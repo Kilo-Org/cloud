@@ -163,6 +163,19 @@ describe('classifyBitbucketConnection', () => {
     ).toEqual({ kind: 'loading' });
   });
 
+  it('holds while the status read has no answer, even after readiness answers off', () => {
+    // Readiness answers first with no token row — the shape an organization
+    // connected through Bitbucket OAuth always gets — while the status read that
+    // names that authorization is still in flight. Claiming "not connected" here
+    // would paint the token form the server refuses.
+    expect(
+      classifyBitbucketConnection({
+        readiness: { ...settled(), data: readiness({ connected: false }) },
+        status: { ...settled(), isLoading: true, isPending: true, data: undefined },
+      })
+    ).toEqual({ kind: 'loading' });
+  });
+
   it('classifies a failed read without data as the error state', () => {
     const retryStatusRefetch = vi.fn<() => void>();
     const connection = classifyBitbucketConnection({

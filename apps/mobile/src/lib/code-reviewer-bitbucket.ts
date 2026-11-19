@@ -280,20 +280,20 @@ export function classifyBitbucketConnection(input: {
     // readiness data below still decides between not-connected and error.
   }
 
-  // Rule 4 — loading: neither read holds a connection answer and one may still
-  // land. `isPending` is a first fetch that has not decided yet; `isLoading`
-  // adds `isFetching`, and neither reads as loading once the read has failed —
-  // the same settled-on-failure shape the provider-state classifier keeps out
-  // of the loading state.
+  // Rule 4 — loading: a read that has no answer yet and may still land. The
+  // readiness read answering first is not an answer about the connection: a
+  // workspace with no token row reads `connected: false` while the status read
+  // that names an OAuth authorization is still in flight, so a pending status
+  // holds the surface rather than letting it claim "not connected". `isPending`
+  // is a first fetch that has not decided; `isLoading` adds `isFetching`, and
+  // neither reads as loading once that read has failed — the same
+  // settled-on-failure shape the provider-state classifier keeps out of the
+  // loading state.
   const readinessDeciding =
     !readiness.isError && (readiness.isLoading || readiness.isPending === true);
   const statusDeciding =
     !status.isError && (status.isLoading === true || status.isPending === true);
-  if (
-    readiness.data === undefined &&
-    status.data === undefined &&
-    (readinessDeciding || statusDeciding)
-  ) {
+  if (readinessDeciding || (status.data === undefined && statusDeciding)) {
     return { kind: 'loading' };
   }
 

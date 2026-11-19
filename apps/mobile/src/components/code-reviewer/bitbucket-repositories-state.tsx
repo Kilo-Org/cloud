@@ -64,7 +64,7 @@ export function BitbucketRepositoriesState({
       {readiness ? (
         <BitbucketSetupRecovery
           scope={scope}
-          readiness={connection.readiness}
+          readiness={readiness}
           message={t('common.couldNotLoadRepositories')}
         />
       ) : (

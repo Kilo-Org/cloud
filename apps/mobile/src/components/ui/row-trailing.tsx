@@ -43,7 +43,7 @@ const SWITCH_BOX_STYLE = {
  * is what keeps its touches inside the row's bounds (Android delivers a touch
  * only inside a parent view).
  */
-function textActionBoxStyle(): { marginVertical: number } {
+function textActionBoxStyle() {
   return { marginVertical: -textActionRowOverhangDp() };
 }
 

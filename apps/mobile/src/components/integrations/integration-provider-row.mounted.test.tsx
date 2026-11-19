@@ -182,7 +182,7 @@ describe('IntegrationProviderRow action cell', () => {
     }
     const margin: unknown = 'marginVertical' in style ? style.marginVertical : undefined;
     if (typeof margin !== 'number') {
-      throw new Error('the Connect cell carries no vertical margin');
+      throw new TypeError('the Connect cell carries no vertical margin');
     }
 
     // The box still carries the platform's target on its own node, and only the

@@ -1,16 +1,22 @@
 import 'server-only';
 
-import { kilo_pass_issuances, kilo_pass_subscriptions } from '@kilocode/db/schema';
+import {
+  kilo_pass_issuance_items,
+  kilo_pass_issuances,
+  kilo_pass_scheduled_changes,
+  kilo_pass_subscriptions,
+} from '@kilocode/db/schema';
 import {
   KiloPassAuditLogResult,
   KiloPassCadence,
+  KiloPassIssuanceItemKind,
   KiloPassIssuanceSource,
   KiloPassAuditLogAction,
   KiloPassPaymentProvider,
   type KiloPassTier,
 } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import type { DrizzleTransaction, db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
-import { and, desc, eq, inArray, isNotNull, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, lte, sql } from 'drizzle-orm';
 import { KILO_PASS_TIER_CONFIG } from '@kilocode/web-shared/lib/kilo-pass/constants';
 import {
   appendKiloPassAuditLog,
@@ -39,6 +45,7 @@ export type RunYearlyMonthlyBaseCronResult = {
   catchupStepCount: number;
   baseIssuedCount: number;
   baseSkippedIdempotentCount: number;
+  baseHeldForUnpaidTierChangeCount: number;
   nextYearlyIssueAtAdvancedCount: number;
 };
 
@@ -49,6 +56,91 @@ type DueSubscription = {
   tier: KiloPassTier;
   nextYearlyIssueAt: string | null;
 };
+
+type UnpaidTierChangeHold = {
+  reason: 'row_tier_not_paid' | 'scheduled_change_not_paid';
+  issueMonth: string;
+  dueAt: string;
+  rowTier: KiloPassTier;
+  rowTierBaseAmountUsd: number;
+  paidBaseAmountUsd: number | null;
+  pendingScheduledChangeId: string | null;
+  pendingScheduledChangeToTier: KiloPassTier | null;
+  pendingScheduledChangeEffectiveAt: string | null;
+};
+
+/**
+ * A yearly tier change resets the prepaid year in Stripe and must be paid before the cron
+ * issues at it. When the paid upgrade invoice arrives it owns this month's issuance header,
+ * so the step holds without creating a header or advancing the cursor.
+ */
+async function findUnpaidTierChangeHold(
+  tx: DrizzleTransaction,
+  params: { subscriptionId: string; tier: KiloPassTier; dueAt: string }
+): Promise<UnpaidTierChangeHold | null> {
+  const { subscriptionId, tier, dueAt } = params;
+
+  const [lastPaidIssuance] = await tx
+    .select({ baseAmountUsd: kilo_pass_issuance_items.amount_usd })
+    .from(kilo_pass_issuances)
+    .leftJoin(
+      kilo_pass_issuance_items,
+      and(
+        eq(kilo_pass_issuance_items.kilo_pass_issuance_id, kilo_pass_issuances.id),
+        eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Base)
+      )
+    )
+    .where(
+      and(
+        eq(kilo_pass_issuances.kilo_pass_subscription_id, subscriptionId),
+        eq(kilo_pass_issuances.source, KiloPassIssuanceSource.StripeInvoice)
+      )
+    )
+    .orderBy(desc(kilo_pass_issuances.issue_month))
+    .limit(1);
+
+  const [pendingScheduledChange] = await tx
+    .select({
+      id: kilo_pass_scheduled_changes.id,
+      toTier: kilo_pass_scheduled_changes.to_tier,
+      effectiveAt: kilo_pass_scheduled_changes.effective_at,
+    })
+    .from(kilo_pass_scheduled_changes)
+    .innerJoin(
+      kilo_pass_subscriptions,
+      eq(
+        kilo_pass_subscriptions.stripe_subscription_id,
+        kilo_pass_scheduled_changes.stripe_subscription_id
+      )
+    )
+    .where(
+      and(
+        eq(kilo_pass_subscriptions.id, subscriptionId),
+        isNull(kilo_pass_scheduled_changes.deleted_at),
+        lte(kilo_pass_scheduled_changes.effective_at, dueAt)
+      )
+    )
+    .limit(1);
+
+  const paidBaseAmountUsd = lastPaidIssuance?.baseAmountUsd ?? null;
+  const rowTierBaseAmountUsd = KILO_PASS_TIER_CONFIG[tier].monthlyPriceUsd;
+  const rowTierIsNotPaid = paidBaseAmountUsd !== null && paidBaseAmountUsd !== rowTierBaseAmountUsd;
+  if (!rowTierIsNotPaid && !pendingScheduledChange) return null;
+
+  return {
+    reason: rowTierIsNotPaid ? 'row_tier_not_paid' : 'scheduled_change_not_paid',
+    issueMonth: computeIssueMonth(dayjs(dueAt).utc()),
+    dueAt: dayjs(dueAt).utc().toISOString(),
+    rowTier: tier,
+    rowTierBaseAmountUsd,
+    paidBaseAmountUsd,
+    pendingScheduledChangeId: pendingScheduledChange?.id ?? null,
+    pendingScheduledChangeToTier: pendingScheduledChange?.toTier ?? null,
+    pendingScheduledChangeEffectiveAt: pendingScheduledChange
+      ? dayjs(pendingScheduledChange.effectiveAt).utc().toISOString()
+      : null,
+  };
+}
 
 async function issueYearlyCadenceMonthlyBaseOnce(
   tx: DrizzleTransaction,
@@ -203,6 +295,7 @@ export async function runKiloPassYearlyMonthlyBaseCron(
   let catchupStepCount = 0;
   let baseIssuedCount = 0;
   let baseSkippedIdempotentCount = 0;
+  let baseHeldForUnpaidTierChangeCount = 0;
   let nextYearlyIssueAtAdvancedCount = 0;
 
   for (const subscription of dueSubscriptions) {
@@ -230,16 +323,24 @@ export async function runKiloPassYearlyMonthlyBaseCron(
     });
 
     let subscriptionSteps: Awaited<ReturnType<typeof issueYearlyCadenceMonthlyBaseOnce>>[] = [];
+    let unpaidTierChangeHold: UnpaidTierChangeHold | null = null;
     let failedDueAt: string | null = null;
 
     try {
-      subscriptionSteps = await db.transaction(async tx => {
+      ({ steps: subscriptionSteps, hold: unpaidTierChangeHold } = await db.transaction(async tx => {
         const steps: Awaited<ReturnType<typeof issueYearlyCadenceMonthlyBaseOnce>>[] = [];
         let stepsForSubscription = 0;
         let dueAt = nextYearlyIssueAt;
 
         while (dueAt <= nowIso && stepsForSubscription < MAX_CATCHUP_STEPS_PER_SUBSCRIPTION) {
           failedDueAt = dueAt;
+
+          const hold = await findUnpaidTierChangeHold(tx, {
+            subscriptionId: subscription.subscriptionId,
+            tier: subscription.tier,
+            dueAt,
+          });
+          if (hold) return { steps, hold };
 
           const step = await issueYearlyCadenceMonthlyBaseOnce(tx, {
             subscriptionId: subscription.subscriptionId,
@@ -253,8 +354,8 @@ export async function runKiloPassYearlyMonthlyBaseCron(
           dueAt = step.nextYearlyIssueAtNewIso;
         }
 
-        return steps;
-      });
+        return { steps, hold: null };
+      }));
     } catch (error) {
       await appendKiloPassAuditLog(db, {
         action: KiloPassAuditLogAction.BaseCreditsIssued,
@@ -271,6 +372,30 @@ export async function runKiloPassYearlyMonthlyBaseCron(
         },
       });
       throw error;
+    }
+
+    if (unpaidTierChangeHold) {
+      baseHeldForUnpaidTierChangeCount += 1;
+      await appendKiloPassAuditLog(db, {
+        action: KiloPassAuditLogAction.BaseCreditsIssued,
+        result: KiloPassAuditLogResult.SkippedIdempotent,
+        kiloUserId: subscription.kiloUserId,
+        kiloPassSubscriptionId: subscription.subscriptionId,
+        stripeSubscriptionId: subscription.stripeSubscriptionId,
+        payload: {
+          kind: 'yearly_monthly_base',
+          reason: unpaidTierChangeHold.reason,
+          runId,
+          issueMonth: unpaidTierChangeHold.issueMonth,
+          nextYearlyIssueAt: unpaidTierChangeHold.dueAt,
+          rowTier: unpaidTierChangeHold.rowTier,
+          rowTierBaseAmountUsd: unpaidTierChangeHold.rowTierBaseAmountUsd,
+          paidBaseAmountUsd: unpaidTierChangeHold.paidBaseAmountUsd,
+          pendingScheduledChangeId: unpaidTierChangeHold.pendingScheduledChangeId,
+          pendingScheduledChangeToTier: unpaidTierChangeHold.pendingScheduledChangeToTier,
+          pendingScheduledChangeEffectiveAt: unpaidTierChangeHold.pendingScheduledChangeEffectiveAt,
+        },
+      });
     }
 
     if (subscriptionSteps.length > 0) {
@@ -319,6 +444,7 @@ export async function runKiloPassYearlyMonthlyBaseCron(
       catchupStepCount,
       baseIssuedCount,
       baseSkippedIdempotentCount,
+      baseHeldForUnpaidTierChangeCount,
       nextYearlyIssueAtAdvancedCount,
     },
   });
@@ -332,6 +458,7 @@ export async function runKiloPassYearlyMonthlyBaseCron(
     catchupStepCount,
     baseIssuedCount,
     baseSkippedIdempotentCount,
+    baseHeldForUnpaidTierChangeCount,
     nextYearlyIssueAtAdvancedCount,
   };
 }

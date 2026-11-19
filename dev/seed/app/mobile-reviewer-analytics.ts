@@ -418,6 +418,12 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     );
   }
 
+  // The review the list and the detail screen open: the first membership's
+  // GitHub review at index 0, whose id this topic derives rather than queries,
+  // because `seedUuid` already fixes it.
+  const firstOrganizationId = memberships[0].organizationId;
+  const completedReviewId = seedUuid(`${firstOrganizationId}:github:0`);
+
   console.log(
     'This fixture represents: completed reviews the Analytics screen captured, with a different count for each period and platform.'
   );
@@ -430,5 +436,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     userId: user.id,
     ...organizationLinks,
     ...counts,
+    completedReviewId,
+    completedReviewDeepLink: `kiloapp:///(app)/code-reviewer/${firstOrganizationId}/reviews/${completedReviewId}`,
+    completedReviewsListDeepLink: `kiloapp:///(app)/code-reviewer/${firstOrganizationId}/reviews`,
   };
 }

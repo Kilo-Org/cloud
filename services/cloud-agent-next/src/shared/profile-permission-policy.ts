@@ -263,8 +263,8 @@ function agentEntriesBroadestFirst(
  * because it names a command the profile never asked about, so it keeps the last
  * word and an ask never lifts a refusal the session wrote.
  *
- * Every pattern appears once, at the position of its last decision, so the
- * rendered map follows the order the decisions were made in.
+ * Every pattern appears once, at the position of its last decision, so a
+ * decision that follows another replaces it rather than repeating it.
  */
 function composeRuleMap(
   session: PermissionRuleMap | undefined,

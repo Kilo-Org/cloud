@@ -252,6 +252,24 @@ describe('RowFrame trailing cell', () => {
     expect(classesOf(action).some(name => name.startsWith('min-h-'))).toBe(true);
   });
 
+  it('lets an action that is working declare its own state', () => {
+    const action = renderFrame({
+      title: 'Integrations',
+      trailing: {
+        kind: 'action',
+        label: 'Connect',
+        onPress: () => undefined,
+        disabled: true,
+        accessibilityState: { disabled: true, busy: true },
+      },
+    }).find(
+      node => Object.is(node.type, 'Pressable') && node.props.accessibilityLabel === 'Connect'
+    );
+
+    expect(action.props.accessibilityState).toEqual({ disabled: true, busy: true });
+    expect(action.props.accessibilityLabel).toBe('Connect');
+  });
+
   it('renders a wrapper-built node as-is', () => {
     const root = renderFrame({
       title: 'Billable',

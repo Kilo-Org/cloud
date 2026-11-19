@@ -9,13 +9,11 @@ import {
 } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { renderRowTrailing, type RowTrailingSpec } from '@/components/ui/row-trailing';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type IntegrationRow } from '@/lib/integrations/integration-rows';
 import {
   canManageProvider,
@@ -72,7 +70,6 @@ export function IntegrationProviderRow({
   retryingConnection,
 }: IntegrationProviderRowProps) {
   const { t } = useTranslation();
-  const colors = useThemeColors();
   const label = t(providerLabelKey(row.provider));
   const canConnect = canManageProvider({
     provider: row.provider,
@@ -162,19 +159,18 @@ export function IntegrationProviderRow({
       : undefined;
   } else if (canConnect) {
     // The browser hand-off is the one thing this row offers, and the cell is
-    // its control: it carries the action's name, the busy mark while the
-    // browser is on its way, and its own 48pt target.
-    action = connecting
-      ? {
-          kind: 'node',
-          node: <ActivityIndicator size="small" color={colors.mutedForeground} />,
-        }
-      : {
-          kind: 'action',
-          label: t('common.connect'),
-          onPress: onConnect,
-          accessibilityLabel: namedAction(t('common.connect')),
-        };
+    // its control: it keeps the action's name and its label while the browser
+    // is on its way, refuses a second press, and announces the wait. Replacing
+    // the control with a bare spinner dropped the name the tap had, so a
+    // reader was told nothing while the row sat unanswerable.
+    action = {
+      kind: 'action',
+      label: t('common.connect'),
+      onPress: onConnect,
+      disabled: connecting,
+      accessibilityLabel: namedAction(t('common.connect')),
+      accessibilityState: { disabled: connecting, busy: connecting },
+    };
   }
 
   return (

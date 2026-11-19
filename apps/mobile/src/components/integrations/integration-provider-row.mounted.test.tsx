@@ -160,13 +160,16 @@ describe('IntegrationProviderRow action cell', () => {
     expect(root.findAllByType('TextMock').map(node => node.props.children)).toContain('Connect');
   });
 
-  it('draws the launch in flight as a busy mark with no second control', () => {
+  it('keeps the Connect control named and busy while the launch is in flight', () => {
+    // A bare spinner in the cell dropped the control's name, so the row went
+    // silent while it refused taps. The cell keeps the action and announces
+    // the wait; its label stays on screen.
     const root = renderRow({ row: integrationRow(), scope: 'personal', connecting: true });
 
-    expect(controls(root)).toHaveLength(0);
-    expect(root.findAllByType('TextMock').map(node => node.props.children)).not.toContain(
-      'Connect'
-    );
+    const [connect] = controls(root);
+    expect(connect?.props.accessibilityLabel).toBe('Connect. GitHub');
+    expect(connect?.props.accessibilityState).toEqual({ disabled: true, busy: true });
+    expect(root.findAllByType('TextMock').map(node => node.props.children)).toContain('Connect');
   });
 
   it('leaves an installed row inert so a stray press cannot disconnect', () => {

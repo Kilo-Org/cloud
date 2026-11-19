@@ -60,12 +60,16 @@ export function tidyReviewLinkCandidate(href: string): string {
   const parenInner = PAREN_WRAPPER.exec(href)?.[1];
   if (parenInner !== undefined) {
     const tidied = tidyReviewLinkCandidate(parenInner);
-    if (SCHEME_PREFIX.test(tidied)) return tidied;
+    if (SCHEME_PREFIX.test(tidied)) {
+      return tidied;
+    }
   }
   const angleInner = ANGLE_WRAPPER.exec(href)?.[1];
   if (angleInner !== undefined) {
     const tidied = tidyReviewLinkCandidate(angleInner);
-    if (SCHEME_PREFIX.test(tidied)) return tidied;
+    if (SCHEME_PREFIX.test(tidied)) {
+      return tidied;
+    }
   }
   let candidate = href.trim().replace(EDGE_QUOTES, '');
   for (;;) {

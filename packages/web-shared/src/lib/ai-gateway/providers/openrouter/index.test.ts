@@ -5,6 +5,7 @@ import {
   getEnhancedOpenRouterModels,
   getOpenRouterTranscriptionModels,
   getRawOpenRouterModels,
+  OPENROUTER_CATALOGUE_MINIMUM_COUNTS,
   resetOpenRouterModelsCaches,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import type {
@@ -1071,12 +1072,14 @@ describe('live catalogue validation', () => {
       Promise.resolve(createMockResponse({ jsonData: { data: [buildModel()] } }))
     ) as unknown as typeof fetch;
 
-    await expect(getRawOpenRouterModels()).rejects.toThrow('fewer than 100');
+    await expect(getRawOpenRouterModels()).rejects.toThrow(
+      `fewer than ${OPENROUTER_CATALOGUE_MINIMUM_COUNTS.models}`
+    );
   });
 
   it('serves a live models payload of exactly the floor size unchanged', async () => {
     const payload = cataloguePayload([buildModel({ id: 'vendor/only-entry' })]);
-    expect(payload.data).toHaveLength(100);
+    expect(payload.data).toHaveLength(OPENROUTER_CATALOGUE_MINIMUM_COUNTS.models);
     global.fetch = jest.fn(() =>
       Promise.resolve(createMockResponse({ jsonData: payload }))
     ) as unknown as typeof fetch;

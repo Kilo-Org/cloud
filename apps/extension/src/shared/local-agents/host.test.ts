@@ -592,6 +592,25 @@ describe('local agents host over a loopback endpoint', () => {
     expect(harness.storage.items.get(LOCAL_AGENT_CONTROLLERS_STORAGE_KEY)).toBeUndefined();
     host.stop();
   });
+
+  it('dials an endpoint stored by an earlier version and stamps it once it connects', async () => {
+    const harness = createHarness();
+    // The shape every endpoint had before the reachability stamp: no `lastConnectedAt`.
+    seedEnabledWithEndpoint(harness.storage);
+    const host = startHost(harness);
+    await host.ready;
+    const socket = await connectSocketIfNeeded(harness);
+
+    expect(socket.url).toBe(WS);
+    await completeHandshake(socket);
+
+    await vi.waitFor(() => {
+      expect(harness.storage.items.get(LOCAL_AGENT_ENDPOINTS_STORAGE_KEY)).toStrictEqual({
+        endpoints: [{ hubId: HUB_ID, key: KEY, lastConnectedAt: 1000, ws: WS }],
+      });
+    });
+    host.stop();
+  });
 });
 
 describe('pairing admission', () => {

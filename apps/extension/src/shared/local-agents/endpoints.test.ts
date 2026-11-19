@@ -55,6 +55,23 @@ describe('endpoint storage', () => {
     ]);
   });
 
+  it('reads an endpoint stored before the stamp existed and starts its clock', async () => {
+    const storage = createStorage();
+    storage.items.set(LOCAL_AGENT_ENDPOINTS_STORAGE_KEY, {
+      endpoints: [{ hubId: HUB_A, key: KEY, ws: WS_A }],
+    });
+
+    await expect(loadLocalAgentEndpoints(storage)).resolves.toStrictEqual([
+      { hubId: HUB_A, key: KEY, ws: WS_A },
+    ]);
+    await expect(
+      pruneLocalAgentEndpoints(storage, { isConnected: () => false, now: 5000 })
+    ).resolves.toStrictEqual([{ hubId: HUB_A, key: KEY, lastConnectedAt: 5000, ws: WS_A }]);
+    expect(storage.items.get(LOCAL_AGENT_ENDPOINTS_STORAGE_KEY)).toStrictEqual({
+      endpoints: [{ hubId: HUB_A, key: KEY, lastConnectedAt: 5000, ws: WS_A }],
+    });
+  });
+
   it('replaces the key and URL when the same hub pairs again', async () => {
     const storage = createStorage();
     const newKey = 'ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8';

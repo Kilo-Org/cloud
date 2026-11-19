@@ -924,7 +924,7 @@
       "reconnectTitleGitLab": "Újracsatlakozás a GitLabhoz",
       "reconnectTitleBitbucket": "Újracsatlakozás a Bitbuckethoz",
       "reconnectDescription": "Visszavonták a GitHub-kapcsolatod engedélyét.",
-      "gitlabDescription": "Módosítási kérelemek ellenőrzése mobilon",
+      "gitlabDescription": "Módosítási kérelmek ellenőrzése mobilon",
       "gitlabInstanceMismatchTitle": "A GitLab-kapcsolat egy másik példányhoz tartozik",
       "gitlabInstanceMismatchDescription": "A GitLab-kapcsolatod a(z) {{connected}} példányhoz tartozik, de ez a módosítási kérelem a(z) {{requested}} példányon van. Az ellenőrzéshez csatlakoztass GitLabot ahhoz a példányhoz.",
       "checkActiveConnection": "A kapcsolat aktív, de ez az elem továbbra sem tölthető be.",
@@ -1338,7 +1338,7 @@
       }
     },
     "manualReview": {
-      "invalidMergeRequestUrl": "Adj meg egy érvényes URL-t a módosítási kéréshez.",
+      "invalidMergeRequestUrl": "Adj meg egy érvényes URL-t a módosítási kérelemhez.",
       "mergeRequestUrl": "Módosítási kérelem URL-címe",
       "instructionsAtLimit": "Az utasítások legfeljebb {{max}} karakter lehetnek",
       "title": "Kézi kódellenőrzés",

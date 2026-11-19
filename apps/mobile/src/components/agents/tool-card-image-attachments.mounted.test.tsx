@@ -11,7 +11,10 @@ type FileInstance = {
   exists: boolean;
   uri: string;
   write: (content: string) => Promise<void>;
+  move: (destination: unknown, options?: { overwrite?: boolean }) => Promise<void>;
+  delete?: () => void;
   filename: string;
+  directory?: { name?: string };
 };
 
 const fileInstances: FileInstance[] = [];
@@ -24,11 +27,16 @@ const expoFileSystemMock = vi.hoisted(() => {
       create: directoryCreate,
     };
   });
-  const File = vi.fn(function FileMock(directory: { name?: string }, filename: string) {
-    const instance = {
+  const File = vi.fn(function FileMock(
+    directory: { name?: string },
+    filename: string
+  ): FileInstance {
+    const instance: FileInstance = {
       exists: false,
       uri: `file:///cache/tool-card-images/${filename}`,
       write: vi.fn(() => Promise.resolve()),
+      move: vi.fn(() => Promise.resolve()),
+      delete: vi.fn(() => undefined),
       filename,
       directory,
     };
@@ -40,6 +48,26 @@ const expoFileSystemMock = vi.hoisted(() => {
     File,
     Paths: { cache: 'file:///cache' },
     directoryCreate,
+    /** Queue the final-name + `<final>.tmp-<n>` pair a write attempt builds;
+     *  the awaited write runs on the temp instance. */
+    mockPendingWrite(write: () => Promise<void>): void {
+      const factory = File.getMockImplementation();
+      File.mockImplementationOnce(function FilePending(
+        directory: { name?: string },
+        filename: string
+      ) {
+        const existing = factory?.(directory, filename) as FileInstance;
+        File.mockImplementationOnce(function FileTemp(dir: { name?: string }, name: string) {
+          const instance: FileInstance = {
+            ...(factory?.(dir, name) as FileInstance),
+            write: vi.fn(() => write()),
+          };
+          fileInstances.push(instance);
+          return instance;
+        });
+        return existing;
+      });
+    },
   };
 });
 
@@ -189,20 +217,7 @@ describe('ToolCardImageAttachments mounted', () => {
 
   it('shows a busy placeholder instead of the unavailable row while the cache write is pending', async () => {
     const write = Promise.withResolvers<undefined>();
-    expoFileSystemMock.File.mockImplementationOnce(function FilePending(
-      directory: { name?: string },
-      filename: string
-    ) {
-      const instance = {
-        exists: false,
-        uri: `file:///cache/tool-card-images/${filename}`,
-        write: vi.fn(() => write.promise),
-        filename,
-        directory,
-      };
-      fileInstances.push(instance);
-      return instance;
-    });
+    expoFileSystemMock.mockPendingWrite(() => write.promise);
     await act(async () => {
       await Promise.resolve();
       seedImageCache();

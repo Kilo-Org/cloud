@@ -21,6 +21,8 @@ type FileInstance = {
   uri: string;
   written?: { content: string; encoding?: string };
   write: (content: string, options?: { encoding?: string }) => Promise<void>;
+  move: (destination: unknown, options?: { overwrite?: boolean }) => Promise<void>;
+  delete?: () => void;
   directory?: { name?: string };
   filename: string;
 };
@@ -38,14 +40,19 @@ const expoFileSystemMock = vi.hoisted(() => {
       delete: directoryDelete,
     };
   });
-  const File = vi.fn(function FileMock(directory: { name?: string }, filename: string) {
+  const File = vi.fn(function FileMock(
+    directory: { name?: string },
+    filename: string
+  ): FileInstance {
     const instance: FileInstance = {
       exists: false,
       uri: `file:///cache/tool-card-images/${filename}`,
-      write(content, options) {
-        this.written = { content, encoding: options?.encoding };
+      write: (content: string, options?: { encoding?: string }) => {
+        instance.written = { content, encoding: options?.encoding };
         return Promise.resolve();
       },
+      move: vi.fn(() => Promise.resolve()),
+      delete: vi.fn(() => undefined),
       filename,
       directory,
     };
@@ -83,6 +90,50 @@ async function drainCacheWrites(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
   await Promise.resolve();
+}
+
+/** The instance created for a final cache name — the exists-check target. */
+function finalInstanceFor(finalName: string): FileInstance | undefined {
+  return fileInstances.find(instance => instance.filename === finalName);
+}
+
+/** The latest `<final>.tmp-<n>` sibling created for a part's write attempts. */
+function tempInstanceFor(finalName: string): FileInstance | undefined {
+  const temps = fileInstances.filter(instance => instance.filename.startsWith(`${finalName}.tmp-`));
+  return temps.at(-1);
+}
+
+/** Instances created for final cache names (every write also builds one temp sibling). */
+function finalInstances(): FileInstance[] {
+  return fileInstances.filter(instance => !instance.filename.includes('.tmp-'));
+}
+
+/**
+ * Queues the two one-shot File mocks a write attempt builds: the final-name
+ * instance (default mock) and the `<final>.tmp-<n>` sibling whose `write` is
+ * the pending/failing one. The default factory is re-entered so every other
+ * member keeps its default behavior.
+ */
+function mockTempWrite(write: () => Promise<void>): void {
+  const defaultFactory = expoFileSystemMock.File.getMockImplementation();
+  expoFileSystemMock.File.mockImplementationOnce(function FileFinal(
+    directory: { name?: string },
+    filename: string
+  ) {
+    const existing = defaultFactory?.(directory, filename) as FileInstance;
+    expoFileSystemMock.File.mockImplementationOnce(function FileTemp(
+      dir: { name?: string },
+      name: string
+    ) {
+      const instance: FileInstance = {
+        ...(defaultFactory?.(dir, name) as FileInstance),
+        write: vi.fn(write),
+      };
+      fileInstances.push(instance);
+      return instance;
+    });
+    return existing;
+  });
 }
 
 describe('extensionForImageMime', () => {
@@ -136,8 +187,8 @@ describe('cacheToolCardImage', () => {
       intermediates: true,
     });
     expect(expoFileSystemMock.File).toHaveBeenCalled();
-    const file = fileInstances[0];
-    expect(file?.filename).toBe('part-1.png');
+    const file = tempInstanceFor('part-1.png');
+    expect(file?.filename).toMatch(/^part-1\.png\.tmp-\d+$/);
     await vi.waitFor(() => {
       expect(getToolCardImageUri('part-1')).toBe('file:///cache/tool-card-images/part-1.png');
     });
@@ -156,8 +207,11 @@ describe('cacheToolCardImage', () => {
     await vi.waitFor(() => {
       expect(getToolCardImageUri('part-1')).toBe('file:///cache/tool-card-images/part-1.png');
     });
-    expect(fileInstances).toHaveLength(1);
-    expect(fileInstances[0]?.written).toEqual({ content: 'AAA', encoding: 'base64' });
+    expect(finalInstances()).toHaveLength(1);
+    expect(tempInstanceFor('part-1.png')?.written).toEqual({
+      content: 'AAA',
+      encoding: 'base64',
+    });
   });
 
   it('skips the write when the file already exists and still records the URI', () => {
@@ -172,6 +226,8 @@ describe('cacheToolCardImage', () => {
         exists: true,
         uri: `file:///cache/tool-card-images/${filename}`,
         write,
+        move: vi.fn(() => Promise.resolve()),
+        delete: vi.fn(),
         filename,
         directory,
       };
@@ -190,21 +246,8 @@ describe('cacheToolCardImage', () => {
     expect(fileInstances).toHaveLength(1);
   });
 
-  it('clears the dedupe mark and records no URI when the write fails', async () => {
-    expoFileSystemMock.File.mockImplementationOnce(function FileFail(
-      directory: { name?: string },
-      filename: string
-    ) {
-      const instance = {
-        exists: false,
-        uri: `file:///cache/tool-card-images/${filename}`,
-        write: vi.fn(() => Promise.reject(new Error('disk full'))),
-        filename,
-        directory,
-      };
-      fileInstances.push(instance);
-      return instance;
-    });
+  it('latches the part after a failed write until the cache is cleared', async () => {
+    mockTempWrite(() => Promise.reject(new Error('disk full')));
 
     expect(() => {
       cacheToolCardImage('part-fail', 'image/png', 'data:image/png;base64,AAA');
@@ -213,13 +256,23 @@ describe('cacheToolCardImage', () => {
     await drainCacheWrites();
     expect(getToolCardImageUri('part-fail')).toBeUndefined();
 
-    // Failure cleared the mark — a retry is allowed and should attempt again.
+    // The failure latches the part: the next pass performs no file-system work
+    // at all — no File construction, no retry — until a clear resets the latch.
+    cacheToolCardImage('part-fail', 'image/png', 'data:image/png;base64,AAA');
+    await drainCacheWrites();
+    expect(finalInstances()).toHaveLength(1);
+    expect(getToolCardImageUri('part-fail')).toBeUndefined();
+
+    clearToolCardImageCache();
     cacheToolCardImage('part-fail', 'image/png', 'data:image/png;base64,AAA');
     await vi.waitFor(() => {
       expect(getToolCardImageUri('part-fail')).toBe('file:///cache/tool-card-images/part-fail.png');
     });
-    expect(fileInstances).toHaveLength(2);
-    expect(fileInstances[1]?.written).toEqual({ content: 'AAA', encoding: 'base64' });
+    expect(finalInstances()).toHaveLength(2);
+    expect(tempInstanceFor('part-fail.png')?.written).toEqual({
+      content: 'AAA',
+      encoding: 'base64',
+    });
   });
 
   it('never throws on invalid input', () => {
@@ -244,10 +297,10 @@ describe('cacheToolAttachment', () => {
       idempotent: true,
       intermediates: true,
     });
-    const file = fileInstances[0];
+    const file = tempInstanceFor('part-send-report.pdf');
     // getSafeCacheFilename({ id: 'part-send', filename: 'report.pdf' })
     //  → 'part-send-report.pdf' (after sanitization)
-    expect(file?.filename).toBe('part-send-report.pdf');
+    expect(file?.filename).toMatch(/^part-send-report\.pdf\.tmp-\d+$/);
     await vi.waitFor(() => {
       expect(getToolCardImageUri('part-send')).toBe(
         'file:///cache/tool-card-images/part-send-report.pdf'
@@ -259,8 +312,9 @@ describe('cacheToolAttachment', () => {
   it('uses extension-based naming when no filename is provided (image fallback)', async () => {
     cacheToolAttachment('part-img', { mime: 'image/png', dataUrl: 'data:image/png;base64,AAA' });
 
-    const file = fileInstances[0];
-    expect(file?.filename).toBe('part-img.png');
+    const file = tempInstanceFor('part-img.png');
+    expect(file?.filename).toMatch(/^part-img\.png\.tmp-\d+$/);
+
     await vi.waitFor(() => {
       expect(file?.written).toEqual({ content: 'AAA', encoding: 'base64' });
     });
@@ -272,12 +326,12 @@ describe('cacheToolAttachment', () => {
       dataUrl: 'data:image/png;base64,AAA',
     });
 
-    const file = fileInstances[0];
+    const file = tempInstanceFor('part-_DOT_42.png');
     // partId "part-_DOT_42" + filename "_DOT_png" →
     //   mock getSafeCacheFilename → "part-_DOT_42-_DOT_png"
     //   _DOT_ in partId must survive; only final -_DOT_ before ext is replaced →
     //   "part-_DOT_42.png"
-    expect(file?.filename).toBe('part-_DOT_42.png');
+    expect(file?.filename).toMatch(/^part-_DOT_42\.png\.tmp-\d+$/);
     await vi.waitFor(() => {
       expect(file?.written).toEqual({ content: 'AAA', encoding: 'base64' });
     });
@@ -300,8 +354,11 @@ describe('cacheToolAttachment', () => {
         'file:///cache/tool-card-images/part-dup-img.png'
       );
     });
-    expect(fileInstances).toHaveLength(1);
-    expect(fileInstances[0]?.written).toEqual({ content: 'AAA', encoding: 'base64' });
+    expect(finalInstances()).toHaveLength(1);
+    expect(tempInstanceFor('part-dup-img.png')?.written).toEqual({
+      content: 'AAA',
+      encoding: 'base64',
+    });
   });
 
   it('sanitizes special characters in the MIME subtype when no filename is provided', async () => {
@@ -312,10 +369,10 @@ describe('cacheToolAttachment', () => {
       dataUrl: 'data:application/vnd.<script>alert;base64,AAA',
     });
 
-    const file = fileInstances[0];
+    const file = tempInstanceFor('part-xss.vnd._script_alert');
     // getSafeCacheFilename({ id: 'part-xss', filename: 'vnd.<script>alert' })
     // mock sanitizes → 'vnd._script_alert'
-    expect(file?.filename).toBe('part-xss.vnd._script_alert');
+    expect(file?.filename).toMatch(/^part-xss\.vnd\._script_alert\.tmp-\d+$/);
     await vi.waitFor(() => {
       expect(file?.written).toEqual({ content: 'AAA', encoding: 'base64' });
     });
@@ -328,11 +385,12 @@ describe('cacheToolAttachment', () => {
       dataUrl: `data:application/${longSubtype};base64,AAA`,
     });
 
-    const file = fileInstances[0];
+    const file = fileInstances[1];
     // The mock does not truncate, but the real getSafeCacheFilename bounds
     // to 255 bytes.  This test verifies the code path routes through the safe
-    // function instead of raw concatenation.
-    expect(file?.filename).toMatch(/^part-long\./);
+    // function instead of raw concatenation (the temp sibling carries that
+    // name plus the `.tmp-<n>` suffix).
+    expect(file?.filename).toMatch(/^part-long\..*\.tmp-\d+$/);
     await vi.waitFor(() => {
       expect(file?.written).toEqual({ content: 'AAA', encoding: 'base64' });
     });
@@ -346,8 +404,8 @@ describe('cacheToolAttachment', () => {
       filename: 'name.png',
     });
 
-    expect(fileInstances).toHaveLength(1);
-    expect(fileInstances[0]?.filename).toBe('part-shared.png');
+    expect(finalInstances()).toHaveLength(1);
+    expect(finalInstances()[0]?.filename).toBe('part-shared.png');
     await vi.waitFor(() => {
       expect(getToolCardImageUri('part-shared')).toBe(
         'file:///cache/tool-card-images/part-shared.png'
@@ -372,7 +430,7 @@ describe('clearToolCardImageCache', () => {
     await vi.waitFor(() => {
       expect(getToolCardImageUri('part-1')).toBe('file:///cache/tool-card-images/part-1.png');
     });
-    expect(fileInstances).toHaveLength(2);
+    expect(finalInstances()).toHaveLength(2);
   });
 
   it('skips delete when the directory does not exist', () => {
@@ -398,20 +456,7 @@ describe('clearToolCardImageCache', () => {
 describe('cacheToolAttachment write lifetime', () => {
   it('reports pending before the write resolves and records the URI only afterwards', async () => {
     const write = Promise.withResolvers<undefined>();
-    expoFileSystemMock.File.mockImplementationOnce(function FilePending(
-      directory: { name?: string },
-      filename: string
-    ) {
-      const instance = {
-        exists: false,
-        uri: `file:///cache/tool-card-images/${filename}`,
-        write: vi.fn(() => write.promise),
-        filename,
-        directory,
-      };
-      fileInstances.push(instance);
-      return instance;
-    });
+    mockTempWrite(() => write.promise);
 
     cacheToolAttachment('part-slow', { mime: 'image/png', dataUrl: 'data:image/png;base64,AAA' });
 
@@ -428,20 +473,7 @@ describe('cacheToolAttachment write lifetime', () => {
 
   it('does not publish a write that resolves after a sign-out reset', async () => {
     const write = Promise.withResolvers<undefined>();
-    expoFileSystemMock.File.mockImplementationOnce(function FilePending(
-      directory: { name?: string },
-      filename: string
-    ) {
-      const instance = {
-        exists: false,
-        uri: `file:///cache/tool-card-images/${filename}`,
-        write: vi.fn(() => write.promise),
-        filename,
-        directory,
-      };
-      fileInstances.push(instance);
-      return instance;
-    });
+    mockTempWrite(() => write.promise);
 
     cacheToolAttachment('part-late', { mime: 'image/png', dataUrl: 'data:image/png;base64,AAA' });
     clearToolCardImageCache();
@@ -451,7 +483,7 @@ describe('cacheToolAttachment write lifetime', () => {
     expect(getToolCardImageUri('part-late')).toBeUndefined();
   });
 
-  it('retries the directory creation after a failed create', async () => {
+  it('does not retry a failed create: the latch holds until the cache is cleared', async () => {
     expoFileSystemMock.directoryCreate.mockImplementationOnce(() => {
       throw new Error('disk unavailable');
     });
@@ -461,13 +493,104 @@ describe('cacheToolAttachment write lifetime', () => {
     expect(getToolCardImageUri('part-retry')).toBeUndefined();
     expect(isToolCardImagePending('part-retry')).toBe(false);
 
+    // The immediate retry is a no-op now: the latched part performs no
+    // file-system work, so the directory create runs exactly once until the
+    // next clear.
+    cacheToolAttachment('part-retry', { mime: 'image/png', dataUrl: 'data:image/png;base64,AAA' });
+    await drainCacheWrites();
+    expect(expoFileSystemMock.directoryCreate).toHaveBeenCalledTimes(1);
+    expect(getToolCardImageUri('part-retry')).toBeUndefined();
+
+    clearToolCardImageCache();
     cacheToolAttachment('part-retry', { mime: 'image/png', dataUrl: 'data:image/png;base64,AAA' });
     await vi.waitFor(() => {
       expect(getToolCardImageUri('part-retry')).toBe(
         'file:///cache/tool-card-images/part-retry.png'
       );
     });
+    // One create from the first attempt and one from the post-clear attempt.
     expect(expoFileSystemMock.directoryCreate).toHaveBeenCalledTimes(2);
+  });
+
+  it('interrupted write leaves no final file, publishes no URI, and latches the part', async () => {
+    // The write "rejects midway": the failing instance is the temp sibling, the
+    // second construction after the final-name exists check.
+    mockTempWrite(() => Promise.reject(new Error('interrupted')));
+
+    cacheToolAttachment('part-partial', {
+      mime: 'image/png',
+      dataUrl: 'data:image/png;base64,AAA',
+    });
+    await drainCacheWrites();
+
+    // The temp sibling was deleted best-effort and nothing exists under the
+    // final name: only the temp instance and its delete exist.
+    expect(tempInstanceFor('part-partial.png')?.delete).toHaveBeenCalledTimes(1);
+    expect(finalInstanceFor('part-partial.png')).toBeDefined();
+    expect(finalInstanceFor('part-partial.png')?.move).not.toHaveBeenCalled();
+    expect(finalInstanceFor('part-partial.png')?.written).toBeUndefined();
+    expect(getToolCardImageUri('part-partial')).toBeUndefined();
+
+    // The latch means a later pass performs no file-system work at all.
+    cacheToolAttachment('part-partial', {
+      mime: 'image/png',
+      dataUrl: 'data:image/png;base64,AAA',
+    });
+    await drainCacheWrites();
+    expect(finalInstances()).toHaveLength(1);
+    expect(tempInstanceFor('part-partial.png')?.delete).toHaveBeenCalledTimes(1);
+    expect(getToolCardImageUri('part-partial')).toBeUndefined();
+  });
+
+  it('a write resolving after a clear publishes nothing in the new generation', async () => {
+    const write = Promise.withResolvers<undefined>();
+    mockTempWrite(() => write.promise);
+
+    cacheToolAttachment('part-stale', { mime: 'image/png', dataUrl: 'data:image/png;base64,AAA' });
+    await drainCacheWrites();
+    expect(isToolCardImagePending('part-stale')).toBe(true);
+
+    clearToolCardImageCache();
+    write.resolve(undefined);
+    await drainCacheWrites();
+
+    // The rekeyed attempt owns nothing anymore: no pending or dedupe mark, no
+    // latch, no URI, and no wake of its subscribers.
+    expect(getToolCardImageUri('part-stale')).toBeUndefined();
+    expect(isToolCardImagePending('part-stale')).toBe(false);
+    expect(finalInstances()).toHaveLength(1);
+    expect(tempInstanceFor('part-stale.png')?.move).not.toHaveBeenCalled();
+    expect(tempInstanceFor('part-stale.png')?.delete).not.toHaveBeenCalled();
+
+    // In the new generation, the same part id proceeds normally: its own File
+    // is constructed, the write runs, and the URI publishes.
+    cacheToolAttachment('part-stale', { mime: 'image/png', dataUrl: 'data:image/png;base64,AAA' });
+    await vi.waitFor(() => {
+      expect(getToolCardImageUri('part-stale')).toBe(
+        'file:///cache/tool-card-images/part-stale.png'
+      );
+    });
+    expect(isToolCardImagePending('part-stale')).toBe(false);
+    expect(finalInstances()).toHaveLength(2);
+    expect(tempInstanceFor('part-stale.png')?.written).toEqual({
+      content: 'AAA',
+      encoding: 'base64',
+    });
+  });
+
+  it('cleans up the temp file when the write fails', async () => {
+    mockTempWrite(() => Promise.reject(new Error('disk full')));
+
+    cacheToolAttachment('part-cleanup', {
+      mime: 'image/png',
+      dataUrl: 'data:image/png;base64,AAA',
+    });
+    await drainCacheWrites();
+
+    const temp = tempInstanceFor('part-cleanup.png');
+    expect(temp).toBeDefined();
+    expect(temp?.delete).toHaveBeenCalledTimes(1);
+    expect(temp?.filename).toMatch(/^part-cleanup\.png\.tmp-\d+$/);
   });
 });
 

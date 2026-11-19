@@ -2,6 +2,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { useCallback, useSyncExternalStore } from 'react';
 
 import { getSafeCacheFilename } from '@/lib/share-remote-file';
+import { truncateUtf8, utf8ByteLength } from '@/lib/utf8-utils';
 
 import { createPartSubscriptions } from './part-subscriptions';
 
@@ -9,6 +10,9 @@ const CACHE_DIR_NAME = 'tool-card-images';
 
 /** part ids currently writing or already written this process lifetime */
 const inFlightOrDone = new Set<string>();
+/** part ids whose write attempt failed on this device and may not be
+ *  re-attempted until the next cache reset clears the latch. */
+const failedPartIds = new Set<string>();
 /** part ids whose write is in flight; the card shows a loading surface instead
  *  of reporting the attachment unavailable. */
 const pendingPartIds = new Set<string>();
@@ -20,8 +24,9 @@ const urisByPartId = new Map<string, string>();
  *  and is never woken by another part. */
 const versionByPartId = new Map<string, number>();
 const subscriptions = createPartSubscriptions();
-/** Bumped by every reset; a write that started before a reset never publishes
- *  its URI into the next account's map. */
+/** Bumped by every reset; a write that started before a reset mutates nothing
+ *  into the next generation — no URI, no pending or dedupe marks, no failure
+ *  latch. */
 let cacheGeneration = 0;
 
 let cacheDirectory: Directory | undefined = undefined;
@@ -102,6 +107,29 @@ function cacheFilenameForAttachment(partId: string, mime: string, filename?: str
   return safe.replace(new RegExp(`-${pattern}(?!.*-${pattern})`), '.');
 }
 
+/** Per-attempt suffix for the temp sibling the body is written into before the
+ *  move; the counter keeps concurrent attempts of one part from colliding. */
+let tempWriteCounter = 0;
+
+/**
+ * Build a unique `<final>.tmp-<n>` sibling name. The 5-byte suffix and the
+ * counter that arrives during this process lifetime fit inside the 255-byte
+ * filename budget the sanitized names are already subject to: when the final
+ * name is near the cap, the counter tail is dropped from it again rather than
+ * extending past it.
+ */
+function tempFilenameFor(finalName: string): string {
+  tempWriteCounter += 1;
+  const suffix = `.tmp-${tempWriteCounter}`;
+  const budget = 247;
+  const finalBytes = utf8ByteLength(finalName);
+  if (finalBytes + suffix.length <= budget) {
+    return finalName + suffix;
+  }
+  const finalStem = truncateUtf8(finalName, budget - suffix.length);
+  return finalStem + suffix;
+}
+
 /**
  * Fire-and-forget sink for completed tool-part attachments.
  * Never throws. First attachment wins for a multi-attachment part (no tool
@@ -114,7 +142,15 @@ function cacheFilenameForAttachment(partId: string, mime: string, filename?: str
  * native calls on the caller's turn; the base64 decode and the disk write are
  * not — `await file.write(...)` hands those to the native file-system thread, so
  * an arbitrarily large attachment no longer holds the JS thread that publishes
- * the stream. The URI is recorded when the write resolves.
+ * the stream.
+ *
+ * The body is written to a `<final>.tmp-<n>` sibling and moved onto the final
+ * name only after the write resolves, so a partial or interrupted write never
+ * leaves a file under the final name and the synchronous exists-reuse check can
+ * only observe a fully written payload. A failed attempt latches the part id:
+ * no further writes run for it until `clearToolCardImageCache` (sign-out) or a
+ * test reset, so a corrupt environment does not turn a long transcript into a
+ * retry storm. The URI is recorded when the move resolves.
  *
  * When `filename` is provided (non-image attachments), the cache filename is
  * derived via `getSafeCacheFilename`. When absent (images), the legacy
@@ -125,6 +161,9 @@ export function cacheToolAttachment(
   partId: string,
   { mime, dataUrl, filename }: Readonly<{ mime: string; dataUrl: string; filename?: string }>
 ): void {
+  if (failedPartIds.has(partId)) {
+    return;
+  }
   if (inFlightOrDone.has(partId)) {
     return;
   }
@@ -142,24 +181,62 @@ export function cacheToolAttachment(
   pendingPartIds.add(partId);
   emitChange(partId);
   void (async () => {
+    let tempFile: File | undefined = undefined;
+    const finalName = cacheFilenameForAttachment(partId, mime, filename);
     try {
       const directory = ensureCacheDirectory();
-      const file = new File(directory, cacheFilenameForAttachment(partId, mime, filename));
+      // Fully reuse a file that survived earlier runs: only a fully written and
+      // moved file can exist under the final name.
+      const file = new File(directory, finalName);
       if (!file.exists) {
-        await file.write(payload, { encoding: 'base64' });
+        tempFile = new File(directory, tempFilenameFor(finalName));
+        await tempFile.write(payload, { encoding: 'base64' });
+        if (generation !== cacheGeneration) {
+          // The cache was reset while the write ran; this attempt owns nothing
+          // anymore, so it publishes no state — not even the on-disk move —
+          // into the new generation. The marks it left behind were dropped by
+          // the reset itself.
+          return;
+        }
+        await tempFile.move(file, { overwrite: true });
+      }
+      if (generation !== cacheGeneration) {
+        // The reuse path (no awaits) can never see this; the move path rechecks
+        // because the reset may have run while the move was in flight.
+        return;
       }
       pendingPartIds.delete(partId);
-      if (generation === cacheGeneration) {
-        urisByPartId.set(partId, file.uri);
-      }
+      // The dedupe mark stays: a written part is never written again.
+      urisByPartId.set(partId, file.uri);
       emitChange(partId);
     } catch {
-      // A failed create or write clears the mark so the next pass retries.
+      // A failed attempt latches the part id: the next pass performs no
+      // file-system work for it until a reset clears the latch. The temp
+      // sibling is deleted best-effort so no partial file survives under any
+      // name.
+      if (generation !== cacheGeneration) {
+        return;
+      }
+      if (tempFile) {
+        bestEffortDelete(tempFile);
+      }
       pendingPartIds.delete(partId);
+      failedPartIds.add(partId);
       inFlightOrDone.delete(partId);
       emitChange(partId);
     }
   })();
+}
+
+/** Delete a temp file without letting the cleanup failure shadow the original
+ *  write failure. */
+function bestEffortDelete(file: File): void {
+  try {
+    file.delete();
+  } catch {
+    // The temp name carries a per-attempt counter, so a leftover file cannot
+    // collide with a later attempt's temp name nor be mistaken for a final one.
+  }
 }
 
 /**
@@ -200,10 +277,11 @@ export function useToolCardImageUri(partId: string): string | undefined {
 
 /**
  * Delete the on-disk cache directory (if present) and reset the in-memory
- * maps for sign-out or account switch. Best-effort: a delete failure never
- * throws. The modern file-system API only deletes synchronously, so this runs
- * on the teardown's own turn; a write still in flight when it runs sees the
- * bumped generation and records nothing.
+ * maps (and the failure latch) for sign-out or account switch. Best-effort: a
+ * delete failure never throws. The modern file-system API only deletes
+ * synchronously, so this runs on the teardown's own turn; a write still in
+ * flight when it runs sees the bumped generation and records nothing into the
+ * next generation.
  */
 export function clearToolCardImageCache(): void {
   try {
@@ -217,6 +295,9 @@ export function clearToolCardImageCache(): void {
   cacheGeneration += 1;
   inFlightOrDone.clear();
   pendingPartIds.clear();
+  failedPartIds.clear();
+  // `tempWriteCounter` stays process-monotonic: temp names are unique per
+  // attempt, so a leftover temp can never collide with a later one.
   urisByPartId.clear();
   versionByPartId.clear();
   cacheDirectory = undefined;
@@ -228,6 +309,7 @@ export function __resetToolCardImageCacheForTests(): void {
   cacheGeneration += 1;
   inFlightOrDone.clear();
   pendingPartIds.clear();
+  failedPartIds.clear();
   urisByPartId.clear();
   versionByPartId.clear();
   cacheDirectory = undefined;

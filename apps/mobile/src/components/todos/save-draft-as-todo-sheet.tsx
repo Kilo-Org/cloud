@@ -83,7 +83,12 @@ export function SaveDraftAsTodoSheet({
   const [savingListId, setSavingListId] = useState<string | null>(null);
   // Through the query client, so the mutation cache sees a failure: a 401
   // there goes to the auth handler, as it does for every other mutation.
-  const createTodo = useMutation(trpc.todos.items.create.mutationOptions());
+  // `networkMode: 'always'` keeps an offline save settling with its network
+  // error instead of pausing: a paused save would hold the rows disabled and
+  // could resume after the sheet closed, discarding the draft then.
+  const createTodo = useMutation(
+    trpc.todos.items.create.mutationOptions({ networkMode: 'always' })
+  );
   // The create-list route is a formSheet, and the native sheet stacks above a
   // formSheet route: with the sheet up, the form would render behind it. Drop
   // the sheet while the form is open and restore it on return, so the picker
@@ -112,8 +117,10 @@ export function SaveDraftAsTodoSheet({
     try {
       await createTodo.mutateAsync({ listId: list.id, ...todo });
     } catch (error) {
-      setSavingListId(null);
+      // The rows stay locked until the failure is reported, so a second tap
+      // cannot succeed first and then be followed by this attempt's toast.
       await reportSaveFailure(error, epoch);
+      setSavingListId(null);
       return;
     }
     setSavingListId(null);

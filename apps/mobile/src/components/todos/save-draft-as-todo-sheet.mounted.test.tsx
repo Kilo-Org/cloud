@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- the react-native and tRPC mock harness stays inline so the sheet's contract reads as one component */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake query factories settle without await because they resolve immediately */
-import { MutationCache, QueryClient } from '@tanstack/react-query';
+import { MutationCache, onlineManager, QueryClient } from '@tanstack/react-query';
 import { createContext, createElement, type ReactNode, useEffect } from 'react';
 import { toast } from 'sonner-native';
 import { act } from '@/test/renderer';
@@ -83,7 +83,9 @@ vi.mock('@/lib/trpc', () => ({
     todos: {
       pathFilter: () => ({ queryKey: ['todos'] }),
       items: {
-        create: { mutationOptions: () => ({ mutationFn: createTodo }) },
+        create: {
+          mutationOptions: (options?: object) => ({ ...options, mutationFn: createTodo }),
+        },
       },
       lists: {
         list: {
@@ -117,6 +119,7 @@ const LIST: TodoList = {
 type ControlProps = {
   accessibilityRole?: string;
   accessibilityLabel?: string;
+  disabled?: boolean;
   onPress?: () => void;
 };
 function controls(mounted: Mounted) {
@@ -283,5 +286,55 @@ describe('SaveDraftAsTodoSheet', () => {
       title: 'Fix the flake',
     });
     expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('settles an offline save with its failure instead of pausing it', async () => {
+    createTodo.mockRejectedValue(new Error('Network request failed'));
+    const onSaved = vi.fn<() => void>();
+    const mounted = await mountSheet(onSaved);
+    await waitFor(() =>
+      controls(mounted).some(control => control.accessibilityLabel === 'Errands')
+    );
+    // The app drives the online manager from NetInfo; a paused save would hold
+    // the rows disabled and could resume after the sheet closed.
+    onlineManager.setOnline(false);
+    onTestFinished(() => {
+      onlineManager.setOnline(true);
+    });
+
+    await tapList(mounted);
+
+    await waitFor(() => vi.mocked(toast.error).mock.calls.length > 0);
+    expect(toast.error).toHaveBeenCalledWith('Network request failed');
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(
+      controls(mounted).find(control => control.accessibilityLabel === 'Errands')?.disabled
+    ).toBe(false);
+  });
+
+  it('keeps the rows locked until the failed attempt is reported', async () => {
+    createTodo.mockRejectedValue(sessionEnded);
+    const refresh = Promise.withResolvers<undefined>();
+    const handler = vi.fn(() => refresh.promise);
+    onTestFinished(setTrpcUnauthorizedHandler(handler));
+    const mounted = await mountSheet();
+
+    await tapList(mounted);
+    await waitFor(() => handler.mock.calls.length > 0);
+
+    // The token refresh is still running: a second tap must not start a save
+    // whose success this attempt's failure toast would then follow.
+    expect(
+      controls(mounted).find(control => control.accessibilityLabel === 'Errands')?.disabled
+    ).toBe(true);
+
+    await act(async () => {
+      refresh.resolve(undefined);
+      await Promise.resolve();
+    });
+    await waitFor(() => vi.mocked(toast.error).mock.calls.length > 0);
+    expect(
+      controls(mounted).find(control => control.accessibilityLabel === 'Errands')?.disabled
+    ).toBe(false);
   });
 });

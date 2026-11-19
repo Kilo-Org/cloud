@@ -400,6 +400,24 @@ describe('organization trial eligibility', () => {
     expect(replacement.trial_granted).toBe(false);
     expect(replacement.free_trial_end_at).toBeNull();
   });
+
+  test('does not grant another trial after a sales demo organization', async () => {
+    const user = await insertTestUser();
+    await db.insert(organizations).values({
+      name: 'Sales Demo',
+      plan: 'enterprise',
+      require_seats: false,
+      created_by_kilo_user_id: user.id,
+      free_trial_end_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+      trial_granted: true,
+      settings: { is_sales_demo: true, suppress_trial_messaging: true },
+    });
+
+    const later = await createOrganization('After Demo', user.id);
+
+    expect(later.trial_granted).toBe(false);
+    expect(later.free_trial_end_at).toBeNull();
+  });
 });
 
 describe('child organization plan inheritance', () => {

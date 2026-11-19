@@ -158,7 +158,7 @@ describe('sales demo router', () => {
     expect(org).toBeDefined();
     expect(org.plan).toBe('enterprise');
     expect(org.require_seats).toBe(false);
-    expect(org.trial_granted).toBe(false);
+    expect(org.trial_granted).toBe(true);
     expect(org.settings.is_sales_demo).toBe(true);
     expect(org.settings.suppress_trial_messaging).toBe(true);
     expect(org.settings.enable_usage_limits).toBe(true);

@@ -2,7 +2,7 @@
 // does not cover: the Gateways segment exists only while the settings read
 // reports gateways available, like the web page's Advanced policies tab, so an
 // unavailable organization loses the tab instead of landing on an empty one;
-// and a lapsed plan names itself in the read-only notice instead of the role
+// and a lapsed plan names itself in a warning banner instead of the role
 // rule. The sibling suite owns the save contract and keeps this harness small.
 
 import { createElement } from 'react';
@@ -19,6 +19,10 @@ const saved = vi.hoisted(() => ({ mutateAsync: vi.fn<(input: unknown) => Promise
 
 vi.mock('@/lib/hooks/use-org-settings-queries', () => ({
   useSaveOrgModelAccess: () => ({ mutateAsync: saved.mutateAsync, isPending: false }),
+}));
+vi.mock('@/components/ui/icons', () => ({ AlertTriangle: 'AlertTriangle' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ warn: '#956011' }),
 }));
 
 vi.mock('react-native', () => ({ View: 'View' }));
@@ -232,6 +236,42 @@ describe('ModelAccessForm read-only notice', () => {
 });
 
 describe('ModelAccessForm lapsed-plan controls', () => {
+  it('paints the plan-ended sentence as a warning banner above the segments', () => {
+    const root = render({ canEdit: true, planEnded: true });
+    const copy = appI18n.t('common.organizationTrialEnded');
+
+    // The banner is one mark and the sentence; the sentence is body-sized
+    // warning ink rather than the helper-sized muted caption it replaced.
+    expect(root.findAllByType('AlertTriangle' as never)).toHaveLength(1);
+    const sentence = root
+      .findAllByType('Text' as never)
+      .find(node => node.props.children === copy);
+    if (!sentence) {
+      throw new Error('the plan-ended sentence is missing');
+    }
+    let banner = sentence.parent;
+    while (banner !== null && !String(banner.props.className ?? '').includes('bg-warn-tile-bg')) {
+      banner = banner.parent;
+    }
+    if (banner === null) {
+      throw new Error('the plan-ended sentence is outside a tinted banner');
+    }
+    expect(String(banner.props.className)).toContain('border-warn-tile-border');
+    expect(banner.findAllByType('AlertTriangle' as never)).toHaveLength(1);
+    expect(String(sentence.props.className)).toContain('text-sm');
+    expect(String(sentence.props.className)).toContain('text-warn');
+  });
+
+  it('keeps the role caption and no banner for a member on an active plan', () => {
+    const root = render({ canEdit: false, planEnded: false });
+
+    expect(renderedCopy(root)).toContain(appI18n.t('organizationModelAccess.readOnly'));
+    expect(root.findAllByType('AlertTriangle' as never)).toHaveLength(0);
+    expect(
+      root.findAll(node => String(node.props.className ?? '').includes('bg-warn-tile-bg'))
+    ).toHaveLength(0);
+  });
+
   it('paints the plan-ended sentence once, in the notice above the segments', () => {
     const root = render({ canEdit: true, planEnded: true });
     const copy = renderedCopy(root);

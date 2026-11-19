@@ -8,6 +8,7 @@ import { ModelDenyList, ProviderAllowList } from '@/components/organization/mode
 import { GatewaySettingsSection } from '@/components/organization/providers-gateways-section';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
+import { AlertTriangle } from '@/components/ui/icons';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import {
@@ -15,6 +16,7 @@ import {
   useSaveOrgModelAccess,
 } from '@/lib/hooks/use-org-settings-queries';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   type AvailableModel,
   type CatalogModel,
@@ -153,6 +155,7 @@ export function ModelAccessForm({
   onRetryGateway: () => void;
 }>) {
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const save = useSaveOrgModelAccess(organizationId);
   const { feedback, begin, clearWhere } = useSurfaceFeedback<SettingsSaveFailure>();
   const [tab, setTab] = useState<Tab>('models');
@@ -305,10 +308,16 @@ export function ModelAccessForm({
           onChange={setTab}
           accessibilityLabel={t('organization.settingsOnWeb.providersAndModels')}
         />
+        {/* The lapsed plan blocks every edit on this screen, so its sentence is
+            a warning banner rather than helper-sized muted copy: the mark and
+            the tint separate it from the segments' labels below. */}
         {planEnded ? (
-          <Text className="text-xs text-muted-foreground">
-            {t('common.organizationTrialEnded')}
-          </Text>
+          <View className="flex-row items-start gap-2 rounded-xl border border-warn-tile-border bg-warn-tile-bg px-3 py-2">
+            <AlertTriangle size={16} color={colors.warn} />
+            <Text className="min-w-0 flex-1 text-sm text-warn">
+              {t('common.organizationTrialEnded')}
+            </Text>
+          </View>
         ) : null}
         {!canEdit && !planEnded ? (
           <Text className="text-xs text-muted-foreground">

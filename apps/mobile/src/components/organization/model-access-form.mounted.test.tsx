@@ -26,6 +26,13 @@ const saved = vi.hoisted(() => ({ mutateAsync: vi.fn<(input: unknown) => Promise
 vi.mock('@/lib/hooks/use-org-settings-queries', () => ({
   useSaveOrgModelAccess: () => ({ mutateAsync: saved.mutateAsync, isPending: false }),
 }));
+// The form paints the lapsed-plan banner's mark from the icon barrel, whose
+// lucide modules reach react-native-svg's untranspiled entry: no Node-side test
+// project can import it, so the mark is a host stub, as in the sibling suite.
+vi.mock('@/components/ui/icons', () => ({ AlertTriangle: 'AlertTriangle' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ warn: '#956011' }),
+}));
 
 vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));

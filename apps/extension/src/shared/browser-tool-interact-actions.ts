@@ -466,11 +466,15 @@ const callFunctionResponseSchema = z.object({
  * without a navigation keeps its backend id and still resolves to a remote
  * object, so only the node's own `isConnected` tells a live ref from a stale one;
  * tagging a detached node would leave the page helper waiting for a selector it
- * can never find.
+ * can never find. A node inside a shadow root (the month, day and year parts of
+ * a date input are one) is out of reach of the page helper's document query, so
+ * it is reported instead of tagged.
  */
 const TAG_CONNECTED_NODE_FUNCTION =
-  'function (name, value) { if (this.isConnected !== true) { return false; } this.setAttribute(name, value); return true; }';
+  "function (name, value) { if (this.isConnected !== true) { return 'detached'; } if (this.getRootNode() instanceof ShadowRoot) { return 'shadow'; } this.setAttribute(name, value); return 'tagged'; }";
 const UNTAG_NODE_FUNCTION = 'function (name) { this.removeAttribute(name); }';
+const SHADOW_PART_ERROR =
+  'This ref points inside a control’s built-in parts (such as the month, day and year of a date input), which this tool cannot fill one by one. Target the control itself with a CSS selector; a date input takes one YYYY-MM-DD value.';
 
 const releaseQuietly = async (
   session: BrowserToolInteractSession,
@@ -521,10 +525,12 @@ const toPageHelperTarget = async (
     })
   );
 
-  if (!tagged.success || tagged.data.result.value !== true) {
+  const outcome = tagged.success ? tagged.data.result.value : undefined;
+
+  if (outcome !== 'tagged') {
     await releaseQuietly(session, objectId);
 
-    return { error: STALE_REF_ERROR, ok: false };
+    return { error: outcome === 'shadow' ? SHADOW_PART_ERROR : STALE_REF_ERROR, ok: false };
   }
 
   return {

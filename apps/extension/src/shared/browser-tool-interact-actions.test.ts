@@ -1,4 +1,5 @@
-/* eslint-disable id-length, jest/no-conditional-expect, jest/no-conditional-in-test, jest/prefer-strict-equal, max-lines, require-await, typescript-eslint/no-base-to-string, typescript-eslint/no-unsafe-type-assertion, typescript-eslint/require-await, unicorn/prefer-array-find, vitest/prefer-describe-function-title -- Fake CDP session records verbatim commands; assertions check conditional error branches. */
+/* eslint-disable id-length, jest/no-conditional-expect, jest/no-conditional-in-test, jest/prefer-strict-equal, max-lines, no-new-func, require-await, typescript/no-implied-eval, typescript/no-unsafe-call, typescript-eslint/no-base-to-string, typescript-eslint/no-unsafe-type-assertion, typescript-eslint/require-await, unicorn/prefer-array-find, vitest/prefer-describe-function-title -- Fake CDP session records verbatim commands and runs the page-side function strings against a JSDOM node; assertions check conditional error branches. */
+import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
 import {
   INTERACT_BROWSER_TOOL_NAMES,
@@ -7,6 +8,25 @@ import {
 } from './browser-tool-interact-actions';
 import type { BrowserToolInteractSession } from './browser-tool-interact-actions';
 import type { BrowserToolResolvedTarget } from './browser-tool-session';
+
+const dom = new JSDOM('<!doctype html><body></body>');
+const { document } = dom.window;
+
+/** A field attached to the document: what a fresh snapshot ref resolves to. */
+const attachedField = (): Element => {
+  const field = document.createElement('input');
+  document.body.append(field);
+
+  return field;
+};
+
+/** Runs a `Runtime.callFunctionOn` declaration the way the page does: `this` is the node. */
+const callOnNode = (node: Element, declaration: string, args: unknown[]): unknown =>
+  (
+    new Function('ShadowRoot', `return (${declaration});`)(dom.window.ShadowRoot) as (
+      ...values: unknown[]
+    ) => unknown
+  ).apply(node, args);
 
 interface RecordedCommand {
   readonly method: string;
@@ -25,7 +45,7 @@ interface FakePageHelperEnvelope {
 const createFakeSession = ({
   boxModelError,
   boxes = {},
-  nodeConnected = true,
+  node = attachedField(),
   pageHelper,
   resolveNodeError,
   targets = {},
@@ -33,8 +53,8 @@ const createFakeSession = ({
   /** A CDP rejection, as when the ref's node was removed without a navigation. */
   boxModelError?: string;
   boxes?: Record<number, number[]>;
-  /** Whether `DOM.resolveNode` + `Runtime.callFunctionOn` report the node attached. */
-  nodeConnected?: boolean;
+  /** The node `DOM.resolveNode` hands back; `Runtime.callFunctionOn` runs on it. */
+  node?: Element;
   pageHelper?: FakePageHelperEnvelope | ((expression: string) => FakePageHelperEnvelope);
   /** A CDP rejection while resolving the ref's node to a remote object. */
   resolveNodeError?: string;
@@ -76,11 +96,14 @@ const createFakeSession = ({
       }
 
       if (method === 'Runtime.callFunctionOn') {
-        const declaration = String(params?.['functionDeclaration'] ?? '');
+        const args = (params?.['arguments'] as readonly { value: unknown }[] | undefined) ?? [];
+        const value = callOnNode(
+          node,
+          String(params?.['functionDeclaration'] ?? ''),
+          args.map(arg => arg.value)
+        );
 
-        return declaration.includes('isConnected')
-          ? { result: { value: nodeConnected } }
-          : { result: {} };
+        return { result: value === undefined ? {} : { value } };
       }
 
       if (method === 'Runtime.evaluate') {
@@ -559,7 +582,7 @@ describe('browser_select_option', () => {
 
   it('reports a stale ref when the ref node is detached from the document', async () => {
     const { commands, session } = createFakeSession({
-      nodeConnected: false,
+      node: document.createElement('select'),
       targets: { e70: ref(70) },
     });
 
@@ -679,7 +702,7 @@ describe('browser_fill_form', () => {
 
   it('reports a detached ref as a field failure before running the page helper', async () => {
     const { commands, session } = createFakeSession({
-      nodeConnected: false,
+      node: document.createElement('input'),
       targets: { e1: ref(1) },
     });
 
@@ -699,5 +722,27 @@ describe('browser_fill_form', () => {
       method: 'Runtime.releaseObject',
       params: { objectId: 'kilo-node-object' },
     });
+  });
+
+  it('reports a ref inside a shadow root at once instead of waiting for a selector it cannot reach', async () => {
+    const host = document.createElement('div');
+    const part = document.createElement('input');
+    document.body.append(host);
+    host.attachShadow({ mode: 'closed' }).append(part);
+    const { commands, session } = createFakeSession({ node: part, targets: { e1: ref(1) } });
+
+    const result = await runInteractBrowserTool(
+      'browser_fill_form',
+      { fields: [{ name: 'Month', target: 'e1', type: 'textbox', value: '05' }] },
+      session
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('Month: failed');
+      expect(result.error).toContain('Target the control itself with a CSS selector');
+    }
+    expect(part.dataset['kiloToolTarget']).toBeUndefined();
+    expect(commands.some(command => command.method === 'Runtime.evaluate')).toBe(false);
   });
 });

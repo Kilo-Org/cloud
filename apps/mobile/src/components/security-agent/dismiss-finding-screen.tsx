@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the reason/comment draft state and the load-failure gates share one screen harness; the paused-offline gate joins the existing error and loading gates */
 import { useRouter } from 'expo-router';
 import { ShieldOff } from '@/components/ui/icons';
 import { useEffect, useRef, useState } from 'react';
@@ -52,6 +53,18 @@ type DismissFindingScreenProps = {
   scope: string;
   findingId: string;
 };
+
+/**
+ * A first read the online manager paused (connectivity down or unsettled) can
+ * never finish: the loading gate would hold the skeleton until connectivity
+ * returns. Name the connection and offer Retry for each read the form waits on.
+ */
+function pausedOfflineRead(query: {
+  isPending: boolean;
+  fetchStatus: 'fetching' | 'paused' | 'idle';
+}): boolean {
+  return query.isPending && query.fetchStatus === 'paused';
+}
 
 export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindingScreenProps>) {
   const router = useRouter();
@@ -177,6 +190,28 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
         <QueryError
           message={t('securityAgent.dismiss.couldNotLoad')}
           onRetry={() => void findingQuery.refetch()}
+        />
+      </View>
+    );
+  }
+
+  // A first read the online manager paused (see pausedOfflineRead): the
+  // loading gate would hold the skeleton until connectivity returns. Name
+  // the connection and offer Retry for each read the form waits on.
+  const findingPaused = pausedOfflineRead(findingQuery);
+  const capabilityPaused = pausedOfflineRead(capability);
+  if (findingPaused || capabilityPaused) {
+    return (
+      <View className="flex-1 bg-background">
+        {sheetHeader}
+        <QueryError
+          variant="offline"
+          message={t(
+            findingPaused
+              ? 'securityAgent.dismiss.couldNotLoad'
+              : 'securityAgent.dismiss.couldNotCheckPermissions'
+          )}
+          onRetry={() => void (findingPaused ? findingQuery.refetch() : capability.refetch())}
         />
       </View>
     );

@@ -13,7 +13,14 @@ const config = vi.hoisted(() => ({
   data: null as unknown,
   isLoading: false,
   isError: false,
+  isPending: false,
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
   refetch: vi.fn(),
+}));
+const platformError = vi.hoisted(() => ({
+  props: null as
+    | { title: string; variant?: string; message?: string; onRetry?: () => void }
+    | null,
 }));
 const capability = vi.hoisted(() => ({
   canManage: true,
@@ -100,7 +107,17 @@ vi.mock('@/components/security-agent/settings-toggle-row', () => ({
     return null;
   },
 }));
-vi.mock('@/components/platform-error-screen', () => ({ PlatformErrorScreen: () => null }));
+vi.mock('@/components/platform-error-screen', () => ({
+  PlatformErrorScreen: (props: {
+    title: string;
+    variant?: string;
+    message?: string;
+    onRetry?: () => void;
+  }) => {
+    platformError.props = props;
+    return null;
+  },
+}));
 vi.mock('@/components/screen-header', () => ({
   ScreenHeader: (props: { headerRight?: unknown }) => props.headerRight ?? null,
 }));
@@ -160,6 +177,9 @@ describe('AutomationSettingsScreen approval gate', () => {
     config.data = null;
     config.isLoading = false;
     config.isError = false;
+    config.isPending = false;
+    config.fetchStatus = 'idle';
+    platformError.props = null;
     capability.canManage = true;
     save.isPending = false;
     save.mutateAsync.mockReset();
@@ -221,6 +241,36 @@ describe('AutomationSettingsScreen approval gate', () => {
     renderScreen();
 
     expect(approvalRow().disabled).toBe(true);
+  });
+
+  it('names the connection and offers Retry for a first read paused offline', () => {
+    // The online manager paused the cold read: pending, no data, no error. The
+    // loading gate would hold the skeleton until connectivity returns.
+    config.data = null;
+    config.isPending = true;
+    config.fetchStatus = 'paused';
+    renderScreen();
+
+    const error = platformError.props;
+    if (!error) {
+      throw new Error('paused first read did not render the failure screen');
+    }
+    expect(error.variant).toBe('offline');
+    expect(error.message).toBe(i18n.t('securityAgent.automation.couldNotLoad'));
+    expect(error.title).toBe(i18n.t('securityAgent.automation.title'));
+    act(() => {
+      error.onRetry?.();
+    });
+    expect(config.refetch).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the skeleton for a first read still in flight', () => {
+    config.data = null;
+    config.isLoading = true;
+    config.fetchStatus = 'fetching';
+    renderScreen();
+
+    expect(platformError.props).toBeNull();
   });
 
   it('names each repeated control with the section it belongs to', () => {

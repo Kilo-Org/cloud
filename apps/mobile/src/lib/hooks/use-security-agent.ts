@@ -219,7 +219,6 @@ export function useSecurityAgentCapability(scope: string) {
   const { role, error, isLoading, isError, isFetching, refetch, hasData, isPending, fetchStatus } =
     useSecurityAgentOrgRoleQuery(scope);
   const canManage = canManageSecurityAgent(scope, role);
-
   let status: SecurityAgentCapabilityStatus = 'loading';
   if (isPersonalSecurityScope(scope)) {
     status = 'allowed';
@@ -243,6 +242,8 @@ export function useSecurityAgentCapability(scope: string) {
     isLoading,
     isError,
     isFetching,
+    /** A role read paused by the online manager: pending with no data yet. */
+    isPending,
     refetch,
     fetchStatus,
   };

@@ -74,15 +74,24 @@ const capability = vi.hoisted(() => ({
   isLoading: false,
   isFetching: false,
   isError: false,
+  isPending: false,
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
   refetch: vi.fn(),
 }));
 const finding = vi.hoisted(() => ({
   isLoading: false,
   isFetching: false,
   isError: false,
+  isPending: false,
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
   error: null as unknown,
   data: undefined as MockedFinding | undefined,
   refetch: vi.fn(),
+}));
+const queryError = vi.hoisted(() => ({
+  props: null as
+    | { variant?: string; message?: string; onRetry?: () => void; placement?: string }
+    | null,
 }));
 const pillGroup = vi.hoisted(() => ({
   onChange: (() => undefined) as (value: string) => void,
@@ -140,7 +149,17 @@ vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
-vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+vi.mock('@/components/query-error', () => ({
+  QueryError: (props: {
+    variant?: string;
+    message?: string;
+    onRetry?: () => void;
+    placement?: string;
+  }) => {
+    queryError.props = props;
+    return 'QueryError';
+  },
+}));
 vi.mock('@/components/security-agent/settings-recovery-status', () => ({
   SettingsRecoveryStatus: 'SettingsRecoveryStatus',
 }));
@@ -244,10 +263,14 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     capability.isLoading = false;
     capability.isFetching = false;
     capability.isError = false;
+    capability.isPending = false;
+    capability.fetchStatus = 'idle';
     capability.refetch.mockReset();
     finding.isLoading = false;
     finding.isFetching = false;
     finding.isError = false;
+    finding.isPending = false;
+    finding.fetchStatus = 'idle';
     finding.error = null;
     finding.data = { status: 'open', ...FINDING_IDENTITY };
     finding.refetch.mockReset();
@@ -333,6 +356,39 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       expect(query.refetch).toHaveBeenCalledOnce();
     }
   );
+
+  it.each(['finding', 'permissions'] as const)(
+    'names the connection and offers Retry for a paused %s read',
+    source => {
+      const query = source === 'finding' ? finding : capability;
+      const otherQuery = source === 'finding' ? capability : finding;
+      finding.data = undefined;
+      query.isPending = true;
+      query.fetchStatus = 'paused';
+      const tree = renderScreen();
+
+      expect(tree.root.findAllByType(ScrollView)).toHaveLength(0);
+      const error = tree.root.findByType(QueryError);
+      expect(error.props.variant).toBe('offline');
+      expect(error.props.message).toBe(
+        source === 'finding'
+          ? i18n.t('securityAgent.dismiss.couldNotLoad')
+          : i18n.t('securityAgent.dismiss.couldNotCheckPermissions')
+      );
+      act(error.props.onRetry as () => void);
+      expect(query.refetch).toHaveBeenCalledOnce();
+      expect(otherQuery.refetch).not.toHaveBeenCalled();
+    }
+  );
+
+  it('keeps the skeleton for a first finding read still in flight', () => {
+    finding.data = undefined;
+    finding.isLoading = true;
+    finding.fetchStatus = 'fetching';
+    const tree = renderScreen();
+
+    expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
+  });
 
   it.each([
     ['denied', 'open'],

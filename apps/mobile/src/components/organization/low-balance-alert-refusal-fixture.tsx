@@ -48,7 +48,7 @@ export function LowBalanceAlertRefusalFixture({
         </View>
 
         <Button disabled>
-          <Text className="text-primary-foreground">{t('common.save')}</Text>
+          <Text>{t('common.save')}</Text>
         </Button>
       </TabScreenScrollView>
     </View>

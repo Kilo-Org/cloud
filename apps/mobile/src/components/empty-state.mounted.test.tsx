@@ -335,4 +335,20 @@ describe('StateAction busy', () => {
     expect(onPress).not.toHaveBeenCalled();
     mounted.unmount();
   });
+
+  it('paints the mark in the ink of the face the action is showing', async () => {
+    // Busy keeps the enabled face, so the spinner takes the label's own ink on
+    // the brand fill; the muted ink belongs to the disabled face's muted fill.
+    const busyAction = await renderWithProviders(
+      <StateAction label="Try again" icon={SearchX} onPress={() => undefined} loading />
+    );
+    expect(busyAction.renderer.root.findByType('ActivityIndicator').props.color).toBe('#ffffff');
+    busyAction.unmount();
+
+    const disabledAction = await renderWithProviders(
+      <StateAction label="Try again" icon={SearchX} onPress={() => undefined} disabled />
+    );
+    expect(disabledAction.renderer.root.findByType(SearchX).props.color).toBe('#777777');
+    disabledAction.unmount();
+  });
 });

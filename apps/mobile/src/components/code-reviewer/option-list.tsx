@@ -138,8 +138,12 @@ export function OptionList<T extends string, TSaveResult>({
                 variant="outline"
                 size="sm"
                 className={cn(STATE_ACTION_CLASS, 'mt-3 self-start')}
-                disabled={retryInFlight}
-                accessibilityState={{ busy: retryInFlight }}
+                // `loading` is the busy face the primitive owns: the spinner
+                // takes the label's slot (which stays reserved, so the retry
+                // does not resize in flight), the control refuses presses and
+                // it announces the wait. Only `disabled` left a control that
+                // looked idle while it silently refused the tap.
+                loading={retryInFlight}
                 accessibilityLabel={t('common.retry')}
                 onPress={() => {
                   void handleSelect(failure.option);

@@ -19,6 +19,7 @@ import {
 import { SecurityAgentSetup } from '@/components/security-agent/security-agent-setup';
 import { SettingsOverviewScreen } from '@/components/security-agent/settings-overview-screen';
 import { Skeleton } from '@/components/ui/skeleton';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
@@ -42,8 +43,10 @@ import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access
  * the dashboard frame instead (`DashboardLoadingView`).
  *
  * Frames come from the spacing scale, not hand-picked pixels: the `ShieldCheck`
- * bubble, the title line, two description lines, and the compact action's box
- * at the shared control radius.
+ * bubble, the title line, two description lines, and the state action's own
+ * box — `STATE_ACTION_CLASS`, the frame the loaded `StateAction` paints — at
+ * the shared control radius. A shorter bar sat 12dp above the action the swap
+ * then draws.
  */
 function ScopeEntryBodySkeleton() {
   return (
@@ -53,7 +56,7 @@ function ScopeEntryBodySkeleton() {
         <Skeleton className="h-6 w-40 rounded" />
         <Skeleton className="h-4 w-full rounded" />
         <Skeleton className="h-4 w-2/3 rounded" />
-        <Skeleton className="mt-3 h-9 w-36 rounded-md" />
+        <Skeleton className={cn(STATE_ACTION_CLASS, 'mt-3 w-36 rounded-md')} />
       </View>
     </View>
   );

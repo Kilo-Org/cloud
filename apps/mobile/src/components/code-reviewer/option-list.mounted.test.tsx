@@ -71,6 +71,7 @@ vi.mock('@/components/ui/button', () => ({
   Button: (props: {
     accessibilityLabel?: string;
     accessibilityState?: { busy?: boolean };
+    loading?: boolean;
     onPress?: () => void;
     children?: ReactNode;
   }) =>
@@ -78,7 +79,14 @@ vi.mock('@/components/ui/button', () => ({
       'View',
       {
         accessibilityLabel: props.accessibilityLabel,
-        accessibilityState: props.accessibilityState,
+        // The primitive derives the announcement from `loading`; the mock keeps
+        // that derivation so the suite reads the state the device would.
+        accessibilityState:
+          props.accessibilityState ??
+          (props.loading === undefined
+            ? undefined
+            : { busy: props.loading, disabled: props.loading }),
+        loading: props.loading,
         onPress: props.onPress,
       },
       props.children
@@ -182,6 +190,7 @@ function texts(root: TestRenderer.ReactTestRenderer): string[] {
 type RetryProps = {
   accessibilityLabel?: string;
   accessibilityState?: { busy?: boolean };
+  loading?: boolean;
   onPress: () => void;
 };
 
@@ -338,6 +347,7 @@ describe('OptionList failed save', () => {
 
     expect(row(renderer, 'All').busy).toBe(true);
     expect(rows(renderer).every(props => props.disabled)).toBe(true);
+    expect(retry(renderer).loading).toBe(true);
     expect(retry(renderer).accessibilityState?.busy).toBe(true);
     expect(texts(renderer)).toContain(i18n.t('codeReviewer.configSaveFailed'));
 
@@ -348,6 +358,7 @@ describe('OptionList failed save', () => {
     });
 
     expect(routerBack).not.toHaveBeenCalled();
+    expect(retry(renderer).loading).toBe(false);
     expect(retry(renderer).accessibilityState?.busy).toBe(false);
     expect(row(renderer, 'All').busy).toBe(false);
     expect(rows(renderer).every(props => props.disabled)).toBe(false);

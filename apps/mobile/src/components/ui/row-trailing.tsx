@@ -59,6 +59,12 @@ export type RowTrailingSpec =
       label: string;
       onPress: () => void;
       disabled?: boolean;
+      /**
+       * Replaces the derived disabled-only state. An action whose work is in
+       * flight passes its own, so the cell announces `busy` while it keeps the
+       * label and the name that say what is running.
+       */
+      accessibilityState?: AccessibilityState;
       accessibilityLabel?: string;
       accessibilityHint?: string;
       testID?: string;
@@ -141,7 +147,9 @@ export function renderRowTrailing(trailing: RowTrailingSpec | undefined): ReactN
         accessibilityRole: 'button' as const,
         accessibilityLabel: trailing.accessibilityLabel ?? trailing.label,
         accessibilityHint: trailing.accessibilityHint,
-        accessibilityState: { disabled: Boolean(trailing.disabled) },
+        accessibilityState: trailing.accessibilityState ?? {
+          disabled: Boolean(trailing.disabled),
+        },
       };
       return (
         <Pressable

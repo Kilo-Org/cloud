@@ -3,6 +3,7 @@ import { cloudSessionMessagesPageSchema, cloudSessionMessagesPageWireSchema } fr
 import type { CloudAgentEvent } from './cloud-conversation-schemas';
 import type { MessageInfo } from './types';
 import {
+  hasUndisplayableKilo2Assets,
   hasUnresolvedKilo2Assets,
   isCompactionSummaryPart,
   kilo2AssetKey,
@@ -1070,5 +1071,64 @@ describe('unresolved native attachments degrade at message granularity', () => {
       })
     ).events;
     expect(second[0]).toMatchObject({ type: 'message.updated', info: { id: followup.id } });
+  });
+});
+
+describe('absolute remote native attachments never display', () => {
+  const remoteFileTool = kilo2MessageSchema.parse({
+    id: 'msg_remote_file',
+    type: 'assistant',
+    time: { created: 2, completed: 3 },
+    content: [
+      { type: 'text', text: 'kept text' },
+      {
+        type: 'tool',
+        id: 'call_remote',
+        name: 'read',
+        state: {
+          status: 'completed',
+          input: { path: '/workspace/app' },
+          content: [{ type: 'file', uri: 'https://example.test/x.png', mime: 'image/png' }],
+        },
+      },
+    ],
+  });
+
+  it('returns no events for the message and still emits events for the next update', () => {
+    // No snapshot can authorize an absolute remote reference, so the message has no
+    // display at all and must not wait on recovery either.
+    expect(hasUndisplayableKilo2Assets(remoteFileTool)).toBe(true);
+    expect(hasUnresolvedKilo2Assets(remoteFileTool)).toBe(false);
+
+    const reader = createConversationSourceReader();
+    expect(
+      reader.read(
+        wire('conversation.message.updated', {
+          sessionID: session.id,
+          source,
+          message: remoteFileTool,
+        })
+      ).events
+    ).toEqual([]);
+
+    const followup = {
+      id: 'msg_after_remote_file',
+      type: 'assistant',
+      time: { created: 4 },
+      content: [{ type: 'text', text: 'next turn' }],
+    };
+    const next = reader.read(
+      wire('conversation.message.updated', {
+        sessionID: session.id,
+        source,
+        message: followup,
+        parentID: user.id,
+      })
+    ).events;
+    expect(next[0]).toMatchObject({
+      type: 'message.updated',
+      info: { id: followup.id, parentID: user.id },
+    });
+    expect(next).toHaveLength(2);
   });
 });

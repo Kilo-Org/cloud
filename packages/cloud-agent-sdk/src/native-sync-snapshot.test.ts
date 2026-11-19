@@ -867,6 +867,7 @@ describe('canonical native snapshot projection', () => {
       native: { sessionMetadata: true },
     };
     const projectedSession = { ...session, location: { directory: session.origin.directory } };
+    const mediaHash = 'e'.repeat(64);
     const messages: Kilo2Message[] = [
       {
         id: 'msg_user',
@@ -949,6 +950,40 @@ describe('canonical native snapshot projection', () => {
       },
       { id: 'msg_shell', type: 'shell', time: { created: 9 }, command: 'pwd' },
       { id: 'msg_empty', type: 'user', time: { created: 10 }, text: '' },
+      {
+        id: 'msg_media_user',
+        type: 'user',
+        time: { created: 11 },
+        text: 'image',
+        files: [
+          {
+            mime: 'image/png',
+            name: 'image.png',
+            uri: `media:${mediaHash}`,
+            source: { type: 'inline' },
+          },
+        ],
+      },
+      {
+        id: 'msg_remote_result',
+        type: 'assistant',
+        time: { created: 12, completed: 13 },
+        content: [
+          { type: 'text', text: 'fetched' },
+          {
+            type: 'tool',
+            id: 'tool_remote',
+            name: 'read',
+            state: {
+              status: 'completed',
+              input: { path: '/workspace' },
+              content: [
+                { type: 'file', uri: 'https://fixture.invalid/image.png', mime: 'image/png' },
+              ],
+            },
+          },
+        ],
+      },
     ];
     const entities = messages
       .flatMap((message, seq) => {
@@ -975,12 +1010,24 @@ describe('canonical native snapshot projection', () => {
       })
       .reverse();
     const sessionBlob = { kind: 'session', id: sessionID, revision: 4, blob: { hash, bytes: 100 } };
+    // The same inline asset mapping shape the dedicated attachment tests use.
+    const mediaAsset = entity('asset', 'media-user-image', {
+      entity: { kind: 'message', id: 'msg_media_user' },
+      pointer: '/message/files/0',
+      reference: `media:${mediaHash}`,
+      blob: { hash: mediaHash, bytes: 3 },
+      mime: 'image/png',
+    });
     const { request } = fakeFetch([
       { path: sessionPath, body: state() },
-      { path: pagePath(), body: page([...entities, sessionBlob]) },
+      { path: pagePath(), body: page([...entities, sessionBlob, mediaAsset]) },
       { path: `${sessionPath}/blobs/${hash}`, body: session },
     ]);
-    const snapshot = await fetchNativeSnapshot(request, sessionID);
+    const readAsset = jest.fn(async (path: string) => {
+      expect(path).toBe(`${sessionPath}/blobs/${mediaHash}`);
+      return new Uint8Array([1, 2, 3]).buffer;
+    });
+    const snapshot = await fetchNativeSnapshot(request, sessionID, undefined, readAsset);
     expect(snapshot.session).toEqual(session);
     expect(snapshot.session).not.toHaveProperty('location');
     expect(snapshot.messages.map(item => item.message)).toEqual(messages);
@@ -988,17 +1035,29 @@ describe('canonical native snapshot projection', () => {
     expect(snapshot.entities).toContainEqual(sessionBlob);
 
     const projection = projectNativeSnapshot(snapshot);
+    // The absolute remote reference has no possible display, so only that message is
+    // dropped, and it is not reported as an incomplete or recoverable message.
+    const displayable = messages.filter(message => message.id !== 'msg_remote_result');
     expect(projection).toEqual({
       session: projectedSession,
       position: 20,
       revision: 4,
-      messages: readKilo2Messages(projectedSession, messages),
+      messages: readKilo2Messages(projectedSession, displayable, {
+        assetURLs: snapshot.assetURLs,
+      }),
       incompleteMessageIDs: [],
     });
+    // A shell record has no display part of its own, so it is absent for the same
+    // reason it always was; only the remote-reference message is newly dropped.
+    expect(projection.messages.map(message => message.info.id)).toEqual(
+      displayable.filter(message => message.type !== 'shell').map(message => message.id)
+    );
+    expect(JSON.stringify(projection.messages)).not.toContain('https://fixture.invalid/image.png');
     expect(projection.messages[0]?.parts).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ type: 'file', url: 'data:text/plain;base64,aGVsbG8=' }),
-        expect.objectContaining({ type: 'file', url: 'https://fixture.invalid/image.png' }),
+        // Bytes display as inline data; the remote source uri is never the display url.
+        expect.objectContaining({ type: 'file', url: 'data:image/png;base64,' }),
       ])
     );
     expect(projection.messages[1]?.info).toMatchObject({
@@ -1029,6 +1088,14 @@ describe('canonical native snapshot projection', () => {
     expect(projection.messages[2]?.parts[0]).toMatchObject({ type: 'compaction' });
     expect(projection.messages[4]?.info).toMatchObject({ id: 'msg_pending' });
     expect(projection.messages[5]?.info).toMatchObject({ error: { name: 'MessageAbortedError' } });
+    expect(projection.messages.at(-1)?.parts[1]).toEqual(
+      expect.objectContaining({
+        id: kilo2PartId('msg_media_user', 1),
+        type: 'file',
+        mime: 'image/png',
+        url: 'data:image/png;base64,AQID',
+      })
+    );
   });
 
   it('retains incomplete native metadata but does not project it as an empty complete answer', async () => {

@@ -54,80 +54,77 @@ function start(messages: NativeSnapshotMessage[] = []) {
 }
 
 test('native snapshots use the exact Cloud projector for files, errors, costs, metadata and message order', () => {
-  const messages: NativeSnapshotMessage[] = [
-    {
-      seq: 1,
-      message: {
-        id: 'msg_user',
-        type: 'user',
-        text: 'Read this',
-        time: { created: 1 },
-        metadata: { nested: { private: 'retained' } },
-        files: [
-          { mime: 'image/png', data: 'aW1hZ2U=', name: 'inline.png', source: { type: 'inline' } },
-          {
-            mime: 'text/plain',
-            data: '',
-            name: 'uri.txt',
-            source: { type: 'uri', uri: 'https://example.test/file.txt' },
-          },
-        ],
-      },
+  const projectedSession = { ...session, location: { directory: session.origin.directory } };
+  const user: NativeSnapshotMessage = {
+    seq: 1,
+    message: {
+      id: 'msg_user',
+      type: 'user',
+      text: 'Read this',
+      time: { created: 1 },
+      metadata: { nested: { private: 'retained' } },
+      files: [
+        { mime: 'image/png', data: 'aW1hZ2U=', name: 'inline.png', source: { type: 'inline' } },
+        // An absolute remote reference: no snapshot ever authorizes a display for it.
+        {
+          mime: 'text/plain',
+          uri: 'https://example.test/file.txt',
+          name: 'uri.txt',
+          source: { type: 'uri', uri: 'https://example.test/file.txt' },
+        },
+      ],
     },
-    {
-      seq: 2,
-      message: {
-        id: 'msg_answer',
-        type: 'assistant',
-        time: { created: 2, completed: 3 },
-        cost: 1.25,
-        tokens: { input: 4, output: 5, reasoning: 6, cache: { read: 7, write: 8 } },
-        error: { type: 'provider.error', message: 'Specific provider failure' },
-        content: [
-          {
-            type: 'reasoning',
-            text: 'Considering',
-            time: { created: 2, completed: 3 },
-            native: { nested: ['kept'] },
+  };
+  const answer: NativeSnapshotMessage = {
+    seq: 2,
+    message: {
+      id: 'msg_answer',
+      type: 'assistant',
+      time: { created: 2, completed: 3 },
+      cost: 1.25,
+      tokens: { input: 4, output: 5, reasoning: 6, cache: { read: 7, write: 8 } },
+      error: { type: 'provider.error', message: 'Specific provider failure' },
+      content: [
+        {
+          type: 'reasoning',
+          text: 'Considering',
+          time: { created: 2, completed: 3 },
+          native: { nested: ['kept'] },
+        },
+        {
+          type: 'tool',
+          id: 'call',
+          name: 'shell',
+          state: {
+            status: 'error',
+            input: { command: 'false' },
+            error: { type: 'tool.error', message: 'Exit code 1' },
+            metadata: { retained: { exact: true } },
           },
-          {
-            type: 'tool',
-            id: 'call',
-            name: 'shell',
-            state: {
-              status: 'error',
-              input: { command: 'false' },
-              error: { type: 'tool.error', message: 'Exit code 1' },
-              metadata: { retained: { exact: true } },
-            },
-          },
-          { type: 'text', text: 'Failed' },
-        ],
-      },
+        },
+        { type: 'text', text: 'Failed' },
+      ],
     },
-  ];
+  };
+  const messages = [user, answer];
   const result = readNativeConversation({ ...state, messages });
+  // Native values stay exactly as received; only the display is gated.
   expect(result.nativeMessages).toBe(messages);
+  expect(result.nativeMessages.map(item => item.message.id)).toEqual(['msg_user', 'msg_answer']);
   expect(result.session).toBe(session);
-  expect(result.messages).toEqual(
-    readKilo2Messages(
-      { ...session, location: { directory: session.origin.directory } },
-      messages.map(item => item.message)
-    )
-  );
-  expect(result.messages.map(item => item.info.id)).toEqual(['msg_user', 'msg_answer']);
-  expect(result.messages[0]?.parts).toMatchObject([
-    { type: 'text' },
-    { type: 'file', url: 'data:image/png;base64,aW1hZ2U=' },
-    { type: 'file', url: 'https://example.test/file.txt' },
-  ]);
-  expect(result.messages[1]?.info).toMatchObject({
+  // The message with the remote reference is undisplayable rather than recoverable, so
+  // it is omitted without waiting on recovery and the rest still projects.
+  expect(result.messages).toEqual(readKilo2Messages(projectedSession, [answer.message]));
+  expect(result.messages.map(item => item.info.id)).toEqual(['msg_answer']);
+  expect(JSON.stringify(result.messages)).not.toContain('https://example.test/file.txt');
+  expect(result.incompleteMessageIDs).toEqual([]);
+  expect(result.error).toBeUndefined();
+  expect(result.messages[0]?.info).toMatchObject({
     cost: 1.25,
-    tokens: messages[1]?.message.tokens,
+    tokens: answer.message.tokens,
     error: { data: { message: 'Specific provider failure' } },
-    parentID: 'msg_user',
   });
-  expect(result.messages[1]?.parts[1]).toMatchObject({
+  expect(result.messages[0]?.parts[1]).toMatchObject({
     type: 'tool',
     tool: 'bash',
     state: { status: 'error', error: 'Exit code 1' },

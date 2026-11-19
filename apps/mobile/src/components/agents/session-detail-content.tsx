@@ -1784,14 +1784,15 @@ export function SessionDetailContent({
   // delivery states say what happened to it. The note is bound to the same
   // resolved kind as the read-only footer, so it withdraws with that footer when
   // the kind turns out to be live after all.
-  const unansweredPromptId =
+  // A prompt whose own row draws its failed preparation states the turn's
+  // failure there, so it is answered even when it is the transcript's last item.
+  const promptWithNoReply =
     activeSessionType === 'read-only' && !isStreaming
-      ? unansweredPromptMessageId(
-          displayedMessages,
-          baseTranscript,
-          pendingMessages,
-          failedPreparationByTrigger
-        )
+      ? unansweredPromptMessageId(displayedMessages, baseTranscript, pendingMessages)
+      : null;
+  const unansweredPromptId =
+    promptWithNoReply !== null && !failedPreparationByTrigger.has(promptWithNoReply)
+      ? promptWithNoReply
       : null;
 
   const renderItem = useCallback(

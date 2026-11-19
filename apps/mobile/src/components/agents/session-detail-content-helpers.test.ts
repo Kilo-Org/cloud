@@ -147,8 +147,6 @@ describe('retryFailedMessage', () => {
 describe('unansweredPromptMessageId', () => {
   /** No live transport: a stored transcript's rows carry no delivery state. */
   const noDeliveryStates = new Map<string, MessageDeliveryState>();
-  /** No failed preparation drawn inside a prompt's own row. */
-  const noRowPreparations = new Map<string, PreparationAttempt>();
 
   function answer(): StoredMessage {
     const message = withParent(assistantMessage('m-answer'), 'm-prompt');
@@ -172,24 +170,14 @@ describe('unansweredPromptMessageId', () => {
   it('names the prompt a stored transcript ends on with nothing answering it', () => {
     const rows = [userMessage('m-prompt')];
     expect(
-      unansweredPromptMessageId(
-        rows,
-        mergeSessionTranscript(rows, []),
-        noDeliveryStates,
-        noRowPreparations
-      )
+      unansweredPromptMessageId(rows, mergeSessionTranscript(rows, []), noDeliveryStates)
     ).toBe('m-prompt');
   });
 
   it('names nothing once an assistant row answers the prompt', () => {
     const rows = [userMessage('m-prompt'), answer()];
     expect(
-      unansweredPromptMessageId(
-        rows,
-        mergeSessionTranscript(rows, []),
-        noDeliveryStates,
-        noRowPreparations
-      )
+      unansweredPromptMessageId(rows, mergeSessionTranscript(rows, []), noDeliveryStates)
     ).toBeNull();
   });
 
@@ -199,38 +187,14 @@ describe('unansweredPromptMessageId', () => {
     const rows = [userMessage('m-prompt'), withParent(assistantMessage('m-reasoning'), 'm-prompt')];
     expect(mergeSessionTranscript(rows, [])).toHaveLength(1);
     expect(
-      unansweredPromptMessageId(
-        rows,
-        mergeSessionTranscript(rows, []),
-        noDeliveryStates,
-        noRowPreparations
-      )
+      unansweredPromptMessageId(rows, mergeSessionTranscript(rows, []), noDeliveryStates)
     ).toBeNull();
   });
 
   it('names nothing when the turn ended in a preparation group', () => {
     const rows = [userMessage('m-prompt')];
     const transcript = mergeSessionTranscript(rows, [attemptAfter('m-prompt')]);
-    expect(
-      unansweredPromptMessageId(rows, transcript, noDeliveryStates, noRowPreparations)
-    ).toBeNull();
-  });
-
-  it('names nothing when the prompt row itself draws its failed preparation', () => {
-    // The detail screen moves a failed attempt into its trigger row, so the
-    // prompt is the transcript's last item; the row still states the failure.
-    const rows = [userMessage('m-prompt')];
-    const attempt = attemptAfter('m-prompt');
-    const transcript = mergeSessionTranscript(rows, []);
-    expect(transcript.at(-1)?.type).toBe('message');
-    expect(
-      unansweredPromptMessageId(
-        rows,
-        transcript,
-        noDeliveryStates,
-        new Map([['m-prompt', attempt]])
-      )
-    ).toBeNull();
+    expect(unansweredPromptMessageId(rows, transcript, noDeliveryStates)).toBeNull();
   });
 
   it('names nothing for a prompt that carries a delivery state', () => {
@@ -238,13 +202,11 @@ describe('unansweredPromptMessageId', () => {
     // failure footer, so a second statement would describe the same turn twice.
     const rows = [userMessage('m-prompt')];
     const queued = new Map<string, MessageDeliveryState>([['m-prompt', { status: 'queued' }]]);
-    expect(
-      unansweredPromptMessageId(rows, mergeSessionTranscript(rows, []), queued, noRowPreparations)
-    ).toBeNull();
+    expect(unansweredPromptMessageId(rows, mergeSessionTranscript(rows, []), queued)).toBeNull();
   });
 
   it('names nothing for an empty stored transcript', () => {
-    expect(unansweredPromptMessageId([], [], noDeliveryStates, noRowPreparations)).toBeNull();
+    expect(unansweredPromptMessageId([], [], noDeliveryStates)).toBeNull();
   });
 });
 

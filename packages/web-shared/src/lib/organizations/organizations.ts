@@ -434,8 +434,10 @@ export async function addSsoUserToOrganization(
         .limit(1);
       if (
         invitation &&
-        normalizeEmail(invitation.email) ===
-          (invitation.normalizedUserEmail ?? normalizeEmail(invitation.userEmail))
+        invitationAddressesAccount(invitation.email, {
+          email: invitation.userEmail,
+          normalizedEmail: invitation.normalizedUserEmail,
+        })
       ) {
         return false;
       }

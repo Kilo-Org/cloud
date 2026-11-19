@@ -843,6 +843,46 @@ describe('Organizations', () => {
       expect(membership?.role).toBe('admin');
     });
 
+    test('recognizes the invited account when its stored normalized email is stale', async () => {
+      const owner = await insertTestUser();
+      const member = await insertTestUser({
+        google_user_email: 'jit-stale-current@example.com',
+        normalized_email: 'jit-stale-old@example.com',
+      });
+      const organization = await createOrganization('SSO Org', owner.id);
+      await db
+        .update(organizations)
+        .set({ sso_domain: 'example.com' })
+        .where(eq(organizations.id, organization.id));
+      const invitation = await inviteUserToOrganization(
+        organization.id,
+        owner.id,
+        'jit-stale-current@example.com',
+        'admin'
+      );
+
+      // The invitation claims the account, so SSO provisioning defers to it.
+      expect(
+        await addSsoUserToOrganization(organization.id, member.id, {
+          invitationToken: invitation.token,
+        })
+      ).toBe(false);
+      expect(await isOrganizationMember(db, organization.id, member.id)).toBe(false);
+
+      const result = await acceptOrganizationInvite(member.id, invitation.token, {
+        provider: 'workos',
+        ssoSourceOrganizationId: organization.id,
+      });
+      expect(result.success).toBe(true);
+      const membership = await db.query.organization_memberships.findFirst({
+        where: and(
+          eq(organization_memberships.organization_id, organization.id),
+          eq(organization_memberships.kilo_user_id, member.id)
+        ),
+      });
+      expect(membership?.role).toBe('admin');
+    });
+
     test.each(['other-org', 'wrong-source', 'ordinary'] as const)(
       'does not defer SSO provisioning for a %s invitation',
       async kind => {

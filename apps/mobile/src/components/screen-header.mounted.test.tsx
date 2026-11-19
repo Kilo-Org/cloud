@@ -50,6 +50,8 @@ const safeArea = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 const platform = vi.hoisted(() => ({ OS: 'ios' as 'ios' | 'android' }));
 /** A normal phone window: wide enough for the title and its actions to share a row. */
 const layout = vi.hoisted(() => ({ width: 390, fontScale: 1 }));
+/** The Android emulator's density, where the German Chat title was cut. */
+const PIXEL_RATIO = 2.625;
 
 vi.mock('expo-router', () => ({
   useRouter: () => routerState,
@@ -59,6 +61,7 @@ vi.mock('expo-router', () => ({
 vi.mock('react-native', () => ({
   I18nManager: i18nManager,
   Platform: platform,
+  PixelRatio: { get: () => PIXEL_RATIO },
   // `useSheetHeaderTopClearance` falls back to the status-bar height on Android.
   StatusBar: { currentHeight: 24 },
   Pressable: 'Pressable',
@@ -276,8 +279,7 @@ function renderHeader(props: ScreenHeaderProps): TestRenderer.ReactTestRenderer 
  * reaches it without a control to anchor on.
  */
 function findTitleRow(root: TestInstance): TestInstance {
-  // A header with inline actions wraps the title in its fit-check box, one
-  // level deeper than the plain title.
+  // An accessory row puts the title one level deeper than the plain title.
   const centered = 'min-w-0 flex-1 flex-row items-center justify-center';
   const title = root.findByProps({ accessibilityRole: 'header' });
   const heading = [title.parent?.parent, title.parent?.parent?.parent].find(
@@ -516,8 +518,8 @@ describe('ScreenHeader mounted', () => {
     // The title row no longer carries the inline slot, and the heading keeps
     // its full-width `min-w-0 flex-1` box, so the title cannot be squeezed.
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    // Text → fit-check box → title column.
-    expect(title.parent?.parent?.props.className).toContain('min-w-0 flex-1');
+    // Text → title column.
+    expect(title.parent?.props.className).toContain('min-w-0 flex-1');
     expect(
       renderer.root.findAll(
         node =>
@@ -621,21 +623,34 @@ describe('ScreenHeader mounted', () => {
   describe('a title the inline cluster would cut', () => {
     // German "Unterhaltung" beside the account picker painted "Unterhaltu…" at
     // the default font size, under a caller that keeps the cluster on the title
-    // row. A hidden copy of the title with no line cap lays out in the visible
-    // title's box; it needs a second line exactly when the title is cut.
-    type TextLayoutHandler = (event: { nativeEvent: { lines: { text: string }[] } }) => void;
-    const findFitCopy = (renderer: TestRenderer.ReactTestRenderer) =>
-      renderer.root.find(
-        node =>
-          typeof node.type === 'string' &&
-          (node.type as string) === 'Text' &&
-          node.props.onTextLayout !== undefined
-      );
-    const reportLines = (renderer: TestRenderer.ReactTestRenderer, lineCount: number) => {
-      const lines = Array.from({ length: lineCount }, () => ({ text: 'line' }));
+    // row. The emulator (2.625 px/dp) gave the title a 440px box for a word
+    // 440.83px wide: the uncapped copy inside that box still reported one line,
+    // so the picker stayed beside the cut title. A copy outside the row now
+    // reports the natural width (441px) and the visible title its box.
+    const NATURAL = 441 / PIXEL_RATIO;
+    const CUT_BOX = 440 / PIXEL_RATIO;
+    const isNaturalCopy = (node: TestInstance) =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'Text' &&
+      node.props.accessibilityRole !== 'header' &&
+      node.props.onLayout !== undefined;
+    const layoutWidth = (node: TestInstance, width: number) => {
       act(() => {
-        (findFitCopy(renderer).props.onTextLayout as TextLayoutHandler)({ nativeEvent: { lines } });
+        (node.props.onLayout as (event: { nativeEvent: { layout: { width: number } } }) => void)({
+          nativeEvent: { layout: { width } },
+        });
       });
+    };
+    const measure = (
+      renderer: TestRenderer.ReactTestRenderer,
+      widths: { natural?: number; box?: number }
+    ) => {
+      if (widths.natural !== undefined) {
+        layoutWidth(renderer.root.find(isNaturalCopy), widths.natural);
+      }
+      if (widths.box !== undefined) {
+        layoutWidth(renderer.root.findByProps({ accessibilityRole: 'header' }), widths.box);
+      }
     };
     const update = (renderer: TestRenderer.ReactTestRenderer, props: ScreenHeaderProps) => {
       act(() => {
@@ -650,45 +665,71 @@ describe('ScreenHeader mounted', () => {
       allowInlineActionsStacking: false,
     };
 
-    it('moves the cluster under the title from the first measurement of a cold start', () => {
+    it('moves the cluster under a title one pixel narrower than its natural width', () => {
       const renderer = renderHeader(german);
       expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+      const copy = renderer.root.find(isNaturalCopy);
+      expect(copy.children).toEqual(['Unterhaltung']);
+      // The copy is out of the row, the reader and the touch path.
+      expect(copy.parent?.props.className).toContain('absolute');
+      expect(copy.parent?.props.pointerEvents).toBe('none');
+      expect(copy.parent?.props.importantForAccessibility).toBe('no-hide-descendants');
 
-      reportLines(renderer, 2);
+      measure(renderer, { natural: NATURAL, box: CUT_BOX });
       const stacked = renderer.root.findAll(isStackedActionsRow);
       expect(stacked).toHaveLength(1);
       expect(stacked[0]?.children).toEqual(['ACTIONS']);
 
-      // The wider room the title gets on its own row does not move the cluster
+      // The full width the title gets on its own row does not move the cluster
       // back beside it.
-      reportLines(renderer, 1);
+      measure(renderer, { box: NATURAL });
       expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
+    });
+
+    it('decides on whichever width reports last', () => {
+      const renderer = renderHeader(german);
+      measure(renderer, { box: CUT_BOX });
+      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+      measure(renderer, { natural: NATURAL });
+      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
+    });
+
+    it('keeps a title that gets its natural width beside the cluster (German "Agenten")', () => {
+      const renderer = renderHeader({ ...german, title: 'Agenten', titleAccessory: undefined });
+      measure(renderer, { natural: 288 / PIXEL_RATIO, box: 288 / PIXEL_RATIO });
+      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+      // Float noise under half a pixel is not a cut.
+      measure(renderer, { box: 288 / PIXEL_RATIO - 0.0001 });
+      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
     });
 
     it('measures again after a language change and keeps a title that fits beside it', () => {
       const renderer = renderHeader(german);
-      reportLines(renderer, 2);
+      measure(renderer, { natural: NATURAL, box: CUT_BOX });
       expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
 
-      // The new title holds no report yet, so the cluster returns to the row,
-      // where the remounted copy measures the title again.
-      const copyBefore = findFitCopy(renderer);
+      // The new title holds no natural width yet, so the cluster returns to the
+      // row, where the remounted copy measures the title again. The visible
+      // title reports first, against the old title's natural width.
+      const copyBefore = renderer.root.find(isNaturalCopy);
       update(renderer, { ...german, title: 'Chat' });
       expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
-      expect(findFitCopy(renderer)).not.toBe(copyBefore);
-      reportLines(renderer, 1);
+      expect(renderer.root.find(isNaturalCopy)).not.toBe(copyBefore);
+      measure(renderer, { box: 160 / PIXEL_RATIO });
+      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+      measure(renderer, { natural: 160 / PIXEL_RATIO });
       expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
 
-      // And back: the overflowing title moves the cluster again.
+      // And back: the cut title moves the cluster again.
       update(renderer, german);
-      reportLines(renderer, 2);
+      measure(renderer, { natural: NATURAL, box: CUT_BOX });
       expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
     });
 
-    it('leaves a title that fits on its row (German "Agenten")', () => {
-      const renderer = renderHeader({ ...german, title: 'Agenten', titleAccessory: undefined });
-      reportLines(renderer, 1);
-      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+    it('does not measure a title the large font scale already moved the cluster under', () => {
+      Object.assign(layout, { width: 390, fontScale: 2 });
+      const renderer = renderHeader(german);
+      expect(renderer.root.findAll(isNaturalCopy)).toHaveLength(0);
     });
   });
 
@@ -715,9 +756,8 @@ describe('ScreenHeader mounted', () => {
     // A cluster of truncating controls declares no floor.
     expect(inline.props.style).toBeUndefined();
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    // Text → fit-check box → accessory row → title column → title band →
-    // heading block.
-    const titleColumn = title.parent?.parent?.parent;
+    // Text → accessory row → title column → title band → heading block.
+    const titleColumn = title.parent?.parent;
     expect(titleColumn?.props.className).toBe('min-w-0 shrink');
     const headingBlock = titleColumn?.parent?.parent;
     expect(headingBlock?.props.className).toContain('grow shrink');
@@ -727,7 +767,7 @@ describe('ScreenHeader mounted', () => {
     const reflowing = renderHeader({ title: 'Chat', size: 'large', inlineActions: 'ACTIONS' });
     expect(findInlineActionsWrapper(reflowing.root).props.className).not.toContain('shrink-[100]');
     expect(
-      reflowing.root.findByProps({ accessibilityRole: 'header' }).parent?.parent?.props.className
+      reflowing.root.findByProps({ accessibilityRole: 'header' }).parent?.props.className
     ).toBe('min-w-0 flex-1');
   });
 

@@ -6,10 +6,10 @@ import { ChevronDown } from '@/components/ui/icons';
 import { DirectionalChevronLeft } from '@/components/ui/directional-icons';
 import {
   type LayoutChangeEvent,
+  PixelRatio,
   Platform,
   Pressable,
   type TextInstance,
-  type TextLayoutEvent,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -139,6 +139,26 @@ export function shouldStackHeaderActions(
  * Text and the reserve are clamped together to keep them in step.
  */
 const MAX_TITLE_LINES = 3;
+
+/**
+ * The two widths the title-fit check compares (see `measuresTitleFit`), in dp.
+ * The natural width belongs to one layout (`naturalKey`); the box width is the
+ * visible title's latest, in whichever row it sits. `cutKey` is the layout in
+ * which the title was found cut beside the inline cluster.
+ */
+type TitleFit = {
+  naturalKey: string | null;
+  naturalWidth: number;
+  boxWidth: number;
+  cutKey: string | null;
+};
+
+const UNMEASURED_TITLE_FIT: TitleFit = {
+  naturalKey: null,
+  naturalWidth: Number.NaN,
+  boxWidth: Number.NaN,
+  cutKey: null,
+};
 
 /**
  * The default header title's typography: 15.75pt semibold in the header's text
@@ -518,22 +538,28 @@ export function ScreenHeader({
     });
   // A text title that the in-row cluster would cut moves the cluster under the
   // heading, whatever the caller allows: German "Unterhaltung" beside the
-  // account picker painted "Unterhaltu…" at the default font size. A hidden copy
-  // of the title, with no line cap, lays out in the visible title's own box:
-  // the title is cut exactly when that copy needs a second line. A width
-  // comparison cannot say this, because the picker gives way first and the
-  // title loses only a fraction of a point — enough for Android to ellipsize,
-  // and inside the two Texts' pixel rounding.
+  // account picker painted "Unterhaltu…" at the default font size. The picker
+  // gives way first, so the title loses very little: on the Android emulator
+  // its box was 440px against the 441px the word needs, and Android cut it.
   //
-  // The decision is the copy's last report from the title's row, for the
-  // layout it was measured in (title, window width, font scale): the room the
-  // title gets once the cluster has moved says nothing about the row, so it is
-  // not recorded, and a new layout (another language, a rotation) holds no
-  // report until the copy, remounted for it, measures the row again.
+  // Two measured widths decide it. A hidden copy of the title, outside the
+  // row and free of any width but the header's, lays out at the title's own
+  // natural width; the visible title reports the box the row gives it. Both
+  // sit on the pixel grid, so the title is cut exactly when its box is a pixel
+  // or more narrower than the copy. A copy laid out inside the title's box
+  // cannot say this: Android lays an uncapped line out 0.83px wider than its
+  // box without breaking it, so that copy reported one line while the capped
+  // title beside it ended in an ellipsis.
+  //
+  // The decision is kept per layout (title, window width, font scale) and only
+  // taken while the cluster shares the title's row: once the cluster moves,
+  // the wider room the title gets says nothing about the row, so the title
+  // never moves back and forth. A new layout (another language, a rotation)
+  // returns the cluster to the row until the remounted copy measures again.
   const measuresTitleFit = inlineActions != null && title != null && !titleContent && !largeFont;
   const titleFitKey = JSON.stringify([title, windowWidth, fontScale]);
-  const [titleFit, setTitleFit] = useState<{ key: string; cut: boolean } | null>(null);
-  const titleOverflows = measuresTitleFit && titleFit?.key === titleFitKey && titleFit.cut;
+  const [titleFit, setTitleFit] = useState<TitleFit>(UNMEASURED_TITLE_FIT);
+  const titleOverflows = measuresTitleFit && titleFit.cutKey === titleFitKey;
   // The inline controls row reflows the same way: a caller that declares its
   // width drops it beneath the title before it squeezes the title's own
   // readable minimum, so the 30px Agents title never breaks inside a word. At
@@ -552,14 +578,21 @@ export function ScreenHeader({
           titleMinWidth,
           contentInset,
         })));
-  const onTitleFitTextLayout = (event: TextLayoutEvent) => {
-    if (stackInlineActions) {
-      return;
-    }
-    const cut = event.nativeEvent.lines.length > 1;
-    setTitleFit(previous =>
-      previous?.key === titleFitKey && previous.cut === cut ? previous : { key: titleFitKey, cut }
-    );
+  const recordTitleFit = (measured: Partial<Omit<TitleFit, 'cutKey'>>) => {
+    setTitleFit(previous => {
+      const next = { ...previous, ...measured };
+      const cut =
+        !stackInlineActions &&
+        next.naturalKey === titleFitKey &&
+        next.naturalWidth - next.boxWidth >= 0.5 / PixelRatio.get();
+      return cut ? { ...next, cutKey: titleFitKey } : next;
+    });
+  };
+  const onTitleNaturalLayout = (event: LayoutChangeEvent) => {
+    recordTitleFit({ naturalKey: titleFitKey, naturalWidth: event.nativeEvent.layout.width });
+  };
+  const onTitleBoxLayout = (event: LayoutChangeEvent) => {
+    recordTitleFit({ boxWidth: event.nativeEvent.layout.width });
   };
   // A caller that turns the reflow off keeps its inline controls beside the
   // title while the title fits, so on that row the title is the primary text
@@ -652,34 +685,17 @@ export function ScreenHeader({
 
   let titleNode: React.ReactNode = null;
   if (title != null) {
-    const titleLabelText = (
+    const titleLabel = (
       <Text
         ref={titleRef}
         className={cn(titleClass, centerTitle && 'text-center')}
         numberOfLines={titleLines}
         ellipsizeMode="tail"
         accessibilityRole="header"
+        onLayout={measuresTitleFit ? onTitleBoxLayout : undefined}
       >
         {title}
       </Text>
-    );
-    // The fit check's copy (see `measuresTitleFit`) shares the visible title's
-    // box and paints nothing; a new layout remounts it, so it always reports.
-    const titleLabel = measuresTitleFit ? (
-      <View className="min-w-0 shrink">
-        {titleLabelText}
-        <Text
-          key={titleFitKey}
-          className={cn(titleClass, 'absolute inset-x-0 top-0 opacity-0')}
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-          onTextLayout={onTitleFitTextLayout}
-        >
-          {title}
-        </Text>
-      </View>
-    ) : (
-      titleLabelText
     );
     let titleText: React.ReactNode = titleLabel;
     if (titleContent) {
@@ -1090,6 +1106,27 @@ export function ScreenHeader({
     inlineActions && stackInlineActions ? (
       <View className="mt-2 min-w-0">{inlineActions}</View>
     ) : null;
+  // The fit check's copy (see `measuresTitleFit`): it paints nothing, takes no
+  // touch and holds no reader, and its box is the header's full width, so it
+  // lays out at the title's natural width. A new layout remounts it, so it
+  // always reports.
+  const titleNaturalCopy = measuresTitleFit ? (
+    <View
+      className="absolute start-0 top-0 opacity-0"
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <Text
+        key={titleFitKey}
+        className={titleClass}
+        numberOfLines={titleLines}
+        onLayout={onTitleNaturalLayout}
+      >
+        {title}
+      </Text>
+    </View>
+  ) : null;
 
   return (
     <View className={cn('bg-background px-4 pb-3', className)} style={safeAreaStyle}>
@@ -1134,6 +1171,7 @@ export function ScreenHeader({
             {stackedInlineActionsRow}
           </>
         )}
+        {titleNaturalCopy}
       </View>
     </View>
   );

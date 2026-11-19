@@ -4769,7 +4769,8 @@
     "connectFailed": "Stránku pro připojení se nepodařilo otevřít"
   },
   "invoices": {
-    "personalEmptyDescription": "Faktury za vaše vlastní nákupy se zde zobrazí po vyúčtování."
+    "personalEmptyDescription": "Faktury za vaše vlastní nákupy se zde zobrazí po vyúčtování. Účtenky z App Store a Google Play jsou v Historii kreditů.",
+    "personalPeriod": "Posledních 12 měsíců"
   },
   "cloudAgent": {
     "compute": {

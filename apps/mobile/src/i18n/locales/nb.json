@@ -4619,7 +4619,8 @@
     "connectFailed": "Kunne ikke åpne tilkoblingssiden"
   },
   "invoices": {
-    "personalEmptyDescription": "Fakturaer for dine egne kjøp vises her når du har blitt fakturert."
+    "personalEmptyDescription": "Fakturaer for dine egne kjøp vises her når du har blitt fakturert. Kvitteringer fra App Store og Google Play finnes i Kreditthistorikk.",
+    "personalPeriod": "Siste 12 måneder"
   },
   "cloudAgent": {
     "compute": {

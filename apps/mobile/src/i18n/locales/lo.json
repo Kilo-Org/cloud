@@ -4619,7 +4619,8 @@
     "connectFailed": "ບໍ່ສາມາດເປີດໜ້າການເຊື່ອມຕໍ່ໄດ້"
   },
   "invoices": {
-    "personalEmptyDescription": "ໃບແຈ້ງໜີ້ສຳລັບການຊື້ຂອງທ່ານເອງຈະສະແດງຢູ່ບ່ອນນີ້ເມື່ອມີການຮຽກເກັບເງິນ."
+    "personalEmptyDescription": "ໃບແຈ້ງໜີ້ສຳລັບການຊື້ຂອງທ່ານເອງສະແດງຢູ່ບ່ອນນີ້ເມື່ອມີການຮຽກເກັບເງິນ. ໃບຮັບເງິນຈາກ App Store ແລະ Google Play ຢູ່ໃນປະຫວັດເຄຣດິດ.",
+    "personalPeriod": "12 ເດືອນຜ່ານມາ"
   },
   "cloudAgent": {
     "compute": {

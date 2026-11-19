@@ -4619,7 +4619,8 @@
     "connectFailed": "සම්බන්ධතා පිටුව විවෘත කළ නොහැකි විය"
   },
   "invoices": {
-    "personalEmptyDescription": "ඔබෙන් බිල්පත් අය කළ පසු, ඔබේම මිලදී ගැනීම් සඳහා ඉන්වොයිස් මෙහි දිස් වේ."
+    "personalEmptyDescription": "ඔබෙන් බිල්පත් අය කළ පසු, ඔබේම මිලදී ගැනීම් සඳහා ඉන්වොයිස් මෙහි දිස් වේ. App Store සහ Google Play වෙතින් ලැබුණු රිසිට්පත් ක්‍රෙඩිට් ඉතිහාසයේ ඇත.",
+    "personalPeriod": "පසුගිය මාස 12"
   },
   "cloudAgent": {
     "compute": {

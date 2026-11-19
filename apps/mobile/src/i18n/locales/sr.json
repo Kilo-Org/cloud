@@ -4694,7 +4694,8 @@
     "connectFailed": "Otvaranje stranice za povezivanje nije uspelo"
   },
   "invoices": {
-    "personalEmptyDescription": "Fakture za vaše lične kupovine pojaviće se ovde nakon prve naplate."
+    "personalEmptyDescription": "Fakture za vaše lične kupovine pojavljuju se ovde nakon prve naplate. Računi iz prodavnice App Store i Google Play nalaze se u Istoriji kredita.",
+    "personalPeriod": "Poslednjih 12 meseci"
   },
   "cloudAgent": {
     "compute": {

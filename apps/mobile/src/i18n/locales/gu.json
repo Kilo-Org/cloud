@@ -4619,7 +4619,8 @@
     "connectFailed": "કનેક્શન પેજ ખોલી શકાયું નહીં"
   },
   "invoices": {
-    "personalEmptyDescription": "તમને બિલ મોકલવામાં આવે પછી તમારી પોતાની ખરીદીઓના ઇન્વૉઇસ અહીં દેખાશે."
+    "personalEmptyDescription": "તમને બિલ મોકલવામાં આવે પછી તમારી પોતાની ખરીદીઓના ઇન્વૉઇસ અહીં દેખાય છે. App Store અને Google Playની રસીદો ક્રેડિટ ઇતિહાસમાં છે.",
+    "personalPeriod": "છેલ્લા 12 મહિના"
   },
   "cloudAgent": {
     "compute": {

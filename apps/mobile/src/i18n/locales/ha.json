@@ -4619,7 +4619,8 @@
     "connectFailed": "Ba a iya buɗe shafin haɗi ba"
   },
   "invoices": {
-    "personalEmptyDescription": "Takardun kuɗi na sayayyarka za su bayyana a nan da zarar an caje ka."
+    "personalEmptyDescription": "Takardun kuɗi na sayayyarka suna bayyana a nan da zarar an caje ka. Rasiti daga App Store da Google Play suna cikin Tarihin kiredit.",
+    "personalPeriod": "Watanni 12 da suka gabata"
   },
   "cloudAgent": {
     "compute": {

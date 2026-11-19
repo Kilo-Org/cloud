@@ -4619,7 +4619,8 @@
     "connectFailed": "Bağlantı sayfası açılamadı"
   },
   "invoices": {
-    "personalEmptyDescription": "Kendi satın alımlarınıza ait faturalar, faturalandırıldığınızda burada görünecek."
+    "personalEmptyDescription": "Kendi satın alımlarınıza ait faturalar, faturalandırıldığınızda burada görünür. Makbuz App Store'da ve Makbuz Google Play'de ise Kredi geçmişi'nde bulunur.",
+    "personalPeriod": "Son 12 Ay"
   },
   "cloudAgent": {
     "compute": {

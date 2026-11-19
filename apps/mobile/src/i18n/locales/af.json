@@ -4619,7 +4619,8 @@
     "connectFailed": "Kon nie die koppelbladsy oopmaak nie"
   },
   "invoices": {
-    "personalEmptyDescription": "Fakture vir jou eie aankope sal hier verskyn sodra jy gefaktureer is."
+    "personalEmptyDescription": "Fakture vir jou eie aankope verskyn hier sodra jy gefaktureer is. Kwitansies van die App Store en Google Play is in Kredietgeskiedenis.",
+    "personalPeriod": "Afgelope 12 maande"
   },
   "cloudAgent": {
     "compute": {

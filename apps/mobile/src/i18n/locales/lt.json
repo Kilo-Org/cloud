@@ -4769,7 +4769,8 @@
     "connectFailed": "Nepavyko atidaryti prijungimo puslapio"
   },
   "invoices": {
-    "personalEmptyDescription": "Jūsų asmeninių pirkimų sąskaitos faktūros bus rodomos čia, kai jums bus išrašyta sąskaita."
+    "personalEmptyDescription": "Jūsų asmeninių pirkimų sąskaitos faktūros rodomos čia, kai jums bus išrašyta sąskaita. Kvitai iš App Store ir Google Play yra Kreditų istorijoje.",
+    "personalPeriod": "Paskutiniai 12 mėnesių"
   },
   "cloudAgent": {
     "compute": {

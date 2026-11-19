@@ -4769,7 +4769,8 @@
     "connectFailed": "Nie udało się otworzyć strony połączenia"
   },
   "invoices": {
-    "personalEmptyDescription": "Faktury za Twoje zakupy pojawią się tutaj po pierwszym obciążeniu."
+    "personalEmptyDescription": "Faktury za Twoje zakupy pojawiają się tutaj po pierwszym obciążeniu. Potwierdzenia w App Store i Google Play znajdują się w sekcji Historia kredytów.",
+    "personalPeriod": "Ostatnie 12 miesięcy"
   },
   "cloudAgent": {
     "compute": {

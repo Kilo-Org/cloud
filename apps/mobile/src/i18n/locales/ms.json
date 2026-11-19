@@ -4619,7 +4619,8 @@
     "connectFailed": "Tidak dapat membuka halaman sambungan"
   },
   "invoices": {
-    "personalEmptyDescription": "Invois untuk pembelian anda sendiri akan dipaparkan di sini setelah anda dibilkan."
+    "personalEmptyDescription": "Invois untuk pembelian anda sendiri dipaparkan di sini setelah anda dibilkan. Resit daripada App Store dan Google Play terdapat dalam Sejarah kredit.",
+    "personalPeriod": "12 Bulan Terakhir"
   },
   "cloudAgent": {
     "compute": {

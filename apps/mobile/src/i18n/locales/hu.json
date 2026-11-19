@@ -4619,7 +4619,8 @@
     "connectFailed": "Nem sikerült megnyitni a csatlakozási oldalt"
   },
   "invoices": {
-    "personalEmptyDescription": "A saját vásárlásaid számlái itt jelennek meg, amint kiállítjuk őket."
+    "personalEmptyDescription": "A saját vásárlásaid számlái itt jelennek meg, amint kiállítjuk őket. Az App Store és a Google Play nyugtái a Kreditelőzményekben érhetők el.",
+    "personalPeriod": "Elmúlt 12 hónap"
   },
   "cloudAgent": {
     "compute": {

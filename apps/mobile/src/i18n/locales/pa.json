@@ -4619,7 +4619,8 @@
     "connectFailed": "ਕਨੈਕਸ਼ਨ ਪੰਨਾ ਖੋਲ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ"
   },
   "invoices": {
-    "personalEmptyDescription": "ਤੁਹਾਡੇ ਤੋਂ ਬਿੱਲ ਲਏ ਜਾਣ ਤੋਂ ਬਾਅਦ ਤੁਹਾਡੀਆਂ ਆਪਣੀਆਂ ਖਰੀਦਾਂ ਦੇ ਇਨਵੌਇਸ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੇ।"
+    "personalEmptyDescription": "ਤੁਹਾਡੇ ਤੋਂ ਬਿੱਲ ਲਏ ਜਾਣ ਤੋਂ ਬਾਅਦ ਤੁਹਾਡੀਆਂ ਆਪਣੀਆਂ ਖਰੀਦਾਂ ਦੇ ਇਨਵੌਇਸ ਇੱਥੇ ਦਿਖਾਈ ਦਿੰਦੇ ਹਨ। App Store ਅਤੇ Google Play ਤੋਂ ਰਸੀਦਾਂ ਕ੍ਰੈਡਿਟ ਇਤਿਹਾਸ ਵਿੱਚ ਹਨ।",
+    "personalPeriod": "ਪਿਛਲੇ 12 ਮਹੀਨੇ"
   },
   "cloudAgent": {
     "compute": {

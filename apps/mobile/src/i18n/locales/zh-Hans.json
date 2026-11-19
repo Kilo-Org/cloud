@@ -4619,7 +4619,8 @@
     "connectFailed": "无法打开连接页面"
   },
   "invoices": {
-    "personalEmptyDescription": "产生扣费后，你个人购买的发票将显示在这里。"
+    "personalEmptyDescription": "产生扣费后，你个人购买的发票显示在这里。App Store 和 Google Play 的收据位于积分记录。",
+    "personalPeriod": "最近 12 个月"
   },
   "cloudAgent": {
     "compute": {

@@ -4619,7 +4619,8 @@
     "connectFailed": "የግንኙነት ገጹን መክፈት አልተቻለም"
   },
   "invoices": {
-    "personalEmptyDescription": "ክፍያ ከተጠየቀብዎ በኋላ ለራስዎ ግዢዎች የሚወጡ የክፍያ መጠየቂያዎች እዚህ ይታያሉ።"
+    "personalEmptyDescription": "ክፍያ ከተጠየቀብዎ በኋላ ለራስዎ ግዢዎች የሚወጡ የክፍያ መጠየቂያዎች እዚህ ይታያሉ። ደረሰኝ ከApp Store እና ደረሰኝ ከGoogle Play በክሬዲት ታሪክ ውስጥ ይገኛሉ።",
+    "personalPeriod": "ያለፉት 12 ወራት"
   },
   "cloudAgent": {
     "compute": {

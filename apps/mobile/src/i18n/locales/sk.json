@@ -4769,7 +4769,8 @@
     "connectFailed": "Stránku pripojenia sa nepodarilo otvoriť"
   },
   "invoices": {
-    "personalEmptyDescription": "Faktúry za vaše vlastné nákupy sa tu zobrazia po vyúčtovaní."
+    "personalEmptyDescription": "Faktúry za vaše vlastné nákupy sa tu zobrazia po vyúčtovaní. Doklady v obchode App Store a Google Play nájdete na obrazovke História kreditov.",
+    "personalPeriod": "Posledných 12 mesiacov"
   },
   "cloudAgent": {
     "compute": {

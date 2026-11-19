@@ -4694,7 +4694,8 @@
     "connectFailed": "Neizdevās atvērt savienojuma lapu"
   },
   "invoices": {
-    "personalEmptyDescription": "Rēķini par jūsu pirkumiem šeit parādīsies, kad jums tiks izrakstīts rēķins."
+    "personalEmptyDescription": "Rēķini par jūsu pirkumiem šeit parādās, kad jums tiks izrakstīts rēķins. Kvīti veikalā App Store un pakalpojumā Google Play atrodas sadaļā Kredītu vēsture.",
+    "personalPeriod": "Pēdējie 12 mēneši"
   },
   "cloudAgent": {
     "compute": {

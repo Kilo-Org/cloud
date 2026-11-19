@@ -4619,7 +4619,8 @@
     "connectFailed": "باز کردن صفحهٔ اتصال ممکن نشد"
   },
   "invoices": {
-    "personalEmptyDescription": "فاکتورهای خریدهای شخصی‌تان پس از صدور صورتحساب در اینجا نمایش داده می‌شوند."
+    "personalEmptyDescription": "فاکتورهای خریدهای شخصی‌تان پس از صدور صورتحساب در اینجا نمایش داده می‌شوند. رسید از App Store و رسید از Google Play در تاریخچهٔ اعتبار هستند.",
+    "personalPeriod": "12 ماه اخیر"
   },
   "cloudAgent": {
     "compute": {

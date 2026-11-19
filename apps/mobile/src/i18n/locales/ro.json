@@ -4694,7 +4694,8 @@
     "connectFailed": "Pagina de conectare nu a putut fi deschisă"
   },
   "invoices": {
-    "personalEmptyDescription": "Facturile pentru achizițiile tale personale vor apărea aici după prima facturare."
+    "personalEmptyDescription": "Facturile pentru achizițiile tale personale apar aici după prima facturare. Chitanțele din App Store și din Google Play sunt în Istoric credite.",
+    "personalPeriod": "Ultimele 12 luni"
   },
   "cloudAgent": {
     "compute": {

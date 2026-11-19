@@ -4619,7 +4619,8 @@
     "connectFailed": "Fuula walitti hidhamiinsaa banuun hin danda'amne"
   },
   "invoices": {
-    "personalEmptyDescription": "Beeksisni kaffaltii bittaa mataa keetii erga kaffaltiin siif herregamee booda asitti mul'ata."
+    "personalEmptyDescription": "Beeksisni kaffaltii bittaa mataa keetii erga kaffaltiin siif herregamee booda asitti mul'ata. Nagaheewwan App Store irraa fi Google Play irraa Seenaa kireeditii keessa jiru.",
+    "personalPeriod": "Ji'oota 12 darban"
   },
   "cloudAgent": {
     "compute": {

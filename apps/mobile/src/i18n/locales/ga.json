@@ -4844,7 +4844,8 @@
     "connectFailed": "Níorbh fhéidir an leathanach ceangail a oscailt"
   },
   "invoices": {
-    "personalEmptyDescription": "Taispeánfar sonraisc do do cheannacháin féin anseo nuair a bheidh bille curtha chugat."
+    "personalEmptyDescription": "Taispeántar sonraisc do do cheannacháin féin anseo nuair a bheith bille curtha chugat. Tá admhálacha ón App Store agus ó Google Play i Stair chreidmheasa.",
+    "personalPeriod": "Na 12 mhí dheireanacha"
   },
   "cloudAgent": {
     "compute": {

@@ -4619,7 +4619,8 @@
     "connectFailed": "کنکشن کا صفحہ نہیں کھل سکا"
   },
   "invoices": {
-    "personalEmptyDescription": "بل بننے کے بعد آپ کی اپنی خریداریوں کے انوائسز یہاں نظر آئیں گے۔"
+    "personalEmptyDescription": "بل بننے کے بعد آپ کی اپنی خریداریوں کے انوائسز یہاں نظر آتے ہیں۔ App Store اور Google Play کی رسیدیں کریڈٹ کی تاریخچہ میں ہیں۔",
+    "personalPeriod": "پچھلے 12 ماہ"
   },
   "cloudAgent": {
     "compute": {

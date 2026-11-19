@@ -4619,7 +4619,8 @@
     "connectFailed": "ସଂଯୋଗ ପୃଷ୍ଠା ଖୋଲିହେଲା ନାହିଁ"
   },
   "invoices": {
-    "personalEmptyDescription": "ଆପଣଙ୍କୁ ବିଲ୍ କରାଗଲା ପରେ ଆପଣଙ୍କ ନିଜ କ୍ରୟର ଇନଭଏସ୍ ଏଠାରେ ଦେଖାଯିବ।"
+    "personalEmptyDescription": "ଆପଣଙ୍କୁ ବିଲ୍ କରାଗଲା ପରେ ଆପଣଙ୍କ ନିଜ କ୍ରୟର ଇନଭଏସ୍ ଏଠାରେ ଦେଖାଯାଏ। App Storeରୁ ରସିଦ ଏବଂ Google Playରୁ ରସିଦ କ୍ରେଡିଟ୍ ଇତିହାସରେ ଅଛି।",
+    "personalPeriod": "ଗତ 12 ମାସ"
   },
   "cloudAgent": {
     "compute": {

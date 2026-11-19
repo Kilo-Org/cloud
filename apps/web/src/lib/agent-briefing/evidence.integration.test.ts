@@ -217,7 +217,7 @@ it('sends screened evidence to the model provider', async () => {
   expect(prompt).not.toContain('Quokka');
   expect(prompt).not.toContain(alias);
   expect(prompt).not.toContain(joined);
-  expect(prompt).toContain('Agent session');
+  expect(prompt).not.toContain('Agent session');
   expect(prompt).toContain('[redacted credential]');
 });
 

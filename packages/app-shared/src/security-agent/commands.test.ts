@@ -59,7 +59,10 @@ describe('security agent command helpers', () => {
   it('uses authored queue-admission copy instead of the backend detail', () => {
     expect(
       getSecurityCommandFailureMessage(
-        command({ resultCode: 'QUEUE_ADMISSION_FAILED', lastErrorRedacted: '…maximum delivery attempts' })
+        command({
+          resultCode: 'QUEUE_ADMISSION_FAILED',
+          lastErrorRedacted: '…maximum delivery attempts',
+        })
       )
     ).toBe('Queued action could not be admitted. Retry action.');
   });
@@ -70,8 +73,10 @@ describe('security agent command helpers', () => {
         command({ resultCode: 'SOME_FUTURE_CODE', lastErrorRedacted: 'raw backend text' })
       )
     ).toBe('Queued action failed. Retry action.');
-    expect(getSecurityCommandFailureMessage(command({ resultCode: null, lastErrorRedacted: 'raw backend text' }))).toBe(
-      'Queued action failed. Retry action.'
-    );
+    expect(
+      getSecurityCommandFailureMessage(
+        command({ resultCode: null, lastErrorRedacted: 'raw backend text' })
+      )
+    ).toBe('Queued action failed. Retry action.');
   });
 });

@@ -14,6 +14,7 @@ const OVERVIEW = 'profiles/[profileId]/index';
 const route = (key: string, name: string): { key: string; name: string } => ({ key, name });
 
 const NOW = 1_000;
+const STACK = 'profileTab';
 
 beforeEach(() => {
   resetPendingProfileRetirementsForTests();
@@ -21,7 +22,7 @@ beforeEach(() => {
 
 describe('takeRetirableProfileRoutes', () => {
   it('retires the original once its rebuilt copy is the focused route', () => {
-    notePendingProfileRetirement({ key: 'orig', selfName: SECTION, now: NOW });
+    notePendingProfileRetirement({ key: 'orig', stack: STACK, selfName: SECTION, now: NOW });
     const routes = [
       route('root', 'index'),
       route('orig', SECTION),
@@ -30,7 +31,7 @@ describe('takeRetirableProfileRoutes', () => {
       route('rebuilt', SECTION),
     ];
 
-    const next = takeRetirableProfileRoutes({ routes, index: 4, now: NOW });
+    const next = takeRetirableProfileRoutes({ routes, index: 4, stack: STACK, now: NOW });
 
     expect(next?.routes.map(entry => entry.key)).toEqual([
       'root',
@@ -42,19 +43,20 @@ describe('takeRetirableProfileRoutes', () => {
   });
 
   it('keeps the original while another screen is the focused route', () => {
-    notePendingProfileRetirement({ key: 'orig', selfName: SECTION, now: NOW });
+    notePendingProfileRetirement({ key: 'orig', stack: STACK, selfName: SECTION, now: NOW });
     const routes = [route('orig', SECTION), route('list', LIST)];
 
-    expect(takeRetirableProfileRoutes({ routes, index: 1, now: NOW })).toBeNull();
+    expect(takeRetirableProfileRoutes({ routes, index: 1, stack: STACK, now: NOW })).toBeNull();
   });
 
   it('keeps the original while it is still the focused route', () => {
-    notePendingProfileRetirement({ key: 'orig', selfName: SECTION, now: NOW });
+    notePendingProfileRetirement({ key: 'orig', stack: STACK, selfName: SECTION, now: NOW });
 
     expect(
       takeRetirableProfileRoutes({
         routes: [route('root', 'index'), route('orig', SECTION)],
         index: 1,
+        stack: STACK,
         now: NOW,
       })
     ).toBeNull();
@@ -63,17 +65,17 @@ describe('takeRetirableProfileRoutes', () => {
   it('never retires a different section that sits on top', () => {
     // The focused route is a rebuilt copy of ANOTHER profile screen: the
     // original being tracked must stay until its own rebuilt copy lands.
-    notePendingProfileRetirement({ key: 'orig', selfName: SECTION, now: NOW });
+    notePendingProfileRetirement({ key: 'orig', stack: STACK, selfName: SECTION, now: NOW });
     const routes = [
       route('orig', SECTION),
       route('skills-rebuilt', 'profiles/[profileId]/skills'),
     ];
 
-    expect(takeRetirableProfileRoutes({ routes, index: 1, now: NOW })).toBeNull();
+    expect(takeRetirableProfileRoutes({ routes, index: 1, stack: STACK, now: NOW })).toBeNull();
   });
 
   it('forgets an original that left the stack some other way', () => {
-    notePendingProfileRetirement({ key: 'orig', selfName: SECTION, now: NOW });
+    notePendingProfileRetirement({ key: 'orig', stack: STACK, selfName: SECTION, now: NOW });
     const gone = [route('root', 'index'), route('rebuilt', SECTION)];
 
     expect(takeRetirableProfileRoutes({ routes: gone, index: 1, now: NOW })).toBeNull();
@@ -82,13 +84,14 @@ describe('takeRetirableProfileRoutes', () => {
   });
 
   it('drops a removal the navigator never confirmed', () => {
-    notePendingProfileRetirement({ key: 'orig', selfName: SECTION, now: NOW });
+    notePendingProfileRetirement({ key: 'orig', stack: STACK, selfName: SECTION, now: NOW });
     const routes = [route('orig', SECTION), route('rebuilt', SECTION)];
 
     expect(
       takeRetirableProfileRoutes({
         routes,
         index: 1,
+        stack: STACK,
         now: NOW + PROFILE_RETIREMENT_TTL_MS,
       })
     ).toBeNull();
@@ -99,8 +102,33 @@ describe('takeRetirableProfileRoutes', () => {
       takeRetirableProfileRoutes({
         routes: [route('a', SECTION), route('b', SECTION)],
         index: 1,
+        stack: STACK,
         now: NOW,
       })
     ).toBeNull();
+  });
+
+  it('leaves another Stack’s pending copy alone', () => {
+    // The app renders two Stacks that hold profile screens, and both subscribe to
+    // their own navigator. A state event in the app-level Stack must not forget a
+    // pending copy of the Profile tab's Stack: that original would then stay in
+    // place and the section would come back on Back.
+    notePendingProfileRetirement({ key: 'orig', stack: STACK, selfName: SECTION, now: NOW });
+    const appRoutes = [route('root', 'index'), route('mgmt', 'profile-management/index')];
+
+    expect(
+      takeRetirableProfileRoutes({ routes: appRoutes, index: 1, stack: 'app', now: NOW })
+    ).toBeNull();
+    // The Profile tab's Stack still owns it, and retires it on its own state.
+    const tabRoutes = [route('orig', SECTION), route('rebuilt', SECTION)];
+    const next = takeRetirableProfileRoutes({
+      routes: tabRoutes,
+      index: 1,
+      stack: STACK,
+      now: NOW,
+    });
+
+    expect(next?.routes.map(entry => entry.key)).toEqual(['rebuilt']);
+    expect(next?.index).toBe(0);
   });
 });

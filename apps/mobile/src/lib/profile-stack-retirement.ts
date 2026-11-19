@@ -37,8 +37,20 @@ type PendingRetirement = Readonly<{
  */
 export const PROFILE_RETIREMENT_TTL_MS = 5_000;
 
-/** The originals still waiting, keyed by the route key of the copy to remove. */
+/**
+ * The copies still waiting, keyed by `<stack>/<route key>`.
+ *
+ * The scope matters: the app renders two Stacks that each hold profile screens
+ * (the Profile tab's and the app-level Manage Profiles one), and both subscribe
+ * to their own navigator's state. Without the scope, a state event in one Stack
+ * would find a pending copy of the other absent from its routes and forget it, so
+ * the original would stay in the stack it belongs to.
+ */
 const pending = new Map<string, PendingRetirement>();
+
+function pendingKey(stack: string, key: string): string {
+  return `${stack}/${key}`;
+}
 
 function dropExpired(now: number): void {
   for (const [key, entry] of pending) {
@@ -50,15 +62,16 @@ function dropExpired(now: number): void {
 
 /**
  * Record that `key` is the original copy of a screen named `selfName`, to be
- * removed once that screen's rebuilt copy is the focused route.
+ * removed once that screen's rebuilt copy is the focused route of `stack`.
  */
 export function notePendingProfileRetirement({
   key,
+  stack,
   selfName,
   now,
-}: Readonly<{ key: string; selfName: string; now: number }>): void {
+}: Readonly<{ key: string; stack: string; selfName: string; now: number }>): void {
   dropExpired(now);
-  pending.set(key, { selfName, expiresAt: now + PROFILE_RETIREMENT_TTL_MS });
+  pending.set(pendingKey(stack, key), { selfName, expiresAt: now + PROFILE_RETIREMENT_TTL_MS });
 }
 
 /** Drop every pending retirement: tests assert from a known state. */
@@ -67,24 +80,26 @@ export function resetPendingProfileRetirementsForTests(): void {
 }
 
 /**
- * The stack `routes` with every retirable original copy removed, or null when
- * nothing is retirable yet.
+ * The stack `routes` with every retirable original copy of `stack` removed, or
+ * null when nothing is retirable yet.
  *
  * A copy is retirable only when it is still in the stack, it is not the focused
  * route, and the focused route is a screen of the same name — i.e. this screen's
  * rebuilt copy is the one on top, not some other screen the reader opened. The
- * focused route is never removed, so `index` is the focused route's own position
- * after the removals.
+ * focused route is never removed, so the returned index is the focused route's own
+ * position after the removals.
  */
-export function takeRetirableProfileRoutes({
+export function takeRetirableProfileRoutes<T extends RetirementRoute>({
   routes,
   index,
+  stack,
   now,
 }: Readonly<{
-  routes: readonly RetirementRoute[];
+  routes: readonly T[];
   index: number;
+  stack: string;
   now: number;
-}>): { routes: RetirementRoute[]; index: number } | null {
+}>): { routes: T[]; index: number } | null {
   dropExpired(now);
   if (pending.size === 0) {
     return null;
@@ -94,10 +109,13 @@ export function takeRetirableProfileRoutes({
     return null;
   }
   const retirable = new Set<string>();
-  for (const [key, entry] of pending) {
+  const prefix = `${stack}/`;
+  const owned = [...pending].filter(([entryKey]) => entryKey.startsWith(prefix));
+  for (const [entryKey, entry] of owned) {
+    const key = entryKey.slice(prefix.length);
     if (!routes.some(route => route.key === key)) {
-      // The original left the stack some other way: nothing to remove.
-      pending.delete(key);
+      // The original left this stack some other way: nothing to remove.
+      pending.delete(entryKey);
     } else if (key !== focused.key && focused.name === entry.selfName) {
       retirable.add(key);
     }
@@ -111,7 +129,7 @@ export function takeRetirableProfileRoutes({
     return null;
   }
   for (const key of retirable) {
-    pending.delete(key);
+    pending.delete(pendingKey(stack, key));
   }
   return { routes: nextRoutes, index: nextIndex };
 }

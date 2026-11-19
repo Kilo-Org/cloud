@@ -133,6 +133,7 @@ export function useRepairProfileRouteStack({
       // any profile screen can finish it (`profile-stack-retirement.ts`).
       notePendingProfileRetirement({
         key: current.key,
+        stack,
         selfName: current.name,
         now: Date.now(),
       });
@@ -162,6 +163,7 @@ export function useRepairProfileRouteStack({
       const next = takeRetirableProfileRoutes({
         routes: state.routes,
         index: state.index,
+        stack,
         now: Date.now(),
       });
       if (next === null) {
@@ -174,5 +176,5 @@ export function useRepairProfileRouteStack({
     // is already settled, so judge the stack once as this instance mounts.
     retire();
     return navigation.addListener('state', retire);
-  }, [navigation]);
+  }, [navigation, stack]);
 }

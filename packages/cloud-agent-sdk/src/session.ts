@@ -286,6 +286,11 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
   // read-only open. A payload whose watched row carries the same status and
   // connection as this one brings nothing new, so it must not re-resolve.
   let lastUpgradeEvidence: { status: string; connectionId?: string | undefined } | null = null;
+  // The row that produced the most recent inconclusive (stay-read-only or
+  // failed) attempt. The backoff resets only when accepted evidence differs
+  // from this row — a repeat of the same row after a re-arm is a retry of the
+  // same attempt, not new evidence, and keeps the escalated interval.
+  let lastAttemptRow: { status: string; connectionId?: string | undefined } | null = null;
   let rearmTimer: ReturnType<typeof setTimeout> | null = null;
   // Current backoff delay for inconclusive (stay-read-only or failed) upgrade
   // attempts. Resets whenever the watcher sees genuinely new evidence.
@@ -326,7 +331,11 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
         lastUpgradeEvidence.connectionId === evidence.connectionId;
       if (unchanged) return;
       lastUpgradeEvidence = evidence;
-      rearmBackoffMs = READ_ONLY_REARM_COOLDOWN_MS;
+      const rowChanged =
+        lastAttemptRow === null ||
+        lastAttemptRow.status !== evidence.status ||
+        lastAttemptRow.connectionId !== evidence.connectionId;
+      if (rowChanged) rearmBackoffMs = READ_ONLY_REARM_COOLDOWN_MS;
       void handleUpgradeTrigger();
     });
     disarmUpgradeWatcher = () => {
@@ -356,6 +365,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     disarmUpgradeWatcher = null;
     connectGeneration += 1;
     const expectedGeneration = connectGeneration;
+    lastAttemptRow = lastUpgradeEvidence;
 
     let resolved: ResolvedSession;
     try {
@@ -376,6 +386,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       // Real upgrade: destroy the historical transport and rebuild on the new
       // resolution. resolveAndConnect reports the resolution (onResolved), so
       // it fires exactly once per resolved session in every path.
+      lastAttemptRow = null;
       if (transport) {
         transport.destroy();
         transport = null;
@@ -416,6 +427,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     disarmUpgradeWatcher?.();
     disarmUpgradeWatcher = null;
     lastUpgradeEvidence = null;
+    lastAttemptRow = null;
     rearmBackoffMs = READ_ONLY_REARM_COOLDOWN_MS;
     if (transport) {
       transport.destroy();
@@ -637,6 +649,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
 
     if (resolved.type === 'read-only') {
       lastUpgradeEvidence = null;
+      lastAttemptRow = null;
       rearmBackoffMs = READ_ONLY_REARM_COOLDOWN_MS;
       armUpgradeWatcher();
     }

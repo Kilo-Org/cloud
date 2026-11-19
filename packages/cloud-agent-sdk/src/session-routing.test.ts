@@ -591,7 +591,9 @@ describe('session transport routing', () => {
         session.connect();
         await flushUpgradeResolution();
 
-        // Attempt 1 at 1s, attempt 2 at 2s, attempt 3 at 4s.
+        // Attempt 1 fires at 1s, attempt 2 at 2s, attempt 3 at 4s: the
+        // backoff survives each re-arm because the retried row is identical
+        // to the row the previous inconclusive attempt was based on.
         fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('busy'));
         await flushUpgradeResolution();
         expect(resolveSession).toHaveBeenCalledTimes(2);
@@ -601,8 +603,8 @@ describe('session transport routing', () => {
         await flushUpgradeResolution();
         expect(resolveSession).toHaveBeenCalledTimes(3);
 
-        // Attempt 2's timer is 2s out; 999ms must not fire it.
-        jest.advanceTimersByTime(999);
+        // Attempt 2's timer is 2s out; 1999ms must not fire it.
+        jest.advanceTimersByTime(1999);
         fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('busy'));
         await flushUpgradeResolution();
         expect(resolveSession).toHaveBeenCalledTimes(3);
@@ -611,6 +613,51 @@ describe('session transport routing', () => {
         fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('busy'));
         await flushUpgradeResolution();
         expect(resolveSession).toHaveBeenCalledTimes(4);
+
+        session.destroy();
+      });
+
+      it('resets the backoff when a changed row drives the next attempt', async () => {
+        const resolveSession = jest.fn((): Promise<ResolvedSession> =>
+          Promise.resolve({ type: 'read-only', kiloSessionId: kiloId(SES_ID) })
+        );
+        const fetchSnapshot = jest.fn(() => Promise.resolve(makeSnapshot({ id: SES_ID }, [])));
+        const fake = makeFakeUserWebConnection();
+
+        const session = createCloudAgentSession({
+          kiloSessionId: kiloId(SES_ID),
+          resolveSession,
+          transport: {
+            fetchSnapshot,
+            userWebConnection: fake.connection,
+          },
+        });
+
+        session.connect();
+        await flushUpgradeResolution();
+
+        // Attempt 1 (new evidence) at 1s, attempt 2 (same row) at 2s.
+        fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('busy'));
+        await flushUpgradeResolution();
+        expect(resolveSession).toHaveBeenCalledTimes(2);
+
+        jest.advanceTimersByTime(1000);
+        fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('busy'));
+        await flushUpgradeResolution();
+        expect(resolveSession).toHaveBeenCalledTimes(3);
+
+        // A changed row is genuinely new evidence, not a retry: it resets the
+        // backoff so the next inconclusive interval is 1s again. The pending
+        // 2s retry timer fires first (the watcher is disarmed until it does).
+        jest.advanceTimersByTime(2000);
+        fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('idle'));
+        await flushUpgradeResolution();
+        expect(resolveSession).toHaveBeenCalledTimes(4);
+
+        jest.advanceTimersByTime(1000);
+        fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('idle'));
+        await flushUpgradeResolution();
+        expect(resolveSession).toHaveBeenCalledTimes(5);
 
         session.destroy();
       });

@@ -41,6 +41,7 @@ const boundary = vi.hoisted(() => ({
 }));
 const routerPush = vi.hoisted(() => vi.fn());
 const openExternalUrlMock = vi.hoisted(() => vi.fn());
+const openAppShellHandoffMock = vi.hoisted(() => vi.fn());
 const kiloPassQuery = vi.hoisted(() => ({ enabled: [] as boolean[] }));
 const membersQuery = vi.hoisted(() => ({
   data: undefined as
@@ -124,7 +125,15 @@ vi.mock('@/lib/organization-context', () => ({
 
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.kilo.test' }));
 
+/** Whether the storefront rule lets the lapsed-plan banner link to the web. */
+const storefrontRule = vi.hoisted(() => ({ linkAllowed: true }));
+
+vi.mock('@/lib/billing/external-purchase-link', () => ({
+  useCanLinkExternalPurchase: () => storefrontRule.linkAllowed,
+}));
+
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: openExternalUrlMock }));
+vi.mock('@/lib/app-shell-handoff', () => ({ openAppShellHandoff: openAppShellHandoffMock }));
 
 vi.mock('@/lib/format', () => ({
   formatPrefixedMoney: (amount: number) => `$${amount}`,
@@ -143,7 +152,7 @@ const kiloPassRowState = vi.hoisted(() => ({
   current: null as null | {
     subtitle: string;
     attention: boolean;
-    action: 'manage' | 'setup' | 'retry' | 'none';
+    action: 'retry' | 'none';
     actionLabel: string | null;
     accessibilityHint: string | null;
     loading: boolean;
@@ -201,6 +210,7 @@ vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }
 
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronRight: 'DirectionalChevronRight',
+  DirectionalLogs: 'DirectionalLogs',
 }));
 
 // Every icon the hub composes, including the web-settings rows' own set: the
@@ -214,6 +224,7 @@ vi.mock('@/components/ui/icons', () => ({
   KeyRound: 'KeyRound',
   LineChart: 'LineChart',
   Lock: 'Lock',
+  Logs: 'Logs',
   Mail: 'Mail',
   Pencil: 'Pencil',
   Plug: 'Plug',
@@ -223,6 +234,7 @@ vi.mock('@/components/ui/icons', () => ({
   Shield: 'Shield',
   SlidersHorizontal: 'SlidersHorizontal',
   Users: 'Users',
+  UsersRound: 'UsersRound',
   Wallet: 'Wallet',
 }));
 
@@ -277,9 +289,16 @@ function hitSlopPerSide(hitSlop: unknown): number {
 }
 
 function findRenameControl(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
-  return root.findAll(
-    node => typeof node.type === 'string' && node.props.accessibilityLabel === 'Rename organization'
-  );
+  // A lapsed plan appends its reason to the control's name, so the search takes
+  // the name the control always starts with rather than the whole string.
+  const title = i18n.t('organization.hub.renameTitle');
+  return root.findAll(node => {
+    if (typeof node.type !== 'string') {
+      return false;
+    }
+    const label: unknown = node.props.accessibilityLabel;
+    return typeof label === 'string' && (label === title || label.startsWith(`${title}. `));
+  });
 }
 
 async function renderHub() {
@@ -296,11 +315,13 @@ beforeEach(() => {
   boundary.balance = 5_000_000;
   boundary.plan = 'teams';
   boundary.isTrialExpiredForEnforcement = false;
+  storefrontRule.linkAllowed = true;
   hideBalancePref.hideBalance = false;
   hideBalancePref.hasLoaded = true;
   kiloPassRowState.current = null;
   routerPush.mockClear();
   openExternalUrlMock.mockClear();
+  openAppShellHandoffMock.mockClear();
   kiloPassQuery.enabled = [];
   membersQuery.data = { parent_organization_id: null, settings: {} };
   membersQuery.isError = false;
@@ -332,6 +353,22 @@ describe('Organization hub card', () => {
     // Left-to-right isolate (U+2066) and pop-directional-isolate (U+2069): the
     // pair reads 1 of 5 in either interface direction.
     expect(seats?.props.value).toBe('\u20661 / 5\u2069');
+    unmount();
+  });
+
+  it('holds a brand-new seat-enforcing organization at the used count, without a total', async () => {
+    // A new organization is created with the enforcement switch on and no
+    // seats bought, so its total is 0 and the pair would read `1 / 0` —
+    // a row that reads as over capacity on creation day.
+    boundary.requireSeats = true;
+    boundary.seatCount = { used: 1, total: 0 };
+
+    const { renderer, unmount } = await renderHub();
+
+    const seats = renderer.root
+      .findAllByType('KvRow')
+      .find(node => node.props.label === i18n.t('organization.hub.organizationSeats'));
+    expect(seats?.props.value).toBe('1');
     unmount();
   });
 
@@ -441,6 +478,18 @@ describe('Organization hub plan', () => {
     unmount();
   });
 
+  it('drops the billing action when the storefront rule refuses the link', async () => {
+    storefrontRule.linkAllowed = false;
+    boundary.isTrialExpiredForEnforcement = true;
+
+    const { renderer, unmount } = await renderHub();
+
+    const [refusal] = refusals(renderer);
+    expect(refusal?.props.action).toBeUndefined();
+    expect(openExternalUrlMock).not.toHaveBeenCalled();
+    unmount();
+  });
+
   it('keeps the explanation and drops the action for a member', async () => {
     boundary.role = 'member';
     boundary.isTrialExpiredForEnforcement = true;
@@ -458,7 +507,7 @@ describe('Organization hub plan', () => {
 });
 
 describe('Organization hub balance masking', () => {
-  // The mocked org carries balance 5_000_000 → the mocked formatMoney paints $5.
+  // The mocked org carries balance 5_000_000 → the mocked formatPrefixedMoney paints $5.
   const balanceRow = (renderer: TestRenderer.ReactTestRenderer) =>
     renderer.root
       .findAllByType('KvRow')
@@ -564,6 +613,63 @@ describe('OrganizationHubScreen rename control', () => {
     if (!control) {
       throw new Error('rename control not found');
     }
+    act(() => {
+      (control.props.onPress as () => void)();
+    });
+
+    expect(renderer.root.findAll(node => String(node.type) === 'RenameModal')).toHaveLength(1);
+    unmount();
+  });
+
+  it('states why a lapsed plan cannot rename, keeping the box and the control disabled', async () => {
+    boundary.isTrialExpiredForEnforcement = true;
+
+    const { renderer, unmount } = await renderHub();
+
+    const controls = findRenameControl(renderer.root);
+    expect(controls).toHaveLength(1);
+    const control = controls[0];
+    if (!control) {
+      throw new Error('rename control not found');
+    }
+
+    // The server refuses every rename while the trial is expired, so the control
+    // says why instead of opening a field whose save cannot succeed. The reason
+    // joins the control's name: React Native maps a hint to Android's tooltip
+    // text, which a screen reader does not announce with the node.
+    expect(control.props.disabled).toBe(true);
+    expect(control.props.accessibilityState).toEqual({ disabled: true });
+    expect(control.props.accessibilityLabel).toBe(
+      `${i18n.t('organization.hub.renameTitle')}. ${i18n.t('organization.hub.planEnded')}`
+    );
+    expect(control.props.accessibilityHint).toBeUndefined();
+    expect(control.props.onPress).toBeUndefined();
+
+    // The control keeps the header's box, so the title above it does not move.
+    expect(sideFromClass(control.props.className, 'h')).toBeGreaterThanOrEqual(MIN_BOX_DP);
+    expect(sideFromClass(control.props.className, 'w')).toBeGreaterThanOrEqual(MIN_BOX_DP);
+    expect(String(control.props.className)).toContain('opacity-50');
+
+    expect(renderer.root.findAll(node => String(node.type) === 'RenameModal')).toHaveLength(0);
+    unmount();
+  });
+
+  it('leaves the control enabled and unannotated on an active plan', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    const controls = findRenameControl(renderer.root);
+    expect(controls).toHaveLength(1);
+    const control = controls[0];
+    if (!control) {
+      throw new Error('rename control not found');
+    }
+
+    expect(control.props.disabled).not.toBe(true);
+    expect(control.props.accessibilityLabel).toBe(i18n.t('organization.hub.renameTitle'));
+    expect(control.props.accessibilityHint).toBeUndefined();
+    expect(control.props.accessibilityState).toBeUndefined();
+
+    expect(renderer.root.findAll(node => String(node.type) === 'RenameModal')).toHaveLength(0);
     act(() => {
       (control.props.onPress as () => void)();
     });
@@ -682,7 +788,7 @@ describe('Organization hub Kilo Pass placeholder', () => {
     kiloPassRowState.current = {
       subtitle: 'Not subscribed',
       attention: false,
-      action: 'setup',
+      action: 'none',
       actionLabel: null,
       accessibilityHint: null,
       loading: false,
@@ -897,36 +1003,178 @@ describe('Organization hub billing card while its data loads', () => {
   });
 });
 
-describe('Organization hub integrations rows', () => {
-  it('names the in-app screen and the web page apart, and opens each where it says', async () => {
+describe('Organization hub integrations row', () => {
+  it('opens the app integrations screen with the organization scope', async () => {
     const { renderer, unmount } = await renderHub();
 
-    // Both rows carry the same Plug glyph and reach different places, so the
-    // titles are the only thing that tells them apart.
+    // One row: the web page that showed the organization's integrations is
+    // gone, and this row opens the app's own screen for the same scope.
     const rows = renderer.root
       .findAllByType('ConfigureRow')
       .filter(node => node.props.icon === 'Plug');
-    expect(rows.map(node => node.props.title)).toEqual([
-      i18n.t('integrations.title'),
-      i18n.t('organization.settingsOnWeb.integrations'),
-    ]);
+    expect(rows.map(node => node.props.title)).toEqual([i18n.t('integrations.title')]);
 
-    const [inApp, web] = rows;
-    if (inApp === undefined || web === undefined) {
-      throw new Error('the hub shows both integrations rows');
+    const [row] = rows;
+    if (row === undefined) {
+      throw new Error('the hub shows the integrations row');
     }
     act(() => {
-      (inApp.props.onPress as () => void)();
+      (row.props.onPress as () => void)();
     });
     expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/integrations?org=org-1');
+    expect(openExternalUrlMock).not.toHaveBeenCalled();
+    unmount();
+  });
+});
 
+describe('Organization hub settings-on-the-web group', () => {
+  function headings(renderer: TestRenderer.ReactTestRenderer) {
+    return renderer.root
+      .findAllByType('Text')
+      .filter(node => node.props.children === i18n.t('organization.settingsOnWeb.title'));
+  }
+
+  it('paints the heading for a member, whose remaining destination is the shell SSO card', async () => {
+    boundary.role = 'member';
+    boundary.plan = 'enterprise';
+
+    const { renderer, unmount } = await renderHub();
+
+    // Every in-app row is still out of this group, but the SSO card is the
+    // shell's own page and carries no billing gate, so the group has a row.
+    expect(headings(renderer)).toHaveLength(1);
+    const titles = renderer.root
+      .findAllByType('ConfigureRow')
+      .map(node => String(node.props.title));
+    expect(titles).toContain(i18n.t('organization.settingsOnWeb.ssoAndDomain'));
+    unmount();
+  });
+
+  it('keeps the heading on enterprise, where the SSO card is the destination', async () => {
+    // SSO and domain is the enterprise dashboard card the shell hosts, so the
+    // group exists exactly where that card does.
+    boundary.plan = 'enterprise';
+    const { renderer, unmount } = await renderHub();
+
+    expect(headings(renderer)).toHaveLength(1);
+    unmount();
+  });
+
+  it('paints the heading for a member on teams, whose card the app shell owns', async () => {
+    // A teams dashboard shows data collection where enterprise shows providers
+    // and models, and the app shell owns that card, so the plan gate keeps the
+    // row and the group names it.
+    boundary.role = 'member';
+
+    const { renderer, unmount } = await renderHub();
+
+    expect(headings(renderer)).toHaveLength(1);
+    const titles = renderer.root
+      .findAllByType('ConfigureRow')
+      .map(node => String(node.props.title));
+    expect(titles).toContain(i18n.t('organization.settingsOnWeb.dataCollection'));
+    unmount();
+  });
+
+  it('lists no row for the removed sub-organization areas', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    // The two areas are gone from the hub and open nothing: neither a web page
+    // nor a replacement screen stands in for them.
+    const titles = renderer.root
+      .findAllByType('ConfigureRow')
+      .map(node => String(node.props.title));
+    expect(titles).not.toContain('Sub-organizations');
+    expect(titles).not.toContain('Distribute funds');
+    unmount();
+  });
+
+  it('opens request logs natively instead of the web page', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    const row = renderer.root
+      .findAllByType('ConfigureRow')
+      .find(node => node.props.title === i18n.t('organization.settingsOnWeb.requestLogs'));
+    if (row === undefined) {
+      throw new Error('the hub shows the request logs row');
+    }
     act(() => {
-      (web.props.onPress as () => void)();
+      (row.props.onPress as () => void)();
     });
-    expect(openExternalUrlMock).toHaveBeenCalledWith(
-      'https://app.kilo.test/organizations/org-1/integrations',
-      { label: i18n.t('organization.settingsOnWeb.integrations') }
+    expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/organization/request-logs');
+    // The row draws the screen's own glyph through the direction-aware wrapper,
+    // so the card's request-logs icon mirrors with the empty state in RTL.
+    expect(row.props.icon).toBe('DirectionalLogs');
+    expect(openExternalUrlMock).not.toHaveBeenCalled();
+    unmount();
+  });
+});
+
+describe('Organization hub billing row', () => {
+  it('opens the billing screen of the organization the hub shows', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    const row = renderer.root
+      .findAllByType('ConfigureRow')
+      .find(node => node.props.icon === 'CreditCard');
+    if (row === undefined) {
+      throw new Error('the hub shows the billing row for a billing role');
+    }
+    act(() => {
+      (row.props.onPress as () => void)();
+    });
+    // The billing screen reads its organization from the query, so the row
+    // keeps the organization this hub was opened for.
+    expect(routerPush).toHaveBeenCalledWith(
+      '/(app)/(tabs)/(3_profile)/organization/billing?org=org-1'
     );
+    unmount();
+  });
+});
+
+describe('Organization hub settings rows on the app shell', () => {
+  const rowTitled = (renderer: TestRenderer.ReactTestRenderer, title: string) => {
+    const row = renderer.root
+      .findAllByType('ConfigureRow')
+      .find(node => node.props.title === title);
+    if (row === undefined) {
+      throw new Error(`the hub shows the "${title}" row`);
+    }
+    return row;
+  };
+
+  it('hands the SSO card off to its shell page', async () => {
+    boundary.plan = 'enterprise';
+    const { renderer, unmount } = await renderHub();
+
+    const title = i18n.t('organization.settingsOnWeb.ssoAndDomain');
+    act(() => {
+      (rowTitled(renderer, title).props.onPress as () => void)();
+    });
+
+    // The card lives on the dashboard the shell owns, so the row may not open
+    // the full-web organization page.
+    expect(openAppShellHandoffMock).toHaveBeenCalledWith(
+      { page: 'organization-sso', organizationId: 'org-1' },
+      { label: title }
+    );
+    expect(openExternalUrlMock).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('hands the data-collection card off to its shell page', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    const title = i18n.t('organization.settingsOnWeb.dataCollection');
+    act(() => {
+      (rowTitled(renderer, title).props.onPress as () => void)();
+    });
+
+    expect(openAppShellHandoffMock).toHaveBeenCalledWith(
+      { page: 'organization-data-collection', organizationId: 'org-1' },
+      { label: title }
+    );
+    expect(openExternalUrlMock).not.toHaveBeenCalled();
     unmount();
   });
 });
@@ -952,7 +1200,7 @@ describe('Organization hub Kilo Pass icon tile', () => {
     kiloPassRowState.current = {
       subtitle: 'Not subscribed',
       attention: false,
-      action: 'setup',
+      action: 'none',
       actionLabel: 'Set up',
       accessibilityHint: 'Opens Kilo Pass setup on web.',
       loading: false,

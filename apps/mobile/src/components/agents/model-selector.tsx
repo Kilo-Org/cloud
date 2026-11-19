@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- The selector and picker row share model disclosure behavior. */
 import { selectionHaptic } from '@/lib/haptics';
-import { type Href, type ImperativeRouter, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import {
   BookOpenCheck,
   Brain,
@@ -15,6 +15,7 @@ import { Keyboard, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { CHIP_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { autoModelLabel } from '@/lib/auto-model-name';
@@ -23,11 +24,11 @@ import {
   BYOK_MODEL_LABEL,
   freeModelDataLabel,
   freeModelFreeLabel,
-  getFreeModelDataAccessibilityLabel,
   modelNameStatesFree,
 } from '@/lib/free-model-data-disclosure';
 import { type ModelOption, thinkingEffortLabel } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { type SinglePushRoute, useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { modelPickerCostLabel } from '@/lib/model-cost';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type ModelPickerSelection, type ModelPickerSelectionScope } from '@/lib/picker-bridge';
@@ -45,6 +46,8 @@ type ModelSelectorProps = {
   /** Whether this chip's `onSelect` stores the picked thinking effort. */
   acceptsVariant: boolean;
   onSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;
+  /** Called as the chip opens the picker, so a caller can mark the field as visited. */
+  onOpen?: () => void;
   disabled?: boolean;
   isLoading?: boolean;
   /** Agent name that pins the model; when set with `disabled`, the chip is locked. */
@@ -98,7 +101,7 @@ function toSessionModelOption(option: ModelOption | SessionModelOption): Session
 }
 
 export function openModelPicker(
-  router: ImperativeRouter,
+  push: SinglePushRoute,
   params: {
     options: (ModelOption | SessionModelOption)[];
     value: string;
@@ -135,7 +138,7 @@ export function openModelPicker(
   // strip of the screen behind it below the sheet. Dismiss the keyboard first
   // so the sheet anchors at the window bottom (e1 spot check).
   Keyboard.dismiss();
-  router.push(`/(app)/agent-chat/model-picker?routeKey=${encodeURIComponent(routeKey)}` as Href);
+  push(`/(app)/agent-chat/model-picker?routeKey=${encodeURIComponent(routeKey)}` as Href);
 }
 
 export function ModelSelector({
@@ -144,11 +147,12 @@ export function ModelSelector({
   options,
   acceptsVariant,
   onSelect,
+  onOpen,
   disabled = false,
   isLoading = false,
   lockLabel,
 }: Readonly<ModelSelectorProps>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
   const selectionContext = useContext(ModelPickerSelectionScopeContext);
@@ -162,16 +166,23 @@ export function ModelSelector({
         accessibilityLabel={t('common.model')}
         className="min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5"
       >
-        <Text className="shrink text-sm font-medium text-foreground" numberOfLines={1}>
-          {t('common.model')}
-        </Text>
-        <ChevronDown size={14} color={colors.mutedForeground} />
+        {/* The bar stands in for the label line and takes that line's own box:
+            `text-sm` sets 17.5 dp of height, and the default model's label
+            measured 75.81 dp on the composer, so the pill is the size it will
+            have once that model arrives. `bg-muted-soft` for the reason recorded
+            on the repository loading row: the default `bg-skeleton-fill` equals
+            this pill's `bg-secondary` in the light palette and would paint
+            nothing. The wrapper keeps the busy label for assistive tech without a
+            text node that reads as a resolved value. */}
+        <Skeleton className="h-[17.5px] w-[75.5px] bg-muted-soft" />
+        <View className="opacity-50">
+          <ChevronDown size={14} color={colors.mutedForeground} />
+        </View>
       </View>
     );
   }
 
   const pickerOptions = options.map(option => toSessionModelOption(option));
-  const effectivelyDisabled = disabled || pickerOptions.every(option => option.unavailable);
   const selectedModel = pickerOptions.find(option => option.id === value);
   const providerAware = pickerOptions.some(
     option => option.modelRef !== undefined || !option.showGatewayMetadata
@@ -191,25 +202,45 @@ export function ModelSelector({
   const { byok, collectsData } = modelSelectorBadges(selectedModel);
   const hasVariants = selectedModel ? selectedModel.variants.length > 1 : false;
   const variantLabel = variant ? thinkingEffortLabel(variant) : '';
-  const dataLabel = collectsData ? getFreeModelDataAccessibilityLabel(label) : label;
-  const modelLabel = byok ? `${dataLabel}, ${BYOK_MODEL_LABEL}` : dataLabel;
-  const accessibilityLabel =
-    (hasVariants && variantLabel
+  const chipParts = [
+    label,
+    collectsData ? freeModelDataLabel() : undefined,
+    byok ? BYOK_MODEL_LABEL : undefined,
+  ].filter((part): part is string => part !== undefined);
+  const modelLabel = formatList(chipParts, i18n.language);
+  const spokenModel =
+    hasVariants && variantLabel
       ? t('agentChat.modelSelector.thinkingEffortWithModel', {
           model: modelLabel,
           variant: variantLabel,
         })
-      : modelLabel) +
-    (lockLabel && disabled ? t('agentChat.modelSelector.lockedByAgent', { agent: lockLabel }) : '');
+      : modelLabel;
+  // The chip names one model, so it states that model's state. Every option
+  // being unavailable is therefore not what decides the announcement.
+  const selectedUnavailable = selectedModel?.unavailable === true;
+  // An empty catalog has nothing to choose, so the chip stays disabled instead
+  // of opening a sheet with no rows; an unavailable catalog keeps its press so
+  // the picker can explain each model.
+  const chipDisabled = disabled || pickerOptions.length === 0;
+  const accessibilityLabel = [
+    spokenModel,
+    selectedUnavailable ? t('agentChat.modelSelector.unavailable') : undefined,
+    lockLabel && disabled
+      ? t('agentChat.modelSelector.lockedByAgent', { agent: lockLabel })
+      : undefined,
+  ]
+    .filter((part): part is string => part !== undefined)
+    .join(t('common.sentenceJoiner'));
   // A pinned variant is meaningful even when the locked option carries a single
   // variant, so surface the badge whenever a lock label is present.
   const showVariantBadge = variantLabel !== '' && (hasVariants || Boolean(lockLabel));
 
   function handlePress() {
-    if (effectivelyDisabled) {
+    if (chipDisabled) {
       return;
     }
-    openModelPicker(router, {
+    onOpen?.();
+    openModelPicker(pushOnce, {
       options: pickerOptions,
       value,
       variant,
@@ -222,13 +253,13 @@ export function ModelSelector({
   return (
     <Pressable
       onPress={handlePress}
-      disabled={effectivelyDisabled}
+      disabled={chipDisabled}
       // The chip's own 27.81pt frame is the visual; the vertical slop carries
       // its touch region past the 44pt design target without growing the row.
       hitSlop={CHIP_HIT_SLOP}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled: effectivelyDisabled }}
+      accessibilityState={{ disabled: chipDisabled }}
       className="min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70"
     >
       <View className="min-w-0 shrink flex-row items-center gap-1.5">
@@ -258,7 +289,7 @@ export function ModelSelector({
       </View>
       {/* The label stays at full theme contrast; a disabled chip dims only its
        * chevron so the pill text keeps the WCAG AA 4.5:1 ratio (D2). */}
-      <View className={cn(effectivelyDisabled && 'opacity-50')}>
+      <View className={cn(chipDisabled && 'opacity-50')}>
         <ChevronDown size={14} color={colors.mutedForeground} />
       </View>
     </Pressable>
@@ -363,7 +394,15 @@ export function ModelPickerOptionRow({
               </Text>
             ) : null}
             {option.displayId ? (
-              <Text selectable className="font-mono text-xs text-muted-foreground">
+              // The subtitle names a source, and a repository path can be long, so
+              // it stays one line: a wrapped path would make one row taller than
+              // its neighbours for a value the person reads at a glance.
+              <Text
+                selectable
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                className="font-mono text-xs text-muted-foreground"
+              >
                 {option.displayId}
               </Text>
             ) : null}

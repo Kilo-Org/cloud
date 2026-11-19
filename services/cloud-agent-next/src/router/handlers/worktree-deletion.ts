@@ -16,6 +16,8 @@ import { hasOrganizationAccess } from '@kilocode/worker-utils';
 import { getPgDb } from '../../db/pg';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub';
 import { getSandboxControlStub } from '../../sandbox-control/stub';
+import { getWorkspaceStub } from '../../control-plane/workspace/workspace-stub';
+import { workspaceSessionIdForScope } from '../../cloud-agent-authority';
 import {
   worktreeDeleteResultSchema,
   type WorktreeDeleteResult,
@@ -142,6 +144,17 @@ export async function deleteWorktreeResources(
     );
     sessionCount = state.manifest.sessions.length;
     locationCount = state.runtimeLocations.length;
+    // Deletion is now the workspace's committed intent: end its Cloud Agent
+    // authority before any chat that could be adopted from is torn down.
+    const workspaceSessionId = workspaceSessionIdForScope(params.worktreeId, params.worktreeId);
+    if (workspaceSessionId !== undefined) {
+      setStage('end_workspace_authority');
+      await withDORetry(
+        () => getWorkspaceStub(ctx.env, ctx.userId, workspaceSessionId),
+        stub => stub.markDeleted(),
+        'markDeleted'
+      );
+    }
     if (state.completed) {
       outcome = 'replayed';
       return {

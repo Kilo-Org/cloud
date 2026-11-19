@@ -66,6 +66,9 @@ export function evaluateEffectiveModelAccessPolicy(
   const organizationProviderCeiling = organizationRestrictionsEnabled
     ? context.organization.settings.provider_allow_list
     : undefined;
+  // `organizationModelDenyList` and `organizationProviderCeiling` set the default
+  // model and provider access for organization members. Group policies set the
+  // access of their own members. Organization admins manage both.
   // The fields below do not vary by branch; each branch adds only the snapshot
   // requirement and the member grant that its policy mode implies.
   const organizationFields = {

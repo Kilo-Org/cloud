@@ -11,6 +11,7 @@ import type { AccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-a
 import type { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
 import type { SandboxControlV2 as SandboxControl } from './control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 as SandboxSession } from './control-plane/session/session-do.js';
+import type { CloudAgentWorkspaceDO } from './control-plane/workspace/workspace-do.js';
 import type { VercelSnapshotBuild } from './persistence/VercelSnapshotBuild.js';
 import type { SandboxContainers } from './sandbox-containers/SandboxContainers.js';
 import type { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
@@ -470,6 +471,15 @@ export type GitTokenService = {
 
 export type Env = {
   AI?: Ai;
+  /**
+   * Deployment environment for runtime-token admission checks; the web app
+   * mints control tokens with the same value (`process.env.NODE_ENV`),
+   * production with the top-level config and development with `env.dev`.
+   */
+  ENVIRONMENT?: string;
+  CLOUD_AGENT_SENTRY_DSN?: string;
+  CLOUD_AGENT_SENTRY_ENVIRONMENT?: string;
+  CF_VERSION_METADATA?: { id: string };
   CONTAINER_BILLING_HEARTBEAT_SECONDS?: string;
   /** Durable Object namespace for sandbox-scoped wrapper call-home control */
   SANDBOX_CONTROL: DurableObjectNamespace<SandboxControl>;
@@ -477,6 +487,8 @@ export type Env = {
   VERCEL_SNAPSHOT_BUILD?: DurableObjectNamespace<VercelSnapshotBuild>;
   /** Durable Object namespace for control-plane sessions */
   SANDBOX_SESSION: DurableObjectNamespace<SandboxSession>;
+  /** One Cloud Agent authority and child registry per workspace (`ownerId:workspace_<uuid>`). */
+  CLOUD_AGENT_WORKSPACE: DurableObjectNamespace<CloudAgentWorkspaceDO>;
   /** Durable Object namespace for DO-managed Cloudflare containers (control-plane only) */
   SANDBOX_CONTAINERS: DurableObjectNamespace<SandboxContainers>;
   /** One environment build coordinator per repository environment id. */
@@ -495,6 +507,10 @@ export type Env = {
   INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
   /** R2 bucket for storing session logs */
   R2_BUCKET: R2Bucket;
+  /** Private R2 bucket for workspace artifacts synchronized from `/artifacts`. */
+  WORKSPACE_ARTIFACTS_BUCKET: R2Bucket;
+  /** Bucket name used as the S3 bucket in presigned artifact download URLs. */
+  WORKSPACE_ARTIFACTS_BUCKET_NAME?: string;
   /** Runtime startup requires this private artifact bucket; missing configuration fails preflight. */
   RUNTIME_RELEASE_BUCKET?: R2Bucket;
   RUNTIME_STARTUP_MODE?: string;
@@ -503,8 +519,10 @@ export type Env = {
   RUNTIME_INTERACTIVE_ORG_IDS?: string;
   /** SHA-256 of the private R2 descriptor; existing allocations can retain inline JSON. */
   RUNTIME_RELEASE_DESCRIPTOR?: string;
-  /** Comma-separated org UUIDs whose new downloaded cloud-agent-web sandboxes run Kilo v2. */
+  /** Comma-separated org UUIDs, or `*` for all accounts' new cloud-agent-web sandboxes. */
   RUNTIME_KILO2_ORG_IDS?: string;
+  /** Comma-separated org UUIDs, or `*`, that select Kilo v2 from every session origin. */
+  RUNTIME_KILO2_ALL_SESSION_ORG_IDS?: string;
   /** The v2 release for `RUNTIME_KILO2_ORG_IDS`, in the same form as `RUNTIME_RELEASE_DESCRIPTOR`. */
   RUNTIME_RELEASE_DESCRIPTOR_KILO2?: string;
   /** Queue for callback messages (optional - supports incremental rollout) */

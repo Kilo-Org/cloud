@@ -6,7 +6,7 @@ import {
   gatewayModelEndpointsSource,
   gatewayModelsSource,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
-import { fetchGatewayModels } from './sync-providers';
+import { fetchGatewayModels, withDisplayPricing } from './sync-providers';
 
 const gateway = {
   type: 'vercel',
@@ -280,5 +280,38 @@ describe('fetchGatewayModels', () => {
       'Suspicious: total number of vercel models is 98 < 100'
     );
     expect(fetchedUrls(fetchSpy)).toEqual([]);
+  });
+});
+
+describe('withDisplayPricing', () => {
+  it('stores the undiscounted peak price of a listing', () => {
+    const model = {
+      slug: 'test/model',
+      name: 'Test model',
+      author: 'test',
+      description: '',
+      context_length: 1000,
+      input_modalities: ['text'],
+      output_modalities: ['text'],
+      group: 'Other',
+      updated_at: '2026-01-01T00:00:00.000Z',
+      endpoint: {
+        provider_display_name: 'Test',
+        is_free: false,
+        pricing: {
+          prompt: '0.00000005',
+          completion: '0.0000001',
+          discount: 0.5,
+          overrides: [
+            { utc_start: 0, utc_end: 1400, prompt: '0.0000001', completion: '0.0000002' },
+          ],
+        },
+      },
+    };
+
+    expect(withDisplayPricing(model).endpoint?.pricing).toEqual({
+      prompt: '0.000000200000',
+      completion: '0.000000400000',
+    });
   });
 });

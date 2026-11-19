@@ -21,11 +21,40 @@ import {
   isLatestMutationGeneration,
   nextMutationGeneration,
 } from '@/lib/hooks/mutation-generations';
+import {
+  type ReviewerBillingRefusal,
+  useReviewerBillingRefusal,
+} from '@/lib/hooks/reviewer-refusal';
 import { chainSave } from '@/lib/hooks/save-chain';
+import { isTrialExpiredRefusal } from '@/lib/server-error-copy';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 import { pick } from '@/lib/utils';
 
 export { isPersonal, PERSONAL_SCOPE, toPersonalPlatform };
+// The scope-to-organization mapping stays published here, so the code-reviewer
+// screens and their suites keep importing it from the module they already read.
+export { reviewerOrganizationId } from '@/lib/hooks/reviewer-refusal';
+
+/**
+ * Reports a rejected reviewer-config write with the explanation its reader
+ * gets. The organization subscription gate refuses these writes too, so a
+ * billing role gets copy that offers the plan step and the step itself next to
+ * the copy, while every other failure keeps the bare explanation.
+ */
+export function announceReviewerSaveFailure(
+  error: unknown,
+  genericMessage: string,
+  refusal: ReviewerBillingRefusal
+) {
+  const message = reviewerSaveFailure(error, genericMessage, refusal.canManageBilling).message;
+  if (!isTrialExpiredRefusal(error) || refusal.action === undefined) {
+    announcingToast.error(message);
+    return;
+  }
+  announcingToast.error(message, {
+    action: { label: refusal.action.label, onClick: refusal.action.onPress },
+  });
+}
 
 // chainSave keys in-flight saves by "scope:platform", so config saves for
 // the same reviewer config are never in flight concurrently — each waits
@@ -168,6 +197,7 @@ export function useToggleReviewer(scope: string, platform: ReviewerPlatform) {
   const queryClient = useQueryClient();
   const queryKey = useReviewConfigQueryKey(scope, platform);
   const toggleChainKey = `${scope}:${platform}`;
+  const refusal = useReviewerBillingRefusal(scope);
 
   // onError policy: roll back the onMutate snapshot (latest generation only)
   // and toast error.message.
@@ -220,9 +250,7 @@ export function useToggleReviewer(scope: string, platform: ReviewerPlatform) {
       }
       // Same reason as the config save: the server's sentence is English and
       // may name a refusal the app explains itself.
-      announcingToast.error(
-        reviewerSaveFailure(error, i18n.t('codeReviewer.updateFailed')).message
-      );
+      announceReviewerSaveFailure(error, i18n.t('codeReviewer.updateFailed'), refusal);
     },
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     onSettled: () => queryClient.invalidateQueries({ queryKey }),
@@ -262,6 +290,7 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
   const queryKey = useReviewConfigQueryKey(scope, platform);
   const webhookWarningQueryKey = gitLabWebhookWarningQueryKey(scope, platform);
   const saveChainKey = `${scope}:${platform}`;
+  const refusal = useReviewerBillingRefusal(scope);
 
   // onError policy: roll back the onMutate snapshot (latest generation only)
   // and toast error.message.
@@ -405,9 +434,7 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
       // The server's sentence is English and may describe a refusal the app
       // already explains (the organization trial gate); the toast shows that
       // explanation, never the raw sentence.
-      announcingToast.error(
-        reviewerSaveFailure(error, i18n.t('codeReviewer.configSaveFailed')).message
-      );
+      announceReviewerSaveFailure(error, i18n.t('codeReviewer.configSaveFailed'), refusal);
     },
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     onSettled: () => queryClient.invalidateQueries({ queryKey }),
@@ -422,8 +449,10 @@ export { classifyProviderState } from '@/lib/code-reviewer-status';
 export { useReviewerEditGuard, useReviewerPermission } from '@/lib/hooks/use-reviewer-permission';
 
 // Bitbucket hooks live in use-bitbucket.ts (keeps this file under the
-// max-lines limit); re-exported here so call sites are unchanged.
-export { useBitbucketReadiness, useConnectBitbucket } from '@/lib/hooks/use-bitbucket';
+// max-lines limit); the readiness read is re-exported here so its call sites
+// are unchanged. The connect mutations are imported from use-bitbucket.ts
+// directly, next to the form that runs them.
+export { useBitbucketReadiness } from '@/lib/hooks/use-bitbucket';
 
 // Review-memory hooks live in use-review-memory.ts (keeps this file under
 // the max-lines limit); re-exported here so call sites are unchanged.

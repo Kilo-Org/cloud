@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
 
-import { formatCurrency } from '@/lib/format';
+import { formatPrefixedMoney } from '@/lib/format';
 
 import { glanceableLayoutCopy, withGlanceableCopy } from './layout-copy';
 
@@ -67,16 +67,15 @@ describe('withGlanceableCopy', () => {
     // The baked parts rebuild the app's own label for a four-figure cost.
     expect(
       english.costTemplate.split('#').join(`1${english.group}234${english.costDecimal}50`)
-    ).toBe(formatCurrency(1234.5, 'en', 2));
+    ).toBe(formatPrefixedMoney(1234.5, 'en'));
     const previous = i18n.language;
     try {
       await i18n.changeLanguage('de');
-      // German writes the amount first and a decimal comma.
+      // German keeps its decimal comma behind a symbol that still leads the
+      // number.
       const german = glanceableLayoutCopy();
       expect(german.costDecimal).toBe(',');
-      expect(german.costTemplate).toContain('#');
-      expect(german.costTemplate).toContain('$');
-      expect(german.costTemplate.indexOf('#')).toBeLessThan(german.costTemplate.indexOf('$'));
+      expect(german.costTemplate).toBe('$#');
       await i18n.changeLanguage('ar');
       // The decimal separator and the template come from the same formatter
       // that writes the app's cost labels in this language.
@@ -101,11 +100,13 @@ describe('withGlanceableCopy', () => {
       checked: i18n.t('glanceable.checked'),
       lastKnown: i18n.t('glanceable.lastKnown'),
       awaitingUpdate: i18n.t('glanceable.awaitingUpdate'),
+      wasDue: i18n.t('glanceable.wasDue'),
       agent: i18n.t('common.agent'),
       homeEmpty: i18n.t('home.noLiveSessions'),
     });
     expect(copy.checked).not.toBe('glanceable.checked');
     expect(copy.awaitingUpdate).not.toBe('glanceable.awaitingUpdate');
+    expect(copy.wasDue).not.toBe('glanceable.wasDue');
   });
 
   it('bakes the Home redesign slots from reviewed keys and a one-character group separator', () => {

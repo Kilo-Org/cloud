@@ -56,6 +56,11 @@ const safeInsets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
 }));
+// The globe's opener goes through the guarded push; the assertion below reads
+// the same spy.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => push,
+}));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
@@ -268,10 +273,6 @@ describe('login-screen error mapping', () => {
     expect(errorMessage('error', { kind: 'key', key: 'authErrors.networkError' })).toBe(
       'Network error. Please try again.'
     );
-  });
-
-  it('passes a server-authored error text through untranslated', () => {
-    expect(errorMessage('error', { kind: 'text', text: 'custom error' })).toBe('custom error');
   });
 
   it('falls back to default when no error is provided', () => {

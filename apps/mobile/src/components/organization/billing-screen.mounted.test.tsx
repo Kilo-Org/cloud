@@ -1,9 +1,9 @@
+/* eslint-disable max-lines -- one suite covers the failure, seats, manage-on-web, organization-override and change-plan contracts of one screen. */
 // Billing screen failure contract: a rejected read renders that block's error
 // card with a Retry, and the Retry refetches only the query that failed — not
 // its siblings. The query layer is mocked so each block's state is driven
 // directly through the screen JSX.
 
-import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
@@ -47,31 +47,54 @@ const queries = vi.hoisted(() => ({
 const boundary = vi.hoisted(() => ({
   requireSeats: true,
   seatCount: { used: 3, total: 3 },
+  /** The id the screen asked the boundary for; a route's `?org=` arrives here. */
+  override: undefined as string | undefined,
+  isResolving: false,
+  isTrialExpiredForEnforcement: false,
 }));
+
+/** The id each billing read was keyed on. */
+const reads = vi.hoisted(() => ({
+  subscription: undefined as string | undefined,
+  seats: undefined as string | undefined,
+}));
+
+/** Whether the storefront rule lets this surface link to the web page. */
+const platform = vi.hoisted(() => ({ linkAllowed: true }));
 
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   isMoneyRole: () => true,
-  useOrgBoundary: () => ({
-    organizationId: 'org-1',
-    role: 'owner',
-    org: {
-      id: 'org-1',
-      name: 'Acme',
-      plan: 'enterprise',
-      seatCount: boundary.seatCount,
-      requireSeats: boundary.requireSeats,
-      isTrialExpiredForEnforcement: false,
-      parentOrganizationId: null,
-    },
-    isResolving: false,
-  }),
+  useOrgBoundary: (organizationIdOverride?: string) => {
+    boundary.override = organizationIdOverride;
+    const organizationId = organizationIdOverride ?? 'org-1';
+    return {
+      organizationId,
+      role: 'owner',
+      org: {
+        id: organizationId,
+        name: 'Acme',
+        plan: 'enterprise',
+        seatCount: boundary.seatCount,
+        requireSeats: boundary.requireSeats,
+        isTrialExpiredForEnforcement: boundary.isTrialExpiredForEnforcement,
+        parentOrganizationId: null,
+      },
+      isResolving: boundary.isResolving,
+    };
+  },
   useOrgParentLink: () => ({ parentLink: null }),
   useOrgKiloPassSummary: () => queries.kiloPass,
 }));
 
 vi.mock('@/lib/hooks/use-org-billing-queries', () => ({
-  useOrgSeatSubscription: () => queries.subscription,
-  useOrgSeats: () => queries.seats,
+  useOrgSeatSubscription: (organizationId?: string) => {
+    reads.subscription = organizationId;
+    return queries.subscription;
+  },
+  useOrgSeats: (organizationId?: string) => {
+    reads.seats = organizationId;
+    return queries.seats;
+  },
   useOrgAutoTopUpConfig: () => queries.autoTopUp,
 }));
 
@@ -81,8 +104,8 @@ vi.mock('@/lib/credits/add-credits-destination', () => ({
   organizationBillingUrl: (organizationId: string) => `http://localhost:3000/${organizationId}`,
 }));
 
-vi.mock('@/lib/external-billing-action', () => ({
-  externalBillingAction: (url: string) => ({ kind: 'link', url }),
+vi.mock('@/lib/billing/external-purchase-link', () => ({
+  useCanLinkExternalPurchase: () => platform.linkAllowed,
 }));
 
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
@@ -91,7 +114,11 @@ vi.mock('@/lib/a11y/tap-target', () => ({ STATE_ACTION_CLASS: 'state-action' }))
 
 vi.mock('@/components/organization/external-billing-link', async () => {
   const { createElement: h } = await import('react');
-  return { ExternalBillingLink: (props: { label?: string }) => h('ExternalBillingLink', props) };
+  return {
+    // The settings block owns the storefront gate, so this control is always
+    // the control it was asked for.
+    ExternalBillingLink: (props: { label?: string }) => h('ExternalBillingLink', props),
+  };
 });
 
 vi.mock('@/components/organization/organization-boundary', async () => {
@@ -144,8 +171,10 @@ vi.mock('@/components/ui/text', async () => {
 
 vi.mock('react-native', () => ({ View: 'View' }));
 
-function mount() {
-  return renderWithProviders(createElement(OrganizationBillingScreen));
+function mount(organizationIdOverride?: string) {
+  return renderWithProviders(
+    <OrganizationBillingScreen organizationIdOverride={organizationIdOverride} />
+  );
 }
 
 type Handler = () => void;
@@ -181,9 +210,7 @@ function subscriptionReadout() {
 
 /** The seats row's rendered value, as the screen hands it to `KvRow`. */
 function seatsReadout(renderer: ReactTestRenderer): unknown {
-  const row = renderer.root
-    .findAllByType('KvRow')
-    .find(node => node.props.label === 'Organization seats');
+  const row = renderer.root.findAllByType('KvRow').find(node => node.props.label === 'In use');
   return row?.props.value;
 }
 
@@ -199,6 +226,13 @@ function manageOnWebLink(renderer: ReactTestRenderer, url: string): ReactTestIns
     .find(node => node.props.url === url);
 }
 
+/** The lapsed-plan banner's action, narrowed out of the renderer's untyped props. */
+function bannerAction(renderer: ReactTestRenderer): { label?: string } | undefined {
+  const banner = renderer.root.findByType('OrganizationPlanRefusal' as never);
+  const action: unknown = banner.props.action;
+  return action as { label?: string } | undefined;
+}
+
 beforeEach(() => {
   for (const query of Object.values(queries)) {
     query.isPending = false;
@@ -209,6 +243,12 @@ beforeEach(() => {
   }
   boundary.requireSeats = true;
   boundary.seatCount = { used: 3, total: 3 };
+  boundary.override = undefined;
+  boundary.isResolving = false;
+  boundary.isTrialExpiredForEnforcement = false;
+  reads.subscription = undefined;
+  reads.seats = undefined;
+  platform.linkAllowed = true;
   queries.seats.data = { usedSeats: 3, totalSeats: 3 };
   queries.autoTopUp.data = { enabled: true, amountCents: 5000, thresholdCents: 1000 };
 });
@@ -280,7 +320,9 @@ describe('OrganizationBillingScreen seats row', () => {
     queries.seats.data = { usedSeats: 3, totalSeats: 4 };
 
     const { renderer, unmount } = await mount();
-    expect(seatsReadout(renderer)).toBe('3 / 4');
+    // Shared readout: the fraction runs inside a left-to-right isolate, so a
+    // right-to-left layout cannot mirror either number.
+    expect(seatsReadout(renderer)).toBe('\u20663 / 4\u2069');
     unmount();
   });
 });
@@ -326,6 +368,78 @@ describe('OrganizationBillingScreen manage-on-web links', () => {
     const { renderer, unmount } = await mount();
 
     expect(manageOnWebLink(renderer, AUTO_TOP_UP_URL)?.props.label).toBe('Set up auto top-up');
+    unmount();
+  });
+});
+
+describe('OrganizationBillingScreen organization override', () => {
+  // The route carries the organization a refusal step resolved its role
+  // against. Every read and link here is built from the boundary's returned id,
+  // so the override has to reach the boundary or the screen shows another
+  // organization's plan.
+  it('reads and links the organization the route names', async () => {
+    const { renderer, unmount } = await mount('org-2');
+
+    expect(boundary.override).toBe('org-2');
+    expect(reads.subscription).toBe('org-2');
+    expect(reads.seats).toBe('org-2');
+    expect(
+      manageOnWebLink(renderer, 'http://localhost:3000/organizations/org-2/subscriptions')
+    ).toBeDefined();
+    unmount();
+  });
+
+  it('gives the placeholder boundary the same organization while it resolves', async () => {
+    boundary.isResolving = true;
+    const { renderer, unmount } = await mount('org-2');
+
+    const placeholder = renderer.root.findByType('OrganizationBoundary' as never);
+    expect(placeholder.props.organizationIdOverride).toBe('org-2');
+    unmount();
+  });
+});
+
+describe('OrganizationBillingScreen change plan placement', () => {
+  it('leads a lapsed plan from the banner and keeps its row neutral', async () => {
+    boundary.isTrialExpiredForEnforcement = true;
+    queries.subscription.data = subscriptionReadout();
+    const { renderer, unmount } = await mount();
+
+    expect(bannerAction(renderer)?.label).toBe('Change plan');
+    // The banner above already holds this destination, so the card's own copy
+    // is gone; the block's other destinations stay.
+    expect(manageOnWebLink(renderer, SUBSCRIPTIONS_URL)).toBeUndefined();
+    expect(manageOnWebLink(renderer, `${SUBSCRIPTIONS_URL}/seats`)?.props.label).toBe('Buy seats');
+    expect(manageOnWebLink(renderer, AUTO_TOP_UP_URL)?.props.url).toBe(AUTO_TOP_UP_URL);
+    // The banner carries the ended state, so the plan value keeps the row's
+    // own neutral tone instead of a second danger colour.
+    const plan = renderer.root
+      .findAllByType('KvRow' as never)
+      .find(node => node.props.label === 'Organization plan');
+    expect(plan).toBeDefined();
+    expect(plan?.props.valueTone).toBeUndefined();
+    unmount();
+  });
+
+  it('states where the settings live when the storefront rule refuses the link', async () => {
+    // Outside the US storefront nothing links, so the banner has no action and
+    // the card states where the settings live: one line, no heading naming the
+    // web, and no purchase call to action.
+    boundary.isTrialExpiredForEnforcement = true;
+    platform.linkAllowed = false;
+    const { renderer, unmount } = await mount();
+
+    expect(bannerAction(renderer)).toBeUndefined();
+    expect(renderer.root.findAllByType('ExternalBillingLink' as never)).toHaveLength(0);
+    expect(texts(renderer)).toContain('The plan, seats and auto top-up are managed on the web.');
+    unmount();
+  });
+
+  it('renders no banner and keeps the card copy while the plan is active', async () => {
+    const { renderer, unmount } = await mount();
+
+    expect(renderer.root.findAllByType('OrganizationPlanRefusal' as never).length).toBe(0);
+    expect(manageOnWebLink(renderer, SUBSCRIPTIONS_URL)?.props.label).toBe('Change plan');
     unmount();
   });
 });

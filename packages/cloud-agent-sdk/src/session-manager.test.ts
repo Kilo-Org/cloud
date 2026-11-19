@@ -680,6 +680,63 @@ describe('createSessionManager', () => {
     });
   });
 
+  describe('workspaceArtifactsRefresh', () => {
+    const changed = {
+      type: 'workspace.artifacts.changed',
+      cloudSessionId: 'agent-1',
+      revision: 2,
+    } satisfies NormalizedEvent;
+    const connected = {
+      type: 'connected',
+      cloudSessionId: 'agent-1',
+      sessionStatus: { type: 'idle' },
+    } satisfies NormalizedEvent;
+
+    it('ignores stale revisions and bumps the connection version on reconnect', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(config.store.get(mgr.atoms.workspaceArtifactsRefresh)).toBeNull();
+
+      mockSessionCallbacks.onEvent?.(changed);
+      const firstChange = config.store.get(mgr.atoms.workspaceArtifactsRefresh);
+      expect(firstChange).toEqual({
+        cloudSessionId: 'agent-1',
+        revision: 2,
+        connectionVersion: 0,
+      });
+
+      mockSessionCallbacks.onEvent?.({ ...changed, revision: 2 });
+      mockSessionCallbacks.onEvent?.({ ...changed, revision: 1 });
+      expect(config.store.get(mgr.atoms.workspaceArtifactsRefresh)).toBe(firstChange);
+
+      mockSessionCallbacks.onEvent?.(connected);
+      expect(config.store.get(mgr.atoms.workspaceArtifactsRefresh)).toEqual({
+        cloudSessionId: 'agent-1',
+        revision: 2,
+        connectionVersion: 1,
+      });
+
+      mockSessionCallbacks.onEvent?.({ ...changed, revision: 3 });
+      expect(config.store.get(mgr.atoms.workspaceArtifactsRefresh)).toEqual({
+        cloudSessionId: 'agent-1',
+        revision: 3,
+        connectionVersion: 1,
+      });
+      mgr.destroy();
+      expect(config.store.get(mgr.atoms.workspaceArtifactsRefresh)).toBeNull();
+    });
+
+    it('ignores other Cloud sessions', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onEvent?.({ ...changed, cloudSessionId: 'agent-other' });
+      expect(config.store.get(mgr.atoms.workspaceArtifactsRefresh)).toBeNull();
+      mgr.destroy();
+    });
+  });
+
   describe('switchSession', () => {
     it('saves the latest live transcript before clearing the outgoing session', async () => {
       const cached = new Map<string, SessionSnapshotPage>();
@@ -7465,6 +7522,63 @@ describe('createSessionManager', () => {
       expect(atomValue<boolean>(config.store, mgr.atoms.isReadOnly)).toBe(false);
     });
 
+    it('repaints the bottom bar from reconnecting warning to terminal loss and back', async () => {
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      // The recoverable drop paints the non-error reconnecting line.
+      mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
+      mockSession.state.getStatus.mockReturnValue({
+        type: 'disconnected',
+        reconnecting: true,
+      });
+      notifyStateChange?.();
+
+      const warning = atomValue<{ type: string; message: string; code?: string } | null>(
+        config.store,
+        mgr.atoms.statusIndicator
+      );
+      expect(warning).toMatchObject({
+        type: 'warning',
+        code: 'agent-connection-reconnecting',
+      });
+
+      // The spent retry budget is the same `disconnected` type: the repaint
+      // gate must still re-project, so the reader gets the canonical loss
+      // line instead of an endless "Reconnecting…".
+      mockSession.state.getStatus.mockReturnValue({
+        type: 'disconnected',
+        code: 'connection-lost',
+      });
+      notifyStateChange?.();
+
+      const loss = atomValue<{ type: string; message: string; code?: string } | null>(
+        config.store,
+        mgr.atoms.statusIndicator
+      );
+      expect(loss).toMatchObject({
+        type: 'error',
+        code: 'connection-lost',
+      });
+
+      // A live connection is the one proof either state is over: the line
+      // clears and the stale error atom goes with it.
+      mockSessionCallbacks.onError?.('Connection lost. Please retry in a moment.');
+      mockSession.state.getStatus.mockReturnValue({ type: 'idle' });
+      notifyStateChange?.();
+
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+      expect(atomValue(config.store, mgr.atoms.statusIndicator)).toBeNull();
+    });
+
     it('suppresses Aborted onError from the interrupted session so errorAtom stays clear', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
@@ -11351,7 +11465,48 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(250);
     });
 
-    it('restores the OLDEST popped cursor when two pages drop in one pass', async () => {
+    it('keeps a contiguous recent window when only one of several older pages is trimmed', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async (_id, options) => {
+        const pages: Record<string, { prefix: string; count: number; nextCursor: string | null }> =
+          {
+            start: { prefix: 'init', count: 100, nextCursor: 'cursor-A' },
+            'cursor-A': { prefix: 'olderA', count: 50, nextCursor: 'cursor-B' },
+            'cursor-B': { prefix: 'olderB', count: 50, nextCursor: 'cursor-C' },
+            'cursor-C': { prefix: 'olderC', count: 50, nextCursor: null },
+          };
+        const page = pages[options.cursor ?? 'start'];
+        if (!page) throw new Error('Unexpected history cursor');
+        return makePage({
+          kiloSessionId: 'ses-1',
+          messages: makeMessages(page.prefix, page.count),
+          nextCursor: page.nextCursor,
+        });
+      });
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.loadOlderMessages();
+      await mgr.loadOlderMessages();
+      await mgr.loadOlderMessages();
+
+      mgr.trimRetainedHistory();
+
+      const retained = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(
+        message => message.info.id
+      );
+      expect(retained).toHaveLength(200);
+      expect(retained).toContain('olderA-0');
+      expect(retained).toContain('olderB-0');
+      expect(retained).not.toContain('olderC-0');
+      await mgr.loadOlderMessages();
+      expect(fetchSnapshotPage).toHaveBeenLastCalledWith(
+        kiloId('ses-1'),
+        expect.objectContaining({ cursor: 'cursor-C' })
+      );
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(250);
+    });
+
+    it('restores the continuation immediately before all trimmed pages', async () => {
       const calls: Array<{ cursor?: string }> = [];
       const fetchSnapshotPage = createPageFetchMock(async (_id, options) => {
         calls.push({ ...options });
@@ -11394,8 +11549,6 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
 
       calls.length = 0;
       await mgr.loadOlderMessages();
-      // Re-fetch starts from the OLDEST dropped page's cursor, so the oldest
-      // page (oldA) comes back, not the newer dropped page (oldB).
       expect(calls[calls.length - 1]).toEqual({ cursor: 'cursor-A' });
       const ids = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(
         m => m.info.id

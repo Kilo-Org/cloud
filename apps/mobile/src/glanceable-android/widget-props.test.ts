@@ -3,6 +3,7 @@ import {
   type HomeWidgetData,
   type HomeWidgetSessionRow,
 } from '@kilocode/app-shared/home-widget';
+import { type GlanceableSnapshotStatusOverride } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { _resetHomeWidgetDataForTests } from '@/lib/glanceable/home-widget-data';
@@ -35,6 +36,7 @@ const COPY: Record<string, string> = {
   'glanceable.lastKnown': 'Last known',
   'glanceable.nextRun': 'Next run',
   'glanceable.awaitingUpdate': 'Awaiting update',
+  'glanceable.wasDue': 'Was due',
   'common.agent': 'Agent',
   'glanceable.approving': 'Approving…',
   'glanceable.couldNotApprove': 'Could not approve',
@@ -46,7 +48,7 @@ const COPY: Record<string, string> = {
 };
 const translate = (key: string) => COPY[key] ?? key;
 const clock = (at: string) => `clock:${at}`;
-function dataFor(sessions: HomeWidgetSessionRow[], status?: HomeWidgetData['snapshot']['status']) {
+function dataFor(sessions: HomeWidgetSessionRow[], status?: GlanceableSnapshotStatusOverride) {
   return buildHomeWidgetData({
     sessions,
     userId: 'user-private-id',
@@ -209,13 +211,29 @@ describe('shared Home presentation localization', () => {
     ]);
     expect(propsFor(data).homeCopy).toMatchObject({
       wake: `Next run clock:${WAKE}`,
+      wakePassed: false,
       title: 'Wake',
     });
     vi.setSystemTime(Date.parse(WAKE));
     const props = propsFor(data);
-    expect(props.homeCopy).toMatchObject({ wake: 'Awaiting update', wakeOverdue: true });
+    expect(props.homeCopy).toMatchObject({ wake: 'Awaiting update', wakePassed: true });
     expect(props.home?.primaryKind).toBe('scheduled');
     expect(props.home?.primaryCount).toBe(1);
+  });
+
+  it('names the clock time a wake was due once its retry window has closed', () => {
+    const due = new Date(NOW - 16 * 60_000).toISOString();
+    const data = dataFor([{ status: 'scheduled', title: 'Wake', scheduledAt: due }]);
+    expect(propsFor(data).homeCopy).toMatchObject({
+      wake: `Was due clock:${due}`,
+      // A passed wake draws muted on every cell, like the awaiting line.
+      wakePassed: true,
+    });
+    expect(propsFor(data).home).toMatchObject({
+      primaryKind: 'scheduled',
+      scheduledAt: due,
+      awaitingUpdate: false,
+    });
   });
 
   it('keeps unknown wake times absent while retaining the scheduled count', () => {

@@ -13,6 +13,7 @@ import {
 } from '@kilocode/worker-utils/usage-writer-client';
 import type { Env } from './publish-usage';
 import { logSafely, queueMetrics } from './diagnostics';
+import { logFinalAttemptFailure } from './final-attempt';
 import { parseQueuedUsage, type QueuedUsage } from './queued-usage';
 import { usageRetryDelaySeconds } from './retry-policy';
 
@@ -56,6 +57,7 @@ async function processQueue(
       const message = batch.messages[nextIndex++];
       let acknowledged = false;
       let retryDelaySeconds: number | undefined;
+      let reason = 'unexpected_error';
       try {
         const result = await processMessage(
           message,
@@ -69,6 +71,7 @@ async function processQueue(
         );
         acknowledged = result.acknowledged;
         retryDelaySeconds = result.retryDelaySeconds;
+        reason = result.reason;
         writerOverloaded ||= result.overloaded;
       } catch (error) {
         unexpectedErrors.push(error);
@@ -76,9 +79,11 @@ async function processQueue(
       // Keep disposition calls outside the processing catch: never retry an ACKed message.
       try {
         if (acknowledged) message.ack();
-        else if (retryDelaySeconds !== undefined)
-          message.retry({ delaySeconds: retryDelaySeconds });
-        else message.retry();
+        else {
+          logFinalAttemptFailure(message, batch.queue, reason);
+          if (retryDelaySeconds !== undefined) message.retry({ delaySeconds: retryDelaySeconds });
+          else message.retry();
+        }
       } catch (error) {
         unexpectedErrors.push(error);
       }
@@ -194,7 +199,8 @@ async function processMessage(
   const writerStatus =
     outcome.kind === 'unavailable' && outcome.reason === 'http_error' ? outcome.status : undefined;
   const overloaded = writerStatus === 429 || writerStatus === 503;
-  const acknowledged = outcome.kind === 'recorded' || outcome.kind === 'duplicate';
+  const acknowledged =
+    outcome.kind === 'recorded' || outcome.kind === 'duplicate' || outcome.kind === 'rejected';
   const admissionReason =
     outcome.kind === 'unavailable' && outcome.reason === 'http_error' && outcome.status === 429
       ? outcome.admissionReason
@@ -232,5 +238,10 @@ async function processMessage(
     })),
     ...(writerDurationMs === undefined ? {} : { writer_duration_ms: writerDurationMs }),
   }));
-  return { acknowledged, overloaded, retryDelaySeconds };
+  return {
+    acknowledged,
+    overloaded,
+    retryDelaySeconds,
+    reason: 'reason' in outcome ? outcome.reason : outcome.kind,
+  };
 }

@@ -25,7 +25,7 @@ jest.mock('./preferred-provider-order-config', () => ({
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
 import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/eligibility';
@@ -83,6 +83,7 @@ describe('bounded spending provider enforcement', () => {
     jest.mocked(applyProviderSpecificLogic).mockResolvedValue(undefined);
     jest.mocked(upstreamRequest).mockClear();
     jest.mocked(isValidOpenRouterModelId).mockResolvedValue(true);
+    jest.mocked(isValidVercelModelId).mockResolvedValue(true);
     jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({ [model.id]: model });
     jest.mocked(getOpenRouterModelsFromDatabase).mockResolvedValue(new Set([model.id]));
     jest.mocked(getRawOpenRouterModels).mockResolvedValue({ data: [catalogEntry] });
@@ -293,6 +294,7 @@ describe('upstream model catalog validation', () => {
         expect(result).toEqual({ type: 'unknown-gateway-model' });
         expect(catalogCheck(providerId).mock.calls).toEqual([['qwen/not-in-catalog']]);
         expect(catalogCheck(otherProviderId)).not.toHaveBeenCalled();
+        expect(applyProviderSpecificLogic).not.toHaveBeenCalled();
         expect(upstreamRequest).not.toHaveBeenCalled();
       });
 
@@ -320,6 +322,27 @@ describe('upstream model catalog validation', () => {
       });
     });
   });
+
+  it.each(['openrouter', 'vercel'] as const)(
+    '%s awaits ID validation before transforming the request',
+    async providerId => {
+      const validity = Promise.withResolvers<boolean>();
+      catalogCheck(providerId).mockReturnValueOnce(validity.promise);
+
+      const result = attempt({
+        providerId,
+        requestedModel: 'qwen/qwen3-coder',
+        wireModel: 'alibaba/qwen3-coder',
+      });
+
+      expect(applyProviderSpecificLogic).not.toHaveBeenCalled();
+      validity.resolve(true);
+
+      expect((await result).type).toBe('success');
+      expect(applyProviderSpecificLogic).toHaveBeenCalledTimes(1);
+      expect(upstreamRequest).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it.each([
     ['z-ai/glm-5', 'zai/glm-5'],
@@ -382,21 +405,26 @@ describe('upstream model catalog validation', () => {
     expect(result.type).toBe(type);
   });
 
-  it.each(['direct-byok', 'mistral', 'inception', 'custom', 'custom-public', 'dev-tools'] as const)(
-    'does not validate %s models against a gateway catalog',
-    async providerId => {
-      const result = await attempt({
-        providerId,
-        requestedModel: 'not-in-catalog',
-        wireModel: 'provider-specific-model',
-      });
+  it.each([
+    'direct-byok',
+    'mistral',
+    'inception',
+    'custom',
+    'custom-public',
+    'partner',
+    'dev-tools',
+  ] as const)('does not validate %s models against a gateway catalog', async providerId => {
+    const result = await attempt({
+      providerId,
+      requestedModel: 'not-in-catalog',
+      wireModel: 'provider-specific-model',
+    });
 
-      expect(result.type).toBe('success');
-      expect(isValidOpenRouterModelId).not.toHaveBeenCalled();
-      expect(isValidVercelModelId).not.toHaveBeenCalled();
-      expect(upstreamRequest).toHaveBeenCalledTimes(1);
-    }
-  );
+    expect(result.type).toBe('success');
+    expect(isValidOpenRouterModelId).not.toHaveBeenCalled();
+    expect(isValidVercelModelId).not.toHaveBeenCalled();
+    expect(upstreamRequest).toHaveBeenCalledTimes(1);
+  });
 });
 describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => {
   let owner: OpenAiChatGptOwner;

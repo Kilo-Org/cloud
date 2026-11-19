@@ -2,6 +2,8 @@ import type { ToolDisplayMode } from './tool-detail-marker';
 import type { BackgroundActivityState } from './background-activity';
 import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
 import { readCloudAgentErrorFields } from '@kilocode/app-shared/cloud-agent-error';
+import { WORKSPACE_DELETING } from '@kilocode/session-ingest-contracts';
+import type { CloudSessionSnapshotPage } from './types';
 import {
   errorShapeSchema,
   cloudSessionMetadataSchema,
@@ -100,6 +102,11 @@ type CloudAgentModelOverride = {
   variant?: string;
 };
 type WorktreeChangesRefresh = {
+  cloudSessionId: string;
+  revision?: number;
+  connectionVersion: number;
+};
+type WorkspaceArtifactsRefresh = {
   cloudSessionId: string;
   revision?: number;
   connectionVersion: number;
@@ -617,6 +624,7 @@ type SessionManagerAtoms = {
    */
   availableCommandsCatalogStatus: W<SlashCommandCatalogStatus | null>;
   worktreeChangesRefresh: W<WorktreeChangesRefresh | null>;
+  workspaceArtifactsRefresh: W<WorkspaceArtifactsRefresh | null>;
   messagesList: Atom<StoredMessage[]>;
   staticMessages: Atom<StoredMessage[]>;
   dynamicMessages: Atom<StoredMessage[]>;
@@ -856,11 +864,14 @@ function formatErrorDetail(err: unknown): FormattedErrorDetail {
         message: 'Service is unavailable right now. Please try again.',
         code: 'service-unavailable',
       };
-    if (code === 'CONFLICT' || httpStatus === 409)
+    if (code === 'CONFLICT' || httpStatus === 409) {
+      if (r.data.message === WORKSPACE_DELETING)
+        return { message: 'This workspace is being deleted.', code: 'workspace-deleting' };
       return {
         message: 'Previous task is still finishing up. Please wait a moment.',
         code: 'previous-task-in-progress',
       };
+    }
     if (code === 'SERVICE_UNAVAILABLE' || httpStatus === 503)
       return {
         message: 'Service is temporarily unavailable. Please retry in a moment.',
@@ -1242,6 +1253,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    */
   const availableCommandsCatalogStatusAtom = atom<SlashCommandCatalogStatus | null>(null);
   const worktreeChangesRefreshAtom = atom<WorktreeChangesRefresh | null>(null);
+  const workspaceArtifactsRefreshAtom = atom<WorkspaceArtifactsRefresh | null>(null);
   const childSessionHydrationStatesAtom = atom<Map<string, ChildSessionHydrationState>>(new Map());
   const childSessionErrorsAtom = atom<Map<string, string>>(new Map());
   const childSessionStatusesAtom = atom<ReadonlyMap<string, SessionStatus>>(new Map());
@@ -1663,9 +1675,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // further older-page loads for the active session.
   let olderMessagesTerminal: boolean = false;
   /**
-   * Stack of loaded older pages, oldest first. Each entry records the cursor
+   * Stack of loaded older pages, newest first. Each entry records the cursor
    * that was current before that page was fetched and the message ids the page
-   * added. `trimRetainedHistory` pops from the front (oldest) to stay under
+   * added. `trimRetainedHistory` pops from the end (oldest) to stay under
    * `RETAINED_MESSAGE_WINDOW`. The initial bounded page is never pushed here,
    * so the live tail always survives.
    */
@@ -1770,6 +1782,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(availableCommandsAtom, []);
     store.set(availableCommandsCatalogStatusAtom, null);
     store.set(worktreeChangesRefreshAtom, null);
+    store.set(workspaceArtifactsRefreshAtom, null);
     if (!preserveTranscript) {
       store.set(hasOlderMessagesAtom, false);
       store.set(olderMessagesOmittedItemCountAtom, 0);
@@ -2294,7 +2307,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         ? `${s.type}:${s.step}:${s.commitHash ?? ''}`
         : s.type === 'scheduled'
           ? `${s.type}:${s.scheduledAt ?? ''}`
-          : s.type;
+          : s.type === 'disconnected'
+            ? s.reconnecting === true
+              ? 'disconnected:reconnecting'
+              : 'disconnected:terminal'
+            : s.type;
     const csKey = (cs: CloudStatus | null) =>
       cs === null
         ? ''
@@ -2503,27 +2520,41 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
     const loadPromise = (async (): Promise<void> => {
       store.set(isLoadingOlderMessagesAtom, true);
-      let outcome: SessionSnapshotPageOutcome | null;
+      let outcome: SessionSnapshotPageOutcome | null = null;
+      let cloudPage: unknown;
+      let cloudRead = false;
       try {
         if (cloudSessionId) {
           if (!config.fetchCloudSnapshotPage) {
             throw new Error('Cloud Agent workspace sessions require fetchCloudSnapshotPage');
           }
-          outcome = cloudSessionMessagesPageSchema.parse(
-            await config.fetchCloudSnapshotPage(cloudSessionId, { cursor })
-          );
+          cloudPage = await config.fetchCloudSnapshotPage(cloudSessionId, { cursor });
+          cloudRead = true;
         } else if (fetchSnapshotPage) {
           outcome = await fetchSnapshotPage(kiloSessionId, { cursor });
         } else {
           return;
         }
-      } catch (_err) {
+      } catch {
         // Network/transport-level failures map to a retryable outcome so
         // the UI exposes a Retry CTA. The cursor is preserved.
         if (expectedGeneration !== loadOlderGeneration) return;
         store.set(olderMessagesErrorAtom, { kind: 'retryable' });
         store.set(isLoadingOlderMessagesAtom, false);
         return;
+      }
+      if (cloudRead) {
+        // A page that fails the schema is terminal, matching the transport's
+        // snapshot read: retrying re-reads the same persisted page. The
+        // schema's transform can also throw (a session-identity mismatch),
+        // and safeParse does not convert a transform throw into a failure.
+        let parsed: { success: true; data: CloudSessionSnapshotPage | null } | { success: false };
+        try {
+          parsed = cloudSessionMessagesPageSchema.safeParse(cloudPage);
+        } catch {
+          parsed = { success: false };
+        }
+        outcome = parsed.success ? parsed.data : { kind: 'invalid_data' };
       }
       if (expectedGeneration !== loadOlderGeneration) return;
 
@@ -2589,30 +2620,22 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   function trimRetainedHistory(): void {
     const storage = store.get(sessionStorageAtom);
     if (!storage) return;
-    // The cursor must be the OLDEST popped entry's `cursorBefore`, not the
-    // last one popped. When two or more pages drop in one pass, overwriting
-    // on every pop leaves the cursor pointing at the newest dropped page, so
-    // `loadOlderMessages` could not re-fetch the oldest dropped page.
-    // Count only root-transcript rows. Child pages share this storage and
-    // must not push the window over the limit.
     let trimmedAny = false;
-    let oldestCursorBefore: string | null = null;
+    let resumeCursor: string | null = null;
     while (
       countRootTranscriptMessages(storage) > RETAINED_MESSAGE_WINDOW &&
       retainedHistoryStack.length > 0
     ) {
-      const entry = retainedHistoryStack.shift();
+      const entry = retainedHistoryStack.pop();
       if (!entry) break;
-      if (!trimmedAny) {
-        trimmedAny = true;
-        oldestCursorBefore = entry.cursorBefore;
-      }
+      trimmedAny = true;
+      resumeCursor = entry.cursorBefore;
       for (const id of entry.messageIds) {
         storage.deleteMessage(id);
       }
     }
     if (trimmedAny) {
-      olderMessagesCursor = oldestCursorBefore;
+      olderMessagesCursor = resumeCursor;
       // The rewind restores a page boundary the backend already served — only
       // a successful page is ever pushed onto the stack — so a terminal latch
       // recorded by a later page no longer describes this cursor. Clear the
@@ -3636,11 +3659,30 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         if (eventSessionId !== null) {
           clearStaleChildSessionHydrationError(session.storage, eventSessionId);
         }
-        if (event.type === 'worktree.changes.ready' || event.type === 'connected') {
+        if (
+          event.type === 'worktree.changes.ready' ||
+          event.type === 'workspace.artifacts.changed' ||
+          event.type === 'connected'
+        ) {
           const cloudSessionId = store.get(sessionIdAtom);
           if (!cloudSessionId || event.cloudSessionId !== cloudSessionId) return;
-          const previous = store.get(worktreeChangesRefreshAtom);
+          if (event.type === 'connected') {
+            const previousWorktree = store.get(worktreeChangesRefreshAtom);
+            store.set(worktreeChangesRefreshAtom, {
+              ...previousWorktree,
+              cloudSessionId,
+              connectionVersion: (previousWorktree?.connectionVersion ?? 0) + 1,
+            });
+            const previousArtifacts = store.get(workspaceArtifactsRefreshAtom);
+            store.set(workspaceArtifactsRefreshAtom, {
+              ...previousArtifacts,
+              cloudSessionId,
+              connectionVersion: (previousArtifacts?.connectionVersion ?? 0) + 1,
+            });
+            return;
+          }
           if (event.type === 'worktree.changes.ready') {
+            const previous = store.get(worktreeChangesRefreshAtom);
             if (event.revision <= (previous?.revision ?? 0)) return;
             store.set(worktreeChangesRefreshAtom, {
               cloudSessionId,
@@ -3648,10 +3690,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
               connectionVersion: previous?.connectionVersion ?? 0,
             });
           } else {
-            store.set(worktreeChangesRefreshAtom, {
-              ...previous,
+            const previous = store.get(workspaceArtifactsRefreshAtom);
+            if (event.revision <= (previous?.revision ?? 0)) return;
+            store.set(workspaceArtifactsRefreshAtom, {
               cloudSessionId,
-              connectionVersion: (previous?.connectionVersion ?? 0) + 1,
+              revision: event.revision,
+              connectionVersion: previous?.connectionVersion ?? 0,
             });
           }
           return;
@@ -4657,6 +4701,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       availableCommands: availableCommandsAtom,
       availableCommandsCatalogStatus: availableCommandsCatalogStatusAtom,
       worktreeChangesRefresh: worktreeChangesRefreshAtom,
+      workspaceArtifactsRefresh: workspaceArtifactsRefreshAtom,
       messagesList: messagesListAtom,
       staticMessages: staticMessagesAtom,
       dynamicMessages: dynamicMessagesAtom,
@@ -4685,6 +4730,7 @@ export type {
   SessionManagerConfig,
   SessionManagerAtoms,
   WorktreeChangesRefresh,
+  WorkspaceArtifactsRefresh,
   SessionStatusIndicator,
   SessionConfig,
   StandalonePermission,

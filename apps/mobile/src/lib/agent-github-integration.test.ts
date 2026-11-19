@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  getGitHubIntegrationUrl,
-  shouldShowGitHubIntegrationPrompt,
-} from './agent-github-integration';
+import { shouldShowGitHubIntegrationPrompt } from './agent-github-integration';
 
 describe('agent GitHub integration helpers', () => {
   it('shows the setup prompt only after GitHub is known to be disconnected', () => {
@@ -52,30 +49,6 @@ describe('agent GitHub integration helpers', () => {
         integrationInstalled: undefined,
       })
     ).toBe(false);
-  });
-
-  it('builds personal and organization GitHub integration URLs', () => {
-    expect(getGitHubIntegrationUrl('https://app.kilo.ai')).toBe('https://app.kilo.ai/github-app');
-    expect(getGitHubIntegrationUrl('https://app.kilo.ai/', 'org_123')).toBe(
-      'https://app.kilo.ai/github-app?organizationId=org_123'
-    );
-  });
-
-  it('builds app-initiated URLs with a pre-minted install state token', () => {
-    const url = getGitHubIntegrationUrl('https://app.kilo.ai', 'org_123', 'abc-token-123');
-    expect(url).toBe(
-      'https://app.kilo.ai/github-app?organizationId=org_123&installState=abc-token-123&fromApp=1'
-    );
-  });
-
-  it('builds app-initiated personal URLs with a pre-minted install state token', () => {
-    const url = getGitHubIntegrationUrl('https://app.kilo.ai/', undefined, 'abc-token-456');
-    expect(url).toBe('https://app.kilo.ai/github-app?installState=abc-token-456&fromApp=1');
-  });
-
-  it('never sets fromApp=1 when no installState token is provided', () => {
-    const url = getGitHubIntegrationUrl('https://app.kilo.ai', 'org_123');
-    expect(url).not.toContain('fromApp');
   });
 
   it('shows the prompt when integration status is unknown', () => {

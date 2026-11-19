@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import type { ModelStats, Organization } from '@kilocode/db/schema';
 import type { EnkryptBenchmark } from '@kilocode/db/schema-types';
-import type { OpenRouterModel, OpenRouterModelsResponse } from './organization-types';
+import type {
+  OpenRouterModel,
+  OpenRouterModelsResponse,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type {
   OrganizationGroupPolicyContext,
   OrganizationPolicySubject,
@@ -85,6 +88,7 @@ const mockAvailability = jest.fn(
   ) => models.map(model => ({ ...model, hasUserByokAvailable: model.id === 'provider/allowed' }))
 );
 const mockTagChatGpt = jest.fn(async (_owner: unknown, models: OpenRouterModel[]) => models);
+const mockTagClaude = jest.fn(async (_owner: unknown, models: OpenRouterModel[]) => models);
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
   requireCustomLlmsById: async () => new Map(),
@@ -147,6 +151,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
   tagOpenAiChatGptByokModels: mockTagChatGpt,
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/byok-models', () => ({
+  tagClaudeBillingByokModels: mockTagClaude,
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store', () => ({
   openAiChatGptSharedServicesOwner: (organizationId: string) => ({
@@ -281,6 +288,7 @@ beforeEach(async () => {
     .mockReset()
     .mockResolvedValue([catalogModel('kilo-internal/private', { mayTrainOnYourPrompts: true })]);
   mockTagChatGpt.mockReset().mockImplementation(async (_owner, models) => models);
+  mockTagClaude.mockReset().mockImplementation(async (_owner, models) => models);
   [producer, cache, enkrypt] = await Promise.all([
     import('./organization-models'),
     import('@kilocode/web-shared/lib/model-stats/model-stats-cache'),
@@ -592,6 +600,19 @@ describe('organization model producer publication', () => {
     expect(result.data.find(model => model.id === 'provider/allowed')?.hasUserByokAvailable).toBe(
       true
     );
+  });
+
+  it('tags every list from the organization Claude billing link', async () => {
+    const owner = { kind: 'organization', organizationId: 'fixture-org' };
+
+    await resultFor(subject, 'member');
+    expect(mockTagClaude).toHaveBeenLastCalledWith(owner, expect.any(Array));
+
+    await resultFor(subject, 'shared_services');
+    expect(mockTagClaude).toHaveBeenLastCalledWith(owner, expect.any(Array));
+
+    await resultFor({ type: 'defaultAccess' });
+    expect(mockTagClaude).toHaveBeenLastCalledWith(owner, expect.any(Array));
   });
 
   it('lists denied models only when an inference provider key the policy admits serves them', async () => {

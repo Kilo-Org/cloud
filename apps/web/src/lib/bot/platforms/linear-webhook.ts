@@ -6,6 +6,7 @@ import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
 import { deleteInstallationByOrganizationId } from '@/lib/integrations/linear-service';
 import { LINEAR_WEBHOOK_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { WebhookBodyTooLargeError, readBoundedRawBody } from '@/lib/webhook-body';
 
 /**
  * Linear's webhook signature format, confirmed against @linear/sdk's
@@ -113,7 +114,15 @@ function cloneLinearRequest(request: Request, body: BodyInit): Request {
  */
 export function createLinearWebhookHandler(chat: Chat, linearAdapter: LinearAdapter) {
   return async (request: Request, options?: WebhookOptions): Promise<Response> => {
-    const body = await request.text();
+    let body: string;
+    try {
+      body = new TextDecoder().decode(await readBoundedRawBody(request));
+    } catch (error) {
+      if (error instanceof WebhookBodyTooLargeError) {
+        return new Response('Payload too large', { status: 413 });
+      }
+      throw error;
+    }
 
     if (!verifyLinearSignature(body, request)) {
       return new Response('Invalid signature', { status: 401 });

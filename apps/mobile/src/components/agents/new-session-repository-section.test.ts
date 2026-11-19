@@ -72,9 +72,17 @@ vi.mock('@/lib/hooks/use-collapsed-connect-ctas-preference', () => ({
 
 /** The rendered Text node holding exactly `copy`, if it is mounted. */
 function textNode(renderer: TestRenderer.ReactTestRenderer, copy: string) {
+  // The action label is the row's centre-aligned Text; the card headers carry
+  // their own title copy, so the centre alignment keeps this lookup on the
+  // action regardless of its position in the tree.
   return renderer.root
     .findAllByType('Text' as never)
-    .find(node => node.children.length === 1 && node.children[0] === copy);
+    .find(
+      node =>
+        node.children.length === 1 &&
+        node.children[0] === copy &&
+        String(node.props.className).includes('text-center')
+    );
 }
 
 /** The headers of the connect cards; the section renders no other pressable. */
@@ -228,13 +236,18 @@ describe('NewSessionRepositorySection connect card open action', () => {
     // A label box sized to the label's own measured width is a fraction
     // narrower than the glyphs Android lays out, so "Open GitLab" wrapped onto
     // two lines. The label takes the row's remaining width instead, and
-    // `numberOfLines` pins the single line.
-    for (const key of ['openGithub', 'openGitlab', 'openBitbucket'] as const) {
-      const label = textNode(renderer, i18n.t(`agentChat.newSession.${key}`));
-      expect(label, key).toBeDefined();
-      expect(label?.props.className, key).toContain('flex-1');
-      expect(label?.props.className, key).toContain('text-center');
-      expect(label?.props.numberOfLines, key).toBe(1);
+    // `numberOfLines` pins the single line. Bitbucket's action reads the bare
+    // "Connect" verb while its card header keeps the "Connect Bitbucket" title.
+    for (const copy of [
+      i18n.t('agentChat.newSession.openGithub'),
+      i18n.t('agentChat.newSession.openGitlab'),
+      i18n.t('common.connect'),
+    ]) {
+      const label = textNode(renderer, copy);
+      expect(label, copy).toBeDefined();
+      expect(label?.props.className, copy).toContain('flex-1');
+      expect(label?.props.className, copy).toContain('text-center');
+      expect(label?.props.numberOfLines, copy).toBe(1);
     }
   });
 

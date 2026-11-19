@@ -19,9 +19,11 @@ import {
   DISABLED_THRESHOLD_USD,
   multiplierBasisPoints,
   multiplierError,
+  multiplierErrorMessages,
   parseMultiplier,
   parseThreshold,
   thresholdError,
+  thresholdErrorMessages,
   thresholdPlaceholder,
   toWindowHours,
 } from '@/components/organization/spend-alert-validators';
@@ -38,10 +40,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { DENSE_ROW_H11_APPEND_HIT_SLOP, DENSE_ROW_H11_TOUCH_SLOP_DP } from '@/lib/a11y/tap-target';
 import { formatList, formatNumber, formatPrefixedMoney } from '@/lib/format';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 
 /** The Notifications screen owns the push gate the channel rows point at. */
@@ -131,6 +135,7 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
     return (
       <OrganizationBoundary
         title={t('notifications.channel.spend')}
+        backFallback={PROFILE_TAB_HREF}
         organizationIdOverride={organizationId}
       />
     );
@@ -145,7 +150,7 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
   if (query.isError && query.data == null) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('notifications.channel.spend')} />
+        <ScreenHeader title={t('notifications.channel.spend')} backFallback={PROFILE_TAB_HREF} />
         <QueryError
           className="bg-background"
           message={t('spendAlerts.loadError')}
@@ -162,7 +167,7 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('notifications.channel.spend')} />
+      <ScreenHeader title={t('notifications.channel.spend')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
         automaticallyAdjustKeyboardInsets
@@ -428,7 +433,11 @@ function SpendAlertsForm({
       </Text>
 
       <View className="rounded-lg bg-secondary px-3">
-        <KvRow label={scopeLabel} value={scopeName} selectable />
+        {/* The owner of the alert is a name, not an identifier: it paints in the
+            sans face, like the row label and the empty amount below it, while
+            the amount keeps the code face because that is the value someone
+            copies. The name stays selectable all the same. */}
+        <KvRow label={scopeLabel} value={scopeName} valueFace="text" selectable />
         {/* A selectable value is exempt from the row's one-line clamp (Android's
             selection path re-applies selection and drops it), so only the amount
             — the value someone copies — is selectable. The empty placeholder is
@@ -497,10 +506,12 @@ function SpendAlertsForm({
             <FormField
               label={t('spendAlerts.limitLabel')}
               required={thresholdEnabled}
+              validateWhileTyping
               placeholder={thresholdPlaceholder()}
               keyboardType="decimal-pad"
               defaultValue={thresholdRef.current || undefined}
               validate={thresholdEnabled ? thresholdError : undefined}
+              reserveErrorMessages={thresholdEnabled ? thresholdErrorMessages() : undefined}
               onChangeText={value => {
                 thresholdRef.current = value;
                 revalidate();
@@ -550,10 +561,12 @@ function SpendAlertsForm({
             <FormField
               label={t('spendAlerts.multiplierLabel')}
               required={anomalyEnabled}
+              validateWhileTyping
               placeholder={String(DEFAULT_MULTIPLIER)}
               keyboardType="decimal-pad"
               defaultValue={multiplierRef.current || undefined}
               validate={anomalyEnabled ? multiplierError : undefined}
+              reserveErrorMessages={anomalyEnabled ? multiplierErrorMessages() : undefined}
               onChangeText={value => {
                 multiplierRef.current = value;
                 revalidate();
@@ -662,7 +675,16 @@ function RuleCard({
 
       {children}
 
-      <View className="rounded-lg bg-secondary px-3">
+      {/* The pad matches the push row's bottom slop band exactly: it renders
+          the same `DENSE_ROW_H11_TOUCH_SLOP_DP` value the row's `hitSlop`
+          adds, so the delivered reach stays inside the card (Android clips
+          touches outside a parent's bounds) without padding the row below the
+          reach. The compiled pad is pinned to the constant in
+          spend-alerts-screen.mounted.test.tsx, so it cannot drift. */}
+      <View
+        className="rounded-lg bg-secondary px-3"
+        style={{ paddingBottom: DENSE_ROW_H11_TOUCH_SLOP_DP }}
+      >
         <View className="min-h-11 flex-row items-center justify-between border-b-[0.5px] border-hair-soft">
           <Text className="text-sm">{t('common.email')}</Text>
           {/* The row's own label names the channel; the card's kind is composed
@@ -677,6 +699,15 @@ function RuleCard({
           <Pressable
             onPress={onOpenNotifications}
             accessibilityRole="button"
+            // The row keeps the group's density (`min-h-11`, 38.5 dp at the
+            // native 14-point rem) and reaches the 44 dp design target through
+            // the slop below it, not a taller row. The reach is asymmetric on
+            // purpose: the Email switch above fills its own row (44 dp, the
+            // shared Switch's own node), so a top slop would shadow the bottom
+            // band of that control, and the card's bottom padding — the same
+            // `DENSE_ROW_H11_TOUCH_SLOP_DP` the reach adds — keeps the whole
+            // band inside the card, where Android delivers it.
+            hitSlop={DENSE_ROW_H11_APPEND_HIT_SLOP}
             className="min-h-11 flex-row items-center justify-between active:opacity-70"
           >
             <Text className="text-sm text-muted-foreground">{t('notifications.push')}</Text>
@@ -720,7 +751,7 @@ function SpendAlertsSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('notifications.channel.spend')} />
+      <ScreenHeader title={t('notifications.channel.spend')} backFallback={PROFILE_TAB_HREF} />
       <ScrollView className="flex-1" contentContainerClassName="px-4 gap-6 pb-8 pt-4">
         <Skeleton className="h-4 w-64 rounded" />
         {/* The scope group holds two KvRows now (the scope owner and the 24 h

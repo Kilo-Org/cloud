@@ -33,11 +33,7 @@ function isWithinLostRotationGrace(consumedAt: string): boolean {
 }
 
 async function revokeForReuse(deviceSessionId: string, revokedAt: string): Promise<void> {
-  await db
-    .update(device_sessions)
-    .set({ revoked_at: revokedAt, revoked_reason: 'refresh_reuse_detected' })
-    .where(eq(device_sessions.id, deviceSessionId));
-  invalidateDeviceSession(deviceSessionId);
+  await revokeDeviceSession(deviceSessionId, 'refresh_reuse_detected', revokedAt);
   console.warn('[native-refresh] refresh token reuse detected; session revoked', {
     deviceSessionId,
   });
@@ -144,41 +140,58 @@ async function enforceLiveAppSessionLimit(
 }
 
 /**
- * Create a new device session.
- * @returns the created session ID.
+ * Insert one device session inside the caller's transaction and enforce the
+ * app-session cap when the session counts toward it.
+ *
+ * Runs in that transaction so a sign-in never commits above the cap. Returns
+ * the evicted session ids for post-commit invalidation.
  */
+async function insertDeviceSession(
+  tx: DrizzleTransaction,
+  params: { userId: string; userAgent?: string; deviceAuthRequestId?: string }
+): Promise<{ sessionId: string; evictedSessionIds: string[] }> {
+  const [session] = await tx
+    .insert(device_sessions)
+    .values({
+      kilo_user_id: params.userId,
+      user_agent: params.userAgent,
+      device_auth_request_id: params.deviceAuthRequestId,
+    })
+    .returning({ id: device_sessions.id });
+
+  if (!session) {
+    throw new Error('Failed to create device session');
+  }
+
+  // A device-auth session is minted by the CLI flow, so it neither counts
+  // toward the app-session cap nor evicts one.
+  const evictedSessionIds =
+    params.deviceAuthRequestId === undefined
+      ? await enforceLiveAppSessionLimit(tx, params.userId)
+      : [];
+
+  return { sessionId: session.id, evictedSessionIds };
+}
+
+/**
+ * Drop the cached auth of evicted sessions. Must run after the transaction commits.
+ */
+function invalidateEvictedSessions(evictedSessionIds: string[]): void {
+  for (const evictedSessionId of evictedSessionIds) {
+    invalidateDeviceSession(evictedSessionId);
+  }
+}
+
 export async function createDeviceSession(params: {
   userId: string;
   userAgent?: string;
   deviceAuthRequestId?: string;
 }): Promise<string> {
-  const { sessionId, evictedSessionIds } = await db.transaction(async tx => {
-    const [session] = await tx
-      .insert(device_sessions)
-      .values({
-        kilo_user_id: params.userId,
-        user_agent: params.userAgent,
-        device_auth_request_id: params.deviceAuthRequestId,
-      })
-      .returning({ id: device_sessions.id });
+  const { sessionId, evictedSessionIds } = await db.transaction(tx =>
+    insertDeviceSession(tx, params)
+  );
 
-    if (!session) {
-      throw new Error('Failed to create device session');
-    }
-
-    // A device-auth session is minted by the CLI flow, so it neither counts
-    // toward the app-session cap nor evicts one.
-    const evictedSessionIds =
-      params.deviceAuthRequestId === undefined
-        ? await enforceLiveAppSessionLimit(tx, params.userId)
-        : [];
-
-    return { sessionId: session.id, evictedSessionIds };
-  });
-
-  for (const evictedSessionId of evictedSessionIds) {
-    invalidateDeviceSession(evictedSessionId);
-  }
+  invalidateEvictedSessions(evictedSessionIds);
 
   return sessionId;
 }
@@ -209,7 +222,6 @@ async function mintSessionCredentials(
 
 /**
  * Issue an access token + refresh token pair for a device session.
- * The access token is short-lived (one hour). The refresh token is 30 days.
  */
 export async function issueSessionCredentials(
   user: User,
@@ -485,43 +497,38 @@ export async function createDeviceSessionWithAttestedKey(params: {
   const { credentials, evictedSessionIds } = await db.transaction(async tx => {
     await persistAttestedKey(params.userId, params.verification, tx);
 
-    const [session] = await tx
-      .insert(device_sessions)
-      .values({
-        kilo_user_id: params.userId,
-        user_agent: params.userAgent,
-      })
-      .returning({ id: device_sessions.id });
-
-    if (!session) {
-      throw new Error('Failed to create device session');
-    }
-
-    const evictedSessionIds = await enforceLiveAppSessionLimit(tx, params.userId);
+    const { sessionId, evictedSessionIds } = await insertDeviceSession(tx, {
+      userId: params.userId,
+      userAgent: params.userAgent,
+    });
 
     const credentials = {
-      ...(await mintSessionCredentials(tx, params.user, session.id)),
-      sessionId: session.id,
+      ...(await mintSessionCredentials(tx, params.user, sessionId)),
+      sessionId,
     };
 
     return { credentials, evictedSessionIds };
   });
 
-  for (const evictedSessionId of evictedSessionIds) {
-    invalidateDeviceSession(evictedSessionId);
-  }
+  invalidateEvictedSessions(evictedSessionIds);
 
   return credentials;
 }
 
 /**
  * Revoke a device session and all its refresh tokens.
+ * `revokedAt` stamps the revocation; callers that must record the request time
+ * (refresh-token reuse) pass it explicitly.
  */
-export async function revokeDeviceSession(sessionId: string, reason: string): Promise<void> {
+export async function revokeDeviceSession(
+  sessionId: string,
+  reason: string,
+  revokedAt?: string
+): Promise<void> {
   await db
     .update(device_sessions)
     .set({
-      revoked_at: new Date().toISOString(),
+      revoked_at: revokedAt ?? new Date().toISOString(),
       revoked_reason: reason,
     })
     .where(eq(device_sessions.id, sessionId));

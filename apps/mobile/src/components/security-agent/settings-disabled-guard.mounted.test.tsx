@@ -83,6 +83,9 @@ vi.mock('react-native', () => ({
     return props.children ?? null;
   },
 }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
+}));
 vi.mock('expo-router', () => ({
   useRouter: () => router,
   useNavigation: () => navigation,
@@ -275,11 +278,11 @@ const CASES: {
     name: 'AutomationSettingsScreen',
     Screen: AutomationSettingsScreen,
     makeDirty: () => {
-      pressToggle(i18n.t('securityAgent.automation.enableAutoAnalysis'));
+      pressToggle(i18n.t('securityAgent.automation.analyzeNewFindings'));
     },
     makeClean: () => {
       const row = toggleRows.rows.find(
-        candidate => candidate.title === i18n.t('securityAgent.automation.enableAutoAnalysis')
+        candidate => candidate.title === i18n.t('securityAgent.automation.analyzeNewFindings')
       );
       if (!row) {
         throw new Error('automation toggle not found');

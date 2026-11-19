@@ -9,6 +9,16 @@ vi.mock('@/lib/font-scale/native-font-scale', () => ({
   subscribeToFontScale: () => null,
 }));
 
+// `expo-localization` imports the `expo` runtime, so the Node test projects
+// cannot load it either. The app's root provider tree reads the device locale
+// list to follow a device language change, so an English device answers the
+// default and nothing else is needed. A suite that needs another locale
+// registers its own mock, which wins.
+vi.mock('expo-localization', () => ({
+  getLocales: () => [{ languageTag: 'en-US' }],
+  useLocales: () => [{ languageTag: 'en-US' }],
+}));
+
 /** The subset of keyboard state the app reads through `useKeyboardState`. */
 type KeyboardStateSnapshot = {
   height: number;
@@ -95,6 +105,19 @@ vi.mock('@/components/keyboard-follow-pane', () => ({
 // (`markdown`, `onLinkPress`, `source`, …).
 vi.mock('react-native-enriched-markdown', () => ({ EnrichedMarkdownText: 'EnrichedMarkdownText' }));
 vi.mock('react-native-webview', () => ({ WebView: 'WebView' }));
+
+// `@react-native-community/netinfo` is a native module, and its CommonJS entry
+// `require`s `react-native` outside Vite: a suite's `react-native` mock is a
+// Vite module and never reaches that `require`, so the real package parses
+// react-native's Flow entry (`import typeof …`) in Node and cannot be imported
+// at all here. The app reads one seam from it — a connectivity subscription
+// whose events only a device produces — so the stub subscribes to nothing. A
+// test that drives connectivity mocks the hook
+// (`@/lib/hooks/use-offline-banner-state`, the store's owner) or this module
+// itself; its later registration wins over this one.
+vi.mock('@react-native-community/netinfo', () => ({
+  addEventListener: () => () => undefined,
+}));
 
 // `@rn-primitives/dialog@1.5.2` ships untranspiled JSX inside `dist/*.mjs` and
 // `dist/*.js`, and its ESM entry re-exports `./dialog` with no extension.

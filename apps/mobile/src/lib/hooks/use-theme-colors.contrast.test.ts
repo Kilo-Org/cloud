@@ -314,6 +314,34 @@ describe('warn foreground token contrast (WCAG AA text)', () => {
   });
 });
 
+describe('offline banner warn-solid pair contrast', () => {
+  it('light theme: warnSolidForeground vs warnSolid >= 4.5:1', () => {
+    // Precomputed ≈ 5.30:1 for #FFFFFF on #956011.
+    const ratio = contrastRatio(lightColors.warnSolidForeground, lightColors.warnSolid);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+
+  it('dark theme: warnSolidForeground vs warnSolid >= 4.5:1', () => {
+    // Precomputed ≈ 6.14:1 for #FFFFFF on #8A5614.
+    const ratio = contrastRatio(darkColors.warnSolidForeground, darkColors.warnSolid);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+
+  // The band is a full-width surface, so WCAG 1.4.11 asks for 3:1 off the page
+  // it covers; below that it stops reading as a distinct surface.
+  it('light theme: warnSolid vs background >= 3:1', () => {
+    // Precomputed ≈ 5.08:1 for #956011 on #FBFAF5.
+    const ratio = contrastRatio(lightColors.warnSolid, lightColors.background);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_NON_TEXT_RATIO);
+  });
+
+  it('dark theme: warnSolid vs background >= 3:1', () => {
+    // Precomputed ≈ 3.14:1 for #8A5614 on #0E0E10.
+    const ratio = contrastRatio(darkColors.warnSolid, darkColors.background);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_NON_TEXT_RATIO);
+  });
+});
+
 describe('row palette contrast (WCAG 1.4.11 non-text)', () => {
   // A 16px stroked glyph on a 30x30 tile is a non-text graphic, so WCAG 1.4.11
   // asks for 3:1: measured against the row surface (`secondary`) and against the

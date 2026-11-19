@@ -1,6 +1,6 @@
 import * as z from 'zod';
 
-const BASE62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+import { encodeBase62 } from './base62';
 
 /** `ses_`, a descending 12-hex-character time prefix, then 14 base62 characters. */
 export const KILO_SESSION_ID_PATTERN = /^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/;
@@ -36,17 +36,10 @@ function descendingTimestampHex(): string {
   return descending.toString(16).padStart(12, '0');
 }
 
-function randomBase62(length: number): string {
-  const bytes = new Uint8Array(length);
-  crypto.getRandomValues(bytes);
-
-  let result = '';
-  for (const byte of bytes) {
-    result += BASE62[byte % 62];
-  }
-  return result;
-}
+const KILO_SESSION_ID_RANDOM_LENGTH = 14;
 
 export function generateKiloSessionId(): string {
-  return `ses_${descendingTimestampHex()}${randomBase62(14)}`;
+  const bytes = new Uint8Array(KILO_SESSION_ID_RANDOM_LENGTH);
+  crypto.getRandomValues(bytes);
+  return `ses_${descendingTimestampHex()}${encodeBase62(bytes)}`;
 }

@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- The Buy credits screen composes the store banner, loading, empty, error, and pack-row surfaces; each is a small rendered surface that mirrors the shared header/scroll pattern. */
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import { selectionHaptic } from '@/lib/haptics';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,13 +14,11 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
-  BALANCE_RETRY_FRAME_CLASS,
-  BALANCE_RETRY_HIT_SLOP,
+  BALANCE_RETRY_TARGET_CLASS,
   LEGAL_LINK_BOX_CLASS,
   LEGAL_LINK_ROW_CLASS,
 } from '@/lib/a11y/tap-target';
 import { isolateLtrBidiText } from '@/lib/bidi';
-import { WEB_BASE_URL } from '@/lib/config';
 import { getStoreUnavailableCopyKeys } from '@/lib/credits/store-products-loader';
 import {
   getStoreCreditExpiryMessageKey,
@@ -28,12 +27,11 @@ import {
 import { useStoreCreditProducts } from '@/lib/credits/use-store-credit-products';
 import { getCreditStorefront } from '@/lib/credits/storefront';
 import { useInlinePurchaseErrorOwnership } from '@/lib/credits/use-store-credit-purchase';
-import { openExternalUrl } from '@/lib/external-link';
 import { formatPrefixedMoney } from '@/lib/format';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { useScreenInsets, useSideInsetStyle } from '@/lib/screen-insets';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
-import { getStoreLegalLinks } from '@/lib/iap/legal-links';
+import { type LegalDocument } from '@/lib/legal-document';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { HIDDEN_BALANCE } from '@/lib/storage-keys';
 import { useTRPC } from '@/lib/trpc';
@@ -200,7 +198,12 @@ export function CreditPurchaseScreen() {
   const { hideBalance, hasLoaded: hideBalanceLoaded } = useHideBalancePreference();
   const hideBalanceAmount = hideBalance || !hideBalanceLoaded;
 
-  const [privacyPolicyLink, termsOfUseLink] = getStoreLegalLinks(WEB_BASE_URL);
+  const router = useRouter();
+  // The two legal documents open in their own native screens: a store purchase
+  // surface must not hand the reader a browser that can reach web pricing.
+  const openLegalDocument = (document: LegalDocument) => {
+    router.push({ pathname: '/(app)/legal/[document]', params: { document } });
+  };
 
   // A granted purchase bumps the owner's counter; a cancelled one releases the
   // request with no error key, so the counter is the only success signal.
@@ -281,11 +284,12 @@ export function CreditPurchaseScreen() {
   };
 
   const renderBalanceValue = () => {
-    // Every branch below is one `h-8` tall, the amount's own line box: the
-    // card's height stays the same in all three states, so the packs below never
-    // move when the read settles. The skeleton keeps the value's box,
-    // and the failed read's target keeps the box too: its tap area comes from
-    // the hit slop, not from a taller box, which would move the packs below.
+    // Every branch paints inside the amount's own line box: the card's height
+    // stays the same in all three states, so the packs below never move when
+    // the read settles. The skeleton keeps the value's box, and the failed
+    // read's target keeps it in flow too: its own node is the full target and
+    // `BALANCE_RETRY_TARGET_CLASS`'s negative margin cancels the half that
+    // overflows the line, which a taller in-flow box would add to the card.
     if (balancePending) {
       return <Skeleton className="h-8 w-24 rounded" />;
     }
@@ -294,8 +298,7 @@ export function CreditPurchaseScreen() {
         <Pressable
           accessibilityLabel={t('profile.failedToLoadBalance')}
           accessibilityRole="button"
-          className={cn(BALANCE_RETRY_FRAME_CLASS, 'justify-center active:opacity-70')}
-          hitSlop={BALANCE_RETRY_HIT_SLOP}
+          className={cn(BALANCE_RETRY_TARGET_CLASS, 'justify-center active:opacity-70')}
           onPress={() => {
             void refetchBalance();
           }}
@@ -386,6 +389,12 @@ export function CreditPurchaseScreen() {
                 sentence grows the floor instead of truncating. */}
             <View
               className="mt-1 justify-center"
+              // The slot paints text only and holds nothing to press, so it
+              // stays out of touch dispatch: it is the card's later sibling
+              // under the amount, and a view that takes a point back would
+              // swallow the failed read's retry target wherever the two
+              // overlap.
+              pointerEvents="none"
               style={{ minHeight: expiryCaptionFloor(fontScale) }}
               testID="credit-expiry-slot"
             >
@@ -493,6 +502,12 @@ export function CreditPurchaseScreen() {
                 // drops them when initialization fails), so even a priced row
                 // cannot complete: keep every row disabled until it reconnects.
                 const disabled = purchasing || !connected || !hasStorePrice;
+                // A disabled row recedes by its own labels, never by its whole
+                // surface: the title and price sit at reduced foreground ink (70%),
+                // which still outranks the muted ink of the note under them, so the
+                // title stays the strongest line while the row reads lighter than an
+                // enabled one. The note keeps its muted ink at full strength.
+                const labelClass = disabled ? 'text-foreground opacity-70' : 'text-foreground';
                 // The trailing slot holds the store price only: it keeps its one
                 // line and its full width, so the title yields and a price a user
                 // pays is never truncated.
@@ -537,15 +552,19 @@ export function CreditPurchaseScreen() {
                   .join(', ');
 
                 return (
+                  // A disabled row recedes by its own labels, never by its shell:
+                  // the title and the price sit at reduced foreground ink (70%),
+                  // above the muted ink of the one line under them, so the title
+                  // stays the row's strongest line while the note still states
+                  // when the credits expire at full muted strength. The row's
+                  // shell, border, padding, accessibility label and
+                  // accessibilityState do not change.
                   <Pressable
                     key={pack.backend.appleProductId}
                     accessibilityLabel={rowAccessibilityLabel}
                     accessibilityRole="button"
                     accessibilityState={{ busy: rowCompleting, disabled }}
-                    className={cn(
-                      'justify-center rounded-xl border border-border bg-card px-5 active:opacity-80',
-                      disabled && 'opacity-50'
-                    )}
+                    className="justify-center rounded-xl border border-border bg-card px-5 active:opacity-80"
                     disabled={disabled}
                     onPress={() => {
                       handlePackPress(pack);
@@ -557,11 +576,16 @@ export function CreditPurchaseScreen() {
                         reserves, so a longer pack name truncates instead of
                         growing the row. */}
                     <View className="flex-row items-start justify-between gap-4">
-                      <Text className="flex-1 font-semibold text-foreground" numberOfLines={1}>
+                      <Text className={cn('flex-1 font-semibold', labelClass)} numberOfLines={1}>
                         {packLabel}
                       </Text>
                       {storePrice !== null && (
-                        <Text className="shrink-0 text-base font-semibold text-foreground tabular-nums">
+                        <Text
+                          className={cn(
+                            'shrink-0 text-base font-semibold tabular-nums',
+                            labelClass
+                          )}
+                        >
                           {storePrice}
                         </Text>
                       )}
@@ -684,19 +708,21 @@ export function CreditPurchaseScreen() {
                 accessibilityRole="link"
                 className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
                 onPress={() => {
-                  void openExternalUrl(termsOfUseLink.url, { label: termsOfUseLink.label });
+                  openLegalDocument('terms');
                 }}
               >
-                <Text className="text-xs text-primary underline">{termsOfUseLink.label}</Text>
+                <Text className="text-xs text-primary underline">
+                  {t('kiloPass.legalTermsOfUse')}
+                </Text>
               </Pressable>
               <Pressable
                 accessibilityRole="link"
                 className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
                 onPress={() => {
-                  void openExternalUrl(privacyPolicyLink.url, { label: privacyPolicyLink.label });
+                  openLegalDocument('privacy');
                 }}
               >
-                <Text className="text-xs text-primary underline">{privacyPolicyLink.label}</Text>
+                <Text className="text-xs text-primary underline">{t('common.privacyPolicy')}</Text>
               </Pressable>
             </View>
           </View>

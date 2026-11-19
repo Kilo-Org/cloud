@@ -1,5 +1,5 @@
 import 'server-only';
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { cookies } from 'next/headers';
 import * as z from 'zod';
 import { and, eq, isNull, sql } from 'drizzle-orm';
@@ -15,6 +15,7 @@ import {
   type CreateOrUpdateUserArgs,
   type DifferentOAuthFailure,
 } from '@/lib/user';
+import { hashOpaqueSecret } from './secret-hash';
 
 const useSecureCookies = NEXTAUTH_URL?.startsWith('https://') ?? false;
 export const PENDING_LINK_COOKIE = useSecureCookies
@@ -52,7 +53,7 @@ export type PendingLinkSummary = {
 const secretSchema = z.string().trim().min(1).max(512);
 
 export function hashPendingLinkSecret(secret: string): string {
-  return createHash('sha256').update(secret).digest('hex');
+  return hashOpaqueSecret(secret);
 }
 
 function parseSecret(secret: unknown): string | null {
@@ -244,12 +245,12 @@ export async function completePendingLink(
   return completePendingLinkByHash(hashPendingLinkSecret(parsed), resolvedUserId);
 }
 
-export async function completePendingLinkByHash(
+async function completePendingLinkByHash(
   secretHash: string,
   resolvedUserId: string
 ): Promise<PendingLinkResult> {
-  const row = await findByHash(secretHash);
-  if (!row || !isLive(row)) return { status: 'failed', reason: 'EXPIRED' };
+  const row = await getLivePendingLinkByHash(secretHash);
+  if (!row) return { status: 'failed', reason: 'EXPIRED' };
   if (resolvedUserId !== row.kilo_user_id) return { status: 'failed', reason: 'WRONG_ACCOUNT' };
 
   const [claimed] = await db
@@ -291,17 +292,36 @@ export async function completePendingLinkByHash(
   return { status: 'linked', provider: row.provider };
 }
 
+/**
+ * A completion failure never reaches the sign-in response: it is reported as a
+ * failed link, so the sign-in still succeeds without the attach.
+ */
+async function completeFailClosed(
+  complete: () => Promise<PendingLinkResult>
+): Promise<PendingLinkResult> {
+  try {
+    return await complete();
+  } catch {
+    return { status: 'failed', reason: 'LINKING-FAILED' };
+  }
+}
+
 /** The mobile 200-body field for a sign-in that carried a pending link token. */
 export async function resolvePendingLinkForUser(
   secret: string | undefined,
   resolvedUserId: string
 ): Promise<PendingLinkResult | undefined> {
   if (!secret) return undefined;
-  try {
-    return await completePendingLink(secret, resolvedUserId);
-  } catch {
-    return { status: 'failed', reason: 'LINKING-FAILED' };
-  }
+  return completeFailClosed(() => completePendingLink(secret, resolvedUserId));
+}
+
+/** The same mapping for a caller that stored only the pending link's secret hash. */
+export async function resolveStoredPendingLinkForUser(
+  secretHash: string | null,
+  resolvedUserId: string
+): Promise<PendingLinkResult | undefined> {
+  if (!secretHash) return undefined;
+  return completeFailClosed(() => completePendingLinkByHash(secretHash, resolvedUserId));
 }
 
 export async function setPendingLinkCookie(secret: string): Promise<void> {

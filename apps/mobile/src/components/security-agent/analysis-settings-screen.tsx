@@ -2,7 +2,6 @@ import {
   getSettingsDirtyState,
   isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
-import { useRouter } from 'expo-router';
 import { Brain, Search, Wrench } from '@/components/ui/icons';
 import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
@@ -22,10 +21,13 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { modelLabelFromCatalogue } from '@/lib/auto-model-name';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
+import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
 } from '@/lib/hooks/use-settings-back-guard';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import {
   useSaveSecurityAgentConfig,
   useSecurityAgentCapability,
@@ -103,7 +105,7 @@ function AnalysisSettingsSkeleton() {
 }
 
 export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
@@ -112,9 +114,12 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const {
     models,
     isLoading: modelsLoading,
-    isError: modelsError,
+    isError: modelsUnavailableFlag,
+    error: modelsError,
+    fetchStatus: modelsFetchStatus,
     refetch: refetchModels,
   } = useAvailableModels(isPersonalSecurityScope(scope) ? undefined : scope);
+  const connectivity = useCommittedConnectivityStatus();
 
   const [triageModelSlug, setTriageModelSlug] = useState('');
   const [analysisModelSlug, setAnalysisModelSlug] = useState('');
@@ -172,7 +177,11 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     return (
       <PlatformErrorScreen
         title={t('securityAgent.analysisSettings.title')}
-        variant="offline"
+        variant={classifyReadFailureVariant({
+          errors: [config.error],
+          isPaused: config.fetchStatus === 'paused',
+          connectivity,
+        })}
         message={t('securityAgent.analysisSettings.couldNotLoad')}
         onRetry={() => void config.refetch()}
       />
@@ -195,13 +204,18 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   // A failed catalogue refetch keeps the last list. Hide the rows only when the
   // failure left nothing to show, so an offline visit with a warm catalogue keeps
   // the current slugs readable and pickable, as the new-session picker does.
-  const modelsUnavailable = modelsError && models.length === 0;
+  const modelsUnavailable = modelsUnavailableFlag && models.length === 0;
+  const modelsFailureVariant = classifyReadFailureVariant({
+    errors: modelsError ? [modelsError] : [],
+    isPaused: modelsFetchStatus === 'paused',
+    connectivity,
+  });
   const modelRowOnPress = (value: string, onSelect: (modelSlug: string) => void) =>
     canManage && !modelsLoading && models.length > 0
       ? () => {
           // The Security Agent config stores a model slug and nothing else, so
           // the picker must not offer a thinking effort it would have to drop.
-          openModelPicker(router, {
+          openModelPicker(pushOnce, {
             options: models,
             value,
             variant: '',
@@ -289,7 +303,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
         )}
         {modelsUnavailable && (
           <QueryError
-            variant="server"
+            variant={modelsFailureVariant}
             placement="top"
             title={t('common.couldNotLoadModels')}
             onRetry={() => void refetchModels()}

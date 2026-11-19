@@ -11,7 +11,8 @@
  * allowlists, wording and exit behavior, including what it does with a key that
  * is not a plural category.
  */
-import { readdirSync } from 'node:fs';
+import { readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 
 /** The plural categories i18next selects from, as they end a catalog key. */
 const PLURAL_SUFFIX = /_(zero|one|two|few|many|other)$/;
@@ -28,11 +29,33 @@ export function pluralParts(key) {
   return { base: key.slice(0, -match[0].length), category: match[1] };
 }
 
-/** The locale tags on disk in `dir`, sorted, without the `.json` extension. */
+/**
+ * The kind of a `.json`-named entry of `dir`: 'file' names a regular file,
+ * 'unreadable' an entry stat cannot follow (stat threw), and 'other' an
+ * entry that exists but is not a regular file, such as a directory named
+ * like a catalog.
+ */
+export function catalogEntryKind(dir, name) {
+  try {
+    return statSync(join(dir, name)).isFile() ? 'file' : 'other';
+  } catch {
+    return 'unreadable';
+  }
+}
+
+/**
+ * The locale tags on disk in `dir`, sorted, without the `.json` extension.
+ *
+ * The tag's path must name a regular file, following symlinks: a directory
+ * named like a catalog is not a catalog, and reading it as one would end the
+ * audit in a stack trace, while a symlink to a real catalog audits like the
+ * file it names. An entry stat cannot follow is kept as a tag anyway,
+ * deliberately: the audit's own later read of that path reports the problem.
+ */
 export function catalogTags(dir) {
-  return readdirSync(dir)
-    .filter(name => name.endsWith('.json'))
-    .map(name => name.replace(/\.json$/, ''))
+  return readdirSync(dir, { withFileTypes: true })
+    .filter(entry => entry.name.endsWith('.json') && catalogEntryKind(dir, entry.name) !== 'other')
+    .map(entry => entry.name.replace(/\.json$/, ''))
     .sort();
 }
 

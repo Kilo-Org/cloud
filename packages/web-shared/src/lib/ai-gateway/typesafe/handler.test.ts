@@ -17,6 +17,9 @@ import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
+import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
+import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import { DEFAULT_ORGANIZATION_FEATURES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import {
   creditsBlockedResponse,
   extractFraudAndProjectHeaders,
@@ -27,9 +30,19 @@ import {
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import type * as LlmProxyHelpers from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import type * as UpstreamRequest from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
+import type * as UpstreamUrlPolicy from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy';
+import {
+  isUpstreamUrlPolicyEnforced,
+  rejectDisallowedUpstreamUrls,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { resolveEmbeddingOrDecisionRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/non-chat-routes';
+import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import type { BYOKResult, Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
+  getCachedVercelInferenceProviderIdsForModel,
   getOpenRouterModelsMetadataFromDatabase,
   getOpenRouterSystemOneModelsFromDatabase,
   resolveOpenRouterModelAlias,
@@ -49,9 +62,13 @@ import {
   TYPESAFE_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/typesafe/schemas';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import { FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import { startBouncerDecide } from '@kilocode/web-shared/lib/bouncer/inference';
 import type * as BouncerInference from '@kilocode/web-shared/lib/bouncer/inference';
 import type { DecideResponse } from '@kilocode/web-shared/lib/bouncer/client';
+import type { CustomPricingConfig } from '@kilocode/db/schema-types';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
+import { EMPTY_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { handleSystemOneRequest } from './handler';
 
 jest.mock('next/server', () => ({
@@ -78,6 +95,7 @@ jest.mock(
   })
 );
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  getCachedVercelInferenceProviderIdsForModel: jest.fn(),
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
   getOpenRouterSystemOneModelsFromDatabase: jest.fn(),
   resolveOpenRouterModelAlias: jest.fn(),
@@ -95,6 +113,18 @@ jest.mock(
 jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit', () => ({
   gatewayRateLimitKey: jest.fn(),
   isGatewayAccountRateLimited: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/organization-features', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/organization-features'
+  ),
+  getRuntimeOrganizationFeatures: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit'
+  ),
+  isFreeModelRateLimited: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => ({
   ...jest.requireActual<typeof LlmProxyHelpers>(
@@ -114,6 +144,12 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter'
     apiKey: 'test-platform-openrouter-key',
   },
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/non-chat-routes', () => ({
+  resolveEmbeddingOrDecisionRoute: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => ({
+  mapModelIdToVercel: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providerHash', () => ({
   generateProviderSpecificHash: jest.fn(),
 }));
@@ -122,19 +158,33 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/processUsage', () => ({
   mapToUsageStats: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/upstream-request', () => ({
+  ...jest.requireActual<typeof UpstreamRequest>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request'
+  ),
   fetchGeneration: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy', () => ({
+  ...jest.requireActual<typeof UpstreamUrlPolicy>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy'
+  ),
+  isUpstreamUrlPolicyEnforced: jest.fn(),
+  rejectDisallowedUpstreamUrls: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitGatewayApiMetrics: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-pricing-config', () => ({
+  getCustomPricingConfig: jest.fn(),
+}));
 
 const routeUrl = 'http://localhost:3000/api/gateway/typesafe/v1/systemone';
-// The handler reads `performance.now()` once per measured point: request start, first byte, then
-// the metrics read. Advancing by one step per read makes each measured interval exact.
+// The handler reads `performance.now()` once per measured point: request start, the upstream
+// fetch start and its headers (read by `fetchUpstream`), first byte, then the metrics read.
+// Advancing by one step per read makes each measured interval exact.
 const CLOCK_START_MS = 1_000;
 const CLOCK_STEP_MS = 500;
-const METERED_LATENCY_MS = CLOCK_STEP_MS;
-const METERED_COMPLETE_REQUEST_MS = 2 * CLOCK_STEP_MS;
+const METERED_LATENCY_MS = 3 * CLOCK_STEP_MS;
+const METERED_COMPLETE_REQUEST_MS = 4 * CLOCK_STEP_MS;
 const OTHER_SYSTEM_ONE_MODEL = 'respan/span-01-lite:free';
 const SYSTEM_ONE_ALIAS = '~typesafe/jev-latest';
 const pricedSystemOneModels: Record<string, GatewayModelWithEndpoints> = {
@@ -183,6 +233,11 @@ const upstreamBody = {
   usage: { input_tokens: 23, output_tokens: 7, cost: 0.0001236, total_tokens: 30 },
   upstream_metadata: { retained: true },
 };
+// The caller sees the cost the ledger row bills, in whole microdollars.
+const billedBody = {
+  ...upstreamBody,
+  usage: { ...upstreamBody.usage, cost: 0.000124, is_byok: false },
+};
 const memberDecision = {
   policy: {
     requireModelInCurrentSnapshot: false,
@@ -192,6 +247,39 @@ const memberDecision = {
     customLlmGrantee: { organizationId: 'org-1', groupIds: [] },
   },
   decision: { allowed: true },
+};
+const VERCEL_SYSTEM_ONE_MODEL = 'typesafe-ai/jev';
+const VERCEL_TYPESAFE_URL = 'https://ai-gateway.vercel.sh/typesafe/v1/systemone';
+const kiloVercelProvider = {
+  type: 'vercel',
+  apiUrl: 'https://ai-gateway.vercel.sh/v1',
+  apiKey: 'test-platform-vercel-key',
+} as Provider;
+const userOpenRouterProvider = { ...OPENROUTER, apiKey: 'test-user-openrouter-key' } as Provider;
+const userOpenRouterKey: BYOKResult = {
+  providerId: 'openrouter',
+  decryptedAPIKey: 'test-user-openrouter-key',
+};
+const userVercelGatewayKey: BYOKResult = {
+  providerId: 'vercel-ai-gateway',
+  decryptedAPIKey: 'test-user-vercel-key',
+};
+const userAnthropicKey: BYOKResult = {
+  providerId: 'anthropic',
+  decryptedAPIKey: 'test-user-anthropic-key',
+};
+const vercelUpstreamBody = {
+  model: VERCEL_SYSTEM_ONE_MODEL,
+  answers: upstreamBody.answers,
+  usage: { input_tokens: 23, output_tokens: 7 },
+  provider_metadata: {
+    gateway: {
+      routing: { finalProvider: 'typesafe-ai' },
+      cost: '0.0001236',
+      marketCost: '0.0002',
+      generationId: 'gen_vercel_systemone',
+    },
+  },
 };
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof fetch>;
 const originalFetch = globalThis.fetch;
@@ -218,6 +306,23 @@ const reconciledStats = {
   is_byok: false,
 };
 
+const customPricingTier = {
+  start_context_length: 0,
+  pricing: {
+    prompt_per_million: 2,
+    completion_per_million: 10,
+    input_cache_read_per_million: null,
+    input_cache_write_per_million: null,
+  },
+};
+/** Both System One models billed at $2/M input and $10/M output tokens. */
+const systemOneCustomPricingConfig: CustomPricingConfig = {
+  models: [
+    { model: TYPESAFE_MODEL, pricing: [customPricingTier] },
+    { model: OTHER_SYSTEM_ONE_MODEL, pricing: [customPricingTier] },
+  ],
+};
+
 function makeRequest(
   body: unknown = requestBody,
   headers: Record<string, string> = {},
@@ -241,19 +346,23 @@ function setAuth(organizationId?: string) {
   });
 }
 
-function upstreamRequest() {
+function upstreamRequest(expectedUrl = 'https://openrouter.ai/api/v1/systemone') {
   expect(mockedFetch).toHaveBeenCalledTimes(1);
   const [url, init] = mockedFetch.mock.calls[0];
-  expect(url).toBe('https://openrouter.ai/api/v1/systemone');
+  expect(url).toBe(expectedUrl);
   expect(init?.method).toBe('POST');
   if (typeof init?.body !== 'string') throw new Error('Expected a JSON upstream body');
   return { body: JSON.parse(init.body), headers: new Headers(init.headers) };
 }
 
 function deferredUsageCallbacks(): Array<() => Promise<unknown>> {
-  return jest
-    .mocked(after)
-    .mock.calls.map(([arg]) => arg)
+  // `fetchUpstream` registers its budget-timer cleanup before it calls fetch; the usage writes
+  // come after the fetch.
+  const fetchedAt = mockedFetch.mock.invocationCallOrder[0] ?? 0;
+  const { calls, invocationCallOrder } = jest.mocked(after).mock;
+  return calls
+    .filter((_call, index) => invocationCallOrder[index] > fetchedAt)
+    .map(([arg]) => arg)
     .filter((arg): arg is () => Promise<unknown> => typeof arg === 'function');
 }
 
@@ -283,17 +392,27 @@ describe('handleSystemOneRequest', () => {
     jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({ balance: 1_000_000 });
     jest.mocked(isGatewayAccountRateLimited).mockResolvedValue(false);
     jest.mocked(gatewayRateLimitKey).mockReturnValue('test-rate-limit-key');
+    jest.mocked(getRuntimeOrganizationFeatures).mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
     jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue(memberDecision);
     jest
       .mocked(getOpenRouterSystemOneModelsFromDatabase)
       .mockResolvedValue(new Set([TYPESAFE_MODEL, OTHER_SYSTEM_ONE_MODEL, SYSTEM_ONE_ALIAS]));
     jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue(pricedSystemOneModels);
+    jest.mocked(getCachedVercelInferenceProviderIdsForModel).mockResolvedValue(null);
     jest
       .mocked(resolveOpenRouterModelAlias)
       .mockImplementation(async modelId =>
         modelId === SYSTEM_ONE_ALIAS ? TYPESAFE_MODEL : modelId
       );
     jest.mocked(generateProviderSpecificHash).mockReturnValue('hashed-user');
+    jest
+      .mocked(resolveEmbeddingOrDecisionRoute)
+      .mockResolvedValue({ provider: OPENROUTER, userByok: null });
+    jest
+      .mocked(mapModelIdToVercel)
+      .mockImplementation(async modelId =>
+        modelId === TYPESAFE_MODEL ? VERCEL_SYSTEM_ONE_MODEL : modelId
+      );
     jest.mocked(extractFraudAndProjectHeaders).mockReturnValue({
       fraudHeaders: EmptyFraudDetectionHeaders,
       projectId: 'project-123',
@@ -316,6 +435,7 @@ describe('handleSystemOneRequest', () => {
     mockedFetch.mockImplementation(async () => Response.json(upstreamBody));
     jest.mocked(fetchGeneration).mockResolvedValue(undefined);
     jest.mocked(mapToUsageStats).mockReturnValue(reconciledStats);
+    jest.mocked(getCustomPricingConfig).mockResolvedValue(EMPTY_CUSTOM_PRICING_CONFIG);
   });
 
   afterEach(() => {
@@ -339,7 +459,7 @@ describe('handleSystemOneRequest', () => {
     const { data, response } = await client.systemOne(requestBody).withResponse();
 
     expect(response.status).toBe(200);
-    expect(data).toEqual(upstreamBody);
+    expect(data).toEqual(billedBody);
     expect(data.answers.billing.noul).toBe(0.95);
     expect(data.answers.category.choice).toBe('billing');
     expect(data.answers.urgency.score).toBe(0.75);
@@ -417,7 +537,7 @@ describe('handleSystemOneRequest', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual(upstreamBody);
+    expect(await response.json()).toEqual(billedBody);
     expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
     await runAfter();
     expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledTimes(1);
@@ -522,6 +642,62 @@ describe('handleSystemOneRequest', () => {
     }
   );
 
+  it('reports the custom-priced cost the ledger row bills', async () => {
+    const customPricing: CustomPricingConfig = {
+      models: [
+        {
+          model: TYPESAFE_MODEL,
+          pricing: [
+            {
+              start_context_length: 0,
+              pricing: {
+                prompt_per_million: 2,
+                completion_per_million: 10,
+                input_cache_read_per_million: null,
+                input_cache_write_per_million: null,
+              },
+            },
+          ],
+        },
+      ],
+    };
+    jest.mocked(getCustomPricingConfig).mockResolvedValue(customPricing);
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    // 23 input tokens at $2/M plus 7 output tokens at $10/M.
+    expect(await response.json()).toEqual({
+      ...billedBody,
+      usage: { ...billedBody.usage, cost: 0.000116 },
+    });
+    await runAfter();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: 116, market_cost: 124 }),
+      expect.anything()
+    );
+  });
+
+  it('reports the provider cost the ledger row bills even when the body claims BYOK', async () => {
+    const usage = {
+      ...upstreamBody.usage,
+      is_byok: true,
+      cost_details: { upstream_inference_cost: 0.002 },
+    };
+    mockedFetch.mockResolvedValue(Response.json({ ...upstreamBody, usage }));
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    expect(await response.json()).toEqual({
+      ...billedBody,
+      usage: { ...usage, cost: 0.000124, is_byok: false },
+    });
+    await runAfter();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: 124, market_cost: 124 }),
+      expect.anything()
+    );
+  });
+
   it('forwards privacy without exposing client routing, credentials, or identity', async () => {
     const response = await handleSystemOneRequest(
       makeRequest({
@@ -620,25 +796,92 @@ describe('handleSystemOneRequest', () => {
     const response = await handleSystemOneRequest(request);
 
     expect(response.status).toBe(429);
-    expect(await response.json()).toMatchObject({ error_type: 'rate_limit_exceeded' });
+    // The same response chat and the other inference routes answer.
+    expect(await response.json()).toEqual({
+      error: 'Rate limit exceeded',
+      error_type: 'rate_limit_exceeded',
+      message: 'Too many requests. Please try again later.',
+    });
     expect(gatewayRateLimitKey).toHaveBeenCalledWith(request.headers, '192.0.2.1');
     expect(isGatewayAccountRateLimited).toHaveBeenCalledWith(request, 'test-rate-limit-key');
     expect(getUserFromAuth).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
+  it('limits a free System One model per account before reading the balance', async () => {
+    jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+
+    const response = await handleSystemOneRequest(
+      makeRequest({ ...requestBody, model: OTHER_SYSTEM_ONE_MODEL })
+    );
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get('x-should-retry')).toBe('false');
+    await expect(response.json()).resolves.toMatchObject({ error_type: 'rate_limit_exceeded' });
+    expect(isFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), {
+      kind: 'account',
+      kiloUserId: user.id,
+    });
+    expect(getBalanceAndOrgSettings).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { features: ['org-123'], status: 403 },
+    { features: [], status: 200 },
+  ])(
+    'rejects a request when the organization disabled OpenRouter, with feature organizations $features',
+    async ({ features, status }) => {
+      setAuth('org-123');
+      jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({
+        balance: 1_000_000,
+        plan: 'enterprise',
+        settings: { disable_openrouter: true },
+      });
+      jest
+        .mocked(getRuntimeOrganizationFeatures)
+        .mockResolvedValue({ ...DEFAULT_ORGANIZATION_FEATURES, gateway_settings: features });
+
+      const response = await handleSystemOneRequest(makeRequest());
+
+      expect(response.status).toBe(status);
+      if (status === 403) {
+        await expect(response.json()).resolves.toMatchObject({
+          error:
+            'This request would be routed through OpenRouter, which your organization has disabled.',
+          error_type: 'provider_not_allowed',
+        });
+      }
+      expect(mockedFetch).toHaveBeenCalledTimes(status === 200 ? 1 : 0);
+    }
+  );
+
+  it('does not count a paid System One model against the free-model limit', async () => {
+    jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(isFreeModelRateLimited).not.toHaveBeenCalled();
+  });
+
   it.each([
     { model: OTHER_SYSTEM_ONE_MODEL, policyModel: OTHER_SYSTEM_ONE_MODEL, isFree: true },
     { model: SYSTEM_ONE_ALIAS, policyModel: TYPESAFE_MODEL, isFree: false },
   ])(
-    'forwards OpenRouter System One model $model unchanged',
+    'forwards OpenRouter System One model $model as the model it resolves to',
     async ({ model, policyModel, isFree }) => {
       setAuth('org-123');
 
       const response = await handleSystemOneRequest(makeRequest({ ...requestBody, model }));
 
       expect(response.status).toBe(200);
-      expect(upstreamRequest().body.model).toBe(model);
+      // A free model reports no cost, and an id other than an alias reports the requested model.
+      await expect(response.json()).resolves.toMatchObject({
+        model: model === SYSTEM_ONE_ALIAS ? TYPESAFE_MODEL : model,
+        usage: { cost: isFree ? 0 : 0.000124 },
+      });
+      expect(upstreamRequest().body.model).toBe(policyModel);
       expect(resolveOrganizationMemberModelDecision).toHaveBeenCalledWith(
         expect.objectContaining({ modelId: policyModel })
       );
@@ -838,6 +1081,89 @@ describe('handleSystemOneRequest', () => {
     expect(upstreamRequest().body.provider).toEqual({ ...provider, only: ['typesafe'] });
   });
 
+  it('answers data_collection_required under an organization data collection policy', async () => {
+    setAuth('org-123');
+    jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({
+      balance: 1000,
+      settings: { data_collection: 'deny' },
+    });
+    jest.mocked(getOrganizationProviderPrivacy).mockReturnValue({ data_collection: 'deny' });
+
+    const response = await handleSystemOneRequest(
+      makeRequest({ ...requestBody, model: OTHER_SYSTEM_ONE_MODEL })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error_type: 'data_collection_required',
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
+    expect(startBouncerDecide).not.toHaveBeenCalled();
+  });
+
+  it('answers data_collection_required under a request data collection policy', async () => {
+    const response = await handleSystemOneRequest(
+      makeRequest({
+        ...requestBody,
+        model: OTHER_SYSTEM_ONE_MODEL,
+        provider: { data_collection: 'deny' },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error_type: 'data_collection_required',
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
+    expect(startBouncerDecide).not.toHaveBeenCalled();
+  });
+
+  it('answers data_collection_required under a zero data retention policy', async () => {
+    const response = await handleSystemOneRequest(
+      makeRequest({ ...requestBody, model: OTHER_SYSTEM_ONE_MODEL, provider: { zdr: true } })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error_type: 'data_collection_required',
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
+    expect(startBouncerDecide).not.toHaveBeenCalled();
+  });
+
+  it('serves a model under an allowing data collection policy', async () => {
+    setAuth('org-123');
+    jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({
+      balance: 1000,
+      settings: { data_collection: 'allow' },
+    });
+    jest.mocked(getOrganizationProviderPrivacy).mockReturnValue({ data_collection: 'allow' });
+
+    const response = await handleSystemOneRequest(
+      makeRequest({ ...requestBody, model: OTHER_SYSTEM_ONE_MODEL })
+    );
+
+    expect(response.status).toBe(200);
+    expect(upstreamRequest().body.provider).toEqual({ data_collection: 'allow' });
+  });
+
+  it('forwards a data collection policy on a paid model', async () => {
+    setAuth('org-123');
+    jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({
+      balance: 1000,
+      settings: { data_collection: 'deny' },
+    });
+    jest.mocked(getOrganizationProviderPrivacy).mockReturnValue({ data_collection: 'deny' });
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(upstreamRequest().body.provider).toEqual({ data_collection: 'deny' });
+  });
+
   it.each([[[]], [['virtual']]])(
     'rejects member routes without a real provider: %j',
     async eligible => {
@@ -883,6 +1209,35 @@ describe('handleSystemOneRequest', () => {
     );
   });
 
+  it('explains an OpenRouter refusal for lack of an allowed provider', async () => {
+    mockedFetch.mockResolvedValue(
+      Response.json(
+        {
+          error: {
+            message: 'No allowed providers are available for the selected model.',
+            code: 404,
+            metadata: { available_providers: ['openai'], requested_providers: ['azure'] },
+          },
+        },
+        { status: 404 }
+      )
+    );
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'No eligible provider can serve the selected model.',
+      error_type: 'provider_not_allowed',
+    });
+    expect(wrapInSafeNextResponse).not.toHaveBeenCalled();
+    await runAfter();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({ hasError: true, status_code: 404, cost_mUsd: 0 }),
+      expect.objectContaining({ status_code: 404 })
+    );
+  });
+
   it.each([400, 429, 500])(
     'delegates upstream HTTP %s to the safe response wrapper and records the attempt',
     async status => {
@@ -908,12 +1263,11 @@ describe('handleSystemOneRequest', () => {
     {
       case: 'a transport failure',
       arrange: () => mockedFetch.mockRejectedValue(new Error('connection failed')),
-      message: 'OpenRouter System One request failed',
       latency: null,
     },
   ])(
     'records a zero-cost attempt row when the upstream call ends with $case',
-    async ({ arrange, message, latency }) => {
+    async ({ arrange, latency }) => {
       mockMeteredClock();
       arrange();
 
@@ -925,8 +1279,8 @@ describe('handleSystemOneRequest', () => {
         error_type: 'upstream_error',
       });
       expect(errorExceptInTest).toHaveBeenCalledWith(
-        message,
-        expect.objectContaining({ message: expect.any(String) })
+        'AI gateway upstream fetch failed',
+        expect.objectContaining({ path: '/systemone', failureFamily: 'unknown' })
       );
       await runAfter();
       expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
@@ -1099,19 +1453,36 @@ describe('handleSystemOneRequest', () => {
     }
   );
 
-  it('records a duration-bound attempt row when the upstream call times out', async () => {
-    mockedFetch.mockRejectedValue(
-      new DOMException('The operation was aborted due to timeout', 'TimeoutError')
-    );
+  it.each([
+    ['the gateway duration budget', new DOMException('The operation was aborted', 'TimeoutError')],
+    [
+      "undici's header timeout",
+      new TypeError('fetch failed', {
+        cause: Object.assign(new Error('Headers Timeout Error'), {
+          code: 'UND_ERR_HEADERS_TIMEOUT',
+        }),
+      }),
+    ],
+  ])(
+    'records a duration-bound attempt row when %s ends the upstream call',
+    async (_case, error) => {
+      mockedFetch.mockRejectedValue(error);
 
-    expect((await handleSystemOneRequest(makeRequest())).status).toBe(502);
+      const response = await handleSystemOneRequest(makeRequest());
 
-    await runAfter();
-    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
-      expect.objectContaining({ hasError: true, status_code: 504, cost_mUsd: 0 }),
-      expect.objectContaining({ status_code: 504 })
-    );
-  });
+      expect(response.status).toBe(502);
+      expect(await response.json()).toEqual({
+        message: 'Upstream request failed',
+        error_type: 'upstream_error',
+      });
+
+      await runAfter();
+      expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+        expect.objectContaining({ hasError: true, status_code: 504, cost_mUsd: 0 }),
+        expect.objectContaining({ status_code: 504 })
+      );
+    }
+  );
 
   it.each([
     ['missing usage', undefined],
@@ -1267,6 +1638,76 @@ describe('handleSystemOneRequest', () => {
     );
   });
 
+  it('bills and reports custom pricing for an answered request', async () => {
+    jest.mocked(getCustomPricingConfig).mockResolvedValue(systemOneCustomPricingConfig);
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    expect(response.status).toBe(200);
+    // 23 input tokens at $2/M plus 7 output tokens at $10/M.
+    expect(await response.json()).toEqual({
+      ...billedBody,
+      usage: { ...billedBody.usage, cost: 0.000116 },
+    });
+    await runAfter();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: 116, market_cost: 124, hasError: false }),
+      expect.objectContaining({ requested_model: TYPESAFE_MODEL, is_free: false })
+    );
+  });
+
+  it('bills custom pricing from the generation tokens when the body is unusable', async () => {
+    mockMeteredClock();
+    jest.mocked(getCustomPricingConfig).mockResolvedValue(systemOneCustomPricingConfig);
+    mockedFetch.mockResolvedValue(Response.json({ ...upstreamBody, usage: undefined }));
+    jest.mocked(fetchGeneration).mockResolvedValue({
+      data: { id: upstreamBody.id },
+    } as OpenRouterGeneration);
+    jest
+      .mocked(mapToUsageStats)
+      .mockReturnValue({ ...reconciledStats, inputTokens: 50, outputTokens: 10 });
+
+    expect((await handleSystemOneRequest(makeRequest())).status).toBe(502);
+
+    await runAfter();
+    // 50 input tokens at $2/M plus 10 output tokens at $10/M.
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageId: upstreamBody.id,
+        model: TYPESAFE_MODEL,
+        hasError: true,
+        status_code: 200,
+        latency: METERED_LATENCY_MS,
+        inputTokens: 50,
+        outputTokens: 10,
+        cost_mUsd: 200,
+        market_cost: 124,
+      }),
+      expect.objectContaining({ requested_model: TYPESAFE_MODEL, is_free: false })
+    );
+  });
+
+  it('charges a custom-priced free model nothing when the body is unusable', async () => {
+    jest.mocked(getCustomPricingConfig).mockResolvedValue(systemOneCustomPricingConfig);
+    mockedFetch.mockResolvedValue(
+      Response.json({ ...upstreamBody, model: OTHER_SYSTEM_ONE_MODEL, usage: undefined })
+    );
+    jest.mocked(fetchGeneration).mockResolvedValue({
+      data: { id: upstreamBody.id },
+    } as OpenRouterGeneration);
+
+    expect(
+      (await handleSystemOneRequest(makeRequest({ ...requestBody, model: OTHER_SYSTEM_ONE_MODEL })))
+        .status
+    ).toBe(502);
+
+    await runAfter();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: 0, market_cost: 124, hasError: true }),
+      expect.objectContaining({ requested_model: OTHER_SYSTEM_ONE_MODEL, is_free: true })
+    );
+  });
+
   it('does not recover deferred accounting errors as parsing failures', async () => {
     const accountingError = new Error('Accounting unavailable');
     jest.mocked(logMicrodollarUsageAndReportToBouncer).mockRejectedValue(accountingError);
@@ -1277,6 +1718,23 @@ describe('handleSystemOneRequest', () => {
     expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledTimes(1);
     expect(captureException).not.toHaveBeenCalled();
     expect(fetchGeneration).not.toHaveBeenCalled();
+  });
+
+  it('returns a URL policy refusal without sending or recording', async () => {
+    const refusal = NextResponse.json({ error_type: 'upstream_url_rejected' }, { status: 503 });
+    jest.mocked(isUpstreamUrlPolicyEnforced).mockReturnValue(true);
+    jest.mocked(rejectDisallowedUpstreamUrls).mockResolvedValue({ rejected: refusal });
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    expect(response).toBe(refusal);
+    expect(mockedFetch).not.toHaveBeenCalled();
+    // The only deferred work is `fetchUpstream`'s budget-timer cleanup.
+    for (const [callback] of jest.mocked(after).mock.calls) {
+      if (typeof callback === 'function') await callback();
+    }
+    expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
+    expect(emitGatewayApiMetrics).not.toHaveBeenCalled();
   });
 
   it('answers 499 without sending or recording when the client left before the upstream call', async () => {
@@ -1337,8 +1795,8 @@ describe('handleSystemOneRequest', () => {
     await runAfter();
 
     expect(response.status).toBe(200);
-    const decideParams = jest.mocked(startBouncerDecide).mock.calls[0]?.[0];
-    if (!decideParams || decideParams instanceof Promise) throw new Error('Expected decide params');
+    const decideParams = await jest.mocked(startBouncerDecide).mock.calls[0]?.[0];
+    if (!decideParams) throw new Error('Expected decide params');
     expect(decideParams.account).toMatchObject({
       accountId: `user:${user.id}`,
       userId: user.id,
@@ -1347,6 +1805,47 @@ describe('handleSystemOneRequest', () => {
       expect.anything(),
       expect.objectContaining({
         bouncer: expect.objectContaining({ spendWatch: true, requestId: decideParams.requestId }),
+      })
+    );
+  });
+
+  it('gives bouncer the raw IP and the usage row the payer-safe IP, under one request id', async () => {
+    const ja4Digest = 'T13D1516H2_8DAAF6152771';
+    jest.mocked(extractFraudAndProjectHeaders).mockReturnValue({
+      fraudHeaders: { ...EmptyFraudDetectionHeaders, http_x_vercel_ja4_digest: ja4Digest },
+      projectId: 'project-123',
+      xKiloCodeVersion: null,
+      numericKiloCodeVersion: 0,
+    });
+    mockVerdict({ enforced: false, spendWatch: false, flags: [] });
+    const cloudflareIp = '104.16.0.1';
+    const headers = { 'x-forwarded-for': cloudflareIp, [FEATURE_HEADER]: 'cloud-agent' };
+
+    const response = await handleSystemOneRequest(makeRequest(requestBody, headers));
+    await runAfter();
+
+    expect(response.status).toBe(200);
+    expect(startBouncerDecide).toHaveBeenCalledTimes(1);
+    const decideParams = await jest.mocked(startBouncerDecide).mock.calls[0]?.[0];
+    expect(decideParams).toMatchObject({
+      ip: cloudflareIp,
+      ja4: ja4Digest.toLowerCase(),
+      account: { accountId: `user:${user.id}`, userId: user.id, tier: 'paid' },
+    });
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        bouncer: {
+          requestId: decideParams?.requestId,
+          occurredAt: expect.any(Date),
+          accountId: `user:${user.id}`,
+          clientIp: undefined,
+          clientAttributed: expect.any(Boolean),
+          requestedLogprobs: false,
+          samples: null,
+          promptSimHash: null,
+          spendWatch: false,
+        },
       })
     );
   });
@@ -1435,5 +1934,329 @@ describe('handleSystemOneRequest', () => {
     expect(getBalanceAndOrgSettings).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
     expect(deferredUsageCallbacks()).toHaveLength(0);
+  });
+  describe('routes', () => {
+    function setEnterpriseRegion(dataRegion?: 'eu') {
+      setAuth('org-123');
+      jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({
+        balance: 1_000_000,
+        plan: 'enterprise',
+        settings: dataRegion ? { data_region: dataRegion } : { disable_openrouter: true },
+      });
+      jest
+        .mocked(getRuntimeOrganizationFeatures)
+        .mockResolvedValue({ ...DEFAULT_ORGANIZATION_FEATURES, gateway_settings: ['org-123'] });
+    }
+
+    it('passes the member decision provider routes to the route selection', async () => {
+      setAuth('org-123');
+      const eligibleProviderRoutes = new Set(['typesafe']);
+      jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue({
+        ...memberDecision,
+        decision: { allowed: true, eligibleProviderRoutes },
+      });
+
+      expect((await handleSystemOneRequest(makeRequest())).status).toBe(200);
+
+      expect(resolveEmbeddingOrDecisionRoute).toHaveBeenCalledWith({
+        requestedModel: TYPESAFE_MODEL,
+        modelType: 'evaluation',
+        user,
+        organizationId: 'org-123',
+        allowedProviders: eligibleProviderRoutes,
+        openRouterDisabled: false,
+      });
+    });
+
+    it("sends the request through the owner's OpenRouter key without a balance check", async () => {
+      jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({ balance: 0 });
+      jest.mocked(resolveEmbeddingOrDecisionRoute).mockResolvedValue({
+        provider: userOpenRouterProvider,
+        userByok: [userOpenRouterKey],
+      });
+
+      const response = await handleSystemOneRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(creditsBlockedResponse).not.toHaveBeenCalled();
+      const upstream = upstreamRequest();
+      expect(upstream.headers.get('authorization')).toBe('Bearer test-user-openrouter-key');
+      expect(upstream.body.user).toBe('hashed-user');
+      expect(generateProviderSpecificHash).toHaveBeenCalledWith(user.id, userOpenRouterProvider);
+      await expect(response.json()).resolves.toMatchObject({
+        usage: { cost: 0, is_byok: true },
+      });
+      await runAfter();
+      expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+        expect.objectContaining({ cost_mUsd: 0, market_cost: 124, is_byok: true }),
+        expect.objectContaining({ provider: 'openrouter', user_byok: true })
+      );
+      expect(emitGatewayApiMetrics).toHaveBeenCalledWith(
+        expect.objectContaining({ userByok: true, provider: 'openrouter' })
+      );
+    });
+
+    it("records the upstream inference cost of the owner's OpenRouter key as the market cost", async () => {
+      jest.mocked(resolveEmbeddingOrDecisionRoute).mockResolvedValue({
+        provider: userOpenRouterProvider,
+        userByok: [userOpenRouterKey],
+      });
+      mockedFetch.mockImplementation(async () =>
+        Response.json({
+          ...upstreamBody,
+          usage: {
+            input_tokens: 23,
+            output_tokens: 7,
+            cost: 0.0000062,
+            is_byok: true,
+            cost_details: { upstream_inference_cost: 0.000124 },
+          },
+        })
+      );
+
+      expect((await handleSystemOneRequest(makeRequest())).status).toBe(200);
+
+      await runAfter();
+      const [stats] = jest.mocked(logMicrodollarUsageAndReportToBouncer).mock.calls[0];
+      expect(stats).toMatchObject({ cost_mUsd: 0, is_byok: true });
+      expect(stats.market_cost).toBeGreaterThanOrEqual(124);
+    });
+
+    it("passes the owner's provider key through Kilo's Vercel account, exempt from the region", async () => {
+      setEnterpriseRegion('eu');
+      jest.mocked(resolveEmbeddingOrDecisionRoute).mockResolvedValue({
+        provider: kiloVercelProvider,
+        userByok: [userAnthropicKey],
+      });
+      mockedFetch.mockImplementation(async () => Response.json(vercelUpstreamBody));
+
+      const response = await handleSystemOneRequest(
+        makeRequest({ ...requestBody, provider: { zdr: true, data_collection: 'deny' } })
+      );
+
+      expect(response.status).toBe(200);
+      const upstream = upstreamRequest(VERCEL_TYPESAFE_URL);
+      expect(upstream.headers.get('authorization')).toBe('Bearer test-platform-vercel-key');
+      expect(upstream.body).toEqual({
+        ...JSON.parse(JSON.stringify(requestBody)),
+        model: VERCEL_SYSTEM_ONE_MODEL,
+        providerOptions: {
+          gateway: {
+            only: ['anthropic'],
+            byok: { anthropic: [{ apiKey: 'test-user-anthropic-key' }] },
+            zeroDataRetention: true,
+            disallowPromptTraining: true,
+          },
+        },
+      });
+      expect(upstream.body.providerOptions.gateway).not.toHaveProperty('inferenceRegion');
+      expect(generateProviderSpecificHash).not.toHaveBeenCalled();
+      await runAfter();
+      expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+        expect.objectContaining({ cost_mUsd: 0, is_byok: true }),
+        expect.objectContaining({ provider: 'vercel', user_byok: true, inference_region: null })
+      );
+    });
+
+    it("runs on Kilo's Vercel account in the organization's region when OpenRouter is refused", async () => {
+      setEnterpriseRegion('eu');
+      jest
+        .mocked(resolveEmbeddingOrDecisionRoute)
+        .mockResolvedValue({ provider: kiloVercelProvider, userByok: null });
+      mockedFetch.mockImplementation(async () => Response.json(vercelUpstreamBody));
+
+      const response = await handleSystemOneRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(resolveEmbeddingOrDecisionRoute).toHaveBeenCalledWith(
+        expect.objectContaining({ openRouterDisabled: true })
+      );
+      const upstream = upstreamRequest(VERCEL_TYPESAFE_URL);
+      expect(upstream.body).toEqual({
+        ...JSON.parse(JSON.stringify(requestBody)),
+        model: VERCEL_SYSTEM_ONE_MODEL,
+        providerOptions: {
+          gateway: { inferenceRegion: { scope: 'zone', geoRegion: 'eu' } },
+        },
+      });
+      await runAfter();
+      expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+        expect.objectContaining({ cost_mUsd: 200, is_byok: false }),
+        expect.objectContaining({
+          provider: 'vercel',
+          user_byok: false,
+          inference_region: 'eu',
+        })
+      );
+    });
+
+    it("omits the region from Kilo's Vercel route without one", async () => {
+      setEnterpriseRegion();
+      jest
+        .mocked(resolveEmbeddingOrDecisionRoute)
+        .mockResolvedValue({ provider: kiloVercelProvider, userByok: null });
+      mockedFetch.mockImplementation(async () => Response.json(vercelUpstreamBody));
+
+      expect((await handleSystemOneRequest(makeRequest())).status).toBe(200);
+
+      expect(upstreamRequest(VERCEL_TYPESAFE_URL).body.providerOptions.gateway).not.toHaveProperty(
+        'inferenceRegion'
+      );
+    });
+
+    it('forwards the effective provider restrictions to the Vercel gateway options', async () => {
+      setAuth('org-123');
+      jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue({
+        ...memberDecision,
+        decision: { allowed: true, eligibleProviderRoutes: new Set(['typesafe']) },
+      });
+      jest
+        .mocked(resolveEmbeddingOrDecisionRoute)
+        .mockResolvedValue({ provider: kiloVercelProvider, userByok: null });
+      mockedFetch.mockImplementation(async () => Response.json(vercelUpstreamBody));
+
+      const response = await handleSystemOneRequest(
+        makeRequest({ ...requestBody, provider: { zdr: true } })
+      );
+
+      expect(response.status).toBe(200);
+      const { gateway } = upstreamRequest(VERCEL_TYPESAFE_URL).body.providerOptions;
+      expect(gateway.zeroDataRetention).toBe(true);
+      expect(gateway.only).toEqual(['typesafe-ai']);
+    });
+
+    it.each([
+      { label: "Kilo's Vercel account", userByok: null },
+      { label: "the owner's Vercel AI Gateway key", userByok: [userVercelGatewayKey] },
+    ])(
+      'rejects a provider allow-list that names no Vercel provider of the model on $label',
+      async ({ userByok }) => {
+        setAuth('org-123');
+        jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue({
+          ...memberDecision,
+          decision: { allowed: true, eligibleProviderRoutes: new Set(['openai']) },
+        });
+        jest
+          .mocked(getCachedVercelInferenceProviderIdsForModel)
+          .mockResolvedValue(['typesafe-ai', 'digitalocean']);
+        jest
+          .mocked(resolveEmbeddingOrDecisionRoute)
+          .mockResolvedValue({ provider: kiloVercelProvider, userByok });
+
+        const response = await handleSystemOneRequest(makeRequest());
+
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({
+          error:
+            'No eligible provider can serve the selected model. Please enable provider: typesafe-ai, digitalocean',
+          error_type: 'provider_not_allowed',
+        });
+        expect(getCachedVercelInferenceProviderIdsForModel).toHaveBeenCalledWith(
+          VERCEL_SYSTEM_ONE_MODEL
+        );
+        expect(mockedFetch).not.toHaveBeenCalled();
+        expect(startBouncerDecide).not.toHaveBeenCalled();
+        expect(after).not.toHaveBeenCalled();
+        expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([
+      { label: 'OpenRouter', provider: OPENROUTER },
+      { label: "Kilo's Vercel AI Gateway", provider: kiloVercelProvider },
+    ])('rejects client providerOptions on the $label route', async ({ provider }) => {
+      jest.mocked(resolveEmbeddingOrDecisionRoute).mockResolvedValue({ provider, userByok: null });
+
+      const response = await handleSystemOneRequest(
+        makeRequest({ ...requestBody, providerOptions: { gateway: { only: ['typesafe-ai'] } } })
+      );
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({
+        error: 'The providerOptions field is not supported. Use provider instead.',
+        error_type: 'unsupported_field',
+      });
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
+    });
+
+    it('normalizes a Vercel response to the OpenRouter-compatible shape and bills its cost', async () => {
+      jest
+        .mocked(resolveEmbeddingOrDecisionRoute)
+        .mockResolvedValue({ provider: kiloVercelProvider, userByok: null });
+      mockedFetch.mockImplementation(async () => Response.json(vercelUpstreamBody));
+
+      const response = await handleSystemOneRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body).toEqual({
+        id: 'gen_vercel_systemone',
+        model: TYPESAFE_MODEL,
+        provider: 'typesafe-ai',
+        answers: upstreamBody.answers,
+        usage: { input_tokens: 23, output_tokens: 7, cost: 0.0002, is_byok: false },
+      });
+      await runAfter();
+      expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messageId: 'gen_vercel_systemone',
+          model: VERCEL_SYSTEM_ONE_MODEL,
+          inference_provider: 'typesafe-ai',
+          cost_mUsd: 200,
+          market_cost: 200,
+          inputTokens: 23,
+          outputTokens: 7,
+          hasError: false,
+        }),
+        expect.objectContaining({ provider: 'vercel' })
+      );
+    });
+
+    it('reconciles a Vercel response without a usable cost through the Vercel generation', async () => {
+      mockMeteredClock();
+      jest
+        .mocked(resolveEmbeddingOrDecisionRoute)
+        .mockResolvedValue({ provider: kiloVercelProvider, userByok: null });
+      const { cost: _cost, ...gateway } = vercelUpstreamBody.provider_metadata.gateway;
+      mockedFetch.mockImplementation(async () =>
+        Response.json({ ...vercelUpstreamBody, provider_metadata: { gateway } })
+      );
+      jest.mocked(fetchGeneration).mockResolvedValue({
+        data: { id: 'gen_vercel_systemone' },
+      } as OpenRouterGeneration);
+
+      expect((await handleSystemOneRequest(makeRequest())).status).toBe(502);
+
+      await runAfter();
+      expect(fetchGeneration).toHaveBeenCalledWith('gen_vercel_systemone', kiloVercelProvider);
+      expect(mapToUsageStats).toHaveBeenCalledWith(expect.anything(), '', user.id, 'vercel');
+    });
+
+    it('refuses the OpenRouter route when an inference region is set', async () => {
+      setEnterpriseRegion('eu');
+
+      const response = await handleSystemOneRequest(makeRequest());
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({ error_type: 'provider_not_allowed' });
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(deferredUsageCallbacks()).toHaveLength(0);
+    });
+
+    it("passes the owner's upstream balance error through instead of reporting Kilo's balance", async () => {
+      jest.mocked(resolveEmbeddingOrDecisionRoute).mockResolvedValue({
+        provider: userOpenRouterProvider,
+        userByok: [userOpenRouterKey],
+      });
+      const safeResponse = NextResponse.json({ error: 'no credits' }, { status: 402 });
+      mockedFetch.mockResolvedValue(Response.json({ error: 'no credits' }, { status: 402 }));
+      jest.mocked(wrapInSafeNextResponse).mockReturnValue(safeResponse);
+
+      const response = await handleSystemOneRequest(makeRequest());
+
+      expect(response.status).toBe(402);
+      expect(errorExceptInTest).not.toHaveBeenCalled();
+    });
   });
 });

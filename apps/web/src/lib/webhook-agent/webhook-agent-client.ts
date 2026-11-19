@@ -1,4 +1,5 @@
 import type { WebhookBodySchema } from '@kilocode/worker-utils/webhook-body-validation';
+import type { WebhookTriggerTarget } from '@kilocode/worker-utils/webhook-trigger-target';
 import 'server-only';
 import { INTERNAL_API_SECRET, WEBHOOK_AGENT_URL } from '@kilocode/web-shared/lib/config.server';
 import { encodeUserIdForPath } from '@kilocode/worker-utils/user-id-encoding';
@@ -16,7 +17,8 @@ export type TriggerConfigResponse = {
   executionUserId?: string | null;
   createdAt: string;
   isActive: boolean;
-  targetType: 'cloud_agent' | 'kiloclaw_chat';
+  targetType: WebhookTriggerTarget;
+  cloudAgentSessionId?: string | null;
   kiloclawInstanceId?: string | null;
   githubRepo: string | null;
   mode: string | null;
@@ -44,7 +46,8 @@ export type TriggerConfigResponse = {
  */
 export type CreateTriggerInput = {
   executionUserId?: string;
-  targetType?: 'cloud_agent' | 'kiloclaw_chat';
+  targetType?: WebhookTriggerTarget;
+  cloudAgentSessionId?: string;
   kiloclawInstanceId?: string;
   githubRepo?: string;
   mode?: string;

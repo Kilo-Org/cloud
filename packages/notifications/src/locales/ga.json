@@ -3,10 +3,7 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Tá nuashonrú ar do sheisiún ghníomhaire",
-      "chatMessage": "Tá teachtaireacht nua agat",
-      "instanceLifecycle": "Tá nuashonrú ar do chás",
-      "scheduledAction": "Tá nuashonrú ar ghníomh sceidealta",
-      "lowBalance": "Teastaíonn aird ar do chothromas",
+      "lowBalance": "Teastaíonn aird ar d'iarmhéid",
       "spendAlert": "Teastaíonn aird ar do chaiteachas",
       "securityFinding": "Teastaíonn aird ar thátal slándála",
       "securityUpdate": "Tá nuashonrú ar sheiceáil slándála",
@@ -15,73 +12,35 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Gan teideal",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
     "lowBalance": {
-      "title": "Foláireamh chothromas íseal",
-      "body": "Thit cothromas {{organizationName}} faoi ${{minimumBalanceUsd}}"
+      "title": "Foláireamh iarmhéid ísil",
+      "body": "Thit iarmhéid {{organizationName}} faoi ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
       "title": "Foláireamh caiteachais",
       "body": "Sháraigh caiteachas {{scopeName}} ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Tátal slándála nua ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} i {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Tátal slándála nua ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Rabhadh SLA",
-      "body": "{{findingTitle}} i {{repoFullName}}"
+      "title": "Rabhadh SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Sárú SLA",
-      "body": "{{findingTitle}} i {{repoFullName}}"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Tá nuashonrú ar sheiceáil slándála"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "Tá {{instanceName}} réidh",
-      "body": "Tapáil le tosú ag comhrá."
-    },
-    "startFailed": {
-      "title": "Theip ar {{instanceName}} tosú",
-      "body": "Theip ar thosú."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "Atosóidh {{instanceName}} go luath",
-      "body": "Sceidealta le hatosú ag {{when}}."
-    },
-    "restartCancelled": {
-      "title": "Atosú {{instanceName}} curtha ar ceal",
-      "body": "Cuireadh an t-atosú sceidealta roimhe sin ar ceal."
-    },
-    "versionChangeNotice": {
-      "title": "Uasghrádóidh {{instanceName}} go luath",
-      "bodyWithTag": "Uasghrádú go {{targetImageTag}} ag {{when}}.",
-      "bodyWithoutTag": "Uasghrádú sceidealta ag {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "Uasghrádú {{instanceName}} curtha ar ceal",
-      "body": "Cuireadh an t-uasghrádú sceidealta roimhe sin ar ceal."
+      "title": "Sárú SLA"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Tá do sheisiún Kilo réidh le rialú ó do ghuthán"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

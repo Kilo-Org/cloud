@@ -49,9 +49,6 @@ const h = vi.hoisted(() => ({
   },
 }));
 const routerPush = vi.hoisted(() => vi.fn<(href: string) => void>());
-const permissionState = vi.hoisted(() => ({
-  permission: 'allowed' as 'resolving' | 'allowed' | 'read-only',
-}));
 
 vi.mock('@/lib/hooks/use-repo-bindings', () => ({
   useRepoBindings: () => h.bindingsQuery,
@@ -62,7 +59,7 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileList: () => h.profileList,
 }));
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useOrganizationProfilePermission: () => permissionState.permission,
+  useOrganizationProfilePermission: () => 'allowed',
 }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: routerPush }) }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -121,7 +118,6 @@ describe('RepoBindingsScreen add form profile picker', () => {
       isError: false,
       isRefetching: false,
     });
-    permissionState.permission = 'allowed';
     routerPush.mockReset();
   });
 
@@ -187,42 +183,6 @@ describe('RepoBindingsScreen add form profile picker', () => {
     expect(routerPush).toHaveBeenCalledWith(
       '/(app)/profile-management/new?owner=organization&returnTo=back&organizationId=org-1'
     );
-
-    unmount();
-  });
-
-  it('empty picker: a read-only organization context offers no create action', async () => {
-    permissionState.permission = 'read-only';
-    Object.assign(h.profileList, { orgProfiles: [], personalProfiles: [PROFILE] });
-
-    const { renderer, unmount } = await mountScreen('org-1');
-    pressButton(renderer.root, 'Add default');
-    pressPressable(renderer.root, 'Select profile');
-
-    const empty = emptyStateProps(renderer.root, 'No profiles yet');
-    expect(empty.description).toBe(
-      'An organization owner or admin can create an organization profile.'
-    );
-    expect(empty.action).toBeUndefined();
-
-    unmount();
-  });
-
-  it('empty picker: an unresolved role does not yet read as read-only', async () => {
-    permissionState.permission = 'resolving';
-    Object.assign(h.profileList, { orgProfiles: [], personalProfiles: [PROFILE] });
-
-    const { renderer, unmount } = await mountScreen('org-1');
-    pressButton(renderer.root, 'Add default');
-    pressPressable(renderer.root, 'Select profile');
-
-    const empty = emptyStateProps(renderer.root, 'No profiles yet');
-    expect(empty.description).toBe(
-      'Create an organization profile to reuse environment variables, setup commands, and skills across sessions.'
-    );
-    // The action still waits for the role: a member must never be offered a
-    // create the server rejects.
-    expect(empty.action).toBeUndefined();
 
     unmount();
   });

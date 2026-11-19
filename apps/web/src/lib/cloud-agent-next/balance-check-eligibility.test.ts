@@ -234,9 +234,9 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
       mockResolveClaudeBillingModel.mockResolvedValue('claude-sonnet-4');
     });
 
-    it("counts the organization's shared-services Claude link for service runs only", async () => {
+    it("counts the organization's Claude link for every request in it", async () => {
       mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
-        owner.kind === 'shared_services' ? { status: 'connected' } : null
+        owner.kind === 'organization' ? { status: 'connected' } : null
       );
       expect(await eligibility(true, 'org-1')).toEqual({
         isFree: false,
@@ -244,11 +244,38 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
       });
       expect(await eligibility(false, 'org-1')).toEqual({
         isFree: false,
-        hasUserByokAvailable: false,
+        hasUserByokAvailable: true,
       });
     });
 
-    it('does not count a shared-services link whose recorded connector is gone', async () => {
+    it("does not use the person's own Claude link for an organization request", async () => {
+      mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
+        owner.kind === 'personal' ? { status: 'connected' } : null
+      );
+
+      expect(await eligibility(true, 'org-1')).toEqual({
+        isFree: false,
+        hasUserByokAvailable: false,
+      });
+      expect(mockGetClaudeBillingConnection).toHaveBeenCalledWith(
+        { kind: 'organization', organizationId: 'org-1' },
+        fakeDb
+      );
+    });
+
+    it("counts the person's own Claude link outside an organization", async () => {
+      mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
+        owner.kind === 'personal' ? { status: 'connected' } : null
+      );
+
+      expect(await eligibility(false)).toEqual({ isFree: false, hasUserByokAvailable: true });
+      expect(mockGetClaudeBillingConnection).toHaveBeenCalledWith(
+        { kind: 'personal', kiloUserId: fakeUser.id },
+        fakeDb
+      );
+    });
+
+    it('does not count an organization link whose recorded connector is gone', async () => {
       mockGetClaudeBillingConnection.mockImplementation(async () => ({
         status: 'connected',
         created_by: 'connector',
@@ -263,32 +290,11 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
       expect(mockResolveClaudeBillingConnector).toHaveBeenCalledWith('connector', fakeDb);
     });
 
-    it('reports the reconnect requirement for a shared-services link before a member link', async () => {
-      // Routing tries the shared link first, so a member's own link does not keep
-      // the model billable while the shared link needs a reconnect.
+    it('counts an organization link whose recorded connector still resolves', async () => {
       mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
-        owner.kind === 'shared_services'
-          ? { status: 'connected', created_by: 'connector' }
-          : { status: 'connected', created_by: 'member' }
+        owner.kind === 'organization' ? { status: 'connected', created_by: 'connector' } : null
       );
-      mockResolveClaudeBillingConnector.mockResolvedValue({ kind: 'gone' });
-
-      expect(await eligibility(true, 'org-1')).toEqual({
-        isFree: false,
-        hasUserByokAvailable: false,
-        reconnectRequired: 'claude_billing',
-      });
-      expect(mockResolveClaudeBillingConnector).toHaveBeenCalledTimes(1);
-    });
-
-    it('counts a shared-services link whose recorded connector still resolves', async () => {
-      mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
-        owner.kind === 'shared_services' ? { status: 'connected', created_by: 'connector' } : null
-      );
-      mockResolveClaudeBillingConnector.mockResolvedValue({
-        kind: 'present',
-        email: 'connector@example.test',
-      });
+      mockResolveClaudeBillingConnector.mockResolvedValue({ kind: 'present' });
 
       expect(await eligibility(true, 'org-1')).toEqual({
         isFree: false,
@@ -296,24 +302,9 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
       });
     });
 
-    it("counts a member's own Claude link in the organization", async () => {
+    it('does not count an organization link that cannot bill', async () => {
       mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
-        owner.kind === 'member' ? { status: 'connected', created_by: 'connector' } : null
-      );
-      mockResolveClaudeBillingConnector.mockResolvedValue({ kind: 'gone' });
-
-      expect(await eligibility(false, 'org-1')).toEqual({
-        isFree: false,
-        hasUserByokAvailable: true,
-      });
-      expect(mockResolveClaudeBillingConnector).not.toHaveBeenCalled();
-    });
-
-    it('does not count past a shared-services link that cannot bill', async () => {
-      mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
-        owner.kind === 'shared_services'
-          ? { status: 'billing_unavailable' }
-          : { status: 'connected' }
+        owner.kind === 'organization' ? { status: 'billing_unavailable' } : { status: 'connected' }
       );
       expect(await eligibility(true, 'org-1')).toEqual({
         isFree: false,

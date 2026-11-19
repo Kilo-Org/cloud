@@ -87,7 +87,7 @@ describe('buildIntegrationRows', () => {
       ],
     });
     const github = rows.find(row => row.provider === 'github');
-    expect(github).toMatchObject({ githubIntegrationId: 'gh-active', webManaged: false });
+    expect(github).toMatchObject({ disconnectIntegrationId: 'gh-active', webManaged: false });
   });
 
   it('sends a GitHub connection the server will not uninstall to the web page', () => {
@@ -98,7 +98,7 @@ describe('buildIntegrationRows', () => {
     });
     expect(rows.find(row => row.provider === 'github')).toMatchObject({
       installed: true,
-      githubIntegrationId: null,
+      disconnectIntegrationId: null,
       webManaged: true,
     });
   });
@@ -110,7 +110,7 @@ describe('buildIntegrationRows', () => {
       githubConnections: [githubConnection({ id: 'gh-1' }), githubConnection({ id: 'gh-2' })],
     });
     expect(rows.find(row => row.provider === 'github')).toMatchObject({
-      githubIntegrationId: null,
+      disconnectIntegrationId: null,
       webManaged: true,
     });
   });
@@ -123,12 +123,12 @@ describe('buildIntegrationRows', () => {
     });
     expect(rows.find(row => row.provider === 'github')).toMatchObject({
       installed: true,
-      githubIntegrationId: null,
+      disconnectIntegrationId: null,
       webManaged: true,
     });
   });
 
-  it('keeps every other provider native, and Bitbucket web-managed', () => {
+  it('names the Bitbucket integration the row disconnects natively', () => {
     const rows = buildIntegrationRows({
       scope: 'organization',
       statuses: [
@@ -136,12 +136,40 @@ describe('buildIntegrationRows', () => {
         setupStatus('bitbucket', true, { accountLogin: 'acme-workspace' }),
       ],
       githubConnections: NO_CONNECTIONS,
+      bitbucketIntegrationId: 'bitbucket-integration-1',
     });
     expect(rows.find(row => row.provider === 'slack')).toMatchObject({ webManaged: false });
     expect(rows.find(row => row.provider === 'bitbucket')).toMatchObject({
       installed: true,
       accountLabel: 'acme-workspace',
-      webManaged: true,
+      disconnectIntegrationId: 'bitbucket-integration-1',
+      webManaged: false,
+      actionPending: false,
+    });
+  });
+
+  it('withholds a connected Bitbucket row until the read that names it settles', () => {
+    const pending = buildIntegrationRows({
+      scope: 'organization',
+      statuses: [setupStatus('bitbucket', true, { accountLogin: 'acme-workspace' })],
+      githubConnections: NO_CONNECTIONS,
+      bitbucketIntegrationPending: true,
+    });
+    expect(pending.find(row => row.provider === 'bitbucket')).toMatchObject({
+      installed: true,
+      disconnectIntegrationId: null,
+      actionPending: true,
+    });
+
+    const settled = buildIntegrationRows({
+      scope: 'organization',
+      statuses: [setupStatus('bitbucket', true, { accountLogin: 'acme-workspace' })],
+      githubConnections: NO_CONNECTIONS,
+      bitbucketIntegrationId: 'bitbucket-integration-1',
+    });
+    expect(settled.find(row => row.provider === 'bitbucket')).toMatchObject({
+      disconnectIntegrationId: 'bitbucket-integration-1',
+      actionPending: false,
     });
   });
 
@@ -154,7 +182,7 @@ describe('buildIntegrationRows', () => {
     });
     expect(pending.find(row => row.provider === 'github')).toMatchObject({
       installed: true,
-      githubIntegrationId: null,
+      disconnectIntegrationId: null,
       webManaged: false,
       actionPending: true,
     });
@@ -165,7 +193,7 @@ describe('buildIntegrationRows', () => {
       githubConnections: [githubConnection({ id: 'gh-1' })],
     });
     expect(settled.find(row => row.provider === 'github')).toMatchObject({
-      githubIntegrationId: 'gh-1',
+      disconnectIntegrationId: 'gh-1',
       actionPending: false,
     });
   });

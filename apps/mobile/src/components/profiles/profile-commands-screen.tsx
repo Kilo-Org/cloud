@@ -1,9 +1,10 @@
-import { usePreventRemove, useRouter } from 'expo-router';
-import { type ReactNode, useMemo, useRef, useState } from 'react';
+import { type Href, usePreventRemove, useRouter } from 'expo-router';
+import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
+import { ProfileCommandRowControls } from '@/components/profiles/profile-command-row-controls';
 import {
   addCommand,
   commandRowA11yLabel,
@@ -14,51 +15,53 @@ import {
   replaceCommand,
   sameCommands,
 } from '@/components/profiles/profile-commands-model';
+import { CommandsSkeleton } from '@/components/profiles/profile-commands-skeleton';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
 import { SetupCommandField } from '@/components/profiles/setup-command-field';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronUp, Terminal, Trash2 } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Terminal } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileCommands } from '@/lib/hooks/use-agent-profiles';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useProfileCommandsSave } from '@/lib/hooks/use-profile-commands-save';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { clearFormDraft, useFormDraftState } from '@/lib/form-draft';
-import { cn } from '@/lib/utils';
-import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { COMMAND_ROW_FIELD_GAP_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 
 type CommandRow = Readonly<{ sequence: number; command: string }>;
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_COMMAND_ROWS: readonly CommandRow[] = [];
 
-/** Content-shaped cards in the same slots as a loaded command row. */
-function CommandsSkeleton() {
-  return (
-    <View className="gap-3">
-      {[0, 1, 2].map(index => (
-        <View key={index} className="gap-1.5 rounded-lg bg-secondary p-3">
-          <View className="h-[48px] flex-row items-center justify-between">
-            <Skeleton className="h-4 w-20 rounded bg-muted-soft" />
-            <Skeleton className="h-[48px] w-[151px] rounded bg-muted-soft" />
-          </View>
-          <Skeleton className="h-[44px] w-full rounded-md bg-muted-soft" />
-        </View>
-      ))}
-    </View>
-  );
-}
-
 export function ProfileCommandsScreen({
   profileId,
   organizationId,
-}: Readonly<{ profileId: string; organizationId?: string }>) {
+  backFallback,
+}: Readonly<{
+  profileId: string;
+  organizationId?: string;
+  /**
+   * The Profiles list of the stack that mounted this screen: the screen's own
+   * "no history" destination, since both the Profile tab and the app-level
+   * Manage Profiles stack render it.
+   */
+  backFallback: Href;
+}>) {
   const { t } = useTranslation();
   const router = useRouter();
+  // A cold link can render this route with nothing beneath it: Back then lands
+  // on the mounting stack's Profiles list instead of unwinding the stack.
+  const leaveScreen = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.dismissTo(backFallback);
+  }, [router, backFallback]);
   const colors = useThemeColors();
   const commandsQuery = useAgentProfileCommands(profileId, organizationId);
   const permission = useOrganizationProfilePermission(organizationId);
@@ -201,9 +204,6 @@ export function ProfileCommandsScreen({
     void leave(repeat);
   });
 
-  const controlClass = (disabled: boolean) =>
-    cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70', disabled && 'opacity-40');
-
   const renderCommandRow = (command: string, index: number) => {
     const isFirst = index === 0;
     const isLast = index === commands.length - 1;
@@ -218,67 +218,58 @@ export function ProfileCommandsScreen({
     // position the row's move and delete controls announce.
     const commandLabel = t('profiles.commandLabelPosition', { position });
     const rowHint = commandRowA11yLabel(index, commands.length);
-    // The reorder and delete controls share the field's own label line, so a
-    // card is its label row and its input and carries no separate control band
-    // under the input. They are the label's accessory, so they stay out of the
-    // field's accessible name and keep their own positions.
+    // The controls stay out of the field's accessible name and keep their own
+    // positions. The controls are the card's own overlay band: the card
+    // positions them, so their touch area escapes the label row's bounds (a
+    // parent-bounds clip) and each control reaches 44 dp on both axes.
     const rowControls = canManage ? (
-      <View className="flex-row items-center gap-1">
-        <Pressable
-          className={controlClass(isFirst)}
-          disabled={isFirst}
-          accessibilityRole="button"
-          accessibilityLabel={upLabel}
-          accessibilityHint={rowHint}
-          onPress={() => {
-            move(index, -1);
-          }}
-        >
-          <ChevronUp size={20} color={colors.mutedForeground} />
-        </Pressable>
-        <Pressable
-          className={controlClass(isLast)}
-          disabled={isLast}
-          accessibilityRole="button"
-          accessibilityLabel={downLabel}
-          accessibilityHint={rowHint}
-          onPress={() => {
-            move(index, 1);
-          }}
-        >
-          <ChevronDown size={20} color={colors.mutedForeground} />
-        </Pressable>
-        <Pressable
-          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-          accessibilityRole="button"
-          accessibilityLabel={deleteLabel}
-          accessibilityHint={rowHint}
-          onPress={() => {
-            remove(index);
-          }}
-        >
-          <Trash2 size={20} color={colors.mutedForeground} />
-        </Pressable>
-      </View>
+      <ProfileCommandRowControls
+        color={colors.mutedForeground}
+        hint={rowHint}
+        upLabel={upLabel}
+        downLabel={downLabel}
+        deleteLabel={deleteLabel}
+        canMoveUp={!isFirst}
+        canMoveDown={!isLast}
+        onMoveUp={() => {
+          move(index, -1);
+        }}
+        onMoveDown={() => {
+          move(index, 1);
+        }}
+        onDelete={() => {
+          remove(index);
+        }}
+      />
     ) : undefined;
     return (
-      <View key={`${generation}-${index}`} className="rounded-lg bg-secondary p-3">
-        <SetupCommandField
-          command={command}
-          label={commandLabel}
-          trailing={rowControls}
-          accessibilityHint={rowHint}
-          readOnly={!canManage}
-          onChangeText={value => {
-            setCommands(current => replaceCommand(current, index, value));
-          }}
-          onEndEditing={() => {
-            commit(index);
-          }}
-          onSubmitEditing={() => {
-            commit(index);
-          }}
-        />
+      // The card's 14 dp padding holds the control band's reach into the top
+      // edge; see tap-target.ts for the arithmetic. The band renders after the
+      // card so it paints on top of the card's opaque background and Android
+      // dispatches its touches last. Only a manager's row carries the widened
+      // label-to-field gap, because only it renders the control band that
+      // needs the field's top edge pushed below the band; a viewer's read-only
+      // card keeps the ordinary compact block.
+      <View key={`${generation}-${index}`} className="relative">
+        <View className="rounded-lg bg-secondary p-4">
+          <SetupCommandField
+            command={command}
+            label={commandLabel}
+            gapClassName={canManage ? COMMAND_ROW_FIELD_GAP_CLASS : undefined}
+            accessibilityHint={rowHint}
+            readOnly={!canManage}
+            onChangeText={value => {
+              setCommands(current => replaceCommand(current, index, value));
+            }}
+            onEndEditing={() => {
+              commit(index);
+            }}
+            onSubmitEditing={() => {
+              commit(index);
+            }}
+          />
+        </View>
+        {rowControls}
       </View>
     );
   };
@@ -317,6 +308,13 @@ export function ProfileCommandsScreen({
       <>
         {commands.map((command, index) => renderCommandRow(command, index))}
         <ProfileManageSlot permission={permission}>
+          {commands.length >= MAX_SETUP_COMMANDS ? (
+            <AccessibleStatus
+              message={t('profiles.commandLimitReached', { max: MAX_SETUP_COMMANDS })}
+              tone="warn"
+              className="text-sm"
+            />
+          ) : null}
           <Button onPress={add} disabled={commands.length >= MAX_SETUP_COMMANDS}>
             <Text>{t('profiles.addCommand')}</Text>
           </Button>
@@ -331,9 +329,8 @@ export function ProfileCommandsScreen({
         profileId={profileId}
         organizationId={organizationId}
         title={t('profiles.commandsTitle')}
-        onBack={() => {
-          router.back();
-        }}
+        backFallback={backFallback}
+        onBack={leaveScreen}
       />
       <TabScreenScrollView
         className="flex-1"

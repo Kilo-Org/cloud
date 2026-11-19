@@ -2,6 +2,7 @@
 import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
+  type GlanceableSnapshotStatusOverride,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -49,7 +50,7 @@ afterEach(() => {
 
 function snapshotFor(
   sessions: { status: string }[],
-  status?: GlanceableAgentsSnapshot['status'],
+  status?: GlanceableSnapshotStatusOverride,
   counts: { running?: number } = {}
 ): GlanceableAgentsSnapshot {
   return {
@@ -93,7 +94,7 @@ describe('iOS and Android widget props parity', () => {
     ],
     ['idle-only', snapshotFor([{ status: 'idle' }])],
     ['scheduled', snapshotFor([{ status: 'scheduled' }])],
-    ['empty', snapshotFor([], 'empty')],
+    ['empty', snapshotFor([])],
     ['waiting', snapshotFor([], 'waiting')],
     ['stale', snapshotFor([{ status: 'busy' }], 'stale')],
     ['expired', snapshotFor([], 'expired')],

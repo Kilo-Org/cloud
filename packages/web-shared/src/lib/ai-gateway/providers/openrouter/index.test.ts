@@ -5,14 +5,20 @@ import {
   getEnhancedOpenRouterModels,
   getOpenRouterTranscriptionModels,
   getRawOpenRouterModels,
+  OPENROUTER_CATALOGUE_MINIMUM_COUNTS,
   resetOpenRouterModelsCaches,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
-import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
+import type {
+  GatewayModelMap,
+  GatewayModelWithEndpoints,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import {
+  cataloguePayload,
   createMockResponse,
   mockOpenRouterModels,
+  withoutFillerModels,
 } from '@kilocode/web-shared/tests/helpers/openrouter-models.helper';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   AUTO_MODELS,
   AUTO_SMALL_TARGET_MODELS,
@@ -29,10 +35,36 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type * as MapModelIdToVercelModule from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { resolveCatalogVariant } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
-import { OpenRouterModelsResponseSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { OpenRouterModelsResponseSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type * as UnavailableModelsModule from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getVercelOnlyCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models';
+import type * as CustomPricingConfigModule from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
+import {
+  getCustomPricingConfig,
+  resolveCustomPricingAliases,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
+import type * as PreferredProviderOrderConfigModule from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
+import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
+import { EMPTY_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import { EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
+import type { CustomPricing } from '@kilocode/db/schema-types';
+import type * as LatestAliasTargetsModule from '@kilocode/web-shared/lib/ai-gateway/providers/latest-alias-targets';
+import { getLatestAliasTargets } from '@kilocode/web-shared/lib/ai-gateway/providers/latest-alias-targets';
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-pricing-config', () => ({
+  ...jest.requireActual<typeof CustomPricingConfigModule>(
+    '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config'
+  ),
+  getCustomPricingConfig: jest.fn(() => Promise.resolve({ models: [] })),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config', () => ({
+  ...jest.requireActual<typeof PreferredProviderOrderConfigModule>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config'
+  ),
+  getPreferredProviderOrderConfig: jest.fn(() => Promise.resolve({ rules: [] })),
+}));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => {
   const actual = jest.requireActual<typeof UnavailableModelsModule>(
@@ -44,6 +76,13 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => {
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
   getVercelModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/latest-alias-targets', () => ({
+  ...jest.requireActual<typeof LatestAliasTargetsModule>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/latest-alias-targets'
+  ),
+  getLatestAliasTargets: jest.fn(() => Promise.resolve(new Map())),
 }));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => ({
@@ -199,7 +238,7 @@ describe('auto models', () => {
     global.fetch = jest.fn(() =>
       Promise.resolve(
         createMockResponse({
-          jsonData: { data: [] },
+          jsonData: cataloguePayload([]),
         })
       )
     ) as unknown as typeof fetch;
@@ -242,15 +281,13 @@ describe('auto models', () => {
       global.fetch = jest.fn(() =>
         Promise.resolve(
           createMockResponse({
-            jsonData: {
-              data: [
-                {
-                  ...buildModel({ id: '~vendor/latest' }),
-                  alias_target: aliasTarget,
-                  canonical_slug: '~vendor/latest',
-                },
-              ],
-            },
+            jsonData: cataloguePayload([
+              {
+                ...buildModel({ id: '~vendor/latest' }),
+                alias_target: aliasTarget,
+                canonical_slug: '~vendor/latest',
+              },
+            ]),
           })
         )
       ) as typeof fetch;
@@ -268,9 +305,9 @@ describe('auto models', () => {
       global.fetch = jest.fn(() =>
         Promise.resolve(
           createMockResponse({
-            jsonData: {
-              data: [buildModel({ id: modelId, alias_target: 'vendor/upstream-only' })],
-            },
+            jsonData: cataloguePayload([
+              buildModel({ id: modelId, alias_target: 'vendor/upstream-only' }),
+            ]),
           })
         )
       ) as typeof fetch;
@@ -316,12 +353,10 @@ describe('auto models', () => {
     global.fetch = jest.fn(() =>
       Promise.resolve(
         createMockResponse({
-          jsonData: {
-            data: [
-              { ...alias, alias_target: { name: 'Upstream model', slug: 'vendor/upstream' } },
-              { ...target, alias_target: 'vendor/upstream' },
-            ],
-          },
+          jsonData: cataloguePayload([
+            { ...alias, alias_target: { name: 'Upstream model', slug: 'vendor/upstream' } },
+            { ...target, alias_target: 'vendor/upstream' },
+          ]),
         })
       )
     ) as unknown as typeof fetch;
@@ -352,7 +387,7 @@ describe('auto models', () => {
           )
       );
     global.fetch = jest.fn(() =>
-      Promise.resolve(createMockResponse({ jsonData: { data: [buildModel()] } }))
+      Promise.resolve(createMockResponse({ jsonData: cataloguePayload([buildModel()]) }))
     ) as typeof fetch;
 
     const response = OpenRouterModelsResponseSchema.parse(
@@ -366,7 +401,7 @@ describe('auto models', () => {
 
   it('does not infer an upstream from the model author when metadata is missing', async () => {
     global.fetch = jest.fn(() =>
-      Promise.resolve(createMockResponse({ jsonData: { data: [buildModel()] } }))
+      Promise.resolve(createMockResponse({ jsonData: cataloguePayload([buildModel()]) }))
     ) as typeof fetch;
 
     const response = await getEnhancedOpenRouterModels({ countryCode: null });
@@ -380,7 +415,7 @@ describe('auto models', () => {
     global.fetch = jest.fn(() =>
       Promise.resolve(
         createMockResponse({
-          jsonData: { data: [buildModel(), buildModel({ id: 'vendor/unavailable' })] },
+          jsonData: cataloguePayload([buildModel(), buildModel({ id: 'vendor/unavailable' })]),
         })
       )
     ) as unknown as typeof fetch;
@@ -395,7 +430,7 @@ describe('auto models', () => {
     global.fetch = jest.fn(() =>
       Promise.resolve(
         createMockResponse({
-          jsonData: { data: [buildModel({ id: AUTO_SMALL_TARGET_MODELS.free })] },
+          jsonData: cataloguePayload([buildModel({ id: AUTO_SMALL_TARGET_MODELS.free })]),
         })
       )
     ) as unknown as typeof fetch;
@@ -409,9 +444,7 @@ describe('auto models', () => {
     global.fetch = jest.fn(() =>
       Promise.resolve(
         createMockResponse({
-          jsonData: {
-            data: [buildModel(), buildModel({ id: 'vendor/model:batch' })],
-          },
+          jsonData: cataloguePayload([buildModel(), buildModel({ id: 'vendor/model:batch' })]),
         })
       )
     ) as unknown as typeof fetch;
@@ -426,9 +459,22 @@ describe('auto models', () => {
 describe('Vercel-only models', () => {
   const vercelOnlyModel = buildModel({ id: 'vendor/vercel-only', name: 'Vendor: Vercel Only' });
 
+  function vercelCatalogArguments() {
+    const catalogModels = jest.mocked(getVercelOnlyCatalogModels);
+    expect(catalogModels).toHaveBeenCalledTimes(1);
+    const [options] = catalogModels.mock.calls.at(-1) ?? [];
+    if (!options) throw new Error('Expected getVercelOnlyCatalogModels to be called');
+    return {
+      ...options,
+      openRouterModels: withoutFillerModels(options.openRouterModels ?? []),
+      listedOpenRouterModels: withoutFillerModels(options.listedOpenRouterModels ?? []),
+    };
+  }
+
   beforeEach(() => {
+    jest.mocked(getVercelOnlyCatalogModels).mockClear();
     global.fetch = jest.fn(() =>
-      Promise.resolve(createMockResponse({ jsonData: { data: [buildModel()] } }))
+      Promise.resolve(createMockResponse({ jsonData: cataloguePayload([buildModel()]) }))
     ) as unknown as typeof fetch;
     jest.mocked(getVercelOnlyCatalogModels).mockResolvedValueOnce([vercelOnlyModel]);
     jest
@@ -456,16 +502,41 @@ describe('Vercel-only models', () => {
   it('lists them after the OpenRouter models with their snapshot providers', async () => {
     const models = await getEnhancedOpenRouterModels({ countryCode: null });
 
-    expect(getVercelOnlyCatalogModels).toHaveBeenCalledWith({
+    expect(vercelCatalogArguments()).toEqual({
       openRouterModels: [expect.objectContaining({ id: 'vendor/model' })],
+      listedOpenRouterModels: [expect.objectContaining({ id: 'vendor/model' })],
       openRouterMetadata: {},
     });
-    const ids = models.data.map(model => model.id);
+    const ids = withoutFillerModels(models.data).map(model => model.id);
     expect(ids.indexOf('vendor/vercel-only')).toBe(ids.indexOf('vendor/model') + 1);
     expect(models.data.find(model => model.id === 'vendor/vercel-only')).toMatchObject({
       name: 'Vendor: Vercel Only',
       inference_provider_ids: ['amazon-bedrock', 'vendor'],
       isFree: false,
+    });
+  });
+
+  it('only compares Vercel-only names against the OpenRouter models the catalog lists', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: cataloguePayload([
+            buildModel(),
+            buildModel({ id: 'vendor/model:batch', name: 'Vendor: Batch' }),
+          ]),
+        })
+      )
+    ) as unknown as typeof fetch;
+
+    await getEnhancedOpenRouterModels({ countryCode: null });
+
+    expect(vercelCatalogArguments()).toEqual({
+      openRouterModels: [
+        expect.objectContaining({ id: 'vendor/model' }),
+        expect.objectContaining({ id: 'vendor/model:batch' }),
+      ],
+      listedOpenRouterModels: [expect.objectContaining({ id: 'vendor/model' })],
+      openRouterMetadata: {},
     });
   });
 
@@ -499,12 +570,221 @@ describe('Vercel-only models', () => {
     }
   });
 
+  it("prices them at the preferred provider's Vercel endpoint peak price", async () => {
+    jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue({
+      rules: [{ includes: ['vendor/'], providers: ['together'] }],
+    });
+    jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue({
+      [vercelOnlyModel.id]: {
+        id: vercelOnlyModel.id,
+        name: 'Vercel Only',
+        endpoints: [
+          { provider_name: 'deepinfra', pricing: { prompt: '0.000009', completion: '0.000009' } },
+          {
+            provider_name: 'togetherai',
+            pricing: { prompt: '0.000002', completion: '0.00001', peak_pricing: { multiplier: 2 } },
+          },
+        ],
+      },
+    });
+
+    try {
+      const models = await getEnhancedOpenRouterModels({ countryCode: null });
+
+      expect(models.data.find(model => model.id === vercelOnlyModel.id)?.pricing).toMatchObject({
+        prompt: '0.000004000000',
+        completion: '0.000020000000',
+      });
+    } finally {
+      jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue({ rules: [] });
+    }
+  });
+
   it('hides unavailable ones', async () => {
     jest.mocked(getUnavailableModelIds).mockResolvedValueOnce(new Set([vercelOnlyModel.id]));
 
     const models = await getEnhancedOpenRouterModels({ countryCode: null });
 
     expect(models.data.some(model => model.id === vercelOnlyModel.id)).toBe(false);
+  });
+});
+
+describe('alias pricing', () => {
+  const alias = buildModel({
+    id: '~vendor/family-latest',
+    name: 'Vendor: Family Latest',
+    description: 'Always the newest family model',
+    context_length: 64_000,
+    pricing: { prompt: '0.000003', completion: '0.000006' },
+  });
+  const target = buildModel({
+    id: 'vendor/family-0101',
+    name: 'Vendor: Family',
+    pricing: { prompt: '0.0000025', completion: '0.0000055' },
+  });
+  const firstRoutePricing = { prompt: '0.000002', completion: '0.000004' };
+  const preferredRoutePricing = { prompt: '0.0000005', completion: '0.0000015' };
+
+  function customPricing(
+    model: string,
+    prompt_per_million: number,
+    overrides: Partial<CustomPricing> = {}
+  ): CustomPricing {
+    return {
+      model,
+      pricing: [
+        {
+          start_context_length: 0,
+          pricing: {
+            prompt_per_million,
+            completion_per_million: prompt_per_million * 2,
+            input_cache_read_per_million: null,
+            input_cache_write_per_million: null,
+          },
+        },
+      ],
+      ...overrides,
+    };
+  }
+
+  async function getCatalog(catalog: OpenRouterModel[] = [alias, target]) {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(createMockResponse({ jsonData: cataloguePayload(catalog) }))
+    ) as unknown as typeof fetch;
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
+    return (id: string) => models.data.find(model => model.id === id);
+  }
+
+  const aliasMetadata: GatewayModelMap = {
+    [alias.id]: {
+      id: alias.id,
+      name: alias.name,
+      endpoints: [{ tag: 'first-route', pricing: firstRoutePricing }],
+      alias_target: { slug: target.id },
+    },
+    [target.id]: {
+      id: target.id,
+      name: target.name,
+      endpoints: [
+        { tag: 'first-route', pricing: firstRoutePricing },
+        { tag: 'preferred-route', pricing: preferredRoutePricing },
+      ],
+    },
+  };
+
+  /** Serves the stored entries as getCustomPricingConfig does, with aliases resolved. */
+  function mockStoredCustomPricing(...models: CustomPricing[]) {
+    jest
+      .mocked(getCustomPricingConfig)
+      .mockResolvedValue(resolveCustomPricingAliases({ models }, aliasMetadata));
+  }
+
+  beforeEach(() => {
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue(aliasMetadata);
+    // The rule matches the target id but not the alias id.
+    jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue({
+      rules: [{ includes: [target.id], providers: ['preferred-route'] }],
+    });
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
+    jest
+      .mocked(getPreferredProviderOrderConfig)
+      .mockResolvedValue(EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG);
+    jest.mocked(getCustomPricingConfig).mockResolvedValue(EMPTY_CUSTOM_PRICING_CONFIG);
+  });
+
+  it("shows the target's preferred route price on the alias and keeps the alias identity", async () => {
+    const model = await getCatalog();
+
+    expect(model(target.id)?.pricing).toEqual(preferredRoutePricing);
+    expect(model(alias.id)).toMatchObject({
+      id: alias.id,
+      name: alias.name,
+      description: `${alias.description}\n\nThis alias currently points to ${target.name} (\`${target.id}\`).`,
+      context_length: alias.context_length,
+      alias_target: target.id,
+      pricing: preferredRoutePricing,
+    });
+  });
+
+  it('names the pending target of an alias and roughly when it switches', async () => {
+    jest.mocked(getLatestAliasTargets).mockResolvedValueOnce(
+      new Map([
+        [
+          alias.id,
+          {
+            alias: alias.id,
+            target: target.id,
+            pending: {
+              target: 'vendor/family-0202',
+              effective_at: new Date(Date.now() + 3 * 60 * 60 * 1000 + 60_000).toISOString(),
+            },
+          },
+        ],
+      ])
+    );
+
+    const model = await getCatalog();
+
+    expect(model(alias.id)?.description).toBe(
+      `${alias.description}\n\nThis alias currently points to ${target.name} (\`${target.id}\`). It will switch to \`vendor/family-0202\` in approximately 3 hours.`
+    );
+  });
+
+  it("shows the target's custom price on the alias without the target's discount label", async () => {
+    mockStoredCustomPricing(customPricing(target.id, 0.25, { discountPercentage: 50 }));
+
+    const model = await getCatalog();
+
+    expect(model(target.id)?.name).toBe(`${target.name} (50% off)`);
+    expect(model(alias.id)?.name).toBe(alias.name);
+    expect(model(alias.id)?.pricing).toEqual(model(target.id)?.pricing);
+    expect(model(alias.id)?.pricing).toMatchObject({
+      prompt: '0.000000250000',
+      completion: '0.000000500000',
+    });
+  });
+
+  it("applies the target's custom price to an alias whose target is not listed", async () => {
+    mockStoredCustomPricing(customPricing(target.id, 0.25, { discountPercentage: 50 }));
+
+    const model = await getCatalog([alias]);
+
+    expect(model(alias.id)?.name).toBe(alias.name);
+    expect(model(alias.id)?.pricing).toMatchObject({
+      prompt: '0.000000250000',
+      completion: '0.000000500000',
+    });
+  });
+
+  it("shows the target's route price when the target's custom price is fallback-only", async () => {
+    mockStoredCustomPricing(customPricing(target.id, 0.75, { fallbackOnly: true }));
+
+    const model = await getCatalog();
+
+    expect(model(alias.id)?.pricing).toEqual(preferredRoutePricing);
+  });
+
+  it('keeps the alias price when the target is not in the upstream catalog', async () => {
+    const model = await getCatalog([alias]);
+
+    expect(model(target.id)).toBeUndefined();
+    expect(model(alias.id)).toMatchObject({
+      alias_target: target.id,
+      pricing: firstRoutePricing,
+    });
+  });
+
+  it('keeps the alias price when the target is unavailable', async () => {
+    jest.mocked(getUnavailableModelIds).mockResolvedValueOnce(new Set([target.id]));
+
+    const model = await getCatalog();
+
+    expect(model(target.id)).toBeUndefined();
+    expect(model(alias.id)?.pricing).toEqual(firstRoutePricing);
   });
 });
 
@@ -522,7 +802,7 @@ describe.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])(
         pricing: { prompt: '0', completion: '0' },
       });
       global.fetch = jest.fn(() =>
-        Promise.resolve(createMockResponse({ jsonData: { data: [catalogModel] } }))
+        Promise.resolve(createMockResponse({ jsonData: cataloguePayload([catalogModel]) }))
       ) as typeof fetch;
 
       const models = await getEnhancedOpenRouterModels({ countryCode: null });
@@ -534,7 +814,7 @@ describe.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])(
 
     it('does not inject the model when OpenRouter omits it', async () => {
       global.fetch = jest.fn(() =>
-        Promise.resolve(createMockResponse({ jsonData: { data: [] } }))
+        Promise.resolve(createMockResponse({ jsonData: cataloguePayload([]) }))
       ) as typeof fetch;
 
       const models = await getEnhancedOpenRouterModels({ countryCode: null });
@@ -555,18 +835,16 @@ describe('reasoning variants', () => {
     global.fetch = jest.fn(() =>
       Promise.resolve(
         createMockResponse({
-          jsonData: {
-            data: [
-              buildModel({
-                id: unsupportedId,
-                supported_parameters: ['max_tokens', 'tools'],
-              }),
-              buildModel({
-                id: supportedId,
-                supported_parameters: ['max_tokens', 'tools', 'reasoning'],
-              }),
-            ],
-          },
+          jsonData: cataloguePayload([
+            buildModel({
+              id: unsupportedId,
+              supported_parameters: ['max_tokens', 'tools'],
+            }),
+            buildModel({
+              id: supportedId,
+              supported_parameters: ['max_tokens', 'tools', 'reasoning'],
+            }),
+          ]),
         })
       )
     ) as unknown as typeof fetch;
@@ -613,14 +891,14 @@ describe('reasoning options', () => {
     global.fetch = jest.fn(() =>
       Promise.resolve(
         createMockResponse({
-          jsonData: {
-            data: Object.entries(openRouterReasoning).map(([id, reasoning]) =>
+          jsonData: cataloguePayload(
+            Object.entries(openRouterReasoning).map(([id, reasoning]) =>
               buildModel({
                 id,
                 supported_parameters: reasoning ? reasoningSupported : ['max_tokens', 'tools'],
               })
-            ),
-          },
+            )
+          ),
         })
       )
     ) as unknown as typeof fetch;
@@ -716,13 +994,11 @@ describe('mayTrainOnYourPrompts', () => {
     global.fetch = jest.fn(() =>
       Promise.resolve(
         createMockResponse({
-          jsonData: {
-            data: [
-              buildModel({ id: 'meta/muse-spark-1.3-contributor' }),
-              buildModel({ id: 'meta/muse-spark-1.3' }),
-              buildModel({ id: 'vendor/model:free', pricing: { prompt: '0', completion: '0' } }),
-            ],
-          },
+          jsonData: cataloguePayload([
+            buildModel({ id: 'meta/muse-spark-1.3-contributor' }),
+            buildModel({ id: 'meta/muse-spark-1.3' }),
+            buildModel({ id: 'vendor/model:free', pricing: { prompt: '0', completion: '0' } }),
+          ]),
         })
       )
     ) as unknown as typeof fetch;
@@ -769,5 +1045,65 @@ describe('OpenRouter transcription model fetcher', () => {
     await getOpenRouterTranscriptionModels();
 
     expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('live catalogue validation', () => {
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('rejects a live models payload whose entry fails the schema instead of serving it', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: cataloguePayload([{ id: 'vendor/fabricated', name: 'Fabricated' }]),
+        })
+      )
+    ) as unknown as typeof fetch;
+
+    const error = await getRawOpenRouterModels().catch(thrown => thrown);
+    expect(error).toBeInstanceOf(Error);
+    expect(String((error as Error).message)).not.toContain('fewer than');
+  });
+
+  it('rejects a live models payload below the catalogue floor with the minimum-count error', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(createMockResponse({ jsonData: { data: [buildModel()] } }))
+    ) as unknown as typeof fetch;
+
+    await expect(getRawOpenRouterModels()).rejects.toThrow(
+      `fewer than ${OPENROUTER_CATALOGUE_MINIMUM_COUNTS.models}`
+    );
+  });
+
+  it('serves a live models payload of exactly the floor size unchanged', async () => {
+    const payload = cataloguePayload([buildModel({ id: 'vendor/only-entry' })]);
+    expect(payload.data).toHaveLength(OPENROUTER_CATALOGUE_MINIMUM_COUNTS.models);
+    global.fetch = jest.fn(() =>
+      Promise.resolve(createMockResponse({ jsonData: payload }))
+    ) as unknown as typeof fetch;
+
+    const response = await getRawOpenRouterModels();
+
+    expect(response).toEqual(payload);
+  });
+
+  it('rejects a live transcription payload that fails the schema', async () => {
+    const fakeLlmUrl = process.env.FAKE_LLM_URL;
+    delete process.env.FAKE_LLM_URL;
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: { data: [{ id: 'vendor/fabricated', name: 'Fabricated' }] },
+        })
+      )
+    ) as unknown as typeof fetch;
+
+    try {
+      await expect(getOpenRouterTranscriptionModels()).rejects.toThrow();
+    } finally {
+      if (fakeLlmUrl !== undefined) process.env.FAKE_LLM_URL = fakeLlmUrl;
+    }
   });
 });

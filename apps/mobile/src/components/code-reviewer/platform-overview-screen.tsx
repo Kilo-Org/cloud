@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- One reviewer overview: each read state (loading, connect, error, ready) returns its own surface, and the ready branch's row config is the picker call plus the toggle wiring. */
 import { selectionHaptic } from '@/lib/haptics';
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
@@ -31,7 +31,7 @@ import { canConnectProvider } from '@/lib/code-reviewer-status';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
-import { useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
+import { useQueryBodyState } from '@/lib/hooks/use-query-body-state';
 import {
   classifyProviderState,
   useGitHubStatus,
@@ -50,7 +50,6 @@ export function PlatformOverviewScreen({
   scope,
   platform,
 }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
-  const router = useRouter();
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -69,7 +68,7 @@ export function PlatformOverviewScreen({
   // The body of the config read has exactly one surface: rows from cache, an
   // error with retry, or a loading state. Bitbucket renders its own overview,
   // which owns its restart, so this screen must not run a second one.
-  const configBody = useReviewConfigBody(config, { restartable: platform !== 'bitbucket' });
+  const configBody = useQueryBodyState(config, { restartable: platform !== 'bitbucket' });
 
   if (permission.status === 'error') {
     return (
@@ -189,7 +188,7 @@ export function PlatformOverviewScreen({
     if (data == null) {
       return;
     }
-    openModelPicker(router, {
+    openModelPicker(pushOnce, {
       options: models,
       value: data.modelSlug,
       variant: data.thinkingEffort ?? '',

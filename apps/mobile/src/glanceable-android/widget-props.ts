@@ -4,7 +4,7 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import {
   buildHomeWidgetPresentation,
-  EMPTY_HOME_WIDGET_DETAILS,
+  emptyHomeWidgetDetails,
   type HomeWidgetData,
   type HomeWidgetPresentation,
 } from '@kilocode/app-shared/home-widget';
@@ -82,7 +82,7 @@ export function buildAndroidWidgetProps(
   const showCounts = status === 'happy' || status === 'stale';
   const primary = showCounts ? primaryGlanceableCount(snapshot) : null;
   const statusKey = glanceableStatusCopyKey(snapshot, flags);
-  const resolvedHomeData = homeData ?? { snapshot, details: EMPTY_HOME_WIDGET_DETAILS };
+  const resolvedHomeData = homeData ?? { snapshot, details: emptyHomeWidgetDetails() };
   const home = buildHomeWidgetPresentation(
     { ...resolvedHomeData, snapshot: homeSnapshotFor(snapshot, flags, resolvedHomeData) },
     Date.now()
@@ -152,7 +152,7 @@ export function buildCurrentWidgetProps(
     formatCount,
     formatAgo,
     formatClock,
-    homeData ?? { snapshot, details: EMPTY_HOME_WIDGET_DETAILS }
+    homeData ?? { snapshot, details: emptyHomeWidgetDetails() }
   );
 }
 

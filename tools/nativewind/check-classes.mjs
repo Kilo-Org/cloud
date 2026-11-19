@@ -25,15 +25,23 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 import { walk } from '../lib/ast.mjs';
+import { runIfMain } from '../lib/entry-point.mjs';
 import { isTestArtifact, parseSourceTree } from '../lib/source-files.mjs';
 
 // Resolve from the app: react-native-css is the app's dependency, not the repo root's.
 const require = createRequire(new URL('../../apps/mobile/package.json', import.meta.url));
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const SOURCE_DIRS = [join(ROOT, 'apps/mobile/src'), join(ROOT, 'packages/app-shared/src')];
+/**
+ * The app's source root, built once. The walk below scans it, the theme tokens
+ * come from its `global.css`, and the formatter rule scopes itself by it, so a
+ * moved or renamed app root reaches all three together instead of leaving one
+ * of them reading a path the walk no longer parses.
+ */
+const APP_SRC = join(ROOT, 'apps/mobile/src');
+const SOURCE_DIRS = [APP_SRC, join(ROOT, 'packages/app-shared/src')];
 
 /** Utilities that take a colour, so `<utility>-black/<alpha>` can appear. */
 const COLOR_UTILITIES = [
@@ -69,7 +77,7 @@ const COLOR_UTILITIES = [
 let themeTokenCache;
 function themeTokens() {
   if (themeTokenCache === undefined) {
-    const css = readFileSync(join(ROOT, 'apps/mobile/src/global.css'), 'utf8');
+    const css = readFileSync(join(APP_SRC, 'global.css'), 'utf8');
     const block = css.match(/@theme inline \{([\s\S]*?)\n\}/)?.[1];
     if (!block) {
       throw new Error('check-classes: no @theme inline block in apps/mobile/src/global.css');
@@ -97,17 +105,15 @@ function rules() {
         'the /opacity modifier is dropped on CSS-variable theme colours; use the paired *-tile-bg / *-tile-border token or a concrete colour',
     },
     {
-      // `text-align` only accepts auto/left/right/center/justify, so the
-      // logical keywords are dropped and the text keeps its default alignment.
-      pattern: /\btext-(?:start|end)\b/g,
-      advice: 'text-align: start/end is dropped; the shared Text handles RTL alignment already',
+      // `text-align` only accepts auto/left/right/center/justify, so this
+      // logical keyword is dropped and the text keeps its default alignment.
+      // `start` and `end` are separate rules so each lifts on its own keyword.
+      pattern: /\btext-start\b/g,
+      advice: 'text-align: start is dropped; the shared Text handles RTL alignment already',
     },
     {
-      // react-native-css resolves a `dir` media condition as
-      // `(I18nManager.isRTL && value === 'rtl') || value === 'ltr'`, so an
-      // `ltr:` class matches in both directions and silently applies in RTL.
-      pattern: /\bltr:/g,
-      advice: 'the ltr: variant also matches in RTL; express the rule with rtl: instead',
+      pattern: /\btext-end\b/g,
+      advice: 'text-align: end is dropped; the shared Text handles RTL alignment already',
     },
     {
       // A numeric `leading-N` compiles to `calc(var(--spacing) * N)`, and the
@@ -135,30 +141,36 @@ const SCROLL_CONTAINER =
 const HORIZONTAL_PADDING = /^-?(?:p|px|pl|pr|ps|pe)-/;
 
 /**
- * The class strings in one `className` value: every string literal and
- * template chunk it holds, including the ones a `${…}` or a `cn(…)` argument
- * contributes, so `cn('flex-1', compact && 'p-2')` contributes `p-2` and
- * `` `flex-1 ${wide ? 'p-6' : ''}` `` contributes `p-6`.
+ * Every string chunk one syntax tree holds, with where each chunk starts in
+ * the source text and the two readings of its content. These are the only
+ * places a class name can be written: a comment, a regular expression and an
+ * identifier are nodes of their own, so a ban can no longer fire on text that
+ * only reads like a class.
  *
- * Only the value of the element's own `className` is read, so an element
- * nested in `renderItem` or `ListHeaderComponent` keeps its classes to itself.
+ * Each chunk is read two ways, and which reading a rule takes is the rule's
+ * choice:
+ * - `raw` is the chunk's source text — a string literal keeps its quotes —
+ *   so a match's offset inside it maps straight back to the file's line,
+ *   escapes included. The ban-list rules match on this.
+ * - `value` is the string the code evaluates to (`cooked ?? raw` for a
+ *   template chunk), so an escaped literal reads as its class name. The
+ *   scroll-padding rule reads this.
  */
-function classStrings(value) {
-  if (value === null || value === undefined) {
-    return [];
-  }
-  if (value.type === 'Literal') {
-    return typeof value.value === 'string' ? [value.value] : [];
-  }
-  const strings = [];
-  walk(value, node => {
+function stringChunks(root, text) {
+  const chunks = [];
+  walk(root, node => {
     if (node.type === 'Literal' && typeof node.value === 'string') {
-      strings.push(node.value);
+      chunks.push({ start: node.start, raw: text.slice(node.start, node.end), value: node.value });
     } else if (node.type === 'TemplateElement') {
-      strings.push(node.value.cooked ?? node.value.raw);
+      // The node spans its delimiters; the chunk itself starts just inside.
+      chunks.push({
+        start: node.start + 1,
+        raw: node.value.raw,
+        value: node.value.cooked ?? node.value.raw,
+      });
     }
   });
-  return strings;
+  return chunks;
 }
 
 /** The source of a JSX tag's name, `ScrollView` or `Animated.ScrollView` alike. */
@@ -184,7 +196,8 @@ export function checkScrollPadding(relative, program, text, lineOf) {
     );
     const padding = [
       ...new Set(
-        classStrings(attribute?.value)
+        stringChunks(attribute?.value, text)
+          .map(chunk => chunk.value)
           .flatMap(classes => classes.split(/\s+/))
           .filter(classes => HORIZONTAL_PADDING.test(classes))
       ),
@@ -288,7 +301,6 @@ const INTL_CONSTRUCTORS = new Set([
   'Segmenter',
 ]);
 const TO_LOCALE_STRING = /^toLocale(?:Date|Time)?String$/;
-const DIRECT_INTL_DIR = join(ROOT, 'apps/mobile/src');
 // These layouts are stringified and run in the iOS widget extension, which
 // cannot import @/lib/intl-cache; they normalise the locale tag themselves.
 const WIDGET_PROCESS_LAYOUTS = new Set([
@@ -320,7 +332,7 @@ function formatterProblem(relative, line, quote) {
 export function checkDirectIntl(relative, absolute, program, lineOf) {
   const problems = [];
   if (
-    !absolute.startsWith(DIRECT_INTL_DIR) ||
+    !absolute.startsWith(APP_SRC) ||
     relative.endsWith('lib/intl-cache.ts') ||
     WIDGET_PROCESS_LAYOUTS.has(relative)
   ) {
@@ -352,40 +364,23 @@ export function checkDirectIntl(relative, absolute, program, lineOf) {
   return problems;
 }
 
-/**
- * The raw source of every string literal and template chunk in one file, with
- * the offset it starts at. These are the only places a class name can be
- * written: a comment, a regular expression and an identifier are nodes of
- * their own, so a ban can no longer fire on text that only reads like a class.
- *
- * The raw source is what the rules read, so a match's offset inside it maps
- * straight back to the file's line, escapes included.
- */
-function stringSources(program, text) {
-  const sources = [];
-  walk(program, node => {
-    if (node.type === 'Literal' && typeof node.value === 'string') {
-      sources.push({ start: node.start, source: text.slice(node.start, node.end) });
-    } else if (node.type === 'TemplateElement') {
-      // The node spans its delimiters; the chunk itself starts just inside.
-      sources.push({ start: node.start + 1, source: node.value.raw });
-    }
-  });
-  return sources;
-}
-
 /** The ban list over one file: every match of every rule, in source order. */
 export function checkRules(relative, program, text, lineOf) {
   const problems = [];
-  const strings = stringSources(program, text);
-  for (const rule of rules()) {
-    for (const { start, source } of strings) {
-      for (const match of source.matchAll(rule.pattern)) {
-        problems.push(`${relative}:${lineOf(start + match.index)}: "${match[0]}" ${rule.advice}`);
+  for (const { start, raw } of stringChunks(program, text)) {
+    for (const rule of rules()) {
+      for (const match of raw.matchAll(rule.pattern)) {
+        problems.push({
+          offset: start + match.index,
+          problem: `${relative}:${lineOf(start + match.index)}: "${match[0]}" ${rule.advice}`,
+        });
       }
     }
   }
-  return problems;
+  // One chunk can match several rules, so emission is sorted by offset after
+  // collection: the chunk-major walk alone does not order matches inside a
+  // chunk, and the docstring promises source order.
+  return problems.sort((left, right) => left.offset - right.offset).map(entry => entry.problem);
 }
 
 /**
@@ -395,56 +390,147 @@ export function checkRules(relative, program, text, lineOf) {
  */
 export function checkCompilerStillDropsThese() {
   const problems = [];
+  // The first line of an error: compile failures and resolution failures are
+  // reported the same way, and a stack trace would bury the fixture name.
+  const firstLine = error =>
+    (error instanceof Error ? error.message : String(error)).split('\n')[0];
+
+  /** One compiler-pin fixture that could not compile: the pin cannot hold. */
+  function compilerPinFailure(fixture, error) {
+    return `check-classes: the compiler failed on ${fixture} (${firstLine(error)}) — the compiler pins cannot be verified without it`;
+  }
   let compile;
   try {
     ({ compile } = require('react-native-css/compiler'));
   } catch (error) {
-    const detail = error instanceof Error ? error.message.split('\n')[0] : String(error);
     problems.push(
-      `check-classes: react-native-css/compiler did not resolve (${detail}) — run pnpm install; the compiler pins cannot be verified without it`
+      `check-classes: react-native-css/compiler did not resolve (${firstLine(error)}) — run pnpm install; the compiler pins cannot be verified without it`
     );
     return problems;
   }
-  const firstValue = (css, options) => {
-    const sheet = compile(css, options).stylesheet();
-    return JSON.stringify(sheet?.s?.[0]?.[1]?.[0]?.d?.[0] ?? null);
-  };
 
-  const alignment = compile('.x { text-align: start; }').warnings();
-  if (!JSON.stringify(alignment).includes('text-align')) {
-    problems.push(
-      'check-classes: text-align: start is no longer dropped — drop the text-start/end rule'
+  /**
+   * Run one pin. Its check returns the problem the compiler now shows, or
+   * nothing while the ban still holds. A throw belongs to this fixture alone:
+   * the compiler is loaded and the fixtures share nothing, so the next one
+   * still runs.
+   */
+  function pin(fixture, check) {
+    try {
+      const problem = check();
+      if (problem !== undefined) {
+        problems.push(problem);
+      }
+    } catch (error) {
+      problems.push(compilerPinFailure(fixture, error));
+    }
+  }
+
+  /**
+   * The value the compiled stylesheet emits for `property` in the fixture rule,
+   * and whether it emits that declaration at all.
+   *
+   * Selecting by the property name the runtime receives keeps the pin on the
+   * declaration the Metro transformer ships, not on one position in the
+   * compiler's private stylesheet tree. `present` is reported separately
+   * because an absent declaration is an outcome of its own: the compiler
+   * stopped shipping what the ban warns about, so the runtime still paints
+   * nothing and the ban still applies.
+   */
+  function emittedValue(css, options, property) {
+    const sheet = compile(css, options).stylesheet();
+    for (const entry of sheet?.s ?? []) {
+      for (const rule of entry?.[1] ?? []) {
+        for (const declaration of rule?.d ?? []) {
+          if (declaration?.[1] === property) {
+            return { present: true, value: declaration[0] };
+          }
+        }
+      }
+    }
+    return { present: false, value: undefined };
+  }
+
+  /**
+   * True while the value still defers to a CSS function call `name`, which is how
+   * the compiler keeps a value for the runtime instead of resolving it at build
+   * time.
+   */
+  function defersTo(value, name) {
+    return (
+      Array.isArray(value) &&
+      value.some(item => (Array.isArray(item) ? defersTo(item, name) : item === name))
     );
+  }
+
+  /**
+   * One pin over a declaration the compiler must keep deferring to `call`.
+   * Only a present value that resolved at build time retires the ban; an
+   * absent declaration reports that and keeps the rule.
+   */
+  function declarationPin({ subject, css, options, property, call, rule }) {
+    return () => {
+      const { present, value } = emittedValue(css, options, property);
+      if (!present) {
+        return `check-classes: ${subject} emits no ${property} declaration — the ban still applies, so keep the ${rule} rule`;
+      }
+      if (defersTo(value, call)) {
+        return undefined;
+      }
+      return `check-classes: ${subject} now compiles to ${JSON.stringify(value ?? null)} instead of a deferred ${call} — drop the ${rule} rule`;
+    };
+  }
+
+  // `start` and `end` are separate rules, so each keyword is pinned on its
+  // own: the compiler handling one keyword retires only that keyword's rule.
+  // The check reads the warning report as text, so a change to the report's
+  // shape leaves the pin holding instead of retiring the rule. The keyword is
+  // matched quoted, which cannot land inside a warning sentence.
+  for (const keyword of ['start', 'end']) {
+    pin(`the text-align: ${keyword} fixture`, () => {
+      const report = JSON.stringify(compile(`.x { text-align: ${keyword}; }`).warnings() ?? null);
+      if (report.includes('text-align') && report.includes(JSON.stringify(keyword))) {
+        return undefined;
+      }
+      return `check-classes: text-align: ${keyword} is no longer dropped — drop the text-${keyword} rule`;
+    });
   }
 
   // A `/opacity` modifier on an `@theme inline` variable is emitted as a
   // deferred colorMix over the variable; the runtime cannot decompose it and
   // drops the declaration. When the compiler resolves it instead, this stops
   // matching and the rule above can go.
-  const themeOpacity = firstValue(
-    '@theme inline { --color-destructive: var(--destructive); }\n' +
-      ':root { --destructive: #b0483a; }\n' +
-      '.x { background-color: color-mix(in oklab, var(--color-destructive) 10%, transparent); }'
+  pin(
+    'the color-mix over an @theme inline variable fixture',
+    declarationPin({
+      subject: 'color-mix over an @theme inline variable',
+      css:
+        '@theme inline { --color-destructive: var(--destructive); }\n' +
+        ':root { --destructive: #b0483a; }\n' +
+        '.x { background-color: color-mix(in oklab, var(--color-destructive) 10%, transparent); }',
+      options: undefined,
+      property: 'backgroundColor',
+      call: 'colorMix',
+      rule: 'theme-token opacity',
+    })
   );
-  if (!themeOpacity.includes('colorMix')) {
-    problems.push(
-      `check-classes: color-mix over an @theme inline variable now compiles to ${themeOpacity} instead of a deferred colorMix — drop the theme-token opacity rule`
-    );
-  }
 
   // With `inlineVariables: false` (apps/mobile/metro.config.js) the spacing
   // scale reaches the runtime as a deferred calc inside the line-height
   // function, which multiplies the result by the font size. When the compiler
   // folds it to a length instead, this stops matching and the rule can go.
-  const spacingLeading = firstValue(
-    ':root { --spacing: 0.25rem; }\n.x { line-height: calc(var(--spacing) * 5); }',
-    { inlineVariables: false }
+  pin(
+    'the spacing-scale line-height fixture',
+    declarationPin({
+      subject: 'a spacing-scale line height',
+      css: ':root { --spacing: 0.25rem; }\n.x { line-height: calc(var(--spacing) * 5); }',
+      options: { inlineVariables: false },
+      property: 'lineHeight',
+      call: 'calc',
+      rule: 'numeric leading',
+    })
   );
-  if (!spacingLeading.includes('"lineHeight",[{},"calc"')) {
-    problems.push(
-      `check-classes: a spacing-scale line height now compiles to ${spacingLeading} instead of a deferred calc — drop the numeric leading rule`
-    );
-  }
+
   return problems;
 }
 
@@ -492,8 +578,4 @@ function run() {
   console.log('check-classes: no dropped classes, stray raw Text or hand-built formatters');
 }
 
-const invokedDirectly =
-  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
-if (invokedDirectly) {
-  run();
-}
+runIfMain(run, import.meta.url);

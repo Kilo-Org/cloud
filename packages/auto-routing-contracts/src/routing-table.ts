@@ -1,8 +1,28 @@
 import * as z from 'zod';
-import { ReasoningEffortSchema } from './reasoning';
+import {
+  ReasoningComplexitySchema,
+  ReasoningEffortSchema,
+  VariantSchema,
+  refineVariantExclusivity,
+} from './reasoning';
 import { TaxonomyRouteKeySchema } from './taxonomy';
 import { DEFAULT_AUTO_ROUTER, type AutoRouter } from './router';
 import { addDuplicateKeyIssues } from './duplicate-keys';
+import {
+  POLICY_SETTINGS,
+  POLICY_SETTING_VALUE_DEFAULTS,
+  POLICY_SETTING_VALUE_SCHEMAS,
+  SWITCH_COST_FACTOR_MIN,
+} from './policy-settings';
+import {
+  ProductionTokenProfileSchema,
+  type ProductionTokenProfile,
+} from './production-token-profile';
+
+export {
+  ProductionTokenProfileSchema,
+  type ProductionTokenProfile,
+} from './production-token-profile';
 
 /** Maximum models in one benchmark profile registration request. */
 export const MAX_POOL_ENTRIES = 10;
@@ -13,7 +33,8 @@ export const PoolEntrySchema = z.object({
 export type PoolEntry = z.infer<typeof PoolEntrySchema>;
 
 export const BenchmarkPairSchema = PoolEntrySchema.extend({
-  variant: z.string().trim().min(1).nullable(),
+  // Canonical catalog variant key, shared with every other variant field in the package.
+  variant: VariantSchema,
 });
 export type BenchmarkPair = z.infer<typeof BenchmarkPairSchema>;
 
@@ -43,12 +64,6 @@ export const CandidatePricingSchema = z.object({
   cacheReadUsdPerToken: z.number().nonnegative().nullable(),
 });
 export type CandidatePricing = z.infer<typeof CandidatePricingSchema>;
-
-export const ProductionTokenProfileSchema = z.object({
-  uncachedInputTokens: z.number().nonnegative(),
-  cachedInputTokens: z.number().nonnegative(),
-});
-export type ProductionTokenProfile = z.infer<typeof ProductionTokenProfileSchema>;
 
 export function estimateRequestCostUsd(
   candidate: { avgCostUsd: number; pricing?: CandidatePricing | null },
@@ -114,10 +129,7 @@ export function linkedAvgCostUsd(
   return summary.avgCostUsd * (blendedUsdPerToken(ownerPricing) / platformBlended);
 }
 /**
- * Reader precedence for candidate variant identity: prefer `variant`; when
- * absent, a valid legacy `reasoningEffort` string may be interpreted as the
- * legacy variant key. New writers emit `variant` only; old writers emitted
- * `reasoningEffort` only. Both non-null is malformed.
+ * Ranked candidate. Variant precedence: {@link refineVariantExclusivity}.
  */
 export const RankedCandidateSchema = z
   .object({
@@ -134,7 +146,7 @@ export const RankedCandidateSchema = z
     p50LatencyMs: z.number().nonnegative().nullable().optional(),
     // Canonical catalog variant key the model was benchmarked with.
     // Optional so tables published before this field existed stay valid.
-    variant: z.string().trim().min(1).nullable().optional(),
+    variant: VariantSchema.optional(),
     // Legacy effort the model was benchmarked with; retained for rolling
     // deploy reads of old published tables. Prefer `variant` when present.
     reasoningEffort: ReasoningEffortSchema.nullable().optional(),
@@ -142,19 +154,10 @@ export const RankedCandidateSchema = z
     // identity than the table's. Custom routers only (ADR 0005).
     stale: z.boolean().optional(),
   })
-  .superRefine((candidate, ctx) => {
-    if (candidate.variant != null && candidate.reasoningEffort != null) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['variant'],
-        message: 'Candidate must not set both variant and reasoningEffort; emit variant only',
-      });
-    }
-  });
+  .superRefine((candidate, ctx) => refineVariantExclusivity(candidate, ctx, 'Candidate'));
 export type RankedCandidate = z.infer<typeof RankedCandidateSchema>;
 
-export const ReasoningComplexitySchema = z.enum(['low', 'medium', 'high']);
-export type ReasoningComplexity = z.infer<typeof ReasoningComplexitySchema>;
+export { ReasoningComplexitySchema, type ReasoningComplexity } from './reasoning';
 export const ComplexityLabelsSchema = z.record(z.string().min(1), ReasoningComplexitySchema);
 export type ComplexityLabels = z.infer<typeof ComplexityLabelsSchema>;
 
@@ -175,14 +178,18 @@ const routingTableFields = {
   // Benchmark run id.
   version: z.string().min(1),
   generatedAt: z.string().min(1),
-  minAccuracy: z.number().min(0).max(1),
-  accuracyNoiseBand: z.number().min(0).max(1).optional(),
+  minAccuracy: POLICY_SETTING_VALUE_SCHEMAS.minAccuracy,
+  accuracyNoiseBand: POLICY_SETTING_VALUE_SCHEMAS.accuracyNoiseBand.optional(),
   // Keep a session's incumbent model unless the fresh pick is cheaper by
-  // more than this factor (see BenchmarkConfigSchema.switchCostFactor).
-  switchCostFactor: z.number().min(1),
+  // more than this factor.
+  // A published table accepts any factor at or above the policy minimum: the
+  // upper bound is an input limit, and a stored table must keep parsing.
+  switchCostFactor: z.number().min(SWITCH_COST_FACTOR_MIN),
   // In best-accuracy mode, keep a threshold-meeting incumbent unless the
   // fresh pick improves accuracy by more than this absolute delta.
-  bestAccuracySwitchThreshold: z.number().min(0).max(1).default(0.05),
+  bestAccuracySwitchThreshold: POLICY_SETTING_VALUE_SCHEMAS.bestAccuracySwitchThreshold.default(
+    POLICY_SETTINGS.bestAccuracySwitchThreshold.fixed
+  ),
   productionTokenProfile: ProductionTokenProfileSchema.nullable().optional(),
   effortByComplexity: EffortByComplexitySchema.optional(),
   switchHorizonTurns: z.number().int().positive().nullable().optional(),
@@ -244,8 +251,6 @@ export function routingTableKvKey(router: AutoRouter = DEFAULT_AUTO_ROUTER): str
   return router === 'frontier' ? FRONTIER_ROUTING_TABLE_KV_KEY : ROUTING_TABLE_KV_KEY;
 }
 
-// Candidates within this raw-accuracy margin of minAccuracy compete on value.
-const ACCURACY_NOISE_BAND = 0.05;
 const LATENCY_WEIGHT = 1.5;
 export const LATENCY_TOTAL_WEIGHT = 0.15;
 const ACCURACY_WEIGHT = 15;
@@ -259,12 +264,12 @@ type RankInput = Omit<RankedCandidate, 'meetsThreshold'> & {
   p50LatencyMs: number | null;
 };
 
-export function wilsonLowerBound(accuracy: number, n: number, z = 1.0): number {
+export function wilsonLowerBound(accuracy: number, n: number, zScore = 1.0): number {
   if (n <= 0) return 0;
-  const zSquared = z * z;
+  const zSquared = zScore * zScore;
   const denominator = 1 + zSquared / n;
   const center = accuracy + zSquared / (2 * n);
-  const margin = z * Math.sqrt((accuracy * (1 - accuracy) + zSquared / (4 * n)) / n);
+  const margin = zScore * Math.sqrt((accuracy * (1 - accuracy) + zSquared / (4 * n)) / n);
   return Math.max(0, (center - margin) / denominator);
 }
 
@@ -296,7 +301,7 @@ export function rankValue(c: ValueInput & { avgCostUsd?: number }): number {
   return ((c.avgCostUsd ?? 1) * effectiveLatency ** LATENCY_WEIGHT) / accuracy ** ACCURACY_WEIGHT;
 }
 
-// Candidates within ACCURACY_NOISE_BAND of the threshold come first, best
+// Candidates within the accuracy noise band of the threshold come first, best
 // value first; the rest follow ordered by accuracy so a degenerate table still
 // routes sensibly. `meetsThreshold` stays the strict `accuracy >= minAccuracy`
 // flag that sticky routing reads.
@@ -313,13 +318,18 @@ export function rankCandidates(
     ignoreLatency?: boolean;
   }
 ): RankedCandidate[] {
-  const floor = minAccuracy - (options?.accuracyNoiseBand ?? ACCURACY_NOISE_BAND);
+  const floor =
+    minAccuracy - (options?.accuracyNoiseBand ?? POLICY_SETTING_VALUE_DEFAULTS.accuracyNoiseBand);
   const requestTokens = options?.requestTokens ?? null;
+  const byAccuracyThenCost = (
+    x: { accuracy: number; avgCostUsd: number },
+    y: { accuracy: number; avgCostUsd: number }
+  ) => y.accuracy - x.accuracy || x.avgCostUsd - y.avgCostUsd;
   return candidates
     .map(({ p50LatencyMs, ...c }) => {
       const estimatedRequestCostUsd =
         requestTokens !== null && c.pricing != null
-          ? c.avgCostUsd + requestTokens * c.pricing.promptUsdPerToken
+          ? estimateRequestCostUsd(c, { uncachedInputTokens: requestTokens, cachedInputTokens: 0 })
           : requestTokens !== null && c.estimatedRequestCostUsd != null
             ? c.estimatedRequestCostUsd
             : estimateRequestCostUsd(c, options?.profile ?? null);
@@ -347,16 +357,10 @@ export function rankCandidates(
     })
     .toSorted((a, b) => {
       if (a.competes !== b.competes) return a.competes ? -1 : 1;
-      if (!a.competes) {
-        const x = a.candidate;
-        const y = b.candidate;
-        return y.accuracy - x.accuracy || x.avgCostUsd - y.avgCostUsd;
-      }
+      if (!a.competes) return byAccuracyThenCost(a.candidate, b.candidate);
       if (a.free !== b.free) return a.free ? -1 : 1;
       if (a.value !== b.value) return a.value < b.value ? -1 : 1;
-      const x = a.candidate;
-      const y = b.candidate;
-      return y.accuracy - x.accuracy || x.avgCostUsd - y.avgCostUsd;
+      return byAccuracyThenCost(a.candidate, b.candidate);
     })
     .map(s => s.candidate);
 }

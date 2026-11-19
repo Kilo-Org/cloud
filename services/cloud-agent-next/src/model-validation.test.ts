@@ -355,13 +355,18 @@ describe('modern model validation trust boundary', () => {
       const bearer = await token({ organizationId });
       const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(Response.json({ valid: true }));
       await assertKiloModelAvailable({
-        env,
+        env: { ...env, KILO_OPENROUTER_BASE: `${env.KILOCODE_BACKEND_BASE_URL}/api/openrouter` },
         submittedModel: 'private/model',
         originalToken: bearer,
         originalOrganizationId: organizationId,
         procedure: 'send',
       });
       const init = fetchMock.mock.calls[0][1];
+      expect(fetchMock.mock.calls[0][0]).toBe(
+        organizationId
+          ? `${env.KILOCODE_BACKEND_BASE_URL}/api/organizations/${organizationId}/models/validate`
+          : `${env.KILOCODE_BACKEND_BASE_URL}/api/openrouter/models/validate`
+      );
       const headers = new Headers(init?.headers);
       expect(init?.redirect).toBe('manual');
       expect(
@@ -446,6 +451,47 @@ describe('modern model validation trust boundary', () => {
     expect(
       new Headers(fetchMock.mock.calls[0][1]?.headers).has(RUNTIME_PROXY_ATTESTATION_HEADER)
     ).toBe(false);
+  });
+
+  it('allows the e2e catalogue override to stand in for the official route', async () => {
+    const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(Response.json({ valid: true }));
+    await assertKiloModelAvailable({
+      env: {
+        ...env,
+        KILO_OPENROUTER_BASE: 'https://fake.test/api/openrouter',
+        E2E_MODEL_VALIDATION_BASE_URL: 'https://fake.test',
+      },
+      submittedModel: 'private/model',
+      originalToken: await token(),
+      procedure: 'start',
+    });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://fake.test/api/openrouter/models/validate');
+    expect(
+      new Headers(fetchMock.mock.calls[0]?.[1]?.headers).has(RUNTIME_PROXY_ATTESTATION_HEADER)
+    ).toBe(true);
+  });
+
+  it.each([
+    ['without a model route', {}],
+    [
+      'on a different origin than the model route',
+      { KILO_OPENROUTER_BASE: 'https://fake.test/api' },
+    ],
+  ])('keeps credentials off an e2e catalogue base %s', async (_case, routeEnv) => {
+    const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(Response.json({ valid: true }));
+    await assertKiloModelAvailable({
+      env: { ...env, ...routeEnv, E2E_MODEL_VALIDATION_BASE_URL: 'https://other.test' },
+      submittedModel: 'private/model',
+      originalToken: await token(),
+      procedure: 'start',
+    }).catch(() => undefined);
+    for (const [input, init] of fetchMock.mock.calls) {
+      const url = input instanceof Request ? input.url : input.toString();
+      expect(url).not.toContain('other.test');
+      if (!url.startsWith('https://backend.test/')) {
+        expect(new Headers(init?.headers).has(RUNTIME_PROXY_ATTESTATION_HEADER)).toBe(false);
+      }
+    }
   });
 
   it('allows an override that resolves to the exact trusted backend route', async () => {

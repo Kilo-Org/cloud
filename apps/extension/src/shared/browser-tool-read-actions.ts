@@ -11,9 +11,32 @@ import {
   readPageTimeOrigin,
   renderBrowserAriaSnapshotLine,
 } from './browser-tool-snapshot';
-import type { BrowserAriaSnapshotLine, BrowserToolPageSession } from './browser-tool-snapshot';
+import type {
+  BrowserAriaSnapshotCapture,
+  BrowserAriaSnapshotLine,
+  BrowserSnapshotArguments,
+  BrowserToolPageSession,
+} from './browser-tool-snapshot';
+import { ambiguousSelectorError } from './browser-agent-checks';
 import type { EvalTabResult } from './tab-debugger';
 import type { BrowserConsoleMessage, BrowserNetworkRequest } from './browser-tool-session';
+import type { AgentReadScope, WithheldFrame } from './browser-agent-frames';
+import {
+  captureAgentSnapshotView,
+  filterAgentConsoleMessages,
+  filterAgentNetworkRequests,
+  readAgentFrameTree,
+  readAgentScreenshotGeometry,
+  readSensitiveFieldBoxes,
+  readWithheldFrameBoxes,
+  withheldFramesOf,
+} from './browser-agent-frames';
+import { maskScreenshotDataUrl } from './browser-screenshot-masking';
+import type {
+  ScreenshotBox,
+  ScreenshotMaskInput,
+  ScreenshotMaskResult,
+} from './browser-screenshot-masking';
 import {
   redactSensitiveBody,
   redactSensitiveHeaders,
@@ -49,6 +72,14 @@ export const isReadBrowserToolName = (name: string): name is ReadBrowserToolName
 
 /** Clock, pause and timeout overrides so `browser_wait_for` is testable without real waits. */
 export interface BrowserReadToolOptions {
+  /**
+   * Present only for a CLI agent caller: the reads are frame-scoped to these
+   * `read` origins, hidden text is stripped and sensitive values are masked.
+   * A panel or workflow caller has no scope and keeps today's behaviour.
+   */
+  readonly agentScope?: AgentReadScope | undefined;
+  /** The masker used on agent screenshots; tests inject one instead of an OffscreenCanvas. */
+  readonly maskScreenshot?: (input: ScreenshotMaskInput) => Promise<ScreenshotMaskResult>;
   readonly now?: () => number;
   readonly pollIntervalMs?: number;
   readonly sleep?: (milliseconds: number) => Promise<void>;
@@ -545,6 +576,155 @@ const renderFindSnippet = (lines: readonly BrowserAriaSnapshotLine[], index: num
     .join('\n')}`;
 };
 
+const captureScopedSnapshot = (
+  deps: BrowserReadActionDeps,
+  options: BrowserSnapshotArguments
+): Promise<BrowserAriaSnapshotCapture> => {
+  if (deps.agentScope === undefined) {
+    return captureBrowserAriaSnapshot(deps.session, options);
+  }
+
+  return captureAgentSnapshotView(deps.session, deps.agentScope, {
+    ...(options.depth === undefined ? {} : { depth: options.depth }),
+    mergeRefs: options.target !== undefined && options.target !== '',
+  });
+};
+
+const withheldFramesFor = async (
+  deps: BrowserReadActionDeps
+): Promise<readonly WithheldFrame[]> => {
+  if (deps.agentScope === undefined) {
+    return [];
+  }
+
+  const frames = await readAgentFrameTree(deps.session);
+
+  return withheldFramesOf(frames, deps.agentScope.readableOrigins);
+};
+
+/** The captured region of an element screenshot, in CSS pixels in page coordinates. */
+interface ScreenshotClip {
+  readonly height: number;
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+}
+
+/**
+ * Shifts document-space boxes into another image origin (a viewport capture
+ * starts at the scroll position). Nothing is dropped: the painter clamps boxes
+ * that fall outside the image.
+ */
+const translateBoxes = (
+  boxes: readonly ScreenshotBox[],
+  deltaX: number,
+  deltaY: number
+): readonly ScreenshotBox[] =>
+  boxes.map(box => ({ ...box, left: box.left + deltaX, top: box.top + deltaY }));
+
+/**
+ * Moves page-space mask boxes into an element capture, whose pixel (0,0) is the
+ * clip's top-left. A box outside the clip is dropped: it paints no pixel of this
+ * image, and withholding it is what the clip already does.
+ */
+const translateBoxesIntoClip = (
+  boxes: readonly ScreenshotBox[],
+  clip: ScreenshotClip
+): readonly ScreenshotBox[] =>
+  boxes.flatMap(box => {
+    const left = Math.max(box.left, clip.left);
+    const top = Math.max(box.top, clip.top);
+    const right = Math.min(box.left + box.width, clip.left + clip.width);
+    const bottom = Math.min(box.top + box.height, clip.top + clip.height);
+
+    return right <= left || bottom <= top
+      ? []
+      : [
+          {
+            height: bottom - top,
+            left: left - clip.left,
+            top: top - clip.top,
+            width: right - left,
+          },
+        ];
+  });
+
+/** A scroll position of zero, for a caller whose layout metrics could not be read. */
+// eslint-disable-next-line id-length -- the geometry's scroll fields are named x and y
+const NO_SCROLL = { x: 0, y: 0 } as const;
+
+/** The masker re-encodes every masked image as PNG, so a masked capture reports that type. */
+const MASKED_SCREENSHOT_MEDIA_TYPE = 'image/png';
+
+const maskAgentScreenshot = async (
+  deps: BrowserReadActionDeps,
+  input: {
+    readonly clip?: ScreenshotClip | undefined;
+    /** The clip's render scale: 1 for a CSS-pixel capture, the device pixel ratio for a device one. */
+    readonly clipScale?: number | undefined;
+    readonly dataUrl: string;
+    readonly fullPage: boolean;
+    readonly mediaType: string;
+  }
+): Promise<
+  { readonly dataUrl: string; readonly mediaType: string } | { readonly error: string }
+> => {
+  if (deps.agentScope === undefined) {
+    return { dataUrl: input.dataUrl, mediaType: input.mediaType };
+  }
+
+  const frames = await readAgentFrameTree(deps.session);
+  const withheld = withheldFramesOf(frames, deps.agentScope.readableOrigins);
+  const geometry = await readAgentScreenshotGeometry(deps.session);
+  // `DOM.getBoxModel` quads are viewport-relative; adding the page's scroll puts every box in document space, the space an element clip and a full-page capture both use.
+  const maskedRegions = await readWithheldFrameBoxes(deps.session, frames, withheld, {
+    offset: geometry.scroll,
+  });
+
+  if ('error' in maskedRegions) {
+    return { error: maskedRegions.error };
+  }
+
+  const fields = await readSensitiveFieldBoxes(
+    deps.session,
+    frames,
+    deps.agentScope.readableOrigins,
+    { offset: geometry.scroll }
+  );
+
+  if ('error' in fields) {
+    return { error: fields.error };
+  }
+
+  const pageBoxes = [...maskedRegions.boxes, ...fields.boxes];
+  // An element clip and a full-page image are document-space; a viewport image starts at the scroll position.
+  let boxes: readonly ScreenshotBox[] = pageBoxes;
+
+  if (input.clip !== undefined) {
+    boxes = translateBoxesIntoClip(pageBoxes, input.clip);
+  } else if (!input.fullPage) {
+    boxes = translateBoxes(pageBoxes, -geometry.scroll.x, -geometry.scroll.y);
+  }
+
+  if (boxes.length === 0) {
+    return { dataUrl: input.dataUrl, mediaType: input.mediaType };
+  }
+
+  const mask = deps.maskScreenshot ?? maskScreenshotDataUrl;
+  const masked = await mask({
+    boxes,
+    dataUrl: input.dataUrl,
+    mediaType: input.mediaType,
+    // An element capture is clipped at its own scale; a viewport or full-page capture keeps the device pixel ratio the image carries.
+    scale: input.clip === undefined ? geometry.scale : (input.clipScale ?? 1),
+  });
+
+  // The masker always re-encodes as PNG, whatever the capture's media type was.
+  return masked.ok
+    ? { dataUrl: masked.dataUrl, mediaType: MASKED_SCREENSHOT_MEDIA_TYPE }
+    : { error: masked.error };
+};
+
 const browserSnapshotHandler: BrowserReadActionHandler = async (arguments_, deps) => {
   const parsed = browserSnapshotArgumentsSchema.safeParse(arguments_);
 
@@ -552,7 +732,7 @@ const browserSnapshotHandler: BrowserReadActionHandler = async (arguments_, deps
     return invalidArguments('browser_snapshot', parsed.error);
   }
 
-  const capture = await captureBrowserAriaSnapshot(deps.session, parsed.data);
+  const capture = await captureScopedSnapshot(deps, parsed.data);
 
   return done(boundBrowserToolText(`${capture.text}${filenameNote(parsed.data.filename)}`));
 };
@@ -582,7 +762,7 @@ const browserFindHandler: BrowserReadActionHandler = async (arguments_, deps) =>
     );
   }
 
-  const capture = await captureBrowserAriaSnapshot(deps.session, {});
+  const capture = await captureScopedSnapshot(deps, {});
   const matches: number[] = [];
 
   for (const [index, line] of capture.lines.entries()) {
@@ -610,9 +790,14 @@ const browserFindHandler: BrowserReadActionHandler = async (arguments_, deps) =>
 
 const readElementClip = async (
   session: BrowserToolPageSession,
-  target: string
+  target: string,
+  options: { readonly failClosedOnGeometryError: boolean }
 ): Promise<z.infer<typeof elementClipSchema>> => {
   const resolved = await session.resolveTarget(target);
+
+  if (resolved?.kind === 'ambiguous') {
+    throw new Error(ambiguousSelectorError(resolved.matches));
+  }
 
   if (resolved === undefined) {
     throw new Error(
@@ -632,13 +817,23 @@ const readElementClip = async (
     throw new Error(`Target "${target}" has no layout box to capture.`);
   }
 
+  // A layout-metrics failure must not take element screenshots away from the panel and workflow callers; an agent caller fails closed instead of guessing.
+  const geometry = await readAgentScreenshotGeometry(session).catch((error: unknown) => {
+    if (options.failClosedOnGeometryError) {
+      throw error instanceof Error ? error : new Error(String(error));
+    }
+
+    return { scale: 1, scroll: NO_SCROLL };
+  });
+
   return elementClipSchema.parse({
     height: model.height ?? 0,
     width: model.width ?? 0,
+    // `Page.captureScreenshot` clips are document-space; the box model's quads are viewport-space.
     // eslint-disable-next-line id-length -- CDP `clip` fields are named x and y
-    x: content[0] ?? 0,
+    x: (content[0] ?? 0) + geometry.scroll.x,
     // eslint-disable-next-line id-length -- CDP `clip` fields are named x and y
-    y: content[1] ?? 0,
+    y: (content[1] ?? 0) + geometry.scroll.y,
   });
 };
 
@@ -674,7 +869,7 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
     return invalidArguments('browser_take_screenshot', parsed.error);
   }
 
-  const { filename, fullPage, target } = parsed.data;
+  const { filename, fullPage, scale, target } = parsed.data;
   const type = inferScreenshotType(parsed.data.type, filename);
 
   if (fullPage === true && target !== undefined && target !== '') {
@@ -684,10 +879,23 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
   }
 
   const clip =
-    target === undefined || target === '' ? undefined : await readElementClip(deps.session, target);
+    target === undefined || target === ''
+      ? undefined
+      : await readElementClip(deps.session, target, {
+          failClosedOnGeometryError: deps.agentScope !== undefined,
+        });
+  // A device-pixel element capture renders the clip at the tab's device pixel ratio; the mask boxes move with it.
+  let clipScale = 1;
+
+  if (clip !== undefined && scale === 'device') {
+    const geometry = await readAgentScreenshotGeometry(deps.session);
+
+    clipScale = geometry.scale;
+  }
+
   const response = await deps.session.send('Page.captureScreenshot', {
     format: type,
-    ...(clip === undefined ? {} : { clip: { ...clip, scale: 1 } }),
+    ...(clip === undefined ? {} : { clip: { ...clip, scale: clipScale } }),
     ...(fullPage === true ? { captureBeyondViewport: true } : {}),
   });
   const shot = screenshotDataSchema.safeParse(response);
@@ -697,6 +905,22 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
   }
 
   const mediaType = screenshotMediaType(type);
+  const masked = await maskAgentScreenshot(deps, {
+    ...(clip === undefined
+      ? {}
+      : {
+          clip: { height: clip.height, left: clip.x, top: clip.y, width: clip.width },
+          clipScale,
+        }),
+    dataUrl: `data:${mediaType};base64,${shot.data.data}`,
+    fullPage: fullPage === true,
+    mediaType,
+  });
+
+  if ('error' in masked) {
+    return fail(masked.error);
+  }
+
   const viewportScope = fullPage === true ? 'full page' : 'viewport';
   const scope = clip === undefined ? viewportScope : `element ${String(target)}`;
   const text = boundBrowserToolText(
@@ -704,8 +928,8 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
   );
 
   const value: BrowserToolScreenshotValue = {
-    dataUrl: `data:${mediaType};base64,${shot.data.data}`,
-    mediaType,
+    dataUrl: masked.dataUrl,
+    mediaType: masked.mediaType,
     text,
   };
 
@@ -786,10 +1010,13 @@ const browserConsoleMessagesHandler: BrowserReadActionHandler = async (arguments
     return invalidArguments('browser_console_messages', parsed.error);
   }
 
-  const messages = await filterConsoleMessages(deps.session, deps.session.consoleMessages(), {
-    all: parsed.data.all === true,
-    level: parsed.data.level ?? 'info',
-  });
+  const messages = filterAgentConsoleMessages(
+    await filterConsoleMessages(deps.session, deps.session.consoleMessages(), {
+      all: parsed.data.all === true,
+      level: parsed.data.level ?? 'info',
+    }),
+    await withheldFramesFor(deps)
+  );
 
   if (messages.length === 0) {
     return done(`No console messages.${filenameNote(parsed.data.filename)}`);
@@ -824,7 +1051,10 @@ const browserNetworkRequestsHandler: BrowserReadActionHandler = async (arguments
 
   // The session bounds the list at the current page load (the last main-frame Document request).
   // Every request keeps its position in that full list, so the number printed here resolves in browser_network_request whichever filter was used.
-  const requests = deps.session.networkRequestsSinceLoad();
+  const requests = filterAgentNetworkRequests(
+    deps.session.networkRequestsSinceLoad(),
+    await withheldFramesFor(deps)
+  );
   const shown = requests.filter(request => {
     if (
       parsed.data.static !== true &&
@@ -858,7 +1088,10 @@ const browserNetworkRequestHandler: BrowserReadActionHandler = async (arguments_
   }
 
   // Numbers match browser_network_requests: both index the full since-load list, so a static request is reachable too.
-  const requests = deps.session.networkRequestsSinceLoad();
+  const requests = filterAgentNetworkRequests(
+    deps.session.networkRequestsSinceLoad(),
+    await withheldFramesFor(deps)
+  );
   const { index, number, part, requestId } = parsed.data;
   const position = index ?? number;
 

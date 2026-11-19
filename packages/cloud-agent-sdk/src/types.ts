@@ -34,6 +34,14 @@ export type {
 } from '@kilocode/session-ingest-contracts';
 
 /**
+ * A part as a storage reader sees it. `createReadonlyPartView` re-routes
+ * writes to nowhere at runtime, so the view's top-level fields are declared
+ * `readonly` — writing to a returned part is a compile error, passing one
+ * where `Part` is expected still typechecks.
+ */
+export type ReadonlyPart = Readonly<Part>;
+
+/**
  * Payload sent to a cloud agent session transport — either a chat prompt or a
  * slash command. Pairs with the SDK transport send types.
  */
@@ -116,6 +124,7 @@ export type SessionActivity =
  */
 export type SdkStatusMessageCode =
   | 'agent-connection-lost'
+  | 'agent-connection-reconnecting'
   | 'session-stopped'
   | 'session-terminated'
   | 'setting-up-environment'
@@ -131,6 +140,7 @@ export type SdkStatusMessageCode =
   | 'not-authorized'
   | 'service-unavailable'
   | 'previous-task-in-progress'
+  | 'workspace-deleting'
   | 'service-temporarily-unavailable'
   | 'generic-error'
   | 'connection-lost'
@@ -147,7 +157,13 @@ export type AgentStatus =
       code?: SdkStatusMessageCode;
     }
   | { type: 'error'; message: string; code?: SdkStatusMessageCode }
-  | { type: 'disconnected' }
+  /** `reconnecting` marks a self-recovering transport drop, not a terminal loss. */
+  | {
+      type: 'disconnected';
+      reconnecting?: boolean | undefined;
+      /** Set on the exhausted loss, so surfaces render one canonical copy. */
+      code?: SdkStatusMessageCode | undefined;
+    }
   | { type: 'interrupted' }
   /** Scheduled to wake later; does nothing now. `scheduledAt` is the ISO-8601 wake time when the CLI reported one. */
   | { type: 'scheduled'; scheduledAt?: string };

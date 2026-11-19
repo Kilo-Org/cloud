@@ -926,3 +926,149 @@ it.each(['completed', 'error'])(
     ]);
   }
 );
+
+describe('unresolved native attachments degrade at message granularity', () => {
+  const unresolvedTool = kilo2MessageSchema.parse({
+    id: 'msg_unresolved_file',
+    type: 'assistant',
+    time: { created: 2, completed: 3 },
+    content: [
+      { type: 'text', text: 'kept text' },
+      {
+        type: 'tool',
+        id: 'call_unresolved',
+        name: 'browser',
+        state: {
+          status: 'completed',
+          input: {},
+          content: [
+            { type: 'file', uri: 'media:///private/shot.png', mime: 'image/png' },
+            { type: 'text', text: 'browser result' },
+          ],
+        },
+      },
+    ],
+  });
+
+  it('omits only the unresolved message from a history page and keeps its siblings', () => {
+    const resolvedSibling = {
+      id: 'msg_resolved',
+      type: 'assistant',
+      time: { created: 4, completed: 5 },
+      content: [
+        {
+          type: 'tool',
+          id: 'call_shell',
+          name: 'shell',
+          state: {
+            status: 'completed',
+            input: { command: 'pwd' },
+            content: [{ type: 'text', text: '/workspace/app' }],
+          },
+        },
+      ],
+    };
+    const display = cloudSessionMessagesPageSchema.parse({
+      ...page,
+      messages: [
+        { message: user },
+        { message: unresolvedTool, parentID: user.id },
+        { message: resolvedSibling, parentID: user.id },
+      ],
+    });
+    expect(display?.messages.map(message => message.info.id)).toEqual([
+      user.id,
+      resolvedSibling.id,
+    ]);
+    expect(display?.messages.at(-1)?.parts).toHaveLength(1);
+    expect(display?.omittedItemCount).toBe(1);
+    expect(display?.messages[0].parts[0]).toMatchObject({ type: 'text', text: 'remember this' });
+  });
+
+  it('returns no events for a live update holding an unresolved attachment and keeps later events', () => {
+    const reader = createConversationSourceReader();
+    const first = reader.read(
+      wire('conversation.message.updated', {
+        sessionID: session.id,
+        source,
+        message: unresolvedTool,
+      })
+    ).events;
+    expect(first).toEqual([]);
+    const followup = {
+      id: 'msg_after_unresolved',
+      type: 'assistant',
+      time: { created: 4 },
+      content: [{ type: 'text', text: 'next turn' }],
+    };
+    const second = reader.read(
+      wire('conversation.message.updated', {
+        sessionID: session.id,
+        source,
+        message: followup,
+        parentID: user.id,
+      })
+    ).events;
+    expect(second[0]).toMatchObject({
+      type: 'message.updated',
+      info: { id: followup.id, parentID: user.id },
+    });
+    expect(second).toHaveLength(2);
+  });
+
+  it('omits a message whose user file is storage-free and keeps its siblings', () => {
+    // A user file with neither bytes nor a uri cannot project: kilo2MessageSchema
+    // rejects the message before the guards, so every call site degrades it the
+    // same way as an unresolved attachment.
+    const storageFree = {
+      id: 'msg_storage_free_file',
+      type: 'user',
+      time: { created: 2 },
+      text: 'attached',
+      files: [{ mime: 'image/png', source: { type: 'inline' } }],
+    };
+    // readKilo2Messages keeps its throwing contract for the raw message; the
+    // guarded call sites never see it because the per-event schema rejects it.
+    expect(() => readKilo2Messages(session, [storageFree as never])).toThrow(
+      'Native attachment msg_storage_free_file_000001 requires authorized asset resolution'
+    );
+    expect(hasUnresolvedKilo2Assets(storageFree as never)).toBe(false);
+
+    const display = cloudSessionMessagesPageSchema.parse({
+      ...page,
+      messages: [
+        { message: user },
+        { message: storageFree, parentID: user.id },
+        { message: assistant },
+      ],
+    });
+    expect(display?.messages.map(message => message.info.id)).toEqual([user.id, assistant.id]);
+    expect(display?.omittedItemCount).toBe(1);
+
+    const reader = createConversationSourceReader();
+    expect(
+      reader.read(
+        wire('conversation.message.updated', {
+          sessionID: session.id,
+          source,
+          message: storageFree,
+        })
+      ).events
+    ).toEqual([]);
+    const followup = {
+      id: 'msg_after_storage_free',
+      type: 'assistant',
+      time: { created: 3 },
+      content: [{ type: 'text', text: 'next turn' }],
+    };
+    const second = reader.read(
+      wire('conversation.message.updated', {
+        sessionID: session.id,
+        source,
+        message: followup,
+        parentID: user.id,
+      })
+    ).events;
+    expect(second[0]).toMatchObject({ type: 'message.updated', info: { id: followup.id } });
+  });
+});

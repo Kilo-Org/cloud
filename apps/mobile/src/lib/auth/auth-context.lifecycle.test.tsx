@@ -539,9 +539,7 @@ function makeToken(payload: Record<string, unknown>): string {
 }
 
 /** Load the auth-context module from a fresh module registry so
- *  module-level state (preloadedToken) is clean. Returns the module
- *  and a helper to extract the context value from a mounted tree. */
-// oxlint-disable-next-line require-await -- dynamic import is awaited
+ *  module-level state (preloadedToken) is clean. */
 async function loadAuthModule() {
   vi.resetModules();
   const mod = await import('./auth-context');
@@ -688,9 +686,7 @@ describe('sign-out teardown ordering', () => {
       await ctx.signOut();
     });
 
-    // clearTelemetryDecision must be called
     expect(hoisted.controller.clearTelemetryDecision).toHaveBeenCalled();
-    // Sentry.setUser must be called
     expect(hoisted.sentry.setUser).toHaveBeenCalledWith(null);
 
     const capture = invocationOrder(hoisted.posthog.captureEvent);
@@ -749,11 +745,8 @@ describe('sign-out teardown ordering', () => {
       await ctx.signOut();
     });
 
-    // resetAppsFlyerState must be called
     expect(hoisted.appsflyer.resetAppsFlyerState).toHaveBeenCalled();
-    // discardPostHog must be called
     expect(hoisted.posthog.discardPostHog).toHaveBeenCalled();
-    // purgePostHogPersistence must be called
     expect(hoisted.posthogStorage.purgePostHogPersistence).toHaveBeenCalled();
 
     // SDK teardown calls must appear before any SecureStore delete.
@@ -1330,7 +1323,6 @@ describe('stale sign-in continuation', () => {
   /** Mount the provider with a consumer that re-captures the context on
    *  every render, and resolve the preload effect. getCtx reads the latest
    *  captured value so a test can assert post-operation state. */
-  // oxlint-disable-next-line require-await -- dynamic import is awaited
   async function mountStaleTest(): Promise<{
     getCtx: () => AuthContextValue;
     unmount: () => void;
@@ -2106,7 +2098,7 @@ describe('bootstrap and foreground race fencing', () => {
     unmount();
   }, 60_000);
 
-  it('repro: an unreadable refresh-token read shows the restore error instead of signing out', async () => {
+  it('ends a token-only session once when its token is refused instead of retrying forever', async () => {
     useFakeBackoffClock();
     const storedToken = makeToken({ kiloUserId: 'user-1' });
     // Bootstrap consumes: preloadedToken, preloadedRefreshToken, the expiry
@@ -2121,9 +2113,14 @@ describe('bootstrap and foreground race fencing', () => {
     expect(getCtx().token).toBe(storedToken);
     expect(getCtx().sessionEnded).toBe(false);
 
-    // Every refresh-token read — including `readStoredValueRetryingNull`'s
-    // retries — answers null while the stored token stays present.
-    hoisted.secureStore.getItemAsync.mockResolvedValue(null);
+    // A sign-in that carried no pair (the legacy long-lived credential) leaves
+    // a token-only set: the stored access token is still there, and every read
+    // of the refresh token — including `readStoredValueRetryingNull`'s
+    // retries — answers null.
+    hoisted.secureStore.getItemAsync.mockImplementation(async (key: string) => {
+      await Promise.resolve();
+      return key === 'auth-token' ? storedToken : null;
+    });
 
     const handler = unauthorizedMock.getHandler();
     if (!handler) {
@@ -2133,20 +2130,68 @@ describe('bootstrap and foreground race fencing', () => {
       await awaitOnFakeClock(handler);
     });
 
-    // The credential set is one unit: an unreadable refresh token is not a
-    // signed-out session, so the session stands and the retryable restore error
-    // takes over instead of the login screen. No teardown ran.
-    expect(getCtx().token).toBe(storedToken);
-    expect(getCtx().sessionEnded).toBe(false);
-    expect(getCtx().restoreFailed).toBe(true);
-    expect(logoutCleanupMock.runLogoutCleanup).not.toHaveBeenCalled();
-    expect(hoisted.posthog.captureEvent).not.toHaveBeenCalledWith('logout');
+    // Nothing can rotate this set, so the refused token ends the session: the
+    // person lands on sign-in with the session-ended notice, and the repeated
+    // restore error plus its repeated events stop.
+    expect(getCtx().token).toBeUndefined();
+    expect(getCtx().sessionEnded).toBe(true);
+    expect(getCtx().restoreFailed).toBe(false);
+    expect(logoutCleanupMock.runLogoutCleanup).toHaveBeenCalledTimes(1);
+    expect(hoisted.posthog.captureEvent).toHaveBeenCalledWith('logout');
     expect(signOutTelemetryMock.reportAuthBranch).toHaveBeenCalledTimes(1);
     expect(signOutTelemetryMock.reportAuthBranch).toHaveBeenCalledWith({
-      cause: 'credentials_unreadable',
-      branch: 'refresh_token_unreadable',
-      keyNames: ['auth-token'],
+      cause: 'session_unrenewable',
     });
+
+    // A later 401 belongs to the session the sign-out already ended: it ends
+    // nothing a second time and files nothing.
+    await act(async () => {
+      await awaitOnFakeClock(handler);
+    });
+    expect(logoutCleanupMock.runLogoutCleanup).toHaveBeenCalledTimes(1);
+    expect(signOutTelemetryMock.reportAuthBranch).toHaveBeenCalledTimes(1);
+
+    unmount();
+  }, 30_000);
+
+  it('keeps a token-only session when the refused request carried no bearer', async () => {
+    useFakeBackoffClock();
+    const storedToken = makeToken({ kiloUserId: 'user-1' });
+    hoisted.secureStore.getItemAsync
+      .mockResolvedValueOnce(storedToken)
+      .mockResolvedValueOnce('stored-refresh')
+      .mockResolvedValueOnce('9999999999999')
+      .mockResolvedValueOnce(storedToken);
+
+    const { getCtx, unmount } = await mountProvider();
+    expect(getCtx().token).toBe(storedToken);
+
+    // No owner can serve a bearer, so the request that produced this 401 went
+    // out unauthenticated and the refusal proves nothing about the stored
+    // token. The set is token-only, which is what the refresh finds.
+    // `afterEach` resets the module registry, so the owner is loaded from the
+    // same graph as the provider rather than through a static import.
+    const { clearActiveToken } = await import('@/lib/auth/token-owner');
+    clearActiveToken();
+    hoisted.secureStore.getItemAsync.mockImplementation(async (key: string) => {
+      await Promise.resolve();
+      return key === 'auth-token' ? storedToken : null;
+    });
+
+    const handler = unauthorizedMock.getHandler();
+    if (!handler) {
+      throw new Error('unauthorized handler was not registered');
+    }
+    await act(async () => {
+      await awaitOnFakeClock(handler);
+    });
+
+    // A session that may still be perfectly healthy is never ended on the
+    // strength of a request that carried no credential.
+    expect(getCtx().token).toBe(storedToken);
+    expect(getCtx().sessionEnded).toBe(false);
+    expect(logoutCleanupMock.runLogoutCleanup).not.toHaveBeenCalled();
+    expect(signOutTelemetryMock.reportAuthBranch).not.toHaveBeenCalled();
 
     unmount();
   }, 30_000);
@@ -2217,14 +2262,13 @@ describe('bootstrap and foreground race fencing', () => {
     });
 
     // A real 401 still signs out, is announced as a session end, and records
-    // the refresh_401 branch.
+    // the ended-session cause.
     expect(getCtx().sessionEnded).toBe(true);
     expect(getCtx().token).toBeUndefined();
     expect(getCtx().restoreFailed).toBe(false);
     expect(signOutTelemetryMock.reportAuthBranch).toHaveBeenCalledTimes(1);
     expect(signOutTelemetryMock.reportAuthBranch).toHaveBeenCalledWith({
       cause: 'session_ended',
-      branch: 'refresh_401',
     });
 
     unmount();
@@ -2240,7 +2284,6 @@ describe('reactive auth epoch', () => {
 
   /** Mount the provider with a consumer that re-captures the context on every
    *  render, so the test can read the epoch after sign-in or sign-out moved it. */
-  // oxlint-disable-next-line require-await -- dynamic import is awaited
   async function mountEpochTest(withConnection = false): Promise<{
     getCtx: () => AuthContextValue;
     unmount: () => void;
@@ -2592,7 +2635,7 @@ describe('reactive auth epoch', () => {
 
     const outcome = await performRefresh();
 
-    expect(outcome.ok).toBe(true);
+    expect(outcome.kind).toBe('ok');
     expect(tokens.getActiveToken()?.token).toBe('refreshed-token');
     expect(scope.getAuthenticatedOwner()).toBe(owner);
     expect(scope.isAuthenticatedOwner(owner)).toBe(true);

@@ -9,12 +9,10 @@ import { DetailScreenScrollView } from '@/components/detail-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { type BackendStoreCreditProduct } from '@/lib/credits/store-products';
 import {
-  BALANCE_RETRY_FRAME_DP,
-  BALANCE_RETRY_HIT_SLOP,
-  BALANCE_RETRY_HIT_SLOP_DP,
+  BALANCE_RETRY_TARGET_CLASS,
+  BALANCE_RETRY_TARGET_DP,
   LEGAL_LINK_BOX_CLASS,
   LEGAL_LINK_ROW_CLASS,
-  tapTargetReachDp,
   TOUCH_TARGET_DP,
 } from '@/lib/a11y/tap-target';
 import { act, type TestRenderer } from '@/test/renderer';
@@ -83,10 +81,6 @@ function answerRead(state: 'ok' | 'pending' | 'error', answer: unknown): Promise
 
 const toastMock = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }));
 
-// The legal links are the only caller of this module on the screen, so the mock
-// is the destination each link opened.
-const externalLink = vi.hoisted(() => ({ openExternalUrl: vi.fn() }));
-
 // The iOS announcement channel behind AccessibleStatus. The screen renders the
 // purchase error inline and suppresses the error toast, so this hook (plus
 // Android's live region) is the only thing a screen reader can hear.
@@ -134,14 +128,9 @@ vi.mock('@/lib/a11y/status-announcement', () => ({
   useStatusAnnouncement: statusAnnouncement.useStatusAnnouncement,
 }));
 
-vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.com' }));
-vi.mock('@/lib/external-link', () => externalLink);
-vi.mock('@/lib/iap/legal-links', () => ({
-  getStoreLegalLinks: () => [
-    { url: 'https://example.com/privacy-app', label: 'Privacy Policy' },
-    { url: 'https://example.com/terms-app', label: 'Terms of Use (EULA)' },
-  ],
-}));
+const legalNavigation = vi.hoisted(() => ({ push: vi.fn() }));
+
+vi.mock('expo-router', () => ({ useRouter: () => ({ push: legalNavigation.push }) }));
 vi.mock('@/lib/credits/use-store-credit-purchase', () => ({
   useInlinePurchaseErrorOwnership: vi.fn(),
 }));
@@ -827,8 +816,8 @@ describe('CreditPurchaseScreen', () => {
     expect(rows).toHaveLength(4);
     // The card above is the one visible statement; no row repeats the status.
     expect(allText(renderer)).not.toContain('Price unavailable');
-    // The rows keep their disabled style, their pack title and their expiry
-    // note, and a screen reader still hears why each one is inactive.
+    // The rows keep their title and their expiry note, and a screen reader
+    // still hears why each one is inactive.
     const labels = rows.map(
       row => (row.props as { accessibilityLabel: string }).accessibilityLabel
     );
@@ -836,10 +825,53 @@ describe('CreditPurchaseScreen', () => {
       `Add ${packAmount('$10.00')} of credits, Price unavailable, Credits purchased through the App Store do not expire.`
     );
     expect(allText(renderer)).toContain(`Add ${packAmount('$10.00')} of credits`);
+    // A disabled row recedes by its own labels rather than its whole surface:
+    // it dims its title and price to 70% foreground ink, leaves the secondary
+    // line at full muted ink so the expiry note stays readable, and keeps the
+    // row's shell, which carries no opacity.
     expect(
       classNamesOf(rows).every(
-        classes => classes.includes(PACK_ROW_SHELL) && classes.includes('opacity-50')
+        classes =>
+          classes.includes(PACK_ROW_SHELL) &&
+          !classes.includes('opacity-50') &&
+          !classes.includes('opacity-70')
       )
+    ).toBe(true);
+    expect(
+      rows.every(row => {
+        const head = row.children[0];
+        const line = row.children[1];
+        if (head === undefined || line === undefined) {
+          return false;
+        }
+        if (typeof head === 'string' || typeof line === 'string') {
+          return false;
+        }
+        const headTexts = head.findAll(node => String(node.type) === 'Text');
+        const lineTexts = line.findAll(node => String(node.type) === 'Text');
+        return (
+          headTexts.length > 0 &&
+          headTexts.every(text => {
+            const className = classNameOf(text);
+            return (
+              className.includes('text-foreground') &&
+              className.includes('opacity-70') &&
+              !className.includes('text-muted-foreground') &&
+              !className.includes('opacity-50')
+            );
+          }) &&
+          lineTexts.length === 1 &&
+          lineTexts.every(text => {
+            const className = classNameOf(text);
+            return (
+              className.includes('text-xs') &&
+              className.includes('text-muted-foreground') &&
+              !className.includes('opacity-50') &&
+              !className.includes('opacity-70')
+            );
+          })
+        );
+      })
     ).toBe(true);
     // No row keeps an empty band for a status it does not state: the title row
     // and the row's one note line are its only children. The note line keeps a
@@ -1565,8 +1597,9 @@ describe('CreditPurchaseScreen', () => {
     // padding stays balanced.
     expect(captions.filter(text => text.length > 0)).toHaveLength(cases.length - 1);
 
-    // The failed read's retry keeps the amount's own line box and reaches the
-    // 44 dp touch minimum from its hit slop, so it adds no height to the card.
+    // The failed read's retry carries the whole touch target on its own box
+    // instead of a `hitSlop`, and its negative vertical margins cancel the
+    // half that overflows the amount's line, so the card's height stays put.
     balance.state = 'error';
     creditBlocks.state = 'ok';
     creditBlocks.entries = [];
@@ -1578,10 +1611,14 @@ describe('CreditPurchaseScreen', () => {
     if (!retry) {
       throw new Error('expected the balance retry target');
     }
-    const slop = (retry.props as { hitSlop?: Record<string, number> }).hitSlop;
-    const reach = tapTargetReachDp(BALANCE_RETRY_FRAME_DP, BALANCE_RETRY_HIT_SLOP_DP);
-    expect(slop).toEqual(BALANCE_RETRY_HIT_SLOP);
-    expect(reach).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    expect((retry.props as { hitSlop?: unknown }).hitSlop).toBeUndefined();
+    expect(classNameOf(retry)).toContain(BALANCE_RETRY_TARGET_CLASS);
+    expect(BALANCE_RETRY_TARGET_DP).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    // The caption slot is the retry's later sibling under the amount, so it
+    // stays touch-transparent: it must not take back the box's bottom overflow.
+    const captionSlot = slotOf(failed.renderer.root, 'credit-expiry-slot');
+    const pointerEvents: unknown = captionSlot?.props.pointerEvents;
+    expect(pointerEvents).toBe('none');
     failed.unmount();
   });
 
@@ -1729,7 +1766,7 @@ describe('CreditPurchaseScreen', () => {
     unmount();
   });
 
-  it('gives each store legal link a full legal-link target and its own destination', async () => {
+  it('gives each store legal link a full legal-link target and opens it natively', async () => {
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
     await waitFor(() => packRows(renderer).length === 4);
 
@@ -1758,19 +1795,15 @@ describe('CreditPurchaseScreen', () => {
       (privacyLink.props as { onPress: () => void }).onPress();
     });
 
-    expect(externalLink.openExternalUrl).toHaveBeenCalledTimes(2);
-    expect(externalLink.openExternalUrl).toHaveBeenNthCalledWith(
-      1,
-      'https://example.com/terms-app',
-      {
-        label: 'Terms of Use (EULA)',
-      }
-    );
-    expect(externalLink.openExternalUrl).toHaveBeenNthCalledWith(
-      2,
-      'https://example.com/privacy-app',
-      { label: 'Privacy Policy' }
-    );
+    expect(legalNavigation.push).toHaveBeenCalledTimes(2);
+    expect(legalNavigation.push).toHaveBeenNthCalledWith(1, {
+      pathname: '/(app)/legal/[document]',
+      params: { document: 'terms' },
+    });
+    expect(legalNavigation.push).toHaveBeenNthCalledWith(2, {
+      pathname: '/(app)/legal/[document]',
+      params: { document: 'privacy' },
+    });
     unmount();
   });
 });

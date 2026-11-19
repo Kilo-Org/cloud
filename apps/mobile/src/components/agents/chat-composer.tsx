@@ -58,7 +58,7 @@ import { useKeyboardMotionProgress } from '@/components/keyboard-motion-provider
 import { pickAgentAttachments, pickAgentImages } from '@/components/agents/attachment-picker';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { Text } from '@/components/ui/text';
+import { RemainingCharactersCounter } from '@/components/ui/remaining-characters-counter';
 import {
   createMobileSlashCommandList,
   getSlashCommandCandidate,
@@ -1228,7 +1228,7 @@ export function ChatComposer({
       return;
     }
     if (upload.hasFailedAttachments) {
-      toast.error(i18n.t('agentChat.composer.removeOrRetryFailed'));
+      toast.error(i18n.t('agentChat.composer.removeFailedAttachments'));
       return;
     }
     // The model changed after the images were attached, to one that reads none.
@@ -1668,17 +1668,7 @@ export function ChatComposer({
         ) : null}
 
         {counterRemaining !== null ? (
-          <View className="flex-row justify-end px-4 pb-1">
-            {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
-            <Text
-              className="text-xs font-normal text-muted-foreground"
-              accessibilityLabel={i18n.t('agentChat.composer.charactersRemaining', {
-                count: counterRemaining,
-              })}
-            >
-              {counterRemaining}
-            </Text>
-          </View>
+          <RemainingCharactersCounter remaining={counterRemaining} className="px-4 pb-1" />
         ) : null}
 
         <GestureDetector gesture={dismissKeyboardPan}>

@@ -1,7 +1,6 @@
 import { ENKRYPT_MAX_SCAN_CHARACTERS } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import {
   renderSegment,
-  SEGMENT_SEPARATOR,
   segmentHeaderLine,
   type RequestSegment,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
@@ -16,9 +15,15 @@ export const MAX_SPLIT_HEADER_CHARACTERS = 10_000;
 
 /**
  * Text whose verdict is cached on its own: a whole segment, or a slice of a segment too long for
- * one Enkrypt call. `segment` is the index of the segment it belongs to.
+ * one Enkrypt call. `segment` is the index of the segment it belongs to. A slice has `bodyRange`,
+ * the part of the segment's body it covers, so `body.slice(start, end)`; a whole segment has none.
+ * Slices of a segment overlap, and their ranges rise in both `start` and `end`.
  */
-export type ScanUnit = { text: string; segment: number };
+export type ScanUnit = {
+  text: string;
+  segment: number;
+  bodyRange?: { start: number; end: number };
+};
 
 /** Whether cutting `text` at `index` would separate the two halves of a surrogate pair. */
 function splitsPair(text: string, index: number): boolean {
@@ -54,7 +59,7 @@ export const ENKRYPT_SLICE_OVERLAP_CHARACTERS = 4_000;
  * the first also repeats the last `ENKRYPT_SLICE_OVERLAP_CHARACTERS` of the text before its cut.
  * No slice starts or ends between the two halves of a surrogate pair.
  */
-function segmentUnits(segment: RequestSegment): string[] {
+function segmentUnits(segment: RequestSegment): Omit<ScanUnit, 'segment'>[] {
   const whole = renderSegment(segment);
   const { header, body } = segment;
   if (
@@ -62,18 +67,18 @@ function segmentUnits(segment: RequestSegment): string[] {
     body === null ||
     header.length > MAX_SPLIT_HEADER_CHARACTERS
   ) {
-    return [whole];
+    return [{ text: whole }];
   }
   const longestHeader = sliceHeader(header, true, true).length;
   const step = ENKRYPT_MAX_SCAN_CHARACTERS - longestHeader - 1 - ENKRYPT_SLICE_OVERLAP_CHARACTERS;
-  const units: string[] = [];
+  const units: Omit<ScanUnit, 'segment'>[] = [];
   for (let cut = 0; cut < body.length; cut += step) {
     const overlapStart = Math.max(0, cut - ENKRYPT_SLICE_OVERLAP_CHARACTERS);
     const start = splitsPair(body, overlapStart) ? overlapStart + 1 : overlapStart;
     const next = cut + step;
     const end = next >= body.length ? body.length : splitsPair(body, next) ? next - 1 : next;
     const sliced = sliceHeader(header, start > 0, end < body.length);
-    units.push(`${sliced}\n${body.slice(start, end)}`);
+    units.push({ text: `${sliced}\n${body.slice(start, end)}`, bodyRange: { start, end } });
   }
   return units;
 }
@@ -85,30 +90,6 @@ function segmentUnits(segment: RequestSegment): string[] {
  */
 export function scanUnits(segments: RequestSegment[]): ScanUnit[] {
   return segments.flatMap((segment, index) =>
-    segmentUnits(segment).map(text => ({ text, segment: index }))
+    segmentUnits(segment).map(unit => ({ ...unit, segment: index }))
   );
-}
-
-/**
- * Packs units, in order, into as few Enkrypt calls of at most `ENKRYPT_MAX_SCAN_CHARACTERS` as
- * fit, joined like segments, since each call pays Enkrypt's per-call minimum. An oversized unit is
- * a call of its own.
- */
-export function packUnits<T extends { text: string }>(units: T[]): T[][] {
-  const calls: T[][] = [];
-  let current: T[] = [];
-  let length = 0;
-  for (const unit of units) {
-    const joined = length + SEGMENT_SEPARATOR.length + unit.text.length;
-    if (current.length > 0 && joined <= ENKRYPT_MAX_SCAN_CHARACTERS) {
-      current.push(unit);
-      length = joined;
-      continue;
-    }
-    if (current.length > 0) calls.push(current);
-    current = [unit];
-    length = unit.text.length;
-  }
-  if (current.length > 0) calls.push(current);
-  return calls;
 }

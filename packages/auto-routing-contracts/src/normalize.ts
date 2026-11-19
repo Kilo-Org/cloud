@@ -638,6 +638,21 @@ const MODALITY_CHILD_ROLES: Record<ModalityRole, Record<string, ModalityRole>> =
   part: { parts: 'part' },
 };
 
+type MediaPartModality = 'image' | 'file';
+
+// Content-part `type` values that carry media rather than text, and the input
+// modality each one requires. The modality walk and the routing token
+// estimator both read this one map, so the estimate excludes exactly the types
+// the capability gate recognizes.
+const MEDIA_PART_MODALITY: Record<string, MediaPartModality | undefined> = {
+  image_url: 'image',
+  image: 'image',
+  input_image: 'image',
+  file: 'file',
+  input_file: 'file',
+  document: 'file',
+};
+
 // The same body reaches this walk as reaches the text walk, with the same
 // unbounded nesting. Its work is already linear in the parsed body, which the
 // request size bounds, and every level costs one node per message, so the
@@ -693,13 +708,16 @@ function collectModalities(
   if (role !== 'part') return;
 
   // Typed content parts: OpenAI Responses `input_image` / `input_file`,
-  // OpenAI chat `image_url`, Anthropic `image` / `document`.
+  // OpenAI chat `image_url`, Anthropic `image` / `document`. `type` is
+  // client-supplied, so the lookup takes an own key only: an index read would
+  // also answer for inherited keys such as `constructor` or `toString`.
   const type = value.type;
   if (typeof type === 'string') {
-    if (type === 'image_url' || type === 'image' || type === 'input_image') {
-      out.add('image');
-    } else if (type === 'file' || type === 'input_file' || type === 'document') {
-      out.add('file');
+    const modality = Object.hasOwn(MEDIA_PART_MODALITY, type)
+      ? MEDIA_PART_MODALITY[type]
+      : undefined;
+    if (modality !== undefined) {
+      out.add(modality);
     }
   }
 
@@ -820,16 +838,10 @@ function sumContentPartTextChars(part: unknown, depth: number): number {
 
   const type = part.type;
 
-  // Media parts: zero contribution regardless of payload size
+  // Media parts: zero contribution regardless of payload size. The own-key
+  // check keeps an inherited key such as `constructor` from reading as media.
   if (typeof type === 'string') {
-    if (
-      type === 'image_url' ||
-      type === 'image' ||
-      type === 'input_image' ||
-      type === 'file' ||
-      type === 'input_file' ||
-      type === 'document'
-    ) {
+    if (Object.hasOwn(MEDIA_PART_MODALITY, type)) {
       return 0;
     }
 

@@ -1,12 +1,6 @@
 'use client';
 
 /**
- * Session Form Atoms
- *
- * Jotai atoms for managing the cloud agent session creation form state.
- * Separates "manual" additions from "profile" config, with derived atoms
- * for the effective merged configuration.
- *
  * Key concepts:
  * - Manual config: What the user explicitly adds via dialogs
  * - Profile config: What comes from the selected profile
@@ -27,13 +21,11 @@ export type ProfileConfig = {
 };
 
 /**
- * Manual environment variables added by user via EnvVarsDialog
  * These override profile vars with the same key
  */
 export const manualEnvVarsAtom = atom<Record<string, string>>({});
 
 /**
- * Manual setup commands added by user via SetupCommandsDialog
  * These are appended to profile commands
  */
 export const manualSetupCommandsAtom = atom<string[]>([]);
@@ -41,16 +33,11 @@ export const manualSetupCommandsAtom = atom<string[]>([]);
 export const selectedProfileIdAtom = atom<string | null>(null);
 
 /**
- * Whether we've auto-selected the default profile on initial load
  * Prevents re-selecting after user manually deselects
  */
 export const hasAutoSelectedDefaultAtom = atom(false);
 
 export const profileConfigAtom = atom<ProfileConfig | null>(null);
-
-// ============================================================================
-// Derived Atoms - Effective Configuration
-// ============================================================================
 
 export const effectiveEnvVarsAtom = atom(get => {
   const manual = get(manualEnvVarsAtom);
@@ -71,10 +58,6 @@ export const effectiveEnvVarsAtom = atom(get => {
   return effective;
 });
 
-/**
- * Effective setup commands: profile + manual merged
- * Manual commands are appended after profile commands (no duplicates)
- */
 export const effectiveSetupCommandsAtom = atom(get => {
   const manual = get(manualSetupCommandsAtom);
   const profileConfig = get(profileConfigAtom);

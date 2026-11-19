@@ -489,6 +489,46 @@ describe('injectVercelModels with models only Vercel serves', () => {
     ]);
   });
 
+  test('omits a Vercel-only model named like an OpenRouter model, along with its endpoints', () => {
+    const vercelModels: Record<string, GatewayModelWithEndpoints> = {
+      'alibaba/qwen3-vl-instruct': {
+        id: 'alibaba/qwen3-vl-instruct',
+        name: 'Qwen3 VL 235B A22B Instruct',
+        ...described,
+        endpoints: [{ provider_name: 'bedrock' }],
+      },
+      'alibaba/qwen3-vl-thinking': {
+        id: 'alibaba/qwen3-vl-thinking',
+        name: 'Qwen3 VL 235B A22B Thinking',
+        ...described,
+        endpoints: [{ provider_name: 'bedrock' }],
+      },
+      'alibaba/qwen3-vl-flash': {
+        id: 'alibaba/qwen3-vl-flash',
+        name: 'qwen3 vl 235b a22b instruct',
+        ...described,
+        endpoints: [{ provider_name: 'bedrock' }],
+      },
+    };
+    const data = providerModelData();
+
+    injectVercelModels({
+      vercelModels,
+      openRouterCatalogModels: [
+        { id: 'qwen/qwen3-vl-235b-a22b-instruct', name: 'Qwen: Qwen3 VL 235B A22B Instruct' },
+      ],
+      openRouterModelIds: ['qwen/qwen3-vl-235b-a22b-instruct'],
+      providerModelData: data,
+      vercelModelIdOverrides: new Map(),
+      updatedAt: '2026-11-02T00:00:00.000Z',
+    });
+
+    expect(data[0]?.models.map(model => model.slug).sort()).toEqual([
+      'qwen/qwen3-vl-flash',
+      'qwen/qwen3-vl-thinking',
+    ]);
+  });
+
   test("skips a Vercel-only model that Vercel's model list does not describe", () => {
     const data = providerModelData();
     injectVercelModels({
@@ -810,5 +850,170 @@ describe('injectVercelModels data policy of paid Vercel-only models under OpenRo
 
     expect(data[0]?.models[0]?.slug).toBe(MODEL_SLUG);
     expect(data[0]?.models[0]?.endpoint?.data_policy).toBeUndefined();
+  });
+});
+
+describe('injectVercelModels inference regions', () => {
+  const policy = { training: false, retainsPrompts: false, canPublish: false };
+
+  function regions(...geoRegions: string[]): Endpoint['inference_regions'] {
+    return geoRegions.map(geo_region => ({ geo_region }));
+  }
+
+  test('records the known regions of each provider listing in a fixed order', () => {
+    const providerModelData = [
+      { provider: provider('nvidia', 'NVIDIA', policy), models: [nvidiaModel()] },
+      {
+        provider: provider('amazon-bedrock', 'Amazon Bedrock', policy),
+        models: [] as OpenRouterModel[],
+      },
+      { provider: provider('google-vertex', 'Google Vertex', policy), models: [] },
+    ];
+    const vercelModels: Record<string, GatewayModelWithEndpoints> = {
+      [MODEL_SLUG]: {
+        id: MODEL_SLUG,
+        name: 'NVIDIA Nemotron 3 Super',
+        endpoints: [
+          { provider_name: 'nvidia' },
+          {
+            provider_name: 'bedrock',
+            inference_regions: [...(regions('jp', 'xx', 'us', 'us') ?? []), {}],
+          },
+          { provider_name: 'vertex', inference_regions: regions('eu') },
+          { provider_name: 'vertexAnthropic', inference_regions: regions('us') },
+        ],
+      },
+    };
+
+    injectSnapshotModels(vercelModels, providerModelData);
+
+    expect(
+      providerModelData.map(({ provider, models }) => [
+        provider.slug,
+        models[0]?.endpoint?.vercel_inference_regions,
+      ])
+    ).toEqual([
+      ['nvidia', undefined],
+      ['amazon-bedrock', ['us', 'jp']],
+      ['google-vertex', ['us', 'eu']],
+    ]);
+  });
+
+  test('records regions on listings OpenRouter already has and on providers only Vercel lists', () => {
+    const providerModelData: ProviderModelData = [
+      { provider: provider('nvidia', 'NVIDIA', policy), models: [nvidiaModel()] },
+    ];
+    const vercelModels: Record<string, GatewayModelWithEndpoints> = {
+      [MODEL_SLUG]: {
+        id: MODEL_SLUG,
+        name: 'NVIDIA Nemotron 3 Super',
+        endpoints: [
+          { provider_name: 'nvidia', inference_regions: regions('eu') },
+          { provider_name: 'baseten', inference_regions: regions('au') },
+        ],
+      },
+    };
+
+    injectSnapshotModels(vercelModels, providerModelData);
+
+    expect(
+      providerModelData.map(({ provider, models }) => [
+        provider.slug,
+        models[0]?.endpoint?.vercel_inference_regions,
+      ])
+    ).toEqual([
+      ['nvidia', ['eu']],
+      ['baseten', ['au']],
+    ]);
+  });
+});
+
+describe('injectVercelModels pricing of models OpenRouter already lists', () => {
+  function pricedListing(endpoint: Partial<NonNullable<OpenRouterModel['endpoint']>>) {
+    return {
+      ...nvidiaModel(),
+      endpoint: {
+        provider_display_name: 'Amazon Bedrock',
+        is_free: false,
+        pricing: { prompt: '0.000001', completion: '0.000004' },
+        data_policy: { training: false, retainsPrompts: false },
+        ...endpoint,
+      },
+    } satisfies OpenRouterModel;
+  }
+
+  function injectBedrockPricing(
+    listing: OpenRouterModel,
+    vercelPricing: NonNullable<Endpoint['pricing']>
+  ) {
+    const providerModelData = [
+      {
+        provider: provider('amazon-bedrock', 'Amazon Bedrock', {
+          training: false,
+          retainsPrompts: false,
+          canPublish: false,
+        }),
+        models: [listing],
+      },
+    ];
+    injectSnapshotModels(
+      {
+        [MODEL_SLUG]: {
+          id: MODEL_SLUG,
+          name: listing.name,
+          endpoints: [{ provider_name: 'bedrock', pricing: vercelPricing }],
+        },
+      },
+      providerModelData
+    );
+    expect(providerModelData[0]?.models).toHaveLength(1);
+    return providerModelData[0]?.models[0]?.endpoint;
+  }
+
+  test('raises the listing to the Vercel price when Vercel charges more', () => {
+    const endpoint = injectBedrockPricing(pricedListing({}), {
+      prompt: '0.000002',
+      completion: '0.000003',
+    });
+
+    expect(endpoint?.pricing).toEqual({ prompt: '0.000002', completion: '0.000004' });
+  });
+
+  test('compares against the undiscounted OpenRouter price', () => {
+    const endpoint = injectBedrockPricing(
+      pricedListing({ pricing: { prompt: '0.000001', completion: '0.000002', discount: 0.5 } }),
+      { prompt: '0.0000015', completion: '0.000003' }
+    );
+
+    expect(endpoint?.pricing?.prompt).toBe('0.000002000000');
+    expect(endpoint?.pricing?.completion).toBe('0.000004000000');
+    expect(endpoint?.pricing).not.toHaveProperty('discount');
+  });
+
+  test('leaves the listing when Vercel charges less', () => {
+    const endpoint = injectBedrockPricing(pricedListing({}), {
+      prompt: '0.0000005',
+      completion: '0.000001',
+    });
+
+    expect(endpoint?.pricing).toEqual({ prompt: '0.000001', completion: '0.000004' });
+  });
+
+  test('leaves a free listing free', () => {
+    const endpoint = injectBedrockPricing(
+      pricedListing({ is_free: true, pricing: { prompt: '0', completion: '0' } }),
+      { prompt: '0.000002', completion: '0.000003' }
+    );
+
+    expect(endpoint?.pricing).toEqual({ prompt: '0', completion: '0' });
+  });
+
+  test('leaves a free variant listing at its own price', () => {
+    const endpoint = injectBedrockPricing(
+      pricedListing({ variant: 'free', pricing: { prompt: '0', completion: '0' } }),
+      { prompt: '0.000002', completion: '0.000003' }
+    );
+
+    expect(endpoint?.pricing).toEqual({ prompt: '0', completion: '0' });
   });
 });

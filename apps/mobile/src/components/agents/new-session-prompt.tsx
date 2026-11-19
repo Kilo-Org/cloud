@@ -28,7 +28,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { Text } from '@/components/ui/text';
+import { RemainingCharactersCounter } from '@/components/ui/remaining-characters-counter';
 import {
   type ComposerSelection,
   pasteTextIntoComposer,
@@ -46,7 +46,7 @@ import {
   resolvePromptCounterRemaining,
 } from '@/components/agents/new-session-prompt-state';
 import {
-  resolveComposerTopFadeHeight,
+  resolveComposerEdgeFadeHeight,
   resolveNewSessionPromptMinHeight,
 } from '@/components/agents/new-session-prompt-fit';
 import { NewSessionPromptClone } from '@/components/agents/new-session-prompt-clone';
@@ -80,28 +80,69 @@ const PROMPT_INPUT_FONT_SIZE = 16;
 const PROMPT_INPUT_ANDROID_HORIZONTAL_INSET = 24;
 /**
  * The input's `py-2` in dp: NativeWind's native rem is 14, so the utility is
- * 7, which the design-gate dump reports as `paddingBlock: 7`. The top fade
- * starts here, at the text box, so the 1 dp band where a scrolled line is
- * clipped is covered rather than left as a hard cut.
+ * 7, which the design-gate dump reports as `paddingBlock: 7`.
  */
 const PROMPT_INPUT_VERTICAL_INSET = 7;
+/**
+ * Where a scrolled field cuts its topmost line, from the field's top. Android's
+ * EditText clips scrolled text at its padding, so the cut is at the text box.
+ * The iOS text view draws scrolled text through its padding and clips at its
+ * own bounds, so the cut is at the field's top edge.
+ */
+const PROMPT_TOP_CLIP_EDGE = Platform.OS === 'ios' ? 0 : PROMPT_INPUT_VERTICAL_INSET;
 /** A sub-pixel scroll is not a hidden line above the field. */
 const PROMPT_SCROLLED_THRESHOLD = 0.5;
 const PROMPT_INPUT_MAX_CHARS = CLOUD_AGENT_PROMPT_MAX_LENGTH;
 /** Minimum pressable size: 44pt on iOS, 48dp on Android (WCAG 2.5.8 AA). */
 const PROMPT_HIT_TARGET = Platform.OS === 'android' ? 48 : 44;
 // LinearGradient is not NativeWind-mapped; the physical style objects follow
-// the skeleton.tsx overlay pattern. The band starts at the text box, where a
-// scrolled field clips its topmost line, and its height comes from the scroll
+// the skeleton.tsx overlay pattern. The band starts at the clip edge, where a
+// scrolled field cuts its topmost line, and its height comes from the scroll
 // offset on the UI thread.
 const PROMPT_TOP_FADE_STYLE = {
   position: 'absolute',
   left: 0,
   right: 0,
-  top: PROMPT_INPUT_VERTICAL_INSET,
+  top: PROMPT_TOP_CLIP_EDGE,
 } as const;
 const PROMPT_TOP_FADE_FILL = { flex: 1 } as const;
+// The bottom band is iOS-only: the hard bottom cut was seen and the band proven
+// on iOS, while an Android emulator run never reached a state where a line is
+// cut at the text box's bottom edge. The iOS text view draws scrolled text through
+// its padding and clips at its own bounds, so the band sits at the field's
+// bottom edge. Its height comes from the scroll offset and the field's current
+// height, on the UI thread.
+const PROMPT_BOTTOM_FADE_STYLE = {
+  position: 'absolute',
+  left: 0,
+  right: 0,
+  bottom: 0,
+} as const;
+const PROMPT_BOTTOM_FADE_FILL = { flex: 1 } as const;
+/**
+ * How far past the hidden part a fade band reaches, in lines. iOS gets a quarter
+ * line, so a clipped descender or ascender fades instead of ending flat at the
+ * edge. Android gets none: its band stays at the hidden part, the rule it
+ * shipped with, because no device run proved a change there.
+ */
+const PROMPT_EDGE_FADE_RAMP_LINES = Platform.OS === 'ios' ? 0.25 : 0;
 const AnimatedPromptInput = createAnimatedComponent(RNTextInput);
+
+/**
+ * The field's rendered height at a keyboard motion progress, in points. The
+ * field grows from its keyboard-closed floor to its keyboard-open floor as the
+ * keyboard lands, so the bottom fade's cut edge moves with it.
+ */
+function resolvePromptRenderedHeight(
+  closedPromptHeight: number,
+  promptHeight: number,
+  progress: number
+): number {
+  'worklet';
+  return (
+    closedPromptHeight + (promptHeight - closedPromptHeight) * Math.max(0, Math.min(1, progress))
+  );
+}
 
 type NewSessionPromptComponentProps = NewSessionPromptProps & {
   /**
@@ -193,6 +234,8 @@ export function NewSessionPrompt({
   const isComposingRef = useRef(false);
   const abortVoiceInputRef = useRef<(() => Promise<boolean>) | null>(null);
   const promptLineHeight = NEW_SESSION_PROMPT_LINE_HEIGHT * fontScale;
+  // The band's extra reach past the hidden part, in points at this font scale.
+  const promptEdgeFadeRamp = PROMPT_EDGE_FADE_RAMP_LINES * promptLineHeight;
   // The card rows that render only in some states, read by name in the render
   // below (the measured card chrome covers their height without a static
   // budget, so they need no separate reservation here).
@@ -220,18 +263,25 @@ export function NewSessionPrompt({
   });
   const keyboardProgress = useKeyboardMotionProgress();
   const promptHeightStyle = useAnimatedStyle(() => ({
-    height:
-      closedPromptHeight +
-      (promptHeight - closedPromptHeight) * Math.max(0, Math.min(1, keyboardProgress.value)),
+    height: resolvePromptRenderedHeight(closedPromptHeight, promptHeight, keyboardProgress.value),
   }));
 
   // The draft's own laid-out height, reported by the input on every content
-  // change. The field keeps its size, so this only decides whether a vertical
-  // drag over the field scrolls the draft or the form behind it: a drag over a
-  // field whose text fits belongs to the form, exactly as it did when the field
-  // grew to its text and only scrolled once the cap stopped it.
+  // change on Android. The field keeps its size, so this only decides whether a
+  // vertical drag over the field scrolls the draft or the form behind it: a
+  // drag over a field whose text fits belongs to the form, exactly as it did
+  // when the field grew to its text and only scrolled once the cap stopped it.
+  //
+  // iOS cannot use the report: Fabric emits `onContentSizeChange` only when the
+  // field's own frame changes (`RCTTextInputComponentView` `updateLayoutMetrics`),
+  // and this field's frame does not change while the user types. The gate stayed
+  // closed, and a text view that cannot scroll never follows its caret, so the
+  // lines past the third and the caret were hidden. The iOS field always scrolls:
+  // a text view whose content fits does not take a vertical drag, so the form
+  // still gets it.
   const [contentHeight, setContentHeight] = useState(0);
-  const promptScrolls = shouldEnableComposerInputScroll(contentHeight, promptHeight);
+  const promptScrolls =
+    Platform.OS === 'ios' || shouldEnableComposerInputScroll(contentHeight, promptHeight);
   // The fade band over the clipped top line, driven from the field's scroll
   // offset. It lives in a shared value, not React state: a drag reports a frame
   // per few pixels, and this card's toolbar, attachment strip and controls are
@@ -240,12 +290,44 @@ export function NewSessionPrompt({
   // gradient is state.
   const promptScrollOffset = useSharedValue(0);
   const [promptFaded, setPromptFaded] = useState(false);
+  // The first line box starts `PROMPT_INPUT_VERTICAL_INSET` below the content's
+  // top, so the offset into the cut line is measured from the clip edge: on iOS
+  // the field scrolls through the padding before it cuts any text.
   const promptTopFadeStyle = useAnimatedStyle(() => ({
-    height: resolveComposerTopFadeHeight({
-      scrollOffset: promptScrollOffset.value,
+    height: resolveComposerEdgeFadeHeight({
+      clipEdgeOffset: Math.max(
+        0,
+        promptScrollOffset.value - (PROMPT_INPUT_VERTICAL_INSET - PROMPT_TOP_CLIP_EDGE)
+      ),
+      edge: 'top',
       lineHeight: promptLineHeight,
+      ramp: promptEdgeFadeRamp,
     }),
   }));
+  // The same band at the bottom edge, for the line a scrolled field cuts there.
+  // It covers only the part of that line still inside the field, so it cannot
+  // dim the line above it. No content height is needed: a draft that ends above
+  // that slot leaves the band over blank card, where it is invisible, which also
+  // matters because iOS cannot report the content height. The band stays
+  // mounted, and its height is 0 where the edge lands on a line boundary. Only
+  // iOS renders it.
+  const promptBottomFadeStyle = useAnimatedStyle(() => {
+    // The bottom clip edge in content coordinates: the scroll offset plus the
+    // field's rendered height, where the iOS text view clips at its own bounds.
+    // The first line box starts one inset into the content, so the edge is
+    // measured from that line box.
+    const clipEdge =
+      promptScrollOffset.value +
+      resolvePromptRenderedHeight(closedPromptHeight, promptHeight, keyboardProgress.value);
+    return {
+      height: resolveComposerEdgeFadeHeight({
+        clipEdgeOffset: Math.max(0, clipEdge - PROMPT_INPUT_VERTICAL_INSET),
+        edge: 'bottom',
+        lineHeight: promptLineHeight,
+        ramp: promptEdgeFadeRamp,
+      }),
+    };
+  });
 
   function handlePromptScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
     const next = Math.max(0, event.nativeEvent.contentOffset.y);
@@ -400,7 +482,7 @@ export function NewSessionPrompt({
       return;
     }
     if (hasAnyFailedAttachment(attachments)) {
-      toast.error(t('agentChat.composer.removeOrRetryFailed'));
+      toast.error(t('agentChat.composer.removeFailedAttachments'));
       return;
     }
     if (isAnyAttachmentUploading(attachments)) {
@@ -569,6 +651,23 @@ export function NewSessionPrompt({
               />
             </Animated.View>
           ) : null}
+          {Platform.OS === 'ios' ? (
+            <Animated.View
+              className="absolute left-0 right-0"
+              pointerEvents="none"
+              style={[PROMPT_BOTTOM_FADE_STYLE, promptBottomFadeStyle]}
+            >
+              <LinearGradient
+                // Transparent above and the card's own color at the cut edge,
+                // so the line fades into the surface under it instead of ending
+                // hard.
+                colors={[resolveAlphaColor(colors.card, 0), resolveAlphaColor(colors.card, 1)]}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+                style={PROMPT_BOTTOM_FADE_FILL}
+              />
+            </Animated.View>
+          ) : null}
         </View>
         <View
           onLayout={event => {
@@ -576,17 +675,7 @@ export function NewSessionPrompt({
           }}
         >
           {showsCounter ? (
-            <View className="flex-row justify-end px-1 pb-1">
-              {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
-              <Text
-                className="text-xs font-normal text-muted-foreground"
-                accessibilityLabel={t('agentChat.composer.charactersRemaining', {
-                  count: counterRemaining,
-                })}
-              >
-                {counterRemaining}
-              </Text>
-            </View>
+            <RemainingCharactersCounter remaining={counterRemaining} className="px-1 pb-1" />
           ) : null}
           <NewSessionPromptControls
             control={control}

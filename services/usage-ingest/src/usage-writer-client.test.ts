@@ -253,6 +253,52 @@ describe('usage writer client', () => {
     });
   });
 
+  it.each(['recorded', 'duplicate'] as const)(
+    'omits the helper acknowledgement log for a queue %s, which the consumer logs',
+    async status => {
+      const acknowledged =
+        status === 'recorded' ? result : { ...result, newMicrodollarsUsed: null };
+      fetchMock.mockResolvedValue(Response.json({ status, result: acknowledged }));
+      expect(await recordLlmUsage(usage, { ...config, source: 'queue' })).toEqual({
+        kind: status,
+        result: acknowledged,
+      });
+      expect(console.info).not.toHaveBeenCalled();
+      expect(console.warn).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([undefined, 'queue_vercel'] as const)(
+    'keeps the helper acknowledgement log for source %s',
+    async source => {
+      fetchMock.mockResolvedValue(Response.json({ status: 'recorded', result }));
+      expect(await recordLlmUsage(usage, { ...config, source })).toEqual({
+        kind: 'recorded',
+        result,
+      });
+      expect(console.info).toHaveBeenCalledExactlyOnceWith('usage writer acknowledged', {
+        usageId: usage.core.id,
+        outcome: 'recorded',
+      });
+    }
+  );
+
+  it('does not let a throwing info sink turn a queue acknowledgement into invalid_response', async () => {
+    vi.mocked(console.info).mockImplementation(() => {
+      throw new Error('info sink failed');
+    });
+    fetchMock.mockResolvedValue(Response.json({ status: 'recorded', result }));
+    expect(await recordLlmUsage(usage, { ...config, source: 'queue' })).toEqual({
+      kind: 'recorded',
+      result,
+    });
+    fetchMock.mockResolvedValue(Response.json({ status: 'recorded', result }));
+    expect(await recordLlmUsage(usage, config)).toEqual({
+      kind: 'unavailable',
+      reason: 'invalid_response',
+    });
+  });
+
   it('accepts a matching duplicate without requiring a new balance update', async () => {
     const duplicate = { ...result, newMicrodollarsUsed: null };
     fetchMock.mockResolvedValue(Response.json({ status: 'duplicate', result: duplicate }));
@@ -408,11 +454,8 @@ describe('Enkrypt usage writer client', () => {
         body: JSON.stringify(enkryptRecord),
         signal: expect.any(AbortSignal),
       });
-      expect(console.info).toHaveBeenCalledExactlyOnceWith('usage writer acknowledged', {
-        usageId: enkryptRecord.id,
-        usageKind: 'enkrypt_usage',
-        outcome: status,
-      });
+      expect(console.info).not.toHaveBeenCalled();
+      expect(console.warn).not.toHaveBeenCalled();
     }
   );
 
@@ -499,7 +542,7 @@ describe('Exa usage writer client', () => {
     source: 'queue' as const,
   };
 
-  it.each(['recorded', 'duplicate'] as const)(
+  it.each(['recorded', 'duplicate', 'rejected'] as const)(
     'posts the record unchanged and accepts a %s echo of its id',
     async status => {
       fetchMock.mockResolvedValue(Response.json({ status, usageId: exaRecord.id }));
@@ -518,16 +561,17 @@ describe('Exa usage writer client', () => {
         body: JSON.stringify(exaRecord),
         signal: expect.any(AbortSignal),
       });
-      expect(console.info).toHaveBeenCalledExactlyOnceWith('usage writer acknowledged', {
-        usageId: exaRecord.id,
-        usageKind: 'exa_usage',
-        outcome: status,
-      });
+      expect(console.info).not.toHaveBeenCalled();
+      expect(console.warn).not.toHaveBeenCalled();
     }
   );
 
   it.each([
     ['another usage id', { status: 'recorded', usageId: '7b2d3f4a-5c6e-4f7a-9b8c-0d1e2f3a4b5c' }],
+    [
+      'another usage id on a rejection',
+      { status: 'rejected', usageId: '7b2d3f4a-5c6e-4f7a-9b8c-0d1e2f3a4b5c' },
+    ],
     ['a missing usage id', { status: 'duplicate' }],
     ['an LLM acknowledgement', { status: 'recorded', result: { usageId: exaRecord.id } }],
     ['not_recorded', { status: 'not_recorded', usageId: exaRecord.id }],

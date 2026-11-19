@@ -47,6 +47,24 @@ describe('cloudPrepareFailureMessage', () => {
     );
   });
 
+  it('gives a reader who may change the plan the copy that offers the step', () => {
+    const trial = makeError('FORBIDDEN', ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
+    expect(cloudPrepareFailureMessage(trial, true)).toBe(
+      "The organization's trial has ended and it has no active plan. You can update billing, then try again."
+    );
+  });
+
+  it('keeps every other rejection on its own copy for a billing role', () => {
+    // The role decides the trial refusal's sentence and nothing else: a
+    // rejection the app explains a different way never changes with it.
+    expect(cloudPrepareFailureMessage(makeError('PAYMENT_REQUIRED', 'add credits'), true)).toBe(
+      'Not enough credits for this request. Add credits and try again.'
+    );
+    expect(cloudPrepareFailureMessage(new Error('Network request failed'), true)).toBe(
+      'Something went wrong on our end. Please try again.'
+    );
+  });
+
   it('maps the unavailable-model rejection to the model picker copy', () => {
     const model = makeError(
       'BAD_REQUEST',
@@ -138,4 +156,15 @@ describe('cloudPrepareFailureMessage', () => {
       'Something went wrong on our end. Please try again.'
     );
   });
+
+  it.each(['source_digest_changed', 'clone_setup_failed'] as const)(
+    'explains the %s clone rejection with the retry copy',
+    code => {
+      // The copy is the one the clone form already uses for a clone that did
+      // not go through; the rejection is about the copy, not the form.
+      expect(cloudPrepareFailureMessage(makeError('CONFLICT', code))).toBe(
+        "Couldn't clone this session. Try again."
+      );
+    }
+  );
 });

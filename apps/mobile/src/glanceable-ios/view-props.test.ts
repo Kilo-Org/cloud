@@ -2,8 +2,9 @@ import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
   type GlanceableSessionRow,
+  type GlanceableSnapshotStatusOverride,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { EMPTY_HOME_WIDGET_DETAILS, type HomeWidgetData } from '@kilocode/app-shared/home-widget';
+import { emptyHomeWidgetDetails, type HomeWidgetData } from '@kilocode/app-shared/home-widget';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { withStatus } from '@/lib/glanceable/publisher';
@@ -34,7 +35,7 @@ afterEach(() => {
 
 function snapshotFor(
   sessions: readonly GlanceableSessionRow[] = [],
-  status?: GlanceableAgentsSnapshot['status']
+  status?: GlanceableSnapshotStatusOverride
 ): GlanceableAgentsSnapshot {
   return buildGlanceableSnapshot({
     sessions,
@@ -88,9 +89,7 @@ describe('newestTitleFor', () => {
     // Empty offers no in-place action, so its slot stays blank rather than
     // carrying a stale title.
     setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: null });
-    expect(
-      buildGlanceableViewProps(snapshotFor([], 'empty'), {}, translate).newestTitle
-    ).toBeNull();
+    expect(buildGlanceableViewProps(snapshotFor([]), {}, translate).newestTitle).toBeNull();
   });
 });
 
@@ -139,7 +138,7 @@ describe('actions', () => {
     const snapshot = snapshotFor([PERMISSION_ROW]);
     const props = buildGlanceableViewProps(snapshot, {}, translate, {
       snapshot,
-      details: { ...EMPTY_HOME_WIDGET_DETAILS, approvalKey: 'a'.repeat(64) },
+      details: { ...emptyHomeWidgetDetails(), approvalKey: 'a'.repeat(64) },
     });
     expect(props.actions).toEqual({ approve: true, newAgent: true });
   });
@@ -208,7 +207,7 @@ describe('buildGlanceableLiveActivityContentState needsApproval', () => {
     const snapshot = snapshotFor([PERMISSION_ROW]);
     const props = buildGlanceableViewProps(snapshot, {}, translate, {
       snapshot,
-      details: { ...EMPTY_HOME_WIDGET_DETAILS, approvalKey: 'a'.repeat(64) },
+      details: { ...emptyHomeWidgetDetails(), approvalKey: 'a'.repeat(64) },
     });
     expect(props.home?.canApprove).toBe(true);
     expect(props.home?.canCreate).toBe(true);
@@ -255,7 +254,7 @@ describe('Home-only presentation and timeline', () => {
     flags => {
       const retained = {
         snapshot: snapshotFor([PERMISSION_ROW]),
-        details: { ...EMPTY_HOME_WIDGET_DETAILS, primaryTitle: 'Private title' },
+        details: { ...emptyHomeWidgetDetails(), primaryTitle: 'Private title' },
       };
       const props = buildGlanceableViewProps(retained.snapshot, flags, translate, retained, NOW);
       expect(props.home).toMatchObject({
@@ -272,7 +271,7 @@ describe('Home-only presentation and timeline', () => {
   it('turns a missed wake into Awaiting update without advancing the checked time', () => {
     const wake = new Date(NOW + 60_000).toISOString();
     const snapshot = snapshotFor([{ status: 'scheduled', scheduledAt: wake }]);
-    const data = { snapshot, details: EMPTY_HOME_WIDGET_DETAILS };
+    const data = { snapshot, details: emptyHomeWidgetDetails() };
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
     const props = toWidgetProps(buildGlanceableViewProps(snapshot, {}, translate, data, NOW));
@@ -294,6 +293,16 @@ describe('Home-only presentation and timeline', () => {
       primaryCount: 1,
       stale: true,
     });
+    // The update claim is bounded: past the retry deadline the wake stays a
+    // past instant, so the layout names the clock time that was due.
+    const afterRetry = buildGlanceableViewProps(
+      snapshot,
+      {},
+      translate,
+      data,
+      Date.parse(wake) + 16 * 60_000
+    );
+    expect(afterRetry.home).toMatchObject({ scheduledAt: wake, awaitingUpdate: false });
   });
 
   it('omits nested nulls at the UserDefaults boundary, without deleting list entries', () => {
@@ -301,7 +310,7 @@ describe('Home-only presentation and timeline', () => {
     const data = {
       snapshot,
       details: {
-        ...EMPTY_HOME_WIDGET_DETAILS,
+        ...emptyHomeWidgetDetails(),
         scheduledAgents: [{ title: 'Usage report', scheduledAt: null }],
       },
     };
@@ -316,7 +325,7 @@ describe('Home-only presentation and timeline', () => {
     const data: HomeWidgetData = {
       snapshot,
       details: {
-        ...EMPTY_HOME_WIDGET_DETAILS,
+        ...emptyHomeWidgetDetails(),
         primaryTitle: placeholder,
         waitingAgents: [{ title: placeholder, kind: 'question' }],
       },
@@ -334,7 +343,7 @@ describe('Home-only presentation and timeline', () => {
         {
           snapshot,
           details: {
-            ...EMPTY_HOME_WIDGET_DETAILS,
+            ...emptyHomeWidgetDetails(),
             waitingAgents: [{ title: 'Named wait', kind: 'question' }],
           },
         },

@@ -1,13 +1,8 @@
 import { z } from 'zod';
 
-import {
-  instanceLifecycleEventSchema,
-  scheduledActionEventSchema,
-  securityLifecyclePayloadShape,
-} from './notification-events';
-import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
+import { securityLifecyclePayloadShape } from './notification-events';
 import { nonEmptyStringSchema } from './non-empty-string';
-import { pushDataSchema, cloudAgentSessionCategorySchema } from './push-data';
+import { pushDataSchema, cloudAgentSessionRaiseShape } from './push-data';
 import { refineSpendAlertScope, spendAlertScopeShape } from './spend-alert-scope';
 
 // The pre-localized copy a producer may attach to a push.
@@ -21,7 +16,10 @@ const i18nCopyFields = {
 //
 // The suppression and failure states a push dispatch can report. Declared
 // once here; each RPC schema below adds only the states its own response can
-// carry, so a renamed or new shared state is a single edit.
+// carry, so a renamed or new shared state is a single edit. A state one
+// schema adds on top of these tuples gets the same treatment: the
+// `RATE_LIMIT_SUPPRESSED_REASON` constant below is declared once and named at
+// every use, so a rename cannot leave one RPC response behind.
 
 // Reported by every RPC that sends a push.
 const DELIVERY_OUTCOME_REASONS = [
@@ -38,30 +36,34 @@ type DeliveryOutcomeReason = (typeof DELIVERY_OUTCOME_REASONS)[number];
 const CHANNEL_DELIVERY_OUTCOME_REASONS = ['suppressed_expired', 'suppressed_access'] as const;
 type ChannelDeliveryOutcomeReason = (typeof CHANNEL_DELIVERY_OUTCOME_REASONS)[number];
 
+// Reported by the dispatch outcome and the agent-session response: a dispatch
+// attempt that fails the sliding-window rate-limit check.
+const RATE_LIMIT_SUPPRESSED_REASON = 'suppressed_rate_limit' as const;
+
+// The cloud-agent and session-ready responses report the shared
+// `suppressed_preference` as-is, spell the shared `failed` outcome
+// `dispatch_failed`, and add `missing_session`, which no dispatch reports.
+// The `satisfies` keeps the shared member tied to the vocabulary above.
+const CLOUD_AGENT_MISSING_SESSION_REASON = 'missing_session' as const;
+const CLOUD_AGENT_DISPATCH_FAILED_REASON = 'dispatch_failed' as const;
+const CLOUD_AGENT_SESSION_REASONS = [
+  CLOUD_AGENT_MISSING_SESSION_REASON,
+  CLOUD_AGENT_DISPATCH_FAILED_REASON,
+  'suppressed_preference' satisfies DeliveryOutcomeReason,
+] as const;
+
 // Discriminated-union members that carry no payload. A generic parameter keeps
 // each variant's own `kind` literal so `DispatchPushOutcome` stays discriminated.
 function payloadFreeOutcome<
   const K extends
     | Exclude<DeliveryOutcomeReason, 'failed'>
     | ChannelDeliveryOutcomeReason
-    | 'suppressed_rate_limit',
+    | typeof RATE_LIMIT_SUPPRESSED_REASON,
 >(kind: K) {
   return z.object({ kind: z.literal(kind) });
 }
 
-// ── sendPushForConversation ─────────────────────────────────────────
-
-export const sendPushForConversationInputSchema = z.object({
-  conversationId: nonEmptyStringSchema,
-  sandboxId: nonEmptyStringSchema,
-  senderUserId: z.union([nonEmptyStringSchema, z.null()]),
-  recipientUserIds: z.array(nonEmptyStringSchema).min(1),
-  title: z.string().max(200),
-  bodyPreview: z.string().max(200),
-  messageId: nonEmptyStringSchema,
-  ...i18nCopyFields,
-});
-export type SendPushForConversationInput = z.infer<typeof sendPushForConversationInputSchema>;
+// ── per-recipient delivery result ────────────────────────────────────
 
 export const perRecipientOutcomeSchema = z.enum([
   'delivered',
@@ -71,7 +73,7 @@ export const perRecipientOutcomeSchema = z.enum([
 export type PerRecipientOutcome = z.infer<typeof perRecipientOutcomeSchema>;
 
 export const perRecipientResultSchema = z.object({
-  userId: z.string(),
+  userId: nonEmptyStringSchema,
   outcome: perRecipientOutcomeSchema,
   // Stable, content-free failure classification (e.g. 'expo_ticket_rejected'),
   // populated by the internal dispatch path for `failed` outcomes. Optional:
@@ -80,19 +82,23 @@ export const perRecipientResultSchema = z.object({
 });
 export type PerRecipientResult = z.infer<typeof perRecipientResultSchema>;
 
-export const sendPushForConversationOutputSchema = z.object({
+/** The internal `/internal/v1/dispatch` endpoint's per-recipient breakdown. */
+export const internalDispatchResponseSchema = z.object({
   perRecipient: z.array(perRecipientResultSchema),
 });
-export type SendPushForConversationOutput = z.infer<typeof sendPushForConversationOutputSchema>;
+export type InternalDispatchResponse = z.infer<typeof internalDispatchResponseSchema>;
 
 // ── badge HTTP routes ───────────────────────────────────────────────
 
 export const badgeBucketSchema = nonEmptyStringSchema;
 export type BadgeBucket = z.infer<typeof badgeBucketSchema>;
 
+/** The count every badge route reports: a whole, never-negative number. */
+const badgeCountSchema = z.number().int().nonnegative();
+
 export const badgeCountRowSchema = z.object({
   badgeBucket: badgeBucketSchema,
-  badgeCount: z.number().int().nonnegative(),
+  badgeCount: badgeCountSchema,
 });
 export type BadgeCountRow = z.infer<typeof badgeCountRowSchema>;
 
@@ -107,7 +113,7 @@ export const markBadgeReadInputSchema = z.object({
 export type MarkBadgeReadInput = z.infer<typeof markBadgeReadInputSchema>;
 
 export const markBadgeReadResponseSchema = z.object({
-  badgeCount: z.number().int().nonnegative(),
+  badgeCount: badgeCountSchema,
 });
 export type MarkBadgeReadResponse = z.infer<typeof markBadgeReadResponseSchema>;
 
@@ -119,56 +125,6 @@ export type ClearBadgeBucketForUserInput = z.infer<typeof clearBadgeBucketForUse
 
 export const clearBadgeBucketForUserOutputSchema = markBadgeReadResponseSchema;
 export type ClearBadgeBucketForUserOutput = z.infer<typeof clearBadgeBucketForUserOutputSchema>;
-
-// ── sendInstanceLifecycleNotification ───────────────────────────────
-
-export const sendInstanceLifecycleNotificationInputSchema = z.object({
-  userId: nonEmptyStringSchema,
-  sandboxId: nonEmptyStringSchema,
-  event: instanceLifecycleEventSchema,
-  instanceName: z.string().nullable(),
-  errorMessage: z.string().optional(),
-});
-export type SendInstanceLifecycleNotificationParams = z.infer<
-  typeof sendInstanceLifecycleNotificationInputSchema
->;
-
-// Per-token delivery counters. Both send RPCs report the same tally, so it is
-// declared once here and each result adds only the field that RPC owns.
-const sendCountersSchema = z.object({
-  tokenCount: z.number().int().nonnegative(),
-  sent: z.number().int().nonnegative(),
-  staleTokens: z.number().int().nonnegative(),
-  receiptCount: z.number().int().nonnegative(),
-  suppressedByPreference: z.boolean().optional(),
-});
-
-export const sendInstanceLifecycleNotificationOutputSchema = sendCountersSchema.extend({
-  ticketErrors: z.object({
-    total: z.number().int().nonnegative(),
-    retryable: z.number().int().nonnegative(),
-    terminal: z.number().int().nonnegative(),
-  }),
-});
-export type SendInstanceLifecycleNotificationResult = z.infer<
-  typeof sendInstanceLifecycleNotificationOutputSchema
->;
-
-// ── sendScheduledActionNotice ─────────────────────────────────────────
-
-export const sendScheduledActionNoticeInputSchema = z.object({
-  userId: nonEmptyStringSchema,
-  instanceId: nonEmptyStringSchema,
-  sandboxId: nonEmptyStringSchema,
-  event: scheduledActionEventSchema,
-  instanceName: z.string().nullable(),
-  scheduledAt: z.string(),
-  targetImageTag: z.string().nullable().optional(),
-});
-export type SendScheduledActionNoticeParams = z.infer<typeof sendScheduledActionNoticeInputSchema>;
-
-export const sendScheduledActionNoticeOutputSchema = sendCountersSchema;
-export type SendScheduledActionNoticeResult = z.infer<typeof sendScheduledActionNoticeOutputSchema>;
 
 // ── sendCloudAgentSessionNotification ───────────────────────────────
 
@@ -182,12 +138,7 @@ export const sendCloudAgentSessionNotificationInputSchema = z.object({
   status: cloudAgentSessionPushStatusSchema,
   body: z.string(),
   suppressIfViewingSession: z.boolean().optional(),
-  // Absent category is treated as 'status' at the enforcement read site.
-  category: cloudAgentSessionCategorySchema.optional(),
-  // Needs-input raise detail: which answer the waiting agent wants, and the PR
-  // that can be opened from the notification. Absent on status pushes.
-  attentionKind: z.enum(NEEDS_INPUT_ATTENTION_KINDS).optional(),
-  prUrl: nonEmptyStringSchema.optional(),
+  ...cloudAgentSessionRaiseShape,
   ...i18nCopyFields,
 });
 export type SendCloudAgentSessionNotificationParams = z.infer<
@@ -196,14 +147,20 @@ export type SendCloudAgentSessionNotificationParams = z.infer<
 
 export const sendCloudAgentSessionNotificationOutputSchema = z.object({
   dispatched: z.boolean(),
-  reason: z.enum(['missing_session', 'dispatch_failed', 'suppressed_preference']).optional(),
+  reason: z.enum(CLOUD_AGENT_SESSION_REASONS).optional(),
 });
 export type SendCloudAgentSessionNotificationResult = z.infer<
   typeof sendCloudAgentSessionNotificationOutputSchema
 >;
 
 // Aggregate refreshes carry identity only; the server reads current status and scope.
-export const refreshGlanceableSessionsInputSchema = z.object({
+
+/**
+ * The shape both the schema and the subset rule below read, so dropping or
+ * renaming a hint list fails to compile in the rule instead of silently
+ * turning it into a no-op.
+ */
+const refreshGlanceableSessionsInputShape = z.object({
   userId: nonEmptyStringSchema,
   cliSessionIds: z.array(nonEmptyStringSchema).min(1),
   /**
@@ -227,6 +184,38 @@ export const refreshGlanceableSessionsInputSchema = z.object({
    */
   cardFollowSessionIds: z.array(nonEmptyStringSchema).optional(),
 });
+
+/**
+ * Both hint lists name sessions the refresh already carries. An id outside
+ * `cliSessionIds` names no session in this batch, and the server resolves such
+ * an id to the personal scope, so an out-of-batch approval hint would exempt
+ * the wrong scope from the delivery window. Reject it instead of acting on it.
+ * Omitted lists parse as before, and duplicates stay allowed (the server
+ * treats each list as a set).
+ */
+function refineRefreshSessionSubset(
+  data: z.infer<typeof refreshGlanceableSessionsInputShape>,
+  ctx: z.RefinementCtx
+): void {
+  const batch = new Set(data.cliSessionIds);
+  const hintFields = ['approvalChangedSessionIds', 'cardFollowSessionIds'] as const;
+  for (const field of hintFields) {
+    const ids = data[field];
+    if (!ids) continue;
+    ids.forEach((id, index) => {
+      if (batch.has(id)) return;
+      ctx.addIssue({
+        code: 'custom',
+        path: [field, index],
+        message: 'each entry must name a session in cliSessionIds',
+      });
+    });
+  }
+}
+
+export const refreshGlanceableSessionsInputSchema = refreshGlanceableSessionsInputShape.superRefine(
+  refineRefreshSessionSubset
+);
 export type RefreshGlanceableSessionsParams = z.infer<typeof refreshGlanceableSessionsInputSchema>;
 
 // ── glanceable scope refresh (POST /internal/v1/glanceable-refresh) ──
@@ -280,7 +269,7 @@ export type SendAgentSessionNotificationParams = z.infer<
 export const sendAgentSessionNotificationReasonSchema = z.enum([
   'not_found',
   ...DELIVERY_OUTCOME_REASONS,
-  'suppressed_rate_limit',
+  RATE_LIMIT_SUPPRESSED_REASON,
 ]);
 export type SendAgentSessionNotificationReason = z.infer<
   typeof sendAgentSessionNotificationReasonSchema
@@ -337,7 +326,7 @@ export type DispatchPushInput = z.infer<typeof dispatchPushInputSchema>;
 export const dispatchPushOutcomeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('delivered'), tokenCount: z.number().int().nonnegative() }),
   payloadFreeOutcome('suppressed_presence'),
-  payloadFreeOutcome('suppressed_rate_limit'),
+  payloadFreeOutcome(RATE_LIMIT_SUPPRESSED_REASON),
   payloadFreeOutcome('suppressed_preference'),
   payloadFreeOutcome('suppressed_expired'),
   payloadFreeOutcome('suppressed_access'),
@@ -346,6 +335,25 @@ export const dispatchPushOutcomeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('failed'), error: z.string() }),
 ]);
 export type DispatchPushOutcome = z.infer<typeof dispatchPushOutcomeSchema>;
+
+/**
+ * The dispatch outcome's discriminator set is the shared delivery vocabulary
+ * plus `delivered`, and nothing else. The builder above catches a reason
+ * renamed in the tuples; this catches one dropped from or added to the union,
+ * so the hand-written member list above cannot drift from that vocabulary.
+ */
+type SameUnion<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
+type AssertTrue<T extends true> = T;
+export type _AssertDispatchPushOutcomeVocabulary = AssertTrue<
+  SameUnion<
+    DispatchPushOutcome['kind'],
+    | 'delivered'
+    | DeliveryOutcomeReason
+    | ChannelDeliveryOutcomeReason
+    | typeof RATE_LIMIT_SUPPRESSED_REASON
+  >
+>;
 
 // ── internal dispatch (POST /internal/v1/dispatch) ─────────────────
 

@@ -1,9 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { i18n } from '@/i18n';
-import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { type InvitedOrgMember } from '@/lib/hooks/use-organization-queries';
-import { knownServerErrorMessage } from '@/lib/server-error-copy';
+import { announceTrialRefusal } from '@/lib/refusal-toast';
+import { isTrialExpiredRefusal, knownServerErrorMessage } from '@/lib/server-error-copy';
+import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 /**
@@ -75,11 +76,14 @@ export function invitedMemberActionOptions(
  * `trpcClient.organizations.members.resendInvite` and re-fetches the member
  * list on success. A failure is announced in localized copy: the server's own
  * sentence is English-only, and no part of a rejected request belongs on a
- * translated screen.
+ * translated screen. A plan refusal names the reader's own step when that
+ * reader may change the plan, and the toast carries it as the toast's action.
  */
 export function useResendInvite(organizationId: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const canManageBilling = useCanManageBilling(organizationId);
+  const billingAction = useBillingAction(organizationId);
   return useMutation({
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (input: { inviteId: string }) =>
@@ -90,8 +94,11 @@ export function useResendInvite(organizationId: string) {
       });
     },
     onError: (error: unknown) => {
-      announcingToast.error(
-        knownServerErrorMessage(error) ?? i18n.t('organization.members.resendInviteError')
+      announceTrialRefusal(
+        knownServerErrorMessage(error, canManageBilling) ??
+          i18n.t('organization.members.resendInviteError'),
+        billingAction,
+        isTrialExpiredRefusal(error)
       );
     },
   });

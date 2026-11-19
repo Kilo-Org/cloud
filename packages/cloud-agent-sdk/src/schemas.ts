@@ -19,6 +19,10 @@ export const cloudWorktreeChangesReadyDataSchema = z
   .object({ revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) })
   .strict();
 
+export const cloudWorkspaceArtifactsChangedDataSchema = z
+  .object({ revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) })
+  .strict();
+
 export const streamErrorSchema = z.object({
   type: z.literal('error'),
   code: z.enum([
@@ -376,6 +380,18 @@ export const PREPARATION_MAX_MESSAGE_LENGTH = 16_384;
 export const PREPARATION_MAX_SETUP_LOG_ENTRIES = 100;
 export const PREPARATION_MAX_ATTEMPTS = 10;
 export const PREPARATION_MAX_STEPS = 100;
+
+/**
+ * Most autocommit rows service state retains. Sized above the turn count of
+ * `RETAINED_MESSAGE_WINDOW` (session-manager.ts) so a commit card of a visible
+ * turn keeps its record, with headroom for a turn that commits more than one
+ * repository.
+ *
+ * This bounds the retained rows only. The seen-identity set keeps one short
+ * identity per commit for the life of the session: dropping an identity would
+ * let a replayed, already-trimmed commit re-enter the list at its tail.
+ */
+export const SESSION_MAX_COMMITS = 256;
 
 /** Most message IDs a `session.queue.changed` snapshot may carry. */
 export const SESSION_QUEUE_MAX_IDS = 1_000;

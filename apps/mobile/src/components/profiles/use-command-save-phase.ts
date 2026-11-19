@@ -74,10 +74,17 @@ export function useCommandSavePhase(owner: SaveOwner, runners: SaveRunners): Com
           ? runners.create(intent.payload)
           : runners.update(intent.target.id, intent.payload));
       } catch (error) {
-        const failure: KiloCommandSaveFailure =
-          readTrpcErrorField(error, 'code') === 'CONFLICT'
-            ? { kind: 'name-conflict' }
-            : { kind: 'refused' };
+        const code = readTrpcErrorField(error, 'code');
+        // The create path raises PRECONDITION_FAILED only for the per-profile
+        // command cap: ownership answers NOT_FOUND, organization access answers
+        // UNAUTHORIZED, the name index answers CONFLICT, and input validation
+        // answers BAD_REQUEST. Update has no cap, so it never maps this kind.
+        let failure: KiloCommandSaveFailure = { kind: 'refused' };
+        if (intent.kind === 'create' && code === 'PRECONDITION_FAILED') {
+          failure = { kind: 'limit' };
+        } else if (code === 'CONFLICT') {
+          failure = { kind: 'name-conflict' };
+        }
         // A refusal belongs to the form that sent it: once a later open or a
         // close replaced that form, publishing would show the error on a form
         // that never sent the save.

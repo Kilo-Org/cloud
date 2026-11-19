@@ -15,6 +15,11 @@
  * `succeeded` is kept because a surface may show a completed outcome that
  * persists. A surface whose success renders as its own new state (a cleared
  * field, fresh rows, a dismissed sheet) calls `attempt.abandon()` instead.
+ *
+ * `abandon()` removes the key's entry. `succeed()` and `fail()` keep it until
+ * the next `begin()` for that key or until the surface unmounts; `clearWhere`
+ * retires only a failure. A failure nothing on the surface renders (a toast
+ * already reports it) settles with `abandon()`.
  */
 export type SurfaceFailure = { readonly kind: string };
 
@@ -206,4 +211,23 @@ export function createSurfaceFeedbackStore<
   }
 
   return { begin, reset, clearWhere, invalidateAll, subscribe, getSnapshot };
+}
+
+/**
+ * Ride one admitted attempt on a save's promise: released the moment the save
+ * settles, whatever its outcome, so a refused save can be retried with the
+ * same control. The rejection is swallowed here because the caller owns the
+ * failure copy the surface renders; this helper only owns the admission.
+ */
+export async function settleSaveAttempt<Failure extends SurfaceFailure>(
+  attempt: SurfaceAttempt<Failure>,
+  save: () => Promise<void>
+): Promise<void> {
+  try {
+    await save();
+  } catch {
+    // The caller's failure copy already covers the refusal.
+  } finally {
+    attempt.abandon();
+  }
 }

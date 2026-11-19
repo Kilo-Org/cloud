@@ -1,5 +1,5 @@
 import type { Part } from '@kilocode/app-shared/opencode';
-import type { MessageInfo } from '../types';
+import type { MessageInfo, ReadonlyPart } from '../types';
 
 /**
  * Storage for a single cloud agent session.
@@ -23,11 +23,26 @@ type SessionStorage = {
    */
   applyPartDelta(messageId: string, partId: string, field: string, delta: string): void;
   deletePart(messageId: string, partId: string): void;
-  getParts(messageId: string): readonly Part[];
+  getParts(messageId: string): readonly ReadonlyPart[];
+  /**
+   * Look up one stored part by id inside the message. Reading several parts in
+   * one pass is `getParts`; this call must answer from the stored parts
+   * without rebuilding the `getParts` snapshot. Seeing the deltas
+   * `applyPartDelta` already accepted is required, matching `getParts`. The
+   * returned view aliases storage, including nested values inside the part:
+   * copy a field before writing it elsewhere.
+   */
+  getPart(messageId: string, partId: string): ReadonlyPart | undefined;
+  /**
+   * Ids of the message's stored parts in storage order, without rebuilding the
+   * `getParts` snapshot. The array is a copy, safe to iterate while storage
+   * mutates. Same visibility of already accepted deltas as `getParts`.
+   */
+  getPartIds(messageId: string): readonly string[];
 
-  // Granular subscriptions
-  // Keys: "messageIds", "message:{id}", "parts:{messageId}"
-  subscribe(key: string, callback: () => void): () => void;
+  // Granular subscriptions. Channels: "messageIds", "message:{id}",
+  // "parts:{messageId}" (`SessionSubscriptionKey`).
+  subscribe(key: SessionSubscriptionKey, callback: () => void): () => void;
 
   // Bulk operations
   clear(): void;
@@ -35,6 +50,9 @@ type SessionStorage = {
   // Delete a message and all its parts
   deleteMessage(messageId: string): void;
 };
+
+/** Channel of a granular storage subscription. */
+type SessionSubscriptionKey = 'messageIds' | `message:${string}` | `parts:${string}`;
 
 /**
  * Storage mutation — the output of the reducer.
@@ -47,4 +65,4 @@ type StorageMutation =
   | { type: 'delete_part'; messageId: string; partId: string }
   | { type: 'delete_message'; messageId: string };
 
-export type { SessionStorage, StorageMutation };
+export type { SessionStorage, SessionSubscriptionKey, StorageMutation };

@@ -46,7 +46,7 @@ describe('adminPreferredProviderOrderRouter', () => {
   it('stores, updates, and clears the config without touching other columns', async () => {
     const preferredModels = { models: ['provider/model-a'] };
     await db.insert(ai_gateway_config).values({
-      config: { vercel_routing_enabled: false },
+      config: { vercel_routing_opt_out_models: [] },
       preferred_models: preferredModels,
     });
     const caller = await createCallerForUser(admin.id);
@@ -63,7 +63,7 @@ describe('adminPreferredProviderOrderRouter', () => {
 
     const [row] = await db.select().from(ai_gateway_config);
     expect(row).toMatchObject({
-      config: { vercel_routing_enabled: false },
+      config: { vercel_routing_opt_out_models: [] },
       preferred_models: preferredModels,
     });
   });
@@ -88,6 +88,7 @@ describe('adminPreferredProviderOrderRouter', () => {
         preferred_models: null,
         unavailable_models: null,
         vercel_model_id_overrides: null,
+        latest_alias_targets: null,
         preferred_provider_order: config,
         custom_pricing: null,
       },

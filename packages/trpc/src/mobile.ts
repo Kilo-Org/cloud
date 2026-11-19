@@ -7,6 +7,7 @@ import { todosRouter } from '@/routers/todos-router';
 import { cloudAgentNextRouter } from '@/routers/cloud-agent-next-router';
 import { cloudAgentSettingsRouter } from '@/routers/cloud-agent-settings-router';
 import { cloudEnvironmentsRouter } from '@/routers/cloud-environments-router';
+import { appShellRouter } from '@/routers/app-shell-router';
 import { githubAppsRouter } from '@/routers/github-apps-router';
 import { platformIntegrationsRouter } from '@/routers/platform-integrations-router';
 import { slackRouter } from '@/routers/slack-router';
@@ -33,6 +34,7 @@ import { agentProfilesMobileRouter } from './agent-profiles-mobile';
 import { usageAnalyticsRouter } from '@/routers/usage-analytics-router';
 import { byokRouter } from '@/routers/byok-router';
 import { userExportsRouter } from '@/routers/user-exports-router';
+import { webhookTriggersRouter } from '@/routers/webhook-triggers-router';
 
 /**
  * Mobile-scoped tRPC router. Composes only the namespaces the mobile app
@@ -50,6 +52,7 @@ const mobileRouter = createTRPCRouter({
   cloudAgentSettings: cloudAgentSettingsRouter,
   cloudEnvironments: cloudEnvironmentsRouter,
   githubApps: githubAppsRouter,
+  appShell: appShellRouter,
   platformIntegrations: platformIntegrationsRouter,
   slack: slackRouter,
   linear: linearRouter,
@@ -75,6 +78,10 @@ const mobileRouter = createTRPCRouter({
   usageAnalytics: usageAnalyticsRouter,
   byok: byokRouter,
   userExports: userExportsRouter,
+  // Cloud Agent webhook/scheduled triggers. The procedures keep the server-side
+  // `baseProcedure` auth and their own `ensureOrganizationAccess` checks; this
+  // mount only exposes them to the mobile client.
+  webhookTriggers: webhookTriggersRouter,
 });
 
 export type MobileRouter = typeof mobileRouter;

@@ -26,9 +26,14 @@ export type AndroidWidgetHomeCopy = {
   emptyShort: string;
   /** The agent the count is about; an untitled agent reads `common.agent`. */
   title: string | null;
-  /** "Next run <time>", or "Awaiting update" once the wake has passed. */
+  /** "Next run <time>", "Awaiting update" inside the retry window, then "Was due <time>". */
   wake: string | null;
-  wakeOverdue: boolean;
+  /**
+   * True when the wake line states a wake that is already behind us — the
+   * retry window, then the overdue time. A passed wake is secondary
+   * information, so the line draws muted; only a future wake draws in ink.
+   */
+  wakePassed: boolean;
   /** "Checked <time>", or "Last known · <time>" when the data is stale. */
   footer: string | null;
   /** "Approving…" or "Could not approve" while an approve press is in flight or failed. */
@@ -58,18 +63,35 @@ const ACTION_FEEDBACK_KEYS = {
   couldNotApprove: 'glanceable.couldNotApprove',
 } as const;
 
+/**
+ * The card's wake line, and whether it states a wake already behind us. One
+ * read of the clock decides both, so the copy and its muted ink cannot
+ * disagree about which case the line draws.
+ */
 function wakeLine(
   home: HomeWidgetPresentation,
   translate: (key: string) => string,
   formatClock: GlanceableClockFormat
-): string | null {
+): { value: string; passed: boolean } | null {
   if (home.awaitingUpdate) {
-    return translate('glanceable.awaitingUpdate');
+    return { value: translate('glanceable.awaitingUpdate'), passed: true };
   }
   if (home.scheduledAt === null) {
     return null;
   }
-  return `${translate('glanceable.nextRun')} ${formatClock(home.scheduledAt)}`;
+  // The retry window has closed, so the card names the clock time it waited
+  // for instead of repeating the footer's checked time.
+  const due = parseTimestamp(home.scheduledAt).getTime();
+  if (Number.isFinite(due) && due <= Date.now()) {
+    return {
+      value: `${translate('glanceable.wasDue')} ${formatClock(home.scheduledAt)}`,
+      passed: true,
+    };
+  }
+  return {
+    value: `${translate('glanceable.nextRun')} ${formatClock(home.scheduledAt)}`,
+    passed: false,
+  };
 }
 
 function scheduledAgentTime(
@@ -153,8 +175,8 @@ export function buildAndroidHomeCopy(
     status,
     emptyShort: translate('glanceable.empty'),
     title,
-    wake,
-    wakeOverdue: home.awaitingUpdate,
+    wake: wake?.value ?? null,
+    wakePassed: wake?.passed ?? false,
     footer,
     actionLine,
     approveFailed: translate('glanceable.approveFailed'),
@@ -175,7 +197,7 @@ export function buildAndroidHomeCopy(
     accessibilityLabel: [
       status,
       ...counts,
-      actionLine ?? wake ?? title,
+      actionLine ?? wake?.value ?? title,
       footer,
       translate('glanceable.openAgents'),
     ]

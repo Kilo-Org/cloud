@@ -3,29 +3,37 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { ENV_KEYS } from '../src/lib/env-keys.js';
-import { SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS } from '../src/lib/android-notification-channels.js';
+import {
+  CREATED_ANDROID_NOTIFICATION_CHANNEL_IDS,
+  SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS,
+} from '../src/lib/android-notification-channels.js';
 
 // Contract values mirrored from app.config.ts (bundle id, package, scheme,
 // orientation, associated domain, blocked and requested permissions, and
-// Sentry plugin). ENV_KEYS is imported live from src/lib/env-keys.js, and
-// the silent channel list from src/lib/android-notification-channels.js. The
-// script runs the full evaluated config, so these must match the resolved
-// build-time output, not the raw app.config.ts source.
+// Sentry plugin). ENV_KEYS is imported live from src/lib/env-keys.js, and the
+// silent and created channel lists from
+// src/lib/android-notification-channels.js. The script runs the full evaluated
+// config, so these must match the resolved build-time output, not the raw
+// app.config.ts source.
 const BUNDLE_IDENTIFIER = 'com.kilocode.kiloapp';
 const ANDROID_PACKAGE = 'com.kilocode.kiloapp';
 const SCHEME = 'kiloapp';
-const ASSOCIATED_DOMAIN = 'applinks:app.kilo.ai';
+// The one host this app claims on the web. The universal-link claim, the
+// passkey relying-party claim and the Expo Head origin below derive from it, so
+// the three forms cannot name different hosts.
+const APP_HOST = 'app.kilo.ai';
+const ASSOCIATED_DOMAIN = `applinks:${APP_HOST}`;
 // The passkey relying-party claim on iOS. The claim is split by platform: iOS
 // carries its half here (the Associated Domains entitlement the platform
 // authenticator reads), Android carries its half in the served Digital Asset
 // Links file, whose `delegate_permission/common.get_login_creds` relation
 // apps/web/src/lib/app-site-association.test.ts pins. Both halves name the one
 // relying-party host, app.kilo.ai.
-const PASSKEY_ASSOCIATED_DOMAIN = 'webcredentials:app.kilo.ai';
+const PASSKEY_ASSOCIATED_DOMAIN = `webcredentials:${APP_HOST}`;
 // Expo Head's handoff origin (extra.router.headOrigin). It is the origin of
 // ASSOCIATED_DOMAIN above: the session link the app advertises and the
 // universal link the app claims have to be the same URL.
-const HEAD_ORIGIN = 'https://app.kilo.ai';
+const HEAD_ORIGIN = `https://${APP_HOST}`;
 // Time Sensitive Notifications capability: the iOS half of the needs-input
 // raise's `interruptionLevel: 'timeSensitive'` break-through contract.
 const TIME_SENSITIVE_ENTITLEMENT = 'com.apple.developer.usernotifications.time-sensitive';
@@ -46,9 +54,11 @@ const BUILD_PROPERTIES_PLUGIN = 'expo-build-properties';
 const NOTIFICATIONS_PLUGIN = 'expo-notifications';
 // The Android channel Firebase falls back to when an FCM message omits
 // `channel_id`, mirrored from app.config.ts. It must be a channel the app
-// creates (src/lib/notifications.ts), or Android drops the fallback push, and
-// it must be created with sound: the fallback carries needs-input/chat alerts,
-// so the silent progress channel must never be named here.
+// creates — CREATED_ANDROID_NOTIFICATION_CHANNEL_IDS in
+// src/lib/android-notification-channels.js, which src/lib/notifications.ts
+// builds its writer from — or Android drops the fallback push, and it must be
+// created with sound: the fallback carries needs-input/chat alerts, so the
+// silent progress channel must never be named here.
 const ANDROID_DEFAULT_NOTIFICATION_CHANNEL = 'needs-input';
 // expo-task-manager instantiates its headless app loader by name from
 // AndroidManifest metadata. R8 does not keep it (its `@DoNotStrip` is on the
@@ -155,6 +165,10 @@ function check(condition, message) {
   }
 }
 
+/** True when `actual` holds exactly the members of `expected`, in any order. */
+const sameMembers = (actual, expected) =>
+  actual.length === expected.length && expected.every(value => actual.includes(value));
+
 check(
   config.ios?.bundleIdentifier === BUNDLE_IDENTIFIER,
   `ios.bundleIdentifier must be "${BUNDLE_IDENTIFIER}"`
@@ -187,9 +201,7 @@ check(
 // browser request falls through to the manifest response instead.
 const PLATFORMS = ['ios', 'android'];
 check(
-  Array.isArray(config.platforms) &&
-    config.platforms.length === PLATFORMS.length &&
-    PLATFORMS.every(platform => config.platforms.includes(platform)),
+  Array.isArray(config.platforms) && sameMembers(config.platforms, PLATFORMS),
   `platforms must be exactly [${PLATFORMS.join(', ')}] (web is not a product target; it bundles an unsupported platform and logs a Metro resolve error into the app console)`
 );
 
@@ -221,11 +233,8 @@ check(
 );
 
 const blockedPermissions = config.android?.blockedPermissions ?? [];
-const blockedPermissionsMatch =
-  blockedPermissions.length === BLOCKED_PERMISSIONS.length &&
-  BLOCKED_PERMISSIONS.every(permission => blockedPermissions.includes(permission));
 check(
-  blockedPermissionsMatch,
+  sameMembers(blockedPermissions, BLOCKED_PERMISSIONS),
   `android.blockedPermissions must equal exactly [${BLOCKED_PERMISSIONS.join(', ')}]`
 );
 
@@ -253,11 +262,14 @@ check(
   'ios.infoPlist.CFBundleLocalizations must list the supported language tags'
 );
 // Exact tags, not a count: swapping one tag for another keeps the length equal
-// while dropping one language's prompts and checking another's.
+// while dropping one language's prompts and checking another's. The two filters
+// only name the offending tags in the failure message. The comparison itself
+// runs on the distinct tags, because a repeat names no extra language: the
+// assertion asks which languages are named, not how often.
 const unlocalizedTags = localeTags.filter(tag => !localizations.includes(tag));
 const unlistedTags = localizations.filter(tag => !localeTags.includes(tag));
 check(
-  unlocalizedTags.length === 0 && unlistedTags.length === 0,
+  sameMembers([...new Set(localizations)], localeTags),
   `ios.infoPlist.CFBundleLocalizations must name exactly the top-level locales tags (without a CFBundleLocalization: [${unlocalizedTags.join(', ')}]; without a locales entry: [${unlistedTags.join(', ')}])`
 );
 for (const tag of localizations) {
@@ -289,8 +301,12 @@ const pluginEntries = (config.plugins ?? []).map(plugin =>
     : { name: plugin, options: undefined }
 );
 const pluginNames = pluginEntries.map(entry => entry.name);
-/** The first entry for a plugin name, with the options it was configured with. */
-const pluginEntry = name => pluginEntries.find(entry => entry.name === name);
+/** The sole entry for a plugin name; a duplicate registration is a failure. */
+const pluginEntry = name => {
+  const entries = pluginEntries.filter(entry => entry.name === name);
+  check(entries.length === 1, `plugins must include exactly one "${name}"`);
+  return entries.length === 1 ? entries[0] : undefined;
+};
 for (const { name, reason } of REQUIRED_PLUGINS) {
   check(pluginNames.includes(name), `plugins must include "${name}": ${reason}`);
 }
@@ -301,14 +317,12 @@ check(
   sentryPlugin?.options?.experimental_android?.enableAndroidGradlePlugin === true,
   `"${SENTRY_PLUGIN}" must set experimental_android.enableAndroidGradlePlugin`
 );
-const splashEntries = pluginEntries.filter(entry => entry.name === BRANDED_SPLASH_PLUGIN);
-check(splashEntries.length === 1, `plugins must include exactly one "${BRANDED_SPLASH_PLUGIN}"`);
+const splashOptions = pluginEntry(BRANDED_SPLASH_PLUGIN)?.options;
 check(
   !pluginNames.includes('expo-splash-screen') &&
     !pluginNames.includes('./plugins/withAndroidSplashWindowBackground'),
   'the shared branded splash must own native splash registration and mod ordering'
 );
-const splashOptions = splashEntries[0]?.options;
 check(
   splashOptions?.image === './assets/images/logo-mark.png' &&
     splashOptions.backgroundColor === '#FFDD00' &&
@@ -389,13 +403,20 @@ check(
   !SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS.includes(ANDROID_DEFAULT_NOTIFICATION_CHANNEL),
   `the FCM default channel must not be silent (${SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS.join(', ')})`
 );
+// Android drops a push addressed to a channel the app never created, so the
+// fallback has to name one the writer sets up.
+check(
+  CREATED_ANDROID_NOTIFICATION_CHANNEL_IDS.includes(ANDROID_DEFAULT_NOTIFICATION_CHANNEL),
+  `the FCM default channel must be a channel the app creates (${CREATED_ANDROID_NOTIFICATION_CHANNEL_IDS.join(', ')})`
+);
 
 const extra = config.extra ?? {};
 for (const key of Object.keys(ENV_KEYS)) {
   const value = extra[key];
-  if (value === undefined || value === null || value === '') {
-    failures.push(`extra.${key} must be present and non-empty`);
-  }
+  check(
+    value !== undefined && value !== null && value !== '',
+    `extra.${key} must be present and non-empty`
+  );
 }
 
 // Admission contract: the server issues native credentials only to an attested

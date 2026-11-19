@@ -16,6 +16,7 @@ import type { Env } from './types.js';
 export { SandboxContainment, SandboxSmallContainment } from './legacy-runtime-tombstones.js';
 export { SandboxControlV2 as SandboxControl } from './control-plane/sandbox/sandbox-do.js';
 export { SandboxSessionV2 as SandboxSession } from './control-plane/session/session-do.js';
+export { CloudAgentWorkspaceDO as CloudAgentWorkspace } from './control-plane/workspace/workspace-do.js';
 export { SandboxContainers } from './sandbox-containers/SandboxContainers.js';
 export { ContainersOutbound } from './sandbox-containers/containers-outbound.js';
 export { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
@@ -36,10 +37,10 @@ export default {
     }
     return production.fetch(request, env, ctx);
   },
-  async queue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
-    return production.queue(batch, env);
+  async queue(batch: MessageBatch<unknown>, env: Env, ctx: ExecutionContext): Promise<void> {
+    return production.queue(batch, env, ctx);
   },
-  async scheduled(controller: ScheduledController, env: Env): Promise<void> {
-    return production.scheduled(controller, env);
+  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    return production.scheduled(controller, env, ctx);
   },
 };

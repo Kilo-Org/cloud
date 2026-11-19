@@ -46,6 +46,13 @@ export type StartAgentInput = {
   model?: string;
   variant?: string;
   organizationId?: string;
+  /**
+   * Whether the in-app caller's reader may change the organization's plan. The
+   * refusal's copy and the step the caller's toast offers must describe one
+   * reader, so the caller that resolves the role passes it here; the OS
+   * surfaces carry no organization and leave it.
+   */
+  canManageBilling?: boolean;
   /** A repository value already prepared for the session start. */
   resolvedRepository?: NewSessionRepository;
 };
@@ -118,6 +125,9 @@ export async function startAgent(input: StartAgentInput): Promise<AppActionResul
         rotateKey: () => {
           runtime.rotateKey();
         },
+        ...(input.canManageBilling === undefined
+          ? {}
+          : { canManageBilling: input.canManageBilling }),
         ...runtime.createOutbox(userId),
       }
     );
@@ -127,15 +137,22 @@ export async function startAgent(input: StartAgentInput): Promise<AppActionResul
     if (outcome.reason === 'outbox-unreadable') {
       return retryableStartFailure();
     }
-    return outcome.retryable
-      ? retryableStartFailure()
-      : {
-          ok: false,
-          action: 'StartAgent',
-          code: 'start-failed',
-          retryable: false,
-          message: failedToCreate,
-        };
+    if (outcome.retryable) {
+      return retryableStartFailure();
+    }
+    // The prepare already classified this terminal rejection into the copy its
+    // reader gets, and said whether it was the trial refusal: the caller's
+    // toast shows that sentence and offers the plan step it promises. A
+    // retryable failure keeps the service line above, which is what its own
+    // recovery reads. An abandoned intent has no message to report.
+    return {
+      ok: false,
+      action: 'StartAgent',
+      code: 'start-failed',
+      retryable: false,
+      message: outcome.reason === 'prepare-failed' ? outcome.message : failedToCreate,
+      ...(outcome.trialRefusal ? { trialRefusal: true } : {}),
+    };
   } catch {
     // Any resolution failure (transport, storage, an unexpected throw) is a
     // start failure the user can retry.

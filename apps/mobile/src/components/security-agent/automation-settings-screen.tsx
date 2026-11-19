@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- one screen draws the three automation sections from one draft, and the section-qualified accessible names repeat their headings */
+/* eslint-disable max-lines -- one screen draws the three automation sections from one draft, and the include-existing rows and severity pickers join their section heading to their accessible name */
 import { getSettingsDirtyState } from '@kilocode/app-shared/security-agent';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
@@ -16,10 +16,12 @@ import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { formatList, formatNumber } from '@/lib/format';
+import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
 } from '@/lib/hooks/use-settings-back-guard';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import {
   useSaveSecurityAgentConfig,
   useSecurityAgentCapability,
@@ -86,6 +88,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
   const remediationSection = t('securityAgent.automation.autoRemediation');
   const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
+  const connectivity = useCommittedConnectivityStatus();
   // This screen announces the outcome itself: the queued count when the save
   // schedules existing findings, the generic confirmation otherwise.
   const save = useSaveSecurityAgentConfig(scope, { announceSaved: false, announceFailed: false });
@@ -211,7 +214,11 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
     return (
       <PlatformErrorScreen
         title={t('securityAgent.automation.title')}
-        variant="offline"
+        variant={classifyReadFailureVariant({
+          errors: [config.error],
+          isPaused: config.fetchStatus === 'paused',
+          connectivity,
+        })}
         message={t('securityAgent.automation.couldNotLoad')}
         onRetry={() => void config.refetch()}
       />
@@ -253,8 +260,8 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-6 pt-4">
         <Section title={analysisSection}>
           <ToggleRow
-            title={t('securityAgent.automation.enableAutoAnalysis')}
-            subtitle={t('securityAgent.automation.enableAutoAnalysisSubtitle')}
+            title={t('securityAgent.automation.analyzeNewFindings')}
+            subtitle={t('securityAgent.automation.autoAnalysisDescription')}
             value={autoAnalysisEnabled}
             disabled={!canManage}
             onValueChange={setAutoAnalysisEnabled}
@@ -291,8 +298,8 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
 
         <Section title={remediationSection}>
           <ToggleRow
-            title={t('securityAgent.automation.enableAutoRemediation')}
-            subtitle={t('securityAgent.automation.enableAutoRemediationSubtitle')}
+            title={t('securityAgent.automation.openFixPrs')}
+            subtitle={t('securityAgent.automation.autoRemediationDescription')}
             value={autoRemediationEnabled}
             disabled={!canManage}
             onValueChange={handleAutoRemediationToggle}
@@ -334,8 +341,8 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
 
         <Section title={t('securityAgent.automation.autoDismiss')}>
           <ToggleRow
-            title={t('securityAgent.automation.enableAutoDismiss')}
-            subtitle={t('securityAgent.automation.enableAutoDismissSubtitle')}
+            title={t('securityAgent.automation.dismissNonExploitable')}
+            subtitle={t('securityAgent.automation.autoDismissDescription')}
             value={autoDismissEnabled}
             disabled={!canManage}
             onValueChange={setAutoDismissEnabled}

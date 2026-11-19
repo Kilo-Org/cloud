@@ -14,7 +14,7 @@ import {
   isRetriggerableReviewStatus,
 } from '@kilocode/app-shared/code-review';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
-import { statusMeta } from '@/components/code-reviewer/review-list-screen';
+import { statusMeta } from '@/components/code-reviewer/review-list-rows';
 import {
   findingsEmptyCopyKey,
   flattenCouncilFindings,
@@ -32,8 +32,10 @@ import {
 } from '@/components/code-reviewer/review-detail-sections';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
+import { type HeaderEyebrow } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
+import { eyebrowHeaderProps } from '@/components/ui/eyebrow-placeholder';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -41,7 +43,7 @@ import { i18n } from '@/i18n';
 import { resolveCodeReviewerOpenPrDestination } from '@/lib/code-reviewer-open-pr-destination';
 import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { openExternalUrl } from '@/lib/external-link';
-import { formatMoney, formatNumber } from '@/lib/format';
+import { formatNumber, formatPrefixedMoney } from '@/lib/format';
 import { isPersonal, useReviewConfig } from '@/lib/hooks/use-code-reviewer';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useCancelReview, useRetriggerReview, useReviewDetail } from '@/lib/hooks/use-code-reviews';
@@ -148,17 +150,19 @@ export function ReviewDetailScreen({
   }
 
   // One header for every state. The eyebrow is the review's repository, which
-  // only the payload knows, so its line is reserved from the first frame: the
-  // title above the body must not move when the review lands — nor when a
-  // refetch drops it back to loading, nor on the error branches that paint the
-  // same header.
-  const header = (
-    <ReviewerHeader
-      title={t('codeReviewer.reviewDetail.title')}
-      eyebrow={loadedReview?.repo_full_name}
-      reserveEyebrow
-    />
-  );
+  // only the payload knows, so its line is reserved while the read is pending —
+  // with the placeholder bar, because the label is on its way — and after the
+  // read stopped, where the same line stays reserved and blank so the title
+  // keeps its place without an animation: a retry re-enters the loading state on
+  // that line, so neither the failure nor the retry moves the title.
+  let eyebrow: HeaderEyebrow = { kind: 'held' };
+  if (loadedReview) {
+    eyebrow = { kind: 'ready', text: loadedReview.repo_full_name };
+  } else if (isLoading) {
+    eyebrow = { kind: 'loading' };
+  }
+  const eyebrowProps = eyebrowHeaderProps(eyebrow);
+  const header = <ReviewerHeader title={t('codeReviewer.reviewDetail.title')} {...eyebrowProps} />;
 
   if (isLoading) {
     return (
@@ -365,7 +369,7 @@ export function ReviewDetailScreen({
             {review.total_cost_musd != null && review.total_cost_musd > 0 ? (
               <MetaRow
                 label={t('common.cost')}
-                value={formatMoney(fromMicrodollars(review.total_cost_musd), i18n.language)}
+                value={formatPrefixedMoney(fromMicrodollars(review.total_cost_musd), i18n.language)}
               />
             ) : null}
             {tokenUsage.input > 0 || tokenUsage.output > 0 ? (

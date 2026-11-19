@@ -4,6 +4,7 @@ import { InvoiceListScreen } from '@/components/invoice-list-screen';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useOrgBoundary, useOrgInvoicesPage } from '@/lib/hooks/use-organization-queries';
+import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 
 export function OrganizationInvoicesScreen() {
   const { t } = useTranslation();
@@ -12,12 +13,29 @@ export function OrganizationInvoicesScreen() {
   useRouteForegroundRefresh([[['organizations']]]);
 
   if (isResolving || organizationId == null || org == null) {
-    return <OrganizationBoundary title={t('organization.invoices.title')} />;
+    // Only the transient membership read reserves the eyebrow line: the header
+    // that replaces this boundary fills it with the screen's name, so the swap
+    // keeps the header's height. A settled boundary state (no membership, no
+    // selection, access denied, unavailable) never fills that line, so it keeps
+    // its own header height.
+    return (
+      <OrganizationBoundary
+        title={t('organization.invoices.title')}
+        reserveEyebrow={isResolving}
+        backFallback={ORGANIZATION_HUB_PATH}
+      />
+    );
   }
 
   return (
     <InvoiceListScreen
-      title={t('organization.invoices.title')}
+      title={org.organizationName}
+      // The organization titles the screen, so the eyebrow keeps the list's own
+      // name out of the header's uppercase style. The boundary reserved this
+      // one-line eyebrow while the membership read ran, so the swap to this
+      // header cannot move the list.
+      eyebrow={t('organization.invoices.title')}
+      backFallback={ORGANIZATION_HUB_PATH}
       query={query}
       entries={entries}
       hasMore={hasMore}

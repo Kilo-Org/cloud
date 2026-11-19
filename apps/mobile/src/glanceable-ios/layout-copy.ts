@@ -1,7 +1,7 @@
 import { i18n } from '@/i18n';
 import { glanceableDigits, glanceableGroupSeparator } from '@/lib/glanceable/count-format';
 import { GLANCEABLE_STATUS_COPY_KEY } from '@/lib/glanceable/presentation';
-import { formatCurrency } from '@/lib/format';
+import { formatPrefixedMoney } from '@/lib/format';
 import { numberFormat } from '@/lib/intl-cache';
 
 /**
@@ -73,6 +73,9 @@ export function glanceableLayoutCopy() {
     lastKnown: i18n.t('glanceable.lastKnown'),
     awaitingUpdate: i18n.t('glanceable.awaitingUpdate'),
     nextRun: i18n.t('glanceable.nextRun'),
+    // The overdue twin of `nextRun`: the clock time the wake was supposed to
+    // happen, shown after the retry window closes.
+    wasDue: i18n.t('glanceable.wasDue'),
     agent: i18n.t('common.agent'),
     // The Home tile's empty state reads the key the Android Home widget and the
     // in-app Home card read, so an empty account is worded the same everywhere.
@@ -141,16 +144,17 @@ const COST_SAMPLE = 1.25;
 
 /**
  * The session cost format in the active language, for the widget process,
- * which has no formatter: the currency template around the amount ("$#",
- * "# $", "US$ #"), with `#` where the number goes, and the decimal separator.
- * The template comes from the app's own cost formatter, so the card shows the
- * currency symbol the app shows everywhere else. Empty slots mean the
- * template could not be read, and the layout falls back to "$#" and ".".
+ * which has no formatter: the text the app's cost formatter puts around the
+ * amount ("$#"), with `#` where the number goes, and the decimal separator.
+ * The template comes from the app's prefixed cost formatter, so the symbol
+ * leads the number in every language, matching the cost label the app shows
+ * everywhere else. Empty slots mean the template could not be read, and the
+ * layout falls back to "$#" and ".".
  */
 type GlanceableCostFormat = { costTemplate: string; costDecimal: string };
 
 function glanceableCostFormat(): GlanceableCostFormat {
-  const sample = formatCurrency(COST_SAMPLE, i18n.language, 2);
+  const sample = formatPrefixedMoney(COST_SAMPLE, i18n.language);
   const amount = numberFormat(i18n.language, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,

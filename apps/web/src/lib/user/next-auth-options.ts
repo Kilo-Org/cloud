@@ -1,12 +1,11 @@
 import 'server-only';
-import { JWT_TOKEN_VERSION } from '@kilocode/web-shared/lib/tokens';
+import { KILO_TOKEN_VERSION } from '@kilocode/worker-utils/kilo-token';
 import { cookies, headers } from 'next/headers';
 
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import type { CreateOrUpdateUserArgs, CreateOrUpdateUserTrackingContext } from '@/lib/user';
 import { createOrUpdateUser, findAndSyncExistingUser } from '@/lib/user';
-import { readWatchwoodSignupAssessment } from '@/lib/auth/watchwood';
 import { getTrustedSignupClientIp } from '@/lib/auth/trusted-signup-ip';
 import type { NextAuthOptions, Account, User as NextUser, Profile } from 'next-auth';
 import NextAuth from 'next-auth';
@@ -83,7 +82,6 @@ import {
   OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE,
   probeOpenAiChatGptEligibility,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/eligibility';
-import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import { claudeSignInProvider } from '@/lib/auth/claude/sign-in-provider';
 import {
   CLAUDE_OIDC_ISSUER,
@@ -122,9 +120,9 @@ import { z } from 'zod';
 import {
   getUserFromSession,
   getUserFromSessionForCredentialIssuance,
-  isBlockedTLD,
   sessionAuthOptions,
 } from '@kilocode/web-shared/lib/user/server';
+import { isBlockedTLD } from '@kilocode/web-shared/lib/user/domain-gates';
 import { isEmailBlacklisted } from '@kilocode/web-shared/lib/blacklist-domains-config';
 
 export type TurnstileJwtPayload = {
@@ -1232,12 +1230,6 @@ export const authOptions: NextAuthOptions = {
             }
             return redirectUrlForCode('LINKING-FAILED');
           }
-          if (
-            account.provider === 'claude' &&
-            !(await isClaudePlatformOAuthEnabled(claudeLinkingUser?.google_user_email))
-          ) {
-            return redirectUrlForCode('LINKING-FAILED');
-          }
         }
         if (account.provider === 'claude' && !isAccountLinking) {
           const claims = claudeEmailClaimSchema.safeParse(profile);
@@ -1253,10 +1245,6 @@ export const authOptions: NextAuthOptions = {
           }
           if (claims.data.email !== accountInfo.google_user_email) {
             console.warn('[claude-auth] authorization refused', { reason: 'email_mismatch' });
-            return redirectUrlForCode('UNKNOWN-ERROR');
-          }
-          if (!(await isClaudePlatformOAuthEnabled(claims.data.email))) {
-            console.warn('[claude-auth] authorization refused', { reason: 'release_denied' });
             return redirectUrlForCode('UNKNOWN-ERROR');
           }
         }
@@ -1356,7 +1344,6 @@ export const authOptions: NextAuthOptions = {
         }
 
         const requestHeaders = await headers();
-        const watchwood = !isAccountLinking ? await readWatchwoodSignupAssessment() : undefined;
 
         if (accountInfo.provider === 'workos') {
           const { affiliateTrackingId, trackingContext } = !isAccountLinking
@@ -1377,7 +1364,7 @@ export const authOptions: NextAuthOptions = {
             accountInfo,
             requestHeaders,
             affiliateTrackingId,
-            { ...trackingContext, watchwood },
+            trackingContext,
             !isAccountLinking
               ? getInvitationTokenFromCallbackPath(redirectContext.callbackPath)
               : undefined
@@ -1470,7 +1457,7 @@ export const authOptions: NextAuthOptions = {
                 autoLinkToExistingUser,
                 requestHeaders,
                 affiliateTrackingId,
-                { ...trackingContext, watchwood },
+                trackingContext,
                 false,
                 undefined,
                 githubEmailProof ? { resolveEmailProof: githubEmailProof } : {}
@@ -1595,7 +1582,7 @@ export const authOptions: NextAuthOptions = {
           await persistOpenAiChatGptConnection(existingUser.id, account, profile);
         }
 
-        token.version = JWT_TOKEN_VERSION;
+        token.version = KILO_TOKEN_VERSION;
         token.exp = Math.floor(Date.now() / 1000) + secondsInDay * 30;
         token.iat = Math.floor(Date.now() / 1000);
         token.isNewUser = (profile as ExtendedProfile)?.isNewUser || false;

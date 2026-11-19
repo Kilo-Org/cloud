@@ -3,7 +3,7 @@ import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
-import { isValidDomain } from '@kilocode/web-shared/lib/organizations/company-domain';
+import { normalizeSsoDomain } from '@kilocode/web-shared/lib/organizations/company-domain';
 
 export type SsoPolicyMisconfigurationReason =
   | 'organization_not_found'
@@ -85,11 +85,6 @@ function decideDomainAuthority(
   }
 
   return { status: 'authoritative', sourceOrganizationId: match.id };
-}
-
-function normalizeSsoDomain(domain: string): string | null {
-  const normalized = domain.trim().toLowerCase();
-  return isValidDomain(normalized) ? normalized : null;
 }
 
 async function resolveAuthorityForNormalizedDomain(

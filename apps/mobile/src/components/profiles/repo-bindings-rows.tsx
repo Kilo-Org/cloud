@@ -7,7 +7,11 @@ import { ChevronDown, GitBranch, Trash2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { ICON_TARGET_BOX_CLASS, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import {
+  COMPACT_CONTROL_BOX_CLASS,
+  COMPACT_CONTROL_HIT_SLOP_DP,
+  ROW_TARGET_CLASS,
+} from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 /**
@@ -36,13 +40,17 @@ export function RepoBindingRow({
   platform: string;
   profileName: string;
   isRemoving: boolean;
-  onRemove: () => void;
+  /**
+   * Absent for a caller who may not unbind, such as an organization member: the
+   * row then renders no control, since the server would refuse it.
+   */
+  onRemove?: () => void;
 }>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const providerLabel = t(repoPlatformLabelKey(platform));
   return (
-    <View className="min-h-14 flex-row items-center gap-2 rounded-lg bg-secondary px-3 py-2">
+    <View className="min-h-14 flex-row items-center gap-2 rounded-lg bg-secondary px-[16px] py-2">
       <GitBranch size={16} color={colors.mutedForeground} />
       {/* One identity element, first, in reading order: the row is announced as
           "repository, profile, provider" before the control that removes it. The
@@ -64,15 +72,22 @@ export function RepoBindingRow({
       >
         {repoPlatformBadge(platform)}
       </Text>
-      <Pressable
-        className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-        accessibilityRole="button"
-        accessibilityLabel={t('profiles.repoBindings.removeForRepo', { repo: repoFullName })}
-        disabled={isRemoving}
-        onPress={onRemove}
-      >
-        <Trash2 size={18} color={colors.mutedForeground} />
-      </Pressable>
+      {onRemove === undefined ? null : (
+        <Pressable
+          className={cn(COMPACT_CONTROL_BOX_CLASS, '-me-[7px] active:opacity-70')}
+          // The 32 dp box sits 9 dp inside the row's end edge, so its 16 dp
+          // glyph ends 16 dp from the edge like the leading icon's inset, and
+          // the 8 dp slop reaches 48 dp of touch while staying inside the row
+          // (Android clips touches to the parent view).
+          hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
+          accessibilityRole="button"
+          accessibilityLabel={t('profiles.repoBindings.removeForRepo', { repo: repoFullName })}
+          disabled={isRemoving}
+          onPress={onRemove}
+        >
+          <Trash2 size={18} color={colors.mutedForeground} />
+        </Pressable>
+      )}
     </View>
   );
 }

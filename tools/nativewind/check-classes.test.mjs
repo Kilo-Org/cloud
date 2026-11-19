@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import {
+  chmodSync,
   copyFileSync,
   mkdirSync,
   mkdtempSync,
@@ -23,7 +25,7 @@ import { parseSourceEntry } from '../lib/source-files.mjs';
 // they build one.
 const REPO = realpathSync(new URL('../..', import.meta.url).pathname);
 const MOBILE_ROOT = join(REPO, 'apps/mobile');
-const SHARED_SCANNERS = ['ast.mjs', 'source-files.mjs'];
+const SHARED_SCANNERS = ['ast.mjs', 'entry-point.mjs', 'source-files.mjs'];
 
 /**
  * The diagnostics of one file, straight from the checker's own export. A
@@ -280,6 +282,35 @@ test('accepts Intl type references', () => {
   );
 });
 
+// The same source checked under two paths: the app tree reports five hand-built
+// formatters, so the empty result for the shared package proves the rule's
+// scope rather than a broken fixture.
+const INTL_SOURCE =
+  "export const a = new Intl.DateTimeFormat('en-US');\n" +
+  "export const b = Intl.NumberFormat('en-US');\n" +
+  'export const c = value.toLocaleDateString();\n' +
+  'export const d = value.toLocaleTimeString();\n' +
+  'export const e = value.toLocaleString();\n';
+
+test('flags toLocale*String calls on the app tree', () => {
+  const found = check('apps/mobile/src/format.ts', INTL_SOURCE);
+  assert.deepEqual(found, [
+    'apps/mobile/src/format.ts:1: "new Intl.DateTimeFormat" builds its own formatter; go through @/lib/intl-cache so the locale is normalised once',
+    'apps/mobile/src/format.ts:2: "Intl.NumberFormat(" builds its own formatter; go through @/lib/intl-cache so the locale is normalised once',
+    'apps/mobile/src/format.ts:3: ".toLocaleDateString(" builds its own formatter; go through @/lib/intl-cache so the locale is normalised once',
+    'apps/mobile/src/format.ts:4: ".toLocaleTimeString(" builds its own formatter; go through @/lib/intl-cache so the locale is normalised once',
+    'apps/mobile/src/format.ts:5: ".toLocaleString(" builds its own formatter; go through @/lib/intl-cache so the locale is normalised once',
+  ]);
+});
+
+test('keeps the formatter rule out of the shared package', () => {
+  assert.deepEqual(
+    check('packages/app-shared/src/format.ts', INTL_SOURCE),
+    [],
+    'the same source reports five diagnostics under apps/mobile/src'
+  );
+});
+
 test('reads padding from a typed scroll container tag', () => {
   const found = check(
     'apps/mobile/src/screen.tsx',
@@ -398,6 +429,221 @@ test('runs the whole audit over a clean tree through the CLI and ignores test sc
   );
 });
 
+test('reports an unreadable file through the CLI and keeps the findings it collected', context => {
+  // The read refusal must reach the same problem list as the rules', or the
+  // audit ends on a stack trace and loses every finding already collected.
+  if (process.getuid?.() === 0) {
+    context.skip('root reads any file, so chmod 000 leaves it readable');
+    return;
+  }
+  const root = makeFixture(context, {
+    'apps/mobile/src/bans.ts': 'const b = "text-start";\n',
+    'apps/mobile/src/locked.ts': 'const c = "text-start";\n',
+  });
+  const locked = join(root, 'apps/mobile/src/locked.ts');
+  chmodSync(locked, 0o000);
+  // Restore the mode before the fixture's own cleanup runs, so removal cannot
+  // trip on the mode this case set.
+  try {
+    const result = spawnSync(process.execPath, [join(root, 'tools/nativewind/check-classes.mjs')], {
+      cwd: root,
+      encoding: 'utf8',
+      timeout: 30_000,
+    });
+
+    assert.ifError(result.error);
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stderr, /locked\.ts: cannot read: /);
+    assert.match(result.stderr, /bans\.ts:1: "text-start"/);
+    assert.match(result.stderr, /check-classes: \d+ problem\(s\)/);
+    // A stack trace means the read escaped the problem list.
+    assert.doesNotMatch(result.stderr, /\n\s+at /);
+  } finally {
+    chmodSync(locked, 0o644);
+  }
+});
+
+/**
+ * A root whose `react-native-css` is a stub package naming the compiler entry:
+ * the pins' subject is the compiler's behaviour, so a stub stands in for the
+ * API drift the audit exists to catch.
+ *
+ * `makeFixture` links the app's node_modules to the repository's own, so the
+ * stub cannot shadow one package in place. The require base walks app
+ * package.json → its node_modules → root node_modules, so the fixture swaps
+ * the app's link for a real directory that holds only the stub package. The
+ * real package.json is resolved through Node, not a package-manager layout
+ * path, so the exports map still resolves `./compiler` under any linker.
+ */
+function stubbedCompilerFixture(context, entrySource) {
+  const root = makeFixture(context, {
+    'apps/mobile/src/bans.ts': 'const b = "text-start";\n',
+  });
+  const entry = join(root, 'apps/mobile/node_modules/react-native-css');
+  rmSync(join(root, 'apps/mobile/node_modules'), { recursive: true, force: true });
+  mkdirSync(join(entry, 'dist/commonjs/compiler'), { recursive: true });
+  copyFileSync(
+    // The checker resolves the compiler from the app's package.json base, so
+    // this resolution names the same installed tree under any package manager.
+    createRequire(join(MOBILE_ROOT, 'package.json')).resolve('react-native-css/package.json'),
+    join(entry, 'package.json')
+  );
+  writeFileSync(join(entry, 'dist/commonjs/compiler/index.js'), entrySource);
+  return root;
+}
+
+/** A compiler stub whose two reads return the given expression sources. */
+function compilerStub({ warnings, stylesheet }) {
+  return (
+    'module.exports = {\n' +
+    '  compile() {\n' +
+    '    return {\n' +
+    `      warnings() { return ${warnings}; },\n` +
+    `      stylesheet() { return ${stylesheet}; },\n` +
+    '    };\n' +
+    '  },\n' +
+    '};\n'
+  );
+}
+
+/**
+ * A stylesheet still holding both declarations the bans warn about: a deferred
+ * colorMix for `backgroundColor` and a deferred calc for `lineHeight`. The stub
+ * answers every fixture with it, so a case that fails one pin leaves the other
+ * pins passing.
+ */
+const HOLDING_STYLESHEET =
+  "{ s: [['x', [{ d: [" +
+  "[['colorMix', [['color', '#b0483a'], ['percent', 10]]], 'backgroundColor'], " +
+  "[['calc', [['var', ['--spacing']], '*', 5]], 'lineHeight']" +
+  '] }]]] }';
+
+for (const [name, entrySource, expected, absent] of [
+  [
+    'will not load, which is the only failure that stops the pins',
+    "throw new Error('compiler entry exploded');\n",
+    ['react-native-css/compiler did not resolve (compiler entry exploded) — run pnpm install'],
+    'the compiler failed on',
+  ],
+  [
+    'throws at compile, and every fixture still reports',
+    "module.exports = { compile() { throw new Error('stubbed compiler exploded on line one'); } };\n",
+    [
+      'the compiler failed on the text-align: start fixture (stubbed compiler exploded on line one)',
+      'the compiler failed on the text-align: end fixture (stubbed compiler exploded on line one)',
+      'the compiler failed on the color-mix over an @theme inline variable fixture (stubbed compiler exploded on line one)',
+      'the compiler failed on the spacing-scale line-height fixture (stubbed compiler exploded on line one)',
+    ],
+  ],
+  [
+    'throws for the color-mix fixture only',
+    // The fixture CSS is the stub's only input, so a throw it raises for one
+    // fixture leaves the other pins running on the same stylesheet.
+    [
+      'module.exports = {',
+      '  compile(css) {',
+      "    if (css.includes('color-mix')) throw new Error('color-mix fixture exploded');",
+      '    return {',
+      "      warnings() { return { values: { 'text-align': ['start', 'end'] } }; },",
+      '      stylesheet() {',
+      "        return { s: [['x', [{ d: [[['calc', [['var', ['--spacing']], '*', 5]], 'lineHeight']] }]]] };",
+      '      },',
+      '    };',
+      '  },',
+      '};',
+    ].join('\n') + '\n',
+    [
+      'the compiler failed on the color-mix over an @theme inline variable fixture (color-mix fixture exploded)',
+    ],
+    'drop the numeric leading rule',
+  ],
+  [
+    'still drops only the text-align: start keyword',
+    compilerStub({
+      warnings: `{ values: { 'text-align': ['start'] } }`,
+      stylesheet: HOLDING_STYLESHEET,
+    }),
+    // `start` still appears in the dropped values, so its rule holds; `end`
+    // no longer does, so only the text-end rule is retired.
+    ['text-align: end is no longer dropped — drop the text-end rule'],
+    'drop the text-start rule',
+  ],
+  [
+    'drops neither text-align keyword',
+    compilerStub({ warnings: '{ values: {} }', stylesheet: HOLDING_STYLESHEET }),
+    [
+      'text-align: start is no longer dropped — drop the text-start rule',
+      'text-align: end is no longer dropped — drop the text-end rule',
+    ],
+  ],
+  [
+    'reports prose around the keyword instead of the dropped value',
+    // The words `end` and `start` sit inside longer words of a warning
+    // sentence, so neither pin may read them as the dropped keyword.
+    compilerStub({
+      warnings: `{ values: {}, notes: ['text-align rendered is extended, restart'] }`,
+      stylesheet: HOLDING_STYLESHEET,
+    }),
+    [
+      'text-align: start is no longer dropped — drop the text-start rule',
+      'text-align: end is no longer dropped — drop the text-end rule',
+    ],
+  ],
+  [
+    'emits no backgroundColor declaration for the color-mix fixture',
+    compilerStub({
+      warnings: '{ values: {} }',
+      stylesheet: `{ s: [['x', [{ d: [[['calc', [['var', ['--spacing']], '*', 5]], 'lineHeight']] }]]] }`,
+    }),
+    [
+      'color-mix over an @theme inline variable emits no backgroundColor declaration — the ban still applies, so keep the theme-token opacity rule',
+    ],
+    'drop the theme-token opacity rule',
+  ],
+  [
+    'resolves the color-mix at build time',
+    compilerStub({
+      warnings: '{ values: {} }',
+      stylesheet: `{ s: [['x', [{ d: [[['calc', [['var', ['--spacing']], '*', 5]], 'lineHeight'], [{ color: '#b0483a10' }, 'backgroundColor']] }]]] }`,
+    }),
+    [
+      'now compiles to {"color":"#b0483a10"} instead of a deferred colorMix — drop the theme-token opacity rule',
+    ],
+  ],
+  [
+    'emits no lineHeight declaration for the spacing-scale fixture',
+    compilerStub({
+      warnings: '{ values: {} }',
+      stylesheet: `{ s: [['x', [{ d: [[['colorMix', [['var', ['--color-destructive']]]], 'backgroundColor']] }]]] }`,
+    }),
+    [
+      'a spacing-scale line height emits no lineHeight declaration — the ban still applies, so keep the numeric leading rule',
+    ],
+    'drop the numeric leading rule',
+  ],
+]) {
+  test(`reports compiler pins when the stub ${name}, keeping the source findings`, context => {
+    const root = stubbedCompilerFixture(context, entrySource);
+    const result = spawnSync(process.execPath, [join(root, 'tools/nativewind/check-classes.mjs')], {
+      cwd: root,
+      encoding: 'utf8',
+      timeout: 30_000,
+    });
+    assert.ifError(result.error);
+    assert.equal(result.status, 1, result.stderr);
+    // The source-tree findings made it out before the stub failed the pins.
+    assert.match(result.stderr, /bans\.ts:1: "text-start" text-align: start is dropped/);
+    for (const fragment of expected) {
+      assert.match(result.stderr, new RegExp(fragment.replace(/[()]/g, m => `\\${m}`)));
+    }
+    if (absent !== undefined) {
+      assert.doesNotMatch(result.stderr, new RegExp(absent));
+    }
+    assert.match(result.stderr, /check-classes: \d+ problem\(s\)/);
+    assert.doesNotMatch(result.stderr, /Error:|at /);
+  });
+}
+
 test('importing the module neither scans nor runs the compiler probes', context => {
   const root = importOnlyRoot(context);
   // A static import from a root with no source dirs, no global.css and no
@@ -506,15 +752,15 @@ test('reports each ban at its own line', () => {
     'apps/mobile/src/bans.ts',
     'const a = 1;\n' +
       '\n' +
-      'const b = "text-start";\n' +
+      'const b = "text-start text-end";\n' +
       'const c = 2;\n' +
-      'const d = "ltr: leading-9";\n' +
+      'const d = "leading-9";\n' +
       '/* "bg-primary/50" in the rule comment is documentation\n' +
       ' * text-start in a block-comment body */\n'
   );
   assert.deepEqual(found, [
-    `apps/mobile/src/bans.ts:3: "text-start" text-align: start/end is dropped; the shared Text handles RTL alignment already`,
-    `apps/mobile/src/bans.ts:5: "ltr:" the ltr: variant also matches in RTL; express the rule with rtl: instead`,
+    `apps/mobile/src/bans.ts:3: "text-start" text-align: start is dropped; the shared Text handles RTL alignment already`,
+    `apps/mobile/src/bans.ts:3: "text-end" text-align: end is dropped; the shared Text handles RTL alignment already`,
     `apps/mobile/src/bans.ts:5: "leading-9" a numeric leading-N is multiplied by the font size at runtime; use an explicit length, e.g. leading-[1.25rem]`,
   ]);
 });
@@ -528,7 +774,7 @@ test('reads a ban inside a template chunk but not one in a comment or a regular 
       '/* ltr: and leading-9 in a comment body read as documentation */\n'
   );
   assert.deepEqual(found, [
-    `apps/mobile/src/bans.ts:1: "text-start" text-align: start/end is dropped; the shared Text handles RTL alignment already`,
+    `apps/mobile/src/bans.ts:1: "text-start" text-align: start is dropped; the shared Text handles RTL alignment already`,
   ]);
 });
 

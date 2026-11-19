@@ -2,13 +2,15 @@ import * as z from 'zod';
 import { AutoRouterSchema, AutoRoutingModeSchema } from './router';
 import { OwnerTypeSchema, type OwnerType } from './owner';
 import { ClassifierSubtaskTypeSchema, ClassifierTaskTypeSchema } from './taxonomy';
+import { VariantSchema } from './reasoning';
 import { addDuplicateKeyIssues } from './duplicate-keys';
+import { KILO_AUTO_MODEL_NAMESPACE_PREFIX, isVirtualAutoModelId } from './virtual-auto-model';
 
 // ADR 0005: docs/adr/0005-custom-auto-routers.md
 
-export const CUSTOM_ROUTER_MODEL_PREFIX = 'kilo-auto/custom/';
-export const ORG_CUSTOM_ROUTER_MODEL_PREFIX = 'kilo-auto/custom/org/';
 export const RESERVED_USER_CUSTOM_ROUTER_SLUG = 'org';
+export const CUSTOM_ROUTER_MODEL_PREFIX = `${KILO_AUTO_MODEL_NAMESPACE_PREFIX}custom/`;
+export const ORG_CUSTOM_ROUTER_MODEL_PREFIX = `${CUSTOM_ROUTER_MODEL_PREFIX}${RESERVED_USER_CUSTOM_ROUTER_SLUG}/`;
 export const MAX_CUSTOM_ROUTERS_PER_OWNER = 10;
 export const MAX_CUSTOM_ROUTER_ENTRIES = 20;
 export const MAX_CUSTOM_ROUTER_NAME_LENGTH = 100;
@@ -82,7 +84,7 @@ const GatewayModelIdSchema = ModelIdSchema.refine(
 
 // A platform model whose global measurement a linked entry reuses for its same-name variants.
 export const MeasuredAsModelIdSchema = GatewayModelIdSchema.refine(
-  model => !model.toLowerCase().startsWith('kilo-auto/'),
+  model => !isVirtualAutoModelId(model),
   'measuredAs must name a concrete platform model'
 );
 
@@ -163,6 +165,23 @@ export function customRouterCandidateModel(entry: CustomRouterEntryRef): string 
   return entry.kind === 'gateway' ? entry.model : customRouterEntryKey(entry);
 }
 
+/**
+ * A decision's `model` must name the candidate its `entry` resolves to.
+ *
+ * Both decision schemas call this function, so a change to the condition, the
+ * issue path, or the message cannot leave one schema behind. `entry` is optional
+ * because the gateway decision schema still accepts a decision without one.
+ */
+export function refineEntryModelMatch(
+  decision: { model: string; entry?: CustomRouterEntryRef },
+  ctx: z.RefinementCtx
+): void {
+  if (decision.entry == null) return;
+  if (decision.model !== customRouterCandidateModel(decision.entry)) {
+    ctx.addIssue({ code: 'custom', path: ['model'], message: 'model must match entry' });
+  }
+}
+
 export function parseCustomRouterCandidateModel(model: string): CustomRouterEntryRef | null {
   if (!model.startsWith(CLIENT_CANDIDATE_PREFIX)) {
     const gateway = GatewayCustomRouterEntryRefSchema.safeParse({ kind: 'gateway', model });
@@ -189,11 +208,7 @@ export const CustomRouterEntriesSchema = z
     });
   });
 
-function addEntryBudgetIssue(
-  ctx: z.RefinementCtx,
-  path: (string | number)[],
-  message: string
-): void {
+function addIssue(ctx: z.RefinementCtx, path: (string | number)[], message: string): void {
   ctx.addIssue({ code: 'custom', path, message });
 }
 
@@ -201,7 +216,7 @@ function addEntryBudgetIssue(
  * Client-supplied entries carry an explicit budget on write. Read schemas stay permissive so rows
  * stored before the budget existed keep parsing in the worker and in list responses.
  */
-function addEntryBudgetIssues(
+function validateEntryBudget(
   entry: CustomRouterEntry,
   ctx: z.RefinementCtx,
   prefix: readonly (string | number)[] = []
@@ -211,7 +226,7 @@ function addEntryBudgetIssues(
     entry.measuredAs !== undefined &&
     entry.measuredAs.length > MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH
   ) {
-    addEntryBudgetIssue(
+    addIssue(
       ctx,
       path('measuredAs'),
       `Too big: expected measuredAs to have <=${MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH} characters`
@@ -219,7 +234,7 @@ function addEntryBudgetIssues(
   }
   if (entry.kind === 'gateway') {
     if (entry.model.length > MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH) {
-      addEntryBudgetIssue(
+      addIssue(
         ctx,
         path('model'),
         `Too big: expected model to have <=${MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH} characters`
@@ -228,29 +243,25 @@ function addEntryBudgetIssues(
     return;
   }
   if (entry.provider.length > MAX_CUSTOM_ROUTER_PROVIDER_ID_LENGTH) {
-    addEntryBudgetIssue(
+    addIssue(
       ctx,
       path('provider'),
       `Too big: expected provider to have <=${MAX_CUSTOM_ROUTER_PROVIDER_ID_LENGTH} characters`
     );
   }
   if (entry.model.length > MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH) {
-    addEntryBudgetIssue(
+    addIssue(
       ctx,
       path('model'),
       `Too big: expected model to have <=${MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH} characters`
     );
   }
   if (entry.variants.length > MAX_CLIENT_VARIANTS) {
-    addEntryBudgetIssue(
-      ctx,
-      path('variants'),
-      `Too big: expected at most ${MAX_CLIENT_VARIANTS} variants`
-    );
+    addIssue(ctx, path('variants'), `Too big: expected at most ${MAX_CLIENT_VARIANTS} variants`);
   }
   entry.variants.forEach((variant, index) => {
     if (variant.length > MAX_CLIENT_VARIANT_LENGTH) {
-      addEntryBudgetIssue(
+      addIssue(
         ctx,
         path('variants', index),
         `Too big: expected a variant to have <=${MAX_CLIENT_VARIANT_LENGTH} characters`
@@ -259,14 +270,14 @@ function addEntryBudgetIssues(
   });
   const { contextLength, inputModalities } = entry.capabilities;
   if (contextLength !== null && contextLength > MAX_CLIENT_CONTEXT_LENGTH) {
-    addEntryBudgetIssue(
+    addIssue(
       ctx,
       path('capabilities', 'contextLength'),
       `Too big: expected contextLength to be <=${MAX_CLIENT_CONTEXT_LENGTH}`
     );
   }
   if (inputModalities.length > MAX_CLIENT_INPUT_MODALITIES) {
-    addEntryBudgetIssue(
+    addIssue(
       ctx,
       path('capabilities', 'inputModalities'),
       `Too big: expected at most ${MAX_CLIENT_INPUT_MODALITIES} input modalities`
@@ -274,7 +285,7 @@ function addEntryBudgetIssues(
   }
   inputModalities.forEach((modality, index) => {
     if (modality.length > MAX_CLIENT_INPUT_MODALITY_LENGTH) {
-      addEntryBudgetIssue(
+      addIssue(
         ctx,
         path('capabilities', 'inputModalities', index),
         `Too big: expected a modality to have <=${MAX_CLIENT_INPUT_MODALITY_LENGTH} characters`
@@ -285,7 +296,7 @@ function addEntryBudgetIssues(
     for (const [field, value] of Object.entries(entry.pricing)) {
       if (value === undefined) continue;
       if (!Number.isFinite(value) || value > MAX_CLIENT_PRICE_PER_MTOK_USD) {
-        addEntryBudgetIssue(
+        addIssue(
           ctx,
           path('pricing', field),
           `Expected ${field} to be finite and <=${MAX_CLIENT_PRICE_PER_MTOK_USD}`
@@ -297,12 +308,12 @@ function addEntryBudgetIssues(
 
 export const CustomRouterWriteEntriesSchema = CustomRouterEntriesSchema.superRefine(
   (entries, ctx) => {
-    entries.forEach((entry, index) => addEntryBudgetIssues(entry, ctx, [index]));
+    entries.forEach((entry, index) => validateEntryBudget(entry, ctx, [index]));
   }
 );
 
 const ClientCustomRouterWriteEntrySchema = ClientCustomRouterEntrySchema.superRefine((entry, ctx) =>
-  addEntryBudgetIssues(entry, ctx)
+  validateEntryBudget(entry, ctx)
 );
 
 function addDefaultEntryIssue(
@@ -407,7 +418,7 @@ export const CustomRouterDecisionSchema = z
   .object({
     entry: CustomRouterEntryRefSchema,
     model: z.string().min(1),
-    variant: z.string().trim().min(1).nullable(),
+    variant: VariantSchema,
     stale: z.boolean(),
     // True when no routing decision named a servable entry, so the default or first servable
     // entry was used. taskType and subtaskType still report the classification, if any.
@@ -418,9 +429,7 @@ export const CustomRouterDecisionSchema = z
     tableVersion: z.string().nullable(),
   })
   .superRefine((decision, ctx) => {
-    if (decision.model !== customRouterCandidateModel(decision.entry)) {
-      ctx.addIssue({ code: 'custom', path: ['model'], message: 'model must match entry' });
-    }
+    refineEntryModelMatch(decision, ctx);
   });
 export type CustomRouterDecision = z.infer<typeof CustomRouterDecisionSchema>;
 
@@ -543,7 +552,6 @@ export async function verifyAutoDecision(
 export const MAX_CLIENT_EVAL_OUTPUT_LENGTH = 1_000_000;
 
 const RouterIdSchema = z.uuid();
-const VariantSchema = z.string().trim().min(1).nullable();
 const CaseIdSchema = z.string().trim().min(1);
 const RepetitionSchema = z.number().int().nonnegative();
 

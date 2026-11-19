@@ -57,8 +57,7 @@ export function resolveFieldActionReserve({
 /**
  * The banner text for a terminal device-auth error, in the active language.
  * Denied and expired are translated here from the status so a language switch
- * re-renders them; keyed descriptors translate at render the same way, and a
- * server-authored text (the start 429 body) passes through as-is.
+ * re-renders them; keyed descriptors translate at render the same way.
  */
 export function errorMessage(status: string, error: DeviceAuthError | undefined): string {
   switch (status) {
@@ -72,7 +71,7 @@ export function errorMessage(status: string, error: DeviceAuthError | undefined)
       if (!error) {
         return i18n.t('authErrors.default');
       }
-      return error.kind === 'key' ? i18n.t(error.key) : error.text;
+      return i18n.t(error.key);
     }
   }
 }

@@ -21,7 +21,6 @@ import {
   serial,
   vector,
   type AnyPgColumn,
-  bigserial,
 } from 'drizzle-orm/pg-core';
 import { isNotNull, isNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
@@ -131,6 +130,7 @@ import type {
   AutoFreeConfig,
   GatewayModelListConfig,
   VercelModelIdOverridesConfig,
+  LatestAliasTargetsConfig,
   PreferredProviderOrderConfig,
   CustomPricingConfig,
   KiloClawAdminAuditAction,
@@ -172,6 +172,7 @@ import type {
   CodeReviewType,
   CodeReviewTriggerSource,
   CodeReviewCouncilResult,
+  ReviewGuidelineImport,
   CodeReviewPlatform,
   ReviewMemoryEvidenceItem,
   ReviewMemoryPlatform,
@@ -2921,30 +2922,38 @@ export const microdollar_usage_metadata = pgTable(
   ]
 );
 
-export const api_request_log = pgTable(
-  'api_request_log',
+/**
+ * The request and response bodies are stored in R2 under a key derived from `created_at` and `id`;
+ * see `apiRequestLogBlobKey`.
+ */
+export const api_request_log_2 = pgTable(
+  'api_request_log_2',
   {
-    id: bigserial({ mode: 'bigint' }).notNull().primaryKey(),
+    /** The `microdollar_usage` id of the request. */
+    id: uuid().notNull().primaryKey(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    kilo_user_id: text(),
+    generation_id: text(),
+    kilo_user_id: text().notNull(),
     organization_id: text(),
     session_id: text(),
-    vercel_request_id: text(),
-    provider: text(),
-    model: text(),
-    status_code: integer(),
-    /** Unused and always empty; the request body is stored in R2 under `request_r2_key`. */
-    request: jsonb(),
-    /** Unused and always empty; the response body is stored in R2 under `response_r2_key`. */
-    response: text(),
-    error: jsonb(),
-    request_r2_key: text(),
-    response_r2_key: text(),
+    requested_model: text().notNull(),
   },
-  table => [index('idx_api_request_log_created_at').on(table.created_at)]
+  table => [
+    index('idx_api_request_log_2_created_at').on(table.created_at),
+    index('idx_api_request_log_2_generation_id')
+      .on(table.generation_id)
+      .where(isNotNull(table.generation_id)),
+    index('idx_api_request_log_2_session_id')
+      .on(table.session_id)
+      .where(isNotNull(table.session_id)),
+    index('idx_api_request_log_2_kilo_user_id_created_at').on(table.kilo_user_id, table.created_at),
+    index('idx_api_request_log_2_organization_id_created_at')
+      .on(table.organization_id, table.created_at)
+      .where(isNotNull(table.organization_id)),
+  ]
 );
 
-export type ApiRequestLog = typeof api_request_log.$inferSelect;
+export type ApiRequestLog2 = typeof api_request_log_2.$inferSelect;
 
 export const http_user_agent = pgTable(
   'http_user_agent',
@@ -5343,8 +5352,8 @@ export const cloud_agent_webhook_triggers = pgTable(
     organization_id: uuid('organization_id').references(() => organizations.id, {
       onDelete: 'cascade',
     }),
-    // Target type: 'cloud_agent' (default) or 'kiloclaw_chat'
     target_type: text('target_type').notNull().default('cloud_agent'),
+    cloud_agent_session_id: text('cloud_agent_session_id'),
     // KiloClaw Chat target: which instance to send messages to
     kiloclaw_instance_id: uuid('kiloclaw_instance_id').references(() => kiloclaw_instances.id),
     // Activation mode: 'webhook' (default) or 'scheduled' (cron-based)
@@ -5404,6 +5413,15 @@ export const cloud_agent_webhook_triggers = pgTable(
       sql`(
         ${table.target_type} != 'kiloclaw_chat' OR
         ${table.kiloclaw_instance_id} IS NOT NULL
+      )`
+    ),
+    check(
+      'CHK_cloud_agent_webhook_triggers_existing_chat_fields',
+      sql`(
+        (${table.target_type} = 'cloud_agent_chat' AND ${table.cloud_agent_session_id} IS NOT NULL
+          AND ${table.github_repo} IS NULL AND ${table.profile_id} IS NULL
+          AND ${table.kiloclaw_instance_id} IS NULL) OR
+        (${table.target_type} != 'cloud_agent_chat' AND ${table.cloud_agent_session_id} IS NULL)
       )`
     ),
     // Scheduled triggers require cron_expression
@@ -6013,6 +6031,7 @@ export const ai_gateway_config = pgTable(
     preferred_models: jsonb().$type<GatewayModelListConfig>(),
     unavailable_models: jsonb().$type<GatewayModelListConfig>(),
     vercel_model_id_overrides: jsonb().$type<VercelModelIdOverridesConfig>(),
+    latest_alias_targets: jsonb().$type<LatestAliasTargetsConfig>(),
     preferred_provider_order: jsonb().$type<PreferredProviderOrderConfig>(),
     custom_pricing: jsonb().$type<CustomPricingConfig>(),
   },
@@ -6022,6 +6041,18 @@ export const ai_gateway_config = pgTable(
 export const blacklisted_domains = pgTable('blacklisted_domains', {
   domain: text().primaryKey(),
 });
+
+export const blacklisted_domains_settings = pgTable(
+  'blacklisted_domains_settings',
+  {
+    id: integer().primaryKey().default(1),
+    blocked_signup_tlds: text().array().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    updated_by: text(),
+    updated_by_email: text(),
+  },
+  table => [check('blacklisted_domains_settings_singleton', sql`${table.id} = 1`)]
+);
 
 export const ai_gateway_sync_providers_state = pgTable(
   'ai_gateway_sync_providers_state',
@@ -6131,6 +6162,7 @@ export const cloud_agent_code_reviews = pgTable(
     repository_review_instructions_used: boolean().notNull().default(false),
     repository_review_instructions_ref: text(),
     repository_review_instructions_truncated: boolean().notNull().default(false),
+    repository_review_instructions_imports: jsonb().$type<ReviewGuidelineImport[]>(),
 
     // Previous summary captured before the agent updates the platform comment
     previous_summary_body: text(),
@@ -7503,6 +7535,42 @@ export const device_refresh_tokens = pgTable(
 );
 
 export type DeviceRefreshToken = typeof device_refresh_tokens.$inferSelect;
+
+/**
+ * A one-time, short-lived grant that opens one app-shell page for one user.
+ *
+ * The native app mints it through an authenticated mutation immediately before
+ * it opens the in-app browser, and the web consumes it once at
+ * `/app-shell/handoff`. The row carries the target the token opens, so the
+ * consuming request cannot redirect anywhere else, and only the SHA-256 digest
+ * of the issued token is stored: a leaked row authorizes nothing.
+ */
+export const app_shell_handoff_tokens = pgTable(
+  'app_shell_handoff_tokens',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    token_hash: text().notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    /** The allow-listed shell path this token opens, including its query. */
+    target_path: text().notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_app_shell_handoff_tokens_token_hash').on(table.token_hash),
+    index('IDX_app_shell_handoff_tokens_expires_at').on(table.expires_at),
+    index('IDX_app_shell_handoff_tokens_kilo_user_id').on(table.kilo_user_id),
+  ]
+);
+
+export type AppShellHandoffToken = typeof app_shell_handoff_tokens.$inferSelect;
+export type NewAppShellHandoffToken = typeof app_shell_handoff_tokens.$inferInsert;
 
 /**
  * A one-time, short-lived grant that lets a native app session add, rename, or
@@ -9137,6 +9205,10 @@ export type CloudAgentBuiltinAgentOverrides = Record<
   { model?: string | null; variant?: string; disable?: boolean }
 >;
 
+// Map of gateway model id (for example `openai/gpt-6.1-sol`) to a context-window
+// token cap. See ModelContextLimitsSchema in `@kilocode/cloud-agent-profile`.
+export type CloudAgentModelContextLimits = Record<string, number>;
+
 export const cloud_agent_user_settings = pgTable(
   'cloud_agent_user_settings',
   {
@@ -9145,6 +9217,9 @@ export const cloud_agent_user_settings = pgTable(
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     workspace_order: text().$type<'manual' | 'created' | 'activity'>().notNull().default('manual'),
     builtin_agents: jsonb().$type<CloudAgentBuiltinAgentOverrides>().notNull().default({}),
+    model_context_limits: jsonb().$type<CloudAgentModelContextLimits>().notNull().default({}),
+    web_search_enabled: boolean().notNull().default(true),
+    web_search_provider: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -11206,7 +11281,9 @@ export const enkrypt_usage = pgTable(
     // guardrail, and between the end of the upstream response and its release for the output
     // guardrail. Set only on the final call of the guardrail's blocking scan, or of its log-only
     // scan when no blocking call was recorded, so it is counted once per guardrail and request; null
-    // on other calls or when the request returned before awaiting the verdict.
+    // on other calls or when the request returned before awaiting the verdict. A guardrail that only
+    // logs adds no wait, so it stores its log-only scan time: how long the scan ran past the point
+    // where a blocking scan would hold the request or response.
     added_latency_ms: integer(),
     // Null on rows recorded before the output guardrail existed, which are all input guardrail calls.
     guardrail_id: integer().references(() => enkrypt_usage_guardrail.guardrail_id),

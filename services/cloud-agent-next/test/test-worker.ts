@@ -75,9 +75,18 @@ export class UserKiloFacade extends RealUserKiloFacade {
 // The test Worker binds the production `SANDBOX_CONTROL`/`SANDBOX_SESSION`
 // names to the control-plane V2 classes, matching production after the C1c flip.
 export { SandboxControlV2, SandboxSessionV2 };
+export { CloudAgentWorkspaceDO } from '../src/control-plane/workspace/workspace-do.js';
 export { EnvironmentBuild } from '../src/environment-build/environment-build-do.js';
 export { SandboxContainers } from '../src/sandbox-containers/SandboxContainers.js';
 export { PreviewPortTestDO } from './integration/helpers/preview-port-test-do.js';
+export {
+  SentryBillingAdmissionContainer,
+  SentrySessionProbe,
+  SentryLegacySessionProbe,
+  SentrySandboxControlProbe,
+  SentrySandboxContainerProbe,
+  SentryDisabledProbe,
+} from './integration/helpers/sentry-durable-object.js';
 
 type TestEnv = {
   CLOUD_AGENT_REPORT_QUEUE: Queue<CloudAgentQueueReport>;

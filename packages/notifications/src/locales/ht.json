@@ -2,86 +2,45 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "Sesyon ajant ou gen yon aktyalizasyon",
-      "chatMessage": "Ou gen yon nouvo mesaj",
-      "instanceLifecycle": "Enstans ou gen yon aktyalizasyon",
-      "scheduledAction": "Yon aksyon pwograme gen yon aktyalizasyon",
-      "lowBalance": "Saldo ou bezwen atansyon",
+      "cloudAgentSession": "Sesyon ajan ou gen yon aktyalizasyon",
+      "lowBalance": "Balans ou bezwen atansyon",
       "spendAlert": "Depans ou bezwen atansyon",
       "securityFinding": "Yon rezilta sekirite bezwen atansyon",
       "securityUpdate": "Yon chèk sekirite gen yon aktyalizasyon",
-      "activeAgentsGlanceable": "Ajans aktif yo gen yon aktyalizasyon"
+      "activeAgentsGlanceable": "Ajan aktif yo gen yon aktyalizasyon"
     }
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · San tit",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
     "lowBalance": {
-      "title": "Alèt saldo ba",
-      "body": "{{organizationName}} saldo tonbe anba ${{minimumBalanceUsd}}"
+      "title": "Alèt balans ba",
+      "body": "{{organizationName}} balans tonbe anba ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
       "title": "Alèt depans",
       "body": "Depans {{scopeName}} te depase ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "Nouvo rezilta sekirite ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} nan {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "Nouvo rezilta sekirite ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "Avètisman SLA",
-      "body": "{{findingTitle}} nan {{repoFullName}}"
+      "title": "Avètisman SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "Vyolasyon SLA",
-      "body": "{{findingTitle}} nan {{repoFullName}}"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Yon chèk sekirite gen yon aktyalizasyon"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} pare",
-      "body": "Tape pou kòmanse chaje."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} echwe pou kòmanse",
-      "body": "Kòmansman echwe."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} ap rekòmanse byento",
-      "body": "Pwograme pou rekòmanse nan {{when}}."
-    },
-    "restartCancelled": {
-      "title": "{{instanceName}} rekòmansman anile",
-      "body": "Rekòmansman ki te pwograme a anile."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} ap mete ajou byento",
-      "bodyWithTag": "Mete ajou nan {{targetImageTag}} nan {{when}}.",
-      "bodyWithoutTag": "Mete ajou pwograme nan {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "{{instanceName}} aktyalizasyon anile",
-      "body": "Aktyalizasyon ki te pwograme a anile."
+      "title": "Vyolasyon SLA"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Sesyon Kilo ou pare pou kontwole soti nan telefòn ou"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

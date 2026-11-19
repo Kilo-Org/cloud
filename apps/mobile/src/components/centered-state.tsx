@@ -1,4 +1,12 @@
-import { type ReactNode, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   type LayoutChangeEvent,
   PixelRatio,
@@ -43,24 +51,32 @@ type MeasuredViewport = { frame: StateFrame; surface: StateFrame };
  * Centered data state (empty, status, error) inside the band a screen surface
  * reserves.
  *
- * The state paints from its first frame: a hidden data state is a blank body,
- * which reads as a broken screen. That first frame and the measured one use one
- * placement — centered in the band the scroller shows, above the surface's
- * bottom reserve — so a state never moves after it is first painted. The layout
- * engine produces the pending placement from the caller's reserve alone, and
- * `getCenteredStateLayout` produces the same numbers once the surface, the
- * scroller and the content have reported their sizes.
+ * The state paints from its first frame wherever the band it will occupy can be
+ * known at once: a hidden data state is a blank body, which reads as a broken
+ * screen. The first frame and the measured one use one placement — centered in
+ * the band the scroller shows, above the surface's bottom reserve — so a state
+ * never moves after it is first painted. The layout engine produces the pending
+ * placement from the caller's reserve alone, and `getCenteredStateLayout`
+ * produces the same numbers once the surface, the scroller and the content have
+ * reported their sizes.
  *
  * The pending placement is the band placement for a band that starts at the
  * scroller's top and ends at the scroller's bottom, which is every band a screen
  * paints. A reserved top inset moves the band's top below the scroller's top and
  * a native-filled viewport moves its bottom below the scroller's bottom; the
  * estimate has no scroller frame to follow either of them, so those bands keep
- * the content back until the scroller reports its own frame. The measurement
- * answers inside the commit that mounts the scroller, so the state paints placed
- * rather than at a position the measurement then corrects. It also paints at the
+ * the content back until the scroller reports its own frame. A surface whose
+ * native geometry is still arriving is such a band too, for the same reason: any
+ * placement built before the probe reports moves when the safe-area answer
+ * lands, so the content waits one commit for the frame. The measurement answers
+ * inside the commit that mounts the scroller, so the state paints placed rather
+ * than at a position the measurement then corrects. It also paints at the
  * estimate whenever a measurement cannot place it at all, because a state that
- * never appears is worse than one placed by the estimate.
+ * never appears is worse than one placed by the estimate — except on a surface
+ * whose native geometry never reports at all, where the content stays back
+ * rather than paint a position the probe would contradict the moment it
+ * answers; the probe failing is reported and visible, a silently misplaced
+ * state is not.
  */
 export function CenteredState({
   children,
@@ -96,6 +112,11 @@ export function CenteredState({
   // yet, or bounds that name no area. A band that cannot be estimated needs this
   // to tell a measurement in flight from one that will never arrive.
   const [unplaceable, setUnplaceable] = useState(false);
+  // Whether any placement has painted at least once. A surface whose node is
+  // briefly detached reports a null frame and the hook maps that to a pending
+  // source; the geometry it had is the geometry it still has, so the placement
+  // already painted stays rather than hiding the body again.
+  const [hasPainted, setHasPainted] = useState(false);
 
   const register = surface?.register;
   useLayoutEffect(() => register?.(), [register]);
@@ -231,13 +252,37 @@ export function CenteredState({
   // for the scroller's frame instead of painting a position the measurement
   // would correct. The estimate still lands whenever a measurement cannot place
   // the state, so a state never stays hidden.
-  const estimateFits = topInset === 0 && !nativeViewportFillsSurface;
+  //
+  // A surface whose own geometry is still arriving (`source: 'pending'`) is
+  // such a band too: its resolved insets are 0/0 until the native probe
+  // reports, and the probe's safe-area answer moves the band bottom on any
+  // device with a home bar, so any placement built while it is pending
+  // provably disagrees with the measured one there. The measured review-list
+  // empty state centered below its final position on the push and jumped up
+  // when the probe answered (explorer:android layout-jump). The ordering is
+  // reachable in both directions — the scroller can measure before the probe
+  // (`NativeStateSurface` installs its capture only on focus) or after — so
+  // the hold applies to the measured placement as well, not only to the
+  // estimate. `unplaceable` still paints the estimate when the scroller itself
+  // cannot measure; a surface whose native geometry never reports keeps the
+  // content back instead, per the class docstring above.
+  const surfacePending = surface?.source === 'pending';
+  const estimateFits = topInset === 0 && !nativeViewportFillsSurface && !surfacePending;
+  // The hold covers only a surface that has never placed anything: once a
+  // placement has painted, a pending window is a re-measure of the same
+  // geometry, and the painted placement stays (see `hasPainted`).
+  const holdForSurface = surfacePending && !hasPainted;
   const placement = useMemo(() => {
-    if (layout) {
+    if (layout && !holdForSurface) {
       return layout;
     }
     return estimateFits || unplaceable ? getPendingCenteredStateStyle(bottomInset) : null;
-  }, [bottomInset, estimateFits, layout, unplaceable]);
+  }, [bottomInset, estimateFits, holdForSurface, layout, unplaceable]);
+  useEffect(() => {
+    if (placement !== null && !hasPainted) {
+      setHasPainted(true);
+    }
+  }, [placement, hasPainted]);
   const contentStyle = useMemo(
     () => (placement ? { flexGrow: 1, ...placement } : undefined),
     [placement]

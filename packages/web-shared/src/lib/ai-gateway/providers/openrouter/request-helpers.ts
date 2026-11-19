@@ -143,17 +143,18 @@ function setCacheControlOnMessagesMessage(
       },
     ];
   } else {
+    const content: Anthropic.ContentBlockParam[] = message.content;
     const environmentDetailsCacheTargetIndex =
-      message.role === 'user' ? findEnvironmentDetailsCacheTargetIndex(message.content) : undefined;
+      message.role === 'user' ? findEnvironmentDetailsCacheTargetIndex(content) : undefined;
     const environmentDetailsCacheTarget =
       environmentDetailsCacheTargetIndex === undefined
         ? undefined
-        : message.content[environmentDetailsCacheTargetIndex];
+        : content[environmentDetailsCacheTargetIndex];
     const cacheTarget =
       environmentDetailsCacheTarget &&
       isCacheableMessagesContentBlock(environmentDetailsCacheTarget)
         ? environmentDetailsCacheTarget
-        : message.content.findLast(isCacheableMessagesContentBlock);
+        : content.findLast(isCacheableMessagesContentBlock);
     if (cacheTarget) {
       cacheTarget.cache_control = cacheControl;
     }

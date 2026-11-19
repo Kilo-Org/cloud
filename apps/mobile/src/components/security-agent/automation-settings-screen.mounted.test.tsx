@@ -31,6 +31,7 @@ const toggleRows = vi.hoisted(() => ({
   rows: [] as {
     title: string;
     accessibilityLabel?: string;
+    subtitle?: string;
     value: boolean;
     disabled: boolean;
     onValueChange: (value: boolean) => void;
@@ -71,6 +72,9 @@ vi.mock('@/lib/hooks/use-settings-back-guard', () => ({
     dialog: null,
   }),
 }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
+}));
 vi.mock('@/components/security-agent/settings-pill-group', () => ({
   PillGroup: (props: { label: string; accessibilityLabel?: string }) => {
     pillGroups.groups.push(props);
@@ -87,6 +91,7 @@ vi.mock('@/components/security-agent/settings-toggle-row', () => ({
   ToggleRow: (props: {
     title: string;
     accessibilityLabel?: string;
+    subtitle?: string;
     value: boolean;
     disabled: boolean;
     onValueChange: (value: boolean) => void;
@@ -255,5 +260,63 @@ describe('AutomationSettingsScreen approval gate', () => {
 
     const names = [...includeNames, ...severityNames];
     expect(new Set(names).size).toBe(4);
+  });
+
+  it('titles each section switch briefly with its description as muted copy', () => {
+    config.data = enabledConfig();
+    renderScreen();
+
+    const sectionNames = [
+      'securityAgent.automation.autoAnalysis',
+      'securityAgent.automation.autoRemediation',
+      'securityAgent.automation.autoDismiss',
+    ].map(key => i18n.t(key));
+    const sections = [
+      {
+        title: i18n.t('securityAgent.automation.analyzeNewFindings'),
+        description: i18n.t('securityAgent.automation.autoAnalysisDescription'),
+      },
+      {
+        title: i18n.t('securityAgent.automation.openFixPrs'),
+        description: i18n.t('securityAgent.automation.autoRemediationDescription'),
+      },
+      {
+        title: i18n.t('securityAgent.automation.dismissNonExploitable'),
+        description: i18n.t('securityAgent.automation.autoDismissDescription'),
+      },
+    ];
+
+    // The rendered rows carry the proof, not the expected pairs: the screen
+    // draws one row per section in section order, so a row that repeated or
+    // swapped another section's title fails here.
+    const rendered = toggleRows.rows.filter(row =>
+      sections.some(section => section.title === row.title)
+    );
+    expect(rendered.map(row => row.title)).toEqual(sections.map(section => section.title));
+
+    for (const [index, section] of sections.entries()) {
+      const row = rendered[index];
+      if (!row) {
+        throw new Error(`section toggle row ${section.title} not found`);
+      }
+
+      // Each short title keeps its own description under it, so the three rows
+      // cannot swap copy between sections.
+      expect(row.subtitle).toBe(section.description);
+
+      // The sentence adds only what the title and heading cannot: the heading
+      // already says "Auto", so a subtitle that names the automatic behaviour
+      // is the repeated copy this row was trimmed of.
+      expect((row.subtitle ?? '').toLowerCase()).not.toMatch(/\bauto/);
+
+      // A title names the setting, not the section it sits under.
+      for (const sectionName of sectionNames) {
+        expect(row.title).not.toContain(sectionName);
+      }
+      expect(row.title.endsWith('.')).toBe(false);
+
+      // Label in name: the switch is named by the text the row shows.
+      expect(row.accessibilityLabel).toBeUndefined();
+    }
   });
 });

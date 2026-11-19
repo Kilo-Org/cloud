@@ -1,5 +1,5 @@
 import { Pressable } from 'react-native';
-import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown } from '@/components/ui/icons';
 
@@ -7,13 +7,13 @@ import { getBuiltinModeLabelKey, getModeIcon } from '@/components/agents/mode-op
 import {
   type AgentMode,
   dedupeCustomModeOptions,
-  ensureSelectedCustomOption,
   isBuiltinAgentMode,
   type ModeOption,
   normalizeAgentMode,
 } from '@/components/agents/mode-normalize';
 import { Text } from '@/components/ui/text';
 import { CHIP_HIT_SLOP } from '@/lib/a11y/tap-target';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { parseParam } from '@/lib/route-params';
 import { modePickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
@@ -33,18 +33,19 @@ export function ModeSelector({
   disabled = false,
   customOptions = [],
 }: Readonly<ModeSelectorProps>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { 'session-id': rawSessionId } = useLocalSearchParams<{ 'session-id'?: string }>();
   const selectedValue = normalizeAgentMode(value);
   const customOptionsDeduped = dedupeCustomModeOptions(customOptions);
-  const selectedCustomOption = ensureSelectedCustomOption(customOptionsDeduped, selectedValue).find(
-    m => m.value === selectedValue
-  );
+  const customMatch = customOptionsDeduped.find(option => option.value === selectedValue);
+  // An empty label means no loaded option names this mode, so the chip falls
+  // back to the generic label rather than printing the slug.
+  const customLabel = customMatch?.label ?? '';
   const selectedLabel = isBuiltinAgentMode(selectedValue)
     ? t(getBuiltinModeLabelKey(selectedValue) ?? '')
-    : (selectedCustomOption?.label ?? selectedValue);
+    : customLabel || t('agentChat.modeSelector.customMode');
   const ModeIcon = getModeIcon(selectedValue);
 
   function handlePress() {
@@ -57,7 +58,7 @@ export function ModeSelector({
       onSelect: onChange,
       customOptions,
     });
-    router.push(`/(app)/agent-chat/mode-picker?routeKey=${encodeURIComponent(routeKey)}` as Href);
+    pushOnce(`/(app)/agent-chat/mode-picker?routeKey=${encodeURIComponent(routeKey)}` as Href);
   }
 
   return (

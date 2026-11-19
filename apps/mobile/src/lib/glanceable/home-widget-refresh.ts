@@ -6,7 +6,7 @@ import {
 import {
   buildHomeWidgetPresentation,
   buildHomeWidgetPresentationTimeline,
-  EMPTY_HOME_WIDGET_DETAILS,
+  emptyHomeWidgetDetails,
   homeWidgetDataSchema,
   homeWidgetRefreshAt,
   homeWidgetResponseSchema,
@@ -16,6 +16,7 @@ import { z } from 'zod';
 
 import { end as endLiveUpdate, setWidgetSnapshot } from '@/glanceable-android/live-update';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { isExpectedAuthFailure } from '@/lib/auth/trpc-unauthorized';
 import { isSignOutTeardownActive } from '@/lib/auth/token-owner';
 import { API_BASE_URL } from '@/lib/config';
 import { isAlreadyReportedNetworkError } from '@/lib/telemetry/app-error-reporting';
@@ -268,7 +269,10 @@ export async function syncHomeWidgetRefresh(context: {
       })
     );
   } catch (error) {
-    if (!superseded()) {
+    // A locked keychain and a refused session credential are expected states,
+    // not a refusal of the widget credential: nothing is latched, dropped or
+    // filed for them, and the next unlocked sync asks again.
+    if (!superseded() && !isExpectedAuthFailure(error)) {
       await handleRefreshFailure(error, { scopeKey, authEpoch });
     }
   }
@@ -312,7 +316,7 @@ export async function applyHomeWidgetResponse(
       accountEpoch: authEpoch,
       status: 'privacy',
     });
-    rememberHomeWidgetData({ snapshot, details: EMPTY_HOME_WIDGET_DETAILS });
+    rememberHomeWidgetData({ snapshot, details: emptyHomeWidgetDetails() });
     setWidgetSnapshot(snapshot);
     endLiveUpdate();
     return true;

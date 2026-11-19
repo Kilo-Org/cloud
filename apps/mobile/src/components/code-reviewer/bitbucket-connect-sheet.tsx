@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { bitbucketRepair } from '@/lib/code-reviewer-bitbucket';
+import { useSheetHeaderTopClearance } from '@/lib/form-sheet';
 import { notificationHaptic } from '@/lib/haptics';
 import { useBitbucketIntegrationStatus, useBitbucketReadiness } from '@/lib/hooks/use-bitbucket';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
@@ -27,12 +28,26 @@ import { isPermissionDeniedError, trpcErrorVariant } from '@/lib/trpc-error';
  * instead of connecting twice, which the server refuses.
  */
 export function BitbucketConnectSheet({ scope }: Readonly<{ scope: string | undefined }>) {
-  // Without a scope there is no organization to name, and the boundary explains
-  // which selection is missing instead of leaving the sheet blank.
-  if (scope === undefined) {
-    return <OrganizationBoundary />;
-  }
-  return <ScopedBitbucketConnectSheet scope={scope} />;
+  // The route presents as a full-window modal on Android, so the surface reaches
+  // the window top there and must clear the status bar itself; the iOS formSheet
+  // presents below it and reserves nothing. The rule resolves both from the same
+  // inputs the sheet headers use, and it is applied once here so every state of
+  // the sheet — the boundary, the loading skeleton and the form — clears it.
+  const windowTopClearance = useSheetHeaderTopClearance('android-window-top');
+  return (
+    <View
+      className="flex-1 bg-background"
+      style={windowTopClearance > 0 ? { paddingTop: windowTopClearance } : undefined}
+    >
+      {scope === undefined ? (
+        // Without a scope there is no organization to name, and the boundary
+        // explains which selection is missing instead of leaving the sheet blank.
+        <OrganizationBoundary />
+      ) : (
+        <ScopedBitbucketConnectSheet scope={scope} />
+      )}
+    </View>
+  );
 }
 
 function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {

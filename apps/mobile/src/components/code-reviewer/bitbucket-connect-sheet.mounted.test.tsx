@@ -60,7 +60,18 @@ const state = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+  StatusBar: { currentHeight: 0 },
+  View: 'View',
+}));
+// The surface's status-bar clearance reads the window insets, and this node
+// project cannot load the library's Flow entry: stub its one native dependency,
+// which is what every mounted suite here does. A zero top inset is the iOS
+// formSheet case, so the wrapper adds no padding.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
 vi.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 'success' },
   notificationAsync: vi.fn(),

@@ -1,5 +1,9 @@
 import { type ModeOption } from '@/components/agents/mode-normalize';
-import { type RepoOption, type RepoPickerSection } from '@/lib/picker-bridge';
+import {
+  buildRepoSections,
+  type RepoOption,
+  toBridgeRepo,
+} from '@/components/agents/repo-sections';
 import {
   branchPickerSlot,
   folderPickerSlot,
@@ -92,7 +96,7 @@ function gitlabRepo(fullName: string, isPrivate = false): RepoOption {
   return { platform: 'gitlab', fullName, isPrivate };
 }
 
-function repoSections(state: (typeof REPO_STATES)[number]): RepoPickerSection[] {
+function repositoriesFor(state: (typeof REPO_STATES)[number]): RepoOption[] {
   if (state === 'empty') {
     return [];
   }
@@ -113,21 +117,24 @@ function repoSections(state: (typeof REPO_STATES)[number]): RepoPickerSection[] 
       index % 2 === 0
     )
   );
-  const recents = [...github.slice(0, 1), ...gitlab.slice(0, 1)];
-  return [
-    { key: 'recents', titleKey: 'agentChat.newSession.recentlyUsed', repos: recents },
-    { key: 'github', titleKey: 'common.github', repos: github },
-    { key: 'gitlab', titleKey: 'common.gitlab', repos: gitlab },
-  ];
+  return [...github, ...gitlab];
 }
 
 function openRepoPicker(state: (typeof REPO_STATES)[number]): string {
-  const sections = repoSections(state);
+  const repositories = repositoriesFor(state);
+  // The first row of each provider was used recently, and the first GitHub row
+  // is the form's pick: the same value shape (`platform:fullName`) and the same
+  // section assembly the composer's repository field publishes.
+  const recents = repositories.filter(
+    (repo, index) => index === 0 || repo.platform !== repositories[index - 1]?.platform
+  );
+  const rows = repositories.map(repo => toBridgeRepo(repo));
+  const picked = rows[0];
   repoPickerSlot.set(UNFENCED_ROUTE_KEY, {
-    repositories: sections.filter(section => section.key !== 'recents').flatMap(s => s.repos),
-    sections,
+    repositories: rows,
+    sections: buildRepoSections({ repositories, recents }),
     organizationId: null,
-    currentValue: sections[0]?.repos[0]?.fullName ?? '',
+    currentValue: picked === undefined ? '' : `${picked.platform}:${picked.fullName}`,
     onSelect: () => undefined,
   });
   return '/(app)/agent-chat/repo-picker';

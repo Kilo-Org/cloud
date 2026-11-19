@@ -62,7 +62,15 @@ describe('agentChatPickerFixtureRoute', () => {
     const listed = slots.repo.mock.calls[0]?.[1];
     expect(listed?.repositories).toHaveLength(6);
     expect(listed?.sections.map(section => section.key)).toEqual(['recents', 'github', 'gitlab']);
-    expect(listed?.currentValue).toBe('kilo-org/repo-1');
+    // Each row appears once, recents included, as the composer's assembly lists them.
+    const shown = listed?.sections.flatMap(section =>
+      section.repos.map(repo => `${repo.platform}:${repo.fullName}`)
+    );
+    expect(shown).toHaveLength(6);
+    expect(new Set(shown).size).toBe(6);
+    // The value the picker compares rows against (`platform:fullName`) names a row.
+    expect(listed?.currentValue).toBe('github:kilo-org/repo-1');
+    expect(shown).toContain(listed?.currentValue);
 
     agentChatPickerFixtureRoute('/dev/repo-picker-fixture/empty');
     expect(slots.repo.mock.calls[1]?.[1]).toMatchObject({

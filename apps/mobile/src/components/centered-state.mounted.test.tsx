@@ -59,6 +59,7 @@ vi.mock('react-native', () => ({
   PixelRatio: { roundToNearestPixel: (value: number) => Math.round(value * 2) / 2 },
   // Portrait by default, so the short-band flag the scroller publishes stays
   // false and a state inside it keeps its full stack.
+  useColorScheme: () => 'light',
   useWindowDimensions: () => ({ ...native.window, fontScale: 1 }),
   View: 'View',
   ScrollView: (props: ComponentPropsWithRef<typeof ScrollView>) => {

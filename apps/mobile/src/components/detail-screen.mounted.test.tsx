@@ -15,9 +15,11 @@ const motion = vi.hoisted(() => ({ reducedMotion: false }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'android', select: (options: Record<string, unknown>) => options.android },
   ScrollView: 'ScrollView',
+  useColorScheme: () => 'light',
   View: 'View',
   useWindowDimensions: () => ({ width: 411, height: 914, scale: 2.625, fontScale: 1 }),
 }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('react-native-keyboard-controller', () => ({
   useKeyboardState: <T,>(selector: (state: { height: number }) => T) => selector({ height: 0 }),
 }));

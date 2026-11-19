@@ -12,6 +12,7 @@ import {
   KILO_ACTIVITY_MESSAGE_LIMIT,
   DrainSessionError,
   isKiloServerUnreachableError,
+  SessionRulesetNotAppliedError,
   type WrapperKiloClient,
 } from './kilo-api';
 
@@ -1082,9 +1083,29 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
         .ensureSession(sessionId, directory)
         .catch((error: unknown) => error);
 
-      expect(error).toBeInstanceOf(Error);
-      expect((error as Error).message).toContain('Session permission restore');
+      expect(error).toBeInstanceOf(SessionRulesetNotAppliedError);
+      expect((error as Error).message).toContain('Session ruleset not applied');
       expect(stub.updates).toHaveLength(3);
+    });
+
+    it('marks a failed ruleset application as not worth retrying', async () => {
+      const sessionId = 'ses_record_permission_final';
+      const directory = temporaryDirectory('kilo-api-permission-final-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-permission-final-other-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' }];
+      const stub = startEnsureSessionStub(
+        sessionId,
+        { id: sessionId, directory: otherDirectory, permission },
+        { failUpdates: 5 }
+      );
+
+      const error = await createClient(stub.url)
+        .ensureSession(sessionId, directory)
+        .catch((error: unknown) => error);
+
+      expect(error).toBeInstanceOf(SessionRulesetNotAppliedError);
+      expect((error as SessionRulesetNotAppliedError).retryable).toBe(false);
+      expect((error as SessionRulesetNotAppliedError).sessionId).toBe(sessionId);
     });
 
     it('does not apply a record permission that is not a ruleset', async () => {

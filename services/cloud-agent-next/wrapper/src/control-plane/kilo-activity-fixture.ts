@@ -195,6 +195,7 @@ export async function activityFixture(
     return {
       root,
       directory,
+      serverUrl: url,
       client,
       harness: createKiloHarness({ server: { url }, directory }),
       wrapper: createWrapperKiloClient(

@@ -25,6 +25,7 @@ import {
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 import type { ControlDiagnosticReporter } from '../../../src/shared/control-diagnostics.js';
 import type { Harness } from './harness.js';
+import { SessionRulesetNotAppliedError } from '../kilo-api.js';
 import {
   git,
   runProcess,
@@ -448,7 +449,9 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       try {
         return await operation(attempt);
       } catch (error) {
-        if (!isCurrent()) throw error;
+        // A session whose record is already in place cannot gain its ruleset
+        // from a second attempt: the retry finds the record and returns first.
+        if (!isCurrent() || error instanceof SessionRulesetNotAppliedError) throw error;
         lastError = error;
       }
     }

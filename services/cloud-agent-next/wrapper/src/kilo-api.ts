@@ -188,6 +188,23 @@ function requireSdkData<T>(
   return result.data;
 }
 
+/**
+ * The import committed the record but its ruleset could not be applied. The
+ * record is in place, so retrying the session step would reuse it and return
+ * without applying the ruleset; this error marks the failure as one a retry
+ * cannot improve.
+ */
+export class SessionRulesetNotAppliedError extends Error {
+  readonly sessionId: string;
+  readonly retryable = false;
+
+  constructor(sessionId: string, cause: unknown) {
+    super(`Session ruleset not applied for ${sessionId}`, { cause });
+    this.name = 'SessionRulesetNotAppliedError';
+    this.sessionId = sessionId;
+  }
+}
+
 export type DrainSessionErrorKind =
   | 'transient'
   | 'definitive'
@@ -654,7 +671,9 @@ export function createWrapperKiloClient(
             }
           }
         }
-        throw lastError;
+        // The record is already in place, so a step retry would reuse it and
+        // skip this call. Report the failure as final for this attempt.
+        throw new SessionRulesetNotAppliedError(sessionId, lastError);
       };
       const lookupTimeout = AbortSignal.timeout(5_000);
       const lookupSignal = signal ? AbortSignal.any([signal, lookupTimeout]) : lookupTimeout;

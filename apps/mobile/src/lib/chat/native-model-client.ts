@@ -320,9 +320,15 @@ function answer(
  * `unavailable` without a reason has nothing more specific to say.
  */
 function reasonAtSendTime(availability: NativeAvailability): string {
-  if (availability.reason !== undefined) return availability.reason;
-  if (availability.status === 'downloadable') return 'model_download_required';
-  if (availability.status === 'downloading') return 'model_downloading';
+  if (availability.reason !== undefined) {
+    return availability.reason;
+  }
+  if (availability.status === 'downloadable') {
+    return 'model_download_required';
+  }
+  if (availability.status === 'downloading') {
+    return 'model_downloading';
+  }
   return 'model_unavailable';
 }
 

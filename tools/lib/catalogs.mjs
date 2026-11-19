@@ -149,10 +149,10 @@ export function familiesOwedByEveryLocale(english) {
  * A family the locale declares itself — a member key with a category suffix —
  * must carry every category its tag selects, whatever English ships. A family
  * English declares and every locale owes (`familiesOwedByEveryLocale`) is
- * mandatory only when the locale carries the family's flat base key; a locale
- * whose copy inflects no word keeps that one string and renders it at every
- * count. Every other family is not this locale's problem: a locale that lacks
- * an owed family's base key is a key-parity finding, not a category finding.
+ * mandatory when the locale carries the family's flat base key, and then every
+ * category the tag selects must be present. Every other family is not this
+ * locale's problem: a locale that lacks an owed family's base key is a
+ * key-parity finding, not a category finding.
  *
  * A complete family is absent from the Map, so an empty Map means the locale is
  * complete. Both audits ask this question, so the answer lives here and neither

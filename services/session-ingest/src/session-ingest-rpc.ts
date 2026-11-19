@@ -140,6 +140,7 @@ import { clearSessionLocalState } from './services/session-local-state';
 import { setCloudAgentSessionVersion } from './services/cloud-agent-session-version';
 import { applyReportedSessionTitle, reportSessionTitleSchema } from './services/session-title';
 import { applyMetadataChanges } from './ingest/metadata';
+import { laterLastActivityAt } from './ingest/last-activity';
 
 const MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS = 512;
 const CLOUD_AGENT_ROOT_SESSION_IDENTITY_CONFLICT_ERROR =
@@ -619,6 +620,43 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
       this.ctx,
       input.cloudAgentSessionId
     );
+    if (input.lastActivityAt === undefined && input.title === undefined) return;
+
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    const runtimeOwner = eq(cli_sessions_v2.cloud_agent_session_id, input.cloudAgentSessionId);
+    if (input.lastActivityAt !== undefined) {
+      await db
+        .update(cli_sessions_v2)
+        .set({ last_activity_at: laterLastActivityAt(input.lastActivityAt) })
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, input.sessionId),
+            eq(cli_sessions_v2.kilo_user_id, input.kiloUserId),
+            runtimeOwner
+          )
+        );
+    }
+    if (input.title !== undefined) {
+      // A native rename names the session as a CLI's rename report does, so it
+      // replaces a generated title too.
+      const result = await applyReportedSessionTitle(db, {
+        sessionId: input.sessionId,
+        kiloUserId: input.kiloUserId,
+        input: { title: input.title, generated: false },
+        scope: runtimeOwner,
+      });
+      if (result.kind !== 'applied') return;
+      const session = mapSessionEventRow(result.row);
+      notifyUserSessionEvent(
+        this.env,
+        input.kiloUserId,
+        {
+          type: 'session.updated',
+          data: { source: 'v2', session, changedAt: session.updatedAt },
+        },
+        this.ctx
+      );
+    }
   }
 
   async recordCloudAgentSessionHarness(

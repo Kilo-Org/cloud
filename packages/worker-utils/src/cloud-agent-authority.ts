@@ -118,12 +118,24 @@ export const requestedEnvironmentSchema = z
   })
   .strict();
 
+/**
+ * The one rule for a cloud-agent prompt: non-blank after trim, length-bounded.
+ * Every boundary that accepts a first-user-instruction prompt (delegated
+ * authority launches, web prepareSession, worker prepareSession) uses this
+ * schema instead of its own copy of the refine.
+ */
+export const cloudAgentPromptSchema = z
+  .string()
+  .min(1)
+  .max(100_000)
+  .refine(prompt => prompt.trim().length > 0, { message: 'Prompt is required' });
+
 const scopedPrepareSessionSchema = z
   .object({
     githubRepo: z.string().regex(/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/),
     model: z.string().min(1).max(200),
     mode: z.enum(['code', 'plan', 'debug', 'orchestrator', 'ask', 'build', 'architect']),
-    prompt: z.string().min(1).max(100_000),
+    prompt: cloudAgentPromptSchema,
     variant: z.string().min(1).max(50).optional(),
     upstreamBranch: z.string().min(1).max(500).optional(),
     stackOnWorktreeId: cloudAgentWorktreeIdSchema
@@ -196,11 +208,7 @@ const scopedChildOperations = {
         payload: z
           .object({
             type: z.literal('prompt'),
-            prompt: z
-              .string()
-              .min(1)
-              .max(100_000)
-              .refine(prompt => prompt.trim().length > 0),
+            prompt: cloudAgentPromptSchema,
             mode: scopedPrepareSessionSchema.shape.mode,
             model: scopedPrepareSessionSchema.shape.model,
             variant: scopedPrepareSessionSchema.shape.variant,

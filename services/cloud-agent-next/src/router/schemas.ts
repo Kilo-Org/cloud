@@ -10,6 +10,7 @@ import {
   sessionIdSchema as kiloSessionIdSchema,
 } from '@kilocode/session-ingest-contracts';
 import { worktreeFileQuerySchema } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+import { cloudAgentPromptSchema } from '@kilocode/worker-utils/cloud-agent-authority';
 import {
   sessionIdSchema,
   githubRepoSchema,
@@ -628,7 +629,7 @@ const PrepareSessionSharedFields = {
 };
 
 const PrepareSessionNonCloneVariant = z.object({
-  prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH).describe('The task prompt for Kilo Code'),
+  prompt: cloudAgentPromptSchema.describe('The task prompt for Kilo Code'),
   kiloSessionId: clientKiloSessionIdSchema
     .optional()
     .describe(
@@ -705,6 +706,13 @@ export const PrepareSessionInput = z
     path: ['githubRepo'],
   })
   .superRefine((data, ctx) => {
+    if (data.initialPayload?.type === 'prompt' && data.initialPayload.prompt.trim().length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['initialPayload', 'prompt'],
+        message: 'Prompt is required',
+      });
+    }
     if (data.baseBranch !== undefined && data.upstreamBranch !== undefined) {
       ctx.addIssue({
         code: 'custom',

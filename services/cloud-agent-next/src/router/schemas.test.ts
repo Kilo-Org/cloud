@@ -679,6 +679,65 @@ describe('legacy live attachment input compatibility', () => {
   });
 });
 
+describe('prepareSession prompt rule', () => {
+  const prepareInput = {
+    prompt: 'Implement the task',
+    mode: 'code' as const,
+    model: 'claude-sonnet-4-5-20250929',
+    githubRepo: 'acme/repo',
+  };
+
+  it('refuses a whitespace-only launch prompt and keeps a real one', () => {
+    for (const prompt of ['   ', '\n\t ']) {
+      const result = PrepareSessionInput.safeParse({ ...prepareInput, prompt });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const issue = result.error.issues.find(entry => entry.message === 'Prompt is required');
+        expect(issue?.path).toEqual(['prompt']);
+      }
+    }
+    expect(PrepareSessionInput.parse(prepareInput).prompt).toBe('Implement the task');
+  });
+
+  it('refuses a whitespace-only prompt-type initialPayload', () => {
+    const result = PrepareSessionInput.safeParse({
+      ...prepareInput,
+      initialPayload: {
+        type: 'prompt',
+        prompt: '   ',
+        mode: 'code',
+        model: 'claude-sonnet-4-5-20250929',
+      },
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find(entry => entry.message === 'Prompt is required');
+      expect(issue?.path).toEqual(['initialPayload', 'prompt']);
+    }
+    expect(
+      PrepareSessionInput.safeParse({
+        ...prepareInput,
+        initialPayload: {
+          type: 'prompt',
+          prompt: 'Do the work',
+          mode: 'code',
+          model: 'claude-sonnet-4-5-20250929',
+        },
+      }).success
+    ).toBe(true);
+  });
+
+  it('keeps the attachment-only follow-up exemption on sendMessageV2', () => {
+    expect(
+      SendMessageV2Input.safeParse({
+        ...baseSendMessageInput,
+        prompt: '',
+        attachments: validAttachments,
+      }).success
+    ).toBe(true);
+  });
+});
+
 describe('prepareSession clone-only variant', () => {
   const baseCloneInput = {
     mode: 'code',

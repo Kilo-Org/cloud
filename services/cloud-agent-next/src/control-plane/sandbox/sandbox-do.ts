@@ -7,6 +7,8 @@ import {
   RUNTIME_HARNESSES,
   RUNTIME_INSTRUCTIONS_HEADER,
   RUNTIME_INSTRUCTIONS_VERSION,
+  RUNTIME_WEB_SEARCH_HEADER,
+  RUNTIME_WEB_SEARCH_VERSION,
   type RuntimeHarness,
   WORKSPACE_CONFIGURATION_HEADER,
   WORKSPACE_CONFIGURATION_VERSION,
@@ -138,7 +140,7 @@ import {
   type SessionCredentialGrant,
 } from '../../sandbox-control/session-credentials.js';
 import { providerUsesOutboundCredentialProxy } from '../../agent-sandbox/capabilities.js';
-import { getManagedOutboundContainerId } from '../../sandbox-id.js';
+import { classifySandboxId, getManagedOutboundContainerId } from '../../sandbox-id.js';
 import {
   resolveSandboxIdClass,
   sandboxKindMatchesKey,
@@ -226,6 +228,7 @@ import {
 } from '../../mcp-config.js';
 import {
   attachmentSpecFromRouteSpec,
+  projectRuntimeProfileFields,
   workspaceConfigFromSpec,
 } from '../../shared/workspace-config.js';
 import {
@@ -245,6 +248,7 @@ import {
   controlPlaneRouteSpecSchema,
   controlPlaneSessionCredentialsPayloadSchema,
   controlPlaneSessionRefPayloadSchema,
+  controlPlaneReleasePayloadSchema,
   controlPlaneTerminalInputSchema,
   controlPlaneWorktreeCaptureInputSchema,
   controlPlaneWorktreeDeletionPayloadSchema,
@@ -270,6 +274,7 @@ import {
   type ControlPlaneRouteView,
   type ControlPlaneSessionCredentialsPayload,
   type ControlPlaneSessionRefPayload,
+  type ControlPlaneReleasePayload,
   type ControlPlaneStatusResult,
   type ControlPlaneTerminalInput,
   type ControlPlaneWorktreeCaptureInput,
@@ -467,6 +472,8 @@ import {
   type SnapshotValidatorInput,
 } from './snapshot-validator.js';
 
+import { readSentryIdentity, sentryIdentityFromBilling } from '../../sentry-identity.js';
+
 const GENERATION_KEY = 'control_plane_generation';
 const GENERATION = 2;
 const WORKSPACE_ARTIFACT_ORPHAN_SWEEP_DELAY_MS = 60_000;
@@ -540,6 +547,7 @@ const wrapperSocketAttachmentSchema = z.object({
   transferGrants: z.literal(true).optional(),
   workspaceConfiguration: z.literal(true).optional(),
   runtimeInstructions: z.literal(true).optional(),
+  runtimeWebSearch: z.literal(true).optional(),
   runtimeCapability: z.literal('worktree').optional(),
   runtimeHarness: z.enum(RUNTIME_HARNESSES).optional(),
   kiloCliVersion: SandboxRuntimeVersionSchema.optional(),
@@ -754,10 +762,13 @@ export type ControlRuntimeCredentialProxyFence = {
   wrapperInstanceId: string;
 };
 
+/** Why an adopted handle cannot serve the caller's canonical scope view. */
+export type RuntimeProxyScopeViewUnavailableReason = 'scope_mismatch' | 'missing_canonical_grant';
+
 /** The fence plus, for an adopted handle, the current scope view or the reason it is unavailable. */
 export type ControlRuntimeCredentialProxyFenceScope = ControlRuntimeCredentialProxyFence & {
   scopeView?: ScopeGrantView;
-  scopeViewUnavailable?: string;
+  scopeViewUnavailable?: RuntimeProxyScopeViewUnavailableReason;
 };
 
 /** The adopted-handle state a scope is already serving, if any. */
@@ -1059,6 +1070,20 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
     this.provider = this.createProviderAdapter(this.defaultPin('cloudflare-containers'));
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
+  }
+
+  async [readSentryIdentity]() {
+    const pin = this.providerPin;
+    const billing = pin?.billing ? sentryIdentityFromBilling(pin.billing) : undefined;
+    return {
+      userId: (await this.requireOwner().catch(() => null)) ?? billing?.userId ?? pin?.byoc?.userId,
+      orgId:
+        billing?.orgId ??
+        pin?.byoc?.organizationId ??
+        (pin?.byoc?.userId ? '(personal)' : undefined),
+      sessionId: billing?.sessionId,
+      sandboxId: this.sandboxId,
+    };
   }
 
   async requestBillingStop(input: NativeBillingStopRequest): Promise<boolean> {
@@ -1582,10 +1607,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
     );
   }
 
-  async release(payload: ControlPlaneSessionRefPayload): Promise<void> {
+  async release(payload: ControlPlaneReleasePayload): Promise<void> {
     await this.initialized;
-    const parsed = controlPlaneSessionRefPayloadSchema.parse(payload);
-    await this.enqueue(() => this.retireRoute(parsed.sessionId));
+    const parsed = controlPlaneReleasePayloadSchema.parse(payload);
+    await this.enqueue(async () => {
+      await this.retireRoute(parsed.sessionId);
+      if (parsed.reason !== 'standalone_session_deleted') return;
+      const sandboxClass = classifySandboxId(this.sandboxId);
+      if (sandboxClass === 'shared' || sandboxClass === 'legacy-shared') return;
+      if ((await listRoutes(this.db)).length !== 0) return;
+      await this.applyEvent({ type: 'stop-requested', at: Date.now(), reason: 'sandbox_stopped' });
+      await this.clearWorkspaceArtifactsForDeletion();
+    });
   }
 
   /**
@@ -2109,20 +2142,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   async listWorkspaceArtifacts(): Promise<WorkspaceArtifactList> {
     await this.initialized;
-    return this.enqueue(async () => {
-      const result = this.workspaceArtifacts.list();
-      await this.scheduleWorkspaceArtifactOrphanSweepIfNeeded();
-      return result;
-    });
+    return this.enqueue(async () => this.workspaceArtifacts.list());
   }
 
   async getWorkspaceArtifact(relativePath: string): Promise<WorkspaceArtifactEntryLookup | null> {
     await this.initialized;
-    return this.enqueue(async () => {
-      const result = this.workspaceArtifacts.get(relativePath);
-      await this.scheduleWorkspaceArtifactOrphanSweepIfNeeded();
-      return result;
-    });
+    return this.enqueue(async () => this.workspaceArtifacts.get(relativePath));
   }
 
   /**
@@ -2560,14 +2585,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
       if (scopeGrantId(grant) !== match.scopeGrantId) {
         return {
           ...fence,
-          scopeViewUnavailable: 'Accepted scope handle does not belong to the caller grant',
+          scopeViewUnavailable: 'scope_mismatch',
         };
       }
       const scopeGrant = readScopeGrant(this.db, match.scopeGrantId);
       if (scopeGrant === null) {
         return {
           ...fence,
-          scopeViewUnavailable: 'Accepted scope handle has no canonical grant',
+          scopeViewUnavailable: 'missing_canonical_grant',
         };
       }
       return { ...fence, scopeView: readScopeGrantView(this.db, scopeGrant) };
@@ -2908,6 +2933,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
           : {}),
         ...(request.headers.get(RUNTIME_INSTRUCTIONS_HEADER) === RUNTIME_INSTRUCTIONS_VERSION
           ? { runtimeInstructions: true as const }
+          : {}),
+        ...(request.headers.get(RUNTIME_WEB_SEARCH_HEADER) === RUNTIME_WEB_SEARCH_VERSION
+          ? { runtimeWebSearch: true as const }
           : {}),
         ...runtimeHarnessField(parseRuntimeHarness(request.headers.get(RUNTIME_HARNESS_HEADER))),
         ...(observedRuntime.kiloCliVersion === null
@@ -3251,7 +3279,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     };
   }
 
-  private async applyEvent(event: AllocationEvent): Promise<void> {
+  private async applyEvent(event: AllocationEvent): Promise<AllocationState> {
     const previous = await this.readAllocation();
     const timers = { ...this.sandboxTimers() };
     if (
@@ -3327,6 +3355,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     for (const effect of effects) {
       await this.runEffect(effect, state);
     }
+    return state;
   }
 
   /**
@@ -3784,13 +3813,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ...(spec.baseBranch === undefined ? {} : { baseBranch: spec.baseBranch }),
       ...(spec.baseSha === undefined ? {} : { baseSha: spec.baseSha }),
       ...(spec.worktreeRecovery === undefined ? {} : { worktreeRecovery: spec.worktreeRecovery }),
-      ...(spec.runtimeSkills === undefined ? {} : { runtimeSkills: spec.runtimeSkills }),
-      ...(spec.runtimeInstructions === undefined
-        ? {}
-        : { runtimeInstructions: spec.runtimeInstructions }),
-      ...(spec.runtimeAgents === undefined ? {} : { runtimeAgents: spec.runtimeAgents }),
-      ...(spec.builtinAgents === undefined ? {} : { builtinAgents: spec.builtinAgents }),
-      ...(spec.kiloCommands === undefined ? {} : { kiloCommands: spec.kiloCommands }),
+      ...projectRuntimeProfileFields(spec),
       ...(spec.permission === undefined ? {} : { permission: spec.permission }),
       ...(spec.runtimeIsolation === undefined ? {} : { runtimeIsolation: spec.runtimeIsolation }),
       ...(payload.githubReviewTarget === undefined
@@ -4746,6 +4769,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
     };
     // Pre-deploy wrappers reject unknown fields in both prepare and attach frames.
     if (attachment?.runtimeInstructions !== true) delete wireSpec.runtimeInstructions;
+    if (attachment?.runtimeWebSearch !== true) {
+      if (wireSpec.webSearchDisabled && attachment?.runtimeHarness === 'kilo2') {
+        wireSpec.permission = { ...wireSpec.permission, websearch: 'deny' };
+      }
+      delete wireSpec.webSearchDisabled;
+      delete wireSpec.webSearchProvider;
+    }
     // A restored workspace tail runs no commands, so the frame carries none. A
     // non-tail start sends the environment build boundary and start list.
     if (snapshotFrame.workspaceSnapshot !== undefined) {
@@ -5492,6 +5522,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
       let createdRef: string | null = null;
       let billingAdmissionDeadlineAt: number | undefined;
       let billingAdmissionTimedOut = false;
+      let logSnapshotCreateFailure: ((willRetry: boolean) => void) | undefined;
+      let willRetrySnapshotCreate = false;
       let selectedLaunch:
         | { options: ProviderLaunchOptions; selection: SnapshotStartSelection | null }
         | undefined;
@@ -5575,15 +5607,53 @@ export class SandboxControlV2 extends DurableObject<Env> {
             }
           }
           // N2: create and launch share one bound (the create deadline).
+          const startedAt = Date.now();
+          const result = withTimeout(
+            this.provider.create(intent),
+            remainingMs(Math.min(createDeadline, billingAdmissionDeadlineAt ?? createDeadline)),
+            'Sandbox create timed out',
+            () => {
+              billingAdmissionTimedOut =
+                billingAdmissionDeadlineAt !== undefined &&
+                billingAdmissionDeadlineAt <= createDeadline;
+            }
+          );
+          if (intent.snapshot === undefined) return { result };
+          const log = (outcome: 'restored' | 'failed', reason?: string) => {
+            const fields = {
+              sandboxId: this.sandboxId,
+              allocationId,
+              provider: pin.provider,
+              stage: 'provider_create',
+              snapshotKind: 'environment',
+              attempt: afterPreflight.createAttempt,
+              durationMs: Math.max(0, Date.now() - startedAt),
+              outcome,
+              reason,
+            };
+            if (outcome === 'failed') {
+              logSnapshotCreateFailure = willRetry =>
+                logControlDiagnostic('snapshot_restore_attempt_finished', { ...fields, willRetry });
+            } else {
+              logControlDiagnostic('snapshot_restore_attempt_finished', {
+                ...fields,
+                willRetry: false,
+              });
+            }
+          };
           return {
-            result: withTimeout(
-              this.provider.create(intent),
-              remainingMs(Math.min(createDeadline, billingAdmissionDeadlineAt ?? createDeadline)),
-              'Sandbox create timed out',
-              () => {
-                billingAdmissionTimedOut =
-                  billingAdmissionDeadlineAt !== undefined &&
-                  billingAdmissionDeadlineAt <= createDeadline;
+            result: result.then(
+              created => {
+                if ('unresolved' in created) log('failed', 'provider_create_unresolved');
+                else log('restored');
+                return created;
+              },
+              (error: unknown) => {
+                log(
+                  'failed',
+                  error instanceof ProviderCreationError ? error.code : 'provider_create_failed'
+                );
+                throw error;
               }
             ),
           };
@@ -5595,7 +5665,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           billingAdmissionDeadlineAt = undefined;
         }
         if ('unresolved' in created) {
-          await this.dispatchCreateFailed(allocationId);
+          willRetrySnapshotCreate = await this.dispatchCreateFailed(allocationId);
           return;
         }
         // N4: persist the ref before launch so an accepted `hello` never sees null.
@@ -5850,12 +5920,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
             await this.stopRef(createdRef, allocationId);
           }
         }
-        await this.dispatchCreateFailed(
+        willRetrySnapshotCreate = await this.dispatchCreateFailed(
           allocationId,
           error instanceof ProviderCreationError && error.code === 'meter_unavailable'
             ? billingAdmissionDeadlineAt
             : undefined
         );
+      } finally {
+        logSnapshotCreateFailure?.(willRetrySnapshotCreate);
       }
     } finally {
       this.createInFlight = false;
@@ -6253,9 +6325,31 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const source = input.selection?.source ?? 'image';
     for (let attempt = 1; ; attempt += 1) {
       const attemptStartedAt = Date.now();
+      let durationMs = 0;
+      const logAttempt = (
+        outcome: 'restored' | 'failed' | 'cancelled',
+        reason?: string,
+        willRetry = false
+      ) => {
+        if (!requestedSnapshot || this.provider.environmentSnapshots === 'create') return;
+        logControlDiagnostic('snapshot_restore_attempt_finished', {
+          sandboxId: this.sandboxId,
+          allocationId: input.allocationId,
+          provider: this.currentProvider(),
+          stage: 'provider_launch',
+          snapshotKind: source,
+          attempt,
+          durationMs,
+          outcome,
+          reason,
+          willRetry,
+        });
+      };
       const recordFailure = (
-        failure: Omit<SnapshotLaunchFailureDiagnostic, 'source' | 'attempt' | 'elapsedMs'>
+        failure: Omit<SnapshotLaunchFailureDiagnostic, 'source' | 'attempt' | 'elapsedMs'>,
+        willRetry = false
       ): SnapshotLaunchFailureDiagnostic => {
+        logAttempt('failed', failure.reason, willRetry);
         const diagnostic: SnapshotLaunchFailureDiagnostic = {
           ...failure,
           source,
@@ -6313,7 +6407,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
           }
         );
       } catch (error) {
-        if (isContainersLaunchInterrupted(error)) throw error;
+        durationMs = Math.max(0, Date.now() - attemptStartedAt);
+        if (isContainersLaunchInterrupted(error)) {
+          logAttempt('cancelled', 'launch_interrupted');
+          throw error;
+        }
         // A create-time snapshot cannot be retried by launch. Retry creation
         // through the allocation lifecycle instead.
         if (!requestedSnapshot || this.provider.environmentSnapshots === 'create') throw error;
@@ -6325,9 +6423,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
         };
         result = { startSource: 'repository' };
       }
+      durationMs = Math.max(0, Date.now() - attemptStartedAt);
       const startedFromSnapshot = !result.snapshotFailed && result.startSource === 'repository';
       if (!requestedSnapshot) return { result, owned: false };
-      if (failure === undefined && startedFromSnapshot) return { result, owned: false };
+      if (failure === undefined && startedFromSnapshot) {
+        logAttempt('restored');
+        return { result, owned: false };
+      }
       const reason: SnapshotStartFailureReason =
         failure !== undefined
           ? 'transient'
@@ -6389,7 +6491,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         });
         return { result, owned: true };
       }
-      recordFailure(failure);
+      recordFailure(failure, true);
       logControlDiagnostic('snapshot_launch_retry', {
         sandboxId: this.sandboxId,
         allocationId: input.allocationId,
@@ -6663,15 +6765,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private async dispatchCreateFailed(
     allocationId: string,
     retryDeadlineAt?: number
-  ): Promise<void> {
-    await this.dispatchResult({
-      type: 'create-failed',
+  ): Promise<boolean> {
+    const nextAllocationId = crypto.randomUUID();
+    const event = {
+      type: 'create-failed' as const,
       at: Date.now(),
       allocationId,
-      nextAllocationId: crypto.randomUUID(),
+      nextAllocationId,
       retryAllowed: await this.retryAllowed(),
       retryDeadlineAt,
-    });
+    };
+    const next = await this.enqueue(() => this.applyEvent(event));
+    return next.kind === 'creating' && next.allocationId === nextAllocationId;
   }
 
   private async stopRef(
@@ -6975,6 +7080,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(frame.transferGrants ? { transferGrants: true } : {}),
         ...(attachment?.workspaceConfiguration ? { workspaceConfiguration: true } : {}),
         ...(attachment?.runtimeInstructions ? { runtimeInstructions: true } : {}),
+        ...(attachment?.runtimeWebSearch ? { runtimeWebSearch: true } : {}),
         ...runtimeHarnessField(attachment?.runtimeHarness),
       });
       logControlDiagnostic('workspace_snapshot_capability', {
@@ -7101,6 +7207,22 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // `stopping`), so only the current connection may move a route or forward.
     const ctx = this.routeContext(currentState);
     switch (frame.type) {
+      case 'session.restore_attempt': {
+        if (!current) return;
+        const route = await readRoute(this.db, frame.sessionId);
+        if (route?.state !== 'preparing') return;
+        const { type: _type, ...timings } = frame;
+        logControlDiagnostic('snapshot_restore_attempt_finished', {
+          ...timings,
+          sandboxId: this.sandboxId,
+          allocationId: currentState.allocationId,
+          attemptId: route.attemptId,
+          provider: this.currentProvider(),
+          stage: 'wrapper_restore',
+          snapshotKind: 'session',
+        });
+        return;
+      }
       case 'session.progress':
         await onRouteProgress(
           ctx,
@@ -7665,8 +7787,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private async clearWorkspaceArtifactsForDeletion(): Promise<void> {
-    const removed = this.workspaceArtifacts.clear();
-    if (removed > 0) await this.scheduleWorkspaceArtifactOrphanSweep();
+    this.workspaceArtifacts.clear();
+    await this.scheduleWorkspaceArtifactOrphanSweep();
   }
 
   private async sweepWorkspaceArtifactOrphans(): Promise<void> {

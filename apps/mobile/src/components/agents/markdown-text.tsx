@@ -24,6 +24,13 @@ import { markdownHtmlSplitCache } from './markdown-parse-cache';
 export type MarkdownTextProps = {
   value: string;
   variant?: MarkdownVariant;
+  /**
+   * Base direction of the document body, when it has one of its own: a legal
+   * document is English in every interface language, so its prose keeps a
+   * left-to-right base direction and the left edge while the screen around it
+   * mirrors. Chat omits this and follows the interface.
+   */
+  documentDirection?: 'ltr';
   selectable?: boolean;
   onLongPressLink?: MarkdownLinkLongPressHandler;
   /**
@@ -46,6 +53,7 @@ export type MarkdownTextProps = {
 export function MarkdownText({
   value,
   variant = 'assistant',
+  documentDirection,
   selectable = true,
   onLongPressLink,
   onPressLink,
@@ -91,6 +99,7 @@ export function MarkdownText({
             key={`md-html-${index}`}
             html={segment.raw}
             palette={palette}
+            documentDirection={documentDirection}
             selectable={selectable}
             onLongPressLink={onLongPressLink}
             onPressLink={onPressLink}
@@ -100,6 +109,7 @@ export function MarkdownText({
             key={`md-content-${index}`}
             raw={segment.raw}
             palette={palette}
+            documentDirection={documentDirection}
             selectable={selectable}
             onLongPressLink={onLongPressLink}
             onPressLink={onPressLink}
@@ -114,6 +124,7 @@ export function MarkdownText({
 type MarkdownRunProps = {
   raw: string;
   palette: MarkdownPalette;
+  documentDirection?: 'ltr';
   selectable: boolean;
   onLongPressLink?: MarkdownLinkLongPressHandler;
   onPressLink?: MarkdownLinkPressHandler;
@@ -130,6 +141,7 @@ type MarkdownRunProps = {
 function MarkdownRun({
   raw,
   palette,
+  documentDirection,
   selectable,
   onLongPressLink,
   onPressLink,
@@ -145,6 +157,7 @@ function MarkdownRun({
               key={`md-text-${index}`}
               value={run.raw}
               palette={palette}
+              documentDirection={documentDirection}
               selectable={selectable}
               onLongPressLink={onLongPressLink}
               onPressLink={onPressLink}

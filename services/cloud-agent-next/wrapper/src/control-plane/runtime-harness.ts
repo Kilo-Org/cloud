@@ -1,7 +1,15 @@
 import { z } from 'zod';
+import { randomUUID } from 'node:crypto';
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import { selectedRuntimeCli } from '../../../src/shared/runtime-distribution.js';
+import {
+  CLOUD_WEB_SEARCH_DISABLED_ENV,
+  CLOUD_WEB_SEARCH_PROVIDER_ENV,
+} from '../../../src/shared/runtime-environment.js';
+import { webSearchProviderSchema } from '../../../src/shared/web-search-provider.js';
 import { fetchKiloServer, type KiloServer } from '../kilo-server-auth.js';
+import { logToFile } from '../utils.js';
 import { createKilo2Harness } from './kilo2-harness.js';
 import { createKilo2EventFeed } from './kilo2-event-feed.js';
 import { createKiloHarness } from './kilo-harness.js';
@@ -59,6 +67,12 @@ export function kilo2RuntimeEnvironment(env: Record<string, string>): Record<str
     .record(z.string(), z.unknown())
     .parse(JSON.parse(env.KILO_CONFIG_CONTENT ?? '{}'));
   delete config.indexing;
+  if (env[CLOUD_WEB_SEARCH_DISABLED_ENV] === '1') config.websearch = false;
+  else if (env[CLOUD_WEB_SEARCH_PROVIDER_ENV]) {
+    config.websearch = {
+      provider: webSearchProviderSchema.parse(env[CLOUD_WEB_SEARCH_PROVIDER_ENV]),
+    };
+  }
   // V2 does not discover legacy rules. Reuse the workspace's files as one
   // configured source, leaving repository AGENTS.md discovery and V1 unchanged.
   if (env.HOME) {
@@ -112,7 +126,54 @@ export function kilo2RuntimeEnvironment(env: Record<string, string>): Record<str
   };
   // V1 disables background subagents; V2 uses its native default.
   delete runtimeEnv.KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS;
+  delete runtimeEnv[CLOUD_WEB_SEARCH_DISABLED_ENV];
+  delete runtimeEnv[CLOUD_WEB_SEARCH_PROVIDER_ENV];
   return runtimeEnv;
+}
+
+export async function prepareKilo2RuntimeEnvironment(
+  env: Record<string, string>
+): Promise<Record<string, string>> {
+  const runtimeEnv = kilo2RuntimeEnvironment(env);
+  if (!env.HOME) return runtimeEnv;
+  const profilePath = runtimeEnv.KILO2_CONFIG;
+  let profile: Record<string, unknown> = {};
+  if (profilePath) {
+    try {
+      profile = z
+        .record(z.string(), z.unknown())
+        .parse(JSON.parse(await fs.readFile(profilePath, 'utf8')));
+    } catch (error) {
+      // An unreadable profile must not spend the restart budget; the Exa
+      // default still applies and the spawn proceeds without profile settings.
+      logToFile(
+        `control-plane unreadable kilo2 profile path=${profilePath} errorClass=${
+          error instanceof Error ? error.name : typeof error
+        }; using web search defaults`
+      );
+    }
+  }
+  // The explicit config loads before repository config, unlike KILO_CONFIG_CONTENT.
+  const directory = profilePath
+    ? path.dirname(profilePath)
+    : path.join(env.HOME, '.config', 'kilo');
+  const configPath = path.join(directory, 'cloud-agent-v2.json');
+  const temporaryPath = `${configPath}.${randomUUID()}.tmp`;
+  await fs.mkdir(directory, { recursive: true });
+  try {
+    await fs.writeFile(
+      temporaryPath,
+      JSON.stringify({ websearch: { provider: 'exa' }, ...profile }),
+      {
+        mode: 0o600,
+        flag: 'wx',
+      }
+    );
+    await fs.rename(temporaryPath, configPath);
+  } finally {
+    await fs.rm(temporaryPath, { force: true });
+  }
+  return { ...runtimeEnv, KILO2_CONFIG: configPath };
 }
 
 export async function probeKilo2Health(server: KiloServer, signal: AbortSignal): Promise<boolean> {

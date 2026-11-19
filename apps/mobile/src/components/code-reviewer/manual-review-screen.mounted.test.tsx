@@ -130,6 +130,23 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: vi.fn(), push: status.push }),
   useFocusEffect: () => undefined,
 }));
+// The connect actions read the reader's organization role for a trial refusal.
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ organizationId: 'org_1', isLoaded: true }),
+}));
+vi.mock('@/lib/hooks/use-organizations-list', () => ({
+  useOrganizationsList: () => ({
+    data: [{ organizationId: 'org_1', role: 'member' }],
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    refetch: vi.fn(),
+  }),
+}));
+vi.mock('@/lib/trpc', () => ({
+  trpcClient: {},
+  useTRPC: () => ({}),
+}));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
@@ -149,6 +166,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 // depend on the real `classifyProviderErrorCode` to tell retryable from
 // permanent failures.
 vi.mock('@/lib/code-reviewer-config', () => ({
+  isPersonal: (scope: string) => scope === 'personal',
   PLATFORM_CAPABILITIES: { github: { label: 'GitHub' }, gitlab: { label: 'GitLab' } },
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -1048,12 +1066,12 @@ function typeInto(field: TestRenderer.ReactTestInstance, value: string) {
   });
 }
 
-/** The remaining-character row, found by the counted sentence it is named with. */
+/** The remaining-character row, found by the counted sentence it shows. */
 function counterRow(root: TestRenderer.ReactTestInstance, remaining: number) {
   return root.findAll(
     node =>
       String(node.type) === 'Text' &&
-      propOf(node, 'accessibilityLabel') ===
+      propOf(node, 'children') ===
         i18n.t('agentChat.composer.charactersRemaining', { count: remaining })
   );
 }
@@ -1089,10 +1107,10 @@ describe('ManualReviewScreen instructions limit', () => {
     const { renderer, unmount } = await renderScreen();
     typeInto(instructionsField(renderer.root), 'x'.repeat(3_500));
 
-    // The number is the visible row; the counted sentence is its accessible
-    // name, so a screen reader reads "500 characters remaining", not "500".
+    // The counted sentence is the visible row, so a sighted reader and a screen
+    // reader both get "500 characters remaining", not "500".
     const [counter] = counterRow(renderer.root, 500);
-    expect(counter?.props.children).toBe(500);
+    expect(counter?.props.children).toBe('500 characters remaining');
 
     unmount();
   });

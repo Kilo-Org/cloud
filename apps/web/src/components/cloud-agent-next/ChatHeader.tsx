@@ -6,17 +6,29 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { CornerUpLeft, ExternalLink, MoreHorizontal, Layers, GitMerge } from 'lucide-react';
+import {
+  CornerUpLeft,
+  ExternalLink,
+  GitMerge,
+  Globe,
+  Info,
+  Layers,
+  MessageSquareWarning,
+  MoreHorizontal,
+  Share2,
+} from 'lucide-react';
 import Link from 'next/link';
 import { SessionInfoDialog } from './SessionInfoDialog';
 import type { SessionCostBreakdown } from './session-cost-breakdown';
 import type { SessionUsage } from './session-token-usage';
 import { SessionActionsDialog } from './SessionActionsDialog';
-import { SoundToggleButton } from '@/components/shared/SoundToggleButton';
 import { FeedbackDialog } from './FeedbackDialog';
+import { PreviewPortDialog } from './PreviewPortDialog';
+import type { PreviewController } from './use-preview-controller';
 import { WorktreeChangesButton } from './WorktreeChanges';
 import { WorkspaceArtifactsButton } from './WorkspaceArtifacts';
 import { buildRepoBrowseUrl, detectGitPlatform } from './utils/git-utils';
@@ -25,7 +37,6 @@ import { StackedWorkspaceActions } from './StackedWorkspaceActions';
 import { useStackedWorkspaceSource } from './hooks/useStackedWorkspaceSource';
 import { resolveStackedWorkspaceAvailability } from './workspace-stacks';
 import type { WorktreeBranchOperationTarget } from './useWorktreeBranchOperations';
-import { Badge } from '@/components/ui/badge';
 
 export type ChatStackBreadcrumbItem = {
   worktreeId: string;
@@ -74,8 +85,7 @@ type ChatHeaderProps = {
   sessionInfoOpen: boolean;
   onSessionInfoOpenChange: (open: boolean) => void;
   sessionInfoTriggerRef: RefObject<HTMLElement | null>;
-  soundEnabled?: boolean;
-  onToggleSound?: () => void;
+  preview: PreviewController;
   changesOpen?: boolean;
   onToggleChanges?: (event: MouseEvent<HTMLButtonElement>) => void;
   artifactsOpen?: boolean;
@@ -107,8 +117,7 @@ export function ChatHeader({
   sessionInfoOpen,
   onSessionInfoOpenChange,
   sessionInfoTriggerRef,
-  soundEnabled = true,
-  onToggleSound,
+  preview,
   changesOpen = false,
   onToggleChanges,
   artifactsOpen = false,
@@ -126,6 +135,7 @@ export function ChatHeader({
 }: ChatHeaderProps) {
   const [showActionsDialog, setShowActionsDialog] = useState(false);
   const [showBranchOperations, setShowBranchOperations] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const preflight = useStackedWorkspaceSource({
     worktreeId,
@@ -141,6 +151,12 @@ export function ChatHeader({
       fallbackDisabledReason: stack?.createStackedWorkspaceDisabledReason,
     });
   const moreOptionsTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const restoreMoreOptionsFocus = (event: Event) => {
+    const trigger = moreOptionsTriggerRef.current;
+    if (!trigger?.isConnected) return;
+    event.preventDefault();
+    trigger.focus();
+  };
   const sessionCostBreakdown = useMemo(
     () => (sessionInfoOpen ? getSessionCostBreakdown?.() : undefined),
     [getSessionCostBreakdown, sessionInfoOpen]
@@ -191,6 +207,16 @@ export function ChatHeader({
         organizationId={organizationId}
         canForkToCloud={canForkToCloud}
       />
+      {preview.dialog && (
+        <PreviewPortDialog {...preview.dialog} onCloseAutoFocus={restoreMoreOptionsFocus} />
+      )}
+      <FeedbackDialog
+        open={showFeedback}
+        onOpenChange={setShowFeedback}
+        onCloseAutoFocus={restoreMoreOptionsFocus}
+        organizationId={organizationId}
+        kiloSessionId={kiloSessionId}
+      />
       {stack?.branchOperations && Boolean(stack.branchOperations.cloudAgentSessionId) && (
         <StackedWorkspaceActions
           open={showBranchOperations}
@@ -206,21 +232,6 @@ export function ChatHeader({
         />
       )}
       <div className="flex min-w-0 items-center gap-1">
-        {stack && (
-          <div className="hidden min-w-0 items-center gap-0.5 overflow-x-auto md:flex">
-            {stack.behindParent && (
-              <Badge
-                variant="outline"
-                className="shrink-0 text-[10px] font-normal"
-                title="This branch does not include the latest changes from its parent. Restack it from Branch operations."
-              >
-                Behind parent
-              </Badge>
-            )}
-          </div>
-        )}
-        {/* First, so its late-loading counts grow into the reserved space on the left
-            instead of moving the other controls. */}
         {onToggleChanges && (
           <WorktreeChangesButton
             key={`worktree-changes:${currentUserId}:${organizationId ?? 'personal'}:${worktreeId ?? changesCloudAgentSessionId}`}
@@ -251,8 +262,8 @@ export function ChatHeader({
             sessionActive={sessionActive}
           />
         )}
-        {onToggleSound && (
-          <SoundToggleButton enabled={soundEnabled} onToggle={onToggleSound} size="toolbar" />
+        {(onToggleChanges || onToggleArtifacts || sandboxStatusEligible) && (
+          <span aria-hidden="true" className="bg-border mx-0.5 h-4 w-px shrink-0" />
         )}
         <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
           <DropdownMenuTrigger asChild>
@@ -260,13 +271,34 @@ export function ChatHeader({
               ref={moreOptionsTriggerRef}
               size="icon-sm"
               variant="ghost"
-              className="text-muted-foreground"
+              className="text-muted-foreground relative data-[state=open]:bg-secondary"
               aria-label="More options"
+              aria-description={stack?.behindParent ? 'Branch is behind its parent' : undefined}
             >
-              <MoreHorizontal className="h-4 w-4" />
+              <MoreHorizontal aria-hidden="true" />
+              {stack?.behindParent && (
+                <span
+                  aria-hidden="true"
+                  className="bg-status-warning-icon absolute top-1.5 right-1.5 size-1.5 rounded-full"
+                />
+              )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent
+            align="end"
+            onCloseAutoFocus={event => {
+              if (showFeedback || preview.dialog?.open) event.preventDefault();
+            }}
+          >
+            {preview.dialog && (
+              <>
+                <DropdownMenuItem onSelect={preview.openDialog}>
+                  <Globe aria-hidden="true" />
+                  Open preview
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
             {parentSessionHref && (
               <>
                 <DropdownMenuItem asChild>
@@ -278,29 +310,35 @@ export function ChatHeader({
                 <DropdownMenuSeparator />
               </>
             )}
-            <DropdownMenuItem onClick={() => setShowActionsDialog(true)}>
+            <DropdownMenuItem onSelect={() => setShowActionsDialog(true)}>
+              <Share2 aria-hidden="true" />
               Share or Fork
             </DropdownMenuItem>
             {repoUrl && (
               <DropdownMenuItem asChild>
                 <a href={repoUrl} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="mr-2 h-4 w-4" />
+                  <ExternalLink aria-hidden="true" />
                   Open in GitHub
                 </a>
               </DropdownMenuItem>
             )}
-            <DropdownMenuSeparator />
             <DropdownMenuItem
               onSelect={() => {
                 sessionInfoTriggerRef.current = moreOptionsTriggerRef.current;
                 onSessionInfoOpenChange(true);
               }}
             >
+              <Info aria-hidden="true" />
               Session Info
             </DropdownMenuItem>
             {stack && (
               <>
                 <DropdownMenuSeparator />
+                {stack.behindParent && (
+                  <DropdownMenuLabel className="text-muted-foreground text-xs">
+                    Branch is behind its parent
+                  </DropdownMenuLabel>
+                )}
                 <DropdownMenuItem
                   aria-disabled={!canCreateStackedWorkspace}
                   title={
@@ -314,20 +352,24 @@ export function ChatHeader({
                     stack.onCreateStackedWorkspace?.();
                   }}
                 >
-                  <Layers className="mr-2 h-4 w-4" />
+                  <Layers aria-hidden="true" />
                   New stacked workspace
                 </DropdownMenuItem>
                 {stack.branchOperations && Boolean(stack.branchOperations.cloudAgentSessionId) && (
                   <DropdownMenuItem onSelect={() => setShowBranchOperations(true)}>
-                    <GitMerge className="mr-2 h-4 w-4" />
+                    <GitMerge aria-hidden="true" />
                     Branch operations
                   </DropdownMenuItem>
                 )}
               </>
             )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => setShowFeedback(true)}>
+              <MessageSquareWarning aria-hidden="true" />
+              Send feedback
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <FeedbackDialog organizationId={organizationId} kiloSessionId={kiloSessionId} />
       </div>
     </>
   );

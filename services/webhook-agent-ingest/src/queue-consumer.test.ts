@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { PostMessageAsUserParams, PostMessageAsUserResult } from '@kilocode/kilo-chat';
 import type * as TokenMintingModule from './services/token-minting-service.js';
+import type * as SessionAccessModule from '@kilocode/worker-utils/cloud-agent-session-access';
+import { checkWorkspaceChatTarget } from '@kilocode/worker-utils/cloud-agent-session-access';
+
+vi.mock('@kilocode/worker-utils/cloud-agent-session-access', async importOriginal => ({
+  ...(await importOriginal<typeof SessionAccessModule>()),
+  checkWorkspaceChatTarget: vi.fn(),
+}));
 
 // Mock module-level imports before importing the unit under test. These mocks
 // stand in for: DB lookup of sandbox id, the kilo-chat service binding cast
@@ -42,6 +49,7 @@ vi.mock('./util/do-retry', () => ({
 import { handleWebhookDeliveryBatch, processKiloclawChatMessage } from './queue-consumer';
 import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { CreatorExecutionAuthorizationError } from './services/token-minting-service.js';
+import { logger } from './util/logger';
 
 type UpdateCall = { requestId: string; patch: Record<string, unknown> };
 
@@ -100,6 +108,185 @@ function makeEnv() {
     KILO_CHAT: {} as unknown,
   } as unknown as Env;
 }
+
+describe('existing Cloud Agent chat delivery', () => {
+  const chatId = 'workspace_00000000-0000-4000-8000-000000000003';
+
+  function harness(method = 'POST') {
+    const webhook = makeWebhook();
+    const request = {
+      ...makeRequest('captured', { method }),
+      id: webhook.requestId,
+      cloudAgentSessionId: null as string | null,
+    };
+    const stub = {
+      getRequest: async () => ({ ...request }),
+      getConfig: async () =>
+        makeTriggerConfig({
+          targetType: 'cloud_agent_chat',
+          cloudAgentSessionId: chatId,
+          mode: 'code',
+          model: 'kilo/fake-deterministic',
+          variant: 'high',
+          promptTemplate: '{{method}} {{body}} {{scheduledTime}}',
+        }),
+      updateRequest: vi.fn(async (_id: string, patch: Record<string, unknown>) => {
+        if (typeof patch.process_status === 'string') request.processStatus = patch.process_status;
+        if (typeof patch.cloud_agent_session_id === 'string')
+          request.cloudAgentSessionId = patch.cloud_agent_session_id;
+        return { success: true };
+      }),
+    };
+    const sendCalls: { path: string; body: unknown }[] = [];
+    const sendStatus = vi.fn(() => 200);
+    const fetch = vi.fn(async (outgoing: Request) => {
+      const body = (await outgoing.json()) as { message: { id: string } };
+      sendCalls.push({ path: new URL(outgoing.url).pathname, body });
+      const status = sendStatus();
+      return status === 200
+        ? Response.json({
+            result: { data: { messageId: body.message.id, cloudAgentSessionId: chatId } },
+          })
+        : new Response(null, { status });
+    });
+    const env = {
+      ...makeEnv(),
+      INTERNAL_API_SECRET: 'internal-secret',
+      TRIGGER_DO: { idFromName: (name: string) => name, get: () => stub },
+      CLOUD_AGENT: { fetch },
+    } as unknown as Env;
+    const ack = vi.fn();
+    const retry = vi.fn();
+    const deliver = (attempts = 1) =>
+      handleWebhookDeliveryBatch(
+        {
+          queue: 'webhook-delivery',
+          messages: [{ body: webhook, attempts, ack, retry }],
+        } as unknown as MessageBatch<ReturnType<typeof makeWebhook>>,
+        env
+      );
+    return { stub, sendCalls, sendStatus, ack, retry, deliver };
+  }
+
+  beforeEach(() => {
+    vi.mocked(checkWorkspaceChatTarget).mockReset().mockResolvedValue(null);
+    mockMintToken
+      .mockReset()
+      .mockResolvedValue({ token: 'test-token', userId: 'user-1', isBot: false });
+  });
+
+  it.each([
+    ['POST', 'POST {} '],
+    ['SCHEDULED', 'SCHEDULED {} 2026-05-08T12:00:00Z'],
+  ])('queues a %s follow-up without preparing a session', async (method, prompt) => {
+    const h = harness(method);
+    await h.deliver();
+    expect(h.sendCalls).toEqual([
+      {
+        path: '/trpc/send',
+        body: {
+          cloudAgentSessionId: chatId,
+          message: { id: expect.stringMatching(/^msg_[0-9a-f]{26}$/), prompt },
+          agent: { mode: 'code', model: 'kilo/fake-deterministic', variant: 'high' },
+          finalization: {},
+        },
+      },
+    ]);
+    expect(h.stub.updateRequest).toHaveBeenCalledWith(
+      'req-1',
+      expect.objectContaining({ process_status: 'inprogress', cloud_agent_session_id: chatId })
+    );
+    expect(h.stub.updateRequest).toHaveBeenLastCalledWith(
+      'req-1',
+      expect.objectContaining({ process_status: 'success' })
+    );
+    expect(h.ack).toHaveBeenCalledOnce();
+  });
+
+  it('reuses the same message ID and rechecks ownership on retry', async () => {
+    const h = harness();
+    h.sendStatus.mockReturnValueOnce(503);
+    await h.deliver();
+    expect(h.retry).toHaveBeenCalledOnce();
+    await h.deliver(2);
+    expect(h.sendCalls).toHaveLength(2);
+    expect(h.sendCalls[1]).toEqual(h.sendCalls[0]);
+    expect(checkWorkspaceChatTarget).toHaveBeenCalledTimes(2);
+    expect(h.ack).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['not_found', 'The target Cloud Agent chat was not found. It may have been deleted.'],
+    ['not_owner', 'The trigger must run as the owner of the target Cloud Agent chat.'],
+    [
+      'scope_mismatch',
+      'The target Cloud Agent chat must be in the same organization or personal scope as the trigger.',
+    ],
+  ] as const)('fails fast when the target is %s', async (reason, error_message) => {
+    vi.mocked(checkWorkspaceChatTarget).mockResolvedValue(reason);
+    const h = harness();
+    await h.deliver();
+    expect(h.sendCalls).toHaveLength(0);
+    expect(h.stub.updateRequest).toHaveBeenLastCalledWith(
+      'req-1',
+      expect.objectContaining({ process_status: 'failed', error_message })
+    );
+    expect(h.retry).not.toHaveBeenCalled();
+    expect(h.ack).toHaveBeenCalledOnce();
+  });
+
+  it('stops retrying a transient failure at the delivery limit', async () => {
+    const h = harness();
+    h.sendStatus.mockReturnValue(503);
+    await h.deliver(3);
+    expect(h.stub.updateRequest).toHaveBeenLastCalledWith(
+      'req-1',
+      expect.objectContaining({
+        process_status: 'failed',
+        error_message: 'Cloud Agent could not accept the message temporarily.',
+      })
+    );
+    expect(h.retry).not.toHaveBeenCalled();
+    expect(h.ack).toHaveBeenCalledOnce();
+  });
+
+  it('reports an unexpected error type without storing or logging its message', async () => {
+    const log = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    try {
+      vi.mocked(checkWorkspaceChatTarget).mockRejectedValue(new TypeError('private details'));
+      const h = harness();
+      await h.deliver(3);
+      const errorMessage =
+        'Could not confirm delivery to the target Cloud Agent chat. Check the chat before retrying.';
+      expect(log).toHaveBeenCalledWith(
+        'Failed to process webhook',
+        expect.objectContaining({ error: errorMessage, errorType: 'TypeError' })
+      );
+      expect(JSON.stringify(log.mock.calls)).not.toContain('private details');
+      expect(h.stub.updateRequest).toHaveBeenLastCalledWith(
+        'req-1',
+        expect.objectContaining({ process_status: 'failed', error_message: errorMessage })
+      );
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it('records a permanent rejection without guessing its cause', async () => {
+    const h = harness();
+    h.sendStatus.mockReturnValue(400);
+    await h.deliver();
+    expect(h.stub.updateRequest).toHaveBeenLastCalledWith(
+      'req-1',
+      expect.objectContaining({
+        process_status: 'failed',
+        error_message: 'Cloud Agent rejected the message (HTTP 400).',
+      })
+    );
+    expect(h.retry).not.toHaveBeenCalled();
+    expect(h.ack).toHaveBeenCalledOnce();
+  });
+});
 
 describe('creator Cloud Agent dispatch', () => {
   function harness(

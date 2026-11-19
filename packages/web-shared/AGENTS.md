@@ -95,7 +95,7 @@ Deliberate limitations until users ask:
 - Model endpoint lists are not filtered by these policies.
 - Embeddings and System One use Vercel only when `mapModelIdToVercel` maps the id to a
   Vercel model of that type; Vercel-only models are unsupported.
-- Transcriptions are OpenRouter-only.
+- Transcriptions and image-only models are OpenRouter-only.
 
 ## Autocomplete routes
 

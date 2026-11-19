@@ -235,11 +235,66 @@ export function useGgufModels(): GgufDownloadsSnapshot {
   return useSyncExternalStore(subscribe, current, current);
 }
 
+function parseUrl(url: string): URL | null {
+  try {
+    return new URL(url);
+  } catch {
+    return null;
+  }
+}
+
+function decodeSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
+}
+
+const HF_HOST = 'huggingface.co';
+
+/**
+ * The repository a Hugging Face file link points into, or `null` when the link
+ * names no repository file.
+ */
+function hfRepositoryPath(pathname: string): string | null {
+  const [owner, repo, marker] = pathname.split('/').filter(segment => segment !== '');
+  if (owner === undefined || repo === undefined) {
+    return null;
+  }
+  // A downloadable repository file is `<owner>/<repo>/resolve/…`. A dataset or a
+  // space repeats its kind as the first segment, so it names no model repository.
+  if (marker !== 'resolve') {
+    return null;
+  }
+  return `${decodeSegment(owner)}/${decodeSegment(repo)}`;
+}
+
+/**
+ * Where a downloaded model came from, for the picker's subtitle: a Hugging Face
+ * repository file reads as its repository, any other link as its host. A link
+ * that does not parse has no place to name, so the row shows no subtitle.
+ */
+export function ggufModelLocator(url: string): string {
+  const parsed = parseUrl(url);
+  if (parsed === null) {
+    return '';
+  }
+  if (parsed.hostname === HF_HOST) {
+    const repository = hfRepositoryPath(parsed.pathname);
+    if (repository !== null) {
+      return repository;
+    }
+  }
+  return parsed.hostname;
+}
+
 export function ggufModelOptions(models: readonly GgufModelRecord[]): SessionModelOption[] {
   return models.map(record => ({
     id: localTargetId('gguf', record.fileId),
     name: record.name,
-    displayId: record.fileId,
+    // The file id is an opaque content hash, so the subtitle names the source instead.
+    displayId: ggufModelLocator(record.url),
     variants: record.thinking ? [...THINKING_SWITCH_VARIANTS] : [],
     isPreferred: false,
     showGatewayMetadata: false,

@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- The aria snapshot substrate: CDP Accessibility decoding, ref allocation, box lookup and the injected DOM fallback are one cohesive unit. */
 import { z } from 'zod';
+import { ambiguousSelectorError } from './browser-agent-checks';
 import { TAB_NOT_INSPECTABLE_ERROR } from './tab-debugger';
 import type { BrowserToolRefEntry, BrowserToolSession } from './browser-tool-session';
 
@@ -608,6 +609,10 @@ const resolveTargetBackendNodeId = async (
   target: string
 ): Promise<number> => {
   const resolved = await session.resolveTarget(target);
+
+  if (resolved?.kind === 'ambiguous') {
+    throw new Error(ambiguousSelectorError(resolved.matches));
+  }
 
   if (resolved === undefined) {
     throw new Error(

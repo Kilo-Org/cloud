@@ -130,6 +130,7 @@ import type {
   AutoFreeConfig,
   GatewayModelListConfig,
   VercelModelIdOverridesConfig,
+  LatestAliasTargetsConfig,
   PreferredProviderOrderConfig,
   CustomPricingConfig,
   KiloClawAdminAuditAction,
@@ -5351,8 +5352,8 @@ export const cloud_agent_webhook_triggers = pgTable(
     organization_id: uuid('organization_id').references(() => organizations.id, {
       onDelete: 'cascade',
     }),
-    // Target type: 'cloud_agent' (default) or 'kiloclaw_chat'
     target_type: text('target_type').notNull().default('cloud_agent'),
+    cloud_agent_session_id: text('cloud_agent_session_id'),
     // KiloClaw Chat target: which instance to send messages to
     kiloclaw_instance_id: uuid('kiloclaw_instance_id').references(() => kiloclaw_instances.id),
     // Activation mode: 'webhook' (default) or 'scheduled' (cron-based)
@@ -5412,6 +5413,15 @@ export const cloud_agent_webhook_triggers = pgTable(
       sql`(
         ${table.target_type} != 'kiloclaw_chat' OR
         ${table.kiloclaw_instance_id} IS NOT NULL
+      )`
+    ),
+    check(
+      'CHK_cloud_agent_webhook_triggers_existing_chat_fields',
+      sql`(
+        (${table.target_type} = 'cloud_agent_chat' AND ${table.cloud_agent_session_id} IS NOT NULL
+          AND ${table.github_repo} IS NULL AND ${table.profile_id} IS NULL
+          AND ${table.kiloclaw_instance_id} IS NULL) OR
+        (${table.target_type} != 'cloud_agent_chat' AND ${table.cloud_agent_session_id} IS NULL)
       )`
     ),
     // Scheduled triggers require cron_expression
@@ -6021,6 +6031,7 @@ export const ai_gateway_config = pgTable(
     preferred_models: jsonb().$type<GatewayModelListConfig>(),
     unavailable_models: jsonb().$type<GatewayModelListConfig>(),
     vercel_model_id_overrides: jsonb().$type<VercelModelIdOverridesConfig>(),
+    latest_alias_targets: jsonb().$type<LatestAliasTargetsConfig>(),
     preferred_provider_order: jsonb().$type<PreferredProviderOrderConfig>(),
     custom_pricing: jsonb().$type<CustomPricingConfig>(),
   },
@@ -6030,6 +6041,18 @@ export const ai_gateway_config = pgTable(
 export const blacklisted_domains = pgTable('blacklisted_domains', {
   domain: text().primaryKey(),
 });
+
+export const blacklisted_domains_settings = pgTable(
+  'blacklisted_domains_settings',
+  {
+    id: integer().primaryKey().default(1),
+    blocked_signup_tlds: text().array().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    updated_by: text(),
+    updated_by_email: text(),
+  },
+  table => [check('blacklisted_domains_settings_singleton', sql`${table.id} = 1`)]
+);
 
 export const ai_gateway_sync_providers_state = pgTable(
   'ai_gateway_sync_providers_state',
@@ -9182,6 +9205,10 @@ export type CloudAgentBuiltinAgentOverrides = Record<
   { model?: string | null; variant?: string; disable?: boolean }
 >;
 
+// Map of gateway model id (for example `openai/gpt-6.1-sol`) to a context-window
+// token cap. See ModelContextLimitsSchema in `@kilocode/cloud-agent-profile`.
+export type CloudAgentModelContextLimits = Record<string, number>;
+
 export const cloud_agent_user_settings = pgTable(
   'cloud_agent_user_settings',
   {
@@ -9190,6 +9217,9 @@ export const cloud_agent_user_settings = pgTable(
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     workspace_order: text().$type<'manual' | 'created' | 'activity'>().notNull().default('manual'),
     builtin_agents: jsonb().$type<CloudAgentBuiltinAgentOverrides>().notNull().default({}),
+    model_context_limits: jsonb().$type<CloudAgentModelContextLimits>().notNull().default({}),
+    web_search_enabled: boolean().notNull().default(true),
+    web_search_provider: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()

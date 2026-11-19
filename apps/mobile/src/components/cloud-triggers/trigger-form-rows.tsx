@@ -10,6 +10,7 @@
 import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { ChevronDown } from '@/components/ui/icons';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
@@ -48,7 +49,8 @@ export function TriggerSelectRow({
         onPress={onPress}
         className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 active:opacity-70')}
       >
-        <Text className="shrink-0 text-sm text-muted-foreground">{label}</Text>
+        {/* The label names the field in every state; the muted value carries the disabled cue. */}
+        <Text className="shrink-0 text-sm font-medium text-foreground">{label}</Text>
         <Text
           numberOfLines={1}
           className={cn(
@@ -60,7 +62,7 @@ export function TriggerSelectRow({
         </Text>
         <ChevronDown size={16} color={colors.mutedForeground} />
       </Pressable>
-      {error === undefined ? null : <Text className="pb-1 text-xs text-destructive">{error}</Text>}
+      {error === undefined ? null : <AccessibleStatus message={error} className="pb-1 text-sm" />}
     </View>
   );
 }

@@ -5,8 +5,12 @@ import { InvalidRouteState } from '@/components/invalid-route-state';
 import { OptionList } from '@/components/code-reviewer/option-list';
 import { ReviewerErrorScreen } from '@/components/code-reviewer/reviewer-error-screen';
 import { REVIEW_STYLES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
-import { useReviewConfig, useSaveReviewConfig } from '@/lib/hooks/use-code-reviewer';
-import { reviewConfigFailure, useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
+import {
+  reviewerOrganizationId,
+  useReviewConfig,
+  useSaveReviewConfig,
+} from '@/lib/hooks/use-code-reviewer';
+import { queryBodyFailure, useQueryBodyState } from '@/lib/hooks/use-query-body-state';
 import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 
 export default function ReviewStyleRoute() {
@@ -22,11 +26,11 @@ function ReviewStyleScreen({
   platform,
 }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   const config = useReviewConfig(scope, platform);
-  const configBody = useReviewConfigBody(config);
+  const configBody = useQueryBodyState(config);
   const save = useSaveReviewConfig(scope, platform);
   const { t } = useTranslation();
   const title = t('codeReviewer.style.title');
-  const failure = reviewConfigFailure(configBody, config.isFetching);
+  const failure = queryBodyFailure(configBody, config.isFetching);
   const labels = {
     strict: t('codeReviewer.reviewStyle.strict'),
     balanced: t('common.balanced'),
@@ -64,6 +68,7 @@ function ReviewStyleScreen({
       labels={labels}
       descriptions={descriptions}
       disabled={configBody.body.status !== 'ready'}
+      organizationId={reviewerOrganizationId(scope)}
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       onSelect={value => save.mutateAsync({ reviewStyle: value })}
     />

@@ -265,7 +265,7 @@ describe('the module hand-off', () => {
   it('hands the action over instead of answering the caller', () => {
     // An intent addresses the app: it carries no request for a result, and the
     // dispatcher's outcome belongs to the app that shows it.
-    expect(ACTIVITY_SOURCE).toContain('AppActionDispatcher.dispatch(payload)');
+    expect(ACTIVITY_SOURCE).toContain('AppActionDispatcher.dispatch(resolved.payload)');
     expect(ACTIVITY_SOURCE).not.toContain('setResult(');
     expect(ACTIVITY_SOURCE).not.toContain('EXTRA_RESULT');
     expect(MODULE_SOURCE).not.toContain('completeAppAction');

@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 export const WORKSPACE_ARTIFACT_MAX_FILES = 1_000;
 export const WORKSPACE_ARTIFACT_MAX_PATH_BYTES = 1_024;
-export const WORKSPACE_ARTIFACT_RETENTION_MS = 14 * 24 * 60 * 60 * 1_000;
 
 export const WORKSPACE_ARTIFACT_MAX_FILE_BYTES = 50 * 1024 * 1024;
 export const WORKSPACE_ARTIFACT_MAX_TOTAL_BYTES = 500 * 1024 * 1024;
@@ -121,7 +120,6 @@ export type WorkspaceArtifactEntry = {
   sizeBytes: number;
   contentType: string;
   updatedAt: number;
-  expiresAt: number;
 };
 
 export const workspaceArtifactEntrySchema = z
@@ -131,7 +129,6 @@ export const workspaceArtifactEntrySchema = z
     sizeBytes: z.number().int().nonnegative(),
     contentType: z.string(),
     updatedAt: z.number().int().nonnegative(),
-    expiresAt: z.number().int().nonnegative(),
   })
   .strict();
 

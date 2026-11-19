@@ -22,6 +22,10 @@ export const RuntimeProfileLimits = {
   MAX_RUNTIME_KILO_COMMAND_NAME_LENGTH: 100,
   MAX_RUNTIME_KILO_COMMAND_TEMPLATE: 100_000,
   MAX_RUNTIME_KILO_COMMAND_DESCRIPTION: 2000,
+  MAX_MODEL_CONTEXT_LIMITS: 50,
+  MAX_MODEL_CONTEXT_LIMIT_MODEL_LENGTH: 200,
+  MIN_MODEL_CONTEXT_TOKENS: 1_000,
+  MAX_MODEL_CONTEXT_TOKENS: 10_000_000,
 } as const;
 
 /** Profile rules share the legacy rules directory with the reserved built-in file. */
@@ -253,6 +257,28 @@ export const RuntimeBuiltinAgentsSchema = z
     }
   });
 export type RuntimeBuiltinAgents = z.infer<typeof RuntimeBuiltinAgentsSchema>;
+
+/**
+ * User-scoped per-model context-window caps, keyed by gateway model id without
+ * the `kilo/` prefix. Materialized into `KILO_CONFIG_CONTENT.provider.kilo.models`
+ * at session preparation time. Keep the bounds in sync with
+ * `ModelContextLimitsSchema` in `@kilocode/cloud-agent-profile`; a parity test
+ * asserts they match.
+ */
+export const RuntimeModelContextLimitsSchema = z
+  .record(
+    z.string().min(1).max(RuntimeProfileLimits.MAX_MODEL_CONTEXT_LIMIT_MODEL_LENGTH),
+    z
+      .number()
+      .int()
+      .min(RuntimeProfileLimits.MIN_MODEL_CONTEXT_TOKENS)
+      .max(RuntimeProfileLimits.MAX_MODEL_CONTEXT_TOKENS)
+  )
+  .refine(
+    limits => Object.keys(limits).length <= RuntimeProfileLimits.MAX_MODEL_CONTEXT_LIMITS,
+    `Maximum ${RuntimeProfileLimits.MAX_MODEL_CONTEXT_LIMITS} model context limits allowed`
+  );
+export type RuntimeModelContextLimits = z.infer<typeof RuntimeModelContextLimitsSchema>;
 
 export const RuntimeKiloCommandSchema = z.object({
   name: z

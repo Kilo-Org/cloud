@@ -20,7 +20,11 @@ import { getSecurityAgentConfig } from '../db/security-config';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
 import { dismissDependabotAlert } from '../github/dependabot-api';
 import type { Owner } from '@/lib/code-reviews/core';
-import type { SecurityFindingAnalysis, SecurityReviewOwner } from '../core/types';
+import type {
+  SecurityAgentConfig,
+  SecurityFindingAnalysis,
+  SecurityReviewOwner,
+} from '../core/types';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
   SecurityAuditLogAction,
@@ -50,44 +54,76 @@ function isTriageConfidence(value: unknown): value is TriageConfidence {
 }
 
 /**
+ * Whether a triage confidence level meets the configured auto-dismiss threshold.
+ * 'low' accepts every confidence, 'medium' rejects 'low', 'high' accepts only 'high'.
+ * An unknown threshold never meets the threshold.
+ */
+function meetsAutoDismissConfidenceThreshold(
+  threshold: SecurityAgentConfig['auto_dismiss_confidence_threshold'],
+  confidence: TriageConfidence
+): boolean {
+  switch (threshold) {
+    case 'low':
+      return true;
+    case 'medium':
+      return confidence !== 'low';
+    case 'high':
+      return confidence === 'high';
+    default:
+      return false;
+  }
+}
+
+/**
+ * Narrow a SecurityReviewOwner into a discriminated owner identity.
+ * Every owner-shaped derivation (config owner, audit owner, audit event key,
+ * finding predicate, analytics organization id) derives from this result.
+ */
+function ownerIdentity(
+  owner: SecurityReviewOwner
+): { type: 'organization'; id: string } | { type: 'user'; id: string } {
+  if ('organizationId' in owner && owner.organizationId) {
+    return { type: 'organization', id: owner.organizationId };
+  }
+  if ('userId' in owner && owner.userId) {
+    return { type: 'user', id: owner.userId };
+  }
+  throw new Error('Invalid owner: must have either organizationId or userId');
+}
+
+/**
  * Convert SecurityReviewOwner + userId to Owner format for config lookups.
  * The userId represents the user performing the action (needed for audit/permissions).
  */
 function toOwner(securityOwner: SecurityReviewOwner, userId: string): Owner {
-  if ('organizationId' in securityOwner && securityOwner.organizationId) {
-    return { type: 'org', id: securityOwner.organizationId, userId };
-  }
-  if ('userId' in securityOwner && securityOwner.userId) {
-    return { type: 'user', id: securityOwner.userId, userId: securityOwner.userId };
-  }
-  throw new Error('Invalid owner: must have either organizationId or userId');
+  const identity = ownerIdentity(securityOwner);
+  return identity.type === 'organization'
+    ? { type: 'org', id: identity.id, userId }
+    : { type: 'user', id: identity.id, userId: identity.id };
 }
 
 function toAuditOwner(owner: SecurityReviewOwner): SecurityFindingAuditOwner {
-  if ('organizationId' in owner && owner.organizationId) {
-    return { type: 'organization', organizationId: owner.organizationId };
-  }
-  if ('userId' in owner && owner.userId) {
-    return { type: 'user', userId: owner.userId };
-  }
-  throw new Error('Invalid owner: must have either organizationId or userId');
+  const identity = ownerIdentity(owner);
+  return identity.type === 'organization'
+    ? { type: 'organization', organizationId: identity.id }
+    : { type: 'user', userId: identity.id };
 }
 
 function ownerAuditKeyPart(owner: SecurityReviewOwner): string {
-  if ('organizationId' in owner && owner.organizationId)
-    return `organization:${owner.organizationId}`;
-  if ('userId' in owner && owner.userId) return `user:${owner.userId}`;
-  throw new Error('Invalid owner: must have either organizationId or userId');
+  const identity = ownerIdentity(owner);
+  return `${identity.type}:${identity.id}`;
 }
 
 function ownerFindingCondition(owner: SecurityReviewOwner) {
-  if ('organizationId' in owner && owner.organizationId) {
-    return eq(security_findings.owned_by_organization_id, owner.organizationId);
-  }
-  if ('userId' in owner && owner.userId) {
-    return eq(security_findings.owned_by_user_id, owner.userId);
-  }
-  throw new Error('Invalid owner: must have either organizationId or userId');
+  const identity = ownerIdentity(owner);
+  return identity.type === 'organization'
+    ? eq(security_findings.owned_by_organization_id, identity.id)
+    : eq(security_findings.owned_by_user_id, identity.id);
+}
+
+/** Organization id for analytics events, or undefined for user-owned owners. */
+function ownerOrganizationId(owner: Owner): string | undefined {
+  return owner.type === 'org' ? owner.id : undefined;
 }
 
 function autoDismissCandidateCondition(owner: Owner) {
@@ -338,7 +374,7 @@ export async function maybeAutoDismissAnalysis(options: {
     trackSecurityAgentAutoDismiss({
       distinctId: userId,
       userId,
-      organizationId: 'organizationId' in owner ? owner.organizationId : undefined,
+      organizationId: ownerOrganizationId(ownerConverted),
       findingId,
       source: 'sandbox',
     });
@@ -350,12 +386,7 @@ export async function maybeAutoDismissAnalysis(options: {
   if (triage?.needsSandboxAnalysis === false && triage.suggestedAction === 'dismiss') {
     const threshold = config.auto_dismiss_confidence_threshold ?? 'high';
 
-    const meetsThreshold =
-      threshold === 'low' ||
-      (threshold === 'medium' && triage.confidence !== 'low') ||
-      (threshold === 'high' && triage.confidence === 'high');
-
-    if (meetsThreshold) {
+    if (meetsAutoDismissConfidenceThreshold(threshold, triage.confidence)) {
       const dismissedFinding = await dismissFindingWithAuditEvent(findingId, {
         owner,
         reason: 'not_used',
@@ -384,7 +415,7 @@ export async function maybeAutoDismissAnalysis(options: {
       trackSecurityAgentAutoDismiss({
         distinctId: userId,
         userId,
-        organizationId: 'organizationId' in owner ? owner.organizationId : undefined,
+        organizationId: ownerOrganizationId(ownerConverted),
         findingId,
         source: 'triage',
         confidence: triage.confidence,
@@ -454,11 +485,7 @@ export async function autoDismissEligibleFindings(
           return;
         }
 
-        if (threshold === 'high' && triage.confidence !== 'high') {
-          skipped++;
-          return;
-        }
-        if (threshold === 'medium' && triage.confidence === 'low') {
+        if (!meetsAutoDismissConfidenceThreshold(threshold, triage.confidence)) {
           skipped++;
           return;
         }
@@ -523,7 +550,7 @@ export async function autoDismissEligibleFindings(
   trackSecurityAgentAutoDismiss({
     distinctId: userId,
     userId,
-    organizationId: 'organizationId' in owner ? owner.organizationId : undefined,
+    organizationId: ownerOrganizationId(ownerConverted),
     source: 'bulk',
     dismissed,
     skipped,

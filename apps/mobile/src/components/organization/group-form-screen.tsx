@@ -85,9 +85,17 @@ export function OrganizationGroupFormScreen() {
 
   if (groupQuery.isError) {
     const errorView = selectOrgListErrorView(groupQuery.error);
+    // `groups.get` answers an unknown or deleted group with NOT_FOUND, so the
+    // missing group arrives here, not as an empty success.
+    if (errorView.variant === 'not-found') {
+      return <GroupNotFound />;
+    }
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('organization.settingsOnWeb.groups')} />
+        <ScreenHeader
+          title={t('organization.settingsOnWeb.groups')}
+          backFallback={GROUPS_LIST_PATH as Href}
+        />
         <QueryError
           variant={errorView.variant}
           onRetry={errorView.showRetry ? () => void groupQuery.refetch() : undefined}

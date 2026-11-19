@@ -314,18 +314,19 @@ function answer(
  * resume that generation instead of starting a new one.
  */
 /**
- * The reason a restricted availability answer reads as at send time. Android's
- * normal downloadable/downloading answer carries no reason, so the status picks
- * the same class its own reason would name; the generic one is the last resort
- * for a status the classification does not know.
+ * The reason a restricted availability answer reads as at send time, when the
+ * answer names none. Android's normal downloadable/downloading answer carries
+ * no reason, so the status picks the same class its own reason would name; an
+ * `unavailable` without a reason has nothing more specific to say.
  */
+const REASON_BY_STATUS = {
+  downloadable: 'model_download_required',
+  downloading: 'model_downloading',
+  unavailable: 'model_unavailable',
+} as const satisfies Record<Exclude<NativeAvailability['status'], 'available'>, string>;
+
 const reasonAtSendTime = (availability: NativeAvailability): string =>
-  availability.reason ??
-  (availability.status === 'downloadable'
-    ? 'model_download_required'
-    : availability.status === 'downloading'
-      ? 'model_downloading'
-      : 'model_unavailable');
+  availability.reason ?? REASON_BY_STATUS[availability.status];
 
 export function nativeModelClient(bridge: NativeModelBridge): ModelClientService {
   const provider: Provider = openProvider(bridge);

@@ -175,11 +175,11 @@ describe('backendFailureKey', () => {
     );
   });
 
-  it('keeps a transport failure generic while online', () => {
+  it('names the connection when a custom backend fails in transport, not a status', () => {
     const failure = new ModelError({ reason: 'transport', cause: 'socket closed' });
 
     expect(backendFailureKey(failure, backendTargetId(first, modelId))).toBe(
-      'common.somethingWentWrong'
+      'modelChat.connectionLost'
     );
   });
 });

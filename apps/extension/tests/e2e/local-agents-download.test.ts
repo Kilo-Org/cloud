@@ -194,6 +194,111 @@ test('a guarded click cancels the download, and the approved retry keeps it', as
   }
 });
 
+test('a download that lands after the click is reported on the next call, and the approved repeat keeps one file', async () => {
+  test.setTimeout(180_000);
+  const downloadsPath = await mkdtemp(join(tmpdir(), 'kilo-downloads-'));
+  const fixture = await startDownloadFixture();
+  const hub = await startFakeHub();
+  const { context, extensionId, userDataDir } = await launchExtensionContext({
+    downloadsPath,
+    grantPermissions: ['downloads'],
+  });
+  await mockKiloApi(context, {});
+  await context.addInitScript({
+    content:
+      "Object.defineProperty(chrome.permissions, 'request', { value: () => Promise.resolve(true) });",
+  });
+
+  try {
+    const sidePanel = await context.newPage();
+    const agentPage = await context.newPage();
+    const downloads: Download[] = [];
+
+    agentPage.on('download', download => downloads.push(download));
+    await agentPage.goto(`${fixture.url}/page`);
+
+    const grants = grant(fixture.url);
+    const session = await openPairedAgentSession({
+      beforeShare: async () => {
+        await activateTab(sidePanel, `${fixture.url}/page`);
+      },
+      context,
+      extensionId,
+      hub,
+      sidePanel,
+      title: 'Late download E2E session',
+    });
+
+    await session.callTool('browser_navigate', { url: `${fixture.url}/page` }, grants);
+
+    const snapshot = await session.callTool('browser_snapshot', {}, grants);
+    const target =
+      snapshot.kind === 'result'
+        ? /link "Download slow report" \[ref=(e\d+)\]/u.exec(snapshot.text)?.[1]
+        : undefined;
+
+    if (target === undefined) {
+      throw new Error(`no delayed download link in the snapshot:\n${snapshot.kind}`);
+    }
+
+    // 1. Call N: the click. The response is held for a second and a half, so nothing lands inside the call.
+    const clicked = await session.callTool(
+      'browser_click',
+      { element: 'Download slow report', target },
+      grants
+    );
+
+    expect(clicked).toMatchObject({ isError: false, kind: 'result' });
+    // The browser created the download after the call answered, and the guard's late window stopped it.
+    await expect.poll(() => downloads.length, { timeout: 20_000 }).toBe(1);
+    await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toStrictEqual([]);
+
+    // 2. Call N+1 — any tool at all — answers with the need, and names the step that started the file.
+    const reported = await session.callTool('browser_snapshot', {}, grants);
+
+    expect(reported).toMatchObject({ afterAction: true, code: -32_010, kind: 'error' });
+    const message = reported.kind === 'error' ? reported.message : '';
+
+    expect(message).toContain("The click on 'Download slow report' started a download of");
+    expect(message).toContain('Repeat that click to receive the file.');
+
+    const token = reported.kind === 'error' ? (reported.stepToken ?? '') : '';
+
+    expect(token).not.toBe('');
+    await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toStrictEqual([]);
+
+    // 3. Repeating the click with the token keeps exactly one file, even though it lands after the call.
+    const approved = await session.callTool(
+      'browser_click',
+      { element: 'Download slow report', target },
+      grants,
+      [token]
+    );
+
+    expect(approved).toMatchObject({ isError: false, kind: 'result' });
+    await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toHaveLength(1);
+
+    // 4. The token is burned: the identical click again is guarded, and the folder keeps its one file.
+    const reguarded = await session.callTool(
+      'browser_click',
+      { element: 'Download slow report', target },
+      grants,
+      [token]
+    );
+
+    expect(reguarded).toMatchObject({ afterAction: true, code: -32_010, kind: 'error' });
+    await expect.poll(() => downloads.length, { timeout: 20_000 }).toBe(2);
+    await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toHaveLength(1);
+    expect(fixture.lateHits()).toBeGreaterThanOrEqual(3);
+  } finally {
+    await context.close();
+    await hub.close();
+    await fixture.close();
+    await rm(downloadsPath, { force: true, recursive: true });
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
 test('a navigate to an attachment asks first, then keeps the file once approved', async () => {
   test.setTimeout(120_000);
   const downloadsPath = await mkdtemp(join(tmpdir(), 'kilo-downloads-'));

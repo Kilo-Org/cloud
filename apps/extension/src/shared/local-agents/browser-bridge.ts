@@ -349,7 +349,8 @@ export const createRuntimeBrowserBridge = ({
     if (outcome.kind === 'needs_permission') {
       throw new LocalAgentRpcError(
         LOCAL_AGENT_ERROR_CODES.needsPermission,
-        NEEDS_PERMISSION_ERROR,
+        // The runtime's text names the step to repeat or the file it could not delete; the model reads it.
+        outcome.result.ok ? NEEDS_PERMISSION_ERROR : outcome.result.error,
         {
           items: outcome.items,
           ...(outcome.stepToken === undefined ? {} : { stepToken: outcome.stepToken }),

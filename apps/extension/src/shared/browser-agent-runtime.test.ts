@@ -1382,6 +1382,221 @@ describe('agent browser calls', () => {
     });
   });
 
+  /**
+   * Runs one call while the fake clock advances: every window a guard keeps is a
+   * timer, so a call that waits on one only settles after the clock moves.
+   */
+  const runTimed = async (
+    call: Promise<BrowserToolRunOutcome>,
+    ms = 300
+  ): Promise<BrowserToolRunOutcome> => {
+    await vi.advanceTimersByTimeAsync(ms);
+
+    return call;
+  };
+
+  it('reports a download that lands after the click on the very next call, whatever tool it is', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+
+    // The fixture's attachment response is delayed: the browser creates the item after the click has answered.
+    cdp.setHandlers({ 'Input.dispatchMouseEvent': () => ({}) });
+
+    const click = () =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+    const shot = () =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: {},
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_take_screenshot',
+      });
+
+    vi.useFakeTimers();
+
+    try {
+      const clicked = await runTimed(click());
+
+      // The click started nothing it could see: it answers plainly and leaves the linger on duty.
+      expect(clicked.kind).toBe('result');
+
+      // 1.5 s later the response arrives and the browser creates the download, inside the linger's window.
+      await vi.advanceTimersByTimeAsync(1500);
+      downloads.emit({ filename: '/home/me/Downloads/report.txt', id: 91, tabId: TAB_ID });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(downloads.cancelled).toStrictEqual([91]);
+
+      // The very next call reports it, whatever tool it is, and does not run: the report is its answer.
+      await vi.advanceTimersByTimeAsync(900);
+      const before = cdp.commands().length;
+      const reported = await runTimed(shot());
+
+      expect(reported).toMatchObject({
+        afterAction: true,
+        items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+        kind: 'needs_permission',
+        result: {
+          error:
+            "The click on '#pay' started a download of report.txt, which was stopped. Approved. Repeat that click to receive the file.",
+          ok: false,
+        },
+      });
+      // A refusal without a token leaves the human nothing to approve: this throws when it has none.
+      expectStepToken(reported);
+      // The read never reached the page: an unanswered download is the whole answer.
+      expect(cdp.commands()).toHaveLength(before);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('binds a late download\u2019s token to the click that started it, not to the call that reported it', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    /** The replayed click's own download, created while its command runs. */
+    let inCall: number | null = null;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        if (inCall !== null) {
+          const id = inCall;
+
+          inCall = null;
+          downloads.emit({ id, tabId: TAB_ID });
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[] = []) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+    const shot = () =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: {},
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_take_screenshot',
+      });
+
+    vi.useFakeTimers();
+
+    try {
+      await runTimed(click());
+      await vi.advanceTimersByTimeAsync(1500);
+      downloads.emit({ id: 92, tabId: TAB_ID });
+      await vi.advanceTimersByTimeAsync(900);
+
+      const reported = await runTimed(shot());
+      const stepToken = expectStepToken(reported);
+
+      // Repeating the click — the step the report named — runs unguarded: the token is bound to it.
+      const approved = await runTimed(click([stepToken]));
+
+      // The guard never denied downloads on the repeat, so the token really bought this one unguarded run.
+      expect([approved.kind, cdp.downloadsDenied(), downloads.cancelled]).toStrictEqual([
+        'result',
+        1,
+        [92],
+      ]);
+
+      // The token was burned, so the identical click again is guarded: its own download is cancelled.
+      inCall = 94;
+
+      const again = await runTimed(click([stepToken]));
+
+      expect(again).toMatchObject({ afterAction: true, kind: 'needs_permission' });
+      expect(downloads.cancelled).toStrictEqual([92, 94]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the file an approved click starts after it answered, and guards the next identical call', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    /** The next click's own download, created while its command runs. */
+    let inCall: number | null = null;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        if (inCall !== null) {
+          const id = inCall;
+
+          inCall = null;
+          downloads.emit({ id, startTime: new Date(Date.now()).toISOString(), tabId: TAB_ID });
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[] = []) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    vi.useFakeTimers();
+
+    try {
+      // 1. A guarded click starts a download that only arrives 1.5 s after the call answered.
+      await runTimed(click());
+      await vi.advanceTimersByTimeAsync(1500);
+      downloads.emit({ id: 101, tabId: TAB_ID });
+      await vi.advanceTimersByTimeAsync(100);
+
+      // 2. The next call reports it, and its token is bound to the click.
+      const reported = await runTimed(click([]));
+      const stepToken = expectStepToken(reported);
+
+      expect(reported).toMatchObject({ afterAction: true, kind: 'needs_permission' });
+
+      // 3. The approved repeat keeps the file it starts late: it answers, the file lands in the late window.
+      const approved = await runTimed(click([stepToken]));
+
+      expect(approved.kind).toBe('result');
+
+      await vi.advanceTimersByTimeAsync(1400);
+      downloads.emit({ id: 102, startTime: new Date(Date.now()).toISOString(), tabId: TAB_ID });
+      await vi.advanceTimersByTimeAsync(0);
+
+      // The approved repeat ran unguarded and its late file was never cancelled or deleted: exactly one is kept.
+      expect([cdp.downloadsDenied(), downloads.cancelled, downloads.removed]).toStrictEqual([
+        1,
+        [101],
+        [],
+      ]);
+
+      // 4. The identical call again, with the burned token, is guarded: its own download is cancelled.
+      inCall = 103;
+
+      const reguarded = await runTimed(click([stepToken]));
+
+      expect(reguarded).toMatchObject({ afterAction: true, kind: 'needs_permission' });
+      expect(downloads.cancelled).toStrictEqual([101, 103]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('pays the announce grace, not the whole poll bound, for a download the browser does not name', async () => {
     const downloads = createFakeDownloads();
     const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });

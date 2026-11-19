@@ -276,12 +276,16 @@ const DOWNLOAD_ANNOUNCE_GRACE_MS = 250;
 const DOWNLOAD_ANNOUNCE_POLL_MS = 10;
 const DOWNLOAD_ANNOUNCE_POLLS = 120;
 
-/** One download this call stopped: its file is gone, still being written, or kept under a name. */
+/**
+ * One download this call stopped: its file is gone, still being written, or
+ * kept under a name. Every outcome names the file, because a report that
+ * arrives after its call has answered can only tell the model what it is.
+ */
 type DiscardOutcome =
   | { readonly kind: 'kept'; readonly filename: string }
   /** The cancel landed on an item the browser was still writing: the file that lands is deleted off the call's path. */
-  | { readonly kind: 'pending' }
-  | { readonly kind: 'removed' };
+  | { readonly kind: 'pending'; readonly filename: string }
+  | { readonly kind: 'removed'; readonly filename: string };
 
 /** What a guard stopped: files it could not delete, and downloads it stopped or is still finishing. */
 interface GuardSettlement {
@@ -434,12 +438,14 @@ const discardDownload = async (
 
   // `interrupted` is the browser's own proof that no file exists.
   if (reached.state === 'interrupted') {
-    return { kind: 'removed' };
+    return { filename: fileNameOf(reached), kind: 'removed' };
   }
 
   if (api.removeFile === undefined) {
     // Nothing can delete a file the browser wrote, so an uncancelled item is a file the user keeps.
-    return cancelled ? { kind: 'removed' } : { filename: fileNameOf(reached), kind: 'kept' };
+    return cancelled
+      ? { filename: fileNameOf(reached), kind: 'removed' }
+      : { filename: fileNameOf(reached), kind: 'kept' };
   }
 
   if (reached.state === 'complete') {
@@ -447,7 +453,7 @@ const discardDownload = async (
       await api.removeFile(item.id);
       await api.erase?.({ id: item.id });
 
-      return { kind: 'removed' };
+      return { filename: fileNameOf(reached), kind: 'removed' };
     } catch {
       return { filename: fileNameOf(reached), kind: 'kept' };
     }
@@ -456,7 +462,9 @@ const discardDownload = async (
   // Still in progress: the call reports the download now, and whatever file lands is deleted off its path.
   void finishDownload(api, item.id);
 
-  return cancelled ? { kind: 'removed' } : { kind: 'pending' };
+  return cancelled
+    ? { filename: fileNameOf(reached), kind: 'removed' }
+    : { filename: fileNameOf(reached), kind: 'pending' };
 };
 
 /** One read of a download's own state; `undefined` when the browser has no such item. */
@@ -569,12 +577,61 @@ interface DownloadAttribution {
   readonly navigation?:
     | { readonly destination: string; readonly landed: () => Promise<boolean> }
     | undefined;
+  /**
+   * The step that owns this guard: the tool, arguments, session and tab that ran.
+   * A download it stops is reported against that step, so the model repeats the
+   * call that started the file rather than the call that carried the news.
+   */
+  readonly step?: DownloadStep | undefined;
   readonly tab: { readonly tabId: number; readonly url: string };
   /** Tabs this call owns, including one it opened. */
   readonly tabIds: () => readonly number[];
   /** What the tab says about the download this call started; absent when there is nothing to watch. */
   readonly witness?: DownloadWitness | undefined;
 }
+
+/**
+ * The step a download belongs to, captured before the guard runs: the exact
+ * binding a step token is issued against, and the words a report repeats back.
+ */
+interface DownloadStep {
+  readonly argumentHash: string;
+  /** How a report names the step: `click on 'Download report'`, `navigation to https://…`. */
+  readonly description: string;
+  /** The noun a report tells the model to repeat: `click`, `navigation`. */
+  readonly noun: string;
+  readonly origin: string;
+  readonly session: string;
+  readonly tabId: number;
+  readonly toolName: string;
+}
+
+/**
+ * How a refused download names the step that started it, so the model repeats
+ * that step instead of the call that happened to carry the report.
+ */
+const downloadStepText = (toolName: string, args: Record<string, unknown>) => {
+  if (toolName === 'browser_click') {
+    const element =
+      argumentText(args['element']) ??
+      argumentText(args['target']) ??
+      argumentText(args['selector']);
+
+    return element === undefined
+      ? { description: 'click', noun: 'click' }
+      : { description: `click on '${element}'`, noun: 'click' };
+  }
+
+  if (toolName === 'browser_navigate') {
+    const url = argumentText(args['url']);
+
+    return url === undefined
+      ? { description: 'navigation', noun: 'navigation' }
+      : { description: `navigation to ${url}`, noun: 'navigation' };
+  }
+
+  return { description: `${toolName} call`, noun: 'call' };
+};
 
 /**
  * What the tab shows about the download a call's own command started: the
@@ -608,11 +665,46 @@ interface LingerSink {
   /** The linger ended, by its own window or by the runtime: the tab no longer holds one. */
   readonly ended: () => void;
   /**
-   * A download the linger stopped after its own call had answered. Nothing else will report it, so the runtime
-   * hands it to the next call on the tab instead of letting the file vanish unreported.
+   * A download the linger stopped after its own call had answered. Nothing else
+   * will report it, so the runtime hands it to the next call on the tab, together
+   * with the step that started it, instead of letting the file vanish unreported.
    */
   readonly late: (outcome: Promise<DiscardOutcome>) => void;
 }
+
+/** One download an answered call's linger stopped, kept until a call can tell the model about it. */
+interface LateStop {
+  readonly outcome: Promise<DiscardOutcome>;
+  /** The step that started the file; absent only for a guard without one (a panel or a workflow call). */
+  readonly step: DownloadStep | undefined;
+}
+
+/** One stopped download as a later call reports it: the file it was, whether it survived, and the step that started it. */
+interface LateDiscard {
+  readonly filename: string;
+  /** The browser would not delete the file, so the human keeps it where it landed. */
+  readonly kept: boolean;
+  readonly step: DownloadStep | undefined;
+}
+
+/**
+ * What a late report says: the step that started the file, what became of it,
+ * and the step to repeat — never the call that happened to carry the news.
+ */
+const lateDownloadError = (files: readonly LateDiscard[]): string => {
+  const names = [...new Set(files.map(file => file.filename))].join(', ');
+  const step = files.findLast(file => file.step !== undefined)?.step;
+  const head = step === undefined ? 'A browser action' : `The ${step.description}`;
+  const repeat =
+    step === undefined
+      ? 'Repeat that step to receive the file.'
+      : `Repeat that ${step.noun} to receive the file.`;
+  const saved = files.some(file => file.kept)
+    ? ` The browser had already saved ${names} before the download could be stopped.`
+    : '';
+
+  return `${head} started a download of ${names}, which was stopped. Approved. ${repeat}${saved}`;
+};
 
 /**
  * The downloads an act call started that the stream has not named yet, searched
@@ -623,14 +715,17 @@ interface LingerSink {
 const observeDownloads = async ({
   api,
   mine,
+  polls,
   startedAt,
 }: {
   readonly api: BrowserDownloadsApi;
   /** Whether an item is this call's own, by the same attribution the stream uses. */
   readonly mine: (item: BrowserDownloadItem) => boolean;
+  /** How many searches to spend: one for a call that saw no sign, the bounded window for one that did. */
+  readonly polls: number;
   readonly startedAt: number;
 }): Promise<readonly BrowserDownloadItem[]> => {
-  for (let attempt = 0; attempt < DOWNLOAD_OBSERVE_POLLS; attempt += 1) {
+  for (let attempt = 0; attempt < polls; attempt += 1) {
     try {
       // eslint-disable-next-line no-await-in-loop -- one search per bounded attempt
       const found = await api.search?.({ startedAfter: new Date(startedAt).toISOString() });
@@ -664,7 +759,8 @@ const isAttachment = (request: { readonly responseHeaders?: Record<string, strin
  * grace: no document can turn into a file. A navigation keeps the call open
  * while it is unanswered, and an announced download for a short grace while
  * the browser names the item. Returns how many downloads the tab announced, so
- * a call that stopped none still reports what it caused.
+ * a call that stopped none still reports what it caused, and whether it saw any
+ * sign of a download at all — an ordinary click sees none and pays no more.
  */
 const awaitStartedDownload = async ({
   announced,
@@ -677,7 +773,7 @@ const awaitStartedDownload = async ({
   readonly pendingNavigation: () => number;
   /** Whether the guard already has a download of its own: the item was named while waiting. */
   readonly stopped: () => boolean;
-}): Promise<number> => {
+}): Promise<{ readonly announced: number; readonly signalled: boolean }> => {
   const start = Date.now();
   let count = 0;
   let started = false;
@@ -687,7 +783,7 @@ const awaitStartedDownload = async ({
     count += announced();
 
     if (stopped()) {
-      return count;
+      return { announced: count, signalled: true };
     }
 
     const now = Date.now();
@@ -703,21 +799,21 @@ const awaitStartedDownload = async ({
     // A call that started no navigation cannot have started a download: the start grace is all it pays.
     if (!started) {
       if (now - start >= DOWNLOAD_START_GRACE_MS) {
-        return count;
+        return { announced: count, signalled: false };
       }
     } else if (count === 0 && pending === 0 && now - idleAt >= DOWNLOAD_ANNOUNCE_GRACE_MS) {
       // Its navigation answered with a page, and no download was announced in the grace: nothing is coming.
-      return count;
+      return { announced: count, signalled: true };
     } else if (count > 0 && now - idleAt >= DOWNLOAD_ANNOUNCE_GRACE_MS) {
       // The tab announced a download: the browser names the item a moment later, then the wait is over.
-      return count;
+      return { announced: count, signalled: true };
     }
 
     // eslint-disable-next-line no-await-in-loop -- one live-state poll per bounded attempt
     await after(DOWNLOAD_ANNOUNCE_POLL_MS);
   }
 
-  return count;
+  return { announced: count, signalled: started };
 };
 
 /**
@@ -740,8 +836,23 @@ const armDownloadGuard = (
   const startedAt = Date.now();
   /** One stop per download: the stream and the searches name the same item, and it is stopped once. */
   const stops = new Map<number, Promise<DiscardOutcome>>();
+  /**
+   * Whether the tab created this item before this guard existed. Such a file is
+   * another call's — an approved step's late download above all — and this guard
+   * must not cancel it: the approval it bought dies at the next guarded call, not
+   * at the file it started.
+   */
+  const notThisCalls = (item: BrowserDownloadItem): boolean => {
+    if (item.startTime === undefined) {
+      return false;
+    }
+
+    const created = Date.parse(item.startTime);
+
+    return !Number.isNaN(created) && created < startedAt;
+  };
   const owned = (item: BrowserDownloadItem): boolean =>
-    item.tabId === undefined || tabIds().includes(item.tabId);
+    (item.tabId === undefined || tabIds().includes(item.tabId)) && !notThisCalls(item);
   let created = false;
   let listening = true;
   let lingering = false;
@@ -769,6 +880,11 @@ const armDownloadGuard = (
   };
 
   const listener = (item: BrowserDownloadItem): void => {
+    // A file the tab created before this guard existed, or inside an approval's window, is another step's.
+    if (notThisCalls(item)) {
+      return;
+    }
+
     // A navigate answers with the file it asked for even when the browser reports no tab for it.
     // An item the browser ties to another tab is that tab's download, so the same url in a second tab is left alone.
     const requested =
@@ -828,20 +944,28 @@ const armDownloadGuard = (
       // The wait follows the navigation it started while that navigation is unanswered, then looks for the item.
       // Without this the linger would delete a file the model was never told about.
       let announced = 0;
+      let signalled = false;
 
       if (navigation === undefined && attribution.witness !== undefined) {
-        announced = await awaitStartedDownload({
+        const waited = await awaitStartedDownload({
           announced: attribution.witness.announced,
           attachmentResponse: attribution.witness.attachmentResponse,
           pendingNavigation: attribution.witness.pendingNavigation,
           stopped: () => stops.size > 0,
         });
+
+        ({ announced, signalled } = waited);
       }
 
+      // One search always: the browser can create an item without announcing it, and the model must be told about
+      // A file this call started. Only a call that saw a sign of a download waits for it — an ordinary click pays
+      // One round trip, and a file that lands later is the linger's, reported on the next call.
       if (!created && navigation === undefined) {
         for (const item of await observeDownloads({
           api,
-          mine: candidate => startedByThisCall(candidate, tab, tabIds()),
+          mine: candidate =>
+            !notThisCalls(candidate) && startedByThisCall(candidate, tab, tabIds()),
+          polls: signalled ? DOWNLOAD_OBSERVE_POLLS : 1,
           startedAt,
         })) {
           stop(item);
@@ -969,8 +1093,9 @@ export const createBrowserRuntime = ({
   // Can act on what that call starts. A read leaves it on duty instead of dropping it.
   const lingers = new Map<number, () => void>();
   // Downloads a linger stopped after its own call answered, which no call has reported yet: the next call on the
-  // Tab reports them, because a file that was deleted is never silent.
-  const lateStops = new Map<number, Promise<DiscardOutcome>[]>();
+  // Tab reports them, because a file that was deleted is never silent. Each carries the step that started it, so
+  // The approval it asks for binds that step and not whichever call happened to carry the news.
+  const lateStops = new Map<number, LateStop[]>();
 
   /** Ends whatever linger an earlier call left on this tab: a new download-capable call owns the downloads from now on. */
   const endLinger = (tabId: number): void => {
@@ -981,20 +1106,24 @@ export const createBrowserRuntime = ({
   };
 
   /** Reports the downloads an earlier call's linger stopped, and had nobody to tell: this call tells the model. */
-  const takeLateStops = async (tabId: number): Promise<GuardSettlement> => {
+  const takeLateStops = async (tabId: number): Promise<readonly LateDiscard[]> => {
     const queued = lateStops.get(tabId);
 
     if (queued === undefined) {
-      return { kept: [], stopped: 0 };
+      return [];
     }
 
     lateStops.delete(tabId);
-    const outcomes = await Promise.all(queued);
 
-    return {
-      kept: outcomes.flatMap(outcome => (outcome.kind === 'kept' ? [outcome.filename] : [])),
-      stopped: outcomes.filter(outcome => outcome.kind !== 'kept').length,
-    };
+    const outcomes = await Promise.all(
+      queued.map(async entry => {
+        const outcome = await entry.outcome;
+
+        return { filename: outcome.filename, kept: outcome.kind === 'kept', step: entry.step };
+      })
+    );
+
+    return outcomes;
   };
 
   const sessionFor = (tabId: number): BrowserToolSession => {
@@ -1251,10 +1380,11 @@ export const createBrowserRuntime = ({
       },
       late: outcome => {
         // The linger outlived its call, so this stop has no result to be reported on: the next call on the tab has.
+        // The step travels with it, so the approval it asks for binds the call that started the file.
         const { tabId } = attribution.tab;
         const queued = lateStops.get(tabId) ?? [];
 
-        queued.push(outcome);
+        queued.push({ outcome, step: attribution.step });
         lateStops.set(tabId, queued);
       },
     });
@@ -1296,11 +1426,13 @@ export const createBrowserRuntime = ({
     items: readonly BrowserPermissionItem[],
     answer: {
       readonly afterAction?: boolean;
+      /** The model-visible text, when the refusal has to name a step or a file. */
+      readonly error?: string;
       readonly keptFiles?: readonly string[];
       readonly stepToken?: string;
     } = {}
   ): BrowserToolRunOutcome => {
-    const { afterAction, keptFiles = [], stepToken } = answer;
+    const { afterAction, error, keptFiles = [], stepToken } = answer;
 
     return {
       items,
@@ -1308,14 +1440,52 @@ export const createBrowserRuntime = ({
       // A file the guard could not delete is named: the refusal must not read as "nothing was written".
       result: {
         error:
-          keptFiles.length === 0
+          error ??
+          (keptFiles.length === 0
             ? NEEDS_PERMISSION_ERROR
-            : `The browser action needs permission for this origin. The browser had already saved ${keptFiles.join(', ')} in the downloads folder before the download could be stopped.`,
+            : `The browser action needs permission for this origin. The browser had already saved ${keptFiles.join(', ')} in the downloads folder before the download could be stopped.`),
         ok: false,
       },
       ...(stepToken === undefined ? {} : { stepToken }),
       ...(afterAction === true ? { afterAction: true } : {}),
     };
+  };
+
+  /**
+   * The refusal that carries a download an already answered call's linger
+   * stopped. Its step token binds the step that started the file — that is the
+   * call the model has to repeat — and the text says so, because this call is
+   * only the one that happened to be next.
+   */
+  const lateDownloadRefusal = (
+    files: readonly LateDiscard[]
+  ): BrowserToolRunOutcome | undefined => {
+    if (files.length === 0) {
+      return undefined;
+    }
+
+    const step = files.findLast(file => file.step !== undefined)?.step;
+    const origin = step?.origin ?? '';
+    const stepToken =
+      step === undefined
+        ? undefined
+        : tokens.issue({
+            argumentHash: step.argumentHash,
+            origin: step.origin,
+            reason: SENSITIVE_REASON.download,
+            session: step.session,
+            tabId: step.tabId,
+            toolName: step.toolName,
+          });
+
+    return needsPermissionOutcome(
+      [{ class: 'sensitive', origin, reason: SENSITIVE_REASON.download }],
+      {
+        afterAction: true,
+        error: lateDownloadError(files),
+        ...(stepToken === undefined ? {} : { stepToken }),
+      }
+    );
   };
 
   const claimTab = async ({ caller, from, tabId }: BrowserTabClaimInput): Promise<boolean> => {
@@ -1364,11 +1534,20 @@ export const createBrowserRuntime = ({
     inFlight.get(tabId)?.();
 
     return runExclusive(tabId, async () => {
-      // A call the user drives through the panel owns the tab's downloads from the moment it starts, so an
-      // Earlier agent call's linger must not cancel a file this one starts. An agent call waits until its class is
-      // Known: a read arms none, and must leave the earlier linger on duty rather than drop what it owes.
-      if (caller.kind !== 'agent') {
+      // A download an earlier call's linger stopped has no result of its own to be reported on: this call reports
+      // It before it runs, whatever tool it is, and its token binds the step that started the file. A panel call has
+      // No model to tell, so it drops what is left instead of holding it for the next agent call.
+      if (caller.kind === 'agent') {
+        const owed = lateDownloadRefusal(await takeLateStops(tabId));
+
+        if (owed !== undefined) {
+          return owed;
+        }
+      } else {
+        // A call the user drives through the panel owns the tab's downloads from the moment it starts, so an
+        // Earlier agent call's linger must not cancel a file this one starts.
         endLinger(tabId);
+        lateStops.delete(tabId);
       }
 
       const unreachable = await reachable(tabId);
@@ -1507,6 +1686,7 @@ export const createBrowserRuntime = ({
         };
 
         const guardTabIds = (): readonly number[] => [...callTabs];
+
         // A navigate names the document it asked for, so a download that starts after the call returns can still be found.
         const destination =
           preflight?.class === 'navigate' ? argumentText(argsRecord['url']) : undefined;
@@ -1515,6 +1695,18 @@ export const createBrowserRuntime = ({
         const requestsBefore = new Set(
           guardDownloads ? session.networkRequests().map(request => request.requestId) : []
         );
+        // The step this call is: what a download it starts is reported against, and what the token then binds.
+        const downloadStep: DownloadStep | undefined =
+          guardDownloads && preflight?.ok
+            ? {
+                argumentHash: hashBrowserToolArguments(argsRecord),
+                ...downloadStepText(toolName, argsRecord),
+                origin: preflight.origin,
+                session: sessionKey,
+                tabId,
+                toolName,
+              }
+            : undefined;
         const downloadGuard =
           guardTab === undefined || guardApi === undefined
             ? undefined
@@ -1527,6 +1719,7 @@ export const createBrowserRuntime = ({
                         landed: navigationLanded(tabId, destination),
                       },
                     }),
+                ...(downloadStep === undefined ? {} : { step: downloadStep }),
                 tab: guardTab,
                 tabIds: guardTabIds,
                 witness: {
@@ -1641,13 +1834,24 @@ export const createBrowserRuntime = ({
         // A download an earlier call's linger stopped while this one ran had no result to be reported on; this
         // Call reports it, so a deleted file is never silent. The tab's own target may also have reported one
         // (`Page.downloadWillBegin`), where that is allowed. A panel call has no model to tell, so it leaves them.
-        const late =
-          agentContext === undefined ? { kept: [], stopped: 0 } : await takeLateStops(tabId);
-        const keptFiles = [...settlement.kept, ...late.kept];
+        const late = agentContext === undefined ? [] : await takeLateStops(tabId);
         const stoppedFiles =
-          settlement.stopped + late.stopped + (guardDownloads ? takeStartedDownloads(session) : 0);
+          settlement.stopped + (guardDownloads ? takeStartedDownloads(session) : 0);
+        // A file the guard could not delete is named, whichever call stopped it.
+        const keptFiles = [
+          ...settlement.kept,
+          ...late.filter(file => file.kept).map(file => file.filename),
+        ];
 
-        if (agentContext !== undefined && stoppedFiles + keptFiles.length > 0) {
+        if (agentContext !== undefined && stoppedFiles + settlement.kept.length === 0) {
+          // Nothing of this call's own was stopped: the report is about an earlier call's download, so its token
+          // Binds that call's step and the text names it.
+          const owed = lateDownloadRefusal(late);
+
+          if (owed !== undefined) {
+            return owed;
+          }
+        } else if (agentContext !== undefined && stoppedFiles + settlement.kept.length > 0) {
           const origin = preflight?.ok ? preflight.origin : '';
           const reason = SENSITIVE_REASON.download;
           const stepToken = preflight?.ok ? issueSensitiveToken({ origin, reason }) : undefined;

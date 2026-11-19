@@ -92,13 +92,27 @@ if (fixtureInvoicesPath) {
   // `client.invoices` wholesale would drop every other method and break the local
   // Stripe calls that use it. The cast is needed because the SDK types `list` on
   // the concrete resource class, and only this one read is replaced.
-  client.invoices.list = (async (params: { subscription?: string }) => {
-    const data = fixtureInvoicesFor(params.subscription ?? '');
+  client.invoices.list = (async (params: {
+    subscription?: string;
+    limit?: number;
+    starting_after?: string;
+  }) => {
+    const all = fixtureInvoicesFor(params.subscription ?? '');
+    // The billing history reads back to front and pages with a cursor, so the
+    // fixture answers the same slice the provider would: after the named invoice,
+    // then at most `limit` (one extra so the caller can see there is more).
+    const afterIndex =
+      params.starting_after === undefined
+        ? -1
+        : all.findIndex(invoice => invoice.id === params.starting_after);
+    const start = afterIndex < 0 ? 0 : afterIndex + 1;
+    const end = params.limit === undefined ? all.length : start + params.limit;
+    const data = all.slice(start, end);
     return {
       object: 'list',
       data,
-      has_more: false,
-      total_count: data.length,
+      has_more: end < all.length,
+      total_count: all.length,
       url: '/v1/invoices',
     };
   }) as unknown as typeof client.invoices.list;

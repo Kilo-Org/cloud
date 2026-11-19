@@ -290,6 +290,10 @@ export async function executeBatchReviewDecisionFetch(owner: TenantOwner): Promi
       appType,
     });
   } catch (error) {
+    // A failed read leaves every claimed row pending, so the next claim window
+    // retries it instead of storing a decision no read produced. A repository
+    // GitHub can no longer resolve keeps retrying for as long as a client polls
+    // its pending flag; that cost is preferred to a wrong badge.
     captureException(error, { tags: { source: 'batch_review_decision_graphql' } });
     return;
   }

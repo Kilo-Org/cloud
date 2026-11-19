@@ -62,6 +62,18 @@ export function ModelPickerContent() {
     router.back();
   }, [router]);
 
+  // A model with several thinking efforts keeps the sheet open after its tap,
+  // so a pick can be pending when the sheet closes. Done keeps it (the focus
+  // cleanup commits it); Cancel drops it and leaves the caller's model as it was.
+  const cancelPicker = useCallback(() => {
+    if (closePickerTimerRef.current) {
+      clearTimeout(closePickerTimerRef.current);
+      closePickerTimerRef.current = null;
+    }
+    selectionChangedRef.current = false;
+    router.back();
+  }, [router]);
+
   // A caller that keeps no variant cannot apply an effort picked here, so the
   // rows leave the chips out and a model tap is the whole selection. Read from
   // the bridge rather than a prop: the slot is the picker route's only input.
@@ -227,6 +239,7 @@ export function ModelPickerContent() {
       <PickerSheet
         title={t('agentChat.modelPicker.title')}
         onDone={closePicker}
+        onCancel={cancelPicker}
         scrollable={false}
         expired
       />
@@ -237,6 +250,7 @@ export function ModelPickerContent() {
     <PickerSheet
       title={t('agentChat.modelPicker.title')}
       onDone={closePicker}
+      onCancel={cancelPicker}
       scrollable={false}
       headerContent={
         <View>

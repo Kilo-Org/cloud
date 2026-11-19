@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- The picker's search, empty-state and bottom-inset contracts share one mount harness. */
-import { createElement, type ReactNode } from 'react';
+import { createElement, type ReactNode, useEffect } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
+import { useFocusEffect } from 'expo-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -127,8 +128,18 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: safeAreaInsets.bottom, left: 0, right: 0 }),
 }));
 vi.mock('@/components/picker-sheet', () => ({
-  PickerSheet: (props: { children?: ReactNode; headerContent?: ReactNode }) =>
-    createElement('PickerSheet', null, props.headerContent, props.children),
+  PickerSheet: (props: {
+    children?: ReactNode;
+    headerContent?: ReactNode;
+    onDone?: () => void;
+    onCancel?: () => void;
+  }) =>
+    createElement(
+      'PickerSheet',
+      { onDone: props.onDone, onCancel: props.onCancel },
+      props.headerContent,
+      props.children
+    ),
 }));
 // EmptyState renders its `action` node (as the real component does) so the
 // empty state's clear CTA is reachable from the tree; `title` stays a prop for
@@ -782,6 +793,65 @@ describe('ModelPickerContent thinking effort availability', () => {
 
     act(() => {
       renderer.unmount();
+    });
+  });
+
+  // The sheet stays open after a tap on a model with several efforts, so that
+  // pick is pending until the sheet closes. The focus cleanup commits it; this
+  // block runs that cleanup for real to tell Done and Cancel apart.
+  describe('closing with a pending pick', () => {
+    const otherOption: SessionModelOption = { ...makeOption(1), id: 'other-model' };
+
+    beforeEach(() => {
+      vi.mocked(useFocusEffect).mockImplementation(effect => {
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- the mock runs the route's own memoized effect
+        useEffect(effect, [effect]);
+      });
+      slotState.bridge = {
+        ...makeBridge(),
+        options: [otherOption, effortOption],
+        currentValue: otherOption.id,
+        currentVariant: '',
+        acceptsVariant: true,
+      };
+    });
+
+    afterEach(() => {
+      vi.mocked(useFocusEffect).mockReset();
+    });
+
+    async function pickEffortModelThen(header: 'onDone' | 'onCancel') {
+      const bridge = slotState.bridge as ModelPickerBridge;
+      const renderer = await mount();
+      await act(async () => {
+        rowProps(modelRow(renderer)).onSelectModel(effortOption);
+        await Promise.resolve();
+      });
+      const sheet = findByType(renderer.root, 'PickerSheet')[0];
+      if (!sheet) {
+        throw new Error('the picker sheet was not rendered');
+      }
+      act(() => {
+        (sheet.props[header] as () => void)();
+      });
+      act(() => {
+        renderer.unmount();
+      });
+      return bridge.onSelect;
+    }
+
+    it('keeps the pending pick when Done closes the sheet', async () => {
+      const onSelect = await pickEffortModelThen('onDone');
+
+      expect(routerBack).toHaveBeenCalledTimes(1);
+      expect(onSelect).toHaveBeenCalledTimes(1);
+    });
+
+    it('drops the pending pick when Cancel closes the sheet', async () => {
+      const onSelect = await pickEffortModelThen('onCancel');
+
+      expect(routerBack).toHaveBeenCalledTimes(1);
+      expect(onSelect).not.toHaveBeenCalled();
     });
   });
 });

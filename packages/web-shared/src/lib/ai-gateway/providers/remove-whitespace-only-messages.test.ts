@@ -376,6 +376,23 @@ describe('preserveCacheControl', () => {
     });
   });
 
+  it('reads a breakpoint that sits on a non-text cacheable block of the removed message', () => {
+    // The old text-only read missed a breakpoint on a tool_result block; the shared
+    // isCacheableMessagesContentBlock predicate finds it and the write re-applies it.
+    const previousMessage: Anthropic.MessageParam = { role: 'assistant', content: [toolUse] };
+    const removedMessage: Anthropic.MessageParam = {
+      role: 'user',
+      content: [{ ...toolResult, cache_control: ephemeral }, image],
+    };
+
+    const result = preserveCacheControl(previousMessage, removedMessage);
+
+    expect(result).toEqual({
+      role: 'assistant',
+      content: [{ ...toolUse, cache_control: ephemeral }],
+    });
+  });
+
   it('keeps a preceding message whose cacheable block already has a breakpoint', () => {
     const previousMessage: Anthropic.MessageParam = {
       role: 'assistant',

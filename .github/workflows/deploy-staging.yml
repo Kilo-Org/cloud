@@ -21,6 +21,21 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # This workflow runs only from main. The job holds no credential, so it can
+  # report the reason a run was rejected instead of skipping silently.
+  verify-main:
+    if: github.repository == 'Kilo-Org/cloud'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+
+    steps:
+      - name: Verify main branch
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::This workflow must be run from main. Got: $GITHUB_REF"
+            exit 1
+          fi
+
   # Only a successful CI run may start an automatic deploy; the poll and the
   # dispatch pass the same guard unchanged. Every later job depends on this one,
   # so a CI completion that must not deploy skips the whole run.
@@ -40,7 +55,7 @@ jobs:
   # runs first, so an unreachable database fails here before the migrations try
   # the same connection.
   db-gate:
-    needs: check-changes
+    needs: [verify-main, check-changes]
     # Guard: this workflow_dispatch is reachable from a fork, and it deploys
     # the web app to staging using repo secrets. Only the canonical repo may
     # run it.
@@ -95,7 +110,7 @@ jobs:
   # timeout. A failed migration still fails db-gate, which stops the Worker
   # deploy and the release record below.
   deploy-app:
-    needs: check-changes
+    needs: [verify-main, check-changes]
     # Guard: privileged workflow — only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/stage-vercel-deployment.yml
@@ -107,7 +122,7 @@ jobs:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_APP }}
 
   deploy-ai-gateway:
-    needs: check-changes
+    needs: [verify-main, check-changes]
     # Guard: privileged workflow — only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/stage-vercel-deployment.yml
@@ -135,7 +150,7 @@ jobs:
   # staging deploys start earlier, beside the gate. record-deployment still
   # requires every one of the three.
   deploy-workers:
-    needs: [check-changes, db-gate, detect-workers]
+    needs: [verify-main, check-changes, db-gate, detect-workers]
     # Guard: this workflow_dispatch is reachable from a fork, and the reusable
     # workflow inherits repo secrets. Only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
@@ -148,7 +163,15 @@ jobs:
     secrets: inherit
 
   record-deployment:
-    needs: [check-changes, db-gate, deploy-app, deploy-ai-gateway, deploy-workers]
+    needs:
+      [
+        verify-main,
+        check-changes,
+        db-gate,
+        deploy-app,
+        deploy-ai-gateway,
+        deploy-workers,
+      ]
     if: >-
       ${{
         github.repository == 'Kilo-Org/cloud' &&

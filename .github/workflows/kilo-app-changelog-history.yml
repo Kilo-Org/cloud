@@ -25,10 +25,28 @@ permissions:
   issues: write
 
 jobs:
-  rewrite:
-    # The mint below uses a repository secret; only the canonical repo may run
-    # this workflow at all.
+  # This workflow runs only from main, where the rewrite job mints its
+  # credential. The job holds no credential, so it can report the reason a run
+  # was rejected instead of skipping silently.
+  verify-main:
     if: github.repository == 'Kilo-Org/cloud'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+
+    steps:
+      - name: Verify main branch
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::This workflow must be run from main. Got: $GITHUB_REF"
+            exit 1
+          fi
+
+  rewrite:
+    needs: verify-main
+    # The mint below uses a repository secret; only the canonical repo may run
+    # this job, and the sibling jobs of the release workflow that consume the
+    # same credential all run on main, so this one requires it too.
+    if: github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     steps:

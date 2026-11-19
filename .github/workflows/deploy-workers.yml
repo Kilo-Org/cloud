@@ -71,11 +71,30 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # This workflow runs only from main. The job holds no credential, so it can
+  # report the reason a run was rejected instead of skipping silently; the
+  # deploy jobs below need it. Reusable calls keep their caller-side gates.
+  verify-main:
+    if: github.repository == 'Kilo-Org/cloud'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+
+    steps:
+      - name: Verify main branch
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::This workflow must be run from main. Got: $GITHUB_REF"
+            exit 1
+          fi
+
   deploy-manual:
+    needs: verify-main
     # Guard: this workflow_dispatch is reachable from a fork, and it deploys
     # Cloudflare Workers using repo secrets. Only the canonical repo may run
-    # it. (Also called as a reusable workflow from deploy-staging.yml, whose
-    # caller job is itself guarded.)
+    # it, and only from main.
+    # (Also called as a reusable workflow from deploy-staging.yml, whose
+    # caller job is itself guarded — deploy-manual does not run on calls
+    # because `worker` is empty.)
     if: inputs.worker != '' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: ${{ inputs.worker == 'services/cloud-agent-next' && 75 || inputs.worker == 'services/auto-routing-benchmark' && inputs.target_environment == 'production' && 60 || 25 }}
@@ -426,6 +445,9 @@ jobs:
           exit 1
 
   deploy-changed:
+    needs: verify-main
+    # A deploy call reaches this job only through a caller that already gates
+    # the call on main (deploy-production.yml / deploy-staging.yml).
     if: inputs.worker_matrix != '[]' && inputs.worker_matrix != '' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: ${{ matrix.worker == 'services/cloud-agent-next' && 75 || matrix.worker == 'services/auto-routing-benchmark' && inputs.target_environment == 'production' && 60 || 25 }}
@@ -570,6 +592,7 @@ jobs:
         run: pnpm run sentry:sourcemaps
 
   deploy-session-ingest:
+    needs: verify-main
     # Guard: this reusable workflow can be invoked from a fork, and the job
     # deploys to the target environment with inherited repo secrets. Only the
     # canonical repo may run it. The ordered path comes from the detection call,
@@ -627,7 +650,7 @@ jobs:
           command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
 
   deploy-cloud-agent-after-session-ingest:
-    needs: deploy-session-ingest
+    needs: [verify-main, deploy-session-ingest]
     # GitHub skips a dependent job when a needed job fails: cloud-agent-next never
     # deploys after an unsuccessful session-ingest deployment.
     if: >-

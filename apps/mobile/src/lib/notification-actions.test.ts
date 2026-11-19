@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- one suite pins every action outcome, category shape, and tap fallback */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import type * as Notifications from 'expo-notifications';
 
 import {
@@ -32,7 +32,10 @@ const mocks = vi.hoisted(() => ({
   runNeedsInputInteraction: vi.fn(),
   refreshGlanceableSurfacesFromTray: vi.fn(),
   captureException: vi.fn(),
+  platform: { OS: 'ios' as 'ios' | 'android' },
 }));
+
+vi.mock('react-native', () => ({ Platform: mocks.platform }));
 
 vi.mock('expo-notifications', () => ({
   setNotificationCategoryAsync: mocks.setNotificationCategoryAsync,
@@ -440,6 +443,61 @@ describe('handleNeedsInputNotificationResponse — approve and reply', () => {
       expect.objectContaining({ identifier: 'needs-input:ses_1' })
     );
     expect(mocks.dismissNotificationAsync).toHaveBeenCalledWith('fcm-remote-1');
+  });
+
+  it('replaces an Android inline reply in place, because the OS keeps it for the reply', async () => {
+    mocks.platform.OS = 'android';
+    onTestFinished(() => {
+      mocks.platform.OS = 'ios';
+    });
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        identifier: 'fcm-remote-1',
+        actionIdentifier: NEEDS_INPUT_ACTION_IDS.reply,
+        userText: 'ship it',
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identifier: 'fcm-remote-1',
+        content: expect.objectContaining({ body: 'Reply sent' }),
+      })
+    );
+    expect(mocks.dismissNotificationAsync.mock.calls).toEqual([['needs-input:ses_1']]);
+  });
+
+  it('keeps the session identifier for an iOS reply and for an Android Approve', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        identifier: 'fcm-remote-1',
+        actionIdentifier: NEEDS_INPUT_ACTION_IDS.reply,
+        userText: 'ship it',
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+    mocks.platform.OS = 'android';
+    onTestFinished(() => {
+      mocks.platform.OS = 'ios';
+    });
+    await handleNeedsInputNotificationResponse(raiseResponse({ identifier: 'fcm-remote-2' }), {
+      runInteraction: mocks.runNeedsInputInteraction,
+    });
+
+    expect(mocks.scheduleNotificationAsync).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ identifier: 'needs-input:ses_1' })
+    );
+    expect(mocks.scheduleNotificationAsync).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ identifier: 'needs-input:ses_1' })
+    );
+    expect(mocks.dismissNotificationAsync.mock.calls).toEqual([['fcm-remote-1'], ['fcm-remote-2']]);
   });
 
   it('uses the attention title when the response notification has no title', async () => {

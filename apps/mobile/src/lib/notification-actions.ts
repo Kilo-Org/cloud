@@ -18,6 +18,7 @@
 import { z } from 'zod';
 
 import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
 
 import {
   androidChannelIdForPushData,
@@ -491,8 +492,7 @@ async function runAnswerAction(args: {
   }
 
   await replaceNotification({
-    resultIdentifier: notificationIdentifierForSession(data.cliSessionId),
-    originalIdentifier: response.notification.request.identifier,
+    ...resultIdentities(response, data),
     title: resultTitleFor({
       previews: deps.readPreviews?.(),
       actedOnTitle: response.notification.request.content.title,
@@ -523,11 +523,35 @@ async function refreshGlanceableAfterAnswer(deps: NeedsInputActionDeps): Promise
 }
 
 /**
- * Replace the acted-on notification with the action's result. The result is
- * posted under `notificationIdentifierForSession` — the identifier the next
- * sync's plan dismisses — and the notification the user actually acted on is
- * dismissed when it is a different one (a server push carries an OS-assigned
- * identifier), so one raise never ends with two notifications.
+ * Where the result goes, and which notification it replaces.
+ *
+ * The result is normally posted under `notificationIdentifierForSession` — the
+ * identifier the next sync's plan dismisses — and the notification the user
+ * acted on is dismissed when it is a different one (a server push carries an
+ * OS-assigned identifier).
+ *
+ * An Android inline Reply is the exception. The OS keeps the replied
+ * notification on screen for the reply (`LIFETIME_EXTENDED_BY_DIRECT_REPLY`)
+ * and ignores a dismissal of it, so the raise would end with two
+ * notifications. Only a post under its own identifier ends that, so the result
+ * replaces it in place, and the session's identifier is the one dismissed.
+ * iOS removes a replied notification itself, so it keeps the normal path.
+ */
+function resultIdentities(
+  response: Notifications.NotificationResponse,
+  data: NeedsInputRaiseData
+): { resultIdentifier: string; replacedIdentifier: string } {
+  const actedOn = response.notification.request.identifier;
+  const session = notificationIdentifierForSession(data.cliSessionId);
+  return Platform.OS === 'android' && response.userText !== undefined
+    ? { resultIdentifier: actedOn, replacedIdentifier: session }
+    : { resultIdentifier: session, replacedIdentifier: actedOn };
+}
+
+/**
+ * Replace a notification with the action's result: post the result under
+ * `resultIdentifier`, and dismiss `replacedIdentifier` when it is a different
+ * one, so one raise never ends with two notifications.
  *
  * `interruptionLevel` is outcome-derived: the retryable failure keeps the
  * raise's time-sensitive break-through because it still needs the user; the
@@ -535,7 +559,7 @@ async function refreshGlanceableAfterAnswer(deps: NeedsInputActionDeps): Promise
  */
 async function replaceNotification(args: {
   resultIdentifier: string;
-  originalIdentifier: string;
+  replacedIdentifier: string;
   title: string;
   body: string;
   data: NeedsInputRaiseData;
@@ -544,7 +568,7 @@ async function replaceNotification(args: {
 }): Promise<void> {
   const {
     resultIdentifier,
-    originalIdentifier,
+    replacedIdentifier,
     title,
     body,
     data,
@@ -568,9 +592,9 @@ async function replaceNotification(args: {
   } catch (error) {
     reportActionFailure('publish', error);
   }
-  if (originalIdentifier !== resultIdentifier) {
+  if (replacedIdentifier !== resultIdentifier) {
     try {
-      await Notifications.dismissNotificationAsync(originalIdentifier);
+      await Notifications.dismissNotificationAsync(replacedIdentifier);
     } catch (error) {
       reportActionFailure('dismiss', error);
     }

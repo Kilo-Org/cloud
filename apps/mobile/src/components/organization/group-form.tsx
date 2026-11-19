@@ -89,7 +89,10 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
   const [nameError, setNameError] = useState<'required' | 'tooLong' | null>(null);
   const [dirty, setDirty] = useState(false);
   const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<'name'>();
-  const guard = useMetadataLeaveGuard({ enabled: true });
+  const saving = mutations.create.isPending || mutations.updateDetails.isPending;
+  const removing = mutations.remove.isPending;
+  const busy = saving || removing;
+  const guard = useMetadataLeaveGuard({ enabled: true, saving: busy });
   const { confirm, dialog } = useConfirmDialog();
   const initial =
     group === undefined
@@ -221,10 +224,6 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
       },
     });
   };
-
-  const saving = mutations.create.isPending || mutations.updateDetails.isPending;
-  const removing = mutations.remove.isPending;
-  const busy = saving || removing;
 
   return (
     <View className="flex-1 bg-background">

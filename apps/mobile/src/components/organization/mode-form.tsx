@@ -103,7 +103,10 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
   const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<
     'name' | 'slug' | 'roleDefinition' | 'editFileRegex'
   >();
-  const guard = useMetadataLeaveGuard({ enabled: true });
+  const saving = mutations.create.isPending || mutations.update.isPending;
+  const removing = mutations.remove.isPending;
+  const busy = saving || removing;
+  const guard = useMetadataLeaveGuard({ enabled: true, saving: busy });
   const { confirm, dialog } = useConfirmDialog();
 
   const currentValues = (nextGroups: readonly ModeToolGroup[] = groups): OrgModeFormValues => ({
@@ -184,10 +187,6 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
       },
     });
   };
-
-  const saving = mutations.create.isPending || mutations.update.isPending;
-  const removing = mutations.remove.isPending;
-  const busy = saving || removing;
 
   return (
     <View className="flex-1 bg-background">

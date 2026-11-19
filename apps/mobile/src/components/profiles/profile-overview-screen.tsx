@@ -133,8 +133,12 @@ export function ProfileOverviewScreen({
   const canManage = permission === 'allowed';
   // Unsaved name or description edits ask before the route goes, the way the
   // profile form sheets do. A read-only viewer cannot edit the form, so the
-  // guard stays off for them.
-  const metadataGuard = useMetadataLeaveGuard({ enabled: canManage });
+  // guard stays off for them. A save or delete already in flight owns the
+  // route, so Back is dropped instead of offered a discard.
+  const metadataGuard = useMetadataLeaveGuard({
+    enabled: canManage,
+    saving: update.isPending || deleteProfile.isPending,
+  });
   // The config-import sheet is a modal over this screen, so it holds no route
   // and no draft of its own.
   const [importOpen, setImportOpen] = useState(false);

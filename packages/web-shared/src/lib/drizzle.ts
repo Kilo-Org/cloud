@@ -134,9 +134,10 @@ if (process.env.NODE_ENV !== 'test') {
  * A dead *primary* pool means the process cannot serve traffic, so it exits and
  * lets the platform replace the instance.
  *
- * A dead *replica* pool does not, so it only logs. The replica is a read-path
- * optimisation and `selectReplicaUrl` already treats a missing replica as "use
- * the primary". Exiting here escalated a replica-only outage into whole-instance
+ * A dead *replica* pool does not, so its listener only logs and then calls this
+ * predicate, which answers false. The replica is a read-path optimisation and
+ * `selectReplicaUrl` already treats a missing replica as "use the primary".
+ * Exiting here escalated a replica-only outage into whole-instance
  * termination: when both EU replicas refused connections on 2026-08-12 this
  * handler fired 107 times in under an hour, killing instances whose primary was
  * healthy the entire time and taking writes and primary reads down with them.
@@ -164,6 +165,9 @@ pool.on('error', (err: Error) => {
 if (usesSeparateReplica) {
   replicaPool.on('error', (err: Error) => {
     console.error('Unexpected error on idle client (replica)', err);
+    if (shouldExitOnPoolError('replica')) {
+      process.exit(-1);
+    }
   });
 }
 

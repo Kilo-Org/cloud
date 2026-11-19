@@ -39,6 +39,7 @@ import { SessionMessageCompletionSourceSchema } from '../session/session-message
 import { SafeFailureProjectionSchema } from '../session/safe-failure-projection.js';
 import { SandboxStatusSessionIdSchema } from '../shared/sandbox-status.js';
 import { GetEgressAuditInputSchema } from '../shared/egress-audit.js';
+import { mcpServersRecordSchema } from '../shared/prepare-session-limits.js';
 
 export { GetEgressAuditResponseSchema as GetEgressAuditOutput } from '../shared/egress-audit.js';
 export type { GetEgressAuditResponse } from '../shared/egress-audit.js';
@@ -548,11 +549,7 @@ const PrepareSessionSharedFields = {
     .max(Limits.MAX_SETUP_COMMANDS)
     .optional()
     .describe('Setup commands to run during session initialization'),
-  mcpServers: z
-    .record(z.string().max(100), MCPServerConfigSchema)
-    .refine(obj => Object.keys(obj).length <= Limits.MAX_MCP_SERVERS, {
-      message: `Maximum ${Limits.MAX_MCP_SERVERS} MCP servers allowed`,
-    })
+  mcpServers: mcpServersRecordSchema(MCPServerConfigSchema)
     .optional()
     .describe('MCP server configurations'),
   runtimeSkills: RuntimeSkillsSchema.optional().describe(
@@ -941,12 +938,7 @@ export const ProfileInputSchema = z
           .array(z.string().max(Limits.MAX_SETUP_COMMAND_LENGTH))
           .max(Limits.MAX_SETUP_COMMANDS)
           .optional(),
-        mcpServers: z
-          .record(z.string().max(100), MCPServerConfigSchema)
-          .refine(obj => Object.keys(obj).length <= Limits.MAX_MCP_SERVERS, {
-            message: `Maximum ${Limits.MAX_MCP_SERVERS} MCP servers allowed`,
-          })
-          .optional(),
+        mcpServers: mcpServersRecordSchema(MCPServerConfigSchema).optional(),
         runtimeSkills: RuntimeSkillsSchema.optional(),
         runtimeAgents: RuntimeAgentsSchema.optional(),
         appendSystemPrompt: z.string().max(10000).optional(),

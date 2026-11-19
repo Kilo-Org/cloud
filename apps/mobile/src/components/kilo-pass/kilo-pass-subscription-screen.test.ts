@@ -7,8 +7,7 @@ import { KiloPassSubscriptionScreen } from './kilo-pass-subscription-screen';
 import { i18n } from '@/i18n';
 import { type KiloPassSubscription } from '@/lib/kilo-pass/state';
 
-const mockRouter = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }));
-const mockClearance = vi.hoisted(() => ({ windowTop: 0 }));
+const mockRouter = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), back: vi.fn() }));
 const mocks = vi.hoisted(() => ({
   state: {
     data: undefined as unknown,
@@ -69,7 +68,7 @@ vi.mock('@/components/empty-state', () => ({
   EmptyState: 'EmptyState',
   StateAction: 'StateAction',
 }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/icons', () => ({ Crown: 'Crown' }));
 vi.mock('@/components/ui/kv-row', () => ({ KvRow: 'KvRow' }));
@@ -96,7 +95,7 @@ vi.mock('@/lib/hooks/use-kilo-pass-history', () => ({
   useKiloPassBillingHistory: () => mocks.ledgers.billing,
 }));
 vi.mock('@/lib/form-sheet', () => ({
-  useSheetHeaderTopClearance: () => mockClearance.windowTop,
+  modalSheetSurfaceClass: () => 'bg-background dark:bg-card',
 }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
@@ -173,7 +172,6 @@ function nodesOfType(
 
 describe('KiloPassSubscriptionScreen', () => {
   beforeEach(() => {
-    mockClearance.windowTop = 0;
     mocks.state.isPending = false;
     mocks.state.isError = false;
     mocks.state.data = { subscription: null, isEligibleForFirstMonthPromo: true };
@@ -379,27 +377,20 @@ describe('KiloPassSubscriptionScreen', () => {
     renderer.unmount();
   });
 
-  it('clears the window top inset itself when the modal surface reaches the window top', async () => {
-    mockClearance.windowTop = 51.8;
+  it('closes the modal from the sheet header', async () => {
     const renderer = await renderScreen();
-    const header = nodesOfType(renderer, 'ScreenHeader')[0];
-    expect(header?.props.safeAreaTop).toBe(false);
-    expect(String(header?.props.className)).toContain('pt-2');
-    // `safeAreaTop: false` only stops the header drawing the inset; the surface
-    // that owns the window top pads it, or the header sits under the status bar.
-    const padded = nodesOfType(renderer, 'View').filter(
-      node => (node.props.style as { paddingTop?: number } | undefined)?.paddingTop === 51.8
-    );
-    expect(padded).toHaveLength(1);
-    renderer.unmount();
-    mockClearance.windowTop = 0;
-  });
-
-  it('keeps the header inset when the sheet presents below the window top', async () => {
-    const renderer = await renderScreen();
-    const header = nodesOfType(renderer, 'ScreenHeader')[0];
-    expect(header?.props.safeAreaTop).toBe(true);
-    expect(header?.props.className).toBeUndefined();
+    const header = nodesOfType(renderer, 'SheetHeader')[0];
+    // The route is a modal: the header's one control is the X that closes it,
+    // and on Android, where the modal reaches the window top, the header clears
+    // the status bar itself.
+    expect(header?.props.variant).toBe('close');
+    expect(header?.props.topInset).toBe('android-window-top');
+    expect(header?.props.surfaceClassName).toBe('bg-background dark:bg-card');
+    const onDone = header?.props.onDone as (() => void) | undefined;
+    act(() => {
+      onDone?.();
+    });
+    expect(mockRouter.back).toHaveBeenCalledTimes(1);
     renderer.unmount();
   });
 });

@@ -1,4 +1,4 @@
-import type { ToolPart } from '../opencode.gen';
+import type { ToolPart } from '../opencode';
 
 export type ToolDetailField = { key: string; value: string };
 

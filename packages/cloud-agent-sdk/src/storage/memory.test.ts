@@ -278,6 +278,40 @@ describe('createMemoryStorage', () => {
 
       expect(s.getParts('msg-1')[0]).toEqual(expect.objectContaining({ text: 'hello' }));
     });
+
+    test('rebuild after a delta reuses the views of unchanged parts', () => {
+      s.upsertPart('msg-1', makePart('a', 'msg-1', 'one'));
+      s.upsertPart('msg-1', makePart('b', 'msg-1', 'two'));
+      s.upsertPart('msg-1', makePart('c', 'msg-1', 'three'));
+
+      const before = s.getParts('msg-1');
+      s.applyPartDelta('msg-1', 'b', 'text', '!');
+      const after = s.getParts('msg-1');
+
+      expect(after[0]).toBe(before[0]);
+      expect(after[2]).toBe(before[2]);
+      expect(after[1]).not.toBe(before[1]);
+      expect(after[1]).toEqual(expect.objectContaining({ id: 'b', text: 'two!' }));
+    });
+
+    test('caches views per message', () => {
+      s.upsertPart('msg-1', makePart('a', 'msg-1', 'one'));
+      s.upsertPart('msg-1', makePart('b', 'msg-1', 'two'));
+      s.upsertPart('msg-2', makePart('a', 'msg-2', 'other'));
+
+      const oneBefore = s.getParts('msg-1');
+      const twoBefore = s.getParts('msg-2');
+
+      s.applyPartDelta('msg-1', 'a', 'text', '!');
+
+      const oneAfter = s.getParts('msg-1');
+      const twoAfter = s.getParts('msg-2');
+
+      expect(oneAfter[0]).not.toBe(oneBefore[0]);
+      expect(oneAfter[1]).toBe(oneBefore[1]);
+      expect(twoAfter[0]).toBe(twoBefore[0]);
+      expect(twoAfter[0]).toEqual(expect.objectContaining({ id: 'a', text: 'other' }));
+    });
   });
 
   describe('subscribe', () => {

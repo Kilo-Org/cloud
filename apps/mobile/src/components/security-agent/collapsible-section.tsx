@@ -46,6 +46,14 @@ type CollapsibleSectionProps = {
   titleClassName?: string;
   contentClassName?: string;
   /**
+   * Draws the body on the header's own surface, under a hairline, instead of
+   * on the page. For a body of plain copy and buttons that belongs to its
+   * header (the new-session connect card): on the page, that copy sat apart
+   * from a filled header bar. A body that brings its own surface must not use
+   * it, or one card nests inside another.
+   */
+  bodyOnSurface?: boolean;
+  /**
    * The section body, or a function that builds it. Pass the function when the
    * body is expensive to build (a long list, per-row formatting): it is
    * evaluated only inside the expanded branch, so a collapsed section costs
@@ -154,6 +162,7 @@ export function CollapsibleSection({
   className,
   titleClassName,
   contentClassName,
+  bodyOnSurface = false,
   children,
 }: Readonly<CollapsibleSectionProps>) {
   const [internalExpanded, setInternalExpanded] = useState(defaultExpanded);
@@ -164,6 +173,17 @@ export function CollapsibleSection({
   const { reducedMotion } = useMotionPolicy();
   // This section's carat points up while it is expanded ("collapse me").
   const chevronStyle = useDisclosureRotation(resolvedExpanded ? 180 : 0);
+  const body = resolvedExpanded ? (
+    <Animated.View
+      entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
+      className={cn('gap-3 pt-3', bodyOnSurface && 'pb-3', contentClassName)}
+    >
+      {
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- the children union has no non-typeof way to tell a body builder from a rendered node
+        typeof children === 'function' ? children() : children
+      }
+    </Animated.View>
+  ) : null;
 
   return (
     <DisclosureLayout className={className} animateLayout={animateLayout}>
@@ -193,21 +213,12 @@ export function CollapsibleSection({
             <ChevronDown size={16} color={colors.mutedForeground} />
           </Animated.View>
         </Pressable>
+        {bodyOnSurface ? body : null}
       </RowGroup>
-      {/* The body sits on the page, not on the header's surface: children bring
-          their own `Card` / `RowGroup` / flat rows, so a disclosure can never
-          nest a card inside the group it opened. */}
-      {resolvedExpanded && (
-        <Animated.View
-          entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
-          className={cn('gap-3 pt-3', contentClassName)}
-        >
-          {
-            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- the children union has no non-typeof way to tell a body builder from a rendered node
-            typeof children === 'function' ? children() : children
-          }
-        </Animated.View>
-      )}
+      {/* By default the body sits on the page, not on the header's surface:
+          children bring their own `Card` / `RowGroup` / flat rows, so a
+          disclosure can never nest a card inside the group it opened. */}
+      {bodyOnSurface ? null : body}
     </DisclosureLayout>
   );
 }

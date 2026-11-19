@@ -67,11 +67,13 @@ supports only USD for seat billing.
   `active`, `trialing`, or `past_due` (the payment processor is
   still retrying payment). Used for access checks and trial
   enforcement — an organization with at least one active
-  subscription purchase is considered subscribed. Every other
-  stored status, including `ended`, `pending_cancel`,
-  `incomplete`, `incomplete_expired`, `canceled`, `unpaid`,
-  `paused`, and any status the system does not recognize, is not an
-  active subscription purchase.
+  subscription purchase is considered subscribed. The named paid set
+  is `PAID_ORGANIZATION_SEAT_SUBSCRIPTION_STATUSES` in
+  `packages/organization-entitlement/src/types.ts`. Every other
+  stored status, including `ended`, `incomplete`,
+  `incomplete_expired`, `canceled`, `unpaid`, `paused`, and any
+  status the system does not recognize, is not an active
+  subscription purchase.
 - **Known paid seat prices**: The set of payment processor price
   identifiers corresponding to the four seat pricing tiers (Teams
   monthly, Teams annual, Enterprise monthly, Enterprise annual).

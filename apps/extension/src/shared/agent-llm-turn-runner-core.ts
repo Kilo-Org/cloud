@@ -77,6 +77,17 @@ const isHighEffort = (thinkingEffort: string | undefined): boolean =>
 
 const isSignalAborted = (signal: AbortSignal | undefined): boolean => signal?.aborted === true;
 
+/** Abort reason for a run whose target tab left the inspectable list: nobody pressed Stop. */
+export const TARGET_TAB_UNAVAILABLE_ABORT_REASON = 'kilo-target-tab-unavailable';
+export const STOPPED_MESSAGE = 'Stopped.';
+const TARGET_TAB_UNAVAILABLE_MESSAGE =
+  'The tab you picked closed or is no longer available, so I stopped this turn. Open or pick a tab, then ask again.';
+
+const turnStoppedMessage = (signal: AbortSignal | undefined): string =>
+  signal?.reason === TARGET_TAB_UNAVAILABLE_ABORT_REASON
+    ? TARGET_TAB_UNAVAILABLE_MESSAGE
+    : STOPPED_MESSAGE;
+
 // One transparent retry tier for failures the user cannot act on: a stalled stream, a transient network failure, or a retriable gateway status.
 const MAX_STREAM_ATTEMPTS = 3;
 const STREAM_RETRY_DELAYS_MS = [1000, 4000];
@@ -117,9 +128,37 @@ class TruncatedCompletionError extends Error {
 const CONTINUE_NUDGE_TEXT =
   'Continue: finish the request now, in this turn. If everything is already done, state the final result.';
 const CONTINUE_NUDGE_MAX_TEXT_LENGTH = 300;
-// First-person intent or a progressive verb: the model said what it is about to do rather than what it did.
+/*
+ * First-person intent or a progressive verb at the START of a sentence: the model's own
+ * announcement of what it is about to do. An intent clause appended to a message that asks
+ * the user to act ("Please stop that session or choose another tab, and I'll read the page.")
+ * is a finished answer waiting on the user, and nudging it buys a second billed request.
+ * "Let me know" is a sign-off, not work the model is about to do.
+ */
 const ANNOUNCEMENT_RE =
-  /\b(?:i'?ll|i will|i'?m \w+ing|i am \w+ing|i am going to|let me|now i|next i)\b|^\s*\w+(?<!th)ing\b[^.!?]*\b(?:workflow|script|search|page|result)/iu;
+  /^(?:(?:i'?ll|i will|i'?m \w+ing|i am \w+ing|i am going to|let me(?! know\b)|now i|next i)\b|\w+(?<!th)ing\b[^.!?]*\b(?:workflow|script|search|page|result))/iu;
+
+// A model decorates its announcement with a bullet, Markdown emphasis, quotes, or a short opener ("Sure — I'll create the workflow now."). Those are the same announcements, so the anchor runs after this chrome.
+const ANNOUNCEMENT_CHROME_RE = /^[\s"'`>*_#\u2018\u2019\u201C\u201D\u2013\u2014:,-]+/u;
+const ANNOUNCEMENT_NUMBER_RE = /^\d+[.)]\s*/u;
+/*
+ * Short conversational lead-ins a model opens an announcement with. The list is bounded on
+ * purpose: every entry is a whole interjection or acknowledgement, matched at a word
+ * boundary, and a longer entry precedes the shorter one it starts with ("all right" before
+ * "right", "sure thing" before "sure"). A generic "strip whatever precedes the first verb"
+ * rule is exactly what the sentence anchor exists to prevent — it would eat the request for
+ * the user that makes an answer settled ("Please stop that session or choose another tab,
+ * and I'll read the page."), and a new opener is a one-line addition when one shows up.
+ */
+const ANNOUNCEMENT_OPENER_RE =
+  /^(?:all right|alright|sure thing|sure|okay|ok|right|great|perfect|got it|sounds good|of course|no problem|will do|yes|absolutely|first|now|next)\b[\s,:;\u2013\u2014-]*/iu;
+
+const stripAnnouncementChrome = (sentence: string): string =>
+  sentence
+    .replace(ANNOUNCEMENT_CHROME_RE, '')
+    .replace(ANNOUNCEMENT_NUMBER_RE, '')
+    .replace(ANNOUNCEMENT_OPENER_RE, '')
+    .replace(ANNOUNCEMENT_CHROME_RE, '');
 
 // A real question to the user ends the message with "?"; a mid-text "?" is usually a URL query string (…/search?q=) or code, not a question, so only a trailing "?" suppresses the nudge.
 const endsWithQuestion = (text: string): boolean => text.trimEnd().endsWith('?');
@@ -128,7 +167,9 @@ const deservesContinueNudge = (lastAssistantText: string): boolean =>
   lastAssistantText.length > 0 &&
   lastAssistantText.length < CONTINUE_NUDGE_MAX_TEXT_LENGTH &&
   !endsWithQuestion(lastAssistantText) &&
-  ANNOUNCEMENT_RE.test(lastAssistantText);
+  lastAssistantText
+    .split(/[.!?]+/u)
+    .some(sentence => ANNOUNCEMENT_RE.test(stripAnnouncementChrome(sentence)));
 
 // A turn that ends with thinking but no assistant text and no tool calls never answered the user; the model spent its completion reasoning and stopped. The finish reason is healthy, so the retry tier never sees it — the nudge does.
 const endedThinkingOnly = (
@@ -477,7 +518,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
       turnUsedTools = true;
 
       if (isSignalAborted(signal)) {
-        appendEvents([createAssistantMessage('Stopped.')]);
+        appendEvents([createAssistantMessage(turnStoppedMessage(signal))]);
         return;
       }
 
@@ -508,7 +549,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
       }
 
       if (isSignalAborted(signal)) {
-        appendEvents([createAssistantMessage('Stopped.')]);
+        appendEvents([createAssistantMessage(turnStoppedMessage(signal))]);
         return;
       }
 
@@ -523,7 +564,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
     await continueConversation([...conversationEvents], maxToolRounds);
   } catch (error) {
     if (isAbortError(error)) {
-      appendEvents([createAssistantMessage('Stopped.')]);
+      appendEvents([createAssistantMessage(turnStoppedMessage(signal))]);
       return;
     }
 

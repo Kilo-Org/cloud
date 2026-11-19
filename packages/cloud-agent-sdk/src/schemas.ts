@@ -405,7 +405,7 @@ export const SESSION_QUESTION_MAX_QUESTIONS = 32;
 export const SESSION_QUESTION_MAX_OPTIONS = 32;
 /** Most actions one suggestion may offer. */
 export const SESSION_SUGGESTION_MAX_ACTIONS = 8;
-/** Longest question-option or suggestion-action text accepted on the wire. */
+/** Longest suggestion-action text accepted on the wire. */
 export const SESSION_INTERACTION_MAX_STRING_LENGTH = 2_000;
 
 const remoteCommandStringSchema = z.string().max(REMOTE_COMMAND_MAX_STRING_LENGTH);

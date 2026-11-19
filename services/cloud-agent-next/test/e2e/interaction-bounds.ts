@@ -32,6 +32,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { DRIVER_USER_EMAIL_SUFFIX, ensureTestUser, loadDevVars, loadRepoEnvFiles } from './auth.js';
 import {
   DEFAULT_CONFIG,
+  deleteSession,
   fakeDirective,
   openConnectedStream,
   resolveStreamTicket,
@@ -42,6 +43,7 @@ import {
   type StartSessionResult,
   type StreamEvent,
 } from './client.js';
+import { currentOwnedSandbox, stopOwnedSandboxFamily } from './lifecycle.js';
 import { createCloudAgentTransport } from '../../../../packages/cloud-agent-sdk/src/cloud-agent-transport.js';
 import { createChatProcessor } from '../../../../packages/cloud-agent-sdk/src/chat-processor.js';
 import { createMemoryStorage } from '../../../../packages/cloud-agent-sdk/src/storage/memory.js';
@@ -239,6 +241,27 @@ async function main(): Promise<void> {
     assert.notEqual(wireOptions, null, 'the wire carried no question payload');
   } finally {
     stream.close();
+    await releaseOwnedSession(config, root);
+  }
+}
+
+/**
+ * Stop the sandbox this driver owns and delete the session, so repeated runs do
+ * not accumulate containers or Durable Object state on the stack.
+ */
+async function releaseOwnedSession(config: DriverConfig, root: StartSessionResult): Promise<void> {
+  try {
+    const sandbox = await currentOwnedSandbox(root.cloudAgentSessionId, root.kiloSessionId);
+    if (sandbox) {
+      await stopOwnedSandboxFamily(sandbox, root.cloudAgentSessionId, root.kiloSessionId);
+    }
+  } catch (error) {
+    console.warn(`interaction-bounds: sandbox cleanup failed: ${String(error)}`);
+  }
+  try {
+    await deleteSession(config, root.cloudAgentSessionId);
+  } catch (error) {
+    console.warn(`interaction-bounds: session cleanup failed: ${String(error)}`);
   }
 }
 

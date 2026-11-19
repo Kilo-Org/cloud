@@ -1,6 +1,7 @@
 import { i18n } from '@/i18n';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { type SharePayload } from '@/lib/share-payload';
+import { trialRefusalMessage } from '@/lib/trial-refusal-copy';
 
 export const remoteSpawnFilesNotSupportedToast = () =>
   i18n.t('agentChat.composer.cannotReceiveFiles');
@@ -16,7 +17,22 @@ export type RemoteStartPlanInput = {
   /** `null`/omitted is a personal start. */
   organizationId?: string | null;
   organizations?: readonly OrganizationPlanState[];
+  /**
+   * Whether this reader may change the organization's plan. It decides the
+   * sentence only: a billing role is offered the step, everyone else keeps the
+   * copy that names the owner who can. Omitted keeps the owner-naming copy, so
+   * a caller that does not read the role never offers a step it cannot take.
+   */
+  canManageBilling?: boolean;
 };
+
+/**
+ * Why admission refused, so a surface can offer the step only where one exists.
+ * `plan` is the organization subscription gate's trial refusal — the only
+ * refusal a reader can end from inside the app — and `attachments` is a CLI
+ * that cannot receive the payload's files.
+ */
+export type RemoteSpawnRefusalReason = 'plan' | 'attachments';
 
 /**
  * The organization subscription gate's verdict for a remote start.
@@ -30,13 +46,17 @@ export type RemoteStartPlanInput = {
  * balance. A personal start and an unsettled or stale membership list (the
  * organization is not in it) never refuse: the app does not block a start on a
  * verdict it does not have.
+ *
+ * The sentence is the refusal's own, so it answers for the reader as well as
+ * the state: `trialRefusalMessage` gives a billing role the copy that offers
+ * the step and everyone else the copy that names the owner who can.
  */
 export function resolveRemoteStartPlan(input: RemoteStartPlanInput):
   | {
       allowed: true;
     }
-  | { allowed: false; toast: string } {
-  const { organizationId, organizations } = input;
+  | { allowed: false; toast: string; reason: RemoteSpawnRefusalReason } {
+  const { organizationId, organizations, canManageBilling } = input;
   if (organizationId == null || organizations === undefined) {
     return { allowed: true };
   }
@@ -44,7 +64,11 @@ export function resolveRemoteStartPlan(input: RemoteStartPlanInput):
   if (organization === undefined || !organization.isTrialExpiredForEnforcement) {
     return { allowed: true };
   }
-  return { allowed: false, toast: i18n.t('common.organizationTrialEnded') };
+  return {
+    allowed: false,
+    toast: trialRefusalMessage(canManageBilling ?? false),
+    reason: 'plan',
+  };
 }
 
 /**
@@ -65,14 +89,16 @@ export function startPlanRefusal(input: RemoteStartPlanInput): string | null {
 /**
  * Whether a remote spawn may proceed from the press-time state. The
  * organization's plan is checked first: a lapsed organization cannot run the
- * session at all, so its explanation wins over a capability refusal.
+ * session at all, so its explanation wins over a capability refusal. A refusal
+ * names which gate it came from, so only the plan's refusal can be handed the
+ * billing step.
  */
 export function resolveRemoteSpawnAdmission(input: {
   instance: InstancePickerInstance;
   payload: SharePayload | null;
   /** The spawn's press-time organization scope and the membership verdicts. */
   plan?: RemoteStartPlanInput;
-}): { allowed: true } | { allowed: false; toast: string } {
+}): { allowed: true } | { allowed: false; toast: string; reason: RemoteSpawnRefusalReason } {
   const { payload, instance } = input;
   const plan = resolveRemoteStartPlan(input.plan ?? {});
   if (!plan.allowed) {
@@ -85,7 +111,11 @@ export function resolveRemoteSpawnAdmission(input: {
   // capability is still unknown (`undefined`) may receive files; only an
   // explicit `attachments: false` blocks the file payload.
   if (payload.files.length > 0 && instance.capabilities?.attachments === false) {
-    return { allowed: false, toast: remoteSpawnFilesNotSupportedToast() };
+    return {
+      allowed: false,
+      toast: remoteSpawnFilesNotSupportedToast(),
+      reason: 'attachments',
+    };
   }
 
   return { allowed: true };

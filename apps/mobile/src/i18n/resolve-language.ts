@@ -14,20 +14,35 @@ function normalizeLocale(tag: string): string {
 }
 
 /**
- * Chinese script resolution. Script-bearing tags such as `zh-Hant-TW` do
- * occur on iOS and Android, so read the subtags, not the full tag. Any `zh`
- * tag whose subtags contain `hant`, `tw`, `hk`, or `mo` resolves to
- * Traditional; every other `zh*` tag resolves to Simplified.
+ * Chinese script resolution. An explicit script subtag decides; otherwise the
+ * region decides, and a region in `regionCode` is only consulted when the tag
+ * names none (iOS can report a Traditional device as bare `zh`).
  */
-function chineseScriptFor(tag: string): SupportedLanguage | undefined {
+/** Regions whose Chinese norms use the Traditional script. */
+const IS_TRADITIONAL_CHINESE_REGION = {
+  tw: true,
+  hk: true,
+  mo: true,
+} satisfies Record<string, true>;
+
+function chineseScriptFor(
+  tag: string,
+  regionCode: string | null | undefined
+): SupportedLanguage | undefined {
   const subtags = tag.split('-');
   if (subtags[0] !== 'zh') {
     return undefined;
   }
-  const traditional = subtags.some(
-    subtag => subtag === 'hant' || subtag === 'tw' || subtag === 'hk' || subtag === 'mo'
-  );
-  return traditional ? 'zh-Hant' : 'zh-Hans';
+  const script = subtags.slice(1).find(part => part === 'hant' || part === 'hans');
+  if (script) {
+    return script === 'hant' ? 'zh-Hant' : 'zh-Hans';
+  }
+  const tagRegion = subtags.slice(1).find(part => part.length === 2);
+  const region = tagRegion ?? regionCode?.toLowerCase() ?? null;
+  if (region !== null && region in IS_TRADITIONAL_CHINESE_REGION) {
+    return 'zh-Hant';
+  }
+  return 'zh-Hans';
 }
 
 /**
@@ -89,7 +104,7 @@ export function resolveSupportedLanguageTag(
     if (raw && raw.length > 0) {
       const tag = normalizeLocale(raw);
 
-      const script = chineseScriptFor(tag);
+      const script = chineseScriptFor(tag, locale.regionCode);
       if (script) {
         return script;
       }

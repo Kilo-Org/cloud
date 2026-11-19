@@ -46,7 +46,12 @@ export async function handleModelEndpointsRequest(
   const vercelModel = getVercelModelForPricing(vercel, servingModel.id);
   const { reasoning: _reasoning, ...modelMetadata } = storedModel;
   const openRouterEndpoints = servingModel.endpoints.map(endpoint => {
-    const pricing = getProviderDisplayPricing(endpoint.tag, endpoint.pricing, vercelModel);
+    const pricing = getProviderDisplayPricing(
+      endpoint.tag,
+      endpoint.pricing,
+      vercelModel,
+      'shortContext'
+    );
     return pricing ? { ...endpoint, pricing } : endpoint;
   });
   const vercelOnlyEndpoints = getVercelOnlyProviderEndpoints(

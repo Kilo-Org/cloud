@@ -73,7 +73,7 @@ export function SessionPreviewHeaderMeta({
 
   return (
     <View className="min-w-0 flex-1">
-      <Text numberOfLines={1} className="text-sm font-medium tracking-tight text-foreground">
+      <Text numberOfLines={1} className="text-sm font-medium text-foreground">
         {target.title}
       </Text>
       {stateLabel || cost ? (

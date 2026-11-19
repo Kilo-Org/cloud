@@ -1,11 +1,14 @@
 /* eslint-disable max-lines -- every chat screen behavior shares this one mocked harness */
 /* eslint-disable typescript-eslint/no-deprecated -- the DOM-free `test-renderer` mounts React/RN trees under vitest (see src/test/render-with-providers.tsx) */
-import { createElement, type ReactElement } from 'react';
+import { type ComponentProps, createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { ChatScreen } from '@/components/chat/chat-screen';
-import { act, type ReactTestRenderer } from '@/test/renderer';
+import { type SessionContextMetrics } from '@/components/agents/session-context-metrics';
+import { shouldStackHeaderActions } from '@/components/screen-header';
+import type * as ScreenHeaderModule from '@/components/screen-header';
+import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { type StoredChatBackend } from '@/lib/chat/backend-store';
@@ -26,6 +29,7 @@ const state = vi.hoisted(() => ({
   messages: [] as { info: { id: string; role?: string } }[],
   asked: null as string | null,
   askedFrom: null as string | null,
+  askedAnswer: null as string | null,
   displaced: [] as {
     id: string;
     text: string;
@@ -57,6 +61,8 @@ const router = vi.hoisted(() => ({
   push: vi.fn<(href: string) => void>(),
   dismissTo: vi.fn<(href: string) => void>(),
 }));
+/** The window the mounted chat measures itself against. */
+const device = vi.hoisted(() => ({ fontScale: 1 }));
 vi.mock('expo-router', () => ({ useRouter: () => router }));
 const backendUi = vi.hoisted(() => ({
   profiles: [] as StoredChatBackend[],
@@ -141,6 +147,7 @@ vi.mock('@/lib/chat/use-chat', () => ({
       status: state.status,
       asked: state.asked,
       askedFrom: state.askedFrom,
+      askedAnswer: state.askedAnswer,
       displaced: state.displaced,
       waiting: [],
       failed: state.failed,
@@ -157,6 +164,7 @@ vi.mock('@/lib/chat/turns', () => ({
   asMessages: () => state.messages,
   askedMessageId: (sessionId: string) => `${sessionId}:asked`,
   displacedMessageId: (sessionId: string, id: string) => `${sessionId}:displaced:${id}`,
+  partialAnswerMessageId: (questionId: string) => `${questionId}:partial`,
 }));
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({ organizationId: null }),
@@ -200,10 +208,17 @@ vi.mock('@/components/agents/part-detail-sheet-host', () => ({
 vi.mock('@/components/agents/session-message-list', () => ({
   SessionMessageList: 'SessionMessageList',
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: (props: { action?: ReactElement }) =>
+    createElement('EmptyState', props, props.action),
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/screen-header', async importOriginal => ({
+  ...(await importOriginal<typeof ScreenHeaderModule>()),
+  ScreenHeader: 'ScreenHeader',
+}));
 vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
   Lock: 'Lock',
@@ -213,6 +228,8 @@ vi.mock('@/components/ui/icons', () => ({
   ServerCrash: 'ServerCrash',
   WifiOff: 'WifiOff',
   Wrench: 'Wrench',
+  ArrowLeft: 'ArrowLeft',
+  RotateCcw: 'RotateCcw',
 }));
 vi.mock('@/components/ui/status-dot', () => ({ StatusDot: 'StatusDot' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
@@ -262,7 +279,7 @@ vi.mock('react-native', () => ({
   Platform: platform,
   Pressable: 'Pressable',
   View: 'View',
-  useWindowDimensions: () => ({ width: 1080, height: 2400, scale: 2, fontScale: 1 }),
+  useWindowDimensions: () => ({ width: 1080, height: 2400, scale: 2, fontScale: device.fontScale }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 24, left: 0, right: 0 }),
@@ -275,6 +292,7 @@ beforeEach(() => {
   state.messages = [];
   state.asked = null;
   state.askedFrom = null;
+  state.askedAnswer = null;
   state.displaced = [];
   state.failed = null;
   state.failureKey = null;
@@ -288,6 +306,7 @@ beforeEach(() => {
   state.effort = null;
   state.images = false;
   keyboard.progress = 0;
+  device.fontScale = 1;
   state.send.mockClear();
   chatPlace.value = PERSONAL_PLACE;
   platform.OS = 'ios';
@@ -336,16 +355,34 @@ const messagesOf = (tree: ReactTestRenderer): unknown[] =>
     .findAll(node => (node.type as string) === 'AccessibleStatus')
     .map(node => node.props.message);
 
+/** A control's visible label: `Button` carries it as text, `StateAction` as its `label`. */
+const actionLabel = (action: ReactTestInstance): unknown => {
+  if ((action.type as string) === 'StateAction') {
+    return action.props.label;
+  }
+  const label = action.findAll(node => (node.type as string) === 'Text')[0];
+  return label === undefined ? undefined : label.props.children;
+};
+
 const buttonLabels = (tree: ReactTestRenderer): unknown[] =>
   tree.root
-    .findAll(node => (node.type as string) === 'Button')
-    .map(button => button.find(node => (node.type as string) === 'Text').props.children);
+    .findAll(node => {
+      const type = node.type as string;
+      return type === 'Button' || type === 'StateAction';
+    })
+    .flatMap(action => {
+      const label = actionLabel(action);
+      return label === undefined ? [] : [label];
+    });
 
 /** The button carrying the given label, for the props a press alone cannot show. */
 function buttonOf(tree: ReactTestRenderer, label: unknown) {
   const button = tree.root
-    .findAll(node => (node.type as string) === 'Button')
-    .find(node => node.find(child => (child.type as string) === 'Text').props.children === label);
+    .findAll(node => {
+      const type = node.type as string;
+      return type === 'Button' || type === 'StateAction';
+    })
+    .find(node => actionLabel(node) === label);
   if (button === undefined) {
     throw new TypeError(`No button ${String(label)}`);
   }
@@ -459,7 +496,7 @@ describe('the chat transcript while it opens', () => {
   });
 });
 
-type Metric = ReactElement<{ onPress: () => void; info: unknown }>;
+type Metric = ReactElement<ComponentProps<typeof SessionContextMetrics>>;
 
 function metricOf(tree: ReactTestRenderer): Metric {
   const header = tree.root.find(node => (node.type as string) === 'ScreenHeader');
@@ -487,7 +524,77 @@ describe('the chat header', () => {
     expect(cluster.props.className).toContain('gap-2');
     expect(cluster.props.children).toHaveLength(3);
   });
+
+  it('marks the pill as loading while the chat still opens, and settles it after', async () => {
+    const opening = metricOf(await mount());
+    // A reopened chat resolves before it can report any usage. The pill paints
+    // its loading bar over the value row until the open finishes, so it never
+    // sits as a wide empty capsule beside the title.
+    expect(opening.props.loading).toBe(true);
+    view?.unmount();
+
+    state.status = 'idle';
+    expect(metricOf(await mount()).props.loading).toBe(false);
+  });
+
+  it('declares its trailing cluster and its own title width to the header', async () => {
+    state.status = 'idle';
+    const tree = await mount();
+    const widths = headerPropsOf(tree);
+
+    // The header reflows this cluster only when the screen declares how wide
+    // the cluster lays out, what the title needs, and the space the row loses
+    // before the title. The compact phone width still holds the chat's name
+    // beside the pill and its two controls, so the header keeps one row there
+    // and the Beta notice yields instead (see `ChatTitle`).
+    //
+    // The reserve is the pill's 125.25 dp at font scale 1 — its 42 dp square
+    // ring button, a dp of border on each side and the 8.75 leading padding,
+    // plus the 72.5 reserved value row — and the two 48 dp icon controls with
+    // the cluster's 7 dp between them.
+    expect(widths.headerRightWidth).toBe(235.25);
+    expect(shouldStackHeaderActions(360, 1, widths)).toBe(false);
+    // An ordinary phone width holds the name and its notice, so the header
+    // keeps the single-row layout it has everywhere else.
+    expect(shouldStackHeaderActions(411, 1, widths)).toBe(false);
+    // Below the compact width the name no longer fits beside the cluster, so
+    // the controls take their own row instead of painting over a lone glyph.
+    expect(shouldStackHeaderActions(320, 1, widths)).toBe(true);
+  });
+
+  it('reserves the cluster at the scale its readings paint at', async () => {
+    state.status = 'idle';
+    const atDefaultScale = headerPropsOf(await mount());
+    view?.unmount();
+
+    device.fontScale = 2;
+    const atLargeScale = headerPropsOf(await mount());
+
+    // The icon controls are fixed boxes; the pill's readings are text. A large
+    // font therefore widens the cluster by the readings alone: 52.75 dp of pill
+    // chrome plus 72.5 per scale unit, and the same two 48 dp controls between
+    // their 7 dp gaps.
+    expect(atDefaultScale.headerRightWidth).toBe(235.25);
+    expect(atLargeScale.headerRightWidth).toBe(307.75);
+    expect(atLargeScale.titleMinWidth).toBe(atDefaultScale.titleMinWidth);
+    // A window the unscaled reserve keeps on one row is too narrow for the row
+    // at this scale, and the header must reflow it rather than squeeze the
+    // title below the width its own text needs.
+    expect(shouldStackHeaderActions(411, 2, atDefaultScale)).toBe(false);
+    expect(shouldStackHeaderActions(411, 2, atLargeScale)).toBe(true);
+  });
 });
+
+type HeaderProps = { headerRightWidth: number; titleMinWidth: number; contentInset: number };
+
+function headerPropsOf(tree: ReactTestRenderer): HeaderProps {
+  const header = tree.root.find(node => (node.type as string) === 'ScreenHeader');
+  const { headerRightWidth, titleMinWidth, contentInset } = header.props as Partial<HeaderProps>;
+  if (headerRightWidth === undefined || titleMinWidth === undefined || contentInset === undefined) {
+    throw new Error('the header was given no widths');
+  }
+  return { headerRightWidth, titleMinWidth, contentInset };
+}
 
 function details(tree: ReactTestRenderer) {
   return tree.root.find(node => (node.type as string) === 'ChatDetailsSheet').props as {
@@ -502,8 +609,10 @@ describe('the chat details', () => {
     const tree = await mount();
 
     expect(details(tree)).toMatchObject({ visible: false, model: 'm1', record: state.record });
+    const openMetrics = metricOf(tree).props.onPress;
+    expect(openMetrics).toBeDefined();
     act(() => {
-      metricOf(tree).props.onPress();
+      openMetrics?.();
     });
     expect(details(tree).visible).toBe(true);
     act(() => {
@@ -917,6 +1026,7 @@ type BubbleProps = {
   onRetryMessage?: (message: unknown) => void;
   addCredits?: AddCreditsDestination;
   onCopyToComposer?: (text: string) => void;
+  composerText?: string;
 };
 
 type RenderItem = (info: { item: unknown; index: number }) => { props: BubbleProps };
@@ -971,7 +1081,7 @@ describe('message actions', () => {
     }
   });
 
-  it('puts Retry and Copy to composer on the failed question, and states why under the transcript', async () => {
+  it('puts Retry, Copy to composer and the cause on the failed question, and nothing above the composer', async () => {
     state.status = 'idle';
     state.asked = 'what is a monad';
     state.failureKey = 'modelChat.backends.deletedBackend';
@@ -984,12 +1094,16 @@ describe('message actions', () => {
     const tree = await mount();
     const failed = bubbleFor(tree, 's1:asked');
 
-    expect(failed.deliveryState).toEqual({ status: 'failed', error: '', reason: 'execution' });
+    expect(failed.deliveryState).toEqual({
+      status: 'failed',
+      error: '',
+      reason: 'chat-response',
+      detailKey: 'modelChat.backends.deletedBackend',
+    });
     expect(bubbleFor(tree, 's1:waiting:0').onRetryMessage).toBeUndefined();
     expect(bubbleFor(tree, 't1').deliveryState).toBeUndefined();
-    expect(tree.root.find(node => (node.type as string) === 'AccessibleStatus').props.message).toBe(
-      'This chat backend was deleted. Choose another backend to continue.'
-    );
+    // The bubble states the failure once; the row above the composer does not repeat it.
+    expect(count(tree, 'AccessibleStatus')).toBe(0);
     // The message carries the one Retry.
     expect(count(tree, 'Button')).toBe(0);
 
@@ -1039,7 +1153,12 @@ describe('message actions', () => {
     const kept = bubbleFor(tree, 's1:displaced:k1');
 
     // It keeps the footer and the recovery it had in the slot.
-    expect(kept.deliveryState).toEqual({ status: 'failed', error: '', reason: 'execution' });
+    expect(kept.deliveryState).toEqual({
+      status: 'failed',
+      error: '',
+      reason: 'chat-response',
+      detailKey: 'modelChat.backends.deletedBackend',
+    });
     expect(bubbleFor(tree, 's1:asked').deliveryState).toEqual(kept.deliveryState);
 
     act(() => {
@@ -1094,7 +1213,8 @@ describe('message actions', () => {
     expect(bubbleFor(tree, 's1:asked').deliveryState).toEqual({
       status: 'failed',
       error: '',
-      reason: 'execution',
+      reason: 'chat-response',
+      detailKey: 'modelChat.backends.deletedBackend',
     });
   });
 
@@ -1163,8 +1283,42 @@ describe('message actions', () => {
     const bubble = bubbleFor(tree, 's1:asked');
 
     // The transcript drew the slot's own bubble, so the recovery is on it.
-    expect(bubble.deliveryState).toEqual({ status: 'failed', error: '', reason: 'execution' });
+    expect(bubble.deliveryState).toEqual({
+      status: 'failed',
+      error: '',
+      reason: 'chat-response',
+      detailKey: 'modelChat.backends.deletedBackend',
+    });
     expect(bubble.onRetryMessage).toBeDefined();
+  });
+
+  it('states a failed answer once, under the words it had reached, with Retry and the question to copy', async () => {
+    state.status = 'idle';
+    state.asked = 'tell a story';
+    state.askedAnswer = 'once upon a time';
+    state.failureKey = 'modelChat.connectionLost';
+    state.messages = [
+      { info: { id: 's1:asked', role: 'user' } },
+      { info: { id: 's1:asked:partial', role: 'assistant' } },
+    ];
+    const tree = await mount();
+    const words = bubbleFor(tree, 's1:asked:partial');
+
+    expect(words.deliveryState).toEqual({
+      status: 'failed',
+      error: '',
+      reason: 'chat-response',
+      detailKey: 'modelChat.connectionLost',
+    });
+    expect(bubbleFor(tree, 's1:asked').deliveryState).toBeUndefined();
+    expect(count(tree, 'AccessibleStatus')).toBe(0);
+    // Copy to composer puts the question back, not the answer's words.
+    expect(words.composerText).toBe('tell a story');
+    expect(words.onCopyToComposer).toBeDefined();
+    act(() => {
+      words.onRetryMessage?.(state.messages[1]);
+    });
+    expect(state.retry).toHaveBeenCalledOnce();
   });
 
   it('shows no recovery under a question asked again while it is being asked', async () => {

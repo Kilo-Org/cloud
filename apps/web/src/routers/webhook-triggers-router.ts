@@ -14,7 +14,8 @@ import {
   type TRPCContext,
 } from '@kilocode/web-shared/lib/trpc/init';
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
-import { generateCloudAgentToken } from '@kilocode/web-shared/lib/tokens';
+import { generateCloudAgentWorkflowToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { prepareCloudAgentWorkflowUser } from '@/lib/auth/cloud-agent-workflow-user';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
@@ -559,7 +560,12 @@ async function getSandboxSelection(
   githubRepo?: string
 ): Promise<SandboxSelectionCapabilities | undefined> {
   if (!organizationId) return undefined;
-  return createCloudAgentNextClient(generateCloudAgentToken(user)).getSandboxSelectionOptions(
+  const workflowUser = await prepareCloudAgentWorkflowUser(user);
+  const token = generateCloudAgentWorkflowToken(workflowUser, {
+    tokenSource: 'webhook-trigger',
+    expiresIn: TOKEN_EXPIRY.oneHour,
+  });
+  return createCloudAgentNextClient(token).getSandboxSelectionOptions(
     sandboxSelectionInput(organizationId, githubRepo)
   );
 }
@@ -1415,6 +1421,7 @@ export const webhookTriggersRouter = createTRPCRouter({
         triggerId: triggerIdSchema,
         organizationId: z.string().uuid().optional(),
         limit: z.number().min(1).max(100).default(50),
+        includeLegacySessionIds: z.boolean().default(false),
       })
     )
     .query(async ({ ctx, input }): Promise<EnrichedCapturedRequest[]> => {
@@ -1449,12 +1456,15 @@ export const webhookTriggersRouter = createTRPCRouter({
         });
       }
 
-      // Enrich requests with kiloSessionId by looking up cloudAgentSessionId in cli_sessions
+      // The mobile app, which shares this procedure, can open only cli_sessions_v2
+      // sessions; a viewer that also opens legacy v1 sessions passes includeLegacySessionIds.
       const cloudAgentSessionIds = result.requests
         .map(r => r.cloudAgentSessionId)
         .filter((id): id is string => id !== null);
 
-      const sessionIdMap = await resolveCloudAgentSessionIds(cloudAgentSessionIds);
+      const sessionIdMap = await resolveCloudAgentSessionIds(cloudAgentSessionIds, {
+        includeLegacyV1: input.includeLegacySessionIds,
+      });
 
       return result.requests.map(request => ({
         ...request,

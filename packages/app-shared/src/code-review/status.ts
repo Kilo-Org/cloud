@@ -43,10 +43,6 @@ export function isInFlightReviewStatus(status: string): boolean {
   return isCodeReviewStatus(status) && IN_FLIGHT_STATUSES.has(status);
 }
 
-// Same semantics as isInFlightReviewStatus today — kept as a separate,
-// clearly-named predicate since the two call sites (polling vs. showing a
-// Cancel button) are conceptually distinct even though the sets currently
-// match exactly.
 export const isCancellableReviewStatus = isInFlightReviewStatus;
 
 export function isRetriggerableReviewStatus(status: string): boolean {

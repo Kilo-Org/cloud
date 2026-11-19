@@ -53,7 +53,10 @@ vi.mock('react-native', () => ({
 vi.mock('expo-web-browser', () => ({ openBrowserAsync: vi.fn() }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
@@ -104,6 +107,8 @@ vi.mock('@/components/ui/icons', () => ({
   MessageSquare: 'MessageSquare',
   UserRound: 'UserRound',
   Users: 'Users',
+  Download: 'Download',
+  RefreshCw: 'RefreshCw',
 }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.test' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
@@ -269,10 +274,10 @@ describe('PR Overview full-body states', () => {
     const body = renderer.root.find(node => String(node.type) === 'EmptyState');
     const install = body.props.action as {
       type: unknown;
-      props: { children: { props: { children: string } } };
+      props: { label: string };
     };
-    expect(String(install.type)).toBe('Button');
-    expect(install.props.children.props.children).toBe('Install the Kilo GitHub App');
+    expect(String(install.type)).toBe('StateAction');
+    expect(install.props.label).toBe('Install the Kilo GitHub App');
     unmount();
   });
 

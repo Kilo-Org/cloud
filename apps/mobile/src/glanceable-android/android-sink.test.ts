@@ -2,6 +2,7 @@
 import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
+  type GlanceableSnapshotStatusOverride,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -160,7 +161,7 @@ const delivery = {
 function snapshotFor(
   sessions: { status: string }[],
   revision = 0,
-  status?: GlanceableAgentsSnapshot['status']
+  status?: GlanceableSnapshotStatusOverride
 ): GlanceableAgentsSnapshot {
   return buildGlanceableSnapshot({
     sessions,
@@ -173,7 +174,7 @@ function snapshotFor(
 }
 
 const MIXED = {
-  ...snapshotFor([], 0, 'happy'),
+  ...snapshotFor([{ status: 'busy' }], 0),
   needsInput: 2,
   idle: 3,
   running: 4,
@@ -696,17 +697,20 @@ describe('androidSink start and update', () => {
     expect(mocks.native.update).toHaveBeenCalledTimes(1);
   });
 
-  it.each(['waiting', 'empty', 'expired', 'signed_out', 'privacy'] as const)(
-    'never starts for a %s snapshot without eligible work',
-    async status => {
-      androidSink.startOrUpdate(snapshotFor([], 0, status), CTX);
-      await flushAsync();
+  it.each([
+    ['empty', snapshotFor([], 0)],
+    ['waiting', snapshotFor([], 0, 'waiting')],
+    ['expired', snapshotFor([], 0, 'expired')],
+    ['signed_out', snapshotFor([], 0, 'signed_out')],
+    ['privacy', snapshotFor([], 0, 'privacy')],
+  ] as const)('never starts for a %s snapshot without eligible work', async (_label, snapshot) => {
+    androidSink.startOrUpdate(snapshot, CTX);
+    await flushAsync();
 
-      expect(mocks.getNotification()).toBeNull();
-      expect(mocks.native.start).not.toHaveBeenCalled();
-      expect(mocks.native.update).not.toHaveBeenCalled();
-    }
-  );
+    expect(mocks.getNotification()).toBeNull();
+    expect(mocks.native.start).not.toHaveBeenCalled();
+    expect(mocks.native.update).not.toHaveBeenCalled();
+  });
 
   it('registers the android_ongoing token on a successful start', async () => {
     const snapshot = snapshotFor([{ status: 'busy' }], 0);
@@ -861,7 +865,7 @@ describe('androidSink approve action', () => {
     // background delivery path publishes without reselecting the ask). The
     // surface is terminal now, so it must not offer an action it no longer
     // reports; Open stays, because the deep link is still the only route back.
-    androidSink.publish(snapshotFor([], 1, 'empty'));
+    androidSink.publish(snapshotFor([], 1));
 
     expect(mocks.getNotification()?.approveLabel).toBeNull();
     expect(mocks.native.update).toHaveBeenLastCalledWith(
@@ -1233,7 +1237,7 @@ describe('androidSink widget publish and end', () => {
     androidSink.publish(MIXED);
     androidSink.startOrUpdate(MIXED, CTX);
     await flushAsync();
-    androidSink.publish(snapshotFor([], 1, 'empty'));
+    androidSink.publish(snapshotFor([], 1));
     expect(mocks.getRequestedNotificationDeadline()).toBe(NOW + 8000);
 
     androidSink.publish(snapshotFor([], 2, status));
@@ -1248,14 +1252,14 @@ describe('androidSink widget publish and end', () => {
   });
 
   it('does not update the notification from publish before it has started', () => {
-    androidSink.publish(snapshotFor([], 1, 'empty'));
+    androidSink.publish(snapshotFor([], 1));
 
     expect(mocks.native.start).not.toHaveBeenCalled();
     expect(mocks.native.update).not.toHaveBeenCalled();
   });
 
   it('dismisses a leftover native notification for an ineligible snapshot', () => {
-    androidSink.publish(snapshotFor([], 1, 'empty'));
+    androidSink.publish(snapshotFor([], 1));
 
     expect(mocks.native.end).toHaveBeenCalledTimes(1);
   });
@@ -1308,28 +1312,27 @@ describe('androidSink widget publish and end', () => {
     expect(subscriptions).toEqual(new Set(['scope']));
   });
 
-  it.each(['happy', 'stale'] as const)(
-    'hands Android the original %s expiry without a JS timer',
-    status => {
-      const snapshot = snapshotFor([{ status: 'busy' }], 0, status);
-      androidSink.publish(snapshot);
-      expect(mocks.getWidgetDeadline()).toBe(NOW + 28_800_000);
-      expect(vi.getTimerCount()).toBe(0);
+  it.each([
+    ['happy', snapshotFor([{ status: 'busy' }], 0)],
+    ['stale', snapshotFor([{ status: 'busy' }], 0, 'stale')],
+  ] as const)('hands Android the original %s expiry without a JS timer', (_label, snapshot) => {
+    androidSink.publish(snapshot);
+    expect(mocks.getWidgetDeadline()).toBe(NOW + 28_800_000);
+    expect(vi.getTimerCount()).toBe(0);
 
-      vi.setSystemTime(NOW + 28_799_999);
-      expect(runningCount()).toBe('1');
-      vi.setSystemTime(NOW + 28_800_000);
-      expect(getCurrentWidgetProps()?.statusLine).toBe('Status expired');
-      expect(getCurrentWidgetProps()?.countLines).toEqual([]);
-      expect(getCurrentWidgetProps()?.home).toMatchObject({
-        primaryKind: 'running',
-        primaryCount: 1,
-        stale: true,
-        checkedAt: snapshot.updatedAt,
-        canCreate: true,
-      });
-    }
-  );
+    vi.setSystemTime(NOW + 28_799_999);
+    expect(runningCount()).toBe('1');
+    vi.setSystemTime(NOW + 28_800_000);
+    expect(getCurrentWidgetProps()?.statusLine).toBe('Status expired');
+    expect(getCurrentWidgetProps()?.countLines).toEqual([]);
+    expect(getCurrentWidgetProps()?.home).toMatchObject({
+      primaryKind: 'running',
+      primaryCount: 1,
+      stale: true,
+      checkedAt: snapshot.updatedAt,
+      canCreate: true,
+    });
+  });
 
   it('replaces the old widget deadline and keeps it when only the notification ends', () => {
     androidSink.publish(MIXED);
@@ -1361,7 +1364,7 @@ describe('androidSink widget publish and end', () => {
   it('passes an eight-second terminal timeout that survives clearing JS state', async () => {
     androidSink.startOrUpdate(MIXED, CTX);
     await flushAsync();
-    androidSink.publish(snapshotFor([], 1, 'empty'));
+    androidSink.publish(snapshotFor([], 1));
     _resetAndroidSinkForTests();
 
     expect(mocks.getNotification()).toMatchObject({
@@ -1377,19 +1380,19 @@ describe('androidSink widget publish and end', () => {
   it('keeps the first terminal deadline across later empty updates', async () => {
     androidSink.startOrUpdate(MIXED, CTX);
     await flushAsync();
-    androidSink.publish(snapshotFor([], 1, 'empty'));
+    androidSink.publish(snapshotFor([], 1));
     vi.setSystemTime(NOW + 4000);
-    androidSink.publish(snapshotFor([], 2, 'empty'));
+    androidSink.publish(snapshotFor([], 2));
     expect(mocks.getRequestedNotificationDeadline()).toBe(NOW + 8000);
     vi.setSystemTime(NOW + 8000);
-    androidSink.publish(snapshotFor([], 3, 'empty'));
+    androidSink.publish(snapshotFor([], 3));
     expect(mocks.getNotification()).toBeNull();
   });
 
   it('allows the same terminal revision to retry after a native post rejects', async () => {
     androidSink.startOrUpdate(MIXED, CTX);
     await flushAsync();
-    const empty = snapshotFor([], 1, 'empty');
+    const empty = snapshotFor([], 1);
     mocks.native.update.mockImplementationOnce(() => {
       throw new Error('Cannot persist the active agents notification timeout');
     });
@@ -1419,7 +1422,7 @@ describe('androidSink widget publish and end', () => {
       androidSink.publish(MIXED);
       androidSink.startOrUpdate(MIXED, CTX);
       await flushAsync();
-      androidSink.publish(snapshotFor([], 1, 'empty'));
+      androidSink.publish(snapshotFor([], 1));
       expect(mocks.getRequestedNotificationDeadline()).toBe(NOW + 8000);
       vi.setSystemTime(NOW + 4000);
       if (method === 'JS reload') {
@@ -1460,7 +1463,7 @@ describe('androidSink widget publish and end', () => {
     // eslint-disable-next-line promise-function-async, prefer-await-to-then -- the test controls permission resolution
     _setPermissionReaderForTests(() => deferred.promise);
     androidSink.startOrUpdate(MIXED, CTX);
-    androidSink.publish(snapshotFor([], 1, 'empty'));
+    androidSink.publish(snapshotFor([], 1));
     deferred.resolve('granted');
     await flushAsync();
 

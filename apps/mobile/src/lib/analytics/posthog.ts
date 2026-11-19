@@ -1,7 +1,7 @@
 import {
   type ANALYTICS_SURFACES,
   type AnalyticsEventMap,
-  redactProhibitedProperties,
+  isProhibitedPropertyKey,
 } from '@kilocode/app-shared/analytics';
 import { isAppVersionAtLeast } from '@kilocode/app-shared/app-version';
 import { type FeatureFlagKey } from '@kilocode/app-shared/feature-flags';
@@ -322,9 +322,16 @@ export function captureEvent(
     return;
   }
   // Redaction is a no-op for the cataloged strict-object payloads (their keys
-  // are deny-list-safe by schema); it guards the record-shaped `app_startup`
-  // payload and every uncataloged dynamic payload at runtime.
-  const safe = properties === undefined ? undefined : redactProhibitedProperties(properties);
+  // are deny-list-safe by schema); it guards the `app_startup` payload and
+  // every uncataloged dynamic payload at runtime. Filtered inline because the
+  // SDK's capture signature rejects `undefined` property values, which
+  // `redactProhibitedProperties`' `Partial` result can carry.
+  const safe =
+    properties === undefined
+      ? undefined
+      : Object.fromEntries(
+          Object.entries(properties).filter(([key]) => !isProhibitedPropertyKey(key))
+        );
   if (__DEV__ && properties !== undefined && safe !== undefined) {
     // A silently dropped key is invisible in production, so name the drops in
     // development. `__DEV__` is React Native only; the shared package stays
@@ -439,11 +446,6 @@ export async function discardPostHog(): Promise<void> {
     c.setPersistedProperty(PostHogPersistedProperty.LogsQueue, null);
     c.setPersistedProperty(PostHogPersistedProperty.AiQueue, null);
 
-    // Drop the live reference before any async work so concurrent code
-    // cannot capture through the stale instance. Flag listeners persist —
-    // like ready listeners, they must survive the discard so mounted
-    // useFeatureFlag subscribers receive updates when the client is
-    // re-created by a later initPostHog.
     // Ready listeners persist — they must observe both the false transition
     // now and a true transition from a later initPostHog.
     client = null;

@@ -17,13 +17,15 @@ import {
   ScrollView as GestureScrollView,
 } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { File } from 'expo-file-system';
+import { File, type FileHandle, FileMode } from 'expo-file-system';
 import { toast } from 'sonner-native';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useTranslation } from 'react-i18next';
 
 import { AlertCircle, File as FileIcon, RotateCcw, X } from '@/components/ui/icons';
 import { requestA11yFocus } from '@/lib/a11y/announce';
+import { TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { AttachmentChipErrorBoundary } from '@/components/agents/attachment-chip-error-boundary';
 
 import { Image } from '@/components/ui/image';
@@ -49,6 +51,10 @@ import { isMarkdownPath } from '@/components/agents/read-tool-markdown';
 import { MarkdownText } from '@/components/agents/markdown-text';
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
 import { getDocumentPreviewTarget, previewLocalDocument } from '@/lib/document-preview';
+import {
+  prepareMonoScrollContent,
+  READ_CODE_CHARACTER_CAP,
+} from '@/components/agents/mono-scroll-block-model';
 
 type Props = {
   attachments: AgentAttachment[];
@@ -76,9 +82,10 @@ function removeHitSlop() {
 /**
  * The document chip is 46 px tall so its body — the whole tap target — is the
  * 44 dp minimum after the 1 dp border on each side. The chip surface clips its
- *  children, so slop on the body could not grow that target past the surface.
+ * children, so slop on the body could not grow that target past the surface.
  */
-const DOCUMENT_CHIP_SIZE_CLASS = 'h-[46px] w-48';
+const DOCUMENT_CHIP_SIZE_CLASS = 'w-48';
+const DOCUMENT_CHIP_HEIGHT_DP = TOUCH_TARGET_DP + 2;
 
 /** Drag arms only after a long press, so ordinary horizontal scroll still wins. */
 const LONG_PRESS_MS = 300;
@@ -124,7 +131,68 @@ export function dragTargetIndex(
   return target;
 }
 
-function renderPreviewBody(preview: { mode: 'markdown' | 'text'; text: string }) {
+/**
+ * A chip's open-as-text/markdown preview. `text` is what the sheet renders —
+ * already bounded to `READ_CODE_CHARACTER_CAP`; `isTruncated` says the file
+ * continues past what the sheet shows.
+ */
+type TextPreviewState = {
+  mode: 'markdown' | 'text';
+  text: string;
+  isTruncated: boolean;
+};
+
+/**
+ * Byte budget for one bounded preview read. UTF-8 encodes a character in at
+ * most four bytes, so this many bytes always carry at least
+ * `READ_CODE_CHARACTER_CAP` characters when the file is long enough. The
+ * budget is bytes because that is what a read can be bounded to; the character
+ * cap is applied after the decode.
+ */
+const PREVIEW_READ_MAX_BYTES = READ_CODE_CHARACTER_CAP * 4;
+
+/**
+ * Read an attachment's preview text, bounded by the shared
+ * `READ_CODE_CHARACTER_CAP` — a preview is an at-a-glance read, not a file
+ * viewer. The known/stored byte size decides the path before anything decodes:
+ * at or under the byte budget the file reads whole, so a multi-byte document
+ * with fewer characters than the cap still previews in full; over it a bounded
+ * prefix is read through a file handle, so a 20 MB text attachment never
+ * decodes whole on this path. `File.text()` has no bounded form — it always
+ * reads the whole file — so the prefix path is the only way to keep the decode
+ * bounded. Whether the decoded text overshoots the character cap, and whether
+ * the read stopped at the byte budget, are reported separately.
+ */
+async function readAttachmentTextPreview(attachment: AgentAttachment): Promise<TextPreviewState> {
+  const mode = isMarkdownPath(attachment.filename) ? 'markdown' : 'text';
+  const file = new File(attachment.localUri);
+  // Restored chips report size 0; fall back to the file's own size so the
+  // over-budget path still fires for them.
+  const size = attachment.size > 0 ? attachment.size : file.size;
+  if (size > PREVIEW_READ_MAX_BYTES) {
+    let handle: FileHandle | null = null;
+    try {
+      handle = file.open(FileMode.ReadOnly);
+      // One bounded read at offset 0, in bytes. The decoded prefix holds at
+      // most `PREVIEW_READ_MAX_BYTES` characters (single-byte text) and at
+      // least `READ_CODE_CHARACTER_CAP` (four-byte text), so the character cap
+      // trims the ASCII case and the read already meets it for the widest
+      // encoding.
+      const bytes = await handle.readBytes(PREVIEW_READ_MAX_BYTES);
+      return {
+        mode,
+        text: new TextDecoder('utf-8', { fatal: false }).decode(bytes),
+        isTruncated: true,
+      };
+    } finally {
+      // An unclosed handle can block the file's later delete.
+      handle?.close();
+    }
+  }
+  return { mode, text: await file.text(), isTruncated: false };
+}
+
+function renderPreviewBody(preview: TextPreviewState) {
   if (preview.mode === 'markdown') {
     return <MarkdownText value={preview.text} />;
   }
@@ -133,6 +201,24 @@ function renderPreviewBody(preview: { mode: 'markdown' | 'text'; text: string })
       {preview.text}
     </SelectableText>
   );
+}
+
+/**
+ * Apply the shared display cap to a preview and fold that cap's own flag into
+ * the preview's. One value then drives both the rendered body and the marker:
+ * a read that stops at the budget can still decode to more characters than it
+ * read (a multi-byte tail), and the cap must never cut the body silently.
+ */
+function boundPreviewText(preview: TextPreviewState): TextPreviewState {
+  const { displayText, isTruncated } = prepareMonoScrollContent(
+    preview.text,
+    READ_CODE_CHARACTER_CAP
+  );
+  return {
+    mode: preview.mode,
+    text: displayText,
+    isTruncated: preview.isTruncated || isTruncated,
+  };
 }
 
 type AttachmentChipProps = {
@@ -176,10 +262,10 @@ const AttachmentChip = memo(function AttachmentChip({
   const { t } = useTranslation();
   const [viewerVisible, setViewerVisible] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
-  const [textPreview, setTextPreview] = useState<{
-    mode: 'markdown' | 'text';
-    text: string;
-  } | null>(null);
+  const [textPreview, setTextPreview] = useState<TextPreviewState | null>(null);
+  // Latches while a preview read is pending so a repeated tap cannot start a
+  // second read (the chip body is tappable throughout the await).
+  const textReadInFlightRef = useRef(false);
   // A device with no viewer keeps that verdict for the chip: its sheet drops the
   // preview choice and leaves the text and share choices it always had.
   const [previewUnavailable, setPreviewUnavailable] = useState(false);
@@ -265,12 +351,20 @@ const AttachmentChip = memo(function AttachmentChip({
     }
   }
 
-  async function openLocalText(mode: 'markdown' | 'text') {
+  async function openLocalText() {
+    // One read in flight per chip: a repeated tap while the first read is
+    // pending starts nothing, so two full-file decodes can never overlap.
+    if (textReadInFlightRef.current) {
+      return;
+    }
+    textReadInFlightRef.current = true;
     try {
-      const text = await new File(attachment.localUri).text();
-      setTextPreview({ mode, text });
+      const preview = await readAttachmentTextPreview(attachment);
+      setTextPreview(preview);
     } catch {
       toast.error(t('agentChat.attachmentPreview.openFailedRetry'));
+    } finally {
+      textReadInFlightRef.current = false;
     }
   }
 
@@ -312,7 +406,7 @@ const AttachmentChip = memo(function AttachmentChip({
       return;
     }
     if (isMarkdownPath(attachment.filename)) {
-      void openLocalText('markdown');
+      void openLocalText();
       return;
     }
     const offerPreview = documentTarget !== null && !previewUnavailable;
@@ -335,7 +429,7 @@ const AttachmentChip = memo(function AttachmentChip({
         if (optionIndex === previewIndex) {
           void previewDocument();
         } else if (optionIndex === textIndex) {
-          void openLocalText('text');
+          void openLocalText();
         } else if (optionIndex === shareIndex) {
           void shareUnknown();
         }
@@ -409,7 +503,7 @@ const AttachmentChip = memo(function AttachmentChip({
             <Text className="text-xs text-foreground" numberOfLines={1} ellipsizeMode="middle">
               {description.filename}
             </Text>
-            <Text numberOfLines={1} className="text-[10px] text-muted-foreground">
+            <Text numberOfLines={1} variant="caption">
               {description.message ??
                 (description.progressText === ''
                   ? description.sizeText
@@ -433,6 +527,15 @@ const AttachmentChip = memo(function AttachmentChip({
     </View>
   );
 
+  // The sheet renders this, not the raw read: the body is always capped and the
+  // marker reflects either reason the shown text stops short. Memoized on the
+  // read's own value, because a fresh 50k-character slice each render would
+  // make the markdown body re-parse when an unrelated chip re-renders.
+  const boundedPreview = useMemo(
+    () => (textPreview === null ? null : boundPreviewText(textPreview)),
+    [textPreview]
+  );
+
   return (
     <>
       {/* Outer wrapper keeps the strip's horizontal spacing (mr-2) and anchors
@@ -454,11 +557,12 @@ const AttachmentChip = memo(function AttachmentChip({
               being shadowed by an accessible parent. */}
           <View
             className={cn(
-              'overflow-hidden rounded-md border border-border bg-card',
+              'overflow-hidden rounded-lg border border-border',
               isImage ? 'h-16 w-20' : DOCUMENT_CHIP_SIZE_CLASS,
               description.showRetry && 'border-destructive',
               isErrored && !description.showRetry && 'border-danger-tile-border'
             )}
+            style={isImage ? undefined : { height: DOCUMENT_CHIP_HEIGHT_DP }}
           >
             {description.showRetry ? (
               // A retryable chip keeps the body as a non-interactive View: the
@@ -559,7 +663,7 @@ const AttachmentChip = memo(function AttachmentChip({
         />
       ) : null}
 
-      {textPreview !== null ? (
+      {boundedPreview !== null ? (
         <SessionPageSheet
           dismissible
           visible
@@ -576,16 +680,31 @@ const AttachmentChip = memo(function AttachmentChip({
             doneLabel={t('common.done')}
             topInset="ios-page-sheet"
           />
-          {textPreview.text === '' ? (
+          {boundedPreview.text === '' ? (
             <CenteredState>
-              <Text className="px-6 text-center text-xs text-muted-foreground">
+              <Text variant="caption" className="px-4 text-center">
                 {t('agentChat.filePart.fileEmpty')}
               </Text>
             </CenteredState>
           ) : (
             <>
-              <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
-                {renderPreviewBody(textPreview)}
+              {boundedPreview.isTruncated ? (
+                // Above the body, not after it: a 50k-character preview never
+                // scrolls to a trailing marker in practice, so the notice the
+                // reader needs has to be visible on the first paint.
+                <Text
+                  accessibilityLabel={t('common.contentTruncated')}
+                  variant="caption"
+                  className="px-4 pb-1"
+                >
+                  {t('common.truncated')}
+                </Text>
+              ) : null}
+              <ScrollView
+                className="flex-1"
+                contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}
+              >
+                {renderPreviewBody(boundedPreview)}
               </ScrollView>
               <View style={{ height: insets.bottom }} className="bg-background" />
             </>

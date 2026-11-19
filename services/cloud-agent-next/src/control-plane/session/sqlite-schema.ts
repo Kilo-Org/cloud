@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { SESSION_MESSAGE_STATES } from './messages.js';
 
 export const events = sqliteTable(
@@ -43,6 +43,22 @@ export const historyImport = sqliteTable(
     ),
   ]
 );
+
+export const sessionCostTotals = sqliteTable(
+  'session_cost_totals',
+  {
+    session_id: text('session_id').notNull(),
+    kilo_session_id: text('kilo_session_id').notNull(),
+    total_dollars: real('total_dollars').notNull(),
+  },
+  table => [primaryKey({ columns: [table.session_id, table.kilo_session_id] })]
+);
+
+export const costBackfillState = sqliteTable('cost_backfill_state', {
+  id: integer('id').primaryKey(),
+  cursor: integer('cursor').notNull().default(0),
+  complete: integer('complete').notNull().default(0),
+});
 
 export const cloudAgentChildSessions = sqliteTable('cloud_agent_child_sessions', {
   child_session_id: text('child_session_id').primaryKey(),

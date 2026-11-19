@@ -43,7 +43,11 @@ describe('resolveRemoteSpawnAdmission', () => {
         instance: { ...instance, capabilities: { attachments: false } },
         payload: filesPayload,
       })
-    ).toEqual({ allowed: false, toast: remoteSpawnFilesNotSupportedToast() });
+    ).toEqual({
+      allowed: false,
+      toast: remoteSpawnFilesNotSupportedToast(),
+      reason: 'attachments',
+    });
   });
 
   it('admits files when the capability is unknown (optimistic default)', () => {
@@ -81,7 +85,25 @@ describe('resolveRemoteSpawnAdmission', () => {
         payload: filesPayload,
         plan: { organizationId: 'org-1', organizations: lapsed },
       })
-    ).toEqual({ allowed: false, toast: i18n.t('common.organizationTrialEnded') });
+    ).toEqual({
+      allowed: false,
+      toast: i18n.t('common.organizationTrialEnded'),
+      reason: 'plan',
+    });
+  });
+
+  it('hands a billing role the plan refusal that offers the step', () => {
+    expect(
+      resolveRemoteSpawnAdmission({
+        instance,
+        payload: null,
+        plan: { organizationId: 'org-1', organizations: lapsed, canManageBilling: true },
+      })
+    ).toEqual({
+      allowed: false,
+      toast: i18n.t('common.organizationTrialEndedBilling'),
+      reason: 'plan',
+    });
   });
 
   it('admits a start in an organization the gate keeps entitled', () => {
@@ -120,6 +142,35 @@ describe('resolveRemoteStartPlan', () => {
     expect(resolveRemoteStartPlan({ organizationId: 'org-1', organizations: lapsed })).toEqual({
       allowed: false,
       toast: i18n.t('common.organizationTrialEnded'),
+      reason: 'plan',
+    });
+  });
+
+  it('gives a billing role the refusal that offers the step', () => {
+    expect(
+      resolveRemoteStartPlan({
+        organizationId: 'org-1',
+        organizations: lapsed,
+        canManageBilling: true,
+      })
+    ).toEqual({
+      allowed: false,
+      toast: i18n.t('common.organizationTrialEndedBilling'),
+      reason: 'plan',
+    });
+  });
+
+  it('gives an explicit member the copy that names who can change the plan', () => {
+    expect(
+      resolveRemoteStartPlan({
+        organizationId: 'org-1',
+        organizations: lapsed,
+        canManageBilling: false,
+      })
+    ).toEqual({
+      allowed: false,
+      toast: i18n.t('common.organizationTrialEnded'),
+      reason: 'plan',
     });
   });
 
@@ -147,6 +198,12 @@ describe('startPlanRefusal', () => {
     expect(startPlanRefusal({ organizationId: 'org-1', organizations: lapsed })).toBe(
       i18n.t('common.organizationTrialEnded')
     );
+  });
+
+  it('explains it to a billing role in the words that offer the step', () => {
+    expect(
+      startPlanRefusal({ organizationId: 'org-1', organizations: lapsed, canManageBilling: true })
+    ).toBe(i18n.t('common.organizationTrialEndedBilling'));
   });
 
   it('leaves an entitled organization, a personal start and an unsettled list alone', () => {

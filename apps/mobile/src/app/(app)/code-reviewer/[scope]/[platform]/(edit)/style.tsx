@@ -5,7 +5,11 @@ import { InvalidRouteState } from '@/components/invalid-route-state';
 import { OptionList } from '@/components/code-reviewer/option-list';
 import { ReviewerErrorScreen } from '@/components/code-reviewer/reviewer-error-screen';
 import { REVIEW_STYLES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
-import { useReviewConfig, useSaveReviewConfig } from '@/lib/hooks/use-code-reviewer';
+import {
+  reviewerOrganizationId,
+  useReviewConfig,
+  useSaveReviewConfig,
+} from '@/lib/hooks/use-code-reviewer';
 import { queryBodyFailure, useQueryBodyState } from '@/lib/hooks/use-query-body-state';
 import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 
@@ -64,6 +68,7 @@ function ReviewStyleScreen({
       labels={labels}
       descriptions={descriptions}
       disabled={configBody.body.status !== 'ready'}
+      organizationId={reviewerOrganizationId(scope)}
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       onSelect={value => save.mutateAsync({ reviewStyle: value })}
     />

@@ -12,9 +12,12 @@ import {
 import { i18n } from '@/i18n';
 import { reconcileFirstPage } from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
+import { announceTrialRefusal } from '@/lib/refusal-toast';
+import { isTrialExpiredRefusal } from '@/lib/server-error-copy';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 import { getRemediationUnavailableKey } from '@/lib/security-agent-copy';
 import { localizedSecurityMarkerMessage } from '@/lib/security-agent-ledger';
+import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 async function invalidateRemediationQueries(
@@ -65,6 +68,11 @@ async function invalidateRemediationQueries(
 export function useStartSecurityRemediation(scope: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  // The scope is the organization id in an organization scope, so the
+  // rejection's copy and the step it offers follow this reader's role in the
+  // organization the remediation runs under.
+  const canManageBilling = useCanManageBilling(scope);
+  const billingAction = useBillingAction(scope);
   return useMutation({
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: Parameters<typeof trpcClient.securityAgent.startRemediation.mutate>[0]) =>
@@ -75,7 +83,13 @@ export function useStartSecurityRemediation(scope: string) {
             ...vars,
           }),
     onError: error => {
-      toast.error(localizedSecurityMarkerMessage(error) ?? error.message);
+      // The marker copy already follows this reader; only the trial refusal
+      // adds the plan step, and only for a role that can take it.
+      announceTrialRefusal(
+        localizedSecurityMarkerMessage(error, canManageBilling) ?? error.message,
+        billingAction,
+        isTrialExpiredRefusal(error)
+      );
     },
     onSuccess: async (result, vars) => {
       if (!result.queued) {
@@ -98,6 +112,9 @@ export function useStartSecurityRemediation(scope: string) {
 export function useRetrySecurityRemediation(scope: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  // Same scope-as-organization-id role read as the start above.
+  const canManageBilling = useCanManageBilling(scope);
+  const billingAction = useBillingAction(scope);
   return useMutation({
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: Parameters<typeof trpcClient.securityAgent.retryRemediation.mutate>[0]) =>
@@ -108,7 +125,13 @@ export function useRetrySecurityRemediation(scope: string) {
             ...vars,
           }),
     onError: error => {
-      toast.error(localizedSecurityMarkerMessage(error) ?? error.message);
+      // The marker copy already follows this reader; only the trial refusal
+      // adds the plan step, and only for a role that can take it.
+      announceTrialRefusal(
+        localizedSecurityMarkerMessage(error, canManageBilling) ?? error.message,
+        billingAction,
+        isTrialExpiredRefusal(error)
+      );
     },
     onSuccess: async (result, vars) => {
       if (!result.queued) {
@@ -147,8 +170,14 @@ function getSecurityAnalysisQueryKey(
 export function useCancelSecurityRemediation(scope: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  // Same scope-as-organization-id role read as start/retry above: the
+  // rejection's copy and the step it offers follow this reader's role in the
+  // organization the cancel runs under.
+  const canManageBilling = useCanManageBilling(scope);
+  const billingAction = useBillingAction(scope);
   // onError policy: roll back the onMutate snapshot (latest generation only)
-  // and toast error.message.
+  // and report the failure through the same refusal toast as start/retry, so
+  // an unrelated failure keeps its own copy and no step.
   return useMutation({
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: { attemptId: string; findingId: string }) =>
@@ -184,7 +213,13 @@ export function useCancelSecurityRemediation(scope: string) {
       ) {
         queryClient.setQueryData(context.analysisQueryKey, context.previous);
       }
-      toast.error(localizedSecurityMarkerMessage(error) ?? error.message);
+      // The marker copy already follows this reader; only the trial refusal
+      // adds the plan step, and only for a role that can take it.
+      announceTrialRefusal(
+        localizedSecurityMarkerMessage(error, canManageBilling) ?? error.message,
+        billingAction,
+        isTrialExpiredRefusal(error)
+      );
     },
     onSuccess: result => {
       // 'cancellation_requested' means the attempt was already running and

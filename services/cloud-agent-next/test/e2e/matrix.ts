@@ -29,9 +29,13 @@
  * `Wall time:`):
  *
  *   unsupported: <name>
+ *   retried: <name>
  *   disabled: <name> (<reason>)
  *   Summary: <pass> passed, <fail> failed, <unsupported> unsupported
  *   Wall time: <seconds>s
+ *
+ * A scenario that fails with a transient infrastructure signature is retried
+ * once, in a fresh child and fake-LLM scope, and listed on a `retried:` line.
  *
  * The runner asserts `pass + fail + unsupported` equals the scenarios it
  * selected and exits `2` otherwise. When `GITHUB_STEP_SUMMARY` is set it appends
@@ -117,7 +121,47 @@ type JobResult = {
   outcome: Outcome;
   exitCode: number;
   durationMs: number;
+  transient: boolean;
 };
+
+/**
+ * Failure text that identifies a transient infrastructure fault. The nightly
+ * runs against production dependencies, so one database or network blip must
+ * not be reported as nine scenario regressions. A single retry keeps the
+ * signal: a persistent defect still fails, and the retry is logged.
+ */
+const TRANSIENT_FAILURE_MARKERS = [
+  'Failed query:',
+  'fetch failed',
+  'ECONNRESET',
+  'ETIMEDOUT',
+  'EAI_AGAIN',
+  'ENOTFOUND',
+  'WebSocket was closed before the connection was established',
+  'Stream did not connect',
+] as const;
+
+const SCENARIO_FAILURE_LINE = /^❌ .+? \(\d+ms\): (.*)$/;
+const TRPC_ERROR_STATUS = /(?:^|: )tRPC \w+ failed: ([45]\d{2})\b/;
+
+/**
+ * Wait before the one retry. A short database or network blip often lasts tens
+ * of seconds, so an immediate retry would race the same fault.
+ */
+const TRANSIENT_RETRY_DELAY_MS = 60_000;
+
+export function isTransientScenarioFailure(resultLine: string): boolean {
+  const detail = SCENARIO_FAILURE_LINE.exec(resultLine)?.[1];
+  if (detail === undefined) return false;
+  const status = TRPC_ERROR_STATUS.exec(detail)?.[1];
+  if (status?.startsWith('4')) return false;
+  return (
+    status === '502' ||
+    status === '503' ||
+    status === '504' ||
+    TRANSIENT_FAILURE_MARKERS.some(marker => detail.includes(marker))
+  );
+}
 
 export type MatrixArgs = { profile?: string; parallel?: string; only?: string[] };
 
@@ -309,7 +353,7 @@ async function scenarioEnvironment(profile: Profile): Promise<ScenarioEnvironmen
   });
 }
 
-function runScenario(
+export function runScenario(
   job: Job,
   profile: Profile,
   scope: string,
@@ -339,49 +383,60 @@ function runScenario(
     });
 
     const prefix = `[${job.label}] `;
-    const forward = (stream: NodeJS.ReadableStream): void => {
+    let failureLine = '';
+    const forward = (stream: NodeJS.ReadableStream, onLine?: (line: string) => void): void => {
       stream.setEncoding('utf8');
       let buffered = '';
+      const emit = (line: string): void => {
+        console.log(`${prefix}${line}`);
+        onLine?.(line);
+      };
       stream.on('data', (chunk: string) => {
         buffered += chunk;
         const lines = buffered.split('\n');
         buffered = lines.pop() ?? '';
-        for (const line of lines) console.log(`${prefix}${line}`);
+        for (const line of lines) emit(line);
       });
       stream.on('end', () => {
-        if (buffered.length > 0) console.log(`${prefix}${buffered}`);
+        if (buffered.length > 0) emit(buffered);
       });
     };
-    forward(child.stdout);
+    forward(child.stdout, line => {
+      if (SCENARIO_FAILURE_LINE.test(line)) failureLine = line;
+    });
     forward(child.stderr);
 
     let settled = false;
+    let watchdogFired = false;
     const watchdogMs = (job.timeoutMs ?? DEFAULT_CHILD_TIMEOUT_MS) + CHILD_WATCHDOG_SLACK_MS;
     const watchdog = setTimeout(() => {
+      watchdogFired = true;
       console.error(
-        `${prefix}watchdog: no exit after ${Math.round(watchdogMs / 1000)}s; killing child`
+        `${prefix}watchdog: no exit after ${Math.round(watchdogMs / 1000)}s; killing child without retry`
       );
       killTree(child);
     }, watchdogMs);
     watchdog.unref();
 
-    const settle = (exitCode: number): void => {
+    const settle = (code: number | null): void => {
       if (settled) return;
       settled = true;
       clearTimeout(watchdog);
       const durationMs = Date.now() - startedAt;
+      const exitCode = watchdogFired ? 1 : (code ?? 1);
       const outcome: Outcome = exitCode === 0 ? 'pass' : 'failure';
+      const transient = !watchdogFired && code === 1 && isTransientScenarioFailure(failureLine);
       console.log(
         `--- ${job.label} ${outcome} (exit=${exitCode}, ${Math.round(durationMs / 1000)}s) ---`
       );
-      resolve({ job, outcome, exitCode, durationMs });
+      resolve({ job, outcome, exitCode, durationMs, transient });
     };
 
     child.on('error', error => {
       console.error(`${prefix}spawn failed: ${error.message}`);
-      settle(1);
+      settle(null);
     });
-    child.on('close', code => settle(code ?? 1));
+    child.on('close', settle);
   });
 }
 
@@ -469,6 +524,7 @@ async function main(): Promise<void> {
   const before = isLocal ? await runningSandboxIds() : undefined;
 
   const results: JobResult[] = [];
+  const retried = new Set<string>();
   let cursor = 0;
   const startedAt = Date.now();
   const worker = async (): Promise<void> => {
@@ -476,8 +532,31 @@ async function main(): Promise<void> {
       const index = cursor++;
       const job = jobs[index];
       if (job === undefined) return;
-      const scope = scopeFor(job, randomUUID().slice(0, 8));
-      results.push(await runScenario(job, profile, scope, jobs.length, index));
+      let result = await runScenario(
+        job,
+        profile,
+        scopeFor(job, randomUUID().slice(0, 8)),
+        jobs.length,
+        index
+      );
+      // One retry for a transient infrastructure fault. The retry uses a new
+      // fake-LLM scope; a scenario that created sessions on the first attempt
+      // cleans them up in its own `finally`.
+      if (result.outcome === 'failure' && result.transient && !retried.has(job.label)) {
+        retried.add(job.label);
+        console.log(
+          `--- ${job.label} transient failure; retrying once after ${TRANSIENT_RETRY_DELAY_MS / 1000}s (exit=${result.exitCode}, ${Math.round(result.durationMs / 1000)}s) ---`
+        );
+        await new Promise(resolve => setTimeout(resolve, TRANSIENT_RETRY_DELAY_MS));
+        result = await runScenario(
+          job,
+          profile,
+          scopeFor(job, randomUUID().slice(0, 8)),
+          jobs.length,
+          index
+        );
+      }
+      results.push(result);
     }
   };
   await Promise.all(Array.from({ length: parallelism.size }, worker));
@@ -512,6 +591,7 @@ async function main(): Promise<void> {
   }
 
   for (const name of unsupported) console.log(`unsupported: ${name}`);
+  for (const label of retried) console.log(`retried: ${label}`);
   for (const name of Object.keys(SHARED_SCENARIOS)) {
     const reason = SHARED_SCENARIOS[name]?.disabled;
     if (reason !== undefined && !selectedKeys.includes(name)) {

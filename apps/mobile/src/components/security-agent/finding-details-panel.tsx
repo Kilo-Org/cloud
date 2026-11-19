@@ -7,7 +7,7 @@ import {
 } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { ExternalLink, GitMerge } from '@/components/ui/icons';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -19,11 +19,13 @@ import { DISMISSAL_REASON_LABEL_KEYS } from '@/components/security-agent/dismiss
 import { storedText } from '@/components/security-agent/stored-text';
 import { getDeadlineCopy, isOpenDeadline } from '@/lib/security-agent-copy';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
+import { Card } from '@/components/ui/card';
 import { KvRow } from '@/components/ui/kv-row';
+import { RowFrame } from '@/components/ui/row-frame';
+import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatDate } from '@/lib/format';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
@@ -88,26 +90,28 @@ function DismissalOrSupersessionNote({
 }: Readonly<{ finding: SecurityFinding; scope: string; supersedingFindingId: string | null }>) {
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
-  const colors = useThemeColors();
 
   if (supersedingFindingId) {
     return (
-      <Pressable
-        className="gap-1 rounded-lg bg-secondary p-3 active:opacity-70"
-        onPress={() => {
-          pushOnce(getSecurityAgentPath(scope, `findings/${supersedingFindingId}`));
-        }}
-      >
-        <View className="flex-row items-center gap-2">
-          <GitMerge size={14} color={colors.mutedForeground} />
-          <Text className="text-sm font-medium">
+      <RowGroup leadingTile>
+        {/* The title wraps: "Superseded by" leads a sentence-length line in
+            several catalogs, and an ellipsized destination names the wrong
+            thing. */}
+        <RowFrame
+          icon={GitMerge}
+          trailing={{ kind: 'chevron' }}
+          onPress={() => {
+            pushOnce(getSecurityAgentPath(scope, `findings/${supersedingFindingId}`));
+          }}
+        >
+          <Text className="text-sm font-medium text-foreground">
             {t('securityAgent.findingDetails.supersededBy')}
           </Text>
-        </View>
-        <Text variant="muted" className="text-xs">
-          {t('securityAgent.findingDetails.supersededByDescription')}
-        </Text>
-      </Pressable>
+          <Text variant="muted" className="mt-0.5 text-xs">
+            {t('securityAgent.findingDetails.supersededByDescription')}
+          </Text>
+        </RowFrame>
+      </RowGroup>
     );
   }
 
@@ -116,24 +120,25 @@ function DismissalOrSupersessionNote({
   }
 
   return (
-    <View className="gap-1 rounded-lg bg-secondary p-3">
-      <Text className="text-sm font-medium">{t('securityAgent.dismiss.reason')}</Text>
-      <Text variant="muted" className="text-xs" selectable>
-        {getDismissalReasonLabel(finding.ignored_reason)}
-      </Text>
-    </View>
+    <RowGroup>
+      <KvRow
+        label={t('securityAgent.dismiss.reason')}
+        value={getDismissalReasonLabel(finding.ignored_reason)}
+        valueFace="text"
+        selectable
+      />
+    </RowGroup>
   );
 }
 
 // Ported from FindingDetailDialog.tsx:552 (getFindingDetailsPresentation) —
 // source, package, severity/status, timestamps, and dismissal/supersession
 // context as plain facts rather than the web's hero + next-step action card
-// (Task 7 owns actions). The repository is the screen header's eyebrow, so this
+// (Task 7 owns actions). The repository is the screen header's subtitle, so this
 // card does not repeat it.
 export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsPanelProps>) {
   const router = useRouter();
   const { t } = useTranslation();
-  const colors = useThemeColors();
   const now = useRelativeTimeNow();
   const severity = getFindingSeverityPresentation(finding.severity);
   const status = getFindingLifecycleStatusPresentation(finding);
@@ -215,7 +220,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
       : []),
   ];
 
-  // The repository is the header's eyebrow, which sits directly above this
+  // The repository is the header's subtitle, which sits directly above this
   // card, so the details list does not repeat it. What the source reported of
   // the advisory identifiers is optional; the group's divider hangs under
   // whichever row ends it.
@@ -230,8 +235,12 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
 
   return (
     <View className="gap-4">
-      <View className="gap-2 rounded-lg bg-secondary p-3">
-        <Text className="text-base font-medium" selectable>
+      <Card>
+        {/* The title and the description are the advisory's own words, not app
+            copy, so each lays itself out from its first strong character: an
+            English finding keeps its left edge and the punctuation that ends it
+            inside a right-to-left interface. */}
+        <Text className="text-base font-medium" selectable direction="auto">
           {finding.title}
         </Text>
         <View className="flex-row flex-wrap items-center gap-3">
@@ -246,15 +255,18 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
               icon={deadline.icon}
               label={deadlineBadgeCopy.label}
               tone={deadline.tone}
+              // The severity and the lifecycle status beside it are captions;
+              // the badge joins that one size instead of standing a step larger.
+              textClassName="text-xs"
             />
           ) : null}
         </View>
         {description ? (
-          <Text variant="muted" className="text-sm" selectable>
+          <Text variant="muted" className="text-sm" selectable direction="auto">
             {description}
           </Text>
         ) : null}
-      </View>
+      </Card>
 
       <DismissalOrSupersessionNote
         finding={finding}
@@ -262,7 +274,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         supersedingFindingId={supersedingFindingId}
       />
 
-      <View className="rounded-lg bg-secondary px-3">
+      <RowGroup>
         <KvRow
           label={t('securityAgent.findingDetails.package')}
           value={`${finding.package_name} (${finding.package_ecosystem})`}
@@ -283,15 +295,13 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
           )}
           valueFace={finding.patched_version ? 'mono' : 'text'}
           valueDirection={finding.patched_version ? 'ltr' : undefined}
-          last={advisoryRows.length === 0 && !finding.manifest_path}
           selectable
         />
-        {advisoryRows.map((row, index) => (
+        {advisoryRows.map(row => (
           <KvRow
             key={row.label}
             label={row.label}
             value={row.value}
-            last={index === advisoryRows.length - 1 && !finding.manifest_path}
             valueDirection="ltr"
             selectable
           />
@@ -300,54 +310,52 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
           <KvRow
             label={t('securityAgent.findingDetails.manifest')}
             value={finding.manifest_path}
-            last
             valueDirection="ltr"
             selectable
           />
         ) : null}
-      </View>
+      </RowGroup>
 
-      <View className="rounded-lg bg-secondary px-3">
-        {dateRows.map((row, index) => (
+      <RowGroup>
+        {dateRows.map(row => (
           <KvRow
             key={row.key}
             label={row.label}
             value={row.value}
             valueFace="text"
             valueTone={row.tone}
-            last={index === dateRows.length - 1}
           />
         ))}
-      </View>
+      </RowGroup>
 
       <CollapsibleSection title={t('securityAgent.findingDetails.sourceRecord')}>
-        <KvRow
-          label={t('securityAgent.findingDetails.source')}
-          value={getFindingSourceLabel(finding.source)}
-          valueFace="text"
-        />
-        <KvRow
-          label={t('securityAgent.findingDetails.sourceId')}
-          value={finding.source_id}
-          valueDirection="ltr"
-          last
-          selectable
-        />
+        <RowGroup>
+          <KvRow
+            label={t('securityAgent.findingDetails.source')}
+            value={getFindingSourceLabel(finding.source)}
+            valueFace="text"
+          />
+          <KvRow
+            label={t('securityAgent.findingDetails.sourceId')}
+            value={finding.source_id}
+            valueDirection="ltr"
+            selectable
+          />
+        </RowGroup>
       </CollapsibleSection>
 
       {advisoryUrl ? (
-        <Pressable
-          className="flex-row items-center justify-center gap-2 rounded-lg bg-secondary p-3 active:opacity-70"
-          onPress={() => {
-            openFindingLink(router, advisoryUrl, t('securityAgent.findingDetails.viewAdvisory'));
-          }}
-          accessibilityRole="link"
-        >
-          <ExternalLink size={14} color={colors.mutedForeground} />
-          <Text className="text-sm font-medium">
-            {t('securityAgent.findingDetails.viewAdvisory')}
-          </Text>
-        </Pressable>
+        <RowGroup leadingTile>
+          <RowFrame
+            icon={ExternalLink}
+            title={t('securityAgent.findingDetails.viewAdvisory')}
+            trailing={{ kind: 'chevron' }}
+            accessibilityRole="link"
+            onPress={() => {
+              openFindingLink(router, advisoryUrl, t('securityAgent.findingDetails.viewAdvisory'));
+            }}
+          />
+        </RowGroup>
       ) : null}
     </View>
   );

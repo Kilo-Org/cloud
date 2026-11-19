@@ -179,7 +179,7 @@ function smallLines(f: Frame): Line[] {
     );
   } else if (copy.primaryKind === 'scheduled') {
     if (copy.wake !== null) {
-      lines.push({ value: copy.wake, ink: copy.wakeOverdue ? 'muted' : 'foreground' });
+      lines.push({ value: copy.wake, ink: copy.wakePassed ? 'muted' : 'foreground' });
     }
     lines.push(
       ...copy.scheduledAgents.map(agent => ({ value: agent.title, ink: 'foreground' as const }))

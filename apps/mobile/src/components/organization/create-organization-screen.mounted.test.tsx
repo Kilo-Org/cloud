@@ -81,8 +81,19 @@ vi.mock('@/lib/navigation/stack-safe-replace', () => ({
   useStackSafeReplace: () => ({ replace: mocks.replace }),
 }));
 
+// The create's copy lookup is recorded so the test can prove the reader it
+// asks for: a create runs outside any organization, so it must ask for the
+// copy every reader gets rather than a role's.
+const errorCopy = vi.hoisted(() => ({ lookup: vi.fn() }));
+
 vi.mock('@/lib/server-error-copy', () => ({
-  organizationErrorMessage: (error: unknown) => (error instanceof Error ? error.message : 'Failed'),
+  // Rest parameters: the recorded call keeps the caller's own arity, so a
+  // caller that reads no role is distinguishable from one that passes it.
+  organizationErrorMessage: (...args: [unknown, boolean?]) => {
+    errorCopy.lookup(...args);
+    const [error] = args;
+    return error instanceof Error ? error.message : 'Failed';
+  },
 }));
 
 vi.mock('@/lib/a11y/tap-target', () => ({ STATE_ACTION_CLASS: 'state-action' }));
@@ -161,6 +172,7 @@ beforeEach(() => {
   mocks.replace.mockClear();
   mocks.setOrganizationId.mockClear();
   mocks.focused.current = true;
+  errorCopy.lookup.mockClear();
   router.dismissTo.mockClear();
   router.push.mockClear();
   // The Profile entry pushes create: it is the only route of the organization
@@ -374,6 +386,21 @@ describe('CreateOrganizationScreen', () => {
 
     expect(mocks.replace).not.toHaveBeenCalled();
     expect(texts(renderer)).toContain('You already own the maximum number of organizations.');
+    unmount();
+  });
+
+  it('asks for the copy every reader gets, because a create holds no organization role', async () => {
+    mocks.createMutate.mockRejectedValue(new Error('boom'));
+    const { renderer, unmount } = await mount();
+
+    await type(renderer, 'Acme');
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+
+    // One argument: no role is read, so the line names the owner who can change
+    // a plan and offers no step.
+    expect(errorCopy.lookup.mock.calls[0]).toHaveLength(1);
     unmount();
   });
 });

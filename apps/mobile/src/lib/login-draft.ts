@@ -31,7 +31,6 @@ const storedLoginDraftSchema = z.discriminatedUnion('state', [
   z.object({ version: z.literal(2), state: z.literal('retired') }),
 ]);
 
-/** The one durable record: the copy a reload reads, or the tombstone that keeps it from coming back. */
 type StoredLoginDraft = z.infer<typeof storedLoginDraftSchema>;
 
 /** One sign-in attempt: what the form holds, or the retirement the sign-in left behind. */

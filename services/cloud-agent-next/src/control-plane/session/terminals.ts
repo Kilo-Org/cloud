@@ -272,6 +272,15 @@ export function createControlPlaneTerminals(deps: ControlPlaneTerminalsDeps) {
     }
   }
 
+  /** Best-effort delete of the keys a creation attempt wrote. */
+  async function deleteCreationKeys(keys: string[]): Promise<void> {
+    try {
+      await deps.state.storage.delete(keys);
+    } catch {
+      // The returned failure is what the caller needs.
+    }
+  }
+
   /** Ends running records for a replaced wrapper and clears their completions. */
   async function endStaleRecords(currentWrapperId: string): Promise<void> {
     const rows = await deps.state.storage.list<unknown>({ prefix: TERMINAL_PREFIX });
@@ -399,8 +408,21 @@ export function createControlPlaneTerminals(deps: ControlPlaneTerminalsDeps) {
       ...(payload.cols === undefined ? {} : { cols: payload.cols }),
       ...(payload.rows === undefined ? {} : { rows: payload.rows }),
     };
-    await deps.state.storage.put(`${TERMINAL_PREFIX}${pty.id}`, record);
-    await deps.state.storage.put(`${TERMINAL_OPERATION_PREFIX}${payload.operationId}`, completion);
+    try {
+      await deps.state.storage.put(`${TERMINAL_PREFIX}${pty.id}`, record);
+      await deps.state.storage.put(
+        `${TERMINAL_OPERATION_PREFIX}${payload.operationId}`,
+        completion
+      );
+    } catch (error) {
+      // The shell is closed below, so no record may stay `running`. A record this
+      // attempt wrote is dropped; one that already existed is marked ended.
+      await closeWrapperTerminal(context, pty.id);
+      if (existing !== null) await markEnded(existing).catch(() => undefined);
+      else await deleteCreationKeys([`${TERMINAL_PREFIX}${pty.id}`]);
+      await deleteCreationKeys([`${TERMINAL_OPERATION_PREFIX}${payload.operationId}`]);
+      return thrownFailure(error);
+    }
     return { success: true, data: result.data };
   }
 

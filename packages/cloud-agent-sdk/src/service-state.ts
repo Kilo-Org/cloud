@@ -7,18 +7,21 @@
  *
  * Preparation diagnostics use the PREPARATION_MAX_* history budgets in schemas.ts:
  * setup messages follow arrival order, attempts follow startedAt, and steps follow
- * causal start order. Each list retains its newest entries. Output tails use the
+ * causal start order. Each list retains its newest entries. The autocommit list
+ * keeps only its newest SESSION_MAX_COMMITS entries. Output tails use the
  * UTF-8 byte budget in limits.ts.
  */
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import type { ServiceEvent } from './normalizer';
-import { upsertByRequestId } from './pending-requests';
+import type { SessionSnapshotFailure } from './snapshot-page';
+import { removePendingRequest, upsertByRequestId } from './pending-requests';
 import { isPreparationCancellation } from './preparation-attempts';
 import { PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
 import {
   PREPARATION_MAX_ATTEMPTS,
   PREPARATION_MAX_SETUP_LOG_ENTRIES,
   PREPARATION_MAX_STEPS,
+  SESSION_MAX_COMMITS,
   knownSessionStatus,
   sessionCommitDataSchema,
   type KnownSessionStatus,
@@ -73,7 +76,7 @@ function preserveGoalReason(previous: SessionInfo | null, next: SessionInfo): Se
 type ServiceStateConfig = {
   /** The root session ID we're tracking (to detect child sessions). */
   rootSessionId: string;
-  onError?: ((message: string) => void) | undefined;
+  onError?: ((message: string, failure?: SessionSnapshotFailure) => void) | undefined;
   onChildSessionError?: ((sessionId: string, message: string) => void) | undefined;
   onQuestionAsked?: ((requestId: string, questions?: QuestionInfo[]) => void) | undefined;
   onQuestionResolved?: ((requestId: string) => void) | undefined;
@@ -198,6 +201,14 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
   // Tracks whether we've received a terminal stopped event (error/interrupted/disconnected).
   // While terminated, session.error events are suppressed as aftershocks.
   let terminated = false;
+
+  /**
+   * True once a transport drop reported its spent reconnect budget. The
+   * transport reports exhaustion once per connection, and this latch keeps a
+   * repeated report from firing the terminal error twice. A `connected` event
+   * clears it.
+   */
+  let transportExhausted = false;
 
   /**
    * The message id whose `cloud.message.failed` last set the terminal error
@@ -343,7 +354,12 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
         disconnectedSource = null;
         completed = false;
         status = { type: 'error', message: 'Session terminated', code: 'session-terminated' };
-        config.onError?.('Session terminated');
+        // A transport that already reported a typed transcript-read failure
+        // sends this stop to end its loading state. Re-reporting the generic
+        // stop message would replace the failure's machine kind with none, so
+        // the typed failure rides through instead.
+        if (event.failure) config.onError?.(event.failure.message, event.failure);
+        else config.onError?.('Session terminated');
         break;
       case 'disconnected':
         // Clear CLI pending-message state unconditionally — including when the
@@ -367,11 +383,25 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
         // (unlike the CLI's always-on `session.queue.changed` replay), so
         // clearing here would silently and permanently drop "Queued" badges
         // for messages that are still queued server-side.
-        terminated = true;
         disconnectedSource = 'transport';
         completed = false;
-        status = { type: 'disconnected' };
-        config.onError?.('Connection to agent lost');
+        if (event.exhausted === true) {
+          // The retry budget is spent, so the socket will not come back on its
+          // own. This reads as a terminal loss and asks the reader to retry.
+          // The code carries the classified connection copy, so both the
+          // indicator and the error sink state one canonical message.
+          terminated = true;
+          status = { type: 'disconnected', code: 'connection-lost' };
+          if (!transportExhausted) {
+            transportExhausted = true;
+            config.onError?.('Connection lost. Please retry in a moment.');
+          }
+          break;
+        }
+        // A drop the transport recovers from on its own. Keep the session
+        // alive and let the status line read "Reconnecting…" instead of an
+        // error the reader cannot act on.
+        status = { type: 'disconnected', reconnecting: true };
         break;
     }
 
@@ -429,7 +459,7 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
   }
 
   function processQuestionResolved(requestId: string): void {
-    questions = questions.filter(entry => entry.requestId !== requestId);
+    questions = removePendingRequest(questions, requestId);
     config.onQuestionResolved?.(requestId);
     notify();
   }
@@ -449,7 +479,7 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       always,
     });
     // A readable request supersedes an unreadable notice for the same id.
-    unreadablePermissions = unreadablePermissions.filter(entry => entry.requestId !== requestId);
+    unreadablePermissions = removePendingRequest(unreadablePermissions, requestId);
     config.onPermissionAsked?.(requestId, permissionType, patterns, metadata, always);
     notify();
   }
@@ -458,7 +488,7 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
     // The scope could not be read, so no consent card may stand for this id: a
     // card already shown for it would describe a scope the app no longer holds.
     if (permissions.some(entry => entry.requestId === requestId)) {
-      permissions = permissions.filter(entry => entry.requestId !== requestId);
+      permissions = removePendingRequest(permissions, requestId);
       config.onPermissionResolved?.(requestId);
     }
     unreadablePermissions = upsertByRequestId(unreadablePermissions, { requestId });
@@ -466,8 +496,8 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
   }
 
   function processPermissionResolved(requestId: string): void {
-    permissions = permissions.filter(entry => entry.requestId !== requestId);
-    unreadablePermissions = unreadablePermissions.filter(entry => entry.requestId !== requestId);
+    permissions = removePendingRequest(permissions, requestId);
+    unreadablePermissions = removePendingRequest(unreadablePermissions, requestId);
     config.onPermissionResolved?.(requestId);
     notify();
   }
@@ -800,7 +830,9 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       const identity = JSON.stringify([parsedCommit.data.repository, parsedCommit.data.commitHash]);
       if (seenCommits.has(identity)) return;
       seenCommits.add(identity);
-      commits = [...commits, { ...parsedCommit.data, timestamp: event.timestamp }];
+      commits = [...commits, { ...parsedCommit.data, timestamp: event.timestamp }].slice(
+        -SESSION_MAX_COMMITS
+      );
     }
     if (event.success || commitHash) {
       const parts = [event.commitHash, event.commitMessage].filter(Boolean);
@@ -1043,10 +1075,13 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
     clearPendingInteractions();
 
     terminated = false;
+    transportExhausted = false;
     if (
       status.type === 'disconnected' &&
       (sessionStatus !== undefined || disconnectedSource === 'transport')
     ) {
+      // Covers both the reconnecting drop and the exhausted loss: a live
+      // connection is the one proof either status is over.
       status = IDLE_STATUS;
       disconnectedSource = null;
     }

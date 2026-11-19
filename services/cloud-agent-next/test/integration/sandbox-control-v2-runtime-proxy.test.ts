@@ -770,9 +770,9 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
           onEvents: notification => peer.onEvents(notification),
           onOutcome: outcome => peer.onOutcome(outcome),
           issueRuntimeCredentialProxyGrant: fence => peer.issueRuntimeCredentialProxyGrant(fence),
-          issueCloudAgentMcpGrant: async () => mcpGrant,
         };
       };
+      instance.cloudAgentMcpGrantFor = async () => mcpGrant;
     });
     await createVercelSession({
       sessionId,
@@ -843,9 +843,9 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
             onEvents: notification => peer.onEvents(notification),
             onOutcome: outcome => peer.onOutcome(outcome),
             issueRuntimeCredentialProxyGrant: fence => peer.issueRuntimeCredentialProxyGrant(fence),
-            issueCloudAgentMcpGrant: issueMcpGrant,
           };
         };
+        instance.cloudAgentMcpGrantFor = issueMcpGrant;
         Object.assign(instance, { grantIssueTimeoutMs: () => 100 });
       });
       const session = await createVercelSession({
@@ -869,7 +869,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       ).not.toBeNull();
       expect(await sandbox.status({ sessionId })).toMatchObject({ view: { state: 'preparing' } });
       expect(issueMcpGrant).toHaveBeenCalledTimes(1);
-      expect(fields).toHaveBeenCalledWith({ sandboxId, sessionId, anchorSessionId: sessionId });
+      expect(fields).toHaveBeenCalledWith({ sandboxId, sessionId, workspaceSessionId: sessionId });
       expect(warn).toHaveBeenCalledWith(
         'Optional Cloud Agent MCP grant unavailable; continuing without it'
       );

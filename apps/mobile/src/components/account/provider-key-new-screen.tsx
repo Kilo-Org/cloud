@@ -1,17 +1,17 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { ProviderKeyCredentialForm } from '@/components/account/provider-key-credential-form';
+import { ProviderKeySaveFailure } from '@/components/account/provider-key-save-failure';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -29,6 +29,7 @@ import {
   readStructuredCredential,
   withoutUnshownValues,
 } from '@/lib/byok/credential-fields';
+import { type KeySaveFailure, refusedKeyMessage } from '@/lib/byok/key-refusal';
 import {
   providerKeyNewParams,
   providerKeyPermissions,
@@ -37,18 +38,13 @@ import {
   providerKeysHref,
 } from '@/lib/byok/provider-key-scope';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
-import { assertSurfaceFailureHandled } from '@/lib/surface-feedback';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { normalizeOrgQueryParam } from '@/lib/org-deep-link';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
-import { isRetryableTrpcError, readTrpcErrorField } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 
 type ProviderOption = inferRouterOutputs<MobileRouter>['byok']['listProviders'][number];
-
-type SaveFailure =
-  | { readonly kind: 'retryable'; readonly message: string }
-  | { readonly kind: 'refused'; readonly message: string };
 
 /**
  * The empty field-error state. One shared object, not a fresh `{}`, so an edit
@@ -80,7 +76,7 @@ export function ProviderKeyNewScreen() {
   const [authMode, setAuthMode] = useState<BedrockAuthMode>('apiKey');
   const [fieldErrors, setFieldErrors] =
     useState<Partial<Record<CredentialFieldId, string>>>(NO_FIELD_ERRORS);
-  const save = useSurfaceFeedback<SaveFailure>();
+  const save = useSurfaceFeedback<KeySaveFailure>();
   const scope = providerKeyScope(parsedParam.success ? parsedParam.data.org : undefined);
   const scopeInput = providerKeyScopeInput(scope);
   const keyId = parsedParam.success ? parsedParam.data.id : undefined;
@@ -132,9 +128,12 @@ export function ProviderKeyNewScreen() {
         {providers.isError ? (
           <QueryError onRetry={() => void providers.refetch()} isRetrying={providers.isFetching} />
         ) : (
-          <View className="gap-6 px-4 pt-4">
-            <Skeleton className="h-[74px] rounded-lg" />
-            <Skeleton className="h-11 rounded-lg" />
+          <View className={SCREEN_BODY_CLASS}>
+            <View className="gap-1">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-12 rounded-md" />
+            </View>
+            <Skeleton className="h-11 rounded-md" />
           </View>
         )}
       </View>
@@ -205,10 +204,11 @@ export function ProviderKeyNewScreen() {
       }
       attempt.fail({
         kind: 'refused',
-        // A structured form names the empty field above, so its summary is the
-        // general refusal; a one-value key has no field to point at.
+        // A structured form names the empty field above, so its summary stays
+        // generic about the missing value; a one-value key has no field to
+        // point at, so it names the key itself.
         message: form
-          ? t('profile.providerKeys.invalidCredentials')
+          ? t('profile.providerKeys.keyIncomplete')
           : t('profile.providerKeys.apiKeyRequired'),
       });
       return;
@@ -232,12 +232,16 @@ export function ProviderKeyNewScreen() {
           })
         : update.mutateAsync({ ...scopeInput, id: keyId, api_key: credential.credential }));
     } catch (error) {
-      attempt.fail({
-        kind: isRetryableTrpcError(error) ? 'retryable' : 'refused',
-        // The server applies the same credential rules it applies to every
-        // stored key, so its message is the specific account of the refusal.
-        message: readTrpcErrorField(error, 'message') ?? t('profile.providerKeys.saveFailed'),
-      });
+      // The server's message can quote the provider's response, which names
+      // things this form does not show and does not translate, so the code
+      // decides the copy. A failure the server has not settled keeps its own
+      // retryable sentence and offers the reader a retry.
+      const refusal = refusedKeyMessage(error);
+      attempt.fail(
+        refusal === null
+          ? { kind: 'retryable', message: t('profile.providerKeys.saveFailed') }
+          : { kind: 'refused', message: refusal }
+      );
       return;
     }
     if (!attempt.owns()) {
@@ -255,35 +259,13 @@ export function ProviderKeyNewScreen() {
     router.dismissTo(backHref);
   };
 
-  const failure = save.failure;
-  let saveFailure: ReactNode = null;
-  if (failure) {
-    switch (failure.kind) {
-      case 'retryable': {
-        saveFailure = (
-          <View className="gap-2">
-            <AccessibleStatus message={failure.message} className="text-sm" />
-            <Button
-              variant="outline"
-              size="sm"
-              className={STATE_ACTION_CLASS}
-              onPress={() => void submit()}
-            >
-              <Text>{t('common.retry')}</Text>
-            </Button>
-          </View>
-        );
-        break;
-      }
-      case 'refused': {
-        saveFailure = <AccessibleStatus message={failure.message} className="text-sm" />;
-        break;
-      }
-      default: {
-        saveFailure = assertSurfaceFailureHandled(failure);
-      }
-    }
-  }
+  const saveFailure = (
+    <ProviderKeySaveFailure
+      failure={save.failure}
+      onRetry={() => void submit()}
+      retryLabel={t('common.retry')}
+    />
+  );
 
   const pending = save.feedback.status === 'pending';
 
@@ -292,22 +274,20 @@ export function ProviderKeyNewScreen() {
       <ScreenHeader title={title} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-6 px-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         <View className="gap-1">
-          <Text className="text-sm font-medium text-foreground">{provider.name}</Text>
-          <Text className="text-xs text-muted-foreground">
+          <Text variant="small">{provider.name}</Text>
+          <Text variant="caption">
             {keyId === undefined
               ? t('profile.providerKeys.newKeyDescription')
               : t('profile.providerKeys.editKeyDescription')}
           </Text>
           {keyId === undefined || !form?.showsModelMappings ? null : (
-            <Text className="text-xs text-muted-foreground">
-              {t('profile.providerKeys.editKeyMappingsWarning')}
-            </Text>
+            <Text variant="caption">{t('profile.providerKeys.editKeyMappingsWarning')}</Text>
           )}
         </View>
         {form ? (

@@ -49,6 +49,7 @@ vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'Activ
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 const toastError = vi.hoisted(() => vi.fn());
 const routerBack = vi.hoisted(() => vi.fn());
+const routerPush = vi.hoisted(() => vi.fn());
 const refetchInstancesMock = vi.hoisted(() => vi.fn(() => undefined));
 const alertMock = vi.hoisted(() => vi.fn());
 const shareDestinationListProps = vi.hoisted(() => ({
@@ -68,13 +69,16 @@ const instanceRows = vi.hoisted((): ShareCliSpawnRow[] => [
   },
 ]);
 
+const announceMock = vi.hoisted(() => vi.fn());
 vi.mock('react-native', () => ({
+  AccessibilityInfo: { announceForAccessibility: announceMock },
   Alert: { alert: alertMock },
   Pressable: 'Pressable',
   View: 'View',
+  useWindowDimensions: () => ({ width: 390, height: 844 }),
 }));
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ back: routerBack }),
+  useRouter: () => ({ back: routerBack, push: routerPush }),
 }));
 vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),
@@ -95,6 +99,12 @@ vi.mock('@/components/ui/button', () => ({
 vi.mock('@/components/ui/text', () => ({
   Text: 'Text',
 }));
+vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
+vi.mock('@/components/ui/row-group', () => ({ RowGroup: 'RowGroup' }));
+vi.mock('@/components/ui/icon-tile', () => ({ IconTile: 'IconTile' }));
+vi.mock('@/components/ui/row-chevron', () => ({ RowChevron: 'RowChevron' }));
+vi.mock('@/lib/font-scale/system-font-scale-context', () => ({ useLiveFontScale: () => 1 }));
+vi.mock('@/lib/narrow-layout', () => ({ isNarrowLayout: () => false }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({}),
 }));
@@ -107,7 +117,7 @@ vi.mock('@/lib/organization-context', () => ({
 const organizationsListMock = vi.hoisted(() => ({
   current: {
     data: [{ organizationId: 'org-selected' }] as
-      | { organizationId: string; isTrialExpiredForEnforcement?: boolean }[]
+      | { organizationId: string; isTrialExpiredForEnforcement?: boolean; role?: string }[]
       | undefined,
     isFetched: true,
     isFetching: false,
@@ -440,7 +450,7 @@ describe('ShareGateSheet spawn operationKey wiring', () => {
     // The Review PR row is the row whose subtitle is the destination identity.
     const subtitles = renderer.root
       .findAllByType('Text')
-      .filter(node => node.props.className === 'text-sm text-muted-foreground')
+      .filter(node => node.props.className === 'mt-0.5 text-xs text-muted-foreground')
       .map(node => node.children.filter(child => typeof child === 'string').join(''));
     expect(subtitles).toEqual(['group/sub/repo!7']);
 
@@ -616,7 +626,37 @@ describe('ShareGateSheet organization plan gate', () => {
     await pressSpawn(captureListProps().onSpawnInstance);
 
     expect(spawnMock).not.toHaveBeenCalled();
-    expect(toastError).toHaveBeenCalledWith(i18n.t('common.organizationTrialEnded'));
+    // A reader who cannot change the plan gets the copy that names who can and
+    // no step: the adapter still makes its two-argument call, with no options.
+    expect(toastError).toHaveBeenCalledWith(i18n.t('common.organizationTrialEnded'), undefined);
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('offers a billing role the step that opens the in-app billing screen', async () => {
+    organizationMock.current = { organizationId: 'org-lapsed', isLoaded: true };
+    organizationsListMock.current.data = [
+      { organizationId: 'org-lapsed', isTrialExpiredForEnforcement: true, role: 'owner' },
+    ];
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+    const renderer = await mountGate(shareId);
+
+    await pressSpawn(captureListProps().onSpawnInstance);
+
+    expect(spawnMock).not.toHaveBeenCalled();
+    expect(toastError).toHaveBeenCalledWith(i18n.t('common.organizationTrialEndedBilling'), {
+      action: { label: i18n.t('organization.hub.manageBilling'), onClick: expect.any(Function) },
+    });
+    const options = toastError.mock.calls.at(-1)?.[1] as
+      | { action: { onClick: () => void } }
+      | undefined;
+    // The step is reachable from the toast and lands on the billing screen of
+    // the organization whose role the gate read.
+    options?.action.onClick();
+    expect(routerPush).toHaveBeenCalledWith(
+      '/(app)/(tabs)/(3_profile)/organization/billing?org=org-lapsed'
+    );
     act(() => {
       renderer.unmount();
     });

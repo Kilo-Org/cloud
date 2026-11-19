@@ -2,9 +2,9 @@
 //
 // Each bridge value is stored under a `routeKey` — a stable id for the flow
 // that produced it: a session id for the agent-chat pickers or the PR
-// owner/repo/number for the review bridges. A route reads its slot with
-// `useRouteRegistry(routeKey)` which clears every slot under that key when the
-// route unmounts, so a stale bridge never leaks into the next visit.
+// owner/repo/number for the review bridges. A route reads a slot through the
+// exported slot accessors for that key; the `useRouteRegistry` hook registers
+// the key for the route's lifetime so unmount cleanup can drop its slots.
 
 import { useEffect } from 'react';
 

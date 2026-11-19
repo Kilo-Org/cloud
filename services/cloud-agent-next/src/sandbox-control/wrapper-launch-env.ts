@@ -4,6 +4,7 @@ import { mintControlLogUploadGrant, mintSandboxTransferGrant } from './sandbox-t
 import { sandboxTransferScopes } from '../shared/control-diagnostics.js';
 import {
   CONTROL_SANDBOX_PROVIDER_ENV,
+  PROVIDER_DESCRIPTORS,
   type AgentSandboxProvider,
 } from '../shared/sandbox-provider.js';
 
@@ -65,13 +66,8 @@ export function buildControlWrapperLaunchEnv(
   }
   return {
     ...transferEnv,
-    // The Vercel node24 snapshot installs Bun and global CLIs in /usr/local/bin.
-    // Supply the runtime path directly instead of reading a snapshot's login profile.
-    ...(input.provider === 'vercel'
-      ? {
-          PATH: '/usr/local/bin:/vercel/runtimes/node24/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin',
-        }
-      : {}),
+    // Provider launch facts, such as the Vercel runtime PATH.
+    ...PROVIDER_DESCRIPTORS[input.provider].launchEnv,
     ...(sentry
       ? {
           CLOUD_AGENT_SENTRY_DSN: sentry.dsn,

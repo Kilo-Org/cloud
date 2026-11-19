@@ -95,13 +95,19 @@ export type SaveErrorCopy = Readonly<{
  * gets the form-level line next to Save. The raw server message never reaches
  * the UI: a schema rejection carries a JSON array of zod issues, not a
  * sentence.
+ *
+ * `canManageBilling` picks the reader's copy for the one sentence that depends
+ * on the role: the plan refusal offers the step to a reader who can take it and
+ * names the owner who can to everyone else.
  */
-export function saveErrorCopy(error: unknown): SaveErrorCopy {
+export function saveErrorCopy(error: unknown, canManageBilling = false): SaveErrorCopy {
   if (readTrpcErrorField(error, 'code') === 'BAD_REQUEST') {
     return { field: 'emails', message: i18n.t('organization.lowBalanceAlert.saveEmailsError') };
   }
   return {
     field: 'form',
-    message: knownServerErrorMessage(error) ?? i18n.t('organization.lowBalanceAlert.saveError'),
+    message:
+      knownServerErrorMessage(error, canManageBilling) ??
+      i18n.t('organization.lowBalanceAlert.saveError'),
   };
 }

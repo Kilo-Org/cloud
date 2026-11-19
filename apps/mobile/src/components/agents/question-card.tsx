@@ -1,20 +1,13 @@
 /* eslint-disable max-lines -- The blocking question card keeps its selection, custom-answer, and CTA presentation together. */
 import { useEffect, useRef, useState } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  type TextInput,
-  type TextInstance,
-  type TextStyle,
-  View,
-} from 'react-native';
+import { ScrollView, type TextInstance, type TextStyle, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import * as Haptics from 'expo-haptics';
 import { impactHaptic } from '@/lib/haptics';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
-import { Check } from '@/components/ui/icons';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { useConfirmDialog } from '@/components/ui/dialog';
@@ -25,8 +18,7 @@ import {
   getBlockingCardPresentationForKind,
 } from '@/components/agents/blocking-card-state';
 import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
-import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useMutedDisabledInk } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import {
   answerLabels,
@@ -35,11 +27,9 @@ import {
   MULTI_NONE,
   type MultiAnswer,
   pressSingleChoice,
-  pressSingleCustom,
   SINGLE_NONE,
   type SingleAnswer,
   toggleMultiChoice,
-  toggleMultiCustom,
   typeMultiCustom,
   typeSingleCustom,
 } from './question-card-answer';
@@ -103,14 +93,12 @@ export function QuestionCard({
   submissionError = null,
   pendingCount = 1,
 }: Readonly<QuestionCardProps>) {
-  const colors = useThemeColors();
   const mutedDisabledInk = useMutedDisabledInk();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const [singleAnswers, setSingleAnswers] = useState<Record<number, SingleAnswer>>({});
   const [multiAnswers, setMultiAnswers] = useState<Record<number, MultiAnswer>>({});
   const customInputs = useRef<Record<number, string>>({});
-  const customInputRefs = useRef<Record<number, TextInput | null>>({});
   // Derived from the custom text ref so Send and the progress line follow every
   // keystroke without the ref itself being read during render.
   const [customHasText, setCustomHasText] = useState<Record<number, boolean>>({});
@@ -172,25 +160,6 @@ export function QuestionCard({
     if (isCustomSelected(current)) {
       clearCustomAnswer(questionIndex);
     }
-  }
-
-  function selectCustomOption(questionIndex: number, multiple: boolean | undefined) {
-    if (multiple) {
-      const current = multiAnswers[questionIndex] ?? MULTI_NONE;
-      const next = toggleMultiCustom(current);
-      setMultiAnswers(prev => ({ ...prev, [questionIndex]: next }));
-      // Re-activating the checked custom answer unchecks it; its text goes with
-      // it so the checkbox and the field stay consistent.
-      if (isCustomSelected(current)) {
-        clearCustomAnswer(questionIndex);
-      }
-      return;
-    }
-    // A single-choice radio stays selected on a re-press, keeping its text.
-    setSingleAnswers(prev => ({
-      ...prev,
-      [questionIndex]: pressSingleCustom(prev[questionIndex] ?? SINGLE_NONE),
-    }));
   }
 
   function handleCustomTextChange(questionIndex: number, text: string) {
@@ -264,24 +233,22 @@ export function QuestionCard({
   ) : null;
 
   return (
-    <View className="mx-4 my-2 shrink overflow-hidden rounded-xl border border-border bg-card">
-      <View className="border-b border-border bg-secondary px-4 py-3">
-        <Text ref={titleRef} accessible accessibilityLabel={title} className="text-sm font-medium">
+    <Card className="mx-4 my-2 shrink">
+      <View className="gap-1">
+        <Text ref={titleRef} accessible accessibilityLabel={title} variant="heading">
           {title}
         </Text>
-        <Text className="mt-1 text-xs text-muted-foreground">
-          {presentation.protocolExplanation}
-        </Text>
+        <Text variant="caption">{presentation.protocolExplanation}</Text>
       </View>
 
       {presentation.errorMessage ? (
-        <View className="border-b border-border bg-danger-tile-bg px-4 py-2">
-          <Text className="text-xs text-destructive">{presentation.errorMessage}</Text>
-        </View>
+        <Text variant="caption" className="text-destructive">
+          {presentation.errorMessage}
+        </Text>
       ) : null}
 
       <ScrollView className="max-h-96 shrink" keyboardShouldPersistTaps="handled">
-        <View className="gap-4 p-4">
+        <View className="gap-3">
           {questions.map((question, qIndex) => {
             const answer = answerOf(question, qIndex);
             const isCustomActive = isCustomSelected(answer);
@@ -363,82 +330,42 @@ export function QuestionCard({
                     );
                   })}
                   {question.custom !== false ? (
-                    // The custom answer choice is a SIBLING radio/checkbox
-                    // Pressable — a TextInput cannot expose a checked choice
-                    // state, and nesting the input inside a selection
-                    // Pressable would shadow it for assistive technology. The
-                    // radio carries the checked semantics (radio for a single
-                    // choice, checkbox beside multi-select options); pressing
-                    // it also focuses the input so typing flows. The input
-                    // below stays a separate, editable control.
-                    <View className="gap-1">
-                      <Pressable
-                        accessibilityRole={question.multiple ? 'checkbox' : 'radio'}
-                        accessibilityLabel={t('agentChat.questionCard.typeYourOwnAnswer')}
-                        accessibilityState={{
-                          checked: isCustomActive,
-                          disabled: interactionDisabled,
-                        }}
-                        disabled={interactionDisabled}
-                        onPress={() => {
-                          selectCustomOption(qIndex, question.multiple);
-                          customInputRefs.current[qIndex]?.focus();
-                        }}
-                        className={cn(
-                          ROW_TARGET_CLASS,
-                          'flex-row items-center justify-between rounded-md border px-3',
-                          isCustomActive
-                            ? 'border-primary bg-primary'
-                            : 'border-border bg-background dark:border-neutral-700 dark:bg-secondary',
-                          interactionDisabled && 'opacity-50'
-                        )}
-                      >
-                        <Text
-                          className={cn(
-                            'text-sm',
-                            isCustomActive ? 'text-primary-foreground' : 'text-foreground'
-                          )}
-                        >
-                          {t('agentChat.questionCard.typeYourOwnAnswer')}
-                        </Text>
-                        {isCustomActive ? (
-                          <Check size={16} color={colors.primaryForeground} />
-                        ) : null}
-                      </Pressable>
-                      <Input
-                        key={`custom-${qIndex}-${customReset[qIndex] ?? 0}`}
-                        ref={node => {
-                          customInputRefs.current[qIndex] = node;
-                        }}
-                        defaultValue=""
-                        onChangeText={text => {
-                          handleCustomTextChange(qIndex, text);
-                        }}
-                        placeholder={t('agentChat.questionCard.typeYourOwnAnswerPlaceholder')}
-                        // The active field swaps its fill to `bg-primary`, so the
-                        // placeholder follows the fill's foreground like the
-                        // typed text and the option label do; the muted grey is
-                        // painted for the plain background and is unreadable on
-                        // the olive fill.
-                        placeholderTextColor={
-                          isCustomActive ? colors.primaryForeground : colors.mutedForeground
-                        }
-                        editable={!interactionDisabled}
-                        accessibilityLabel={t('agentChat.questionCard.typeYourOwnAnswer')}
-                        accessibilityState={{ disabled: interactionDisabled }}
-                        className={cn(
-                          // The shared single-line box supplies the touch
-                          // floor (`min-h-[44px]`, never a fixed height);
-                          // dropping `py-2.5` lets the box own the vertical
-                          // geometry, and every other token stays.
-                          'rounded-md border pl-3 pr-3 text-sm shadow-sm shadow-[#0000000D]',
-                          isCustomActive
-                            ? 'border-primary bg-primary text-primary-foreground'
-                            : 'border-border bg-background text-foreground dark:border-neutral-700 dark:bg-secondary',
-                          interactionDisabled && 'opacity-50'
-                        )}
-                      />
-                    </View>
+                    // The custom answer is one control, the field itself, drawn
+                    // as one more option: the outlined box of an unchosen option
+                    // and the filled one of a chosen option. A separate "Type
+                    // your own answer" choice above it repeated the field's own
+                    // placeholder and wore a box unlike the options beside it.
+                    // Typing chooses the answer and clearing the text drops it,
+                    // so the field needs no second control; it states its choice
+                    // the way the preset options do, in its accessible name.
+                    <Input
+                      key={`custom-${qIndex}-${customReset[qIndex] ?? 0}`}
+                      defaultValue=""
+                      onChangeText={text => {
+                        handleCustomTextChange(qIndex, text);
+                      }}
+                      placeholder={t('agentChat.questionCard.typeYourOwnAnswerPlaceholder')}
+                      editable={!interactionDisabled}
+                      accessibilityLabel={
+                        isCustomActive
+                          ? t('agentChat.questionCard.optionSelected', {
+                              label: t('agentChat.questionCard.typeYourOwnAnswer'),
+                            })
+                          : t('agentChat.questionCard.option', {
+                              label: t('agentChat.questionCard.typeYourOwnAnswer'),
+                            })
+                      }
+                      accessibilityState={{ disabled: interactionDisabled }}
+                      className={cn(
+                        // The option buttons' border and fill: the outline of an
+                        // unchosen option, the filled `default` of a chosen one.
+                        'rounded-md border pl-3 pr-3 text-sm',
+                        isCustomActive
+                          ? 'border-primary bg-primary text-primary-foreground shadow-sm shadow-[#0000000D]'
+                          : 'border-input bg-background text-foreground',
+                        interactionDisabled && 'opacity-50'
+                      )}
+                    />
                   ) : null}
                 </View>
               </View>
@@ -448,12 +375,9 @@ export function QuestionCard({
       </ScrollView>
 
       {presentation.hasPrimaryCta || presentation.hasRetryCta || presentation.hasRejectCta ? (
-        <View className="flex-col gap-2 border-t border-border p-3">
+        <View className="flex-col gap-2 border-t-[0.5px] border-hair-soft pt-3">
           {questions.length > 1 ? (
-            <Text
-              accessibilityLiveRegion="polite"
-              className="text-center text-xs text-muted-foreground"
-            >
+            <Text accessibilityLiveRegion="polite" variant="caption" className="text-center">
               {t('agentChat.questionCard.answerProgress', {
                 answered: answeredCount,
                 total: questions.length,
@@ -497,6 +421,6 @@ export function QuestionCard({
         </View>
       ) : null}
       {dialog}
-    </View>
+    </Card>
   );
 }

@@ -520,8 +520,7 @@ export async function clearSessionAttentionForSignOut(): Promise<void> {
     try {
       await kv.clearScope(SESSION_ATTENTION_KEY);
     } catch {
-      // Swallow: the in-memory store is already empty; a stale blob is
-      // discarded by the next hydration's identity-free reset at worst.
+      // Swallow: sign-out must not abort because a clear failed.
     }
   });
   await lastWrite;

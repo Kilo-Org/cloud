@@ -3,7 +3,6 @@ import {
   BYOK_MODEL_LABEL,
   freeModelDataLabel,
   freeModelFreeLabel,
-  getFreeModelDataAccessibilityLabel,
   hasUserByokAvailable,
   isFreeModelOption,
   mayTrainOnYourPrompts,
@@ -74,9 +73,5 @@ describe('free model data disclosure', () => {
     expect(modelNameStatesFree('Авто Бесплатный', 'kilo-auto/free')).toBe(true);
     expect(modelNameStatesFree('Авто Бесплатный', 'kilocode/kilo-auto/free')).toBe(true);
     expect(modelNameStatesFree('Auto Efficient', 'kilo-auto/efficient')).toBe(false);
-  });
-
-  it('adds a data collection phrase to accessibility labels', () => {
-    expect(getFreeModelDataAccessibilityLabel('Kilo Auto')).toBe('Kilo Auto, Data collected');
   });
 });

@@ -122,6 +122,16 @@ export const unstable_settings = {
 export default function AppLayout() {
   const colors = useThemeColors();
   const sheetOptions = useFormSheetScreenOptions();
+  // The Android presentation of a route that holds a guarded draft. A `modal`
+  // surface has no drag dismissal at all (unlike the tour and consent routes,
+  // which also disable the gesture), so Android Back is the one removal
+  // `usePreventRemove` has to answer. The screen draws its own header, which is
+  // what carries the visible close control.
+  const guardedModalOptions = {
+    presentation: 'modal' as const,
+    headerShown: false,
+    contentStyle: { backgroundColor: colors.background },
+  };
   // Android's half-height search sheets leave their results behind the IME, so
   // they keep the existing safe-area-capped full detent. iOS keeps its native
   // detent expansion on focus, except in a short window: there the half detent
@@ -231,7 +241,17 @@ export default function AppLayout() {
             <Stack.Screen name="agent-briefing/[report-id]" />
             <Stack.Screen name="agent-briefing/settings" />
             <Stack.Screen name="share-gate" options={sheetOptions} />
-            <Stack.Screen name="bitbucket-connect" options={sheetOptions} />
+            {/* The token form's leave guard must see the dismissal before the
+                native surface tears down. A formSheet's swipe-down dismissal
+                starts natively and races usePreventRemove (measured on the
+                emulator: the screen is removed natively before the guard's
+                route pop), so the sheet presents as a modal on Android and
+                Back is the one dismissal the guard answers. iOS keeps the
+                formSheet, where preventNativeDismiss holds the swipe. */}
+            <Stack.Screen
+              name="bitbucket-connect"
+              options={Platform.OS === 'android' ? guardedModalOptions : sheetOptions}
+            />
             <Stack.Screen name="language-picker" options={searchSheetOptions} />
             <Stack.Screen name="transcription-model-picker" options={pickerSheetOptions} />
             <Stack.Screen name="voice-language-picker" options={searchSheetOptions} />

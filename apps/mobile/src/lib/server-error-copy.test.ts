@@ -3,12 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-review';
 import { i18n } from '@/i18n';
 import {
+  isTrialExpiredRefusal,
   knownServerErrorMessage,
   ORGANIZATION_MEMBER_EXISTS_MESSAGE,
   ORGANIZATION_PENDING_INVITATION_MESSAGE,
   ORGANIZATION_TRIAL_EXPIRED_MESSAGE,
   organizationErrorMessage,
 } from '@/lib/server-error-copy';
+import { TRIAL_ENDED_BILLING_COPY_KEY, TRIAL_ENDED_COPY_KEY } from '@/lib/trial-refusal-copy';
 
 function makeError(code: string, message: string): Error {
   return Object.assign(new Error(message), { data: { code, message } });
@@ -97,6 +99,57 @@ describe('knownServerErrorMessage', () => {
     expect(copy).toBe(i18n.t('codeReviewer.reviewMemory.offAction'));
     expect(copy).not.toContain(i18n.t('common.pullRequest'));
     expect(copy).not.toContain('REVIEW.md');
+  });
+});
+
+describe('isTrialExpiredRefusal', () => {
+  it('recognizes the trial sentence the gate refuses with', () => {
+    expect(isTrialExpiredRefusal(makeError('FORBIDDEN', ORGANIZATION_TRIAL_EXPIRED_MESSAGE))).toBe(
+      true
+    );
+  });
+
+  it('answers false for every other rejection on the same surface', () => {
+    expect(isTrialExpiredRefusal(makeError('FORBIDDEN', 'You cannot change your own role'))).toBe(
+      false
+    );
+    expect(isTrialExpiredRefusal(new TypeError('Network request failed'))).toBe(false);
+    expect(isTrialExpiredRefusal(null)).toBe(false);
+  });
+});
+
+describe('the trial refusal, read by role', () => {
+  const trialRefusal = () => makeError('FORBIDDEN', ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
+
+  it('gives a billing role the copy that offers the step', () => {
+    expect(knownServerErrorMessage(trialRefusal(), true)).toBe(
+      i18n.t(TRIAL_ENDED_BILLING_COPY_KEY)
+    );
+    expect(organizationErrorMessage(trialRefusal(), true)).toBe(
+      i18n.t(TRIAL_ENDED_BILLING_COPY_KEY)
+    );
+  });
+
+  it('keeps the owner-naming copy for a reader who cannot change the plan', () => {
+    expect(knownServerErrorMessage(trialRefusal(), false)).toBe(i18n.t(TRIAL_ENDED_COPY_KEY));
+    expect(knownServerErrorMessage(trialRefusal())).toBe(i18n.t(TRIAL_ENDED_COPY_KEY));
+    expect(organizationErrorMessage(trialRefusal())).toBe(i18n.t(TRIAL_ENDED_COPY_KEY));
+  });
+
+  it('carries the role into no other sentence', () => {
+    const inviteConflict = makeError('CONFLICT', ORGANIZATION_MEMBER_EXISTS_MESSAGE);
+    expect(knownServerErrorMessage(inviteConflict, true)).toBe(
+      i18n.t('organization.inviteMember.alreadyMember')
+    );
+    expect(organizationErrorMessage(inviteConflict, true)).toBe(
+      i18n.t('organization.inviteMember.alreadyMember')
+    );
+  });
+
+  it('does not let the role invent an explanation for an unknown sentence', () => {
+    expect(
+      knownServerErrorMessage(makeError('FORBIDDEN', 'This user must join through your SSO'), true)
+    ).toBeNull();
   });
 });
 

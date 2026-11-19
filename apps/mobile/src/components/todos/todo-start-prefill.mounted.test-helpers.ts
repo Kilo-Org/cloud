@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react';
 import { vi } from 'vitest';
 
+import type * as OrganizationsModule from '@kilocode/app-shared/organizations';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { type TodoItem, type TodoList } from '@/lib/todos/todo-types';
 
@@ -151,6 +152,18 @@ vi.mock('sonner-native', () => ({
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({ organizationId: handoff.organizationId }),
 }));
+// The to-do start resolves its list's role through the organization query
+// chain, which imports the Expo runtime this harness does not build. The real
+// `isMoneyRole` rule applies to the memberships handed back here.
+vi.mock('@/lib/hooks/use-organization-queries', async () => {
+  const { canManageOrganizationBilling } = await vi.importActual<typeof OrganizationsModule>(
+    '@kilocode/app-shared/organizations'
+  );
+  return {
+    isMoneyRole: canManageOrganizationBilling,
+    useOrgBoundary: () => ({ orgs: [] }),
+  };
+});
 vi.mock('@/lib/trpc', () => ({ useTRPC: () => ({}), trpcClient: {} }));
 vi.mock('@/lib/app-actions/start-agent', () => ({ startAgent: vi.fn() }));
 vi.mock('@/lib/hooks/use-todos', () => ({

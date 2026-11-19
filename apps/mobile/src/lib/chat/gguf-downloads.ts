@@ -219,8 +219,6 @@ export function ggufDownloads({
           index,
           partialNames: active?.transfers.map(transfer => transfer.part) ?? [],
         });
-        // Only a list that parsed in full is written back: anything else would lose
-        // an entry, and the next launch would then delete the file it names.
         if (modelIndexFullyParsed(index)) {
           save(models);
         }
@@ -247,7 +245,7 @@ export function ggufDownloads({
       };
     },
     model: (fileId: string) => models.find(model => model.fileId === fileId),
-    /** The files the inference client loads for a downloaded model. */
+    /** The file of a downloaded model, or undefined when fileId names no stored model. */
     file: (fileId: string): GgufModelFile | undefined => {
       const record = models.find(model => model.fileId === fileId);
       return record === undefined ? undefined : modelFileOf(storage, record);

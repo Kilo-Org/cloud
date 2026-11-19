@@ -1,4 +1,3 @@
-import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { type ReactNode, useState } from 'react';
@@ -6,19 +5,19 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { type ProviderKey, ProviderKeyRow } from '@/components/account/provider-key-row';
 import { EmptyState } from '@/components/empty-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { useConfirmDialog } from '@/components/ui/dialog';
+import { IconButton } from '@/components/ui/icon-button';
 import { KeyRound, Plus } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import {
   providerKeyAddHref,
   providerKeyNewHref,
@@ -26,112 +25,22 @@ import {
   providerKeyScope,
   providerKeyScopeInput,
 } from '@/lib/byok/provider-key-scope';
+import { announceTestOutcome } from '@/lib/byok/key-test-outcome';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 
-type ProviderKey = inferRouterOutputs<MobileRouter>['byok']['list'][number];
-
 const SKELETON_ROWS = [0, 1];
 
 /**
- * The height the pending band already occupies: two 104 dp skeletons and the gap
- * between them. Every state that is not the key list keeps it, so the Add key
- * action below never moves when the skeletons are replaced by the settled state.
+ * The height the pending band already occupies: two key cards and the gap
+ * between them. Every state that is not the key list keeps it, so the list
+ * never moves when the skeletons are replaced by the settled state.
  */
-const BODY_BAND_CLASS = 'min-h-[220px]';
-
-function ProviderKeyRow({
-  providerKey,
-  testing,
-  toggling,
-  deleting,
-  canEdit,
-  onTest,
-  onToggle,
-  onEdit,
-  onDelete,
-}: Readonly<{
-  providerKey: ProviderKey;
-  testing: boolean;
-  toggling: boolean;
-  deleting: boolean;
-  canEdit: boolean;
-  onTest: () => void;
-  onToggle: (enabled: boolean) => void;
-  onEdit: () => void;
-  onDelete: () => void;
-}>) {
-  const { t } = useTranslation();
-  // A key the coding plan manages cannot be changed here: the plan created it and
-  // only ending the plan removes it, so every control is closed and the row says
-  // why instead of failing a server call the reader could not predict.
-  const managed = providerKey.management_source === 'coding_plan';
-  const editable = canEdit && !managed;
-  const busy = testing || toggling || deleting;
-
-  return (
-    <View className="gap-2 rounded-lg bg-secondary p-3">
-      <View className="flex-row items-center gap-3">
-        <View className="min-w-0 flex-1 gap-1">
-          <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
-            {providerKey.provider_name}
-          </Text>
-          {/*
-            Only a managed row keeps a line: its switch is disabled, so it cannot
-            carry the state and the row has to name the plan instead.
-          */}
-          {managed ? (
-            <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-              {t('profile.providerKeys.managedByPlan')}
-            </Text>
-          ) : null}
-        </View>
-        <Switch
-          value={providerKey.is_enabled}
-          disabled={!editable || busy}
-          onValueChange={onToggle}
-          accessibilityLabel={t('profile.providerKeys.enableKey', {
-            provider: providerKey.provider_name,
-          })}
-        />
-      </View>
-      <View className="flex-row flex-wrap items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          className={STATE_ACTION_CLASS}
-          disabled={!editable || busy}
-          loading={testing}
-          onPress={onTest}
-        >
-          <Text>{t('profile.providerKeys.test')}</Text>
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className={STATE_ACTION_CLASS}
-          disabled={!editable || busy}
-          onPress={onEdit}
-        >
-          <Text>{t('profile.providerKeys.edit')}</Text>
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className={STATE_ACTION_CLASS}
-          disabled={!editable || busy}
-          loading={deleting}
-          onPress={onDelete}
-        >
-          <Text>{t('common.remove')}</Text>
-        </Button>
-      </View>
-    </View>
-  );
-}
+const BODY_BAND_CLASS = 'min-h-64 gap-3';
 
 /**
  * The keys of one scope: the caller's own, or an organization's.
@@ -190,14 +99,8 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
 
   const test = useMutation(
     trpc.byok.testApiKey.mutationOptions({
-      onSuccess: result => {
-        if (result.success) {
-          announcingToast.success(result.message);
-          return;
-        }
-        announcingToast.error(result.message);
-      },
-      onError: error => toast.error(error.message),
+      onSuccess: announceTestOutcome,
+      onError: () => announcingToast.error(t('profile.providerKeys.testFailed')),
       onSettled: (_result, _error, input) => {
         setTestingId(current => (current === input.id ? null : current));
       },
@@ -244,11 +147,18 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
   let body: ReactNode = null;
   if (keys.isPending) {
     body = (
-      <View className="gap-3">
+      <>
         {SKELETON_ROWS.map(row => (
-          <Skeleton key={row} className="h-[104px] rounded-lg" />
+          <Card key={row}>
+            <View className="flex-row items-center gap-3">
+              <Skeleton className="h-4 w-32 max-w-full" />
+              <View className="flex-1" />
+              <Skeleton className="h-6 w-12 rounded-full" />
+            </View>
+            <Skeleton className="h-8 w-full rounded-md" />
+          </Card>
         ))}
-      </View>
+      </>
     );
   } else if (keys.isError) {
     // A terminal code (a refusal the server will repeat) gets the state its
@@ -261,6 +171,8 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
       />
     );
   } else if (keys.data.length === 0) {
+    // The header's "+" is the screen's one create control, so the empty state
+    // carries the title and its hint only.
     body = (
       <EmptyState
         placement="top"
@@ -271,7 +183,7 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
     );
   } else {
     body = (
-      <View className="gap-3">
+      <>
         {keys.data.map(providerKey => (
           <ProviderKeyRow
             key={providerKey.id}
@@ -295,43 +207,42 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
             }}
           />
         ))}
-      </View>
+      </>
     );
   }
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profile.providerKeys.title')} backFallback={PROFILE_TAB_HREF} />
+      <ScreenHeader
+        title={t('profile.providerKeys.title')}
+        backFallback={PROFILE_TAB_HREF}
+        headerRight={
+          permissions.canEdit ? (
+            <IconButton
+              accessibilityLabel={t('profile.providerKeys.add')}
+              onPress={() => {
+                router.push(providerKeyAddHref(scope));
+              }}
+            >
+              <Plus size={20} color={colors.foreground} />
+            </IconButton>
+          ) : undefined
+        }
+      />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-3 px-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
-        <Text variant="muted" className="text-xs">
+        <Text variant="muted">
           {scope.kind === 'organization'
             ? t('profile.providerKeys.orgDescription')
             : t('profile.providerKeys.description')}
         </Text>
         {scope.kind === 'organization' && !permissions.canEdit ? (
-          <Text variant="muted" className="text-xs">
-            {t('profile.providerKeys.viewOnly')}
-          </Text>
+          <Text variant="muted">{t('profile.providerKeys.viewOnly')}</Text>
         ) : null}
         <View className={BODY_BAND_CLASS}>{body}</View>
-        {permissions.canEdit ? (
-          <View className="pt-3">
-            <Button
-              variant="outline"
-              className={STATE_ACTION_CLASS}
-              onPress={() => {
-                router.push(providerKeyAddHref(scope));
-              }}
-            >
-              <Plus size={16} color={colors.foreground} />
-              <Text>{t('profile.providerKeys.add')}</Text>
-            </Button>
-          </View>
-        ) : null}
       </TabScreenScrollView>
       {dialog}
     </View>

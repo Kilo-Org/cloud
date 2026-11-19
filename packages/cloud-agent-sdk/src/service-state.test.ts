@@ -1,8 +1,8 @@
 import { createServiceState } from './service-state';
-import type { ServiceStateConfig } from './service-state';
+import type { ServiceState, ServiceStateConfig } from './service-state';
 import type { Session, QuestionInfo } from '@kilocode/app-shared/opencode';
 import { PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
-import { autocommitCompletedDataSchema, preparingDataSchema } from './schemas';
+import { autocommitCompletedDataSchema, preparingDataSchema, SESSION_MAX_COMMITS } from './schemas';
 import type { SessionCommit, SessionGoal } from './types';
 
 function makeConfig(overrides?: Partial<ServiceStateConfig>): ServiceStateConfig {
@@ -519,6 +519,45 @@ describe('createServiceState', () => {
       expect(state.getActivity()).toEqual({ type: 'idle' });
       expect(state.getStatus()).toEqual({ type: 'idle' });
       expect(onError).not.toHaveBeenCalledWith('Connection to agent lost');
+    });
+
+    it('escalates an exhausted transport drop to a terminal loss', () => {
+      const onError = jest.fn();
+      const state = createServiceState(makeConfig({ onError }));
+
+      state.process({ type: 'stopped', reason: 'transport-disconnected' });
+      expect(state.getStatus()).toEqual({ type: 'disconnected', reconnecting: true });
+      expect(onError).not.toHaveBeenCalled();
+
+      state.process({ type: 'stopped', reason: 'transport-disconnected', exhausted: true });
+      expect(state.getStatus()).toEqual({ type: 'disconnected', code: 'connection-lost' });
+      expect(onError).toHaveBeenCalledWith('Connection lost. Please retry in a moment.');
+
+      // A live connection proves the loss is over: the status clears and a
+      // later session.error reaches the reader again.
+      state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+
+      onError.mockClear();
+      state.process({ type: 'session.error', error: 'aftershock' });
+      expect(onError).toHaveBeenCalledWith('aftershock');
+    });
+
+    it('reports an exhausted transport drop once across repeated reports', () => {
+      const onError = jest.fn();
+      const state = createServiceState(makeConfig({ onError }));
+
+      state.process({ type: 'stopped', reason: 'transport-disconnected', exhausted: true });
+      state.process({ type: 'stopped', reason: 'transport-disconnected', exhausted: true });
+
+      expect(state.getStatus()).toEqual({ type: 'disconnected', code: 'connection-lost' });
+      expect(onError).toHaveBeenCalledTimes(1);
+
+      // A reconnect clears the latch, so the next spent budget reports again.
+      state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
+      state.process({ type: 'stopped', reason: 'transport-disconnected', exhausted: true });
+
+      expect(onError).toHaveBeenCalledTimes(2);
     });
 
     it('stopped resets cloudStatus to null when it was preparing', () => {
@@ -2338,11 +2377,15 @@ describe('createServiceState', () => {
       expect(state.getStatus()).toEqual({ type: 'disconnected' });
     });
 
-    it('clears transport-disconnected status on synthetic viewer reconnect', () => {
-      const state = createServiceState(makeConfig());
+    it('clears a reconnecting transport drop on synthetic viewer reconnect', () => {
+      const onError = jest.fn();
+      const state = createServiceState(makeConfig({ onError }));
 
       state.process({ type: 'stopped', reason: 'transport-disconnected' });
-      expect(state.getStatus()).toEqual({ type: 'disconnected' });
+      // A drop the transport retries is not a terminal loss: the status says
+      // reconnecting and the reader is told nothing.
+      expect(state.getStatus()).toEqual({ type: 'disconnected', reconnecting: true });
+      expect(onError).not.toHaveBeenCalled();
 
       state.process({ type: 'connected' });
 
@@ -2455,6 +2498,43 @@ describe('createServiceState', () => {
       state.reset();
       state.process({ type: 'autocommit_completed', success: true, ...localCommit });
       expect(state.getCommits()).toEqual([localCommit]);
+    });
+
+    const commitAtIndex = (index: number): SessionCommit => ({
+      ...localCommit,
+      commitHash: index.toString(16).padStart(40, '0'),
+      messageId: `message-${index}`,
+      committedAt: new Date(Date.UTC(2026, 8, 1, 10, 0, 0) + index * 1_000).toISOString(),
+    });
+
+    const fillCommits = (state: ServiceState, count: number): void => {
+      for (let index = 0; index < count; index += 1) {
+        state.process({ type: 'autocommit_completed', success: true, ...commitAtIndex(index) });
+      }
+    };
+
+    it('trims the autocommit list to its newest budget', () => {
+      const state = createServiceState(makeConfig());
+      fillCommits(state, SESSION_MAX_COMMITS + 20);
+      const retained = state.getCommits();
+      expect(retained).toHaveLength(SESSION_MAX_COMMITS);
+      expect(retained[0]).toEqual(commitAtIndex(20));
+      expect(retained.at(-1)).toEqual(commitAtIndex(SESSION_MAX_COMMITS + 19));
+    });
+
+    it('does not resurrect a trimmed commit on replay', () => {
+      const state = createServiceState(makeConfig());
+      fillCommits(state, SESSION_MAX_COMMITS + 20);
+      state.process({ type: 'autocommit_completed', success: true, ...commitAtIndex(0) });
+      state.process({
+        type: 'autocommit_completed',
+        success: true,
+        ...commitAtIndex(0),
+        commitMessage: 'Replayed with a different message',
+      });
+      const retained = state.getCommits();
+      expect(retained).toHaveLength(SESSION_MAX_COMMITS);
+      expect(retained[0]).toEqual(commitAtIndex(20));
     });
 
     it.each([

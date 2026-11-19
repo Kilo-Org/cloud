@@ -235,8 +235,8 @@ if (!stdinDockerfile) {
     // Trust the sandbox's HTTPS interception CA inside development images, not production sources.
     const trust = cert ? `RUN mkdir -p /usr/local/share/ca-certificates && printf '%s' '${cert}' | base64 -d > /usr/local/share/ca-certificates/kilo-sandbox.crt && (if command -v apt-get >/dev/null; then printf 'Acquire::http::Timeout "30";\\nAcquire::https::Timeout "30";\\nAcquire::Retries "2";\\n' > /etc/apt/apt.conf.d/99-kilo-startup-timeouts; fi) && (command -v update-ca-certificates || (apt-get update && apt-get install -y --no-install-recommends ca-certificates)) && update-ca-certificates\nENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/kilo-sandbox.crt` : '';
     const limits = 'ENV NODE_OPTIONS=--max-old-space-size=768 GOMAXPROCS=2 npm_config_jobs=1';
-    dockerfile = dockerfile.replace(/^FROM (?:docker.io\/library\/)?(docker:dind-rootless|debian:trixie-slim)([^\n]*)/gm,
-      (_, image, suffix) => `FROM mirror.gcr.io/library/${image}${suffix}\nUSER root\n${trust}\n${limits}`);
+    dockerfile = dockerfile.replace(/^FROM[ \t]+(--platform=\S+[ \t]+)?(?:docker\.io\/library\/)?(docker:dind-rootless|debian:trixie-slim)(?=[@ \t\r]|$)([^\n]*)/gm,
+      (_, platform = '', image, suffix) => `FROM ${platform}mirror.gcr.io/library/${image}${suffix}\nUSER root\n${trust}\n${limits}`);
     run(dockerfile);
   });
 }

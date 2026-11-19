@@ -12,6 +12,7 @@
 // again, and a Back that lands while that dismissal animates is this screen's
 // Back too — the pair never closes the screen beneath.
 
+/* eslint-disable max-lines -- one suite for the list's save contract: the failed save, its inline explanation and step, the retry that can succeed, and the completion that outlives the screen share one mounted harness */
 /* eslint-disable promise-function-async -- gate fakes must stay pending until the test releases them */
 
 import { createElement, type ReactNode } from 'react';
@@ -21,6 +22,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 import { resetLeaveSettle } from '@/lib/navigation/leave-settle';
 import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
+import { billingHrefFor } from '@/lib/trial-refusal';
 import { OptionList } from './option-list';
 
 vi.mock('@/components/ui/activity-indicator', () => ({
@@ -29,10 +31,12 @@ vi.mock('@/components/ui/activity-indicator', () => ({
 vi.mock('react-native', () => ({
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
+  Platform: { OS: 'android' },
+  Pressable: 'Pressable',
   BackHandler: { addEventListener: () => ({ remove: () => undefined }) },
 }));
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ back: routerBack }),
+  useRouter: () => ({ back: routerBack, push: routerPush }),
   useNavigation: () => ({
     isFocused: () => focus.focused,
     addListener: () => () => undefined,
@@ -42,6 +46,23 @@ vi.mock('expo-router', () => ({
     getParent: () => undefined,
   }),
 }));
+// The connect actions read the reader's organization role for a trial refusal.
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ organizationId: 'org_1', isLoaded: true }),
+}));
+vi.mock('@/lib/hooks/use-organizations-list', () => ({
+  useOrganizationsList: () => ({
+    data: [{ organizationId: 'org_1', role: orgState.role }],
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    refetch: vi.fn(),
+  }),
+}));
+vi.mock('@/lib/trpc', () => ({
+  trpcClient: {},
+  useTRPC: () => ({}),
+}));
 vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),
 }));
@@ -49,6 +70,7 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/ui/button', () => ({
   Button: (props: {
     accessibilityLabel?: string;
+    accessibilityState?: { busy?: boolean };
     loading?: boolean;
     onPress?: () => void;
     children?: ReactNode;
@@ -57,6 +79,13 @@ vi.mock('@/components/ui/button', () => ({
       'View',
       {
         accessibilityLabel: props.accessibilityLabel,
+        // The primitive derives the announcement from `loading`; the mock keeps
+        // that derivation so the suite reads the state the device would.
+        accessibilityState:
+          props.accessibilityState ??
+          (props.loading === undefined
+            ? undefined
+            : { busy: props.loading, disabled: props.loading }),
         loading: props.loading,
         onPress: props.onPress,
       },
@@ -84,6 +113,11 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 
 const routerBack = vi.hoisted(() => vi.fn());
+const routerPush = vi.hoisted(() => vi.fn());
+// The reader's organization role, as the shared membership list reports it.
+// Only the money roles (`owner`, `admin`, `billing_manager`) may take the
+// plan step a trial refusal offers.
+const orgState = vi.hoisted(() => ({ role: 'member' as string | undefined }));
 // Route focus as the navigator reports it: `false` once this screen is gone.
 const focus = vi.hoisted(() => ({ focused: true }));
 
@@ -99,7 +133,10 @@ function makeServerError(code: string, message: string): Error {
 // The OptionList prop type widens the value to `string` in its own generic bound;
 // the mock keeps the literal union, so the element cast narrows it back.
 
-async function mountAsync(onSelect: SelectFn): Promise<TestRenderer.ReactTestRenderer> {
+async function mountAsync(
+  onSelect: SelectFn,
+  organizationId: string | null = 'org_1'
+): Promise<TestRenderer.ReactTestRenderer> {
   const ref = { current: undefined as TestRenderer.ReactTestRenderer | undefined };
   await act(async () => {
     ref.current = TestRenderer.create(
@@ -110,6 +147,7 @@ async function mountAsync(onSelect: SelectFn): Promise<TestRenderer.ReactTestRen
         onSelect: onSelect as (value: string) => Promise<unknown>,
         labels: { off: 'Off', all: 'All' },
         disabled: false,
+        organizationId,
       })
     );
     await Promise.resolve();
@@ -149,7 +187,12 @@ function texts(root: TestRenderer.ReactTestRenderer): string[] {
     .filter((child): child is string => typeof child === 'string');
 }
 
-type RetryProps = { accessibilityLabel?: string; loading?: boolean; onPress: () => void };
+type RetryProps = {
+  accessibilityLabel?: string;
+  accessibilityState?: { busy?: boolean };
+  loading?: boolean;
+  onPress: () => void;
+};
 
 function retryButtons(root: TestRenderer.ReactTestRenderer): RetryProps[] {
   return root.root
@@ -168,6 +211,16 @@ function retry(root: TestRenderer.ReactTestRenderer): RetryProps {
   return found;
 }
 
+type BillingStepProps = { accessibilityLabel?: string; onPress?: () => void };
+
+/** The plan step a trial refusal offers a money role, or none. */
+function billingSteps(root: TestRenderer.ReactTestRenderer): BillingStepProps[] {
+  const label = i18n.t('organization.hub.manageBilling');
+  return root.root
+    .findAll(node => String(node.type) === 'Pressable' && node.props.accessibilityLabel === label)
+    .map(node => node.props as BillingStepProps);
+}
+
 /** The OptionList press handler returns void; the state updates settle over a few microtask turns. */
 async function press(pressable: () => void): Promise<void> {
   await act(async () => {
@@ -180,6 +233,8 @@ async function press(pressable: () => void): Promise<void> {
 beforeEach(() => {
   resetLeaveSettle();
   routerBack.mockReset();
+  routerPush.mockReset();
+  orgState.role = 'member';
   focus.focused = true;
 });
 
@@ -234,6 +289,46 @@ describe('OptionList failed save', () => {
     expect(retryButtons(renderer)).toHaveLength(0);
   });
 
+  it('offers a billing role the plan step with the copy that offers it', async () => {
+    orgState.role = 'owner';
+    const renderer = await mountAsync(() =>
+      Promise.reject(makeServerError('FORBIDDEN', ORGANIZATION_TRIAL_EXPIRED_MESSAGE))
+    );
+    await press(() => {
+      row(renderer, 'All').onPress();
+    });
+
+    const rendered = texts(renderer);
+    expect(rendered).toContain(i18n.t('common.organizationTrialEndedBilling'));
+    expect(rendered).not.toContain(i18n.t('common.organizationTrialEnded'));
+    expect(retryButtons(renderer)).toHaveLength(0);
+
+    const [step] = billingSteps(renderer);
+    if (!step) {
+      throw new Error('billing step not found');
+    }
+    expect(rendered).toContain(i18n.t('organization.hub.manageBilling'));
+    act(() => {
+      step.onPress?.();
+    });
+    expect(routerPush).toHaveBeenCalledWith(billingHrefFor('org_1'));
+    expect(routerBack).not.toHaveBeenCalled();
+  });
+
+  it('keeps the owner-naming copy and no step for a member', async () => {
+    const renderer = await mountAsync(() =>
+      Promise.reject(makeServerError('FORBIDDEN', ORGANIZATION_TRIAL_EXPIRED_MESSAGE))
+    );
+    await press(() => {
+      row(renderer, 'All').onPress();
+    });
+
+    expect(texts(renderer)).toContain(i18n.t('common.organizationTrialEnded'));
+    expect(billingSteps(renderer)).toHaveLength(0);
+    expect(routerPush).not.toHaveBeenCalled();
+    expect(retryButtons(renderer)).toHaveLength(0);
+  });
+
   it('shows the retry in progress on the retried option and keeps the explanation up', async () => {
     const gate = Promise.withResolvers<unknown>();
     const onSelect = vi
@@ -253,6 +348,7 @@ describe('OptionList failed save', () => {
     expect(row(renderer, 'All').busy).toBe(true);
     expect(rows(renderer).every(props => props.disabled)).toBe(true);
     expect(retry(renderer).loading).toBe(true);
+    expect(retry(renderer).accessibilityState?.busy).toBe(true);
     expect(texts(renderer)).toContain(i18n.t('codeReviewer.configSaveFailed'));
 
     await act(async () => {
@@ -263,6 +359,7 @@ describe('OptionList failed save', () => {
 
     expect(routerBack).not.toHaveBeenCalled();
     expect(retry(renderer).loading).toBe(false);
+    expect(retry(renderer).accessibilityState?.busy).toBe(false);
     expect(row(renderer, 'All').busy).toBe(false);
     expect(rows(renderer).every(props => props.disabled)).toBe(false);
     expect(texts(renderer)).toContain(i18n.t('codeReviewer.configSaveFailed'));

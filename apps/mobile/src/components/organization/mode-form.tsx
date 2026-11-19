@@ -1,3 +1,4 @@
+import { MODE_SLUG_MAX_LENGTH, modeSlugFromName } from '@kilocode/app-shared/organizations';
 import { type Href, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -6,10 +7,8 @@ import { View } from 'react-native';
 import {
   isOrgModeFormDirty,
   MODE_TOOL_GROUPS,
-  modeSlugFromName,
   type ModeToolGroup,
   ORG_MODE_NAME_MAX_LENGTH,
-  ORG_MODE_SLUG_MAX_LENGTH,
   type OrgMode,
   orgModeConfigInput,
   type OrgModeFormErrorCode,
@@ -30,6 +29,7 @@ import { ModeToolsFields } from '@/components/organization/mode-tools-fields';
 import { Text } from '@/components/ui/text';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 import { useOrgModeMutations } from '@/lib/hooks/use-org-modes-queries';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { usePopOnce } from '@/lib/navigation/pop-once';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 
@@ -103,7 +103,10 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
   const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<
     'name' | 'slug' | 'roleDefinition' | 'editFileRegex'
   >();
-  const guard = useMetadataLeaveGuard({ enabled: true });
+  const saving = mutations.create.isPending || mutations.update.isPending;
+  const removing = mutations.remove.isPending;
+  const busy = saving || removing;
+  const guard = useMetadataLeaveGuard({ enabled: true, saving: busy });
   const { confirm, dialog } = useConfirmDialog();
 
   const currentValues = (nextGroups: readonly ModeToolGroup[] = groups): OrgModeFormValues => ({
@@ -125,10 +128,14 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
 
   const syncDirty = (nextGroups: readonly ModeToolGroup[] = groups) => {
     const next = isOrgModeFormDirty(currentValues(nextGroups), initial);
-    if (next !== dirty) {
-      setDirty(next);
-      guard.handleDirtyChange(next);
-    }
+    setDirty(next);
+    // Reported on every edit, not only on a change of this form's own verdict: a
+    // caller-driven leave whose pop the navigator dropped leaves the form mounted
+    // with `dirty` still true while the guard stands down, so a gated report would
+    // never re-arm it and a later Back would leave silently with the draft. The
+    // hook's `setState` bails out on an unchanged value, so repeating the verdict
+    // costs nothing.
+    guard.handleDirtyChange(next);
   };
 
   const errorFor = (field: keyof OrgModeFormErrors): string | undefined => {
@@ -185,17 +192,13 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
     });
   };
 
-  const saving = mutations.create.isPending || mutations.update.isPending;
-  const removing = mutations.remove.isPending;
-  const busy = saving || removing;
-
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={mode === undefined ? t('organization.modes.create') : mode.name} />
       <TabScreenScrollView
         ref={scrollRef}
         className="flex-1"
-        contentContainerClassName="gap-5 px-6 pb-10 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
@@ -225,7 +228,7 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
             label={t('organization.modes.identifierLabel')}
             required
             defaultValue={values.slug}
-            maxLength={ORG_MODE_SLUG_MAX_LENGTH}
+            maxLength={MODE_SLUG_MAX_LENGTH}
             autoCapitalize="none"
             autoCorrect={false}
             disabled={busy}
@@ -241,7 +244,7 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
               }
             }}
           />
-          <Text variant="muted" className="text-xs">
+          <Text variant="caption">
             {suggestion.length === 0
               ? t('organization.modes.identifierHint')
               : `${suggestion} · ${t('organization.modes.identifierHint')}`}

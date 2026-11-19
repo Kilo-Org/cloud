@@ -15,7 +15,8 @@ import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { ScopeAccessDeniedScreen } from '@/components/organization/scope-access-denied-screen';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { Text } from '@/components/ui/text';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
@@ -29,6 +30,7 @@ import {
 } from '@/lib/hooks/use-code-reviewer';
 import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access';
 import { CODE_REVIEWER_HOME_PATH } from '@/lib/profile-agent-navigation';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useTRPC } from '@/lib/trpc';
 
 const PLATFORM_ICONS = {
@@ -107,8 +109,8 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
   if (access !== 'granted') {
     return (
       <ScopeAccessDeniedScreen
-        title={scopeTitle}
-        eyebrow={t('common.codeReviewer')}
+        title={t('common.codeReviewer')}
+        subtitle={scopeTitle}
         backFallback={CODE_REVIEWER_HOME_PATH}
         kind={access}
         onRetry={() => void retryAccess()}
@@ -139,21 +141,17 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ReviewerHeader
-        title={scopeTitle}
-        // The same one-line header the review list for this scope paints, so
-        // both scopes report one header height and the platform rows never move
-        // when the name arrives with the membership read: a longer name
-        // tail-truncates inside that line.
-        titleNumberOfLines={1}
-        eyebrow={t('common.codeReviewer')}
+        title={t('common.codeReviewer')}
+        // The scope is the subtitle under the product name, the one two-line
+        // header every Code Reviewer screen paints: a longer organization name
+        // tail-truncates inside that line, so the rows never move when it
+        // arrives with the membership read.
+        subtitle={scopeTitle}
       />
-      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
-        <View className="gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('codeReviewer.platformList.platforms')}
-          </Text>
-          <View>
-            {platforms.map((platform, index) => {
+      <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
+        <Section label={t('codeReviewer.platformList.platforms')}>
+          <RowGroup leadingTile>
+            {platforms.map(platform => {
               const status = statusFor(platform);
               return (
                 <ConfigureRow
@@ -161,21 +159,17 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
                   icon={PLATFORM_ICONS[platform]}
                   title={PLATFORM_CAPABILITIES[platform].label}
                   subtitle={connectionSubtitle(status)}
-                  last={index === platforms.length - 1}
                   onPress={() => {
                     pushOnce(`/(app)/code-reviewer/${scope}/${platform}` as Href);
                   }}
                 />
               );
             })}
-          </View>
-        </View>
+          </RowGroup>
+        </Section>
 
-        <View className="mt-6 gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('codeReviewer.platformList.activity')}
-          </Text>
-          <View>
+        <Section label={t('codeReviewer.platformList.activity')}>
+          <RowGroup leadingTile>
             <ConfigureRow
               icon={History}
               title={t('codeReviewer.reviewList.title')}
@@ -186,7 +180,6 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
             <ConfigureRow
               icon={CirclePlus}
               title={t('codeReviewer.manualReview.title')}
-              last={isPersonal}
               onPress={() => {
                 pushOnce(`/(app)/code-reviewer/${scope}/manual-review` as Href);
               }}
@@ -197,14 +190,13 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
               <ConfigureRow
                 icon={LineChart}
                 title={t('codeReviewer.analytics.title')}
-                last
                 onPress={() => {
                   pushOnce(`/(app)/code-reviewer/${scope}/analytics` as Href);
                 }}
               />
             )}
-          </View>
-        </View>
+          </RowGroup>
+        </Section>
       </TabScreenScrollView>
     </View>
   );

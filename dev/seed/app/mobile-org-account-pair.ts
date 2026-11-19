@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray, ne } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
@@ -47,14 +47,13 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error('This fixture requires a local development database.');
   }
   const db = getSeedDb();
-  const userId = `dev-seed:mobile-org-account-pair:${email}`;
   const [existing] = await db
     .select({ id: kilocode_users.id })
     .from(kilocode_users)
     .where(eq(kilocode_users.normalized_email, email));
-  if (existing && existing.id !== userId) {
-    throw new Error('The requested email belongs to a different account; choose a new fake email.');
-  }
+  // A fake account that already signed in keeps its own row: the pair joins it,
+  // so the seed runs before or after the device-code sign-in.
+  const userId = existing?.id ?? `dev-seed:mobile-org-account-pair:${email}`;
   await db
     .insert(kilocode_users)
     .values({
@@ -76,27 +75,45 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     { id: OWNER_ORGANIZATION_ID, name: 'Kestrel Studio' },
     { id: MEMBER_ORGANIZATION_ID, name: 'Lantern Studio' },
   ];
-  for (const organization of pair) {
-    await db
-      .insert(organizations)
-      .values({
-        id: organization.id,
-        name: organization.name,
-        created_by_kilo_user_id: userId,
-        require_seats: true,
-        plan: 'teams',
-        settings: {},
-      })
+  // The ids stay fixed so deep links stay stable, and the pair belongs to one
+  // account at a time: a run for another email takes it over instead of adding
+  // that email beside the previous owner. One transaction, so an interrupted
+  // takeover never leaves the organizations without members.
+  await db.transaction(async tx => {
+    for (const organization of pair) {
+      await tx
+        .insert(organizations)
+        .values({
+          id: organization.id,
+          name: organization.name,
+          created_by_kilo_user_id: userId,
+          require_seats: true,
+          plan: 'teams',
+          settings: {},
+        })
+        .onConflictDoUpdate({
+          target: organizations.id,
+          set: { created_by_kilo_user_id: userId },
+        });
+    }
+    await tx.delete(organization_memberships).where(
+      and(
+        inArray(
+          organization_memberships.organization_id,
+          pair.map(organization => organization.id)
+        ),
+        ne(organization_memberships.kilo_user_id, userId)
+      )
+    );
+    await tx
+      .insert(organization_memberships)
+      .values({ organization_id: OWNER_ORGANIZATION_ID, kilo_user_id: userId, role: 'owner' })
       .onConflictDoNothing();
-  }
-  await db
-    .insert(organization_memberships)
-    .values({ organization_id: OWNER_ORGANIZATION_ID, kilo_user_id: userId, role: 'owner' })
-    .onConflictDoNothing();
-  await db
-    .insert(organization_memberships)
-    .values({ organization_id: MEMBER_ORGANIZATION_ID, kilo_user_id: userId, role: 'member' })
-    .onConflictDoNothing();
+    await tx
+      .insert(organization_memberships)
+      .values({ organization_id: MEMBER_ORGANIZATION_ID, kilo_user_id: userId, role: 'member' })
+      .onConflictDoNothing();
+  });
 
   console.log(
     'This fixture represents: one person who owns one organization and belongs to another.'

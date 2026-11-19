@@ -101,6 +101,9 @@ const IMPLIED_CLOSES: ReadonlyMap<
   ['tfoot', SECTIONS],
 ]);
 
+// An element opened at this depth renders as the inline text it contains.
+const MAX_ELEMENT_DEPTH = 64;
+
 const OPEN_TAG =
   /<([a-zA-Z][a-zA-Z0-9-]*)((?:\s+[a-zA-Z_:][-a-zA-Z0-9_:.]*(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*)\s*(\/?)>/y;
 const CLOSE_TAG = /<\/([a-zA-Z][a-zA-Z0-9-]*)\s*>/y;
@@ -140,6 +143,9 @@ export function parseMarkdownHtml(value: string, masks: readonly MaskRange[]): H
   const root: HtmlNode[] = [];
   const stack: HtmlElement[] = [];
   let textStart = 0;
+  // One folded copy per parse: raw-text tags search it instead of re-folding
+  // the whole value for every tag opened.
+  const lowercaseValue = value.toLowerCase();
 
   const siblings = () => stack.at(-1)?.children ?? root;
   const pushText = (end: number) => {
@@ -201,13 +207,26 @@ export function parseMarkdownHtml(value: string, masks: readonly MaskRange[]): H
     const name = open[1]?.toLowerCase() ?? '';
     pushText(start);
     const implied = IMPLIED_CLOSES.get(name);
-    const openNames = stack.map(element => element.name);
-    const barrier = implied ? openNames.findLastIndex(tag => implied.barriers.has(tag)) : -1;
-    const target = implied ? openNames.findLastIndex(tag => implied.targets.has(tag)) : -1;
+    const barrier = implied
+      ? stack.findLastIndex(element => implied.barriers.has(element.name))
+      : -1;
+    const target = implied ? stack.findLastIndex(element => implied.targets.has(element.name)) : -1;
     if (target > barrier) {
       closeFrom(target, start);
     } else if (!implied && HTML_BLOCK_TAGS.has(name) && stack.at(-1)?.name === 'p') {
       closeFrom(stack.length - 1, start);
+    }
+    // Every tag that reaches this branch — void, self-closing, stack-growing —
+    // folds into the parent the same way: no element is built and the stack
+    // never grows. `pushText` above already emitted whatever text preceded
+    // the tag while `textStart` still holds that run's start, so the branch
+    // resets `textStart` to `start` and a second push emits the tag's own
+    // characters as text.
+    if (stack.length >= MAX_ELEMENT_DEPTH) {
+      textStart = start;
+      pushText(end);
+      textStart = end;
+      return end;
     }
     const element: HtmlElement = {
       kind: 'element',
@@ -230,7 +249,7 @@ export function parseMarkdownHtml(value: string, masks: readonly MaskRange[]): H
     if (!RAW_TEXT_TAGS.has(name)) {
       return end;
     }
-    const rawClose = value.toLowerCase().indexOf(`</${name}`, end);
+    const rawClose = lowercaseValue.indexOf(`</${name}`, end);
     return rawClose === -1 ? value.length : rawClose;
   };
 

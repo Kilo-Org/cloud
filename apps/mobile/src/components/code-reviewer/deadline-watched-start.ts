@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { type TrialRefusalAction } from '@/lib/trial-refusal';
+
 /**
  * Budget for a manual-review start to settle before the screen stops showing
  * the busy button and offers the retry. Matches the client control-plane
@@ -17,6 +19,13 @@ export const MANUAL_REVIEW_START_DEADLINE_MS = 15_000;
 export type WatchedStartFailure = {
   message: string;
   retryable: boolean;
+  /**
+   * The step that ends a refusal elsewhere — a lapsed organization plan opens
+   * its billing screen — when the reader can take it. A retryable failure has
+   * a recovery control already, so only a terminal refusal carries one, and
+   * the feedback renders it under the copy through `RefusalStatus`.
+   */
+  action?: TrialRefusalAction;
 };
 
 /** The state a deadline-watched start exposes to its screen. */

@@ -4,25 +4,26 @@ import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, type TextInput, View, type ViewStyle } from 'react-native';
+import { Pressable, View, type ViewStyle } from 'react-native';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
-import { Search, X } from '@/components/ui/icons';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Search } from '@/components/ui/icons';
+import { RowChevron } from '@/components/ui/row-chevron';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { SearchField } from '@/components/ui/search-field';
 import { Text } from '@/components/ui/text';
-import { FIELD_CLEAR_BOX_CLASS, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
+import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import {
   providerKeyNewHref,
   type ProviderKeyScope,
   providerKeyScope,
   providerKeyScopeInput,
 } from '@/lib/byok/provider-key-scope';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -32,25 +33,23 @@ type ProviderOption = inferRouterOutputs<MobileRouter>['byok']['listProviders'][
 const ID_FOLD_LOCALE = 'en';
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = {
-  flexGrow: 1,
-  paddingHorizontal: 16,
-  paddingTop: 12,
-} satisfies ViewStyle;
 
-const PROVIDER_ROW_SEPARATOR = () => <View className="h-px bg-border" />;
 const SKELETON_ROWS = [0, 1, 2, 3, 4, 5];
 
 function ProviderRow({
   provider,
   scope,
-}: Readonly<{ provider: ProviderOption; scope: ProviderKeyScope }>) {
+  last,
+}: Readonly<{ provider: ProviderOption; scope: ProviderKeyScope; last: boolean }>) {
   const router = useRouter();
-  const colors = useThemeColors();
 
   return (
     <Pressable
-      className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-3 py-3 active:opacity-70')}
+      className={cn(
+        ROW_TARGET_CLASS,
+        'flex-row items-center gap-3 px-4 py-3 active:opacity-70',
+        !last && 'border-b-[0.5px] border-hair-soft'
+      )}
       accessibilityRole="button"
       accessibilityLabel={provider.name}
       onPress={() => {
@@ -60,7 +59,7 @@ function ProviderRow({
       <Text className="min-w-0 flex-1 text-sm text-foreground" numberOfLines={1}>
         {provider.name}
       </Text>
-      <DirectionalChevronRight size={14} color={colors.mutedForeground} />
+      <RowChevron />
     </Pressable>
   );
 }
@@ -78,9 +77,8 @@ export function ProviderKeyProviderPickerScreen({
   organizationId,
 }: Readonly<{ organizationId?: string }>) {
   const { t, i18n } = useTranslation();
+  const sideInsetStyle = useSideInsetStyle();
   const trpc = useTRPC();
-  const colors = useThemeColors();
-  const inputRef = useRef<TextInput>(null);
   const listRef = useRef<FlashListRef<ProviderOption>>(null);
   const [query, setQuery] = useState('');
   const scope = providerKeyScope(organizationId);
@@ -114,19 +112,21 @@ export function ProviderKeyProviderPickerScreen({
   }, [query]);
 
   const renderItem = useCallback(
-    ({ item }: { item: ProviderOption | undefined }) =>
+    ({ item, index }: { item: ProviderOption | undefined; index: number }) =>
       // A stale index past the end of the rows (the model picker's renderItem
       // carries the same guard for the same reason).
-      item ? <ProviderRow provider={item} scope={scope} /> : null,
-    [scope]
+      item ? (
+        <ProviderRow provider={item} scope={scope} last={index === filtered.length - 1} />
+      ) : null,
+    [scope, filtered.length]
   );
 
   let body: ReactNode = null;
   if (providers.isPending) {
     body = (
-      <View className="gap-2 px-4 pt-3">
+      <View>
         {SKELETON_ROWS.map(row => (
-          <Skeleton key={row} className="h-11 rounded-lg" />
+          <RowSkeleton key={row} />
         ))}
       </View>
     );
@@ -144,6 +144,7 @@ export function ProviderKeyProviderPickerScreen({
     body = (
       <EmptyState
         placement="top"
+        inset="gutter"
         icon={Search}
         title={t('profile.providerKeys.noProvidersTitle')}
         description={t('profile.providerKeys.noProvidersDescription')}
@@ -161,8 +162,6 @@ export function ProviderKeyProviderPickerScreen({
         maintainVisibleContentPosition={{ disabled: true }}
         renderItem={renderItem}
         getItemType={() => 'provider'}
-        ItemSeparatorComponent={PROVIDER_ROW_SEPARATOR}
-        contentContainerStyle={listContentContainerStyle}
         {...SEARCHABLE_PICKER_LIST_PROPS}
       />
     );
@@ -174,41 +173,18 @@ export function ProviderKeyProviderPickerScreen({
         title={t('profile.providerKeys.chooseProvider')}
         backFallback={PROFILE_TAB_HREF}
       />
-      <View className="pb-1 pt-2 px-[16px]">
-        {/* px-[16px], not px-4: the app's inlineRem is 14, so px-4 is 14 and the
-            list rows' `paddingHorizontal: 16` would leave this box 2 wider on
-            each side than the rows it sits above. */}
-        <View className="min-h-[44px] flex-row items-center gap-2 rounded-lg bg-secondary px-3">
-          <Search size={18} color={colors.mutedForeground} />
-          <Input
-            ref={inputRef}
-            // The row owns the inset on both sides, so the field itself adds
-            // none: a physical inset here pushed the field past its box in
-            // right-to-left layouts, where the row's children swap sides.
-            className="min-w-0 flex-1 pl-0 pr-0"
+      <View className="flex-1" style={sideInsetStyle}>
+        <View className={cn(SCREEN_GUTTER_CLASS, 'pb-1 pt-2')}>
+          {/* The page gutter, not a hand-picked inset: the field's edges sit on
+              the same 14pt line as the rows below it. */}
+          <SearchField
             placeholder={t('profile.providerKeys.searchProviders')}
-            accessibilityLabel={t('profile.providerKeys.searchProviders')}
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="search"
+            hasText={query !== ''}
             onChangeText={setQuery}
           />
-          {query === '' ? null : (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t('common.clearSearch')}
-              className={cn(FIELD_CLEAR_BOX_CLASS, '-me-3 active:opacity-70')}
-              onPress={() => {
-                setQuery('');
-                inputRef.current?.clear();
-              }}
-            >
-              <X size={16} color={colors.mutedForeground} />
-            </Pressable>
-          )}
         </View>
+        {body}
       </View>
-      {body}
     </View>
   );
 }

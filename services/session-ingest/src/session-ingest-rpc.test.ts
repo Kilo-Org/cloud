@@ -80,6 +80,8 @@ import {
   validateCloudAgentRootSessionsCursor,
   validateCloudAgentWorkspacesCursor,
   validateKiloSdkMessagesCursor,
+  type CanGenerateTitleForCloudAgentParams,
+  type SetGeneratedTitleForCloudAgentParams,
 } from '@kilocode/session-ingest-contracts';
 import { desc, gte, isNotNull, lt, or, sql, SQL } from 'drizzle-orm';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
@@ -101,9 +103,10 @@ describe('publishCloudAgentSessionStatus', () => {
   const ctx = { waitUntil: vi.fn() } as unknown as ExecutionContext;
   const env = { HYPERDRIVE: { connectionString: 'postgres://unused' } };
 
-  it('forwards only the validated status projection with an immutable runtime-owner fence', async () => {
+  it('forwards only the validated status projection and rename with an immutable runtime-owner fence', async () => {
     const rpc = new SessionIngestRPC(ctx, env as never);
-    await rpc.publishCloudAgentSessionStatus(input);
+    const rename = { title: 'Renamed by the agent', transitionId: input.transitionId };
+    await rpc.publishCloudAgentSessionStatus({ ...input, rename });
     expect(applyMetadataChanges).toHaveBeenCalledWith(
       env,
       input.kiloUserId,
@@ -114,7 +117,8 @@ describe('publishCloudAgentSessionStatus', () => {
         ['statusTransitionId', input.transitionId],
       ]),
       ctx,
-      input.cloudAgentSessionId
+      input.cloudAgentSessionId,
+      rename
     );
   });
 
@@ -1085,7 +1089,8 @@ describe('setGeneratedTitleForCloudAgent', () => {
         rpc.setGeneratedTitleForCloudAgent({
           sessionId: badSessionId,
           kiloUserId: 'usr_owner',
-          cloudAgentSessionId: badCloudId,
+          cloudAgentSessionId:
+            badCloudId as SetGeneratedTitleForCloudAgentParams['cloudAgentSessionId'],
           title,
         })
       ).rejects.toThrow();
@@ -1112,12 +1117,8 @@ describe('canGenerateTitleForCloudAgent', () => {
   };
 
   function makeParams(
-    overrides: Partial<{
-      sessionId: string;
-      kiloUserId: string;
-      cloudAgentSessionId: string;
-    }> = {}
-  ) {
+    overrides: Partial<CanGenerateTitleForCloudAgentParams> = {}
+  ): CanGenerateTitleForCloudAgentParams {
     return { sessionId, kiloUserId, cloudAgentSessionId, ...overrides };
   }
 
@@ -1299,7 +1300,11 @@ describe('canGenerateTitleForCloudAgent', () => {
 
     await expect(
       rpc.canGenerateTitleForCloudAgent(
-        makeParams({ sessionId: badSessionId, cloudAgentSessionId: badCloudId })
+        makeParams({
+          sessionId: badSessionId,
+          cloudAgentSessionId:
+            badCloudId as CanGenerateTitleForCloudAgentParams['cloudAgentSessionId'],
+        })
       )
     ).rejects.toThrow();
 

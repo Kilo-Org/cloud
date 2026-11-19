@@ -15,6 +15,7 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/icons', () => ({
   Check: 'Check',
   ChevronDown: 'ChevronDown',

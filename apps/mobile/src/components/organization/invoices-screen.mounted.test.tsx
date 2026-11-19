@@ -15,7 +15,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/render-with-providers';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { OrganizationInvoicesScreen } from './invoices-screen';
 
 const pageQuery = vi.hoisted(() => ({
@@ -33,6 +33,7 @@ const pageQuery = vi.hoisted(() => ({
 const pageHook = vi.hoisted(() => ({
   entries: [] as unknown[],
   hasMore: false,
+  isRetentionLimited: false,
 }));
 
 const queryErrors = vi.hoisted(() => ({
@@ -40,6 +41,30 @@ const queryErrors = vi.hoisted(() => ({
 }));
 
 const connectivity = vi.hoisted(() => ({ value: 'online' as 'online' | 'offline' | 'unknown' }));
+
+// The organization the boundary resolves to, and whether its membership read is
+// still running. The header contract is driven through both, and through a
+// settled state where the selection resolves to nothing.
+const boundaryState = vi.hoisted(() => ({
+  isResolving: false,
+  organizationName: 'Acme Corp',
+  organizationId: 'org-1' as string | null,
+  hasOrg: true,
+}));
+
+// Props each header boundary was rendered with: the boundary's own header and
+// the shared list header, which the resolved screen paints.
+const boundaryProps = vi.hoisted(() => ({
+  rendered: [] as { title?: string; reserveEyebrow?: boolean }[],
+}));
+
+const screenHeaders = vi.hoisted(() => ({
+  rendered: [] as {
+    title?: string;
+    eyebrow?: string;
+    reserveEyebrow?: boolean;
+  }[],
+}));
 
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   getCommittedConnectivityStatus: () => connectivity.value,
@@ -58,15 +83,22 @@ const buttons = vi.hoisted(() => ({
 
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   useOrgBoundary: () => ({
-    organizationId: 'org-1',
+    organizationId: boundaryState.organizationId,
     role: 'owner',
-    org: { organizationId: 'org-1', role: 'owner' },
-    isResolving: false,
+    org: boundaryState.hasOrg
+      ? {
+          organizationId: 'org-1',
+          role: 'owner',
+          organizationName: boundaryState.organizationName,
+        }
+      : undefined,
+    isResolving: boundaryState.isResolving,
   }),
   useOrgInvoicesPage: () => ({
     query: pageQuery,
     entries: pageHook.entries,
     hasMore: pageHook.hasMore,
+    isRetentionLimited: pageHook.isRetentionLimited,
   }),
 }));
 
@@ -104,6 +136,7 @@ vi.mock('@/lib/utils', () => ({
 }));
 
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   EmptyState: (props: { title: string; placement?: string }) =>
     createElement('EmptyState', props, `EMPTY_STATE:${props.title}`),
 }));
@@ -116,10 +149,18 @@ vi.mock('@/components/query-error', () => ({
 }));
 
 vi.mock('@/components/organization/organization-boundary', () => ({
-  OrganizationBoundary: () => null,
+  OrganizationBoundary: (props: { title?: string; reserveEyebrow?: boolean }) => {
+    boundaryProps.rendered.push(props);
+    return null;
+  },
 }));
 
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
+vi.mock('@/components/screen-header', () => ({
+  ScreenHeader: (props: { title?: string; eyebrow?: string; reserveEyebrow?: boolean }) => {
+    screenHeaders.rendered.push(props);
+    return null;
+  },
+}));
 
 vi.mock('@/components/ui/button', () => ({
   Button: (props: {
@@ -220,8 +261,15 @@ beforeEach(() => {
   pageQuery.fetchNextPage.mockClear();
   pageHook.entries = [];
   pageHook.hasMore = false;
+  pageHook.isRetentionLimited = false;
   queryErrors.errors = [];
   buttons.rendered = [];
+  boundaryState.isResolving = false;
+  boundaryState.organizationName = 'Acme Corp';
+  boundaryState.organizationId = 'org-1';
+  boundaryState.hasOrg = true;
+  boundaryProps.rendered = [];
+  screenHeaders.rendered = [];
 });
 
 describe('OrganizationInvoicesScreen status badges', () => {
@@ -441,5 +489,94 @@ describe('OrganizationInvoicesScreen pagination', () => {
     expect(texts).toContain('Older invoices are available.');
     expect(texts).not.toContain("Couldn't load more");
     expect(buttons.rendered.some(button => button.accessibilityLabel === 'Load more')).toBe(true);
+  });
+});
+
+describe('OrganizationInvoicesScreen header', () => {
+  it('titles the loaded header with the organization name and keeps the screen name as its eyebrow', async () => {
+    pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: null, hasMore: false }] };
+    pageHook.entries = [INVOICE];
+
+    await renderScreen();
+
+    expect(screenHeaders.rendered).toHaveLength(1);
+    expect(screenHeaders.rendered[0]?.title).toBe('Acme Corp');
+    expect(screenHeaders.rendered[0]?.eyebrow).toBe(i18n.t('organization.invoices.title'));
+    expect(screenHeaders.rendered[0]?.reserveEyebrow).toBeUndefined();
+  });
+
+  it('reserves the eyebrow line on the boundary so the header keeps its height before the name arrives', async () => {
+    boundaryState.isResolving = true;
+
+    await renderScreen();
+
+    // The list header is not painted yet: the boundary owns the header while the
+    // membership read resolves, and it reserves the eyebrow line for the label
+    // the resolved screen fills in.
+    expect(screenHeaders.rendered).toHaveLength(0);
+    expect(boundaryProps.rendered).toHaveLength(1);
+    expect(boundaryProps.rendered[0]?.title).toBe(i18n.t('organization.invoices.title'));
+    expect(boundaryProps.rendered[0]?.reserveEyebrow).toBe(true);
+    // The reserve needs no label of its own: the eyebrow variant holds one line
+    // box for every script (`EYEBROW_LINE_HEIGHT_DP`), so the boundary hands the
+    // header its reserve alone and the swap cannot grow it.
+    expect(boundaryProps.rendered[0]).not.toHaveProperty('eyebrow');
+  });
+
+  it('does not reserve the eyebrow line on a settled boundary state that never fills it', async () => {
+    boundaryState.isResolving = false;
+    boundaryState.organizationId = null;
+    boundaryState.hasOrg = false;
+
+    await renderScreen();
+
+    // The boundary owns the header here too, but no resolved header will ever
+    // paint an eyebrow into the reserved line, so the state keeps its own
+    // height instead of being permanently one line taller.
+    expect(screenHeaders.rendered).toHaveLength(0);
+    expect(boundaryProps.rendered).toHaveLength(1);
+    expect(boundaryProps.rendered[0]?.title).toBe(i18n.t('organization.invoices.title'));
+    expect(boundaryProps.rendered[0]?.reserveEyebrow).not.toBe(true);
+  });
+});
+
+describe('OrganizationInvoicesScreen retention-limit footer', () => {
+  it('names the retention bound with no Load more at the bound', async () => {
+    pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: null, hasMore: false }] };
+    pageHook.entries = [INVOICE];
+    pageHook.isRetentionLimited = true;
+
+    const texts = await renderScreen();
+
+    expect(texts).toContain('INV-0001');
+    expect(texts).toContain(i18n.t('organization.invoices.retentionLimit'));
+    expect(texts).not.toContain('Older invoices are available.');
+    expect(buttons.rendered.some(button => button.accessibilityLabel === 'Load more')).toBe(false);
+  });
+
+  it('keeps the truncated note and Load more below the bound', async () => {
+    pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: 'inv-1', hasMore: true }] };
+    pageHook.entries = [INVOICE];
+    pageHook.hasMore = true;
+
+    const texts = await renderScreen();
+
+    expect(texts).toContain('Older invoices are available.');
+    expect(texts).not.toContain(i18n.t('organization.invoices.retentionLimit'));
+    expect(buttons.rendered.some(button => button.accessibilityLabel === 'Load more')).toBe(true);
+  });
+
+  it('never renders the two notes together when the impossible flag pairing is forced', async () => {
+    // The hooks can never return the bound flag next to `hasMore: true`, so
+    // force the pairing from the mock side and hold the footer to one note.
+    pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: 'inv-1', hasMore: true }] };
+    pageHook.entries = [INVOICE];
+    pageHook.hasMore = true;
+    pageHook.isRetentionLimited = true;
+
+    const texts = await renderScreen();
+
+    expect(texts).not.toContain(i18n.t('organization.invoices.retentionLimit'));
+    expect(texts).toContain('Older invoices are available.');
   });
 });

@@ -32,6 +32,12 @@ export type ProbeNode = Readonly<{
   label?: string;
   role?: string;
   pressable?: true;
+  /**
+   * The field declares `editable={false}`: read-only text the platform still
+   * lets the reader select, and a `TextInput` carries its own press handler to
+   * start that selection. It is a text surface, not a control.
+   */
+  readOnly?: true;
   hitSlop?: Insets;
   lines?: number;
   screenState?: number;
@@ -207,6 +213,7 @@ function describe(element: Element, parent: number, viewport: Offset): ProbeNode
     pressable: PRESS_HANDLERS.some(key => typeof field(props, key) === 'function')
       ? true
       : undefined,
+    readOnly: field(props, 'editable') === false ? true : undefined,
     hitSlop: insets(field(props, 'hitSlop')),
     lines: lines !== undefined && lines > 0 ? lines : undefined,
     screenState: finite(field(props, 'activityState')),

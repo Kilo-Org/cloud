@@ -48,12 +48,7 @@ export type EffectiveOrganizationModelPolicy = {
 export type EffectiveModelDecision = {
   allowed: boolean;
   eligibleProviderRoutes?: ReadonlySet<string>;
-  denialSource?:
-    | 'organization_model'
-    | 'organization_provider'
-    | 'group_model'
-    | 'group_provider'
-    | 'no_grant';
+  denialSource?: 'organization_model' | 'organization_provider' | 'no_grant';
 };
 
 export function evaluateEffectiveModelAccessPolicy(
@@ -184,12 +179,15 @@ export async function getEffectiveModelDecision(
     ? new Set(policy.organizationProviderCeiling)
     : undefined;
 
+  const resolveModelProviders = async () =>
+    currentModelProviders ?? (await providerLookup(modelId));
+
   async function decisionWithinOrganizationBaseline(): Promise<EffectiveModelDecision> {
     if (policy.organizationModelDenyList.includes(normalizedModelId)) {
       return { allowed: false, denialSource: 'organization_model' };
     }
     if (!organizationRoutes) return { allowed: true };
-    const modelProviders = currentModelProviders ?? (await providerLookup(modelId));
+    const modelProviders = await resolveModelProviders();
     if (modelProviders.size === 0) {
       return { allowed: false, denialSource: 'organization_model' };
     }
@@ -202,13 +200,13 @@ export async function getEffectiveModelDecision(
   if (policy.memberGrant.mode === 'organization_baseline') {
     return await decisionWithinOrganizationBaseline();
   }
-  // A group policy that selects models and providers sets the access of its own
-  // members.
   if (policy.memberGrant.modelAllowList.includes(normalizedModelId)) {
     return { allowed: true };
   }
   if (policy.memberGrant.providerAllowList.length > 0) {
-    const modelProviders = currentModelProviders ?? (await providerLookup(modelId));
+    // An empty provider set produces no eligible routes here, so the branch falls
+    // through to the organization-baseline check or `no_grant` on purpose.
+    const modelProviders = await resolveModelProviders();
     const memberProviders = new Set(policy.memberGrant.providerAllowList);
     const eligibleProviderRoutes = getEligibleProviderRoutes(modelProviders, memberProviders);
     if (eligibleProviderRoutes.size > 0) {

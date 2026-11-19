@@ -36,6 +36,23 @@ const displayField = z
   .refine(hasVisibleGlyph, 'must not contain only invisible characters');
 
 /**
+ * The client identifier the requester is held to. Unlike the displayed fields,
+ * the stored value is compared byte-for-byte against the identifier the OAuth
+ * flow carries (the pairing echo and the approval confirmation), so a value
+ * the display normalization would change — a layout format control, a control
+ * character, or leading or trailing whitespace — is refused with a definite
+ * 400 instead of pairing one identifier and confirming another. The check runs
+ * on the untouched value, before any normalization.
+ */
+const clientIdField = z
+  .string()
+  .refine(
+    value => value.trim() === value && sessionDisplayLine(value) === value,
+    'must not contain characters its display normalization would change'
+  )
+  .pipe(displayField);
+
+/**
  * Schemes a browser handles itself. A bare scheme is only accepted for a native
  * app that takes the code without a host, never for one of these.
  */
@@ -84,7 +101,7 @@ function redirectOriginFor(url: URL): string {
 
 /** The `requesting_client` member of `POST /api/device-auth/codes`. */
 export const requestingClientSchema = z.object({
-  client_id: displayField,
+  client_id: clientIdField,
   client_name: displayField,
   redirect_origin: displayField.refine(
     isRedirectOrigin,

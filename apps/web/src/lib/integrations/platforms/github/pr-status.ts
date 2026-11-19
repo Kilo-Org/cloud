@@ -4,6 +4,9 @@ import { Octokit } from '@octokit/rest';
 import { z } from 'zod';
 import {
   generateGitHubInstallationToken,
+  graphQlEnvelopeSchema,
+  graphQlRateLimitError,
+  isRateLimitGraphQlError,
   toGitHubRateLimitError,
   type AssociatedPullRequest,
   type GitHubAppType,
@@ -25,13 +28,6 @@ const PAGE_SIZE = 100;
 // Two pages hold the 200-observation state cap without reading history nobody
 // can persist.
 const MAX_PAGES = 2;
-// GraphQL reports rate limiting in a HTTP 200 body; scan every entry because
-// the limiting error is not guaranteed to be first.
-const GRAPHQL_RATE_LIMIT_CODES = new Set([
-  'RATE_LIMITED',
-  'SECONDARY_RATE_LIMIT',
-  'ABUSE_DETECTION',
-]);
 
 export type PullRequestObservationMetadata = AssociatedPullRequest & {
   baseSha?: string;
@@ -136,11 +132,6 @@ const reviewDataSchema = z.object({
     .nullable(),
 });
 
-const graphQlResponseSchema = z.object({
-  data: z.unknown().optional(),
-  errors: z.array(z.unknown()).optional(),
-});
-
 const REVIEW_THREADS_QUERY = /* GraphQL */ `
   query PrObservationReviewThreads($owner: String!, $name: String!, $number: Int!, $after: String) {
     repository(owner: $owner, name: $name) {
@@ -191,28 +182,6 @@ function recordRateLimit(state: RateLimitState, error: unknown): GitHubRateLimit
     state.error = rateError;
   }
   return rateError;
-}
-
-function isRateLimitGraphQlError(entry: unknown): boolean {
-  if (!isRecord(entry)) return false;
-  const codes: unknown[] = [entry.type];
-  if (isRecord(entry.extensions)) codes.push(entry.extensions.code);
-  return codes.some(
-    code => typeof code === 'string' && GRAPHQL_RATE_LIMIT_CODES.has(code.toUpperCase())
-  );
-}
-
-/**
- * GraphQL answers rate limits with HTTP 200, so there are no rate headers to
- * classify. Reuse the adapter's header parser against a synthetic 429 carrying
- * the response's actual headers to keep one deadline rule.
- */
-function graphQlRateLimitError(headers: unknown): GitHubRateLimitError | null {
-  return toGitHubRateLimitError({
-    status: 429,
-    message: 'GitHub GraphQL rate limit',
-    response: { headers },
-  });
 }
 
 async function collectRestPages<T>(
@@ -269,7 +238,7 @@ async function fetchReviewPage(
     throw rateError ?? error;
   }
 
-  const body = graphQlResponseSchema.safeParse(response.data);
+  const body = graphQlEnvelopeSchema.safeParse(response.data);
   if (!body.success) {
     throw new Error('GitHub returned an invalid GraphQL response for pull request reviews');
   }

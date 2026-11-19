@@ -1,4 +1,5 @@
 import { withTimeout } from '@kilocode/worker-utils';
+import type { CanGenerateTitleForCloudAgentParams } from '@kilocode/session-ingest-contracts';
 import { z } from 'zod';
 import { logger } from '../logger.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
@@ -65,10 +66,13 @@ export async function generateSessionTitle(
   if (!prompt) return;
 
   const log = logger.withFields({ sessionId: metadata.identity.sessionId });
-  const session = {
+  // The Worker's strict contract parse rejects a malformed id; metadata keeps
+  // the historical `string` shape because it also holds legacy `agent_` ids.
+  const session: CanGenerateTitleForCloudAgentParams = {
     sessionId,
     kiloUserId: metadata.identity.userId,
-    cloudAgentSessionId: metadata.identity.sessionId,
+    cloudAgentSessionId: metadata.identity
+      .sessionId as CanGenerateTitleForCloudAgentParams['cloudAgentSessionId'],
   };
   try {
     const eligible = await withTimeout(

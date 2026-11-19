@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
+import { rejects } from 'node:assert/strict';
 import { createKilo2Harness } from './kilo2-harness.js';
 import { createKilo2Lifecycle } from './kilo2-lifecycle.js';
 import { DrainSessionError } from '../kilo-api.js';
@@ -41,13 +42,140 @@ function startStub(handle: (request: Request, url: URL, requests: RecordedReques
   return { url: server.url.toString(), requests };
 }
 
-function createHarness(serverUrl: string) {
+function withModelCatalog(
+  handle: Parameters<typeof startStub>[0]
+): Parameters<typeof startStub>[0] {
+  return (request, url, requests) =>
+    url.pathname === '/api/model'
+      ? Response.json({ data: [{ providerID: 'kilo', id: 'test-model' }] })
+      : handle(request, url, requests);
+}
+
+function createHarness(
+  serverUrl: string,
+  wait?: (ms: number, signal?: AbortSignal) => Promise<void>
+) {
   return createKilo2Harness({
     server: { url: serverUrl, authorization: 'Basic harness-test' },
     directory,
     lifecycle: createKilo2Lifecycle(),
+    wait,
   });
 }
+
+describe('Kilo v2 model lookup before native model calls', () => {
+  const input = {
+    sessionId: `ses_${'a'.repeat(26)}`,
+    directory,
+    messageId: `msg_${'b'.repeat(26)}`,
+    model: 'test-model',
+    prompt: 'hello',
+  };
+
+  it.each([
+    { readyOn: 1, delays: [] },
+    { readyOn: 3, delays: [1000, 2000] },
+    { readyOn: 7, delays: [1000, 2000, 2000, 2000, 2000, 3000] },
+    {
+      readyOn: Infinity,
+      delays: [1000, 2000, 2000, 2000, 2000, 3000, 3000, 3000, 3000, 3000, 3000, 3000],
+    },
+  ])('submits once after model lookup (ready on $readyOn)', async ({ readyOn, delays }) => {
+    let reads = 0;
+    const waits: number[] = [];
+    const { url, requests } = startStub((_request, url) => {
+      if (url.pathname !== '/api/model') return new Response(null, { status: 204 });
+      return Response.json({
+        data: [{ providerID: ++reads >= readyOn ? 'kilo' : 'other', id: input.model }],
+      });
+    });
+    const harness = createHarness(url, async ms => {
+      waits.push(ms);
+    });
+    await harness.submit(input);
+
+    expect(waits).toEqual([...delays]);
+    expect(reads).toBe(delays.length + 1);
+    expect(
+      requests
+        .filter(request => request.pathname === '/api/model')
+        .every(request => request.directory === directory)
+    ).toBe(true);
+    expect(requests.filter(request => request.pathname.endsWith('/prompt'))).toHaveLength(1);
+    expect(requests.at(-1)?.body).toMatchObject({ id: input.messageId, text: input.prompt });
+
+    // The location has started; a later turn neither looks up nor waits again.
+    await harness.submit({ ...input, messageId: `msg_${'c'.repeat(26)}`, model: 'other-model' });
+    expect(waits).toEqual([...delays]);
+    expect(reads).toBe(delays.length + 1);
+    expect(requests.filter(request => request.pathname.endsWith('/prompt'))).toHaveLength(2);
+  });
+
+  it.each(['command', 'compact'] as const)(
+    'waits for the model before the native %s call',
+    async operation => {
+      let reads = 0;
+      const waits: number[] = [];
+      const { url, requests } = startStub((_request, url) => {
+        if (url.pathname === '/api/model')
+          return Response.json({
+            data: [{ providerID: ++reads >= 2 ? 'kilo' : 'other', id: input.model }],
+          });
+        if (url.pathname.includes('/message/'))
+          return Response.json({
+            data: { id: input.messageId, type: 'compaction', status: 'completed' },
+          });
+        return new Response(null, { status: 204 });
+      });
+      const harness = createHarness(url, async ms => {
+        waits.push(ms);
+      });
+      const session = {
+        sessionId: input.sessionId,
+        directory,
+        messageId: input.messageId,
+        model: input.model,
+      };
+      if (operation === 'command') await harness.command({ ...session, command: 'review' });
+      else expect(await harness.compact(session)).toBe('executed');
+
+      expect(waits).toEqual([1000]);
+      const paths = requests.map(request => request.pathname);
+      expect(paths.lastIndexOf('/api/model')).toBeLessThan(
+        paths.indexOf(`/api/session/${input.sessionId}/${operation}`)
+      );
+    }
+  );
+
+  it('does not retry a catalog request failure or submit a prompt', async () => {
+    const { url, requests } = startStub(
+      (_request, url) =>
+        new Response(null, {
+          status: url.pathname === '/api/model' ? 503 : 204,
+        })
+    );
+    await rejects(createHarness(url).submit(input), /HTTP 503/);
+    expect(requests.filter(request => request.pathname === '/api/model')).toHaveLength(1);
+    expect(requests.some(request => request.pathname.endsWith('/prompt'))).toBe(false);
+  });
+
+  it('cancels during the model retry wait without submitting a prompt', async () => {
+    const controller = new AbortController();
+    const { url, requests } = startStub((_request, url) =>
+      url.pathname === '/api/model'
+        ? Response.json({ data: [] })
+        : new Response(null, { status: 204 })
+    );
+    const harness = createHarness(url, async (_ms, signal) => {
+      expect(signal).toBe(controller.signal);
+      controller.abort(new Error('Stopped'));
+      signal?.throwIfAborted();
+    });
+    await rejects(harness.submit({ ...input, signal: controller.signal }), /Stopped/);
+    expect(requests.filter(request => request.pathname === '/api/model')).toHaveLength(1);
+    expect(requests.some(request => request.pathname.endsWith('/prompt'))).toBe(false);
+  });
+});
 
 function statusResponse(status: string, error?: string) {
   return Response.json({
@@ -258,12 +386,14 @@ describe('Kilo v2 harness compaction', () => {
   it.each([204, 409].flatMap(status => terminalResults.map(result => ({ status, result }))))(
     'preserves the Cloud message id and accepts %j',
     async ({ status, result }) => {
-      const { url, requests } = startStub((_request, url) => {
-        if (url.pathname.endsWith('/compact')) return new Response(null, { status });
-        return url.pathname.includes('/message/')
-          ? Response.json({ data: { id: messageId, ...result } })
-          : new Response(null, { status: 204 });
-      });
+      const { url, requests } = startStub(
+        withModelCatalog((_request, url) => {
+          if (url.pathname.endsWith('/compact')) return new Response(null, { status });
+          return url.pathname.includes('/message/')
+            ? Response.json({ data: { id: messageId, ...result } })
+            : new Response(null, { status: 204 });
+        })
+      );
 
       expect(await createHarness(url).compact(input)).toBe(
         status === 409 ? 'replayed' : 'executed'
@@ -274,6 +404,7 @@ describe('Kilo v2 harness compaction', () => {
           `/api/session/${sessionId}/model`,
           { model: { providerID: 'kilo', id: input.model } },
         ],
+        ['GET', '/api/model', undefined],
         [
           'PUT',
           `/api/experimental/session/${sessionId}/instructions/entries/cloud-agent-context`,
@@ -293,10 +424,12 @@ describe('Kilo v2 harness compaction', () => {
     { message: 'Unknown compaction error' },
     undefined,
   ])('keeps real compaction failures failing: %j', async error => {
-    const { url } = startStub((_request, url) =>
-      url.pathname.includes('/message/')
-        ? Response.json({ data: { id: messageId, type: 'compaction', status: 'failed', error } })
-        : new Response(null, { status: 204 })
+    const { url } = startStub(
+      withModelCatalog((_request, url) =>
+        url.pathname.includes('/message/')
+          ? Response.json({ data: { id: messageId, type: 'compaction', status: 'failed', error } })
+          : new Response(null, { status: 204 })
+      )
     );
 
     const failure: unknown = await createHarness(url)
@@ -320,14 +453,16 @@ describe('Kilo v2 harness compaction', () => {
       error: { type: 'provider.error', message: 'Compaction failed' },
     },
   ])('rejects a conflicting ID without a matching successful compaction: %j', async result => {
-    const { url } = startStub((_request, url) => {
-      if (url.pathname.endsWith('/compact')) return new Response(null, { status: 409 });
-      if (url.pathname.includes('/message/'))
-        return result === undefined
-          ? new Response(null, { status: 404 })
-          : Response.json({ data: result });
-      return new Response(null, { status: 204 });
-    });
+    const { url } = startStub(
+      withModelCatalog((_request, url) => {
+        if (url.pathname.endsWith('/compact')) return new Response(null, { status: 409 });
+        if (url.pathname.includes('/message/'))
+          return result === undefined
+            ? new Response(null, { status: 404 })
+            : Response.json({ data: result });
+        return new Response(null, { status: 204 });
+      })
+    );
     const failure: unknown = await createHarness(url)
       .compact(input)
       .catch(error => error);
@@ -336,8 +471,10 @@ describe('Kilo v2 harness compaction', () => {
 
   it('does not recover other compact admission failures', async () => {
     const { url, requests } = startStub(
-      (_request, url) =>
-        new Response(null, { status: url.pathname.endsWith('/compact') ? 500 : 204 })
+      withModelCatalog(
+        (_request, url) =>
+          new Response(null, { status: url.pathname.endsWith('/compact') ? 500 : 204 })
+      )
     );
     const failure: unknown = await createHarness(url)
       .compact(input)
@@ -348,17 +485,19 @@ describe('Kilo v2 harness compaction', () => {
   });
 
   it('accepts empty finalization compaction using its own message id', async () => {
-    const { url, requests } = startStub((_request, url) =>
-      url.pathname.includes('/message/')
-        ? Response.json({
-            data: {
-              id: url.pathname.split('/').at(-1),
-              type: 'compaction',
-              status: 'failed',
-              error: { type: 'compaction.unavailable', message: 'Nothing to compact yet' },
-            },
-          })
-        : new Response(null, { status: 204 })
+    const { url, requests } = startStub(
+      withModelCatalog((_request, url) =>
+        url.pathname.includes('/message/')
+          ? Response.json({
+              data: {
+                id: url.pathname.split('/').at(-1),
+                type: 'compaction',
+                status: 'failed',
+                error: { type: 'compaction.unavailable', message: 'Nothing to compact yet' },
+              },
+            })
+          : new Response(null, { status: 204 })
+      )
     );
 
     expect(await createHarness(url).condense({ sessionId, directory, model: input.model })).toEqual(
@@ -551,16 +690,18 @@ describe('Kilo v2 harness MCP refresh', () => {
     async operation => {
       const sessionId = 'ses_non_prompt_context';
       const instructionPath = `/api/experimental/session/${sessionId}/instructions/entries/cloud-agent-context`;
-      const { url, requests } = startStub((_request, url) =>
-        url.pathname.includes('/message/')
-          ? Response.json({
-              data: {
-                id: url.pathname.split('/').at(-1),
-                type: 'compaction',
-                status: 'completed',
-              },
-            })
-          : new Response(null, { status: 204 })
+      const { url, requests } = startStub(
+        withModelCatalog((_request, url) =>
+          url.pathname.includes('/message/')
+            ? Response.json({
+                data: {
+                  id: url.pathname.split('/').at(-1),
+                  type: 'compaction',
+                  status: 'completed',
+                },
+              })
+            : new Response(null, { status: 204 })
+        )
       );
       await createHarness(url).submit({
         sessionId,
@@ -592,8 +733,10 @@ describe('Kilo v2 harness MCP refresh', () => {
     'does not run %s if the prior prompt context cannot be cleared',
     async operation => {
       const { url, requests } = startStub(
-        (_request, url) =>
-          new Response(null, { status: url.pathname.includes('/instructions/') ? 503 : 204 })
+        withModelCatalog(
+          (_request, url) =>
+            new Response(null, { status: url.pathname.includes('/instructions/') ? 503 : 204 })
+        )
       );
       const harness = createHarness(url);
       const input = {

@@ -182,10 +182,6 @@ function invalidateEvictedSessions(evictedSessionIds: string[]): void {
   }
 }
 
-/**
- * Create a new device session.
- * @returns the created session ID.
- */
 export async function createDeviceSession(params: {
   userId: string;
   userAgent?: string;
@@ -504,6 +500,41 @@ export async function createDeviceSessionWithAttestedKey(params: {
     const { sessionId, evictedSessionIds } = await insertDeviceSession(tx, {
       userId: params.userId,
       userAgent: params.userAgent,
+    });
+
+    const credentials = {
+      ...(await mintSessionCredentials(tx, params.user, sessionId)),
+      sessionId,
+    };
+
+    return { credentials, evictedSessionIds };
+  });
+
+  invalidateEvictedSessions(evictedSessionIds);
+
+  return credentials;
+}
+
+/**
+ * Create a device session and mint its credential pair in a single transaction.
+ *
+ * Minting the refresh token in the session's transaction means a mint failure
+ * cannot leave a committed session row without its refresh token. The cache of
+ * evicted sessions is invalidated only after the transaction commits.
+ *
+ * Returns the session ID and credential pair on success.
+ */
+export async function createDeviceSessionWithCredentials(params: {
+  userId: string;
+  userAgent?: string;
+  user: User;
+  deviceAuthRequestId?: string;
+}): Promise<{ token: string; refreshToken: string; expiresIn: number; sessionId: string }> {
+  const { credentials, evictedSessionIds } = await db.transaction(async tx => {
+    const { sessionId, evictedSessionIds } = await insertDeviceSession(tx, {
+      userId: params.userId,
+      userAgent: params.userAgent,
+      deviceAuthRequestId: params.deviceAuthRequestId,
     });
 
     const credentials = {

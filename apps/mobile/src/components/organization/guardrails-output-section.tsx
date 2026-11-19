@@ -52,12 +52,8 @@ export function OutputGuardrailsSection({
         onChange(current => ({ ...current, outputEnabled: next }));
       }}
     >
-      <Text className="text-xs text-muted-foreground">
-        {t('organizationGuardrails.detectorsHintOutput')}
-      </Text>
-      <Text className="text-xs text-muted-foreground">
-        {t('organizationGuardrails.blockingOutputNote')}
-      </Text>
+      <Text variant="caption">{t('organizationGuardrails.detectorsHintOutput')}</Text>
+      <Text variant="caption">{t('organizationGuardrails.blockingOutputNote')}</Text>
       {OUTPUT_DETECTOR_IDS.map(id => {
         const copy = OUTPUT_DETECTOR_COPY[id];
         return (

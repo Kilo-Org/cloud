@@ -12,7 +12,7 @@ import { ReasoningEffortSchema, refineVariantExclusivity, VariantSchema } from '
 import { addDuplicateKeyIssues } from './duplicate-keys';
 import { TaxonomyRouteKeySchema } from './taxonomy';
 import { AutoRouterSchema, DEFAULT_AUTO_ROUTER, type AutoRouter } from './router';
-import { OwnerTypeSchema } from './owner';
+import { OwnerIdentityShape } from './owner';
 import {
   POLICY_SETTING_VALUE_DEFAULTS,
   POLICY_SETTING_VALUE_SCHEMAS,
@@ -269,10 +269,10 @@ export const BenchmarkModelSummarySchema = z.object({
   routeAccuracy: z.number().min(0).max(1).nullable().default(null),
   // Mean tokens per graded case, as the CLI reports them on `step_finish`: input excludes cache
   // reads, output excludes reasoning. Null for summaries recorded before token capture.
-  avgInputTokens: z.number().nonnegative().nullable().optional(),
-  avgCachedInputTokens: z.number().nonnegative().nullable().optional(),
-  avgOutputTokens: z.number().nonnegative().nullable().optional(),
-  avgReasoningTokens: z.number().nonnegative().nullable().optional(),
+  avgInputTokens: z.number().nonnegative().nullable().default(null),
+  avgCachedInputTokens: z.number().nonnegative().nullable().default(null),
+  avgOutputTokens: z.number().nonnegative().nullable().default(null),
+  avgReasoningTokens: z.number().nonnegative().nullable().default(null),
 });
 export type BenchmarkModelSummary = z.infer<typeof BenchmarkModelSummarySchema>;
 
@@ -457,8 +457,7 @@ export type BenchmarkProfileEntryStatus = z.infer<typeof BenchmarkProfileEntrySt
 export const RegisterBenchmarkProfilesRequestSchema = z
   .object({
     router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
-    ownerType: OwnerTypeSchema,
-    ownerId: z.string().trim().min(1),
+    ...OwnerIdentityShape,
     entries: EfficientModelPoolSchema,
     // Subset of `entries` the owner explicitly retries after a terminal failure.
     // Absent/empty means no explicit retries (failed current profiles are reported
@@ -484,8 +483,7 @@ export type RegisterBenchmarkProfilesRequest = z.input<
 >;
 
 export const SyncBenchmarkSubscriptionsRequestSchema = z.object({
-  ownerType: OwnerTypeSchema,
-  ownerId: z.string().trim().min(1),
+  ...OwnerIdentityShape,
   entries: EfficientModelPoolSchema.nullable(),
   restorePrevious: z.boolean().optional(),
 });
@@ -501,8 +499,7 @@ export type SyncBenchmarkSubscriptionsRequest = z.infer<
 const OwnerScopedPoolRequestSchema = z
   .object({
     router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
-    ownerType: OwnerTypeSchema.optional(),
-    ownerId: z.string().trim().min(1).optional(),
+    ...z.object(OwnerIdentityShape).partial().shape,
     entries: EfficientModelPoolSchema,
   })
   .superRefine((request, ctx) => {

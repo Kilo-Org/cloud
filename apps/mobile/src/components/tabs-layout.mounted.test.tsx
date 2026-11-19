@@ -1,7 +1,11 @@
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { CountSurfaces, routerReplace } from '@/components/agents/agents-tab-badge.test-helpers';
+import {
+  CountSurfaces,
+  routerReplace,
+  segments,
+} from '@/components/agents/agents-tab-badge.test-helpers';
 import { i18n } from '@/i18n';
 import { type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -22,6 +26,7 @@ function screenOptions(renderer: Mount['renderer']) {
     tabBarHideOnKeyboard: boolean;
     tabBarShowLabel: boolean;
     tabBarStyle: { display?: string };
+    tabBarButton: (props: Record<string, unknown>) => ReactTestInstance;
   };
 }
 
@@ -32,10 +37,43 @@ describe('Tabs layout with the keyboard raised', () => {
   });
 
   afterEach(() => {
+    // Module-level state: the wiring test installs the sheet segments and must
+    // return the holder to its default however the test exits, or the remaining
+    // suites render the layout in a state they were not written for.
+    segments.current = ['(app)', '(tabs)', '(0_home)'];
     for (const result of mounts) {
       result.unmount();
     }
     mounts.length = 0;
+  });
+
+  // The wiring that hides the bar's entries under a presented form sheet: the
+  // layout decides from its own segments at render time, and the entry the
+  // navigator builds must carry the flag. Each state mounts fresh, because the
+  // layout reads the segments during render. Pinning the render-prop result
+  // keeps the device-proved behavior from silently regressing if the wiring is
+  // dropped or reordered.
+  it('hands the bar entries the form-sheet hiding flag from the current segments', async () => {
+    const idle = await renderWithProviders(createElement(CountSurfaces));
+    mounts.push(idle);
+    const idleOptions = screenOptions(idle.renderer);
+    expect(idleOptions.tabBarButton).toBeTypeOf('function');
+    // Home segments: no sheet presented, the entry stays readable. The render
+    // prop returns the `TabBarButton` element; its flag mapping to the native
+    // accessibility props is covered by `tab-bar-button.mounted.test.tsx`.
+    const idleEntry = idleOptions.tabBarButton({});
+    expect(idleEntry.props.hiddenFromA11y).toBe(false);
+    idle.unmount();
+    mounts.length = 0;
+
+    // The organization invite form sheet's segments: the entry hides itself
+    // with the covered scene's presentation.
+    segments.current = ['(app)', '(tabs)', '(3_profile)', 'organization', 'invite-member'];
+    const covered = await renderWithProviders(createElement(CountSurfaces));
+    mounts.push(covered);
+    const coveredOptions = screenOptions(covered.renderer);
+    const coveredEntry = coveredOptions.tabBarButton({});
+    expect(coveredEntry.props.hiddenFromA11y).toBe(true);
   });
 
   it('steps the whole bar out of the IME’s way instead of leaving a clipped icon strip', async () => {

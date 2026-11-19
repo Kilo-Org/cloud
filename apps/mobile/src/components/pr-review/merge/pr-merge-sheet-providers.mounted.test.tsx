@@ -62,9 +62,13 @@ describe('PrMergeSheet provider behavior', () => {
     expect(hosts(renderer, 'TextInput').map(node => node.props.accessibilityLabel)).toEqual([
       'Commit message',
     ]);
-    expect(hosts(renderer, 'Pressable').map(node => node.props.accessibilityLabel)).toEqual([
-      'Create a merge commit',
-    ]);
+    // The method picker is one labelled pressable per method; the delete-branch
+    // row adds an unlabelled one, which the filter leaves out.
+    expect(
+      hosts(renderer, 'Pressable')
+        .map(node => node.props.accessibilityLabel)
+        .filter(label => label !== undefined)
+    ).toEqual(['Create a merge commit']);
     await edit(renderer, 'Commit message', '  Bitbucket message  ');
     await submit(renderer);
     expect(state.merge.mutateAsync).toHaveBeenCalledExactlyOnceWith({

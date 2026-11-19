@@ -16,11 +16,28 @@ export function isWhitespaceOnlyMessage(message: Anthropic.MessageParam) {
   );
 }
 
+// removeWhitespaceOnlyMessages cannot reach a non-text-block breakpoint today, because its
+// whitespace check requires every block of the removed message to be whitespace text. The shared
+// predicate keeps this read in agreement with the write in preserveCacheControl for any caller.
 function findCacheControl(message: Anthropic.MessageParam) {
   if (!Array.isArray(message.content)) return undefined;
-  return message.content
-    .filter(block => block.type === 'text')
-    .findLast(block => block.cache_control)?.cache_control;
+  for (let index = message.content.length - 1; index >= 0; index -= 1) {
+    const block = message.content[index];
+    if (block && isCacheableMessagesContentBlock(block) && block.cache_control) {
+      return block.cache_control;
+    }
+  }
+  return undefined;
+}
+
+function withCacheControlOnBlock<T extends object>(
+  content: T[],
+  target: T,
+  cacheControl: Anthropic.CacheControlEphemeral
+): T[] {
+  return content.map(block =>
+    block === target ? { ...block, cache_control: cacheControl } : block
+  );
 }
 
 /** Carries a removed message's breakpoint without mutating the retained history. */
@@ -37,13 +54,19 @@ export function preserveCacheControl(
     };
   }
   if (!Array.isArray(previousMessage.content)) return previousMessage;
+  if (previousMessage.role === 'system') {
+    const target = previousMessage.content.at(-1);
+    if (!target || target.cache_control) return previousMessage;
+    return {
+      ...previousMessage,
+      content: withCacheControlOnBlock(previousMessage.content, target, cacheControl),
+    };
+  }
   const target = previousMessage.content.findLast(isCacheableMessagesContentBlock);
   if (!target || target.cache_control) return previousMessage;
   return {
     ...previousMessage,
-    content: previousMessage.content.map(block =>
-      block === target ? { ...block, cache_control: cacheControl } : block
-    ),
+    content: withCacheControlOnBlock(previousMessage.content, target, cacheControl),
   };
 }
 

@@ -76,6 +76,27 @@ describe('parseRoutingDetails', () => {
     });
   });
 
+  test('keeps an Enkrypt report whose scan failed open', () => {
+    const record = JSON.parse(productionRecord) as Record<string, unknown>;
+    const failedOpen = {
+      ...expectedEnkrypt,
+      verdict: 'fail_open',
+      scans: [
+        {
+          ...expectedEnkrypt.scans[0],
+          decision: 'error_fail_open',
+          error: 'http_503',
+          detectors_fired: [],
+          credits_cost: null,
+        },
+      ],
+    };
+
+    const parsed = parseRoutingDetails(JSON.stringify({ ...record, enkrypt: failedOpen }));
+
+    expect(parsed?.enkrypt).toEqual(failedOpen);
+  });
+
   test('drops an Enkrypt report from before scans were split into parts', () => {
     const record = JSON.parse(productionRecord) as Record<string, unknown>;
     const scan: Record<string, unknown> = { ...expectedEnkrypt.scans[0] };
@@ -494,6 +515,7 @@ describe('requestNotSentReason', () => {
   test.each([
     ['block', 191, 'enkrypt-block'],
     ['unavailable', 5_000, 'enkrypt-unavailable'],
+    ['fail_open', 5_000, null],
     ['allow', 191, null],
     ['skip', 0, null],
     ['allow', null, 'rejected-before-guardrail'],
@@ -512,5 +534,49 @@ describe('requestNotSentReason', () => {
 
   test('treats a request without the input guardrail as sent', () => {
     expect(requestNotSentReason({ enkrypt: null })).toBeNull();
+  });
+});
+
+describe('parseRoutingDetails for a partner', () => {
+  const record = (steps: unknown[]) =>
+    JSON.stringify({
+      schema_version: 1,
+      usage_id: '00000000-0000-4000-8000-000000000001',
+      created_at: '2026-11-04T13:32:13.604Z',
+      requested_model: 'moonshotai/kimi-k2.6',
+      api_kind: 'chat_completions',
+      owner_type: 'user',
+      steps,
+      byok_candidates: [],
+      result: {
+        kind: 'provider',
+        route: 'kilo',
+        provider_type: 'partner',
+        byok_provider_ids: [],
+        payer: 'kilo',
+        is_free: false,
+      },
+    });
+
+  test('keeps the partner fields on the kilo and partner steps', () => {
+    const steps = [
+      {
+        step: 'partner',
+        outcome: 'skipped',
+        partner_inference_provider: 'acme-ai',
+        reason: 'provider-settings',
+      },
+      {
+        step: 'kilo',
+        outcome: 'selected',
+        gateway: 'vercel',
+        bounded_spending: false,
+        kilo_ignored_providers: [],
+        partner_inference_provider: 'acme-ai',
+      },
+    ];
+
+    expect(parseRoutingDetails(record(steps))?.steps).toEqual(steps);
+    expect(parseRoutingDetails(record(steps))?.result).toMatchObject({ provider_type: 'partner' });
   });
 });

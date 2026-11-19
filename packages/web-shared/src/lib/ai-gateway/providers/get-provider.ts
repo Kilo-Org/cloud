@@ -73,10 +73,7 @@ import type {
 import { checkOpenAiChatGptByok } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import { checkClaudeBilling } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/routing';
 import { isKiloCatalogModelId } from '@kilocode/web-shared/lib/ai-gateway/byok/servable-catalog-model';
-import {
-  isValidOpenRouterModelId,
-  resolveOpenRouterModelAlias,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import * as z from 'zod';
 import {
   CustomLlmCredentialsSchema,

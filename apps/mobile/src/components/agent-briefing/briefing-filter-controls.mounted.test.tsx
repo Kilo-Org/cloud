@@ -88,13 +88,20 @@ it('names the context chip row as a filter group', () => {
   if (!root) {
     throw new Error('Controls are not mounted');
   }
-  const groups = root.root.findAll(node => node.props.accessibilityRole === 'radiogroup');
+  // Both rows are tablists now, so the context row is the one whose name says
+  // what it filters.
+  const groups = root.root
+    .findAll(node => node.props.accessibilityRole === 'tablist')
+    .filter(node => node.props.accessibilityLabel === 'agentBriefing.filterByContext');
   expect(groups).toHaveLength(1);
   const [group] = groups;
   if (!group) {
     throw new Error('The context chip row is not announced as a group');
   }
-  expect(group.props.accessibilityLabel).toBe('agentBriefing.filterByContext');
+  // The row's entries carry the strip-entry role contract too, so the
+  // announced role matches the chips' children (the same shape the tabs use).
+  const contextChips = group.findAll(node => isHostType(node, 'Pressable'));
+  expect(contextChips.length).toBeGreaterThan(0);
   // The all-contexts chip speaks its own copy, not the shared "All". The chip
   // passes `label` to `Button`, which builds the pressable's name from it.
   const allChip = root.root
@@ -117,7 +124,7 @@ it('announces the active briefing tab and context filter as selected', () => {
   if (!root) {
     throw new Error('Controls are not mounted');
   }
-  expect(root.root.findAll(node => node.props.accessibilityRole === 'tablist')).toHaveLength(1);
+  expect(root.root.findAll(node => node.props.accessibilityRole === 'tablist')).toHaveLength(2);
   // The mocked platform is iOS, where a strip entry is typed as a button so
   // VoiceOver gives it a control trait (see lib/a11y/tab-entry).
   for (const label of ['agentBriefing.available', 'agentBriefing.history']) {

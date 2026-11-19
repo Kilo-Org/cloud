@@ -28,6 +28,23 @@ import { useTRPC } from '@/lib/trpc';
 /** The dismissal drain could not finish a step; the ladder owns the retry. */
 type DrainFailure = { readonly kind: 'sync-failed' };
 
+/**
+ * One report id per already-announced hidden brief; a small window keeps the
+ * mount's memory bounded for a session that dismisses many briefs.
+ */
+const MAX_ANNOUNCED_DISMISSALS = 64;
+
+function rememberAnnouncedDismissal(announced: Set<string>, reportId: string): void {
+  announced.add(reportId);
+  if (announced.size <= MAX_ANNOUNCED_DISMISSALS) {
+    return;
+  }
+  const oldest = announced.values().next().value;
+  if (oldest !== undefined) {
+    announced.delete(oldest);
+  }
+}
+
 export function BriefingSyncMount() {
   const trpc = useTRPC();
   const client = useQueryClient();
@@ -44,8 +61,12 @@ export function BriefingSyncMount() {
   const [failures, setFailures] = useState(0);
   // Hidden briefs whose failed dismissal the user already heard about. The
   // background retry ladder owns the recovery, so each report gets one
-  // announcement, not one per attempt.
+  // announcement, not one per attempt. The window is bounded and cleared per
+  // account for the same reason `useSessionAutoApprove` bounds its ids.
   const announcedDismissFailures = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    announcedDismissFailures.current.clear();
+  }, [userId, authEpoch]);
   const { mutateAsync: dismiss } = useMutation(trpc.agentBriefing.dismiss.mutationOptions({}));
 
   useEffect(() => {
@@ -142,7 +163,7 @@ export function BriefingSyncMount() {
           setFailures(count => count + 1);
           attempt.fail({ kind: 'sync-failed' });
           if (!announcedDismissFailures.current.has(outcome.reportId)) {
-            announcedDismissFailures.current.add(outcome.reportId);
+            rememberAnnouncedDismissal(announcedDismissFailures.current, outcome.reportId);
             toast.error(i18n.t('agentBriefing.dismissFailed'));
           }
           return;

@@ -23,6 +23,7 @@ const state = vi.hoisted(() => ({
   dismiss: vi.fn<(input: { reportId: string }) => Promise<unknown>>(),
   saveJournal: vi.fn<(entries: JournalEntry[]) => Promise<unknown>>(),
   journalFails: 0,
+  authEpoch: 1,
   toastError: vi.fn(),
 }));
 
@@ -39,7 +40,7 @@ vi.mock('@/lib/agent-briefing-cache', () => ({
   purgeInaccessibleBriefingCache: vi.fn<() => Promise<void>>(),
 }));
 vi.mock('@/lib/auth/auth-context', () => ({
-  useAuth: () => ({ authEpoch: 1, isSigningOut: false }),
+  useAuth: () => ({ authEpoch: state.authEpoch, isSigningOut: false }),
 }));
 vi.mock('@/lib/auth/auth-epoch', () => ({ isCurrentAuthEpoch: () => true }));
 vi.mock('@/lib/hooks/use-app-lifecycle', () => ({
@@ -85,6 +86,7 @@ describe('BriefingSyncMount dismissal drain', () => {
     vi.useFakeTimers();
     vi.clearAllMocks();
     state.journalFails = 0;
+    state.authEpoch = 1;
     state.dismiss.mockReset();
     state.saveJournal.mockReset();
     const entry: JournalEntry = {
@@ -175,6 +177,30 @@ describe('BriefingSyncMount dismissal drain', () => {
     await advance(8000);
     // Report-2 already had its announcement: the retries stay quiet.
     expect(state.toastError).toHaveBeenCalledTimes(2);
+
+    act(() => {
+      unmount();
+    });
+    unmount = () => undefined;
+  });
+
+  it('announces the same report again after the account changes', async () => {
+    state.dismiss.mockRejectedValue(new Error('upstream unavailable'));
+
+    await advance(0);
+    expect(state.dismiss).toHaveBeenCalledTimes(1);
+    expect(state.toastError).toHaveBeenCalledTimes(1);
+
+    // A new sign-in epoch clears the announcement memory with the ladder's
+    // own reset, so the still-pending report announces once more for the new
+    // account, and its ladder restarts from the first step.
+    state.authEpoch = 2;
+    await advance(0);
+    await advance(2000);
+    expect(state.toastError).toHaveBeenCalledTimes(2);
+    expect(state.toastError).toHaveBeenLastCalledWith(
+      'Couldn’t dismiss this brief yet. It retries in the background.'
+    );
 
     act(() => {
       unmount();

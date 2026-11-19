@@ -153,7 +153,7 @@ export function AutoTopUpToggle() {
 
   const displayAmount = enabled ? currentAmount : selectedAmount;
 
-  if (isError) {
+  if (isError && autoTopUpInfo === undefined) {
     return <AutoTopUpLoadFailure onRetry={() => void refetch()} />;
   }
 

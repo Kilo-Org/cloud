@@ -160,7 +160,7 @@ export function OrganizationAutoTopUpToggle({ organizationId }: Props) {
     );
   }
 
-  if (isError) {
+  if (isError && configData === undefined) {
     return <AutoTopUpLoadFailure onRetry={() => void refetch()} />;
   }
 

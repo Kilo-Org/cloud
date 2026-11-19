@@ -112,12 +112,11 @@ export function LegalDocumentScreen({
             <Text>{t('common.legalDocumentEnglishOnly')}</Text>
           </Card>
         ) : null}
-        {/* The served body is the whole document. Both bodies are returned
-         * complete: the terms end with the "I. Trade Controls." paragraph of
-         * their last section, and the privacy policy ends with its closing
-         * paragraph. A reader whose scroll stops on one of those sentences has
-         * scrolled through every earlier section; the scroll area reporting no
-         * content below it is the end of the document. */}
+        {/* The served body is the whole document: the API returns the source
+         * page's complete content, so this screen adds no cut of its own. When a
+         * reader's scroll stops on the document's own final words, that is the
+         * end of the document, not a missing section: reaching them means every
+         * earlier section was scrolled through. */}
         <MarkdownText value={state.html} documentDirection="ltr" onPressLink={openInContentLink} />
       </ScrollView>
     );

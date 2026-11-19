@@ -126,6 +126,19 @@ afterEach(async () => {
   await i18n.changeLanguage('en');
 });
 
+describe('LegalDocumentScreen body selection', () => {
+  it('renders the body as plain text, so an in-content link tap reaches its handler', async () => {
+    await i18n.changeLanguage('en');
+    const renderer = mountScreen();
+
+    const bodies = renderer.root.findAll(isBody);
+    expect(bodies).toHaveLength(1);
+    // A selectable body takes the Android tap before the anchor's press
+    // handler and exposes every block as a press target.
+    expect(bodies[0]?.props.selectable).toBe(false);
+  });
+});
+
 describe('LegalDocumentScreen English-only notice', () => {
   it('shows the Arabic notice above the document body', async () => {
     await i18n.changeLanguage('ar');

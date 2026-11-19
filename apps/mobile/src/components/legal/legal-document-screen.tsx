@@ -112,7 +112,15 @@ export function LegalDocumentScreen({
             <Text>{t('common.legalDocumentEnglishOnly')}</Text>
           </Card>
         ) : null}
-        <MarkdownText value={state.html} documentDirection="ltr" onPressLink={openInContentLink} />
+        {/* Selectable text takes the Android tap before the anchor's press
+            handler, so an in-content link would never open; it also exposes
+            every block as a press target to a screen reader. */}
+        <MarkdownText
+          value={state.html}
+          documentDirection="ltr"
+          selectable={false}
+          onPressLink={openInContentLink}
+        />
       </ScrollView>
     );
   }

@@ -808,7 +808,8 @@ const steps: Step[] = [
       blocking: {
         tools: 'miss skip tools=0/0 calls=0',
         system: 'miss skip calls=0',
-        conversation: 'hit block calls=0',
+        // The cached block skips the 4 units no cached verdict covers.
+        conversation: 'hit block calls=0 chunks=4',
       },
       log_only: {
         tools: 'hit allow tools=3/0 calls=0',
@@ -857,7 +858,8 @@ const steps: Step[] = [
       blocking: {
         tools: 'miss skip tools=0/0 calls=0',
         system: 'miss skip calls=0',
-        conversation: 'hit block calls=0',
+        // The cached block skips the 11 units no cached verdict covers.
+        conversation: 'hit block calls=0 chunks=11',
       },
       log_only: {
         tools: 'hit allow tools=3/0 calls=0',

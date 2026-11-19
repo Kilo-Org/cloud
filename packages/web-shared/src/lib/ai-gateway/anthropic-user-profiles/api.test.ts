@@ -8,6 +8,7 @@ describe('anthropicUserProfileCreateParams', () => {
       userId: 'oauth/github:1',
       email: ' Person@Example.com ',
       createdAt: '2026-04-29 01:16:12.945+00',
+      country: 'NL',
     });
     expect(params).toEqual({
       access_type: 'passthrough',
@@ -18,6 +19,7 @@ describe('anthropicUserProfileCreateParams', () => {
         account_status: 'active',
         onboarded_at: '2026-04-29T01:16:12.945Z',
         email_hash: anthropicUserProfileEmailHash('person@example.com'),
+        country: 'NL',
       },
     });
     expect(params.name).toBeUndefined();
@@ -29,6 +31,20 @@ describe('anthropicUserProfileCreateParams', () => {
     // Pinned: a different value means the pepper changed, which breaks matching at Anthropic.
     expect(hash).toBe('e401be35f622916caf6786b83879cee35a39acbd7ca9166e74866fce59955a59');
     expect(hash).not.toBe(anthropicUserProfileEmailHash('other@example.com'));
+  });
+
+  it('omits a missing or malformed country', () => {
+    const details = {
+      kind: 'user',
+      userId: 'u',
+      email: 'person@example.com',
+      createdAt: '2026-04-29T01:16:12.945Z',
+    } as const;
+    for (const country of [null, 'XXX', 'nl', '']) {
+      expect(
+        anthropicUserProfileCreateParams({ ...details, country }).external_user_details
+      ).not.toHaveProperty('country');
+    }
   });
 
   it('registers an organization as a named passthrough business', () => {

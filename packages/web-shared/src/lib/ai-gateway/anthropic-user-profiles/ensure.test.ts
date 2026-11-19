@@ -34,13 +34,13 @@ describe('ensureAnthropicUserProfile', () => {
 
   it('creates and stores a passthrough profile for a user once', async () => {
     const user = await insertTestUser();
-    const first = await ensureAnthropicUserProfile({ kind: 'user', userId: user.id });
+    const first = await ensureAnthropicUserProfile({ kind: 'user', userId: user.id }, 'DE');
     const second = await ensureAnthropicUserProfile({ kind: 'user', userId: user.id });
     expect(first).toMatch(/^uprof_/);
     expect(second).toBe(first);
     expect(createAnthropicUserProfile).toHaveBeenCalledTimes(1);
     expect(createAnthropicUserProfile).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: 'user', userId: user.id })
+      expect.objectContaining({ kind: 'user', userId: user.id, country: 'DE' })
     );
   });
 

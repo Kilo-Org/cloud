@@ -27,6 +27,8 @@ export type AnthropicUserProfileDetails =
       userId: string;
       email: string;
       createdAt: string;
+      /** The IP country of the request that created the profile, a best guess at the user's. */
+      country: string | null;
     }
   | {
       kind: 'organization';
@@ -63,6 +65,10 @@ export function anthropicUserProfileCreateParams(
         account_status: 'active',
         onboarded_at,
         email_hash: anthropicUserProfileEmailHash(details.email),
+        // Anthropic accepts only an ISO 3166-1 alpha-2 code and cannot clear one later.
+        ...(details.country && /^[A-Z]{2}$/.test(details.country)
+          ? { country: details.country }
+          : {}),
       },
     };
   }

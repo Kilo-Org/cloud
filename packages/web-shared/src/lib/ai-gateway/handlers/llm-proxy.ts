@@ -455,7 +455,7 @@ export async function handleLlmProxyRequest(
     // This request goes out unattributed; later ones carry the stored profile.
     const { subject } = anthropicUserProfile;
     after(() =>
-      ensureAnthropicUserProfile(subject).then(
+      ensureAnthropicUserProfile(subject, countryCode).then(
         () => undefined,
         (error: unknown) => console.error('Failed to create an Anthropic user profile', error)
       )

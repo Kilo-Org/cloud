@@ -29,7 +29,7 @@ async function storeUserProfile(userId: string, userProfileId: string): Promise<
   return winner?.id ?? null;
 }
 
-async function ensureUserProfile(userId: string): Promise<string | null> {
+async function ensureUserProfile(userId: string, country: string | null): Promise<string | null> {
   const [user] = await db
     .select({
       profileId: kilocode_users.anthropic_user_profile_id,
@@ -47,6 +47,7 @@ async function ensureUserProfile(userId: string): Promise<string | null> {
     userId,
     email: user.normalizedEmail ?? user.email,
     createdAt: user.createdAt,
+    country,
   });
   return await storeUserProfile(userId, created);
 }
@@ -155,7 +156,9 @@ const inFlight = new Map<string, Promise<string | null>>();
  * returned either way and the losing one is left for the cleanup.
  */
 export async function ensureAnthropicUserProfile(
-  subject: AnthropicUserProfileSubject
+  subject: AnthropicUserProfileSubject,
+  /** The request's IP country; used only for user profiles. */
+  country: string | null = null
 ): Promise<string | null> {
   if (!isClaudeOperatorConfigured()) return null;
   const key =
@@ -164,7 +167,7 @@ export async function ensureAnthropicUserProfile(
   if (pending) return await pending;
   const promise = (
     subject.kind === 'user'
-      ? ensureUserProfile(subject.userId)
+      ? ensureUserProfile(subject.userId, country)
       : ensureOrganizationProfile(subject.organizationId)
   ).finally(() => inFlight.delete(key));
   inFlight.set(key, promise);

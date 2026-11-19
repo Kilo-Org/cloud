@@ -3776,6 +3776,7 @@
   },
   "modelChat": {
     "offlineFailure": "Den här modellen kräver en internetanslutning. Anslut och försök igen, eller byt till en modell på den här enheten.",
+    "connectionLost": "Anslutningen till modellen bröts. Kontrollera anslutningen och försök igen.",
     "empty": {
       "title": "Starta en chatt",
       "description": "Skicka ett meddelande för att prata med en modell."

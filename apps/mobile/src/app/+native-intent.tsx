@@ -4,6 +4,7 @@ import { agentChatPickerFixtureRoute } from '@/lib/agent-chat-picker-fixture';
 import { handleAppActionPath } from '@/lib/app-actions/action-url-handler';
 import { takeRemoteMcpRedirect } from '@/lib/chat/remote-mcp-oauth-browser';
 import { redirectSystemPath as mapWebPath } from '@/lib/deep-link-handler';
+import { applyForceStatePath } from '@/lib/force-state-fixture';
 import { handleGlanceableFixturePath } from '@/lib/glanceable/fixture-harness';
 import { handleHomeFixturePath } from '@/lib/home-fixture';
 import { instancePickerFixtureRoute } from '@/lib/instance-picker-fixture';
@@ -14,6 +15,7 @@ import { handleOrganizationInviteMemberFixturePath } from '@/lib/organization-in
 import { handlePrReviewCopyFixturePath } from '@/lib/pr-review/pr-review-copy-fixture-route';
 import { handlePrReviewInstanceFixturePath } from '@/lib/pr-review/pr-review-instance-fixture';
 import { profilePickerFixtureRoute } from '@/lib/profile-picker-fixture';
+import { queryClient } from '@/lib/query-client';
 import { handleRenderRecoveryFixturePath } from '@/lib/render-recovery-fixture';
 import { securityAgentSingleRouteFixtureRoute } from '@/lib/security-agent-single-route-fixture';
 
@@ -23,7 +25,13 @@ import { securityAgentSingleRouteFixtureRoute } from '@/lib/security-agent-singl
 // reaches the universal-link mapper. Every handled or ignored link returns
 // falsy (`deep-link-handler.ts`); a truthy return re-dispatches the linking
 // resolver.
-export function redirectSystemPath({ path, initial }: { path: string; initial: boolean }) {
+export function redirectSystemPath({
+  path,
+  initial,
+}: {
+  path: string;
+  initial: boolean;
+}): string | null {
   let shareKey: string | null = null;
   try {
     shareKey = getShareExtensionKey();
@@ -50,6 +58,15 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
   // Dev-only locked-keychain links (`kiloapp:///dev/locked-keychain/<name>`).
   if (__DEV__ && handleLockedKeychainFixturePath(path)) {
     return null;
+  }
+  if (__DEV__) {
+    // Dev-only forced data state
+    // (`kiloapp:///dev/force-state/<mode|clear>?next=<url-encoded app link>`):
+    // the mode is set, then `next` resolves exactly as that link would alone.
+    const forcedNext = applyForceStatePath(path, queryClient);
+    if (forcedNext !== undefined) {
+      return forcedNext === null ? null : redirectSystemPath({ path: forcedNext, initial });
+    }
   }
   if (__DEV__) {
     // Dev-only link that opens the connect gate's GitLab-instance state the way

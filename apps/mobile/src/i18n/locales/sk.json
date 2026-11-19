@@ -3896,6 +3896,7 @@
   },
   "modelChat": {
     "offlineFailure": "Tento model vyžaduje pripojenie na internet. Pripojte sa a skúste to znova alebo prepnite na model v tomto zariadení.",
+    "connectionLost": "Pripojenie k modelu sa prerušilo. Skontroluj pripojenie a skús to znova.",
     "empty": {
       "title": "Začať chat",
       "description": "Pošlite správu a porozprávajte sa s modelom."

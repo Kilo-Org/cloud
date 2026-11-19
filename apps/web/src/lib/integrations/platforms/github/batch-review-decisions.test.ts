@@ -52,7 +52,11 @@ describe('batch-review-decisions', () => {
   async function seedPrRow(
     branch: string,
     prNumber: number,
-    opts: { pending?: boolean; fetchingAt?: string } = {}
+    opts: {
+      pending?: boolean;
+      fetchingAt?: string;
+      reviewDecision?: 'approved' | 'changes_requested' | 'review_required' | null;
+    } = {}
   ) {
     await db.insert(github_branch_pull_requests).values({
       git_url: GIT_URL,
@@ -60,6 +64,7 @@ describe('batch-review-decisions', () => {
       owned_by_user_id: testUserId,
       pr_number: prNumber,
       pr_state: 'open',
+      pr_review_decision: opts.reviewDecision ?? null,
       review_decision_pending: opts.pending ?? true,
       review_decision_fetching_at: opts.fetchingAt ?? null,
     });
@@ -183,6 +188,24 @@ describe('batch-review-decisions', () => {
       const row = await readRow(11);
       expect(row?.pr_review_decision).toBeNull();
       expect(row?.review_decision_pending).toBe(false);
+    });
+
+    it('keeps the stored decision and pending flag when the batch read fails', async () => {
+      const branch = 'batch/fetch-failure';
+      await seedSession(branch);
+      await seedPrRow(branch, 13, { pending: true, reviewDecision: 'review_required' });
+
+      mockGetIntegration.mockResolvedValue(fakeIntegration());
+      mockFetchBatch.mockRejectedValue(new Error('GitHub reported errors'));
+
+      const before = await readRow(13);
+      await executeBatchReviewDecisionFetch(testOwner);
+
+      expect(mockFetchBatch).toHaveBeenCalledTimes(1);
+      const row = await readRow(13);
+      expect(row?.pr_review_decision).toBe('review_required');
+      expect(row?.review_decision_pending).toBe(true);
+      expect(row?.pr_last_synced_at).toEqual(before?.pr_last_synced_at);
     });
 
     it('clears pending on rows with no pr_number instead of looping on them forever', async () => {

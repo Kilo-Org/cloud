@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import {
-  getOpenRouterModelsFromDatabase,
-  getVercelModelsFromDatabase,
+  getOpenRouterChatModelIdsFromDatabase,
+  getVercelLanguageModelIdsFromDatabase,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { getVercelModelIdOverrides } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { getModelGateways } from '@kilocode/web-shared/lib/ai-gateway/providers/model-gateway-availability';
@@ -12,8 +12,8 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
   ...jest.requireActual<typeof GatewayModelsCacheModule>(
     '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'
   ),
-  getOpenRouterModelsFromDatabase: jest.fn(),
-  getVercelModelsFromDatabase: jest.fn(),
+  getOpenRouterChatModelIdsFromDatabase: jest.fn(),
+  getVercelLanguageModelIdsFromDatabase: jest.fn(),
 }));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => ({
@@ -27,10 +27,10 @@ describe('getModelGateways', () => {
   beforeEach(() => {
     jest.mocked(getVercelModelIdOverrides).mockResolvedValue(new Map());
     jest
-      .mocked(getOpenRouterModelsFromDatabase)
+      .mocked(getOpenRouterChatModelIdsFromDatabase)
       .mockResolvedValue(new Set(['anthropic/claude-opus-5', 'qwen/qwen3-max', 'acme/or-only']));
     jest
-      .mocked(getVercelModelsFromDatabase)
+      .mocked(getVercelLanguageModelIdsFromDatabase)
       .mockResolvedValue(new Set(['anthropic/claude-opus-5', 'alibaba/qwen3-max']));
   });
 

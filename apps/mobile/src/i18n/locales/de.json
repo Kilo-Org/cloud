@@ -3776,6 +3776,7 @@
   },
   "modelChat": {
     "offlineFailure": "Dieses Modell benötigt eine Internetverbindung. Stelle eine Verbindung her und versuche es erneut, oder wechsle zu einem Modell auf diesem Gerät.",
+    "connectionLost": "Die Verbindung zum Modell wurde unterbrochen. Prüfe deine Verbindung und versuche es erneut.",
     "empty": {
       "title": "Chat starten",
       "description": "Sende eine Nachricht, um mit einem Modell zu sprechen."

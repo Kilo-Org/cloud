@@ -3836,6 +3836,7 @@
   },
   "modelChat": {
     "offlineFailure": "Acest model necesită o conexiune la internet. Conectează-te și încearcă din nou sau comută la un model de pe acest dispozitiv.",
+    "connectionLost": "Conexiunea cu modelul s-a întrerupt. Verifică conexiunea și încearcă din nou.",
     "empty": {
       "title": "Începe un chat",
       "description": "Trimite un mesaj pentru a vorbi cu un model."

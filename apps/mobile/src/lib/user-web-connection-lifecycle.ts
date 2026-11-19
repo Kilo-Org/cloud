@@ -3,6 +3,7 @@ import { addEventListener } from '@react-native-community/netinfo';
 import { AppState, type AppStateStatus } from 'react-native';
 
 import { type ConnectivityState, connectivityStatus } from '@/lib/connectivity-online';
+import { subscribeConnectivityWithForceState } from '@/lib/force-state-fixture';
 
 type NativeLifecycleSources = {
   getAppState: () => typeof AppState.currentState;
@@ -18,7 +19,10 @@ const nativeLifecycleSources: NativeLifecycleSources = {
       subscription.remove();
     };
   },
-  onConnectivityChange: listener => addEventListener(listener),
+  onConnectivityChange: listener =>
+    __DEV__
+      ? subscribeConnectivityWithForceState(addEventListener, listener)
+      : addEventListener(listener),
 };
 
 // A socket outlives short trips out of the app (app switcher, notification

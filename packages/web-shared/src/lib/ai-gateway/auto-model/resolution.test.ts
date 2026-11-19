@@ -6,7 +6,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
   ...jest.requireActual<typeof GatewayModelsCache>(
     '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'
   ),
-  getOpenRouterModelsFromDatabase: jest.fn(),
+  getOpenRouterChatModelIdsFromDatabase: jest.fn(),
 }));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config', () => ({
@@ -54,7 +54,7 @@ const baseParams = {
 const nullUserPromise = Promise.resolve(null);
 const zeroBalancePromise = Promise.resolve(0);
 const primaryDefaultFallback = { model: PRIMARY_DEFAULT_MODEL };
-const { getOpenRouterModelsFromDatabase: mockedGetOpenRouterModels } = jest.requireMock<
+const { getOpenRouterChatModelIdsFromDatabase: mockedGetOpenRouterChatModelIds } = jest.requireMock<
   jest.Mocked<typeof GatewayModelsCache>
 >('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache');
 const { getConfiguredAutoFreeModels: mockedGetConfiguredAutoFreeModels } = jest.requireMock<
@@ -549,7 +549,7 @@ describe('resolveAutoModel — kilo-auto/frontier branch', () => {
 
 describe('resolveAutoModel — kilo-auto/free branch', () => {
   beforeEach(() => {
-    mockedGetOpenRouterModels.mockResolvedValue(
+    mockedGetOpenRouterChatModelIds.mockResolvedValue(
       new Set(['poolside/laguna-s-2.1:free', 'nvidia/nemotron-3-ultra-550b-a55b:free'])
     );
     mockedGetConfiguredAutoFreeModels.mockResolvedValue([

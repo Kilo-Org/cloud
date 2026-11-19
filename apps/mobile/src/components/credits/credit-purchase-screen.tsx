@@ -29,6 +29,7 @@ import { isolateLtrBidiText } from '@/lib/bidi';
 import { getStoreUnavailableCopyKeys } from '@/lib/credits/store-products-loader';
 import {
   getStoreCreditExpiryMessageKey,
+  getStoreCreditGroupExpiryMessageKey,
   type StoreCreditProduct,
 } from '@/lib/credits/store-products';
 import { useStoreCreditProducts } from '@/lib/credits/use-store-credit-products';
@@ -209,17 +210,15 @@ export function CreditPurchaseScreen() {
   const showRows = !isLoading && !identityUnavailable && !packsEmpty && !storeUnavailable;
   // The store's credit-expiry policy belongs to the pack group, so the screen
   // states it once under the rows instead of repeating the same sentence under
-  // every pack. A catalogue whose packs differ (one expiring, the rest not)
-  // contributes one caption per distinct policy, still once each.
-  const expiryNotes = showRows
-    ? [
-        ...new Set(
-          products
-            .map(pack => getStoreCreditExpiryMessageKey(pack.backend, storefront))
-            .filter((key): key is NonNullable<typeof key> => key !== undefined)
-        ),
-      ].map(key => t(key))
-    : [];
+  // every pack. The balance card above already states non-expiry, so only an
+  // expiring catalogue adds a caption here.
+  const expiryNoteKey = showRows
+    ? getStoreCreditGroupExpiryMessageKey(
+        products.map(pack => pack.backend),
+        storefront
+      )
+    : undefined;
+  const expiryNote = expiryNoteKey ? t(expiryNoteKey) : null;
   const balancePending = balanceQuery.isPending;
   const balanceFailed = balanceQuery.isError;
   // The card's title and its default body come from one per-store source, so
@@ -537,8 +536,9 @@ export function CreditPurchaseScreen() {
                         // the state phrase never wraps into a second line, so
                         // no row changes height when a purchase or the store
                         // state changes. The expiry policy is stated once for
-                        // the group below the rows; the row's accessible label
-                        // still carries it per pack.
+                        // the group below the rows, and only when the balance
+                        // card does not already state it; the row's accessible
+                        // label still carries it per pack.
                         subtitleNumberOfLines={1}
                         variant="action"
                         disabled={disabled}
@@ -561,11 +561,7 @@ export function CreditPurchaseScreen() {
               </RowGroup>
             )}
 
-            {expiryNotes.map(note => (
-              <Text key={note} variant="caption">
-                {note}
-              </Text>
-            ))}
+            {expiryNote !== null && <Text variant="caption">{expiryNote}</Text>}
           </View>
 
           {/* The purchase state is its own slot after the pack rows: a request

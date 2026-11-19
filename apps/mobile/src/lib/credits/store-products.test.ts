@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   type BackendStoreCreditProduct,
   getStoreCreditExpiryMessageKey,
+  getStoreCreditGroupExpiryMessageKey,
   joinStoreCreditProducts,
 } from './store-products';
 
@@ -118,5 +119,26 @@ describe('getStoreCreditExpiryMessageKey', () => {
 
   it('does not invent a deadline while the backend has no product policy', () => {
     expect(getStoreCreditExpiryMessageKey(product, 'play')).toBeUndefined();
+  });
+});
+
+describe('getStoreCreditGroupExpiryMessageKey', () => {
+  const catalog = (
+    policy: NonNullable<BackendStoreCreditProduct['creditExpiryPolicy']>
+  ): BackendStoreCreditProduct[] =>
+    backendProducts.map(product => ({ ...product, creditExpiryPolicy: policy }));
+
+  it('adds no caption when the balance card already says the credits do not expire', () => {
+    expect(getStoreCreditGroupExpiryMessageKey(catalog('never'), 'play')).toBeUndefined();
+  });
+
+  it('adds no caption for an App Store catalog, whose credits never expire', () => {
+    expect(getStoreCreditGroupExpiryMessageKey(catalog('one_year'), 'app_store')).toBeUndefined();
+  });
+
+  it('states the one-year policy once for a Play catalog that expires', () => {
+    expect(getStoreCreditGroupExpiryMessageKey(catalog('one_year'), 'play')).toBe(
+      'credits.playOneYearExpiry'
+    );
   });
 });

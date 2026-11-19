@@ -55,6 +55,27 @@ export function getStoreCreditExpiryMessageKey(
   return undefined;
 }
 
+/**
+ * The one credit-expiry policy the pack group states below its rows, or
+ * `undefined` when the screen already says it once.
+ *
+ * A catalog response is uniform — every pack is `never` or every pack is
+ * `one_year` — so deduping leaves at most one policy. The balance card above
+ * the packs states non-expiry itself, so a non-expiring catalog adds no
+ * caption and only an expiring policy is restated here. Each row's accessible
+ * label still carries its own policy sentence.
+ */
+export function getStoreCreditGroupExpiryMessageKey(
+  products: readonly BackendStoreCreditProduct[],
+  storefront: 'app_store' | 'play'
+): 'credits.playOneYearExpiry' | undefined {
+  const stated = products.map(product => getStoreCreditExpiryMessageKey(product, storefront));
+  // Only a policy the balance card cannot state earns a caption: the card says
+  // the account's credits never expire, and the two non-expiring keys restate
+  // that.
+  return stated.includes('credits.playOneYearExpiry') ? 'credits.playOneYearExpiry' : undefined;
+}
+
 export function joinStoreCreditProducts(params: {
   /**
    * Part of the loader contract this mirrors from the Kilo Pass join. The

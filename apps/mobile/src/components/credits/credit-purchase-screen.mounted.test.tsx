@@ -445,6 +445,56 @@ describe('CreditPurchaseScreen', () => {
     unmount();
   });
 
+  it('states no group expiry caption on Android when no credits expire', async () => {
+    // A non-expiring catalogue repeats what the balance card above already
+    // says, so the group adds no caption; each row still announces its own
+    // policy.
+    mockedPlatform.OS = 'android';
+    backend.response.products = BACKEND_PRODUCTS.map(product => ({
+      ...product,
+      creditExpiryPolicy: 'never',
+    }));
+    owner.fetchStoreProducts.mockResolvedValue(
+      BACKEND_PRODUCTS.map(product => ({ id: product.googleProductId, displayPrice: '$10.99' }))
+    );
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    expect(allText(renderer)).toContain('No expiring credits.');
+    expect(allText(renderer)).not.toContain('These credits do not expire.');
+    const labels = packRows(renderer).map(row => row.props.accessibilityLabel);
+    expect(labels).toHaveLength(4);
+    expect(labels.every(label => label.endsWith(', These credits do not expire.'))).toBe(true);
+    unmount();
+  });
+
+  it('states the Play one-year policy once for the pack group below the rows', async () => {
+    mockedPlatform.OS = 'android';
+    backend.response.products = BACKEND_PRODUCTS.map(product => ({
+      ...product,
+      creditExpiryPolicy: 'one_year',
+    }));
+    owner.fetchStoreProducts.mockResolvedValue(
+      BACKEND_PRODUCTS.map(product => ({ id: product.googleProductId, displayPrice: '$10.99' }))
+    );
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const oneYearCaption = 'These credits expire one calendar year after purchase.';
+    // Only the visible caption Text counts; the four row labels repeat the
+    // sentence for a screen reader without drawing it again.
+    const captions = renderer.root.findAll(
+      node => String(node.type) === 'Text' && node.props.children === oneYearCaption
+    );
+    expect(captions).toHaveLength(1);
+    expect(allText(renderer)).toContain(oneYearCaption);
+    const labels = packRows(renderer).map(row => row.props.accessibilityLabel);
+    expect(labels.every(label => label.endsWith(`, ${oneYearCaption}`))).toBe(true);
+    unmount();
+  });
+
   it('shows the actual next expiring balance without calling purchased credits a bonus', async () => {
     creditBlocks.entries = [
       { balance_mUsd: 10_000_000, expiry_date: '2027-10-15T00:00:00Z' },
@@ -671,6 +721,11 @@ describe('CreditPurchaseScreen', () => {
     const ios = await renderWithProviders(createElement(CreditPurchaseScreen));
     await waitFor(() => packRows(ios.renderer).length === 4);
     const iosRows = rowState(ios.renderer);
+    // The balance card states non-expiry, so the App Store disclosure rides in
+    // the row labels only and the screen draws no expiry caption for it.
+    expect(allText(ios.renderer)).not.toContain(
+      'Credits purchased through the App Store do not expire.'
+    );
     const iosSkus = owner.fetchStoreProducts.mock.calls.at(-1)?.[0];
     ios.unmount();
 
@@ -856,17 +911,16 @@ describe('CreditPurchaseScreen', () => {
 
     const rows = packRows(renderer);
     const priced = rows[0]?.findAll(node => String(node.type) === 'Text') ?? [];
-    // Title, then the store price in the trailing slot. The expiry policy is
-    // stated once for the pack group below the rows, and still rides in each
-    // row's accessibility label.
+    // Title, then the store price in the trailing slot. The balance card above
+    // already states non-expiry, so the group draws no caption; the policy
+    // still rides in each row's accessibility label.
     expect(priced.map(node => node.props.children)).toEqual([
       `Add ${packAmount('$10.00')} of credits`,
       '$10.99',
     ]);
     const unpriced = rows[3]?.findAll(node => String(node.type) === 'Text') ?? [];
-    // The disabled reason takes the same subtitle line its neighbours fill with
-    // the expiry note, and the note it no longer prints stays in the row's
-    // accessibility label.
+    // The disabled reason takes the row's one subtitle line, and the expiry
+    // policy the row no longer prints stays in its accessibility label.
     expect(unpriced.map(node => node.props.children)).toEqual([
       `Add ${packAmount('$500.00')} of credits`,
       'Price unavailable',
@@ -1309,7 +1363,8 @@ describe('CreditPurchaseScreen', () => {
       .map(node => Number(node.props.numberOfLines));
     // Every row caps its one state line to a line, so the store price's own
     // `shrink-0` line stays the only unclamped one and no row grows when the
-    // copy changes. The expiry policy is a group caption below the rows.
+    // copy changes. This non-expiring catalogue's single expiry statement is
+    // the balance card's own line; the group adds no caption.
     expect(caps.filter(cap => cap === 1)).toHaveLength(4);
     unmount();
   });

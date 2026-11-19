@@ -622,9 +622,12 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
       input.rename
     );
     if (input.lastActivityAt === undefined) return;
+    // The Session DO's clock can run ahead of the database, and the active-session list treats a
+    // future last_activity_at as live; no writer would lower it, so the report is clamped.
+    const activity = sql`LEAST(${input.lastActivityAt}::timestamptz, now())`;
     await getWorkerDb(this.env.HYPERDRIVE.connectionString)
       .update(cli_sessions_v2)
-      .set({ last_activity_at: laterLastActivityAt(input.lastActivityAt) })
+      .set({ last_activity_at: laterLastActivityAt(activity) })
       .where(
         and(
           eq(cli_sessions_v2.session_id, input.sessionId),

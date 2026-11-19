@@ -301,10 +301,11 @@ export function syncFollowedSessionCards(
         updatedAt,
         statusSinceFallback: stored.content?.statusSince ?? updatedAt,
         // The tray row is the `activeSessions.list` row: it has no step, plan,
-        // diff, permission command, failure or start time, and it omits its
-        // cost and last activity when the column is null. `previous` is what
-        // keeps the rest under the builder's own absence rule; `outcome` is
-        // recomputed there and is never carried.
+        // diff, permission command, failure, start time or `costMicrodollars`
+        // (its cost field is `totalCostMicrodollars`), and it omits last
+        // activity when the column is null. `previous` supplies the rest under
+        // the builder's absence rule; `outcome` is recomputed there and is
+        // never carried.
         previous: stored.content ?? undefined,
       });
       if (isLiveKind(content.statusKind)) {

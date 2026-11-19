@@ -136,6 +136,7 @@ import {
   allocationCapabilityFor,
   assertEnvironmentSupportsSandbox,
   requestedSandboxAllocation,
+  requestNeedsEgressPolicy,
   withSavedSandboxAllocation,
 } from './sandbox-allocation-resolution.js';
 import type { SessionCreateRequest, SessionRepositoryRequest } from './session-requests.js';
@@ -203,7 +204,7 @@ function assertEgressPolicyAllocation(
   input: SessionRegistrationInput,
   allocation: Pick<SessionRegistrationResult, 'sandboxProvider'>
 ): void {
-  if (input.runtime?.egressMode !== 'allowlist' && input.runtime?.egressAudit !== true) return;
+  if (!requestNeedsEgressPolicy(input.runtime)) return;
   if (!providerSupports(allocation.sandboxProvider, 'egressPolicy')) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
@@ -2017,7 +2018,7 @@ async function withLedgerSavedAllocation(
   freshAdmission: boolean
 ): Promise<SessionRegistrationInput> {
   const pinned = row.canonical_result?.[SESSION_CREATE_SAVED_ALLOCATION_KEY];
-  if (typeof pinned === 'string' && isSelectableSandboxAllocation(pinned as SandboxAllocation)) {
+  if (typeof pinned === 'string' && isSelectableSandboxAllocation(pinned)) {
     return { ...input, savedSandboxAllocation: pinned as SandboxAllocation };
   }
   // Admission always writes a canonical result, so its presence no longer means
@@ -2201,9 +2202,8 @@ export async function sessionCreateIntentFingerprint(
       requireEnvironmentChoice: input.requireEnvironmentChoice,
       finalization: input.finalization,
       runtime:
-        input.runtime?.sandboxAllocation ||
-        input.runtime?.egressMode === 'allowlist' ||
-        input.runtime?.egressAudit === true
+        input.runtime &&
+        (input.runtime.sandboxAllocation || requestNeedsEgressPolicy(input.runtime))
           ? {
               ...(input.runtime.sandboxAllocation
                 ? { sandboxAllocation: input.runtime.sandboxAllocation }
@@ -2280,9 +2280,7 @@ async function assertCreateIntentUnchanged(
     // saved choice is resolved after admission and is not part of the fingerprint.
     (!options?.freshAdmission &&
       !recordedSandboxAllocationMatchesRequest(recorded.data, requested, replacement)) ||
-    ((selectable !== undefined ||
-      input.runtime?.egressMode === 'allowlist' ||
-      input.runtime?.egressAudit === true) &&
+    ((selectable !== undefined || requestNeedsEgressPolicy(input.runtime)) &&
       (typeof stored !== 'string' || stored.length === 0))
   ) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });

@@ -1,7 +1,7 @@
 /**
  * Sandbox provider ids. The allocation catalog (`sandbox-allocation.ts`)
- * passes its provider ids to {@link providerSupports}, so the compiler rejects
- * a catalog provider without a table entry. This module imports nothing from
+ * returns its provider ids as this type, so the compiler rejects a catalog
+ * provider without a table entry. This module imports nothing from
  * the catalog, to keep the dependency one-way.
  */
 export type SandboxProviderId = 'cloudflare' | 'vercel' | 'cloudflare-containers';
@@ -16,7 +16,6 @@ export const SANDBOX_PROVIDER_FEATURES = [
   'workspaceSnapshots',
   'environmentSnapshots',
   'egressPolicy',
-  'multiRepository',
   'scmCliTools',
   'meteredBilling',
 ] as const;
@@ -37,7 +36,6 @@ export const SANDBOX_PROVIDER_CAPABILITIES: Readonly<
     workspaceSnapshots: false,
     environmentSnapshots: false,
     egressPolicy: false,
-    multiRepository: true,
     scmCliTools: true,
     meteredBilling: false,
   },
@@ -46,7 +44,6 @@ export const SANDBOX_PROVIDER_CAPABILITIES: Readonly<
     workspaceSnapshots: false,
     environmentSnapshots: true,
     egressPolicy: false,
-    multiRepository: false,
     scmCliTools: true,
     meteredBilling: false,
   },
@@ -55,7 +52,6 @@ export const SANDBOX_PROVIDER_CAPABILITIES: Readonly<
     workspaceSnapshots: true,
     environmentSnapshots: true,
     egressPolicy: true,
-    multiRepository: true,
     scmCliTools: true,
     meteredBilling: true,
   },

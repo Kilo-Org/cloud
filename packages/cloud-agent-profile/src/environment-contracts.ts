@@ -239,6 +239,11 @@ type EnvironmentBuildInputBase = {
    * resolves it with the repository and context settings to pin one target.
    */
   sandboxAllocation: string | null;
+  /**
+   * The environment's saved network policy. Build admission reads it so the
+   * build target skips the same saved defaults as a session of this environment.
+   */
+  egressMode: EgressMode | null;
 };
 
 /**

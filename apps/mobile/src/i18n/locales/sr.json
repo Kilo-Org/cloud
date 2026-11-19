@@ -3827,6 +3827,7 @@
   },
   "modelChat": {
     "offlineFailure": "Ovaj model zahteva internet vezu. Povežite se i pokušajte ponovo ili pređite na model na ovom uređaju.",
+    "connectionLost": "Veza sa modelom je prekinuta. Proveri vezu i pokušaj ponovo.",
     "empty": {
       "title": "Započnite ćaskanje",
       "description": "Pošaljite poruku da razgovarate sa modelom."

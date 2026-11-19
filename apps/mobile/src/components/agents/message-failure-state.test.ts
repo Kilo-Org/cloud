@@ -252,6 +252,24 @@ describe('selectMessageFailure', () => {
       expect(JSON.stringify(result)).not.toContain('RAW_PROVIDER_TEXT');
     });
 
+    it('states a chat answer the person stopped under its words, with the Retry the chat offers', () => {
+      const deliveryState = { status: 'failed', error: '', reason: 'interrupted' } as const;
+      const result = selectMessageFailure({ info: assistantInfoWithoutError(), deliveryState });
+      expect(result?.side).toBe('assistant');
+      expect(result?.error).toBe(false);
+      expect(result?.titleKey).toBe('agentChat.messageFailure.assistantStopped');
+      expect(result?.detail).toBeNull();
+      expect(result?.canRetry).toBe(true);
+      expect(result?.canCopy).toBe(false);
+      expect(
+        selectMessageFailure({
+          info: assistantInfoWithoutError(),
+          deliveryState,
+          retryAvailable: false,
+        })?.canRetry
+      ).toBe(false);
+    });
+
     it('sets canRetry false only for NON_RETRYABLE_ASSISTANT_ERRORS', () => {
       for (const name of NON_RETRYABLE_ASSISTANT_ERRORS) {
         const result = selectMessageFailure({ info: assistantInfo(name) });

@@ -3827,6 +3827,7 @@
   },
   "modelChat": {
     "offlineFailure": "Ce modèle nécessite une connexion Internet. Connectez-vous et réessayez, ou passez à un modèle sur cet appareil.",
+    "connectionLost": "La connexion au modèle a été perdue. Vérifiez votre connexion et réessayez.",
     "empty": {
       "title": "Démarrer une discussion",
       "description": "Envoyez un message pour discuter avec un modèle."

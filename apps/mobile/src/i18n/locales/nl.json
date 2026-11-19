@@ -3767,6 +3767,7 @@
   },
   "modelChat": {
     "offlineFailure": "Dit model heeft een internetverbinding nodig. Maak verbinding en probeer het opnieuw, of schakel over naar een model op dit apparaat.",
+    "connectionLost": "De verbinding met het model is verbroken. Controleer je verbinding en probeer het opnieuw.",
     "empty": {
       "title": "Start een chat",
       "description": "Stuur een bericht om met een model te praten."

@@ -3887,6 +3887,7 @@
   },
   "modelChat": {
     "offlineFailure": "Ta model potrebuje internetno povezavo. Poveži se in poskusi znova ali preklopi na model v tej napravi.",
+    "connectionLost": "Povezava z modelom je bila prekinjena. Preveri povezavo in poskusi znova.",
     "empty": {
       "title": "Začni klepet",
       "description": "Pošlji sporočilo za pogovor z modelom."

@@ -3767,6 +3767,7 @@
   },
   "modelChat": {
     "offlineFailure": "此模型需要联网。请连接网络后重试，或切换到此设备上的模型。",
+    "connectionLost": "与模型的连接已断开。请检查网络连接后重试。",
     "empty": {
       "title": "开始聊天",
       "description": "发送消息以与模型聊天。"

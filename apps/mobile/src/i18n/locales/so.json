@@ -3767,6 +3767,7 @@
   },
   "modelChat": {
     "offlineFailure": "Model-kan wuxuu u baahan yahay xiriir internet. Ku xirmo oo isku day mar kale, ama u beddel model ku jira qalabkan.",
+    "connectionLost": "Xiriirka model-ka wuu go'ay. Hubi xiriirkaaga oo mar kale isku day.",
     "empty": {
       "title": "Bilow wada sheekaysi",
       "description": "Dir fariin si aad ula hadasho model."

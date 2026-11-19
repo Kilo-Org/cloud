@@ -3767,6 +3767,7 @@
   },
   "modelChat": {
     "offlineFailure": "Le modeli idinga ukuxhumeka ku-inthanethi. Xhuma bese uzama futhi, noma ushintshele kumodeli ekule divayisi.",
+    "connectionLost": "Ukuxhumana nemodeli kunqamukile. Hlola ukuxhumana kwakho bese uzama futhi.",
     "empty": {
       "title": "Qala ingxoxo",
       "description": "Thumela umlayezo ukuze uxoxe nomodeli."

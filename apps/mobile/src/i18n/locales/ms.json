@@ -3767,6 +3767,7 @@
   },
   "modelChat": {
     "offlineFailure": "Model ini memerlukan sambungan internet. Sambung dan cuba lagi, atau tukar kepada model pada peranti ini.",
+    "connectionLost": "Sambungan kepada model terputus. Semak sambungan anda dan cuba semula.",
     "empty": {
       "title": "Mulakan sembang",
       "description": "Hantar mesej untuk bercakap dengan model."

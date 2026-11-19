@@ -3947,6 +3947,7 @@
   },
   "modelChat": {
     "offlineFailure": "Dan il-mudell jeħtieġ konnessjoni tal-internet. Ikkonnettja u erġa' pprova, jew aqleb għal mudell fuq dan l-apparat.",
+    "connectionLost": "Il-konnessjoni mal-mudell intilfet. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
     "empty": {
       "title": "Ibda chat",
       "description": "Ibgħat messaġġ biex tikkellem ma' mudell."

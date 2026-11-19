@@ -3767,6 +3767,7 @@
   },
   "modelChat": {
     "offlineFailure": "Me whai hononga ipurangi tēnei tauira. Tūhono, ka whakamātau anō, kia huri rānei ki tētahi tauira i tēnei pūrere.",
+    "connectionLost": "Kua motu te hononga ki te tauira. Tirohia tō hononga, kātahi ka whakamātau anō.",
     "empty": {
       "title": "Tīmata he kōrerorero",
       "description": "Tukuna he karere hei kōrerorero ki tētahi tauira."

@@ -3767,6 +3767,7 @@
   },
   "modelChat": {
     "offlineFailure": "Ihe nlereanya a chọrọ njikọ ịntanetị. Jikọọ ma nwaa ọzọ, ma ọ bụ gbanwee gaa n'ihe nlereanya dị na ngwaọrụ a.",
+    "connectionLost": "Njikọ gị na ihe nlereanya ahụ kwụsịrị. Lelee njikọ gị ma nwaa ọzọ.",
     "empty": {
       "title": "Malite nkata",
       "description": "Ziga ozi ka ị soro ihe nlereanya kparịta ụka."

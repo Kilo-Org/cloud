@@ -3767,6 +3767,7 @@
   },
   "modelChat": {
     "offlineFailure": "See mudel vajab internetiühendust. Loo ühendus ja proovi uuesti või lülitu selle seadme mudelile.",
+    "connectionLost": "Ühendus mudeliga katkes. Kontrolli ühendust ja proovi uuesti.",
     "empty": {
       "title": "Alusta vestlust",
       "description": "Mudeliga vestlemiseks saada sõnum."

@@ -197,7 +197,15 @@ function createUserWebConnection(
   let connectPromise: Promise<void> | null = null;
   let retainCount = 0;
   let commandRetainCount = 0;
-  let legacyRelease: (() => void) | null = null;
+  // The deprecated connect()/disconnect() pair owns one legacy lifetime. Its
+  // phase is explicit because a `disconnect()` can run synchronously inside
+  // `retainConnection()` (an `onError` or connection-signal listener), before
+  // the release closure that call returns exists.
+  type LegacyLifetime =
+    | { status: 'idle' }
+    | { status: 'retaining' }
+    | { status: 'held'; release: () => void };
+  let legacyLifetime: LegacyLifetime = { status: 'idle' };
   // True once the current base connection's socket has opened (i.e. the one-use
   // ingest ticket was consumed at the upgrade). Drives the pre-connect auth
   // refresh so only reconnects mint a fresh ticket, not the initial connect.
@@ -614,8 +622,17 @@ function createUserWebConnection(
   }
 
   function connect(): void {
-    if (destroyed || legacyRelease) return;
-    legacyRelease = retainConnection();
+    if (destroyed || legacyLifetime.status !== 'idle') return;
+    legacyLifetime = { status: 'retaining' };
+    const release = retainConnection();
+    // A `disconnect()` that ran synchronously inside `retainConnection()` has
+    // already cleared the intent, so release this retain now instead of
+    // holding a lifetime nobody owns.
+    if (legacyLifetime.status !== 'retaining') {
+      release();
+      return;
+    }
+    legacyLifetime = { status: 'held', release };
   }
 
   type RawCommandWire = {
@@ -698,15 +715,19 @@ function createUserWebConnection(
     retain: retainConnection,
     connect,
     disconnect() {
-      if (!legacyRelease) return;
-      const release = legacyRelease;
-      legacyRelease = null;
+      if (legacyLifetime.status === 'idle') return;
+      if (legacyLifetime.status === 'retaining') {
+        legacyLifetime = { status: 'idle' };
+        return;
+      }
+      const { release } = legacyLifetime;
+      legacyLifetime = { status: 'idle' };
       release();
     },
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      legacyRelease = null;
+      legacyLifetime = { status: 'idle' };
       retainCount = 0;
       commandRetainCount = 0;
       stopConnection('Connection destroyed');

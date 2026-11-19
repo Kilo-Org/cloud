@@ -771,6 +771,7 @@
       "retryLoadingMore": "Tentar carregar mais comentários novamente",
       "loadMoreComments": "Carregar mais comentários",
       "conversationTruncated": "São apresentados apenas os primeiros {{displayCount}} comentários.",
+      "conversationTruncated_zero": "São apresentados apenas os primeiros {{displayCount}} comentários.",
       "conversationTruncated_one": "São apresentados apenas os primeiros {{displayCount}} comentários.",
       "conversationTruncated_other": "São apresentados apenas os primeiros {{displayCount}} comentários.",
       "conversationTruncated_many": "São apresentados apenas os primeiros {{displayCount}} comentários.",

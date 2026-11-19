@@ -2910,6 +2910,7 @@
       "comment_other": "{{displayCount}} comentários",
       "comment_zero": "{{displayCount}} comentários",
       "conversationTruncated": "Exibindo apenas os primeiros {{displayCount}} comentários.",
+      "conversationTruncated_zero": "Exibindo apenas os primeiros {{displayCount}} comentários.",
       "conversationTruncated_one": "Exibindo apenas os primeiros {{displayCount}} comentários.",
       "conversationTruncated_many": "Exibindo apenas os primeiros {{displayCount}} comentários.",
       "conversationTruncated_other": "Exibindo apenas os primeiros {{displayCount}} comentários.",

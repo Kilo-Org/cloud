@@ -98,9 +98,9 @@ describe('trpcErrorVariant', () => {
 
 describe('isAccountBlockedTrpcError', () => {
   it('recognizes the flag on a direct tRPC client error envelope', () => {
-    expect(
-      isAccountBlockedTrpcError({ data: { code: 'FORBIDDEN', accountBlocked: true } })
-    ).toBe(true);
+    expect(isAccountBlockedTrpcError({ data: { code: 'FORBIDDEN', accountBlocked: true } })).toBe(
+      true
+    );
   });
 
   it('recognizes the flag on the server-shaped envelope', () => {
@@ -111,9 +111,9 @@ describe('isAccountBlockedTrpcError', () => {
 
   it('is false for an ordinary permission denial', () => {
     expect(isAccountBlockedTrpcError(trpcCode('FORBIDDEN'))).toBe(false);
-    expect(
-      isAccountBlockedTrpcError({ data: { code: 'FORBIDDEN', accountBlocked: false } })
-    ).toBe(false);
+    expect(isAccountBlockedTrpcError({ data: { code: 'FORBIDDEN', accountBlocked: false } })).toBe(
+      false
+    );
   });
 
   it('requires the boolean true, not a truthy stand-in', () => {

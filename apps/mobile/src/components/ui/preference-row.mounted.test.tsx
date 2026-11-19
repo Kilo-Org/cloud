@@ -351,20 +351,22 @@ describe('PreferenceRow', () => {
     expect(contrast(trackColor.false, darkColors.secondary)).toBeGreaterThanOrEqual(3);
   });
 
-  it('paints an unavailable row with the muted pair instead of the accent', () => {
+  it('paints an unavailable row with its own disabled pair, not the accent', () => {
     // A dimmed title beside a full-strength accent track reads as both
     // unavailable and on, and Android folds the colours into the switch
     // drawables with no unavailable appearance of its own. The row therefore
-    // yields the light override and lets the shared switch paint its muted pair.
+    // yields the light override and lets the shared switch paint its disabled
+    // pair, which keeps the two positions apart.
     schemeState.current = 'light';
     platformState.os = 'android';
     const root = renderRow({ value: true, disabled: true, onValueChange: () => undefined });
     const toggle = root.find(node => Object.is(node.type, 'Switch'));
     const trackColor = toggle.props.trackColor as { false: string; true: string };
 
-    expect(trackColor.false).toBe(lightColors.mutedSoft);
-    expect(trackColor.true).toBe(lightColors.mutedSoft);
-    expect(toggle.props.thumbColor).toBe(lightColors.foreground);
+    expect(trackColor.false).toBe(lightColors.switchDisabledOff);
+    expect(trackColor.true).toBe(lightColors.switchDisabledOn);
+    expect(toggle.props.thumbColor).toBe(lightColors.switchDisabledOnForeground);
+    expect(trackColor.true).not.toBe(lightColors.primary);
   });
 });
 

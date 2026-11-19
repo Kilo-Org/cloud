@@ -31,9 +31,10 @@ type OrganizationPlanRefusalCopy = { message: string; action?: OrganizationPlanR
  * The step is the web billing page when the storefront rule lets the app link
  * it, which is the page that sells the plan. A surface that has its own step for
  * the storefronts the rule refuses — the in-app billing screen, which names
- * where the plan is bought — passes it as `inAppBilling`; a surface without one
- * keeps the sentence that names the person who can end the state, so a claimed
- * step is never left without the control that takes it.
+ * where the plan is bought — passes it as `inAppBilling`, and it is used for
+ * exactly the roles the state sentence belongs to. A caller without one leaves
+ * that role with the state sentence alone; a reader who cannot change the plan
+ * keeps the sentence that names who can, with no step either way.
  */
 export function organizationPlanRefusalFor({
   role,

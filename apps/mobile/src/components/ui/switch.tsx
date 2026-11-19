@@ -26,22 +26,24 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * `mutedForeground` with a `foreground` grip in dark. A caller that wants
  * another pair still wins: its own props are applied last.
  *
- * A disabled switch paints one muted pair, at the position it still shows.
+ * A disabled switch keeps a pair of its own, at the position it still shows.
  * Android folds the colours into the track and thumb drawables and only sets
  * `isEnabled`, so the platform draws no unavailable appearance of its own;
  * without this pair a row whose title dims for "not available" keeps a
  * full-strength accent track beside it and reads as both unavailable and on.
  *
- * The pair is the same for on and off, and for light and dark: the mid-neutral
- * `mutedSoft` track under the scheme's own ink `foreground`. A grey track with
- * a contrasting thumb reads as a control that is not available in either
- * scheme, while the thumb's position still says which way it points. The
- * palette's disabled accent fill (`primaryDisabled`) made light's track a dark
- * olive with a white thumb — at a glance an active switch — and dark's a light
- * grey with a dark thumb — at a glance an off one, so one state read two ways
- * across themes (`app-notifications` gate, 2026-11-18). `mutedSoft` clears a
- * visible step on the row's `secondary` surface in both schemes (2.2:1 light,
- * 2.2:1 dark), and `foreground` clears 6.6:1 against it in both.
+ * The disabled pair keeps the positions apart rather than painting one grey
+ * pill for both: the olive on-track and the neutral off-track, each dimmed
+ * toward the row so the control reads as unavailable, and a grip that still
+ * stands off its own track. Painting the same mid-neutral for both positions
+ * (the palette's `mutedSoft` under `foreground`) did read as unavailable, but
+ * it stopped saying whether the switch was on — the one thing a read-only list
+ * has to show. The steps are palette tokens of their own
+ * (`--switch-disabled-on`, `--switch-disabled-off` and their grips), measured
+ * over the `secondary` row the switch sits on: the two tracks separate at
+ * 2.0:1 in light and 1.68:1 in dark, each track clears 1.6:1 over the row, and
+ * each grip clears 1.6:1 over its track. A caller's own pair still wins: its
+ * props are applied last.
  *
  * iOS is left alone: UIKit fades a disabled `UISwitch` itself, so painting the
  * muted pair there would dim the control twice. Android is the platform that
@@ -78,7 +80,8 @@ export function Switch({
   const colors = useThemeColors();
   const dark = useColorScheme() === 'dark';
   const resolvedDisabled = disabled ?? accessibilityState?.disabled;
-  // Only Android needs the muted pair: iOS fades a disabled `UISwitch` itself.
+  // Only Android needs the disabled pairs: iOS fades a disabled `UISwitch`
+  // itself.
   const inactive = resolvedDisabled === true && Platform.OS === 'android';
   // The on pair is the olive accent at the luminance its grip needs: light
   // fills with `primary`, dark with the muted olive `selection`.
@@ -86,16 +89,15 @@ export function Switch({
   const enabledOnGrip = dark ? colors.selectionForeground : colors.primaryForeground;
   const enabledOffGrip = dark ? colors.foreground : colors.primaryForeground;
   const enabledOffTrack = dark ? colors.mutedForeground : colors.mutedSoft;
-  // The off grip sits on the off track. A control that cannot change paints
-  // one muted pair at the position it still shows: the mid-neutral track under
-  // the scheme's ink, so light and dark both read as unavailable instead of
-  // one reading active and the other off.
-  const disabledTrack = colors.mutedSoft;
-  const disabledGrip = colors.foreground;
-  const offGrip = inactive ? disabledGrip : enabledOffGrip;
-  const offTrack = inactive ? disabledTrack : enabledOffTrack;
-  const onTrack = inactive ? disabledTrack : enabledOnTrack;
-  const onGrip = inactive ? disabledGrip : enabledOnGrip;
+  // A disabled control keeps the hue that says which way it points: the olive
+  // on-track and the neutral off-track each dim toward the row, with a grip
+  // that still stands off its own track. One grey pair for both positions read
+  // as unavailable but stopped saying whether the switch was on, which is the
+  // state a read-only list has to show.
+  const offGrip = inactive ? colors.switchDisabledOffForeground : enabledOffGrip;
+  const offTrack = inactive ? colors.switchDisabledOff : enabledOffTrack;
+  const onTrack = inactive ? colors.switchDisabledOn : enabledOnTrack;
+  const onGrip = inactive ? colors.switchDisabledOnForeground : enabledOnGrip;
 
   return (
     <NativeSwitch

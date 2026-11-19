@@ -1,4 +1,7 @@
-import { canManageOrganization } from '@kilocode/app-shared/organizations';
+import {
+  canManageOrganization,
+  canManageOrganizationBilling,
+} from '@kilocode/app-shared/organizations';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -147,7 +150,10 @@ export function OrganizationProvidersAndModelsScreen() {
     canLinkBilling,
     billingUrl: `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions`,
     inAppBilling: billingActionFor(
-      canManageOrganization(role),
+      // The role that may change the plan, which is the role whose sentence
+      // stops at the state: a `billing_manager` reaches this screen and the
+      // in-app billing screen accepts them, so the step follows them too.
+      canManageOrganizationBilling(role),
       t('organization.hub.manageBilling'),
       () => {
         router.push(billingHrefFor(organizationId));

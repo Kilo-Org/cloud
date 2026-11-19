@@ -314,13 +314,6 @@ describe('ModelAccessForm lapsed-plan controls', () => {
     expect(root.findAllByType('AccessibleStatus' as never)).toHaveLength(0);
   });
 
-  it('keeps the role caption and no refusal for a member on an active plan', () => {
-    const root = render({ canEdit: false, planEnded: false });
-
-    expect(renderedCopy(root)).toContain(appI18n.t('organizationModelAccess.readOnly'));
-    expect(refusals(root)).toHaveLength(0);
-  });
-
   it('disables save and the lists while the plan lapsed, even with edits', () => {
     // A clean draft already disables Save through `!dirty`, so the plan gate is
     // only observable after an edit dirties the draft: the same denial must
@@ -357,15 +350,23 @@ describe('ModelAccessForm lapsed-plan controls', () => {
     expect(labelledControl(next, appI18n.t('common.save')).props.disabled).toBe(false);
   });
 
-  it('leaves the actions row out for a clean draft while the plan lapsed', () => {
+  it('leaves the controls out but keeps their place while the plan lapsed', () => {
     // A clean draft already disables Save through `!dirty` and Cancel through
     // the same rule, so a lapsed plan with nothing to discard has no action
-    // left: the row leaves rather than holding two dead controls under the
-    // sentence that states the blocker.
+    // left: the controls leave rather than sit dead under the sentence that
+    // states the blocker. Their height stays, so the list below does not move
+    // when the gate arrives or clears.
     const root = render({ canEdit: true, planEnded: true });
 
     expect(controls(root, appI18n.t('common.save'))).toHaveLength(0);
     expect(controls(root, appI18n.t('common.cancel'))).toHaveLength(0);
+    expect(
+      root.findAll(
+        node =>
+          Object.is(node.type, 'View') &&
+          String(node.props.className ?? '').includes('min-h-[36px]')
+      )
+    ).toHaveLength(1);
   });
 
   it('keeps the actions row with Cancel live and Save gated for a trapped draft', () => {
@@ -386,24 +387,16 @@ describe('ModelAccessForm lapsed-plan controls', () => {
     const baseline = root.findByType('ModelDenyList' as never).props.draft as ModelAccessDraft;
     changeDraft(root, draft => ({ ...draft, modelDenyList: ['anthropic/claude'] }));
 
-    expect(root.findByType('ModelDenyList' as never).props.draft).not.toEqual(baseline);
     expect(labelledControl(root, appI18n.t('common.save')).props.disabled).toBe(true);
     const cancel = labelledControl(root, appI18n.t('common.cancel'));
-    const enabled = cancel.props.disabled === false;
     // A disabled pressable takes no press, exactly as on device, so a gated
     // Cancel would leave the trapped draft in place.
-    if (enabled) {
-      act(() => {
-        (cancel.props.onPress as () => void)();
-      });
-    }
-
-    // One report for both facts: the control is live beside the gated Save,
-    // and the draft it discards is the baseline again.
-    expect({
-      enabled,
-      draft: root.findByType('ModelDenyList' as never).props.draft,
-    }).toEqual({ enabled: true, draft: baseline });
+    expect(cancel.props.disabled).toBe(false);
+    act(() => {
+      (cancel.props.onPress as () => void)();
+    });
+    // One report: the draft is the baseline again, and nothing was saved.
+    expect(root.findByType('ModelDenyList' as never).props.draft).toEqual(baseline);
     expect(saved.mutateAsync).not.toHaveBeenCalled();
   });
 

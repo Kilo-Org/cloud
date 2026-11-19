@@ -34,6 +34,22 @@
    * the ink label (primary-foreground) legible: white on this fill clears 4.5:1,
    * so a disabled control reads as inactive without losing its label. */
   --primary-disabled: #6f6a61;
+  /* The shared Switch's disabled pair. A disabled control keeps the hue that
+   * says which way it points instead of one grey pill for both positions: the
+   * olive on-track and the neutral off-track, each dimmed toward the row so the
+   * control reads as unavailable, with a grip that still stands off its own
+   * track. Measured over the `secondary` row the switch sits on: the two tracks
+   * separate at 2.0:1 (light) and 1.68:1 (dark), each track clears 1.6:1 over
+   * the row, and each grip clears 1.6:1 over its track. The dark block carries
+   * its own pair (see there). */
+  --switch-disabled-on: #7f8650;
+  /* The grip is the scheme's ink rather than white: Android's thumb is wider
+   * than the track, so its outer arc sits on the light row, where a white grip
+   * would dissolve (1.16:1). The ink clears 3.0:1 on its own track and 10:1 on
+   * the row. */
+  --switch-disabled-on-foreground: #3c382f;
+  --switch-disabled-off: #bebab1;
+  --switch-disabled-off-foreground: #6f6a61;
   --destructive: #b0483a;
   --destructive-foreground: #ffffff;
   /* Solid destructive control fill. Separate from `--destructive` because the
@@ -201,6 +217,16 @@
      * The fill stays neutral and muted: a tinted fill reads as a second brand
      * colour and competes with the enabled #ffdd00 it replaces. */
     --primary-disabled: #8a8680;
+    /* Dark counterpart of the shared Switch's disabled pair: the olive on-track
+     * and the neutral off-track, dimmed toward the near-black row. The steps are
+     * darker than light's because the row is: the two tracks separate at
+     * 1.68:1, each clears 1.67:1 over `--secondary`, and each grip clears 1.6:1
+     * over its own track. One grey pair for both positions would lose the state
+     * this pair exists to show. */
+    --switch-disabled-on: #5d6b16;
+    --switch-disabled-on-foreground: #f2f0eb;
+    --switch-disabled-off: #444344;
+    --switch-disabled-off-foreground: #c4c1b8;
     --destructive: #f28b7a;
     --destructive-foreground: #1a1a10;
     /* The deep red the light scheme fills with, lifted just enough to stand off
@@ -332,6 +358,10 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-disabled: var(--primary-disabled);
+  --color-switch-disabled-on: var(--switch-disabled-on);
+  --color-switch-disabled-on-foreground: var(--switch-disabled-on-foreground);
+  --color-switch-disabled-off: var(--switch-disabled-off);
+  --color-switch-disabled-off-foreground: var(--switch-disabled-off-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary-fill: var(--secondary-fill);

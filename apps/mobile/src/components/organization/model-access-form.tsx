@@ -326,20 +326,26 @@ export function ModelAccessForm({
         {/* The lapsed plan blocks every edit on this screen, so the block under
             the segments names that state, its cause and who can end it: the
             shared organization plan refusal, as the hub, the billing screen and
-            the new-session form paint it. The sentence says "then try again",
-            so the step the screen resolved rides under it. */}
+            the new-session form paint it. The screen resolves both parts: the
+            sentence the reader's role picks, and the step that role can take.
+            A role that cannot change the plan keeps the sentence that names who
+            can, and gets no step. */}
         {planEnded ? <OrganizationPlanRefusal message={planMessage} action={planAction} /> : null}
         {!canEdit && !planEnded ? (
           <Text variant="caption">{t('organizationModelAccess.readOnly')}</Text>
         ) : null}
         {/* The buttons keep their place while the draft is clean, so a save
             that settles never moves the list below them. A lapsed plan with a
-            clean draft has no action left to offer — the gate has Save and
-            Cancel is `!dirty` — so the row leaves instead of holding two dead
-            controls under the sentence that already states the blocker. A
-            dirty draft keeps it, because Cancel is then the only way to
-            discard what the gate trapped. */}
-        {planEnded && !dirty ? null : (
+            clean draft has no action left to offer — the gate holds Save and
+            Cancel is `!dirty` — so the controls leave rather than sit dead
+            under the sentence that already states the blocker, and a box of
+            the row's own height keeps their place: the row comes and goes with
+            a state, and a state change must never move the list under the
+            reader's finger. A dirty draft keeps the live row, because Cancel
+            is then the only way to discard what the gate trapped. */}
+        {planEnded && !dirty ? (
+          <View className="min-h-[36px]" />
+        ) : (
           <View className="flex-row items-center gap-2">
             <View className="min-h-5 flex-1 justify-center">
               <AccessibleStatus

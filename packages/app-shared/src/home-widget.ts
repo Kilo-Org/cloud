@@ -17,6 +17,7 @@ import {
   GLANCEABLE_TITLE_LIMIT,
   glanceableStatusKind,
   isStartableGlanceableWork,
+  isApprovableGlanceableStatus,
   isTerminalGlanceableStatus,
   type BuildGlanceableSnapshotInput,
   type GlanceableNeedsInputKind,
@@ -195,12 +196,13 @@ export function buildHomeWidgetDetails(
   const byStatusUpdatedAt = compareSessionInstant(row => row.statusUpdatedAt, 'earliest');
   // One status predicate owns both membership and the kind, so a needs-input
   // row and the label drawn for it cannot disagree.
-  // The schema is the one representation every payload enforces, so a row's
-  // key counts as approvable only when it parses; anything else reads as none.
+  // The schema is the one representation every payload enforces, so a row's key
+  // counts only when it parses; anything else reads as none.
   const waiting: {
     row: HomeWidgetSessionRow;
     kind: GlanceableNeedsInputKind;
-    approvalKey: string | null;
+    /** The schema-valid key the row carries, or null when it carries none. */
+    key: string | null;
   }[] = [];
   for (const row of sessions) {
     const kind = glanceableNeedsInputKind(row.status);
@@ -208,14 +210,12 @@ export function buildHomeWidgetDetails(
       waiting.push({
         row,
         kind,
-        approvalKey: approvalKeySchema.safeParse(row.approvalKey).data ?? null,
+        key: approvalKeySchema.safeParse(row.approvalKey).data ?? null,
       });
     }
   }
   waiting.sort(
-    (a, b) =>
-      Number(b.approvalKey !== null) - Number(a.approvalKey !== null) ||
-      byStatusUpdatedAt(a.row, b.row)
+    (a, b) => Number(b.key !== null) - Number(a.key !== null) || byStatusUpdatedAt(a.row, b.row)
   );
   const scheduled = sessions
     .filter(row => glanceableStatusKind(row.status) === 'scheduled')
@@ -229,10 +229,14 @@ export function buildHomeWidgetDetails(
         : sessions
             .filter(row => glanceableStatusKind(row.status) === primaryKind)
             .sort(compareSessionInstant(row => row.statusUpdatedAt, 'latest'))[0];
+  // The list still ranks any row carrying a valid key first, but the key handed
+  // to Approve comes only from a permission row: a question or retry row's key
+  // is ignored, so that entry may not be waiting[0].
+  const approvalRow = waiting.find(
+    entry => entry.key !== null && isApprovableGlanceableStatus(entry.row.status)
+  );
   return {
-    // The sort put the approvable row first, so the key belongs to the same
-    // row the needs-input primary title reads.
-    approvalKey: waiting[0]?.approvalKey ?? null,
+    approvalKey: approvalRow?.key ?? null,
     primaryKind: primaryKind ?? null,
     primaryTitle: primary === undefined ? null : glanceableTitle(primary.title),
     waitingAgents: waiting

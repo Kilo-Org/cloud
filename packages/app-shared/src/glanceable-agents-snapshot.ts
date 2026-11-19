@@ -299,18 +299,31 @@ export function countGlanceableSessions(
 }
 
 /**
+ * The one approvable-status rule: a `permission` wait is the only needs-input
+ * kind the user can clear without choosing an option, so a `question` or
+ * `retry` row is never approvable, whatever else it carries. The `needsApproval`
+ * count, the Home widget's approving row and the server's front-permission row
+ * all read this one rule, so they cannot drift.
+ */
+export function isApprovableGlanceableStatus(status: string): boolean {
+  return status === 'permission';
+}
+
+/**
  * The number of session rows whose status is exactly `permission`. A
  * permission wait is the one needs-input kind the user can clear without
  * choosing an option, so the wrist control offers Approve only against this
  * count.
  *
  * Deliberately narrower than `needsInput`: a `question` needs an answer, and a
- * `retry` needs the provider to come back, so neither is approvable.
+ * `retry` needs the provider to come back, so neither is approvable. It reads
+ * `isApprovableGlanceableStatus`, the same rule the Home widget's approving row
+ * reads, so the count and that row cannot drift.
  */
 export function countGlanceableApprovals(sessions: readonly GlanceableSessionRow[]): number {
   let approvals = 0;
   for (const session of sessions) {
-    if (session.status === 'permission') {
+    if (isApprovableGlanceableStatus(session.status)) {
       approvals += 1;
     }
   }

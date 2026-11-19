@@ -19,20 +19,36 @@ export interface TabLeaseHolder {
 }
 
 /**
+ * The live agent session whose tab group holds a tab. The tab is that session's
+ * between its calls too (D10): a panel needs the confirmation before it acts on
+ * it, lease or no lease. An ended session's group holds nothing.
+ */
+export interface TabSessionOwner {
+  readonly sessionHandle: string;
+  readonly title?: string;
+}
+
+/**
  * - `granted`: the caller owns the tab now. `takeover` names the agent it took
  *   the tab from, whose in-flight call the runtime ends with `tab_taken`.
  * - `busy`: the wait ran out (`tab_busy`). Agents time out after
  *   `AGENT_TAB_WAIT_MS`; a dropped queue slot for a disposed caller also lands
  *   here.
- * - `needs_take_over`: a panel asked for a tab an agent holds. The panel must
- *   show its confirmation and ask again with `takeOver`.
+ * - `needs_take_over`: a panel asked for a tab an agent holds or a live
+ *   session owns. The panel must show its confirmation and ask again with
+ *   `takeOver`.
+ * - `taken`: a panel took this agent's tab between its calls. The agent's
+ *   first call after that gets `tab_taken` once, so it re-reads the page.
  */
 export type TabLeaseResult =
   | { readonly kind: 'granted'; readonly takeover?: TabLeaseHolder }
   | { readonly kind: 'busy' }
-  | { readonly kind: 'needs_take_over'; readonly holder: TabLeaseHolder };
+  | { readonly kind: 'needs_take_over'; readonly owner: TabSessionOwner }
+  | { readonly kind: 'taken' };
 
 export interface TabLeaseAcquireOptions {
+  /** The live agent session whose group holds the tab, if any. */
+  readonly owner?: TabSessionOwner | undefined;
   readonly signal?: AbortSignal | undefined;
   /** A panel passes this only after its take-over confirmation. */
   readonly takeOver?: boolean;
@@ -115,6 +131,8 @@ export const createTabLeaseRegistry = ({
   let pendingSnapshot: PersistedTabLease[] | undefined = undefined;
   let writeChain: Promise<void> = Promise.resolve();
   let draining = false;
+  /** Tabs a panel took from a live session between its calls, and the session whose next call owes `tab_taken`. */
+  const takenBetweenCalls = new Map<number, string>();
 
   const snapshotLeases = (): PersistedTabLease[] => {
     const snapshot: PersistedTabLease[] = [];
@@ -370,9 +388,30 @@ export const createTabLeaseRegistry = ({
     }
 
     const key = browserCallerKey(caller);
+    const owner = options?.owner;
+
+    // Only a call that names its own session as the owner is the session's next call; a step's inner acquire is not.
+    if (
+      caller.kind === 'agent' &&
+      owner?.sessionHandle === caller.sessionHandle &&
+      takenBetweenCalls.get(tabId) === caller.sessionHandle
+    ) {
+      takenBetweenCalls.delete(tabId);
+      return { kind: 'taken' };
+    }
+
     const holder = holders.get(tabId);
 
     if (holder === undefined) {
+      if (caller.kind === 'panel' && owner !== undefined) {
+        if (options?.takeOver !== true) {
+          return { kind: 'needs_take_over', owner };
+        }
+
+        // No call of the session is in flight to end, so its next call is the one that learns the page moved on.
+        takenBetweenCalls.set(tabId, owner.sessionHandle);
+      }
+
       grant(tabId, caller, options?.title);
       return { kind: 'granted' };
     }
@@ -384,7 +423,13 @@ export const createTabLeaseRegistry = ({
 
     if (caller.kind === 'panel' && holder.caller.kind === 'agent') {
       if (options?.takeOver !== true) {
-        return { holder, kind: 'needs_take_over' };
+        return {
+          kind: 'needs_take_over',
+          owner: owner ?? {
+            sessionHandle: holder.caller.sessionHandle,
+            ...(holder.title === undefined ? {} : { title: holder.title }),
+          },
+        };
       }
 
       grant(tabId, caller, options.title);
@@ -427,6 +472,14 @@ export const createTabLeaseRegistry = ({
 
     noteReleased({ key });
 
+    if (caller.kind === 'agent') {
+      for (const [tabId, sessionHandle] of takenBetweenCalls) {
+        if (sessionHandle === caller.sessionHandle) {
+          takenBetweenCalls.delete(tabId);
+        }
+      }
+    }
+
     for (const [tabId, holder] of holders) {
       if (holder.key === key) {
         holders.delete(tabId);
@@ -447,6 +500,7 @@ export const createTabLeaseRegistry = ({
     const holder = holders.get(tabId);
 
     noteReleased({ tabId });
+    takenBetweenCalls.delete(tabId);
 
     if (holder !== undefined) {
       holders.delete(tabId);

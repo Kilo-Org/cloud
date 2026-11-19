@@ -239,8 +239,8 @@ describe('tab leases', () => {
     const withoutConfirmation = await leases.acquire(7, panel('conversation-1'));
 
     expect(withoutConfirmation).toStrictEqual({
-      holder: { caller: holder, key: 'agent:controller-1:session-1', title: 'Price check' },
       kind: 'needs_take_over',
+      owner: { sessionHandle: 'session-1', title: 'Price check' },
     });
     expect(leases.holder(7)?.caller).toStrictEqual(holder);
   });
@@ -259,6 +259,89 @@ describe('tab leases', () => {
       takeover: { caller: holder, key: 'agent:controller-1:session-1', title: 'Price check' },
     });
     expect(leases.holder(7)?.caller).toStrictEqual(taker);
+
+    // The call in flight was the one that learned of the take-over; the session's next call queues behind the panel.
+    const next = leases.acquire(7, holder);
+
+    leases.release(7, taker);
+    await expect(next).resolves.toStrictEqual({ kind: 'granted' });
+  });
+
+  it('asks a panel to confirm before it acts on a live session tab between the agent calls', async () => {
+    const leases = createTabLeaseRegistry({});
+    const owner = { sessionHandle: 'session-1', title: 'Price check' };
+
+    await leases.acquire(7, agent('session-1'), { owner });
+    leases.release(7, agent('session-1'));
+
+    await expect(leases.acquire(7, panel('conversation-1'), { owner })).resolves.toStrictEqual({
+      kind: 'needs_take_over',
+      owner,
+    });
+    expect(leases.holder(7)).toBeUndefined();
+  });
+
+  it('gives the session tab_taken once after a take-over between its calls, then queues it behind the panel', async () => {
+    const leases = createTabLeaseRegistry({});
+    const owner = { sessionHandle: 'session-1', title: 'Price check' };
+    const taker = panel('conversation-1');
+
+    await expect(leases.acquire(7, taker, { owner, takeOver: true })).resolves.toStrictEqual({
+      kind: 'granted',
+    });
+
+    await expect(leases.acquire(7, agent('session-1'), { owner })).resolves.toStrictEqual({
+      kind: 'taken',
+    });
+
+    let granted = false;
+    const queued = (async () => {
+      const result = await leases.acquire(7, agent('session-1'), { owner });
+      granted = true;
+      return result;
+    })();
+
+    await Promise.resolve();
+    expect(granted).toBe(false);
+
+    leases.releaseCaller(taker);
+    await expect(queued).resolves.toStrictEqual({ kind: 'granted' });
+    expect(leases.holder(7)?.caller).toStrictEqual(agent('session-1'));
+  });
+
+  it('leaves the session its tab when the panel cancels the confirmation', async () => {
+    const leases = createTabLeaseRegistry({});
+    const owner = { sessionHandle: 'session-1', title: 'Price check' };
+
+    await leases.acquire(7, panel('conversation-1'), { owner });
+
+    await expect(leases.acquire(7, agent('session-1'), { owner })).resolves.toStrictEqual({
+      kind: 'granted',
+    });
+  });
+
+  it('drops an owed tab_taken when the session is disposed or the tab closes', async () => {
+    const leases = createTabLeaseRegistry({});
+
+    await leases.acquire(7, panel('conversation-1'), {
+      owner: { sessionHandle: 'session-1' },
+      takeOver: true,
+    });
+    await leases.acquire(8, panel('conversation-1'), {
+      owner: { sessionHandle: 'session-2' },
+      takeOver: true,
+    });
+    leases.releaseCaller(panel('conversation-1'));
+
+    leases.releaseCaller(agent('session-1'));
+    leases.releaseTab(8);
+
+    await expect(
+      leases.acquire(7, agent('session-1'), { owner: { sessionHandle: 'session-1' } })
+    ).resolves.toStrictEqual({ kind: 'granted' });
+    await expect(
+      leases.acquire(8, agent('session-2'), { owner: { sessionHandle: 'session-2' } })
+    ).resolves.toStrictEqual({ kind: 'granted' });
   });
 
   it('does not let a panel take a tab from another panel or a workflow', async () => {
@@ -335,12 +418,8 @@ describe('tab leases', () => {
     const result = await leases.acquire(7, panel('conversation-1'));
 
     expect(result).toStrictEqual({
-      holder: {
-        caller: agent('session-1'),
-        key: 'agent:controller-1:session-1',
-        title: 'Price check',
-      },
       kind: 'needs_take_over',
+      owner: { sessionHandle: 'session-1', title: 'Price check' },
     });
   });
 

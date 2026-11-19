@@ -13,6 +13,7 @@ import {
 } from '@/components/organization/guardrails-rule-menu';
 import { SettingsValueRow } from '@/components/organization/settings-form-sections';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { FilterChip } from '@/components/ui/filter-chip';
 import { FormField } from '@/components/ui/form-field';
 import { Trash2 } from '@/components/ui/icons';
@@ -93,7 +94,7 @@ export function PolicyRulesEditor({
         <Text variant="caption">{t('organizationGuardrails.rulesEmpty')}</Text>
       ) : (
         rules.map((rule, index) => (
-          <View key={ruleKeys[index] ?? index} className="gap-3 rounded-lg bg-background p-3">
+          <Card key={ruleKeys[index] ?? index}>
             <View className="flex-row items-center justify-between gap-2">
               <Text className="text-sm font-medium text-foreground">
                 {t('organizationGuardrails.ruleNumber', { number: index + 1 })}
@@ -197,7 +198,7 @@ export function PolicyRulesEditor({
                 })}
               </View>
             </View>
-          </View>
+          </Card>
         ))
       )}
       <Button

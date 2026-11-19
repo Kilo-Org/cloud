@@ -1,7 +1,6 @@
 import { type ReactNode } from 'react';
 import { View } from 'react-native';
 
-import { Card } from '@/components/ui/card';
 import { RowChevron } from '@/components/ui/row-chevron';
 import { RowFrame } from '@/components/ui/row-frame';
 import { renderRowTrailing } from '@/components/ui/row-trailing';
@@ -9,11 +8,11 @@ import { Text } from '@/components/ui/text';
 
 /**
  * One titled block of an organization settings form: the title, its
- * description, and an optional master switch on the title row. The heading is a
- * card of its own and the fields below it are siblings, so a row keeps the
- * page's row inset instead of nesting inside the card's padding. Children
- * render only while the switch is on, which is how the web forms show a
- * section's fields.
+ * description, and an optional master switch on the title row. The heading and
+ * the fields below it are flat siblings at the page gutter, never a surface
+ * inside another surface, so every relation in a section keeps the one gap and
+ * the title row stays one line tall. Children render only while the switch is
+ * on, which is how the web forms show a section's fields.
  */
 export function SettingsSection({
   title,
@@ -33,12 +32,11 @@ export function SettingsSection({
   const showsSwitch = enabled !== undefined && onEnabledChange !== undefined;
   return (
     <View className="gap-3">
-      <Card>
-        <View className="flex-row items-start justify-between gap-3">
-          <View className="min-w-0 flex-1 gap-1">
-            <Text variant="heading">{title}</Text>
-            <Text variant="caption">{description}</Text>
-          </View>
+      <View className="gap-3">
+        <View className="flex-row items-center justify-between gap-3">
+          <Text variant="heading" className="min-w-0 flex-1">
+            {title}
+          </Text>
           {showsSwitch &&
             renderRowTrailing({
               kind: 'switch',
@@ -48,7 +46,8 @@ export function SettingsSection({
               accessibilityLabel: title,
             })}
         </View>
-      </Card>
+        <Text variant="caption">{description}</Text>
+      </View>
       {!showsSwitch || enabled ? children : null}
     </View>
   );

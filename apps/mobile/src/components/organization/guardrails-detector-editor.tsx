@@ -2,7 +2,6 @@ import { type ReactNode } from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { Card } from '@/components/ui/card';
 import { FilterChip } from '@/components/ui/filter-chip';
 import { FormField } from '@/components/ui/form-field';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -57,7 +56,7 @@ export function DetectorCard({
     { value: 'block' as const, label: t('codeReviewer.decision.block') },
   ];
   return (
-    <Card>
+    <View className="gap-3">
       <View className="gap-1">
         <Text className="text-sm font-medium text-foreground">{label}</Text>
         <Text variant="caption">{description}</Text>
@@ -69,10 +68,10 @@ export function DetectorCard({
         disabled={disabled}
         accessibilityLabel={label}
       />
-      {choice === 'off' ? null : (
+      {choice === 'off' || !children ? null : (
         <View className={disabled ? 'pointer-events-none opacity-50' : undefined}>{children}</View>
       )}
-    </Card>
+    </View>
   );
 }
 

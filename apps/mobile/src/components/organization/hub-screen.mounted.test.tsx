@@ -484,6 +484,10 @@ describe('Organization hub plan', () => {
       label: i18n.t('organization.hub.planStatusTrialEndsOn', { date: expectedDate }),
       tone: 'default',
     });
+    // The tier plus the trial sentence does not fit one line on a narrow
+    // window, so the row must state the trial end rather than ellipsize it;
+    // two lines fit the readout in every language the gate sweeps.
+    expect(row?.props.valueLines).toBe(2);
     // The separator lives in the catalog value, so this pins it as the row's
     // leading segment rather than folding the trial into the plan name.
     expect(status).toMatchObject({ label: expect.stringMatching(/^ · /) });

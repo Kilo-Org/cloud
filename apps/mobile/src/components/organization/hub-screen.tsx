@@ -370,6 +370,10 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           <KvRow
             label={t('organization.hub.plan')}
             value={planName}
+            // The tier plus the trial sentence does not fit one line on a
+            // narrow window, so the row must state the trial end rather than
+            // ellipsize it away.
+            valueLines={2}
             valueStatus={
               planEnded
                 ? { label: t('organization.hub.planStatusLapsed'), tone: 'danger' }

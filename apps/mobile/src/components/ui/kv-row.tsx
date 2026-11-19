@@ -40,6 +40,12 @@ type KvRowProps = {
   className?: string;
   /** Allow the value text to be selected/copied (e.g. identifiers, versions, paths). */
   selectable?: boolean;
+  /**
+   * A row whose value carries a sentence may wrap to this many lines instead
+   * of losing characters in the middle; the row grows to fit, like a
+   * selectable value.
+   */
+  valueLines?: number;
   /** Extra classes for the value text only (e.g. `uppercase` for a status readout). */
   valueClassName?: string;
   /**
@@ -99,6 +105,7 @@ export function KvRow({
   last,
   className,
   selectable,
+  valueLines,
   valueClassName,
   valueAccessibilityLabel,
   valueDirection,
@@ -111,14 +118,20 @@ export function KvRow({
   // paints a clipped second line (SPOT-DEFECT: the finding-details Manifest
   // row). Clamp the values that can hold it; a selectable value wraps inside
   // the row and the row grows to fit it, so no glyph is cut off.
-  const valueLineLimit = selectable ? undefined : 1;
+  const valueLineLimit = selectable ? undefined : (valueLines ?? 1);
+  // One clamped line keeps the middle ellipsis — a long identifier loses its
+  // middle glyphs; a sentence wrapped to several lines cuts at its end instead.
+  let valueEllipsizeMode: 'middle' | 'tail' | undefined = undefined;
+  if (valueLineLimit !== undefined) {
+    valueEllipsizeMode = valueLineLimit > 1 ? 'tail' : 'middle';
+  }
   const valueText = (
     <Text
       variant={valueFace === 'mono' ? 'mono' : 'default'}
       selectable={selectable}
       accessibilityLabel={valueAccessibilityLabel}
       numberOfLines={valueLineLimit}
-      ellipsizeMode={valueLineLimit ? 'middle' : undefined}
+      ellipsizeMode={valueEllipsizeMode}
       style={valueDirection === 'ltr' ? LTR_TEXT_DIRECTION : undefined}
       className={cn(
         'min-w-0 shrink text-right text-[13px]',

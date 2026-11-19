@@ -82,6 +82,7 @@ function renderRow(
     | {
         value: string;
         selectable?: boolean;
+        valueLines?: number;
         valueDirection?: 'ltr';
         valueFace?: 'mono' | 'text' | 'numeric';
         valueStatus?: { label: string; tone: 'good' | 'warn' | 'danger' | 'muted' };
@@ -147,6 +148,18 @@ describe('KvRow mounted layout', () => {
     );
     expect(text.props.numberOfLines).toBe(1);
     expect(text.props.ellipsizeMode).toBe('middle');
+  });
+
+  // A value that carries a sentence — the plan tier plus the trial end — must
+  // not lose characters in the middle; the default stays one line because a
+  // short value never needed more.
+  it('wraps a value that carries a sentence to the lines it is given', () => {
+    const text = valueText(
+      renderRow({ value: 'Enterprise · Trial ends on Nov 24', valueLines: 2 }),
+      'Enterprise · Trial ends on Nov 24'
+    );
+    expect(text.props.numberOfLines).toBe(2);
+    expect(text.props.ellipsizeMode).toBe('tail');
   });
 
   // A version range is written left to right, so a right-to-left interface lets

@@ -4,6 +4,7 @@ import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organiza
 import { getOpenRouterTranscriptionModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { CATALOG_CACHE_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/handlers/catalog-cache-headers';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   getEffectiveModelDecision,
@@ -37,9 +38,12 @@ export async function handleTranscriptionModelsRequest(): Promise<
       for (const model of data.data) {
         if ((await getEffectiveModelDecision(policy, model.id)).allowed) models.push(model);
       }
-      return NextResponse.json({ ...data, data: models });
+      return NextResponse.json(
+        { ...data, data: models },
+        { headers: CATALOG_CACHE_HEADERS.perCaller }
+      );
     }
-    return NextResponse.json(data);
+    return NextResponse.json(data, { headers: CATALOG_CACHE_HEADERS.shared });
   } catch (error) {
     captureException(error, {
       tags: { endpoint: 'gateway/transcription-models' },

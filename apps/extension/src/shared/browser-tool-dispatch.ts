@@ -6,6 +6,7 @@ import {
 } from './browser-tool-interact-actions';
 import { PAGE_BROWSER_TOOL_NAMES, runPageBrowserTool } from './browser-tool-page-actions';
 import type {
+  BrowserAgentAccess,
   BrowserToolPageActionOptions,
   BrowserToolPageActionSession,
   BrowserToolPageTabsApi,
@@ -13,6 +14,7 @@ import type {
 import { READ_BROWSER_TOOL_NAMES, runReadBrowserTool } from './browser-tool-read-actions';
 import type { BrowserReadToolOptions } from './browser-tool-read-actions';
 import type { BrowserToolPageSession } from './browser-tool-snapshot';
+import type { AgentReadScope } from './browser-agent-frames';
 import type { BrowserToolInteractSession } from './browser-tool-interact-actions';
 import type { BrowserToolSession } from './browser-tool-session';
 import type { EvalTabResult } from './tab-debugger';
@@ -39,6 +41,12 @@ export type BrowserToolDispatchSession = BrowserToolPageSession &
  * clock override, and the WebMCP runtime hooks for the two WebMCP tools.
  */
 export interface BrowserToolDispatchOptions {
+  /** The agent caller's grants and group, so the tab actions enforce D9; absent for the panel and workflow callers. */
+  readonly agentAccess?: BrowserAgentAccess | undefined;
+  /** Records a tab the page tools opened, with its opener tab. */
+  readonly noteTabCreated?: ((tabId: number, openerTabId: number | undefined) => void) | undefined;
+  /** Frame scoping for a CLI agent caller; absent for the panel and workflow callers. */
+  readonly agentScope?: AgentReadScope | undefined;
   readonly now?: () => number;
   readonly tabId?: number;
   readonly tabsApi?: BrowserToolPageTabsApi;
@@ -62,10 +70,14 @@ const dispatchArgumentsSchema = z.record(z.string(), z.unknown());
 const toUpstreamToolName = (name: string): string =>
   name.startsWith(KILO_BROWSER_TOOL_PREFIX) ? name.slice(KILO_BROWSER_TOOL_PREFIX.length) : name;
 
-const readToolOptions = (options: BrowserToolDispatchOptions): BrowserReadToolOptions =>
-  options.now === undefined ? {} : { now: options.now };
+const readToolOptions = (options: BrowserToolDispatchOptions): BrowserReadToolOptions => ({
+  ...(options.agentScope === undefined ? {} : { agentScope: options.agentScope }),
+  ...(options.now === undefined ? {} : { now: options.now }),
+});
 
 const pageToolOptions = (options: BrowserToolDispatchOptions): BrowserToolPageActionOptions => ({
+  ...(options.agentAccess === undefined ? {} : { agentAccess: options.agentAccess }),
+  ...(options.noteTabCreated === undefined ? {} : { noteTabCreated: options.noteTabCreated }),
   ...(options.now === undefined ? {} : { now: options.now }),
   ...(options.tabId === undefined ? {} : { tabId: options.tabId }),
   ...(options.tabsApi === undefined ? {} : { tabsApi: options.tabsApi }),

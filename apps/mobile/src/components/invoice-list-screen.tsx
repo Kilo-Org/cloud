@@ -43,17 +43,19 @@ type InvoiceListQuery = {
 };
 
 // FlashList takes `contentContainerStyle` (no className), so the FlatList's
-// `grow gap-3 px-6 pt-4` content classes map to their pixel values. FlashList v2
-// positions every cell absolutely and has no `gap` handling (2.3.2 ships zero
-// `gap` references), so the 12px inter-row gap rides on the measured item
-// separator instead of `contentContainerStyle.gap`. The old container `gap` also
-// sat between the last row and the pagination footer; FlashList's separator only
-// spans items, so that boundary carries the same 12px as `pt-3` on the footer.
+// `grow gap-3 px-6 pt-4` content classes map to their pixel values: NativeWind's
+// native rem is 14, so px-6 is 21 dp and pt-4 is 14 dp (24/16 is the web rem and
+// sits 3 dp inside the skeleton it replaces). FlashList v2 positions every cell
+// absolutely and has no `gap` handling (2.3.2 ships zero `gap` references), so
+// the 12px inter-row gap rides on the measured item separator instead of
+// `contentContainerStyle.gap`. The old container `gap` also sat between the last
+// row and the pagination footer; FlashList's separator only spans items, so that
+// boundary carries the same 12px as `pt-3` on the footer.
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = {
   flexGrow: 1,
-  paddingHorizontal: 24,
-  paddingTop: 16,
+  paddingHorizontal: 21,
+  paddingTop: 14,
 } satisfies ViewStyle;
 
 const InvoiceRowSeparator = () => <View className="h-3" />;
@@ -70,6 +72,18 @@ function InvoiceRowSkeleton() {
 type InvoiceListScreenProps = Readonly<{
   /** The screen's own title: the personal and organization lists differ. */
   title: string;
+  /**
+   * The screen's own name when the title names a scope: the organization scope
+   * titles itself with the membership's name, so this list's name keeps the
+   * header's mono category line and a user-authored name never takes it.
+   */
+  eyebrow?: string;
+  /**
+   * Hold the eyebrow's line before a scope name resolves, so the header keeps
+   * one height while the membership read settles. A caller whose title is
+   * already this screen's name paints no eyebrow and leaves this off.
+   */
+  reserveEyebrow?: boolean;
   /** Where the header's Back lands when the list opens with no history to pop. */
   backFallback: Href;
   /** The scope's paged invoice read, flattened by its own hook. */
@@ -87,6 +101,8 @@ type InvoiceListScreenProps = Readonly<{
  */
 export function InvoiceListScreen({
   title,
+  eyebrow,
+  reserveEyebrow,
   backFallback,
   query,
   entries,
@@ -236,7 +252,12 @@ export function InvoiceListScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} backFallback={backFallback} />
+      <ScreenHeader
+        title={title}
+        eyebrow={eyebrow}
+        reserveEyebrow={reserveEyebrow}
+        backFallback={backFallback}
+      />
       {body}
     </View>
   );

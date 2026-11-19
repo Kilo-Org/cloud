@@ -124,7 +124,6 @@ export function validateAdmissionPayload(raw: unknown): AdmissionPayload | undef
   if (obj['platform'] !== 'ios' && obj['platform'] !== 'android') return undefined;
   if (obj['kind'] !== 'attestation' && obj['kind'] !== 'assertion') return undefined;
   if (typeof obj['challenge'] !== 'string' || !obj['challenge']) return undefined;
-  // payload: non-empty base64 string within MAX_ADMISSION_PAYLOAD_CHARS
   if (typeof obj['payload'] !== 'string' || !obj['payload']) return undefined;
   if (payloadExceedsMaxLength(obj)) return undefined;
 
@@ -133,7 +132,6 @@ export function validateAdmissionPayload(raw: unknown): AdmissionPayload | undef
   const keyId = obj['keyId'];
 
   if (platform === 'ios') {
-    // iOS requires keyId for both attestation and assertion
     if (typeof keyId !== 'string' || !keyId) return undefined;
   }
 

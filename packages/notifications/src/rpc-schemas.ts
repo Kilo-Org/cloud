@@ -1,9 +1,8 @@
 import { z } from 'zod';
 
 import { securityLifecyclePayloadShape } from './notification-events';
-import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
 import { nonEmptyStringSchema } from './non-empty-string';
-import { pushDataSchema, cloudAgentSessionCategorySchema } from './push-data';
+import { pushDataSchema, cloudAgentSessionRaiseShape } from './push-data';
 import { refineSpendAlertScope, spendAlertScopeShape } from './spend-alert-scope';
 
 // The pre-localized copy a producer may attach to a push.
@@ -17,7 +16,10 @@ const i18nCopyFields = {
 //
 // The suppression and failure states a push dispatch can report. Declared
 // once here; each RPC schema below adds only the states its own response can
-// carry, so a renamed or new shared state is a single edit.
+// carry, so a renamed or new shared state is a single edit. A state one
+// schema adds on top of these tuples gets the same treatment: the
+// `RATE_LIMIT_SUPPRESSED_REASON` constant below is declared once and named at
+// every use, so a rename cannot leave one RPC response behind.
 
 // Reported by every RPC that sends a push.
 const DELIVERY_OUTCOME_REASONS = [
@@ -33,6 +35,10 @@ type DeliveryOutcomeReason = (typeof DELIVERY_OUTCOME_REASONS)[number];
 // agent-session RPC folds both into `failed`.
 const CHANNEL_DELIVERY_OUTCOME_REASONS = ['suppressed_expired', 'suppressed_access'] as const;
 type ChannelDeliveryOutcomeReason = (typeof CHANNEL_DELIVERY_OUTCOME_REASONS)[number];
+
+// Reported by the dispatch outcome and the agent-session response: a dispatch
+// attempt that fails the sliding-window rate-limit check.
+const RATE_LIMIT_SUPPRESSED_REASON = 'suppressed_rate_limit' as const;
 
 // The cloud-agent and session-ready responses report the shared
 // `suppressed_preference` as-is, spell the shared `failed` outcome
@@ -52,7 +58,7 @@ function payloadFreeOutcome<
   const K extends
     | Exclude<DeliveryOutcomeReason, 'failed'>
     | ChannelDeliveryOutcomeReason
-    | 'suppressed_rate_limit',
+    | typeof RATE_LIMIT_SUPPRESSED_REASON,
 >(kind: K) {
   return z.object({ kind: z.literal(kind) });
 }
@@ -129,12 +135,7 @@ export const sendCloudAgentSessionNotificationInputSchema = z.object({
   status: cloudAgentSessionPushStatusSchema,
   body: z.string(),
   suppressIfViewingSession: z.boolean().optional(),
-  // Absent category is treated as 'status' at the enforcement read site.
-  category: cloudAgentSessionCategorySchema.optional(),
-  // Needs-input raise detail: which answer the waiting agent wants, and the PR
-  // that can be opened from the notification. Absent on status pushes.
-  attentionKind: z.enum(NEEDS_INPUT_ATTENTION_KINDS).optional(),
-  prUrl: nonEmptyStringSchema.optional(),
+  ...cloudAgentSessionRaiseShape,
   ...i18nCopyFields,
 });
 export type SendCloudAgentSessionNotificationParams = z.infer<
@@ -227,7 +228,7 @@ export type SendAgentSessionNotificationParams = z.infer<
 export const sendAgentSessionNotificationReasonSchema = z.enum([
   'not_found',
   ...DELIVERY_OUTCOME_REASONS,
-  'suppressed_rate_limit',
+  RATE_LIMIT_SUPPRESSED_REASON,
 ]);
 export type SendAgentSessionNotificationReason = z.infer<
   typeof sendAgentSessionNotificationReasonSchema
@@ -284,7 +285,7 @@ export type DispatchPushInput = z.infer<typeof dispatchPushInputSchema>;
 export const dispatchPushOutcomeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('delivered'), tokenCount: z.number().int().nonnegative() }),
   payloadFreeOutcome('suppressed_presence'),
-  payloadFreeOutcome('suppressed_rate_limit'),
+  payloadFreeOutcome(RATE_LIMIT_SUPPRESSED_REASON),
   payloadFreeOutcome('suppressed_preference'),
   payloadFreeOutcome('suppressed_expired'),
   payloadFreeOutcome('suppressed_access'),
@@ -306,7 +307,10 @@ type AssertTrue<T extends true> = T;
 export type _AssertDispatchPushOutcomeVocabulary = AssertTrue<
   SameUnion<
     DispatchPushOutcome['kind'],
-    'delivered' | DeliveryOutcomeReason | ChannelDeliveryOutcomeReason | 'suppressed_rate_limit'
+    | 'delivered'
+    | DeliveryOutcomeReason
+    | ChannelDeliveryOutcomeReason
+    | typeof RATE_LIMIT_SUPPRESSED_REASON
   >
 >;
 

@@ -1,5 +1,7 @@
 /* eslint-disable max-lines */
 import { z } from 'zod';
+import { browserCallerSchema } from './browser-caller';
+import type { BrowserCaller } from './browser-caller';
 
 export const DEBUGGER_PROTOCOL_VERSION = '1.3';
 export const LIST_INSPECTABLE_TABS_MESSAGE = 'kilo.tabs.listInspectable';
@@ -9,6 +11,9 @@ export const VIEWPORT_SCREENSHOT_MESSAGE = 'kilo.tabs.viewportScreenshot';
 export const WEB_MCP_DISCOVER_MESSAGE = 'kilo.tabs.webMcpDiscover';
 export const WEB_MCP_EXECUTE_MESSAGE = 'kilo.tabs.webMcpExecute';
 export const BROWSER_TOOL_MESSAGE = 'kilo.tabs.browserTool';
+export const CLAIM_TAB_MESSAGE = 'kilo.tabs.claim';
+export const RELEASE_BROWSER_CALLER_MESSAGE = 'kilo.tabs.releaseBrowserCaller';
+export const DISPOSE_BROWSER_CALLER_MESSAGE = 'kilo.tabs.disposeBrowserCaller';
 export const DEFAULT_EVAL_TIMEOUT_MS = 5000;
 /**
  * The debugger can only attach to ordinary pages. `chrome://`, extension and
@@ -89,6 +94,12 @@ export interface BrowserTabInfo {
   readonly windowId?: number;
 }
 
+export interface BrowserTabCreatedApi {
+  readonly addListener: (
+    listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+  ) => void;
+}
+
 export interface BrowserTabRemovedApi {
   readonly addListener: (listener: (tabId: number) => void) => void;
   readonly removeListener: (listener: (tabId: number) => void) => void;
@@ -101,6 +112,8 @@ export interface BrowserTabsApi {
   ) => Promise<string> | string;
   readonly get?: (tabId: number) => Promise<BrowserTabInfo> | BrowserTabInfo;
   /** `chrome.tabs.onRemoved` — a browser-tool session disposes when its tab closes. */
+  /** `chrome.tabs.onCreated` — a tab opened from a session's tab joins that session. */
+  readonly onCreated?: BrowserTabCreatedApi;
   readonly onRemoved?: BrowserTabRemovedApi;
   readonly query: (
     queryInfo: Record<string, unknown>
@@ -224,15 +237,41 @@ export type EvalTabResult =
       readonly ok: false;
     };
 
+/**
+ * A panel asked for a tab an agent holds. The side panel shows the
+ * confirmation and sends the call again with `takeOver: true`; without that
+ * answer the agent keeps the tab and the panel does not take it.
+ */
+export interface BrowserTabTakeOverRequest {
+  readonly holderKind: 'agent';
+  readonly sessionTitle: string;
+  readonly tabId: number;
+}
+
 export type TabDebuggerRequest =
   | {
       readonly type: typeof LIST_INSPECTABLE_TABS_MESSAGE;
     }
   | {
+      readonly caller: BrowserCaller;
       readonly code: string;
       readonly tabId: number;
       readonly timeoutMs?: number;
       readonly type: typeof EVAL_TAB_MESSAGE;
+    }
+  | {
+      readonly caller: BrowserCaller;
+      readonly from?: BrowserCaller;
+      readonly tabId: number;
+      readonly type: typeof CLAIM_TAB_MESSAGE;
+    }
+  | {
+      readonly caller: BrowserCaller;
+      readonly type: typeof RELEASE_BROWSER_CALLER_MESSAGE;
+    }
+  | {
+      readonly caller: BrowserCaller;
+      readonly type: typeof DISPOSE_BROWSER_CALLER_MESSAGE;
     }
   | {
       readonly query?: string;
@@ -258,11 +297,27 @@ export type TabDebuggerRequest =
       readonly type: typeof WEB_MCP_EXECUTE_MESSAGE;
     }
   | {
+      /**
+       * Present only for the CLI agent transport: the grant pairs the session
+       * already approved and the sensitive step token a retry carries.
+       */
+      readonly agent?: BrowserToolAgentContext | undefined;
       readonly arguments: Record<string, unknown>;
+      readonly caller: BrowserCaller;
       readonly tabId: number;
+      readonly takeOver?: boolean;
       readonly tool: string;
       readonly type: typeof BROWSER_TOOL_MESSAGE;
     };
+
+/** The grant pairs and step tokens one CLI agent call carries. */
+export interface BrowserToolAgentContext {
+  readonly authorized: readonly {
+    readonly class: 'act' | 'navigate' | 'read';
+    readonly origin: string;
+  }[];
+  readonly sensitive?: readonly string[] | undefined;
+}
 
 export type TabDebuggerResponse =
   | {
@@ -296,8 +351,49 @@ export type TabDebuggerResponse =
       readonly type: typeof WEB_MCP_EXECUTE_MESSAGE;
     }
   | {
+      readonly granted: boolean;
+      readonly ok: true;
+      readonly type: typeof CLAIM_TAB_MESSAGE;
+    }
+  | {
+      readonly released: number;
+      readonly ok: true;
+      readonly type: typeof RELEASE_BROWSER_CALLER_MESSAGE;
+    }
+  | {
+      /** `needs_permission`: the transport maps this to JSON-RPC -32010. */
+      readonly permission?:
+        | {
+            readonly items: readonly Record<string, unknown>[];
+            readonly stepToken?: string | undefined;
+          }
+        | undefined;
       readonly result: EvalTabResult;
       readonly ok: true;
+      readonly type: typeof BROWSER_TOOL_MESSAGE;
+      /** Origins whose frames this agent call could not read. */
+      readonly withheldFrames?: readonly string[] | undefined;
+    }
+  | {
+      /** `origin_changed`: the transport maps this to JSON-RPC -32012. */
+      readonly originChanged: { readonly from: string; readonly to: string };
+      readonly result: EvalTabResult;
+      readonly ok: true;
+      readonly type: typeof BROWSER_TOOL_MESSAGE;
+    }
+  | {
+      readonly released: number;
+      readonly ok: true;
+      readonly type: typeof DISPOSE_BROWSER_CALLER_MESSAGE;
+    }
+  | {
+      readonly result: EvalTabResult;
+      readonly ok: true;
+      readonly type: typeof BROWSER_TOOL_MESSAGE;
+    }
+  | {
+      readonly ok: true;
+      readonly takeOver: BrowserTabTakeOverRequest;
       readonly type: typeof BROWSER_TOOL_MESSAGE;
     }
   | {
@@ -349,14 +445,39 @@ const tabDebuggerRequestSchema = z.union([
     type: z.literal(WEB_MCP_EXECUTE_MESSAGE),
   }),
   z.object({
+    caller: browserCallerSchema,
     code: z.string(),
     tabId: z.number(),
     timeoutMs: z.number().optional(),
     type: z.literal(EVAL_TAB_MESSAGE),
   }),
   z.object({
-    arguments: z.record(z.string(), z.unknown()),
+    caller: browserCallerSchema,
+    from: browserCallerSchema.optional(),
     tabId: z.number(),
+    type: z.literal(CLAIM_TAB_MESSAGE),
+  }),
+  z.object({
+    caller: browserCallerSchema,
+    type: z.literal(RELEASE_BROWSER_CALLER_MESSAGE),
+  }),
+  z.object({
+    caller: browserCallerSchema,
+    type: z.literal(DISPOSE_BROWSER_CALLER_MESSAGE),
+  }),
+  z.object({
+    agent: z
+      .object({
+        authorized: z.array(
+          z.object({ class: z.enum(['act', 'navigate', 'read']), origin: z.string().min(1) })
+        ),
+        sensitive: z.array(z.string()).optional(),
+      })
+      .optional(),
+    arguments: z.record(z.string(), z.unknown()),
+    caller: browserCallerSchema,
+    tabId: z.number(),
+    takeOver: z.boolean().optional(),
     tool: z.string(),
     type: z.literal(BROWSER_TOOL_MESSAGE),
   }),
@@ -393,8 +514,50 @@ const tabDebuggerResponseSchema = z.union([
     type: z.literal(WEB_MCP_EXECUTE_MESSAGE),
   }),
   z.object({
+    granted: z.boolean(),
+    ok: z.literal(true),
+    type: z.literal(CLAIM_TAB_MESSAGE),
+  }),
+  z.object({
+    ok: z.literal(true),
+    released: z.number(),
+    type: z.literal(RELEASE_BROWSER_CALLER_MESSAGE),
+  }),
+  z.object({
+    ok: z.literal(true),
+    originChanged: z.object({ from: z.string(), to: z.string() }),
+    result: evalTabResultSchema,
+    type: z.literal(BROWSER_TOOL_MESSAGE),
+  }),
+  z.object({
+    ok: z.literal(true),
+    released: z.number(),
+    type: z.literal(DISPOSE_BROWSER_CALLER_MESSAGE),
+  }),
+  z.object({
     ok: z.literal(true),
     result: evalTabResultSchema,
+    type: z.literal(BROWSER_TOOL_MESSAGE),
+  }),
+  z.object({
+    ok: z.literal(true),
+    permission: z
+      .object({
+        items: z.array(z.record(z.string(), z.unknown())),
+        stepToken: z.string().optional(),
+      })
+      .optional(),
+    result: evalTabResultSchema,
+    type: z.literal(BROWSER_TOOL_MESSAGE),
+    withheldFrames: z.array(z.string()).optional(),
+  }),
+  z.object({
+    ok: z.literal(true),
+    takeOver: z.object({
+      holderKind: z.literal('agent'),
+      sessionTitle: z.string(),
+      tabId: z.number(),
+    }),
     type: z.literal(BROWSER_TOOL_MESSAGE),
   }),
   z.object({
@@ -1158,25 +1321,28 @@ const withTimeout = async <Result>(
   }
 };
 
-export const evalInTab = async ({
+export interface TabEvalSend {
+  readonly send: (
+    method: string,
+    params?: Record<string, unknown>
+  ) => Promise<Record<string, unknown> | undefined>;
+}
+
+/**
+ * Runs model-authored code in the tab through the tab's one attachment. The
+ * browser-tool session owns attach/detach, so this never attaches or detaches:
+ * a workflow eval cannot break a live tool session's refs or listeners.
+ */
+export const evaluateTabCode = async ({
   code,
-  debuggerApi,
-  tabId,
+  send,
   timeoutMs = DEFAULT_EVAL_TIMEOUT_MS,
-}: {
+}: TabEvalSend & {
   readonly code: string;
-  readonly debuggerApi: ChromeDebuggerApi;
-  readonly tabId: number;
   readonly timeoutMs?: number;
 }): Promise<EvalTabResult> => {
-  const target = { tabId };
-  let attached = false;
-
   try {
-    await debuggerApi.attach(target, DEBUGGER_PROTOCOL_VERSION);
-    attached = true;
-
-    const response = await debuggerApi.sendCommand(target, 'Runtime.evaluate', {
+    const response = await send('Runtime.evaluate', {
       awaitPromise: true,
       expression: getEvalExpression(code),
       returnByValue: true,
@@ -1211,14 +1377,6 @@ export const evalInTab = async ({
       error: error instanceof Error ? error.message : 'Page evaluation failed.',
       ok: false,
     };
-  } finally {
-    if (attached) {
-      try {
-        await debuggerApi.detach(target);
-      } catch {
-        // Detach can fail if the tab closed or already detached; keep the result.
-      }
-    }
   }
 };
 

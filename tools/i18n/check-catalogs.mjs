@@ -19,12 +19,13 @@
  *
  * Usage: node tools/i18n/check-catalogs.mjs
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative as relativePath, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { isTranslateCallee, propertyName, unwrap, walk } from '../lib/ast.mjs';
 import {
+  catalogEntryKind,
   catalogTags,
   countPlaceholderBases,
   flattenCatalog,
@@ -263,10 +264,13 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // A placeholder-only accessibility label: the list's name and its open
   // counter joined by a comma, so a catalog may keep English punctuation.
   'todos.lists.rowA11y',
-  // Format-only briefing values: a lower-bound marker and a time range built
-  // from localized placeholders, with no translatable words.
+  // Format-only values with no translatable words: the briefing's lower-bound
+  // marker, and the `{{start}} – {{end}}` join the brief window and the
+  // organization request-logs window both read. The join is a separator
+  // between two placeholders already formatted in the reader's locale, so
+  // every catalog keeps English punctuation here.
   'agentBriefing.atLeast',
-  'agentBriefing.window',
+  'common.timeRange',
   // The organization plan's own tier names. They are product names, so every
   // catalog keeps them as the billing pages and the invoices spell them.
   'organization.hub.planTeams',
@@ -336,15 +340,24 @@ const PER_LINE_BUCKET_PHRASES = new Set([
   'securityAgent.dashboardMetrics.breakdownHigh',
 ]);
 
-/** The supported tags, read from the one source of truth. */
+/**
+ * The supported tags, read from the one source of truth. A `null` tag list
+ * means the list could not be read, which is not the same as an empty list.
+ */
 function supportedLanguages(root) {
   const problems = [];
   const file = join(root, 'apps/mobile/src/i18n/languages.ts');
   if (!existsSync(file)) {
-    problems.push(`mobile: no supported-language list at ${relativePath(root, file)}`);
-    return { tags: [], problems };
+    return {
+      tags: null,
+      problems: [`mobile: no supported-language list at ${relativePath(root, file)}`],
+    };
   }
-  const entry = parseSourceEntry(root, root, file, readFileSync(file, 'utf8'));
+  const read = readAuditText(file, 'mobile', 'the supported-language list');
+  if (read.text === null) {
+    return { tags: null, problems: read.problems };
+  }
+  const entry = parseSourceEntry(root, root, file, read.text);
   for (const problem of entry.problems) {
     problems.push(problem);
   }
@@ -433,17 +446,41 @@ function scanCatalogKeys(text) {
 }
 
 /**
+ * Read one hand-written audit input, reporting a read the filesystem refuses.
+ *
+ * These inputs are edited by hand, so a path `existsSync` accepts can still
+ * refuse a read: a directory, a missing file, or a permission the process
+ * lacks. One named problem line lets the rest of the audit report, the way an
+ * unreadable catalog does.
+ *
+ * Returns the text, or `null` with the problem to report.
+ */
+function readAuditText(file, label, what) {
+  try {
+    return { text: readFileSync(file, 'utf8'), problems: [] };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { text: null, problems: [`${label}: cannot audit ${what}: ${message}`] };
+  }
+}
+
+/**
  * Parse a catalog and report a key that appears twice in one object. JSON.parse
  * keeps the last duplicate silently, so the raw text is the only witness.
  *
  * A catalog this cannot read is reported once and skipped, the way
- * `check-plurals.mjs` treats a locale it cannot audit: an unbalanced scan or a
- * file JSON.parse rejects leaves one problem line instead of a stack trace and a
- * cascade of missing-key findings.
+ * `check-plurals.mjs` treats a locale it cannot audit: a read the filesystem
+ * refuses, an unbalanced scan, or a file JSON.parse rejects leaves one problem
+ * line instead of a stack trace and a cascade of missing-key findings.
  */
 function parseCatalog(file, label) {
   const problems = [];
-  const text = readFileSync(file, 'utf8');
+  const read = readAuditText(file, label, 'catalog');
+  problems.push(...read.problems);
+  if (read.text === null) {
+    return { catalog: null, problems };
+  }
+  const text = read.text;
   const { duplicates, readable } = scanCatalogKeys(text);
   if (!readable) {
     problems.push(`${label}: cannot audit catalog: its strings and braces do not balance`);
@@ -650,10 +687,20 @@ const LOCALE_SEPARATED_KEYS = new Set([
   // The sentence and list joiners are the catalog's own statement about how it
   // closes a sentence and separates two items, so both carry their own edges: a
   // space after the mark nearly everywhere, none where the mark alone separates
-  // ("ja", "zh-Hans", "zh-Hant").
+  // ("ja", "zh-Hans", "zh-Hant"), and none at all where the catalog writes no
+  // mark ("th" separates its sentences with a bare space).
   'common.sentenceJoiner',
   'common.listJoiner',
 ]);
+
+/**
+ * The catalogs that close no sentence with a mark: Thai separates its
+ * sentences with a bare space, so its `common.sentenceJoiner` is that space
+ * and nothing else. Every other catalog's joiner carries its sentence
+ * terminator, so a whitespace-only joiner there stays an untranslated string
+ * the empty-value rule rejects.
+ */
+const MARKLESS_SENTENCE_TAGS = new Set(['th']);
 
 /**
  * The counted clause the review-submit message renders before its stale
@@ -1234,7 +1281,7 @@ function addsFamilyPlaceholderOnly(english, key, actual, expected) {
  * that only sat in the folder used to render in English with no gate saying so;
  * a registry entry with no import would translate nothing.
  */
-function checkPushLocaleRegistry({ root, catalog }) {
+function checkPushLocaleRegistry({ root, catalog, present }) {
   const problems = [];
   const catalogDir = catalog.dir;
   const localeModule = catalog.localeRegistry;
@@ -1245,9 +1292,12 @@ function checkPushLocaleRegistry({ root, catalog }) {
     problems.push(`${catalog.name}: no push locale registry at ${relativeModule}`);
     return problems;
   }
-  const present = new Set(catalogTags(catalogDir));
-  const text = readFileSync(localeModule, 'utf8');
-  const entry = parseSourceEntry(root, root, localeModule, text);
+  const read = readAuditText(localeModule, catalog.name, 'the push locale registry');
+  problems.push(...read.problems);
+  if (read.text === null) {
+    return problems;
+  }
+  const entry = parseSourceEntry(root, root, localeModule, read.text);
   for (const problem of entry.problems) {
     problems.push(problem);
   }
@@ -1364,7 +1414,7 @@ function isAdmittedPluralKey(parts, englishFamilies, englishCountedBases) {
 }
 
 /** The catalogs a folder is missing, and the files no supported language names. */
-function checkCatalogMembership({ catalogName, tags, present }) {
+function checkCatalogMembership({ catalogName, tags, present, dir }) {
   const problems = [];
   for (const tag of tags) {
     if (!present.has(tag)) {
@@ -1376,7 +1426,30 @@ function checkCatalogMembership({ catalogName, tags, present }) {
       problems.push(`${catalogName}: catalog "${tag}.json" is not a supported language`);
     }
   }
+  // `catalogTags` counts only regular files, so a directory named like a
+  // catalog would vanish from `present` and from this rule without a trace.
+  // Naming it here keeps the stray entry a reported problem instead.
+  for (const name of nonFileCatalogEntries(dir)) {
+    problems.push(
+      `${catalogName}: catalog "${name}.json" is not a regular file; remove it or make it a catalog`
+    );
+  }
   return problems;
+}
+
+/**
+ * The `.json`-named entries of `dir` that are not regular files, sorted.
+ *
+ * Deliberately different from the tag set `catalogTags` builds: this names
+ * 'unreadable' and 'other' entries, while the tag set keeps 'file' and
+ * 'unreadable'. So a directory named like a catalog is reported here instead
+ * of vanishing from `present` without a trace.
+ */
+function nonFileCatalogEntries(dir) {
+  return readdirSync(dir, { withFileTypes: true })
+    .filter(entry => entry.name.endsWith('.json') && catalogEntryKind(dir, entry.name) !== 'file')
+    .map(entry => entry.name.replace(/\.json$/, ''))
+    .sort();
 }
 
 function checkEnglishCopies({ catalogName, english }) {
@@ -1608,7 +1681,11 @@ function checkTranslatedValue({
   mustTranslateKeys,
 }) {
   const problems = [];
-  if (value.trim() === '') {
+  // A catalog that writes no sentence mark may hold nothing but the space it
+  // separates sentences with; any other whitespace-only value is untranslated.
+  const separatorOnly =
+    key === 'common.sentenceJoiner' && MARKLESS_SENTENCE_TAGS.has(tag) && value !== '';
+  if (value.trim() === '' && !separatorOnly) {
     problems.push(`${label}: "${key}" is empty`);
   }
   if (rejectContainingCancel !== undefined) {
@@ -2086,17 +2163,39 @@ export function checkCatalogs(root = ROOT) {
     }
   }
   const scannable = catalogs.filter(catalog => !unscannable.has(catalog));
+  // The tag set of each catalog folder serves both the registry checks and the
+  // per-catalog checks, so one refused listing reports one line here and skips
+  // the rules that need the set.
+  const presentByCatalog = new Map();
   for (const catalog of scannable) {
-    if (catalog.localeRegistry) {
-      problems.push(...checkPushLocaleRegistry({ root, catalog }));
+    try {
+      presentByCatalog.set(catalog, new Set(catalogTags(catalog.dir)));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      problems.push(`${catalog.name}: cannot audit the catalog folder: ${message}`);
+      presentByCatalog.set(catalog, null);
+    }
+  }
+  for (const catalog of scannable) {
+    const present = presentByCatalog.get(catalog);
+    if (catalog.localeRegistry && present !== null) {
+      problems.push(...checkPushLocaleRegistry({ root, catalog, present }));
     }
   }
 
   for (const catalog of scannable) {
     const catalogName = catalog.name;
-    const present = new Set(catalogTags(catalog.dir));
+    const present = presentByCatalog.get(catalog);
+    if (present === null) {
+      // The folder line above already names why this catalog cannot be read.
+      continue;
+    }
 
-    problems.push(...checkCatalogMembership({ catalogName, tags, present }));
+    // A tag list this could not read would report every catalog file as an
+    // unsupported language and bury the one line that names the real cause.
+    if (tags !== null) {
+      problems.push(...checkCatalogMembership({ catalogName, tags, present, dir: catalog.dir }));
+    }
 
     const parsedEnglish = parseCatalog(join(catalog.dir, 'en.json'), `${catalogName}/en`);
     problems.push(...parsedEnglish.problems);
@@ -2162,14 +2261,15 @@ export function checkCatalogs(root = ROOT) {
     );
   }
 
-  return { problems, languages: tags.length };
+  return { problems, languages: tags === null ? null : tags.length };
 }
 
 /** The whole audit, reported the way CI reads it. */
 function run() {
   const { problems: found, languages } = checkCatalogs();
   if (found.length > 0) {
-    const limit = Number(process.env.I18N_CHECK_LIMIT ?? '50');
+    const parsedLimit = Number(process.env.I18N_CHECK_LIMIT ?? '50');
+    const limit = Number.isInteger(parsedLimit) && parsedLimit >= 0 ? parsedLimit : 50;
     const shown = found.slice(0, limit);
     for (const problem of shown) {
       console.error(problem);

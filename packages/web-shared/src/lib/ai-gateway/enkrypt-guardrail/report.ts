@@ -34,9 +34,13 @@ const ScanDecisionSchema = z.enum([
   'allowed',
   'blocked',
   'error_fail_closed',
+  /** Enkrypt failed, so the blocking scan let the content through unscanned. */
+  'error_fail_open',
   'error_logged',
   'client_aborted',
 ]);
+
+const VerdictSchema = z.enum(['skip', 'allow', 'fail_open', 'block', 'unavailable']);
 
 const VerdictCacheSchema = z.enum(['off', 'miss', 'hit', 'error']);
 
@@ -183,8 +187,11 @@ export type EnkryptInputPartScanReport = EnkryptToolScanReport | EnkryptSegments
 export const EnkryptGuardrailReportSchema = z.object({
   /** Null when the scan could not be prepared, which rejects the request. */
   settings: GuardrailSettingsSchema.nullable(),
-  /** The verdict the request acted on; `skip` when no blocking detector gated it. */
-  verdict: z.enum(['skip', 'allow', 'block', 'unavailable']),
+  /**
+   * The verdict the request acted on; `skip` when no blocking detector gated it, and `fail_open`
+   * when Enkrypt failed, so the request was sent without a complete scan.
+   */
+  verdict: VerdictSchema,
   unavailable_reason: UnavailableReasonSchema.nullable(),
   /** How long the request waited for the verdict, or null when it never waited. */
   added_latency_ms: z.number().nullable(),
@@ -219,8 +226,11 @@ export const EnkryptOutputGuardrailReportSchema = z.object({
   not_scanned_reason: z
     .enum(['invalid_config', 'output_too_large', 'held_output_too_large'])
     .nullable(),
-  /** The verdict the response acted on; `skip` when no blocking detector gated it. */
-  verdict: z.enum(['skip', 'allow', 'block', 'unavailable']),
+  /**
+   * The verdict the response acted on; `skip` when no blocking detector gated it, and `fail_open`
+   * when Enkrypt failed, so the response was released unscanned.
+   */
+  verdict: VerdictSchema,
   unavailable_reason: UnavailableReasonSchema.nullable(),
   /** How long the held-back response waited for the verdict after the upstream response ended. */
   added_latency_ms: z.number().nullable(),

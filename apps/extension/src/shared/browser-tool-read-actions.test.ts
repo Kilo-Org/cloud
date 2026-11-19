@@ -8,6 +8,7 @@ import {
 } from './browser-tool-read-actions';
 import type { BrowserAriaNode, BrowserToolPageSession } from './browser-tool-snapshot';
 import type { BrowserConsoleMessage, BrowserNetworkRequest } from './browser-tool-session';
+import type { ScreenshotMaskInput, ScreenshotMaskResult } from './browser-screenshot-masking';
 
 interface RecordedCommand {
   readonly method: string;
@@ -39,6 +40,9 @@ const createSession = ({
   axNodes = SAMPLE_TREE,
   boxes = {},
   consoleMessages = [],
+  frameTree,
+  layoutMetrics,
+  layoutMetricsError = false,
   requestsSinceLoad = [],
   pageText = () => '',
   responseBody,
@@ -50,6 +54,9 @@ const createSession = ({
   axNodes?: BrowserAriaNode[];
   boxes?: Record<number, { content: number[]; height: number; width: number }>;
   consoleMessages?: BrowserConsoleMessage[];
+  frameTree?: Record<string, unknown>;
+  layoutMetrics?: Record<string, unknown>;
+  layoutMetricsError?: boolean;
   requestsSinceLoad?: BrowserNetworkRequest[];
   pageText?: () => string;
   responseBody?: { base64Encoded?: boolean; body?: string };
@@ -92,6 +99,22 @@ const createSession = ({
 
       if (method === 'Page.captureScreenshot') {
         return { data: screenshot };
+      }
+
+      if (method === 'Page.getFrameTree') {
+        return frameTree ?? {};
+      }
+
+      if (method === 'Page.getLayoutMetrics') {
+        if (layoutMetricsError) {
+          throw new Error('layout metrics unavailable');
+        }
+
+        return layoutMetrics ?? {};
+      }
+
+      if (method === 'DOM.getFrameOwner') {
+        return { backendNodeId: 99 };
       }
 
       if (method === 'Network.getResponseBody') {
@@ -245,6 +268,208 @@ describe('browser_find', () => {
 });
 
 describe('browser_take_screenshot', () => {
+  const FRAME_TREE_WITH_PAY = {
+    frameTree: {
+      childFrames: [
+        {
+          frame: {
+            id: 'f1',
+            parentId: 'main',
+            securityOrigin: 'https://pay.example.com',
+            url: 'https://pay.example.com/widget',
+          },
+        },
+      ],
+      frame: {
+        id: 'main',
+        securityOrigin: 'https://app.example.com',
+        url: 'https://app.example.com/dashboard',
+      },
+    },
+  };
+
+  const recordMask = (): {
+    readonly inputs: ScreenshotMaskInput[];
+    readonly mask: (input: ScreenshotMaskInput) => Promise<ScreenshotMaskResult>;
+  } => {
+    const inputs: ScreenshotMaskInput[] = [];
+
+    return {
+      inputs,
+      mask: input => {
+        inputs.push(input);
+
+        return Promise.resolve({ dataUrl: 'data:image/png;base64,TUFTS0VE', ok: true });
+      },
+    };
+  };
+
+  it('masks a withheld frame inside an element capture in the clip coordinate space', async () => {
+    // The clip is the iframe's own rect, so its page-space box lands at the image origin.
+    const iframeRect = { content: [40, 120, 440, 120, 440, 320, 40, 320], height: 200, width: 400 };
+    const { session } = createSession({
+      boxes: { 12: iframeRect, 99: iframeRect },
+      frameTree: FRAME_TREE_WITH_PAY,
+    });
+    const { inputs, mask } = recordMask();
+
+    const result = await runReadBrowserTool('browser_take_screenshot', { target: 'e12' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+      maskScreenshot: mask,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]?.boxes).toStrictEqual([{ height: 200, left: 0, top: 0, width: 400 }]);
+    expect(inputs[0]?.scale).toBe(1);
+  });
+
+  it('renders a device-scale element capture at the device pixel ratio', async () => {
+    const iframeRect = { content: [40, 120, 440, 120, 440, 320, 40, 320], height: 200, width: 400 };
+    const { commands, session } = createSession({
+      boxes: { 12: iframeRect, 99: iframeRect },
+      frameTree: FRAME_TREE_WITH_PAY,
+      layoutMetrics: {
+        cssLayoutViewport: { clientWidth: 400 },
+        layoutViewport: { clientWidth: 800 },
+      },
+    });
+    const { inputs, mask } = recordMask();
+
+    await runReadBrowserTool(
+      'browser_take_screenshot',
+      { scale: 'device', target: 'e12' },
+      session,
+      {
+        agentScope: { readableOrigins: ['https://app.example.com'] },
+        maskScreenshot: mask,
+      }
+    );
+
+    expect(commands).toContainEqual({
+      method: 'Page.captureScreenshot',
+      params: { clip: { height: 200, scale: 2, width: 400, x: 40, y: 120 }, format: 'png' },
+    });
+    expect(inputs[0]?.scale).toBe(2);
+  });
+
+  it('reports the masked image as PNG whatever the capture type was', async () => {
+    const iframeRect = { content: [40, 120, 440, 120, 440, 320, 40, 320], height: 200, width: 400 };
+    const { session } = createSession({
+      boxes: { 12: iframeRect, 99: iframeRect },
+      frameTree: FRAME_TREE_WITH_PAY,
+    });
+    const { mask } = recordMask();
+
+    const result = await runReadBrowserTool(
+      'browser_take_screenshot',
+      { scale: 'css', target: 'e12', type: 'jpeg' },
+      session,
+      { agentScope: { readableOrigins: ['https://app.example.com'] }, maskScreenshot: mask }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { dataUrl: 'data:image/png;base64,TUFTS0VE', mediaType: 'image/png' },
+    });
+  });
+
+  it('keeps the capture media type when nothing is masked', async () => {
+    const { session } = createSession({ frameTree: FRAME_TREE_WITH_PAY });
+
+    const result = await runReadBrowserTool(
+      'browser_take_screenshot',
+      { scale: 'css', type: 'jpeg' },
+      session,
+      {
+        agentScope: { readableOrigins: ['https://app.example.com', 'https://pay.example.com'] },
+        maskScreenshot: () =>
+          Promise.resolve({ dataUrl: 'data:image/png;base64,TUFTS0VE', ok: true }),
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { dataUrl: 'data:image/jpeg;base64,QUJD', mediaType: 'image/jpeg' },
+    });
+  });
+
+  it('captures and masks a scrolled element in document space', async () => {
+    // The box model reports viewport coordinates; the clip the capture takes is document-space.
+    const viewportRect = {
+      content: [40, 120, 440, 120, 440, 320, 40, 320],
+      height: 200,
+      width: 400,
+    };
+    const { commands, session } = createSession({
+      boxes: { 12: viewportRect, 99: viewportRect },
+      frameTree: FRAME_TREE_WITH_PAY,
+      layoutMetrics: {
+        cssLayoutViewport: { clientWidth: 400 },
+        cssVisualViewport: { pageX: 100, pageY: 50 },
+        layoutViewport: { clientWidth: 400 },
+      },
+    });
+    const { inputs, mask } = recordMask();
+
+    await runReadBrowserTool('browser_take_screenshot', { scale: 'css', target: 'e12' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+      maskScreenshot: mask,
+    });
+
+    expect(commands).toContainEqual({
+      method: 'Page.captureScreenshot',
+      params: { clip: { height: 200, scale: 1, width: 400, x: 140, y: 170 }, format: 'png' },
+    });
+    expect(inputs[0]?.boxes).toStrictEqual([{ height: 200, left: 0, top: 0, width: 400 }]);
+  });
+
+  it('masks a scrolled viewport capture where the frame paints in the image', async () => {
+    const viewportRect = {
+      content: [40, 120, 440, 120, 440, 320, 40, 320],
+      height: 200,
+      width: 400,
+    };
+    const { session } = createSession({
+      boxes: { 99: viewportRect },
+      frameTree: FRAME_TREE_WITH_PAY,
+      layoutMetrics: {
+        cssLayoutViewport: { clientWidth: 800 },
+        cssVisualViewport: { pageX: 100, pageY: 50 },
+        layoutViewport: { clientWidth: 800 },
+      },
+    });
+    const { inputs, mask } = recordMask();
+
+    await runReadBrowserTool('browser_take_screenshot', { scale: 'css' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+      maskScreenshot: mask,
+    });
+
+    // The withheld frame sits at viewport (40,120); the viewport image starts at the scroll position.
+    expect(inputs[0]?.boxes).toStrictEqual([{ height: 200, left: 40, top: 120, width: 400 }]);
+  });
+
+  it('drops a withheld frame that the element clip does not overlap', async () => {
+    const { session } = createSession({
+      boxes: {
+        12: { content: [0, 0, 200, 0, 200, 100, 0, 100], height: 100, width: 200 },
+        99: { content: [300, 400, 500, 400, 500, 500, 300, 500], height: 100, width: 200 },
+      },
+      frameTree: FRAME_TREE_WITH_PAY,
+    });
+    const { inputs, mask } = recordMask();
+
+    const result = await runReadBrowserTool('browser_take_screenshot', { target: 'e12' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+      maskScreenshot: mask,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(inputs).toHaveLength(0);
+    expect(result).toMatchObject({ value: { dataUrl: 'data:image/png;base64,QUJD' } });
+  });
+
   it('returns the image and a text line', async () => {
     const { commands, session } = createSession();
     const result = await runReadBrowserTool('browser_take_screenshot', { type: 'png' }, session);
@@ -280,6 +505,31 @@ describe('browser_take_screenshot', () => {
       method: 'Page.captureScreenshot',
       params: { clip: { height: 10, scale: 1, width: 10, x: 3, y: 4 }, format: 'png' },
     });
+  });
+
+  it('keeps a panel element capture working when layout metrics fail', async () => {
+    const { session } = createSession({ layoutMetricsError: true });
+
+    const result = await runReadBrowserTool(
+      'browser_take_screenshot',
+      { scale: 'css', target: 'e12', type: 'png' },
+      session
+    );
+
+    expect(result.ok).toBe(true);
+  });
+
+  it('fails an agent element capture closed when layout metrics fail', async () => {
+    const { session } = createSession({ layoutMetricsError: true });
+
+    const result = await runReadBrowserTool(
+      'browser_take_screenshot',
+      { scale: 'css', target: 'e12', type: 'png' },
+      session,
+      { agentScope: { readableOrigins: ['https://app.example.com'] } }
+    );
+
+    expect(result.ok).toBe(false);
   });
 
   it('rejects fullPage combined with a target', async () => {

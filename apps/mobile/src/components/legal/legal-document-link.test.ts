@@ -5,8 +5,15 @@ import { legalDocumentForLink, planLegalInContentLink } from './legal-document-l
 describe('legalDocumentForLink', () => {
   it('keeps a kilo.ai legal cross reference in the app', () => {
     expect(legalDocumentForLink('https://kilo.ai/privacy')).toBe('privacy');
+    expect(legalDocumentForLink('https://kilo.ai/privacy/')).toBe('privacy');
     expect(legalDocumentForLink('https://www.kilo.ai/terms')).toBe('terms');
-    expect(legalDocumentForLink('https://kilo.ai/privacy/apps')).toBe('privacy');
+  });
+
+  it('leaves a page below a legal document to the renderer', () => {
+    expect(legalDocumentForLink('https://kilo.ai/privacy/apps')).toBeNull();
+    expect(legalDocumentForLink('https://kilo.ai/privacy/apps/x')).toBeNull();
+    expect(legalDocumentForLink('https://kilo.ai/terms/apps')).toBeNull();
+    expect(legalDocumentForLink('https://kilo.ai/terms/foo')).toBeNull();
   });
 
   it('leaves every other destination to the renderer', () => {
@@ -39,6 +46,12 @@ describe('planLegalInContentLink', () => {
   });
 
   it('leaves every other destination to the renderer', () => {
+    expect(planLegalInContentLink('https://kilo.ai/privacy/apps', 'privacy')).toEqual({
+      kind: 'external',
+    });
+    expect(planLegalInContentLink('https://kilo.ai/privacy/apps', 'terms')).toEqual({
+      kind: 'external',
+    });
     expect(planLegalInContentLink('https://example.com/terms', 'terms')).toEqual({
       kind: 'external',
     });

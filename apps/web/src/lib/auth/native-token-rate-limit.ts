@@ -17,10 +17,13 @@ import { reportFirewallRateLimitIssue } from './firewall-rate-limit';
  * once the account is known, before any device session or refresh token is
  * written, and takes no refusal decision of its own: it returns the limiter's
  * answer unchanged and only adds the report, because the provider calls it
- * covers have already happened by then. A rule that is not configured therefore
- * leaves the answer `rateLimited: false` and the exchange finishes; an answer
- * the firewall blocked arrives as `rateLimited: true` and the exchange is
- * refused. Both answers are reported through the shared throttle.
+ * covers have already happened by then. Whether the exchange finishes is
+ * therefore whatever `rateLimited` says. An id that is not configured answers
+ * `rateLimited: false`, so the exchange finishes. An answer the firewall blocks
+ * arrives as either shape — `rateLimited: true` on its own, which refuses, or
+ * `rateLimited: false` with the `blocked` discriminator, which proceeds — and
+ * both are reported through the shared throttle, as is the not-configured
+ * answer.
  */
 const ADDRESS_RATE_LIMIT_ID = 'native-token-address';
 const USER_RATE_LIMIT_ID = 'native-token-user';
@@ -63,9 +66,6 @@ export async function isNativeTokenAddressRateLimited(request: Request): Promise
     request,
     rateLimitKey: `${ADDRESS_RATE_LIMIT_ID}:${address}`,
   });
-  // Only a "not rate limited" answer permits the exchange. A rule that is not
-  // configured, or an answer the firewall blocks, refuses here, before the
-  // admission gate and its provider calls.
   if (error) {
     reportAddressRuleIssue(error);
     return true;

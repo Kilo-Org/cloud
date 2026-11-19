@@ -34,6 +34,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/moonshotai';
 import { resolvePreferredProviderOrder } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
 import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
+import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
 import {
   ReasoningDetailsTransform,
@@ -70,6 +71,7 @@ import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta'
 import { addMissingToolSchemaEnumTypes } from '@kilocode/web-shared/lib/ai-gateway/providers/add-missing-tool-schema-enum-types';
 import { removeRecursiveToolSchemaRefs } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-recursive-tool-schema-refs';
 import { removeTopLevelToolSchemaCombinators } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-top-level-tool-schema-combinators';
+import { repairGeminiToolSchemas } from '@kilocode/web-shared/lib/ai-gateway/providers/repair-gemini-tool-schemas';
 import { removePaidServerFeatures } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-paid-server-features';
 import { removeWhitespaceOnlyMessages } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-whitespace-only-messages';
 import {
@@ -339,6 +341,8 @@ export async function applyProviderSpecificLogic(
 
   if (isGeminiModel(requestedModel)) {
     sanitizeJsonRefToolResults(requestToMutate);
+    // Gemini rejects tools with "schema specified other fields alongside any_of. When using any_of, it must be the only field set."
+    repairGeminiToolSchemas(requestToMutate);
   }
 
   if (isMuseModel(requestedModel)) {
@@ -386,6 +390,11 @@ export async function applyProviderSpecificLogic(
   );
   if (isAutoSmallFreeModel(requestedModel)) {
     requestToMutate.body.model = AUTO_SMALL_FREE_MODEL_UPSTREAM_ID;
+  }
+  if (provider.type === 'openrouter' && requestedModel.startsWith('~')) {
+    // Kilo pins a latest alias to its stored target, so OpenRouter serves that target rather than
+    // the newest model it would pick.
+    requestToMutate.body.model = await resolveOpenRouterModelAlias(requestedModel);
   }
 
   if (isClaudeModel(requestedModel)) {

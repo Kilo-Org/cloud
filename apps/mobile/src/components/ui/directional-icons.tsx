@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
+  Logs,
   type LucideIcon,
 } from '@/components/ui/icons';
 
@@ -72,3 +73,19 @@ export const DirectionalLogOut: LucideIcon = forwardRef<unknown, IconProps>((pro
   return <View style={MIRRORED_GLYPH}>{icon}</View>;
 });
 DirectionalLogOut.displayName = 'DirectionalLogOut';
+
+/**
+ * A bulleted-list glyph carries its bullets on the reading-start side, so an
+ * RTL screen mirrors it the same way the chevrons flip: the ticks move to the
+ * right edge, beside the text the reader starts from. Lucide's `Logs` keeps
+ * them on the left, so the RTL frame flips the whole glyph.
+ */
+export const DirectionalLogs: LucideIcon = forwardRef<unknown, IconProps>((props, ref) => {
+  const Glyph = Logs as ComponentType<IconProps & { ref?: Ref<unknown> }>;
+  const icon = <Glyph {...props} ref={ref} />;
+  if (!I18nManager.isRTL) {
+    return icon;
+  }
+  return <View style={MIRRORED_GLYPH}>{icon}</View>;
+});
+DirectionalLogs.displayName = 'DirectionalLogs';

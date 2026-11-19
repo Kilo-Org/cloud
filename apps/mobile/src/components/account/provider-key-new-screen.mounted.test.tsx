@@ -2,6 +2,12 @@
 import { createElement, type ElementType } from 'react';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
+import {
+  BYOK_PROVIDER_UNAVAILABLE_MESSAGE,
+  MANAGED_KEY_PROVIDER_OCCUPIED_MESSAGE,
+  MANAGED_KEY_READ_ONLY_MESSAGE,
+} from '@kilocode/app-shared/byok-errors';
+
 import '@/i18n';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -101,12 +107,23 @@ const FIELD = 'FormField' as ElementType;
 const BUTTON = 'Button' as ElementType;
 const CREDENTIAL_FORM = 'CredentialForm' as ElementType;
 
+/** A tRPC client rejection, carrying the `data.code` the screen reads. */
+function serverRefusal(code: string, message: string): Error {
+  return Object.assign(new Error(message), { data: { code, message } });
+}
+
 let renderer: ReactTestRenderer | undefined = undefined;
 
 async function mount() {
   const view = await renderWithProviders(createElement(ProviderKeyNewScreen));
   renderer = view.renderer;
   return view.renderer.root;
+}
+
+function statusMessages(root: ReactTestRenderer['root']) {
+  return root
+    .findAll(node => Object.is(node.type, 'AccessibleStatus'))
+    .map(node => node.props.message);
 }
 
 function apiKeyField(root: ReactTestRenderer['root']) {
@@ -149,12 +166,6 @@ function retryButton(root: ReactTestRenderer['root']) {
   return allButtons(root).find(
     node => node.findAll(child => child.props.children === 'Retry').length > 0
   );
-}
-
-function statusMessages(root: ReactTestRenderer['root']) {
-  return root
-    .findAll(node => Object.is(node.type, 'AccessibleStatus'))
-    .map(node => node.props.message);
 }
 
 async function submitKey(root: ReactTestRenderer['root'], key: string) {
@@ -233,7 +244,7 @@ describe('ProviderKeyNewScreen', () => {
 
     await submitKey(root, 'sk-test-123');
 
-    expect(statusMessages(root)).toEqual(['That key was rejected by the provider']);
+    expect(statusMessages(root)).toEqual(['The key could not be saved.']);
     expect(state.dismissTo).not.toHaveBeenCalled();
     // A refusal of the value itself offers no retry: the same value would be
     // refused again, so the reader has to change it.
@@ -246,7 +257,135 @@ describe('ProviderKeyNewScreen', () => {
 
     await submitKey(root, 'sk-test-123');
 
-    expect(statusMessages(root)).toEqual(['The network dropped the request']);
+    // The transport text is not the reader's copy: the state offers a retry and
+    // says so in the app's own words.
+    expect(statusMessages(root)).toEqual(['Could not save the key.']);
+    expect(retryButton(root)).toBeDefined();
+  });
+
+  it('names a duplicate key instead of quoting the refusal', async () => {
+    state.mutateAsync.mockRejectedValueOnce(
+      serverRefusal('CONFLICT', 'A key for this provider already exists')
+    );
+    const root = await mount();
+
+    await submitKey(root, 'sk-test-123');
+
+    expect(statusMessages(root)).toEqual([
+      'You already have a key for this provider. Remove it before you add another.',
+    ]);
+    expect(retryButton(root)).toBeUndefined();
+    expect(state.dismissTo).not.toHaveBeenCalled();
+  });
+
+  it('reports a key the provider format rejects', async () => {
+    state.mutateAsync.mockRejectedValueOnce(
+      serverRefusal('UNPROCESSABLE_CONTENT', 'The key does not match the provider format')
+    );
+    const root = await mount();
+
+    await submitKey(root, 'sk-test-123');
+
+    expect(statusMessages(root)).toEqual([
+      'This key is not in the format this provider expects. Check it and try again.',
+    ]);
+    expect(retryButton(root)).toBeUndefined();
+    expect(state.dismissTo).not.toHaveBeenCalled();
+  });
+
+  it('reports a managed key refused with a conflict as read-only, not as a duplicate', async () => {
+    // The update route reuses `CONFLICT` for a plan-managed key, so the edit
+    // path is the one that reaches this refusal; the screen must match the
+    // shared sentence rather than the code alone.
+    state.params = { provider: 'anthropic', id: KEY_ID };
+    state.mutateAsync.mockRejectedValueOnce(
+      serverRefusal('CONFLICT', MANAGED_KEY_READ_ONLY_MESSAGE)
+    );
+    const root = await mount();
+
+    await submitKey(root, 'sk-test-123');
+
+    expect(state.mutateAsync).toHaveBeenCalledWith(
+      'update',
+      expect.objectContaining({ id: KEY_ID })
+    );
+    expect(statusMessages(root)).toEqual([
+      "A coding plan manages this provider's key, and the key is read-only. Cancel the coding plan to add your own.",
+    ]);
+    expect(retryButton(root)).toBeUndefined();
+    expect(state.dismissTo).not.toHaveBeenCalled();
+  });
+
+  it('reports a provider key the coding plan manages as read-only', async () => {
+    state.mutateAsync.mockRejectedValueOnce(
+      serverRefusal('PRECONDITION_FAILED', MANAGED_KEY_PROVIDER_OCCUPIED_MESSAGE)
+    );
+    const root = await mount();
+
+    await submitKey(root, 'sk-test-123');
+
+    expect(statusMessages(root)).toEqual([
+      "A coding plan manages this provider's key, and the key is read-only. Cancel the coding plan to add your own.",
+    ]);
+    expect(retryButton(root)).toBeUndefined();
+    expect(state.dismissTo).not.toHaveBeenCalled();
+  });
+
+  it('answers an unrelated precondition refusal with the generic refused copy', async () => {
+    // `PRECONDITION_FAILED` alone also covers other refusals, so the screen
+    // matches the sentence both sides share rather than the code alone.
+    state.mutateAsync.mockRejectedValueOnce(
+      serverRefusal('PRECONDITION_FAILED', 'The account is not ready for this key')
+    );
+    const root = await mount();
+
+    await submitKey(root, 'sk-test-123');
+
+    expect(statusMessages(root)).toEqual(['The key could not be saved.']);
+    expect(retryButton(root)).toBeUndefined();
+    expect(state.dismissTo).not.toHaveBeenCalled();
+  });
+
+  it('reports a provider the server has not opened as unavailable, not as a retry', async () => {
+    // The refusal is matched on the sentence both sides share, so the screen
+    // needs no provider id of its own to recognise it.
+    state.mutateAsync.mockRejectedValueOnce(
+      serverRefusal('FORBIDDEN', BYOK_PROVIDER_UNAVAILABLE_MESSAGE)
+    );
+    const root = await mount();
+
+    await submitKey(root, 'sk-test-123');
+
+    expect(statusMessages(root)).toEqual([
+      'This provider is not available yet, so you cannot add a key for it.',
+    ]);
+    expect(retryButton(root)).toBeUndefined();
+    expect(state.dismissTo).not.toHaveBeenCalled();
+  });
+
+  it('keeps the generic copy for a permission denial that is not the unavailable provider', async () => {
+    state.mutateAsync.mockRejectedValueOnce(
+      serverRefusal('FORBIDDEN', 'You cannot write this key')
+    );
+    const root = await mount();
+
+    await submitKey(root, 'sk-test-123');
+
+    // `FORBIDDEN` alone does not mean the provider is unavailable, so the
+    // server's sentence is replaced rather than repeated.
+    expect(statusMessages(root)).toEqual(['The key could not be saved.']);
+    expect(state.dismissTo).not.toHaveBeenCalled();
+  });
+
+  it('reports a store failure in its own words for a server fault', async () => {
+    state.mutateAsync.mockRejectedValueOnce(
+      serverRefusal('INTERNAL_SERVER_ERROR', 'KMS unavailable')
+    );
+    const root = await mount();
+
+    await submitKey(root, 'sk-test-123');
+
+    expect(statusMessages(root)).toEqual(['Could not save the key.']);
     expect(retryButton(root)).toBeDefined();
   });
 
@@ -333,7 +472,7 @@ describe('ProviderKeyNewScreen', () => {
     });
 
     expect(state.mutateAsync).not.toHaveBeenCalled();
-    expect(statusMessages(root)).toEqual(['Check the credentials and try again.']);
+    expect(statusMessages(root)).toEqual(['The key is missing a required value.']);
   });
 
   it('retires the structured field error and the refusal once the form is edited', async () => {
@@ -350,7 +489,7 @@ describe('ProviderKeyNewScreen', () => {
     expect(credentialForm(root).errors).toEqual({
       resourceName: 'Azure resource name is required.',
     });
-    expect(statusMessages(root)).toEqual(['Check the credentials and try again.']);
+    expect(statusMessages(root)).toEqual(['The key is missing a required value.']);
 
     act(() => {
       credentialForm(root).onEdit();
@@ -461,7 +600,7 @@ describe('ProviderKeyNewScreen', () => {
     const root = await mount();
 
     await submitKey(root, 'sk-test-123');
-    expect(statusMessages(root)).toEqual(['That key was rejected by the provider']);
+    expect(statusMessages(root)).toEqual(['The key could not be saved.']);
 
     act(() => {
       (apiKeyField(root).props.onChangeText as (value: string) => void)('sk-test-456');

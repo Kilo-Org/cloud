@@ -75,19 +75,35 @@ export function toWindowHours(value: number | null | undefined): SpendAlertWindo
   return DEFAULT_WINDOW_HOURS;
 }
 
+/** The reserve set for `FormField`'s `reserveErrorMessages`: every message the limit rule can show. */
+export function thresholdErrorMessages(): readonly [aboveMaximum: string, unusable: string] {
+  return [
+    aboveMaximumError(MAX_THRESHOLD_USD),
+    // Empty, unparsable, and below the smallest storable amount share the billing
+    // alert's copy: the same sentence, so the two fields can never drift apart in
+    // a translation.
+    i18n.t('organization.lowBalanceAlert.thresholdError'),
+  ];
+}
+
 /** Inline error for the limit field, or `null` while the value is valid. */
 export function thresholdError(value: string): string | null {
   const { problem } = readAmountWithin(value, THRESHOLD_BOUNDS);
   if (problem === null) {
     return null;
   }
-  if (problem === 'aboveMaximum') {
-    return aboveMaximumError(MAX_THRESHOLD_USD);
-  }
-  // Empty, unparsable, and below the smallest storable amount share the billing
-  // alert's copy: the same sentence, so the two fields can never drift apart in
-  // a translation.
-  return i18n.t('organization.lowBalanceAlert.thresholdError');
+  const [aboveMaximum, unusable] = thresholdErrorMessages();
+  return problem === 'aboveMaximum' ? aboveMaximum : unusable;
+}
+
+/** The reserve set for `FormField`'s `reserveErrorMessages`: every message the multiplier rule can show. */
+export function multiplierErrorMessages(): readonly [aboveMaximum: string, unusable: string] {
+  return [
+    i18n.t('spendAlerts.multiplierMaxError', {
+      max: formatNumber(MAX_MULTIPLIER, i18n.language),
+    }),
+    i18n.t('spendAlerts.multiplierError'),
+  ];
 }
 
 /** Inline error for the multiplier field, or `null` while the value is valid. */
@@ -96,10 +112,6 @@ export function multiplierError(value: string): string | null {
   if (problem === null) {
     return null;
   }
-  if (problem === 'aboveMaximum') {
-    return i18n.t('spendAlerts.multiplierMaxError', {
-      max: formatNumber(MAX_MULTIPLIER, i18n.language),
-    });
-  }
-  return i18n.t('spendAlerts.multiplierError');
+  const [aboveMaximum, unusable] = multiplierErrorMessages();
+  return problem === 'aboveMaximum' ? aboveMaximum : unusable;
 }

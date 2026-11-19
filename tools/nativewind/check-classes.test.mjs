@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import {
+  chmodSync,
   copyFileSync,
   mkdirSync,
   mkdtempSync,
@@ -280,6 +282,35 @@ test('accepts Intl type references', () => {
   );
 });
 
+// The same source checked under two paths: the app tree reports five hand-built
+// formatters, so the empty result for the shared package proves the rule's
+// scope rather than a broken fixture.
+const INTL_SOURCE =
+  "export const a = new Intl.DateTimeFormat('en-US');\n" +
+  "export const b = Intl.NumberFormat('en-US');\n" +
+  'export const c = value.toLocaleDateString();\n' +
+  'export const d = value.toLocaleTimeString();\n' +
+  'export const e = value.toLocaleString();\n';
+
+test('flags toLocale*String calls on the app tree', () => {
+  const found = check('apps/mobile/src/format.ts', INTL_SOURCE);
+  assert.deepEqual(found, [
+    'apps/mobile/src/format.ts:1: "new Intl.DateTimeFormat" builds its own formatter; go through @/lib/intl-cache so the locale is normalised once',
+    'apps/mobile/src/format.ts:2: "Intl.NumberFormat(" builds its own formatter; go through @/lib/intl-cache so the locale is normalised once',
+    'apps/mobile/src/format.ts:3: ".toLocaleDateString(" builds its own formatter; go through @/lib/intl-cache so the locale is normalised once',
+    'apps/mobile/src/format.ts:4: ".toLocaleTimeString(" builds its own formatter; go through @/lib/intl-cache so the locale is normalised once',
+    'apps/mobile/src/format.ts:5: ".toLocaleString(" builds its own formatter; go through @/lib/intl-cache so the locale is normalised once',
+  ]);
+});
+
+test('keeps the formatter rule out of the shared package', () => {
+  assert.deepEqual(
+    check('packages/app-shared/src/format.ts', INTL_SOURCE),
+    [],
+    'the same source reports five diagnostics under apps/mobile/src'
+  );
+});
+
 test('reads padding from a typed scroll container tag', () => {
   const found = check(
     'apps/mobile/src/screen.tsx',
@@ -397,6 +428,103 @@ test('runs the whole audit over a clean tree through the CLI and ignores test sc
     /check-classes: no dropped classes, stray raw Text or hand-built formatters/
   );
 });
+
+test('reports an unreadable file through the CLI and keeps the findings it collected', context => {
+  // The read refusal must reach the same problem list as the rules', or the
+  // audit ends on a stack trace and loses every finding already collected.
+  if (process.getuid?.() === 0) {
+    context.skip('root reads any file, so chmod 000 leaves it readable');
+    return;
+  }
+  const root = makeFixture(context, {
+    'apps/mobile/src/bans.ts': 'const b = "text-start";\n',
+    'apps/mobile/src/locked.ts': 'const c = "text-start";\n',
+  });
+  const locked = join(root, 'apps/mobile/src/locked.ts');
+  chmodSync(locked, 0o000);
+  // Restore the mode before the fixture's own cleanup runs, so removal cannot
+  // trip on the mode this case set.
+  try {
+    const result = spawnSync(process.execPath, [join(root, 'tools/nativewind/check-classes.mjs')], {
+      cwd: root,
+      encoding: 'utf8',
+      timeout: 30_000,
+    });
+
+    assert.ifError(result.error);
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stderr, /locked\.ts: cannot read: /);
+    assert.match(result.stderr, /bans\.ts:1: "text-start"/);
+    assert.match(result.stderr, /check-classes: \d+ problem\(s\)/);
+    // A stack trace means the read escaped the problem list.
+    assert.doesNotMatch(result.stderr, /\n\s+at /);
+  } finally {
+    chmodSync(locked, 0o644);
+  }
+});
+
+/**
+ * A root whose `react-native-css` is a stub package naming the compiler entry:
+ * the pins' subject is the compiler's behaviour, so a stub stands in for the
+ * API drift the audit exists to catch.
+ *
+ * `makeFixture` links the app's node_modules to the repository's own, so the
+ * stub cannot shadow one package in place. The require base walks app
+ * package.json → its node_modules → root node_modules, so the fixture swaps
+ * the app's link for a real directory that holds only the stub package. The
+ * real package.json is resolved through Node, not a package-manager layout
+ * path, so the exports map still resolves `./compiler` under any linker.
+ */
+function stubbedCompilerFixture(context, entrySource) {
+  const root = makeFixture(context, {
+    'apps/mobile/src/bans.ts': 'const b = "text-start";\n',
+  });
+  const entry = join(root, 'apps/mobile/node_modules/react-native-css');
+  rmSync(join(root, 'apps/mobile/node_modules'), { recursive: true, force: true });
+  mkdirSync(join(entry, 'dist/commonjs/compiler'), { recursive: true });
+  copyFileSync(
+    // The checker resolves the compiler from the app's package.json base, so
+    // this resolution names the same installed tree under any package manager.
+    createRequire(join(MOBILE_ROOT, 'package.json')).resolve('react-native-css/package.json'),
+    join(entry, 'package.json')
+  );
+  writeFileSync(join(entry, 'dist/commonjs/compiler/index.js'), entrySource);
+  return root;
+}
+
+for (const [name, entrySource, expected] of [
+  [
+    'throws at compile',
+    "module.exports = { compile() { throw new Error('stubbed compiler exploded on line one'); } };\n",
+    'the compiler failed on the text-align: start fixture (stubbed compiler exploded on line one)',
+  ],
+  [
+    'returns a warnings value with no text-align',
+    'module.exports = { compile() { return { warnings() { return undefined; } }; } };\n',
+    'text-align: start is no longer dropped — drop the text-start/end rule',
+  ],
+  [
+    'throws at stylesheet',
+    "module.exports = { compile() { return { warnings() { return ['text-align']; }, stylesheet() { throw new Error('stylesheet boom first line'); } }; } };\n",
+    'the compiler failed on the color-mix over an @theme inline variable fixture (stylesheet boom first line)',
+  ],
+]) {
+  test(`reports compiler pins the stub ${name}, keeping the source findings`, context => {
+    const root = stubbedCompilerFixture(context, entrySource);
+    const result = spawnSync(process.execPath, [join(root, 'tools/nativewind/check-classes.mjs')], {
+      cwd: root,
+      encoding: 'utf8',
+      timeout: 30_000,
+    });
+    assert.ifError(result.error);
+    assert.equal(result.status, 1, result.stderr);
+    // The source-tree findings made it out before the stub failed the pins.
+    assert.match(result.stderr, /bans\.ts:1: "text-start" text-align: start\/end is dropped/);
+    assert.match(result.stderr, new RegExp(expected.replace(/[()]/g, m => `\\${m}`)));
+    assert.match(result.stderr, /check-classes: \d+ problem\(s\)/);
+    assert.doesNotMatch(result.stderr, /Error:|at /);
+  });
+}
 
 test('importing the module neither scans nor runs the compiler probes', context => {
   const root = importOnlyRoot(context);

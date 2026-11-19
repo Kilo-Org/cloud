@@ -96,6 +96,27 @@ function getDisplay(part: ToolPart): Omit<ToolDisplay, 'translatable'> {
 }
 
 describe('getToolDisplay mapping', () => {
+  it('labels a projected agent notice with its description instead of its tool id', () => {
+    const description = 'The active agent has changed from dev to Code.';
+    const output = `${description}\nThe new agent can edit files.`;
+    const part = makeToolPart('agent_notice', {
+      ...completed({}, output),
+      title: 'agent_notice',
+      metadata: {
+        backgroundResult: {
+          kind: 'notice',
+          state: 'unknown',
+          outcome: 'unknown',
+          description,
+          output,
+        },
+      },
+    });
+
+    expect(getToolDisplay(part)).toEqual({ title: description, translatable: true });
+    expect(toolPartHasDetails(part)).toBe(true);
+  });
+
   it('maps read with and without a file path', () => {
     expect(getDisplay(makeToolPart('read', completed({ filePath: '/repo/src/app.ts' })))).toEqual({
       title: 'read',

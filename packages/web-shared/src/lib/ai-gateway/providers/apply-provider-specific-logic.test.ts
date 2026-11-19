@@ -35,6 +35,15 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
   applyVercelSettings: jest.fn(),
 }));
 
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  ...jest.requireActual<object>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'
+  ),
+  resolveOpenRouterModelAlias: jest.fn(async (model: string) =>
+    model === '~vendor/model-latest' ? 'vendor/model-2' : model
+  ),
+}));
+
 const USER_GATEWAY_TEST_MODEL = 'vendor/user-gateway-test-model';
 const USER_GATEWAY_TEST_ORDER = ['google-vertex', 'amazon-bedrock'];
 
@@ -223,6 +232,45 @@ describe('applyProviderSpecificLogic JSON ref field sanitization', () => {
   });
 });
 
+describe('applyProviderSpecificLogic latest aliases', () => {
+  async function upstreamModel(provider: Provider, model: string) {
+    const request = makeRequest(model);
+    await applyProviderSpecificLogic(
+      provider,
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false,
+      null
+    );
+    return request.body.model;
+  }
+
+  it('sends OpenRouter the target a latest alias resolves to', async () => {
+    await expect(upstreamModel(makeProvider(null), '~vendor/model-latest')).resolves.toBe(
+      'vendor/model-2'
+    );
+  });
+
+  it('leaves other OpenRouter models unchanged', async () => {
+    await expect(upstreamModel(makeProvider(null), 'vendor/model-1')).resolves.toBe(
+      'vendor/model-1'
+    );
+  });
+
+  it('leaves the alias to the Vercel settings on the Vercel route', async () => {
+    await expect(upstreamModel(VERCEL_AI_GATEWAY, '~vendor/model-latest')).resolves.toBe(
+      '~vendor/model-latest'
+    );
+  });
+});
+
 describe('applyProviderSpecificLogic recursive tool schemas', () => {
   async function applyToToolParameters(model: string) {
     const request: Extract<GatewayRequest, { kind: 'responses' }> = {
@@ -395,6 +443,66 @@ describe('applyProviderSpecificLogic untyped tool schema enums', () => {
     const properties = await applyToToolParameters('vendor/model');
 
     expect(properties).toEqual({ op: { enum: ['set_title', 'delete_block'] } });
+  });
+});
+
+describe('applyProviderSpecificLogic Gemini tool schemas', () => {
+  async function applyToToolParameters(model: string) {
+    const request: Extract<GatewayRequest, { kind: 'chat_completions' }> = {
+      kind: 'chat_completions',
+      body: {
+        model,
+        messages: [{ role: 'user', content: 'hello' }],
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: 'edit_page',
+              parameters: {
+                type: 'object',
+                properties: {
+                  align: { anyOf: [{ type: 'string' }], nullable: true, enum: ['left', 'null'] },
+                },
+              },
+            },
+          },
+        ],
+      },
+    };
+
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false,
+      null
+    );
+
+    const tool = request.body.tools?.[0];
+    return tool?.type === 'function' ? tool.function.parameters?.properties : undefined;
+  }
+
+  it('moves keys beside anyOf into its branches for Gemini models', async () => {
+    const properties = await applyToToolParameters('google/gemini-3.7-flash');
+
+    expect(properties).toEqual({
+      align: { anyOf: [{ type: 'string', enum: ['left'] }, { type: 'null' }] },
+    });
+  });
+
+  it('preserves keys beside anyOf for other models', async () => {
+    const properties = await applyToToolParameters('vendor/model');
+
+    expect(properties).toEqual({
+      align: { anyOf: [{ type: 'string' }], nullable: true, enum: ['left', 'null'] },
+    });
   });
 });
 

@@ -139,6 +139,29 @@ export const DENSE_ROW_HIT_SLOP = {
 } as const;
 
 /**
+ * Per-side `hitSlop` that lifts the dense `min-h-11` frame (NativeWind's rem
+ * is 14pt, so `min-h-11` renders 38.5pt) to `DESIGN.md:364`'s 44pt minimum:
+ * 38.5 + 5.5 = 44. Larger than {@link DENSE_ROW_HIT_SLOP_DP} because the
+ * frame is smaller than {@link DENSE_ROW_FRAME_DP}'s 39.
+ */
+export const DENSE_ROW_H11_TOUCH_SLOP_DP = 5.5;
+
+/**
+ * The vertical-only `hitSlop` a dense `min-h-11` row renders on the side that
+ * must reach 44pt: `top: 0` because the side that faces a filled 44pt control
+ * above must not shadow it, and the row is last in its card, so the slop side
+ * is also the side the card's padding must contain. Horizontal sides stay 0;
+ * the row spans the card's full inner width, so horizontal slop would reach
+ * past the card's own edge. 38.5 + {@link DENSE_ROW_H11_TOUCH_SLOP_DP} = 44.
+ */
+export const DENSE_ROW_H11_APPEND_HIT_SLOP = {
+  top: 0,
+  bottom: DENSE_ROW_H11_TOUCH_SLOP_DP,
+  left: 0,
+  right: 0,
+} as const;
+
+/**
  * The box a Home section header's text action renders, in dp. It matches the
  * header's label box, so a row with an action is no taller than a row without
  * one, and every Home section keeps one gap to the block above it.
@@ -159,6 +182,15 @@ export const SECTION_ACTION_HIT_SLOP_DP = 9;
 
 /** The vertical padding of a Home section header row, as {@link SECTION_ACTION_HIT_SLOP_DP}. */
 export const SECTION_HEADER_ROW_PADDING_CLASS = 'py-[9px]';
+
+/**
+ * The negated counterpart of {@link SECTION_ACTION_HIT_SLOP_DP}: a row that
+ * reserves the action's hit slop as padding gives up the same amount as its own
+ * height, so it holds the whole reach in its bounds without growing the card it
+ * sits on. A literal class string, because NativeWind only compiles the classes
+ * it finds in source.
+ */
+export const SECTION_ACTION_ROW_CANCEL_CLASS = '-my-[9px]';
 
 /** The `hitSlop` a Home section header action renders, as {@link SECTION_ACTION_HIT_SLOP_DP}. */
 export const SECTION_ACTION_HIT_SLOP = {
@@ -519,6 +551,52 @@ export const LINE_ACTION_BOX_CLASS = 'min-h-[28px] -my-[7px]';
 
 /** The `hitSlop` {@link LINE_ACTION_BOX_CLASS} renders, reaching past 44dp each way. */
 export const LINE_ACTION_HIT_SLOP = { top: 9, bottom: 9, left: 5, right: 5 } as const;
+
+/**
+ * The full vertical reach of a {@link LINE_ACTION_BOX_CLASS} control: the
+ * `h-[46px]` box the command card's controls render as, past the 44pt
+ * target. The reach is the box itself, not `box + hitSlop`: the box is the
+ * target on its own node, and React Native's parent-bounds rule makes any
+ * slop past a control's frame unreliable at a row's outer side (measured:
+ * the vertical slop band reorders, a tap past the outer edge does nothing).
+ */
+export const LINE_ACTION_REACH_DP = 46;
+
+/**
+ * The overlay a command card renders its reorder and delete controls in, as
+ * the absolutely positioned row the card itself parents. Each control's box
+ * is the whole touch target ({@link LINE_ACTION_REACH_DP} tall and wide on
+ * its own node), so the parent-bounds rule cannot clip either axis and no
+ * `hitSlop` is involved; the band is the boxes' parent and exactly their
+ * height.
+ *
+ * `top-0` pins the band to the card's top edge, so the boxes reach into the
+ * card's top padding: the glyph centres at the band's 23dp midpoint, a
+ * quarter dp from the one-text-line label row's centre (22.75dp). The band's
+ * bottom edge (46dp from the card's top) stops above the field, whose gap
+ * from the label row the card widens with {@link COMMAND_ROW_FIELD_GAP_CLASS}
+ * (field top 47.5dp), so a tap aimed at the field's top strip lands on the
+ * field. `end-[14px]` puts the boxes' outer edge on the card's content edge
+ * (`p-4` = 14dp), so the delete control's whole 46dp width is tappable where
+ * the old slop past its box was dead. `gap-3` keeps a 10.5dp band between
+ * neighbouring boxes that the boxes do not cover, so a tap beside one control
+ * cannot reach the next. The row covers the label's tail horizontally, so
+ * `box-none` keeps the band itself touch-transparent and the label under it
+ * stays pressable.
+ */
+export const LINE_ACTION_OVERLAY_CLASS =
+  'absolute end-[14px] top-0 flex-row items-center gap-3 h-[46px]';
+
+/**
+ * The gap between a command card's label row and its field, as a literal
+ * class. The 46dp control band ({@link LINE_ACTION_REACH_DP}) ends at 46dp
+ * from the card's top; the label row ends at `p-4` + one `text-sm` line
+ * (14 + 17.5 = 31.5dp), so a 16dp gap puts the field's top edge at 47.5dp —
+ * 1.5dp below the band's bottom edge. The shared field's own `gap-1.5` (6dp)
+ * would put the band's bottom 8dp into the field, where a tap aimed at the
+ * input's top strip would reorder or delete instead.
+ */
+export const COMMAND_ROW_FIELD_GAP_CLASS = 'gap-y-[16px]';
 
 /**
  * The class an inline-link connector carries so the two links' facing reaches do

@@ -1,6 +1,6 @@
 import Svg, { Rect } from 'react-native-svg';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { I18nManager, useColorScheme, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { formatCalendarDate } from '@/lib/format';
@@ -27,6 +27,10 @@ const MIN_VISIBLE_HEIGHT = 1.5;
  */
 export function UsageBarChart({ points, accessibilityLabel }: Readonly<UsageBarChartProps>) {
   const colors = useThemeColors();
+  // In dark mode the full-chart accent is the softer `--selection` tone, the
+  // same swap large accent fills make elsewhere (the device-session badge);
+  // light mode stays on `primary`.
+  const barFill = useColorScheme() === 'dark' ? colors.selection : colors.primary;
   const { i18n } = useTranslation();
   let peak = 0;
   for (const point of points) {
@@ -34,6 +38,11 @@ export function UsageBarChart({ points, accessibilityLabel }: Readonly<UsageBarC
   }
   const step = 100 / Math.max(points.length, 1);
   const barWidth = step * 0.64;
+  // The date row is a flex row, so a right-to-left layout puts the oldest date
+  // on the right. The SVG paints in its own coordinate space and React Native
+  // does not mirror it, so the bars are placed on the mirrored axis by hand to
+  // stay under their dates.
+  const mirrored = I18nManager.isRTL;
   const first = points[0]?.datetime;
   const last = points.at(-1)?.datetime;
 
@@ -60,14 +69,15 @@ export function UsageBarChart({ points, accessibilityLabel }: Readonly<UsageBarC
               return null;
             }
             const height = peak > 0 ? Math.max((point.value / peak) * 100, MIN_VISIBLE_HEIGHT) : 0;
+            const left = index * step + (step - barWidth) / 2;
             return (
               <Rect
                 key={point.datetime}
-                x={index * step + (step - barWidth) / 2}
+                x={mirrored ? 100 - left - barWidth : left}
                 y={100 - height}
                 width={barWidth}
                 height={height}
-                fill={colors.primary}
+                fill={barFill}
               />
             );
           })}

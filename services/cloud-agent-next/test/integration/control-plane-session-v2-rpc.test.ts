@@ -16,6 +16,7 @@ import type {
   StopResult,
 } from '../../src/sandbox-control/provider.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
+import { shouldCaptureCloudAgentException } from '../../src/sentry.js';
 import {
   parseSessionMetadata,
   type SessionMetadata,
@@ -48,9 +49,9 @@ function b64url(value: string): string {
 }
 
 /** A Kilo token that decodes to `runtimeAuthorization` (modern authorization). */
-function runtimeAuthorizedKiloToken(): string {
+function runtimeAuthorizedKiloToken(exp?: number, authorizationId = 'ra_1'): string {
   const header = b64url(JSON.stringify({ alg: 'none', typ: 'JWT' }));
-  const payload = b64url(JSON.stringify({ runtimeAuthorization: { id: 'ra_1' } }));
+  const payload = b64url(JSON.stringify({ runtimeAuthorization: { id: authorizationId }, exp }));
   return `${header}.${payload}.sig`;
 }
 
@@ -71,12 +72,16 @@ function messageId(): string {
   return `msg_${hex}${suffix}`;
 }
 
-async function sealFor(sessionId: string, secret: string): Promise<string> {
+async function sealFor(
+  sessionId: string,
+  secret: string,
+  id = crypto.randomUUID()
+): Promise<string> {
   const now = Date.now();
   return sealRuntimeAuthorization(
     {
       version: 1,
-      id: crypto.randomUUID(),
+      id,
       resourceKind: 'cloud-agent-next',
       resourceId: sessionId,
       userId: USER_ID,
@@ -1437,6 +1442,63 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     await expect(
       sessionStub.resolveRuntimeCredentialProxyGrant('not-a-handle')
     ).resolves.toBeNull();
+  });
+
+  it('denies a fence scope mismatch and rethrows a fence transport failure without scope fallback', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId(sessionId);
+    const worktreeId = `worktree_${crypto.randomUUID()}`;
+    const authorizationId = crypto.randomUUID();
+    const secret = 'test-nextauth-secret';
+    const sessionStub = sessions.getByName(sessionId);
+    const peer = new FakeSandboxPeer();
+    const fence = {
+      plane: 'control',
+      allocationId: 'allocation_1',
+      providerInstanceId: 'provider_1',
+      connectionId: 'connection_1',
+      wrapperInstanceId: 'wrapper_1',
+    } as const;
+    const readFence = vi.spyOn(peer, 'getRuntimeCredentialProxyFence');
+    const resolveScope = vi.spyOn(peer, 'resolveScopeHandle');
+    await runInDurableObject(sessionStub, instance => {
+      instance.env.NEXTAUTH_SECRET = secret;
+      instance.sandboxPeerFor = () => peer;
+    });
+    await expect(
+      sessionStub.registerSessionFromMetadata({
+        metadata: metadata({
+          sessionId,
+          kiloSessionId: kiloSessionId(),
+          sandboxId,
+          worktreeId,
+          workspacePath: getWorktreeWorkspacePath(ORG_ID, USER_ID, worktreeId),
+          kiloToken: runtimeAuthorizedKiloToken(
+            Math.floor(Date.now() / 1000) + 30 * 60,
+            authorizationId
+          ),
+        }),
+        sandboxSelection: { provider: 'cloudflare-containers' },
+        runtimeAuthorizationSeal: await sealFor(sessionId, secret, authorizationId),
+      })
+    ).resolves.toEqual({ success: true });
+
+    const handle = await sessionStub.issueRuntimeCredentialProxyGrant(fence);
+    if (handle === null) throw new Error('Expected a runtime credential proxy handle');
+
+    readFence.mockResolvedValue({ ...fence, scopeViewUnavailable: 'scope_mismatch' });
+    await expect(sessionStub.resolveRuntimeCredentialProxyGrant(handle)).resolves.toBeNull();
+    expect(readFence).toHaveBeenCalledOnce();
+    expect(resolveScope).not.toHaveBeenCalled();
+
+    readFence.mockRejectedValue(Object.assign(new Error('sandbox RPC reset'), { retryable: true }));
+    await runInDurableObject(sessionStub, async instance => {
+      const resolution = instance.resolveRuntimeCredentialProxyGrant(handle);
+      await expect(resolution).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+      const error = await resolution.catch((caught: unknown) => caught);
+      expect(shouldCaptureCloudAgentException(error)).toBe(false);
+    });
+    expect(resolveScope).not.toHaveBeenCalled();
   });
 });
 

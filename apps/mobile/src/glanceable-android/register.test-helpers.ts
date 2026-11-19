@@ -62,6 +62,7 @@ async function runTask(
         screenHeightDp: 800,
         density: 2,
         densityDpi: 320,
+        fontScale: 1,
       },
     },
     renderWidget: widget => {

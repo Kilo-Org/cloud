@@ -8,13 +8,16 @@ import { View } from 'react-native';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import {
   emailsError,
+  emailsErrorMessages,
   parseEmails,
   parseThreshold,
   saveErrorCopy,
   thresholdError,
+  thresholdErrorMessages,
 } from '@/components/organization/low-balance-alert-validators';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
+import { RefusalStatus } from '@/components/refusal-status';
 import { SheetScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
@@ -23,6 +26,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { formatNumber } from '@/lib/format';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
@@ -32,13 +36,21 @@ import {
   useOrgBoundary,
   useOrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
+import { isTrialExpiredRefusal } from '@/lib/server-error-copy';
+import { useTrialRefusalAction } from '@/lib/trial-refusal';
 
 type LowBalanceAlertFormProps = Readonly<{
   organizationId: string | null;
   settings: OrgWithMembers['settings'];
+  /** Whether this reader may change the plan, which picks the refusal copy. */
+  canManageBilling: boolean;
 }>;
 
-function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormProps) {
+function LowBalanceAlertForm({
+  organizationId,
+  settings,
+  canManageBilling,
+}: LowBalanceAlertFormProps) {
   const router = useRouter();
   const { t } = useTranslation();
   const mutations = useOrganizationMutations(organizationId ?? '');
@@ -82,9 +94,16 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
 
   // A rejected save belongs to the field that caused it; correcting either
   // field drops the rejection so Save no longer sits under a stale sentence.
-  const saveError = mutations.updateMinimumBalanceAlert.isError
-    ? saveErrorCopy(mutations.updateMinimumBalanceAlert.error)
+  // The copy and the step are chosen for this reader's role: only the plan
+  // refusal offers a step, and only to a role the server would let take it.
+  const saveFailure = mutations.updateMinimumBalanceAlert.isError
+    ? mutations.updateMinimumBalanceAlert.error
     : null;
+  const saveError = saveFailure == null ? null : saveErrorCopy(saveFailure, canManageBilling);
+  const trialRefusalAction = useTrialRefusalAction(
+    isTrialExpiredRefusal(saveFailure),
+    organizationId
+  );
   const clearSaveError = () => {
     if (mutations.updateMinimumBalanceAlert.isError) {
       mutations.updateMinimumBalanceAlert.reset();
@@ -116,7 +135,18 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
   return (
     <>
       <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
-        <Text className="text-sm font-medium">{t('common.enabled')}</Text>
+        {/* The slot wraps the label and carries the gutter (`pe-3`) instead of
+            the label, so a wrapped catalog line stays clear of the switch's
+            own 44 dp box — the shape sibling toggle rows use. The label keeps
+            the hidden-label props: hiding the wrapper's own node would leave
+            the inner text in the tree (`no` hides one view,
+            `no-hide-descendants` hides a subtree), so the props sit on the
+            text itself. The switch below already names the row. */}
+        <View className="min-w-0 flex-1 pe-3">
+          <Text {...HIDDEN_LABEL_PROPS} className="text-sm font-medium">
+            {t('organization.lowBalanceAlert.enableA11y')}
+          </Text>
+        </View>
         <Switch
           accessibilityLabel={t('organization.lowBalanceAlert.enableA11y')}
           value={enabled}
@@ -139,6 +169,7 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
             keyboardType="decimal-pad"
             defaultValue={thresholdRef.current || undefined}
             validate={thresholdError}
+            reserveErrorMessages={thresholdErrorMessages()}
             error={draftThresholdError ?? undefined}
             onChangeText={value => {
               thresholdRef.current = value;
@@ -152,12 +183,14 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
             <FormField
               label={t('organization.lowBalanceAlert.notifyEmailsLabel')}
               required
+              validateWhileTyping
               placeholder={t('organization.inviteMember.emailPlaceholder')}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
               defaultValue={emailsRef.current || undefined}
               validate={emailsError}
+              reserveErrorMessages={emailsErrorMessages()}
               onChangeText={value => {
                 emailsRef.current = value;
                 revalidate(enabled, thresholdRef.current, value);
@@ -176,12 +209,14 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
       )}
 
       {/* updateMinimumBalanceAlert has no mutation toast (inline error pattern
-          P2), so AccessibleStatus is the single announcement owner here: one
+          P2), so the status line is the single announcement owner here: one
           announcement per platform, visuals preserved (tone error). A rejected
           save names itself in localized copy — the server's schema message is
-          a JSON array, never a sentence a person should read. */}
-      <AccessibleStatus
+          a JSON array, never a sentence a person should read — and a refusal
+          this reader can end carries the billing step under the copy. */}
+      <RefusalStatus
         message={saveError?.field === 'form' ? saveError.message : null}
+        action={trialRefusalAction}
         className="text-sm"
       />
 
@@ -264,6 +299,7 @@ export function LowBalanceAlertSheet() {
         <LowBalanceAlertForm
           organizationId={organizationId}
           settings={orgWithMembers.data.settings}
+          canManageBilling={isMoneyRole(role)}
         />
       )}
     </SheetScrollView>

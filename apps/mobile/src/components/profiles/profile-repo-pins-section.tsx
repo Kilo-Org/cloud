@@ -13,7 +13,6 @@ import {
   repoPlatformLabelKey,
 } from '@/components/profiles/repo-bindings-model';
 import { QueryError } from '@/components/query-error';
-import { Button } from '@/components/ui/button';
 import { GitBranch, Link2, Plus, Trash2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -23,7 +22,14 @@ import {
   useRepoOptions,
 } from '@/lib/hooks/use-repo-bindings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import {
+  COMPACT_CONTROL_BOX_CLASS,
+  COMPACT_CONTROL_HIT_SLOP_DP,
+  SECTION_ACTION_BOX_CLASS,
+  SECTION_ACTION_HIT_SLOP,
+  SECTION_ACTION_ROW_CANCEL_CLASS,
+  SECTION_HEADER_ROW_PADDING_CLASS,
+} from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 /** The mutation hook toasts `error.message`; the section supplies a fallback otherwise. */
@@ -37,7 +43,10 @@ function RepoPinsSkeleton() {
     <View className="gap-3 rounded-lg border border-border p-3">
       <View className="flex-row items-center justify-between gap-2">
         <Skeleton className="h-4 w-40 rounded bg-muted-soft" />
-        <Skeleton className="h-9 w-28 rounded-md bg-muted-soft" />
+        {/* The placeholder reserves the compact box the loaded action renders, not
+            a rem-scaled height: NativeWind's 14 pt rem draws `h-7` at 24.5 dp,
+            which would let the card grow when the bindings land. */}
+        <Skeleton className={cn(SECTION_ACTION_BOX_CLASS, 'w-24 rounded-md bg-muted-soft')} />
       </View>
       <Skeleton className="h-4 w-full rounded bg-muted-soft" />
       <Skeleton className="h-9 w-full rounded-md bg-muted-soft" />
@@ -101,7 +110,16 @@ export function ProfileRepoPinsSection({
 
   return (
     <View className="gap-3 rounded-lg border border-border p-3">
-      <View className="flex-row items-center justify-between gap-2">
+      {/* The row reserves the action's hit slop as padding and cancels the same
+          amount from its own height, so the action's whole reach sits inside the
+          row that delivers its touches while the card keeps one text line. */}
+      <View
+        className={cn(
+          'flex-row items-center justify-between gap-2',
+          SECTION_HEADER_ROW_PADDING_CLASS,
+          SECTION_ACTION_ROW_CANCEL_CLASS
+        )}
+      >
         <View className="flex-row items-center gap-2">
           <GitBranch size={16} color={colors.mutedForeground} />
           <Text className="text-sm font-medium text-foreground">
@@ -109,18 +127,30 @@ export function ProfileRepoPinsSection({
           </Text>
         </View>
         {canManage ? (
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={bind.isPending}
+          <Pressable
+            className={cn(
+              SECTION_ACTION_BOX_CLASS,
+              // The outlined secondary chrome the action carried before, at the
+              // compact frame: the box holds the height, so no vertical padding,
+              // and the label is the body font the card's own rows read in.
+              'shrink-0 flex-row items-center justify-center gap-1.5 rounded-md border border-border px-2.5 active:opacity-80 dark:border-neutral-700 dark:bg-secondary',
+              'bg-card shadow-sm shadow-[#0000000D]',
+              bind.isPending && 'opacity-50'
+            )}
+            hitSlop={SECTION_ACTION_HIT_SLOP}
+            accessibilityRole="button"
             accessibilityLabel={t('profiles.repoBindings.pinRepo')}
+            accessibilityState={{ disabled: bind.isPending }}
+            disabled={bind.isPending}
             onPress={() => {
               setPickerOpen(true);
             }}
           >
             <Plus size={14} color={colors.foreground} />
-            <Text>{t('profiles.repoBindings.pinRepo')}</Text>
-          </Button>
+            <Text className="shrink text-sm font-semibold text-foreground">
+              {t('profiles.repoBindings.pinRepo')}
+            </Text>
+          </Pressable>
         ) : null}
       </View>
 
@@ -149,7 +179,7 @@ export function ProfileRepoPinsSection({
           {pinned.map(binding => (
             <View
               key={`${binding.repoFullName}-${binding.platform}`}
-              className="min-h-11 flex-row items-center gap-2 rounded-md border border-border bg-background px-3 py-2"
+              className="min-h-11 flex-row items-center gap-2 rounded-md border border-border bg-background px-[16px] py-2"
             >
               <Link2 size={14} color={colors.mutedForeground} />
               {/* One identity element, first, as the profile's bindings rows read:
@@ -173,7 +203,12 @@ export function ProfileRepoPinsSection({
               </Text>
               {canManage ? (
                 <Pressable
-                  className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+                  className={cn(COMPACT_CONTROL_BOX_CLASS, '-me-[7px] active:opacity-70')}
+                  // Same compact-box geometry as the repository defaults rows:
+                  // the glyph ends 17 dp from the row's edge against the
+                  // leading icon's 16 dp inset, and the slop keeps the 48 dp
+                  // touch reach inside the row.
+                  hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
                   accessibilityRole="button"
                   accessibilityLabel={t('profiles.repoBindings.removeForRepo', {
                     repo: binding.repoFullName,

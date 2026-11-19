@@ -1,11 +1,12 @@
 import { Asset } from 'expo-asset';
 import { Directory, File, Paths } from 'expo-file-system';
 import { type ComponentRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, useColorScheme, View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import { z } from 'zod';
 
 import MERMAID_SCRIPT_ASSET from '@/../assets/vendor/mermaid-11.12.0.min.txt';
+import { tokenSchemeForSurface } from '@/lib/pr-review/diff/syntax-colors';
 
 import { MarkdownCodeFence } from './markdown-code-fence';
 import { type MarkdownCopyCodeHandler } from './markdown-handlers';
@@ -31,7 +32,13 @@ const PAGE_FILE_NAME = `diagram-${MERMAID_VERSION}.html`;
 
 type MermaidHost = { pageUri: string; directoryUri: string };
 
+/** Wait before a failed preparation may run again, keyed to no diagram in
+ * particular: the whole process either has its host or records the failure. */
+export const MERMAID_HOST_RETRY_MS = 30_000;
+
 let mermaidHost: Promise<MermaidHost> | null = null;
+let lastFailedAt: number | null = null;
+let now: () => number = () => Date.now();
 
 async function prepareMermaidHost(): Promise<MermaidHost> {
   const directory = new Directory(Paths.cache, HOST_DIRECTORY_NAME);
@@ -47,15 +54,47 @@ async function prepareMermaidHost(): Promise<MermaidHost> {
   return { pageUri: page.uri, directoryUri: directory.uri };
 }
 
+/**
+ * The prepared host, or the reason it is not: a failure makes every diagram
+ * still mounting draw its source as a code fence, and arms the cooldown so the
+ * next attempt waits `MERMAID_HOST_RETRY_MS` instead of repeating the whole
+ * asset download and copy per mount. A successful preparation clears the
+ * record, so a later failure waits a fresh window.
+ */
 async function loadMermaidHost(): Promise<MermaidHost> {
+  const elapsed = now() - (lastFailedAt ?? 0);
+  if (
+    mermaidHost === null &&
+    lastFailedAt !== null &&
+    elapsed >= 0 &&
+    elapsed < MERMAID_HOST_RETRY_MS
+  ) {
+    // The last preparation attempt just failed, so re-running the whole asset
+    // copy this soon repeats work a broken cache device cannot finish. Every
+    // diagram in the window draws its fence from the rejection instead, and a
+    // diagram after the window starts the next attempt. A negative elapsed
+    // time means the device clock moved backwards, which is not an elapsed
+    // wait, so the next attempt runs rather than holding the old window.
+    throw new Error('mermaid host preparation is cooling down');
+  }
   mermaidHost ??= prepareMermaidHost();
   try {
-    return await mermaidHost;
+    const host = await mermaidHost;
+    lastFailedAt = null;
+    return host;
   } catch (error) {
-    // A failed copy is retried by the next diagram instead of being cached.
+    // A failed copy is retried by a later diagram, spaced by the cooldown,
+    // instead of being cached or repeated per mount.
     mermaidHost = null;
+    lastFailedAt = now();
     throw error;
   }
+}
+
+/** For tests: aim the cooldown's clock, so a case can set it at or past the
+ * window without fake timers. Module state itself resets between cases. */
+export function __setMermaidHostClockForTests(clock: () => number): void {
+  now = clock;
 }
 
 const MIN_HEIGHT = 48;
@@ -99,7 +138,10 @@ export function MarkdownMermaid({
   selectable,
   onCopyCode,
 }: Readonly<MarkdownMermaidProps>) {
-  const dark = useColorScheme() === 'dark';
+  // The theme follows the diagram's own page, which the palette derives from the
+  // app scheme rather than from the bubble the diagram sits in, so the diagram
+  // stays legible whatever the chat surface around it looks like.
+  const dark = tokenSchemeForSurface(palette.diagramSurface) === 'onDark';
   // The page's imperative surface: `injectJavaScript` redraws the diagram in the
   // loaded page. `ComponentRef` is how this package's ref is typed, because its
   // JSX element infers its props type parameter from the attributes.
@@ -135,13 +177,13 @@ export function MarkdownMermaid({
   }, [source]);
   const webSource = useMemo(() => (host === null ? null : { uri: host.pageUri }), [host]);
   const webViewStyle = useMemo(
-    () => ({ backgroundColor: palette.codeBackground }),
-    [palette.codeBackground]
+    () => ({ backgroundColor: palette.diagramSurface }),
+    [palette.diagramSurface]
   );
   // What the page should be painting. The load handler and the color effect both
   // read it, so the injection that follows a load carries the colors in effect by
   // then instead of the ones a prop had while the page was loading.
-  const wantedRender = useRef({ source, dark, background: palette.codeBackground });
+  const wantedRender = useRef({ source, dark, background: palette.diagramSurface });
   // The source whose diagram the loaded page is drawing, or `null` while the
   // page is loading or has failed. A color change may redraw a loaded page; a
   // source change remounts the page and its own load draws the new diagram.
@@ -163,15 +205,15 @@ export function MarkdownMermaid({
     const { source: wantedSource, dark: wantedDark, background } = wantedRender.current;
     webViewRef.current?.injectJavaScript(renderCall(wantedSource, wantedDark, background));
   }, []);
-  // Redraw into the page already loaded when the color scheme or the palette
+  // Redraw into the page already loaded when the surface or the palette
   // changes, instead of reloading it: the vendored script is then read once per
-  // diagram rather than once per theme flip or palette change.
+  // diagram rather than once per palette change.
   useEffect(() => {
-    wantedRender.current = { source, dark, background: palette.codeBackground };
+    wantedRender.current = { source, dark, background: palette.diagramSurface };
     if (loadedSource.current === source) {
       injectWantedRender();
     }
-  }, [source, dark, palette.codeBackground, injectWantedRender]);
+  }, [source, dark, palette.diagramSurface, injectWantedRender]);
 
   if (failed) {
     // The fence's source is drawn on the same card as every other code fence,
@@ -191,7 +233,7 @@ export function MarkdownMermaid({
   return (
     <View
       className="my-1 overflow-hidden rounded-lg"
-      style={{ height, backgroundColor: palette.codeBackground }}
+      style={{ height, backgroundColor: palette.diagramSurface }}
     >
       {host === null || webSource === null ? null : (
         <WebView
@@ -240,7 +282,7 @@ export function MarkdownMermaid({
             loadedSource.current = null;
             setFailure({ source });
           }}
-          // The page paints the card color itself, so the native view must not
+          // The page paints the card surface itself, so the native view must not
           // flash its own white background before the diagram loads.
           style={webViewStyle}
         />

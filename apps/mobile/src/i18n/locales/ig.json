@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Akaụntụ a enweghị òtù ọ bụla ruo ugbu a. Enwere ike ịnyochaa arịrịọ ijikọ koodu Bitbucket ozugbo ị mepụtara òtù ma ọ bụ sonye na òtù.",
       "gitlabReconnectAdminOnlyDescription": "Rịọ onye nwe nzukọ, onye nchịkwa, ma ọ bụ onye njikwa ịgba ụgwọ ka ha jikọọ ya.",
       "bitbucketNotConnectedTitle": "E jikọghị Bitbucket",
-      "bitbucketAdminOnlyDescription": "Naanị ndị nwe nzukọ, ndị nchịkwa, na ndị njikwa ịgba ụgwọ nwere ike ijikọ ya.",
+      "adminOnlyConnectDescription": "Naanị ndị nwe nzukọ, ndị nchịkwa, na ndị njikwa ịgba ụgwọ nwere ike ijikọ ya.",
       "contextLine": "Maka {{organization}}",
       "contextLinePersonal": "Maka nkeonwe"
     },
@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Enweghị ike ibudata nnọkọ",
-    "couldNotLoadActiveSessions": "Enweghị ike ibudata nnọkọ na-aga n'ihu",
     "agentSessions": "Na-aga n'ihu ugbu a",
     "newCodingTask": "Ọrụ ịde koodu ọhụrụ",
     "newTaskFromPicture": "Ọrụ ọhụrụ site na foto",
@@ -3417,7 +3416,8 @@
         "accounting_adjustment": "Mmezi ndekọ ego",
         "credits_expired": "Oge ego ojiji agwụla"
       },
-      "truncated": "Ndekọ ego ojiji gara aga dị."
+      "truncated": "Ndekọ ego ojiji gara aga dị.",
+      "retentionLimit": "Na-egosi ndekọ ego ojiji ndị kachasị ọhụrụ."
     },
     "inviteMember": {
       "emailError": "Tinye adreesị ozi ịntanetị ziri ezi.",
@@ -3449,7 +3449,8 @@
         "void": "Akagbuola",
         "uncollectible": "A pụghị ịnakọta ụgwọ"
       },
-      "truncated": "Akwụkwọ ịgba ụgwọ gara aga dị."
+      "truncated": "Akwụkwọ ịgba ụgwọ gara aga dị.",
+      "retentionLimit": "Na-egosi akwụkwọ ịgba ụgwọ ndị kachasị ọhụrụ."
     },
     "lowBalanceAlert": {
       "enableA11y": "Gbanye ịdọ aka na ntị mgbe ego fọdụrụ dị ntakịrị",
@@ -3683,8 +3684,7 @@
     "imagesSectionEmpty": "Enweghị saịtị onyonyo a tụkwasịrị obi",
     "revoke": "Kagbuo ntụkwasị obi na {{host}}",
     "revokeMessage": "Njikọ ndị na-aga saịtị a ga-arịọ nkwenye ọzọ.",
-    "revokeImageMessage": "Onyonyo sitere na saịtị a ga-arịọ nkwenye ọzọ.",
-    "backToPreferences": "Laghachi na nhọrọ"
+    "revokeImageMessage": "Onyonyo sitere na saịtị a ga-arịọ nkwenye ọzọ."
   },
   "glanceable": {
     "waiting": "Na-emelite ndị nnọchi anya",
@@ -3931,6 +3931,8 @@
       "downloading": "Na-ebudata: {{written}} n'ime {{total}}",
       "downloadingUnknown": "Na-ebudata: {{written}}",
       "paused": "A kwụsịrị: {{written}} n'ime {{total}}",
+      "retrying": "Na-anwa ọzọ: {{written}} n'ime {{total}}",
+      "retryingUnknown": "Na-anwa ọzọ: {{written}}",
       "verifying": "Na-enyocha faịlụ e budatara…",
       "downloaded": "E budatara · {{size}}",
       "url": "Njikọ ibudata kpọmkwem",
@@ -4021,7 +4023,9 @@
         "androidModelUnavailable": "Ngwaọrụ a anaghị akwado Gemini Nano, ma ọ bụ ngwa sistemụ AICore ka na-akwado onwe ya. Nwaa ọzọ ma emechaa.",
         "aicoreUpdateRequired": "Melite ngwa AICore na sọftụwia sistemụ gị iji ihe nlereanya a.",
         "downloadable": "Ihe nlereanya a chọrọ nbudata otu ugboro tupu i nwee ike iji ya.",
-        "downloading": "Ihe nlereanya ahụ na-ebudata. Ọ ga-adị njikere mgbe nbudata ahụ gwụchara."
+        "downloading": "Ihe nlereanya ahụ na-ebudata. Ọ ga-adị njikere mgbe nbudata ahụ gwụchara.",
+        "batteryQuota": "Ihe nlereanya dị na ngwaọrụ ejirila oke batrị ya ugbu a. Nwaa ọzọ ma emechaa.",
+        "checkFailed": "Ngwa ahụ enweghị ike ịlele ihe nlereanya a. Nwaa ọzọ."
       },
       "unavailable": "Ihe nlereanya na ngwaọrụ adịghị ugbu a. Lelee ọnọdụ ya na $t(modelChat.backends.title).",
       "busy": "Ihe nlereanya na ngwaọrụ na-arụ ọrụ na nzaghachi ọzọ. Nwaa ọzọ mgbe ọ gwụchara.",
@@ -4382,7 +4386,8 @@
       "purchaseFallback": "Ịzụ kredit",
       "receipt": "Rịsịt",
       "receiptA11y": "Mepee rịsịt maka {{description}}, {{amount}}, site na {{date}}",
-      "receiptUnavailable": "Enweghị rịsịt maka ihe a zụrụ a."
+      "receiptUnavailable": "Enweghị rịsịt maka ihe a zụrụ a.",
+      "retentionLimit": "Na-egosi akụkọ kredit kachasị ọhụrụ."
     },
     "title": "Zụta ego ojiji",
     "description": "Ego ojiji bụ azụmahịa otu oge nke a na-agbakwunye na nguzozi Kilo gị maka ịgba nnọkọ ịde koodu AI na Kilo App. Ụlọ ahịa na-akwụ ụgwọ na akaụntụ gị, a na-agbakwunye ego ojiji mgbe ụlọ ahịa kwadoro ịkwụ ụgwọ ahụ.",
@@ -4629,6 +4634,9 @@
     "couldNotLoad": "Enweghị ike ibudata njikọ",
     "permissionDenied": "Ị nweghị ikike ijikwa njikọ ndị a.",
     "managedByOwner": "Gwa onye nwe nzukọ ka ọ gbanwee njikọ ị na-enweghị ike ịgbanwe.",
+    "managedByOwnerOrAdmin": "Gwa onye nwe nzukọ ma ọ bụ onye nchịkwa ka ha gbanwee njikọ ị na-enweghị ike ịgbanwe.",
+    "managedByOwnerOrBilling": "Gwa onye nwe nzukọ ma ọ bụ onye njikwa ịgba ụgwọ ka ha gbanwee njikọ ị na-enweghị ike ịgbanwe.",
+    "managedByOwnerAdminOrBilling": "Gwa onye nwe nzukọ, onye nchịkwa, ma ọ bụ onye njikwa ịgba ụgwọ ka ha gbanwee njikọ ị na-enweghị ike ịgbanwe.",
     "connectFailed": "Enweghị ike imepe ibe njikọ"
   },
   "invoices": {

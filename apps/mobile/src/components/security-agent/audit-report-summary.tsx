@@ -7,6 +7,7 @@ import {
   summaryCountLabel,
   type SummaryFigureKind,
 } from '@/components/security-agent/audit-report-copy';
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
@@ -31,7 +32,7 @@ function SummaryCount({
       accessible
       accessibilityLabel={summaryCountLabel({ kind, value, displayCount, label })}
     >
-      <Text className="text-lg font-semibold tabular-nums">{displayCount}</Text>
+      <Text variant="stat">{displayCount}</Text>
       <Text variant="muted" className="text-xs">
         {label}
       </Text>
@@ -42,8 +43,8 @@ function SummaryCount({
 export function ReportSummary({ summary }: Readonly<{ summary: ReportSummaryFigures }>) {
   const { t } = useTranslation();
   return (
-    <View className="gap-3 rounded-lg bg-secondary p-3">
-      <Text className="text-sm font-medium">{t('securityAgent.auditReport.summary')}</Text>
+    <Card>
+      <Text variant="heading">{t('securityAgent.auditReport.summary')}</Text>
       <View className="flex-row flex-wrap gap-x-6 gap-y-2">
         <SummaryCount kind="findings" label={t('common.findings')} value={summary.findingCount} />
         <SummaryCount
@@ -60,6 +61,6 @@ export function ReportSummary({ summary }: Readonly<{ summary: ReportSummaryFigu
           />
         ))}
       </View>
-    </View>
+    </Card>
   );
 }

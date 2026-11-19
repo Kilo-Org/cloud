@@ -5,6 +5,7 @@ import { type Pressable, ScrollView, View } from 'react-native';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Button } from '@/components/ui/button';
+import { SheetHeader } from '@/components/sheet-header';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -32,6 +33,7 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insets,
 }));
+vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -94,26 +96,35 @@ function findRow(renderer: RenderedView['renderer'], label: string) {
 }
 
 function pressButton(renderer: RenderedView['renderer'], label: string) {
-  const button = renderer.root
-    .findAllByType(Button)
-    .find(row => row.findByType(Text).props.children === label);
-  if (!button) {
-    throw new Error(`missing button: ${label}`);
-  }
+  const header = renderer.root.findByType(SheetHeader);
+  const onPress =
+    label === i18n.t('common.apply')
+      ? (header.props.onDone as () => void)
+      : (header.props.onCancel as () => void);
   act(() => {
-    (button.props.onPress as () => void)();
+    onPress();
   });
 }
 
-/** The sheet's content column: it fills the detent and pads the bottom inset. */
+/** The sheet's content column, above the sheet's own bottom-inset spacer. */
 function findSheetContent(renderer: RenderedView['renderer']) {
-  const content = renderer.root
-    .findAllByType(View)
-    .find(view => view.props.className === 'flex-1 gap-4 p-5');
+  const content = renderer.root.findAllByType(View).find(view => view.props.className === 'flex-1');
   if (!content) {
     throw new Error('missing sheet content');
   }
   return content;
+}
+
+/** The explicit height a mocked host View paints, read off its loosely-typed props. */
+function explicitHeight(props: unknown): number | undefined {
+  if (typeof props !== 'object' || props === null || !('style' in props)) {
+    return undefined;
+  }
+  const style = props.style;
+  if (typeof style !== 'object' || style === null || !('height' in style)) {
+    return undefined;
+  }
+  return typeof style.height === 'number' ? style.height : undefined;
 }
 
 /** Project rows only, in render order, so a toggle's reorder would show up. */
@@ -188,7 +199,7 @@ describe('SessionFilterModal', () => {
       expect(findRow(renderer, secondProject.displayName).props.accessibilityState).toEqual({
         selected: true,
       });
-      expect(renderer.root.findAllByType(Button)).toHaveLength(2);
+      expect(renderer.root.findAllByType(Button)).toHaveLength(0);
 
       act(() => {
         (closing.props.onDismiss as () => void)();
@@ -294,13 +305,17 @@ describe('SessionFilterModal', () => {
     const options = renderer.root.findByType(ScrollView);
     expect(renderer.root.findAllByType(ScrollView)).toHaveLength(1);
     expect(options.findAllByType(Button)).toHaveLength(0);
-    expect(renderer.root.findAllByType(Button)).toHaveLength(2);
+    // Apply and Cancel are the sheet header's two controls, above the scroll.
+    expect(renderer.root.findAllByType(Button)).toHaveLength(0);
   });
 
-  it('reserves the bottom safe-area inset in the sheet padding', async () => {
+  it('reserves the bottom safe-area inset below the sheet content', async () => {
     insets = { top: 47, bottom: 34, left: 0, right: 0 };
     const { renderer } = await renderModal();
-    expect(findSheetContent(renderer).props.style).toMatchObject({ paddingBottom: 34 + 20 });
+    const spacer = renderer.root
+      .findAllByType(View)
+      .find(view => explicitHeight(view.props) === insets.bottom);
+    expect(spacer).toBeDefined();
   });
 
   it('uses the supplied platform options and omits an empty project section', async () => {

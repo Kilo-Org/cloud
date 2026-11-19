@@ -1,4 +1,5 @@
 import { i18n } from '@/i18n';
+import { segmentsBeneathFormSheet } from '@/lib/form-sheet-routes';
 import { formatNumber } from '@/lib/format';
 
 const TAB_BAR_BASE_HEIGHT = 50;
@@ -27,7 +28,7 @@ const TAB_ICON_BASE_SIZE = 22;
 const TAB_ICON_MAX_SIZE = 26;
 
 // Label metrics mirrored from `TabBarLabel`
-// (`apps/mobile/src/components/tab-bar-label.tsx`): `font-mono-medium text-[11px]
+// (`apps/mobile/src/components/ui/tab-bar-label.tsx`): `font-mono-medium text-[11px]
 // leading-[1rem] uppercase tracking-[0.2px]`. Keep these in step with that style.
 const TAB_LABEL_FONT_SIZE = 11;
 const TAB_LABEL_LETTER_SPACING = 0.2;
@@ -266,22 +267,28 @@ export function tabLabelNumberOfLines(label: string): 1 | 2 {
   return label.includes('\n') ? 2 : 1;
 }
 
-/**
- * The route group of the Chat tab, and the one screen in it that is not the
- * list. A conversation puts its composer where the tab bar sits, so the bar
- * goes while one is open. The group is read from the segments rather than the
- * path, because a conversation's path is the session id and nothing else.
- */
-const CHAT_TAB_GROUP = '(4_chat)';
-const CHAT_CONVERSATION = '[id]';
+/** The four tab roots: the only routes that draw the bar. */
+const TAB_ROOT_GROUPS = new Set(['(0_home)', '(2_agents)', '(4_chat)', '(3_profile)']);
 
-export function shouldHideTabBar(pathname: string, segments: readonly string[]): boolean {
-  const parts = pathname.split('/').filter(Boolean);
-  const isSecurityFindingFilter =
-    parts[0] === 'security-agent' && parts.length === 3 && parts[2] === 'filter';
-  const isChatConversation =
-    segments.includes(CHAT_TAB_GROUP) && segments.at(-1) === CHAT_CONVERSATION;
-  return isSecurityFindingFilter || isChatConversation;
+/**
+ * The bar belongs to the four tab roots. Every pushed route hides it, whether
+ * it sits inside a tab group (Past sessions, Spend alerts, Triggers, Billing)
+ * or on the root stack (Usage, Notifications, Buy credits, Kilo Pass), so a
+ * Profile sub-screen and an Agents sub-screen carry the same chrome. Read from
+ * the segments, because a chat conversation's path is the session id alone.
+ *
+ * A form sheet is not a screen of its own: it covers the route beneath it, so
+ * the rule reads that route. A sheet over a tab root therefore leaves the bar
+ * where the root had it — and the root's bottom inset with it — while a sheet
+ * over a pushed screen keeps the bar hidden.
+ */
+export function shouldHideTabBar(_pathname: string, segments: readonly string[]): boolean {
+  const screen = segmentsBeneathFormSheet(segments);
+  const leaf = screen.at(-1);
+  if (leaf !== undefined && TAB_ROOT_GROUPS.has(leaf)) {
+    return false;
+  }
+  return !(leaf === 'index' && TAB_ROOT_GROUPS.has(screen.at(-2) ?? ''));
 }
 
 export type TabBarTab = 'home' | 'agents' | 'chat' | 'profile';

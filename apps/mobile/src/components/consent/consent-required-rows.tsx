@@ -1,8 +1,8 @@
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
 
-import { ConsentRow } from '@/components/consent/consent-row';
+import { ConfigureRow } from '@/components/ui/configure-row';
 import { MessageSquare, Smartphone, Sparkles, User } from '@/components/ui/icons';
+import { RowGroup } from '@/components/ui/row-group';
 
 /**
  * The disclosures the app cannot work without, in the order the consent card
@@ -13,27 +13,27 @@ export function ConsentRequiredRows() {
   const { t } = useTranslation();
 
   return (
-    <View className="mt-3 gap-5">
-      <ConsentRow
+    <RowGroup leadingTile>
+      <ConfigureRow
         icon={MessageSquare}
         title={t('consent.promptsTitle')}
-        description={t('consent.promptsDescription')}
+        subtitle={t('consent.promptsDescription')}
       />
-      <ConsentRow
+      <ConfigureRow
         icon={User}
         title={t('consent.accountTitle')}
-        description={t('consent.accountDescription')}
+        subtitle={t('consent.accountDescription')}
       />
-      <ConsentRow
+      <ConfigureRow
         icon={Smartphone}
         title={t('consent.diagnosticsTitle')}
-        description={t('consent.diagnosticsDescription')}
+        subtitle={t('consent.diagnosticsDescription')}
       />
-      <ConsentRow
+      <ConfigureRow
         icon={Sparkles}
         title={t('consent.featureFlagsTitle')}
-        description={t('consent.featureFlagsDescription')}
+        subtitle={t('consent.featureFlagsDescription')}
       />
-    </View>
+    </RowGroup>
   );
 }

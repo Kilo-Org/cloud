@@ -246,9 +246,9 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
   const storeUnavailable =
     !catalogEmpty && (productsState.storeUnavailable || backendProductsQuery.isError);
 
-  // A store failure must not blank the rows: keep the backend packs with no
-  // store price, so the amounts stay on screen and each row shows the
-  // price-unavailable note instead of disappearing.
+  // A store failure must not change what the catalogue sells: keep the backend
+  // packs with no store price, so a store that answered and skipped one pack
+  // still leaves that row in place with its price-unavailable note.
   const unpricedBackendProducts = useMemo<StoreCreditProduct[]>(
     () =>
       (backendProductsQuery.data?.products ?? []).map(backend => ({

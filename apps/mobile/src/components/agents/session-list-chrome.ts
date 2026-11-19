@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
+import { FAB_MARGIN, FAB_SIZE } from '@/components/ui/fab';
 
 /** The FAB's own height plus its fixed margin above the tab bar. */
 const FAB_BAND = FAB_SIZE + FAB_MARGIN;

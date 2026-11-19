@@ -15,9 +15,12 @@ type EmptyStateProps = {
   iconColor?: string;
   compactTitleClassName?: string;
   description?: ReactElement<{ tone?: string }>;
+  placement?: string;
+  inset?: string;
 };
 
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   EmptyState: (props: EmptyStateProps) =>
     createElement('EmptyState', props, props.description, props.action),
 }));
@@ -25,6 +28,7 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: () => null,
   AlertCircle: () => null,
   Lock: () => null,
   SearchX: () => null,
@@ -37,8 +41,8 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ destructive: '#ff0000' }),
 }));
 
-/** The retry button's props, including the label it renders. */
-type RetryButtonProps = { onPress: () => void; children: { props: { children: string } } };
+/** The retry action's props, including the label it carries. */
+type RetryActionProps = { onPress: () => void; label: string };
 
 function emptyStateProps(mounted: RenderWithProvidersResult): EmptyStateProps {
   return mounted.renderer.root.findByType('EmptyState' as never).props as EmptyStateProps;
@@ -50,8 +54,8 @@ describe('QueryError retry action', () => {
     const mounted = await renderWithProviders(<QueryError onRetry={onRetry} />);
 
     const retry = mounted.renderer.root.findByProps({ accessibilityLabel: 'common.retry' })
-      .props as RetryButtonProps;
-    expect(retry.children.props.children).toBe('common.retry');
+      .props as RetryActionProps;
+    expect(retry.label).toBe('common.retry');
     retry.onPress();
     expect(onRetry).toHaveBeenCalledOnce();
     mounted.unmount();
@@ -64,8 +68,8 @@ describe('QueryError retry action', () => {
 
     const retry = mounted.renderer.root.findByProps({
       accessibilityLabel: 'Refresh repositories',
-    }).props as RetryButtonProps;
-    expect(retry.children.props.children).toBe('Refresh repositories');
+    }).props as RetryActionProps;
+    expect(retry.label).toBe('Refresh repositories');
     expect(
       mounted.renderer.root.findAllByProps({ accessibilityLabel: 'common.retry' })
     ).toHaveLength(0);
@@ -89,5 +93,17 @@ describe('QueryError state emphasis', () => {
 
     expect(emptyStateProps(mounted).compactTitleClassName).toBe('text-destructive');
     mounted.unmount();
+  });
+
+  it('hands the state the caller inset it asked for, and none by default', async () => {
+    // The error owns its surface's gutter only where it is that surface's
+    // full-bleed content; a `top` one in a body draws none (see EmptyState).
+    const plain = await renderWithProviders(<QueryError placement="top" />);
+    expect(emptyStateProps(plain).inset).toBeUndefined();
+    plain.unmount();
+
+    const fullBleed = await renderWithProviders(<QueryError placement="top" inset="gutter" />);
+    expect(emptyStateProps(fullBleed).inset).toBe('gutter');
+    fullBleed.unmount();
   });
 });

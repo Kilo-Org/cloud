@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import { type ChosenProfile, type ChosenRepo } from '@/components/profiles/repo-bindings-add-model';
 import { PickerField } from '@/components/profiles/repo-bindings-rows';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 
 /**
@@ -34,7 +35,7 @@ export function RepoBindingsAddForm({
 }>) {
   const { t } = useTranslation();
   return (
-    <View className="gap-3 rounded-lg border border-border p-3">
+    <Card>
       <PickerField
         label={t('profiles.repoBindings.repo')}
         value={chosenRepo.kind === 'chosen' ? chosenRepo.repo.fullName : null}
@@ -78,6 +79,6 @@ export function RepoBindingsAddForm({
           <Text>{t('profiles.repoBindings.add')}</Text>
         </Button>
       </View>
-    </View>
+    </Card>
   );
 }

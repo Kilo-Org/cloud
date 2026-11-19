@@ -2483,7 +2483,6 @@
   },
   "home": {
     "couldNotLoadSessions": "セッションを読み込めませんでした。",
-    "couldNotLoadActiveSessions": "実行中のセッションを読み込めませんでした。",
     "agentSessions": "現在実行中",
     "newCodingTask": "新しいコーディングタスク",
     "newTaskFromPicture": "画像から新しいタスク",
@@ -2800,7 +2799,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "このアカウントにはまだ組織がありません。組織を作成または参加すると、Bitbucketのプルリクエストをレビューできるようになります。",
       "gitlabReconnectAdminOnlyDescription": "組織のオーナー、管理者、または請求管理者に再接続を依頼してください。",
       "bitbucketNotConnectedTitle": "Bitbucketが接続されていません",
-      "bitbucketAdminOnlyDescription": "接続できるのは組織のオーナー、管理者、請求管理者のみです。",
+      "adminOnlyConnectDescription": "接続できるのは組織のオーナー、管理者、請求管理者のみです。",
       "contextLine": "{{organization}}用",
       "contextLinePersonal": "個人用"
     },
@@ -3409,7 +3408,8 @@
         "accounting_adjustment": "会計調整",
         "credits_expired": "クレジット失効"
       },
-      "truncated": "これより前のクレジットの履歴も確認できます。"
+      "truncated": "これより前のクレジットの履歴も確認できます。",
+      "retentionLimit": "最新のクレジットの履歴を表示しています。"
     },
     "hub": {
       "balance": "残高",
@@ -3454,7 +3454,8 @@
         "void": "無効",
         "uncollectible": "回収不能"
       },
-      "truncated": "これより前の請求書も確認できます。"
+      "truncated": "これより前の請求書も確認できます。",
+      "retentionLimit": "最新の請求書を表示しています。"
     },
     "lowBalanceAlert": {
       "enableA11y": "残高アラートを有効にする",
@@ -3683,8 +3684,7 @@
     "imagesSectionEmpty": "信頼済み画像ホストはありません",
     "revoke": "{{host}}を信頼済みホストから削除",
     "revokeMessage": "このホストへのリンクは再び確認を求めます。",
-    "revokeImageMessage": "このホストの画像は再び確認を求めます。",
-    "backToPreferences": "設定に戻る"
+    "revokeImageMessage": "このホストの画像は再び確認を求めます。"
   },
   "glanceable": {
     "waiting": "エージェントの状態を更新中",
@@ -3931,6 +3931,8 @@
       "downloading": "ダウンロード中: {{written}} / {{total}}",
       "downloadingUnknown": "ダウンロード中: {{written}}",
       "paused": "一時停止中: {{written}} / {{total}}",
+      "retrying": "再試行中: {{written}} / {{total}}",
+      "retryingUnknown": "再試行中: {{written}}",
       "verifying": "ダウンロードしたファイルを確認しています…",
       "downloaded": "ダウンロード済み · {{size}}",
       "url": "直接ダウンロードリンク",
@@ -4021,7 +4023,9 @@
         "androidModelUnavailable": "このデバイスはGemini Nanoに対応していないか、AICoreシステムアプリがまだセットアップ中です。しばらくしてからもう一度お試しください。",
         "aicoreUpdateRequired": "このモデルを使用するには、AICoreアプリとシステムソフトウェアをアップデートしてください。",
         "downloadable": "このモデルを使用するには、初回のみダウンロードが必要です。",
-        "downloading": "モデルをダウンロード中です。ダウンロードが完了すると使用可能になります。"
+        "downloading": "モデルをダウンロード中です。ダウンロードが完了すると使用可能になります。",
+        "batteryQuota": "オンデバイスモデルは、いま使えるバッテリー枠を使い尽くしました。しばらくしてからもう一度お試しください。",
+        "checkFailed": "アプリがこのモデルを確認できませんでした。もう一度お試しください。"
       },
       "unavailable": "オンデバイスモデルは現在利用できません。$t(modelChat.backends.title)で状態を確認してください。",
       "busy": "オンデバイスモデルは別の返信を処理中です。完了してからもう一度お試しください。",
@@ -4382,7 +4386,8 @@
       "purchaseFallback": "クレジットの購入",
       "receipt": "領収書",
       "receiptA11y": "{{description}}、{{amount}}、{{date}}の領収書を開く",
-      "receiptUnavailable": "この購入の領収書はありません。"
+      "receiptUnavailable": "この購入の領収書はありません。",
+      "retentionLimit": "最新のクレジット履歴を表示しています。"
     },
     "title": "クレジットを購入",
     "description": "クレジットは、Kilo AppでAIコーディングセッションを実行するためにKilo残高に追加される買い切りの購入です。ストアがアカウントに請求し、ストアが支払いを確認した後にクレジットが追加されます。",
@@ -4629,6 +4634,9 @@
     "couldNotLoad": "連携を読み込めませんでした",
     "permissionDenied": "これらの連携を管理する権限がありません。",
     "managedByOwner": "変更できない接続については、組織のオーナーに変更を依頼してください。",
+    "managedByOwnerOrAdmin": "変更できない接続については、組織のオーナー、または管理者に変更を依頼してください。",
+    "managedByOwnerOrBilling": "変更できない接続については、組織のオーナー、または請求管理者に変更を依頼してください。",
+    "managedByOwnerAdminOrBilling": "変更できない接続については、組織のオーナー、管理者、または請求管理者に変更を依頼してください。",
     "connectFailed": "接続ページを開けませんでした"
   },
   "invoices": {

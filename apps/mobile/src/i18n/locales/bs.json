@@ -961,7 +961,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Ovaj račun još nema organizacije. Zahtjeve za spajanje na Bitbucketu možeš pregledati kada kreiraš ili se pridružiš organizaciji.",
       "gitlabReconnectAdminOnlyDescription": "Zamolite vlasnika organizacije, administratora ili menadžera za naplatu da je ponovo poveže.",
       "bitbucketNotConnectedTitle": "Bitbucket nije povezan",
-      "bitbucketAdminOnlyDescription": "Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu ga povezati.",
+      "adminOnlyConnectDescription": "Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu ga povezati.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za lični nalog"
     },
@@ -3094,7 +3094,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nije moguće učitati sesije.",
-    "couldNotLoadActiveSessions": "Nije moguće učitati aktivne sesije.",
     "agentSessions": "Trenutno aktivno",
     "newCodingTask": "Novi zadatak programiranja",
     "newTaskFromPicture": "Novi zadatak sa slike",
@@ -3475,7 +3474,8 @@
         "accounting_adjustment": "Računovodstvena korekcija",
         "credits_expired": "Istekli krediti"
       },
-      "truncated": "Dostupan je raniji promet kredita."
+      "truncated": "Dostupan je raniji promet kredita.",
+      "retentionLimit": "Prikazuje se najnoviji promet kredita."
     },
     "inviteMember": {
       "emailError": "Unesi ispravnu adresu e-pošte.",
@@ -3507,7 +3507,8 @@
         "void": "Poništeno",
         "uncollectible": "Nenaplativo"
       },
-      "truncated": "Starije fakture su dostupne."
+      "truncated": "Starije fakture su dostupne.",
+      "retentionLimit": "Prikazuju se najnovije fakture."
     },
     "lowBalanceAlert": {
       "enableA11y": "Omogući upozorenje o niskom saldu",
@@ -3743,8 +3744,7 @@
     "imagesSectionEmpty": "Nema pouzdanih hostova za slike",
     "revoke": "Povuci povjerenje za {{host}}",
     "revokeMessage": "Linkovi na ovaj host će ponovo tražiti potvrdu.",
-    "revokeImageMessage": "Slike s ovog hosta će ponovo tražiti potvrdu.",
-    "backToPreferences": "Nazad na postavke"
+    "revokeImageMessage": "Slike s ovog hosta će ponovo tražiti potvrdu."
   },
   "glanceable": {
     "waiting": "Ažuriranje agenata",
@@ -3992,6 +3992,8 @@
       "downloading": "Preuzimanje: {{written}} od {{total}}",
       "downloadingUnknown": "Preuzimanje: {{written}}",
       "paused": "Pauzirano: {{written}} od {{total}}",
+      "retrying": "Ponovni pokušaj: {{written}} od {{total}}",
+      "retryingUnknown": "Ponovni pokušaj: {{written}}",
       "verifying": "Provjera preuzete datoteke…",
       "downloaded": "Preuzeto · {{size}}",
       "url": "Direktan link za preuzimanje",
@@ -4082,7 +4084,9 @@
         "androidModelUnavailable": "Ovaj uređaj ne podržava Gemini Nano ili se sistemska aplikacija AICore još postavlja. Pokušajte ponovo kasnije.",
         "aicoreUpdateRequired": "Da biste koristili ovaj model, ažurirajte aplikaciju AICore i sistemski softver.",
         "downloadable": "Ovaj model je potrebno jednom preuzeti prije korištenja.",
-        "downloading": "Model se preuzima. Bit će spreman kada se preuzimanje završi."
+        "downloading": "Model se preuzima. Bit će spreman kada se preuzimanje završi.",
+        "batteryQuota": "Model na uređaju je za sada iskoristio svoju baterijsku kvotu. Pokušajte ponovo kasnije.",
+        "checkFailed": "Aplikacija nije mogla provjeriti ovaj model. Pokušajte ponovo."
       },
       "unavailable": "Model na uređaju trenutno nije dostupan. Provjerite njegov status u odjeljku $t(modelChat.backends.title).",
       "busy": "Model na uređaju je zauzet drugim odgovorom. Pokušajte ponovo kada završi.",
@@ -4449,7 +4453,8 @@
       "purchaseFallback": "Kupovina kredita",
       "receipt": "Potvrda",
       "receiptA11y": "Otvori potvrdu za {{description}}, {{amount}}, od {{date}}",
-      "receiptUnavailable": "Potvrda nije dostupna za ovu kupovinu."
+      "receiptUnavailable": "Potvrda nije dostupna za ovu kupovinu.",
+      "retentionLimit": "Prikazuje se najnovija historija kredita."
     },
     "title": "Kupi kredite",
     "description": "Krediti su jednokratna kupovina koja se dodaje na tvoj Kilo saldo za pokretanje AI sesija kodiranja u Kilo App. Trgovina naplaćuje tvoj račun, a krediti se dodaju nakon što trgovina potvrdi plaćanje.",
@@ -4704,6 +4709,9 @@
     "couldNotLoad": "Nije moguće učitati integracije",
     "permissionDenied": "Nemate dozvolu za upravljanje ovim integracijama.",
     "managedByOwner": "Zamolite vlasnika organizacije da promijeni vezu koju ne možete promijeniti.",
+    "managedByOwnerOrAdmin": "Zamolite vlasnika organizacije ili administratora da promijeni vezu koju ne možete promijeniti.",
+    "managedByOwnerOrBilling": "Zamolite vlasnika organizacije ili menadžera za naplatu da promijeni vezu koju ne možete promijeniti.",
+    "managedByOwnerAdminOrBilling": "Zamolite vlasnika organizacije, administratora ili menadžera za naplatu da promijeni vezu koju ne možete promijeniti.",
     "connectFailed": "Nije moguće otvoriti stranicu za povezivanje"
   },
   "invoices": {

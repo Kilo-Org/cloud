@@ -22,6 +22,7 @@ import {
   KiloWorktreeCredentialClassMismatchError,
   KiloWorktreeMcpMismatchError,
   KiloWorktreePolicyMismatchError,
+  kiloServerPort,
   liveRuntimeClient,
   parseKiloPidfile,
   prepareKiloFilesystem,
@@ -2758,6 +2759,38 @@ describe('createKiloRuntimes', () => {
     releaseShutdown.resolve();
     await retire;
     expect(runtimes.get('dir')).not.toBe(first);
+  });
+
+  it('reports the port of each live Kilo server', async () => {
+    const spawner = createSpawner();
+    const runtimes = createKiloRuntimes({
+      readSnapshot: async () => [],
+      timers: TEST_TIMERS,
+      pidfileDirectory: '/tmp/kilo-runtimes-server-ports-pids',
+      scheduler: createScheduler().scheduler,
+      spawnKilo: spawner.spawn,
+      openFeed: createFeedFactory().openFeed,
+      probeHealth: createProbe(false).probe,
+      readProcessStartTime: () => undefined,
+      log: () => undefined,
+    });
+    expect(runtimes.serverPorts()).toEqual([]);
+    await runtimes.ensure({ key: 'a', directory: '/tmp/a', env: {} });
+    await runtimes.ensure({ key: 'b', directory: '/tmp/b', env: {} });
+    // The fake spawner serves each process on a port equal to its pid.
+    const ports = spawner.processes.map(record => record.pid);
+    expect(runtimes.serverPorts()).toEqual(ports);
+
+    await runtimes.get('a')?.shutdown();
+    expect(runtimes.serverPorts()).toEqual([ports[1]]);
+    await runtimes.shutdown();
+    expect(runtimes.serverPorts()).toEqual([]);
+  });
+
+  it('reads no port from a Kilo URL without one', () => {
+    expect(kiloServerPort({ url: 'http://127.0.0.1:4096', authorization: 'x' })).toBe(4096);
+    expect(kiloServerPort({ url: 'not a url', authorization: 'x' })).toBeUndefined();
+    expect(kiloServerPort(undefined)).toBeUndefined();
   });
 
   it('summary counts a suspected runtime as suspected only', async () => {

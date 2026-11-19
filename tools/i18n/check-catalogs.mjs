@@ -551,10 +551,6 @@ const MOBILE_ENGLISH_COPY_EXCEPTIONS = {
     'Gateway model slug':
       'Malagasy borrows the technical slug term: the catalog\'s own provider-key sentences keep "slug" and "deployment name" in English inside Malagasy sentences',
   },
-  mi: {
-    'Gateway model slug':
-      'Te reo Māori has no established kupu for gateway model slug (Te Aka/Glosbe have no compounds; NCSC glossary has no entry); the mi catalog keeps the English engineering term and wraps it with Māori grammar ("Hononga {{number}}")',
-  },
   ms: {
     token:
       "Bahasa Melayu writes the LLM/context unit as the loanword 'token' (DBP kamus lists no replacement; the catalog renders the concept identically in sibling keys contextUsage tokens, tokens_other, tokensWithPercentage, reviewDetail.tokens)",

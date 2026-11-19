@@ -403,6 +403,8 @@ jobs:
         run: node --test tools/nativewind/check-classes.test.mjs
       - name: Test the i18n catalog checker
         run: node --test tools/i18n/check-catalogs.test.mjs
+      - name: Test the plural audit
+        run: node --test tools/i18n/check-plurals.test.mjs
       - name: Test the shared source walk
         run: node --test tools/lib/source-files.test.mjs
 
@@ -441,6 +443,8 @@ jobs:
         run: node tools/i18n/check-catalogs.mjs
       - name: Test the i18n catalog checker
         run: node --test tools/i18n/check-catalogs.test.mjs
+      - name: Test the plural audit
+        run: node --test tools/i18n/check-plurals.test.mjs
 
   # The unused-export check reads the harness SDK build only, so it starts when
   # that producer finishes instead of waiting for the declaration build.

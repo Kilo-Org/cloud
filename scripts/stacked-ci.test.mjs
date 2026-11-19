@@ -498,8 +498,9 @@ test('the catalog job owns exactly the paths no mobile family selects', () => {
       'Install dependencies',
       'Check i18n catalogs',
       'Test the i18n catalog checker',
+      'Test the plural audit',
     ],
-    'the catalog job runs the audit and its test after the shared setup'
+    'the catalog job runs the audit and its tests after the shared setup'
   );
   assert.ok(
     [mobile.jobs['mobile-test-result'].needs ?? []].flat().includes('i18n-catalogs'),

@@ -98,17 +98,15 @@ function rules() {
         'the /opacity modifier is dropped on CSS-variable theme colours; use the paired *-tile-bg / *-tile-border token or a concrete colour',
     },
     {
-      // `text-align` only accepts auto/left/right/center/justify, so the
-      // logical keywords are dropped and the text keeps its default alignment.
-      pattern: /\btext-(?:start|end)\b/g,
-      advice: 'text-align: start/end is dropped; the shared Text handles RTL alignment already',
+      // `text-align` only accepts auto/left/right/center/justify, so this
+      // logical keyword is dropped and the text keeps its default alignment.
+      // `start` and `end` are separate rules so each lifts on its own keyword.
+      pattern: /\btext-start\b/g,
+      advice: 'text-align: start is dropped; the shared Text handles RTL alignment already',
     },
     {
-      // react-native-css resolves a `dir` media condition as
-      // `(I18nManager.isRTL && value === 'rtl') || value === 'ltr'`, so an
-      // `ltr:` class matches in both directions and silently applies in RTL.
-      pattern: /\bltr:/g,
-      advice: 'the ltr: variant also matches in RTL; express the rule with rtl: instead',
+      pattern: /\btext-end\b/g,
+      advice: 'text-align: end is dropped; the shared Text handles RTL alignment already',
     },
     {
       // A numeric `leading-N` compiles to `calc(var(--spacing) * N)`, and the
@@ -406,11 +404,32 @@ export function checkCompilerStillDropsThese() {
   }
 
   /**
-   * The value the compiled stylesheet emits for `property` in the fixture rule.
+   * Run one pin. Its check returns the problem the compiler now shows, or
+   * nothing while the ban still holds. A throw belongs to this fixture alone:
+   * the compiler is loaded and the fixtures share nothing, so the next one
+   * still runs.
+   */
+  function pin(fixture, check) {
+    try {
+      const problem = check();
+      if (problem !== undefined) {
+        problems.push(problem);
+      }
+    } catch (error) {
+      problems.push(compilerPinFailure(fixture, error));
+    }
+  }
+
+  /**
+   * The value the compiled stylesheet emits for `property` in the fixture rule,
+   * and whether it emits that declaration at all.
    *
    * Selecting by the property name the runtime receives keeps the pin on the
    * declaration the Metro transformer ships, not on one position in the
-   * compiler's private stylesheet tree.
+   * compiler's private stylesheet tree. `present` is reported separately
+   * because an absent declaration is an outcome of its own: the compiler
+   * stopped shipping what the ban warns about, so the runtime still paints
+   * nothing and the ban still applies.
    */
   function emittedValue(css, options, property) {
     const sheet = compile(css, options).stylesheet();
@@ -418,12 +437,12 @@ export function checkCompilerStillDropsThese() {
       for (const rule of entry?.[1] ?? []) {
         for (const declaration of rule?.d ?? []) {
           if (declaration?.[1] === property) {
-            return declaration[0];
+            return { present: true, value: declaration[0] };
           }
         }
       }
     }
-    return undefined;
+    return { present: false, value: undefined };
   }
 
   /**
@@ -438,64 +457,73 @@ export function checkCompilerStillDropsThese() {
     );
   }
 
-  let alignment;
-  try {
-    alignment = compile('.x { text-align: start; }').warnings();
-  } catch (error) {
-    problems.push(compilerPinFailure('the text-align: start fixture', error));
-    return problems;
+  /**
+   * One pin over a declaration the compiler must keep deferring to `call`.
+   * Only a present value that resolved at build time retires the ban; an
+   * absent declaration reports that and keeps the rule.
+   */
+  function declarationPin({ subject, css, options, property, call, rule }) {
+    return () => {
+      const { present, value } = emittedValue(css, options, property);
+      if (!present) {
+        return `check-classes: ${subject} emits no ${property} declaration — the ban still applies, so keep the ${rule} rule`;
+      }
+      if (defersTo(value, call)) {
+        return undefined;
+      }
+      return `check-classes: ${subject} now compiles to ${JSON.stringify(value ?? null)} instead of a deferred ${call} — drop the ${rule} rule`;
+    };
   }
-  if (!JSON.stringify(alignment ?? null).includes('text-align')) {
-    problems.push(
-      'check-classes: text-align: start is no longer dropped — drop the text-start/end rule'
-    );
+
+  // `start` and `end` are separate rules, so each keyword is pinned on its
+  // own: the compiler handling one keyword retires only that keyword's rule.
+  // The check reads the rest of the warning report as text, so a change to the
+  // report's shape leaves the pin holding instead of retiring the rule.
+  for (const keyword of ['start', 'end']) {
+    pin(`the text-align: ${keyword} fixture`, () => {
+      const report = JSON.stringify(compile(`.x { text-align: ${keyword}; }`).warnings() ?? null);
+      if (report.includes('text-align') && report.includes(keyword)) {
+        return undefined;
+      }
+      return `check-classes: text-align: ${keyword} is no longer dropped — drop the text-${keyword} rule`;
+    });
   }
 
   // A `/opacity` modifier on an `@theme inline` variable is emitted as a
   // deferred colorMix over the variable; the runtime cannot decompose it and
   // drops the declaration. When the compiler resolves it instead, this stops
   // matching and the rule above can go.
-  let themeOpacity;
-  try {
-    themeOpacity = emittedValue(
-      '@theme inline { --color-destructive: var(--destructive); }\n' +
+  pin(
+    'the color-mix over an @theme inline variable fixture',
+    declarationPin({
+      subject: 'color-mix over an @theme inline variable',
+      css:
+        '@theme inline { --color-destructive: var(--destructive); }\n' +
         ':root { --destructive: #b0483a; }\n' +
         '.x { background-color: color-mix(in oklab, var(--color-destructive) 10%, transparent); }',
-      undefined,
-      'backgroundColor'
-    );
-  } catch (error) {
-    problems.push(
-      compilerPinFailure('the color-mix over an @theme inline variable fixture', error)
-    );
-    return problems;
-  }
-  if (!defersTo(themeOpacity, 'colorMix')) {
-    problems.push(
-      `check-classes: color-mix over an @theme inline variable now compiles to ${JSON.stringify(themeOpacity ?? null)} instead of a deferred colorMix — drop the theme-token opacity rule`
-    );
-  }
+      options: undefined,
+      property: 'backgroundColor',
+      call: 'colorMix',
+      rule: 'theme-token opacity',
+    })
+  );
 
   // With `inlineVariables: false` (apps/mobile/metro.config.js) the spacing
   // scale reaches the runtime as a deferred calc inside the line-height
   // function, which multiplies the result by the font size. When the compiler
   // folds it to a length instead, this stops matching and the rule can go.
-  let spacingLeading;
-  try {
-    spacingLeading = emittedValue(
-      ':root { --spacing: 0.25rem; }\n.x { line-height: calc(var(--spacing) * 5); }',
-      { inlineVariables: false },
-      'lineHeight'
-    );
-  } catch (error) {
-    problems.push(compilerPinFailure('the spacing-scale line-height fixture', error));
-    return problems;
-  }
-  if (!defersTo(spacingLeading, 'calc')) {
-    problems.push(
-      `check-classes: a spacing-scale line height now compiles to ${JSON.stringify(spacingLeading ?? null)} instead of a deferred calc — drop the numeric leading rule`
-    );
-  }
+  pin(
+    'the spacing-scale line-height fixture',
+    declarationPin({
+      subject: 'a spacing-scale line height',
+      css: ':root { --spacing: 0.25rem; }\n.x { line-height: calc(var(--spacing) * 5); }',
+      options: { inlineVariables: false },
+      property: 'lineHeight',
+      call: 'calc',
+      rule: 'numeric leading',
+    })
+  );
+
   return problems;
 }
 

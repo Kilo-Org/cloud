@@ -99,7 +99,7 @@ export function findReservedEnvVarName(names: Iterable<string>): string | undefi
 
 /**
  * Cap on the profile environment an attach payload may carry. Mirrors
- * `Limits.MAX_ENV_VARS` in `../../schema.ts`, which the wrapper cannot import:
+ * `Limits.MAX_ENV_VARS` in `../schema.ts`, which the wrapper cannot import:
  * that module reaches the Worker's Durable Object types, which the wrapper's
  * program does not declare. `src/reserved-env-vars.test.ts` holds the two
  * equal.
@@ -109,8 +109,8 @@ export const MAX_PROFILE_ENV_VARS = 50;
 /**
  * Credential names a prepared attach env adds beside the profile env: every
  * `ISSUED_CREDENTIAL_ENV_KEYS` entry that is not reserved. Mirrored here for
- * the same reason as `MAX_PROFILE_ENV_VARS`; the same test holds this count at
- * least as large as that list.
+ * the same reason as `MAX_PROFILE_ENV_VARS`; `src/reserved-env-vars.test.ts`
+ * holds this count equal to that list.
  */
 const PLATFORM_ATTACH_ENV_KEY_COUNT = 13;
 

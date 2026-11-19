@@ -21,10 +21,10 @@ describe('repository environment reserved keys', () => {
     expect(MAX_PROFILE_ENV_VARS).toBe(Limits.MAX_ENV_VARS);
   });
 
-  it('leaves room for every credential name the preparation adds', () => {
+  it('reserves room for every credential name the preparation adds', () => {
     const reserved = new Set<string>(RESERVED_ENV_VARS);
     const added = ISSUED_CREDENTIAL_ENV_KEYS.filter(key => !reserved.has(key));
-    expect(MAX_ATTACH_ENV_KEYS).toBeGreaterThanOrEqual(MAX_PROFILE_ENV_VARS + added.length);
+    expect(MAX_ATTACH_ENV_KEYS - MAX_PROFILE_ENV_VARS).toBe(added.length);
   });
 
   it('rejects every RESERVED_ENV_VARS entry', () => {

@@ -752,6 +752,19 @@ export async function compareProof(
       ...readiness.map(reason => `${revision}: ${reason}`),
       ...receipt.readiness.map(reason => `${revision}: ${reason}`)
     );
+    // A screen captured under a LogBox toast shows the toast, not the screen, so
+    // the two runs were never compared on that screen. A dev-overlay error is
+    // therefore a reason to call the pair inconclusive, not an introduced
+    // finding: attributing it to head would present a dev overlay as a product
+    // regression.
+    reasons.push(
+      ...run.findings
+        .filter(entry => entry.rule === 'dev-overlay' && entry.severity === 'error')
+        .map(
+          entry =>
+            `${revision}: a LogBox error painted over ${entry.cell}/${entry.target}: ${entry.element.text?.trim() || entry.message}`
+        )
+    );
     return run;
   });
   const [base, head] = runs;

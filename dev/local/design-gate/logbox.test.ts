@@ -214,6 +214,63 @@ test('a toast painted after disabling is an environment warning, not a screen de
   assert.match(overlay?.message ?? '', /Disabling failed in this runtime/);
 });
 
-test('a dump without the not-yet-mounted warning has no overlay finding', () => {
-  assert.deepEqual(checkDevLogOverlay(warningDump('Loaded 4 items')), []);
+test('a dump whose LogBox node carries no text has no overlay finding', () => {
+  // LogBox chrome is in the dump with nothing painted into it: no message, no
+  // finding.
+  assert.deepEqual(checkDevLogOverlay(warningDump('   ')), []);
+  assert.deepEqual(checkDevLogOverlay(warningDump('')), []);
+});
+
+const RENDER_ERROR = 'Text strings must be rendered within a <Text> component.';
+
+/** A dump holding the toast's message node plus the chrome that repeats it. */
+function toastDump(...texts: readonly string[]): ProbeDump {
+  const dump = warningDump(texts[0] ?? '');
+  // LogBox paints the same string twice: the message paragraph, and the
+  // notification chrome that renders it. One notification must read as one
+  // finding, and the paragraph names the message, so it wins.
+  const message = dump.nodes[7];
+  dump.nodes.push(
+    { parent: 5, tag: 'View', rect: [9.9, 556.19, 340.19, 48], testID: 'logbox', text: texts[0] ?? '' },
+    // The badge carries the count, never a message: it must not read as one.
+    {
+      parent: 5,
+      tag: 'Paragraph',
+      rect: [27.81, 832.38, 10.29, 18.29],
+      testID: 'logbox_notification_count_text',
+      text: '!',
+    },
+    ...texts.slice(1).map(text => ({ ...message, text }))
+  );
+  return dump;
+}
+
+test('a LogBox error painted over the screen is an error, not a screen defect', () => {
+  const findings = checkDevLogOverlay(toastDump(RENDER_ERROR));
+  // The chrome repeats the message; the notification still yields one finding.
+  assert.equal(findings.length, 1);
+  const [overlay] = findings;
+  assert.equal(overlay.rule, 'dev-overlay');
+  assert.equal(overlay.severity, 'error');
+  assert.equal(overlay.element.testID, 'logbox_notification_message_text');
+  assert.equal(overlay.element.index, 7);
+  assert.equal(overlay.element.text, RENDER_ERROR);
+  assert.equal(overlay.measured, 22.86);
+  assert.equal(overlay.expected, 'no LogBox toast painted over the screen');
+  assert.match(overlay.message, /cannot grade what it covers/);
+  assert.match(overlay.message, new RegExp(RENDER_ERROR.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+});
+
+test('a benign not-yet-mounted toast stays a warning beside a real LogBox error', () => {
+  const findings = checkDevLogOverlay(toastDump(WARNING, RENDER_ERROR));
+  assert.deepEqual(
+    findings.map(entry => [entry.severity, entry.element.text]),
+    [
+      ['warning', WARNING],
+      ['error', RENDER_ERROR],
+    ]
+  );
+  const [warning, error] = findings;
+  assert.match(warning.message, /Disabling failed in this runtime/);
+  assert.match(error.message, /Text strings must be rendered within a <Text> component\./);
 });

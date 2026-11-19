@@ -503,6 +503,47 @@ test('pre-existing findings are not attributed to head', async t => {
   );
 });
 
+test('a screen captured under a LogBox error makes the pair inconclusive, never introduced', async t => {
+  const fixture = syntheticRepo(t);
+  const preparation = await prepareProof(fixture);
+  const baseRun = path.join(fixture.root, 'base-run');
+  const headRun = path.join(fixture.root, 'head-run');
+  const message = 'Text strings must be rendered within a <Text> component.';
+  const overlay: Finding = {
+    rule: 'dev-overlay',
+    severity: 'error',
+    cell: 'base',
+    target: TARGET.id,
+    element: {
+      index: 0,
+      path: 'testID:logbox_notification_message_text',
+      tag: 'Paragraph',
+      testID: 'logbox_notification_message_text',
+      text: message,
+      rect: [60.95, 830.48, 303.62, 22.86],
+    },
+    measured: 22.86,
+    expected: 'no LogBox toast painted over the screen',
+    unit: 'dp',
+    message: `LogBox painted "${message}" over this screen`,
+  };
+  capture(preparation, 'base', baseRun);
+  capture(preparation, 'head', headRun, { findings: [overlay] });
+  const result = await compareProof(
+    preparation,
+    baseRun,
+    headRun,
+    path.join(fixture.root, 'comparison')
+  );
+  // The capture shows the toast, not the screen, so the screens were never
+  // compared and the overlay is never head's regression.
+  assert.equal(result.status, 'inconclusive');
+  assert.deepEqual(result.introduced, []);
+  assert.deepEqual(result.reasons, [
+    `head: a LogBox error painted over base/${TARGET.id}: ${message}`,
+  ]);
+});
+
 test('a landing notice persisted in both findings artifacts still compares', async t => {
   // The shape `warningFinding` in capture.ts writes for a tab route whose link
   // leaves the route unchanged: a ratio warning on the root node.

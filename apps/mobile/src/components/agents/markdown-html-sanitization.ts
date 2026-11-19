@@ -109,7 +109,8 @@ function sanitizesToEmptyAfterRemovals(value: string): boolean {
 
 /**
  * Drop every removed tag name that starts at `at`, else `undefined`. The name
- * compare is case-insensitive, as the old alternation's `i` flag was.
+ * compare is case-insensitive, as the old alternation's `i` flag was; the lower
+ * case is a comparison key and never reaches the screen.
  */
 function removedTagNameAt(value: string, at: number): string | undefined {
   TAG_NAME_RUN_RE.lastIndex = at;
@@ -117,7 +118,7 @@ function removedTagNameAt(value: string, at: number): string | undefined {
   if (match === null) {
     return undefined;
   }
-  const name = match[0].toLowerCase();
+  const name = match[0].toLocaleLowerCase();
   return REMOVED_TAG_SET.has(name) ? name : undefined;
 }
 

@@ -1,5 +1,13 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 import test from 'node:test';
@@ -138,7 +146,10 @@ test('reports an unreadable file as one problem and keeps walking', context => {
 });
 
 test('names a file absolutely when the walk is given a relative directory', context => {
-  const fixture = mkdtempSync(join(tmpdir(), 'source-files-'));
+  // Resolved, because the walk resolves its own arguments: a platform whose
+  // temporary directory is a symlink would otherwise compare the resolved
+  // `file` against an unresolved fixture path and fail for no real reason.
+  const fixture = realpathSync(mkdtempSync(join(tmpdir(), 'source-files-')));
   const previous = process.cwd();
   context.after(() => {
     // The cwd is process-wide state, so it is restored even when an assertion

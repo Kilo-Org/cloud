@@ -34,6 +34,7 @@ import type {
   BrowserShareTabInput,
   BrowserShareTabResult,
   BrowserTabGroupController,
+  BrowserTabGroupAdoptResult,
   BrowserTabGroupOpenResult,
   BrowserTabGroupSessionSummary,
 } from './browser-tab-groups';
@@ -204,7 +205,7 @@ export interface BrowserTabClaimInput {
 
 export interface BrowserRuntime {
   /** Gives a session its tab group back after it ended (`/browser adopt`). */
-  readonly adoptEnded: (input: BrowserSessionRef) => Promise<BrowserTabGroupOpenResult>;
+  readonly adoptEnded: (input: BrowserSessionRef) => Promise<BrowserTabGroupAdoptResult>;
   /**
    * Takes the tab's lease before the caller's first command, so a workflow run
    * navigates under the lease rather than rewriting the page under its holder.
@@ -2604,8 +2605,10 @@ export const createBrowserRuntime = ({
       return { kind: 'result', result: { error: TAB_BUSY_ERROR, ok: false } };
     }
 
-    // The panel confirmed: the agent's in-flight call ends here and the panel's call waits for it to unwind.
-    inFlight.get(tabId)?.();
+    // Only a confirmed take-over ends the agent's in-flight call; a holder re-entering its own lease ends nothing.
+    if (lease.takeover !== undefined) {
+      inFlight.get(tabId)?.();
+    }
 
     return runExclusive(tabId, async () => {
       // A download an earlier call left for this session — stopped, kept, or only announced — has no result of its
@@ -3460,7 +3463,9 @@ export const createBrowserRuntime = ({
       tabId: created.id,
       title: created.title ?? '',
       url: 'about:blank',
-      ...(shared.groupId === undefined ? {} : { groupId: shared.groupId }),
+      ...(shared.kind === 'shared' && shared.groupId !== undefined
+        ? { groupId: shared.groupId }
+        : {}),
     };
   };
 

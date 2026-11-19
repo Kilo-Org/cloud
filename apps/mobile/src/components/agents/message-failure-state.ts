@@ -414,8 +414,8 @@ export function selectMessageFailure(input: {
   const retryAvailable = input.retryAvailable ?? true;
 
   // A chat's own statements (a failed answer, a refused send) can also hang off
-  // the words a stopped answer left, which is an assistant row: a failure that
-  // lands after the Stop is stated there, under what the person read.
+  // the words an answer had reached before it ended, which is an assistant row:
+  // the failure is stated there, under what the person read.
   const chatStatement =
     deliveryState?.status === 'failed' &&
     (deliveryState.reason === CHAT_RESPONSE_DELIVERY_REASON ||
@@ -438,7 +438,7 @@ export function selectMessageFailure(input: {
           : copy.detailKey;
       return {
         kind: 'delivery',
-        // Under a stopped answer's words the row stays in the answer's column.
+        // Under an answer's words the row stays in the answer's column.
         side: info.role === 'assistant' ? 'assistant' : copy.side,
         error: copy.error,
         titleKey: copy.titleKey,
@@ -475,14 +475,14 @@ export function selectMessageFailure(input: {
 
   // A chat draws the words a stopped answer had reached as the answer, and the
   // stop is stated under them instead of under the question. The chat can ask
-  // that question again, so this stop keeps the Retry a session's stop has no
-  // use for.
+  // that question again, so this stop keeps the Retry and the Copy to composer
+  // the question had, which a session's stop has no use for.
   if (
     info.role === 'assistant' &&
     deliveryState?.status === 'failed' &&
     deliveryState.reason === 'interrupted'
   ) {
-    return stoppedAnswerFailure(retryAvailable);
+    return stoppedAnswerFailure(retryAvailable, true);
   }
 
   if (info.role === 'assistant' && info.error) {
@@ -493,7 +493,7 @@ export function selectMessageFailure(input: {
     // message the person stopped does (`DELIVERY_FAILURE_ROW.interrupted`). The
     // stop is the recovery that was already taken, so the row offers none.
     if (errorName === STOPPED_ASSISTANT_ERROR) {
-      return stoppedAnswerFailure(false);
+      return stoppedAnswerFailure(false, false);
     }
     // A terminal gateway verdict drops the Retry and changes the detail line;
     // the name set still covers the errors whose class is terminal on every
@@ -532,7 +532,7 @@ export function selectMessageFailure(input: {
 }
 
 /** The neutral row under an answer the person stopped: no error marker and no second line. */
-function stoppedAnswerFailure(canRetry: boolean): MessageFailure {
+function stoppedAnswerFailure(canRetry: boolean, canCopy: boolean): MessageFailure {
   return {
     kind: 'assistant',
     side: 'assistant',
@@ -544,6 +544,6 @@ function stoppedAnswerFailure(canRetry: boolean): MessageFailure {
     copyDetail: '',
     canRetry,
     canAddCredits: false,
-    canCopy: false,
+    canCopy,
   };
 }

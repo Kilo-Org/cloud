@@ -497,7 +497,7 @@
     },
     "changelog": "Újdonságok",
     "changelogVersionPending": "A(z) {{version}} verzió újdonságai a következő frissítéssel érkeznek.",
-    "changelogGroupNew": "Újdonságok",
+    "changelogGroupNew": "Új",
     "changelogFixesIn": "Javítások és fejlesztések a következő területeken: {{areas}}.",
     "changelogFixesPolish": "Javítások és fejlesztések az egész alkalmazásban.",
     "changelogAreas": {

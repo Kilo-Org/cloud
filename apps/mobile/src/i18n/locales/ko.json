@@ -497,7 +497,7 @@
     },
     "changelog": "새로운 기능",
     "changelogVersionPending": "{{version}} 버전의 릴리스 노트는 다음 앱 업데이트에 포함됩니다.",
-    "changelogGroupNew": "새로운 기능",
+    "changelogGroupNew": "새 기능",
     "changelogFixesIn": "{{areas}} 관련 수정 및 개선 사항.",
     "changelogFixesPolish": "앱 전반의 수정 및 개선 사항.",
     "changelogAreas": {

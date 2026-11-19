@@ -497,7 +497,7 @@
     },
     "changelog": "Noutăți",
     "changelogVersionPending": "Notele versiunii {{version}} vin cu următoarea actualizare a aplicației.",
-    "changelogGroupNew": "Noutăți",
+    "changelogGroupNew": "Nou",
     "changelogFixesIn": "Remedieri și îmbunătățiri în {{areas}}.",
     "changelogFixesPolish": "Remedieri și îmbunătățiri în întreaga aplicație.",
     "changelogAreas": {

@@ -497,7 +497,7 @@
     },
     "changelog": "புதியவை",
     "changelogVersionPending": "{{version}} பதிப்புக்கான குறிப்புகள் அடுத்த செயலி புதுப்பிப்புடன் வரும்.",
-    "changelogGroupNew": "புதியவை",
+    "changelogGroupNew": "புதியது",
     "changelogFixesIn": "இந்தப் பகுதிகளில் திருத்தங்களும் மேம்பாடுகளும்: {{areas}}.",
     "changelogFixesPolish": "செயலி முழுவதும் திருத்தங்களும் மேம்பாடுகளும்.",
     "changelogAreas": {

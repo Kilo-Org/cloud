@@ -2590,14 +2590,30 @@ export const createBrowserToolSession = ({
       refs.set(entry.ref, entry);
     }
 
-    // Merged refs never shrink by themselves: past the cap the oldest go first, and resolving one is a stale ref.
+    const current = new Set(entries.map(entry => entry.ref));
+
+    // Merged refs never shrink by themselves: past the cap the oldest earlier refs go first, and resolving one is a stale ref. The refs this call hands back are never evicted.
     for (const ref of refs.keys()) {
       if (refs.size <= MAX_BROWSER_TOOL_REFS) {
         break;
       }
 
-      refs.delete(ref);
+      if (!current.has(ref)) {
+        refs.delete(ref);
+      }
     }
+  };
+
+  /** The refs of a snapshot that its returned, possibly truncated, text names. */
+  const shownRefEntries = (
+    entries: readonly BrowserToolRefEntry[],
+    lines: readonly string[]
+  ): readonly BrowserToolRefEntry[] => {
+    const shown = new Set(
+      lines.flatMap(line => Array.from(line.matchAll(/\[ref=(e\d+)\]/gu), match => match[1]))
+    );
+
+    return entries.filter(entry => shown.has(entry.ref));
   };
 
   const handleDownloadWillBegin = (params: Record<string, unknown> | undefined): void => {
@@ -2719,7 +2735,7 @@ export const createBrowserToolSession = ({
     const { scope } = call;
 
     if (scope === undefined) {
-      registerRefs(call.refs, rootRefs, { merge });
+      registerRefs(call.refs, shownRefEntries(rootRefs, snapshot.data.lines), { merge });
 
       return { lines: snapshot.data.lines, ok: true };
     }
@@ -2770,7 +2786,10 @@ export const createBrowserToolSession = ({
 
     registerRefs(
       call.refs,
-      [...rootRefs.filter(entry => !dropped.has(entry.ref)), ...spliced.refs],
+      shownRefEntries(
+        [...rootRefs.filter(entry => !dropped.has(entry.ref)), ...spliced.refs],
+        spliced.lines
+      ),
       { merge }
     );
 

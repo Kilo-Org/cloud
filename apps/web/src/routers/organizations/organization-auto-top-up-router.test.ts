@@ -24,6 +24,9 @@ import type Stripe from 'stripe';
 // Mock Stripe client to avoid API calls in tests
 jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   client: {
+    paymentMethods: {
+      retrieve: jest.fn(),
+    },
     checkout: {
       sessions: {
         create: jest.fn().mockResolvedValue({
@@ -135,6 +138,12 @@ describe('organization auto-top-up router', () => {
         amount_cents: 10000,
         threshold_cents: 10000,
       });
+      jest.mocked(client.paymentMethods.retrieve).mockResolvedValueOnce({
+        id: 'pm_test_config_123',
+        type: 'card',
+        card: { last4: '4242', brand: 'visa' },
+        link: null,
+      } as unknown as Stripe.Response<Stripe.PaymentMethod>);
 
       const caller = await createCallerForUser(ownerUser.id);
       const result = await caller.organizations.autoTopUp.getConfig({
@@ -143,8 +152,13 @@ describe('organization auto-top-up router', () => {
 
       expect(result.amountCents).toBe(10000);
       expect(result.thresholdCents).toBe(10000);
-      // paymentMethod will be null because Stripe API call will fail in test
-      // but the structure is correct
+      expect(result.paymentMethod).toEqual({
+        type: 'card',
+        last4: '4242',
+        brand: 'visa',
+        linkEmail: null,
+        stripePaymentMethodId: 'pm_test_config_123',
+      });
     });
 
     it('throws UNAUTHORIZED for non-owner members', async () => {

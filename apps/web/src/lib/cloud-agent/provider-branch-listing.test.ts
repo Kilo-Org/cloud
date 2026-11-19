@@ -1,6 +1,11 @@
 import { describe, expect, it, beforeEach } from '@jest/globals';
+import { TRPCError } from '@trpc/server';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { GitLabBranchesFetchError } from '@/lib/integrations/platforms/gitlab/adapter';
+import {
+  GITHUB_LISTING_BUDGET_MESSAGE,
+  GitHubListingBudgetExceededError,
+} from '@/lib/integrations/platforms/github/adapter';
 import { getProviderBranchHead, listProviderRepositoryBranches } from './provider-branch-listing';
 
 const mockGetIntegrationForOwner = jest.fn();
@@ -100,6 +105,17 @@ function githubRefusal(status: number, message = 'GitHub refused the request') {
   return Object.assign(new Error(message), { status });
 }
 
+/** What `githubAppsService.listBranches` throws once its pagination budget trips. */
+function githubListingBudgetTrpcError() {
+  return new TRPCError({
+    code: 'PAYLOAD_TOO_LARGE',
+    message: GITHUB_LISTING_BUDGET_MESSAGE,
+    cause: new GitHubListingBudgetExceededError(
+      'GitHub pagination limit exceeded: branch listing returned more than 100 pages'
+    ),
+  });
+}
+
 describe('listProviderRepositoryBranches (github refusals)', () => {
   const githubIntegration = {
     ...integrationRow,
@@ -120,6 +136,21 @@ describe('listProviderRepositoryBranches (github refusals)', () => {
         repositoryFullName: 'blocked/repo',
       })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('answers a listing past the pagination budget as PAYLOAD_TOO_LARGE', async () => {
+    mockListGitHubBranches.mockRejectedValue(githubListingBudgetTrpcError());
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'octocat/hello',
+      })
+    ).rejects.toMatchObject({
+      code: 'PAYLOAD_TOO_LARGE',
+      message: GITHUB_LISTING_BUDGET_MESSAGE,
+    });
   });
 
   it('keeps a secondary-rate-limited 403 retryable instead of FORBIDDEN', async () => {
@@ -389,6 +420,25 @@ describe('listProviderRepositoryBranches (organization github installations)', (
       message: 'GitHub is limiting requests. Try again in a moment.',
     });
     expect(mockListGitHubBranches).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops on an oversized listing instead of walking to another installation', async () => {
+    // The service layer raised this TRPCError, so the walk must not read it as
+    // an unreachable-repository refusal.
+    mockListGitHubBranches.mockRejectedValue(githubListingBudgetTrpcError());
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        organizationId: 'org_1',
+        repositoryFullName: 'octocat/hello',
+      })
+    ).rejects.toMatchObject({
+      code: 'PAYLOAD_TOO_LARGE',
+      message: GITHUB_LISTING_BUDGET_MESSAGE,
+    });
+    expect(mockListGitHubBranches).toHaveBeenCalledTimes(1);
   });
 
   it('recovers from a rate-limited installation that a later one can still list', async () => {

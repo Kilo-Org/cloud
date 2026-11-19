@@ -245,12 +245,34 @@ export const readFrameSensitiveValues = async (
 };
 
 /**
+ * Playwright's `follow-label` retarget (`InjectedScript.retarget` in the
+ * pinned release): a node inside a button-like control acts on that control,
+ * and a label, or a node inside one, acts on the control the label names.
+ * `browser_type` fills the element this returns, so the sensitive probe must
+ * classify the same element.
+ */
+export const RETARGET_TO_CONTROL_FUNCTION = `function (node) {
+  var element = node.nodeType === 1 ? node : node.parentElement;
+  if (!element) { return null; }
+  if (!element.matches('input, textarea, select') && !element.isContentEditable) {
+    element = element.closest('button, [role=button], [role=checkbox], [role=radio]') || element;
+  }
+  if (!element.matches('a, input, textarea, button, select, [role=link], [role=button], [role=checkbox], [role=radio]') && !element.isContentEditable) {
+    var label = element.closest('label');
+    if (label && label.control) { element = label.control; }
+  }
+  return element;
+}`;
+
+/**
  * Classifies the element a call targets (and, for a submit control, the form
  * it submits). Runs in the element's own context, so it sees the frame the
- * element lives in and the frame's own forms.
+ * element lives in and the frame's own forms. A target that retargets to
+ * another control (a label naming a password field) is classified as that
+ * control too.
  */
 export const SENSITIVE_TARGET_PROBE_FUNCTION = `function () {
-  var element = this;
+  var element = (${RETARGET_TO_CONTROL_FUNCTION})(this) || this;
   var kindOf = function (input) {
     var type = String(input.type || '').toLowerCase();
     if (type === 'password') { return 'password'; }
@@ -265,8 +287,11 @@ export const SENSITIVE_TARGET_PROBE_FUNCTION = `function () {
     return null;
   };
   var fields = [];
-  var ownKind = kindOf(element);
-  if (ownKind !== null) { fields.push({ kind: ownKind }); }
+  var candidates = element === this ? [element] : [this, element];
+  for (var candidate = 0; candidate < candidates.length; candidate += 1) {
+    var kind = kindOf(candidates[candidate]);
+    if (kind !== null) { fields.push({ kind: kind }); }
+  }
   var form = element.closest ? element.closest('form') : null;
   var tag = String(element.tagName || '').toUpperCase();
   var role = element.getAttribute ? String(element.getAttribute('role') || '') : '';

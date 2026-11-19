@@ -1361,7 +1361,7 @@ describe('browser tool session', () => {
 });
 
 const scriptingSnapshotPayload = {
-  lines: ['- button "Go" e1'],
+  lines: ['- button "Go" [ref=e1]'],
   nextRef: 1,
   refs: [{ ref: 'e1', selector: 'button.go' }],
 };
@@ -1576,7 +1576,7 @@ describe('browser tool session scripting backend', () => {
 
     await expect(session.callTool('kilo_browser_snapshot')).resolves.toStrictEqual({
       ok: true,
-      value: '- button "Go" e1',
+      value: '- button "Go" [ref=e1]',
     });
 
     await session.callTool('kilo_browser_click', { target: 'e1' });
@@ -1791,7 +1791,28 @@ describe('browser tool session scripting backend', () => {
     });
   });
 
-  it('caps a caller’s merged refs, dropping the oldest first', async () => {
+  it('caps a caller’s merged refs, dropping the oldest earlier refs first', async () => {
+    const { session } = createScriptingSession();
+
+    session.registerRefs(
+      Array.from({ length: MAX_BROWSER_TOOL_REFS }, (_slot, index) => ({
+        ref: `e${String(index + 1)}`,
+        selector: `#node-${String(index + 1)}`,
+      })),
+      { merge: true }
+    );
+    session.registerRefs([{ ref: 'e9999', selector: '#late' }], { merge: true });
+
+    await expect(session.callTool('browser_click', { target: 'e1' })).resolves.toStrictEqual({
+      error: STALE_REF_ERROR,
+      ok: false,
+    });
+    await expect(session.callTool('browser_click', { target: 'e2' })).resolves.toMatchObject({
+      ok: true,
+    });
+  });
+
+  it('never evicts the refs of the registration it is making', async () => {
     const { session } = createScriptingSession();
 
     session.registerRefs(
@@ -1802,13 +1823,32 @@ describe('browser tool session scripting backend', () => {
       { merge: true }
     );
 
-    await expect(session.callTool('browser_click', { target: 'e1' })).resolves.toStrictEqual({
-      error: STALE_REF_ERROR,
-      ok: false,
-    });
-    await expect(session.callTool('browser_click', { target: 'e2' })).resolves.toMatchObject({
+    await expect(session.callTool('browser_click', { target: 'e1' })).resolves.toMatchObject({
       ok: true,
     });
+  });
+
+  it('registers only the refs a snapshot’s returned text names', async () => {
+    const refs = Array.from({ length: MAX_BROWSER_TOOL_REFS + 1 }, (_slot, index) => ({
+      ref: `e${String(index + 1)}`,
+      selector: `#node-${String(index + 1)}`,
+    }));
+    const { session } = createScriptingSession({
+      result: code =>
+        code.includes('__buildAria')
+          ? {
+              lines: ['- button "One" [ref=e1]', '- button "Two" [ref=e2]'],
+              nextRef: refs.length,
+              refs,
+            }
+          : 'ok',
+    });
+
+    await expect(session.callTool('browser_snapshot', {})).resolves.toMatchObject({ ok: true });
+    await expect(session.callTool('browser_click', { target: 'e1' })).resolves.toMatchObject({
+      ok: true,
+    });
+    await expect(session.resolveTarget('e3')).resolves.toBeUndefined();
   });
 
   it('types slowly character by character with key events through the injected code', async () => {

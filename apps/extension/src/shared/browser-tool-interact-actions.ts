@@ -6,6 +6,7 @@ import {
   looksLikeBrowserRef,
   STALE_REF_ERROR,
 } from './browser-agent-checks';
+import { RETARGET_TO_CONTROL_FUNCTION } from './browser-agent-probes';
 import type { BrowserToolResolvedTarget, BrowserToolUniqueTarget } from './browser-tool-session';
 import type { EvalTabResult } from './tab-debugger';
 
@@ -458,6 +459,17 @@ const callFunctionResponseSchema = z.object({
   result: z.object({ value: z.unknown().optional() }),
 });
 
+const releaseRemoteObject = async (
+  session: BrowserToolInteractSession,
+  objectId: string
+): Promise<void> => {
+  try {
+    await session.send('Runtime.releaseObject', { objectId });
+  } catch {
+    // A navigation may already have destroyed the object's context; the handle went with it.
+  }
+};
+
 /**
  * Proves the frontend node is still attached to the document. A node removed
  * without a navigation keeps its backend id, still resolves to a remote object
@@ -487,12 +499,7 @@ const nodeIsConnected = async (
 
     return connected.success && connected.data.result.value === true;
   } finally {
-    try {
-      // Release the remote object the resolve created; a navigation may already have destroyed its context.
-      await session.send('Runtime.releaseObject', { objectId });
-    } catch {
-      // The object's context is gone; the handle went with it.
-    }
+    await releaseRemoteObject(session, objectId);
   }
 };
 
@@ -706,6 +713,147 @@ const typeArgsSchema = z.object({
   text: z.string(),
 });
 
+/** Why text cannot land in an element, or null when it can; shared by both typing paths. */
+const TYPING_REFUSAL_FUNCTION = `function (element) {
+  var tag = element.nodeName.toLowerCase();
+  if (tag === 'input' || tag === 'textarea') {
+    return element.disabled || element.readOnly ? 'The element is not editable: it is disabled or read-only.' : null;
+  }
+  return element.isContentEditable ? null : 'Element is not an <input>, <textarea> or [contenteditable] element';
+}`;
+
+/**
+ * Playwright's `locator.fill` page half (`InjectedScript.fill` and
+ * `selectText` in the pinned release): the target is retargeted with the rule
+ * the sensitive-step probe classifies by, a date-like input gets its value set
+ * with `input` and `change`, and any other editable field is focused with its
+ * whole content selected so the inserted text replaces it.
+ */
+const FILL_PREPARE_FUNCTION = `function (value) {
+  var element = (${RETARGET_TO_CONTROL_FUNCTION})(this);
+  if (!element || !element.isConnected) { return { status: 'detached' }; }
+  var refuse = function (message) { return { message: message, status: 'refused' }; };
+  var refusal = (${TYPING_REFUSAL_FUNCTION})(element);
+  if (refusal !== null) { return refuse(refusal); }
+  var tag = element.nodeName.toLowerCase();
+  if (tag === 'input') {
+    var type = element.type.toLowerCase();
+    var setValueTypes = ['color', 'date', 'time', 'datetime-local', 'month', 'range', 'week'];
+    var typeIntoTypes = ['', 'email', 'number', 'password', 'search', 'tel', 'text', 'url'];
+    if (setValueTypes.indexOf(type) === -1 && typeIntoTypes.indexOf(type) === -1) {
+      return refuse('Input of type "' + type + '" cannot be filled');
+    }
+    if (type === 'number' && isNaN(Number(value.trim()))) {
+      return refuse('Cannot type text into input[type=number]');
+    }
+    if (setValueTypes.indexOf(type) !== -1) {
+      var direct = type === 'color' ? value.trim().toLowerCase() : value.trim();
+      element.focus();
+      element.value = direct;
+      if (element.value !== direct) { return refuse('Malformed value'); }
+      element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+      return { status: 'done' };
+    }
+    element.select();
+    element.focus();
+    return { status: 'ready' };
+  }
+  if (tag === 'textarea') {
+    element.selectionStart = 0;
+    element.selectionEnd = element.value.length;
+    element.focus();
+    return { status: 'ready' };
+  }
+  element.focus();
+  var range = element.ownerDocument.createRange();
+  range.selectNodeContents(element);
+  var selection = element.ownerDocument.defaultView.getSelection();
+  if (selection) { selection.removeAllRanges(); selection.addRange(range); }
+  return { status: 'ready' };
+}`;
+
+/**
+ * Playwright's `pressSequentially` focus (`InjectedScript.focusNode` with
+ * `resetSelectionIfNotFocused`): an input it newly focuses gets its caret at
+ * the start, and a field that already has focus keeps its caret. Playwright
+ * also requires `document.hasFocus()`, which it emulates; a tab this extension
+ * drives is often in the background, so focus is judged by the active element.
+ */
+const FOCUS_FOR_TYPING_FUNCTION = `function () {
+  if (!this.isConnected) { return { status: 'detached' }; }
+  var refusal = (${TYPING_REFUSAL_FUNCTION})(this);
+  if (refusal !== null) { return { message: refusal, status: 'refused' }; }
+  var active = this.getRootNode().activeElement;
+  var wasFocused = active === this;
+  if (this.isContentEditable && !wasFocused && active && active.blur) { active.blur(); }
+  this.focus();
+  if (!wasFocused && this.nodeName.toLowerCase() === 'input') {
+    try { this.setSelectionRange(0, 0); } catch (error) {}
+  }
+  return { status: 'ready' };
+}`;
+
+const typingPreparationSchema = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('done') }),
+  z.object({ status: z.literal('ready') }),
+  z.object({ message: z.string(), status: z.literal('refused') }),
+  z.object({ status: z.literal('detached') }),
+]);
+
+type TypingPreparation = z.infer<typeof typingPreparationSchema>;
+
+const prepareTyping = async (
+  session: BrowserToolInteractSession,
+  target: BrowserToolUniqueTarget,
+  pageFunction: { readonly declaration: string; readonly values: readonly string[] }
+): Promise<TypingPreparation> => {
+  const resolved = await sendOrUndefined(session, 'DOM.resolveNode', nodeParams(target));
+  const object = nodeObjectSchema.safeParse(resolved);
+  const objectId = object.success ? object.data.object.objectId : undefined;
+
+  if (objectId === undefined) {
+    return { status: 'detached' };
+  }
+
+  try {
+    const response = evaluateResponseSchema.safeParse(
+      await session.send('Runtime.callFunctionOn', {
+        arguments: pageFunction.values.map(value => ({ value })),
+        functionDeclaration: pageFunction.declaration,
+        objectId,
+        returnByValue: true,
+      })
+    );
+
+    if (!response.success) {
+      return { message: 'The page returned an unexpected response.', status: 'refused' };
+    }
+
+    const exception = response.data.exceptionDetails;
+
+    if (exception !== undefined) {
+      return {
+        message: exception.exception?.description ?? exception.text ?? 'The page threw.',
+        status: 'refused',
+      };
+    }
+
+    const prepared = typingPreparationSchema.safeParse(response.data.result?.value);
+
+    return prepared.success
+      ? prepared.data
+      : { message: 'The page returned an unexpected result.', status: 'refused' };
+  } finally {
+    await releaseRemoteObject(session, objectId);
+  }
+};
+
+/**
+ * Playwright MCP `browser_type`: `locator.fill` replaces the field's content,
+ * and `slowly` uses `locator.pressSequentially`, which types key by key at the
+ * caret its focus leaves.
+ */
 const handleType = async (
   args: Record<string, unknown>,
   session: BrowserToolInteractSession
@@ -728,10 +876,32 @@ const handleType = async (
     return fail(centre.error);
   }
 
-  await session.send('DOM.focus', nodeParams(resolved.target));
+  const { slowly, submit, text } = parsed.data;
+  const prepared =
+    slowly === true
+      ? await prepareTyping(session, resolved.target, {
+          declaration: FOCUS_FOR_TYPING_FUNCTION,
+          values: [],
+        })
+      : await prepareTyping(session, resolved.target, {
+          declaration: FILL_PREPARE_FUNCTION,
+          values: [text],
+        });
 
-  if (parsed.data.slowly === true) {
-    for (const character of parsed.data.text) {
+  if (prepared.status === 'detached') {
+    return fail(
+      resolved.target.kind === 'ref'
+        ? STALE_REF_ERROR
+        : `The element is no longer in the page. ${FRESH_SNAPSHOT_HINT}`
+    );
+  }
+
+  if (prepared.status === 'refused') {
+    return fail(prepared.message);
+  }
+
+  if (slowly === true) {
+    for (const character of text) {
       const stroke = keyStrokeFor(character);
 
       // Playwright inserts a character the US layout cannot type (e.g. 'é').
@@ -740,18 +910,20 @@ const handleType = async (
         ? session.send('Input.insertText', { text: character })
         : dispatchKeyStroke(session, stroke, 0));
     }
-  } else {
-    await session.send('Input.insertText', { text: parsed.data.text });
+  } else if (prepared.status === 'ready') {
+    await (text === ''
+      ? pressKeyChord(session, 'Delete')
+      : session.send('Input.insertText', { text }));
   }
 
-  if (parsed.data.submit === true) {
+  if (submit === true) {
     await pressKeyChord(session, 'Enter');
   }
 
   const label = parsed.data.element ?? parsed.data.target;
 
   return ok(
-    `Typed ${String(parsed.data.text.length)} characters into "${label}"${parsed.data.submit === true ? ' and submitted' : ''}.`
+    `Typed ${String(text.length)} characters into "${label}"${submit === true ? ' and submitted' : ''}.`
   );
 };
 

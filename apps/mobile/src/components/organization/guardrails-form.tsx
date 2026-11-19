@@ -62,9 +62,13 @@ export function GuardrailsForm({
     setDraftGeneration(generation => generation + 1);
   };
 
+  // A save already in flight owns the route: a Back press is dropped instead of
+  // offered a Discard, because the write lands even if the screen popped first.
+  const saving = feedback.status === 'pending';
+
   // Declared before the rebase block below, which reports on every render that
   // takes it.
-  const guard = useMetadataLeaveGuard({ enabled: true });
+  const guard = useMetadataLeaveGuard({ enabled: true, saving });
 
   // A refetch that moved the server's configuration rebases the form, unless
   // the form holds edits of its own: those win, and the next save replaces the
@@ -85,7 +89,6 @@ export function GuardrailsForm({
   const issues = guardrailsIssues(draft, outputAvailable);
   const dirty = !draftsEqual(draft, baseline, outputAvailable);
   const firstIssue = issues[0];
-  const saving = feedback.status === 'pending';
   const editDraft = (update: (current: GuardrailsDraft) => GuardrailsDraft) => {
     clearWhere(() => true);
     const next = update(draft);

@@ -112,9 +112,9 @@ interface TargetFrame {
   readonly frame: boolean;
   readonly origin: string;
   /**
-   * The document holding a targeted frame element, when the tool runs there:
-   * on the scripting backend an evaluate or a click on an `<iframe>` runs in
-   * its owner's document, so the call needs that document's grant as well.
+   * The document holding a targeted frame element: a tool on an `<iframe>`
+   * runs in, reads or captures its owner's document, so the call needs that
+   * document's grant as well as the hosted frame's.
    */
   readonly owner?: { readonly frame: boolean; readonly origin: string };
 }
@@ -329,8 +329,17 @@ const targetFrameOf = async (
   if ((nodeName === 'FRAME' || nodeName === 'IFRAME') && ownerBackendNodeId !== undefined) {
     const hosted = await frameWithOwnerNode(session, frames, ownerBackendNodeId);
 
+    const owning = await frameOwningNode(session, frames, ownerBackendNodeId);
+
     // A frame owner whose frame this tab cannot see (an out-of-process iframe, a frame still loading) has no origin the gate can judge.
-    return { frame: true, origin: hosted?.origin ?? OPAQUE_ORIGIN };
+    return {
+      frame: true,
+      origin: hosted?.origin ?? OPAQUE_ORIGIN,
+      owner:
+        owning === undefined
+          ? { frame: true, origin: OPAQUE_ORIGIN }
+          : { frame: owning.parentId !== undefined, origin: owning.origin },
+    };
   }
 
   // A selector is answered by the tab's own document root, so it can only name a node there.

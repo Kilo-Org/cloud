@@ -10,7 +10,7 @@ import { AgentChatPanel } from './agent-chat-panel';
 import { AgentsMode } from './agents-mode';
 import { AgentsModeSwitch } from './agents-mode-switch';
 import { ExtensionAgentsProvider } from './agents-provider';
-import { Shell } from './auth-shell';
+import { Shell, ShellHeader, SignedInHeaderActions, SignedOutHeaderActions } from './auth-shell';
 import { ErrorNotice } from './error-notice';
 import type { DescribedFetchError } from './error-notice';
 import { useOrganizationCreditAccount } from './organization-credit-account';
@@ -25,6 +25,7 @@ const secondaryAuthButtonClassName =
 
 export const LoadingView = (): JSX.Element => (
   <Shell>
+    <ShellHeader />
     <div className="flex flex-1 items-center justify-center px-4 py-6">
       <p className="type-body text-foreground-muted">Checking session...</p>
     </div>
@@ -43,6 +44,9 @@ export const SignedOutView = ({
   onSignIn: () => void;
 }): JSX.Element => (
   <Shell>
+    <ShellHeader>
+      <SignedOutHeaderActions />
+    </ShellHeader>
     <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-4 px-4 py-6">
       <div className="space-y-1">
         <p className="type-heading text-foreground">Sign in to continue</p>
@@ -83,6 +87,9 @@ export const PendingView = ({
   userCode: string;
 }): JSX.Element => (
   <Shell>
+    <ShellHeader>
+      <SignedOutHeaderActions />
+    </ShellHeader>
     <div className="flex flex-1 flex-col justify-center gap-4 px-4 py-6">
       <div className="space-y-1">
         <p className="type-heading text-foreground">Complete sign in</p>
@@ -116,6 +123,9 @@ export const ValidationErrorView = ({
   onSignInAgain: () => void;
 }): JSX.Element => (
   <Shell>
+    <ShellHeader>
+      <SignedOutHeaderActions />
+    </ShellHeader>
     <div className="flex flex-1 flex-col justify-center gap-4 px-4 py-6">
       <div className="space-y-1">
         <p className="type-heading text-foreground">Session check failed</p>
@@ -177,14 +187,17 @@ export const SignedInView = ({
   const agentsOrgId = normalizeOrganizationId(selectedOrganizationId);
 
   return (
-    <Shell
-      auth={auth}
-      headerBeforeSettings={mode === 'browser' ? headerBeforeSettings : undefined}
-      onOrganizationChange={selectOrganization}
-      onSignOut={onSignOut}
-      organizationOptions={organizationOptions}
-      selectedOrganizationId={selectedOrganizationId}
-    >
+    <Shell>
+      <ShellHeader>
+        <SignedInHeaderActions
+          auth={auth}
+          beforeSettings={mode === 'browser' ? headerBeforeSettings : undefined}
+          onOrganizationChange={selectOrganization}
+          onSignOut={onSignOut}
+          organizationOptions={organizationOptions}
+          selectedOrganizationId={selectedOrganizationId}
+        />
+      </ShellHeader>
       <AgentsModeSwitch mode={mode} onModeChange={handleModeChange} />
       {mode === 'browser' ? (
         <>

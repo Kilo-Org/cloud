@@ -69,6 +69,9 @@ const BILLING_ENTRY: KiloPassBillingEntry = {
   invoiceUrl: null,
   invoicePdfUrl: null,
   description: BILLING_DESCRIPTION,
+  // An invoice the server cannot classify: the row falls back to the cleaned
+  // description. Its own cases live in kilo-pass-billing-row-title.test.ts.
+  line: null,
 };
 
 /** The first-page failure codes the section classifies. */
@@ -121,7 +124,9 @@ const SECTIONS: SectionCase[] = [
     name: 'billing',
     emptyCopy: 'No billing history yet.',
     errorCopy: "Couldn't load billing history",
-    entryText: BILLING_DESCRIPTION,
+    // An invoice the server cannot classify prints its description with the
+    // product name and any identifier parenthesis removed.
+    entryText: 'Invoice',
     render: (query, entries, hasMore = false) =>
       renderElement(
         createElement(KiloPassBillingHistorySection, {

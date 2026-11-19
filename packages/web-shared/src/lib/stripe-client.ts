@@ -1,5 +1,6 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import 'server-only';
+import { readFileSync } from 'node:fs';
 import Stripe from 'stripe';
 import { captureMessage } from '@sentry/nextjs';
 
@@ -21,6 +22,89 @@ export const client: Stripe = new Stripe(stripeSecretKey, {
   apiVersion: '2026-09-30.endive',
   maxNetworkRetries: STRIPE_MAX_NETWORK_RETRIES,
 });
+
+/**
+ * A dev-only fixture client for reads a local E2E cannot reach any other way.
+ *
+ * `SKIP_STRIPE_API=true` already keeps every write local, but a billing-history
+ * proof needs an invoice read, and no local stack can produce one. When the
+ * fixture file is set (dev builds only, next to `SKIP_STRIPE_API`), the two
+ * reads the Kilo Pass surfaces make answer from the file instead of the
+ * provider. The file's shape mirrors the Stripe SDK responses these calls
+ * return, so the routers run unchanged.
+ */
+const fixtureInvoicesPath =
+  skipStripeApi && process.env.E2E_KILO_PASS_INVOICES_JSON
+    ? process.env.E2E_KILO_PASS_INVOICES_JSON
+    : null;
+
+function fixtureInvoicesFor(subscription: string): Stripe.Invoice[] {
+  if (!fixtureInvoicesPath) return [];
+  const parsed = JSON.parse(readFileSync(fixtureInvoicesPath, 'utf8')) as {
+    subscriptionId: string;
+    invoices: Array<{
+      id: string;
+      created: number;
+      amount_due: number;
+      billing_reason: string;
+      currency: string;
+      status: string;
+      description: string;
+      tier: string | null;
+    }>;
+  };
+  if (parsed.subscriptionId !== subscription) return [];
+  return parsed.invoices.map(invoice => ({
+    id: invoice.id,
+    object: 'invoice',
+    created: invoice.created,
+    amount_due: invoice.amount_due,
+    billing_reason: invoice.billing_reason,
+    currency: invoice.currency,
+    status: invoice.status,
+    lines: {
+      object: 'list',
+      data: [
+        {
+          description: invoice.description,
+          ...(invoice.tier
+            ? {
+                pricing: {
+                  price_details: {
+                    price: `price_fixture_${invoice.tier}`,
+                  },
+                },
+              }
+            : {}),
+        },
+      ],
+      has_more: false,
+      total_count: 1,
+      url: `/v1/invoices/${invoice.id}/lines`,
+    },
+  })) as unknown as Stripe.Invoice[];
+}
+
+if (fixtureInvoicesPath) {
+  const realClient = client;
+  const fixtureClient = realClient as unknown as Record<string, unknown>;
+  fixtureClient.invoices = {
+    ...realClient.invoices,
+    list: async (params: { subscription?: string }) => ({
+      object: 'list',
+      data: fixtureInvoicesFor(params.subscription ?? ''),
+      has_more: false,
+      total_count: fixtureInvoicesFor(params.subscription ?? '').length,
+      url: '/v1/invoices',
+    }),
+  };
+  fixtureClient.subscriptions = {
+    ...realClient.subscriptions,
+    retrieve: async () => {
+      throw new Error('E2E fixture client does not serve subscriptions.retrieve');
+    },
+  };
+}
 
 // The profile page asks whether a customer has a card on every render, and the
 // answer only changes when a card is attached to or detached from that

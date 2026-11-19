@@ -1,4 +1,5 @@
 import type * as BouncerClient from '@kilocode/web-shared/lib/bouncer/client';
+import type * as KiloPassPriceIds from '@kilocode/web-shared/lib/kilo-pass/stripe-price-ids.server';
 import { describe, expect, it, beforeAll, beforeEach, afterEach, jest } from '@jest/globals';
 
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -430,9 +431,12 @@ jest.mock('@kilocode/web-shared/lib/stripe-client', () => {
 });
 
 jest.mock('@kilocode/web-shared/lib/kilo-pass/stripe-price-ids.server', () => {
-  const getStripePriceIdForKiloPassMock = jest.fn(() => 'price_test_kilo_pass');
+  const actual = jest.requireActual<typeof KiloPassPriceIds>(
+    '@kilocode/web-shared/lib/kilo-pass/stripe-price-ids.server'
+  );
   return {
-    getStripePriceIdForKiloPass: getStripePriceIdForKiloPassMock,
+    ...actual,
+    getStripePriceIdForKiloPass: jest.fn(() => 'price_test_kilo_pass'),
   };
 });
 
@@ -4531,11 +4535,19 @@ describe('kiloPassRouter', () => {
             id: 'in_test_1',
             created: invoiceCreatedTs,
             amount_due: 1900,
+            billing_reason: 'subscription_cycle',
             currency: 'usd',
             status: 'paid',
             hosted_invoice_url: 'https://stripe.example.test/invoice/1',
             invoice_pdf: 'https://stripe.example.test/invoice/1.pdf',
-            lines: { data: [{ description: 'Kilo Pass Tier 19' }] },
+            lines: {
+              data: [
+                {
+                  description: 'Kilo Pass Tier 19',
+                  pricing: { price_details: { price: 'price_test_tier_19_monthly' } },
+                },
+              ],
+            },
           },
         ],
       });
@@ -4566,6 +4578,7 @@ describe('kiloPassRouter', () => {
       expect(entry.amountCents).toBe(1900);
       expect(entry.currency).toBe('usd');
       expect(entry.status).toBe('paid');
+      expect(entry.line).toEqual({ kind: 'renewal', tier: 'tier_19' });
       expect(result.hasMore).toBe(false);
       expect(result.cursor).toBeNull();
     });
@@ -4579,11 +4592,19 @@ describe('kiloPassRouter', () => {
             id: 'in_canceled_1',
             created: invoiceCreatedTs,
             amount_due: 4900,
+            billing_reason: 'subscription_create',
             currency: 'usd',
             status: 'paid',
             hosted_invoice_url: 'https://stripe.example.test/invoice/canceled',
             invoice_pdf: 'https://stripe.example.test/invoice/canceled.pdf',
-            lines: { data: [{ description: 'Kilo Pass Tier 49' }] },
+            lines: {
+              data: [
+                {
+                  description: 'Kilo Pass Tier 49',
+                  pricing: { price_details: { price: 'price_test_tier_49_monthly' } },
+                },
+              ],
+            },
           },
         ],
       });
@@ -4615,8 +4636,58 @@ describe('kiloPassRouter', () => {
       expect(entry.amountCents).toBe(4900);
       expect(entry.currency).toBe('usd');
       expect(entry.status).toBe('paid');
+      expect(entry.line).toEqual({ kind: 'initial', tier: 'tier_49' });
       expect(result.hasMore).toBe(false);
       expect(result.cursor).toBeNull();
+    });
+
+    it('maps a zero-amount first invoice to a trial line', async () => {
+      const stripeMock = getStripeMock();
+      const invoiceCreatedTs = Math.floor(Date.now() / 1000) - 86400;
+      stripeMock.invoices.list.mockResolvedValue({
+        data: [
+          {
+            id: 'in_trial_1',
+            created: invoiceCreatedTs,
+            amount_due: 0,
+            billing_reason: 'subscription_create',
+            currency: 'usd',
+            status: 'paid',
+            hosted_invoice_url: 'https://stripe.example.test/invoice/trial',
+            invoice_pdf: 'https://stripe.example.test/invoice/trial.pdf',
+            lines: {
+              data: [
+                {
+                  description: 'Free trial for 1 × Kilo Pass (Pro)',
+                  pricing: { price_details: { price: 'price_test_tier_49_monthly' } },
+                },
+              ],
+            },
+          },
+        ],
+      });
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-billing-history-trial@example.com',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_trial_history_test',
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getBillingHistory({});
+
+      expect(result.entries).toHaveLength(1);
+      const entry = result.entries[0];
+      if (!entry) throw new Error('Expected at least one billing history entry');
+      if (entry.kind !== 'stripe') throw new Error('Expected stripe entry');
+      expect(entry.id).toBe('in_trial_1');
+      expect(entry.amountCents).toBe(0);
+      expect(entry.line).toEqual({ kind: 'trial', tier: 'tier_49' });
     });
   });
 

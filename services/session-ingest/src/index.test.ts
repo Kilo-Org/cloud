@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SignJWT } from 'jose';
 import { SQL } from 'drizzle-orm';
+import { DrizzleQueryError } from 'drizzle-orm/errors';
 import { PgDialect } from 'drizzle-orm/pg-core';
 
 vi.mock('cloudflare:workers', () => ({
@@ -298,6 +299,50 @@ describe('public session route', () => {
     const res = await app.request(`/session/${encodeURIComponent(token)}`, {}, defaultEnv);
 
     expect(res.status).toBe(404);
+  });
+
+  it('logs the database cause of an unhandled request error without parameters', async () => {
+    const { db, selectResult } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    selectResult.mockRejectedValueOnce(
+      new DrizzleQueryError(
+        'select "session_id" from "cli_sessions_v2" where "public_id" = $1',
+        ['11111111-1111-4111-8111-111111111111'],
+        Object.assign(new Error('canceling statement due to statement timeout'), {
+          code: '57014',
+        })
+      )
+    );
+    const token = await signSessionShareToken(defaultEnv, {
+      sessionId: 'ses_12345678901234567890123456',
+      publicId: '11111111-1111-4111-8111-111111111111',
+    });
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    try {
+      const res = await app.request(`/session/${encodeURIComponent(token)}`, {}, defaultEnv);
+
+      expect(res.status).toBe(500);
+      expect(await res.text()).toBe('Internal Server Error');
+      expect(consoleError).toHaveBeenCalledWith(
+        'Unhandled request error',
+        expect.objectContaining({
+          method: 'GET',
+          route: '/session/:shareToken',
+          causes: [
+            expect.objectContaining({
+              code: '57014',
+              message: 'canceling statement due to statement timeout',
+            }),
+          ],
+        })
+      );
+      const logged = JSON.stringify(consoleError.mock.calls);
+      expect(logged).not.toContain('11111111-1111-4111-8111-111111111111');
+      expect(logged).not.toContain(token);
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 
   it('returns a matching shared snapshot at the token boundary with no-store caching', async () => {

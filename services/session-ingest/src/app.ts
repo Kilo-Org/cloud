@@ -1,6 +1,7 @@
 import { timingSafeEqual } from '@kilocode/encryption';
 import { Hono } from 'hono';
 import { createMiddleware } from 'hono/factory';
+import { HTTPException } from 'hono/http-exception';
 import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
 import type { Env } from './env';
 import { z } from 'zod';
@@ -14,6 +15,7 @@ import { getUserConnectionDO } from './dos/UserConnectionDO';
 import { getSessionExport } from './services/session-export';
 import { resolveSessionShareToken } from './services/session-share-token';
 import { withDORetry } from '@kilocode/worker-utils';
+import { describeWorkerDbError } from './util/worker-db-error';
 
 const invalidateSessionAccessSchema = z.object({
   kiloUserId: z.string().min(1),
@@ -59,6 +61,19 @@ export const app = new Hono<{
     deletionAudience?: boolean;
   };
 }>();
+
+// Hono's default handler, but the log names the cause of a failed Worker DB call, for example a
+// lock or statement timeout or a Hyperdrive pool failure, instead of only drizzle's message. The
+// route pattern stands in for the path, which can hold session IDs.
+app.onError((error, c) => {
+  if (error instanceof HTTPException) return error.getResponse();
+  console.error('Unhandled request error', {
+    method: c.req.method,
+    route: c.req.routePath,
+    ...describeWorkerDbError(error),
+  });
+  return c.text('Internal Server Error', 500);
+});
 
 // Protect all /api routes with Kilo user API JWT auth.
 app.use('/api/*', kiloJwtAuthMiddleware);

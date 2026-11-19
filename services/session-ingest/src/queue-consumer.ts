@@ -22,6 +22,7 @@ import {
   dispatchRemoteSessionAttentionSignal,
   isEligibleForRemoteSessionAttention,
 } from './remote-session-notifications';
+import { describeWorkerDbError } from './util/worker-db-error';
 
 export interface IngestQueueMessage {
   r2Key: string;
@@ -638,7 +639,7 @@ export async function queue(
         r2Key: msg.body.r2Key,
         sessionId: msg.body.sessionId,
         attempts: msg.attempts,
-        error: err instanceof Error ? err.message : String(err),
+        ...describeWorkerDbError(err),
       });
       msg.retry({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
     }

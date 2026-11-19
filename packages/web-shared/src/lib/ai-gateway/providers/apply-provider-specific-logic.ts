@@ -10,6 +10,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   applyMistralModelSettings,
+  applyMistralThinkingRequestTransform,
   isMistralModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
@@ -307,6 +308,9 @@ export function applyReasoningDetailsTransform(
     case ReasoningDetailsTransform.Reasoning:
       replaceReasoningObjectWithReasoningEffort(requestToMutate);
       mapReasoningDetailsToReasoning(requestToMutate.body);
+      break;
+    case ReasoningDetailsTransform.MistralThinking:
+      applyMistralThinkingRequestTransform(requestToMutate);
       break;
     case null:
       break;

@@ -58,10 +58,10 @@ export function NativeRemoteEntryScreen() {
   const { token, authEpoch, isSigningOut } = useAuth();
   const { organizationId, isLoaded } = useOrganization();
   // The link handler (`+native-intent.tsx`) is the documented fixture entry
-  // point; the route query param carries the same selection for links that
-  // must land on the plain demo route, like the design gate's prepared pair.
+  // point, but its selection is process-global and only sets what links name;
+  // the live route parameter wins when both name a state.
   const { nativeRemoteFixture } = useLocalSearchParams<{ nativeRemoteFixture?: string }>();
-  const fixture = readNativeRemoteFixture() ?? fixtureParam(nativeRemoteFixture);
+  const fixture = fixtureParam(nativeRemoteFixture) ?? readNativeRemoteFixture();
   if (!__DEV__) {
     return <Redirect href="/" />;
   }

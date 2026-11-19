@@ -351,6 +351,7 @@ function NativeRemoteScope({ organizationID }: { organizationID: string | undefi
                   ? '1 part of this transcript is missing.'
                   : `${conversation.recoveryGaps} parts of this transcript are missing.`}{' '}
                 <Button
+                  disabled={state?.connection !== 'connected'}
                   variant="outline"
                   onClick={() => void sessionRef.current?.requestRecovery()}
                 >

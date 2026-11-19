@@ -156,7 +156,11 @@ export function nativeRemoteFixtureRoute(path: string): `/(app)/native-remote` |
 
 let activeFixture: NativeRemoteFixtureName | undefined = undefined;
 
-/** The fixture the handler link selected for this dev session. */
+/**
+ * The fixture the handler link selected for this dev session. A link's
+ * selection is process-global and sticky; the entry screen's live route
+ * parameter wins when both name a state, so navigation order does not matter.
+ */
 export function readNativeRemoteFixture(): NativeRemoteFixtureName | undefined {
   return activeFixture;
 }

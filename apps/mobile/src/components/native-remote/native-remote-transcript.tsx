@@ -55,7 +55,13 @@ export function NativeRemoteTranscript({
               displayCount: formatNumber(conversation.recoveryGaps, i18n.language),
             })}
           </Text>
-          <Button variant="outline" disabled={!canControl} onPress={() => void remote.recover()}>
+          {/* Recovery reads the snapshot over the live socket; the runner's
+              restart does not take it down, so this is a connection guard. */}
+          <Button
+            variant="outline"
+            disabled={state.connection !== 'connected'}
+            onPress={() => void remote.recover()}
+          >
             <Text>{t('common.retry')}</Text>
           </Button>
         </View>

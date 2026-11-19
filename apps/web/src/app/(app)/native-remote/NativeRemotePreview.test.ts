@@ -351,6 +351,7 @@ it('feeds canonical live native messages into the existing Cloud transcript and 
     })
   );
   expect(mockTranscript.mock.lastCall?.[0].messages).toEqual([]);
+  expect(dom.document.body.textContent).toContain('parts of this transcript are missing.');
   expect(dom.document.body.textContent).not.toContain('This session has no messages yet.');
   expect(dom.document.body.textContent).not.toContain('msg_');
   for (const error of ['forbidden', 'session_deleted']) {

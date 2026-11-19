@@ -329,7 +329,7 @@ describe('GET /api/v1/models', () => {
           ok: true,
           status: 200,
           statusText: 'OK',
-          jsonData: { data: [{ id: 'vendor/incomplete', name: 'Incomplete entry' }] },
+          jsonData: cataloguePayload([{ id: 'vendor/incomplete', name: 'Incomplete entry' }]),
         })
       );
     }) as unknown as typeof fetch;

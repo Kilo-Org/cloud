@@ -459,7 +459,9 @@ describe('Vercel-only models', () => {
   const vercelOnlyModel = buildModel({ id: 'vendor/vercel-only', name: 'Vendor: Vercel Only' });
 
   function vercelCatalogArguments() {
-    const [options] = jest.mocked(getVercelOnlyCatalogModels).mock.calls.at(-1) ?? [];
+    const catalogModels = jest.mocked(getVercelOnlyCatalogModels);
+    expect(catalogModels).toHaveBeenCalledTimes(1);
+    const [options] = catalogModels.mock.calls.at(-1) ?? [];
     if (!options) throw new Error('Expected getVercelOnlyCatalogModels to be called');
     return {
       ...options,
@@ -469,6 +471,7 @@ describe('Vercel-only models', () => {
   }
 
   beforeEach(() => {
+    jest.mocked(getVercelOnlyCatalogModels).mockClear();
     global.fetch = jest.fn(() =>
       Promise.resolve(createMockResponse({ jsonData: cataloguePayload([buildModel()]) }))
     ) as unknown as typeof fetch;
@@ -1053,12 +1056,14 @@ describe('live catalogue validation', () => {
     global.fetch = jest.fn(() =>
       Promise.resolve(
         createMockResponse({
-          jsonData: { data: [{ id: 'vendor/fabricated', name: 'Fabricated' }] },
+          jsonData: cataloguePayload([{ id: 'vendor/fabricated', name: 'Fabricated' }]),
         })
       )
     ) as unknown as typeof fetch;
 
-    await expect(getRawOpenRouterModels()).rejects.toThrow();
+    const error = await getRawOpenRouterModels().catch(thrown => thrown);
+    expect(error).toBeInstanceOf(Error);
+    expect(String((error as Error).message)).not.toContain('fewer than');
   });
 
   it('rejects a live models payload below the catalogue floor with the minimum-count error', async () => {

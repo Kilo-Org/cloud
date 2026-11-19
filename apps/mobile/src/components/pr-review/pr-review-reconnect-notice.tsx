@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { type ProviderPrPlatform, useProviderPrScopeOrNull } from '@/lib/pr-review/provider-pr-ref';
 import { useCheckGitHubConnection } from '@/lib/pr-review/use-check-github-connection';
@@ -54,7 +54,7 @@ export function PrReviewReconnectNotice({
   const message = t('prReview.reconnectNotice.message');
 
   return (
-    <View className="gap-3 rounded-lg bg-secondary p-4">
+    <Card>
       <Text className="text-sm font-medium text-foreground">{title}</Text>
       <Text className="text-sm text-muted-foreground">{message}</Text>
       <Button
@@ -71,6 +71,6 @@ export function PrReviewReconnectNotice({
       >
         <Text>{t('prReview.checkConnection')}</Text>
       </Button>
-    </View>
+    </Card>
   );
 }

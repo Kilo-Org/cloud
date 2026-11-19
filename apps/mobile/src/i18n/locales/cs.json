@@ -3151,7 +3151,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Relace se nepodařilo načíst.",
-    "couldNotLoadActiveSessions": "Aktivní relace se nepodařilo načíst.",
     "agentSessions": "Právě běží",
     "newCodingTask": "Nový programovací úkol",
     "newTaskFromPicture": "Nový úkol z obrázku",
@@ -3534,7 +3533,8 @@
         "accounting_adjustment": "Účetní úprava",
         "credits_expired": "Kredity s prošlou platností"
       },
-      "truncated": "K dispozici jsou i starší pohyby kreditů."
+      "truncated": "K dispozici jsou i starší pohyby kreditů.",
+      "retentionLimit": "Zobrazují se nejnovější pohyby kreditů."
     },
     "inviteMember": {
       "emailError": "Zadejte platnou e-mailovou adresu.",
@@ -3566,7 +3566,8 @@
         "void": "Stornováno",
         "uncollectible": "Nedobytné"
       },
-      "truncated": "Starší faktury jsou k dispozici."
+      "truncated": "Starší faktury jsou k dispozici.",
+      "retentionLimit": "Zobrazují se nejnovější faktury."
     },
     "lowBalanceAlert": {
       "enableA11y": "Povolit upozornění na nízký zůstatek",
@@ -3804,8 +3805,7 @@
     "imagesSectionEmpty": "Žádné důvěryhodné domény obrázků",
     "revoke": "Odebrat důvěru doméně {{host}}",
     "revokeMessage": "Odkazy na tuto doménu budou znovu vyžadovat potvrzení.",
-    "revokeImageMessage": "Obrázky z této domény budou znovu vyžadovat potvrzení.",
-    "backToPreferences": "Zpět na předvolby"
+    "revokeImageMessage": "Obrázky z této domény budou znovu vyžadovat potvrzení."
   },
   "glanceable": {
     "waiting": "Aktualizace agentů",
@@ -4054,6 +4054,8 @@
       "downloading": "Stahování: {{written}} z {{total}}",
       "downloadingUnknown": "Stahování: {{written}}",
       "paused": "Pozastaveno: {{written}} z {{total}}",
+      "retrying": "Nový pokus: {{written}} z {{total}}",
+      "retryingUnknown": "Nový pokus: {{written}}",
       "verifying": "Kontrola staženého souboru…",
       "downloaded": "Staženo · {{size}}",
       "url": "Přímý odkaz ke stažení",
@@ -4144,7 +4146,9 @@
         "androidModelUnavailable": "Toto zařízení nepodporuje Gemini Nano, nebo se systémová aplikace AICore ještě nastavuje. Zkuste to později.",
         "aicoreUpdateRequired": "Pokud chcete tento model používat, aktualizujte aplikaci AICore a systémový software.",
         "downloadable": "Před prvním použitím je potřeba tento model jednorázově stáhnout.",
-        "downloading": "Model se stahuje. Bude připraven, jakmile stahování skončí."
+        "downloading": "Model se stahuje. Bude připraven, jakmile stahování skončí.",
+        "batteryQuota": "Model v zařízení prozatím vyčerpal svůj limit baterie. Zkuste to znovu později.",
+        "checkFailed": "Aplikace tento model nemohla zkontrolovat. Zkuste to znovu."
       },
       "unavailable": "Model v zařízení teď není dostupný. Zkontrolujte jeho stav v sekci $t(modelChat.backends.title).",
       "busy": "Model v zařízení právě generuje jinou odpověď. Zkuste to znovu, až skončí.",
@@ -4517,7 +4521,8 @@
       "purchaseFallback": "Nákup kreditů",
       "receipt": "Účtenka",
       "receiptA11y": "Otevřít účtenku pro {{description}}, {{amount}}, ze dne {{date}}",
-      "receiptUnavailable": "Pro tento nákup není účtenka k dispozici."
+      "receiptUnavailable": "Pro tento nákup není účtenka k dispozici.",
+      "retentionLimit": "Zobrazuje se nejnovější historie kreditů."
     },
     "title": "Koupit kredity",
     "description": "Kredity jsou jednorázový nákup přidaný do vašeho zůstatku Kilo pro spouštění AI programovacích relací v aplikaci Kilo. Obchod vám strhne platbu z účtu a kredity se přidají po potvrzení platby obchodem.",

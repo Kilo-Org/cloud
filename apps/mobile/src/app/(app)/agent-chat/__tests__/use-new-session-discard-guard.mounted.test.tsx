@@ -365,7 +365,7 @@ describe('useNewSessionDiscardGuard', () => {
     const { renderer } = mountGuard(true, onDiscard);
 
     triggerPreventRemoveInAct();
-    pressDialogButton(renderer, 'border-border');
+    pressDialogButton(renderer, 'border-input');
 
     // Keep editing: the request stays on screen until the native dismissal
     // reports, and the draft is never cleared.

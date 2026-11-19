@@ -2484,7 +2484,6 @@
   },
   "home": {
     "couldNotLoadSessions": "De sessies konden niet worden geladen.",
-    "couldNotLoadActiveSessions": "De actieve sessies konden niet worden geladen.",
     "agentSessions": "Nu actief",
     "newCodingTask": "Nieuwe programmeertaak",
     "newTaskFromPicture": "Nieuwe taak vanaf een afbeelding",
@@ -3410,7 +3409,8 @@
         "accounting_adjustment": "Boekhoudkundige correctie",
         "credits_expired": "Tegoed verlopen"
       },
-      "truncated": "Er zijn oudere tegoedtransacties beschikbaar."
+      "truncated": "Er zijn oudere tegoedtransacties beschikbaar.",
+      "retentionLimit": "De meest recente tegoedtransacties worden weergegeven."
     },
     "hub": {
       "balance": "Saldo",
@@ -3455,7 +3455,8 @@
         "void": "Vervallen",
         "uncollectible": "Oninbaar"
       },
-      "truncated": "Oudere facturen zijn beschikbaar."
+      "truncated": "Oudere facturen zijn beschikbaar.",
+      "retentionLimit": "De meest recente facturen worden weergegeven."
     },
     "lowBalanceAlert": {
       "enableA11y": "Waarschuwing voor laag saldo inschakelen",
@@ -3684,8 +3685,7 @@
     "imagesSectionEmpty": "Geen vertrouwde afbeeldingshosts",
     "revoke": "Vertrouwen in {{host}} intrekken",
     "revokeMessage": "Links naar deze host vragen voortaan weer om bevestiging.",
-    "revokeImageMessage": "Afbeeldingen van deze host vragen voortaan weer om bevestiging.",
-    "backToPreferences": "Terug naar voorkeuren"
+    "revokeImageMessage": "Afbeeldingen van deze host vragen voortaan weer om bevestiging."
   },
   "glanceable": {
     "waiting": "Agents bijwerken",
@@ -3932,6 +3932,8 @@
       "downloading": "Downloaden: {{written}} van {{total}}",
       "downloadingUnknown": "Downloaden: {{written}}",
       "paused": "Gepauzeerd: {{written}} van {{total}}",
+      "retrying": "Nieuwe poging: {{written}} van {{total}}",
+      "retryingUnknown": "Nieuwe poging: {{written}}",
       "verifying": "Het gedownloade bestand wordt gecontroleerd…",
       "downloaded": "Gedownload · {{size}}",
       "url": "Directe downloadlink",
@@ -4022,7 +4024,9 @@
         "androidModelUnavailable": "Dit apparaat ondersteunt Gemini Nano niet, of de systeemapp AICore wordt nog ingesteld. Probeer het later opnieuw.",
         "aicoreUpdateRequired": "Werk de AICore-app en je systeemsoftware bij om dit model te gebruiken.",
         "downloadable": "Dit model moet eenmalig worden gedownload voordat je het kunt gebruiken.",
-        "downloading": "Het model wordt gedownload. Het is klaar voor gebruik zodra het downloaden is voltooid."
+        "downloading": "Het model wordt gedownload. Het is klaar voor gebruik zodra het downloaden is voltooid.",
+        "batteryQuota": "Het model op het apparaat heeft zijn batterijtoewijzing voorlopig gebruikt. Probeer het later opnieuw.",
+        "checkFailed": "De app kon dit model niet controleren. Probeer het opnieuw."
       },
       "unavailable": "Het model op het apparaat is nu niet beschikbaar. Controleer de status in $t(modelChat.backends.title).",
       "busy": "Het model op het apparaat is bezig met een ander antwoord. Probeer het opnieuw zodra het klaar is.",
@@ -4383,7 +4387,8 @@
       "purchaseFallback": "Tegoedaankoop",
       "receipt": "Bon",
       "receiptA11y": "Open de bon voor {{description}}, {{amount}}, van {{date}}",
-      "receiptUnavailable": "Er is geen bon beschikbaar voor deze aankoop."
+      "receiptUnavailable": "Er is geen bon beschikbaar voor deze aankoop.",
+      "retentionLimit": "De meest recente tegoedgeschiedenis wordt weergegeven."
     },
     "title": "Credits kopen",
     "description": "Credits zijn een eenmalige aankoop die aan je Kilo-saldo wordt toegevoegd voor AI-coderingssessies in Kilo App. De store belast je account en de credits worden toegevoegd nadat de store de betaling bevestigt.",

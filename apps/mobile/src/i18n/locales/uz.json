@@ -3039,7 +3039,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Seanslarni yuklab bo'lmadi.",
-    "couldNotLoadActiveSessions": "Faol seanslarni yuklab bo'lmadi.",
     "agentSessions": "Hozir faol",
     "newCodingTask": "Yangi kodlash vazifasi",
     "newTaskFromPicture": "Rasmdan yangi vazifa",
@@ -3418,7 +3417,8 @@
         "accounting_adjustment": "Buxgalteriya tuzatmasi",
         "credits_expired": "Kreditlarning muddati tugadi"
       },
-      "truncated": "Kreditlar bo'yicha oldingi amallar ham mavjud."
+      "truncated": "Kreditlar bo'yicha oldingi amallar ham mavjud.",
+      "retentionLimit": "Eng so'nggi kredit amallari ko'rsatilmoqda."
     },
     "inviteMember": {
       "emailError": "To'g'ri elektron pochta manzilini kiriting.",
@@ -3450,7 +3450,8 @@
         "void": "Bekor qilingan",
         "uncollectible": "Undirib bo'lmaydi"
       },
-      "truncated": "Oldingi hisob-fakturalar ham mavjud."
+      "truncated": "Oldingi hisob-fakturalar ham mavjud.",
+      "retentionLimit": "Eng so'nggi hisob-fakturalar ko'rsatilmoqda."
     },
     "lowBalanceAlert": {
       "enableA11y": "Balans kamayishi haqida ogohlantirishni yoqish",
@@ -3684,8 +3685,7 @@
     "imagesSectionEmpty": "Ishonchli rasm saytlari yo'q",
     "revoke": "{{host}} saytiga berilgan ishonchni bekor qilish",
     "revokeMessage": "Bu saytga havolalar yana tasdiq so'raydi.",
-    "revokeImageMessage": "Bu saytning rasmlari yana tasdiq so'raydi.",
-    "backToPreferences": "Sozlamalarga qaytish"
+    "revokeImageMessage": "Bu saytning rasmlari yana tasdiq so'raydi."
   },
   "glanceable": {
     "waiting": "Agentlar yangilanmoqda",
@@ -3932,6 +3932,8 @@
       "downloading": "Yuklanmoqda: {{total}} dan {{written}}",
       "downloadingUnknown": "Yuklanmoqda: {{written}}",
       "paused": "To‘xtatib turildi: {{total}} dan {{written}}",
+      "retrying": "Qayta urinilmoqda: {{total}} dan {{written}}",
+      "retryingUnknown": "Qayta urinilmoqda: {{written}}",
       "verifying": "Yuklab olingan fayl tekshirilmoqda…",
       "downloaded": "Yuklab olindi · {{size}}",
       "url": "To‘g‘ridan-to‘g‘ri yuklab olish havolasi",
@@ -4022,7 +4024,9 @@
         "androidModelUnavailable": "Bu qurilma Gemini Nano’ni qo‘llab-quvvatlamaydi yoki AICore tizim ilovasi hali sozlanmoqda. Keyinroq qayta urining.",
         "aicoreUpdateRequired": "Bu modeldan foydalanish uchun AICore ilovasi va tizim dasturini yangilang.",
         "downloadable": "Bu modeldan foydalanishdan oldin uni bir marta yuklab olish kerak.",
-        "downloading": "Model yuklab olinmoqda. Yuklab olish tugagach, u tayyor bo‘ladi."
+        "downloading": "Model yuklab olinmoqda. Yuklab olish tugagach, u tayyor bo‘ladi.",
+        "batteryQuota": "Qurilmadagi model hozircha o‘ziga ajratilgan batareya miqdorini ishlatdi. Keyinroq qayta urining.",
+        "checkFailed": "Ilova bu modelni tekshira olmadi. Qayta urining."
       },
       "unavailable": "Qurilmadagi model hozir mavjud emas. Uning holatini $t(modelChat.backends.title) bo‘limida tekshiring.",
       "busy": "Qurilmadagi model boshqa javob bilan band. U tugagach, qayta urining.",
@@ -4383,7 +4387,8 @@
       "purchaseFallback": "Kredit xaridi",
       "receipt": "Chek",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} chekini ochish",
-      "receiptUnavailable": "Bu xarid uchun chek mavjud emas."
+      "receiptUnavailable": "Bu xarid uchun chek mavjud emas.",
+      "retentionLimit": "Kreditlarning eng so'nggi tarixi ko'rsatilmoqda."
     },
     "title": "Kredit sotib olish",
     "description": "Kreditlar Kilo App'da AI kodlash sessiyalarini ishga tushirish uchun Kilo balansingizga qo'shiladigan bir martalik xariddir. Do'kon hisobingizdan to'lov oladi va do'kon to'lovni tasdiqlaganidan keyin kreditlar qo'shiladi.",

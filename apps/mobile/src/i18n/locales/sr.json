@@ -3095,7 +3095,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nije moguće učitati sesije.",
-    "couldNotLoadActiveSessions": "Nije moguće učitati aktivne sesije.",
     "agentSessions": "Trenutno aktivno",
     "newCodingTask": "Novi zadatak za programiranje",
     "newTaskFromPicture": "Novi zadatak sa slike",
@@ -3476,7 +3475,8 @@
         "accounting_adjustment": "Računovodstveno usklađivanje",
         "credits_expired": "Istekli krediti"
       },
-      "truncated": "Dostupne su i ranije promene kredita."
+      "truncated": "Dostupne su i ranije promene kredita.",
+      "retentionLimit": "Prikazuju se najnovije promene kredita."
     },
     "inviteMember": {
       "emailError": "Unesi važeću adresu e-pošte.",
@@ -3508,7 +3508,8 @@
         "void": "Stornirano",
         "uncollectible": "Nenaplativo"
       },
-      "truncated": "Starije fakture su dostupne."
+      "truncated": "Starije fakture su dostupne.",
+      "retentionLimit": "Prikazuju se najnovije fakture."
     },
     "lowBalanceAlert": {
       "enableA11y": "Omogući upozorenje o niskom saldu",
@@ -3744,8 +3745,7 @@
     "imagesSectionEmpty": "Nema pouzdanih hostova za slike",
     "revoke": "Ukloni {{host}} iz pouzdanih hostova",
     "revokeMessage": "Linkovi ka ovom hostu ponovo će tražiti potvrdu.",
-    "revokeImageMessage": "Slike sa ovog hosta ponovo će tražiti potvrdu.",
-    "backToPreferences": "Nazad na podešavanja"
+    "revokeImageMessage": "Slike sa ovog hosta ponovo će tražiti potvrdu."
   },
   "glanceable": {
     "waiting": "Ažuriranje agenata",
@@ -3993,6 +3993,8 @@
       "downloading": "Preuzimanje: {{written}} od {{total}}",
       "downloadingUnknown": "Preuzimanje: {{written}}",
       "paused": "Pauzirano: {{written}} od {{total}}",
+      "retrying": "Ponovni pokušaj: {{written}} od {{total}}",
+      "retryingUnknown": "Ponovni pokušaj: {{written}}",
       "verifying": "Provera preuzetog fajla…",
       "downloaded": "Preuzeto · {{size}}",
       "url": "Direktan link za preuzimanje",
@@ -4083,7 +4085,9 @@
         "androidModelUnavailable": "Ovaj uređaj ne podržava Gemini Nano ili se sistemska aplikacija AICore još podešava. Pokušajte ponovo kasnije.",
         "aicoreUpdateRequired": "Ažurirajte aplikaciju AICore i sistemski softver da biste koristili ovaj model.",
         "downloadable": "Ovaj model je potrebno jednom preuzeti pre upotrebe.",
-        "downloading": "Model se preuzima. Biće spreman kada se preuzimanje završi."
+        "downloading": "Model se preuzima. Biće spreman kada se preuzimanje završi.",
+        "batteryQuota": "Model na uređaju je iscrpio dozvoljenu potrošnju baterije. Pokušajte ponovo kasnije.",
+        "checkFailed": "Aplikacija nije mogla da proveri ovaj model. Pokušajte ponovo."
       },
       "unavailable": "Model na uređaju trenutno nije dostupan. Proverite njegov status u odeljku $t(modelChat.backends.title).",
       "busy": "Model na uređaju je zauzet drugim odgovorom. Pokušajte ponovo kada završi.",
@@ -4444,6 +4448,7 @@
       "receipt": "Račun",
       "receiptA11y": "Otvori račun za {{description}}, {{amount}}, od {{date}}",
       "receiptUnavailable": "Račun nije dostupan za ovu kupovinu.",
+      "retentionLimit": "Prikazuje se najnovija istorija kredita.",
       "kind": {
         "adjustment": "Korekcija",
         "balanceNeutral": "Bez uticaja na stanje",

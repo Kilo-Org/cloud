@@ -3095,7 +3095,6 @@
   },
   "home": {
     "couldNotLoadSessions": "No s'han pogut carregar les sessions.",
-    "couldNotLoadActiveSessions": "No s'han pogut carregar les sessions actives.",
     "agentSessions": "En curs ara",
     "newCodingTask": "Nova tasca de programació",
     "newTaskFromPicture": "Nova tasca a partir d'una imatge",
@@ -3476,7 +3475,8 @@
         "accounting_adjustment": "Ajust comptable",
         "credits_expired": "Crèdits caducats"
       },
-      "truncated": "Hi ha moviments de crèdits anteriors disponibles."
+      "truncated": "Hi ha moviments de crèdits anteriors disponibles.",
+      "retentionLimit": "Es mostren els moviments de crèdits més recents."
     },
     "inviteMember": {
       "emailError": "Introdueix una adreça de correu electrònic vàlida.",
@@ -3508,7 +3508,8 @@
         "void": "Anul·lada",
         "uncollectible": "Incobrable"
       },
-      "truncated": "Hi ha factures més antigues disponibles."
+      "truncated": "Hi ha factures més antigues disponibles.",
+      "retentionLimit": "Es mostren les factures més recents."
     },
     "lowBalanceAlert": {
       "enableA11y": "Activa l'avís de saldo baix",
@@ -3744,8 +3745,7 @@
     "imagesSectionEmpty": "No hi ha servidors d'imatges de confiança",
     "revoke": "Deixa de confiar en {{host}}",
     "revokeMessage": "Els enllaços a aquest servidor tornaran a demanar confirmació.",
-    "revokeImageMessage": "Les imatges d'aquest servidor tornaran a demanar confirmació.",
-    "backToPreferences": "Torna a les preferències"
+    "revokeImageMessage": "Les imatges d'aquest servidor tornaran a demanar confirmació."
   },
   "glanceable": {
     "waiting": "S'estan actualitzant els agents",
@@ -3993,6 +3993,8 @@
       "downloading": "S'està descarregant: {{written}} de {{total}}",
       "downloadingUnknown": "S'està descarregant: {{written}}",
       "paused": "En pausa: {{written}} de {{total}}",
+      "retrying": "S'està reintentant: {{written}} de {{total}}",
+      "retryingUnknown": "S'està reintentant: {{written}}",
       "verifying": "S'està comprovant el fitxer descarregat…",
       "downloaded": "Descarregat · {{size}}",
       "url": "Enllaç de descàrrega directa",
@@ -4083,7 +4085,9 @@
         "androidModelUnavailable": "Aquest dispositiu no és compatible amb Gemini Nano, o l'aplicació del sistema AICore encara s'està configurant. Torna-ho a provar més tard.",
         "aicoreUpdateRequired": "Actualitza l'aplicació AICore i el programari del sistema per fer servir aquest model.",
         "downloadable": "Cal baixar aquest model una sola vegada abans de poder-lo fer servir.",
-        "downloading": "El model s'està baixant. Estarà a punt quan acabi la baixada."
+        "downloading": "El model s'està baixant. Estarà a punt quan acabi la baixada.",
+        "batteryQuota": "El model al dispositiu ha esgotat la quota de bateria per ara. Torna-ho a provar més tard.",
+        "checkFailed": "L'app no ha pogut comprovar aquest model. Torna-ho a provar."
       },
       "unavailable": "El model al dispositiu no està disponible ara mateix. Comprova'n l'estat a $t(modelChat.backends.title).",
       "busy": "El model al dispositiu està ocupat amb una altra resposta. Torna-ho a provar quan acabi.",
@@ -4450,7 +4454,8 @@
       "purchaseFallback": "Compra de crèdits",
       "receipt": "Rebut",
       "receiptA11y": "Obre el rebut de {{description}}, {{amount}}, del {{date}}",
-      "receiptUnavailable": "No hi ha cap rebut disponible per a aquesta compra."
+      "receiptUnavailable": "No hi ha cap rebut disponible per a aquesta compra.",
+      "retentionLimit": "Es mostra l'historial de crèdits més recent."
     },
     "title": "Compra crèdits",
     "description": "Els crèdits són una compra única que s'afegeix al teu saldo de Kilo per executar sessions de programació amb IA a l'aplicació Kilo. La botiga cobra al teu compte i els crèdits s'afegeixen quan la botiga confirma el pagament.",

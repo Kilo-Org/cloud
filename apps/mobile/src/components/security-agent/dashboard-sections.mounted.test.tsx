@@ -10,7 +10,10 @@ import { type ComponentProps } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import { ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { Section } from '@/components/ui/section';
+import { SectionHeaderSkeleton } from '@/components/ui/section-header-skeleton';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import {
   DashboardSections,
   DashboardSectionsSkeleton,
@@ -34,15 +37,20 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => k
 vi.mock('@/i18n', () => ({
   i18n: { language: 'en', t: (key: string) => key },
 }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text', EYEBROW_LINE_HEIGHT_DP: 22 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/kv-row', () => ({ KvRow: 'KvRow' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: () => undefined }));
 vi.mock('@/components/ui/icons', () => ({
   Clock: 'Clock',
   FolderGit2: 'FolderGit2',
   ShieldCheck: 'ShieldCheck',
+  Settings: 'Settings',
 }));
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalArrowRight: 'DirectionalArrowRight',
@@ -355,11 +363,9 @@ describe('DashboardSections repository card with an empty grant', () => {
 
   type ActionNode = {
     props: {
-      className?: string;
-      variant?: string;
+      label: string;
       loading?: boolean;
       onPress: () => void;
-      children: { props: { children: string } };
     };
   };
 
@@ -393,8 +399,8 @@ describe('DashboardSections repository card with an empty grant', () => {
     );
     const action = actionOf(state);
 
-    expect(action.props.className).toContain(STATE_ACTION_CLASS);
-    expect(action.props.variant).toBe('default');
+    // The state's one action is a `StateAction`, which owns its own style.
+    expect(action.props.label).toBe('securityAgent.dashboard.manageRepositories');
     act(() => {
       action.props.onPress();
     });
@@ -413,7 +419,7 @@ describe('DashboardSections repository card with an empty grant', () => {
     const state = emptyState(renderSections({ emptyGrant: true, emptyGrantAction: manageAccess }));
     const action = actionOf(state);
 
-    expect(action.props.children.props.children).toBe('securityAgent.repositories.manageAccess');
+    expect(action.props.label).toBe('securityAgent.repositories.manageAccess');
     expect(action.props.loading).toBe(true);
   });
 
@@ -475,60 +481,54 @@ describe('DashboardSectionsSkeleton', () => {
     return renderer;
   }
 
-  /** The section cards: the views that carry the card frame. */
-  function cards(instance: Instance): Instance[] {
-    return instance.findAll(
-      n =>
-        typeof n.type === 'string' &&
-        (n.type as string) === 'View' &&
-        String(n.props.className ?? '').includes('bg-secondary')
-    );
+  /**
+   * One block per placeholder section: the `View` that holds the section's
+   * reserved label line, found through the header twin itself.
+   */
+  function placeholderBlocks(instance: Instance): Instance[] {
+    return instance
+      .findAllByType(SectionHeaderSkeleton)
+      .map(header => header.parent)
+      .filter((parent): parent is Instance => parent !== null);
   }
 
-  /** The row blocks of a placeholder card, one per loaded row. */
-  function rowBlocks(card: Instance): Instance[] {
-    return card.findAll(
-      n =>
-        typeof n.type === 'string' &&
-        (n.type as string) === 'View' &&
-        String(n.props.className ?? '').includes('py-3')
-    );
+  /** The placeholder's bars: the label's line, then each row's lines. */
+  function reservedLines(block: Instance): number {
+    return block.findAll(node => String(node.type) === 'Skeleton').length;
   }
 
-  it.each([true, false])(
-    'draws one placeholder per loaded card, in the card frame (slaEnabled=%s)',
-    slaEnabled => {
-      const loaded = cards(renderSections({ slaEnabled }).root);
-      const placeholders = cards(renderSkeleton(slaEnabled).root);
+  it.each([true, false])('draws one placeholder per loaded section (slaEnabled=%s)', slaEnabled => {
+    const loaded = renderSections({ slaEnabled }).root.findAllByType(Section);
+    const placeholders = renderSkeleton(slaEnabled).root.findAllByType(SectionHeaderSkeleton);
 
-      expect(placeholders).toHaveLength(loaded.length);
-      expect(new Set(placeholders.map(card => card.props.className))).toEqual(
-        new Set(loaded.map(card => card.props.className))
-      );
-    }
-  );
+    // The posture section is the one SLA tracking hides, so the reserve follows
+    // the loaded tree: three sections with the deadlines on, four without.
+    expect(placeholders).toHaveLength(slaEnabled ? 3 : 4);
+    expect(placeholders).toHaveLength(loaded.length);
+  });
 
   it('names nothing it has not measured', () => {
-    const placeholders = cards(renderSkeleton(true).root);
+    const renderer = renderSkeleton(true).root;
+    const placeholders = placeholderBlocks(renderer);
 
-    expect(placeholders.every(card => copy(card).length === 0)).toBe(true);
-    expect(placeholders.every(card => card.findAllByType('Skeleton').length > 0)).toBe(true);
+    expect(renderer.findAllByType('Text')).toHaveLength(0);
+    expect(placeholders.every(block => block.findAllByType(RowSkeleton).length > 0)).toBe(true);
   });
 
   it('draws the Act-first placeholder at the height of the card a never-synced scope loads', () => {
     // Before the first sync that card holds one line of pending copy instead of
     // a title over its repository, so the placeholder that has the read's
-    // answer draws that single line and does not lose a second one when the
+    // answer draws that single row and does not lose a second one when the
     // cards replace it.
     const placeholderLines = (neverSynced: boolean) => {
-      const card = cards(renderSkeleton(true, neverSynced).root)[0];
-      if (!card) {
+      const block = placeholderBlocks(renderSkeleton(true, neverSynced).root)[0];
+      if (!block) {
         throw new Error('priority placeholder not found');
       }
-      return card.findAllByType('Skeleton').length;
+      return reservedLines(block);
     };
     const loadedLines = (neverSynced: boolean) => {
-      const card = cards(renderSections({ slaEnabled: true, neverSynced }).root)[0];
+      const card = renderSections({ slaEnabled: true, neverSynced }).root.findAllByType(Section)[0];
       if (!card) {
         throw new Error('priority card not found');
       }
@@ -540,25 +540,25 @@ describe('DashboardSectionsSkeleton', () => {
   });
 
   it('draws the risk placeholder at the row count the loaded card shows', () => {
-    // The skeleton card order mirrors the sections': priority, posture (only
-    // without SLA tracking), risk, repositories. The risk card's rows are the
-    // analysis outcomes, so they read the same with SLA tracking on and off and
-    // the placeholder must not carry a row the loaded card has dropped.
+    // The skeleton section order mirrors the sections': priority, posture
+    // (only without SLA tracking), risk, repositories. The risk card's rows are
+    // the analysis outcomes, so they read the same with SLA tracking on and off
+    // and the placeholder must not carry a row the loaded card has dropped.
     const loadedRows = (slaEnabled: boolean) => {
-      const risk = cards(renderSections({ slaEnabled }).root).find(card =>
-        copy(card).includes('securityAgent.dashboard.codebaseRisk')
-      );
+      const risk = renderSections({ slaEnabled })
+        .root.findAllByType(Section)
+        .find(section => copy(section).includes('securityAgent.dashboard.codebaseRisk'));
       if (!risk) {
         throw new Error('risk card not found');
       }
       return risk.findAllByType('KvRow').length;
     };
     const placeholderRows = (slaEnabled: boolean) => {
-      const card = cards(renderSkeleton(slaEnabled).root)[slaEnabled ? 1 : 2];
-      if (!card) {
+      const block = placeholderBlocks(renderSkeleton(slaEnabled).root)[slaEnabled ? 1 : 2];
+      if (!block) {
         throw new Error('risk placeholder not found');
       }
-      return rowBlocks(card).length;
+      return block.findAllByType(RowSkeleton).length;
     };
 
     expect(placeholderRows(true)).toBe(loadedRows(true));

@@ -3039,7 +3039,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Sessionerne kunne ikke indlæses.",
-    "couldNotLoadActiveSessions": "De aktive sessioner kunne ikke indlæses.",
     "agentSessions": "I gang nu",
     "newCodingTask": "Ny programmeringsopgave",
     "newTaskFromPicture": "Ny opgave fra et billede",
@@ -3418,7 +3417,8 @@
         "accounting_adjustment": "Regnskabsmæssig justering",
         "credits_expired": "Udløbne kreditter"
       },
-      "truncated": "Du kan se ældre bevægelser på kreditsaldoen."
+      "truncated": "Du kan se ældre bevægelser på kreditsaldoen.",
+      "retentionLimit": "Viser de seneste bevægelser på kreditsaldoen."
     },
     "inviteMember": {
       "emailError": "Angiv en gyldig e-mailadresse.",
@@ -3450,7 +3450,8 @@
         "void": "Annulleret",
         "uncollectible": "Uinddrivelig"
       },
-      "truncated": "Ældre fakturaer er tilgængelige."
+      "truncated": "Ældre fakturaer er tilgængelige.",
+      "retentionLimit": "Viser de seneste fakturaer."
     },
     "lowBalanceAlert": {
       "enableA11y": "Aktivér advarsel om lav saldo",
@@ -3684,8 +3685,7 @@
     "imagesSectionEmpty": "Ingen betroede billeddomæner",
     "revoke": "Fjern tillid til {{host}}",
     "revokeMessage": "Links til dette domæne vil igen bede om bekræftelse.",
-    "revokeImageMessage": "Billeder fra dette domæne vil igen bede om bekræftelse.",
-    "backToPreferences": "Tilbage til indstillinger"
+    "revokeImageMessage": "Billeder fra dette domæne vil igen bede om bekræftelse."
   },
   "glanceable": {
     "waiting": "Opdaterer agenter",
@@ -3932,6 +3932,8 @@
       "downloading": "Downloader: {{written}} af {{total}}",
       "downloadingUnknown": "Downloader: {{written}}",
       "paused": "Sat på pause: {{written}} af {{total}}",
+      "retrying": "Prøver igen: {{written}} af {{total}}",
+      "retryingUnknown": "Prøver igen: {{written}}",
       "verifying": "Tjekker den downloadede fil…",
       "downloaded": "Downloadet · {{size}}",
       "url": "Direkte downloadlink",
@@ -4022,7 +4024,9 @@
         "androidModelUnavailable": "Denne enhed understøtter ikke Gemini Nano, eller systemappen AICore er stadig ved at blive klargjort. Prøv igen senere.",
         "aicoreUpdateRequired": "Opdater AICore-appen og din systemsoftware for at bruge denne model.",
         "downloadable": "Modellen skal downloades én gang, før du kan bruge den.",
-        "downloading": "Modellen downloades. Den er klar, når downloaden er færdig."
+        "downloading": "Modellen downloades. Den er klar, når downloaden er færdig.",
+        "batteryQuota": "Modellen på enheden har opbrugt sin batterikvote for nu. Prøv igen senere.",
+        "checkFailed": "Appen kunne ikke tjekke denne model. Prøv igen."
       },
       "unavailable": "Modellen på enheden er ikke tilgængelig lige nu. Tjek dens status i $t(modelChat.backends.title).",
       "busy": "Modellen på enheden er optaget af et andet svar. Prøv igen, når den er færdig.",
@@ -4383,7 +4387,8 @@
       "purchaseFallback": "Kreditkøb",
       "receipt": "Kvittering",
       "receiptA11y": "Åbn kvitteringen for {{description}}, {{amount}}, fra {{date}}",
-      "receiptUnavailable": "Der er ingen kvittering for dette køb."
+      "receiptUnavailable": "Der er ingen kvittering for dette køb.",
+      "retentionLimit": "Viser den seneste kredithistorik."
     },
     "title": "Køb kreditter",
     "description": "Kreditter er et engangskøb, der lægges til din Kilo-saldo til at køre AI-kodningssessioner i Kilo App. Butikken opkræver betaling på din konto, og kreditterne tilføjes, når butikken bekræfter betalingen.",

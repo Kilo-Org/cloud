@@ -3039,7 +3039,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Die sessies kon nie gelaai word nie.",
-    "couldNotLoadActiveSessions": "Die aktiewe sessies kon nie gelaai word nie.",
     "agentSessions": "Tans aktief",
     "newCodingTask": "Nuwe koderingstaak",
     "newTaskFromPicture": "Nuwe taak vanaf 'n prentjie",
@@ -3418,7 +3417,8 @@
         "accounting_adjustment": "Boekhoudkundige aanpassing",
         "credits_expired": "Krediete het verval"
       },
-      "truncated": "Ouer kredietaktiwiteit is beskikbaar."
+      "truncated": "Ouer kredietaktiwiteit is beskikbaar.",
+      "retentionLimit": "Die mees onlangse kredietaktiwiteit word gewys."
     },
     "inviteMember": {
       "emailError": "Voer 'n geldige e-posadres in.",
@@ -3450,7 +3450,8 @@
         "void": "Nietig",
         "uncollectible": "Oninbaar"
       },
-      "truncated": "Ouer fakture is beskikbaar."
+      "truncated": "Ouer fakture is beskikbaar.",
+      "retentionLimit": "Die mees onlangse fakture word gewys."
     },
     "lowBalanceAlert": {
       "enableA11y": "Aktiveer waarskuwing vir lae saldo",
@@ -3684,8 +3685,7 @@
     "imagesSectionEmpty": "Geen vertroude beeldgashere nie",
     "revoke": "Herroep vertroue in {{host}}",
     "revokeMessage": "Skakels na hierdie gasheer sal weer om bevestiging vra.",
-    "revokeImageMessage": "Beelde van hierdie gasheer sal weer om bevestiging vra.",
-    "backToPreferences": "Terug na voorkeure"
+    "revokeImageMessage": "Beelde van hierdie gasheer sal weer om bevestiging vra."
   },
   "glanceable": {
     "waiting": "Besig om agente op te dateer",
@@ -3932,6 +3932,8 @@
       "downloading": "Laai af: {{written}} van {{total}}",
       "downloadingUnknown": "Laai af: {{written}}",
       "paused": "Gepouseer: {{written}} van {{total}}",
+      "retrying": "Probeer weer: {{written}} van {{total}}",
+      "retryingUnknown": "Probeer weer: {{written}}",
       "verifying": "Kontroleer die afgelaaide lêer…",
       "downloaded": "Afgelaai · {{size}}",
       "url": "Direkte aflaai-skakel",
@@ -4022,7 +4024,9 @@
         "androidModelUnavailable": "Hierdie toestel ondersteun nie Gemini Nano nie, of die AICore-stelselprogram word nog opgestel. Probeer later weer.",
         "aicoreUpdateRequired": "Werk die AICore-program en jou stelselsagteware by om hierdie model te gebruik.",
         "downloadable": "Hierdie model moet eenmalig afgelaai word voordat jy dit kan gebruik.",
-        "downloading": "Die model word tans afgelaai. Dit sal gereed wees wanneer die aflaai klaar is."
+        "downloading": "Die model word tans afgelaai. Dit sal gereed wees wanneer die aflaai klaar is.",
+        "batteryQuota": "Die model op die toestel het sy batterykwota vir eers opgebruik. Probeer later weer.",
+        "checkFailed": "Die app kon nie hierdie model kontroleer nie. Probeer weer."
       },
       "unavailable": "Die model op die toestel is nie nou beskikbaar nie. Kontroleer sy status in $t(modelChat.backends.title).",
       "busy": "Die model op die toestel is besig met 'n ander antwoord. Probeer weer wanneer dit klaar is.",
@@ -4383,7 +4387,8 @@
       "purchaseFallback": "Kredietaankoop",
       "receipt": "Kwitansie",
       "receiptA11y": "Maak die kwitansie vir {{description}}, {{amount}}, vanaf {{date}} oop",
-      "receiptUnavailable": "Geen kwitansie is vir hierdie aankoop beskikbaar nie."
+      "receiptUnavailable": "Geen kwitansie is vir hierdie aankoop beskikbaar nie.",
+      "retentionLimit": "Die mees onlangse kredietgeskiedenis word gewys."
     },
     "title": "Koop krediete",
     "description": "Krediete is 'n eenmalige aankoop wat by jou Kilo-saldo gevoeg word om AI-koderingsessies in Kilo App te laat loop. Die winkel hef jou rekening en krediete word bygevoeg nadat die winkel betaling bevestig.",

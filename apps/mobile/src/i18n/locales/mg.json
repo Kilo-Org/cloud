@@ -3039,7 +3039,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Tsy nety nampidirina ny fotoam-piasana.",
-    "couldNotLoadActiveSessions": "Tsy nety nampidirina ny fotoam-piasana mandeha.",
     "agentSessions": "Mandeha izao",
     "newCodingTask": "Asa fanoratana kaody vaovao",
     "newTaskFromPicture": "Asa vaovao avy amin'ny sary",
@@ -3418,7 +3417,8 @@
         "accounting_adjustment": "Fanitsiana kaonty",
         "credits_expired": "Lany daty ny kireditra"
       },
-      "truncated": "Misy hetsika taloha kokoa momba ny kireditra."
+      "truncated": "Misy hetsika taloha kokoa momba ny kireditra.",
+      "retentionLimit": "Aseho ny hetsika momba ny kireditra farany indrindra."
     },
     "inviteMember": {
       "emailError": "Mampidira adiresy mailaka manan-kery.",
@@ -3450,7 +3450,8 @@
         "void": "Nofoanana",
         "uncollectible": "Tsy azo takina"
       },
-      "truncated": "Misy ny faktiora taloha kokoa."
+      "truncated": "Misy ny faktiora taloha kokoa.",
+      "retentionLimit": "Aseho ny faktiora farany indrindra."
     },
     "lowBalanceAlert": {
       "enableA11y": "Alefaso ny fampandrenesana rehefa kely ny ambim-bola",
@@ -3684,8 +3685,7 @@
     "imagesSectionEmpty": "Tsy misy mpampiantrano sary atokisana",
     "revoke": "Foano ny fitokisana ny {{host}}",
     "revokeMessage": "Hangataka fanamafisana indray ny rohy mankany amin'ity mpampiantrano ity.",
-    "revokeImageMessage": "Hangataka fanamafisana indray ny sary avy amin'ity mpampiantrano ity.",
-    "backToPreferences": "Miverena amin'ny safidy"
+    "revokeImageMessage": "Hangataka fanamafisana indray ny sary avy amin'ity mpampiantrano ity."
   },
   "glanceable": {
     "waiting": "Manavao ny mpanatanteraka",
@@ -3932,6 +3932,8 @@
       "downloading": "Mampidina: {{written}} amin'ny {{total}}",
       "downloadingUnknown": "Mampidina: {{written}}",
       "paused": "Najanona: {{written}} amin'ny {{total}}",
+      "retrying": "Mamerina manandrana: {{written}} amin'ny {{total}}",
+      "retryingUnknown": "Mamerina manandrana: {{written}}",
       "verifying": "Manamarina ny rakitra voampidina…",
       "downloaded": "Voampidina · {{size}}",
       "url": "Rohy fampidinana mivantana",
@@ -4022,7 +4024,9 @@
         "androidModelUnavailable": "Tsy mandeha amin'ity fitaovana ity ny Gemini Nano, na mbola eo am-panomanana ny rindranasa AICore. Andramo indray any aoriana.",
         "aicoreUpdateRequired": "Havaozy ny rindranasa AICore sy ny rindrankajin'ny rafitra mba hampiasana ity modely ity.",
         "downloadable": "Mila sintonina indray mandeha ity modely ity vao azo ampiasaina.",
-        "downloading": "Eo am-pisintonana ny modely. Ho vonona izy rehefa vita ny fisintonana."
+        "downloading": "Eo am-pisintonana ny modely. Ho vonona izy rehefa vita ny fisintonana.",
+        "batteryQuota": "Efa nampiasa ny fetran'ny bateria nomena azy ny modely ao amin'ny fitaovana. Andramo indray any aoriana.",
+        "checkFailed": "Tsy afaka nanamarina ity modely ity ny fampiharana. Andramo indray."
       },
       "unavailable": "Tsy azo ampiasaina amin'izao fotoana izao ny modely ao amin'ny fitaovana. Jereo ny toetrany ao amin'ny $t(modelChat.backends.title).",
       "busy": "Mbola mamaly hafatra hafa ny modely ao amin'ny fitaovana. Andramo indray rehefa vita izany.",
@@ -4383,7 +4387,8 @@
       "purchaseFallback": "Fividianana kredita",
       "receipt": "Rosia",
       "receiptA11y": "Sokafy ny rosia ho an'ny {{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Tsy misy rosia ho an'ity fividianana ity."
+      "receiptUnavailable": "Tsy misy rosia ho an'ity fividianana ity.",
+      "retentionLimit": "Aseho ny tantaran'ny kredita farany indrindra."
     },
     "title": "Hividy kireditra",
     "description": "Ny kireditra dia fividianana indray mandeha ampiana amin'ny balan Kilo anao hanaovana session coding AI ao amin'ny Kilo App. Ny fivarotana no maka vola amin'ny kaontinao ary ampiana ny kireditra rehefa manamarina ny fandoavam-bola ny fivarotana.",

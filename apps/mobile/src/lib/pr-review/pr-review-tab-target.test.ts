@@ -50,7 +50,7 @@ describe('PR review tab tap target', () => {
   it('states the frame the selector actually renders', () => {
     // The pill is `py-<n>` around one `text-sm` line. Both classes come from
     // the component, so the constant cannot drift away from what it describes.
-    const padding = /'flex-1 items-center justify-center rounded-md py-(\d+)/.exec(selectorSource);
+    const padding = /'flex-1 justify-center rounded-full px-2 py-(\d+)/.exec(selectorSource);
     expect(padding?.[1]).toBeDefined();
     expect(selectorSource).toContain("'text-sm'");
     const paddingDp = Number(padding?.[1]) * 0.25 * REM_DP;

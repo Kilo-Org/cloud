@@ -3039,7 +3039,6 @@
   },
   "home": {
     "couldNotLoadSessions": "An kasa loda zaman aiki.",
-    "couldNotLoadActiveSessions": "An kasa loda zaman aikin da ke gudana.",
     "agentSessions": "Masu gudana yanzu",
     "newCodingTask": "Sabon aikin rubuta lambar shiri",
     "newTaskFromPicture": "Sabon aiki daga hoto",
@@ -3418,7 +3417,8 @@
         "accounting_adjustment": "Daidaitawar lissafin kuɗi",
         "credits_expired": "Wa'adin kuɗin amfani ya ƙare"
       },
-      "truncated": "Ana samun ma'amalolin kuɗin amfani na baya."
+      "truncated": "Ana samun ma'amalolin kuɗin amfani na baya.",
+      "retentionLimit": "Ana nuna ma'amalolin kuɗin amfani na baya-bayan nan."
     },
     "inviteMember": {
       "emailError": "Shigar da adireshin imel mai inganci.",
@@ -3450,7 +3450,8 @@
         "void": "An soke",
         "uncollectible": "Ba a iya karɓar kuɗin"
       },
-      "truncated": "Ana samun takardun biyan kuɗi na baya."
+      "truncated": "Ana samun takardun biyan kuɗi na baya.",
+      "retentionLimit": "Ana nuna takardun biyan kuɗi na baya-bayan nan."
     },
     "lowBalanceAlert": {
       "enableA11y": "Kunna faɗakarwar ƙarancin kuɗi",
@@ -3684,8 +3685,7 @@
     "imagesSectionEmpty": "Babu rukunin yanar gizo na hoto da aka amince da shi",
     "revoke": "Soke amincewa da {{host}}",
     "revokeMessage": "Hanyoyin shiga wannan rukunin yanar gizo za su sake neman tabbaci.",
-    "revokeImageMessage": "Hotuna daga wannan rukunin yanar gizo za su sake neman tabbaci.",
-    "backToPreferences": "Koma ga zaɓuɓɓuka"
+    "revokeImageMessage": "Hotuna daga wannan rukunin yanar gizo za su sake neman tabbaci."
   },
   "glanceable": {
     "waiting": "Ana sabunta wakilai",
@@ -3932,6 +3932,8 @@
       "downloading": "Ana saukewa: {{written}} cikin {{total}}",
       "downloadingUnknown": "Ana saukewa: {{written}}",
       "paused": "An dakata: {{written}} cikin {{total}}",
+      "retrying": "Ana sake gwadawa: {{written}} cikin {{total}}",
+      "retryingUnknown": "Ana sake gwadawa: {{written}}",
       "verifying": "Ana duba fayil ɗin da aka sauke…",
       "downloaded": "An sauke · {{size}}",
       "url": "Hanyar haɗin sauke kai tsaye",
@@ -4022,7 +4024,9 @@
         "androidModelUnavailable": "Wannan na'urar ba ta goyon bayan Gemini Nano, ko kuma manhajar tsarin AICore tana ci gaba da shiryawa. Sake gwadawa daga baya.",
         "aicoreUpdateRequired": "Sabunta manhajar AICore da manhajar tsarin na'urarka don amfani da wannan samfurin.",
         "downloadable": "Wannan samfurin yana buƙatar saukewa sau ɗaya kafin ka iya amfani da shi.",
-        "downloading": "Ana sauke samfurin. Zai kasance a shirye idan saukewar ta kammala."
+        "downloading": "Ana sauke samfurin. Zai kasance a shirye idan saukewar ta kammala.",
+        "batteryQuota": "Samfurin da ke kan na'ura ya yi amfani da rabonsa na baturi a yanzu. Sake gwadawa daga baya.",
+        "checkFailed": "Manhajar ba ta iya duba wannan samfurin ba. Sake gwadawa."
       },
       "unavailable": "Samfurin da ke kan na'ura ba ya samuwa a yanzu. Duba matsayinsa a $t(modelChat.backends.title).",
       "busy": "Samfurin da ke kan na'ura yana aiki da wata amsa. Sake gwadawa idan ya gama.",
@@ -4383,7 +4387,8 @@
       "purchaseFallback": "Sayen kiredit",
       "receipt": "Rasiti",
       "receiptA11y": "Buɗe rasitin {{description}}, {{amount}}, daga {{date}}",
-      "receiptUnavailable": "Babu rasiti don wannan sayayya."
+      "receiptUnavailable": "Babu rasiti don wannan sayayya.",
+      "retentionLimit": "Ana nuna tarihin kiredit na baya-bayan nan."
     },
     "title": "Sayi kuɗin amfani",
     "description": "Kuɗin amfani saye ne na lokaci ɗaya da ake ƙarawa a ma'aunin Kilo naka don gudanar da zaman shirye-shiryen AI a cikin Kilo App. Shagon yana cajin asusunka kuma ana ƙara kuɗin amfani bayan shagon ya tabbatar da biyan kuɗi.",

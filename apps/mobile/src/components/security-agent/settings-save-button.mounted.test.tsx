@@ -178,8 +178,9 @@ describe('SettingsSaveButton header cap', () => {
     const button = findSavePressable(render());
 
     const tokens = classes(button);
-    // A variable-width header action caps itself on the narrowest viewport.
-    expect(tokens).toContain('max-w-[140px]');
+    // A variable-width header action caps itself on the narrowest viewport,
+    // at 40 spacing steps (140pt at the app's 14pt rem).
+    expect(tokens).toContain('max-w-40');
     expect(tokens).toContain('min-w-0');
     // The Button's own `shrink-0` must be overridden or the cap would clip the
     // label instead of letting it compress.

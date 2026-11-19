@@ -2484,7 +2484,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Die Sitzungen konnten nicht geladen werden.",
-    "couldNotLoadActiveSessions": "Die aktiven Sitzungen konnten nicht geladen werden.",
     "agentSessions": "Jetzt aktiv",
     "newCodingTask": "Neue Programmieraufgabe",
     "newTaskFromPicture": "Neue Aufgabe aus einem Bild",
@@ -3410,7 +3409,8 @@
         "accounting_adjustment": "Buchhaltungskorrektur",
         "credits_expired": "Verfallenes Guthaben"
       },
-      "truncated": "Es sind ältere Guthabenbewegungen verfügbar."
+      "truncated": "Es sind ältere Guthabenbewegungen verfügbar.",
+      "retentionLimit": "Es werden die neuesten Guthabenbewegungen angezeigt."
     },
     "hub": {
       "balance": "Guthaben",
@@ -3455,7 +3455,8 @@
         "void": "Storniert",
         "uncollectible": "Uneinbringlich"
       },
-      "truncated": "Ältere Rechnungen sind verfügbar."
+      "truncated": "Ältere Rechnungen sind verfügbar.",
+      "retentionLimit": "Es werden die neuesten Rechnungen angezeigt."
     },
     "lowBalanceAlert": {
       "enableA11y": "Warnung bei niedrigem Guthaben aktivieren",
@@ -3684,8 +3685,7 @@
     "imagesSectionEmpty": "Keine vertrauenswürdigen Bild-Hosts",
     "revoke": "Vertrauen in {{host}} widerrufen",
     "revokeMessage": "Links zu diesem Host fragen künftig wieder nach einer Bestätigung.",
-    "revokeImageMessage": "Bilder von diesem Host fragen künftig wieder nach einer Bestätigung.",
-    "backToPreferences": "Zurück zu den Einstellungen"
+    "revokeImageMessage": "Bilder von diesem Host fragen künftig wieder nach einer Bestätigung."
   },
   "glanceable": {
     "waiting": "Agenten werden aktualisiert",
@@ -3932,6 +3932,8 @@
       "downloading": "Wird heruntergeladen: {{written}} von {{total}}",
       "downloadingUnknown": "Wird heruntergeladen: {{written}}",
       "paused": "Pausiert: {{written}} von {{total}}",
+      "retrying": "Erneuter Versuch: {{written}} von {{total}}",
+      "retryingUnknown": "Erneuter Versuch: {{written}}",
       "verifying": "Die heruntergeladene Datei wird überprüft…",
       "downloaded": "Heruntergeladen · {{size}}",
       "url": "Direkter Download-Link",
@@ -4022,7 +4024,9 @@
         "androidModelUnavailable": "Dieses Gerät unterstützt Gemini Nano nicht, oder die System-App AICore wird noch eingerichtet. Versuche es später erneut.",
         "aicoreUpdateRequired": "Aktualisiere die AICore-App und deine Systemsoftware, um dieses Modell zu nutzen.",
         "downloadable": "Dieses Modell muss einmalig heruntergeladen werden, bevor du es nutzen kannst.",
-        "downloading": "Das Modell wird heruntergeladen. Es ist einsatzbereit, sobald der Download abgeschlossen ist."
+        "downloading": "Das Modell wird heruntergeladen. Es ist einsatzbereit, sobald der Download abgeschlossen ist.",
+        "batteryQuota": "Das Modell auf dem Gerät hat sein Batteriekontingent vorerst ausgeschöpft. Versuche es später erneut.",
+        "checkFailed": "Die App konnte dieses Modell nicht prüfen. Versuche es erneut."
       },
       "unavailable": "Das Modell auf dem Gerät ist gerade nicht verfügbar. Prüfe seinen Status unter $t(modelChat.backends.title).",
       "busy": "Das Modell auf dem Gerät erstellt gerade eine andere Antwort. Versuche es erneut, wenn es fertig ist.",
@@ -4383,7 +4387,8 @@
       "purchaseFallback": "Credit-Kauf",
       "receipt": "Beleg",
       "receiptA11y": "Beleg für {{description}}, {{amount}}, vom {{date}} öffnen",
-      "receiptUnavailable": "Für diesen Kauf ist kein Beleg verfügbar."
+      "receiptUnavailable": "Für diesen Kauf ist kein Beleg verfügbar.",
+      "retentionLimit": "Es wird der neueste Credit-Verlauf angezeigt."
     },
     "title": "Guthaben kaufen",
     "description": "Guthaben ist ein einmaliger Kauf, der deinem Kilo-Guthaben für AI-Codierungssitzungen in der Kilo App hinzugefügt wird. Der Store belastet dein Konto, und das Guthaben wird gutgeschrieben, sobald der Store die Zahlung bestätigt.",

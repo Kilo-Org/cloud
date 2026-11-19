@@ -3039,7 +3039,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Kunde inte läsa in sessionerna.",
-    "couldNotLoadActiveSessions": "Kunde inte läsa in de aktiva sessionerna.",
     "agentSessions": "Pågår nu",
     "newCodingTask": "Ny programmeringsuppgift",
     "newTaskFromPicture": "Ny uppgift från en bild",
@@ -3418,7 +3417,8 @@
         "accounting_adjustment": "Redovisningsjustering",
         "credits_expired": "Utgångna krediter"
       },
-      "truncated": "Det finns äldre kreditaktivitet att visa."
+      "truncated": "Det finns äldre kreditaktivitet att visa.",
+      "retentionLimit": "Visar den senaste kreditaktiviteten."
     },
     "inviteMember": {
       "emailError": "Ange en giltig e-postadress",
@@ -3450,7 +3450,8 @@
         "void": "Makulerad",
         "uncollectible": "Oindrivbar"
       },
-      "truncated": "Äldre fakturor finns tillgängliga."
+      "truncated": "Äldre fakturor finns tillgängliga.",
+      "retentionLimit": "Visar de senaste fakturorna."
     },
     "lowBalanceAlert": {
       "enableA11y": "Aktivera varning för lågt saldo",
@@ -3684,8 +3685,7 @@
     "imagesSectionEmpty": "Inga betrodda bildvärdar",
     "revoke": "Sluta lita på {{host}}",
     "revokeMessage": "Länkar till den här värden kommer att be om bekräftelse igen.",
-    "revokeImageMessage": "Bilder från den här värden kommer att be om bekräftelse igen.",
-    "backToPreferences": "Tillbaka till inställningarna"
+    "revokeImageMessage": "Bilder från den här värden kommer att be om bekräftelse igen."
   },
   "glanceable": {
     "waiting": "Uppdaterar agenter",
@@ -3932,6 +3932,8 @@
       "downloading": "Laddar ner: {{written}} av {{total}}",
       "downloadingUnknown": "Laddar ner: {{written}}",
       "paused": "Pausad: {{written}} av {{total}}",
+      "retrying": "Försöker igen: {{written}} av {{total}}",
+      "retryingUnknown": "Försöker igen: {{written}}",
       "verifying": "Kontrollerar den nedladdade filen…",
       "downloaded": "Nedladdad · {{size}}",
       "url": "Direkt nedladdningslänk",
@@ -4022,7 +4024,9 @@
         "androidModelUnavailable": "Enheten har inte stöd för Gemini Nano, eller så håller systemappen AICore fortfarande på att konfigureras. Försök igen senare.",
         "aicoreUpdateRequired": "Uppdatera AICore-appen och systemprogramvaran för att använda den här modellen.",
         "downloadable": "Modellen måste laddas ned en gång innan du kan använda den.",
-        "downloading": "Modellen laddas ned. Den är redo när nedladdningen är klar."
+        "downloading": "Modellen laddas ned. Den är redo när nedladdningen är klar.",
+        "batteryQuota": "Modellen på enheten har använt sin batterikvot för tillfället. Försök igen senare.",
+        "checkFailed": "Appen kunde inte kontrollera den här modellen. Försök igen."
       },
       "unavailable": "Modellen på enheten är inte tillgänglig just nu. Kontrollera dess status i $t(modelChat.backends.title).",
       "busy": "Modellen på enheten är upptagen med ett annat svar. Försök igen när den är klar.",
@@ -4383,7 +4387,8 @@
       "purchaseFallback": "Kreditköp",
       "receipt": "Kvitto",
       "receiptA11y": "Öppna kvittot för {{description}}, {{amount}}, från {{date}}",
-      "receiptUnavailable": "Det finns inget kvitto för det här köpet."
+      "receiptUnavailable": "Det finns inget kvitto för det här köpet.",
+      "retentionLimit": "Visar den senaste kredithistoriken."
     },
     "title": "Köp krediter",
     "description": "Krediter är ett engångsköp som läggs till på ditt Kilo-saldo för att köra AI-kodningssessioner i Kilo-appen. Butiken debiterar ditt konto och krediterna läggs till efter att butiken bekräftar betalningen.",

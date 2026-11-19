@@ -4,6 +4,8 @@ import { Pressable, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 /**
  * Development-only route for the header-balance proof: one centered header in
@@ -29,14 +31,14 @@ function SaveCluster() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Fixture secondary"
-        className="h-[48px] w-[48px] items-center justify-center"
+        className={ICON_TARGET_BOX_CLASS}
       >
         <Text>◦</Text>
       </Pressable>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Fixture save"
-        className="ms-3 h-[48px] w-[48px] items-center justify-center rounded-full bg-accent"
+        className={cn(ICON_TARGET_BOX_CLASS, 'ms-3 rounded-full bg-accent')}
       >
         <Text className="text-sm font-semibold text-primary-foreground">Save</Text>
       </Pressable>

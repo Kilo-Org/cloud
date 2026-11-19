@@ -3039,7 +3039,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Hindi ma-load ang mga sesyon.",
-    "couldNotLoadActiveSessions": "Hindi ma-load ang mga aktibong sesyon.",
     "agentSessions": "Kasalukuyang tumatakbo",
     "newCodingTask": "Bagong gawain sa pag-code",
     "newTaskFromPicture": "Bagong gawain mula sa larawan",
@@ -3418,7 +3417,8 @@
         "accounting_adjustment": "Pagsasaayos sa talaan ng pananalapi",
         "credits_expired": "Kreditong nawalan ng bisa"
       },
-      "truncated": "May mas naunang aktibidad sa kredito na maaaring tingnan."
+      "truncated": "May mas naunang aktibidad sa kredito na maaaring tingnan.",
+      "retentionLimit": "Ipinapakita ang pinakabagong aktibidad sa kredito."
     },
     "inviteMember": {
       "emailError": "Maglagay ng wastong email address.",
@@ -3450,7 +3450,8 @@
         "void": "Walang bisa",
         "uncollectible": "Hindi masingil"
       },
-      "truncated": "May mas naunang mga talaan ng singil na maaaring tingnan."
+      "truncated": "May mas naunang mga talaan ng singil na maaaring tingnan.",
+      "retentionLimit": "Ipinapakita ang mga pinakabagong talaan ng singil."
     },
     "lowBalanceAlert": {
       "enableA11y": "Paganahin ang babala sa mababang balanse",
@@ -3684,8 +3685,7 @@
     "imagesSectionEmpty": "Walang pinagkakatiwalaang host ng larawan",
     "revoke": "Bawiin ang tiwala sa {{host}}",
     "revokeMessage": "Muling hihingi ng kumpirmasyon ang mga link sa host na ito.",
-    "revokeImageMessage": "Muling hihingi ng kumpirmasyon ang mga larawan mula sa host na ito.",
-    "backToPreferences": "Bumalik sa mga setting"
+    "revokeImageMessage": "Muling hihingi ng kumpirmasyon ang mga larawan mula sa host na ito."
   },
   "glanceable": {
     "waiting": "Ina-update ang mga agent",
@@ -3932,6 +3932,8 @@
       "downloading": "Nagda-download: {{written}} ng {{total}}",
       "downloadingUnknown": "Nagda-download: {{written}}",
       "paused": "Naka-pause: {{written}} ng {{total}}",
+      "retrying": "Muling sinusubukan: {{written}} ng {{total}}",
+      "retryingUnknown": "Muling sinusubukan: {{written}}",
       "verifying": "Sinusuri ang na-download na file…",
       "downloaded": "Na-download · {{size}}",
       "url": "Direktang link ng pag-download",
@@ -4022,7 +4024,9 @@
         "androidModelUnavailable": "Hindi suportado ng device na ito ang Gemini Nano, o inihahanda pa ang system app na AICore. Subukang muli mamaya.",
         "aicoreUpdateRequired": "I-update ang AICore app at ang system software mo para magamit ang modelong ito.",
         "downloadable": "Kailangang i-download nang isang beses ang modelong ito bago mo ito magamit.",
-        "downloading": "Nagda-download ang modelo. Magiging handa ito kapag natapos ang pag-download."
+        "downloading": "Nagda-download ang modelo. Magiging handa ito kapag natapos ang pag-download.",
+        "batteryQuota": "Naubos na ng modelong nasa device ang allotment nito sa battery sa ngayon. Subukang muli mamaya.",
+        "checkFailed": "Hindi nasuri ng app ang modelong ito. Subukang muli."
       },
       "unavailable": "Hindi available ngayon ang modelong nasa device. Tingnan ang status nito sa $t(modelChat.backends.title).",
       "busy": "Abala pa ang modelong nasa device sa ibang sagot. Subukang muli kapag tapos na ito.",
@@ -4383,7 +4387,8 @@
       "purchaseFallback": "Pagbili ng credit",
       "receipt": "Resibo",
       "receiptA11y": "Buksan ang resibo para sa {{description}}, {{amount}}, mula noong {{date}}",
-      "receiptUnavailable": "Walang available na resibo para sa pagbiling ito."
+      "receiptUnavailable": "Walang available na resibo para sa pagbiling ito.",
+      "retentionLimit": "Ipinapakita ang pinakabagong kasaysayan ng credit."
     },
     "title": "Bumili ng kredito",
     "description": "Ang kredito ay isang besesang pagbili na idinaragdag sa iyong Kilo balance para sa pagpapatakbo ng mga AI coding session sa Kilo App. Sinisingil ng store ang iyong account at idinaragdag ang kredito pagkatapos kumpirmahin ng store ang bayad.",

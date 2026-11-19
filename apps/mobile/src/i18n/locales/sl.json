@@ -3151,7 +3151,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Sej ni bilo mogoče naložiti.",
-    "couldNotLoadActiveSessions": "Aktivnih sej ni bilo mogoče naložiti.",
     "agentSessions": "Trenutno aktivno",
     "newCodingTask": "Nova programska naloga",
     "newTaskFromPicture": "Nova naloga iz slike",
@@ -3534,7 +3533,8 @@
         "accounting_adjustment": "Računovodska prilagoditev",
         "credits_expired": "Potek veljavnosti kreditov"
       },
-      "truncated": "Na voljo so starejše transakcije s krediti."
+      "truncated": "Na voljo so starejše transakcije s krediti.",
+      "retentionLimit": "Prikazane so najnovejše transakcije s krediti."
     },
     "inviteMember": {
       "emailError": "Vnesi veljaven e-poštni naslov.",
@@ -3566,7 +3566,8 @@
         "void": "Razveljavljeno",
         "uncollectible": "Neizterljivo"
       },
-      "truncated": "Starejši računi so na voljo."
+      "truncated": "Starejši računi so na voljo.",
+      "retentionLimit": "Prikazani so najnovejši računi."
     },
     "lowBalanceAlert": {
       "enableA11y": "Omogoči opozorilo o nizkem stanju",
@@ -3804,8 +3805,7 @@
     "imagesSectionEmpty": "Ni zaupanja vrednih gostiteljev slik",
     "revoke": "Prekliči zaupanje gostitelju {{host}}",
     "revokeMessage": "Povezave do tega gostitelja bodo znova zahtevale potrditev.",
-    "revokeImageMessage": "Slike s tega gostitelja bodo znova zahtevale potrditev.",
-    "backToPreferences": "Nazaj na nastavitve"
+    "revokeImageMessage": "Slike s tega gostitelja bodo znova zahtevale potrditev."
   },
   "glanceable": {
     "waiting": "Posodabljanje agentov",
@@ -4054,6 +4054,8 @@
       "downloading": "Prenašanje: {{written}} od {{total}}",
       "downloadingUnknown": "Prenašanje: {{written}}",
       "paused": "Začasno ustavljeno: {{written}} od {{total}}",
+      "retrying": "Ponovni poskus: {{written}} od {{total}}",
+      "retryingUnknown": "Ponovni poskus: {{written}}",
       "verifying": "Preverjanje prenesene datoteke…",
       "downloaded": "Preneseno · {{size}}",
       "url": "Neposredna povezava za prenos",
@@ -4144,7 +4146,9 @@
         "androidModelUnavailable": "Ta naprava ne podpira modela Gemini Nano ali pa se sistemska aplikacija AICore še nastavlja. Poskusite znova pozneje.",
         "aicoreUpdateRequired": "Za uporabo tega modela posodobite aplikacijo AICore in sistemsko programsko opremo.",
         "downloadable": "Pred uporabo je treba ta model enkrat prenesti.",
-        "downloading": "Model se prenaša. Pripravljen bo, ko se prenos konča."
+        "downloading": "Model se prenaša. Pripravljen bo, ko se prenos konča.",
+        "batteryQuota": "Model v napravi je porabil dovoljeno porabo baterije. Poskusite znova pozneje.",
+        "checkFailed": "Aplikacija ni mogla preveriti tega modela. Poskusite znova."
       },
       "unavailable": "Model v napravi trenutno ni na voljo. Njegovo stanje preverite v razdelku $t(modelChat.backends.title).",
       "busy": "Model v napravi je zaseden z drugim odgovorom. Poskusite znova, ko ga dokonča.",
@@ -4517,7 +4521,8 @@
       "purchaseFallback": "Nakup kreditov",
       "receipt": "Potrdilo",
       "receiptA11y": "Odpri potrdilo za {{description}}, {{amount}}, z dne {{date}}",
-      "receiptUnavailable": "Potrdilo za ta nakup ni na voljo."
+      "receiptUnavailable": "Potrdilo za ta nakup ni na voljo.",
+      "retentionLimit": "Prikazana je najnovejša zgodovina kreditov."
     },
     "title": "Kupi kredite",
     "description": "Krediti so enkraten nakup, ki se doda tvojemu Kilo stanju za izvajanje sej kodiranja z umetno inteligenco v aplikaciji Kilo. Trgovina obremeni tvoj račun in krediti se dodajo, ko trgovina potrdi plačilo.",

@@ -3039,7 +3039,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Non se puideron cargar as sesións.",
-    "couldNotLoadActiveSessions": "Non se puideron cargar as sesións activas.",
     "agentSessions": "En curso agora",
     "newCodingTask": "Nova tarefa de programación",
     "newTaskFromPicture": "Nova tarefa a partir dunha imaxe",
@@ -3418,7 +3417,8 @@
         "accounting_adjustment": "Axuste contable",
         "credits_expired": "Créditos caducados"
       },
-      "truncated": "Hai movementos de créditos anteriores dispoñibles."
+      "truncated": "Hai movementos de créditos anteriores dispoñibles.",
+      "retentionLimit": "Mostrando os movementos de créditos máis recentes."
     },
     "inviteMember": {
       "emailError": "Introduce un enderezo de correo válido.",
@@ -3450,7 +3450,8 @@
         "void": "Anulada",
         "uncollectible": "Incobrable"
       },
-      "truncated": "Hai facturas máis antigas dispoñibles."
+      "truncated": "Hai facturas máis antigas dispoñibles.",
+      "retentionLimit": "Mostrando as facturas máis recentes."
     },
     "lowBalanceAlert": {
       "enableA11y": "Activar a alerta de saldo baixo",
@@ -3684,8 +3685,7 @@
     "imagesSectionEmpty": "Non hai dominios de confianza de imaxes",
     "revoke": "Revogar a confianza en {{host}}",
     "revokeMessage": "As ligazóns a este dominio volverán pedir confirmación.",
-    "revokeImageMessage": "As imaxes deste dominio volverán pedir confirmación.",
-    "backToPreferences": "Volver ás preferencias"
+    "revokeImageMessage": "As imaxes deste dominio volverán pedir confirmación."
   },
   "glanceable": {
     "waiting": "Actualizando axentes",
@@ -3932,6 +3932,8 @@
       "downloading": "Descargando: {{written}} de {{total}}",
       "downloadingUnknown": "Descargando: {{written}}",
       "paused": "En pausa: {{written}} de {{total}}",
+      "retrying": "Tentando de novo: {{written}} de {{total}}",
+      "retryingUnknown": "Tentando de novo: {{written}}",
       "verifying": "Comprobando o ficheiro descargado…",
       "downloaded": "Descargado · {{size}}",
       "url": "Ligazón de descarga directa",
@@ -4022,7 +4024,9 @@
         "androidModelUnavailable": "Este dispositivo non é compatible con Gemini Nano ou a aplicación do sistema AICore aínda se está configurando. Téntao de novo máis tarde.",
         "aicoreUpdateRequired": "Actualiza a aplicación AICore e o software do sistema para usar este modelo.",
         "downloadable": "Este modelo necesita unha descarga única antes de poder usalo.",
-        "downloading": "O modelo estase descargando. Estará listo cando remate a descarga."
+        "downloading": "O modelo estase descargando. Estará listo cando remate a descarga.",
+        "batteryQuota": "O modelo no dispositivo esgotou a súa cota de batería por agora. Téntao de novo máis tarde.",
+        "checkFailed": "A aplicación non puido comprobar este modelo. Téntao de novo."
       },
       "unavailable": "O modelo no dispositivo non está dispoñible agora mesmo. Comproba o seu estado en $t(modelChat.backends.title).",
       "busy": "O modelo no dispositivo está ocupado con outra resposta. Téntao de novo cando remate.",
@@ -4383,7 +4387,8 @@
       "purchaseFallback": "Compra de créditos",
       "receipt": "Recibo",
       "receiptA11y": "Abrir o recibo de {{description}}, {{amount}}, do {{date}}",
-      "receiptUnavailable": "Non hai ningún recibo dispoñible para esta compra."
+      "receiptUnavailable": "Non hai ningún recibo dispoñible para esta compra.",
+      "retentionLimit": "Mostrando o historial de créditos máis recente."
     },
     "title": "Mercar créditos",
     "description": "Os créditos son unha compra única que se engade ao teu saldo de Kilo para executar sesións de codificación con IA na app de Kilo. A tenda cobra na túa conta e os créditos engádense despois de que a tenda confirme o pagamento.",

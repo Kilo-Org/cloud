@@ -1,4 +1,9 @@
 import { environmentSetupCommandCountSchema, setupCommandsSchema } from './setup-script.js';
+import {
+  findReservedEnvVarName,
+  MAX_ATTACH_ENV_KEYS,
+  RESERVED_ENV_VARS_MESSAGE,
+} from './runtime-environment.js';
 import { z } from 'zod';
 
 export {
@@ -167,6 +172,21 @@ export const sessionAttachMcpServersSchema = z
     message: 'Serialized MCP configuration exceeds the 80 KiB limit',
   });
 
+/**
+ * The attach env starts from the stored profile env and carries the credential
+ * names the preparation adds, so the cap is the profile cap plus those names.
+ * Reserved names are the platform's: the workspace path, session home and pnpm
+ * store are computed from them.
+ */
+const sessionAttachEnvSchema = z
+  .record(z.string().max(256), z.string().max(8192))
+  .refine(obj => Object.keys(obj).length <= MAX_ATTACH_ENV_KEYS, {
+    message: `Maximum ${MAX_ATTACH_ENV_KEYS} environment variables allowed`,
+  })
+  .refine(obj => findReservedEnvVarName(Object.keys(obj)) === undefined, {
+    message: RESERVED_ENV_VARS_MESSAGE,
+  });
+
 export const sessionAttachPayloadSchema = z
   .object({
     captureNativeRuntimeId: z.literal(true).optional(),
@@ -209,7 +229,7 @@ export const sessionAttachPayloadSchema = z
       })
       .strict()
       .optional(),
-    env: z.record(z.string().max(256), z.string().max(8192)).optional(),
+    env: sessionAttachEnvSchema.optional(),
     mcp: sessionAttachMcpServersSchema.optional(),
     setupCommands: setupCommandsSchema.optional(),
     startCommands: setupCommandsSchema.optional(),

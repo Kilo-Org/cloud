@@ -2517,7 +2517,6 @@
   },
   "home": {
     "couldNotLoadSessions": "לא ניתן לטעון את הסשנים.",
-    "couldNotLoadActiveSessions": "לא ניתן לטעון את הסשנים הפעילים.",
     "agentSessions": "פעילים עכשיו",
     "newCodingTask": "משימת תכנות חדשה",
     "newTaskFromPicture": "משימה חדשה מתמונה",
@@ -3468,7 +3467,8 @@
         "accounting_adjustment": "התאמה חשבונאית",
         "credits_expired": "פג תוקף הקרדיטים"
       },
-      "truncated": "יש תנועות קודמות בקרדיטים."
+      "truncated": "יש תנועות קודמות בקרדיטים.",
+      "retentionLimit": "מוצגות תנועות הקרדיטים העדכניות ביותר."
     },
     "hub": {
       "balance": "יתרה",
@@ -3513,7 +3513,8 @@
         "void": "בוטלה",
         "uncollectible": "לא ניתנת לגבייה"
       },
-      "truncated": "קיימות חשבוניות ישנות יותר."
+      "truncated": "קיימות חשבוניות ישנות יותר.",
+      "retentionLimit": "מוצגות החשבוניות העדכניות ביותר."
     },
     "lowBalanceAlert": {
       "enableA11y": "הפעלת התראה על יתרה נמוכה",
@@ -3744,8 +3745,7 @@
     "imagesSectionEmpty": "אין אתרי תמונות מהימנים",
     "revoke": "ביטול האמון באתר {{host}}",
     "revokeMessage": "קישורים לאתר זה יבקשו אישור שוב.",
-    "revokeImageMessage": "תמונות מאתר זה יבקשו אישור שוב.",
-    "backToPreferences": "חזרה להעדפות"
+    "revokeImageMessage": "תמונות מאתר זה יבקשו אישור שוב."
   },
   "glanceable": {
     "waiting": "נתוני הסוכנים מתעדכנים",
@@ -3993,6 +3993,8 @@
       "downloading": "מוריד: {{written}} מתוך {{total}}",
       "downloadingUnknown": "מוריד: {{written}}",
       "paused": "מושהה: {{written}} מתוך {{total}}",
+      "retrying": "מנסה שוב: {{written}} מתוך {{total}}",
+      "retryingUnknown": "מנסה שוב: {{written}}",
       "verifying": "בודק את הקובץ שהורד…",
       "downloaded": "הורד · {{size}}",
       "url": "קישור הורדה ישיר",
@@ -4083,7 +4085,9 @@
         "androidModelUnavailable": "המכשיר הזה לא תומך ב-Gemini Nano, או שאפליקציית המערכת AICore עדיין בהגדרה. יש לנסות שוב מאוחר יותר.",
         "aicoreUpdateRequired": "כדי להשתמש במודל הזה צריך לעדכן את אפליקציית AICore ואת תוכנת המערכת.",
         "downloadable": "לפני השימוש הראשון צריך להוריד את המודל הזה. ההורדה נדרשת פעם אחת בלבד.",
-        "downloading": "המודל בהורדה. אפשר יהיה להשתמש בו כשההורדה תסתיים."
+        "downloading": "המודל בהורדה. אפשר יהיה להשתמש בו כשההורדה תסתיים.",
+        "batteryQuota": "המודל במכשיר מיצה את מכסת הסוללה שלו לעת עתה. אפשר לנסות שוב מאוחר יותר.",
+        "checkFailed": "האפליקציה לא הצליחה לבדוק את המודל הזה. אפשר לנסות שוב."
       },
       "unavailable": "המודל במכשיר לא זמין כרגע. אפשר לבדוק את הסטטוס שלו ב$t(modelChat.backends.title).",
       "busy": "המודל במכשיר עסוק בתשובה אחרת. יש לנסות שוב כשהוא יסיים.",
@@ -4450,7 +4454,8 @@
       "purchaseFallback": "רכישת קרדיטים",
       "receipt": "קבלה",
       "receiptA11y": "פתיחת הקבלה עבור {{description}}, {{amount}}, מתאריך {{date}}",
-      "receiptUnavailable": "אין קבלה זמינה עבור רכישה זו."
+      "receiptUnavailable": "אין קבלה זמינה עבור רכישה זו.",
+      "retentionLimit": "מוצגת היסטוריית הקרדיטים העדכנית ביותר."
     },
     "title": "קניית קרדיטים",
     "description": "קרדיטים הם רכישה חד-פעמית שמתווספת ליתרת ה-Kilo שלך להרצת מפגשי קידוד בינה מלאכותית ב-Kilo App. החנות מחייבת את החשבון שלך והקרדיטים מתווספים לאחר שהחנות מאשרת את התשלום.",

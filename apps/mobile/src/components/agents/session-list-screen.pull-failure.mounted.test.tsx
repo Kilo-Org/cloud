@@ -170,9 +170,11 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/agents/remote-session-row', () => ({ RemoteSessionRow: 'RemoteSessionRow' }));
 vi.mock('@/components/agents/session-list-content', () => ({
   AgentSessionListContent: 'AgentSessionListContent',
-  FAB_MARGIN: 16,
-  FAB_SIZE: 48,
 }));
+vi.mock('@/components/ui/fab', async () => {
+  const actual = (await vi.importActual('@/components/ui/fab')) as Record<string, unknown>;
+  return { ...actual, FAB_MARGIN: 16, FAB_SIZE: 48 };
+});
 vi.mock('@/components/agents/session-list-search-header', () => ({
   SessionListSearchHeader: 'SessionListSearchHeader',
 }));
@@ -183,7 +185,7 @@ vi.mock('@/components/agents/platform-filter-modal', () => ({
 vi.mock('@/components/agents/use-agent-session-navigator', () => ({
   useAgentSessionNavigator: () => () => undefined,
 }));
-vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
+vi.mock('@/components/ui/section-header', () => ({ SectionHeader: 'SectionHeader' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));

@@ -44,6 +44,26 @@ export function hasRetentionBudget(
 }
 
 /**
+ * Whether a list stopped at the retention bound rather than at the end of its
+ * history.
+ *
+ * The bound is reached by refusing the next page while the server still reports
+ * older rows, so a list with no further page to load looks the same whether the
+ * cursor was withheld by the bound or the server had nothing left. The last
+ * loaded page carries the server's answer (`hasMore`), so this predicate
+ * recovers the distinction: a list at the bound whose last page still reports
+ * more is retention-limited, and a surface can say so instead of presenting the
+ * truncated history as complete.
+ */
+export function stoppedAtRetentionBound(
+  pageCount: number,
+  serverHasMore: boolean,
+  maxPages: number = INFINITE_QUERY_MAX_PAGES
+): boolean {
+  return serverHasMore && !hasRetentionBudget(pageCount, maxPages);
+}
+
+/**
  * A page-one refetch is one page from the start. `infiniteQueryBehavior` reads
  * the page count from the options, and without it a plain refetch re-requests
  * every retained page (up to the retention bound).

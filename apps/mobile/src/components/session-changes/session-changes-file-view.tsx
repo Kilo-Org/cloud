@@ -103,6 +103,7 @@ function UnavailableState({
       title={title}
       description={description}
       placement="top"
+      inset="gutter"
       refreshControl={refreshControl}
     />
   );

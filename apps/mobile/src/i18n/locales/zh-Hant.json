@@ -2484,7 +2484,6 @@
   },
   "home": {
     "couldNotLoadSessions": "無法載入工作階段。",
-    "couldNotLoadActiveSessions": "無法載入進行中的工作階段。",
     "agentSessions": "目前執行中",
     "newCodingTask": "新增程式設計任務",
     "newTaskFromPicture": "從圖片新增任務",
@@ -3410,7 +3409,8 @@
         "accounting_adjustment": "會計調整",
         "credits_expired": "點數已到期"
       },
-      "truncated": "還有更早的點數記錄可供查看。"
+      "truncated": "還有更早的點數記錄可供查看。",
+      "retentionLimit": "顯示最近的點數記錄。"
     },
     "hub": {
       "balance": "餘額",
@@ -3455,7 +3455,8 @@
         "void": "已作廢",
         "uncollectible": "無法收款"
       },
-      "truncated": "還有更早的發票可供查看。"
+      "truncated": "還有更早的發票可供查看。",
+      "retentionLimit": "顯示最近的發票。"
     },
     "lowBalanceAlert": {
       "enableA11y": "啟用餘額不足提醒",
@@ -3684,8 +3685,7 @@
     "imagesSectionEmpty": "沒有信任的圖片主機",
     "revoke": "撤銷對 {{host}} 的信任",
     "revokeMessage": "前往此主機的連結將再次要求確認。",
-    "revokeImageMessage": "來自此主機的圖片將再次要求確認。",
-    "backToPreferences": "返回偏好設定"
+    "revokeImageMessage": "來自此主機的圖片將再次要求確認。"
   },
   "glanceable": {
     "waiting": "正在更新代理程式狀態",
@@ -3932,6 +3932,8 @@
       "downloading": "下載中：{{written}}／{{total}}",
       "downloadingUnknown": "下載中：{{written}}",
       "paused": "已暫停：{{written}}／{{total}}",
+      "retrying": "正在重試：{{written}}／{{total}}",
+      "retryingUnknown": "正在重試：{{written}}",
       "verifying": "正在檢查下載的檔案…",
       "downloaded": "已下載 · {{size}}",
       "url": "直接下載連結",
@@ -4022,7 +4024,9 @@
         "androidModelUnavailable": "此裝置不支援 Gemini Nano，或 AICore 系統應用程式仍在設定中。請稍後再試。",
         "aicoreUpdateRequired": "請更新 AICore 應用程式和系統軟體，才能使用此模型。",
         "downloadable": "此模型需要先下載一次才能使用。",
-        "downloading": "模型下載中，下載完成後即可使用。"
+        "downloading": "模型下載中，下載完成後即可使用。",
+        "batteryQuota": "裝置端模型已用完目前的電池用量額度。請稍後再試。",
+        "checkFailed": "應用程式無法檢查此模型。請再試一次。"
       },
       "unavailable": "裝置端模型目前無法使用。請在「$t(modelChat.backends.title)」中查看其狀態。",
       "busy": "裝置端模型正在產生另一則回覆，請在完成後再試一次。",
@@ -4383,7 +4387,8 @@
       "purchaseFallback": "點數購買",
       "receipt": "收據",
       "receiptA11y": "開啟「{{description}}」，{{amount}}，{{date}} 的收據",
-      "receiptUnavailable": "此筆購買沒有可用的收據。"
+      "receiptUnavailable": "此筆購買沒有可用的收據。",
+      "retentionLimit": "顯示最近的點數紀錄。"
     },
     "title": "購買點數",
     "description": "點數是一次性購買，會加入你的 Kilo 餘額，用於在 Kilo App 中執行 AI 程式設計工作階段。商店會向你的帳戶收費，商店確認付款後點數才會入帳。",

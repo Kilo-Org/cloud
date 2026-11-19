@@ -615,6 +615,37 @@ describe('organization model producer publication', () => {
     expect(mockTagClaude).toHaveBeenLastCalledWith(owner, expect.any(Array));
   });
 
+  it('merges the ChatGPT and Claude tags, which run on the same input', async () => {
+    const tagIds = (ids: string[]) => async (_owner: unknown, models: OpenRouterModel[]) =>
+      models.map(model =>
+        ids.includes(model.id) ? { ...model, hasUserByokAvailable: true, isFree: false } : model
+      );
+    const seenByChatGpt: string[][] = [];
+    const seenByClaude: string[][] = [];
+    mockTagChatGpt.mockImplementation(async (owner, models: OpenRouterModel[]) => {
+      seenByChatGpt.push(models.map(model => model.id));
+      return tagIds(['provider/training'])(owner, models);
+    });
+    mockTagClaude.mockImplementation(async (owner, models: OpenRouterModel[]) => {
+      seenByClaude.push(models.map(model => model.id));
+      return tagIds(['morph-byok/private'])(owner, models);
+    });
+
+    const result = await resultFor();
+
+    expect(seenByClaude).toEqual(seenByChatGpt);
+    for (const id of ['provider/training', 'morph-byok/private']) {
+      expect(result.data.find(model => model.id === id)).toMatchObject({
+        hasUserByokAvailable: true,
+        isFree: false,
+      });
+    }
+    const untagged = result.data.find(model => model.id === 'kilo-internal/private');
+    expect(untagged).toBeDefined();
+    expect(untagged?.hasUserByokAvailable).not.toBe(true);
+    expect(untagged?.isFree).toBeUndefined();
+  });
+
   it('lists denied models only when an inference provider key the policy admits serves them', async () => {
     const catalogModelIds = new Set([
       'provider/allowed',

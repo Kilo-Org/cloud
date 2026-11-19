@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- cohesive mounted suite for the credit-activity screen state contract */
+/* eslint-disable max-lines -- cohesive mounted suite for the credit-activity screen state contract, including the retention-limit footer */
 
 // Credit-activity screen state contract: loading skeleton, first-page error
 // (retryable vs. permanent NOT_FOUND/FORBIDDEN/UNAUTHORIZED no-retry), the empty
@@ -32,6 +32,7 @@ const pageQuery = vi.hoisted(() => ({
 const pageHook = vi.hoisted(() => ({
   entries: [] as unknown[],
   hasMore: false,
+  isRetentionLimited: false,
 }));
 
 const queryErrors = vi.hoisted(() => ({
@@ -78,7 +79,12 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
   },
   useOrgCreditTransactionsPage: (id: string | null) => {
     route.queryIds.push(id);
-    return { query: pageQuery, entries: pageHook.entries, hasMore: pageHook.hasMore };
+    return {
+      query: pageQuery,
+      entries: pageHook.entries,
+      hasMore: pageHook.hasMore,
+      isRetentionLimited: pageHook.isRetentionLimited,
+    };
   },
 }));
 
@@ -149,6 +155,7 @@ vi.mock('@/lib/utils', () => ({
 }));
 
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   EmptyState: (props: { title: string; placement?: string }) =>
     createElement('EmptyState', props, `EMPTY_STATE:${props.title}`),
 }));
@@ -264,6 +271,7 @@ beforeEach(() => {
   pageQuery.fetchNextPage.mockClear();
   pageHook.entries = [];
   pageHook.hasMore = false;
+  pageHook.isRetentionLimited = false;
   queryErrors.errors = [];
   buttons.rendered = [];
   account.reset();
@@ -494,6 +502,47 @@ describe('OrganizationCreditActivityScreen pagination', () => {
     expect(texts).toContain('Older credit activity is available.');
     expect(texts).not.toContain("Couldn't load more");
     expect(buttons.rendered.some(button => button.accessibilityLabel === 'Load more')).toBe(true);
+  });
+});
+
+describe('OrganizationCreditActivityScreen retention-limit footer', () => {
+  it('names the retention bound with no Load more at the bound', async () => {
+    pageQuery.data = { pages: [{ entries: [TRANSACTION], nextCursor: null, hasMore: false }] };
+    pageHook.entries = [TRANSACTION];
+    pageHook.isRetentionLimited = true;
+
+    const texts = await renderScreen();
+
+    expect(texts).toContain('Top-up');
+    expect(texts).toContain(i18n.t('organization.creditActivity.retentionLimit'));
+    expect(texts).not.toContain('Older credit activity is available.');
+    expect(buttons.rendered.some(button => button.accessibilityLabel === 'Load more')).toBe(false);
+  });
+
+  it('keeps the truncated note and Load more below the bound', async () => {
+    pageQuery.data = { pages: [{ entries: [TRANSACTION], nextCursor: 1, hasMore: true }] };
+    pageHook.entries = [TRANSACTION];
+    pageHook.hasMore = true;
+
+    const texts = await renderScreen();
+
+    expect(texts).toContain('Older credit activity is available.');
+    expect(texts).not.toContain(i18n.t('organization.creditActivity.retentionLimit'));
+    expect(buttons.rendered.some(button => button.accessibilityLabel === 'Load more')).toBe(true);
+  });
+
+  it('never renders the two notes together when the impossible flag pairing is forced', async () => {
+    // The hooks can never return the bound flag next to `hasMore: true`, so
+    // force the pairing from the mock side and hold the footer to one note.
+    pageQuery.data = { pages: [{ entries: [TRANSACTION], nextCursor: 1, hasMore: true }] };
+    pageHook.entries = [TRANSACTION];
+    pageHook.hasMore = true;
+    pageHook.isRetentionLimited = true;
+
+    const texts = await renderScreen();
+
+    expect(texts).not.toContain(i18n.t('organization.creditActivity.retentionLimit'));
+    expect(texts).toContain('Older credit activity is available.');
   });
 });
 

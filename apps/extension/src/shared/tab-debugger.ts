@@ -99,6 +99,8 @@ export interface BrowserTabInfo {
   /** `chrome.tabGroups` id the tab is in; `-1` (or absent) when ungrouped. */
   readonly groupId?: number;
   readonly id?: number;
+  /** `loading` while a document loads, `complete` once it has. */
+  readonly status?: string;
   readonly title?: string;
   readonly url?: string;
   readonly windowId?: number;

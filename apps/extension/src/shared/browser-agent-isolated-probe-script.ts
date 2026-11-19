@@ -10,6 +10,14 @@
  * scope; its sensitive-field rules are the ones the debugger probes in
  * `browser-agent-probes.ts` carry as page source. It answers JSON text.
  */
+/** One element's viewport box, the shape the screenshot mask reads. */
+interface ProbeBox {
+  readonly height: number;
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+}
+
 export const runIsolatedAgentProbe = (kind: string, selector: string): string => {
   const { runtime } =
     (
@@ -67,7 +75,7 @@ export const runIsolatedAgentProbe = (kind: string, selector: string): string =>
 
     return { fields: own === null ? [] : [{ kind: own }], paymentFormSubmit };
   };
-  const boxOf = (element: Element) => {
+  const boxOf = (element: Element): ProbeBox => {
     const rect = element.getBoundingClientRect();
 
     return { height: rect.height, left: rect.left, top: rect.top, width: rect.width };
@@ -139,15 +147,39 @@ export const runIsolatedAgentProbe = (kind: string, selector: string): string =>
   }
 
   if (kind === 'boxes') {
+    // Firefox gives content scripts `openOrClosedShadowRoot`, so a closed root is read like an open one, as the debugger's pierced DOM is.
+    const readsClosedRoots = 'openOrClosedShadowRoot' in document.documentElement;
+    const shadowOf = (element: Element): ShadowRoot | null =>
+      (element as Element & { readonly openOrClosedShadowRoot?: ShadowRoot | null })
+        .openOrClosedShadowRoot ?? element.shadowRoot;
+    const fields: ProbeBox[] = [];
+    const owners: { readonly box: ProbeBox; readonly frameId: number | null }[] = [];
+    const scan = (root: Document | ShadowRoot): void => {
+      for (const element of root.querySelectorAll('*')) {
+        if (element.tagName === 'INPUT' && kindOf(element) !== null) {
+          fields.push(boxOf(element));
+        }
+
+        if (['EMBED', 'FRAME', 'IFRAME', 'OBJECT'].includes(element.tagName)) {
+          owners.push({ box: boxOf(element), frameId: frameIdOf(element) });
+        }
+
+        const shadow = shadowOf(element);
+
+        if (shadow !== null) {
+          scan(shadow);
+        } else if (!readsClosedRoots && element.tagName.includes('-')) {
+          // A custom element may hold a closed root this world cannot open, so its whole box is masked.
+          fields.push(boxOf(element));
+        }
+      }
+    };
+
+    scan(document);
+
     return JSON.stringify({
-      fields: [...document.querySelectorAll('input')]
-        .filter(input => kindOf(input) !== null)
-        .map(input => boxOf(input))
-        .filter(box => box.width > 0 && box.height > 0),
-      owners: [...document.querySelectorAll('embed, frame, iframe, object')].map(element => ({
-        box: boxOf(element),
-        frameId: frameIdOf(element),
-      })),
+      fields: fields.filter(box => box.width > 0 && box.height > 0),
+      owners,
     });
   }
 

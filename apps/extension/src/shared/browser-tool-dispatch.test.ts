@@ -23,6 +23,7 @@ const createFakeSession = (unavailableError?: string): FakeSession => {
     attach: async () => {},
     backend: 'debugger',
     callTool: async (): Promise<BrowserToolCallResult> => ({ ok: true, value: undefined }),
+    captureViewportImage: async () => undefined,
     commands,
     consoleMessages: () => [],
     dispose: async () => {},
@@ -64,6 +65,7 @@ const createScriptingFakeSession = (
 
       return callToolResult ?? { ok: true, value: undefined };
     },
+    captureViewportImage: async () => undefined,
     commands,
     consoleMessages: () => [],
     dispose: async () => {},

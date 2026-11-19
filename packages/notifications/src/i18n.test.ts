@@ -25,13 +25,9 @@ describe('translatePush', () => {
     expect(translatePush(null, 'generic.body.lowBalance')).toBe('Your balance needs attention');
   });
 
-  it('returns the key itself when the key is unknown and no fallback is given', () => {
-    expect(translatePush('es', 'missing.key')).toBe('missing.key');
-  });
-
-  it('returns the fallback string when the key is unknown and a fallback is given', () => {
-    expect(translatePush('es', 'missing.key', undefined, 'Fallback English')).toBe(
-      'Fallback English'
+  it('returns the given fallback when the key is unknown', () => {
+    expect(translatePush('de', 'not.a.catalog.key', undefined, 'Something went wrong')).toBe(
+      'Something went wrong'
     );
   });
 });

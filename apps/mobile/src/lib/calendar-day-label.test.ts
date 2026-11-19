@@ -51,19 +51,13 @@ describe('calendarDayRelativeLabel', () => {
     ).toBe('last year');
   });
 
-  it('formats a future date as days ahead', () => {
+  it('reads a row stamped ahead of the clock sample as now, never as days ahead', () => {
     expect(
       calendarDayRelativeLabel(new Date('2026-11-12T09:00:00.000Z').toISOString(), {
         nowMs: now,
         timeZone: zone,
       })
-    ).toBe('in 2 days');
-    expect(
-      calendarDayRelativeLabel(new Date('2026-11-13T09:00:00.000Z').toISOString(), {
-        nowMs: now,
-        timeZone: zone,
-      })
-    ).toBe('in 3 days');
+    ).toBe('Just now');
   });
 
   it('names the date the given zone shows', () => {

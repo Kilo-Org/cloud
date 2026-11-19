@@ -19,6 +19,7 @@ import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { type SheetHeaderTopInset } from '@/lib/form-sheet';
 import { formatProfileCountItems, profileCountItems } from '@/lib/profile-count-labels';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 
 const SKELETON_ROW_COUNT = 4;
 
@@ -95,6 +96,7 @@ export function ProfilePickerSheet({
   onClose,
 }: Readonly<ProfilePickerSheetProps>) {
   const { t } = useTranslation();
+  const sideInsetStyle = useSideInsetStyle();
   const ownerLabel = useProfileOwnerLabel();
   // The same split and order the profile manager renders: an organization
   // group, then a personal one, and a single untitled list in a personal
@@ -130,12 +132,14 @@ export function ProfilePickerSheet({
         scrollable={false}
         topInset={SHEET_TOP_INSET}
       >
-        <View className="px-4 pt-3">
-          <RowGroup>
-            {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
-              <RowSkeleton key={index} subtitle />
-            ))}
-          </RowGroup>
+        <View style={sideInsetStyle}>
+          <View className="px-4 pt-3">
+            <RowGroup>
+              {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
+                <RowSkeleton key={index} subtitle />
+              ))}
+            </RowGroup>
+          </View>
         </View>
       </PickerSheet>
     );
@@ -152,7 +156,9 @@ export function ProfilePickerSheet({
       >
         <EmptyState
           icon={Settings2}
-          title={t('agentChat.newSession.couldNotLoadEnvironment')}
+          // The sheet lists profiles, so its failure names what did not load
+          // in the sheet's own words, not the Environment row's.
+          title={t('profiles.loadFailed')}
           description={t('organization.boundary.loadErrorMessage')}
           action={<StateAction label={t('common.retry')} icon={RotateCcw} onPress={onRetry} />}
         />

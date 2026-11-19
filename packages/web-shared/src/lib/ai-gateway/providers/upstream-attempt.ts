@@ -31,6 +31,11 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import { readChatGptUsageLimit } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/usage-limit';
 import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
+import {
+  ANTHROPIC_USER_PROFILE_HEADER,
+  isAnthropicUserProfileRoute,
+} from '@kilocode/web-shared/lib/ai-gateway/anthropic-user-profiles/gateway';
+import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import { applyProviderSpecificLogic } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { ProviderRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
@@ -61,6 +66,8 @@ export type SendUpstreamAttemptInput = {
   dataRegion: OrganizationDataRegion | null;
   /** What remains of `UPSTREAM_DURATION_BUDGET_MS` for this attempt. */
   upstreamDurationBudgetMs: number;
+  /** Sent on Kilo-paid Claude attempts; BYOK and subscription routes never carry it. */
+  anthropicUserProfileId?: string | null;
 };
 
 export type SendUpstreamAttemptResult =
@@ -103,6 +110,7 @@ export async function sendUpstreamAttempt({
   costLimit,
   dataRegion,
   upstreamDurationBudgetMs,
+  anthropicUserProfileId,
 }: SendUpstreamAttemptInput): Promise<SendUpstreamAttemptResult> {
   if (
     !isAutoSmallFreeModel(requestedModel) &&
@@ -126,6 +134,13 @@ export async function sendUpstreamAttempt({
     isNonTrialEnterprise,
     dataRegion
   );
+  if (
+    anthropicUserProfileId &&
+    isAnthropicUserProfileRoute(providerContext) &&
+    isClaudeModel(requestedModel)
+  ) {
+    extraHeaders[ANTHROPIC_USER_PROFILE_HEADER] = anthropicUserProfileId;
+  }
   // This bound limits Kilo debits. The connected Claude organization pays its own bill.
   if (costLimit && providerContext.provider.type !== CLAUDE_BILLING_PROVIDER_ID) {
     const decision = await enforceRequestCostLimit(

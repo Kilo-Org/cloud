@@ -7,6 +7,9 @@ import {
 } from './session-detail-skeleton';
 
 const platform = vi.hoisted(() => ({ os: 'android', fontScale: 1 }));
+const sideInsets = vi.hoisted(() => ({
+  style: undefined as { paddingLeft?: number; paddingRight?: number } | undefined,
+}));
 
 // Vitest hoists these above the component import, which is what keeps the real
 // skeleton and blur bar out of this suite.
@@ -26,6 +29,9 @@ vi.mock('@/lib/font-scale/system-font-scale-context', () => ({
 }));
 vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: 'BlurBar' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+// The suite calls the skeletons as plain functions, outside a React render, so
+// the side-inset hook is served from the suite's own state.
+vi.mock('@/lib/screen-insets', () => ({ useSideInsetStyle: () => sideInsets.style }));
 
 function walk(node: unknown, visit: (el: React.ReactElement) => void): void {
   if (node == null || typeof node === 'string' || typeof node === 'number') {
@@ -63,8 +69,11 @@ describe('SessionReadOnlyFooterPlaceholder', () => {
     expect(containers).toContain('bg-secondary');
     expect(containers).toContain('border-t-[0.5px]');
     expect(containers).toContain('border-hair-soft');
-    expect(containers).toContain('px-4');
-    expect(containers).toContain('py-3');
+    // The gutter sits on the content inside the fill, beside the side insets.
+    const content = (root.props as { children: React.ReactElement }).children;
+    const gutter = classNameOf(content).split(/\s+/);
+    expect(gutter).toContain('px-4');
+    expect(gutter).toContain('py-3');
 
     const bars: React.ReactElement[] = [];
     walk(root, el => {
@@ -86,6 +95,19 @@ describe('SessionReadOnlyFooterPlaceholder', () => {
       // The collision: bare `bg-muted` is the fill this footer already paints.
       expect(tokens).not.toContain('bg-muted');
     }
+  });
+
+  // The live read-only footer pads its content by the landscape side insets,
+  // so the placeholder it replaces must too, or the footer jumps sideways.
+  it('clears the landscape side insets the live footer clears', () => {
+    sideInsets.style = { paddingLeft: 47, paddingRight: 59 };
+    // eslint-disable-next-line new-cap
+    const root = SessionReadOnlyFooterPlaceholder() as React.ReactElement;
+    sideInsets.style = undefined;
+    expect((root.props as { style?: unknown }).style).toEqual({
+      paddingLeft: 47,
+      paddingRight: 59,
+    });
   });
 });
 
@@ -150,5 +172,19 @@ describe('SessionComposerSkeleton', () => {
     // slot must follow it or the row clips its text.
     expect(fieldBoxHeight(1)).toBe(46);
     expect(fieldBoxHeight(1.3)).toBeCloseTo(20 * 1.3 + 24 + 2);
+  });
+
+  // The composer pads its content by the landscape side insets; the slot that
+  // holds its place must clear the same insets.
+  it('clears the landscape side insets the composer clears', () => {
+    sideInsets.style = { paddingLeft: 47, paddingRight: 59 };
+    // eslint-disable-next-line new-cap
+    const root = SessionComposerSkeleton() as React.ReactElement;
+    sideInsets.style = undefined;
+    const content = (root.props as { children: React.ReactElement }).children;
+    expect((content.props as { style?: unknown }).style).toEqual({
+      paddingLeft: 47,
+      paddingRight: 59,
+    });
   });
 });

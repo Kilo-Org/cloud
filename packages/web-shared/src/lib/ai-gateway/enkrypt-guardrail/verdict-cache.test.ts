@@ -244,6 +244,15 @@ function hangingFetch(): typeof fetch {
   ) as unknown as typeof fetch;
 }
 
+/** A fetch that answers its first calls as clean and then hangs, like Enkrypt past the deadline. */
+function hangingAfter(answered: number): typeof fetch {
+  const hang = hangingFetch();
+  let made = 0;
+  return jest.fn(async (url: string, init: RequestInit) =>
+    ++made <= answered ? enkryptResponse({ injection_attack: 0 }) : hang(url, init)
+  ) as unknown as typeof fetch;
+}
+
 /** Scans a request without tools or system prompt, which yields a single conversation result. */
 async function scanConversation(
   request: EnkryptGuardrailRequest,
@@ -627,6 +636,8 @@ describe('scanRequestWithVerdictCache', () => {
       attempts: 1,
       calls_skipped: 5,
       failed_calls_cached: 0,
+      calls_cached: 1,
+      call_outcomes: { allowed: 0, flagged: 0, blocked: 1, failed: 0, not_sent: 0 },
     });
     expect(result.cacheEntries).toEqual([
       {
@@ -648,7 +659,13 @@ describe('scanRequestWithVerdictCache', () => {
     expect(scannedTexts(dependencies)).toEqual(
       [4, 3, 2, 1].map(index => renderSegment(injected[index]))
     );
-    expect(result.report).toMatchObject({ chunks: 5, attempts: 4, calls_skipped: 1 });
+    expect(result.report).toMatchObject({
+      chunks: 5,
+      attempts: 4,
+      calls_skipped: 1,
+      calls_cached: 4,
+      call_outcomes: { allowed: 3, flagged: 0, blocked: 1, failed: 0, not_sent: 0 },
+    });
     const keys = keysFor(injected);
     expect(result.cacheEntries).toEqual([
       {
@@ -732,6 +749,8 @@ describe('scanRequestWithVerdictCache', () => {
             total_units: segments.length,
             cached_units: 1,
             failed_calls_cached: 0,
+            calls_cached: 0,
+            call_outcomes: { allowed: 0, flagged: 0, blocked: 0, failed: 0, not_sent: 0 },
             // The other, uncached segments are not scanned.
             calls_skipped: segments.length - 1,
             omitted_attachments: 0,
@@ -979,6 +998,32 @@ describe('scanRequestWithVerdictCache', () => {
         );
       }
     );
+
+    it('counts a detection as flagged, and caches it like an allow', async () => {
+      const dependencies = deps(memoryStore(), text =>
+        enkryptResponse({ pii: text.includes('hello') ? 1 : 0 })
+      );
+
+      const result = await scanConversation(
+        makeRequest(conversation, { config: logOnlyConfig }),
+        dependencies
+      );
+
+      expect(result.report).toMatchObject({
+        scan: 'log_only',
+        decision: 'allowed',
+        detectors_fired: ['pii'],
+        chunks: 5,
+        attempts: 5,
+        failed_calls_cached: 0,
+        calls_cached: 5,
+        calls_skipped: 0,
+        call_outcomes: { allowed: 4, flagged: 1, blocked: 0, failed: 0, not_sent: 0 },
+      });
+      expect(result.cacheEntries).toEqual(
+        allowed(keysFor(conversation, { config: logOnlyConfig }))
+      );
+    });
 
     it('scans a segment too long for one call in slices and returns an allow entry for each', async () => {
       const segments = [segment('user', 'a'.repeat(ENKRYPT_MAX_SCAN_CHARACTERS + 1))];
@@ -1401,6 +1446,8 @@ describe('scanRequestWithVerdictCache', () => {
         total_units: unitTexts(cold).length,
         cached_units: 0,
         failed_calls_cached: 0,
+        calls_cached: 5,
+        call_outcomes: { allowed: 5, flagged: 0, blocked: 0, failed: 0, not_sent: 0 },
         calls_skipped: 0,
         omitted_attachments: 0,
         scanned_characters: sum(coldChunks.map(text => text.length)),
@@ -1827,6 +1874,8 @@ describe('scanRequestWithVerdictCache', () => {
         total_units: tools.length,
         cached_units: 0,
         failed_calls_cached: 0,
+        calls_cached: 2,
+        call_outcomes: { allowed: 2, flagged: 0, blocked: 0, failed: 0, not_sent: 0 },
         calls_skipped: 0,
         scanned_characters: characters(tools),
         decision: 'allowed',
@@ -2899,6 +2948,8 @@ describe('scanRequestWithVerdictCache', () => {
         total_units: 4,
         cached_units: 0,
         failed_calls_cached: 1,
+        calls_cached: 3,
+        call_outcomes: { allowed: 1, flagged: 1, blocked: 1, failed: 1, not_sent: 0 },
         calls_skipped: 0,
         scanned_characters: characters(definitions),
         decision: 'blocked',
@@ -3331,6 +3382,59 @@ describe('scanRequestWithVerdictCache', () => {
       expect(results.map(result => result.cacheEntries)).toEqual(briefEntries());
     });
 
+    it('reports the calls a deadline cut off mid-conversation as failed, and those after as not sent', async () => {
+      const dependencies = deps(memoryStore());
+      dependencies.timeoutMs = 50;
+      dependencies.fetch = hangingAfter(2);
+
+      const result = await scanConversation(makeRequest(conversation), dependencies);
+
+      expect(scannedTexts(dependencies)).toEqual(
+        [4, 3, 2].map(index => renderSegment(conversation[index]))
+      );
+      expect(result.verdict).toEqual({ action: 'fail_open' });
+      expect(result.report).toMatchObject({
+        decision: 'error_fail_open',
+        error: 'timeout',
+        chunks: 5,
+        attempts: 3,
+        calls_skipped: 0,
+        calls_cached: 2,
+        failed_calls_cached: 3,
+        call_outcomes: { allowed: 2, flagged: 0, blocked: 0, failed: 1, not_sent: 2 },
+      });
+      const keys = keysFor(conversation);
+      expect(result.cacheEntries).toHaveLength(keys.length);
+      expect(result.cacheEntries).toEqual(
+        expect.arrayContaining([...allowed(keys.slice(3)), ...allowedBriefly(keys.slice(0, 3))])
+      );
+    });
+
+    it('sums the call outcomes of the tools, including those a deadline cut off', async () => {
+      const definitions = [tool('first', 'One.'), tool('second', 'Two.'), tool('third', 'Three.')];
+      const dependencies = deps(memoryStore());
+      dependencies.timeoutMs = 50;
+      dependencies.fetch = hangingAfter(1);
+
+      const results = await scanRequestWithVerdictCache(
+        makeRequest([], {}, { tools: definitions }),
+        dependencies
+      );
+
+      expect(scannedTexts(dependencies)).toEqual(
+        definitions.map(toolText).toReversed().slice(0, 2)
+      );
+      expect(toolsReport(results)).toMatchObject({
+        decision: 'error_fail_open',
+        error: 'timeout',
+        attempts: 2,
+        calls_skipped: 0,
+        calls_cached: 1,
+        failed_calls_cached: 2,
+        call_outcomes: { allowed: 1, flagged: 0, blocked: 0, failed: 1, not_sent: 1 },
+      });
+    });
+
     it('caches a log-only scan that timed out, and those never made, only briefly', async () => {
       const dependencies = deps(memoryStore());
       dependencies.timeoutMs = 50;
@@ -3382,6 +3486,89 @@ describe('scanRequestWithVerdictCache', () => {
           (fields as { error?: string }).error === 'timeout'
       );
       expect(timeoutWarnings).toHaveLength(1);
+    });
+  });
+
+  describe('cache entries reported as calls finish', () => {
+    const short = tool('ls', 'Lists.');
+    const mediumSystem = [segment('system', 's'.repeat(1_000))];
+
+    function partsRequest() {
+      return makeRequest(conversation, {}, { tools: [short], system: mediumSystem });
+    }
+
+    it("reports each call's entry before the next call starts, as in the results", async () => {
+      const reported: EnkryptVerdictCacheEntry[] = [];
+      const reportedAtCall: number[] = [];
+      const dependencies = deps(memoryStore(), () => {
+        reportedAtCall.push(reported.length);
+        return enkryptResponse({ injection_attack: 0 });
+      });
+
+      const results = await scanRequestWithVerdictCache(partsRequest(), {
+        ...dependencies,
+        onCacheEntry: entry => reported.push(entry),
+      });
+
+      const calls = conversation.length + 2;
+      expect(reportedAtCall).toEqual([...Array(calls).keys()]);
+      expect(reported).toEqual([
+        ...allowed(keysFor(conversation).toReversed()),
+        ...allowed(keysFor(mediumSystem, {}, 'system')),
+        ...allowed([toolKey(short)]),
+      ]);
+      const inResults = results.flatMap(result => result.cacheEntries);
+      expect(inResults).toHaveLength(reported.length);
+      for (const entry of inResults) expect(reported).toContain(entry);
+    });
+
+    it('reports the block, and nothing for the calls it skipped', async () => {
+      const reported: EnkryptVerdictCacheEntry[] = [];
+      const blocked = renderSegment(conversation[3]);
+      const dependencies = deps(memoryStore(), text =>
+        enkryptResponse({ injection_attack: text === blocked ? 1 : 0 })
+      );
+
+      await scanRequestWithVerdictCache(partsRequest(), {
+        ...dependencies,
+        onCacheEntry: entry => reported.push(entry),
+      });
+
+      const keys = keysFor(conversation);
+      expect(reported).toEqual([
+        ...allowed([keys[4]!]),
+        {
+          key: keys[3],
+          verdict: { action: 'block', detectors: ['injection_attack'] },
+          ttlSeconds: ENKRYPT_VERDICT_CACHE_TTL_SECONDS,
+        },
+      ]);
+    });
+
+    it('reports the calls a deadline cut off, and those never made, as allowed briefly', async () => {
+      const reported: EnkryptVerdictCacheEntry[] = [];
+      const dependencies = deps(memoryStore());
+      dependencies.timeoutMs = 50;
+      dependencies.fetch = hangingAfter(2);
+
+      await scanConversation(makeRequest(conversation), {
+        ...dependencies,
+        onCacheEntry: entry => reported.push(entry),
+      });
+
+      const newestFirst = keysFor(conversation).toReversed();
+      expect(reported).toEqual([
+        ...allowed(newestFirst.slice(0, 2)),
+        ...allowedBriefly(newestFirst.slice(2)),
+      ]);
+    });
+
+    it('reports nothing without a store', async () => {
+      const onCacheEntry = jest.fn();
+
+      await scanConversation(makeRequest(conversation), { ...deps(null), onCacheEntry });
+
+      expect(onCacheEntry).not.toHaveBeenCalled();
     });
   });
 });

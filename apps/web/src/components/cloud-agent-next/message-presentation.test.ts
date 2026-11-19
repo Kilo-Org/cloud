@@ -3,7 +3,7 @@ import type {
   SessionCommit,
   SessionStatusIndicator,
 } from '@kilocode/cloud-agent-sdk';
-import type { AssistantMessage } from '@/types/opencode.gen';
+import type { AssistantMessage } from '@/types/opencode';
 import type { Part, ReasoningPart, StoredMessage, TextPart, ToolPart } from './types';
 import {
   getVisibleAssistantParts,

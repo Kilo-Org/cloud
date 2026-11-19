@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import {
   CUSTOM_ROUTER_EVAL_RESULT_PATH,
   CustomRouterErrorResponseSchema,
-  customRouterEntryRef,
+  toCustomRouterEntryRef,
   type BenchmarkConfig,
   type ClientCustomRouterEntry,
   type InternalClientEvalResultRequest,
@@ -83,7 +83,7 @@ function upload(
   return {
     ...context,
     engineIdentity: ENGINE,
-    entry: customRouterEntryRef(localModel),
+    entry: toCustomRouterEntryRef(localModel),
     variant: 'low',
     caseId: exactCase!.id,
     rep: 0,

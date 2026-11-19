@@ -16,6 +16,7 @@ const URL_KEY_TO_SERVICE = new Map<string, { service: string; protocol: 'http' |
   ['EVENT_SERVICE_URL', { service: 'event-service', protocol: 'ws' }],
   ['NOTIFICATIONS_URL', { service: 'notifications', protocol: 'http' }],
   ['LATENCY_INGEST_URL', { service: 'latency-ingest', protocol: 'http' }],
+  ['EXPO_PUBLIC_SESSION_SYNC_URL', { service: 'cloudflare-session-sync', protocol: 'http' }],
 ]);
 
 type MobileEnvValues = ReadonlyMap<string, string>;

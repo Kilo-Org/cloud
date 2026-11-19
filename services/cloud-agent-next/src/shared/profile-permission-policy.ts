@@ -195,32 +195,34 @@ function patternIsCoveredBy(left: string, right: string): boolean {
 }
 
 /**
- * The profile entries with a strictly broader pattern placed before the narrower
- * patterns it covers, so the profile's most specific verdict is the one the
- * runtime resolves last. Coverage is a strict partial order, so this is one
- * deterministic topological sort of the broader-first edges: the lowest author
- * index among the entries that no unplaced pattern covers is taken first. A
- * broader pattern therefore always precedes the narrower patterns it covers, and
- * a pair the relation leaves unordered keeps the author's order only while the
- * sort places no other entry between the two.
+ * The profile entries in one deterministic order of their patterns, broader
+ * before narrower wherever coverage proves it, so the profile's most specific
+ * rule is the one the runtime resolves last. Coverage is a strict partial order,
+ * so this is one deterministic topological sort of the broader-first edges: the
+ * lowest author index among the entries that no unplaced entry must precede is
+ * taken first. A pair the relation leaves unordered keeps the author's order
+ * only while the sort places no other entry between the two.
  */
 function agentEntriesBroadestFirst(
   entries: Array<[string, PermissionAction]>
 ): Array<[string, PermissionAction]> {
-  const wider: boolean[][] = entries.map(([broadPattern], broadIndex) =>
-    entries.map(
-      ([narrowPattern], narrowIndex) =>
-        broadIndex !== narrowIndex &&
+  const precedes: boolean[][] = entries.map(() => entries.map(() => false));
+  for (const [broadIndex, [broadPattern]] of entries.entries()) {
+    for (const [narrowIndex, [narrowPattern]] of entries.entries()) {
+      if (broadIndex === narrowIndex) continue;
+      if (
         patternIsCoveredBy(narrowPattern, broadPattern) &&
         !patternIsCoveredBy(broadPattern, narrowPattern)
-    )
-  );
+      )
+        precedes[broadIndex][narrowIndex] = true;
+    }
+  }
   const placed = new Set<number>();
   const ordered: Array<[string, PermissionAction]> = [];
   while (placed.size < entries.length) {
     const ready = entries.findIndex(
-      (_, narrow) =>
-        !placed.has(narrow) && wider.every((row, broad) => !row[narrow] || placed.has(broad))
+      (_, index) =>
+        !placed.has(index) && precedes.every((row, other) => !row[index] || placed.has(other))
     );
     if (ready < 0) return [...entries];
     placed.add(ready);
@@ -234,11 +236,12 @@ function agentEntriesBroadestFirst(
  *
  * The rendered map orders each tool's profile rules so that a broader pattern
  * precedes the narrower patterns it covers, so the profile's most specific
- * decision is the one the runtime applies. A pair of patterns with no coverage
- * relation keeps the author's order only while no other rule is placed between
- * the two, so a profile's exception written after its own refusal survives where
- * the exception is the narrower of the two, and each session decision it carries
- * follows it.
+ * decision is the one the runtime applies, whatever its action. A pair of
+ * patterns with no coverage relation keeps the author's order only while no
+ * other rule is placed between the two, and a command that matches two such
+ * rules takes the later one. A profile's exception written after its own refusal
+ * therefore survives where the exception is the narrower of the two, and each
+ * session decision it carries follows it.
  *
  * A profile refusal applies as written. A profile ask applies as written too.
  * A profile allowance is kept only where the session writes an allow for that

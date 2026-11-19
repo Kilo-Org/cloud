@@ -652,8 +652,22 @@ describe('narrowProfilePermission', () => {
     const composed = narrowProfilePermission(session, {
       bash: { '*': 'deny', 'git *': 'ask' },
     }) as PermissionMap;
+    // The narrower rule is the profile's most specific decision, so the ask
+    // settles the commands it reaches and the refusal keeps the rest.
     expect(resolve(session, composed, 'bash', 'git log --oneline')).toBe('ask');
     expect(resolve(session, composed, 'bash', 'npm test')).toBe('deny');
+  });
+
+  it('settles two overlapping patterns that contain neither other by their order', () => {
+    const session: PermissionMap = { bash: { '*': 'allow', 'git p*': 'allow' } };
+    const composed = narrowProfilePermission(session, {
+      bash: { 'git p*': 'allow', '* push': 'ask', 'git *': 'deny' },
+    }) as PermissionMap;
+    // `git p*` and `* push` overlap without containing each other, so only the
+    // composed order can settle a command that matches both. The wider `git *`
+    // refusal contains `git p*`, which places `git *` before it.
+    expect(resolve(session, composed, 'bash', 'git push')).toBe('allow');
+    expect(resolve(session, composed, 'bash', 'git pull')).toBe('allow');
   });
 
   it('keeps a session refusal as the last word over a profile ask', () => {

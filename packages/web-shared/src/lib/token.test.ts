@@ -72,6 +72,7 @@ const mockUser: User = {
   email_domain: null,
   external_id: null,
   personal_account_disabled: false,
+  anthropic_user_profile_id: null,
 };
 
 describe('Token Functions', () => {

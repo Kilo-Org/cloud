@@ -695,8 +695,9 @@
       "notConnectedReadOnly": "Bitbucket no está conectado. Solo los propietarios de la organización, los administradores y los gestores de facturación pueden conectarlo."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "La conexión de Bitbucket de esta organización se gestiona en la web desde un ordenador.",
-      "description": "Crea un token de acceso del espacio de trabajo con los permisos necesarios y pégalo abajo.",
+      "managedOnWeb": "La conexión de Bitbucket con {{organization}} se gestiona en la web desde un ordenador.",
+      "description": "Crea un token de acceso del espacio de trabajo para {{organization}} y pégalo abajo.",
+      "descriptionReconnect": "Crea un nuevo token de acceso del espacio de trabajo para {{organization}} y pégalo abajo.",
       "scopes": "Cuenta: lectura · Repositorios: lectura/escritura · PR: lectura · Webhooks: lectura/escritura",
       "tokenPlaceholder": "Token de acceso del espacio de trabajo",
       "tokenRefused": "Bitbucket no ha aceptado este token de acceso del espacio de trabajo. Comprueba que tiene los permisos indicados arriba y vuelve a intentarlo."
@@ -1626,6 +1627,8 @@
       "renameAccessibility": "Cambiar nombre de la sesión: {{title}}",
       "cloningSession": "Clonando sesión",
       "couldNotLoadThisSession": "No se pudo cargar esta sesión.",
+      "historyTooLarge": "La transcripción de esta sesión es demasiado grande para cargarla.",
+      "historyUnavailable": "No se puede leer la transcripción de esta sesión.",
       "cloneFailedRetry": "No se pudo clonar esta sesión. Inténtalo de nuevo.",
       "notEnoughCredits": "No hay suficientes créditos para esta solicitud. Añade créditos e inténtalo de nuevo.",
       "previousTaskFinishing": "La tarea anterior aún no ha terminado. Espera un momento.",
@@ -1702,6 +1705,7 @@
       "branchDefault": "Por defecto",
       "branchAccessibility": "Rama: {{label}}",
       "branchLoading": "Cargando ramas",
+      "branchInactive": "Elige un repositorio para cargar sus ramas",
       "branchLoadError": "No se pudieron cargar las ramas",
       "branchUnavailable": "No hay ramas disponibles para este repositorio. Comprueba tu acceso con el proveedor y elige otro repositorio.",
       "branchEmpty": "No hay ramas disponibles",
@@ -4748,7 +4752,7 @@
       "new": "Nuevo disparador",
       "create": "Crear disparador",
       "emptyTitle": "Aún no hay disparadores",
-      "emptyDescription": "Crea un disparador para iniciar una ejecución de Cloud Agent desde una llamada de webhook o de forma programada.",
+      "emptyDescription": "Crea tu primer disparador.",
       "loadFailedTitle": "No se pudieron cargar los disparadores",
       "loadFailedDescription": "Vuelve a intentarlo cuando tengas conexión.",
       "detailLoadFailedTitle": "No se pudo cargar este disparador",

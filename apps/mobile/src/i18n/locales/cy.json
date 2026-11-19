@@ -1477,8 +1477,9 @@
       "notConnectedReadOnly": "Nid yw Bitbucket wedi'i gysylltu. Dim ond perchnogion, gweinyddwyr a rheolwyr bilio'r sefydliad sy'n gallu ei gysylltu."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Caiff cysylltiad Bitbucket y sefydliad hwn ei reoli ar y we o gyfrifiadur.",
-      "description": "Crëwch docyn mynediad gweithle gyda'r cwmpasau gofynnol a'i ludo isod.",
+      "managedOnWeb": "Caiff cysylltiad Bitbucket ag {{organization}} ei reoli ar y we o gyfrifiadur.",
+      "description": "Crëwch docyn mynediad gweithle ar gyfer {{organization}} a'i ludo isod.",
+      "descriptionReconnect": "Crëwch docyn mynediad gweithle newydd ar gyfer {{organization}} a'i ludo isod.",
       "scopes": "Cyfrif: darllen · Ystorfeydd: darllen/ysgrifennu · Ceisiadau tynnu: darllen · Bachau gwe: darllen/ysgrifennu",
       "tokenPlaceholder": "Tocyn mynediad gweithle",
       "tokenRefused": "Ni dderbyniodd Bitbucket y tocyn mynediad gweithle hwn. Gwiriwch fod ganddo'r cwmpasau uchod, yna ceisiwch eto."
@@ -2336,6 +2337,8 @@
       "renameAccessibility": "Ailenwi sesiwn: {{title}}",
       "cloningSession": "Yn clonio sesiwn",
       "couldNotLoadThisSession": "Methu llwytho'r sesiwn hon.",
+      "historyTooLarge": "Mae trawsgrifiad y sesiwn hon yn rhy fawr i'w llwytho.",
+      "historyUnavailable": "Ni ellir darllen trawsgrifiad y sesiwn hon.",
       "cloneFailedRetry": "Methu clonio'r sesiwn hon. Ceisiwch eto.",
       "notEnoughCredits": "Nid oes digon o gredydau ar gyfer y cais hwn. Ychwanegwch gredydau a cheisiwch eto.",
       "previousTaskFinishing": "Nid yw'r dasg flaenorol wedi gorffen eto. Arhoswch am eiliad.",
@@ -2412,6 +2415,7 @@
       "branchDefault": "Rhagosodedig",
       "branchAccessibility": "Cangen: {{label}}",
       "branchLoading": "Yn llwytho ceangau",
+      "branchInactive": "Dewiswch ystorfa i lwytho ei cheangau.",
       "branchLoadError": "Ni lwyddwyd i lwytho ceangau",
       "branchUnavailable": "Nid yw ceangau ar gael ar gyfer yr ystorfa hon. Gwiriwch eich mynediad gyda'r darparwr, yna dewiswch ystorfa arall.",
       "branchEmpty": "Dim ceangau ar gael",
@@ -4973,7 +4977,7 @@
       "new": "Sbardun newydd",
       "create": "Crëwch sbardun",
       "emptyTitle": "Dim sbardunau eto",
-      "emptyDescription": "Crëwch sbardun i ddechrau rhediad Cloud Agent o alwad bachyn gwe neu ar atodlen.",
+      "emptyDescription": "Crëwch eich sbardun cyntaf.",
       "loadFailedTitle": "Methwyd llwytho sbardunau",
       "loadFailedDescription": "Rhowch gynnig eto pan fydd gennych gysylltiad.",
       "detailLoadFailedTitle": "Methwyd llwytho’r sbardun hwn",

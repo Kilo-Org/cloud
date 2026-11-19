@@ -1431,8 +1431,9 @@
       "notConnectedReadOnly": "Bitbucket neprijungtas. Jį prijungti gali tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Šios organizacijos Bitbucket ryšys valdomas žiniatinklyje naudojant kompiuterį.",
-      "description": "Sukurk darbo srities prieigos raktą su reikiamomis teisėmis ir įklijuok jį žemiau.",
+      "managedOnWeb": "{{organization}} Bitbucket ryšys valdomas žiniatinklyje naudojant kompiuterį.",
+      "description": "Sukurk {{organization}} darbo srities prieigos raktą ir įklijuok jį žemiau.",
+      "descriptionReconnect": "Sukurk naują {{organization}} darbo srities prieigos raktą ir įklijuok jį žemiau.",
       "scopes": "Paskyra: skaityti · Saugyklos: skaityti / rašyti · Pakeitimų užklausos: skaityti · Webhook: skaityti / rašyti",
       "tokenPlaceholder": "Darbo srities prieigos raktas",
       "tokenRefused": "Bitbucket nepriėmė šio darbo srities prieigos rakto. Patikrink, ar jis turi aukščiau nurodytas teises, tada bandyk dar kartą."
@@ -2248,6 +2249,8 @@
       "renameAccessibility": "Pervadinti sesiją: {{title}}",
       "cloningSession": "Klonuojama sesija",
       "couldNotLoadThisSession": "Nepavyko įkelti šios sesijos",
+      "historyTooLarge": "Šios sesijos nuorašas per didelis, kad jį būtų galima įkelti.",
+      "historyUnavailable": "Šios sesijos nuorašo skaityti negalima.",
       "cloneFailedRetry": "Nepavyko klonuoti šios sesijos. Bandykite dar kartą.",
       "notEnoughCredits": "Nepakanka kreditų šiai užklausai. Papildykite kreditus ir bandykite dar kartą.",
       "previousTaskFinishing": "Ankstesnė užduotis dar nebaigta. Šiek tiek palaukite.",
@@ -2324,6 +2327,7 @@
       "branchDefault": "Numatytoji",
       "branchAccessibility": "Šaka: {{label}}",
       "branchLoading": "Įkeliamos šakos",
+      "branchInactive": "Pasirinkite saugyklą, kad būtų įkeltos jos šakos.",
       "branchLoadError": "Nepavyko įkelti šakų",
       "branchUnavailable": "Šiai saugyklai šakos neprieinamos. Patikrinkite prieigos teises pas tiekėją ir pasirinkite kitą saugyklą.",
       "branchEmpty": "Nėra prieinamų šakų",
@@ -4823,7 +4827,7 @@
       "new": "Naujas trigeris",
       "create": "Sukurti trigerį",
       "emptyTitle": "Trigerių dar nėra",
-      "emptyDescription": "Sukurkite trigerį, kad Cloud Agent būtų paleistas pagal žiniatinklio kabliuko iškvietimą arba pagal grafiką.",
+      "emptyDescription": "Sukurkite savo pirmąjį trigerį.",
       "loadFailedTitle": "Nepavyko įkelti trigerių",
       "loadFailedDescription": "Bandykite dar kartą, kai turėsite ryšį.",
       "detailLoadFailedTitle": "Nepavyko įkelti šio trigerio",

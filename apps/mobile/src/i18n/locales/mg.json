@@ -1385,8 +1385,9 @@
       "notConnectedReadOnly": "Tsy mifandray ny Bitbucket. Ny tompon'ny fikambanana, ny mpitantana, ary ny mpitantana ny faktiora ihany no afaka mampifandray azy."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Ny fifandraisana Bitbucket an'ity fikambanana ity dia tantanana amin'ny tranonkala, avy amin'ny solosaina.",
-      "description": "Mamoròna mari-pidirana ho an'ny sehatra fiasana, miaraka amin'ny alalana ilaina, ary apetaho eto ambany.",
+      "managedOnWeb": "Ny fifandraisana Bitbucket amin'ny {{organization}} dia tantanana amin'ny tranonkala, avy amin'ny solosaina.",
+      "description": "Mamoròna mari-pidirana ho an'ny sehatra fiasana ho an'ny {{organization}} ary apetaho eto ambany.",
+      "descriptionReconnect": "Mamoròna mari-pidirana vaovao ho an'ny sehatra fiasana ho an'ny {{organization}} ary apetaho eto ambany.",
       "scopes": "Kaonty: mamaky · Tahirin-kaody: mamaky/manoratra · PR: mamaky · Rohy fampandrenesana: mamaky/manoratra",
       "tokenPlaceholder": "Mari-pidirana ho an'ny sehatra fiasana",
       "tokenRefused": "Tsy nanaiky io mari-pidirana ho an'ny sehatra fiasana io i Bitbucket. Hamarinio fa manana ny alalana etsy ambony izy, dia andramo indray."
@@ -2160,6 +2161,8 @@
       "renameAccessibility": "Ovao ny anaran'ny fotoam-piasana: {{title}}",
       "cloningSession": "Mamorona dika mitovy amin'ny fotoam-piasana",
       "couldNotLoadThisSession": "Tsy voaray ity fotoam-piasana ity.",
+      "historyTooLarge": "Lava loatra ny firaketan'ity fotoam-piasana ity havoaka.",
+      "historyUnavailable": "Tsy azo vakiana ny firaketan'ity fotoam-piasana ity.",
       "cloneFailedRetry": "Tsy nahomby ny famoronana dika mitovy amin'ity fotoam-piasana ity. Andramo indray.",
       "notEnoughCredits": "Tsy ampy ny kireditra ho an'ity fangatahana ity. Ampio kireditra ary andramo indray.",
       "previousTaskFinishing": "Mbola eo am-pamaranana ny asa teo aloha. Andraso kely azafady.",
@@ -2236,6 +2239,7 @@
       "branchDefault": "Default",
       "branchAccessibility": "Sampana: {{label}}",
       "branchLoading": "Mampiditra ny sampana",
+      "branchInactive": "Safidio ny tahirin-kaody mba hiditra ny sampany.",
       "branchLoadError": "Tsy tafiditra ny sampana",
       "branchUnavailable": "Tsy azo ny sampana amin'ity tahirin-kaody ity. Hamarino ny alalana ananao amin'ny mpanome tolotra, dia safidio tahirin-kaody hafa.",
       "branchEmpty": "Tsy misy sampana azo",
@@ -4673,7 +4677,7 @@
       "new": "Fanentanana vaovao",
       "create": "Mamorona fanentanana",
       "emptyTitle": "Mbola tsy misy fanentanana",
-      "emptyDescription": "Mamorona fanentanana hanombohana fanatanterahana Cloud Agent avy amin'ny fiantsoana na araka ny fandaharam-potoana.",
+      "emptyDescription": "Mamorona ny fanentanana voalohany.",
       "loadFailedTitle": "Tsy afaka nampiditra ny fanentanana",
       "loadFailedDescription": "Andramo indray rehefa manana fifandraisana ianao.",
       "detailLoadFailedTitle": "Tsy afaka nampiditra ity fanentanana ity",

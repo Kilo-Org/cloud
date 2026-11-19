@@ -365,6 +365,57 @@ function failedCallsCached(
   return results.filter(result => result !== null && isFailedAllow(result)).length;
 }
 
+/** Calls whose verdicts are cached for the usual TTL: a genuine allow or block. */
+function callsCached(
+  results: (EnkryptGuardrailScanResult | null)[],
+  cache: VerdictCache | null
+): number {
+  if (!cache) return 0;
+  return results.filter(
+    result =>
+      result !== null && !isFailedAllow(result) && cacheableVerdict(result, cache.config) !== null
+  ).length;
+}
+
+type CallOutcomes = NonNullable<EnkryptScanReport['call_outcomes']>;
+
+const NO_CALL_OUTCOMES: CallOutcomes = {
+  allowed: 0,
+  flagged: 0,
+  blocked: 0,
+  failed: 0,
+  not_sent: 0,
+};
+
+/** How a call that was not skipped ended. A call that was never sent reports no attempt. */
+function callOutcome({ report }: EnkryptGuardrailScanResult): keyof CallOutcomes {
+  if (report.attempts === 0) return 'not_sent';
+  if (report.decision === 'blocked') return 'blocked';
+  if (report.decision !== 'allowed') return 'failed';
+  return report.detectors_fired.length > 0 ? 'flagged' : 'allowed';
+}
+
+/** The outcomes of a part's calls, one per uncached unit; skipped calls are counted apart. */
+function callOutcomes(
+  calls: KeyedUnit[],
+  results: (EnkryptGuardrailScanResult | null)[]
+): CallOutcomes {
+  const outcomes = { ...NO_CALL_OUTCOMES };
+  if (calls.length === 0) return outcomes;
+  for (const result of results) if (result) outcomes[callOutcome(result)] += 1;
+  return outcomes;
+}
+
+function sumCallOutcomes(each: CallOutcomes[]): CallOutcomes {
+  return {
+    allowed: sum(each.map(outcomes => outcomes.allowed)),
+    flagged: sum(each.map(outcomes => outcomes.flagged)),
+    blocked: sum(each.map(outcomes => outcomes.blocked)),
+    failed: sum(each.map(outcomes => outcomes.failed)),
+    not_sent: sum(each.map(outcomes => outcomes.not_sent)),
+  };
+}
+
 const DECISION_SEVERITY: readonly EnkryptScanReport['decision'][] = [
   'blocked',
   'error_fail_closed',
@@ -505,6 +556,8 @@ async function planSegmentsPart(
       latency_ms: 0,
       chunks: skipped,
       failed_calls_cached: 0,
+      calls_cached: 0,
+      call_outcomes: { ...NO_CALL_OUTCOMES },
       calls_skipped: skipped,
     };
     console.debug('[enkrypt-guardrail] decision', { ...scanLogFields(request), ...report });
@@ -536,6 +589,8 @@ async function planSegmentsPart(
           part,
           chunks: calls.length,
           failed_calls_cached: failedCallsCached(results, cache),
+          calls_cached: callsCached(results, cache),
+          call_outcomes: callOutcomes(calls, results),
           calls_skipped: skippedCalls(results),
         },
         cacheEntries: callCacheEntries(calls, results, cache),
@@ -577,6 +632,8 @@ type ToolOutcome = {
         result: EnkryptGuardrailScanResult;
         cacheEntries: EnkryptVerdictCacheEntry[];
         failedCallsCached: number;
+        callsCached: number;
+        callOutcomes: CallOutcomes;
         calls: number;
         callsSkipped: number;
       };
@@ -630,6 +687,12 @@ function toolsReport(
     cached_units: sum(outcomes.map(each => each.cachedUnits)),
     failed_calls_cached: sum(
       outcomes.map(({ outcome }) => (outcome.kind === 'scanned' ? outcome.failedCallsCached : 0))
+    ),
+    calls_cached: sum(
+      outcomes.map(({ outcome }) => (outcome.kind === 'scanned' ? outcome.callsCached : 0))
+    ),
+    call_outcomes: sumCallOutcomes(
+      outcomes.flatMap(({ outcome }) => (outcome.kind === 'scanned' ? [outcome.callOutcomes] : []))
     ),
     calls_skipped: sum(outcomes.map(({ outcome }) => outcome.callsSkipped)),
     scanned_characters: sum(reports.map(report => report.scanned_characters)),
@@ -769,6 +832,8 @@ async function planTools(
             result: combineChunks(plan.scans, results),
             cacheEntries: callCacheEntries(plan.calls, results, cache),
             failedCallsCached: failedCallsCached(results, cache),
+            callsCached: callsCached(results, cache),
+            callOutcomes: callOutcomes(plan.calls, results),
             calls: plan.calls.length,
             callsSkipped: skippedCalls(results),
           },

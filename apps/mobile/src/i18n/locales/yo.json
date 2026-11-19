@@ -1385,8 +1385,9 @@
       "notConnectedReadOnly": "A kò tíì so Bitbucket pọ̀. Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè so ó pọ̀."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "A ń ṣàkóso ìsopọ̀ Bitbucket àjọ yìí lórí wẹ́ẹ̀bù láti orí kọ̀ǹpútà.",
-      "description": "Ṣẹ̀dá àmi ìwọlé àyè iṣẹ́ pẹ̀lú àwọn àṣẹ tó yẹ, kí o sì lẹ̀ ẹ́ mọ́ nísàlẹ̀.",
+      "managedOnWeb": "A ń ṣàkóso ìsopọ̀ Bitbucket ti {{organization}} lórí wẹ́ẹ̀bù láti orí kọ̀ǹpútà.",
+      "description": "Ṣẹ̀dá àmi ìwọlé àyè iṣẹ́ fún {{organization}}, kí o sì lẹ̀ ẹ́ mọ́ nísàlẹ̀.",
+      "descriptionReconnect": "Ṣẹ̀dá àmi ìwọlé àyè iṣẹ́ tuntun fún {{organization}}, kí o sì lẹ̀ ẹ́ mọ́ nísàlẹ̀.",
       "scopes": "Àkọọ́lẹ̀: kíkà · Àwọn ibi ìpamọ́: kíkà/kíkọ · Àwọn ìbéèrè àkópọ̀: kíkà · Àwọn ìfitónilétí wẹ́bù: kíkà/kíkọ",
       "tokenPlaceholder": "Àmi ìwọlé àyè iṣẹ́",
       "tokenRefused": "Bitbucket kò gba àmi ìwọlé àyè iṣẹ́ yìí. Ṣàyẹ̀wò pé ó ní àwọn àkọọ́lẹ̀ tó wà lókè, kí o sì tún gbìyànjú lẹ́ẹ̀kan sí i."
@@ -2160,6 +2161,8 @@
       "renameAccessibility": "Yí orúkọ ìgbà iṣẹ́ padà: {{title}}",
       "cloningSession": "Ń ṣe àdàkọ ìgbà iṣẹ́",
       "couldNotLoadThisSession": "A kò lè gbé ìgbà iṣẹ́ yìí wọlé.",
+      "historyTooLarge": "Ìgbésílẹ̀ ìgbà iṣẹ́ yìí tóbí jù lọ láti lè gbé wọlé.",
+      "historyUnavailable": "Kò sí lè ka ìgbésílẹ̀ ìgbà iṣẹ́ yìí.",
       "cloneFailedRetry": "A kò lè ṣe àdàkọ ìgbà iṣẹ́ yìí. Gbìyànjú lẹ́ẹ̀kan sí i.",
       "notEnoughCredits": "Kirẹ́dítì kò tó fún ìbéèrè yìí. Fi kirẹ́dítì kún un kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
       "previousTaskFinishing": "Iṣẹ́ tó ṣáájú kò tíì parí. Jọ̀wọ́ dúró díẹ̀.",
@@ -2236,6 +2239,7 @@
       "branchDefault": "Ìpìlẹ̀",
       "branchAccessibility": "Ẹ̀ka: {{label}}",
       "branchLoading": "Ń gbé àwọn ẹ̀ka wọlé",
+      "branchInactive": "Yan ibi ìpamọ́ kóòdù láti gbé àwọn ẹ̀ka rẹ̀ wọlé.",
       "branchLoadError": "A kò lè gbé àwọn ẹ̀ka wọlé",
       "branchUnavailable": "Àwọn ẹ̀ka kò sí fún ibi ìpamọ́ kóòdù yìí. Ṣàyẹ̀wò àṣẹ rẹ pẹ̀lú olùpèsè, lẹ́yìn náà yan ibi ìpamọ́ kóòdù mìíràn.",
       "branchEmpty": "Kò sí ẹ̀ka kankan",
@@ -4673,7 +4677,7 @@
       "new": "Ìmúṣiṣẹ́ tuntun",
       "create": "Ṣẹ̀dá ìmúṣiṣẹ́",
       "emptyTitle": "Kò sí ìmúṣiṣẹ́ kankan síbẹ̀",
-      "emptyDescription": "Ṣẹ̀dá ìmúṣiṣẹ́ kan láti bẹ̀rẹ̀ ìṣiṣẹ́ Cloud Agent láti ìpè wẹ́ẹ̀bùhóòkù tàbí ní ìtòlẹ́sẹẹsẹ.",
+      "emptyDescription": "Ṣẹ̀dá ìmúṣiṣẹ́ àkọ́kọ́ rẹ.",
       "loadFailedTitle": "A kò lè gbé àwọn ìmúṣiṣẹ́ wọlé",
       "loadFailedDescription": "Tún gbìyànjú nígbà tí o bá ní ìsopọ̀.",
       "detailLoadFailedTitle": "A kò lè gbé ìmúṣiṣẹ́ yìí wọlé",

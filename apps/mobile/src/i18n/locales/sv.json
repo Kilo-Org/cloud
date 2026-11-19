@@ -1385,8 +1385,9 @@
       "notConnectedReadOnly": "Det finns ingen anslutning till Bitbucket. Endast organisationsägare, administratörer och faktureringsansvariga kan skapa anslutningen."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Organisationens Bitbucket-anslutning hanteras på webben från en dator.",
-      "description": "Skapa en åtkomsttoken för arbetsytan med de behörigheter som krävs och klistra in den nedan.",
+      "managedOnWeb": "Bitbucket-anslutningen för {{organization}} hanteras på webben från en dator.",
+      "description": "Skapa en åtkomsttoken för arbetsytan åt {{organization}} och klistra in den nedan.",
+      "descriptionReconnect": "Skapa en ny åtkomsttoken för arbetsytan åt {{organization}} och klistra in den nedan.",
       "scopes": "Behörigheter som krävs: läsa kontouppgifter, läsa och skriva i kodarkiv, läsa pull-begäranden samt läsa och skriva webbhookar.",
       "tokenPlaceholder": "Åtkomsttoken för arbetsytan",
       "tokenRefused": "Bitbucket accepterade inte den här åtkomsttoken för arbetsytan. Kontrollera att den har behörigheterna ovan och försök igen."
@@ -2160,6 +2161,8 @@
       "renameAccessibility": "Byt namn på sessionen: {{title}}",
       "cloningSession": "Klonar sessionen",
       "couldNotLoadThisSession": "Det gick inte att läsa in den här sessionen",
+      "historyTooLarge": "Den här sessionens logg är för stor för att läsas in.",
+      "historyUnavailable": "Den här sessionens logg kan inte läsas.",
       "cloneFailedRetry": "Kunde inte klona den här sessionen. Försök igen.",
       "notEnoughCredits": "Du har inte tillräckligt med krediter för den här förfrågan. Fyll på krediter och försök igen.",
       "previousTaskFinishing": "Den föregående uppgiften håller på att avslutas. Vänta en stund.",
@@ -2236,6 +2239,7 @@
       "branchDefault": "Standard",
       "branchAccessibility": "Gren: {{label}}",
       "branchLoading": "Läser in grenar",
+      "branchInactive": "Välj ett kodarkiv för att läsa in dess grenar.",
       "branchLoadError": "Kunde inte läsa in grenar",
       "branchUnavailable": "Inga grenar är tillgängliga för det här kodarkivet. Kontrollera din åtkomst hos leverantören och välj ett annat kodarkiv.",
       "branchEmpty": "Inga grenar tillgängliga",
@@ -4673,7 +4677,7 @@
       "new": "Ny utlösare",
       "create": "Skapa utlösare",
       "emptyTitle": "Inga utlösare än",
-      "emptyDescription": "Skapa en utlösare för att starta en Cloud Agent-körning från ett webhookanrop eller enligt ett schema.",
+      "emptyDescription": "Skapa din första utlösare.",
       "loadFailedTitle": "Det gick inte att läsa in utlösare",
       "loadFailedDescription": "Försök igen när du har en anslutning.",
       "detailLoadFailedTitle": "Det gick inte att läsa in den här utlösaren",

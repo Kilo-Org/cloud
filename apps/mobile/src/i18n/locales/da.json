@@ -1385,8 +1385,9 @@
       "notConnectedReadOnly": "Bitbucket er ikke tilsluttet. Kun organisationsejere, administratorer og faktureringsansvarlige kan oprette forbindelsen."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Organisationens Bitbucket-forbindelse administreres på nettet fra en computer.",
-      "description": "Opret et adgangstoken til arbejdsområdet med de nødvendige tilladelser, og indsæt det nedenfor.",
+      "managedOnWeb": "Bitbucket-forbindelsen til {{organization}} administreres på nettet fra en computer.",
+      "description": "Opret et adgangstoken til arbejdsområdet for {{organization}}, og indsæt det nedenfor.",
+      "descriptionReconnect": "Opret et nyt adgangstoken til arbejdsområdet for {{organization}}, og indsæt det nedenfor.",
       "scopes": "Konto: læse · Kodelagre: læse/skrive · Pull requests: læse · Webhooks: læse/skrive",
       "tokenPlaceholder": "Adgangstoken til arbejdsområdet",
       "tokenRefused": "Bitbucket accepterede ikke dette adgangstoken til arbejdsområdet. Kontroller, at det har tilladelserne ovenfor, og prøv derefter igen."
@@ -2160,6 +2161,8 @@
       "renameAccessibility": "Omdøb session: {{title}}",
       "cloningSession": "Kloner session",
       "couldNotLoadThisSession": "Kunne ikke indlæse denne session.",
+      "historyTooLarge": "Denne sessions transskription er for stor at indlæse.",
+      "historyUnavailable": "Denne sessions transskription kan ikke læses.",
       "cloneFailedRetry": "Kunne ikke klone denne session. Prøv igen.",
       "notEnoughCredits": "Du har ikke nok kreditter til denne anmodning. Tilføj kreditter og prøv igen.",
       "previousTaskFinishing": "Den forrige opgave er ved at blive afsluttet. Vent et øjeblik.",
@@ -2236,6 +2239,7 @@
       "branchDefault": "Standard",
       "branchAccessibility": "Gren: {{label}}",
       "branchLoading": "Indlæser grene",
+      "branchInactive": "Vælg et kodelager for at indlæse dets grene.",
       "branchLoadError": "Grene kunne ikke indlæses",
       "branchUnavailable": "For dette kodelager er der ingen tilgængelige grene. Tjek din adgang hos udbyderen, og vælg et andet kodelager.",
       "branchEmpty": "Ingen tilgængelige grene",
@@ -4673,7 +4677,7 @@
       "new": "Ny udløser",
       "create": "Opret udløser",
       "emptyTitle": "Ingen udløsere endnu",
-      "emptyDescription": "Opret en udløser for at starte en Cloud Agent-kørsel fra et webhook-kald eller efter en tidsplan.",
+      "emptyDescription": "Opret din første udløser.",
       "loadFailedTitle": "Kunne ikke indlæse udløsere",
       "loadFailedDescription": "Prøv igen, når du har forbindelse.",
       "detailLoadFailedTitle": "Kunne ikke indlæse denne udløser",

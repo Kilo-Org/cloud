@@ -1385,8 +1385,9 @@
       "notConnectedReadOnly": "Bitbucket አልተገናኘም። ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።"
     },
     "bitbucketConnect": {
-      "managedOnWeb": "የዚህ ድርጅት የBitbucket ግንኙነት ከኮምፒውተር በድር ላይ ይተዳደራል።",
-      "description": "አስፈላጊ ፈቃዶች ያሉት የሥራ ቦታ መዳረሻ ቶከን ይፍጠሩና ከታች ይለጥፉት።",
+      "managedOnWeb": "የ{{organization}} የBitbucket ግንኙነት ከኮምፒውተር በድር ላይ ይተዳደራል።",
+      "description": "ለ{{organization}} የሥራ ቦታ መዳረሻ ቶከን ይፍጠሩና ከታች ይለጥፉት።",
+      "descriptionReconnect": "ለ{{organization}} አዲስ የሥራ ቦታ መዳረሻ ቶከን እንደገና ይፍጠሩና ከታች ይለጥፉት።",
       "scopes": "መለያ፦ ማንበብ · ማከማቻዎች፦ ማንበብ/መጻፍ · የኮድ ውህደት ጥያቄዎች፦ ማንበብ · ዌብሁኮች፦ ማንበብ/መጻፍ",
       "tokenPlaceholder": "የሥራ ቦታ መዳረሻ ቶከን",
       "tokenRefused": "Bitbucket ይህን የሥራ ቦታ ቶከን አልተቀበለውም። ከላይ ያሉት አስፈላጊ ፈቃዶች እንዳሉት ያረጋግጡ፣ ከዚያ እንደገና ይሞክሩ።"
@@ -2160,6 +2161,8 @@
       "renameAccessibility": "የክፍለ ጊዜውን ስም ይቀይሩ፦ {{title}}",
       "cloningSession": "የክፍለ ጊዜውን ቅጂ በመፍጠር ላይ",
       "couldNotLoadThisSession": "ይህን ክፍለ ጊዜ መጫን አልተቻለም።",
+      "historyTooLarge": "የዚህ ክፍለ ጊዜ ጽሑፍ ለመጫን በጣም ትልቅ ነው።",
+      "historyUnavailable": "የዚህ ክፍለ ጊዜ ጽሑፍ ሊነበብ አይችልም።",
       "cloneFailedRetry": "የዚህን ክፍለ ጊዜ ቅጂ መፍጠር አልተቻለም። እንደገና ይሞክሩ።",
       "notEnoughCredits": "ለዚህ ጥያቄ በቂ ክሬዲት የለዎትም። ክሬዲት ጨምረው እንደገና ይሞክሩ።",
       "previousTaskFinishing": "ያለፈው ተግባር ገና አልተጠናቀቀም። እባክዎ ትንሽ ይጠብቁ።",
@@ -2236,6 +2239,7 @@
       "branchDefault": "ነባሪ",
       "branchAccessibility": "ቅርንጫፍ፦ {{label}}",
       "branchLoading": "ቅርንጫፎች በመጫን ላይ",
+      "branchInactive": "ቅርንጫፎቹ እንዲጫኑ ማከማቻ ይምረጡ።",
       "branchLoadError": "ቅርንጫፎችን መጫን አልተቻለም",
       "branchUnavailable": "ለዚህ ማከማቻ ቅርንጫፎች አይገኙም። ከአቅራቢው ጋር ያለዎትን መዳረስ ያረጋግጡ፣ ከዚያ ሌላ ማከማቻ ይምረጡ።",
       "branchEmpty": "ምንም ቅርንጫፎች አይገኙም",
@@ -4673,7 +4677,7 @@
       "new": "አዲስ ቀስቅሴ",
       "create": "ቀስቅሴ ፍጠር",
       "emptyTitle": "እስካሁን ቀስቅሴዎች የሉም",
-      "emptyDescription": "የCloud Agent ሩጫን ከዌብሁክ ጥሪ ወይም በመርሐ ግብር ለመጀመር ቀስቅሴ ይፍጠሩ።",
+      "emptyDescription": "የመጀመሪያዎን ቀስቅሴ ይፍጠሩ።",
       "loadFailedTitle": "ቀስቅሴዎችን መጫን አልተቻለም",
       "loadFailedDescription": "ግንኙነት ሲኖርዎ እንደገና ይሞክሩ።",
       "detailLoadFailedTitle": "ይህን ቀስቅሴ መጫን አልተቻለም",

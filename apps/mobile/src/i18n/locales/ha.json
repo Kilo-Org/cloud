@@ -1385,8 +1385,9 @@
       "notConnectedReadOnly": "Ba a haɗa Bitbucket ba. Masu ƙungiya, masu gudanarwa, da manajannin biyan kuɗi kawai za su iya haɗa shi."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Ana sarrafa haɗin Bitbucket na wannan ƙungiyar a yanar gizo daga kwamfuta.",
-      "description": "Ƙirƙiri lambar izinin shiga muhallin aiki da take da izinin da ake buƙata, sannan ka manna ta a ƙasa.",
+      "managedOnWeb": "Ana sarrafa haɗin Bitbucket da {{organization}} a yanar gizo daga kwamfuta.",
+      "description": "Ƙirƙiri lambar izinin shiga muhallin aiki don {{organization}}, sannan ka manna ta a ƙasa.",
+      "descriptionReconnect": "Ƙirƙiri sabuwar lambar izinin shiga muhallin aiki don {{organization}}, sannan ka manna ta a ƙasa.",
       "scopes": "Asusu: karantawa · Ma'ajiyoyi: karantawa/rubutawa · Buƙatun haɗa canje-canje: karantawa · Hanyoyin sanarwa ta yanar gizo: karantawa/rubutawa",
       "tokenPlaceholder": "Lambar izinin shiga muhallin aiki",
       "tokenRefused": "Bitbucket bai karɓi wannan lambar izinin shiga muhallin aikin ba. Ka duba cewa tana da izinin da ke sama, sannan ka sake gwadawa."
@@ -2160,6 +2161,8 @@
       "renameAccessibility": "Canza sunan zaman: {{title}}",
       "cloningSession": "Ana yin kwafin zaman",
       "couldNotLoadThisSession": "An kasa loda wannan zaman.",
+      "historyTooLarge": "Rubutun wannan zaman ya yi girma don a loda shi.",
+      "historyUnavailable": "Ba a iya karantawa rubutun wannan zaman ba.",
       "cloneFailedRetry": "An kasa yin kwafin wannan zaman. Sake gwadawa.",
       "notEnoughCredits": "Kuɗin amfani ba su isa don wannan buƙata ba. Ƙara kuɗin amfani ka sake gwadawa.",
       "previousTaskFinishing": "Ba a gama aikin da ya gabata ba tukuna. Jira ɗan lokaci.",
@@ -2236,6 +2239,7 @@
       "branchDefault": "Na al'ada",
       "branchAccessibility": "Reshe: {{label}}",
       "branchLoading": "Ana loda rasshe",
+      "branchInactive": "Zaɓi ma'ajiya don loda rasshenta.",
       "branchLoadError": "Ba a iya loda rasshe ba",
       "branchUnavailable": "Rasshe ba su samuwa ga wannan ma'ajiya ba. Duba damar shigarka tare da mai ba da sabis, sannan ka zaɓi wata ma'ajiya.",
       "branchEmpty": "Babu reshe da ya samu",
@@ -4673,7 +4677,7 @@
       "new": "Sabon mai jawowa",
       "create": "Ƙirƙiri mai jawowa",
       "emptyTitle": "Babu masu jawowa tukuna",
-      "emptyDescription": "Ƙirƙiri mai jawowa don fara aikin Cloud Agent daga kiran yanar gizo ko bisa jadawali.",
+      "emptyDescription": "Ƙirƙiri mai jawowa na farko.",
       "loadFailedTitle": "An kasa loda masu jawowa",
       "loadFailedDescription": "Sake gwadawa idan kana da haɗi.",
       "detailLoadFailedTitle": "An kasa loda wannan mai jawowa",

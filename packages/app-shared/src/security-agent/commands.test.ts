@@ -55,4 +55,23 @@ describe('security agent command helpers', () => {
       getSecurityCommandFailureMessage(command({ resultCode: 'GITHUB_TOKEN_UNAVAILABLE' }))
     ).toBe('GitHub authorization needs attention. Re-authorize GitHub App, then retry.');
   });
+
+  it('uses authored queue-admission copy instead of the backend detail', () => {
+    expect(
+      getSecurityCommandFailureMessage(
+        command({ resultCode: 'QUEUE_ADMISSION_FAILED', lastErrorRedacted: '…maximum delivery attempts' })
+      )
+    ).toBe('Queued action could not be admitted. Retry action.');
+  });
+
+  it('does not show the backend detail for an unknown result code', () => {
+    expect(
+      getSecurityCommandFailureMessage(
+        command({ resultCode: 'SOME_FUTURE_CODE', lastErrorRedacted: 'raw backend text' })
+      )
+    ).toBe('Queued action failed. Retry action.');
+    expect(getSecurityCommandFailureMessage(command({ resultCode: null, lastErrorRedacted: 'raw backend text' }))).toBe(
+      'Queued action failed. Retry action.'
+    );
+  });
 });

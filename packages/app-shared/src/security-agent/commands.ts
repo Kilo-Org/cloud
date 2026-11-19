@@ -100,8 +100,13 @@ export function getSecurityCommandInvalidationScopes(
 }
 
 // Ported from apps/web/src/components/security-agent/SecurityAgentContext.tsx:362
-// (commandFailureDescription) — the user-visible fallback copy per result code.
-// Result codes with a fixed message (independent of `lastErrorRedacted`).
+// (commandFailureDescription) — the user-visible failure copy per result code,
+// and the fixed copy for every code this table does not name. The backend
+// detail (`lastErrorRedacted`) stays diagnostics-only: it can carry raw
+// backend wording (for QUEUE_ADMISSION_FAILED it stores a
+// "…maximum delivery attempts" string), so it is never the text this slot
+// shows. Surfaces that render the detail separately keep reading it from the
+// command object itself.
 const FAILURE_MESSAGE_BY_RESULT_CODE: Record<string, string> = {
   OWNER_CAP_REACHED:
     'Analysis capacity is full. Wait for an active analysis to finish, then retry.',
@@ -114,20 +119,13 @@ const FAILURE_MESSAGE_BY_RESULT_CODE: Record<string, string> = {
     'Repository is no longer available to GitHub App. Refresh repository access, then retry.',
   INVALID_DISMISS_TARGET: 'Finding cannot be dismissed because its Dependabot target is invalid.',
   COMMAND_STALLED: 'Queued action did not finish in time. Retry action.',
-  // The backend stores a raw "…maximum delivery attempts" string in
-  // lastErrorRedacted for this code; surface friendly, actionable copy instead.
   QUEUE_RETRIES_EXHAUSTED: 'Action could not be completed after several attempts. Retry action.',
+  QUEUE_ADMISSION_FAILED: 'Queued action could not be admitted. Retry action.',
 };
 
 export function getSecurityCommandFailureMessage(command: SecurityCommand): string {
   const knownMessage = command.resultCode
     ? FAILURE_MESSAGE_BY_RESULT_CODE[command.resultCode]
     : undefined;
-  if (knownMessage) {
-    return knownMessage;
-  }
-  if (command.resultCode === 'QUEUE_ADMISSION_FAILED') {
-    return command.lastErrorRedacted ?? 'Queued action could not be admitted. Retry action.';
-  }
-  return command.lastErrorRedacted ?? 'Queued action failed. Retry action.';
+  return knownMessage ?? 'Queued action failed. Retry action.';
 }

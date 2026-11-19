@@ -19,8 +19,10 @@ const QUEUE_ADMISSION_FAILED_KEY = 'securityAgent.commandFailure.queueAdmissionF
 const GENERIC_FAILURE_KEY = 'securityAgent.commandFailure.generic';
 
 // Mirrors getSecurityCommandFailureMessage in packages/app-shared: a known
-// result code translates to catalog copy; QUEUE_ADMISSION_FAILED and unknown
-// codes keep lastErrorRedacted when present, else the translated fallback.
+// result code translates to its catalog copy, QUEUE_ADMISSION_FAILED to its
+// own, and everything else to the generic one. The backend's
+// lastErrorRedacted stays diagnostics-only — it can carry raw backend
+// wording, so it never becomes the toast text.
 export function getSecurityCommandFailureMessage(command: SecurityCommand): string {
   const knownKey =
     command.resultCode && command.resultCode in FAILURE_MESSAGE_KEY_BY_RESULT_CODE
@@ -32,7 +34,7 @@ export function getSecurityCommandFailureMessage(command: SecurityCommand): stri
     return i18n.t(knownKey);
   }
   if (command.resultCode === 'QUEUE_ADMISSION_FAILED') {
-    return command.lastErrorRedacted ?? i18n.t(QUEUE_ADMISSION_FAILED_KEY);
+    return i18n.t(QUEUE_ADMISSION_FAILED_KEY);
   }
-  return command.lastErrorRedacted ?? i18n.t(GENERIC_FAILURE_KEY);
+  return i18n.t(GENERIC_FAILURE_KEY);
 }

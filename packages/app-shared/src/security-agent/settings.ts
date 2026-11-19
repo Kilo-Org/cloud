@@ -67,10 +67,24 @@ const MAX_SLA_DAYS = 365;
  * if it isn't one — shared by the notification screen's SLA warning lead
  * time and the SLA screen's four severity day thresholds, all validated as
  * 1-365 whole days.
+ *
+ * A `TextInput` carries the keypad's own digits, and a keypad follows its
+ * script, not the ASCII one: an Arabic-Indic keyboard types `٣٢` for 32.
+ * Every decimal digit (`\p{Nd}`) set is ten consecutive code points in
+ * ascending order and adjacent sets share no separator, so a digit's value is
+ * its offset from the start of its run modulo ten — the same fold the mobile
+ * app's `foldDecimalDigits` (apps/mobile/src/lib/format.ts) applies.
  */
 export function parseDayCount(raw: string): number {
-  const trimmed = raw.trim();
-  return /^\d+$/.test(trimmed) ? Number(trimmed) : Number.NaN;
+  const folded = raw.trim().replace(/\p{Nd}/gu, digit => {
+    const codePoint = digit.codePointAt(0) ?? 0;
+    let start = codePoint;
+    while (/\p{Nd}/u.test(String.fromCodePoint(start - 1))) {
+      start -= 1;
+    }
+    return String((codePoint - start) % 10);
+  });
+  return /^\d+$/.test(folded) ? Number(folded) : Number.NaN;
 }
 
 export function isValidDayCount(value: number): boolean {

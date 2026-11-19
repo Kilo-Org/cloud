@@ -6,6 +6,7 @@ import {
   mount,
   platform,
   queries,
+  reads,
   resetBillingQueries,
   seatsReadout,
   subscriptionReadout,
@@ -92,6 +93,33 @@ describe('OrganizationBillingScreen manage-on-web links', () => {
     const { renderer, unmount } = await mount();
 
     expect(manageOnWebLink(renderer, AUTO_TOP_UP_URL)?.props.label).toBe('Set up auto top-up');
+    unmount();
+  });
+});
+
+describe('OrganizationBillingScreen organization override', () => {
+  // The route carries the organization a refusal step resolved its role
+  // against. Every read and link here is built from the boundary's returned id,
+  // so the override has to reach the boundary or the screen shows another
+  // organization's plan.
+  it('reads and links the organization the route names', async () => {
+    const { renderer, unmount } = await mount('org-2');
+
+    expect(boundary.override).toBe('org-2');
+    expect(reads.subscription).toBe('org-2');
+    expect(reads.seats).toBe('org-2');
+    expect(
+      manageOnWebLink(renderer, 'http://localhost:3000/organizations/org-2/subscriptions')
+    ).toBeDefined();
+    unmount();
+  });
+
+  it('gives the placeholder boundary the same organization while it resolves', async () => {
+    boundary.isResolving = true;
+    const { renderer, unmount } = await mount('org-2');
+
+    const placeholder = renderer.root.findByType('OrganizationBoundary' as never);
+    expect(placeholder.props.organizationIdOverride).toBe('org-2');
     unmount();
   });
 });

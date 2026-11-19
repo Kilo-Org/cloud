@@ -66,10 +66,12 @@ const LARGE_TITLE_LINE_HEIGHT = 36;
 const HEADER_SINGLE_ROW_MIN_CONTENT_WIDTH = 120;
 
 /**
- * The horizontal gutter a header's content sits inside. The list screens use
- * the widest one in service (`px-[22px]`, 44dp); the default `px-4` is
- * narrower, so the check reflows a hair early for those callers instead of
- * squeezing them.
+ * The horizontal gutter a header's content sits inside, and the default for the
+ * stacking check's `contentInset`. The list screens use the widest one in
+ * service (`px-[22px]`, 44dp); the default `px-4` is narrower, so the check
+ * reflows a hair early for those callers instead of squeezing them. A header
+ * that shows a leading control beside its title, or needs an exact decision,
+ * declares its own inset instead of inheriting this one.
  */
 const HEADER_CONTENT_GUTTER = 44;
 
@@ -80,28 +82,54 @@ const HEADER_CONTENT_GUTTER = 44;
  */
 const HEADER_ACTIONS_GAP = 12;
 
+type HeaderStackingWidths = {
+  /**
+   * Width the caller's trailing cluster lays out at, in dp — the widths the
+   * caller renders, not a worst case it may never show. A cluster wide enough
+   * to leave the title below its readable minimum reflows too. It is taken as
+   * laid out and is not scaled here, so a caller whose cluster paints text at
+   * the current scale declares the width it lays out at in that scale.
+   */
+  headerRightWidth?: number;
+  /**
+   * Content width the caller's own title needs to stay readable, at font scale
+   * 1. It defaults to the list footer's 30px title; a detail header whose title
+   * is the 18px style needs less, and declaring that width keeps the header on
+   * one row where the larger default would already have reflowed it.
+   */
+  titleMinWidth?: number;
+  /**
+   * Horizontal space, in dp, the caller's row loses before its title: the
+   * gutter its own padding paints plus the width of a leading control that
+   * shares the title's row, such as a back button. It defaults to the widest
+   * list gutter, which the check takes as covering both. A caller that declares
+   * the space it really loses makes the check exact: it neither reflows a row
+   * that still holds the title nor squeezes a title that no longer fits.
+   */
+  contentInset?: number;
+};
+
 /**
  * Whether the header's actions drop to their own row instead of sharing the
  * title's. `width` is the window width in dp; `fontScale` is the system font
  * scale, so a large font reflows before a small one at the same width.
- * `headerRightWidth` is the width the caller's trailing cluster lays out at, in
- * dp — the widths the caller renders, not a worst case it may never show. A
- * cluster wide enough to leave the title below its readable minimum reflows
- * too. Fixed-size children (icon buttons, a label capped at its own max-w) do
- * not grow with the font scale, so this width is taken as laid out and is not
- * scaled.
  */
 export function shouldStackHeaderActions(
   width: number,
   fontScale: number,
-  headerRightWidth = 0
+  widths: HeaderStackingWidths = {}
 ): boolean {
   if (!Number.isFinite(width)) {
     return false;
   }
+  const {
+    headerRightWidth = 0,
+    titleMinWidth = HEADER_SINGLE_ROW_MIN_CONTENT_WIDTH,
+    contentInset = HEADER_CONTENT_GUTTER,
+  } = widths;
   const scale = Number.isFinite(fontScale) && fontScale > 0 ? fontScale : 1;
-  const titleWidth = width - HEADER_CONTENT_GUTTER - HEADER_ACTIONS_GAP - headerRightWidth;
-  return titleWidth < HEADER_SINGLE_ROW_MIN_CONTENT_WIDTH * scale;
+  const titleWidth = width - contentInset - HEADER_ACTIONS_GAP - headerRightWidth;
+  return titleWidth < titleMinWidth * scale;
 }
 
 /**
@@ -124,8 +152,11 @@ const SCREEN_HEADER_LARGE_TITLE_CLASS =
   'shrink text-[30px] font-bold tracking-tight text-foreground';
 
 /**
- * What a reserved band's eyebrow twin lays out with: a space, so the twin
- * holds one eyebrow line without painting a label that is not on screen.
+ * What a reserve paints when it has no label yet: a no-break space, which paints
+ * no ink. It holds the eyebrow variant's single line box
+ * (`EYEBROW_LINE_HEIGHT_DP` in `ui/text.tsx`), which no longer depends on the
+ * script, so a zero-ink filler reserves exactly the height the arriving label
+ * takes.
  */
 const blankEyebrow = '\u00A0';
 
@@ -234,10 +265,31 @@ type ScreenHeaderProps = {
    * Width the `headerRight` cluster lays out at, in dp. The stacking decision
    * reserves it (see `shouldStackHeaderActions`), so a wide cluster reflows the
    * actions onto their own row instead of squeezing the title to a few
-   * characters. Pass the widths of the controls actually rendered. Omit it for
-   * a cluster no wider than a single icon button.
+   * characters. Pass the widths of the controls actually rendered: a cluster
+   * whose text grows with the font scale declares the width it lays out at in
+   * the current scale, and a cluster of fixed-size controls declares the same
+   * width at every scale. Omit it for a cluster no wider than a single icon
+   * button.
    */
   headerRightWidth?: number;
+  /**
+   * Content width (dp, at font scale 1) this screen's own title needs to stay
+   * readable beside the trailing cluster, for the stacking decision above. The
+   * default reserves the 30px list title's width; a header whose title is the
+   * 18px style declares the smaller width it actually paints, so a cluster that
+   * still leaves the title its own text does not reflow the header.
+   */
+  titleMinWidth?: number;
+  /**
+   * Horizontal space (dp) the title's row loses before the title, for the
+   * stacking decision above: this header's own content gutter plus the width of
+   * a leading control such as the back button. It defaults to the 44 dp list
+   * gutter, which the check takes as covering both. A header that paints a
+   * narrower gutter, or shows a back control beside its title, declares the
+   * space it really loses so the check reflows where its title stops fitting
+   * rather than a whole control-width late.
+   */
+  contentInset?: number;
   /** Keep compact fixed-width controls beside the title even on narrow screens. */
   allowHeaderRightStacking?: boolean;
   /**
@@ -403,6 +455,8 @@ export function ScreenHeader({
   size = 'default',
   headerRight,
   headerRightWidth,
+  titleMinWidth,
+  contentInset,
   allowHeaderRightStacking = true,
   headerRightShrinks = false,
   inlineActions,
@@ -437,14 +491,22 @@ export function ScreenHeader({
   const stackActions =
     allowHeaderRightStacking &&
     headerRight != null &&
-    shouldStackHeaderActions(windowWidth, fontScale, headerRightWidth ?? 0);
+    shouldStackHeaderActions(windowWidth, fontScale, {
+      headerRightWidth: headerRightWidth ?? 0,
+      titleMinWidth,
+      contentInset,
+    });
   // The inline controls row reflows the same way: a caller that declares its
   // width drops it beneath the title before it squeezes the title's own
   // readable minimum, so the 30px Agents title never breaks inside a word.
   const stackInlineActions =
     allowInlineActionsStacking &&
     inlineActions != null &&
-    shouldStackHeaderActions(windowWidth, fontScale, inlineActionsWidth ?? 0);
+    shouldStackHeaderActions(windowWidth, fontScale, {
+      headerRightWidth: inlineActionsWidth ?? 0,
+      titleMinWidth,
+      contentInset,
+    });
 
   // Which of the heading's lines the header paints, which decides whether the
   // leading control has a line above the title to reach into (see
@@ -670,6 +732,7 @@ export function ScreenHeader({
       {subtitleSlot}
     </View>
   );
+
   // The reserve, as a band rather than a box around the title: a zero-width,
   // clipped twin of the eyebrow and the title's line cap holds the header's text
   // area to one height for every line count the cap allows, so a title that

@@ -3,6 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { ProfileRepoPinsSection } from '@/components/profiles/profile-repo-pins-section';
+import {
+  SECTION_ACTION_BOX_CLASS,
+  SECTION_ACTION_FRAME_DP,
+  SECTION_ACTION_HIT_SLOP,
+  SECTION_ACTION_HIT_SLOP_DP,
+  tapTargetReachDp,
+  TOUCH_TARGET_DP,
+} from '@/lib/a11y/tap-target';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
@@ -77,7 +85,6 @@ vi.mock('@/components/empty-state', () => ({
   EmptyState: 'EmptyState',
   StateAction: 'StateAction',
 }));
-vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text', EYEBROW_LATIN_DISPLAY: '' }));
 vi.mock('@/components/ui/icons', () => ({
@@ -221,6 +228,37 @@ describe('ProfileRepoPinsSection', () => {
 
     unmount();
   });
+
+  it('compact: the pin action rides the section header box, so the header stays one line', async () => {
+    Object.assign(h.bindingsQuery, { isLoading: false });
+
+    const { renderer, unmount } = await mountSection();
+
+    const action = findAll(renderer.root, 'Pressable').find(
+      node => node.props.accessibilityLabel === 'Pin a repo'
+    );
+    if (!action) {
+      throw new Error('the pin action was not rendered');
+    }
+    // The action is the section header's own box: its negative margins cancel
+    // the 28dp frame back to the one text line it sits on, so the card never
+    // grows a second line for it.
+    const actionClasses = String(action.props.className).split(/\s+/);
+    for (const token of SECTION_ACTION_BOX_CLASS.split(' ')) {
+      expect(actionClasses).toContain(token);
+    }
+    expect(action.props.hitSlop).toEqual(SECTION_ACTION_HIT_SLOP);
+    expect(action.props.accessibilityRole).toBe('button');
+    expect(action.props.accessibilityState).toBeUndefined();
+    // The declared reach clears the design target, and the box is symmetric
+    // about the label's line, so the row keeps its height either way.
+    expect(
+      tapTargetReachDp(SECTION_ACTION_FRAME_DP, SECTION_ACTION_HIT_SLOP_DP)
+    ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+
+    unmount();
+  });
+
   it('names each pinned row and its own unbind control', async () => {
     Object.assign(h.bindingsQuery, {
       isLoading: false,
@@ -247,11 +285,12 @@ describe('ProfileRepoPinsSection', () => {
         .filter(node => node.props.accessibilityRole === 'text' && node.props.accessible === true)
         .map(node => node.props.accessibilityLabel)
     ).toEqual(['acme/api, GitHub', 'acme/infra, GitLab']);
+    // The header's own action leads the rows it sits above.
     expect(
       findAll(renderer.root, 'Pressable')
-        .filter(node => String(node.props.accessibilityLabel).startsWith('Unbind '))
+        .filter(node => node.props.accessibilityRole === 'button')
         .map(node => node.props.accessibilityLabel)
-    ).toEqual(['Unbind acme/api', 'Unbind acme/infra']);
+    ).toEqual(['Pin a repo', 'Unbind acme/api', 'Unbind acme/infra']);
 
     unmount();
   });
@@ -272,12 +311,9 @@ describe('ProfileRepoPinsSection', () => {
     const { renderer, unmount } = await mountSection('org-1', false);
 
     expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain('acme/api');
-    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
     expect(
-      findAll(renderer.root, 'Pressable').some(node =>
-        String(node.props.accessibilityLabel).startsWith('Unbind ')
-      )
-    ).toBe(false);
+      findAll(renderer.root, 'Pressable').filter(node => node.props.accessibilityRole === 'button')
+    ).toHaveLength(0);
     expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(0);
 
     unmount();

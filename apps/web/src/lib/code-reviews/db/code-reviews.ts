@@ -629,7 +629,10 @@ export async function createCodeReviewAttempt(params: {
 export async function createInfraRetryAttemptIfMissing(params: {
   codeReviewId: string;
   retryOfAttemptId: string;
+  /** Defaults to 'infra_failure'. A caller with its own bound may pass a distinct reason. */
+  retryReason?: string;
 }): Promise<InfraRetryAttemptResult> {
+  const retryReason = params.retryReason ?? 'infra_failure';
   try {
     return await db.transaction(async tx => {
       const [review] = await tx
@@ -683,7 +686,7 @@ export async function createInfraRetryAttemptIfMissing(params: {
         .where(
           and(
             eq(cloud_agent_code_review_attempts.code_review_id, params.codeReviewId),
-            eq(cloud_agent_code_review_attempts.retry_reason, 'infra_failure'),
+            eq(cloud_agent_code_review_attempts.retry_reason, retryReason),
             eq(cloud_agent_code_review_attempts.retry_of_attempt_id, params.retryOfAttemptId)
           )
         )
@@ -699,7 +702,7 @@ export async function createInfraRetryAttemptIfMissing(params: {
         .where(
           and(
             eq(cloud_agent_code_review_attempts.code_review_id, params.codeReviewId),
-            eq(cloud_agent_code_review_attempts.retry_reason, 'infra_failure')
+            eq(cloud_agent_code_review_attempts.retry_reason, retryReason)
           )
         )
         .limit(1);
@@ -723,7 +726,7 @@ export async function createInfraRetryAttemptIfMissing(params: {
           code_review_id: params.codeReviewId,
           attempt_number: (latest?.attempt_number ?? 0) + 1,
           retry_of_attempt_id: params.retryOfAttemptId,
-          retry_reason: 'infra_failure',
+          retry_reason: retryReason,
           analytics_enabled_at_dispatch: sourceAttempt.analytics_enabled_at_dispatch,
           status: 'pending',
         })

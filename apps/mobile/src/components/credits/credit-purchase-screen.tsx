@@ -524,7 +524,12 @@ export function CreditPurchaseScreen() {
                         disabled={disabled}
                         trailing={
                           storePrice === null ? null : (
-                            <Text variant="small" className="tabular-nums">
+                            <Text
+                              variant="small"
+                              className={
+                                disabled ? 'text-muted-foreground tabular-nums' : 'tabular-nums'
+                              }
+                            >
                               {storePrice}
                             </Text>
                           )

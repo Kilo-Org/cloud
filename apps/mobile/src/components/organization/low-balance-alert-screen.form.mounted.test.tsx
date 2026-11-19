@@ -2,6 +2,7 @@
 // fields write on blur and on submit under one all-valid rule, and a rejected
 // write keeps the draft, names itself in localized copy and offers Retry.
 import {
+  boundary,
   calls,
   capSentence,
   emailsFieldOf,
@@ -18,10 +19,23 @@ import {
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { act } from '@/test/renderer';
+import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
+import { act, type ReactTestRenderer } from '@/test/renderer';
 
 beforeEach(() => {
   resetLowBalanceState();
+});
+
+/** The labels of the steps painted under a refusal line, in screen order. */
+function stepLabels(renderer: ReactTestRenderer): string[] {
+  return renderer.root
+    .findAll(node => String(node.type) === 'Pressable')
+    .map(node => node.props.accessibilityLabel)
+    .filter((label): label is string => typeof label === 'string');
+}
+
+const TRIAL_REFUSAL = Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+  data: { code: 'FORBIDDEN', message: ORGANIZATION_TRIAL_EXPIRED_MESSAGE },
 });
 
 describe('low balance alert screen form', () => {
@@ -192,6 +206,8 @@ describe('low balance alert screen form', () => {
 
     expect(statusMessages(renderer)).toContain(i18n.t('organization.lowBalanceAlert.saveError'));
     expect(JSON.stringify(renderer.toJSON())).not.toContain('Failed to fetch');
+    // A failure that is not the plan refusal offers no step.
+    expect(stepLabels(renderer)).toEqual([]);
 
     const retry = retryButtonOf(renderer);
     expect(retry).toBeDefined();
@@ -265,6 +281,33 @@ describe('low balance alert screen form', () => {
       calls.list[1]?.options.onSuccess?.();
     });
     expect(statusMessages(renderer)).toContain(i18n.t('organizationGuardrails.statusSaved'));
+    unmount();
+  });
+
+  it('gives a billing role the plan refusal that offers the billing step', async () => {
+    const { renderer, unmount } = await mountScreen();
+    await act(() => {
+      (thresholdFieldOf(renderer).props.onChangeText as (value: string) => void)('250');
+    });
+    await act(() => {
+      (thresholdFieldOf(renderer).props.onBlur as () => void)();
+    });
+    await act(() => {
+      calls.list[0]?.options.onError?.(TRIAL_REFUSAL);
+    });
+
+    expect(statusMessages(renderer)).toContain(i18n.t('common.organizationTrialEndedBilling'));
+    expect(statusMessages(renderer)).not.toContain(i18n.t('common.organizationTrialEnded'));
+    expect(stepLabels(renderer)).toEqual([i18n.t('organization.hub.manageBilling')]);
+    unmount();
+  });
+
+  it('keeps a member out of the form, so no member reads the plan refusal here', async () => {
+    boundary.role = 'member';
+    const { renderer, unmount } = await mountScreen();
+
+    expect(renderer.root.findAll(node => String(node.type) === 'PermissionDenied')).toHaveLength(1);
+    expect(statusMessages(renderer)).toEqual([]);
     unmount();
   });
 });

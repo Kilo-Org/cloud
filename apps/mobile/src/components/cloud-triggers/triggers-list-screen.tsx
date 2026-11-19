@@ -216,7 +216,9 @@ export function TriggersListScreen({ organizationId }: TriggersListScreenProps) 
         >
           <Section>
             <Text variant="muted">{t('cloudAgent.triggers.subtitle')}</Text>
-            <View className={BODY_BAND_CLASS}>{body}</View>
+            <View className={BODY_BAND_CLASS} testID="triggers-list-body">
+              {body}
+            </View>
           </Section>
         </TabScreenScrollView>
       )}

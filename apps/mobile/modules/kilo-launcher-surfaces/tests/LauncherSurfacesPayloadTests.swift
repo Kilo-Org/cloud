@@ -1,15 +1,22 @@
+/** The valid base payload (New agent only) plus one caller-supplied JSON fragment. */
+private func payloadJSON(adding fragment: String = "") -> String {
+  let extra = fragment.isEmpty ? "" : ",\n    " + fragment
+  return """
+    {
+      "newAgentUrl": "kiloapp://agent/new",
+      "newAgentLabel": "New agent"\(extra)
+    }
+    """
+}
+
 @main struct LauncherSurfacesPayloadTests {
   static func main() {
-    let full = KiloLauncherSurfacesPayload(json: """
-      {
-        "newAgentUrl": "kiloapp://agent/new",
-        "newAgentLabel": "New agent",
-        "needsInputUrl": "kiloapp://agent/waiting",
-        "needsInputLabel": "Needs input",
-        "openLastSessionUrl": "kiloapp://agent/recent",
-        "openLastSessionLabel": "Open last session"
-      }
-      """)
+    let full = KiloLauncherSurfacesPayload(json: payloadJSON(adding: """
+      "needsInputUrl": "kiloapp://agent/waiting",
+      "needsInputLabel": "Needs input",
+      "openLastSessionUrl": "kiloapp://agent/recent",
+      "openLastSessionLabel": "Open last session"
+      """))
     precondition(
       full?.newAgent == LauncherSurfacesAction(url: "kiloapp://agent/new", label: "New agent"),
       "a full payload yields the New agent action"
@@ -65,9 +72,7 @@
     )
     precondition(KiloLauncherSurfacesPayload(json: "not json") == nil, "non-JSON text is rejected")
 
-    let newAgentOnly = KiloLauncherSurfacesPayload(
-      json: #"{"newAgentUrl": "kiloapp://agent/new", "newAgentLabel": "New agent"}"#
-    )
+    let newAgentOnly = KiloLauncherSurfacesPayload(json: payloadJSON())
     precondition(
       newAgentOnly?.newAgent == LauncherSurfacesAction(url: "kiloapp://agent/new", label: "New agent"),
       "a payload with only the New agent action keeps it"
@@ -75,13 +80,9 @@
     precondition(newAgentOnly?.needsInput == nil, "an absent Needs input pair yields no action")
     precondition(newAgentOnly?.openLastSession == nil, "an absent Open last session pair yields no action")
 
-    let needsInputUrlOnly = KiloLauncherSurfacesPayload(json: """
-      {
-        "newAgentUrl": "kiloapp://agent/new",
-        "newAgentLabel": "New agent",
-        "needsInputUrl": "kiloapp://agent/waiting"
-      }
-      """)
+    let needsInputUrlOnly = KiloLauncherSurfacesPayload(json: payloadJSON(adding: """
+      "needsInputUrl": "kiloapp://agent/waiting"
+      """))
     precondition(
       needsInputUrlOnly?.newAgent == LauncherSurfacesAction(url: "kiloapp://agent/new", label: "New agent"),
       "an unpaired Needs input url leaves the New agent action alone"
@@ -90,69 +91,73 @@
       needsInputUrlOnly?.needsInput == nil,
       "a needsInputUrl without its label yields no Needs input action"
     )
-    precondition(
-      KiloLauncherSurfacesPayload(json: """
-        {
-          "newAgentUrl": "kiloapp://agent/new",
-          "newAgentLabel": "New agent",
-          "needsInputLabel": "Needs input"
-        }
-        """)?.needsInput == nil,
-      "a needsInputLabel without its url yields no Needs input action"
+
+    let needsInputLabelOnly = KiloLauncherSurfacesPayload(
+      json: payloadJSON(adding: #""needsInputLabel": "Needs input""#)
     )
     precondition(
-      KiloLauncherSurfacesPayload(json: """
-        {
-          "newAgentUrl": "kiloapp://agent/new",
-          "newAgentLabel": "New agent",
-          "needsInputUrl": "kiloapp://agent/waiting",
-          "needsInputLabel": 42
-        }
-        """)?.needsInput == nil,
+      needsInputLabelOnly?.newAgent == LauncherSurfacesAction(url: "kiloapp://agent/new", label: "New agent"),
+      "an unpaired Needs input label leaves the New agent action alone"
+    )
+    precondition(
+      needsInputLabelOnly?.needsInput == nil,
+      "a needsInputLabel without its url yields no Needs input action"
+    )
+
+    let needsInputNonStringLabel = KiloLauncherSurfacesPayload(json: payloadJSON(adding: """
+      "needsInputUrl": "kiloapp://agent/waiting",
+      "needsInputLabel": 42
+      """))
+    precondition(
+      needsInputNonStringLabel?.newAgent == LauncherSurfacesAction(url: "kiloapp://agent/new", label: "New agent"),
+      "a non-string Needs input label leaves the New agent action alone"
+    )
+    precondition(
+      needsInputNonStringLabel?.needsInput == nil,
       "a non-string needsInputLabel yields no Needs input action"
     )
 
-    let openLastSessionUrlOnly = KiloLauncherSurfacesPayload(json: """
-      {
-        "newAgentUrl": "kiloapp://agent/new",
-        "newAgentLabel": "New agent",
-        "openLastSessionUrl": "kiloapp://agent/recent"
-      }
-      """)
+    let openLastSessionUrlOnly = KiloLauncherSurfacesPayload(json: payloadJSON(adding: """
+      "openLastSessionUrl": "kiloapp://agent/recent"
+      """))
+    precondition(
+      openLastSessionUrlOnly?.newAgent == LauncherSurfacesAction(url: "kiloapp://agent/new", label: "New agent"),
+      "an unpaired Open last session url leaves the New agent action alone"
+    )
     precondition(
       openLastSessionUrlOnly?.openLastSession == nil,
       "an openLastSessionUrl without its label yields no Open last session action"
     )
-    precondition(
-      KiloLauncherSurfacesPayload(json: """
-        {
-          "newAgentUrl": "kiloapp://agent/new",
-          "newAgentLabel": "New agent",
-          "openLastSessionLabel": "Open last session"
-        }
-        """)?.openLastSession == nil,
-      "an openLastSessionLabel without its url yields no Open last session action"
+
+    let openLastSessionLabelOnly = KiloLauncherSurfacesPayload(
+      json: payloadJSON(adding: #""openLastSessionLabel": "Open last session""#)
     )
     precondition(
-      KiloLauncherSurfacesPayload(json: """
-        {
-          "newAgentUrl": "kiloapp://agent/new",
-          "newAgentLabel": "New agent",
-          "openLastSessionUrl": "",
-          "openLastSessionLabel": "Open last session"
-        }
-        """)?.openLastSession == nil,
+      openLastSessionLabelOnly?.newAgent == LauncherSurfacesAction(url: "kiloapp://agent/new", label: "New agent"),
+      "an unpaired Open last session label leaves the New agent action alone"
+    )
+    precondition(
+      openLastSessionLabelOnly?.openLastSession == nil,
+      "an openLastSessionLabel without its url yields no Open last session action"
+    )
+
+    let openLastSessionEmptyUrl = KiloLauncherSurfacesPayload(json: payloadJSON(adding: """
+      "openLastSessionUrl": "",
+      "openLastSessionLabel": "Open last session"
+      """))
+    precondition(
+      openLastSessionEmptyUrl?.newAgent == LauncherSurfacesAction(url: "kiloapp://agent/new", label: "New agent"),
+      "an empty Open last session url leaves the New agent action alone"
+    )
+    precondition(
+      openLastSessionEmptyUrl?.openLastSession == nil,
       "an empty openLastSessionUrl yields no Open last session action"
     )
 
-    let withExtras = KiloLauncherSurfacesPayload(json: """
-      {
-        "newAgentUrl": "kiloapp://agent/new",
-        "newAgentLabel": "New agent",
-        "unexpected": { "nested": [1, 2] },
-        "publishedAt": 1763000000
-      }
-      """)
+    let withExtras = KiloLauncherSurfacesPayload(json: payloadJSON(adding: """
+      "unexpected": { "nested": [1, 2] },
+      "publishedAt": 1763000000
+      """))
     precondition(
       withExtras?.newAgent == LauncherSurfacesAction(url: "kiloapp://agent/new", label: "New agent"),
       "unknown keys do not disturb the New agent action"

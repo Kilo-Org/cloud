@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- The billing readout composes the plan, seats, auto top-up and Kilo Pass blocks on one screen. */
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -78,6 +79,11 @@ function BillingCardError({
   );
 }
 
+type OrganizationBillingScreenProps = Readonly<{
+  /** Explicit org id from the route's `?org=`, replacing the persisted selection for this render. */
+  organizationIdOverride?: string;
+}>;
+
 /**
  * The organization's billing readout: the plan and its subscription state, the
  * seats in use, auto top-up, and the organization's Kilo Pass.
@@ -87,9 +93,11 @@ function BillingCardError({
  * on an iOS build in the US storefront, a statement of where the setting lives
  * everywhere else, the rule `useCanLinkExternalPurchase` owns.
  */
-export function OrganizationBillingScreen() {
+export function OrganizationBillingScreen({
+  organizationIdOverride,
+}: OrganizationBillingScreenProps = {}) {
   const { t } = useTranslation();
-  const { organizationId, role, org, isResolving } = useOrgBoundary();
+  const { organizationId, role, org, isResolving } = useOrgBoundary(organizationIdOverride);
   const hasBillingRole = isMoneyRole(role);
   const subscription = useOrgSeatSubscription(organizationId, hasBillingRole);
   const seats = useOrgSeats(organizationId);
@@ -107,7 +115,13 @@ export function OrganizationBillingScreen() {
   const screenTitle = t('organization.billing.title');
 
   if (isResolving || organizationId == null || org == null) {
-    return <OrganizationBoundary title={screenTitle} backFallback={ORGANIZATION_HUB_PATH} />;
+    return (
+      <OrganizationBoundary
+        title={screenTitle}
+        backFallback={ORGANIZATION_HUB_PATH}
+        organizationIdOverride={organizationIdOverride}
+      />
+    );
   }
 
   if (!hasBillingRole) {

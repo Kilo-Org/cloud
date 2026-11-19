@@ -14,9 +14,9 @@ import {
 } from '@/components/organization/member-limit-validators';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
+import { RefusalStatus } from '@/components/refusal-status';
 import { SheetHeader } from '@/components/sheet-header';
 import { SheetScrollView } from '@/components/tab-screen';
-import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -28,21 +28,31 @@ import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations
 import {
   type ActiveOrgMember,
   isActiveOrgMember,
+  isMoneyRole,
   type OrgMember,
   useOrgBoundary,
   useOrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
 import { usePopOnce } from '@/lib/navigation/pop-once';
 import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
+import { isTrialExpiredRefusal } from '@/lib/server-error-copy';
+import { useTrialRefusalAction } from '@/lib/trial-refusal';
 import { firstNonEmpty } from '@/lib/utils';
 
 type MemberLimitFormProps = Readonly<{
   memberId: string;
   organizationId: string | null;
   member: ActiveOrgMember;
+  /** Whether this reader may change the plan, which picks the refusal copy. */
+  canManageBilling: boolean;
 }>;
 
-function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormProps) {
+function MemberLimitForm({
+  memberId,
+  organizationId,
+  member,
+  canManageBilling,
+}: MemberLimitFormProps) {
   const { t } = useTranslation();
   const closeSheet = usePopOnce();
   const headerTopInset = useFormSheetHeaderTopInset();
@@ -64,10 +74,15 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
   );
   const [fieldTouched, setFieldTouched] = useState(false);
   const canSave = fieldError === null;
-  // A rejected save is rendered in localized copy, never as the server wrote it.
-  const saveError = mutations.updateMember.isError
-    ? saveErrorCopy(mutations.updateMember.error)
-    : null;
+  // A rejected save is rendered in localized copy, never as the server wrote
+  // it. The copy and the step are chosen for this reader's role: only the plan
+  // refusal offers a step, and only to a role the server would let take it.
+  const saveFailure = mutations.updateMember.isError ? mutations.updateMember.error : null;
+  const saveError = saveFailure == null ? null : saveErrorCopy(saveFailure, canManageBilling);
+  const trialRefusalAction = useTrialRefusalAction(
+    isTrialExpiredRefusal(saveFailure),
+    organizationId
+  );
   const resetUpdateMember = mutations.updateMember.reset;
   const clearSaveError = () => {
     if (mutations.updateMember.isError) {
@@ -133,11 +148,13 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
           }}
         />
 
-        {/* updateMember's toast is silenced for this caller, so AccessibleStatus
+        {/* updateMember's toast is silenced for this caller, so the status line
             is the single announcement owner: one announcement per platform,
-            visuals preserved (tone error). */}
-        <AccessibleStatus
+            visuals preserved (tone error). A plan refusal this reader can end
+            carries the billing step under the copy. */}
+        <RefusalStatus
           message={saveError?.field === 'form' ? saveError.message : null}
+          action={trialRefusalAction}
           className="text-sm"
         />
 
@@ -247,5 +264,12 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
     );
   }
 
-  return <MemberLimitForm memberId={memberId} organizationId={organizationId} member={member} />;
+  return (
+    <MemberLimitForm
+      memberId={memberId}
+      organizationId={organizationId}
+      member={member}
+      canManageBilling={isMoneyRole(role)}
+    />
+  );
 }

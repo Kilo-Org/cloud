@@ -164,6 +164,7 @@ export function NewSessionConfigureForm({
   cloudCreateError = null,
   onRetryCloudCreate,
   planRefusal = null,
+  planRefusalAction,
   remoteSpawnFailure = null,
   onRetryRemoteSpawn,
 }: Readonly<NewSessionConfigureFormProps & NewSessionProfileOverrideProps>) {
@@ -310,7 +311,9 @@ export function NewSessionConfigureForm({
         {/* The plan refusal is known before the press, so it sits in the scroll
             content under the composer rather than in the pinned footer: it
             never takes height from the fields, the launch folder included. */}
-        {planRefusal !== null ? <OrganizationPlanRefusal message={planRefusal} /> : null}
+        {planRefusal !== null ? (
+          <OrganizationPlanRefusal message={planRefusal} action={planRefusalAction} />
+        ) : null}
         {accountSection}
         <NewSessionRunTarget
           showRunOnSelector={showRunOnSelector}

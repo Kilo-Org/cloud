@@ -130,6 +130,23 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: vi.fn(), push: status.push }),
   useFocusEffect: () => undefined,
 }));
+// The connect actions read the reader's organization role for a trial refusal.
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ organizationId: 'org_1', isLoaded: true }),
+}));
+vi.mock('@/lib/hooks/use-organizations-list', () => ({
+  useOrganizationsList: () => ({
+    data: [{ organizationId: 'org_1', role: 'member' }],
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    refetch: vi.fn(),
+  }),
+}));
+vi.mock('@/lib/trpc', () => ({
+  trpcClient: {},
+  useTRPC: () => ({}),
+}));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
 vi.mock('@/components/empty-state', () => ({
   EmptyState: 'EmptyState',
@@ -154,6 +171,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 // depend on the real `classifyProviderErrorCode` to tell retryable from
 // permanent failures.
 vi.mock('@/lib/code-reviewer-config', () => ({
+  isPersonal: (scope: string) => scope === 'personal',
   PLATFORM_CAPABILITIES: { github: { label: 'GitHub' }, gitlab: { label: 'GitLab' } },
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({

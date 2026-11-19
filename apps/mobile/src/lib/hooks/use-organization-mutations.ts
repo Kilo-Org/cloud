@@ -1,6 +1,5 @@
 import { hashKey, useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { announcingToast } from '@/lib/a11y/announcing-toast';
 import {
   isLatestMutationGeneration,
   nextMutationGeneration,
@@ -10,12 +9,31 @@ import {
   type OrgRole,
   type OrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
-import { organizationErrorMessage } from '@/lib/server-error-copy';
+import { announceTrialRefusal } from '@/lib/refusal-toast';
+import { isTrialExpiredRefusal, organizationErrorMessage } from '@/lib/server-error-copy';
+import {
+  type TrialRefusalAction,
+  useBillingAction,
+  useCanManageBilling,
+} from '@/lib/trial-refusal';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
-const onMutationError = (error: unknown) => {
-  announcingToast.error(organizationErrorMessage(error));
-};
+/**
+ * The toast a failed mutation paints: the reader's own copy for a rejection the
+ * app can explain, and the billing step when the refusal is the plan gate and
+ * this reader may change the plan.
+ */
+function onMutationError(
+  error: unknown,
+  canManageBilling: boolean,
+  billingAction: TrialRefusalAction | undefined
+) {
+  announceTrialRefusal(
+    organizationErrorMessage(error, canManageBilling),
+    billingAction,
+    isTrialExpiredRefusal(error)
+  );
+}
 
 // Distributive helpers: `OrgWithMembers` is a union of the admin and member
 // variants, so a plain `{ ...old, members: ... }` spread loses the variant
@@ -53,6 +71,10 @@ export function useOrganizationMutations(
 ) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  // The toast's copy and its optional step are the reader's: a role that can
+  // change the plan gets the copy that offers the step, and the step itself.
+  const canManageBilling = useCanManageBilling(organizationId);
+  const billingAction = useBillingAction(organizationId);
 
   const withMembersKey = trpc.organizations.withMembers.queryKey({ organizationId });
   const listKey = trpc.organizations.list.queryKey();
@@ -96,7 +118,7 @@ export function useOrganizationMutations(
           queryClient.setQueryData(withMembersKey, context.previous);
         }
         if (!silent) {
-          onMutationError(error);
+          onMutationError(error, canManageBilling, billingAction);
         }
       },
       onSettled: invalidateAll,

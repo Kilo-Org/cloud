@@ -5,6 +5,8 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as ReactI18nextModule from 'react-i18next';
+
 import { QueryError } from '@/components/query-error';
 import { type SecurityFinding } from '@/lib/security-agent';
 import { FindingAnalysisPanel } from './finding-analysis-panel';
@@ -60,7 +62,19 @@ vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronLeft: 'C
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', async importOriginal => ({
+  // The refusal module imports `@/i18n`, whose init registers this plugin.
+  ...(await importOriginal<typeof ReactI18nextModule>()),
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
+// The refusal hooks read the reader's role through the organization query
+// chain; this harness has no organization provider and the chain pulls the Expo
+// runtime it cannot load, so the boundary is stubbed. No case here sets a role:
+// the screen only has to render with the member copy.
+vi.mock('@/lib/hooks/use-organization-queries', () => ({
+  isMoneyRole: () => false,
+  useOrgBoundary: () => ({ role: undefined }),
+}));
 vi.mock('expo-router', () => ({
   useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
   useRouter: () => ({

@@ -94,7 +94,9 @@ describe('SectionHeader mounted layout', () => {
       expect(label.props.style).not.toContainEqual({ letterSpacing: 0 });
       expect(text.props.style).not.toContainEqual({ letterSpacing: 0 });
     } else {
-      expect(label.props.style).toBeUndefined();
+      // The eyebrow's shared line box adds an inline style array in LTR too; no
+      // RTL reset may land on it.
+      expect(label.props.style).not.toContainEqual({ letterSpacing: 0 });
       expect(text.props.style).toBeUndefined();
     }
 

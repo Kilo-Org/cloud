@@ -27,7 +27,12 @@ import {
   useRepoOptions,
 } from '@/lib/hooks/use-repo-bindings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { ICON_TARGET_BOX_CLASS, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import {
+  COMPACT_CONTROL_BOX_CLASS,
+  COMPACT_CONTROL_HIT_SLOP_DP,
+  ROW_TARGET_CLASS,
+  SECTION_ACTION_BOX_CLASS,
+} from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 /** The mutation hook toasts `error.message`; the section supplies a fallback otherwise. */
@@ -39,7 +44,13 @@ function hasUsableMessage(error: unknown): boolean {
 function RepoPinsSkeleton() {
   return (
     <View className="gap-3">
-      <Skeleton className="h-2 w-32 rounded bg-muted-soft" />
+      <View className="flex-row items-center justify-between gap-2">
+        <Skeleton className="h-2 w-32 rounded bg-muted-soft" />
+        {/* The placeholder reserves the box the loaded action renders, not a
+            rem-scaled height, so the section keeps one header line and cannot
+            grow when the bindings land. */}
+        <Skeleton className={cn(SECTION_ACTION_BOX_CLASS, 'w-24 rounded-md bg-muted-soft')} />
+      </View>
       <Skeleton className="h-3 w-56 rounded bg-muted-soft" />
       <RowGroup>
         <RowSkeleton subtitle trailingControl />
@@ -148,7 +159,12 @@ export function ProfileRepoPinsSection({
             <Eyebrow>{repoPlatformBadge(binding.platform)}</Eyebrow>
             {canManage ? (
               <Pressable
-                className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+                className={cn(COMPACT_CONTROL_BOX_CLASS, '-me-2 active:opacity-70')}
+                // The compact box pulls its own end margin, so the glyph ends
+                // level with the leading icon's inset while the row keeps one
+                // text line; the slop carries the touch reach to 48 dp inside
+                // the row.
+                hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
                 accessibilityRole="button"
                 accessibilityLabel={t('profiles.repoBindings.removeForRepo', {
                   repo: binding.repoFullName,

@@ -29,7 +29,10 @@ vi.mock('@/components/code-reviewer/review-memory-proposal-sheet', () => ({
 // The screen reads route focus to close the proposal sheet when the route is
 // left, and the sheet's own suite owns that behavior; the state contract below
 // only needs the hook to exist.
-vi.mock('expo-router', () => ({ useFocusEffect: () => undefined }));
+vi.mock('expo-router', () => ({
+  useFocusEffect: () => undefined,
+  useRouter: () => ({ push: vi.fn() }),
+}));
 
 const summary = vi.hoisted(() => ({
   isPending: false,
@@ -143,6 +146,22 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { error: vi.fn() },
+}));
+
+// The proposal sheet reads the reader's organization role for its refusal line
+// (`@/lib/trial-refusal`), which resolves the membership list; only the list and
+// the persisted selection are faked here.
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ organizationId: 'org_1', isLoaded: true }),
+}));
+vi.mock('@/lib/hooks/use-organizations-list', () => ({
+  useOrganizationsList: () => ({
+    data: [{ organizationId: 'org_1', role: 'member' }],
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    refetch: vi.fn(),
+  }),
 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));

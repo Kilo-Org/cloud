@@ -10,14 +10,20 @@ import { UsageBarChart } from './usage-bar-chart';
 
 const layoutDirection = vi.hoisted(() => ({ isRTL: false }));
 
-vi.mock('react-native', () => ({ I18nManager: layoutDirection, View: 'View' }));
+const themeState = vi.hoisted(() => ({ scheme: 'light' as 'light' | 'dark' }));
+
+vi.mock('react-native', () => ({
+  I18nManager: layoutDirection,
+  View: 'View',
+  useColorScheme: () => themeState.scheme,
+}));
 vi.mock('react-native-svg', () => ({ Rect: 'Rect', default: 'Svg' }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ i18n: { language: 'en' } }) }));
 vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/format', () => ({ formatCalendarDate: (value: string) => value }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ primary: '#101010', ringTrack: '#909090' }),
+  useThemeColors: () => ({ primary: '#101010', selection: '#202020', ringTrack: '#909090' }),
 }));
 
 const POINTS = [
@@ -55,6 +61,29 @@ function xs(renderer: TestRenderer.ReactTestRenderer): number[] {
 
 afterEach(() => {
   layoutDirection.isRTL = false;
+  themeState.scheme = 'light';
+});
+
+/** Every bar's fill; the full-width baseline is not a bar. */
+function barFills(renderer: TestRenderer.ReactTestRenderer): string[] {
+  return renderer.root
+    .findAllByType('Rect')
+    .filter(rect => Number(rect.props.width) < VIEW_BOX)
+    .map(rect => String(rect.props.fill));
+}
+
+describe('UsageBarChart bar color', () => {
+  it('paints the bars with the primary token in light mode', async () => {
+    themeState.scheme = 'light';
+
+    expect(barFills(await mount())).toEqual(['#101010', '#101010', '#101010']);
+  });
+
+  it('paints the bars with the selection token in dark mode', async () => {
+    themeState.scheme = 'dark';
+
+    expect(barFills(await mount())).toEqual(['#202020', '#202020', '#202020']);
+  });
 });
 
 describe('UsageBarChart bar direction', () => {

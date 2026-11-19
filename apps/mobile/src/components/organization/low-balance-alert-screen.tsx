@@ -121,6 +121,7 @@ export function LowBalanceAlertScreen() {
         <LowBalanceAlertForm
           organizationId={organizationId}
           settings={orgWithMembers.data.settings}
+          canManageBilling={isMoneyRole(role)}
         />
       </TabScreenScrollView>
     </View>

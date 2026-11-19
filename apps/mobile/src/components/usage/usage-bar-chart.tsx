@@ -1,6 +1,6 @@
 import Svg, { Rect } from 'react-native-svg';
 import { useTranslation } from 'react-i18next';
-import { I18nManager, View } from 'react-native';
+import { I18nManager, useColorScheme, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
@@ -28,6 +28,10 @@ const MIN_VISIBLE_HEIGHT = 1.5;
  */
 export function UsageBarChart({ points, accessibilityLabel }: Readonly<UsageBarChartProps>) {
   const colors = useThemeColors();
+  // In dark mode the full-chart accent is the softer `--selection` tone, the
+  // same swap large accent fills make elsewhere (the device-session badge);
+  // light mode stays on `primary`.
+  const barFill = useColorScheme() === 'dark' ? colors.selection : colors.primary;
   const { i18n } = useTranslation();
   let peak = 0;
   for (const point of points) {
@@ -69,7 +73,7 @@ export function UsageBarChart({ points, accessibilityLabel }: Readonly<UsageBarC
                 y={100 - height}
                 width={barWidth}
                 height={height}
-                fill={colors.primary}
+                fill={barFill}
               />
             );
           })}

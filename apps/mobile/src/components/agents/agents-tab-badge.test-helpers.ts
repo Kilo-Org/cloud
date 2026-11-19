@@ -1,6 +1,7 @@
 import { createElement, Fragment, type ReactNode } from 'react';
 import { vi } from 'vitest';
 
+import type * as OrganizationsModule from '@kilocode/app-shared/organizations';
 import '@/i18n';
 import TabsLayout from '@/app/(app)/(tabs)/_layout';
 import { AgentSessionListScreen } from './session-list-screen';
@@ -19,8 +20,13 @@ const attentionKv = vi.hoisted(() => ({
   setItem: vi.fn().mockResolvedValue(undefined),
 }));
 const routerReplace = vi.hoisted(() => vi.fn());
+// Mutable so a test can present a different route: the tabs layout reads these
+// segments to decide whether a form sheet covers the tab's screen.
+const segments = vi.hoisted(() => ({
+  current: ['(app)', '(tabs)', '(0_home)'] as readonly string[],
+}));
 
-export { attentionKv, fetchSessions, organization, routerReplace };
+export { attentionKv, fetchSessions, organization, routerReplace, segments };
 
 vi.mock('@/lib/persist/encrypted-kv', () => attentionKv);
 vi.mock('@/lib/trpc', () => {
@@ -46,7 +52,7 @@ vi.mock('expo-router', () => ({
     Screen: 'TabScreen',
   }),
   usePathname: () => '/',
-  useSegments: () => ['(app)', '(tabs)', '(0_home)'],
+  useSegments: () => segments.current,
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ replace: routerReplace, setParams: vi.fn() }),
   useNavigation: () => ({ isFocused: () => false }),
@@ -193,12 +199,19 @@ vi.mock('@/lib/auth/auth-context', () => ({
   }),
 }));
 vi.mock('@/lib/organization-context', () => ({ useOrganization: () => organization }));
-vi.mock('@/lib/hooks/use-organization-queries', () => {
+vi.mock('@/lib/hooks/use-organization-queries', async () => {
+  // The billing step's role rule is the shared package's, not this harness's;
+  // the memberships here carry no role, so every reader resolves to the copy
+  // that names the person who can change the plan.
+  const { canManageOrganizationBilling } = await vi.importActual<typeof OrganizationsModule>(
+    '@kilocode/app-shared/organizations'
+  );
   const orgs = ['org-a', 'org-b'].map(organizationId => ({
     organizationId,
     organizationName: organizationId,
   }));
   return {
+    isMoneyRole: canManageOrganizationBilling,
     useOrgBoundary: () => ({
       orgs,
       org: orgs.find(org => org.organizationId === organization.organizationId),

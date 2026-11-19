@@ -19,6 +19,16 @@ type SetupCommandFieldProps = Readonly<{
   command: string;
   /** The field's label, which is also its accessible name. */
   label: string;
+  /**
+   * The gap between the label row and the field. Undefined keeps the ordinary
+   * compact block (`gap-1.5`); a card that renders row controls over the label
+   * line passes `COMMAND_ROW_FIELD_GAP_CLASS`, which lands on a wrapper around
+   * the label row and the field/value box only — the pair the controls' 46 dp
+   * touch band has to clear. The block root and anything below the field (an
+   * error or reserved message, the counter, the at-limit line) keep the
+   * ordinary compact spacing.
+   */
+  gapClassName?: string;
   /** The viewer cannot manage this row: render the command as read-only text. */
   readOnly?: boolean;
   /** The row is busy, not unmanageable: the field stays a field, dimmed. */
@@ -50,6 +60,7 @@ type SetupCommandFieldProps = Readonly<{
 export function SetupCommandField({
   command,
   label,
+  gapClassName,
   readOnly = false,
   disabled = false,
   accessibilityHint,
@@ -61,22 +72,27 @@ export function SetupCommandField({
 
   if (readOnly) {
     return (
+      // The caller's gap lands only on the label-to-value pair, via the same
+      // wrapper the editable branch uses; the block root keeps its compact
+      // `gap-1.5`.
       <View className="gap-1.5">
-        <FormFieldLabel label={label} />
-        <View
-          className={cn(
-            INPUT_BOX_SHAPE_CLASS,
-            'justify-center rounded-md border border-input bg-background py-2.5 dark:bg-[#FFFFFF0A]'
-          )}
-        >
-          <SelectableText
-            accessibilityLabel={label}
-            accessibilityHint={accessibilityHint}
-            className="font-mono text-sm leading-[1.25rem] text-foreground"
-            style={codeFieldTextStyle()}
+        <View className={gapClassName ?? 'gap-1.5'}>
+          <FormFieldLabel label={label} />
+          <View
+            className={cn(
+              INPUT_BOX_SHAPE_CLASS,
+              'justify-center rounded-md border border-input bg-background py-2.5 dark:bg-[#FFFFFF0A]'
+            )}
           >
-            {command}
-          </SelectableText>
+            <SelectableText
+              accessibilityLabel={label}
+              accessibilityHint={accessibilityHint}
+              className="font-mono text-sm leading-[1.25rem] text-foreground"
+              style={codeFieldTextStyle()}
+            >
+              {command}
+            </SelectableText>
+          </View>
         </View>
       </View>
     );
@@ -99,10 +115,15 @@ export function SetupCommandField({
       ? withoutMonoFamily('font-mono')
       : 'font-mono';
 
+  // The caller's gap lands only on the label-to-input pair inside `FormField`:
+  // the block's own root keeps its compact `gap-1.5`, so the counter and the
+  // at-limit line below the field keep the ordinary spacing no matter what the
+  // controls' touch band needs above the input.
   return (
     <View className="gap-1.5">
       <FormField
         label={label}
+        gapClassName={gapClassName}
         defaultValue={command}
         placeholder={placeholder}
         className={monoClass}

@@ -10,10 +10,10 @@ import {
   parseEmails,
   parseThreshold,
   saveErrorCopy,
-  type SaveErrorCopy,
   thresholdError,
   thresholdErrorMessages,
 } from '@/components/organization/low-balance-alert-validators';
+import { RefusalStatus } from '@/components/refusal-status';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
@@ -25,6 +25,8 @@ import { formatNumber } from '@/lib/format';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { type OrgWithMembers } from '@/lib/hooks/use-organization-queries';
+import { isTrialExpiredRefusal } from '@/lib/server-error-copy';
+import { useTrialRefusalAction } from '@/lib/trial-refusal';
 
 /** The payload every commit of this form posts. */
 type LowBalanceAlertInput = Readonly<{
@@ -33,12 +35,14 @@ type LowBalanceAlertInput = Readonly<{
   minimum_balance_alert_email?: string[];
 }>;
 
-/** A rejected commit: where its sentence belongs, and what to retry. */
-type SaveFailure = SaveErrorCopy & Readonly<{ input: LowBalanceAlertInput }>;
+/** A rejected commit: the raw rejection, and what to retry. */
+type SaveFailure = Readonly<{ error: unknown; input: LowBalanceAlertInput }>;
 
 type LowBalanceAlertFormProps = Readonly<{
   organizationId: string;
   settings: OrgWithMembers['settings'];
+  /** Whether this reader may change the plan, which picks the refusal copy. */
+  canManageBilling: boolean;
 }>;
 
 /**
@@ -56,7 +60,11 @@ function liveThresholdError(value: string): string | null {
  * fields write on blur and on the keyboard's submit under the same all-valid
  * rule. A rejected write keeps the draft and names itself inline with a Retry.
  */
-export function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormProps) {
+export function LowBalanceAlertForm({
+  organizationId,
+  settings,
+  canManageBilling,
+}: LowBalanceAlertFormProps) {
   const { t } = useTranslation();
   const saveMutation = useOrganizationMutations(organizationId).updateMinimumBalanceAlert;
   const { email: myEmail } = useCurrentUserId();
@@ -152,7 +160,7 @@ export function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAler
       },
       onError: error => {
         settle(version, () => {
-          setFailure({ ...saveErrorCopy(error), input });
+          setFailure({ error, input });
         });
       },
     });
@@ -174,12 +182,21 @@ export function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAler
     }
   }
 
+  // The sentence and the step are chosen for this reader's role: only the plan
+  // refusal offers a step, and only to a role the server would let take it.
+  const failureCopy = failure === null ? null : saveErrorCopy(failure.error, canManageBilling);
+  const trialRefusalAction = useTrialRefusalAction(
+    failure !== null && isTrialExpiredRefusal(failure.error),
+    organizationId
+  );
+
   // The error is announced once: under the recipients when the server rejected
   // an address and the field is on screen, otherwise on the form line. The
   // rejected sentence keeps priority over a last confirmation.
-  const emailFailure = enabled && failure?.field === 'emails' ? failure : null;
+  const emailFailure = enabled && failureCopy?.field === 'emails' ? failureCopy : null;
   const saveFailureHere = emailFailure?.message ?? null;
-  const saveFailureOnForm = failure !== null && emailFailure === null ? failure.message : null;
+  const saveFailureOnForm =
+    failureCopy !== null && emailFailure === null ? failureCopy.message : null;
 
   return (
     <>
@@ -251,9 +268,14 @@ export function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAler
       {/* The error is announced once: under the recipients when the server
           rejected an address, otherwise here. A failure outranks the last
           confirmation, and the Retry resends the rejected write so it cannot
-          drift from the values that failed. */}
+          drift from the values that failed. A refusal this reader can end
+          carries the billing step under the copy. */}
       {saveFailureOnForm != null && (
-        <AccessibleStatus message={saveFailureOnForm} tone="error" className="text-sm" />
+        <RefusalStatus
+          message={saveFailureOnForm}
+          action={trialRefusalAction}
+          className="text-sm"
+        />
       )}
       {saved && (
         <AccessibleStatus

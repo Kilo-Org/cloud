@@ -42,7 +42,16 @@ const queries = vi.hoisted(() => ({
 const boundary = vi.hoisted(() => ({
   requireSeats: true,
   seatCount: { used: 3, total: 3 },
+  /** The id the screen asked the boundary for; a route's `?org=` arrives here. */
+  override: undefined as string | undefined,
+  isResolving: false,
   isTrialExpiredForEnforcement: false,
+}));
+
+/** The id each billing read was keyed on. */
+const reads = vi.hoisted(() => ({
+  subscription: undefined as string | undefined,
+  seats: undefined as string | undefined,
 }));
 
 /** Whether the storefront rule lets this surface link to the web page. */
@@ -50,31 +59,41 @@ const platform = vi.hoisted(() => ({ linkAllowed: true }));
 
 // `vi.hoisted` results cannot be exported at their declaration (vitest hoists
 // them above the export), so they are exported after the declaration instead.
-export { boundary, platform, queries };
+export { boundary, platform, queries, reads };
 
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   isMoneyRole: () => true,
-  useOrgBoundary: () => ({
-    organizationId: 'org-1',
-    role: 'owner',
-    org: {
-      id: 'org-1',
-      name: 'Acme',
-      plan: 'enterprise',
-      seatCount: boundary.seatCount,
-      requireSeats: boundary.requireSeats,
-      isTrialExpiredForEnforcement: boundary.isTrialExpiredForEnforcement,
-      parentOrganizationId: null,
-    },
-    isResolving: false,
-  }),
+  useOrgBoundary: (organizationIdOverride?: string) => {
+    boundary.override = organizationIdOverride;
+    const organizationId = organizationIdOverride ?? 'org-1';
+    return {
+      organizationId,
+      role: 'owner',
+      org: {
+        id: organizationId,
+        name: 'Acme',
+        plan: 'enterprise',
+        seatCount: boundary.seatCount,
+        requireSeats: boundary.requireSeats,
+        isTrialExpiredForEnforcement: boundary.isTrialExpiredForEnforcement,
+        parentOrganizationId: null,
+      },
+      isResolving: boundary.isResolving,
+    };
+  },
   useOrgParentLink: () => ({ parentLink: null }),
   useOrgKiloPassSummary: () => queries.kiloPass,
 }));
 
 vi.mock('@/lib/hooks/use-org-billing-queries', () => ({
-  useOrgSeatSubscription: () => queries.subscription,
-  useOrgSeats: () => queries.seats,
+  useOrgSeatSubscription: (organizationId?: string) => {
+    reads.subscription = organizationId;
+    return queries.subscription;
+  },
+  useOrgSeats: (organizationId?: string) => {
+    reads.seats = organizationId;
+    return queries.seats;
+  },
   useOrgAutoTopUpConfig: () => queries.autoTopUp,
 }));
 
@@ -154,8 +173,10 @@ vi.mock('@/components/ui/text', async () => {
 
 vi.mock('react-native', () => ({ View: 'View' }));
 
-export function mount() {
-  return renderWithProviders(createElement(OrganizationBillingScreen));
+export function mount(organizationIdOverride?: string) {
+  return renderWithProviders(
+    createElement(OrganizationBillingScreen, { organizationIdOverride })
+  );
 }
 
 type Handler = () => void;
@@ -227,7 +248,11 @@ export function resetBillingQueries() {
   }
   boundary.requireSeats = true;
   boundary.seatCount = { used: 3, total: 3 };
+  boundary.override = undefined;
+  boundary.isResolving = false;
   boundary.isTrialExpiredForEnforcement = false;
+  reads.subscription = undefined;
+  reads.seats = undefined;
   platform.linkAllowed = true;
   queries.seats.data = { usedSeats: 3, totalSeats: 3 };
   queries.autoTopUp.data = { enabled: true, amountCents: 5000, thresholdCents: 1000 };

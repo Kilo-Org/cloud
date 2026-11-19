@@ -11,6 +11,7 @@ import {
   CHIP_FRAME_DP,
   CHIP_HIT_SLOP,
   CHIP_HIT_SLOP_DP,
+  COMMAND_ROW_FIELD_GAP_CLASS,
   COMPACT_BUTTON_HIT_SLOP,
   COMPACT_CONTROL_BOX_CLASS,
   COMPACT_CONTROL_HIT_SLOP_DP,
@@ -47,6 +48,8 @@ import {
   LEGAL_LINK_ROW_CLASS,
   LINE_ACTION_BOX_CLASS,
   LINE_ACTION_HIT_SLOP,
+  LINE_ACTION_OVERLAY_CLASS,
+  LINE_ACTION_REACH_DP,
   MIN_TAP_TARGET_DP,
   ROW_TARGET_CLASS,
   STATE_ACTION_CLASS,
@@ -470,6 +473,31 @@ describe('code-reviewer line-action geometry', () => {
     // The box floats over one line, so neither axis has a shorter side.
     expect(LINE_ACTION_HIT_SLOP.top).toBe(LINE_ACTION_HIT_SLOP.bottom);
     expect(LINE_ACTION_HIT_SLOP.left).toBe(LINE_ACTION_HIT_SLOP.right);
+  });
+
+  it('lays the command-card band out at the full slop reach', async () => {
+    // The band is the controls' parent, and each control's box is the whole
+    // touch target on its own node: `h-[46px]` past the 44pt target, with no
+    // `hitSlop` whose outer side a row's end cannot dispatch (measured: the
+    // vertical slop band reorders, a tap past the outer edge does nothing).
+    expect(LINE_ACTION_OVERLAY_CLASS).toContain(`h-[${LINE_ACTION_REACH_DP}px]`);
+    expect(await compiledDp(LINE_ACTION_OVERLAY_CLASS, 'height')).toBe(LINE_ACTION_REACH_DP);
+    // The band pins the boxes' outer edge to the card's content edge
+    // (`p-4` = 14dp), so the delete control's whole 46dp width is tappable.
+    expect(LINE_ACTION_OVERLAY_CLASS).toContain('end-[14px]');
+    // The field gap clears the band's bottom edge: 14dp card padding + 17.5dp
+    // label line + 16dp gap = 47.5dp, more than a dp below the band's 46dp.
+    expect(COMMAND_ROW_FIELD_GAP_CLASS).toBe('gap-y-[16px]');
+    expect(await compiledDp(COMMAND_ROW_FIELD_GAP_CLASS, 'rowGap')).toBe(16);
+    expect(14 + 17.5 + 16 - LINE_ACTION_REACH_DP).toBeGreaterThanOrEqual(1);
+    // The band covers the label's tail, so it is touch-transparent itself:
+    // only the control boxes take taps.
+    expect(LINE_ACTION_OVERLAY_CLASS).toContain('absolute');
+    expect(LINE_ACTION_OVERLAY_CLASS).toContain('flex-row');
+    expect(LINE_ACTION_OVERLAY_CLASS).toContain('gap-3');
+    // The box's own compiled width and height carry the reach past 44dp.
+    expect(await compiledDp('w-[46px]', 'width')).toBe(LINE_ACTION_REACH_DP);
+    expect(await compiledDp('h-[46px]', 'height')).toBe(LINE_ACTION_REACH_DP);
   });
 });
 

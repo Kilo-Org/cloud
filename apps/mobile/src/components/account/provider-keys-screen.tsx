@@ -25,6 +25,7 @@ import {
   providerKeyScope,
   providerKeyScopeInput,
 } from '@/lib/byok/provider-key-scope';
+import { announceTestOutcome } from '@/lib/byok/key-test-outcome';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
@@ -98,14 +99,8 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
 
   const test = useMutation(
     trpc.byok.testApiKey.mutationOptions({
-      onSuccess: result => {
-        if (result.success) {
-          announcingToast.success(result.message);
-          return;
-        }
-        announcingToast.error(result.message);
-      },
-      onError: error => toast.error(error.message),
+      onSuccess: announceTestOutcome,
+      onError: () => announcingToast.error(t('profile.providerKeys.testFailed')),
       onSettled: (_result, _error, input) => {
         setTestingId(current => (current === input.id ? null : current));
       },

@@ -18,9 +18,9 @@ import {
 } from '@/components/organization/organization-role-options';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
+import { RefusalStatus } from '@/components/refusal-status';
 import { SheetHeader } from '@/components/sheet-header';
 import { SheetScrollView } from '@/components/tab-screen';
-import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
@@ -39,6 +39,8 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { usePopOnce } from '@/lib/navigation/pop-once';
 import { selectionCheckColor } from '@/lib/selection-check-color';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { isTrialExpiredRefusal } from '@/lib/server-error-copy';
+import { useTrialRefusalAction } from '@/lib/trial-refusal';
 import { cn } from '@/lib/utils';
 import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 
@@ -71,8 +73,16 @@ export function InviteMemberSheet() {
   // A rejected invite is rendered in localized copy, never as the server wrote
   // it: a schema rejection is a JSON issue array (internal code, raw pattern,
   // English message), not a sentence. Correcting the address drops the
-  // rejection, so the field never sits under a stale one.
-  const inviteError = mutations.invite.isError ? inviteErrorCopy(mutations.invite.error) : null;
+  // rejection, so the field never sits under a stale one. The copy and the step
+  // are chosen for this reader's role: only the plan refusal offers a step, and
+  // only to a role the server would let take it.
+  const inviteFailure = mutations.invite.isError ? mutations.invite.error : null;
+  const inviteError =
+    inviteFailure == null ? null : inviteErrorCopy(inviteFailure, isMoneyRole(myRole));
+  const trialRefusalAction = useTrialRefusalAction(
+    isTrialExpiredRefusal(inviteFailure),
+    organizationId
+  );
   const clearInviteError = () => {
     if (mutations.invite.isError) {
       resetInvite();
@@ -262,10 +272,13 @@ export function InviteMemberSheet() {
 
         {/* The rejected invite sits under the field it names, above the
             software keyboard. The mutation has no toast (inline error pattern
-            P2), so AccessibleStatus is the single announcement owner here: one
-            announcement per platform, visuals preserved (tone error). */}
-        <AccessibleStatus
+            P2), so the status line is the single announcement owner here: one
+            announcement per platform, visuals preserved (tone error). A plan
+            refusal this reader can end carries the billing step under the
+            copy. */}
+        <RefusalStatus
           message={visibleInviteError?.field === 'form' ? visibleInviteError.message : null}
+          action={trialRefusalAction}
           className="text-sm"
         />
 

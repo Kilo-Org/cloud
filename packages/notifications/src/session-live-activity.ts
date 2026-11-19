@@ -85,7 +85,10 @@ function maxCost(
 /**
  * The keep-the-previous rule for a fact a row may not carry: an absent fact
  * leaves what the card shows, and a carried one replaces it. `null` is not a
- * row value here; only `failure` reports an absence with it.
+ * row value for these facts; the `failure` fact below is the one exception —
+ * it reports "no failure" with `null`, so its caller passes the remembered
+ * kind as `previous` and an explicit `null` clears it while an absent key
+ * keeps it.
  */
 function carried<T>(value: T | undefined, previous: T | null | undefined): T | null {
   return value === undefined ? (previous ?? null) : value;
@@ -129,7 +132,7 @@ export function buildSessionLiveActivityContentState(
 ): SessionLiveActivityContentState {
   const previous = options.previous;
   const base = glanceableStatusKind(row.status);
-  const failure = row.failure === undefined ? (previous?.failure?.kind ?? null) : row.failure;
+  const failure = carried(row.failure, previous?.failure?.kind ?? null);
   const statusKind: SessionCardStatusKind = base === 'idle' && failure !== null ? 'failed' : base;
   const approvalKey = row.status === 'permission' ? options.approvalKey : null;
   const changes = carried(row.changes, previous?.changes);

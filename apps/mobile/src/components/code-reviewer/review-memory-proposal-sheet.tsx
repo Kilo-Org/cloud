@@ -1,9 +1,10 @@
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
+import { RefusalStatus } from '@/components/refusal-status';
 import { SheetHeader } from '@/components/sheet-header';
-import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
@@ -20,6 +21,24 @@ export function ReviewMemoryProposalSheet(props: ProposalEditorInput) {
   const { permission } = props;
   const { t } = useTranslation();
   const dismissal = useConfirmDialog();
+  // The screen presents this sheet in place and unmounts it once the close
+  // completes, so the dismissal animation needs a `visible` of its own here: the
+  // close sets it false, the native sheet slides out, and the parent's close runs
+  // from the dismissal report. A step that leaves the sheet hands its navigation
+  // through the same handoff, so the billing route is pushed onto a stack with no
+  // sheet above it instead of under a sheet that is still presented.
+  const [visible, setVisible] = useState(true);
+  const afterDismissRef = useRef<(() => void) | null>(null);
+  const close = (after?: () => void) => {
+    afterDismissRef.current = after ?? null;
+    setVisible(false);
+  };
+  const dismissed = () => {
+    const after = afterDismissRef.current;
+    afterDismissRef.current = null;
+    props.onClose();
+    after?.();
+  };
   const {
     record,
     draft,
@@ -27,18 +46,35 @@ export function ReviewMemoryProposalSheet(props: ProposalEditorInput) {
     dirty,
     valid,
     failure,
+    failureMessage,
+    failureAction,
     pending,
     canEdit,
     busy,
     changeField,
     perform,
     requestClose,
+    requestCloseThen,
     requestDismiss,
     dialog,
-  } = useReviewMemoryProposalEditor(props);
+  } = useReviewMemoryProposalEditor({ ...props, onClose: close });
+  const refusalAction =
+    failureAction === undefined
+      ? undefined
+      : {
+          label: failureAction.label,
+          onPress: () => {
+            requestCloseThen(failureAction.onPress);
+          },
+        };
 
   return (
-    <SessionPageSheet visible onClose={requestClose} onRequestDismiss={requestDismiss}>
+    <SessionPageSheet
+      visible={visible}
+      onClose={requestClose}
+      onRequestDismiss={requestDismiss}
+      onDismiss={dismissed}
+    >
       <SheetHeader
         title={t('codeReviewer.reviewMemory.proposalDetails')}
         onDone={requestClose}
@@ -147,7 +183,7 @@ export function ReviewMemoryProposalSheet(props: ProposalEditorInput) {
             <Text>{t('common.openPullRequest')}</Text>
           </Button>
         ) : null}
-        <AccessibleStatus message={failure?.message ?? null} />
+        <RefusalStatus message={failureMessage} action={refusalAction} />
         {failure && canEdit ? (
           <Button
             variant="outline"

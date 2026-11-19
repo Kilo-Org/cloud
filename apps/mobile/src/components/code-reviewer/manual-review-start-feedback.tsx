@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
-import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { RefusalStatus } from '@/components/refusal-status';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 
@@ -28,7 +28,10 @@ type ManualReviewStartFeedbackProps = {
  * The retry is offered only when resending can change the outcome: a stall
  * always can, while a terminal refusal (a lapsed organization plan, a lost
  * role) can only be fixed elsewhere, so the pinned action stays as the single
- * way forward instead of two controls that do the same thing.
+ * way forward instead of two controls that do the same thing. The lapsed plan
+ * is the one refusal with a destination inside the app: a billing role's
+ * failure carries the billing step, which `RefusalStatus` paints under the
+ * copy and announces once.
  */
 export function ManualReviewStartFeedback({
   stalled,
@@ -43,7 +46,11 @@ export function ManualReviewStartFeedback({
   const retryable = stalled || failure?.retryable === true;
   return (
     <View className="gap-2 pb-3">
-      <AccessibleStatus message={message} tone="error" className="text-sm" />
+      <RefusalStatus
+        message={message}
+        action={stalled ? undefined : failure?.action}
+        className="text-sm"
+      />
       {retryable ? (
         <Button variant="outline" onPress={onRetry} accessibilityLabel={t('common.retry')}>
           <Text>{t('common.retry')}</Text>

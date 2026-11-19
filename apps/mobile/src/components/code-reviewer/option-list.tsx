@@ -5,6 +5,7 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 
+import { RefusalStatus } from '@/components/refusal-status';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ChoiceRow } from '@/components/ui/choice-row';
@@ -12,10 +13,12 @@ import { RowGroup } from '@/components/ui/row-group';
 import { RadioGroup } from '@/components/ui/radio-group';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
-import { reviewerSaveFailure, type ReviewerSaveFailure } from '@/lib/code-reviewer-save-error';
+import { reviewerSaveFailure } from '@/lib/code-reviewer-save-error';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { usePopOnce } from '@/lib/navigation/pop-once';
 import { CODE_REVIEWER_HOME_PATH } from '@/lib/profile-agent-navigation';
+import { isTrialExpiredRefusal } from '@/lib/server-error-copy';
+import { useCanManageBilling, useTrialRefusalAction } from '@/lib/trial-refusal';
 import { cn } from '@/lib/utils';
 
 type OptionListProps<T extends string, TSaveResult> = {
@@ -31,6 +34,12 @@ type OptionListProps<T extends string, TSaveResult> = {
   descriptions?: Readonly<Record<T, string>>;
   /** Disables every row, e.g. while the config backing `selected` is still loading. */
   disabled?: boolean;
+  /**
+   * The organization the save is made against, or null for a personal scope.
+   * The role it resolves to decides the explanation a refused save shows: the
+   * organization trial gate's copy offers the plan step to a billing role.
+   */
+  organizationId?: string | null;
 };
 
 /** Full-screen single-select list. Selecting saves, then pops the screen only once the save confirms. */
@@ -42,13 +51,26 @@ export function OptionList<T extends string, TSaveResult>({
   labels,
   descriptions,
   disabled,
+  organizationId,
 }: Readonly<OptionListProps<T, TSaveResult>>) {
   const popOnce = usePopOnce();
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const canManageBilling = useCanManageBilling(organizationId);
   const [pending, setPending] = useState<T | null>(null);
-  const [failure, setFailure] = useState<(ReviewerSaveFailure & { option: T }) | null>(null);
+  // The rejection is kept raw rather than as its mapped copy: the explanation
+  // and the step under it are re-derived on every render, so the role that
+  // settles after the refusal paints both from the same answer.
+  const [failure, setFailure] = useState<{ error: unknown; option: T } | null>(null);
   const retryInFlight = failure?.option === pending;
+  const report =
+    failure === null
+      ? null
+      : reviewerSaveFailure(failure.error, t('codeReviewer.configSaveFailed'), canManageBilling);
+  const billingAction = useTrialRefusalAction(
+    failure !== null && isTrialExpiredRefusal(failure.error),
+    organizationId
+  );
 
   const handleSelect = async (option: T) => {
     setPending(option);
@@ -68,10 +90,7 @@ export function OptionList<T extends string, TSaveResult>({
       // The save hook already surfaced the failure (toast + cache rollback) —
       // keep the screen up, clear the busy state, and hand the row to the
       // inline explanation below.
-      setFailure({
-        ...reviewerSaveFailure(error, t('codeReviewer.configSaveFailed')),
-        option,
-      });
+      setFailure({ error, option });
     } finally {
       setPending(null);
     }
@@ -104,10 +123,17 @@ export function OptionList<T extends string, TSaveResult>({
             ))}
           </RowGroup>
         </RadioGroup>
-        {failure !== null && (
-          <View className="gap-3 rounded-xl bg-warn-tile-bg p-4" accessibilityLiveRegion="polite">
-            <Text className="text-sm font-medium">{failure.message}</Text>
-            {failure.retryable && (
+        {failure !== null && report !== null && (
+          <View className="gap-3 rounded-xl bg-warn-tile-bg p-4">
+            {/* `RefusalStatus` owns the announcement (the card carried a live
+                region of its own before), and the tile's own ink stays: the
+                refusal is a configuration refusal, not a destructive one. */}
+            <RefusalStatus
+              message={report.message}
+              action={billingAction}
+              className="text-sm font-medium text-foreground"
+            />
+            {report.retryable && (
               <Button
                 variant="outline"
                 size="sm"

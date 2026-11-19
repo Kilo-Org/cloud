@@ -11,11 +11,16 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as OrganizationsModule from '@kilocode/app-shared/organizations';
+
 import { ScrollView } from 'react-native';
+import { i18n } from '@/i18n';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { type SecurityFinding } from '@/lib/security-agent';
 import { mapSecurityDismissOperationError } from '@/lib/security-agent-ledger';
+import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
+import { TRIAL_ENDED_BILLING_COPY_KEY, TRIAL_ENDED_COPY_KEY } from '@/lib/trial-refusal-copy';
 import { SettingsRecoveryStatus } from './settings-recovery-status';
 import { DismissFindingScreen } from './dismiss-finding-screen';
 
@@ -38,6 +43,19 @@ const SERVICE_UNAVAILABLE_MESSAGE = vi.hoisted(() => 'Security service is unavai
 const SERVICE_UNAVAILABLE_COPY = vi.hoisted(
   () => 'The security service is unavailable. Try again.'
 );
+
+// The two sentences the trial refusal has, one per reader, and the step the
+// billing one offers.
+const TRIAL_MEMBER_COPY = i18n.t(TRIAL_ENDED_COPY_KEY);
+const TRIAL_BILLING_COPY = i18n.t(TRIAL_ENDED_BILLING_COPY_KEY);
+const BILLING_ACTION_LABEL = i18n.t('organization.hub.manageBilling');
+
+/** The lapsed-trial refusal as the organization gate sends it. */
+function trialRefusal(): Error {
+  return Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+    data: { code: 'FORBIDDEN' },
+  });
+}
 
 const routerBack = vi.hoisted(() => vi.fn());
 type MockedFinding = Pick<
@@ -85,6 +103,9 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   TextInput: 'TextInput',
   ActivityIndicator: 'ActivityIndicator',
+  // The refusal step is a Pressable, and the shared status reads the platform
+  // for its live region.
+  Pressable: 'Pressable',
   Platform: { OS: 'android' },
   I18nManager: { isRTL: false },
 }));
@@ -93,6 +114,20 @@ vi.mock('@/components/ui/icons', () => ({ ShieldOff: 'ShieldOff' }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: routerBack }),
 }));
+// The refusal hooks read the reader's role through the organization query
+// chain; this harness has no organization provider and the chain pulls the Expo
+// runtime it cannot load, so the boundary is stubbed and the real money-role
+// rule decides from the role a case sets.
+const trialRole = vi.hoisted(() => ({ role: undefined as string | undefined }));
+vi.mock('@/lib/hooks/use-organization-queries', async () => {
+  const { canManageOrganizationBilling } = await vi.importActual<typeof OrganizationsModule>(
+    '@kilocode/app-shared/organizations'
+  );
+  return {
+    isMoneyRole: canManageOrganizationBilling,
+    useOrgBoundary: () => ({ role: trialRole.role }),
+  };
+});
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useMutedDisabledInk: () => '#fff',
   useThemeColors: () => ({ mutedForeground: '#000', primaryForeground: '#fff' }),
@@ -201,8 +236,19 @@ function findCommentInput(root: I): I {
   return n;
 }
 
+/** The billing step a refusal renders under the sentence that names it. */
+function billingSteps(root: I): I[] {
+  return root.findAll(
+    n =>
+      typeof n.type === 'string' &&
+      (n.type as string) === 'Pressable' &&
+      n.props.accessibilityLabel === BILLING_ACTION_LABEL
+  );
+}
+
 describe('DismissFindingScreen dismissal CTA states', () => {
   beforeEach(() => {
+    trialRole.role = undefined;
     dismiss.mutate.mockClear();
     dismiss.isPending = false;
     dismiss.isError = false;
@@ -402,6 +448,60 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     expect(renderedTexts(root.root)).not.toContain(
       "Couldn't confirm — check the security review before retrying."
     );
+  });
+
+  it('gives a billing role the trial sentence and the step that ends it', () => {
+    trialRole.role = 'owner';
+    dismiss.isError = true;
+    dismiss.error = mapSecurityDismissOperationError(trialRefusal(), true);
+    const root = renderScreen();
+    selectReason();
+
+    // The plan is the fix, so the CTA stays down while the step out is offered.
+    expect(doneDisabled()).toBe(true);
+    expect(renderedTexts(root.root)).toContain(TRIAL_BILLING_COPY);
+    expect(renderedTexts(root.root)).not.toContain(TRIAL_MEMBER_COPY);
+    expect(billingSteps(root.root)).toHaveLength(1);
+  });
+
+  it('keeps every other role on the owner-naming sentence, with no step', () => {
+    trialRole.role = 'member';
+    dismiss.isError = true;
+    dismiss.error = mapSecurityDismissOperationError(trialRefusal());
+    const root = renderScreen();
+    selectReason();
+
+    expect(doneDisabled()).toBe(true);
+    expect(renderedTexts(root.root)).toContain(TRIAL_MEMBER_COPY);
+    expect(billingSteps(root.root)).toHaveLength(0);
+  });
+
+  it('a refusal mapped before the role settled re-reads as the billing sentence once the reader can change the plan', () => {
+    trialRole.role = 'owner';
+    dismiss.isError = true;
+    // Mapped while the membership list was still unresolved, so the sentence
+    // baked on the error is the member-worded one.
+    dismiss.error = mapSecurityDismissOperationError(trialRefusal(), false);
+    const root = renderScreen();
+    selectReason();
+
+    expect(doneDisabled()).toBe(true);
+    expect(renderedTexts(root.root)).toContain(TRIAL_BILLING_COPY);
+    expect(renderedTexts(root.root)).not.toContain(TRIAL_MEMBER_COPY);
+    expect(billingSteps(root.root)).toHaveLength(1);
+  });
+
+  it('a refusal mapped before the role settled re-reads as the owner-naming sentence once the reader loses the plan', () => {
+    trialRole.role = 'member';
+    dismiss.isError = true;
+    // Mapped while the membership list still read as a billing role.
+    dismiss.error = mapSecurityDismissOperationError(trialRefusal(), true);
+    const root = renderScreen();
+    selectReason();
+
+    expect(doneDisabled()).toBe(true);
+    expect(renderedTexts(root.root)).toContain(TRIAL_MEMBER_COPY);
+    expect(billingSteps(root.root)).toHaveLength(0);
   });
 
   it('marks the dismissal CTA busy while the dismissal is pending', () => {

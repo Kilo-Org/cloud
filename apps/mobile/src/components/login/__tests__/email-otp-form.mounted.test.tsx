@@ -254,8 +254,10 @@ describe('EmailOtpForm controls', () => {
 
   it.each([
     ['Arabic-Indic', '٢٤٦٨١٠'],
+    ['Extended Arabic-Indic', '۲۴۶۸۱۰'],
     ['Thai', '๒๔๖๘๑๐'],
     ['full-width', '２４６８１０'],
+    ['mixed Latin and Urdu', '۲468١0'],
   ])('verifies a code typed in %s digits', (_script, typed) => {
     const { mounted, props } = mount();
     const input = mounted.root.findByType('TextInput');

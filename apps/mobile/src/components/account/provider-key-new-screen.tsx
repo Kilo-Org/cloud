@@ -32,6 +32,7 @@ import {
   readStructuredCredential,
   withoutUnshownValues,
 } from '@/lib/byok/credential-fields';
+import { type KeySaveFailure, refusedKeyMessage } from '@/lib/byok/key-refusal';
 import {
   providerKeyNewParams,
   providerKeyPermissions,
@@ -44,7 +45,6 @@ import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { normalizeOrgQueryParam } from '@/lib/org-deep-link';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
-import { isRetryableTrpcError, readTrpcErrorField } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 
 type ProviderOption = inferRouterOutputs<MobileRouter>['byok']['listProviders'][number];
@@ -79,7 +79,7 @@ export function ProviderKeyNewScreen() {
   const [authMode, setAuthMode] = useState<BedrockAuthMode>('apiKey');
   const [fieldErrors, setFieldErrors] =
     useState<Partial<Record<CredentialFieldId, string>>>(NO_FIELD_ERRORS);
-  const save = useSurfaceFeedback<SaveFailure>();
+  const save = useSurfaceFeedback<KeySaveFailure>();
   const scope = providerKeyScope(parsedParam.success ? parsedParam.data.org : undefined);
   const scopeInput = providerKeyScopeInput(scope);
   const keyId = parsedParam.success ? parsedParam.data.id : undefined;
@@ -207,10 +207,11 @@ export function ProviderKeyNewScreen() {
       }
       attempt.fail({
         kind: 'refused',
-        // A structured form names the empty field above, so its summary is the
-        // general refusal; a one-value key has no field to point at.
+        // A structured form names the empty field above, so its summary stays
+        // generic about the missing value; a one-value key has no field to
+        // point at, so it names the key itself.
         message: form
-          ? t('profile.providerKeys.invalidCredentials')
+          ? t('profile.providerKeys.keyIncomplete')
           : t('profile.providerKeys.apiKeyRequired'),
       });
       return;
@@ -234,12 +235,16 @@ export function ProviderKeyNewScreen() {
           })
         : update.mutateAsync({ ...scopeInput, id: keyId, api_key: credential.credential }));
     } catch (error) {
-      attempt.fail({
-        kind: isRetryableTrpcError(error) ? 'retryable' : 'refused',
-        // The server applies the same credential rules it applies to every
-        // stored key, so its message is the specific account of the refusal.
-        message: readTrpcErrorField(error, 'message') ?? t('profile.providerKeys.saveFailed'),
-      });
+      // The server's message can quote the provider's response, which names
+      // things this form does not show and does not translate, so the code
+      // decides the copy. A failure the server has not settled keeps its own
+      // retryable sentence and offers the reader a retry.
+      const refusal = refusedKeyMessage(error);
+      attempt.fail(
+        refusal === null
+          ? { kind: 'retryable', message: t('profile.providerKeys.saveFailed') }
+          : { kind: 'refused', message: refusal }
+      );
       return;
     }
     if (!attempt.owns()) {

@@ -6,6 +6,7 @@ import { ScrollView, View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
+import { RefusalStatus } from '@/components/refusal-status';
 import { SheetHeader } from '@/components/sheet-header';
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
 import { DismissFindingSkeleton } from '@/components/security-agent/dismiss-finding-skeleton';
@@ -19,10 +20,15 @@ import {
   resolveDismissFailure,
 } from '@/components/security-agent/dismiss-finding-failure';
 import { useSecurityAgentCapability } from '@/lib/hooks/use-security-agent';
-import { securityMutationCopyKey } from '@/lib/security-agent-ledger';
+import {
+  isSecurityTrialRefusal,
+  isSecurityTrialRefusalCopyKey,
+  securityMutationCopyKey,
+} from '@/lib/security-agent-ledger';
 import { useSecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
 import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 import { cn } from '@/lib/utils';
 
 // The five GitHub dismissal reasons the backend's DismissReasonSchema accepts
@@ -56,6 +62,12 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   const commentRef = useRef('');
   const dismissFinding = useDismissSecurityFinding(scope);
   const dismissDraft = useSecurityDismissDraft(scope, findingId);
+  // The reader's role, read once: the mapping that built `dismissFinding.error`
+  // took the same role read, and the draft records which refusal it was rather
+  // than which reader saw it, so the stored sentence is re-translated for this
+  // reader while `useBillingAction` offers the step from the same predicate.
+  const canManageBilling = useCanManageBilling(scope);
+  const billingAction = useBillingAction(scope);
 
   // Restore the reason and comment from the stored draft once, so a retry
   // reopens the form with the user's last intent. The form renders only after
@@ -99,7 +111,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
             reason,
             comment,
             lastError: error.message,
-            lastErrorKey: securityMutationCopyKey(error),
+            lastErrorKey: securityMutationCopyKey(error, canManageBilling),
             retryable: isDismissFailureRetryable(error),
           });
         },
@@ -235,11 +247,21 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
 
   const dismissFailure: DismissFailure | null = resolveDismissFailure(
     dismissFinding.isError ? dismissFinding.error : null,
-    dismissDraft.draft
+    dismissDraft.draft,
+    canManageBilling
   );
   // A terminal rejection ended the intent, so disable the CTA and let the
-  // inline copy explain the outcome.
+  // inline copy explain the outcome. The lapsed-trial refusal is the one where
+  // the reader can end the state from here, so a reader who can change the plan
+  // is offered that step under the sentence.
   const dismissBlocked = dismissFailure?.kind === 'terminal';
+  // The sentence can come from the live rejection or from the draft that
+  // survives the sheet, so the ledger is asked about whichever one holds it:
+  // the raw error, or the key that names the copy the draft replays.
+  const dismissIsTrialRefusal = dismissFinding.isError
+    ? isSecurityTrialRefusal(dismissFinding.error)
+    : isSecurityTrialRefusalCopyKey(dismissDraft.draft?.lastErrorKey);
+  const dismissRefusalAction = dismissIsTrialRefusal ? billingAction : undefined;
 
   return (
     <View className="flex-1 bg-background">
@@ -315,9 +337,16 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           }}
         />
 
-        {dismissFailure === null ? null : (
-          <Text className="text-sm text-destructive">{dismissFailure.message}</Text>
-        )}
+        {dismissFailure !== null &&
+          (dismissRefusalAction === undefined ? (
+            <Text className="text-sm text-destructive">{dismissFailure.message}</Text>
+          ) : (
+            <RefusalStatus
+              message={dismissFailure.message}
+              action={dismissRefusalAction}
+              className="text-sm"
+            />
+          ))}
       </ScrollView>
     </View>
   );

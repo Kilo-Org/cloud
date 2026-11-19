@@ -102,7 +102,25 @@ vi.mock('@/lib/trpc', () => ({
 }));
 
 vi.mock('@/lib/a11y/announcing-toast', () => ({
-  announcingToast: { error: (msg: string) => toastErrorMock(msg) },
+  // Mirrors the adapter: the options argument reaches the toast only when the
+  // caller passed one, so a bare-copy call stays a one-argument call.
+  announcingToast: {
+    error: (msg: string, options?: unknown) =>
+      options === undefined ? toastErrorMock(msg) : toastErrorMock(msg, options),
+  },
+}));
+
+// The reader's role lives behind `@/lib/trial-refusal`, whose hooks reach
+// expo-router and the organization query chain; the pure project has no Expo
+// build, so the two hooks are stubbed and driven per test.
+const billing = vi.hoisted(() => ({
+  canManage: false,
+  action: undefined as { label: string; onPress: () => void } | undefined,
+}));
+vi.mock('@/lib/trial-refusal', () => ({
+  useCanManageBilling: () => billing.canManage,
+  useBillingAction: () => billing.action,
+  useTrialRefusalAction: (isRefusal: boolean) => (isRefusal ? billing.action : undefined),
 }));
 
 // use-code-reviewer.ts re-exports from use-reviewer-permission, which imports
@@ -157,6 +175,8 @@ beforeEach(() => {
   invalidateQueriesMock.mockReset();
   toastErrorMock.mockReset();
   mutateMock.mockReset();
+  billing.canManage = false;
+  billing.action = undefined;
   setQueryDataMock.mockClear();
   personalPatchMutateMock.mockResolvedValue({ success: true, webhookSync: null });
   orgPatchMutateMock.mockResolvedValue({ success: true, webhookSync: null });
@@ -231,6 +251,56 @@ describe('useRepoSelectionToggle debounced delta sender', () => {
 
     expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('common.organizationTrialEnded'));
     expect(toastErrorMock).not.toHaveBeenCalledWith(ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
+  });
+
+  it('offers a billing role the plan step beside the copy that offers it', () => {
+    billing.canManage = true;
+    billing.action = {
+      label: i18n.t('organization.hub.manageBilling'),
+      onPress: vi.fn<() => void>(),
+    };
+    vi.useFakeTimers();
+    seedReviewConfigCache([1, 2]);
+    const { toggleRepo, deltaOptions } = getToggleRepo('org-1', 'github');
+
+    toggleRepo(3);
+    vi.advanceTimersByTime(REPO_SELECTION_DEBOUNCE_MS);
+
+    expect(mutateMock).toHaveBeenCalledTimes(1);
+    const vars = mutateMock.mock.calls[0]?.[0] as { optimisticSelection: unknown };
+    deltaOptions.onError?.(
+      Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+        data: { code: 'FORBIDDEN', message: ORGANIZATION_TRIAL_EXPIRED_MESSAGE },
+      }),
+      vars
+    );
+
+    expect(toastErrorMock).toHaveBeenCalledTimes(1);
+    expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('common.organizationTrialEndedBilling'), {
+      action: { label: billing.action.label, onClick: billing.action.onPress },
+    });
+  });
+
+  it('keeps the copy and no step for a member of the organization', () => {
+    vi.useFakeTimers();
+    seedReviewConfigCache([1, 2]);
+    const { toggleRepo, deltaOptions } = getToggleRepo('org-1', 'github');
+
+    toggleRepo(3);
+    vi.advanceTimersByTime(REPO_SELECTION_DEBOUNCE_MS);
+
+    expect(mutateMock).toHaveBeenCalledTimes(1);
+    const vars = mutateMock.mock.calls[0]?.[0] as { optimisticSelection: unknown };
+    deltaOptions.onError?.(
+      Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+        data: { code: 'FORBIDDEN', message: ORGANIZATION_TRIAL_EXPIRED_MESSAGE },
+      }),
+      vars
+    );
+
+    // One argument: no step rides a refusal this reader cannot take.
+    expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('common.organizationTrialEnded'));
+    expect(toastErrorMock.mock.calls[0]).toHaveLength(1);
   });
 
   it('sends nothing when the net delta is empty', () => {

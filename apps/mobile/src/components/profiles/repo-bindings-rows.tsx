@@ -12,9 +12,10 @@ import { Text } from '@/components/ui/text';
 import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
+  COMPACT_CONTROL_BOX_CLASS,
+  COMPACT_CONTROL_HIT_SLOP_DP,
   FIELD_TRIGGER_BODY_CLASS,
   FIELD_TRIGGER_FRAME_CLASS,
-  ICON_TARGET_BOX_CLASS,
   ROW_TARGET_CLASS,
 } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
@@ -77,7 +78,12 @@ export function RepoBindingRow({
       </Eyebrow>
       {onRemove === undefined ? null : (
         <Pressable
-          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+          className={cn(COMPACT_CONTROL_BOX_CLASS, '-me-[7px] active:opacity-70')}
+          // The 32 dp box sits 9 dp inside the row's end edge, so its 16 dp
+          // glyph ends 16 dp from the edge like the leading icon's inset, and
+          // the 8 dp slop reaches 48 dp of touch while staying inside the row
+          // (Android clips touches to the parent view).
+          hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
           accessibilityRole="button"
           accessibilityLabel={t('profiles.repoBindings.removeForRepo', { repo: repoFullName })}
           disabled={isRemoving}

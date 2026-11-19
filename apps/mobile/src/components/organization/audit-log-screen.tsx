@@ -1,11 +1,6 @@
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { memo, type ReactNode, useCallback, useRef, useState } from 'react';
-import {
-  Pressable,
-  type TextLayoutEvent,
-  View,
-  type ViewStyle,
-} from 'react-native';
+import { Pressable, type TextLayoutEvent, View, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
@@ -84,19 +79,16 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
   // synchronously with the press, so no report from the expanded layout can
   // land after the collapse begins.
   const expandedRef = useRef(false);
-  const onDetailLayout = useCallback(
-    (e: TextLayoutEvent) => {
-      if (expandedRef.current) {
-        return;
-      }
-      const painted = Math.max(
-        1,
-        e.nativeEvent.lines.filter(line => line.text.trim().length > 0).length
-      );
-      setCollapsedLines(current => (current === painted ? current : painted));
-    },
-    []
-  );
+  const onDetailLayout = useCallback((e: TextLayoutEvent) => {
+    if (expandedRef.current) {
+      return;
+    }
+    const painted = Math.max(
+      1,
+      e.nativeEvent.lines.filter(line => line.text.trim().length > 0).length
+    );
+    setCollapsedLines(current => (current === painted ? current : painted));
+  }, []);
   const clamp = expanded ? undefined : (collapsedLines ?? 2);
   const actor = entry.actor_email ?? entry.actor_name;
   const time = formatAuditTime(entry.created_at);

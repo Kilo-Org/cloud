@@ -748,13 +748,15 @@ function liveGenerationFilter(asOf: string) {
 
 /**
  * The failure a claimed generation records, guarded by the generation id so a
- * generation another run claimed or already finished is left alone. A failure of
- * the post-claim checks releases the slot in the same write (`releaseSlot`):
- * the paid request has not been shipped for this generation id, so no receipt
- * can arrive for it, and the row must not hold one of two pool slots for the
- * rest of the morning. A failure of the billed phase keeps the generation id,
- * because a usage receipt the gateway has already accepted can still deliver,
- * and `recordBriefingUsage` matches the row by that id.
+ * generation another run claimed or already finished is left alone. A post-claim
+ * refusal this function could decide releases the slot in the same write
+ * (`releaseSlot`): the paid request has not been shipped for this generation
+ * id, so no receipt can arrive for it, and the row must not hold one of two
+ * pool slots for the rest of the morning. A post-claim failure that could not
+ * decide releases alone through `releaseBriefingClaim` and stays pending under
+ * the rethrow budget instead. A failure of the billed phase keeps the
+ * generation id, because a usage receipt the gateway has already accepted can
+ * still deliver, and `recordBriefingUsage` matches the row by that id.
  */
 async function recordBriefingClaimedFailure(
   row: BriefingReportRow,
@@ -780,6 +782,37 @@ async function recordBriefingClaimedFailure(
           ? { status: 'failed', text: null, startedAt: null, finishedAt: null, error: code }
           : { status: 'failed', text: null, finishedAt, error: code }
       )}::jsonb`,
+    })
+    .where(
+      and(
+        eq(agent_briefing_snapshots.id, row.id),
+        eq(agent_briefing_snapshots.generation_id, generationId),
+        sql`${agent_briefing_snapshots.summary}->>'status' = 'running'`
+      )
+    );
+}
+
+/**
+ * Releases a held slot without recording an outcome: the generation stamps go
+ * back to the unclaimed shape and the row returns to `pending` with the due
+ * time it had before the claim (the write that claimed it moved it), so the
+ * outer catch's rethrow budget can decide the row's fate on a later due run.
+ * Guarded by the generation id and the running status so a generation another
+ * run claimed, admitted, or already finished is left alone.
+ */
+async function releaseBriefingClaim(row: BriefingReportRow, generationId: string): Promise<void> {
+  await db
+    .update(agent_briefing_snapshots)
+    .set({
+      generation_id: null,
+      generation_started_at: null,
+      generation_deadline_at: null,
+      generation_max_cost: null,
+      job_due_at: row.job_due_at,
+      summary: sql`${agent_briefing_snapshots.summary} || ${JSON.stringify({
+        status: 'pending',
+        startedAt: null,
+      })}::jsonb`,
     })
     .where(
       and(
@@ -877,10 +910,18 @@ export async function runBriefingSummary(reportId: string): Promise<void> {
         throw new Error('permission_unavailable');
       await assertBriefingSourcesAccessible(row);
     } catch (error) {
-      // The row is recorded refused, not generation-failed: nothing was paid for
-      // this claim and the slot is released by the same write.
-      await recordBriefingClaimedFailure(row, generationId, briefingAdmissionCode(error), true);
-      return;
+      const code = briefingAdmissionCode(error);
+      if (CODE_DESCRIBES_ROW[code]) {
+        // The row is recorded refused, not generation-failed: nothing was paid
+        // for this claim and the slot is released by the same write.
+        await recordBriefingClaimedFailure(row, generationId, code, true);
+        return;
+      }
+      // The check could not decide (a transient lookup or transport error), so
+      // releasing the claim lets this run throw to the outer catch, which keeps
+      // the row pending under the rethrow budget; the write moves its due time.
+      await releaseBriefingClaim(row, generationId);
+      throw error;
     }
     try {
       const deadlineAt = new Date(deadlineMs).toISOString();

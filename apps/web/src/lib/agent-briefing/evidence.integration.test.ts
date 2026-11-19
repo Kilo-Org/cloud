@@ -21,7 +21,7 @@ import { sweepAgentBriefings, generatePendingAgentBriefings } from './sweep';
 import { reconcileBriefingCharge, runBriefingSummary, SUMMARY_MAX_ATTEMPTS } from './summary';
 import { briefingFactsSchema, buildBriefingSnapshot, collectBriefingSnapshot } from './evidence';
 import { agentBriefingRouter } from '@/routers/agent-briefing-router';
-import { emptySummary } from './store';
+import * as briefingStore from './store';
 
 jest.mock('@kilocode/web-shared/lib/notifications-worker-client', () => ({
   dispatchAgentBriefingPush: jest.fn().mockResolvedValue(false),
@@ -42,6 +42,35 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-pricing-config', () => ({
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
   getBalanceAndOrgSettings: jest.fn().mockResolvedValue({ payer: {}, balance: 10 }),
 }));
+// The `./store` override below exists because jest.spyOn cannot redefine the
+// module's export binding under this project's SWC transform. `briefingContextSettings`
+// runs pre-claim for eligibility and again post-claim; the recorded error is
+// armed for exactly one call, so setting it between the pre-claim read and the
+// post-claim re-check (via the balance mock, which runs in that gap) leaves
+// phase 1 on the real function and refuses only the post-claim re-check. The
+// test body clears the error right after the run, and Jest runs each test file
+// in its own module registry, so no sibling ever sees the override.
+jest.mock('./store', () => {
+  const actual = jest.requireActual('./store');
+  const state = {
+    transientPostClaimError: null as Error | null,
+    transientArmed: false,
+  };
+  (globalThis as unknown as { __briefingStoreMock: typeof state }).__briefingStoreMock = state;
+  return {
+    ...actual,
+    briefingContextSettings: (userId: string, organizationId?: string | null) => {
+      const { transientPostClaimError: error, transientArmed: armed } = (
+        globalThis as unknown as { __briefingStoreMock: typeof state }
+      ).__briefingStoreMock;
+      if (error && armed) {
+        state.transientArmed = false;
+        return Promise.reject(error);
+      }
+      return actual.briefingContextSettings(userId, organizationId);
+    },
+  };
+});
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/providers/openrouter'),
   getRawOpenRouterModels: jest.fn().mockResolvedValue({
@@ -848,15 +877,26 @@ it('preserves saved snapshot readability while disabling future paid generation'
 // A context whose preference is disabled (or removed) after the row was captured
 // is re-refused after the slot is claimed: the run releases the claim in the same
 // failure write, so the row is stored refused without cost and without holding
-// one of two pool slots for the rest of the morning.
+// one of two pool slots for the rest of the morning. The context flips between
+// the preflight and the claim, so phase 1 admits the row and the post-claim
+// re-check is what refuses it.
 it('releases the claimed slot when the context is gone by the post-claim re-check', async () => {
-  const { user, now } = await scheduled();
+  const { now } = await scheduled();
   await sweepAgentBriefings(now);
   const [row] = await db.select().from(agent_briefing_snapshots);
   if (!row) throw new Error('No captured snapshot');
-  await agentBriefingRouter.createCaller({ user }).updateContextPreferences({ enabled: false });
+  const balance = jest.mocked(getBalanceAndOrgSettings);
+  // One-shot: the single preflight call flips the context off and then falls
+  // through to the balance lookup the module default provides, so this mock
+  // leaves later tests untouched.
+  const defaults = jest.requireActual('@kilocode/web-shared/lib/organizations/organization-usage');
+  balance.mockImplementationOnce(async (organizationId, user) => {
+    await agentBriefingRouter.createCaller({ user }).updateContextPreferences({ enabled: false });
+    return defaults.getBalanceAndOrgSettings(organizationId, user);
+  });
   const fetcher = jest.spyOn(globalThis, 'fetch');
   await runBriefingSummary(row.id);
+  expect(balance).toHaveBeenCalled();
   expect(fetcher).not.toHaveBeenCalled();
   const [refused] = await db.select().from(agent_briefing_snapshots);
   expect(refused?.summary.status).toBe('failed');
@@ -871,6 +911,72 @@ it('releases the claimed slot when the context is gone by the post-claim re-chec
   expect(refused?.facts).toEqual(row.facts);
 });
 
+// A post-claim check whose failure could not decide the row (a transient lookup
+// error) releases the claim and rethrows instead of recording a refusal: the row
+// stays pending with its due time pushed out, and the next due run generates it.
+it('releases a claimed slot and retries when the post-claim check fails transiently', async () => {
+  const { now } = await scheduled();
+  await sweepAgentBriefings(now);
+  const [row] = await db.select().from(agent_briefing_snapshots);
+  if (!row) throw new Error('No captured snapshot');
+  const dueAt = row.job_due_at;
+  if (!dueAt) throw new Error('No due time');
+  // jest.spyOn cannot redefine this export binding under the project's SWC
+  // transform, so the transient failure rides the `./store` mock factory's
+  // one-shot flag; arming it inside the preflight mock leaves phase 1 on the
+  // real function and refuses only the post-claim re-check.
+  const mockGlobals = (
+    globalThis as typeof globalThis & {
+      __briefingStoreMock?: { transientPostClaimError: Error | null; transientArmed: boolean };
+    }
+  ).__briefingStoreMock;
+  if (!mockGlobals) throw new Error('Missing store mock state');
+  const balance = jest.mocked(getBalanceAndOrgSettings);
+  // One-shot: the single preflight call arms the store override and then falls
+  // through to the balance lookup the module default provides, keeping this mock
+  // from leaking into sibling tests.
+  const defaults = jest.requireActual('@kilocode/web-shared/lib/organizations/organization-usage');
+  balance.mockImplementationOnce(async (organizationId, user) => {
+    mockGlobals.transientPostClaimError = new Error('_transient');
+    mockGlobals.transientArmed = true;
+    return defaults.getBalanceAndOrgSettings(organizationId, user);
+  });
+  const fetcher = jest
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValue(
+      Response.json({ choices: [{ message: { content: 'Recovered summary.' } }] })
+    );
+  await expect(runBriefingSummary(row.id)).rejects.toThrow('_transient');
+  mockGlobals.transientArmed = false;
+  mockGlobals.transientPostClaimError = null;
+  expect(fetcher).not.toHaveBeenCalled();
+  const [stalled] = await db
+    .select()
+    .from(agent_briefing_snapshots)
+    .where(eq(agent_briefing_snapshots.id, row.id));
+  expect(stalled?.summary.status).toBe('pending');
+  expect(stalled?.summary.error).toBeNull();
+  expect(stalled?.generation_id).toBeNull();
+  expect(stalled?.generation_started_at).toBeNull();
+  expect(stalled?.generation_deadline_at).toBeNull();
+  expect(stalled?.generation_max_cost).toBeNull();
+  expect(stalled?.summary.startedAt).toBeNull();
+  // The claim itself writes only the running status, so a release leaves no
+  // per-generation accounting residue for a generation nothing was paid for.
+  expect(stalled?.summary.chargeAccounting).toBeUndefined();
+  expect(stalled?.summary.chargeStatus).toBe('settled');
+  expect(stalled?.summary.costMicrodollars).toBe(0);
+  expect(Date.parse(stalled?.job_due_at ?? '')).toBeGreaterThan(Date.parse(dueAt));
+  await runBriefingSummary(row.id);
+  const [finished] = await db
+    .select()
+    .from(agent_briefing_snapshots)
+    .where(eq(agent_briefing_snapshots.id, row.id));
+  expect(finished?.summary.status).toBe('ready');
+  expect(finished?.summary.text).toBe('Recovered summary.');
+  expect(finished?.generation_id).not.toBeNull();
+});
+
 // While both pool slots are busy, a due row must not pay for the admission work
 // it cannot use: the run stops after the cheap eligibility checks, before the
 // pricing lookup and its balance read, and the row stays pending untouched.
@@ -880,7 +986,7 @@ it('skips pricing and balance work for a due row while the pool is full', async 
   await db.insert(agent_briefing_snapshots).values(
     ['first', 'second'].map(slot => ({
       ...maintenanceSnapshot(otherUser.id, `busy-${slot}`),
-      summary: { ...emptySummary, status: 'running' },
+      summary: { ...briefingStore.emptySummary, status: 'running' },
       generation_id: `agent-briefing:${slot}`,
       generation_started_at: new Date(now.getTime() - 60_000).toISOString(),
       generation_deadline_at: new Date(now.getTime() + 600_000).toISOString(),
@@ -1092,7 +1198,7 @@ function maintenanceSnapshot(
     published_at: '2026-10-28T08:00:00.000Z',
     expires_at: '2026-11-27T08:00:00.000Z',
     facts: buildBriefingSnapshot([]),
-    summary: emptySummary,
+    summary: briefingStore.emptySummary,
   };
 }
 
@@ -1161,7 +1267,7 @@ it('repairs an expired running job behind an entire batch of still-open pending 
     Array.from({ length: 100 }, (_, index) => ({
       ...maintenanceSnapshot(user.id, `pending-${index}`),
       job_due_at: '2026-10-28T08:00:00.000Z',
-      summary: { ...emptySummary, status: 'pending' },
+      summary: { ...briefingStore.emptySummary, status: 'pending' },
     }))
   );
   const [running] = await db
@@ -1172,7 +1278,7 @@ it('repairs an expired running job behind an entire batch of still-open pending 
       generation_id: 'agent-briefing:expired',
       generation_started_at: '2026-10-28T08:00:00.000Z',
       generation_deadline_at: '2026-10-28T08:05:00.000Z',
-      summary: { ...emptySummary, status: 'running' },
+      summary: { ...briefingStore.emptySummary, status: 'running' },
     })
     .returning();
   if (!running) throw new Error('Missing running report');
@@ -1193,7 +1299,7 @@ it('leaves a running job within the expiry grace for its in-flight success write
       generation_id: 'agent-briefing:finishing',
       generation_started_at: '2026-10-28T08:00:00.000Z',
       generation_deadline_at: '2026-10-28T08:09:00.000Z',
-      summary: { ...emptySummary, status: 'running' },
+      summary: { ...briefingStore.emptySummary, status: 'running' },
     })
     .returning();
   if (!running) throw new Error('Missing running report');

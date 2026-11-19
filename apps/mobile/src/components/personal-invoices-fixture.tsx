@@ -25,9 +25,22 @@ type PersonalInvoicesFixtureState = 'listed' | 'empty';
 /**
  * Sample rows. Each `created` is noon UTC on the day its description names: the
  * screen formats it in the device's own zone, so a midnight value would print
- * the last day of the previous month anywhere west of UTC.
+ * the last day of the previous month anywhere west of UTC. The three rows carry
+ * the three statuses the row colors: paid, open, void.
  */
 const INVOICES: InvoicesPage['entries'] = [
+  {
+    id: 'in_personal_fixture_open',
+    number: 'INV-2026-0003',
+    status: 'open',
+    amount_due: 4900,
+    currency: 'usd',
+    created: Date.parse('2026-06-01T12:00:00Z') / 1000,
+    hosted_invoice_url: 'https://billing.example.com/in_personal_fixture_open',
+    invoice_pdf: null,
+    invoice_type: 'seats',
+    description: 'Kilo Pass seats, June 2026',
+  },
   {
     id: 'in_personal_fixture_paid',
     number: 'INV-2026-0002',

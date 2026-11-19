@@ -171,7 +171,7 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
   const manageRowOnWeb = (provider: IntegrationProvider) => {
     if (provider === 'bitbucket') {
       if (organizationId) {
-        router.push(bitbucketConnectHref(organizationId));
+        pushOnce(bitbucketConnectHref(organizationId));
       }
       return;
     }

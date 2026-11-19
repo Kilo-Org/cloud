@@ -1,4 +1,5 @@
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
+import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -18,6 +19,7 @@ import {
 } from '@/lib/hooks/use-org-settings-queries';
 import { useOrgBoundary, useOrgWithMembers } from '@/lib/hooks/use-organization-queries';
 import { organizationPlanRefusalFor } from '@/lib/organization/plan-refusal-copy';
+import { billingActionFor, billingHrefFor } from '@/lib/trial-refusal';
 
 const TITLE_KEY = 'organization.settingsOnWeb.providersAndModels';
 
@@ -39,6 +41,7 @@ export function OrganizationProvidersAndModelsScreen() {
   // the web billing page. Read with the other hooks, before the boundary's
   // early return, so the form receives the same step the hub offers.
   const canLinkBilling = useCanLinkExternalPurchase();
+  const router = useRouter();
 
   if (isResolving || organizationId == null || org == null) {
     return <OrganizationBoundary title={t(TITLE_KEY)} />;
@@ -116,10 +119,20 @@ export function OrganizationProvidersAndModelsScreen() {
   // do not need: the organization's own models and both saved lists come from
   // the membership and available-models payloads. When it fails, the form still
   // opens on what the phone already has and offers a retry for the rest.
+  // The step the storefronts the web link is refused on still get: the in-app
+  // billing screen, which names where the plan is bought. Without it the
+  // sentence stops at the state and the reader has nowhere to go.
   const planRefusal = organizationPlanRefusalFor({
     role,
     canLinkBilling,
     billingUrl: `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions`,
+    inAppBilling: billingActionFor(
+      canManageOrganization(role),
+      t('organization.hub.manageBilling'),
+      () => {
+        router.push(billingHrefFor(organizationId));
+      }
+    ),
     t,
   });
   return (

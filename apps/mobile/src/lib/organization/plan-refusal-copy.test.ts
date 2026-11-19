@@ -52,6 +52,57 @@ describe('organizationPlanRefusalFor', () => {
     expect(opened.openExternalUrl).not.toHaveBeenCalled();
   });
 
+  it('takes the caller in-app step where the web link is refused', () => {
+    // Android refuses the web link, so a surface with its own billing route
+    // hands it over instead of leaving the sentence without a next step.
+    const inApp = vi.fn<() => void>();
+    const refusal = organizationPlanRefusalFor({
+      role: 'owner',
+      canLinkBilling: false,
+      billingUrl: BILLING_URL,
+      inAppBilling: { label: 'Manage billing', onPress: inApp },
+      t,
+    });
+
+    expect(refusal.message).toBe(i18n.t('organization.hub.planEnded'));
+    refusal.action?.onPress();
+
+    expect(refusal.action?.label).toBe('Manage billing');
+    expect(inApp).toHaveBeenCalledTimes(1);
+    expect(opened.openExternalUrl).not.toHaveBeenCalled();
+  });
+
+  it('keeps the web link ahead of the in-app step where the storefront allows it', () => {
+    const inApp = vi.fn<() => void>();
+    const refusal = organizationPlanRefusalFor({
+      role: 'owner',
+      canLinkBilling: true,
+      billingUrl: BILLING_URL,
+      inAppBilling: { label: 'Manage billing', onPress: inApp },
+      t,
+    });
+
+    refusal.action?.onPress();
+
+    expect(opened.openExternalUrl).toHaveBeenCalledTimes(1);
+    expect(inApp).not.toHaveBeenCalled();
+  });
+
+  it('offers no step to a member, even one handed in', () => {
+    const inApp = vi.fn<() => void>();
+    const refusal = organizationPlanRefusalFor({
+      role: 'member',
+      canLinkBilling: false,
+      billingUrl: BILLING_URL,
+      inAppBilling: { label: 'Manage billing', onPress: inApp },
+      t,
+    });
+
+    expect(refusal.message).toBe(i18n.t('common.organizationTrialEnded'));
+    expect(refusal.action).toBeUndefined();
+    expect(inApp).not.toHaveBeenCalled();
+  });
+
   it('names the owner to a member, with no step even when the link is allowed', () => {
     const refusal = organizationPlanRefusalFor({
       role: 'member',

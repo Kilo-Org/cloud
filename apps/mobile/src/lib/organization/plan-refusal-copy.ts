@@ -1,7 +1,7 @@
 // The lapsed organization plan, in the two shapes every surface paints it: the
-// sentence the reader's role picks, and the step outside the app when that role
-// can take it. The organization hub and the providers-and-models form state the
-// same state, so the choice lives here instead of being copied into each screen.
+// sentence the reader's role picks, and the step when that role can take it. The
+// organization hub and the providers-and-models form state the same state, so
+// the choice lives here instead of being copied into each screen.
 //
 // `isMoneyRole` in the organization query module is `canManageOrganizationBilling`
 // re-exported; the predicate is imported from the shared package directly so
@@ -26,27 +26,38 @@ type OrganizationPlanRefusalCopy = { message: string; action?: OrganizationPlanR
  * The sentence and the step for a lapsed plan. A role that can change the plan
  * gets the sentence that stops at the state, because the action beside it is
  * the next step; every other role gets the sentence the rest of the app shows
- * with the explanation, so the member still learns who can end the state. The
- * action exists only when the storefront rule lets the app link the web billing
- * page, which is the page that refuses the other roles.
+ * with the explanation, so the member still learns who can end the state.
+ *
+ * The step is the web billing page when the storefront rule lets the app link
+ * it, which is the page that sells the plan. A surface that has its own step for
+ * the storefronts the rule refuses — the in-app billing screen, which names
+ * where the plan is bought — passes it as `inAppBilling`; a surface without one
+ * keeps the sentence that names the person who can end the state, so a claimed
+ * step is never left without the control that takes it.
  */
 export function organizationPlanRefusalFor({
   role,
   canLinkBilling,
   billingUrl,
+  inAppBilling,
   t,
 }: {
   role: OrganizationRole | undefined;
   canLinkBilling: boolean;
   billingUrl: string;
+  /** The caller's own step, used when the storefront rule refuses the web link. */
+  inAppBilling?: OrganizationPlanRefusalAction;
   t: TFunction;
 }): OrganizationPlanRefusalCopy {
   const canManagePlan = canManageOrganizationBilling(role);
   const message = canManagePlan
     ? t('organization.hub.planEnded')
     : t('common.organizationTrialEnded');
-  if (!canManagePlan || !canLinkBilling) {
+  if (!canManagePlan) {
     return { message };
+  }
+  if (!canLinkBilling) {
+    return inAppBilling === undefined ? { message } : { message, action: inAppBilling };
   }
   const label = t('organization.hub.manageBilling');
   return {

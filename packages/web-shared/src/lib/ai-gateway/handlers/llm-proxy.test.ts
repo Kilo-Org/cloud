@@ -2446,9 +2446,8 @@ describe('POST /api/v1/chat/completions request handling', () => {
 
     it.each([
       ['the organization model deny list', 'organization_model'],
+      ['an organization provider restriction', 'organization_provider'],
       ['a missing group grant', 'no_grant'],
-      ['a group model restriction', 'group_model'],
-      ['a group provider restriction', 'group_provider'],
     ] as const)(
       'keeps denying a model excluded by %s through a Vercel BYOK inference provider key',
       async (_name, denialSource) => {
@@ -3925,7 +3924,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     });
     mockedGetEffectiveModelDecision.mockResolvedValue({
       allowed: false,
-      denialSource: 'group_model',
+      denialSource: 'no_grant',
     });
     mockedApplyResolvedAutoModel.mockImplementation(async params => {
       const isCandidateAllowed = params.isAutoFreeCandidateAllowed;
@@ -4319,7 +4318,7 @@ describe('kilo-auto/efficient classifier billing', () => {
       });
       mockedGetEffectiveModelDecision.mockResolvedValue({
         allowed: false,
-        denialSource: 'group_model',
+        denialSource: 'no_grant',
       });
       mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
 

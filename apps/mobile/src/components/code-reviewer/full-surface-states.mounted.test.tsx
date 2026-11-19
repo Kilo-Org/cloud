@@ -307,6 +307,18 @@ vi.mock('@/lib/hooks/use-reviewer-permission', async () => {
   };
 });
 vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({ useRouteForegroundRefresh: vi.fn() }));
+// The Bitbucket web-managed notice names the organization from the membership
+// list; it resolves against the same `organizations` rows this suite seeds, so
+// the real hook's tRPC client (and the expo runtime with it) stays out of the
+// module graph.
+vi.mock('@/lib/hooks/use-organization-queries', () => ({
+  useOrgBoundary: (organizationIdOverride?: string) => ({
+    org: state.organizations.find(
+      entry => entry.organizationId === (organizationIdOverride ?? state.scope)
+    ),
+    isResolving: false,
+  }),
+}));
 vi.mock('@/lib/hooks/use-reviewer-council', () => ({
   useCouncilGate: () => ({ allowed: false, pending: false }),
   useCouncilUiEnabled: () => false,

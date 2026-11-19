@@ -144,9 +144,9 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 vi.mock('@/lib/hooks/use-reviewer-models', () => ({
   useReviewerModels: () => ({ models: [], isLoading: false }),
 }));
-// The header and connect copy name the organization from the boundary read;
-// the OAuth cases never reach that copy, so one resolved organization stands
-// in and the screen never waits on the membership list.
+// The header and the OAuth notice name the organization from the boundary
+// read, so one resolved organization stands in here and the screen never waits
+// on the membership list.
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   useOrgBoundary: () => ({
     org: { organizationId: 'org_1', organizationName: 'Acme Robotics', role: 'owner' },
@@ -250,7 +250,11 @@ describe('BitbucketOverview OAuth connection', () => {
 
     const renderer = await renderScreen();
 
-    expect(texts(renderer)).toContain(i18n.t('codeReviewer.bitbucketConnect.managedOnWeb'));
+    const expected = i18n.t('codeReviewer.bitbucketConnect.managedOnWeb', {
+      organization: 'Acme Robotics',
+    });
+    expect(texts(renderer)).toContain(expected);
+    expect(texts(renderer).some(text => text.includes('{{'))).toBe(false);
     expect(texts(renderer)).toContain('Acme Ltd');
     expect(renderer.root.findAllByType('Switch')).toHaveLength(0);
     expect(renderer.root.findAllByType('ConfigureRow')).toHaveLength(0);
@@ -264,7 +268,11 @@ describe('BitbucketOverview OAuth connection', () => {
 
     const renderer = await renderScreen();
 
-    expect(texts(renderer)).toContain(i18n.t('codeReviewer.bitbucketConnect.managedOnWeb'));
+    const expected = i18n.t('codeReviewer.bitbucketConnect.managedOnWeb', {
+      organization: 'Acme Robotics',
+    });
+    expect(texts(renderer)).toContain(expected);
+    expect(texts(renderer).some(text => text.includes('{{'))).toBe(false);
     expect(renderer.root.findAllByType('Button')).toHaveLength(0);
     expect(renderer.root.findAllByType('ConfigureRow')).toHaveLength(0);
 
@@ -274,7 +282,8 @@ describe('BitbucketOverview OAuth connection', () => {
 
     const secondRenderer = await renderScreen();
 
-    expect(texts(secondRenderer)).toContain(i18n.t('codeReviewer.bitbucketConnect.managedOnWeb'));
+    expect(texts(secondRenderer)).toContain(expected);
+    expect(texts(secondRenderer).some(text => text.includes('{{'))).toBe(false);
     expect(secondRenderer.root.findAllByType('Button')).toHaveLength(0);
     expect(secondRenderer.root.findAllByType('ConfigureRow')).toHaveLength(0);
   });

@@ -6,6 +6,7 @@ import { BitbucketSetupRecovery } from '@/components/code-reviewer/bitbucket-set
 import { QueryError } from '@/components/query-error';
 import { Text } from '@/components/ui/text';
 import { type BitbucketConnection, isWebManagedConnection } from '@/lib/code-reviewer-bitbucket';
+import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 
 /**
  * The body the repositories screen paints for a Bitbucket connection that holds
@@ -26,6 +27,9 @@ export function BitbucketRepositoriesState({
   onRetry: () => void;
 }>) {
   const { t } = useTranslation();
+  // The notice names the organization, so it reads that name from the same
+  // membership list the rest of the reviewer surfaces use.
+  const orgBoundary = useOrgBoundary(scope);
 
   if (connection.kind === 'error') {
     return (
@@ -49,7 +53,9 @@ export function BitbucketRepositoriesState({
     return (
       <CenteredState contentContainerClassName="px-4">
         <Text variant="muted" className="text-center text-xs">
-          {t('codeReviewer.bitbucketConnect.managedOnWeb')}
+          {t('codeReviewer.bitbucketConnect.managedOnWeb', {
+            organization: orgBoundary.org?.organizationName ?? t('common.organization'),
+          })}
         </Text>
       </CenteredState>
     );

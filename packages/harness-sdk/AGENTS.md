@@ -2035,8 +2035,8 @@ There are eleven entry points: `@kilocode/harness-sdk`, `/core`,
 `/plugins/remote-mcp`, `/plugins/tools`, `/plugins/store/node`, `/plugins/store/expo`
 and `/testing`.
 The two stores have
-subpaths of their own because each names a platform: exporting them from the
-root would pull `node:sqlite` into every bundle. `/plugins/fetch`
+subpaths of their own because each names a platform: exporting the Node store
+from the root would pull `node:sqlite` into every bundle. `/plugins/fetch`
 and `/testing` have theirs because an entry point is what a consumer bundles and
 neither runs in production — a caller with a `fetch` of their own should not
 carry this one, and the conformance checks belong to a plugin author's test

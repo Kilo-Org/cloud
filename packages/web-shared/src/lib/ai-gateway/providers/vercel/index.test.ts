@@ -10,7 +10,6 @@ import {
   getAnthropicProviderOptionsForVercel,
   getVercelInferenceProvidersExcludingIgnored,
   hasCompatibleVercelInferenceProvider,
-  isVercelRoutingOptOut,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import type {
   GatewayRequest,
@@ -286,7 +285,7 @@ describe('convertProviderOptions', () => {
     };
 
     expect(() => convertProviderOptions(request, null)).toThrow(
-      'Vercel inference provider data became unavailable during request transform'
+      'Vercel inference provider data is unavailable to apply provider.ignore'
     );
   });
 });
@@ -297,16 +296,50 @@ const unrestrictedRouting = {
 };
 
 describe('shouldRouteToVercel', () => {
-  async function loadShouldRouteToVercel(options?: { optOut?: boolean }) {
+  async function loadShouldRouteToVercel(
+    options: {
+      model?: string;
+      optOut?: boolean;
+      /** The model's stored OpenRouter endpoint tags, or null when OpenRouter does not list it. */
+      openRouterEndpointTags?: string[] | null;
+      /** Replaces the stored OpenRouter models derived from `openRouterEndpointTags`. */
+      openRouterModels?: Record<string, { endpoints: { tag?: string }[]; aliasTarget?: string }>;
+      /** The Vercel model ids Vercel serves; defaults to `model`. */
+      vercelModelIds?: string[];
+      vercelInferenceProviders?: string[] | null;
+    } = {}
+  ) {
+    const {
+      model = 'anthropic/claude-sonnet-4.5',
+      optOut = false,
+      openRouterEndpointTags = ['anthropic'],
+      openRouterModels: storedOpenRouterModels,
+      vercelModelIds = [model],
+      vercelInferenceProviders = ['anthropic'],
+    } = options;
+    const openRouterModels = storedOpenRouterModels
+      ? Object.fromEntries(
+          Object.entries(storedOpenRouterModels).map(([id, { endpoints, aliasTarget }]) => [
+            id,
+            { id, endpoints, ...(aliasTarget && { alias_target: { slug: aliasTarget } }) },
+          ])
+        )
+      : openRouterEndpointTags
+        ? { [model]: { id: model, endpoints: openRouterEndpointTags.map(tag => ({ tag })) } }
+        : {};
     jest.resetModules();
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/routing-config', () => ({
       getRuntimeGatewayRoutingConfig: jest.fn(async () => ({
-        vercelOptOutModels: new Set(options?.optOut ? ['anthropic/claude-sonnet-4.5'] : []),
+        vercelOptOutModels: new Set(optOut ? [model] : []),
       })),
     }));
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
-      getVercelModelsFromDatabase: jest.fn(async () => new Set(['anthropic/claude-sonnet-4.5'])),
-      getCachedVercelInferenceProviderIdsForModel: jest.fn(async () => ['anthropic']),
+      getVercelModelsFromDatabase: jest.fn(async () => new Set(vercelModelIds)),
+      getCachedVercelInferenceProviderIdsForModel: jest.fn(async () => vercelInferenceProviders),
+      getOpenRouterModelsMetadataFromDatabase: jest.fn(async () => openRouterModels),
+      resolveOpenRouterModelAlias: jest.fn(
+        async (modelId: string) => storedOpenRouterModels?.[modelId]?.aliasTarget ?? modelId
+      ),
     }));
     return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel'))
       .shouldRouteToVercel;
@@ -352,14 +385,145 @@ describe('shouldRouteToVercel', () => {
     );
   });
 
-  it('does not resolve provider policy for models opted out of Vercel routing', async () => {
-    const shouldRouteToVercel = await loadShouldRouteToVercel({ optOut: true });
-    const getRoutingProviderConfig = jest.fn(async () => ({ only: ['anthropic'] }));
+  describe('with a model opted out of Vercel routing', () => {
+    // Telnyx serves this model on Vercel but not on OpenRouter.
+    const model = 'deepseek/deepseek-v4.1-flash-1017';
+    const routing = { requestedModel: model, boundedSpending: false };
+    const providerData = {
+      model,
+      openRouterEndpointTags: ['deepseek', 'deepinfra/fp8'],
+      vercelInferenceProviders: ['deepseek', 'telnyx'],
+    };
 
-    await expect(shouldRouteToVercel(unrestrictedRouting, getRoutingProviderConfig)).resolves.toBe(
-      false
+    it('stays on OpenRouter without provider routing settings', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({ ...providerData, optOut: true });
+
+      await expect(shouldRouteToVercel(routing, async () => undefined)).resolves.toBe(false);
+    });
+
+    it('routes to Vercel when only Vercel serves the providers `only` allows', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({ ...providerData, optOut: true });
+
+      await expect(shouldRouteToVercel(routing, async () => ({ only: ['telnyx'] }))).resolves.toBe(
+        true
+      );
+    });
+
+    it('stays on OpenRouter when `only` allows a provider OpenRouter serves', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({ ...providerData, optOut: true });
+
+      await expect(
+        shouldRouteToVercel(routing, async () => ({ only: ['telnyx', 'deepinfra'] }))
+      ).resolves.toBe(false);
+    });
+
+    it.each([true, false])(
+      'stays on OpenRouter when `only` names providers on neither gateway (opted out: %s)',
+      async optOut => {
+        const shouldRouteToVercel = await loadShouldRouteToVercel({ ...providerData, optOut });
+
+        await expect(
+          shouldRouteToVercel(routing, async () => ({ only: ['unknown-provider'] }))
+        ).resolves.toBe(false);
+      }
     );
-    expect(getRoutingProviderConfig).not.toHaveBeenCalled();
+
+    it('routes to Vercel when ignored providers leave only Vercel providers', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({ ...providerData, optOut: true });
+
+      await expect(
+        shouldRouteToVercel(routing, async () => ({ ignore: ['deepseek', 'deepinfra'] }))
+      ).resolves.toBe(true);
+    });
+
+    it('stays on OpenRouter when its endpoints for the model are unknown', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({
+        ...providerData,
+        optOut: true,
+        openRouterEndpointTags: null,
+      });
+
+      await expect(shouldRouteToVercel(routing, async () => ({ only: ['telnyx'] }))).resolves.toBe(
+        false
+      );
+    });
+
+    it('stays on OpenRouter when Vercel inference provider data is unavailable', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({
+        ...providerData,
+        optOut: true,
+        vercelInferenceProviders: null,
+      });
+
+      await expect(shouldRouteToVercel(routing, async () => ({ only: ['telnyx'] }))).resolves.toBe(
+        false
+      );
+    });
+
+    it('leaves a spend-bounded request on OpenRouter', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({ ...providerData, optOut: true });
+
+      await expect(
+        shouldRouteToVercel({ ...routing, boundedSpending: true }, async () => ({
+          only: ['telnyx'],
+        }))
+      ).resolves.toBe(false);
+    });
+  });
+
+  describe('with a latest alias opted out of Vercel routing', () => {
+    const alias = '~vendor/model-latest';
+    const target = 'vendor/model-2';
+    const routing = { requestedModel: alias, boundedSpending: false };
+
+    function loadForAlias(options: { targetEndpointTags?: string[] | null; optOut?: boolean }) {
+      const { targetEndpointTags = ['vendor'], optOut = true } = options;
+      return loadShouldRouteToVercel({
+        model: alias,
+        optOut,
+        // OpenRouter lists the alias itself without endpoints; its target carries them.
+        openRouterModels: {
+          [alias]: { endpoints: [], aliasTarget: target },
+          ...(targetEndpointTags && {
+            [target]: { endpoints: targetEndpointTags.map(tag => ({ tag })) },
+          }),
+        },
+        vercelModelIds: [target],
+        vercelInferenceProviders: ['vendor', 'telnyx'],
+      });
+    }
+
+    it('stays on OpenRouter when its target serves a provider `only` allows', async () => {
+      const shouldRouteToVercel = await loadForAlias({});
+
+      await expect(shouldRouteToVercel(routing, async () => ({ only: ['vendor'] }))).resolves.toBe(
+        false
+      );
+    });
+
+    it('routes to Vercel when the alias is not opted out', async () => {
+      const shouldRouteToVercel = await loadForAlias({ optOut: false });
+
+      await expect(shouldRouteToVercel(routing, async () => ({ only: ['vendor'] }))).resolves.toBe(
+        true
+      );
+    });
+
+    it('routes to Vercel when only Vercel serves the providers `only` allows', async () => {
+      const shouldRouteToVercel = await loadForAlias({});
+
+      await expect(shouldRouteToVercel(routing, async () => ({ only: ['telnyx'] }))).resolves.toBe(
+        true
+      );
+    });
+
+    it('stays on OpenRouter when the metadata of its target is missing', async () => {
+      const shouldRouteToVercel = await loadForAlias({ targetEndpointTags: null });
+
+      await expect(shouldRouteToVercel(routing, async () => ({ only: ['telnyx'] }))).resolves.toBe(
+        false
+      );
+    });
   });
 
   it('leaves a spend-bounded request on OpenRouter without resolving provider policy', async () => {
@@ -1223,16 +1387,7 @@ describe('applyVercelSettings session affinity', () => {
   });
 });
 
-describe('isVercelRoutingOptOut', () => {
-  it('only opts out exact model ID matches', () => {
-    const optOutModels = new Set(['moonshotai/kimi-k3']);
-
-    expect(isVercelRoutingOptOut('moonshotai/kimi-k3', optOutModels)).toBe(true);
-    expect(isVercelRoutingOptOut('moonshotai/kimi-k3-fast', optOutModels)).toBe(false);
-  });
-});
-
-describe('getUsageEndpointGatewayOptions', () => {
+describe('getNonChatGatewayOptions', () => {
   async function loadGetOptions(vercelInferenceProviders: string[] | null) {
     jest.resetModules();
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
@@ -1240,7 +1395,7 @@ describe('getUsageEndpointGatewayOptions', () => {
       getVercelModelsFromDatabase: jest.fn(),
     }));
     return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel'))
-      .getUsageEndpointGatewayOptions;
+      .getNonChatGatewayOptions;
   }
 
   it("applies the request's ignore list to Kilo's route", async () => {
@@ -1254,11 +1409,14 @@ describe('getUsageEndpointGatewayOptions', () => {
         dataRegion: 'eu',
       })
     ).resolves.toEqual({
-      only: ['azure'],
-      order: ['azure'],
-      zeroDataRetention: undefined,
-      disallowPromptTraining: undefined,
-      inferenceRegion: { scope: 'zone', geoRegion: 'eu' },
+      kind: 'routable',
+      gateway: {
+        only: ['azure'],
+        order: ['azure'],
+        zeroDataRetention: undefined,
+        disallowPromptTraining: undefined,
+        inferenceRegion: { scope: 'zone', geoRegion: 'eu' },
+      },
     });
   });
 
@@ -1272,7 +1430,7 @@ describe('getUsageEndpointGatewayOptions', () => {
         provider: { only: ['typesafe'] },
         dataRegion: null,
       })
-    ).resolves.toMatchObject({ only: ['typesafe-ai'] });
+    ).resolves.toMatchObject({ kind: 'routable', gateway: { only: ['typesafe-ai'] } });
   });
 
   it('drops an ignored provider key unless it is the last one', async () => {
@@ -1288,8 +1446,8 @@ describe('getUsageEndpointGatewayOptions', () => {
       provider: { ignore: ['openai'] },
       dataRegion: 'eu',
     });
-    expect(some.only).toEqual(['mistral']);
-    expect(some).not.toHaveProperty('inferenceRegion');
+    expect(some).toMatchObject({ kind: 'routable', gateway: { only: ['mistral'] } });
+    expect(some).not.toHaveProperty('gateway.inferenceRegion');
 
     const all = await getOptions({
       vercelModelId: 'openai/text-embedding-3-small',
@@ -1297,6 +1455,98 @@ describe('getUsageEndpointGatewayOptions', () => {
       provider: { ignore: ['openai'] },
       dataRegion: null,
     });
-    expect(all.only).toEqual(['openai']);
+    expect(all).toMatchObject({ kind: 'routable', gateway: { only: ['openai'] } });
+  });
+
+  it("rejects Kilo's route when the ignore list excludes every provider of the model", async () => {
+    const getOptions = await loadGetOptions(['azure', 'openai']);
+
+    await expect(
+      getOptions({
+        vercelModelId: 'openai/text-embedding-3-small',
+        userByok: null,
+        provider: { ignore: ['openai', 'azure'] },
+        dataRegion: null,
+      })
+    ).resolves.toEqual({ kind: 'no-eligible-provider', providers: ['azure', 'openai'] });
+  });
+
+  it('matches OpenRouter slugs in the ignore list against Vercel provider ids', async () => {
+    const getOptions = await loadGetOptions(['vertex', 'vertexAnthropic', 'bedrock']);
+
+    await expect(
+      getOptions({
+        vercelModelId: 'anthropic/claude-sonnet-4.5',
+        userByok: null,
+        provider: { ignore: ['google-vertex', 'amazon-bedrock'] },
+        dataRegion: null,
+      })
+    ).resolves.toEqual({ kind: 'no-eligible-provider', providers: ['vertex', 'bedrock'] });
+  });
+
+  it.each([
+    ['without an ignore list', { only: ['mistral'] }],
+    ['with an ignore list', { only: ['mistral'], ignore: ['azure'] }],
+  ])(
+    "rejects Kilo's route when the allow-list names no provider of the model, %s",
+    async (_, provider) => {
+      const getOptions = await loadGetOptions(['azure', 'openai']);
+
+      await expect(
+        getOptions({
+          vercelModelId: 'openai/text-embedding-3-small',
+          userByok: null,
+          provider,
+          dataRegion: null,
+        })
+      ).resolves.toEqual({ kind: 'no-eligible-provider', providers: ['azure', 'openai'] });
+    }
+  );
+
+  it('rejects an empty allow-list even without provider data', async () => {
+    const getOptions = await loadGetOptions(null);
+
+    await expect(
+      getOptions({
+        vercelModelId: 'openai/text-embedding-3-small',
+        userByok: null,
+        provider: { only: [] },
+        dataRegion: null,
+      })
+    ).resolves.toEqual({ kind: 'no-eligible-provider', providers: [] });
+    await expect(
+      getOptions({
+        vercelModelId: 'openai/text-embedding-3-small',
+        userByok: null,
+        provider: { only: ['openai'], ignore: ['openai'] },
+        dataRegion: null,
+      })
+    ).resolves.toEqual({ kind: 'no-eligible-provider', providers: [] });
+  });
+
+  it('keeps an allow-list that names a provider of the model', async () => {
+    const getOptions = await loadGetOptions(['azure', 'openai']);
+
+    await expect(
+      getOptions({
+        vercelModelId: 'openai/text-embedding-3-small',
+        userByok: null,
+        provider: { only: ['openai', 'mistral'] },
+        dataRegion: null,
+      })
+    ).resolves.toMatchObject({ kind: 'routable', gateway: { only: ['openai', 'mistral'] } });
+  });
+
+  it("keeps the last provider key even when the request's provider settings exclude it", async () => {
+    const getOptions = await loadGetOptions(['azure', 'openai']);
+
+    await expect(
+      getOptions({
+        vercelModelId: 'openai/text-embedding-3-small',
+        userByok: [{ decryptedAPIKey: 'sk-openai', providerId: 'openai' }],
+        provider: { ignore: ['openai', 'azure'] },
+        dataRegion: null,
+      })
+    ).resolves.toMatchObject({ kind: 'routable', gateway: { only: ['openai'] } });
   });
 });

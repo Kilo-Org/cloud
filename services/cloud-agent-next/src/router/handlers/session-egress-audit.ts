@@ -1,3 +1,4 @@
+import { providerSupports } from '@kilocode/worker-utils/sandbox-provider-capabilities';
 import { TRPCError } from '@trpc/server';
 import { withLogTags } from '../../logger.js';
 import type { SessionMetadata } from '../../persistence/session-metadata.js';
@@ -47,7 +48,8 @@ export function createSessionEgressAuditHandlers() {
             });
           }
           if (
-            workspace.sandboxProvider !== 'cloudflare-containers' ||
+            workspace.sandboxProvider === undefined ||
+            !providerSupports(workspace.sandboxProvider, 'egressPolicy') ||
             workspace.sandboxRoute !== undefined ||
             (workspace.sandboxKind !== undefined
               ? workspace.sandboxKind !== 'isolated'

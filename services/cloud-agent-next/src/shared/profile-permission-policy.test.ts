@@ -528,6 +528,52 @@ describe('narrowProfilePermission', () => {
     expect(resolve(session, composed, 'bash', 'rm -rf /')).toBe('deny');
   });
 
+  it('carries a session allow for a pattern the profile does not name in either profile key order', () => {
+    const session: PermissionMap = {
+      bash: { '*': 'deny', 'git log': 'allow', 'git log *': 'allow' },
+    };
+    const expected = {
+      '*': 'deny',
+      'git *': 'ask',
+      'git log': 'ask',
+      'git log *': 'ask',
+      'rm *': 'deny',
+    };
+    const askFirst = narrowProfilePermission(session, {
+      bash: { 'git *': 'ask', 'rm *': 'deny' },
+    }) as PermissionMap;
+    const refusalFirst = narrowProfilePermission(session, {
+      bash: { 'rm *': 'deny', 'git *': 'ask' },
+    }) as PermissionMap;
+    expect(askFirst['bash']).toEqual(expected);
+    expect(refusalFirst['bash']).toEqual(expected);
+    // The session refuses every command and its refusal is carried after the
+    // asks, so it settles every command the asks reach, whatever their order.
+    for (const composed of [askFirst, refusalFirst]) {
+      expect(resolve(session, composed, 'bash', 'git log --oneline')).toBe('deny');
+      expect(resolve(session, composed, 'bash', 'git status')).toBe('deny');
+      expect(resolve(session, composed, 'bash', 'rm -rf /')).toBe('deny');
+    }
+  });
+
+  it('keeps the profile verdict for a pattern the profile decides when an ask covers it', () => {
+    const session: PermissionMap = { bash: { 'git log *': 'allow' } };
+    const refusal = narrowProfilePermission(session, {
+      bash: { 'git log *': 'deny', 'git *': 'ask' },
+    }) as PermissionMap;
+    const allowance = narrowProfilePermission(session, {
+      bash: { 'git log *': 'allow', 'git *': 'ask' },
+    }) as PermissionMap;
+    expect(refusal['bash']).toEqual({ 'git log *': 'deny', 'git *': 'ask' });
+    expect(allowance['bash']).toEqual({ 'git log *': 'allow', 'git *': 'ask' });
+    // The profile decides the kept pattern, so its verdict settles the command
+    // and the ask decides only the commands the profile named no rule for.
+    expect(resolve(session, refusal, 'bash', 'git log --oneline')).toBe('deny');
+    expect(resolve(session, refusal, 'bash', 'git status')).toBe('ask');
+    expect(resolve(session, allowance, 'bash', 'git log --oneline')).toBe('allow');
+    expect(resolve(session, allowance, 'bash', 'git status')).toBe('ask');
+  });
+
   it('drops an empty agent map', () => {
     expect(narrowProfilePermission(reviewSession, {})).toBeUndefined();
     expect(narrowProfilePermission(reviewSession, { bash: {} })).toBeUndefined();
@@ -576,6 +622,65 @@ describe('narrowProfilePermission', () => {
     expect(narrowProfilePermission({ edit: 'deny' }, { todowrite: 'ask' })).toEqual({
       todowrite: 'ask',
     });
+  });
+
+  it('orders a narrower refusal after the broader ask in either profile key order', () => {
+    const session: PermissionMap = { bash: { 'git log *': 'allow' } };
+    const expectedKeys = ['git *', 'git log *'];
+    for (const agent of [
+      { bash: { 'git *': 'ask', 'git log *': 'deny' } },
+      { bash: { 'git log *': 'deny', 'git *': 'ask' } },
+    ]) {
+      const composed = narrowProfilePermission(session, agent) as PermissionMap;
+      expect(Object.keys(composed['bash'] as Record<string, string>)).toEqual(expectedKeys);
+      expect((composed['bash'] as Record<string, string>)['git log *']).toBe('deny');
+      expect(resolve(session, composed, 'bash', 'git log --oneline')).toBe('deny');
+    }
+  });
+
+  it('lets a narrower profile allowance outrank a broader profile refusal', () => {
+    const session: PermissionMap = { bash: { 'git log *': 'allow' } };
+    const composed = narrowProfilePermission(session, {
+      bash: { '*': 'deny', 'git log *': 'allow' },
+    }) as PermissionMap;
+    expect(resolve(session, composed, 'bash', 'git log --oneline')).toBe('allow');
+    expect(resolve(session, composed, 'bash', 'npm test')).toBe('deny');
+  });
+
+  it('lets a narrower profile ask outrank a broader profile refusal', () => {
+    const session: PermissionMap = { bash: { 'git *': 'allow' } };
+    const composed = narrowProfilePermission(session, {
+      bash: { '*': 'deny', 'git *': 'ask' },
+    }) as PermissionMap;
+    // The narrower rule is the profile's most specific decision, so the ask
+    // settles the commands it reaches and the refusal keeps the rest.
+    expect(resolve(session, composed, 'bash', 'git log --oneline')).toBe('ask');
+    expect(resolve(session, composed, 'bash', 'npm test')).toBe('deny');
+  });
+
+  it('settles two overlapping patterns that contain neither other by their order', () => {
+    const session: PermissionMap = { bash: { '*': 'allow', 'git p*': 'allow' } };
+    const composed = narrowProfilePermission(session, {
+      bash: { 'git p*': 'allow', '* push': 'ask', 'git *': 'deny' },
+    }) as PermissionMap;
+    // `git p*` and `* push` overlap without containing each other, so the
+    // composed order settles a command that matches both. That order is
+    // intended and deterministic: `git p*` has `git *` ahead of it because
+    // `git *` contains it, so the unrelated `* push` is placed first and
+    // `git p*` last.
+    expect(resolve(session, composed, 'bash', 'git push')).toBe('allow');
+    expect(resolve(session, composed, 'bash', 'git pull')).toBe('allow');
+  });
+
+  it('keeps a session refusal as the last word over a profile ask', () => {
+    const session: PermissionMap = { bash: { '*': 'deny', 'cat *': 'allow' } };
+    const composed = narrowProfilePermission(session, {
+      bash: { 'gh pr diff *': 'ask' },
+    }) as PermissionMap;
+    // The session refusal covers every command, so it is carried after the ask
+    // and the ask decides nothing, whatever the ask's own breadth is.
+    expect((composed['bash'] as Record<string, string>)['*']).toBe('deny');
+    expect(resolve(session, composed, 'bash', 'gh pr diff 1')).toBe('deny');
   });
 });
 

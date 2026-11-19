@@ -5,6 +5,7 @@ import {
 import { type Effort } from '@kilocode/harness-sdk';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import * as z from 'zod';
 
 import { API_BASE_URL } from '@/lib/config';
@@ -79,54 +80,57 @@ type ModelResponse = {
 
 // ── Pure model-option helpers ─────────────────────────────────────────
 
-export function toModelOptions(data: ModelResponse | undefined): ModelOption[] {
+/**
+ * Preferred rows first — in the server's own `preferredIndex` order, which is
+ * meaningful — then the rest in the locale's base-collation order. One shared
+ * comparator for every picker surface that re-sorts cached options on a
+ * language change: a catalog read served from the query cache keeps the order
+ * of the language that fetched it, so each memo re-runs the sort with the
+ * language that renders now. Sorts a copy; call it over a cached array.
+ */
+export function sortModelOptions<
+  V extends { name: string; isPreferred?: boolean; preferredIndex?: number },
+>(options: V[], language: string): V[] {
+  return [...options].sort((a, b) => {
+    if (a.isPreferred !== b.isPreferred) {
+      return a.isPreferred ? -1 : 1;
+    }
+    if (a.isPreferred) {
+      return (a.preferredIndex ?? 0) - (b.preferredIndex ?? 0);
+    }
+    return collator(language, { sensitivity: 'base' }).compare(a.name, b.name);
+  });
+}
+
+export function toModelOptions(data: ModelResponse | undefined, language: string): ModelOption[] {
   if (!data?.data) {
     return [];
   }
 
-  const items = data.data.map(model => ({
-    id: model.id,
-    name: formatShortModelDisplayName(model.name),
-    isFree: model.isFree,
-    mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
-    hasUserByokAvailable: model.hasUserByokAvailable,
-    pricing: model.pricing,
-    variants: Object.keys(model.opencode?.variants ?? {}),
-    variantEfforts: catalogVariantEfforts(model.opencode?.variants ?? {}),
-    preferredIndex: model.preferredIndex,
-    context_length: model.context_length ?? null,
-    supportsImages: model.architecture?.input_modalities?.includes('image') === true,
-  }));
+  const projected = data.data.map(
+    (model): ModelOption & { isPreferred: boolean; preferredIndex?: number } => ({
+      id: model.id,
+      name: formatShortModelDisplayName(model.name),
+      variants: Object.keys(model.opencode?.variants ?? {}),
+      variantEfforts: catalogVariantEfforts(model.opencode?.variants ?? {}),
+      isPreferred: model.preferredIndex !== undefined,
+      isFree: model.isFree,
+      mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
+      hasUserByokAvailable: model.hasUserByokAvailable,
+      pricing: model.pricing,
+      context_length: model.context_length ?? null,
+      supportsImages: model.architecture?.input_modalities?.includes('image') === true,
+      ...(model.preferredIndex === undefined ? {} : { preferredIndex: model.preferredIndex }),
+    })
+  );
 
-  items.sort((a, b) => {
-    const aHas = a.preferredIndex !== undefined;
-    const bHas = b.preferredIndex !== undefined;
-
-    if (aHas && bHas) {
-      return (a.preferredIndex ?? 0) - (b.preferredIndex ?? 0);
-    }
-    if (aHas) {
-      return -1;
-    }
-    if (bHas) {
-      return 1;
-    }
-    return collator(i18n.language, { sensitivity: 'base' }).compare(a.name, b.name);
-  });
-
-  return items.map(item => ({
-    id: item.id,
-    name: item.name,
-    variants: item.variants,
-    variantEfforts: item.variantEfforts,
-    isPreferred: item.preferredIndex !== undefined,
-    isFree: item.isFree,
-    mayTrainOnYourPrompts: item.mayTrainOnYourPrompts,
-    hasUserByokAvailable: item.hasUserByokAvailable,
-    pricing: item.pricing,
-    context_length: item.context_length,
-    supportsImages: item.supportsImages,
-  }));
+  // `sortModelOptions` orders preferred rows first and the rest by `name`;
+  // the projection carries every field the option exposes, so the sorted
+  // array is the answer. `preferredIndex` stays on the rows past the declared
+  // `ModelOption` shape on purpose: the declared interface is what callers
+  // read, and the index is the comparator's private ordering input — adding
+  // it to the interface would invite re-sorting by it outside this helper.
+  return sortModelOptions(projected, language);
 }
 
 export function thinkingEffortLabel(variant: string): string {
@@ -187,6 +191,8 @@ type ModelCatalogEndpoint = 'models' | 'org-defaults';
  */
 class ModelCatalogFetchError extends Error {
   readonly [TELEMETRY_DESCRIPTION_KEY]: TelemetryDescription;
+  /** The answer's HTTP status, so failure classifiers can name the server answer. */
+  readonly status: number;
 
   constructor(args: {
     endpoint: ModelCatalogEndpoint;
@@ -197,6 +203,7 @@ class ModelCatalogFetchError extends Error {
   }) {
     super(args.message);
     this.name = 'ModelCatalogFetchError';
+    this.status = args.status;
     const expected = isExpectedHttpStatus(args.status);
     this[TELEMETRY_DESCRIPTION_KEY] = {
       level: expected ? 'warning' : 'error',
@@ -304,17 +311,25 @@ export function useAvailableModels(
   audience: OrganizationModelAudience = 'member',
   options: { enabled?: boolean } = {}
 ) {
-  const { data, isLoading, isError, isFetching, isFetched, error, refetch } = useQuery({
-    queryKey: ['available-models', organizationId, audience] as const,
-    queryFn: fetchModels.bind(null, organizationId, audience),
-    enabled: options.enabled ?? true,
-    staleTime: 60_000,
-    // A paused catalogue read leaves the picker with no model to list, so
-    // auto-selection never resolves.
-    ...SETTLE_WHILE_OFFLINE,
-  });
+  const { data, isLoading, isError, isFetching, fetchStatus, isFetched, error, refetch } = useQuery(
+    {
+      queryKey: ['available-models', organizationId, audience] as const,
+      queryFn: fetchModels.bind(null, organizationId, audience),
+      enabled: options.enabled ?? true,
+      staleTime: 60_000,
+      // A paused catalogue read leaves the picker with no model to list, so
+      // auto-selection never resolves.
+      ...SETTLE_WHILE_OFFLINE,
+    }
+  );
 
-  const models = useMemo(() => toModelOptions(data), [data]);
+  // `toModelOptions` orders the catalog rows with the active language's
+  // collator, so the memo follows the language as well as the payload:
+  // `applyLanguagePreference`'s LTR switch calls `i18n.changeLanguage` in
+  // place (no remount) and leaves the cached `data` identity unchanged.
+  const { i18n: translation } = useTranslation();
+  const language = translation.language;
+  const models = useMemo(() => toModelOptions(data, language), [data, language]);
 
   // `isFetching` covers every in-flight request; `isLoading` is only the first
   // load (it turns true again during a no-data refetch, so it cannot tell a
@@ -322,5 +337,5 @@ export function useAvailableModels(
   // least once, letting a caller keep the error state through a retry: v5
   // downgrades a no-data refetch back to pending and clears `error`, so
   // `isError` alone would drop the error block. See `use-current-user-id`.
-  return { models, isLoading, isError, isFetching, isFetched, error, refetch };
+  return { models, isLoading, isError, isFetching, fetchStatus, isFetched, error, refetch };
 }

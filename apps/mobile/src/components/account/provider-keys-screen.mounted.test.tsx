@@ -1,8 +1,9 @@
 /* eslint-disable max-lines -- one suite covers the personal and organization scopes, the row controls and every list state, against one mocked data layer. */
-import { createElement, type ElementType } from 'react';
+import { createElement, type ElementType, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -18,8 +19,12 @@ type Key = {
 };
 
 type MutationOptions = {
-  onSuccess?: (result: unknown, input: never) => void;
-  onError?: (error: Error) => void;
+  kind?: string;
+  onSuccess?: (
+    result: { outcome: string; provider?: string; model?: string; detail?: string },
+    input?: never
+  ) => void;
+  onError?: (error: unknown) => void;
 };
 
 const state = vi.hoisted(() => ({
@@ -93,18 +98,35 @@ vi.mock('@/lib/trpc', () => ({
 vi.mock('@/components/ui/icons', () => ({ KeyRound: 'KeyRound', Plus: 'Plus' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/icon-button', () => ({
+  IconButton: (props: {
+    accessibilityLabel?: string;
+    onPress?: () => void;
+    children?: ReactNode;
+  }) => createElement('IconButton', props, props.children),
+}));
 vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: (props: { action?: ReactNode }) => createElement('EmptyState', props, props.action),
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/organization/organization-boundary', () => ({
   OrganizationBoundary: 'OrganizationBoundary',
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+// The header renders its trailing slot, so the suite can read the screen's one
+// create control the way the screen hands it over.
+vi.mock('@/components/screen-header', () => ({
+  ScreenHeader: (props: { headerRight?: ReactNode }) =>
+    createElement('ScreenHeader', null, props.headerRight),
+}));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 
 const SWITCH = 'Switch' as ElementType;
 const BUTTON = 'Button' as ElementType;
+const ICON_BUTTON = 'IconButton' as ElementType;
+const STATE_ACTION = 'StateAction' as ElementType;
 
 let renderer: ReactTestRenderer | undefined = undefined;
 
@@ -139,8 +161,12 @@ function textsInRow(root: ReactTestRenderer['root'], provider: string) {
 function button(root: ReactTestRenderer['root'], label: string) {
   const found = root.findAll(
     node =>
-      Object.is(node.type, BUTTON) &&
-      node.findAll(child => child.props.children === label).length > 0
+      (Object.is(node.type, BUTTON) ||
+        Object.is(node.type, STATE_ACTION) ||
+        Object.is(node.type, ICON_BUTTON)) &&
+      (node.props.label === label ||
+        node.props.accessibilityLabel === label ||
+        node.findAll(child => child.props.children === label).length > 0)
   );
   const [first] = found;
   if (!first) {
@@ -157,6 +183,15 @@ function lastConfirm() {
     throw new Error('confirm was never asked');
   }
   return call;
+}
+
+/** The key-test mutation the screen registered, whichever order it landed in. */
+function testMutation() {
+  const found = state.mutations.find(mutation => mutation.kind === 'test');
+  if (!found) {
+    throw new Error('the test mutation was never created');
+  }
+  return found;
 }
 
 beforeEach(() => {
@@ -186,6 +221,8 @@ beforeEach(() => {
   state.mutate.mockClear();
   state.confirm.mockClear();
   state.push.mockClear();
+  vi.mocked(announcingToast.success).mockClear();
+  vi.mocked(announcingToast.error).mockClear();
 });
 
 afterEach(() => {
@@ -223,6 +260,68 @@ describe('ProviderKeysScreen', () => {
     });
 
     expect(state.mutate).toHaveBeenCalledWith({ id: 'key-1' });
+  });
+
+  it('reports the key test verdict in its own words', async () => {
+    await mount();
+
+    act(() => {
+      testMutation().onSuccess?.({ outcome: 'rejected' });
+    });
+
+    expect(announcingToast.error).toHaveBeenCalledWith(
+      'The provider rejected this key. Check that it is correct and has not been revoked.'
+    );
+    expect(announcingToast.success).not.toHaveBeenCalled();
+
+    act(() => {
+      testMutation().onSuccess?.({
+        outcome: 'ok',
+        provider: 'Anthropic',
+        model: 'claude-sonnet-4',
+      });
+    });
+
+    expect(announcingToast.success).toHaveBeenCalledWith(
+      'Key works. Provider: Anthropic. Model: claude-sonnet-4.'
+    );
+  });
+
+  it('reports a failed test request in the same words', async () => {
+    await mount();
+
+    act(() => {
+      testMutation().onError?.(new Error('socket hang up'));
+    });
+
+    expect(announcingToast.error).toHaveBeenCalledWith('The key test failed. Try again.');
+  });
+
+  it.each([
+    ['incomplete', 'The provider ended the test before it finished. Try again.'],
+    ['unsupported-provider', 'This provider is no longer supported. Remove the key.'],
+    ['unreadable-key', 'The stored key could not be read. Try again later.'],
+    ['deprecated-provider', 'This provider is deprecated, so its key cannot be tested.'],
+  ])('names the %s verdict in its own words', async (outcome, copy) => {
+    await mount();
+
+    act(() => {
+      testMutation().onSuccess?.({ outcome });
+    });
+
+    expect(announcingToast.error).toHaveBeenCalledWith(copy);
+    expect(announcingToast.success).not.toHaveBeenCalled();
+  });
+
+  it('answers a tap whose outcome this build does not know', async () => {
+    await mount();
+
+    act(() => {
+      testMutation().onSuccess?.({ outcome: 'rate-limited' });
+    });
+
+    expect(announcingToast.error).toHaveBeenCalledWith('The key test failed. Try again.');
+    expect(announcingToast.success).not.toHaveBeenCalled();
   });
 
   it('asks before removing a key and then deletes it', async () => {
@@ -335,8 +434,9 @@ describe('ProviderKeysScreen', () => {
     expect(
       root.findAll(
         node =>
-          Object.is(node.type, BUTTON) &&
-          node.findAll(child => child.props.children === 'Add key').length > 0
+          (Object.is(node.type, BUTTON) || Object.is(node.type, ICON_BUTTON)) &&
+          (node.props.accessibilityLabel === 'Add key' ||
+            node.findAll(child => child.props.children === 'Add key').length > 0)
       )
     ).toHaveLength(0);
     expect(

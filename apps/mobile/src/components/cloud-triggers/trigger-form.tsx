@@ -61,9 +61,7 @@ function FailureBand({
       <Text className="text-sm font-medium text-destructive">
         {t('cloudAgent.triggers.saveFailedTitle')}
       </Text>
-      <Text variant="muted" className="text-xs">
-        {failure.message}
-      </Text>
+      <Text variant="caption">{failure.message}</Text>
       <View className="flex-row gap-2">
         {failure.kind === 'retryable' ? (
           <Button variant="outline" onPress={onRetry}>
@@ -98,7 +96,10 @@ export function TriggerForm({
   const [repositoryPickerOpen, setRepositoryPickerOpen] = useState(false);
   const [agentSheet, setAgentSheet] = useState<TriggerAgentSheet>(null);
   return (
-    <View className="gap-6">
+    // One 16dp gap governs every break on the form — section to section and the
+    // submit group alike — so no break reads wider than another. The sections
+    // carry no hairline between them: the gap alone separates them.
+    <View className="gap-4">
       <TriggerFormBasics
         mode={mode}
         organizationId={organizationId}
@@ -108,7 +109,6 @@ export function TriggerForm({
         repositoryPickerOpen={repositoryPickerOpen}
         onRepositoryPickerOpenChange={setRepositoryPickerOpen}
       />
-      <View className="h-[0.5px] bg-hair-soft" />
       <TriggerFormAgent
         organizationId={organizationId}
         draft={draft}
@@ -117,7 +117,6 @@ export function TriggerForm({
         openSheet={agentSheet}
         onOpenSheetChange={setAgentSheet}
       />
-      <View className="h-[0.5px] bg-hair-soft" />
       <TriggerFormBehaviour
         mode={mode}
         organizationId={organizationId}

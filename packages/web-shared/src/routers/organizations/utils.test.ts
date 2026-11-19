@@ -5,6 +5,7 @@ import {
   ensureOrganizationAccessAndFetchOrg,
   ensureOrganizationsAccess,
   getOrganizationsAccessRoles,
+  organizationMemberProcedure,
   requireLiveOrganizationForPlatformAdmin,
   resolveOrganizationAccess,
 } from './utils';
@@ -12,7 +13,12 @@ import {
   setAdminAccessSinkForTest,
   type AdminAccessEvent,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
-import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
+import { supportStepUpPort } from '@kilocode/web-shared/lib/admin/support-step-up';
+import {
+  createCallerFactory,
+  createTRPCRouter,
+  type TRPCContext,
+} from '@kilocode/web-shared/lib/trpc/init';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
@@ -26,7 +32,7 @@ import {
   support_access_grants,
   type User,
 } from '@kilocode/db/schema';
-import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
+import { hashStepUpBinding, hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { and, eq } from 'drizzle-orm';
 
 /**
@@ -549,33 +555,57 @@ describe('binary support organization access', () => {
     userId: string,
     credentialId: string,
     verifiedAt = new Date(),
-    expiresAt = new Date(Date.now() + 15 * 60_000)
+    expiresAt = new Date(Date.now() + 15 * 60_000),
+    binding?: { route: string; organizationId: string }
   ) {
+    const purpose = binding ? 'operation' : 'session';
     await db.insert(session_step_up_proofs).values({
       kilo_user_id: userId,
       session_id_hash: hashWebSessionId(writeSessionId),
       method: 'webauthn_uv',
       passkey_credential_id: credentialId,
-      purpose: 'session',
+      purpose,
+      action_binding_hash: binding
+        ? hashStepUpBinding('support_write', {
+            surface: 'trpc',
+            route: binding.route,
+            method: 'mutation',
+            target: { kind: 'organization', id: binding.organizationId },
+          })
+        : null,
       verified_at: verifiedAt.toISOString(),
       expires_at: expiresAt.toISOString(),
     });
   }
 
-  async function writeCtxWithStepUpForPath(user: User, trpcPath: string): Promise<TRPCContext> {
+  async function writeCtxWithStepUpForPath(
+    user: User,
+    trpcPath: string,
+    organizationId?: string
+  ): Promise<TRPCContext> {
     const credentialId = await enroll(user.id);
-    await insertStepUpProof(user.id, credentialId);
+    if (organizationId) {
+      await insertStepUpProof(user.id, credentialId, undefined, undefined, {
+        route: trpcPath,
+        organizationId,
+      });
+    }
     return {
       user,
       credential: 'session',
       webSessionId: writeSessionId,
       trpcPath,
       trpcType: 'mutation',
+      stepUpClaims: new Set<string>(),
     };
   }
 
-  async function writeCtxWithStepUp(user: User): Promise<TRPCContext> {
-    return writeCtxWithStepUpForPath(user, 'organizations.settings.updateDefaultModel');
+  async function writeCtxWithStepUp(user: User, organizationId?: string): Promise<TRPCContext> {
+    return writeCtxWithStepUpForPath(
+      user,
+      'organizations.settings.updateDefaultModel',
+      organizationId
+    );
   }
 
   function failGrantLookupQueries() {
@@ -683,7 +713,7 @@ describe('binary support organization access', () => {
       actionClass: 'support_write',
       approverKiloUserId: approver.id,
     });
-    const writeCtx = await writeCtxWithStepUp(admin);
+    const writeCtx = await writeCtxWithStepUp(admin, organization.id);
 
     await expect(ensureOrganizationAccess(writeCtx, organization.id)).resolves.toBe('admin');
   });
@@ -744,6 +774,195 @@ describe('binary support organization access', () => {
     });
   });
 
+  async function approveWriteGrant(actorKiloUserId: string, organizationId: string) {
+    const approver = await insertTestUser({ is_admin: true });
+    return insertGrant({
+      actorKiloUserId,
+      organizationId,
+      actionClass: 'support_write',
+      approverKiloUserId: approver.id,
+    });
+  }
+
+  /**
+   * What the `adminProcedure` middleware leaves on the context once it has
+   * claimed and spent one operation proof for the exact tRPC route.
+   */
+  function freshUpstreamState(): NonNullable<TRPCContext['adminStepUpState']> {
+    return {
+      status: 'fresh',
+      method: 'webauthn_uv',
+      verifiedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+    };
+  }
+
+  function writeCtxFor(
+    user: User,
+    adminStepUpState?: TRPCContext['adminStepUpState'],
+    trpcPath = 'organizations.settings.updateDefaultModel',
+    adminStepUpDecision?: TRPCContext['adminStepUpDecision']
+  ): TRPCContext {
+    return {
+      user,
+      credential: 'session',
+      webSessionId: writeSessionId,
+      trpcPath,
+      trpcType: 'mutation',
+      ...(adminStepUpState ? { adminStepUpState } : {}),
+      ...(adminStepUpDecision ? { adminStepUpDecision } : {}),
+    };
+  }
+
+  test('a fresh upstream step-up is reused instead of claiming a second proof', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    const grant = await approveWriteGrant(admin.id, organization.id);
+
+    // No operation proof is minted here: the upstream middleware already spent
+    // one, so a second claim would demand a prompt the caller cannot answer.
+    const requireFreshSpy = jest.spyOn(supportStepUpPort, 'requireFresh');
+    try {
+      await expect(
+        ensureOrganizationAccess(
+          writeCtxFor(admin, freshUpstreamState(), 'organizations.settings.updateDefaultModel', {
+            actionClass: 'support_write',
+            target: { kind: 'organization', id: organization.id },
+          }),
+          organization.id
+        )
+      ).resolves.toBe('admin');
+      expect(requireFreshSpy).not.toHaveBeenCalled();
+    } finally {
+      requireFreshSpy.mockRestore();
+    }
+
+    const [use] = await db
+      .select()
+      .from(support_access_grant_events)
+      .where(
+        and(
+          eq(support_access_grant_events.grant_id, grant.id),
+          eq(support_access_grant_events.event_type, 'used_write')
+        )
+      );
+    expect(use).toMatchObject({
+      organization_id: organization.id,
+      action_class: 'support_write',
+      performed_by_kilo_user_id: admin.id,
+    });
+  });
+
+  test('without an upstream state the write use claims a proof bound to the organization', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    await approveWriteGrant(admin.id, organization.id);
+    const writeCtx = await writeCtxWithStepUp(admin, organization.id);
+
+    const requireFreshSpy = jest.spyOn(supportStepUpPort, 'requireFresh');
+    try {
+      await expect(ensureOrganizationAccess(writeCtx, organization.id)).resolves.toBe('admin');
+      expect(requireFreshSpy).toHaveBeenCalledTimes(1);
+      expect(requireFreshSpy).toHaveBeenCalledWith({
+        userId: admin.id,
+        action: 'support_write_use',
+        actionClass: 'support_write',
+        organizationId: organization.id,
+        credential: 'session',
+        webSessionId: writeSessionId,
+        route: 'organizations.settings.updateDefaultModel',
+        method: 'mutation',
+        surface: 'trpc',
+      });
+    } finally {
+      requireFreshSpy.mockRestore();
+    }
+  });
+
+  test('resolving organization access twice in one request', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    const grant = await approveWriteGrant(admin.id, organization.id);
+    const middlewareCtx = await writeCtxWithStepUp(admin, organization.id);
+    const handlerCtx: TRPCContext = { ...middlewareCtx, organizationAccess: undefined };
+
+    const requireFreshSpy = jest.spyOn(supportStepUpPort, 'requireFresh');
+    try {
+      await expect(ensureOrganizationAccess(middlewareCtx, organization.id)).resolves.toBe('admin');
+      await expect(ensureOrganizationAccess(handlerCtx, organization.id)).resolves.toBe('admin');
+      expect(requireFreshSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      requireFreshSpy.mockRestore();
+    }
+
+    const uses = await db
+      .select()
+      .from(support_access_grant_events)
+      .where(
+        and(
+          eq(support_access_grant_events.grant_id, grant.id),
+          eq(support_access_grant_events.event_type, 'used_write')
+        )
+      );
+    expect(uses).toHaveLength(1);
+  });
+
+  test('resolving organization access in two requests', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    await approveWriteGrant(admin.id, organization.id);
+    const firstCtx = await writeCtxWithStepUp(admin, organization.id);
+    const secondCtx = await writeCtxWithStepUp(admin, organization.id);
+
+    const requireFreshSpy = jest.spyOn(supportStepUpPort, 'requireFresh');
+    try {
+      await expect(ensureOrganizationAccess(firstCtx, organization.id)).resolves.toBe('admin');
+      await expect(ensureOrganizationAccess(secondCtx, organization.id)).resolves.toBe('admin');
+      expect(requireFreshSpy).toHaveBeenCalledTimes(2);
+    } finally {
+      requireFreshSpy.mockRestore();
+    }
+  });
+
+  test('a support write use is still refused while step-up is switched off', async () => {
+    setSupportEnabled(true);
+    delete process.env.ADMIN_STEP_UP_ENABLED;
+    const { organization, admin } = await orgAndAdmin();
+    await approveWriteGrant(admin.id, organization.id);
+    const writeCtx = await writeCtxWithStepUp(admin, organization.id);
+
+    await expect(ensureOrganizationAccess(writeCtx, organization.id)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Step-up must be enabled for this support access change',
+      cause: expect.objectContaining({
+        code: 'MFA_REQUIRED',
+        actionClass: 'support_write',
+        purpose: 'operation',
+        maxAgeSeconds: 300,
+      }),
+    });
+  });
+
+  test('a read grant request never claims a write proof', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: organization.id,
+      actionClass: 'support_read',
+    });
+
+    const requireFreshSpy = jest.spyOn(supportStepUpPort, 'requireFresh');
+    try {
+      await expect(ensureOrganizationAccess(readCtx(admin), organization.id)).resolves.toBe(
+        'member'
+      );
+      expect(requireFreshSpy).not.toHaveBeenCalled();
+    } finally {
+      requireFreshSpy.mockRestore();
+    }
+  });
+
   test('ON write use rejects an expired proof as MFA_EXPIRED', async () => {
     setSupportEnabled(true);
     const { organization, admin } = await orgAndAdmin();
@@ -759,7 +978,8 @@ describe('binary support organization access', () => {
       admin.id,
       credentialId,
       new Date(Date.now() - 2 * 60 * 60_000),
-      new Date(Date.now() - 60_000)
+      new Date(Date.now() - 60_000),
+      { route: 'organizations.settings.updateDefaultModel', organizationId: organization.id }
     );
 
     await expect(
@@ -910,7 +1130,7 @@ describe('binary support organization access', () => {
     });
 
     await expect(
-      ensureOrganizationAccess(await writeCtxWithStepUp(admin), organization.id)
+      ensureOrganizationAccess(await writeCtxWithStepUp(admin, organization.id), organization.id)
     ).resolves.toBe('admin');
   });
 
@@ -1044,7 +1264,10 @@ describe('binary support organization access', () => {
     });
 
     await expect(
-      ensureOrganizationAccess(await writeCtxWithStepUp(superadmin), organization.id)
+      ensureOrganizationAccess(
+        await writeCtxWithStepUp(superadmin, organization.id),
+        organization.id
+      )
     ).resolves.toBe('admin');
   });
 
@@ -1193,9 +1416,9 @@ describe('binary support organization access', () => {
       approverKiloUserId: approver.id,
     });
 
-    await expect(ensureOrganizationAccess(await writeCtxWithStepUp(admin), child.id)).resolves.toBe(
-      'admin'
-    );
+    await expect(
+      ensureOrganizationAccess(await writeCtxWithStepUp(admin, child.id), child.id)
+    ).resolves.toBe('admin');
 
     const evidence = await db
       .select()
@@ -1713,5 +1936,107 @@ describe('binary support organization access', () => {
     const event = events.find(event => event.kind === 'kilo_admin_elevation');
     expect(event).toMatchObject({ reason: 'organization_access' });
     expect(event).toMatchObject({ supportDecision: null });
+  });
+});
+
+describe('organizationMemberProcedure replica membership read', () => {
+  const router = createTRPCRouter({
+    ping: organizationMemberProcedure.query(({ ctx }) => ctx.user.id),
+  });
+  const createCaller = createCallerFactory(router);
+
+  afterEach(async () => {
+    jest.restoreAllMocks();
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(organization_memberships);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(organizations);
+  });
+
+  function ctxFor(user: User, fromDb?: TRPCContext['fromDb']): TRPCContext {
+    return { user, authViaToken: false, tokenSource: null, ip: null, fromDb };
+  }
+
+  /** A read client whose every query chain resolves to the given rows, or throws on `select`. */
+  function fakeReplica(outcome: 'empty' | 'throws') {
+    const select = jest.fn(() => {
+      if (outcome === 'throws') throw new Error('replica unavailable');
+      const chain: unknown = new Proxy(() => chain, {
+        get: (_target, property) =>
+          property === 'then' ? (resolve: (rows: unknown[]) => void) => resolve([]) : () => chain,
+      });
+      return chain;
+    });
+    return { select, client: { select } as unknown as TRPCContext['fromDb'] };
+  }
+
+  async function member() {
+    const user = await insertTestUser({ is_admin: false });
+    const organization = await createTestOrganization(
+      `replica-member-${crypto.randomUUID()}`,
+      user.id,
+      0
+    );
+    return { user, organization };
+  }
+
+  test('a granting replica read admits the member without reading the primary', async () => {
+    const { user, organization } = await member();
+    const select = db.select.bind(db);
+    const replicaSelect = jest.fn(select);
+    const primarySelect = jest.spyOn(db, 'select');
+    const fromDb = { select: replicaSelect } as unknown as TRPCContext['fromDb'];
+
+    await expect(
+      createCaller(ctxFor(user, fromDb)).ping({ organizationId: organization.id })
+    ).resolves.toBe(user.id);
+
+    expect(replicaSelect).toHaveBeenCalled();
+    expect(primarySelect).not.toHaveBeenCalled();
+  });
+
+  test('a replica read that grants no role falls back to the primary', async () => {
+    const { user, organization } = await member();
+    const replica = fakeReplica('empty');
+    const primarySelect = jest.spyOn(db, 'select');
+
+    await expect(
+      createCaller(ctxFor(user, replica.client)).ping({ organizationId: organization.id })
+    ).resolves.toBe(user.id);
+
+    expect(replica.select).toHaveBeenCalled();
+    expect(primarySelect).toHaveBeenCalled();
+  });
+
+  test('a failed replica read falls back to the primary', async () => {
+    const { user, organization } = await member();
+    const replica = fakeReplica('throws');
+
+    await expect(
+      createCaller(ctxFor(user, replica.client)).ping({ organizationId: organization.id })
+    ).resolves.toBe(user.id);
+
+    expect(replica.select).toHaveBeenCalled();
+  });
+
+  test('a non-member is still rejected when the replica returns no rows', async () => {
+    const { organization } = await member();
+    const outsider = await insertTestUser({ is_admin: false });
+    const replica = fakeReplica('empty');
+
+    await expect(
+      createCaller(ctxFor(outsider, replica.client)).ping({ organizationId: organization.id })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(replica.select).toHaveBeenCalled();
+  });
+
+  test('without a replica client the primary is read', async () => {
+    const { user, organization } = await member();
+    const primarySelect = jest.spyOn(db, 'select');
+
+    await expect(
+      createCaller(ctxFor(user)).ping({ organizationId: organization.id })
+    ).resolves.toBe(user.id);
+    expect(primarySelect).toHaveBeenCalled();
   });
 });

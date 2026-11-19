@@ -7,6 +7,7 @@ import {
   type SandboxKind,
 } from '../sandbox-placement.js';
 import type { RuntimeHarness } from '../shared/control-plane-runtime-contract.js';
+import { PROVIDER_DESCRIPTORS } from '../shared/sandbox-provider.js';
 import type { AgentSandboxProvider, Env } from '../types.js';
 import { ProviderCreationError } from './provider.js';
 import { RetiredSandboxProviderError } from './retired-cloudflare-provider.js';
@@ -100,7 +101,7 @@ function startupTarget(
   env: StartupEnv,
   provider: AgentSandboxProvider
 ): { mode: 'downloaded'; image: 'runtime-free' } {
-  if (provider === 'cloudflare') throw new RetiredSandboxProviderError('create');
+  if (PROVIDER_DESCRIPTORS[provider].retired) throw new RetiredSandboxProviderError('create');
   if (provider === 'vercel') return { mode: 'downloaded', image: 'runtime-free' };
   if (env.RUNTIME_INTERACTIVE_ORG_IDS !== undefined)
     throw new ProviderCreationError('invalid_configuration');

@@ -133,6 +133,23 @@ export class GitHubRateLimitError extends Error {
 }
 
 /**
+ * Mirrors the real adapter's typed credential rejection so
+ * `isGitHubCredentialRejection` classifies it in tests that run against this
+ * mock.
+ */
+export class GitHubCredentialRejectionError extends Error {
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause));
+    this.name = 'GitHubCredentialRejectionError';
+    this.cause = cause;
+  }
+}
+
+export function isGitHubCredentialRejection(error: unknown): boolean {
+  return error instanceof GitHubCredentialRejectionError;
+}
+
+/**
  * Mirrors the adapter's rule: 429, `x-ratelimit-remaining: 0`, or a 403 whose
  * Retry-After header or message names a rate limit or abuse. Keep in step with
  * `isGitHubRateLimitError` in the real adapter.
@@ -246,5 +263,16 @@ export async function fetchGitHubRootTextFileAtRef(_params: {
   path: string;
   ref: string;
 }): Promise<string | null> {
+  return null;
+}
+
+export type GitHubHeadPullRequest = { number: number; url: string };
+
+export async function fetchGitHubPullRequestForHeadBranch(_params: {
+  token: string;
+  owner: string;
+  repo: string;
+  headBranch: string;
+}): Promise<GitHubHeadPullRequest | null> {
   return null;
 }

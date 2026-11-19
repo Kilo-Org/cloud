@@ -19,6 +19,7 @@ export function ReviewerHeader({
   reserveTitleSpace = false,
   eyebrow,
   reserveEyebrow = false,
+  eyebrowPlaceholder,
   backFallback = CODE_REVIEWER_HOME_PATH,
   onBack,
 }: Readonly<{
@@ -47,6 +48,12 @@ export function ReviewerHeader({
    * their first frame leave it off.
    */
   reserveEyebrow?: boolean;
+  /**
+   * What the reserved eyebrow line paints while its label loads, such as a bar
+   * one eyebrow line tall. Ignored when the caller passes no `eyebrow` and no
+   * `reserveEyebrow`, because no line is reserved to paint it over.
+   */
+  eyebrowPlaceholder?: React.ReactNode;
   /** Where Back lands when the screen has no history to pop. */
   backFallback?: Href;
   /** Run this instead of navigating, e.g. while a form confirms a discard. */
@@ -59,6 +66,7 @@ export function ReviewerHeader({
       reserveTitleSpace={reserveTitleSpace}
       eyebrow={eyebrow}
       reserveEyebrow={reserveEyebrow}
+      eyebrowPlaceholder={eyebrowPlaceholder}
       backFallback={backFallback}
       onBack={onBack}
     />

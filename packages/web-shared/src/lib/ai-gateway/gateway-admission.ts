@@ -14,25 +14,27 @@ import {
   type BalanceAndOrgSettings,
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import {
-  hasBestEffortGuessDataCollectionRequirement,
+  isDeniedByProviderPrivacy,
   isFreeModel,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import type {
   OrganizationPlan,
   OrganizationSettings,
 } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { EffectiveModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
-import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import {
-  isDataCollectionExplicitlyDisallowed,
-  type OpenRouterProviderConfig,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+  composeProviderPreferences,
+  getEffectiveProviderPrivacy,
+} from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
+import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import {
   accountFreeModelLimitResponse,
   anonymousFreeModelLimitResponse,
   creditsBlockedResponse,
   dataCollectionRequiredResponse,
+  zeroDataRetentionUnavailableResponse,
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
   gatewayAccountRateLimitResponse,
@@ -237,14 +239,14 @@ export function paidUsageRejection(params: {
 
 /**
  * The provider preferences the organization requires: its data collection
- * policy and the member decision's provider routes, with the request's own
- * privacy merged in. `provider` is undefined when the organization requires
+ * policy and the member decision's provider routes, applied over the request's
+ * own provider object. `provider` is undefined when the organization requires
  * neither, so the request's provider preferences stand.
  */
 export function organizationProviderPreferences(params: {
   decision: EffectiveModelDecision | undefined;
   settings: OrganizationSettings | undefined;
-  requestProvider: Pick<OpenRouterProviderConfig, 'data_collection' | 'zdr'> | undefined;
+  requestProvider: OpenRouterProviderConfig | undefined;
 }):
   | { kind: 'rejected'; response: NextResponse }
   | { kind: 'allowed'; provider: OpenRouterProviderConfig | undefined } {
@@ -258,25 +260,25 @@ export function organizationProviderPreferences(params: {
   if (only?.length === 0) return { kind: 'rejected', response: modelNotAllowedResponse() };
   const organizationPrivacy = getOrganizationProviderPrivacy(settings);
   if (!organizationPrivacy && !only) return { kind: 'allowed', provider: undefined };
-  return {
-    kind: 'allowed',
-    provider: {
-      ...organizationPrivacy,
-      ...getEffectiveProviderPrivacy(requestProvider, settings?.data_collection),
-      ...(only && { only }),
-    },
-  };
+  const composed = composeProviderPreferences({
+    requestProvider,
+    organizationOnly: only,
+    effectivePrivacy: getEffectiveProviderPrivacy(requestProvider, settings?.data_collection),
+  });
+  if (composed.kind === 'none') return { kind: 'rejected', response: modelNotAllowedResponse() };
+  return { kind: 'allowed', provider: composed.provider };
 }
 
-/** Rejects a model that requires data collection under the effective provider privacy policy. */
+/** Rejects a model the effective provider privacy policy rules out; see `isDeniedByProviderPrivacy`. */
 export async function dataCollectionPolicyRejection(
   model: string,
   effectiveProviderPolicy: OpenRouterProviderConfig | undefined
 ): Promise<NextResponse | null> {
-  if (
-    (await hasBestEffortGuessDataCollectionRequirement(model)) &&
-    isDataCollectionExplicitlyDisallowed(effectiveProviderPolicy)
-  ) {
+  // Kilo does not vouch for zero data retention on any custom LLM.
+  if (effectiveProviderPolicy?.zdr === true && (await isCustomLlm(model))) {
+    return zeroDataRetentionUnavailableResponse();
+  }
+  if (await isDeniedByProviderPrivacy(model, effectiveProviderPolicy)) {
     return dataCollectionRequiredResponse();
   }
   return null;

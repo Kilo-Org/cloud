@@ -13,18 +13,21 @@
   },
   "ignorePatterns": [
     ".next/**",
-    "node_modules/**",
     "**/node_modules/**",
     "**/*.js",
     "**/*.jsx",
+    "!oxlint-plugin-drizzle.js",
     "build/**",
     "**/dist/**",
     "**/.wrangler/**",
     "supabase/functions/**",
     "**/opencode.gen.ts"
   ],
-  // Category defaults are off, so this block is the complete list of active checks,
-  // and each rules block below that is not a child of this one states why it relaxes.
+  // Category defaults are off, so this block lists the checks that apply to every file.
+  // The overrides below may add scoped checks as well as relax them: the **/*.ts and
+  // **/*.tsx override adds the TypeScript checks that apply repo-wide, and the
+  // services/**/*.ts and packages/**/*.ts override adds further strict checks for
+  // those trees. An override that relaxes a check states why it does.
   "rules": {
     "for-direction": "error",
     "no-async-promise-executor": "error",
@@ -125,10 +128,12 @@
         "@typescript-eslint/prefer-as-const": "error",
         "@typescript-eslint/prefer-namespace-keyword": "error",
         "@typescript-eslint/triple-slash-reference": "error",
-        "@typescript-eslint/no-var-requires": "error",
         "@typescript-eslint/consistent-type-imports": "error",
         "@typescript-eslint/no-non-null-assertion": "error",
         "@typescript-eslint/no-floating-promises": "error",
+        // Async event handlers and callbacks like onSave or onClick are passed where a
+        // void-returning callback is expected by design; no-floating-promises covers
+        // unawaited promises, so only the void-return half is relaxed.
         "@typescript-eslint/no-misused-promises": [
           "error",
           {
@@ -214,7 +219,7 @@
       "files": ["**/*.test.ts", "**/*.test.tsx", "**/__tests__/**/*.ts", "**/__tests__/**/*.tsx"],
       // Tests assert on untyped fixtures, so this override turns off only the checks
       // that fixture assertions trip: the `any`-flow rules, the two assertion rules,
-      // and `unbound-method` (jest mocks). Test files keep every other strict check,
+      // `no-redundant-type-constituents`, and `unbound-method` (jest mocks). Test files keep every other strict check,
       // because those report defects in the test code itself, not in fixture typing:
       // no-empty-object-type, await-thenable, no-base-to-string,
       // no-duplicate-type-constituents, no-for-in-array, no-implied-eval,

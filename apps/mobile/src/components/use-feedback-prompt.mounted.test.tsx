@@ -172,7 +172,7 @@ describe('useFeedbackPrompt', () => {
     const root = mount();
 
     press(requestButton(root));
-    answer(root, 'border-border');
+    answer(root, 'border-input');
 
     expect(feedback.sendAppFeedback).toHaveBeenCalledWith('user-1');
     expect(dialogs(root)).toHaveLength(0);

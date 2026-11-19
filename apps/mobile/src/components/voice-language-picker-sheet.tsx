@@ -1,6 +1,6 @@
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { type TFunction } from 'i18next';
-import { type ReactNode, useCallback, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
@@ -12,11 +12,10 @@ import { QueryError } from '@/components/query-error';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { Mic, Search, SearchX } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { foldForSearch } from '@/i18n/fold-for-search';
 import { languageRows } from '@/i18n/language-rows';
 import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import {
@@ -31,36 +30,27 @@ import {
 } from '@/lib/voice-input/voice-input-language-preference';
 import { useGatewayTranscriptionPreference } from '@/lib/voice-input/gateway/gateway-transcription-preference';
 import { useVoiceRecognitionLanguages } from '@/lib/voice-input/use-voice-recognition-languages';
-import { cn } from '@/lib/utils';
 
 // The picker sheet renders its own scroll container (`scrollable={false}`), so
-// the list fills the sheet's body.
+// the list fills the sheet's body. Rows own the page gutter, so the list adds
+// none of its own.
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = {
-  paddingHorizontal: 16,
-  paddingBottom: 16,
-} satisfies ViewStyle;
+const listContentContainerStyle = { paddingBottom: 16 } satisfies ViewStyle;
 
-// Static skeleton rows: count and shape match the real ChoiceRow rows (name
-// line + caption; the trailing check is transparent unless selected, so the
-// skeleton carries no trailing control) so the swap never moves layout and
-// never shows a shape the loaded row will not have.
+// Static skeleton rows: count and shape match the real ChoiceRow rows so the
+// swap never moves layout and never shows a shape the loaded row will not have.
 const SKELETON_ROW_COUNT = 6;
 
 function SkeletonRows() {
   return (
-    <View className="px-4 pb-4 pt-1">
+    <View className="pt-1">
       {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
-        // eslint-disable-next-line react/no-array-index-key -- static skeleton rows, no reordering
-        <View
+        <RowSkeleton
+          // eslint-disable-next-line react/no-array-index-key -- static skeleton rows, no reordering
           key={index}
-          className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between py-3')}
-        >
-          <View className="flex-1 gap-1.5 pr-3">
-            <Skeleton className="h-4 w-40" />
-            <Skeleton className="h-3 w-28" />
-          </View>
-        </View>
+          subtitle
+          className={index < SKELETON_ROW_COUNT - 1 ? 'border-b-[0.5px] border-hair-soft' : ''}
+        />
       ))}
     </View>
   );
@@ -111,6 +101,7 @@ function VoiceLanguageList({
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const listRef = useRef<FlashListRef<VoiceLanguageOption>>(null);
   // `matchesQuery` folds the label, the description and every search term of
   // every option, so the filter only reruns when the option array or the query
   // changes. An unrelated parent re-render then hands the list the same `data`
@@ -119,6 +110,12 @@ function VoiceLanguageList({
     () => options.filter(option => matchesQuery(option, query)),
     [options, query]
   );
+  // A query change draws a shorter list under the current offset, so a deep
+  // scroll would leave the matching rows above the viewport.
+  // `repository-rows-list` carries the same reset.
+  useEffect(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [query]);
 
   if (filtered.length === 0) {
     return (
@@ -131,25 +128,38 @@ function VoiceLanguageList({
   }
 
   return (
-    <FlashList
+    <FlashList<VoiceLanguageOption>
       nestedScrollEnabled
+      ref={listRef}
       style={[listStyle, { backgroundColor: colors.background }]}
       contentContainerStyle={listContentContainerStyle}
       data={filtered}
-      keyExtractor={option => option.tag ?? 'automatic'}
+      // FlashList stores its props during render and can index `data` past its
+      // end for a render React discarded; the fallback is the one FlashList
+      // uses when the callback is absent (see the model picker's comment).
+      keyExtractor={(option: VoiceLanguageOption | undefined, index) =>
+        option?.tag ?? String(index)
+      }
+      maintainVisibleContentPosition={{ disabled: true }}
       {...SEARCHABLE_PICKER_LIST_PROPS}
       ListFooterComponent={<View style={{ height: insets.bottom }} pointerEvents="none" />}
-      renderItem={({ item, index }) => (
-        <ChoiceRow
-          label={item.label}
-          description={item.description}
-          className={index < filtered.length - 1 ? 'border-b-[0.5px] border-hair-soft' : undefined}
-          selected={chosen === item.tag}
-          onPress={() => {
-            onSelect(item.tag);
-          }}
-        />
-      )}
+      renderItem={({ item, index }: { item: VoiceLanguageOption | undefined; index: number }) =>
+        // A stale index past the end of the rows (the model picker's
+        // renderItem carries the same guard for the same reason).
+        item ? (
+          <ChoiceRow
+            label={item.label}
+            description={item.description}
+            className={
+              index < filtered.length - 1 ? 'border-b-[0.5px] border-hair-soft' : undefined
+            }
+            selected={chosen === item.tag}
+            onPress={() => {
+              onSelect(item.tag);
+            }}
+          />
+        ) : null
+      }
     />
   );
 }

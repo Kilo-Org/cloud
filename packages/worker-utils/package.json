@@ -22,6 +22,7 @@
     "./runtime-proxy-attestation": "./src/runtime-proxy-attestation.ts",
     "./sandbox-id": "./src/sandbox-id.ts",
     "./sandbox-allocation": "./src/sandbox-allocation.ts",
+    "./sandbox-provider-capabilities": "./src/sandbox-provider-capabilities.ts",
     "./microdollars": "./src/microdollars.ts",
     "./compute-member": "./src/compute-member.ts",
     "./cloud-agent-compute": "./src/cloud-agent-compute.ts",
@@ -72,6 +73,7 @@
     "./vercel-execution-region": "./src/vercel-execution-region.ts",
     "./organization-membership": "./src/organization-membership.ts",
     "./webhook-body-validation": "./src/webhook-body-validation.ts",
+    "./webhook-trigger-target": "./src/webhook-trigger-target.ts",
     "./organization-usage": "./src/organization-usage.ts",
     "./organization-consumption": "./src/organization-consumption.ts",
     "./runtime-model-diagnostics": "./src/runtime-model-diagnostics.ts"

@@ -477,10 +477,10 @@ export function SessionMessageList<T>({
                 // has to be this node's own box.
                 className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
               >
-                {/* The visible circle stays compact (explicit px, because
-                  NativeWind's 14pt rem renders `h-10` at 35pt): DESIGN.md keeps
-                  the target, not the visual, at 44pt. */}
-                <View className="h-[35px] w-[35px] items-center justify-center rounded-full border border-border bg-card shadow-lg shadow-[#00000040]">
+                {/* The visible circle stays compact: `h-10` renders at 35pt on
+                  the 14pt rem, while the pressable above keeps the 48pt target.
+                  DESIGN.md keeps the target, not the visual, at 44pt. */}
+                <View className="h-10 w-10 items-center justify-center rounded-full border border-border bg-card shadow-lg shadow-[#00000040]">
                   <ChevronDown size={20} color={colors.foreground} />
                 </View>
               </Pressable>

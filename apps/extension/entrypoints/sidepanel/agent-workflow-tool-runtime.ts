@@ -1,6 +1,8 @@
 /* eslint-disable max-lines */
 import { z } from 'zod';
 import type { WorkflowToolCallEvent } from '@/src/shared/agent-conversation';
+import { TAB_BUSY_ERROR } from '@/src/shared/browser-caller';
+import type { BrowserCaller } from '@/src/shared/browser-caller';
 import type { EvalTabResult } from '@/src/shared/tab-debugger';
 import {
   MAX_WORKFLOW_COUNT,
@@ -38,7 +40,18 @@ export interface WorkflowToolContext {
     kind: ApprovalKind,
     draft: Record<string, unknown>
   ) => Promise<ApprovalOutcome>;
-  readonly evalInTab: (tabId: number, code: string) => Promise<EvalTabResult>;
+  readonly evalInTab: (
+    tabId: number,
+    code: string,
+    caller: BrowserCaller
+  ) => Promise<EvalTabResult>;
+  /**
+   * Takes the tab's lease for a run's caller before the run's first command,
+   * handing over this conversation's panel lease when it holds the tab — a run
+   * navigates to its start URL before it evaluates anything.
+   */
+  readonly claimTab: (tabId: number, caller: BrowserCaller) => Promise<boolean>;
+  readonly disposeBrowserCaller: (caller: BrowserCaller) => Promise<void>;
   readonly navigateTab: (tabId: number, url: string) => Promise<void>;
   readonly getTabUrl: (tabId: number) => Promise<string>;
 }
@@ -469,25 +482,43 @@ const executeRunWorkflow = async (
     };
   }
 
-  const result = await runWorkflow(
-    // EvalInTab resolves to the same type structurally but a tsc project-reference edge case
-    // Sees two different EvalTabResult declarations. Cast through Parameters to reconcile.
-    // eslint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- required for tsc project-reference type identity
-    {
-      evalInTab: ctx.evalInTab,
-      getTabUrl: ctx.getTabUrl,
-      navigateTab: ctx.navigateTab,
-    } as Parameters<typeof runWorkflow>[0],
-    {
-      dryRun,
-      input,
-      signal: ctx.signal,
-      tabId: ctx.selectedTabId,
-      workflow,
+  // One caller per run: the tab lease and the ref registry belong to this run, not to the conversation.
+  const caller: BrowserCaller = { kind: 'workflow', runId: crypto.randomUUID() };
+  try {
+    /*
+     * The run navigates to its start URL before its first eval, so its lease has
+     * to be taken first: otherwise a run started while another caller holds the
+     * tab rewrites the page and invalidates that holder's refs. The claim also
+     * hands over the conversation's own panel lease, so a run_workflow in a turn
+     * that already used a browser tool does not queue behind its own turn.
+     */
+    if (!(await ctx.claimTab(ctx.selectedTabId, caller))) {
+      return { error: ctx.signal.aborted ? 'Run stopped.' : TAB_BUSY_ERROR, ok: false };
     }
-  );
 
-  return runResultToToolResult(result, dryRun, workflow.name);
+    const result = await runWorkflow(
+      // EvalInTab resolves to the same type structurally but a tsc project-reference edge case
+      // Sees two different EvalTabResult declarations. Cast through Parameters to reconcile.
+      // eslint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- required for tsc project-reference type identity
+      {
+        evalInTab: (tabId: number, code: string) => ctx.evalInTab(tabId, code, caller),
+        getTabUrl: ctx.getTabUrl,
+        navigateTab: ctx.navigateTab,
+      } as Parameters<typeof runWorkflow>[0],
+      {
+        dryRun,
+        input,
+        signal: ctx.signal,
+        tabId: ctx.selectedTabId,
+        workflow,
+      }
+    );
+
+    return runResultToToolResult(result, dryRun, workflow.name);
+  } finally {
+    // The run is over for good: its lease and its refs go, so a waiting caller (another conversation, or a CLI agent) can take the tab.
+    await ctx.disposeBrowserCaller(caller);
+  }
 };
 
 const executeDeleteWorkflow = async (

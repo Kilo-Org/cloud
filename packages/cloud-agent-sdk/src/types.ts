@@ -124,6 +124,7 @@ export type SessionActivity =
  */
 export type SdkStatusMessageCode =
   | 'agent-connection-lost'
+  | 'agent-connection-reconnecting'
   | 'session-stopped'
   | 'session-terminated'
   | 'setting-up-environment'
@@ -139,6 +140,7 @@ export type SdkStatusMessageCode =
   | 'not-authorized'
   | 'service-unavailable'
   | 'previous-task-in-progress'
+  | 'workspace-deleting'
   | 'service-temporarily-unavailable'
   | 'generic-error'
   | 'connection-lost'
@@ -155,7 +157,13 @@ export type AgentStatus =
       code?: SdkStatusMessageCode;
     }
   | { type: 'error'; message: string; code?: SdkStatusMessageCode }
-  | { type: 'disconnected' }
+  /** `reconnecting` marks a self-recovering transport drop, not a terminal loss. */
+  | {
+      type: 'disconnected';
+      reconnecting?: boolean | undefined;
+      /** Set on the exhausted loss, so surfaces render one canonical copy. */
+      code?: SdkStatusMessageCode | undefined;
+    }
   | { type: 'interrupted' }
   /** Scheduled to wake later; does nothing now. `scheduledAt` is the ISO-8601 wake time when the CLI reported one. */
   | { type: 'scheduled'; scheduledAt?: string };

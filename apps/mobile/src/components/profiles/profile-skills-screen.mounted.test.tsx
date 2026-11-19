@@ -99,6 +99,7 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   // The screen hands its action to the manage slot, so the stub renders what it
   // is given: the read-only sentence replaces the button in the same subtree.
   EmptyState: (props: { title: string; description?: ReactNode; action?: ReactNode }) =>
@@ -112,6 +113,7 @@ vi.mock('@/components/ui/icons', () => ({
   Pencil: 'Pencil',
   Sparkles: 'Sparkles',
   Trash2: 'Trash2',
+  Plus: 'Plus',
 }));
 
 describe('ProfileSkillsScreen', () => {
@@ -183,17 +185,35 @@ describe('ProfileSkillsScreen', () => {
 
   it('read-only: a loaded list keeps its rows, drops its controls and names who may act', async () => {
     permissionState.permission = 'read-only';
-    h.query.data = testSkills([testSkill()]);
+    // Two source kinds, so each row paints the source under its name.
+    h.query.data = testSkills([
+      testSkill(),
+      testSkill({ id: 'skill-2', name: 'frontend-rules', sourceType: 'imported' }),
+    ]);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
 
-    expect(findOne(renderer.root, 'Switch').props.accessibilityLabel).toBe('code-review');
-    expect(findAll(renderer.root, 'Pressable')).toHaveLength(0);
+    expect(findAll(renderer.root, 'Switch')[0]?.props.accessibilityLabel).toBe('code-review');
+    // The row content is the edit action, so without the manage role it renders
+    // no labelled control at all.
+    expect(
+      findAll(renderer.root, 'Pressable')
+        .map(node => node.props.accessibilityLabel)
+        .filter((label): label is string => typeof label === 'string')
+    ).toEqual([]);
     expect(findAll(renderer.root, 'Button')).toHaveLength(0);
     expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
       i18n.t('profiles.organizationRoleRequired')
     );
+
+    // With nothing to open the row renders static, so the source it paints stays
+    // a text stop instead of being hidden for a press that does not exist.
+    const sourceLine = findAll(renderer.root, 'Text').find(
+      node => node.props.children === i18n.t('profiles.skillSourceCustom')
+    );
+    expect(sourceLine?.props.accessible).toBeUndefined();
+    expect(sourceLine?.props.importantForAccessibility).toBeUndefined();
 
     unmount();
   });
@@ -213,8 +233,11 @@ describe('ProfileSkillsScreen', () => {
     unmount();
   });
 
-  it('happy: a row shows the name and source type; the switch toggles', async () => {
-    h.query.data = testSkills([testSkill()]);
+  it('happy: rows show the name, and the source only when the list mixes sources', async () => {
+    h.query.data = testSkills([
+      testSkill(),
+      testSkill({ id: 'skill-2', name: 'web-search', sourceType: 'marketplace' }),
+    ]);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -232,6 +255,11 @@ describe('ProfileSkillsScreen', () => {
       accessible: false,
       importantForAccessibility: 'no',
     });
+    // The source is painted under the name and merged into the content press,
+    // so it rides the control's spoken name instead of disappearing.
+    expect(
+      findAll(renderer.root, 'Pressable').map(node => node.props.accessibilityLabel)
+    ).toContain(`Edit skill code-review, ${i18n.t('profiles.skillSourceCustom')}`);
     act(() => {
       (toggle.props as { onValueChange: (v: boolean) => void }).onValueChange(false);
     });
@@ -244,8 +272,29 @@ describe('ProfileSkillsScreen', () => {
     unmount();
   });
 
+  it('leaves the source out when every row has the same one', async () => {
+    h.query.data = testSkills([testSkill(), testSkill({ id: 'skill-2', name: 'web-search' })]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    const texts = findAll(renderer.root, 'Text').map(node => node.props.children);
+    expect(texts).toContain('code-review');
+    expect(texts).not.toContain('Custom');
+    // Nothing else is painted under the name, so the press is named by the
+    // action alone, with no separator trailing it.
+    expect(
+      findAll(renderer.root, 'Pressable').map(node => node.props.accessibilityLabel)
+    ).toContain('Edit skill code-review');
+
+    unmount();
+  });
+
   it('hides the edit control for skills.sh references but keeps the toggle and delete', async () => {
-    h.query.data = testSkills([testSkill({ sourceType: 'skills-sh', rawMarkdown: '' })]);
+    h.query.data = testSkills([
+      testSkill({ sourceType: 'skills-sh', rawMarkdown: '' }),
+      testSkill({ id: 'skill-2', name: 'web-search' }),
+    ]);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -555,11 +604,10 @@ describe('ProfileSkillsScreen', () => {
     pressSheetDone(renderer.root);
     expect(h.mutations.createCustomSkill.mutateAsync).toHaveBeenCalledTimes(1);
 
+    // The save is still in flight, so the guard closes without asking: the
+    // request already left and there is nothing unsaved to discard.
     pressSheetCancel(renderer.root);
-    await act(async () => {
-      confirmRequest(h.confirm as TestConfirmMock);
-      await Promise.resolve();
-    });
+    expect(h.confirm).not.toHaveBeenCalled();
     pressEmptyAction(renderer);
 
     await act(async () => {
@@ -587,11 +635,9 @@ describe('ProfileSkillsScreen', () => {
     changeText(renderer.root, 'Skill content', 'Body');
     pressSheetDone(renderer.root);
 
+    // The save is still in flight, so the guard closes without asking.
     pressSheetCancel(renderer.root);
-    await act(async () => {
-      confirmRequest(h.confirm as TestConfirmMock);
-      await Promise.resolve();
-    });
+    expect(h.confirm).not.toHaveBeenCalled();
     pressEmptyAction(renderer);
 
     await act(async () => {

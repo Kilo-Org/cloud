@@ -18,14 +18,14 @@ import { RepoToggleRow } from '@/components/repo-toggle-row';
 import { SearchX } from '@/components/ui/icons';
 import { SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import { filterRepoPickerOptions } from '@/lib/repo-picker-filter';
+import { cn } from '@/lib/utils';
 
 /** A repository as the three providers' cached snapshots describe it. */
 export type RepositoryRow = { id: number | string; fullName: string; private?: boolean };
 
-// `FlashList` takes styles, not classes: the content inset the scroll body used
-// to carry as `px-6 pt-4`, in pixels, and a list that fills its frame.
+// `FlashList` takes styles, not classes: a list fills its frame, and the header
+// and the rows draw the page gutter themselves.
 const LIST_STYLE = { flex: 1 } satisfies ViewStyle;
-const LIST_CONTENT_STYLE = { paddingHorizontal: 24, paddingTop: 16 } satisfies ViewStyle;
 
 function repositoryKey(repository: RepositoryRow): string {
   return String(repository.id);
@@ -94,7 +94,7 @@ export function RepositoryRowsList({
   }, [deferredSearch]);
 
   const renderRow = useCallback(
-    ({ item }: { item: RepositoryRow | undefined }) => {
+    ({ item, index }: { item: RepositoryRow | undefined; index: number }) => {
       // FlashList can ask for an index past the end of a shorter rows array
       // React discarded with a deferred render; the row is then undefined. The
       // model picker carries the same guard for the same reason.
@@ -106,14 +106,16 @@ export function RepositoryRowsList({
           repo={item}
           selected={selectedIds.includes(item.id)}
           disabled={disabled}
-          className="border-b-[0.5px] border-hair-soft"
+          // The rows are a flat list: full-bleed, the page gutter inside the
+          // row, and one hairline between them.
+          className={index < visibleRows.length - 1 ? 'border-b-[0.5px] border-hair-soft' : ''}
           onPress={() => {
             onToggle(item.id);
           }}
         />
       );
     },
-    [selectedIds, disabled, onToggle]
+    [selectedIds, disabled, onToggle, visibleRows.length]
   );
 
   // A query that matches none of the snapshot's rows emptied the body; the
@@ -122,6 +124,7 @@ export function RepositoryRowsList({
     searchable && deferredSearch.trim() !== '' && visibleRows.length === 0 ? (
       <EmptyState
         placement="top"
+        inset="gutter"
         icon={SearchX}
         title={t('agentChat.repoPicker.noMatches')}
         description={t('agents.sessionList.tryDifferentSearch')}
@@ -138,15 +141,14 @@ export function RepositoryRowsList({
           item ? repositoryKey(item) : String(index)
         }
         renderItem={renderRow}
-        contentContainerStyle={LIST_CONTENT_STYLE}
         ListHeaderComponent={
-          <View className={headerGapClass}>
+          <View className={cn('px-4 pt-3', headerGapClass)}>
             {header}
             {searchable && <RepositorySearchField onChangeText={setSearch} />}
           </View>
         }
         ListEmptyComponent={noMatchState}
-        ListFooterComponent={footer}
+        ListFooterComponent={footer ? <View className="px-4">{footer}</View> : null}
         refreshControl={refreshControl}
         {...SEARCHABLE_PICKER_LIST_PROPS}
       />

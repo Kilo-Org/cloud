@@ -4,7 +4,7 @@ import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
-import { Switch } from '@/components/ui/switch';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 
 import { type BackendModelFields } from './backend-form-state';
@@ -66,39 +66,42 @@ export function BackendModelRow({
       />
       <View className="flex-row items-center justify-between gap-3">
         <Text className="flex-1">{t('modelChat.backends.modelTools')}</Text>
-        <Switch
-          accessibilityLabel={t('modelChat.backends.modelTools')}
-          value={tools}
-          disabled={busy}
-          onValueChange={value => {
+        {renderRowTrailing({
+          kind: 'switch',
+          accessibilityLabel: t('modelChat.backends.modelTools'),
+          value: tools,
+          disabled: busy,
+          onValueChange: value => {
             setTools(value);
             onChange({ tools: value });
-          }}
-        />
+          },
+        })}
       </View>
       <View className="flex-row items-center justify-between gap-3">
         <Text className="flex-1">{t('modelChat.backends.modelImages')}</Text>
-        <Switch
-          accessibilityLabel={t('modelChat.backends.modelImages')}
-          value={images}
-          disabled={busy}
-          onValueChange={value => {
+        {renderRowTrailing({
+          kind: 'switch',
+          accessibilityLabel: t('modelChat.backends.modelImages'),
+          value: images,
+          disabled: busy,
+          onValueChange: value => {
             setImages(value);
             onChange({ images: value });
-          }}
-        />
+          },
+        })}
       </View>
       <View className="flex-row items-center justify-between gap-3">
         <Text className="flex-1">{t('modelChat.reasoningEffort.modelFlag')}</Text>
-        <Switch
-          accessibilityLabel={t('modelChat.reasoningEffort.modelFlag')}
-          value={reasoning}
-          disabled={busy}
-          onValueChange={value => {
+        {renderRowTrailing({
+          kind: 'switch',
+          accessibilityLabel: t('modelChat.reasoningEffort.modelFlag'),
+          value: reasoning,
+          disabled: busy,
+          onValueChange: value => {
             setReasoning(value);
             onChange({ reasoning: value });
-          }}
-        />
+          },
+        })}
       </View>
       <Button variant="outline" disabled={busy} onPress={onCheck}>
         <Text>{t('modelChat.backends.checkConnection')}</Text>

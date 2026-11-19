@@ -1,11 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
-import {
-  getKiloPassCardContentState,
-  getKiloPassDetailState,
-  type KiloPassSubscription,
-} from './state';
+import { getKiloPassDetailState, type KiloPassSubscription } from './state';
 
 function subscription(overrides: Partial<KiloPassSubscription> = {}): KiloPassSubscription {
   return {
@@ -252,65 +248,5 @@ describe('getKiloPassDetailState', () => {
       throw new Error(`unexpected state: ${detail.kind}`);
     }
     expect(detail.rows[0]?.value).toBe('Dec 5, 2026');
-  });
-});
-
-describe('getKiloPassCardContentState', () => {
-  it('shows the loading card while the query is pending', () => {
-    expect(
-      getKiloPassCardContentState({ subscription: undefined, isError: false, isPending: true })
-    ).toEqual({ kind: 'loading' });
-  });
-
-  it('keeps a failed query on the retry row', () => {
-    expect(
-      getKiloPassCardContentState({ subscription: undefined, isError: true, isPending: false })
-    ).toEqual({
-      kind: 'error',
-      title: "Couldn't load Kilo Pass.",
-      description: 'Check your connection, then try again.',
-      actionLabel: 'Retry',
-    });
-  });
-
-  it('tells a subscriber-less account that the app does not offer a pass', () => {
-    expect(
-      getKiloPassCardContentState({ subscription: null, isError: false, isPending: false })
-    ).toEqual({
-      kind: 'card',
-      title: 'Kilo Pass',
-      description: "Kilo Pass isn't available in the app.",
-      accessibilityLabel: "Kilo Pass. Kilo Pass isn't available in the app.",
-    });
-  });
-
-  it('summarizes an active pass with its plan and status', () => {
-    expect(
-      getKiloPassCardContentState({
-        subscription: subscription(),
-        isError: false,
-        isPending: false,
-      })
-    ).toEqual({
-      kind: 'card',
-      title: 'Kilo Pass',
-      description: 'Active',
-      accessibilityLabel: 'Kilo Pass. Active',
-    });
-  });
-
-  it('summarizes a lapsed pass with its tier and end date', () => {
-    expect(
-      getKiloPassCardContentState({
-        subscription: subscription({ status: 'canceled', endedAt: '2026-11-08T04:05:06.000Z' }),
-        isError: false,
-        isPending: false,
-      })
-    ).toEqual({
-      kind: 'card',
-      title: 'Kilo Pass',
-      description: 'Pro · Ended Nov 8, 2026',
-      accessibilityLabel: 'Kilo Pass. Pro · Ended Nov 8, 2026',
-    });
   });
 });

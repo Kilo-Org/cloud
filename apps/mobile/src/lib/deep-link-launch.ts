@@ -65,8 +65,8 @@ const PENDING_DEEP_LINK_TTL_MS = 24 * 60 * 60 * 1000;
 
 let pendingDeepLink: string | null = null;
 let pendingSource: DeepLinkSource | null = null;
-// The href the cold-start capture stashed; 'none' once handled without one;
-// null until the capture has run.
+// The href the cold-start capture stashed; null until the capture stashes a
+// link, and null when the launch names nothing capturable.
 let launchCapturedHref: string | null = null;
 
 // The launch opened one of the app's own routes (`kiloapp:///(app)/…`): the
@@ -591,12 +591,13 @@ export function captureLaunchDeepLink(): void {
 }
 
 /**
- * The href the synchronous launch capture stashed, or null once handled. A
- * truthy result the caller compares against the pending slot tells the OS's
- * stale replay (same destination) apart from a live tap (different one).
+ * The href the synchronous launch capture stashed, or null when the launch
+ * named nothing capturable. A truthy result the caller compares against the
+ * pending slot tells the OS's stale replay (same destination) apart from a live
+ * tap (different one).
  */
 export function wasLaunchLinkHandled(): string | null {
-  return launchCapturedHref === 'none' ? null : launchCapturedHref;
+  return launchCapturedHref;
 }
 
 /** Whether the launch opened one of the app's own routes, which the relaunch

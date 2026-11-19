@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { boundSlashCommandCatalog } from '../../../src/shared/slash-commands.js';
 import { createMessageId } from '../../../src/shared/message-id.js';
 import { fetchKiloServer, kiloServerHeaders, type KiloServer } from '../kilo-server-auth.js';
@@ -6,13 +7,7 @@ import { DrainSessionError, isKiloServerUnreachableError } from '../kilo-api.js'
 import { logToFile } from '../utils.js';
 import type { Harness, HarnessSession } from './harness.js';
 import { readSessionSnapshot } from './session-snapshot.js';
-import {
-  createKilo2Api,
-  Kilo2HttpError,
-  kilo2FormSchema,
-  kilo2PermissionSchema,
-  kilo2SessionPath,
-} from './kilo2-api.js';
+import { createKilo2Api, Kilo2HttpError, kilo2FormSchema, kilo2SessionPath } from './kilo2-api.js';
 import { createKilo2Reads, kilo2LocationQuery as locationQuery } from './kilo2-reads.js';
 import { restoreKilo2History } from './kilo2-history.js';
 import type { Kilo2Lifecycle } from './kilo2-lifecycle.js';
@@ -29,6 +24,10 @@ const ptySchema = z.object({
 });
 
 const MCP_SERVER_NAME = 'kilo-cloud-agent';
+const MODEL_NOT_FOUND_RETRY_DELAYS_MS = [
+  1_000, 2_000, 2_000, 2_000, 2_000, 3_000, 3_000, 3_000, 3_000, 3_000, 3_000, 3_000,
+];
+const modelCatalogSchema = z.array(z.object({ id: z.string(), providerID: z.string() }));
 const mcpServerSchema = z.object({
   name: z.string(),
   status: z.object({ status: z.string() }),
@@ -38,9 +37,12 @@ export function createKilo2Harness(options: {
   server: KiloServer;
   directory: string;
   lifecycle: Kilo2Lifecycle;
+  log?: (message: string) => void;
+  wait?: (delayMs: number, signal?: AbortSignal) => Promise<void>;
 }): Harness {
   const api = createKilo2Api(options.server);
   const { reads, session, list } = createKilo2Reads(api, options.directory);
+  const wait = options.wait ?? ((ms, signal) => sleep(ms, undefined, { signal }));
   const post = (path: string, body: unknown, signal?: AbortSignal) =>
     api.request(path, { method: 'POST', body, signal });
   // Context can contain a one-shot startup-failure note; never inherit it into a new turn.
@@ -49,6 +51,32 @@ export function createKilo2Harness(options: {
       `/api/experimental/session/${encodeURIComponent(input.sessionId)}/instructions/entries/cloud-agent-context`,
       { method: 'PUT', body: { value: context }, signal: input.signal }
     );
+  // A harness lives for one runtime. After a location's catalog matched or its
+  // retries ran out, its plugins have started; later turns skip the lookup.
+  const startedModelLocations = new Set<string>();
+  // The catalog can be incomplete while location plugins start. Retry the
+  // lookup, not the native call, which Kilo accepts before reporting a missing model.
+  async function waitForModel(input: HarnessSession, model: string): Promise<void> {
+    if (startedModelLocations.has(input.directory)) return;
+    const path = `/api/model?${locationQuery(input.directory)}`;
+    for (let attempt = 0; ; attempt++) {
+      input.signal?.throwIfAborted();
+      const catalog = modelCatalogSchema.parse(await api.data(path, { signal: input.signal }));
+      const delay = MODEL_NOT_FOUND_RETRY_DELAYS_MS[attempt];
+      // The native call owns the eventual model error and its transcript entry.
+      if (
+        delay === undefined ||
+        catalog.some(entry => entry.providerID === 'kilo' && entry.id === model)
+      ) {
+        startedModelLocations.add(input.directory);
+        return;
+      }
+      options.log?.(
+        `kilo2 model_not_found sessionId=${input.sessionId} attempt=${attempt + 1} retryInMs=${delay}`
+      );
+      await wait(delay, input.signal);
+    }
+  }
   async function select(
     input: HarnessSession & { agent?: string; model?: string; variant?: string }
   ) {
@@ -59,7 +87,7 @@ export function createKilo2Harness(options: {
         { agent: input.agent },
         input.signal
       );
-    if (input.model)
+    if (input.model) {
       await post(
         `${kilo2SessionPath(input.sessionId)}/model`,
         {
@@ -71,6 +99,8 @@ export function createKilo2Harness(options: {
         },
         input.signal
       );
+      await waitForModel(input, input.model);
+    }
   }
   async function interrupt(input: HarnessSession) {
     const signal = input.signal ?? AbortSignal.timeout(10_000);
@@ -289,16 +319,22 @@ export function createKilo2Harness(options: {
     },
     async answer({ reply, directory, signal }) {
       if (reply.action === 'permission') {
-        const pending = z
-          .array(kilo2PermissionSchema)
-          .parse(await api.data(`/api/permission/request?${locationQuery(directory)}`, { signal }));
+        const pending = await reads.getPermissions(directory, signal);
         const request = pending.find(item => item.id === reply.permissionId);
         if (!request) return false;
-        await post(
-          `${kilo2SessionPath(request.sessionID)}/permission/${encodeURIComponent(request.id)}/reply`,
-          { decision: reply.response, ...(reply.message ? { message: reply.message } : {}) },
-          signal
-        );
+        try {
+          await post(
+            `${kilo2SessionPath(request.sessionID)}/permission/${encodeURIComponent(request.id)}/reply`,
+            { decision: reply.response, ...(reply.message ? { message: reply.message } : {}) },
+            signal
+          );
+        } catch (error) {
+          if (error instanceof Kilo2HttpError && error.status === 404) {
+            const pending = await reads.getPermissions(directory, signal);
+            if (!pending.some(item => item.id === reply.permissionId)) return false;
+          }
+          throw error;
+        }
       } else {
         const pending = z
           .array(kilo2FormSchema)
@@ -415,11 +451,14 @@ export function createKilo2Harness(options: {
       );
     },
     async generateCommitMessage(input) {
+      const query = locationQuery(input.path);
+      // Model reads wait for location plugins; RPC dispatch no longer does.
+      await api.request(`/api/model/default?${query}`, { signal: input.signal });
       const result = z
         .object({ output: z.object({ message: z.string() }) })
         .parse(
           await post(
-            `/api/rpc/kilocode.commit-message/generate?${locationQuery(input.path)}`,
+            `/api/rpc/kilocode.commit-message/generate?${query}`,
             { input: { path: input.path } },
             input.signal
           )

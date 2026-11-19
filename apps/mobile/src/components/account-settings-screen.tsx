@@ -22,6 +22,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { DirectionalLogOut } from '@/components/ui/directional-icons';
 import { useConfirmDialog } from '@/components/ui/dialog';
+import { RowGroup } from '@/components/ui/row-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { attemptPushRegistrationReconciliation } from '@/lib/auth/push-registration-reconciliation';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -32,6 +33,7 @@ import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 import { LANGUAGE_ENDONYMS } from '@/i18n/languages';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { setLanguagePickerBridge } from '@/lib/picker-bridge';
 
 /**
@@ -70,8 +72,6 @@ export function AccountSettingsScreen() {
     })
   );
 
-  const rowClassName = 'rounded-lg bg-secondary px-3';
-
   let body: ReactNode = null;
   if (isLoading) {
     body = (
@@ -87,12 +87,11 @@ export function AccountSettingsScreen() {
     body = <QueryError onRetry={refetch} />;
   } else {
     body = (
-      <>
+      <RowGroup leadingTile>
         <ConfigureRow
           icon={UserRound}
           title={t('profile.editProfile.title')}
           subtitle={t('profile.editProfile.rowSubtitle')}
-          className={rowClassName}
           onPress={() => {
             router.push('/(app)/(tabs)/(3_profile)/profile-edit' as Href);
           }}
@@ -101,7 +100,6 @@ export function AccountSettingsScreen() {
           icon={Lock}
           title={t('profile.signInMethods.title')}
           subtitle={t('profile.linkedAccounts')}
-          className={rowClassName}
           onPress={() => {
             router.push('/(app)/(tabs)/(3_profile)/login-methods' as Href);
           }}
@@ -110,7 +108,6 @@ export function AccountSettingsScreen() {
           icon={Globe}
           title={t('common.language')}
           subtitle={languageSubtitle}
-          className={rowClassName}
           onPress={() => {
             setLanguagePickerBridge({
               onApplied: () => {
@@ -126,7 +123,6 @@ export function AccountSettingsScreen() {
           icon={Shield}
           title={t('trustedHosts.title')}
           subtitle={t('trustedHosts.subtitle')}
-          className={rowClassName}
           disabled={!trustedHostsLoaded}
           onPress={() => {
             router.push('/(app)/(tabs)/(3_profile)/trusted-hosts' as Href);
@@ -136,7 +132,6 @@ export function AccountSettingsScreen() {
           icon={KeyRound}
           title={t('profile.passkeysTitle')}
           subtitle={t('profile.passkeysSubtitle')}
-          className={rowClassName}
           onPress={() => {
             router.push('/(app)/(tabs)/(3_profile)/passkeys' as Href);
           }}
@@ -145,7 +140,6 @@ export function AccountSettingsScreen() {
           icon={Cpu}
           title={t('profile.providerKeys.title')}
           subtitle={t('profile.providerKeys.rowSubtitle')}
-          className={rowClassName}
           onPress={() => {
             router.push('/(app)/(tabs)/(3_profile)/provider-keys' as Href);
           }}
@@ -154,7 +148,6 @@ export function AccountSettingsScreen() {
           icon={FileText}
           title={t('profile.dataExport.title')}
           subtitle={t('profile.dataExport.rowSubtitle')}
-          className={rowClassName}
           onPress={() => {
             router.push('/(app)/(tabs)/(3_profile)/data-export' as Href);
           }}
@@ -163,7 +156,6 @@ export function AccountSettingsScreen() {
           icon={Ban}
           title={t('profile.blockedPeople.title')}
           subtitle={t('profile.blockedPeople.rowSubtitle')}
-          className={rowClassName}
           onPress={() => {
             router.push('/(app)/(tabs)/(3_profile)/blocked-people' as Href);
           }}
@@ -172,7 +164,6 @@ export function AccountSettingsScreen() {
           icon={Smartphone}
           title={t('common.deviceSessions')}
           subtitle={t('profile.deviceSessionsSubtitle')}
-          className={rowClassName}
           onPress={() => {
             router.push('/(app)/(tabs)/(3_profile)/device-sessions' as Href);
           }}
@@ -182,8 +173,6 @@ export function AccountSettingsScreen() {
           title={t('profile.signOutWeb.title')}
           subtitle={t('profile.signOutWeb.rowSubtitle')}
           tone="danger"
-          className={rowClassName}
-          last
           accessibilityLabel={t('profile.signOutWeb.title')}
           onPress={() => {
             confirm({
@@ -196,7 +185,7 @@ export function AccountSettingsScreen() {
             });
           }}
         />
-      </>
+      </RowGroup>
     );
   }
 
@@ -205,7 +194,7 @@ export function AccountSettingsScreen() {
       <ScreenHeader title={t('preferences.account')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-4 gap-3 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
         {body}

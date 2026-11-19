@@ -1,4 +1,5 @@
 import {
+  EXA_MAX_COST_MICRODOLLARS_PER_CALL,
   EXA_USAGE_FEATURE_ID_MAX_LENGTH,
   EXA_USAGE_TYPE_MAX_LENGTH,
   type ExaAllowedPath,
@@ -18,13 +19,30 @@ export type ExaUsageRecordInput = {
   type: string | undefined;
 };
 
+/** A cost above the per-call maximum is not one Exa call's cost and is never recorded. */
+export class ExaCostAbovePerCallMaximumError extends Error {
+  constructor(costMicrodollars: number) {
+    super(
+      `Exa cost of ${costMicrodollars} microdollars is above the per-call maximum of ${EXA_MAX_COST_MICRODOLLARS_PER_CALL}`
+    );
+    this.name = 'ExaCostAbovePerCallMaximumError';
+  }
+}
+
 export function buildExaUsageRecord(input: ExaUsageRecordInput): ExaUsageRecord {
+  if (input.costMicrodollars > EXA_MAX_COST_MICRODOLLARS_PER_CALL) {
+    throw new ExaCostAbovePerCallMaximumError(input.costMicrodollars);
+  }
   const featureId =
     input.featureId && input.featureId.length <= EXA_USAGE_FEATURE_ID_MAX_LENGTH
       ? input.featureId
       : undefined;
+  // PostgreSQL text rejects an embedded NUL, so an optional type that carries one
+  // is omitted rather than letting the whole usage insert and its charge fail.
   const type =
-    input.type !== undefined && input.type.length <= EXA_USAGE_TYPE_MAX_LENGTH
+    input.type !== undefined &&
+    input.type.length <= EXA_USAGE_TYPE_MAX_LENGTH &&
+    !input.type.includes('\u0000')
       ? input.type
       : undefined;
 

@@ -26,6 +26,7 @@
     "creditHistory": "Seenaa kireeditii",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Dhiisi",
     "done": "Xumurame",
     "retry": "Irra deebi'ii yaali",
@@ -157,7 +158,7 @@
     "retryLoadingMore": "Dabalata fe'uuf irra deebi'ii yaali",
     "reviewPr": "PR sakatta'i",
     "role": "Gahee",
-    "searchModels": "Barbaacha modeelootaa...",
+    "searchModels": "Barbaacha modeelootaa…",
     "selectedRepositories": "Kuusaalee koodii filataman",
     "selectRepositories": "Kuusaalee koodii filadhu",
     "sendMessage": "Ergaa ergi",
@@ -175,7 +176,9 @@
     "durationHourShort": "h",
     "changes": "Jijjiiramoota",
     "organizationTrialEnded": "Yeroon yaalii dhaabbataa xumurameera, karoora socho'aa hin qabu. Abbaan dhaabbataa kaffaltii kilo.ai irratti haaromsuu danda'a, sana booda irra deebi'ii yaali.",
-    "privateRepositoryA11y": "{{name}}, kuusaa koodii dhuunfaa"
+    "privateRepositoryA11y": "{{name}}, kuusaa koodii dhuunfaa",
+    "legalDocumentEnglishOnly": "Dokumentiin kun Afaan Ingiliffaan qofa argama.",
+    "organizationTrialEndedBilling": "Yeroon yaalii dhaabbataa xumurameera, karoora socho'aa hin qabu. Kaffaltii haaromsuu danda'aa, sana booda irra deebi'ii yaali."
   },
   "language": {
     "restarting": "Afaan filatame fayyadamuuf irra deebi'ee jalqabaa jira",
@@ -198,7 +201,7 @@
     "openSignInPageInBrowser": "Fuula seensaa biraawzarii keessatti bani",
     "copySignInLink": "Geessituu seensaa garagalchi",
     "cancelSignIn": "Seensa haqi",
-    "startingSignIn": "Seensa jalqabaa jira...",
+    "startingSignIn": "Seensa jalqabaa jira…",
     "organizationUsesSso": "Dhaabbanni kee seensa yeroo tokkoo fayyadama.",
     "continueWithSso": "SSO fayyadamuun itti fufi",
     "useDifferentEmail": "Imeelii biraa fayyadami",
@@ -308,9 +311,9 @@
     "passkeyVerifyDescription": "Nageenya keetiif, furtuu seenii kee jijjiiruu dura eenyummaa kee mirkaneessi.",
     "passkeyVerifyWithPasskey": "Furtuu seeniitiin mirkaneessi",
     "passkeyVerifySendCode": "Koodii imeeliidhaan naaf ergi",
-    "passkeyVerifySendingCode": "Koodiin ergamaa jira...",
+    "passkeyVerifySendingCode": "Koodiin ergamaa jira…",
     "passkeyVerifyPasskeyPrompt": "Itti fufuuf furtuu seenii keetiin mirkaneessi.",
-    "passkeyVerifyChecking": "Koodiin kee sakatta'amaa jira...",
+    "passkeyVerifyChecking": "Koodiin kee sakatta'amaa jira…",
     "passkeyVerifyCodeSent": "Koodii gara {{email}} ergame galchi.",
     "passkeyVerifyCodeRejected": "Koodiin sun wal hin simne. Irra deebi'ii yaali.",
     "passkeyVerifyPasskeyFailed": "Furtuu seenii sana mirkaneessuun hin danda'amne. Irra deebi'ii yaali.",
@@ -318,8 +321,8 @@
     "passkeyVerifyInProgress": "Koodiin sun duraan sakatta'amaa jira. Yeroo gabaabaa booda irra deebi'ii yaali.",
     "passkeyVerifyTooManyAttempts": "Yaalii baay'ee godhame. Koodii haaraa ergi.",
     "passkeyVerifySsoRequired": "Dhaabbanni kee seensa tokkicha barbaada. Jijjiirama kana biraawzarii keessatti raggaasisi, sana booda asitti deebi'i.",
-    "passkeyVerifySsoStarting": "Raggaasisuun eegalaa jira...",
-    "passkeyVerifySsoWaiting": "Raggaasisuuf eegaa jira...",
+    "passkeyVerifySsoStarting": "Raggaasisuun eegalaa jira…",
+    "passkeyVerifySsoWaiting": "Raggaasisuuf eegaa jira…",
     "passkeyVerifySsoOpen": "Fuula raggaasisuu bani",
     "passkeyVerifySsoExpired": "Raggaasisuun sun yeroon isaa darbe yookaan haqame. Irra deebi'ii yaali.",
     "passkeyVerifySsoUnavailable": "Raggaasisuun seensa tokkichaa amma hin jiru. Irra deebi'ii yaali.",
@@ -385,12 +388,24 @@
       "editKeyDescription": "Gatiin kuufame agarsiifamuu hin danda'u. Bakka buusuuf haaraa galchi.",
       "editKeyMappingsWarning": "Furtuu bakka buusuun walqabsiisa moodeelaa kuufamees ni bakka buusa: walqabsiisa amma illee barbaachisu hunda irra deebi'ii galchi.",
       "saveFailed": "Furtuu olkaa'uun hin danda'amne.",
-      "invalidCredentials": "Ragaalee eenyummaa mirkaneessiitii irra deebi'ii yaali.",
       "fieldRequired": "{{field}} barbaachisaadha.",
+      "keyIncomplete": "Furtuun keessatti gatii barbaachisu hin jiru.",
       "incompleteMapping": "Walqabsiisa {{number}} slug moodeela gateway fi maqaa deployment lachuu qabaachuu qaba.",
       "apiKeyLabel": "Furtuu API",
       "apiKeyPlaceholder": "Furtuu maxxansi",
       "apiKeyRequired": "Furtuu galchi.",
+      "keyAlreadyExists": "Furtuu dhiyeessii kanaa duraan qabda. Osoo kan biraa hin dabaliin kana haqi.",
+      "keyStoreFailed": "Furtuun kuufamuu hin dandeenye.",
+      "invalidCredentials": "Furtuun kun bifti dhiyeessii kanaa eeggatu miti. Isaa mirkaneessii irra deebi'ii yaali.",
+      "testSucceeded": "Furtuun ni hojjeta. Dhiyeessaa: {{provider}}. Moodeela: {{model}}.",
+      "testRejected": "Dhiyeessaan furtuu kana didde. Furtuun kun sirrii ta'uu fi hin haqamne mirkaneessi.",
+      "testIncomplete": "Dhiyeessaan qorannoo osoo hin xumuramiin dhaabe. Irra deebi'ii yaali.",
+      "testUnsupportedProvider": "Dhiyeessaan kun amma hin deeggaramu. Furtuu haqi.",
+      "testUnreadableKey": "Furtuun kuufame dubbifamuu hin dandeenye. Booda irra deebi'ii yaali.",
+      "testDeprecatedProvider": "Dhiyeessaan kun fayyadama irraa baheera, kanaaf furtuun isaa qoramuu hin danda'u.",
+      "keyManagedByCodingPlan": "Furtuun dhiyeessii kanaa karoora koodiin bulfama. Furtuun kun dubbisuu qofa waan ta'eef, furtuu kee dabaluuf karoora koodii haqi.",
+      "providerUnavailable": "Dhiyeessiin kun amma hin jiru, kanaaf furtuu isaaf dabaluu hin dandeessu.",
+      "testFailed": "Qorannoon furtuu hin milkaa'ne. Irra deebi'ii yaali.",
       "authMethod": "Mala mirkaneessaa",
       "authMethodAccessKeys": "Furtuuwwan seensaa",
       "resourceName": "Maqaa qabeenya Azure",
@@ -481,7 +496,14 @@
       "viewReceipt": "Ragaa ilaali"
     },
     "changelog": "Waan haaraa",
-    "changelogVersionPending": "Yaadannoon gulaala kanaa haaromsa appii itti aanu waliin dhufa."
+    "changelogVersionPending": "Yaadannoon {{version}} haaromsa appii itti aanu waliin dhufa.",
+    "changelogGroupNew": "Haaraa",
+    "changelogFixesIn": "Sirreeffamaa fi fooyya'iinsota {{areas}} keessatti.",
+    "changelogFixesPolish": "Sirreeffamaa fi fooyya'iinsota appii guutuu keessatti.",
+    "changelogAreas": {
+      "signIn": "Seenuu",
+      "profileOrganizations": "Piroofaayilii fi dhaabbilee"
+    }
   },
   "preferences": {
     "general": "Waliigalaa",
@@ -798,7 +820,19 @@
         "fileComment": "Yaada faayilii",
         "outdatedOnPathLines": "Yeroon kan darbe: {{path}} {{lines}}",
         "outdatedOnLines": "Yeroon kan darbe: {{lines}}",
-        "outdatedOnPath": "Yeroon kan darbe: {{path}}"
+        "outdatedOnPath": "Yeroon kan darbe: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Cinaa bitaa",
+        "sideRight": "Cinaa mirgaa",
+        "outdatedOnLinesSide": "Yeroon kan darbe {{lines}} irratti ({{side}})",
+        "outdatedOnPathLinesSide": "Yeroon kan darbe {{path}} {{lines}} irratti ({{side}})",
+        "outdatedSide": "Yeroon kan darbe ({{side}})",
+        "outdatedOnPathSide": "Yeroon kan darbe {{path}} irratti ({{side}})"
       },
       "deletedUser": "fayyadamaa haqame",
       "replyForbiddenTerm": "{{term}} kanaaf deebii kennuuf hayyama hin qabdu.",
@@ -910,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Herrega kun dhaabbilee ammas hin qabu. Dhaabbata uumtee yookiin dhaabbataatti seeteen, gaaffiiwwan walitti makuu Bitbucket ilaaluu ni dandeessa.",
       "gitlabReconnectAdminOnlyDescription": "Isa irra deebi'ii akka walqabsiisuuf dhaabbataa abbaa dhaabbataa, bulchaa, ykn bulchaa kaffaltii tokko gaafadhu.",
       "bitbucketNotConnectedTitle": "Bitbucket hin walqabsiifamne",
-      "bitbucketAdminOnlyDescription": "Abbootiin dhaabbataa, bulchitootaa fi bulchitoonni kaffaltii qofa isa walqabsiisuu danda'u.",
+      "adminOnlyConnectDescription": "Abbootiin dhaabbataa, bulchitootaa fi bulchitoonni kaffaltii qofa isa walqabsiisuu danda'u.",
       "contextLine": "{{organization}}iif",
       "contextLinePersonal": "Dhuunfaa'iif"
     },
@@ -1250,7 +1284,7 @@
       "transcriptRetry": "Galmee barreeffamaa sakatta'aa fe'uun hin danda'amne.",
       "transcriptLive": "Kallattiin",
       "agentIdle": "Gargaaraan hojii hin qabu",
-      "agentWorking": "Gargaaraan hojjechaa jira...",
+      "agentWorking": "Gargaaraan hojjechaa jira…",
       "anErrorOccurred": "Dogoggorri uumame",
       "errorWithMessage": "Dogoggora: {{message}}.",
       "executionStarted": "Raawwiin jalqabameera",
@@ -1354,7 +1388,8 @@
       "managedOnWeb": "Walqunnamtiin Bitbucket dhaabbata kanaa weebii irratti kompiitara irraa bulfama.",
       "description": "Tokanii hayyama iddoo hojii kan hayyamoota barbaachisan qabu uumiitii armaan gaditti maxxansi.",
       "scopes": "Herrega: dubbisuu · Kuusaawwan koodii: dubbisuu/barreessuu · Gaaffii makuu: dubbisuu · Weebhuukii: dubbisuu/barreessuu",
-      "tokenPlaceholder": "Tokanii hayyama iddoo hojii"
+      "tokenPlaceholder": "Tokanii hayyama iddoo hojii",
+      "tokenRefused": "Bitbucket tokanii hayyama iddoo hojii kana hin fudhanne. Hayyamoonni armaan olii isa keessa jiraachuu mirkaneessi, sana booda ammas yaali."
     },
     "scopeList": {
       "personalStillAvailable": "Kuusaawwan koodii dhuunfaa ammallee armaan gaditti ni argamu.",
@@ -1465,13 +1500,25 @@
       "repositoryLine": "Sakatta'a: {{reviews}} · Argamoota: {{findings}}",
       "empty": "Ammatti sakatta'a istaatiksii qabu hin jiru",
       "emptyDescription": "Istaatiksiin sakatta'awwan xumuraman yeroo dhaabbataaf banamu galmeessa.",
-      "off": "Istaatiksiin dhaabbata kanaaf cufameera.",
-      "couldNotLoad": "Istaatiksii fe'uun hin danda'amne"
+      "offTitle": "Istaatiksiin {{platform}} cufameera",
+      "offDescription": "Taayitoonni kaffaltii dhaabbataa — abbootii, adminoota fi mannijaroota kaffaltii — istaatiksii banuu danda'u; kunis web irratti, qindeessa dhaabbataa keessatti, akka sakatto'awwan xumuraman galmeessaniitan.",
+      "couldNotLoad": "Istaatiksii fe'uun hin danda'amne",
+      "trackedReviewsCaption": "Sakatto'awwan xumuraman yeroo kana keessatti istaatiksii banan xumuraman. Sakatto'awwan itti fufaanii fi sakatto'awwan hanqatan hin lakkaa'amanII.,",
+      "trackedReviewsUncounted": "Hin lakkaa’aman: {{displayCount}} / {{displayTotal}} dhaabbataan qabu xumuraman bu’aan qabamee hin boolu.",
+      "trackedReviewsUncounted_one": "Hin lakkaa’aman: {{displayCount}} / {{displayTotal}} dhaabbataan qabu xumuraman bu’aan qabamee hin boolu.",
+      "trackedReviewsUncounted_other": "Hin lakkaa’aman: {{displayCount}} / {{displayTotal}} dhaabbataan qabu xumuraman bu’aan qabamee hin boolu."
     },
     "council": {
       "title": "Sakatta'a gumii",
       "subtitle": "Ogeessota hedduun PR tokkoon tokkoo sakatta'u, sagaleen isaanii immoo murtee tokko ta'a.",
-      "unavailable": "Sakatta'aan gumii dhaabbata kanaaf hin argamu.",
+      "unavailablePersonallyTitle": "Dhaabbata Enterprise barbaachisa",
+      "unavailablePersonally": "Sakatta'aan gumii waan hisaabii dhuunirraa ta'e miti.",
+      "unavailablePersonallyAction": "Dhaabbata uumi",
+      "unavailablePersonallySwitchAction": "Dhaabbata jijjiiruu",
+      "unavailableOrganizationTitle": "Sakatta'a gumii yeroo ammaa hin jiru",
+      "unavailableForOrganization": "Sakatta'aan gumii karooraa Enterprise qabaachuu qaba, kan Galmee tajaajilaa sochuu qabu ykn yeroo dhayaabaa qabu. Dhaabbanni kun yeroo ammaa isa hin qabu.",
+      "unavailableForOrganizationNeutral": "Sakatta'aan gumii dhaabbata kanaaf yeroo ammaa hin jiru. Booda irra deebi'ii yaali.",
+      "unavailableOnBitbucket": "Sakatta'aan gumii kuusaa koodii Bitbucket tiif hin argamu.",
       "noRepositories": "Ammatti kuusaan koodii filatame hin jiru. Dura qindaa'ina kuusaa koodii keessatti kuusaawwan koodii filadhu.",
       "specialists": "Ogeessota",
       "labels": "Mallattoowwan sakatta'a gumii kakaasan",
@@ -2421,7 +2468,8 @@
       "customModes": "Haalawwan addaa"
     },
     "modeSelector": {
-      "accessibility": "Haala: {{label}}"
+      "accessibility": "Haala: {{label}}",
+      "customMode": "Haala addaa"
     },
     "modeOptions": {
       "code": "Koodii barreessi",
@@ -2442,7 +2490,7 @@
       "noMatches": "Wanti walsimu hin jiru",
       "noRepositories": "Kuusaan koodii hin argamu",
       "noRepositoriesDescription": "Kuusaawwan koodii herrega keetti walqabatan hin jiran.",
-      "loading": "Fe'aa jira...",
+      "loading": "Fe'aa jira…",
       "accessibility": "Kuusaa koodii: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -2737,7 +2785,7 @@
       "thinkingEffortAccessibility": "sadarkaa xiinxalaa {{label}}",
       "thinkingEffortSelected": "sadarkaa xiinxalaa {{label}}, filatame",
       "thinkingEffortWithModel": "{{model}}, sadarkaa xiinxalaa {{variant}}",
-      "lockedByAgent": ", Ergamaa \"{{agent}}\" dhaan cufame",
+      "lockedByAgent": "Ergamaa \"{{agent}}\" dhaan cufame",
       "addToFavorites": "{{name}} kan jaallattetti dabali",
       "removeFromFavorites": "{{name}} kan jaallatte keessaa baasi",
       "sessionModel": "Moodela turtii"
@@ -2773,8 +2821,8 @@
       "pasteFromClipboard": "Gabatee kopii irraa maxxansi",
       "stopGenerating": "Uumuu dhaabi",
       "selectModelBeforeSending": "Erguun dura moodela filadhu.",
-      "preparingPlaceholder": "Naannoo qopheessaa jira...",
-      "finalizingPlaceholder": "Xumuraa jira...",
+      "preparingPlaceholder": "Naannoo qopheessaa jira…",
+      "finalizingPlaceholder": "Xumuraa jira…",
       "sessionLoadFailed": "Seshiniin hin fe'amne. Dura irra deebi'ii yaali.",
       "cannotReceiveFiles": "Turtiin kun faayiloota fudhachuu hin danda'u. Ergaa kee erguuf faayiloota qabachiifaman baasi.",
       "couldNotAttachFiles": "Faayiloota qabachiisuu hin danda'amne. Deebi'anii yaaluuf Ergi tuqi.",
@@ -2990,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Turtiiwwan fe'uun hin danda'amne.",
-    "couldNotLoadActiveSessions": "Turtiiwwan adeemaa jiran fe'uun hin danda'amne.",
     "agentSessions": "Amma adeemaa jiru",
     "newCodingTask": "Hojii koodii haaraa",
     "newTaskFromPicture": "Hojii haaraa suuraa irraa",
@@ -3017,6 +3064,7 @@
   "queryError": {
     "neutralDescription": "Irra deebi'ii yaali.",
     "offlineTitle": "Fe'uun hin milkoofne.",
+    "offlineDescription": "Sarvarii bira ga'uun hin danda'amne.",
     "permissionDescription": "Kana ilaaluuf hayyama hin qabdu.",
     "notFoundDescription": "Wantichi haqamee ta'uu danda'a yookaan kana booda hin argamu.",
     "serverTitle": "Fe'uun hin danda'amne.",
@@ -3037,7 +3085,7 @@
     "scheduled": "KAROORFAME"
   },
   "voiceInput": {
-    "listening": "Dhaggeeffachaa jira...",
+    "listening": "Dhaggeeffachaa jira…",
     "onlineTitle": "Haasaan intarneetiin qindaa'a",
     "onlineMessage": "Meeshaan kun intarneetii malee sagalee gara barreeffamaatti jijjiiruu hin danda'u. Waraabbiin kee gara barreeffamaatti jijjiiramuuf gara {{provider}} ergama. Kilo sagalee hin kuusu.",
     "allow": "Hayyami",
@@ -3059,7 +3107,7 @@
     "useOnlineTranscription": "Warraabbi intarneetii hayyami",
     "offlineModelDownloadScheduled": "Faayiloota sagalee offlaayinii duubatti buufamu. Sagaleen galchuu booda irra deebi'ii yaali.",
     "listeningStopped": "Dhaggeeffachuun dhaabbateera.",
-    "transcribing": "Barreeffamatti jijjiiraa jira...",
+    "transcribing": "Barreeffamatti jijjiiraa jira…",
     "gatewayUnreachable": "Kilo Gateway'tti quhamuun hin danda'amne. Walqabannaa kee ilaaliitii deebi'ii yaali.",
     "gatewayTimeout": "Sagalee barreeffamatti jijjiiruun yeroo dheeraa fudhate. Irra deebi'ii yaali.",
     "gatewayModelUnavailable": "Moodeeli sagalee jijjiiru kun hin jiru. Filannoowwan keessaa kan biroo filadhu.",
@@ -3122,7 +3170,6 @@
     "completingPurchase": "Bittaa xumuraa jira",
     "subscriptionLoading": "Maamilummaa Kilo Pass fe'aa jira",
     "retryHint": "Haala Kilo Pass fe'uu irra deebi'ee yaala.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "{{date}} xumurameera",
     "notAvailableInApp": "Kilo Pass appii keessatti hin argamu.",
     "statusActive": "Socho'aa",
@@ -3325,6 +3372,7 @@
       "manageOnWeb": "Qindaa'ina kaffaltii weebii irratti",
       "changePlan": "Karoora jijjiiri",
       "buySeats": "Bakka miseensotaa bitadhu",
+      "managedOnWeb": "Karoorri, bakki miseensotaa fi guutuun ofumaan weebii irratti bulchamu.",
       "setupAutoTopUp": "Guutuu ofumaan qindeessi",
       "manageAutoTopUp": "Guutuu ofumaan bulchi",
       "opensOnWeb": "Weebii irratti bana"
@@ -3336,7 +3384,7 @@
       "loadErrorTitle": "Dhaabbilee kee fe'uu hin danda'amne.",
       "membershipLostNotice": "Dhaabbata kana bira ga'uuf kana booda hayyama hin qabdu. Gara {{target}} tti jijjiirame.",
       "noOrganization": "Dhaabbanni hin jiru",
-      "noOrganizationDescription": "Herregni kun dhaabbata tokko keessa hin jiru. Amaloota dhaabbataa kan akka affeerraa miseensotaa fi akeekkachiisa haftee gadi aanaa fayyadamuuf dhaabbata uumi, ykn dhaabbata itti affeeramte tokkotti makamuuf weebii bani.",
+      "noOrganizationDescription": "Herregni kun dhaabbata tokko keessa hin jiru. Amaloota dhaabbataa kan akka affeerraa miseensotaa fi akeekkachiisa haftee gadi aanaa fayyadamuuf dhaabbata uumi, ykn iimeelii dhaabbatni siif erge irraa affeerraa fudhadhu.",
       "organizationUnavailable": "Dhaabbanni hin argamu.",
       "selectDescriptionWithOrganizations": "Ati dhaabbata tokko yookaan tokkoo ol keessaa qoodda. Herrega fuulli kun fayyadamuu qabu filadhu.",
       "selectOrganization": "Dhaabbata filadhu",
@@ -3368,7 +3416,8 @@
         "accounting_adjustment": "Sirreeffama herregaa",
         "credits_expired": "Kiriiditiin yeroon isaa darbe"
       },
-      "truncated": "Sochiin kiriiditii duraanii ni argama."
+      "truncated": "Sochiin kiriiditii duraanii ni argama.",
+      "retentionLimit": "Sochiin kiriiditii haaraan agarsiifamaa jira."
     },
     "inviteMember": {
       "emailError": "Teessoo imeelii sirrii galchi.",
@@ -3378,6 +3427,7 @@
       "sendInvite": "Affeerraa ergi",
       "title": "Miseensa afeeri",
       "alreadyInvited": "Duraan ni affeeramaniiru ykn miseensa dha.",
+      "organizationUnavailable": "Dhaabbanni kun amma hin argamu.",
       "sendError": "Affeerraa erguun hin danda'amne.",
       "pendingInvitation": "Teessoon imeelii kun duraanuu affeerraa eeggachaa jiru qaba.",
       "alreadyMember": "Namni kun duraanuu miseensa dhaabbata kanaati.",
@@ -3399,7 +3449,8 @@
         "void": "Haqame",
         "uncollectible": "Sassaabamuu hin danda'u"
       },
-      "truncated": "Gaaffiiwwan kaffaltii duraanii ni argamu."
+      "truncated": "Gaaffiiwwan kaffaltii duraanii ni argamu.",
+      "retentionLimit": "Gaaffiiwwan kaffaltii haaraan agarsiifamaa jiran."
     },
     "lowBalanceAlert": {
       "enableA11y": "Akeekkachiisa haftee xiqqaa bani",
@@ -3462,7 +3513,6 @@
     },
     "settingsOnWeb": {
       "title": "Qindaa'ina dhaabbataa weebii irratti",
-      "integrations": "Walitti hidhamiinsota weebii irratti",
       "usageDetails": "Odeeffannoo itti fayyadamaa",
       "providersAndModels": "Dhiyeessitootaa fi moodeelota",
       "groups": "Gareewwan",
@@ -3471,9 +3521,18 @@
       "ssoAndDomain": "SSO fi doomeenii",
       "dataCollection": "Funaansa daataa",
       "auditLogs": "Galmeewwan odiitii",
-      "requestLogs": "Galmeewwan gaaffii",
-      "subOrganizations": "Dhaabbilee jalaa",
-      "distributeFunds": "Maallaqa qoodi"
+      "requestLogs": "Galmeewwan gaaffii"
+    },
+    "requestLogs": {
+      "older": "Sa'aatii darbe",
+      "newer": "Sa'aatii itti aanu",
+      "truncated": "Sa'aatiin kun gaaffiiwwan tarree kana irratti mul'atan caalaa qaba.",
+      "emptyTitle": "Sa'aatii kana keessatti gaaffiin hin jiru",
+      "emptyDescription": "Sa'aatii darbe fayyadamuun gaaffiiwwan darban ilaali.",
+      "loadError": "Galmeewwan gaaffii fe'uun hin danda'amne.",
+      "permissionDenied": "Galmeewwan gaaffii dhaabbataa kan dubbisuu danda'an abbaa dhaabbataa, bulchaa ykn hogganaa kaffaltii qofa.",
+      "tokens": "{{input}} seene · {{output}} ba'e",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Tookanoota galtee",
@@ -3625,8 +3684,7 @@
     "imagesSectionEmpty": "Keessummeessitoota suuraa amanaman hin jiran",
     "revoke": "Amanamummaa {{host}} haqi",
     "revokeMessage": "Geessituuwwan gara keessummeessaa kanaa ammas mirkaneessa gaafatu.",
-    "revokeImageMessage": "Suuraan keessummeessaa kanaa irraa ammas mirkaneessa gaafatu.",
-    "backToPreferences": "Gara filannoowwaniitti deebi'i"
+    "revokeImageMessage": "Suuraan keessummeessaa kanaa irraa ammas mirkaneessa gaafatu."
   },
   "glanceable": {
     "waiting": "Eejentoota haaromsaa jira",
@@ -3640,7 +3698,7 @@
     "newestSession": "Haaraa ta'e: {{title}}",
     "noneWaiting": "Eejentiin eegu hin jiru",
     "newAgent": "Eejentii haaraa",
-    "approving": "Raggaasisaa jira...",
+    "approving": "Raggaasisaa jira…",
     "couldNotApprove": "Raggaasisuu hin dandeenye",
     "channelName": "Eejentoota hojii irra jiran",
     "activityKitDisabledBody": "Eejentoota hojii irra jiran iskiriinii qulfii irratti ilaaluuf, qindaa'ina keessatti sochiiwwan yeroo ammaa hojii irra oolchi.",
@@ -3652,6 +3710,7 @@
     "lastKnown": "Kan dhumarratti beekame",
     "awaitingUpdate": "Haaromsa eeggachaa jira",
     "nextRun": "Raawwii itti aanu",
+    "wasDue": "Yeroo eegame",
     "waitingForYou": "Si eeggachaa jira",
     "nextScheduled": "Kan itti aansee karoorfame",
     "answerNeeded": "Deebii barbaada",
@@ -3761,6 +3820,8 @@
       "fieldName": "Maqaa mul'atu",
       "fieldUrl": "URL sarvarii",
       "fieldUrlInvalid": "URL sarvarii sirrii galchi.",
+      "duplicateUrl": "URL sarvarii sun duraan qabameera.",
+      "serverNotFound": "Sarvariin kun amma qabamee hin jiru.",
       "enableServer": "Sarvarii kana dandeessisi: {{name}}",
       "editServer": "Sarvarii sirreessi",
       "deleteServer": "Sarvarii balleessi",
@@ -3870,6 +3931,8 @@
       "downloading": "Buufamaa jira: {{total}} keessaa {{written}}",
       "downloadingUnknown": "Buufamaa jira: {{written}}",
       "paused": "Dhaabbate: {{total}} keessaa {{written}}",
+      "retrying": "Irra deebi'ee yaalaa jira: {{total}} keessaa {{written}}",
+      "retryingUnknown": "Irra deebi'ee yaalaa jira: {{written}}",
       "verifying": "Faayilii buufame sakatta'amaa jira…",
       "downloaded": "Buufameera · {{size}}",
       "url": "Liinkii buufinsa kallattii",
@@ -3960,7 +4023,9 @@
         "androidModelUnavailable": "Meeshaan kun Gemini Nano hin deeggaru, ykn appiin sirnaa AICore ammallee qophaa'aa jira. Booda irra deebi'ii yaali.",
         "aicoreUpdateRequired": "Moodeela kana fayyadamuuf appii AICore fi sooftiweerii sirnaa kee haaromsi.",
         "downloadable": "Moodeelli kun osoo hin fayyadamin dura al tokko buufamuu qaba.",
-        "downloading": "Moodeelli buufamaa jira. Yeroo buufachuun xumuramu qophaa'a."
+        "downloading": "Moodeelli buufamaa jira. Yeroo buufachuun xumuramu qophaa'a.",
+        "batteryQuota": "Moodeelli meeshaa irratti qoonnaa baatirii isaa ammaaf fayyadameera. Booda irra deebi'ii yaali.",
+        "checkFailed": "Moodeela kana sakatta'uun hin danda'ame. Irra deebi'ii yaali."
       },
       "unavailable": "Moodeelli meeshaa irratti amma hin argamu. Haala isaa $t(modelChat.backends.title) keessatti ilaali.",
       "busy": "Moodeelli meeshaa irratti deebii biraatiin qabameera. Yeroo xumuru irra deebi'ii yaali.",
@@ -4198,7 +4263,7 @@
       "topPPlaceholder": "fakkeenyaaf 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Bakka bu'aa koo",
-      "promptPlaceholder": "Ati nama ...",
+      "promptPlaceholder": "Ati nama …",
       "tools": "Meeshaalee",
       "wholeToolRule": "Maajentiin kun seera tokko meeshaalee hunda irratti yeroo tokkotti hojiirra oolcha: {{rule}}. Qalqalloonni kunneen dubbisuu qofa danda'u.",
       "visibility": "Mul’achuu",
@@ -4254,10 +4319,10 @@
       "add": "Durtii itti dabali",
       "empty": "Durtii hin qindaa'e",
       "emptyDescription": "Yeroo turtii repo'f jalqabdu ofumaan piroofaayilii hojii irra oolchuuf durtii dabali.",
-      "repo": "Kuusaa filadhu...",
+      "repo": "Kuusaa filadhu…",
       "profile": "Profaayilii filadhu",
       "removeForRepo": "Hidhaa {{repo}} hiikaa",
-      "search": "Kuusaawwan barbaadi...",
+      "search": "Kuusaawwan barbaadi…",
       "addedToast": "Profaayilii durtii \"{{repo}}\" tiif saagame.",
       "addFailed": "Profaayilii durtii saaguu hin dandeenye",
       "removedToast": "Profaayilii durtii \"{{repo}}\" tiif haqame.",
@@ -4273,8 +4338,7 @@
       "repoValue": "Kuusaa: {{name}}",
       "profileValue": "Profaayilii: {{name}}",
       "profileUnavailable": "Profaayiliin kun kana booda hin argamu. Kan biraa filadhu.",
-      "pickerEmptyDescriptionOrganization": "Jijjiiramoota naannoo, ajajoota saaguu, fi dandeettiiwwan turtii hunda irra deebi'ee fayyadamuuf piroofaayilii dhaabbataa uumi.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Abbaan dhaabbataa yookiin bulchaan dhaabbataa piroofaayilii dhaabbataa uumuu danda'a."
+      "pickerEmptyDescriptionOrganization": "Jijjiiramoota naannoo, ajajoota saaguu, fi dandeettiiwwan turtii hunda irra deebi'ee fayyadamuuf piroofaayilii dhaabbataa uumi."
     },
     "variablesDeleteFailed": "Jijjiiramaa haquu hin dandeenye",
     "deleteVariable": "Jijjiiramaa {{key}} balleessi",
@@ -4322,7 +4386,8 @@
       "purchaseFallback": "Bittaa kireeditii",
       "receipt": "Nagahee",
       "receiptA11y": "Nagahee {{description}}, {{amount}}, {{date}} bani",
-      "receiptUnavailable": "Bittaa kanaaf nagaheen hin jiru."
+      "receiptUnavailable": "Bittaa kanaaf nagaheen hin jiru.",
+      "retentionLimit": "Seenaan kireeditii haaraan agarsiifamaa jira."
     },
     "title": "Kireedita bituu",
     "description": "Kireeditiin bittaa yeroo tokkoo kan baalansii Kilo kee irratti dabalame ta'ee, shumarra code AI Kilo App keessatti hojjechuuf oola. Suuqii ammaataa kee irraa kaffaltii fudhata, suuqiin kaffaltii erga mirkaneesse booda kireeditiin dabalama.",
@@ -4456,16 +4521,20 @@
     "loadError": "Gabaasota fe'uun hin danda'amne",
     "view": "Gabaasa dubbisi",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
+    "filterByContext": "Haalaan filadhu",
+    "contextAll": "Haalota hundaa",
     "dismiss": "Gabaasa dhiisi",
+    "dismissFailed": "Gabaasa kana dhiisuun amma hin milkoofne. Duubatti irra deebi'ee yaala.",
     "offline": "Toora ala · gabaasa kuufame",
     "cached": "Gabaasa kuufame · haaromsuun hin danda'amu",
-    "window": "{{start}} – {{end}}",
     "summary": "Cuunfaa AI",
     "summaryPending": "Cuunfaan AI hojjetamaa jira. Yeroo qophaa'u asitti ni maxxana.",
     "summaryUnavailable": "Cuunfaan AI hin jiru. Gabaasni qindaa'aan kee ammas ni argama.",
     "summaryCharge": "AI {{cost}} kaffalchiseera",
     "summaryChargePending": "Kaffaltiin AI mirkaneessuu eegaa jira",
+    "summaryModel": "$t(common.model): {{model}}",
     "sources": "Ragaalee fi meeshaalee",
     "timezone": "Zoonii yeroo gabaasaa",
     "deviceTimezone": "Zoonii yeroo meeshaa fayyadami",
@@ -4477,22 +4546,22 @@
     "timeHint": "Kaardiin Home yeroo yeroon gabaasaa xumuramu, toora ala illee, haala yeroo ammaa deebisa.",
     "invalidSchedule": "Zoonii yeroo sirrii fi yeroo gabaasaa duwwaa hin taane filadhu.",
     "notificationsHint": "Gabaasa sagantaa tokkotti beeksisa waliigalaa tokko. Cuunfaa AI kaffaltii irraa walaba.",
-    "notificationPermission": "Gabaasa kee argachuuf beeksisa meeshaa $t(common.notifications) keessatti dandeessisi.",
+    "notificationPermission": "Gabaasa kee argachuuf beeksisa push dandeessisi.",
     "defaultModel": "Moodeela durtii Kilo fayyadami",
     "duration": "Eegumsa yeroo (daqiiqaa)",
     "spendLimit": "Eegumsa baasii (USD)",
     "invalidSafeguards": "Daangaa yeroo fi baasii poozatiivii fi daangeffame galchi.",
     "estimate": "Tilmaama {{estimate}} · daangaa ol'aanaa {{maximum}}",
-    "estimateUnavailable": "Cuunfaan kaffaltii qindaa'inoota kanaaf hin argamu.",
+    "estimateUnavailable": "Cuunfaan kaffaltii qindaa'inoota kanaaf hin argamu. Moodelii ykn daangoota jijjiiri, ykn booda irra deebi'ii yaali.",
     "confirmPaid": "Cuunfaa kaffaltii {{context}}f dandeessisuu?",
     "paidDisclosure": "Tilmaamaan {{estimate}}, hanga {{maximum}}, daangaa daqiiqaa {{minutes}} wajjin. Uumamni yoo kufe illee kaffaltiin ni jira.",
     "enable": "Cuunfaa kaffaltii dandeessisi",
     "allContexts": "Gabaasonni dhuunfaa fi dhaabbataa adda adda ta'u.",
     "emptyHistory": "Gabaasonni olkaa'aman hin jiran",
-    "estimatePermissionUnavailable": "Maallaqa haala kana keessatti hafe fayyadamuuf hayyama hin qabdu.",
-    "estimatePricingUnavailable": "Gatii moodelii kanaa hin argamu.",
-    "estimateBalanceUnavailable": "Hafteen cuunfaa kaffaltiif hin ga'u.",
-    "estimateModelNotAllowed": "Moodelii kun asitti hin hayyamamu.",
+    "estimatePermissionUnavailable": "Maallaqa haala kana keessatti hafe fayyadamuuf hayyama hin qabdu. Abbaa dhaabbataa dandeessisuuf gaafadhu.",
+    "estimatePricingUnavailable": "Gatii moodelii kanaa hin argamu. Moodelii biraan filadhu.",
+    "estimateBalanceUnavailable": "Hafteen cuunfaa kaffaltiif hin ga'u. Haala kana keessatti hafe irratti kriidii dabali.",
+    "estimateModelNotAllowed": "Moodelii kun haala kana keessatti hin hayyamamu. Moodelii biraan filadhu.",
     "estimateSpendLimitTooLow": "Cuunfaa kana hayyamuuf eegumsa baasii ol kaa'i.",
     "saved": "Qindaa'ina gabaasaa kuusamee jira",
     "selectedSessions": "Taa'umsawwan filataman",
@@ -4501,16 +4570,35 @@
     "capturedAt": "{{time}} galmaa'e",
     "snapshotHint": "Galmee haala taa'umsaa isa dhumaa argamuu, hanga danda'ametti ganama saganteeffametti qabame. Lakkoofsi taa'umsawwan filataman ibsa malee sochii halkan guutuu miti.",
     "snapshotTruncated": "Galmeen haalaa kun daangaa akka hin darbineef taa'umsawwan ykn ragaaleen tokko tokko keessaa hafaniiru.",
-    "snapshotSummaryFailed": "Cuunfaan AI hin milkoofne. Galmeen haalaa qindaa'aan kee ammas ni argama.",
+    "snapshotSummaryFailed": "Cuunfaan AI hin milkoofne. Gabaasni qindaa'aan kee ammas ni argama.",
     "scheduledContextEnabled": "Gabaasota saganteeffaman",
     "scheduledContextSettings": "Gabaasota saganteeffaman · {{context}}",
     "scheduledContextHint": "Haala kana qofaaf galmeessuu saganteeffamee fi cuunfaa AI kaffaltii dandeessisi. Kutaaleen filatamanii fi odeeffannoon iccitii keessaa haqame akkasumas dhugaawwan qindaa'an gara moodeela keetti ergamu. Cuunfaawwan afaan app yeroo ati qindaa'ina gabaasaa ifatti jijjiirtu kuufame fayyadamu. Kaffaltiin haftee haala kanaa fayyadama. Galmeewwan haalaa sochii hin qabne AI hin fayyadaman.",
     "snapshotSafeguards": "Daangaawwan yeroo fi baasii cuunfaa tokkoof kaa'aman galmee haalaa saganteeffame tokkoon tokkoof hojii irra oolu; baajata guyyaa miti.",
-    "snapshotEstimateInputTooLarge": "Galmeen haalaa kun moodeela filatameef ragaa baay'ee qaba.",
+    "snapshotEstimateInputTooLarge": "Galmeen haalaa kun moodeela filatameef ragaa baay'ee qaba. Moodeela addaa galii bal'aa qabu filadhu.",
     "quietSnapshot": "Galmee haalaa kanaaf sochiin taa'umsaa hin filatamne. Cuunfaan AI hin gaafatamne; kaffaltiinis hin jiru.",
     "noEnabledContexts": "Gabaasota saganteeffamaniif haalawwan dandeessifaman hin jiran",
     "sourceBlocker": "Taa'umsi xiyyeeffannoo barbaada",
-    "sourceMetadata": "Meetadaataa taa'umsaa galmaa'e"
+    "sourceMetadata": "Meetadaataa taa'umsaa galmaa'e",
+    "metadataPlan_one": "Karoora: tarkaanfii {{displayTotal}} keessaa {{displayDone}} xumurame",
+    "metadataPlan_other": "Karoora: tarkaanfiiwwan {{displayTotal}} keessaa {{displayDone}} xumuraman",
+    "metadataPlan": "Karoora: tarkaanfiiwwan {{displayTotal}} keessaa {{displayDone}} xumuraman",
+    "metadataFiles_one": "Faayilii {{displayCount}} jijjiirame",
+    "metadataFiles_other": "Faayiliiwwan {{displayCount}} jijjiiraman",
+    "metadataFiles": "Faayiliiwwan {{displayCount}} jijjiiraman",
+    "metadataLinesAdded_one": "Sarara {{displayCount}} dabalame",
+    "metadataLinesAdded_other": "Sararoota {{displayCount}} dabalaman",
+    "metadataLinesAdded": "Sararoota {{displayCount}} dabalaman",
+    "metadataLinesRemoved_one": "Sarara {{displayCount}} haqame",
+    "metadataLinesRemoved_other": "Sararoota {{displayCount}} haqaman",
+    "metadataLinesRemoved": "Sararoota {{displayCount}} haqaman",
+    "metadataPlanCurrent": "Tarkaanfii ammaa: {{current}}",
+    "metadataFailure": "Deebiin dhumaa kufe: {{kind}}",
+    "sourceActivity": "Sochii maqaa hin qabne",
+    "metadataFailureProvider": "dogoggora dhiyeessaa",
+    "metadataFailureTool": "dogoggora meeshaa",
+    "metadataFailureCancelled": "Haqame",
+    "metadataFailureOther": "dogoggora hin ibsamne"
   },
   "systemSearch": {
     "couldNotOpenResult": "Bu'aa barbaachuu kana banuun hin danda'amne"
@@ -4527,6 +4615,8 @@
     "topModels": "Moodeelota olaanoo",
     "topFeatures": "Amaloota olaanoo",
     "emptyTitle": "Yeroo kana keessa itti fayyadamni hin jiru",
+    "unavailableTitle": "Itti fayyadama hin argamne",
+    "unavailableDescription": "Iddoo hojii kun itti fayyadama hin gabaasu. Irra deebi'uun homaa hin fayyadu.",
     "orgSelfNotice": "Itti fayyadama kee dhaabbata kana keessatti argaa jirta.",
     "viewDetails": "Bal'ina itti fayyadamaa ilaali"
   },
@@ -4544,10 +4634,14 @@
     "couldNotLoad": "Walitti hidhamiinsota fe'uun hin danda'amne",
     "permissionDenied": "Walitti hidhamiinsota kana bulchuuf hayyama hin qabdu.",
     "managedByOwner": "Walitti hidhamiinsa ati jijjiiruu hin dandeenye jijjiiruuf abbaa dhaabbataa gaafadhu.",
+    "managedByOwnerOrAdmin": "Walitti hidhamiinsa ati jijjiiruu hin dandeenye jijjiiruuf abbaa dhaabbataa ykn bulchaa gaafadhu.",
+    "managedByOwnerOrBilling": "Walitti hidhamiinsa ati jijjiiruu hin dandeenye jijjiiruuf abbaa dhaabbataa ykn bulchaa kaffaltii gaafadhu.",
+    "managedByOwnerAdminOrBilling": "Walitti hidhamiinsa ati jijjiiruu hin dandeenye jijjiiruuf abbaa dhaabbataa, bulchaa, ykn bulchaa kaffaltii gaafadhu.",
     "connectFailed": "Fuula walitti hidhamiinsaa banuun hin danda'amne"
   },
   "invoices": {
-    "personalEmptyDescription": "Beeksisni kaffaltii bittaa mataa keetii erga kaffaltiin siif herregamee booda asitti mul'ata."
+    "personalEmptyDescription": "Beeksisni kaffaltii bittaa mataa keetii erga kaffaltiin siif herregamee booda asitti mul'ata. Nagaheewwan App Store irraa fi Google Play irraa Seenaa kireeditii keessa jiru.",
+    "personalPeriod": "Ji'oota 12 darban"
   },
   "cloudAgent": {
     "compute": {
@@ -4577,6 +4671,7 @@
       "title": "Kakaawwan fi weebhuukiiwwan",
       "subtitle": "Waamicha weebhuukii yookaan sagantaa irraa hojiiwwan Cloud Agent ofumaan akka hojjetan gochuu.",
       "new": "Kakaawwaa haaraa",
+      "create": "Kakaawwaa uumi",
       "emptyTitle": "Kakaawwan ammaaf hin jiran",
       "emptyDescription": "Kakaawwaa uumi akka hojii Cloud Agent waamicha weebhuukii irraa yookaan sagantaa irratti jalqabuuf.",
       "loadFailedTitle": "Kakaawwan fiduu hin dandeenye",
@@ -4630,6 +4725,8 @@
       "created": "Kakaawwaan uumame",
       "saved": "Kakaawwaan olkaa'ame",
       "statusArrived": "Ga'e",
+      "defaultPromptWebhook": "Qaama gaaffii waamicha weebhuukii kanaa ibsi:\n\n{{body}}",
+      "defaultPromptScheduled": "Hojii sagantaa hojjedhu. Yeroo {{scheduledTime}} kakaawwame.",
       "problems": {
         "nameRequired": "Maqaa galchi.",
         "nameTooShort": "Yoo xiqqaate mallattoo 8 fayyadami.",
@@ -4678,6 +4775,7 @@
     "superseded": "Liinkiin kun bakka biraatti bakka buufameera, kanaaf kana booda hin hojjetu."
   },
   "sharedSession": {
+    "startedAt": "Yeroo {{time}} jalqabame",
     "title": "Seshinii qoodame",
     "someone": "Nama tokko",
     "sharedBy": "Kan qoode {{owner}}",
@@ -4685,5 +4783,179 @@
     "unavailableDescription": "Yeroon liinkii qooddannaa kanaa darbeera ykn haqameera.",
     "transcriptUnavailableTitle": "Galmee kana fe'uun hin danda'amne",
     "transcriptUnavailableDescription": "Liinkiin ammallee ni hojjeta. Yeroo muraasa booda irra deebi'ii yaali."
+  },
+  "organizationGuardrails": {
+    "title": "Daangoolee Eegumsaa AI",
+    "permissionDenied": "Abbootii fi bulchitoonni dhaabbataa qofti Daangoolee Eegumsaa AI bulchuu danda'u.",
+    "unavailableTitle": "Daangooleen Eegumsaa AI hin hojiirra oolle",
+    "unavailable": "Kilon gaaffii irratti dhaabbataaf Daangoolee Eegumsaa AI hojiirra oolcha. {{supportEmail}} qunnamaa, gareen Kilo isa dhaabbataa keeffiif ni bane.",
+    "contactSupport": "Deeggarsa qunnami",
+    "loadError": "Daangoolee Eegumsaa AI fe'uu hin dandeenye",
+    "statusSaving": "Galmeessa jira…",
+    "statusSaved": "Galmeeffame",
+    "statusFailed": "Galmeessuu hin dandeenye.",
+    "inputTitle": "Daangoolee seensaa",
+    "inputDescription": "Seensa hunda Enkrypt AI waliin sakatta'a, bu'aa meeshaa dabalatee. Yeroo Enkrypt hin jiraanne, gaaffiiwwan didamuu mannaa osoo hin sakatta'amiin ni ergamu.",
+    "outputTitle": "Daangoolee ba'aa",
+    "outputDescription": "Deebiiwwan Enkrypt AI waliin osoo miseensonni hin fudhanne dura sakatta'a. Yoo ati hin banne, cufaa ta'a.",
+    "detectorsHint": "Dhorkuun gaaffii mallatteeffame ni dida. Galmeessuun qofa osoo gaaffii hin turre itti galmeessa.",
+    "detectorsHintOutput": "Dhorkuun deebii mallatteeffame ni kasaasa. Galmeessuun qofa osoo deebii hin turre itti galmeessa.",
+    "choiceLog": "Galmeessuu qofa",
+    "applyTo": "Itti fayyadami",
+    "applyToAllMembers": "Miseensota hunda",
+    "applyKiloDefault": "Durtii Kilo fayyadami",
+    "invalidSavedTitle": "Qindaa'inni qorataa seensaa galmeeffame dubbisamuu hin danda'u",
+    "invalidSavedBody": "Gaaffiin ni dhorkama hanga qorattoonni seensaa irra deebi'anii galmeeffamanitti. Qorattoonni armaan gadii Durtii Kilo irraa eegalu.",
+    "invalidSavedOutputTitle": "Qindaa'inni qorataa ba'aa galmeeffame dubbisamuu hin danda'u",
+    "invalidSavedOutputBody": "Deebiiwwan ni qabama hanga qorattoonni ba'aa irra deebi'anii galmeeffamanitti. Qorattoota ba'aa armaan gadii filadhu.",
+    "blockingOutputNote": "Qorataan ba'aa dhorku deebii hanga Enkrypt guutummaa isaa qoradetti ni qaba. Turuu dhiisuuf Galmeessuu qofa fayyadami.",
+    "inputDetectorRequired": "Qorataa seensaa yoo xiqqaate tokko bani.",
+    "outputDetectorRequired": "Qorataa ba'aa yoo xiqqaate tokko bani.",
+    "rulesTooMany": "Hanga {{max}} seera dabalchuu dandeessa.",
+    "ruleIdRequired": "ID seeraa galchi.",
+    "ruleIdInvalid": "ID seeraa qubee, lakkoofsa, tuqaa, xarii, fi xarii gadi fayyadamuu qofa danda'a.",
+    "ruleTextRequired": "Seerichi maal dhorku yookaan maal barbaadu ibsi.",
+    "keywordTooLong": "Jechi furtuu tokkoon tokkoon hanga {{max}} qubee qabaachuu danda'a.",
+    "topicTooLong": "Mata-duree tokkoon tokkoon hanga {{max}} qubee qabaachuu danda'a.",
+    "keywordsTooMany": "Hanga {{max}} jechoota furtuu dabalchuu dandeessa.",
+    "topicsTooMany": "Hanga {{max}} mata-dureewwan dabalchuu dandeessa.",
+    "piiEntityRequired": "Gosa daataa qoratamuu qabu tokko yoo xiqqaate filadhu.",
+    "keywordRequired": "Jecha furtuu tokko yoo xiqqaate dabali.",
+    "topicRequired": "Mata-duree tokko yoo xiqqaate dabali.",
+    "policyTextRequired": "Barruu imaammataa galchi.",
+    "ruleRequired": "Seera tokko yoo xiqqaate dabali.",
+    "ruleIdDuplicate": "Seerri tokkoon tokkoon ID seeraa ofii isaa qabaachuu qaba.",
+    "piiEntities": "Daataa qoratamuu qabu",
+    "keywordsLabel": "Jechoota furtuu",
+    "keywordsHint": "Jecha furtuu tokko sarara tokkoon.",
+    "topicsHint": "Mata-duree tokko sarara tokkoon.",
+    "policyFormat": "Bitaa imaammataa",
+    "policyFormatRules": "Seerota caasaa qaban",
+    "policyFormatRulesDescription": "Seera tokko barbaachisummaa tokkoof, ramaddii fi cimina waliin. Ni gorfama.",
+    "policyFormatText": "Barruu imaammataa",
+    "policyFormatTextDescription": "Imaammata jiru barruu salphaatti maxxansi.",
+    "rulesEmpty": "Amma ammaatti seerri hin jiru. Seerri tokkoon tokkoon waan seensi qabaachuu hin qabne yookaan gaafachuu hin qabne tokko ibsa.",
+    "addRule": "Seera dabali",
+    "ruleNumber": "Seera {{number}}",
+    "ruleRemove": "Seera {{number}} haqi",
+    "ruleIdLabel": "ID seeraa",
+    "ruleNameLabel": "Maqaa (dirqamaa miti)",
+    "ruleTextLabel": "Seera",
+    "ruleRiskCategory": "Ramaddii balaa",
+    "ruleApplicability": "Daangaa",
+    "ruleFrameworks": "Caasawwan",
+    "detector": {
+      "promptInjection": {
+        "label": "Injekkshinii ajajaa",
+        "description": "Yaaliin ajaja jijjiiruu yookaan moodela cufaa keessaa ba'uu qorata."
+      },
+      "policyViolation": {
+        "label": "Cabsa imaammataa",
+        "description": "Seensota imaammata dhaabbata kee cabsan mallatteessa, barruu yookaan seerotaan barreeffaman.",
+        "descriptionOutput": "Deebiiwwan imaammata dhaabbata kee cabsan mallatteessa, barruu yookaan seerotaan barreeffaman."
+      },
+      "pii": {
+        "label": "PII fi iccitii",
+        "description": "Daataa dhuunfaa, ragaa seensaa, teessoo IP, fi URL qorata."
+      },
+      "keywords": {
+        "label": "Jechoota furtuu dhorkaman",
+        "descriptionOutput": "Deebiiwwan jecha furtuu ati tarreessite kamiyyuu of keessaa qaban qorata."
+      },
+      "topics": {
+        "label": "Mata-dureewwan",
+        "descriptionOutput": "Deebiiwwan mata-duree ati tarreessite kamiyyuu ilaalchisee mallatteessa."
+      },
+      "toxicity": {
+        "label": "Sumaawummaa",
+        "description": "Afaan sumaawaa, tuffisaa, naasisaa, yookaan jibbisaa qorata."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Qabiyyee saalaa yookaan karaa biraatiin hojii keessatti nageenya qabeessa hin taane qorata."
+      },
+      "bias": {
+        "label": "Loogii",
+        "description": "Afaan loogii yookaan adda baasaa qorata."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Daataa dhuunfaa",
+        "description": "Maqoota, teessoo imeelii, lakkoofsa bilbilaa."
+      },
+      "secrets": {
+        "label": "Iccitii",
+        "description": "Furtuu API, tokeenii, jecha darbii."
+      },
+      "ipAddress": {
+        "label": "Teessoo IP",
+        "description": "Teessoo IPv4 fi IPv6."
+      },
+      "url": {
+        "label": "Teessoowwan URL",
+        "description": "Teessoo weebii."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Eegumsa fi gowwoomsa",
+      "safetyHarm": "Nageenya fi miidhaa",
+      "privacyDataProtection": "Dhuunfaa fi eegumsa daataa",
+      "brandReputationTrust": "Mallattoo fi maqaa gaarii",
+      "biasFairnessEthical": "Loogii fi walqixxummaa",
+      "legalIpLiability": "Itti gaafatamummaa seeraa fi IP",
+      "productMisuse": "Itti fayyadama dogoggoraa oomishaa",
+      "performanceQuality": "Raawwii fi qulqullina"
+    },
+    "applicability": {
+      "user": "Seensa fayyadamaa",
+      "userAssistant": "Seensa fayyadamaa fi deebiiwwan"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Kudhan Olii (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Seera AI EU",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Amala dhaabbata guddaa",
+    "enterpriseOnly": "Kun amala dhaabbata guddaaf qofa.",
+    "readOnly": "Abbootii fi bulchitoonni dhaabbataa qofti qindaa'ina kana jijjiiruu danda'u.",
+    "loadError": "Dhiyeessitoonni fi moodeloonni fe'uu hin dandeenye",
+    "tabModels": "Moodeloota",
+    "tabProviders": "Dhiyeessitoota",
+    "tabGateways": "Kallattiiwwan",
+    "modelsDescription": "Moodela dhaabi miseensa hundaaf dhorkuuf. Moodeloonni dhiyeessitoota hayyamaman irraa dhufan banamaniin eegalu.",
+    "modelsDeniedOnly": "Kan dhorkaman qofa",
+    "modelsEmpty": "Moodelaan barbaacha kanaaf hin jiru.",
+    "modelsDeniedEmpty": "Moodelaan dhorkaman hin jiru.",
+    "modelsDeniedSearchEmpty": "Moodelaan dhorkaman barbaacha kanaaf hin jiru.",
+    "providersDescription": "Dhiyeessaa dhaabi dhaabbata kanaaf Kilo gara isaa akka hin geessineef.",
+    "providersNeedCatalog": "Furtuuwwan dhiyeessaa hanga kaataalogiin moodeelaa guutuun fe'amutti dubbisuuf qofa ta'anii turu. Isaan gulaaluuf Irra deebi'ii yaali armaan olii tuqi.",
+    "providersEmpty": "Dhiyeessaan barbaacha kanaaf hin jiru.",
+    "allowAllShown": "Kan mul'atan hunda hayyami",
+    "denyAllShown": "Kan mul'atan hunda dhorki",
+    "gatewaysDescription": "Kilo gaaffiiwwan moodelaa Vercel AI Gateway yookaan OpenRouter keessa geessa. Kallattiin cufame gaaffiiwwan sana ni kasaasa.",
+    "emptyProviderList": "Yoo xiqqaate dhiyeessaa tokko hayyami. Tarreen duwwaan karaa moodelaa Kilo hunda ni cufa.",
+    "gatewaysUnavailable": "Qindaa'inni kallattiiwwanii dhaabbata kanaaf hin argamu.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Gaaffiiwwan OpenRouter naannoo tokkoon hin hidhamne.",
+    "inferenceRegion": "Naannoo raawwii",
+    "inferenceRegionDescription": "Gaaffiiwwan Vercel AI Gateway naannoo kanaatti ni hidha. Moodelaan achitti hin jiraanne ni kasaasa.",
+    "disableOpenrouterNote": "OpenRouter cufuun furtuulee BYOK gaaffiiwwan isa keessa geessanis ni dhorka.",
+    "emptyModelList": "Yoo xiqqaate moodela tokko banaa dhiisi. Moodela hunda yoo dide, miseensonni waan itti fayyadaman hin qaban.",
+    "catalogUnavailable": "Kaataalogiin moodelaa guutuun hin fe'amne, kanaaf tarreewwan kee olkaa'aman qofatu mul'ata. Moodela hunda fe'uuf irra deebi'ii yaali.",
+    "region": {
+      "global": "Addunyaa",
+      "us": "Istaatawwan Ameerikaa",
+      "eu": "Gamtaa Awurooppaa",
+      "au": "Awustraaliyaa",
+      "jp": "Jaappaan"
+    }
   }
 }

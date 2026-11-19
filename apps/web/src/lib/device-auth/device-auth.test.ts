@@ -24,6 +24,7 @@ import {
   DeviceAuthPendingLimitError,
   DEVICE_AUTH_PENDING_LIMIT_MESSAGE,
   DEVICE_AUTH_PENDING_LOCK_WAIT_MS,
+  DEVICE_AUTH_CODE_LIFETIME_SECONDS,
   DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE,
   DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE,
   getDeviceAuthPendingLink,
@@ -63,6 +64,13 @@ jest.mock('@kilocode/web-shared/lib/tokens', () => {
 
 const mockedIssueSessionCredentials = jest.mocked(issueSessionCredentials);
 const mockedGenerateApiToken = jest.mocked(generateApiToken);
+
+/**
+ * Remaining life of the oldest pending row in the retry-advisory test. Well
+ * inside the code lifetime, so the advisory it produces is distinguishable from
+ * both the full-lifetime default and every later row's expiry.
+ */
+const OLDEST_ROW_REMAINING_MS = 120_000;
 
 describe('Device Auth', () => {
   const testUserId = 'test-user-' + Date.now();
@@ -258,25 +266,117 @@ describe('Device Auth', () => {
       expect(result.code).toBeDefined();
       expect(result.userCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
     });
-    test('rejects the sixth live pending request from the same IP', async () => {
+    test('rejects the sixth live pending request from the same IP with the oldest row as the retry advisory', async () => {
       const ipAddress = `192.168.1.${(Date.now() * 11) % 254}`;
 
       // Clean up any leftover rows.
       await db.delete(device_auth_requests).where(eq(device_auth_requests.ip_address, ipAddress));
 
-      // Create 5 live pending requests.
-      for (let i = 0; i < 5; i++) {
-        await createDeviceAuthRequest({ ipAddress });
+      // Create 5 live pending requests, staggered so the OLDEST row is
+      // distinguishable: the first request expires first, the rest later.
+      const firstUserCode = await (async () => {
+        const { userCode } = await createDeviceAuthRequest({ ipAddress });
+        return userCode;
+      })();
+      // The oldest row is pulled well inside the code lifetime, so its remaining
+      // life differs from both the full lifetime and every other row: a read of
+      // this row cannot be confused with the default fallback, and a read of the
+      // newest row instead of the oldest would report a much larger wait.
+      await db
+        .update(device_auth_requests)
+        .set({ expires_at: new Date(Date.now() + OLDEST_ROW_REMAINING_MS).toISOString() })
+        .where(eq(device_auth_requests.user_code, firstUserCode));
+      for (let i = 0; i < 4; i++) {
+        const { userCode } = await createDeviceAuthRequest({ ipAddress });
+        // Push each later row past the first one's expiry in the same live state.
+        await db
+          .update(device_auth_requests)
+          .set({ expires_at: new Date(Date.now() + (600_000 + (i + 1) * 60_000)).toISOString() })
+          .where(eq(device_auth_requests.user_code, userCode));
       }
+      // The first row keeps the shortest remaining life of the five live rows.
+      const [oldest] = await db
+        .select({ expires_at: device_auth_requests.expires_at })
+        .from(device_auth_requests)
+        .where(eq(device_auth_requests.user_code, firstUserCode));
+      expect(oldest).toBeDefined();
+      const oldestRemainingMs = new Date(oldest!.expires_at).getTime() - Date.now();
 
-      // The 6th request must be rejected.
-      await expect(createDeviceAuthRequest({ ipAddress })).rejects.toThrow(
-        DeviceAuthPendingLimitError
-      );
+      // The 6th request must be rejected with an advisory derived from that row.
+      let refusal: DeviceAuthPendingLimitError | undefined;
+      try {
+        await createDeviceAuthRequest({ ipAddress });
+      } catch (error) {
+        if (error instanceof DeviceAuthPendingLimitError) refusal = error;
+      }
+      expect(refusal).toBeInstanceOf(DeviceAuthPendingLimitError);
+      const retryAfterSeconds = refusal!.retryAfterSeconds;
+      // The advisory tracks the oldest row's remaining life (within a small
+      // tolerance for elapsed time between the read and the throw) and never
+      // promises a longer or shorter wait than the block allows.
+      expect(retryAfterSeconds).toBeGreaterThanOrEqual(Math.floor(oldestRemainingMs / 1000) - 5);
+      expect(retryAfterSeconds).toBeLessThanOrEqual(Math.ceil(oldestRemainingMs / 1000) + 5);
+      // It is a read of a row, not the default that applies when no row can be
+      // read, and not a read of a later row: both would report a longer wait.
+      expect(retryAfterSeconds).not.toBe(DEVICE_AUTH_CODE_LIFETIME_SECONDS);
+      expect(retryAfterSeconds).toBeLessThan(DEVICE_AUTH_CODE_LIFETIME_SECONDS);
       await expect(createDeviceAuthRequest({ ipAddress })).rejects.toThrow(
         DEVICE_AUTH_PENDING_LIMIT_MESSAGE
       );
     });
+
+    test('does not count rows that expired while the request waited for the address lock', async () => {
+      const ipAddress = `192.168.1.${(Date.now() * 37) % 254}`;
+      await db.delete(device_auth_requests).where(eq(device_auth_requests.ip_address, ipAddress));
+
+      // Five live rows sharing one deadline captured before the loop, so the
+      // guard does not depend on how fast the loop runs: every row is still
+      // live when the waiting request starts. Their remaining life is far
+      // shorter than the lock hold, so by the time the request that waited for
+      // the lock reads its clock every row is past its deadline. The previous
+      // code read that clock before the wait and still counted them.
+      const rowsDeadline = new Date(Date.now() + 2_000).toISOString();
+      for (let i = 0; i < 5; i++) {
+        const { userCode } = await createDeviceAuthRequest({ ipAddress });
+        await db
+          .update(device_auth_requests)
+          .set({ status: 'pending', expires_at: rowsDeadline })
+          .where(eq(device_auth_requests.user_code, userCode));
+      }
+
+      // Hold the address's advisory lock (same namespace literal as
+      // PENDING_LIMIT_LOCK_NAMESPACE) so the next request must wait for it.
+      const lockHeld = Promise.withResolvers<void>();
+      const releaseLock = Promise.withResolvers<void>();
+      const lockHolder = db.transaction(async tx => {
+        await tx.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtext('device_auth_request_pending'), hashtext(${ipAddress}))`
+        );
+        lockHeld.resolve();
+        // A real wait, deliberate: the rows expire against Postgres's own
+        // clock, which jest fake timers cannot advance. Hold the lock past the
+        // rows' 2 s deadline, so the waiting request reads its clock after
+        // every row is past its deadline.
+        await new Promise(resolve => setTimeout(resolve, 2_700));
+        await releaseLock.promise;
+      });
+      await lockHeld.promise;
+
+      try {
+        // Start the request while the lock is held: it blocks on the lock for
+        // the holder's whole 2.7 s hold, and its clock is read only once the
+        // lock is acquired — after every row is past its deadline — so the
+        // five expired rows do not count and the request is admitted.
+        const waiting = createDeviceAuthRequest({ ipAddress });
+        releaseLock.resolve();
+        const result = await waiting;
+        expect(result.userCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+      } finally {
+        releaseLock.resolve();
+        await lockHolder.catch(() => {});
+        await db.delete(device_auth_requests).where(eq(device_auth_requests.ip_address, ipAddress));
+      }
+    }, 30_000);
 
     test('keeps the live pending rows of one address within the limit under concurrent requests', async () => {
       const ipAddress = `10.${(Date.now() * 13) % 254}.${(Date.now() * 17) % 254}.7`;
@@ -348,8 +448,11 @@ describe('Device Auth', () => {
         expect(other.userCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
         expect(Date.now() - otherStartedAt).toBeLessThan(1_000);
 
-        // The wait ends at the bound with the pending-limit refusal.
-        expect(await waitingOutcome).toBeInstanceOf(DeviceAuthPendingLimitError);
+        // The wait ends at the bound with the pending-limit refusal, carrying
+        // the default full code lifetime as its retry advisory.
+        const waitingError = (await waitingOutcome) as DeviceAuthPendingLimitError;
+        expect(waitingError).toBeInstanceOf(DeviceAuthPendingLimitError);
+        expect(waitingError.retryAfterSeconds).toBe(DEVICE_AUTH_CODE_LIFETIME_SECONDS);
         const waitedMs = Date.now() - waitingStartedAt;
         expect(waitedMs).toBeGreaterThanOrEqual(DEVICE_AUTH_PENDING_LOCK_WAIT_MS - 250);
         expect(waitedMs).toBeLessThan(DEVICE_AUTH_PENDING_LOCK_WAIT_MS + 10_000);

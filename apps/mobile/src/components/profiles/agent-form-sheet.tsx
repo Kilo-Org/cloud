@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- the agent form keeps its validation, dirty check, and every field group in one sheet, so Save and the fields it saves stay together */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
@@ -21,17 +21,21 @@ import {
 } from '@/components/profiles/profile-agents-model';
 import { SheetHeader } from '@/components/sheet-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { ChoiceRow } from '@/components/ui/choice-row';
 import { FormField } from '@/components/ui/form-field';
-import { Switch } from '@/components/ui/switch';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
+import { RowFrame } from '@/components/ui/row-frame';
+import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
-import { selectableRowA11y } from '@/lib/a11y/selectable-row';
 import { MAX_PROFILE_AGENTS } from '@/lib/agent-profile-forms';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
+import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
-import { cn } from '@/lib/utils';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { settleSaveAttempt } from '@/lib/surface-feedback';
 
 const ERROR_FIELDS = {
   'slug-required': 'slug',
@@ -64,7 +68,11 @@ type AgentFormSheetProps = Readonly<{
   organizationId?: string;
   isSaving: boolean;
   onClose: () => void;
-  onSave: (payload: { slug: string; name: string; config: Record<string, unknown> }) => void;
+  onSave: (payload: {
+    slug: string;
+    name: string;
+    config: Record<string, unknown>;
+  }) => Promise<void>;
   /** The last save refusal, each arm rendered where it belongs in the sheet. */
   saveFailure?: AgentSaveFailure | null;
 }>;
@@ -154,12 +162,26 @@ export function AgentFormSheet({
     variant !== initial.variant ||
     disabledTools.length !== initial.disabledTools.length ||
     disabledTools.some(tool => !initial.disabledTools.includes(tool));
+  // One save per Save press burst; see `instruction-form-sheet.tsx`. Its
+  // pending admission closes the burst window the lagging `isSaving` leaves
+  // open, so the dismissal guard reads it too.
+  const { feedback, begin } = useSurfaceFeedback<never>();
+
   const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({
     isDirty: hasUnsavedEdits,
+    isRunning: () => isSaving || feedback.status === 'pending',
     onDiscard: onClose,
   });
 
   const submit = () => {
+    void runSubmit();
+  };
+
+  const runSubmit = async () => {
+    const attempt = begin();
+    if (attempt === null) {
+      return;
+    }
     const state: AgentFormState = {
       slug: slugRef.current,
       name: nameRef.current,
@@ -175,12 +197,14 @@ export function AgentFormSheet({
     };
     const problem = validateAgentForm(state, existingSlugs);
     if (problem !== null) {
+      attempt.abandon();
       setError(problem);
       scrollToField(ERROR_FIELDS[problem]);
       return;
     }
     setError(null);
-    onSave(buildAgentPayload(state, agent?.config));
+    // The admission rides the save; see `instruction-form-sheet.tsx`.
+    await settleSaveAttempt(attempt, () => onSave(buildAgentPayload(state, agent?.config)));
   };
 
   // The one refusal line: a create past the cap names the cap as a warning, and
@@ -207,7 +231,7 @@ export function AgentFormSheet({
       <ScrollView
         ref={scrollRef}
         className="flex-1"
-        contentContainerClassName="gap-4 px-6 pt-4 pb-8"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
@@ -330,73 +354,59 @@ export function AgentFormSheet({
         />
 
         <View className="gap-1.5">
-          <Text className="text-sm font-medium text-foreground">
-            {t('profiles.agents.visibility')}
-          </Text>
-          <View className="gap-1">
-            {AGENT_VISIBILITY_OPTIONS.map(option => {
-              const selected = visibility === option.value;
-              return (
-                <Pressable
-                  key={option.value}
-                  className={cn(
-                    'min-h-11 flex-row items-center rounded-md px-3 active:opacity-70',
-                    selected && 'bg-secondary'
-                  )}
-                  {...selectableRowA11y({ multi: false, selected })}
-                  accessibilityLabel={t(option.labelKey)}
-                  onPress={() => {
-                    setVisibility(option.value);
-                  }}
-                >
-                  <Text
-                    className={cn(
-                      'text-sm',
-                      selected ? 'font-medium text-foreground' : 'text-muted-foreground'
-                    )}
-                  >
-                    {t(option.labelKey)}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <FormFieldLabel label={t('profiles.agents.visibility')} />
+          <RowGroup>
+            {AGENT_VISIBILITY_OPTIONS.map(option => (
+              <ChoiceRow
+                key={option.value}
+                label={t(option.labelKey)}
+                selected={visibility === option.value}
+                onPress={() => {
+                  setVisibility(option.value);
+                }}
+              />
+            ))}
+          </RowGroup>
         </View>
 
         <View className="gap-1.5">
-          <Text className="text-sm font-medium text-foreground">{t('profiles.agents.tools')}</Text>
-          <View className="gap-1">
+          <FormFieldLabel label={t('profiles.agents.tools')} />
+          <RowGroup>
             {PERMISSION_TOOLS.map(tool => {
               const enabled = !disabledTools.includes(tool);
               return (
-                <View key={tool} className="min-h-11 flex-row items-center gap-3 px-1">
-                  <Text
-                    variant="mono"
-                    {...HIDDEN_LABEL_PROPS}
-                    className="flex-1 text-sm text-foreground"
-                  >
-                    {tool}
-                  </Text>
-                  <Switch
-                    value={enabled}
-                    disabled={isSaving || wholeToolAction !== undefined}
-                    accessibilityLabel={tool}
-                    onValueChange={next => {
+                <RowFrame
+                  key={tool}
+                  trailing={{
+                    kind: 'switch',
+                    value: enabled,
+                    disabled: isSaving || wholeToolAction !== undefined,
+                    accessibilityLabel: tool,
+                    onValueChange: next => {
                       setDisabledTools(current =>
                         next ? current.filter(item => item !== tool) : [...current, tool]
                       );
-                    }}
-                  />
-                </View>
+                    },
+                  }}
+                >
+                  <Text
+                    variant="mono"
+                    {...HIDDEN_LABEL_PROPS}
+                    className="min-w-0 flex-1 text-sm text-foreground"
+                  >
+                    {tool}
+                  </Text>
+                </RowFrame>
               );
             })}
-          </View>
+          </RowGroup>
           {wholeToolAction !== undefined ? (
-            <Text className="text-sm text-muted-foreground">
+            <Text variant="muted">
               {t('profiles.agents.wholeToolRule', { rule: wholeToolAction })}
             </Text>
           ) : null}
         </View>
+        <View className="h-3" />
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
       {dialog}

@@ -346,9 +346,7 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
         needsInput={needsInput}
         metaWhileLive
         platformIcon={platformIcon}
-        stripMode={variant === 'card' ? 'edge' : 'inline'}
         last={variant === 'card' ? true : undefined}
-        className={variant === 'card' ? undefined : 'pl-[22px] pr-[22px]'}
       />
       {exitDialog}
     </Pressable>

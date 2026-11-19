@@ -1,3 +1,5 @@
+import { isUsageSourceNotConfigured } from '@kilocode/app-shared/usage-source';
+
 export type UsageQueryOutcome = 'loading' | 'error' | 'success';
 
 export function usageQueryOutcome(query: {
@@ -12,14 +14,29 @@ export function usageQueryOutcome(query: {
   return 'success';
 }
 
+export type UsageDashboardState = 'error' | 'unavailable' | 'pending' | 'ready';
+
+/**
+ * The error the summary or table query saw, when it failed with nothing to
+ * keep showing. The dashboard maps the unconfigured-usage-source message to
+ * its terminal state; every other failure stays retryable.
+ */
 export function resolveUsageDashboardState(args: {
   period: string;
   hasActiveFilters: boolean;
   summary: { requestCount: number } | undefined;
   tableRowCount: number | undefined;
   queries: readonly UsageQueryOutcome[];
-}): 'error' | 'pending' | 'ready' {
-  if (args.queries.includes('error')) return 'error';
+  summaryError?: unknown;
+  tableError?: unknown;
+}): UsageDashboardState {
+  if (args.queries.includes('error')) {
+    const failed = [args.summaryError, args.tableError].find(
+      error => error !== undefined && isUsageSourceNotConfigured(readTrpcErrorMessage(error))
+    );
+    if (failed !== undefined) return 'unavailable';
+    return 'error';
+  }
 
   const usageDataPending =
     args.period === 'today' &&
@@ -30,4 +47,23 @@ export function resolveUsageDashboardState(args: {
     !args.hasActiveFilters;
 
   return usageDataPending ? 'pending' : 'ready';
+}
+
+/**
+ * The tRPC error's own message, when the failure carries one. Matches
+ * `USAGE_SOURCE_NOT_CONFIGURED_MESSAGE` by identity, the one signal the
+ * wire gives a client for the condition.
+ */
+function readTrpcErrorMessage(error: unknown): string | undefined {
+  if (error && typeof error === 'object') {
+    // The tRPC wire's error envelope keeps the message at the top level, and
+    // the web client surfaces it as `TRPCClientError.message`; `data` carries
+    // only `{ code, httpStatus, … }`. `data.message` stays first so a shaped
+    // error keeps working, with the client error's own message as fallback —
+    // the same order mobile's `readTrpcErrorField` uses.
+    const shaped = error as { data?: { message?: unknown }; message?: unknown };
+    if (typeof shaped.data?.message === 'string') return shaped.data.message;
+    if (typeof shaped.message === 'string') return shaped.message;
+  }
+  return undefined;
 }

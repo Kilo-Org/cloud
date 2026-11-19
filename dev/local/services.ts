@@ -4,7 +4,9 @@ import * as path from 'node:path';
 
 import { resolveFakeAdminToken } from '../../services/cloud-agent-next/test/e2e/fake-llm-admin';
 import { resolveE2eInternalSecret } from '../../services/cloud-agent-next/test/e2e/e2e-internal-secret';
+import { caBundlePath } from '../mock-snowflake/tls-env';
 import { readEnvFile } from './env-sync/parse';
+import { shellQuote } from './shell';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
 const CLOUD_AGENT_DEV_VARS_PATH = path.join(REPO_ROOT, 'services/cloud-agent-next/.dev.vars');
@@ -108,6 +110,7 @@ const serviceMeta: Record<string, ServiceMeta> = {
       'ai-gateway',
       'cloudflare-git-token-service',
       'byok-kms',
+      'mock-snowflake',
     ],
   },
   postgres: { group: 'core', dependsOn: [] },
@@ -308,6 +311,18 @@ const serviceMeta: Record<string, ServiceMeta> = {
     group: 'deletion-mock',
     dependsOn: [],
     dir: 'dev/local/scripts',
+  },
+  // Dev-only Snowflake stand-in for the usage screens (dev/mock-snowflake/
+  // README.md). Core is always on, so every `dev:start` gains it; its entry
+  // keeps the SNOWFLAKE_* block and the CA bundle that the managed section of
+  // .env.local names current, and `serviceCommand` exports that bundle to
+  // `next dev` when this service is selected. A real SNOWFLAKE_ACCOUNT_HOST in
+  // .env.local is never replaced — the entry takes its own section back out
+  // instead; run without the mock with `pnpm dev:start app --without=mock-snowflake`.
+  'mock-snowflake': {
+    group: 'core',
+    dependsOn: [],
+    dir: 'dev/mock-snowflake',
   },
 };
 
@@ -588,6 +603,11 @@ const INFRA_PORTS: Record<string, number> = {
 
 const BYOK_KMS_SERVICE_BASE_PORT = 8901;
 
+// Base host port of dev/mock-snowflake; must agree with the fallback in
+// dev/mock-snowflake/tls-env.ts. An offset worktree runs its own mock so the
+// SNOWFLAKE_ACCOUNT_HOST its entry wires into .env.local matches its stack.
+const MOCK_SNOWFLAKE_BASE_PORT = 4792;
+
 export function byokKmsServicePort(offset: number = portOffset): number {
   return BYOK_KMS_SERVICE_BASE_PORT + offset;
 }
@@ -828,6 +848,27 @@ function buildServiceDefs(): ServiceDef[] {
           'exec',
           'tsx',
           'deletion-provider-mock.ts',
+        ],
+        group: meta.group,
+      });
+      continue;
+    }
+
+    if (name === 'mock-snowflake') {
+      const mockSnowflakePort = MOCK_SNOWFLAKE_BASE_PORT + portOffset;
+      defs.push({
+        name,
+        type: 'process',
+        dir: meta.dir ?? name,
+        port: mockSnowflakePort,
+        dependsOn: meta.dependsOn,
+        command: [
+          'env',
+          `MOCK_SNOWFLAKE_PORT=${mockSnowflakePort}`,
+          'pnpm',
+          'exec',
+          'tsx',
+          'stack-service.ts',
         ],
         group: meta.group,
       });
@@ -1187,12 +1228,29 @@ export function getService(name: string): ServiceDef {
  * tunnels optionally publish the fake-LLM tunnel; that only makes sense when
  * the fake Worker is in the same selection, and including the port
  * unconditionally would make a standalone tunnels start depend on a running
- * fake Worker.
+ * fake Worker. The web app is handed the Snowflake mock's CA bundle the same
+ * way: exporting it here is what makes the mock's certificate trusted.
+ *
+ * The export is also the only defence against a value the developer's own shell
+ * exits with: `scripts/dev.sh` resolves `NODE_EXTRA_CA_CERTS` as the shell's
+ * value first and only then reads `.env.local`, and Node keeps the exported
+ * value over anything Next.js loads later. Setting it on this command beats
+ * both, so every relaunch path must pass the session's selection — a restart or
+ * a recreate without one falls back to the bare command and silently un-trusts
+ * the mock.
  */
 export function serviceCommand(serviceName: string, serviceNames: readonly string[]): string[] {
   const command = getService(serviceName).command;
   if (serviceName === 'cloud-agent-public-tunnels' && serviceNames.includes('fake-llm-worker')) {
     return [...command, String(resolveFakeLlmWorkerPort())];
+  }
+  if (serviceName === 'nextjs' && serviceNames.includes('mock-snowflake')) {
+    // `env` opens the web app's command, so the variable joins that prefix.
+    // `buildStartCommand` joins argv with spaces and the pane runs the string
+    // through `/bin/sh -lc`, so the absolute path has to be one quoted word: an
+    // unquoted one splits at the first space in the checkout path.
+    const [env, ...prefixAndArgs] = command;
+    return [env, `NODE_EXTRA_CA_CERTS=${shellQuote(caBundlePath())}`, ...prefixAndArgs];
   }
   return command;
 }

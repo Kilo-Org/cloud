@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { type NativeInventory } from '@/lib/native-remote/use-native-inventory';
@@ -31,75 +32,79 @@ export function NativeRemoteInventory({
   const online = inventory.presence.instances.filter(instance => instance.online);
   const selected = online.find(instance => instance.instanceID === instanceID);
   return (
-    <View className="gap-4">
-      <Text accessibilityRole="header">{t('todos.segment.sessions')}</Text>
-      {inventory.loading && inventory.sessions.length === 0 ? (
-        <Skeleton className="h-24 rounded-md" />
-      ) : null}
-      {!inventory.loading && inventory.sessions.length === 0 ? (
-        <Text>{t('nativeRemote.sessionsEmpty')}</Text>
-      ) : null}
-      {inventory.sessions.length > 0 ? (
-        <NativeRemoteSessionList sessions={inventory.sessions} select={select} />
-      ) : null}
-      <View className="flex-row flex-wrap gap-2">
-        <Button
-          variant="outline"
-          disabled={inventory.loading}
-          onPress={() => void inventory.load()}
-        >
-          <Text>{t('common.refresh')}</Text>
-        </Button>
-        {inventory.cursor ? (
+    <View className="gap-6">
+      <Section label={t('todos.segment.sessions')}>
+        {inventory.loading && inventory.sessions.length === 0 ? (
+          <Skeleton className="h-24 rounded-xl" />
+        ) : null}
+        {!inventory.loading && inventory.sessions.length === 0 ? (
+          <Text variant="muted">{t('nativeRemote.sessionsEmpty')}</Text>
+        ) : null}
+        {inventory.sessions.length > 0 ? (
+          <NativeRemoteSessionList sessions={inventory.sessions} select={select} />
+        ) : null}
+        <View className="flex-row flex-wrap gap-2">
           <Button
             variant="outline"
             disabled={inventory.loading}
-            onPress={() => void inventory.load(inventory.cursor ?? undefined)}
+            onPress={() => void inventory.load()}
           >
-            <Text>{t('common.loadMore')}</Text>
+            <Text>{t('common.refresh')}</Text>
           </Button>
-        ) : null}
-      </View>
-      {inventory.error ? (
-        <Text accessibilityRole="alert" className="text-destructive">
-          {inventory.error}
-        </Text>
-      ) : null}
-      <Text accessibilityRole="header">{t('nativeRemote.hosts')}</Text>
-      <Text className="text-muted-foreground">
-        {t('nativeRemote.presenceStatus', {
-          connection: t(connectionKeys[inventory.presence.connection]),
-        })}
-      </Text>
-      {inventory.presence.error ? (
-        <Text accessibilityRole="alert" className="text-destructive">
-          {inventory.presence.error}
-        </Text>
-      ) : null}
-      {online.length === 0 ? <Text>{t('nativeRemote.hostsEmpty')}</Text> : null}
-      {online.map(instance => (
-        <Button
-          key={instance.instanceID}
-          variant={instanceID === instance.instanceID ? 'secondary' : 'outline'}
-          accessibilityRole="radio"
-          accessibilityState={{ checked: instanceID === instance.instanceID }}
-          onPress={() => {
-            setInstanceID(instance.instanceID);
-          }}
-        >
-          <Text className="min-w-0 flex-1" numberOfLines={2}>
-            {instance.advertisement.name} · {instance.advertisement.projectName}
+          {inventory.cursor ? (
+            <Button
+              variant="outline"
+              disabled={inventory.loading}
+              onPress={() => void inventory.load(inventory.cursor ?? undefined)}
+            >
+              <Text>{t('common.loadMore')}</Text>
+            </Button>
+          ) : null}
+        </View>
+        {inventory.error ? (
+          <Text accessibilityRole="alert" variant="muted" className="text-destructive">
+            {inventory.error}
           </Text>
-        </Button>
-      ))}
-      {selected ? (
-        <CreateSession
-          key={selected.instanceID}
-          instance={selected}
-          creating={inventory.creating}
-          create={create}
-        />
-      ) : null}
+        ) : null}
+      </Section>
+      <Section label={t('nativeRemote.hosts')}>
+        <Text variant="muted">
+          {t('nativeRemote.presenceStatus', {
+            connection: t(connectionKeys[inventory.presence.connection]),
+          })}
+        </Text>
+        {inventory.presence.error ? (
+          <Text accessibilityRole="alert" variant="muted" className="text-destructive">
+            {inventory.presence.error}
+          </Text>
+        ) : null}
+        {online.length === 0 ? <Text variant="muted">{t('nativeRemote.hostsEmpty')}</Text> : null}
+        <View className="gap-2">
+          {online.map(instance => (
+            <Button
+              key={instance.instanceID}
+              variant={instanceID === instance.instanceID ? 'secondary' : 'outline'}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: instanceID === instance.instanceID }}
+              onPress={() => {
+                setInstanceID(instance.instanceID);
+              }}
+            >
+              <Text className="min-w-0 flex-1" numberOfLines={2}>
+                {instance.advertisement.name} · {instance.advertisement.projectName}
+              </Text>
+            </Button>
+          ))}
+        </View>
+        {selected ? (
+          <CreateSession
+            key={selected.instanceID}
+            instance={selected}
+            creating={inventory.creating}
+            create={create}
+          />
+        ) : null}
+      </Section>
     </View>
   );
 }

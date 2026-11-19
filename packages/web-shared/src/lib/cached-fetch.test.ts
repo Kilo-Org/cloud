@@ -157,6 +157,36 @@ describe('createCachedFetch', () => {
     ]);
   });
 
+  test('serves a cached null value rather than a non-null default after a failed refresh', async () => {
+    const clock = createClock(0);
+    const reported: RefreshFailureInfo[] = [];
+    const failure = new Error('upstream down');
+    const fetcher = jest
+      .fn<() => Promise<string | null>>()
+      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(failure);
+    const get = createCachedFetch<string | null>(fetcher, 1_000, 'default', {
+      name: 'test-cache',
+      now: clock.now,
+      onRefreshFailure: info => {
+        reported.push(info);
+      },
+    });
+
+    expect(await get()).toBeNull();
+
+    clock.set(1_000);
+    expect(await get()).toBeNull();
+    expect(reported).toEqual([
+      {
+        name: 'test-cache',
+        error: failure,
+        served: 'last-known-good',
+        failureBackoffMs: FAILURE_BACKOFF_MS,
+      },
+    ]);
+  });
+
   test('suppresses retries and reports inside the backoff window, then refreshes at its deadline', async () => {
     const clock = createClock(0);
     const reported: RefreshFailureInfo[] = [];

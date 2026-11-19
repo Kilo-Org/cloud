@@ -18,6 +18,7 @@ import {
   type OpenAiChatGptStoredConnection,
 } from './store';
 import { isOpenAiModelServed } from './served-models';
+import { OPENAI_CHATGPT_PROVIDER_ID } from './provider-id';
 import { OPENAI_CHATGPT_API_KEY_ENV, OPENAI_CHATGPT_API_URL } from './upstream';
 
 /**
@@ -25,11 +26,6 @@ import { OPENAI_CHATGPT_API_KEY_ENV, OPENAI_CHATGPT_API_URL } from './upstream';
  * has an enabled connection, an eligible OpenAI model is served by api.openai.com
  * on the delegated token instead of a managed gateway.
  */
-
-/** The delegated upstream URL, shared with the served-model lookup. */
-export { OPENAI_CHATGPT_API_URL };
-
-export { OPENAI_CHATGPT_API_KEY_ENV };
 
 /**
  * The delegated access token travels in its own upstream header. `extraHeaders`
@@ -91,8 +87,11 @@ export function withTraceabilityMetadata(
 
   const merged: Record<string, string> = { ...(metadata ?? {}), ...traceability };
   const removable = Object.keys(merged).filter(key => !(key in traceability));
-  while (Object.keys(merged).length > METADATA_ENTRY_LIMIT && removable.length > 0) {
-    delete merged[removable.shift() as string];
+  const excess = Object.keys(merged).length - METADATA_ENTRY_LIMIT;
+  if (excess > 0) {
+    for (const key of removable.slice(0, excess)) {
+      delete merged[key];
+    }
   }
   return merged;
 }
@@ -188,21 +187,6 @@ function openAiChatGptOwnerCandidates(input: OpenAiChatGptRoutingInput): OpenAiC
 }
 
 /**
- * An enabled, readable ChatGPT connection makes a delegated OpenAI model
- * eligible. The partner project key is deliberately not part of this check: a
- * missing deployment credential must not hide the person's connection state.
- * The delegated-token flow is accepted only by `POST /v1/responses`: a
- * `chat/completions` request for the same model keeps its current route, and
- * declaring `chat_completions` support here would make the gateway answer the
- * person with an api-kind error instead of their existing provider.
- */
-export async function isOpenAiChatGptEligible(input: OpenAiChatGptRoutingInput): Promise<boolean> {
-  const [owner] = openAiChatGptOwnerCandidates(input);
-  if (!owner) return false;
-  return (await eligibleUpstreamModelForOwner(input, owner)) !== null;
-}
-
-/**
  * Whether a stored row may serve traffic. The payload's `status` mirrors a save
  * or a terminal failure, but a person can also disable the row through the
  * ordinary BYOK toggle, which leaves the payload saying `connected`. Both the
@@ -227,10 +211,6 @@ async function eligibleUpstreamModelForOwner(
   );
   if (!upstreamModel) return null;
 
-  // The catalog can list an OpenAI model the plain API does not serve. A
-  // `-pro` slug such as `openai/gpt-5.6-luna-pro` is a reasoning mode on the
-  // base model, not an API model id, so sending it upstream fails the request.
-  // Only a model this project actually serves may take the delegated route.
   if (!(await isOpenAiModelServed(getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV), upstreamModel))) {
     return null;
   }
@@ -396,8 +376,8 @@ export function buildOpenAiChatGptProvider(
   if (apiKey.trim().length === 0) return null;
 
   return {
-    type: 'openai-chatgpt',
-    inferenceProviderId: 'openai-chatgpt',
+    type: OPENAI_CHATGPT_PROVIDER_ID,
+    inferenceProviderId: OPENAI_CHATGPT_PROVIDER_ID,
     ...(owner ? { chatGptOwner: owner } : {}),
     apiUrl: OPENAI_CHATGPT_API_URL,
     apiUrlOverrides: {},

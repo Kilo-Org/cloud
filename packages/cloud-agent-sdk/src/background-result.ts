@@ -45,7 +45,7 @@ export function backgroundOutcome(
 
 export function backgroundResultLabel(result: BackgroundResult): string {
   if (result.kind === 'notice') return 'Agent notice';
-  const name = result.kind === 'shell' ? 'Shell' : result.agent || 'Agent';
+  const name = result.kind === 'shell' ? 'Shell' : result.agent || 'Subagent';
   return `${name.charAt(0).toUpperCase()}${name.slice(1)} ${result.outcome === 'unknown' ? 'ended' : result.outcome}`;
 }
 
@@ -63,6 +63,7 @@ export function projectBackgroundResult(
   message: Kilo2Message,
   result: BackgroundResult
 ): Kilo2Message {
+  const metadata = z.record(z.string(), z.unknown()).safeParse(message['metadata']);
   return {
     ...message,
     type: 'assistant',
@@ -76,7 +77,7 @@ export function projectBackgroundResult(
         state: {
           input: {},
           metadata: {
-            ...z.record(z.string(), z.unknown()).parse(message['metadata']),
+            ...(metadata.success ? metadata.data : {}),
             backgroundResult: result,
           },
           content: [{ type: 'text', text: result.output }],

@@ -6,7 +6,7 @@ import { NewSessionConfigureForm } from '@/components/agents/new-session-configu
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { ScreenHeader } from '@/components/screen-header';
-import { i18n } from '@/i18n';
+import { trialRefusalMessage } from '@/lib/trial-refusal-copy';
 
 // Development-only visual fixture, opened through the development fixture link.
 // Renders the real new-session body in the state a lapsed organization's plan
@@ -14,6 +14,11 @@ import { i18n } from '@/i18n';
 // own verdict, so the form shows the plan explanation under the composer and
 // keeps Start in its disabled style. Nothing can spawn from here, which is why
 // the fixture is safe on the account that runs it.
+//
+// `canManageBilling` paints the other reader of the same state: the sentence
+// that offers the step, and the billing step itself. The fixture supplies the
+// action explicitly so the design gate captures both readers without an
+// organization whose role it would have to switch.
 const INSTANCE: InstancePickerInstance = {
   connectionId: 'fixture-remote-instance',
   name: 'fixture-laptop',
@@ -30,7 +35,9 @@ const MODEL_OPTIONS: ModelOption[] = [
 
 const noop = (): void => undefined;
 
-export function NewSessionPlanRefusalFixture() {
+export function NewSessionPlanRefusalFixture({
+  canManageBilling = false,
+}: Readonly<{ canManageBilling?: boolean }>) {
   const { t } = useTranslation();
   const voiceInputSettlerRef = useRef<(() => Promise<boolean>) | null>(null);
 
@@ -99,7 +106,12 @@ export function NewSessionPlanRefusalFixture() {
         isSpawningRemote={false}
         isStartDisabled
         onStartSession={noop}
-        planRefusal={i18n.t('common.organizationTrialEnded')}
+        planRefusal={trialRefusalMessage(canManageBilling)}
+        planRefusalAction={
+          canManageBilling
+            ? { label: t('organization.hub.manageBilling'), onPress: noop }
+            : undefined
+        }
       />
     </View>
   );

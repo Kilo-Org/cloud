@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one hydration harness drives all four settings screens; splitting it would duplicate the mock set and the frame recorder */
 // Regression for the four Security Agent settings screens that hydrate their
 // draft from the loaded config in an effect. A body painted before that
 // hydration shows the default draft and then moves every control below it once
@@ -45,9 +46,28 @@ const save = vi.hoisted(() => ({ mutateAsync: vi.fn(), isPending: false }));
 // events turns them into one frame per body render.
 const record = vi.hoisted(() => ({ events: [] as Event[] }));
 
+vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
+vi.mock('@/components/ui/icons', () => ({
+  Bell: 'Bell',
+  Brain: 'Brain',
+  Check: 'Check',
+  CircleCheck: 'CircleCheck',
+  Clock: 'Clock',
+  Clock3: 'Clock3',
+  Cpu: 'Cpu',
+  FolderGit2: 'FolderGit2',
+  GitPullRequest: 'GitPullRequest',
+  ScanSearch: 'ScanSearch',
+  Search: 'Search',
+  ShieldCheck: 'ShieldCheck',
+  Trash2: 'Trash2',
+  Wrench: 'Wrench',
+  Zap: 'Zap',
+}));
 vi.mock('react-native', () => ({
   View: ({ children }: { children?: ReactNode }): ReactNode => children ?? null,
   Alert: { alert: vi.fn() },
+  Platform: { OS: 'android' },
   Pressable: (props: {
     children?: ReactNode;
     accessibilityRole?: string;
@@ -64,6 +84,9 @@ vi.mock('react-native', () => ({
     }
     return props.children ?? null;
   },
+}));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: vi.fn(), back: vi.fn(), push: vi.fn() }),
@@ -120,7 +143,6 @@ vi.mock('@/components/ui/configure-row', () => ({
     return null;
   },
 }));
-vi.mock('@/components/ui/icons', () => ({ Brain: 'Brain', Search: 'Search', Wrench: 'Wrench' }));
 vi.mock('@/components/ui/radio-group', () => ({
   RadioGroup: (props: { children?: ReactNode }): ReactNode => props.children ?? null,
   radioItemA11y: ({
@@ -158,8 +180,8 @@ vi.mock('@/components/security-agent/settings-pill-group', () => ({
 vi.mock('@/components/security-agent/settings-save-button', () => ({
   SettingsSaveButton: 'SettingsSaveButton',
 }));
-vi.mock('@/components/security-agent/settings-toggle-row', () => ({
-  ToggleRow: (props: { value: boolean }): null => {
+vi.mock('@/components/ui/preference-row', () => ({
+  PreferenceRow: (props: { value: boolean }): null => {
     record.events.push({ kind: 'toggle', value: props.value });
     return null;
   },

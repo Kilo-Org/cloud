@@ -18,7 +18,8 @@ import {
   resolveGatewayCaller,
   resolveOrganizationGatewaySettings,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
-import { hasBestEffortGuessDataCollectionRequirement } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isDeniedByProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   gatewayRateLimitKey,
@@ -40,7 +41,13 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
   ...jest.requireActual<Record<string, unknown>>(
     '@kilocode/web-shared/lib/ai-gateway/is-free-model'
   ),
-  hasBestEffortGuessDataCollectionRequirement: jest.fn(),
+  isDeniedByProviderPrivacy: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog'
+  ),
+  isCustomLlm: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit', () => ({
   gatewayRateLimitKey: jest.fn(),
@@ -281,6 +288,46 @@ describe('organizationProviderPreferences', () => {
     });
   });
 
+  it('keeps the request provider options while the organization limits the routes', () => {
+    expect(
+      organizationProviderPreferences({
+        decision: {
+          allowed: true,
+          eligibleProviderRoutes: new Set(['openai', 'azure', 'virtual']),
+        },
+        settings: { data_collection: 'deny' },
+        requestProvider: {
+          only: ['openai', 'anthropic'],
+          ignore: ['azure'],
+          order: ['openai', 'azure'],
+          zdr: true,
+        },
+      })
+    ).toEqual({
+      kind: 'allowed',
+      provider: {
+        only: ['openai'],
+        ignore: ['azure'],
+        order: ['openai', 'azure'],
+        zdr: true,
+        data_collection: 'deny',
+      },
+    });
+  });
+
+  it('rejects a request whose providers the organization routes exclude', () => {
+    const preferences = organizationProviderPreferences({
+      decision: { allowed: true, eligibleProviderRoutes: new Set(['openai']) },
+      settings: { data_collection: 'allow' },
+      requestProvider: { only: ['anthropic'], zdr: true },
+    });
+
+    expect(preferences.kind).toBe('rejected');
+    if (preferences.kind === 'rejected') {
+      expect(preferences.response.status).toBe(404);
+    }
+  });
+
   it.each([
     { organization: 'allow', request: 'deny' },
     { organization: 'deny', request: 'allow' },
@@ -302,19 +349,37 @@ describe('organizationProviderPreferences', () => {
 describe('dataCollectionPolicyRejection', () => {
   const model = 'vendor/model';
 
+  beforeEach(() => {
+    jest.mocked(isCustomLlm).mockResolvedValue(false);
+  });
+
   it.each<OpenRouterProviderConfig>([
     { data_collection: 'deny' },
     { zdr: true },
     { data_collection: 'allow', zdr: true },
-  ])('rejects a model requiring data collection under %j', async provider => {
-    jest.mocked(hasBestEffortGuessDataCollectionRequirement).mockResolvedValue(true);
+  ])('rejects a model the provider privacy rules out under %j', async provider => {
+    jest.mocked(isDeniedByProviderPrivacy).mockResolvedValue(true);
 
     const response = await dataCollectionPolicyRejection(model, provider);
 
-    expect(hasBestEffortGuessDataCollectionRequirement).toHaveBeenCalledWith(model);
+    expect(isDeniedByProviderPrivacy).toHaveBeenCalledWith(model, provider);
     expect(response?.status).toBe(400);
     await expect(response?.json()).resolves.toMatchObject({
       error_type: ProxyErrorType.data_collection_required,
+      error: expect.stringContaining('Data collection is required'),
+    });
+  });
+
+  it('rejects a custom LLM under zdr as unavailable for zero data retention', async () => {
+    jest.mocked(isCustomLlm).mockResolvedValue(true);
+    jest.mocked(isDeniedByProviderPrivacy).mockResolvedValue(true);
+
+    const response = await dataCollectionPolicyRejection(model, { zdr: true });
+
+    expect(response?.status).toBe(400);
+    await expect(response?.json()).resolves.toMatchObject({
+      error_type: ProxyErrorType.data_collection_required,
+      error: expect.stringContaining('Zero data retention is not available'),
     });
   });
 
@@ -323,20 +388,12 @@ describe('dataCollectionPolicyRejection', () => {
     {},
     { data_collection: 'allow' },
     { zdr: false },
-  ])('admits a model requiring data collection under %j', async provider => {
-    jest.mocked(hasBestEffortGuessDataCollectionRequirement).mockResolvedValue(true);
+    { data_collection: 'deny' },
+  ])('admits a model the provider privacy does not rule out under %j', async provider => {
+    jest.mocked(isDeniedByProviderPrivacy).mockResolvedValue(false);
 
     await expect(dataCollectionPolicyRejection(model, provider)).resolves.toBeNull();
   });
-
-  it.each<OpenRouterProviderConfig>([{ data_collection: 'deny' }, { zdr: true }])(
-    'admits a model without a data collection requirement under %j',
-    async provider => {
-      jest.mocked(hasBestEffortGuessDataCollectionRequirement).mockResolvedValue(false);
-
-      await expect(dataCollectionPolicyRejection(model, provider)).resolves.toBeNull();
-    }
-  );
 });
 
 describe('gatewayUsageContextBase', () => {

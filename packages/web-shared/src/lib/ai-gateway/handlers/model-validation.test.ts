@@ -1,12 +1,15 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
+import { TRPCError } from '@trpc/server';
 import { NextRequest, NextResponse } from 'next/server';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getDirectByokModelsForUser } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { listUsableCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
+import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
+import { addAutoRoutingModels } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
 import type * as Drizzle from '@kilocode/web-shared/lib/drizzle';
 import { handleModelValidationRequest } from './model-validation';
 
@@ -14,12 +17,25 @@ jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
   getEnhancedOpenRouterModels: jest.fn(),
+  buildAutoModelCatalogEntry: (model: { id: string; name: string }) => ({
+    id: model.id,
+    name: model.name,
+  }),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForUser: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
   listUsableCustomRouters: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/organizations/organization-models', () => ({
+  getAvailableModelsForOrganization: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-models', () => ({
+  addAutoRoutingModels: jest.fn(async (models: unknown[]) => models),
+  addCustomRouterModels: jest.requireActual(
+    '@kilocode/web-shared/lib/ai-gateway/auto-routing-models'
+  ).addCustomRouterModels,
 }));
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
 
@@ -29,6 +45,8 @@ const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetEnhancedOpenRouterModels = jest.mocked(getEnhancedOpenRouterModels);
 const mockedGetDirectByokModelsForUser = jest.mocked(getDirectByokModelsForUser);
 const mockedListUsableCustomRouters = jest.mocked(listUsableCustomRouters);
+const mockedGetAvailableModelsForOrganization = jest.mocked(getAvailableModelsForOrganization);
+const mockedAddAutoRoutingModels = jest.mocked(addAutoRoutingModels);
 
 function makeModel(id: string): OpenRouterModel {
   return {
@@ -67,6 +85,8 @@ describe('POST /api/openrouter/models/validate', () => {
     mockedGetEnhancedOpenRouterModels.mockResolvedValue({ data: [makeModel('available/model')] });
     mockedGetDirectByokModelsForUser.mockResolvedValue([]);
     mockedListUsableCustomRouters.mockResolvedValue([]);
+    mockedGetAvailableModelsForOrganization.mockResolvedValue({ data: [] } as never);
+    mockedAddAutoRoutingModels.mockImplementation(async models => models);
   });
 
   test('confirms a Kilo-eligible catalog model', async () => {
@@ -182,5 +202,139 @@ describe('POST /api/openrouter/models/validate', () => {
     const response = await handleModelValidationRequest(request('  available/model  '));
 
     await expect(response.json()).resolves.toEqual({ valid: true });
+  });
+
+  describe('organization-bound credentials', () => {
+    function signInAsOrganizationMember() {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: { id: 'member-1' },
+        organizationId: 'org-1',
+        authFailedResponse: null,
+      } as never);
+    }
+
+    test('answers a member from the organization catalog', async () => {
+      signInAsOrganizationMember();
+      mockedGetAvailableModelsForOrganization.mockResolvedValue({
+        data: [makeModel('org/available')],
+      } as never);
+
+      const response = await handleModelValidationRequest(request('org/available'));
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ valid: true });
+      const [organizationId, subject, audience, options] =
+        mockedGetAvailableModelsForOrganization.mock.calls[0]!;
+      expect(organizationId).toBe('org-1');
+      expect(subject).toEqual({ type: 'member', kiloUserId: 'member-1' });
+      expect(audience).toBe('member');
+      expect(options.fromDb).toBe(readDb);
+      expect(options.countryCode).toBeNull();
+      expect(mockedGetEnhancedOpenRouterModels).not.toHaveBeenCalled();
+      expect(mockedGetDirectByokModelsForUser).not.toHaveBeenCalled();
+    });
+
+    test('reports a model the organization catalog omits as unavailable', async () => {
+      signInAsOrganizationMember();
+      mockedGetAvailableModelsForOrganization.mockResolvedValue({
+        data: [makeModel('org/available')],
+      } as never);
+
+      const response = await handleModelValidationRequest(request('catalog/denied'));
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ valid: false, reason: 'unavailable' });
+      expect(mockedGetEnhancedOpenRouterModels).not.toHaveBeenCalled();
+    });
+
+    test('does not fall back to the personal catalog when the organization has no models', async () => {
+      signInAsOrganizationMember();
+
+      const response = await handleModelValidationRequest(request('available/model'));
+
+      await expect(response.json()).resolves.toEqual({ valid: false, reason: 'unavailable' });
+      expect(mockedGetEnhancedOpenRouterModels).not.toHaveBeenCalled();
+    });
+
+    test('validates a custom router usable in the organization context', async () => {
+      signInAsOrganizationMember();
+      mockedListUsableCustomRouters.mockResolvedValue([
+        {
+          id: '00000000-0000-4000-8000-000000000002',
+          ownerType: 'org',
+          ownerId: 'org-1',
+          slug: 'efficient',
+          name: 'Efficient',
+          baseRouter: 'efficient',
+          mode: 'best_accuracy',
+          entries: [{ kind: 'gateway', model: 'openai/gpt-5.4-mini' }],
+          defaultEntryKey: 'gateway:openai/gpt-5.4-mini',
+        },
+      ]);
+
+      const response = await handleModelValidationRequest(
+        request('kilo-auto/custom/org/efficient')
+      );
+
+      await expect(response.json()).resolves.toEqual({ valid: true });
+      expect(mockedGetAvailableModelsForOrganization).toHaveBeenCalled();
+      expect(mockedListUsableCustomRouters).toHaveBeenCalledWith({
+        userId: 'member-1',
+        organizationId: 'org-1',
+      });
+    });
+
+    test('answers unavailable when the organization routers cannot be listed', async () => {
+      signInAsOrganizationMember();
+      mockedListUsableCustomRouters.mockRejectedValue(new Error('database unavailable'));
+
+      const response = await handleModelValidationRequest(
+        request('kilo-auto/custom/org/efficient')
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ valid: false, reason: 'unavailable' });
+    });
+
+    test('answers unavailable when the membership is not visible', async () => {
+      signInAsOrganizationMember();
+      mockedGetAvailableModelsForOrganization.mockRejectedValue(
+        new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'You do not have direct access to this organization',
+        })
+      );
+
+      const response = await handleModelValidationRequest(request('org/available'));
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ valid: false, reason: 'unavailable' });
+      expect(mockedGetEnhancedOpenRouterModels).not.toHaveBeenCalled();
+    });
+
+    test('reports unavailable when the organization no longer exists', async () => {
+      signInAsOrganizationMember();
+      mockedGetAvailableModelsForOrganization.mockRejectedValue(
+        new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' })
+      );
+
+      const response = await handleModelValidationRequest(request('org/available'));
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ valid: false, reason: 'unavailable' });
+    });
+
+    test('keeps the personal catalog for a personal credential', async () => {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: { id: 'personal-1' },
+        organizationId: null,
+        authFailedResponse: null,
+      } as never);
+
+      const response = await handleModelValidationRequest(request('available/model'));
+
+      await expect(response.json()).resolves.toEqual({ valid: true });
+      expect(mockedGetAvailableModelsForOrganization).not.toHaveBeenCalled();
+    });
   });
 });

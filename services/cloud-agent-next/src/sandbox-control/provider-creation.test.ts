@@ -1,7 +1,12 @@
 import { supervisorStartup } from '../../test/fixtures/supervisor-startup.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ContainerCapacityUnavailableError } from '../container-concurrency.js';
+import {
+  ContainerCapacityUnavailableError,
+  getContainerCapacityFailureReason,
+} from '../container-concurrency.js';
 import { containerLimitError } from '../container-limit-test-helpers.js';
+import { messageFailureText } from '../control-plane/session/failure-messages.js';
+import { logger } from '../logger.js';
 import {
   parseSandboxBillingInput,
   type SandboxBillingAdmissionResult,
@@ -238,6 +243,35 @@ describe('cloudflare-containers creation causes', () => {
       await expect(provider.create(intent)).rejects.toBe(denial);
     }
   );
+
+  it('preserves the user-facing limit reason without an RPC failure or retry', async () => {
+    const admit = vi.fn<() => Promise<SandboxBillingAdmissionResult>>().mockResolvedValue({
+      success: false,
+      code: 'container_limit_reached',
+      message: 'Meter capacity rejection',
+    });
+    const withFields = vi.spyOn(logger, 'withFields');
+    try {
+      const error = await cloudflareProvider(admit)
+        .create(intent)
+        .catch((error: unknown) => error);
+      expect(error).toMatchObject({
+        name: 'ContainerUsageAdmissionError',
+        code: 'container_limit_reached',
+        message: 'Meter capacity rejection',
+      });
+      const reason = getContainerCapacityFailureReason(error);
+      expect(reason).toBe('container_limit_reached');
+      expect(messageFailureText(reason ?? '')).toBe(
+        'Container limit reached. Stop an existing container before starting another.'
+      );
+      expect(admit).toHaveBeenCalledOnce();
+      expect(withFields).not.toHaveBeenCalled();
+    } finally {
+      withFields.mockRestore();
+    }
+  });
+
   it.each([
     'insufficient_credits',
     'stopping',
@@ -486,6 +520,20 @@ describe('Vercel runtime metadata', () => {
       expect(provider.describeRuntime?.(providerRef)?.snapshotId).toBe(expectedSnapshot);
     }
   );
+
+  it('reads a ref that a newer Worker wrote and drops the fields it does not know', () => {
+    const known = {
+      sandboxName: SANDBOX_ID,
+      sessionId: 'physical-session',
+      metadata: { region: 'iad1' },
+    };
+    const newerRef = JSON.stringify({
+      ...known,
+      addedLater: 'value',
+      metadata: { ...known.metadata, addedLater: 1 },
+    });
+    expect(decodeVercelProviderRef(newerRef)).toEqual(known);
+  });
 
   it('reads old refs without metadata using the configured snapshot and no region', () => {
     const provider = createVercelProviderAdapter({

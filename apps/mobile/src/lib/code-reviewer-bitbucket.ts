@@ -103,21 +103,42 @@ export type BitbucketFailure =
   | { readonly kind: 'retryable'; readonly message: string };
 
 /**
- * The copy each failure renders, named so a new kind cannot skip its sentence.
- * Every key is one the catalogs already carry: a refusal the user can act on
- * names the connection that refused, and a transport failure points at the
- * connection rather than at Bitbucket's reply.
+ * The surface that submitted the token which Bitbucket refused. A first
+ * connect pasted the very token that was refused, so the honest sentence names
+ * the bad token; a stored-token surface submitted or re-read a token the
+ * connection had already accepted, so the connection it sits on is what
+ * expired.
+ */
+export type BitbucketTokenRefusal = 'first-connect' | 'replace-token';
+
+/**
+ * The copy the failure kinds that have exactly one sentence render, named so a
+ * new kind cannot skip its sentence. Every key is one the catalogs already
+ * carry: a refusal the user can act on names the connection that refused, and
+ * a transport failure points at the connection rather than at Bitbucket's
+ * reply. `token-refused` is the one kind with two truths — the same refusal
+ * reads as a bad pasted token on a first connect but as an expired connection
+ * once a stored token has been replaced or re-read — so its copy lives with
+ * the axis above.
  */
 const FAILURE_COPY_KEY = {
-  // Bitbucket refused the saved token: the connection behind it is expired and
-  // only a replacement token revives it.
-  'token-refused': 'prReview.reconnectNotice.bitbucketTitle',
   // The same role rule the integration page states: an owner, admin or billing
   // manager is who can connect the workspace.
-  'role-refused': 'prReview.connect.bitbucketAdminOnlyDescription',
+  'role-refused': 'prReview.connect.adminOnlyConnectDescription',
   'connection-changed': 'prReview.connect.checkFailedTitleBitbucket',
   retryable: 'prReview.connect.providerCheckFailedMessage',
-} as const satisfies Record<BitbucketFailure['kind'], string>;
+} as const satisfies Record<Exclude<BitbucketFailure['kind'], 'token-refused'>, string>;
+
+/**
+ * The two sentences a refused token renders. Kept side by side with the axis
+ * above so a new refusal surface cannot be wired without naming its truth:
+ * one is what a first connect needs (the pasted token is wrong), the other is
+ * what a stored-token surface shows (the connection expired).
+ */
+const TOKEN_REFUSED_COPY_KEY = {
+  'first-connect': 'codeReviewer.bitbucketConnect.tokenRefused',
+  'replace-token': 'prReview.reconnectNotice.bitbucketTitle',
+} as const satisfies Record<BitbucketTokenRefusal, string>;
 
 /**
  * The server's denial sentences for a caller who may not manage organization
@@ -158,11 +179,20 @@ function failureKind(error: unknown): BitbucketFailure['kind'] {
   return 'retryable';
 }
 
-/** The failure copy a surface renders for one kind of connection failure. */
+/**
+ * The failure copy a surface renders for one kind of connection failure. The
+ * submitting surface names its side of the refusal axis: a token Bitbucket
+ * refused has two honest sentences, and only the surface knows whether it
+ * pasted a first token that never worked or sat on a connection whose token
+ * has stopped working.
+ */
 export function bitbucketConnectionFailure(
   error: unknown,
-  translate: (key: string) => string
+  translate: (key: string) => string,
+  tokenRefusal: BitbucketTokenRefusal
 ): BitbucketFailure {
   const kind = failureKind(error);
-  return { kind, message: translate(FAILURE_COPY_KEY[kind]) };
+  return kind === 'token-refused'
+    ? { kind, message: translate(TOKEN_REFUSED_COPY_KEY[tokenRefusal]) }
+    : { kind, message: translate(FAILURE_COPY_KEY[kind]) };
 }

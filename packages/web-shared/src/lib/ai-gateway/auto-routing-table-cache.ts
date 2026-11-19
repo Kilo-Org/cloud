@@ -3,11 +3,17 @@ import { getBenchmarkRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/au
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 
 const ROUTING_TABLE_TTL_MS = 5 * 60 * 1000;
+// Model listings and auto-routed requests wait on a refresh, so a stalled worker
+// times out into the last-known-good table instead of holding the response.
+const ROUTING_TABLE_FETCH_TIMEOUT_MS = 3_000;
 
 function createCachedRoutingTable(router: AutoRouter) {
   return createCachedFetch(
     async () => {
-      const result = await getBenchmarkRoutingTable(router);
+      const result = await getBenchmarkRoutingTable(
+        router,
+        AbortSignal.timeout(ROUTING_TABLE_FETCH_TIMEOUT_MS)
+      );
       if (result.status === 200 && 'table' in result.body) {
         // `table` may be null, meaning no routing is configured — a valid state to cache.
         return result.body.table;

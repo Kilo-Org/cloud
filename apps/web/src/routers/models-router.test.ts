@@ -76,7 +76,7 @@ function caller() {
 }
 
 describe('modelsRouter.list', () => {
-  it('preserves the existing compact shape and adds variants and alias_target', async () => {
+  it('preserves the compact shape and adds variants, alias_target, and provider ids', async () => {
     mockGetEnhancedOpenRouterModels.mockResolvedValue({
       data: [
         {
@@ -85,6 +85,7 @@ describe('modelsRouter.list', () => {
           architecture: { input_modalities: ['text', 'image'] },
           opencode: { variants: { high: {}, low: {} } },
           alias_target: 'provider/target',
+          inference_provider_ids: ['provider', 'other-provider'],
         },
         {
           id: 'provider/plain',
@@ -110,6 +111,7 @@ describe('modelsRouter.list', () => {
         supportsVision: true,
         isPreferred: true,
         variants: ['high', 'low'],
+        inference_provider_ids: ['provider', 'other-provider'],
         alias_target: 'provider/target',
       },
       {
@@ -118,6 +120,7 @@ describe('modelsRouter.list', () => {
         supportsVision: false,
         isPreferred: false,
         variants: [],
+        inference_provider_ids: [],
       },
       {
         id: 'provider/no-settings',
@@ -125,6 +128,7 @@ describe('modelsRouter.list', () => {
         supportsVision: false,
         isPreferred: false,
         variants: [],
+        inference_provider_ids: [],
       },
     ]);
   });

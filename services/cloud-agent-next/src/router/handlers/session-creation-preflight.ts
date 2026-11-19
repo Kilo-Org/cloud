@@ -2,7 +2,10 @@ import { TRPCError } from '@trpc/server';
 import type { WorkerDb } from '@kilocode/db/client';
 import {
   getBuiltinAgentSettings,
+  getModelContextLimits,
+  getWebSearchPreference,
   hasBuiltinAgentSettings,
+  hasModelContextLimits,
   loadEnvironmentForSession,
   mergeProfileConfiguration,
   profileMcpServersToClientRecord,
@@ -14,14 +17,14 @@ import {
   type EnvironmentSessionLayer,
   type InlineAgentInput,
   type MergeProfileConfigurationResult,
+  type ModelContextLimits,
   type ProfileOwner,
+  type WebSearchPreference,
 } from '@kilocode/cloud-agent-profile';
 import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
 import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
-import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import { getPgDb } from '../../db/pg.js';
 import { assertKiloModelAvailable } from '../../model-validation.js';
-import { CurrentSessionMetadataSchema } from '../../persistence/session-metadata.js';
 import { SessionProfileBundleSchema } from '../../persistence/schemas.js';
 import type { SessionProfileBundle } from '../../session-profile.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
@@ -35,7 +38,7 @@ import type { TRPCContext } from '../../types.js';
 import { isBuiltinMode } from '../schemas.js';
 import { assertOrganizationMembership } from './organization-membership.js';
 import { assertRequestedRepositories } from './requested-environment-repositories.js';
-import { getSandboxSessionStub, type SessionStub } from '../../sandbox-session/session-stub.js';
+import { getWorkspaceStub } from '../../control-plane/workspace/workspace-stub.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { validateBalanceOnly } from '../../balance-validation.js';
 import { timingSafeEqual } from '@kilocode/encryption';
@@ -193,9 +196,19 @@ async function resolveProfileForSessionCreateRequest(
 function applyProfileResolution(
   input: SessionCreateRequest,
   resolved: MergeProfileConfigurationResult | null,
-  builtinAgents: BuiltinAgentSettings
+  builtinAgents: BuiltinAgentSettings,
+  modelContextLimits: ModelContextLimits,
+  webSearchPreference: WebSearchPreference
 ): SessionCreateRequest {
+  const webSearch = {
+    webSearchDisabled: webSearchPreference === 'off' ? (true as const) : undefined,
+    webSearchProvider:
+      webSearchPreference === 'off' || webSearchPreference === 'default'
+        ? undefined
+        : webSearchPreference,
+  };
   const hasBuiltinAgents = hasBuiltinAgentSettings(builtinAgents);
+  const hasContextLimits = hasModelContextLimits(modelContextLimits);
   if (!resolved) {
     return {
       ...input,
@@ -210,6 +223,8 @@ function applyProfileResolution(
           runtimeSkills: input.profile?.overrides?.runtimeSkills,
           runtimeAgents: input.profile?.overrides?.runtimeAgents,
           ...(hasBuiltinAgents ? { builtinAgents } : {}),
+          ...(hasContextLimits ? { modelContextLimits } : {}),
+          ...webSearch,
         },
       },
     };
@@ -235,6 +250,8 @@ function applyProfileResolution(
         runtimeSkills: resolved.skills,
         runtimeAgents: resolved.agents,
         ...(hasBuiltinAgents ? { builtinAgents } : {}),
+        ...(hasContextLimits ? { modelContextLimits } : {}),
+        ...webSearch,
         kiloCommands: resolved.kiloCommands ?? input.profile?.resolved?.kiloCommands,
         runtimeInstructions: resolved.instructions ?? input.profile?.resolved?.runtimeInstructions,
       },
@@ -278,6 +295,40 @@ async function loadBuiltinAgentSettingsForSession(
   }
 }
 
+async function loadModelContextLimitsForSession(
+  ctx: Pick<TRPCContext, 'env' | 'userId'>,
+  db?: WorkerDb
+): Promise<ModelContextLimits> {
+  try {
+    return await getModelContextLimits(db ?? getPgDb(ctx.env), ctx.userId);
+  } catch (error) {
+    logger
+      .withFields({
+        userId: ctx.userId,
+        errorClass: error instanceof Error ? error.name : typeof error,
+      })
+      .warn('Unable to load model context limit preferences; using defaults');
+    return {};
+  }
+}
+
+async function loadWebSearchPreferenceForSession(
+  ctx: Pick<TRPCContext, 'env' | 'userId'>,
+  db?: WorkerDb
+): Promise<WebSearchPreference> {
+  try {
+    return await getWebSearchPreference(db ?? getPgDb(ctx.env), ctx.userId);
+  } catch (error) {
+    logger
+      .withFields({
+        userId: ctx.userId,
+        errorClass: error instanceof Error ? error.name : typeof error,
+      })
+      .warn('Unable to load web search preferences; using defaults');
+    return 'default';
+  }
+}
+
 export async function resolveEffectiveSessionConfiguration(
   ctx: Pick<TRPCContext, 'env' | 'userId'>,
   input: SessionCreateRequest,
@@ -292,14 +343,24 @@ export async function resolveEffectiveSessionConfiguration(
   });
   // An environment resolves only under the implicit-defaults policy, so the
   // profile path always runs when one exists.
-  const [resolved, builtinAgents] = await Promise.all([
+  const [resolved, builtinAgents, modelContextLimits, webSearchPreference] = await Promise.all([
     shouldResolveProfile(input, policy)
       ? resolveProfileForSessionCreateRequest(ctx, input, environment?.layer, db)
       : Promise.resolve(null),
     loadBuiltinAgentSettingsForSession(ctx, db),
+    loadModelContextLimitsForSession(ctx, db),
+    input.options?.kilocodeOrganizationId
+      ? Promise.resolve('default' as const)
+      : loadWebSearchPreferenceForSession(ctx, db),
   ]);
 
-  const resolvedRequest = applyProfileResolution(input, resolved, builtinAgents);
+  const resolvedRequest = applyProfileResolution(
+    input,
+    resolved,
+    builtinAgents,
+    modelContextLimits,
+    webSearchPreference
+  );
   assertResolvedConfigurationWithinSessionLimits(resolvedRequest.profile?.resolved);
   // The reference and the allocation travel beside the merged configuration;
   // a client cannot set them.
@@ -340,52 +401,6 @@ type InheritedEgressPolicy = {
   egressAllowlist?: string[];
   egressAudit?: boolean;
 };
-
-function parentPolicyUnavailableError(): TRPCError {
-  return new TRPCError({
-    code: 'INTERNAL_SERVER_ERROR',
-    message: 'Cloud Agent parent policy unavailable',
-  });
-}
-
-/**
- * Reads the policy the authorized parent recorded when it was created. The
- * environment's current settings do not apply to an existing parent.
- */
-async function readParentEgressPolicy(
-  getStub: () => SessionStub,
-  authority: CloudAgentAuthority
-): Promise<InheritedEgressPolicy | undefined> {
-  let raw: unknown;
-  try {
-    raw = await withDORetry(getStub, parent => parent.getMetadata(), 'getMetadata');
-  } catch {
-    throw parentPolicyUnavailableError();
-  }
-
-  // The RPC returns the current grouped schema, but revalidate so a malformed
-  // or legacy payload cannot be read as an unrestricted parent.
-  const parsed = CurrentSessionMetadataSchema.safeParse(raw);
-  if (!parsed.success) throw parentPolicyUnavailableError();
-  const metadata = parsed.data;
-  if (
-    metadata.identity.sessionId !== authority.parentSessionId ||
-    metadata.identity.userId !== authority.ownerId ||
-    (metadata.identity.orgId ?? null) !== authority.organizationId
-  ) {
-    throw parentPolicyUnavailableError();
-  }
-
-  const workspace = metadata.workspace;
-  if (workspace?.egressMode !== 'allowlist' && workspace?.egressAudit !== true) return undefined;
-  return {
-    egressMode: workspace.egressMode ?? 'unrestricted',
-    ...(workspace.egressMode === 'allowlist'
-      ? { egressAllowlist: workspace.egressAllowlist ?? [] }
-      : {}),
-    ...(workspace.egressAudit === true ? { egressAudit: true } : {}),
-  };
-}
 
 export function assertModeAvailableForProfile(
   mode: string,
@@ -458,17 +473,19 @@ export async function preflightSessionCreation(
     ) {
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Cloud Agent parent binding mismatch' });
     }
-    const parentStub = () => getSandboxSessionStub(ctx.env, ctx.userId, authority.parentSessionId);
     let token: string;
     let parentCreatedOnPlatform: string | undefined;
     try {
-      const parent = await withDORetry(
-        parentStub,
-        stub => stub.getCloudAgentSpawnContext(authority),
-        'getCloudAgentSpawnContext'
+      // The workspace records the policy it was created with; the environment's
+      // current settings do not apply to an existing workspace.
+      const workspace = await withDORetry(
+        () => getWorkspaceStub(ctx.env, ctx.userId, authority.parentSessionId),
+        stub => stub.getSpawnContext(authority),
+        'getSpawnContext'
       );
-      token = parent.token;
-      parentCreatedOnPlatform = parent.createdOnPlatform;
+      token = workspace.token;
+      parentCreatedOnPlatform = workspace.createdOnPlatform;
+      inheritedEgress = workspace.egress;
     } catch {
       throw new TRPCError({
         code: 'FORBIDDEN',
@@ -485,7 +502,6 @@ export async function preflightSessionCreation(
       ...request.options,
       createdOnPlatform: parentCreatedOnPlatform,
     };
-    inheritedEgress = await readParentEgressPolicy(parentStub, authority);
     const internalApiKey = ctx.request?.headers.get('x-internal-api-key');
     const skipBalance =
       ctx.request?.headers.get('x-skip-balance-check') === 'true' &&

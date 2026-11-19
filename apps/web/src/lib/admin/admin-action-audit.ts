@@ -13,6 +13,7 @@ import {
   adminTierFor,
   authViaTokenFromHeaders,
   clientIpFromHeaders,
+  routeFromHeaders,
   type AdminAccessAttribution,
   type AdminAuditContext,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
@@ -137,7 +138,9 @@ export async function recordAdminActions(
       adminTier: adminTierFor(ctx.user),
       authVia: ctx.authViaToken ? 'token' : 'session',
       tokenSource: ctx.tokenSource ?? null,
-      route: ctx.trpcPath ?? null,
+      // A caller that names its own path (a tRPC procedure, or a route handler
+      // that sets one) wins over the best-effort route from the request headers.
+      route: ctx.trpcPath ?? ctx.auditRoute ?? null,
       ip: ctx.ip ?? null,
       targetType: entry.target?.type ?? null,
       targetId: entry.target?.id ?? null,
@@ -173,13 +176,10 @@ const EMAIL_ADDRESS_PATTERN = /[\p{L}\p{N}][^\s@]*@[^\s@]+\.[\p{L}\p{M}]{2,}/gu;
  * browsable by every platform admin, and the target user records hold block
  * reason, admin note and credit transaction description that admins read too.
  *
- * The local part is the whole non-space run after its first letter or digit, so
- * no fragment of it survives whatever form the address was pasted in, while
- * prose punctuation that precedes the address stays in the text. The domain
- * match accepts Unicode letters and combining marks. The
- * match requires a dotted domain of at least two letters: an intranet host
- * without a dot, and a bracketed IP literal, are not treated as customer
- * addresses and stay in the text.
+ * The domain match accepts Unicode letters and combining marks and requires a
+ * dotted domain of at least two letters: an intranet host without a dot, and a
+ * bracketed IP literal, are not treated as customer addresses and stay in the
+ * text.
  */
 export function redactEmailAddressesInAuditText(text: string): string {
   return text.replace(EMAIL_ADDRESS_PATTERN, '[redacted-email]');
@@ -291,5 +291,6 @@ export function adminActionContextFromHeaders(
     authViaToken: authViaTokenFromHeaders(headersList),
     tokenSource: null,
     ip: clientIpFromHeaders(headersList),
+    auditRoute: routeFromHeaders(headersList) ?? undefined,
   };
 }

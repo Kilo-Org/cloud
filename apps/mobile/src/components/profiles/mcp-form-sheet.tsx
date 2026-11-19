@@ -4,6 +4,7 @@ import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
+import { ERROR_KEYS, errorKeyFor, FIELD_FOR_ERROR } from '@/components/profiles/mcp-form-errors';
 import {
   buildMcpServerPayload,
   initialMcpFormState,
@@ -16,52 +17,19 @@ import {
 import { SheetHeader } from '@/components/sheet-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
+import { RowFrame } from '@/components/ui/row-frame';
+import { RowGroup } from '@/components/ui/row-group';
 import { SegmentedControl } from '@/components/ui/segmented-control';
-import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { MAX_PROFILE_MCP_SERVERS } from '@/lib/agent-profile-forms';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
+import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
-
-/** Catalog key for each refused field, so the message lands under the input at fault. */
-const ERROR_KEYS = {
-  'name-required': 'profiles.mcp.nameRequired',
-  'name-invalid': 'profiles.mcp.nameInvalid',
-  'name-conflict': 'profiles.mcp.nameConflict',
-  'command-required': 'profiles.mcp.commandRequired',
-  'command-too-long': 'profiles.mcp.commandTooLong',
-  'url-required': 'profiles.mcp.urlRequired',
-  'url-invalid': 'profiles.mcp.urlInvalid',
-  'url-too-long': 'profiles.mcp.urlTooLong',
-  'timeout-invalid': 'profiles.mcp.timeoutInvalid',
-  'json-invalid': 'profiles.mcp.jsonInvalid',
-  'record-too-large': 'profiles.mcp.jsonTooLarge',
-} satisfies Record<McpFormError, string>;
-
-/** The field each refused input belongs to, so Save can scroll it into view. */
-const FIELD_FOR_ERROR = {
-  'name-required': 'name',
-  'name-invalid': 'name',
-  'name-conflict': 'name',
-  'command-required': 'command',
-  'command-too-long': 'command',
-  'url-required': 'url',
-  'url-invalid': 'url',
-  'url-too-long': 'url',
-  'timeout-invalid': 'timeout',
-  'json-invalid': 'config',
-  'record-too-large': 'config',
-} satisfies Record<McpFormError, 'name' | 'command' | 'url' | 'config' | 'timeout'>;
-
-function errorKeyFor(
-  t: (key: string) => string,
-  error: McpFormError | null,
-  match: readonly McpFormError[]
-): string | undefined {
-  return error !== null && match.includes(error) ? t(ERROR_KEYS[error]) : undefined;
-}
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { settleSaveAttempt } from '@/lib/surface-feedback';
 
 /**
  * The save's refusal: the per-profile server cap, a name the server already
@@ -89,7 +57,7 @@ type McpFormSheetProps = Readonly<{
    * Persist the validated payload. The caller owns create-vs-update and closes
    * the sheet on success; on failure it returns with the sheet still open.
    */
-  onSave: (payload: McpServerPayload) => void;
+  onSave: (payload: McpServerPayload) => Promise<void>;
   /** The last save refusal, each arm rendered where it belongs in the sheet. */
   saveFailure?: McpSaveFailure | null;
 }>;
@@ -137,6 +105,11 @@ export function McpFormSheet({
     'name' | 'command' | 'url' | 'config' | 'timeout'
   >();
 
+  // One save per Save press burst; see `instruction-form-sheet.tsx`. Its
+  // pending admission closes the burst window the lagging `isSaving` leaves
+  // open, so the dismissal guard reads it too.
+  const { feedback, begin } = useSurfaceFeedback<never>();
+
   const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({
     isDirty: () =>
       nameRef.current !== initial.name ||
@@ -146,10 +119,19 @@ export function McpFormSheet({
       timeoutRef.current !== initial.timeout ||
       type !== initial.type ||
       enabled !== initial.enabled,
+    isRunning: () => isSaving || feedback.status === 'pending',
     onDiscard: onClose,
   });
 
   const submit = () => {
+    void runSubmit();
+  };
+
+  const runSubmit = async () => {
+    const attempt = begin();
+    if (attempt === null) {
+      return;
+    }
     const state = {
       name: nameRef.current,
       type,
@@ -161,12 +143,14 @@ export function McpFormSheet({
     };
     const problem = validateMcpForm(state, existingNames);
     if (problem !== null) {
+      attempt.abandon();
       setError(problem);
       scrollToField(FIELD_FOR_ERROR[problem]);
       return;
     }
     setError(null);
-    onSave(buildMcpServerPayload(state));
+    // The admission rides the save; see `instruction-form-sheet.tsx`.
+    await settleSaveAttempt(attempt, () => onSave(buildMcpServerPayload(state)));
   };
 
   const nameError =
@@ -203,7 +187,7 @@ export function McpFormSheet({
       <ScrollView
         ref={scrollRef}
         className="flex-1"
-        contentContainerClassName="gap-4 px-6 pt-4 pb-8"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
@@ -211,7 +195,7 @@ export function McpFormSheet({
         <AccessibleStatus message={refusalMessage} tone={refusalTone} className="text-sm" />
         {server === null ? (
           <View className="gap-1.5">
-            <Text className="text-sm font-medium text-foreground">{t('profiles.mcp.type')}</Text>
+            <FormFieldLabel label={t('profiles.mcp.type')} />
             <SegmentedControl
               options={typeOptions}
               value={type}
@@ -299,7 +283,7 @@ export function McpFormSheet({
             }}
           />
           {server !== null ? (
-            <Text className="text-xs text-muted-foreground">
+            <Text variant="caption">
               {type === 'local' ? t('profiles.mcp.environmentHint') : t('profiles.mcp.headersHint')}
             </Text>
           ) : null}
@@ -319,17 +303,25 @@ export function McpFormSheet({
           }}
         />
 
-        <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-          <Text {...HIDDEN_LABEL_PROPS} className="flex-1 text-sm font-medium text-foreground">
-            {t('common.enabled')}
-          </Text>
-          <Switch
-            value={enabled}
-            disabled={isSaving}
-            accessibilityLabel={t('common.enabled')}
-            onValueChange={setEnabled}
-          />
-        </View>
+        <RowGroup>
+          <RowFrame
+            trailing={{
+              kind: 'switch',
+              value: enabled,
+              disabled: isSaving,
+              accessibilityLabel: t('common.enabled'),
+              onValueChange: setEnabled,
+            }}
+          >
+            <Text
+              {...HIDDEN_LABEL_PROPS}
+              className="min-w-0 flex-1 text-sm font-medium text-foreground"
+            >
+              {t('common.enabled')}
+            </Text>
+          </RowFrame>
+        </RowGroup>
+        <View className="h-3" />
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
       {dialog}

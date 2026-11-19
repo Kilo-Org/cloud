@@ -102,7 +102,7 @@ export async function getModelVariants(
   model: string,
   allowFallback: boolean
 ): Promise<OpenCodeSettings['variants']> {
-  return (await getGatewayOpenCodeSettings(model, allowFallback))?.variants;
+  return (await getGatewayOpenCodeSettings(model, allowFallback)).variants;
 }
 
 export function getAiSdkProvider(
@@ -129,7 +129,7 @@ function getOpenCodePrompt(model: string): OpenCodePrompt | undefined {
 export async function getGatewayOpenCodeSettings(
   model: string,
   allowFallback: boolean
-): Promise<OpenCodeSettings | undefined> {
+): Promise<OpenCodeSettings> {
   const ai_sdk_provider = getAiSdkProvider(model);
   const reasoning_options = await getModelReasoningOptions(model, allowFallback);
   const variants = toLegacyVariants(reasoning_options, ai_sdk_provider);

@@ -17,8 +17,8 @@ import * as z from 'zod';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { organizations } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
+import { OrganizationSSODomainSchema } from '@kilocode/web-shared/lib/organizations/company-domain';
 import {
-  OrganizationSSODomainSchema,
   type OrganizationSsoConfigView,
   type OrganizationSsoStatusView,
 } from '@kilocode/web-shared/lib/organizations/organization-types';

@@ -233,7 +233,7 @@ jest.mock('@kilocode/web-shared/lib/organizations/non-trial-enterprise', () => (
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/get-provider');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
-  getDirectByokModel: jest.fn(async () => ({ provider: null, model: null })),
+  getDirectByokModel: jest.fn(async () => null),
   supportsCatalogMode: jest.fn(() => false),
   createDirectByokReferenceResolver: jest.fn(async () => async (modelId: string) => modelId),
 }));
@@ -3373,7 +3373,7 @@ describe('organization data-collection policy on provider-policy exempt routes',
 describe('kilo-auto/efficient classifier billing', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedGetDirectByokModel.mockResolvedValue({ provider: null, model: null });
+    mockedGetDirectByokModel.mockResolvedValue(null);
     mockedSupportsCatalogMode.mockReturnValue(false);
     mockedCreateDirectByokReferenceResolver.mockResolvedValue(async modelId => modelId);
     setUserAuth();
@@ -4382,7 +4382,7 @@ describe('custom routers and signed auto decisions', () => {
         bypassAccessCheck: false,
       })
     );
-    mockedGetDirectByokModel.mockResolvedValue({ provider: null, model: null });
+    mockedGetDirectByokModel.mockResolvedValue(null);
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({

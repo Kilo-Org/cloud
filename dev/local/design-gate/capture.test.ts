@@ -11,6 +11,7 @@ import {
   joinPasses,
   linkPath,
   loadingPlaceholder,
+  openResetLink,
   runMatrix,
   sampleInterval,
   sampleUntilSettled,
@@ -601,6 +602,19 @@ test('runMatrix retries a link that leaves the screen unchanged and reports last
       ],
     ]
   );
+});
+
+test('a link to the screen navigation resets to counts as opened when that screen settles', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  state.screen = '(app)/(tabs)/(0_home)';
+  const home = 'kiloapp:///(app)/(tabs)/(0_home)';
+  const ctx = context(fakeDevice(calls, state, { routes: { [home]: '/' } }), fakeProbe(state));
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), [
+    { id: 'home', link: home },
+  ]);
+  assert.equal(calls.filter(call => call === `open:${home}`).length, 1);
+  assert.deepEqual(outcome.findings, []);
 });
 
 test('runMatrix re-sends a link the router routed without painting the screen', async () => {
@@ -1461,4 +1475,57 @@ test('a screen that keeps changing keeps the bracket a mismatch and says so', as
   assert.equal(captureEvidence(ctx, outcome).status, 'mismatch');
   assert.ok(logs.some(line => line.includes('screen still changing before the screenshot')));
   assert.ok(outcome.findings.some(finding => finding.rule === 'unsettled'));
+});
+
+const CLEAR = 'kiloapp:///dev/force-state/clear';
+
+test('openResetLink resends a reset whose send failed and confirms its delivery', async () => {
+  const sends: string[] = [];
+  let outcome = 'none';
+  const probe: ProbeClient = {
+    ...fakeProbe(probeState()),
+    openLink: async url => {
+      sends.push(url);
+      if (sends.length === 1) throw new InfraError('CDP Runtime.evaluate timed out');
+      outcome = `openLink ${url}: opened`;
+    },
+    lastOutcome: async () => outcome,
+  };
+  const ctx = context(fakeDevice([], probeState()), probe);
+  assert.equal(await openResetLink(ctx, CLEAR), undefined);
+  assert.deepEqual(sends, [CLEAR, CLEAR]);
+});
+
+test('openResetLink reports a reset the app never confirms instead of throwing', async () => {
+  const probe: ProbeClient = {
+    ...fakeProbe(probeState()),
+    openLink: async () => undefined,
+    lastOutcome: async () => `openLink ${CLEAR}: pending`,
+  };
+  const ctx = context(fakeDevice([], probeState()), probe);
+  assert.equal(await openResetLink(ctx, CLEAR), `openLink ${CLEAR}: pending`);
+});
+
+test('an unconfirmed reset on the last target skips the next cell and fails the restore', async () => {
+  const state = probeState();
+  const sends: string[] = [];
+  const probe: ProbeClient = {
+    ...fakeProbe(state),
+    openLink: async url => {
+      sends.push(url);
+      state.open?.(url);
+    },
+    lastOutcome: async () => `openLink ${CLEAR}: failed (no route)`,
+  };
+  const ctx = context(fakeDevice([], state), probe);
+  const result = await runMatrix(ctx, matrixCells('android', 'base', ['dark']), [
+    { id: 'forced', link: 'kiloapp://forced', after: CLEAR },
+  ]);
+  assert.deepEqual(
+    result.skipped.map(entry => `${entry.cell}/${entry.target}`),
+    ['dark/forced']
+  );
+  assert.match(result.restoreError ?? '', /forced left a forced state.*still unconfirmed/);
+  // Two sends after the capture, two at the next cell, two in the restore.
+  assert.equal(sends.filter(url => url === CLEAR).length, 6);
 });

@@ -34,6 +34,8 @@ export function normalizeCompanyDomain(input: string): string | null {
 const DOMAIN_REGEX =
   /^(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?\.)+[\p{L}\p{N}][\p{L}\p{N}-]*[\p{L}\p{N}]$/u;
 
+export const INVALID_DOMAIN_MESSAGE = 'Please enter a valid domain (e.g. acme.com)';
+
 /**
  * Validates that a string looks like a valid domain.
  * Accepts ASCII, unicode (IDN), and punycode domains.
@@ -57,6 +59,19 @@ export function normalizeSsoDomain(domain: string): string | null {
 }
 
 /**
+ * Zod schema for an SSO domain: trimmed, lowercased and validated. Unlike
+ * `CompanyDomainSchema`, it accepts bare domains only, never URLs.
+ */
+export const OrganizationSSODomainSchema = z.string().transform((input, ctx) => {
+  const normalized = normalizeSsoDomain(input);
+  if (normalized === null) {
+    ctx.addIssue({ code: 'custom', message: INVALID_DOMAIN_MESSAGE });
+    return z.NEVER;
+  }
+  return normalized;
+});
+
+/**
  * Zod schema that normalizes and validates a company domain.
  *
  * Input: string (bare domain or full URL)
@@ -65,9 +80,4 @@ export function normalizeSsoDomain(domain: string): string | null {
 export const CompanyDomainSchema = z
   .string()
   .transform(normalizeCompanyDomain)
-  .pipe(
-    z
-      .string()
-      .refine(isValidDomain, { message: 'Please enter a valid domain (e.g. acme.com)' })
-      .nullable()
-  );
+  .pipe(z.string().refine(isValidDomain, { message: INVALID_DOMAIN_MESSAGE }).nullable());

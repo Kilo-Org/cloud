@@ -1,5 +1,5 @@
 {
-  "id": "fe7ff2fd-7129-4772-b6c6-b3183dab47ad",
+  "id": "59d0967a-0390-4c3c-a329-703f7b3b8e38",
   "prevId": "1a243d23-704e-44c1-a3a1-863463454480",
   "version": "7",
   "dialect": "postgresql",
@@ -7397,8 +7397,8 @@
             }
           ],
           "isUnique": false,
-          "where": "\"cloud_agent_pending_uploads\".\"status\" = 'pending'",
-          "concurrently": false,
+          "where": "\"cloud_agent_pending_uploads\".\"status\" IN ('pending', 'released')",
+          "concurrently": true,
           "method": "btree",
           "with": {}
         }
@@ -7418,7 +7418,7 @@
       "checkConstraints": {
         "cloud_agent_pending_uploads_status_check": {
           "name": "cloud_agent_pending_uploads_status_check",
-          "value": "\"cloud_agent_pending_uploads\".\"status\" IN ('pending', 'linked', 'reaped')"
+          "value": "\"cloud_agent_pending_uploads\".\"status\" IN ('pending', 'linked', 'released', 'reaped')"
         }
       },
       "isRLSEnabled": false
@@ -28533,13 +28533,6 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
-        },
-        "trial_granted": {
-          "name": "trial_granted",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
         },
         "company_domain": {
           "name": "company_domain",

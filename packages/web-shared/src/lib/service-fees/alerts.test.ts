@@ -4,6 +4,8 @@ import type { captureException as captureSentryException } from '@sentry/nextjs'
 
 import type { sendAdminSlackNotification } from '@kilocode/web-shared/lib/slack/admin-notifications';
 
+// Stand-in for the production error class, so alerts.ts's `instanceof` check
+// and `kind`/`status` reads behave as in production. The tests throw `upstream`.
 class AdminSlackNotificationError extends Error {
   constructor(
     readonly kind: 'network' | 'upstream',

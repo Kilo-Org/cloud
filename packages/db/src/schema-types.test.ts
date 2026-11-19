@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 import {
   CodeReviewCouncilConfigSchema,
+  CustomLlmApiConfigSchema,
   CustomLlmDefinitionSchema,
   EnkryptInputGuardrailSettingsSchema,
   ModelsSchema,
@@ -426,5 +427,44 @@ describe('CustomLlmDefinitionSchema partner', () => {
 describe('ReasoningDetailsTransformSchema', () => {
   it('accepts mistral-thinking', () => {
     expect(ReasoningDetailsTransformSchema.parse('mistral-thinking')).toBe('mistral-thinking');
+  });
+});
+
+describe('CustomLlmApiConfigSchema remove_from_body', () => {
+  const parse = (remove_from_body: string[]) =>
+    CustomLlmApiConfigSchema.safeParse({
+      base_url: 'https://llm.example.com/v1',
+      remove_from_body,
+    });
+
+  it.each([
+    ['usage'],
+    ['tools.*.function.strict'],
+    ['messages.*.content.*.cache_control'],
+    ['a.*.*.b'],
+  ])('accepts %s', path => {
+    expect(parse([path]).success).toBe(true);
+  });
+
+  it('accepts an empty list', () => {
+    expect(parse([]).success).toBe(true);
+  });
+
+  it.each([
+    [''],
+    ['.'],
+    ['a..b'],
+    ['.a'],
+    ['a.'],
+    ['*'],
+    ['a.*'],
+    ['__proto__'],
+    ['a.__proto__.b'],
+    ['constructor.prototype.x'],
+    ['messages.*.prototype'],
+  ])('rejects %j', path => {
+    const result = parse(['usage', path]);
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map(issue => issue.path)).toEqual([['remove_from_body', 1]]);
   });
 });

@@ -46,6 +46,7 @@ import {
 } from '@/lib/hooks/use-code-reviewer';
 import { useCouncilUiEnabled } from '@/lib/hooks/use-reviewer-council';
 import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
+import { useReviewerScopeTitle } from '@/lib/hooks/use-reviewer-scope-title';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export function PlatformOverviewScreen({
@@ -54,6 +55,7 @@ export function PlatformOverviewScreen({
 }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
+  const scopeTitle = useReviewerScopeTitle(scope);
   const colors = useThemeColors();
   const capabilities = PLATFORM_CAPABILITIES[platform];
   const githubStatus = useGitHubStatus(scope);
@@ -76,7 +78,7 @@ export function PlatformOverviewScreen({
     return (
       <ReviewerErrorScreen
         title={capabilities.label}
-        eyebrow={t('common.codeReviewer')}
+        subtitle={scopeTitle}
         onRetry={() => {
           permission.refetch();
         }}
@@ -112,7 +114,7 @@ export function PlatformOverviewScreen({
     return (
       <ReviewerErrorScreen
         title={capabilities.label}
-        eyebrow={t('common.codeReviewer')}
+        subtitle={scopeTitle}
         variant={providerState.variant}
         // A permission/not-found error can't be fixed by retrying — hide retry.
         onRetry={
@@ -142,7 +144,7 @@ export function PlatformOverviewScreen({
     return (
       <ReviewerErrorScreen
         title={capabilities.label}
-        eyebrow={t('common.codeReviewer')}
+        subtitle={scopeTitle}
         variant={configBody.body.status === 'error' ? configBody.body.variant : 'server'}
         onRetry={configBody.body.status === 'error' ? configBody.body.refetch : configBody.retry}
         isRetrying={config.isFetching}
@@ -159,7 +161,7 @@ export function PlatformOverviewScreen({
     const canConnect = canConnectProvider(platform, permission);
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+        <ReviewerHeader title={capabilities.label} subtitle={scopeTitle} />
         <ProviderConnectState
           scope={scope}
           platform={platform}
@@ -226,7 +228,7 @@ export function PlatformOverviewScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+      <ReviewerHeader title={capabilities.label} subtitle={scopeTitle} />
       <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
         <Animated.View layout={LinearTransition}>
           {/* Every read state paints something: while connectivity is unsettled a

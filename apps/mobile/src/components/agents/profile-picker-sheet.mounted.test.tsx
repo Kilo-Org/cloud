@@ -302,7 +302,7 @@ describe('ProfilePickerSheet', () => {
     const renderer = mount({ isError: true, onRetry });
 
     const empty = renderer.root.findByType('EmptyState' as never);
-    expect(empty.props.title).toBe("Couldn't load your environment");
+    expect(empty.props.title).toBe("Couldn't load profiles");
     const retry = renderer.root.findByType('StateAction' as never);
     expect(retry.props.label).toBe('Retry');
     press(retry);

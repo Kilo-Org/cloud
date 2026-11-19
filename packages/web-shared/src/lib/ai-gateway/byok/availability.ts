@@ -28,7 +28,7 @@ export async function hasEnabledUserByokForModel({
     if (!isVercelUserByokProviderAllowed(providerId, allowedProviders)) continue;
     if (providerId !== 'vercel-ai-gateway' || !allowedProviders) return true;
     const only = withoutVirtualProvider([...allowedProviders]);
-    if (await canRouteToVercel(modelId, async () => ({ only }))) return true;
+    if (await canRouteToVercel(modelId, { only })) return true;
   }
   return false;
 }

@@ -13,6 +13,7 @@ import {
   androidChannelIdForPushData,
   androidChannelIdForPushDataToAppVersion,
   BRIEFING_FALLBACK_CHANNEL_ID,
+  FOLLOWED_SESSIONS_LOCK_SCREEN_APP_VERSION,
   LEGACY_AGENT_ANDROID_CHANNEL_ID,
   LEGACY_ACTIVE_AGENTS_ANDROID_CHANNEL_ID,
   LIVE_ACTIVITY_RELEVANCE,
@@ -412,6 +413,38 @@ describe('androidChannelIdForPushDataToAppVersion', () => {
     expect(BRIEFING_FALLBACK_CHANNEL_ID).toBe('agent-progress');
   });
 
+  it('addresses a followed-sessions push only from the build that creates the channel', () => {
+    const followed = pushDataSchema.parse({
+      type: 'session_live_update',
+      schemaVersion: 1,
+      event: 'update',
+      content: {
+        sessionId: 'ses-1',
+        title: 'Fix the login bug',
+        statusKind: 'running',
+        statusSince: '2026-01-01T00:00:00.000Z',
+        scheduledAt: null,
+        awaitingPermission: false,
+        approvalKey: null,
+        updatedAt: '2026-01-01T00:00:01.000Z',
+      },
+    });
+
+    // A token from a build that does not create the channel gets no channel
+    // id; the push is data-only, so the client draws its own card.
+    expect(androidChannelIdForPushDataToAppVersion(followed, '1.0.14')).toBeUndefined();
+    expect(androidChannelIdForPushDataToAppVersion(followed, null)).toBeUndefined();
+    expect(
+      androidChannelIdForPushDataToAppVersion(followed, FOLLOWED_SESSIONS_LOCK_SCREEN_APP_VERSION)
+    ).toBe('followed-sessions-lock-screen');
+    expect(androidChannelIdForPushDataToAppVersion(followed, '1.0.15')).toBe(
+      'followed-sessions-lock-screen'
+    );
+    expect(androidChannelIdForPushDataToAppVersion(followed, '1.1.0')).toBe(
+      'followed-sessions-lock-screen'
+    );
+  });
+
   it('routes an agent push through its kind', () => {
     expect(
       androidChannelIdForPushData(
@@ -536,6 +569,23 @@ describe('androidChannelIdForRegisteredClient', () => {
       expect(androidChannelIdForRegisteredClient(channelId, splitVersion)).toBe(channelId);
       expect(androidChannelIdForRegisteredClient(channelId, null)).toBeUndefined();
     }
+  });
+
+  it('withholds the followed-sessions channel from a client that does not create it', () => {
+    // A token from a build that does not create the channel gets no channel
+    // id; Android 8+ would drop a post addressed to it.
+    expect(
+      androidChannelIdForRegisteredClient('followed-sessions-lock-screen', '1.0.14')
+    ).toBeUndefined();
+    expect(
+      androidChannelIdForRegisteredClient(
+        'followed-sessions-lock-screen',
+        FOLLOWED_SESSIONS_LOCK_SCREEN_APP_VERSION
+      )
+    ).toBe('followed-sessions-lock-screen');
+    expect(androidChannelIdForRegisteredClient('followed-sessions-lock-screen', '1.0.15')).toBe(
+      'followed-sessions-lock-screen'
+    );
   });
 });
 

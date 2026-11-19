@@ -51,6 +51,29 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { enforceOrganizationCreationLimit } from '@kilocode/web-shared/lib/organizations/organization-creation-limit';
 
+// `organization_seats_purchases` is append-only, so the most recently created
+// row is the organization's current subscription state — the same input the
+// subscription gate classifies with. Lazily built: suites that mock the
+// drizzle module must not see this evaluated at import time.
+function latestSeatPurchaseStatusSql() {
+  return sql<OrganizationSeatsPurchase['subscription_status'] | null>`(
+    SELECT ${organization_seats_purchases.subscription_status}
+    FROM ${organization_seats_purchases}
+    WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
+    ORDER BY ${organization_seats_purchases.created_at} DESC
+    LIMIT 1
+  )`;
+}
+
+/** An invitation is live while it is unaccepted and unexpired. */
+function liveInvitationCondition(organizationId: string) {
+  return and(
+    eq(organization_invitations.organization_id, organizationId),
+    isNull(organization_invitations.accepted_at),
+    gt(organization_invitations.expires_at, sql`NOW()`)
+  );
+}
+
 export async function getOrganizationById(
   id: Organization['id'],
   txn?: DrizzleTransaction
@@ -79,16 +102,6 @@ export async function findOrganizationByStripeCustomerId(
 export async function getUserOrganizationsWithSeats(
   userId: User['id']
 ): Promise<UserOrganizationWithSeats[]> {
-  // `organization_seats_purchases` is append-only, so the most recently created
-  // row is the organization's current subscription state — the same input the
-  // subscription gate classifies with.
-  const latestSeatPurchaseStatus = sql<OrganizationSeatsPurchase['subscription_status'] | null>`(
-    SELECT ${organization_seats_purchases.subscription_status}
-    FROM ${organization_seats_purchases}
-    WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
-    ORDER BY ${organization_seats_purchases.created_at} DESC
-    LIMIT 1
-  )`;
   const results = await db
     .select({
       organizationId: organizations.id,
@@ -102,7 +115,7 @@ export async function getUserOrganizationsWithSeats(
       createdAt: organizations.created_at,
       freeTrialEndAt: organizations.free_trial_end_at,
       settings: organizations.settings,
-      latestSeatPurchaseStatus,
+      latestSeatPurchaseStatus: latestSeatPurchaseStatusSql(),
       seatCountTotal: organizations.seat_count,
       total_member_count: sql<number>`(
         SELECT COUNT(*)::int FROM (
@@ -233,13 +246,7 @@ export async function getProfileOrganizations(
   // getProfileOrganizations a single query and adds no seat-purchase lookup for
   // callers that don't opt in.
   const latestSeatPurchaseStatus = excludeAccessBlocked
-    ? sql<OrganizationSeatsPurchase['subscription_status'] | null>`(
-        SELECT ${organization_seats_purchases.subscription_status}
-        FROM ${organization_seats_purchases}
-        WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
-        ORDER BY ${organization_seats_purchases.created_at} DESC
-        LIMIT 1
-      )`
+    ? latestSeatPurchaseStatusSql()
     : sql<OrganizationSeatsPurchase['subscription_status'] | null>`NULL`;
 
   const results: ProfileOrganizationRow[] = await db
@@ -423,12 +430,10 @@ export async function addSsoUserToOrganization(
         .innerJoin(kilocode_users, eq(kilocode_users.id, userId))
         .where(
           and(
-            eq(organization_invitations.organization_id, organizationId),
+            liveInvitationCondition(organizationId),
             eq(organization_invitations.token, options.invitationToken),
             eq(organization_invitations.authentication_requirement, 'workos'),
-            eq(organization_invitations.sso_source_organization_id, organizationId),
-            isNull(organization_invitations.accepted_at),
-            gt(organization_invitations.expires_at, sql`NOW()`)
+            eq(organization_invitations.sso_source_organization_id, organizationId)
           )
         )
         .limit(1);
@@ -506,13 +511,7 @@ export async function updateUserRoleInOrganization(
     const pendingInvitations = await tx
       .select({ id: organization_invitations.id, email: organization_invitations.email })
       .from(organization_invitations)
-      .where(
-        and(
-          eq(organization_invitations.organization_id, organizationId),
-          isNull(organization_invitations.accepted_at),
-          gt(organization_invitations.expires_at, sql`NOW()`)
-        )
-      );
+      .where(liveInvitationCondition(organizationId));
 
     const invitationIds = pendingInvitations
       .filter(invitation => invitationAddressesAccount(invitation.email, user))
@@ -527,9 +526,8 @@ export async function updateUserRoleInOrganization(
       .set({ role })
       .where(
         and(
-          inArray(organization_invitations.id, invitationIds),
-          isNull(organization_invitations.accepted_at),
-          gt(organization_invitations.expires_at, sql`NOW()`)
+          liveInvitationCondition(organizationId),
+          inArray(organization_invitations.id, invitationIds)
         )
       );
 
@@ -742,13 +740,7 @@ export async function assertInviteeAddressIsAvailable(
   const pendingInvitations = await tx
     .select({ email: organization_invitations.email })
     .from(organization_invitations)
-    .where(
-      and(
-        eq(organization_invitations.organization_id, organizationId),
-        isNull(organization_invitations.accepted_at),
-        gt(organization_invitations.expires_at, sql`NOW()`)
-      )
-    );
+    .where(liveInvitationCondition(organizationId));
 
   if (pendingInvitations.some(invitation => isSameInvitationAddress(invitation.email, email))) {
     throw new Error('User already has a pending invitation');
@@ -879,13 +871,7 @@ export async function getOrganizationMembers(
         external_side_effect_outbox,
         eq(external_side_effect_outbox.invitation_id, organization_invitations.id)
       )
-      .where(
-        and(
-          eq(organization_invitations.organization_id, organizationId),
-          isNull(organization_invitations.accepted_at),
-          gt(organization_invitations.expires_at, sql`NOW()`)
-        )
-      ),
+      .where(liveInvitationCondition(organizationId)),
   ]);
 
   const members: OrganizationMember[] = [

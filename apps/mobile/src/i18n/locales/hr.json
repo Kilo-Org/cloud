@@ -3475,7 +3475,8 @@
         "accounting_adjustment": "Računovodstveno usklađenje",
         "credits_expired": "Istekli krediti"
       },
-      "truncated": "Dostupan je raniji promet po kreditima."
+      "truncated": "Dostupan je raniji promet po kreditima.",
+      "retentionLimit": "Prikazuje se najnoviji promet po kreditima."
     },
     "inviteMember": {
       "emailError": "Unesi valjanu adresu e-pošte.",
@@ -3507,7 +3508,8 @@
         "void": "Poništeno",
         "uncollectible": "Nenaplativo"
       },
-      "truncated": "Dostupni su stariji računi."
+      "truncated": "Dostupni su stariji računi.",
+      "retentionLimit": "Prikazuju se najnoviji računi."
     },
     "lowBalanceAlert": {
       "enableA11y": "Omogući upozorenje o niskom saldu",
@@ -4449,7 +4451,8 @@
       "purchaseFallback": "Kupnja kredita",
       "receipt": "Račun",
       "receiptA11y": "Otvori račun za {{description}}, {{amount}}, od {{date}}",
-      "receiptUnavailable": "Račun za ovu kupnju nije dostupan."
+      "receiptUnavailable": "Račun za ovu kupnju nije dostupan.",
+      "retentionLimit": "Prikazuje se najnovija povijest kredita."
     },
     "title": "Kupi kredite",
     "description": "Krediti su jednokratna kupnja koja se dodaje tvom Kilo saldu za pokretanje AI sesija kodiranja u aplikaciji Kilo. Trgovina naplaćuje tvoj račun, a krediti se dodaju nakon što trgovina potvrdi plaćanje.",

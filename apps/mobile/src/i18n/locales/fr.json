@@ -3467,7 +3467,8 @@
         "accounting_adjustment": "Ajustement comptable",
         "credits_expired": "Crédits expirés"
       },
-      "truncated": "Des mouvements de crédits plus anciens sont disponibles."
+      "truncated": "Des mouvements de crédits plus anciens sont disponibles.",
+      "retentionLimit": "Affichage des mouvements de crédits les plus récents."
     },
     "hub": {
       "balance": "Solde",
@@ -3512,7 +3513,8 @@
         "void": "Annulée",
         "uncollectible": "Irrecouvrable"
       },
-      "truncated": "Des factures plus anciennes sont disponibles."
+      "truncated": "Des factures plus anciennes sont disponibles.",
+      "retentionLimit": "Affichage des factures les plus récentes."
     },
     "lowBalanceAlert": {
       "enableA11y": "Activer l'alerte de solde faible",
@@ -4449,7 +4451,8 @@
       "purchaseFallback": "Achat de crédits",
       "receipt": "Reçu",
       "receiptA11y": "Ouvrir le reçu pour {{description}}, {{amount}}, du {{date}}",
-      "receiptUnavailable": "Aucun reçu n'est disponible pour cet achat."
+      "receiptUnavailable": "Aucun reçu n'est disponible pour cet achat.",
+      "retentionLimit": "Affichage de l'historique de crédits le plus récent."
     },
     "title": "Acheter des crédits",
     "description": "Les crédits sont un achat unique ajouté à votre solde Kilo pour lancer des sessions de codage IA dans Kilo App. La boutique débite votre compte et les crédits sont ajoutés après confirmation du paiement par la boutique.",

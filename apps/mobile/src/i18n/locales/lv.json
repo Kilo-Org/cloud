@@ -3475,7 +3475,8 @@
         "accounting_adjustment": "Grāmatvedības korekcija",
         "credits_expired": "Kredītu derīguma termiņš beidzies"
       },
-      "truncated": "Ir pieejami arī iepriekšējie kredītu darījumi."
+      "truncated": "Ir pieejami arī iepriekšējie kredītu darījumi.",
+      "retentionLimit": "Tiek rādīti jaunākie kredītu darījumi."
     },
     "inviteMember": {
       "emailError": "Ievadi derīgu e-pasta adresi.",
@@ -3507,7 +3508,8 @@
         "void": "Anulēts",
         "uncollectible": "Nepiedzenams"
       },
-      "truncated": "Ir pieejami vecāki rēķini."
+      "truncated": "Ir pieejami vecāki rēķini.",
+      "retentionLimit": "Tiek rādīti jaunākie rēķini."
     },
     "lowBalanceAlert": {
       "enableA11y": "Iespējot brīdinājumu par mazu atlikumu",
@@ -4449,7 +4451,8 @@
       "purchaseFallback": "Kredītu pirkums",
       "receipt": "Kvīts",
       "receiptA11y": "Atvērt kvīti: {{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Šim pirkumam kvīts nav pieejama."
+      "receiptUnavailable": "Šim pirkumam kvīts nav pieejama.",
+      "retentionLimit": "Tiek rādīta jaunākā kredītu vēsture."
     },
     "title": "Pirkt kredītus",
     "description": "Kredīti ir vienreizējs pirkums, kas tiek pievienots tavam Kilo bilancei AI kodēšanas sesiju vadīšanai Kilo App. Veikals iekasē maksu no tava konta, un kredīti tiek pievienoti pēc tam, kad veikals apstiprina maksājumu.",

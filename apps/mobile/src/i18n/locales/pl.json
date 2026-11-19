@@ -3525,7 +3525,8 @@
         "accounting_adjustment": "Korekta księgowa",
         "credits_expired": "Wygaśnięcie środków"
       },
-      "truncated": "Dostępne są wcześniejsze operacje na saldzie."
+      "truncated": "Dostępne są wcześniejsze operacje na saldzie.",
+      "retentionLimit": "Wyświetlane są najnowsze operacje na saldzie."
     },
     "hub": {
       "balance": "Saldo",
@@ -3570,7 +3571,8 @@
         "void": "Unieważniona",
         "uncollectible": "Nieściągalna"
       },
-      "truncated": "Dostępne są starsze faktury."
+      "truncated": "Dostępne są starsze faktury.",
+      "retentionLimit": "Wyświetlane są najnowsze faktury."
     },
     "lowBalanceAlert": {
       "enableA11y": "Włącz powiadomienie o niskim saldzie",
@@ -4516,7 +4518,8 @@
       "purchaseFallback": "Zakup kredytów",
       "receipt": "Potwierdzenie",
       "receiptA11y": "Otwórz potwierdzenie dla: {{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Potwierdzenie dla tego zakupu nie jest dostępne."
+      "receiptUnavailable": "Potwierdzenie dla tego zakupu nie jest dostępne.",
+      "retentionLimit": "Wyświetlana jest najnowsza historia kredytów."
     },
     "title": "Kup kredyty",
     "description": "Kredyty to jednorazowy zakup dodawany do Twojego salda Kilo na potrzeby sesji kodowania AI w aplikacji Kilo. Sklep obciąża Twoje konto, a kredyty są dodawane po potwierdzeniu płatności przez sklep.",

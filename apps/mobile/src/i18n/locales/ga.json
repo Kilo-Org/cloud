@@ -3591,7 +3591,8 @@
         "accounting_adjustment": "Coigeartú cuntasaíochta",
         "credits_expired": "Creidmheasanna imithe in éag"
       },
-      "truncated": "Tá gníomhaíocht chreidmheasa níos sine ar fáil."
+      "truncated": "Tá gníomhaíocht chreidmheasa níos sine ar fáil.",
+      "retentionLimit": "Taispeántar an ghníomhaíocht chreidmheasa is déanaí."
     },
     "inviteMember": {
       "emailError": "Iontráil seoladh ríomhphoist bailí.",
@@ -3623,7 +3624,8 @@
         "void": "Ar neamhní",
         "uncollectible": "Dobhailithe"
       },
-      "truncated": "Tá sonraisc níos sine ar fáil."
+      "truncated": "Tá sonraisc níos sine ar fáil.",
+      "retentionLimit": "Taispeántar na sonraisc is déanaí."
     },
     "lowBalanceAlert": {
       "enableA11y": "Cumasaigh foláireamh faoi iarmhéid íseal",
@@ -4583,7 +4585,8 @@
       "purchaseFallback": "Ceannach creidmheasa",
       "receipt": "Admháil",
       "receiptA11y": "Oscail an admháil do {{description}}, {{amount}}, ó {{date}}",
-      "receiptUnavailable": "Níl admháil ar fáil don cheannach seo."
+      "receiptUnavailable": "Níl admháil ar fáil don cheannach seo.",
+      "retentionLimit": "Taispeántar an stair chreidmheasa is déanaí."
     },
     "title": "Ceannaigh creidmheasanna",
     "description": "Is ceannach aonuaire iad creidmheasanna a chuirtear le do chothromas Kilo chun seisiúin chódaithe AI a rith in Kilo App. Gearrann an siopa do chuntas agus cuirtear creidmheasanna leis tar éis don siopa an íocaíocht a dhearbhú.",

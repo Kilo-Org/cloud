@@ -3417,7 +3417,8 @@
         "accounting_adjustment": "Pelarasan perakaunan",
         "credits_expired": "Kredit tamat tempoh"
       },
-      "truncated": "Aktiviti kredit terdahulu tersedia."
+      "truncated": "Aktiviti kredit terdahulu tersedia.",
+      "retentionLimit": "Memaparkan aktiviti kredit terkini."
     },
     "inviteMember": {
       "emailError": "Masukkan alamat e-mel yang sah.",
@@ -3449,7 +3450,8 @@
         "void": "Dibatalkan",
         "uncollectible": "Tidak dapat dikutip"
       },
-      "truncated": "Invois terdahulu tersedia."
+      "truncated": "Invois terdahulu tersedia.",
+      "retentionLimit": "Memaparkan invois terkini."
     },
     "lowBalanceAlert": {
       "enableA11y": "Dayakan amaran baki rendah",
@@ -4382,7 +4384,8 @@
       "purchaseFallback": "Pembelian kredit",
       "receipt": "Resit",
       "receiptA11y": "Buka resit untuk {{description}}, {{amount}}, dari {{date}}",
-      "receiptUnavailable": "Resit tidak tersedia untuk pembelian ini."
+      "receiptUnavailable": "Resit tidak tersedia untuk pembelian ini.",
+      "retentionLimit": "Memaparkan sejarah kredit terkini."
     },
     "title": "Beli kredit",
     "description": "Kredit ialah pembelian sekali sahaja yang ditambah pada baki Kilo anda untuk menjalankan sesi pengekodan AI dalam Apl Kilo. Kedai mengenakan caj pada akaun anda dan kredit ditambah selepas kedai mengesahkan pembayaran.",

@@ -3417,7 +3417,8 @@
         "accounting_adjustment": "Rregullim kontabël",
         "credits_expired": "Kredite të skaduara"
       },
-      "truncated": "Ka aktivitet të mëparshëm të krediteve."
+      "truncated": "Ka aktivitet të mëparshëm të krediteve.",
+      "retentionLimit": "Po shfaqet aktiviteti i krediteve më i fundit."
     },
     "inviteMember": {
       "emailError": "Shkruaj një adresë të vlefshme emaili.",
@@ -3449,7 +3450,8 @@
         "void": "E anuluar",
         "uncollectible": "E paarkëtueshme"
       },
-      "truncated": "Faturat më të vjetra janë të disponueshme."
+      "truncated": "Faturat më të vjetra janë të disponueshme.",
+      "retentionLimit": "Po shfaqen faturat më të fundit."
     },
     "lowBalanceAlert": {
       "enableA11y": "Aktivizo njoftimin për gjendje të ulët",
@@ -4382,7 +4384,8 @@
       "purchaseFallback": "Blerje kredish",
       "receipt": "Dëftesë",
       "receiptA11y": "Hap dëftesën për {{description}}, {{amount}}, nga {{date}}",
-      "receiptUnavailable": "Nuk ka dëftesë për këtë blerje."
+      "receiptUnavailable": "Nuk ka dëftesë për këtë blerje.",
+      "retentionLimit": "Po shfaqet historiku i kredive më i fundit."
     },
     "title": "Bli kredite",
     "description": "Kreditet janë një blerje e njëhershme që shtohet në bilancin tuaj Kilo për të drejtuar seanca kodimi me AI në Kilo App. Dyqani të faturova llogarinë dhe kreditet shtohen pasi dyqani konfirmon pagesën.",

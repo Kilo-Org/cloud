@@ -3409,7 +3409,8 @@
         "accounting_adjustment": "会計調整",
         "credits_expired": "クレジット失効"
       },
-      "truncated": "これより前のクレジットの履歴も確認できます。"
+      "truncated": "これより前のクレジットの履歴も確認できます。",
+      "retentionLimit": "最新のクレジットの履歴を表示しています。"
     },
     "hub": {
       "balance": "残高",
@@ -3454,7 +3455,8 @@
         "void": "無効",
         "uncollectible": "回収不能"
       },
-      "truncated": "これより前の請求書も確認できます。"
+      "truncated": "これより前の請求書も確認できます。",
+      "retentionLimit": "最新の請求書を表示しています。"
     },
     "lowBalanceAlert": {
       "enableA11y": "残高アラートを有効にする",
@@ -4382,7 +4384,8 @@
       "purchaseFallback": "クレジットの購入",
       "receipt": "領収書",
       "receiptA11y": "{{description}}、{{amount}}、{{date}}の領収書を開く",
-      "receiptUnavailable": "この購入の領収書はありません。"
+      "receiptUnavailable": "この購入の領収書はありません。",
+      "retentionLimit": "最新のクレジット履歴を表示しています。"
     },
     "title": "クレジットを購入",
     "description": "クレジットは、Kilo AppでAIコーディングセッションを実行するためにKilo残高に追加される買い切りの購入です。ストアがアカウントに請求し、ストアが支払いを確認した後にクレジットが追加されます。",

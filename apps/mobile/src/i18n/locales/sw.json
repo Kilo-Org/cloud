@@ -3417,7 +3417,8 @@
         "accounting_adjustment": "Marekebisho ya uhasibu",
         "credits_expired": "Muda wa salio umeisha"
       },
-      "truncated": "Shughuli za awali za salio zinapatikana."
+      "truncated": "Shughuli za awali za salio zinapatikana.",
+      "retentionLimit": "Inaonyesha shughuli za salio za hivi karibuni."
     },
     "inviteMember": {
       "emailError": "Weka anwani halali ya barua pepe.",
@@ -3449,7 +3450,8 @@
         "void": "Imebatilishwa",
         "uncollectible": "Haiwezi kulipika"
       },
-      "truncated": "Ankara za zamani zinapatikana."
+      "truncated": "Ankara za zamani zinapatikana.",
+      "retentionLimit": "Inaonyesha ankara za hivi karibuni."
     },
     "lowBalanceAlert": {
       "enableA11y": "Washa arifa ya salio la chini",
@@ -4382,7 +4384,8 @@
       "purchaseFallback": "Ununuzi wa salio",
       "receipt": "Risiti",
       "receiptA11y": "Fungua risiti ya {{description}}, {{amount}}, kutoka {{date}}",
-      "receiptUnavailable": "Hakuna risiti ya ununuzi huu."
+      "receiptUnavailable": "Hakuna risiti ya ununuzi huu.",
+      "retentionLimit": "Inaonyesha historia ya salio ya hivi karibuni."
     },
     "title": "Nunua salio",
     "description": "Salio ni ununuzi wa mara moja unaoongezwa kwenye usawa wako wa Kilo kwa kuendesha vikao vya kuandika msimbo kwa AI katika Kilo App. Duka hukutoza akaunti yako na salio huongezwa baada ya duka kuthibitisha malipo.",

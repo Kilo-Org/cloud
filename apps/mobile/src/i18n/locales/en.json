@@ -3511,6 +3511,7 @@
       "title": "Credit activity",
       "transactionFallback": "Credit transaction",
       "truncated": "Older credit activity is available.",
+      "retentionLimit": "Showing the most recent credit activity.",
       "category": {
         "organization_custom": "Organization custom",
         "parent_to_child_transfer_in": "Parent to child transfer in",
@@ -3544,6 +3545,7 @@
       "emptyTitle": "No invoices",
       "invoiceFallback": "Invoice",
       "truncated": "Older invoices are available.",
+      "retentionLimit": "Showing the most recent invoices.",
       "title": "Invoices",
       "downloadFailed": "Couldn't download invoice. Check your connection and try again.",
       "sharingUnavailable": "Sharing is not available on this device.",
@@ -4472,7 +4474,8 @@
       "purchaseFallback": "Credit purchase",
       "receipt": "Receipt",
       "receiptA11y": "Open the receipt for {{description}}, {{amount}}, from {{date}}",
-      "receiptUnavailable": "A receipt is not available for this purchase."
+      "receiptUnavailable": "A receipt is not available for this purchase.",
+      "retentionLimit": "Showing the most recent credit history."
     },
     "title": "Buy credits",
     "description": "Credits are a one-time purchase added to your Kilo balance for running AI coding sessions in Kilo App. The store charges your account and credits are added after the store confirms payment.",

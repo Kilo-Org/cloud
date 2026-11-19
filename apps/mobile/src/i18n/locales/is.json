@@ -3417,7 +3417,8 @@
         "accounting_adjustment": "Bókhaldsleiðrétting",
         "credits_expired": "Inneign rann út"
       },
-      "truncated": "Hægt er að skoða eldri inneignarfærslur."
+      "truncated": "Hægt er að skoða eldri inneignarfærslur.",
+      "retentionLimit": "Nýjustu inneignarfærslurnar eru sýndar."
     },
     "inviteMember": {
       "emailError": "Sláðu inn gilt tölvupóstfang.",
@@ -3449,7 +3450,8 @@
         "void": "Ógildur",
         "uncollectible": "Óinnheimtanlegur"
       },
-      "truncated": "Hægt er að skoða eldri reikninga."
+      "truncated": "Hægt er að skoða eldri reikninga.",
+      "retentionLimit": "Nýjustu reikningarnir eru sýndir."
     },
     "lowBalanceAlert": {
       "enableA11y": "Virkja viðvörun um lága inneign",
@@ -4382,7 +4384,8 @@
       "purchaseFallback": "Kaup á inneign",
       "receipt": "Kvittun",
       "receiptA11y": "Opna kvittun fyrir {{description}}, {{amount}}, frá {{date}}",
-      "receiptUnavailable": "Engin kvittun er tiltæk fyrir þessi kaup."
+      "receiptUnavailable": "Engin kvittun er tiltæk fyrir þessi kaup.",
+      "retentionLimit": "Nýjasti inneignarferillinn er sýndur."
     },
     "title": "Kaupa inneign",
     "description": "Inneign er einstakt kaup sem bætist við Kilo-stöðuna þína til að keyra AI-forritunarlotur í Kilo App. Verslunin rukkar reikninginn þinn og inneign bætist við eftir að verslunin staðfestir greiðsluna.",

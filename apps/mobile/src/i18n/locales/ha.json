@@ -3417,7 +3417,8 @@
         "accounting_adjustment": "Daidaitawar lissafin kuɗi",
         "credits_expired": "Wa'adin kuɗin amfani ya ƙare"
       },
-      "truncated": "Ana samun ma'amalolin kuɗin amfani na baya."
+      "truncated": "Ana samun ma'amalolin kuɗin amfani na baya.",
+      "retentionLimit": "Ana nuna ma'amalolin kuɗin amfani na baya-bayan nan."
     },
     "inviteMember": {
       "emailError": "Shigar da adireshin imel mai inganci.",
@@ -3449,7 +3450,8 @@
         "void": "An soke",
         "uncollectible": "Ba a iya karɓar kuɗin"
       },
-      "truncated": "Ana samun takardun biyan kuɗi na baya."
+      "truncated": "Ana samun takardun biyan kuɗi na baya.",
+      "retentionLimit": "Ana nuna takardun biyan kuɗi na baya-bayan nan."
     },
     "lowBalanceAlert": {
       "enableA11y": "Kunna faɗakarwar ƙarancin kuɗi",
@@ -4382,7 +4384,8 @@
       "purchaseFallback": "Sayen kiredit",
       "receipt": "Rasiti",
       "receiptA11y": "Buɗe rasitin {{description}}, {{amount}}, daga {{date}}",
-      "receiptUnavailable": "Babu rasiti don wannan sayayya."
+      "receiptUnavailable": "Babu rasiti don wannan sayayya.",
+      "retentionLimit": "Ana nuna tarihin kiredit na baya-bayan nan."
     },
     "title": "Sayi kuɗin amfani",
     "description": "Kuɗin amfani saye ne na lokaci ɗaya da ake ƙarawa a ma'aunin Kilo naka don gudanar da zaman shirye-shiryen AI a cikin Kilo App. Shagon yana cajin asusunka kuma ana ƙara kuɗin amfani bayan shagon ya tabbatar da biyan kuɗi.",

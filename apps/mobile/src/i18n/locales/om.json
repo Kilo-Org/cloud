@@ -3417,7 +3417,8 @@
         "accounting_adjustment": "Sirreeffama herregaa",
         "credits_expired": "Kiriiditiin yeroon isaa darbe"
       },
-      "truncated": "Sochiin kiriiditii duraanii ni argama."
+      "truncated": "Sochiin kiriiditii duraanii ni argama.",
+      "retentionLimit": "Sochiin kiriiditii haaraan agarsiifamaa jira."
     },
     "inviteMember": {
       "emailError": "Teessoo imeelii sirrii galchi.",
@@ -3449,7 +3450,8 @@
         "void": "Haqame",
         "uncollectible": "Sassaabamuu hin danda'u"
       },
-      "truncated": "Gaaffiiwwan kaffaltii duraanii ni argamu."
+      "truncated": "Gaaffiiwwan kaffaltii duraanii ni argamu.",
+      "retentionLimit": "Gaaffiiwwan kaffaltii haaraan agarsiifamaa jiran."
     },
     "lowBalanceAlert": {
       "enableA11y": "Akeekkachiisa haftee xiqqaa bani",
@@ -4382,7 +4384,8 @@
       "purchaseFallback": "Bittaa kireeditii",
       "receipt": "Nagahee",
       "receiptA11y": "Nagahee {{description}}, {{amount}}, {{date}} bani",
-      "receiptUnavailable": "Bittaa kanaaf nagaheen hin jiru."
+      "receiptUnavailable": "Bittaa kanaaf nagaheen hin jiru.",
+      "retentionLimit": "Seenaan kireeditii haaraan agarsiifamaa jira."
     },
     "title": "Kireedita bituu",
     "description": "Kireeditiin bittaa yeroo tokkoo kan baalansii Kilo kee irratti dabalame ta'ee, shumarra code AI Kilo App keessatti hojjechuuf oola. Suuqii ammaataa kee irraa kaffaltii fudhata, suuqiin kaffaltii erga mirkaneesse booda kireeditiin dabalama.",

@@ -3417,7 +3417,8 @@
         "accounting_adjustment": "Mühasibat düzəlişi",
         "credits_expired": "Kreditlərin müddəti bitib"
       },
-      "truncated": "Əvvəlki kredit əməliyyatlarına da baxmaq olar."
+      "truncated": "Əvvəlki kredit əməliyyatlarına da baxmaq olar.",
+      "retentionLimit": "Ən son kredit əməliyyatları göstərilir."
     },
     "inviteMember": {
       "emailError": "Düzgün e-poçt ünvanı daxil et.",
@@ -3449,7 +3450,8 @@
         "void": "Ləğv edilib",
         "uncollectible": "Alınmaz borc"
       },
-      "truncated": "Əvvəlki hesab-fakturalara da baxmaq olar."
+      "truncated": "Əvvəlki hesab-fakturalara da baxmaq olar.",
+      "retentionLimit": "Ən son hesab-fakturalar göstərilir."
     },
     "lowBalanceAlert": {
       "enableA11y": "Aşağı balans xəbərdarlığını aktivləşdir",
@@ -4382,7 +4384,8 @@
       "purchaseFallback": "Kredit alışı",
       "receipt": "Qəbz",
       "receiptA11y": "{{description}} üçün {{amount}}, {{date}} tarixli qəbzi açın",
-      "receiptUnavailable": "Bu alış üçün qəbz mövcud deyil."
+      "receiptUnavailable": "Bu alış üçün qəbz mövcud deyil.",
+      "retentionLimit": "Ən son kredit tarixçəsi göstərilir."
     },
     "title": "Kredit al",
     "description": "Kredit Kilo App-də AI kodlaşdırma sessiyalarını işə salmaq üçün Kilo balansına əlavə olunan birdəfəlik alışdır. Mağaza hesabından ödəniş alır və mağaza ödənişi təsdiqlədikdən sonra kredit əlavə olunur.",

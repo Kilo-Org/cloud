@@ -3417,7 +3417,8 @@
         "accounting_adjustment": "Számviteli kiigazítás",
         "credits_expired": "Lejárt kreditek"
       },
-      "truncated": "Korábbi kreditműveletek is elérhetők."
+      "truncated": "Korábbi kreditműveletek is elérhetők.",
+      "retentionLimit": "A legutóbbi kreditműveletek láthatók."
     },
     "inviteMember": {
       "emailError": "Adj meg egy érvényes e-mail-címet.",
@@ -3449,7 +3450,8 @@
         "void": "Érvénytelen",
         "uncollectible": "Behajthatatlan"
       },
-      "truncated": "Korábbi számlák érhetők el."
+      "truncated": "Korábbi számlák érhetők el.",
+      "retentionLimit": "A legutóbbi számlák láthatók."
     },
     "lowBalanceAlert": {
       "enableA11y": "Figyelmeztetés bekapcsolása alacsony egyenleg esetén",
@@ -4382,7 +4384,8 @@
       "purchaseFallback": "Kreditvásárlás",
       "receipt": "Nyugta",
       "receiptA11y": "Nyugta megnyitása: {{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Ehhez a vásárláshoz nem érhető el nyugta."
+      "receiptUnavailable": "Ehhez a vásárláshoz nem érhető el nyugta.",
+      "retentionLimit": "A legutóbbi kreditelőzmények láthatók."
     },
     "title": "Kreditek vásárlása",
     "description": "A kreditek egyszeri vásárlás, amely a Kilo egyenlegedhez adódik AI kódolási munkamenetek futtatásához a Kilo alkalmazásban. Az áruház terheli a fiókodat, és a kreditek az áruház fizetésigazolása után kerülnek jóváírásra.",

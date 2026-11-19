@@ -3473,7 +3473,8 @@
         "accounting_adjustment": "Ajuste contábil",
         "credits_expired": "Créditos expirados"
       },
-      "truncated": "Há movimentações de créditos anteriores disponíveis."
+      "truncated": "Há movimentações de créditos anteriores disponíveis.",
+      "retentionLimit": "Mostrando as movimentações de créditos mais recentes."
     },
     "hub": {
       "balance": "Saldo",
@@ -3518,7 +3519,8 @@
         "void": "Cancelada",
         "uncollectible": "Incobrável"
       },
-      "truncated": "Há faturas anteriores disponíveis."
+      "truncated": "Há faturas anteriores disponíveis.",
+      "retentionLimit": "Mostrando as faturas mais recentes."
     },
     "lowBalanceAlert": {
       "enableA11y": "Ativar alerta de saldo baixo",
@@ -4455,7 +4457,8 @@
       "purchaseFallback": "Compra de créditos",
       "receipt": "Recibo",
       "receiptA11y": "Abrir o recibo de {{description}}, {{amount}}, de {{date}}",
-      "receiptUnavailable": "Não há recibo disponível para esta compra."
+      "receiptUnavailable": "Não há recibo disponível para esta compra.",
+      "retentionLimit": "Mostrando o histórico de créditos mais recente."
     },
     "title": "Comprar créditos",
     "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de codificação com IA no Kilo App. A loja cobra na sua conta e os créditos são adicionados depois que a loja confirma o pagamento.",

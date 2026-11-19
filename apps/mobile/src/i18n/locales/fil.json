@@ -3417,7 +3417,8 @@
         "accounting_adjustment": "Pagsasaayos sa talaan ng pananalapi",
         "credits_expired": "Kreditong nawalan ng bisa"
       },
-      "truncated": "May mas naunang aktibidad sa kredito na maaaring tingnan."
+      "truncated": "May mas naunang aktibidad sa kredito na maaaring tingnan.",
+      "retentionLimit": "Ipinapakita ang pinakabagong aktibidad sa kredito."
     },
     "inviteMember": {
       "emailError": "Maglagay ng wastong email address.",
@@ -3449,7 +3450,8 @@
         "void": "Walang bisa",
         "uncollectible": "Hindi masingil"
       },
-      "truncated": "May mas naunang mga talaan ng singil na maaaring tingnan."
+      "truncated": "May mas naunang mga talaan ng singil na maaaring tingnan.",
+      "retentionLimit": "Ipinapakita ang mga pinakabagong talaan ng singil."
     },
     "lowBalanceAlert": {
       "enableA11y": "Paganahin ang babala sa mababang balanse",
@@ -4382,7 +4384,8 @@
       "purchaseFallback": "Pagbili ng credit",
       "receipt": "Resibo",
       "receiptA11y": "Buksan ang resibo para sa {{description}}, {{amount}}, mula noong {{date}}",
-      "receiptUnavailable": "Walang available na resibo para sa pagbiling ito."
+      "receiptUnavailable": "Walang available na resibo para sa pagbiling ito.",
+      "retentionLimit": "Ipinapakita ang pinakabagong kasaysayan ng credit."
     },
     "title": "Bumili ng kredito",
     "description": "Ang kredito ay isang besesang pagbili na idinaragdag sa iyong Kilo balance para sa pagpapatakbo ng mga AI coding session sa Kilo App. Sinisingil ng store ang iyong account at idinaragdag ang kredito pagkatapos kumpirmahin ng store ang bayad.",

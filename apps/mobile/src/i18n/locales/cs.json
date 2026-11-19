@@ -3533,7 +3533,8 @@
         "accounting_adjustment": "Účetní úprava",
         "credits_expired": "Kredity s prošlou platností"
       },
-      "truncated": "K dispozici jsou i starší pohyby kreditů."
+      "truncated": "K dispozici jsou i starší pohyby kreditů.",
+      "retentionLimit": "Zobrazují se nejnovější pohyby kreditů."
     },
     "inviteMember": {
       "emailError": "Zadejte platnou e-mailovou adresu.",
@@ -3565,7 +3566,8 @@
         "void": "Stornováno",
         "uncollectible": "Nedobytné"
       },
-      "truncated": "Starší faktury jsou k dispozici."
+      "truncated": "Starší faktury jsou k dispozici.",
+      "retentionLimit": "Zobrazují se nejnovější faktury."
     },
     "lowBalanceAlert": {
       "enableA11y": "Povolit upozornění na nízký zůstatek",
@@ -4516,7 +4518,8 @@
       "purchaseFallback": "Nákup kreditů",
       "receipt": "Účtenka",
       "receiptA11y": "Otevřít účtenku pro {{description}}, {{amount}}, ze dne {{date}}",
-      "receiptUnavailable": "Pro tento nákup není účtenka k dispozici."
+      "receiptUnavailable": "Pro tento nákup není účtenka k dispozici.",
+      "retentionLimit": "Zobrazuje se nejnovější historie kreditů."
     },
     "title": "Koupit kredity",
     "description": "Kredity jsou jednorázový nákup přidaný do vašeho zůstatku Kilo pro spouštění AI programovacích relací v aplikaci Kilo. Obchod vám strhne platbu z účtu a kredity se přidají po potvrzení platby obchodem.",

@@ -3417,7 +3417,8 @@
         "accounting_adjustment": "Mmezi ndekọ ego",
         "credits_expired": "Oge ego ojiji agwụla"
       },
-      "truncated": "Ndekọ ego ojiji gara aga dị."
+      "truncated": "Ndekọ ego ojiji gara aga dị.",
+      "retentionLimit": "Na-egosi ndekọ ego ojiji ndị kachasị ọhụrụ."
     },
     "inviteMember": {
       "emailError": "Tinye adreesị ozi ịntanetị ziri ezi.",
@@ -3449,7 +3450,8 @@
         "void": "Akagbuola",
         "uncollectible": "A pụghị ịnakọta ụgwọ"
       },
-      "truncated": "Akwụkwọ ịgba ụgwọ gara aga dị."
+      "truncated": "Akwụkwọ ịgba ụgwọ gara aga dị.",
+      "retentionLimit": "Na-egosi akwụkwọ ịgba ụgwọ ndị kachasị ọhụrụ."
     },
     "lowBalanceAlert": {
       "enableA11y": "Gbanye ịdọ aka na ntị mgbe ego fọdụrụ dị ntakịrị",
@@ -4382,7 +4384,8 @@
       "purchaseFallback": "Ịzụ kredit",
       "receipt": "Rịsịt",
       "receiptA11y": "Mepee rịsịt maka {{description}}, {{amount}}, site na {{date}}",
-      "receiptUnavailable": "Enweghị rịsịt maka ihe a zụrụ a."
+      "receiptUnavailable": "Enweghị rịsịt maka ihe a zụrụ a.",
+      "retentionLimit": "Na-egosi akụkọ kredit kachasị ọhụrụ."
     },
     "title": "Zụta ego ojiji",
     "description": "Ego ojiji bụ azụmahịa otu oge nke a na-agbakwunye na nguzozi Kilo gị maka ịgba nnọkọ ịde koodu AI na Kilo App. Ụlọ ahịa na-akwụ ụgwọ na akaụntụ gị, a na-agbakwunye ego ojiji mgbe ụlọ ahịa kwadoro ịkwụ ụgwọ ahụ.",

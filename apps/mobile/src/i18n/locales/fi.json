@@ -3417,7 +3417,8 @@
         "accounting_adjustment": "Kirjanpidon oikaisu",
         "credits_expired": "Krediitit vanhentuivat"
       },
-      "truncated": "Aiempia krediittitapahtumia on saatavilla."
+      "truncated": "Aiempia krediittitapahtumia on saatavilla.",
+      "retentionLimit": "Näytetään uusimmat krediittitapahtumat."
     },
     "inviteMember": {
       "emailError": "Anna kelvollinen sähköpostiosoite.",
@@ -3449,7 +3450,8 @@
         "void": "Mitätöity",
         "uncollectible": "Perimiskelvoton"
       },
-      "truncated": "Vanhempia laskuja on saatavilla."
+      "truncated": "Vanhempia laskuja on saatavilla.",
+      "retentionLimit": "Näytetään uusimmat laskut."
     },
     "lowBalanceAlert": {
       "enableA11y": "Ota saldohälytys käyttöön",
@@ -4382,7 +4384,8 @@
       "purchaseFallback": "Krediittiosto",
       "receipt": "Kuitti",
       "receiptA11y": "Avaa kuitti: {{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Tälle ostolle ei ole saatavilla kuittia."
+      "receiptUnavailable": "Tälle ostolle ei ole saatavilla kuittia.",
+      "retentionLimit": "Näytetään uusin krediittihistoria."
     },
     "title": "Osta krediittejä",
     "description": "Krediitit ovat kertaostos, joka lisätään Kilo-saldoosi AI-koodausistuntojen ajamista varten Kilo-sovelluksessa. Kauppa veloittaa tiliäsi ja krediitit lisätään, kun kauppa vahvistaa maksun.",

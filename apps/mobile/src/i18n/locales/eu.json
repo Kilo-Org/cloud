@@ -3417,7 +3417,8 @@
         "accounting_adjustment": "Kontabilitate-doikuntza",
         "credits_expired": "Kredituak iraungita"
       },
-      "truncated": "Aurreko kreditu-jarduera eskuragarri dago."
+      "truncated": "Aurreko kreditu-jarduera eskuragarri dago.",
+      "retentionLimit": "Azken kreditu-jarduera erakusten da."
     },
     "inviteMember": {
       "emailError": "Sartu baliozko helbide elektroniko bat.",
@@ -3449,7 +3450,8 @@
         "void": "Baliogabetuta",
         "uncollectible": "Kobratu ezina"
       },
-      "truncated": "Aurreko fakturak eskuragarri daude."
+      "truncated": "Aurreko fakturak eskuragarri daude.",
+      "retentionLimit": "Azken fakturak erakusten dira."
     },
     "lowBalanceAlert": {
       "enableA11y": "Gaitu saldo baxuko alerta",
@@ -4382,7 +4384,8 @@
       "purchaseFallback": "Kreditu-erosketa",
       "receipt": "Ordainagiria",
       "receiptA11y": "Ireki honen ordainagiria: {{description}}, {{amount}}, {{date}}tik",
-      "receiptUnavailable": "Ez dago ordainagiririk erosketa honetarako."
+      "receiptUnavailable": "Ez dago ordainagiririk erosketa honetarako.",
+      "retentionLimit": "Azken kreditu-historia erakusten da."
     },
     "title": "Erosi kredituak",
     "description": "Kredituak Kilo App-en AI kodetze-saioak exekutatzeko zure Kilo saldoari gehitzen zaion behin betiko erosketa bat dira. Dendak zure kontuari kobratzen dio eta kredituak dendak ordainketa baieztatu ondoren gehitzen dira.",

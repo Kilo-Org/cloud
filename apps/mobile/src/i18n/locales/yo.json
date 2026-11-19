@@ -3417,7 +3417,8 @@
         "accounting_adjustment": "Àtúnṣe ìṣirò owó",
         "credits_expired": "Kirẹ́dítì ti dópin"
       },
-      "truncated": "Àwọn ìṣe kirẹ́dítì tó ṣáájú ṣì wà."
+      "truncated": "Àwọn ìṣe kirẹ́dítì tó ṣáájú ṣì wà.",
+      "retentionLimit": "Ń ṣàfihàn àwọn ìṣe kirẹ́dítì tuntun jùlọ."
     },
     "inviteMember": {
       "emailError": "Tẹ àdírẹ́sì ímeèlì tó péye.",
@@ -3449,7 +3450,8 @@
         "void": "A ti fagilé",
         "uncollectible": "Kò ṣeé gbà"
       },
-      "truncated": "Àwọn ìwé ìbéèrè owó tó ṣáájú ṣì wà."
+      "truncated": "Àwọn ìwé ìbéèrè owó tó ṣáájú ṣì wà.",
+      "retentionLimit": "Ń ṣàfihàn àwọn ìwé ìbéèrè owó tuntun jùlọ."
     },
     "lowBalanceAlert": {
       "enableA11y": "Tan ìkìlọ̀ owó tó kù díẹ̀",
@@ -4382,7 +4384,8 @@
       "purchaseFallback": "Ìrajà kírẹ́dítì",
       "receipt": "Ìwé ẹ̀rí ìsanwó",
       "receiptA11y": "Ṣí ìwé ẹ̀rí ìsanwó fún {{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Kò sí ìwé ẹ̀rí ìsanwó fún ìrajà yìí."
+      "receiptUnavailable": "Kò sí ìwé ẹ̀rí ìsanwó fún ìrajà yìí.",
+      "retentionLimit": "Ń ṣàfihàn ìtàn kírẹ́dítì tuntun jùlọ."
     },
     "title": "Ra kírẹ́dítì",
     "description": "Kírẹ́dítì jẹ́ rírà ẹ̀ẹ̀kan tí a fi kún iwọntunwọnsi Kilo rẹ fún ṣíṣe àwọn ìpàdé kíkọ kóòdù AI nínú Kilo App. Ṣọ́ọ̀bù gba owó láti inú àkọọ́lẹ̀ rẹ, a sì fi kírẹ́dítì kún un lẹ́yìn tí ṣọ́ọ̀bù bá fọwọ́sí ìsanwó.",

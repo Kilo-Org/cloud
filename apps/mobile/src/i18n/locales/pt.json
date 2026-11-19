@@ -3481,7 +3481,8 @@
         "accounting_adjustment": "Ajuste contabilístico",
         "credits_expired": "Créditos expirados"
       },
-      "truncated": "Há movimentos de créditos mais antigos disponíveis."
+      "truncated": "Há movimentos de créditos mais antigos disponíveis.",
+      "retentionLimit": "A mostrar os movimentos de créditos mais recentes."
     },
     "inviteMember": {
       "emailError": "Introduza um endereço de email válido.",
@@ -3513,7 +3514,8 @@
         "void": "Anulada",
         "uncollectible": "Incobrável"
       },
-      "truncated": "Estão disponíveis faturas mais antigas."
+      "truncated": "Estão disponíveis faturas mais antigas.",
+      "retentionLimit": "A mostrar as faturas mais recentes."
     },
     "lowBalanceAlert": {
       "enableA11y": "Ativar alerta de saldo baixo",
@@ -4455,7 +4457,8 @@
       "purchaseFallback": "Compra de créditos",
       "receipt": "Recibo",
       "receiptA11y": "Abrir o recibo de {{description}}, {{amount}}, de {{date}}",
-      "receiptUnavailable": "Não há recibo disponível para esta compra."
+      "receiptUnavailable": "Não há recibo disponível para esta compra.",
+      "retentionLimit": "A mostrar o histórico de créditos mais recente."
     },
     "title": "Comprar créditos",
     "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de programação com IA na aplicação Kilo. A loja cobra na sua conta e os créditos são adicionados depois de a loja confirmar o pagamento.",

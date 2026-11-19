@@ -499,22 +499,33 @@ export const createDownloadHold = ({
    * The tab whose call is navigating to this item's file: the item's url (or its
    * final url, after redirects) names the page the runtime asked for, or the
    * expectation is live on that tab and the item carries no referrer at all.
+   * A url match wins over a merely live expectation: an earlier call's
+   * expectation stays live for its settle window, so it would otherwise claim a
+   * later call's file on another tab — and name that earlier call's step with it.
    * Only a live expectation can claim an unreferred item, so a user's typed-URL
    * download — no expectation on its tab — still passes as foreign.
    */
   const tabByNavigation = (item: DownloadHoldItem, at: number): number | undefined => {
     const named = pageOf(item.url) ?? pageOf(item.finalUrl);
-    const unreferred = pageOf(item.referrer) === undefined;
+    let newest: { readonly tabId: number; readonly until: number } | undefined;
 
     for (const [tabId, navigation] of navigations) {
-      const live = navigation.until >= at && tabs.has(tabId);
+      if (navigation.until < at || !tabs.has(tabId)) {
+        continue;
+      }
 
-      if (live && (unreferred || named === undefined || pageOf(navigation.url) === named)) {
+      if (named !== undefined && pageOf(navigation.url) === named) {
         return tabId;
+      }
+
+      // An item with no url, or one redirected away from the url the call sent: the newest expectation is the tie.
+      if (newest === undefined || navigation.until > newest.until) {
+        newest = { tabId, until: navigation.until };
       }
     }
 
-    return undefined;
+    // An item that carries a referrer is attributed by it, never by an expectation.
+    return pageOf(item.referrer) === undefined ? newest?.tabId : undefined;
   };
 
   const classify = (item: DownloadHoldItem): Attribution => {

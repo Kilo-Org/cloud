@@ -521,8 +521,12 @@ export const createRuntimeBrowserBridge = ({
         return callOnOwnTab(parsed.data, input);
       }
 
-      // A repeat of a refused `browser_tabs new` carries its token, and the runtime drives the tab that step opened.
-      return runOnTab(parsed.data, input, { tabId: existing });
+      // The step is always the call the model made: the runtime may run `browser_tabs new` as the navigate on the
+      // Tab it opens, and the refusal it answers must still bind the model's own tool and arguments.
+      return runOnTab(parsed.data, input, {
+        step: { arguments: parsed.data.arguments, toolName: parsed.data.name },
+        tabId: existing,
+      });
     },
 
     closeSession: closeOne,

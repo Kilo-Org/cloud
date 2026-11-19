@@ -8,7 +8,7 @@ import { ModelDenyList, ProviderAllowList } from '@/components/organization/mode
 import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { GatewaySettingsSection } from '@/components/organization/providers-gateways-section';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { Button, COMPACT_BUTTON_FRAME_CLASS } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import {
@@ -335,17 +335,32 @@ export function ModelAccessForm({
         {!canEdit && !planEnded ? (
           <Text variant="caption">{t('organizationModelAccess.readOnly')}</Text>
         ) : null}
-        {/* The buttons keep their place while the draft is clean, so a save
+        {/* The controls keep their place while the draft is clean, so a save
             that settles never moves the list below them. A lapsed plan with a
             clean draft has no action left to offer — the gate holds Save and
             Cancel is `!dirty` — so the controls leave rather than sit dead
-            under the sentence that already states the blocker, and a box of
-            the row's own height keeps their place: the row comes and goes with
-            a state, and a state change must never move the list under the
-            reader's finger. A dirty draft keeps the live row, because Cancel
-            is then the only way to discard what the gate trapped. */}
+            under the sentence that already states the blocker. They leave as an
+            inert copy of themselves rather than as a measured box: the row's
+            height is the taller of its scaled label and its frame, so only the
+            row's own content keeps the list still at every type scale. The copy
+            takes no press and leaves the accessibility tree, so what leaves is
+            the action, not the space. A dirty draft keeps the live row, because
+            Cancel is then the only way to discard what the gate trapped. */}
         {planEnded && !dirty ? (
-          <View className={COMPACT_BUTTON_FRAME_CLASS} />
+          <View
+            className="flex-row items-center gap-2 opacity-0"
+            pointerEvents="none"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            <View className="min-h-5 flex-1 justify-center" />
+            <Button variant="outline" size="sm">
+              <Text>{t('common.cancel')}</Text>
+            </Button>
+            <Button variant="outline" size="sm">
+              <Text>{t('common.save')}</Text>
+            </Button>
+          </View>
         ) : (
           <View className="flex-row items-center gap-2">
             <View className="min-h-5 flex-1 justify-center">

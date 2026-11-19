@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted suite covers the segment gate, the lapsed-plan notice and the reserved actions row of one form. */
 // What the providers-and-models form offers and says, which the save contract
 // does not cover: the Gateways segment exists only while the settings read
 // reports gateways available, like the web page's Advanced policies tab, so an
@@ -10,7 +11,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, type ReactTestInstance, TestRenderer } from '@/test/renderer';
 
 import { i18n as appI18n } from '@/i18n';
-import { COMPACT_BUTTON_FRAME_CLASS } from '@/components/ui/button';
 import { type OrgGatewaySettings } from '@/lib/hooks/use-org-settings-queries';
 import { type ModelAccessDraft } from '@/lib/organization/model-access';
 import { ModelAccessForm } from './model-access-form';
@@ -162,6 +162,24 @@ function controls(root: ReactTestInstance, label: string): ReactTestInstance[] {
         node.findAll(child => Object.is(child.type, 'Text') && child.props.children === label)
           .length === 1
     );
+}
+
+/** The row the gate leaves behind: the actions row, out of the accessibility tree. */
+function reservedRow(root: ReactTestInstance): ReactTestInstance[] {
+  return root.findAll(
+    node =>
+      Object.is(node.type, 'View') &&
+      String(node.props.className ?? '').includes('opacity-0') &&
+      node.props.pointerEvents === 'none'
+  );
+}
+
+/** The same controls, keeping only the ones a reader can still press. */
+function liveControls(root: ReactTestInstance, label: string): ReactTestInstance[] {
+  const reserved = reservedRow(root);
+  return controls(root, label).filter(
+    node => !reserved.some(row => row.findAll(child => child === node).length > 0)
+  );
 }
 
 /** The control whose single label `Text` reads `label`, as the rendered pressable. */
@@ -351,23 +369,23 @@ describe('ModelAccessForm lapsed-plan controls', () => {
     expect(labelledControl(next, appI18n.t('common.save')).props.disabled).toBe(false);
   });
 
-  it('leaves the controls out but keeps their place while the plan lapsed', () => {
+  it('leaves the controls inert but in place while the plan lapsed', () => {
     // A clean draft already disables Save through `!dirty` and Cancel through
     // the same rule, so a lapsed plan with nothing to discard has no action
-    // left: the controls leave rather than sit dead under the sentence that
-    // states the blocker. Their height stays, so the list below does not move
-    // when the gate arrives or clears.
+    // left: the controls go inert rather than sit live under the sentence that
+    // states the blocker. Their own content stays, so the row keeps its height
+    // at every type scale and the list below does not move when the gate
+    // arrives or clears.
     const root = render({ canEdit: true, planEnded: true });
 
-    expect(controls(root, appI18n.t('common.save'))).toHaveLength(0);
-    expect(controls(root, appI18n.t('common.cancel'))).toHaveLength(0);
-    expect(
-      root.findAll(
-        node =>
-          Object.is(node.type, 'View') &&
-          String(node.props.className ?? '').includes(COMPACT_BUTTON_FRAME_CLASS)
-      )
-    ).toHaveLength(1);
+    expect(liveControls(root, appI18n.t('common.save'))).toHaveLength(0);
+    expect(liveControls(root, appI18n.t('common.cancel'))).toHaveLength(0);
+    // Both labels are still laid out, inside the row that leaves the
+    // accessibility tree.
+    expect(renderedCopy(root)).toEqual(
+      expect.arrayContaining([appI18n.t('common.cancel'), appI18n.t('common.save')])
+    );
+    expect(reservedRow(root)).toHaveLength(1);
   });
 
   it('keeps the actions row with Cancel live and Save gated for a trapped draft', () => {

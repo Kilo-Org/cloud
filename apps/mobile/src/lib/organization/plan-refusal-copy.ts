@@ -26,7 +26,8 @@ type OrganizationPlanRefusalCopy = { message: string; action?: OrganizationPlanR
  * The sentence and the step for a lapsed plan. The sentence follows the step
  * this call can paint, so it never leaves a reader without a next step: a role
  * that gets an action is told the state and stops there, because the action is
- * the next step; a role that gets none is told who can end the state and where.
+ * the next step; a role that gets none is told where billing is changed, in the
+ * form the app's trial-refusal table uses for that role.
  *
  * The step is the web billing page when the storefront rule lets the app link
  * it, which is the page that sells the plan. A surface that has its own step for
@@ -34,7 +35,7 @@ type OrganizationPlanRefusalCopy = { message: string; action?: OrganizationPlanR
  * where the plan is bought — passes it as `inAppBilling`, and it is used for
  * exactly the roles the state sentence belongs to. A caller that hands in
  * neither keeps the sentence that carries the step itself; a reader who cannot
- * change the plan keeps that same sentence, with no step.
+ * change the plan keeps the sentence that names who can, with no step.
  */
 export function organizationPlanRefusalFor({
   role,
@@ -52,16 +53,16 @@ export function organizationPlanRefusalFor({
 }): OrganizationPlanRefusalCopy {
   const canManagePlan = canManageOrganizationBilling(role);
   // The sentence that stops at the state belongs to a step painted beside it.
-  // Without one it is a dead end, so the reader gets the sentence that carries
-  // the step, exactly as a role that cannot change the plan does.
+  // Without one the reader gets the sentence that carries the step, and which
+  // one that is follows the app's trial-refusal table: a reader who can change
+  // the plan is told they can, and everyone else is told which role can.
   const stepSentence = t('organization.hub.planEnded');
-  const explainedSentence = t('common.organizationTrialEnded');
   if (!canManagePlan) {
-    return { message: explainedSentence };
+    return { message: t('common.organizationTrialEnded') };
   }
   if (!canLinkBilling) {
     return inAppBilling === undefined
-      ? { message: explainedSentence }
+      ? { message: t('common.organizationTrialEndedBilling') }
       : { message: stepSentence, action: inAppBilling };
   }
   const label = t('organization.hub.manageBilling');

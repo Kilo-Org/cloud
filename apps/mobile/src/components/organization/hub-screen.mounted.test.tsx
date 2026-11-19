@@ -510,8 +510,9 @@ describe('Organization hub plan', () => {
 
     const [refusal] = refusals(renderer);
     expect(refusal?.props.action).toBeUndefined();
-    // With no action, the sentence has to carry the step.
-    expect(refusal?.props.message).toBe(i18n.t('common.organizationTrialEnded'));
+    // With no action, the sentence has to carry the step — in the wording the
+    // app uses for a role that can change the plan.
+    expect(refusal?.props.message).toBe(i18n.t('common.organizationTrialEndedBilling'));
     expect(refusal?.props.message).not.toBe(i18n.t('organization.hub.planEnded'));
     expect(openExternalUrlMock).not.toHaveBeenCalled();
     unmount();

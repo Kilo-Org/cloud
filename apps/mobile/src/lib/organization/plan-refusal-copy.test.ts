@@ -48,9 +48,11 @@ describe('organizationPlanRefusalFor', () => {
     });
 
     // The state sentence belongs to an action beside it, so a surface with no
-    // step hands the reader the one that names where the plan is changed.
-    expect(refusal.message).toBe(i18n.t('common.organizationTrialEnded'));
+    // step hands the reader the sentence that says they can change the plan —
+    // the app's own trial-refusal wording for a role that can.
+    expect(refusal.message).toBe(i18n.t('common.organizationTrialEndedBilling'));
     expect(refusal.message).not.toBe(i18n.t('organization.hub.planEnded'));
+    expect(refusal.message).not.toBe(i18n.t('common.organizationTrialEnded'));
     expect(refusal.action).toBeUndefined();
     expect(opened.openExternalUrl).not.toHaveBeenCalled();
   });

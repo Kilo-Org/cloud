@@ -816,6 +816,9 @@ export async function ensureOrganizationAccessAndFetchOrg(
  * `sfo1`). Only a granting result is trusted: rows that grant no role return
  * undefined, so `resolveOrganizationAccess` re-reads the primary and replica lag
  * cannot deny a new member. A failed replica read falls back the same way.
+ * Revocation is eventually consistent instead: a member just removed or demoted
+ * keeps passing until the replica catches up, which `packages/web-shared/AGENTS.md`
+ * accepts for gateway auth reads. Only the read-only model-list gate sets `fromDb`.
  */
 async function loadReplicaMembershipRows(
   ctx: TRPCContext,

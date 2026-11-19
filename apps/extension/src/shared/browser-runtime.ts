@@ -3323,6 +3323,39 @@ export const createBrowserRuntime = ({
           });
         }
 
+        // A dialog the call left open holds the page: no frame or redirect read can run until it is answered,
+        // So the dialog is what the caller acts on next, ahead of the step's own text or the tab it opened.
+        const dialogAfterCall = runSession.pendingDialog();
+
+        if (dialogAfterCall !== undefined) {
+          const modalState = modalStateText(
+            dialogAfterCall,
+            toolName,
+            dialogMessageReadable(dialogAfterCall, agentContext)
+          );
+
+          // A guarded `browser_tabs new` names the tab it opened even when the dialog swallowed its answer:
+          // Its id and url are how the caller answers the dialog on that tab, and they were lost before.
+          const openedNote =
+            openedForStep === undefined
+              ? ''
+              : `\n\nThe call opened tab ${String(runTabId)} (${(await tabInfo(runTabId))?.url ?? openedForStep.url}).`;
+
+          return {
+            kind: 'result',
+            result: withModalState(settled, `${modalState}${openedNote}`),
+            // The page cannot report its frames while its dialog is open, so the tab's own document is the inventory.
+            ...(agentContext === undefined
+              ? {}
+              : {
+                  withheldFrames: await withheldOriginsFor(
+                    () => dialogFrameInventory(runTabId),
+                    agentContext.authorized
+                  ),
+                }),
+          };
+        }
+
         // A guarded `browser_tabs new` answers with what the tool itself would: the tab it opened, at its new url.
         if (openedForStep !== undefined) {
           if (!settled.ok) {
@@ -3350,24 +3383,6 @@ export const createBrowserRuntime = ({
                   agentContext.authorized
                 ),
               };
-        }
-
-        // A dialog the call left open holds the page: no frame or redirect read can run until it is answered.
-        // The dialog is what the caller has to act on next.
-        const dialogAfterCall = runSession.pendingDialog();
-
-        if (dialogAfterCall !== undefined) {
-          return {
-            kind: 'result',
-            result: withModalState(
-              settled,
-              modalStateText(
-                dialogAfterCall,
-                toolName,
-                dialogMessageReadable(dialogAfterCall, agentContext)
-              )
-            ),
-          };
         }
 
         // An approved navigate to an attachment keeps its file and still answers `ERR_ABORTED`: that is a success with no page change, not a failure.

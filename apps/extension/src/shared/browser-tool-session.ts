@@ -1899,9 +1899,10 @@ export const createBrowserToolSession = ({
     const { defaultPrompt, message, type, url } = parsed.data;
 
     const opened: BrowserToolDialog = {
-      message: message ?? '',
+      // The page writes this text and every other bounded page text has the same cap: a dialog cannot flood the model.
+      message: truncateText(message ?? ''),
       type: type ?? 'alert',
-      ...(defaultPrompt === undefined ? {} : { defaultValue: defaultPrompt }),
+      ...(defaultPrompt === undefined ? {} : { defaultValue: truncateText(defaultPrompt) }),
       ...(url === undefined ? {} : { url }),
     };
 

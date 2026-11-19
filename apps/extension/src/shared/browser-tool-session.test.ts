@@ -4,6 +4,7 @@ import {
   FIREFOX_PLATFORM_LIMIT,
   FIREFOX_UNSUPPORTED_BROWSER_TOOLS,
   MAX_BROWSER_TOOL_CONSOLE_MESSAGES,
+  MAX_BROWSER_TOOL_MESSAGE_TEXT_LENGTH,
   MAX_BROWSER_TOOL_NETWORK_REQUESTS,
   createBrowserToolSession,
   getFirefoxUnsupportedToolError,
@@ -930,6 +931,21 @@ describe('browser tool session', () => {
     debuggerApi.emitEvent(7, 'Page.javascriptDialogClosed', {});
 
     expect(session.takeDialog()).toBeUndefined();
+  });
+
+  it('bounds the page-written dialog message like every other page text', async () => {
+    const { debuggerApi, session } = createSession();
+
+    await session.attach();
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogOpening', {
+      defaultPrompt: 'x'.repeat(10_000),
+      message: 'y'.repeat(10_000),
+      type: 'prompt',
+    });
+    const dialog = session.takeDialog();
+
+    expect(dialog?.message).toBe(`${'y'.repeat(MAX_BROWSER_TOOL_MESSAGE_TEXT_LENGTH)}...`);
+    expect(dialog?.defaultValue).toBe(`${'x'.repeat(MAX_BROWSER_TOOL_MESSAGE_TEXT_LENGTH)}...`);
   });
 
   it('refuses page commands while a dialog is open, sends its answer, and takes commands again once it closes', async () => {

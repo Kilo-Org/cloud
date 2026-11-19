@@ -347,7 +347,8 @@ function cacheableVerdict(
  * What to cache for a call, the scan of one unit: an allow or a genuine block, or for a failed call
  * a short-lived allow, so the next request rescans only the units without a verdict, and a failed
  * unit only once its allow expired. A call that was skipped, because the request was blocked
- * first, caches nothing. Writes are auto-pipelined, and an allow is never overwritten.
+ * first, caches nothing. The caller writes each entry as its call finishes, and an allow is never
+ * overwritten.
  */
 function callCacheEntry(
   { key }: KeyedUnit,

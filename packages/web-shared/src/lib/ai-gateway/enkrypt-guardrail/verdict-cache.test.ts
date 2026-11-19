@@ -2789,10 +2789,11 @@ describe('scanRequestWithVerdictCache', () => {
       });
     });
 
-    it('counts only the slice with a cached block as a cached unit when it decides the tool', async () => {
+    it('counts only the slice with a cached block as cached when it decides the tool', async () => {
       const long = tool('long', numbered('t', 250_000));
       const keys = toolKeys(long);
       expect(keys).toHaveLength(3);
+      const middle = scanUnits(long.segments)[1]!.bodyRange!;
       const store = memoryStore();
       await rememberRequestVerdict(
         {
@@ -2820,6 +2821,7 @@ describe('scanRequestWithVerdictCache', () => {
         total_units: keys.length,
         cached_units: 1,
         calls_skipped: keys.length - 1,
+        cached_characters: middle.end - middle.start,
         decision: 'blocked',
       });
       expect(dependencies.fetch).not.toHaveBeenCalled();

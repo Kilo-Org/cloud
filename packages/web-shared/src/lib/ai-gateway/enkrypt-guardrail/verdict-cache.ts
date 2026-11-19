@@ -545,6 +545,7 @@ export function mostSevereVerdict(verdicts: EnkryptGuardrailVerdict[]): EnkryptG
 type ToolOutcome = {
   tool: RequestToolDefinition;
   characters: number;
+  cachedCharacters: number;
   totalUnits: number;
   cachedUnits: number;
   outcome:
@@ -602,9 +603,7 @@ function toolsReport(
     ).length,
     tools_flagged: flagged.length,
     total_characters: sum(outcomes.map(each => each.characters)),
-    cached_characters:
-      sum(cached.map(each => each.characters)) +
-      sum(reports.map(report => report.cached_characters)),
+    cached_characters: sum(outcomes.map(each => each.cachedCharacters)),
     total_units: sum(outcomes.map(each => each.totalUnits)),
     cached_units: sum(outcomes.map(each => each.cachedUnits)),
     failed_calls_cached: sum(
@@ -633,12 +632,13 @@ function toolsReport(
 }
 
 /**
- * A tool's cached verdict, or the calls that scan its uncached segments, with its unit counts. A
- * tool decided by a cached block counts only the units with a cached verdict as cached.
+ * A tool's cached verdict, or the calls that scan its uncached segments, with its cache coverage.
+ * A tool decided by a cached block counts only what has a cached verdict as cached.
  */
 type ToolPlan = {
   tool: RequestToolDefinition;
   characters: number;
+  cachedCharacters: number;
   totalUnits: number;
   cachedUnits: number;
 } & (
@@ -679,13 +679,24 @@ async function planTools(
       totalUnits: units.length,
       cachedUnits: units.filter(unit => unit.verdict).length,
     };
+    const allCached = unitCounts.cachedUnits === unitCounts.totalUnits;
     const block = cachedBlock(units);
     if (block) {
+      const cachedCharacters = allCached
+        ? characters
+        : cachedCoverage(rendered, units, characters).cachedCharacters;
       const callsSkipped = uncachedUnits(units).length;
-      return { tool, characters, ...unitCounts, verdict: block, callsSkipped };
+      return { tool, characters, cachedCharacters, ...unitCounts, verdict: block, callsSkipped };
     }
     if (units.every(unit => unit.verdict === 'allow')) {
-      return { tool, characters, ...unitCounts, verdict: 'allow', callsSkipped: 0 };
+      return {
+        tool,
+        characters,
+        cachedCharacters: characters,
+        ...unitCounts,
+        verdict: 'allow',
+        callsSkipped: 0,
+      };
     }
     const calls = uncachedUnits(units);
     const coverage: EnkryptScanCoverage = {
@@ -699,6 +710,7 @@ async function planTools(
     return {
       tool,
       characters,
+      cachedCharacters: coverage.cachedCharacters,
       ...unitCounts,
       calls,
       scans: callScans(request, coverage, calls),
@@ -709,11 +721,12 @@ async function planTools(
     cachedBlock: plans.some(plan => 'verdict' in plan && plan.verdict !== 'allow'),
     finish(resultOf) {
       const outcomes = plans.map((plan): ToolOutcome => {
-        const { tool, characters, totalUnits, cachedUnits } = plan;
+        const { tool, characters, cachedCharacters, totalUnits, cachedUnits } = plan;
         if ('verdict' in plan) {
           return {
             tool,
             characters,
+            cachedCharacters,
             totalUnits,
             cachedUnits,
             outcome: { kind: 'cached', verdict: plan.verdict, callsSkipped: plan.callsSkipped },
@@ -723,6 +736,7 @@ async function planTools(
         return {
           tool,
           characters,
+          cachedCharacters,
           totalUnits,
           cachedUnits,
           outcome: {

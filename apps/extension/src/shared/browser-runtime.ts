@@ -49,7 +49,7 @@ import type {
   BrowserToolSession,
   BrowserToolTabsApi,
 } from './browser-tool-session';
-import type { TabLeaseHolder, TabLeaseRegistry } from './browser-tab-leases';
+import type { TabLeaseRegistry, TabSessionOwner } from './browser-tab-leases';
 import { getInspectableTab, isInspectablePageUrl } from './tab-debugger';
 import type {
   BrowserScriptingApi,
@@ -87,8 +87,8 @@ export interface BrowserToolRunInput {
 
 export type BrowserToolRunOutcome =
   | {
-      readonly holder: TabLeaseHolder;
       readonly kind: 'needs_take_over';
+      readonly owner: TabSessionOwner;
     }
   | {
       readonly kind: 'result';
@@ -2575,6 +2575,22 @@ export const createBrowserRuntime = ({
     return lease.kind === 'granted';
   };
 
+  const liveSessionOwner = (tabId: number): TabSessionOwner | undefined => {
+    const sessionHandle = groups.sessionForTab(tabId);
+
+    if (sessionHandle === undefined) {
+      return undefined;
+    }
+
+    const title = groups
+      .listSessions()
+      .find(session => session.sessionHandle === sessionHandle)
+      ?.title.trim();
+
+    // A blank title names nobody: the card falls back to its generic session name.
+    return { sessionHandle, ...(title === undefined || title === '' ? {} : { title }) };
+  };
+
   const runTool = async ({
     agent,
     arguments: toolArguments,
@@ -2593,16 +2609,21 @@ export const createBrowserRuntime = ({
     }
 
     const lease = await leases.acquire(tabId, caller, {
+      owner: liveSessionOwner(tabId),
       ...(takeOver === undefined ? {} : { takeOver }),
       ...(title === undefined ? {} : { title }),
     });
 
     if (lease.kind === 'needs_take_over') {
-      return { holder: lease.holder, kind: 'needs_take_over' };
+      return { kind: 'needs_take_over', owner: lease.owner };
     }
 
     if (lease.kind === 'busy') {
       return { kind: 'result', result: { error: TAB_BUSY_ERROR, ok: false } };
+    }
+
+    if (lease.kind === 'taken') {
+      return { kind: 'result', result: { error: TAB_TAKEN_ERROR, ok: false } };
     }
 
     // Only a confirmed take-over ends the agent's in-flight call; a holder re-entering its own lease ends nothing.
@@ -3291,8 +3312,16 @@ export const createBrowserRuntime = ({
 
         // A download is not a document, so a navigate that became one never moved the tab.
         // An opaque or older origin there is the file's answer, not the redirect this check looks for.
-        if (preflight !== undefined && preflight.class === 'navigate' && keptText === undefined) {
-          const changed = await postAgentNavigate(runSession, preflight.origin);
+        if (
+          agentContext !== undefined &&
+          preflight?.class === 'navigate' &&
+          keptText === undefined
+        ) {
+          const changed = await postAgentNavigate(
+            runSession,
+            preflight.origin,
+            agentContext.authorized
+          );
 
           if (changed !== undefined) {
             return { from: changed.from, kind: 'origin_changed', result: settled, to: changed.to };

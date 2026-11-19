@@ -23,7 +23,6 @@ import {
 } from './payer-state';
 import { getClaudeOperatorToken, isClaudeOperatorConfigured } from './operator';
 
-/** The provider type of a request served on a customer's Claude organization. */
 export { CLAUDE_BILLING_PROVIDER_ID } from './provider-id';
 
 export const CLAUDE_BILLING_REQUIRED_MESSAGE =

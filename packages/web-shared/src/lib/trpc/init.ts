@@ -30,7 +30,7 @@ import {
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
 import { isAdminStepUpEnabled } from '@kilocode/web-shared/lib/config.server';
-import { setTag, trpcMiddleware } from '@sentry/nextjs';
+import { captureMessage, setTag, trpcMiddleware } from '@sentry/nextjs';
 import {
   AccountBlockedError,
   AuthContextError,
@@ -40,6 +40,7 @@ import {
   appUpdateRequiredError,
   enforceMinimumVersion,
   getMinimumVersions,
+  NO_ROW_CACHE_TTL_MS,
 } from '@kilocode/web-shared/lib/trpc/min-version';
 import { APP_CLIENT_HEADER, isMobileClient } from '@kilocode/web-shared/lib/app-headers';
 import {
@@ -294,15 +295,35 @@ const auditContextMiddleware = t.middleware(({ path, type, next }) =>
 // `isMobileClient` and pass without a DB read.
 // `getMinimumVersions` rejects with a retryable SERVICE_UNAVAILABLE when the
 // read failed and nothing is cached, and that rejection passes through here
-// unchanged, so only a version verdict becomes a FORBIDDEN app update here.
-// Runs before `sentryMiddleware`: both outcomes are expected gate verdicts, and
-// the read failure is already reported once per backoff window, so the tRPC
-// Sentry middleware must not capture one event per request during an outage
-// (its capture reaches `beforeSend`, which only drops tRPC 4xx errors).
+// unchanged. When the read succeeded but found no configuration row, it
+// resolves `null`: that is a missing configuration, not a version verdict, so
+// the call proceeds and the missing configuration is reported once per no-row
+// cache window. Only a version verdict becomes a FORBIDDEN app update here.
+// Runs before `sentryMiddleware`: all outcomes are expected gate verdicts, and
+// the read failure and the no-row report are throttled by their own windows, so
+// the tRPC Sentry middleware must not capture one event per request during an
+// outage (its capture reaches `beforeSend`, which only drops tRPC 4xx errors).
+let lastNoRowReportAt = 0;
 const minimumVersionMiddleware = t.middleware(async ({ ctx, next }) => {
   if (!isMobileClient(ctx.headersList?.get(APP_CLIENT_HEADER))) return next();
   const minimums = await getMinimumVersions();
-  if (!minimums || !enforceMinimumVersion(ctx.headersList, minimums).pass) {
+  if (minimums === null) {
+    // The gate's configuration is absent. Serve — an update cannot fix a
+    // missing row — but report so the missing configuration is visible.
+    const now = Date.now();
+    if (now - lastNoRowReportAt >= NO_ROW_CACHE_TTL_MS) {
+      lastNoRowReportAt = now;
+      captureMessage(
+        'SUSPICIOUS: no app_min_versions row configured; serving mobile callers unguarded',
+        {
+          level: 'error',
+          tags: { source: 'min_version_gate' },
+        }
+      );
+    }
+    return next();
+  }
+  if (!enforceMinimumVersion(ctx.headersList, minimums).pass) {
     throw appUpdateRequiredError();
   }
   return next();

@@ -269,9 +269,9 @@ type GuardEnkryptOutputParams = {
  *
  * With a blocking detector, the whole upstream response is read before any of it reaches the
  * client, so a streamed response arrives at once after generation and the scan; the stream itself
- * starts at once with keep-alive comments. The response is released only when the blocking scan
- * allows it. A block, or any failure of the scan, replaces it with a rejection, so unscanned output
- * never reaches the client.
+ * starts at once with keep-alive comments. The response is released when the blocking scan allows
+ * it, or when Enkrypt fails and the scan fails open (see `failureVerdict` in `detect.ts`). A block,
+ * or a failure of Kilo's own, such as an invalid configuration, replaces it with a rejection.
  *
  * Log-only detectors never delay the response: they scan a copy of the body after it ends, and
  * only log. Usage records are written in `after()`.
@@ -343,7 +343,7 @@ export async function guardEnkryptOutput({
   const decide = (verdict: EnkryptGuardrailVerdict, allowed: Response): OutputDecision => {
     report.verdict = verdict.action;
     report.unavailable_reason = verdict.action === 'unavailable' ? verdict.reason : null;
-    if (verdict.action === 'allow' || verdict.action === 'skip') {
+    if (verdict.action === 'allow' || verdict.action === 'skip' || verdict.action === 'fail_open') {
       return { action: 'release', response: allowed };
     }
     warnExceptInTest('[enkrypt-guardrail] output withheld', {

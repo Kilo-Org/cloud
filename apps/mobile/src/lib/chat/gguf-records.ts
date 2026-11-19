@@ -43,7 +43,7 @@ export type GgufDownload = {
   readonly pending: boolean;
   /** The model file and its projector together, so one bar covers both. */
   readonly written: number;
-  /** Zero until the server states a length. */
+  /** Zero only while no length is known — the published size or the server's report as transfers finish. */
   readonly total: number;
 };
 

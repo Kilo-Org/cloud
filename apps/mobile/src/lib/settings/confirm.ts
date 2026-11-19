@@ -170,12 +170,7 @@ export function settleAllSettingsConfirms(confirmed: boolean): void {
   }
 }
 
-/**
- * The settings where one direction of the change needs the person's ok, and the
- * dialog body that asks for it. The table is the single source of truth for the
- * guarded set: the catalog entries read it through `guardedChangeSummary`, and
- * the test suite iterates the same names.
- */
+/** One entry of the guarded set: a setting, the value that asks, and its copy. */
 type GuardedChange = Readonly<{
   name: string;
   /** The boolean value that asks first; the opposite value is written at once. */
@@ -183,7 +178,13 @@ type GuardedChange = Readonly<{
   summaryKey: string;
 }>;
 
-const GUARDED_CHANGES = [
+/**
+ * The settings where one direction of the change needs the person's ok, and the
+ * dialog body that asks for it. The table is the single source of truth for the
+ * guarded set: the catalog entries read it through `guardedChangeSummary`, and
+ * the test suite iterates this same list rather than repeating the names.
+ */
+export const GUARDED_CHANGES: readonly GuardedChange[] = [
   {
     name: 'notifications.spendAlerts',
     direction: 'off',
@@ -206,6 +207,11 @@ const GUARDED_CHANGES = [
   },
 ] as const satisfies readonly GuardedChange[];
 
+/** The guarded entry for a setting name, or nothing when that setting is not guarded. */
+export function guardedChangeFor(name: string): GuardedChange | undefined {
+  return GUARDED_CHANGES.find(change => change.name === name);
+}
+
 /**
  * The dialog body to show before writing this change, or nothing when the
  * change does not need one. Value-triggered: only the guarded direction of a
@@ -217,12 +223,8 @@ const GUARDED_CHANGES = [
  * the change without an English sentence inside translated copy.
  */
 export function guardedChangeSummary(name: string, value: unknown): string | undefined {
-  const guarded = GUARDED_CHANGES.find(change => change.name === name);
-  if (guarded === undefined) {
-    return undefined;
-  }
-  const guardedValue = guarded.direction === 'on';
-  if (value !== guardedValue) {
+  const guarded = guardedChangeFor(name);
+  if (guarded === undefined || value !== (guarded.direction === 'on')) {
     return undefined;
   }
   return `${i18n.t(guarded.summaryKey)} (${name} = ${String(value)})`;

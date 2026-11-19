@@ -11,7 +11,10 @@ import { setDefaultModelForContext } from '@/lib/hooks/use-persisted-agent-model
 import { setThemePreference } from '@/lib/hooks/use-theme-preference';
 import { setTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 
+import { i18n } from '@/i18n';
+
 import type * as ConfirmModule from './confirm';
+import { GUARDED_CHANGES, guardedChangeFor } from './confirm';
 import { APP_SETTINGS, settingNamed, settingsService } from './registry';
 
 // The guarded settings reach a native confirm dialog. Its summary comes from
@@ -47,9 +50,8 @@ const applyLanguagePreference = vi.hoisted(() =>
 );
 vi.mock('@/i18n/apply-language', () => ({ applyLanguagePreference }));
 
-const notificationMutation = vi.hoisted(() => ({
-  mutate: vi.fn().mockResolvedValue(undefined),
-  query: vi.fn().mockResolvedValue({
+const notificationMutation = vi.hoisted(() => {
+  const defaults = {
     agentAttention: false,
     agentUpdates: true,
     sessionStatus: true,
@@ -58,8 +60,18 @@ const notificationMutation = vi.hoisted(() => ({
     spendAlerts: true,
     agentPushEnabled: true,
     notificationPreviews: 'full',
-  }),
-}));
+  };
+  const stored: Record<string, unknown> = { ...defaults };
+  return {
+    // A write lands in this record, so a read after it proves the value moved.
+    reset: () => Object.assign(stored, defaults),
+    mutate: vi.fn((patch: Record<string, unknown>) => {
+      Object.assign(stored, patch);
+      return Promise.resolve();
+    }),
+    query: vi.fn(() => Promise.resolve({ ...stored })),
+  };
+});
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {
     user: {
@@ -85,6 +97,7 @@ beforeEach(() => {
   appearance.setColorScheme.mockClear();
   confirmSettingChange.mockReset();
   confirmSettingChange.mockReturnValue(Effect.succeed(true));
+  notificationMutation.reset();
 });
 
 describe('APP_SETTINGS', () => {
@@ -241,90 +254,68 @@ describe('settingsService one source of truth', () => {
 /**
  * The alert channels and the balance toggle ask the person before the one
  * direction that takes something away. The confirm answer is stubbed per test;
- * the dialog copy itself comes from the real `guardedChangeSummary`.
+ * the dialog copy itself comes from the real `guardedChangeSummary`. Every case
+ * comes from the guarded table, so a name added there is covered here too.
  */
 describe('guarded settings ask the person first', () => {
-  beforeEach(() => {
-    notificationMutation.mutate.mockClear();
-    confirmSettingChange.mockReset();
-    confirmSettingChange.mockReturnValue(Effect.succeed(true));
-  });
-
-  it.each([
-    ['notifications.spendAlerts', { spendAlerts: false }],
-    ['notifications.balanceAlerts', { balanceAlerts: false }],
-    ['notifications.securityFindings', { securityFindings: false }],
-  ] as const)('asks before turning off %s, then writes', async (name, mutation) => {
-    const report = await Effect.runPromise(settingsService().write(name, false));
-
-    expect(confirmSettingChange).toHaveBeenCalledTimes(1);
-    expect(confirmSettingChange.mock.calls[0]?.[0]).toContain(`${name} = false`);
-    expect(notificationMutation.mutate).toHaveBeenCalledWith(mutation);
-    expect(report).toContain(name);
-    expect(report).toContain('false');
-  });
-
-  it('writes nothing when the person cancels an alert change', async () => {
-    confirmSettingChange.mockReturnValue(Effect.succeed(false));
-
-    const refused = await Effect.runPromise(
-      Effect.result(settingsService().write('notifications.spendAlerts', false))
-    );
-
-    expect(Result.isFailure(refused)).toBe(true);
-    if (Result.isFailure(refused)) {
-      expect(String(refused.failure.cause)).toContain('did not confirm');
+  const guarded = (name: string) => {
+    const found = guardedChangeFor(name);
+    if (found === undefined) {
+      throw new Error(`${name} is not a guarded setting`);
     }
-    expect(notificationMutation.mutate).not.toHaveBeenCalled();
-    await expect(
-      Effect.runPromise(settingsService().read('notifications.spendAlerts'))
-    ).resolves.toBe(true);
-  });
+    return found;
+  };
+  const read = (name: string) => Effect.runPromise(settingsService().read(name));
+  const answer = (confirmed: boolean) => {
+    confirmSettingChange.mockReset();
+    confirmSettingChange.mockReturnValue(Effect.succeed(confirmed));
+  };
 
-  it('turns an alert channel back on without asking', async () => {
-    const report = await Effect.runPromise(
-      settingsService().write('notifications.spendAlerts', true)
-    );
+  it.each(GUARDED_CHANGES.map(change => [change.name, change.direction === 'on'] as const))(
+    'asks before writing the guarded direction of %s, and honours the answer',
+    async (name, guardedValue) => {
+      answer(true);
+      await Effect.runPromise(settingsService().write(name, !guardedValue));
+
+      const report = await Effect.runPromise(settingsService().write(name, guardedValue));
+
+      expect(confirmSettingChange).toHaveBeenCalledTimes(1);
+      expect(confirmSettingChange.mock.calls[0]?.[0]).toBe(
+        `${i18n.t(guarded(name).summaryKey)} (${name} = ${String(guardedValue)})`
+      );
+      expect(report).toContain(name);
+      expect(await read(name)).toBe(guardedValue);
+
+      answer(false);
+      confirmSettingChange.mockClear();
+
+      const refused = await Effect.runPromise(
+        Effect.result(settingsService().write(name, guardedValue))
+      );
+
+      expect(Result.isFailure(refused)).toBe(true);
+      if (Result.isFailure(refused)) {
+        expect(String(refused.failure.cause)).toContain('did not confirm');
+      }
+      expect(await read(name)).toBe(guardedValue);
+
+      confirmSettingChange.mockClear();
+
+      const flipped = await Effect.runPromise(settingsService().write(name, !guardedValue));
+
+      expect(confirmSettingChange).not.toHaveBeenCalled();
+      expect(flipped).toContain(String(!guardedValue));
+      expect(await read(name)).toBe(!guardedValue);
+    }
+  );
+
+  it('turns an alert channel back on through the mutation', async () => {
+    answer(true);
+
+    await Effect.runPromise(settingsService().write('notifications.spendAlerts', true));
 
     expect(confirmSettingChange).not.toHaveBeenCalled();
     expect(notificationMutation.mutate).toHaveBeenCalledWith({ spendAlerts: true });
-    expect(report).toContain('true');
-  });
-
-  it('asks before hiding balances, and writes only after the person agrees', async () => {
-    await Effect.runPromise(settingsService().write('hideBalance', false));
-    const effect = settingsService().write('hideBalance', true);
-    expect(Effect.runSync(settingsService().read('hideBalance'))).toBe(false);
-
-    const report = await Effect.runPromise(effect);
-
-    expect(confirmSettingChange).toHaveBeenCalledTimes(1);
-    expect(confirmSettingChange.mock.calls[0]?.[0]).toContain('hideBalance = true');
-    expect(report).toContain('hideBalance');
-    expect(Effect.runSync(settingsService().read('hideBalance'))).toBe(true);
-  });
-
-  it('leaves the balance toggle alone when the person cancels', async () => {
-    await Effect.runPromise(settingsService().write('hideBalance', false));
-    confirmSettingChange.mockReturnValue(Effect.succeed(false));
-
-    const refused = await Effect.runPromise(
-      Effect.result(settingsService().write('hideBalance', true))
-    );
-
-    expect(Result.isFailure(refused)).toBe(true);
-    if (Result.isFailure(refused)) {
-      expect(String(refused.failure.cause)).toContain('did not confirm');
-    }
-    expect(Effect.runSync(settingsService().read('hideBalance'))).toBe(false);
-  });
-
-  it('shows the balances again without asking', async () => {
-    const report = await Effect.runPromise(settingsService().write('hideBalance', false));
-
-    expect(confirmSettingChange).not.toHaveBeenCalled();
-    expect(report).toContain('hideBalance');
-    expect(report).toContain('false');
   });
 });
 

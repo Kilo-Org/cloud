@@ -6,11 +6,19 @@ import { ensureRemoteMcp, remoteMcpState, subscribeRemoteMcp } from './remote-mc
 import { signInRemoteMcpServer } from './remote-mcp-oauth';
 import { type RemoteMcpServerState } from './remote-mcp-state';
 import {
+  REMOTE_MCP_URL_ERROR_KEYS,
+  RemoteMcpUrlError,
+  type RemoteMcpUrlProblem,
+} from './remote-mcp-url';
+import {
   addRemoteMcpServer,
   deleteRemoteMcpServer,
   getRemoteMcpServersHasLoaded,
   listRemoteMcpServers,
+  REMOTE_MCP_STORE_ERROR_KEYS,
   type RemoteMcpServerDraft,
+  RemoteMcpStoreError,
+  type RemoteMcpStoreProblem,
   setRemoteMcpServerEnabled,
   type StoredRemoteMcpServer,
   subscribeRemoteMcpServers,
@@ -55,6 +63,27 @@ export type RemoteMcpServers = {
   readonly saving: boolean;
 };
 
+/**
+ * The copy key a refusal is said with, or nothing when the failure is not one
+ * of the store's or the URL policy's. A refusal's message is a problem tag the
+ * person must never read, so the words come from the catalog, in the reader's
+ * language; anything that is not a refusal falls back to the generic copy.
+ */
+function refusalKey(
+  error: unknown
+):
+  | (typeof REMOTE_MCP_STORE_ERROR_KEYS)[RemoteMcpStoreProblem]
+  | (typeof REMOTE_MCP_URL_ERROR_KEYS)[RemoteMcpUrlProblem]
+  | undefined {
+  if (error instanceof RemoteMcpStoreError) {
+    return REMOTE_MCP_STORE_ERROR_KEYS[error.problem];
+  }
+  if (error instanceof RemoteMcpUrlError) {
+    return REMOTE_MCP_URL_ERROR_KEYS[error.problem];
+  }
+  return undefined;
+}
+
 export function useRemoteMcpServers(place: ChatPlace | null): RemoteMcpServers {
   const { t } = useTranslation();
   const servers = useSyncExternalStore(subscribeRemoteMcpServers, listRemoteMcpServers);
@@ -64,10 +93,11 @@ export function useRemoteMcpServers(place: ChatPlace | null): RemoteMcpServers {
   const [retryingIds, setRetryingIds] = useState<ReadonlySet<string>>(() => new Set());
   const [signingInIds, setSigningInIds] = useState<ReadonlySet<string>>(() => new Set());
 
-  /** The reason a write failed, said out loud because the store kept its value. */
+  /** A refused write is said in the reader's language; any other failure falls
+      back to the generic copy, because the store kept its value either way. */
   const failed = useCallback(
     (error: unknown): false => {
-      toast.error(error instanceof Error ? error.message : t('common.somethingWentWrong'));
+      toast.error(t(refusalKey(error) ?? 'common.somethingWentWrong'));
       return false;
     },
     [t]

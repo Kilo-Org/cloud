@@ -2,12 +2,12 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "您的代理工作階段有更新",
+      "cloudAgentSession": "您的代理程式工作階段有更新",
       "lowBalance": "您的餘額需要留意",
       "spendAlert": "您的支出需要留意",
       "securityFinding": "安全發現需要留意",
       "securityUpdate": "安全檢查有更新",
-      "activeAgentsGlanceable": "使用中的代理有更新"
+      "activeAgentsGlanceable": "使用中的代理程式有更新"
     }
   },
   "agentSession": {

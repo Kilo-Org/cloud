@@ -5,6 +5,7 @@ import {
   hasRetentionBudget,
   INFINITE_QUERY_MAX_PAGES,
   reconcileFirstPage,
+  stoppedAtRetentionBound,
   withInfiniteRetention,
 } from '@/lib/query/infinite-retention';
 
@@ -55,6 +56,31 @@ describe('hasRetentionBudget', () => {
   });
 });
 
+describe('stoppedAtRetentionBound', () => {
+  it('is false before any page has loaded', () => {
+    expect(stoppedAtRetentionBound(0, false)).toBe(false);
+  });
+
+  it('is false while the list still has budget left', () => {
+    expect(stoppedAtRetentionBound(4, true, 5)).toBe(false);
+    expect(stoppedAtRetentionBound(4, false, 5)).toBe(false);
+  });
+
+  it('is true at the bound when the server still reports more', () => {
+    expect(stoppedAtRetentionBound(5, true, 5)).toBe(true);
+  });
+
+  it('is false at the bound when the server reports the end', () => {
+    expect(stoppedAtRetentionBound(5, false, 5)).toBe(false);
+  });
+
+  it('honours a custom maxPages', () => {
+    expect(stoppedAtRetentionBound(2, true, 2)).toBe(true);
+    expect(stoppedAtRetentionBound(1, true, 2)).toBe(false);
+    expect(stoppedAtRetentionBound(2, false, 2)).toBe(false);
+  });
+});
+
 describe('reconcileFirstPage', () => {
   const prefix = ['trpc', 'cliSessionsV2', 'list'];
   const fullKey = [...prefix, { input: { organizationId: 'org-1' } }];
@@ -66,7 +92,6 @@ describe('reconcileFirstPage', () => {
     const gate: { release?: () => void } = {};
     let hold = false;
     const calls: number[] = [];
-    // eslint-disable-next-line require-await -- the held fetch is the point: the recipe resolves it from the test.
     const queryFn = async ({ pageParam }: { pageParam: number }): Promise<Page> => {
       calls.push(pageParam);
       if (hold) {

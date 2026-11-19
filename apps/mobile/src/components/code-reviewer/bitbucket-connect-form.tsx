@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -29,21 +29,45 @@ const CREATE_WORKSPACE_TOKEN_URL =
 export function BitbucketConnectForm({
   scope,
   integrationId,
+  organizationName,
   onConnected,
+  onDirtyChange,
 }: Readonly<{
   scope: string;
   integrationId: string | null;
+  organizationName: string;
   onConnected: () => void;
+  /**
+   * Reports whether a dismissal would drop a draft: text in the token field
+   * that no submit has taken yet. A connect already running owns that token, so
+   * the sheet lets a Back leave without asking while it is in flight.
+   */
+  onDirtyChange?: (dirty: boolean) => void;
 }>) {
   const { t } = useTranslation();
   // iOS never lets a controlled `value` hold the caret, so the token lives in a
   // ref and the state below only tracks whether submit can run.
   const tokenRef = useRef('');
   const [hasToken, setHasToken] = useState(false);
+  /** Text in the field that a submit would send: the sheet's leave-guard draft. */
+  const [holdsDraft, setHoldsDraft] = useState(false);
+  /**
+   * A connect accepted this token and the sheet is closing, so the token is no
+   * longer a draft even though the field still holds its text.
+   */
+  const [connectLanded, setConnectLanded] = useState(false);
   const { feedback, begin, clearWhere } = useSurfaceFeedback<BitbucketFailure>();
   const connect = useConnectBitbucket(scope);
   const replaceToken = useReplaceBitbucketToken(scope);
   const submitting = feedback.status === 'pending';
+
+  // A submit takes the draft: while a connect runs, its token is already sent,
+  // so the sheet's dismissal is not dropping anything a person typed. The
+  // effect covers both edges, so a failed connect arms the guard again, and a
+  // landed one never re-arms it on the render that ends the pending phase.
+  useEffect(() => {
+    onDirtyChange?.(holdsDraft && !submitting && !connectLanded);
+  }, [connectLanded, holdsDraft, onDirtyChange, submitting]);
 
   const onSubmit = () => {
     const field = readBitbucketToken(tokenRef.current);
@@ -62,6 +86,10 @@ export function BitbucketConnectForm({
           ? connect.mutateAsync({ accessToken: field.token })
           : replaceToken.mutateAsync({ integrationId, accessToken: field.token }));
         if (attempt.owns()) {
+          // Both in one batch: the render that ends the pending phase already
+          // knows the token was accepted, so it cannot report a draft and
+          // re-arm the leave guard over the dismissal the sheet is starting.
+          setConnectLanded(true);
           attempt.abandon();
           onConnected();
         }
@@ -88,7 +116,11 @@ export function BitbucketConnectForm({
     <View className="gap-5">
       <View className="gap-2">
         <Text variant="muted" className="text-sm">
-          {t('codeReviewer.bitbucketConnect.description')}
+          {integrationId === null
+            ? t('codeReviewer.bitbucketConnect.description', { organization: organizationName })
+            : t('codeReviewer.bitbucketConnect.descriptionReconnect', {
+                organization: organizationName,
+              })}
         </Text>
         <Text variant="muted" className="text-sm">
           {t('codeReviewer.bitbucketConnect.scopes')}
@@ -118,6 +150,8 @@ export function BitbucketConnectForm({
         onChangeText={value => {
           tokenRef.current = value;
           setHasToken(readBitbucketToken(value).kind === 'ready');
+          // Whitespace is what a submit would not send, so it is no draft either.
+          setHoldsDraft(value.trim().length > 0);
           // Only a failure another token can repair is what a new one answers;
           // a lost role or a connection that changed underneath keeps the submit
           // disabled until the sheet is reopened.
@@ -129,7 +163,7 @@ export function BitbucketConnectForm({
 
       {failure?.kind === 'connection-changed' ? (
         <Text variant="muted" className="text-sm">
-          {t('codeReviewer.bitbucketConnect.managedOnWeb')}
+          {t('codeReviewer.bitbucketConnect.managedOnWeb', { organization: organizationName })}
         </Text>
       ) : null}
 

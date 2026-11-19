@@ -7,6 +7,8 @@ import {
   gateThresholdLabel,
   severityLabelKey,
 } from '@/components/code-reviewer/review-detail-helpers';
+import { Card } from '@/components/ui/card';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { type useReviewDetail } from '@/lib/hooks/use-code-reviews';
 import { cn } from '@/lib/utils';
@@ -43,7 +45,7 @@ export function MetaRow({
 export function FindingCard({ finding }: Readonly<{ finding: CouncilFinding }>) {
   const { t } = useTranslation();
   return (
-    <View className="gap-1 rounded-lg bg-secondary p-3">
+    <Card className="gap-1">
       <View className="flex-row items-center justify-between">
         <Text
           className={cn(
@@ -61,16 +63,15 @@ export function FindingCard({ finding }: Readonly<{ finding: CouncilFinding }>) 
         </Text>
       </View>
       <Text className="text-xs">{finding.rationale}</Text>
-    </View>
+    </Card>
   );
 }
 
 export function CouncilSection({ councilResult }: Readonly<{ councilResult: CouncilResult }>) {
   const { t } = useTranslation();
   return (
-    <View className="gap-2">
-      <Text className="text-sm font-medium">{t('codeReviewer.reviewDetail.council')}</Text>
-      <View className="gap-1 rounded-lg bg-secondary p-4">
+    <Section label={t('codeReviewer.reviewDetail.council')}>
+      <Card className="gap-1">
         <MetaRow
           label={t('codeReviewer.reviewDetail.decision')}
           value={councilDecisionLabel(councilResult.decision)}
@@ -82,8 +83,8 @@ export function CouncilSection({ councilResult }: Readonly<{ councilResult: Coun
             value={councilVoteLabel(specialist.vote)}
           />
         ))}
-      </View>
-    </View>
+      </Card>
+    </Section>
   );
 }
 
@@ -104,9 +105,8 @@ export function GateSection({
     checkRunLabel = t('codeReviewer.reviewDetail.gateHidden');
   }
   return (
-    <View className="gap-2">
-      <Text className="text-sm font-medium">{t('codeReviewer.reviewDetail.gate')}</Text>
-      <View className="gap-1 rounded-lg bg-secondary p-4">
+    <Section label={t('codeReviewer.reviewDetail.gate')}>
+      <Card className="gap-1">
         <MetaRow label={t('codeReviewer.reviewDetail.checkRun')} value={checkRunLabel} />
         {gateThreshold ? (
           <MetaRow
@@ -114,7 +114,7 @@ export function GateSection({
             value={gateThresholdLabel(gateThreshold)}
           />
         ) : null}
-      </View>
-    </View>
+      </Card>
+    </Section>
   );
 }

@@ -1,6 +1,6 @@
 import { isAppVersionAtLeast } from '@kilocode/app-shared/app-version';
 
-import { type PushData } from './push-data';
+import { classifyCloudAgentSessionPush, type PushData } from './push-data';
 
 /**
  * Android notification channels. Each push is routed to exactly one channel
@@ -178,9 +178,9 @@ export function agentNotificationKindForGlanceableSnapshot(snapshot: {
 function agentKindForAgentPush(data: AgentPushData): AgentNotificationKind {
   switch (data.type) {
     case 'cloud_agent_session':
-      // The schema default is 'status', applied at the producer's enforcement
-      // read site; an omitted category is a status update, not a question.
-      return data.category === 'attention' ? 'needs-input' : 'progress';
+      // An omitted category is a status update, not a question: the shared
+      // classifier applies the schema default.
+      return classifyCloudAgentSessionPush(data) === 'attention' ? 'needs-input' : 'progress';
     case 'active_agents_glanceable':
       return agentNotificationKindForGlanceableSnapshot(data);
     default: {

@@ -10,7 +10,7 @@ import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/con
 import type {
   OpenRouterModel,
   OpenRouterModelsResponse,
-} from '@kilocode/web-shared/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   type User,
   type Organization,

@@ -45,7 +45,7 @@ export function PreparationStepDetails({
     return null;
   }
   return (
-    <View className={divided ? 'gap-2 border-t border-border px-3 py-2' : 'gap-2'}>
+    <View className={divided ? 'gap-2 border-t-[0.5px] border-hair-soft px-3 py-2' : 'gap-2'}>
       {step.command ? (
         <Text selectable className="rounded bg-secondary p-2 font-mono text-xs">
           {step.command}

@@ -24,7 +24,7 @@ import { useRouter } from 'expo-router';
 import { Search } from '@/components/ui/icons';
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, Pressable, type TextInput, View, type ViewStyle } from 'react-native';
+import { Platform, type TextInput, View, type ViewStyle } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -33,10 +33,12 @@ import { EmptyState } from '@/components/empty-state';
 import { NavigatorFileRow } from '@/components/pr-review/diff/pr-diff-navigator-file-row';
 import { usePrDiffStateCopy } from '@/components/pr-review/diff/pr-diff-state-copy';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { FIELD_TRIGGER_FRAME_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber } from '@/lib/format';
 import { requestScrollToFile } from '@/lib/pr-review/file-navigator-bridge';
 import {
@@ -237,7 +239,7 @@ export function PrDiffFileNavigator({
     const isProviderScope = scope.ref.platform !== 'github';
     body = (
       <CenteredState>
-        <View className="items-center px-6">
+        <View className="items-center px-4">
           <Text className="text-center text-lg font-semibold text-foreground">
             {copy.unavailableTitle}
           </Text>
@@ -258,7 +260,7 @@ export function PrDiffFileNavigator({
   } else if (firstPageErrorState?.kind === 'permission') {
     body = (
       <CenteredState>
-        <View className="items-center px-6">
+        <View className="items-center px-4">
           <Text className="text-center text-lg font-semibold text-foreground">
             {t('common.accessDenied')}
           </Text>
@@ -271,26 +273,24 @@ export function PrDiffFileNavigator({
   } else if (firstPageErrorState) {
     body = (
       <CenteredState>
-        <View className="items-center gap-3 px-6">
+        <View className="items-center gap-3 px-4">
           <Text className="text-center text-lg font-semibold text-foreground">
             {t('prReview.fileNavigator.couldNotLoadFiles')}
           </Text>
           <Text variant="muted" className="text-center">
             {t('organization.boundary.loadErrorMessage')}
           </Text>
-          <Pressable
+          <Button
+            variant="outline"
+            size="sm"
+            className={STATE_ACTION_CLASS}
             onPress={() => {
               void query.refetch();
             }}
-            className={cn(
-              STATE_ACTION_CLASS,
-              'mt-1 rounded-md border border-border bg-card px-4 py-2 active:opacity-70'
-            )}
-            accessibilityRole="button"
             accessibilityLabel={t('prReview.fileNavigator.retryLoadingFiles')}
           >
-            <Text className="text-sm font-medium text-foreground">{t('common.retry')}</Text>
-          </Pressable>
+            <Text>{t('common.retry')}</Text>
+          </Button>
         </View>
       </CenteredState>
     );
@@ -313,13 +313,13 @@ export function PrDiffFileNavigator({
       <EmptyState
         icon={Search}
         title={t('prReview.noFilesChanged')}
-        description={t('prReview.noFilesChangedDescription')}
+        description={copy.noChangesDescription ?? t('prReview.noFilesChangedDescription')}
       />
     );
   } else if (filtered.length === 0) {
     body = (
       <CenteredState>
-        <View className="px-6">
+        <View className="px-4">
           <Text variant="muted" className="text-center text-sm">
             {t('prReview.fileNavigator.noMatches', { query: searchRef.current })}
           </Text>
@@ -366,7 +366,7 @@ export function PrDiffFileNavigator({
     <>
       <View collapsable={false} className="bg-background pb-2">
         {header}
-        <View className="mx-4 mt-2 flex-row items-center gap-2 rounded-md border border-border bg-card px-3 py-2">
+        <View className={cn('mx-4 mt-2', FIELD_TRIGGER_FRAME_CLASS)}>
           <Search size={16} color={colors.mutedForeground} />
           <Input
             ref={inputRef}
@@ -422,20 +422,18 @@ export function PrDiffFileNavigator({
         )}
 
         {showRetry ? (
-          <View className="mx-4 mt-2 flex-row items-center justify-between rounded-md border border-border bg-card px-3 py-2">
+          <Card className="mx-4 mt-2 flex-row items-center justify-between gap-3">
             <Text className="text-xs text-destructive">{retryMessage}</Text>
-            <Pressable
+            <Button
+              variant="outline"
+              size="sm"
+              className={STATE_ACTION_CLASS}
               onPress={() => void retryAction()}
-              className={cn(
-                STATE_ACTION_CLASS,
-                'rounded-md border border-border bg-card px-3 py-1 active:opacity-70'
-              )}
-              accessibilityRole="button"
               accessibilityLabel={retryLabel}
             >
-              <Text className="text-xs font-medium text-foreground">{t('common.retry')}</Text>
-            </Pressable>
-          </View>
+              <Text>{t('common.retry')}</Text>
+            </Button>
+          </Card>
         ) : null}
       </View>
       {body}

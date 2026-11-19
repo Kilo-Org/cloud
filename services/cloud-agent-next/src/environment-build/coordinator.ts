@@ -94,6 +94,7 @@ export type CoordinatorEnvironment = {
     repoFullName: string | undefined;
     commands: readonly string[];
     sandboxAllocation: string | null;
+    egressMode: ProfileBuildInput['egressMode'];
   }): Promise<BuildTargetResolution>;
 };
 
@@ -279,6 +280,7 @@ export class EnvironmentBuildCoordinator {
       repoFullName: input.repoFullName,
       commands: input.commands,
       sandboxAllocation: input.sandboxAllocation,
+      egressMode: input.egressMode,
     });
     if (!target.ok) return { status: 'rejected', reason: 'unsupported_provider' };
     const buildId = await this.admit(
@@ -394,6 +396,7 @@ export class EnvironmentBuildCoordinator {
       repoFullName: input.repoFullName,
       commands: input.commands,
       sandboxAllocation: input.sandboxAllocation,
+      egressMode: input.egressMode,
     });
     if (!target.ok) {
       return {
@@ -495,6 +498,7 @@ export class EnvironmentBuildCoordinator {
       repoFullName: input.repoFullName,
       commands: input.commands,
       sandboxAllocation: input.sandboxAllocation,
+      egressMode: input.egressMode,
     });
     if (!target.ok) return { status: 'skipped', reason: 'unsupported' };
     const buildId = await this.admit(
@@ -554,6 +558,7 @@ export class EnvironmentBuildCoordinator {
         repoFullName: input.repoFullName,
         commands: input.commands,
         sandboxAllocation: input.sandboxAllocation,
+        egressMode: input.egressMode,
       });
     } catch (error) {
       this.deps.log('Environment build target is temporarily unavailable', {

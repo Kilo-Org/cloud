@@ -13,12 +13,14 @@ import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connecti
 import { isChatEvent, type NormalizedEvent } from './normalizer';
 import { createConversationSourceReader } from './conversation-source';
 import type { CloudAgentEvent } from './cloud-conversation-schemas';
+import type { CloudSessionSnapshotPage } from './types';
 import type { ServiceEvent } from './normalizer';
 import {
   replaySnapshotPage,
   replayStoredMessages,
   SESSION_HISTORY_UNAVAILABLE_MESSAGE,
   sessionSnapshotFailureMessage,
+  type SessionSnapshotFailure,
   snapshotPageFromSnapshot,
 } from './snapshot-page';
 import {
@@ -92,6 +94,8 @@ type CloudAgentTransportConfig = {
    * its initial bounded read (newest 50) instead of `fetchSnapshot`, and for
    * any reconnect snapshot replays. The transport calls `onInitialPageLoaded`
    * after a successful initial read so the manager can record the cursor.
+   *
+   * `null` represents an access-not-found outcome (worker returns 404).
    */
   fetchSnapshotPage?: (
     kiloSessionId: KiloSessionId,
@@ -102,7 +106,7 @@ type CloudAgentTransportConfig = {
   /** Called after a successful initial bounded page read. */
   onInitialPageLoaded?: ((page: SessionSnapshotPage) => void) | undefined;
   websocketBaseUrl: string;
-  onError?: ((message: string) => void) | undefined;
+  onError?: ((message: string, failure?: SessionSnapshotFailure) => void) | undefined;
   lifecycleHooks?: ConnectionLifecycleHooks | undefined;
   websocketHeaders?: WebSocketHeaders | undefined;
   /**
@@ -130,12 +134,24 @@ async function readCloudSnapshotPage(
   fetchPage: NonNullable<CloudAgentTransportConfig['fetchCloudSnapshotPage']>,
   sessionId: CloudAgentSessionId
 ): Promise<SnapshotRead> {
+  let payload: unknown;
   try {
-    const page = cloudSessionMessagesPageSchema.parse(await fetchPage(sessionId, {}));
-    return page === null ? { kind: 'missing' } : { kind: 'page', page };
+    payload = await fetchPage(sessionId, {});
   } catch (error) {
     return { kind: 'rejected', error };
   }
+  // A page that fails the schema is terminal: a retry replays the same
+  // persisted page, and its validation text is not a user-facing message.
+  // The schema's transform can also throw (a session-identity mismatch), and
+  // safeParse does not convert a transform throw into a failure result.
+  let parsed: { success: true; data: CloudSessionSnapshotPage | null } | { success: false };
+  try {
+    parsed = cloudSessionMessagesPageSchema.safeParse(payload);
+  } catch {
+    return { kind: 'typed', outcome: { kind: 'invalid_data' } };
+  }
+  if (!parsed.success) return { kind: 'typed', outcome: { kind: 'invalid_data' } };
+  return parsed.data === null ? { kind: 'missing' } : { kind: 'page', page: parsed.data };
 }
 
 function snapshotReadFailureMessage(error: unknown): string {
@@ -491,10 +507,14 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       }
     }
 
-    function reportSnapshotFailure(message: string, expectedGeneration: number): void {
+    function reportSnapshotFailure(
+      message: string,
+      expectedGeneration: number,
+      failure?: SessionSnapshotFailure
+    ): void {
       if (expectedGeneration !== lifecycleGeneration || snapshotFailureReported) return;
       snapshotFailureReported = true;
-      config.onError?.(message);
+      config.onError?.(message, failure);
     }
 
     /**
@@ -516,12 +536,12 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       }
       if (read.kind === 'missing') return true;
       if (read.kind === 'typed' && read.outcome.kind !== 'retryable_failure') return true;
-      reportSnapshotFailure(
-        read.kind === 'rejected'
-          ? snapshotReadFailureMessage(read.error)
-          : sessionSnapshotFailureMessage(read.outcome.kind),
-        expectedGeneration
-      );
+      if (read.kind === 'rejected') {
+        reportSnapshotFailure(snapshotReadFailureMessage(read.error), expectedGeneration);
+        return false;
+      }
+      const failure = sessionSnapshotFailureMessage(read.outcome.kind);
+      reportSnapshotFailure(failure.message, expectedGeneration, failure);
       return false;
     }
 
@@ -642,14 +662,12 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       // A terminal typed history failure is reported here, once per open, and
       // still connects: the websocket remains useful for live events.
       if (read.kind === 'typed' && read.outcome.kind !== 'retryable_failure') {
-        reportSnapshotFailure(sessionSnapshotFailureMessage(read.outcome.kind), expectedGeneration);
+        const failure = sessionSnapshotFailureMessage(read.outcome.kind);
+        reportSnapshotFailure(failure.message, expectedGeneration, failure);
       }
       if (!applySnapshotRead(read, () => {}, expectedGeneration)) {
         scheduleSnapshotRetry(replayInitialPage, expectedGeneration, 0);
       }
-      // Even on a failed read the websocket is still useful — connect without
-      // a snapshot replay. The manager surfaces the error and a retry fills the
-      // transcript when the read recovers.
       return { ticket };
     }
 
@@ -660,12 +678,31 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       if (expectedGeneration !== lifecycleGeneration) return;
 
       const stoppedEvent: ServiceEvent = { type: 'stopped', reason: 'transport-disconnected' };
+      const exhaustedEvent: ServiceEvent = {
+        type: 'stopped',
+        reason: 'transport-disconnected',
+        exhausted: true,
+      };
+      // The base connection reports exhaustion on both edges. Only the first
+      // `true` per connection escalates, so a repeated report never publishes
+      // a second terminal stop.
+      let exhaustionReported = false;
 
       const nextConnection = createConnection({
         websocketUrl: buildWebsocketUrl,
         ticket,
         lifecycleHooks: config.lifecycleHooks,
         websocketHeaders: config.websocketHeaders,
+        onReconnectExhaustionChange: exhausted => {
+          if (expectedGeneration !== lifecycleGeneration) return;
+          if (!exhausted) {
+            exhaustionReported = false;
+            return;
+          }
+          if (exhaustionReported) return;
+          exhaustionReported = true;
+          sink.onServiceEvent(exhaustedEvent);
+        },
         onEvent: raw => {
           if (expectedGeneration !== lifecycleGeneration || raw.sessionId !== config.sessionId) {
             return;

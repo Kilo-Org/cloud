@@ -28,6 +28,14 @@ type ToggleProps = {
   onValueChange?: (value: boolean) => void;
 };
 
+type ChoiceProps = {
+  label: string;
+  selected: boolean;
+  disabled?: boolean;
+  multi?: boolean;
+  onPress?: () => void;
+};
+
 type SaveMutation = { mutate: Mock; isPending: boolean };
 
 /** The one field the app's organization list answer carries for the switcher. */
@@ -54,6 +62,7 @@ const state = vi.hoisted(() => {
     save,
     toastErrors: [] as string[],
     toggleProps: [] as ToggleProps[],
+    choiceProps: [] as ChoiceProps[],
     patches: [] as SavedPatch[],
     routerPush: vi.fn(),
     routerReplace: vi.fn(),
@@ -154,7 +163,16 @@ vi.mock('@/components/code-reviewer/reviewer-error-screen', () => ({
 }));
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
 vi.mock('@/components/empty-state', () => ({
-  // The real state wraps its title and description in `Text` nodes; the mock
+  // The refusal's one action is what this suite presses, so the stub carries
+  // its label and handler the way the real `StateAction`'s button does; the
+  // real module would pull the button's native graph into this render suite.
+  StateAction: (props: { label: string; onPress?: () => void }) =>
+    createElement(
+      'Pressable',
+      { accessibilityLabel: props.label, onPress: props.onPress },
+      createElement('Text', null, props.label)
+    ),
+  // The real state wraps its title and description in `Text` nodes; the stub
   // mirrors that, so the suite's rendered-text assertions read both.
   EmptyState: (props: { title?: string; description?: string; action?: ReactNode }) =>
     createElement(
@@ -165,26 +183,32 @@ vi.mock('@/components/empty-state', () => ({
       props.action ?? null
     ),
 }));
-// The state's icon comes from the lucide barrel, whose ESM entry the loader
-// cannot parse (see the activity-indicator stub below); the suite never
-// asserts the glyph, so it is a stub like the indicator.
-vi.mock('@/components/ui/icons', () => ({ Building2: 'Building2' }));
-vi.mock('@/components/security-agent/settings-toggle-row', () => ({
-  ToggleRow: (props: ToggleProps) => {
+vi.mock('@/components/ui/preference-row', () => ({
+  PreferenceRow: (props: ToggleProps) => {
     state.toggleProps.push(props);
-    return createElement('ToggleRow', props);
+    return createElement('PreferenceRow', props);
   },
 }));
+vi.mock('@/components/ui/icons', () => ({
+  ArrowRight: 'ArrowRight',
+  Building2: 'Building2',
+  Lock: 'Lock',
+  Plus: 'Plus',
+  Users: 'Users',
+  ShieldCheck: 'ShieldCheck',
+}));
 vi.mock('@/components/ui/choice-row', () => ({
-  ChoiceRow: (props: { label: string; selected: boolean; onPress?: () => void }) =>
-    createElement('ChoiceRow', props),
+  ChoiceRow: (props: ChoiceProps) => {
+    state.choiceProps.push(props);
+    return createElement('ChoiceRow', props);
+  },
 }));
 vi.mock('@/components/ui/radio-group', () => ({
   RadioGroup: (props: { children?: ReactNode }) =>
     createElement('RadioGroup', null, props.children),
 }));
 vi.mock('@/components/ui/input', () => ({ Input: 'TextInput' }));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
 // `Button` draws its spinner through the activity indicator, whose icon barrel
 // deep-imports lucide; lucide's ESM pulls react-native-svg, whose CJS entry
 // requires the React Native package itself (`import typeof`), which Node's
@@ -266,7 +290,10 @@ describe('council route gate', () => {
     expect(renderedTexts(renderer)).toContain(
       'Council review is not available for Bitbucket repositories.'
     );
-    expect(renderer.root.findAll(node => String(node.type) === 'ToggleRow')).toHaveLength(0);
+    // The refusal is the shared empty state: a title saying what is
+    // unavailable above the sentence naming the platform.
+    expect(renderedTexts(renderer)).toContain('Council review is unavailable');
+    expect(renderer.root.findAll(node => String(node.type) === 'PreferenceRow')).toHaveLength(0);
     // The config read is what the editor needs; a refused platform never asks.
     expect(state.configEnabled).toEqual([false]);
 
@@ -411,8 +438,12 @@ describe('council route gate', () => {
     expect(renderedTexts(renderer)).not.toContain(
       'Council review needs the Enterprise plan with an active subscription or trial. This organization does not have it right now.'
     );
-    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton').length).toBeGreaterThan(
-      0
+    // The placeholder reserves the row primitive's own shape — a leading tile
+    // and a subtitle line — so it cannot drift into a hand-sized box.
+    const placeholders = renderer.root.findAll(node => String(node.type) === 'RowSkeleton');
+    expect(placeholders.length).toBeGreaterThan(0);
+    expect(placeholders.every(row => row.props.tile === true && row.props.subtitle === true)).toBe(
+      true
     );
 
     mounted.unmount();
@@ -486,9 +517,10 @@ describe('council unit of write', () => {
     await act(() => undefined);
 
     expect(specialistToggle('Council review')?.value).toBe(false);
-    // An opt-in only runs against a stored council, so the row stays closed
-    // until the switch stores one.
-    expect(specialistToggle('kilo/app')?.disabled).toBe(true);
+    // A repository opt-in is a multi-select choice row, and one only runs
+    // against a stored council, so the row stays closed until the switch
+    // stores one.
+    expect(state.choiceProps.findLast(props => props.label === 'kilo/app')?.disabled).toBe(true);
 
     mounted.unmount();
   });

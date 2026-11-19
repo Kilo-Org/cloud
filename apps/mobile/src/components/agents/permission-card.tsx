@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { displaySafeText } from '@kilocode/app-shared/display-text';
 
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import {
   applyBlockingCardAppearance,
@@ -128,44 +129,49 @@ export function PermissionCard({
   // Only the command is display copy. Other metadata entries are control flags
   // or machine payloads and must not reach the card as raw key/value rows.
   const parsedCommand = commandSchema.safeParse(metadata?.command);
-  const command = parsedCommand.success ? parsedCommand.data : null;
-  // Patterns are the rule-matching form of the request, not display copy. When
-  // the verbatim command is present they repeat it in a different spelling, so
-  // the card shows the command alone and keeps the patterns for requests that
-  // have no command, such as path scopes.
-  const showPatterns = patterns.length > 0 && !command;
+  // An empty or whitespace-only command names no text to show; treat it as
+  // absent so the stored scope stays visible in the standalone block.
+  const command =
+    parsedCommand.success && parsedCommand.data.trim() !== '' ? parsedCommand.data : null;
+  // The patterns name the scope a stored rule covers. With a command visible,
+  // only the patterns that differ from the command after trimming and
+  // collapsing whitespace need a scope caption, and the command stays visible.
+  const normalized = (value: string) => value.replaceAll(/\s+/g, ' ').trim();
+  const scopePatterns =
+    command === null
+      ? patterns
+      : patterns.filter(pattern => normalized(pattern) !== normalized(command));
 
   return (
-    <View className="mx-4 my-2 shrink overflow-hidden rounded-xl border border-border bg-card">
-      <View className="border-b border-border bg-secondary px-4 py-3">
-        <Text ref={titleRef} accessible accessibilityLabel={title} className="text-sm font-medium">
+    <Card className="mx-4 my-2 shrink">
+      <View className="gap-1">
+        <Text ref={titleRef} accessible accessibilityLabel={title} variant="heading">
           {title}
         </Text>
-        <Text className="mt-1 text-xs text-muted-foreground">
-          {presentation.protocolExplanation}
-        </Text>
+        <Text variant="caption">{presentation.protocolExplanation}</Text>
       </View>
 
       {presentation.errorMessage ? (
-        <View className="border-b border-border bg-danger-tile-bg px-4 py-2">
-          <Text className="text-xs text-destructive">{presentation.errorMessage}</Text>
-        </View>
+        <Text variant="caption" className="text-destructive">
+          {presentation.errorMessage}
+        </Text>
       ) : null}
 
       <ScrollView className="max-h-96 shrink">
-        <View className="gap-3 p-4">
+        <View className="gap-3">
           <Text className="text-sm text-foreground">
             {t('agentChat.permissionCard.allowQuestion', { permission: permissionDisplay })}
           </Text>
 
-          {showPatterns ? (
+          {command === null && patterns.length > 0 ? (
             <View className="gap-1 rounded-lg bg-muted p-2">
               <Text className="text-xs font-medium text-muted-foreground">
                 {t('agentChat.permissionCard.appliesTo')}
               </Text>
               {patterns.map((pattern, index) => (
                 <Text key={index} className="text-xs text-muted-foreground">
-                  • {isolateLtrBidiText(displaySafeText(pattern))}
+                  {patterns.length > 1 ? '• ' : null}
+                  {isolateLtrBidiText(displaySafeText(pattern))}
                 </Text>
               ))}
             </View>
@@ -179,13 +185,19 @@ export function PermissionCard({
               <Text className="text-xs text-muted-foreground">
                 {isolateLtrBidiText(displaySafeText(command))}
               </Text>
+              {scopePatterns.map((pattern, index) => (
+                <Text key={index} className="text-xs text-muted-foreground">
+                  {t('agentChat.permissionCard.appliesTo')}{' '}
+                  {isolateLtrBidiText(displaySafeText(pattern))}
+                </Text>
+              ))}
             </View>
           ) : null}
         </View>
       </ScrollView>
 
       {presentation.hasPrimaryCta || presentation.hasRetryCta ? (
-        <View className="flex-row gap-2 border-t border-border p-3">
+        <View className="flex-row gap-2 border-t-[0.5px] border-hair-soft pt-3">
           {presentation.hasPrimaryCta ? (
             <>
               <Button
@@ -267,6 +279,6 @@ export function PermissionCard({
           ) : null}
         </View>
       ) : null}
-    </View>
+    </Card>
   );
 }

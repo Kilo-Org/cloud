@@ -50,6 +50,13 @@
       "when": 1794258033433,
       "tag": "0006_confused_shiva",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1795008596223,
+      "tag": "0007_session_cost_totals",
+      "breakpoints": true
     }
   ]
 }

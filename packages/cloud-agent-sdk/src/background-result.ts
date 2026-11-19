@@ -45,7 +45,7 @@ export function backgroundOutcome(
 
 export function backgroundResultLabel(result: BackgroundResult): string {
   if (result.kind === 'notice') return 'Agent notice';
-  const name = result.kind === 'shell' ? 'Shell' : result.agent || 'Agent';
+  const name = result.kind === 'shell' ? 'Shell' : result.agent || 'Subagent';
   return `${name.charAt(0).toUpperCase()}${name.slice(1)} ${result.outcome === 'unknown' ? 'ended' : result.outcome}`;
 }
 

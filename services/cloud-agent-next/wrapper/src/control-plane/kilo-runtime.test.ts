@@ -21,6 +21,7 @@ import {
   createKiloRuntimes,
   KiloWorktreeCredentialClassMismatchError,
   KiloWorktreeMcpMismatchError,
+  kiloServerPort,
   liveRuntimeClient,
   parseKiloPidfile,
   prepareKiloFilesystem,
@@ -419,6 +420,67 @@ describe('prepareKiloFilesystem', () => {
 });
 
 describe('Kilo startup lifecycle', () => {
+  it('holds sibling prompts until the running CLI applies the workspace MCP refresh', async () => {
+    const { runtime } = createRuntime({
+      spawner: createSpawner(),
+      feed: createFeedFactory(),
+      probe: createProbe(true),
+      scheduler: createScheduler(),
+      isIdle: () => false,
+    });
+    const client = await runtime.ensure();
+    const refresh = Promise.withResolvers<void>();
+    const materialized = Promise.withResolvers<void>();
+    const submitted = Promise.withResolvers<void>();
+    const events: string[] = [];
+    client.updateCloudAgentMcp = async () => {
+      await refresh.promise;
+      events.push('refreshed');
+    };
+    client.submit = async () => {
+      events.push('submitted');
+      submitted.resolve();
+    };
+    const turns = createTurnManager({
+      timers: TEST_TIMERS,
+      runtimes: { get: () => runtime },
+      emit: () => undefined,
+      materializeAttachments: async message => {
+        materialized.resolve();
+        return message;
+      },
+    });
+    turns.registerRoute({
+      sessionId: 'workspace_sibling',
+      kiloSessionId: 'ses_sibling',
+      directory: runtime.directory,
+      attemptId: 'sibling',
+    });
+    const installation = runtime.installCredentials(runtime.env, {
+      url: 'https://mcp.kiloapps.io/mcp',
+      token: 'renewed-mcp-grant',
+      expiresAt: 1_900_000_000,
+    });
+    try {
+      turns.submit('workspace_sibling', {
+        messageId: 'm1',
+        turn: { type: 'prompt', prompt: 'hello' },
+        agent: { mode: 'code', model: 'test/model' },
+      });
+      await materialized.promise;
+      await Bun.sleep(0);
+      expect(events).toEqual([]);
+      refresh.resolve();
+      await submitted.promise;
+      expect(events).toEqual(['refreshed', 'submitted']);
+    } finally {
+      refresh.resolve();
+      await installation;
+      turns.release('workspace_sibling');
+      await runtime.shutdown();
+    }
+  });
+
   it.each([0, 3600, -3600])('refreshes MCP with a proxy handle expiry delta of %s', async delta => {
     const exp = 1_800_000_000;
     const { runtime } = createRuntime({
@@ -2696,6 +2758,38 @@ describe('createKiloRuntimes', () => {
     releaseShutdown.resolve();
     await retire;
     expect(runtimes.get('dir')).not.toBe(first);
+  });
+
+  it('reports the port of each live Kilo server', async () => {
+    const spawner = createSpawner();
+    const runtimes = createKiloRuntimes({
+      readSnapshot: async () => [],
+      timers: TEST_TIMERS,
+      pidfileDirectory: '/tmp/kilo-runtimes-server-ports-pids',
+      scheduler: createScheduler().scheduler,
+      spawnKilo: spawner.spawn,
+      openFeed: createFeedFactory().openFeed,
+      probeHealth: createProbe(false).probe,
+      readProcessStartTime: () => undefined,
+      log: () => undefined,
+    });
+    expect(runtimes.serverPorts()).toEqual([]);
+    await runtimes.ensure({ key: 'a', directory: '/tmp/a', env: {} });
+    await runtimes.ensure({ key: 'b', directory: '/tmp/b', env: {} });
+    // The fake spawner serves each process on a port equal to its pid.
+    const ports = spawner.processes.map(record => record.pid);
+    expect(runtimes.serverPorts()).toEqual(ports);
+
+    await runtimes.get('a')?.shutdown();
+    expect(runtimes.serverPorts()).toEqual([ports[1]]);
+    await runtimes.shutdown();
+    expect(runtimes.serverPorts()).toEqual([]);
+  });
+
+  it('reads no port from a Kilo URL without one', () => {
+    expect(kiloServerPort({ url: 'http://127.0.0.1:4096', authorization: 'x' })).toBe(4096);
+    expect(kiloServerPort({ url: 'not a url', authorization: 'x' })).toBeUndefined();
+    expect(kiloServerPort(undefined)).toBeUndefined();
   });
 
   it('summary counts a suspected runtime as suspected only', async () => {

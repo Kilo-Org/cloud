@@ -23,7 +23,7 @@ export function isEmailOnBlockedTld(email: string, blockedTlds: readonly string[
 }
 
 /**
- * New-signup TLD gate. The TLD list is admin-configurable in Redis, so a cheap
+ * New-signup TLD gate. The TLD list is admin-configurable in Postgres, so a cheap
  * TLD can be blocked without a deploy. Only new accounts are refused; an
  * existing account on a blocked TLD keeps signing in.
  */

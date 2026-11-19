@@ -239,7 +239,6 @@ function hasOnlyExchangeSafeClaims(claimNames: readonly string[]): boolean {
   return claimNames.every(name => exchangeSafeClaimNames.has(name));
 }
 
-/** `kilo-api` on its own, as a scalar audience or a single-element array. */
 function hasSoleKiloApiAudience(audience: unknown): boolean {
   if (typeof audience === 'string') return audience === KILO_API_AUDIENCE;
   return Array.isArray(audience) && audience.length === 1 && audience[0] === KILO_API_AUDIENCE;

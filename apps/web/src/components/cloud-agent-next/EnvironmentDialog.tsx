@@ -30,7 +30,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { EnvironmentDeleteDialog } from './EnvironmentDeleteDialog';
-import { allocationSupportsMultiRepository } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   useCloudAgentEnvironment,
   useCloudAgentEnvironmentMutations,
@@ -428,7 +427,6 @@ function EnvironmentForm({
           value={sandboxAllocation}
           disabled={!canManage || isSaving}
           onChange={setSandboxAllocation}
-          isAllowed={isMultiRepository ? allocationSupportsMultiRepository : undefined}
         />
       )}
       <EnvironmentNetworkField

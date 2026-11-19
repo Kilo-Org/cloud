@@ -7,7 +7,6 @@ import { getBuiltinModeLabelKey, getModeIcon } from '@/components/agents/mode-op
 import {
   type AgentMode,
   dedupeCustomModeOptions,
-  ensureSelectedCustomOption,
   isBuiltinAgentMode,
   type ModeOption,
   normalizeAgentMode,
@@ -40,12 +39,13 @@ export function ModeSelector({
   const { 'session-id': rawSessionId } = useLocalSearchParams<{ 'session-id'?: string }>();
   const selectedValue = normalizeAgentMode(value);
   const customOptionsDeduped = dedupeCustomModeOptions(customOptions);
-  const selectedCustomOption = ensureSelectedCustomOption(customOptionsDeduped, selectedValue).find(
-    m => m.value === selectedValue
-  );
+  const customMatch = customOptionsDeduped.find(option => option.value === selectedValue);
+  // An empty label means no loaded option names this mode, so the chip falls
+  // back to the generic label rather than printing the slug.
+  const customLabel = customMatch?.label ?? '';
   const selectedLabel = isBuiltinAgentMode(selectedValue)
     ? t(getBuiltinModeLabelKey(selectedValue) ?? '')
-    : (selectedCustomOption?.label ?? selectedValue);
+    : customLabel || t('agentChat.modeSelector.customMode');
   const ModeIcon = getModeIcon(selectedValue);
 
   function handlePress() {

@@ -217,7 +217,7 @@ it('sends screened evidence to the model provider', async () => {
   expect(prompt).not.toContain('Quokka');
   expect(prompt).not.toContain(alias);
   expect(prompt).not.toContain(joined);
-  expect(prompt).toContain('Agent session');
+  expect(prompt).not.toContain('Agent session');
   expect(prompt).toContain('[redacted credential]');
 });
 
@@ -823,7 +823,28 @@ it('atomically initializes a fresh enabled context schedule in the requested tim
     timezone: 'America/Los_Angeles',
     language: 'ja',
   });
-  expect((await db.select().from(agent_briefing_preferences))[0]).toEqual(schedule);
+  // The language rides every context update, so the stored row carries it; the
+  // schedule's own fields (timezone and next run) stay on the first enable.
+  expect((await db.select().from(agent_briefing_preferences))[0]).toEqual({
+    ...schedule,
+    language: 'ja',
+    updated_at: expect.any(String),
+  });
+});
+
+// A language-only update must not enroll a user who never enabled summaries:
+// the schedule row's NOT NULL next_run_at would put them in the daily sweep.
+it('leaves no schedule row when a context update only carries a language', async () => {
+  const user = await insertTestUser({ total_microdollars_acquired: 10_000_000 });
+  const caller = agentBriefingRouter.createCaller({ user });
+  await expect(
+    caller.updateContextPreferences({
+      enabled: false,
+      timezone: 'Europe/Berlin',
+      language: 'de',
+    })
+  ).resolves.toBeDefined();
+  expect(await db.select().from(agent_briefing_preferences)).toHaveLength(0);
 });
 
 function maintenanceSnapshot(

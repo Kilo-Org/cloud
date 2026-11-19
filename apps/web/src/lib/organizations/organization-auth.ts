@@ -62,7 +62,7 @@ type DataOrNextError<T> = CustomResult<
 
 export async function getAuthorizedOrgContext(
   id: Organization['id'],
-  roles?: OrganizationRole[],
+  roles?: readonly OrganizationRole[],
   options: {
     // used only in testing because mocking getUserFromAuth doesn't work with jest
     // due to the way next module loading works
@@ -280,7 +280,7 @@ function roleForAccess(
 export async function getAuthorizedOrgContextOrSupport(
   id: Organization['id'],
   supportKey: string,
-  roles?: OrganizationRole[],
+  roles?: readonly OrganizationRole[],
   options: Omit<Parameters<typeof getAuthorizedOrgContext>[2], 'supportKey'> = {}
 ) {
   return getAuthorizedOrgContext(id, roles, { ...options, supportKey });

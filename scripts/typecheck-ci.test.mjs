@@ -2208,14 +2208,14 @@ test('a changes-only run checks the packages the detector selects, readers inclu
     root: true,
     changes: 'scoped',
     affected: selection({
-      dirs: ['apps/ai-gateway', 'apps/web', 'packages/usage-queue', 'packages/web-shared'],
-      packages: ['@kilocode/usage-queue', '@kilocode/web-shared', 'ai-gateway', 'web'],
+      dirs: ['apps/ai-gateway', 'apps/web', 'packages/usage-contracts', 'packages/web-shared'],
+      packages: ['@kilocode/usage-contracts', '@kilocode/web-shared', 'ai-gateway', 'web'],
     }),
   });
   assert.equal(result.status, 0);
   assert.ok(result.commands.includes(detectorCall));
   assert.deepEqual(workspaceRuns(result), [
-    selectedTypecheck(['@kilocode/usage-queue', '@kilocode/web-shared', 'ai-gateway']),
+    selectedTypecheck(['@kilocode/usage-contracts', '@kilocode/web-shared', 'ai-gateway']),
   ]);
 });
 

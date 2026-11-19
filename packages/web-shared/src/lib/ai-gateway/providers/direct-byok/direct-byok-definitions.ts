@@ -7,7 +7,6 @@ import chutesByok from './chutes-byok';
 import edenai from './edenai';
 import inceptronByok from './inceptron-byok';
 import kimiCoding from './kimi-coding';
-import martian from './martian';
 import morph from './morph';
 import neuralwatt from './neurowatt';
 import nvidiaByok from './nvidia-byok';
@@ -31,7 +30,6 @@ const DIRECT_BYOK_PROVIDERS = [
   edenai,
   inceptronByok,
   kimiCoding,
-  martian,
   morph,
   neuralwatt,
   nvidiaByok,

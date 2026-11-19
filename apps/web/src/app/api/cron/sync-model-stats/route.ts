@@ -17,7 +17,7 @@ import { syncInternalUsageStats } from '@/lib/model-stats/sync-internal-data';
 import { invalidateModelStatsCache } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
 import { CRON_SECRET, ENKRYPT_SYNC_ENABLED } from '@kilocode/web-shared/lib/config.server';
 import { ENKRYPT_MODEL_MAPPINGS } from '@/lib/model-stats/enkrypt-identity';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { getMonitoredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
 
 /**

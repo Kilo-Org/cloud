@@ -223,6 +223,17 @@ export type KiloProcess = KiloServer & {
   stop(deadlineAt: number): Promise<boolean>;
 };
 
+/** The TCP port in a `kilo serve` URL, if it has one. */
+export function kiloServerPort(server: KiloServer | undefined): number | undefined {
+  if (server === undefined) return undefined;
+  try {
+    const port = Number(new URL(server.url).port);
+    return Number.isInteger(port) && port > 0 ? port : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export type KiloProcessSpawnInput = {
   directory: string;
   env: Record<string, string>;
@@ -386,6 +397,8 @@ export type KiloRuntime = {
   isSuspected(): boolean;
   isRestarting(): boolean;
   isUnavailable(): boolean;
+  /** The port of the live `kilo serve`; preview refuses it. */
+  serverPort(): number | undefined;
   needsCompute(): boolean;
   liveTreeExecutions(root: string): number[] | undefined;
   sessionState(id: string): ReturnType<RuntimeActivity['state']>;
@@ -623,6 +636,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
   /** Spec §7: one health probe per silence episode, reset by any activity. */
   let probedThisEpisode = false;
   let pendingCredentials = false;
+  let mcpRefresh: Promise<void> | undefined;
   /** Single-flight owner for the health probe and the reconnect loop. */
   let recovery: Promise<void> | undefined;
   let lastActivityAt = scheduler.now();
@@ -1100,6 +1114,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
   }
 
   async function ensure(): Promise<Harness> {
+    while (mcpRefresh !== undefined) await mcpRefresh;
     if (phase === 'stopped') throw new Error('Kilo runtime is shutting down');
     if (phase === 'unavailable') throw new Error('Kilo runtime is unavailable');
     if (client) return client;
@@ -1316,22 +1331,33 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       // Repeated proxy handles can still carry a renewed MCP credential.
       options.env = env;
       if (client && cloudAgentMcp) {
-        try {
-          await withTimeoutAndAbort(
-            client.updateCloudAgentMcp(
-              cloudAgentMcp,
-              AbortSignal.timeout(KILO_CONTROL_REQUEST_TIMEOUT_MS)
-            ),
-            {
-              timeoutMs: KILO_CONTROL_REQUEST_TIMEOUT_MS,
-              timeoutMessage: 'Cloud Agent MCP credential refresh timed out',
-              abortMessage: 'Cloud Agent MCP credential refresh aborted',
-            }
-          );
-        } catch {
-          pendingCredentials = true;
-          log('control-plane MCP credential refresh failed; retaining pending credential restart');
-        }
+        const previous = mcpRefresh;
+        const refresh = (async () => {
+          await previous;
+          if (!client) return;
+          try {
+            await withTimeoutAndAbort(
+              client.updateCloudAgentMcp(
+                cloudAgentMcp,
+                AbortSignal.timeout(KILO_CONTROL_REQUEST_TIMEOUT_MS)
+              ),
+              {
+                timeoutMs: KILO_CONTROL_REQUEST_TIMEOUT_MS,
+                timeoutMessage: 'Cloud Agent MCP credential refresh timed out',
+                abortMessage: 'Cloud Agent MCP credential refresh aborted',
+              }
+            );
+          } catch {
+            pendingCredentials = true;
+            log(
+              'control-plane MCP credential refresh failed; retaining pending credential restart'
+            );
+          }
+        })().finally(() => {
+          if (mcpRefresh === refresh) mcpRefresh = undefined;
+        });
+        mcpRefresh = refresh;
+        await refresh;
       }
     },
     applyPendingCredentials,
@@ -1346,6 +1372,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     isSuspected: isSuspectedPhase,
     isRestarting: () => phase === 'restarting',
     isUnavailable: () => phase === 'unavailable',
+    serverPort: () => kiloServerPort(kiloProcess),
     async shutdown(): Promise<void> {
       if (phase === 'stopped') return;
       phase = 'stopped';
@@ -1408,6 +1435,8 @@ export type KiloRuntimes = {
   };
   /** Live runtimes serving one directory; worktree deletion retires them (R2). */
   runtimesForDirectory(directory: string): KiloRuntime[];
+  /** The ports of every live `kilo serve`; preview refuses them. */
+  serverPorts(): number[];
   /** Stops and removes every runtime serving one directory (worktree deletion). */
   retireDirectory(directory: string): Promise<void>;
   shutdown(): Promise<void>;
@@ -1597,6 +1626,11 @@ export function createKiloRuntimes(options: KiloRuntimesOptions): KiloRuntimes {
     },
     runtimesForDirectory: directory =>
       [...runtimes.values()].filter(runtime => runtime.directory === directory),
+    serverPorts: () =>
+      [...runtimes.values()].flatMap(runtime => {
+        const port = runtime.serverPort();
+        return port === undefined ? [] : [port];
+      }),
     async retireDirectory(directory) {
       const targets = [...runtimes.entries()].filter(
         ([, runtime]) => runtime.directory === directory

@@ -1914,3 +1914,69 @@ describe('per-tool entries', () => {
     ).toEqual([]);
   });
 });
+
+describe('mid-conversation tool changes and browser state', () => {
+  it('scans tools listed or added in the message history as tool definitions', () => {
+    const gatewayRequest = request('messages', {
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'mcp_tool_listing',
+              mcp_server_name: 'docs',
+              tools: [
+                { name: 'search', description: 'Search docs', input_schema: { type: 'object' } },
+              ],
+            },
+            {
+              type: 'tool_addition',
+              tool: {
+                type: 'tool_definition',
+                definition: {
+                  name: 'lookup',
+                  description: 'Look things up',
+                  input_schema: { type: 'object' },
+                },
+              },
+            },
+            { type: 'tool_addition', tool: { type: 'tool_reference', name: 'known' } },
+            { type: 'tool_removal', tool: { type: 'tool_reference', name: 'known' } },
+          ],
+        },
+      ],
+    });
+
+    expect(render(gatewayRequest).conversation).toBe(
+      lines(
+        seg('tool definition: search', 'Search docs', '{"type":"object"}'),
+        seg('tool definition: lookup', 'Look things up', '{"type":"object"}')
+      )
+    );
+  });
+
+  it('scans browser state in tool results', () => {
+    const gatewayRequest = request('messages', {
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: 'call',
+              content: [
+                {
+                  type: 'browser_state',
+                  tabs: [{ tab_id: 't1', title: 'Page title', url: 'https://example.com' }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(render(gatewayRequest).conversation).toContain('Page title');
+    expect(render(gatewayRequest).conversation).toContain('[tool result browser state]');
+  });
+});

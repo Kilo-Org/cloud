@@ -50,6 +50,7 @@ vi.mock('react-i18next', () => ({
 }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: 'RotateCcw',
   ExternalLink: 'ExternalLink',
   ScanSearch: 'ScanSearch',
   Ban: 'Ban',

@@ -2,12 +2,12 @@
   "generic": {
     "title": "I-Kilo",
     "body": {
-      "cloudAgentSession": "Iseshini yakho ye-agent inokubuyekezwa",
+      "cloudAgentSession": "Iseshini yakho ye-ejenti inokubuyekezwa",
       "lowBalance": "Ibhalansi yakho idinga ukunakwa",
       "spendAlert": "Izindleko zakho zidinga ukunakwa",
       "securityFinding": "Okutholakele kokuphepha kudinga ukunakwa",
       "securityUpdate": "Ukuhlola kokuphepha kunokubuyekezwa",
-      "activeAgentsGlanceable": "Ama-agent asebenzayo anokubuyekezwa"
+      "activeAgentsGlanceable": "Ama-ejenti asebenzayo anokubuyekezwa"
     }
   },
   "agentSession": {

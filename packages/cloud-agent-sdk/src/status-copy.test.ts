@@ -22,6 +22,7 @@ import { kiloId, cloudAgentId } from './test-helpers';
 
 const EXPECTED_COPY: Record<SdkStatusMessageCode, string> = {
   'agent-connection-lost': 'Agent connection lost',
+  'agent-connection-reconnecting': 'Reconnecting…',
   'session-stopped': 'Session stopped',
   'session-terminated': 'Session terminated',
   'setting-up-environment': 'Setting up environment…',
@@ -317,6 +318,17 @@ describe('session manager indicator copy codes', () => {
       atomValue<{ message: string; code?: SdkStatusMessageCode } | null>(
         disconnected.store,
         disconnectedManager.atoms.statusIndicator
+      )
+    );
+
+    const reconnecting = createMockConfig();
+    mockSession.state.getStatus.mockReturnValue({ type: 'disconnected', reconnecting: true });
+    const reconnectingManager = createSessionManager(reconnecting);
+    await reconnectingManager.switchSession(kiloId('ses-1'));
+    recordIndicator(
+      atomValue<{ message: string; code?: SdkStatusMessageCode } | null>(
+        reconnecting.store,
+        reconnectingManager.atoms.statusIndicator
       )
     );
 

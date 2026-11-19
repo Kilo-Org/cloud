@@ -7,8 +7,8 @@ import {
 } from '@kilocode/worker-utils/cloud-agent-child-callback';
 import { requireCurrentSessionAccess } from '../session-access.js';
 import { fetchSessionMetadata } from '../session/metadata.js';
-import type { SessionMetadata } from '../persistence/session-metadata.js';
-import { isWorkspaceAnchorMetadata } from '../cloud-agent-authority.js';
+import { getWorkspaceStub } from '../control-plane/workspace/workspace-stub.js';
+import { withDORetry } from '../utils/do-retry.js';
 import { isCanonicalMessageId } from '../session/message-id.js';
 import { preflightAndQueuePromptMessage } from '../session/queue-message.js';
 import type { Env } from '../types.js';
@@ -48,41 +48,51 @@ export function parentSessionCallbackPrompt(
   });
 }
 
-/** Resolves the child's stored lineage and revalidates the canonical parent. */
-export async function resolveParentCallbackSession(
+export type CallbackWorkspace = {
+  workspaceSessionId: string;
+  worktreeId: string | null;
+  organizationId: string | null;
+};
+
+/**
+ * Resolves the child's stored lineage to the workspace that launched it and
+ * revalidates that workspace. Callbacks belong to the workspace, so they do not
+ * depend on the chat that created it still existing. A deleted or revoked
+ * workspace receives no callbacks; an expired one can still notify an existing
+ * chat, which runs on that chat's own authorization.
+ */
+export async function resolveCallbackWorkspace(
   env: Env,
   userId: string,
   childSessionId: string
-): Promise<{ parentSessionId: string; parent: SessionMetadata }> {
+): Promise<CallbackWorkspace> {
   const child = await fetchSessionMetadata(env, userId, childSessionId);
-  const parentSessionId = child?.parentCloudAgentSessionId;
+  const workspaceSessionId = child?.parentCloudAgentSessionId;
   if (
     !child ||
     child.identity.userId !== userId ||
     child.identity.sessionId !== childSessionId ||
-    !parentSessionId?.startsWith('workspace_') ||
-    parentSessionId === child.identity.sessionId
+    !workspaceSessionId?.startsWith('workspace_') ||
+    workspaceSessionId === child.identity.sessionId
   ) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Child session lineage unavailable' });
   }
-  const parent = await fetchSessionMetadata(env, userId, parentSessionId);
+  const workspace = await withDORetry(
+    () => getWorkspaceStub(env, userId, workspaceSessionId),
+    stub => stub.describe(),
+    'describe'
+  );
   if (
-    !parent ||
-    parent.identity.sessionId !== parentSessionId ||
-    parent.identity.userId !== userId ||
-    (parent.identity.orgId ?? null) !== (child.identity.orgId ?? null) ||
-    parent.allowSubagentSessions !== true
+    (workspace.state !== 'active' && workspace.state !== 'expired') ||
+    workspace.organizationId !== (child.identity.orgId ?? null)
   ) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Parent session callback denied' });
   }
-  await requireCurrentSessionAccess({
-    env,
-    kiloUserId: userId,
-    cloudAgentSessionId: parentSessionId,
-    expectedOrganizationId: parent.identity.orgId ?? null,
-    expectedKiloSessionId: parent.auth.kiloSessionId,
-  });
-  return { parentSessionId, parent };
+  return {
+    workspaceSessionId,
+    worktreeId: workspace.worktreeId,
+    organizationId: workspace.organizationId,
+  };
 }
 
 /**
@@ -108,21 +118,21 @@ export async function deliverWorkspaceSessionCallback(
   }
 
   try {
-    const { parent } = await resolveParentCallbackSession(
+    const workspace = await resolveCallbackWorkspace(
       env,
       source.userId,
       job.payload.cloudAgentSessionId
     );
+    // The named chat only. A deleted target fails rather than moving to another chat.
     const target = await fetchSessionMetadata(env, source.userId, targetSessionId);
     if (
       !target ||
-      !isWorkspaceAnchorMetadata(parent) ||
+      workspace.worktreeId === null ||
       target.identity.sessionId !== targetSessionId ||
       target.identity.userId !== source.userId ||
-      (target.identity.orgId ?? null) !== (parent.identity.orgId ?? null) ||
+      (target.identity.orgId ?? null) !== workspace.organizationId ||
       target.parentCloudAgentSessionId !== undefined ||
-      target.workspace?.worktreeId === undefined ||
-      target.workspace.worktreeId !== parent.workspace?.worktreeId
+      target.workspace?.worktreeId !== workspace.worktreeId
     ) {
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Workspace session callback denied' });
     }

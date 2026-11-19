@@ -8,7 +8,7 @@ import { Pressable, View } from 'react-native';
 import { RowsRefreshControl } from '@/components/agents/rows-refresh-control';
 import { TruncationBannerRow } from '@/components/pr-review/diff/pr-diff-file-rows';
 import { fileStatusIcon, fileStatusLabel } from '@/components/pr-review/diff/pr-diff-file-status';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { RowChevron } from '@/components/ui/row-chevron';
 import { Text } from '@/components/ui/text';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -41,40 +41,30 @@ function SessionChangesFileRow({
         additions: file.countsComplete ? file.additions : `~${file.additions}`,
         deletions: file.countsComplete ? file.deletions : `~${file.deletions}`,
       })}
-      className="min-h-[44px] flex-row items-center gap-2 border-b border-hair-soft bg-card px-4 py-3 active:opacity-70"
+      className="flex-row items-center gap-2 border-b-[0.5px] border-hair-soft px-4 py-3 active:opacity-70"
       testID="session-changes-file-row"
     >
       <StatusIcon size={14} color={colors.mutedForeground} />
       <View className="flex-1">
-        <Text className="font-mono-medium text-sm text-foreground" numberOfLines={2}>
+        <Text variant="mono" numberOfLines={2}>
           {isolateLtrBidiText(file.path)}
         </Text>
         <View className="mt-0.5 flex-row items-center gap-2">
-          <Text variant="muted" className="text-xs">
-            {statusLabel}
-          </Text>
+          <Text variant="caption">{statusLabel}</Text>
           {file.countsComplete ? (
             <>
-              <Text variant="muted" className="text-xs">
-                {isolateLtrBidiText(`+${file.additions}`)}
-              </Text>
-              <Text variant="muted" className="text-xs">
-                {isolateLtrBidiText(`-${file.deletions}`)}
-              </Text>
+              <Text variant="caption">{isolateLtrBidiText(`+${file.additions}`)}</Text>
+              <Text variant="caption">{isolateLtrBidiText(`-${file.deletions}`)}</Text>
             </>
           ) : (
-            <Text variant="muted" className="text-xs">
-              {t('agentChat.sessionChanges.partialCounts')}
-            </Text>
+            <Text variant="caption">{t('agentChat.sessionChanges.partialCounts')}</Text>
           )}
           {file.binary ? (
-            <Text variant="muted" className="text-xs">
-              {t('agentChat.sessionChanges.binaryFile')}
-            </Text>
+            <Text variant="caption">{t('agentChat.sessionChanges.binaryFile')}</Text>
           ) : null}
         </View>
       </View>
-      <DirectionalChevronRight size={16} color={colors.mutedForeground} />
+      <RowChevron />
     </Pressable>
   );
 }

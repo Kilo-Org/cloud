@@ -362,7 +362,7 @@ export async function handleLlmProxyRequest(
     provider: route.provider.type,
     requested_model: effectiveModelIdLowerCased,
     is_free: route.isFree,
-    custom_llm_pricing: customLlm?.definition.pricing ?? null,
+    custom_llm_pricing: route.customLlmPricing ?? customLlm?.definition.pricing ?? null,
     promptInfo,
     max_tokens: getMaxTokens(requestBodyParsed),
     has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),
@@ -464,6 +464,9 @@ export async function handleLlmProxyRequest(
   }
   if (attempt.type === 'error') return attempt.response;
   usageContext.provider = providerContext.provider.type;
+  // A partner route bills its own pricing; the gateway route it fails over to bills the model's.
+  usageContext.custom_llm_pricing =
+    providerContext.customLlmPricing ?? customLlm?.definition.pricing ?? null;
 
   const { settings: organizationSettings } = await balanceAndSettingsPromise;
   return await respondToUpstream({

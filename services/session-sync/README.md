@@ -712,6 +712,11 @@ code 4009 without a false offline transition. Session runners treat 4009 as
 terminal for that session and never automatically reconnect; otherwise two
 processes can repeatedly evict one another. Overload uses `503 service_overloaded`
 and `Retry-After`. Other reconnects respect the independent 1–60 second jitter.
+A connect that fails before its `hello` frame — a failed ticket mint, an unreachable
+relay, or an immediate close — doubles its retry delay from 1 second to the same
+60-second ceiling, so an outage does not drive one ticket request every second.
+`hello` resets that delay, and `NativeSessionConnection.refresh()` starts a fresh
+budget. The server `reconnectAfterMs` and a typed `Retry-After` remain lower bounds.
 
 ### Presence and watch signals
 
@@ -1294,6 +1299,12 @@ cursor is accepted. Recovery keeps its snapshot revision/position requirement an
 native part identity until authoritative state covers the gap. Neither an unchanged
 snapshot nor a newer unrelated snapshot proves that a missing tool/result arrived.
 Exhausted recovery remains an explicit error, not a complete empty transcript.
+Repeated snapshot failures are bounded per connection: after three failed read cycles —
+a hello/reset read that throws, or a recovery that ends without converging — the client
+stops automatic reads and reconnection, publishes `snapshotFailure` with the reason, and
+resumes only through `NativeSessionConnection.refresh()`, which re-reads the authoritative
+transcript, or a new connection. A stored reference with no authorized asset mapping is terminal
+on its first read, because no retry can make it resolvable.
 
 Native stored-media and tool-file references retain their original canonical
 values. The native reader resolves only authorized asset mappings using the same

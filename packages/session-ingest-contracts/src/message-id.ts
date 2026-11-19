@@ -7,10 +7,13 @@ export const MESSAGE_ID_RANDOM_LENGTH = 14;
 export const MESSAGE_ID_LENGTH =
   MESSAGE_ID_PREFIX.length + MESSAGE_ID_TIME_LENGTH + MESSAGE_ID_RANDOM_LENGTH;
 
-export const MESSAGE_ID_PATTERN = /^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/;
+export const MESSAGE_ID_PATTERN = new RegExp(
+  `^${MESSAGE_ID_PREFIX}[0-9a-f]{${MESSAGE_ID_TIME_LENGTH}}[0-9A-Za-z]{${MESSAGE_ID_RANDOM_LENGTH}}$`
+);
 
 export const MESSAGE_ID_FORMAT_DESCRIPTION =
-  'messageId must match msg_ followed by 12 lowercase hex characters and 14 base62 characters';
+  `messageId must match ${MESSAGE_ID_PREFIX} followed by ${MESSAGE_ID_TIME_LENGTH} lowercase hex ` +
+  `characters and ${MESSAGE_ID_RANDOM_LENGTH} base62 characters`;
 
 export function isCanonicalMessageId(value: string): boolean {
   return MESSAGE_ID_PATTERN.test(value);

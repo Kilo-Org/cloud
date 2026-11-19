@@ -1,14 +1,12 @@
-// Shared mount harness for automation-settings-screen.mounted.test.tsx. The
-// mock state below lives here with its vi.mock registrations so the suite
-// stays under the max-lines budget (same pattern as
-// offline-banner.mounted.test-helpers.tsx). Hoisted bindings are exported at
-// the bottom: an inline `export const x = vi.hoisted(...)` is un-transformable.
+// Mock registrations for automation-settings-screen.mounted.test.tsx. They live
+// here so the suite stays under the max-lines budget (same pattern as
+// offline-banner.mounted.test-helpers.tsx). The suite imports this module
+// FIRST, before any other import, so the registrations are in place before the
+// screen module evaluates.
 //
-// The component the suite mocks is never imported here — the test file imports
-// it and hands it to `renderScreen`.
+// The component the suite mocks is never imported here: the test file imports
+// it and drives it through the exported mock state.
 
-import { createElement, type ReactNode } from 'react';
-import { act, TestRenderer } from '@/test/renderer';
 import { vi } from 'vitest';
 
 const config = vi.hoisted(() => ({
@@ -18,9 +16,6 @@ const config = vi.hoisted(() => ({
   isPending: false,
   fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
   refetch: vi.fn(),
-}));
-const platformError = vi.hoisted(() => ({
-  props: null as { title: string; variant?: string; message?: string; onRetry?: () => void } | null,
 }));
 const capability = vi.hoisted(() => ({
   canManage: true,
@@ -49,8 +44,23 @@ const pillGroups = vi.hoisted(() => ({
 const saveButton = vi.hoisted(() => ({
   onSave: null as (() => Promise<void>) | null,
 }));
+const connectivity = vi.hoisted(() => ({
+  committed: 'online' as 'online' | 'offline' | 'unknown',
+}));
+const platformError = vi.hoisted(() => ({
+  props: null as { title: string; variant?: string; message?: string; onRetry?: () => void } | null,
+}));
 const toastSuccess = vi.hoisted(() => vi.fn());
 
+vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
+vi.mock('@/components/ui/icons', () => ({
+  Check: 'Check',
+  CircleCheck: 'CircleCheck',
+  Clock: 'Clock',
+  GitPullRequest: 'GitPullRequest',
+  ScanSearch: 'ScanSearch',
+  Trash2: 'Trash2',
+}));
 vi.mock('react-native', () => ({
   View: 'View',
   Alert: { alert: vi.fn() },
@@ -78,9 +88,6 @@ vi.mock('@/lib/hooks/use-settings-back-guard', () => ({
     dialog: null,
   }),
 }));
-const connectivity = vi.hoisted(() => ({
-  committed: 'online' as 'online' | 'offline' | 'unknown',
-}));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => connectivity.committed,
 }));
@@ -96,8 +103,8 @@ vi.mock('@/components/security-agent/settings-save-button', () => ({
     return null;
   },
 }));
-vi.mock('@/components/security-agent/settings-toggle-row', () => ({
-  ToggleRow: (props: {
+vi.mock('@/components/ui/preference-row', () => ({
+  PreferenceRow: (props: {
     title: string;
     accessibilityLabel?: string;
     subtitle?: string;
@@ -141,51 +148,3 @@ export {
   toggleRows,
   trackInteraction,
 };
-
-export const APPROVAL_ROW_TITLE = 'Require approval before auto-remediation';
-
-/** The enabled-config body the hydration and save suites read. */
-export function enabledConfig(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return {
-    isEnabled: true,
-    autoAnalysisEnabled: false,
-    autoAnalysisMinSeverity: 'high',
-    autoAnalysisIncludeExisting: false,
-    autoRemediationEnabled: true,
-    autoRemediationMinSeverity: 'high',
-    autoRemediationIncludeExisting: false,
-    autoRemediationRequireApproval: true,
-    autoDismissEnabled: false,
-    autoDismissConfidenceThreshold: 'high',
-    ...overrides,
-  };
-}
-
-/** Mounts the screen component the test file imports, for scope 'personal'. */
-export function renderScreen(
-  Screen: (props: { scope: string }) => ReactNode
-): TestRenderer.ReactTestRenderer {
-  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
-  act(() => {
-    ref.current = TestRenderer.create(createElement(Screen, { scope: 'personal' }));
-  });
-  const renderer = ref.current;
-  if (!renderer) {
-    throw new Error('renderer was not created');
-  }
-  return renderer;
-}
-
-/** The "Require approval before auto-remediation" row, by its title. */
-export function approvalRow(): {
-  title: string;
-  value: boolean;
-  disabled: boolean;
-  onValueChange: (value: boolean) => void;
-} {
-  const row = toggleRows.rows.find(r => r.title === APPROVAL_ROW_TITLE);
-  if (!row) {
-    throw new Error('approval toggle row not found');
-  }
-  return row;
-}

@@ -1,7 +1,7 @@
 import { translatePush } from './i18n';
 import en from './locales/en.json';
 import { type PushData } from './push-data';
-import { GENERIC_PUSH_TITLE_KEY } from './push-i18n-keys';
+import { GENERIC_PUSH_TITLE_KEY, SECURITY_LIFECYCLE_BODY_LEAF } from './push-i18n-keys';
 
 type GenericBodyLeaf = keyof typeof en.generic.body;
 
@@ -29,7 +29,7 @@ const GENERIC_BODY_LEAF_BY_TYPE: Record<PushData['type'], GenericBodyLeaf> = {
   security_finding: 'securityFinding',
   // A status change (analysis finished, remediation queued, …) is not an
   // outstanding finding, so it must not reuse the finding body.
-  security_lifecycle: 'securityUpdate',
+  security_lifecycle: SECURITY_LIFECYCLE_BODY_LEAF,
   agent_briefing: ACTIVE_AGENTS_LEAF,
   active_agents_glanceable: ACTIVE_AGENTS_LEAF,
 };

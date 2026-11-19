@@ -331,6 +331,8 @@ function scanReport(overrides: Record<string, unknown>) {
     total_segments: 1,
     cached_characters: 0,
     cached_segments: 0,
+    total_units: 1,
+    cached_units: 0,
     omitted_attachments: 0,
     scanned_characters: MODEL_OUTPUT.length,
     decision: 'allowed',
@@ -461,6 +463,14 @@ describe('guardEnkryptOutput', () => {
   describe('with only log-only detectors', () => {
     it('releases the original response before the body completes and scans it afterwards', async () => {
       const fetchSpy = mockEnkrypt(allowAll);
+      // The wait a blocking scan would have added starts once the body completes; the scan reads
+      // the clock as it starts and ends.
+      jest
+        .spyOn(performance, 'now')
+        .mockReturnValueOnce(1_000)
+        .mockReturnValueOnce(1_000)
+        .mockReturnValueOnce(1_120)
+        .mockReturnValueOnce(1_180.4);
       const body = UPSTREAM_BODIES.chat_completions.sse;
       const splitAt = body.indexOf('\n\n') + 2;
       const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
@@ -484,7 +494,8 @@ describe('guardEnkryptOutput', () => {
         { text: MODEL_OUTPUT, detectors: { pii }, user_metadata: { organization_id: 'org-1' } },
       ]);
       expect(mockedRecordUsage.mock.calls).toEqual([
-        [usageRecord({ decision: 'allowed', creditsCost: 2, addedLatencyMs: 0 })],
+        // The latency a blocking scan would have added, from the end of the body to the verdict.
+        [usageRecord({ decision: 'allowed', creditsCost: 2, addedLatencyMs: 180 })],
       ]);
     });
 
@@ -511,7 +522,7 @@ describe('guardEnkryptOutput', () => {
             apiKind: 'messages',
             decision: 'allowed',
             creditsCost: 2,
-            addedLatencyMs: 0,
+            addedLatencyMs: expect.any(Number),
             detectorsFired: ['pii'],
           }),
         ],
@@ -790,84 +801,65 @@ describe('guardEnkryptOutput', () => {
   });
 
   describe('when the blocking scan cannot complete', () => {
-    it('withholds the response after Enkrypt fails twice', async () => {
-      const fetchSpy = mockEnkrypt(() => new Response('upstream error', { status: 500 }));
+    it('releases the response unscanned when Enkrypt fails, without retrying', async () => {
+      // A retry would succeed, so one call proves the failure was not retried.
+      const responses = [new Response('upstream error', { status: 500 }), allowAll()];
+      const fetchSpy = mockEnkrypt(() => responses.shift() ?? allowAll());
+      const body = UPSTREAM_BODIES.chat_completions.json;
 
       const { client, release, onReject } = await guard(
-        upstreamResponse(UPSTREAM_BODIES.chat_completions.json, 'json'),
+        upstreamResponse(body, 'json'),
         outputScan(blockingPii),
         'chat_completions',
         false
       );
 
-      expect(fetchSpy).toHaveBeenCalledTimes(2);
-      expect(release).not.toHaveBeenCalled();
-      expect(rejection(onReject).verdict).toEqual({ action: 'unavailable', reason: 'transient' });
-      expect(client.status).toBe(503);
-      expect(client.headers.get('retry-after')).toBe('1');
-      expect(await client.json()).toEqual({
-        error: {
-          message:
-            "Your organization's Enkrypt AI guardrail could not check the model's response, so it was withheld. Please retry.",
-          type: 'server_error',
-          code: 'guardrail_unavailable',
-          param: null,
-        },
-        error_type: 'guardrail_unavailable',
-      });
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(onReject).not.toHaveBeenCalled();
+      expect(release).toHaveBeenCalledTimes(1);
+      expect(client.status).toBe(200);
+      expect(await client.text()).toBe(body);
     });
 
-    it('sends a stream error event when Enkrypt fails on a streamed request', async () => {
-      mockEnkrypt(() => new Response('upstream error', { status: 500 }));
+    it('releases a streamed response unscanned when Enkrypt fails', async () => {
+      const fetchSpy = mockEnkrypt(() => new Response('upstream error', { status: 500 }));
+      const body = UPSTREAM_BODIES.messages.sse;
 
       const { client, release, onReject } = await guard(
-        upstreamResponse(UPSTREAM_BODIES.messages.sse, 'sse'),
+        upstreamResponse(body, 'sse'),
         outputScan(blockingPii, 'messages'),
         'messages',
         true
       );
 
       expect(client.status).toBe(200);
-      const text = await client.text();
-      expect(text).not.toContain(SECRET);
-      expect(parseSingleSseEvent(afterKeepAlive(text))).toEqual({
-        event: 'error',
-        data: {
-          type: 'error',
-          error: {
-            type: 'api_error',
-            message: expect.stringContaining("could not check the model's response"),
-          },
-          error_type: 'guardrail_unavailable',
-        },
-      });
-      expect(release).not.toHaveBeenCalled();
-      expect(rejection(onReject).response.headers.get('retry-after')).toBe('1');
+      expect(await client.text()).toBe(`${KEEP_ALIVE}${body}`);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(onReject).not.toHaveBeenCalled();
+      expect(release).toHaveBeenCalledTimes(1);
     });
 
-    it('withholds the response when the scan times out', async () => {
-      mockEnkrypt(
+    it('releases the response unscanned when the scan times out', async () => {
+      const fetchSpy = mockEnkrypt(
         (_request, init) =>
           new Promise<Response>((_resolve, reject) => {
             init.signal?.addEventListener('abort', () => reject(init.signal?.reason));
           })
       );
+      const body = UPSTREAM_BODIES.responses.json;
 
-      const { client, onReject } = await guard(
-        upstreamResponse(UPSTREAM_BODIES.responses.json, 'json'),
+      const { client, release, onReject } = await guard(
+        upstreamResponse(body, 'json'),
         outputScan(blockingPii, 'responses'),
         'responses',
         false
       );
 
-      expect(rejection(onReject).verdict).toEqual({ action: 'unavailable', reason: 'timeout' });
-      expect(client.status).toBe(503);
-      expect(client.headers.get('x-should-retry')).toBe('false');
-      expect(await client.json()).toMatchObject({
-        error: {
-          message: expect.stringContaining("did not finish checking the model's response in time"),
-        },
-      });
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(onReject).not.toHaveBeenCalled();
+      expect(release).toHaveBeenCalledTimes(1);
+      expect(client.status).toBe(200);
+      expect(await client.text()).toBe(body);
     });
 
     it('withholds output too large to scan without calling Enkrypt', async () => {
@@ -1048,7 +1040,7 @@ describe('guardEnkryptOutput', () => {
   });
 
   describe('usage', () => {
-    it('preserves the inference association on output retries and log-only usage with latency only on the final blocking call', async () => {
+    it('preserves the inference association on a failed blocking call and log-only usage, with latency only on the blocking call', async () => {
       const microdollarUsageId = '00000000-0000-4000-8000-000000000003';
       let blockingCalls = 0;
       const fetchSpy = mockEnkrypt(request => {
@@ -1066,21 +1058,13 @@ describe('guardEnkryptOutput', () => {
       await runAfterTasks();
 
       expect(await client.text()).toBe(`${KEEP_ALIVE}${UPSTREAM_BODIES.chat_completions.sse}`);
-      expect(fetchSpy).toHaveBeenCalledTimes(3);
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
       expect(mockedRecordUsage.mock.calls).toEqual([
         [
           usageRecord({
             microdollarUsageId,
             decision: 'error',
             creditsCost: null,
-            addedLatencyMs: null,
-          }),
-        ],
-        [
-          usageRecord({
-            microdollarUsageId,
-            decision: 'allowed',
-            creditsCost: 2,
             addedLatencyMs: expect.any(Number),
           }),
         ],
@@ -1195,7 +1179,7 @@ describe('guardEnkryptOutput', () => {
       });
     });
 
-    it('reports a transient Enkrypt failure', async () => {
+    it('reports an Enkrypt failure that failed open', async () => {
       mockEnkrypt(() => new Response('upstream error', { status: 500 }));
       const body = UPSTREAM_BODIES.chat_completions.json;
       const captureReport = reportCapture();
@@ -1218,14 +1202,14 @@ describe('guardEnkryptOutput', () => {
         upstream_read_failed: false,
         output_characters: MODEL_OUTPUT.length,
         not_scanned_reason: null,
-        verdict: 'unavailable',
-        unavailable_reason: 'transient',
+        verdict: 'fail_open',
+        unavailable_reason: null,
         added_latency_ms: expect.any(Number),
         scans: [
           scanReport({
-            decision: 'error_fail_closed',
+            decision: 'error_fail_open',
             error: 'http_500',
-            attempts: 2,
+            attempts: 1,
             credits_cost: null,
           }),
         ],
@@ -1367,7 +1351,8 @@ describe('guardEnkryptOutput', () => {
         not_scanned_reason: null,
         verdict: 'skip',
         unavailable_reason: null,
-        added_latency_ms: null,
+        // What a blocking scan would have added.
+        added_latency_ms: expect.any(Number),
         scans: [scanReport({ scan: 'log_only', detectors_blocking: [] })],
       });
     });

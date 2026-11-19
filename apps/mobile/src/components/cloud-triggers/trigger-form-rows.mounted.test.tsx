@@ -14,14 +14,18 @@ import { renderWithProviders } from '@/test/render-with-providers';
 import { TriggerSwitchRow } from './trigger-form-rows';
 
 vi.mock('react-native', () => ({
+  ActivityIndicator: 'ActivityIndicator',
   Pressable: 'Pressable',
   Switch: 'Switch',
   TextInput: 'TextInput',
   View: 'View',
+  useColorScheme: () => 'light',
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown' }));
 vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#test-muted' }),
 }));

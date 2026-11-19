@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the group's disclosure, step and error states each carry their own mounted assertions. */
 import '@/i18n';
 import { createElement } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -17,6 +18,7 @@ vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
   Check: 'Check',
   ChevronDown: 'ChevronDown',
+  ChevronUp: 'ChevronUp',
   Square: 'Square',
   Terminal: 'Terminal',
 }));

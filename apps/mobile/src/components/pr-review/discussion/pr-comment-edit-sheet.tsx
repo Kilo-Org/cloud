@@ -35,6 +35,7 @@ import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/re
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { type SurfaceAttempt } from '@/lib/surface-feedback';
@@ -251,7 +252,7 @@ export function PrCommentEditSheet({
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode="interactive"
       >
-        <View className="gap-4 px-6 pt-4">
+        <View className={SCREEN_BODY_CLASS}>
           <CommentBodyField
             inputRef={bodyInputRef}
             isDisabled={isSubmitting}

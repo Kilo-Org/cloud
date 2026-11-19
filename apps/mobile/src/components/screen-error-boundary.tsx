@@ -114,7 +114,7 @@ export function ScreenErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   }, [router]);
 
   return (
-    <View className="flex-1 items-center justify-center bg-background px-6">
+    <View className="flex-1 items-center justify-center bg-background px-4">
       <QueryError placement="static" onRetry={retryAfterRefetch} isRetrying={isRetrying} />
       <Button variant="ghost" className="mt-2" onPress={goBack}>
         <Text>{t('common.goBack')}</Text>

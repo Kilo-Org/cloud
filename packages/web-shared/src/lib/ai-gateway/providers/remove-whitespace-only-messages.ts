@@ -18,9 +18,19 @@ export function isWhitespaceOnlyMessage(message: Anthropic.MessageParam) {
 
 function findCacheControl(message: Anthropic.MessageParam) {
   if (!Array.isArray(message.content)) return undefined;
-  return message.content
-    .filter(block => block.type === 'text')
-    .findLast(block => block.cache_control)?.cache_control;
+  const content: Anthropic.ContentBlockParam[] = message.content;
+  return content.filter(block => block.type === 'text').findLast(block => block.cache_control)
+    ?.cache_control;
+}
+
+function withCacheControlOnBlock<T extends object>(
+  content: T[],
+  target: T,
+  cacheControl: Anthropic.CacheControlEphemeral
+): T[] {
+  return content.map(block =>
+    block === target ? { ...block, cache_control: cacheControl } : block
+  );
 }
 
 /** Carries a removed message's breakpoint without mutating the retained history. */
@@ -37,13 +47,19 @@ export function preserveCacheControl(
     };
   }
   if (!Array.isArray(previousMessage.content)) return previousMessage;
+  if (previousMessage.role === 'system') {
+    const target = previousMessage.content.at(-1);
+    if (!target || target.cache_control) return previousMessage;
+    return {
+      ...previousMessage,
+      content: withCacheControlOnBlock(previousMessage.content, target, cacheControl),
+    };
+  }
   const target = previousMessage.content.findLast(isCacheableMessagesContentBlock);
   if (!target || target.cache_control) return previousMessage;
   return {
     ...previousMessage,
-    content: previousMessage.content.map(block =>
-      block === target ? { ...block, cache_control: cacheControl } : block
-    ),
+    content: withCacheControlOnBlock(previousMessage.content, target, cacheControl),
   };
 }
 

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { ProfilesListScreen } from '@/components/profiles/profiles-list-screen';
 import {
+  findAll,
   findOne,
   groupChildren,
   groupTexts,
@@ -60,13 +61,16 @@ vi.mock('@/components/screen-header', () => ({
   ScreenHeader: ({ headerRight }: { headerRight?: ReactNode }) => headerRight ?? null,
 }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/icon-button', () => ({ IconButton: 'IconButton' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text', EYEBROW_LATIN_DISPLAY: 'uppercase' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/ui/icons', () => ({
   Building2: 'Building2',
@@ -126,20 +130,20 @@ describe('ProfilesListScreen repo defaults entry', () => {
   it('follows the profile rows as its own group without repeating the screen title', async () => {
     const { renderer, unmount } = await mount();
 
-    // The rows and the entry are separate blocks, spaced by the scroll's own
-    // gap; the rows carry no heading, because the screen's title already names
-    // them.
+    // The rows and the entry are two sections, spaced by the body's own gap;
+    // the rows carry no heading that would repeat the screen title.
     const scroll = findOne(renderer.root, 'ScrollView');
     expect(groupChildren(scroll)).toHaveLength(2);
-    // Nothing repeats the screen title above the rows; only the owner section
-    // and the settings group name themselves.
     expect(groupTexts(renderer.root).map(node => node.props.children)).toEqual([
       'Personal',
       REPO_DEFAULTS_HEADING,
     ]);
+    // The entry sits in the second section, in a row group of its own.
     const settingsGroup = rowGroup(renderer.root, repoDefaultsRow(renderer.root));
-    // The entry is the second block, directly under the rows.
-    expect(groupChildren(scroll)[1]).toBe(settingsGroup);
+    const secondSection = groupChildren(scroll)[1];
+    expect(secondSection).toBeDefined();
+    expect(secondSection?.findAll(node => node === settingsGroup)).toHaveLength(1);
+    expect(groupChildren(settingsGroup)).toEqual([repoDefaultsRow(renderer.root)]);
 
     unmount();
   });
@@ -161,17 +165,20 @@ describe('ProfilesListScreen repo defaults entry', () => {
 
     const heading = repoDefaultsHeading(renderer.root);
     expect(heading.props.children).toBe(REPO_DEFAULTS_HEADING);
-    // One heading over one row: the settings entry is a group, not a fifth
-    // row of the personal group above it.
+    // One heading over one group of one row: the settings entry is a section,
+    // not a fifth row of the personal group above it.
     const settingsGroup = rowGroup(renderer.root, repoDefaultsRow(renderer.root));
-    expect(groupChildren(settingsGroup)).toHaveLength(2);
+    expect(groupChildren(settingsGroup)).toEqual([repoDefaultsRow(renderer.root)]);
 
-    // The owner sections are the reference, so the two cannot drift apart.
+    // The owner section is the reference, so the two cannot drift apart: both
+    // labels render through the shared section header and both groups through
+    // the shared row group.
     const ownerGroup = rowGroup(renderer.root, rowByTitle(renderer.root, 'Personal profile'));
-    const ownerHeading = groupTexts(ownerGroup)[0];
-    expect(ownerHeading?.props.children).toBe('Personal');
+    const ownerHeading = findAll(renderer.root, 'Text').find(
+      node => String(node.props.children) === 'Personal'
+    );
     expect(heading.props.className).toBe(ownerHeading?.props.className);
-    // The headings share one element, so the spacing around both groups is
+    // The headings share one element, so the spacing around both sections is
     // the container gap the screen sets, not per-group markup.
     expect(settingsGroup.props.className).toBe(ownerGroup.props.className);
 

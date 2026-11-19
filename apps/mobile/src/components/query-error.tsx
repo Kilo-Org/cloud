@@ -2,6 +2,7 @@ import {
   AlertCircle,
   Lock,
   type LucideIcon,
+  RotateCcw,
   SearchX,
   ServerCrash,
   WifiOff,
@@ -11,11 +12,8 @@ import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type ScrollViewProps } from 'react-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export type QueryErrorVariant =
@@ -38,7 +36,7 @@ const VARIANT_ICONS = {
 
 const VARIANT_META_KEYS = {
   neutral: { title: 'common.somethingWentWrong', description: 'queryError.neutralDescription' },
-  offline: { title: 'queryError.offlineTitle', description: 'common.somethingWentWrong' },
+  offline: { title: 'queryError.offlineTitle', description: 'queryError.offlineDescription' },
   permission: {
     title: 'common.accessDenied',
     description: 'queryError.permissionDescription',
@@ -85,6 +83,13 @@ type QueryErrorProps = {
    */
   descriptionClassName?: string;
   placement?: 'center' | 'top' | 'static';
+  /** Who draws the page gutter; see `EmptyState`. A `center` error defaults to
+   *  the gutter, a `top`/`static` one to none. */
+  inset?: 'gutter' | 'none';
+  /** The short form, for a failure that sits inside a section or a form rather
+   *  than owning the surface: no icon bubble, tighter block gaps, and no top
+   *  pin air. The title keeps the error cue through its tint. See `EmptyState`. */
+  compact?: boolean;
   refreshControl?: ScrollViewProps['refreshControl'];
 };
 
@@ -102,6 +107,8 @@ export function QueryError({
   className,
   descriptionClassName,
   placement = 'center',
+  inset,
+  compact,
   refreshControl,
 }: Readonly<QueryErrorProps>) {
   const { t } = useTranslation();
@@ -128,6 +135,8 @@ export function QueryError({
       }
       className={className}
       placement={placement}
+      inset={inset}
+      compact={compact}
       refreshControl={refreshControl}
       iconContainerClassName="rounded-full bg-muted p-4"
       iconColor={colors.destructive}
@@ -138,15 +147,13 @@ export function QueryError({
       action={
         action ??
         (onRetry && (
-          <Button
-            className={STATE_ACTION_CLASS}
-            variant="outline"
+          <StateAction
+            label={retryText}
+            icon={RotateCcw}
             onPress={onRetry}
             loading={isRetrying}
             accessibilityLabel={retryText}
-          >
-            <Text>{retryText}</Text>
-          </Button>
+          />
         ))
       }
     />

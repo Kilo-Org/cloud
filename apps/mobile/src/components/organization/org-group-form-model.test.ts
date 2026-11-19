@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isOrgGroupFormDirty,
   ORG_GROUP_NAME_MAX_LENGTH,
+  orgGroupFormExit,
   orgGroupNameError,
   selectOrgGroupMemberPickerState,
   toggleOrgGroupMember,
@@ -89,5 +90,74 @@ describe('isOrgGroupFormDirty', () => {
     expect(isOrgGroupFormDirty({ ...initial, memberIds: ['u2', 'u1'] }, initial)).toBe(false);
     expect(isOrgGroupFormDirty({ ...initial, memberIds: ['u1'] }, initial)).toBe(true);
     expect(isOrgGroupFormDirty({ ...initial, name: 'Designers' }, initial)).toBe(true);
+  });
+});
+
+describe('orgGroupFormExit', () => {
+  const LIST = 'groups';
+  const FORM = 'group-form';
+
+  it('returns to the list beneath the form, naming its route key', () => {
+    expect(
+      orgGroupFormExit({
+        routes: [
+          { key: 'groups-1', name: LIST },
+          { key: 'form-1', name: FORM },
+        ],
+        currentIndex: 1,
+        listRouteName: LIST,
+      })
+    ).toEqual({ kind: 'list', listRouteKey: 'groups-1' });
+  });
+
+  it('returns to the nearest list with screens of other names between them', () => {
+    expect(
+      orgGroupFormExit({
+        routes: [
+          { key: 'groups-outer', name: LIST },
+          { key: 'modes-1', name: 'modes' },
+          { key: 'groups-2', name: LIST },
+          { key: 'form-1', name: FORM },
+        ],
+        currentIndex: 3,
+        listRouteName: LIST,
+      })
+    ).toEqual({ kind: 'list', listRouteKey: 'groups-2' });
+  });
+
+  it('ignores a list registered above the form', () => {
+    expect(
+      orgGroupFormExit({
+        routes: [
+          { key: 'form-1', name: FORM },
+          { key: 'groups-1', name: LIST },
+        ],
+        currentIndex: 0,
+        listRouteName: LIST,
+      })
+    ).toEqual({ kind: 'push-list' });
+  });
+
+  it('goes back when no list is beneath and the stack has one', () => {
+    expect(
+      orgGroupFormExit({
+        routes: [
+          { key: 'members-1', name: 'members' },
+          { key: 'form-1', name: FORM },
+        ],
+        currentIndex: 1,
+        listRouteName: LIST,
+      })
+    ).toEqual({ kind: 'back' });
+  });
+
+  it('replaces itself with the list when the form is the only route of its stack', () => {
+    expect(
+      orgGroupFormExit({
+        routes: [{ key: 'form-1', name: FORM }],
+        currentIndex: 0,
+        listRouteName: LIST,
+      })
+    ).toEqual({ kind: 'push-list' });
   });
 });

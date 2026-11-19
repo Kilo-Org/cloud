@@ -25,7 +25,7 @@ jest.mock('./preferred-provider-order-config', () => ({
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
 import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/eligibility';
@@ -405,21 +405,26 @@ describe('upstream model catalog validation', () => {
     expect(result.type).toBe(type);
   });
 
-  it.each(['direct-byok', 'mistral', 'inception', 'custom', 'custom-public', 'dev-tools'] as const)(
-    'does not validate %s models against a gateway catalog',
-    async providerId => {
-      const result = await attempt({
-        providerId,
-        requestedModel: 'not-in-catalog',
-        wireModel: 'provider-specific-model',
-      });
+  it.each([
+    'direct-byok',
+    'mistral',
+    'inception',
+    'custom',
+    'custom-public',
+    'partner',
+    'dev-tools',
+  ] as const)('does not validate %s models against a gateway catalog', async providerId => {
+    const result = await attempt({
+      providerId,
+      requestedModel: 'not-in-catalog',
+      wireModel: 'provider-specific-model',
+    });
 
-      expect(result.type).toBe('success');
-      expect(isValidOpenRouterModelId).not.toHaveBeenCalled();
-      expect(isValidVercelModelId).not.toHaveBeenCalled();
-      expect(upstreamRequest).toHaveBeenCalledTimes(1);
-    }
-  );
+    expect(result.type).toBe('success');
+    expect(isValidOpenRouterModelId).not.toHaveBeenCalled();
+    expect(isValidVercelModelId).not.toHaveBeenCalled();
+    expect(upstreamRequest).toHaveBeenCalledTimes(1);
+  });
 });
 describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => {
   let owner: OpenAiChatGptOwner;

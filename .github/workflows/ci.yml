@@ -1145,6 +1145,12 @@ jobs:
       UPSTASH_REDIS_REST_URL: http://localhost:8079
       UPSTASH_REDIS_REST_TOKEN: example_token
       JEST_MAX_WORKERS: 2
+      # The dev-local tmux suite attaches a real client through script(1). A
+      # runner whose TERM is unset or dumb leaves tmux unable to drive that
+      # terminal ("terminal does not support clear"), the attach never
+      # completes, and the foreign-client test times out. Pin a real type so
+      # the suite does not depend on the runner image's terminal environment.
+      TERM: xterm-256color
 
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
@@ -1375,8 +1381,8 @@ jobs:
           cp ../web/.env .env
           cp ../web/.env.test .env.production.local
 
-      - name: Check ai-gateway usage queue targets
-        run: pnpm --filter ai-gateway run test:usage-queue
+      - name: Check ai-gateway Vercel config
+        run: pnpm --filter ai-gateway run test:vercel-config
 
       - name: Build ai-gateway
         env:

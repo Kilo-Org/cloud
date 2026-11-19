@@ -44,6 +44,9 @@ cloud-agent-next refactor.
    Next.js. A real-model session (`kilo-auto/efficient`, etc.) uses the same
    Worker URL and does not need a restart.
 
+If a Kilo Cloud sandbox image build fails with a certificate error while
+downloading `glab`, see [Docker build TLS trust](../../../../.kilo/skills/cloud-agent-sandbox/SKILL.md#docker-build-tls-trust).
+
 ## Kilo v2 drain checks
 
 Drain completion applies only to Kilo v2 (`0.0.0-v2-85` or newer), not the default v1 runtime.
@@ -479,6 +482,32 @@ when the matrix includes worktree scenarios. The local dev container caps in
 The matrix starts with `cold-hot`, which pays one cold sandbox boot and then
 runs several hot same-session turns.
 
+### Workspace MCP authority check
+
+`workspace-mcp-authority-local.ts` follows the built-in `kilo-cloud-agent` MCP
+connection of a two-chat workspace through expiry, renewal, a sandbox restart,
+deletion of the first chat and a pepper revocation. It sends real MCP
+`tools/list` and `tools/call` requests to the local kilo-mcp. Runtime
+delegations normally last 24 hours, so add a development-only override to the
+local `services/cloud-agent-next/.dev.vars` and restart `cloud-agent-next`:
+
+```sh
+RUNTIME_AUTHORIZATION_LIFETIME_MS=480000
+```
+
+The Worker reads it only when `ENVIRONMENT=development`; never add it to
+`wrangler.jsonc`. Select steps with `WORKSPACE_MCP_STEPS` (default
+`expiry,restart`; also `delete-root` and `revoke`):
+
+```sh
+WORKSPACE_MCP_STEPS=expiry,restart,delete-root,revoke \
+  WORKER_URL=http://localhost:8794 KILO_MCP_URL=http://localhost:8815/mcp \
+  pnpm exec tsx services/cloud-agent-next/test/e2e/workspace-mcp-authority-local.ts
+```
+
+The script prints one JSON observation per step and does not assert. The run
+takes about 15 minutes because it waits for real expiry.
+
 ### Teardown
 
 The shared gate (`runSharedScenario`) owns teardown for every profile, so
@@ -868,6 +897,7 @@ exactly `auth-reject`. The end-of-run output is a machine-readable contract:
 
 ```
 unsupported: <name>
+retried: <name>
 Summary: <pass> passed, <fail> failed, <unsupported> unsupported
 Wall time: <seconds>s
 ```
@@ -878,6 +908,14 @@ scenarios are filtered before spawn, a non-zero child exit is a failure: exit `1
 if any scenario failed, else `0`. A child that exceeds its watchdog deadline (its
 scenario budget plus ten minutes) is killed and reported as a failure. When
 `GITHUB_STEP_SUMMARY` is set the runner appends its `Summary:` line to that file.
+
+The matrix retries a scenario once if its failure result line names a known
+transient infrastructure fault, such as `Failed query:`, `fetch failed`,
+`Stream did not connect`, or a tRPC 502/503/504 response. Earlier logs and
+event summaries do not affect retry eligibility. The runner does not retry
+children killed by a signal or the watchdog. The retry starts after 60 s in a
+fresh child and fake-LLM scope and appears on a `retried:` line. If the second
+attempt fails, the matrix reports a failure.
 
 The `cloud-agent-e2e-tests` GitHub workflow
 (`.github/workflows/cloud-agent-e2e-tests.yml`) supports `workflow_dispatch`

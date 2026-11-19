@@ -16,17 +16,11 @@ import {
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
 import {
-  authorizeCloudAgentChild,
-  authorizeCloudAgentWorkspaceSibling,
-  issueCloudAgentMcpGrant,
-  assertCloudAgentParentAuthority,
-  CLOUD_AGENT_PARENT_AUTHORITY_DENIED,
-  type WorkspaceMcpBinding,
+  isWorkspaceAnchorMetadata,
+  workspaceSessionIdForMetadata,
+  type WorkspaceAuthoritySeed,
 } from '../../cloud-agent-authority.js';
-import {
-  CloudAgentAuthoritySchema,
-  type CloudAgentAuthority,
-} from '@kilocode/worker-utils/cloud-agent-authority';
+import { getWorkspaceStub } from '../workspace/workspace-stub.js';
 import { sessionCallbackContext } from './callback-context.js';
 import { createSessionListStatusOutbox, deriveSessionListStatus } from './list-status.js';
 import { createRuntimeHarnessRecorder } from './runtime-harness-record.js';
@@ -36,7 +30,7 @@ import {
   type CloudAgentChildSessionLineage,
   type CloudAgentWorktreeLocation,
 } from '@kilocode/session-ingest-contracts';
-import { asc, eq, gt } from 'drizzle-orm';
+import { asc } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
@@ -70,7 +64,6 @@ import {
 import { sessionRuntimeLocator } from '../../sandbox-control/worktree-ownership.js';
 import { logRuntimeAuthorizationDiagnostic } from '../../session/runtime-authorization-diagnostics.js';
 import { applyControlPlanePreparingEvent } from '../../sandbox-session/control-plane-preparing.js';
-import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import {
   applyPendingInteractionEvent,
   pendingInteractionsSchema,
@@ -243,8 +236,10 @@ import type {
 import {
   cloudAgentChildSessions,
   controlPlaneMessages,
+  costBackfillState,
   events,
   historyImport,
+  sessionCostTotals,
 } from './sqlite-schema.js';
 import {
   decodeSessionHistoryCursor,
@@ -474,31 +469,7 @@ function statusWorkspaceIdentity(registration: ControlPlaneSessionRegistration |
       );
 }
 
-const cloudAgentChildSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
-
-const cloudAgentChildSessionRegistrationSchema = z
-  .object({
-    cloudAgentSessionId: cloudAgentChildSessionIdSchema,
-    initialMessageId: z.string().min(1).max(200).optional(),
-    worktreeId: cloudAgentWorktreeIdSchema.optional(),
-  })
-  .strict();
-
-const cloudAgentChildSessionListSchema = z
-  .object({
-    limit: z.number().int().min(1).max(50),
-    cursor: z.uuid().optional(),
-  })
-  .strict();
-
-export type CloudAgentChildSessionPage = {
-  sessions: Array<{
-    cloudAgentSessionId: string;
-    initialMessageId?: string;
-    worktreeId?: string;
-  }>;
-  nextCursor?: string;
-};
+const LEGACY_CHILD_REGISTRY_EXPORT_LIMIT = 1_000;
 
 export type ControlPlaneSendResult =
   | { type: 'ok' }
@@ -1463,174 +1434,39 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
-  async assertCloudAgentManagementAuthority(authority: unknown): Promise<void> {
+  /**
+   * The one-time adoption source for this chat's workspace authority: the
+   * stored runtime authorization and the legacy child registry, only when this
+   * chat created its workspace and may launch children. The workspace Durable
+   * Object owns both after adoption.
+   */
+  async exportWorkspaceAuthoritySeed(): Promise<WorkspaceAuthoritySeed | null> {
     await this.initialized;
-    const scope = CloudAgentAuthoritySchema.safeParse(authority);
-    const authorization = RuntimeAuthorizationSchema.safeParse(
-      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
-    );
-    if (!scope.success || !authorization.success) {
-      throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
+    const metadata = this.metadata;
+    if (metadata?.allowSubagentSessions !== true || !isWorkspaceAnchorMetadata(metadata)) {
+      return null;
     }
-    assertCloudAgentParentAuthority(this.metadata, authorization.data, scope.data);
-  }
-
-  async recordCloudAgentChildSession(input: unknown): Promise<{ success: true }> {
-    await this.initialized;
-    const child = cloudAgentChildSessionRegistrationSchema.parse(input);
-    if (this.metadata?.allowSubagentSessions !== true) {
-      throw new Error('Cloud Agent child registry denied');
-    }
-    if (child.cloudAgentSessionId === this.sessionId) {
-      throw new Error('Cloud Agent child registry requires another session');
-    }
-    this.db
-      .insert(cloudAgentChildSessions)
-      .values({
-        child_session_id: child.cloudAgentSessionId,
-        initial_message_id: child.initialMessageId ?? null,
-        worktree_id: child.worktreeId ?? null,
-        created_at: Date.now(),
-      })
-      .onConflictDoNothing()
-      .run();
-    return { success: true };
-  }
-
-  async forgetCloudAgentChildSession(input: unknown): Promise<{ success: true }> {
-    await this.initialized;
-    const childSessionId = cloudAgentChildSessionIdSchema.parse(input);
-    this.db
-      .delete(cloudAgentChildSessions)
-      .where(eq(cloudAgentChildSessions.child_session_id, childSessionId))
-      .run();
-    return { success: true };
-  }
-
-  async listCloudAgentChildSessions(input: unknown): Promise<CloudAgentChildSessionPage> {
-    await this.initialized;
-    const page = cloudAgentChildSessionListSchema.parse(input);
-    const cursorSessionId = page.cursor === undefined ? undefined : `workspace_${page.cursor}`;
-    const rows = this.db
+    const authorization = await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY);
+    if (authorization === undefined) return null;
+    const children = this.db
       .select({
         cloudAgentSessionId: cloudAgentChildSessions.child_session_id,
         initialMessageId: cloudAgentChildSessions.initial_message_id,
         worktreeId: cloudAgentChildSessions.worktree_id,
       })
       .from(cloudAgentChildSessions)
-      .where(
-        cursorSessionId === undefined
-          ? undefined
-          : gt(cloudAgentChildSessions.child_session_id, cursorSessionId)
-      )
       .orderBy(asc(cloudAgentChildSessions.child_session_id))
-      .limit(page.limit + 1)
+      .limit(LEGACY_CHILD_REGISTRY_EXPORT_LIMIT)
       .all();
-    const visible = rows.slice(0, page.limit);
-    const last = visible.at(-1);
-    const nextCursor =
-      rows.length > page.limit && last !== undefined
-        ? last.cloudAgentSessionId.slice('workspace_'.length)
-        : undefined;
     return {
-      sessions: visible.map(row => ({
+      metadata,
+      authorization,
+      children: children.map(row => ({
         cloudAgentSessionId: row.cloudAgentSessionId,
         ...(row.initialMessageId === null ? {} : { initialMessageId: row.initialMessageId }),
         ...(row.worktreeId === null ? {} : { worktreeId: row.worktreeId }),
       })),
-      ...(nextCursor === undefined ? {} : { nextCursor }),
     };
-  }
-
-  async getCloudAgentSpawnRuntimeToken(authority: CloudAgentAuthority): Promise<string> {
-    return (await this.getCloudAgentSpawnContext(authority)).token;
-  }
-
-  async getCloudAgentSpawnContext(
-    authority: CloudAgentAuthority
-  ): Promise<{ token: string; createdOnPlatform: string | undefined }> {
-    await this.initialized;
-    const scope = CloudAgentAuthoritySchema.safeParse(authority);
-    const authorization = RuntimeAuthorizationSchema.safeParse(
-      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
-    );
-    if (!scope.success || !authorization.success) {
-      throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
-    }
-    assertCloudAgentParentAuthority(this.metadata, authorization.data, scope.data);
-    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-    if (!secret) throw new Error('Authentication unavailable');
-    const issued = await renewRuntimeAuthorization({
-      authorization: authorization.data,
-      secret,
-      connectionString: this.env.HYPERDRIVE.connectionString,
-    }).catch(error => {
-      if (
-        error instanceof RuntimeAuthorizationRevokedError ||
-        error instanceof RuntimeAuthorizationExpiredError
-      ) {
-        throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
-      }
-      throw error;
-    });
-    const current = RuntimeAuthorizationSchema.safeParse(
-      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
-    );
-    if (!current.success) throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
-    assertCloudAgentParentAuthority(this.metadata, current.data, scope.data);
-    return {
-      token: issued.token,
-      createdOnPlatform: this.metadata?.identity.createdOnPlatform,
-    };
-  }
-
-  async authorizeCloudAgentChild(input: {
-    authority: CloudAgentAuthority;
-    childSessionId: string;
-  }): Promise<{ token: string; seal: string }> {
-    await this.initialized;
-    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-    if (!secret) throw new Error('Authentication unavailable');
-    return authorizeCloudAgentChild({
-      ...input,
-      secret,
-      connectionString: this.env.HYPERDRIVE.connectionString,
-      metadata: () => this.getMetadata(),
-      authorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
-    });
-  }
-
-  async authorizeCloudAgentWorkspaceSibling(input: {
-    siblingSessionId: string;
-  }): Promise<{ token: string; seal: string }> {
-    await this.initialized;
-    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-    if (!secret) throw new Error('Authentication unavailable');
-    return authorizeCloudAgentWorkspaceSibling({
-      parentSessionId: this.metadata?.identity.sessionId ?? '',
-      siblingSessionId: input.siblingSessionId,
-      secret,
-      connectionString: this.env.HYPERDRIVE.connectionString,
-      metadata: () => this.getMetadata(),
-      authorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
-    });
-  }
-
-  async issueCloudAgentMcpGrant(
-    workspace?: WorkspaceMcpBinding
-  ): Promise<{ url: string; token: string; expiresAt: number } | undefined> {
-    await this.initialized;
-    if (this.metadata?.allowSubagentSessions !== true) return undefined;
-    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-    if (!secret) throw new Error('Authentication unavailable');
-    return issueCloudAgentMcpGrant({
-      workspace,
-      secret,
-      connectionString: this.env.HYPERDRIVE.connectionString,
-      metadata: () => this.getMetadata(),
-      authorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
-      mcpUrl: this.env.CLOUD_AGENT_MCP_URL_OVERRIDE,
-    });
   }
 
   /**
@@ -3180,12 +3016,19 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   async getRuntimeAuthorizationStatus(): Promise<{
     state: 'legacy' | 'active' | 'expired' | 'revoked';
     id?: string;
+    /** The workspace whose Cloud Agent authority a user send in this chat may renew. */
+    workspaceSessionId?: string;
   }> {
     await this.initialized;
-    return readRuntimeAuthorizationRecoveryState({
+    const status = await readRuntimeAuthorizationRecoveryState({
       metadata: this.metadata,
       getAuthorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
     });
+    const workspaceSessionId =
+      this.metadata?.allowSubagentSessions === true
+        ? workspaceSessionIdForMetadata(this.metadata)
+        : undefined;
+    return workspaceSessionId === undefined ? status : { ...status, workspaceSessionId };
   }
 
   /**
@@ -3344,6 +3187,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.initialized;
     if (this.registration === null) return;
     await this.enqueue(async () => {
+      if (this.registration === null) return;
       const peer = this.sandboxPeer();
       if (peer !== null) {
         const standalone =
@@ -3359,6 +3203,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           'release'
         );
       }
+      await this.settleWorkspaceAuthorityBeforeDelete();
       await this.tearDownSession();
     });
   }
@@ -3414,13 +3259,17 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   /**
    * Worktree deletion, phase 2 (legacy `finishWorktreeDeletion`): purge this
-   * session's data once the Sandbox DO confirmed the worktree cleanup. Idempotent
-   * and holds no per-worktree state: the Sandbox DO already removed the routes.
+   * session's data once the Sandbox DO confirmed the worktree cleanup, for the
+   * stored worktree binding. Idempotent and holds no per-worktree state: the
+   * Sandbox DO already removed the routes.
    */
   async finishWorktreeDeletion(worktreeId: string): Promise<void> {
     await this.initialized;
-    cloudAgentWorktreeIdSchema.parse(worktreeId);
+    const requested = cloudAgentWorktreeIdSchema.parse(worktreeId);
     if (this.registration === null) return;
+    if (this.metadata !== null && this.metadata.workspace?.worktreeId !== requested) {
+      throw new Error('Worktree identity conflict');
+    }
     await this.enqueue(async () => {
       await this.tearDownSession();
     });
@@ -3456,12 +3305,38 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
   }
 
+  /**
+   * A chat that created its workspace hands the workspace authority over
+   * before its own storage is wiped. A workspace chat leaves it to the
+   * workspace, which outlives this chat; a chat without a worktree is the whole
+   * workspace, so deleting it ends that authority.
+   */
+  private async settleWorkspaceAuthorityBeforeDelete(): Promise<void> {
+    const metadata = this.metadata;
+    if (metadata?.allowSubagentSessions !== true || !isWorkspaceAnchorMetadata(metadata)) return;
+    const ownerId = metadata.identity.userId;
+    const workspaceSessionId = metadata.identity.sessionId;
+    if (metadata.workspace?.worktreeId === undefined) {
+      await withDORetry(
+        () => getWorkspaceStub(this.env, ownerId, workspaceSessionId),
+        stub => stub.markDeleted(),
+        'markDeleted'
+      );
+      return;
+    }
+    await withDORetry(
+      () => getWorkspaceStub(this.env, ownerId, workspaceSessionId),
+      stub => stub.describe(),
+      'describe'
+    );
+  }
+
   private async pruneChildRegistryEntry(ownerId: string, parentSessionId: string): Promise<void> {
     try {
       await withDORetry(
-        () => getSandboxSessionStub(this.env, ownerId, parentSessionId),
-        stub => stub.forgetCloudAgentChildSession(this.sessionId),
-        'forgetCloudAgentChildSession'
+        () => getWorkspaceStub(this.env, ownerId, parentSessionId),
+        stub => stub.forgetChild(this.sessionId),
+        'forgetChild'
       );
     } catch (error) {
       logger
@@ -3470,7 +3345,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           parentSessionId,
           error: error instanceof Error ? error.message : String(error),
         })
-        .warn('Failed to prune deleted child from parent session registry');
+        .warn('Failed to prune deleted child from parent workspace registry');
     }
   }
 
@@ -3538,6 +3413,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         this.db.delete(events).run();
         this.db.delete(cloudAgentChildSessions).run();
         this.db.delete(historyImport).run();
+        this.db.delete(sessionCostTotals).run();
+        this.db.delete(costBackfillState).run();
       },
     });
     this.clearSessionInMemoryState();

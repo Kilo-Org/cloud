@@ -91,4 +91,23 @@ describe('sendAdminSlackNotification', () => {
     expect(error).toMatchObject({ kind: 'network' });
     expect(String(error)).not.toContain(WEBHOOK_URL);
   });
+
+  it('maps a body-read failure to the same network error', async () => {
+    const bodyFailure = new Response('ok', { status: 200 });
+    jest
+      .spyOn(bodyFailure, 'text')
+      .mockRejectedValue(new Error(`Connection lost for ${WEBHOOK_URL}`));
+    jest.spyOn(global, 'fetch').mockResolvedValue(bodyFailure);
+    const { sendAdminSlackNotification } = await loadModule(WEBHOOK_URL);
+
+    let error: unknown;
+    try {
+      await sendAdminSlackNotification({ text: 'Test' });
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toMatchObject({ kind: 'network' });
+    expect(String(error)).not.toContain(WEBHOOK_URL);
+  });
 });

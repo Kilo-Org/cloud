@@ -2,12 +2,12 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "Misy fanavaozana ny session agent anao",
-      "lowBalance": "Mila jerena ny balan-nao",
+      "cloudAgentSession": "Misy fanavaozana ny session mpandraharahanao",
+      "lowBalance": "Mila jerena ny ambim-bolanao",
       "spendAlert": "Mila jerena ny fandaniana",
       "securityFinding": "Misy hitan'ny fiarovana mila jerena",
       "securityUpdate": "Misy fanavaozana ny fisavana fiarovana",
-      "activeAgentsGlanceable": "Misy fanavaozana ny agent mavitrika"
+      "activeAgentsGlanceable": "Misy fanavaozana ny mpandraharaha mavitrika"
     }
   },
   "agentSession": {
@@ -17,8 +17,8 @@
   },
   "internal": {
     "lowBalance": {
-      "title": "Fampandrenesana balan ambany",
-      "body": "Ny balan’ny {{organizationName}} dia latsaka ambany ny ${{minimumBalanceUsd}}"
+      "title": "Fampandrenesana ambim-bola kely",
+      "body": "Ny ambim-bolan'ny {{organizationName}} dia latsaka ambany ny ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
       "title": "Fampandrenesana fandaniana",

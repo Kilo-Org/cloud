@@ -24,7 +24,7 @@ import type { User } from '@kilocode/db/schema';
 import type {
   OpenRouterModel,
   OpenRouterModelsResponse,
-} from '@kilocode/web-shared/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 
 const mockedGetEnhancedOpenRouterModels =
   getEnhancedOpenRouterModels as unknown as jest.MockedFunction<typeof getEnhancedOpenRouterModels>;

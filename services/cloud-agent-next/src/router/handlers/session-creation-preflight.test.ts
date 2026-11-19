@@ -66,12 +66,26 @@ vi.mock('./organization-membership.js', () => ({
   assertOrganizationMembership: assertOrganizationMembershipMock,
 }));
 
-vi.mock('../../sandbox-session/session-stub.js', () => ({
-  getSandboxSessionStub: () => ({
-    getCloudAgentSpawnContext: parentSpawnContextMock,
-    getMetadata: parentMetadataMock,
-  }),
-}));
+// The workspace records its policy from the chat that created it; the fake
+// derives it from that chat's metadata through the production helper.
+vi.mock('../../control-plane/workspace/workspace-stub.js', async () => {
+  const { workspaceEgressFromMetadata } = await import('../../cloud-agent-authority.js');
+  const { CurrentSessionMetadataSchema } = await import('../../persistence/session-metadata.js');
+  return {
+    getWorkspaceStub: () => ({
+      getSpawnContext: async (authority: unknown) => {
+        const context = await parentSpawnContextMock(authority);
+        const metadata = await parentMetadataMock();
+        return {
+          ...context,
+          egress: metadata
+            ? workspaceEgressFromMetadata(CurrentSessionMetadataSchema.parse(metadata))
+            : undefined,
+        };
+      },
+    }),
+  };
+});
 vi.mock('../../balance-validation.js', () => ({ validateBalanceOnly: balanceMock }));
 
 import {
@@ -1669,71 +1683,7 @@ describe('scoped child network policy', () => {
     expect(resolved.runtime).toEqual({ egressMode: 'unrestricted' });
   });
 
-  it.each([
-    { name: 'missing metadata', configure: () => parentMetadataMock.mockResolvedValue(null) },
-    {
-      name: 'malformed metadata',
-      configure: () => parentMetadataMock.mockResolvedValue({ metadataSchemaVersion: 2 }),
-    },
-    {
-      name: 'unavailable metadata read',
-      configure: () => parentMetadataMock.mockRejectedValue(new Error('DO unavailable')),
-    },
-    {
-      name: 'session binding mismatch',
-      configure: () =>
-        parentMetadataMock.mockResolvedValue(
-          parentMetadata(undefined, { sessionId: 'workspace_other' })
-        ),
-    },
-    {
-      name: 'user binding mismatch',
-      configure: () =>
-        parentMetadataMock.mockResolvedValue(
-          parentMetadata(undefined, { userId: 'oauth/another-user' })
-        ),
-    },
-  ])('fails closed for $name', async ({ configure }) => {
-    configure();
-
-    const error: unknown = await preflightSessionCreation(
-      childRequest(),
-      scopedContext,
-      'prepareSession'
-    ).catch(caught => caught);
-
-    expect(error).toMatchObject({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Cloud Agent parent policy unavailable',
-    });
-    expect((error as Error).message).not.toContain('workspace_');
-  });
-
-  it('rejects parent metadata bound to another organization', async () => {
-    const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
-    parentMetadataMock.mockResolvedValue(
-      parentMetadata(undefined, { orgId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479-other' })
-    );
-
-    await expect(
-      preflightSessionCreation(
-        request({
-          parentCloudAgentSessionId: PARENT_SESSION_ID,
-          options: { createdOnPlatform: 'cloud-agent', kilocodeOrganizationId: organizationId },
-        }),
-        {
-          ...scopedContext,
-          cloudAgentAuthority: { ...authority, organizationId },
-        },
-        'prepareSession'
-      )
-    ).rejects.toMatchObject({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Cloud Agent parent policy unavailable',
-    });
-  });
-
-  it('stops before reading parent policy when authority is revoked', async () => {
+  it('stops before reading workspace policy when authority is revoked', async () => {
     parentSpawnContextMock.mockRejectedValueOnce(new Error('authority revoked'));
 
     await expect(

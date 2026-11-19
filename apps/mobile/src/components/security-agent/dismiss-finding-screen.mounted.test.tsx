@@ -105,6 +105,9 @@ const dismissDraft = vi.hoisted(() => ({
   persist: vi.fn(),
   clear: vi.fn(),
 }));
+// The sheet's commit is its header's Done control, so the harness records the
+// header props the screen passes instead of looking for an inline button.
+const sheetHeader = vi.hoisted((): { props: Record<string, unknown> } => ({ props: {} }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
@@ -116,7 +119,9 @@ vi.mock('react-native', () => ({
   // for its live region.
   Pressable: 'Pressable',
   Platform: { OS: 'android' },
+  I18nManager: { isRTL: false },
 }));
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: () => undefined }));
 vi.mock('@/components/ui/icons', () => ({ ShieldOff: 'ShieldOff' }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: routerBack }),
@@ -156,8 +161,16 @@ vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
   useSecurityDismissDraft: () => dismissDraft,
   securityDismissFailureCopy: (draft: { lastError: string }) => draft.lastError,
 }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/sheet-header', () => ({
+  SheetHeader: (props: Record<string, unknown>) => {
+    sheetHeader.props = props;
+    return null;
+  },
+}));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({
   QueryError: (props: {
     variant?: string;
@@ -168,11 +181,6 @@ vi.mock('@/components/query-error', () => ({
     queryError.props = props;
     return 'QueryError';
   },
-}));
-// The screen routes every load-failure gate through this body; the mock is a
-// named node whose props the failure assertions read through findAllByType.
-vi.mock('@/components/security-agent/dismiss-finding-load-failure', () => ({
-  DismissFindingLoadFailure: 'DismissFindingLoadFailure',
 }));
 vi.mock('@/components/security-agent/settings-recovery-status', () => ({
   SettingsRecoveryStatus: 'SettingsRecoveryStatus',
@@ -185,7 +193,7 @@ vi.mock('@/components/security-agent/settings-pill-group', () => ({
   },
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text', EYEBROW_LINE_HEIGHT_DP: 22 }));
 
 type R = TestRenderer.ReactTestRenderer;
 type I = TestRenderer.ReactTestInstance;
@@ -219,20 +227,21 @@ function selectReason(): void {
   });
 }
 
-function findDismissButton(root: I): I {
-  const nodes = root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Button');
-  if (nodes.length !== 1) {
-    throw new Error(`expected 1 dismissal Button, got ${nodes.length}`);
-  }
-  const n = nodes[0];
-  if (!n) {
-    throw new Error('dismissal Button not found');
-  }
-  return n;
+/** The commit control's disabled state, as the sheet header received it. */
+function doneDisabled(): boolean | undefined {
+  return sheetHeader.props.doneDisabled as boolean | undefined;
 }
 
-function buttonDisabled(root: I): boolean | undefined {
-  return findDismissButton(root).props.disabled as boolean | undefined;
+/** The commit control's in-flight state, as the sheet header received it. */
+function doneBusy(): boolean | undefined {
+  return sheetHeader.props.doneBusy as boolean | undefined;
+}
+
+/** Presses the sheet header's Done control, the sheet's only commit. */
+function submit(): void {
+  act(() => {
+    (sheetHeader.props.onDone as () => void)();
+  });
 }
 
 function renderedTexts(root: I): string[] {
@@ -267,9 +276,7 @@ function billingSteps(root: I): I[] {
 
 /** Every failure-body node the screen rendered, its props along. */
 function findAllFailures(root: I): I[] {
-  return root.findAll(
-    n => typeof n.type === 'string' && (n.type as string) === 'DismissFindingLoadFailure'
-  );
+  return root.findAll(n => n.type === QueryError);
 }
 
 /** The one load-failure surface the screen must show. */
@@ -359,8 +366,8 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       expect(tree.root.findByType(ScrollView)).toBe(scroll);
       expect(findCommentInput(tree.root)).toBe(input);
       expect(tree.root.findAllByType(SettingsRecoveryStatus)).toHaveLength(0);
-      expect(buttonDisabled(tree.root)).toBe(false);
-      act(findDismissButton(tree.root).props.onPress as () => void);
+      expect(doneDisabled()).toBe(false);
+      submit();
       expect(dismiss.mutate).toHaveBeenCalledWith(
         { findingId: 'finding-1', reason: 'not_used', comment: 'Keep this comment' },
         expect.any(Object)
@@ -469,10 +476,10 @@ describe('DismissFindingScreen dismissal CTA states', () => {
   });
 
   it('keeps the dismissal CTA enabled once a reason is chosen', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(false);
+    expect(doneDisabled()).toBe(false);
   });
 
   it('keeps the dismissal CTA enabled after a retryable failure and shows its copy', () => {
@@ -481,7 +488,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     const root = renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(false);
+    expect(doneDisabled()).toBe(false);
     expect(renderedTexts(root.root)).toContain(IN_PROGRESS_COPY);
   });
 
@@ -493,7 +500,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
 
     // The key was rotated, so a resubmit is a fresh intent; leaving the CTA
     // down would give the reader "try again later" with no way to try.
-    expect(buttonDisabled(root.root)).toBe(false);
+    expect(doneDisabled()).toBe(false);
     expect(renderedTexts(root.root)).toContain(PERSISTENCE_FAILED_MESSAGE);
   });
 
@@ -509,7 +516,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     const root = renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(false);
+    expect(doneDisabled()).toBe(false);
     expect(renderedTexts(root.root)).toContain(PERSISTENCE_FAILED_MESSAGE);
   });
 
@@ -519,7 +526,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     const root = renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(true);
+    expect(doneDisabled()).toBe(true);
     expect(renderedTexts(root.root)).toContain(CONFIGURATION_COPY);
     // The raw server message is replaced by the state-specific copy.
     expect(renderedTexts(root.root)).not.toContain(CONFIGURATION_ERROR_MESSAGE);
@@ -531,7 +538,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     const root = renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(false);
+    expect(doneDisabled()).toBe(false);
     expect(renderedTexts(root.root)).toContain(SERVICE_UNAVAILABLE_COPY);
     // The old ambiguous sentence must not be what the reader is told.
     expect(renderedTexts(root.root)).not.toContain(
@@ -547,7 +554,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     selectReason();
 
     // The plan is the fix, so the CTA stays down while the step out is offered.
-    expect(buttonDisabled(root.root)).toBe(true);
+    expect(doneDisabled()).toBe(true);
     expect(renderedTexts(root.root)).toContain(TRIAL_BILLING_COPY);
     expect(renderedTexts(root.root)).not.toContain(TRIAL_MEMBER_COPY);
     expect(billingSteps(root.root)).toHaveLength(1);
@@ -560,7 +567,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     const root = renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(true);
+    expect(doneDisabled()).toBe(true);
     expect(renderedTexts(root.root)).toContain(TRIAL_MEMBER_COPY);
     expect(billingSteps(root.root)).toHaveLength(0);
   });
@@ -574,7 +581,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     const root = renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(true);
+    expect(doneDisabled()).toBe(true);
     expect(renderedTexts(root.root)).toContain(TRIAL_BILLING_COPY);
     expect(renderedTexts(root.root)).not.toContain(TRIAL_MEMBER_COPY);
     expect(billingSteps(root.root)).toHaveLength(1);
@@ -588,26 +595,24 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     const root = renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(true);
+    expect(doneDisabled()).toBe(true);
     expect(renderedTexts(root.root)).toContain(TRIAL_MEMBER_COPY);
     expect(billingSteps(root.root)).toHaveLength(0);
   });
 
-  it('disables the dismissal CTA while the dismissal is pending', () => {
+  it('marks the dismissal CTA busy while the dismissal is pending', () => {
     dismiss.isPending = true;
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(true);
+    expect(doneBusy()).toBe(true);
   });
 
   it('submits the dismissal and pops the screen only on success', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
-    act(() => {
-      (findDismissButton(root.root).props.onPress as () => void)();
-    });
+    submit();
 
     expect(dismiss.mutate).toHaveBeenCalledWith(
       expect.objectContaining({ findingId: 'finding-1', reason: 'not_used' }),
@@ -616,12 +621,10 @@ describe('DismissFindingScreen dismissal CTA states', () => {
   });
 
   it('records the intent as a draft before submitting', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
-    act(() => {
-      (findDismissButton(root.root).props.onPress as () => void)();
-    });
+    submit();
 
     expect(dismissDraft.persist).toHaveBeenCalledWith({
       reason: 'not_used',
@@ -633,12 +636,10 @@ describe('DismissFindingScreen dismissal CTA states', () => {
   });
 
   it('clears the draft and pops on authoritative accept', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
-    act(() => {
-      (findDismissButton(root.root).props.onPress as () => void)();
-    });
+    submit();
 
     const options = dismiss.mutate.mock.calls[0]?.[1] as {
       onSuccess?: () => void;
@@ -652,12 +653,10 @@ describe('DismissFindingScreen dismissal CTA states', () => {
   });
 
   it('persists lastError and retryable on a retryable failure', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
-    act(() => {
-      (findDismissButton(root.root).props.onPress as () => void)();
-    });
+    submit();
 
     const options = dismiss.mutate.mock.calls[0]?.[1] as {
       onError?: (error: Error) => void;
@@ -676,12 +675,10 @@ describe('DismissFindingScreen dismissal CTA states', () => {
   });
 
   it('persists retry copy and a retryable draft when the Worker was unreachable', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
-    act(() => {
-      (findDismissButton(root.root).props.onPress as () => void)();
-    });
+    submit();
 
     const options = dismiss.mutate.mock.calls[0]?.[1] as {
       onError?: (error: Error) => void;
@@ -700,12 +697,10 @@ describe('DismissFindingScreen dismissal CTA states', () => {
   });
 
   it('persists the configuration copy and non-retryable on a missing-configuration failure', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
-    act(() => {
-      (findDismissButton(root.root).props.onPress as () => void)();
-    });
+    submit();
 
     const options = dismiss.mutate.mock.calls[0]?.[1] as {
       onError?: (error: Error) => void;
@@ -737,12 +732,12 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     const root = renderScreen();
 
     expect(renderedTexts(root.root)).toContain(CONFIGURATION_COPY);
-    expect(buttonDisabled(root.root)).toBe(true);
+    expect(doneDisabled()).toBe(true);
 
     // Choosing a reason is a new intent but not a new request: resubmitting the
     // same unrecoverable dismissal cannot succeed, so the CTA stays down.
     selectReason();
-    expect(buttonDisabled(root.root)).toBe(true);
+    expect(doneDisabled()).toBe(true);
   });
 });
 

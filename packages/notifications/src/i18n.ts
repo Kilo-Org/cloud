@@ -217,7 +217,7 @@ export function resolvePushLocale(locale: string | null | undefined): string {
 }
 
 /**
- * Translate a catalog key for a push locale. Unknown locales use English.
+ * Translate a catalog key for a push locale.
  * An unknown key returns `fallback` when provided; otherwise it returns the
  * key itself (test-only convenience — production callers pass a fallback).
  */

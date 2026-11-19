@@ -89,7 +89,7 @@ const translate = (key: string) => ENGLISH[key] ?? key;
 
 type Options = {
   feedback?: GlanceableActionFeedback;
-  status?: 'waiting' | 'empty' | 'signed_out' | 'privacy' | 'stale';
+  status?: 'waiting' | 'signed_out' | 'privacy' | 'stale';
   now?: number;
 };
 
@@ -342,7 +342,7 @@ describe('Home header', () => {
   const STATES = [
     propsFor([PERMISSION, BUSY]),
     propsFor([BUSY]),
-    propsFor([], { status: 'empty' }),
+    propsFor([]),
     propsFor([], { status: 'waiting' }),
     propsFor([], { status: 'privacy' }),
     propsFor([], { status: 'signed_out' }),
@@ -615,6 +615,28 @@ describe('scheduled', () => {
     }
   });
 
+  it('names the clock time a wake was due once its retry window has closed', () => {
+    // `awaitingUpdate` is a bounded claim: inside the retry window the line
+    // asks for an update, and after it the line states the time the run was
+    // due. Small and large own the line; medium keeps its per-row detail.
+    const due = NOW + MINUTE;
+    const at = due + 16 * MINUTE;
+    const props = propsFor([scheduled('Dependency audit', due)], { now: at });
+    expect(props.home?.awaitingUpdate).toBe(false);
+    for (const family of ['systemSmall', 'systemLarge'] as const) {
+      const tree = render(props, family, { at });
+      const label = textNode(tree, 'Was due');
+      expect(label, family).toBeDefined();
+      expect(modifier(label, 'foregroundStyle')).toBe('#6F6A61');
+      const time = collect(tree).find(
+        node => node.kind === 'Text' && node.props.dateStyle === 'time'
+      );
+      expect(time, family).toBeDefined();
+      expect(modifier(time, 'foregroundStyle')).toBe('#6F6A61');
+      expect(texts(tree)).not.toContain('Next run');
+    }
+  });
+
   it('shows nothing for an unknown time: the title in small, no detail in the rows', () => {
     const rows = [scheduled('Dependency audit', null), scheduled('Usage report', null)];
     expectBaselines(render(propsFor(rows), 'systemSmall'), 'systemSmall', [
@@ -653,7 +675,7 @@ describe('scheduled', () => {
 
 describe('nothing running, updating, last known', () => {
   it('keeps + on the small card and moves create into a pill on medium and large', () => {
-    const props = propsFor([], { status: 'empty' });
+    const props = propsFor([]);
     expectBaselines(render(props, 'systemSmall'), 'systemSmall', [
       ['Nothing running right now', 123],
       ['Checked', 151],
@@ -855,18 +877,18 @@ describe('Lock Screen accessories', () => {
   });
 
   it('draws the Kilo glyph over a state glyph, never a placeholder dash, when nothing counts', () => {
-    const expected = {
-      waiting: 'arrow.triangle.2.circlepath',
-      empty: 'checkmark.circle.fill',
-      privacy: 'lock.fill',
-      signed_out: 'person.fill',
-    } as const;
-    for (const status of Object.keys(expected) as (keyof typeof expected)[]) {
-      const tree = render(propsFor([], { status }), 'accessoryCircular');
+    const expected: [GlanceableViewProps, string][] = [
+      [propsFor([], { status: 'waiting' }), 'arrow.triangle.2.circlepath'],
+      [propsFor([]), 'checkmark.circle.fill'],
+      [propsFor([], { status: 'privacy' }), 'lock.fill'],
+      [propsFor([], { status: 'signed_out' }), 'person.fill'],
+    ];
+    for (const [props, stateGlyph] of expected) {
+      const tree = render(props, 'accessoryCircular');
       const images = collect(tree).filter(node => node.kind === 'Image');
       expect(images.map(node => node.props.uiImage ?? node.props.systemName)).toEqual([
         '__KILO_WIDGET_GLYPH_URI__',
-        expected[status],
+        stateGlyph,
       ]);
       expect(texts(tree)).not.toContain('—');
     }

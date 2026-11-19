@@ -73,6 +73,7 @@ vi.mock('@/components/ui/icons', () => ({
   Clock: 'Clock',
   Cpu: 'Cpu',
   FolderGit2: 'FolderGit2',
+  ShieldCheck: 'ShieldCheck',
   Zap: 'Zap',
 }));
 vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({

@@ -9,7 +9,7 @@ import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { InvitedMemberRow } from '@/components/organization/invited-member-row';
 import { MemberRow } from '@/components/organization/member-row';
 import {
@@ -19,13 +19,12 @@ import {
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Text } from '@/components/ui/text';
+import { RowGroup, RowGroupItem, rowGroupPosition } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { SectionHeader } from '@/components/ui/section-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { collator } from '@/lib/intl-cache';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import {
@@ -39,7 +38,7 @@ import {
 } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
-import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
+import { firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
 import { buildMembersListItems, type MembersListItem } from './members-list-items';
 import { selectOrgListErrorView } from './org-list-error-view';
@@ -67,19 +66,9 @@ function sortInvitedMembers(invites: InvitedOrgMember[]): InvitedOrgMember[] {
   });
 }
 
-function MemberRowSkeleton({ last }: Readonly<{ last?: boolean }>) {
-  return (
-    <View className={!last ? 'border-b-[0.5px] border-hair-soft' : undefined}>
-      <View className="gap-1.5 px-3 py-3">
-        <Skeleton className="h-4 w-32 rounded" />
-        <Skeleton className="h-3 w-44 rounded" />
-      </View>
-    </View>
-  );
-}
+const ListTopPad = () => <View className="pt-3" />;
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = { paddingTop: 16, flexGrow: 1 } satisfies ViewStyle;
 
 /** The refused removal this row must state, read from the screen-level store. */
 function readRemovalFailure(snapshot: MemberRemovalStore['snapshot'], memberId: string) {
@@ -133,7 +122,7 @@ export function OrganizationMembersScreen() {
   // fetch has isLoading false but no data — it must keep the list skeleton
   // instead of rendering a settled body, until the read answers (reconnect)
   // or the person retries, while a real error still reaches QueryError (the
-  // invariant low-balance-alert-sheet states for the same read).
+  // invariant low-balance-alert-screen states for the same read).
   const isMembersPending = orgWithMembers.isPending;
   const isError = orgWithMembers.isError && !orgWithMembers.data;
   const enableUsageLimits = orgWithMembers.data?.settings.enable_usage_limits !== false;
@@ -159,6 +148,7 @@ export function OrganizationMembersScreen() {
     <EmptyState
       icon={Users}
       placement={items.length > 0 ? 'top' : 'center'}
+      inset="gutter"
       title={t('organization.members.emptyTitle')}
       description={
         canInvite
@@ -167,41 +157,36 @@ export function OrganizationMembersScreen() {
       }
       action={
         canInvite ? (
-          <Button
-            className={STATE_ACTION_CLASS}
+          <StateAction
+            label={t('organization.inviteMember.title')}
+            icon={UserPlus}
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/organization/invite-member' as Href);
             }}
-          >
-            <Text className="text-primary-foreground">{t('organization.inviteMember.title')}</Text>
-          </Button>
+          />
         ) : undefined
       }
     />
   );
 
+  // A member's or invite's rounded corners follow its run inside one group: the
+  // rows after a section header start the run, and the last row of the group
+  // closes it. The group is a card, so it keeps the 14pt page gutter inside the
+  // full-bleed list rather than running to the screen edge.
+  const positionOf = (index: number, last: boolean) =>
+    rowGroupPosition({ first: index === 0 || items[index - 1]?.kind === 'section', last });
+
   const renderItem = ({ item, index }: { item: MembersListItem; index: number }) => {
     switch (item.kind) {
       case 'section': {
-        return (
-          <View className="bg-background px-6 pb-2 pt-4">
-            <Text variant="eyebrow">{item.title}</Text>
-          </View>
-        );
+        return <SectionHeader label={item.title} inset />;
       }
       case 'members-empty': {
         return emptyState;
       }
       case 'member': {
-        const isFirst = index === 0 || items[index - 1]?.kind === 'section';
         return (
-          <View
-            className={cn(
-              'mx-6 bg-secondary',
-              isFirst && 'rounded-t-lg',
-              item.last && 'rounded-b-lg'
-            )}
-          >
+          <RowGroupItem position={positionOf(index, item.last)} className="mx-4">
             <MemberRow
               member={item.member}
               canManage={
@@ -217,28 +202,19 @@ export function OrganizationMembersScreen() {
               removalFailure={readRemovalFailure(removals.snapshot, item.member.id)}
               onRemovalStarted={handleRemovalStarted}
               onRemovalCleared={handleRemovalCleared}
-              last={item.last}
             />
-          </View>
+          </RowGroupItem>
         );
       }
       case 'invite': {
-        const isFirst = index === 0 || items[index - 1]?.kind === 'section';
         return (
-          <View
-            className={cn(
-              'mx-6 bg-secondary',
-              isFirst && 'rounded-t-lg',
-              item.last && 'rounded-b-lg'
-            )}
-          >
+          <RowGroupItem position={positionOf(index, item.last)} className="mx-4">
             <InvitedMemberRow
               invite={item.invite}
               canManage={canManageMembers && (item.invite.role !== 'owner' || canManageOwners)}
               organizationId={organizationId}
-              last={item.last}
             />
-          </View>
+          </RowGroupItem>
         );
       }
       default: {
@@ -307,16 +283,16 @@ export function OrganizationMembersScreen() {
             }
           }}
           getItemType={item => item.kind}
+          ListHeaderComponent={<ListTopPad />}
           ListEmptyComponent={
-            <View className="mx-6 rounded-lg bg-secondary">
-              <MemberRowSkeleton />
-              <MemberRowSkeleton />
-              <MemberRowSkeleton last />
-            </View>
+            <RowGroup className="mx-4">
+              <RowSkeleton subtitle />
+              <RowSkeleton subtitle />
+              <RowSkeleton subtitle />
+            </RowGroup>
           }
           ListFooterComponent={<View style={{ height: paddingBottom }} pointerEvents="none" />}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={listContentContainerStyle}
         />
       )}
     </View>

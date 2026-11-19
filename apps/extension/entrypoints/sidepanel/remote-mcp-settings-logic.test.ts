@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- cohesive unit suite for the remote MCP settings logic: draft building, storage application and formatting helpers */
 import { describe, expect, it } from 'vitest';
 import type { RemoteMcpStore } from '../../src/shared/remote-mcp';
 import {
@@ -234,6 +235,59 @@ describe('remote-mcp-settings pure logic', () => {
 
     it('add-new bearer with empty token — no token field', () => {
       const draft = buildDraftFromForm({ ...baseFields, authType: 'bearer' });
+      expect(draft.auth).toStrictEqual({ type: 'bearer' });
+    });
+
+    const savedOAuth = {
+      clientInformation: { client_id: 'c1' },
+      codeVerifier: 'v1',
+      tokens: { access_token: 't1', token_type: 'Bearer' },
+    };
+    const savedOAuthAuth = { oauth: savedOAuth, type: 'oauth' as const };
+
+    it('oauth edit — existing oauth state is preserved when the URL is unchanged', () => {
+      const draft = buildDraftFromForm(
+        { ...baseFields, authType: 'oauth' },
+        savedOAuthAuth,
+        baseFields.url
+      );
+      expect(draft.auth).toStrictEqual(savedOAuthAuth);
+    });
+
+    it('oauth edit — cosmetic URL difference still preserves the blob', () => {
+      const draft = buildDraftFromForm(
+        { ...baseFields, authType: 'oauth', url: 'https://example.com/mcp/' },
+        savedOAuthAuth,
+        'https://example.com/mcp'
+      );
+      expect(draft.auth).toStrictEqual(savedOAuthAuth);
+    });
+
+    it('oauth edit — changed URL drops the blob', () => {
+      const draft = buildDraftFromForm(
+        { ...baseFields, authType: 'oauth', url: 'https://other.example.com/mcp' },
+        savedOAuthAuth,
+        'https://example.com/mcp'
+      );
+      expect(draft.auth).toStrictEqual({ type: 'oauth' });
+    });
+
+    it('oauth edit — invalid existing URL drops the blob instead of throwing', () => {
+      const draft = buildDraftFromForm(
+        { ...baseFields, authType: 'oauth' },
+        savedOAuthAuth,
+        'not a url'
+      );
+      expect(draft.auth).toStrictEqual({ type: 'oauth' });
+    });
+
+    it('oauth edit without existing state — no oauth blob', () => {
+      const draft = buildDraftFromForm({ ...baseFields, authType: 'oauth' });
+      expect(draft.auth).toStrictEqual({ type: 'oauth' });
+    });
+
+    it('oauth server switched to bearer — oauth blob dropped', () => {
+      const draft = buildDraftFromForm({ ...baseFields, authType: 'bearer' }, savedOAuthAuth);
       expect(draft.auth).toStrictEqual({ type: 'bearer' });
     });
   });

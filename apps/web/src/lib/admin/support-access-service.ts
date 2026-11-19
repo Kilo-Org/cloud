@@ -103,6 +103,47 @@ function assertAdminActor(actor: GrantActorRow | undefined): GrantActorRow {
   return actor;
 }
 
+/**
+ * Whether this grant may still be approved by this actor. The router calls it
+ * before it claims the single-use step-up proof so a refusal costs no passkey
+ * prompt; `approveSupportGrant` calls it again under the grant locks, and that
+ * run decides the outcome.
+ */
+export function assertGrantApprovable(params: {
+  approverKiloUserId: string;
+  grant: Pick<SupportAccessGrant, 'actor_kilo_user_id' | 'action_class' | 'status'>;
+  requester: GrantActorRow | undefined;
+}): void {
+  if (params.grant.actor_kilo_user_id === params.approverKiloUserId) {
+    throw badRequest('A request cannot be approved by its requester');
+  }
+  if (params.grant.status !== 'pending') {
+    throw new TRPCError({ code: 'CONFLICT', message: 'Grant is not pending' });
+  }
+  if (params.grant.action_class !== 'support_write') {
+    throw badRequest('Only write grants require approval');
+  }
+  assertAdminActor(params.requester);
+}
+
+/**
+ * Whether an organization is live, for a caller outside a transaction: the
+ * router reads this before it claims the single-use step-up proof. The write
+ * paths keep their own share-locked read inside the transaction.
+ */
+export async function assertSupportOrganizationLive(
+  organizationId: string,
+  fromDb: typeof db = db
+): Promise<void> {
+  const [organization] = await fromDb
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)));
+  if (!organization) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+  }
+}
+
 async function assertLiveOrganization(
   tx: DrizzleTransaction,
   organizationId: string
@@ -367,9 +408,6 @@ export async function approveSupportGrant(params: {
       .where(eq(support_access_grants.id, params.grantId))
       .limit(1);
     if (!unlocked) throw new TRPCError({ code: 'NOT_FOUND', message: 'Grant not found' });
-    if (unlocked.actor_kilo_user_id === params.approverKiloUserId) {
-      throw badRequest('A request cannot be approved by its requester');
-    }
 
     // Advisory lock before any row lock: request() takes advisory first, and a
     // reverse order here would deadlock.
@@ -385,17 +423,12 @@ export async function approveSupportGrant(params: {
       .where(eq(support_access_grants.id, params.grantId))
       .for('update');
     if (!pending) throw new TRPCError({ code: 'NOT_FOUND', message: 'Grant not found' });
-    if (pending.status !== 'pending') {
-      throw new TRPCError({ code: 'CONFLICT', message: 'Grant is not pending' });
-    }
-    if (pending.action_class !== 'support_write') {
-      throw badRequest('Only write grants require approval');
-    }
-    assertAdminActor(actors.get(pending.actor_kilo_user_id));
-    const approver = actors.get(params.approverKiloUserId);
-    if (!approver || isBlockedAccount(approver) || !approver.is_admin) {
-      throw forbidden('Platform admin access required');
-    }
+    assertGrantApprovable({
+      approverKiloUserId: params.approverKiloUserId,
+      grant: pending,
+      requester: actors.get(pending.actor_kilo_user_id),
+    });
+    assertAdminActor(actors.get(params.approverKiloUserId));
     await assertLiveOrganization(tx, pending.organization_id);
 
     const durationSeconds = clampDuration(

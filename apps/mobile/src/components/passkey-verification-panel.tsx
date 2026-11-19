@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { type PasskeyVerificationState } from '@/lib/passkeys/passkey-verification-state';
@@ -41,9 +41,9 @@ export function PasskeyVerificationPanel({
   const { t } = useTranslation();
 
   return (
-    <View className="gap-3 rounded-lg border border-border bg-card p-3">
-      <Text className="text-base font-semibold">{t('profile.passkeyVerifyTitle')}</Text>
-      <Text className="text-sm text-muted-foreground">{t('profile.passkeyVerifyDescription')}</Text>
+    <Card>
+      <Text variant="heading">{t('profile.passkeyVerifyTitle')}</Text>
+      <Text variant="muted">{t('profile.passkeyVerifyDescription')}</Text>
 
       {state.phase === 'choose' && (
         <>
@@ -162,7 +162,7 @@ export function PasskeyVerificationPanel({
           </Button>
         </>
       )}
-    </View>
+    </Card>
   );
 }
 

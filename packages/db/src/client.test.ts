@@ -81,11 +81,32 @@ const acceptsPoolSetting: PoolConfigOption = {
 };
 // @ts-expect-error createDrizzleClient installs databaseTypeParsers on its pool.
 const poolTypes: PoolConfigOption = { types: databaseTypeParsers };
+// @ts-expect-error createDrizzleClient derives the connection fields from its `connectionString` argument.
+const poolConnectionString: PoolConfigOption = { connectionString: 'postgres://other.example/db' };
+// @ts-expect-error createDrizzleClient parses `user` from its `connectionString` argument.
+const poolUser: PoolConfigOption = { user: 'someone' };
+// @ts-expect-error createDrizzleClient parses `password` from its `connectionString` argument.
+const poolPassword: PoolConfigOption = { password: 'secret' };
+// @ts-expect-error createDrizzleClient parses `host` from its `connectionString` argument.
+const poolHost: PoolConfigOption = { host: 'other.example' };
+// @ts-expect-error createDrizzleClient parses `port` from its `connectionString` argument.
+const poolPort: PoolConfigOption = { port: 5432 };
+// @ts-expect-error createDrizzleClient parses `database` from its `connectionString` argument.
+const poolDatabase: PoolConfigOption = { database: 'other' };
+// @ts-expect-error createDrizzleClient owns TLS; the dedicated `ssl` option replaces it.
+const poolSsl: PoolConfigOption = { ssl: { ca: 'ca' } };
 
 void acceptsWorkerSetting;
 void acceptsPoolSetting;
 void workerTypes;
 void poolTypes;
+void poolConnectionString;
+void poolUser;
+void poolPassword;
+void poolHost;
+void poolPort;
+void poolDatabase;
+void poolSsl;
 
 describe('databaseTypeParsers', () => {
   it('reads int8 as BigInt', () => {

@@ -1,21 +1,15 @@
 // Automation-settings approval-gate contract: the "Require approval before
 // auto-remediation" toggle hydrates from the loaded config, persists through
-// the save patch object, and renders disabled for read-only viewers. The
-// paused gate contract lives here too: the mock state and mount harness they
-// share sit in the mounted-test-helpers module.
+// the save patch object, and renders disabled for read-only viewers.
 
-// The helpers import is first: its vi.mock registrations (react-native among
-// them) must be in place before any other import evaluates, so the real
-// React Native entry never loads.
+// The helper import is first: its vi.mock registrations must be in place
+// before any other import evaluates.
 import {
-  approvalRow,
   capability,
   config,
   connectivity,
-  enabledConfig,
   pillGroups,
   platformError,
-  renderScreen,
   save,
   saveButton,
   toastSuccess,
@@ -23,21 +17,63 @@ import {
   trackInteraction,
 } from './automation-settings-screen.mounted.test-helpers';
 
-import { act } from '@/test/renderer';
+import { createElement } from 'react';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { AutomationSettingsScreen } from './automation-settings-screen';
+
+const APPROVAL_ROW_TITLE = 'Require approval before auto-remediation';
+
+function enabledConfig(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    isEnabled: true,
+    autoAnalysisEnabled: false,
+    autoAnalysisMinSeverity: 'high',
+    autoAnalysisIncludeExisting: false,
+    autoRemediationEnabled: true,
+    autoRemediationMinSeverity: 'high',
+    autoRemediationIncludeExisting: false,
+    autoRemediationRequireApproval: true,
+    autoDismissEnabled: false,
+    autoDismissConfidenceThreshold: 'high',
+    ...overrides,
+  };
+}
+
+function renderScreen(): TestRenderer.ReactTestRenderer {
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  act(() => {
+    ref.current = TestRenderer.create(
+      createElement(AutomationSettingsScreen, { scope: 'personal' })
+    );
+  });
+  const renderer = ref.current;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
+}
+
+function approvalRow(): {
+  title: string;
+  value: boolean;
+  disabled: boolean;
+  onValueChange: (value: boolean) => void;
+} {
+  const row = toggleRows.rows.find(r => r.title === APPROVAL_ROW_TITLE);
+  if (!row) {
+    throw new Error('approval toggle row not found');
+  }
+  return row;
+}
 
 describe('AutomationSettingsScreen approval gate', () => {
   beforeEach(() => {
     config.data = null;
     config.isLoading = false;
     config.isError = false;
-    config.isPending = false;
-    config.fetchStatus = 'idle';
-    platformError.props = null;
-    connectivity.committed = 'online';
     capability.canManage = true;
     save.isPending = false;
     save.mutateAsync.mockReset();
@@ -47,18 +83,20 @@ describe('AutomationSettingsScreen approval gate', () => {
     pillGroups.groups = [];
     saveButton.onSave = null;
     toastSuccess.mockClear();
+    connectivity.committed = 'online';
+    platformError.props = null;
   });
 
   it('hydrates the approval toggle from the loaded config', () => {
     config.data = enabledConfig({ autoRemediationRequireApproval: false });
-    renderScreen(AutomationSettingsScreen);
+    renderScreen();
 
     expect(approvalRow().value).toBe(false);
   });
 
   it('persists the approval toggle through the save patch object', async () => {
     config.data = enabledConfig({ autoRemediationRequireApproval: true });
-    renderScreen(AutomationSettingsScreen);
+    renderScreen();
 
     act(() => {
       approvalRow().onValueChange(false);
@@ -80,7 +118,7 @@ describe('AutomationSettingsScreen approval gate', () => {
   ])('announces one confirmation for a save result of %j', async (result, expectedKey) => {
     config.data = enabledConfig();
     save.mutateAsync.mockResolvedValue(result);
-    renderScreen(AutomationSettingsScreen);
+    renderScreen();
 
     await act(async () => {
       await saveButton.onSave?.();
@@ -96,7 +134,7 @@ describe('AutomationSettingsScreen approval gate', () => {
   it('renders the approval toggle disabled for read-only viewers', () => {
     capability.canManage = false;
     config.data = enabledConfig();
-    renderScreen(AutomationSettingsScreen);
+    renderScreen();
 
     expect(approvalRow().disabled).toBe(true);
   });
@@ -109,7 +147,7 @@ describe('AutomationSettingsScreen approval gate', () => {
     config.isPending = true;
     config.fetchStatus = 'paused';
     connectivity.committed = 'offline';
-    renderScreen(AutomationSettingsScreen);
+    renderScreen();
 
     const error = platformError.props;
     if (!error) {
@@ -133,7 +171,7 @@ describe('AutomationSettingsScreen approval gate', () => {
       config.isPending = true;
       config.fetchStatus = 'paused';
       connectivity.committed = state;
-      renderScreen(AutomationSettingsScreen);
+      renderScreen();
 
       expect(platformError.props).toBeNull();
     }
@@ -143,14 +181,14 @@ describe('AutomationSettingsScreen approval gate', () => {
     config.data = null;
     config.isLoading = true;
     config.fetchStatus = 'fetching';
-    renderScreen(AutomationSettingsScreen);
+    renderScreen();
 
     expect(platformError.props).toBeNull();
   });
 
   it('names each repeated control with the section it belongs to', () => {
     config.data = enabledConfig({ autoAnalysisEnabled: true, autoRemediationEnabled: true });
-    renderScreen(AutomationSettingsScreen);
+    renderScreen();
 
     const analysisSection = i18n.t('securityAgent.automation.autoAnalysis');
     const remediationSection = i18n.t('securityAgent.automation.autoRemediation');
@@ -189,7 +227,7 @@ describe('AutomationSettingsScreen approval gate', () => {
 
   it('titles each section switch briefly with its description as muted copy', () => {
     config.data = enabledConfig();
-    renderScreen(AutomationSettingsScreen);
+    renderScreen();
 
     const sectionNames = [
       'securityAgent.automation.autoAnalysis',

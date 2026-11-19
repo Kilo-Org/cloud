@@ -1234,8 +1234,8 @@ describe('ChatComposer placeholder visibility', () => {
 describe('ChatComposer voice status', () => {
   it.each([
     { status: 'idle', placeholder: 'Message the agent' },
-    { status: 'listening', placeholder: 'Listening...' },
-    { status: 'transcribing', placeholder: 'Transcribing...' },
+    { status: 'listening', placeholder: 'Listening…' },
+    { status: 'transcribing', placeholder: 'Transcribing…' },
   ])('shows "$placeholder" in the input while $status', async ({ status, placeholder }) => {
     voiceStatus.value = status;
     const render = await mount(makeProps({ placeholder: 'Message the agent' }));
@@ -1247,7 +1247,7 @@ describe('ChatComposer voice status', () => {
     voiceStatus.value = 'transcribing';
     await mount(makeProps({}));
 
-    expect(announceForAccessibility).toHaveBeenCalledWith('Transcribing...');
+    expect(announceForAccessibility).toHaveBeenCalledWith('Transcribing…');
   });
 });
 

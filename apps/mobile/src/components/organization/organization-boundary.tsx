@@ -1,17 +1,14 @@
 import { type Href, useRouter } from 'expo-router';
-import { Building2, type LucideIcon } from '@/components/ui/icons';
+import { ArrowLeft, ArrowRight, Building2, type LucideIcon, Plus } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
 import { useContextPicker } from '@/components/context-control';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { CREATE_ORGANIZATION_HREF } from '@/lib/organization-navigation';
@@ -20,6 +17,13 @@ import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 type OrganizationBoundaryProps = Readonly<{
   /** Full-screen callers pass a title for the `ScreenHeader`; sheets omit it and own no chrome. */
   title?: string;
+  /**
+   * Hold the header's eyebrow line while the caller's real content has one to
+   * fill. The boundary paints no eyebrow itself, so this only reserves the
+   * band: the title keeps its height and the content below it does not move
+   * when the resolved screen swaps the label in.
+   */
+  reserveEyebrow?: boolean;
   /**
    * Where the header's Back lands when the screen opens with no history to pop.
    * Every caller that passes a `title` names its own area's parent: the Profile
@@ -44,8 +48,9 @@ type OrganizationBoundaryProps = Readonly<{
  *    doesn't resolve to a membership. Three settled states, mutually
  *    exclusive:
  *    - no memberships at all → the account has no organization; the action
- *      opens the web organizations page (create/join live there), and Back
- *      to profile stays as the plain exit.
+ *      opens the app's own create-organization flow, and Back to profile
+ *      stays as the plain exit. Joining one happens from the invitation
+ *      email the organization sent, not from a control on this screen.
  *    - memberships exist but nothing is selected → the action opens the
  *      context picker sheet, the same account switcher the composer uses.
  *    - a deep-link override absent from a non-empty member list is
@@ -58,6 +63,7 @@ type OrganizationBoundaryProps = Readonly<{
  */
 export function OrganizationBoundary({
   title,
+  reserveEyebrow,
   backFallback,
   organizationIdOverride,
   icon = Building2,
@@ -89,9 +95,9 @@ export function OrganizationBoundary({
     // whether the account has any memberships at all:
     // 1. no memberships — the account has no organization (nothing selected,
     //    a stale selection, or an absent deep-link override all look the
-    //    same here); the web organizations page owns create/join, so the
-    //    boundary sends the reader there instead of a profile control that
-    //    does not exist.
+    //    same here); the app's own create-organization flow is the action
+    //    this state can actually deliver, and an invitation is accepted from
+    //    its email, so the description names no control this state lacks.
     // 2. memberships exist but the resolved selection renders nothing —
     //    nothing selected or a stale persisted selection; open the context
     //    picker so the reader can actually make the choice.
@@ -100,15 +106,13 @@ export function OrganizationBoundary({
     // 4. defensive fallback for a resolved selection the callers would not
     //    route here — org unavailable.
     const backToProfileAction = (
-      <Button
-        variant="outline"
-        className={STATE_ACTION_CLASS}
+      <StateAction
+        label={t('organization.boundary.backToProfile')}
+        icon={ArrowLeft}
         onPress={() => {
           router.replace(PROFILE_TAB_HREF);
         }}
-      >
-        <Text>{t('organization.boundary.backToProfile')}</Text>
-      </Button>
+      />
     );
     const hasOrganizations = (orgs?.length ?? 0) > 0;
     if (!hasOrganizations) {
@@ -119,14 +123,13 @@ export function OrganizationBoundary({
           description={t('organization.boundary.noOrganizationDescription')}
           action={
             <View className="gap-3">
-              <Button
-                className={STATE_ACTION_CLASS}
+              <StateAction
+                label={t('organization.create.title')}
+                icon={Plus}
                 onPress={() => {
                   router.push(CREATE_ORGANIZATION_HREF);
                 }}
-              >
-                <Text>{t('organization.create.title')}</Text>
-              </Button>
+              />
               {backToProfileAction}
             </View>
           }
@@ -161,7 +164,7 @@ export function OrganizationBoundary({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} backFallback={backFallback} />
+      <ScreenHeader title={title} reserveEyebrow={reserveEyebrow} backFallback={backFallback} />
       {content}
     </View>
   );
@@ -190,14 +193,13 @@ function OrganizationPickerBoundaryState({
         description={t('organization.boundary.selectDescriptionWithOrganizations')}
         action={
           <View className="gap-3">
-            <Button
-              className={STATE_ACTION_CLASS}
+            <StateAction
+              label={t('organization.boundary.chooseAccount')}
+              icon={ArrowRight}
               onPress={() => {
                 openPicker();
               }}
-            >
-              <Text>{t('organization.boundary.chooseAccount')}</Text>
-            </Button>
+            />
             {backAction}
           </View>
         }

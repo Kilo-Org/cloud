@@ -8,7 +8,6 @@ import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { InviteMemberSheet } from './invite-member-sheet';
-import { LowBalanceAlertSheet } from './low-balance-alert-sheet';
 import { MemberLimitSheet } from './member-limit-sheet';
 import {
   type OrganizationBoundaryFixture,
@@ -70,7 +69,10 @@ vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 // The real clearance reads the tab bar and the keyboard, neither of which this
 // suite models: the surface still renders its body as the ScrollView host.
 vi.mock('@/components/tab-screen', () => ({ SheetScrollView: 'ScrollView' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
@@ -84,7 +86,11 @@ vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
 }));
-vi.mock('@/components/ui/icons', () => ({ Check: 'Check', Lock: 'Lock' }));
+vi.mock('@/components/ui/icons', () => ({
+  ArrowLeft: 'ArrowLeft',
+  Check: 'Check',
+  Lock: 'Lock',
+}));
 vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { success: vi.fn() } }));
 vi.mock('@/lib/analytics/posthog', () => ({
   captureEvent: vi.fn(),
@@ -136,7 +142,6 @@ beforeEach(() => {
 
 const sheets = [
   { name: 'member limit', element: createElement(MemberLimitSheet, { memberId: 'member-1' }) },
-  { name: 'low balance alert', element: createElement(LowBalanceAlertSheet) },
 ];
 
 describe('organization sheet surfaces', () => {
@@ -190,11 +195,16 @@ describe('organization sheet surfaces', () => {
   });
 
   it.each([...sheets, { name: 'invite', element: createElement(InviteMemberSheet) }])(
-    'keeps $name permission denial outside a scroller',
+    'keeps $name permission denial under the sheet header',
     async ({ element }) => {
       boundary.role = 'member';
       const { renderer, unmount } = await renderWithProviders(element);
-      expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(1);
+      const header = renderer.root.find(node => String(node.type) === 'SheetHeader');
+      // The denial keeps the sheet's title and close control, so the state
+      // carries no way out of its own.
+      expect(propsOf(header).variant).toBe('close');
+      const emptyState = renderer.root.find(node => String(node.type) === 'EmptyState');
+      expect(propsOf(emptyState).action).toBeUndefined();
       expect(renderer.root.findAll(node => String(node.type) === 'ScrollView')).toHaveLength(0);
       unmount();
     }
@@ -263,11 +273,10 @@ function formField(renderer: TestRenderer.ReactTestRenderer): Record<string, unk
 }
 
 function saveButton(renderer: TestRenderer.ReactTestRenderer): Record<string, unknown> {
-  const [save] = renderer.root.findAll(node => String(node.type) === 'Button');
-  if (!save) {
-    throw new Error('the limit form rendered no save button');
-  }
-  return propsOf(save);
+  // Save moved into the shared header, so the control's unavailable state is
+  // the header's own `doneDisabled`.
+  const header = renderer.root.find(node => String(node.type) === 'SheetHeader');
+  return { disabled: propsOf(header).doneDisabled };
 }
 
 const rangeMessage = i18n.t('organization.memberLimit.rangeError', {

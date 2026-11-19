@@ -121,8 +121,7 @@ export function subscribeGlanceableTerminalEnd(end: () => void): () => void {
 }
 
 function writeTerminalAndEnd(status: 'signed_out' | 'privacy'): void {
-  // Arm the publisher gate before any sink writes, so a cache success that
-  // lands during this window can never emit for the torn-down session.
+  // Arm the publisher gate before any sink writes.
   terminalBlankEpoch += 1;
   // The ask names a session and an organization of the scope that is ending.
   // End it with that scope, in memory and in the mirror: the surfaces read the

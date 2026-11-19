@@ -8,6 +8,7 @@ import {
   type FetchedSessionData,
   type AssociatedPrData,
   type StoredMessage,
+  type SnapshotHistoryFailure,
 } from './session-manager';
 import {
   createCloudAgentSession,
@@ -27,6 +28,7 @@ import type {
 } from './session';
 import type { JotaiSessionStorage } from './storage/jotai';
 import { createChatProcessor } from './chat-processor';
+import { sessionSnapshotFailureMessage, type SessionSnapshotFailure } from './snapshot-page';
 import { readKilo2Messages } from './kilo2-source-messages';
 import { createServiceState } from './service-state';
 import type {
@@ -166,7 +168,7 @@ const mockSessionCallbacks: {
     messageId: string,
     state: Extract<MessageDeliveryState, { status: 'failed' }>
   ) => void;
-  onError?: (message: string) => void;
+  onError?: (message: string, failure?: SessionSnapshotFailure) => void;
   onChildSessionError?: (sessionId: string, message: string) => void;
 } = {};
 
@@ -205,14 +207,14 @@ jest.mock('./session', () => ({
         messageId: string,
         state: Extract<MessageDeliveryState, { status: 'failed' }>
       ) => void;
-      onError?: (message: string) => void;
+      onError?: (message: string, failure?: SessionSnapshotFailure) => void;
       onChildSessionError?: (sessionId: string, message: string) => void;
       transport?: {
         userWebConnection?: unknown;
         fetchSnapshotPage?: (
           kiloSessionId: string,
           options: { cursor?: string }
-        ) => Promise<unknown>;
+        ) => Promise<SessionSnapshotPageOutcome | null>;
         onInitialPageLoaded?: (page: unknown) => void;
       };
     }) => {
@@ -239,16 +241,11 @@ jest.mock('./session', () => ({
                   transport.onInitialPageLoaded(page);
                 } else if (page.kind !== 'success' && sessionConfig.onError) {
                   // Mirror the real transport's typed-failure handling:
-                  // it surfaces a stable error message via the manager's
-                  // `onError` channel so the standard session-error UI
-                  // shows the failure.
-                  const message =
-                    page.kind === 'retryable_failure'
-                      ? 'Session history temporarily unavailable'
-                      : page.kind === 'too_large'
-                        ? 'Session history too large to load'
-                        : 'Session history is unavailable';
-                  sessionConfig.onError(message);
+                  // it surfaces a stable error message plus the typed
+                  // failure via the manager's `onError` channel so the
+                  // standard session-error UI shows the failure.
+                  const failure = sessionSnapshotFailureMessage(page.kind);
+                  sessionConfig.onError(failure.message, failure);
                 }
               }
             }
@@ -7522,6 +7519,63 @@ describe('createSessionManager', () => {
       expect(atomValue<boolean>(config.store, mgr.atoms.isReadOnly)).toBe(false);
     });
 
+    it('repaints the bottom bar from reconnecting warning to terminal loss and back', async () => {
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      // The recoverable drop paints the non-error reconnecting line.
+      mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
+      mockSession.state.getStatus.mockReturnValue({
+        type: 'disconnected',
+        reconnecting: true,
+      });
+      notifyStateChange?.();
+
+      const warning = atomValue<{ type: string; message: string; code?: string } | null>(
+        config.store,
+        mgr.atoms.statusIndicator
+      );
+      expect(warning).toMatchObject({
+        type: 'warning',
+        code: 'agent-connection-reconnecting',
+      });
+
+      // The spent retry budget is the same `disconnected` type: the repaint
+      // gate must still re-project, so the reader gets the canonical loss
+      // line instead of an endless "Reconnecting…".
+      mockSession.state.getStatus.mockReturnValue({
+        type: 'disconnected',
+        code: 'connection-lost',
+      });
+      notifyStateChange?.();
+
+      const loss = atomValue<{ type: string; message: string; code?: string } | null>(
+        config.store,
+        mgr.atoms.statusIndicator
+      );
+      expect(loss).toMatchObject({
+        type: 'error',
+        code: 'connection-lost',
+      });
+
+      // A live connection is the one proof either state is over: the line
+      // clears and the stale error atom goes with it.
+      mockSessionCallbacks.onError?.('Connection lost. Please retry in a moment.');
+      mockSession.state.getStatus.mockReturnValue({ type: 'idle' });
+      notifyStateChange?.();
+
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+      expect(atomValue(config.store, mgr.atoms.statusIndicator)).toBeNull();
+    });
+
     it('suppresses Aborted onError from the interrupted session so errorAtom stays clear', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
@@ -10898,6 +10952,66 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
     expect(
       atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
     ).toBeNull();
+  });
+
+  it('stores the typed history failure kind beside the error atom on initial load', async () => {
+    const fetchSnapshotPage = createPageFetchMock(async () => ({
+      kind: 'too_large' as const,
+    }));
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+
+    expect(
+      atomValue<SnapshotHistoryFailure | null>(config.store, mgr.atoms.failedHistoryKind)
+    ).toEqual({ kind: 'too_large' });
+    expect(atomValue<string | null>(config.store, mgr.atoms.error)).not.toBeNull();
+  });
+
+  it('clears failedHistoryKind alongside the error atom via clearError', async () => {
+    const fetchSnapshotPage = createPageFetchMock(async () => ({
+      kind: 'too_large' as const,
+    }));
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+    expect(
+      atomValue<SnapshotHistoryFailure | null>(config.store, mgr.atoms.failedHistoryKind)
+    ).toEqual({ kind: 'too_large' });
+
+    mgr.clearError();
+
+    expect(
+      atomValue<SnapshotHistoryFailure | null>(config.store, mgr.atoms.failedHistoryKind)
+    ).toBeNull();
+    expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+  });
+
+  it('passes no history failure kind for a plain transport error', async () => {
+    const fetchSnapshotPage = createPageFetchMock(async () =>
+      makePage({ kiloSessionId: 'ses-1', nextCursor: null })
+    );
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+    expect(
+      atomValue<SnapshotHistoryFailure | null>(config.store, mgr.atoms.failedHistoryKind)
+    ).toBeNull();
+
+    mockSessionCallbacks.onError?.('Connection to agent lost');
+
+    expect(
+      atomValue<SnapshotHistoryFailure | null>(config.store, mgr.atoms.failedHistoryKind)
+    ).toBeNull();
+    expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe(
+      'Connection to agent lost'
+    );
   });
 
   it('surfaces non-retryable failure on initial load and disables further older loads', async () => {

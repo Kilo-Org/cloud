@@ -26,7 +26,9 @@ export const PROVIDER_COPY = {
     // below (`connectNoteKey`): a workspace access token is pasted in the
     // app's own sheet, so there is no browser step left to announce.
     connectDescription: null,
-    openLabel: 'common.connectBitbucket',
+    // The card's title already names Bitbucket, so the action repeats only
+    // the verb instead of the whole "Connect Bitbucket" phrase.
+    openLabel: 'common.connect',
     connectedTitle: 'common.bitbucketConnected',
     errorTitle: 'agentChat.newSession.couldNotLoadBitbucketRepositories',
     emptyDescription: 'agentChat.newSession.noRepositoriesVisibleBitbucket',

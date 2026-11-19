@@ -15,6 +15,7 @@ import {
   findUnlistedDynamicCalls,
   findUnparsedFiles,
   NO_AGREEMENT,
+  readEnglishCatalog,
 } from '../../../../tools/i18n/check-plurals.mjs';
 import { i18n } from '@/i18n';
 
@@ -47,7 +48,14 @@ describe('plural families', () => {
     const scan = auditCountedCalls();
     // A non-trivial scan, so the assertion below cannot pass by finding nothing.
     expect(collectCountedKeys(scan).length).toBeGreaterThan(10);
-    expect(findCountlessFamilies(scan)).toEqual([]);
+    const english = readEnglishCatalog();
+    // An unreadable English catalog makes the family check vacuous, so it must
+    // fail here rather than pass on an empty problem list.
+    expect(english.problems).toEqual([]);
+    expect(english.catalog).not.toBeNull();
+    if (english.catalog !== null) {
+      expect(findCountlessFamilies(scan, english.catalog)).toEqual([]);
+    }
   });
 
   it('keeps every NO_AGREEMENT entry documented with a reason', () => {

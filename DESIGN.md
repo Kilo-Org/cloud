@@ -344,7 +344,7 @@ The product scale is intentionally compact:
 - `bodyLg`: lead or emphasized prose, `16px / 400 / 1.5`.
 - `body`: default product copy, `14px / 400 / 1.5`.
 - `label`: controls, compact metadata, and badges, `12px / 500 / 1.4`.
-- `eyebrow`: short uppercase category labels, `11px / 500 / 1.2`, with `0.08em` tracking.
+- `eyebrow`: short uppercase category labels, `11px / 500 / 1.2`, with `0.08em` tracking. RTL-script eyebrow copy takes the 13px twin of this token, because the capitals and tracking it leans on are Latin devices a joined script cannot take.
 - `code`: code and terminal text, `14px / 400 / 1.5`.
 
 Use sentence case for user-visible copy. Eyebrows are the exception because the token explicitly transforms them to uppercase. Use `tabular-nums` for values aligned in columns. Do not use monospace as prose emphasis.

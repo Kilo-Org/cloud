@@ -458,7 +458,6 @@ export function scrubEvent<T>(event: T): T {
 
     const e = event as Record<string, unknown>;
 
-    // request.url
     if (e.request != null && typeof e.request === 'object') {
       const req = e.request as Record<string, unknown>;
       if ('url' in req) {
@@ -466,7 +465,6 @@ export function scrubEvent<T>(event: T): T {
       }
     }
 
-    // contexts.response (nested under contexts)
     if (e.contexts != null && typeof e.contexts === 'object') {
       const ctx = e.contexts as Record<string, unknown>;
       if (ctx.response != null && typeof ctx.response === 'object') {
@@ -485,7 +483,6 @@ export function scrubEvent<T>(event: T): T {
       }
     }
 
-    // user identity
     if (e.user != null && typeof e.user === 'object') {
       const user = e.user as Record<string, unknown>;
       delete user.email;
@@ -493,7 +490,6 @@ export function scrubEvent<T>(event: T): T {
       delete user.ip_address;
     }
 
-    // extras and tags
     if ('extra' in e) {
       e.extra = redactTokens(e.extra as Record<string, unknown> | undefined, 'extra');
     }

@@ -616,8 +616,9 @@ function createUserWebConnection(
    * Shared private sender for both `sendCommand` and `sendCommandToConnection`.
    * Owns the command-scoped connection retain, the pending-commands map
    * entry, and the 30s timeout — so the two public entry points only differ in
-   * the wire shape (`sessionId` present vs omitted). `connectionId` is always
-   * serialized; the relay tolerates it without a `sessionId`.
+   * the wire shape (`sessionId` present vs omitted). `connectionId` rides the
+   * wire whenever the caller knows one; the relay tolerates it without a
+   * `sessionId`.
    */
   function sendRawCommand(wire: RawCommandWire): Promise<unknown> {
     const hasOwnerLifetime = retainCount > commandRetainCount;
@@ -752,9 +753,8 @@ function createUserWebConnection(
     sendCommand(sessionId, command, data, expectedOwnerConnectionId, mutationId) {
       return sendRawCommand({
         command,
-        // `expectedOwnerConnectionId` undefined still flows through `connectionId`
-        // as a top-level field on the wire (the relay tolerates a `connectionId`
-        // without a `sessionId`), so reuse the shared sender.
+        // A missing owner id leaves `connectionId` off the wire; `sessionId`
+        // still addresses the command.
         ...(expectedOwnerConnectionId ? { connectionId: expectedOwnerConnectionId } : {}),
         sessionId,
         data,

@@ -2603,12 +2603,38 @@ describe('createPreparationManager', () => {
     );
   });
 
+  it('prepares a per-session route again when only its directory changes', async () => {
+    // Per-session isolation keys the runtime by session id, so a directory change
+    // keeps the key. The prepared runtime is rooted in the old directory and must
+    // not be handed back for the new one.
+    const harness = createHarness();
+    const spec = routeSpec({ runtimeIsolation: 'per-session' });
+    await harness.manager.prepare(spec);
+    expect(harness.ensureCalls()).toBe(1);
+    expect(harness.ensureInputs[0]?.key).toBe(spec.sessionId);
+    expect(harness.releaseCalls).toEqual([]);
+
+    await harness.manager.prepare({ ...spec, directory: '/tmp/prepare-test-other' });
+
+    expect(harness.ensureCalls()).toBe(2);
+    expect(harness.ensureInputs[1]?.key).toBe(spec.sessionId);
+    expect(harness.ensureInputs[1]?.directory).toBe('/tmp/prepare-test-other');
+    // The old runtime was released before the new one was ensured, so the new
+    // binding starts on a runtime rooted in its own directory.
+    expect(harness.releaseCalls).toEqual([spec.sessionId]);
+    expect(harness.manager.preparedRoute(spec.sessionId)?.directory).toBe(
+      '/tmp/prepare-test-other'
+    );
+    expect(lastFrame(harness.frames)).toEqual({ type: 'session.ready', sessionId: spec.sessionId });
+  });
+
   it('prepares again when the re-prepare asks for another runtime isolation', async () => {
     const harness = createHarness();
     const spec = routeSpec();
     await harness.manager.prepare(spec);
     const prepared = harness.manager.preparedRoute(spec.sessionId);
     if (prepared === null) throw new Error('The first prepare did not record a route');
+    harness.frames.length = 0;
 
     await harness.manager.prepare({ ...spec, runtimeIsolation: 'per-session' });
 
@@ -2616,6 +2642,9 @@ describe('createPreparationManager', () => {
     expect(harness.releaseCalls).toEqual([prepared.runtimeKey]);
     expect(harness.manager.preparedRoute(spec.sessionId)?.runtimeKey).toBe(spec.sessionId);
     expect(lastFrame(harness.frames)).toEqual({ type: 'session.ready', sessionId: spec.sessionId });
+    // The superseded runtime key is released only after the new binding reported
+    // ready, so a live turn never observes its runtime missing mid-change.
+    expect(harness.logs.some(line => line.includes('re-prepare binding changed'))).toBe(true);
   });
 
   it('installs refreshed Git and Kilo credentials into the running route and runtime', async () => {

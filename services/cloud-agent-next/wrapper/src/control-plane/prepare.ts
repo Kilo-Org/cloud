@@ -152,6 +152,11 @@ export type PrepareDeps = {
   log?: (message: string) => void;
   onNativeDiagnostic?: ControlDiagnosticReporter;
   onPreparedRoute?: (spec: ControlPlaneRouteSpec) => void;
+  /**
+   * Called with the binding a prepared route is leaving, before that route's
+   * runtime is released, so work attached to it settles first.
+   */
+  onSupersededRoute?: (spec: ControlPlaneRouteSpec) => void;
   runGit?: (args: string[], options?: ProcessOptions) => Promise<ExecResult>;
   runSetup?: (
     command: string,
@@ -1691,13 +1696,16 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           prepared.delete(spec.sessionId);
         } else if (!sameRouteBinding(route.spec, spec)) {
           // The acknowledgement belongs to the binding that was prepared. A
-          // prepare that names another binding prepares that binding, and the
-          // runtime key the old one held is released when no route holds it.
+          // prepare that names another binding first settles the work still
+          // attached to the old one, then prepares the new binding.
           log(
-            `control-plane re-prepare binding changed session=${spec.sessionId} was=${
-              route.directory
-            } now=${spec.directory}`
+            `control-plane re-prepare binding changed session=${spec.sessionId} runtimeKey=${
+              route.key
+            }->${runtimeKey(spec)} nativeSession=${route.spec.kiloSessionId}->${
+              spec.kiloSessionId
+            } directory=${route.directory}->${spec.directory}`
           );
+          deps.onSupersededRoute?.(route.spec);
           prepared.delete(spec.sessionId);
           finishReleasedRoute({
             key: route.key,

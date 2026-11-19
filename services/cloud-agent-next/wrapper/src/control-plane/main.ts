@@ -683,6 +683,7 @@ async function main(
     onNativeDiagnostic: projector,
     allocationId,
     onPreparedRoute: spec => turnsRef.current?.registerRoute(spec),
+    onSupersededRoute: spec => turnsRef.current?.releaseSupersededRoute(spec),
     runtimes: {
       ensure: input => runtimes.ensure(input),
       installCredentials: async (key, nextEnv, cloudAgentMcp) => {

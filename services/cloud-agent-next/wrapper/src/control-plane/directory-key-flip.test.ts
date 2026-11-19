@@ -193,6 +193,7 @@ function createHarness() {
     emit: send,
     allocationId: 'alloc_directory_key_flip',
     onPreparedRoute: spec => turns.registerRoute(spec),
+    onSupersededRoute: spec => turns.releaseSupersededRoute(spec),
     runtimes: {
       ensure: async input => {
         const harness = await runtimes.ensure(input);

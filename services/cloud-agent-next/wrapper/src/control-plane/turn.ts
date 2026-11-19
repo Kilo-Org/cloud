@@ -1457,14 +1457,22 @@ export function createTurnManager(deps: TurnManagerDeps) {
   }
 
   /**
-   * A live turn keeps the runtime that started its execution, so a route that
-   * moves to another runtime key stays its owner. A re-registration that names
-   * another binding settles the turn as an agent restart, so Cloud receives one
-   * outcome for the prompt it accepted and the next prompt builds its turn from
-   * the current registration. The route's automatic permission and question rules
-   * carry over on the shared sets, and the review publication is rebuilt with the
-   * turn.
+   * Settle the live turn of a route whose binding is being replaced, and stop any
+   * finalization it is running. The Cloud session receives one outcome for the
+   * prompt it accepted, and the next prompt builds its turn from the binding that
+   * is current. Called before the superseded runtime is released.
    */
+  function settleSupersededRoute(sessionId: string): void {
+    interruptedFinalizations.get(sessionId)?.abort.abort(new Error('route binding changed'));
+    const turn = turns.get(sessionId);
+    if (turn === undefined) return;
+    // Finalization re-checks the live turn only after its steps return, so a
+    // running auto-commit or condense is stopped through the signal it takes.
+    turn.stepAbort?.abort(new Error('route binding changed'));
+    sendOutcome(turn, 'failed', 'agent_restarted');
+  }
+
+  /** A registration of the same binding leaves the live turn untouched. */
   function adoptRegisteredRoute(previous: TurnRoute | undefined, route: TurnRoute): void {
     if (previous === undefined || sameRegisteredBinding(previous, route)) return;
     log(
@@ -1472,14 +1480,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
         previous.kiloSessionId
       }->${route.kiloSessionId}`
     );
-    interruptedFinalizations.get(route.sessionId)?.abort.abort(new Error('route binding changed'));
-    const turn = turns.get(route.sessionId);
-    if (turn !== undefined) {
-      // Finalization re-checks the live turn only after its steps return, so a
-      // running auto-commit or condense is stopped through the signal it takes.
-      turn.stepAbort?.abort(new Error('route binding changed'));
-      sendOutcome(turn, 'failed', 'agent_restarted');
-    }
+    settleSupersededRoute(route.sessionId);
   }
 
   async function answerAutomaticPermission(
@@ -1691,6 +1692,25 @@ export function createTurnManager(deps: TurnManagerDeps) {
 
     credentialsInstalled(runtimeKeyValue: string): void {
       maybeApplyPendingCredentials(runtimeKeyValue);
+    },
+
+    /**
+     * Settle the work attached to a binding that a re-prepare is replacing, before
+     * its runtime is released.
+     */
+    releaseSupersededRoute(spec: ControlPlaneRouteSpec): void {
+      const route = routes.get(spec.sessionId);
+      if (route === undefined) return;
+      if (
+        route.kiloSessionId === spec.kiloSessionId &&
+        route.directory === spec.directory &&
+        route.runtimeKey === runtimeKey(spec) &&
+        route.createdOnPlatform === spec.createdOnPlatform &&
+        sameReviewTarget(route.githubReviewTarget, spec.githubReviewTarget)
+      )
+        return;
+      log(`turn: route binding changed session=${spec.sessionId}`);
+      settleSupersededRoute(spec.sessionId);
     },
 
     registerRoute(spec: ControlPlaneRouteSpec): void {

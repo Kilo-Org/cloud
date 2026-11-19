@@ -4687,6 +4687,45 @@ describe('custom routers and signed auto decisions', () => {
       });
     });
 
+    it('checks policy on the catalog id a catalog-mode key serves a stored bespoke entry under', async () => {
+      setOrganizationAuth('org-1');
+      const bespoke = 'private-a1b2c3d4e5/acme/haiku';
+      mockedFindCustomRouter.mockResolvedValue({
+        ...personalRouter,
+        ownerType: 'org',
+        ownerId: 'org-1',
+        slug: 'team',
+        entries: [
+          { kind: 'gateway', model: bespoke },
+          { kind: 'gateway', model: 'openai/gpt-5-mini' },
+        ],
+      });
+      mockedCreateDirectByokReferenceResolver.mockResolvedValueOnce(async modelId =>
+        modelId === bespoke ? haiku : modelId
+      );
+      mockedDeniedAutoRoutingCandidates.mockImplementation(async (_policy, candidateIds) =>
+        candidateIds.filter(id => id !== haiku)
+      );
+      mockedFetchCustomRouterDecision.mockResolvedValue({
+        kind: 'ok',
+        decision: { ...haikuDecision, model: bespoke, entry: { kind: 'gateway', model: bespoke } },
+        costUsd: 0,
+      });
+
+      const response = await handleLlmProxyRequest(
+        makeRequest(makeBody('kilo-auto/custom/org/team'))
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockedDeniedAutoRoutingCandidates).toHaveBeenCalledWith(expect.anything(), [
+        haiku,
+        'openai/gpt-5-mini',
+      ]);
+      expect(mockedFetchCustomRouterDecision).toHaveBeenCalledWith(
+        expect.objectContaining({ deniedModelIds: ['openai/gpt-5-mini'] })
+      );
+    });
+
     it.each([
       ['an organization router without an organization context', 'kilo-auto/custom/org/team'],
       ['a missing router', 'kilo-auto/custom/missing'],

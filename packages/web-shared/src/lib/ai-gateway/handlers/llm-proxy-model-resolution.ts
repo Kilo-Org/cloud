@@ -251,12 +251,19 @@ async function resolveAutoModelId(
     return await decideCustomRouter({
       reference,
       ...caller,
-      deniedModelIds: candidateIds =>
-        autoRoutingDenials(
-          ctx,
-          policy => deniedAutoRoutingCandidates(policy, candidateIds),
-          options => dataCollectionRequiredAutoRoutingCandidates(candidateIds, options)
-        ),
+      // The gateway serves an entry stored with a bespoke id of a catalog-mode key under its catalog
+      // id, so that id is what policy checks; the worker still knows the entry by its stored id.
+      deniedModelIds: async candidateIds => {
+        const servedIds = await resolveCatalogModeReferences(candidateIds, caller);
+        const denied = new Set(
+          await autoRoutingDenials(
+            ctx,
+            policy => deniedAutoRoutingCandidates(policy, servedIds),
+            options => dataCollectionRequiredAutoRoutingCandidates(servedIds, options)
+          )
+        );
+        return candidateIds.filter((_, index) => denied.has(servedIds[index]));
+      },
       decide: async (router, deniedModelIds) => {
         const outcome = await fetchCustomRouterDecision({
           ...decisionRequest(ctx, caller),
@@ -331,6 +338,34 @@ async function resolveAutoModelId(
   }
 }
 
+/** Whether `model` may be a bespoke id of a key that could be in catalog mode. */
+async function mayNameCatalogModeKeyModel(model: string): Promise<boolean> {
+  // Only the caller's keys know its private providers, which can all serve catalog ids.
+  if (isByokPrivateModelId(model.toLowerCase())) return true;
+  const { provider } = await getDirectByokModel(model.toLowerCase());
+  return !!provider && supportsCatalogMode(provider);
+}
+
+/**
+ * The id the gateway serves each of `modelIds` under: the catalog id of a bespoke id whose key is
+ * in catalog mode, and otherwise the id itself, including a bespoke id with no catalog id.
+ */
+async function resolveCatalogModeReferences(
+  modelIds: ReadonlyArray<string>,
+  caller: RoutingCaller
+): Promise<string[]> {
+  const mayResolve = await Promise.all(modelIds.map(mayNameCatalogModeKeyModel));
+  if (!mayResolve.includes(true)) return [...modelIds];
+  const resolveReference = await createDirectByokReferenceResolver(
+    byokOwner(caller.userId, caller.organizationId)
+  );
+  return await Promise.all(
+    modelIds.map(async (modelId, index) =>
+      mayResolve[index] ? ((await resolveReference(modelId)) ?? modelId) : modelId
+    )
+  );
+}
+
 /**
  * The catalog id that replaces an auto-routed bespoke direct BYOK or private provider id when the caller's
  * key for it is in catalog mode. Null when the id needs no replacement or has no catalog id; an
@@ -340,11 +375,7 @@ async function catalogModeModelForRoutedModel(
   model: string,
   callerPromise: ModelResolutionContext['callerPromise']
 ): Promise<string | null> {
-  // Only the caller's keys know its private providers, which can all serve catalog ids.
-  if (!isByokPrivateModelId(model.toLowerCase())) {
-    const { provider } = await getDirectByokModel(model.toLowerCase());
-    if (!provider || !supportsCatalogMode(provider)) return null;
-  }
+  if (!(await mayNameCatalogModeKeyModel(model))) return null;
   const caller = await callerPromise;
   if (caller.kind !== 'signed-in') return null;
   const resolveReference = await createDirectByokReferenceResolver(

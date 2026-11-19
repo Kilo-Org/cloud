@@ -34,7 +34,7 @@ function printUsage(): void {
   console.log('a sign-in with their codes, so the local server answers its poll with 202');
   console.log('or 403.');
   console.log('');
-  console.log('Suggested next step (development app):');
+  console.log('Suggested next step (signed-out development app):');
   console.log('  kiloapp:///dev/login-fixture/pending');
   console.log('  kiloapp:///dev/login-fixture/denied');
 }
@@ -84,7 +84,9 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   ] satisfies (typeof device_auth_requests.$inferInsert)[]);
 
   console.log('This fixture represents: one pending and one denied device sign-in request.');
-  console.log('Suggested next step: kiloapp:///dev/login-fixture/<pending|denied>');
+  console.log(
+    'Suggested next step (signed-out development app): kiloapp:///dev/login-fixture/<pending|denied>'
+  );
   return {
     pendingDeviceCode: REQUESTS.pending.deviceCode,
     pendingUserCode: REQUESTS.pending.userCode,

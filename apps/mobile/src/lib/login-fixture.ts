@@ -18,12 +18,13 @@ import { API_BASE_URL } from '@/lib/config';
  * - `error`: an empty device code. The server refuses the body with 400 and the
  *   screen shows the error banner.
  *
- * The route is its own screen, pushed over whatever is open: a sign-in screen
- * already on the stack keeps its mount, so its unmount cannot clear the record
- * this route's screen restores.
+ * The route is its own screen, pushed over the signed-out stack: a sign-in
+ * screen already open keeps its mount, so its unmount cannot clear the record
+ * this route's screen restores. It needs a signed-out app; a signed-in app is
+ * sent out of `(auth)`, and the route writes nothing there.
  *
- * Open it: `pnpm dev:seed app:device-auth-states` (once per local database, for
- * `pending` and `denied`), then
+ * Open it signed out: `pnpm dev:seed app:device-auth-states` (once per local
+ * database, for `pending` and `denied`), then
  * `kiloapp:///dev/login-fixture/<pending|denied|expired|error>`. The first poll
  * runs a few seconds after the screen opens.
  */

@@ -1475,8 +1475,9 @@
       "notConnectedReadOnly": "Bitbucket isn't connected. Only organization owners, admins, and billing managers can connect it."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "This organization's Bitbucket connection is managed on the web from a computer.",
-      "description": "Create a Workspace Access Token with the required scopes and paste it below.",
+      "managedOnWeb": "The Bitbucket connection for {{organization}} is managed on the web from a computer.",
+      "description": "Create a Workspace Access Token for {{organization}}, then paste it below.",
+      "descriptionReconnect": "Create a new Workspace Access Token for {{organization}}, then paste it below.",
       "scopes": "Account: read · Repositories: read/write · Pull requests: read · Webhooks: read/write",
       "tokenPlaceholder": "Workspace access token",
       "tokenRefused": "Bitbucket did not accept this workspace token. Check that it has the scopes above, then try again."

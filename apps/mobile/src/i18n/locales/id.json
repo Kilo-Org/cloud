@@ -695,8 +695,9 @@
       "notConnectedReadOnly": "Bitbucket tidak terhubung. Hanya pemilik organisasi, admin, dan manajer penagihan yang dapat menghubungkannya."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Koneksi Bitbucket organisasi ini dikelola di web melalui komputer.",
-      "description": "Buat token akses ruang kerja dengan cakupan izin yang diperlukan, lalu tempelkan di bawah.",
+      "managedOnWeb": "Koneksi Bitbucket untuk {{organization}} dikelola di web melalui komputer.",
+      "description": "Buat token akses ruang kerja untuk {{organization}}, lalu tempelkan di bawah.",
+      "descriptionReconnect": "Buat token akses ruang kerja baru untuk {{organization}}, lalu tempelkan di bawah.",
       "scopes": "Akun: baca · Repositori: baca/tulis · PR: baca · Webhook: baca/tulis",
       "tokenPlaceholder": "Token akses ruang kerja",
       "tokenRefused": "Bitbucket tidak menerima token akses ruang kerja ini. Periksa bahwa token tersebut memiliki cakupan izin di atas, lalu coba lagi."

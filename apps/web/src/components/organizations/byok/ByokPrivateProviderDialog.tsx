@@ -758,6 +758,11 @@ function ByokPrivateProviderForm({
             The API root, without a trailing slash; requests go to /chat/completions, /messages, or
             /responses under it.
           </p>
+          <p className="text-muted-foreground text-xs sm:col-span-2">
+            Kilo does not verify or enforce the private provider&apos;s data retention or zero data
+            retention, including for Kilo catalog model IDs that are served by it. Your organization
+            is responsible for choosing a private provider that meets its requirements.
+          </p>
         </div>
 
         {!keepsSavedCredentials ? (

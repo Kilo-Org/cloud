@@ -120,6 +120,53 @@ export function deepCopyCommands(commands: SlashCommandInfo[]): SlashCommandInfo
   }));
 }
 
+type DiscoveryRequest = {
+  ownerConnectionId: string;
+  isCurrent: () => boolean;
+  settle: () => void;
+};
+
+/**
+ * One in-flight request slot for a catalog discovery kind. Each kind owns its
+ * own generation counter, so one kind finishing or failing never invalidates
+ * the other's request. A request is current only while its transport
+ * generation, its slot generation, and the tracked owner all still match what
+ * they were when the request was issued.
+ */
+function createDiscoveryRequestSlot(
+  readOwnerConnectionId: () => string | null,
+  readTransportGeneration: () => number
+): {
+  begin: (ownerConnectionId: string) => DiscoveryRequest | null;
+  reset: () => void;
+} {
+  let requestGeneration = 0;
+  let inFlight: { ownerConnectionId: string; generation: number } | null = null;
+  return {
+    begin(ownerConnectionId) {
+      if (inFlight?.ownerConnectionId === ownerConnectionId) return null;
+      requestGeneration += 1;
+      const expectedRequestGeneration = requestGeneration;
+      const expectedGeneration = readTransportGeneration();
+      inFlight = { ownerConnectionId, generation: expectedRequestGeneration };
+      return {
+        ownerConnectionId,
+        isCurrent: () =>
+          expectedGeneration === readTransportGeneration() &&
+          expectedRequestGeneration === requestGeneration &&
+          readOwnerConnectionId() === ownerConnectionId,
+        settle: () => {
+          if (inFlight?.generation === expectedRequestGeneration) inFlight = null;
+        },
+      };
+    },
+    reset() {
+      requestGeneration += 1;
+      inFlight = null;
+    },
+  };
+}
+
 function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactory {
   return (sink: TransportSink) => {
     let generation = 0;
@@ -142,19 +189,17 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       currentCapabilities = next;
       config.onCapabilitiesChange?.(next);
     }
-    let catalogRequestGeneration = 0;
-    let catalogRequestInFlight: {
-      ownerConnectionId: string;
-      generation: number;
-    } | null = null;
+    const modelDiscovery = createDiscoveryRequestSlot(
+      () => ownerConnectionId,
+      () => generation
+    );
     // Command catalog discovery runs on its own generation so it stays
     // independent of model discovery: a model refresh that completes or
     // fails must not drop an in-flight command catalog request.
-    let commandCatalogRequestGeneration = 0;
-    let commandCatalogRequestInFlight: {
-      ownerConnectionId: string;
-      generation: number;
-    } | null = null;
+    const commandDiscovery = createDiscoveryRequestSlot(
+      () => ownerConnectionId,
+      () => generation
+    );
     let remoteModelState: RemoteModelState = {
       ownerConnectionId: null,
       protocol: 'unknown',
@@ -220,17 +265,17 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       config.onRemoteCommandStateChange?.(next);
     }
 
-    function isCurrentDiscoveryRequest(
-      currentRequestGeneration: number,
-      expectedOwnerConnectionId: string,
-      expectedGeneration: number,
-      expectedRequestGeneration: number
-    ): boolean {
-      return (
-        expectedGeneration === generation &&
-        expectedRequestGeneration === currentRequestGeneration &&
-        ownerConnectionId === expectedOwnerConnectionId
-      );
+    /**
+     * A relay `SESSION_OWNER_CHANGED` means the request was fenced against a
+     * different connection, so the locally tracked owner is stale: drop it
+     * (which resets both discovery slots) and report the failure as handled.
+     */
+    function handleOwnerChanged(error: unknown): boolean {
+      if (error instanceof UserWebCommandError && error.code === 'SESSION_OWNER_CHANGED') {
+        setOwnerConnectionId(null);
+        return true;
+      }
+      return false;
     }
 
     function canExitSession(): boolean {
@@ -261,10 +306,8 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
     function resetOwnerState(previousOwnerConnectionId: string | null): void {
       // A new (or absent) owner gets a fresh self-healing budget.
       resetModelDiscoveryBudget();
-      catalogRequestGeneration += 1;
-      catalogRequestInFlight = null;
-      commandCatalogRequestGeneration += 1;
-      commandCatalogRequestInFlight = null;
+      modelDiscovery.reset();
+      commandDiscovery.reset();
       publishRemoteModelState({
         ownerConnectionId,
         protocol: 'unknown',
@@ -302,31 +345,14 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       }
     }
 
-    function handleCatalogFailure(
-      error: unknown,
-      expectedOwnerConnectionId: string,
-      expectedGeneration: number,
-      expectedRequestGeneration: number
-    ): void {
-      if (
-        !isCurrentDiscoveryRequest(
-          catalogRequestGeneration,
-          expectedOwnerConnectionId,
-          expectedGeneration,
-          expectedRequestGeneration
-        )
-      ) {
-        return;
-      }
+    function handleCatalogFailure(error: unknown, request: DiscoveryRequest): void {
+      if (!request.isCurrent()) return;
 
-      if (error instanceof UserWebCommandError && error.code === 'SESSION_OWNER_CHANGED') {
-        setOwnerConnectionId(null);
-        return;
-      }
+      if (handleOwnerChanged(error)) return;
 
       if (error instanceof Error && error.message.includes('unknown command')) {
         publishRemoteModelState({
-          ownerConnectionId: expectedOwnerConnectionId,
+          ownerConnectionId: request.ownerConnectionId,
           protocol: 'legacy',
           refresh: 'idle',
         });
@@ -334,7 +360,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       }
 
       publishRemoteModelState({
-        ownerConnectionId: expectedOwnerConnectionId,
+        ownerConnectionId: request.ownerConnectionId,
         protocol: remoteModelState.protocol,
         ...(remoteModelState.catalog ? { catalog: remoteModelState.catalog } : {}),
         refresh: 'error',
@@ -342,20 +368,14 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       });
       // Transient failures must not be terminal: keep retrying under the
       // bounded budget so a late/slow CLI still produces the full catalog.
-      scheduleModelRetry(expectedOwnerConnectionId);
+      scheduleModelRetry(request.ownerConnectionId);
     }
 
     function discoverModels(expectedOwnerConnectionId: string): void {
-      if (catalogRequestInFlight?.ownerConnectionId === expectedOwnerConnectionId) return;
+      const request = modelDiscovery.begin(expectedOwnerConnectionId);
+      if (!request) return;
 
       modelDiscoveryAttempts += 1;
-      catalogRequestGeneration += 1;
-      const expectedRequestGeneration = catalogRequestGeneration;
-      const expectedGeneration = generation;
-      catalogRequestInFlight = {
-        ownerConnectionId: expectedOwnerConnectionId,
-        generation: expectedRequestGeneration,
-      };
       publishRemoteModelState({
         ownerConnectionId: expectedOwnerConnectionId,
         protocol: remoteModelState.protocol,
@@ -372,25 +392,11 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         )
         .then(
           result => {
-            if (
-              !isCurrentDiscoveryRequest(
-                catalogRequestGeneration,
-                expectedOwnerConnectionId,
-                expectedGeneration,
-                expectedRequestGeneration
-              )
-            ) {
-              return;
-            }
+            if (!request.isCurrent()) return;
 
             const parsed = remoteModelCatalogV1Schema.safeParse(result);
             if (!parsed.success) {
-              handleCatalogFailure(
-                new Error('Invalid remote model catalog'),
-                expectedOwnerConnectionId,
-                expectedGeneration,
-                expectedRequestGeneration
-              );
+              handleCatalogFailure(new Error('Invalid remote model catalog'), request);
               return;
             }
 
@@ -424,19 +430,9 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
               refresh: 'idle',
             });
           },
-          error =>
-            handleCatalogFailure(
-              error,
-              expectedOwnerConnectionId,
-              expectedGeneration,
-              expectedRequestGeneration
-            )
+          error => handleCatalogFailure(error, request)
         )
-        .finally(() => {
-          if (catalogRequestInFlight?.generation === expectedRequestGeneration) {
-            catalogRequestInFlight = null;
-          }
-        });
+        .finally(request.settle);
     }
 
     function publishCommandFailure(
@@ -456,33 +452,19 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
 
     function handleCommandCatalogFailure(
       error: unknown,
-      expectedOwnerConnectionId: string,
-      expectedGeneration: number,
-      expectedRequestGeneration: number,
+      request: DiscoveryRequest,
       clearCatalog: boolean
     ): void {
-      if (
-        !isCurrentDiscoveryRequest(
-          commandCatalogRequestGeneration,
-          expectedOwnerConnectionId,
-          expectedGeneration,
-          expectedRequestGeneration
-        )
-      ) {
-        return;
-      }
+      if (!request.isCurrent()) return;
 
-      if (error instanceof UserWebCommandError && error.code === 'SESSION_OWNER_CHANGED') {
-        setOwnerConnectionId(null);
-        return;
-      }
+      if (handleOwnerChanged(error)) return;
 
       // Exact relay `CLI_UPGRADE_REQUIRED` is non-fatal: clear the catalog
       // and surface actionable copy through the command state so the chat
       // composer can prompt the user to upgrade. Never populate the global
       // session error atom for this.
       if (error instanceof UserWebCommandError && error.code === 'CLI_UPGRADE_REQUIRED') {
-        publishCommandFailure(expectedOwnerConnectionId, 'upgrade-required', {
+        publishCommandFailure(request.ownerConnectionId, 'upgrade-required', {
           message: error.message,
           clearCatalog: true,
         });
@@ -492,13 +474,13 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       // Legacy CLI without `list_commands` support: treat as "no commands
       // available" rather than a failure so the composer can hide suggestions.
       if (error instanceof Error && error.message.includes('unknown command')) {
-        publishCommandFailure(expectedOwnerConnectionId, 'idle', { clearCatalog: true });
+        publishCommandFailure(request.ownerConnectionId, 'idle', { clearCatalog: true });
         return;
       }
 
       const message = error instanceof Error ? error.message : 'Failed to discover remote commands';
       if (clearCatalog) {
-        publishCommandFailure(expectedOwnerConnectionId, 'error', {
+        publishCommandFailure(request.ownerConnectionId, 'error', {
           message,
           clearCatalog: true,
         });
@@ -507,19 +489,13 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       // Transient failure on a same-owner refresh: keep the previously
       // published catalog and report the error through state without
       // populating the fatal session error atom.
-      publishCommandFailure(expectedOwnerConnectionId, 'error', { message });
+      publishCommandFailure(request.ownerConnectionId, 'error', { message });
     }
 
     function discoverCommands(expectedOwnerConnectionId: string): void {
-      if (commandCatalogRequestInFlight?.ownerConnectionId === expectedOwnerConnectionId) return;
+      const request = commandDiscovery.begin(expectedOwnerConnectionId);
+      if (!request) return;
 
-      commandCatalogRequestGeneration += 1;
-      const expectedRequestGeneration = commandCatalogRequestGeneration;
-      const expectedGeneration = generation;
-      commandCatalogRequestInFlight = {
-        ownerConnectionId: expectedOwnerConnectionId,
-        generation: expectedRequestGeneration,
-      };
       publishRemoteCommandState({
         ownerConnectionId: expectedOwnerConnectionId,
         refresh: 'loading',
@@ -536,24 +512,13 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         )
         .then(
           result => {
-            if (
-              !isCurrentDiscoveryRequest(
-                commandCatalogRequestGeneration,
-                expectedOwnerConnectionId,
-                expectedGeneration,
-                expectedRequestGeneration
-              )
-            ) {
-              return;
-            }
+            if (!request.isCurrent()) return;
 
             const parsed = parseRemoteCommandCatalog(result);
             if (!parsed.ok) {
               handleCommandCatalogFailure(
                 new Error('Invalid remote command catalog'),
-                expectedOwnerConnectionId,
-                expectedGeneration,
-                expectedRequestGeneration,
+                request,
                 true
               );
               return;
@@ -570,20 +535,14 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           error =>
             handleCommandCatalogFailure(
               error,
-              expectedOwnerConnectionId,
-              expectedGeneration,
-              expectedRequestGeneration,
+              request,
               // A relay `CATALOG_TOO_LARGE` reports the response is over
               // the 512 KiB size cap; clear the prior catalog so the
               // composer can present a clean state.
               error instanceof UserWebCommandError && error.code === 'CATALOG_TOO_LARGE'
             )
         )
-        .finally(() => {
-          if (commandCatalogRequestInFlight?.generation === expectedRequestGeneration) {
-            commandCatalogRequestInFlight = null;
-          }
-        });
+        .finally(request.settle);
     }
 
     function handleEventMessage(

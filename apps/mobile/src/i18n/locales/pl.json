@@ -172,6 +172,7 @@
     "generating": "Generowanie…",
     "working": "W toku",
     "yourOwnRepositories": "Twoje repozytoria",
+    "organizationRepositories": "Repozytoria organizacji",
     "dismissed": "Odrzucone",
     "agent": "Agent",
     "durationMinuteShort": "min",
@@ -3550,8 +3551,7 @@
     "hub": {
       "balance": "Saldo",
       "lowBalanceBelow": "Poniżej {{amount}}",
-      "organizationSeats": "Miejsca w organizacji",
-      "plan": "Plan organizacji",
+      "plan": "Plan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Zakończony",
@@ -4585,6 +4585,7 @@
     "pickPackToBuyAgain": "Wybierz pakiet powyżej, aby rozpocząć nowy zakup.",
     "purchasePending": "Sklep wciąż przetwarza tę płatność. Kredyty pojawią się, gdy tylko zatwierdzi obciążenie.",
     "buyAgain": "Kup ponownie",
+    "checkPurchase": "Sprawdź zakup",
     "purchaseOwnedByAnotherAccount": "Kredyty na tym koncie Apple należą do innego konta Kilo. Zaloguj się na to konto Kilo, aby z nich korzystać.",
     "purchaseOwnedByAnotherAccountPlay": "Kredyty na tym koncie Google Play należą do innego konta Kilo. Zaloguj się na to konto Kilo, aby z nich korzystać."
   },

@@ -172,6 +172,7 @@
     "generating": "Генерування…",
     "working": "У роботі",
     "yourOwnRepositories": "Власні репозиторії",
+    "organizationRepositories": "Репозиторії організації",
     "dismissed": "Відхилено",
     "agent": "Агент",
     "durationMinuteShort": "хв",
@@ -3550,8 +3551,7 @@
     "hub": {
       "balance": "Баланс",
       "lowBalanceBelow": "Менше ніж {{amount}}",
-      "organizationSeats": "Місця в організації",
-      "plan": "План організації",
+      "plan": "План",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Завершився",
@@ -4585,6 +4585,7 @@
     "pickPackToBuyAgain": "Виберіть пакет вище, щоб почати нову покупку.",
     "purchasePending": "Магазин досі обробляє цей платіж. Кредити надійдуть, щойно він схвалить списання.",
     "buyAgain": "Купити знову",
+    "checkPurchase": "Перевірити покупку",
     "purchaseOwnedByAnotherAccount": "Кредити в цьому Apple Account належать іншому обліковому запису Kilo. Увійдіть у той обліковий запис Kilo, щоб ними користуватися.",
     "purchaseOwnedByAnotherAccountPlay": "Кредити в цьому обліковому записі Google Play належать іншому обліковому запису Kilo. Увійдіть у той обліковий запис Kilo, щоб ними користуватися."
   },

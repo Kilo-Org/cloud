@@ -172,6 +172,7 @@
     "generating": "बना रहे हैं…",
     "working": "काम जारी",
     "yourOwnRepositories": "आपकी अपनी रिपॉज़िटरी",
+    "organizationRepositories": "संगठन की रिपॉज़िटरी",
     "dismissed": "खारिज",
     "agent": "प्रतिनिधि",
     "durationMinuteShort": "min",
@@ -3432,8 +3433,7 @@
     "hub": {
       "balance": "बैलेंस",
       "lowBalanceBelow": "{{amount}} से कम",
-      "organizationSeats": "संगठन की सीटें",
-      "plan": "संगठन का प्लान",
+      "plan": "प्लान",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · समाप्त",
@@ -4449,6 +4449,7 @@
     "pickPackToBuyAgain": "नई खरीदारी शुरू करने के लिए ऊपर से कोई पैक चुनें।",
     "purchasePending": "स्टोर अभी भी इस भुगतान को प्रोसेस कर रहा है। स्टोर के शुल्क स्वीकृत करते ही आपके क्रेडिट आ जाएँगे।",
     "buyAgain": "दोबारा खरीदें",
+    "checkPurchase": "खरीदारी जाँचें",
     "purchaseOwnedByAnotherAccount": "इस Apple Account का क्रेडिट किसी दूसरे Kilo खाते से जुड़ा है। इसका उपयोग करने के लिए उस Kilo खाते में साइन इन करें।",
     "purchaseOwnedByAnotherAccountPlay": "इस Google Play खाते का क्रेडिट किसी दूसरे Kilo खाते से संबंधित है। इसका उपयोग करने के लिए उस Kilo खाते में साइन इन करें।"
   },

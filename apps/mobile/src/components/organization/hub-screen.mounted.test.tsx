@@ -358,7 +358,7 @@ describe('Organization hub card', () => {
 
     const seats = renderer.root
       .findAllByType('KvRow')
-      .find(node => node.props.label === i18n.t('organization.hub.organizationSeats'));
+      .find(node => node.props.label === i18n.t('organization.billing.seats'));
     // Left-to-right isolate (U+2066) and pop-directional-isolate (U+2069): the
     // pair reads 1 of 5 in either interface direction.
     expect(seats?.props.value).toBe('\u20661 / 5\u2069');
@@ -376,7 +376,7 @@ describe('Organization hub card', () => {
 
     const seats = renderer.root
       .findAllByType('KvRow')
-      .find(node => node.props.label === i18n.t('organization.hub.organizationSeats'));
+      .find(node => node.props.label === i18n.t('organization.billing.seats'));
     expect(seats?.props.value).toBe('1');
     unmount();
   });

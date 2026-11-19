@@ -172,6 +172,7 @@
     "generating": "جارٍ الإنشاء…",
     "working": "جارٍ العمل",
     "yourOwnRepositories": "مستودعاتك الخاصة",
+    "organizationRepositories": "مستودعات المؤسسة",
     "dismissed": "مستبعدة",
     "agent": "عامل",
     "durationMinuteShort": "min",
@@ -3668,8 +3669,7 @@
     "hub": {
       "balance": "الرصيد",
       "lowBalanceBelow": "أقل من {{amount}}",
-      "organizationSeats": "مقاعد المؤسسة",
-      "plan": "خطة المؤسسة",
+      "plan": "الخطة",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · منتهية",
@@ -4721,6 +4721,7 @@
     "pickPackToBuyAgain": "اختر حزمة من الأعلى لبدء عملية شراء جديدة.",
     "purchasePending": "لا يزال المتجر يعالج هذه الدفعة. ستصلك أرصدتك بمجرد موافقته على عملية الدفع.",
     "buyAgain": "شراء مجددًا",
+    "checkPurchase": "التحقق من الشراء",
     "purchaseOwnedByAnotherAccount": "الرصيد على حساب Apple Account هذا يخص حساب Kilo آخر. سجّل الدخول إلى حساب Kilo ذلك لاستخدامه.",
     "purchaseOwnedByAnotherAccountPlay": "الرصيد على حساب Google Play هذا يخص حساب Kilo مختلف. سجّل الدخول إلى حساب Kilo ذلك لاستخدامه."
   },

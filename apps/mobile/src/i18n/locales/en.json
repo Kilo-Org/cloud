@@ -265,6 +265,7 @@
     "generating": "Generating…",
     "working": "Working",
     "yourOwnRepositories": "Your own repositories",
+    "organizationRepositories": "Organization repositories",
     "dismissed": "Dismissed",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
@@ -3658,9 +3659,9 @@
       "byok": "BYOK"
     },
     "usageStats": {
-      "inputTokens": "Input Tokens",
+      "inputTokens": "Input tokens",
       "orgLast30Days": "All members · Last 30 days",
-      "outputTokens": "Output Tokens",
+      "outputTokens": "Output tokens",
       "requests": "Requests"
     },
     "modes": {
@@ -3722,8 +3723,7 @@
       "renameTitle": "Rename organization",
       "renamePlaceholder": "Enter organization name",
       "balance": "Balance",
-      "organizationSeats": "Organization seats",
-      "plan": "Organization plan",
+      "plan": "Plan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Lapsed",
@@ -4541,6 +4541,7 @@
     "pickPackToBuyAgain": "Choose a pack above to start a new purchase.",
     "purchasePending": "The store is still processing this payment. Your credits arrive once it approves the charge.",
     "buyAgain": "Buy again",
+    "checkPurchase": "Check purchase",
     "purchaseOwnedByAnotherAccount": "The credits on this Apple Account belong to a different Kilo account. Sign in to that Kilo account to use them.",
     "purchaseOwnedByAnotherAccountPlay": "The credits on this Google Play account belong to a different Kilo account. Sign in to that Kilo account to use them."
   },

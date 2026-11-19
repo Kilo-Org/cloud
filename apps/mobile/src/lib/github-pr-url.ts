@@ -54,14 +54,17 @@ export function tidyReviewLinkCandidate(href: string): string {
   // A paren/angle layer peels when the inside, itself tidied, still starts
   // with a scheme — the gate keeps `(see <url>)` or plain `(text)` intact
   // while `(<url>)` and `(url)` unwrap, and the recursion collapses nested
-  // layers in one call.
+  // layers in one call. The tidied inside is computed ONCE and reused as the
+  // return value, so the cost per nesting level stays linear.
   const parenInner = PAREN_WRAPPER.exec(href)?.[1];
-  if (parenInner !== undefined && SCHEME_PREFIX.test(tidyReviewLinkCandidate(parenInner))) {
-    return tidyReviewLinkCandidate(parenInner);
+  if (parenInner !== undefined) {
+    const tidied = tidyReviewLinkCandidate(parenInner);
+    if (SCHEME_PREFIX.test(tidied)) return tidied;
   }
   const angleInner = ANGLE_WRAPPER.exec(href)?.[1];
-  if (angleInner !== undefined && SCHEME_PREFIX.test(tidyReviewLinkCandidate(angleInner))) {
-    return tidyReviewLinkCandidate(angleInner);
+  if (angleInner !== undefined) {
+    const tidied = tidyReviewLinkCandidate(angleInner);
+    if (SCHEME_PREFIX.test(tidied)) return tidied;
   }
   let candidate = href.trim().replace(EDGE_QUOTES, '');
   for (;;) {

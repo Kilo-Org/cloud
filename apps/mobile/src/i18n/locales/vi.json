@@ -2906,8 +2906,8 @@
         "sideRight": "Bên phải",
         "outdatedOnLinesSide": "Không còn cập nhật tại {{lines}} ({{side}})",
         "outdatedOnPathLinesSide": "Không còn cập nhật tại {{path}} {{lines}} ({{side}})",
-        "outdatedSide": "\"Không còn cập nhật ({{side}})\"",
-        "outdatedOnPathSide": "\"Không còn cập nhật tại {{path}} ({{side}})\""
+        "outdatedSide": "Không còn cập nhật ({{side}})",
+        "outdatedOnPathSide": "Không còn cập nhật tại {{path}} ({{side}})"
       },
       "deletedUser": "người dùng đã bị xóa",
       "replyForbiddenTerm": "Bạn không có quyền trả lời trong {{term}} này.",

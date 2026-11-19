@@ -170,20 +170,28 @@ jobs:
             echo "mobile=false" >> "$GITHUB_OUTPUT"
           fi
 
-  # One harness SDK build per run. The four suites below read
-  # packages/harness-sdk/dist: the shard jobs import it at run time, and the
-  # type-aware checks resolve its declarations. Building it inside each job made
-  # a cache miss pay the typia compile once per job, because the shards start
-  # together and actions/cache saves at the end of a job, so no job can hit
-  # another's save. The action still runs here, so its cache serves a later run
-  # with the same inputs, and the `mobile-test-result` aggregator needs this
-  # one, so a failed build fails the gate instead of leaving the suites skipped.
+  # One harness SDK build per run. The four shards below import
+  # packages/harness-sdk/dist at run time, and the type-aware checks resolve its
+  # declarations. Building it inside each job made a cache miss pay the typia
+  # compile once per job, because the shards start together and actions/cache
+  # saves at the end of a job, so no job can hit another's save. The action
+  # still runs here, so its cache serves a later run with the same inputs, and
+  # the `mobile-test-result` aggregator needs this one, so a failed build fails
+  # the gate instead of leaving the suites skipped.
+  #
+  # This producer reads no change-detection output, so it starts beside change
+  # detection instead of behind it. The shard row is then released as soon as
+  # detection reports a mobile change and the build exists, not after detection
+  # completes plus the whole build.
   #
   # One tRPC declaration build per run, for the same reason: typecheck and lint
   # both need packages/trpc/dist, they start together, and both used to run the
   # action, so on a cache miss they compiled the same declaration program twice
   # and raced to save the one key (the loser logged "Unable to reserve cache").
   # Here the build happens once and both checks download the tree.
+  # `prepare-trpc` stays behind change detection because only `mobile-typecheck`
+  # and `mobile-lint` read its tree, and those two checks are not the workflow's
+  # critical path.
   #
   # The two producers are separate jobs, not two steps of one job, because
   # neither build reads the other's output: one job made every consumer wait for
@@ -193,8 +201,6 @@ jobs:
   # import only the harness SDK build, so they wait for `prepare-harness-sdk`
   # alone.
   prepare-harness-sdk:
-    needs: mobile-changes
-    if: needs.mobile-changes.outputs.mobile == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
@@ -563,6 +569,12 @@ jobs:
   # carries that failure to the gate. The catalog job belongs here too: its
   # paths never select a shard, so without this needs entry a failed audit
   # would leave the required check green.
+  #
+  # The harness SDK producer starts beside change detection, so it also runs on
+  # a change this suite does not cover. On such a run no job downloads its
+  # artifact, so this job counts the producer result only when detection
+  # reported a mobile change. A producer failure still fails this check on a run
+  # that did report one.
   mobile-test-result:
     needs: [mobile-changes, prepare-harness-sdk, prepare-trpc, mobile-test, i18n-catalogs]
     if: ${{ !cancelled() }}
@@ -571,9 +583,14 @@ jobs:
     steps:
       - name: Check test results
         env:
-          RESULTS: ${{ toJSON(needs.*.result) }}
+          RESULTS: ${{ toJSON(needs) }}
+          MOBILE: ${{ needs.mobile-changes.outputs.mobile }}
         run: |
           echo "$RESULTS"
-          if jq -e 'any(.[]; . == "failure" or . == "cancelled")' <<< "$RESULTS" > /dev/null; then
+          if jq -e --arg mobile "$MOBILE" '
+            to_entries
+            | map(select(($mobile == "true") or (.key != "prepare-harness-sdk")).value.result)
+            | any(.[]; . == "failure" or . == "cancelled")
+          ' <<< "$RESULTS" > /dev/null; then
             exit 1
           fi

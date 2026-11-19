@@ -567,8 +567,18 @@ test('kilo-app CI builds the harness SDK once and every suite downloads it', () 
   );
   const producer = jobs[harnessProducer];
   assert.ok(producer, 'the harness producer exists');
-  assert.equal(producer.needs, 'mobile-changes', 'the harness producer waits for change detection');
-  assert.equal(producer.if, "needs.mobile-changes.outputs.mobile == 'true'");
+  // No step of the producer reads a detection output, so it starts beside
+  // change detection instead of behind it.
+  assert.equal(
+    producer.needs,
+    undefined,
+    'the producer starts beside change detection because no step reads a detection output'
+  );
+  assert.equal(
+    producer.if,
+    undefined,
+    'the producer starts beside change detection because no step reads a detection output'
+  );
   const producerSteps = producer.steps;
   const producerInstall = producerSteps.findIndex(step =>
     /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
@@ -663,6 +673,29 @@ test('kilo-app CI builds the harness SDK once and every suite downloads it', () 
       `the mobile-test-result aggregator fails with a failed ${requiredProducer}`
     );
   }
+
+  // With an unconditional producer, its failure must only count when the suite
+  // ran: the step drops the producer result unless detection reported a mobile
+  // change.
+  const aggregateStep = jobs['mobile-test-result'].steps.find(
+    step => step.name === 'Check test results'
+  );
+  assert.match(
+    aggregateStep.run,
+    /prepare-harness-sdk/,
+    'the aggregator decides about the harness producer result'
+  );
+  assert.match(aggregateStep.run, /--arg mobile/, 'the aggregator reads a mobile flag');
+  assert.equal(
+    aggregateStep.env.MOBILE,
+    '${{ needs.mobile-changes.outputs.mobile }}',
+    'the aggregator takes that flag from change detection'
+  );
+  assert.equal(
+    aggregateStep.env.RESULTS,
+    '${{ toJSON(needs) }}',
+    'the aggregator reads every needed job as an object'
+  );
 });
 
 // mobile-native-build needs the same single producer for a different reason:

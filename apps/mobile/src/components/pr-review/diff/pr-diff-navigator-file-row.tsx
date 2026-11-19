@@ -97,9 +97,11 @@ export function NavigatorFileRow({
           </View>
         </View>
       </Pressable>
-      <View className="shrink-0">
-        <MarkViewedToggle path={file.path} viewed={viewed} onToggle={onToggleViewed} />
-      </View>
+      {/* A direct child of the padded row: Android delivers a touch only inside
+          the parent view, so a wrapper sized to the 32 dp box would drop the
+          toggle's 8 dp slop. React Native's flexShrink defaults to 0, so the
+          path beside it cannot squeeze the box. */}
+      <MarkViewedToggle path={file.path} viewed={viewed} onToggle={onToggleViewed} />
     </View>
   );
 }

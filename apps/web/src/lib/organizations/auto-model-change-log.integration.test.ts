@@ -245,6 +245,33 @@ describe('logAutoModelChangesForAllOrgs', () => {
     expect(logs).toHaveLength(0);
   });
 
+  test('writes audit logs for an enterprise org whose trial date an admin set', async () => {
+    const owner = await insertTestUser();
+    const enterpriseOrg = await createTestOrganization('Admin Trial Enterprise Org', owner.id, 0, {
+      provider_allow_list: ['z-ai'],
+    });
+    await db
+      .update(organizations)
+      .set({
+        trial_granted: false,
+        free_trial_end_at: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+        require_seats: true,
+      })
+      .where(eq(organizations.id, enterpriseOrg.id));
+
+    const oldSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5'] }]);
+    const newSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5', 'z-ai/glm-5.1'] }]);
+
+    const result = await logAutoModelChangesForAllOrgs(oldSnapshot, newSnapshot);
+
+    expect(result.orgCount).toBe(1);
+    expect(result.logCount).toBe(1);
+
+    const logs = await fetchAutoChangeLogs(enterpriseOrg.id);
+    expect(logs).toHaveLength(1);
+    expect(logs[0].message).toBe('Added models from provider z-ai: z-ai/glm-5.1');
+  });
+
   test('skips enterprise orgs whose effective availability did not change', async () => {
     const owner = await insertTestUser();
     const restrictedOrg = await createTestOrganization('Restricted to openai only', owner.id, 0, {

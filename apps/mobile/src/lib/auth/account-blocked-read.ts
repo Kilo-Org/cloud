@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-import { setBlockedAccountActive } from '@/lib/auth/blocked-account-state';
+import { isBlockedAccountActive, setBlockedAccountActive } from '@/lib/auth/blocked-account-state';
 import { isAccountBlockedTrpcError } from '@/lib/trpc-error';
 
 /** What the latest current-user read attempt says about the account. */
@@ -65,22 +65,49 @@ type BlockedAccountFromAccountReadInput = {
  * a ref refreshed each render rather than listed as a dependency: callers pass
  * an inline closure, and a dependency on its identity would re-run the effect
  * (and could refetch the tree) on every render of the layout.
+ *
+ * The raise is tied to the refusal object that made it: a cached blocked error
+ * re-observed after the person dismissed the surface (Sign out) is the same
+ * attempt, not a new one, and re-raising it would reopen a screen they closed.
+ * Without a session (`enabled` false) a cached refusal raises nothing either —
+ * it belongs to a session that has ended.
  */
 export function useBlockedAccountFromAccountRead(input: BlockedAccountFromAccountReadInput): void {
   const raisedHere = useRef(false);
+  // The error object the current raise came from, so the same refusal seen
+  // again is not a second raise.
+  const raisedFor = useRef<unknown>(null);
   const onAnswered = useRef(input.onAnswered);
   onAnswered.current = input.onAnswered;
   const verdict = accountReadVerdict(input.error, input.userId);
   useEffect(() => {
+    if (!input.enabled) {
+      // No session: a cached refusal from the session that ended must neither
+      // raise nor clear anything.
+      raisedHere.current = false;
+      raisedFor.current = null;
+      return;
+    }
     if (verdict === 'refused-blocked') {
+      if (raisedFor.current === input.error) {
+        return;
+      }
+      raisedFor.current = input.error;
       raisedHere.current = true;
       setBlockedAccountActive(true);
       return;
     }
-    if (verdict === 'answered' && input.enabled && !input.fetching && raisedHere.current) {
+    if (verdict === 'answered' && !input.fetching && raisedHere.current) {
       raisedHere.current = false;
+      raisedFor.current = null;
+      // A sign-in (or the surface's own Sign out) may have cleared the flag
+      // already: the explanation is gone, so there is nothing to reveal and
+      // nothing to refetch.
+      if (!isBlockedAccountActive()) {
+        return;
+      }
       setBlockedAccountActive(false);
       onAnswered.current?.();
     }
-  }, [verdict, input.enabled, input.fetching]);
+  }, [verdict, input.error, input.enabled, input.fetching]);
 }

@@ -103,12 +103,19 @@ describe('useBlockedAccountFromAccountRead', () => {
   });
 
   it('does not clear a raise while no session exists, even if the read answers', async () => {
-    const renderer = mount({ error: BLOCKED_REFUSAL, userId: undefined, enabled: true });
+    const onAnswered = vi.fn<() => void>();
+    const renderer = mount({
+      error: BLOCKED_REFUSAL,
+      userId: undefined,
+      enabled: true,
+      onAnswered,
+    });
     expect(isBlockedAccountActive()).toBe(true);
 
-    await update(renderer, { error: null, userId: 'user-1', enabled: false });
+    await update(renderer, { error: null, userId: 'user-1', enabled: false, onAnswered });
 
     expect(isBlockedAccountActive()).toBe(true);
+    expect(onAnswered).not.toHaveBeenCalled();
 
     renderer.unmount();
   });
@@ -154,9 +161,8 @@ describe('useBlockedAccountFromAccountRead', () => {
     await update(renderer, { error: OTHER_FAILURE, userId: undefined, enabled: true, onAnswered });
     expect(onAnswered).not.toHaveBeenCalled();
 
-    await update(renderer, { error: null, userId: 'user-1', enabled: false, onAnswered });
-    expect(onAnswered).not.toHaveBeenCalled();
-
+    // The session survives the block, so `enabled` stays true and the answered
+    // attempt is the reveal.
     await update(renderer, { error: null, userId: 'user-1', enabled: true, onAnswered });
     expect(isBlockedAccountActive()).toBe(false);
     expect(onAnswered).toHaveBeenCalledTimes(1);
@@ -218,6 +224,66 @@ describe('useBlockedAccountFromAccountRead', () => {
 
     expect(isBlockedAccountActive()).toBe(false);
     expect(onAnswered).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('does not re-raise a cached refusal after the surface was dismissed', async () => {
+    const renderer = mount({ error: BLOCKED_REFUSAL, userId: undefined, enabled: true });
+    expect(isBlockedAccountActive()).toBe(true);
+
+    // The overlay's Sign out clears the explanation; the session then ends and
+    // the cached refusal is still the query's `error`.
+    act(() => {
+      setBlockedAccountActive(false);
+    });
+    await update(renderer, { error: BLOCKED_REFUSAL, userId: undefined, enabled: false });
+
+    expect(isBlockedAccountActive()).toBe(false);
+
+    renderer.unmount();
+  });
+
+  it('does not refetch for an answered read after an external clear', async () => {
+    const onAnswered = vi.fn<() => void>();
+    const renderer = mount({
+      error: BLOCKED_REFUSAL,
+      userId: undefined,
+      enabled: true,
+      onAnswered,
+    });
+    expect(isBlockedAccountActive()).toBe(true);
+
+    // A sign-in cleared the flag: the explanation is already gone, so the
+    // answered read reveals nothing and must not refetch the tree.
+    act(() => {
+      setBlockedAccountActive(false);
+    });
+    await update(renderer, { error: null, userId: 'user-1', enabled: true, onAnswered });
+
+    expect(isBlockedAccountActive()).toBe(false);
+    expect(onAnswered).not.toHaveBeenCalled();
+
+    renderer.unmount();
+  });
+
+  it('does not re-raise the same refusal object while the flag is cleared', async () => {
+    const renderer = mount({ error: BLOCKED_REFUSAL, userId: undefined, enabled: true });
+    expect(isBlockedAccountActive()).toBe(true);
+
+    act(() => {
+      setBlockedAccountActive(false);
+    });
+    // Same refusal, same session: the effect runs again because `fetching`
+    // changed, and the attempt it names was already handled.
+    await update(renderer, {
+      error: BLOCKED_REFUSAL,
+      userId: undefined,
+      enabled: true,
+      fetching: true,
+    });
+
+    expect(isBlockedAccountActive()).toBe(false);
 
     renderer.unmount();
   });

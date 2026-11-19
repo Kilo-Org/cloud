@@ -235,23 +235,33 @@ function firstString(input: Record<string, unknown>, keys: readonly string[]): u
 /** The path a file tool acted on: `filePath` (CLI), `file_path` or `path`. */
 const FILE_PATH_KEYS = ['filePath', 'file_path', 'path'] as const;
 
+/**
+ * The host a URL names, or null when the text is not a URL. The caller supplies
+ * it because this package compiles under consumers whose `lib` has no platform
+ * globals: `webUrlHost` in `@kilocode/worker-utils` is the implementation every
+ * producer passes.
+ */
+export type SessionLiveUrlHost = (url: string) => string | null;
+
 /** The URL host, or the whole trimmed URL when it does not parse. */
-function urlHost(value: unknown): string | null {
+function urlHost(value: unknown, webHost: SessionLiveUrlHost): string | null {
   const text = sessionLiveText(value, Number.MAX_SAFE_INTEGER);
   if (text === null) return null;
-  try {
-    return sessionLiveText(new URL(text).host, SESSION_LIVE_TARGET_LIMIT);
-  } catch {
-    return sessionLiveText(text, SESSION_LIVE_TARGET_LIMIT);
-  }
+  const host = webHost(text);
+  return sessionLiveText(host ?? text, SESSION_LIVE_TARGET_LIMIT);
 }
 
 /**
  * The step a started tool call shows: its verb and a short target (a file
  * basename, a command, a pattern or a host). Every producer of the summary
- * names a tool through this one table.
+ * names a tool through this one table; `webHost` reads a web fetch URL's host
+ * for the `webfetch` cases.
  */
-export function sessionLiveToolStep(tool: string, input: Record<string, unknown>): SessionLiveStep {
+export function sessionLiveToolStep(
+  tool: string,
+  input: Record<string, unknown>,
+  webHost: SessionLiveUrlHost
+): SessionLiveStep {
   switch (tool.toLowerCase()) {
     case 'edit':
     case 'write':
@@ -278,7 +288,7 @@ export function sessionLiveToolStep(tool: string, input: Record<string, unknown>
       return { verb: 'searching', target: sessionLiveText(input.query, SESSION_LIVE_TARGET_LIMIT) };
     case 'webfetch':
     case 'web_fetch':
-      return { verb: 'searching', target: urlHost(input.url) };
+      return { verb: 'searching', target: urlHost(input.url, webHost) };
     default:
       return { verb: 'other', target: null };
   }

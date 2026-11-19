@@ -6,6 +6,7 @@ import {
   type SessionLiveFailureKind,
   type SessionLiveSummary,
 } from '@kilocode/session-ingest-contracts';
+import { webUrlHost } from '@kilocode/worker-utils';
 import { z } from 'zod';
 
 /**
@@ -121,7 +122,7 @@ export function foldSessionLiveSummary(
           const input = toolState.input ?? {};
           if (name.toLowerCase() === 'todowrite') plan = sessionLivePlan(input);
           if (toolState.status === 'pending' || toolState.status === 'running') {
-            step = sessionLiveToolStep(name, input);
+            step = sessionLiveToolStep(name, input, webUrlHost);
           } else if (toolState.status === 'error') {
             failure = { kind: 'tool' };
           }

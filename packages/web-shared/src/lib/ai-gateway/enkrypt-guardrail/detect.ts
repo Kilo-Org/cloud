@@ -233,6 +233,20 @@ function parseCreditsCost(response: Response): number | null {
   return value;
 }
 
+/** Shared deadlines whose timeout a scan already logged as a warning. */
+const timeoutsWarned = new WeakSet<AbortSignal>();
+
+/**
+ * Whether a scan already warned about the timeout of the shared `deadline`; records that one
+ * does now. A scan with a deadline of its own always warns.
+ */
+function warnedTimeout(deadline: AbortSignal | undefined): boolean {
+  if (!deadline) return false;
+  const warned = timeoutsWarned.has(deadline);
+  timeoutsWarned.add(deadline);
+  return warned;
+}
+
 /** The scan signal combines the client's disconnect signal with the shared deadline. */
 function abortError(signal: AbortSignal, deps: EnkryptDetectDependencies): DetectError | null {
   if (deps.signal.aborted) return 'client_aborted';
@@ -458,10 +472,11 @@ export async function scanRequest(
   ]);
   const notStarted = abortError(signal, deps);
   if (notStarted) {
-    // Earlier calls of the request used up the shared deadline, so this one is not made. The call
-    // the deadline cut short already logged the timeout, so the calls after it log at debug level
-    // rather than adding a warning for every unit of a long conversation.
-    return failedVerdict([], scope, { error: notStarted, latencyMs: 0, quiet: true });
+    // Earlier calls of the request used up the shared deadline, so this one is not made, and sends
+    // nothing. Once a timeout of the deadline was logged as a warning, the calls after it log at
+    // debug level rather than adding a warning for every unit of a long conversation.
+    const quiet = notStarted === 'timeout' && warnedTimeout(deps.deadline);
+    return failedVerdict([], noTextSent(scope), { error: notStarted, latencyMs: 0, quiet });
   }
   const startedAt = performance.now();
   const requestLog: EnkryptRequestLog | undefined = deps.requestLog
@@ -481,6 +496,7 @@ export async function scanRequest(
   // content fails open instead and is rescanned once its short-lived cached verdict expires.
   const attempt = await detectOnce(body, signal, { ...deps, apiKey }, requestLog);
   const latencyMs = Math.round(performance.now() - startedAt);
+  if (attempt.kind === 'failed' && attempt.error === 'timeout') warnedTimeout(deps.deadline);
 
   const usageRecords: EnkryptGuardrailCall[] = [
     {
@@ -610,6 +626,11 @@ type ScanScope = {
   logFields: Record<string, unknown>;
   report: CoverageReport & Pick<EnkryptScanReport, 'scanned_characters'>;
 };
+
+/** A scope for a scan that made no call, so sent none of its text. */
+function noTextSent(scope: ScanScope): ScanScope {
+  return { ...scope, report: { ...scope.report, scanned_characters: 0 } };
+}
 
 function scanReport(
   scope: ScanScope,

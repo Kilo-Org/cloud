@@ -513,6 +513,32 @@ describe('scanRequestWithVerdictCache', () => {
     expect(result.report).toMatchObject({ total_segments: 5, cached_segments: 0 });
   });
 
+  it('schedules a repeated segment at its newest position, keeping its chunk index', async () => {
+    const repeated = [
+      segment('user', 'continue'),
+      segment('assistant', 'one'),
+      segment('assistant', 'two'),
+      segment('user', 'continue'),
+    ];
+    const captured: Promise<EnkryptRequestLog>[] = [];
+    const dependencies = deps(memoryStore());
+    dependencies.requestLog = { guardrail: 'input', capture: entry => captured.push(entry) };
+
+    const result = await scanConversation(makeRequest(repeated), dependencies);
+
+    // The repeated message is the newest segment, so it runs first, though it first appeared first.
+    expect(scannedTexts(dependencies)).toEqual(
+      [repeated[3], repeated[2], repeated[1]].map(renderSegment)
+    );
+    const logs = await Promise.all(captured);
+    expect(logs.map(log => log.chunk)).toEqual([
+      { index: 0, count: 3 },
+      { index: 2, count: 3 },
+      { index: 1, count: 3 },
+    ]);
+    expect(result.cacheEntries).toEqual(allowed(keysFor(repeated.slice(0, 3))));
+  });
+
   it('reuses the verdict of a segment wherever it appears', async () => {
     const store = memoryStore(keysFor(conversation));
     const dependencies = deps(store);
@@ -3268,11 +3294,13 @@ describe('scanRequestWithVerdictCache', () => {
         { action: 'fail_open' },
       ]);
       const [toolsResult, systemResult, conversationResult] = results;
+      // Only the call that was made sent its text.
       expect(conversationResult?.report).toMatchObject({
         decision: 'error_fail_open',
         error: 'timeout',
         attempts: 1,
         failed_calls_cached: 1,
+        scanned_characters: render(mediumConversation).length,
       });
       expect(conversationResult?.usageRecords.map(record => record.decision)).toEqual(['error']);
       expect(systemResult?.report).toMatchObject({
@@ -3283,12 +3311,14 @@ describe('scanRequestWithVerdictCache', () => {
         latency_ms: 0,
         failed_calls_cached: 1,
         calls_skipped: 0,
+        scanned_characters: 0,
       });
       expect(systemResult?.usageRecords).toEqual([]);
       expect(toolsResult?.report).toMatchObject({
         decision: 'error_fail_open',
         error: 'timeout',
         attempts: 0,
+        scanned_characters: 0,
         failed_calls_cached: 2,
         tools_scanned: 2,
         tools_flagged: 2,
@@ -3345,6 +3375,13 @@ describe('scanRequestWithVerdictCache', () => {
         { action: 'fail_open' },
       ]);
       expect(results.map(result => result.report?.attempts)).toEqual([0, 0, 0]);
+      // No call reported the timeout, so the first call not made warns, and only it.
+      const timeoutWarnings = mockedWarnExceptInTest.mock.calls.filter(
+        ([message, fields]) =>
+          message === '[enkrypt-guardrail] decision' &&
+          (fields as { error?: string }).error === 'timeout'
+      );
+      expect(timeoutWarnings).toHaveLength(1);
     });
   });
 });

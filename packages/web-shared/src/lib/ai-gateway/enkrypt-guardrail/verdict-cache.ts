@@ -259,19 +259,37 @@ function cachedCoverage(
   };
 }
 
+/** An uncached unit, and the position of its last occurrence among the units of its part. */
+type CallUnit = KeyedUnit & { last: number };
+
 /**
  * The units without a cached verdict, each once and each scanned by its own Enkrypt call, so
  * different segments, such as a user message and a tool result, are never judged together. A unit
- * that appears more than once, such as a repeated message, is scanned once.
+ * that appears more than once, such as a repeated message, is scanned once, in the order of its
+ * first occurrence, and scheduled by its last; see `newestFirst`.
  */
-function uncachedUnits(units: LookedUpUnit[]): KeyedUnit[] {
-  const seen = new Set<string>();
-  return units.filter(unit => {
+function uncachedUnits(units: LookedUpUnit[]): CallUnit[] {
+  const calls = new Map<string, CallUnit>();
+  units.forEach((unit, index) => {
+    if (unit.verdict) return;
     const id = unit.key ?? unit.text;
-    if (unit.verdict || seen.has(id)) return false;
-    seen.add(id);
-    return true;
+    const call = calls.get(id);
+    if (call) call.last = index;
+    else calls.set(id, { ...unit, last: index });
   });
+  return [...calls.values()];
+}
+
+/**
+ * The scans of a part's calls in the order they run: by the last occurrence of their unit, latest
+ * first, so a repeated unit runs at its newest position.
+ */
+function newestFirst(scans: EnkryptGuardrailScan[], calls: CallUnit[]): EnkryptGuardrailScan[] {
+  if (calls.length === 0) return scans;
+  return scans
+    .map((scan, index) => ({ scan, last: required(calls[index]).last }))
+    .sort((a, b) => b.last - a.last)
+    .map(each => each.scan);
 }
 
 /**
@@ -416,6 +434,8 @@ function combineChunks(
  */
 type PartPlan = {
   scans: EnkryptGuardrailScan[];
+  /** `scans` in the order they run, newest unit first. */
+  scanOrder: EnkryptGuardrailScan[];
   cachedBlock: boolean;
   finish(
     resultOf: (scan: EnkryptGuardrailScan) => EnkryptGuardrailScanResult | null
@@ -490,6 +510,7 @@ async function planSegmentsPart(
     console.debug('[enkrypt-guardrail] decision', { ...scanLogFields(request), ...report });
     return {
       scans: [],
+      scanOrder: [],
       cachedBlock: true,
       finish: () => ({
         verdict: { action: 'block', message: guardrailBlockMessage(detectors, null) },
@@ -503,6 +524,7 @@ async function planSegmentsPart(
   const scans = callScans(request, coverage, calls);
   return {
     scans,
+    scanOrder: newestFirst(scans, calls),
     cachedBlock: false,
     finish(resultOf) {
       const results = scans.map(resultOf);
@@ -643,7 +665,7 @@ type ToolPlan = {
   cachedUnits: number;
 } & (
   | { verdict: CachedVerdict; callsSkipped: number }
-  | { calls: KeyedUnit[]; scans: EnkryptGuardrailScan[] }
+  | { calls: CallUnit[]; scans: EnkryptGuardrailScan[] }
 );
 
 /**
@@ -718,6 +740,9 @@ async function planTools(
   });
   return {
     scans: plans.flatMap(plan => ('scans' in plan ? plan.scans : [])),
+    scanOrder: plans
+      .toReversed()
+      .flatMap(plan => ('scans' in plan ? newestFirst(plan.scans, plan.calls) : [])),
     cachedBlock: plans.some(plan => 'verdict' in plan && plan.verdict !== 'allow'),
     finish(resultOf) {
       const outcomes = plans.map((plan): ToolOutcome => {
@@ -827,7 +852,7 @@ export async function scanRequestWithVerdictCache(
     planSegmentsPart('conversation', parts.conversation, request, cache),
   ]);
   const plans = [tools, system, conversation].filter(plan => plan !== null);
-  const scanOrder = [conversation, system, tools].flatMap(plan => plan?.scans.toReversed() ?? []);
+  const scanOrder = [conversation, system, tools].flatMap(plan => plan?.scanOrder ?? []);
   const results = new Map<EnkryptGuardrailScan, EnkryptGuardrailScanResult | null>();
   let blocked = plans.some(plan => plan.cachedBlock);
   for (const scan of scanOrder) {

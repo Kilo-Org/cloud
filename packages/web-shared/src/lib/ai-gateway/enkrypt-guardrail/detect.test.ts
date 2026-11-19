@@ -1188,7 +1188,7 @@ describe('scanRequest', () => {
         ],
       ]
     )(
-      'fails a %s scan as timed out, without a call, usage, or warning',
+      'fails a %s scan as timed out, without a call, usage, or text sent, warning once',
       async (_name, overrides, verdict, decision) => {
         const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
         const deadline = new AbortController();
@@ -1198,13 +1198,19 @@ describe('scanRequest', () => {
         });
 
         const result = await scanRequest(makeScan(overrides), dependencies);
+        // Another scan of the same request, after the timeout was already reported.
+        await scanRequest(makeScan({ ...overrides, text: 'later output' }), dependencies);
 
         expect(dependencies.fetch).not.toHaveBeenCalled();
-        // The call the deadline cut short already warned.
-        expect(mockedWarnExceptInTest).not.toHaveBeenCalled();
-        expect(debug).toHaveBeenCalledWith(
+        expect(mockedWarnExceptInTest).toHaveBeenCalledTimes(1);
+        expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
           '[enkrypt-guardrail] decision',
           expect.objectContaining({ error: 'timeout', attempts: 0 })
+        );
+        expect(debug).toHaveBeenCalledTimes(1);
+        expect(debug).toHaveBeenCalledWith(
+          '[enkrypt-guardrail] decision',
+          expect.objectContaining({ error: 'timeout', attempts: 0, scanned_characters: 0 })
         );
         expect(result.verdict).toEqual(verdict);
         expect(result.usageRecords).toEqual([]);
@@ -1214,9 +1220,36 @@ describe('scanRequest', () => {
           attempts: 0,
           credits_cost: null,
           latency_ms: 0,
+          scanned_characters: 0,
         });
       }
     );
+
+    it('does not warn again for calls after one the deadline cut short', async () => {
+      jest.spyOn(console, 'debug').mockImplementation(() => {});
+      const deadline = new AbortController();
+      const dependencies = deps(
+        (_url, init) =>
+          new Promise<Response>((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () => reject(init.signal?.reason), {
+              once: true,
+            });
+            deadline.abort();
+          }),
+        { deadline: deadline.signal }
+      );
+
+      const cutShort = await scanRequest(makeScan(), dependencies);
+      const notStarted = await scanRequest(makeScan({ text: 'later output' }), dependencies);
+
+      expect(cutShort.report).toMatchObject({ error: 'timeout', attempts: 1 });
+      expect(notStarted.report).toMatchObject({ error: 'timeout', attempts: 0 });
+      expect(mockedWarnExceptInTest).toHaveBeenCalledTimes(1);
+      expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
+        '[enkrypt-guardrail] decision',
+        expect.objectContaining({ attempts: 1 })
+      );
+    });
   });
 
   describe('a log-only scan', () => {

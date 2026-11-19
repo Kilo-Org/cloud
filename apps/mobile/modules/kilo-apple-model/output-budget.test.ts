@@ -7,7 +7,7 @@ import { fileURLToPath, URL } from 'node:url';
 import { expect, it } from 'vitest';
 
 const moduleSource = readFileSync(
-  new URL('./ios/KiloAppleModelModule.swift', import.meta.url),
+  new URL('ios/KiloAppleModelModule.swift', import.meta.url),
   'utf8'
 );
 
@@ -20,7 +20,9 @@ const normalizedModuleSource = moduleSource.replaceAll(/\s+/g, ' ').replaceAll(/
 function swiftFunctionSource(name: string): string {
   const anchor = `func ${name}(`;
   const start = normalizedModuleSource.indexOf(anchor);
-  if (start === -1) throw new Error(`module has no func ${name}(`);
+  if (start === -1) {
+    throw new Error(`module has no func ${name}(`);
+  }
   const end = normalizedModuleSource.indexOf('func ', start + anchor.length);
   return normalizedModuleSource.slice(start, end === -1 ? normalizedModuleSource.length : end);
 }

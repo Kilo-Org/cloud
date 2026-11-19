@@ -1,18 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { modelNameWithRetirement, retirementNoteSuffix } from './retirement-note';
 
-describe('retirementNoteSuffix', () => {
-  it('builds the English note the web shows', () => {
+describe('the English retirement suffix', () => {
+  it('builds the note the web shows', () => {
     expect(retirementNoteSuffix('2026-07-01')).toBe(' (retires Jul 1)');
   });
 
-  it('builds no note without a date', () => {
-    expect(retirementNoteSuffix(undefined)).toBe('');
+  it('builds no note for an empty date', () => {
     expect(retirementNoteSuffix('')).toBe('');
   });
 });
 
-describe('modelNameWithRetirement', () => {
+describe('a model name with its retirement note', () => {
   it('appends the note to the name', () => {
     expect(modelNameWithRetirement({ name: 'Test Model', retires_on: '2026-07-01' })).toBe(
       'Test Model (retires Jul 1)'

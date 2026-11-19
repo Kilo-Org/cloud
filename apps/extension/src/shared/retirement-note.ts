@@ -13,15 +13,19 @@
  * or `''` when the entry carries none.
  */
 export function retirementNoteSuffix(retiresOn: string | undefined): string {
-  if (!retiresOn) return '';
+  if (retiresOn === undefined || retiresOn === '') {
+    return '';
+  }
   const date = new Date(retiresOn);
-  if (!Number.isFinite(date.getTime())) return '';
+  if (!Number.isFinite(date.getTime())) {
+    return '';
+  }
   const suffix = date.toLocaleDateString('en-US', {
-    month: 'short',
     day: 'numeric',
+    month: 'short',
     timeZone: 'UTC',
   });
-  return ' (retires ' + suffix + ')';
+  return ` (retires ${suffix})`;
 }
 
 /** A catalog entry's name with the English retirement note the picker shows. */
@@ -29,5 +33,5 @@ export function modelNameWithRetirement(model: {
   readonly name: string;
   readonly retires_on?: string;
 }): string {
-  return model.name + retirementNoteSuffix(model.retires_on);
+  return `${model.name}${retirementNoteSuffix(model.retires_on)}`;
 }

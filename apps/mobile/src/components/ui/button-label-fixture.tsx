@@ -11,17 +11,19 @@ import en from '@/i18n/locales/en.json';
 import hi from '@/i18n/locales/hi.json';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 
 // Development-only label layout cases opened through the dev fixture link.
 // No API call, account or stored state.
 export function ButtonLabelFixture() {
   const colors = useThemeColors();
   const [loading, setLoading] = useState(false);
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Button labels" />
-      <ScrollView contentContainerClassName={SCREEN_BODY_CLASS}>
+      <ScrollView style={sideInsetMarginStyle} contentContainerClassName={SCREEN_BODY_CLASS}>
         <Text>Hindi · full width</Text>
         <Button>
           <Plus size={16} color={colors.primaryForeground} />

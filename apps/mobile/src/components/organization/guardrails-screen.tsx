@@ -1,4 +1,5 @@
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -11,16 +12,17 @@ import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Lock } from '@/components/ui/icons';
+import { Lock, Mail } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useOrgGuardrails, useSaveOrgGuardrails } from '@/lib/hooks/use-org-settings-queries';
 import { useOrgBoundary, useOrgWithMembers } from '@/lib/hooks/use-organization-queries';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
+import { openExternalUrl } from '@/lib/external-link';
 import { configKey, draftsEqual } from '@/lib/organization/guardrails-config-key';
 import {
   buildUpdateInput,
@@ -93,8 +95,19 @@ export function OrganizationGuardrailsScreen() {
         <EmptyState
           className="bg-background"
           icon={Lock}
-          title={t('organizationModelAccess.enterpriseOnlyTitle')}
+          title={t('organizationGuardrails.unavailableTitle')}
           description={t('organizationGuardrails.unavailable')}
+          action={
+            <StateAction
+              label={t('organizationGuardrails.contactSupport')}
+              icon={Mail}
+              onPress={() => {
+                void openExternalUrl(`mailto:${SUPPORT_EMAIL}`, {
+                  label: t('organizationGuardrails.contactSupport'),
+                });
+              }}
+            />
+          }
         />
       </View>
     );

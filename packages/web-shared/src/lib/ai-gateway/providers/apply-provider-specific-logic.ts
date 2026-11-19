@@ -10,6 +10,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   applyMistralModelSettings,
+  applyMistralThinkingRequestTransform,
   isMistralModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
@@ -101,11 +102,16 @@ function mapGeminiReasoningDetails(request: OpenRouterChatCompletionRequest) {
     delete message.reasoning;
 
     const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls.filter(isRecord) : [];
+    const toolCallsById = new Map<string, Record<string, unknown>>();
     for (const toolCall of toolCalls) {
       const legacySignature = toolCall.thoughtSignature;
       delete toolCall.thoughtSignature;
       if (typeof legacySignature === 'string') {
         setGeminiThoughtSignature(toolCall, legacySignature);
+      }
+      // First write wins, so a duplicate id keeps the earliest tool call.
+      if (typeof toolCall.id === 'string' && !toolCallsById.has(toolCall.id)) {
+        toolCallsById.set(toolCall.id, toolCall);
       }
     }
 
@@ -125,10 +131,7 @@ function mapGeminiReasoningDetails(request: OpenRouterChatCompletionRequest) {
         continue;
       }
 
-      const toolCall =
-        typeof detail.id === 'string'
-          ? toolCalls.find(candidate => candidate.id === detail.id)
-          : undefined;
+      const toolCall = typeof detail.id === 'string' ? toolCallsById.get(detail.id) : undefined;
       setGeminiThoughtSignature(toolCall ?? message, detail.data);
     }
   }
@@ -305,6 +308,9 @@ export function applyReasoningDetailsTransform(
     case ReasoningDetailsTransform.Reasoning:
       replaceReasoningObjectWithReasoningEffort(requestToMutate);
       mapReasoningDetailsToReasoning(requestToMutate.body);
+      break;
+    case ReasoningDetailsTransform.MistralThinking:
+      applyMistralThinkingRequestTransform(requestToMutate);
       break;
     case null:
       break;

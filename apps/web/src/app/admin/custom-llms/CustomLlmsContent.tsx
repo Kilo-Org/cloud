@@ -46,7 +46,7 @@ import type { CustomLlmCredentials, CustomLlmDefinition } from '@kilocode/db/sch
 import { deepStrict } from '@/lib/zod/deep-strict';
 import { formatZodError } from '@/lib/zod/format-zod-error';
 import { toast } from 'sonner';
-import { ChevronRight, Copy as CopyIcon, Globe, Lock, Plus, Pencil } from 'lucide-react';
+import { ChevronRight, Copy as CopyIcon, Globe, Handshake, Lock, Plus, Pencil } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Editor, { type EditorProps } from '@monaco-editor/react';
 
@@ -483,6 +483,11 @@ export function CustomLlmsContent() {
                       <Globe />
                       Public
                     </Badge>
+                  ) : item.definition.partner ? (
+                    <Badge variant="secondary">
+                      <Handshake />
+                      Partner: {item.definition.partner.inference_provider}
+                    </Badge>
                   ) : (
                     <Badge variant="secondary">
                       <Lock />
@@ -504,15 +509,17 @@ export function CustomLlmsContent() {
                     >
                       <Pencil className="h-3 w-3" />
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openCopy(item.public_id, item.definition)}
-                      aria-label={`Copy ${item.public_id}`}
-                      title="Copy custom LLM"
-                    >
-                      <CopyIcon className="h-3 w-3" />
-                    </Button>
+                    {!item.definition.partner && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openCopy(item.public_id, item.definition)}
+                        aria-label={`Copy ${item.public_id}`}
+                        title="Copy custom LLM"
+                      >
+                        <CopyIcon className="h-3 w-3" />
+                      </Button>
+                    )}
                     <InlineDeleteConfirmation
                       onDelete={() => handleDelete(item.public_id)}
                       isLoading={deleteMutation.isPending}
@@ -657,8 +664,20 @@ export function CustomLlmsContent() {
                   </li>
                   <li>
                     With <code>pricing</code>, set{' '}
-                    <code>&quot;may_train_on_prompts&quot;: false</code> only for zero data
-                    retention upstreams.
+                    <code>&quot;may_train_on_prompts&quot;: false</code> only for upstreams that do
+                    not train on prompts. Custom LLMs never serve requests that ask for zero data
+                    retention.
+                  </li>
+                  <li>
+                    A partner sets{' '}
+                    <code>
+                      &quot;partner&quot;: {'{'} &quot;inference_provider&quot;: &quot;acme&quot;{' '}
+                      {'}'}
+                    </code>{' '}
+                    and uses the catalog model ID it serves as its public ID. It needs{' '}
+                    <code>pricing</code> and must not set grants, <code>public</code>, or{' '}
+                    <code>country_deny_list</code>. Kilo-paid requests try it first and fall back to
+                    the gateway on an error.
                   </li>
                   <li>
                     Grant access with <code>organization_ids</code> or <code>group_ids</code>, or

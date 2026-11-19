@@ -222,7 +222,7 @@ describe('OrganizationBoundary settled states', () => {
     expect(findByType(renderer.root, 'EmptyStateMock')).toHaveLength(1);
     expect(texts).toContain('No organization');
     expect(texts).toContain(
-      'This account is not part of an organization. Create one to use organization features like member invites and low-balance alerts, or open the web to join one you were invited to.'
+      'This account is not part of an organization. Create one to use organization features like member invites and low-balance alerts, or accept an invitation from the email an organization sent you.'
     );
     expect(texts).toContain('Create organization');
     expect(texts).toContain('Back to profile');

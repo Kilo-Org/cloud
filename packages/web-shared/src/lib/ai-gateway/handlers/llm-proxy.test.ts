@@ -4141,12 +4141,18 @@ describe('kilo-auto/efficient classifier billing', () => {
       name: 'organization data collection deny',
       settings: { data_collection: 'deny' },
       provider: undefined,
+      zdr: false,
     },
-    { name: 'request data collection deny', settings: {}, provider: { data_collection: 'deny' } },
-    { name: 'request ZDR', settings: {}, provider: { zdr: true } },
+    {
+      name: 'request data collection deny',
+      settings: {},
+      provider: { data_collection: 'deny' },
+      zdr: false,
+    },
+    { name: 'request ZDR', settings: {}, provider: { zdr: true }, zdr: true },
   ] as const)(
     'denies models that require data collection to the efficient decision worker for $name',
-    async ({ settings, provider: requestProvider }) => {
+    async ({ settings, provider: requestProvider, zdr }) => {
       mockedGetUserFromAuth.mockResolvedValue({
         user: { id: 'user-123', microdollars_used: 0 } as User,
         authFailedResponse: null,
@@ -4168,7 +4174,8 @@ describe('kilo-auto/efficient classifier billing', () => {
 
       expect(response.status).toBe(200);
       expect(mockedCollectDataCollectionRequiredAutoRoutingModelIds).toHaveBeenCalledWith(
-        'efficient'
+        'efficient',
+        { zdr }
       );
       expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
         expect.objectContaining({ deniedModelIds: ['meta/muse-spark-1.3-contributor'] })
@@ -8345,6 +8352,104 @@ describe('BYOK failover', () => {
     }
   );
 
+  describe('with a partner route', () => {
+    const partnerPricing: CustomPricingTiers = [
+      {
+        start_context_length: 0,
+        pricing: {
+          prompt_per_million: 0.5,
+          completion_per_million: 1.5,
+          input_cache_read_per_million: null,
+          input_cache_write_per_million: null,
+        },
+      },
+    ];
+
+    function partnerRoute(): ProviderRoute {
+      return {
+        provider: byokProvider('partner-key', { type: 'partner' }),
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+        customLlmPricing: partnerPricing,
+      };
+    }
+
+    function kiloRoute(): ProviderRoute {
+      return {
+        provider: byokProvider('kilo-key'),
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+      };
+    }
+
+    it('bills the partner pricing when the partner serves the request', async () => {
+      const { result, failovers } = withFailover(partnerRoute(), kiloRoute());
+      mockedGetProvider.mockResolvedValue(result);
+      mockedUpstreamRequest.mockResolvedValueOnce(upstreamWithStatus(200));
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+      expect(response.status).toBe(200);
+      expect(failovers[0]).not.toHaveBeenCalled();
+      expect(sentApiKeys()).toEqual(['partner-key']);
+      expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1]).toMatchObject({
+        provider: 'partner',
+        is_free: false,
+        custom_llm_pricing: partnerPricing,
+      });
+      expect(mockedRewriteModelResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ customLlmPricing: partnerPricing })
+      );
+    });
+
+    it.each([401, 429, 500])(
+      "fails over to Kilo's route and bills the model's own pricing when the partner answers %s",
+      async status => {
+        const { result, failovers } = withFailover(partnerRoute(), kiloRoute());
+        mockedGetProvider.mockResolvedValue(result);
+        mockedUpstreamRequest
+          .mockResolvedValueOnce(upstreamWithStatus(status))
+          .mockResolvedValueOnce(upstreamWithStatus(200));
+
+        const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+        expect(response.status).toBe(200);
+        expect(failovers[0]).toHaveBeenCalledTimes(1);
+        expect(sentApiKeys()).toEqual(['partner-key', 'kilo-key']);
+        expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1]).toMatchObject({
+          provider: 'openrouter',
+          custom_llm_pricing: null,
+        });
+        expect(mockedRewriteModelResponse).toHaveBeenCalledWith(
+          expect.objectContaining({ customLlmPricing: null })
+        );
+        expect(console.warn).toHaveBeenCalledWith(
+          '[byok-failover] Upstream failed, trying the next route',
+          expect.objectContaining({
+            failedProviderType: 'partner',
+            nextProviderType: 'openrouter',
+            status,
+          })
+        );
+      }
+    );
+
+    it("returns Kilo's failure when the partner and Kilo's route both fail", async () => {
+      const { result } = withFailover(partnerRoute(), kiloRoute());
+      mockedGetProvider.mockResolvedValue(result);
+      mockedUpstreamRequest
+        .mockResolvedValueOnce(upstreamWithStatus(500))
+        .mockResolvedValueOnce(upstreamWithStatus(502));
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+      expect(response.status).toBe(502);
+      expect(sentApiKeys()).toEqual(['partner-key', 'kilo-key']);
+    });
+  });
+
   it('skips a failover key the policy refuses and uses the next one', async () => {
     const { result, failovers } = withFailover(
       byokRoute('openai', byokProvider('primary-byok-key')),
@@ -8363,7 +8468,7 @@ describe('BYOK failover', () => {
     expect(failovers[1]).toHaveBeenCalledTimes(1);
     expect(sentApiKeys()).toEqual(['primary-byok-key', 'next-byok-key']);
     expect(console.warn).toHaveBeenCalledWith(
-      '[byok-failover] Skipping a BYOK key the policy refuses',
+      '[byok-failover] Skipping a failover route the policy refuses',
       { providerIds: ['anthropic'] }
     );
   });
@@ -8393,7 +8498,7 @@ describe('BYOK failover', () => {
     expect(next).toHaveBeenCalledTimes(1);
     expect(sentApiKeys()).toEqual(['primary-byok-key', 'next-byok-key']);
     expect(consoleError).toHaveBeenCalledWith(
-      '[byok-failover] Skipping a BYOK key that could not be resolved',
+      '[byok-failover] Skipping a failover route that could not be resolved',
       { errorType: 'TypeError' }
     );
     expect(JSON.stringify(consoleError.mock.calls)).not.toMatch(/byok-key/);

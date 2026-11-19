@@ -405,21 +405,26 @@ describe('upstream model catalog validation', () => {
     expect(result.type).toBe(type);
   });
 
-  it.each(['direct-byok', 'mistral', 'inception', 'custom', 'custom-public', 'dev-tools'] as const)(
-    'does not validate %s models against a gateway catalog',
-    async providerId => {
-      const result = await attempt({
-        providerId,
-        requestedModel: 'not-in-catalog',
-        wireModel: 'provider-specific-model',
-      });
+  it.each([
+    'direct-byok',
+    'mistral',
+    'inception',
+    'custom',
+    'custom-public',
+    'partner',
+    'dev-tools',
+  ] as const)('does not validate %s models against a gateway catalog', async providerId => {
+    const result = await attempt({
+      providerId,
+      requestedModel: 'not-in-catalog',
+      wireModel: 'provider-specific-model',
+    });
 
-      expect(result.type).toBe('success');
-      expect(isValidOpenRouterModelId).not.toHaveBeenCalled();
-      expect(isValidVercelModelId).not.toHaveBeenCalled();
-      expect(upstreamRequest).toHaveBeenCalledTimes(1);
-    }
-  );
+    expect(result.type).toBe('success');
+    expect(isValidOpenRouterModelId).not.toHaveBeenCalled();
+    expect(isValidVercelModelId).not.toHaveBeenCalled();
+    expect(upstreamRequest).toHaveBeenCalledTimes(1);
+  });
 });
 describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => {
   let owner: OpenAiChatGptOwner;

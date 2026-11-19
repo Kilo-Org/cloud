@@ -1,14 +1,25 @@
 import { describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { type SecurityCommand } from '@/lib/security-agent';
 
 import { getSecurityCommandFailureMessage } from './security-command-failure-copy';
 
-function command(overrides: Partial<Parameters<typeof getSecurityCommandFailureMessage>[0]> = {}) {
+function command(overrides: Partial<SecurityCommand> = {}): SecurityCommand {
   return {
+    id: '00000000-0000-4000-8000-000000000000',
+    commandType: 'sync',
+    origin: 'dashboard_refresh',
+    findingId: null,
+    repoFullName: null,
     status: 'failed',
     resultCode: null,
+    resultMetadata: null,
     lastErrorRedacted: null,
+    acceptedAt: '2026-11-19T00:00:00.000Z',
+    startedAt: null,
+    completedAt: null,
+    updatedAt: '2026-11-19T00:00:00.000Z',
     ...overrides,
   };
 }

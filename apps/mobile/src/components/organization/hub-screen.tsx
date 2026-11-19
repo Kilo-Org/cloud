@@ -72,31 +72,27 @@ type OrganizationHubScreenProps = Readonly<{
   organizationIdOverride?: string;
 }>;
 
-/** Whether the rename control offers the dialog, or states why it cannot. */
-type RenameControl = { kind: 'ready'; onPress: () => void } | { kind: 'blocked'; reason: string };
+/** Whether the rename control offers the dialog, or only says it cannot. */
+type RenameControl = { kind: 'ready'; onPress: () => void } | { kind: 'blocked' };
 
 /**
  * The rename control's props for its state. A blocked control keeps the same
  * box and therefore the same header width: the title beside it cannot reflow to
- * another line. It is dimmed the way the shared Button dims a disabled
- * non-primary control, and the reason joins the control's own name, in the
- * shape this screen's other composed labels use. A hint would not reach Android:
- * React Native maps `accessibilityHint` to the platform's tooltip text, which
- * TalkBack does not announce with the node, so the reason would be spoken on one
- * platform only.
+ * another line. It is dimmed and disabled the way the shared Button dims a
+ * disabled non-primary control, and it states nothing beyond its own name: the
+ * plan refusal block below the header states the reason once, so a label that
+ * repeated it would have the screen reader speak the sentence twice in a row.
+ * A hint is no place for it either: React Native maps `accessibilityHint` to the
+ * platform's tooltip text, which TalkBack does not announce with the node.
  */
 function renameControlProps(control: RenameControl, label: string) {
   if (control.kind === 'ready') {
     return { accessibilityLabel: label, onPress: control.onPress };
   }
-  // Built outside the props object: the shared screen-reader name is the
-  // control's title followed by the reason, the shape the rest of this screen
-  // composes its labels with.
-  const blockedLabel = `${label}. ${control.reason}`;
   return {
     disabled: true,
     className: 'opacity-50',
-    accessibilityLabel: blockedLabel,
+    accessibilityLabel: label,
     accessibilityState: { disabled: true },
   };
 }
@@ -235,10 +231,11 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   // The rename control's two states. `organizations.update` runs on the
   // organization billing mutation procedure, which refuses every mutation once
   // `classifyOrganizationEntitlement` reports the hard-expired trial, and that is
-  // the same server verdict `planEnded` reads. A lapsed plan therefore states the
-  // blocker on the control instead of opening a field whose save cannot succeed.
+  // the same server verdict `planEnded` reads. A lapsed plan therefore disables
+  // the control instead of opening a field whose save cannot succeed, and the
+  // refusal block below the header states why.
   const renameControl: RenameControl = planEnded
-    ? { kind: 'blocked', reason: t('organization.hub.planEnded') }
+    ? { kind: 'blocked' }
     : {
         kind: 'ready',
         onPress: () => {

@@ -64,13 +64,13 @@ import {
   checkOpenAiChatGptByok,
   getOpenAiChatGptByokModelIds,
   OPENAI_ON_BEHALF_OF_TOKEN_HEADER,
-  resetConnectorGoneLogThrottleForTest,
   tagOpenAiChatGptByokModels,
   type OpenAiChatGptRoutingInput,
 } from './routing';
 import type { OpenAiChatGptConnection } from './types';
 import type { OpenAiChatGptOwner, OpenAiChatGptStoredConnection } from './store';
 import { OPENAI_CHATGPT_API_URL } from './upstream';
+import { resetReportWindowsForTest } from '@kilocode/web-shared/lib/ai-gateway/report-window';
 
 const PARTNER_KEY = 'partner-project-key';
 const DELEGATED_TOKEN = 'delegated-access-token';
@@ -167,7 +167,7 @@ async function transformResponsesRequest(
 
 beforeEach(() => {
   jest.mocked(logExceptInTest).mockClear();
-  resetConnectorGoneLogThrottleForTest();
+  resetReportWindowsForTest();
   process.env.OPENAI_CHATGPT_API_KEY = PARTNER_KEY;
   jest.mocked(getOpenAiChatGptStoredConnection).mockReset().mockResolvedValue(storedConnection());
   jest.mocked(openAiChatGptConnectorGone).mockReset().mockResolvedValue(false);
@@ -1426,7 +1426,7 @@ describe('shared-services routing', () => {
     expect(goneLines()).toEqual([expectedLine, otherConnectorLine]);
 
     // Once the window is cleared, the same connector reports again.
-    resetConnectorGoneLogThrottleForTest();
+    resetReportWindowsForTest();
     sharedConnectorGone('gone-connector');
     await checkOpenAiChatGptByok(input);
     expect(goneLines()).toEqual([expectedLine, otherConnectorLine, expectedLine]);

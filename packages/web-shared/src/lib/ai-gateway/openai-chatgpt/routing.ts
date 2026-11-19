@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ReasoningEffortSchema, type ReasoningEffort } from '@kilocode/db/schema-types';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { claimReportWindow } from '@kilocode/web-shared/lib/ai-gateway/report-window';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import { isGptOssModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -214,29 +215,19 @@ function isUsableStoredConnection(
 /**
  * A shared connector that cannot serve stays in that state until an owner or
  * admin reconnects it, so the report describes one standing fact rather than an
- * event. Emitting it at most once per organization and connector per interval
- * keeps that fact visible without repeating it on every request.
- *
- * The throttle is per instance, so a fleet of N instances reports up to N lines
- * an interval for one organization. That is the ceiling worth paying for
- * module-level timestamps.
+ * event. The shared report window keeps that fact visible without repeating it
+ * on every request, and bounds the keys it remembers.
  */
-const CONNECTOR_GONE_LOG_INTERVAL_MS = 60_000;
-const lastConnectorGoneLogAt = new Map<string, number>();
-
-/** Tests clear the throttle between cases; production keeps the module state. */
-export function resetConnectorGoneLogThrottleForTest() {
-  lastConnectorGoneLogAt.clear();
-}
-
-function shouldLogConnectorGone(organizationId: string, connectorId: string): boolean {
-  const now = Date.now();
-  const key = `${organizationId}:${connectorId}`;
-  if (now - (lastConnectorGoneLogAt.get(key) ?? 0) < CONNECTOR_GONE_LOG_INTERVAL_MS) {
-    return false;
-  }
-  lastConnectorGoneLogAt.set(key, now);
-  return true;
+function logSharedConnectorGone(organizationId: string, connectorId: string): void {
+  const key = `openai-chatgpt-shared-connector-gone:${organizationId}:${connectorId}`;
+  if (!claimReportWindow(key, Date.now())) return;
+  logExceptInTest(
+    JSON.stringify({
+      type: 'openai_chatgpt_shared_connector_gone',
+      organizationId,
+      connectorId,
+    })
+  );
 }
 
 /**
@@ -261,15 +252,7 @@ async function eligibleUpstreamModelForOwner(
   if (!isUsableStoredConnection(stored)) return null;
 
   if (owner.scope === 'shared_services' && (await openAiChatGptConnectorGone(stored))) {
-    if (shouldLogConnectorGone(owner.organizationId, stored.createdBy)) {
-      logExceptInTest(
-        JSON.stringify({
-          type: 'openai_chatgpt_shared_connector_gone',
-          organizationId: owner.organizationId,
-          connectorId: stored.createdBy,
-        })
-      );
-    }
+    logSharedConnectorGone(owner.organizationId, stored.createdBy);
     return null;
   }
 

@@ -29,3 +29,8 @@ export function claimReportWindow(key: string, now: number): boolean {
   }
   return true;
 }
+
+/** Tests clear the window state between cases; production keeps it for the process. */
+export function resetReportWindowsForTest(): void {
+  reportedAt.clear();
+}

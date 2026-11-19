@@ -15,6 +15,24 @@ import { refineSpendAlertScope, spendAlertScopeShape } from './spend-alert-scope
 export const cloudAgentSessionCategorySchema = z.enum(['attention', 'status']);
 export type CloudAgentSessionCategory = z.infer<typeof cloudAgentSessionCategorySchema>;
 
+/**
+ * The category a cloud-agent-session push carries, applying the schema default
+ * ('status') at the enforcement read site. Both presentation consumers — the
+ * push kind and the history category — read this one function, so an omitted
+ * category cannot mean different things in the two places.
+ *
+ * The parameter names the payload's discriminant beside `category` so a whole
+ * `PushData` union passes unchanged: a bare `{ category }` is a weak type and
+ * TypeScript rejects a union that shares no property with it. Only `category`
+ * is read.
+ */
+export function classifyCloudAgentSessionPush(data: {
+  type?: string;
+  category?: CloudAgentSessionCategory;
+}): CloudAgentSessionCategory {
+  return data.category ?? 'status';
+}
+
 // The needs-input raise fields every cloud-agent-session contract carries,
 // whatever envelope transports it: the visible push in this module and the
 // send request in `./rpc-schemas`. Declared once so a field cannot be added

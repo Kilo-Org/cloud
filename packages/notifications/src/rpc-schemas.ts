@@ -93,9 +93,12 @@ export type InternalDispatchResponse = z.infer<typeof internalDispatchResponseSc
 export const badgeBucketSchema = nonEmptyStringSchema;
 export type BadgeBucket = z.infer<typeof badgeBucketSchema>;
 
+/** The count every badge route reports: a whole, never-negative number. */
+const badgeCountSchema = z.number().int().nonnegative();
+
 export const badgeCountRowSchema = z.object({
   badgeBucket: badgeBucketSchema,
-  badgeCount: z.number().int().nonnegative(),
+  badgeCount: badgeCountSchema,
 });
 export type BadgeCountRow = z.infer<typeof badgeCountRowSchema>;
 
@@ -110,7 +113,7 @@ export const markBadgeReadInputSchema = z.object({
 export type MarkBadgeReadInput = z.infer<typeof markBadgeReadInputSchema>;
 
 export const markBadgeReadResponseSchema = z.object({
-  badgeCount: z.number().int().nonnegative(),
+  badgeCount: badgeCountSchema,
 });
 export type MarkBadgeReadResponse = z.infer<typeof markBadgeReadResponseSchema>;
 
@@ -151,30 +154,63 @@ export type SendCloudAgentSessionNotificationResult = z.infer<
 >;
 
 // Aggregate refreshes carry identity only; the server reads current status and scope.
-export const refreshGlanceableSessionsInputSchema = z.object({
-  userId: nonEmptyStringSchema,
-  cliSessionIds: z.array(nonEmptyStringSchema).min(1),
-  /**
-   * The subset of `cliSessionIds` whose change moved a session into or out of
-   * the `permission` status. `needsApproval` gates the Approve control on the
-   * locked/background surfaces, so the delivery window may not defer those
-   * scopes. The caller is the one that saw the previous status; the server
-   * cannot read a past status. Naming the sessions lets the server exempt only
-   * the scope that actually moved: one batch can span the personal scope and
-   * several organizations, and exempting all of them would wake devices that
-   * had no approval change.
-   */
-  approvalChangedSessionIds: z.array(nonEmptyStringSchema).optional(),
-  /**
-   * Sessions in `cliSessionIds` whose refresh must not happen unless a session
-   * card follows them. The ingest service refreshes the card content after it
-   * persists a new summary; a session nobody follows would otherwise pay for a
-   * whole snapshot build. The notifications side checks the follow with one
-   * indexed read and skips this call when none of the named sessions is
-   * followed. Omitting the field keeps the previous behavior.
-   */
-  cardFollowSessionIds: z.array(nonEmptyStringSchema).optional(),
-});
+
+/**
+ * Both hint lists name sessions the refresh already carries. An id outside
+ * `cliSessionIds` names no session in this batch, so the server could not act
+ * on it: reject it rather than silently ignore it. Omitted lists parse as
+ * before, and duplicates stay allowed (the server treats each list as a set).
+ */
+function refineRefreshSessionSubset(
+  data: {
+    cliSessionIds: string[];
+    approvalChangedSessionIds?: string[];
+    cardFollowSessionIds?: string[];
+  },
+  ctx: z.RefinementCtx
+): void {
+  const batch = new Set(data.cliSessionIds);
+  const hintFields = ['approvalChangedSessionIds', 'cardFollowSessionIds'] as const;
+  for (const field of hintFields) {
+    const ids = data[field];
+    if (!ids) continue;
+    ids.forEach((id, index) => {
+      if (batch.has(id)) return;
+      ctx.addIssue({
+        code: 'custom',
+        path: [field, index],
+        message: 'each entry must name a session in cliSessionIds',
+      });
+    });
+  }
+}
+
+export const refreshGlanceableSessionsInputSchema = z
+  .object({
+    userId: nonEmptyStringSchema,
+    cliSessionIds: z.array(nonEmptyStringSchema).min(1),
+    /**
+     * The subset of `cliSessionIds` whose change moved a session into or out of
+     * the `permission` status. `needsApproval` gates the Approve control on the
+     * locked/background surfaces, so the delivery window may not defer those
+     * scopes. The caller is the one that saw the previous status; the server
+     * cannot read a past status. Naming the sessions lets the server exempt only
+     * the scope that actually moved: one batch can span the personal scope and
+     * several organizations, and exempting all of them would wake devices that
+     * had no approval change.
+     */
+    approvalChangedSessionIds: z.array(nonEmptyStringSchema).optional(),
+    /**
+     * Sessions in `cliSessionIds` whose refresh must not happen unless a session
+     * card follows them. The ingest service refreshes the card content after it
+     * persists a new summary; a session nobody follows would otherwise pay for a
+     * whole snapshot build. The notifications side checks the follow with one
+     * indexed read and skips this call when none of the named sessions is
+     * followed. Omitting the field keeps the previous behavior.
+     */
+    cardFollowSessionIds: z.array(nonEmptyStringSchema).optional(),
+  })
+  .superRefine(refineRefreshSessionSubset);
 export type RefreshGlanceableSessionsParams = z.infer<typeof refreshGlanceableSessionsInputSchema>;
 
 // ── glanceable scope refresh (POST /internal/v1/glanceable-refresh) ──

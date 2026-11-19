@@ -412,6 +412,40 @@ test('prepares native session sync secrets without reusing the authentication si
   }
 });
 
+test('generates a blank cron secret and writes it to the web development env', () => {
+  const repo = createRepo({
+    '.env.local': 'CRON_SECRET=\n',
+    'apps/web/.env.development.local.example': fs.readFileSync(
+      new URL('../../../apps/web/.env.development.local.example', import.meta.url),
+      'utf-8'
+    ),
+  });
+  try {
+    const plan = computePlan(repo.root, new Set(['nextjs']));
+    assert.deepEqual(
+      plan.envLocalAutoCreates.find(create => create.key === 'CRON_SECRET'),
+      { key: 'CRON_SECRET', command: 'openssl', args: ['rand', '-base64', '32'] }
+    );
+    assert.equal(
+      plan.envDevLocalChanges.find(change => change.key === 'CRON_SECRET'),
+      undefined
+    );
+
+    writeFile(repo.root, '.env.local', 'CRON_SECRET=synthetic-cron-secret\n');
+    const ready = computePlan(repo.root, new Set(['nextjs']));
+    assert.equal(
+      ready.envLocalAutoCreates.find(create => create.key === 'CRON_SECRET'),
+      undefined
+    );
+    assert.deepEqual(
+      ready.envDevLocalChanges.find(change => change.key === 'CRON_SECRET'),
+      { key: 'CRON_SECRET', oldValue: undefined, newValue: 'synthetic-cron-secret' }
+    );
+  } finally {
+    repo.cleanup();
+  }
+});
+
 test('syncs generated shared callback secrets into blank worker dev vars', () => {
   const repo = createRepo({
     '.env.local': 'CALLBACK_TOKEN_SECRET=generated-callback-secret\n',

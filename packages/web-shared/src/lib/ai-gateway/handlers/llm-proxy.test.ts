@@ -3853,6 +3853,28 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
+  it('answers the API mismatch of a catalog-mode key routing reports without a route', async () => {
+    mockedGetProvider.mockResolvedValue({
+      kind: 'direct-byok-unsupported-api-kind',
+      providerId: 'private-a1b2c3d4e5',
+      keyLabel: 'Acme private provider',
+      supportedApiKinds: ['messages'],
+    });
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('moonshotai/kimi-k2.6')) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error_type: 'api_kind_not_supported',
+      message:
+        'This model does not support the chat_completions API through your Acme private provider, please use any of: messages',
+    });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
   it('explains an unmapped bespoke id when the key serves catalog ids', async () => {
     mockedGetProvider.mockResolvedValue({
       kind: 'direct-byok-catalog-only',

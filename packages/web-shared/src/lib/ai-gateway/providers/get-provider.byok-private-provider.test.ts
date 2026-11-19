@@ -23,6 +23,7 @@ import type * as byokModule from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type * as gatewayModelsCacheModule from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { shouldRouteToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import { getGoogleServiceAccountAccessToken } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/google-service-account';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
@@ -62,6 +63,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
     modelId === LATEST_ALIAS ? 'moonshotai/kimi-k2.6' : modelId
   ),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/google-service-account', () => ({
+  getGoogleServiceAccountAccessToken: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
   canRouteToVercel: jest.fn(async () => false),
   shouldRouteToVercel: jest.fn(async () => false),
@@ -77,6 +81,18 @@ const LATEST_ALIAS = '~moonshotai/kimi-latest';
 const PRIVATE_PROVIDER_ID = 'private-a1b2c3d4e5';
 const OTHER_PRIVATE_PROVIDER_ID = 'private-f6g7h8i9j0';
 const CREDENTIALS = JSON.stringify({ type: 'api_key', api_key: 'private-provider-secret' });
+const SERVICE_ACCOUNT_CREDENTIALS = JSON.stringify({
+  type: 'service_account',
+  project_id: 'acme',
+  private_key_id: 'key-id',
+  private_key: 'private-key',
+  client_email: 'gateway@acme.iam.gserviceaccount.com',
+  client_id: 'client-id',
+  auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+  token_uri: 'https://oauth2.googleapis.com/token',
+  auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
+  client_x509_cert_url: 'https://www.googleapis.com/robot/v1/metadata/x509/gateway',
+});
 
 function privateProvider(
   overrides: Partial<ByokPrivateProviderDefinition> = {}
@@ -464,20 +480,68 @@ describe('getProvider for a catalog id a private provider serves in catalog mode
     expect(await onlyRoute(result)).toMatchObject({ userByok: null });
   });
 
+  test('fails over to the next key when authenticating with the first upstream fails', async () => {
+    const user = await insertTestUser();
+    const organizationId = await organizationWithKeys(user, [
+      {
+        providerId: PRIVATE_PROVIDER_ID,
+        privateProvider: privateProvider(),
+        catalogMode: true,
+        priority: 0,
+        secret: SERVICE_ACCOUNT_CREDENTIALS,
+      },
+      { providerId: 'openrouter', priority: 1 },
+    ]);
+    jest
+      .mocked(getGoogleServiceAccountAccessToken)
+      .mockRejectedValueOnce(new Error('token exchange failed'));
+    const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const { result, decision } = await route(user, organizationId, CATALOG_MODEL);
+
+    error.mockRestore();
+    expect(getGoogleServiceAccountAccessToken).toHaveBeenCalledTimes(1);
+    expect(await onlyRoute(result)).toMatchObject({ userByok: [{ providerId: 'openrouter' }] });
+    expect(decision.byok_candidates).toEqual([
+      expect.objectContaining({
+        provider_id: PRIVATE_PROVIDER_ID,
+        outcome: 'skipped',
+        reason: 'unusable-credential',
+      }),
+      expect.objectContaining({ provider_id: 'openrouter', outcome: 'selected' }),
+    ]);
+    expect(decision.result).toMatchObject({ byok_provider_ids: ['openrouter'] });
+  });
+
   test('fails with the private provider over another API kind instead of falling back to Kilo', async () => {
     const user = await insertTestUser();
     const organizationId = await organizationWithKeys(user, [
-      { providerId: PRIVATE_PROVIDER_ID, privateProvider: privateProvider(), catalogMode: true },
+      {
+        providerId: PRIVATE_PROVIDER_ID,
+        privateProvider: privateProvider(),
+        catalogMode: true,
+        secret: SERVICE_ACCOUNT_CREDENTIALS,
+      },
     ]);
     jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue([]);
+    jest.mocked(getGoogleServiceAccountAccessToken).mockClear();
 
     const { result, decision } = await route(user, organizationId, CATALOG_MODEL, {
       apiKind: 'messages',
     });
 
-    expect(await onlyRoute(result)).toMatchObject({
-      provider: { type: 'direct-byok', supportedChatApis: ['chat_completions'] },
-      userByok: [{ providerId: PRIVATE_PROVIDER_ID }],
+    // The mismatch is known from the definition, so routing never authenticates with the upstream.
+    expect(getGoogleServiceAccountAccessToken).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      kind: 'direct-byok-unsupported-api-kind',
+      providerId: PRIVATE_PROVIDER_ID,
+      keyLabel: 'Acme private provider',
+      supportedApiKinds: ['chat_completions'],
+    });
+    expect(decision.result).toMatchObject({
+      route: 'unsupported-api-kind',
+      provider_type: 'direct-byok',
+      byok_provider_ids: [PRIVATE_PROVIDER_ID],
     });
     expect(decision.steps).toContainEqual({
       step: 'unsupported-api-kind',

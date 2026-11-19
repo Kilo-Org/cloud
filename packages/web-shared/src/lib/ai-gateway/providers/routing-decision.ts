@@ -24,6 +24,8 @@ const ByokCandidateSkipReasonSchema = z.enum([
   'model-unavailable',
   'provider-settings',
   'ignored-by-request',
+  /** The key could not be decrypted, or authenticating with its upstream failed. */
+  'unusable-credential',
 ]);
 
 export type ByokCandidateSkipReason = z.infer<typeof ByokCandidateSkipReasonSchema>;

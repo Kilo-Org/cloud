@@ -267,6 +267,15 @@ export async function resolveProviderAndPolicy(
         : directByokCatalogOnlyResponse(message)
     );
   }
+  if (getProviderResult.kind === 'direct-byok-unsupported-api-kind') {
+    return reject(
+      apiKindNotSupportedResponse(
+        request.kind,
+        getProviderResult.supportedApiKinds,
+        getProviderResult.keyLabel
+      )
+    );
+  }
   /** Why the policy refuses the route, or null when it may serve the request. */
   const routeRejection = async (
     route: ProviderRoute

@@ -1099,7 +1099,7 @@ describe('getProvider direct BYOK routing', () => {
       .mockResolvedValue([
         { provider: directByokProvider('synthetic'), model: directByokModel('hf:openai/gpt-oss') },
       ]);
-    storeKeys({
+    const decrypt = storeKeys({
       decryptedAPIKey: 'synthetic-key',
       providerId: 'synthetic',
       serveCatalogModels: true,
@@ -1111,13 +1111,13 @@ describe('getProvider direct BYOK routing', () => {
 
     const result = await getProvider(getProviderInput(responsesInput('openai/gpt-oss')));
 
-    const route = await firstRoute(result);
-    expect(route.provider).toMatchObject({
-      type: 'direct-byok',
-      apiKey: 'synthetic-key',
-      supportedChatApis: ['chat_completions'],
+    expect(result).toEqual({
+      kind: 'direct-byok-unsupported-api-kind',
+      providerId: 'synthetic',
+      keyLabel: 'Synthetic key',
+      supportedApiKinds: ['chat_completions'],
     });
-    expect(route.userByok).toEqual([{ decryptedAPIKey: 'synthetic-key', providerId: 'synthetic' }]);
+    expect(decrypt).not.toHaveBeenCalled();
   });
 
   test('lets another BYOK key serve an API kind the catalog-mode keys cannot', async () => {

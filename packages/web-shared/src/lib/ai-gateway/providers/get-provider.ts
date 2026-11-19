@@ -179,7 +179,21 @@ export type GetProviderResult =
   | { kind: 'claude-billing-reconnect'; message: string }
   /** The id is a custom LLM the caller may not use, or its stored credentials are unusable. */
   | { kind: 'custom-llm-unavailable' }
-  | DirectByokCatalogOnlyResult;
+  | DirectByokCatalogOnlyResult
+  | DirectByokUnsupportedApiKindResult;
+
+/**
+ * No key serves the catalog id over the request's API, but a catalog-mode direct BYOK key serves it
+ * over another. BYOK requests are never billed to Kilo, so the request fails with the API mismatch,
+ * known without decrypting the key or authenticating with its upstream.
+ */
+export type DirectByokUnsupportedApiKindResult = {
+  kind: 'direct-byok-unsupported-api-kind';
+  providerId: UserByokProviderId;
+  /** The caller's key, as `getDirectByokKeyLabel` names it. */
+  keyLabel: string;
+  supportedApiKinds: GatewayChatApiKind[];
+};
 
 async function directByokRoute(
   directByok: DirectByokProvider,
@@ -529,7 +543,14 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     const decided =
       result.kind === 'provider'
         ? { kind: 'provider' as const, ...(await result.routes[0]()) }
-        : result;
+        : result.kind === 'direct-byok-unsupported-api-kind'
+          ? {
+              kind: 'provider' as const,
+              provider: { type: 'direct-byok' as const },
+              userByok: [{ providerId: result.providerId }],
+              isFree: false,
+            }
+          : result;
     try {
       input.onDecision(decision.finish(decided));
     } catch (error) {
@@ -681,27 +702,49 @@ async function selectProvider(
       return isKeyPlanStep(step) && !reasonToPass(step) ? [step] : [];
     });
 
+  /**
+   * Serves the request with the key of `step`. Like a failover route, a key whose route cannot be
+   * resolved, such as one whose upstream authentication fails, yields to the owner's next serving
+   * key. When none resolves, the first failure fails the request, never another payer's route.
+   */
   const takeKey = async (
     step: KeyPlanStep,
     planIndex: number
   ): Promise<GetProviderProviderResult> => {
-    const route = await resolveKey(step);
-    const { providerId } = step.key;
-    logSelection(providerId);
-    decision.markByokCandidate(step, 'selected');
-    decision.step({
-      step: 'byok-key',
-      outcome: 'selected',
-      route: step.route,
-      provider_id: providerId,
-    });
-    return {
-      kind: 'provider',
-      routes: [
-        async () => route,
-        ...failoverStepsAfter(planIndex).map(failoverStep => () => resolveKey(failoverStep)),
-      ],
-    };
+    const candidates = [step, ...failoverStepsAfter(planIndex)];
+    const failures: unknown[] = [];
+    for (const [index, candidate] of candidates.entries()) {
+      const { providerId } = candidate.key;
+      let route: ProviderRoute;
+      try {
+        route = await resolveKey(candidate);
+      } catch (error) {
+        failures.push(error);
+        // The error may carry upstream or credential details, so only its type is logged.
+        console.error('[getProvider] Skipping a BYOK key whose route could not be resolved', {
+          providerId,
+          errorType: error instanceof Error ? error.name : 'unknown',
+        });
+        decision.markByokCandidate(candidate, 'skipped', 'unusable-credential');
+        continue;
+      }
+      logSelection(providerId);
+      decision.markByokCandidate(candidate, 'selected');
+      decision.step({
+        step: 'byok-key',
+        outcome: 'selected',
+        route: candidate.route,
+        provider_id: providerId,
+      });
+      return {
+        kind: 'provider',
+        routes: [
+          async () => route,
+          ...candidates.slice(index + 1).map(failoverStep => () => resolveKey(failoverStep)),
+        ],
+      };
+    }
+    throw failures[0];
   };
 
   // A connection whose credential is terminally dead must fail readably instead of resolving to
@@ -765,15 +808,23 @@ async function selectProvider(
         return await takeKey(step.step, planIndex);
       case 'unsupported-api-kind': {
         recordNoKeyServed();
-        const route = await resolveKey(step.step);
+        const { providerId } = step.step.key;
+        const supportedApiKinds = [
+          ...getDirectByokModelChatApis(step.step.provider, step.step.model),
+        ];
         decision.markByokCandidate(step.step, 'selected');
         decision.step({
           step: 'unsupported-api-kind',
           outcome: 'selected',
-          provider_id: step.step.key.providerId,
-          supported_api_kinds: [...getDirectByokModelChatApis(step.step.provider, step.step.model)],
+          provider_id: providerId,
+          supported_api_kinds: supportedApiKinds,
         });
-        return servedBy(route);
+        return {
+          kind: 'direct-byok-unsupported-api-kind',
+          providerId,
+          keyLabel: getDirectByokKeyLabel(step.step.provider),
+          supportedApiKinds,
+        };
       }
       case 'kilo': {
         recordNoKeyServed();

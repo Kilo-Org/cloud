@@ -2481,7 +2481,7 @@
   },
   "accountBlocked": {
     "title": "Account bloccato",
-    "description": "Il tuo accesso ai nostri servizi è stato limitato.",
+    "description": "Kilo ha bloccato questo account e un nuovo accesso non lo sbloccherà. L'assistenza può riesaminare il blocco su richiesta.",
     "contactSupport": "Contatta l'assistenza"
   },
   "addCredits": {

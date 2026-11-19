@@ -2991,7 +2991,7 @@
   },
   "accountBlocked": {
     "title": "Konto blokeret",
-    "description": "Din adgang til vores tjenester er blevet begrænset.",
+    "description": "Kilo har blokeret denne konto, og det hjælper ikke at logge ind igen. Support kan gennemgå blokeringen efter anmodning.",
     "contactSupport": "Kontakt support"
   },
   "addCredits": {

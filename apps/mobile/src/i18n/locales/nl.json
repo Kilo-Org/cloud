@@ -2448,7 +2448,7 @@
   },
   "accountBlocked": {
     "title": "Account geblokkeerd",
-    "description": "Je toegang tot onze diensten is beperkt.",
+    "description": "Kilo heeft dit account geblokkeerd en opnieuw inloggen heft de blokkade niet op. De helpdesk kan de blokkade op verzoek bekijken.",
     "contactSupport": "Contact opnemen met de helpdesk"
   },
   "addCredits": {

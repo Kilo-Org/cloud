@@ -3047,7 +3047,7 @@
   },
   "accountBlocked": {
     "title": "Cont blocat",
-    "description": "Accesul tău la serviciile noastre a fost restricționat.",
+    "description": "Kilo a blocat acest cont și o nouă autentificare nu va ridica blocarea. Asistența poate analiza blocarea la cerere.",
     "contactSupport": "Contactează asistența"
   },
   "addCredits": {

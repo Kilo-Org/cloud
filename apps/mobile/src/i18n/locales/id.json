@@ -2448,7 +2448,7 @@
   },
   "accountBlocked": {
     "title": "Akun diblokir",
-    "description": "Akses Anda ke layanan kami telah dibatasi.",
+    "description": "Kilo memblokir akun ini, dan masuk lagi tidak akan membuka blokirnya. Tim dukungan dapat meninjau pemblokiran jika diminta.",
     "contactSupport": "Hubungi tim dukungan"
   },
   "addCredits": {

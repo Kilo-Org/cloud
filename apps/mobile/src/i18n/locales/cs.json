@@ -3103,7 +3103,7 @@
   },
   "accountBlocked": {
     "title": "Účet zablokován",
-    "description": "Přístup k našim službám byl omezen.",
+    "description": "Kilo zablokovalo tento účet a nové přihlášení to nezruší. Podpora může blokaci na požádání přezkoumat.",
     "contactSupport": "Kontaktovat podporu"
   },
   "addCredits": {

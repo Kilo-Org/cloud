@@ -2991,7 +2991,7 @@
   },
   "accountBlocked": {
     "title": "Conta bloqueada",
-    "description": "O acceso aos nosos servizos foi restrinxido.",
+    "description": "Kilo bloqueou esta conta e volver iniciar sesión non a desbloqueará. A asistencia pode revisar o bloqueo se o solicitas.",
     "contactSupport": "Contactar coa asistencia"
   },
   "addCredits": {

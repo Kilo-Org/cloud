@@ -2991,7 +2991,7 @@
   },
   "accountBlocked": {
     "title": "Konto blokeeritud",
-    "description": "Teie juurdepääs meie teenustele on piiratud.",
+    "description": "Kilo blokeeris selle konto ja uuesti sisselogimine ei tühista blokeeringut. Tugi saab blokeeringu taotluse korral üle vaadata.",
     "contactSupport": "Võta ühendust toega"
   },
   "addCredits": {

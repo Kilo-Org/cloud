@@ -2991,7 +2991,7 @@
   },
   "accountBlocked": {
     "title": "Akaun disekat",
-    "description": "Akses anda kepada perkhidmatan kami telah dihadkan.",
+    "description": "Kilo telah menyekat akaun ini, dan log masuk semula tidak akan membatalkan sekatan itu. Sokongan boleh menyemak sekatan itu atas permintaan.",
     "contactSupport": "Hubungi sokongan"
   },
   "addCredits": {

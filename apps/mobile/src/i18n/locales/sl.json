@@ -3103,7 +3103,7 @@
   },
   "accountBlocked": {
     "title": "Račun blokiran",
-    "description": "Dostop do naših storitev vam je omejen.",
+    "description": "Kilo je blokiral ta račun in nova prijava blokade ne bo odpravila. Podpora lahko blokado na zahtevo pregleda.",
     "contactSupport": "Obrni se na podporo"
   },
   "addCredits": {

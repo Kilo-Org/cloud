@@ -2991,7 +2991,7 @@
   },
   "accountBlocked": {
     "title": "Llogaria e bllokuar",
-    "description": "Aksesi juaj në shërbimet tona është kufizuar.",
+    "description": "Kilo bllokoi këtë llogari dhe një hyrje e re nuk e heq bllokimin. Mbështetja mund ta shqyrtojë bllokimin me kërkesë.",
     "contactSupport": "Kontakto mbështetjen"
   },
   "addCredits": {

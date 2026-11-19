@@ -2991,7 +2991,7 @@
   },
   "accountBlocked": {
     "title": "Rekening geblokkeer",
-    "description": "Jou toegang tot ons dienste is beperk.",
+    "description": "Kilo het hierdie rekening geblokkeer, en weer aanmeld sal dit nie ophef nie. Ondersteuning kan die blokkade op versoek hersien.",
     "contactSupport": "Kontak ondersteuning"
   },
   "addCredits": {

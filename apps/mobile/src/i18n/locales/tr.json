@@ -2448,7 +2448,7 @@
   },
   "accountBlocked": {
     "title": "Hesap engellendi",
-    "description": "Hizmetlerimize erişiminiz kısıtlandı.",
+    "description": "Kilo bu hesabı engelledi ve yeniden giriş yapmak engeli kaldırmaz. Destek, talep üzerine engeli inceleyebilir.",
     "contactSupport": "Destekle iletişime geç"
   },
   "addCredits": {

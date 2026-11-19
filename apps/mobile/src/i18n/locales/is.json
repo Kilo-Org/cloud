@@ -2991,7 +2991,7 @@
   },
   "accountBlocked": {
     "title": "Reikningur lokaður",
-    "description": "Aðgangur þinn að þjónustunni okkar hefur verið takmarkaður.",
+    "description": "Kilo hefur lokað þessum reikningi og ný innskráning opnar hann ekki. Þjónustuver getur farið yfir lokunina sé þess óskað.",
     "contactSupport": "Hafa samband við þjónustuver"
   },
   "addCredits": {

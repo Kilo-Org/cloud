@@ -2991,7 +2991,7 @@
   },
   "accountBlocked": {
     "title": "Tili estetty",
-    "description": "Pääsysi palveluihimme on rajoitettu.",
+    "description": "Kilo esti tämän tilin, eikä uudelleenkirjautuminen poista estoa. Tuki voi tarkistaa eston pyynnöstä.",
     "contactSupport": "Ota yhteyttä tukeen"
   },
   "addCredits": {

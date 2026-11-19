@@ -2991,7 +2991,7 @@
   },
   "accountBlocked": {
     "title": "Hesab bloklanıb",
-    "description": "Xidmətlərimizə girişiniz məhdudlaşdırılıb.",
+    "description": "Kilo bu hesabı bloklayıb və yenidən daxil olmaq bloku aradan qaldırmayacaq. Dəstək xidməti sorğu əsasında bloku nəzərdən keçirə bilər.",
     "contactSupport": "Dəstək xidməti ilə əlaqə saxla"
   },
   "addCredits": {

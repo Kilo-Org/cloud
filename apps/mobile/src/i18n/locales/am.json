@@ -2991,7 +2991,7 @@
   },
   "accountBlocked": {
     "title": "መለያ ታግዷል",
-    "description": "ወደ አገልግሎቶቻችን ያለዎት መዳረሻ ተገድቧል።",
+    "description": "Kilo ይህን መለያ ታግዷል፤ እንደገና መግባት ግን አያነሳውም። የድጋፍ ቡድኑ በጥያቄ መሰረት እገዳውን መገምገም ይችላል።",
     "contactSupport": "የድጋፍ ቡድኑን አግኝ"
   },
   "addCredits": {

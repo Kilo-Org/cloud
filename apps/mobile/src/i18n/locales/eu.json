@@ -2991,7 +2991,7 @@
   },
   "accountBlocked": {
     "title": "Kontua blokeatuta",
-    "description": "Zure sarbidea gure zerbitzuetara mugatuta dago.",
+    "description": "Kilok kontu hau blokeatu du, eta berriro saioa hasita ez da blokeoa kenduko. Laguntza-taldeak blokeoa berrikusi dezake eskatuz gero.",
     "contactSupport": "Jarri harremanetan laguntza-taldearekin"
   },
   "addCredits": {

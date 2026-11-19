@@ -3053,7 +3053,7 @@
   },
   "accountBlocked": {
     "title": "Conta bloqueada",
-    "description": "O seu acesso aos nossos serviços foi restrito.",
+    "description": "O Kilo bloqueou esta conta e iniciar sessão novamente não vai desfazer o bloqueio. O suporte pode rever o bloqueio a pedido.",
     "contactSupport": "Contactar o suporte"
   },
   "addCredits": {

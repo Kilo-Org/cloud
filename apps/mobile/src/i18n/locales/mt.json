@@ -3159,7 +3159,7 @@
   },
   "accountBlocked": {
     "title": "Kont imblukkat",
-    "description": "L-aċċess tiegħek għas-servizzi tagħna ġie ristrett.",
+    "description": "Kilo imblokka dan il-kont u d-dħul mill-ġdid ma jneħħix l-imblokk. L-appoġġ jista' jirrevedi l-imblokk fuq talba.",
     "contactSupport": "Ikkuntattja l-appoġġ"
   },
   "addCredits": {

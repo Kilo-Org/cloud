@@ -16,6 +16,7 @@ vi.mock('react-native-safe-area-context', () => ({
 
 // The account row opens the shared picker through the press-burst guard; this
 // suite asserts the row colours, not the navigation, so the push is a stub.
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('@/lib/hooks/use-single-push-route', () => ({
   useSinglePushRoute: () => vi.fn(),
 }));

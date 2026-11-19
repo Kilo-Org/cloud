@@ -18,7 +18,6 @@ import type {
   EnkryptUnavailableReason,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { MAX_ENKRYPT_CREDITS_PER_CALL } from '@kilocode/usage-contracts';
-import type { EnkryptCallLimiter } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/call-limiter';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
 
@@ -27,11 +26,11 @@ type ReadyEnkryptGuardrailConfig = Extract<EnkryptGuardrailConfig, { status: 're
 export const ENKRYPT_DETECT_URL = 'https://api.enkryptai.com/guardrails/detect';
 
 /**
- * Bounds a scan, including time spent waiting for a free call slot. The input guardrail starts one
- * deadline for all scans of a request's blocking detectors, and one for its log-only detectors.
+ * Bounds a scan. The input guardrail starts one deadline for all Enkrypt calls of a request, which
+ * run one at a time: those of its blocking detectors first, then those of its log-only detectors.
  * The gateway awaits the blocking scans just before the upstream request, so this is the most
- * latency an enabled organization's request can gain. It also bounds the deferred work of the
- * log-only scans, which the request does not wait for.
+ * latency an enabled organization's request can gain. The log-only scans, which the request does
+ * not wait for, get what the blocking scans leave of it.
  */
 export const ENKRYPT_GUARDRAIL_TIMEOUT_MS = 60_000;
 
@@ -59,8 +58,8 @@ const detectResponseSchema = z.object({
 
 /**
  * How much of the part `text` covers. Units (segments, or slices of a segment too long for one
- * call) with a cached verdict are left out, and the rest are packed into calls of at most
- * `ENKRYPT_MAX_SCAN_CHARACTERS`; `chunk` locates this call among them. For tool definitions, the
+ * call) with a cached verdict are left out, and each of the rest is scanned by its own call;
+ * `chunk` locates this call among them. For tool definitions, the
  * totals and cached counts are those of the one tool the call scans.
  */
 export type EnkryptScanCoverage = {
@@ -68,8 +67,14 @@ export type EnkryptScanCoverage = {
   cache: EnkryptScanReport['verdict_cache'];
   totalCharacters: number;
   totalSegments: number;
+  /** Characters covered by cached verdicts: whole segments, and cached slices of the others. */
   cachedCharacters: number;
+  /** Segments whose units all have a cached verdict. */
   cachedSegments: number;
+  /** Units: segments, or slices of a segment too long for one call; repeats count each time. */
+  totalUnits: number;
+  /** Units with a cached verdict. */
+  cachedUnits: number;
   /** Attachments, such as images, represented only by an omission marker. */
   omittedAttachments: number;
   chunk?: { index: number; count: number };
@@ -133,8 +138,6 @@ export type EnkryptDetectDependencies = {
   timeoutMs: number;
   /** A deadline shared with other scans of the request. */
   deadline?: AbortSignal;
-  /** Shared by the request's scans to bound their concurrent Enkrypt calls. */
-  limiter?: EnkryptCallLimiter;
   signal: AbortSignal;
   requestLog?: {
     guardrail: EnkryptRequestLog['guardrail'];
@@ -228,6 +231,20 @@ function parseCreditsCost(response: Response): number | null {
     return MAX_ENKRYPT_CREDITS_PER_CALL;
   }
   return value;
+}
+
+/** Shared deadlines whose timeout a scan already logged as a warning. */
+const timeoutsWarned = new WeakSet<AbortSignal>();
+
+/**
+ * Whether a scan already warned about the timeout of the shared `deadline`; records that one
+ * does now. A scan with a deadline of its own always warns.
+ */
+function warnedTimeout(deadline: AbortSignal | undefined): boolean {
+  if (!deadline) return false;
+  const warned = timeoutsWarned.has(deadline);
+  timeoutsWarned.add(deadline);
+  return warned;
 }
 
 /** The scan signal combines the client's disconnect signal with the shared deadline. */
@@ -453,15 +470,15 @@ export async function scanRequest(
     deps.signal,
     deps.deadline ?? AbortSignal.timeout(deps.timeoutMs),
   ]);
-  const startedAt = performance.now();
-  const slot = deps.limiter ? await deps.limiter.acquire(kind, signal) : () => {};
-  if (!slot) {
-    // The scan ran out of time, or the client disconnected, waiting for a call slot.
-    return failedVerdict([], scope, {
-      error: abortError(signal, deps) ?? 'timeout',
-      latencyMs: Math.round(performance.now() - startedAt),
-    });
+  const notStarted = abortError(signal, deps);
+  if (notStarted) {
+    // Earlier calls of the request used up the shared deadline, so this one is not made, and sends
+    // nothing. Once a timeout of the deadline was logged as a warning, the calls after it log at
+    // debug level rather than adding a warning for every unit of a long conversation.
+    const quiet = notStarted === 'timeout' && warnedTimeout(deps.deadline);
+    return failedVerdict([], noTextSent(scope), { error: notStarted, latencyMs: 0, quiet });
   }
+  const startedAt = performance.now();
   const requestLog: EnkryptRequestLog | undefined = deps.requestLog
     ? {
         guardrail: deps.requestLog.guardrail,
@@ -477,13 +494,9 @@ export async function scanRequest(
   // A failed call is deliberately not retried, even when the failure looks transient. Retrying
   // within the request multiplies the load on Enkrypt exactly when it is struggling; the failed
   // content fails open instead and is rescanned once its short-lived cached verdict expires.
-  let attempt: DetectAttempt;
-  try {
-    attempt = await detectOnce(body, signal, { ...deps, apiKey }, requestLog);
-  } finally {
-    slot();
-  }
+  const attempt = await detectOnce(body, signal, { ...deps, apiKey }, requestLog);
   const latencyMs = Math.round(performance.now() - startedAt);
+  if (attempt.kind === 'failed' && attempt.error === 'timeout') warnedTimeout(deps.deadline);
 
   const usageRecords: EnkryptGuardrailCall[] = [
     {
@@ -537,6 +550,30 @@ export async function scanRequest(
   };
 }
 
+/**
+ * The result of a scan whose calls were all skipped, because an earlier call or a cached verdict
+ * blocked the request: no call, so it gates nothing, and its report covers only the cache lookup.
+ */
+export function skippedScanResult({
+  config,
+  coverage,
+}: EnkryptGuardrailScan): EnkryptGuardrailScanResult {
+  return {
+    verdict: { action: 'skip' },
+    usageRecords: [],
+    report: {
+      ...coverageReport(config, coverage),
+      scanned_characters: 0,
+      decision: 'allowed',
+      error: null,
+      detectors_fired: [],
+      attempts: 0,
+      credits_cost: null,
+      latency_ms: 0,
+    },
+  };
+}
+
 type CoverageReport = Pick<
   EnkryptScanReport,
   | 'scan'
@@ -548,6 +585,8 @@ type CoverageReport = Pick<
   | 'total_segments'
   | 'cached_characters'
   | 'cached_segments'
+  | 'total_units'
+  | 'cached_units'
   | 'omitted_attachments'
 >;
 
@@ -577,6 +616,8 @@ export function coverageReport(
     total_segments: coverage.totalSegments,
     cached_characters: coverage.cachedCharacters,
     cached_segments: coverage.cachedSegments,
+    total_units: coverage.totalUnits,
+    cached_units: coverage.cachedUnits,
     omitted_attachments: coverage.omittedAttachments,
   };
 }
@@ -585,6 +626,11 @@ type ScanScope = {
   logFields: Record<string, unknown>;
   report: CoverageReport & Pick<EnkryptScanReport, 'scanned_characters'>;
 };
+
+/** A scope for a scan that made no call, so sent none of its text. */
+function noTextSent(scope: ScanScope): ScanScope {
+  return { ...scope, report: { ...scope.report, scanned_characters: 0 } };
+}
 
 function scanReport(
   scope: ScanScope,
@@ -608,10 +654,10 @@ function scanReport(
   };
 }
 
-/** A client disconnect is not an Enkrypt failure, so it is logged at debug level. */
-function logDecision(scope: ScanScope, report: EnkryptScanReport): void {
+/** A client disconnect is not an Enkrypt failure, so it is logged at debug level, as is `quiet`. */
+function logDecision(scope: ScanScope, report: EnkryptScanReport, quiet = false): void {
   const fields = { ...scope.logFields, ...report };
-  const failed = report.error !== null && report.decision !== 'client_aborted';
+  const failed = !quiet && report.error !== null && report.decision !== 'client_aborted';
   if (failed) warnExceptInTest('[enkrypt-guardrail] decision', fields);
   else console.debug('[enkrypt-guardrail] decision', fields);
 }
@@ -661,6 +707,8 @@ function failedVerdict(
     latencyMs: number;
     closedVerdict?: EnkryptGuardrailVerdict;
     detectorsFired?: EnkryptDetectorId[];
+    /** Logs the decision at debug level, even when it failed. */
+    quiet?: boolean;
   }
 ): EnkryptGuardrailScanResult {
   const report = scanReport(scope, {
@@ -670,7 +718,7 @@ function failedVerdict(
     usageRecords,
     latencyMs: failure.latencyMs,
   });
-  logDecision(scope, report);
+  logDecision(scope, report, failure.quiet);
   return {
     verdict: failureVerdict(scope.report.scan, failure),
     usageRecords:

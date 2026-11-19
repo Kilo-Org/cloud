@@ -28,7 +28,10 @@ import { emptyHomeWidgetDetails } from '@kilocode/app-shared/home-widget';
 
 import { captureEvent } from '@/lib/analytics/posthog';
 import { refreshActiveSessionsFromPush } from '@/lib/active-sessions-live-sync';
-import { SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS } from '@/lib/android-notification-channels';
+import {
+  CREATED_ANDROID_NOTIFICATION_CHANNEL_IDS,
+  SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS,
+} from '@/lib/android-notification-channels';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
 import { releaseAndroidSessionToken } from '@/lib/glanceable/session-activity-tokens-android';
@@ -834,26 +837,27 @@ const CHANNEL_NAME_KEYS = {
   'followed-sessions-lock-screen': 'notifications.channel.followedSessions',
 } as const;
 
-/** The android channel ids this app posts to and has a translated name for. */
-type MobileAndroidNotificationChannelId = keyof typeof CHANNEL_NAME_KEYS;
+// The name map must cover every channel id the shared list can carry, because
+// the created list is a subset of it: a channel this app creates without a
+// translated name would be created with the wrong label. `satisfies` keeps each
+// value's translation-key literal, which i18n.t requires.
+const channelNameKeys = CHANNEL_NAME_KEYS satisfies Record<AndroidNotificationChannelId, string>;
 
-/** Whether this app creates and posts to the shared channel. */
-function isMobileAndroidChannel(
-  channel: (typeof ANDROID_NOTIFICATION_CHANNELS)[number]
-): channel is (typeof ANDROID_NOTIFICATION_CHANNELS)[number] & {
-  id: MobileAndroidNotificationChannelId;
-} {
-  return channel.id in CHANNEL_NAME_KEYS;
-}
+// The typechecked half of the created-channel contract: the JSDoc type in the
+// plain-JS list is only a cast, so this binding is what fails if it goes away.
+const createdAndroidChannelIds: readonly AndroidNotificationChannelId[] =
+  CREATED_ANDROID_NOTIFICATION_CHANNEL_IDS;
 
 /**
- * The channels this app creates. `ANDROID_NOTIFICATION_CHANNELS` is shared with
- * the push producers, so it can carry a channel for a product this app has no
- * screen for; creating one of those would add a row to the system settings list
- * for a notification the app can never post.
+ * The channels this app creates: the ones `CREATED_ANDROID_NOTIFICATION_CHANNEL_IDS`
+ * names. Membership comes from that list, so the channel writer and the
+ * plain-Node config assertion agree on the set. `ANDROID_NOTIFICATION_CHANNELS`
+ * is shared with the push producers, so it can carry a channel for a product
+ * this app has no screen for; creating one of those would add a row to the
+ * system settings list for a notification the app can never post.
  */
 const MOBILE_ANDROID_NOTIFICATION_CHANNELS = ANDROID_NOTIFICATION_CHANNELS.filter(channel =>
-  isMobileAndroidChannel(channel)
+  createdAndroidChannelIds.includes(channel.id)
 );
 
 /**
@@ -865,7 +869,7 @@ const MOBILE_ANDROID_NOTIFICATION_CHANNELS = ANDROID_NOTIFICATION_CHANNELS.filte
 function androidChannelName(
   channel: (typeof MOBILE_ANDROID_NOTIFICATION_CHANNELS)[number]
 ): string {
-  return i18n.t(CHANNEL_NAME_KEYS[channel.id]);
+  return i18n.t(channelNameKeys[channel.id]);
 }
 
 async function createAndroidNotificationChannels(): Promise<boolean> {

@@ -22,7 +22,7 @@ import {
 import type * as z from 'zod';
 import { logger, withLogTags } from '../../logger.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
-import { isWorkspaceAnchorMetadata } from '../../cloud-agent-authority.js';
+import { getWorkspaceStub } from '../../control-plane/workspace/workspace-stub.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import type { TRPCContext } from '../../types.js';
@@ -89,28 +89,27 @@ async function validateCallbackTarget(
   }
   const targetSessionId = parseWorkspaceSessionCallbackTarget(target.url);
   if (targetSessionId === null) return { url: target.url };
-  const [targetSession, parentSession] = await Promise.all([
+  const [targetSession, workspace] = await Promise.all([
     loadCallbackSession(ctx, authority.ownerId, targetSessionId),
-    targetSessionId === authority.parentSessionId
-      ? Promise.resolve(undefined)
-      : loadCallbackSession(ctx, authority.ownerId, authority.parentSessionId),
+    withDORetry(
+      () => getWorkspaceStub(ctx.env, authority.ownerId, authority.parentSessionId),
+      stub => stub.describe(),
+      'describe'
+    ),
   ]);
-  const parent = targetSessionId === authority.parentSessionId ? targetSession : parentSession;
   if (
     !targetSession ||
-    !parent ||
+    workspace.state !== 'active' ||
+    workspace.organizationId !== authority.organizationId ||
     targetSession.identity.sessionId !== targetSessionId ||
     targetSession.identity.userId !== authority.ownerId ||
     (targetSession.identity.orgId ?? null) !== authority.organizationId ||
     targetSession.parentCloudAgentSessionId !== undefined ||
-    targetSession.allowSubagentSessions !== true ||
-    !parent.identity.sessionId.startsWith('workspace_') ||
-    !isWorkspaceAnchorMetadata(parent) ||
-    parent.allowSubagentSessions !== true
+    targetSession.allowSubagentSessions !== true
   ) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'Callback session is not available' });
   }
-  const worktreeId = parent.workspace?.worktreeId;
+  const worktreeId = workspace.worktreeId;
   if (!worktreeId || targetSession.workspace?.worktreeId !== worktreeId) {
     throw new TRPCError({
       code: 'BAD_REQUEST',

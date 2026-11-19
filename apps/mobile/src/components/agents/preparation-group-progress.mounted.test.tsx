@@ -16,6 +16,7 @@ vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
   Check: 'Check',
   ChevronDown: 'ChevronDown',
+  ChevronUp: 'ChevronUp',
   Terminal: 'Terminal',
 }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));

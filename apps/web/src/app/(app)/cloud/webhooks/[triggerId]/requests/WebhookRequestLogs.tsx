@@ -70,6 +70,8 @@ export function WebhookRequestLogs({
   const isActive = data?.processStatus === 'captured' || data?.processStatus === 'inprogress';
   const errorLogs = data?.logs?.filter(entry => entry.eventType === 'error') ?? [];
   const hasTranscript = Boolean(data?.transcript?.messages.length);
+  const incompleteMessageCount =
+    data?.transcript?.version === 'v2' ? (data.transcript.incompleteMessageCount ?? 0) : 0;
 
   return (
     <section aria-label="Execution logs" className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
@@ -115,6 +117,12 @@ export function WebhookRequestLogs({
           </p>
         ) : !isAccessError(error) && data ? (
           <>
+            {incompleteMessageCount > 0 && (
+              <p role="status" className="text-muted-foreground mb-2">
+                Transcript incomplete: {incompleteMessageCount}{' '}
+                {incompleteMessageCount === 1 ? 'message' : 'messages'} could not be loaded.
+              </p>
+            )}
             {hasTranscript && data.transcript ? (
               <div className="mx-auto max-w-3xl break-words">
                 <MessageErrorBoundary resetKey={dataUpdatedAt}>
@@ -138,7 +146,7 @@ export function WebhookRequestLogs({
                 ))}
               </div>
             ) : null}
-            {!hasTranscript && errorLogs.length === 0 ? (
+            {!hasTranscript && errorLogs.length === 0 && incompleteMessageCount === 0 ? (
               <p role="status" className="text-muted-foreground">
                 {isActive
                   ? 'Waiting for cloud agent logs...'

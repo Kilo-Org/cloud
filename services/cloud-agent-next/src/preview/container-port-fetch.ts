@@ -17,6 +17,10 @@ export type PreviewContainerPort = {
 
 export const PREVIEW_NOT_RUNNING_TEXT = 'The sandbox is not running';
 export const PREVIEW_RESERVED_PORT_TEXT = 'That port is reserved';
+export const PREVIEW_NOT_LISTENING_TEXT = 'Nothing is listening on that port';
+export const PREVIEW_UPSTREAM_TIMEOUT_TEXT = 'The server on that port did not respond in time';
+export const PREVIEW_UNAVAILABLE_TEXT = 'Preview is temporarily unavailable';
+export const PREVIEW_NOT_READY_TEXT = 'The sandbox is not ready';
 /** A preview URL opened without its cookie, for example from a copied link. */
 export const PREVIEW_SESSION_MISSING_TEXT =
   'Preview session is missing or expired. Open the preview again from the chat.';
@@ -107,9 +111,9 @@ export async function fetchPreviewPort(
   } catch (error) {
     clearTimeout(timer);
     if (isAbortError(error)) {
-      return fixedResponse(504, 'The server on that port did not respond in time');
+      return fixedResponse(504, PREVIEW_UPSTREAM_TIMEOUT_TEXT);
     }
-    return fixedResponse(502, 'Nothing is listening on that port');
+    return fixedResponse(502, PREVIEW_NOT_LISTENING_TEXT);
   }
   clearTimeout(timer);
 

@@ -521,6 +521,45 @@ describe('createServiceState', () => {
       expect(onError).not.toHaveBeenCalledWith('Connection to agent lost');
     });
 
+    it('escalates an exhausted transport drop to a terminal loss', () => {
+      const onError = jest.fn();
+      const state = createServiceState(makeConfig({ onError }));
+
+      state.process({ type: 'stopped', reason: 'transport-disconnected' });
+      expect(state.getStatus()).toEqual({ type: 'disconnected', reconnecting: true });
+      expect(onError).not.toHaveBeenCalled();
+
+      state.process({ type: 'stopped', reason: 'transport-disconnected', exhausted: true });
+      expect(state.getStatus()).toEqual({ type: 'disconnected', code: 'connection-lost' });
+      expect(onError).toHaveBeenCalledWith('Connection lost. Please retry in a moment.');
+
+      // A live connection proves the loss is over: the status clears and a
+      // later session.error reaches the reader again.
+      state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+
+      onError.mockClear();
+      state.process({ type: 'session.error', error: 'aftershock' });
+      expect(onError).toHaveBeenCalledWith('aftershock');
+    });
+
+    it('reports an exhausted transport drop once across repeated reports', () => {
+      const onError = jest.fn();
+      const state = createServiceState(makeConfig({ onError }));
+
+      state.process({ type: 'stopped', reason: 'transport-disconnected', exhausted: true });
+      state.process({ type: 'stopped', reason: 'transport-disconnected', exhausted: true });
+
+      expect(state.getStatus()).toEqual({ type: 'disconnected', code: 'connection-lost' });
+      expect(onError).toHaveBeenCalledTimes(1);
+
+      // A reconnect clears the latch, so the next spent budget reports again.
+      state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
+      state.process({ type: 'stopped', reason: 'transport-disconnected', exhausted: true });
+
+      expect(onError).toHaveBeenCalledTimes(2);
+    });
+
     it('stopped resets cloudStatus to null when it was preparing', () => {
       const state = createServiceState(makeConfig());
       state.process({
@@ -2338,11 +2377,15 @@ describe('createServiceState', () => {
       expect(state.getStatus()).toEqual({ type: 'disconnected' });
     });
 
-    it('clears transport-disconnected status on synthetic viewer reconnect', () => {
-      const state = createServiceState(makeConfig());
+    it('clears a reconnecting transport drop on synthetic viewer reconnect', () => {
+      const onError = jest.fn();
+      const state = createServiceState(makeConfig({ onError }));
 
       state.process({ type: 'stopped', reason: 'transport-disconnected' });
-      expect(state.getStatus()).toEqual({ type: 'disconnected' });
+      // A drop the transport retries is not a terminal loss: the status says
+      // reconnecting and the reader is told nothing.
+      expect(state.getStatus()).toEqual({ type: 'disconnected', reconnecting: true });
+      expect(onError).not.toHaveBeenCalled();
 
       state.process({ type: 'connected' });
 

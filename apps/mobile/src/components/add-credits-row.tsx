@@ -70,7 +70,7 @@ export function AddCreditsButton({
         // A line action fills the box `AddCreditsRow` wraps around it: the frame
         // is the box's floor with no vertical margin, so the box alone cancels
         // the height and the caller's line stays one text line tall.
-        lineAction ? 'min-h-[28px]' : STATE_ACTION_CLASS
+        lineAction ? 'min-h-8' : STATE_ACTION_CLASS
       )}
       // Undefined keeps the shared `Button`'s own `sm` default; a line action
       // draws a smaller frame, so it carries the flush-to-44pt slop itself.

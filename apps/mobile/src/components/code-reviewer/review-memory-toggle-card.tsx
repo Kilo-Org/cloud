@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
-import { Switch } from '@/components/ui/switch';
+import { Card } from '@/components/ui/card';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
@@ -28,7 +29,7 @@ export function ReviewMemoryToggleCard({
 }>) {
   const { t } = useTranslation();
   return (
-    <View className="rounded-lg bg-secondary p-4">
+    <Card>
       <View className="flex-row items-center justify-between gap-3">
         <Pressable
           className={cn(ROW_TARGET_CLASS, 'min-w-0 flex-1 justify-center active:opacity-70')}
@@ -43,22 +44,23 @@ export function ReviewMemoryToggleCard({
             {t('codeReviewer.reviewMemory.on')}
           </Text>
         </Pressable>
-        <Switch
-          value={enabled}
-          disabled={disabled}
-          accessibilityLabel={t('codeReviewer.reviewMemory.title')}
-          accessibilityHint={
-            readOnly ? t('codeReviewer.reviewMemory.readOnlyDescription') : undefined
-          }
-          accessibilityState={{ disabled, busy: pending, checked: enabled }}
-          onValueChange={onChange}
-        />
+        {renderRowTrailing({
+          kind: 'switch',
+          value: enabled,
+          disabled,
+          accessibilityLabel: t('codeReviewer.reviewMemory.title'),
+          accessibilityHint: readOnly
+            ? t('codeReviewer.reviewMemory.readOnlyDescription')
+            : undefined,
+          accessibilityState: { disabled, busy: pending, checked: enabled },
+          onValueChange: onChange,
+        })}
       </View>
       {readOnly ? (
-        <Text variant="muted" className="mt-2 text-xs">
+        <Text variant="muted" className="text-xs">
           {t('codeReviewer.reviewMemory.readOnlyDescription')}
         </Text>
       ) : null}
-    </View>
+    </Card>
   );
 }

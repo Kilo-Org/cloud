@@ -16,12 +16,14 @@ import type { Env } from './types.js';
 export { SandboxContainment, SandboxSmallContainment } from './legacy-runtime-tombstones.js';
 export { SandboxControlV2 as SandboxControl } from './control-plane/sandbox/sandbox-do.js';
 export { SandboxSessionV2 as SandboxSession } from './control-plane/session/session-do.js';
+export { CloudAgentWorkspaceDO as CloudAgentWorkspace } from './control-plane/workspace/workspace-do.js';
 export { SandboxContainers } from './sandbox-containers/SandboxContainers.js';
 export { ContainersOutbound } from './sandbox-containers/containers-outbound.js';
 export { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
 export { EnvironmentBuild } from './environment-build/environment-build-do.js';
 export { VercelSnapshotBuild } from './persistence/VercelSnapshotBuild.js';
 export { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
+export { PreviewTunnel } from './preview-tunnel/preview-tunnel-do.js';
 export { E2eCallbackSink } from './persistence/E2eCallbackSink.js';
 
 function isE2eSurfacePath(pathname: string): boolean {

@@ -34,12 +34,6 @@
    * the ink label (primary-foreground) legible: white on this fill clears 4.5:1,
    * so a disabled control reads as inactive without losing its label. */
   --primary-disabled: #6f6a61;
-  /* Fill of a disabled primary action (a default-variant Button). Light keeps
-   * the palette's disabled primary, whose white label clears 4.5:1. It is its
-   * own token because the dark plate the action needs differs from the dark
-   * `--primary-disabled`, which the shared Switch paints as its disabled
-   * on-track (see the dark block). */
-  --primary-disabled-action: #6f6a61;
   --destructive: #b0483a;
   --destructive-foreground: #ffffff;
   /* Solid destructive control fill. Separate from `--destructive` because the
@@ -106,6 +100,12 @@
   --good-tile-border: #24784a33;
   --warn: #956011;
   --warn-foreground: #ffffff;
+  /* Solid warn fill of the app-wide offline banner. Light mode paints the same
+   * brown as `--warn`, so the banner's pixels do not move. The pair still
+   * exists because a solid fill and an ink token must not be conflated: the
+   * dark block paints a different fill from its amber ink. */
+  --warn-solid: #956011;
+  --warn-solid-foreground: #ffffff;
   --warn-tile-bg: #9560111a;
   --warn-tile-border: #95601133;
   --danger-tile-bg: #b0483a1a;
@@ -201,14 +201,6 @@
      * The fill stays neutral and muted: a tinted fill reads as a second brand
      * colour and competes with the enabled #ffdd00 it replaces. */
     --primary-disabled: #8a8680;
-    /* Dark counterpart of a disabled primary action's fill. `--primary-disabled`
-     * (a light neutral, 5.3:1 above the near-black page) outshines every other
-     * element and reads as an enabled control, and the inactive icon surface
-     * (`--control-idle`, 1.7:1) leaves a full-width plate without presence. This
-     * step keeps the plate a visible object on the page while it stays well
-     * below the enabled #ffdd00, and `--foreground` clears 6.4:1 on it. The
-     * palette's `--primary-disabled` stays with the Switch's disabled on-track. */
-    --primary-disabled-action: #5a564f;
     --destructive: #f28b7a;
     --destructive-foreground: #1a1a10;
     /* The deep red the light scheme fills with, lifted just enough to stand off
@@ -269,6 +261,12 @@
     --good-tile-border: #5fcb8e33;
     --warn: #f2b05f;
     --warn-foreground: #1a1a10;
+    /* Solid warn fill of the app-wide offline banner. The `--warn` above is the
+     * pale amber ink, which glares as a full-width fill, so the banner takes
+     * this deeper brown of the same hue: 3.1:1 off `--background` and 2.9:1 off
+     * `--card`, with white ink at 6.1:1 on it. */
+    --warn-solid: #8a5614;
+    --warn-solid-foreground: #ffffff;
     --warn-tile-bg: #f2b05f1a;
     --warn-tile-border: #f2b05f33;
     --danger-tile-bg: #f28b7a1a;
@@ -334,7 +332,6 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-disabled: var(--primary-disabled);
-  --color-primary-disabled-action: var(--primary-disabled-action);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary-fill: var(--secondary-fill);
@@ -370,6 +367,8 @@
   --color-good-tile-border: var(--good-tile-border);
   --color-warn: var(--warn);
   --color-warn-foreground: var(--warn-foreground);
+  --color-warn-solid: var(--warn-solid);
+  --color-warn-solid-foreground: var(--warn-solid-foreground);
   --color-warn-tile-bg: var(--warn-tile-bg);
   --color-warn-tile-border: var(--warn-tile-border);
   --color-danger-tile-bg: var(--danger-tile-bg);

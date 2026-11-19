@@ -42,9 +42,7 @@ export function FeedbackPromptDialog({
 
   return (
     <DialogCard onClose={onDismiss}>
-      <Text accessibilityRole="header" className="text-base font-semibold">
-        {t('feedback.neutralTitle')}
-      </Text>
+      <Text variant="heading">{t('feedback.neutralTitle')}</Text>
       <View className="gap-2">
         <Button
           onPress={() => {

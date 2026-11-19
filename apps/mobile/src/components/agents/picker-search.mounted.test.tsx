@@ -49,6 +49,7 @@ vi.mock('react-native', () => ({
   FlatList: 'FlatList',
   I18nManager: i18nManager,
   Keyboard: { dismiss: () => undefined },
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   TextInput: 'TextInput',
@@ -85,6 +86,7 @@ vi.mock('@/components/agents/model-selector', () => ({
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: theme.foreground }),
+  useMutedDisabledInk: () => theme.foreground,
 }));
 vi.mock('@/lib/hooks/use-model-preferences', () => ({
   useModelPreferences: () => ({ favorites: [], addFavorite: vi.fn(), removeFavorite: vi.fn() }),

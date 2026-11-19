@@ -46,6 +46,8 @@ import { createControlPlaneWorktreeDeletion } from './worktree-deletion.js';
 import { createControlPlaneWorktreeGit, type PreparedGitContext } from './worktree-git.js';
 import { createControlPlaneKiloRequests } from './kilo-requests.js';
 import { createControlPlanePreviewServices } from './preview-services.js';
+import { createPreviewForwarder } from './preview-forwarder.js';
+import { createPreviewTunnelClient, type PreviewTunnelClient } from './preview-tunnel.js';
 import { createHistoryRequests } from './history-requests.js';
 import { runtimeHarness } from './runtime-harness.js';
 import { readKiloCliVersion } from './runtime-versions.js';
@@ -68,6 +70,11 @@ import {
   parseAgentSandboxProvider,
 } from '../../../src/shared/sandbox-provider.js';
 import { reservedPreviewPorts } from '../../../src/shared/reserved-ports.js';
+import {
+  PREVIEW_TUNNEL_HEAD_TIMEOUT_MS,
+  PREVIEW_TUNNEL_SOCKET_TIMEOUT_MS,
+  previewTunnelUrl,
+} from '../../../src/shared/preview-tunnel-protocol.js';
 
 const DIAGNOSTICS_FINALIZE_TIMEOUT_MS = 4_000;
 const FILE_LOG_FINALIZE_TIMEOUT_MS = 5_000;
@@ -322,6 +329,7 @@ export type ControlPlaneFrameDispatcherDeps = {
   worktreeDeletion: { current?: ReturnType<typeof createControlPlaneWorktreeDeletion> };
   kiloRequests: { current?: ReturnType<typeof createControlPlaneKiloRequests> };
   previewServices?: { current?: ReturnType<typeof createControlPlanePreviewServices> };
+  previewTunnel?: { current?: Pick<PreviewTunnelClient, 'demand'> };
   historyRequests?: { current?: ReturnType<typeof createHistoryRequests> };
   transferGrants?: { current?: ReturnType<typeof createTransferGrantRequests> };
   send: (frame: ControlPlaneWrapperFrame) => void;
@@ -410,6 +418,9 @@ export function createControlPlaneFrameDispatcher(
         return;
       case 'preview.list':
         void deps.previewServices?.current?.handle(frame);
+        return;
+      case 'preview.tunnel':
+        deps.previewTunnel?.current?.demand();
         return;
       case 'history.result':
         deps.historyRequests?.current?.handle(frame);
@@ -562,6 +573,8 @@ async function main(
   const previewServicesRef: {
     current?: ReturnType<typeof createControlPlanePreviewServices>;
   } = {};
+  // The Worker asks for the preview tunnel over the connection.
+  const previewTunnelRef: { current?: PreviewTunnelClient } = {};
   // Wrapper-initiated Cloud history reads answer over the same connection.
   const historyRequestsRef: { current?: ReturnType<typeof createHistoryRequests> } = {};
   const transferClientRef: { current?: ReturnType<typeof createSandboxTransferClient> } = {};
@@ -624,6 +637,7 @@ async function main(
       worktreeDeletion: worktreeDeletionRef,
       kiloRequests: kiloRequestsRef,
       previewServices: previewServicesRef,
+      previewTunnel: previewTunnelRef,
       historyRequests: historyRequestsRef,
       transferGrants: transferGrantsRef,
       send: frame => connection.send(frame),
@@ -761,6 +775,19 @@ async function main(
       : { excludedPorts: reservedPreviewPorts(sandboxProvider) }),
     log: logToFile,
   });
+  previewTunnelRef.current = createPreviewTunnelClient({
+    url: previewTunnelUrl(url),
+    credential,
+    forwarder: createPreviewForwarder({
+      refusedPorts: () => [
+        ...(sandboxProvider === undefined ? [] : reservedPreviewPorts(sandboxProvider)),
+        ...runtimes.serverPorts(),
+      ],
+      headTimeoutMs: PREVIEW_TUNNEL_HEAD_TIMEOUT_MS,
+      socketTimeoutMs: PREVIEW_TUNNEL_SOCKET_TIMEOUT_MS,
+    }),
+    log: logToFile,
+  });
   const nativeStatus = createNativeStatusReporter({
     enabled: projector.enabled,
     project: projector,
@@ -813,6 +840,7 @@ async function main(
       transferGrantsRef.current?.disconnected();
       transferClientRef.current?.stop();
       nativeStatus.stop();
+      previewTunnelRef.current?.stop();
       turnsRef.current?.shutdown();
       terminalsRef.current?.shutdown();
       await runtimes.shutdown();

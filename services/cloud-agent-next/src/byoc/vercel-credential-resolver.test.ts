@@ -200,6 +200,35 @@ describe('BYOC Vercel credential encryption', () => {
   });
 
   it.each([
+    { name: 'a stored digest', fields: { runtimeDigest: 'downloaded-base-v1:abc' } },
+    { name: 'no stored digest', fields: { runtimeDigest: null } },
+    { name: 'an older web response', fields: {} },
+  ])('keeps the selected snapshot digest from $name', async ({ fields }) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          ...personalIdentity,
+          setupStatus: 'ready',
+          setupStep: null,
+          setupError: null,
+          buildGeneration: snapshot.buildGeneration,
+          runtimeBuildId: 'runtime-build-1',
+          runtimeSnapshotId: snapshot.runtimeSnapshotId,
+          teamSlug: null,
+          projectSlug: null,
+          ...fields,
+        })
+      )
+    );
+
+    const enrollment = await fetchByocVercelEnrollmentForUser(env, personalIdentity.userId);
+    expect(enrollment.runtimeDigest).toBe(
+      'runtimeDigest' in fields ? fields.runtimeDigest : undefined
+    );
+  });
+
+  it.each([
     {
       name: 'organization',
       organizationId: '44444444-4444-4444-8444-444444444444',

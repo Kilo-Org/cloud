@@ -189,6 +189,7 @@ jobs:
       ${{
         github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
+        needs.verify-main.result == 'success' &&
         needs.check-changes.outputs.should_deploy == 'true' &&
         needs.detect-workers.result == 'success' &&
         needs.db-gate.result == 'success'

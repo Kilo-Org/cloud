@@ -455,6 +455,7 @@ describe('adminGatewayConfigRouter', () => {
         experimental_byok: [],
         enkrypt_output_guardrail: [],
         gateway_settings: [organizationId],
+        org_permission_policy: [],
       });
       await caller.admin.gatewayConfig.setAnthropicUserProfiles(settings);
 

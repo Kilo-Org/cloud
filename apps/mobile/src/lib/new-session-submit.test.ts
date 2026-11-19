@@ -185,9 +185,31 @@ describe('resolveNewSessionStartDisabled', () => {
   });
 
   it('enables Start again once the retried profile read resolves the pick', () => {
-    expect(resolveNewSessionStartDisabled(startInput({ profileGate: { kind: 'ready' } }))).toBe(
-      false
-    );
+    // The gate comes from the read's flags, so the retry is a real transition:
+    // the settled error blocks Start, and the read that resolves the same pick
+    // afterwards enables it with no other input changed.
+    expect(
+      resolveNewSessionStartDisabled(
+        startInput({
+          profileGate: resolveNewSessionProfileGate({
+            isLoading: false,
+            isError: true,
+            hasOverride: true,
+          }),
+        })
+      )
+    ).toBe(true);
+    expect(
+      resolveNewSessionStartDisabled(
+        startInput({
+          profileGate: resolveNewSessionProfileGate({
+            isLoading: false,
+            isError: false,
+            hasOverride: true,
+          }),
+        })
+      )
+    ).toBe(false);
   });
   it('non-clone empty prompt stays disabled through the ordinary gate', () => {
     expect(resolveNewSessionStartDisabled(startInput({ hasPrompt: false }))).toBe(true);

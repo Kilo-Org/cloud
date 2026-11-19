@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted harness drives the screen's list rows, its cap and both empty-state permissions */
 import { type Href } from 'expo-router';
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -347,24 +348,19 @@ describe('ProfileInstructionsScreen empty state', () => {
     Object.assign(h.query, { data: [], isError: false, isPending: false, isRefetching: false });
   });
 
-  const emptyStateOf = (root: ReactTestInstance) =>
-    root.findAll(node => String(node.type) === 'EmptyState')[0];
-
-  it('offers the add control and its invitation to a manager', async () => {
-    const { renderer, unmount } = await mountScreen();
-    expect(emptyStateOf(renderer.root)?.props.description).toBe(
-      i18n.t('profiles.instructionsEmptyDescription')
-    );
-    expect(findAll(renderer.root, 'StateAction')).toHaveLength(1);
-    unmount();
-  });
-
   // A member used to read an invitation to add rule files directly above the
   // sentence that says they cannot change the profile.
-  it('states what the files do and offers no action a member cannot take', async () => {
+  it('picks the description and the action by the manage permission', async () => {
+    const manager = await mountScreen();
+    expect(findAll(manager.renderer.root, 'EmptyState')[0]?.props.description).toBe(
+      i18n.t('profiles.instructionsEmptyDescription')
+    );
+    expect(findAll(manager.renderer.root, 'StateAction')).toHaveLength(1);
+    manager.unmount();
+
     permission.value = 'read-only';
     const member = await mountScreen();
-    expect(emptyStateOf(member.renderer.root)?.props.description).toBe(
+    expect(findAll(member.renderer.root, 'EmptyState')[0]?.props.description).toBe(
       i18n.t('profiles.instructionsEmptyDescriptionReadOnly')
     );
     const texts = findAll(member.renderer.root, 'Text').map(node => node.props.children);

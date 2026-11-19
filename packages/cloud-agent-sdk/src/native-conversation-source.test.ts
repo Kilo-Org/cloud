@@ -686,7 +686,7 @@ test('native inbox files and synthetic messages retain exact payloads and delive
     frame('session.inbox.cancelled', { inboxID: 'msg_synthetic' }, 5)
   );
   expect(messages.map(item => item.message.id)).toEqual(['msg_user']);
-  const dbg = readNativeConversation({ ...state, messages }); console.log('DBG', JSON.stringify(dbg.nativeMessages.map(n => ({ id: n.message.id, inc: n.incomplete }))), 'gaps', dbg.recoveryGaps); expect(dbg.messages[0]?.parts[1]).toMatchObject({
+  expect(readNativeConversation({ ...state, messages }).messages[0]?.parts[1]).toMatchObject({
     type: 'file',
     filename: 'file.txt',
   });

@@ -926,6 +926,67 @@ test('refresh keeps a warning for a frame no later snapshot has covered yet', as
   connection.close();
 });
 
+test('refresh clears a replay-loss notice only with an authoritative read', async () => {
+  snapshot.mockResolvedValueOnce(complete(5));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  connectedSocket(0).frame('hello', hello(), 3);
+  await flush();
+  expect(state?.error).toBeUndefined();
+  // Replay was unavailable, so the transcript cannot be certified from the live stream.
+  snapshot.mockRejectedValue(new Error('Native state read failed'));
+  connectedSocket(0).frame('reset_required', { seq: 9 }, 9);
+  await flush();
+  expect(state?.error).toContain('may be incomplete');
+  // A clean subscribe alone does not certify it.
+  connectedSocket(0).frame('subscribed', { seq: 9 }, 9);
+  await flush();
+  expect(state?.error).toContain('may be incomplete');
+  // The authoritative read does, and the notice goes with it.
+  snapshot.mockResolvedValueOnce({ ...complete(9), revision: 2 });
+  connection.refresh();
+  await flush();
+  connectedSocket(1).frame('hello', hello(), 12);
+  await flush();
+  connectedSocket(1).frame('subscribed', { seq: 12 }, 12);
+  await flush();
+  expect(state?.error).toBeUndefined();
+  expect(state?.snapshot?.position).toBe(9);
+  connection.close();
+});
+
+test('a retry that cannot read the transcript reports the terminal failure', async () => {
+  snapshot.mockResolvedValueOnce(complete(5));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  connectedSocket(0).frame('hello', hello(), 3);
+  await flush();
+  snapshot.mockRejectedValue(new Error('Native state read failed'));
+  connectedSocket(0).frame('reset_required', { seq: 9 }, 9);
+  await flush();
+  expect(state?.error).toContain('may be incomplete');
+  connection.refresh();
+  await flush();
+  for (const index of [1, 2, 3]) {
+    connectedSocket(index).frame('hello', hello());
+    await flush();
+    await jest.advanceTimersByTimeAsync(2001);
+    await flush();
+  }
+  expect(state?.connection).toBe('disconnected');
+  expect(state?.snapshotFailure?.error).toContain('Native state read failed');
+  expect(state?.error).toBe(state?.snapshotFailure?.error);
+  connection.close();
+});
+
 test('an unreadable native asset latches on the first snapshot read', async () => {
   snapshot.mockRejectedValueOnce(
     Object.assign(new Error('asset file is not readable'), { code: 'native_asset_not_found' })

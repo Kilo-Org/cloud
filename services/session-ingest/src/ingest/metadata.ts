@@ -319,8 +319,13 @@ export async function applyMetadataChanges(
     }
 
     // A native rename rides every publication from the first one that carried it until one is
-    // delivered. Apply it only while none of those has been applied, so a late or repeated
-    // rename never replaces a newer native rename or a user rename.
+    // delivered, so the same rename can arrive twice. Apply it only while the stored status
+    // transition is older than the one named in the rename: that rejects a late older
+    // publication and a repeat after the rename landed, even when a user renamed the session in
+    // between. Neither user rename path carries an ordering signal — the web rename and the
+    // reported title both leave status_transition_id alone — so a first delivery that has not
+    // landed yet can still replace a user rename made in the meantime. That is last-write-wins,
+    // exactly as for a CLI rename report.
     if (
       nativeRename !== undefined &&
       !isDefaultSessionTitle(nativeRename.title) &&

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { FetchLike } from './auth';
+import { modelNameWithRetirement } from './retirement-note';
 export {
   fetchKiloGatewayChatCompletionStream,
   KiloGatewayHttpError,
@@ -23,6 +24,8 @@ export interface KiloGatewayModelOption {
   readonly isPreferred: boolean;
   readonly mayTrainOnYourPrompts?: boolean;
   readonly name: string;
+  /** The date this catalog entry retires, when the picker shows the English note. */
+  readonly retires_on?: string;
   readonly supportsImages?: boolean;
   readonly variants: string[];
 }
@@ -56,6 +59,7 @@ interface ParsedGatewayModelOption {
   mayTrainOnYourPrompts?: boolean;
   name: string;
   preferredIndex?: number;
+  retires_on?: string;
   supportsImages?: boolean;
   variants: string[];
 }
@@ -80,6 +84,8 @@ const modelSchema = z.object({
     })
     .optional(),
   preferredIndex: z.number().optional(),
+  /** The date this catalog entry retires, when the picker must show the English note. */
+  retires_on: z.string().optional(),
 });
 const gatewayModelsResponseSchema = z.object({
   data: z.array(z.unknown()),
@@ -135,7 +141,7 @@ const compareModelOptions = (
 const toGatewayModelOption = (model: ParsedGatewayModelOption): KiloGatewayModelOption => ({
   id: model.id,
   isPreferred: model.isPreferred,
-  name: model.name,
+  name: modelNameWithRetirement(model),
   variants: model.variants,
   ...(model.contextLength === undefined ? {} : { contextLength: model.contextLength }),
   ...(model.hasUserByokAvailable === undefined
@@ -168,6 +174,7 @@ export const parseKiloGatewayModelsResponse = (value: unknown): KiloGatewayModel
         isPreferred: model.data.preferredIndex !== undefined,
         name: formatShortModelName(model.data.name),
         variants: getModelVariants(model.data),
+        ...(model.data.retires_on === undefined ? {} : { retires_on: model.data.retires_on }),
         ...(model.data.context_length !== undefined &&
         model.data.context_length !== null &&
         model.data.context_length > 0

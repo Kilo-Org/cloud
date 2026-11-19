@@ -297,7 +297,6 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({ useCurrentUserId: () => ({ u
 vi.mock('@/lib/form-sheet', () => ({
   useFormSheetDetents: () => ({ fullSheetDetent: 1 }),
   useSheetHeaderTopClearance: () => 0,
-  sheetHeaderKeyboardTopClearance: () => 0,
   useSettledSheetHeaderTopClearance: () => ({ clearance: 0, onLayout: vi.fn() }),
   useFormSheetScreenOptions: () => ({
     presentation: 'formSheet',

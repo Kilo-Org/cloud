@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  sheetHeaderKeyboardTopClearance,
   sheetHeaderSettledTopClearance,
   sheetHeaderTopClearance,
   type SheetHeaderTopInset,
@@ -233,29 +232,6 @@ describe('sheetHeaderSettledTopClearance', () => {
     expect(sheetHeaderSettledTopClearance({ clearance: 0, insetTop: 51.81, headerTop: -12 })).toBe(
       51.81
     );
-  });
-});
-
-describe('sheetHeaderKeyboardTopClearance', () => {
-  it('reserves the band the keyboard lifts an expanded sheet into', () => {
-    // The list settings sheet on the emulator: a 51.81 dp status bar, a 24 dp
-    // navigation bar and a keyboard far taller than either. The content's top
-    // edge lands at 24 dp, so 27.81 dp of the status bar is left to cover.
-    expect(
-      sheetHeaderKeyboardTopClearance({ insetTop: 51.81, insetBottom: 24, keyboardHeight: 330 })
-    ).toBeCloseTo(27.81);
-  });
-
-  it('reserves nothing without a keyboard', () => {
-    expect(
-      sheetHeaderKeyboardTopClearance({ insetTop: 51.81, insetBottom: 24, keyboardHeight: 0 })
-    ).toBe(0);
-  });
-
-  it('follows a keyboard shorter than the room above the full detent', () => {
-    expect(
-      sheetHeaderKeyboardTopClearance({ insetTop: 51.81, insetBottom: 24, keyboardHeight: 40 })
-    ).toBe(16);
   });
 });
 

@@ -38,7 +38,6 @@ vi.mock('react-native-reanimated', () => ({
   FadeIn: { duration: vi.fn() },
   FadeOut: { duration: vi.fn() },
   LinearTransition: {},
-  useAnimatedStyle: (style: () => object) => style(),
 }));
 
 // ProfileScreen reads its landscape side insets through `@/lib/screen-insets`,

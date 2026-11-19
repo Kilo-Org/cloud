@@ -169,10 +169,6 @@
     {
       "path": "/api/cron/recover-code-reviews",
       "schedule": "*/15 * * * *"
-    },
-    {
-      "path": "/api/cron/anthropic-user-profile-cleanup",
-      "schedule": "40 2 * * *"
     }
   ],
   "schedules": {
@@ -199,6 +195,11 @@
     "cleanup-api-request-log": {
       "schedule": "*/5 * * * *",
       "path": "/api/cron/cleanup-api-request-log",
+      "requestMethod": "GET"
+    },
+    "anthropic-user-profile-cleanup": {
+      "schedule": "40 2 * * *",
+      "path": "/api/cron/anthropic-user-profile-cleanup",
       "requestMethod": "GET"
     }
   },

@@ -320,6 +320,50 @@ describe('GET /api/v1/models', () => {
     expect(responseData.message).toBe('Error from OpenRouter API');
   });
 
+  test('answers 500 when the live catalogue fails the schema', async () => {
+    const request = createTestRequest('/api/v1/models');
+
+    global.fetch = jest.fn(() => {
+      return Promise.resolve(
+        createMockResponse({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          jsonData: { data: [{ id: 'vendor/incomplete', name: 'Incomplete entry' }] },
+        })
+      );
+    }) as unknown as typeof fetch;
+
+    const response = await GET(request);
+    const responseData = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(responseData.error).toBe('Failed to fetch models');
+    expect(responseData.message).toBe('Error from OpenRouter API');
+  });
+
+  test('answers 500 when the live catalogue is below the floor', async () => {
+    const request = createTestRequest('/api/v1/models');
+
+    global.fetch = jest.fn(() => {
+      return Promise.resolve(
+        createMockResponse({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          jsonData: { data: [mockOpenRouterModels.data[0]] },
+        })
+      );
+    }) as unknown as typeof fetch;
+
+    const response = await GET(request);
+    const responseData = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(responseData.error).toBe('Failed to fetch models');
+    expect(responseData.message).toBe('Error from OpenRouter API');
+  });
+
   test('should include defaultModel field in response', async () => {
     const request = createTestRequest('/api/v1/models');
 

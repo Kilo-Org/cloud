@@ -277,4 +277,41 @@ describe('DestructiveConfirmDialog', () => {
       root.findAll(node => isType(node, 'Text') && node.children.includes('Cancel'))
     ).toHaveLength(1);
   });
+
+  // The host asks a withdrawn request's dialog to put itself away with the
+  // safe choice: the flag arriving starts the dismissal with `onCancel` held
+  // over, and the destructive action can no longer run.
+  it('dismisses with the safe choice when the dismissal is requested', () => {
+    const root = mount({ dismissRequested: true });
+
+    const sheet = root.find(node => isType(node, 'BottomSheet'));
+    expect(sheet.props.index).toBe(-1);
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(onCancel).not.toHaveBeenCalled();
+
+    callProp(sheet, 'onDismiss');
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  // A choice the person already made wins: the flag arriving after the
+  // destructive press must not override the pending action, so the sheet still
+  // goes out through it and the safe choice never fires.
+  it('does not override a pending destructive choice when the dismissal is then requested', () => {
+    const root = mount();
+
+    callProp(pressableWith(root, 'bg-destructive'), 'onPress');
+    expect(onConfirm).not.toHaveBeenCalled();
+
+    // The request was withdrawn while the person's dismissal was in flight;
+    // the flag arriving must not redirect the sheet to the safe choice.
+    mount({ dismissRequested: true, onCancel: () => undefined });
+
+    const sheet = root.find(node => isType(node, 'BottomSheet'));
+    expect(sheet.props.index).toBe(-1);
+
+    callProp(sheet, 'onDismiss');
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onCancel).not.toHaveBeenCalled();
+  });
 });

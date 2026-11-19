@@ -66,7 +66,7 @@ import { buildVercelModelIdOverrides } from '@/lib/providers/openrouter/vercel-m
 import { loadModelsDevCatalog } from '@/lib/providers/direct-byok/models-dev';
 import { injectSupportedFimModels } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
 import { injectVirtualModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
-import type { OpenRouterModel as CatalogModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModel as CatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   fetchCustomLlmsFromDatabase,
   type CustomLlm,

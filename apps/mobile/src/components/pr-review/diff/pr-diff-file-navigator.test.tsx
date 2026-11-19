@@ -780,6 +780,24 @@ describe('PrDiffFileNavigator provider wording', () => {
     };
   }
 
+  // The 0-listed-files state: the read answered, and the navigator has no row
+  // to show, which is the empty state rather than a terminal error.
+  function setEmptyState() {
+    listQueryResult = {
+      query: {
+        isLoading: false,
+        isFetching: false,
+        isFetchingNextPage: false,
+        hasNextPage: false,
+        fetchNextPage: fetchNextPageMock,
+        refetch: vi.fn(),
+      },
+      files: [],
+      firstPageErrorState: null,
+      laterPageError: false,
+    };
+  }
+
   async function mountInScope(ref: ProviderPrRef) {
     const { renderer } = await renderWithProviders(
       <ProviderPrScopeProvider value={{ ref, organizationId: null }}>
@@ -833,6 +851,41 @@ describe('PrDiffFileNavigator provider wording', () => {
     const text = renderedText(await mountInScope(GITHUB_REF));
 
     expect(text).toContain("You don't have permission to view this pull request.");
+  });
+
+  // The navigator's 0-listed-files state is the same shared empty state the
+  // Files tab renders, so it reads the provider key too: a GitLab merge
+  // request is never described as a pull request.
+  const PULL_REQUEST_EMPTY = 'This pull request has no file changes.';
+  const MERGE_REQUEST_EMPTY = 'This merge request has no file changes.';
+
+  function emptyDescription(renderer: RenderWithProvidersResult['renderer']) {
+    const empty = renderer.root.find(node => String(node.type) === 'EmptyState');
+    return empty.props.description as string;
+  }
+
+  it('describes a GitLab empty file list as a merge request', async () => {
+    setEmptyState();
+
+    const description = emptyDescription(await mountInScope(GITLAB_REF));
+
+    expect(description).toBe(MERGE_REQUEST_EMPTY);
+  });
+
+  it('keeps the pull-request empty copy for GitHub', async () => {
+    setEmptyState();
+
+    const description = emptyDescription(await mountInScope(GITHUB_REF));
+
+    expect(description).toBe(PULL_REQUEST_EMPTY);
+  });
+
+  it('keeps the pull-request empty copy for Bitbucket', async () => {
+    setEmptyState();
+
+    const description = emptyDescription(await mountInScope(BITBUCKET_REF));
+
+    expect(description).toBe(PULL_REQUEST_EMPTY);
   });
 });
 

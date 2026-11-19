@@ -144,7 +144,7 @@ export const adminGatewayConfigRouter = createTRPCRouter({
       .where(
         or(
           isNull(anthropic_user_profile_deletions.deleted_at),
-          gte(anthropic_user_profile_deletions.deleted_at, sql`now() - interval '7 days'`)
+          gte(anthropic_user_profile_deletions.deleted_at, sql`now() - interval '30 days'`)
         )
       )
       .orderBy(

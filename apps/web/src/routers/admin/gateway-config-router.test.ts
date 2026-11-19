@@ -467,15 +467,15 @@ describe('adminGatewayConfigRouter', () => {
       ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     });
 
-    it('lists pending deletions first, then deletions of the last 7 days newest first', async () => {
+    it('lists pending deletions first, then deletions of the last 30 days newest first', async () => {
       const caller = await createCallerForUser(admin.id);
       const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
       await db.insert(anthropic_user_profile_deletions).values([
         {
           user_profile_id: 'uprof_expired',
           reason: 'unlinked',
-          queued_at: daysAgo(10),
-          deleted_at: daysAgo(8),
+          queued_at: daysAgo(40),
+          deleted_at: daysAgo(31),
         },
         {
           user_profile_id: 'uprof_new',

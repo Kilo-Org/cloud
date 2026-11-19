@@ -361,12 +361,12 @@ describe('runAnthropicUserProfileCleanup', () => {
     expect(await savedNextPage()).toBe('page-3');
   });
 
-  it('prunes completed deletions older than seven days but keeps pending ones', async () => {
+  it('prunes completed deletions older than 30 days but keeps pending ones', async () => {
     const [oldId, recentId, pendingId] = [profileId(), profileId(), profileId()];
     mockDelete.mockRejectedValue(new Error('still unavailable'));
     await db.insert(anthropic_user_profile_deletions).values([
-      { user_profile_id: oldId, reason: 'unlinked', deleted_at: daysAgo(8).toISOString() },
-      { user_profile_id: recentId, reason: 'unlinked', deleted_at: daysAgo(6).toISOString() },
+      { user_profile_id: oldId, reason: 'unlinked', deleted_at: daysAgo(31).toISOString() },
+      { user_profile_id: recentId, reason: 'unlinked', deleted_at: daysAgo(29).toISOString() },
       { user_profile_id: pendingId, reason: 'unlinked', queued_at: daysAgo(60).toISOString() },
     ]);
     listsProfiles();

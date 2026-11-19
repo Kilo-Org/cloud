@@ -138,7 +138,7 @@ function ProfileDeletionsCard() {
           The daily cleanup deletes profiles that no user or organization uses anymore, and profiles
           of users who have been blocked for at least 30 days. Profiles are detached first and then
           deleted at Anthropic; the cleanup retries pending deletions. Shows pending deletions and
-          those completed in the last 7 days.
+          those completed in the last 30 days.
         </CardDescription>
       </CardHeader>
       <CardContent>

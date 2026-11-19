@@ -6064,7 +6064,7 @@ export const ai_gateway_config = pgTable(
  * Anthropic user profiles the daily cleanup deletes. A row is queued when the
  * profile is detached, before the remote delete, and `deleted_at` is set once
  * Anthropic confirms it, so a failed delete is retried without relisting the
- * profile. Deleted rows older than seven days are pruned.
+ * profile. Deleted rows older than 30 days are pruned.
  */
 export const anthropic_user_profile_deletions = pgTable(
   'anthropic_user_profile_deletions',

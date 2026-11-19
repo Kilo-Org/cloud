@@ -21,7 +21,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** How old a profile, and how long its user's block, must be before it is deleted. */
 const GRACE_PERIOD_MS = 30 * DAY_MS;
 /** How long completed deletions stay in the log. */
-const LOG_RETENTION_MS = 7 * DAY_MS;
+const LOG_RETENTION_MS = 30 * DAY_MS;
 const DEFAULT_MAX_QUEUED = 500;
 /** Leaves headroom under the route's five-minute `maxDuration`. */
 const DEFAULT_BUDGET_MS = 4 * 60 * 1000;

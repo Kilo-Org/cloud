@@ -20,6 +20,7 @@ import {
   replayStoredMessages,
   SESSION_HISTORY_UNAVAILABLE_MESSAGE,
   sessionSnapshotFailureMessage,
+  type SessionSnapshotFailure,
   snapshotPageFromSnapshot,
 } from './snapshot-page';
 import {
@@ -105,7 +106,7 @@ type CloudAgentTransportConfig = {
   /** Called after a successful initial bounded page read. */
   onInitialPageLoaded?: ((page: SessionSnapshotPage) => void) | undefined;
   websocketBaseUrl: string;
-  onError?: ((message: string) => void) | undefined;
+  onError?: ((message: string, failure?: SessionSnapshotFailure) => void) | undefined;
   lifecycleHooks?: ConnectionLifecycleHooks | undefined;
   websocketHeaders?: WebSocketHeaders | undefined;
   /**
@@ -506,10 +507,14 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       }
     }
 
-    function reportSnapshotFailure(message: string, expectedGeneration: number): void {
+    function reportSnapshotFailure(
+      message: string,
+      expectedGeneration: number,
+      failure?: SessionSnapshotFailure
+    ): void {
       if (expectedGeneration !== lifecycleGeneration || snapshotFailureReported) return;
       snapshotFailureReported = true;
-      config.onError?.(message);
+      config.onError?.(message, failure);
     }
 
     /**
@@ -531,12 +536,12 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       }
       if (read.kind === 'missing') return true;
       if (read.kind === 'typed' && read.outcome.kind !== 'retryable_failure') return true;
-      reportSnapshotFailure(
-        read.kind === 'rejected'
-          ? snapshotReadFailureMessage(read.error)
-          : sessionSnapshotFailureMessage(read.outcome.kind),
-        expectedGeneration
-      );
+      if (read.kind === 'rejected') {
+        reportSnapshotFailure(snapshotReadFailureMessage(read.error), expectedGeneration);
+        return false;
+      }
+      const failure = sessionSnapshotFailureMessage(read.outcome.kind);
+      reportSnapshotFailure(failure.message, expectedGeneration, failure);
       return false;
     }
 
@@ -657,7 +662,8 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       // A terminal typed history failure is reported here, once per open, and
       // still connects: the websocket remains useful for live events.
       if (read.kind === 'typed' && read.outcome.kind !== 'retryable_failure') {
-        reportSnapshotFailure(sessionSnapshotFailureMessage(read.outcome.kind), expectedGeneration);
+        const failure = sessionSnapshotFailureMessage(read.outcome.kind);
+        reportSnapshotFailure(failure.message, expectedGeneration, failure);
       }
       if (!applySnapshotRead(read, () => {}, expectedGeneration)) {
         scheduleSnapshotRetry(replayInitialPage, expectedGeneration, 0);

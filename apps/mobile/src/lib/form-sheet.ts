@@ -316,7 +316,14 @@ export function useSettledSheetHeaderTopClearance(input: {
     if (measure === undefined) {
       return;
     }
-    const { top } = measure.call(view);
+    let top = Number.NaN;
+    try {
+      ({ top } = measure.call(view));
+    } catch {
+      // A surface mid-teardown cannot be measured; the header keeps its last
+      // edge rather than taking the app down from a timer callback.
+      return;
+    }
     if (!Number.isFinite(top)) {
       return;
     }

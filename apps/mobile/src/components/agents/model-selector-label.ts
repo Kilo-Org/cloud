@@ -10,8 +10,10 @@ type ModelSelectorLabelInput = {
    * human name for an unmatched value and falls back to the generic label.
    */
   providerAware: boolean;
-  /** `t('common.model')`: the label when nothing else can be resolved. */
+  /** `t('common.model')`: the label for a stored value nothing can name. */
   fallbackLabel: string;
+  /** `t('common.notSelected')`: the label while no model is chosen at all. */
+  notSelectedLabel: string;
 };
 
 /**
@@ -30,7 +32,13 @@ export function resolveModelSelectorLabel(input: ModelSelectorLabelInput): strin
   if (input.selectedName !== undefined) {
     return input.selectedName;
   }
-  if (!input.providerAware && input.value !== '') {
+  if (input.value === '') {
+    // Nothing is chosen. The field's own label already reads "Model", so the
+    // value says that no model is chosen instead of repeating the label as if
+    // it were a choice.
+    return input.notSelectedLabel;
+  }
+  if (!input.providerAware) {
     const shortName = formatShortModelDisplayName(input.value);
     if (shortName !== '') {
       // A `vendor/model` reference is an id, not copy: show its readable last

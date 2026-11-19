@@ -10,13 +10,22 @@ import type { LocalAgentStorageArea } from './storage';
  * can redial without the user repeating pairing (SPEC "Loopback pairing").
  * Values are filtered through the loopback rules on every read: nothing
  * non-loopback and no short key is ever treated as an endpoint.
+ *
+ * A hub that exits never comes back under its id (every hub start has a new
+ * one), so an endpoint that stays unreachable is removed: at once when a newer
+ * pairing takes over its socket URL, otherwise after a day without a connection.
+ * A live connection refreshes its stamp hourly, so a worker restart never finds
+ * a long-connected hub looking a day old.
  */
 
 export const LOCAL_AGENT_ENDPOINTS_STORAGE_KEY = 'local:kiloLocalAgentEndpoints';
+export const LOCAL_AGENT_ENDPOINT_STALE_MS = 24 * 60 * 60 * 1000;
+export const LOCAL_AGENT_ENDPOINT_REFRESH_MS = 60 * 60 * 1000;
 
 const storedEndpointSchema = z.object({
   hubId: z.uuid(),
   key: z.string().min(1),
+  lastConnectedAt: z.number().optional(),
   ws: z.string().min(1),
 });
 
@@ -28,13 +37,17 @@ const storedEndpointsSchema = z
 
 export type { LocalAgentStoredEndpoint } from './pairing';
 
+/** A stored endpoint and the last time its hub was reachable: paired, connected, or disconnected. */
+export type LocalAgentSavedEndpoint = LocalAgentStoredEndpoint & { lastConnectedAt: number };
+
+/* Endpoints written before the stamp existed have none until the next prune. */
+type LocalAgentReadEndpoint = z.infer<typeof storedEndpointSchema>;
+
 /* Two pairing navigations can land in the same tick; one queue keeps every
    read-modify-write on the endpoints key ordered. */
 const endpointWrites = createSerialTaskQueue();
 
-const readEndpoints = async (
-  storage: LocalAgentStorageArea
-): Promise<LocalAgentStoredEndpoint[]> => {
+const readEndpoints = async (storage: LocalAgentStorageArea): Promise<LocalAgentReadEndpoint[]> => {
   const parsed = storedEndpointsSchema.safeParse(
     await storage.getItem(LOCAL_AGENT_ENDPOINTS_STORAGE_KEY)
   );
@@ -43,7 +56,7 @@ const readEndpoints = async (
     return [];
   }
 
-  const byHub = new Map<string, LocalAgentStoredEndpoint>();
+  const byHub = new Map<string, LocalAgentReadEndpoint>();
 
   for (const endpoint of parsed.data.endpoints) {
     if (isUsableStoredEndpoint(endpoint)) {
@@ -56,20 +69,25 @@ const readEndpoints = async (
 
 const writeEndpoints = async (
   storage: LocalAgentStorageArea,
-  endpoints: LocalAgentStoredEndpoint[]
+  endpoints: LocalAgentReadEndpoint[]
 ): Promise<void> => {
   await storage.setItem(LOCAL_AGENT_ENDPOINTS_STORAGE_KEY, { endpoints });
 };
 
 export const loadLocalAgentEndpoints = (
   storage: LocalAgentStorageArea
-): Promise<LocalAgentStoredEndpoint[]> => readEndpoints(storage);
+): Promise<LocalAgentReadEndpoint[]> => readEndpoints(storage);
 
-/** Stores (or replaces by hubId) one endpoint; unusable endpoints are dropped. */
+/**
+ * Stores (or replaces by hubId) one endpoint that just paired; unusable
+ * endpoints are dropped. An older endpoint on the same socket URL belongs to a
+ * hub that no longer listens there, so it goes too.
+ */
 export const saveLocalAgentEndpoint = (
   storage: LocalAgentStorageArea,
-  endpoint: LocalAgentStoredEndpoint
-): Promise<LocalAgentStoredEndpoint[]> =>
+  endpoint: LocalAgentStoredEndpoint,
+  pairedAt: number
+): Promise<LocalAgentReadEndpoint[]> =>
   endpointWrites(async () => {
     const current = await readEndpoints(storage);
 
@@ -77,20 +95,67 @@ export const saveLocalAgentEndpoint = (
       return current;
     }
 
-    const next = [...current.filter(stored => stored.hubId !== endpoint.hubId), endpoint];
+    const next = [
+      ...current.filter(stored => stored.hubId !== endpoint.hubId && stored.ws !== endpoint.ws),
+      { ...endpoint, lastConnectedAt: pairedAt },
+    ];
     await writeEndpoints(storage, next);
 
     return next;
   });
 
-export const removeLocalAgentEndpoint = (
+/** Records that the hub was reachable at `at`; an endpoint removed meanwhile stays removed. */
+export const touchLocalAgentEndpoint = (
   storage: LocalAgentStorageArea,
-  hubId: string
-): Promise<LocalAgentStoredEndpoint[]> =>
+  hubId: string,
+  at: number
+): Promise<void> =>
   endpointWrites(async () => {
     const current = await readEndpoints(storage);
-    const next = current.filter(endpoint => endpoint.hubId !== hubId);
-    await writeEndpoints(storage, next);
+    const touched = current.find(endpoint => endpoint.hubId === hubId);
+
+    if (touched === undefined) {
+      return;
+    }
+
+    // `current` is this write's own fresh parse, so the stamp can be set in place.
+    touched.lastConnectedAt = at;
+    await writeEndpoints(storage, current);
+  });
+
+/**
+ * The endpoints worth dialing. One not connected now that has not been
+ * reachable for a day is removed; a connected one's stamp is refreshed once it
+ * is an hour old; one stored without a stamp starts its clock now.
+ */
+export const pruneLocalAgentEndpoints = (
+  storage: LocalAgentStorageArea,
+  { isConnected, now }: { isConnected: (hubId: string) => boolean; now: number }
+): Promise<LocalAgentSavedEndpoint[]> =>
+  endpointWrites(async () => {
+    const current = await readEndpoints(storage);
+    let changed = false;
+    const next = current.flatMap(endpoint => {
+      const stamped = endpoint.lastConnectedAt ?? now;
+      const age = now - stamped;
+      const connected = isConnected(endpoint.hubId);
+
+      if (!connected && age > LOCAL_AGENT_ENDPOINT_STALE_MS) {
+        changed = true;
+
+        return [];
+      }
+
+      const lastConnectedAt = connected && age > LOCAL_AGENT_ENDPOINT_REFRESH_MS ? now : stamped;
+
+      changed ||= lastConnectedAt !== endpoint.lastConnectedAt;
+
+      return [{ ...endpoint, lastConnectedAt }];
+    });
+
+    if (changed) {
+      await writeEndpoints(storage, next);
+    }
 
     return next;
   });

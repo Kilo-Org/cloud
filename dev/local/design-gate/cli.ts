@@ -5,7 +5,7 @@ import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 
-import { agentDeviceArgs, agentDeviceToProbeDump } from './agent-device';
+import { agentDeviceArgs, agentDeviceToProbeDump, withScreenshotScale } from './agent-device';
 import {
   compareProof,
   prepareProof,
@@ -631,6 +631,11 @@ async function scanOutcome(
   screenshot.completedMs = deps.clock.now() - started;
   const after = await readTree();
   const image = readRgba(files.absolute(files.screenshot), deps.exec);
+  const scaled = withScreenshotScale(dump, image.width);
+  if (scaled !== dump) {
+    dump = scaled;
+    writeJson(files.absolute(files.dump), dump);
+  }
   const alignment = captureAlignment(
     before,
     screenshot,

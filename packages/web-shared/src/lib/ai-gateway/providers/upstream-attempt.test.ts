@@ -7,7 +7,7 @@ jest.mock('./apply-provider-specific-logic', () => ({
 jest.mock('./gateway-models-cache', () => ({
   ...jest.requireActual('./gateway-models-cache'),
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
-  getOpenRouterModelsFromDatabase: jest.fn(),
+  getOpenRouterChatModelIdsFromDatabase: jest.fn(),
   isValidOpenRouterModelId: jest.fn(),
 }));
 jest.mock('./openrouter', () => ({
@@ -40,7 +40,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import { applyProviderSpecificLogic } from './apply-provider-specific-logic';
 import {
-  getOpenRouterModelsFromDatabase,
+  getOpenRouterChatModelIdsFromDatabase,
   getOpenRouterModelsMetadataFromDatabase,
   isValidOpenRouterModelId,
 } from './gateway-models-cache';
@@ -85,7 +85,7 @@ describe('bounded spending provider enforcement', () => {
     jest.mocked(isValidOpenRouterModelId).mockResolvedValue(true);
     jest.mocked(isValidVercelModelId).mockResolvedValue(true);
     jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({ [model.id]: model });
-    jest.mocked(getOpenRouterModelsFromDatabase).mockResolvedValue(new Set([model.id]));
+    jest.mocked(getOpenRouterChatModelIdsFromDatabase).mockResolvedValue(new Set([model.id]));
     jest.mocked(getRawOpenRouterModels).mockResolvedValue({ data: [catalogEntry] });
     jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue({
       rules: [{ includes: ['test/'], providers: ['preferred-route'] }],

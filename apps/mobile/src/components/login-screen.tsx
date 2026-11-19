@@ -40,7 +40,7 @@ import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { persistLoginDrafts, restoreLoginDrafts, type SsoRecoveryDraft } from '@/lib/login-draft';
 import { setLanguagePickerBridge } from '@/lib/picker-bridge';
-import { useScreenInsets } from '@/lib/screen-insets';
+import { useScreenInsets, useSideInsetStyle } from '@/lib/screen-insets';
 
 export function LoginScreen() {
   const { sessionEnded, signIn, token: publishedToken } = useAuth();
@@ -63,6 +63,7 @@ export function LoginScreen() {
   } = useDeviceAuth();
   const colors = useThemeColors();
   const insets = useScreenInsets();
+  const sideInsetStyle = useSideInsetStyle();
   const { t } = useTranslation();
   const fontScale = useLiveFontScale();
   // The space the keyboard reveal keeps below a focused field is the height of
@@ -269,11 +270,7 @@ export function LoginScreen() {
     <View
       className="flex-1 bg-background"
       // eslint-disable-next-line react-native/no-inline-styles -- dynamic chrome and safe-area padding
-      style={{
-        paddingBottom: bottomPadding,
-        paddingLeft: insets.left,
-        paddingRight: insets.right,
-      }}
+      style={{ paddingBottom: bottomPadding, ...sideInsetStyle }}
     >
       <View className="flex-row justify-end" style={headerRowStyle}>
         <Pressable

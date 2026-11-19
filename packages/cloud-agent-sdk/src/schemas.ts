@@ -401,6 +401,12 @@ export const SESSION_MAX_COMMITS = 256;
 export const SESSION_QUEUE_MAX_IDS = 1_000;
 /** Most questions a `question.asked` event may carry. */
 export const SESSION_QUESTION_MAX_QUESTIONS = 32;
+/** Most options one question may offer. */
+export const SESSION_QUESTION_MAX_OPTIONS = 32;
+/** Most actions one suggestion may offer. */
+export const SESSION_SUGGESTION_MAX_ACTIONS = 8;
+/** Longest suggestion-action text accepted on the wire. */
+export const SESSION_INTERACTION_MAX_STRING_LENGTH = 2_000;
 
 const remoteCommandStringSchema = z.string().max(REMOTE_COMMAND_MAX_STRING_LENGTH);
 const remoteSlashCommandInfoSchema = z
@@ -854,7 +860,7 @@ const questionOptionSchema = z.object({
 const questionInfoSchema = z.object({
   question: z.string(),
   header: z.string(),
-  options: z.array(questionOptionSchema),
+  options: z.array(questionOptionSchema).max(SESSION_QUESTION_MAX_OPTIONS),
   multiple: z.boolean().optional(),
   custom: z.boolean().optional(),
 });
@@ -886,7 +892,9 @@ function toQuestionInfo(parsed: z.infer<typeof questionInfoSchema>): QuestionInf
  * answer sliding onto the wrong question. No usable entry means the payload
  * carries no questions the client can render. A list longer than
  * `SESSION_QUESTION_MAX_QUESTIONS` fails the field, which the caller catches to
- * `undefined`.
+ * `undefined`. A question whose option list exceeds
+ * `SESSION_QUESTION_MAX_OPTIONS` fails that entry, so the kept prefix stops
+ * there, exactly as an over-limit question list does.
  */
 const questionListSchema = z
   .array(z.unknown())
@@ -959,9 +967,9 @@ export type PermissionRepliedData = z.infer<typeof permissionRepliedDataSchema>;
 // Older CLIs never emit these events, so no explicit version gate is needed here.
 
 export const suggestionActionSchema = z.object({
-  label: z.string(),
-  description: z.string().optional(),
-  prompt: z.string(),
+  label: z.string().max(SESSION_INTERACTION_MAX_STRING_LENGTH),
+  description: z.string().max(SESSION_INTERACTION_MAX_STRING_LENGTH).optional(),
+  prompt: z.string().max(SESSION_INTERACTION_MAX_STRING_LENGTH),
 });
 export type SuggestionActionData = z.infer<typeof suggestionActionSchema>;
 
@@ -969,7 +977,7 @@ export const suggestionShownDataSchema = z.object({
   id: z.string(),
   sessionID: z.string().optional(),
   text: z.string(),
-  actions: z.array(suggestionActionSchema).catch([]),
+  actions: z.array(suggestionActionSchema).max(SESSION_SUGGESTION_MAX_ACTIONS).catch([]),
   tool: z.object({ messageID: z.string(), callID: z.string() }).optional(),
 });
 export type SuggestionShownData = z.infer<typeof suggestionShownDataSchema>;
@@ -977,7 +985,7 @@ export type SuggestionShownData = z.infer<typeof suggestionShownDataSchema>;
 export const suggestionAcceptedDataSchema = z.object({
   requestID: z.string(),
   index: z.number(),
-  action: suggestionActionSchema.optional(),
+  action: suggestionActionSchema.optional().catch(undefined),
 });
 export type SuggestionAcceptedData = z.infer<typeof suggestionAcceptedDataSchema>;
 

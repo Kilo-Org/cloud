@@ -63,6 +63,12 @@ const keyboardStore = vi.hoisted(() => {
   };
 });
 
+// The header's scope subtitle reads the membership list; this suite tests the
+// form, so the subtitle is a fixed name for each kind of scope.
+vi.mock('@/lib/hooks/use-reviewer-scope-title', () => ({
+  useReviewerScopeTitle: (scope: string) => (scope === 'personal' ? 'Personal' : 'Drain Labs'),
+}));
+
 // The screen scrolls the body back to the URL section when Start rejects an
 // empty or malformed URL; the shared mock records those calls so the suite can
 // prove the field is revealed rather than trusting that it happened.

@@ -948,3 +948,67 @@ test('gutter: only the top-most screen is measured over the tab root below', () 
   assert.equal(findings[0]?.measured, 21);
   assert.equal(findings[0]?.element.text, 'Preferences body');
 });
+
+test('gutter: a row the list cuts at its edge is not measured as the column', () => {
+  // The PR files list on iOS: the last row starts 11 pt above the list's bottom
+  // edge, so only a sliver of its title is inside the list and its chevron is
+  // outside. The title alone read as a column starting at 66.7 dp.
+  const fileRow = (top: number, parent: number, chevron = true): ProbeNode[] => {
+    const row = parent + 2;
+    const text = chevron ? row + 3 : row + 1;
+    return [
+      {
+        parent,
+        tag: 'View',
+        rect: [0, top, 402, 55],
+        style: { backgroundColor: '#ffffff', paddingInline: 14 },
+      },
+      {
+        parent: parent + 1,
+        tag: 'View',
+        rect: [14, top + 10.67, 374, 33.67],
+        style: { flexDirection: 'row' },
+      },
+      ...(chevron
+        ? ([
+            { parent: row, tag: 'View', rect: [14, top + 15.33, 24.67, 24.33] },
+            { parent: row + 1, tag: 'RNSVGSvgView', rect: [17.33, top + 18.67, 18, 18] },
+          ] satisfies ProbeNode[])
+        : []),
+      { parent: row, tag: 'View', rect: [66.67, top + 10.67, 283, 33.67] },
+      {
+        parent: text,
+        tag: 'Paragraph',
+        rect: [66.67, top + 10.67, 283, 17.67],
+        text: 'src/example.ts',
+      },
+    ];
+  };
+  const list = (rows: (parent: number) => ProbeNode[]): ProbeNode[] => [
+    { parent: 0, tag: 'RNSScreen', rect: [0, 0, 402, 874] },
+    { parent: 1, tag: 'ScrollView', rect: [0, 220, 402, 509] },
+    { parent: 2, tag: 'View', rect: [0, 220, 402, 600] },
+    ...rows(3),
+  ];
+  const env = { window: { width: 402, height: 874 } };
+  assert.deepEqual(
+    run(
+      list(parent => fileRow(220, parent)),
+      env
+    ),
+    []
+  );
+  assert.deepEqual(
+    run(
+      list(parent => fileRow(718, parent)),
+      env
+    ),
+    []
+  );
+  // A whole row without its leading chevron is still off the column.
+  const [finding] = run(
+    list(parent => fileRow(220, parent, false)),
+    env
+  );
+  assert.equal(Math.round((finding?.measured ?? 0) * 10) / 10, 66.7);
+});

@@ -25,6 +25,7 @@ import { commitModelPickerSelection, resolveModelPickerSelection } from '@/lib/p
 import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import { parseParam } from '@/lib/route-params';
 import { modelPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 
 // The picker sheet renders its own scroll container (`scrollable={false}`), so
 // the list fills the sheet's body.
@@ -35,6 +36,7 @@ export function ModelPickerContent() {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const { favorites, favoritesError, addFavorite, removeFavorite } = useModelPreferences(undefined);
   const favoriteIds = useMemo(() => new Set(favorites), [favorites]);
   const { routeKey: rawRouteKey } = useLocalSearchParams<{ routeKey?: string }>();
@@ -55,9 +57,19 @@ export function ModelPickerContent() {
   const selectedModelRef = useRef(selectedModel);
   const selectedVariantRef = useRef(selectedVariant);
   const selectionChangedRef = useRef(false);
+  // Set only by the closes that keep the pick: Done, and the pick's own close
+  // (a single-effort model, or an effort chip). Every other way out — Cancel,
+  // Android Back, an iOS swipe-down — leaves it unset, so the focus cleanup
+  // drops a pick still waiting for its effort and the caller keeps its model.
+  const commitOnCloseRef = useRef(false);
   const closePickerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const closePicker = useCallback(() => {
+    commitOnCloseRef.current = true;
+    router.back();
+  }, [router]);
+
+  const cancelPicker = useCallback(() => {
     router.back();
   }, [router]);
 
@@ -76,6 +88,7 @@ export function ModelPickerContent() {
       selectedModelRef.current = nextModel;
       selectedVariantRef.current = nextVariant;
       selectionChangedRef.current = false;
+      commitOnCloseRef.current = false;
       setBridge(nextBridge);
       setSelectedModel(nextModel);
       setSelectedVariant(nextVariant);
@@ -89,7 +102,7 @@ export function ModelPickerContent() {
         }
 
         const activeBridge = bridgeRef.current;
-        if (activeBridge && selectionChangedRef.current) {
+        if (activeBridge && selectionChangedRef.current && commitOnCloseRef.current) {
           commitModelPickerSelection(
             activeBridge,
             selectedModelRef.current,
@@ -225,6 +238,7 @@ export function ModelPickerContent() {
       <PickerSheet
         title={t('agentChat.modelPicker.title')}
         onDone={closePicker}
+        onCancel={cancelPicker}
         scrollable={false}
         expired
       />
@@ -235,6 +249,7 @@ export function ModelPickerContent() {
     <PickerSheet
       title={t('agentChat.modelPicker.title')}
       onDone={closePicker}
+      onCancel={cancelPicker}
       scrollable={false}
       headerContent={
         <View>
@@ -291,7 +306,11 @@ export function ModelPickerContent() {
           nestedScrollEnabled
           ref={listRef}
           maintainVisibleContentPosition={{ disabled: true }}
-          style={[listStyle, { backgroundColor: colors.background, marginBottom: bottom }]}
+          style={[
+            listStyle,
+            { backgroundColor: colors.background, marginBottom: bottom },
+            sideInsetMarginStyle,
+          ]}
           data={rows}
           // FlashList stores its props during render. When React discards a
           // deferred search render, FlashList can keep that render's shorter

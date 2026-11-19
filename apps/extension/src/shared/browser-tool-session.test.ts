@@ -1,4 +1,4 @@
-/* eslint-disable max-lines, max-classes-per-file -- the page-global fakes below need several instanceof-identity classes in this one test file */
+/* eslint-disable max-lines, max-classes-per-file, vitest/max-expects -- the page-global fakes below need several instanceof-identity classes in this one test file, and one contract is several assertions */
 import { describe, expect, it, vi } from 'vitest';
 import {
   FIREFOX_PLATFORM_LIMIT,
@@ -29,17 +29,42 @@ const ENABLED_DOMAINS = [
   'Accessibility.enable',
 ];
 
+/**
+ * A base64 png whose IHDR reports this size: the capture checks the frame's own
+ * pixels against the layout viewport, so a test frame has to carry a real header.
+ */
+const pngOfSize = (width: number, height: number): string => {
+  const header = new Uint8Array(24);
+
+  // The PNG signature, then a 4-byte chunk length, the IHDR type, and the two 4-byte dimensions.
+  header.set([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82]);
+  new DataView(header.buffer).setUint32(16, width);
+  new DataView(header.buffer).setUint32(20, height);
+
+  return btoa(String.fromCodePoint(...header));
+};
+
 const createDebuggerApi = ({
   documentNodeId = 11,
   gate,
+  layoutViewport,
   responseBodies,
+  screencast,
   selectorMatches = [42],
   visibilityState = 'visible',
 }: {
   documentNodeId?: number;
   /** When set, `sendCommand` waits on `gate.wait` before resolving the gated method. */
   gate?: { readonly command: string; readonly wait: Promise<void> };
+  /** What `Page.getLayoutMetrics` reports, in device pixels. */
+  layoutViewport?: { readonly clientHeight: number; readonly clientWidth: number };
   responseBodies?: Record<string, { base64Encoded?: boolean; body: string }>;
+  /** The frame `Page.startScreencast` pushes back, on a macrotask like the real event. */
+  screencast?: {
+    readonly data: string;
+    readonly deviceHeight: number;
+    readonly deviceWidth: number;
+  };
   selectorMatches?: readonly number[];
   visibilityState?: string;
 } = {}): {
@@ -105,6 +130,24 @@ const createDebuggerApi = ({
 
       if (method === 'DOM.querySelectorAll') {
         return { nodeIds: selectorMatches };
+      }
+
+      if (method === 'Page.getLayoutMetrics') {
+        return layoutViewport === undefined ? {} : { layoutViewport };
+      }
+
+      if (method === 'Page.startScreencast' && screencast !== undefined) {
+        const frame = screencast;
+
+        setTimeout(() => {
+          for (const listener of eventListeners) {
+            listener({}, 'Page.screencastFrame', {
+              data: frame.data,
+              metadata: { deviceHeight: frame.deviceHeight, deviceWidth: frame.deviceWidth },
+              sessionId: 3,
+            });
+          }
+        }, 0);
       }
 
       if (method === 'Network.getResponseBody') {
@@ -180,18 +223,28 @@ const createSession = ({
   tabId = 7,
   url = 'https://example.com/',
   gate,
+  layoutViewport,
   responseBodies,
+  screencast,
   selectorMatches,
 }: {
   tabId?: number;
   url?: string;
   gate?: { readonly command: string; readonly wait: Promise<void> };
+  layoutViewport?: { readonly clientHeight: number; readonly clientWidth: number };
   responseBodies?: Record<string, { base64Encoded?: boolean; body: string }>;
+  screencast?: {
+    readonly data: string;
+    readonly deviceHeight: number;
+    readonly deviceWidth: number;
+  };
   selectorMatches?: readonly number[];
 } = {}) => {
   const debuggerApi = createDebuggerApi({
     ...(gate === undefined ? {} : { gate }),
+    ...(layoutViewport === undefined ? {} : { layoutViewport }),
     ...(responseBodies === undefined ? {} : { responseBodies }),
+    ...(screencast === undefined ? {} : { screencast }),
     ...(selectorMatches === undefined ? {} : { selectorMatches }),
   });
   const tabsApi = createTabsApi({ url });
@@ -1425,5 +1478,224 @@ describe('browser tool session scripting backend', () => {
     expect(
       debuggerBackedSession.getToolUnavailableError('kilo_browser_console_messages')
     ).toBeUndefined();
+  });
+});
+
+describe('background tab viewport capture', () => {
+  const LAYOUT = { clientHeight: 557, clientWidth: 1000 };
+
+  it('returns the frame the screencast pushes, acked and then stopped', async () => {
+    const frame = pngOfSize(LAYOUT.clientWidth, LAYOUT.clientHeight);
+    const { debuggerApi, session } = createSession({
+      layoutViewport: LAYOUT,
+      // The metadata is in device-independent pixels; the frame's own header is what the size gate reads.
+      screencast: {
+        data: frame,
+        deviceHeight: LAYOUT.clientHeight,
+        deviceWidth: LAYOUT.clientWidth,
+      },
+    });
+
+    await expect(session.captureViewportImage('png')).resolves.toBe(frame);
+
+    const methods = debuggerApi.commands.map(command => command.method);
+
+    expect(methods).toContain('Page.startScreencast');
+    expect(methods).toContain('Page.screencastFrameAck');
+    expect(methods).toContain('Page.stopScreencast');
+    // The page is told it is looked at before the frame is asked for, which is what makes an inactive tab paint.
+    expect(methods.indexOf('Emulation.setFocusEmulationEnabled')).toBeLessThan(
+      methods.indexOf('Page.startScreencast')
+    );
+    expect(debuggerApi.commands).toContainEqual({
+      method: 'Page.startScreencast',
+      params: { everyNthFrame: 1, format: 'png' },
+    });
+  });
+
+  it('falls back when no frame arrives inside the bound, and drops a late one', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const { debuggerApi, session } = createSession({ layoutViewport: LAYOUT });
+      const capture = session.captureViewportImage('png');
+
+      await vi.advanceTimersByTimeAsync(400);
+
+      await expect(capture).resolves.toBeUndefined();
+      // The screencast is stopped even when nothing came back.
+      expect(debuggerApi.commands.map(command => command.method)).toContain('Page.stopScreencast');
+
+      debuggerApi.emitEvent(7, 'Page.screencastFrame', {
+        data: 'TEFURQ==',
+        metadata: { deviceHeight: LAYOUT.clientHeight, deviceWidth: LAYOUT.clientWidth },
+        sessionId: 4,
+      });
+
+      // The late frame answers nothing: the next capture is a fresh request, not this image.
+      const next = session.captureViewportImage('png');
+
+      await vi.advanceTimersByTimeAsync(400);
+
+      await expect(next).resolves.toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('refuses a frame that is not the size a plain capture of this viewport is', async () => {
+    const { session } = createSession({
+      layoutViewport: LAYOUT,
+      // A frame at another scale would put the mask boxes off the pixels they must cover.
+      screencast: { data: pngOfSize(2000, 1114), deviceHeight: 1114, deviceWidth: 2000 },
+    });
+
+    await expect(session.captureViewportImage('png')).resolves.toBeUndefined();
+  });
+
+  it('accepts the frame a plain capture of a DPR-2 viewport is, whatever the metadata reports', async () => {
+    // A DPR-2 renderer reports a layout viewport in device pixels and captures at that size, while the
+    // Screencast metadata stays in device-independent pixels, i.e. half of it. The image is the viewport,
+    // So a gate on the metadata would throw away the frame that matches the mask geometry exactly.
+    const layout = { clientHeight: 1114, clientWidth: 2000 };
+    const frame = pngOfSize(2000, 1114);
+    const { session } = createSession({
+      layoutViewport: layout,
+      screencast: { data: frame, deviceHeight: 557, deviceWidth: 1000 },
+    });
+
+    await expect(session.captureViewportImage('png')).resolves.toBe(frame);
+  });
+
+  it('refuses a frame whose header it cannot read, rather than scale the mask onto a guess', async () => {
+    const { session } = createSession({
+      layoutViewport: LAYOUT,
+      screencast: { data: 'TlVSU0VSQ0FTVA==', deviceHeight: 557, deviceWidth: 1000 },
+    });
+
+    // Not a png or a jpeg: the plain capture is the only image whose pixels are known.
+    await expect(session.captureViewportImage('png')).resolves.toBeUndefined();
+  });
+
+  it('takes no frame on a platform without the debugger', async () => {
+    const { session } = createScriptingSession();
+
+    await expect(session.captureViewportImage('png')).resolves.toBeUndefined();
+  });
+
+  it('gives each capture its own screencast, so an older one cannot stop a newer one\u2019s frame', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const { debuggerApi, session } = createSession({ layoutViewport: LAYOUT });
+      const older = session.captureViewportImage('png');
+
+      // The older capture is still waiting for its frame when the newer one starts on the same tab.
+      await vi.advanceTimersByTimeAsync(240);
+
+      const newer = session.captureViewportImage('png');
+
+      // The older capture's bound expires while the newer one waits: only its own attempt may be given up.
+      await vi.advanceTimersByTimeAsync(20);
+
+      const frame = pngOfSize(LAYOUT.clientWidth, LAYOUT.clientHeight);
+
+      debuggerApi.emitEvent(7, 'Page.screencastFrame', {
+        data: frame,
+        metadata: { deviceHeight: LAYOUT.clientHeight, deviceWidth: LAYOUT.clientWidth },
+        sessionId: 5,
+      });
+
+      await expect(newer).resolves.toBe(frame);
+      await expect(older).resolves.toBeUndefined();
+
+      const methods = debuggerApi.commands.map(command => command.method);
+
+      // The screencast is stopped once — by the capture that owns it — not by the capture it replaced.
+      expect(methods.filter(method => method === 'Page.stopScreencast')).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('sends nothing after the tab is taken over mid-capture', async () => {
+    const { promise: gateWait, resolve: openGate } = Promise.withResolvers<void>();
+    const { debuggerApi, session } = createSession({
+      gate: { command: 'Page.getLayoutMetrics', wait: gateWait },
+      layoutViewport: LAYOUT,
+    });
+    const taken = { cancelled: false };
+    const capture = session.captureViewportImage(
+      'png',
+      {},
+      {
+        cancelled: () => taken.cancelled,
+      }
+    );
+
+    await vi.waitFor(() => {
+      expect(debuggerApi.commands.map(command => command.method)).toContain(
+        'Page.getLayoutMetrics'
+      );
+    });
+
+    // The panel took the tab while the measurement was in flight.
+    taken.cancelled = true;
+    openGate();
+
+    await expect(capture).resolves.toBeUndefined();
+
+    const methods = debuggerApi.commands.map(command => command.method);
+
+    expect(methods).not.toContain('Page.startScreencast');
+    expect(methods).not.toContain('Page.screencastFrameAck');
+    expect(methods).not.toContain('Page.stopScreencast');
+  });
+
+  it('acks no frame and stops only its own screencast once the tab is taken over', async () => {
+    const { debuggerApi, session } = createSession({ layoutViewport: LAYOUT });
+    const taken = { cancelled: false };
+    const capture = session.captureViewportImage(
+      'png',
+      {},
+      {
+        cancelled: () => taken.cancelled,
+      }
+    );
+
+    await vi.waitFor(() => {
+      expect(debuggerApi.commands.map(command => command.method)).toContain('Page.startScreencast');
+    });
+
+    taken.cancelled = true;
+    debuggerApi.emitEvent(7, 'Page.screencastFrame', {
+      data: 'VEFLRU4=',
+      metadata: { deviceHeight: LAYOUT.clientHeight, deviceWidth: LAYOUT.clientWidth },
+      sessionId: 6,
+    });
+
+    await expect(capture).resolves.toBeUndefined();
+
+    const methods = debuggerApi.commands.map(command => command.method);
+
+    // The frame belongs to nobody now: the ack is not sent, and the best-effort stop winds its own screencast down.
+    expect(methods).not.toContain('Page.screencastFrameAck');
+    expect(methods.filter(method => method === 'Page.stopScreencast')).toHaveLength(1);
+  });
+
+  it('takes no screencast frame for a webp request, which the protocol has no format for', async () => {
+    const { debuggerApi, session } = createSession({
+      layoutViewport: LAYOUT,
+      screencast: {
+        data: 'V0VCUA==',
+        deviceHeight: LAYOUT.clientHeight,
+        deviceWidth: LAYOUT.clientWidth,
+      },
+    });
+
+    await expect(session.captureViewportImage('webp')).resolves.toBeUndefined();
+    expect(debuggerApi.commands.map(command => command.method)).not.toContain(
+      'Page.startScreencast'
+    );
   });
 });

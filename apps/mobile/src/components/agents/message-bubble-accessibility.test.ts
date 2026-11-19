@@ -53,6 +53,7 @@ vi.mock('./chat-markdown-text', () => ({ ChatMarkdownText: 'ChatMarkdownText' })
 vi.mock('./compaction-separator', () => ({ CompactionSeparator: 'CompactionSeparator' }));
 vi.mock('./file-part-renderer', () => ({ FilePartRenderer: 'FilePartRenderer' }));
 vi.mock('./part-renderer', () => ({ PartRenderer: 'PartRenderer' }));
+vi.mock('./preparation-group', () => ({ PreparationGroup: 'PreparationGroup' }));
 // The condensed-row module pulls `fixed-part-row` → `activity-indicator` →
 // `a11y/motion` → `expo-battery`, which the pure project cannot load. The a11y
 // harness inspects the element tree, so stand the row in as a sentinel like the

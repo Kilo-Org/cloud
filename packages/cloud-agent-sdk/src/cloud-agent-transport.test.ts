@@ -373,7 +373,8 @@ describe('CloudAgentTransport event routing', () => {
       );
       expect(questionAsked).toHaveBeenCalledWith('live-question', []);
       mockWs.onclose?.({ code: 1006, reason: '', wasClean: false } as CloseEvent);
-      expect(state.getStatus()).toEqual({ type: 'disconnected' });
+      // A drop the transport retries reads as reconnecting, not as a loss.
+      expect(state.getStatus()).toEqual({ type: 'disconnected', reconnecting: true });
     } finally {
       transport.destroy();
       jest.useRealTimers();
@@ -394,7 +395,8 @@ describe('CloudAgentTransport event routing', () => {
   });
 
   it('publishes connection loss when authentication fails after a partial replay', async () => {
-    const { transport, state, stateNotifications, stateErrors } = createTransportWithSinks();
+    const { transport, state, stateNotifications, stateErrors, serviceEvents } =
+      createTransportWithSinks();
     transport.connect();
     await flushPromises();
     stateNotifications.mockClear();
@@ -403,9 +405,16 @@ describe('CloudAgentTransport event routing', () => {
     mockWs.onclose?.({ code: 1008, reason: 'Unauthorized', wasClean: false } as CloseEvent);
     await flushPromises();
     mockWs.onclose?.({ code: 1008, reason: 'Unauthorized', wasClean: false } as CloseEvent);
+    // The first close is a drop the transport retries, so it reads as
+    // reconnecting. The second close spends the retry budget on an auth
+    // failure, which escalates to one terminal loss.
     expect(state.getStatus()).toEqual({ type: 'disconnected' });
-    expect(stateNotifications).toHaveBeenCalledTimes(1);
+    expect(stateNotifications).toHaveBeenCalledTimes(2);
+    expect(stateErrors).toHaveBeenCalledWith('Connection lost. Please retry in a moment.');
     expect(stateErrors).not.toHaveBeenCalledWith('Historical overload');
+    expect(
+      serviceEvents.filter(event => event.type === 'stopped' && event.exhausted === true)
+    ).toHaveLength(1);
     transport.destroy();
   });
 
@@ -540,7 +549,7 @@ describe('CloudAgentTransport event routing', () => {
     sendRaw(kilocode('session.error', { sessionID: 'ses-1', error: 'Old failure' }));
     expect(stateNotifications).not.toHaveBeenCalled();
     mockWs.onclose?.({ code: 1006, reason: '', wasClean: false } as CloseEvent);
-    expect(state.getStatus()).toEqual({ type: 'disconnected' });
+    expect(state.getStatus()).toEqual({ type: 'disconnected', reconnecting: true });
     expect(stateErrors).not.toHaveBeenCalledWith('Old failure');
     expect(stateNotifications).toHaveBeenCalledTimes(1);
     transport.destroy();

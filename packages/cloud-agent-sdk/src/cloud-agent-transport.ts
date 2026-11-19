@@ -673,12 +673,31 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       if (expectedGeneration !== lifecycleGeneration) return;
 
       const stoppedEvent: ServiceEvent = { type: 'stopped', reason: 'transport-disconnected' };
+      const exhaustedEvent: ServiceEvent = {
+        type: 'stopped',
+        reason: 'transport-disconnected',
+        exhausted: true,
+      };
+      // The base connection reports exhaustion on both edges. Only the first
+      // `true` per connection escalates, so a repeated report never publishes
+      // a second terminal stop.
+      let exhaustionReported = false;
 
       const nextConnection = createConnection({
         websocketUrl: buildWebsocketUrl,
         ticket,
         lifecycleHooks: config.lifecycleHooks,
         websocketHeaders: config.websocketHeaders,
+        onReconnectExhaustionChange: exhausted => {
+          if (expectedGeneration !== lifecycleGeneration) return;
+          if (!exhausted) {
+            exhaustionReported = false;
+            return;
+          }
+          if (exhaustionReported) return;
+          exhaustionReported = true;
+          sink.onServiceEvent(exhaustedEvent);
+        },
         onEvent: raw => {
           if (expectedGeneration !== lifecycleGeneration || raw.sessionId !== config.sessionId) {
             return;

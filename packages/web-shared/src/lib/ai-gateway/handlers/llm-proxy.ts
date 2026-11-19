@@ -533,8 +533,7 @@ export async function handleLlmProxyRequest(
           )
         : null,
     signal: request.signal,
-    keepAliveUntilFirstByte:
-      caller.kind === 'signed-in' && caller.cloudAgentRuntimeProxied === true,
+    keepAliveUntilFirstByte: caller.kind === 'signed-in' && caller.cloudAgentRuntimeProxied,
     captureEnkryptOutputReport: report =>
       providerMetadataCapture?.captureEnkryptOutputReport(report),
   });

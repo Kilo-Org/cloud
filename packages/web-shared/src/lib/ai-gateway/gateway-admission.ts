@@ -72,7 +72,7 @@ export type SignedInGatewayCaller = {
   organizationId: string | undefined;
   botId?: string;
   /** The request came through the Cloud Agent runtime credential proxy (verified attestation). */
-  cloudAgentRuntimeProxied?: boolean;
+  cloudAgentRuntimeProxied: boolean;
 };
 export type AnonymousGatewayCaller = { kind: 'anonymous'; user: AnonymousUserContext };
 export type RejectedGatewayCaller = { kind: 'rejected'; response: NextResponse };

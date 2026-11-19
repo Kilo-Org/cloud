@@ -236,7 +236,11 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
   return (
     <View className="gap-4">
       <Card>
-        <Text className="text-base font-medium" selectable>
+        {/* The title and the description are the advisory's own words, not app
+            copy, so each lays itself out from its first strong character: an
+            English finding keeps its left edge and the punctuation that ends it
+            inside a right-to-left interface. */}
+        <Text className="text-base font-medium" selectable direction="auto">
           {finding.title}
         </Text>
         <View className="flex-row flex-wrap items-center gap-3">
@@ -255,7 +259,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
           ) : null}
         </View>
         {description ? (
-          <Text variant="muted" className="text-sm" selectable>
+          <Text variant="muted" className="text-sm" selectable direction="auto">
             {description}
           </Text>
         ) : null}

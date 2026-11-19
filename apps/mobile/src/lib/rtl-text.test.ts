@@ -4,9 +4,9 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   codeFieldTextStyle,
   containsJoinedScript,
+  CONTENT_TEXT_DIRECTION,
   hasRtlScript,
   ltrValueTextStyle,
-  rtlBlockTextAlign,
   withoutMonoFamily,
 } from './rtl-text';
 
@@ -187,16 +187,13 @@ describe('withoutMonoFamily', () => {
   });
 });
 
-describe('rtlBlockTextAlign', () => {
-  // A native markdown paragraph resolves its direction from its first strong
-  // character, so an English reply would sit at the left edge of an Arabic
-  // interface while the rows around it sit on the start edge.
-  it('names the start edge in a right-to-left interface', () => {
-    expect(rtlBlockTextAlign(true)).toEqual({ textAlign: 'right' });
-  });
-
-  it('leaves the renderer its natural alignment in a left-to-right interface', () => {
-    expect(rtlBlockTextAlign(false)).toEqual({});
+describe('CONTENT_TEXT_DIRECTION', () => {
+  // Copy the app did not write — a server's message, a user's own text — lays
+  // itself out from its own first strong character, so an English sentence
+  // keeps its left edge and the punctuation that ends it inside an Arabic
+  // interface, and an Arabic one still aligns to the right.
+  it('names the paragraph its own direction', () => {
+    expect(CONTENT_TEXT_DIRECTION).toEqual({ writingDirection: 'auto' });
   });
 });
 

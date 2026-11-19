@@ -151,7 +151,11 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
         topInset={headerTopInset}
       >
         <View className="gap-5 px-4 pt-2">
-          <View className="flex-row gap-3">
+          {/* The two boxes sit on one line. A translated label can wrap in the
+              80 pt emoji column (Arabic "الرموز التعبيرية" takes two lines), so
+              the columns are bottom-aligned: the boxes stay level with each
+              other whatever the label above them does. */}
+          <View className="flex-row items-end gap-3">
             <View className="w-20 gap-2">
               <FieldLabel>{t('todos.listSettings.emoji')}</FieldLabel>
               <Input

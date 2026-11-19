@@ -150,17 +150,18 @@ export function codeFieldTextStyle(): TextStyle {
 }
 
 /**
- * The start alignment for a block of prose. A renderer that resolves a
- * paragraph's direction from its first strong character — the native markdown
- * text does — leaves a Latin reply at the left edge of a right-to-left
- * interface while the rows around it sit on the start edge, so the interface
- * names the alignment itself. In a left-to-right interface the patch is empty
- * and the renderer keeps its natural alignment; a centered block is unaffected
- * because it never takes this patch.
+ * Base direction for copy the app did not write — a server's message, a user's
+ * own text, an issue body. Each paragraph resolves from its own first strong
+ * character, so English content keeps its left edge and the punctuation that
+ * ends it, while Arabic content still lays out and aligns to the right. Naming
+ * the paragraph's own direction is also what makes the natural alignment
+ * resolve (`RTL_WRITING_DIRECTION` names the other direction for app copy).
+ *
+ * iOS reads the paragraph from `writingDirection`; Android resolves a paragraph
+ * from its first strong character when no direction is named, so the constant
+ * carries nothing to do there.
  */
-export function rtlBlockTextAlign(isRtl: boolean): { textAlign?: 'right' } {
-  return isRtl ? { textAlign: 'right' } : {};
-}
+export const CONTENT_TEXT_DIRECTION: TextStyle = { writingDirection: 'auto' };
 
 /**
  * A joined script's letters connect into one shape, so `letter-spacing` — a

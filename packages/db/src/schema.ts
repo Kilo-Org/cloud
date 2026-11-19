@@ -3441,7 +3441,8 @@ export const organizations = pgTable(
   table => [
     index('IDX_organizations_anthropic_user_profile_id')
       .on(table.anthropic_user_profile_id)
-      .where(sql`${table.anthropic_user_profile_id} IS NOT NULL`),
+      .where(sql`${table.anthropic_user_profile_id} IS NOT NULL`)
+      .concurrently(),
     check('organizations_name_not_empty_check', sql`length(trim(${table.name})) > 0`),
     check(
       'organizations_not_parented_by_self_check',

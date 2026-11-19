@@ -11,6 +11,7 @@ import { PrReviewReviewSubmitScreen } from '@/components/pr-review/pr-review-rev
 import { FeedbackPromptProvider } from '@/components/use-feedback-prompt';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import {
+  clearDraft,
   flushDraft,
   prCommentDraftKey,
   prConversationCommentDraftKey,
@@ -79,13 +80,24 @@ function SeededDraft({
   const [ready, setReady] = useState(false);
   useEffect(() => {
     if (!userId) {
-      return;
+      return undefined;
     }
     void (async () => {
-      saveDraft(userId, entityKey, body);
-      await flushDraft(userId, entityKey);
+      try {
+        saveDraft(userId, entityKey, body);
+        await flushDraft(userId, entityKey);
+      } catch {
+        // A refused write mounts the bare composer: the developer sees an empty
+        // field instead of a blank surface that looks like a broken link.
+      }
       setReady(true);
     })();
+    // The seeded draft is dev state, so it goes with the surface: a later plain
+    // visit to the same key must open empty (the existing `composer` surface
+    // shares the comment-composer key).
+    return () => {
+      void clearDraft(userId, entityKey);
+    };
   }, [userId, entityKey, body]);
   return userId && ready ? children : null;
 }

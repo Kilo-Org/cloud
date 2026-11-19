@@ -373,6 +373,24 @@ describe('shouldHideTabBar', () => {
     expect(shouldHideTabBar('/abc123', ['(app)', '(tabs)', '(4_chat)', '[id]'])).toBe(true);
   });
 
+  it('reads the screen a form sheet covers instead of the sheet', () => {
+    // A sheet is not a screen of its own: over a pushed screen the bar keeps
+    // that screen's hidden state, and over a tab root it keeps the bar, so the
+    // covered root also keeps its bottom inset while the sheet is up.
+    expect(
+      shouldHideTabBar('/organization/invite-member', [
+        '(app)',
+        '(tabs)',
+        '(3_profile)',
+        'organization',
+        'invite-member',
+      ])
+    ).toBe(true);
+    expect(shouldHideTabBar('/share-gate', ['(app)', '(tabs)', '(0_home)', 'share-gate'])).toBe(
+      false
+    );
+  });
+
   it('hides the bar on a root-stack screen', () => {
     expect(shouldHideTabBar('/usage', ['(app)', 'usage'])).toBe(true);
     expect(shouldHideTabBar('/credits', ['(app)', 'credits'])).toBe(true);

@@ -1,4 +1,5 @@
 import { i18n } from '@/i18n';
+import { segmentsBeneathFormSheet } from '@/lib/form-sheet-routes';
 import { formatNumber } from '@/lib/format';
 
 const TAB_BAR_BASE_HEIGHT = 50;
@@ -275,13 +276,19 @@ const TAB_ROOT_GROUPS = new Set(['(0_home)', '(2_agents)', '(4_chat)', '(3_profi
  * or on the root stack (Usage, Notifications, Buy credits, Kilo Pass), so a
  * Profile sub-screen and an Agents sub-screen carry the same chrome. Read from
  * the segments, because a chat conversation's path is the session id alone.
+ *
+ * A form sheet is not a screen of its own: it covers the route beneath it, so
+ * the rule reads that route. A sheet over a tab root therefore leaves the bar
+ * where the root had it — and the root's bottom inset with it — while a sheet
+ * over a pushed screen keeps the bar hidden.
  */
 export function shouldHideTabBar(_pathname: string, segments: readonly string[]): boolean {
-  const leaf = segments.at(-1);
+  const screen = segmentsBeneathFormSheet(segments);
+  const leaf = screen.at(-1);
   if (leaf !== undefined && TAB_ROOT_GROUPS.has(leaf)) {
     return false;
   }
-  return !(leaf === 'index' && TAB_ROOT_GROUPS.has(segments.at(-2) ?? ''));
+  return !(leaf === 'index' && TAB_ROOT_GROUPS.has(screen.at(-2) ?? ''));
 }
 
 export type TabBarTab = 'home' | 'agents' | 'chat' | 'profile';

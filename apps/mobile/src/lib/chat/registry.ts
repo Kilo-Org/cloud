@@ -1020,7 +1020,7 @@ function partsOf({ text, images }: Question): string | readonly PartDraft[] {
   ];
 }
 
-/** The tally stays in memory if persistence fails, so the next write includes it. */
+/** The tally stays in memory when persistence fails; the next write includes it. */
 async function countCall(
   sessionId: string,
   chat: Chat,
@@ -1054,6 +1054,8 @@ async function countCall(
   try {
     recordUsage(await open(), sessionId, usage);
   } catch {
+    // Swallow: a failed write keeps the in-memory tally authoritative and the
+    // next answer's write includes it.
   }
 }
 

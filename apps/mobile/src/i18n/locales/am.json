@@ -4742,7 +4742,7 @@
     "statusSaved": "ተቀምጧል",
     "statusFailed": "ማስቀመጥ አልተቻለም።",
     "inputTitle": "የግብዓት ጥበቃ ገደቦች",
-    "inputDescription": "የመሣሪያ ውጤቶችን ጨምሮ እያንዳንዱን ግብዓት በEnkrypt AI ይቃኛል። Enkrypt በማይገኝበት ጊዜ የሚያግድ መመርመሪያ ጥያቄውን ውድቅ ያደርጋል።",
+    "inputDescription": "የመሣሪያ ውጤቶችን ጨምሮ እያንዳንዱን ግብዓት በEnkrypt AI ይቃኛል። Enkrypt በማይገኝበት ጊዜ ጥያቄዎች ውድቅ ከመደረግ ይልቅ ሳይቃኙ ይላካሉ።",
     "outputTitle": "የውጤት ጥበቃ ገደቦች",
     "outputDescription": "አባላት ምላሾችን ከመቀበላቸው በፊት በEnkrypt AI ይቃኛል። እርስዎ ካላበሩት በስተቀር ጠፍቷል።",
     "detectorsHint": "«አግድ» የተጠቆመ ጥያቄን ውድቅ ያደርጋል። «መዝግብ ብቻ» ጥያቄውን ሳያዘገይ ይመዘግበዋል።",

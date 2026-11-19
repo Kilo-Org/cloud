@@ -4742,7 +4742,7 @@
     "statusSaved": "Saqlandi",
     "statusFailed": "Saqlab bo'lmadi.",
     "inputTitle": "Kirish himoya to'siqlari",
-    "inputDescription": "Har bir kirishni Enkrypt AI bilan skanerlaydi, jumladan asbob natijalarini. Bloklovchi detektor Enkrypt mavjud bo'lmaganda so'rovni rad etadi.",
+    "inputDescription": "Har bir kirishni Enkrypt AI bilan skanerlaydi, jumladan asbob natijalarini. Enkrypt mavjud bo'lmaganda so'rovlar rad etilish o'rniga skanerlanmasdan yuboriladi.",
     "outputTitle": "Chiqish himoya to'siqlari",
     "outputDescription": "A'zolar javoblarni olishidan oldin ularni Enkrypt AI bilan skanerlaydi. Siz yoqmaguningizcha o'chirilgan.",
     "detectorsHint": "Bloklash belgilangan so'rovni rad etadi. Faqat jurnalga yozish uni kechiktirmasdan qayd etadi.",

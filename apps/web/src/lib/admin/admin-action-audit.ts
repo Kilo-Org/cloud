@@ -176,13 +176,10 @@ const EMAIL_ADDRESS_PATTERN = /[\p{L}\p{N}][^\s@]*@[^\s@]+\.[\p{L}\p{M}]{2,}/gu;
  * browsable by every platform admin, and the target user records hold block
  * reason, admin note and credit transaction description that admins read too.
  *
- * The local part is the whole non-space run after its first letter or digit, so
- * no fragment of it survives whatever form the address was pasted in, while
- * prose punctuation that precedes the address stays in the text. The domain
- * match accepts Unicode letters and combining marks. The
- * match requires a dotted domain of at least two letters: an intranet host
- * without a dot, and a bracketed IP literal, are not treated as customer
- * addresses and stay in the text.
+ * The domain match accepts Unicode letters and combining marks and requires a
+ * dotted domain of at least two letters: an intranet host without a dot, and a
+ * bracketed IP literal, are not treated as customer addresses and stay in the
+ * text.
  */
 export function redactEmailAddressesInAuditText(text: string): string {
   return text.replace(EMAIL_ADDRESS_PATTERN, '[redacted-email]');

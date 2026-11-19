@@ -4742,7 +4742,7 @@
     "statusSaved": "Sparat",
     "statusFailed": "Det gick inte att spara.",
     "inputTitle": "Skyddsräcken för indata",
-    "inputDescription": "Skannar varje indata med Enkrypt AI, inklusive verktygsresultat. En blockerande detektor avvisar en begäran när Enkrypt AI inte är tillgängligt.",
+    "inputDescription": "Skannar varje indata med Enkrypt AI, inklusive verktygsresultat. När Enkrypt AI inte är tillgängligt skickas begäranden utan skanning i stället för att avvisas.",
     "outputTitle": "Skyddsräcken för utdata",
     "outputDescription": "Skannar svar med Enkrypt AI innan medlemmar får dem. Avstängt om du inte aktiverar det.",
     "detectorsHint": "Blockera avvisar en flaggad begäran. Endast logga registrerar den utan att fördröja begäran.",

@@ -4742,7 +4742,7 @@
     "statusSaved": "已保存",
     "statusFailed": "保存失败。",
     "inputTitle": "输入护栏",
-    "inputDescription": "使用 Enkrypt AI 扫描每个输入，包括工具结果。当 Enkrypt 不可用时，阻断型检测器会拒绝请求。",
+    "inputDescription": "使用 Enkrypt AI 扫描每个输入，包括工具结果。当 Enkrypt 不可用时，请求不会被拒绝，而是在未经扫描的情况下发送。",
     "outputTitle": "输出护栏",
     "outputDescription": "在成员收到响应之前，使用 Enkrypt AI 扫描响应。除非你将其开启，否则处于关闭状态。",
     "detectorsHint": "阻止会拒绝被标记的请求。仅记录会将其记录下来，但不会延迟请求。",

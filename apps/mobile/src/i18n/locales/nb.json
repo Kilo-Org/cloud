@@ -4742,7 +4742,7 @@
     "statusSaved": "Lagret",
     "statusFailed": "Kunne ikke lagre.",
     "inputTitle": "Vernetiltak for inndata",
-    "inputDescription": "Skanner alle inndata med Enkrypt AI, inkludert verktøyresultater. En blokkerende detektor avviser en forespørsel når Enkrypt ikke er tilgjengelig.",
+    "inputDescription": "Skanner alle inndata med Enkrypt AI, inkludert verktøyresultater. Når Enkrypt ikke er tilgjengelig, sendes forespørsler uten skanning i stedet for å bli avvist.",
     "outputTitle": "Vernetiltak for utdata",
     "outputDescription": "Skanner svar med Enkrypt AI før medlemmer mottar dem. Av med mindre du slår det på.",
     "detectorsHint": "Blokker avviser en forespørsel som er flagget. Bare logg registrerer den uten å forsinke forespørselen.",

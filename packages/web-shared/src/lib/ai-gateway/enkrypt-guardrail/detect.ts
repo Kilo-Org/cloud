@@ -27,15 +27,14 @@ type ReadyEnkryptGuardrailConfig = Extract<EnkryptGuardrailConfig, { status: 're
 export const ENKRYPT_DETECT_URL = 'https://api.enkryptai.com/guardrails/detect';
 
 /**
- * Bounds every attempt of a scan together, including time spent waiting for a free call slot. The
- * input guardrail starts one deadline for all scans of a request's blocking detectors, and one for
- * its log-only detectors. The gateway awaits the blocking scans just before the upstream request,
- * so this is the most latency an enabled organization's request can gain. It also bounds the
- * deferred work of the log-only scans, which the request does not wait for.
+ * Bounds a scan, including time spent waiting for a free call slot. The input guardrail starts one
+ * deadline for all scans of a request's blocking detectors, and one for its log-only detectors.
+ * The gateway awaits the blocking scans just before the upstream request, so this is the most
+ * latency an enabled organization's request can gain. It also bounds the deferred work of the
+ * log-only scans, which the request does not wait for.
  */
 export const ENKRYPT_GUARDRAIL_TIMEOUT_MS = 60_000;
 
-const MAX_ATTEMPTS = 2;
 const MAX_ERROR_BODY_BYTES = 64 * 1024;
 const ERROR_BODY_TIMEOUT_MS = 1_000;
 
@@ -104,13 +103,14 @@ export function scanLogFields(scan: EnkryptScanContext) {
 
 /**
  * `skip`: no scan gates the request, because the organization has no guardrail or its detectors
- * only log. An unavailable guardrail's `reason` is `transient` when an automatic retry could
- * succeed, and `timeout` when the scan ran out of time, which a long conversation makes likely to
- * recur.
+ * only log. `fail_open`: Enkrypt failed, so the content was let through unscanned; see
+ * `failureVerdict`. `unavailable`: the guardrail could not run for a reason of Kilo's own, such as
+ * an invalid configuration or a missing API key, so the content was rejected.
  */
 export type EnkryptGuardrailVerdict =
   | { action: 'skip' }
   | { action: 'allow' }
+  | { action: 'fail_open' }
   | { action: 'block'; message: string }
   | { action: 'unavailable'; reason: EnkryptUnavailableReason };
 
@@ -153,14 +153,35 @@ type DetectError =
 
 type ScanError = DetectError | 'invalid_config' | 'missing_api_key' | 'request_too_large';
 
+/**
+ * `detected`: Enkrypt answered. Some detectors may still have failed inside Enkrypt; `error` then
+ * names them, and the scan fails unless a blocking detector fired anyway.
+ */
 type DetectAttempt =
   | {
       kind: 'detected';
       firedDetectors: EnkryptDetectorId[];
       resultMessage: string | null;
       creditsCost: number | null;
+      error: `detector_error:${string}` | null;
     }
-  | { kind: 'failed'; error: DetectError; retryable: boolean; creditsCost: number | null };
+  | { kind: 'failed'; error: DetectError; creditsCost: number | null };
+
+/**
+ * A failure of Enkrypt itself, or of reaching it in time, rather than a client disconnect or a
+ * fault of Kilo's own. Enkrypt rejecting the API key (401 or 403) is Kilo's fault: a revoked or
+ * wrong `ENKRYPT_API_KEY` must not silently turn the guardrail off.
+ */
+function isEnkryptFailure(error: ScanError): boolean {
+  return (
+    error !== 'client_aborted' &&
+    error !== 'invalid_config' &&
+    error !== 'missing_api_key' &&
+    error !== 'request_too_large' &&
+    error !== 'http_401' &&
+    error !== 'http_403'
+  );
+}
 
 function hasFired(value: unknown): boolean {
   if (typeof value === 'number') return value > 0;
@@ -274,7 +295,7 @@ async function detectOnce(
 ): Promise<DetectAttempt> {
   const finish = (attempt: DetectAttempt): DetectAttempt => {
     if (requestLog) {
-      requestLog.error = attempt.kind === 'failed' ? attempt.error : null;
+      requestLog.error = attempt.error;
       deps.requestLog?.capture(capturedBody.then(() => requestLog));
     }
     return attempt;
@@ -290,11 +311,7 @@ async function detectOnce(
     });
   } catch {
     const aborted = abortError(signal, deps);
-    return finish(
-      aborted
-        ? { kind: 'failed', error: aborted, retryable: false, creditsCost: null }
-        : { kind: 'failed', error: 'network', retryable: true, creditsCost: null }
-    );
+    return finish({ kind: 'failed', error: aborted ?? 'network', creditsCost: null });
   }
   if (requestLog) requestLog.status_code = response.status;
   const creditsCost = parseCreditsCost(response);
@@ -309,13 +326,7 @@ async function detectOnce(
     } else {
       await response.body?.cancel().catch(() => {});
     }
-    return finish({
-      kind: 'failed',
-      error: `http_${response.status}`,
-      // An immediate retry of a 429 would hit the same limiter within the deadline.
-      retryable: response.status >= 500,
-      creditsCost,
-    });
+    return finish({ kind: 'failed', error: `http_${response.status}`, creditsCost });
   }
   let json: unknown;
   try {
@@ -326,29 +337,20 @@ async function detectOnce(
     return finish({
       kind: 'failed',
       error: abortError(signal, deps) ?? 'invalid_response',
-      retryable: false,
       creditsCost,
     });
   }
   const parsed = detectResponseSchema.safeParse(json);
   if (!parsed.success) {
-    return finish({ kind: 'failed', error: 'invalid_response', retryable: false, creditsCost });
+    return finish({ kind: 'failed', error: 'invalid_response', creditsCost });
   }
   const erroredDetectors = matchingDetectors(parsed.data.summary, hasErrored);
-  if (erroredDetectors.length > 0) {
-    return finish({
-      kind: 'failed',
-      error: `detector_error:${erroredDetectors.join(',')}`,
-      // The known cause is deterministic, so an immediate retry would fail again and be charged again.
-      retryable: false,
-      creditsCost,
-    });
-  }
   return finish({
     kind: 'detected',
     firedDetectors: matchingDetectors(parsed.data.summary, hasFired),
     resultMessage: parsed.data.result_message ?? null,
     creditsCost,
+    error: erroredDetectors.length > 0 ? `detector_error:${erroredDetectors.join(',')}` : null,
   });
 }
 
@@ -393,15 +395,15 @@ function attemptDecision(
   config: ReadyEnkryptGuardrailConfig
 ): EnkryptGuardrailDecision {
   if (attempt.kind === 'failed') return 'error';
-  return blockingDetectors(attempt.firedDetectors, config).length > 0 ? 'blocked' : 'allowed';
+  if (blockingDetectors(attempt.firedDetectors, config).length > 0) return 'blocked';
+  return attempt.error ? 'error' : 'allowed';
 }
 
 /**
- * Scans the request once, retrying a single transient failure within the shared deadline, and
- * maps the result to a verdict. Never throws. Returns one usage record per Enkrypt call, including
- * calls that failed, so a blocked or failed request is still accounted for. Any failure of a
- * blocking scan rejects the request, so a request never reaches the model unchecked by a detector
- * that can block it. A log-only scan always allows.
+ * Scans the text with one Enkrypt call, without retrying, and maps the result to a verdict. Never
+ * throws. Returns a usage record for the call, including a call that failed, so a blocked or failed
+ * request is still accounted for. When Enkrypt fails, a blocking scan fails open; see
+ * `failureVerdict`. A log-only scan always allows.
  */
 export async function scanRequest(
   scan: EnkryptGuardrailScan,
@@ -452,67 +454,71 @@ export async function scanRequest(
     deps.deadline ?? AbortSignal.timeout(deps.timeoutMs),
   ]);
   const startedAt = performance.now();
-  const attempts: DetectAttempt[] = [];
-  // Set when the scan ran out of time, or the client disconnected, waiting for a call slot.
-  let queueError: DetectError | null = null;
-  while (true) {
-    const slot = deps.limiter ? await deps.limiter.acquire(kind, signal) : () => {};
-    if (!slot) {
-      queueError = abortError(signal, deps) ?? 'timeout';
-      break;
-    }
-    const requestLog: EnkryptRequestLog | undefined = deps.requestLog
-      ? {
-          guardrail: deps.requestLog.guardrail,
-          scan: kind,
-          part: coverage.part,
-          ...(coverage.chunk ? { chunk: coverage.chunk } : {}),
-          request,
-          response: null,
-          status_code: null,
-          error: null,
-        }
-      : undefined;
-    let attempt: DetectAttempt;
-    try {
-      attempt = await detectOnce(body, signal, { ...deps, apiKey }, requestLog);
-    } finally {
-      slot();
-    }
-    attempts.push(attempt);
-    const retry =
-      attempt.kind === 'failed' &&
-      attempt.retryable &&
-      attempts.length < MAX_ATTEMPTS &&
-      !signal.aborted;
-    if (!retry) break;
+  const slot = deps.limiter ? await deps.limiter.acquire(kind, signal) : () => {};
+  if (!slot) {
+    // The scan ran out of time, or the client disconnected, waiting for a call slot.
+    return failedVerdict([], scope, {
+      error: abortError(signal, deps) ?? 'timeout',
+      latencyMs: Math.round(performance.now() - startedAt),
+    });
+  }
+  const requestLog: EnkryptRequestLog | undefined = deps.requestLog
+    ? {
+        guardrail: deps.requestLog.guardrail,
+        scan: kind,
+        part: coverage.part,
+        ...(coverage.chunk ? { chunk: coverage.chunk } : {}),
+        request,
+        response: null,
+        status_code: null,
+        error: null,
+      }
+    : undefined;
+  // A failed call is deliberately not retried, even when the failure looks transient. Retrying
+  // within the request multiplies the load on Enkrypt exactly when it is struggling; the failed
+  // content fails open instead and is rescanned once its short-lived cached verdict expires.
+  let attempt: DetectAttempt;
+  try {
+    attempt = await detectOnce(body, signal, { ...deps, apiKey }, requestLog);
+  } finally {
+    slot();
   }
   const latencyMs = Math.round(performance.now() - startedAt);
 
-  const usageRecords = attempts.map((each): EnkryptGuardrailCall => ({
-    organizationId: scan.organizationId,
-    kiloUserId: scan.kiloUserId,
-    sessionId: scan.sessionId,
-    microdollarUsageId: scan.microdollarUsageId,
-    apiKind: scan.apiKind,
-    decision: attemptDecision(each, config),
-    creditsCost: each.creditsCost,
-    scannedCharacters: text.length,
-    totalCharacters: coverage.totalCharacters,
-    ...(each.kind === 'detected' && each.firedDetectors.length > 0
-      ? { detectorsFired: each.firedDetectors }
-      : {}),
-  }));
+  const usageRecords: EnkryptGuardrailCall[] = [
+    {
+      organizationId: scan.organizationId,
+      kiloUserId: scan.kiloUserId,
+      sessionId: scan.sessionId,
+      microdollarUsageId: scan.microdollarUsageId,
+      apiKind: scan.apiKind,
+      decision: attemptDecision(attempt, config),
+      creditsCost: attempt.creditsCost,
+      scannedCharacters: text.length,
+      totalCharacters: coverage.totalCharacters,
+      ...(attempt.kind === 'detected' && attempt.firedDetectors.length > 0
+        ? { detectorsFired: attempt.firedDetectors }
+        : {}),
+    },
+  ];
 
-  if (queueError) return failedVerdict(usageRecords, scope, { error: queueError, latencyMs });
-  const attempt = attempts.at(-1);
-  if (attempt?.kind !== 'detected') {
-    return failedVerdict(usageRecords, scope, { error: attempt?.error ?? 'timeout', latencyMs });
+  if (attempt.kind !== 'detected') {
+    return failedVerdict(usageRecords, scope, { error: attempt.error, latencyMs });
   }
 
   const blocking = blockingDetectors(attempt.firedDetectors, config);
+  // A blocking detector that fired blocks even when another detector failed inside Enkrypt, so a
+  // detector error never lets content through that Enkrypt did flag.
+  if (attempt.error && blocking.length === 0) {
+    return failedVerdict(usageRecords, scope, {
+      error: attempt.error,
+      detectorsFired: attempt.firedDetectors,
+      latencyMs,
+    });
+  }
   const report = scanReport(scope, {
     decision: blocking.length === 0 ? 'allowed' : 'blocked',
+    error: attempt.error ?? undefined,
     detectorsFired: attempt.firedDetectors,
     usageRecords,
     latencyMs,
@@ -616,25 +622,31 @@ export function totalCredits(costs: (number | null)[]): number | null {
   return reported.length === 0 ? null : reported.reduce((sum, cost) => sum + cost, 0);
 }
 
-function unavailableReason(error: ScanError): EnkryptUnavailableReason {
-  if (error === 'timeout') return 'timeout';
-  const transient = error === 'network' || error === 'http_429' || /^http_5\d\d$/.test(error);
-  return transient ? 'transient' : 'failed';
-}
-
 function failureDecision(kind: EnkryptScanKind, error: ScanError): EnkryptScanReport['decision'] {
   if (error === 'client_aborted') return 'client_aborted';
-  return kind === 'log_only' ? 'error_logged' : 'error_fail_closed';
+  if (kind === 'log_only') return 'error_logged';
+  return isEnkryptFailure(error) ? 'error_fail_open' : 'error_fail_closed';
 }
 
+/**
+ * A blocking scan that Enkrypt fails, by an error response, a timeout, or a network failure, fails
+ * open: the content goes through unscanned. This is a deliberate tradeoff. Failing closed rejects
+ * every request of every member of the organization for as long as Enkrypt is degraded, which is
+ * unreasonable disruption for legitimate use. The failed content's verdict is cached as an allow
+ * for only `ENKRYPT_FAILED_SCAN_CACHE_TTL_SECONDS`, so it is rescanned soon anyway, without every
+ * step of an agent's conversation adding load to an Enkrypt that is already failing.
+ *
+ * Failures of Kilo's own, an invalid configuration or a missing or rejected API key, still fail
+ * closed, since they would otherwise silently turn the guardrail off; so does content too large to
+ * scan.
+ */
 function failureVerdict(
   kind: EnkryptScanKind,
   failure: { error: ScanError; closedVerdict?: EnkryptGuardrailVerdict }
 ): EnkryptGuardrailVerdict {
   if (kind === 'log_only') return { action: 'allow' };
-  return (
-    failure.closedVerdict ?? { action: 'unavailable', reason: unavailableReason(failure.error) }
-  );
+  if (isEnkryptFailure(failure.error)) return { action: 'fail_open' };
+  return failure.closedVerdict ?? { action: 'unavailable', reason: 'failed' };
 }
 
 /**
@@ -648,11 +660,13 @@ function failedVerdict(
     error: ScanError;
     latencyMs: number;
     closedVerdict?: EnkryptGuardrailVerdict;
+    detectorsFired?: EnkryptDetectorId[];
   }
 ): EnkryptGuardrailScanResult {
   const report = scanReport(scope, {
     decision: failureDecision(scope.report.scan, failure.error),
     error: failure.error,
+    detectorsFired: failure.detectorsFired,
     usageRecords,
     latencyMs: failure.latencyMs,
   });

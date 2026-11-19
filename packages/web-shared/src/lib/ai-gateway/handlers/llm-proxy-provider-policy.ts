@@ -16,11 +16,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
-import {
-  findDirectByokProvider,
-  getDirectByokModel,
-  getDirectByokPolicyProviderId,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { isInferenceProviderUserByok } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { isVercelUserByokProviderAllowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { CustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
@@ -322,10 +318,9 @@ export async function resolveProviderAndPolicy(
     if (route.provider.type === 'direct-byok') {
       // A catalog-mode direct BYOK key is the request's only route, so the policy is checked
       // against the key's provider alone. Routing already skips keys it rejects.
-      const directByokProvider = findDirectByokProvider(route.userByok?.[0]?.providerId ?? '');
       if (
-        !directByokProvider ||
-        !(await isModelAllowedForPolicyProvider(getDirectByokPolicyProviderId(directByokProvider)))
+        !route.directByokPolicyProviderId ||
+        !(await isModelAllowedForPolicyProvider(route.directByokPolicyProviderId))
       ) {
         return poolRouted ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
       }

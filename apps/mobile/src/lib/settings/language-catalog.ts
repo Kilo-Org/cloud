@@ -82,8 +82,6 @@ export const languageEntry: AppSettingEntry = {
       return Effect.tryPromise({
         try: async () => {
           const resolved = language === 'device' ? resolveDeviceLanguage() : language;
-          // The picker's own path: change the catalog in place, or force the
-          // direction and reload. Persisting alone never reaches the screen.
           const outcome = await applyLanguagePreference(language, resolved);
           return languageChangeReport(language, outcome);
         },

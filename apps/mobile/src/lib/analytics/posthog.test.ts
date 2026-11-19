@@ -828,9 +828,8 @@ describe('discard serialization', () => {
     captureEvent('recovery-test');
     expect(hoisted.client.capture).toHaveBeenCalledWith('recovery-test', undefined);
 
-    // The recovered client must not be opted out — optOut was called on the
-    // old client, not the new one. The new client's optOut has never been
-    // called.
+    // The mock factory returns one shared client for every construction, so
+    // toHaveBeenCalledTimes(1) pins the single optOut from the first discard.
     expect(hoisted.client.optOut).toHaveBeenCalledTimes(1);
   });
 });

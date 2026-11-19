@@ -4742,7 +4742,7 @@
     "statusSaved": "Đã lưu",
     "statusFailed": "Không thể lưu.",
     "inputTitle": "Rào chắn đầu vào",
-    "inputDescription": "Quét mọi đầu vào bằng Enkrypt AI, bao gồm cả kết quả công cụ. Bộ phát hiện chặn sẽ từ chối yêu cầu khi Enkrypt không khả dụng.",
+    "inputDescription": "Quét mọi đầu vào bằng Enkrypt AI, bao gồm cả kết quả công cụ. Khi Enkrypt không khả dụng, yêu cầu được gửi đi mà không quét thay vì bị từ chối.",
     "outputTitle": "Rào chắn đầu ra",
     "outputDescription": "Quét phản hồi bằng Enkrypt AI trước khi thành viên nhận được. Tắt trừ khi bạn bật.",
     "detectorsHint": "Chặn sẽ từ chối yêu cầu bị gắn cờ. Chỉ ghi nhật ký sẽ ghi lại mà không làm chậm yêu cầu.",

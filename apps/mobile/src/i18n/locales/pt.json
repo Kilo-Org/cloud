@@ -4819,7 +4819,7 @@
     "statusSaved": "Guardado",
     "statusFailed": "Não foi possível guardar.",
     "inputTitle": "Proteções de entrada",
-    "inputDescription": "Analisa cada entrada com a Enkrypt AI, incluindo os resultados das ferramentas. Um detetor bloqueante rejeita um pedido quando a Enkrypt AI não está disponível.",
+    "inputDescription": "Analisa cada entrada com a Enkrypt AI, incluindo os resultados das ferramentas. Quando a Enkrypt AI não está disponível, os pedidos são enviados sem análise em vez de rejeitados.",
     "outputTitle": "Proteções de saída",
     "outputDescription": "Analisa as respostas com a Enkrypt AI antes de os membros as receberem. Desativadas, a menos que as ative.",
     "detectorsHint": "Bloquear rejeita um pedido sinalizado. A opção Registar apenas regista-o sem atrasar o pedido.",

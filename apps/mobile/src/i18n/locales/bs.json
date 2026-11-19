@@ -4813,7 +4813,7 @@
     "statusSaved": "Sačuvano",
     "statusFailed": "Čuvanje nije uspjelo.",
     "inputTitle": "Zaštitna ograničenja ulaza",
-    "inputDescription": "Skenira svaki ulaz pomoću Enkrypt AI, uključujući rezultate alata. Detektor s blokiranjem odbija zahtjev kada Enkrypt nije dostupan.",
+    "inputDescription": "Skenira svaki ulaz pomoću Enkrypt AI, uključujući rezultate alata. Kada Enkrypt nije dostupan, zahtjevi se šalju bez skeniranja umjesto da budu odbijeni.",
     "outputTitle": "Zaštitna ograničenja izlaza",
     "outputDescription": "Skenira odgovore pomoću Enkrypt AI prije nego što ih članovi prime. Isključeno dok to ne uključite.",
     "detectorsHint": "„Blokiraj“ odbija označeni zahtjev. „Samo evidentiraj“ ga bilježi bez odgađanja zahtjeva.",

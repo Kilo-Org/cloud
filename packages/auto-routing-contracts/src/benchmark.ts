@@ -269,10 +269,10 @@ export const BenchmarkModelSummarySchema = z.object({
   routeAccuracy: z.number().min(0).max(1).nullable().default(null),
   // Mean tokens per graded case, as the CLI reports them on `step_finish`: input excludes cache
   // reads, output excludes reasoning. Null for summaries recorded before token capture.
-  avgInputTokens: z.number().nonnegative().nullable().optional(),
-  avgCachedInputTokens: z.number().nonnegative().nullable().optional(),
-  avgOutputTokens: z.number().nonnegative().nullable().optional(),
-  avgReasoningTokens: z.number().nonnegative().nullable().optional(),
+  avgInputTokens: z.number().nonnegative().nullable().default(null),
+  avgCachedInputTokens: z.number().nonnegative().nullable().default(null),
+  avgOutputTokens: z.number().nonnegative().nullable().default(null),
+  avgReasoningTokens: z.number().nonnegative().nullable().default(null),
 });
 export type BenchmarkModelSummary = z.infer<typeof BenchmarkModelSummarySchema>;
 

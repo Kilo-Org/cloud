@@ -80,6 +80,8 @@ import type {
 } from './types';
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import { splitByContiguousPrefix } from './array-utils';
+import { addBoundedKeeping, setBoundedKeeping } from './bounded-map';
+import { createRevisionedSetProjection } from './revisioned-set-projection';
 import { sessionConfigFromFetchedSession } from './session-config';
 import { createTranscriptRowRestore } from './transcript-row-restore';
 import { readCachedPage } from './cached-page-read';
@@ -101,16 +103,54 @@ type CloudAgentModelOverride = {
   model: string;
   variant?: string;
 };
-type WorktreeChangesRefresh = {
+
+/**
+ * The refresh signal of one session-scoped channel (worktree changes, workspace
+ * artifacts). `revision` is the newest revision the server announced and is
+ * absent before any; `connectionVersion` counts the connections a channel has
+ * accepted for the session, so a consumer sees a reconnect as a change even
+ * when no revision moved.
+ */
+type SessionChannelRefresh = {
   cloudSessionId: string;
   revision?: number;
   connectionVersion: number;
 };
-type WorkspaceArtifactsRefresh = {
-  cloudSessionId: string;
-  revision?: number;
-  connectionVersion: number;
-};
+type WorktreeChangesRefresh = SessionChannelRefresh;
+type WorkspaceArtifactsRefresh = SessionChannelRefresh;
+
+/**
+ * The channel's signal after a new connection: the connection counter moves so
+ * a consumer refetches, and the announcement revision is kept, because a
+ * reconnect replays the channel's current state rather than superseding it.
+ */
+function withConnectionBump(
+  signal: SessionChannelRefresh | null,
+  cloudSessionId: string
+): SessionChannelRefresh {
+  return {
+    ...signal,
+    cloudSessionId,
+    connectionVersion: (signal?.connectionVersion ?? 0) + 1,
+  };
+}
+
+/**
+ * The channel's signal for an announced revision, carrying the connection
+ * counter forward so a reconnect and a revision change stay distinguishable.
+ */
+function withRevision(
+  signal: SessionChannelRefresh | null,
+  cloudSessionId: string,
+  revision: number
+): SessionChannelRefresh {
+  return {
+    cloudSessionId,
+    revision,
+    connectionVersion: signal?.connectionVersion ?? 0,
+  };
+}
+
 type ActiveSessionType = ResolvedSession['type'];
 type ObservedModelSource = 'session' | 'message' | 'catalog';
 /**
@@ -1270,15 +1310,18 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // before clearing the active session id.
   const resolvedDeliveryFailuresRevisionAtom = atom(0);
   /**
-   * Memo for the read-only projection below, keyed by the session and revision
-   * it was derived from, so the returned Set keeps a stable identity between
-   * bumps (see the derivation for why the identity must change on a bump).
+   * Read-only projections of the two per-session records below, each re-derived
+   * only on a session switch or a revision bump (see
+   * `createRevisionedSetProjection` for why a bump must change the identity).
    */
-  let resolvedDeliveryProjectionCache: {
-    sessionId: KiloSessionId;
-    revision: number;
-    value: ReadonlySet<string>;
-  } | null = null;
+  const projectResolvedDeliveryFailures = createRevisionedSetProjection<KiloSessionId>(
+    sessionId => resolvedDeliveryFailuresBySession.get(sessionId),
+    EMPTY_RESOLVED_DELIVERY_FAILURES
+  );
+  const projectSupersededInFlight = createRevisionedSetProjection<KiloSessionId>(
+    sessionId => supersededInFlightBySession.get(sessionId),
+    EMPTY_SUPERSEDED_IN_FLIGHT
+  );
   /**
    * Ids whose delivery failure the user resolved by retrying, for the active
    * session. A superseded row must stay hidden after the screen that hosted
@@ -1288,69 +1331,21 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * is the cross-launch source, and this projection is how the transcript
    * filter reaches it.
    */
-  const resolvedDeliveryFailuresAtom = atom<ReadonlySet<string>>(get => {
-    const revision = get(resolvedDeliveryFailuresRevisionAtom);
-    if (activeSessionId === null) {
-      return EMPTY_RESOLVED_DELIVERY_FAILURES;
-    }
-    if (
-      resolvedDeliveryProjectionCache !== null &&
-      resolvedDeliveryProjectionCache.sessionId === activeSessionId &&
-      resolvedDeliveryProjectionCache.revision === revision
-    ) {
-      return resolvedDeliveryProjectionCache.value;
-    }
-    // The record is mutated in place (the live session predicate holds the same
-    // Set), and jotai compares a derived value with `Object.is`: returning the
-    // mutated Set would leave its identity unchanged and notify no subscriber.
-    // A fresh Set per revision keeps the identity stable between bumps while
-    // making a bump observable.
-    const recorded = resolvedDeliveryFailuresBySession.get(activeSessionId);
-    const value =
-      recorded === undefined || recorded.size === 0
-        ? EMPTY_RESOLVED_DELIVERY_FAILURES
-        : new Set(recorded);
-    resolvedDeliveryProjectionCache = { sessionId: activeSessionId, revision, value };
-    return value;
-  });
+  const resolvedDeliveryFailuresAtom = atom<ReadonlySet<string>>(get =>
+    projectResolvedDeliveryFailures(activeSessionId, get(resolvedDeliveryFailuresRevisionAtom))
+  );
 
   // Bumped whenever the active session's in-flight supersede record changes: on
   // a mark, an unmark, an accepted resolution, a session switch, and a destroy.
   // Same reason for a revision trigger as `resolvedDeliveryFailuresRevisionAtom`.
   const supersededInFlightRevisionAtom = atom(0);
   /**
-   * Memo for the read-only projection below, for the same identity reason as
-   * `resolvedDeliveryProjectionCache`.
-   */
-  let supersededInFlightProjectionCache: {
-    sessionId: KiloSessionId;
-    revision: number;
-    value: ReadonlySet<string>;
-  } | null = null;
-  /**
    * Ids whose failed row a re-send superseded while it is still in flight, for
-   * the active session. The record is mutated in place, so a fresh Set per
-   * revision keeps the projection's identity stable between bumps while making
-   * a bump observable.
+   * the active session.
    */
-  const supersededInFlightMessageIdsAtom = atom<ReadonlySet<string>>(get => {
-    const revision = get(supersededInFlightRevisionAtom);
-    if (activeSessionId === null) {
-      return EMPTY_SUPERSEDED_IN_FLIGHT;
-    }
-    if (
-      supersededInFlightProjectionCache !== null &&
-      supersededInFlightProjectionCache.sessionId === activeSessionId &&
-      supersededInFlightProjectionCache.revision === revision
-    ) {
-      return supersededInFlightProjectionCache.value;
-    }
-    const marked = supersededInFlightBySession.get(activeSessionId);
-    const value =
-      marked === undefined || marked.size === 0 ? EMPTY_SUPERSEDED_IN_FLIGHT : new Set(marked);
-    supersededInFlightProjectionCache = { sessionId: activeSessionId, revision, value };
-    return value;
-  });
+  const supersededInFlightMessageIdsAtom = atom<ReadonlySet<string>>(get =>
+    projectSupersededInFlight(activeSessionId, get(supersededInFlightRevisionAtom))
+  );
 
   // Memoized per-row StoredMessage objects. Reused while both `info` and the
   // parts array keep the same reference, so unchanged rows keep object identity
@@ -1426,9 +1421,18 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   });
 
   const notStreaming = (msg: StoredMessage) => !isMessageStreaming(msg);
+  /**
+   * The one contiguous-prefix split of the message list, shared by the two
+   * halves below so a list change scans it once instead of once per half. The
+   * halves keep their own row memo: this split allocates new arrays, and the
+   * rendered halves must keep their identity while their rows are unchanged.
+   */
+  const contiguousTranscriptSplitAtom = atom(get =>
+    splitByContiguousPrefix(get(messagesListAtom), notStreaming)
+  );
   let previousStaticMessages: StoredMessage[] | null = null;
   const staticMessagesAtom = atom(get => {
-    const next = splitByContiguousPrefix(get(messagesListAtom), notStreaming).staticItems;
+    const next = get(contiguousTranscriptSplitAtom).staticItems;
     if (previousStaticMessages !== null && sameMessageRows(previousStaticMessages, next)) {
       return previousStaticMessages;
     }
@@ -1437,7 +1441,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   });
   let previousDynamicMessages: StoredMessage[] | null = null;
   const dynamicMessagesAtom = atom(get => {
-    const next = splitByContiguousPrefix(get(messagesListAtom), notStreaming).dynamicItems;
+    const next = get(contiguousTranscriptSplitAtom).dynamicItems;
     if (previousDynamicMessages !== null && sameMessageRows(previousDynamicMessages, next)) {
       return previousDynamicMessages;
     }
@@ -2667,15 +2671,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       return existing;
     }
     const created = new Set<string>();
-    resolvedDeliveryFailuresBySession.set(kiloSessionId, created);
-    if (resolvedDeliveryFailuresBySession.size > RESOLVED_DELIVERY_MEMORY_MAX_SESSIONS) {
-      for (const key of resolvedDeliveryFailuresBySession.keys()) {
-        if (key !== kiloSessionId && key !== activeSessionId) {
-          resolvedDeliveryFailuresBySession.delete(key);
-          break;
-        }
-      }
-    }
+    setBoundedKeeping(
+      resolvedDeliveryFailuresBySession,
+      kiloSessionId,
+      created,
+      RESOLVED_DELIVERY_MEMORY_MAX_SESSIONS,
+      activeSessionId
+    );
     return created;
   }
 
@@ -2727,15 +2729,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     messageText: string,
     messageId: string
   ): void {
-    failedPromptBySession.delete(kiloSessionId);
-    failedPromptBySession.set(kiloSessionId, { text: messageText, messageId });
-    if (failedPromptBySession.size <= FAILED_PROMPT_MEMORY_MAX_SESSIONS) return;
-    for (const key of failedPromptBySession.keys()) {
-      if (key !== kiloSessionId && key !== activeSessionId) {
-        failedPromptBySession.delete(key);
-        return;
-      }
-    }
+    setBoundedKeeping(
+      failedPromptBySession,
+      kiloSessionId,
+      { text: messageText, messageId },
+      FAILED_PROMPT_MEMORY_MAX_SESSIONS,
+      activeSessionId
+    );
   }
 
   /**
@@ -2757,15 +2757,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     kiloSessionId: KiloSessionId,
     pending: Map<string, string>
   ): void {
-    pendingConfirmationBySession.delete(kiloSessionId);
-    pendingConfirmationBySession.set(kiloSessionId, pending);
-    if (pendingConfirmationBySession.size <= PENDING_CONFIRMATION_MAX_SESSIONS) return;
-    for (const key of pendingConfirmationBySession.keys()) {
-      if (key !== kiloSessionId && key !== activeSessionId) {
-        pendingConfirmationBySession.delete(key);
-        return;
-      }
-    }
+    setBoundedKeeping(
+      pendingConfirmationBySession,
+      kiloSessionId,
+      pending,
+      PENDING_CONFIRMATION_MAX_SESSIONS,
+      activeSessionId
+    );
   }
 
   /**
@@ -2888,15 +2886,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * ids survive eviction; the active session is never evicted.
    */
   function rememberDeniedSession(kiloSessionId: KiloSessionId): void {
-    deniedSessionIds.delete(kiloSessionId);
-    deniedSessionIds.add(kiloSessionId);
-    if (deniedSessionIds.size <= DENIED_SESSION_MEMORY_MAX_SESSIONS) return;
-    for (const key of deniedSessionIds) {
-      if (key !== kiloSessionId && key !== activeSessionId) {
-        deniedSessionIds.delete(key);
-        return;
-      }
-    }
+    addBoundedKeeping(
+      deniedSessionIds,
+      kiloSessionId,
+      DENIED_SESSION_MEMORY_MAX_SESSIONS,
+      activeSessionId
+    );
   }
 
   /**
@@ -3667,37 +3662,23 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           const cloudSessionId = store.get(sessionIdAtom);
           if (!cloudSessionId || event.cloudSessionId !== cloudSessionId) return;
           if (event.type === 'connected') {
-            const previousWorktree = store.get(worktreeChangesRefreshAtom);
-            store.set(worktreeChangesRefreshAtom, {
-              ...previousWorktree,
-              cloudSessionId,
-              connectionVersion: (previousWorktree?.connectionVersion ?? 0) + 1,
-            });
-            const previousArtifacts = store.get(workspaceArtifactsRefreshAtom);
-            store.set(workspaceArtifactsRefreshAtom, {
-              ...previousArtifacts,
-              cloudSessionId,
-              connectionVersion: (previousArtifacts?.connectionVersion ?? 0) + 1,
-            });
+            store.set(
+              worktreeChangesRefreshAtom,
+              withConnectionBump(store.get(worktreeChangesRefreshAtom), cloudSessionId)
+            );
+            store.set(
+              workspaceArtifactsRefreshAtom,
+              withConnectionBump(store.get(workspaceArtifactsRefreshAtom), cloudSessionId)
+            );
             return;
           }
-          if (event.type === 'worktree.changes.ready') {
-            const previous = store.get(worktreeChangesRefreshAtom);
-            if (event.revision <= (previous?.revision ?? 0)) return;
-            store.set(worktreeChangesRefreshAtom, {
-              cloudSessionId,
-              revision: event.revision,
-              connectionVersion: previous?.connectionVersion ?? 0,
-            });
-          } else {
-            const previous = store.get(workspaceArtifactsRefreshAtom);
-            if (event.revision <= (previous?.revision ?? 0)) return;
-            store.set(workspaceArtifactsRefreshAtom, {
-              cloudSessionId,
-              revision: event.revision,
-              connectionVersion: previous?.connectionVersion ?? 0,
-            });
-          }
+          const refreshAtom =
+            event.type === 'worktree.changes.ready'
+              ? worktreeChangesRefreshAtom
+              : workspaceArtifactsRefreshAtom;
+          const previous = store.get(refreshAtom);
+          if (event.revision <= (previous?.revision ?? 0)) return;
+          store.set(refreshAtom, withRevision(previous, cloudSessionId, event.revision));
           return;
         }
         if (event.type === 'commands.available') {

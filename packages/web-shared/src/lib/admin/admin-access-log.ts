@@ -481,6 +481,7 @@ function attributionFromHeaders(params: {
   headersList: Headers;
   surface?: AdminAccessSurface;
   method?: string;
+  route?: string;
   tokenSource?: string | null;
   internalApiUse?: boolean;
   delegatedWorkload?: boolean;
@@ -497,7 +498,7 @@ function attributionFromHeaders(params: {
       internalApiUse: params.internalApiUse,
       delegatedWorkload: params.delegatedWorkload,
     }),
-    route: routeFromHeaders(params.headersList),
+    route: params.route ?? routeFromHeaders(params.headersList),
     method: params.method ?? methodFromHeaders(params.headersList),
     ip: clientIpFromHeaders(params.headersList),
     userAgentProduct: userAgentProductFromHeaders(params.headersList),
@@ -585,6 +586,7 @@ export async function recordKiloAdminElevation(
       target: params.target,
       surface: ctx.auditSurface,
       method: ctx.auditMethod,
+      route: ctx.auditRoute,
       delegatedWorkload: ctx.delegatedWorkload,
       membershipRole: params.membershipRole,
       wouldPassWithoutAdmin: params.wouldPassWithoutAdmin,
@@ -641,6 +643,8 @@ export type KiloAdminElevationRequestParams = {
   surface?: AdminAccessSurface;
   /** The actual Request method when the caller has one. */
   method?: string;
+  /** Route the caller already knows, e.g. from its request context. */
+  route?: string;
   /** Use the caller's request headers instead of the ambient header store. */
   headersList?: Headers;
   internalApiUse?: boolean;

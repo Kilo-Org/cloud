@@ -424,6 +424,22 @@ describe('deleteWorktree authorization and completion', () => {
     expect(f.complete).not.toHaveBeenCalled();
   });
 
+  it('finishes a root whose begin response does not parse', async () => {
+    const f = fixture();
+    mocks.getSession.mockImplementation((_env, _ownerId, id: string) => ({
+      beginWorktreeDeletion: async () => {
+        if (id === workspaceId(0)) return { location: { sandboxId: 42 }, children: [] };
+        return { location, children: [] };
+      },
+      finishWorktreeDeletion: () => f.finishSession(id),
+    }));
+
+    await expect(f.caller.deleteWorktree({ worktreeId })).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+    });
+    expect(f.finishSession).not.toHaveBeenCalled();
+  });
+
   it('skips runtime locations whose successful cleanup is already journaled', async () => {
     const f = fixture();
     f.getState().runtimeLocations = [location];

@@ -1,5 +1,11 @@
 /* eslint-disable max-lines -- one harness holds the screen's state cases and the real-query retention cases that share its page fixtures. */
-import { createElement, type ElementType, Fragment, type ReactNode } from 'react';
+import {
+  createElement,
+  type ElementType,
+  Fragment,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { infiniteQueryOptions, QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
@@ -13,6 +19,8 @@ import type * as ReactQuery from '@tanstack/react-query';
 type Row = { receiptId: string; triageStatus: string; appealStatus: string; createdAt: string };
 
 type Page = { items: Row[]; nextCursor: string | null };
+
+type PullControl = ReactElement<{ refreshing?: boolean; onRefresh?: () => void }>;
 
 type ScreenState = {
   pages: Page[];
@@ -133,11 +141,28 @@ vi.mock('@/components/empty-state', () => ({
     title,
     description,
     action,
+    placement,
+    refreshControl,
   }: {
     title: string;
     description?: string;
     action?: ReactNode;
-  }) => createElement('EmptyState', { title, description }, action),
+    placement?: 'center' | 'top' | 'static';
+    refreshControl?: ReactNode;
+  }) =>
+    createElement(
+      'EmptyState',
+      // The component forwards a refresh control only for the placement that
+      // owns a scroller; the others render a bare view.
+      {
+        title,
+        description,
+        placement,
+        refreshControl:
+          placement === undefined || placement === 'center' ? refreshControl : undefined,
+      },
+      action
+    ),
 }));
 vi.mock('@/components/query-error', () => ({
   QueryError: ({ title, onRetry }: { title?: string; onRetry?: () => void }) =>
@@ -364,6 +389,22 @@ function pullControl(root: ReactTestRenderer['root']) {
   };
 }
 
+/** The refresh control the empty state renders, as the reader's pull drives it. */
+function emptyStatePull(root: ReactTestRenderer['root']) {
+  const empty = mustExist(
+    root.findAll(node => Object.is(node.type, EMPTY_STATE))[0],
+    'the empty state'
+  );
+  const control = mustExist(
+    (empty.props.refreshControl as PullControl | null) ?? undefined,
+    'a pull-to-refresh control on the empty state'
+  );
+  return {
+    refreshing: control.props.refreshing === true,
+    onRefresh: control.props.onRefresh as () => void,
+  };
+}
+
 /** Run the real infinite query: its page bookkeeping is what the bound measures. */
 async function useRealInfiniteQuery() {
   const { useInfiniteQuery } = await vi.importActual<typeof ReactQuery>('@tanstack/react-query');
@@ -413,6 +454,36 @@ describe('ReportReceiptsScreen', () => {
     const [empty] = root.findAll(node => Object.is(node.type, EMPTY_STATE));
     expect(empty?.props.title).toBe('No reports yet');
     expect(rows(root)).toHaveLength(0);
+  });
+
+  it('reloads page one on a pull from the empty state', async () => {
+    await useRealInfiniteQuery();
+    state.answerPage = () => Promise.resolve({ items: [], nextCursor: null });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+    });
+
+    const root = await mountWith(queryClient);
+    await waitFor(() => root.findAll(node => Object.is(node.type, EMPTY_STATE)).length === 1);
+    await waitFor(() => queryClient.isFetching() === 0);
+    expect(emptyStatePull(root).refreshing).toBe(false);
+    state.pageRequests = [];
+
+    const refresh = Promise.withResolvers<Page>();
+    state.answerPage = () => refresh.promise;
+
+    act(() => {
+      emptyStatePull(root).onRefresh();
+    });
+    expect(emptyStatePull(root).refreshing).toBe(true);
+    await waitFor(() => state.pageRequests.length === 1);
+    expect(state.pageRequests).toEqual([FIRST_PAGE_PARAM]);
+
+    await act(async () => {
+      refresh.resolve({ items: [], nextCursor: null });
+      await Promise.resolve();
+    });
+    await waitFor(() => !emptyStatePull(root).refreshing);
   });
 
   it('lists the reports newest first and opens the pressed receipt', async () => {

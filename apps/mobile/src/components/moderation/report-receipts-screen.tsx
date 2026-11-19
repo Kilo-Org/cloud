@@ -159,7 +159,6 @@ export function ReportReceiptsScreen() {
 
         {!loading && !failure && items.length === 0 ? (
           <EmptyState
-            placement="top"
             icon={Flag}
             refreshControl={refreshControl}
             title={t('profile.reportReceipts.emptyTitle')}

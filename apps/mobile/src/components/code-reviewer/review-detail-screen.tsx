@@ -381,6 +381,7 @@ export function ReviewDetailScreen({
               <KvRow
                 label={t('common.cost')}
                 value={formatPrefixedMoney(fromMicrodollars(review.total_cost_musd), i18n.language)}
+                valueFace="text"
               />
             ) : null}
             {tokenUsage.input > 0 || tokenUsage.output > 0 ? (
@@ -390,6 +391,7 @@ export function ReviewDetailScreen({
                   input: formatNumber(tokenUsage.input, i18n.language),
                   output: formatNumber(tokenUsage.output, i18n.language),
                 })}
+                valueFace="text"
               />
             ) : null}
           </RowGroup>

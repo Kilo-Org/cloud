@@ -73,6 +73,9 @@ export function CouncilSection({ councilResult }: Readonly<{ councilResult: Coun
             label={specialist.name}
             value={councilVoteLabel(specialist.vote)}
             valueFace="text"
+            // The name is configured and can be long: it truncates so the vote
+            // the row exists to show stays in view.
+            labelShrink
           />
         ))}
       </RowGroup>

@@ -955,7 +955,7 @@ describe('bb', () => {
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain('bb: comment_not_owned\n');
     expect(result.stderr).toContain(
-      'publish the summary with bb comments create <pull-request-id> when no summary exists'
+      're-run comments list and update your own summary, or create one when none exists'
     );
     expect(requests.map(request => `${request.init.method} ${request.url}`)).toEqual([
       `GET ${pullRequestUrl}`,
@@ -1148,7 +1148,7 @@ describe('bb', () => {
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain('bb: comment_not_owned\n');
     expect(result.stderr).toContain(
-      'publish the summary with bb comments create <pull-request-id> when no summary exists'
+      're-run comments list and update your own summary, or create one when none exists'
     );
     expect(requests.map(request => `${request.init.method} ${request.url}`)).toEqual([
       `GET ${pullRequestUrl}`,

@@ -594,7 +594,7 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(rawMarkdown).toContain('update the newest such candidate');
     expect(rawMarkdown).toContain('`user.kind` is `workspace_access_token`');
     expect(rawMarkdown).toContain('ignore that comment entirely');
-    expect(rawMarkdown).toContain('On `comment_not_owned`, do not retry the update');
+    expect(rawMarkdown).toContain('On `comment_not_owned`, do not retry that same target');
     expect(rawMarkdown).toContain('Bitbucket renders HTML comments visibly');
     expect(rawMarkdown).toContain('top-level summary last');
     expect(rawMarkdown).toContain('Retry an ambiguous provider write at most once');

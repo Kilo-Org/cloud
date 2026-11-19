@@ -88,7 +88,7 @@ const CREATE_BATCH_COMMENT_INPUT_HINT =
   'expected batch create input JSON: {"comments":[{"body":"...","inline":{"path":"src/widget.ts","to":42}}]}';
 const UPDATE_COMMENT_INPUT_HINT = 'expected update input JSON: {"body":"..."}';
 const UPDATE_COMMENT_TARGET_HINT =
-  'only the existing Code Review Summary comment can be updated; publish the summary with bb comments create <pull-request-id> when no summary exists';
+  "only this CLI's own Code Review Summary comment can be updated; re-run comments list and update your own summary, or create one when none exists";
 const UPDATE_COMMENT_BODY_HINT = 'the updated body must start with the Code Review Summary heading';
 const BITBUCKET_ENVIRONMENT_HINT =
   'expected Bitbucket cloud-agent environment: BITBUCKET_TOKEN, KILO_BITBUCKET_WORKSPACE_SLUG, KILO_BITBUCKET_WORKSPACE_UUID, KILO_BITBUCKET_REPOSITORY_SLUG, KILO_BITBUCKET_REPOSITORY_UUID';

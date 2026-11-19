@@ -1,4 +1,4 @@
-import { GIT_CREDENTIAL_HELPER } from './runtime-distribution.js';
+import { GIT_CREDENTIAL_HELPER } from './runtime-distribution';
 
 export const PNPM_STORE_DIR = '/var/cache/kilo/pnpm-store';
 export const PNPM_STORE_ENV_VAR = 'pnpm_config_store_dir';

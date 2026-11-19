@@ -3878,12 +3878,6 @@ describe('GitHub review publication recovery', () => {
     [{ type: 'provider.quota', message: 'Request failed', status: 402 }, 'insufficient_credits'],
     [{ type: 'provider.quota', message: 'Request failed', status: 402.5 }, 'insufficient_credits'],
     [{ type: 'provider.rate-limit', message: 'Request failed' }, 'rate_limited'],
-    [{ type: 'provider.unknown', message: 'Request failed', status: 200 }, 'provider_unavailable'],
-    [
-      { type: 'provider.unknown', message: 'Request failed: insufficient credits', status: 200 },
-      'insufficient_credits',
-    ],
-    [{ type: 'provider.unknown', message: 'Too many requests', status: 200 }, 'rate_limited'],
     [{ type: 'provider.future-error', message: 'Request failed' }, 'unknown'],
   ] as const)(
     'reports Kilo v2 assistant error %j as %s when the root closes completed',
@@ -4040,7 +4034,7 @@ describe('GitHub review publication recovery', () => {
         id: 'msg_failed',
         type: 'assistant',
         time: { created: 1, completed: 2 },
-        error: { type: 'provider.unknown', message: 'Request failed', status: 200 },
+        error: { type: 'provider.unknown', message: 'Request failed' },
       })
     );
     if (!errored) throw new Error('Expected assistant activity');

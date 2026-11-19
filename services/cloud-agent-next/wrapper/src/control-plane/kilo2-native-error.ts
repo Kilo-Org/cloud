@@ -37,13 +37,7 @@ const NATIVE_ERROR_STATUSES = new Map([
 ]);
 
 export function nativeTurnError(error: z.infer<typeof nativeErrorSchema>) {
-  // A 2xx response status is not an HTTP error status; the provider type owns
-  // the classification, so a 200 must not mask it as an unmapped status.
-  const reportedStatus =
-    error.status !== undefined && error.status >= 200 && error.status < 300
-      ? undefined
-      : error.status;
-  const status = reportedStatus ?? NATIVE_ERROR_STATUSES.get(error.type);
+  const status = error.status ?? NATIVE_ERROR_STATUSES.get(error.type);
   const name =
     status === undefined
       ? (NATIVE_ERROR_NAMES.get(error.type) ?? error.name ?? 'UnknownError')
@@ -51,16 +45,15 @@ export function nativeTurnError(error: z.infer<typeof nativeErrorSchema>) {
   const data = status === undefined ? {} : { statusCode: status };
   const message = classifyAssistantFailure(error.message);
   // Generic request rejections omit the native context-overflow classification.
-  const isContextOrOutputLimit =
-    error.type === 'provider.invalid-request' &&
-    (status === undefined || status === 400 || status === 413) &&
-    (message.reason === 'context_limit' || message.reason === 'output_limit');
-  const isUnknownProviderError = error.type === 'provider.unknown' && reportedStatus === undefined;
   const structured = classifyAssistantFailure({
     name,
     data: {
       ...data,
-      ...(isContextOrOutputLimit || isUnknownProviderError ? { message: error.message } : {}),
+      ...(error.type === 'provider.invalid-request' &&
+      (error.status === undefined || error.status === 400 || error.status === 413) &&
+      (message.reason === 'context_limit' || message.reason === 'output_limit')
+        ? { message: error.message }
+        : {}),
     },
   });
   // V1 lets specific message text override structured errors. Canonicalize only

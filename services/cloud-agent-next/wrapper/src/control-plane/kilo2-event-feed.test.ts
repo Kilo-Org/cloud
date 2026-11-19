@@ -635,31 +635,6 @@ it.each([
   expect(classifyAssistantFailure(translated).reason).toBe(reason);
 });
 
-it.each([200, 201, 204, 299] as const)(
-  'does not let a 2xx status mask the provider type (status %s)',
-  status => {
-    const translated = nativeTurnError({
-      type: 'provider.unknown',
-      message: 'Request failed',
-      status,
-    });
-    expect(translated).toMatchObject({ name: 'APIError', data: { statusCode: 503 } });
-    expect(classifyAssistantFailure(translated).reason).toBe('provider_unavailable');
-  }
-);
-
-it('keeps the context-overflow identity of a 2xx invalid-request', () => {
-  const failure = classifyAssistantFailure(
-    nativeTurnError({
-      type: 'provider.invalid-request',
-      message: 'prompt is too long: 200000 tokens > 128000 maximum',
-      status: 200,
-    }),
-    'managed'
-  );
-  expect(failure.reason).toBe('context_limit');
-});
-
 it.each(['Rate limit reached', 'Request timed out', 'insufficient credits'])(
   'does not replace a native invalid-request identity with %s',
   message => {

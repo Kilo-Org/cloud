@@ -7,10 +7,15 @@ import {
   useBlockedAccountFromAccountRead,
 } from '@/lib/auth/account-blocked-read';
 import { isBlockedAccountActive, setBlockedAccountActive } from '@/lib/auth/blocked-account-state';
+import { setSignOutActive } from '@/lib/auth/sign-out-state';
 
 // ── Fixtures ───────────────────────────────────────────────────────────────
 
 const BLOCKED_REFUSAL = { data: { code: 'FORBIDDEN', accountBlocked: true } };
+// A second refusal with the same shape and a different identity: an attempt
+// that settles after the surface was dismissed is a fresh publish, not the
+// cached error object the raise was tied to.
+const BLOCKED_RETRY_REFUSAL = { data: { code: 'FORBIDDEN', accountBlocked: true } };
 const OTHER_FAILURE = new Error('network');
 
 type ProbeProps = {
@@ -70,6 +75,9 @@ describe('accountReadVerdict', () => {
 describe('useBlockedAccountFromAccountRead', () => {
   beforeEach(() => {
     setBlockedAccountActive(false);
+    // The fence is module-global: a case that closes it leaves it closed, so
+    // every case starts with it reopened.
+    setSignOutActive(false);
   });
 
   it('raises the explanation on a blocked refusal', () => {
@@ -284,6 +292,99 @@ describe('useBlockedAccountFromAccountRead', () => {
     });
 
     expect(isBlockedAccountActive()).toBe(false);
+
+    renderer.unmount();
+  });
+
+  it('does not re-raise a fresh refusal while sign-out is active', async () => {
+    const renderer = mount({ error: BLOCKED_REFUSAL, userId: undefined, enabled: true });
+    expect(isBlockedAccountActive()).toBe(true);
+
+    // The surface's Sign out clears the explanation, and sign-out closes the
+    // fence synchronously; an attempt already in flight then refuses again.
+    act(() => {
+      setSignOutActive(true);
+    });
+    act(() => {
+      setBlockedAccountActive(false);
+    });
+    await update(renderer, { error: BLOCKED_RETRY_REFUSAL, userId: undefined, enabled: true });
+
+    expect(isBlockedAccountActive()).toBe(false);
+
+    // Sign-in reopens the fence. The refusal object is unchanged; only
+    // `fetching` differs, and that dependency is what re-runs the effect.
+    act(() => {
+      setSignOutActive(false);
+    });
+    await update(renderer, {
+      error: BLOCKED_RETRY_REFUSAL,
+      userId: undefined,
+      enabled: true,
+      fetching: true,
+    });
+
+    expect(isBlockedAccountActive()).toBe(true);
+
+    renderer.unmount();
+  });
+
+  it('does not refetch for an answered read while sign-out is active', async () => {
+    const onAnswered = vi.fn<() => void>();
+    const renderer = mount({
+      error: BLOCKED_REFUSAL,
+      userId: undefined,
+      enabled: true,
+      onAnswered,
+    });
+    expect(isBlockedAccountActive()).toBe(true);
+
+    act(() => {
+      setSignOutActive(true);
+    });
+    // A retry that reaches the server before the token is revoked can still
+    // answer; during the teardown even settling is a publish, so the fence
+    // neither clears the explanation nor refetches with a dying token.
+    await update(renderer, { error: null, userId: 'user-1', enabled: true, onAnswered });
+
+    expect(isBlockedAccountActive()).toBe(true);
+    expect(onAnswered).not.toHaveBeenCalled();
+
+    renderer.unmount();
+    act(() => {
+      setSignOutActive(false);
+    });
+  });
+
+  it('resets its raise across a full sign-out cycle', async () => {
+    const onAnswered = vi.fn<() => void>();
+    const renderer = mount({
+      error: BLOCKED_REFUSAL,
+      userId: undefined,
+      enabled: true,
+      onAnswered,
+    });
+    expect(isBlockedAccountActive()).toBe(true);
+
+    act(() => {
+      setSignOutActive(true);
+    });
+    // The token is gone, but the fence owns the teardown: the raise is kept
+    // past the state that would otherwise forget it.
+    await update(renderer, { error: null, userId: undefined, enabled: false, onAnswered });
+
+    // Sign-in published credentials, reopened the fence, and cleared the
+    // explanation the previous session raised.
+    act(() => {
+      setSignOutActive(false);
+      setBlockedAccountActive(false);
+    });
+    await update(renderer, { error: null, userId: 'user-1', enabled: true, onAnswered });
+
+    expect(isBlockedAccountActive()).toBe(false);
+    // That block was dismissed by its own Sign out: the new session's first
+    // settled answer must not refetch for it.
+    expect(onAnswered).not.toHaveBeenCalled();
 
     renderer.unmount();
   });

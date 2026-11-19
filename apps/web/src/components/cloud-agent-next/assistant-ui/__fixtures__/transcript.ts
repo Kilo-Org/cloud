@@ -1,4 +1,4 @@
-import type { AssistantMessage } from '@/types/opencode.gen';
+import type { AssistantMessage } from '@/types/opencode';
 import type { Part, StoredMessage, ToolPart } from '../../types';
 
 const fixtureChildId = 'ses_00000000000000000000000000';

@@ -8,7 +8,7 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 
 import { BitbucketOverview } from './bitbucket-overview';
 
@@ -142,11 +142,14 @@ vi.mock('@/lib/hooks/use-reviewer-models', () => ({
   useReviewerModels: () => ({ models: [], isLoading: false }),
 }));
 const orgBoundaryCalls = vi.hoisted(() => [] as (string | undefined)[]);
+const orgBoundary = vi.hoisted(() => ({ resolved: true }));
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   useOrgBoundary: (organizationIdOverride?: string) => {
     orgBoundaryCalls.push(organizationIdOverride);
     return {
-      org: { organizationId: 'org_1', organizationName: 'Acme Robotics', role: 'owner' },
+      org: orgBoundary.resolved
+        ? { organizationId: 'org_1', organizationName: 'Acme Robotics', role: 'owner' }
+        : undefined,
       isResolving: false,
     };
   },
@@ -204,6 +207,7 @@ beforeEach(() => {
   readiness.workspaceSlug = 'ws';
   readiness.fetchStatus = 'idle';
   orgBoundaryCalls.length = 0;
+  orgBoundary.resolved = true;
   connectivity.known = true;
   queryError.variants = [];
   queryError.retries = [];
@@ -315,6 +319,15 @@ describe('BitbucketOverview rows entrance', () => {
   });
 });
 
+// The shared Button is stubbed out, so the action is found by the props the
+// empty state's action element carries rather than by its rendered label.
+function connectActions(root: TestRenderer.ReactTestRenderer) {
+  const label = i18n.t('common.connectBitbucket');
+  return root.root.findAll(node => typeof node.type === 'function' && node.props.label === label, {
+    deep: false,
+  });
+}
+
 describe('BitbucketOverview not-connected state', () => {
   it('names the organization in the connect description', async () => {
     readiness.connected = false;
@@ -325,7 +338,20 @@ describe('BitbucketOverview not-connected state', () => {
 
     expect(text).toContain('Acme Robotics');
     expect(text).not.toContain('{{');
+    expect(connectActions(root)).toHaveLength(1);
     expect(orgBoundaryCalls.length).toBeGreaterThan(0);
     expect(orgBoundaryCalls.every(scope => scope === 'org_1')).toBe(true);
+  });
+
+  it('offers no connect action when the organization cannot be resolved', async () => {
+    readiness.connected = false;
+    readiness.integrationId = null;
+    orgBoundary.resolved = false;
+
+    const root = await renderScreen();
+    const text = JSON.stringify(root.toJSON());
+
+    expect(text).toContain(i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'));
+    expect(connectActions(root)).toHaveLength(0);
   });
 });

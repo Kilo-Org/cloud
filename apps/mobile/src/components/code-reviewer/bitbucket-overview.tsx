@@ -119,6 +119,10 @@ export function BitbucketOverview({
     // the role rule refuses gets the sentence naming who can connect instead of
     // a press it cannot finish.
     const repair = readinessData === undefined ? null : bitbucketRepair(readinessData);
+    // An organization the membership list cannot resolve has no name for the
+    // connect copy, so the screen shows who can connect and offers no action
+    // that would contradict that sentence.
+    const canConnect = canEdit && organizationName !== undefined;
     return (
       <View className="flex-1 bg-background">
         <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
@@ -127,12 +131,12 @@ export function BitbucketOverview({
           iconSize={28}
           title={t('prReview.connect.bitbucketNotConnectedTitle')}
           description={
-            canEdit && readinessData && organizationName !== undefined
+            canConnect && readinessData
               ? t('codeReviewer.bitbucketConnect.description', { organization: organizationName })
               : t('codeReviewer.bitbucket.notConnectedReadOnly')
           }
           action={
-            canEdit && repair !== null ? (
+            canConnect && repair !== null ? (
               <StateAction
                 label={
                   repair.kind === 'replace-token'

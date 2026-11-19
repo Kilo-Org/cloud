@@ -33,7 +33,8 @@ const PROVIDER_HINTS_MAX_STRING_LENGTH = 256;
 // the token estimate) run over the whole body, which the request size already
 // bounds, so they are bounded by depth alone and keep reporting every message.
 const PROMPT_WALK_MAX_NODES = 1024;
-const PROMPT_WALK_MAX_DEPTH = 64;
+/** Bounds every walk this module does over client-supplied content. */
+export const PROMPT_WALK_MAX_DEPTH = 64;
 // Cleaning runs before the stored prefix is taken and is linear in the text it
 // receives, so text is gathered up to this window and no further. The window has
 // to be larger than any single block the cleaning passes strip, because a block

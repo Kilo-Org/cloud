@@ -365,7 +365,7 @@ describe.each(['aws', 'aws-ecs'] as const)('%s owner and persistence contracts',
     expect(requests.at(-1)?.owner).toEqual({ organizationId });
     const orgRow = await db.query.byoc_connections.findFirst({
       where: and(
-        eq(byoc_connections.provider, 'aws'),
+        eq(byoc_connections.provider, provider),
         eq(byoc_connections.organization_id, organizationId)
       ),
     });

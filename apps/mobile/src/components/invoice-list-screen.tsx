@@ -72,14 +72,42 @@ function InvoiceRowSkeleton() {
 type InvoiceListScreenProps = Readonly<{
   /** The screen's own title: the personal and organization lists differ. */
   title: string;
+  /**
+   * One muted context line under the title, the header's subtitle slot: what
+   * the list covers when the title alone does not say it (the personal list's
+   * fixed one-year window).
+   */
+  subtitle?: string;
+  /**
+   * The screen's own name when the title names a scope: the organization scope
+   * titles itself with the membership's name, so this list's name keeps the
+   * header's mono category line and a user-authored name never takes it.
+   */
+  eyebrow?: string;
+  /**
+   * Hold the eyebrow's line before a scope name resolves, so the header keeps
+   * one height while the membership read settles. A caller whose title is
+   * already this screen's name paints no eyebrow and leaves this off.
+   */
+  reserveEyebrow?: boolean;
   /** Where the header's Back lands when the list opens with no history to pop. */
   backFallback: Href;
   /** The scope's paged invoice read, flattened by its own hook. */
   query: InvoiceListQuery;
   entries: readonly Invoice[];
   hasMore: boolean;
+  /**
+   * The read paused at the cache's page bound with the server still offering
+   * more: the footer names that bound where "Load more" would otherwise sit.
+   */
+  isRetentionLimited: boolean;
   emptyTitle: string;
   emptyDescription: string;
+  /**
+   * The empty state's way out, rendered in the state's action slot: a scope
+   * whose empty copy points elsewhere passes the control that opens it.
+   */
+  emptyAction?: ReactNode;
 }>;
 
 /**
@@ -89,12 +117,17 @@ type InvoiceListScreenProps = Readonly<{
  */
 export function InvoiceListScreen({
   title,
+  subtitle,
+  eyebrow,
+  reserveEyebrow,
   backFallback,
   query,
   entries,
   hasMore,
+  isRetentionLimited,
   emptyTitle,
   emptyDescription,
+  emptyAction,
 }: InvoiceListScreenProps) {
   const { t } = useTranslation();
   const paddingBottom = useTabBarBottomPadding();
@@ -162,6 +195,7 @@ export function InvoiceListScreen({
         icon={FileText}
         title={emptyTitle}
         description={emptyDescription}
+        action={emptyAction}
         refreshControl={refreshControl}
       />
     );
@@ -170,6 +204,13 @@ export function InvoiceListScreen({
       // The former container gap also separated the last row from this footer
       // block, which the item separator does not cover.
       <View className="pt-3">
+        {isRetentionLimited && !isLaterPageError && !hasMore && (
+          <View className="items-center gap-3 px-6 py-4">
+            <Text variant="muted" className="text-center text-xs">
+              {t('organization.invoices.retentionLimit')}
+            </Text>
+          </View>
+        )}
         {hasMore && !isLaterPageError && (
           <View className="items-center gap-3 px-6 py-4">
             <Text variant="muted" className="text-center text-xs">
@@ -228,6 +269,7 @@ export function InvoiceListScreen({
               icon={FileText}
               title={emptyTitle}
               description={emptyDescription}
+              action={emptyAction}
             />
           }
           ListFooterComponent={footer}
@@ -238,7 +280,13 @@ export function InvoiceListScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} backFallback={backFallback} />
+      <ScreenHeader
+        title={title}
+        subtitle={subtitle}
+        eyebrow={eyebrow}
+        reserveEyebrow={reserveEyebrow}
+        backFallback={backFallback}
+      />
       {body}
     </View>
   );

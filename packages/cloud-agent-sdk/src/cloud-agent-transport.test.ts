@@ -373,7 +373,8 @@ describe('CloudAgentTransport event routing', () => {
       );
       expect(questionAsked).toHaveBeenCalledWith('live-question', []);
       mockWs.onclose?.({ code: 1006, reason: '', wasClean: false } as CloseEvent);
-      expect(state.getStatus()).toEqual({ type: 'disconnected' });
+      // A drop the transport retries reads as reconnecting, not as a loss.
+      expect(state.getStatus()).toEqual({ type: 'disconnected', reconnecting: true });
     } finally {
       transport.destroy();
       jest.useRealTimers();
@@ -394,7 +395,8 @@ describe('CloudAgentTransport event routing', () => {
   });
 
   it('publishes connection loss when authentication fails after a partial replay', async () => {
-    const { transport, state, stateNotifications, stateErrors } = createTransportWithSinks();
+    const { transport, state, stateNotifications, stateErrors, serviceEvents } =
+      createTransportWithSinks();
     transport.connect();
     await flushPromises();
     stateNotifications.mockClear();
@@ -403,9 +405,16 @@ describe('CloudAgentTransport event routing', () => {
     mockWs.onclose?.({ code: 1008, reason: 'Unauthorized', wasClean: false } as CloseEvent);
     await flushPromises();
     mockWs.onclose?.({ code: 1008, reason: 'Unauthorized', wasClean: false } as CloseEvent);
-    expect(state.getStatus()).toEqual({ type: 'disconnected' });
-    expect(stateNotifications).toHaveBeenCalledTimes(1);
+    // The first close is a drop the transport retries, so it reads as
+    // reconnecting. The second close spends the retry budget on an auth
+    // failure, which escalates to one terminal loss.
+    expect(state.getStatus()).toEqual({ type: 'disconnected', code: 'connection-lost' });
+    expect(stateNotifications).toHaveBeenCalledTimes(2);
+    expect(stateErrors).toHaveBeenCalledWith('Connection lost. Please retry in a moment.');
     expect(stateErrors).not.toHaveBeenCalledWith('Historical overload');
+    expect(
+      serviceEvents.filter(event => event.type === 'stopped' && event.exhausted === true)
+    ).toHaveLength(1);
     transport.destroy();
   });
 
@@ -540,7 +549,7 @@ describe('CloudAgentTransport event routing', () => {
     sendRaw(kilocode('session.error', { sessionID: 'ses-1', error: 'Old failure' }));
     expect(stateNotifications).not.toHaveBeenCalled();
     mockWs.onclose?.({ code: 1006, reason: '', wasClean: false } as CloseEvent);
-    expect(state.getStatus()).toEqual({ type: 'disconnected' });
+    expect(state.getStatus()).toEqual({ type: 'disconnected', reconnecting: true });
     expect(stateErrors).not.toHaveBeenCalledWith('Old failure');
     expect(stateNotifications).toHaveBeenCalledTimes(1);
     transport.destroy();
@@ -2386,6 +2395,51 @@ describe('CloudAgentTransport snapshot read recovery', () => {
       expect(fetchSnapshotPage).toHaveBeenCalledTimes(4);
       expect(errors).toEqual(['Connection lost.']);
       expect(webSocketConstructor).toHaveBeenCalledTimes(1);
+
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('reads a malformed snapshot page once and reports it as unavailable history', async () => {
+    jest.useFakeTimers();
+    try {
+      const cloudAgentWorkspaceId = 'workspace_' + 'w'.repeat(12);
+      const fetchCloudSnapshotPage = jest.fn(() =>
+        Promise.resolve({ kind: 'success', info: { id: 123 }, messages: 'nope' })
+      );
+      const errors: string[] = [];
+      const serviceEvents: ServiceEvent[] = [];
+      const onInitialPageLoaded = jest.fn();
+      const transport = createCloudAgentTransport({
+        sessionId: cloudAgentId(cloudAgentWorkspaceId),
+        kiloSessionId: kiloId('ses-1'),
+        api: createMockApi(),
+        getTicket: () => 'test-ticket',
+        fetchCloudSnapshotPage,
+        onInitialPageLoaded,
+        websocketBaseUrl: 'ws://localhost:9999',
+        onError: message => errors.push(message),
+      })({
+        onChatEvent: () => undefined,
+        onServiceEvent: event => serviceEvents.push(event),
+      });
+
+      transport.connect();
+      await flushMicrotasks();
+
+      // Cover the full retry window: a malformed page is terminal, so the
+      // read must not be repeated.
+      for (let attempt = 0; attempt < 4; attempt++) {
+        jest.advanceTimersByTime(5000);
+        await flushMicrotasks();
+      }
+
+      expect(fetchCloudSnapshotPage).toHaveBeenCalledTimes(1);
+      expect(errors).toEqual(['Session history is unavailable']);
+      expect(onInitialPageLoaded).not.toHaveBeenCalled();
+      expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(0);
 
       transport.destroy();
     } finally {

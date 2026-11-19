@@ -233,9 +233,10 @@ export function viewDocument(html: string, policy: string): string {
  * iframe's own messages are handed back to the app. A message from anywhere
  * else on this page is dropped.
  *
- * The names are the seam the app calls: `window.kiloMcpHost.mount(html)` puts a
- * document in the sandbox, and `window.kiloMcpHost.deliver(text)` posts one
- * bridge message into it.
+ * The names are the seam the app calls: `window.kiloMcpHost.mount(html, label)`
+ * puts a document in the sandbox, and `label` names the frame for assistive
+ * technology; `window.kiloMcpHost.deliver(text)` posts one bridge message into
+ * it.
  */
 export const VIEW_HOST_PAGE = `<!doctype html><html><head>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
@@ -247,7 +248,7 @@ html,body{margin:0;padding:0;background:transparent;overflow:hidden;}
 const view = document.getElementById('view');
 const post = text => window.ReactNativeWebView.postMessage(text);
 window.kiloMcpHost = {
-  mount: html => { view.srcdoc = html; },
+  mount: (html, label) => { if (typeof label === 'string' && label !== '') view.title = label; view.srcdoc = html; },
   deliver: text => {
     if (view.contentWindow) {
       view.contentWindow.postMessage(JSON.parse(text), '*');

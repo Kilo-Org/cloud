@@ -1,6 +1,7 @@
 const mockGetAuthenticated = jest.fn();
 const mockPullsGet = jest.fn();
 const mockPullsListCommits = jest.fn();
+const mockReposGetCollaboratorPermissionLevel = jest.fn();
 const mockPaginate = jest.fn();
 const mockInstallationAuth = jest.fn();
 const mockOctokitRequest = jest.fn();
@@ -8,6 +9,7 @@ const mockOctokitRequest = jest.fn();
 jest.mock('@octokit/rest', () => ({
   Octokit: jest.fn().mockImplementation(() => ({
     rest: { users: { getAuthenticated: mockGetAuthenticated } },
+    repos: { getCollaboratorPermissionLevel: mockReposGetCollaboratorPermissionLevel },
     pulls: { get: mockPullsGet, listCommits: mockPullsListCommits },
     paginate: mockPaginate,
     request: mockOctokitRequest,
@@ -19,6 +21,7 @@ jest.mock('@octokit/auth-app', () => ({
 }));
 
 jest.mock('../../github/runtime-authorization', () => ({
+  GitHubRuntimeAuthorizationError: class GitHubRuntimeAuthorizationError extends Error {},
   assertGitHubInstallationRuntimeAuthorized: jest.fn(),
 }));
 
@@ -34,7 +37,10 @@ jest.mock('./app-selector', () => ({
 import {
   exchangeGitHubOAuthCode,
   fetchPullRequestByNumber,
+  getCollaboratorPermissionLevel,
+  GitHubCredentialRejectionError,
   GitHubRateLimitError,
+  isGitHubCredentialRejection,
   toGitHubRateLimitError,
 } from './adapter';
 import { verifySessionPullRequestLink } from './pr-link-identity';
@@ -78,7 +84,11 @@ describe('exchangeGitHubOAuthCode', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://github.com/login/oauth/access_token',
-      expect.objectContaining({ method: 'POST' })
+      expect.objectContaining({
+        method: 'POST',
+        redirect: 'error',
+        signal: expect.any(AbortSignal),
+      })
     );
     expect(requestBody(fetchMock)).toEqual({
       client_id: 'github-client-id',
@@ -135,6 +145,34 @@ describe('exchangeGitHubOAuthCode', () => {
       'GitHub OAuth code exchange returned a non-JSON response'
     );
   });
+
+  it('propagates the abort error when the token request times out', async () => {
+    const timeoutError = new DOMException(
+      'The operation was aborted due to timeout',
+      'TimeoutError'
+    );
+    jest.spyOn(global, 'fetch').mockRejectedValueOnce(timeoutError);
+
+    await expect(exchangeGitHubOAuthCode('auth-code', 'standard')).rejects.toBe(timeoutError);
+  });
+
+  it('authenticates the user with a bounded request', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(tokenResponse());
+
+    await exchangeGitHubOAuthCode('auth-code', 'standard');
+
+    expect(mockGetAuthenticated).toHaveBeenCalledWith({
+      request: { signal: expect.any(AbortSignal) },
+    });
+  });
+
+  it('propagates a failure from the authenticated user lookup', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(tokenResponse());
+    const lookupError = new Error('Bad credentials');
+    mockGetAuthenticated.mockRejectedValueOnce(lookupError);
+
+    await expect(exchangeGitHubOAuthCode('auth-code', 'standard')).rejects.toBe(lookupError);
+  });
 });
 
 function githubPrPayload(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -167,6 +205,82 @@ function httpError(status: number, message: string, headers?: Record<string, str
     ...(headers ? { response: { headers } } : {}),
   });
 }
+
+describe('getCollaboratorPermissionLevel', () => {
+  const fetchParams = ['5001', 'kilo', 'repo', 'octocat'] as const;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockInstallationAuth.mockReset().mockResolvedValue({
+      token: 'installation-token',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('returns a known permission from the collaborator lookup', async () => {
+    mockReposGetCollaboratorPermissionLevel.mockResolvedValue({ data: { permission: 'write' } });
+
+    await expect(getCollaboratorPermissionLevel(...fetchParams)).resolves.toBe('write');
+    expect(mockReposGetCollaboratorPermissionLevel).toHaveBeenCalledWith({
+      owner: 'kilo',
+      repo: 'repo',
+      username: 'octocat',
+    });
+  });
+
+  it('mints the installation token before the collaborator lookup', async () => {
+    mockReposGetCollaboratorPermissionLevel.mockResolvedValue({ data: { permission: 'read' } });
+
+    await getCollaboratorPermissionLevel(...fetchParams);
+
+    expect(createAppAuth).toHaveBeenCalledWith(expect.objectContaining({ installationId: '5001' }));
+  });
+
+  it('rejects a mint 401 as the typed credential rejection', async () => {
+    const mintError = httpError(401, "Kernel's GitHub App credentials were rejected");
+    mockInstallationAuth.mockRejectedValue(mintError);
+
+    const thrown: unknown = await getCollaboratorPermissionLevel(...fetchParams).catch(
+      (error: unknown) => error
+    );
+
+    expect(thrown).toBeInstanceOf(GitHubCredentialRejectionError);
+    expect(isGitHubCredentialRejection(thrown)).toBe(true);
+    expect(thrown).toMatchObject({ message: "Kernel's GitHub App credentials were rejected" });
+    expect((thrown as GitHubCredentialRejectionError).cause).toBe(mintError);
+    expect(mockReposGetCollaboratorPermissionLevel).not.toHaveBeenCalled();
+  });
+
+  it('rethrows a lookup 401 raw so it stays retryable', async () => {
+    const lookupError = httpError(401, 'Bad credentials');
+    mockReposGetCollaboratorPermissionLevel.mockRejectedValue(lookupError);
+
+    const thrown: unknown = await getCollaboratorPermissionLevel(...fetchParams).catch(
+      (error: unknown) => error
+    );
+
+    expect(thrown).toBe(lookupError);
+    expect(isGitHubCredentialRejection(thrown)).toBe(false);
+  });
+
+  it('returns null for an unknown collaborator', async () => {
+    mockReposGetCollaboratorPermissionLevel.mockRejectedValue(
+      Object.assign(new Error('Not Found'), { status: 404 })
+    );
+
+    await expect(getCollaboratorPermissionLevel(...fetchParams)).resolves.toBeNull();
+  });
+
+  it('returns null when the mint reports the installation gone', async () => {
+    mockInstallationAuth.mockRejectedValue(Object.assign(new Error('Not Found'), { status: 404 }));
+
+    await expect(getCollaboratorPermissionLevel(...fetchParams)).resolves.toBeNull();
+  });
+});
 
 describe('toGitHubRateLimitError', () => {
   const NOW = Date.parse('2026-01-01T00:00:00.000Z');

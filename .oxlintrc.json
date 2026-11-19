@@ -13,7 +13,6 @@
   },
   "ignorePatterns": [
     ".next/**",
-    "node_modules/**",
     "**/node_modules/**",
     "**/*.js",
     "**/*.jsx",
@@ -24,8 +23,11 @@
     "supabase/functions/**",
     "**/opencode.gen.ts"
   ],
-  // Category defaults are off, so this block is the complete list of active checks,
-  // and each rules block below that is not a child of this one states why it relaxes.
+  // Category defaults are off, so this block lists the checks that apply to every file.
+  // The overrides below may add scoped checks as well as relax them: the **/*.ts and
+  // **/*.tsx override adds the TypeScript checks that apply repo-wide, and the
+  // services/**/*.ts and packages/**/*.ts override adds further strict checks for
+  // those trees. An override that relaxes a check states why it does.
   "rules": {
     "for-direction": "error",
     "no-async-promise-executor": "error",

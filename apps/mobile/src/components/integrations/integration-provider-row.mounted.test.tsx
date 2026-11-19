@@ -75,7 +75,7 @@ function renderRow(props: {
         retryingConnection: props.retryingConnection ?? false,
         onConnect: calls.connect,
         onDisconnect: calls.disconnect,
-        onManageOnWeb: calls.manageOnWeb,
+        onOpenOnWeb: calls.manageOnWeb,
         onRetryConnection: calls.retryConnection,
       })
     );

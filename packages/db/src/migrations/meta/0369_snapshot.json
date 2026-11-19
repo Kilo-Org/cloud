@@ -1,5 +1,5 @@
 {
-  "id": "789b12b4-d911-4964-ac6a-79c01cc19b7b",
+  "id": "c6373dd1-7a9f-41a2-80b1-1285215e64e3",
   "prevId": "11a2ce65-96d4-4bf6-a565-29a780abfd9e",
   "version": "7",
   "dialect": "postgresql",
@@ -28374,13 +28374,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "trial_granted": {
-          "name": "trial_granted",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
         "company_domain": {
           "name": "company_domain",
           "type": "text",
@@ -35287,6 +35280,33 @@
           ],
           "isUnique": false,
           "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_session_step_up_proofs_user_session_binding": {
+          "name": "idx_session_step_up_proofs_user_session_binding",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "session_id_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "action_binding_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },

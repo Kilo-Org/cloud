@@ -1,4 +1,4 @@
-import { env, reset, runInDurableObject } from 'cloudflare:test';
+import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { sealRuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
@@ -754,7 +754,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
     await expect(stub.finishWorktreeDeletion(worktree)).resolves.toBeUndefined();
   });
 
-  it('purges on finish regardless of the informational worktree id and is idempotent', async () => {
+  it('purges the session for its own worktree id', async () => {
     const sessionId = newSessionId();
     const sandboxId = await generateSandboxId(sessionId);
     const worktree = worktreeId();
@@ -766,11 +766,30 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
       workspacePath: `/workspace/worktrees/${worktree}`,
     });
 
-    // A mismatched id is informational: begin validated identity, and the
-    // Sandbox DO already confirmed cleanup before finish runs.
     await expect(
       runInDurableObject(stub, instance => instance.finishWorktreeDeletion(worktreeId()))
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow(/Worktree identity conflict/);
+    await expect(stub.getSession()).resolves.toMatchObject({ type: 'found' });
+    await expect(stub.getMetadata()).resolves.not.toBeNull();
+
+    await stub.finishWorktreeDeletion(worktree);
+    await expect(stub.getSession()).resolves.toEqual({ type: 'session-not-found' });
+  });
+
+  it('purges a registered session that stores no metadata', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId(sessionId);
+    const stub = await registerSession({
+      sessionId,
+      sandboxId,
+      kiloSessionId: kiloSessionId(),
+    });
+    await runInDurableObject(stub, (_instance, state) => state.storage.delete('session_metadata'));
+    await evictAllDurableObjects();
+
+    await expect(stub.getSession()).resolves.toMatchObject({ type: 'found' });
+    await stub.finishWorktreeDeletion(worktreeId());
+
     await expect(stub.getSession()).resolves.toEqual({ type: 'session-not-found' });
   });
 

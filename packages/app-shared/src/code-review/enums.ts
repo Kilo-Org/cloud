@@ -1,7 +1,8 @@
-// Ported from packages/db/src/schema-types.ts's CodeReviewAgentConfigSchema
-// (review_style, gate_threshold z.enums) and apps/web/src/components/code-reviews/ReviewConfigForm.tsx's
-// FOCUS_AREAS ids. Values must stay in sync with the db zod schema — see
-// packages/db/src/schema-types.ts.
+// Review configuration enums for the code-review agent. This module is the
+// single declaration: packages/db's CodeReviewAgentConfigSchema imports
+// REVIEW_STYLES and GATE_THRESHOLDS from here for its review_style and
+// gate_threshold columns, and REVIEW_FOCUS_AREAS holds the focus-area ids the
+// web and mobile forms offer.
 //
 // Note: the db schema does NOT constrain focus_areas to an enum (it's
 // `z.array(z.string())`, deliberately permissive). REVIEW_FOCUS_AREAS here

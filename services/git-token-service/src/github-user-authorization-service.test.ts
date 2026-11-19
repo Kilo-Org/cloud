@@ -7,6 +7,10 @@ const database = vi.hoisted(() => ({
   rows: [] as Array<Record<string, unknown>>,
   updates: [] as Array<Record<string, unknown>>,
   updatedRow: undefined as Record<string, unknown> | undefined,
+  // Test seam: lets a test store a newer credential generation, so a
+  // conditional update matches no row and later reads see the stored row.
+  updateLosesRace: false,
+  rowAfterLostUpdate: undefined as Record<string, unknown> | undefined,
   deleted: false,
   deleteWinsRace: true,
   rowAfterDelete: undefined as Record<string, unknown> | undefined,
@@ -55,6 +59,10 @@ vi.mock('@kilocode/db/client', () => ({
           return {
             where: () => ({
               returning: async () => {
+                if (database.updateLosesRace) {
+                  database.rows = database.rowAfterLostUpdate ? [database.rowAfterLostUpdate] : [];
+                  return [];
+                }
                 if (!database.updatedRow) return [];
                 database.rows = [database.updatedRow];
                 return [database.updatedRow];
@@ -170,6 +178,8 @@ describe('GitHubUserAuthorizationService envelope selection', () => {
     database.deleted = false;
     database.deleteWinsRace = true;
     database.rowAfterDelete = undefined;
+    database.updateLosesRace = false;
+    database.rowAfterLostUpdate = undefined;
     database.lockExecutions = 0;
     database.depth = 0;
     database.leaseDenied = false;
@@ -435,6 +445,8 @@ describe('GitHubUserAuthorizationService disconnect', () => {
     database.deleted = false;
     database.deleteWinsRace = true;
     database.rowAfterDelete = undefined;
+    database.updateLosesRace = false;
+    database.rowAfterLostUpdate = undefined;
     database.lockExecutions = 0;
     database.depth = 0;
     database.leaseDenied = false;
@@ -714,11 +726,52 @@ describe('GitHubUserAuthorizationService disconnect', () => {
     expect(database.deleted).toBe(false);
   });
 
-  it('does not revoke after reconnect wins the refresh persistence race', async () => {
+  it('serves the reconnect generation when a concurrent refresh commits first', async () => {
     database.rows = [
       { ...makeRow(), access_token_expires_at: new Date(Date.now() - 1000).toISOString() },
     ];
-    const request = vi.fn().mockResolvedValueOnce(
+    database.updateLosesRace = true;
+    database.rowAfterLostUpdate = {
+      ...makeRow(activePublicKey, 'active', {
+        access: 'refreshed-access',
+        refresh: 'refreshed-refresh',
+      }),
+      credential_version: 2,
+      access_token_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+      refresh_token_expires_at: new Date(Date.now() + 7200 * 1000).toISOString(),
+    };
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({
+          access_token: 'refreshed-access',
+          expires_in: 3600,
+          refresh_token: 'refreshed-refresh',
+          refresh_token_expires_in: 7200,
+        })
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', request);
+
+    await expect(
+      makeService().disconnectUserAuthorization('user_1', {
+        authorizationId: 'authorization_1',
+        credentialVersion: 1,
+      })
+    ).resolves.toBeUndefined();
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls[1]?.[1]).toEqual(
+      expect.objectContaining({ body: JSON.stringify({ access_token: 'refreshed-access' }) })
+    );
+    expect(database.deleted).toBe(true);
+  });
+
+  it('waits for the provider exchange lease before refreshing credentials during disconnect', async () => {
+    database.rows = [
+      { ...makeRow(), access_token_expires_at: new Date(Date.now() - 1000).toISOString() },
+    ];
+    database.leaseDenied = true;
+    const request = vi.fn().mockResolvedValue(
       Response.json({
         access_token: 'refreshed-access',
         expires_in: 3600,
@@ -733,9 +786,73 @@ describe('GitHubUserAuthorizationService disconnect', () => {
         authorizationId: database.rows[0] ? 'authorization_1' : null,
         credentialVersion: database.rows[0] ? 1 : null,
       })
-    ).rejects.toThrow('changed during disconnect');
-    expect(request).toHaveBeenCalledTimes(1);
+    ).rejects.toThrow('could not be revoked');
+    expect(request).not.toHaveBeenCalled();
+    expect(database.updates).toEqual([]);
     expect(database.deleted).toBe(false);
+  });
+
+  it('re-reads the current credential when the exchange lease changed hands', async () => {
+    database.rows = [
+      { ...makeRow(), access_token_expires_at: new Date(Date.now() - 1000).toISOString() },
+    ];
+    database.releaseDenied = true;
+    const request = vi.fn().mockResolvedValue(
+      Response.json({
+        access_token: 'refreshed-access',
+        expires_in: 3600,
+        refresh_token: 'refreshed-refresh',
+        refresh_token_expires_in: 7200,
+      })
+    );
+    vi.stubGlobal('fetch', request);
+
+    await expect(
+      makeService().disconnectUserAuthorization('user_1', {
+        authorizationId: database.rows[0] ? 'authorization_1' : null,
+        credentialVersion: database.rows[0] ? 1 : null,
+      })
+    ).rejects.toThrow('could not be revoked');
+    expect(database.updates).toEqual([]);
+    expect(database.deleted).toBe(false);
+  });
+
+  it('honors the GITHUB_OAUTH_BASE_URL env seam for its disconnect token request', async () => {
+    database.rows = [
+      { ...makeRow(), access_token_expires_at: new Date(Date.now() - 1000).toISOString() },
+    ];
+    database.updatedRow = {
+      ...makeRow(activePublicKey, 'active', {
+        access: 'refreshed-access',
+        refresh: 'refreshed-refresh',
+      }),
+      credential_version: 2,
+      access_token_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+      refresh_token_expires_at: new Date(Date.now() + 7200 * 1000).toISOString(),
+    };
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({
+          access_token: 'refreshed-access',
+          expires_in: 3600,
+          refresh_token: 'refreshed-refresh',
+          refresh_token_expires_in: 7200,
+        })
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', request);
+
+    await makeService({
+      GITHUB_OAUTH_BASE_URL: 'https://github.example.test///',
+    }).disconnectUserAuthorization('user_1', {
+      authorizationId: database.rows[0] ? 'authorization_1' : null,
+      credentialVersion: database.rows[0] ? 1 : null,
+    });
+
+    expect(request.mock.calls[0]?.[0]).toBe('https://github.example.test/login/oauth/access_token');
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(database.deleted).toBe(true);
   });
 
   it('returns successfully when another delete removes the already revoked row', async () => {
@@ -784,6 +901,8 @@ describe('GitHubUserAuthorizationService.getUserAccessToken', () => {
     database.deleted = false;
     database.deleteWinsRace = true;
     database.rowAfterDelete = undefined;
+    database.updateLosesRace = false;
+    database.rowAfterLostUpdate = undefined;
     database.lockExecutions = 0;
     database.depth = 0;
     database.selectSequence = undefined;

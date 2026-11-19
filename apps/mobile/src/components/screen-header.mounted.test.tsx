@@ -112,6 +112,73 @@ function backPressableCount(root: TestInstance): number {
   return root.findAll(isBackPressable).length;
 }
 
+/**
+ * The 48dp column a non-centred row puts before the heading when it draws a
+ * back control. It mirrors the heading's own lines — an eyebrow twin above the
+ * band, the band the caret sits in, a subtitle twin below it — so the two cells
+ * measure the same height; the centred branch has no column (its leading spacer
+ * starts `h-[48px]`, this one `w-[48px]`), and neither has a header that draws
+ * no control at all.
+ */
+function leadingColumns(root: TestInstance): TestInstance[] {
+  return root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'View' &&
+      String(node.props.className ?? '').startsWith('w-[48px]')
+  );
+}
+
+function findLeadingColumn(root: TestInstance): TestInstance {
+  const column = leadingColumns(root)[0];
+  if (!column) {
+    throw new Error('leading column not found');
+  }
+  return column;
+}
+
+/**
+ * The band a title cell lays out in: the View wrapping the title inside the
+ * heading. The leading column wraps the caret in a View carrying the very same
+ * class, which is what keeps the two cells the same height at any font scale —
+ * and what puts the caret's 48dp target inside a parent of its own height.
+ */
+function findTitleBand(root: TestInstance): TestInstance {
+  const band = root.findByProps({ accessibilityRole: 'header' }).parent;
+  if (!band || typeof band.type !== 'string') {
+    throw new Error('title band not found');
+  }
+  return band;
+}
+
+/**
+ * The band the leading column centres the caret in. It is the back control's
+ * circular frame's parent, so no absolute overlay can stand in for it.
+ */
+function findCaretBand(root: TestInstance): TestInstance {
+  const band = findBackFrame(root).parent;
+  if (!band) {
+    throw new Error('caret band not found');
+  }
+  return band;
+}
+
+/**
+ * The eyebrow a reader sees: the heading's own slot. Both the leading column
+ * and the `reserveTitleSpace` band lay out a zero-ink twin of it, hidden from
+ * assistive readers, so a bare `Eyebrow` lookup has more than one candidate the
+ * moment the header carries an eyebrow line.
+ */
+function findHeadingEyebrow(root: TestInstance): TestInstance {
+  const eyebrow = root.findAll(
+    node => String(node.type) === 'Eyebrow' && node.props['aria-hidden'] !== true
+  )[0];
+  if (!eyebrow) {
+    throw new Error('heading eyebrow not found');
+  }
+  return eyebrow;
+}
+
 function findTitlePressable(root: TestInstance): TestInstance {
   return root.find(
     node =>
@@ -167,6 +234,21 @@ function findSideInsetWrapper(root: TestInstance): TestInstance {
     throw new Error('side-inset wrapper not found');
   }
   return wrapper;
+}
+
+/**
+ * The zero-width, clipped band `reserveTitleSpace` lays out beside the heading:
+ * the only View laid out at no width, holding the eyebrow twin and the title's
+ * cap so the header's text area keeps one height for every line count.
+ */
+function findReservedBand(root: TestInstance): TestInstance {
+  return root.find(
+    node =>
+      typeof node.type === 'string' &&
+      String(node.props.className ?? '')
+        .split(' ')
+        .includes('w-0')
+  );
 }
 
 function deriveTitleFontSize(className: string): number {
@@ -267,6 +349,51 @@ function renderHeader(props: ScreenHeaderProps): TestRenderer.ReactTestRenderer 
   return renderer;
 }
 
+/**
+ * The `min-h-11` row the centered branch lays the back control (when present),
+ * heading and trailing slots into. The balance fillers are that row's direct
+ * spacer children, positioned where they guard the title's window axis. Found
+ * by the heading it owns — the centered branch is the only place a
+ * `justify-center` flex row wraps `min-w-0 flex-1` — so a no-back variant
+ * reaches it without a control to anchor on.
+ */
+function findTitleRow(root: TestInstance): TestInstance {
+  const heading = root.findByProps({ accessibilityRole: 'header' }).parent?.parent;
+  if (
+    !heading ||
+    String(heading.props.className ?? '') !== 'min-w-0 flex-1 flex-row items-center justify-center'
+  ) {
+    throw new Error('centered heading not found');
+  }
+  const row = heading.parent;
+  if (!row || String(row.type) !== 'View') {
+    throw new Error('back control row not found');
+  }
+  return row;
+}
+
+type BalanceFillers = {
+  leading: TestInstance | undefined;
+  trailing: TestInstance | undefined;
+};
+
+/**
+ * The pair of spacer views the centered row mirrors its extents with (`style`
+ * width > 0, `shrink-0`, reader-hidden, noninteractive). The row keeps each
+ * filler at a FIXED ORDER sibling position: the leading one directly after the
+ * back control; the trailing one between the real trailing slots and the
+ * inline slot — the finders go by that contract's `testID`, since both carry
+ * it.
+ */
+function findBalanceFillers(row: TestInstance): BalanceFillers {
+  const byTestID = (testID: string): TestInstance | undefined =>
+    row.findAll(node => node.props.testID === testID)[0];
+  return {
+    leading: byTestID('screen-header-leading-filler'),
+    trailing: byTestID('screen-header-trailing-filler'),
+  };
+}
+
 describe('ScreenHeader mounted', () => {
   beforeEach(() => {
     routerState.routes = ['previous-screen', 'session-detail'];
@@ -296,7 +423,7 @@ describe('ScreenHeader mounted', () => {
     expect(back.props.className).not.toContain('mr-1');
     expect(back.props.hitSlop).toBeUndefined();
     expect(findBackFrame(renderer.root).props.className).toContain('shrink-0');
-    expect(findBackFrame(renderer.root).props.className).toContain('-ms-4');
+    expect(findLeadingColumn(renderer.root).props.className).toContain('-ms-4');
   });
 
   it('clips the back control to a circle instead of letting the platform surface fill its box', () => {
@@ -355,10 +482,11 @@ describe('ScreenHeader mounted', () => {
     // points under the 44-point back target and the title's box covered 0.27 of
     // it — the "two controls cover each other" finding (the scan reports above
     // 0.25). `-ms-4` keeps a real 4-point `gap-1` between the two controls in
-    // both writing directions. It rides on the frame, which is the row's child.
-    const frame = findBackFrame(renderer.root);
-    expect(frame.props.className).toContain('-ms-4');
-    expect(await compiledMarginProperties(frame.props.className as string)).toEqual([
+    // both writing directions. It rides on the leading column, which is the
+    // row's child and holds the caret's box.
+    const column = findLeadingColumn(renderer.root);
+    expect(column.props.className).toContain('-ms-4');
+    expect(await compiledMarginProperties(column.props.className as string)).toEqual([
       'marginInlineStart',
     ]);
 
@@ -393,7 +521,11 @@ describe('ScreenHeader mounted', () => {
     expect(inline.parent).toBe(cluster.parent);
     expect(inline.children).toEqual(['ACTIONS']);
     expect(inline.parent?.props.className).toContain('flex-row');
-    const heading = inline.parent?.children[0] as TestInstance;
+    // The heading is the row's other flexible child: the leading column now
+    // sits before it, so it is found by its own class rather than by index.
+    const heading = renderer.root.findByProps({ className: 'min-w-0 flex-1' });
+    expect(heading.parent?.parent).toBe(inline.parent);
+    expect(heading.parent?.props.className).toContain('flex-row');
     expect(heading.props.className).toContain('min-w-0 flex-1');
     // Neither trailing slot clamps itself: `headerRight` sizes to its content
     // and `inlineActions` keeps its full width instead of wrapping the controls.
@@ -467,8 +599,9 @@ describe('ScreenHeader mounted', () => {
     expect(stackedRow?.children).toEqual(['ACTIONS']);
     // The title row no longer carries the inline slot, and the heading keeps
     // its full-width `min-w-0 flex-1` box, so the title cannot be squeezed.
-    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    expect(title.parent?.props.className).toContain('min-w-0 flex-1');
+    // The title sits in the band inside that box, so the box is the band's
+    // parent.
+    expect(findTitleBand(renderer.root).parent?.props.className).toContain('min-w-0 flex-1');
     expect(
       renderer.root.findAll(
         node =>
@@ -780,7 +913,7 @@ describe('ScreenHeader mounted', () => {
     }
   });
 
-  it('reserves the title cap in a band beside the heading, not around the title', () => {
+  it('reserves the title cap in a zero-width band beside the heading', () => {
     const renderer = renderHeader({
       title: 'Harbor Analytics',
       eyebrow: 'RECENT REVIEWS',
@@ -788,13 +921,7 @@ describe('ScreenHeader mounted', () => {
       reserveTitleSpace: true,
     });
 
-    const band = renderer.root.find(
-      node =>
-        typeof node.type === 'string' &&
-        String(node.props.className ?? '')
-          .split(' ')
-          .includes('w-0')
-    );
+    const band = findReservedBand(renderer.root);
     // The band holds one eyebrow line and the title's two-line cap, so the row
     // keeps its height for a title that paints one line: the body below never
     // moves when the name arrives and wraps.
@@ -807,10 +934,70 @@ describe('ScreenHeader mounted', () => {
     // space from the heading or paints beside the title.
     expect(String(band.props.className)).toContain('w-0');
 
-    // The visible title keeps its own height, so the eyebrow sits right above
-    // it instead of above the empty line the cap reserves.
+    // The visible title keeps its own height inside the cell the leading
+    // column shares, so the eyebrow sits right above it instead of above the
+    // empty line the cap reserves; the clipped reserve stays beside the
+    // heading and never becomes an ancestor of the text.
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    expect(title.parent?.props.className).toBe('min-w-0 flex-1');
+    expect(title.parent?.props.className).toBe('justify-center min-h-14');
+    expect(band.findAll(node => node === title)).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  // The reserve cannot know the arriving label, so it holds a no-ink no-break
+  // space: the eyebrow variant's line box is the same for every script
+  // (`EYEBROW_LINE_HEIGHT_DP`), so the space reserves exactly the height the
+  // label takes, in either interface direction.
+  it.each([false, true])(
+    'reserves a blank filler when the arriving label is unknown (RTL=%s)',
+    isRTL => {
+      i18nManager.isRTL = isRTL;
+
+      const banded = renderHeader({
+        title: '#6054',
+        reserveEyebrow: true,
+        reserveTitleSpace: true,
+      });
+      const twin = findReservedBand(banded.root).find(node => String(node.type) === 'Eyebrow');
+      expect(twin.children).toEqual(['\u00A0']);
+      // No eyebrow class is forced on the reserve: the size and family stay the
+      // `Text` variant's business.
+      expect(twin.props.className).toBe('mb-0.5');
+      banded.unmount();
+
+      // The hidden placeholder line, which is what holds the height when the
+      // caller does not reserve the title space (the invoices boundary).
+      const inline = renderHeader({ title: '#6054', reserveEyebrow: true });
+      const placeholder = findHeadingEyebrow(inline.root);
+      expect(placeholder.children).toEqual(['\u00A0']);
+      // It still paints nothing and reaches no reader.
+      expect(placeholder.props.className).toContain('opacity-0');
+      inline.unmount();
+
+      i18nManager.isRTL = false;
+    }
+  );
+
+  it('keeps the reserved eyebrow twin out of the accessibility tree and the visible eyebrow readable', () => {
+    const renderer = renderHeader({
+      title: 'الفواتير',
+      eyebrow: 'الفواتير',
+      reserveTitleSpace: true,
+    });
+
+    const band = findReservedBand(renderer.root);
+    expect(band.props['aria-hidden']).toBe(true);
+    // The twin is still clipped to no width: it holds height only, so the
+    // eyebrow line it lays out paints nothing.
+    expect(band.props.className).toContain('w-0');
+    expect(band.props.className).toContain('overflow-hidden');
+
+    // Only the visible slot is the header's labelled eyebrow.
+    const labelled = renderer.root.findAll(
+      node => String(node.type) === 'Eyebrow' && node.props.accessible === true
+    );
+    expect(labelled).toHaveLength(1);
+    expect(labelled[0]?.children).toEqual(['الفواتير']);
     renderer.unmount();
   });
 
@@ -840,13 +1027,16 @@ describe('ScreenHeader mounted', () => {
       safeAreaTop: false,
       className: 'pt-3',
     });
-    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    expect(title.parent?.parent).toBe(findBackFrame(renderer.root).parent);
+    // The band the title sits in shares the leading control's row, so the close
+    // control lines up with the title instead of drawing on its own row.
+    expect(findTitleBand(renderer.root).parent?.parent).toBe(
+      findLeadingColumn(renderer.root).parent
+    );
     expect(renderer.root.props.style).toBeUndefined();
     expect(renderer.root.props.className).toContain('pt-3');
   });
 
-  it('keeps the modal close control on the centered title row with a mirroring spacer', () => {
+  it('keeps the modal close control on the centered title row with a mirroring filler', () => {
     const renderer = renderHeader({ title: 'Kilo Pass', modal: true });
 
     const row = findBackFrame(renderer.root).parent;
@@ -860,26 +1050,22 @@ describe('ScreenHeader mounted', () => {
     expect(title.props.className).toContain('text-center');
     expect(title.parent?.parent?.parent).toBe(row);
 
-    const spacer = row.find(
-      node =>
-        typeof node.type === 'string' &&
-        (node.type as string) === 'View' &&
-        node.props.className === 'h-[48px] w-[48px] shrink-0'
-    );
-    expect(spacer).toBeDefined();
+    // Back-only: L = 48, T = 0 → leading filler 0, trailing filler min(48, free/2)
+    // = 48 at the phone window. The derived pair keeps `centeredControls`' exact
+    // trailing mirror, laid out with the same style-object width the fillers use.
+    const { leading, trailing } = findBalanceFillers(row);
+    expect(leading).toBeUndefined();
+    expect(trailing?.props.style).toEqual({ width: 48 });
   });
 
-  it('omits the mirroring spacer when the centered header has no back control', () => {
+  it('omits the mirroring filler when the centered header has no back control', () => {
     routerState.canGoBack.mockReturnValue(false);
     const renderer = renderHeader({ title: 'Kilo Pass', modal: true });
 
-    const spacers = renderer.root.findAll(
-      node =>
-        typeof node.type === 'string' &&
-        (node.type as string) === 'View' &&
-        node.props.className === 'h-[48px] w-[48px] shrink-0'
-    );
-    expect(spacers).toHaveLength(0);
+    // L = 0 and T = 0: no in-row cluster pays a gap, so both fillers collapse.
+    const { leading, trailing } = findBalanceFillers(findTitleRow(renderer.root));
+    expect(leading).toBeUndefined();
+    expect(trailing).toBeUndefined();
   });
 
   it.each([false, true])('keeps repository eyebrows on one line with RTL=%s', isRTL => {
@@ -889,7 +1075,7 @@ describe('ScreenHeader mounted', () => {
 
     for (const eyebrow of repositories) {
       const renderer = renderHeader({ title: '#6054', eyebrow, headerRight: 'Submit review' });
-      const label = renderer.root.findByType('Eyebrow');
+      const label = findHeadingEyebrow(renderer.root);
       expect(label.props.numberOfLines).toBe(1);
       expect(label.props.ellipsizeMode).toBe('tail');
       expect(label.children).toEqual([eyebrow]);
@@ -904,7 +1090,7 @@ describe('ScreenHeader mounted', () => {
       act(() => {
         renderer.update(createElement(ScreenHeader, { title: '#6054', eyebrow }));
       });
-      expect(renderer.root.findByType('Eyebrow').props.numberOfLines).toBe(1);
+      expect(findHeadingEyebrow(renderer.root).props.numberOfLines).toBe(1);
       expect(findBackPressable(renderer.root).props.className).toContain(ICON_TARGET_BOX_CLASS);
       renderer.unmount();
     }
@@ -967,6 +1153,32 @@ describe('ScreenHeader mounted', () => {
   it('omits an absent eyebrow when no space is reserved', () => {
     const renderer = renderHeader({ title: '#6054' });
     expect(renderer.root.findAllByType('Eyebrow')).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('holds the arriving eyebrow line with a no-ink filler, so the swap cannot grow it', () => {
+    // The invoices boundary reserves the eyebrow line without
+    // `reserveTitleSpace`, so this transparent slot is what holds the height.
+    // The eyebrow variant owns one line box for every script
+    // (`EYEBROW_LINE_HEIGHT_DP`), so a no-break space reserves exactly the
+    // height the arriving label takes — Arabic included — and the swap cannot
+    // grow the header.
+    const renderer = renderHeader({ title: 'الفواتير', reserveEyebrow: true });
+    const reserved = findHeadingEyebrow(renderer.root);
+    expect(reserved.children).toEqual(['\u00A0']);
+    expect(reserved.props.className).toContain('opacity-0');
+    expect(reserved.props.accessible).toBe(false);
+    expect(reserved.props.accessibilityElementsHidden).toBe(true);
+
+    act(() => {
+      renderer.update(
+        createElement(ScreenHeader, { title: 'استوديو آنا للتصميم', eyebrow: 'الفواتير' })
+      );
+    });
+    const label = findHeadingEyebrow(renderer.root);
+    expect(label.children).toEqual(['الفواتير']);
+    expect(label.props.className).not.toContain('opacity-0');
+    expect(label.props.accessible).toBe(true);
     renderer.unmount();
   });
 
@@ -1048,12 +1260,11 @@ describe('ScreenHeader mounted', () => {
     ).toHaveLength(1);
     // The placeholder is painted over the reserved line, which still holds the
     // height the name will take, so the placeholder and the name lay out the same.
-    const reserved = renderer.root.findAll(
-      node =>
-        typeof node.type === 'string' &&
-        (node.type as string) === 'Text' &&
-        node.props.variant === 'muted'
-    );
+    // The heading's own line, not the leading column's zero-ink twin.
+    const heading = renderer.root.findByProps({ className: 'min-w-0 flex-1' });
+    const reserved = heading
+      .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
+      .filter(node => node.props.variant === 'muted');
     expect(reserved).toHaveLength(1);
     expect(reserved[0]?.children).toEqual(['\u00A0']);
 
@@ -1125,7 +1336,7 @@ describe('ScreenHeader mounted', () => {
       paddingLeft: 47,
       paddingRight: 59,
     });
-    expect(findBackFrame(renderer.root).props.className).toContain('-ms-4');
+    expect(findLeadingColumn(renderer.root).props.className).toContain('-ms-4');
   });
 
   it('keeps the container style a portrait no-op with zero side insets', () => {
@@ -1238,7 +1449,7 @@ describe('ScreenHeader mounted', () => {
       eyebrowNumberOfLines: 1,
     });
 
-    const eyebrow = renderer.root.findByType('Eyebrow');
+    const eyebrow = findHeadingEyebrow(renderer.root);
     expect(eyebrow.props.numberOfLines).toBe(1);
     expect(eyebrow.props.ellipsizeMode).toBe('middle');
     expect(eyebrow.children).toEqual(['KILO-STUB/DISCUSSION-MIXED']);
@@ -1250,11 +1461,356 @@ describe('ScreenHeader mounted', () => {
     // The reserve is the eyebrow itself: a blank line in the same style, capped
     // and middle-ellipsized the way the label will be, so the header is already
     // the height the label leaves it and a path's distinguishing tail survives.
-    const [reserved] = renderer.root.findAllByType('Eyebrow');
-    expect(reserved?.children).toEqual(['\u00A0']);
-    expect(reserved?.props.numberOfLines).toBe(1);
-    expect(reserved?.props.ellipsizeMode).toBe('middle');
-    expect(reserved?.props.accessible).toBe(false);
+    const reserved = findHeadingEyebrow(renderer.root);
+    expect(reserved.children).toEqual(['\u00A0']);
+    expect(reserved.props.numberOfLines).toBe(1);
+    expect(reserved.props.ellipsizeMode).toBe('middle');
+    expect(reserved.props.accessible).toBe(false);
+  });
+
+  it('centres the back control on the title band, not on the eyebrow-plus-title block', () => {
+    // The organization invoices header: the eyebrow is the screen's name and
+    // the title is the organization's, so the heading is two lines. The caret
+    // used to centre on that whole block and sat about 12dp above the title
+    // line it belongs to; the column now mirrors the heading's lines around a
+    // band both cells carry, so the caret centres on the title's own band.
+    const renderer = renderHeader({ title: 'Acme Studio Nordics', eyebrow: 'Invoices' });
+
+    const column = findLeadingColumn(renderer.root);
+    expect(column.props.className).toContain('w-[48px]');
+    expect(column.props.className).toContain('shrink-0');
+    expect(column.props.className).toContain('-ms-4');
+    // The band holds the height now, not the column: the caret's 48dp box used
+    // to be as tall as the column, and the column's lines are centred in it.
+    expect(column.props.className).not.toContain('min-h');
+
+    // The column mirrors the heading's own lines: the eyebrow twin above the
+    // band, and no line below it because this header has no subtitle.
+    const eyebrowTwin = column.findAllByType('Eyebrow')[0];
+    expect(eyebrowTwin?.props.className).toBe('mb-0.5');
+    expect(eyebrowTwin?.children).toEqual(['\u00A0']);
+    expect(eyebrowTwin?.props.numberOfLines).toBe(1);
+    expect(eyebrowTwin?.props['aria-hidden']).toBe(true);
+    expect(eyebrowTwin?.props.accessibilityElementsHidden).toBe(true);
+    expect(eyebrowTwin?.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(column.findAllByType('Text')).toHaveLength(0);
+
+    // The caret is a normal flow child of the band, so its 48dp target lives
+    // inside a parent at least that tall: React Native hit-tests inside each
+    // view's bounds, and the old absolutely positioned overlay left the 11.6dp
+    // above and below the title line — and about 1dp past the header's `pb-3` —
+    // untouchable.
+    const band = findCaretBand(renderer.root);
+    expect(band.parent).toBe(column);
+    expect(band.props.className).toContain('justify-center');
+    expect(band.props.className).toContain('min-h-[48px]');
+    // The title's own cell carries the same class string, which is the property
+    // that keeps the two cells the same height at any font scale.
+    expect(findTitleBand(renderer.root).props.className).toBe(band.props.className);
+
+    // Nothing is positioned absolutely any more: no overlay over the title, and
+    // no `relative` wrapper left holding it.
+    expect(
+      column.findAll(node => String(node.props.className ?? '').includes('absolute'))
+    ).toHaveLength(0);
+    expect(
+      renderer.root.findAll(
+        node => typeof node.type === 'string' && node.props.className === 'relative'
+      )
+    ).toHaveLength(0);
+
+    // The control keeps its 48dp target and its circular press surface.
+    expect(findBackPressable(renderer.root).props.className).toContain(ICON_TARGET_BOX_CLASS);
+    expect(findBackFrame(renderer.root).props.className).toContain('rounded-full');
+    expect(findBackFrame(renderer.root).props.className).toContain('overflow-hidden');
+  });
+
+  it('gives a two-line title and its subtitle one band for both cells', () => {
+    // The shared-session header: a two-line title cap and a subtitle, so the
+    // column has to hold the same three lines the heading lays out — the
+    // eyebrow twin, the band, the subtitle twin.
+    const renderer = renderHeader({
+      title: 'Shared session',
+      eyebrow: 'KILO-ORG/CLOUD',
+      subtitle: 'Reviewing the drain work item',
+      titleNumberOfLines: 2,
+    });
+
+    const column = findLeadingColumn(renderer.root);
+    // Two title lines keep the title's own reserve instead of the 48dp floor,
+    // so a name that wraps still cannot move the body past either cell.
+    const band = findCaretBand(renderer.root);
+    expect(band.props.className).toBe('justify-center min-h-14');
+    expect(findTitleBand(renderer.root).props.className).toBe(band.props.className);
+
+    // The subtitle twin is a zero-ink, one-line muted Text in the heading's own
+    // `mt-0.5` slot, so the column is exactly one line taller, like the
+    // heading.
+    const subtitleTwins = column.findAllByType('Text');
+    expect(subtitleTwins).toHaveLength(1);
+    const subtitleTwin = subtitleTwins[0];
+    expect(subtitleTwin?.props.variant).toBe('muted');
+    expect(subtitleTwin?.props.className).toBe('mt-0.5');
+    expect(subtitleTwin?.props.numberOfLines).toBe(1);
+    expect(subtitleTwin?.children).toEqual(['\u00A0']);
+    expect(subtitleTwin?.props['aria-hidden']).toBe(true);
+    expect(subtitleTwin?.props.accessibilityElementsHidden).toBe(true);
+    expect(subtitleTwin?.props.importantForAccessibility).toBe('no-hide-descendants');
+
+    expect(column.findAllByType('Eyebrow')).toHaveLength(1);
+    expect(
+      column.findAll(node => String(node.props.className ?? '').includes('absolute'))
+    ).toHaveLength(0);
+  });
+
+  it('lays out no band and no column when the header draws no back control', () => {
+    // Without a control there is nothing to line up and no 48dp box to fit, so
+    // the heading keeps the tree — and the height — it has always had: the
+    // title stays the heading's own child instead of gaining a band wrapper, so
+    // a header that draws no control cannot move.
+    const plain = renderHeader({ title: 'Personal', showBackButton: false });
+
+    expect(leadingColumns(plain.root)).toHaveLength(0);
+    const title = plain.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.parent?.props.className).toBe('min-w-0 flex-1');
+    expect(title.parent?.children).toHaveLength(1);
+    expect(
+      plain.root.findAll(
+        node =>
+          typeof node.type === 'string' && String(node.props.className ?? '').includes('min-h')
+      )
+    ).toHaveLength(0);
+
+    // A centred header shares its row with the control, so it keeps its own
+    // band-free heading too.
+    const centered = renderHeader({ title: 'Kilo Pass', modal: true });
+    expect(leadingColumns(centered.root)).toHaveLength(0);
+    expect(centered.root.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toBe(
+      'min-w-0 flex-1'
+    );
+  });
+
+  it('keeps the caret in its plain 48dp band when the heading has no eyebrow', () => {
+    // No second line to align with: the column is the caret's own 48dp band,
+    // which is the layout every eyebrow-less header has always had.
+    const renderer = renderHeader({ title: 'Personal', showBackButton: true });
+
+    const column = findLeadingColumn(renderer.root);
+    expect(column.findAllByType('Eyebrow')).toHaveLength(0);
+    expect(column.findAllByType('Text')).toHaveLength(0);
+    expect(column.props.className).not.toContain('min-h');
+    const band = findCaretBand(renderer.root);
+    expect(band.props.className).toBe('justify-center min-h-[48px]');
+    expect(band.parent).toBe(column);
+    expect(findTitleBand(renderer.root).props.className).toBe(band.props.className);
+  });
+
+  it('keeps the leading column free of text and the two bands on one class', () => {
+    const rendered = renderHeader({ title: 'Acme Studio Nordics', eyebrow: 'Invoices' });
+    // The band follows the title's box, not its truncation: the shared class is
+    // the same string on both cells, and the column holds no text of its own.
+    expect(findLeadingColumn(rendered.root).findAllByType('Text')).toHaveLength(0);
+    expect(findTitleBand(rendered.root).props.className).toBe(
+      findCaretBand(rendered.root).props.className
+    );
+    expect(rendered.root.findByProps({ accessibilityRole: 'header' }).props.ellipsizeMode).toBe(
+      'tail'
+    );
+  });
+});
+
+describe('centered title balance', () => {
+  // The measured fillers: L = 48 with a back control, T = the in-row
+  // slot extents plus their shared 12dp gap, free = rowWidth - L - T,
+  // leading filler clamp(T - L, 0, free/2), trailing filler
+  // clamp(L - T, 0, free/2) — the whole mirror weight moves to the
+  // under-weight end. A heading never lays out at zero width: the cap keeps
+  // at least free/2 for it in both directions.
+  // This describe owns its window geometry, as the actions describe does.
+  beforeEach(() => {
+    routerState.canGoBack.mockImplementation(() => routerState.routes.length > 1);
+    Object.assign(layout, { width: 390, fontScale: 1 });
+  });
+  afterEach(() => {
+    Object.assign(layout, { width: 390, fontScale: 1 });
+  });
+
+  it('balances a Save-style trailing cluster against the back control', () => {
+    // The Security Agent settings cluster: 140dp declared, at the 390dp phone
+    // window. L = 48, T = 152 (140 + its 12dp gap); the seed frame balances on
+    // the row the header's widest documented gutter leaves: free =
+    // (390 - 44) - 48 - 152 = 146, so the leading filler is
+    // min(152 - 48, free/2 = 73) = 73 and the trailing one collapses.
+    const renderer = renderHeader({
+      title: 'Kilo Pass',
+      modal: true,
+      headerRight: 'SAVE',
+      headerRightWidth: 140,
+    });
+
+    const row = findTitleRow(renderer.root);
+    const { leading, trailing } = findBalanceFillers(row);
+    expect(trailing).toBeUndefined();
+    expect(leading?.props.style).toEqual({ width: 73 });
+    // The filler sits behind the back control: its parent is the row itself,
+    // and its index in the row's children is immediately after the back
+    // control's frame.
+    expect(leading?.parent).toBe(row);
+    expect(row.children.indexOf(findBackFrame(renderer.root))).toBe(0);
+    if (!leading) {
+      throw new Error('leading filler missing');
+    }
+    expect(row.children.indexOf(leading)).toBe(1);
+  });
+
+  it('refines the filler from the measured slot width after mount', () => {
+    // No declared width: the first frame balances on the 0 seed (no mirror),
+    // then onLayout reports the slot's real 140dp — the same filler this test
+    // then reads back. The row's layout event lands the 358dp row width the
+    // seed already used, so the filler only moves when the slot
+    // reports.
+    const renderer = renderHeader({
+      title: 'Kilo Pass',
+      modal: true,
+      headerRight: 'SAVE',
+    });
+
+    const row = findTitleRow(renderer.root);
+    const slot = findHeaderRight(row);
+    expect(findBalanceFillers(row).leading).toBeUndefined();
+
+    act(() => {
+      (
+        slot.props.onLayout as (event: {
+          nativeEvent: { layout: { width: number; height: number } };
+        }) => void
+      )({ nativeEvent: { layout: { width: 140, height: 48 } } });
+    });
+
+    // T = 152, L = 48, seed row = 390 - 44 = 346: free = 146 → leading
+    // min(104, 73) = 73.
+    const { leading } = findBalanceFillers(row);
+    expect(leading?.props.style).toEqual({ width: 73 });
+  });
+
+  it('keeps the trailing mirror on the 48dp back-only header exactly', () => {
+    const renderer = renderHeader({ title: 'Kilo Pass', modal: true });
+
+    const { leading, trailing } = findBalanceFillers(findTitleRow(renderer.root));
+    expect(leading).toBeUndefined();
+    expect(trailing?.props.style).toEqual({ width: 48 });
+  });
+
+  it('puts the whole mirror on the leading filler with no back control', () => {
+    // The plan's no-back variant: an in-row cluster with NO back control has
+    // L = 0 and T = 152, the seed row = 390 - 44 = 346: free = 194, so the
+    // leading filler is min(152, 97) = 97 — the half it can take without
+    // squeezing the title under half the free space — and the trailing filler
+    // collapses. (The title still centers better than the old fixed-48
+    // mirror, which ignored the cluster entirely.)
+    routerState.canGoBack.mockReturnValue(false);
+    const renderer = renderHeader({
+      title: 'Kilo Pass',
+      modal: true,
+      headerRight: 'SAVE',
+      headerRightWidth: 140,
+    });
+
+    const row = findTitleRow(renderer.root);
+    const { leading, trailing } = findBalanceFillers(row);
+    expect(leading?.props.style).toEqual({ width: 97 });
+    expect(trailing).toBeUndefined();
+    // The leading filler is the row's FIRST child when no control came
+    // before it.
+    if (!leading) {
+      throw new Error('leading filler missing');
+    }
+    expect(row.children.indexOf(leading)).toBe(0);
+  });
+
+  it('keeps a 0-width heading impossible when the mirror demand exceeds the row', () => {
+    // The cap case: a 232dp window (reflow opt-out on) with the 140dp cluster
+    // has L = 48, T = 152; the seed row = 232 - 32 = 200 → free = 200 - 48 -
+    // 152 = 0. The uncapped mirror would demand 104dp of filler and leave the
+    // heading negative; the seeded row leaves no free space, so the filler is
+    // 0 and lays out no node — the heading keeps the row's full measure the
+    // moment the row's own layout lands. (Before the inset-aware seed this
+    // frame rendered a 16dp filler against the overstated window seed.)
+    layout.width = 232;
+    const renderer = renderHeader({
+      title: 'Kilo Pass',
+      modal: true,
+      headerRight: 'SHARE REVIEW MERGE',
+      headerRightWidth: 140,
+      allowHeaderRightStacking: false,
+    });
+
+    const row = findTitleRow(renderer.root);
+    const { leading, trailing } = findBalanceFillers(row);
+    expect(leading).toBeUndefined();
+    expect(trailing).toBeUndefined();
+    // The heading itself never lays out at zero width: it is flex-1 over
+    // min-w-0 with the filler capped at half the free space. After the row's
+    // own measure lands the seed is replaced by the real one:
+    act(() => {
+      (
+        row.props.onLayout as (event: {
+          nativeEvent: { layout: { width: number; height: number } };
+        }) => void
+      )({ nativeEvent: { layout: { width: 232, height: 48 } } });
+    });
+    // T = 152, L = 48, measured row 232: free = 32 → leading
+    // min(104, 16) = 16 — the capped mirror exact against the real row, the
+    // heading keeping the other half.
+    const refilled = findBalanceFillers(row);
+    expect(refilled.leading?.props.style).toEqual({ width: 16 });
+    expect(refilled.trailing).toBeUndefined();
+    const heading = row.find(node => node.props.className === 'min-w-0 flex-1');
+    expect(heading).toBeDefined();
+  });
+
+  it('counts one ms-3 gap per in-row trailing slot, not one for the row', () => {
+    // Both trailing slots in one row each carry their own `ms-3`: the mirror
+    // that ignores the second gap leaves the title half a gap off the axis in
+    // that combination. 390dp seed row = 346; L = 48; T = 40 + 92 + 2 × 12
+    // = 156; free = 346 - 48 - 156 = 142; uncapped mirror demand = 108 > 71,
+    // so the cap binds: leading filler = 71.
+    const renderer = renderHeader({
+      title: 'Kilo Pass',
+      modal: true,
+      headerRight: 'RIGHT',
+      headerRightWidth: 40,
+      inlineActions: 'ACTIONS',
+      inlineActionsWidth: 92,
+    });
+
+    const { leading, trailing } = findBalanceFillers(findTitleRow(renderer.root));
+    expect(trailing).toBeUndefined();
+    expect(leading?.props.style).toEqual({ width: 71 });
+  });
+
+  it('keeps the stacked reflow free of in-row fillers', () => {
+    // A window too narrow for the title and the cluster stacks the cluster,
+    // which removes the in-row trailing extent — the mirror collapses so the
+    // back-only mirror survives. The seed row = 160 - 44 = 116dp: the mirror
+    // is capped at free/2 = (116 - 48)/2 = 34 for the seed frame, because the
+    // row's own layout event does not fire in the test renderer; the seed is
+    // bounded by the header's own gutter constant, so the cap cannot overstate
+    // the row and the first measured layout can only grow the mirror onto the
+    // axis, never shrink it.
+    layout.width = 160;
+    layout.fontScale = 1.5;
+    const renderer = renderHeader({
+      title: 'Kilo Pass',
+      modal: true,
+      headerRight: 'SAVE',
+      headerRightWidth: 140,
+    });
+
+    expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
+    const { leading, trailing } = findBalanceFillers(findTitleRow(renderer.root));
+    expect(leading).toBeUndefined();
+    expect(trailing?.props.style).toEqual({ width: 34 });
   });
 });
 
@@ -1302,9 +1858,11 @@ describe('header actions row', () => {
           String(node.props.className ?? '').includes('ms-3 shrink-0')
       )
     ).toHaveLength(0);
-    // The title still shares its row with the back control; only the actions moved.
-    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    expect(title.parent?.parent).toBe(findBackFrame(renderer.root).parent);
+    // The title still shares its row with the back control; only the actions
+    // moved. The title's band sits in the heading, which is that row's child.
+    expect(findTitleBand(renderer.root).parent?.parent).toBe(
+      findLeadingColumn(renderer.root).parent
+    );
   });
 
   it('reflows a centered modal header the same way', () => {
@@ -1383,7 +1941,7 @@ describe('header status line', () => {
     layout.fontScale = 1.5;
     const renderer = renderHeader({ title: 'Agents', size: 'large', eyebrow: '1 LIVE' });
 
-    const eyebrow = renderer.root.findByType('Eyebrow');
+    const eyebrow = findHeadingEyebrow(renderer.root);
     expect(eyebrow.props.numberOfLines).toBe(1);
     expect(eyebrow.children).toEqual(['1 LIVE']);
   });
@@ -1410,14 +1968,39 @@ describe('shouldStackHeaderActions', () => {
   it('reflows for a declared trailing cluster the title cannot share the row with', () => {
     // Declaring a wide cluster makes it reflow before the title is squeezed.
     expect(shouldStackHeaderActions(320, 2)).toBe(false);
-    expect(shouldStackHeaderActions(320, 2, 236)).toBe(true);
+    expect(shouldStackHeaderActions(320, 2, { headerRightWidth: 236 })).toBe(true);
     // A narrower cluster still fits beside the title at a normal phone width.
-    expect(shouldStackHeaderActions(390, 1, 92)).toBe(false);
-    expect(shouldStackHeaderActions(390, 1, 236)).toBe(true);
+    expect(shouldStackHeaderActions(390, 1, { headerRightWidth: 92 })).toBe(false);
+    expect(shouldStackHeaderActions(390, 1, { headerRightWidth: 236 })).toBe(true);
   });
 
   it('treats a missing window measurement as a single row', () => {
     expect(shouldStackHeaderActions(Number.NaN, 1)).toBe(false);
     expect(shouldStackHeaderActions(160, Number.NaN)).toBe(true);
+  });
+
+  it('reserves the title width the caller declares instead of the list title default', () => {
+    // A detail header's title is the 18px style, narrower than the 30px list
+    // title the default reserve assumes. Declaring its own width keeps that
+    // header on one row where the default would already have reflowed it, and
+    // still reflows when the cluster leaves the title below what it needs.
+    expect(shouldStackHeaderActions(411, 1, { headerRightWidth: 240 })).toBe(true);
+    expect(shouldStackHeaderActions(411, 1, { headerRightWidth: 240, titleMinWidth: 104 })).toBe(
+      false
+    );
+    expect(shouldStackHeaderActions(360, 1, { headerRightWidth: 240, titleMinWidth: 104 })).toBe(
+      true
+    );
+  });
+
+  it('counts the row space the caller declares before its title', () => {
+    // The default inset is the widest list gutter, which a header that shows a
+    // back control beside its title does not charge. Declaring the real inset
+    // reflows a window the default keeps on one row with a title too narrow to
+    // paint, and leaves the compact phone width on a single row.
+    const widths = { headerRightWidth: 238, titleMinWidth: 40 };
+    expect(shouldStackHeaderActions(340, 1, widths)).toBe(false);
+    expect(shouldStackHeaderActions(340, 1, { ...widths, contentInset: 65.5 })).toBe(true);
+    expect(shouldStackHeaderActions(360, 1, { ...widths, contentInset: 65.5 })).toBe(false);
   });
 });

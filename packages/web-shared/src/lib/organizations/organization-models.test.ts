@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import type { ModelStats, Organization } from '@kilocode/db/schema';
 import type { EnkryptBenchmark } from '@kilocode/db/schema-types';
-import type { OpenRouterModel, OpenRouterModelsResponse } from './organization-types';
+import type {
+  OpenRouterModel,
+  OpenRouterModelsResponse,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type {
   OrganizationGroupPolicyContext,
   OrganizationPolicySubject,

@@ -55,7 +55,7 @@ import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import type { CloudAgentCodeReview } from '@kilocode/db/schema';
 import { cliSessions, cli_sessions_v2 } from '@kilocode/db/schema';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
-import { fetchSessionSnapshot } from '@/lib/session-ingest-client';
+import { fetchSessionTranscript } from '@/lib/session-transcript';
 import { getBlobContent } from '@/lib/r2/cli-sessions';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, isNull } from 'drizzle-orm';
@@ -815,8 +815,10 @@ export const codeReviewRouter = createTRPCRouter({
         if (cliSessionId ? isNewSession(cliSessionId) : review.agent_version === 'v2') {
           const [session, duplicateSession] = await db
             .select({
-              session_id: cli_sessions_v2.session_id,
-              kilo_user_id: cli_sessions_v2.kilo_user_id,
+              sessionId: cli_sessions_v2.session_id,
+              userId: cli_sessions_v2.kilo_user_id,
+              organizationId: cli_sessions_v2.organization_id,
+              version: cli_sessions_v2.version,
             })
             .from(cli_sessions_v2)
             .where(
@@ -839,7 +841,7 @@ export const codeReviewRouter = createTRPCRouter({
             return successResult({ entries: [] });
           }
 
-          const snapshot = await fetchSessionSnapshot(session.session_id, session.kilo_user_id);
+          const snapshot = await fetchSessionTranscript(session);
           if (!snapshot) {
             return successResult({ entries: [] });
           }

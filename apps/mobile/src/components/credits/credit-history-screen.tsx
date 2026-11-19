@@ -169,6 +169,13 @@ export function PersonalCreditHistoryScreen() {
   } else {
     const footer = (
       <View className="pt-3">
+        {purchases.isRetentionLimited && !isLaterPageError && !purchases.hasMore && (
+          <View className="items-center gap-3 px-6 py-4">
+            <Text variant="muted" className="text-center text-xs">
+              {t('credits.history.retentionLimit')}
+            </Text>
+          </View>
+        )}
         {purchases.hasMore && !isLaterPageError && (
           <View className="items-center gap-3 px-6 py-4">
             <Text variant="muted" className="text-center text-xs">

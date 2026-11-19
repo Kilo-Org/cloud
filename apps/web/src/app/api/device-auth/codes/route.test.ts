@@ -322,6 +322,21 @@ describe('POST /api/device-auth/codes', () => {
       },
       'INVALID_REQUESTING_CLIENT',
     ],
+    [
+      'a client id with a layout format control',
+      { client_id: 'cl\u202eient-abc', client_name: 'Acme', redirect_origin: 'https://a.test' },
+      'INVALID_REQUESTING_CLIENT',
+    ],
+    [
+      'a client id with leading whitespace',
+      { client_id: ' client-abc', client_name: 'Acme', redirect_origin: 'https://a.test' },
+      'INVALID_REQUESTING_CLIENT',
+    ],
+    [
+      'a client id with trailing whitespace',
+      { client_id: 'client-abc ', client_name: 'Acme', redirect_origin: 'https://a.test' },
+      'INVALID_REQUESTING_CLIENT',
+    ],
   ])('refuses a client description with %s', async (_label, requesting_client, code) => {
     const response = await POST(
       new NextRequest('http://localhost:3000/api/device-auth/codes', {
@@ -371,9 +386,8 @@ describe('POST /api/device-auth/codes', () => {
   test.each([
     ['U+202E', '\u202e'],
     ['U+2066', '\u2066'],
-  ])('accepts and strips %s from every client field', async (_label, bidi) => {
+  ])('accepts and strips %s from the displayed client fields', async (_label, bidi) => {
     const strippedClient = {
-      clientId: 'client-abc',
       clientName: 'Acme',
       redirectOrigin: 'https://a.test',
     };
@@ -382,7 +396,7 @@ describe('POST /api/device-auth/codes', () => {
       userCode: 'ABCD-EFGH',
       deviceCode: 'device-secret',
       expiresAt: new Date(Date.now() + 600_000),
-      requestingClient: strippedClient,
+      requestingClient: { clientId: 'client-abc', ...strippedClient },
     });
 
     const response = await POST(
@@ -390,7 +404,7 @@ describe('POST /api/device-auth/codes', () => {
         method: 'POST',
         body: JSON.stringify({
           requesting_client: {
-            client_id: `cl${bidi}ient-abc`,
+            client_id: 'client-abc',
             client_name: `Ac${bidi}me`,
             redirect_origin: `https://a${bidi}.test`,
           },
@@ -401,8 +415,11 @@ describe('POST /api/device-auth/codes', () => {
 
     expect(response.status).toBe(200);
     expect(mockCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ requestingClient: strippedClient })
+      expect.objectContaining({ requestingClient: { clientId: 'client-abc', ...strippedClient } })
     );
-    expect((await response.json()).requestingClient).toEqual(strippedClient);
+    expect((await response.json()).requestingClient).toEqual({
+      clientId: 'client-abc',
+      ...strippedClient,
+    });
   });
 });

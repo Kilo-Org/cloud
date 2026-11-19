@@ -3,9 +3,10 @@
  * Plain .js because the Expo config loader cannot consume workspace TS
  * (same reason env-keys.js exists). Drift is CI-caught by
  * universal-link-paths.test.ts — keep the two in sync there, never silently.
- * A row compiles `*`/`**` to `.*` (crossing `/`); the bare organization row
- * states its own one-segment `[^/]+` so it cannot swallow the web-only pages
- * under it, and no other row's pattern changes.
+ * A row compiles `*`/`**` to `.*`, which crosses `/`; `pathPattern` is a
+ * simple glob with no character classes, so a one-segment row cannot be
+ * expressed and the organization root is deliberately absent (the table row
+ * still serves iOS and the runtime matcher).
  * @type {string[]} */
 export const UNIVERSAL_LINK_PATH_PATTERNS = [
   '/home',
@@ -35,7 +36,6 @@ export const UNIVERSAL_LINK_PATH_PATTERNS = [
   '/organizations/.*/usage-details',
   '/organizations/new',
   '/organizations/create',
-  '/organizations/[^/]+',
   '/pr-review/gitlab/.*',
   '/pr-review/bitbucket/.*',
   '/pr-review/.*/.*/.*',

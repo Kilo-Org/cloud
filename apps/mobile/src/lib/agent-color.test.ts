@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   agentColor,
+  IDLE_TINT,
   isPlaceholderTint,
+  isQuietTint,
   PLACEHOLDER_TINT,
   stateTint,
   toneColor,
@@ -30,12 +32,58 @@ describe('stateTint', () => {
     expect(stateTint('repository').hueClass).toBe('bg-session-strip');
   });
 
-  it('keeps each live state at the tint its English word first rendered', () => {
-    // The continuity contract: the pre-pin row tint was the hash of the
-    // rendered English word, so each state pin must equal that hash or an
-    // existing live surface changes hue for no reason.
-    expect(stateTint('idle')).toBe(agentColor('IDLE'));
-    expect(stateTint('live')).toBe(agentColor('LIVE'));
+  it('pins live to the agent-sky step it rendered before the pin', () => {
+    // The continuity contract: the live state keeps the hue it rendered before
+    // the pin — the sky step — so an existing live row changes colour for no
+    // reason. The pin is the contract, not the hash: `agentColor('LIVE')`
+    // happens to land on the same step today, and asserting the hash here
+    // would silently move live the next time a step is appended to the ramp.
+    const live = stateTint('live');
+    expect(live.hueClass).toBe('bg-agent-sky');
+    expect(live.hueTextClass).toBe('text-agent-sky');
+    expect(live).not.toBe(PLACEHOLDER_TINT);
+    expect(live).not.toBe(stateTint('idle'));
+  });
+
+  it('pins idle to the quiet neutral strip, distinct from live and from every other state', () => {
+    // The state contract: idle and live are opposite states on a real
+    // session, so each must pin its own token. Idle takes the quiet neutral
+    // (it is the inactive state), not a ramp entry: the English word's own
+    // hash is not the pin (both words hash to sky, the shared value this
+    // change unwinds), and a ramp step keeps moving as the ramp grows.
+    const idle = stateTint('idle');
+    expect(idle).toBe(IDLE_TINT);
+    expect(idle.hueTextClass).toBe('text-secondary-foreground');
+    // The strip token, not the settings-tile hairline: the hairline composites
+    // to about 1.1:1 on the page, so an idle row would carry no leading mark.
+    expect(idle.hueClass).toBe('bg-session-strip');
+    expect(idle).not.toBe(stateTint('live'));
+    expect(idle).not.toBe(stateTint('unknown'));
+    expect(idle).not.toBe(stateTint('platform'));
+    expect(idle).not.toBe(stateTint('repository'));
+  });
+
+  it('collapses no two states onto one token, so no state tint distinguishes nothing', () => {
+    // The regression the doc's table guards: a palette edit that re-collapses
+    // two states fails here before it ships. Idle and live own one token
+    // each; the muted trio shares PLACEHOLDER_TINT by design.
+    const tints = {
+      unknown: stateTint('unknown'),
+      platform: stateTint('platform'),
+      repository: stateTint('repository'),
+      idle: stateTint('idle'),
+      live: stateTint('live'),
+    };
+    const identityGroups = new Map<unknown, string[]>();
+    for (const [state, tint] of Object.entries(tints)) {
+      const list = identityGroups.get(tint) ?? [];
+      list.push(state);
+      identityGroups.set(tint, list);
+    }
+    expect(new Set(identityGroups.keys()).size).toBe(3);
+    expect(identityGroups.get(stateTint('unknown'))).toEqual(['unknown', 'platform', 'repository']);
+    expect(identityGroups.get(stateTint('idle'))).toEqual(['idle']);
+    expect(identityGroups.get(stateTint('live'))).toEqual(['live']);
   });
 });
 
@@ -52,5 +100,19 @@ describe('isPlaceholderTint', () => {
     expect(isPlaceholderTint(toneColor('danger'))).toBe(false);
     expect(isPlaceholderTint(stateTint('idle'))).toBe(false);
     expect(isPlaceholderTint(stateTint('live'))).toBe(false);
+  });
+});
+
+describe('isQuietTint', () => {
+  it('holds for the context trio and for idle, whose strips stay at full strength', () => {
+    for (const state of ['unknown', 'platform', 'repository', 'idle'] as const) {
+      expect(isQuietTint(stateTint(state))).toBe(true);
+    }
+  });
+
+  it('holds for no accent, so live and hashed agent rows still dim', () => {
+    expect(isQuietTint(stateTint('live'))).toBe(false);
+    expect(isQuietTint(agentColor('Cloud'))).toBe(false);
+    expect(isQuietTint(toneColor('danger'))).toBe(false);
   });
 });

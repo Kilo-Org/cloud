@@ -217,6 +217,10 @@
         "name": "SANDBOX_SESSION",
       },
       {
+        "class_name": "CloudAgentWorkspace",
+        "name": "CLOUD_AGENT_WORKSPACE",
+      },
+      {
         "class_name": "SandboxContainers",
         "name": "SANDBOX_CONTAINERS",
       },
@@ -300,6 +304,10 @@
         "SandboxCodeReview",
         "SandboxCodeReviewContainment",
       ],
+    },
+    {
+      "new_sqlite_classes": ["CloudAgentWorkspace"],
+      "tag": "v16",
     },
   ],
   /**
@@ -460,6 +468,10 @@
           {
             "class_name": "SandboxSession",
             "name": "SANDBOX_SESSION",
+          },
+          {
+            "class_name": "CloudAgentWorkspace",
+            "name": "CLOUD_AGENT_WORKSPACE",
           },
           {
             "class_name": "SandboxContainers",

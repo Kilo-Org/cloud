@@ -109,6 +109,13 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/attachment-chip-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/attachment-chip-fixture';
     }
+    // Dev-only header geometry fixture: a centered title against each trailing
+    // variant the plan names (`?variant=cluster|back-only|no-back`, default
+    // cluster), so the emulator probe can measure all three from one link.
+    const headerBalanceFixture = /(?:^|\/)dev\/header-balance-fixture\/?(\?.*)?$/.exec(path);
+    if (headerBalanceFixture) {
+      return `/(app)/header-balance-fixture${headerBalanceFixture[1] ?? ''}`;
+    }
     if (/(?:^|\/)dev\/preparation-copy-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/preparation-copy-fixture';
     }
@@ -171,6 +178,11 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/question-card-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(auth)/question-card-fixture';
     }
+    // Dev-only destructive settings confirmation: the screen that runs the
+    // agent's `settings_set` call, so the confirm can be driven without a chat.
+    if (/(?:^|\/)dev\/settings-confirm-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(auth)/settings-confirm-fixture';
+    }
     const reauthorizeFixtureMatch =
       /(?:^|\/)dev\/security-agent-reauthorize-fixture\/?(\?.*)?$/.exec(path);
     if (reauthorizeFixtureMatch) {
@@ -183,6 +195,15 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     }
     if (/(?:^|\/)dev\/organization-invoices-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/(tabs)/(3_profile)/organization/invoices-fixture';
+    }
+    // Dev-only personal invoices screen against fixed Stripe answers
+    // (`dev/personal-invoices-fixture/<listed|empty|error>`): the personal list
+    // is a Stripe read a local stack cannot serve, so every capture state routes
+    // here.
+    const personalInvoicesFixture =
+      /(?:^|\/)dev\/personal-invoices-fixture\/(listed|empty|error)\/?$/.exec(path);
+    if (personalInvoicesFixture) {
+      return `/(app)/(tabs)/(3_profile)/personal-invoices-fixture?state=${personalInvoicesFixture[1]}`;
     }
     // Dev-only invite sheet: it navigates itself, so this returns falsy.
     if (handleOrganizationInviteMemberFixturePath(path)) {

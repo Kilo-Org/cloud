@@ -88,17 +88,72 @@ async function renderCard(overrides: CardOverrides = {}) {
 }
 
 describe('PermissionCard mounted', () => {
-  it('shows the command alone when a bash request carries one', async () => {
+  it('lists the patterns beside the command when a pattern names another text', async () => {
     const renderer = await renderCard({
-      patterns: ['rg todo 2_/dev/null'],
+      patterns: ['rg todo *', 'rg --files *'],
       metadata: { command: 'rg todo 2>/dev/null' },
     });
     const lines = textLines(renderer.root);
 
-    expect(lines).not.toContain(i18n.t('agentChat.permissionCard.appliesTo'));
-    expect(lines).not.toContain(isolated('rg todo 2_/dev/null'));
+    expect(
+      lines.filter(value => value === i18n.t('agentChat.permissionCard.appliesTo'))
+    ).toHaveLength(2);
+    expect(lines).toContain(isolated('rg todo *'));
+    expect(lines).toContain(isolated('rg --files *'));
     expect(lines).toContain(i18n.t('profiles.commandLabel'));
     expect(lines).toContain(isolated('rg todo 2>/dev/null'));
+    expect(lines).not.toContain('• ');
+  });
+
+  it('keeps a caption for the one pattern that differs from the command', async () => {
+    const renderer = await renderCard({
+      patterns: ['rg todo *', ' rg  todo  2>/dev/null '],
+      metadata: { command: 'rg todo 2>/dev/null' },
+    });
+    const lines = textLines(renderer.root);
+
+    expect(
+      lines.filter(value => value === i18n.t('agentChat.permissionCard.appliesTo'))
+    ).toHaveLength(1);
+    expect(lines).toContain(isolated('rg todo *'));
+    expect(lines).toContain(isolated('rg todo 2>/dev/null'));
+    expect(lines).not.toContain(isolated(' rg  todo  2>/dev/null '));
+  });
+
+  it('shows the standalone scope when the command is whitespace only', async () => {
+    const renderer = await renderCard({
+      patterns: ['pnpm test *'],
+      metadata: { command: '   ' },
+    });
+    const lines = textLines(renderer.root);
+
+    expect(lines).toContain(i18n.t('agentChat.permissionCard.appliesTo'));
+    expect(lines).toContain(isolated('pnpm test *'));
+    expect(lines).not.toContain(i18n.t('profiles.commandLabel'));
+  });
+
+  it('lists only the command when every pattern reads the same after whitespace normalization', async () => {
+    const renderer = await renderCard({
+      patterns: ['pnpm test'],
+      metadata: { command: 'pnpm test' },
+    });
+    const lines = textLines(renderer.root);
+
+    expect(lines).not.toContain(i18n.t('agentChat.permissionCard.appliesTo'));
+    expect(lines).toContain(i18n.t('profiles.commandLabel'));
+    expect(lines).toContain(isolated('pnpm test'));
+  });
+
+  it('reads a whitespace-only difference as the same text', async () => {
+    const renderer = await renderCard({
+      patterns: [' pnpm  test '],
+      metadata: { command: 'pnpm test' },
+    });
+    const lines = textLines(renderer.root);
+
+    expect(lines).not.toContain(i18n.t('agentChat.permissionCard.appliesTo'));
+    expect(lines).toContain(i18n.t('profiles.commandLabel'));
+    expect(lines).toContain(isolated('pnpm test'));
   });
 
   it('renders an ordinary command unchanged', async () => {
@@ -126,7 +181,7 @@ describe('PermissionCard mounted', () => {
     const lines = textLines(renderer.root);
 
     expect(lines).toContain(i18n.t('agentChat.permissionCard.appliesTo'));
-    expect(lines).toContain('• ');
+    expect(lines).not.toContain('• ');
     expect(lines).toContain(`${ISOLATE_OPEN}/var/tmp/\\u200escope/**${ISOLATE_CLOSE}`);
     expect(lines).not.toContain('/var/tmp/\u200Escope/**');
   });
@@ -139,8 +194,22 @@ describe('PermissionCard mounted', () => {
     const lines = textLines(renderer.root);
 
     expect(lines).toContain(i18n.t('agentChat.permissionCard.appliesTo'));
-    expect(lines).toContain('• ');
+    expect(lines).not.toContain('• ');
     expect(lines).toContain(isolated('/var/tmp/scope/**'));
+    expect(lines).not.toContain(i18n.t('profiles.commandLabel'));
+  });
+
+  it('marks each pattern with a bullet when a no-command request has two patterns', async () => {
+    const renderer = await renderCard({
+      permission: 'external_directory',
+      patterns: ['/var/tmp/**', '/tmp/**'],
+    });
+    const lines = textLines(renderer.root);
+
+    expect(lines).toContain(i18n.t('agentChat.permissionCard.appliesTo'));
+    expect(lines).toContain('• ');
+    expect(lines).toContain(isolated('/var/tmp/**'));
+    expect(lines).toContain(isolated('/tmp/**'));
     expect(lines).not.toContain(i18n.t('profiles.commandLabel'));
   });
 

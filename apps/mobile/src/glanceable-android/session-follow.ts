@@ -300,9 +300,10 @@ export function syncFollowedSessionCards(
         approvalKey: stored.approvalKey,
         updatedAt,
         statusSinceFallback: stored.content?.statusSince ?? updatedAt,
-        // A tray row carries no step, plan, diff, permission command, outcome,
-        // failure or start time: the rebuild keeps the ones the last push
-        // delivered instead of wiping them.
+        // A tray row carries no step, plan, diff, permission command, failure,
+        // start time or last activity: the rebuild keeps the ones the last push
+        // delivered instead of wiping them. The builder recomputes `outcome`
+        // from what the row and the card carry, so it is never carried here.
         previous: stored.content ?? undefined,
       });
       if (isLiveKind(content.statusKind)) {

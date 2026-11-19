@@ -67,7 +67,7 @@ type FeatureItem = {
   icon: LucideIcon;
 };
 
-const enterpriseTrialFeatures: FeatureItem[] = [
+const enterpriseFeatures: FeatureItem[] = [
   { text: 'Usage analytics & reporting', icon: Clock },
   { text: 'AI adoption score', icon: TrendingUp },
   { text: 'Shared agent modes', icon: ArrowLeftRight },
@@ -157,7 +157,7 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
           <CardContent className="p-6 lg:p-8">
             <h3 className="mb-4 text-lg font-bold">What Kilo Enterprise includes:</h3>
             <ul className="space-y-2">
-              {enterpriseTrialFeatures.map((feature, index) => {
+              {enterpriseFeatures.map((feature, index) => {
                 const Icon = feature.icon;
                 return (
                   <li key={index} className="flex items-start gap-2">
@@ -169,7 +169,7 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
               <li className="flex items-start gap-2">
                 <Coins className="text-brand-primary mt-0.5 h-4 w-4 flex-shrink-0" />
                 <span className="font-bold">
-                  Pay as you go usage based pricing, no tokens included in trial
+                  Pay as you go usage based pricing, no tokens included
                 </span>
               </li>
             </ul>

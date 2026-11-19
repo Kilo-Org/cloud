@@ -140,6 +140,43 @@ describe('confirmSettingChange', () => {
     expect(getSettingsConfirmRequest()).toBeUndefined();
   });
 
+  // The host draws only the queue head, so a withdrawn request that is not the
+  // head was never on screen: keeping it would present a phantom sheet on
+  // mount just to dismiss it, briefly blocking the requests behind it. It
+  // leaves the queue on withdrawal; only the head — the sheet already
+  // presented — stays until its dismissal report.
+  it('removes a withdrawn request that is not the head from the queue outright', async () => {
+    setSettingsConfirmHostMounted(true);
+    const firstId = requestSettingsConfirmChange(SUMMARY, () => undefined);
+
+    // The second call queues behind the head. The store announces the
+    // publication, so the wait pins the queued state before the withdrawal —
+    // otherwise the interrupt below could land before the request existed.
+    let published = 0;
+    const unsubscribe = subscribeSettingsConfirm(() => {
+      published += 1;
+    });
+    const secondFiber = Effect.runFork(confirmSettingChange('Change "theme" to "dark"'));
+    try {
+      await vi.waitFor(() => {
+        expect(published).toBeGreaterThan(0);
+      });
+    } finally {
+      unsubscribe();
+    }
+
+    // Interrupting the second call withdraws it behind the head: never drawn,
+    // so it leaves the queue outright instead of waiting for a dismissal
+    // report, and the head the sheet is presented on is untouched.
+    await Effect.runPromise(Fiber.interrupt(secondFiber));
+    expect(getSettingsConfirmRequest()).toMatchObject({ id: firstId, withdrawn: false });
+
+    // The head is still answered normally; with the second entry already
+    // gone, answering it empties the queue instead of drawing the next one.
+    answerSettingsConfirm(firstId, false);
+    expect(getSettingsConfirmRequest()).toBeUndefined();
+  });
+
   // The listener answers while the store is mid-publish. The resolver must
   // already be registered when the listeners hear about the request, so a
   // settle from inside the publish still reaches the waiting tool call.

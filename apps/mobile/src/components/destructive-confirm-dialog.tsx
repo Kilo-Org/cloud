@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -74,24 +74,29 @@ export function DestructiveConfirmDialog({
   const { t } = useTranslation();
   const [visible, setVisible] = useState(true);
   const pendingAction = useRef<(() => void) | null>(null);
+  // The one-shot edge reads the latest handler without re-arming on the
+  // handler identity: the host re-renders the dialog with new handler
+  // closures while its flag stays true, and only the flag's edge starts a
+  // dismissal.
+  const onCancelRef = useRef(onCancel);
+  onCancelRef.current = onCancel;
+
+  const dismiss = useCallback((action: () => void) => {
+    if (pendingAction.current !== null) {
+      return;
+    }
+    pendingAction.current = action;
+    setVisible(false);
+  }, []);
 
   // The caller's one-shot "put it away" edge. `dismiss` is a no-op while an
   // action or a dismissal is already pending, so this only ever starts the
   // dismissal — it never overrides a choice the person made.
   useEffect(() => {
     if (dismissRequested) {
-      dismiss(onCancel);
+      dismiss(onCancelRef.current);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- a one-shot edge on the flag; dismiss and onCancel are bound to this request identity
-  }, [dismissRequested]);
-
-  function dismiss(action: () => void) {
-    if (pendingAction.current !== null) {
-      return;
-    }
-    pendingAction.current = action;
-    setVisible(false);
-  }
+  }, [dismissRequested, dismiss]);
 
   return (
     <Sheet

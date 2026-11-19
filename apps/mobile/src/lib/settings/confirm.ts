@@ -8,8 +8,9 @@ export type SettingsConfirmRequest = {
   summary: string;
   /**
    * The tool call behind the request was interrupted: the request must never be
-   * answered, but it stays in the queue until the host has dismissed the sheet
-   * it was drawn on and reports it.
+   * answered. The head keeps its place until the host has dismissed the sheet
+   * it presented and reports it; a request still queued behind the head was
+   * never drawn and leaves the queue outright instead.
    */
   withdrawn: boolean;
 };
@@ -118,13 +119,25 @@ export function answerSettingsConfirm(id: number, confirmed: boolean): void {
 
 /**
  * Marks the request withdrawn for an interrupted tool call: its resolver is
- * dropped, so it can never be answered, but it stays in the queue so the host
- * keeps drawing the sheet it already presented. The host removes it with
- * `forgetSettingsConfirm` once the sheet reports its dismissal.
+ * dropped, so it can never be answered. Only the head keeps its queue place —
+ * its sheet is presented, and it goes out through a reported dismissal the
+ * host answers with `forgetSettingsConfirm`. A request still waiting behind
+ * the head was never drawn, and the host renders only the head, so keeping it
+ * would present a phantom sheet on mount just to dismiss it; it is removed
+ * from the queue outright instead.
  */
 function withdrawSettingsConfirm(id: number): void {
   settleCallbacks.delete(id);
-  requests = requests.map(item => (item.id === id ? { ...item, withdrawn: true } : item));
+  const request = requests.find(item => item.id === id);
+  if (request === undefined) {
+    return;
+  }
+  // The head's place is kept for its reported dismissal; anything still queued
+  // behind it was never drawn and leaves outright.
+  requests =
+    requests[0] === request
+      ? requests.map(item => (item.id === id ? { ...item, withdrawn: true } : item))
+      : requests.filter(item => item.id !== id);
   notify();
 }
 

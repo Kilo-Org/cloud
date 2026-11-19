@@ -273,7 +273,15 @@ describe('getDirectByokModel', () => {
 
     expect(directByokProviders[0].models).not.toHaveBeenCalled();
     expect(directByokProviders[1].models).not.toHaveBeenCalled();
+  });
+
+  test('returns null for a model the matching provider does not serve', async () => {
+    const { directByokProviders, getDirectByokModel } = await loadDirectByokModule();
+
     await expect(getDirectByokModel('chutes-byok/absent-model')).resolves.toBeNull();
+
+    expect(directByokProviders[0].models).toHaveBeenCalledTimes(1);
+    expect(directByokProviders[1].models).not.toHaveBeenCalled();
   });
 
   test('loads only the model list for the matching provider prefix', async () => {

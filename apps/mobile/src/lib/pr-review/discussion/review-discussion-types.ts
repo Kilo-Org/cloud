@@ -79,38 +79,64 @@ export type DiscussionListItem =
   | { readonly kind: 'comment'; readonly comment: ConversationComment };
 
 /**
- * Display label for a thread's anchor. The label reflects THREE
- * different nullable shapes:
+ * Display label for a thread's anchor. Every displayed word comes from the
+ * `prReview.discussion.anchor.*` catalog keys, composed inside the
+ * translated string: the diff-side label (`sideLeft` / `sideRight`) is the
+ * `{{side}}` interpolation value of a side-bearing sentence key, and the
+ * `L` markers live in the `line` / `lineRange` patterns — never
+ * concatenated in code. Each branch renders through exactly ONE sentence
+ * `i18n.t` call (its word fragments are computed first, passed as values).
+ * The label reflects THREE different nullable shapes:
  *   - file-level (`subjectType==='FILE'` or `line===null`):
- *     "File comment on <path>"
- *   - outdated (`isOutdated` true, with `originalLine`):
- *     "Outdated on <path> L<originalLine> (<diffSide>)"
- *   - active line:
- *     "<path> L<line> (<diffSide>)"  (or just L<line> if no path)
- *   - active range:
- *     "<path> L<startLine>–L<line> (<diffSide>)"
+ *     `fileCommentOnPath` / `fileComment`
+ *   - outdated (`isOutdated` true): `outdatedOnPath` / `outdatedOnPathSide` /
+ *     `outdatedSide` (no original line) / `outdatedOnPathLinesSide` /
+ *     `outdatedOnLinesSide`, with the original
+ *     single line (`line` pattern) or range (`lineRange` pattern) as
+ *     `{{lines}}`; a side-less thread (`diffSide` null) renders through the
+ *     existing side-less sentence keys (`outdatedOnPathLines` /
+ *     `outdatedOnLines`)
+ *   - active line: `lineOnPathLineSide` / `lineOnlyLineSide`; active range:
+ *     `lineOnPathRangeSide` / `lineOnlyRangeSide`, with the range rendered
+ *     through `lineRange`; a side-less thread composes the data `path` with
+ *     the translated `line` / `lineRange` pattern (no side-bearing slot).
  */
 export function selectThreadAnchorLabel(thread: ReviewThread): string {
   const path = thread.path ?? '';
-  const side = thread.diffSide ? ` (${thread.diffSide})` : '';
   // Outdated threads anchor via `original*` (their current-line `line`
   // field is null because the diff has moved past the comment).
   if (thread.isOutdated) {
-    const { originalLine } = thread;
+    const { originalLine, originalStartLine } = thread;
     // No complete original anchor — fall back to a path-only outdated label
-    // (never render a dangling "L").
+    // (never render a dangling placeholder). The side keeps its slot here:
+    // base appended the raw token to these two labels too.
     if (originalLine === null) {
+      if (thread.diffSide === null) {
+        return path
+          ? i18n.t('prReview.discussion.anchor.outdatedOnPath', { path })
+          : i18n.t('prReview.discussion.outdated');
+      }
+      const side = sideLabel(thread.diffSide);
       return path
-        ? i18n.t('prReview.discussion.anchor.outdatedOnPath', { path }) + side
-        : i18n.t('prReview.discussion.outdated') + side;
+        ? i18n.t('prReview.discussion.anchor.outdatedOnPathSide', { path, side })
+        : i18n.t('prReview.discussion.anchor.outdatedSide', { side });
     }
-    const original =
-      thread.originalStartLine && thread.originalStartLine !== originalLine
-        ? `L${thread.originalStartLine}–L${originalLine}`
-        : `L${originalLine}`;
+    const lines =
+      originalStartLine !== null && originalStartLine !== originalLine
+        ? i18n.t('prReview.discussion.anchor.lineRange', {
+            startLine: originalStartLine,
+            endLine: originalLine,
+          })
+        : i18n.t('prReview.discussion.anchor.line', { line: originalLine });
+    if (thread.diffSide === null) {
+      return path
+        ? i18n.t('prReview.discussion.anchor.outdatedOnPathLines', { path, lines })
+        : i18n.t('prReview.discussion.anchor.outdatedOnLines', { lines });
+    }
+    const side = sideLabel(thread.diffSide);
     return path
-      ? i18n.t('prReview.discussion.anchor.outdatedOnPathLines', { path, lines: original }) + side
-      : i18n.t('prReview.discussion.anchor.outdatedOnLines', { lines: original }) + side;
+      ? i18n.t('prReview.discussion.anchor.outdatedOnPathLinesSide', { path, lines, side })
+      : i18n.t('prReview.discussion.anchor.outdatedOnLinesSide', { lines, side });
   }
   // File-level (subjectType FILE or no line) — only show path.
   if (thread.subjectType === 'FILE' || thread.line === null) {
@@ -118,12 +144,41 @@ export function selectThreadAnchorLabel(thread: ReviewThread): string {
       ? i18n.t('prReview.discussion.anchor.fileCommentOnPath', { path })
       : i18n.t('prReview.discussion.anchor.fileComment');
   }
-  // Active line / range.
-  const line =
-    thread.startLine && thread.startLine !== thread.line
-      ? `L${thread.startLine}–L${thread.line}`
-      : `L${thread.line}`;
-  return path ? `${path} ${line}${side}` : `${line}${side}`;
+  // Active line / range: the `L` marker comes from the `line` / `lineRange`
+  // pattern, the side label from `sideLeft` / `sideRight` — both inside the
+  // translated sentence keys. The sentence keys carry the `L` themselves, so
+  // the side-bearing calls pass the RAW line number (word fragments only feed
+  // the side-less compositions and the `{{lineRange}}` range slot).
+  if (thread.startLine !== null && thread.startLine !== thread.line) {
+    const lineRange = i18n.t('prReview.discussion.anchor.lineRange', {
+      startLine: thread.startLine,
+      endLine: thread.line,
+    });
+    if (thread.diffSide === null) {
+      return path ? `${path} ${lineRange}` : lineRange;
+    }
+    const side = sideLabel(thread.diffSide);
+    return path
+      ? i18n.t('prReview.discussion.anchor.lineOnPathRangeSide', { path, lineRange, side })
+      : i18n.t('prReview.discussion.anchor.lineOnlyRangeSide', { lineRange, side });
+  }
+  if (thread.diffSide === null) {
+    const line = i18n.t('prReview.discussion.anchor.line', { line: thread.line });
+    return path ? `${path} ${line}` : line;
+  }
+  const side = sideLabel(thread.diffSide);
+  return path
+    ? i18n.t('prReview.discussion.anchor.lineOnPathLineSide', { path, line: thread.line, side })
+    : i18n.t('prReview.discussion.anchor.lineOnlyLineSide', { line: thread.line, side });
+}
+
+/** `sideLeft` / `sideRight` label for a non-null thread diff side. */
+function sideLabel(diffSide: 'LEFT' | 'RIGHT'): string {
+  return i18n.t(
+    diffSide === 'LEFT'
+      ? 'prReview.discussion.anchor.sideLeft'
+      : 'prReview.discussion.anchor.sideRight'
+  );
 }
 
 /**

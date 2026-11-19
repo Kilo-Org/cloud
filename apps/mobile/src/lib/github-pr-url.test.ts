@@ -113,4 +113,65 @@ describe('parseGitHubPrUrl', () => {
       number: 1,
     });
   });
+
+  it('parses a PR URL with a trailing sentence period', () => {
+    expect(parseGitHubPrUrl('https://github.com/octocat/hello-world/pull/42.')).toEqual({
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
+    });
+  });
+
+  it('parses a PR URL with a trailing comma', () => {
+    expect(parseGitHubPrUrl('https://github.com/octocat/hello-world/pull/42,')).toEqual({
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
+    });
+  });
+
+  it('parses an angle-wrapped PR URL', () => {
+    expect(parseGitHubPrUrl('<https://github.com/octocat/hello-world/pull/42>')).toEqual({
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
+    });
+  });
+
+  it('parses a markdown-link PR URL, dropping the title', () => {
+    expect(parseGitHubPrUrl('[PR 42](https://github.com/octocat/hello-world/pull/42)')).toEqual({
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
+    });
+  });
+
+  it('parses a paren-wrapped angle-wrapped PR URL', () => {
+    expect(parseGitHubPrUrl('(<https://github.com/octocat/hello-world/pull/42>)')).toEqual({
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
+    });
+  });
+
+  it('parses a paren-wrapped PR URL', () => {
+    expect(parseGitHubPrUrl('(https://github.com/octocat/hello-world/pull/42)')).toEqual({
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
+    });
+  });
+
+  it('parses a single-quoted PR URL', () => {
+    expect(parseGitHubPrUrl("'https://github.com/octocat/hello-world/pull/42'")).toEqual({
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
+    });
+  });
+
+  it('keeps rejecting a wrapped non-PR GitHub URL', () => {
+    // Tidying may not promote a URL the checker would refuse unwrapped.
+    expect(parseGitHubPrUrl('[diff](https://github.com/octocat/hello-world/blob/main/a.md)')).toBeNull();
+  });
 });

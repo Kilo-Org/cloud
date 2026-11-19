@@ -97,6 +97,10 @@ const TWO_SENSE_COPY = new Map([
   ],
   ['comment', 'the verb on a button, versus the noun on a row label and a badge'],
   [
+    'outdated',
+    "the discussion thread's staleness badge, versus the same label the thread's anchor line renders beside the file and line range",
+  ],
+  [
     'receipt',
     'the confirmation a moderation report produces, versus the proof of payment for a credit purchase',
   ],
@@ -287,6 +291,12 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // A product name has nothing to translate, so every catalog keeps the spelling
   // the gateway and its documentation publish.
   'organizationModelAccess.openrouter',
+  // The review thread's line markers: format-only `L<n>` / `L<start>–L<end>`
+  // patterns whose `L` marker and en dash are the universal diff-anchor
+  // spelling, so every catalog keeps the English pattern. The words around
+  // them live in the sentence keys (`lineOnPathLineSide`, …).
+  'prReview.discussion.anchor.line',
+  'prReview.discussion.anchor.lineRange',
 ]);
 
 /**

@@ -371,6 +371,17 @@ describe('buildGlanceableSnapshot', () => {
     expect(org.organizationBound).toBe(true);
   });
 
+  it('reads an empty organization id as the personal scope', () => {
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [],
+      userId: 'u1',
+      organizationId: '',
+      now: NOW,
+    });
+    expect(snapshot.organizationBound).toBe(false);
+    expect(snapshot.scopeKey).toBe(buildOpaqueScopeKey({ userId: 'u1', organizationId: null }));
+  });
+
   it('honours a status override and omits accountEpoch when absent', () => {
     const snapshot = buildGlanceableSnapshot({
       sessions: [],

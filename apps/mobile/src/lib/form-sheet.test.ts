@@ -229,9 +229,9 @@ describe('sheetHeaderSettledTopClearance', () => {
   });
 
   it('never reserves more than the inset the header overlaps', () => {
-    expect(
-      sheetHeaderSettledTopClearance({ clearance: 0, insetTop: 51.81, headerTop: -12 })
-    ).toBe(51.81);
+    expect(sheetHeaderSettledTopClearance({ clearance: 0, insetTop: 51.81, headerTop: -12 })).toBe(
+      51.81
+    );
   });
 });
 

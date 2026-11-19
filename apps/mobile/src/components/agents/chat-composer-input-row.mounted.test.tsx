@@ -213,9 +213,11 @@ describe('ChatComposerInputRow mounted — framework suggestions', () => {
   // framework's suggestions because it has no such popup.
   //
   // Both cases mount after a platform change, so the flag is read from a
-  // module graph resolved in the platform under test. The module bound at file
-  // load was resolved once, for whichever platform a previous suite left, and
-  // asserting against it would pass without testing the resolution.
+  // module graph resolved in the platform under test. Rendering the module
+  // bound at file load would instead assert that module's own platform value,
+  // taken from the hoisted initial before the imports: with the platform state
+  // set to `android` that form still passes on its load-time value, while a
+  // freshly resolved mount fails there.
   beforeEach(() => {
     platformOS.os = 'ios';
   });

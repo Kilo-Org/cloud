@@ -1,5 +1,3 @@
-import { LOCAL_FAKE_DETERMINISTIC_MODEL_ID } from '@kilocode/app-shared/local-fake-llm';
-
 export function normalizeKilocodeModel(model: string | undefined | null): string | undefined {
   if (!model) return undefined;
   const trimmed = model.trim();
@@ -9,8 +7,4 @@ export function normalizeKilocodeModel(model: string | undefined | null): string
 
 export function dispatchedKilocodeModelId(model: string | undefined | null): string | undefined {
   return normalizeKilocodeModel(model)?.replace(/^kilo\//, '');
-}
-
-export function isLocalFakeDeterministicModel(model: string | undefined | null): boolean {
-  return dispatchedKilocodeModelId(model) === LOCAL_FAKE_DETERMINISTIC_MODEL_ID;
 }

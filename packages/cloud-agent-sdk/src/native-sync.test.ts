@@ -987,6 +987,64 @@ test('a retry that cannot read the transcript reports the terminal failure', asy
   connection.close();
 });
 
+test('a read canceled by a closing socket never counts toward the bound', async () => {
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  for (const index of [0, 1, 2, 3]) {
+    snapshot.mockImplementationOnce(
+      (_request, _sessionID, signal?: AbortSignal) =>
+        new Promise((_resolve, reject) => {
+          signal?.addEventListener('abort', () => reject(new NativeSyncError('request_canceled')));
+        })
+    );
+    const socket = connectedSocket(index);
+    socket.frame('hello', hello());
+    await flush();
+    socket.close();
+    await flush();
+    await jest.advanceTimersByTimeAsync(2001);
+    await flush();
+    expect(state?.snapshotFailure).toBeUndefined();
+  }
+  expect(FakeSocket.sockets.length).toBeGreaterThan(3);
+  connection.close();
+});
+
+test('a retry keeps a more specific transcript notice', async () => {
+  snapshot.mockResolvedValue(complete(5));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 3);
+  await flush();
+  socket.frame(
+    'session.step.started',
+    { syncPosition: 9, data: { data: { id: 'invalid' } } },
+    4,
+    'events'
+  );
+  await flush();
+  expect(state?.error).toContain('skipped an event it could not read');
+  // Replay is unavailable as well, and its notice names the loss the client cannot repair.
+  snapshot.mockRejectedValueOnce(new Error('Native state read failed'));
+  socket.frame('reset_required', { seq: 9 }, 9);
+  await flush();
+  expect(state?.error).toContain('may be incomplete');
+  connection.refresh();
+  await flush();
+  expect(state?.error).toContain('may be incomplete');
+  expect(state?.error).not.toContain('skipped an event it could not read');
+  connection.close();
+});
+
 test('an unreadable native asset latches on the first snapshot read', async () => {
   snapshot.mockRejectedValueOnce(
     Object.assign(new Error('asset file is not readable'), { code: 'native_asset_not_found' })

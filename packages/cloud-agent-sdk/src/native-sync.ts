@@ -897,6 +897,13 @@ export class NativeSyncClient {
       !state.messages.some(
         message => message.incomplete || hasUnresolvedKilo2Assets(message.message, state.assetURLs)
       );
+    /** A settled transcript owns no terminal failure, so the published marker goes with it. */
+    const settleSnapshotStreak = () => {
+      snapshotFailures = 0;
+      if (snapshotFailure === undefined) return;
+      snapshotFailure = undefined;
+      publish({ snapshotFailure: undefined, error: undefined });
+    };
     const recoverIncomplete = (epoch: SocketEpoch, force = false) => {
       if (
         recovery ||
@@ -1039,7 +1046,7 @@ export class NativeSyncClient {
               publish({ error: undefined });
             }
             current.completed = true;
-            if (transcriptSettled()) snapshotFailures = 0;
+            if (transcriptSettled()) settleSnapshotStreak();
             return;
           }
           if (current.attempt >= 4) {
@@ -1078,11 +1085,13 @@ export class NativeSyncClient {
               try {
                 await snapshot(epoch);
               } catch (error) {
+                // A read the retiring socket canceled never described the transcript.
+                if (!epoch.current()) throw error;
                 throw noteSnapshotFailure(error) ?? error;
               }
               if (!epoch.current()) return;
               // A read that still leaves an uncertified gap has not settled the transcript.
-              if (transcriptSettled()) snapshotFailures = 0;
+              if (transcriptSettled()) settleSnapshotStreak();
               lastSeq = frame.seq;
             }
             send({ type: 'subscribe', afterSeq: lastSeq });
@@ -1094,10 +1103,11 @@ export class NativeSyncClient {
             try {
               await snapshot(epoch);
             } catch (error) {
+              if (!epoch.current()) throw error;
               throw noteSnapshotFailure(error) ?? error;
             }
             if (!epoch.current()) return;
-            if (transcriptSettled()) snapshotFailures = 0;
+            if (transcriptSettled()) settleSnapshotStreak();
             lastSeq = typeof body['seq'] === 'number' ? body['seq'] : frame.seq;
             send({ type: 'subscribe', afterSeq: lastSeq });
             recoverIncomplete(epoch);
@@ -1361,7 +1371,7 @@ export class NativeSyncClient {
         snapshotPosition = -1;
         integrityGap = false;
         // A frame the client could not project keeps its warning until a snapshot read covers it.
-        integrityError = quarantined.length === 0 ? undefined : projectedFrameGap;
+        integrityError ??= quarantined.length === 0 ? undefined : projectedFrameGap;
         publish({ snapshotFailure: undefined, error: undefined });
       },
       close: () => {

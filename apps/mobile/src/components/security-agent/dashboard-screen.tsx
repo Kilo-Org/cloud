@@ -272,11 +272,11 @@ function DashboardHeader({
   const { t } = useTranslation();
   return (
     <ScreenHeader
-      title={scopeTitle}
-      eyebrow={t('common.securityAgent')}
-      // The scope name is the one thing that tells two organizations apart,
-      // so it wraps to a second line rather than ellipsizing its tail.
-      titleNumberOfLines={2}
+      title={t('common.securityAgent')}
+      // The scope is the subtitle under the product name, the one two-line
+      // header the app uses: a longer organization name tail-truncates inside
+      // that line instead of growing the header.
+      subtitle={scopeTitle}
       // The trailing cluster's laid-out width — 48 dp icon boxes 7 dp apart:
       // findings and settings, plus the audit overflow when the viewer can
       // manage the agent. Declaring 44 dp boxes understated the cluster, so

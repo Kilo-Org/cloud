@@ -1,7 +1,10 @@
 import { decodeTime, ulid } from 'ulid';
 import { z } from 'zod';
 import {
+  isDefaultSessionTitle,
+  kilo2ConversationSourceSchema,
   publishCloudAgentSessionStatusSchema,
+  sessionTitleSchema,
   type PublishCloudAgentSessionStatusParams,
 } from '@kilocode/session-ingest-contracts';
 import { withTimeout } from '@kilocode/worker-utils';
@@ -41,6 +44,36 @@ export function deriveSessionListStatus(input: {
   return 'idle';
 }
 
+/**
+ * Events that write the transcript: the evidence session-ingest records as a
+ * CLI's `last_activity_at`. Kilo v2 has no ingest client, so the Session DO
+ * publishes it with the list status.
+ */
+export const TRANSCRIPT_EVENT_TYPES: ReadonlySet<string> = new Set([
+  'message.updated',
+  'message.part.updated',
+  'message.part.delta',
+  'conversation.message.updated',
+  'conversation.event',
+]);
+
+/**
+ * The name a Kilo v2 `conversation.source` gives the session `sessionId`;
+ * undefined for the source of another session, a missing title or a creation
+ * placeholder. Kilo v1 never sends this event: its CLI reports its own titles
+ * to session-ingest.
+ */
+export function nativeSessionTitle(source: unknown, sessionId: string): string | undefined {
+  const parsed = kilo2ConversationSourceSchema.safeParse(source);
+  if (
+    !parsed.success ||
+    parsed.data.session.id !== sessionId ||
+    isDefaultSessionTitle(parsed.data.session.title)
+  )
+    return undefined;
+  return sessionTitleSchema.safeParse(parsed.data.session.title).data;
+}
+
 const storedStatusSchema = z.object({
   update: publishCloudAgentSessionStatusSchema,
   dueAt: z.number().finite().nullable(),
@@ -61,20 +94,36 @@ export function createSessionListStatusOutbox(input: {
     return undefined;
   };
 
+  /**
+   * `activityAt` is the latest transcript activity the Session DO observed; it
+   * rides every snapshot and never moves back. `title` is a native rename: it
+   * forces a snapshot, and stays in newer ones until a publication delivers it,
+   * naming the snapshot that first carried it so ingest never applies a repeat
+   * of a rename it already applied.
+   */
   function record(
     identity: Pick<
       PublishCloudAgentSessionStatusParams,
       'sessionId' | 'kiloUserId' | 'cloudAgentSessionId'
     >,
     status: ListStatus,
-    now = Date.now()
+    now = Date.now(),
+    observed: { activityAt?: number; title?: string } = {}
   ): void {
     const previous = current();
+    const recordedActivityAt =
+      previous?.update.lastActivityAt === undefined
+        ? -Infinity
+        : Date.parse(previous.update.lastActivityAt);
+    const activityAt = Math.max(observed.activityAt ?? -Infinity, recordedActivityAt);
     // Refresh on observed activity, not a timer that would keep a silent or
-    // disconnected runtime looking fresh indefinitely.
+    // disconnected runtime looking fresh indefinitely. Busy and retry refresh on
+    // any event; other statuses on newer transcript activity, so a wait on input
+    // while subagents keep working still proves the session live.
     if (
+      observed.title === undefined &&
       previous?.update.status === status &&
-      ((status !== 'busy' && status !== 'retry') ||
+      ((status !== 'busy' && status !== 'retry' && activityAt <= recordedActivityAt) ||
         now - Date.parse(previous.update.occurredAt) < LIST_STATUS_REFRESH_MS)
     )
       return;
@@ -84,12 +133,23 @@ export function createSessionListStatusOutbox(input: {
       now,
       previous === undefined ? 0 : decodeTime(previous.update.transitionId) + 1
     );
+    const transitionId = ulid(at);
+    const rename =
+      observed.title === undefined
+        ? previous?.dueAt === null
+          ? undefined
+          : previous?.update.rename
+        : { title: observed.title, transitionId };
     const snapshot = storedStatusSchema.safeParse({
       update: {
         ...identity,
         status,
         occurredAt: new Date(at).toISOString(),
-        transitionId: ulid(at),
+        transitionId,
+        ...(Number.isFinite(activityAt)
+          ? { lastActivityAt: new Date(activityAt).toISOString() }
+          : {}),
+        ...(rename === undefined ? {} : { rename }),
       },
       dueAt: now,
     });

@@ -10,15 +10,14 @@ import {
 } from './lifecycle';
 import type { PartsSnapshot } from './helpers';
 import {
-  EMPTY_PARTS,
   appendPartTextChunks,
-  clonePart,
   createReadonlyPartView,
   createSubscriberRegistry,
   insertSortedBy,
   isSupportedDeltaField,
   messageIdKey,
   publishPartsChanged,
+  readPartsSnapshot,
   upsertPartDroppingStaleSyntheticParts,
 } from './helpers';
 
@@ -113,15 +112,7 @@ function createMemoryStorage(): SessionStorage {
     },
 
     getParts(messageId) {
-      const cached = partsSnapshot.get(messageId);
-      if (cached) return cached;
-
-      const arr = parts.get(messageId);
-      if (!arr || arr.length === 0) return EMPTY_PARTS;
-
-      const snapshot = arr.map(part => createReadonlyPartView(clonePart(part)));
-      partsSnapshot.set(messageId, snapshot);
-      return snapshot;
+      return readPartsSnapshot(messageId, parts.get(messageId), partsSnapshot);
     },
 
     getPart(messageId, partId) {

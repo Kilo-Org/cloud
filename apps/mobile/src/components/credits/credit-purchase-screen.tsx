@@ -9,7 +9,7 @@ import { toast } from 'sonner-native';
 
 import { DetailScreenScrollView } from '@/components/detail-screen';
 import { StateAction } from '@/components/empty-state';
-import { ScreenHeader } from '@/components/screen-header';
+import { SheetHeader } from '@/components/sheet-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Card } from '@/components/ui/card';
 import { ConfigureRow } from '@/components/ui/configure-row';
@@ -37,6 +37,7 @@ import { useInlinePurchaseErrorOwnership } from '@/lib/credits/use-store-credit-
 import { formatPrefixedMoney } from '@/lib/format';
 import { LARGE_FONT_SCALE, useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { useSideInsetStyle } from '@/lib/screen-insets';
+import { modalSheetSurfaceClass } from '@/lib/form-sheet';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { type LegalDocument } from '@/lib/legal-document';
@@ -105,6 +106,7 @@ const WAIT_COPY_KEYS = {
 export function CreditPurchaseScreen() {
   const { t, i18n } = useTranslation();
   const storefront = getCreditStorefront();
+  const surfaceClass = modalSheetSurfaceClass();
   // The footer and the error overlay sit outside the scroller, so they take the
   // side insets the scroller applies to its own content.
   const sideInsetStyle = useSideInsetStyle();
@@ -328,8 +330,20 @@ export function CreditPurchaseScreen() {
   };
 
   return (
-    <View className="flex-1 bg-background" testID="credit-purchase-screen">
-      <ScreenHeader title={t('credits.title')} modal centerTitle={false} backIcon="back" />
+    <View className={cn('flex-1', surfaceClass)} testID="credit-purchase-screen">
+      {/* The route is a modal (an iOS page sheet), so its header is the sheet
+          header: the X closes the sheet, where a back chevron would say "go
+          back" and the pushed-screen header left an empty band above the
+          title. */}
+      <SheetHeader
+        title={t('credits.title')}
+        variant="close"
+        topInset="android-window-top"
+        surfaceClassName={surfaceClass}
+        onDone={() => {
+          router.back();
+        }}
+      />
       <View className="flex-1">
         <DetailScreenScrollView
           className="flex-1"
@@ -630,7 +644,7 @@ export function CreditPurchaseScreen() {
           the control-size audit can read, which keeps its height in the flow so
           the two boxes never overlap when a long locale wraps them onto two
           lines. */}
-      <ScreenFooter>
+      <ScreenFooter className={surfaceClass}>
         <Text variant="caption">{t('credits.description')}</Text>
         <View className={LEGAL_LINK_ROW_CLASS}>
           <Pressable

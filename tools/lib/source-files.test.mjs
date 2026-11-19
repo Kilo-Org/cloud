@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import test from 'node:test';
 
-import { isTestArtifact, parseSourceTree, sourceFiles } from './source-files.mjs';
+import { isTestArtifact, parseSourceEntry, parseSourceTree, sourceFiles } from './source-files.mjs';
 
 test('walks the tree depth-first with entries sorted by name at each level', context => {
   const root = mkdtempSync(join(tmpdir(), 'source-files-'));
@@ -135,4 +135,32 @@ test('reports an unreadable file as one problem and keeps walking', context => {
   // The filesystem can read what the reader refused, so the throw came from the
   // injected reader and not from an unreadable file.
   assert.equal(readFileSync(join(root, 'cannot.ts'), 'utf8'), 'export const b = 2;\n');
+});
+
+test('names a file absolutely when the walk is given a relative directory', context => {
+  const fixture = mkdtempSync(join(tmpdir(), 'source-files-'));
+  const previous = process.cwd();
+  context.after(() => {
+    // The cwd is process-wide state, so it is restored even when an assertion
+    // above failed and left the test body early.
+    process.chdir(previous);
+    rmSync(fixture, { recursive: true, force: true });
+  });
+
+  mkdirSync(join(fixture, 'src'));
+  writeFileSync(join(fixture, 'src', 'a.ts'), 'export const a = 1;\n');
+  process.chdir(fixture);
+
+  // A caller that spells its paths relative still gets the absolute `file` the
+  // entry contract promises, and a `path` spelled from `root` exactly as the
+  // same call with absolute paths spells it.
+  const [entry] = [...parseSourceTree('src', 'src', isTestArtifact)];
+  assert.equal(isAbsolute(entry.file), true);
+  assert.equal(entry.file, join(fixture, 'src', 'a.ts'));
+  assert.equal(entry.path, 'a.ts');
+
+  const direct = parseSourceEntry('src', 'src', join('src', 'a.ts'), 'export const a = 1;\n');
+  assert.equal(isAbsolute(direct.file), true);
+  assert.equal(direct.file, join(fixture, 'src', 'a.ts'));
+  assert.equal(direct.path, 'a.ts');
 });

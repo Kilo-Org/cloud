@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   type BackendStoreCreditProduct,
+  getStoreCreditExpiryCaption,
   getStoreCreditExpiryMessageKey,
-  getStoreCreditGroupExpiryMessageKey,
   joinStoreCreditProducts,
 } from './store-products';
 
@@ -122,7 +122,7 @@ describe('getStoreCreditExpiryMessageKey', () => {
   });
 });
 
-describe('getStoreCreditGroupExpiryMessageKey', () => {
+describe('getStoreCreditExpiryCaption', () => {
   const catalog = (
     policy: NonNullable<BackendStoreCreditProduct['creditExpiryPolicy']>
   ): BackendStoreCreditProduct[] =>
@@ -133,17 +133,41 @@ describe('getStoreCreditGroupExpiryMessageKey', () => {
       creditExpiryPolicy: policy,
     }));
 
-  it('adds no caption when the balance card already says the credits do not expire', () => {
-    expect(getStoreCreditGroupExpiryMessageKey(catalog('never'), 'play')).toBeUndefined();
+  it('states the non-expiring Play policy for a uniform catalog that never expires', () => {
+    expect(getStoreCreditExpiryCaption(catalog('never'), 'play')).toEqual({
+      key: 'credits.playNonexpiring',
+      expires: false,
+    });
   });
 
-  it('adds no caption for an App Store catalog, whose credits never expire', () => {
-    expect(getStoreCreditGroupExpiryMessageKey(catalog('one_year'), 'app_store')).toBeUndefined();
+  it('states the App Store policy for an App Store catalog', () => {
+    expect(getStoreCreditExpiryCaption(catalog('one_year'), 'app_store')).toEqual({
+      key: 'credits.appStoreExpiry',
+      expires: false,
+    });
   });
 
-  it('states the one-year policy once for a Play catalog that expires', () => {
-    expect(getStoreCreditGroupExpiryMessageKey(catalog('one_year'), 'play')).toBe(
-      'credits.playOneYearExpiry'
-    );
+  it('states the one-year Play policy for a uniform catalog that expires', () => {
+    expect(getStoreCreditExpiryCaption(catalog('one_year'), 'play')).toEqual({
+      key: 'credits.playOneYearExpiry',
+      expires: true,
+    });
+  });
+
+  it('states no group sentence for a catalog whose packs mix policies', () => {
+    const [firstPack, ...rest] = catalog('never');
+    if (firstPack === undefined) {
+      throw new Error('expected a catalog');
+    }
+    const mixed: BackendStoreCreditProduct[] = [
+      { ...firstPack, creditExpiryPolicy: 'one_year' },
+      ...rest,
+    ];
+
+    expect(getStoreCreditExpiryCaption(mixed, 'play')).toBeUndefined();
+  });
+
+  it('states no group sentence while a pack has no backend policy', () => {
+    expect(getStoreCreditExpiryCaption(backendProducts, 'play')).toBeUndefined();
   });
 });

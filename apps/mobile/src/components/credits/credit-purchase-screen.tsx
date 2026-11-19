@@ -26,10 +26,11 @@ import {
   LEGAL_LINK_ROW_CLASS,
 } from '@/lib/a11y/tap-target';
 import { isolateLtrBidiText } from '@/lib/bidi';
+import { getNextCreditExpiry } from '@/lib/credits/credit-expiry';
 import { getStoreUnavailableCopyKeys } from '@/lib/credits/store-products-loader';
 import {
+  getStoreCreditExpiryCaption,
   getStoreCreditExpiryMessageKey,
-  getStoreCreditGroupExpiryMessageKey,
   type StoreCreditProduct,
 } from '@/lib/credits/store-products';
 import { useStoreCreditProducts } from '@/lib/credits/use-store-credit-products';
@@ -210,15 +211,26 @@ export function CreditPurchaseScreen() {
   const showRows = !isLoading && !identityUnavailable && !packsEmpty && !storeUnavailable;
   // The store's credit-expiry policy belongs to the pack group, so the screen
   // states it once under the rows instead of repeating the same sentence under
-  // every pack. The balance card above already states non-expiry, so only an
-  // expiring catalogue adds a caption here.
-  const expiryNoteKey = showRows
-    ? getStoreCreditGroupExpiryMessageKey(
+  // every pack. Only a catalogue whose packs share one policy has a sentence to
+  // state; a mixed one is disclosed per row instead.
+  const expiryCaption = showRows
+    ? getStoreCreditExpiryCaption(
         products.map(pack => pack.backend),
         storefront
       )
     : undefined;
-  const expiryNote = expiryNoteKey ? t(expiryNoteKey) : null;
+  // The balance card states non-expiry in exactly one state: its read settled
+  // with no future expiry, which is when it paints `credits.noExpiringCredits`.
+  // While it paints its skeleton, `credits.expiryUnavailable`, or the next
+  // expiring block, it says nothing about the purchase terms, so the pack group
+  // must state them itself.
+  const balanceStatesNoExpiry =
+    creditBlocksQuery.isSuccess &&
+    getNextCreditExpiry(creditBlocksQuery.data.creditBlocks) === undefined;
+  const expiryNote =
+    expiryCaption !== undefined && !(balanceStatesNoExpiry && !expiryCaption.expires)
+      ? t(expiryCaption.key)
+      : null;
   const balancePending = balanceQuery.isPending;
   const balanceFailed = balanceQuery.isError;
   // The card's title and its default body come from one per-store source, so

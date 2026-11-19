@@ -55,25 +55,34 @@ export function getStoreCreditExpiryMessageKey(
   return undefined;
 }
 
+export type StoreCreditExpiryCaption = {
+  /** The one sentence the pack group states for every pack it lists. */
+  key: 'credits.appStoreExpiry' | 'credits.playOneYearExpiry' | 'credits.playNonexpiring';
+  /** Whether the packs this sentence describes expire. */
+  expires: boolean;
+};
+
 /**
  * The one credit-expiry policy the pack group states below its rows, or
- * `undefined` when the screen already says it once.
+ * `undefined` when the rows do not share one.
  *
- * A catalog response is uniform — every pack is `never` or every pack is
- * `one_year` — so deduping leaves at most one policy. The balance card above
- * the packs states non-expiry itself, so a non-expiring catalog adds no
- * caption and only an expiring policy is restated here. Each row's accessible
- * label still carries its own policy sentence.
+ * A backend catalog is uniform — `getMobileCreditProducts` in
+ * `apps/web/src/lib/credits/store-products.ts` gives every pack the same
+ * policy — so one sentence describes the whole group. A mixed catalog, or a
+ * pack the backend gave no policy, has no single sentence to state: one
+ * caption would misdescribe the packs it does not cover, so the group draws
+ * none and each row's accessible label still carries its own policy sentence.
  */
-export function getStoreCreditGroupExpiryMessageKey(
+export function getStoreCreditExpiryCaption(
   products: readonly BackendStoreCreditProduct[],
   storefront: 'app_store' | 'play'
-): 'credits.playOneYearExpiry' | undefined {
+): StoreCreditExpiryCaption | undefined {
   const stated = products.map(product => getStoreCreditExpiryMessageKey(product, storefront));
-  // Only a policy the balance card cannot state earns a caption: the card says
-  // the account's credits never expire, and the two non-expiring keys restate
-  // that.
-  return stated.includes('credits.playOneYearExpiry') ? 'credits.playOneYearExpiry' : undefined;
+  const [first] = stated;
+  if (first === undefined || stated.some(key => key !== first)) {
+    return undefined;
+  }
+  return { key: first, expires: first === 'credits.playOneYearExpiry' };
 }
 
 export function joinStoreCreditProducts(params: {

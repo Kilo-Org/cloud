@@ -439,6 +439,12 @@ describe('CreditPurchaseScreen', () => {
     const labels = packRows(renderer).map(row => labelOf(row));
     expect(labels[0]).toContain('These credits expire one calendar year after purchase.');
     expect(labels[1]).toContain('These credits do not expire.');
+    // One group sentence cannot describe rows that differ, so the group draws
+    // neither policy; only the per-row labels state them.
+    expect(allText(renderer)).not.toContain(
+      'These credits expire one calendar year after purchase.'
+    );
+    expect(allText(renderer)).not.toContain('These credits do not expire.');
     expect(allText(renderer)).not.toContain(
       'Credits purchased through the App Store do not expire.'
     );
@@ -446,9 +452,8 @@ describe('CreditPurchaseScreen', () => {
   });
 
   it('states no group expiry caption on Android when no credits expire', async () => {
-    // A non-expiring catalogue repeats what the balance card above already
-    // says, so the group adds no caption; each row still announces its own
-    // policy.
+    // The balance card states non-expiry in this state, so the group caption
+    // would repeat it; each row still announces its own policy.
     mockedPlatform.OS = 'android';
     backend.response.products = BACKEND_PRODUCTS.map(product => ({
       ...product,
@@ -466,6 +471,56 @@ describe('CreditPurchaseScreen', () => {
     const labels = packRows(renderer).map(row => labelOf(row));
     expect(labels).toHaveLength(4);
     expect(labels.every(label => label.endsWith(', These credits do not expire.'))).toBe(true);
+    unmount();
+  });
+
+  it('states the non-expiring Play policy while the balance card names a future expiry', async () => {
+    // The card names the account's next expiring block, not the policy these
+    // packs follow, so the group states its own policy below the rows.
+    mockedPlatform.OS = 'android';
+    backend.response.products = BACKEND_PRODUCTS.map(product => ({
+      ...product,
+      creditExpiryPolicy: 'never',
+    }));
+    owner.fetchStoreProducts.mockResolvedValue(
+      BACKEND_PRODUCTS.map(product => ({ id: product.googleProductId, displayPrice: '$10.99' }))
+    );
+    creditBlocks.entries = [{ balance_mUsd: 10_000_000, expiry_date: '2027-10-15T00:00:00Z' }];
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => allText(renderer).includes('in credits expires'));
+
+    const captions = renderer.root.findAll(
+      node => String(node.type) === 'Text' && node.props.children === 'These credits do not expire.'
+    );
+    expect(captions).toHaveLength(1);
+    expect(allText(renderer)).toContain('in credits expires');
+    expect(allText(renderer)).not.toContain('Credit expiry unavailable.');
+    const labels = packRows(renderer).map(row => labelOf(row));
+    expect(labels.every(label => label.endsWith(', These credits do not expire.'))).toBe(true);
+    unmount();
+  });
+
+  it('states the non-expiring Play policy while the balance card cannot read the expiry', async () => {
+    // A failed credit-blocks read leaves the card saying "expiry unavailable",
+    // not the purchase terms, so the group must state them itself.
+    mockedPlatform.OS = 'android';
+    backend.response.products = BACKEND_PRODUCTS.map(product => ({
+      ...product,
+      creditExpiryPolicy: 'never',
+    }));
+    owner.fetchStoreProducts.mockResolvedValue(
+      BACKEND_PRODUCTS.map(product => ({ id: product.googleProductId, displayPrice: '$10.99' }))
+    );
+    creditBlocks.state = 'error';
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => allText(renderer).includes('Credit expiry unavailable.'));
+
+    const captions = renderer.root.findAll(
+      node => String(node.type) === 'Text' && node.props.children === 'These credits do not expire.'
+    );
+    expect(captions).toHaveLength(1);
     unmount();
   });
 

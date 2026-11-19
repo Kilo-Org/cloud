@@ -176,12 +176,14 @@ function firstLetter(node: ReactNode): string | undefined {
 /**
  * The code point ranges whose letters are right to left (bidi class R or AL):
  * Hebrew through Arabic Extended-A, the Hebrew and Arabic presentation forms,
- * and the two supplementary right-to-left areas (Phoenician through Arabic
- * Extended-C, Mende Kikakui through the Arabic mathematical symbols). Unlike
- * `RTL_SCRIPT`, which lists the scripts the app has glyphs for, this covers
- * every right-to-left script content can arrive in — Syriac, Thaana, NKo,
- * Samaritan, Mandaic, Adlam. Only a letter is tested, so the few neutral
- * code points in these ranges never decide a direction.
+ * and the two supplementary areas Unicode reserves for right-to-left scripts
+ * (U+10800-U+10FFF, Cypriot Syllabary through Elymaic and Arabic Extended-C;
+ * U+1E800-U+1EFFF, Mende Kikakui through the Arabic mathematical symbols).
+ * Every letter in these ranges is R or AL, Cypriot, Lydian and Meroitic
+ * included. Unlike `RTL_SCRIPT`, which lists the scripts the app has glyphs
+ * for, this covers every right-to-left script content can arrive in — Syriac,
+ * Thaana, NKo, Samaritan, Mandaic, Adlam. Only a letter is tested, so the few
+ * neutral code points in these ranges never decide a direction.
  */
 const RTL_LETTER =
   /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1E800}-\u{1EFFF}]/u;

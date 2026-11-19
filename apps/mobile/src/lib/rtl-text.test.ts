@@ -213,8 +213,9 @@ describe('contentTextDirection', () => {
   });
 
   // Hebrew, and the right-to-left scripts the app has no glyphs for, still
-  // arrive in content: Syriac, Thaana, NKo, Samaritan, Mandaic, Adlam.
-  it.each(['שלום', 'ܫܠܡܐ', 'ދިވެހި', 'ߒߞߏ', 'ࠀࠁ', 'ࡀࡁ', '𞤀𞤁'])(
+  // arrive in content: Syriac, Thaana, NKo, Samaritan, Mandaic, Adlam, and the
+  // supplementary scripts Unicode classes R — Cypriot, Lydian, Meroitic.
+  it.each(['שלום', 'ܫܠܡܐ', 'ދިވެހި', 'ߒߞߏ', 'ࠀࠁ', 'ࡀࡁ', '𞤀𞤁', '𐠀𐠁', '𐤠𐤡', '𐦀𐦁'])(
     'names %s content right to left',
     text => {
       expect(contentTextDirection(`1. ${text}`)).toEqual(RTL);

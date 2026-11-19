@@ -121,6 +121,10 @@ export const OrganizationFeaturesInputSchema = z.object({
   experimental_byok: organizationIdsInput,
   enkrypt_output_guardrail: organizationIdsInput,
   gateway_settings: organizationIdsInput,
+  org_permission_policy: organizationIdsInput,
+}) satisfies z.ZodType<OrganizationFeatures, unknown>;
+
+export const OrganizationFeaturesCompatibleInputSchema = OrganizationFeaturesInputSchema.extend({
   org_permission_policy: organizationIdsInput.optional(),
 });
 

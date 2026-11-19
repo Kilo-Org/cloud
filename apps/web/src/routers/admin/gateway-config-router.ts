@@ -3,7 +3,7 @@ import {
   GatewayConfigSchema,
   GatewayConfigInputSchema,
   DEFAULT_GATEWAY_CONFIG,
-  OrganizationFeaturesInputSchema,
+  OrganizationFeaturesCompatibleInputSchema,
   AnthropicUserProfilesSettingsInputSchema,
   GatewayAnthropicUserProfilesConfigSchema,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
@@ -70,7 +70,7 @@ export const adminGatewayConfigRouter = createTRPCRouter({
   }),
 
   previewOrganizationFeatures: adminProcedure
-    .input(OrganizationFeaturesInputSchema)
+    .input(OrganizationFeaturesCompatibleInputSchema)
     .query(async ({ input }) => {
       const organizationIds = [...new Set(Object.values(input).flatMap(ids => ids ?? []))];
       if (organizationIds.length === 0) return [];
@@ -92,7 +92,7 @@ export const adminGatewayConfigRouter = createTRPCRouter({
     }),
 
   setOrganizationFeatures: adminProcedure
-    .input(OrganizationFeaturesInputSchema)
+    .input(OrganizationFeaturesCompatibleInputSchema)
     .mutation(async ({ input }) => {
       const orgPermissionPolicy =
         input.org_permission_policy ?? (await readOrganizationFeatures(db)).org_permission_policy;

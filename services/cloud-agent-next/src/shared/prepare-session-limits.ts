@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { RuntimeProfileLimits } from './runtime-profile.js';
+import { RuntimeProfileLimits } from './runtime-profile';
 
 /**
  * Caps for the configuration `prepareSession` accepts and persists.

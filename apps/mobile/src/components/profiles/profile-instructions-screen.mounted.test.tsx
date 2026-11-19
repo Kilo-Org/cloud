@@ -72,6 +72,7 @@ vi.mock('@/components/ui/dialog', () => ({
 vi.mock('@/components/ui/icons', () => ({
   FileText: 'FileText',
   Pencil: 'Pencil',
+  Plus: 'Plus',
   Trash2: 'Trash2',
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

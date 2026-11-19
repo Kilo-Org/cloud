@@ -1,9 +1,16 @@
+import {
+  GITLAB_REVIEW_CAPABILITIES,
+  type ProviderPrMergeState,
+  type ProviderPrSummary,
+  type ProviderReviewCapabilities,
+} from '@kilocode/app-shared/provider-review';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { createTRPCClient, httpLink } from '@trpc/client';
 import { z } from 'zod';
 
 import { reviewOverviewFixture } from '@/components/pr-review/pr-review-overview-copy-fixture';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
+import { FIXTURE_WRITE_REFUSED } from '@/lib/pr-review/pr-review-copy-fixture-route';
 
 // The fake reads behind the PR-review copy fixture. Real review consumers run
 // against these owned DTOs across an asynchronous tRPC boundary: the reads
@@ -105,7 +112,42 @@ type FixtureReadData =
   | RouterOutputs['githubPrReview']['getPullRequest']
   | RouterOutputs['githubPrReview']['listChecks']
   | RouterOutputs['githubPrReview']['listFiles']
-  | RouterOutputs['user']['getMe'];
+  | RouterOutputs['user']['getMe']
+  | ProviderPrSummary
+  | ProviderPrMergeState
+  | ProviderReviewCapabilities;
+
+/**
+ * The GitLab merge request the provider route shape reads. The screens
+ * normalize it through the seam exactly as a real `providerReview` answer is
+ * normalized, so the provider arm renders the same read models as GitHub.
+ */
+const providerSummary: ProviderPrSummary = {
+  ref: { platform: 'gitlab', projectPath: 'acme/review-copy', mrIid: 7 },
+  title: 'Greet the reader in the sample project',
+  body: 'Normalizes the greeting helper so every caller prints the same text.',
+  author: { login: 'review-copy', avatarUrl: null },
+  state: 'open',
+  draft: false,
+  headRef: 'greeting-copy',
+  baseRef: 'main',
+  headSha,
+  changedFiles: 101,
+  additions: 120,
+  deletions: 8,
+  webUrl: 'https://gitlab.example.test/acme/review-copy/-/merge_requests/7',
+  createdAt: '2026-11-01T10:00:00.000Z',
+  updatedAt: '2026-11-02T10:00:00.000Z',
+};
+
+/** The provider merge gate: open, approving nothing, nothing in the way. */
+const providerMergeState: ProviderPrMergeState = {
+  canMerge: true,
+  approvalsRequired: 0,
+  pipelineMustSucceed: false,
+  conflicts: false,
+  blockedReasons: [],
+};
 
 function fixtureResponse(data: FixtureReadData): Response {
   // eslint-disable-next-line unicorn/prefer-response-static-json -- React Native's fetch polyfill has no static Response.json.
@@ -120,6 +162,23 @@ const FIXTURE_URL = 'review-copy-fixture-trpc';
 const FIXTURE_URL_BASE = 'review-copy-fixture:/';
 
 const FilePageInput = z.object({ cursor: z.literal(100).nullish() });
+
+/**
+ * One page of the fixture's file list: the surface's set, 100 at a time, with
+ * the second page's cursor. Both route shapes read the page the same way, so a
+ * provider navigator lists the same files as the GitHub one.
+ */
+function fixtureFilesPage(url: string, surface: string | undefined) {
+  const pageInput = FilePageInput.parse(
+    JSON.parse(new URL(url, FIXTURE_URL_BASE).searchParams.get('input') ?? '{}')
+  );
+  const offset = pageInput.cursor === 100 ? 100 : 0;
+  const surfaceFiles = filesForSurface(surface);
+  return {
+    files: surfaceFiles.slice(offset, offset + 100),
+    nextCursor: offset + 100 < surfaceFiles.length ? offset + 100 : null,
+  };
+}
 
 /** A read failure in the shape the tRPC http link raises as its error. */
 function readFailure(path: string): Response {
@@ -154,10 +213,24 @@ export function createFixtureClient(surface: string | undefined) {
           await Promise.resolve();
           const url = input instanceof Request ? input.url : input.toString();
           if (init?.method !== 'GET') {
-            throw new Error('Review copy fixture does not allow writes');
+            throw new Error(FIXTURE_WRITE_REFUSED);
           }
           if (url.includes('/githubPrReview.getPullRequest')) {
             return fixtureResponse(reviewOverviewFixture);
+          }
+          // The provider route shape's reads. The screens normalize these
+          // through the seam, so the provider arm paints the same cards.
+          if (url.includes('/providerReview.getPullRequest')) {
+            return fixtureResponse(providerSummary);
+          }
+          if (url.includes('/providerReview.getMergeState')) {
+            return fixtureResponse(providerMergeState);
+          }
+          if (url.includes('/providerReview.getCapabilities')) {
+            return fixtureResponse(GITLAB_REVIEW_CAPABILITIES);
+          }
+          if (url.includes('/providerReview.listFiles')) {
+            return fixtureResponse(fixtureFilesPage(url, surface));
           }
           if (url.includes('/githubPrReview.listChecks')) {
             return surface === 'checks-not-available'
@@ -165,15 +238,7 @@ export function createFixtureClient(surface: string | undefined) {
               : fixtureResponse(checks);
           }
           if (url.includes('/githubPrReview.listFiles')) {
-            const pageInput = FilePageInput.parse(
-              JSON.parse(new URL(url, FIXTURE_URL_BASE).searchParams.get('input') ?? '{}')
-            );
-            const offset = pageInput.cursor === 100 ? 100 : 0;
-            const surfaceFiles = filesForSurface(surface);
-            return fixtureResponse({
-              files: surfaceFiles.slice(offset, offset + 100),
-              nextCursor: offset + 100 < surfaceFiles.length ? offset + 100 : null,
-            } satisfies RouterOutputs['githubPrReview']['listFiles']);
+            return fixtureResponse(fixtureFilesPage(url, surface));
           }
           if (url.includes('/user.getMe')) {
             return fixtureResponse({

@@ -250,6 +250,11 @@ function placeholderShells(
   );
 }
 
+function classNameOf(instance: TestRenderer.ReactTestInstance): string {
+  const value: unknown = instance.props.className;
+  return typeof value === 'string' ? value : '';
+}
+
 function labelOf(instance: TestRenderer.ReactTestInstance | undefined): string {
   const value: unknown = instance?.props.accessibilityLabel;
   return typeof value === 'string' ? value : '';

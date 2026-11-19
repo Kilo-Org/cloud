@@ -392,6 +392,9 @@ export async function resolveProviderAndPolicy(
     }
   }
 
+  // Direct BYOK routes drop the provider object before the request leaves, so Kilo neither
+  // verifies nor enforces `zdr` or prompt retention at an organization's private provider, even
+  // when it serves a catalog id.
   const dataCollectionRejected = await dataCollectionPolicyRejection(model, request.body.provider);
   if (dataCollectionRejected) return reject(dataCollectionRejected);
 

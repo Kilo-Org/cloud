@@ -258,8 +258,7 @@ describe('guarded settings ask the person first', () => {
     const report = await Effect.runPromise(settingsService().write(name, false));
 
     expect(confirmSettingChange).toHaveBeenCalledTimes(1);
-    expect(confirmSettingChange.mock.calls[0]?.[0]).toEqual(expect.any(String));
-    expect(confirmSettingChange.mock.calls[0]?.[0]).not.toBe('');
+    expect(confirmSettingChange.mock.calls[0]?.[0]).toContain(`Change "${name}" to false.`);
     expect(notificationMutation.mutate).toHaveBeenCalledWith(mutation);
     expect(report).toContain(name);
     expect(report).toContain('false');
@@ -300,6 +299,7 @@ describe('guarded settings ask the person first', () => {
     const report = await Effect.runPromise(effect);
 
     expect(confirmSettingChange).toHaveBeenCalledTimes(1);
+    expect(confirmSettingChange.mock.calls[0]?.[0]).toContain('Change "hideBalance" to true.');
     expect(report).toContain('hideBalance');
     expect(Effect.runSync(settingsService().read('hideBalance'))).toBe(true);
   });

@@ -42,7 +42,9 @@ const GUARDED_CHANGES = [
 /**
  * The dialog body to show before writing this change, or nothing when the
  * change does not need one. Value-triggered: only the guarded direction of a
- * guarded setting returns a summary.
+ * guarded setting returns a summary. The body opens with the setting's name and
+ * the value it would take — the same opening the destructive list uses — so the
+ * dialog always says exactly what is being asked.
  */
 export function guardedChangeSummary(name: string, value: unknown): string | undefined {
   const guarded = GUARDED_CHANGES.find(change => change.name === name);
@@ -50,7 +52,11 @@ export function guardedChangeSummary(name: string, value: unknown): string | und
     return undefined;
   }
   const guardedValue = guarded.direction === 'on';
-  return value === guardedValue ? i18n.t(guarded.summaryKey) : undefined;
+  if (value !== guardedValue) {
+    return undefined;
+  }
+  const ask = `Change "${name}" to ${String(value)}.`;
+  return `${ask} ${i18n.t(guarded.summaryKey)}`;
 }
 
 /**

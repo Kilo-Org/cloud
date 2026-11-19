@@ -2399,14 +2399,9 @@ describe('a headless session_live_update push', () => {
       completed = true;
     })();
 
-    await vi.waitFor(
-      () => {
-        expect(sessionPush.applySessionLiveUpdate).toHaveBeenCalled();
-      },
-      // The headless preparation reads the Live Activity switch through one
-      // null-retrying budget (250 + 500 + 1000 ms) before the push is applied.
-      { timeout: 5000 }
-    );
+    await vi.waitFor(() => {
+      expect(sessionPush.applySessionLiveUpdate).toHaveBeenCalled();
+    });
     expect(completed).toBe(false);
     expect(sessionPush.releaseAndroidSessionToken).not.toHaveBeenCalled();
     release.resolve(true);
@@ -2966,16 +2961,7 @@ describe('cold iOS background delivery', () => {
     const { getLiveActivityEnabled, isLiveActivityPreferenceKnown } =
       await import('@/lib/glanceable/live-activity-switch');
 
-    expect(
-      await (async () => {
-        // The switch read retries an absent (null) value on 250/500/1000 ms
-        // backoff before the canary write proves the absence; fake timers must
-        // fire that schedule while the delivery runs.
-        const pending = background.deliverPrepared({});
-        await vi.advanceTimersByTimeAsync(2000);
-        return pending;
-      })()
-    ).toBe(0);
+    expect(await background.deliverPrepared({})).toBe(0);
     await vi.advanceTimersByTimeAsync(0);
 
     expect(isLiveActivityPreferenceKnown()).toBe(true);

@@ -77,24 +77,17 @@ describe('stored Live Activity preference read', () => {
     await expect(readStoredLiveActivityEnabled()).resolves.toBeNull();
   });
 
-  it('retries a spoofed null before reading the stored switch', async () => {
-    vi.useFakeTimers();
-    try {
-      // Two nulls, then the real value: the retry budget must not accept the
-      // first null as an absence even though the canary write would land.
-      getItemAsync
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null)
-        .mockResolvedValue('false');
+  it('reads a null on an answering keychain as the shipped default on without retrying', async () => {
+    // A null read spends no retry budget, so the canary write decides it is an
+    // absence and the shipped default on applies.
+    getItemAsync.mockResolvedValue(null);
 
-      const read = readStoredLiveActivityEnabled();
-      await vi.advanceTimersByTimeAsync(2000);
-
-      await expect(read).resolves.toBe(false);
-      expect(getItemAsync).toHaveBeenCalledTimes(3);
-    } finally {
-      vi.useRealTimers();
-    }
+    await expect(readStoredLiveActivityEnabled()).resolves.toBe(true);
+    expect(getItemAsync).toHaveBeenCalledTimes(1);
+    expect(setItemAsync).toHaveBeenCalledWith(
+      WIDGET_STORE_UNLOCK_CANARY.key,
+      WIDGET_STORE_UNLOCK_CANARY.value
+    );
   });
 
   it('leaves the preference unknown when every read attempt rejects', async () => {

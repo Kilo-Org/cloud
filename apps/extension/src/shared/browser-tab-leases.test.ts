@@ -5,7 +5,11 @@ import {
   createStorageSessionLeasePersistence,
   createTabLeaseRegistry,
 } from './browser-tab-leases';
-import type { PersistedTabLease, TabLeasePersistence } from './browser-tab-leases';
+import type {
+  PersistedTabLease,
+  PersistedTabLeases,
+  TabLeasePersistence,
+} from './browser-tab-leases';
 import type { BrowserCaller } from './browser-caller';
 
 const panel = (conversationId: string): BrowserCaller => ({
@@ -25,21 +29,17 @@ const workflow = (runId: string): BrowserCaller => ({ kind: 'workflow', runId })
 const createPersistence = (
   initial: PersistedTabLease[] = []
 ): TabLeasePersistence & {
-  readonly stored: () => unknown;
-  readonly writes: () => readonly unknown[];
+  readonly stored: () => PersistedTabLeases;
 } => {
-  let stored: PersistedTabLease[] = initial;
-  const writes: unknown[] = [];
+  let stored: PersistedTabLeases = { leases: initial, owedTaken: [] };
 
   return {
     read: () => Promise.resolve(stored),
     stored: () => stored,
-    write: leases => {
-      stored = [...leases];
-      writes.push(leases);
+    write: snapshot => {
+      stored = snapshot;
       return Promise.resolve();
     },
-    writes: () => writes,
   };
 };
 
@@ -178,7 +178,7 @@ describe('tab leases', () => {
 
   it('does not resurrect a lease a dispose released while the initial read was in flight', async () => {
     const { promise: readLeases, resolve: resolveRead } = Promise.withResolvers<
-      PersistedTabLease[] | undefined
+      PersistedTabLeases | undefined
     >();
     const leases = createTabLeaseRegistry({
       persistence: {
@@ -192,7 +192,7 @@ describe('tab leases', () => {
     // The worker restart's read is still pending; the agent session closes in the meantime.
     expect(leases.releaseCaller(agent('session-1'))).toBe(0);
 
-    resolveRead([stored]);
+    resolveRead({ leases: [stored], owedTaken: [] });
 
     // The tab is free: the released lease must not come back as a phantom owner.
     await expect(first).resolves.toStrictEqual({ kind: 'granted' });
@@ -344,6 +344,66 @@ describe('tab leases', () => {
     ).resolves.toStrictEqual({ kind: 'granted' });
   });
 
+  it('keeps an owed tab_taken across a service-worker restart', async () => {
+    const persistence = createPersistence();
+    const owner = { sessionHandle: 'session-1' };
+    const before = createTabLeaseRegistry({ persistence });
+
+    await before.acquire(7, panel('conversation-1'), { owner, takeOver: true });
+    before.releaseCaller(panel('conversation-1'));
+    await before.flush();
+
+    // The idle worker was evicted while the model was thinking; the session's next call wakes a fresh one.
+    const after = createTabLeaseRegistry({ persistence });
+
+    await expect(after.acquire(7, agent('session-1'), { owner })).resolves.toStrictEqual({
+      kind: 'taken',
+    });
+    await after.flush();
+    expect(persistence.stored()).toStrictEqual({ leases: [], owedTaken: [] });
+  });
+
+  it('persists a release that lands while the grant before it is still being written', async () => {
+    const persistence = createPersistence();
+    const leases = createTabLeaseRegistry({ persistence });
+    const owner = panel('conversation-1');
+
+    await leases.acquire(7, owner);
+    leases.releaseCaller(owner);
+    await leases.flush();
+
+    // A dropped write would bring the released lease back after a worker restart and park every other caller.
+    expect(persistence.stored()).toStrictEqual({ leases: [], owedTaken: [] });
+  });
+
+  it('drops the owed tab_taken once one of the session calls is granted the tab', async () => {
+    const leases = createTabLeaseRegistry({});
+    const owner = { sessionHandle: 'session-1' };
+
+    await leases.acquire(7, panel('conversation-1'), { owner, takeOver: true });
+    leases.releaseCaller(panel('conversation-1'));
+
+    // A step of a call drives the tab without naming its owner; the session holds it from then on.
+    await expect(leases.acquire(7, agent('session-1'))).resolves.toStrictEqual({
+      kind: 'granted',
+    });
+    leases.release(7, agent('session-1'));
+
+    await expect(leases.acquire(7, agent('session-1'), { owner })).resolves.toStrictEqual({
+      kind: 'granted',
+    });
+  });
+
+  it('names the session whose call holds the tab, not the group the tab moved to', async () => {
+    const leases = createTabLeaseRegistry({});
+
+    await leases.acquire(7, agent('session-1'));
+
+    await expect(
+      leases.acquire(7, panel('conversation-1'), { owner: { sessionHandle: 'session-2' } })
+    ).resolves.toStrictEqual({ kind: 'needs_take_over', owner: { sessionHandle: 'session-1' } });
+  });
+
   it('does not let a panel take a tab from another panel or a workflow', async () => {
     vi.useFakeTimers();
     const leases = createTabLeaseRegistry({});
@@ -431,12 +491,15 @@ describe('tab leases', () => {
     await leases.acquire(7, owner, { title: 'Panel' });
     await leases.flush();
 
-    expect(persistence.stored()).toStrictEqual([{ caller: owner, tabId: 7, title: 'Panel' }]);
+    expect(persistence.stored()).toStrictEqual({
+      leases: [{ caller: owner, tabId: 7, title: 'Panel' }],
+      owedTaken: [],
+    });
 
     leases.release(7, owner);
     await leases.flush();
 
-    expect(persistence.stored()).toStrictEqual([]);
+    expect(persistence.stored()).toStrictEqual({ leases: [], owedTaken: [] });
   });
 
   it('ignores a malformed persisted record instead of blocking the tab', async () => {

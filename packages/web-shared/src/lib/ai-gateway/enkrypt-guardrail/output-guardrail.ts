@@ -32,6 +32,7 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getOutputHeaders } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { KEEP_ALIVE_COMMENT } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse.shared';
 import { ENKRYPT_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
@@ -77,9 +78,6 @@ const outputTooLarge: OutputScanResult = {
 function isTooLargeToScan(text: string): boolean {
   return text.length > ENKRYPT_MAX_SCAN_CHARACTERS;
 }
-
-/** The comment the response rewrite already sends for upstream keep-alives. */
-const KEEP_ALIVE_COMMENT = ': KILO PROCESSING\n\n';
 
 /**
  * Clients and proxies time out a response that sends nothing for minutes, while generation alone

@@ -259,6 +259,7 @@ export {
   redactProviderHints,
   detectRequiredInputModalities,
   estimateRoutingTokens,
+  PROMPT_WALK_MAX_DEPTH,
   type ClassifierApiKind,
 } from './normalize';
 

@@ -75,6 +75,15 @@ export const AGENT_CHANNEL_SPLIT_APP_VERSION = '1.0.12';
 export const AGENT_BRIEFING_CHANNEL_APP_VERSION = '1.0.16';
 
 /**
+ * The first mobile version whose every build creates
+ * `followed-sessions-lock-screen`. Builds of `1.0.14` shipped both without it
+ * (release tags from before the channel existed) and with it, so a lower
+ * version must not be addressed with the id (see
+ * `androidChannelIdForPushDataToAppVersion`).
+ */
+export const FOLLOWED_SESSIONS_LOCK_SCREEN_APP_VERSION = '1.0.15';
+
+/**
  * The minimum app version that creates each channel, or `undefined` when every
  * build creates it. Total over the channel ids, so a channel added to
  * `ANDROID_NOTIFICATION_CHANNELS` fails typecheck here until this map
@@ -86,7 +95,7 @@ const ANDROID_CHANNEL_MIN_APP_VERSIONS: Record<AndroidNotificationChannelId, str
   'agent-briefing': AGENT_BRIEFING_CHANNEL_APP_VERSION,
   balance: undefined,
   security: undefined,
-  'followed-sessions-lock-screen': undefined,
+  'followed-sessions-lock-screen': FOLLOWED_SESSIONS_LOCK_SCREEN_APP_VERSION,
 };
 
 /** A channel a server push may address, including pre-split channel ids. */
@@ -117,6 +126,11 @@ export function androidChannelIdForPushDataToAppVersion(
       return LEGACY_ACTIVE_AGENTS_ANDROID_CHANNEL_ID;
     case 'agent_briefing':
       return androidChannelIdForRegisteredClient(BRIEFING_FALLBACK_CHANNEL_ID, appVersion);
+    case 'session_live_update':
+      // No released build ever created a followed-sessions channel, so there
+      // is no legacy id to redirect to. The push is data-only: the caller omits
+      // `channelId` and the client draws its own card.
+      return undefined;
     default:
       return undefined;
   }

@@ -3,13 +3,14 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { type ChatComposerControl } from '@/components/agents/chat-composer';
 import {
+  CHAT_RESPONSE_DELIVERY_REASON,
   CREDITS_DELIVERY_REASON,
   type MessageDeliveryStatement,
 } from '@/components/agents/message-failure-state';
 import { CREDITS_FAILURE_KEY } from '@/lib/chat/backend-target';
 import { type AddCreditsDestination } from '@/lib/credits/add-credits-destination';
 import { type ChatState, type Displaced } from '@/lib/chat/state';
-import { askedMessageId, displacedMessageId } from '@/lib/chat/turns';
+import { askedMessageId, displacedMessageId, stoppedAnswerMessageId } from '@/lib/chat/turns';
 
 /**
  * The bubble the slot's question is drawn as: its own, or the kept one it asks
@@ -28,6 +29,36 @@ function slotBubbleId(
     return askedMessageId(state.sessionId);
   }
   return displacedMessageId(state.sessionId, from);
+}
+
+/**
+ * The bubble a question's recovery hangs off: the words its stopped answer had
+ * reached when there are any, so the stop is stated under what it stopped and
+ * not between the question and its words, and the question itself otherwise.
+ */
+const recoveryHost = (questionId: string, answer: string | null | undefined): string =>
+  answer == null ? questionId : stoppedAnswerMessageId(questionId);
+
+/**
+ * What a question's bubble states about an answer that did not come, from the
+ * fixed copy key of its failure: null is a question the person stopped. The
+ * bubble names the cause itself — a send the balance refused, a lost
+ * connection — so the failure is stated once, where it happened. The generic
+ * key adds nothing to the bubble's own title, so it brings no second line.
+ */
+function failureStatement(failureKey: string | null | undefined): MessageDeliveryStatement {
+  if (failureKey == null) {
+    return { status: 'failed', error: '', reason: 'interrupted' };
+  }
+  if (failureKey === CREDITS_FAILURE_KEY) {
+    return { status: 'failed', error: '', reason: CREDITS_DELIVERY_REASON };
+  }
+  return {
+    status: 'failed',
+    error: '',
+    reason: CHAT_RESPONSE_DELIVERY_REASON,
+    detailKey: failureKey === 'common.somethingWentWrong' ? null : failureKey,
+  };
 }
 
 /**
@@ -74,7 +105,14 @@ type BubbleActions = {
 export function useChatMessageActions(
   state: Pick<
     ChatState,
-    'sessionId' | 'status' | 'asked' | 'askedFrom' | 'displaced' | 'waiting' | 'failureKey'
+    | 'sessionId'
+    | 'status'
+    | 'asked'
+    | 'askedFrom'
+    | 'askedAnswer'
+    | 'displaced'
+    | 'waiting'
+    | 'failureKey'
   >,
   messages: readonly StoredMessage[],
   recovery: {
@@ -85,45 +123,34 @@ export function useChatMessageActions(
   const { retry, addCredits } = recovery;
   const composerControlRef = useRef<ChatComposerControl | null>(null);
   const [detailsId, setDetailsId] = useState<string | null>(null);
-  const unanswered = slotBubbleId(state);
-  // A question whose answer failed says so, and the row under the transcript
-  // says why. A question with no failure was stopped, and one the balance
-  // refused states that cause instead of a generic failure.
-  const stopped = state.failureKey === null;
+  const slotQuestion = slotBubbleId(state);
+  const unanswered =
+    slotQuestion === undefined ? undefined : recoveryHost(slotQuestion, state.askedAnswer);
+  // A question whose answer failed states why on its bubble. A question with no
+  // failure was stopped, and one the balance refused offers Add credits.
   const credits = state.failureKey === CREDITS_FAILURE_KEY;
-  const delivery = useMemo<MessageDeliveryStatement>(() => {
-    if (stopped) {
-      return { status: 'failed', error: '', reason: 'interrupted' };
-    }
-    return {
-      status: 'failed',
-      error: '',
-      reason: credits ? CREDITS_DELIVERY_REASON : 'execution',
-    };
-  }, [credits, stopped]);
-  /* Each kept question with how it ended, by the identifier its bubble carries.
-     A failed answer says the response failed; a question the person stopped
-     reads as interrupted, as the slot's own question does while it holds it.
-     The cause it failed with travels with it, so a send the balance refused
-     keeps its statement and its Add credits where it was said. */
+  const delivery = useMemo(() => failureStatement(state.failureKey), [state.failureKey]);
+  /* Each kept question with how it ended, by the identifier of the bubble its
+     recovery hangs off. A question the person stopped reads as interrupted, as
+     the slot's own question does while it holds it. The cause it failed with
+     travels with it, so a send the balance refused keeps its statement and its
+     Add credits where it was said. A question kept before its outcome was
+     recorded failed, with no cause to name. */
   const kept = useMemo(
     () =>
       new Map(
-        state.displaced.map(question => {
-          const refused = question.failureKey === CREDITS_FAILURE_KEY;
-          const statement: MessageDeliveryStatement =
-            question.outcome === 'failed'
-              ? {
-                  status: 'failed',
-                  error: '',
-                  reason: refused ? CREDITS_DELIVERY_REASON : 'execution',
-                }
-              : { status: 'failed', error: '', reason: 'interrupted' };
-          return [
-            displacedMessageId(state.sessionId, question.id),
-            { question, refused, statement },
-          ];
-        })
+        state.displaced.map(question => [
+          recoveryHost(displacedMessageId(state.sessionId, question.id), question.answer),
+          {
+            question,
+            refused: question.failureKey === CREDITS_FAILURE_KEY,
+            statement: failureStatement(
+              question.outcome === 'failed'
+                ? (question.failureKey ?? 'common.somethingWentWrong')
+                : null
+            ),
+          },
+        ])
       ),
     [state.displaced, state.sessionId]
   );

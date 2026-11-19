@@ -10,9 +10,9 @@ import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { QueryError } from '@/components/query-error';
 import { ChoiceRow } from '@/components/ui/choice-row';
-import { Mic, Search, SearchX } from '@/components/ui/icons';
-import { Input } from '@/components/ui/input';
+import { Mic, SearchX } from '@/components/ui/icons';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { SearchField } from '@/components/ui/search-field';
 import { foldForSearch } from '@/i18n/fold-for-search';
 import { languageRows } from '@/i18n/language-rows';
 import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
@@ -245,7 +245,6 @@ function DeviceVoiceLanguages({
 export function VoiceLanguagePickerSheet() {
   const { t } = useTranslation();
   const router = useRouter();
-  const colors = useThemeColors();
   const { gatewayTranscriptionEnabled, hasLoaded: gatewayTranscriptionLoaded } =
     useGatewayTranscriptionPreference();
   const chosen = useVoiceInputLanguage();
@@ -314,29 +313,14 @@ export function VoiceLanguagePickerSheet() {
       }}
       scrollable={false}
       headerContent={
-        // Same filled pill as the account language picker and the repository
-        // and share pickers: one search-field shape for the same control. The
-        // field itself is the shared single-line `Input`, so the pill owns only
-        // the chrome while the field owns the height floor, the one line box for
-        // the placeholder and the value, and the RTL content alignment.
-        <View className="mx-4 mb-3 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
-          <Search size={18} color={colors.mutedForeground} />
-          <Input
-            accessibilityLabel={t('language.search')}
-            // The pill supplies the horizontal inset, so the field zeroes both
-            // physical sides of the shared box.
-            className="flex-1 pl-0 pr-0 text-base text-foreground"
-            placeholder={t('language.search')}
-            placeholderTextColor={colors.mutedForeground}
-            // Uncontrolled: iOS drops keystrokes when state drives `value`;
-            // `onChangeText` only feeds the filter.
-            onChangeText={setQuery}
-            autoCapitalize="none"
-            autoCorrect={false}
-            clearButtonMode="while-editing"
-            returnKeyType="search"
-          />
-        </View>
+        // Uncontrolled: iOS drops keystrokes when state drives `value`;
+        // `onChangeText` only feeds the filter.
+        <SearchField
+          className="mx-4 my-3"
+          placeholder={t('language.search')}
+          hasText={query !== ''}
+          onChangeText={setQuery}
+        />
       }
     >
       {content}

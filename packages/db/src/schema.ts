@@ -7261,10 +7261,13 @@ export type NewCloudAgentSession = typeof cloud_agent_sessions.$inferInsert;
  * Pending-upload ledger for cloud agent attachments. An uploader admits a row
  * in status 'pending' before its R2 write (the presigned composer path and the
  * Kilo Bot upload path); send-time finalization flips the matching rows to
- * 'linked' in one transaction; a cron reaper deletes the R2 objects behind
- * abandoned 'pending' rows whose lease has expired and records them as
- * 'reaped'. kilo_user_id is text() because user IDs are not always UUIDs
- * (OAuth users).
+ * 'linked' in one transaction. A client release claims its own 'pending' rows
+ * as 'released', which keeps the object key until the presigned-URL TTL passes
+ * so a late PUT is still attributable; a released row counts against neither
+ * the per-message nor the per-account ceiling. A cron reaper deletes the R2
+ * objects behind every non-linked state, 'pending' and 'released', whose lease
+ * has expired, recording each claimed row as 'reaped'. kilo_user_id is text()
+ * because user IDs are not always UUIDs (OAuth users).
  */
 export const cloud_agent_pending_uploads = pgTable(
   'cloud_agent_pending_uploads',
@@ -7285,14 +7288,16 @@ export const cloud_agent_pending_uploads = pgTable(
       table.message_uuid,
       table.status
     ),
-    // The hourly reaper scans `status = 'pending' AND expires_at < now()`,
-    // which the composite index above cannot serve.
+    // The hourly reaper scans
+    // `status IN ('pending', 'released') AND expires_at < now()`, which the
+    // composite index above cannot serve.
     index('IDX_cloud_agent_pending_uploads_expired')
       .on(table.expires_at)
-      .where(sql`${table.status} = 'pending'`),
+      .concurrently()
+      .where(sql`${table.status} IN ('pending', 'released')`),
     check(
       'cloud_agent_pending_uploads_status_check',
-      sql`${table.status} IN ('pending', 'linked', 'reaped')`
+      sql`${table.status} IN ('pending', 'linked', 'released', 'reaped')`
     ),
   ]
 );
@@ -7828,8 +7833,9 @@ export const openai_chatgpt_connections = pgTable(
     /**
      * True for the organization's shared-services connection: one row per
      * organization, used by the platform's own callers (code reviewer, Slack
-     * bot) instead of any member's personal connection. The
-     * connecting person is recorded in `kilo_user_id` and `created_by`.
+     * bot) instead of any member's personal connection. The connecting person
+     * is recorded in `created_by`, and the organization's shared connection is
+     * revalidated against that person before it serves a request.
      */
     is_shared_services: boolean().default(false).notNull(),
     /**

@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import React, { act, createElement, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 
-import type { QuestionInfo } from '@/types/opencode.gen';
+import type { QuestionInfo } from '@/types/opencode';
 import type { QuestionToolCard as QuestionToolCardComponent } from './QuestionToolCard';
 import type { QuestionContextProvider as QuestionContextProviderComponent } from './QuestionContext';
 

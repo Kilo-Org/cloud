@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
+/* eslint-disable typescript-eslint/no-deprecated, max-lines -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom); the section's motion, class and surface contracts share one harness. */
 
 // Reduce-motion gate for the security-agent CollapsibleSection. When
 // `useMotionPolicy()` reports reduced motion the chevron must jump to its
@@ -14,6 +14,8 @@ import { type ComponentProps, type ElementType, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
+
+import { RowGroup } from '@/components/ui/row-group';
 
 import { CollapsibleSection, DisclosureChevron, DisclosureLayout } from './collapsible-section';
 
@@ -244,6 +246,15 @@ describe('CollapsibleSection controlled expanded state and class overrides', () 
       'flex-1 text-sm font-medium text-base font-semibold'
     );
     expect(animatedView(renderer, 'gap-3 pt-3 bg-card p-4 gap-3')).toBeDefined();
+  });
+
+  it('draws the body on the header surface only with bodyOnSurface', () => {
+    const bodyNodesInGroup = (bodyOnSurface: boolean) =>
+      mountSection({ expanded: true, bodyOnSurface })
+        .root.findByType(RowGroup)
+        .findAll(node => node.children.includes(SECTION_BODY)).length;
+    expect(bodyNodesInGroup(false)).toBe(0);
+    expect(bodyNodesInGroup(true)).toBeGreaterThan(0);
   });
 });
 

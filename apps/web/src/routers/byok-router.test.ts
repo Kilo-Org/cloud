@@ -14,7 +14,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
       actual.getOpenRouterModelsMetadataFromDatabase
     ),
     getVercelModelsMetadataFromDatabase: jest.fn(actual.getVercelModelsMetadataFromDatabase),
-    getVercelModelsFromDatabase: jest.fn(actual.getVercelModelsFromDatabase),
+    getVercelLanguageModelIdsFromDatabase: jest.fn(actual.getVercelLanguageModelIdsFromDatabase),
   };
 });
 
@@ -31,7 +31,7 @@ import { createCallerForUser } from '@/routers/test-utils';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   getOpenRouterModelsMetadataFromDatabase,
-  getVercelModelsFromDatabase,
+  getVercelLanguageModelIdsFromDatabase,
   getVercelModelsMetadataFromDatabase,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { getKiloEmbeddingModelCatalogFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/embeddings/openrouter-embedding-models';
@@ -1767,7 +1767,7 @@ describe('BYOK Router', () => {
       // the listSupportedModels test.
       beforeEach(() => {
         jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue({});
-        jest.mocked(getVercelModelsFromDatabase).mockResolvedValue(new Set());
+        jest.mocked(getVercelLanguageModelIdsFromDatabase).mockResolvedValue(new Set());
       });
 
       afterEach(() => {
@@ -1778,8 +1778,8 @@ describe('BYOK Router', () => {
           .mocked(getVercelModelsMetadataFromDatabase)
           .mockImplementation(actual.getVercelModelsMetadataFromDatabase);
         jest
-          .mocked(getVercelModelsFromDatabase)
-          .mockImplementation(actual.getVercelModelsFromDatabase);
+          .mocked(getVercelLanguageModelIdsFromDatabase)
+          .mockImplementation(actual.getVercelLanguageModelIdsFromDatabase);
       });
 
       async function createCatalogKey(
@@ -2177,7 +2177,7 @@ describe('BYOK Router', () => {
         };
         jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue(openRouterMetadata);
         jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue(vercelMetadata);
-        jest.mocked(getVercelModelsFromDatabase).mockResolvedValue(new Set());
+        jest.mocked(getVercelLanguageModelIdsFromDatabase).mockResolvedValue(new Set());
         jest.mocked(getKiloEmbeddingModelCatalogFromDatabase).mockResolvedValue({
           defaultModel: embedding.id,
           models: [embedding, { id: 'acme/embedding-free:free', name: 'Embedding Free' }],
@@ -2199,8 +2199,8 @@ describe('BYOK Router', () => {
           .mocked(getVercelModelsMetadataFromDatabase)
           .mockImplementation(actual.getVercelModelsMetadataFromDatabase);
         jest
-          .mocked(getVercelModelsFromDatabase)
-          .mockImplementation(actual.getVercelModelsFromDatabase);
+          .mocked(getVercelLanguageModelIdsFromDatabase)
+          .mockImplementation(actual.getVercelLanguageModelIdsFromDatabase);
         jest.mocked(getKiloEmbeddingModelCatalogFromDatabase).mockResolvedValue(null);
         jest.mocked(getOpenRouterTranscriptionModels).mockResolvedValue({ data: [] });
       });

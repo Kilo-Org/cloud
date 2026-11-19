@@ -629,7 +629,7 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     }
   );
 
-  it('renders the models error above the input', async () => {
+  it('keeps the toolbar and states no models error inside the composer', async () => {
     const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
     const element = renderPrompt({
       ...defaultProps(),
@@ -637,12 +637,9 @@ describe('NewSessionPrompt initialPrompt seed', () => {
       modelOptions: [],
     }) as Node;
 
-    const errorIndex = findFirstIndexByType(element, 'QueryError') ?? -1;
-    const inputIndex = findFirstIndexByType(element, 'TextInput') ?? -1;
-
-    expect(errorIndex).toBeGreaterThanOrEqual(0);
-    expect(inputIndex).toBeGreaterThanOrEqual(0);
-    expect(errorIndex).toBeLessThan(inputIndex);
+    // The pinned footer names the failed read and carries its Retry.
+    expect(findFirstIndexByType(element, 'QueryError')).toBeNull();
+    expect(findFirstIndexByType(element, 'ChatToolbar')).toBeGreaterThanOrEqual(0);
   });
 
   it('gives the input the three-line floor at a large font scale', async () => {

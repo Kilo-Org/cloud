@@ -111,7 +111,15 @@ export function backendFailureKey(error: unknown, model?: string): string {
   }
   // A remote model fails with no connection, and an on-device one does not.
   // Saying so tells the person what to change instead of only that it failed.
-  return onlineManager.isOnline() ? 'common.somethingWentWrong' : 'modelChat.offlineFailure';
+  if (!onlineManager.isOnline()) {
+    return 'modelChat.offlineFailure';
+  }
+  // The request or its stream broke underneath the answer. The device can
+  // still read as online for a moment after the network goes, so the transport
+  // itself is what names the connection here.
+  return error instanceof ModelError && error.reason === 'transport'
+    ? 'modelChat.connectionLost'
+    : 'common.somethingWentWrong';
 }
 
 type BackendTarget = {

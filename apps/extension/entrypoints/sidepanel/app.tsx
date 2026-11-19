@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { resetAnalyticsUser } from '@/src/shared/analytics';
 import {
-  clearStoredSession,
   getKiloApiBaseUrl,
   loadStoredAuth,
   saveStoredAuth,
@@ -94,8 +93,7 @@ export const App = (): JSX.Element => {
       }
 
       if (result.status === 'invalid') {
-        // Clear all account-scoped state (conversations, drafts, and cached agents data) like sign-out. Message returned below.
-        await clearStoredSession(storage);
+        // Clear account data (conversations, drafts, and cached agents data) like sign-out; local-agent settings stay. Message returned below.
         await clearAccountScopedState(queryClient);
         return { message: 'Your session expired. Sign in again.', status: 'signedOut' };
       }
@@ -164,9 +162,8 @@ export const App = (): JSX.Element => {
     void resetAnalyticsUser({ reason: 'explicit' });
     void (async (): Promise<void> => {
       try {
-        await clearStoredSession(storage);
-      } finally {
         await clearAccountScopedState(queryClient);
+      } finally {
         queryClient.setQueryData(storedAuthQueryKey, undefined);
         if (storedAuth !== undefined) {
           queryClient.setQueryData(getAuthValidationQueryKey(storedAuth.token), {

@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -14,7 +15,7 @@ import {
   KiloPassManagementSections,
   type KiloPassScheduledChange,
 } from '@/components/kilo-pass/kilo-pass-management';
-import { ScreenHeader } from '@/components/screen-header';
+import { SheetHeader } from '@/components/sheet-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Crown } from '@/components/ui/icons';
@@ -24,7 +25,7 @@ import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { SectionHeaderSkeleton } from '@/components/ui/section-header-skeleton';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useSheetHeaderTopClearance } from '@/lib/form-sheet';
+import { modalSheetSurfaceClass } from '@/lib/form-sheet';
 import {
   type KiloPassBillingHistory,
   type KiloPassCreditHistory,
@@ -36,32 +37,30 @@ import { getKiloPassDetailState, type KiloPassDetail } from '@/lib/kilo-pass/sta
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
 
 /**
  * The screen's frame: one header for every state, above the body it owns. The
- * route presents as a full-screen modal on Android, so the sheet edge reaches
- * the window top there and this frame clears the status-bar inset itself; the
- * iOS page sheet presents below the status bar, reserves nothing, and the
- * header keeps its own grabber clearance.
+ * route is a modal, so the header is the sheet header and its X closes the
+ * sheet. Android presents the modal full-window, so the header clears the
+ * status-bar inset itself there; the iOS page sheet presents below the status
+ * bar and the header reserves nothing.
  */
 function KiloPassFrame({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
-  const windowTopClearance = useSheetHeaderTopClearance('android-window-top');
-  const surfaceOwnsWindowTop = windowTopClearance > 0;
+  const router = useRouter();
+  const surfaceClass = modalSheetSurfaceClass();
   return (
-    <View className="flex-1 bg-background">
-      {/* `safeAreaTop` only draws the inset inside the header, so the surface
-          that owns the window top pads it here instead. */}
-      <View style={surfaceOwnsWindowTop ? { paddingTop: windowTopClearance } : undefined}>
-        <ScreenHeader
-          title={t('kiloPass.title')}
-          modal
-          centerTitle={false}
-          backIcon="back"
-          safeAreaTop={!surfaceOwnsWindowTop}
-          className={surfaceOwnsWindowTop ? 'pt-2' : undefined}
-        />
-      </View>
+    <View className={cn('flex-1', surfaceClass)}>
+      <SheetHeader
+        title={t('kiloPass.title')}
+        variant="close"
+        topInset="android-window-top"
+        surfaceClassName={surfaceClass}
+        onDone={() => {
+          router.back();
+        }}
+      />
       {children}
     </View>
   );

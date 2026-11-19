@@ -299,9 +299,14 @@ function assertAuthorityOrganization(
   }
 }
 
+export function cloudAgentNextProcedurePrefix(
+  authority: CloudAgentAuthority
+): 'cloudAgentNext' | 'organizations.cloudAgentNext' {
+  return authority.organizationId === null ? 'cloudAgentNext' : 'organizations.cloudAgentNext';
+}
+
 export function cloudAgentAuthorityProcedures(authority: CloudAgentAuthority): string[] {
-  const prefix =
-    authority.organizationId === null ? 'cloudAgentNext' : 'organizations.cloudAgentNext';
+  const prefix = cloudAgentNextProcedurePrefix(authority);
   return [
     ...Object.keys(scopedChildOperations).map(name => `${prefix}.${name}`),
     MODELS_LIST_PROCEDURE,
@@ -344,9 +349,7 @@ export function cloudAgentAuthorityInputSchema(
 }
 
 export function cloudAgentAuthorityProcedure(authority: CloudAgentAuthority) {
-  return authority.organizationId === null
-    ? 'cloudAgentNext.prepareSession'
-    : 'organizations.cloudAgentNext.prepareSession';
+  return `${cloudAgentNextProcedurePrefix(authority)}.prepareSession`;
 }
 
 export function validateCloudAgentAuthorityRequest(

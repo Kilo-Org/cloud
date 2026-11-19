@@ -237,7 +237,11 @@ export function ModelSelector({
     value,
     providerAware,
     fallbackLabel: t('common.model'),
+    notSelectedLabel: t('common.notSelected'),
   });
+  // With no model chosen the label is a placeholder, so it takes the muted ink
+  // the Repository field's "Not selected" does rather than a chosen value's.
+  const nothingChosen = value === '';
   const { byok, collectsData } = modelSelectorBadges(selectedModel);
   const hasVariants = selectedModel ? selectedModel.variants.length > 1 : false;
   const variantLabel = variant ? thinkingEffortLabel(variant) : '';
@@ -262,6 +266,8 @@ export function ModelSelector({
   // the picker can explain each model.
   const chipDisabled = disabled || pickerOptions.length === 0;
   const accessibilityLabel = [
+    // "Not selected" alone would not say what is not selected.
+    nothingChosen ? t('common.model') : undefined,
     spokenModel,
     selectedUnavailable ? t('agentChat.modelSelector.unavailable') : undefined,
     lockLabel && disabled
@@ -291,7 +297,13 @@ export function ModelSelector({
 
   const selectorBody = (
     <View className="min-w-0 shrink flex-row items-center gap-1.5">
-      <Text className="shrink text-sm font-medium text-foreground" numberOfLines={1}>
+      <Text
+        className={cn(
+          'shrink text-sm font-medium',
+          nothingChosen ? 'text-muted-foreground' : 'text-foreground'
+        )}
+        numberOfLines={1}
+      >
         {label}
       </Text>
       {byok ? (

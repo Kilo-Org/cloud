@@ -200,6 +200,17 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   const rows = generateReviewRows(user.id, count, Date.now());
   await insertInChunks(rows, chunk => db.insert(cloud_agent_code_reviews).values(chunk));
+  // The detail screen opens by review id, which the database assigns.
+  const [newest] = await db
+    .select({ id: cloud_agent_code_reviews.id })
+    .from(cloud_agent_code_reviews)
+    .where(
+      and(
+        eq(cloud_agent_code_reviews.owned_by_user_id, user.id),
+        eq(cloud_agent_code_reviews.repo_full_name, SEED_REPO_FULL_NAME),
+        eq(cloud_agent_code_reviews.pr_number, SEED_PR_NUMBER_BASE)
+      )
+    );
 
   const rerunCommand = `pnpm dev:seed code-reviews:review-list --email ${email} --count ${count}`;
 
@@ -224,6 +235,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     pageSize: 50,
     page2Count: Math.max(count - 50, 0),
     firstTitle: 'Seed review 0001',
+    newestReviewId: newest?.id ?? null,
     lastTitle: count > 0 ? `Seed review ${String(count).padStart(4, '0')}` : null,
     rerunCommand,
   };

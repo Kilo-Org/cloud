@@ -3,7 +3,9 @@ import type { OrganizationTrialStage } from './types';
 export const ORGANIZATION_TRIAL_DURATION_DAYS = 14;
 export const ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING = 8;
 
-const ORGANIZATION_TRIAL_ENDING_SOON_MAX_DAYS_REMAINING = 3;
+// `trial_ending_very_soon` covers 1..N days remaining and `trial_ending_soon` covers the days
+// above this ceiling up to ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING.
+const ORGANIZATION_TRIAL_VERY_SOON_MAX_DAYS_REMAINING = 3;
 const ORGANIZATION_TRIAL_SOFT_EXPIRY_GRACE_DAYS = 3;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -30,7 +32,7 @@ export function getOrgTrialStatusFromDays(daysRemaining: number): OrganizationTr
   if (daysRemaining >= ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING) {
     return 'trial_active';
   }
-  if (daysRemaining > ORGANIZATION_TRIAL_ENDING_SOON_MAX_DAYS_REMAINING) {
+  if (daysRemaining > ORGANIZATION_TRIAL_VERY_SOON_MAX_DAYS_REMAINING) {
     return 'trial_ending_soon';
   }
   if (daysRemaining > 0) {

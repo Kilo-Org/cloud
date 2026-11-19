@@ -40,6 +40,7 @@ import {
   readWithheldFrameBoxes,
   withheldFramesOf,
 } from './browser-agent-frames';
+import { recompressPngBase64 } from './browser-png';
 import { maskScreenshotDataUrl } from './browser-screenshot-masking';
 import type {
   ScreenshotBox,
@@ -692,6 +693,7 @@ const NO_SCROLL = { x: 0, y: 0 } as const;
 
 /** The masker re-encodes every masked image as PNG, so a masked capture reports that type. */
 const MASKED_SCREENSHOT_MEDIA_TYPE = 'image/png';
+const PNG_DATA_URL_PREFIX = 'data:image/png;base64,';
 
 const maskAgentScreenshot = async (
   deps: BrowserReadActionDeps,
@@ -1092,8 +1094,12 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
     `Screenshot captured (${type}, ${scope}).${filenameNote(filename)}`
   );
 
+  // The screencast frame and the masker's canvas both deflate a PNG for speed; deflating it again keeps every pixel.
+  const dataUrl = masked.dataUrl.startsWith(PNG_DATA_URL_PREFIX)
+    ? `${PNG_DATA_URL_PREFIX}${await recompressPngBase64(masked.dataUrl.slice(PNG_DATA_URL_PREFIX.length))}`
+    : masked.dataUrl;
   const value: BrowserToolScreenshotValue = {
-    dataUrl: masked.dataUrl,
+    dataUrl,
     mediaType: masked.mediaType,
     text,
   };

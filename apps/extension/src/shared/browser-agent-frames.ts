@@ -1174,6 +1174,10 @@ export const captureAgentSnapshotView = async (
     depth: options.depth,
     ...(options.rootFrameId === undefined ? {} : { rootFrameId: options.rootFrameId }),
   });
+  // The hidden-text filter only ever asks about the names these lines print, so the probe checks those and no other text.
+  const candidates = [
+    ...new Set(capture.lines.map(line => line.name.trim()).filter(name => name !== '')),
+  ];
   const hiddenText = new Set<string>();
   const sensitiveValues = new Set<string>();
 
@@ -1181,7 +1185,7 @@ export const captureAgentSnapshotView = async (
     const channel = frameChannel(session, capture.childSessions ?? new Map(), frameId);
 
     // eslint-disable-next-line no-await-in-loop -- one probe pair per frame; a frame probe is two CDP round trips
-    const hidden = await readFrameHiddenText({ send: channel.send }, frameId);
+    const hidden = await readFrameHiddenText({ send: channel.send }, frameId, candidates);
 
     for (const text of hidden) {
       hiddenText.add(text);

@@ -1,6 +1,8 @@
 /* eslint-disable id-length, jest/no-conditional-in-test, jest/max-expects, max-lines, require-await, sort-keys, typescript-eslint/no-base-to-string, typescript-eslint/no-unsafe-assignment, typescript-eslint/no-unsafe-type-assertion, typescript-eslint/require-await, unicorn/no-useless-undefined -- Fake CDP session returns verbatim responses for assertions; masked-output tests assert many unrelated fields at once. */
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { TAB_NOT_INSPECTABLE_ERROR } from './tab-debugger';
+import { pngScanlinesOf, writeRgbPng } from './browser-png-test-images';
 import {
   READ_BROWSER_TOOL_NAMES,
   isReadBrowserToolName,
@@ -388,6 +390,48 @@ describe('browser_take_screenshot', () => {
       dataUrl: 'data:image/png;base64,RlJFU0g=',
       mediaType: 'image/png',
     });
+  });
+
+  it('re-deflates the forced frame for size without changing its scanlines', async () => {
+    const png = writeRgbPng({ level: 0, size: { height: 120, width: 200 } });
+    const frame = Buffer.from(png).toString('base64');
+    const { session } = createSession({ freshFrame: frame });
+
+    const result = await runReadBrowserTool('browser_take_screenshot', { type: 'png' }, session);
+    const { dataUrl } = z
+      .object({ dataUrl: z.string() })
+      .parse(result.ok ? result.value : undefined);
+    const base64 = dataUrl.replace('data:image/png;base64,', '');
+
+    expect(base64.length).toBeGreaterThan(0);
+    expect(base64.length).toBeLessThan(frame.length);
+    expect(pngScanlinesOf(Buffer.from(base64, 'base64')).equals(pngScanlinesOf(png))).toBe(true);
+  });
+
+  it('re-deflates a masked image the masker encoded for speed', async () => {
+    const png = writeRgbPng({ level: 0, size: { height: 120, width: 200 } });
+    const masked = Buffer.from(png).toString('base64');
+    const { session } = createSession({
+      frameTree: FRAME_TREE_WITH_PAY,
+      freshFrame: 'RlJFU0g=',
+      layoutMetrics: {
+        cssLayoutViewport: { clientHeight: 120, clientWidth: 200 },
+        cssVisualViewport: { pageX: 0, pageY: 0 },
+        layoutViewport: { clientHeight: 120, clientWidth: 200 },
+      },
+    });
+
+    const result = await runReadBrowserTool('browser_take_screenshot', { type: 'png' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+      maskScreenshot: async () => ({ dataUrl: `data:image/png;base64,${masked}`, ok: true }),
+    });
+    const { dataUrl } = z
+      .object({ dataUrl: z.string() })
+      .parse(result.ok ? result.value : undefined);
+    const base64 = dataUrl.replace('data:image/png;base64,', '');
+
+    expect(base64.length).toBeLessThan(masked.length);
+    expect(pngScanlinesOf(Buffer.from(base64, 'base64')).equals(pngScanlinesOf(png))).toBe(true);
   });
 
   it('falls back to a plain capture when the tab cannot force a frame', async () => {

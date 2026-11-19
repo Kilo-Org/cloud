@@ -3422,8 +3422,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.initialized;
     const requested = cloudAgentWorktreeIdSchema.parse(worktreeId);
     if (this.registration === null) return;
-    if (this.metadata === null) return;
-    if (this.metadata.workspace?.worktreeId !== requested) {
+    if (this.metadata !== null && this.metadata.workspace?.worktreeId !== requested) {
       throw new Error('Worktree identity conflict');
     }
     await this.enqueue(async () => {

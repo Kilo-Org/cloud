@@ -1,4 +1,4 @@
-import { env, reset, runInDurableObject } from 'cloudflare:test';
+import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { sealRuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
@@ -773,6 +773,23 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
     await expect(stub.getMetadata()).resolves.not.toBeNull();
 
     await stub.finishWorktreeDeletion(worktree);
+    await expect(stub.getSession()).resolves.toEqual({ type: 'session-not-found' });
+  });
+
+  it('purges a registered session that stores no metadata', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId(sessionId);
+    const stub = await registerSession({
+      sessionId,
+      sandboxId,
+      kiloSessionId: kiloSessionId(),
+    });
+    await runInDurableObject(stub, (_instance, state) => state.storage.delete('session_metadata'));
+    await evictAllDurableObjects();
+
+    await expect(stub.getSession()).resolves.toMatchObject({ type: 'found' });
+    await stub.finishWorktreeDeletion(worktreeId());
+
     await expect(stub.getSession()).resolves.toEqual({ type: 'session-not-found' });
   });
 

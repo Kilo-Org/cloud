@@ -2793,7 +2793,7 @@ describe('turn finalization', () => {
       {
         type: 'error',
         properties: {
-          error: 'Finalization steps skipped: the agent is restarting',
+          error: 'Finalization steps skipped: Kilo runtime has not started',
           fatal: false,
         },
       },

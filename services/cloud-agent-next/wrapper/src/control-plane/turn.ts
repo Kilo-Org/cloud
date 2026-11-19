@@ -69,11 +69,18 @@ function hasNativeDrain(runtime: TurnKiloRuntime | undefined): boolean {
   }
 }
 
-function runtimeClient(runtime: TurnKiloRuntime | undefined): Harness | undefined {
+/** The runtime's client, or the reason its getter gave (`kilo-runtime.ts`). */
+function runtimeClient(runtime: TurnKiloRuntime | undefined): {
+  client: Harness | undefined;
+  unavailable: string | undefined;
+} {
   try {
-    return runtime?.client;
-  } catch {
-    return undefined;
+    return { client: runtime?.client, unavailable: undefined };
+  } catch (error) {
+    return {
+      client: undefined,
+      unavailable: error instanceof Error ? error.message : String(error),
+    };
   }
 }
 
@@ -913,14 +920,12 @@ export function createTurnManager(deps: TurnManagerDeps) {
       }, DEFAULT_CONDENSE_TIMEOUT_MS);
       emitEvents(sessionId, [{ type: CONTROL_PLANE_WRAPPER_FINALIZING_EVENT, properties: {} }]);
       const runtime = deps.runtimes.get(turn.route.runtimeKey);
-      const client = runtimeClient(runtime);
-      let skipped: string | undefined;
+      const { client, unavailable } = runtimeClient(runtime);
+      let skipped: string | undefined = runtime === undefined ? 'no runtime' : unavailable;
       try {
         if (client) {
           await runAutoCommitStep(turn, client, controller.signal);
           await runCondenseStep(turn, client, controller.signal);
-        } else if (runtime !== undefined) {
-          skipped = 'the agent is restarting';
         }
       } catch (error) {
         skipped = error instanceof Error ? error.message : String(error);

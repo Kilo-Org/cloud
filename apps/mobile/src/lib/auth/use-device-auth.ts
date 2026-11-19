@@ -14,7 +14,7 @@ import {
   idleDeviceAuthState,
   pendingDeviceAuthState,
 } from '@/lib/auth/device-auth-state';
-import { startDeviceAuthPoll } from '@/lib/auth/device-auth-poll';
+import { deviceAuthExpiresAt, startDeviceAuthPoll } from '@/lib/auth/device-auth-poll';
 import {
   clearPendingExternalAuth,
   readPendingExternalAuth,
@@ -117,7 +117,7 @@ export function useDeviceAuth(): DeviceAuthResult {
         setState,
         cleanup,
         browserKind: resolveAuthBrowserKind(record.verificationUrl),
-        startedAt: record.startedAt,
+        expiresAt: record.expiresAt,
       });
     }
 
@@ -205,6 +205,7 @@ export function useDeviceAuth(): DeviceAuthResult {
         }
 
         const { userCode, deviceCode } = data;
+        const expiresAt = deviceAuthExpiresAt(Date.now(), data.expiresIn);
 
         deviceCodeReference.current = deviceCode;
 
@@ -229,7 +230,7 @@ export function useDeviceAuth(): DeviceAuthResult {
           deviceCode,
           userCode,
           verificationUrl: browserUrl,
-          startedAt: Date.now(),
+          expiresAt,
         });
 
         setState(pendingDeviceAuthState(userCode, browserUrl));
@@ -246,6 +247,7 @@ export function useDeviceAuth(): DeviceAuthResult {
           // which API opened it: the plain browser on a non-product host (or on
           // Android) needs its own dismissal.
           browserKind: resolveAuthBrowserKind(browserUrl),
+          expiresAt,
         });
 
         await openAuthBrowser(browserUrl);

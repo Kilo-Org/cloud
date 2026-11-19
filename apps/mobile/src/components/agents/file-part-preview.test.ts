@@ -115,9 +115,13 @@ describe('getFilePartAccessibilityLabel', () => {
   });
 
   it('falls back to File when filename is undefined', () => {
-    expect(getFilePartAccessibilityLabel('image', undefined)).toBe('Open File full screen');
     expect(getFilePartAccessibilityLabel('markdown', undefined)).toBe('Preview File');
     expect(getFilePartAccessibilityLabel('other', undefined)).toBe('Open File');
+  });
+
+  it('names an image with no filename as an image', () => {
+    expect(getFilePartAccessibilityLabel('image', undefined)).toBe('View image');
+    expect(getFilePartAccessibilityLabel('image', '  ')).toBe('View image');
   });
 
   it('falls back to File when filename is blank', () => {

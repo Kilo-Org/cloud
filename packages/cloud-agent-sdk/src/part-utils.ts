@@ -148,8 +148,15 @@ export function normalizeMissingPartText(part: Part): Part {
  * (`services/cloud-agent-next/src/shared/ingest-frame.ts` `compactMessagePart`),
  * so a replayed terminal can arrive with no time. Either case carries no
  * ordering evidence.
+ *
+ * The caller's `part` is not guaranteed to be a part at all: a replay hands a
+ * stored page's rows to readers with no event schema in front of them, so a
+ * page can carry a null entry or a value with no `type`. Such a value carries
+ * no ordering evidence either. It is read defensively here, so the report that
+ * follows belongs to the replay's per-event boundary rather than escaping it.
  */
 export function partSettledAt(part: Part): number | undefined {
+  if (typeof part !== 'object' || part === null) return undefined;
   if (part.type !== 'tool') return undefined;
   const state = toolStateOf(part);
   if (state === null) return undefined;

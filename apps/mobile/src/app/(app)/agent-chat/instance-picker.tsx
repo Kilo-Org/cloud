@@ -11,16 +11,20 @@ import { useTranslation } from 'react-i18next';
 import { EmptyState, StateAction } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { ChoiceRow } from '@/components/ui/choice-row';
+import { InlineCodeText } from '@/components/ui/inline-code-text';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
-import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { formatList } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { instancePickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
-import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
+import {
+  useDetailScreenBottomPadding,
+  useSideInsetMarginStyle,
+  useSideInsetStyle,
+} from '@/lib/screen-insets';
 import { resolveLiveInstance } from '@/lib/resolve-live-instance';
 import {
   type InstancePickerListItem,
@@ -51,6 +55,8 @@ export default function InstancePickerScreen() {
   // that report a zero bottom inset still keep the bottom action visible and
   // tappable.
   const bottomClearance = useDetailScreenBottomPadding();
+  const sideInsetStyle = useSideInsetStyle();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const [bridge, setBridge] = useState(() => instancePickerSlot.get(UNFENCED_ROUTE_KEY));
   const bridgeRef = useRef(bridge);
   useRouteRegistry(UNFENCED_ROUTE_KEY);
@@ -245,7 +251,10 @@ export default function InstancePickerScreen() {
         onCancel={closePicker}
         scrollable={false}
       >
-        <View className="bg-background" style={{ paddingBottom: bottomClearance }}>
+        <View
+          className="bg-background"
+          style={{ paddingBottom: bottomClearance, ...sideInsetStyle }}
+        >
           {Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => (
             <RowSkeleton key={i} subtitle />
           ))}
@@ -302,7 +311,7 @@ export default function InstancePickerScreen() {
           group name live on the FlashList container instead of a wrapper. */}
       <FlashList<InstancePickerListItem>
         nestedScrollEnabled
-        style={[listStyle, { backgroundColor: colors.background }]}
+        style={[listStyle, { backgroundColor: colors.background }, sideInsetMarginStyle]}
         accessibilityRole="radiogroup"
         accessibilityLabel={t('agentChat.instancePicker.runOn')}
         data={listItems}
@@ -354,9 +363,14 @@ export default function InstancePickerScreen() {
               inset="gutter"
               compact
               title={t('agentChat.instancePicker.noCliInstances')}
-              description={stripInlineCodeMarkers(
-                t('agentChat.instancePicker.noCliInstancesDescription')
-              )}
+              description={
+                <InlineCodeText
+                  variant="muted"
+                  className="text-center"
+                  codeClassName="text-muted-foreground"
+                  value={t('agentChat.instancePicker.noCliInstancesDescription')}
+                />
+              }
               action={
                 <StateAction
                   label={t('common.refresh')}

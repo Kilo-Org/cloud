@@ -1496,7 +1496,7 @@ describe('MarkdownText streaming conversion tail', () => {
 describe('MarkdownText document direction', () => {
   const value = '# Heading\n\nBody text\n\n- one\n- two';
 
-  it('aligns chat blocks with a right-to-left interface and marks its list items', async () => {
+  it('leaves chat blocks their own direction and marks its list items', async () => {
     rnStub.I18nManager.isRTL = true;
     // Only Android resolves a list item from its own first strong character.
     rnStub.Platform.OS = 'android';
@@ -1504,8 +1504,11 @@ describe('MarkdownText document direction', () => {
       const renderer = await mount(<MarkdownText value={value} />);
       const props = enrichedProps(renderer);
 
-      expect(props.markdownStyle.paragraph.textAlign).toBe('right');
-      expect(props.markdownStyle.h1).toMatchObject({ textAlign: 'right' });
+      // Chat is copy the app did not write, so each paragraph resolves from its
+      // own first strong character: an English reply keeps its left edge and
+      // the punctuation that ends it inside an Arabic interface.
+      expect(props.markdownStyle.paragraph).not.toHaveProperty('textAlign');
+      expect(props.markdownStyle.h1).not.toHaveProperty('textAlign');
       // `rtlListItems` names the start edge and isolates the item's own text.
       expect(props.markdown).toContain('\u200F\u2068one\u2069');
     } finally {

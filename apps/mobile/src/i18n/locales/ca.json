@@ -148,6 +148,7 @@
     "performance": "Rendiment",
     "preferences": "Preferències",
     "privacyPolicy": "Política de privadesa",
+    "termsOfService": "Condicions del servei",
     "profile": "Perfil",
     "reactions": "Reaccions",
     "recent": "Recents",
@@ -171,6 +172,7 @@
     "generating": "Generant…",
     "working": "En curs",
     "yourOwnRepositories": "Els teus repositoris",
+    "organizationRepositories": "Repositoris de l'organització",
     "dismissed": "Descartat",
     "agent": "Agent",
     "durationMinuteShort": "min",
@@ -217,8 +219,8 @@
     "verifyCode": "Verifica el codi",
     "resendCode": "Torna a enviar el codi",
     "termsPrefix": "En continuar, acceptes les nostres ",
+    "termsInSentence": "Condicions del servei",
     "terms": "Condicions d'ús",
-    "termsInSentence": "Condicions d'ús",
     "termsConnector": " i ",
     "termsSuffix": ".",
     "moreSignInOptions": "Més opcions d'inici de sessió",
@@ -773,7 +775,6 @@
       "replyPlaceholder": "La teva resposta…",
       "replyBody": "Text de la resposta",
       "submitReply": "Envia la resposta",
-      "termsTitle": "Condicions del servei",
       "termsCopy": "Has de tenir 13 anys o més per publicar.",
       "termsAcceptRetry": "No s'han pogut acceptar les condicions. Comprova la connexió i torna-ho a provar.",
       "viewTerms": "Consulta les condicions",
@@ -1048,7 +1049,11 @@
     "tabs": {
       "overview": "Visió general",
       "files": "Fitxers",
-      "discussion": "Discussió"
+      "discussion": "Discussió",
+      "discussionAccessibility_one": "{{title}}: 1 comentari",
+      "discussionAccessibility": "{{title}}: {{displayCount}} comentaris",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} comentaris",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} comentaris"
     },
     "fileStatus": {
       "modified": "Modificat",
@@ -1155,16 +1160,16 @@
     },
     "category": {
       "agentAttentionTitle": "L'agent et necessita",
-      "agentAttentionSubtitle": "preguntes, permisos i sol·licituds d'informació",
+      "agentAttentionSubtitle": "Preguntes, permisos i sol·licituds d'informació",
       "agentUpdatesTitle": "Actualitzacions de l'agent",
-      "agentUpdatesSubtitle": "missatges de l'agent durant la tasca",
+      "agentUpdatesSubtitle": "Missatges de l'agent durant la tasca",
       "sessionStatusTitle": "Estat de la sessió",
-      "sessionStatusSubtitle": "finalitzada / fallida / a punt per controlar",
-      "balanceAlertsSubtitle": "avisos de saldo baix de l'organització",
+      "sessionStatusSubtitle": "Finalitzada / fallida / a punt per controlar",
+      "balanceAlertsSubtitle": "Avisos de saldo baix de l'organització",
       "balanceAlertsUnavailable": "Uneix-te a una organització per rebre avisos de saldo.",
-      "securityFindingsSubtitle": "noves deteccions i recordatoris d'SLA",
+      "securityFindingsSubtitle": "Noves deteccions i recordatoris d'SLA",
       "securityFindingsUnavailable": "Activa l'Agent de seguretat de Kilo en un àmbit per rebre deteccions de seguretat.",
-      "spendAlertsSubtitle": "superacions de llindars i pics horaris",
+      "spendAlertsSubtitle": "Superacions de llindars i pics horaris",
       "spendAlertsToggle": "Categoria d'alertes de despesa"
     },
     "history": {
@@ -1246,7 +1251,7 @@
     },
     "instructions": {
       "title": "Instruccions personalitzades",
-      "deprecation": "Està previst retirar les instruccions personalitzades. Trasllada aquestes pautes a un fitxer REVIEW.md del teu repositori.",
+      "deprecation": "Les instruccions personalitzades es retiraran. Trasllada aquestes pautes a un fitxer REVIEW.md del teu repositori.",
       "placeholder": "p. ex., aplica les nostres convencions de gestió d'errors…",
       "clearTitle": "Vols eliminar les instruccions personalitzades?",
       "clearMessage": "Si deses el camp buit, s'eliminaran les instruccions personalitzades emmagatzemades per a aquest revisor."
@@ -1412,6 +1417,7 @@
       "managedOnWeb": "La connexió de Bitbucket amb {{organization}} es gestiona al web des d'un ordinador.",
       "description": "Crea un testimoni d'accés a l'espai de treball per a {{organization}} i enganxa'l a continuació.",
       "descriptionReconnect": "Crea un testimoni nou d'accés a l'espai de treball per a {{organization}} i enganxa'l a continuació.",
+      "descriptionOverview": "Crea un testimoni d'accés a l'espai de treball per a {{organization}} i enganxa'l a la pantalla següent.",
       "scopes": "Compte: lectura · Repositoris: lectura/escriptura · Sol·licituds d'integració: lectura · Webhooks: lectura/escriptura.",
       "tokenPlaceholder": "Testimoni d'accés a l'espai de treball",
       "tokenRefused": "Bitbucket no ha acceptat aquest testimoni d'accés a l'espai de treball. Comprova que tingui els permisos indicats a dalt i torna-ho a provar."
@@ -3077,6 +3083,7 @@
     "noSessions": "No hi ha sessions actives",
     "noSessionsDescription": "Inicia la sessió a l'aplicació de Kilo en un altre dispositiu i apareixerà aquí.",
     "signedIn": "Inici de sessió: {{signedIn}} · Última activitat: {{lastSeen}}",
+    "signedInThisDevice": "Inici de sessió: {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "Aquí apareixen els inicis de sessió de l'aplicació de Kilo, del Kilo CLI i d'un navegador web. No es mostren els de l'editor.",
     "thisDevice": "Aquest dispositiu",
     "webBrowser": "Navegador web",
@@ -3240,6 +3247,8 @@
     "retryHint": "Torna a consultar l'estat de Kilo Pass.",
     "endedOn": "Finalitzat el {{date}}",
     "notAvailableInApp": "Kilo Pass no està disponible a l'aplicació.",
+    "notAvailableTitle": "Kilo Pass no és a l'aplicació",
+    "noPassDescription": "Aquest compte no té Kilo Pass.",
     "statusActive": "Actiu",
     "statusTrialing": "En prova",
     "statusPastDue": "Pagament vençut",
@@ -3522,7 +3531,7 @@
       "retentionLimit": "Es mostren les factures més recents."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Activa l'avís de saldo baix",
+      "subtitle": "Envia una alerta per correu a les adreces que indiquis quan el saldo d'aquesta organització baixi de l'import que estableixis.",
       "notifyEmailsLabel": "Adreces de correu per als avisos",
       "permissionDenied": "No tens permís per gestionar els avisos de facturació.",
       "separateEmailsHint": "Separa les adreces de correu electrònic amb comes.",
@@ -3598,6 +3607,7 @@
       "truncated": "Aquesta hora té més sol·licituds de les que mostra la llista.",
       "emptyTitle": "No hi ha sol·licituds en aquesta hora",
       "emptyDescription": "Utilitza «Hora anterior» per veure les sol·licituds anteriors.",
+      "emptyBoundDescription": "Els registres de sol·licituds no arriben més enrere.",
       "loadError": "No s'han pogut carregar els registres de sol·licituds.",
       "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització pot consultar-ne els registres de sol·licituds.",
       "tokens": "{{input}} d'entrada · {{output}} de sortida",
@@ -3669,8 +3679,7 @@
       "renameTitle": "Reanomena l'organització",
       "renamePlaceholder": "Nom de l'organització",
       "balance": "Saldo",
-      "organizationSeats": "Llicències de l'organització",
-      "plan": "Pla de l'organització",
+      "plan": "Pla",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Caducat",
@@ -3705,7 +3714,8 @@
     "signupStepUp": "Per acabar de crear el teu compte, utilitza «$t(login.moreSignInOptions)».",
     "signupStepUpApple": "Per acabar de crear el teu compte, utilitza «$t(login.signInWithApple)».",
     "signupStepUpGoogle": "Per acabar de crear el teu compte, utilitza «$t(login.signInWithGoogle)».",
-    "invalidCode": "Aquest codi és incorrecte. Torna-ho a provar.",
+    "signupStepUpBack": "Per acabar de crear el teu compte, torna enrere i utilitza «$t(login.moreSignInOptions)».",
+    "invalidCode": "Aquest codi és incorrecte o ha caducat. Torna-ho a provar o utilitza «$t(login.resendCode)».",
     "codeInProgress": "S'està processant el teu codi. Espera un moment i torna-ho a provar.",
     "tooManyAttempts": "Has fet massa intents. Sol·licita un codi nou.",
     "invalidToken": "L'inici de sessió ha fallat. Torna-ho a provar.",
@@ -3834,6 +3844,7 @@
   },
   "modelChat": {
     "offlineFailure": "Aquest model necessita connexió a internet. Connecta't i torna-ho a provar, o canvia a un model d'aquest dispositiu.",
+    "connectionLost": "S'ha perdut la connexió amb el model. Comprova la connexió i torna-ho a provar.",
     "empty": {
       "title": "Comença un xat",
       "description": "Envia un missatge per parlar amb un model."
@@ -3974,6 +3985,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) envia una sol·licitud breu d'inferència a aquest punt de connexió amb el protocol i el model seleccionats. El proveïdor pot cobrar per aquesta sol·licitud.",
       "connectionSucceeded": "El model ha completat una sol·licitud amb aquest protocol.",
       "connectionFailed": "El model no ha pogut completar una sol·licitud. Comprova l'arrel de l'API, el protocol, les credencials i l'ID del model.",
+      "requestTimedOut": "El punt de connexió no ha respost a temps. Comprova l'arrel de l'API i la teva connexió, i torna-ho a provar.",
+      "requestUnauthorized": "El punt de connexió ha rebutjat les credencials. Comprova la clau de l'API i les capçaleres personalitzades, i torna-ho a provar.",
+      "requestNotFound": "No s'ha trobat el punt de connexió ni el model. Comprova l'arrel de l'API i l'ID del model.",
+      "requestRateLimited": "El punt de connexió està limitant les sol·licituds. Espera un moment i torna-ho a provar.",
+      "requestUnavailable": "El punt de connexió no està disponible ara mateix. Torna-ho a provar d'aquí a un moment.",
+      "requestUnreachable": "No s'ha pogut arribar al punt de connexió. Comprova l'arrel de l'API i la teva connexió.",
+      "requestInvalidResponse": "El punt de connexió no ha respost en el format esperat. Comprova que l'arrel de l'API i el protocol coincideixin amb el servidor i torna-ho a provar.",
+      "discoveryNoModels": "El punt de connexió no ha llistat cap model. Introdueix els models manualment.",
+      "connectionIncomplete": "El model ha respost però no ha acabat. Torna-ho a provar o comprova l'ID del model i el protocol.",
       "invalidInput": "Introdueix un nom de servidor, capçaleres vàlides i almenys un model amb un ID i un nom únics. Els límits de tòkens han de ser nombres enters positius.",
       "invalidUrl": "Introdueix una arrel d'API HTTP o HTTPS sense credencials, consulta ni fragment.",
       "publicHttp": "No es permeten punts de connexió HTTP públics. Utilitza HTTPS o un punt de connexió local privat.",
@@ -4112,7 +4132,11 @@
     "reasoningEffort": {
       "modelFlag": "Aquest model admet l'esforç de raonament"
     },
-    "creditsRequired": "No hi ha prou crèdits per enviar aquest missatge."
+    "creditsRequired": "No hi ha prou crèdits per enviar aquest missatge.",
+    "providerKeyRefused": "El proveïdor ha rebutjat les credencials. Comprova la seva clau de l'API i torna a enviar.",
+    "providerModelMissing": "Aquest servidor ja no ofereix aquest model. Tria un altre.",
+    "providerRateLimited": "El proveïdor està limitant les sol·licituds. Espera un moment i torna a enviar.",
+    "providerUnavailable": "El proveïdor no està disponible ara mateix. Torna a enviar d'aquí a poc."
   },
   "settingsTools": {
     "confirmTitle": "Confirmar aquest canvi?"
@@ -4493,6 +4517,7 @@
     "pickPackToBuyAgain": "Tria un paquet de dalt per iniciar una compra nova.",
     "purchasePending": "La botiga encara està processant aquest pagament. Els crèdits arribaran quan aprovi el càrrec.",
     "buyAgain": "Torna a comprar",
+    "checkPurchase": "Comprova la compra",
     "purchaseOwnedByAnotherAccount": "Els crèdits d'aquest Apple Account pertanyen a un altre compte de Kilo. Inicia la sessió en aquell compte de Kilo per utilitzar-los.",
     "purchaseOwnedByAnotherAccountPlay": "Els crèdits d'aquest compte de Google Play pertanyen a un compte de Kilo diferent. Inicia la sessió en aquest compte de Kilo per utilitzar-los."
   },
@@ -4590,7 +4615,9 @@
     },
     "saveSheet": {
       "title": "Desa a la llista",
-      "saved": "Desada a {{list}}"
+      "saved": "Desada a {{list}}",
+      "saveFailed": "No s’ha pogut desar la tasca. Comprova la connexió i torna-ho a provar.",
+      "saveRefused": "No s’ha pogut desar la tasca en aquesta llista. Tria una altra llista."
     }
   },
   "agentBriefing": {
@@ -4602,6 +4629,7 @@
     "empty": "Cap activitat en aquesta finestra de l'informe",
     "emptyHint": "Les teves sessions de programació al núvol i a la CLI apareixen aquí quan un informe programat té activitat.",
     "loadError": "No s'han pogut carregar els informes",
+    "estimateLoadError": "No s'ha pogut carregar l'estimació.",
     "view": "Llegeix l'informe",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4704,7 +4732,7 @@
     "topFeatures": "Funcions més usades",
     "emptyTitle": "Cap ús en aquest període",
     "unavailableTitle": "Ús no disponible",
-    "unavailableDescription": "Aquest espai de treball no informa de l'ús. Tornar-ho a provar no ajudarà.",
+    "unavailableDescription": "L'ús no està configurat per a aquest espai de treball. Contacta amb el servei d'assistència si esperes veure l'ús aquí.",
     "orgSelfNotice": "Estàs veient el teu propi ús en aquesta organització.",
     "viewDetails": "Mostra els detalls d'ús"
   },
@@ -4712,7 +4740,7 @@
     "title": "Integracions",
     "sectionTitle": "Serveis connectats",
     "entrySubtitle": "GitHub, Slack, Linear i més",
-    "subtitle": "Connecta les teves eines i fluxos de treball de desenvolupament a Kilo",
+    "subtitle": "Connecta les teves eines i fluxos de treball de desenvolupament a Kilo.",
     "disconnect": "Desconnecta",
     "disconnectTitle": "Vols desconnectar {{provider}}?",
     "disconnectMessage": "Kilo deixarà de respondre a {{provider}}. Pots tornar a connectar-lo en qualsevol moment.",
@@ -5011,7 +5039,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Funció per a empreses",
-    "enterpriseOnly": "Aquesta funció només està disponible per a empreses.",
+    "enterpriseOnly": "Els proveïdors i els models estan disponibles al pla Enterprise.",
     "readOnly": "Només els propietaris i els administradors de l'organització poden canviar aquesta configuració.",
     "loadError": "No s'han pogut carregar els proveïdors i els models",
     "tabModels": "Models",

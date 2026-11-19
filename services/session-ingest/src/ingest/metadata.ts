@@ -1,7 +1,10 @@
 import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
-import type { PublishCloudAgentSessionStatusParams } from '@kilocode/session-ingest-contracts';
+import {
+  sessionLiveSummarySchema,
+  type PublishCloudAgentSessionStatusParams,
+} from '@kilocode/session-ingest-contracts';
 import { hasOrganizationAccess, normalizeGitUrl, withDORetry } from '@kilocode/worker-utils';
 
 import type { Env } from '../env';
@@ -47,6 +50,7 @@ type SessionMetadataUpdates = Partial<
     | 'pr_link_verified_at'
     | 'briefing_excerpt'
     | 'briefing_excerpt_scope_changed_at'
+    | 'live_summary'
   >
 >;
 
@@ -178,7 +182,7 @@ export async function applyMetadataChanges(
   mergedChanges: Map<string, string | null>,
   ctx?: { waitUntil(promise: Promise<unknown>): void },
   expectedCloudAgentSessionId?: string,
-  nativeRename?: PublishCloudAgentSessionStatusParams['rename']
+  cloudAgentProjection?: Pick<PublishCloudAgentSessionStatusParams, 'rename' | 'liveSummary'>
 ): Promise<void> {
   if (mergedChanges.size === 0) return;
 
@@ -199,6 +203,9 @@ export async function applyMetadataChanges(
 
   /** True only when a title write was actually applied: an agent-generated title over the placeholder, or a native rename. */
   let titleWriteApplied = false;
+
+  /** True only when a Kilo v2 session card summary write was actually applied. */
+  let liveSummaryWriteApplied = false;
 
   /** True only when a git_url write was actually applied (non-Cloud-Agent write or Cloud Agent null-to-value heal). */
   let gitUrlWriteApplied = false;
@@ -224,6 +231,7 @@ export async function applyMetadataChanges(
           gitUrl: cli_sessions_v2.git_url,
           prUrl: cli_sessions_v2.pr_url,
           organizationId: cli_sessions_v2.organization_id,
+          liveSummary: cli_sessions_v2.live_summary,
         })
         .from(cli_sessions_v2)
         .where(
@@ -326,6 +334,7 @@ export async function applyMetadataChanges(
     // reported title both leave status_transition_id alone — so a first delivery that has not
     // landed yet can still replace a user rename made in the meantime. That is last-write-wins,
     // exactly as for a CLI rename report.
+    const nativeRename = cloudAgentProjection?.rename;
     if (
       nativeRename !== undefined &&
       !isDefaultSessionTitle(nativeRename.title) &&
@@ -334,6 +343,21 @@ export async function applyMetadataChanges(
     ) {
       updates.title = nativeRename.title;
       titleWriteApplied = true;
+    }
+
+    // Kilo v2 has no ingest client, so the Session DO sends its whole current session card
+    // summary with each status publication. The status transition orders it: a late older
+    // publication has a stale status, so it cannot replace a newer summary. An unchanged summary
+    // is not rewritten.
+    const liveSummary = cloudAgentProjection?.liveSummary;
+    if (
+      liveSummary !== undefined &&
+      !staleStatus &&
+      JSON.stringify(sessionLiveSummarySchema.safeParse(currentRow.liveSummary).data ?? null) !==
+        JSON.stringify(liveSummary)
+    ) {
+      updates.live_summary = liveSummary;
+      liveSummaryWriteApplied = true;
     }
 
     // Membership check only for non-null org claims; run on the same tx as the UPDATE.
@@ -614,6 +638,19 @@ export async function applyMetadataChanges(
         error: error instanceof Error ? error.message : String(error),
       });
     }
+  }
+
+  // The session card reads the summary from the row. A status change refreshes the cards below;
+  // a summary change under an unchanged status refreshes only a card that follows this session,
+  // as the Kilo v1 summary write does.
+  if (liveSummaryWriteApplied && !notification?.changedStatus) {
+    const delivery = refreshGlanceableSessions(env, {
+      userId: kiloUserId,
+      cliSessionIds: [sessionId],
+      cardFollowSessionIds: [sessionId],
+    });
+    if (ctx) ctx.waitUntil(delivery);
+    else await delivery;
   }
 
   if (!notification) return;

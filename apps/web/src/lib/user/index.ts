@@ -234,14 +234,14 @@ function getSignupIp(requestHeaders?: Headers): string | null {
 async function checkNormalizedEmailUnique(
   normalizedEmail: string,
   tx: DrizzleTransaction
-): Promise<Result<null, 'EMAIL-ALREADY-USED'>> {
+): Promise<OptionalError<'EMAIL-ALREADY-USED'>> {
   const [existing] = await tx
     .select({ id: kilocode_users.id })
     .from(kilocode_users)
     .where(eq(kilocode_users.normalized_email, normalizedEmail))
     .limit(1);
 
-  if (!existing) return successResult(null);
+  if (!existing) return successResult();
 
   console.warn('[auth] Signup rejected: normalized_email already in use', {
     normalized_email: normalizedEmail,

@@ -148,6 +148,7 @@
     "performance": "Afköst",
     "preferences": "Kjörstillingar",
     "privacyPolicy": "Persónuverndarstefna",
+    "termsOfService": "Þjónustuskilmálar",
     "profile": "Notandasnið",
     "reactions": "Viðbrögð",
     "recent": "Nýlegt",
@@ -171,6 +172,7 @@
     "generating": "Bý til…",
     "working": "Í vinnslu",
     "yourOwnRepositories": "Þín eigin kóðasöfn",
+    "organizationRepositories": "Kóðasöfn fyrirtækisins",
     "dismissed": "Vísað frá",
     "agent": "Umboðsmaður",
     "durationMinuteShort": "min",
@@ -217,8 +219,8 @@
     "verifyCode": "Staðfesta kóða",
     "resendCode": "Senda kóða aftur",
     "termsPrefix": "Með því að halda áfram samþykkir þú ",
+    "termsInSentence": "Þjónustuskilmála",
     "terms": "Skilmála",
-    "termsInSentence": "Skilmála",
     "termsConnector": " og ",
     "termsSuffix": ".",
     "moreSignInOptions": "Fleiri innskráningarmöguleikar",
@@ -763,7 +765,6 @@
       "replyPlaceholder": "Svar…",
       "replyBody": "Svartexti",
       "submitReply": "Senda svar",
-      "termsTitle": "Þjónustuskilmálar",
       "termsCopy": "Þú verður að vera 13 ára eða eldri til að birta efni.",
       "termsAcceptRetry": "Ekki tókst að samþykkja skilmálana. Athugaðu tenginguna og reyndu aftur.",
       "viewTerms": "Skoða skilmála",
@@ -1026,7 +1027,10 @@
     "tabs": {
       "overview": "Yfirlit",
       "files": "Skrár",
-      "discussion": "Umræða"
+      "discussion": "Umræða",
+      "discussionAccessibility_one": "{{title}}: {{displayCount}} athugasemd",
+      "discussionAccessibility": "{{title}}: {{displayCount}} athugasemdir",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} athugasemdir"
     },
     "fileStatus": {
       "modified": "Breytt",
@@ -1132,16 +1136,16 @@
     },
     "category": {
       "agentAttentionTitle": "Fulltrúinn þarf aðstoð þína",
-      "agentAttentionSubtitle": "spurningar og beiðnir um heimild eða svör",
+      "agentAttentionSubtitle": "Spurningar og beiðnir um heimild eða svör",
       "agentUpdatesTitle": "Uppfærslur frá fulltrúa",
-      "agentUpdatesSubtitle": "skilaboð frá fulltrúanum meðan verkefni er í vinnslu",
+      "agentUpdatesSubtitle": "Skilaboð frá fulltrúanum meðan verkefni er í vinnslu",
       "sessionStatusTitle": "Staða lotu",
-      "sessionStatusSubtitle": "lokið / mistókst / tilbúin til stýringar",
-      "balanceAlertsSubtitle": "viðvaranir um lága inneign félagsins",
+      "sessionStatusSubtitle": "Lokið / mistókst / tilbúin til stýringar",
+      "balanceAlertsSubtitle": "Viðvaranir um lága inneign félagsins",
       "balanceAlertsUnavailable": "Skráðu þig í félag til að fá viðvaranir um inneign.",
-      "securityFindingsSubtitle": "nýjar niðurstöður og SLA-áminningar",
+      "securityFindingsSubtitle": "Nýjar niðurstöður og SLA-áminningar",
       "securityFindingsUnavailable": "Virkjaðu Kilo-öryggiserindreka á sviði til að fá öryggisniðurstöður.",
-      "spendAlertsSubtitle": "yfirferðir þröskulda og uppsveiflur á klukkustund",
+      "spendAlertsSubtitle": "Yfirferðir þröskulda og uppsveiflur á klukkustund",
       "spendAlertsToggle": "Flokkur útgjaldaviðvarana"
     },
     "history": {
@@ -1223,7 +1227,7 @@
     },
     "instructions": {
       "title": "Sérsniðnar leiðbeiningar",
-      "deprecation": "Fyrirhugað er að hætta stuðningi við sérsniðnar leiðbeiningar í stillingunum. Færðu þær í REVIEW.md-skrá í geymslunni þinni í staðinn.",
+      "deprecation": "Sérsniðnar leiðbeiningar í stillingunum verða fjarlægðar. Færðu þær í REVIEW.md-skrá í geymslunni þinni í staðinn.",
       "placeholder": "t.d. fylgja reglum okkar um villumeðhöndlun…",
       "clearTitle": "Fjarlægja sérsniðnar leiðbeiningar?",
       "clearMessage": "Ef þú vistar tóman reit eyðast þær sérsniðnu leiðbeiningar sem geymdar eru fyrir þennan yfirferðaraðila."
@@ -1389,6 +1393,7 @@
       "managedOnWeb": "Bitbucket-tengingu við {{organization}} er stjórnað á vefnum í tölvu.",
       "description": "Búðu til aðgangstóka vinnusvæðis fyrir {{organization}} og límdu hann hér fyrir neðan.",
       "descriptionReconnect": "Búðu til nýjan aðgangstóka vinnusvæðis fyrir {{organization}} og límdu hann hér fyrir neðan.",
+      "descriptionOverview": "Búðu til aðgangstóka vinnusvæðis fyrir {{organization}} og límdu hann á næsta skjá.",
       "scopes": "Reikningur: lestur · Geymslur: lestur/skrift · Samrunabeiðnir: lestur · Vefkrækjur: lestur/skrift",
       "tokenPlaceholder": "Aðgangstóki vinnusvæðis",
       "tokenRefused": "Bitbucket tók ekki við þessum aðgangstóka vinnusvæðis. Athugaðu að hann hafi heimildirnar hér fyrir ofan og reyndu svo aftur."
@@ -3021,6 +3026,7 @@
     "noSessions": "Engar virkar lotur",
     "noSessionsDescription": "Skráðu þig inn í Kilo-forritið á öðru tæki til að það birtist hér.",
     "signedIn": "Innskráning {{signedIn}} · Síðast virkt {{lastSeen}}",
+    "signedInThisDevice": "Innskráning {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "Innskráningar í Kilo-forritið, Kilo CLI og vafra birtast hér. Innskráningar í kóðaritil eru ekki á listanum.",
     "thisDevice": "Þetta tæki",
     "viewProfile": "Skoða prófíl",
@@ -3182,6 +3188,8 @@
     "retryHint": "Reynir aftur að sækja stöðu Kilo Pass.",
     "endedOn": "Lokið {{date}}",
     "notAvailableInApp": "Kilo Pass er ekki tiltækt í appinu.",
+    "notAvailableTitle": "Kilo Pass er ekki í appinu",
+    "noPassDescription": "Þessi aðgangur er ekki með Kilo Pass.",
     "statusActive": "Virkt",
     "statusTrialing": "Á prufutímabili",
     "statusPastDue": "Greiðsla fram yfir gjalddaga",
@@ -3464,7 +3472,7 @@
       "retentionLimit": "Nýjustu reikningarnir eru sýndir."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Virkja viðvörun um lága inneign",
+      "subtitle": "Sendu viðvörun í tölvupósti á netföngin sem þú tilgreinir þegar inneign stofnunarinnar fer undir upphæðina sem þú stillir.",
       "notifyEmailsLabel": "Tölvupóstföng viðtakenda",
       "permissionDenied": "Þú hefur ekki heimild til að stjórna innheimtuviðvörunum.",
       "separateEmailsHint": "Aðgreindu tölvupóstföng með kommum.",
@@ -3540,6 +3548,7 @@
       "truncated": "Fleiri beiðnir eru á þessari klukkustund en listinn sýnir.",
       "emptyTitle": "Engar beiðnir á þessari klukkustund",
       "emptyDescription": "Notaðu „Fyrri klukkustund“ til að sjá fyrri beiðnir.",
+      "emptyBoundDescription": "Beiðnaskrár ná ekki lengra aftur.",
       "loadError": "Ekki tókst að sækja beiðnaskrár.",
       "permissionDenied": "Aðeins eigandi, stjórnandi eða greiðslustjóri félags getur lesið beiðnaskrár þess.",
       "tokens": "{{input}} inn · {{output}} út",
@@ -3610,8 +3619,7 @@
       "renameTitle": "Endurnefna félag",
       "renamePlaceholder": "Nafn félags",
       "balance": "Inneign",
-      "organizationSeats": "Notendasæti félagsins",
-      "plan": "Áætlun fyrirtækis",
+      "plan": "Áætlun",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Lokið",
@@ -3645,7 +3653,8 @@
     "signupStepUp": "Veldu „$t(login.moreSignInOptions)“ til að ljúka við að stofna reikninginn þinn.",
     "signupStepUpApple": "Veldu „$t(login.signInWithApple)“ til að ljúka við að stofna reikninginn þinn.",
     "signupStepUpGoogle": "Veldu „$t(login.signInWithGoogle)“ til að ljúka við að stofna reikninginn þinn.",
-    "invalidCode": "Þessi kóði er rangur. Reyndu aftur.",
+    "signupStepUpBack": "Farðu til baka og veldu „$t(login.moreSignInOptions)“ til að ljúka við að stofna reikninginn þinn.",
+    "invalidCode": "Þessi kóði er rangur eða útrunninn. Reyndu aftur eða veldu „$t(login.resendCode)“.",
     "codeInProgress": "Kóðinn þinn er í vinnslu. Bíddu í smá stund og reyndu aftur.",
     "tooManyAttempts": "Of margar tilraunir. Biddu um nýjan kóða.",
     "invalidToken": "Innskráning mistókst. Reyndu aftur.",
@@ -3774,6 +3783,7 @@
   },
   "modelChat": {
     "offlineFailure": "Þetta líkan þarf nettengingu. Tengstu og reyndu aftur, eða skiptu yfir í líkan á þessu tæki.",
+    "connectionLost": "Tengingin við líkanið rofnaði. Athugaðu tenginguna og reyndu aftur.",
     "empty": {
       "title": "Byrjaðu spjall",
       "description": "Sendu skilaboð til að tala við líkan."
@@ -3913,6 +3923,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) sendir stutta ályktunarbeiðni á þennan endapunkt með valinni samskiptareglu og líkani. Þjónustuveitandinn gæti rukkað fyrir hana.",
       "connectionSucceeded": "Líkanið afgreiddi beiðni með þessari samskiptareglu.",
       "connectionFailed": "Líkanið gat ekki afgreitt beiðni. Athugaðu grunnslóð API, samskiptareglu, auðkenningarupplýsingar og auðkenni líkans.",
+      "requestTimedOut": "Endapunkturinn svaraði ekki í tæka tíð. Athugaðu grunnslóð API og tenginguna þína, og reyndu aftur.",
+      "requestUnauthorized": "Endapunkturinn hafnaði auðkenningarupplýsingunum. Athugaðu API-lykilinn og sérsniðna hausa, og reyndu aftur.",
+      "requestNotFound": "Endapunkturinn eða líkanið fannst ekki. Athugaðu grunnslóð API og auðkenni líkans.",
+      "requestRateLimited": "Endapunkturinn takmarkar beiðnir. Bíddu aðeins og reyndu aftur.",
+      "requestUnavailable": "Endapunkturinn er ekki í boði núna. Reyndu aftur eftir smástund.",
+      "requestUnreachable": "Ekki náðist samband við endapunktinn. Athugaðu grunnslóð API og tenginguna þína.",
+      "requestInvalidResponse": "Endapunkturinn svaraði ekki í væntu sniði. Athugaðu að grunnslóð API og samskiptaregla séu í samræmi við þjóninn og reyndu aftur.",
+      "discoveryNoModels": "Endapunkturinn skilaði engum líkönum. Sláðu inn líkön handvirkt.",
+      "connectionIncomplete": "Líkanið svaraði en lauk ekki. Reyndu aftur, eða athugaðu auðkenni líkans og samskiptareglu.",
       "invalidInput": "Sláðu inn heiti bakenda, gilda hausa og að minnsta kosti eitt líkan með einkvæmu auðkenni og heiti. Táknamörk verða að vera jákvæðar heiltölur.",
       "invalidUrl": "Sláðu inn HTTP- eða HTTPS-grunnslóð API án auðkenningarupplýsinga, fyrirspurnarhluta eða brotahluta.",
       "publicHttp": "Opinberir HTTP-endapunktar eru ekki leyfðir. Notaðu HTTPS eða einkarekinn endapunkt á staðarneti.",
@@ -4051,7 +4070,11 @@
     "reasoningEffort": {
       "modelFlag": "Þetta líkan styður dýpt rökhugsunar"
     },
-    "creditsRequired": "Ekki nógu mikil inneign til að senda þetta skilaboð."
+    "creditsRequired": "Ekki nógu mikil inneign til að senda þetta skilaboð.",
+    "providerKeyRefused": "Þjónustuveitandinn hafnaði auðkenningarupplýsingunum. Athugaðu API-lykil hans og sendu aftur.",
+    "providerModelMissing": "Þessi bakendi þjónar ekki lengur þessu líkani. Veldu annað.",
+    "providerRateLimited": "Þjónustuveitandinn takmarkar beiðnir. Bíddu aðeins og sendu aftur.",
+    "providerUnavailable": "Þjónustuveitandinn er ekki í boði núna. Sendu aftur eftir smástund."
   },
   "settingsTools": {
     "confirmTitle": "Staðfesta þessa breytingu?"
@@ -4426,6 +4449,7 @@
     "pickPackToBuyAgain": "Veldu pakka hér fyrir ofan til að hefja ný kaup.",
     "purchasePending": "Verslunin er enn að vinna úr þessari greiðslu. Inneignin þín berst um leið og hún samþykkir færsluna.",
     "buyAgain": "Kaupa aftur",
+    "checkPurchase": "Athuga kaupin",
     "purchaseOwnedByAnotherAccount": "Inneignin á þessum Apple Account-reikningi tilheyrir öðrum Kilo-reikningi. Skráðu þig inn á þann Kilo-reikning til að nota hana.",
     "purchaseOwnedByAnotherAccountPlay": "Inneignin á þessum Google Play-reikningi tilheyrir öðrum Kilo-reikningi. Skráðu þig inn á þann Kilo-reikning til að nota hana."
   },
@@ -4519,7 +4543,9 @@
     },
     "saveSheet": {
       "title": "Vista á lista",
-      "saved": "Vistað á {{list}}"
+      "saved": "Vistað á {{list}}",
+      "saveFailed": "Gat ekki vistað verkefnið. Athugaðu nettenginguna þína og reyndu aftur.",
+      "saveRefused": "Gat ekki vistað verkefnið á þennan lista. Veldu annan lista."
     }
   },
   "agentBriefing": {
@@ -4531,6 +4557,7 @@
     "empty": "Engin virkni í þessum yfirlitsglugga",
     "emptyHint": "Forritunarlotur þínar í skýinu og CLI birtast hér þegar áætlað yfirlit hefur virkni.",
     "loadError": "Ekki tókst að hlaða yfirlitum",
+    "estimateLoadError": "Ekki tókst að hlaða áætluninni.",
     "view": "Lesa yfirlit",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4629,7 +4656,7 @@
     "topFeatures": "Mest notaðir eiginleikar",
     "emptyTitle": "Engin notkun á þessu tímabili",
     "unavailableTitle": "Notkun ekki tiltæk",
-    "unavailableDescription": "Þetta vinnusvæði tilkynnir ekki notkun. Að reyna aftur mun ekki hjálpa.",
+    "unavailableDescription": "Notkun hefur ekki verið sett upp fyrir þetta vinnusvæði. Hafðu samband við þjónustuver ef þú átt von á að sjá notkun hér.",
     "orgSelfNotice": "Þú sérð þína eigin notkun í þessu fyrirtæki.",
     "viewDetails": "Skoða upplýsingar um notkun"
   },
@@ -4637,7 +4664,7 @@
     "title": "Samþættingar",
     "sectionTitle": "Tengdar þjónustur",
     "entrySubtitle": "GitHub, Slack, Linear og fleira",
-    "subtitle": "Tengdu þróunartólin þín og vinnuflæði við Kilo",
+    "subtitle": "Tengdu þróunartólin þín og vinnuflæði við Kilo.",
     "disconnect": "Aftengja",
     "disconnectTitle": "Aftengja {{provider}}?",
     "disconnectMessage": "Kilo hættir að svara í {{provider}}. Þú getur tengt aftur hvenær sem er.",
@@ -4936,7 +4963,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Fyrirtækjaeiginleiki",
-    "enterpriseOnly": "Þetta er eingöngu fyrirtækjaeiginleiki.",
+    "enterpriseOnly": "Veitendur og líkön eru í boði með Enterprise-áskrift.",
     "readOnly": "Aðeins eigendur og stjórnendur samtaka geta breytt þessum stillingum.",
     "loadError": "Ekki tókst að hlaða veitendum og líkönum",
     "tabModels": "Líkön",

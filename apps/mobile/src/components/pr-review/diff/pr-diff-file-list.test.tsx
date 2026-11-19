@@ -38,6 +38,7 @@ const listQueryState = vi.hoisted(() => ({
 
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false, doLeftAndRightSwapInRTL: true },
   View: 'View',
   RefreshControl: 'RefreshControl',
 }));

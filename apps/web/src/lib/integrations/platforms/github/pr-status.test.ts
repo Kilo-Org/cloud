@@ -56,10 +56,53 @@ jest.mock('./adapter', () => {
     return new MockGitHubRateLimitError(new Date(deadline));
   }
 
+  const GRAPHQL_RATE_LIMIT_CODES = new Set([
+    'RATE_LIMITED',
+    'SECONDARY_RATE_LIMIT',
+    'ABUSE_DETECTION',
+  ]);
+
+  function isRateLimitGraphQlError(entry: unknown): boolean {
+    if (typeof entry !== 'object' || entry === null) return false;
+    const record = entry as { type?: unknown; extensions?: { code?: unknown } };
+    const codes: unknown[] = [record.type];
+    if (typeof record.extensions === 'object' && record.extensions !== null) {
+      codes.push(record.extensions.code);
+    }
+    return codes.some(
+      code => typeof code === 'string' && GRAPHQL_RATE_LIMIT_CODES.has(code.toUpperCase())
+    );
+  }
+
+  function graphQlRateLimitError(headers: unknown): MockGitHubRateLimitError | null {
+    return toGitHubRateLimitError({
+      status: 429,
+      message: 'GitHub GraphQL rate limit',
+      response: { headers },
+    });
+  }
+
+  const graphQlEnvelopeSchema = {
+    safeParse(value: unknown) {
+      if (typeof value !== 'object' || value === null) return { success: false as const };
+      const record = value as { data?: unknown; errors?: unknown };
+      if (record.errors !== undefined && !Array.isArray(record.errors)) {
+        return { success: false as const };
+      }
+      return {
+        success: true as const,
+        data: { data: record.data, errors: record.errors },
+      };
+    },
+  };
+
   return {
     generateGitHubInstallationToken: (...args: unknown[]) => mockGenerateToken(...args),
     GitHubRateLimitError: MockGitHubRateLimitError,
     toGitHubRateLimitError,
+    graphQlEnvelopeSchema,
+    isRateLimitGraphQlError,
+    graphQlRateLimitError,
   };
 });
 

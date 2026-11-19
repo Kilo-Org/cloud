@@ -40,7 +40,7 @@ import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { persistLoginDrafts, restoreLoginDrafts, type SsoRecoveryDraft } from '@/lib/login-draft';
 import { setLanguagePickerBridge } from '@/lib/picker-bridge';
-import { useScreenInsets } from '@/lib/screen-insets';
+import { useScreenInsets, useSideInsetStyle } from '@/lib/screen-insets';
 
 export function LoginScreen() {
   const { sessionEnded, signIn, token: publishedToken } = useAuth();
@@ -63,6 +63,7 @@ export function LoginScreen() {
   } = useDeviceAuth();
   const colors = useThemeColors();
   const insets = useScreenInsets();
+  const sideInsetStyle = useSideInsetStyle();
   const { t } = useTranslation();
   const fontScale = useLiveFontScale();
   // The space the keyboard reveal keeps below a focused field is the height of
@@ -251,10 +252,8 @@ export function LoginScreen() {
   // indicator below instead of a wholesale swap to the spinner.
   const startInFlight = status === 'pending' && !code;
   const showTerminalError = status === 'denied' || status === 'expired' || status === 'error';
-  // The idle form paints on the first frame, before the stored draft resolves.
-  // A shorter placeholder instead of the form would grow the centered column
-  // into its place and lift the logo and the heading off the position they had
-  // already painted; painting the form reserves that space by construction.
+  // The idle form paints on the first frame, before the stored draft resolves,
+  // so the restore never swaps a placeholder for the form under the heading.
   const showIdleForm = status === 'idle' || showTerminalError || startInFlight;
   // The form reads its seed once, so a stored address or SSO recovery reaches
   // it through one remount when the restore lands. The module draft keeps the
@@ -269,11 +268,7 @@ export function LoginScreen() {
     <View
       className="flex-1 bg-background"
       // eslint-disable-next-line react-native/no-inline-styles -- dynamic chrome and safe-area padding
-      style={{
-        paddingBottom: bottomPadding,
-        paddingLeft: insets.left,
-        paddingRight: insets.right,
-      }}
+      style={{ paddingBottom: bottomPadding, ...sideInsetStyle }}
     >
       <View className="flex-row justify-end" style={headerRowStyle}>
         <Pressable
@@ -295,10 +290,11 @@ export function LoginScreen() {
       </View>
       <KeyboardAwareScrollView
         className="flex-1 bg-background"
-        contentContainerClassName={cn(
-          SCREEN_BODY_CLASS,
-          'flex-grow items-center justify-center py-8'
-        )}
+        // Top-aligned, not centered: the device-auth states below the heading
+        // differ in height (the code card, the starting row, the form with or
+        // without a refusal above it), and a centered column moved the logo and
+        // the heading by that difference each time the status changed.
+        contentContainerClassName={cn(SCREEN_BODY_CLASS, 'flex-grow items-center py-8')}
         keyboardShouldPersistTaps="handled"
         // The space the form keeps below the focused field while the keyboard is
         // up: its own measured height, floored at the primary action plus the

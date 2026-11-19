@@ -148,6 +148,7 @@
     "performance": "Teljesítmény",
     "preferences": "Beállítások",
     "privacyPolicy": "Adatvédelmi tájékoztató",
+    "termsOfService": "Szolgáltatási feltételek",
     "profile": "Profil",
     "reactions": "Reakciók",
     "recent": "Legutóbbiak",
@@ -171,6 +172,7 @@
     "generating": "Generálás…",
     "working": "Dolgozik",
     "yourOwnRepositories": "Saját adattáraid",
+    "organizationRepositories": "A szervezet adattárai",
     "dismissed": "Elvetve",
     "agent": "Ügynök",
     "durationMinuteShort": "min",
@@ -217,8 +219,8 @@
     "verifyCode": "Kód ellenőrzése",
     "resendCode": "Kód újraküldése",
     "termsPrefix": "A folytatással elfogadod a ",
+    "termsInSentence": "Szolgáltatási feltételeket",
     "terms": "Felhasználási feltételeket",
-    "termsInSentence": "Felhasználási feltételeket",
     "termsConnector": " és a ",
     "termsSuffix": ".",
     "moreSignInOptions": "További bejelentkezési lehetőségek",
@@ -763,7 +765,6 @@
       "replyPlaceholder": "Válasz…",
       "replyBody": "Válasz szövege",
       "submitReply": "Válasz elküldése",
-      "termsTitle": "Szolgáltatási feltételek",
       "termsCopy": "A hozzászóláshoz legalább 13 évesnek kell lenned.",
       "termsAcceptRetry": "Nem sikerült elfogadni a feltételeket. Ellenőrizd az internetkapcsolatot, és próbáld újra.",
       "viewTerms": "Feltételek megtekintése",
@@ -1026,7 +1027,10 @@
     "tabs": {
       "overview": "Áttekintés",
       "files": "Fájlok",
-      "discussion": "Beszélgetés"
+      "discussion": "Beszélgetés",
+      "discussionAccessibility_one": "{{title}}: 1 hozzászólás",
+      "discussionAccessibility": "{{title}}: {{displayCount}} hozzászólás",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} hozzászólás"
     },
     "fileStatus": {
       "modified": "Módosítva",
@@ -1132,16 +1136,16 @@
     },
     "category": {
       "agentAttentionTitle": "Az ügynök rád vár",
-      "agentAttentionSubtitle": "kérdések, engedélykérések, válaszra váró kérések",
+      "agentAttentionSubtitle": "Kérdések, engedélykérések, válaszra váró kérések",
       "agentUpdatesTitle": "Hírek az ügynöktől",
-      "agentUpdatesSubtitle": "az ügynök üzenetei a feladat végrehajtása közben",
+      "agentUpdatesSubtitle": "Az ügynök üzenetei a feladat végrehajtása közben",
       "sessionStatusTitle": "Munkamenet állapota",
-      "sessionStatusSubtitle": "befejezett / sikertelen / vezérelhető",
-      "balanceAlertsSubtitle": "figyelmeztetések a szervezet alacsony egyenlegére",
+      "sessionStatusSubtitle": "Befejezett / sikertelen / vezérelhető",
+      "balanceAlertsSubtitle": "Figyelmeztetések a szervezet alacsony egyenlegére",
       "balanceAlertsUnavailable": "Csatlakozz egy szervezethez, hogy egyenleg-figyelmeztetéseket kapj.",
-      "securityFindingsSubtitle": "új biztonsági találatok és SLA-emlékeztetők",
+      "securityFindingsSubtitle": "Új biztonsági találatok és SLA-emlékeztetők",
       "securityFindingsUnavailable": "Kapcsold be a Kilo biztonsági ügynököt egy hatókörön, hogy biztonsági találatokat kapj.",
-      "spendAlertsSubtitle": "küszöbátlépések és óránkénti kiugrások",
+      "spendAlertsSubtitle": "Küszöbátlépések és óránkénti kiugrások",
       "spendAlertsToggle": "Költésfigyelmeztetések kategóriája"
     },
     "history": {
@@ -1223,7 +1227,7 @@
     },
     "instructions": {
       "title": "Egyéni utasítások",
-      "deprecation": "Az egyéni utasítások funkcióját a tervek szerint megszüntetjük. Helyezd át ezeket az irányelveket a kódtáradban lévő REVIEW.md fájlba.",
+      "deprecation": "Az egyéni utasítások funkcióját megszüntetjük. Helyezd át ezeket az irányelveket a kódtáradban lévő REVIEW.md fájlba.",
       "placeholder": "pl. a hibakezelési szabályaink betartása…",
       "clearTitle": "Eltávolítod az egyéni utasításokat?",
       "clearMessage": "Az üres mező mentése törli az ellenőrzőhöz tárolt egyéni utasításokat."
@@ -1389,6 +1393,7 @@
       "managedOnWeb": "{{organization}} Bitbucket-kapcsolata a weben, számítógépről kezelhető.",
       "description": "Hozz létre egy hozzáférési tokent a munkaterülethez {{organization}} számára, és illeszd be alább.",
       "descriptionReconnect": "Hozz létre egy új hozzáférési tokent a munkaterülethez {{organization}} számára, és illeszd be alább.",
+      "descriptionOverview": "Hozz létre egy hozzáférési tokent a munkaterülethez {{organization}} számára, majd illeszd be a következő képernyőn.",
       "scopes": "Fiók: olvasás · Kódtárak: olvasás/írás · PR-ek: olvasás · Webhookok: olvasás/írás.",
       "tokenPlaceholder": "Munkaterület-hozzáférési token",
       "tokenRefused": "A Bitbucket nem fogadta el ezt a munkaterület-hozzáférési tokent. Ellenőrizd, hogy rendelkezik-e a fenti jogosultságokkal, majd próbáld újra."
@@ -3021,6 +3026,7 @@
     "noSessions": "Nincs aktív munkamenet",
     "noSessionsDescription": "Jelentkezz be a Kilo alkalmazásba egy másik eszközön, és az eszköz itt is megjelenik.",
     "signedIn": "Bejelentkezés: {{signedIn}} · Utolsó aktivitás: {{lastSeen}}",
+    "signedInThisDevice": "Bejelentkezés: {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "Itt a Kilo alkalmazásba, a Kilo CLI-be és a webböngészőbe történő bejelentkezések jelennek meg. A szerkesztőbe történő bejelentkezéseket nem soroljuk fel.",
     "thisDevice": "Ez az eszköz",
     "viewProfile": "Profil megtekintése",
@@ -3182,6 +3188,8 @@
     "retryHint": "Újra lekéri a Kilo Pass állapotát.",
     "endedOn": "Lejárt: {{date}}",
     "notAvailableInApp": "A Kilo Pass nem érhető el az alkalmazásban.",
+    "notAvailableTitle": "A Kilo Pass nem szerepel az alkalmazásban",
+    "noPassDescription": "Ehhez a fiókhoz nem tartozik Kilo Pass.",
     "statusActive": "Aktív",
     "statusTrialing": "Próbaidőszak",
     "statusPastDue": "Fizetési késedelem",
@@ -3464,7 +3472,7 @@
       "retentionLimit": "A legutóbbi számlák láthatók."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Figyelmeztetés bekapcsolása alacsony egyenleg esetén",
+      "subtitle": "Küldj e-mailes értesítést a megadott címekre, amikor a szervezet egyenlege az általad beállított összeg alá csökken.",
       "notifyEmailsLabel": "Értesítési e-mail-címek",
       "permissionDenied": "Nincs jogosultságod a számlázási figyelmeztetések kezelésére.",
       "separateEmailsHint": "Ha több e-mail-címet adsz meg, vesszővel válaszd el őket.",
@@ -3540,6 +3548,7 @@
       "truncated": "Ebben az órában több kérés van, mint amennyi a listán látható.",
       "emptyTitle": "Ebben az órában nincsenek kérések",
       "emptyDescription": "A Korábbi óra gombbal tekintheti meg a korábbi kéréseket.",
+      "emptyBoundDescription": "A kérésnaplók ennél korábbra nem nyúlnak vissza.",
       "loadError": "Nem sikerült betölteni a kérésnaplókat.",
       "permissionDenied": "A kérésnaplókat csak a szervezet tulajdonosa, adminisztrátora vagy számlázási felelőse olvashatja.",
       "tokens": "{{input}} be · {{output}} ki",
@@ -3610,8 +3619,7 @@
       "renameTitle": "Szervezet átnevezése",
       "renamePlaceholder": "Szervezet neve",
       "balance": "Egyenleg",
-      "organizationSeats": "Szervezeti férőhelyek",
-      "plan": "Szervezeti csomag",
+      "plan": "Csomag",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Lejárt",
@@ -3645,7 +3653,8 @@
     "signupStepUp": "A fiókod létrehozásának befejezéséhez válaszd ezt: „$t(login.moreSignInOptions)”.",
     "signupStepUpApple": "A fiókod létrehozásának befejezéséhez válaszd ezt: „$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "A fiókod létrehozásának befejezéséhez válaszd ezt: „$t(login.signInWithGoogle)”.",
-    "invalidCode": "A kód helytelen. Próbáld újra.",
+    "signupStepUpBack": "A fiókod létrehozásának befejezéséhez lépj vissza, és válaszd ezt: „$t(login.moreSignInOptions)”.",
+    "invalidCode": "A kód helytelen vagy lejárt. Próbáld újra, vagy válaszd ezt: „$t(login.resendCode)”.",
     "codeInProgress": "A kód feldolgozása folyamatban van. Várj egy pillanatot, majd próbáld újra.",
     "tooManyAttempts": "Túl sok próbálkozás történt. Kérj új kódot.",
     "invalidToken": "Nem sikerült bejelentkezni. Próbáld újra.",
@@ -3774,6 +3783,7 @@
   },
   "modelChat": {
     "offlineFailure": "Ehhez a modellhez internetkapcsolat szükséges. Csatlakozz, és próbáld újra, vagy válts egy ezen az eszközön lévő modellre.",
+    "connectionLost": "Megszakadt a kapcsolat a modellel. Ellenőrizd a kapcsolatot, és próbáld újra.",
     "empty": {
       "title": "Kezdjen csevegést",
       "description": "Küldjön egy üzenetet, hogy beszélgessen egy modellel."
@@ -3913,6 +3923,15 @@
       "checkHelp": "A „$t(modelChat.backends.checkConnection)” rövid következtetési kérést küld erre a végpontra a kiválasztott protokoll és modell használatával. A szolgáltató ezért díjat számíthat fel.",
       "connectionSucceeded": "A modell sikeresen teljesített egy kérést ezzel a protokollal.",
       "connectionFailed": "A modell nem tudta teljesíteni a kérést. Ellenőrizd az API alap-URL-címét, a protokollt, a hitelesítési adatokat és a modellazonosítót.",
+      "requestTimedOut": "A végpont nem válaszolt időben. Ellenőrizd az API alap-URL-címét és a kapcsolatot, majd próbáld újra.",
+      "requestUnauthorized": "A végpont elutasította a hitelesítési adatokat. Ellenőrizd az API-kulcsot és az egyéni fejléceket, majd próbáld újra.",
+      "requestNotFound": "A végpont vagy a modell nem található. Ellenőrizd az API alap-URL-címét és a modellazonosítót.",
+      "requestRateLimited": "A végpont korlátozza a kéréseket. Várj egy kicsit, és próbáld újra.",
+      "requestUnavailable": "A végpont jelenleg nem érhető el. Próbáld újra egy pillanat múlva.",
+      "requestUnreachable": "A végpontot nem sikerült elérni. Ellenőrizd az API alap-URL-címét és a kapcsolatot.",
+      "requestInvalidResponse": "A végpont nem a várt formátumban válaszolt. Ellenőrizd, hogy az API alap-URL-címe és a protokoll illeszkedik-e a szerverhez, majd próbáld újra.",
+      "discoveryNoModels": "A végpont nem sorolt fel modelleket. Add meg a modelleket kézzel.",
+      "connectionIncomplete": "A modell válaszolt, de nem fejezte be. Próbáld újra, vagy ellenőrizd a modellazonosítót és a protokollt.",
       "invalidInput": "Adj meg egy háttérrendszernevet, érvényes fejléceket és legalább egy modellt egyedi azonosítóval és névvel. A tokenkorlátoknak pozitív egész számoknak kell lenniük.",
       "invalidUrl": "Adj meg egy HTTP vagy HTTPS API alap-URL-címet hitelesítési adatok, lekérdezési paraméterek és töredékazonosító nélkül.",
       "publicHttp": "Nyilvános HTTP-végpontok nem engedélyezettek. Használj HTTPS-t vagy privát helyi végpontot.",
@@ -4051,7 +4070,11 @@
     "reasoningEffort": {
       "modelFlag": "Ez a modell támogatja a gondolkodás szintjét"
     },
-    "creditsRequired": "Nincs elég egyenleged ennek az üzenetnek az elküldéséhez."
+    "creditsRequired": "Nincs elég egyenleged ennek az üzenetnek az elküldéséhez.",
+    "providerKeyRefused": "A szolgáltató elutasította a hitelesítési adatokat. Ellenőrizd az API-kulcsát, majd küldd el újra.",
+    "providerModelMissing": "Ez a háttérrendszer már nem szolgálja ki ezt a modellt. Válassz másikat.",
+    "providerRateLimited": "A szolgáltató korlátozza a kéréseket. Várj egy kicsit, és küldd el újra.",
+    "providerUnavailable": "A szolgáltató jelenleg nem érhető el. Küldd el újra hamarosan."
   },
   "settingsTools": {
     "confirmTitle": "Megerősíted ezt a módosítást?"
@@ -4426,6 +4449,7 @@
     "pickPackToBuyAgain": "Új vásárlás indításához válassz egy csomagot fent.",
     "purchasePending": "Az áruház még feldolgozza ezt a fizetést. A kreditjeid a terhelés jóváhagyása után érkeznek meg.",
     "buyAgain": "Vásárolj újra",
+    "checkPurchase": "Vásárlás ellenőrzése",
     "purchaseOwnedByAnotherAccount": "Az ezen Apple-fiókon lévő kreditek egy másik Kilo-fiókhoz tartoznak. A használatukhoz jelentkezz be abba a Kilo-fiókba.",
     "purchaseOwnedByAnotherAccountPlay": "Az ezen Google Play-fiókon lévő kreditek egy másik Kilo-fiókhoz tartoznak. A használatukhoz jelentkezz be abba a Kilo-fiókba."
   },
@@ -4519,7 +4543,9 @@
     },
     "saveSheet": {
       "title": "Mentés listába",
-      "saved": "Elmentve a listába: {{list}}"
+      "saved": "Elmentve a listába: {{list}}",
+      "saveFailed": "Nem sikerült menteni a teendőt. Ellenőrizd a kapcsolatot, és próbáld újra.",
+      "saveRefused": "Nem sikerült menteni a teendőt ebbe a listába. Válassz egy másik listát."
     }
   },
   "agentBriefing": {
@@ -4531,6 +4557,7 @@
     "empty": "Nincs tevékenység ebben az időablakban",
     "emptyHint": "A felhőben és CLI-ben futó kódolási munkamenetek itt jelennek meg, amikor egy ütemezett jelentésben van tevékenység.",
     "loadError": "Nem sikerült betölteni a jelentéseket",
+    "estimateLoadError": "Nem sikerült betölteni a becslést.",
     "view": "Jelentés megnyitása",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4629,7 +4656,7 @@
     "topFeatures": "Leggyakoribb funkciók",
     "emptyTitle": "Nincs használat ebben az időszakban",
     "unavailableTitle": "A használat nem érhető el",
-    "unavailableDescription": "Ez a munkaterület nem jelent használatot. Az újrapróbálkozás nem segít.",
+    "unavailableDescription": "Ehhez a munkaterülethez nincs beállítva a használat. Ha itt használati adatokat vár, forduljon az ügyfélszolgálathoz.",
     "orgSelfNotice": "A saját használatodat látod ebben a szervezetben.",
     "viewDetails": "Használati részletek megtekintése"
   },
@@ -4637,7 +4664,7 @@
     "title": "Integrációk",
     "sectionTitle": "Csatlakoztatott szolgáltatások",
     "entrySubtitle": "GitHub, Slack, Linear és még sok más",
-    "subtitle": "Csatlakoztasd a fejlesztői eszközeidet és munkafolyamataidat a Kilo-fiókodhoz",
+    "subtitle": "Csatlakoztasd a fejlesztői eszközeidet és munkafolyamataidat a Kilo-fiókodhoz.",
     "disconnect": "Leválasztás",
     "disconnectTitle": "{{provider}} leválasztása?",
     "disconnectMessage": "A Kilo többé nem fog válaszolni itt: {{provider}}. Bármikor újra csatlakoztathatod.",
@@ -4936,7 +4963,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Vállalati funkció",
-    "enterpriseOnly": "Ez egy csak vállalati csomagban elérhető funkció.",
+    "enterpriseOnly": "A szolgáltatók és modellek az Enterprise csomagban érhetők el.",
     "readOnly": "Csak a szervezet tulajdonosai és rendszergazdái módosíthatják ezeket a beállításokat.",
     "loadError": "A szolgáltatókat és modelleket nem sikerült betölteni",
     "tabModels": "Modellek",

@@ -116,7 +116,7 @@ function getFrontmatterValue(frontmatter: string, key: string): string | null {
 
 /**
  * Extract YAML frontmatter `name` and `description` from SKILL.md.
- * Supports both --- and +++ delimiters. Returns `null` if no frontmatter.
+ * Supports both --- and +++ delimiters.
  */
 export function parseSkillFrontmatter(rawMarkdown: string): {
   name: string | null;

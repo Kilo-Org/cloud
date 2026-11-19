@@ -54,7 +54,7 @@ function textActionBoxStyle() {
  */
 export type RowTrailingSpec =
   | Readonly<{ kind: 'chevron' }>
-  | Readonly<{ kind: 'check'; selected: boolean; disabled?: boolean }>
+  | Readonly<{ kind: 'check'; selected: boolean; disabled?: boolean; multi?: boolean }>
   | Readonly<{
       kind: 'switch';
       value: boolean;
@@ -110,7 +110,13 @@ export function renderRowTrailing(trailing: RowTrailingSpec | undefined): ReactN
       return <RowChevron />;
     }
     case 'check': {
-      return <RowCheck selected={trailing.selected} disabled={trailing.disabled} />;
+      return (
+        <RowCheck
+          selected={trailing.selected}
+          disabled={trailing.disabled}
+          multi={trailing.multi}
+        />
+      );
     }
     case 'switch': {
       // The control's handlers reach the native switch as one props object;

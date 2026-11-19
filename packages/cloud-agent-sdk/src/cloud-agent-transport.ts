@@ -6,6 +6,7 @@
  * service-state notifications are batched until bootstrap completes.
  */
 import type { ToolDisplayMode } from './tool-detail-marker';
+import { createAgentBoardReader } from './agent-board';
 import { createBackgroundActivityReader } from './background-activity';
 import { setBounded } from './bounded-map';
 import { createConnection, type Connection } from './cloud-agent-connection';
@@ -201,6 +202,24 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           publish: state => sink.onServiceEvent({ type: 'background.activity', state }),
         })
       : undefined;
+    const readBoard = config.api.getAgentBoard;
+    const board = readBoard
+      ? createAgentBoardReader({
+          ownerSessionID: config.kiloSessionId,
+          read: signal => readBoard({ sessionId: config.sessionId, signal }),
+          publish: state => sink.onServiceEvent({ type: 'agent-board.state', state }),
+        })
+      : undefined;
+    const liveReads = {
+      start() {
+        background?.start();
+        board?.start();
+      },
+      stop() {
+        background?.stop();
+        board?.stop();
+      },
+    };
 
     /**
      * Supersede the pending snapshot catch-up: clear the retry timer and
@@ -232,6 +251,10 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         background?.invalidate();
         return;
       }
+      if (event.type === 'agent-board.invalidated') {
+        board?.invalidate();
+        return;
+      }
       if (
         backgroundEnabled &&
         (event.type.startsWith('question.') ||
@@ -244,8 +267,8 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           backgroundEnabled &&
           (event.cloudStatus.type === 'preparing' || event.cloudStatus.type === 'error')
         )
-          background?.stop();
-        else if (event.cloudStatus.type === 'ready' && backgroundEnabled) background?.start();
+          liveReads.stop();
+        else if (event.cloudStatus.type === 'ready' && backgroundEnabled) liveReads.start();
       }
       if (
         event.type === 'message.part.updated' &&
@@ -733,14 +756,14 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           const batch = sources.read(raw);
           if (batch.source.version === 'v2' && !backgroundEnabled) {
             backgroundEnabled = true;
-            background?.start();
+            liveReads.start();
           }
           for (const event of batch.events) deliverEvent(raw, event, batch.source.version);
         },
         onConnected: () => {
           if (expectedGeneration !== lifecycleGeneration) return;
           startReplay();
-          if (backgroundEnabled) background?.start();
+          if (backgroundEnabled) liveReads.start();
         },
         onReconnected: () => {
           if (expectedGeneration !== lifecycleGeneration) return;
@@ -751,7 +774,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           // is already in flight is dropped by the epoch bump.
           const hadPendingCatchUp = cancelSnapshotRetry();
           startReplay();
-          if (backgroundEnabled) background?.start();
+          if (backgroundEnabled) liveReads.start();
           // The lost page seed applies to workspace sessions too, with the
           // same row-replay best-effort skip (dispatchRetryRead).
           const usesCursorOnlyReplay = workspaceSession || lastEventId !== null;
@@ -781,7 +804,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         },
         onDisconnected: () => {
           if (expectedGeneration !== lifecycleGeneration) return;
-          if (backgroundEnabled) background?.stop();
+          if (backgroundEnabled) liveReads.stop();
           if (!replaying) return;
           sink.onServiceEvent(stoppedEvent);
           cancelReplay();
@@ -789,7 +812,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         },
         onUnexpectedDisconnect: () => {
           if (expectedGeneration !== lifecycleGeneration) return;
-          if (backgroundEnabled) background?.stop();
+          if (backgroundEnabled) liveReads.stop();
           if (stoppedReceived && !replaying) return;
           sink.onServiceEvent(stoppedEvent);
           cancelReplay();
@@ -829,7 +852,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
 
     return {
       connect() {
-        if (backgroundEnabled) background?.stop();
+        if (backgroundEnabled) liveReads.stop();
         closeConnection('destroy');
         cancelSnapshotRetry();
         lifecycleGeneration += 1;
@@ -850,7 +873,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       },
 
       disconnect() {
-        if (backgroundEnabled) background?.stop();
+        if (backgroundEnabled) liveReads.stop();
         cancelReplay();
         cancelSnapshotRetry();
         lifecycleGeneration += 1;
@@ -858,7 +881,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       },
 
       destroy() {
-        if (backgroundEnabled) background?.stop();
+        if (backgroundEnabled) liveReads.stop();
         cancelReplay();
         cancelSnapshotRetry();
         lifecycleGeneration += 1;

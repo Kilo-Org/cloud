@@ -15,7 +15,11 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
-vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
+vi.mock('@/components/ui/icons', () => ({
+  Check: 'Check',
+  Square: 'Square',
+  SquareCheck: 'SquareCheck',
+}));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#111111', mutedForeground: '#6f6a61' }),
@@ -139,6 +143,25 @@ describe('ChoiceRow accessible name', () => {
 
     const multiple = rowControl(renderRow({ label: 'Many', selected: true, multi: true }));
     expect(multiple.props.accessibilityRole).toBe('checkbox');
+  });
+
+  it('marks every multi-select row, and holds a single choice blank until it is picked', () => {
+    // A multi-select list with no mark on its unselected rows read as inert
+    // text (focus areas), so each of its rows draws a box; a single choice keeps
+    // the one check, held transparent while the row is not the pick.
+    const glyph = (root: TestRenderer.ReactTestInstance) =>
+      root.find(node => ['Check', 'Square', 'SquareCheck'].includes(String(node.type)));
+
+    const unpicked = glyph(renderRow({ label: 'Many', selected: false, multi: true }));
+    expect(unpicked.type).toBe('Square');
+    expect(unpicked.props.color).toBe('#6f6a61');
+    expect(glyph(renderRow({ label: 'Many', selected: true, multi: true })).type).toBe(
+      'SquareCheck'
+    );
+
+    const single = glyph(renderRow({ label: 'One', selected: false }));
+    expect(single.type).toBe('Check');
+    expect(single.props.color).toBe('transparent');
   });
 });
 

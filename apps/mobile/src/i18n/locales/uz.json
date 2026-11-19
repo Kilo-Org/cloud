@@ -1389,6 +1389,7 @@
       "managedOnWeb": "{{organization}} uchun Bitbucket ulanishi kompyuterdan veb orqali boshqariladi.",
       "managedOnWebTitle": "Veb orqali boshqariladi",
       "managedOnWebShort": "Bu ulanish kompyuterdan veb orqali boshqariladi.",
+      "managedOnWebRepositories": "{{organization}} uchun repozitoriylarni kompyuterdan veb orqali tanlang.",
       "description": "{{organization}} uchun ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
       "descriptionReconnect": "{{organization}} uchun yangi ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
       "scopes": "Hisob: o'qish · Repozitoriyalar: o'qish/yozish · PRlar: o'qish · Vebhuklar: o'qish/yozish",

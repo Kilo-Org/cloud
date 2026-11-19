@@ -1389,6 +1389,7 @@
       "managedOnWeb": "Bitbucket-tengingu við {{organization}} er stjórnað á vefnum í tölvu.",
       "managedOnWebTitle": "Stjórnað á vefnum",
       "managedOnWebShort": "Þessari tengingu er stjórnað á vefnum í tölvu.",
+      "managedOnWebRepositories": "Veldu geymslur fyrir {{organization}} á vefnum í tölvu.",
       "description": "Búðu til aðgangstóka vinnusvæðis fyrir {{organization}} og límdu hann hér fyrir neðan.",
       "descriptionReconnect": "Búðu til nýjan aðgangstóka vinnusvæðis fyrir {{organization}} og límdu hann hér fyrir neðan.",
       "scopes": "Reikningur: lestur · Geymslur: lestur/skrift · Samrunabeiðnir: lestur · Vefkrækjur: lestur/skrift",

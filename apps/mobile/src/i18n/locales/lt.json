@@ -1435,6 +1435,7 @@
       "managedOnWeb": "{{organization}} Bitbucket ryšys valdomas žiniatinklyje naudojant kompiuterį.",
       "managedOnWebTitle": "Valdoma žiniatinklyje",
       "managedOnWebShort": "Šis ryšys valdomas žiniatinklyje naudojant kompiuterį.",
+      "managedOnWebRepositories": "Pasirinkite {{organization}} saugyklas žiniatinklyje naudodami kompiuterį.",
       "description": "Sukurk {{organization}} darbo srities prieigos raktą ir įklijuok jį žemiau.",
       "descriptionReconnect": "Sukurk naują {{organization}} darbo srities prieigos raktą ir įklijuok jį žemiau.",
       "scopes": "Paskyra: skaityti · Saugyklos: skaityti / rašyti · Pakeitimų užklausos: skaityti · Webhook: skaityti / rašyti",

@@ -8,6 +8,7 @@ import { QueryError } from '@/components/query-error';
 import { GitMerge } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { type BitbucketConnection, isWebManagedConnection } from '@/lib/code-reviewer-bitbucket';
+import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 
 /**
  * The body the repositories screen paints for a Bitbucket connection that holds
@@ -28,6 +29,12 @@ export function BitbucketRepositoriesState({
   onRetry: () => void;
 }>) {
   const { t } = useTranslation();
+  // The body names the organization the web page manages the connection for,
+  // read from the same membership row the rest of the screen uses. Until it
+  // resolves the line holds the generic noun, so it never prints an unfilled
+  // placeholder.
+  const orgBoundary = useOrgBoundary(scope);
+  const organizationName = orgBoundary.org?.organizationName;
 
   if (connection.kind === 'error') {
     return (
@@ -57,7 +64,9 @@ export function BitbucketRepositoriesState({
         icon={GitMerge}
         iconSize={28}
         title={t('codeReviewer.bitbucketConnect.managedOnWebTitle')}
-        description={t('codeReviewer.bitbucketConnect.managedOnWebShort')}
+        description={t('codeReviewer.bitbucketConnect.managedOnWebRepositories', {
+          organization: organizationName ?? t('common.organization'),
+        })}
       />
     );
   }

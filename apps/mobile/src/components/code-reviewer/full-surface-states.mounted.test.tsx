@@ -168,6 +168,11 @@ vi.mock('react-native-reanimated', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { error: state.toastError } }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+// The token recovery card is a host node here, so a read-only case can assert
+// its absence; an unmocked component's source text never matches a node name.
+vi.mock('@/components/code-reviewer/bitbucket-setup-recovery', () => ({
+  BitbucketSetupRecovery: 'BitbucketSetupRecovery',
+}));
 vi.mock('@/components/empty-state', () => ({
   EmptyState: 'EmptyState',
   StateAction: 'StateAction',
@@ -589,7 +594,9 @@ describe('Reviewer repository bodies', () => {
     const { renderer, unmount } = await renderWithProviders(reposRoute());
     const empty = renderer.root.find(node => String(node.type) === 'EmptyState');
     expect(empty.props.title).toBe(i18n.t('codeReviewer.bitbucketConnect.managedOnWebTitle'));
-    expect(empty.props.description).toBe(i18n.t('codeReviewer.bitbucketConnect.managedOnWebShort'));
+    expect(empty.props.description).toBe(
+      i18n.t('codeReviewer.bitbucketConnect.managedOnWebRepositories', { organization: 'Acme' })
+    );
     expect(String(empty.props.description)).not.toContain('{{');
     expect(
       renderer.root.findAll(node => String(node.type) === 'BitbucketSetupRecovery')

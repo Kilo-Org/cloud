@@ -1389,6 +1389,7 @@
       "managedOnWeb": "Uxhumano lwe-Bitbucket lwe-{{organization}} luphathwa kuwebhu ngekhompyutha.",
       "managedOnWebTitle": "Iphathwa kuwebhu",
       "managedOnWebShort": "Luxhumano luphathwa kuwebhu ngekhompyutha.",
+      "managedOnWebRepositories": "Khetha amarekhodi ka-{{organization}} kuwebhu ngekhompyutha.",
       "description": "Dala ithokheni yokufinyelela endaweni yokusebenza ka-{{organization}}, bese uyinamathisela ngezansi.",
       "descriptionReconnect": "Dala ithokheni entsha yokufinyelela endaweni yokusebenza ka-{{organization}}, bese uyinamathisela ngezansi.",
       "scopes": "I-akhawunti: ukufunda · Izinqolobane zekhodi: ukufunda/ukubhala · Izicelo zokuhlanganisa ikhodi: ukufunda · Ama-webhook: ukufunda/ukubhala",

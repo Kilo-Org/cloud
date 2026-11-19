@@ -1389,6 +1389,7 @@
       "managedOnWeb": "Lidhja me Bitbucket e {{organization}} menaxhohet në ueb nga një kompjuter.",
       "managedOnWebTitle": "Menaxhohet në ueb",
       "managedOnWebShort": "Kjo lidhje menaxhohet në ueb nga një kompjuter.",
+      "managedOnWebRepositories": "Zgjidh repositorët për {{organization}} në ueb nga një kompjuter.",
       "description": "Krijo një token qasjeje për hapësirën e punës të organizatës {{organization}} dhe ngjite më poshtë.",
       "descriptionReconnect": "Krijo një token të ri qasjeje për hapësirën e punës të organizatës {{organization}} dhe ngjite më poshtë.",
       "scopes": "Llogaria: lexim · Depot: lexim/shkrim · PR: lexim · Webhook-et: lexim/shkrim",

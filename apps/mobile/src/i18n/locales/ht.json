@@ -1389,6 +1389,7 @@
       "managedOnWeb": "Koneksyon Bitbucket pou {{organization}} jere sou entènèt la, apati yon òdinatè.",
       "managedOnWebTitle": "Jere sou entènèt la",
       "managedOnWebShort": "Koneksyon sa a jere sou entènèt la, apati yon òdinatè.",
+      "managedOnWebRepositories": "Chwazi depo yo pou {{organization}} sou entènèt la, apati yon òdinatè.",
       "description": "Kreye yon jeton aksè pou espas travay la pou {{organization}}, epi kole li anba a.",
       "descriptionReconnect": "Kreye yon nouvo jeton aksè pou espas travay la pou {{organization}}, epi kole li anba a.",
       "scopes": "Kont: lekti · Depo: lekti/ekriti · Demann fizyon: lekti · Webhook: lekti/ekriti",

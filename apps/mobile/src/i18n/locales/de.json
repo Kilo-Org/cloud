@@ -700,6 +700,7 @@
       "managedOnWeb": "Die Bitbucket-Verbindung für {{organization}} wird im Web über einen Computer verwaltet.",
       "managedOnWebTitle": "Im Web verwaltet",
       "managedOnWebShort": "Diese Verbindung wird im Web über einen Computer verwaltet.",
+      "managedOnWebRepositories": "Wähle die Repositories für {{organization}} im Web über einen Computer aus.",
       "description": "Erstelle ein Workspace-Zugriffstoken für {{organization}} und füge es unten ein.",
       "descriptionReconnect": "Erstelle ein neues Workspace-Zugriffstoken für {{organization}} und füge es unten ein.",
       "scopes": "Konto: Lesen · Repositories: Lesen/Schreiben · Pull-Requests: Lesen · Webhooks: Lesen/Schreiben",

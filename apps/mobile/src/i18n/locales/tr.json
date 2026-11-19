@@ -700,6 +700,7 @@
       "managedOnWeb": "{{organization}} için Bitbucket bağlantısı bir bilgisayardan web üzerinden yönetilir.",
       "managedOnWebTitle": "Web üzerinden yönetilir",
       "managedOnWebShort": "Bu bağlantı bir bilgisayardan web üzerinden yönetilir.",
+      "managedOnWebRepositories": "{{organization}} için depoları bir bilgisayardan web üzerinden seç.",
       "description": "{{organization}} için bir çalışma alanı erişim belirteci oluştur ve aşağıya yapıştır.",
       "descriptionReconnect": "{{organization}} için yeni bir çalışma alanı erişim belirteci oluştur ve aşağıya yapıştır.",
       "scopes": "İzinler: Hesap okuma · Depo okuma/yazma · Çekme isteği okuma · Webhook okuma/yazma.",

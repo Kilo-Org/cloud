@@ -667,6 +667,7 @@
       "managedOnWeb": "La connexion Bitbucket à {{organization}} se gère sur le web, depuis un ordinateur.",
       "managedOnWebTitle": "Géré sur le web",
       "managedOnWebShort": "Cette connexion se gère sur le web, depuis un ordinateur.",
+      "managedOnWebRepositories": "Choisissez les dépôts de {{organization}} sur le web, depuis un ordinateur.",
       "description": "Créez un jeton d'accès à l'espace de travail pour {{organization}}, puis collez-le ci-dessous.",
       "descriptionReconnect": "Créez un nouveau jeton d'accès à l'espace de travail pour {{organization}}, puis collez-le ci-dessous.",
       "scopes": "Compte : lecture · Dépôts : lecture/écriture · Demandes de fusion : lecture · Webhooks : lecture/écriture",

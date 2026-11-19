@@ -700,6 +700,7 @@
       "managedOnWeb": "Połączeniem {{organization}} z Bitbucket zarządza się w przeglądarce na komputerze.",
       "managedOnWebTitle": "Zarządzane w przeglądarce",
       "managedOnWebShort": "To połączenie jest zarządzane w przeglądarce na komputerze.",
+      "managedOnWebRepositories": "Wybierz repozytoria dla {{organization}} w przeglądarce na komputerze.",
       "description": "Utwórz token dostępu do obszaru roboczego dla {{organization}} i wklej go poniżej.",
       "descriptionReconnect": "Utwórz nowy token dostępu do obszaru roboczego dla {{organization}} i wklej go poniżej.",
       "scopes": "Konto: odczyt · Repozytoria: odczyt/zapis · PR: odczyt · Webhooki: odczyt/zapis",

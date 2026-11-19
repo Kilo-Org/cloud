@@ -1389,6 +1389,7 @@
       "managedOnWeb": "Walqunnamtiin Bitbucket {{organization}}iif weebii irratti kompiitara irraa bulfama.",
       "managedOnWebTitle": "Weebii irratti bulfama",
       "managedOnWebShort": "Walqunnamtiin kun weebii irratti kompiitara irraa bulfama.",
+      "managedOnWebRepositories": "{{organization}}iif kuusaalee weebii irratti kompiitara irraa filadhu.",
       "description": "{{organization}}iif tokanii hayyama iddoo hojii uumiitii armaan gaditti maxxansi.",
       "descriptionReconnect": "{{organization}}iif tokanii haaraa hayyama iddoo hojii uumiitii armaan gaditti maxxansi.",
       "scopes": "Herrega: dubbisuu · Kuusaawwan koodii: dubbisuu/barreessuu · Gaaffii makuu: dubbisuu · Weebhuukii: dubbisuu/barreessuu",

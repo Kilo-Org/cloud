@@ -700,6 +700,7 @@
       "managedOnWeb": "Kết nối Bitbucket của {{organization}} được quản lý trên web từ máy tính.",
       "managedOnWebTitle": "Quản lý trên web",
       "managedOnWebShort": "Kết nối này được quản lý trên web từ máy tính.",
+      "managedOnWebRepositories": "Chọn kho lưu trữ cho {{organization}} trên web từ máy tính.",
       "description": "Tạo mã truy cập không gian làm việc cho {{organization}} rồi dán vào bên dưới.",
       "descriptionReconnect": "Tạo mã truy cập không gian làm việc mới cho {{organization}} rồi dán vào bên dưới.",
       "scopes": "Tài khoản: đọc · Kho lưu trữ: đọc/ghi · Yêu cầu hợp nhất: đọc · Webhook: đọc/ghi",

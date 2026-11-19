@@ -1412,6 +1412,7 @@
       "managedOnWeb": "Conexiunea Bitbucket pentru {{organization}} se gestionează pe web, de pe un computer.",
       "managedOnWebTitle": "Gestionată pe web",
       "managedOnWebShort": "Această conexiune se gestionează pe web, de pe un computer.",
+      "managedOnWebRepositories": "Alege repository-urile pentru {{organization}} pe web, de pe un computer.",
       "description": "Creează un token de acces la spațiul de lucru pentru {{organization}} și lipește-l mai jos.",
       "descriptionReconnect": "Creează un nou token de acces la spațiul de lucru pentru {{organization}} și lipește-l mai jos.",
       "scopes": "Cont: citire · Depozite: citire/scriere · PR-uri: citire · Webhook-uri: citire/scriere",

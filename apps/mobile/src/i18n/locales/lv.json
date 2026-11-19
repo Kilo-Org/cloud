@@ -1412,6 +1412,7 @@
       "managedOnWeb": "{{organization}} Bitbucket savienojums tiek pārvaldīts tīmeklī no datora.",
       "managedOnWebTitle": "Pārvaldīts tīmeklī",
       "managedOnWebShort": "Šis savienojums tiek pārvaldīts tīmeklī no datora.",
+      "managedOnWebRepositories": "Izvēlies repozitorijus priekš {{organization}} tīmeklī no datora.",
       "description": "Izveido darbvietas piekļuves pilnvaru priekš {{organization}} un ielīmē to zemāk.",
       "descriptionReconnect": "Izveido jaunu darbvietas piekļuves pilnvaru priekš {{organization}} un ielīmē to zemāk.",
       "scopes": "Konts: lasīšana · Repozitoriji: lasīšana/rakstīšana · Izmaiņu pieprasījumi: lasīšana · Tīmekļa aizķeres: lasīšana/rakstīšana",

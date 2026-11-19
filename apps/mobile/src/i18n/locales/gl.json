@@ -1389,6 +1389,7 @@
       "managedOnWeb": "A conexión de Bitbucket con {{organization}} xestiónase na web desde un ordenador.",
       "managedOnWebTitle": "Xestiónase na web",
       "managedOnWebShort": "Esta conexión xestiónase na web desde un ordenador.",
+      "managedOnWebRepositories": "Escolle os repositorios de {{organization}} na web desde un ordenador.",
       "description": "Crea un token de acceso ao espazo de traballo para {{organization}} e pégao aquí embaixo.",
       "descriptionReconnect": "Crea un novo token de acceso ao espazo de traballo para {{organization}} e pégao aquí embaixo.",
       "scopes": "Conta: lectura · Repositorios: lectura/escritura · Solicitudes de cambios: lectura · Webhooks: lectura/escritura",

@@ -349,9 +349,7 @@ describe('session transport routing', () => {
         const resolveSession = jest.fn((): Promise<ResolvedSession> =>
           Promise.resolve({ type: 'read-only', kiloSessionId: kiloId(SES_ID) })
         );
-        const fetchSnapshot = jest.fn(() =>
-          Promise.resolve(makeSnapshot({ id: SES_ID }, []))
-        );
+        const fetchSnapshot = jest.fn(() => Promise.resolve(makeSnapshot({ id: SES_ID }, [])));
         const fake = makeFakeUserWebConnection();
 
         const session = createCloudAgentSession({
@@ -411,9 +409,7 @@ describe('session transport routing', () => {
           .mockResolvedValueOnce({ type: 'read-only', kiloSessionId: kiloId(SES_ID) })
           .mockResolvedValueOnce({ type: 'read-only', kiloSessionId: kiloId(SES_ID) })
           .mockResolvedValue({ type: 'remote', kiloSessionId: kiloId(SES_ID) });
-        const fetchSnapshot = jest.fn(() =>
-          Promise.resolve(makeSnapshot({ id: SES_ID }, []))
-        );
+        const fetchSnapshot = jest.fn(() => Promise.resolve(makeSnapshot({ id: SES_ID }, [])));
         const fake = makeFakeUserWebConnection();
 
         const remoteApi = {
@@ -471,9 +467,7 @@ describe('session transport routing', () => {
         const resolveSession = jest.fn((): Promise<ResolvedSession> =>
           Promise.resolve({ type: 'read-only', kiloSessionId: kiloId(SES_ID) })
         );
-        const fetchSnapshot = jest.fn(() =>
-          Promise.resolve(makeSnapshot({ id: SES_ID }, []))
-        );
+        const fetchSnapshot = jest.fn(() => Promise.resolve(makeSnapshot({ id: SES_ID }, [])));
         const fake = makeFakeUserWebConnection();
 
         const session = createCloudAgentSession({

@@ -12,6 +12,8 @@ type QueryCallback = (error: Error | null, result: unknown) => void;
  */
 class RecordingClient extends EventEmitter {
   static created: RecordingClient[] = [];
+  /** Emitted on close, as the Workers socket does when pg closes it. */
+  static closeError: Error | undefined;
   readonly queries: string[] = [];
   ended = false;
   _queryable = true;
@@ -44,6 +46,7 @@ class RecordingClient extends EventEmitter {
     this.ended = true;
     this._ending = true;
     this._queryable = false;
+    if (RecordingClient.closeError) this.emit('error', RecordingClient.closeError);
     callback?.();
   }
 }
@@ -56,6 +59,7 @@ function recordingWorkerDb() {
 
 beforeEach(() => {
   RecordingClient.created = [];
+  RecordingClient.closeError = undefined;
 });
 
 describe('getWorkerDb transaction bounds', () => {
@@ -141,6 +145,20 @@ describe('getWorkerDb connection lifetime', () => {
     expect(warn).toHaveBeenCalledWith('Worker database connection failed', {
       error: failure.message,
     });
+    warn.mockRestore();
+  });
+
+  it('ignores the error that a connection emits when the pool closes it after use', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    RecordingClient.closeError = new Error('Stream was cancelled.');
+    const db = recordingWorkerDb();
+
+    await db.execute(sql`select 1`);
+    await db.transaction(async tx => tx.execute(sql`select 2`));
+
+    expect(RecordingClient.created.map(client => client.ended)).toEqual([true, true]);
+    expect(db.$client.totalCount).toBe(0);
+    expect(warn).not.toHaveBeenCalled();
     warn.mockRestore();
   });
 

@@ -103,13 +103,21 @@ function boundTransactionStarts(client: pg.PoolClient): void {
 
 /**
  * pg emits `error` on a checked-out connection that fails between statements, for example when
- * PostgreSQL ends an idle transaction. Without a listener the event is an uncaught exception. pg
- * still rejects the queries that use the failed connection.
+ * PostgreSQL ends an idle transaction. pg still rejects the queries that use the failed
+ * connection. The Workers socket also emits `error` when the pool closes a released connection,
+ * and pg-pool forwards errors of released connections to the pool. Without listeners each of
+ * these events is an uncaught exception. Only the failure of a checked-out connection is reported.
  */
-function reportConnectionErrors(client: pg.PoolClient): void {
-  client.on('error', error => {
-    console.warn('Worker database connection failed', { error: error.message });
+function reportConnectionErrors(pool: pg.Pool): void {
+  const released = new WeakSet<pg.PoolClient>();
+  pool.on('release', (_error, client) => released.add(client));
+  pool.on('connect', client => {
+    client.on('error', error => {
+      if (released.has(client)) return;
+      console.warn('Worker database connection failed', { error: error.message });
+    });
   });
+  pool.on('error', () => undefined);
 }
 
 /**
@@ -146,7 +154,7 @@ export function getWorkerDb(connectionString: string, options: GetWorkerDbOption
     types: databaseTypeParsers,
   });
   pool.on('connect', boundTransactionStarts);
-  pool.on('connect', reportConnectionErrors);
+  reportConnectionErrors(pool);
   return drizzle(pool, { schema });
 }
 

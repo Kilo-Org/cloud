@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "Дахин оролдоно уу.",
     "offlineTitle": "Ачаалж чадсангүй.",
+    "offlineDescription": "Сервертэй холбогдож чадсангүй. Холболтоо шалгаад, дахин оролдоно уу.",
     "permissionDescription": "Танд үүнийг үзэх эрх байхгүй.",
     "notFoundDescription": "Үүнийг устгасан эсвэл хандах боломжгүй болсон байж болзошгүй.",
     "serverTitle": "Ачаалж чадсангүй.",

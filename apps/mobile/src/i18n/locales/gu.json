@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "કૃપા કરીને ફરી પ્રયાસ કરો.",
     "offlineTitle": "લોડ કરી શકાયું નહીં.",
+    "offlineDescription": "સર્વર સુધી પહોંચી શકાયું નહીં. કનેક્શન તપાસો અને ફરી પ્રયાસ કરો.",
     "permissionDescription": "તમને આ જોવાની મંજૂરી નથી.",
     "notFoundDescription": "આ વસ્તુ દૂર કરવામાં આવી હોઈ શકે છે અથવા હવે ઉપલબ્ધ નથી.",
     "serverTitle": "લોડ કરી શકાયું નહીં.",

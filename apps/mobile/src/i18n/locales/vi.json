@@ -2509,6 +2509,7 @@
   "queryError": {
     "neutralDescription": "Vui lòng thử lại.",
     "offlineTitle": "Không thể tải dữ liệu.",
+    "offlineDescription": "Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối và thử lại.",
     "permissionDescription": "Bạn không có quyền xem nội dung này.",
     "notFoundDescription": "Mục này có thể đã bị xóa hoặc không còn truy cập được.",
     "serverTitle": "Không thể tải dữ liệu.",

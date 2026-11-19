@@ -2575,6 +2575,7 @@
   "queryError": {
     "neutralDescription": "Spróbuj ponownie.",
     "offlineTitle": "Nie udało się wczytać danych.",
+    "offlineDescription": "Nie udało się połączyć z serwerem. Sprawdź połączenie i spróbuj ponownie.",
     "permissionDescription": "Nie masz uprawnień, aby to wyświetlić.",
     "notFoundDescription": "Ten element mógł zostać usunięty lub nie jest już dostępny.",
     "serverTitle": "Nie udało się wczytać danych.",

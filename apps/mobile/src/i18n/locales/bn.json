@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "আবার চেষ্টা করুন।",
     "offlineTitle": "লোড করা যায়নি।",
+    "offlineDescription": "সার্ভারে পৌঁছানো যায়নি। আপনার সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।",
     "permissionDescription": "এটি দেখার অনুমতি আপনার নেই।",
     "notFoundDescription": "এই আইটেমটি হয়তো সরিয়ে ফেলা হয়েছে বা এখন আর পাওয়া যাচ্ছে না।",
     "serverTitle": "লোড করা যায়নি।",

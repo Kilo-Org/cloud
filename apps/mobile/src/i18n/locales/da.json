@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "Prøv igen.",
     "offlineTitle": "Indlæsningen mislykkedes.",
+    "offlineDescription": "Serveren kunne ikke nås. Tjek forbindelsen, og prøv igen.",
     "permissionDescription": "Du har ikke tilladelse til at se dette.",
     "notFoundDescription": "Indholdet er muligvis fjernet eller ikke længere tilgængeligt.",
     "serverTitle": "Indholdet kunne ikke indlæses.",

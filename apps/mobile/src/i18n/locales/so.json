@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "Fadlan mar kale isku day.",
     "offlineTitle": "Soo dejintu way fashilantay.",
+    "offlineDescription": "Adeegaha lama gaari karin. Hubi xiriirkaaga oo mar kale isku day.",
     "permissionDescription": "Ma haysatid oggolaansho aad tan ku aragto.",
     "notFoundDescription": "Waxaa dhici karta in shaygan la saaray ama aan mar dambe la heli karin.",
     "serverTitle": "Lama soo dejin karin.",

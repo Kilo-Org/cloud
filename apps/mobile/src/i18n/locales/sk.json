@@ -3164,6 +3164,7 @@
   "queryError": {
     "neutralDescription": "Skúste to znova.",
     "offlineTitle": "Načítanie zlyhalo.",
+    "offlineDescription": "Nepodarilo sa spojiť so serverom. Skontrolujte pripojenie a skúste to znova.",
     "permissionDescription": "Na zobrazenie nemáš oprávnenie.",
     "notFoundDescription": "Táto položka mohla byť odstránená alebo už nie je dostupná.",
     "serverTitle": "Údaje sa nepodarilo načítať.",

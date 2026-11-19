@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "Téntao de novo.",
     "offlineTitle": "Non se puido cargar.",
+    "offlineDescription": "Non se puido contactar co servidor. Comproba a conexión e téntao de novo.",
     "permissionDescription": "Non tes permiso para ver isto.",
     "notFoundDescription": "É posible que este elemento fose eliminado ou que xa non estea dispoñible.",
     "serverTitle": "Non se puido cargar.",

@@ -2542,6 +2542,7 @@
   "queryError": {
     "neutralDescription": "נסה שוב.",
     "offlineTitle": "הטעינה נכשלה.",
+    "offlineDescription": "לא ניתן להגיע לשרת. בדוק את החיבור ונסה שוב.",
     "permissionDescription": "אין לך הרשאה לצפות בזה.",
     "notFoundDescription": "ייתכן שהפריט הזה הוסר או שאינו זמין עוד.",
     "serverTitle": "לא ניתן לטעון את הנתונים.",

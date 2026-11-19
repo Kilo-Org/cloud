@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "Andramo indray azafady.",
     "offlineTitle": "Tsy nahomby ny fampidirana.",
+    "offlineDescription": "Tsy tafita nifandray tamin'ny mpizara. Jereo ny fifandraisana ary andramo indray.",
     "permissionDescription": "Tsy manana alalana hijery an'ity ianao.",
     "notFoundDescription": "Mety nesorina ity zavatra ity na tsy misy intsony.",
     "serverTitle": "Tsy nety nampidirina ny angona.",

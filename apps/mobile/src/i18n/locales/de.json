@@ -2509,6 +2509,7 @@
   "queryError": {
     "neutralDescription": "Bitte versuche es erneut.",
     "offlineTitle": "Das Laden ist fehlgeschlagen.",
+    "offlineDescription": "Der Server ist nicht erreichbar. Prüfe deine Verbindung und versuche es erneut.",
     "permissionDescription": "Du hast keine Berechtigung, diesen Inhalt anzusehen.",
     "notFoundDescription": "Dieses Element wurde möglicherweise entfernt oder ist nicht mehr verfügbar.",
     "serverTitle": "Die Daten konnten nicht geladen werden.",

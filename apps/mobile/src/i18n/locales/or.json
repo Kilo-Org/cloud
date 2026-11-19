@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "offlineTitle": "ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+    "offlineDescription": "ସର୍ଭର ସହିତ ସଂଯୋଗ ହୋଇପାରିଲା ନାହିଁ। ସଂଯୋଗ ଯାଞ୍ଚ କରନ୍ତୁ ଏବଂ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "permissionDescription": "ଏହା ଦେଖିବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
     "notFoundDescription": "ଏହି ଆଇଟମ୍‌ଟି ହଟାଯାଇଥାଇପାରେ କିମ୍ବା ଆଉ ଉପଲବ୍ଧ ନାହିଁ।",
     "serverTitle": "ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",

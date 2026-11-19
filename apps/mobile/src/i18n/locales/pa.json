@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "offlineTitle": "ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
+    "offlineDescription": "ਸਰਵਰ ਨਾਲ ਸੰਪਰਕ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "permissionDescription": "ਤੁਹਾਨੂੰ ਇਹ ਦੇਖਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
     "notFoundDescription": "ਇਹ ਆਈਟਮ ਹਟਾ ਦਿੱਤੀ ਗਈ ਹੋ ਸਕਦੀ ਹੈ ਜਾਂ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
     "serverTitle": "ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",

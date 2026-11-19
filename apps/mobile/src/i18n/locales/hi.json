@@ -2509,6 +2509,7 @@
   "queryError": {
     "neutralDescription": "कृपया फिर से कोशिश करें।",
     "offlineTitle": "डेटा लोड नहीं हो सका।",
+    "offlineDescription": "सर्वर से संपर्क नहीं हो सका। अपना कनेक्शन जाँचें और फिर से कोशिश करें।",
     "permissionDescription": "आपको इसे देखने की अनुमति नहीं है।",
     "notFoundDescription": "हो सकता है कि यह आइटम हटा दिया गया हो या अब उपलब्ध न हो।",
     "serverTitle": "डेटा लोड नहीं हो सका।",

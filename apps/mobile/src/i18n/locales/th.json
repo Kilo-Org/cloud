@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "กรุณาลองอีกครั้ง",
     "offlineTitle": "โหลดไม่สำเร็จ",
+    "offlineDescription": "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
     "permissionDescription": "คุณไม่มีสิทธิ์ดูข้อมูลนี้",
     "notFoundDescription": "รายการนี้อาจถูกลบหรือใช้งานไม่ได้แล้ว",
     "serverTitle": "โหลดไม่สำเร็จ",

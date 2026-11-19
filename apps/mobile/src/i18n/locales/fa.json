@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "لطفاً دوباره تلاش کنید.",
     "offlineTitle": "بارگذاری ناموفق بود.",
+    "offlineDescription": "به سرور دسترسی پیدا نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
     "permissionDescription": "اجازه مشاهده این مورد را ندارید.",
     "notFoundDescription": "این مورد ممکن است حذف شده باشد یا دیگر در دسترس نباشد.",
     "serverTitle": "بارگذاری ممکن نشد.",

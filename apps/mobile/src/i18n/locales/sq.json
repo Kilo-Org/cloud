@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "Provo përsëri.",
     "offlineTitle": "Ngarkimi dështoi.",
+    "offlineDescription": "Nuk mund të arrihet serveri. Kontrollo lidhjen dhe provo përsëri.",
     "permissionDescription": "Nuk ke leje për ta parë këtë.",
     "notFoundDescription": "Ky element mund të jetë hequr ose të mos jetë më i disponueshëm.",
     "serverTitle": "Nuk u krye ngarkimi.",

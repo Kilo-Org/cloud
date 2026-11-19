@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "Sila cuba lagi.",
     "offlineTitle": "Gagal memuatkan data.",
+    "offlineDescription": "Tidak dapat menghubungi pelayan. Semak sambungan anda dan cuba lagi.",
     "permissionDescription": "Anda tidak mempunyai kebenaran untuk melihat ini.",
     "notFoundDescription": "Item ini mungkin telah dibuang atau tidak lagi tersedia.",
     "serverTitle": "Tidak dapat memuatkan data.",

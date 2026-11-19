@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "Tafadhali jaribu tena.",
     "offlineTitle": "Imeshindikana kupakia.",
+    "offlineDescription": "Imeshindikana kufikia seva. Angalia muunganisho wako na ujaribu tena.",
     "permissionDescription": "Huna ruhusa ya kuona maudhui haya.",
     "notFoundDescription": "Kipengele hiki huenda kiliondolewa au hakipatikani tena.",
     "serverTitle": "Imeshindikana kupakia.",

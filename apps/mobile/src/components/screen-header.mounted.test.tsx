@@ -349,6 +349,48 @@ function renderHeader(props: ScreenHeaderProps): TestRenderer.ReactTestRenderer 
   return renderer;
 }
 
+/**
+ * The `min-h-11` row the centered branch lays the back control (when present),
+ * heading and trailing slots into. The balance fillers are that row's direct
+ * spacer children, positioned where they guard the title's window axis. Found
+ * by the heading it owns — the centered branch is the only place a
+ * `justify-center` flex row wraps `min-w-0 flex-1` — so a no-back variant
+ * reaches it without a control to anchor on.
+ */
+function findTitleRow(root: TestInstance): TestInstance {
+  const heading = root.findByProps({ accessibilityRole: 'header' }).parent?.parent;
+  if (!heading || String(heading.props.className ?? '') !== 'min-w-0 flex-1 flex-row items-center justify-center') {
+    throw new Error('centered heading not found');
+  }
+  const row = heading.parent;
+  if (!row || String(row.type) !== 'View') {
+    throw new Error('back control row not found');
+  }
+  return row;
+}
+
+type BalanceFillers = {
+  leading: TestInstance | undefined;
+  trailing: TestInstance | undefined;
+};
+
+/**
+ * The pair of spacer views the centered row mirrors its extents with (`style`
+ * width > 0, `shrink-0`, reader-hidden, noninteractive). The row keeps each
+ * filler at a FIXED ORDER sibling position: the leading one directly after the
+ * back control; the trailing one between the real trailing slots and the
+ * inline slot — the finders go by that contract's `testID`, since both carry
+ * it.
+ */
+function findBalanceFillers(row: TestInstance): BalanceFillers {
+  const byTestID = (testID: string): TestInstance | undefined =>
+    row.findAll(node => node.props.testID === testID)[0];
+  return {
+    leading: byTestID('screen-header-leading-filler'),
+    trailing: byTestID('screen-header-trailing-filler'),
+  };
+}
+
 describe('ScreenHeader mounted', () => {
   beforeEach(() => {
     routerState.routes = ['previous-screen', 'session-detail'];
@@ -991,7 +1033,7 @@ describe('ScreenHeader mounted', () => {
     expect(renderer.root.props.className).toContain('pt-3');
   });
 
-  it('keeps the modal close control on the centered title row with a mirroring spacer', () => {
+  it('keeps the modal close control on the centered title row with a mirroring filler', () => {
     const renderer = renderHeader({ title: 'Kilo Pass', modal: true });
 
     const row = findBackFrame(renderer.root).parent;
@@ -1005,26 +1047,24 @@ describe('ScreenHeader mounted', () => {
     expect(title.props.className).toContain('text-center');
     expect(title.parent?.parent?.parent).toBe(row);
 
-    const spacer = row.find(
-      node =>
-        typeof node.type === 'string' &&
-        (node.type as string) === 'View' &&
-        node.props.className === 'h-[48px] w-[48px] shrink-0'
-    );
-    expect(spacer).toBeDefined();
+    // Back-only: L = 48, T = 0 → leading filler 0, trailing filler min(48, free/2)
+    // = 48 at the phone window. The derived pair keeps `centeredControls`' exact
+    // trailing mirror, laid out with the same style-object width the fillers use.
+    const { leading, trailing } = findBalanceFillers(row);
+    expect(leading).toBeUndefined();
+    expect(trailing?.props.style).toEqual({ width: 48 });
   });
 
-  it('omits the mirroring spacer when the centered header has no back control', () => {
+  it('omits the mirroring filler when the centered header has no back control', () => {
     routerState.canGoBack.mockReturnValue(false);
     const renderer = renderHeader({ title: 'Kilo Pass', modal: true });
 
-    const spacers = renderer.root.findAll(
-      node =>
-        typeof node.type === 'string' &&
-        (node.type as string) === 'View' &&
-        node.props.className === 'h-[48px] w-[48px] shrink-0'
+    // L = 0 and T = 0: no in-row cluster pays a gap, so both fillers collapse.
+    const { leading, trailing } = findBalanceFillers(
+      findTitleRow(renderer.root)
     );
-    expect(spacers).toHaveLength(0);
+    expect(leading).toBeUndefined();
+    expect(trailing).toBeUndefined();
   });
 
   it.each([false, true])('keeps repository eyebrows on one line with RTL=%s', isRTL => {
@@ -1575,6 +1615,158 @@ describe('ScreenHeader mounted', () => {
     expect(rendered.root.findByProps({ accessibilityRole: 'header' }).props.ellipsizeMode).toBe(
       'tail'
     );
+  });
+});
+
+describe('centered title balance', () => {
+  // The measured fillers: L = 48 with a back control, T = the in-row
+  // slot extents plus their shared 12dp gap, free = rowWidth - L - T,
+  // leading filler clamp(T - L, 0, free/2), trailing filler
+  // clamp(L - T, 0, free/2) — the whole mirror weight moves to the
+  // under-weight end. A heading never lays out at zero width: the cap keeps
+  // at least free/2 for it in both directions.
+  // This describe owns its window geometry, as the actions describe does.
+  beforeEach(() => {
+    routerState.canGoBack.mockImplementation(() => routerState.routes.length > 1);
+    Object.assign(layout, { width: 390, fontScale: 1 });
+  });
+  afterEach(() => {
+    Object.assign(layout, { width: 390, fontScale: 1 });
+  });
+
+  it('balances a Save-style trailing cluster against the back control', () => {
+    // The Security Agent settings cluster: 140dp declared, at the 390dp phone
+    // window. L = 48, T = 152 (140 + its 12dp gap); the seed frame balances on
+    // the 390dp window: free = 390 - 48 - 152 = 190, so the leading filler is
+    // min(152 - 48, free/2 = 95) = 95 and the trailing one collapses.
+    const renderer = renderHeader({
+      title: 'Kilo Pass',
+      modal: true,
+      headerRight: 'SAVE',
+      headerRightWidth: 140,
+    });
+
+    const row = findTitleRow(renderer.root);
+    const { leading, trailing } = findBalanceFillers(row);
+    expect(trailing).toBeUndefined();
+    expect(leading?.props.style).toEqual({ width: 95 });
+    // The filler sits behind the back control: its parent is the row itself,
+    // and its index in the row's children is immediately after the back
+    // control's frame.
+    expect(leading?.parent).toBe(row);
+    expect(row.children.indexOf(findBackFrame(renderer.root))).toBe(0);
+    if (!leading) {
+      throw new Error('leading filler missing');
+    }
+    expect(row.children.indexOf(leading)).toBe(1);
+  });
+
+  it('refines the filler from the measured slot width after mount', () => {
+    // No declared width: the first frame balances on the 0 seed (no mirror),
+    // then onLayout reports the slot's real 140dp — the same filler this test
+    // then reads back. The row's layout event lands the 390dp window width,
+    // which the seed already used, so the filler only moves when the slot
+    // reports.
+    const renderer = renderHeader({
+      title: 'Kilo Pass',
+      modal: true,
+      headerRight: 'SAVE',
+    });
+
+    const row = findTitleRow(renderer.root);
+    const slot = findHeaderRight(row);
+    expect(findBalanceFillers(row).leading).toBeUndefined();
+
+    act(() => {
+      (slot.props.onLayout as (event: {
+        nativeEvent: { layout: { width: number; height: number } };
+      }) => void)({ nativeEvent: { layout: { width: 140, height: 48 } } });
+    });
+
+    // T = 152, L = 48, seed window 390: free = 190 → leading
+    // min(104, 95) = 95.
+    const { leading } = findBalanceFillers(row);
+    expect(leading?.props.style).toEqual({ width: 95 });
+  });
+
+  it('keeps the trailing mirror on the 48dp back-only header exactly', () => {
+    const renderer = renderHeader({ title: 'Kilo Pass', modal: true });
+
+    const { leading, trailing } = findBalanceFillers(findTitleRow(renderer.root));
+    expect(leading).toBeUndefined();
+    expect(trailing?.props.style).toEqual({ width: 48 });
+  });
+
+  it('puts the whole mirror on the leading filler with no back control', () => {
+    // The plan's no-back variant: an in-row cluster with NO back control has
+    // L = 0 and T = 152, the seed row = 390: free = 238, so the leading
+    // filler is min(152, 119) = 119 — the half it can take without squeezing
+    // the title under half the free space — and the trailing filler
+    // collapses. (The title still centers better than the old fixed-48
+    // mirror, which ignored the cluster entirely.)
+    routerState.canGoBack.mockReturnValue(false);
+    const renderer = renderHeader({
+      title: 'Kilo Pass',
+      modal: true,
+      headerRight: 'SAVE',
+      headerRightWidth: 140,
+    });
+
+    const row = findTitleRow(renderer.root);
+    const { leading, trailing } = findBalanceFillers(row);
+    expect(leading?.props.style).toEqual({ width: 119 });
+    expect(trailing).toBeUndefined();
+    // The leading filler is the row's FIRST child when no control came
+    // before it.
+    if (!leading) {
+      throw new Error('leading filler missing');
+    }
+    expect(row.children.indexOf(leading)).toBe(0);
+  });
+
+  it('keeps a 0-width heading impossible when the mirror demand exceeds the row', () => {
+    // The cap case: a 232dp window (reflow opt-out on) with the 140dp cluster
+    // has L = 48, T = 152 → free = 232 - 48 - 152 = 32; the uncapped mirror
+    // would demand 104dp of filler and leave the heading negative. The cap
+    // holds the leading filler to free/2 = 16, and the heading keeps the
+    // other 16dp of free space plus the shared gap the filler does not take —
+    // a 0-width heading is impossible in both directions.
+    layout.width = 232;
+    const renderer = renderHeader({
+      title: 'Kilo Pass',
+      modal: true,
+      headerRight: 'SHARE REVIEW MERGE',
+      headerRightWidth: 140,
+      allowHeaderRightStacking: false,
+    });
+
+    const row = findTitleRow(renderer.root);
+    const { leading, trailing } = findBalanceFillers(row);
+    expect(leading?.props.style).toEqual({ width: 16 });
+    expect(trailing).toBeUndefined();
+    // The heading itself never lays out at zero width: it is flex-1 over
+    // min-w-0 with the filler capped at half the free space.
+    const heading = row.find(node => node.props.className === 'min-w-0 flex-1');
+    expect(heading).toBeDefined();
+  });
+
+  it('keeps the stacked reflow free of in-row fillers', () => {
+    // A window too narrow for the title and the cluster stacks the cluster,
+    // which removes the in-row trailing extent — the mirror collapses so the
+    // back-only 48dp mirror survives unchanged.
+    layout.width = 160;
+    layout.fontScale = 1.5;
+    const renderer = renderHeader({
+      title: 'Kilo Pass',
+      modal: true,
+      headerRight: 'SAVE',
+      headerRightWidth: 140,
+    });
+
+    expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
+    const { leading, trailing } = findBalanceFillers(findTitleRow(renderer.root));
+    expect(leading).toBeUndefined();
+    expect(trailing?.props.style).toEqual({ width: 48 });
   });
 });
 

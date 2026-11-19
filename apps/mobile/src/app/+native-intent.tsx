@@ -109,6 +109,13 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/attachment-chip-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/attachment-chip-fixture';
     }
+    // Dev-only header geometry fixture: a centered title against each trailing
+    // variant the plan names (`?variant=cluster|back-only|no-back`, default
+    // cluster), so the emulator probe can measure all three from one link.
+    const headerBalanceFixture = /(?:^|\/)dev\/header-balance-fixture\/?(\?.*)?$/.exec(path);
+    if (headerBalanceFixture) {
+      return `/(app)/header-balance-fixture${headerBalanceFixture[1] ?? ''}`;
+    }
     if (/(?:^|\/)dev\/preparation-copy-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/preparation-copy-fixture';
     }

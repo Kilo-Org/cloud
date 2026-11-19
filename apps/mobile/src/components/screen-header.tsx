@@ -1,10 +1,10 @@
 /* eslint-disable max-lines -- one header contract: the title, eyebrow and subtitle slots, the back control, the action reflow, and the safe-area and offline-banner rules must stay in step */
 import { type Href, useNavigationContainerRef, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { type ReactElement, useEffect, useState } from 'react';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { ChevronDown } from '@/components/ui/icons';
 import { DirectionalChevronLeft } from '@/components/ui/directional-icons';
-import { Platform, Pressable, useWindowDimensions, View } from 'react-native';
+import { type LayoutChangeEvent, Platform, Pressable, useWindowDimensions, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
@@ -66,6 +66,14 @@ const HEADER_CONTENT_GUTTER = 44;
  * as well whenever the row holds both.
  */
 const HEADER_ACTIONS_GAP = 12;
+
+/**
+ * The centered row's leading extent (dp): the width of the 48dp icon target
+ * the back control draws, whichever call site renders it. The balance filler
+ * treats the whole 48dp box as the leading weight, matching the audit's
+ * control rect (see `ICON_TARGET_BOX_CLASS`).
+ */
+const HEADER_LEADING_COLUMN_WIDTH = 48;
 
 type HeaderStackingWidths = {
   /**
@@ -798,17 +806,109 @@ export function ScreenHeader({
   const headerRightSlotClassName = headerRightShrinks
     ? 'ms-3 max-w-[50%] min-w-0 shrink'
     : 'ms-3 shrink-0';
-  const centeredControls =
-    separateHeading &&
-    backControl &&
-    (!inlineActions || stackInlineActions) &&
-    (!headerRight || stackActions) ? (
+  // A centered title balances against BOTH row ends, not just the leading one.
+  // `centeredControls` mirrored only the 48dp back control, which left the
+  // heading's flex box asymmetric whenever an in-row trailing cluster shared
+  // the row: `[48][flex heading][cluster]` puts the title's center (L - T)/2
+  // off the window axis — a 140dp Save-style cluster biases it ~52dp left, an
+  // icon cluster ~14dp, and a cluster with NO back control biases it by half
+  // its own extent. The fix gives each end the FULL extent it mirrors:
+  //
+  //   leading filler  = clamp(T - L, 0, free/2)  behind the back control
+  //   trailing filler = clamp(L - T, 0, free/2)  before the trailing slots
+  //
+  // where L is the leading extent (48 for a back control, else 0), T the
+  // in-row trailing extent (slot extents plus their shared gap) and
+  // `free = rowWidth - L - T`. Identical buts, complementary extents: when
+  // T > L the leading filler carries the whole T-minus-shared-gap weight the
+  // old spacer put only on 48dp — so the back-only header keeps exactly
+  // `centeredControls`' 48dp mirror (T = 0 → trailing filler = 48) — and when
+  // L > T (no, or narrower, trailing slots) the trailing filler takes over
+  // the balancing duty on that end. The `free/2` cap keeps the heading at
+  // least half of the free space, so a measured-width cluster can never
+  // recreate the feedback loop reading its own mirror would open, and a
+  // fully-mirrored fixed cluster keeps at least its own measured width — a
+  // 0-width heading is impossible in both directions.
+  //
+  // The seeds come from the declared `headerRightWidth`/`inlineActionsWidth`
+  // (the same declared widths the stacking decision reserves), so the FIRST
+  // frame is already balanced and nothing shifts when `onLayout` reports; the
+  // layout handlers then refine each slot's real laid-out width. Stale seeds
+  // can never reapply across a cluster's mount state: the mirror is derived
+  // from which slots are in the row at render time, so a reflowed (absent)
+  // slot contributes nothing, and each slot's measured extent rides that
+  // slot's own `onLayout`. A slot removed from the row by a reflow never
+  // reports: its stale number is excluded at derive time, from the render
+  // where it left.
+  const inRowHeaderRight = headerRight && !stackActions ? headerRight : null;
+  const inRowInlineActions = inlineActions && !stackInlineActions ? inlineActions : null;
+  // Measured extents live in one state pair; both hooks stay mounted at the
+  // top level, whatever the row currently draws.
+  const [layoutExtents, setLayoutExtents] = useState({
+    headerRight: Number.NaN,
+    inlineActions: Number.NaN,
+  });
+  const [rowWidth, setRowWidth] = useState<number | null>(null);
+  const onHeaderRightLayout = (event: LayoutChangeEvent) => {
+    const next = event.nativeEvent.layout.width;
+    setLayoutExtents(state => ({ ...state, headerRight: next }));
+  };
+  const onInlineActionsLayout = (event: LayoutChangeEvent) => {
+    const next = event.nativeEvent.layout.width;
+    setLayoutExtents(state => ({ ...state, inlineActions: next }));
+  };
+  const onRowLayout = (event: LayoutChangeEvent) => {
+    const next = event.nativeEvent.layout.width;
+    setRowWidth(next);
+  };
+  const measuredHeaderRightSlot = inRowHeaderRight ? layoutExtents.headerRight : Number.NaN;
+  const measuredInlineActionsSlot = inRowInlineActions ? layoutExtents.inlineActions : Number.NaN;
+  // The declared widths are the same dp the caller gives the stacking decision;
+  // a slot that has not laid out yet balances on its declared extent instead,
+  // so the first paint is already on the axis and nothing shifts when the
+  // layout handler lands.
+  const seededHeaderRight = inRowHeaderRight ? (headerRightWidth ?? 0) : 0;
+  const seededInlineActions = inRowInlineActions ? (inlineActionsWidth ?? 0) : 0;
+  const headerRightExtent = Number.isFinite(measuredHeaderRightSlot)
+    ? measuredHeaderRightSlot
+    : seededHeaderRight;
+  const inlineActionsExtent = Number.isFinite(measuredInlineActionsSlot)
+    ? measuredInlineActionsSlot
+    : seededInlineActions;
+  // Each in-row slot pays its own `ms-3` gap to the title; a reflowed
+  // (absent) slot pays nothing. Presence decides the gap, never the seed: a
+  // slot with no declared width and no layout yet still owns its gap.
+  const hasInRowTrailingSlot = inRowHeaderRight != null || inRowInlineActions != null;
+  const trailingExtent =
+    (hasInRowTrailingSlot ? HEADER_ACTIONS_GAP : 0) + headerRightExtent + inlineActionsExtent;
+  const leadingExtent = separateHeading && backControl ? HEADER_LEADING_COLUMN_WIDTH : 0;
+  const resolvedRowWidth = rowWidth ?? windowWidth;
+  const free = Math.max(0, resolvedRowWidth - leadingExtent - trailingExtent);
+  const leadingFillerWidth = Math.max(0, Math.min(trailingExtent - leadingExtent, free / 2));
+  const trailingFillerWidth = Math.max(0, Math.min(leadingExtent - trailingExtent, free / 2));
+  // The mirrored extents are spacer boxes, not controls: they paint nothing,
+  // hold no reader, and never take a touch. An extent that balances to zero
+  // lays out no filler node at all, but each filler keeps its row ORDER fixed:
+  // `leadingFiller` is always the back control's next sibling and
+  // `trailingFiller` always sits between the real trailing slots and the
+  // inline slot, so a reflowed cluster's gap can never be stranded on the
+  // filler's far side.
+  const balanceFiller = (width: number, testID: string): ReactElement | null => {
+    if (width <= 0) {
+      return null;
+    }
+    return (
       <View
-        className="h-[48px] w-[48px] shrink-0"
-        accessibilityElementsHidden
+        testID={testID}
+        style={{ width: Math.round(width) }}
+        className="shrink-0"
+        aria-hidden
         pointerEvents="none"
       />
-    ) : null;
+    );
+  };
+  const leadingFiller = balanceFiller(leadingFillerWidth, 'screen-header-leading-filler');
+  const trailingFiller = balanceFiller(trailingFillerWidth, 'screen-header-trailing-filler');
   // The inline controls keep the title's row only while it can still hold a
   // readable title; below that they take a row of their own. On their own row
   // they keep the header's full width, so a long translation (Croatian
@@ -823,7 +923,10 @@ export function ScreenHeader({
   // free space can never go negative, so the heading always keeps its share.
   const inlineActionsSlot =
     inlineActions && !stackInlineActions ? (
-      <View className={cn('ms-3 min-w-0 shrink', !allowInlineActionsStacking && 'max-w-[50%]')}>
+      <View
+        className={cn('ms-3 min-w-0 shrink', !allowInlineActionsStacking && 'max-w-[50%]')}
+        onLayout={onInlineActionsLayout}
+      >
         {inlineActions}
       </View>
     ) : null;
@@ -837,15 +940,17 @@ export function ScreenHeader({
       <View style={sideInsetStyle}>
         {separateHeading ? (
           <>
-            <View className="min-h-11 flex-row items-center">
+            <View className="min-h-11 flex-row items-center" onLayout={onRowLayout}>
               {backControl}
+              {leadingFiller}
               <View className="min-w-0 flex-1 flex-row items-center justify-center">{heading}</View>
               {reservedTitleBand}
               {headerRight && !stackActions ? (
-                <View className={headerRightSlotClassName}>{headerRight}</View>
-              ) : (
-                centeredControls
-              )}
+                <View className={headerRightSlotClassName} onLayout={onHeaderRightLayout}>
+                  {headerRight}
+                </View>
+              ) : null}
+              {trailingFiller}
               {inlineActionsSlot}
             </View>
             {headerRight && stackActions ? (
@@ -859,7 +964,7 @@ export function ScreenHeader({
           </>
         ) : (
           <>
-            <View className="flex-row items-center">
+            <View className="flex-row items-center" onLayout={onRowLayout}>
               <View className="min-w-0 flex-1 flex-row items-center gap-1">
                 {leadingControl}
                 {heading}

@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useConfirm } from '@/components/ui/confirm';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
+import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { GitHubConnectionAttemptState } from './GitHubConnectionAttemptState';
@@ -60,7 +61,7 @@ export function OrganizationGitHubInstallations({
     () =>
       openRouterModels?.data.map(model => ({
         id: model.id,
-        name: model.name,
+        name: modelNameWithRetirement(model),
         isFree: model.isFree,
         mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
         hasUserByokAvailable: model.hasUserByokAvailable,

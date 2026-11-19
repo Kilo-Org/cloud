@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { inferRouterOutputs } from '@trpc/server';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { RootRouter } from '@/routers/root-router';
+import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -203,7 +204,7 @@ export function BYOKRoutingPreview({
         .filter(model => !DIRECT_BYOK_MODEL_PREFIXES.some(prefix => model.id.startsWith(prefix)))
         .map(model => ({
           id: model.id,
-          name: model.name,
+          name: modelNameWithRetirement(model),
           isFree: model.isFree,
           mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
           hasUserByokAvailable: model.hasUserByokAvailable,

@@ -3,6 +3,7 @@
 import { useEffect, useId, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { RotateCcw } from 'lucide-react';
+import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -66,7 +67,7 @@ export function ModelContextLimitsSection({
         )
         .map(model => ({
           id: model.id,
-          name: model.name,
+          name: modelNameWithRetirement(model),
           isFree: model.isFree,
           mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
           hasUserByokAvailable: model.hasUserByokAvailable,
@@ -120,7 +121,7 @@ export function ModelContextLimitsSection({
                   <div className="flex min-w-0 flex-col">
                     <span className="truncate text-sm font-medium">
                       {catalogModel
-                        ? formatShortModelDisplayName(catalogModel.name)
+                        ? formatShortModelDisplayName(modelNameWithRetirement(catalogModel))
                         : formatShortModelDisplayName(model)}
                     </span>
                     <span className="text-muted-foreground truncate font-mono text-xs">

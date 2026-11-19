@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { getWebhookRoutes } from '@/lib/webhook-routes';
+import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 
 import { Button } from '@/components/ui/button';
 import { LinkButton } from '@/components/Button';
@@ -91,7 +92,7 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
     () =>
       (modelsData?.data || []).map(model => ({
         id: model.id,
-        name: model.name,
+        name: modelNameWithRetirement(model),
         isFree: model.isFree,
         mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
         hasUserByokAvailable: model.hasUserByokAvailable,

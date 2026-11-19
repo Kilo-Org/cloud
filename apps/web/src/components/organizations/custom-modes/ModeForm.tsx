@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select';
 import type { OrganizationMode } from '@/lib/organizations/organization-modes';
 import type { EditGroupConfig } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 import { Save, FileText } from 'lucide-react';
 import { useModeTemplates } from './useModeTemplates';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
@@ -555,8 +556,10 @@ export function ModeForm({
                       <SelectItem key={model.id} value={model.id}>
                         <div className="flex flex-col">
                           <span className="font-mono text-sm">{model.id}</span>
-                          {model.name !== model.id && (
-                            <span className="text-muted-foreground text-xs">{model.name}</span>
+                          {modelNameWithRetirement(model) !== model.id && (
+                            <span className="text-muted-foreground text-xs">
+                              {modelNameWithRetirement(model)}
+                            </span>
                           )}
                         </div>
                       </SelectItem>

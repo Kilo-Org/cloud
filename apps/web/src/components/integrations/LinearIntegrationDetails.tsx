@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
+import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -66,7 +67,7 @@ export function LinearIntegrationDetails({
     return (
       openRouterModels?.data.map(model => ({
         id: model.id,
-        name: model.name,
+        name: modelNameWithRetirement(model),
         isFree: model.isFree,
         mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
         hasUserByokAvailable: model.hasUserByokAvailable,

@@ -19,6 +19,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
+import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 import { GatewayModelListConfigSchema } from '@kilocode/db/schema-types';
 import { formatZodError } from '@/lib/zod/format-zod-error';
 import type { GatewayModelList } from '@/routers/admin/gateway-model-lists-router';
@@ -63,7 +64,10 @@ export function GatewayModelListContent({
   }, [savedModels]);
 
   const catalogNames = useMemo(
-    () => new Map((catalogQuery.data ?? []).map(model => [model.id, model.name])),
+    () =>
+      new Map(
+        (catalogQuery.data ?? []).map(model => [model.id, modelNameWithRetirement(model)])
+      ),
     [catalogQuery.data]
   );
 
@@ -71,7 +75,7 @@ export function GatewayModelListContent({
     const selected = new Set(models);
     return (catalogQuery.data ?? [])
       .filter(model => !selected.has(model.id))
-      .map(model => ({ id: model.id, name: model.name }));
+      .map(model => ({ id: model.id, name: modelNameWithRetirement(model) }));
   }, [catalogQuery.data, models]);
 
   const mutation = useMutation(

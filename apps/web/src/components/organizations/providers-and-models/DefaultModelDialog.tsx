@@ -6,6 +6,7 @@ import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useConfigureOrganizationDefaultBehavior } from '@/app/api/organizations/hooks';
+import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { LockableContainer } from '../LockableContainer';
 import { Badge } from '@/components/ui/badge';
@@ -330,8 +331,10 @@ export function DefaultModelDialog({
                       <SelectItem key={model.id} value={model.id}>
                         <div className="flex flex-col">
                           <span className="font-mono text-sm">{model.id}</span>
-                          {model.name !== model.id && (
-                            <span className="text-muted-foreground text-xs">{model.name}</span>
+                          {modelNameWithRetirement(model) !== model.id && (
+                            <span className="text-muted-foreground text-xs">
+                              {modelNameWithRetirement(model)}
+                            </span>
                           )}
                         </div>
                       </SelectItem>
@@ -378,8 +381,10 @@ export function DefaultModelDialog({
                       <SelectItem key={model.id} value={model.id}>
                         <div className="flex flex-col">
                           <span className="font-mono text-sm">{model.id}</span>
-                          {model.name !== model.id && (
-                            <span className="text-muted-foreground text-xs">{model.name}</span>
+                          {modelNameWithRetirement(model) !== model.id && (
+                            <span className="text-muted-foreground text-xs">
+                              {modelNameWithRetirement(model)}
+                            </span>
                           )}
                         </div>
                       </SelectItem>

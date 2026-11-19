@@ -1,6 +1,7 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { modelStats } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
+import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { OpenRouterModel as OpenRouterApiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { deriveModelStatsIdentity } from '@kilocode/worker-utils/kilo-model-id';
@@ -70,7 +71,7 @@ export async function syncOpenRouterModels(
           isActive: true,
           isRecommended,
           ...deriveModelStatsIdentity(model.id),
-          name: model.name,
+          name: modelNameWithRetirement(model),
           description: model.description,
           priceInput: toPricePerMillion(model.pricing?.prompt),
           priceOutput: toPricePerMillion(model.pricing?.completion),
@@ -87,7 +88,7 @@ export async function syncOpenRouterModels(
         isRecommended,
         openrouterId: model.id,
         ...deriveModelStatsIdentity(model.id),
-        name: model.name,
+        name: modelNameWithRetirement(model),
         description: model.description,
         priceInput: toPricePerMillion(model.pricing?.prompt),
         priceOutput: toPricePerMillion(model.pricing?.completion),

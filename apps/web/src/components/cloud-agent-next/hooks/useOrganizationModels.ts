@@ -5,6 +5,7 @@
  */
 
 import { useMemo } from 'react';
+import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
 import { buildContextLengthByModelId } from '@/components/cloud-agent-next/model-context-lengths';
@@ -45,7 +46,7 @@ export function useOrganizationModels(
     return (
       openRouterModels?.data.map(model => ({
         id: model.id,
-        name: model.name,
+        name: modelNameWithRetirement(model),
         isFree: model.isFree,
         mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
         hasUserByokAvailable: model.hasUserByokAvailable,

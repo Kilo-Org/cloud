@@ -21,6 +21,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { Trash2 } from 'lucide-react';
 import React, { useId, useMemo, useState } from 'react';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
+import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -132,7 +133,7 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
         )
         .map(model => ({
           id: model.id,
-          name: model.name,
+          name: modelNameWithRetirement(model),
           isFree: model.isFree,
           mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
           hasUserByokAvailable: model.hasUserByokAvailable,

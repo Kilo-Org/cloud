@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { ModelOption } from '@/app/admin/alerting/types';
 import { OpenRouterModelsResponseSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { z } from 'zod';
 
@@ -45,7 +46,7 @@ export function useAddModelSearch(search: string): AddModelSearchResult {
       const id = normalizeModelId(model.id);
       if (seen.has(id)) continue;
       seen.add(id);
-      mapped.push({ openrouterId: id, name: model.name || id });
+      mapped.push({ openrouterId: id, name: modelNameWithRetirement(model) || id });
     }
 
     if (!search.trim()) return mapped;

@@ -2,6 +2,7 @@
 import {
   getSecurityAnalysisDetailPresentation,
   getSecurityFindingAnalysisState,
+  remediationNeedsAnalysisRefresh,
 } from '@kilocode/app-shared/security-agent';
 import { ExternalLink, ScanSearch } from '@/components/ui/icons';
 import { View } from 'react-native';
@@ -40,7 +41,7 @@ import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { LTR_TEXT_DIRECTION } from '@/lib/rtl-text';
-import { remediationNeedsAnalysisRefresh, type SecurityAnalysis } from '@/lib/security-agent';
+import { type SecurityAnalysis } from '@/lib/security-agent';
 import {
   getAnalysisCapacityBlockedHint,
   getSecurityAnalysisDetailDescription,

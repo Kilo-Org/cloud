@@ -83,6 +83,8 @@ import {
   getFindingSeverityPresentation,
   getFindingSourceLabel,
   getSupersedingFindingId as getSharedSupersedingFindingId,
+  hasRegisteredRemediationAttempt as hasRegisteredRemediationAttemptShared,
+  remediationNeedsAnalysisRefresh as remediationNeedsAnalysisRefreshShared,
 } from '@kilocode/app-shared/security-agent';
 
 type FindingAnalysis = SecurityFinding['analysis'];
@@ -3071,9 +3073,11 @@ export function FindingDetailDialog({
   const effectiveRemediationOutcomeSummary = isEffectiveRemediationActive
     ? null
     : (remediationSummary?.outcomeSummary ?? null);
-  const hasRegisteredRemediationAttempt =
-    remediationAttempts.length > 0 ||
-    Boolean(remediationSummary?.latestAttemptId ?? remediationSummary?.latestAttempt?.id);
+  const hasRegisteredRemediationAttempt = hasRegisteredRemediationAttemptShared({
+    remediationAttempts,
+    remediationCapability,
+    remediationSummary,
+  });
   const activeRemediationAttemptId = isEffectiveRemediationActive
     ? (remediationCapability?.cancelAttemptId ??
       latestHistoryAttempt?.id ??
@@ -3095,10 +3099,11 @@ export function FindingDetailDialog({
     effectiveRemediationStatus === 'pr_opened'
       ? getRemediationUnavailableCopy('pr_already_opened')
       : remediationUnavailableCopy;
-  const remediationNeedsAnalysisRefresh =
-    !hasRegisteredRemediationAttempt &&
-    (remediationCapability?.startReason === 'stale_analysis' ||
-      remediationCapability?.retryReason === 'stale_analysis');
+  const remediationNeedsAnalysisRefresh = remediationNeedsAnalysisRefreshShared({
+    remediationAttempts,
+    remediationCapability,
+    remediationSummary,
+  });
   const remediationNeedsCodebaseAnalysis =
     !hasRegisteredRemediationAttempt &&
     !isEffectiveRemediationActive &&

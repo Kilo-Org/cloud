@@ -1,5 +1,8 @@
 /* eslint-disable max-lines -- the panel composes the status card, remediation controls, summary PR button, timeline, and attempt history; each is a small rendered surface that mirrors the shared remediation pattern. Splitting would re-encode the same hooks. */
-import { getRemediationStatusPresentation } from '@kilocode/app-shared/security-agent';
+import {
+  getRemediationStatusPresentation,
+  remediationNeedsAnalysisRefresh,
+} from '@kilocode/app-shared/security-agent';
 import { Wrench } from '@/components/ui/icons';
 import { useRouter } from 'expo-router';
 import { type TFunction } from 'i18next';
@@ -33,7 +36,7 @@ import {
 } from '@/lib/hooks/use-security-remediation';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { remediationNeedsAnalysisRefresh, type SecurityAnalysis } from '@/lib/security-agent';
+import { type SecurityAnalysis } from '@/lib/security-agent';
 import { getRemediationUnavailableKey } from '@/lib/security-agent-copy';
 import { openFindingLink } from '@/lib/security-agent-link';
 import { firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';

@@ -4622,7 +4622,7 @@
       "new": "新增觸發器",
       "create": "建立觸發器",
       "emptyTitle": "尚無觸發器",
-      "emptyDescription": "建立觸發器，以透過網路鉤子呼叫或排程啟動 Cloud Agent 執行。",
+      "emptyDescription": "建立你的第一個觸發器。",
       "loadFailedTitle": "無法載入觸發器",
       "loadFailedDescription": "有連線時請再試一次。",
       "detailLoadFailedTitle": "無法載入此觸發器",

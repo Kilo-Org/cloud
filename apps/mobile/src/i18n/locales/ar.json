@@ -4906,7 +4906,7 @@
       "new": "مشغل جديد",
       "create": "أنشئ مشغلاً",
       "emptyTitle": "لا توجد مشغلات بعد",
-      "emptyDescription": "أنشئ مشغلاً لبدء تشغيل Cloud Agent من استدعاء ويب هوك أو وفق جدول زمني.",
+      "emptyDescription": "أنشئ أول مشغّل.",
       "loadFailedTitle": "تعذر تحميل المشغلات",
       "loadFailedDescription": "أعد المحاولة عندما يكون لديك اتصال.",
       "detailLoadFailedTitle": "تعذر تحميل هذا المشغل",

@@ -4622,7 +4622,7 @@
       "new": "Shkaktar i ri",
       "create": "Krijo shkaktar",
       "emptyTitle": "Nuk ka shkaktarë ende",
-      "emptyDescription": "Krijo një shkaktar për të nisur një ekzekutim të Cloud Agent nga një thirrje webhook ose sipas një planifikimi.",
+      "emptyDescription": "Krijo shkaktarin tënd të parë.",
       "loadFailedTitle": "Shkaktarët nuk mund të ngarkoheshin",
       "loadFailedDescription": "Provo përsëri kur të kesh lidhje.",
       "detailLoadFailedTitle": "Ky shkaktar nuk mund të ngarkohej",

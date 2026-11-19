@@ -4622,7 +4622,7 @@
       "new": "Nieuwe trigger",
       "create": "Trigger aanmaken",
       "emptyTitle": "Nog geen triggers",
-      "emptyDescription": "Maak een trigger om een Cloud Agent-uitvoering te starten via een webhookaanroep of volgens een planning.",
+      "emptyDescription": "Maak je eerste trigger.",
       "loadFailedTitle": "Kan triggers niet laden",
       "loadFailedDescription": "Probeer het opnieuw wanneer je verbinding hebt.",
       "detailLoadFailedTitle": "Kan deze trigger niet laden",

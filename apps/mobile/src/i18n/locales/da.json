@@ -4622,7 +4622,7 @@
       "new": "Ny udløser",
       "create": "Opret udløser",
       "emptyTitle": "Ingen udløsere endnu",
-      "emptyDescription": "Opret en udløser for at starte en Cloud Agent-kørsel fra et webhook-kald eller efter en tidsplan.",
+      "emptyDescription": "Opret din første udløser.",
       "loadFailedTitle": "Kunne ikke indlæse udløsere",
       "loadFailedDescription": "Prøv igen, når du har forbindelse.",
       "detailLoadFailedTitle": "Kunne ikke indlæse denne udløser",

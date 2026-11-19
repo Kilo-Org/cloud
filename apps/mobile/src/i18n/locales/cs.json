@@ -4764,7 +4764,7 @@
       "new": "Nový spouštěč",
       "create": "Vytvořit spouštěč",
       "emptyTitle": "Zatím žádné spouštěče",
-      "emptyDescription": "Vytvořte spouštěč pro spuštění Cloud Agent voláním webhooku nebo podle plánu.",
+      "emptyDescription": "Vytvořte svůj první spouštěč.",
       "loadFailedTitle": "Spouštěče se nepodařilo načíst",
       "loadFailedDescription": "Zkuste to znovu, až budete mít připojení.",
       "detailLoadFailedTitle": "Tento spouštěč se nepodařilo načíst",

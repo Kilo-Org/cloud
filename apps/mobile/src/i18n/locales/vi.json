@@ -4622,7 +4622,7 @@
       "new": "Trình kích hoạt mới",
       "create": "Tạo trình kích hoạt",
       "emptyTitle": "Chưa có trình kích hoạt nào",
-      "emptyDescription": "Tạo trình kích hoạt để bắt đầu một lần chạy Cloud Agent từ lệnh gọi webhook hoặc theo lịch.",
+      "emptyDescription": "Tạo trình kích hoạt đầu tiên của bạn.",
       "loadFailedTitle": "Không thể tải trình kích hoạt",
       "loadFailedDescription": "Hãy thử lại khi bạn có kết nối.",
       "detailLoadFailedTitle": "Không thể tải trình kích hoạt này",

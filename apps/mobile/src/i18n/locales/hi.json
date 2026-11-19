@@ -4622,7 +4622,7 @@
       "new": "नया ट्रिगर",
       "create": "ट्रिगर बनाएँ",
       "emptyTitle": "अभी कोई ट्रिगर नहीं है",
-      "emptyDescription": "वेबहुक कॉल या शेड्यूल पर Cloud Agent रन शुरू करने के लिए ट्रिगर बनाएँ।",
+      "emptyDescription": "अपना पहला ट्रिगर बनाएँ।",
       "loadFailedTitle": "ट्रिगर लोड नहीं हो सके",
       "loadFailedDescription": "कनेक्शन होने पर फिर से प्रयास करें।",
       "detailLoadFailedTitle": "यह ट्रिगर लोड नहीं हो सका",

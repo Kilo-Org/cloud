@@ -4835,7 +4835,7 @@
       "new": "Skattatur ġdid",
       "create": "Oħloq skattatur",
       "emptyTitle": "Għadhom ma hemmx skattaturi",
-      "emptyDescription": "Oħloq skattatur biex tibda eżekuzzjoni tal-Cloud Agent minn sejħa webhook jew fuq skeda.",
+      "emptyDescription": "Oħloq l-ewwel skattatur tiegħek.",
       "loadFailedTitle": "Ma setgħux jitgħabbew l-iskattaturi",
       "loadFailedDescription": "Erġa' pprova meta jkollok konnessjoni.",
       "detailLoadFailedTitle": "Ma setax jitgħabba dan l-iskattatur",

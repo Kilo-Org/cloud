@@ -4693,7 +4693,7 @@
       "new": "Nuovo attivatore",
       "create": "Crea attivatore",
       "emptyTitle": "Nessun attivatore per ora",
-      "emptyDescription": "Crea un attivatore per avviare un'esecuzione di Cloud Agent da una chiamata webhook o in base a una pianificazione.",
+      "emptyDescription": "Crea il tuo primo attivatore.",
       "loadFailedTitle": "Impossibile caricare gli attivatori",
       "loadFailedDescription": "Riprova quando hai una connessione.",
       "detailLoadFailedTitle": "Impossibile caricare questo attivatore",

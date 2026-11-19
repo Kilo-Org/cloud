@@ -4764,7 +4764,7 @@
       "new": "Nový spúšťač",
       "create": "Vytvorte spúšťač",
       "emptyTitle": "Zatiaľ žiadne spúšťače",
-      "emptyDescription": "Vytvorte spúšťač na spustenie Cloud Agent z volania webhooku alebo podľa plánu.",
+      "emptyDescription": "Vytvorte svoj prvý spúšťač.",
       "loadFailedTitle": "Nepodarilo sa načítať spúšťače",
       "loadFailedDescription": "Skúste to znova, keď budete mať pripojenie.",
       "detailLoadFailedTitle": "Nepodarilo sa načítať tento spúšťač",

@@ -4622,7 +4622,7 @@
       "new": "ຕົວກະຕຸ້ນໃໝ່",
       "create": "ສ້າງຕົວກະຕຸ້ນ",
       "emptyTitle": "ຍັງບໍ່ມີຕົວກະຕຸ້ນ",
-      "emptyDescription": "ສ້າງຕົວກະຕຸ້ນເພື່ອເລີ່ມການຣັນ Cloud Agent ຈາກການເອີ້ນເວັບຮຸກ ຫຼື ຕາມຕາຕະລາງເວລາ.",
+      "emptyDescription": "ສ້າງຕົວກະຕຸ້ນທຳອິດຂອງເຈົ້າ.",
       "loadFailedTitle": "ໂຫຼດຕົວກະຕຸ້ນບໍ່ໄດ້",
       "loadFailedDescription": "ລອງອີກຄັ້ງເມື່ອມີການເຊື່ອມຕໍ່.",
       "detailLoadFailedTitle": "ໂຫຼດຕົວກະຕຸ້ນນີ້ບໍ່ໄດ້",

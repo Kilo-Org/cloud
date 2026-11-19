@@ -4622,7 +4622,7 @@
       "new": "ಹೊಸ ಟ್ರಿಗರ್",
       "create": "ಟ್ರಿಗರ್ ರಚಿಸಿ",
       "emptyTitle": "ಇನ್ನೂ ಟ್ರಿಗರ್ಗಳಿಲ್ಲ",
-      "emptyDescription": "ವೆಬ್ಹುಕ್ ಕರೆ ಅಥವಾ ವೇಳಾಪಟ್ಟಿಯಿಂದ Cloud Agent ರನ್ ಪ್ರಾರಂಭಿಸಲು ಟ್ರಿಗರ್ ರಚಿಸಿ।",
+      "emptyDescription": "ನಿಮ್ಮ ಮೊದಲ ಟ್ರಿಗರ್ ಅನ್ನು ರಚಿಸಿ।",
       "loadFailedTitle": "ಟ್ರಿಗರ್ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
       "loadFailedDescription": "ಸಂಪರ್ಕವಿದ್ದಾಗ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ।",
       "detailLoadFailedTitle": "ಈ ಟ್ರಿಗರ್ ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",

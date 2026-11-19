@@ -4622,7 +4622,7 @@
       "new": "አዲስ ቀስቅሴ",
       "create": "ቀስቅሴ ፍጠር",
       "emptyTitle": "እስካሁን ቀስቅሴዎች የሉም",
-      "emptyDescription": "የCloud Agent ሩጫን ከዌብሁክ ጥሪ ወይም በመርሐ ግብር ለመጀመር ቀስቅሴ ይፍጠሩ።",
+      "emptyDescription": "የመጀመሪያዎቹ ቀስቅሴዎን ይፍጠሩ።",
       "loadFailedTitle": "ቀስቅሴዎችን መጫን አልተቻለም",
       "loadFailedDescription": "ግንኙነት ሲኖርዎ እንደገና ይሞክሩ።",
       "detailLoadFailedTitle": "ይህን ቀስቅሴ መጫን አልተቻለም",

@@ -4622,7 +4622,7 @@
       "new": "Pencetus baharu",
       "create": "Cipta pencetus",
       "emptyTitle": "Belum ada pencetus",
-      "emptyDescription": "Cipta pencetus untuk memulakan larian Cloud Agent daripada panggilan webhook atau pada jadual.",
+      "emptyDescription": "Cipta pencetus pertama anda.",
       "loadFailedTitle": "Tidak dapat memuatkan pencetus",
       "loadFailedDescription": "Cuba lagi apabila anda mempunyai sambungan.",
       "detailLoadFailedTitle": "Tidak dapat memuatkan pencetus ini",

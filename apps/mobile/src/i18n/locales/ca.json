@@ -4693,7 +4693,7 @@
       "new": "Disparador nou",
       "create": "Crea disparador",
       "emptyTitle": "Encara no hi ha disparadors",
-      "emptyDescription": "Crea un disparador per iniciar una execució del Cloud Agent a partir d'una crida de ganxo web o segons una programació.",
+      "emptyDescription": "Crea el teu primer disparador.",
       "loadFailedTitle": "No s'han pogut carregar els disparadors",
       "loadFailedDescription": "Torna-ho a provar quan tinguis connexió.",
       "detailLoadFailedTitle": "No s'ha pogut carregar aquest disparador",

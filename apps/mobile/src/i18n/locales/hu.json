@@ -4622,7 +4622,7 @@
       "new": "Új trigger",
       "create": "Hozzon létre triggert",
       "emptyTitle": "Még nincsenek triggerek",
-      "emptyDescription": "Hozzon létre egy triggert, amely webhookhívásból vagy ütemezés szerint indít Cloud Agent futtatást.",
+      "emptyDescription": "Hozza létre az első triggerjét.",
       "loadFailedTitle": "Nem sikerült betölteni a triggereket",
       "loadFailedDescription": "Próbálja újra, ha van kapcsolat.",
       "detailLoadFailedTitle": "Nem sikerült betölteni ezt a triggert",

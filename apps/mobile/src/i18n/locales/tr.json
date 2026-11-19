@@ -4622,7 +4622,7 @@
       "new": "Yeni tetikleyici",
       "create": "Tetikleyici oluştur",
       "emptyTitle": "Henüz tetikleyici yok",
-      "emptyDescription": "Bir web kancası çağrısıyla veya bir zamanlamayla Cloud Agent çalıştırması başlatmak için bir tetikleyici oluşturun.",
+      "emptyDescription": "İlk tetikleyicinizi oluşturun.",
       "loadFailedTitle": "Tetikleyiciler yüklenemedi",
       "loadFailedDescription": "Bağlantınız olduğunda tekrar deneyin.",
       "detailLoadFailedTitle": "Bu tetikleyici yüklenemedi",

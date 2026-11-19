@@ -4622,7 +4622,7 @@
       "new": "새 트리거",
       "create": "트리거 만들기",
       "emptyTitle": "아직 트리거가 없습니다",
-      "emptyDescription": "웹훅 호출 또는 일정에 따라 Cloud Agent 실행을 시작하려면 트리거를 만드세요.",
+      "emptyDescription": "첫 번째 트리거를 만드세요.",
       "loadFailedTitle": "트리거를 불러오지 못했습니다",
       "loadFailedDescription": "연결된 상태에서 다시 시도하세요.",
       "detailLoadFailedTitle": "이 트리거를 불러오지 못했습니다",

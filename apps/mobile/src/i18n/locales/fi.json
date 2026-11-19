@@ -4622,7 +4622,7 @@
       "new": "Uusi liipaisin",
       "create": "Luo liipaisin",
       "emptyTitle": "Ei liipaisimia vielä",
-      "emptyDescription": "Luo liipaisin, joka käynnistää Cloud Agent -ajon verkkokoukun kutsusta tai aikataulusta.",
+      "emptyDescription": "Luo ensimmäinen liipaisin.",
       "loadFailedTitle": "Liipaisimien lataus epäonnistui",
       "loadFailedDescription": "Yritä uudelleen, kun yhteys on käytettävissä.",
       "detailLoadFailedTitle": "Tämän liipaisimen lataus epäonnistui",

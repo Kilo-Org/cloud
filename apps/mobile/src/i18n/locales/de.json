@@ -4622,7 +4622,7 @@
       "new": "Neuer Auslöser",
       "create": "Auslöser erstellen",
       "emptyTitle": "Noch keine Auslöser",
-      "emptyDescription": "Erstelle einen Auslöser, um einen Lauf von Cloud Agent per Webhook-Aufruf oder nach Zeitplan zu starten.",
+      "emptyDescription": "Erstelle deinen ersten Auslöser.",
       "loadFailedTitle": "Auslöser konnten nicht geladen werden",
       "loadFailedDescription": "Versuche es erneut, wenn du eine Verbindung hast.",
       "detailLoadFailedTitle": "Dieser Auslöser konnte nicht geladen werden",

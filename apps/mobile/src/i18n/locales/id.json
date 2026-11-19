@@ -4622,7 +4622,7 @@
       "new": "Pemicu baru",
       "create": "Buat pemicu",
       "emptyTitle": "Belum ada pemicu",
-      "emptyDescription": "Buat pemicu untuk memulai eksekusi Cloud Agent dari panggilan webhook atau sesuai jadwal.",
+      "emptyDescription": "Buat pemicu pertama Anda.",
       "loadFailedTitle": "Tidak dapat memuat pemicu",
       "loadFailedDescription": "Coba lagi saat koneksi tersedia.",
       "detailLoadFailedTitle": "Tidak dapat memuat pemicu ini",

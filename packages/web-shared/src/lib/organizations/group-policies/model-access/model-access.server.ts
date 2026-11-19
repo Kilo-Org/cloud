@@ -202,8 +202,6 @@ export async function getEffectiveModelDecision(
   if (policy.memberGrant.mode === 'organization_baseline') {
     return await decisionWithinOrganizationBaseline();
   }
-  // A group policy that selects models and providers sets the access of its own
-  // members.
   if (policy.memberGrant.modelAllowList.includes(normalizedModelId)) {
     return { allowed: true };
   }

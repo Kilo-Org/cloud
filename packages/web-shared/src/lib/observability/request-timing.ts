@@ -48,7 +48,6 @@ const VERSION_MAX_LENGTH = 32;
 /** Accepted request-id shape: 1-64 characters from a bounded character set. */
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{1,64}$/;
 
-/** An absent or empty header is `null`; a known value passes; anything else is `'other'`. */
 function readAllowlisted(
   raw: string | null | undefined,
   allowlist: readonly string[]

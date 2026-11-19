@@ -225,7 +225,6 @@ export async function saveOpenAiChatGptConnection(
     });
 }
 
-/** Deletes the owner's stored connection. */
 export async function clearOpenAiChatGptConnection(owner: OpenAiChatGptOwner): Promise<void> {
   await db.delete(openai_chatgpt_connections).where(openAiChatGptOwnerWhere(owner));
 }

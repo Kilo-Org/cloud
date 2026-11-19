@@ -1189,6 +1189,32 @@ describe('createUserWebConnection', () => {
     client.destroy();
   });
 
+  it('does not leak the legacy retain when the start throws', () => {
+    const getAuthToken = jest
+      .fn()
+      .mockImplementationOnce(() => {
+        throw new Error('auth unavailable');
+      })
+      .mockReturnValue('token');
+    const client = createUserWebConnection({
+      websocketUrl: WS_URL,
+      getAuthToken,
+      onError: () => {
+        throw new Error('onError exploded');
+      },
+    });
+
+    expect(() => client.connect()).toThrow('onError exploded');
+
+    // The failed start must not keep a lifetime: the next connect takes a
+    // fresh retain that starts the connection, and its disconnect stops it.
+    client.connect();
+    expect(webSocketConstructor).toHaveBeenCalledTimes(1);
+    client.disconnect();
+    expect(sockets[0].close).toHaveBeenCalledTimes(1);
+    client.destroy();
+  });
+
   it('ref-counts subscribe and unsubscribe for one session and releases its connection lease', () => {
     const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
     const releaseA = client.subscribeToCliSession('ses-1');

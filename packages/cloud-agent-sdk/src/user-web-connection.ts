@@ -393,8 +393,15 @@ function createUserWebConnection(
     if (destroyed) return () => {};
     retainCount += 1;
     if (retainCount === 1) {
-      addPreSocketLifecycleListeners();
-      startConnection();
+      try {
+        addPreSocketLifecycleListeners();
+        startConnection();
+      } catch (error) {
+        // A caller-supplied hook or auth callback threw during the start; roll
+        // the count back so a failed start does not hold a lifetime forever.
+        retainCount -= 1;
+        throw error;
+      }
     }
 
     let released = false;
@@ -624,7 +631,13 @@ function createUserWebConnection(
   function connect(): void {
     if (destroyed || legacyLifetime.status !== 'idle') return;
     legacyLifetime = { status: 'retaining' };
-    const release = retainConnection();
+    let release: () => void;
+    try {
+      release = retainConnection();
+    } catch (error) {
+      legacyLifetime = { status: 'idle' };
+      throw error;
+    }
     // A `disconnect()` that ran synchronously inside `retainConnection()` has
     // already cleared the intent, so release this retain now instead of
     // holding a lifetime nobody owns.

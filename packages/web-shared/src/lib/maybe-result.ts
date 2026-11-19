@@ -5,18 +5,29 @@ import { TRPCError } from '@trpc/server';
 // A result that carries no fields of its own.
 type NoFields = Record<never, never>;
 
-export type SuccessResult<TOk = NoFields> = { success: true } & TOk;
+/**
+ * The payload a success result may carry.
+ *
+ * `successResult` merges its payload with an object spread, which copies own
+ * properties only. A primitive payload would be dropped, and the result would
+ * not carry the value its type promises, so a payload must be an object.
+ */
+type SuccessFields = object;
+
+export type SuccessResult<TOk extends SuccessFields = NoFields> = { success: true } & TOk;
 export type CustomFailureResult<TErr> = { success: false } & TErr;
 export type FailureResult<TErr = void> = { success: false; error: TErr };
 
 /**
  *  equivalent to CustomResult<TOk, {error:TErr}>
  */
-export type Result<TOk, TErr> = SuccessResult<TOk> | FailureResult<TErr>;
+export type Result<TOk extends SuccessFields, TErr> = SuccessResult<TOk> | FailureResult<TErr>;
 
-export type CustomResult<TOk, TErr> = SuccessResult<TOk> | CustomFailureResult<TErr>;
+export type CustomResult<TOk extends SuccessFields, TErr> =
+  | SuccessResult<TOk>
+  | CustomFailureResult<TErr>;
 export type OptionalError<TErr> = Result<NoFields, TErr>;
-export type OptionalValue<TOk> = Result<TOk, void>;
+export type OptionalValue<TOk extends SuccessFields> = Result<TOk, void>;
 
 export function failureResult(): FailureResult<undefined>;
 export function failureResult<TErr>(error: TErr): FailureResult<TErr>;
@@ -39,16 +50,22 @@ export function trpcFailure(
 }
 
 export function successResult(): SuccessResult<NoFields>;
-export function successResult<TOk>(okValue: TOk): SuccessResult<TOk>;
-export function successResult<TOk>(okValue?: TOk): SuccessResult<TOk | NoFields> {
+export function successResult<TOk extends SuccessFields>(okValue: TOk): SuccessResult<TOk>;
+export function successResult<TOk extends SuccessFields>(
+  okValue?: TOk
+): SuccessResult<TOk | NoFields> {
   return { ...okValue, success: true };
 }
 
-export function assertNoTrpcError<TOk>(result: Result<TOk, TRPCError>): SuccessResult<TOk> {
+export function assertNoTrpcError<TOk extends SuccessFields>(
+  result: Result<TOk, TRPCError>
+): SuccessResult<TOk> {
   if (result.success) return result;
   else throw result.error;
 }
-export function assertNoError<TOk, TErr>(result: CustomResult<TOk, TErr>): SuccessResult<TOk> {
+export function assertNoError<TOk extends SuccessFields, TErr>(
+  result: CustomResult<TOk, TErr>
+): SuccessResult<TOk> {
   if (result.success) return result;
   throw 'error' in result && result.error instanceof Error
     ? result.error
@@ -69,14 +86,14 @@ function serializeError(error: unknown) {
   return typeof error;
 }
 
-export function whenOkTry<TOk, TOk2, TErr>(
+export function whenOkTry<TOk extends SuccessFields, TOk2 extends SuccessFields, TErr>(
   result: Result<TOk, TErr>,
   map: (val: TOk) => Result<TOk2, TErr>
 ): Result<TOk2, TErr> {
   if (!result.success) return result;
   return map(result);
 }
-export function whenOk<TOk, TOk2, TErr>(
+export function whenOk<TOk extends SuccessFields, TOk2 extends SuccessFields, TErr>(
   result: Result<TOk, TErr>,
   map: (val: TOk) => TOk2
 ): Result<TOk2, TErr> {

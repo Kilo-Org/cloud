@@ -97,6 +97,10 @@ const TWO_SENSE_COPY = new Map([
   ],
   ['comment', 'the verb on a button, versus the noun on a row label and a badge'],
   [
+    'contact support',
+    'the recovery action beside a Code Reviewer alert, versus the support contact beside the AI Guardrails availability notice',
+  ],
+  [
     'receipt',
     'the confirmation a moderation report produces, versus the proof of payment for a credit purchase',
   ],

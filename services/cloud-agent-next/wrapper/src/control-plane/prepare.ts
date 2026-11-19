@@ -1334,6 +1334,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
             const snapshotRestore: NonNullable<Parameters<Harness['open']>[0]['snapshotRestore']> =
               { timings: {} };
             let failed = false;
+            let final = false;
             try {
               await withinStep('kilo_session', timers.kiloSessionMs, async signal => {
                 await Promise.all([
@@ -1358,6 +1359,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
               });
             } catch (error) {
               failed = true;
+              final = error instanceof SessionRulesetNotAppliedError;
               throw error;
             } finally {
               if (snapshotRestore.startedAt !== undefined) {
@@ -1377,7 +1379,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
                       snapshotRestore.durationMs ??
                       Math.round(performance.now() - snapshotRestore.startedAt),
                     ...result,
-                    willRetry: failed && !owner.released && attempt < STEP_RETRY_ATTEMPTS,
+                    willRetry: failed && !final && !owner.released && attempt < STEP_RETRY_ATTEMPTS,
                   });
                 } catch {
                   // Diagnostic delivery must not change preparation's result.

@@ -1068,6 +1068,35 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       expect(stub.updates[1]).toEqual({ queryDirectory: directory, body: { permission } });
     });
 
+    it('applies the owed ruleset on the next call instead of reusing an incomplete record', async () => {
+      const sessionId = 'ses_record_permission_owed';
+      const directory = temporaryDirectory('kilo-api-permission-owed-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-permission-owed-other-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' }];
+      const failing = startEnsureSessionStub(
+        sessionId,
+        { id: sessionId, directory: otherDirectory, permission },
+        { failUpdates: 5 }
+      );
+      const first = await createClient(failing.url)
+        .ensureSession(sessionId, directory)
+        .catch((error: unknown) => error);
+      expect(first).toBeInstanceOf(SessionRulesetNotAppliedError);
+
+      // The next call sees the record already at the route directory. It must
+      // apply the owed ruleset rather than treat the record as complete.
+      const healthy = startEnsureSessionStub(sessionId, {
+        id: sessionId,
+        directory,
+        permission,
+      });
+      await createClient(healthy.url).ensureSession(sessionId, directory);
+
+      expect(healthy.imports).toHaveLength(0);
+      expect(healthy.updates).toHaveLength(1);
+      expect(healthy.updates[0]).toEqual({ queryDirectory: directory, body: { permission } });
+    });
+
     it('reports a ruleset application that keeps failing', async () => {
       const sessionId = 'ses_record_permission_failing';
       const directory = temporaryDirectory('kilo-api-permission-fail-target-');

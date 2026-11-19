@@ -10,6 +10,7 @@ import type { KiloClient as SDKClient } from '@kilocode/sdk';
 import {
   createKiloClient as createV2Client,
   type PermissionRequest,
+  type PermissionRuleset,
   type QuestionRequest,
   type SessionCommandResponse,
   type SessionPromptResponse,
@@ -203,6 +204,19 @@ export class SessionRulesetNotAppliedError extends Error {
     this.name = 'SessionRulesetNotAppliedError';
     this.sessionId = sessionId;
   }
+}
+
+/**
+ * Rulesets that a committed record still owes. The native import replaces the
+ * row and its body cannot carry a ruleset, so the ruleset is applied right
+ * after it. When that call fails, the record stays in place without its
+ * rules; the next prepare must apply the ruleset before the route is reused,
+ * not skip the call because the record is already there.
+ */
+const outstandingRulesets = new Map<string, PermissionRuleset>();
+
+export function hasOutstandingRuleset(sessionId: string): boolean {
+  return outstandingRulesets.has(sessionId);
 }
 
 export type DrainSessionErrorKind =
@@ -645,9 +659,8 @@ export function createWrapperKiloClient(
       // The import commits the record before a ruleset is applied, so a
       // transient failure on that second call is retried here: the enclosing
       // step retry would find the record in place and return early.
-      const applyRuleset = async (
-        permission: NonNullable<Parameters<typeof v2Client.session.update>[0]['permission']>
-      ): Promise<void> => {
+      const applyRuleset = async (permission: PermissionRuleset): Promise<void> => {
+        outstandingRulesets.set(sessionId, permission);
         const attemptOnce = async () => {
           const restoreTimeout = AbortSignal.timeout(8_000);
           const restored = await v2Client.session.update(
@@ -660,6 +673,7 @@ export function createWrapperKiloClient(
         for (let attempt = 1; attempt <= 3; attempt += 1) {
           try {
             await attemptOnce();
+            outstandingRulesets.delete(sessionId);
             return;
           } catch (error) {
             lastError = error;
@@ -672,7 +686,8 @@ export function createWrapperKiloClient(
           }
         }
         // The record is already in place, so a step retry would reuse it and
-        // skip this call. Report the failure as final for this attempt.
+        // skip this call. The outstanding entry makes the next prepare apply
+        // the ruleset instead of accepting the record as complete.
         throw new SessionRulesetNotAppliedError(sessionId, lastError);
       };
       const lookupTimeout = AbortSignal.timeout(5_000);
@@ -696,6 +711,11 @@ export function createWrapperKiloClient(
           typeof record.directory === 'string' &&
           (await sameDirectory(record.directory, directory))
         ) {
+          // A record that still owes its ruleset is not complete: apply it
+          // before the route is reused instead of returning as if it were.
+          const owed = outstandingRulesets.get(sessionId);
+          if (owed === undefined) return;
+          await applyRuleset(owed);
           return;
         }
       }

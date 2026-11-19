@@ -141,6 +141,9 @@ function primaryKindOf(counts: GlanceableCounts): GlanceableStatusKind | null {
 
 const ACTIVE_REFRESH_MS = 30 * 60 * 1000;
 const QUIET_REFRESH_MS = 2 * 60 * 60 * 1000;
+// Both native schedulers clamp a request to a 15-minute floor, so a retry that
+// asks for the wake plus this delay is the instant the widget can fetch.
+const WAKE_RETRY_MS = 15 * 60 * 1000;
 
 function refreshInterval(snapshot: GlanceableAgentsSnapshot): number {
   return snapshot.status === 'waiting' ||
@@ -276,6 +279,12 @@ function scheduledWake(
   return { at: timestampMs(snapshot.scheduledAt), iso: timestampToIso(snapshot.scheduledAt) };
 }
 
+/** One retry after the wake's own schedule; a snapshot with no wake has no retry. */
+function wakeRetryAt(snapshot: GlanceableAgentsSnapshot, terminal: boolean): number | null {
+  const wake = scheduledWake(snapshot, terminal).at;
+  return wake === null ? null : wake + WAKE_RETRY_MS;
+}
+
 /**
  * The one status precedence: a terminal snapshot outranks content, content
  * outranks a request for input, and an acknowledged snapshot that is neither is
@@ -305,6 +314,7 @@ export function buildHomeWidgetPresentation(
   // keeps the title, so that payload renders as it did.
   const titleKind = details.primaryKind ?? null;
   const wake = scheduledWake(snapshot, terminal);
+  const retry = wakeRetryAt(snapshot, terminal);
   const status = presentationStatus(snapshot, terminal, primaryKind);
   return {
     status,
@@ -324,7 +334,8 @@ export function buildHomeWidgetPresentation(
         (staleAt !== null && now >= staleAt)),
     scheduledAt: wake.iso,
     approvalKey: terminal || snapshot.needsInput === 0 ? null : details.approvalKey,
-    awaitingUpdate: wake.at !== null && now >= wake.at,
+    // The card never advertises an update past the retry deadline.
+    awaitingUpdate: wake.at !== null && now >= wake.at && (retry === null || now < retry),
     primaryTitle:
       terminal || primaryKind === null || (titleKind !== null && titleKind !== primaryKind)
         ? null
@@ -337,14 +348,20 @@ export function buildHomeWidgetPresentation(
   };
 }
 
-/** Requested refresh only; native minimum intervals and OS budgets still apply. */
+/**
+ * Requested refresh only; native minimum intervals and OS budgets still apply.
+ * A wake that just passed retries once shortly after its wake, then backs off.
+ */
 export function homeWidgetRefreshAt(data: HomeWidgetData, now: number): number {
   const { snapshot } = data;
   const terminal = isTerminalGlanceableStatus(snapshot.status);
   const next = now + (terminal ? QUIET_REFRESH_MS : refreshInterval(snapshot));
   const wake = scheduledWake(snapshot, terminal).at;
-  // An overdue wake is not proof of running and must not create a busy refresh loop.
-  return wake !== null && wake > now ? Math.min(next, wake) : next;
+  const retry = wakeRetryAt(snapshot, terminal);
+  // Both instants come from the snapshot, so a passed wake cannot create a busy refresh loop.
+  const requested =
+    wake !== null && wake > now ? wake : retry !== null && retry > now ? retry : null;
+  return requested !== null ? Math.min(next, requested) : next;
 }
 
 /** Native offline aging uses these server/shared-derived boundaries, not a second policy. */
@@ -359,6 +376,8 @@ export function buildHomeWidgetPresentationTimeline(
     if (staleAt !== null && staleAt > now) times.push(staleAt);
     const wake = scheduledWake(snapshot, terminal).at;
     if (wake !== null && wake > now && wake !== staleAt) times.push(wake);
+    const retry = wakeRetryAt(snapshot, terminal);
+    if (retry !== null && retry > now && retry !== staleAt && retry !== wake) times.push(retry);
   }
   return times
     .sort((a, b) => a - b)

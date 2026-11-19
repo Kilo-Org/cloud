@@ -100,11 +100,13 @@ describe('withGlanceableCopy', () => {
       checked: i18n.t('glanceable.checked'),
       lastKnown: i18n.t('glanceable.lastKnown'),
       awaitingUpdate: i18n.t('glanceable.awaitingUpdate'),
+      wasDue: i18n.t('glanceable.wasDue'),
       agent: i18n.t('common.agent'),
       homeEmpty: i18n.t('home.noLiveSessions'),
     });
     expect(copy.checked).not.toBe('glanceable.checked');
     expect(copy.awaitingUpdate).not.toBe('glanceable.awaitingUpdate');
+    expect(copy.wasDue).not.toBe('glanceable.wasDue');
   });
 
   it('bakes the Home redesign slots from reviewed keys and a one-character group separator', () => {

@@ -3755,6 +3755,7 @@
     "lastKnown": "Últim estat conegut",
     "awaitingUpdate": "Pendent d’actualització",
     "nextRun": "Propera execució",
+    "wasDue": "S’esperava",
     "waitingForYou": "Esperant-te",
     "nextScheduled": "Properes programades",
     "answerNeeded": "Pendent de resposta",

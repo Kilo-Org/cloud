@@ -3695,6 +3695,7 @@
     "lastKnown": "สถานะล่าสุดที่ทราบ",
     "awaitingUpdate": "รออัปเดต",
     "nextRun": "ทำงานครั้งถัดไป",
+    "wasDue": "เลยกำหนด",
     "waitingForYou": "รอคุณ",
     "nextScheduled": "กำหนดการถัดไป",
     "answerNeeded": "รอคำตอบ",

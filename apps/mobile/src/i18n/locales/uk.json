@@ -3815,6 +3815,7 @@
     "lastKnown": "Останній відомий стан",
     "awaitingUpdate": "Очікує оновлення",
     "nextRun": "Наступний запуск",
+    "wasDue": "Очікувалося",
     "waitingForYou": "Очікує на вас",
     "nextScheduled": "Наступні заплановані",
     "answerNeeded": "Очікує відповіді",

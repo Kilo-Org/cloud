@@ -891,27 +891,14 @@ export function ScreenHeader({
     inRowSlotCount * HEADER_ACTIONS_GAP + headerRightExtent + inlineActionsExtent;
   const leadingExtent = separateHeading && backControl ? HEADER_LEADING_COLUMN_WIDTH : 0;
   // The row's widest possible measure, for the seed fallback below: the
-  // window minus this header's own gutters. `px-4` is the default padding the
-  // outer container paints; a caller's `className` (`px-[22px]`, `px-6`)
-  // replaces it, and the landscape side insets (the corner-clearance wrapper)
-  // add to it. Read each from the same source the layout gets them from, so
-  // the seed cannot overstate the row the fillers land in.
-  const parsedGutter = /\bpx-\[(\d+(?:\.\d+)?)px\]/.exec(className ?? '');
-  const gutter = parsedGutter
-    ? Number(parsedGutter[1])
-    : /\bpx-6\b/.test(className ?? '')
-      ? 24
-      : 16;
-  const headerInsetWidth = 2 * gutter + insets.left + insets.right;
-  // The row's own width is its on-layout measure; before that lands, the same
-  // measure to seed with is the window minus the header's own gutters (the
-  // `px-4`/`px-[22px]` padding and the landscape side insets), not the whole
-  // window: an over-wide seed overstates `free`, and where the `free/2` cap
-  // binds, the first frame would render an over-wide filler that the first
-  // measured layout then shrinks. Seeding narrow bounds the filler: the cap
-  // under `free` cannot grow past the row it lands in, so nothing shifts when
-  // the row's real measure arrives.
-  const resolvedRowWidth = rowWidth ?? Math.max(0, windowWidth - headerInsetWidth);
+  // window minus the header's own gutters. The seed uses the widest gutter
+  // this file documents (`HEADER_CONTENT_GUTTER`, the widest one in service),
+  // which is conservative for every caller: a narrower gutter only means the
+  // seed understates the row, and the filler cap under an understated row can
+  // never overstate the room the first frame lands in. The measured row's own
+  // `onLayout` then replaces the seed exactly.
+  const resolvedRowWidth =
+    rowWidth ?? Math.max(0, windowWidth - HEADER_CONTENT_GUTTER - insets.left - insets.right);
   const free = Math.max(0, resolvedRowWidth - leadingExtent - trailingExtent);
   const leadingFillerWidth = Math.max(0, Math.min(trailingExtent - leadingExtent, free / 2));
   const trailingFillerWidth = Math.max(0, Math.min(leadingExtent - trailingExtent, free / 2));

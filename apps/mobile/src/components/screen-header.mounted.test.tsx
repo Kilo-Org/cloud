@@ -1638,9 +1638,9 @@ describe('centered title balance', () => {
   it('balances a Save-style trailing cluster against the back control', () => {
     // The Security Agent settings cluster: 140dp declared, at the 390dp phone
     // window. L = 48, T = 152 (140 + its 12dp gap); the seed frame balances on
-    // the row the header's own `px-4` gutters leave: free =
-    // (390 - 32) - 48 - 152 = 158, so the leading filler is
-    // min(152 - 48, free/2 = 79) = 79 and the trailing one collapses.
+    // the row the header's widest documented gutter leaves: free =
+    // (390 - 44) - 48 - 152 = 146, so the leading filler is
+    // min(152 - 48, free/2 = 73) = 73 and the trailing one collapses.
     const renderer = renderHeader({
       title: 'Kilo Pass',
       modal: true,
@@ -1651,7 +1651,7 @@ describe('centered title balance', () => {
     const row = findTitleRow(renderer.root);
     const { leading, trailing } = findBalanceFillers(row);
     expect(trailing).toBeUndefined();
-    expect(leading?.props.style).toEqual({ width: 79 });
+    expect(leading?.props.style).toEqual({ width: 73 });
     // The filler sits behind the back control: its parent is the row itself,
     // and its index in the row's children is immediately after the back
     // control's frame.
@@ -1687,10 +1687,10 @@ describe('centered title balance', () => {
       )({ nativeEvent: { layout: { width: 140, height: 48 } } });
     });
 
-    // T = 152, L = 48, seed row = 390 - 32 = 358: free = 158 → leading
-    // min(104, 79) = 79.
+    // T = 152, L = 48, seed row = 390 - 44 = 346: free = 146 → leading
+    // min(104, 73) = 73.
     const { leading } = findBalanceFillers(row);
-    expect(leading?.props.style).toEqual({ width: 79 });
+    expect(leading?.props.style).toEqual({ width: 73 });
   });
 
   it('keeps the trailing mirror on the 48dp back-only header exactly', () => {
@@ -1703,8 +1703,8 @@ describe('centered title balance', () => {
 
   it('puts the whole mirror on the leading filler with no back control', () => {
     // The plan's no-back variant: an in-row cluster with NO back control has
-    // L = 0 and T = 152, the seed row = 390 - 32 = 358: free = 206, so the
-    // leading filler is min(152, 103) = 103 — the half it can take without
+    // L = 0 and T = 152, the seed row = 390 - 44 = 346: free = 194, so the
+    // leading filler is min(152, 97) = 97 — the half it can take without
     // squeezing the title under half the free space — and the trailing filler
     // collapses. (The title still centers better than the old fixed-48
     // mirror, which ignored the cluster entirely.)
@@ -1718,7 +1718,7 @@ describe('centered title balance', () => {
 
     const row = findTitleRow(renderer.root);
     const { leading, trailing } = findBalanceFillers(row);
-    expect(leading?.props.style).toEqual({ width: 103 });
+    expect(leading?.props.style).toEqual({ width: 97 });
     expect(trailing).toBeUndefined();
     // The leading filler is the row's FIRST child when no control came
     // before it.
@@ -1772,9 +1772,9 @@ describe('centered title balance', () => {
   it('counts one ms-3 gap per in-row trailing slot, not one for the row', () => {
     // Both trailing slots in one row each carry their own `ms-3`: the mirror
     // that ignores the second gap leaves the title half a gap off the axis in
-    // that combination. 390dp seed row = 358; L = 48; T = 40 + 92 + 2 × 12
-    // = 156; free = 358 - 48 - 156 = 154; uncapped mirror demand = 108 > 77,
-    // so the cap binds: leading filler = 77.
+    // that combination. 390dp seed row = 346; L = 48; T = 40 + 92 + 2 × 12
+    // = 156; free = 346 - 48 - 156 = 142; uncapped mirror demand = 108 > 71,
+    // so the cap binds: leading filler = 71.
     const renderer = renderHeader({
       title: 'Kilo Pass',
       modal: true,
@@ -1786,17 +1786,17 @@ describe('centered title balance', () => {
 
     const { leading, trailing } = findBalanceFillers(findTitleRow(renderer.root));
     expect(trailing).toBeUndefined();
-    expect(leading?.props.style).toEqual({ width: 77 });
+    expect(leading?.props.style).toEqual({ width: 71 });
   });
 
   it('keeps the stacked reflow free of in-row fillers', () => {
     // A window too narrow for the title and the cluster stacks the cluster,
     // which removes the in-row trailing extent — the mirror collapses so the
-    // back-only mirror survives. The seed row = 160 - 32 = 128dp: the mirror
-    // is capped at free/2 = (128 - 48)/2 = 40 for the seed frame, because the
+    // back-only mirror survives. The seed row = 160 - 44 = 116dp: the mirror
+    // is capped at free/2 = (116 - 48)/2 = 34 for the seed frame, because the
     // row's own layout event does not fire in the test renderer; the seed is
-    // bounded by the header's own gutters, so the cap cannot overstate the
-    // row and the first measured layout can only grow the mirror onto the
+    // bounded by the header's own gutter constant, so the cap cannot overstate
+    // the row and the first measured layout can only grow the mirror onto the
     // axis, never shrink it.
     layout.width = 160;
     layout.fontScale = 1.5;
@@ -1810,7 +1810,7 @@ describe('centered title balance', () => {
     expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
     const { leading, trailing } = findBalanceFillers(findTitleRow(renderer.root));
     expect(leading).toBeUndefined();
-    expect(trailing?.props.style).toEqual({ width: 40 });
+    expect(trailing?.props.style).toEqual({ width: 34 });
   });
 });
 

@@ -2,6 +2,8 @@ import { NextRequest } from 'next/server';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
 
+jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
+
 jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
   createScheduledJobRun: jest.fn(() => ({ runId: 'run-id' })),
   buildScheduledJobSuccessEvent: jest.fn((_run, fields) => ({ outcome: 'succeeded', ...fields })),
@@ -12,7 +14,12 @@ jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
   emitScheduledJobEvent: jest.fn(),
 }));
 
-import { webhook_events } from '@kilocode/db/schema';
+import { webhook_event_signatures, webhook_events } from '@kilocode/db/schema';
+import { sql } from 'drizzle-orm';
+import {
+  provisionWebhookEventPartitions,
+  webhookEventPartitionName,
+} from '@/lib/integrations/db/webhook-event-partitions';
 import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import { emitScheduledJobEvent } from '@kilocode/worker-utils/scheduled-job-observability';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -135,6 +142,63 @@ describe('GET /api/cron/cleanup-webhook-events', () => {
     expect(body.hasMore).toBe(true);
     const remaining = await db.select({ id: webhook_events.id }).from(webhook_events);
     expect(remaining).toHaveLength(1);
+  });
+
+  it('keeps the partitioned table writable, drops expired partitions and prunes signatures', async () => {
+    // A day in 2020 is far past retention, so this run must detach and drop it.
+    await provisionWebhookEventPartitions(db, new Date('2020-01-10T00:00:00.000Z'));
+    await db.insert(webhook_event_signatures).values(
+      [61, 1].map(age => ({
+        event_signature: `cron-signature-${age}`,
+        webhook_event_id: crypto.randomUUID(),
+        webhook_event_created_at: daysAgo(age),
+        created_at: daysAgo(age),
+      }))
+    );
+
+    const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.partitionErrors).toEqual([]);
+    expect(body.partitionsDropped).toContain('webhook_events_v2_2020_01_10');
+    expect(body.signaturesDeleted).toBe(1);
+    const { rows } = await db.execute<{ name: string }>(sql`
+      SELECT c.relname AS name FROM pg_inherits i JOIN pg_class c ON c.oid = i.inhrelid
+      WHERE i.inhparent = 'public.webhook_events_v2'::regclass
+    `);
+    const names = rows.map(row => row.name);
+    expect(names.some(name => name.includes('_2020_'))).toBe(false);
+    expect(names).toContain(webhookEventPartitionName(new Date()));
+    expect(mockEmitScheduledJobEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ outcome: 'succeeded', deleted_signature_count: 1 })
+    );
+  });
+
+  it('fails the run when a coming partition cannot be created', async () => {
+    const lastDay = new Date(Date.now() + 7 * 24 * 60 * 60 * 1_000);
+    const blocked = webhookEventPartitionName(lastDay);
+    await provisionWebhookEventPartitions(db);
+    // Stand-in for the furthest day: a plain table that holds its name.
+    await db.execute(sql.raw(`ALTER TABLE webhook_events_v2 DETACH PARTITION ${blocked}`));
+    await db.execute(sql.raw(`DROP TABLE ${blocked}`));
+    await db.execute(sql.raw(`CREATE TABLE ${blocked} (id int)`));
+
+    try {
+      const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
+      const body = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(body.partitionErrors).toEqual([
+        expect.stringContaining(`${blocked} exists but is not an attached partition`),
+      ]);
+      expect(mockEmitScheduledJobEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ outcome: 'failed' })
+      );
+    } finally {
+      await db.execute(sql.raw(`DROP TABLE IF EXISTS ${blocked}`));
+      await provisionWebhookEventPartitions(db);
+    }
   });
 
   it('reports database failures without treating them as successful cleanup', async () => {

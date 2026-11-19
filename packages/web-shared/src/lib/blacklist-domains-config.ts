@@ -12,7 +12,6 @@ import {
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
-import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /**
  * TLDs refused for new signups until an admin changes the stored list. These are
@@ -91,25 +90,19 @@ export async function readBlacklistDomainsSettings(): Promise<BlacklistDomainsSe
 }
 
 /**
- * Throws when the read or the stored payload is unusable, after reporting it: createCachedFetch
- * then keeps serving the last settings it read successfully, and retries once the failure
- * backoff window passes.
+ * The cache owns the once-per-failure warning; the same failure reaches Sentry through
+ * `onRefreshFailure`, so one failed read produces one log line and one report.
  */
-async function readSettingsOrReport(): Promise<BlacklistDomainsSettings | null> {
-  try {
-    return await readBlacklistDomainsSettings();
-  } catch (error) {
-    errorExceptInTest('[blacklist-domains] Failed to read the blacklist settings:', error);
-    captureException(error, { tags: { source: 'blacklist_domains_config' } });
-    throw error;
-  }
-}
-
 const getCachedSettings = createCachedFetch<BlacklistDomainsSettings | null>(
-  readSettingsOrReport,
+  readBlacklistDomainsSettings,
   60_000,
   null,
-  { name: 'blacklistDomainsSettings' }
+  {
+    name: 'blacklistDomainsSettings',
+    onRefreshFailure: ({ error }) => {
+      captureException(error, { tags: { source: 'blacklist_domains_config' } });
+    },
+  }
 );
 
 /**

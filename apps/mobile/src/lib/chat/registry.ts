@@ -1054,7 +1054,6 @@ async function countCall(
   try {
     recordUsage(await open(), sessionId, usage);
   } catch {
-    // The tally stays in memory and the next answer's write includes it.
   }
 }
 
@@ -1979,8 +1978,7 @@ async function endChat(sessionId: string, chat: Chat): Promise<void> {
 }
 
 /**
- * Ends a chat, whether it is being deleted or the account is going. Closing the
- * scope is what tells the store to write down whatever it still holds.
+ * Ends a chat for a deletion or the account's sign-out.
  *
  * The id may be one a chat moved off — a route or a list row can still name it.
  * It resolves to the chat that carried on, or releasing it would leave that

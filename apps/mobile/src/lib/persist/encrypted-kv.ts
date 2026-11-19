@@ -83,7 +83,6 @@ const BUSY_TIMEOUT_MS = 5000;
 // interpolation, and the open is routed into delete-and-recreate recovery.
 const DB_KEY_PATTERN = /^[0-9a-f]{64}$/;
 
-/** True when `key` is exactly 64 lowercase hex characters (32 bytes). */
 export function isValidDbKey(key: string): boolean {
   return DB_KEY_PATTERN.test(key);
 }

@@ -7,7 +7,7 @@
     "directory": "دليل العمل",
     "createSession": "إنشاء جلسة ببروتوكول CLI الأصلي",
     "queueIfOffline": "إضافة المطالبة إلى قائمة الانتظار إذا كان المضيف غير متصل",
-    "prompt": "مطالبة أو /command",
+    "prompt": "مطالبة أو \u2066/command\u2069",
     "localClear": "مسح العرض المحلي",
     "abort": "إيقاف الدور",
     "failed": "فشل إجراء التحكم عن بُعد ببروتوكول CLI الأصلي",
@@ -22,7 +22,7 @@
     "expired": "انتهت الصلاحية",
     "recoveryGaps_zero": "لا توجد أجزاء مفقودة من هذا السجل.",
     "recoveryGaps_one": "الجزء {{displayCount}} من هذا السجل مفقود.",
-    "recoveryGaps_two": "جزآن من هذا السجل مفقودان ({{displayCount}}).",
+    "recoveryGaps_two": "جزآن من هذا السجل مفقودان.",
     "recoveryGaps_few": "{{displayCount}} أجزاء من هذا السجل مفقودة.",
     "recoveryGaps_many": "{{displayCount}} جزءًا من هذا السجل مفقود.",
     "recoveryGaps_other": "{{displayCount}} جزء من هذا السجل مفقود."

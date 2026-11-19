@@ -187,7 +187,7 @@ function NativeRemoteComposer({ remote }: { remote: NativeRemoteSession }) {
         placeholder={t('nativeRemote.prompt')}
         defaultValue=""
         multiline
-        className="min-h-[96px] leading-[1.25rem]"
+        className="min-h-[96px] rounded-md border border-input bg-background leading-[1.25rem]"
         autoCapitalize="sentences"
         onChangeText={text => {
           prompt.current = text;

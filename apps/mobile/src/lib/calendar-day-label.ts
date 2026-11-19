@@ -21,9 +21,10 @@ const MONTH_UNIT_SECONDS = 30 * DAY_UNIT_SECONDS;
  * the month or year unit is returned unchanged.
  *
  * The label keeps `timeAgo`'s natural casing, so a caller that draws it in
- * capitals and a caller that speaks it share one answer. Empty when the
- * timestamp does not parse, so the caller shows nothing rather than an invalid
- * date.
+ * capitals and a caller that speaks it share one answer. Like `timeAgo`, it
+ * never reads a row's own past event as ahead of a clock sample that trails
+ * it. Empty when the timestamp does not parse, so the caller shows nothing
+ * rather than an invalid date.
  */
 export function calendarDayRelativeLabel(
   timestamp: string | null | undefined,
@@ -35,7 +36,7 @@ export function calendarDayRelativeLabel(
   if (Number.isNaN(date.getTime())) {
     return '';
   }
-  const now = nowMs ?? Date.now();
+  const now = Math.max(nowMs ?? Date.now(), date.getTime());
   const elapsed = timeAgo(date, undefined, now);
   const magnitude = Math.abs(Math.floor((now - date.getTime()) / 1000));
   if (magnitude < DAY_UNIT_SECONDS || magnitude >= MONTH_UNIT_SECONDS) {

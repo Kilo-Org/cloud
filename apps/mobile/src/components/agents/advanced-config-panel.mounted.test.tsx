@@ -352,7 +352,7 @@ describe('AdvancedConfigPanel', () => {
     expect(disclosure?.props.accessibilityState).toMatchObject({ expanded: false });
     expect(byLabel(renderer, 'Pick a profile')).toBeUndefined();
     expect(texts(renderer)).not.toContain('Environment variables');
-    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
+    expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
   });
 
   it('expands to both manual editors and the summary', () => {
@@ -361,8 +361,8 @@ describe('AdvancedConfigPanel', () => {
 
     expect(texts(renderer)).toContain('Environment variables');
     expect(texts(renderer)).toContain('Setup commands');
-    // No manual config yet, so no Save as Profile.
-    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
+    // No manual config yet, so no Save as profile.
+    expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
   });
 
   it('nests the revealed body under the disclosure row it belongs to', () => {
@@ -433,17 +433,17 @@ describe('AdvancedConfigPanel', () => {
     expect(onRequestReveal).toHaveBeenLastCalledWith(640);
   });
 
-  it('only offers Save as Profile for commands that will be persisted', () => {
+  it('only offers Save as profile for commands that will be persisted', () => {
     const renderer = mount();
     press(byLabel(renderer, 'Advanced Configuration'));
     press(buttonByText(renderer, 'Add command'));
-    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
+    expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
     typeInto(renderer, 'Command 1', '   ');
-    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
+    expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
     typeInto(renderer, 'Command 1', 'pnpm install');
-    expect(buttonByText(renderer, 'Save as Profile')).toBeDefined();
+    expect(buttonByText(renderer, 'Save as profile')).toBeDefined();
     typeInto(renderer, 'Command 1', '');
-    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
+    expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
   });
 
   it('names each setup-command control after the command position', () => {
@@ -472,12 +472,12 @@ describe('AdvancedConfigPanel', () => {
     );
   });
 
-  it('offers Save as Profile once a manual variable exists', () => {
+  it('offers Save as profile once a manual variable exists', () => {
     const renderer = mount();
     press(byLabel(renderer, 'Advanced Configuration'));
     addVariable(renderer, 'API_KEY', 'abc');
 
-    expect(buttonByText(renderer, 'Save as Profile')).toBeDefined();
+    expect(buttonByText(renderer, 'Save as profile')).toBeDefined();
     expect(texts(renderer)).toContain('1 var');
   });
 
@@ -606,7 +606,7 @@ describe('AdvancedConfigPanel', () => {
     press(byLabel(renderer, 'Advanced Configuration'));
 
     addVariable(renderer, 'API_KEY', 'abc');
-    expect(buttonByText(renderer, 'Save as Profile')).toBeDefined();
+    expect(buttonByText(renderer, 'Save as profile')).toBeDefined();
   });
 
   it('includes the session-owned selected profile in resource counts', () => {
@@ -625,7 +625,7 @@ describe('AdvancedConfigPanel', () => {
     // A setup command.
     press(buttonByText(renderer, 'Add command'));
     typeInto(renderer, 'Command 1', 'pnpm install');
-    press(buttonByText(renderer, 'Save as Profile'));
+    press(buttonByText(renderer, 'Save as profile'));
 
     typeInto(renderer, 'Profile name', 'My Setup');
     act(() => {
@@ -665,7 +665,7 @@ describe('AdvancedConfigPanel', () => {
     // The profile carries the draft now, and the server appends a profile's
     // setup commands to the inline ones, so a kept draft would run them twice.
     expect(texts(renderer)).not.toContain('API_KEY');
-    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
+    expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
     expect(texts(renderer)).toContain('1 var · 1 setup cmd');
   });
 
@@ -676,7 +676,7 @@ describe('AdvancedConfigPanel', () => {
     const renderer = mount({ mocks });
     press(byLabel(renderer, 'Advanced Configuration'));
     addVariable(renderer, 'API_KEY', 'abc');
-    press(buttonByText(renderer, 'Save as Profile'));
+    press(buttonByText(renderer, 'Save as profile'));
     typeInto(renderer, 'Profile name', 'Broken');
 
     await act(async () => {
@@ -693,7 +693,7 @@ describe('AdvancedConfigPanel', () => {
     press(byLabel(renderer, 'Advanced Configuration'));
     addVariable(renderer, 'API_KEY', 'abc');
 
-    press(buttonByText(renderer, 'Save as Profile'));
+    press(buttonByText(renderer, 'Save as profile'));
     const firstSheet = renderer.root.findAll(node => node.type === SaveProfileSheet)[0];
     if (!firstSheet) {
       throw new TypeError('the first sheet was not mounted');
@@ -703,7 +703,7 @@ describe('AdvancedConfigPanel', () => {
     // The person dismisses it, then opens it again.
     invokeHandler(firstClose);
     expect(renderer.root.findAll(node => node.type === SaveProfileSheet)).toHaveLength(0);
-    press(buttonByText(renderer, 'Save as Profile'));
+    press(buttonByText(renderer, 'Save as profile'));
     expect(renderer.root.findAll(node => node.type === SaveProfileSheet)).toHaveLength(1);
 
     // A settlement from the closed sheet arrives late: it must not close the

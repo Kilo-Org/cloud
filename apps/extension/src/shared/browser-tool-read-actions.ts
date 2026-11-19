@@ -10,6 +10,7 @@ import {
   readPageText,
   readPageTimeOrigin,
   renderBrowserAriaSnapshotLine,
+  resolveTargetBackendNodeId,
 } from './browser-tool-snapshot';
 import type {
   BrowserAriaSnapshotCapture,
@@ -20,13 +21,21 @@ import type {
 import { ambiguousSelectorError } from './browser-agent-checks';
 import type { EvalTabResult } from './tab-debugger';
 import type { BrowserConsoleMessage, BrowserNetworkRequest } from './browser-tool-session';
-import type { AgentReadScope, WithheldFrame } from './browser-agent-frames';
+import type {
+  AgentFrameInventory,
+  AgentReadScope,
+  AgentScreenshotGeometry,
+  WithheldFrame,
+} from './browser-agent-frames';
 import {
   captureAgentSnapshotView,
   filterAgentConsoleMessages,
   filterAgentNetworkRequests,
+  frameWithOwnerNode,
+  readAgentFrames,
   readAgentFrameTree,
   readAgentScreenshotGeometry,
+  readFrameOwners,
   readSensitiveFieldBoxes,
   readWithheldFrameBoxes,
   withheldFramesOf,
@@ -78,6 +87,8 @@ export interface BrowserReadToolOptions {
    * A panel or workflow caller has no scope and keeps today's behaviour.
    */
   readonly agentScope?: AgentReadScope | undefined;
+  /** The call's shared frame inventory, so the grant check, the mask and the withheld report read one tree. */
+  readonly readFrames?: (() => Promise<AgentFrameInventory>) | undefined;
   /** The masker used on agent screenshots; tests inject one instead of an OffscreenCanvas. */
   readonly maskScreenshot?: (input: ScreenshotMaskInput) => Promise<ScreenshotMaskResult>;
   readonly now?: () => number;
@@ -576,7 +587,28 @@ const renderFindSnippet = (lines: readonly BrowserAriaSnapshotLine[], index: num
     .join('\n')}`;
 };
 
-const captureScopedSnapshot = (
+/**
+ * The frame a `browser_snapshot` target addresses, when the target is an
+ * iframe element. `DOM.describeNode` puts that element in its parent's
+ * document, so the hosted frame comes from `DOM.getFrameOwner`. Any other
+ * target (or one that no longer resolves) keeps the whole-page snapshot.
+ */
+const snapshotRootFrameId = async (
+  deps: BrowserReadActionDeps,
+  target: string
+): Promise<string | undefined> => {
+  try {
+    const backendNodeId = await resolveTargetBackendNodeId(deps.session, target);
+    const frames = await readAgentFrameTree(deps.session);
+    const frame = await frameWithOwnerNode(deps.session, frames, backendNodeId);
+
+    return frame?.id;
+  } catch {
+    return undefined;
+  }
+};
+
+const captureScopedSnapshot = async (
   deps: BrowserReadActionDeps,
   options: BrowserSnapshotArguments
 ): Promise<BrowserAriaSnapshotCapture> => {
@@ -584,9 +616,14 @@ const captureScopedSnapshot = (
     return captureBrowserAriaSnapshot(deps.session, options);
   }
 
+  const target = options.target ?? '';
+  // A granted iframe is read through its own frame document; an untargeted call keeps the whole tab.
+  const rootFrameId = target === '' ? undefined : await snapshotRootFrameId(deps, target);
+
   return captureAgentSnapshotView(deps.session, deps.agentScope, {
     ...(options.depth === undefined ? {} : { depth: options.depth }),
-    mergeRefs: options.target !== undefined && options.target !== '',
+    mergeRefs: target !== '',
+    ...(rootFrameId === undefined ? {} : { rootFrameId }),
   });
 };
 
@@ -662,8 +699,14 @@ const maskAgentScreenshot = async (
     readonly clip?: ScreenshotClip | undefined;
     /** The clip's render scale: 1 for a CSS-pixel capture, the device pixel ratio for a device one. */
     readonly clipScale?: number | undefined;
+    /** Whether the caller asked for a CSS-pixel viewport capture, whose mask needs a proven scale. */
+    readonly cssCapture?: boolean | undefined;
     readonly dataUrl: string;
     readonly fullPage: boolean;
+    /** Geometry the caller already read for the capture (a device-scale clip), so the mask does not ask again. */
+    readonly geometry?: AgentScreenshotGeometry | undefined;
+    /** The image's pixels per CSS pixel: 1 for a css-scale capture, the tab's ratio for a device-pixel one. */
+    readonly imageScale?: number | undefined;
     readonly mediaType: string;
   }
 ): Promise<
@@ -673,24 +716,47 @@ const maskAgentScreenshot = async (
     return { dataUrl: input.dataUrl, mediaType: input.mediaType };
   }
 
-  const frames = await readAgentFrameTree(deps.session);
+  const readFrames = deps.readFrames ?? (() => readAgentFrames(deps.session));
+  const { geometry: measured } = input;
+  const [inventory, geometry] = await Promise.all([
+    readFrames(),
+    measured ?? readAgentScreenshotGeometry(deps.session),
+  ]);
+
+  if (!inventory.complete) {
+    // An unread frame list cannot be masked: blacking out nothing would ship the very pixels scoping exists to hide.
+    return {
+      error:
+        'The tab’s frames could not be read, so no screenshot was returned. Try again once the page has loaded.',
+    };
+  }
+
+  const { frames } = inventory;
   const withheld = withheldFramesOf(frames, deps.agentScope.readableOrigins);
-  const geometry = await readAgentScreenshotGeometry(deps.session);
+  // One owner read per child frame, shared by both box readers.
+  const owners =
+    withheld.length === 0
+      ? undefined
+      : await readFrameOwners(
+          deps.session,
+          frames.filter(frame => frame.parentId !== undefined).map(frame => frame.id)
+        );
   // `DOM.getBoxModel` quads are viewport-relative; adding the page's scroll puts every box in document space, the space an element clip and a full-page capture both use.
-  const maskedRegions = await readWithheldFrameBoxes(deps.session, frames, withheld, {
-    offset: geometry.scroll,
-  });
+  const [maskedRegions, fields] = await Promise.all([
+    readWithheldFrameBoxes(deps.session, frames, withheld, {
+      offset: geometry.scroll,
+      ...(owners === undefined ? {} : { owners }),
+    }),
+    readSensitiveFieldBoxes(deps.session, frames, deps.agentScope.readableOrigins, {
+      childSessions: inventory.childSessions,
+      offset: geometry.scroll,
+      ...(owners === undefined ? {} : { owners }),
+    }),
+  ]);
 
   if ('error' in maskedRegions) {
     return { error: maskedRegions.error };
   }
-
-  const fields = await readSensitiveFieldBoxes(
-    deps.session,
-    frames,
-    deps.agentScope.readableOrigins,
-    { offset: geometry.scroll }
-  );
 
   if ('error' in fields) {
     return { error: fields.error };
@@ -710,13 +776,23 @@ const maskAgentScreenshot = async (
     return { dataUrl: input.dataUrl, mediaType: input.mediaType };
   }
 
+  // Nothing proves the image's pixels per CSS pixel: the CSS viewport was not read, so the capture is the tab's
+  // Own pixels, and no ratio was given. Masking at a guessed 1x would leave the withheld pixels visible.
+  if (input.cssCapture === true && input.imageScale === undefined) {
+    return {
+      error:
+        'The page’s viewport could not be measured, so no masked screenshot was returned. Try again once the page has loaded.',
+    };
+  }
+
   const mask = deps.maskScreenshot ?? maskScreenshotDataUrl;
   const masked = await mask({
     boxes,
     dataUrl: input.dataUrl,
     mediaType: input.mediaType,
-    // An element capture is clipped at its own scale; a viewport or full-page capture keeps the device pixel ratio the image carries.
-    scale: input.clip === undefined ? geometry.scale : (input.clipScale ?? 1),
+    // An element capture is clipped at its own scale; a viewport capture is the image's own pixels per CSS pixel,
+    // Which a css-scale capture renders at 1 however high the tab's ratio is.
+    scale: input.clip === undefined ? (input.imageScale ?? geometry.scale) : (input.clipScale ?? 1),
   });
 
   // The masker always re-encodes as PNG, whatever the capture's media type was.
@@ -792,7 +868,11 @@ const readElementClip = async (
   session: BrowserToolPageSession,
   target: string,
   options: { readonly failClosedOnGeometryError: boolean }
-): Promise<z.infer<typeof elementClipSchema>> => {
+): Promise<{
+  readonly clip: z.infer<typeof elementClipSchema>;
+  /** The geometry the clip was measured against, reused for its device-pixel scale and the mask. */
+  readonly geometry: AgentScreenshotGeometry;
+}> => {
   const resolved = await session.resolveTarget(target);
 
   if (resolved?.kind === 'ambiguous') {
@@ -823,18 +903,21 @@ const readElementClip = async (
       throw error instanceof Error ? error : new Error(String(error));
     }
 
-    return { scale: 1, scroll: NO_SCROLL };
+    return { scale: 1, scroll: NO_SCROLL, viewport: undefined };
   });
 
-  return elementClipSchema.parse({
-    height: model.height ?? 0,
-    width: model.width ?? 0,
-    // `Page.captureScreenshot` clips are document-space; the box model's quads are viewport-space.
-    // eslint-disable-next-line id-length -- CDP `clip` fields are named x and y
-    x: (content[0] ?? 0) + geometry.scroll.x,
-    // eslint-disable-next-line id-length -- CDP `clip` fields are named x and y
-    y: (content[1] ?? 0) + geometry.scroll.y,
-  });
+  return {
+    clip: elementClipSchema.parse({
+      height: model.height ?? 0,
+      width: model.width ?? 0,
+      // `Page.captureScreenshot` clips are document-space; the box model's quads are viewport-space.
+      // eslint-disable-next-line id-length -- CDP `clip` fields are named x and y
+      x: (content[0] ?? 0) + geometry.scroll.x,
+      // eslint-disable-next-line id-length -- CDP `clip` fields are named x and y
+      y: (content[1] ?? 0) + geometry.scroll.y,
+    }),
+    geometry,
+  };
 };
 
 const SCREENSHOT_MEDIA_TYPES = {
@@ -862,6 +945,73 @@ const inferScreenshotType = (
   return extension === 'webp' ? 'webp' : 'png';
 };
 
+/**
+ * One image of the tab's viewport, base64: fresh when the browser can make a
+ * frame on request, which a background tab otherwise refuses for up to a
+ * second. An element clip and a full-page capture keep the plain path — a
+ * forced frame is the viewport.
+ */
+const readScreenshotData = async (
+  deps: BrowserReadActionDeps,
+  input: {
+    readonly clip: z.infer<typeof elementClipSchema> | undefined;
+    readonly clipScale: number;
+    readonly fullPage: boolean;
+    /** The measured geometry of the tab: the CSS viewport a css-scale image is cut from. */
+    readonly geometry: AgentScreenshotGeometry | undefined;
+    readonly scale: 'css' | 'device';
+    readonly type: 'jpeg' | 'png' | 'webp';
+  }
+): Promise<string | undefined> => {
+  // A css-scale viewport image is the viewport's CSS size at device pixel ratio 2 as well: the frame is rendered at
+  // That size, so the forced frame stays the fast path instead of falling back to a device-pixel capture.
+  const cssSize =
+    input.scale === 'css' && input.geometry?.viewport !== undefined
+      ? input.geometry.viewport
+      : undefined;
+
+  // `Page.startScreencast` has only jpeg and png, so a webp request takes the plain capture, which honours the type.
+  const fresh =
+    input.clip === undefined && !input.fullPage && input.type !== 'webp'
+      ? await deps.session.captureViewportImage(
+          input.type,
+          cssSize === undefined ? {} : { size: cssSize }
+        )
+      : undefined;
+
+  if (fresh !== undefined) {
+    return fresh;
+  }
+
+  // A viewport capture is clipped to the viewport at the requested scale: `scale: 1` renders CSS pixels however
+  // High the tab's ratio is, and the device scale renders the pixels the fast path would have returned.
+  const viewportClip =
+    input.clip === undefined && !input.fullPage && input.geometry?.viewport !== undefined
+      ? {
+          height: input.geometry.viewport.height,
+          scale: input.scale === 'device' ? input.geometry.scale : 1,
+          width: input.geometry.viewport.width,
+          // CDP clips are document-space, so a scrolled page starts at its scroll position.
+          // eslint-disable-next-line id-length -- CDP `clip` fields are named x and y
+          x: input.geometry.scroll.x,
+          // eslint-disable-next-line id-length -- see above
+          y: input.geometry.scroll.y,
+        }
+      : undefined;
+  const clip = input.clip === undefined ? viewportClip : { ...input.clip, scale: input.clipScale };
+  const parsed = screenshotDataSchema.safeParse(
+    await deps.session.send('Page.captureScreenshot', {
+      format: input.type,
+      // The surface is the tab's own compositor output; a viewport capture never extends past it.
+      fromSurface: true,
+      ...(clip === undefined ? {} : { clip }),
+      ...(input.fullPage ? { captureBeyondViewport: true } : {}),
+    })
+  );
+
+  return parsed.success ? parsed.data.data : undefined;
+};
+
 const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_, deps) => {
   const parsed = browserTakeScreenshotArgumentsSchema.safeParse(arguments_);
 
@@ -878,29 +1028,33 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
     );
   }
 
-  const clip =
+  const measured =
     target === undefined || target === ''
       ? undefined
       : await readElementClip(deps.session, target, {
           failClosedOnGeometryError: deps.agentScope !== undefined,
         });
+  const clip = measured?.clip;
+  // An element capture measured its own geometry, with the CSS-scale fallback a panel caller relies on; only a viewport capture an agent will mask needs a fresh read.
+  const geometry =
+    measured?.geometry ??
+    (deps.agentScope === undefined ? undefined : await readAgentScreenshotGeometry(deps.session));
   // A device-pixel element capture renders the clip at the tab's device pixel ratio; the mask boxes move with it.
-  let clipScale = 1;
+  const clipScale = clip !== undefined && scale === 'device' ? (geometry?.scale ?? 1) : 1;
+  // The contract's default is a CSS-pixel image: `css` renders the viewport at 1 pixel per CSS pixel even on a 2x
+  // Tab, and only `device` returns the tab's own pixels.
+  const requestedScale = scale ?? 'css';
 
-  if (clip !== undefined && scale === 'device') {
-    const geometry = await readAgentScreenshotGeometry(deps.session);
-
-    clipScale = geometry.scale;
-  }
-
-  const response = await deps.session.send('Page.captureScreenshot', {
-    format: type,
-    ...(clip === undefined ? {} : { clip: { ...clip, scale: clipScale } }),
-    ...(fullPage === true ? { captureBeyondViewport: true } : {}),
+  const data = await readScreenshotData(deps, {
+    clip,
+    clipScale,
+    fullPage: fullPage === true,
+    geometry,
+    scale: requestedScale,
+    type,
   });
-  const shot = screenshotDataSchema.safeParse(response);
 
-  if (!shot.success) {
+  if (data === undefined) {
     return fail('The browser did not return screenshot data.');
   }
 
@@ -912,8 +1066,19 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
           clip: { height: clip.height, left: clip.x, top: clip.y, width: clip.width },
           clipScale,
         }),
-    dataUrl: `data:${mediaType};base64,${shot.data.data}`,
+    // A css viewport capture is masked at 1 only when the CSS viewport proved the image is that size; otherwise
+    // The masker scales the boxes by the device ratio or fails closed rather than masking at a guess.
+    ...(requestedScale === 'css' && fullPage !== true && clip === undefined
+      ? { cssCapture: true }
+      : {}),
+    dataUrl: `data:${mediaType};base64,${data}`,
     fullPage: fullPage === true,
+    ...(geometry === undefined ? {} : { geometry }),
+    // Only a capture cut at the CSS viewport is one CSS pixel per image pixel; without that viewport the image is
+    // The tab's own pixels, and the masker scales the boxes by the device ratio instead.
+    ...(requestedScale === 'css' && fullPage !== true && geometry?.viewport !== undefined
+      ? { imageScale: 1 }
+      : {}),
     mediaType,
   });
 

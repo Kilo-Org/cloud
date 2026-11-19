@@ -431,7 +431,7 @@ describe('remote session transport state', () => {
   it('publishes owner-scoped model state and dynamic send capability', async () => {
     let systemListener: ((event: UserWebSystemEvent) => void) | undefined;
     const onRemoteModelStateChange = jest.fn<void, [RemoteModelState]>();
-    const onTransportCapabilityChange = jest.fn();
+    const onComposerCapabilityChange = jest.fn();
     const userWebConnection = {
       retain: jest.fn(() => jest.fn()),
       connect: jest.fn(),
@@ -468,7 +468,7 @@ describe('remote session transport state', () => {
       resolveSession: () => Promise.resolve({ type: 'remote', kiloSessionId }),
       transport: { userWebConnection },
       onRemoteModelStateChange,
-      onTransportCapabilityChange,
+      onComposerCapabilityChange,
     });
 
     session.connect();
@@ -492,7 +492,7 @@ describe('remote session transport state', () => {
     await Promise.resolve();
 
     expect(session.canSend).toBe(true);
-    expect(onTransportCapabilityChange).toHaveBeenCalled();
+    expect(onComposerCapabilityChange).toHaveBeenCalled();
     // An empty catalog is not a successful load: the transport self-heals it
     // (error refresh) instead of publishing an empty `idle` catalog.
     expect(onRemoteModelStateChange).toHaveBeenLastCalledWith({

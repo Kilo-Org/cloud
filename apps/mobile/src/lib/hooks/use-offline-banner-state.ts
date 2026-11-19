@@ -4,6 +4,11 @@ import { useSyncExternalStore } from 'react';
 
 import { API_BASE_URL } from '@/lib/config';
 import {
+  isForcedOffline,
+  subscribeConnectivityWithForceState,
+  subscribeForceState,
+} from '@/lib/force-state-fixture';
+import {
   type BannerState,
   type ConnectivitySource,
   createOfflineBannerStore,
@@ -13,7 +18,10 @@ import {
 } from '@/lib/offline-banner-state';
 
 const netInfoSource: ConnectivitySource = {
-  subscribe: listener => addEventListener(listener),
+  subscribe: listener =>
+    __DEV__
+      ? subscribeConnectivityWithForceState(addEventListener, listener)
+      : addEventListener(listener),
 };
 
 const defaultTimer: OfflineBannerTimer = {
@@ -33,10 +41,17 @@ const defaultTimer: OfflineBannerTimer = {
 let store: OfflineBannerStore | null = null;
 
 function getStore(): OfflineBannerStore {
-  store ??= createOfflineBannerStore({
+  if (store !== null) {
+    return store;
+  }
+  const created = createOfflineBannerStore({
     source: netInfoSource,
     timer: defaultTimer,
     probe: async () => {
+      // Dev-only `force-state/offline` link: the backend is unreachable too.
+      if (__DEV__ && isForcedOffline()) {
+        return false;
+      }
       await withDeadline(3000, async signal => {
         await fetch(API_BASE_URL, { method: 'HEAD', signal });
       });
@@ -44,7 +59,20 @@ function getStore(): OfflineBannerStore {
       return true;
     },
   });
-  return store;
+  store = created;
+  if (__DEV__) {
+    // Dev-only `force-state/offline` link: the network is known to be gone, so
+    // the banner commits at once, before the link opens its next screen, and
+    // that screen lays out under the banner from its first frame.
+    const confirmForcedOffline = () => {
+      if (isForcedOffline()) {
+        created.confirmOffline();
+      }
+    };
+    subscribeForceState(confirmForcedOffline);
+    confirmForcedOffline();
+  }
+  return created;
 }
 
 export function useOfflineBannerState(): boolean {

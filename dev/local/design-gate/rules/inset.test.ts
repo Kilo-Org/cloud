@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { ProbeNode, Rect } from '../tree';
+import type { ProbeEnv, ProbeNode, Rect } from '../tree';
 import { checkScreen } from './index';
 import { tree } from './test-dump';
 
@@ -61,4 +61,61 @@ test('inset-asymmetry: safe-area insets are excluded at the window edges', () =>
   assert.deepEqual(header([0, 0, 400, 100], [10, 59.8, 380, 29.5]), []);
   assert.deepEqual(header([0, 700, 400, 100], [10, 710, 380, 50]), []);
   assert.equal(header([0, 2, 400, 100], [10, 61.8, 380, 29.5]).length, 1);
+});
+
+const IOS = {
+  platform: 'ios',
+  osVersion: '26.5',
+  window: { width: 402, height: 874 },
+  safeArea: { top: 62, right: 0, bottom: 34, left: 0 },
+};
+
+function insets(nodes: ProbeNode[], env: Partial<ProbeEnv> = IOS) {
+  return checkScreen(tree(nodes, env)).filter(finding => finding.rule === 'inset-asymmetry');
+}
+
+test('inset-asymmetry: a card partly below the window is not measured', () => {
+  // Org billing: the card starts at 795 and is 193 tall, so only 79 pt show.
+  // Its children below the window are dropped, and the union of the rest
+  // stops at the first line.
+  const billing = (top: number): ProbeNode[] => [
+    { parent: 0, tag: 'View', rect: [14, top, 374, 193], style: { backgroundColor: '#ffffff' } },
+    { parent: 1, tag: 'Paragraph', rect: [28, top + 14, 300, 20], text: 'Invoices' },
+    { parent: 1, tag: 'Paragraph', rect: [28, top + 159, 300, 20], text: 'View all' },
+  ];
+  assert.deepEqual(insets(billing(795)), []);
+  // The same card on screen is balanced, so nothing is lost by skipping it.
+  assert.deepEqual(insets(billing(400)), []);
+});
+
+test('inset-asymmetry: an iOS page sheet footer pads the home indicator', () => {
+  // Credits: the footer ends at the sheet's bottom, which UIKit puts at the
+  // window's bottom, so 34 of its 34 pt bottom gap are the home indicator inset.
+  assert.deepEqual(
+    insets([
+      { parent: 0, tag: 'RNSModalScreen', rect: [0, 0, 402, 812] },
+      { parent: 1, tag: 'View', rect: [0, 728, 402, 84], style: { backgroundColor: '#ffffff' } },
+      { parent: 2, tag: 'View', rect: [14, 742, 374, 36], label: 'Buy credits', pressable: true },
+    ]),
+    []
+  );
+});
+
+test('inset-asymmetry: a header at an iOS sheet top pads for the grabber', () => {
+  // The sheet header's 32 pt top padding clears the grabber the way a screen's
+  // top clears the status bar.
+  const header = (sheetHeight: number) =>
+    insets([
+      { parent: 0, tag: 'RNSModalScreen', rect: [0, 0, 402, sheetHeight] },
+      { parent: 1, tag: 'View', rect: [0, 0, 402, 74], style: { backgroundColor: '#ffffff' } },
+      { parent: 2, tag: 'Paragraph', rect: [14, 32, 374, 30], text: 'Add instruction' },
+    ]);
+  assert.deepEqual(header(423), []);
+  // The same header lower in the sheet is measured.
+  const [finding] = insets([
+    { parent: 0, tag: 'RNSModalScreen', rect: [0, 0, 402, 423] },
+    { parent: 1, tag: 'View', rect: [0, 100, 402, 74], style: { backgroundColor: '#ffffff' } },
+    { parent: 2, tag: 'Paragraph', rect: [14, 132, 374, 30], text: 'Add instruction' },
+  ]);
+  assert.equal(finding?.measured, 20);
 });

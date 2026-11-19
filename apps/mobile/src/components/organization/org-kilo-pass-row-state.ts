@@ -37,11 +37,20 @@ export type OrgKiloPassSummary = {
   } | null;
 };
 
+type OrgKiloPassTone = 'default' | 'muted' | 'warn';
+
 export type OrgKiloPassRowState = {
   /** One-line state summary under the "Kilo Pass" title. */
   subtitle: string;
   /** Warn-tint the icon tile for states needing org-admin attention or action. */
   attention: boolean;
+  /**
+   * The ink of the billing row's value: `warn` for a state that needs
+   * attention, `default` for a pass that is held or being set up, and `muted`
+   * for a state that says no pass is in effect. The muted ink matches the
+   * screen's other inert values ("No subscription", "Disabled").
+   */
+  tone: OrgKiloPassTone;
   /**
    * What pressing the row does. `retry` refetches the payload that could not
    * load (the summary, or the membership payload that decides whether this
@@ -92,15 +101,25 @@ function cancelingSubtitle(agreement: NonNullable<OrgKiloPassSummary['agreement'
     : `${i18n.t('organization.kiloPass.canceling')} · ${activeSubtitle(agreement)}`;
 }
 
+/**
+ * A settled state with no pass in effect, or one that needs attention. The
+ * states that name a held pass go through `held` instead.
+ */
 function settled(subtitle: string, attention = false): OrgKiloPassRowState {
   return {
     subtitle,
     attention,
+    tone: attention ? 'warn' : 'muted',
     action: 'none',
     actionLabel: null,
     accessibilityHint: null,
     loading: false,
   };
+}
+
+/** A settled state that names a pass the organization holds or is setting up. */
+function held(subtitle: string): OrgKiloPassRowState {
+  return { ...settled(subtitle), tone: 'default' };
 }
 
 /** Conditions needing admin attention, checked before commercial state (mirrors web `toCondition`). */
@@ -135,6 +154,7 @@ export function getOrgKiloPassRowState(params: {
       return {
         subtitle: i18n.t('organization.kiloPass.couldNotLoadStatus'),
         attention: true,
+        tone: 'warn',
         action: 'retry',
         actionLabel: i18n.t('common.retry'),
         accessibilityHint: i18n.t('organization.kiloPass.retryHint'),
@@ -144,6 +164,7 @@ export function getOrgKiloPassRowState(params: {
     return {
       subtitle: i18n.t('common.loading'),
       attention: false,
+      tone: 'default',
       action: 'none',
       actionLabel: null,
       accessibilityHint: null,
@@ -167,19 +188,19 @@ export function getOrgKiloPassRowState(params: {
   }
 
   if (data.commercialState === 'active') {
-    return settled(activeSubtitle(agreement));
+    return held(activeSubtitle(agreement));
   }
   if (data.commercialState === 'cancel_at_period_end') {
-    return settled(cancelingSubtitle(agreement));
+    return held(cancelingSubtitle(agreement));
   }
   if (data.commercialState === 'pending_payment' || data.state === 'pending_payment') {
-    return settled(i18n.t('organization.kiloPass.paymentPending'));
+    return held(i18n.t('organization.kiloPass.paymentPending'));
   }
   if (data.state === 'requires_action') {
     return settled(i18n.t('organization.kiloPass.paymentNeedsAttention'), true);
   }
   if (data.state === 'activating') {
-    return settled(i18n.t('organization.kiloPass.activating'));
+    return held(i18n.t('organization.kiloPass.activating'));
   }
   if (data.commercialState === 'ended' || data.state === 'ended') {
     return settled(i18n.t('organization.kiloPass.ended'));

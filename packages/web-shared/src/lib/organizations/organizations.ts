@@ -51,6 +51,29 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { enforceOrganizationCreationLimit } from '@kilocode/web-shared/lib/organizations/organization-creation-limit';
 
+// `organization_seats_purchases` is append-only, so the most recently created
+// row is the organization's current subscription state — the same input the
+// subscription gate classifies with. Lazily built: suites that mock the
+// drizzle module must not see this evaluated at import time.
+function latestSeatPurchaseStatusSql() {
+  return sql<OrganizationSeatsPurchase['subscription_status'] | null>`(
+    SELECT ${organization_seats_purchases.subscription_status}
+    FROM ${organization_seats_purchases}
+    WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
+    ORDER BY ${organization_seats_purchases.created_at} DESC
+    LIMIT 1
+  )`;
+}
+
+/** An invitation is live while it is unaccepted and unexpired. */
+function liveInvitationCondition(organizationId: string) {
+  return and(
+    eq(organization_invitations.organization_id, organizationId),
+    isNull(organization_invitations.accepted_at),
+    gt(organization_invitations.expires_at, sql`NOW()`)
+  );
+}
+
 export async function getOrganizationById(
   id: Organization['id'],
   txn?: DrizzleTransaction
@@ -79,16 +102,6 @@ export async function findOrganizationByStripeCustomerId(
 export async function getUserOrganizationsWithSeats(
   userId: User['id']
 ): Promise<UserOrganizationWithSeats[]> {
-  // `organization_seats_purchases` is append-only, so the most recently created
-  // row is the organization's current subscription state — the same input the
-  // subscription gate classifies with.
-  const latestSeatPurchaseStatus = sql<OrganizationSeatsPurchase['subscription_status'] | null>`(
-    SELECT ${organization_seats_purchases.subscription_status}
-    FROM ${organization_seats_purchases}
-    WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
-    ORDER BY ${organization_seats_purchases.created_at} DESC
-    LIMIT 1
-  )`;
   const results = await db
     .select({
       organizationId: organizations.id,
@@ -102,7 +115,7 @@ export async function getUserOrganizationsWithSeats(
       createdAt: organizations.created_at,
       freeTrialEndAt: organizations.free_trial_end_at,
       settings: organizations.settings,
-      latestSeatPurchaseStatus,
+      latestSeatPurchaseStatus: latestSeatPurchaseStatusSql(),
       seatCountTotal: organizations.seat_count,
       total_member_count: sql<number>`(
         SELECT COUNT(*)::int FROM (
@@ -233,13 +246,7 @@ export async function getProfileOrganizations(
   // getProfileOrganizations a single query and adds no seat-purchase lookup for
   // callers that don't opt in.
   const latestSeatPurchaseStatus = excludeAccessBlocked
-    ? sql<OrganizationSeatsPurchase['subscription_status'] | null>`(
-        SELECT ${organization_seats_purchases.subscription_status}
-        FROM ${organization_seats_purchases}
-        WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
-        ORDER BY ${organization_seats_purchases.created_at} DESC
-        LIMIT 1
-      )`
+    ? latestSeatPurchaseStatusSql()
     : sql<OrganizationSeatsPurchase['subscription_status'] | null>`NULL`;
 
   const results: ProfileOrganizationRow[] = await db
@@ -351,6 +358,43 @@ export async function skipCustomerSourceSurveyForOrgJoin(
     .where(and(eq(kilocode_users.id, userId), isNull(kilocode_users.customer_source)));
 }
 
+/**
+ * Insert an organization membership and, when the row is new, advance the
+ * organization's group-policy revision. The SSO/join path and the
+ * invitation-acceptance path both use this, so neither can commit the membership
+ * without the revision change. A caller that requires a new row reads the
+ * membership first and rejects the conflict.
+ */
+async function insertOrganizationMembership(
+  tx: DrizzleTransaction,
+  membership: {
+    organizationId: Organization['id'];
+    userId: User['id'];
+    role: OrganizationRole;
+    invitedBy?: string | null;
+  }
+): Promise<boolean> {
+  const result = await tx
+    .insert(organization_memberships)
+    .values({
+      organization_id: membership.organizationId,
+      kilo_user_id: membership.userId,
+      role: membership.role,
+      invited_by: membership.invitedBy ?? null,
+    })
+    .onConflictDoNothing();
+
+  const added = (result.rowCount ?? 0) > 0;
+  // Only a real membership change affects group-policy evaluation. Bumping the
+  // revision (and taking the org-wide policy advisory lock) on a no-op insert
+  // would serialize every SSO re-login on one row. Skip both when nothing was
+  // inserted.
+  if (added) {
+    await bumpOrganizationGroupPolicyRevision(tx, membership.organizationId, membership.userId);
+  }
+  return added;
+}
+
 export async function addUserToOrganization(
   organizationId: Organization['id'],
   userId: User['id'],
@@ -362,24 +406,11 @@ export async function addUserToOrganization(
       addUserToOrganization(organizationId, userId, role, tx)
     );
   }
-  const result = await txn
-    .insert(organization_memberships)
-    .values({
-      organization_id: organizationId,
-      kilo_user_id: userId,
-      role,
-    })
-    .onConflictDoNothing();
-
-  const added = (result.rowCount ?? 0) > 0;
-  // Only a real membership change affects group-policy evaluation. Bumping the
-  // revision (and taking the org-wide policy advisory lock) on a no-op insert
-  // would serialize every SSO re-login on one row. Skip both when nothing was
-  // inserted.
-  if (added) {
-    await bumpOrganizationGroupPolicyRevision(txn, organizationId, userId);
-  }
-  return added;
+  return await insertOrganizationMembership(txn, {
+    organizationId,
+    userId,
+    role,
+  });
 }
 
 export async function lockOrganizationMembershipMutation(
@@ -423,12 +454,10 @@ export async function addSsoUserToOrganization(
         .innerJoin(kilocode_users, eq(kilocode_users.id, userId))
         .where(
           and(
-            eq(organization_invitations.organization_id, organizationId),
+            liveInvitationCondition(organizationId),
             eq(organization_invitations.token, options.invitationToken),
             eq(organization_invitations.authentication_requirement, 'workos'),
-            eq(organization_invitations.sso_source_organization_id, organizationId),
-            isNull(organization_invitations.accepted_at),
-            gt(organization_invitations.expires_at, sql`NOW()`)
+            eq(organization_invitations.sso_source_organization_id, organizationId)
           )
         )
         .limit(1);
@@ -506,13 +535,7 @@ export async function updateUserRoleInOrganization(
     const pendingInvitations = await tx
       .select({ id: organization_invitations.id, email: organization_invitations.email })
       .from(organization_invitations)
-      .where(
-        and(
-          eq(organization_invitations.organization_id, organizationId),
-          isNull(organization_invitations.accepted_at),
-          gt(organization_invitations.expires_at, sql`NOW()`)
-        )
-      );
+      .where(liveInvitationCondition(organizationId));
 
     const invitationIds = pendingInvitations
       .filter(invitation => invitationAddressesAccount(invitation.email, user))
@@ -527,9 +550,8 @@ export async function updateUserRoleInOrganization(
       .set({ role })
       .where(
         and(
-          inArray(organization_invitations.id, invitationIds),
-          isNull(organization_invitations.accepted_at),
-          gt(organization_invitations.expires_at, sql`NOW()`)
+          liveInvitationCondition(organizationId),
+          inArray(organization_invitations.id, invitationIds)
         )
       );
 
@@ -742,13 +764,7 @@ export async function assertInviteeAddressIsAvailable(
   const pendingInvitations = await tx
     .select({ email: organization_invitations.email })
     .from(organization_invitations)
-    .where(
-      and(
-        eq(organization_invitations.organization_id, organizationId),
-        isNull(organization_invitations.accepted_at),
-        gt(organization_invitations.expires_at, sql`NOW()`)
-      )
-    );
+    .where(liveInvitationCondition(organizationId));
 
   if (pendingInvitations.some(invitation => isSameInvitationAddress(invitation.email, email))) {
     throw new Error('User already has a pending invitation');
@@ -879,13 +895,7 @@ export async function getOrganizationMembers(
         external_side_effect_outbox,
         eq(external_side_effect_outbox.invitation_id, organization_invitations.id)
       )
-      .where(
-        and(
-          eq(organization_invitations.organization_id, organizationId),
-          isNull(organization_invitations.accepted_at),
-          gt(organization_invitations.expires_at, sql`NOW()`)
-        )
-      ),
+      .where(liveInvitationCondition(organizationId)),
   ]);
 
   const members: OrganizationMember[] = [
@@ -1134,16 +1144,19 @@ export async function acceptOrganizationInvite(
         return failureResult('Invitation is no longer valid');
       }
 
-      await tx.insert(organization_memberships).values({
-        organization_id: invitation.organization_id,
-        kilo_user_id: userId,
+      const inserted = await insertOrganizationMembership(tx, {
+        organizationId: invitation.organization_id,
+        userId,
         role: invitation.role,
-        invited_by: invitation.invited_by,
+        invitedBy: invitation.invited_by,
       });
-
-      // A real membership insert changes group-policy evaluation, so advance the
-      // same revision signal addUserToOrganization uses for the SSO path.
-      await bumpOrganizationGroupPolicyRevision(tx, invitation.organization_id, userId);
+      if (!inserted) {
+        // The read above runs under the membership-mutation advisory lock, but
+        // writers such as directory sync insert through addUserToOrganization
+        // without it. Keep that concurrent insert a failure: the invitation must
+        // not be accepted against a membership this path did not create.
+        throw new Error('Organization membership was created concurrently while accepting invite');
+      }
 
       await skipCustomerSourceSurveyForOrgJoin(userId, tx);
 

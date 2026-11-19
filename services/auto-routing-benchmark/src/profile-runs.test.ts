@@ -845,6 +845,10 @@ describe('decider run completion', () => {
           errors: 0,
           timeouts: 0,
           routeAccuracy: null,
+          avgInputTokens: null,
+          avgCachedInputTokens: null,
+          avgOutputTokens: null,
+          avgReasoningTokens: null,
         }))
       )
     );
@@ -913,6 +917,10 @@ describe('decider run completion', () => {
         errors: 0,
         timeouts: 0,
         routeAccuracy: null,
+        avgInputTokens: null,
+        avgCachedInputTokens: null,
+        avgOutputTokens: null,
+        avgReasoningTokens: null,
       }))
     );
 
@@ -950,6 +958,10 @@ describe('decider run completion', () => {
         errors: 0,
         timeouts: 0,
         routeAccuracy: null,
+        avgInputTokens: null,
+        avgCachedInputTokens: null,
+        avgOutputTokens: null,
+        avgReasoningTokens: null,
       }))
     );
 
@@ -987,6 +999,10 @@ describe('decider run completion', () => {
         errors: 0,
         timeouts: 0,
         routeAccuracy: null,
+        avgInputTokens: null,
+        avgCachedInputTokens: null,
+        avgOutputTokens: null,
+        avgReasoningTokens: null,
       }))
     );
 
@@ -1021,6 +1037,10 @@ describe('decider run completion', () => {
         errors: 0,
         timeouts: 0,
         routeAccuracy: null,
+        avgInputTokens: null,
+        avgCachedInputTokens: null,
+        avgOutputTokens: null,
+        avgReasoningTokens: null,
       }));
     // The bump promoted only the pairs measured so far, so `a` serves alone while `b` waits.
     vi.mocked(servingSubscriptionSnapshot).mockResolvedValue([
@@ -1437,6 +1457,10 @@ describe('alias-resolved platform publication', () => {
         errors: 0,
         timeouts: 0,
         routeAccuracy: null,
+        avgInputTokens: null,
+        avgCachedInputTokens: null,
+        avgOutputTokens: null,
+        avgReasoningTokens: null,
         accuracy: 0.9,
         avgCostUsd: 0.001,
         avgLatencyMs: 100,
@@ -1509,6 +1533,10 @@ describe('alias-resolved platform publication', () => {
         errors: 0,
         timeouts: 0,
         routeAccuracy: null,
+        avgInputTokens: null,
+        avgCachedInputTokens: null,
+        avgOutputTokens: null,
+        avgReasoningTokens: null,
         accuracy: 0.9,
         avgCostUsd: 0.001,
         avgLatencyMs: 100,
@@ -1674,6 +1702,10 @@ describe('frontier router runs', () => {
         errors: 0,
         timeouts: 0,
         routeAccuracy: null,
+        avgInputTokens: null,
+        avgCachedInputTokens: null,
+        avgOutputTokens: null,
+        avgReasoningTokens: null,
       }))
     );
     await publishPlatformRoutingTable(env, catalogFetch, 'frontier');
@@ -1728,6 +1760,10 @@ describe('frontier router runs', () => {
         errors: 0,
         timeouts: 0,
         routeAccuracy: null,
+        avgInputTokens: null,
+        avgCachedInputTokens: null,
+        avgOutputTokens: null,
+        avgReasoningTokens: null,
       }))
     );
     await publishPlatformRoutingTable(env, catalogFetch, 'efficient');
@@ -1777,6 +1813,10 @@ describe('frontier router runs', () => {
         errors: 0,
         timeouts: 0,
         routeAccuracy: null,
+        avgInputTokens: null,
+        avgCachedInputTokens: null,
+        avgOutputTokens: null,
+        avgReasoningTokens: null,
       }))
     );
     await publishPlatformRoutingTable(env, catalogFetch, 'efficient');

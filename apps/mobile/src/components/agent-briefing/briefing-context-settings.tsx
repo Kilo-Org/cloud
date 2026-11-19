@@ -1,10 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { ModelSelector } from '@/components/agents/model-selector';
+import {
+  BriefingEstimateLine,
+  type BriefingEstimateLineQuote,
+  parseBriefingEstimateLineQuote,
+} from '@/components/agent-briefing/briefing-estimate-line';
+import { useBriefingEnableFlow } from '@/components/agent-briefing/use-briefing-enable-flow';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
@@ -13,11 +19,7 @@ import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { type BriefingPreferences } from '@/lib/agent-briefing';
-import { briefingMoney } from '@/lib/agent-briefing-format';
-import {
-  briefingEstimateUnavailableKey,
-  parseBriefingSafeguardInput,
-} from '@/lib/agent-briefing-state';
+import { parseBriefingSafeguardInput } from '@/lib/agent-briefing-state';
 import { formatNumber } from '@/lib/format';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
@@ -35,13 +37,6 @@ const SAFEGUARD_INPUT_FORMAT: Intl.NumberFormatOptions = {
   useGrouping: false,
 };
 
-/**
- * A disclosure names the limit to the nearest hundredth of a minute, so a
- * duration that is not a whole number of minutes reads as `0.13`, not as the
- * full quotient. Locale formatting supplies the decimal separator.
- */
-const SAFEGUARD_DISCLOSURE_FORMAT: Intl.NumberFormatOptions = { maximumFractionDigits: 2 };
-
 export function BriefingContextSettings({
   preference,
   defaultModel,
@@ -55,6 +50,7 @@ export function BriefingContextSettings({
   const trpc = useTRPC();
   const client = useQueryClient();
   const offline = useOfflineBannerState();
+  const enableFlow = useBriefingEnableFlow();
   const locale = i18n.resolvedLanguage ?? i18n.language;
   const organizationId = preference.context.organizationId ?? undefined;
   const catalog = useAvailableModels(organizationId);
@@ -82,14 +78,18 @@ export function BriefingContextSettings({
     enabled: !offline && valid,
     staleTime: 0,
   });
-  type LimitQuote =
-    | { readonly kind: 'invalid' }
-    | { readonly kind: 'quoted'; readonly quote: typeof estimate.data };
-  // An unparsable field disables the query, so the last estimate cannot speak
-  // for the current limits: invalid paints the line alone, never a stale quote.
-  const limitQuote: LimitQuote = valid
-    ? { kind: 'quoted', quote: estimate.data }
-    : { kind: 'invalid' };
+  // One phase per state of the quote line, so no flag pair can render two lines
+  // or the wrong one. An unparsable field disables the query, so the last
+  // estimate cannot speak for the current limits and `invalid` owns the line.
+  // A cached quote renders whatever the read is doing; only with nothing cached
+  // does the line name the read itself (offline, failed), and the Retry below
+  // belongs to the failed phase alone.
+  const quote = estimate.data;
+  const limitQuote: BriefingEstimateLineQuote = parseBriefingEstimateLineQuote(
+    valid,
+    { offline, isError: estimate.isError },
+    quote
+  );
   const update = useMutation(
     trpc.agentBriefing.updateContextPreferences.mutationOptions({
       onMutate: async input => {
@@ -141,45 +141,33 @@ export function BriefingContextSettings({
       setLimits(next);
     }
   };
-  const enable = async () => {
-    if (!valid) {
-      toast.error(t('agentBriefing.invalidSafeguards'));
-      return;
-    }
-    const result = await estimate.refetch();
-    const quote = result.data;
-    if (!quote?.canGenerate) {
-      toast.error(t(briefingEstimateUnavailableKey(quote?.unavailableReason)));
-      return;
-    }
-    Alert.alert(
-      t('agentBriefing.confirmPaid', { context: contextName }),
-      t('agentBriefing.paidDisclosure', {
-        estimate: briefingMoney(quote.estimatedCostMicrodollars, i18n.language),
-        maximum: briefingMoney(quote.maximumCostMicrodollars, i18n.language),
-        minutes: formatNumber(quote.maxDurationSeconds / 60, locale, SAFEGUARD_DISCLOSURE_FORMAT),
-      }),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('agentBriefing.enable'),
-          onPress: () => {
-            update.mutate({
-              organizationId,
-              enabled: true,
-              timezone,
-              language: locale,
-              model,
-              ...limits,
-              estimateToken: quote.estimateToken,
-            });
-          },
-        },
-      ],
-      // Android back dismisses, which equals Cancel: nothing is enabled.
-      { cancelable: true }
-    );
+  const startEnable = (): void => {
+    enableFlow.start({
+      valid,
+      refetch: () => estimate.refetch(),
+      contextName,
+      locale,
+      language: i18n.language,
+      confirm: estimateToken => {
+        update.mutate({
+          organizationId,
+          enabled: true,
+          timezone,
+          language: locale,
+          model,
+          ...limits,
+          estimateToken,
+        });
+      },
+    });
   };
+  // The estimate's first load is a wait this card owns: the primary action shows
+  // the same spinner the switch does while the quote is on its way. A disabled
+  // (offline) or failed read never produces a quote, so only a real in-flight
+  // fetch is a wait this button can name; `estimate.isPending` alone would hold
+  // the spinner forever for the disabled read.
+  const estimateLoading = estimate.data === undefined && estimate.isFetching;
+  /** Exactly one line per quote phase, rendered by the line's own component. */
   return (
     <Card>
       <Text variant="muted">{t('agentBriefing.scheduledContextHint')}</Text>
@@ -188,15 +176,18 @@ export function BriefingContextSettings({
         {renderRowTrailing({
           kind: 'switch',
           value: preference.enabled,
-          disabled: offline || update.isPending,
+          disabled: offline || update.isPending || enableFlow.pending,
           accessibilityLabel: t('agentBriefing.scheduledContextEnabled'),
           accessibilityState: {
             checked: preference.enabled,
-            disabled: offline || update.isPending,
+            disabled: offline || update.isPending || enableFlow.pending,
+            // Both paths are busy while a quote is in flight: the estimate's own
+            // fetch, and the confirm-and-enable flow that refetches it.
+            busy: enableFlow.pending || estimate.isFetching,
           },
           onValueChange: next => {
             if (next) {
-              void enable();
+              startEnable();
             } else {
               update.mutate({ organizationId, enabled: false, timezone, language: locale });
             }
@@ -259,25 +250,8 @@ export function BriefingContextSettings({
         />
         <Text variant="caption">{t('agentBriefing.snapshotSafeguards')}</Text>
       </View>
-      {limitQuote.kind === 'invalid' ? (
-        <Text variant="muted" className="text-destructive">
-          {t('agentBriefing.invalidSafeguards')}
-        </Text>
-      ) : null}
-      {limitQuote.kind === 'quoted' && limitQuote.quote?.canGenerate ? (
-        <Text variant="caption">
-          {t('agentBriefing.estimate', {
-            estimate: briefingMoney(limitQuote.quote.estimatedCostMicrodollars, i18n.language),
-            maximum: briefingMoney(limitQuote.quote.maximumCostMicrodollars, i18n.language),
-          })}
-        </Text>
-      ) : null}
-      {limitQuote.kind === 'quoted' && !limitQuote.quote?.canGenerate ? (
-        <Text variant="caption">
-          {t(briefingEstimateUnavailableKey(limitQuote.quote?.unavailableReason))}
-        </Text>
-      ) : null}
-      {estimate.isError ? (
+      <BriefingEstimateLine quote={limitQuote} />
+      {limitQuote.kind === 'failed' ? (
         <Button
           variant="ghost"
           size="sm"
@@ -291,16 +265,12 @@ export function BriefingContextSettings({
       ) : null}
       <Button
         variant="outline"
-        disabled={
-          offline ||
-          !valid ||
-          update.isPending ||
-          !estimate.data?.canGenerate ||
-          estimate.isFetching
-        }
-        onPress={() => {
-          void enable();
-        }}
+        // The spinner replaces the hand-rolled disabled-while-fetching boolean:
+        // it keeps the label's width and says the quote is on its way, on the
+        // switch's refetch and on a first load alike.
+        loading={enableFlow.pending || (valid && estimateLoading)}
+        disabled={offline || !valid || update.isPending || !estimate.data?.canGenerate}
+        onPress={startEnable}
       >
         <Text>{t(preference.enabled ? 'common.save' : 'agentBriefing.enable')}</Text>
       </Button>

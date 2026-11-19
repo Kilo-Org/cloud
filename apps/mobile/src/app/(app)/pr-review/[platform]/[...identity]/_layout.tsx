@@ -6,6 +6,7 @@ import {
   useLocalSearchParams,
 } from 'expo-router';
 import { useMemo } from 'react';
+import { Platform } from 'react-native';
 
 import { appScreenLayout } from '@/components/app-screen-layout';
 import { InvalidRouteState } from '@/components/invalid-route-state';
@@ -19,6 +20,7 @@ import {
   pendingReviewDraftKey,
   PendingReviewProvider,
 } from '@/lib/pr-review/pending-review-provider';
+import { prMergeSheetOptions } from '@/lib/pr-review/merge/merge-sheet-options';
 import {
   parseProviderPrRoute,
   providerPrRefKey,
@@ -72,6 +74,7 @@ export default function ProviderPrReviewLayout() {
   const instance = parseParam(query.instance) ?? '';
   const { organizationId } = useOrganization();
   const sheetOptions = { ...useFormSheetScreenOptions(), sheetInitialDetentIndex: 'last' as const };
+  const mergeSheetOptions = prMergeSheetOptions(sheetOptions, Platform.OS);
   const { userId } = useCurrentUserId();
   useRouteForegroundRefresh([[['providerReview']]]);
 
@@ -133,7 +136,7 @@ export default function ProviderPrReviewLayout() {
               <Stack.Screen name="comment-composer" options={sheetOptions} />
               <Stack.Screen name="conversation-comment" options={sheetOptions} />
               <Stack.Screen name="review-submit" options={sheetOptions} />
-              <Stack.Screen name="merge" options={sheetOptions} />
+              <Stack.Screen name="merge" options={mergeSheetOptions} />
               <Stack.Screen name="file-navigator" options={sheetOptions} />
             </Stack>
           </PrReviewConnectGate>

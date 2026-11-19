@@ -12,6 +12,7 @@ const emptyFeatures: OrganizationFeatures = {
   experimental_byok: [],
   enkrypt_output_guardrail: [],
   gateway_settings: [],
+  org_permission_policy: [],
 };
 const mockMutate = jest.fn();
 const mockRefetchConfig = jest.fn();
@@ -80,6 +81,7 @@ describe('OrganizationFeaturesContent', () => {
         experimental_byok: [activeId],
         enkrypt_output_guardrail: [],
         gateway_settings: [],
+        org_permission_policy: [],
       },
       isLoading: false,
       error: null,
@@ -153,6 +155,7 @@ describe('OrganizationFeaturesContent', () => {
       experimental_byok: [activeId, unknownId],
       enkrypt_output_guardrail: [activeId],
       gateway_settings: [deletedId, activeId],
+      org_permission_policy: [activeId],
     };
     mockPreviewQuery.data?.push({ id: deletedId, name: 'Deleted organization', isDeleted: true });
     render();
@@ -165,6 +168,7 @@ describe('OrganizationFeaturesContent', () => {
       'Direct Amazon Bedrock and Google Vertex AI BYOK (2)',
       'Enkrypt output guardrails (1)',
       'Advanced policies (2)',
+      'Organization permission policy (1)',
     ]);
     expect(Array.from(sections[2].querySelectorAll('a')).map(link => link.textContent)).toEqual([
       'Deleted organization',
@@ -199,11 +203,13 @@ describe('OrganizationFeaturesContent', () => {
     edit('experimental_byok', ` ${deletedId.toUpperCase()} \n\n${deletedId}\n `);
     edit('enkrypt_output_guardrail', deletedId);
     edit('gateway_settings', ` ${deletedId.toUpperCase()} \n${deletedId}\n`);
+    edit('org_permission_policy', deletedId);
 
     const input = {
       experimental_byok: [deletedId],
       enkrypt_output_guardrail: [deletedId],
       gateway_settings: [deletedId],
+      org_permission_policy: [deletedId],
     };
     expect(mockPreviewOptions).toHaveBeenLastCalledWith(input, {
       enabled: true,
@@ -213,8 +219,8 @@ describe('OrganizationFeaturesContent', () => {
     expect(container.textContent).not.toContain('Active organization');
     expect(
       Array.from(container.querySelectorAll('section a')).map(link => link.textContent)
-    ).toEqual(['New organization', 'New organization', 'New organization']);
-    expect(container.querySelectorAll('section li')).toHaveLength(3);
+    ).toEqual(['New organization', 'New organization', 'New organization', 'New organization']);
+    expect(container.querySelectorAll('section li')).toHaveLength(4);
     expect(button('Save').disabled).toBe(false);
     expect(mockMutate).not.toHaveBeenCalled();
     act(() => button('Save').click());
@@ -280,7 +286,7 @@ describe('OrganizationFeaturesContent', () => {
       enabled: false,
     });
     expect(Array.from(container.querySelectorAll('section p')).map(p => p.textContent)).toEqual(
-      Array.from({ length: 3 }, () => 'No organizations enabled.')
+      Array.from({ length: 4 }, () => 'No organizations enabled.')
     );
     expect(container.querySelector('[role="status"]')).toBeNull();
     expect(container.querySelector('section li')).toBeNull();

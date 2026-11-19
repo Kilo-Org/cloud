@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted suite for the overview's surfaces: the config body, the rows and the not-connected state share one mock harness */
 // The Bitbucket reviewer overview must paint one surface for its config read:
 // rows from cache, an error with retry, or a loading state. A pending read that
 // nothing is fetching (the state a cancelled first fetch reverts to) used to
@@ -8,7 +9,7 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 
 import { BitbucketOverview } from './bitbucket-overview';
 
@@ -109,7 +110,9 @@ vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.example.test' }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
-  classifyProviderState: () => ({ status: 'connected' }),
+  classifyProviderState: () => ({
+    status: readiness.connected ? 'connected' : 'disconnected',
+  }),
   useBitbucketReadiness: () => ({
     isLoading: false,
     isError: false,
@@ -138,6 +141,19 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 vi.mock('@/lib/hooks/use-reviewer-models', () => ({
   useReviewerModels: () => ({ models: [], isLoading: false }),
+}));
+const orgBoundaryCalls = vi.hoisted(() => [] as (string | undefined)[]);
+const orgBoundary = vi.hoisted(() => ({ resolved: true, resolving: false }));
+vi.mock('@/lib/hooks/use-organization-queries', () => ({
+  useOrgBoundary: (organizationIdOverride?: string) => {
+    orgBoundaryCalls.push(organizationIdOverride);
+    return {
+      org: orgBoundary.resolved
+        ? { organizationId: 'org_1', organizationName: 'Acme Robotics', role: 'owner' }
+        : undefined,
+      isResolving: orgBoundary.resolving,
+    };
+  },
 }));
 
 function makeConfig(over: Record<string, unknown> = {}) {
@@ -188,8 +204,12 @@ beforeEach(() => {
   config.refetch.mockReset();
   readiness.connected = true;
   readiness.ready = true;
+  readiness.integrationId = 'bitbucket-1';
   readiness.workspaceSlug = 'ws';
   readiness.fetchStatus = 'idle';
+  orgBoundaryCalls.length = 0;
+  orgBoundary.resolved = true;
+  orgBoundary.resolving = false;
   connectivity.known = true;
   queryError.variants = [];
   queryError.retries = [];
@@ -298,5 +318,63 @@ describe('BitbucketOverview rows entrance', () => {
     const renderer = await renderScreen();
 
     expect(rowsContainer(renderer)?.props.entering).toBeDefined();
+  });
+});
+
+// The shared Button is stubbed out, so the action is found by the props the
+// empty state's action element carries rather than by its rendered label.
+function connectActions(root: TestRenderer.ReactTestRenderer) {
+  const label = i18n.t('common.connectBitbucket');
+  return root.root.findAll(node => typeof node.type === 'function' && node.props.label === label, {
+    deep: false,
+  });
+}
+
+describe('BitbucketOverview not-connected state', () => {
+  it('names the organization and the next screen in the connect description', async () => {
+    readiness.connected = false;
+    readiness.integrationId = null;
+
+    const root = await renderScreen();
+    const text = JSON.stringify(root.toJSON());
+
+    // The token field lives on the sheet the action opens, so the copy names
+    // that step; "paste it below" pointed at a button with no field under it.
+    expect(text).toContain(
+      i18n.t('codeReviewer.bitbucketConnect.descriptionOverview', {
+        organization: 'Acme Robotics',
+      })
+    );
+    expect(text).not.toContain('{{');
+    expect(connectActions(root)).toHaveLength(1);
+    expect(orgBoundaryCalls.length).toBeGreaterThan(0);
+    expect(orgBoundaryCalls.every(scope => scope === 'org_1')).toBe(true);
+  });
+
+  it('offers no connect action when the organization cannot be resolved', async () => {
+    readiness.connected = false;
+    readiness.integrationId = null;
+    orgBoundary.resolved = false;
+
+    const root = await renderScreen();
+    const text = JSON.stringify(root.toJSON());
+
+    expect(text).toContain(i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'));
+    expect(connectActions(root)).toHaveLength(0);
+  });
+
+  it('keeps the skeleton while the organization list resolves', async () => {
+    readiness.connected = false;
+    readiness.integrationId = null;
+    orgBoundary.resolved = false;
+    orgBoundary.resolving = true;
+
+    const root = await renderScreen();
+    const text = JSON.stringify(root.toJSON());
+
+    expect(skeletonRenders.count).toBeGreaterThan(0);
+    expect(text).not.toContain(i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'));
+    expect(text).not.toContain('{{');
+    expect(connectActions(root)).toHaveLength(0);
   });
 });

@@ -106,7 +106,11 @@ export function SectionHeader({
     <View className={cn('flex-row flex-wrap items-end gap-2 py-2', inset && SCREEN_GUTTER_CLASS)}>
       {labelNode}
       {notice ? (
-        <View className="min-w-0 shrink grow basis-0 flex-row items-center justify-end gap-2">
+        // The slot spans the row's `py-2` and cancels it again (`-my-2 py-2`),
+        // so it keeps the one-line height while a line-sized action inside it
+        // (Home's `Retry`, a 28 dp box over a 14 dp line) lies wholly inside the
+        // slot: Android delivers a touch only inside the parent view.
+        <View className="-my-2 min-w-0 shrink grow basis-0 flex-row items-center justify-end gap-2 py-2">
           {notice}
         </View>
       ) : null}

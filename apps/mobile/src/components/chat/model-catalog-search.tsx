@@ -1,12 +1,8 @@
 import { type RefObject, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, type TextInput, View } from 'react-native';
+import { type TextInput } from 'react-native';
 
-import { Search, X } from '@/components/ui/icons';
-import { Input } from '@/components/ui/input';
-import { FIELD_CLEAR_BOX_CLASS } from '@/lib/a11y/tap-target';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { cn } from '@/lib/utils';
+import { SearchField } from '@/components/ui/search-field';
 
 const SEARCH_DELAY_MS = 350;
 
@@ -53,35 +49,14 @@ export function useModelSearch(): ModelSearch {
 
 export function ModelSearchField({ search }: Readonly<{ search: ModelSearch }>) {
   const { t } = useTranslation();
-  const colors = useThemeColors();
   return (
-    <View className="mx-4 my-2">
-      <View className="flex-row items-center gap-2 rounded-md border border-input bg-background px-2">
-        <Search size={18} color={colors.mutedForeground} />
-        <Input
-          ref={search.inputRef}
-          accessibilityLabel={t('modelChat.catalog.search')}
-          className="flex-1 text-sm text-foreground"
-          numberOfLines={1}
-          placeholder={t('modelChat.catalog.search')}
-          placeholderTextColor={colors.mutedForeground}
-          onChangeText={search.handleChangeText}
-          returnKeyType="search"
-          disableFullscreenUI
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        {search.hasText && (
-          <Pressable
-            onPress={search.handleClear}
-            accessibilityLabel={t('common.clearSearch')}
-            accessibilityRole="button"
-            className={cn(FIELD_CLEAR_BOX_CLASS, 'active:opacity-70')}
-          >
-            <X size={16} color={colors.mutedForeground} />
-          </Pressable>
-        )}
-      </View>
-    </View>
+    <SearchField
+      className="mx-4 my-2"
+      inputRef={search.inputRef}
+      placeholder={t('modelChat.catalog.search')}
+      hasText={search.hasText}
+      onChangeText={search.handleChangeText}
+      onClear={search.handleClear}
+    />
   );
 }

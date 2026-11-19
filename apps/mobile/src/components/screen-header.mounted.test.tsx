@@ -112,6 +112,73 @@ function backPressableCount(root: TestInstance): number {
   return root.findAll(isBackPressable).length;
 }
 
+/**
+ * The 48dp column a non-centred row puts before the heading when it draws a
+ * back control. It mirrors the heading's own lines — an eyebrow twin above the
+ * band, the band the caret sits in, a subtitle twin below it — so the two cells
+ * measure the same height; the centred branch has no column (its leading spacer
+ * starts `h-[48px]`, this one `w-[48px]`), and neither has a header that draws
+ * no control at all.
+ */
+function leadingColumns(root: TestInstance): TestInstance[] {
+  return root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'View' &&
+      String(node.props.className ?? '').startsWith('w-[48px]')
+  );
+}
+
+function findLeadingColumn(root: TestInstance): TestInstance {
+  const column = leadingColumns(root)[0];
+  if (!column) {
+    throw new Error('leading column not found');
+  }
+  return column;
+}
+
+/**
+ * The band a title cell lays out in: the View wrapping the title inside the
+ * heading. The leading column wraps the caret in a View carrying the very same
+ * class, which is what keeps the two cells the same height at any font scale —
+ * and what puts the caret's 48dp target inside a parent of its own height.
+ */
+function findTitleBand(root: TestInstance): TestInstance {
+  const band = root.findByProps({ accessibilityRole: 'header' }).parent;
+  if (!band || typeof band.type !== 'string') {
+    throw new Error('title band not found');
+  }
+  return band;
+}
+
+/**
+ * The band the leading column centres the caret in. It is the back control's
+ * circular frame's parent, so no absolute overlay can stand in for it.
+ */
+function findCaretBand(root: TestInstance): TestInstance {
+  const band = findBackFrame(root).parent;
+  if (!band) {
+    throw new Error('caret band not found');
+  }
+  return band;
+}
+
+/**
+ * The eyebrow a reader sees: the heading's own slot. Both the leading column
+ * and the `reserveTitleSpace` band lay out a zero-ink twin of it, hidden from
+ * assistive readers, so a bare `Eyebrow` lookup has more than one candidate the
+ * moment the header carries an eyebrow line.
+ */
+function findHeadingEyebrow(root: TestInstance): TestInstance {
+  const eyebrow = root.findAll(
+    node => String(node.type) === 'Eyebrow' && node.props['aria-hidden'] !== true
+  )[0];
+  if (!eyebrow) {
+    throw new Error('heading eyebrow not found');
+  }
+  return eyebrow;
+}
+
 function findTitlePressable(root: TestInstance): TestInstance {
   return root.find(
     node =>
@@ -167,6 +234,21 @@ function findSideInsetWrapper(root: TestInstance): TestInstance {
     throw new Error('side-inset wrapper not found');
   }
   return wrapper;
+}
+
+/**
+ * The zero-width, clipped band `reserveTitleSpace` lays out beside the heading:
+ * the only View laid out at no width, holding the eyebrow twin and the title's
+ * cap so the header's text area keeps one height for every line count.
+ */
+function findReservedBand(root: TestInstance): TestInstance {
+  return root.find(
+    node =>
+      typeof node.type === 'string' &&
+      String(node.props.className ?? '')
+        .split(' ')
+        .includes('w-0')
+  );
 }
 
 function deriveTitleFontSize(className: string): number {
@@ -296,7 +378,7 @@ describe('ScreenHeader mounted', () => {
     expect(back.props.className).not.toContain('mr-1');
     expect(back.props.hitSlop).toBeUndefined();
     expect(findBackFrame(renderer.root).props.className).toContain('shrink-0');
-    expect(findBackFrame(renderer.root).props.className).toContain('-ms-4');
+    expect(findLeadingColumn(renderer.root).props.className).toContain('-ms-4');
   });
 
   it('clips the back control to a circle instead of letting the platform surface fill its box', () => {
@@ -355,10 +437,11 @@ describe('ScreenHeader mounted', () => {
     // points under the 44-point back target and the title's box covered 0.27 of
     // it — the "two controls cover each other" finding (the scan reports above
     // 0.25). `-ms-4` keeps a real 4-point `gap-1` between the two controls in
-    // both writing directions. It rides on the frame, which is the row's child.
-    const frame = findBackFrame(renderer.root);
-    expect(frame.props.className).toContain('-ms-4');
-    expect(await compiledMarginProperties(frame.props.className as string)).toEqual([
+    // both writing directions. It rides on the leading column, which is the
+    // row's child and holds the caret's box.
+    const column = findLeadingColumn(renderer.root);
+    expect(column.props.className).toContain('-ms-4');
+    expect(await compiledMarginProperties(column.props.className as string)).toEqual([
       'marginInlineStart',
     ]);
 
@@ -393,7 +476,11 @@ describe('ScreenHeader mounted', () => {
     expect(inline.parent).toBe(cluster.parent);
     expect(inline.children).toEqual(['ACTIONS']);
     expect(inline.parent?.props.className).toContain('flex-row');
-    const heading = inline.parent?.children[0] as TestInstance;
+    // The heading is the row's other flexible child: the leading column now
+    // sits before it, so it is found by its own class rather than by index.
+    const heading = renderer.root.findByProps({ className: 'min-w-0 flex-1' });
+    expect(heading.parent?.parent).toBe(inline.parent);
+    expect(heading.parent?.props.className).toContain('flex-row');
     expect(heading.props.className).toContain('min-w-0 flex-1');
     // Neither trailing slot clamps itself: `headerRight` sizes to its content
     // and `inlineActions` keeps its full width instead of wrapping the controls.
@@ -467,8 +554,9 @@ describe('ScreenHeader mounted', () => {
     expect(stackedRow?.children).toEqual(['ACTIONS']);
     // The title row no longer carries the inline slot, and the heading keeps
     // its full-width `min-w-0 flex-1` box, so the title cannot be squeezed.
-    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    expect(title.parent?.props.className).toContain('min-w-0 flex-1');
+    // The title sits in the band inside that box, so the box is the band's
+    // parent.
+    expect(findTitleBand(renderer.root).parent?.props.className).toContain('min-w-0 flex-1');
     expect(
       renderer.root.findAll(
         node =>
@@ -780,7 +868,7 @@ describe('ScreenHeader mounted', () => {
     }
   });
 
-  it('reserves the title cap in a band beside the heading, not around the title', () => {
+  it('reserves the title cap in a zero-width band beside the heading', () => {
     const renderer = renderHeader({
       title: 'Harbor Analytics',
       eyebrow: 'RECENT REVIEWS',
@@ -788,13 +876,7 @@ describe('ScreenHeader mounted', () => {
       reserveTitleSpace: true,
     });
 
-    const band = renderer.root.find(
-      node =>
-        typeof node.type === 'string' &&
-        String(node.props.className ?? '')
-          .split(' ')
-          .includes('w-0')
-    );
+    const band = findReservedBand(renderer.root);
     // The band holds one eyebrow line and the title's two-line cap, so the row
     // keeps its height for a title that paints one line: the body below never
     // moves when the name arrives and wraps.
@@ -807,10 +889,70 @@ describe('ScreenHeader mounted', () => {
     // space from the heading or paints beside the title.
     expect(String(band.props.className)).toContain('w-0');
 
-    // The visible title keeps its own height, so the eyebrow sits right above
-    // it instead of above the empty line the cap reserves.
+    // The visible title keeps its own height inside the cell the leading
+    // column shares, so the eyebrow sits right above it instead of above the
+    // empty line the cap reserves; the clipped reserve stays beside the
+    // heading and never becomes an ancestor of the text.
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    expect(title.parent?.props.className).toBe('min-w-0 flex-1');
+    expect(title.parent?.props.className).toBe('justify-center min-h-14');
+    expect(band.findAll(node => node === title)).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  // The reserve cannot know the arriving label, so it holds a no-ink no-break
+  // space: the eyebrow variant's line box is the same for every script
+  // (`EYEBROW_LINE_HEIGHT_DP`), so the space reserves exactly the height the
+  // label takes, in either interface direction.
+  it.each([false, true])(
+    'reserves a blank filler when the arriving label is unknown (RTL=%s)',
+    isRTL => {
+      i18nManager.isRTL = isRTL;
+
+      const banded = renderHeader({
+        title: '#6054',
+        reserveEyebrow: true,
+        reserveTitleSpace: true,
+      });
+      const twin = findReservedBand(banded.root).find(node => String(node.type) === 'Eyebrow');
+      expect(twin.children).toEqual(['\u00A0']);
+      // No eyebrow class is forced on the reserve: the size and family stay the
+      // `Text` variant's business.
+      expect(twin.props.className).toBe('mb-0.5');
+      banded.unmount();
+
+      // The hidden placeholder line, which is what holds the height when the
+      // caller does not reserve the title space (the invoices boundary).
+      const inline = renderHeader({ title: '#6054', reserveEyebrow: true });
+      const placeholder = findHeadingEyebrow(inline.root);
+      expect(placeholder.children).toEqual(['\u00A0']);
+      // It still paints nothing and reaches no reader.
+      expect(placeholder.props.className).toContain('opacity-0');
+      inline.unmount();
+
+      i18nManager.isRTL = false;
+    }
+  );
+
+  it('keeps the reserved eyebrow twin out of the accessibility tree and the visible eyebrow readable', () => {
+    const renderer = renderHeader({
+      title: 'الفواتير',
+      eyebrow: 'الفواتير',
+      reserveTitleSpace: true,
+    });
+
+    const band = findReservedBand(renderer.root);
+    expect(band.props['aria-hidden']).toBe(true);
+    // The twin is still clipped to no width: it holds height only, so the
+    // eyebrow line it lays out paints nothing.
+    expect(band.props.className).toContain('w-0');
+    expect(band.props.className).toContain('overflow-hidden');
+
+    // Only the visible slot is the header's labelled eyebrow.
+    const labelled = renderer.root.findAll(
+      node => String(node.type) === 'Eyebrow' && node.props.accessible === true
+    );
+    expect(labelled).toHaveLength(1);
+    expect(labelled[0]?.children).toEqual(['الفواتير']);
     renderer.unmount();
   });
 
@@ -840,8 +982,11 @@ describe('ScreenHeader mounted', () => {
       safeAreaTop: false,
       className: 'pt-3',
     });
-    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    expect(title.parent?.parent).toBe(findBackFrame(renderer.root).parent);
+    // The band the title sits in shares the leading control's row, so the close
+    // control lines up with the title instead of drawing on its own row.
+    expect(findTitleBand(renderer.root).parent?.parent).toBe(
+      findLeadingColumn(renderer.root).parent
+    );
     expect(renderer.root.props.style).toBeUndefined();
     expect(renderer.root.props.className).toContain('pt-3');
   });
@@ -889,7 +1034,7 @@ describe('ScreenHeader mounted', () => {
 
     for (const eyebrow of repositories) {
       const renderer = renderHeader({ title: '#6054', eyebrow, headerRight: 'Submit review' });
-      const label = renderer.root.findByType('Eyebrow');
+      const label = findHeadingEyebrow(renderer.root);
       expect(label.props.numberOfLines).toBe(1);
       expect(label.props.ellipsizeMode).toBe('tail');
       expect(label.children).toEqual([eyebrow]);
@@ -904,7 +1049,7 @@ describe('ScreenHeader mounted', () => {
       act(() => {
         renderer.update(createElement(ScreenHeader, { title: '#6054', eyebrow }));
       });
-      expect(renderer.root.findByType('Eyebrow').props.numberOfLines).toBe(1);
+      expect(findHeadingEyebrow(renderer.root).props.numberOfLines).toBe(1);
       expect(findBackPressable(renderer.root).props.className).toContain(ICON_TARGET_BOX_CLASS);
       renderer.unmount();
     }
@@ -967,6 +1112,32 @@ describe('ScreenHeader mounted', () => {
   it('omits an absent eyebrow when no space is reserved', () => {
     const renderer = renderHeader({ title: '#6054' });
     expect(renderer.root.findAllByType('Eyebrow')).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('holds the arriving eyebrow line with a no-ink filler, so the swap cannot grow it', () => {
+    // The invoices boundary reserves the eyebrow line without
+    // `reserveTitleSpace`, so this transparent slot is what holds the height.
+    // The eyebrow variant owns one line box for every script
+    // (`EYEBROW_LINE_HEIGHT_DP`), so a no-break space reserves exactly the
+    // height the arriving label takes — Arabic included — and the swap cannot
+    // grow the header.
+    const renderer = renderHeader({ title: 'الفواتير', reserveEyebrow: true });
+    const reserved = findHeadingEyebrow(renderer.root);
+    expect(reserved.children).toEqual(['\u00A0']);
+    expect(reserved.props.className).toContain('opacity-0');
+    expect(reserved.props.accessible).toBe(false);
+    expect(reserved.props.accessibilityElementsHidden).toBe(true);
+
+    act(() => {
+      renderer.update(
+        createElement(ScreenHeader, { title: 'استوديو آنا للتصميم', eyebrow: 'الفواتير' })
+      );
+    });
+    const label = findHeadingEyebrow(renderer.root);
+    expect(label.children).toEqual(['الفواتير']);
+    expect(label.props.className).not.toContain('opacity-0');
+    expect(label.props.accessible).toBe(true);
     renderer.unmount();
   });
 
@@ -1048,12 +1219,11 @@ describe('ScreenHeader mounted', () => {
     ).toHaveLength(1);
     // The placeholder is painted over the reserved line, which still holds the
     // height the name will take, so the placeholder and the name lay out the same.
-    const reserved = renderer.root.findAll(
-      node =>
-        typeof node.type === 'string' &&
-        (node.type as string) === 'Text' &&
-        node.props.variant === 'muted'
-    );
+    // The heading's own line, not the leading column's zero-ink twin.
+    const heading = renderer.root.findByProps({ className: 'min-w-0 flex-1' });
+    const reserved = heading
+      .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
+      .filter(node => node.props.variant === 'muted');
     expect(reserved).toHaveLength(1);
     expect(reserved[0]?.children).toEqual(['\u00A0']);
 
@@ -1125,7 +1295,7 @@ describe('ScreenHeader mounted', () => {
       paddingLeft: 47,
       paddingRight: 59,
     });
-    expect(findBackFrame(renderer.root).props.className).toContain('-ms-4');
+    expect(findLeadingColumn(renderer.root).props.className).toContain('-ms-4');
   });
 
   it('keeps the container style a portrait no-op with zero side insets', () => {
@@ -1238,7 +1408,7 @@ describe('ScreenHeader mounted', () => {
       eyebrowNumberOfLines: 1,
     });
 
-    const eyebrow = renderer.root.findByType('Eyebrow');
+    const eyebrow = findHeadingEyebrow(renderer.root);
     expect(eyebrow.props.numberOfLines).toBe(1);
     expect(eyebrow.props.ellipsizeMode).toBe('middle');
     expect(eyebrow.children).toEqual(['KILO-STUB/DISCUSSION-MIXED']);
@@ -1250,11 +1420,161 @@ describe('ScreenHeader mounted', () => {
     // The reserve is the eyebrow itself: a blank line in the same style, capped
     // and middle-ellipsized the way the label will be, so the header is already
     // the height the label leaves it and a path's distinguishing tail survives.
-    const [reserved] = renderer.root.findAllByType('Eyebrow');
-    expect(reserved?.children).toEqual(['\u00A0']);
-    expect(reserved?.props.numberOfLines).toBe(1);
-    expect(reserved?.props.ellipsizeMode).toBe('middle');
-    expect(reserved?.props.accessible).toBe(false);
+    const reserved = findHeadingEyebrow(renderer.root);
+    expect(reserved.children).toEqual(['\u00A0']);
+    expect(reserved.props.numberOfLines).toBe(1);
+    expect(reserved.props.ellipsizeMode).toBe('middle');
+    expect(reserved.props.accessible).toBe(false);
+  });
+
+  it('centres the back control on the title band, not on the eyebrow-plus-title block', () => {
+    // The organization invoices header: the eyebrow is the screen's name and
+    // the title is the organization's, so the heading is two lines. The caret
+    // used to centre on that whole block and sat about 12dp above the title
+    // line it belongs to; the column now mirrors the heading's lines around a
+    // band both cells carry, so the caret centres on the title's own band.
+    const renderer = renderHeader({ title: 'Acme Studio Nordics', eyebrow: 'Invoices' });
+
+    const column = findLeadingColumn(renderer.root);
+    expect(column.props.className).toContain('w-[48px]');
+    expect(column.props.className).toContain('shrink-0');
+    expect(column.props.className).toContain('-ms-4');
+    // The band holds the height now, not the column: the caret's 48dp box used
+    // to be as tall as the column, and the column's lines are centred in it.
+    expect(column.props.className).not.toContain('min-h');
+
+    // The column mirrors the heading's own lines: the eyebrow twin above the
+    // band, and no line below it because this header has no subtitle.
+    const eyebrowTwin = column.findAllByType('Eyebrow')[0];
+    expect(eyebrowTwin?.props.className).toBe('mb-0.5');
+    expect(eyebrowTwin?.children).toEqual(['\u00A0']);
+    expect(eyebrowTwin?.props.numberOfLines).toBe(1);
+    expect(eyebrowTwin?.props['aria-hidden']).toBe(true);
+    expect(eyebrowTwin?.props.accessibilityElementsHidden).toBe(true);
+    expect(eyebrowTwin?.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(column.findAllByType('Text')).toHaveLength(0);
+
+    // The caret is a normal flow child of the band, so its 48dp target lives
+    // inside a parent at least that tall: React Native hit-tests inside each
+    // view's bounds, and the old absolutely positioned overlay left the 11.6dp
+    // above and below the title line — and about 1dp past the header's `pb-3` —
+    // untouchable.
+    const band = findCaretBand(renderer.root);
+    expect(band.parent).toBe(column);
+    expect(band.props.className).toContain('justify-center');
+    expect(band.props.className).toContain('min-h-[48px]');
+    // The title's own cell carries the same class string, which is the property
+    // that keeps the two cells the same height at any font scale.
+    expect(findTitleBand(renderer.root).props.className).toBe(band.props.className);
+
+    // Nothing is positioned absolutely any more: no overlay over the title, and
+    // no `relative` wrapper left holding it.
+    expect(
+      column.findAll(node => String(node.props.className ?? '').includes('absolute'))
+    ).toHaveLength(0);
+    expect(
+      renderer.root.findAll(
+        node => typeof node.type === 'string' && node.props.className === 'relative'
+      )
+    ).toHaveLength(0);
+
+    // The control keeps its 48dp target and its circular press surface.
+    expect(findBackPressable(renderer.root).props.className).toContain(ICON_TARGET_BOX_CLASS);
+    expect(findBackFrame(renderer.root).props.className).toContain('rounded-full');
+    expect(findBackFrame(renderer.root).props.className).toContain('overflow-hidden');
+  });
+
+  it('gives a two-line title and its subtitle one band for both cells', () => {
+    // The shared-session header: a two-line title cap and a subtitle, so the
+    // column has to hold the same three lines the heading lays out — the
+    // eyebrow twin, the band, the subtitle twin.
+    const renderer = renderHeader({
+      title: 'Shared session',
+      eyebrow: 'KILO-ORG/CLOUD',
+      subtitle: 'Reviewing the drain work item',
+      titleNumberOfLines: 2,
+    });
+
+    const column = findLeadingColumn(renderer.root);
+    // Two title lines keep the title's own reserve instead of the 48dp floor,
+    // so a name that wraps still cannot move the body past either cell.
+    const band = findCaretBand(renderer.root);
+    expect(band.props.className).toBe('justify-center min-h-14');
+    expect(findTitleBand(renderer.root).props.className).toBe(band.props.className);
+
+    // The subtitle twin is a zero-ink, one-line muted Text in the heading's own
+    // `mt-0.5` slot, so the column is exactly one line taller, like the
+    // heading.
+    const subtitleTwins = column.findAllByType('Text');
+    expect(subtitleTwins).toHaveLength(1);
+    const subtitleTwin = subtitleTwins[0];
+    expect(subtitleTwin?.props.variant).toBe('muted');
+    expect(subtitleTwin?.props.className).toBe('mt-0.5');
+    expect(subtitleTwin?.props.numberOfLines).toBe(1);
+    expect(subtitleTwin?.children).toEqual(['\u00A0']);
+    expect(subtitleTwin?.props['aria-hidden']).toBe(true);
+    expect(subtitleTwin?.props.accessibilityElementsHidden).toBe(true);
+    expect(subtitleTwin?.props.importantForAccessibility).toBe('no-hide-descendants');
+
+    expect(column.findAllByType('Eyebrow')).toHaveLength(1);
+    expect(
+      column.findAll(node => String(node.props.className ?? '').includes('absolute'))
+    ).toHaveLength(0);
+  });
+
+  it('lays out no band and no column when the header draws no back control', () => {
+    // Without a control there is nothing to line up and no 48dp box to fit, so
+    // the heading keeps the tree — and the height — it has always had: the
+    // title stays the heading's own child instead of gaining a band wrapper, so
+    // a header that draws no control cannot move.
+    const plain = renderHeader({ title: 'Personal', showBackButton: false });
+
+    expect(leadingColumns(plain.root)).toHaveLength(0);
+    const title = plain.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.parent?.props.className).toBe('min-w-0 flex-1');
+    expect(title.parent?.children).toHaveLength(1);
+    expect(
+      plain.root.findAll(
+        node =>
+          typeof node.type === 'string' && String(node.props.className ?? '').includes('min-h')
+      )
+    ).toHaveLength(0);
+
+    // A centred header shares its row with the control, so it keeps its own
+    // band-free heading too.
+    const centered = renderHeader({ title: 'Kilo Pass', modal: true });
+    expect(leadingColumns(centered.root)).toHaveLength(0);
+    expect(centered.root.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toBe(
+      'min-w-0 flex-1'
+    );
+  });
+
+  it('keeps the caret in its plain 48dp band when the heading has no eyebrow', () => {
+    // No second line to align with: the column is the caret's own 48dp band,
+    // which is the layout every eyebrow-less header has always had.
+    const renderer = renderHeader({ title: 'Personal', showBackButton: true });
+
+    const column = findLeadingColumn(renderer.root);
+    expect(column.findAllByType('Eyebrow')).toHaveLength(0);
+    expect(column.findAllByType('Text')).toHaveLength(0);
+    expect(column.props.className).not.toContain('min-h');
+    const band = findCaretBand(renderer.root);
+    expect(band.props.className).toBe('justify-center min-h-[48px]');
+    expect(band.parent).toBe(column);
+    expect(findTitleBand(renderer.root).props.className).toBe(band.props.className);
+  });
+
+  it('keeps the leading column free of text and the two bands on one class', () => {
+    const rendered = renderHeader({ title: 'Acme Studio Nordics', eyebrow: 'Invoices' });
+    // The band follows the title's box, not its truncation: the shared class is
+    // the same string on both cells, and the column holds no text of its own.
+    expect(findLeadingColumn(rendered.root).findAllByType('Text')).toHaveLength(0);
+    expect(findTitleBand(rendered.root).props.className).toBe(
+      findCaretBand(rendered.root).props.className
+    );
+    expect(rendered.root.findByProps({ accessibilityRole: 'header' }).props.ellipsizeMode).toBe(
+      'tail'
+    );
   });
 });
 
@@ -1302,9 +1622,11 @@ describe('header actions row', () => {
           String(node.props.className ?? '').includes('ms-3 shrink-0')
       )
     ).toHaveLength(0);
-    // The title still shares its row with the back control; only the actions moved.
-    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    expect(title.parent?.parent).toBe(findBackFrame(renderer.root).parent);
+    // The title still shares its row with the back control; only the actions
+    // moved. The title's band sits in the heading, which is that row's child.
+    expect(findTitleBand(renderer.root).parent?.parent).toBe(
+      findLeadingColumn(renderer.root).parent
+    );
   });
 
   it('reflows a centered modal header the same way', () => {
@@ -1383,7 +1705,7 @@ describe('header status line', () => {
     layout.fontScale = 1.5;
     const renderer = renderHeader({ title: 'Agents', size: 'large', eyebrow: '1 LIVE' });
 
-    const eyebrow = renderer.root.findByType('Eyebrow');
+    const eyebrow = findHeadingEyebrow(renderer.root);
     expect(eyebrow.props.numberOfLines).toBe(1);
     expect(eyebrow.children).toEqual(['1 LIVE']);
   });

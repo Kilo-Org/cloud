@@ -52,6 +52,26 @@ describe('OrganizationPlanRefusal', () => {
     expect(root.findAllByType('Pressable')).toHaveLength(0);
   });
 
+  it('paints the refusal as an error surface with its own mark', () => {
+    const root = renderBlock({});
+
+    const mark = root.findByType('AlertCircle');
+    expect(mark.props.size).toBe(16);
+    // The mocked theme returns `#ff0000` for the destructive ink, so this also
+    // proves the mark takes the palette token and not a hard-coded colour.
+    expect(mark.props.color).toBe('#ff0000');
+
+    const surface = root.findAll(node =>
+      String(node.props.className ?? '').includes('bg-danger-tile-bg')
+    );
+    expect(surface).toHaveLength(1);
+    const [box] = surface;
+    if (!box) {
+      throw new Error('the refusal has no tinted surface');
+    }
+    expect(String(box.props.className)).toContain('border-danger-tile-border');
+  });
+
   it('renders the action on its own target and presses it', () => {
     const onPress = vi.fn<() => void>();
     const root = renderBlock({ action: { label: 'Manage billing', onPress } });

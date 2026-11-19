@@ -22,7 +22,7 @@ vi.mock('@/lib/hooks/use-org-settings-queries', () => ({
   useSaveOrgModelAccess: () => ({ mutateAsync: saved.mutateAsync, isPending: false }),
 }));
 // The form hands the plan state to the shared refusal and owns nothing about
-// its paint: the primitive's own suite proves the mark, the tint and the ink.
+// its paint: the primitive's own suite pins the mark and the tinted surface.
 vi.mock('@/components/organization/plan-refusal', () => ({
   OrganizationPlanRefusal: 'OrganizationPlanRefusal',
 }));

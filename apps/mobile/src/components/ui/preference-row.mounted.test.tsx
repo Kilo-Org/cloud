@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/no-deprecated -- DOM-free mounted React Native layout regression tests. */
+/* eslint-disable max-lines, typescript-eslint/no-deprecated -- DOM-free mounted React Native layout regression tests: one mock harness mounts every row shape, its trailing variants and its note line. */
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 

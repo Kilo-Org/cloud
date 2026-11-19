@@ -816,7 +816,11 @@ test("the user's own download in another tab lands during an approved call and i
       throw new Error('the refusal carried no step token');
     }
 
-    // The approved call runs while the user starts their own download in a tab no agent holds.
+    // The approved call runs while the user starts their own download in a tab no agent holds. A page opened
+    // Over CDP is a background tab, and Playwright's actionability waits for an animation frame a hidden tab
+    // Never runs: the user's click would hang for the whole test. A user clicking their own tab fronts it first.
+    await userPage.bringToFront();
+
     const [approved] = await Promise.all([
       session.callTool('browser_click', { element: 'Download report', target }, grants, [token]),
       (async () => {

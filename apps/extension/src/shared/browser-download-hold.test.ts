@@ -393,6 +393,26 @@ describe('foreign downloads', () => {
     expect(downloads.order).toEqual(['suggest']);
   });
 
+  it('leaves a file another page of the agent tab’s origin started to the user', () => {
+    const downloads = makeDownloads();
+    const { hold, reports } = makeHold(downloads);
+
+    hold.tab(agentTab());
+
+    // The agent's tab is on /reports; the user's own tab is on /user, same origin. The referrer is the document
+    // That started the file, so the origin alone must not claim it.
+    expect(
+      hold.handle(
+        { id: 3, referrer: 'https://app.example/user', url: 'https://app.example/assets/user.txt' },
+        () => {
+          downloads.order.push('suggest');
+        }
+      )
+    ).toBe(false);
+    expect(downloads.order).toEqual(['suggest']);
+    expect(reports).toStrictEqual([]);
+  });
+
   it('passes a user download on another tab through untouched during an approved call', () => {
     const downloads = makeDownloads();
     const { hold } = makeHold(downloads);

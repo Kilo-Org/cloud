@@ -256,14 +256,6 @@ const pageOf = (url: string | undefined): string | undefined => {
   }
 };
 
-const originOf = (url: string | undefined): string | undefined => {
-  try {
-    return new URL(url ?? '').origin;
-  } catch {
-    return undefined;
-  }
-};
-
 /** The file name a url asks for: its path's last non-empty segment, decoded. */
 const requestedName = (url: string | undefined): string | undefined => {
   try {
@@ -471,23 +463,21 @@ export const createDownloadHold = ({
     return found;
   };
 
-  /** The agent tab a referrer names: its exact page first, then its origin alone. */
+  /**
+   * The agent tab whose page the referrer names, exactly. The page is the
+   * document that started the file, so another page of the same origin is
+   * another tab's file — the user's own download, in the tab next to the
+   * agent's — and claiming it by origin alone would refuse and report it.
+   */
   const tabByReferrer = (referrer: string | undefined): number | undefined => {
     const page = pageOf(referrer);
-    const origin = originOf(referrer);
 
-    for (const [tabId, tab] of tabs) {
-      if (page !== undefined && pageOf(tab.page) === page) {
-        return tabId;
-      }
-    }
-
-    if (origin === undefined) {
+    if (page === undefined) {
       return undefined;
     }
 
     for (const [tabId, tab] of tabs) {
-      if (originOf(tab.page) === origin) {
+      if (pageOf(tab.page) === page) {
         return tabId;
       }
     }

@@ -382,7 +382,6 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
     if (a.preferredIndex !== undefined && b.preferredIndex === undefined) return -1;
     if (a.preferredIndex === undefined && b.preferredIndex !== undefined) return 1;
 
-    // If both have preferredIndex, sort by the index value
     if (a.preferredIndex !== undefined && b.preferredIndex !== undefined) {
       return a.preferredIndex - b.preferredIndex;
     }

@@ -777,7 +777,6 @@ export async function inviteUserToOrganization(
     if (membershipRule === 'organization_missing') {
       throw new Error('Organization SSO policy is misconfigured');
     }
-    // A child org can invite only people who already belong to its live parent.
     if (membershipRule === 'refused') {
       throw new Error(CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER);
     }

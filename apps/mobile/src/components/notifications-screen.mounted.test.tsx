@@ -659,7 +659,7 @@ describe('NotificationsScreen category availability', () => {
   });
 
   it('disables the unavailable row and keeps its available sibling enabled', async () => {
-    // The switch's own paint is `PreferenceRow`'s (its suite asserts the muted
+    // The switch's own paint is `PreferenceRow`'s (its suite asserts the disabled
     // pair); this screen owns which rows the capability disables.
     platform.os = 'android';
     prefsQueryFn.mockResolvedValue(

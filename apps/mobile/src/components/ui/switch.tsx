@@ -45,9 +45,9 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * each grip clears 1.6:1 over its track. A caller's own pair still wins: its
  * props are applied last.
  *
- * iOS is left alone: UIKit fades a disabled `UISwitch` itself, so painting the
- * muted pair there would dim the control twice. Android is the platform that
- * needs the pair, and only it takes it.
+ * iOS is left alone: UIKit fades a disabled `UISwitch` itself, so the disabled
+ * pair there would paint an unavailable control twice. Android is the platform
+ * that needs the pair, and only it takes it.
  *
  * Fabric derives the accessibility traits from the role and
  * `accessibilityState`, then assigns them to the native control, replacing the

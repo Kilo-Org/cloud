@@ -9,7 +9,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { PreferenceRow } from './preference-row';
 
 const schemeState = vi.hoisted(() => ({ current: 'light' as 'light' | 'dark' }));
-// The shared switch paints its own muted pair on Android only: iOS fades a
+// The shared switch paints its own disabled pair on Android only: iOS fades a
 // disabled `UISwitch` itself, so the row's light override yields on both.
 const platformState = vi.hoisted(() => ({ os: 'ios' as 'ios' | 'android' }));
 

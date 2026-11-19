@@ -41,6 +41,7 @@ const confirmMock = vi.hoisted(() => ({ requests: [] as ConfirmRequest[] }));
 
 const state = vi.hoisted(() => ({
   role: 'owner' as string | undefined,
+  isTrialExpiredForEnforcement: false,
   readiness: {
     connected: false,
     ready: false,
@@ -129,7 +130,11 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { success: vi.f
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   useOrgBoundary: () => ({
     role: state.role,
-    org: { organizationId: 'org-1', organizationName: 'Acme' },
+    org: {
+      organizationId: 'org-1',
+      organizationName: 'Acme',
+      isTrialExpiredForEnforcement: state.isTrialExpiredForEnforcement,
+    },
     isResolving: false,
     isError: false,
   }),
@@ -258,6 +263,7 @@ export async function reportDirty(root: ReactTestRenderer['root'], dirty: boolea
 /** The state every case starts from, plus the mock logs a case reads. */
 export function resetSheetMocks(): void {
   state.role = 'owner';
+  state.isTrialExpiredForEnforcement = false;
   platformMock.OS = 'ios';
   state.readiness.integrationId = null;
   state.status.data = undefined;

@@ -19,8 +19,10 @@ import { bitbucketRepair } from '@/lib/code-reviewer-bitbucket';
 import { notificationHaptic } from '@/lib/haptics';
 import { useBitbucketIntegrationStatus, useBitbucketReadiness } from '@/lib/hooks/use-bitbucket';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { joinSentences } from '@/lib/i18n/join-sentences';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { isPermissionDeniedError, trpcErrorVariant } from '@/lib/trpc-error';
+import { trialRefusalMessage } from '@/lib/trial-refusal-copy';
 
 /**
  * The one form that connects the organization's Bitbucket workspace, in the
@@ -101,7 +103,14 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
       deniedDescription = t('integrations.managedByOwner');
     } else if (integrationId === null) {
       title = t('common.connectBitbucket');
-      deniedDescription = t('codeReviewer.bitbucket.notConnectedReadOnly');
+      const roleDenial = t('codeReviewer.bitbucket.notConnectedReadOnly');
+      // The same organization's lapsed plan refuses every organization change,
+      // so a member must not read the role as the only blocker: the second
+      // sentence names the owner and the billing step that unblocks it.
+      deniedDescription =
+        org?.isTrialExpiredForEnforcement === true
+          ? joinSentences([roleDenial, trialRefusalMessage(false)])
+          : roleDenial;
     } else {
       title = t('prReview.connect.reconnectTitleBitbucket');
     }

@@ -7,6 +7,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { joinSentences } from '@/lib/i18n/join-sentences';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 
 import {
@@ -105,6 +106,43 @@ describe('BitbucketConnectSheet', () => {
     const root = await mount();
 
     expect(root.findAll(node => Object.is(node.type, FORM))).toHaveLength(0);
+    const [denied] = root.findAll(node => Object.is(node.type, PERMISSION_DENIED));
+    expect(denied?.props.description).toBe(i18n.t('integrations.managedByOwner'));
+  });
+
+  it('names the lapsed plan beside the role when a member cannot connect a workspace', async () => {
+    state.role = 'member';
+    state.isTrialExpiredForEnforcement = true;
+    state.status.data = { method: 'workspace_access_token', integrationId: null };
+    const root = await mount();
+
+    const [denied] = root.findAll(node => Object.is(node.type, PERMISSION_DENIED));
+    // The role is not the only blocker: the same organization's lapsed plan
+    // refuses the connection too, so the description carries both sentences.
+    expect(denied?.props.description).toBe(
+      joinSentences([
+        i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'),
+        i18n.t('common.organizationTrialEnded'),
+      ])
+    );
+  });
+
+  it('keeps the role sentence alone when the plan does not block the connection', async () => {
+    state.role = 'member';
+    state.isTrialExpiredForEnforcement = false;
+    state.status.data = { method: 'workspace_access_token', integrationId: null };
+    const root = await mount();
+
+    const [denied] = root.findAll(node => Object.is(node.type, PERMISSION_DENIED));
+    expect(denied?.props.description).toBe(i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'));
+  });
+
+  it('leaves the managed denial unchanged for a lapsed plan', async () => {
+    state.role = 'member';
+    state.isTrialExpiredForEnforcement = true;
+    state.status.data = { method: 'oauth', integrationId: 'bitbucket-4' };
+    const root = await mount();
+
     const [denied] = root.findAll(node => Object.is(node.type, PERMISSION_DENIED));
     expect(denied?.props.description).toBe(i18n.t('integrations.managedByOwner'));
   });

@@ -158,11 +158,17 @@ export function ProfileScreen() {
   // so it needs the read's pending and failed windows kept apart: one
   // `undefined` would make it paint the member spend balance — `$0.00` for a
   // billing manager — while the list is still on its way.
-  const creditsOrgList: CreditsCardOrgList = organizationsError
-    ? { status: 'error', retry: () => void refetchOrganizations() }
-    : orgs === undefined
-      ? { status: 'loading' }
-      : { status: 'ready', orgs };
+  let creditsOrgList: CreditsCardOrgList = { status: 'loading' };
+  if (organizationsError) {
+    creditsOrgList = {
+      status: 'error',
+      retry: () => {
+        void refetchOrganizations();
+      },
+    };
+  } else if (orgs !== undefined) {
+    creditsOrgList = { status: 'ready', orgs };
+  }
 
   const { userId } = useCurrentUserId({ enabled: isAuthenticated });
   // The prompt's surface is platform-specific (`feedback-prompt-platform.ts`);

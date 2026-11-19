@@ -247,12 +247,15 @@ let saveCompletion: Promise<undefined> | undefined = undefined;
 
 async function mountCard(
   queryClient: QueryClient = createTestQueryClient(),
-  orgList: CreditsCardOrgList = { status: 'loading' }
+  orgList?: CreditsCardOrgList
 ) {
-  const ui = await renderWithProviders(createElement(CreditsCard, { enabled: true, orgList }), {
-    queryClient,
-    wrapper: OrganizationProvider,
-  });
+  const ui = await renderWithProviders(
+    createElement(CreditsCard, { enabled: true, orgList: orgList ?? { status: 'loading' } }),
+    {
+      queryClient,
+      wrapper: OrganizationProvider,
+    }
+  );
   return {
     ...ui,
     texts: () =>
@@ -1199,7 +1202,7 @@ describe('CreditsCard organization balance source', () => {
     currentUser.userId = 'user-1';
     savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
     getContextBalanceQueryFn.mockResolvedValue({ balance: 0 });
-    const retryOrganizations = vi.fn();
+    const retryOrganizations = vi.fn<() => void>();
     // The provider still needs the memberships to restore the selection.
     listState.payload = billingManagerOrgs;
 

@@ -3,7 +3,7 @@ import { type ComponentProps, createElement, type ReactElement, useState } from 
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { Text } from '@/components/ui/text';
+import { EYEBROW_LINE_HEIGHT_DP, Text } from '@/components/ui/text';
 import { SECTION_ACTION_BOX_CLASS, SECTION_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { SectionHeader } from './section-header';
 import { SectionHeaderSkeleton } from './section-header-skeleton';
@@ -508,5 +508,35 @@ describe('SectionHeader mounted layout', () => {
 
     const insetSkeleton = shape(createElement(SectionHeaderSkeleton, { inset: true }));
     expect(insetSkeleton.row).toContain('px-4');
+  });
+
+  it('reserves the loaded label line so the section cannot grow when data lands', () => {
+    // Field defect: the twin drew `h-3.5` bars on the header's `py-2` row, ~26dp
+    // where the loaded header lays its eyebrow on `EYEBROW_LINE_HEIGHT_DP` (36dp
+    // with the same padding), so the profile Overview's `Pinned to repositories`
+    // section grew ~10dp the moment the bindings arrived. The bar now sits
+    // inside a box of the eyebrow's own line, so every twin is as tall as the
+    // header it replaces.
+    const root = mount(createElement(SectionHeaderSkeleton, { action: true }));
+    const [line] = root.findAll(
+      node =>
+        Object.is(node.type, 'View') && String(node.props.className).includes('justify-center')
+    );
+    if (!line) {
+      throw new Error('the skeleton reserves no label line');
+    }
+    const style: unknown = line.props.style;
+    const height =
+      typeof style === 'object' && style !== null && 'height' in style ? style.height : undefined;
+
+    expect(EYEBROW_LINE_HEIGHT_DP).toBe(22);
+    expect(height).toBe(EYEBROW_LINE_HEIGHT_DP);
+    // The bar keeps the glyph's size; the line, not the bar, is what the row
+    // measures, so the two rows the eye compares start at the same y.
+    const bars = root
+      .findAll(node => Object.is(node.type, 'Skeleton'))
+      .map(node => String(node.props.className).split(' '));
+    expect(bars[0]).toEqual(expect.arrayContaining(['h-3.5', 'w-16']));
+    expect(EYEBROW_LINE_HEIGHT_DP).toBeGreaterThan(14);
   });
 });

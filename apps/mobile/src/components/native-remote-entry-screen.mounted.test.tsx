@@ -48,7 +48,12 @@ vi.mock('@/lib/config', () => ({
 vi.mock('@/lib/native-remote-credential', () => ({ nativeRemoteCredential: mocks.credential }));
 vi.mock('@/lib/native-remote-fixture', () => ({
   nativeRemoteFixtureClient: vi.fn(() => ({})),
-  nativeRemoteFixtureSummary: { sessionID: 'ses-fixture', tenant: { type: 'user', id: 'fixture-owner' }, live: true, createdAt: 1 },
+  nativeRemoteFixtureSummary: {
+    sessionID: 'ses-fixture',
+    tenant: { type: 'user', id: 'fixture-owner' },
+    live: true,
+    createdAt: 1,
+  },
   readNativeRemoteFixture: () => mocks.fixture as string | undefined,
 }));
 

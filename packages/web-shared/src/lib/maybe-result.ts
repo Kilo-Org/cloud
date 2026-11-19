@@ -9,19 +9,27 @@ type NoFields = Record<never, never>;
  * The payload a success result may carry.
  *
  * `successResult` merges its payload with an object spread, which copies own
- * properties only. A primitive payload would be dropped, an array would arrive
- * as its index properties, and a function would arrive as an empty object, so
- * the declared payload would not be the value the result carries. The payload
- * is therefore limited to an object that is not an array and not callable.
+ * enumerable properties only. Anything else loses the value its type promises:
+ * a primitive is dropped, an array arrives as index properties, and a function
+ * as an empty object. Objects such as `Date`, `Map` and `Promise` keep their
+ * state in internal slots, so they arrive as an empty object too.
  */
 type SuccessFields = object;
 
-/** Rejects the payloads the object spread would reshape or drop. */
+/**
+ * Rejects every payload the object spread would reshape or drop.
+ *
+ * The `Record` check is the effective one: it requires the fields the spread
+ * would copy. Arrays and callables are named first because they satisfy
+ * `Record` and would otherwise pass.
+ */
 type SpreadablePayload<TOk> = TOk extends readonly unknown[]
   ? never
   : TOk extends (...args: never[]) => unknown
     ? never
-    : TOk;
+    : TOk extends Record<string, unknown>
+      ? TOk
+      : never;
 
 export type SuccessResult<TOk extends SuccessFields = NoFields> = { success: true } & TOk;
 export type CustomFailureResult<TErr> = { success: false } & TErr;

@@ -278,7 +278,8 @@ test('a download that lands after the click is reported on the next call, and th
     expect(approved).toMatchObject({ isError: false, kind: 'result' });
     await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toHaveLength(1);
 
-    // 4. The token is burned: the identical click again is guarded, and the folder keeps its one file.
+    // 4. The token is burned: the identical click is guarded again, and the folder keeps its one file. The slow route
+    // Answers only after the click, so this call cannot stop the file itself — the next call reports it, as in step 1.
     const reguarded = await session.callTool(
       'browser_click',
       { element: 'Download slow report', target },
@@ -286,10 +287,25 @@ test('a download that lands after the click is reported on the next call, and th
       [token]
     );
 
-    expect(reguarded).toMatchObject({ afterAction: true, code: -32_010, kind: 'error' });
-    await expect.poll(() => downloads.length, { timeout: 20_000 }).toBe(2);
+    expect(reguarded).toMatchObject({ isError: false, kind: 'result' });
+    // Each slow click reaches the browser as a download: the third one is cancelled in the late window, so its file
+    // Never lands, and the folder keeps the approved file alone.
+    await expect.poll(() => downloads.length, { timeout: 20_000 }).toBe(3);
     await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toHaveLength(1);
     expect(fixture.lateHits()).toBeGreaterThanOrEqual(3);
+
+    // The third file is reported, so the model is asked again with a fresh token: the burned one bought it nothing.
+    const reReported = await session.callTool('browser_snapshot', {}, grants);
+
+    expect(reReported).toMatchObject({ afterAction: true, code: -32_010, kind: 'error' });
+    const reMessage = reReported.kind === 'error' ? reReported.message : '';
+    const reToken = reReported.kind === 'error' ? (reReported.stepToken ?? '') : '';
+
+    expect(reMessage).toContain("The click on 'Download slow report' started a download of");
+    expect(reMessage).toContain('Repeat that click to receive the file.');
+    expect(reToken).not.toBe('');
+    expect(reToken).not.toBe(token);
+    await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toHaveLength(1);
   } finally {
     await context.close();
     await hub.close();

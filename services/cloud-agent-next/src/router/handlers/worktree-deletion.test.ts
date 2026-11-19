@@ -424,7 +424,7 @@ describe('deleteWorktree authorization and completion', () => {
     expect(f.complete).not.toHaveBeenCalled();
   });
 
-  it('finishes a root whose begin response does not parse', async () => {
+  it('aborts the deletion before destroying content when a phase-1 response does not parse', async () => {
     const f = fixture();
     mocks.getSession.mockImplementation((_env, _ownerId, id: string) => ({
       beginWorktreeDeletion: async () => {
@@ -438,6 +438,9 @@ describe('deleteWorktree authorization and completion', () => {
       code: 'INTERNAL_SERVER_ERROR',
     });
     expect(f.finishSession).not.toHaveBeenCalled();
+    expect(f.deleteContent).not.toHaveBeenCalled();
+    expect(f.complete).not.toHaveBeenCalled();
+    expect(f.getState().completed).toBe(false);
   });
 
   it('skips runtime locations whose successful cleanup is already journaled', async () => {

@@ -1150,6 +1150,23 @@ export function createTurnManager(deps: TurnManagerDeps) {
   }
 
   /**
+   * The route that owns an event which names no native session. Runtime-level
+   * events are like this, so the only live turn on that runtime owns the stream;
+   * when two turns share it the event has no single owner and is dropped.
+   */
+  function sessionlessOwner(key: string | undefined): TurnRoute | undefined {
+    if (key === undefined) return undefined;
+    let matched: TurnRoute | undefined;
+    for (const turn of turns.values()) {
+      const route = routes.get(turn.route.sessionId);
+      if (route === undefined || route.runtimeKey !== key) continue;
+      if (matched !== undefined) return undefined;
+      matched = route;
+    }
+    return matched;
+  }
+
+  /**
    * The route that owns a newly announced child session. `session.created` is the
    * one event a route may adopt: the child is not tracked yet, and the runtime
    * that emitted it is authoritative, because its reported parent may name
@@ -1165,14 +1182,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
     const knownSessionId = knownRoot === undefined ? undefined : turnByKiloSession.get(knownRoot);
     const knownRoute = knownSessionId === undefined ? undefined : routes.get(knownSessionId);
     if (knownRoute?.runtimeKey === key) return knownRoute;
-    let matched: TurnRoute | undefined;
-    for (const turn of turns.values()) {
-      const route = routes.get(turn.route.sessionId);
-      if (route === undefined || route.runtimeKey !== key) continue;
-      if (matched !== undefined) return undefined;
-      matched = route;
-    }
-    return matched;
+    return sessionlessOwner(key);
   }
 
   function onKiloError(turn: Turn, properties: Record<string, unknown>): void {
@@ -1230,15 +1240,18 @@ export function createTurnManager(deps: TurnManagerDeps) {
     }
     if (event && SYNTHETIC_KILO_EVENTS.has(event.type)) return;
     if (event?.type === 'session.created') registerChild(event);
-    // A control event is handled only for a native session this wrapper serves: a
-    // registered route root, or a child a `session.created` registered under one.
-    // Every other native session belongs to another owner, so its events are not
-    // handled here.
-    if (!isAttributedKiloSession(eventSessionId)) {
+    // A session-named control event is handled only for a native session this
+    // wrapper serves: a registered route root, or a child a `session.created`
+    // registered under one. Any other session has another owner, so its events are
+    // not handled here. An event that names no session is runtime-level and has no
+    // other owner to defer to.
+    const sessionOwner =
+      eventSessionId === undefined ? sessionlessOwner(source.runtimeKey) : undefined;
+    if (!isAttributedKiloSession(eventSessionId) && sessionOwner === undefined) {
       noteUnattributedEvent(eventSessionId, event, source.runtimeKey);
       return;
     }
-    const root = resolveRootKiloSession(eventSessionId);
+    const root = sessionOwner?.kiloSessionId ?? resolveRootKiloSession(eventSessionId);
     if (root === undefined) return;
     const sessionId = turnByKiloSession.get(root);
     if (sessionId === undefined) return;

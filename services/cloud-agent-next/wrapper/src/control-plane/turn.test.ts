@@ -1926,6 +1926,25 @@ describe('turn resubmission', () => {
     expect(h.logs.some(line => line.includes('child of an unknown parent'))).toBe(true);
   });
 
+  it('relays a runtime-level event to the only turn on that runtime', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.frames.length = 0;
+
+    // No native session named: a runtime-level event has no other owner.
+    h.manager.observeKiloEvent(
+      kiloEvent('file.edited', { file: '/workspace/session/notes.txt' }, DIRECTORY)
+    );
+    await settle();
+
+    const frames = h.frames.filter(
+      frame => frame.type === 'session.events' && frame.sessionId === SESSION_ID
+    );
+    expect(frames).toHaveLength(1);
+  });
+
   it('keeps an interaction of an unrelated native session out of the route', async () => {
     const h = createHarness();
     const routeA = routeSpec({ sessionId: 'workspace_a', kiloSessionId: 'ses_kilo_a' });

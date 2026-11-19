@@ -176,6 +176,19 @@ function firstLetter(node: ReactNode): string | undefined {
 const CONTENT_LTR_DIRECTION: TextStyle = { writingDirection: 'ltr' };
 
 /**
+ * The code point ranges whose letters are right to left (bidi class R or AL):
+ * Hebrew through Arabic Extended-A, the Hebrew and Arabic presentation forms,
+ * and the two supplementary right-to-left areas (Phoenician through Arabic
+ * Extended-C, Mende Kikakui through the Arabic mathematical symbols). Unlike
+ * `RTL_SCRIPT`, which lists the scripts the app has glyphs for, this covers
+ * every right-to-left script content can arrive in — Syriac, Thaana, NKo,
+ * Samaritan, Mandaic, Adlam. Only a letter is tested, so the few neutral
+ * code points in these ranges never decide a direction.
+ */
+const RTL_LETTER =
+  /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1E800}-\u{1EFFF}]/u;
+
+/**
  * Base direction for copy the app did not write — a server's message, a user's
  * own text, an issue body. The paragraph takes the direction of its own first
  * letter, so English content keeps its left edge and the punctuation that ends
@@ -194,7 +207,7 @@ export function contentTextDirection(children: ReactNode): TextStyle | undefined
   if (letter === undefined) {
     return undefined;
   }
-  return RTL_SCRIPT.test(letter) ? RTL_WRITING_DIRECTION : CONTENT_LTR_DIRECTION;
+  return RTL_LETTER.test(letter) ? RTL_WRITING_DIRECTION : CONTENT_LTR_DIRECTION;
 }
 
 /**

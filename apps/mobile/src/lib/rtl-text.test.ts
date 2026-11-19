@@ -209,6 +209,20 @@ describe('contentTextDirection', () => {
     });
   });
 
+  // Hebrew, and the right-to-left scripts the app has no glyphs for, still
+  // arrive in content: Syriac, Thaana, NKo, Samaritan, Mandaic, Adlam.
+  it.each(['שלום', 'ܫܠܡܐ', 'ދިވެހި', 'ߒߞߏ', 'ࠀࠁ', 'ࡀࡁ', '𞤀𞤁'])(
+    'names %s content right to left',
+    text => {
+      expect(contentTextDirection(`1. ${text}`)).toEqual({ writingDirection: 'rtl' });
+    }
+  );
+
+  it('names Greek and Cyrillic content left to right', () => {
+    expect(contentTextDirection('Ελληνικά')).toEqual({ writingDirection: 'ltr' });
+    expect(contentTextDirection('Русский')).toEqual({ writingDirection: 'ltr' });
+  });
+
   it('leaves copy with no letter to the interface', () => {
     expect(contentTextDirection(['42 · ', 7])).toBeUndefined();
   });

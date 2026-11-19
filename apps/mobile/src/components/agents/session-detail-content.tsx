@@ -2045,7 +2045,7 @@ export function SessionDetailContent({
       resolveSessionTerminalError({
         error,
         statusIndicator,
-        historyFailureKind: failedHistoryKind,
+        historyFailureKind: failedHistoryKind?.kind ?? null,
         messageCount: messages.length,
         hasFailedPreparation,
         connectionLost,

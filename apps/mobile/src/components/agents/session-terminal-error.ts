@@ -1,5 +1,4 @@
 import {
-  type SnapshotHistoryFailure,
   type SdkStatusMessageCode,
   type SessionStatusIndicator,
 } from '@kilocode/cloud-agent-sdk';
@@ -426,8 +425,11 @@ export function resolveSessionTerminalError(input: {
   messageCount: number;
   hasFailedPreparation: boolean;
   connectionLost?: boolean;
-  /** The typed transcript-read failure the manager recorded with `error`, when it carries one. */
-  historyFailureKind?: SnapshotHistoryFailure['kind'] | null;
+  /**
+   * The typed transcript-read failure the manager recorded with `error`, when
+   * it carries one. The kind decides the branch; the string stays untyped.
+   */
+  historyFailureKind?: 'retryable_failure' | 'too_large' | 'invalid_data' | null;
 }): SessionTerminalError | null {
   // A session with rows on screen is not a failed open. A failed preparation
   // group is the run's own statement of what went wrong, with the failed stage

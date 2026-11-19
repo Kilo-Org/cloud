@@ -171,6 +171,16 @@ export type RequiredPermissions = {
    * data route.
    */
   skipStepUpGuard?: boolean;
+  /**
+   * Credential kinds that skip the passkey step-up guard for this call. Matched
+   * against the kind `getUserFromAuth` derives for the request, not against
+   * headers, so a session request can never match a bearer kind. For a
+   * read-only, low-risk data route that has been explicitly approved to accept
+   * those credentials (`GET /api/private/users`, for Pylon webhooks). Admin
+   * authentication still applies in full. Do not add routes without a security
+   * review.
+   */
+  stepUpExemptCredentials?: readonly PrivilegedCredentialKind[];
 };
 
 type GetAuthResponse =
@@ -253,6 +263,14 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
   // Admin audit trail: emit exactly one identity-attributed event per authorized
   // admin request. Guarded strictly on adminOnly so the millions of
   // adminOnly:false calls never log.
+  // `wouldBlock` sizes bearer traffic that step-up enforcement would refuse. A
+  // request whose credential kind the caller exempted is never refused, so it
+  // must not count as one. Server-component layouts skip the guard but still
+  // refuse bearer credentials themselves, so they keep reporting `wouldBlock`
+  // for non-session traffic.
+  const stepUpExempt = opts.stepUpExemptCredentials?.includes(credential) ?? false;
+  const wouldBlockUnderStepUp = credential !== 'session' && !stepUpExempt;
+
   if (opts.adminOnly === true && (result.user || authViaToken)) {
     // One header read and one privileged-inventory lookup per admin request, so
     // the step-up guard and the token outcome event that reports it cannot name
@@ -277,13 +295,14 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
         authViaToken,
         tokenSource: result.tokenSource ?? null,
         credential,
+        wouldBlock: wouldBlockUnderStepUp,
         route,
         method,
         userAgentProduct: userAgentProductFromHeaders(headersList),
         ip: clientIpFromHeaders(headersList),
       });
 
-      if (isAdminStepUpEnabled() && !opts.skipStepUpGuard) {
+      if (isAdminStepUpEnabled() && !opts.skipStepUpGuard && !stepUpExempt) {
         const { actionClass, inventoryId, targetKind } = routeAttribution();
         try {
           await runStepUpGuard({
@@ -344,7 +363,7 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
         actionClass,
         actionId: inventoryId,
         target: null,
-        wouldBlock: credential !== 'session',
+        wouldBlock: wouldBlockUnderStepUp,
         userAgentProduct: userAgentProductFromHeaders(headersList),
         tokenSource: result.tokenSource ?? null,
         route,

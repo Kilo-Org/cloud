@@ -364,6 +364,30 @@ describe('privileged inventory covers discovered route handlers', () => {
     expect(mapping).toMatchSnapshot('privileged-rest-routes');
   });
 
+  test('only reviewed call sites skip the step-up guard', () => {
+    const sourceFiles = [
+      ...walkFiles(path.join(REPO_ROOT, 'apps/web/src')),
+      ...walkFiles(path.join(REPO_ROOT, 'packages/web-shared/src')),
+    ].filter(file => /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file));
+    const sitesUsing = (identifier: string) =>
+      sourceFiles
+        .filter(file => stripCommentsAndStrings(fs.readFileSync(file, 'utf8')).includes(identifier))
+        .map(file => path.relative(REPO_ROOT, file))
+        .sort();
+
+    // Adding a call site means a data route or page now accepts requests without a
+    // passkey proof. That needs a security review, not just an edit to these lists.
+    expect(sitesUsing('skipStepUpGuard')).toEqual([
+      'apps/web/src/app/admin/layout.tsx',
+      'apps/web/src/lib/admin/require-admin-page.tsx',
+      'packages/web-shared/src/lib/user/server.ts',
+    ]);
+    expect(sitesUsing('stepUpExemptCredentials')).toEqual([
+      'apps/web/src/app/api/private/users/route.ts',
+      'packages/web-shared/src/lib/user/server.ts',
+    ]);
+  });
+
   test('wildcards stop at path-segment boundaries', () => {
     expect(
       findPrivilegedInventoryEntry({ surface: 'rest', route: '/organizationsX', access: 'read' })

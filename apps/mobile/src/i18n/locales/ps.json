@@ -4590,7 +4590,7 @@
     "connectFailed": "د نښلولو پاڼه پرانیستل نه شوه"
   },
   "invoices": {
-    "personalEmptyDescription": "کله چې درڅخه پیسې واخیستل شي، ستاسو د شخصي پېرودنو بلونه دلته ښکاره شي. له App Store او Google Play څخه رسیدونه د کریډیټ تاریخچه کې دي.",
+    "personalEmptyDescription": "کله چې درڅخه پیسې واخیستل شي، ستاسو د شخصي پېرودنو بلونه دلته ښکاره شي. له App Store او Google Play څخه رسیدونه د کریډیټ تاریخچه کې دي.",
     "personalPeriod": "وروستۍ 12 میاشتې"
   },
   "cloudAgent": {

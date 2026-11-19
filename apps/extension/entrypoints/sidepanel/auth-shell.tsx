@@ -1,6 +1,6 @@
 /* eslint-disable import/max-dependencies, max-lines -- the header owns sign-in, identity, organization picker and the settings dialog; splitting it would spread one state machine across files */
 import { storage } from '#imports';
-import { useAtom, useSetAtom } from 'jotai';
+import { useAtom } from 'jotai';
 import { useEffect, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
 import { Settings, X } from 'lucide-react';
@@ -176,15 +176,18 @@ export const AnalyticsSettingsRow = ({
 const SettingsDialog = ({
   beforeSettings,
   children,
+  isOpen,
+  setIsOpen,
 }: {
   beforeSettings?: ReactNode;
   children: ReactNode;
+  isOpen: boolean;
+  setIsOpen: (update: (current: boolean) => boolean) => void;
 }): JSX.Element => {
-  const [isSettingsOpen, setIsSettingsOpen] = useAtom(settingsDialogOpenAtom);
   const closeSettings = (): void => {
-    setIsSettingsOpen(false);
+    setIsOpen(() => false);
   };
-  const settingsDialogRef = useModalDialog({ onClose: closeSettings, open: isSettingsOpen });
+  const settingsDialogRef = useModalDialog({ onClose: closeSettings, open: isOpen });
 
   return (
     <div className="relative flex shrink-0 items-center justify-end gap-2">
@@ -192,13 +195,13 @@ const SettingsDialog = ({
       <IconButton
         ariaLabel="Settings"
         onClick={() => {
-          setIsSettingsOpen(current => !current);
+          setIsOpen(current => !current);
         }}
       >
         <Settings aria-hidden="true" className="size-4" />
       </IconButton>
 
-      {isSettingsOpen ? (
+      {isOpen ? (
         <div
           aria-label="Settings panel"
           aria-modal="true"
@@ -242,10 +245,14 @@ export const SignedInHeaderActions = ({
   organizationOptions: KiloOrganizationOption[];
   selectedOrganizationId: string;
 }): JSX.Element => {
-  const setIsSettingsOpen = useSetAtom(settingsDialogOpenAtom);
+  const [isSettingsOpen, setIsSettingsOpen] = useAtom(settingsDialogOpenAtom);
 
   return (
-    <SettingsDialog beforeSettings={beforeSettings}>
+    <SettingsDialog
+      beforeSettings={beforeSettings}
+      isOpen={isSettingsOpen}
+      setIsOpen={setIsSettingsOpen}
+    >
       <div className="min-w-0 rounded-xl border border-border bg-surface-raised p-3">
         <p className="type-label text-foreground-muted">Signed in</p>
         <p className="type-body mt-1 truncate text-foreground">{auth.userEmail ?? 'Kilo user'}</p>
@@ -275,12 +282,20 @@ export const SignedInHeaderActions = ({
   );
 };
 
-/* Local agents need no Kilo account (SPEC D15), so their settings stay reachable before sign-in. */
-export const SignedOutHeaderActions = (): JSX.Element => (
-  <SettingsDialog>
-    <LocalAgentsSettings />
-  </SettingsDialog>
-);
+/*
+ * Local agents need no Kilo account (SPEC D15), so their settings stay reachable
+ * before sign-in. The open state is local: the signed-in dialog's shared atom
+ * would otherwise open the full account settings right after sign-in.
+ */
+export const SignedOutHeaderActions = (): JSX.Element => {
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  return (
+    <SettingsDialog isOpen={isSettingsOpen} setIsOpen={setIsSettingsOpen}>
+      <LocalAgentsSettings />
+    </SettingsDialog>
+  );
+};
 
 export const ShellHeader = ({ children }: { children?: ReactNode }): JSX.Element => (
   <div className="border-b border-border bg-surface-background px-4 py-3">

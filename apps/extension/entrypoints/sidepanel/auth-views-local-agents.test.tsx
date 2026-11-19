@@ -105,4 +105,30 @@ describe('local agents settings without a Kilo account', () => {
     expect(within(dialog).getByRole('region', { name: 'Local agents' })).toBeTruthy();
     expect(within(dialog).getByRole('button', { name: 'Sign out' })).toBeTruthy();
   });
+
+  it('does not carry the signed-out settings into the signed-in view on sign-in', () => {
+    const store = createStore();
+    const signedIn = h(SignedInHeaderActions, {
+      auth: { token: 'token-1', userEmail: 'user@kilo.ai' },
+      onOrganizationChange: () => {},
+      onSignOut: () => {},
+      organizationOptions: [],
+      selectedOrganizationId: '',
+    });
+    const { getByRole, queryByRole, rerender } = render(
+      h(
+        Provider,
+        { store },
+        h(PendingView, { onCancel: () => {}, onOpen: () => {}, userCode: 'ABCD-2345' })
+      )
+    );
+
+    fireEvent.click(getByRole('button', { name: 'Settings' }));
+    expect(getByRole('dialog', { name: 'Settings panel' })).toBeTruthy();
+
+    rerender(h(Provider, { store }, signedIn));
+
+    expect(queryByRole('dialog', { name: 'Settings panel' })).toBeNull();
+    expect(queryByRole('button', { name: 'Sign out' })).toBeNull();
+  });
 });

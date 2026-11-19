@@ -29,6 +29,11 @@ import {
   baseCreatePreviewNextSchema,
   basePreviewOptionsNextSchema,
 } from './cloud-agent-next-schemas';
+import {
+  MAX_ENCRYPTED_DATA_LENGTH,
+  MAX_ENCRYPTED_DEK_LENGTH,
+  MAX_MCP_SERVERS_SERIALIZED_BYTES,
+} from '@cloud-agent-shared/prepare-session-limits';
 
 const MESSAGE_UUID = '12345678-1234-4234-9234-123456789abc';
 const ATTACHMENT_ID = '87654321-4321-4321-8321-cba987654321';
@@ -1331,6 +1336,41 @@ describe('basePrepareSessionNextSchema config caps', () => {
     expect(urlOf(4096)).toHaveLength(4096);
     expect(accepts(withRemoteServer({ url: urlOf(4096) }))).toBe(true);
     expect(accepts(withRemoteServer({ url: urlOf(4097) }))).toBe(false);
+  });
+
+  it('rejects an empty server name and an empty environment or header key', () => {
+    expect(accepts({ mcpServers: { '': { type: 'local', command: ['node'] } } })).toBe(false);
+    expect(accepts(withLocalServer({ environment: { '': 'value' } }))).toBe(false);
+    expect(accepts(withRemoteServer({ headers: { '': 'value' } }))).toBe(false);
+  });
+
+  it('caps the serialized MCP server map at the encrypted-value input budget', () => {
+    const maxEnvelope = {
+      encryptedData: 'x'.repeat(MAX_ENCRYPTED_DATA_LENGTH),
+      encryptedDEK: 'x'.repeat(MAX_ENCRYPTED_DEK_LENGTH),
+      algorithm: 'rsa-aes-256-gcm',
+      version: 1,
+    };
+    const serversOf = (count: number) => ({
+      local: {
+        type: 'local',
+        command: ['node'],
+        environment: Object.fromEntries(
+          Array.from({ length: count }, (_, index) => [`KEY_${index}`, maxEnvelope])
+        ),
+      },
+    });
+    const serializedBytes = (servers: Record<string, unknown>) =>
+      new TextEncoder().encode(JSON.stringify(servers)).byteLength;
+
+    let fits = 0;
+    while (serializedBytes(serversOf(fits + 1)) <= MAX_MCP_SERVERS_SERIALIZED_BYTES) fits += 1;
+    // The entry-count cap is not what bounds this record, so the budget is under test.
+    expect(fits).toBeLessThan(50);
+    expect(serializedBytes(serversOf(fits))).toBeLessThanOrEqual(MAX_MCP_SERVERS_SERIALIZED_BYTES);
+    expect(serializedBytes(serversOf(fits + 1))).toBeGreaterThan(MAX_MCP_SERVERS_SERIALIZED_BYTES);
+    expect(accepts({ mcpServers: serversOf(fits) })).toBe(true);
+    expect(accepts({ mcpServers: serversOf(fits + 1) })).toBe(false);
   });
 
   it('caps encrypted envelope strings', () => {

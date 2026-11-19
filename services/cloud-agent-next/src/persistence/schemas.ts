@@ -20,6 +20,7 @@ import {
   mcpCommandSchema,
   mcpEnvOrHeadersRecordSchema,
   mcpRemoteUrlSchema,
+  mcpServersRecordSchema,
 } from '../shared/prepare-session-limits.js';
 
 /**
@@ -250,12 +251,7 @@ const SharedSessionProfileFields = {
     .optional(),
   encryptedSecrets: EncryptedSecretsSchema.optional(),
   setupCommands: setupCommandsSchema.optional(),
-  mcpServers: z
-    .record(z.string().max(100), MCPServerConfigSchema)
-    .refine(obj => Object.keys(obj).length <= Limits.MAX_MCP_SERVERS, {
-      message: `Maximum ${Limits.MAX_MCP_SERVERS} MCP servers allowed`,
-    })
-    .optional(),
+  mcpServers: mcpServersRecordSchema(MCPServerConfigSchema).optional(),
   runtimeSkills: RuntimeSkillsSchema.optional(),
   runtimeAgents: RuntimeAgentsSchema.optional(),
   builtinAgents: RuntimeBuiltinAgentsSchema.optional(),

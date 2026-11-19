@@ -15,6 +15,7 @@ import {
 import {
   MAX_ENCRYPTED_DATA_LENGTH,
   MAX_ENCRYPTED_DEK_LENGTH,
+  MAX_MCP_SERVERS_SERIALIZED_BYTES,
 } from '../shared/prepare-session-limits.js';
 import type { MCPServerConfig } from './types.js';
 
@@ -1185,5 +1186,70 @@ describe('prepareSession config caps', () => {
     expect(urlOf(4096)).toHaveLength(4096);
     expect(MCPServerConfigSchema.safeParse(withUrl(urlOf(4096))).success).toBe(true);
     expect(MCPServerConfigSchema.safeParse(withUrl(urlOf(4097))).success).toBe(false);
+  });
+
+  it('rejects an empty server name and an empty environment or header key', () => {
+    const metadataWith = (mcpServers: Record<string, MCPServerConfig>) => ({
+      version: 1,
+      sessionId: 'session123',
+      orgId: 'org456',
+      userId: 'user789',
+      timestamp: Date.now(),
+      mcpServers,
+    });
+    expect(
+      MetadataSchema.safeParse(metadataWith({ '': { type: 'local', command: ['node'] } })).success
+    ).toBe(false);
+    expect(
+      MCPServerConfigSchema.safeParse({
+        type: 'local',
+        command: ['node'],
+        environment: { '': 'value' },
+      }).success
+    ).toBe(false);
+    expect(
+      MCPServerConfigSchema.safeParse({
+        type: 'remote',
+        url: 'https://example.com/mcp',
+        headers: { '': 'value' },
+      }).success
+    ).toBe(false);
+  });
+
+  it('caps the serialized MCP server map at the encrypted-value input budget', () => {
+    const maxEnvelope = {
+      encryptedData: 'x'.repeat(MAX_ENCRYPTED_DATA_LENGTH),
+      encryptedDEK: 'x'.repeat(MAX_ENCRYPTED_DEK_LENGTH),
+      algorithm: 'rsa-aes-256-gcm' as const,
+      version: 1 as const,
+    };
+    const recordWith = (count: number): Record<string, MCPServerConfig> => ({
+      local: {
+        type: 'local',
+        command: ['node'],
+        environment: Object.fromEntries(
+          Array.from({ length: count }, (_, index) => [`KEY_${index}`, maxEnvelope])
+        ),
+      },
+    });
+    const serializedBytes = (servers: Record<string, MCPServerConfig>) =>
+      new TextEncoder().encode(JSON.stringify(servers)).byteLength;
+    const metadataWith = (mcpServers: Record<string, MCPServerConfig>) => ({
+      version: 1,
+      sessionId: 'session123',
+      orgId: 'org456',
+      userId: 'user789',
+      timestamp: Date.now(),
+      mcpServers,
+    });
+
+    let fits = 0;
+    while (serializedBytes(recordWith(fits + 1)) <= MAX_MCP_SERVERS_SERIALIZED_BYTES) fits += 1;
+    // The entry-count cap is not what bounds this record, so the budget is under test.
+    expect(fits).toBeLessThan(50);
+    expect(serializedBytes(recordWith(fits))).toBeLessThanOrEqual(MAX_MCP_SERVERS_SERIALIZED_BYTES);
+    expect(serializedBytes(recordWith(fits + 1))).toBeGreaterThan(MAX_MCP_SERVERS_SERIALIZED_BYTES);
+    expect(MetadataSchema.safeParse(metadataWith(recordWith(fits))).success).toBe(true);
+    expect(MetadataSchema.safeParse(metadataWith(recordWith(fits + 1))).success).toBe(false);
   });
 });

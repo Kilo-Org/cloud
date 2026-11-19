@@ -1,4 +1,14 @@
 import { environmentSetupCommandCountSchema, setupCommandsSchema } from './setup-script.js';
+import {
+  MAX_MCP_COMMAND_ARGS,
+  MAX_MCP_COMMAND_ARG_LENGTH,
+  MAX_MCP_ENV_OR_HEADER_KEY_LENGTH,
+  MAX_MCP_ENV_OR_HEADERS_PER_SERVER,
+  MAX_MCP_REMOTE_URL_LENGTH,
+  MAX_MCP_SECRET_VALUE_LENGTH,
+  MAX_MCP_SERVERS,
+  MAX_MCP_SERVER_NAME_LENGTH,
+} from './prepare-session-limits.js';
 import { z } from 'zod';
 
 export {
@@ -132,17 +142,17 @@ export const gitAuthorSchema = z
   })
   .strict();
 
-const sessionAttachMcpValueSchema = z.string().max(8192);
+const sessionAttachMcpValueSchema = z.string().max(MAX_MCP_SECRET_VALUE_LENGTH);
 const sessionAttachMcpValuesSchema = z
-  .record(z.string().min(1).max(256), sessionAttachMcpValueSchema)
-  .refine(values => Object.keys(values).length <= 50, {
-    message: 'An MCP server can have at most 50 environment variables or headers',
+  .record(z.string().min(1).max(MAX_MCP_ENV_OR_HEADER_KEY_LENGTH), sessionAttachMcpValueSchema)
+  .refine(values => Object.keys(values).length <= MAX_MCP_ENV_OR_HEADERS_PER_SERVER, {
+    message: `An MCP server can have at most ${MAX_MCP_ENV_OR_HEADERS_PER_SERVER} environment variables or headers`,
   });
 const sessionAttachMcpServerSchema = z.discriminatedUnion('type', [
   z
     .object({
       type: z.literal('local'),
-      command: z.array(z.string().max(8192)).min(1).max(50),
+      command: z.array(z.string().max(MAX_MCP_COMMAND_ARG_LENGTH)).min(1).max(MAX_MCP_COMMAND_ARGS),
       environment: sessionAttachMcpValuesSchema.optional(),
       enabled: z.boolean().optional(),
       timeout: z.number().int().positive().max(3_600_000).optional(),
@@ -151,7 +161,7 @@ const sessionAttachMcpServerSchema = z.discriminatedUnion('type', [
   z
     .object({
       type: z.literal('remote'),
-      url: z.string().url().max(4096),
+      url: z.string().url().max(MAX_MCP_REMOTE_URL_LENGTH),
       headers: sessionAttachMcpValuesSchema.optional(),
       enabled: z.boolean().optional(),
       timeout: z.number().int().positive().max(3_600_000).optional(),
@@ -159,9 +169,9 @@ const sessionAttachMcpServerSchema = z.discriminatedUnion('type', [
     .strict(),
 ]);
 export const sessionAttachMcpServersSchema = z
-  .record(z.string().min(1).max(100), sessionAttachMcpServerSchema)
-  .refine(servers => Object.keys(servers).length <= 20, {
-    message: 'A session can have at most 20 MCP servers',
+  .record(z.string().min(1).max(MAX_MCP_SERVER_NAME_LENGTH), sessionAttachMcpServerSchema)
+  .refine(servers => Object.keys(servers).length <= MAX_MCP_SERVERS, {
+    message: `A session can have at most ${MAX_MCP_SERVERS} MCP servers`,
   })
   .refine(servers => new TextEncoder().encode(JSON.stringify(servers)).byteLength <= 80 * 1024, {
     message: 'Serialized MCP configuration exceeds the 80 KiB limit',

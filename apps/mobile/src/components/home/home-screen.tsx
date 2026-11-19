@@ -19,7 +19,7 @@ import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { UpNextSection } from '@/components/todos/up-next-section';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
-import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { SCREEN_BODY_CLASS, SCREEN_SECTION_GAP_CLASS } from '@/lib/layout';
 import { useSideInsetStyle } from '@/lib/screen-insets';
 
 export function HomeScreen() {
@@ -109,7 +109,10 @@ export function HomeScreen() {
               />
             }
           >
-            <Animated.View layout={LinearTransition}>
+            {/* The body class spaces the scroller's children and this wrapper
+                is its only one, so the section gap belongs here, on the element
+                whose children are the sections. */}
+            <Animated.View layout={LinearTransition} className={SCREEN_SECTION_GAP_CLASS}>
               <AgentSessionsSection
                 context={context}
                 sessions={sessions}

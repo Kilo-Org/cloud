@@ -325,6 +325,17 @@ describe('HomeScreen composition', () => {
     expect(text()).not.toContain(i18n.t('login.welcome'));
   });
 
+  it('spaces the sections on the element that holds them', async () => {
+    await renderHome();
+
+    const scroller = nodes('ScrollView')[0];
+    // The body class spaces the scroller's own children and the animated
+    // wrapper is its only one, so the section gap has to sit on the wrapper or
+    // every Home section paints flush against the one above it.
+    const sections = scroller?.findAll(node => Object.is(node.type, 'Animated.View'))[0];
+    expect(String(sections?.props.className).split(' ')).toContain('gap-6');
+  });
+
   it.each([null, 'org-1'])(
     'shows the switchable account control for %s and keeps the live query scope',
     async organizationId => {

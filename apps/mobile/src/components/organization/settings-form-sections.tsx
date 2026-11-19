@@ -10,13 +10,19 @@ import { Text } from '@/components/ui/text';
  * One titled block of an organization settings form: the title, its
  * description, and an optional master switch on the title row. The heading and
  * the fields below it are flat siblings at the page gutter, never a surface
- * inside another surface, so every relation in a section keeps the one gap and
- * the title row stays one line tall. Children render only while the switch is
- * on, which is how the web forms show a section's fields.
+ * inside another surface, and the title row stays one line tall.
+ *
+ * The section gap separates the header group — title, description, and the
+ * `intro` copy that explains the fields — from each child group and each child
+ * group from the next, so unrelated groups do not read as one block. The
+ * header's own parts, and the parts of each child group, keep the inner gap.
+ * The intro and the children render only while the switch is on, which is how
+ * the web forms show a section's fields.
  */
 export function SettingsSection({
   title,
   description,
+  intro,
   enabled,
   onEnabledChange,
   switchDisabled = false,
@@ -24,14 +30,16 @@ export function SettingsSection({
 }: Readonly<{
   title: string;
   description: string;
+  intro?: ReactNode;
   enabled?: boolean;
   onEnabledChange?: (next: boolean) => void;
   switchDisabled?: boolean;
   children?: ReactNode;
 }>) {
   const showsSwitch = enabled !== undefined && onEnabledChange !== undefined;
+  const showsFields = !showsSwitch || enabled;
   return (
-    <View className="gap-3">
+    <View className="gap-6">
       <View className="gap-3">
         <View className="flex-row items-center justify-between gap-3">
           <Text variant="heading" className="min-w-0 flex-1">
@@ -47,8 +55,9 @@ export function SettingsSection({
             })}
         </View>
         <Text variant="caption">{description}</Text>
+        {showsFields ? intro : null}
       </View>
-      {!showsSwitch || enabled ? children : null}
+      {showsFields ? children : null}
     </View>
   );
 }

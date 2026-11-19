@@ -1386,8 +1386,9 @@
       "notConnectedReadOnly": "Bitbucket pa konekte. Mande yon Pwopriyetè, yon Administratè, oswa yon Responsab faktirasyon nan òganizasyon an pou konekte l."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Koneksyon Bitbucket òganizasyon sa a jere sou entènèt la, apati yon òdinatè.",
-      "description": "Kreye yon jeton aksè pou espas travay la ak pèmisyon ki nesesè yo, epi kole li anba a.",
+      "managedOnWeb": "Koneksyon Bitbucket pou {{organization}} jere sou entènèt la, apati yon òdinatè.",
+      "description": "Kreye yon jeton aksè pou espas travay la pou {{organization}}, epi kole li anba a.",
+      "descriptionReconnect": "Kreye yon nouvo jeton aksè pou espas travay la pou {{organization}}, epi kole li anba a.",
       "scopes": "Kont: lekti · Depo: lekti/ekriti · Demann fizyon: lekti · Webhook: lekti/ekriti",
       "tokenPlaceholder": "Jeton aksè pou espas travay la",
       "tokenRefused": "Bitbucket pa aksepte jeton aksè pou espas travay sa a. Verifye ke li gen pèmisyon ki anwo a, epi eseye ankò."
@@ -2161,6 +2162,8 @@
       "renameAccessibility": "Chanje non sesyon an: {{title}}",
       "cloningSession": "Ap klone sesyon an",
       "couldNotLoadThisSession": "Nou pa t ka chaje sesyon sa a.",
+      "historyTooLarge": "Transksipsyon sesyon sa a twò gwo pou chaje.",
+      "historyUnavailable": "Pa ka li transksipsyon sesyon sa a.",
       "cloneFailedRetry": "Nou pa t ka klone sesyon sa a. Eseye ankò.",
       "notEnoughCredits": "Pa gen ase kredi pou demann sa a. Ajoute kredi epi eseye ankò.",
       "previousTaskFinishing": "Travay anvan an poko fini. Tanpri tann yon ti moman.",
@@ -2237,6 +2240,7 @@
       "branchDefault": "Pa defo",
       "branchAccessibility": "Branch: {{label}}",
       "branchLoading": "Ap chaje branch yo",
+      "branchInactive": "Chwazi yon depo pou chaje branch li yo.",
       "branchLoadError": "Pa t ka chaje branch yo",
       "branchUnavailable": "Pa gen branch disponib pou depo sa a. Tcheke aksè ou ak founisè a, epi chwazi yon lòt depo.",
       "branchEmpty": "Pa gen branch disponib",
@@ -3039,7 +3043,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nou pa t ka chaje sesyon yo.",
-    "couldNotLoadActiveSessions": "Nou pa t ka chaje sesyon aktif yo.",
     "agentSessions": "Aktif kounye a",
     "newCodingTask": "Nouvo travay pwogramasyon",
     "newTaskFromPicture": "Nouvo travay soti nan yon foto",
@@ -3686,8 +3689,7 @@
     "imagesSectionEmpty": "Pa gen domèn imaj ou fè konfyans",
     "revoke": "Retire {{host}}",
     "revokeMessage": "Lyen pou domèn sa a ap mande konfimasyon ankò.",
-    "revokeImageMessage": "Imaj ki soti nan domèn sa a ap mande konfimasyon ankò.",
-    "backToPreferences": "Tounen nan preferans yo"
+    "revokeImageMessage": "Imaj ki soti nan domèn sa a ap mande konfimasyon ankò."
   },
   "glanceable": {
     "waiting": "Ap mete ajan yo ajou",
@@ -4676,7 +4678,7 @@
       "new": "Nouvo deklanchè",
       "create": "Kreye deklanchè",
       "emptyTitle": "Pa gen deklanchè ankò",
-      "emptyDescription": "Kreye yon deklanchè pou kòmanse yon egzekisyon Cloud Agent soti nan yon apèl wèbhuk oswa sou yon pwogramasyon.",
+      "emptyDescription": "Kreye premye deklanchè ou.",
       "loadFailedTitle": "Nou pa t kapab chaje deklanchè yo",
       "loadFailedDescription": "Eseye ankò lè w gen koneksyon.",
       "detailLoadFailedTitle": "Nou pa t kapab chaje deklanchè sa a",

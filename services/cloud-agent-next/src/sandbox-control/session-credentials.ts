@@ -1,4 +1,3 @@
-import { providerSupports } from '@kilocode/worker-utils/sandbox-provider-capabilities';
 import { containedKiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
@@ -346,9 +345,9 @@ function refinePersistedSessionCredentialGrant(
   };
   assertScmGrantValid(grant.scm, grant.repository, scmContext, reject, options);
   if (grant.additionalRepositories) {
-    // Only a contained grant on a multi-repository provider can hold several
-    // repositories. The Vercel network policy forwards the launch capability only.
-    if (!contained || !providerSupports(grant.provider, 'multiRepository')) reject();
+    // Only a contained grant can hold several repositories: the proxy selects
+    // each one's capability from the request URL.
+    if (!contained) reject();
     const aliasByPurpose = new Map([[grant.scm.purpose, grant.scm.alias]]);
     for (const { repository, scm } of grant.additionalRepositories) {
       if (scm.purpose !== repository.type) reject();
@@ -1199,11 +1198,6 @@ export async function prepareCredentialGrant(
     diagnostic
   );
   const additionalMembers = additionalEnvironmentMembers(input.environment, source.repository);
-  if (additionalMembers.length > 0 && !providerSupports(provider, 'multiRepository')) {
-    // Several repositories need the proxy to select each one's capability.
-    diagnostic?.record({ grantPhase: 'validation', grantFailureReason: 'invalid_grant' });
-    invalidCredentials();
-  }
   const additionalEntries = additionalMembers.map(member => ({
     repoFullName: member.repoFullName,
     repository: additionalRepositoryOf(member, existing, source, diagnostic),

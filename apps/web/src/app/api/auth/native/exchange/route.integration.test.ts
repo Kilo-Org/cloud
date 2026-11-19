@@ -1,8 +1,7 @@
 const mockHeaders = jest.fn<Promise<Headers>, []>();
 const mockGetServerSession = jest.fn();
-const mockCreateDeviceSession = jest.fn();
 const mockCreateDeviceSessionWithAttestedKey = jest.fn();
-const mockIssueSessionCredentials = jest.fn();
+const mockCreateDeviceSessionWithCredentials = jest.fn();
 const mockVerifyAdmissionAsync = jest.fn();
 
 jest.mock('next/headers', () => ({
@@ -17,10 +16,10 @@ jest.mock('next-auth', () => ({
 }));
 
 jest.mock('@/lib/auth/device-sessions', () => ({
-  createDeviceSession: (...args: unknown[]) => mockCreateDeviceSession(...args),
   createDeviceSessionWithAttestedKey: (...args: unknown[]) =>
     mockCreateDeviceSessionWithAttestedKey(...args),
-  issueSessionCredentials: (...args: unknown[]) => mockIssueSessionCredentials(...args),
+  createDeviceSessionWithCredentials: (...args: unknown[]) =>
+    mockCreateDeviceSessionWithCredentials(...args),
 }));
 
 // The route refuses a request with no verified proof, and a real proof needs a
@@ -66,17 +65,15 @@ function setCurrentSession(userId: string, webSessionPepper: string | null) {
 }
 
 function expectNoCredentialsIssued() {
-  expect(mockCreateDeviceSession).not.toHaveBeenCalled();
-  expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+  expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
 }
 
 describe('POST /api/auth/native/exchange integration', () => {
   beforeEach(() => {
     mockHeaders.mockReset();
     mockGetServerSession.mockReset();
-    mockCreateDeviceSession.mockReset();
     mockCreateDeviceSessionWithAttestedKey.mockReset();
-    mockIssueSessionCredentials.mockReset();
+    mockCreateDeviceSessionWithCredentials.mockReset();
     mockVerifyAdmissionAsync.mockReset();
     mockVerifyAdmissionAsync.mockResolvedValue({ ok: true, platform: 'android' });
   });
@@ -84,19 +81,21 @@ describe('POST /api/auth/native/exchange integration', () => {
   test('exchanges a legacy generated API token with a null pepper and device authorization code', async () => {
     const user = await insertTestUser({ api_token_pepper: null });
     const token = generateApiToken(user, { deviceAuthRequestCode: 'ABCD-EFGH' });
-    mockCreateDeviceSession.mockResolvedValue('device-session-id');
-    mockIssueSessionCredentials.mockResolvedValue(credentials);
+    mockCreateDeviceSessionWithCredentials.mockResolvedValue({
+      ...credentials,
+      sessionId: 'device-session-id',
+    });
 
     const response = await POST(createRequest({ Authorization: `Bearer ${token}` }));
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual(credentials);
     expect(response.headers.get('cache-control')).toBe('no-store');
-    expect(mockCreateDeviceSession).toHaveBeenCalledWith({
+    expect(mockCreateDeviceSessionWithCredentials).toHaveBeenCalledWith({
       userId: user.id,
       userAgent: undefined,
+      user: expect.objectContaining({ id: user.id }),
     });
-    expect(mockIssueSessionCredentials).toHaveBeenCalledWith(user, 'device-session-id');
     expect(mockGetServerSession).not.toHaveBeenCalled();
   });
 
@@ -221,8 +220,7 @@ describe('POST /api/auth/native/exchange integration', () => {
       user: expect.objectContaining({ id: user.id }),
       verification: { ok: true, platform: 'ios', keyId: 'ios-key', publicKey: 'spki' },
     });
-    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
-    expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
   });
 
   test('refuses a key bound to a different account', async () => {

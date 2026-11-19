@@ -54,6 +54,7 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   // The real state renders its action inside its body, so the slot that stands in
   // for the add action belongs to the tree; the stub keeps only that slot.
   EmptyState: (props: { action?: ReactNode }) => props.action,
@@ -68,6 +69,7 @@ vi.mock('@/components/ui/icons', () => ({
   Bot: 'Bot',
   Pencil: 'Pencil',
   Trash2: 'Trash2',
+  Plus: 'Plus',
 }));
 vi.mock('@/components/profiles/agent-form-sheet', () => ({ AgentFormSheet: 'AgentFormSheet' }));
 
@@ -103,7 +105,7 @@ describe('ProfileAgentsScreen mode badge', () => {
 
     const labels = renderer.root
       .findAll(node => String(node.type) === 'Text')
-      .filter(node => String(node.props.className ?? '').includes('uppercase'))
+      .filter(node => node.props.variant === 'caption')
       .map(node => node.props.children as string);
 
     expect(labels).toEqual([
@@ -125,7 +127,7 @@ describe('ProfileAgentsScreen mode badge', () => {
 
     const labels = renderer.root
       .findAll(node => String(node.type) === 'Text')
-      .filter(node => String(node.props.className ?? '').includes('uppercase'))
+      .filter(node => node.props.variant === 'caption')
       .map(node => node.props.children as string);
 
     expect(labels).toEqual([i18n.t('profiles.agents.modePrimary')]);
@@ -323,13 +325,24 @@ describe('ProfileAgentsScreen agent row layout', () => {
 
     const texts = renderer.root.findAll(node => String(node.type) === 'Text');
     const nameText = texts.find(node => node.props.children === 'Alpha');
-    const label = texts.find(node => String(node.props.className ?? '').includes('uppercase'));
+    const label = texts.find(node => node.props.variant === 'caption');
+    if (nameText === undefined || label === undefined) {
+      throw new Error('the row rendered no name or no mode label');
+    }
 
     // A label beside the name takes the width a short name needs, so the row
-    // ellipsizes "Alpha" on a compact card. The label belongs to the column,
-    // where it sits at the same gap as the model and the description.
-    expect(label?.parent).not.toBe(nameText?.parent);
-    expect(label?.parent).toBe(nameText?.parent?.parent);
+    // would ellipsize "Alpha". The label belongs to the column under the name:
+    // the name owns the column's first line and the mode label the next one.
+    const column = nameText.parent;
+    if (column === null) {
+      throw new Error('the name has no column');
+    }
+    const lines = column.children.filter(
+      (child): child is ReactTestInstance => typeof child !== 'string'
+    );
+    expect(label.parent).toBe(column);
+    expect(lines[0]).toBe(nameText);
+    expect(lines[1]).toBe(label);
 
     unmount();
   });

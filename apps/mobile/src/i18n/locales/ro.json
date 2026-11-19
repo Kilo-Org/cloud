@@ -1409,8 +1409,9 @@
       "notConnectedReadOnly": "Bitbucket nu este conectat. Cere unui proprietar de organizație, unui administrator sau unui manager de facturare să îl conecteze."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Conexiunea Bitbucket a acestei organizații se gestionează pe web, de pe un computer.",
-      "description": "Creează un token de acces pentru spațiul de lucru, cu permisiunile necesare, și lipește-l mai jos.",
+      "managedOnWeb": "Conexiunea Bitbucket pentru {{organization}} se gestionează pe web, de pe un computer.",
+      "description": "Creează un token de acces la spațiul de lucru pentru {{organization}} și lipește-l mai jos.",
+      "descriptionReconnect": "Creează un nou token de acces la spațiul de lucru pentru {{organization}} și lipește-l mai jos.",
       "scopes": "Cont: citire · Depozite: citire/scriere · PR-uri: citire · Webhook-uri: citire/scriere",
       "tokenPlaceholder": "Token de acces la spațiul de lucru",
       "tokenRefused": "Bitbucket nu a acceptat acest token de acces la spațiul de lucru. Verifică dacă are permisiunile de mai sus, apoi încearcă din nou."
@@ -2205,6 +2206,8 @@
       "renameAccessibility": "Redenumește sesiunea: {{title}}",
       "cloningSession": "Se clonează sesiunea",
       "couldNotLoadThisSession": "Nu s-a putut încărca această sesiune.",
+      "historyTooLarge": "Transcrierea acestei sesiuni este prea mare pentru a fi încărcată.",
+      "historyUnavailable": "Transcrierea acestei sesiuni nu poate fi citită.",
       "cloneFailedRetry": "Nu s-a putut clona această sesiune. Încearcă din nou.",
       "notEnoughCredits": "Nu ai suficiente credite pentru această solicitare. Adaugă credite și încearcă din nou.",
       "previousTaskFinishing": "Sarcina anterioară este în curs de finalizare. Așteaptă puțin.",
@@ -2281,6 +2284,7 @@
       "branchDefault": "Implicit",
       "branchAccessibility": "Ramură: {{label}}",
       "branchLoading": "Se încarcă ramurile",
+      "branchInactive": "Selectează un depozit pentru a-i încărca ramurile.",
       "branchLoadError": "Nu s-au putut încărca ramurile",
       "branchUnavailable": "Nu există ramuri disponibile pentru acest depozit. Verifică-ți accesul la furnizor, apoi alege alt depozit.",
       "branchEmpty": "Nicio ramură disponibilă",
@@ -3095,7 +3099,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nu s-au putut încărca sesiunile.",
-    "couldNotLoadActiveSessions": "Nu s-au putut încărca sesiunile active.",
     "agentSessions": "În curs acum",
     "newCodingTask": "Sarcină nouă de programare",
     "newTaskFromPicture": "Sarcină nouă dintr-o imagine",
@@ -3746,8 +3749,7 @@
     "imagesSectionEmpty": "Nicio gazdă de imagini de încredere",
     "revoke": "Retrage încrederea acordată gazdei {{host}}",
     "revokeMessage": "Linkurile către această gazdă vor cere din nou confirmare.",
-    "revokeImageMessage": "Imaginile de la această gazdă vor cere din nou confirmare.",
-    "backToPreferences": "Înapoi la preferințe"
+    "revokeImageMessage": "Imaginile de la această gazdă vor cere din nou confirmare."
   },
   "glanceable": {
     "waiting": "Se actualizează agenții",
@@ -4751,7 +4753,7 @@
       "new": "Declanșator nou",
       "create": "Creează declanșator",
       "emptyTitle": "Nu există declanșatoare încă",
-      "emptyDescription": "Creează un declanșator pentru a porni o rulare Cloud Agent dintr-un apel webhook sau conform unui program.",
+      "emptyDescription": "Creează primul tău declanșator.",
       "loadFailedTitle": "Nu s-au putut încărca declanșatoarele",
       "loadFailedDescription": "Încearcă din nou când ai conexiune.",
       "detailLoadFailedTitle": "Nu s-a putut încărca acest declanșator",

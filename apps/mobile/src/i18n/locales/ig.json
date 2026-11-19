@@ -1386,8 +1386,9 @@
       "notConnectedReadOnly": "E jikọghị Bitbucket. Rịọ ndị nwe nzukọ, ndị nchịkwa, ma ọ bụ ndị njikwa ịgba ụgwọ ka ha jikọọ ya."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "A na-elekọta njikọ Bitbucket nke nzukọ a na weebụ site na kọmputa.",
-      "description": "Mepụta akara ikike ịnweta oghere ọrụ nwere ikike ndị achọrọ, wee mado ya n'okpuru.",
+      "managedOnWeb": "A na-elekọta njikọ Bitbucket nke {{organization}} na weebụ site na kọmputa.",
+      "description": "Mepụta akara ikike ịnweta oghere ọrụ maka {{organization}}, wee mado ya n'okpuru.",
+      "descriptionReconnect": "Mepụta akara ikike ọhụrụ ịnweta oghere ọrụ maka {{organization}}, wee mado ya n'okpuru.",
       "scopes": "Akaụntụ: ịgụ · Ebe nchekwa: ịgụ/ide · Arịrịọ ijikọ koodu: ịgụ · Njikọ ngosi: ịgụ/ide",
       "tokenPlaceholder": "Akara ikike ịnweta oghere ọrụ",
       "tokenRefused": "Bitbucket anabataghị akara ikike ịnweta oghere ọrụ a. Lelee na o nwere ikike ndị dị n'elu, wee gbalịa ọzọ."
@@ -2161,6 +2162,8 @@
       "renameAccessibility": "Gbanwee aha nnọkọ: {{title}}",
       "cloningSession": "Na-emepụta oyiri nnọkọ",
       "couldNotLoadThisSession": "Enweghị ike ibudata nnọkọ a.",
+      "historyTooLarge": "Ndebe nke okwu nnọkọ a buru ibu karịa ka a ga-ebugo ya.",
+      "historyUnavailable": "Enweghị ike ịgụ ndebe nke okwu nnọkọ a.",
       "cloneFailedRetry": "Enweghị ike ịmepụta oyiri nnọkọ a. Nwaa ọzọ.",
       "notEnoughCredits": "Ego ojiji ezughị maka arịrịọ a. Tinye ego ojiji ma nwaa ọzọ.",
       "previousTaskFinishing": "Ọrụ gara aga ka na-agwụcha. Biko chere obere oge.",
@@ -2237,6 +2240,7 @@
       "branchDefault": "Ndabere",
       "branchAccessibility": "Alaka: {{label}}",
       "branchLoading": "Na-ebudata alaka",
+      "branchInactive": "Họrọ ebe nchekwa koodu iji budata alaka ya.",
       "branchLoadError": "Enweghị ike ibudata alaka",
       "branchUnavailable": "Alaka adịghị maka ebe nchekwa koodu a. Lelee ikike gị n'aka onye na-enye ọrụ, ma họrọ ebe nchekwa koodu ọzọ.",
       "branchEmpty": "Enweghị alaka dị",
@@ -3039,7 +3043,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Enweghị ike ibudata nnọkọ",
-    "couldNotLoadActiveSessions": "Enweghị ike ibudata nnọkọ na-aga n'ihu",
     "agentSessions": "Na-aga n'ihu ugbu a",
     "newCodingTask": "Ọrụ ịde koodu ọhụrụ",
     "newTaskFromPicture": "Ọrụ ọhụrụ site na foto",
@@ -3686,8 +3689,7 @@
     "imagesSectionEmpty": "Enweghị saịtị onyonyo a tụkwasịrị obi",
     "revoke": "Kagbuo ntụkwasị obi na {{host}}",
     "revokeMessage": "Njikọ ndị na-aga saịtị a ga-arịọ nkwenye ọzọ.",
-    "revokeImageMessage": "Onyonyo sitere na saịtị a ga-arịọ nkwenye ọzọ.",
-    "backToPreferences": "Laghachi na nhọrọ"
+    "revokeImageMessage": "Onyonyo sitere na saịtị a ga-arịọ nkwenye ọzọ."
   },
   "glanceable": {
     "waiting": "Na-emelite ndị nnọchi anya",
@@ -4676,7 +4678,7 @@
       "new": "Ihe mkpalite ọhụrụ",
       "create": "Mepụta ihe mkpalite",
       "emptyTitle": "Enwebeghị ihe mkpalite",
-      "emptyDescription": "Mepụta ihe mkpalite iji malite ọsọ Cloud Agent site na oku webhook ma ọ bụ na nhazi oge.",
+      "emptyDescription": "Mepụta ihe mkpalite mbụ gị.",
       "loadFailedTitle": "Enweghị ike ibudata ihe mkpalite",
       "loadFailedDescription": "Nwaa ọzọ mgbe ị nwere njikọ.",
       "detailLoadFailedTitle": "Enweghị ike ibudata ihe mkpalite a",

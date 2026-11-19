@@ -20,7 +20,6 @@ import {
   mountForm,
   mountWithoutScope,
   PERMISSION_DENIED,
-  platformMock,
   QUERY_ERROR,
   reportDirty,
   resetSheetMocks,
@@ -31,7 +30,9 @@ import {
 } from './bitbucket-connect-sheet.test-helpers';
 
 /** The sentence that names where a connection the app cannot change is managed. */
-const MANAGED_ON_WEB = i18n.t('codeReviewer.bitbucketConnect.managedOnWeb');
+const MANAGED_ON_WEB = i18n.t('codeReviewer.bitbucketConnect.managedOnWeb', {
+  organization: 'Acme',
+});
 
 /** Whether the sheet renders this exact copy. */
 function rendersText(root: ReactTestRenderer['root'], value: string): boolean {
@@ -49,6 +50,10 @@ describe('BitbucketConnectSheet', () => {
 
     expect(root.findAll(node => Object.is(node.type, FORM))).toHaveLength(0);
     expect(rendersText(root, MANAGED_ON_WEB)).toBe(true);
+    // The note names the organization whose connection the reader has to change
+    // elsewhere, because a person in several organizations cannot tell which one
+    // the sheet is about.
+    expect(MANAGED_ON_WEB).toContain('Acme');
     // The connection page is not a place this sheet sends the reader: the note
     // is text, and the sheet offers nothing to press.
     expect(root.findAll(node => Object.is(node.type, BUTTON))).toHaveLength(0);
@@ -61,6 +66,7 @@ describe('BitbucketConnectSheet', () => {
     expect(rendersText(root, MANAGED_ON_WEB)).toBe(false);
     const [form] = root.findAll(node => Object.is(node.type, FORM));
     expect(form?.props.integrationId).toBeNull();
+    expect(form?.props.organizationName).toBe('Acme');
   });
 
   it('replaces the token of the integration the readiness read names', async () => {
@@ -151,36 +157,34 @@ describe('BitbucketConnectSheet', () => {
     expect(repeat).not.toHaveBeenCalled();
   });
 
-  it('renders a header close control on the Android modal instead of the plain title', async () => {
-    platformMock.OS = 'android';
+  it('draws the header with the sheet close control above the form', async () => {
     const root = await mountForm();
 
     const header = root.find(node => Object.is(node.type, HEADER));
     expect(header.props.title).toBe(i18n.t('common.connectBitbucket'));
-    expect(header.props.showBackButton).toBe(true);
-    expect(header.props.backIcon).toBe('close');
-    // The surface reserves the status-bar inset itself, so the header must not.
-    expect(header.props.safeAreaTop).toBe(false);
+    // Nothing on this sheet commits: the single control is an X that closes it.
+    expect(header.props.variant).toBe('close');
+    // The Android route is a full-window modal, so the surface reaches the
+    // window top and the header clears the status bar itself.
+    expect(header.props.topInset).toBe('android-window-top');
 
     // The control asks the navigator to remove the route, which is the same
     // removal the guard holds for Back.
     await act(async () => {
-      (header.props.onBack as () => void)();
+      (header.props.onDone as () => void)();
       await Promise.resolve();
     });
     expect(routerMock.back).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the close control in the loading and failing states too', async () => {
-    platformMock.OS = 'android';
-
     // Loading: the skeleton body, and the header is already there, naming the
     // platform rather than claiming a connection the reads have not answered.
     state.status.isPending = true;
     const loading = await mount();
     const loadingHeader = loading.find(node => Object.is(node.type, HEADER));
     expect(loadingHeader.props.title).toBe(i18n.t('agentChat.repoPicker.platformBitbucket'));
-    expect(loadingHeader.props.showBackButton).toBe(true);
+    expect(loadingHeader.props.variant).toBe('close');
 
     // A failed status read: the retry body, and the same control, outside it.
     state.status.isPending = false;
@@ -188,7 +192,7 @@ describe('BitbucketConnectSheet', () => {
     state.status.error = new Error('request failed');
     const failed = await mount();
     const failedHeader = failed.find(node => Object.is(node.type, HEADER));
-    expect(failedHeader.props.showBackButton).toBe(true);
+    expect(failedHeader.props.variant).toBe('close');
     expect(failed.findAll(node => Object.is(node.type, QUERY_ERROR))).toHaveLength(1);
 
     // One header for the surface, not one inside each body: a scroll in the form
@@ -197,13 +201,18 @@ describe('BitbucketConnectSheet', () => {
   });
 
   it('carries the same close control when no scope was supplied', async () => {
-    platformMock.OS = 'android';
     const root = await mountWithoutScope();
 
     // This branch renders the boundary rather than any scope-dependent state,
     // and it is still the modal's only way out.
     const header = root.find(node => Object.is(node.type, HEADER));
-    expect(header.props.showBackButton).toBe(true);
+    expect(header.props.variant).toBe('close');
     expect(root.findAll(node => Object.is(node.type, BOUNDARY))).toHaveLength(1);
+
+    await act(async () => {
+      (header.props.onDone as () => void)();
+      await Promise.resolve();
+    });
+    expect(routerMock.back).toHaveBeenCalledTimes(1);
   });
 });

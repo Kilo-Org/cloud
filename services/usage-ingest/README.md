@@ -87,8 +87,11 @@ configuration and unavailable writes retry under the queue policy,
 then reach the DLQ. Processing logs contain the usage ID when valid, queue message
 ID, delivery attempt count, and categorical outcome/reason.
 
-Writer HTTP 429 and 503 also reject the queue invocation after all messages in the
-batch have been handled. Each successful message keeps its explicit ACK; failed
+Writer HTTP 429 and 503 reject the queue invocation after all messages in the
+batch have been handled, except for a validated tagged write with a recognized
+`queue_limit` 429 and the exact response header `x-usage-class-limit: non_llm`.
+That message takes its usual admission retry. A shared overload in any sibling
+still fails the invocation. Each successful message keeps its explicit ACK; failed
 messages keep their explicit retry using the per-message delay policy below and the shared retry/DLQ budget.
 There is no extra writer attempt within an invocation. Other failures retain
 per-message retries without being classified as overload. Overload retry logs add
@@ -205,7 +208,7 @@ The consumer reads the tag before anything else:
 
 A message that never ACKs exhausts the shared 20-retry budget and goes to the DLQ,
 so the DLQ can hold all three kinds. A recognized admission 429 takes the admission
-retry schedule, and HTTP 429/503 rejects the invocation, exactly as for LLM usage.
+retry schedule. Only the explicitly marked class-only rejection is exempt from invocation failure.
 The invocation launch budget is shared. Consumer settings are unchanged. On the
 writer, these queue writes take the `non_llm` admission class described under
 [writer admission protection](#writer-admission-protection); its ceiling rejection
@@ -403,7 +406,7 @@ Healthy events still make one HTTP call and ACK only a matching `recorded` or
 `duplicate` result, with no added delay. Failed items make no additional HTTP call
 inside the delivery: the consumer chooses a native `message.retry({delaySeconds})`
 for that item, freeing invocation slots while waiting for redelivery. Successful
-siblings retain their ACKs. Existing HTTP 429/503 overload feedback still rejects
+siblings retain their ACKs. Shared HTTP 429/503 overload feedback still rejects
 the invocation after all sibling processing and dispositions settle; other
 unavailable/configuration failures do not newly trigger that feedback.
 
@@ -552,6 +555,16 @@ shared limit is 1 (pool maximum 3 or less), the ceiling is 1 and a non-LLM call
 can take the only slot. The total limit is unchanged. Like the shared limit, this
 is a per-runtime counter, not a connection reservation, and it makes no
 fleet-wide fairness claim.
+
+The writer marks a class-only rejection when shared slots remain and its pool
+snapshot shows zero waiters and fewer checked-out connections than the shared
+limit. Missing or inconsistent gauges leave the rejection unmarked. Roll out
+the writer first, then the consumer. Either order retains the existing overload
+behavior until both sides support the header. Older consumers ignore it and the
+429 body stays compatible. During an authorized rollout, compare backlog slope,
+native invocation exception ratio and concurrency with pool waiting and LLM 429s.
+Halt rollout if shared pressure rises or backlog growth and exceptions worsen.
+A lower exception ratio alone does not establish recovery.
 
 `usage_writer_admission` diagnostics sample admitted decisions at 1% and warn on
 all rejected decisions. Fields contain only the bounded caller/outcome/reason,

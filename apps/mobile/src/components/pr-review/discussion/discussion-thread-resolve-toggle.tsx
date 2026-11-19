@@ -37,7 +37,7 @@ export function ResolveToggle({ resolved, disabled, onPress }: Readonly<ResolveT
       {/* The visible circle stays compact (explicit px, because NativeWind's
           14pt rem renders `h-7` at 24.5pt): DESIGN.md keeps the target, not the
           visual, at 44pt. */}
-      <View className="h-[28px] w-[28px] items-center justify-center rounded-full border border-border bg-card">
+      <View className="h-8 w-8 items-center justify-center rounded-full border border-border bg-card">
         <Check size={14} color={resolved ? colors.good : colors.mutedForeground} />
       </View>
     </Pressable>

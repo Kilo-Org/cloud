@@ -1386,8 +1386,9 @@
       "notConnectedReadOnly": "Bitbucket qoşulmayıb. Onu qoşmaq üçün təşkilat sahibindən, inzibatçıdan və ya ödəniş menecerindən xahiş edin."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Bu təşkilatın Bitbucket bağlantısı kompüterdən vebdə idarə olunur.",
-      "description": "Tələb olunan icazələri olan iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
+      "managedOnWeb": "{{organization}} üçün Bitbucket bağlantısı kompüterdən vebdə idarə olunur.",
+      "description": "{{organization}} üçün iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
+      "descriptionReconnect": "{{organization}} üçün yeni iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
       "scopes": "Hesab: oxuma · Repozitoriyalar: oxuma/yazma · PR-lər: oxuma · Vebhuklar: oxuma/yazma",
       "tokenPlaceholder": "İş sahəsinin giriş tokeni",
       "tokenRefused": "Bitbucket bu iş sahəsi tokenini qəbul etmədi. Yuxarıdakı icazələrin olduğunu yoxla, sonra yenidən cəhd et."
@@ -2161,6 +2162,8 @@
       "renameAccessibility": "Sessiyanın adını dəyiş: {{title}}",
       "cloningSession": "Sessiya klonlanır",
       "couldNotLoadThisSession": "Bu sessiyanı yükləmək mümkün olmadı.",
+      "historyTooLarge": "Bu sessiyanın transkripti yükləmək üçün çox böyükdür.",
+      "historyUnavailable": "Bu sessiyanın transkripti oxuna bilmir.",
       "cloneFailedRetry": "Bu sessiyanı klonlamaq mümkün olmadı. Yenidən cəhd et.",
       "notEnoughCredits": "Bu sorğu üçün kifayət qədər kredit yoxdur. Kredit əlavə et və yenidən cəhd et.",
       "previousTaskFinishing": "Əvvəlki tapşırıq hələ tamamlanmayıb. Bir az gözlə.",
@@ -2237,6 +2240,7 @@
       "branchDefault": "Defolt",
       "branchAccessibility": "Budaq: {{label}}",
       "branchLoading": "Budaqlar yüklənir",
+      "branchInactive": "Budaqlarının yüklənməsi üçün repozitoriya seç.",
       "branchLoadError": "Budaqları yükləmək mümkün olmadı",
       "branchUnavailable": "Bu repozitoriya üçün budaq əlçatan deyil. Provayderdəki icazələrini yoxla, sonra başqa repozitoriya seç.",
       "branchEmpty": "Əlçatan budaq yoxdur",
@@ -3039,7 +3043,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Sessiyaları yükləmək mümkün olmadı.",
-    "couldNotLoadActiveSessions": "Aktiv sessiyaları yükləmək mümkün olmadı.",
     "agentSessions": "Hazırda aktiv",
     "newCodingTask": "Yeni kodlaşdırma tapşırığı",
     "newTaskFromPicture": "Şəkildən yeni tapşırıq",
@@ -3686,8 +3689,7 @@
     "imagesSectionEmpty": "Etibarlı şəkil saytı yoxdur",
     "revoke": "{{host}} üçün etibarı ləğv et",
     "revokeMessage": "Bu hosta olan keçidlər yenidən təsdiq tələb edəcək.",
-    "revokeImageMessage": "Bu hostdan olan şəkillər yenidən təsdiq tələb edəcək.",
-    "backToPreferences": "Parametrlərə qayıt"
+    "revokeImageMessage": "Bu hostdan olan şəkillər yenidən təsdiq tələb edəcək."
   },
   "glanceable": {
     "waiting": "Agentlər yenilənir",
@@ -4676,7 +4678,7 @@
       "new": "Yeni tətikləyici",
       "create": "Tətikləyici yaradın",
       "emptyTitle": "Hələ tətikləyici yoxdur",
-      "emptyDescription": "Cloud Agent icrasını vebhuk çağırışı və ya cədvəl üzrə başlatmaq üçün tətikləyici yaradın.",
+      "emptyDescription": "İlk tətikləyicinizi yaradın.",
       "loadFailedTitle": "Tətikləyicilər yüklənə bilmədi",
       "loadFailedDescription": "Bağlantı olduqda yenidən cəhd edin.",
       "detailLoadFailedTitle": "Bu tətikləyici yüklənə bilmədi",

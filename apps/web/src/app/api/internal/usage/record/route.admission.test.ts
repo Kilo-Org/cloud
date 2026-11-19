@@ -115,6 +115,7 @@ it.each(['queue', 'queue_vercel'])(
     try {
       const ninth = await POST(request(source));
       expect(ninth.status).toBe(429);
+      expect(ninth.headers.get('x-usage-class-limit')).toBeNull();
       await expect(ninth.json()).resolves.toEqual({
         error: 'Usage writer overloaded',
         reason: 'queue_limit',

@@ -178,7 +178,7 @@ function McpAppView({ part, view }: Readonly<McpAppViewProps>) {
   }, [pageLoaded, documentState, dark, t, i18n.language, part, view]);
 
   return (
-    <View style={{ height }} className="overflow-hidden rounded-lg bg-secondary">
+    <View style={{ height }} className="overflow-hidden rounded-lg">
       <WebView<unknown>
         // A retry gets a page of its own: a page that failed to load has no
         // host object left to hand a document to.

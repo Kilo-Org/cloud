@@ -1386,8 +1386,9 @@
       "notConnectedReadOnly": "Bitbucket nuk është i lidhur. Kërkoni nga një pronar, administrator ose menaxher faturimi i organizatës ta lidhë atë."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Lidhja me Bitbucket e kësaj organizate menaxhohet në ueb nga një kompjuter.",
-      "description": "Krijo një token qasjeje për hapësirën e punës me lejet e nevojshme dhe ngjite më poshtë.",
+      "managedOnWeb": "Lidhja me Bitbucket e {{organization}} menaxhohet në ueb nga një kompjuter.",
+      "description": "Krijo një token qasjeje për hapësirën e punës të organizatës {{organization}} dhe ngjite më poshtë.",
+      "descriptionReconnect": "Krijo një token të ri qasjeje për hapësirën e punës të organizatës {{organization}} dhe ngjite më poshtë.",
       "scopes": "Llogaria: lexim · Depot: lexim/shkrim · PR: lexim · Webhook-et: lexim/shkrim",
       "tokenPlaceholder": "Token qasjeje për hapësirën e punës",
       "tokenRefused": "Bitbucket nuk e pranoi këtë token qasjeje për hapësirën e punës. Kontrollo që ai t'i ketë lejet më sipër, pastaj provo përsëri."
@@ -2161,6 +2162,8 @@
       "renameAccessibility": "Riemërto seancën: {{title}}",
       "cloningSession": "Duke klonuar seancën",
       "couldNotLoadThisSession": "Nuk u ngarkua kjo seancë.",
+      "historyTooLarge": "Transkripti i kësaj seance është shumë i madh për t'u ngarkuar.",
+      "historyUnavailable": "Transkripti i kësaj seance nuk mund të lexohet.",
       "cloneFailedRetry": "Nuk u klonua kjo seancë. Provo përsëri.",
       "notEnoughCredits": "Nuk ke mjaft kredite për këtë kërkesë. Shto kredite dhe provo përsëri.",
       "previousTaskFinishing": "Detyra e mëparshme nuk ka përfunduar ende. Prit pak.",
@@ -2237,6 +2240,7 @@
       "branchDefault": "Parazgjedhje",
       "branchAccessibility": "Dega: {{label}}",
       "branchLoading": "Degët po ngarkohen",
+      "branchInactive": "Zgjidh një depo për të ngarkuar degët e tij.",
       "branchLoadError": "Degët nuk u ngarkuan dot",
       "branchUnavailable": "Nuk ka degë të disponueshme për këtë depo. Kontrollo aksesin tënd te ofruesi, pastaj përzgjidh një depo tjetër.",
       "branchEmpty": "Nuk ka degë të disponueshme",
@@ -3039,7 +3043,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nuk u ngarkuan sesionet.",
-    "couldNotLoadActiveSessions": "Nuk u ngarkuan sesionet aktive.",
     "agentSessions": "Aktive tani",
     "newCodingTask": "Detyrë e re kodimi",
     "newTaskFromPicture": "Detyrë e re nga një imazh",
@@ -3686,8 +3689,7 @@
     "imagesSectionEmpty": "Nuk ka serverë të besuar të imazheve",
     "revoke": "Hiq besimin për {{host}}",
     "revokeMessage": "Lidhjet për këtë server do të kërkojnë përsëri konfirmim.",
-    "revokeImageMessage": "Imazhet nga ky server do të kërkojnë përsëri konfirmim.",
-    "backToPreferences": "Kthehu te preferencat"
+    "revokeImageMessage": "Imazhet nga ky server do të kërkojnë përsëri konfirmim."
   },
   "glanceable": {
     "waiting": "Po përditësohen agjentët",
@@ -4676,7 +4678,7 @@
       "new": "Shkaktar i ri",
       "create": "Krijo shkaktar",
       "emptyTitle": "Nuk ka shkaktarë ende",
-      "emptyDescription": "Krijo një shkaktar për të nisur një ekzekutim të Cloud Agent nga një thirrje webhook ose sipas një planifikimi.",
+      "emptyDescription": "Krijo shkaktarin tënd të parë.",
       "loadFailedTitle": "Shkaktarët nuk mund të ngarkoheshin",
       "loadFailedDescription": "Provo përsëri kur të kesh lidhje.",
       "detailLoadFailedTitle": "Ky shkaktar nuk mund të ngarkohej",

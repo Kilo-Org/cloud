@@ -1386,8 +1386,9 @@
       "notConnectedReadOnly": "Bitbucket non está conectado. Pídelle ao propietario, ao administrador ou ao xestor de facturación da organización que o conecte."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "A conexión de Bitbucket desta organización xestiónase na web desde un ordenador.",
-      "description": "Crea un token de acceso ao espazo de traballo cos ámbitos requiridos e pégao aquí embaixo.",
+      "managedOnWeb": "A conexión de Bitbucket con {{organization}} xestiónase na web desde un ordenador.",
+      "description": "Crea un token de acceso ao espazo de traballo para {{organization}} e pégao aquí embaixo.",
+      "descriptionReconnect": "Crea un novo token de acceso ao espazo de traballo para {{organization}} e pégao aquí embaixo.",
       "scopes": "Conta: lectura · Repositorios: lectura/escritura · Solicitudes de cambios: lectura · Webhooks: lectura/escritura",
       "tokenPlaceholder": "Token de acceso ao espazo de traballo",
       "tokenRefused": "Bitbucket non aceptou este token do espazo de traballo. Comproba que ten os ámbitos indicados arriba e téntao de novo."
@@ -2161,6 +2162,8 @@
       "renameAccessibility": "Renomear sesión: {{title}}",
       "cloningSession": "Clonando a sesión",
       "couldNotLoadThisSession": "Non se puido cargar esta sesión.",
+      "historyTooLarge": "A transcrición desta sesión é demasiado grande para cargala.",
+      "historyUnavailable": "Non se pode ler a transcrición desta sesión.",
       "cloneFailedRetry": "Non se puido clonar esta sesión. Téntao de novo.",
       "notEnoughCredits": "Non tes créditos suficientes para esta solicitude. Engade créditos e téntao de novo.",
       "previousTaskFinishing": "A tarefa anterior aínda está a rematar. Agarda un momento.",
@@ -2237,6 +2240,7 @@
       "branchDefault": "Predeterminada",
       "branchAccessibility": "Rama: {{label}}",
       "branchLoading": "Cargando ramas",
+      "branchInactive": "Selecciona un repositorio para cargar as súas ramas.",
       "branchLoadError": "Non se puideron cargar as ramas",
       "branchUnavailable": "Non hai ramas dispoñibles para este repositorio. Comproba o teu acceso co provedor e escolle outro repositorio.",
       "branchEmpty": "Non hai ramas dispoñibles",
@@ -3039,7 +3043,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Non se puideron cargar as sesións.",
-    "couldNotLoadActiveSessions": "Non se puideron cargar as sesións activas.",
     "agentSessions": "En curso agora",
     "newCodingTask": "Nova tarefa de programación",
     "newTaskFromPicture": "Nova tarefa a partir dunha imaxe",
@@ -3686,8 +3689,7 @@
     "imagesSectionEmpty": "Non hai dominios de confianza de imaxes",
     "revoke": "Revogar a confianza en {{host}}",
     "revokeMessage": "As ligazóns a este dominio volverán pedir confirmación.",
-    "revokeImageMessage": "As imaxes deste dominio volverán pedir confirmación.",
-    "backToPreferences": "Volver ás preferencias"
+    "revokeImageMessage": "As imaxes deste dominio volverán pedir confirmación."
   },
   "glanceable": {
     "waiting": "Actualizando axentes",
@@ -4676,7 +4678,7 @@
       "new": "Novo disparador",
       "create": "Crear disparador",
       "emptyTitle": "Aínda non hai disparadores",
-      "emptyDescription": "Crea un disparador para iniciar unha execución de Cloud Agent a partir dunha chamada de webhook ou segundo unha programación.",
+      "emptyDescription": "Crea o teu primeiro disparador.",
       "loadFailedTitle": "Non se puideron cargar os disparadores",
       "loadFailedDescription": "Volve tentalo cando teñas conexión.",
       "detailLoadFailedTitle": "Non se puido cargar este disparador",

@@ -80,9 +80,13 @@ describe('PasskeysScreen verification', () => {
     // There is no passkey to assert, so the code is the one working proof.
     expect(hasButtonLabel(view, VERIFY_PASSKEY)).toBe(false);
     expect(hasButtonLabel(view, VERIFY_EMAIL)).toBe(true);
-    expect(nodes(view, 'EmptyState')).toHaveLength(0);
+    // The panel sits above the same empty state, from the top of the body: the
+    // screen does not swap the state out while the proof is chosen.
+    expect(nodes(view, 'EmptyState')).toHaveLength(1);
+    expect(first(view, 'EmptyState').props.placement).toBe('top');
     await press(buttonByLabel(view, 'Cancel'));
-    await waitFor(() => nodes(view, 'EmptyState').length === 1);
+    await waitFor(() => first(view, 'EmptyState').props.placement === 'center');
+    expect(nodes(view, 'EmptyState')).toHaveLength(1);
     view.unmount();
   });
 

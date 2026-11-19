@@ -274,7 +274,6 @@ export function SessionHistoryScreen() {
             onBlur={keyboard.handleInputBlur}
             defaultValue={searchDefaultValue}
             inputKey={searchInputKey}
-            compact
             inline
           />
         }

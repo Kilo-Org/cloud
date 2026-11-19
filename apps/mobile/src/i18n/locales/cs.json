@@ -1432,8 +1432,9 @@
       "notConnectedReadOnly": "Bitbucket není připojen. Požádejte vlastníka organizace, správce nebo správce fakturace, aby ho připojil."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Připojení Bitbucket této organizace se spravuje na webu z počítače.",
-      "description": "Vytvořte přístupový token pracovního prostoru s požadovanými oprávněními a vložte jej níže.",
+      "managedOnWeb": "Připojení Bitbucket k {{organization}} se spravuje na webu z počítače.",
+      "description": "Vytvořte přístupový token pracovního prostoru pro {{organization}} a vložte jej níže.",
+      "descriptionReconnect": "Vytvořte nový přístupový token pracovního prostoru pro {{organization}} a vložte jej níže.",
       "scopes": "Účet: čtení · Repozitáře: čtení/zápis · PR: čtení · Webhooky: čtení/zápis",
       "tokenPlaceholder": "Přístupový token pracovního prostoru",
       "tokenRefused": "Bitbucket tento token pracovního prostoru nepřijal. Zkontrolujte, že má výše uvedená oprávnění, a poté to zkuste znovu."
@@ -2249,6 +2250,8 @@
       "renameAccessibility": "Přejmenovat relaci: {{title}}",
       "cloningSession": "Klonování relace",
       "couldNotLoadThisSession": "Tuto relaci se nepodařilo načíst.",
+      "historyTooLarge": "Přepis této relace je příliš velký k načtení.",
+      "historyUnavailable": "Přepis této relace nelze přečíst.",
       "cloneFailedRetry": "Tuto relaci se nepodařilo klonovat. Zkuste to znovu.",
       "notEnoughCredits": "Nemáte dost kreditů pro tento požadavek. Dobijte si kredity a zkuste to znovu.",
       "previousTaskFinishing": "Předchozí úkol se ještě dokončuje. Chvíli prosím počkejte.",
@@ -2325,6 +2328,7 @@
       "branchDefault": "Výchozí",
       "branchAccessibility": "Větev: {{label}}",
       "branchLoading": "Načítání větví",
+      "branchInactive": "Vyberte repozitář, aby se načetly jeho větve.",
       "branchLoadError": "Větve se nepodařilo načíst",
       "branchUnavailable": "Pro tento repozitář nejsou větve dostupné. Zkontroluj svůj přístup u poskytovatele a vyber jiný repozitář.",
       "branchEmpty": "Žádné dostupné větve",
@@ -3151,7 +3155,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Relace se nepodařilo načíst.",
-    "couldNotLoadActiveSessions": "Aktivní relace se nepodařilo načíst.",
     "agentSessions": "Právě běží",
     "newCodingTask": "Nový programovací úkol",
     "newTaskFromPicture": "Nový úkol z obrázku",
@@ -3806,8 +3809,7 @@
     "imagesSectionEmpty": "Žádné důvěryhodné domény obrázků",
     "revoke": "Odebrat důvěru doméně {{host}}",
     "revokeMessage": "Odkazy na tuto doménu budou znovu vyžadovat potvrzení.",
-    "revokeImageMessage": "Obrázky z této domény budou znovu vyžadovat potvrzení.",
-    "backToPreferences": "Zpět na předvolby"
+    "revokeImageMessage": "Obrázky z této domény budou znovu vyžadovat potvrzení."
   },
   "glanceable": {
     "waiting": "Aktualizace agentů",
@@ -4826,7 +4828,7 @@
       "new": "Nový spouštěč",
       "create": "Vytvořit spouštěč",
       "emptyTitle": "Zatím žádné spouštěče",
-      "emptyDescription": "Vytvořte spouštěč pro spuštění Cloud Agent voláním webhooku nebo podle plánu.",
+      "emptyDescription": "Vytvořte svůj první spouštěč.",
       "loadFailedTitle": "Spouštěče se nepodařilo načíst",
       "loadFailedDescription": "Zkuste to znovu, až budete mít připojení.",
       "detailLoadFailedTitle": "Tento spouštěč se nepodařilo načíst",

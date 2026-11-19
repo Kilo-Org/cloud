@@ -1409,8 +1409,9 @@
       "notConnectedReadOnly": "Bitbucket nav pievienots. Lūdziet īpašniekam, administratoram vai norēķinu pārvaldniekam to pievienot."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Šīs organizācijas Bitbucket savienojums tiek pārvaldīts tīmeklī no datora.",
-      "description": "Izveido darbvietas piekļuves pilnvaru ar vajadzīgajām atļaujām un ielīmē to zemāk.",
+      "managedOnWeb": "{{organization}} Bitbucket savienojums tiek pārvaldīts tīmeklī no datora.",
+      "description": "Izveido darbvietas piekļuves pilnvaru priekš {{organization}} un ielīmē to zemāk.",
+      "descriptionReconnect": "Izveido jaunu darbvietas piekļuves pilnvaru priekš {{organization}} un ielīmē to zemāk.",
       "scopes": "Konts: lasīšana · Repozitoriji: lasīšana/rakstīšana · Izmaiņu pieprasījumi: lasīšana · Tīmekļa aizķeres: lasīšana/rakstīšana",
       "tokenPlaceholder": "Darbvietas piekļuves pilnvara",
       "tokenRefused": "Bitbucket nepieņēma šo darbvietas piekļuves pilnvaru. Pārbaudi, vai tai ir iepriekš norādītās atļaujas, un pēc tam mēģini vēlreiz."
@@ -2205,6 +2206,8 @@
       "renameAccessibility": "Pārdēvēt sesiju: {{title}}",
       "cloningSession": "Klonē sesiju…",
       "couldNotLoadThisSession": "Neizdevās ielādēt šo sesiju.",
+      "historyTooLarge": "Šīs sesijas ieraksts ir pārāk liels, lai to ielādētu.",
+      "historyUnavailable": "Šīs sesijas ierakstu nevar nolasīt.",
       "cloneFailedRetry": "Neizdevās klonēt šo sesiju. Mēģini vēlreiz.",
       "notEnoughCredits": "Nepietiek kredītu šim pieprasījumam. Papildini kredītus un mēģini vēlreiz.",
       "previousTaskFinishing": "Iepriekšējā uzdevuma izpilde vēl nav beigusies. Lūdzu, nedaudz uzgaidi.",
@@ -2281,6 +2284,7 @@
       "branchDefault": "Noklusējuma",
       "branchAccessibility": "Atzars: {{label}}",
       "branchLoading": "Notiek atzaru ielāde",
+      "branchInactive": "Izvēlies repozitoriju, lai ielādētu tā atzarus.",
       "branchLoadError": "Neizdevās ielādēt atzarus",
       "branchUnavailable": "Šim repozitorijam atzari nav pieejami. Pārbaudi savas tiesības pie pakalpojumu sniedzēja un izvēlies citu repozitoriju.",
       "branchEmpty": "Nav pieejamu atzaru",
@@ -3095,7 +3099,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Neizdevās ielādēt sesijas.",
-    "couldNotLoadActiveSessions": "Neizdevās ielādēt aktīvās sesijas.",
     "agentSessions": "Pašlaik aktīvs",
     "newCodingTask": "Jauns programmēšanas uzdevums",
     "newTaskFromPicture": "Jauns uzdevums no attēla",
@@ -3746,8 +3749,7 @@
     "imagesSectionEmpty": "Nav uzticamu attēlu resursdatoru",
     "revoke": "Atsaukt uzticību resursdatoram {{host}}",
     "revokeMessage": "Saites uz šo resursdatoru atkal prasīs apstiprinājumu.",
-    "revokeImageMessage": "Attēli no šī resursdatora atkal prasīs apstiprinājumu.",
-    "backToPreferences": "Atpakaļ uz iestatījumiem"
+    "revokeImageMessage": "Attēli no šī resursdatora atkal prasīs apstiprinājumu."
   },
   "glanceable": {
     "waiting": "Tiek atjaunināta informācija par aģentiem",
@@ -4751,7 +4753,7 @@
       "new": "Jauns trigeris",
       "create": "Izveidot trigeri",
       "emptyTitle": "Vēl nav trigeru",
-      "emptyDescription": "Izveidojiet trigeri, lai sāktu Cloud Agent palaišanu ar tīmekļa āķa izsaukumu vai pēc grafika.",
+      "emptyDescription": "Izveidojiet savu pirmo trigeri.",
       "loadFailedTitle": "Neizdevās ielādēt trigerus",
       "loadFailedDescription": "Mēģiniet vēlreiz, kad būs savienojums.",
       "detailLoadFailedTitle": "Neizdevās ielādēt šo trigeri",

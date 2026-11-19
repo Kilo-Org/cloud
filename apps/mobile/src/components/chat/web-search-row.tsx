@@ -4,6 +4,7 @@ import { toast } from 'sonner-native';
 
 import { Globe } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
 import { chatFlagValueOf } from '@/lib/chat/chat-flag';
 import { setChatFlag } from '@/lib/chat/registry';
 import { type ChatPlace } from '@/lib/chat/scope';
@@ -59,15 +60,17 @@ export function useWebSearchSetting(
 export function WebSearchRow({ setting }: Readonly<{ setting: WebSearchSetting }>) {
   const { t } = useTranslation();
   return (
-    <PreferenceRow
-      icon={Globe}
-      title={t('modelChat.webSearch.title')}
-      subtitle={t('modelChat.webSearch.description')}
-      value={setting.enabled}
-      disabled={false}
-      onValueChange={next => {
-        setting.setEnabled(next);
-      }}
-    />
+    <RowGroup>
+      <PreferenceRow
+        icon={Globe}
+        title={t('modelChat.webSearch.title')}
+        subtitle={t('modelChat.webSearch.description')}
+        value={setting.enabled}
+        disabled={false}
+        onValueChange={next => {
+          setting.setEnabled(next);
+        }}
+      />
+    </RowGroup>
   );
 }

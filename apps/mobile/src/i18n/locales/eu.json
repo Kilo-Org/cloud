@@ -1386,8 +1386,9 @@
       "notConnectedReadOnly": "Bitbucket ez dago konektatuta. Eskatu erakunde bateko jabeari, administratzaileari edo fakturazio-kudeatzaileari konekta dezan."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Erakunde honen Bitbucket konexioa webean kudeatzen da, ordenagailu batetik.",
-      "description": "Sortu lan-eremurako sarbide-token bat beharrezko baimenekin eta itsatsi behean.",
+      "managedOnWeb": "{{organization}}-ren Bitbucket konexioa webean kudeatzen da, ordenagailu batetik.",
+      "description": "Sortu lan-eremurako sarbide-token bat {{organization}}-rako eta itsatsi behean.",
+      "descriptionReconnect": "Sortu lan-eremurako sarbide-token berri bat {{organization}}-rako eta itsatsi behean.",
       "scopes": "Kontua: irakurtzea · Biltegiak: irakurtzea/idaztea · Bateratze-eskaerak: irakurtzea · Webhook-ak: irakurtzea/idaztea",
       "tokenPlaceholder": "Lan-eremurako sarbide-tokena",
       "tokenRefused": "Bitbucketek ez du lan-eremurako sarbide-token hau onartu. Egiaztatu goiko baimenak dituela, eta saiatu berriro."
@@ -2161,6 +2162,8 @@
       "renameAccessibility": "Berrizendatu saioa: {{title}}",
       "cloningSession": "Saioa klonatzen",
       "couldNotLoadThisSession": "Ezin izan da saio hau kargatu.",
+      "historyTooLarge": "Saio honen transkripzioa kargatzeko handiegia da.",
+      "historyUnavailable": "Ezin da irakurri saio honen transkripzioa.",
       "cloneFailedRetry": "Ezin izan da saio hau klonatu. Saiatu berriro.",
       "notEnoughCredits": "Ez dago nahikoa kreditu eskaera honetarako. Gehitu kredituak eta saiatu berriro.",
       "previousTaskFinishing": "Aurreko zeregina oraindik amaitzen ari da. Itxaron pixka bat.",
@@ -2237,6 +2240,7 @@
       "branchDefault": "Lehenetsia",
       "branchAccessibility": "Adarra: {{label}}",
       "branchLoading": "Adarrak kargatzen",
+      "branchInactive": "Hautatu biltegi bat bere adarrak kargatzeko.",
       "branchLoadError": "Ezin izan dira adarrak kargatu",
       "branchUnavailable": "Ez dago adarrik eskuragarri biltegi honetarako. Egiaztatu hornitzailearekin duzun sarbidea eta hautatu beste biltegi bat.",
       "branchEmpty": "Ez dago adarrik eskuragarri",
@@ -3039,7 +3043,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Ezin izan dira saioak kargatu.",
-    "couldNotLoadActiveSessions": "Ezin izan dira saio aktiboak kargatu.",
     "agentSessions": "Orain martxan",
     "newCodingTask": "Programazio-zeregin berria",
     "newTaskFromPicture": "Zeregin berria irudi batetik",
@@ -3686,8 +3689,7 @@
     "imagesSectionEmpty": "Ez dago konfiantzako irudi-ostalaririk",
     "revoke": "Kendu ostalari honi emandako konfiantza: {{host}}",
     "revokeMessage": "Ostalari honetarako estekek berriro eskatuko dute berrespena.",
-    "revokeImageMessage": "Ostalari honetako irudiek berriro eskatuko dute berrespena.",
-    "backToPreferences": "Itzuli hobespenetara"
+    "revokeImageMessage": "Ostalari honetako irudiek berriro eskatuko dute berrespena."
   },
   "glanceable": {
     "waiting": "Agenteak eguneratzen",
@@ -4676,7 +4678,7 @@
       "new": "Abiarazle berria",
       "create": "Sortu abiarazlea",
       "emptyTitle": "Oraindik ez dago abiarazlerik",
-      "emptyDescription": "Sortu abiarazle bat Cloud Agent exekuzio bat hasteko webhook dei batetik edo ordutegi baten arabera.",
+      "emptyDescription": "Sortu zure lehen abiarazlea.",
       "loadFailedTitle": "Ezin izan dira abiarazleak kargatu",
       "loadFailedDescription": "Saiatu berriro konexioa duzunean.",
       "detailLoadFailedTitle": "Ezin izan da abiarazle hau kargatu",

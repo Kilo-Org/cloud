@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
 
+import { KvRow } from '@/components/ui/kv-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { formatPercent } from '@/lib/format';
 
@@ -39,34 +41,25 @@ export function UsageBreakdownList({
   }
 
   return (
-    <View className="gap-3">
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {title}
-      </Text>
-      <View className="rounded-lg bg-secondary px-3">
-        {entries.map((entry, index) => (
-          <View
+    <Section label={title}>
+      <RowGroup>
+        {entries.map(entry => (
+          <KvRow
             key={entry.key}
-            className={
-              index === entries.length - 1
-                ? 'flex-row items-center justify-between gap-3 py-3'
-                : 'flex-row items-center justify-between gap-3 border-b-[0.5px] border-hair-soft py-3'
-            }
-          >
-            <Text className="min-w-0 shrink text-sm text-foreground" numberOfLines={1}>
-              {humanize ? humanizeDimension(entry.label, i18n.language) : entry.label}
-            </Text>
-            <View className="shrink-0 flex-row items-center gap-2">
-              <Text className="text-sm text-foreground tabular-nums">
-                {formatUsageCost(entry.value, i18n.language)}
-              </Text>
-              <Text className="w-10 text-right text-xs text-muted-foreground tabular-nums">
+            label={humanize ? humanizeDimension(entry.label, i18n.language) : entry.label}
+            // A model id can be long; the cost and the share are the columns a
+            // reader compares, so the name yields its width to them.
+            labelShrink
+            value={formatUsageCost(entry.value, i18n.language)}
+            valueFace="numeric"
+            trailing={
+              <Text variant="caption" className="w-12 shrink-0 text-right tabular-nums">
                 {formatPercent(entry.percentage, i18n.language)}
               </Text>
-            </View>
-          </View>
+            }
+          />
         ))}
-      </View>
-    </View>
+      </RowGroup>
+    </Section>
   );
 }

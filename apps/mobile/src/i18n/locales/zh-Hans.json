@@ -695,8 +695,9 @@
       "notConnectedReadOnly": "尚未连接 Bitbucket。请让组织所有者、管理员或账单管理员进行连接。"
     },
     "bitbucketConnect": {
-      "managedOnWeb": "此组织的 Bitbucket 连接需在电脑上通过网页版进行管理。",
-      "description": "创建具有所需权限范围的工作区访问令牌，并粘贴到下方。",
+      "managedOnWeb": "{{organization}} 的 Bitbucket 连接需在电脑上通过网页版进行管理。",
+      "description": "为 {{organization}} 创建工作区访问令牌，然后粘贴到下方。",
+      "descriptionReconnect": "为 {{organization}} 创建新的工作区访问令牌，然后粘贴到下方。",
       "scopes": "账户：读取 · 仓库：读/写 · 拉取请求：读取 · Webhook：读/写",
       "tokenPlaceholder": "工作区访问令牌",
       "tokenRefused": "Bitbucket 未接受此工作区访问令牌。请检查其是否具有上述权限范围，然后重试。"
@@ -1605,6 +1606,8 @@
       "renameAccessibility": "重命名会话：{{title}}",
       "cloningSession": "正在克隆会话",
       "couldNotLoadThisSession": "无法加载此会话",
+      "historyTooLarge": "此会话的对话记录过大，无法加载。",
+      "historyUnavailable": "无法读取此会话的对话记录。",
       "cloneFailedRetry": "无法克隆此会话。请重试。",
       "notEnoughCredits": "额度不足，无法处理此请求。请充值后重试。",
       "previousTaskFinishing": "上一个任务正在收尾，请稍等。",
@@ -1681,6 +1684,7 @@
       "branchDefault": "默认",
       "branchAccessibility": "分支: {{label}}",
       "branchLoading": "正在加载分支",
+      "branchInactive": "选择一个仓库以加载其分支。",
       "branchLoadError": "无法加载分支",
       "branchUnavailable": "此仓库没有可用的分支。检查你在提供商处的访问权限，然后选择另一个仓库。",
       "branchEmpty": "没有可用的分支",
@@ -2483,7 +2487,6 @@
   },
   "home": {
     "couldNotLoadSessions": "无法加载会话。",
-    "couldNotLoadActiveSessions": "无法加载进行中的会话。",
     "agentSessions": "正在进行",
     "newCodingTask": "新建编程任务",
     "newTaskFromPicture": "从图片新建任务",
@@ -3686,8 +3689,7 @@
     "imagesSectionEmpty": "暂无受信任的图片主机",
     "revoke": "撤销对 {{host}} 的信任",
     "revokeMessage": "指向此主机的链接将再次请求确认。",
-    "revokeImageMessage": "来自此主机的图片将再次请求确认。",
-    "backToPreferences": "返回偏好设置"
+    "revokeImageMessage": "来自此主机的图片将再次请求确认。"
   },
   "glanceable": {
     "waiting": "正在更新智能体状态",
@@ -4676,7 +4678,7 @@
       "new": "新建触发器",
       "create": "创建触发器",
       "emptyTitle": "还没有触发器",
-      "emptyDescription": "创建触发器，以便通过 Webhook 调用或按计划启动 Cloud Agent 运行。",
+      "emptyDescription": "创建你的第一个触发器。",
       "loadFailedTitle": "无法加载触发器",
       "loadFailedDescription": "请在连接可用后重试。",
       "detailLoadFailedTitle": "无法加载此触发器",

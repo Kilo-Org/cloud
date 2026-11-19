@@ -662,8 +662,9 @@
       "notConnectedReadOnly": "Bitbucket não está conectado. Peça a um Proprietário, Administrador ou Gerente de cobrança da organização para conectá-lo."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "A conexão do Bitbucket desta organização é gerenciada na web, em um computador.",
-      "description": "Crie um token de acesso do espaço de trabalho com os escopos necessários e cole-o abaixo.",
+      "managedOnWeb": "A conexão do Bitbucket para {{organization}} é gerenciada na web, em um computador.",
+      "description": "Crie um token de acesso do espaço de trabalho para {{organization}} e cole-o abaixo.",
+      "descriptionReconnect": "Crie um novo token de acesso do espaço de trabalho para {{organization}} e cole-o abaixo.",
       "scopes": "Conta: leitura · Repositórios: leitura/gravação · PRs: leitura · Webhooks: leitura/gravação",
       "tokenPlaceholder": "Token de acesso do espaço de trabalho",
       "tokenRefused": "O Bitbucket não aceitou este token de acesso do espaço de trabalho. Verifique se ele tem os escopos acima e tente novamente."
@@ -1599,6 +1600,8 @@
       "renameAccessibility": "Renomear sessão: {{title}}",
       "cloningSession": "Clonando sessão",
       "couldNotLoadThisSession": "Não foi possível carregar esta sessão.",
+      "historyTooLarge": "A transcrição desta sessão é grande demais para carregar.",
+      "historyUnavailable": "Não é possível ler a transcrição desta sessão.",
       "cloneFailedRetry": "Não foi possível clonar esta sessão. Tente novamente.",
       "notEnoughCredits": "Créditos insuficientes para esta solicitação. Adicione créditos e tente novamente.",
       "previousTaskFinishing": "A tarefa anterior ainda está sendo concluída. Aguarde um momento.",
@@ -1675,6 +1678,7 @@
       "branchDefault": "Padrão",
       "branchAccessibility": "Branch: {{label}}",
       "branchLoading": "Carregando branches",
+      "branchInactive": "Selecione um repositório para carregar os branches dele.",
       "branchLoadError": "Não foi possível carregar os branches",
       "branchUnavailable": "Não há branches disponíveis para este repositório. Verifique seu acesso com o provedor e escolha outro repositório.",
       "branchEmpty": "Nenhum branch disponível",
@@ -2522,7 +2526,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Não foi possível carregar as sessões.",
-    "couldNotLoadActiveSessions": "Não foi possível carregar as sessões ativas.",
     "agentSessions": "Em andamento agora",
     "newCodingTask": "Nova tarefa de programação",
     "newTaskFromPicture": "Nova tarefa a partir de uma imagem",
@@ -3752,8 +3755,7 @@
     "imagesSectionEmpty": "Nenhum domínio confiável de imagens",
     "revoke": "Deixar de confiar em {{host}}",
     "revokeMessage": "Os links para este domínio voltarão a pedir confirmação.",
-    "revokeImageMessage": "As imagens deste domínio voltarão a pedir confirmação.",
-    "backToPreferences": "Voltar às preferências"
+    "revokeImageMessage": "As imagens deste domínio voltarão a pedir confirmação."
   },
   "glanceable": {
     "waiting": "Atualizando agentes",
@@ -4757,7 +4759,7 @@
       "new": "Novo gatilho",
       "create": "Criar gatilho",
       "emptyTitle": "Ainda não há gatilhos",
-      "emptyDescription": "Crie um gatilho para iniciar uma execução do Cloud Agent a partir de uma chamada de webhook ou em um agendamento.",
+      "emptyDescription": "Crie seu primeiro gatilho.",
       "loadFailedTitle": "Não foi possível carregar os gatilhos",
       "loadFailedDescription": "Tente novamente quando tiver conexão.",
       "detailLoadFailedTitle": "Não foi possível carregar este gatilho",

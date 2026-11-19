@@ -1386,8 +1386,9 @@
       "notConnectedReadOnly": "Bitbucket نښلول شوی نه دی. له یو سازمان مالک، مدیر، یا د بلونو مدیر څخه وغواړئ چې دا ونښلوي."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "د دې سازمان د Bitbucket اړیکه له کمپیوټر څخه په وېب کې اداره کېږي.",
-      "description": "د کاري چاپېریال لپاره د اړینو اجازو لرونکی لاسرسي ټوکن جوړ کړئ او لاندې یې پیسټ کړئ.",
+      "managedOnWeb": "د {{organization}} د Bitbucket اړیکه له کمپیوټر څخه په وېب کې اداره کېږي.",
+      "description": "د کاري چاپېریال د لاسرسي ټوکن {{organization}} لپاره جوړ کړئ او لاندې یې پیسټ کړئ.",
+      "descriptionReconnect": "د کاري چاپېریال د لاسرسي یو نوی ټوکن {{organization}} لپاره جوړ کړئ او لاندې یې پیسټ کړئ.",
       "scopes": "حساب: لوستل · زېرمتونونه: لوستل/لیکل · PR: لوستل · وېب هوکونه: لوستل/لیکل",
       "tokenPlaceholder": "د کاري چاپېریال د لاسرسي ټوکن",
       "tokenRefused": "Bitbucket دا د کاري چاپېریال د لاسرسي ټوکن ونه منل. وګورئ چې پورتنۍ اجازې لري، بیاځلي هڅه وکړئ."
@@ -2161,6 +2162,8 @@
       "renameAccessibility": "د ناستې نوم بدل کړئ: {{title}}",
       "cloningSession": "د ناستې کاپي جوړېږي",
       "couldNotLoadThisSession": "دا ناسته بار نه شوه.",
+      "historyTooLarge": "د دې ناستې لیکن د بارولو لپاره ډېره لویه ده.",
+      "historyUnavailable": "د دې ناستې لیکن نه شي لوستل کېدای.",
       "cloneFailedRetry": "د دې ناستې کاپي جوړه نه شوه. بیا هڅه وکړئ.",
       "notEnoughCredits": "د دې غوښتنې لپاره کافي کریډیټ نشته. کریډیټ زیات کړئ او بیا هڅه وکړئ.",
       "previousTaskFinishing": "مخکینۍ دنده لا د بشپړېدو په حال کې ده. یوه شېبه صبر وکړئ.",
@@ -2237,6 +2240,7 @@
       "branchDefault": "ډیفالټ",
       "branchAccessibility": "څانګه: {{label}}",
       "branchLoading": "څانګې بارېږي",
+      "branchInactive": "د څانګو د بارولو لپاره یو زېرمتون وټاکئ.",
       "branchLoadError": "څانګې بار نه شوې",
       "branchUnavailable": "د دې زېرمتون لپاره څانګې شتون نلري. له چمتو کوونکي سره خپل لاسرسی وګورئ، بیا بل زېرمتون وټاکئ.",
       "branchEmpty": "هېڅ څانګه شتون نلري",
@@ -3039,7 +3043,6 @@
   },
   "home": {
     "couldNotLoadSessions": "ناستې بار نه شوې.",
-    "couldNotLoadActiveSessions": "فعالې ناستې بار نه شوې.",
     "agentSessions": "اوس روانې",
     "newCodingTask": "د کوډ کولو نوې دنده",
     "newTaskFromPicture": "له انځور څخه نوې دنده",
@@ -3686,8 +3689,7 @@
     "imagesSectionEmpty": "هېڅ باوري انځور کوربه نشته",
     "revoke": "پر {{host}} باور لغوه کړئ",
     "revokeMessage": "د دې کوربه لینکونه به بیا د تایید غوښتنه وکړي.",
-    "revokeImageMessage": "د دې کوربه انځورونه به بیا د تایید غوښتنه وکړي.",
-    "backToPreferences": "بېرته تنظیماتو ته ورشئ"
+    "revokeImageMessage": "د دې کوربه انځورونه به بیا د تایید غوښتنه وکړي."
   },
   "glanceable": {
     "waiting": "اجنټان تازه کېږي",
@@ -4676,7 +4678,7 @@
       "new": "نوی ټرېګر",
       "create": "ټرېګر جوړ کړئ",
       "emptyTitle": "تر اوسه هېڅ ټرېګر نشته",
-      "emptyDescription": "یو ټرېګر جوړ کړئ ترڅو د ویب‌هوک غوښتنې یا مهالویش له مخې د Cloud Agent چل پیل کړئ.",
+      "emptyDescription": "خپل لومړی ټرېګر جوړ کړئ.",
       "loadFailedTitle": "ټرېګرونه بار نشول",
       "loadFailedDescription": "کله چې اړیکه ولرئ بیا هڅه وکړئ.",
       "detailLoadFailedTitle": "دا ټرېګر بار نشو",

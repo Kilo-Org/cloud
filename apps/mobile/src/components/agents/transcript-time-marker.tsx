@@ -22,9 +22,7 @@ export function TranscriptTimeMarker({
   }
   return (
     <View className="items-center py-2">
-      <Text className="font-mono-medium text-[11px] uppercase tracking-[1px] text-muted-foreground">
-        {label}
-      </Text>
+      <Text variant="eyebrow">{label}</Text>
     </View>
   );
 }

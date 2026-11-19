@@ -13,7 +13,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { RefreshControl } from '@/components/ui/refresh-control';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
@@ -42,29 +42,22 @@ type InvoiceListQuery = {
   readonly fetchNextPage: () => void;
 };
 
-// FlashList takes `contentContainerStyle` (no className), so the FlatList's
-// `grow gap-3 px-6 pt-4` content classes map to their pixel values: NativeWind's
-// native rem is 14, so px-6 is 21 dp and pt-4 is 14 dp (24/16 is the web rem and
-// sits 3 dp inside the skeleton it replaces). FlashList v2 positions every cell
-// absolutely and has no `gap` handling (2.3.2 ships zero `gap` references), so
-// the 12px inter-row gap rides on the measured item separator instead of
-// `contentContainerStyle.gap`. The old container `gap` also sat between the last
-// row and the pagination footer; FlashList's separator only spans items, so that
-// boundary carries the same 12px as `pt-3` on the footer.
+// FlashList takes `contentContainerStyle` (no className). The rows own their
+// full-bleed geometry and their hairline, so the container only carries the
+// flex grow the empty state needs.
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = {
   flexGrow: 1,
-  paddingHorizontal: 21,
-  paddingTop: 14,
 } satisfies ViewStyle;
 
-const InvoiceRowSeparator = () => <View className="h-3" />;
+const SKELETON_ROW_COUNT = 3;
 
-function InvoiceRowSkeleton() {
+function InvoiceListSkeleton() {
   return (
-    <View className="gap-1.5 rounded-lg bg-secondary p-3">
-      <Skeleton className="h-4 w-40 rounded" />
-      <Skeleton className="h-3 w-24 rounded" />
+    <View>
+      {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
+        <RowSkeleton key={index} subtitle />
+      ))}
     </View>
   );
 }
@@ -140,8 +133,10 @@ export function InvoiceListScreen({
   // `InvoiceRow` is memoized at module scope, so the renderer keeps one identity
   // across data updates and only the changed rows re-render.
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<Invoice>) => <InvoiceRow invoice={item} />,
-    []
+    ({ item, index }: ListRenderItemInfo<Invoice>) => (
+      <InvoiceRow invoice={item} last={index === entries.length - 1} />
+    ),
+    [entries.length]
   );
 
   const isLoading = query.isPending;
@@ -167,10 +162,8 @@ export function InvoiceListScreen({
   let body: ReactNode = null;
   if (isLoading) {
     body = (
-      <Animated.View exiting={FadeOut.duration(150)} className="gap-3 px-6 pt-4">
-        <InvoiceRowSkeleton />
-        <InvoiceRowSkeleton />
-        <InvoiceRowSkeleton />
+      <Animated.View exiting={FadeOut.duration(150)}>
+        <InvoiceListSkeleton />
       </Animated.View>
     );
   } else if (isFirstPageError) {
@@ -201,18 +194,18 @@ export function InvoiceListScreen({
     );
   } else {
     const footer = (
-      // The former container gap also separated the last row from this footer
-      // block, which the item separator does not cover.
+      // The paging block follows the rows: the last row draws no hairline, so
+      // the footer owns the gap above it.
       <View className="pt-3">
         {isRetentionLimited && !isLaterPageError && !hasMore && (
-          <View className="items-center gap-3 px-6 py-4">
+          <View className="items-center gap-3 px-4 py-4">
             <Text variant="muted" className="text-center text-xs">
               {t('organization.invoices.retentionLimit')}
             </Text>
           </View>
         )}
         {hasMore && !isLaterPageError && (
-          <View className="items-center gap-3 px-6 py-4">
+          <View className="items-center gap-3 px-4 py-4">
             <Text variant="muted" className="text-center text-xs">
               {t('organization.invoices.truncated')}
             </Text>
@@ -230,7 +223,7 @@ export function InvoiceListScreen({
           </View>
         )}
         {isLaterPageError && (
-          <View className="items-center gap-3 px-6 py-4">
+          <View className="items-center gap-3 px-4 py-4">
             <Text variant="muted" className="text-center text-xs">
               {t('common.couldnTLoadMore')}
             </Text>
@@ -260,12 +253,12 @@ export function InvoiceListScreen({
           keyExtractor={item => item.id}
           renderItem={renderItem}
           getItemType={() => 'invoice'}
-          ItemSeparatorComponent={InvoiceRowSeparator}
           contentContainerStyle={listContentContainerStyle}
           refreshControl={refreshControl}
           ListEmptyComponent={
             <EmptyState
               placement="top"
+              inset="gutter"
               icon={FileText}
               title={emptyTitle}
               description={emptyDescription}

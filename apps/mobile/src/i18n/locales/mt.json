@@ -1455,8 +1455,9 @@
       "notConnectedReadOnly": "Bitbucket mhux konness. Itlob lis-sid ta' organizzazzjoni, lill-amministratur jew lill-maniġer tal-ħlasijiet biex jikkonnettjah."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Il-konnessjoni ta' Bitbucket ta' din l-organizzazzjoni tiġi ġestita fuq il-web minn kompjuter.",
-      "description": "Oħloq token ta' aċċess għall-ispazju tax-xogħol bil-permessi meħtieġa u waħħlu hawn taħt.",
+      "managedOnWeb": "Il-konnessjoni ta' Bitbucket ta' {{organization}} tiġi ġestita fuq il-web minn kompjuter.",
+      "description": "Oħloq token ta' aċċess għall-ispazju tax-xogħol għal {{organization}} u waħħlu hawn taħt.",
+      "descriptionReconnect": "Oħloq token ta' aċċess ġdid għall-ispazju tax-xogħol għal {{organization}} u waħħlu hawn taħt.",
       "scopes": "Kont: qari · Repożitorji: qari/kitba · PRs: qari · Webhooks: qari/kitba",
       "tokenPlaceholder": "Token ta' aċċess għall-ispazju tax-xogħol",
       "tokenRefused": "Bitbucket ma aċċettax dan it-token tal-ispazju tax-xogħol. Iċċekkja li għandu l-permessi ta' hawn fuq, imbagħad ipprova mill-ġdid."
@@ -2293,6 +2294,8 @@
       "renameAccessibility": "Ibdel l-isem tas-sessjoni: {{title}}",
       "cloningSession": "Qed tiġi kklonjata s-sessjoni",
       "couldNotLoadThisSession": "Ma setgħetx titgħabba din is-sessjoni.",
+      "historyTooLarge": "It-transkrizzjoni ta' din is-sessjoni hija kbira wisq biex titgħabba.",
+      "historyUnavailable": "It-transkrizzjoni ta' din is-sessjoni ma tistax tiġi maqruża.",
       "cloneFailedRetry": "Ma setgħetx tiġi kklonjata din is-sessjoni. Erġa' pprova.",
       "notEnoughCredits": "M'għandekx biżżejjed krediti għal din it-talba. Żid krediti u erġa' pprova.",
       "previousTaskFinishing": "Il-kompitu ta' qabel għadu qed jitlesta. Stenna ftit.",
@@ -2369,6 +2372,7 @@
       "branchDefault": "Predefinit",
       "branchAccessibility": "Fergħa: {{label}}",
       "branchLoading": "Tagħbija tal-fergħat",
+      "branchInactive": "Agħżel repożitorju biex jitgħabbew il-fergħat tiegħu.",
       "branchLoadError": "Ma setgħetx titgħabba l-fergħat",
       "branchUnavailable": "M'hemmx fergħat disponibbli għal dan ir-repożitorju. Iċċekkja l-aċċess tiegħek mal-fornitur, imbagħad agħżel repożitorju ieħor.",
       "branchEmpty": "Ebda fergħa disponibbli",
@@ -3207,7 +3211,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Ma setgħux jitgħabbew is-sessjonijiet.",
-    "couldNotLoadActiveSessions": "Ma setgħux jitgħabbew is-sessjonijiet attivi.",
     "agentSessions": "Attivi bħalissa",
     "newCodingTask": "Kompitu ġdid ta' programmazzjoni",
     "newTaskFromPicture": "Kompitu ġdid minn ritratt",
@@ -3866,8 +3869,7 @@
     "imagesSectionEmpty": "L-ebda ospitant fdat tal-immaġnijiet",
     "revoke": "Irtira l-fiduċja f'{{host}}",
     "revokeMessage": "Linkijiet lejn dan l-ospitant se jerġgħu jitolbu konferma.",
-    "revokeImageMessage": "L-immaġnijiet minn dan l-ospitant se jerġgħu jitolbu konferma.",
-    "backToPreferences": "Lura għall-preferenzi"
+    "revokeImageMessage": "L-immaġnijiet minn dan l-ospitant se jerġgħu jitolbu konferma."
   },
   "glanceable": {
     "waiting": "Qed jiġu aġġornati l-aġenti",
@@ -4901,7 +4903,7 @@
       "new": "Skattatur ġdid",
       "create": "Oħloq skattatur",
       "emptyTitle": "Għadhom ma hemmx skattaturi",
-      "emptyDescription": "Oħloq skattatur biex tibda eżekuzzjoni tal-Cloud Agent minn sejħa webhook jew fuq skeda.",
+      "emptyDescription": "Oħloq l-ewwel skattatur tiegħek.",
       "loadFailedTitle": "Ma setgħux jitgħabbew l-iskattaturi",
       "loadFailedDescription": "Erġa' pprova meta jkollok konnessjoni.",
       "detailLoadFailedTitle": "Ma setax jitgħabba dan l-iskattatur",

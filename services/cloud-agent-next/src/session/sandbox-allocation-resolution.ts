@@ -2,15 +2,14 @@ import { TRPCError } from '@trpc/server';
 import type { WorkerDb } from '@kilocode/db/client';
 import { getSandboxAllocationCandidates, type ProfileOwner } from '@kilocode/cloud-agent-profile';
 import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
-import { providerSupports } from '@kilocode/worker-utils/sandbox-provider-capabilities';
 import {
   allocationSupportsMultiRepository,
   getSandboxAllocationProvider,
   isSelectableSandboxAllocation,
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
+import { egressRequestSupported } from '@kilocode/worker-utils/sandbox-provider-capabilities';
 import { isMultiRepositoryEnvironment } from '../environment-build/reference.js';
-import { PROVIDER_DESCRIPTORS } from '../shared/sandbox-provider.js';
 import {
   getSandboxSelectionCapabilities,
   isSandboxAllocationAvailable,
@@ -21,7 +20,11 @@ import {
 } from '../sandbox-selection.js';
 import { requiredProviderCapability } from '../session-identity.js';
 import type { Env } from '../types.js';
-import type { SessionCreateRequest, SessionRepositoryRequest } from './session-requests.js';
+import type {
+  SessionCreateRequest,
+  SessionRepositoryRequest,
+  SessionRuntimeIntent,
+} from './session-requests.js';
 
 export type RepositoryAllocationTarget = {
   platform: 'github' | 'gitlab';
@@ -49,17 +52,37 @@ function profileOwner(owner: SelectionOwner): ProfileOwner {
 }
 
 /**
+ * Whether a create asks for an egress policy: an allowlist or an egress audit.
+ * Session registration reads it for the intent fingerprint and to require a
+ * selectable allocation. Whether a provider can enforce the policy is a
+ * separate question: `egressRequestSupported` answers it for every gate.
+ */
+export function requestNeedsEgressPolicy(runtime: SessionRuntimeIntent | undefined): boolean {
+  return runtime?.egressMode === 'allowlist' || runtime?.egressAudit === true;
+}
+
+function selectableAllocations(candidates: (string | undefined)[]) {
+  return candidates.filter(isSelectableSandboxAllocation);
+}
+
+function enforcesRequestedEgress(
+  allocation: SandboxAllocation,
+  runtime: SessionRuntimeIntent | undefined
+): boolean {
+  return egressRequestSupported(getSandboxAllocationProvider(allocation), runtime ?? {});
+}
+
+/**
  * Resolves the allocation that an owner's saved settings give a repository: the
  * eligible repository environment allocation first, then the eligible
  * repository override, then the eligible context default. Stale or
  * incompatible saved keys are skipped; the unavailable saved key is never
- * disabled or deleted. For a V2 environment, a repository or context allocation
- * that cannot hold several repositories is skipped the same way, so resolution
- * falls to the next candidate. The environment's own allocation is an explicit
- * choice and is never skipped here; `assertEnvironmentSupportsSandbox` rejects
- * it. Session start passes the session's environment. The new-session picker
- * passes `null` until it knows the environment, so for a V2 environment it can
- * show a default that the session itself skips.
+ * disabled or deleted. Every selectable allocation can hold a V2 environment,
+ * so the result does not depend on the environment. When `runtime` needs an
+ * egress policy, an owner default whose provider cannot enforce one is skipped.
+ * The environment allocation is never skipped for that reason: the start fails
+ * it with the reason. The new-session picker does not know the egress policy,
+ * so it can show a default that a restricted session skips.
  */
 export async function resolveSavedSandboxAllocation(args: {
   db: WorkerDb;
@@ -69,11 +92,10 @@ export async function resolveSavedSandboxAllocation(args: {
   target?: RepositoryAllocationTarget;
   capability?: SandboxAllocationCapability;
   environmentAllocation?: string;
-  environment: EnvironmentRequest | null;
+  runtime?: SessionRuntimeIntent;
   readiness?: VercelSelectionReadiness;
 }): Promise<SandboxAllocation | undefined> {
   const { db, env, owner, repositoryType, target, capability, environmentAllocation } = args;
-  const needsMultiRepository = isMultiRepositoryEnvironment(args.environment);
   const selectionOptions = {
     repositoryType,
     ...(capability ? { capability } : {}),
@@ -82,15 +104,11 @@ export async function resolveSavedSandboxAllocation(args: {
       : {}),
   };
   const candidates = await getSandboxAllocationCandidates(db, profileOwner(owner), target);
-  const ownerAllocations = [candidates.repositoryAllocation, candidates.contextAllocation]
-    .filter((candidate): candidate is string => candidate !== undefined)
-    .map(candidate => candidate as SandboxAllocation)
-    .filter(isSelectableSandboxAllocation)
-    .filter(allocation => !needsMultiRepository || allocationSupportsMultiRepository(allocation));
-  const allocations = [environmentAllocation, ...ownerAllocations]
-    .filter((candidate): candidate is string => candidate !== undefined)
-    .map(candidate => candidate as SandboxAllocation)
-    .filter(isSelectableSandboxAllocation);
+  const ownerDefaults = selectableAllocations([
+    candidates.repositoryAllocation,
+    candidates.contextAllocation,
+  ]).filter(allocation => enforcesRequestedEgress(allocation, args.runtime));
+  const allocations = [...selectableAllocations([environmentAllocation]), ...ownerDefaults];
   if (allocations.length === 0) return undefined;
 
   let capabilities = await getSandboxSelectionCapabilities(env, owner, selectionOptions);
@@ -161,33 +179,30 @@ export async function withSavedSandboxAllocation(
     ...(input.environmentSandboxAllocation
       ? { environmentAllocation: input.environmentSandboxAllocation }
       : {}),
-    environment: input.environment ?? null,
+    ...(input.runtime ? { runtime: input.runtime } : {}),
   });
   return { ...input, savedSandboxAllocation: saved ?? null };
 }
 
 /**
  * A V2 environment keeps every repository in one workspace and gives each
- * repository its own contained capability, so it needs an isolated Cloudflare
- * sandbox that can hold several repositories. Every new session already has a
- * contained credential grant, because containment is mandatory, so this check
- * covers the sandbox alone. A session whose allocation cannot hold several
- * repositories fails before it registers, with the reason. `allocation` is the
- * one the session will use, and `undefined` is the default isolated sandbox.
+ * repository its own contained capability, so it needs a sandbox that one
+ * session owns. Every new session already has a contained credential grant,
+ * because containment is mandatory, so this check covers the sandbox alone. A
+ * session on the shared sandbox fails before it registers, with the reason.
+ * `allocation` is the one the session will use, and `undefined` is the default
+ * isolated sandbox.
  */
 export function assertEnvironmentSupportsSandbox(input: {
   environment: EnvironmentRequest;
   allocation: SandboxAllocation | undefined;
 }): void {
   if (!isMultiRepositoryEnvironment(input.environment)) return;
-  const reject = (message: string) => new TRPCError({ code: 'BAD_REQUEST', message });
   const { allocation } = input;
   if (allocation !== undefined && !allocationSupportsMultiRepository(allocation)) {
-    const provider = getSandboxAllocationProvider(allocation);
-    throw reject(
-      providerSupports(provider, 'multiRepository')
-        ? 'A multi-repository environment cannot run on the shared sandbox'
-        : `A multi-repository environment cannot run on a ${PROVIDER_DESCRIPTORS[provider].label} sandbox`
-    );
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'A multi-repository environment cannot run on the shared sandbox',
+    });
   }
 }

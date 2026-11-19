@@ -1386,8 +1386,9 @@
       "notConnectedReadOnly": "Bitbucket ayixhunyiwe. Cela umnikazi, umlawuli, noma umphathi wokukhokha wenhlangano ukuxhuma."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Uxhumano lwe-Bitbucket lwale nhlangano luphathwa kuwebhu ngekhompyutha.",
-      "description": "Dala ithokheni yokufinyelela endaweni yokusebenza enezimvume ezidingekayo bese uyinamathisela ngezansi.",
+      "managedOnWeb": "Uxhumano lwe-Bitbucket lwe-{{organization}} luphathwa kuwebhu ngekhompyutha.",
+      "description": "Dala ithokheni yokufinyelela endaweni yokusebenza ka-{{organization}}, bese uyinamathisela ngezansi.",
+      "descriptionReconnect": "Dala ithokheni entsha yokufinyelela endaweni yokusebenza ka-{{organization}}, bese uyinamathisela ngezansi.",
       "scopes": "I-akhawunti: ukufunda · Izinqolobane zekhodi: ukufunda/ukubhala · Izicelo zokuhlanganisa ikhodi: ukufunda · Ama-webhook: ukufunda/ukubhala",
       "tokenPlaceholder": "Ithokheni yokufinyelela endaweni yokusebenza",
       "tokenRefused": "I-Bitbucket ayikwamukelanga le thokheni yokufinyelela endaweni yokusebenza. Hlola ukuthi inazo izimvume ezingenhla, bese uzama futhi."
@@ -2161,6 +2162,8 @@
       "renameAccessibility": "Qamba kabusha iseshini: {{title}}",
       "cloningSession": "Iseshini iyakopishwa",
       "couldNotLoadThisSession": "Asikwazanga ukulayisha le seshini.",
+      "historyTooLarge": "Umyalezo wale seshini mude kakhulu ukuthi ulayishwe.",
+      "historyUnavailable": "Iyalelephu wale seshini ayikwazi ukufundwa.",
       "cloneFailedRetry": "Asikwazanga ukwenza ikhophi yale seshini. Zama futhi.",
       "notEnoughCredits": "Awekho amakhredithi anele kulesi sicelo. Engeza amakhredithi bese uzama futhi.",
       "previousTaskFinishing": "Umsebenzi wangaphambilini usaphethwa. Sicela ulinde isikhashana.",
@@ -2237,6 +2240,7 @@
       "branchDefault": "Okuzenzakalelayo",
       "branchAccessibility": "Igatsha: {{label}}",
       "branchLoading": "Kulayishwa amagatsha",
+      "branchInactive": "Khetha inqolobane yekhodi ukuze kulayishwe amagatsha ayo.",
       "branchLoadError": "Kwehlulekile ukulayisha amagatsha",
       "branchUnavailable": "Amagatsha awatholakali kule nqolobane yekhodi. Hlola ukufinyelela kwakho kumhlinzeki, bese ukhetha enye inqolobane yekhodi.",
       "branchEmpty": "Akukho gatsha elitholakalayo",
@@ -3039,7 +3043,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Asikwazanga ukulayisha amaseshini.",
-    "couldNotLoadActiveSessions": "Asikwazanga ukulayisha amaseshini asebenzayo.",
     "agentSessions": "Okusebenza manje",
     "newCodingTask": "Umsebenzi omusha wokubhala ikhodi",
     "newTaskFromPicture": "Umsebenzi omusha ovela esithombeni",
@@ -3686,8 +3689,7 @@
     "imagesSectionEmpty": "Awekho abasingathi bezithombe abathenjwayo",
     "revoke": "Hoxisa ukwethenjwa kuka-{{host}}",
     "revokeMessage": "Izixhumanisi eziya kulo msingathi zizocela imvume futhi.",
-    "revokeImageMessage": "Izithombe ezivela kulo msingathi zizocela imvume futhi.",
-    "backToPreferences": "Buyela ezilungiselelweni"
+    "revokeImageMessage": "Izithombe ezivela kulo msingathi zizocela imvume futhi."
   },
   "glanceable": {
     "waiting": "Kubuyekezwa ama-ejenti",
@@ -4676,7 +4678,7 @@
       "new": "Isibangeli esisha",
       "create": "Dala isibangeli",
       "emptyTitle": "Azikho izibangeli okwamanje",
-      "emptyDescription": "Dala isibangeli ukuze uqale ukusebenza kwe-Cloud Agent kusuka ocingweni lwe-webhook noma ngohlelo lwesikhathi.",
+      "emptyDescription": "Dala isibangeli sakho sokuqala.",
       "loadFailedTitle": "Akukwazekanga ukulayisha izibangeli",
       "loadFailedDescription": "Zama futhi uma usuxhunyiwe.",
       "detailLoadFailedTitle": "Akukwazekanga ukulayisha lesi sibangeli",

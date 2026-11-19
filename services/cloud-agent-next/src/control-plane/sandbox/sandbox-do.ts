@@ -149,6 +149,7 @@ import {
 } from '../../sandbox-placement.js';
 import { sessionDoName } from '../../session-identity.js';
 import { logger } from '../../logger.js';
+import type { PreviewTunnelDemandResult } from '../../preview-tunnel/tunnel-demand.js';
 import {
   diagnosticCause,
   logControlDiagnostic,
@@ -459,10 +460,14 @@ import type { WorktreeChangeStates } from '../session/worktree-changes.js';
 import type { WorktreeChangesReady } from '../worktree-changes-ready.js';
 import type { WorktreeChangesContext } from '../../sandbox-session/worktree-changes.js';
 import { buildNativeEgressAllowlist } from '../../sandbox-control/egress-policy.js';
-import { nativeEgressAllowlistSchema } from '../../sandbox-containers/egress-policy.js';
+import { nativeEgressAllowlistSchema } from '../../sandbox-control/egress-policy.js';
 import { ByocVercelProviderError, type ByocVercelSource } from '../../byoc/vercel-provider.js';
 import { createProviderAdapter, type StoredProviderPin } from './provider-adapters.js';
-import { providerSupports } from '@kilocode/worker-utils/sandbox-provider-capabilities';
+import {
+  egressRequestSupported,
+  providerSupports,
+  type EgressRequest,
+} from '@kilocode/worker-utils/sandbox-provider-capabilities';
 import {
   SNAPSHOT_VALIDATOR_REF_KEY,
   snapshotValidatorAllocation,
@@ -529,6 +534,7 @@ const wrapperSocketAttachmentSchema = z.object({
   worktreeGit: z.literal(true).optional(),
   startCommands: z.literal(true).optional(),
   transferGrants: z.literal(true).optional(),
+  previewTunnel: z.literal(true).optional(),
   workspaceConfiguration: z.literal(true).optional(),
   runtimeInstructions: z.literal(true).optional(),
   runtimeWebSearch: z.literal(true).optional(),
@@ -2274,10 +2280,33 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const allocation = await this.readAllocation();
     return resolvePreviewTarget({
       allocationKind: allocation.kind,
+      allocationId: allocation.allocationId,
       providerRef: allocation.providerRef,
       provider: this.currentProvider(),
       logicalSandboxId: this.sandboxId,
     });
+  }
+
+  /**
+   * PreviewTunnel DO -> Sandbox DO. Asks the bound wrapper to open its preview
+   * tunnel. A passive read and one frame: no queue, alarm, lease or activity,
+   * so preview traffic never keeps a sandbox alive.
+   */
+  async requestPreviewTunnel(allocationId: string): Promise<PreviewTunnelDemandResult> {
+    await this.initialized;
+    const state = await this.readAllocation();
+    if (state.allocationId !== allocationId) return 'not_ready';
+    const socket = this.boundWrapperSocket(state);
+    if (socket === null) return 'not_ready';
+    if (this.readAttachment(socket)?.previewTunnel !== true) return 'outdated';
+    return this.trySendFrame(socket, { type: 'preview.tunnel' }) ? 'requested' : 'not_ready';
+  }
+
+  /** Worker tunnel route -> Sandbox DO. A read of the allocation, like the demand. */
+  async admitPreviewTunnel(allocationId: string, credential: string): Promise<boolean> {
+    await this.initialized;
+    const event = 'preview_tunnel_admission';
+    return this.validateAllocationCredential(allocationId, credential, undefined, event);
   }
 
   /**
@@ -3180,13 +3209,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
     };
   }
 
-  /** A restricted egress policy needs a provider that enforces it and an isolated sandbox. */
-  private egressPolicyAllowed(
+  /** An egress request needs a provider that enforces it and an isolated sandbox. */
+  private egressRequestAllowed(
     provider: AgentSandboxProvider,
-    sandboxKind: SandboxKind | undefined
+    sandboxKind: SandboxKind | undefined,
+    request: EgressRequest
   ): boolean {
+    if (request.egressMode !== 'allowlist' && request.egressAudit !== true) return true;
     return (
-      providerSupports(provider, 'egressPolicy') &&
+      egressRequestSupported(provider, request) &&
       (sandboxKind === undefined ? this.sandboxId.startsWith('ses-') : sandboxKind === 'isolated')
     );
   }
@@ -3208,10 +3239,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     );
     if (!parsedProvider.success) throw new ProviderCreationError('invalid_configuration');
     const provider = parsedProvider.data;
-    if (
-      (policy.data.egressMode === 'allowlist' || policy.data.egressAudit === true) &&
-      !this.egressPolicyAllowed(provider, input.sandboxKind)
-    ) {
+    if (!this.egressRequestAllowed(provider, input.sandboxKind, policy.data)) {
       throw new ProviderCreationError('invalid_configuration');
     }
     const { requiresCustomerCredential } = PROVIDER_DESCRIPTORS[provider];
@@ -7153,6 +7181,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(frame.startCommands ? { startCommands: true } : {}),
         ...(frame.worktreeGit ? { worktreeGit: true } : {}),
         ...(frame.transferGrants ? { transferGrants: true } : {}),
+        ...(frame.previewTunnel ? { previewTunnel: true } : {}),
         ...(attachment?.workspaceConfiguration ? { workspaceConfiguration: true } : {}),
         ...(attachment?.runtimeInstructions ? { runtimeInstructions: true } : {}),
         ...(attachment?.runtimeWebSearch ? { runtimeWebSearch: true } : {}),
@@ -7490,7 +7519,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private async validateAllocationCredential(
     allocationId: string,
     credential: string | null,
-    runtimeHarness?: RuntimeHarness
+    runtimeHarness?: RuntimeHarness,
+    diagnosticEvent = 'hello_admission'
   ): Promise<boolean> {
     const state = await this.readAllocation();
     const admission = {
@@ -7502,7 +7532,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       credentialPresent: credential !== null,
     };
     const reject = (reason: string, extra: ControlDiagnosticFields = {}): boolean => {
-      logControlDiagnostic('hello_admission', { ...admission, accepted: false, reason, ...extra });
+      logControlDiagnostic(diagnosticEvent, { ...admission, accepted: false, reason, ...extra });
       return false;
     };
     if (
@@ -7524,7 +7554,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (!(await sandboxCredentialMatchesHash(credential, storedHash))) {
       return reject('credential_mismatch', { credentialHashPresent: true });
     }
-    logControlDiagnostic('hello_admission', { ...admission, accepted: true, reason: 'accepted' });
+    logControlDiagnostic(diagnosticEvent, { ...admission, accepted: true, reason: 'accepted' });
     return true;
   }
 
@@ -7774,10 +7804,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (pin.egressAllowlist !== undefined) {
       pin.egressAllowlist = nativeEgressAllowlistSchema.parse(pin.egressAllowlist);
     }
-    if (pin.egressAllowlist !== undefined || pin.egressAudit === true) {
-      if (!this.egressPolicyAllowed(pin.provider, pin.sandboxKind)) {
-        throw new ProviderCreationError('invalid_configuration');
-      }
+    const request: EgressRequest = {
+      egressMode: pin.egressAllowlist === undefined ? undefined : 'allowlist',
+      egressAudit: pin.egressAudit,
+    };
+    if (!this.egressRequestAllowed(pin.provider, pin.sandboxKind, request)) {
+      throw new ProviderCreationError('invalid_configuration');
     }
     return pin;
   }

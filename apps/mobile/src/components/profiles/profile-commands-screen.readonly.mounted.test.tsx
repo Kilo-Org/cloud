@@ -60,6 +60,7 @@ vi.mock('@/components/empty-state', async () => {
   // helpers must be loaded inside the factory.
   const { createElement } = await import('react');
   return {
+    StateAction: 'StateAction',
     // The real state renders its `action` below the title, so the manage slot's
     // sentence reaches the tree the way the screen hands it over.
     EmptyState: (props: { action?: unknown }) =>
@@ -92,6 +93,7 @@ vi.mock('@/components/ui/icons', () => ({
   ChevronUp: 'ChevronUp',
   Terminal: 'Terminal',
   Trash2: 'Trash2',
+  Plus: 'Plus',
 }));
 
 /** The role sentence a member reads in the action's place. */

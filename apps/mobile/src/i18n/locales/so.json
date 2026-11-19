@@ -1386,8 +1386,9 @@
       "notConnectedReadOnly": "Bitbucket kuma xidhna. Weydii mulkiile, maamule ama maareeyaha biilasha ururka si ay ugu xidhaan."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Xiriirka Bitbucket ee ururkan waxaa lagu maamulaa shabakadda iyadoo kombiyuutar la isticmaalayo.",
-      "description": "Abuur summad gelitaan oo goobta shaqada ah oo leh oggolaanshaha loo baahan yahay, ka dibna hoos ku dheji.",
+      "managedOnWeb": "Xiriirka Bitbucket ee {{organization}} waxaa lagu maamulaa shabakadda iyadoo kombiyuutar la isticmaalayo.",
+      "description": "Abuur summad gelitaan oo goobta shaqada ah oo {{organization}} loogu talagalay, ka dibna hoos ku dheji.",
+      "descriptionReconnect": "Abuur summad gelitaan cusub oo goobta shaqada ah oo {{organization}} loogu talagalay, ka dibna hoos ku dheji.",
       "scopes": "Akoonka: akhrin · Kaydadka: akhrin/qorid · Codsiyada isku darka: akhrin · Ogeysiisyada shabakadda: akhrin/qorid",
       "tokenPlaceholder": "Summadda gelitaanka goobta shaqada",
       "tokenRefused": "Bitbucket ma aqbalin summaddan gelitaanka goobta shaqada. Hubi inay leedahay oggolaanshaha sare, ka dibna isku day mar kale."
@@ -2161,6 +2162,8 @@
       "renameAccessibility": "Beddel magaca kalfadhiga: {{title}}",
       "cloningSession": "Kalfadhiga waa la nuqulayaa",
       "couldNotLoadThisSession": "Kalfadhigan lama soo shubi karin.",
+      "historyTooLarge": "Qoralka kalfadhigan waa aad u weyn yahay si la soo shubo.",
+      "historyUnavailable": "Qoralka kalfadhigan lama akhriyi karo.",
       "cloneFailedRetry": "Kalfadhigan nuqul lagama samayn karin. Mar kale isku day.",
       "notEnoughCredits": "Lacagta isticmaalka kuma filna codsigan. Lacag ku dar oo mar kale isku day.",
       "previousTaskFinishing": "Hawshii hore weli waa la dhammaystirayaa. Fadlan wax yar sug.",
@@ -2237,6 +2240,7 @@
       "branchDefault": "Aasaasi",
       "branchAccessibility": "Laan: {{label}}",
       "branchLoading": "Laamaha soo dhacaya",
+      "branchInactive": "Dooro kayd si aad u soo dejiso laamihiisa.",
       "branchLoadError": "Laamaha lama soo dejin karin",
       "branchUnavailable": "Laamo kuma jiraan kaydkan. Xiriirkaaga bixiyaha hubi, kadibna dooro kayd kale.",
       "branchEmpty": "Laamo la heli karo ma jiraan",
@@ -3039,7 +3043,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Kalfadhiyada lama soo dejin karin.",
-    "couldNotLoadActiveSessions": "Kalfadhiyada socda lama soo dejin karin.",
     "agentSessions": "Hadda socda",
     "newCodingTask": "Hawl cusub oo koodh qorista ah",
     "newTaskFromPicture": "Hawl cusub oo sawir laga bilaabo",
@@ -3686,8 +3689,7 @@
     "imagesSectionEmpty": "Ma jiraan martigeliyeyaal sawir la aaminay",
     "revoke": "Ka noqo aaminaadda {{host}}",
     "revokeMessage": "Xiriiriyeyaasha martigeliyahan ayaa mar kale weydiin doona xaqiijin.",
-    "revokeImageMessage": "Sawirrada martigeliyahan ayaa mar kale weydiin doona xaqiijin.",
-    "backToPreferences": "Ku noqo doorashooyinka"
+    "revokeImageMessage": "Sawirrada martigeliyahan ayaa mar kale weydiin doona xaqiijin."
   },
   "glanceable": {
     "waiting": "Wakiillada ayaa la cusboonaysiinayaa",
@@ -4676,7 +4678,7 @@
       "new": "Kiciye cusub",
       "create": "Samee kiciye",
       "emptyTitle": "Weli kiciyeyaal ma jiraan",
-      "emptyDescription": "Samee kiciye si aad u bilowdo socodka Cloud Agent ee ka imanaya wicitaan web ama jadwal.",
+      "emptyDescription": "Samee kiciyahaaga ugu horreeya.",
       "loadFailedTitle": "Kiciyeyaal lama soo shubi karin",
       "loadFailedDescription": "Isku day mar kale marka aad xiriir haysato.",
       "detailLoadFailedTitle": "Kiciyahan lama soo shubi karin",

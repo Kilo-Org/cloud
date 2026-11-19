@@ -1386,8 +1386,9 @@
       "notConnectedReadOnly": "Bitbucket pole ühendatud. Palu organisatsiooni omanikul, administraatoril või arveldushalduril see ühendada."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Selle organisatsiooni Bitbucketi ühendust hallatakse arvutis veebi kaudu.",
-      "description": "Loo nõutavate õigustega tööruumi juurdepääsutunnus ja kleebi see allolevale väljale.",
+      "managedOnWeb": "Bitbucketi ühendust {{organization}}-ga hallatakse arvutis veebi kaudu.",
+      "description": "Loo tööruumi juurdepääsutunnus {{organization}} jaoks ja kleebi see allolevale väljale.",
+      "descriptionReconnect": "Loo uus tööruumi juurdepääsutunnus {{organization}} jaoks ja kleebi see allolevale väljale.",
       "scopes": "Konto: lugemine · Hoidlad: lugemine/kirjutamine · Tõmbetaotlused: lugemine · Veebihaagid: lugemine/kirjutamine",
       "tokenPlaceholder": "Tööruumi juurdepääsutunnus",
       "tokenRefused": "Bitbucket ei võtnud seda tööruumi juurdepääsutunnust vastu. Kontrolli, et sellel oleksid ülaltoodud õigused, ja proovi seejärel uuesti."
@@ -2161,6 +2162,8 @@
       "renameAccessibility": "Nimeta seanss ümber: {{title}}",
       "cloningSession": "Seanssi kloonitakse",
       "couldNotLoadThisSession": "Seda seanssi ei õnnestunud laadida.",
+      "historyTooLarge": "Selle seansi üleskirjutus on laadimiseks liiga suur.",
+      "historyUnavailable": "Selle seansi üleskirjutust ei saa lugeda.",
       "cloneFailedRetry": "Seda seanssi ei õnnestunud kloonida. Proovi uuesti.",
       "notEnoughCredits": "Selle päringu jaoks ei jätku krediiti. Lisa krediiti ja proovi uuesti.",
       "previousTaskFinishing": "Eelmine ülesanne pole veel lõppenud. Oota hetk.",
@@ -2237,6 +2240,7 @@
       "branchDefault": "Vaikimisi",
       "branchAccessibility": "Haru: {{label}}",
       "branchLoading": "Harude laadimine",
+      "branchInactive": "Vali hoidla, et harud laadida",
       "branchLoadError": "Harude laadimine ebaõnnestus",
       "branchUnavailable": "Selle hoidla harud pole saadaval. Kontrolli oma õigusi teenusepakkuja juures ja vali mõni teine hoidla.",
       "branchEmpty": "Ühtegi haru pole saadaval",
@@ -3039,7 +3043,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Seansse ei õnnestunud laadida.",
-    "couldNotLoadActiveSessions": "Aktiivseid seansse ei õnnestunud laadida",
     "agentSessions": "Praegu käimas",
     "newCodingTask": "Uus programmeerimisülesanne",
     "newTaskFromPicture": "Uus ülesanne pildist",
@@ -3686,8 +3689,7 @@
     "imagesSectionEmpty": "Usaldatud pildihoste pole",
     "revoke": "Lõpeta hosti {{host}} usaldamine",
     "revokeMessage": "Selle hosti lingid küsivad taas kinnitust.",
-    "revokeImageMessage": "Selle hosti pildid küsivad taas kinnitust.",
-    "backToPreferences": "Tagasi eelistuste juurde"
+    "revokeImageMessage": "Selle hosti pildid küsivad taas kinnitust."
   },
   "glanceable": {
     "waiting": "Agentide oleku värskendamine",
@@ -4676,7 +4678,7 @@
       "new": "Uus päästik",
       "create": "Loo päästik",
       "emptyTitle": "Päästikuid veel pole",
-      "emptyDescription": "Loo päästik, et alustada Cloud Agent käivitust veebihaagi kutse või ajakava alusel.",
+      "emptyDescription": "Loo oma esimene päästik.",
       "loadFailedTitle": "Päästikute laadimine ebaõnnestus",
       "loadFailedDescription": "Proovi uuesti, kui ühendus on olemas.",
       "detailLoadFailedTitle": "Selle päästiku laadimine ebaõnnestus",

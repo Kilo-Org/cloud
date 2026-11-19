@@ -1386,8 +1386,9 @@
       "notConnectedReadOnly": "A Bitbucket nincs csatlakoztatva. Kérd meg egy tulajdonost, adminisztrátort vagy számlázási felelőst, hogy csatlakoztassa."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Ennek a szervezetnek a Bitbucket-kapcsolata a weben, számítógépről kezelhető.",
-      "description": "Hozz létre egy hozzáférési tokent a munkaterülethez a szükséges jogosultságokkal, és illeszd be alább.",
+      "managedOnWeb": "{{organization}} Bitbucket-kapcsolata a weben, számítógépről kezelhető.",
+      "description": "Hozz létre egy hozzáférési tokent a munkaterülethez {{organization}} számára, és illeszd be alább.",
+      "descriptionReconnect": "Hozz létre egy új hozzáférési tokent a munkaterülethez {{organization}} számára, és illeszd be alább.",
       "scopes": "Fiók: olvasás · Kódtárak: olvasás/írás · PR-ek: olvasás · Webhookok: olvasás/írás.",
       "tokenPlaceholder": "Munkaterület-hozzáférési token",
       "tokenRefused": "A Bitbucket nem fogadta el ezt a munkaterület-hozzáférési tokent. Ellenőrizd, hogy rendelkezik-e a fenti jogosultságokkal, majd próbáld újra."
@@ -2161,6 +2162,8 @@
       "renameAccessibility": "Munkamenet átnevezése: {{title}}",
       "cloningSession": "Munkamenet klónozása…",
       "couldNotLoadThisSession": "Nem sikerült betölteni ezt a munkamenetet.",
+      "historyTooLarge": "Ez a munkamenet leirata túl nagy a betöltéshez.",
+      "historyUnavailable": "Ez a munkamenet leirata nem olvasható.",
       "cloneFailedRetry": "Nem sikerült klónozni ezt a munkamenetet. Próbáld újra.",
       "notEnoughCredits": "Nincs elég kredit ehhez a kéréshez. Töltsd fel az egyenleged, és próbáld újra.",
       "previousTaskFinishing": "Az előző feladat még nem fejeződött be. Várj egy kicsit.",
@@ -2237,6 +2240,7 @@
       "branchDefault": "Alapértelmezett",
       "branchAccessibility": "Ág: {{label}}",
       "branchLoading": "Ágak betöltése",
+      "branchInactive": "Válassz egy adattárat az ágai betöltéséhez.",
       "branchLoadError": "Nem sikerült betölteni az ágakat",
       "branchUnavailable": "Ehhez az adattárhoz nem érhetők el ágak. Ellenőrizd a jogosultságodat a szolgáltatónál, majd válassz másik adattárat.",
       "branchEmpty": "Nincs elérhető ág",
@@ -3039,7 +3043,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nem sikerült betölteni a munkameneteket.",
-    "couldNotLoadActiveSessions": "Nem sikerült betölteni az aktív munkameneteket.",
     "agentSessions": "Most fut",
     "newCodingTask": "Új kódolási feladat",
     "newTaskFromPicture": "Új feladat képből",
@@ -3686,8 +3689,7 @@
     "imagesSectionEmpty": "Nincsenek megbízható képwebhelyek",
     "revoke": "A megbízható jelölés visszavonása: {{host}}",
     "revokeMessage": "A webhelyre mutató hivatkozások ismét jóváhagyást kérnek majd.",
-    "revokeImageMessage": "A webhelyről származó képek ismét jóváhagyást kérnek majd.",
-    "backToPreferences": "Vissza a beállításokhoz"
+    "revokeImageMessage": "A webhelyről származó képek ismét jóváhagyást kérnek majd."
   },
   "glanceable": {
     "waiting": "Ügynökök frissítése",
@@ -4676,7 +4678,7 @@
       "new": "Új trigger",
       "create": "Hozzon létre triggert",
       "emptyTitle": "Még nincsenek triggerek",
-      "emptyDescription": "Hozzon létre egy triggert, amely webhookhívásból vagy ütemezés szerint indít Cloud Agent futtatást.",
+      "emptyDescription": "Hozza létre az első triggerjét.",
       "loadFailedTitle": "Nem sikerült betölteni a triggereket",
       "loadFailedDescription": "Próbálja újra, ha van kapcsolat.",
       "detailLoadFailedTitle": "Nem sikerült betölteni ezt a triggert",

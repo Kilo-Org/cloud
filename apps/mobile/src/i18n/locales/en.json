@@ -1476,8 +1476,9 @@
       "notConnectedReadOnly": "Bitbucket isn't connected. Ask an organization owner, admin, or billing manager to connect it."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "This organization's Bitbucket connection is managed on the web from a computer.",
-      "description": "Create a Workspace Access Token with the required scopes and paste it below.",
+      "managedOnWeb": "The Bitbucket connection for {{organization}} is managed on the web from a computer.",
+      "description": "Create a Workspace Access Token for {{organization}}, then paste it below.",
+      "descriptionReconnect": "Create a new Workspace Access Token for {{organization}}, then paste it below.",
       "scopes": "Account: read · Repositories: read/write · Pull requests: read · Webhooks: read/write",
       "tokenPlaceholder": "Workspace access token",
       "tokenRefused": "Bitbucket did not accept this workspace token. Check that it has the scopes above, then try again."
@@ -2251,6 +2252,8 @@
       "renameAccessibility": "Rename session: {{title}}",
       "cloningSession": "Cloning session",
       "couldNotLoadThisSession": "Couldn't load this session",
+      "historyTooLarge": "This session's transcript is too large to load.",
+      "historyUnavailable": "This session's transcript can't be read.",
       "cloneFailedRetry": "Couldn't clone this session. Try again.",
       "notEnoughCredits": "Not enough credits for this request. Add credits and try again.",
       "previousTaskFinishing": "The previous task is still finishing. Please wait a moment.",
@@ -2327,6 +2330,7 @@
       "branchDefault": "Default",
       "branchAccessibility": "Branch: {{label}}",
       "branchLoading": "Loading branches",
+      "branchInactive": "Choose a repository to load its branches",
       "branchLoadError": "Couldn't load branches",
       "branchUnavailable": "Branches aren't available for this repository. Check your access with the provider, then pick another repository.",
       "branchEmpty": "No branches available",
@@ -3130,8 +3134,7 @@
     "imagesSectionEmpty": "No trusted image hosts",
     "revoke": "Revoke {{host}}",
     "revokeMessage": "Links to this host will ask for confirmation again.",
-    "revokeImageMessage": "Images from this host will ask for confirmation again.",
-    "backToPreferences": "Back to preferences"
+    "revokeImageMessage": "Images from this host will ask for confirmation again."
   },
   "forceUpdate": {
     "couldNotOpenStore": "Could not open the app store.",
@@ -3142,7 +3145,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Couldn't load sessions",
-    "couldNotLoadActiveSessions": "Couldn't load active sessions",
     "agentSessions": "Live now",
     "newCodingTask": "New coding task",
     "newTaskFromPicture": "New task from a picture",
@@ -4676,7 +4678,7 @@
       "new": "New trigger",
       "create": "Create trigger",
       "emptyTitle": "No triggers yet",
-      "emptyDescription": "Create a trigger to start a Cloud Agent run from a webhook call or on a schedule.",
+      "emptyDescription": "Create your first trigger.",
       "loadFailedTitle": "Couldn't load triggers",
       "loadFailedDescription": "Try again when you have a connection.",
       "detailLoadFailedTitle": "Couldn't load this trigger",

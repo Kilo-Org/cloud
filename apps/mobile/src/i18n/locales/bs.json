@@ -1409,8 +1409,9 @@
       "notConnectedReadOnly": "Bitbucket nije povezan. Zamolite vlasnika organizacije, administratora ili menadžera za naplatu da ga poveže."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Bitbucket vezom ove organizacije upravlja se na webu s računara.",
-      "description": "Kreiraj token za pristup radnom prostoru s potrebnim dozvolama i zalijepi ga ispod.",
+      "managedOnWeb": "Bitbucket vezom s {{organization}} upravlja se na webu s računara.",
+      "description": "Kreiraj token za pristup radnom prostoru za {{organization}} i zalijepi ga ispod.",
+      "descriptionReconnect": "Kreiraj novi token za pristup radnom prostoru za {{organization}} i zalijepi ga ispod.",
       "scopes": "Račun: čitanje · Repozitoriji: čitanje/pisanje · Zahtjevi za spajanje: čitanje · Webhookovi: čitanje/pisanje",
       "tokenPlaceholder": "Token za pristup radnom prostoru",
       "tokenRefused": "Bitbucket nije prihvatio ovaj token za pristup radnom prostoru. Provjeri da ima gore navedene dozvole, pa pokušaj ponovo."
@@ -2205,6 +2206,8 @@
       "renameAccessibility": "Preimenuj sesiju: {{title}}",
       "cloningSession": "Kloniranje sesije",
       "couldNotLoadThisSession": "Nije moguće učitati ovu sesiju.",
+      "historyTooLarge": "Prijepis ove sesije je prevelik za učitavanje.",
+      "historyUnavailable": "Prijepis ove sesije se ne može pročitati.",
       "cloneFailedRetry": "Nije moguće klonirati ovu sesiju. Pokušaj ponovo.",
       "notEnoughCredits": "Nema dovoljno kredita za ovaj zahtjev. Dodaj kredite i pokušaj ponovo.",
       "previousTaskFinishing": "Prethodni zadatak se još završava. Sačekaj trenutak.",
@@ -2281,6 +2284,7 @@
       "branchDefault": "Zadano",
       "branchAccessibility": "Grana: {{label}}",
       "branchLoading": "Učitavanje grana",
+      "branchInactive": "Odaberi repozitorij da bi se učitale njegove grane.",
       "branchLoadError": "Učitavanje grana nije uspjelo",
       "branchUnavailable": "Grane nisu dostupne za ovaj repozitorij. Provjeri svoj pristup kod pružatelja usluga, pa odaberi drugi repozitorij.",
       "branchEmpty": "Nema dostupnih grana",
@@ -3095,7 +3099,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nije moguće učitati sesije.",
-    "couldNotLoadActiveSessions": "Nije moguće učitati aktivne sesije.",
     "agentSessions": "Trenutno aktivno",
     "newCodingTask": "Novi zadatak programiranja",
     "newTaskFromPicture": "Novi zadatak sa slike",
@@ -3746,8 +3749,7 @@
     "imagesSectionEmpty": "Nema pouzdanih hostova za slike",
     "revoke": "Povuci povjerenje za {{host}}",
     "revokeMessage": "Linkovi na ovaj host će ponovo tražiti potvrdu.",
-    "revokeImageMessage": "Slike s ovog hosta će ponovo tražiti potvrdu.",
-    "backToPreferences": "Nazad na postavke"
+    "revokeImageMessage": "Slike s ovog hosta će ponovo tražiti potvrdu."
   },
   "glanceable": {
     "waiting": "Ažuriranje agenata",
@@ -4751,7 +4753,7 @@
       "new": "Novi okidač",
       "create": "Kreiraj okidač",
       "emptyTitle": "Još nema okidača",
-      "emptyDescription": "Kreirajte okidač za pokretanje Cloud Agent-a putem webhook poziva ili prema rasporedu.",
+      "emptyDescription": "Kreirajte svoj prvi okidač.",
       "loadFailedTitle": "Nije moguće učitati okidače",
       "loadFailedDescription": "Pokušajte ponovo kada imate vezu.",
       "detailLoadFailedTitle": "Nije moguće učitati ovaj okidač",

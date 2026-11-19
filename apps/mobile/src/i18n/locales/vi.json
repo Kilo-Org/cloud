@@ -695,8 +695,9 @@
       "notConnectedReadOnly": "Bitbucket chưa được kết nối. Hãy yêu cầu Chủ sở hữu, Quản trị viên hoặc Người quản lý thanh toán của tổ chức kết nối."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Kết nối Bitbucket của tổ chức này được quản lý trên web từ máy tính.",
-      "description": "Tạo mã truy cập không gian làm việc với các quyền cần thiết rồi dán vào bên dưới.",
+      "managedOnWeb": "Kết nối Bitbucket của {{organization}} được quản lý trên web từ máy tính.",
+      "description": "Tạo mã truy cập không gian làm việc cho {{organization}} rồi dán vào bên dưới.",
+      "descriptionReconnect": "Tạo mã truy cập không gian làm việc mới cho {{organization}} rồi dán vào bên dưới.",
       "scopes": "Tài khoản: đọc · Kho lưu trữ: đọc/ghi · Yêu cầu hợp nhất: đọc · Webhook: đọc/ghi",
       "tokenPlaceholder": "Mã truy cập không gian làm việc",
       "tokenRefused": "Bitbucket không chấp nhận mã truy cập không gian làm việc này. Hãy kiểm tra rằng mã có các quyền ở trên, rồi thử lại."
@@ -1605,6 +1606,8 @@
       "renameAccessibility": "Đổi tên phiên: {{title}}",
       "cloningSession": "Đang sao chép phiên",
       "couldNotLoadThisSession": "Không thể tải phiên này.",
+      "historyTooLarge": "Kết xuất của phiên này quá lớn để tải.",
+      "historyUnavailable": "Không thể đọc kết xuất của phiên này.",
       "cloneFailedRetry": "Không thể sao chép phiên này. Hãy thử lại.",
       "notEnoughCredits": "Số dư không đủ cho yêu cầu này. Hãy nạp tiền và thử lại.",
       "previousTaskFinishing": "Tác vụ trước chưa hoàn tất. Vui lòng chờ một chút.",
@@ -1681,6 +1684,7 @@
       "branchDefault": "Mặc định",
       "branchAccessibility": "Nhánh: {{label}}",
       "branchLoading": "Đang tải các nhánh",
+      "branchInactive": "Chọn một kho mã để tải các nhánh của kho đó.",
       "branchLoadError": "Không tải được các nhánh",
       "branchUnavailable": "Không có nhánh khả dụng cho kho mã nguồn này. Kiểm tra quyền truy cập của bạn với nhà cung cấp, rồi chọn kho mã nguồn khác.",
       "branchEmpty": "Không có nhánh khả dụng",
@@ -2483,7 +2487,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Không thể tải danh sách phiên.",
-    "couldNotLoadActiveSessions": "Không thể tải các phiên đang hoạt động.",
     "agentSessions": "Đang hoạt động",
     "newCodingTask": "Tác vụ lập trình mới",
     "newTaskFromPicture": "Tác vụ mới từ hình ảnh",
@@ -3686,8 +3689,7 @@
     "imagesSectionEmpty": "Chưa có máy chủ hình ảnh được tin cậy",
     "revoke": "Bỏ tin cậy {{host}}",
     "revokeMessage": "Liên kết đến máy chủ này sẽ hỏi xác nhận lại.",
-    "revokeImageMessage": "Hình ảnh từ máy chủ này sẽ hỏi xác nhận lại.",
-    "backToPreferences": "Quay lại cài đặt"
+    "revokeImageMessage": "Hình ảnh từ máy chủ này sẽ hỏi xác nhận lại."
   },
   "glanceable": {
     "waiting": "Đang cập nhật tác nhân",
@@ -4676,7 +4678,7 @@
       "new": "Trình kích hoạt mới",
       "create": "Tạo trình kích hoạt",
       "emptyTitle": "Chưa có trình kích hoạt nào",
-      "emptyDescription": "Tạo trình kích hoạt để bắt đầu một lần chạy Cloud Agent từ lệnh gọi webhook hoặc theo lịch.",
+      "emptyDescription": "Tạo trình kích hoạt đầu tiên của bạn.",
       "loadFailedTitle": "Không thể tải trình kích hoạt",
       "loadFailedDescription": "Hãy thử lại khi bạn có kết nối.",
       "detailLoadFailedTitle": "Không thể tải trình kích hoạt này",

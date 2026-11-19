@@ -88,7 +88,6 @@ import {
   getDirectByokModel,
   supportsCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
-import type * as directByokModule from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import {
   logUnrewrittenResponse,
   rewriteModelResponse,
@@ -233,18 +232,11 @@ jest.mock('@kilocode/web-shared/lib/organizations/non-trial-enterprise', () => (
   isNonTrialEnterpriseOrganization: jest.fn(async () => false),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/get-provider');
-jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => {
-  const actual = jest.requireActual<typeof directByokModule>(
-    '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'
-  );
-  return {
-    getDirectByokModel: jest.fn(async () => ({ provider: null, model: null })),
-    supportsCatalogMode: jest.fn(() => false),
-    createDirectByokReferenceResolver: jest.fn(async () => async (modelId: string) => modelId),
-    findDirectByokProvider: actual.findDirectByokProvider,
-    getDirectByokPolicyProviderId: actual.getDirectByokPolicyProviderId,
-  };
-});
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
+  getDirectByokModel: jest.fn(async () => ({ provider: null, model: null })),
+  supportsCatalogMode: jest.fn(() => false),
+  createDirectByokReferenceResolver: jest.fn(async () => async (modelId: string) => modelId),
+}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/upstream-request');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
@@ -2205,10 +2197,14 @@ describe('POST /api/v1/chat/completions request handling', () => {
       | 'an OpenRouter key'
       | 'a Vercel AI Gateway key'
       | 'no BYOK key';
-    const byokRoutes: Record<ByokRoute, Pick<ProviderRoute, 'provider' | 'userByok'>> = {
+    const byokRoutes: Record<
+      ByokRoute,
+      Pick<ProviderRoute, 'provider' | 'userByok' | 'directByokPolicyProviderId'>
+    > = {
       'a catalog-mode direct BYOK key': {
         provider: { ...provider, type: 'direct-byok' },
         userByok: [{ decryptedAPIKey: 'key', providerId: 'zai-coding' }],
+        directByokPolicyProviderId: 'z-ai',
       },
       'a Vercel BYOK inference provider key': {
         provider: { ...provider, type: 'vercel' },
@@ -3805,6 +3801,7 @@ describe('kilo-auto/efficient classifier billing', () => {
         userByok: [{ decryptedAPIKey: 'key', providerId: 'synthetic' }],
         isFree: false,
         bypassAccessCheck: false,
+        directByokPolicyProviderId: 'synthetic',
       })
     );
 
@@ -8102,12 +8099,17 @@ describe('BYOK failover', () => {
     return { ...provider, apiKey, transformRequest: jest.fn(async () => {}), ...overrides };
   }
 
-  function byokRoute(providerId: UserByokProviderId, routeProvider: Provider): ProviderRoute {
+  function byokRoute(
+    providerId: UserByokProviderId,
+    routeProvider: Provider,
+    directByokPolicyProviderId?: string
+  ): ProviderRoute {
     return {
       provider: routeProvider,
       userByok: [{ decryptedAPIKey: routeProvider.apiKey, providerId }],
       isFree: false,
       bypassAccessCheck: false,
+      ...(directByokPolicyProviderId && { directByokPolicyProviderId }),
     };
   }
 
@@ -8168,7 +8170,7 @@ describe('BYOK failover', () => {
         }),
       });
       const failoverProvider = byokProvider('failover-byok-key', { type: 'direct-byok' });
-      const failoverRoute = byokRoute('zai-coding', failoverProvider);
+      const failoverRoute = byokRoute('zai-coding', failoverProvider, 'z-ai');
       const { result, failovers } = withFailover(
         byokRoute('openai', primaryProvider),
         failoverRoute

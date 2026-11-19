@@ -110,6 +110,9 @@ export type ProviderRoute = {
    *  outside Kilo credits pays for the request, such as the ChatGPT
    *  subscription, while abuse and organization policy checks still apply. */
   skipBalanceCheck?: boolean;
+  /** The provider the organization policy checks when a direct BYOK key serves the request (see
+   *  `getDirectByokPolicyProviderId`). */
+  directByokPolicyProviderId?: string;
 };
 
 /** Resolves a route. A BYOK key is decrypted only when its route is resolved. */
@@ -187,6 +190,7 @@ async function directByokRoute(
     // Organization model and provider policies cover catalog ids. A bespoke id is only served by a
     // key outside catalog mode, which stays exempt as before.
     bypassAccessCheck: !servesCatalogId,
+    directByokPolicyProviderId: getDirectByokPolicyProviderId(directByok),
   };
 }
 

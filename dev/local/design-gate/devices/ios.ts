@@ -70,7 +70,7 @@ export function createIosDevice(options: {
   let initialContentSize: string | undefined;
   let contentSize: string | undefined;
   const setContentSize = (value: string) => {
-    if (contentSize === value) return;
+    if (contentSize === value || value === 'unsupported') return;
     simctl('ui', simulator.udid, 'content_size', value);
     contentSize = value;
   };
@@ -83,15 +83,36 @@ export function createIosDevice(options: {
       setAppearance(config.dark ? 'dark' : 'light');
       if (config.fontMax) {
         initialContentSize ??= simctl('ui', simulator.udid, 'content_size');
+        if (initialContentSize === 'unsupported') {
+          throw new InfraError(
+            `simctl ui ${simulator.udid} content_size is unsupported; the font-max cell cannot run`
+          );
+        }
         contentSize ??= initialContentSize;
         setContentSize(IOS_MAX_CONTENT_SIZE);
       } else if (initialContentSize !== undefined) {
         setContentSize(initialContentSize);
       }
     },
+    // Each step restores on its own, so a failed appearance restore still puts
+    // Dynamic Type back.
     restore: () => {
-      setAppearance(initialAppearance);
-      if (initialContentSize !== undefined) setContentSize(initialContentSize);
+      const errors: unknown[] = [];
+      for (const step of [
+        () => setAppearance(initialAppearance),
+        () => {
+          if (initialContentSize !== undefined) setContentSize(initialContentSize);
+        },
+      ]) {
+        try {
+          step();
+        } catch (error) {
+          errors.push(error);
+        }
+      }
+      if (errors.length > 0) {
+        throw new AggregateError(errors, `iOS restore failed on ${simulator.udid}`);
+      }
     },
     screenshot: file => {
       fs.mkdirSync(path.dirname(file), { recursive: true });

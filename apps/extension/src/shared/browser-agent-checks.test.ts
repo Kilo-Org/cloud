@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the checks cover origins, tokens, masks, downloads and field classification in one table-driven suite. */
 import { describe, expect, it } from 'vitest';
 import {
   applyAgentSnapshotLine,
@@ -192,6 +193,20 @@ describe('step tokens', () => {
     const token = store.issue({ ...binding, reason: SENSITIVE_REASON.password });
 
     expect(store.consume(token, { ...binding, tabId: 8 })).toBe(false);
+  });
+
+  it('keeps the file an approval is for, for the whole life of the token', () => {
+    let clock = 1000;
+    const store = createStepTokenStore({ now: () => clock, random: () => 'token-need' });
+    const need = { tabId: 7, url: 'https://example.com/invoice.pdf' };
+    const token = store.issue({ ...binding, need, reason: SENSITIVE_REASON.download });
+
+    // A human takes half a minute: no download record survives that long, and the token still names the file.
+    clock += 30_000;
+
+    expect(store.take(token, binding)).toStrictEqual({ need, ok: true });
+    // The token is spent whether or not the next call matches: a replay cannot probe for a valid binding.
+    expect(store.take(token, binding)).toStrictEqual({ ok: false });
   });
 
   it('expires after 60 s', () => {

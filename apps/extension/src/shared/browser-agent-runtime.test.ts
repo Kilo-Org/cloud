@@ -827,6 +827,267 @@ describe('agent browser calls', () => {
     expect([downloads.cancelled, downloads.removed]).toStrictEqual([[41, 43], []]);
   });
 
+  it('never touches a download on another tab while an approved call runs', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    const otherTab = TAB_ID + 1;
+    let commands = 0;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        const click = Math.floor(commands / 2);
+
+        commands += 1;
+
+        if (commands % 2 === 0 && click === 0) {
+          downloads.emit({ id: 41, tabId: TAB_ID, url: `${MAIN_ORIGIN}/invoice.pdf` });
+        } else if (commands % 2 === 0) {
+          downloads.emit({ id: 42, tabId: TAB_ID, url: `${MAIN_ORIGIN}/invoice.pdf` });
+          // The user's own download, in another tab: no approval of this session covers it.
+          downloads.emit({ id: 90, tabId: otherTab, url: `${MAIN_ORIGIN}/user.pdf` });
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    const refused = await click([]);
+
+    expect(refused.kind).toBe('needs_permission');
+
+    const approved = await click([expectStepToken(refused)]);
+
+    // The approved call keeps its file and answers with its own result: the other tab's download is not reported.
+    expect(approved.kind).toBe('result');
+    expect([downloads.cancelled, downloads.removed]).toStrictEqual([[41], []]);
+  });
+
+  it('keeps the approved file when the human approves thirty seconds later', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    let commands = 0;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        const click = Math.floor(commands / 2);
+
+        commands += 1;
+
+        if (commands % 2 === 0) {
+          downloads.emit({
+            id: click === 0 ? 41 : 42,
+            tabId: TAB_ID,
+            url: `${MAIN_ORIGIN}/invoice.pdf`,
+          });
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    vi.useFakeTimers();
+
+    try {
+      const refused = await runTimed(click([]));
+
+      if (refused.kind !== 'needs_permission') {
+        throw new Error(`expected a refusal, got ${JSON.stringify(refused)}`);
+      }
+
+      // A human takes their time, and the model keeps working meanwhile: the next call prunes the reported record,
+      // So only the token can still name the file.
+      await vi.advanceTimersByTimeAsync(20_000);
+      await runTimed(
+        runtime.runTool({
+          agent: { authorized: [readGrant, actGrant] },
+          arguments: {},
+          caller: agent(),
+          tabId: TAB_ID,
+          toolName: 'browser_take_screenshot',
+        }),
+        0
+      );
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      const approved = await runTimed(click([expectStepToken(refused)]), 300);
+
+      expect(approved.kind).toBe('result');
+      expect(downloads.cancelled).toStrictEqual([41]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops and reports a download the approved call starts after it returned', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    let commands = 0;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        const click = Math.floor(commands / 2);
+
+        commands += 1;
+
+        // The same file both times: the refused click starts it, and the approved repeat starts it again.
+        if (commands % 2 === 0) {
+          downloads.emit({
+            id: click === 0 ? 41 : 42,
+            tabId: TAB_ID,
+            url: `${MAIN_ORIGIN}/invoice.pdf`,
+          });
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    const refused = await click([]);
+
+    expect(refused.kind).toBe('needs_permission');
+
+    const approved = await click([expectStepToken(refused)]);
+
+    expect(approved.kind).toBe('result');
+
+    // The page starts a second download after the call answered: the approved call's own linger still owns the tab,
+    // And the file it must not keep is stopped rather than left where the user finds it later.
+    downloads.emit({ id: 44, tabId: TAB_ID, url: `${MAIN_ORIGIN}/late.pdf` });
+
+    const next = await click([]);
+
+    expect(next.kind).toBe('needs_permission');
+    expect(downloads.cancelled).toStrictEqual([41, 44]);
+  });
+
+  it('completes an approved browser_tabs new that is refused again for a second download', async () => {
+    const downloads = createFakeDownloads();
+    const created: Record<string, unknown>[] = [];
+    const openedListeners: ((tab: {
+      readonly id?: number;
+      readonly openerTabId?: number;
+    }) => void)[] = [];
+    const newTab = TAB_ID + 6;
+    let navigations = 0;
+    downloads.searched.push({ filename: '/home/me/Downloads/report.txt', id: 72 });
+
+    const tabsApi = {
+      create: async (properties: { readonly url?: string } = {}) => {
+        created.push({ ...properties });
+
+        for (const listener of openedListeners) {
+          listener({ id: newTab, openerTabId: TAB_ID });
+        }
+
+        return { id: newTab, title: '', url: properties.url ?? 'about:blank', windowId: 1 };
+      },
+      get: async (tabId: number) =>
+        tabId === newTab
+          ? { id: newTab, title: '', url: `${MAIN_ORIGIN}/report.txt`, windowId: 1 }
+          : { id: TAB_ID, title: 'Example', url: MAIN_ORIGIN, windowId: 1 },
+      onCreated: {
+        addListener: (
+          listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+        ) => {
+          openedListeners.push(listener);
+        },
+        removeListener: (
+          listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+        ) => {
+          const index = openedListeners.indexOf(listener);
+
+          if (index !== -1) {
+            openedListeners.splice(index, 1);
+          }
+        },
+      },
+      query: async () => [
+        { active: true, id: TAB_ID, title: 'Example', url: MAIN_ORIGIN, windowId: 1 },
+      ],
+    };
+    const { controller } = createGroups();
+    const { cdp, runtime } = await createHarness({
+      downloadsApi: downloads.api,
+      tabGroups: controller,
+      tabsApi,
+    });
+
+    cdp.setHandlers({
+      'Page.navigate': () => {
+        navigations += 1;
+
+        // The guarded step starts the file; the approved repeat starts it again and the page adds a second one.
+        if (navigations === 1) {
+          downloads.emit({ id: 71, tabId: newTab, url: `${MAIN_ORIGIN}/report.txt` });
+        } else if (navigations === 2) {
+          downloads.emit({ id: 72, tabId: newTab, url: `${MAIN_ORIGIN}/report.txt` });
+          downloads.emit({ id: 73, tabId: newTab, url: `${MAIN_ORIGIN}/extra.txt` });
+        }
+
+        return { errorText: 'net::ERR_ABORTED' };
+      },
+    });
+
+    const url = `${MAIN_ORIGIN}/report.txt`;
+    const openTab = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: {
+          authorized: [readGrant, actGrant, { class: 'navigate', origin: MAIN_ORIGIN }],
+          sensitive: [...sensitive],
+        },
+        arguments: { action: 'new', url },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_tabs',
+      });
+
+    const guarded = await openTab([]);
+
+    if (guarded.kind !== 'needs_permission') {
+      throw new Error(`expected a refusal, got ${JSON.stringify(guarded)}`);
+    }
+
+    const refusedAgain = await openTab([expectStepToken(guarded)]);
+
+    // The second download is guarded, and the new token names the tab the repeat is driving.
+    if (refusedAgain.kind !== 'needs_permission') {
+      throw new Error(`expected a second refusal, got ${JSON.stringify(refusedAgain)}`);
+    }
+
+    const approved = await openTab([expectStepToken(refusedAgain)]);
+
+    // The approval completes on the tab it already opened: no vanished step tab, and no second tab.
+    expect(approved.kind).toBe('result');
+    expect([created.length, downloads.cancelled]).toStrictEqual([1, [71, 73]]);
+  });
+
   it('refuses a download-capable call when the optional permission is missing', async () => {
     // No downloads API: the guard cannot see a blob download, so the click must not run.
     const { cdp, runtime } = await createHarness({ downloadsGranted: false });

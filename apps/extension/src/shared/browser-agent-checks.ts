@@ -411,8 +411,22 @@ export interface StepTokenBinding {
   readonly toolName: string;
 }
 
+/** The one download a step's approval buys: the tab it was on and the url of the file it started. */
+export interface StepTokenNeed {
+  readonly tabId: number;
+  readonly url: string;
+}
+
 export interface StepTokenIssue extends StepTokenBinding {
+  /** The download this approval is for, when the step was refused for one: the call keeps that file alone. */
+  readonly need?: StepTokenNeed | undefined;
   readonly reason: string;
+}
+
+/** What consuming a token answered: whether it named the call, and the file its approval buys. */
+export interface StepTokenTake {
+  readonly need?: StepTokenNeed | undefined;
+  readonly ok: boolean;
 }
 
 export interface StepTokenStore {
@@ -420,6 +434,11 @@ export interface StepTokenStore {
   readonly issue: (input: StepTokenIssue) => string;
   /** Consumes a token: true only when it names the same call and has not expired. */
   readonly consume: (token: string, binding: StepTokenBinding) => boolean;
+  /**
+   * Consumes a token and answers what it carried. The need lives exactly as long as the token — a human may take
+   * Minutes to approve — so it is never tied to a download record the browser's own pruning removes.
+   */
+  readonly take: (token: string, binding: StepTokenBinding) => StepTokenTake;
   readonly size: () => number;
 }
 
@@ -515,7 +534,11 @@ export const createStepTokenStore = ({
 } = {}): StepTokenStore => {
   const tokens = new Map<
     string,
-    StepTokenBinding & { readonly expiresAt: number; readonly reason: string }
+    StepTokenBinding & {
+      readonly expiresAt: number;
+      readonly need?: StepTokenNeed | undefined;
+      readonly reason: string;
+    }
   >();
 
   const prune = (): void => {
@@ -528,21 +551,27 @@ export const createStepTokenStore = ({
     }
   };
 
+  const take: StepTokenStore['take'] = (token, binding) => {
+    prune();
+
+    const stored = tokens.get(token);
+
+    if (stored === undefined) {
+      return { ok: false };
+    }
+
+    // A token is single use: even a mismatch burns it, so a replay cannot probe for a valid binding.
+    tokens.delete(token);
+
+    if (!stepTokenBindingMatches(stored, binding)) {
+      return { ok: false };
+    }
+
+    return stored.need === undefined ? { ok: true } : { need: stored.need, ok: true };
+  };
+
   return {
-    consume: (token, binding) => {
-      prune();
-
-      const stored = tokens.get(token);
-
-      if (stored === undefined) {
-        return false;
-      }
-
-      // A token is single use: even a mismatch burns it, so a replay cannot probe for a valid binding.
-      tokens.delete(token);
-
-      return stepTokenBindingMatches(stored, binding);
-    },
+    consume: (token, binding) => take(token, binding).ok,
     issue: input => {
       prune();
 
@@ -557,6 +586,7 @@ export const createStepTokenStore = ({
         session: input.session,
         tabId: input.tabId,
         toolName: input.toolName,
+        ...(input.need === undefined ? {} : { need: input.need }),
       });
 
       return token;
@@ -566,6 +596,7 @@ export const createStepTokenStore = ({
 
       return tokens.size;
     },
+    take,
   };
 };
 

@@ -23,7 +23,7 @@ on:
     secrets:
       VERCEL_PROJECT_TOKEN:
         description: 'Vercel token scoped to the project being deployed'
-        required: true
+        required: false
 
 permissions:
   contents: read
@@ -103,11 +103,19 @@ jobs:
       # for deployments that include thousands of files.
       - name: Stage Vercel deployment
         id: deploy
+        env:
+          # The token the caller passes, or the VERCEL_PROJECT_TOKEN secret of
+          # the environment this job declares when the caller omits it.
+          VERCEL_TOKEN_TO_USE: ${{ secrets.VERCEL_PROJECT_TOKEN }}
         run: |
+          if [ -z "$VERCEL_TOKEN_TO_USE" ]; then
+            echo "::error::No Vercel project token reached the staging step: pass it from the caller, or keep a VERCEL_PROJECT_TOKEN secret in the $TARGET_ENVIRONMENT environment"
+            exit 1
+          fi
           if [ "$TARGET_ENVIRONMENT" = "production" ]; then
-            deployment_output=$(vercel deploy --prod --skip-domain --archive=tgz --token=${{ secrets.VERCEL_PROJECT_TOKEN }})
+            deployment_output=$(vercel deploy --prod --skip-domain --archive=tgz --token="$VERCEL_TOKEN_TO_USE")
           else
-            deployment_output=$(vercel deploy --target="$TARGET_ENVIRONMENT" --archive=tgz --token=${{ secrets.VERCEL_PROJECT_TOKEN }})
+            deployment_output=$(vercel deploy --target="$TARGET_ENVIRONMENT" --archive=tgz --token="$VERCEL_TOKEN_TO_USE")
           fi
 
           deployment_url=$(printf '%s\n' "$deployment_output" | tail -n 1)

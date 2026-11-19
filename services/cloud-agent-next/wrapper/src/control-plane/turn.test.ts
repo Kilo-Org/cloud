@@ -4523,8 +4523,8 @@ describe('turn route identity', () => {
       kiloEvent('question.asked', { sessionID: 'ses_replaced', id: 'q1', questions: [] })
     );
     await settle();
-    // No longer a code-review route, so its question reaches the person instead
-    // of being rejected by the previous route's policy.
+    // Each route applies its own policy to the session it serves, so this question
+    // reaches the person.
     expect(h.client(first).questionRejections).toHaveLength(0);
     expect(eventFrames(h.frames).filter(event => event.type === 'question.asked')).toHaveLength(1);
   });
@@ -4567,7 +4567,7 @@ describe('turn route identity', () => {
     ]);
     release.resolve();
     await settle();
-    // Nothing more was dispatched into the previous native session.
+    // The turn's prompts stay with the registration they were accepted on.
     expect(h.client(first).prompts.map(call => call.messageId)).toEqual(['m1']);
   });
 });

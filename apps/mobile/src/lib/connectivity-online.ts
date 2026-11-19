@@ -8,7 +8,9 @@ export type ConnectivityStatus = 'online' | 'offline' | 'unknown';
  * Three-way connectivity classification. NetInfo reports `null` for both
  * fields while it boots, so a `null` reachability must not be read as online
  * (the old `isOnline` defaulted to `true` and rendered an unknown boot as
- * live data). Only a definite reachability answer is authoritative.
+ * live data). Only a definite reachability answer is authoritative; a null
+ * one falls back to the definite connection state: offline when the device
+ * is surely disconnected, otherwise unknown.
  */
 export function connectivityStatus(state: ConnectivityState): ConnectivityStatus {
   const { isConnected, isInternetReachable } = state;

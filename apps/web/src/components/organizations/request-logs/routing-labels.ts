@@ -38,6 +38,7 @@ const BYOK_SKIP_REASON_LABELS: Record<string, string> = {
   'model-unavailable': 'Model not offered through this gateway',
   'provider-settings': 'Excluded by provider settings',
   'ignored-by-request': 'Provider ignored by the request',
+  'unusable-credential': 'Credential unusable',
 };
 
 const PRIVATE_PROVIDER_SKIP_REASON_LABELS: Record<string, string> = {

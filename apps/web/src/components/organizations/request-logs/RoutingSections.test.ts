@@ -256,6 +256,24 @@ describe('RoutingSections private providers', () => {
     expect(candidateRows(document)[0]).toContain('Private provider disabled');
   });
 
+  it('labels a candidate skipped for an unusable credential', () => {
+    const document = render(
+      privateProviderRouting({
+        byok_candidates: [
+          {
+            route: 'direct-byok',
+            provider_id: privateProviderId,
+            route_order: 0,
+            outcome: 'skipped',
+            reason: 'unusable-credential',
+          },
+        ],
+      })
+    );
+
+    expect(candidateRows(document)[0]).toContain('Credential unusable');
+  });
+
   it('names a private provider that failed over to the next key', () => {
     const document = render(
       privateProviderRouting({}, [

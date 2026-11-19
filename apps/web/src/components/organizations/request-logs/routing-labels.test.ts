@@ -210,6 +210,11 @@ describe('private provider steps', () => {
     );
   });
 
+  test('labels an unusable credential for a key and a private provider alike', () => {
+    expect(byokSkipReasonLabel('unusable-credential', 'synthetic')).toBe('Credential unusable');
+    expect(byokSkipReasonLabel('unusable-credential', privateProvider)).toBe('Credential unusable');
+  });
+
   test.each([
     ['byok-private-provider-unavailable', 'Rejected: the private provider is unavailable'],
     [

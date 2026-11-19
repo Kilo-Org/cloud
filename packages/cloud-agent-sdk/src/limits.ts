@@ -20,3 +20,13 @@ export const PREPARATION_OUTPUT_MAX_LENGTH = 65_536;
  * which keeps the last 65,536 UTF-8 bytes of a running setup command.
  */
 export const PREPARATION_OUTPUT_TAIL_MAX_BYTES = 65_536;
+
+/**
+ * Retained live-transport work a native session keeps while it awaits parsing and replay, in
+ * UTF-16 bytes. Model discovery shares the same ceiling so one catalog read cannot exceed the
+ * work one live session would retain.
+ */
+export const NATIVE_SYNC_RETAINED_WORK_BYTES = 4 * 1024 * 1024;
+
+/** Retained live frames a native session keeps; model discovery shares the same frame budget. */
+export const NATIVE_SYNC_RETAINED_WORK_FRAMES = 1024;

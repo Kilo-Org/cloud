@@ -10,6 +10,7 @@ import { type ShareDestinationRow } from './share-destinations';
 import { type ShareGateState } from './share-gate-state';
 
 vi.mock('react-native', () => ({
+  Pressable: 'Pressable',
   View: 'View',
   TextInput: 'TextInput',
   // `@/components/ui/input` reads `I18nManager.isRTL` through

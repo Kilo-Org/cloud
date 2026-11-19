@@ -21,7 +21,10 @@ const statusTransitionIdSchema = z.string().regex(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$
  * has no session-ingest client, so this is also how its transcript activity and native renames
  * reach the row: `lastActivityAt` only moves forward, and `rename` is present only while a
  * native rename is undelivered. A rename rides every publication from the first one that
- * carried it, named by `rename.transitionId`, until one is delivered.
+ * carried it, named by `rename.transitionId`, until one is delivered. Ingest applies it only
+ * while the stored status transition is older than `rename.transitionId`, so a late publication
+ * and a repeat after delivery cannot replace a newer title. A first delivery that has not landed
+ * still can, because a user rename carries no ordering signal.
  */
 export const publishCloudAgentSessionStatusSchema = z
   .object({
@@ -836,12 +839,9 @@ export const persistedSnapshotFileDiffsSchema = z
  * are stripped (not rejected) so a newer Kilo field cannot fail the read, and
  * an unknown status degrades to "no status" instead of an invalid file.
  */
-export const sessionDiffFileSchema = z.object({
-  file: z.string(),
+export const sessionDiffFileSchema = sdkSnapshotFileDiffBaseSchema.extend({
   patch: z.string(),
-  additions: z.number(),
-  deletions: z.number(),
-  status: z.enum(['added', 'deleted', 'modified']).optional().catch(undefined),
+  status: sdkSnapshotFileDiffBaseSchema.shape.status.catch(undefined),
 });
 export type SessionDiffFile = z.infer<typeof sessionDiffFileSchema>;
 

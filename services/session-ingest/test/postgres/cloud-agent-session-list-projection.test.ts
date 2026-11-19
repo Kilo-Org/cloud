@@ -102,6 +102,14 @@ async function storedRow() {
   };
 }
 
+/** Postgres row version and `updated_at`, to see whether a publication wrote the row at all. */
+async function rowVersion() {
+  const { rows } = await client.db.execute<{ updated_at: string; xmin: string }>(
+    sql`SELECT updated_at::text AS updated_at, xmin::text AS xmin FROM pg_temp.cli_sessions_v2`
+  );
+  return { updated_at: rows[0]?.updated_at, xmin: rows[0]?.xmin };
+}
+
 describe('Cloud Agent list projection from the Session DO', () => {
   it('records transcript activity and never moves it back', async () => {
     await publish({ lastActivityAt: '2026-01-01T00:05:00.000Z' });
@@ -115,6 +123,17 @@ describe('Cloud Agent list projection from the Session DO', () => {
       status: 'idle',
       last_activity_at: '2026-01-01T00:05:00.000Z',
     });
+  });
+
+  it('writes nothing when a report repeats an activity the row already holds', async () => {
+    const lastActivityAt = '2026-01-01T00:05:00.000Z';
+    await publish({ lastActivityAt });
+    const before = await rowVersion();
+    // The same snapshot retried: the status transition is already stored, so the activity write
+    // is the only one that could touch the row.
+    await publish({ lastActivityAt });
+    expect(await rowVersion()).toEqual(before);
+    expect((await storedRow()).last_activity_at).toBe(lastActivityAt);
   });
 
   it('clamps a future-dated activity report to the database clock', async () => {
@@ -153,9 +172,22 @@ describe('Cloud Agent list projection from the Session DO', () => {
     expect(await storedRow()).toMatchObject({ status: 'idle', title: 'Newer rename' });
   });
 
+  it('applies a native rename on a publication newer than the stored status', async () => {
+    await publish({ transitionId: firstTransitionId });
+    expect((await storedRow()).title).toBe('Generated from the first prompt');
+    await publish({
+      status: 'idle',
+      occurredAt: '2026-01-01T00:06:00.000Z',
+      transitionId: laterTransitionId,
+      rename: { title: 'Renamed by the agent', transitionId: laterTransitionId },
+    });
+    expect(await storedRow()).toMatchObject({ status: 'idle', title: 'Renamed by the agent' });
+  });
+
   it('keeps a user rename when a newer publication repeats an applied native rename', async () => {
     const rename = { title: 'Renamed by the agent', transitionId: firstTransitionId };
     await publish({ rename });
+    expect((await storedRow()).title).toBe('Renamed by the agent');
     await client.db.update(cli_sessions_v2).set({ title: 'Renamed by the user' });
     await publish({
       status: 'idle',

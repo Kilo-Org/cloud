@@ -1,6 +1,4 @@
-import { type Href, useRouter } from 'expo-router';
 import { LineChart, Shield } from '@/components/ui/icons';
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,10 +6,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ConsentRequiredRows } from '@/components/consent/consent-required-rows';
 import { type ConsentMode, getConsentActions } from '@/components/consent/consent-mode';
 import { ConsentPolicySentence } from '@/components/consent/consent-policy-sentence';
+import {
+  type ConsentLoadStatus,
+  ConsentLoadStatusLine,
+} from '@/components/consent/consent-load-status';
+import { useConsentCardState } from '@/components/consent/use-consent-card-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { useConfirmDialog } from '@/components/ui/dialog';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowChevron } from '@/components/ui/row-chevron';
 import { RowGroup } from '@/components/ui/row-group';
@@ -19,11 +21,7 @@ import { ScreenFooter } from '@/components/ui/screen-footer';
 import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
-import { useAuth } from '@/lib/auth/auth-context';
-import { acceptConsent, readConsent, revokeConsent, setOptionalConsent } from '@/lib/consent';
-import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSideInsetStyle } from '@/lib/screen-insets';
@@ -36,7 +34,7 @@ type ConsentCardProps = {
 /**
  * Maximum font scale honoured by the pinned privacy disclosure.
  *
- * The disclosure sits in the card's pinned footer with the reserved error
+ * The disclosure sits in the card's pinned footer with the reserved status
  * line and two `size="lg"` buttons. Uncapped, the `text-sm` sentence grows
  * with Dynamic Type to several lines at the largest system text size, and
  * that height comes out of the sheet, not the scroll region: the footer has
@@ -55,178 +53,59 @@ type ConsentCardProps = {
  */
 export const CONSENT_DISCLOSURE_MAX_FONT_SCALE = 1.4;
 
+/**
+ * Whether the optional switch holds the same-size placeholder.
+ *
+ * The placeholder covers every render with a resolved account and no stored
+ * answer: `loading` is the read in flight, and `idle` is the render between
+ * the account arriving and the load effect committing `loading` — one the
+ * test renderer cannot observe, because its `act` flushes effects. Only
+ * `ready` and `failed` have observed the stored record (or its refusal), so
+ * only they may paint a choice. No account means nothing to load: the switch
+ * renders as before and its toggle path reports the account error.
+ */
+export function optionalIsPending(hasAccount: boolean, load: ConsentLoadStatus): boolean {
+  if (!hasAccount) {
+    return false;
+  }
+  return load.status === 'loading' || load.status === 'idle';
+}
+
+/**
+ * The data-sharing consent surface ("Before we get started" onboarding, and the
+ * review screen an updated disclosure reopens). `useConsentCardState` owns the
+ * behaviour; this component renders it.
+ */
 export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
-  const router = useRouter();
   const colors = useThemeColors();
   const { top } = useSafeAreaInsets();
   const sideInsetStyle = useSideInsetStyle();
-  const { signOut, token } = useAuth();
-  const { userId } = useCurrentUserId({ enabled: token != null });
   const { t } = useTranslation();
-  const { confirm, dialog } = useConfirmDialog();
   const actions = getConsentActions(mode);
+  const {
+    userId,
+    pendingAction,
+    error,
+    optionalToggle,
+    storedLoad,
+    savingOptional,
+    dialog,
+    handlePrimaryAction,
+    handleSecondaryAction,
+    handleOpenPrivacy,
+    handleOpenDetails,
+    handleToggleOptional,
+    retryStoredLoad,
+    primaryBlocked,
+  } = useConsentCardState(mode);
   // The review surface is a pushed screen, so its header clears the status
   // bar; onboarding has no header and keeps clearing it here. Both keep the
   // side insets around the body and the pinned footer.
   const bodyStyle = mode === 'review' ? sideInsetStyle : { paddingTop: top, ...sideInsetStyle };
-  const [pendingAction, setPendingAction] = useState<'primary' | 'secondary' | null>(null);
-  // The catalogue key, not the copy: the card translates it at render, so the
-  // line follows an applied language instead of keeping the words of the
-  // language the action failed under.
-  const [error, setError] = useState<string | null>(null);
-  // Onboarding pre-selects optional telemetry; review mode starts off. The
-  // stored value loads over either default, so a stored decline never flashes
-  // as on.
-  const [optionalToggle, setOptionalToggle] = useState(mode === 'onboarding');
-  // The switch must not present a state before the stored value has loaded: in
-  // review mode the pre-load OFF looked like a completed revoke in the b911 vr5
-  // e3 evidence (e3-toggled-off.png showed the switch off while the realm was
-  // still consented — no toggle had landed), and onboarding needs the read
-  // because an older consent record carries the choice it must start from.
-  // Until loaded, the switch slot holds a same-size placeholder, so the card
-  // never claims a choice the user has not made and a tap cannot flip the wrong
-  // way. With no userId there is nothing to load: the switch renders as before
-  // and its toggle path shows the account error.
-  const [storedValueLoaded, setStoredValueLoaded] = useState(false);
-  const optionalControlPending = userId !== undefined && !storedValueLoaded;
-  const [savingOptional, setSavingOptional] = useState(false);
-  const loadedRef = useRef(false);
-  const userToggledRef = useRef(false);
-
-  // Load the stored optional value. Review mode shows the accepted choice; a
-  // record from an older consent version re-opens onboarding, and its choice is
-  // what the switch must show, because an updated disclosure must never
-  // re-enable analytics for someone who turned it off. With nothing to carry,
-  // onboarding keeps its on-by-default. The active flag stops a late resolve
-  // from overwriting a value the user just toggled.
-  useEffect(() => {
-    if (!userId || loadedRef.current) {
-      return undefined;
-    }
-    let active = true;
-    // eslint-disable-next-line promise/prefer-await-to-then, promise/always-return -- async/await would allow the promise to settle after unmount.
-    void readConsent(userId).then(
-      // eslint-disable-next-line promise/always-return
-      stored => {
-        if (active) {
-          if (!userToggledRef.current) {
-            setOptionalToggle(
-              mode === 'review' ? stored.optional : (stored.previousOptional ?? true)
-            );
-            loadedRef.current = true;
-          }
-          setStoredValueLoaded(true);
-        }
-      },
-      () => {
-        if (active) {
-          // The error names the unreliability, so the switch may show its
-          // default; the placeholder only covers the silent loading window.
-          setStoredValueLoaded(true);
-          setError('consent.couldNotLoadConsentSettings');
-        }
-      }
-    );
-    return () => {
-      active = false;
-    };
-  }, [mode, userId]);
-
-  const handlePrimaryAction = async () => {
-    if (!userId) {
-      setError('consent.couldNotLoadAccount');
-      return;
-    }
-
-    setError(null);
-    setPendingAction('primary');
-    try {
-      await acceptConsent(userId, optionalToggle);
-      router.replace('/(app)/(tabs)' as Href);
-    } catch {
-      setError('consent.couldNotSaveConsent');
-      setPendingAction(null);
-    }
-  };
-
-  const runSecondaryAction = async () => {
-    setError(null);
-    setPendingAction('secondary');
-
-    if (mode === 'review') {
-      if (!userId) {
-        setError('consent.couldNotLoadAccount');
-        setPendingAction(null);
-        return;
-      }
-
-      try {
-        await revokeConsent(userId);
-      } catch {
-        setError('consent.couldNotRevokeConsent');
-        setPendingAction(null);
-        return;
-      }
-    }
-
-    try {
-      await signOut();
-    } catch {
-      setError(mode === 'review' ? 'consent.revokedSignOutFailed' : 'consent.couldNotSignOut');
-      setPendingAction(null);
-    }
-  };
-
-  const handleSecondaryAction = () => {
-    const message =
-      mode === 'review' ? t('consent.revokeSignOutMessage') : t('consent.declineSignOutMessage');
-
-    confirm({
-      title: actions.destructiveTitle,
-      message,
-      confirmLabel: actions.destructiveLabel,
-      onConfirm: () => {
-        void runSecondaryAction();
-      },
-    });
-  };
-
-  const handleOpenPrivacy = () => {
-    router.push({ pathname: '/(app)/legal/[document]', params: { document: 'privacy' } });
-  };
-
-  const handleToggleOptional = useCallback(
-    (next: boolean) => {
-      setOptionalToggle(next);
-      setError(null);
-
-      if (mode === 'review' && userId) {
-        userToggledRef.current = true;
-        setSavingOptional(true);
-        // eslint-disable-next-line promise/prefer-await-to-then, promise/always-return -- fire-and-forget toggle revert pattern.
-        void setOptionalConsent(userId, next).then(
-          // eslint-disable-next-line promise/always-return
-          () => {
-            setSavingOptional(false);
-          },
-          () => {
-            setOptionalToggle(!next);
-            setError('consent.couldNotSaveChoice');
-            setSavingOptional(false);
-          }
-        );
-      } else if (mode === 'review') {
-        setOptionalToggle(!next);
-        setError('consent.couldNotLoadAccount');
-      } else {
-        // Onboarding: the switch is the user's own answer. The stored read can
-        // still land later — the account id may resolve after this render — and
-        // it must not overwrite a choice the user already made.
-        userToggledRef.current = true;
-      }
-    },
-    [mode, userId]
-  );
+  // The switch must not present a state before the stored value has loaded;
+  // `optionalIsPending` owns the rule (its doc carries the reasoning and the
+  // cases).
+  const optionalControlPending = optionalIsPending(userId !== undefined, storedLoad);
 
   return (
     <View className="flex-1 bg-background">
@@ -295,11 +174,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
 
         <Pressable
           onPress={() => {
-            router.push(
-              mode === 'review'
-                ? ('/(app)/consent-details?mode=review' as Href)
-                : ('/(app)/consent-details' as Href)
-            );
+            handleOpenDetails();
           }}
           hitSlop={8}
           accessibilityRole="button"
@@ -319,22 +194,23 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
       <ScreenFooter>
         <View className="gap-3">
           {/* The error lives in the pinned footer, not the scroll content: the
-            footer draws over the scroll tail, so a content-placed error was
-            invisible behind the buttons (b911 vr2 device repro — staging
-            error measured at y=792 under the Back/Revoke footer). The
-            disclosure is pinned here too, because at the foot of the scrolling
-            body the footer edge cut the sentence in half. Its font scale is
-            capped so the pinned height stays bounded (see
-            CONSENT_DISCLOSURE_MAX_FONT_SCALE). */}
+              footer draws over the scroll tail, so a content-placed error was
+              invisible behind the buttons (b911 vr2 device repro — staging
+              error measured at y=792 under the footer). The disclosure is
+              pinned here too, because at the foot of the scrolling body the
+              footer edge cut the sentence in half. Its font scale is capped so
+              the pinned height stays bounded (see
+              CONSENT_DISCLOSURE_MAX_FONT_SCALE), and it leads the block: the
+              footer's own top padding is the same 12dp that `gap-3` keeps
+              between the line and the primary button, so the disclosure reads
+              as part of the actions it qualifies instead of floating between
+              the divider and them. */}
           <ConsentPolicySentence
             prefix={t('consent.privacyPolicyPrefix')}
             linkLabel={t('consent.privacyPolicy')}
             maxFontSizeMultiplier={CONSENT_DISCLOSURE_MAX_FONT_SCALE}
             onOpenPolicy={handleOpenPrivacy}
           />
-          <View className="min-h-5 justify-center">
-            <AccessibleStatus message={error ? t(error) : null} />
-          </View>
           {actions.primaryLabel ? (
             <Button
               onPress={() => {
@@ -342,9 +218,10 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
               }}
               size="lg"
               accessibilityLabel={actions.primaryLabel}
-              // Accepting before the stored (or carried) choice has loaded would
-              // write the default over a decision the user already made.
-              disabled={pendingAction === 'secondary' || optionalControlPending}
+              // `primaryBlocked` is the rule that the primary exists only in
+              // onboarding and needs the stored read's answer there; it sits on
+              // the state hook beside the code it guards.
+              disabled={primaryBlocked}
               loading={pendingAction === 'primary'}
             >
               <Text>{actions.primaryLabel}</Text>
@@ -360,6 +237,30 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           >
             <Text>{actions.secondaryLabel}</Text>
           </Button>
+          {/* The reserved status slot renders below the actions: its reserve
+              must not sit between the disclosure and the buttons it qualifies
+              (an empty spacer with two gap edges sat between the disclosure
+              and the Accept button, floating the line away from the block it
+              qualifies). The slot keeps its one-line height whenever it is
+              mounted (the same reserve as the credits expiry line and the
+              guardrails and spend-alerts save status), in flow after the
+              container's `gap-3`: the failed phase's Retry overflows its
+              17.5dp line by 5.25dp on each side (`LINE_ACTION_BOX_CLASS`'s
+              `-my-[7px]` on a 28dp box), and that overflow needs the container
+              gap above the row and the footer's bottom padding below it to
+              land inside the footer — a negative margin here would put the
+              Retry's upper hit band under the secondary button's edge and its
+              lower band past the footer's bottom. The band below the
+              secondary button is the reserve; the footer's height changes by
+              nothing across the default phases because the slot never unmounts. */}
+          <View className="min-h-5 justify-center">
+            <ConsentLoadStatusLine
+              load={storedLoad}
+              error={error}
+              onRetry={retryStoredLoad}
+              t={t}
+            />
+          </View>
         </View>
       </ScreenFooter>
       {dialog}

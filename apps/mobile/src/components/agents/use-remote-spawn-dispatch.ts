@@ -100,10 +100,11 @@ export function useRemoteSpawnDispatch({
     onSpawnFailedRef.current?.();
   });
   const { arm: armWatchdog, disarm: clearWatchdog } = spawnWatchdog;
-  // Identity of the newest committed spawn attempt. A delayed tail's settle
-  // and failure writes run against this token: only the newest attempt may
-  // disarm the watchdog, reset the busy window, or publish a failure, so a
-  // retry is never clobbered by a previous attempt's late outcome.
+  // Identity of the newest committed spawn attempt. A delayed tail's settle,
+  // failure, and terminal writes run against this token: only the newest
+  // attempt may disarm the watchdog, reset the busy window, publish a
+  // failure, or publish terminal success (navigation, key rotation, and the
+  // success callbacks), so a retry is never clobbered by a stale outcome.
   const attemptRef = useRef(0);
   // P1-A-08b: one `operationKey` per spawn intent, so a retryable failure keeps
   // the key and the relay dedupes the retry.
@@ -283,6 +284,12 @@ export function useRemoteSpawnDispatch({
         });
         if (outcome.status === 'ready') {
           settle();
+          // A superseded attempt's late success must not publish terminal
+          // state: the live attempt alone owns navigation, key rotation and
+          // the success callbacks.
+          if (attemptRef.current !== attempt) {
+            return;
+          }
           // The spawn settled; the next submit is a fresh intent.
           rotateKey();
           const spawnedPath = getSpawnedAgentSessionPath(outcome.sessionID, organizationId, {

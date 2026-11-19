@@ -14,7 +14,7 @@ import type {
 import { READ_BROWSER_TOOL_NAMES, runReadBrowserTool } from './browser-tool-read-actions';
 import type { BrowserReadToolOptions } from './browser-tool-read-actions';
 import type { BrowserToolPageSession } from './browser-tool-snapshot';
-import type { AgentReadScope } from './browser-agent-frames';
+import type { AgentFrameInventory, AgentReadScope } from './browser-agent-frames';
 import type { BrowserToolInteractSession } from './browser-tool-interact-actions';
 import type { BrowserToolSession } from './browser-tool-session';
 import type { EvalTabResult } from './tab-debugger';
@@ -48,6 +48,8 @@ export interface BrowserToolDispatchOptions {
   /** Frame scoping for a CLI agent caller; absent for the panel and workflow callers. */
   readonly agentScope?: AgentReadScope | undefined;
   readonly now?: () => number;
+  /** The call's shared frame inventory, so the preflight, the tool and the withheld report read one tree. */
+  readonly readFrames?: (() => Promise<AgentFrameInventory>) | undefined;
   readonly tabId?: number;
   readonly tabsApi?: BrowserToolPageTabsApi;
   readonly webMcpDiscover?: BrowserToolPageActionOptions['webMcpDiscover'];
@@ -73,6 +75,7 @@ const toUpstreamToolName = (name: string): string =>
 const readToolOptions = (options: BrowserToolDispatchOptions): BrowserReadToolOptions => ({
   ...(options.agentScope === undefined ? {} : { agentScope: options.agentScope }),
   ...(options.now === undefined ? {} : { now: options.now }),
+  ...(options.readFrames === undefined ? {} : { readFrames: options.readFrames }),
 });
 
 const pageToolOptions = (options: BrowserToolDispatchOptions): BrowserToolPageActionOptions => ({

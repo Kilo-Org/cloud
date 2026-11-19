@@ -140,7 +140,6 @@ import { clearSessionLocalState } from './services/session-local-state';
 import { setCloudAgentSessionVersion } from './services/cloud-agent-session-version';
 import { applyReportedSessionTitle, reportSessionTitleSchema } from './services/session-title';
 import { applyMetadataChanges } from './ingest/metadata';
-import { laterLastActivityAt } from './ingest/last-activity';
 
 const MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS = 512;
 const CLOUD_AGENT_ROOT_SESSION_IDENTITY_CONFLICT_ERROR =
@@ -625,14 +624,20 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     // The Session DO's clock can run ahead of the database, and the active-session list treats a
     // future last_activity_at as live; no writer would lower it, so the report is clamped.
     const activity = sql`LEAST(${input.lastActivityAt}::timestamptz, now())`;
+    // The predicate makes the write forward-only by itself, so a repeat that does not advance
+    // the stored value matches no row and writes no row version.
     await getWorkerDb(this.env.HYPERDRIVE.connectionString)
       .update(cli_sessions_v2)
-      .set({ last_activity_at: laterLastActivityAt(activity) })
+      .set({ last_activity_at: activity })
       .where(
         and(
           eq(cli_sessions_v2.session_id, input.sessionId),
           eq(cli_sessions_v2.kilo_user_id, input.kiloUserId),
-          eq(cli_sessions_v2.cloud_agent_session_id, input.cloudAgentSessionId)
+          eq(cli_sessions_v2.cloud_agent_session_id, input.cloudAgentSessionId),
+          or(
+            isNull(cli_sessions_v2.last_activity_at),
+            lt(cli_sessions_v2.last_activity_at, activity)
+          )
         )
       );
   }

@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, eq, isNull, or } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { kilocode_users, organizations } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { isClaudeOperatorConfigured } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
@@ -10,19 +10,22 @@ import type { AnthropicUserProfileSubject } from '@kilocode/web-shared/lib/ai-ga
 // through `after()`, and a lagging replica would hide a profile another request
 // just stored and create a duplicate.
 
+// The final writes recheck the account: a soft deletion or block during the
+// remote create clears or forbids the slot, and must not be undone by a late write.
 async function storeUserProfile(userId: string, userProfileId: string): Promise<string | null> {
+  const active = and(eq(kilocode_users.id, userId), isNull(kilocode_users.blocked_reason));
   const [stored] = await db
     .update(kilocode_users)
     .set({ anthropic_user_profile_id: userProfileId })
-    .where(and(eq(kilocode_users.id, userId), isNull(kilocode_users.anthropic_user_profile_id)))
+    .where(and(active, isNull(kilocode_users.anthropic_user_profile_id)))
     .returning({ id: kilocode_users.anthropic_user_profile_id });
   if (stored) return stored.id;
-  // Another request stored its profile first. Use that one; the cleanup deletes
-  // the profile created here once nothing references it.
+  // Another request stored its profile first, or the account is gone. The
+  // profile created here is left for the cleanup, since nothing references it.
   const [winner] = await db
     .select({ id: kilocode_users.anthropic_user_profile_id })
     .from(kilocode_users)
-    .where(eq(kilocode_users.id, userId));
+    .where(active);
   return winner?.id ?? null;
 }
 
@@ -48,17 +51,25 @@ async function ensureUserProfile(userId: string): Promise<string | null> {
   return await storeUserProfile(userId, created);
 }
 
+/** A live organization without a parent, which owns the profile its sub-organizations share. */
+function liveRootOrganization(organizationId: string) {
+  return and(
+    eq(organizations.id, organizationId),
+    isNull(organizations.parent_organization_id),
+    isNull(organizations.deleted_at)
+  );
+}
+
 async function ensureRootOrganizationProfile(rootOrganizationId: string): Promise<string | null> {
   const [root] = await db
     .select({
       profileId: organizations.anthropic_user_profile_id,
       name: organizations.name,
       createdAt: organizations.created_at,
-      deletedAt: organizations.deleted_at,
     })
     .from(organizations)
-    .where(eq(organizations.id, rootOrganizationId));
-  if (!root || root.deletedAt !== null) return null;
+    .where(liveRootOrganization(rootOrganizationId));
+  if (!root) return null;
   if (root.profileId) return root.profileId;
   const created = await createAnthropicUserProfile({
     kind: 'organization',
@@ -66,19 +77,33 @@ async function ensureRootOrganizationProfile(rootOrganizationId: string): Promis
     name: root.name,
     createdAt: root.createdAt,
   });
-  const [stored] = await db
-    .update(organizations)
-    .set({ anthropic_user_profile_id: created })
-    .where(
-      and(eq(organizations.id, rootOrganizationId), isNull(organizations.anthropic_user_profile_id))
-    )
-    .returning({ id: organizations.anthropic_user_profile_id });
-  if (stored) return stored.id;
-  const [winner] = await db
-    .select({ id: organizations.anthropic_user_profile_id })
-    .from(organizations)
-    .where(eq(organizations.id, rootOrganizationId));
-  return winner?.id ?? null;
+  // Publishing and sharing commit together. `setParent` and sub-organization
+  // creation read the parent's profile under a share lock, which this row
+  // update waits for or blocks, so a sub-organization attached meanwhile either
+  // copies this profile or is in the share below. The recheck that the row is
+  // still a live root keeps an organization attached during the create from
+  // getting a profile of its own.
+  return await db.transaction(async tx => {
+    const [stored] = await tx
+      .update(organizations)
+      .set({ anthropic_user_profile_id: created })
+      .where(
+        and(
+          liveRootOrganization(rootOrganizationId),
+          isNull(organizations.anthropic_user_profile_id)
+        )
+      )
+      .returning({ id: organizations.anthropic_user_profile_id });
+    if (stored?.id) {
+      await shareAnthropicUserProfileWithSubOrganizations(rootOrganizationId, stored.id, tx);
+      return stored.id;
+    }
+    const [winner] = await tx
+      .select({ id: organizations.anthropic_user_profile_id })
+      .from(organizations)
+      .where(liveRootOrganization(rootOrganizationId));
+    return winner?.id ?? null;
+  });
 }
 
 async function ensureOrganizationProfile(organizationId: string): Promise<string | null> {
@@ -100,12 +125,12 @@ async function ensureOrganizationProfile(organizationId: string): Promise<string
   const [current] = await db
     .select({ id: organizations.anthropic_user_profile_id })
     .from(organizations)
-    .where(eq(organizations.id, organizationId));
+    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)));
   return current?.id ?? null;
 }
 
 /** Gives the parent's profile to its live sub-organizations that have none yet. */
-export async function shareAnthropicUserProfileWithSubOrganizations(
+async function shareAnthropicUserProfileWithSubOrganizations(
   parentOrganizationId: string,
   userProfileId: string,
   fromDb: Pick<typeof db, 'update'> = db
@@ -115,10 +140,7 @@ export async function shareAnthropicUserProfileWithSubOrganizations(
     .set({ anthropic_user_profile_id: userProfileId })
     .where(
       and(
-        or(
-          eq(organizations.id, parentOrganizationId),
-          eq(organizations.parent_organization_id, parentOrganizationId)
-        ),
+        eq(organizations.parent_organization_id, parentOrganizationId),
         isNull(organizations.anthropic_user_profile_id),
         isNull(organizations.deleted_at)
       )

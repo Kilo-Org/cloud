@@ -69,6 +69,65 @@ describe('ensureAnthropicUserProfile', () => {
     expect(createAnthropicUserProfile).toHaveBeenCalledTimes(1);
   });
 
+  it('does not reattach a profile when the user is soft-deleted during the create', async () => {
+    const user = await insertTestUser();
+    jest.mocked(createAnthropicUserProfile).mockImplementationOnce(async () => {
+      await db
+        .update(kilocode_users)
+        .set({
+          blocked_reason: 'soft-deleted at 2026-11-19T00:00:00.000Z',
+          anthropic_user_profile_id: null,
+        })
+        .where(eq(kilocode_users.id, user.id));
+      return 'uprof_late';
+    });
+    expect(await ensureAnthropicUserProfile({ kind: 'user', userId: user.id })).toBeNull();
+    const [row] = await db
+      .select({ id: kilocode_users.anthropic_user_profile_id })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id));
+    expect(row?.id).toBeNull();
+  });
+
+  it('does not give an organization attached to a parent during the create its own profile', async () => {
+    const organization = await createOrganization(`Root ${randomUUID()}`);
+    const parent = await createOrganization(`New parent ${randomUUID()}`);
+    jest.mocked(createAnthropicUserProfile).mockImplementationOnce(async () => {
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, organization.id));
+      return 'uprof_standalone';
+    });
+    expect(
+      await ensureAnthropicUserProfile({
+        kind: 'organization',
+        organizationId: organization.id,
+        rootOrganizationId: organization.id,
+      })
+    ).toBeNull();
+    expect(await organizationProfile(organization.id)).toBeNull();
+  });
+
+  it('does not reattach a profile when the organization is deleted during the create', async () => {
+    const organization = await createOrganization(`Deleted ${randomUUID()}`);
+    jest.mocked(createAnthropicUserProfile).mockImplementationOnce(async () => {
+      await db
+        .update(organizations)
+        .set({ deleted_at: new Date().toISOString() })
+        .where(eq(organizations.id, organization.id));
+      return 'uprof_late';
+    });
+    expect(
+      await ensureAnthropicUserProfile({
+        kind: 'organization',
+        organizationId: organization.id,
+        rootOrganizationId: organization.id,
+      })
+    ).toBeNull();
+    expect(await organizationProfile(organization.id)).toBeNull();
+  });
+
   it('creates nothing for a blocked user', async () => {
     const user = await insertTestUser({
       blocked_reason: 'abuse',

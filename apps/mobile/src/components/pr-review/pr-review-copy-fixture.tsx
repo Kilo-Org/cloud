@@ -1,6 +1,6 @@
 import { MutationCache, QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 import { initialWindowMetrics } from 'react-native-safe-area-context';
@@ -33,7 +33,7 @@ import {
 } from '@/components/pr-review/pr-review-tab-selector';
 import { ScreenHeader } from '@/components/screen-header';
 import { FeedbackPromptProvider } from '@/components/use-feedback-prompt';
-import { setDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
+import { clearDiffSelection, setDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
 import {
   pendingReviewDraftKey,
   PendingReviewProvider,
@@ -120,23 +120,28 @@ export function PrReviewCopyFixture() {
       })
   );
   const [client] = useState(() => createFixtureClient(surface));
-  // Seed the selection bridge once so the available state renders on a device
-  // too: the composer reads the bridge during render, and this initializer runs
-  // before its children mount.
-  useState(() => {
-    if (!__DEV__ || surface !== 'composer' || fixtureSide !== 'RIGHT' || selected !== '1') {
-      return;
+  // Point the selection bridge at the state the link asks for, before the
+  // composer below reads it. Applied once per distinct link, so navigating
+  // between the three composer surfaces does not leave one's selection on the
+  // next: the composer reads the bridge during render, not reactively.
+  const selectionKey = surface === 'composer' ? `${fixtureSide}:${selected ?? ''}` : null;
+  const appliedSelectionRef = useRef<string | null>(null);
+  if (selectionKey !== null && appliedSelectionRef.current !== selectionKey) {
+    appliedSelectionRef.current = selectionKey;
+    if (fixtureSide === 'RIGHT' && selected === '1') {
+      setDiffSelection({
+        owner: triple.owner,
+        repo: triple.repo,
+        number: triple.number,
+        path: 'src/greeting.ts',
+        side: 'RIGHT',
+        line: 2,
+        selectedText: 'export function greet(): string { return "hello"; }',
+      });
+    } else {
+      clearDiffSelection({ owner: triple.owner, repo: triple.repo, number: triple.number });
     }
-    setDiffSelection({
-      owner: triple.owner,
-      repo: triple.repo,
-      number: triple.number,
-      path: 'src/greeting.ts',
-      side: 'RIGHT',
-      line: 2,
-      selectedText: 'export function greet(): string { return "hello"; }',
-    });
-  });
+  }
   const [tab, setTab] = useState<PrReviewTabId>('files');
   const header = (
     <ScreenHeader title={t('prReview.fileNavigator.title')} eyebrow="sample/review-copy#1" />

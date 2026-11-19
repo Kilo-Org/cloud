@@ -16,6 +16,7 @@ vi.mock('react-native', () => ({
   },
   useColorScheme: () => native.scheme,
   Switch: 'Switch',
+  View: 'View',
 }));
 
 type R = TestRenderer.ReactTestRenderer;
@@ -28,6 +29,7 @@ type SwitchFixture = {
   thumbColor?: string;
   value?: boolean;
   style?: { marginVertical?: number };
+  onValueChange?: (next: boolean) => void;
 };
 
 function renderSwitch(props: SwitchFixture) {
@@ -49,12 +51,24 @@ function nativeProps(root: I): {
   thumbColor?: string;
   value?: boolean;
   style?: unknown;
+  onStartShouldSetResponder?: () => boolean;
 } {
   const node = root.findAll(candidate => (candidate.type as string) === 'Switch')[0];
   if (!node) {
     throw new Error('native Switch was not rendered');
   }
   return node.props as never;
+}
+
+function touchBox(root: I):
+  | {
+      accessible?: boolean;
+      style?: unknown;
+      onStartShouldSetResponder?: () => boolean;
+      onResponderRelease?: () => void;
+    }
+  | undefined {
+  return root.findAll(candidate => (candidate.type as string) === 'View')[0]?.props;
 }
 
 describe('Switch', () => {
@@ -139,20 +153,49 @@ describe('Switch', () => {
     expect(props.thumbColor).toBe('#333333');
   });
 
-  it('gives the control a full touch target on both axes', () => {
+  it('gives the Android control a full touch target on both axes, with no touch box', () => {
     native.os = 'android';
-    const props = nativeProps(renderSwitch({}).root);
+    const root = renderSwitch({}).root;
+    const props = nativeProps(root);
     expect((props.style as unknown[])[0]).toEqual({
       minHeight: TOUCH_TARGET_DP,
       minWidth: TOUCH_TARGET_DP,
     });
+    expect(props.onStartShouldSetResponder).toBeUndefined();
+    expect(touchBox(root)).toBeUndefined();
   });
 
-  it('applies a caller style after the touch target box', () => {
+  it('applies a caller style after the touch target box on Android', () => {
     native.os = 'android';
     const style = { marginVertical: 3 };
     const props = nativeProps(renderSwitch({ style }).root);
     expect(props.style).toEqual([{ minHeight: TOUCH_TARGET_DP, minWidth: TOUCH_TARGET_DP }, style]);
+  });
+
+  it('centers the iOS control at its own size in a hidden 44pt touch box', () => {
+    native.os = 'ios';
+    const style = { marginVertical: 3 };
+    const root = renderSwitch({ style }).root;
+    const props = nativeProps(root);
+    expect(props.style).toBeUndefined();
+    expect(props.onStartShouldSetResponder?.()).toBe(true);
+    const box = touchBox(root);
+    expect(box?.accessible).toBe(false);
+    expect(box?.style).toEqual([
+      { alignSelf: 'center', justifyContent: 'center', minHeight: TOUCH_TARGET_DP },
+      style,
+    ]);
+  });
+
+  it('flips the iOS value when a tap in the touch box ends, and not when disabled', () => {
+    native.os = 'ios';
+    const onValueChange = vi.fn<(next: boolean) => void>();
+    const enabled = touchBox(renderSwitch({ value: true, onValueChange }).root);
+    expect(enabled?.onStartShouldSetResponder?.()).toBe(true);
+    act(() => enabled?.onResponderRelease?.());
+    expect(onValueChange).toHaveBeenCalledWith(false);
+    const disabled = touchBox(renderSwitch({ disabled: true, onValueChange }).root);
+    expect(disabled?.onStartShouldSetResponder?.()).toBe(false);
   });
 
   it('paints the muted pair on a disabled on switch and keeps it on', () => {

@@ -1,7 +1,20 @@
-import { Switch as NativeSwitch, Platform, type SwitchProps, useColorScheme } from 'react-native';
+import {
+  Switch as NativeSwitch,
+  Platform,
+  type SwitchProps,
+  useColorScheme,
+  View,
+} from 'react-native';
 
 import { TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+
+const ANDROID_BOX_STYLE = { minHeight: TOUCH_TARGET_DP, minWidth: TOUCH_TARGET_DP } as const;
+const IOS_TOUCH_BOX_STYLE = {
+  alignSelf: 'center',
+  justifyContent: 'center',
+  minHeight: TOUCH_TARGET_DP,
+} as const;
 
 /**
  * The native `Switch`, painted with the app palette, with its disabled state
@@ -55,16 +68,26 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * state; doing it here keeps both platforms honest.
  *
  * The control draws at the platform's own size — about 46.5x27dp on Android,
- * 51x31pt on iOS — which is under `DESIGN.md:364`'s 44pt touch target, and the
- * audit reads the control's own node rect, so a caller's row or `hitSlop` does
- * not lift it. Every caller gets the target here: the node renders at least
- * {@link TOUCH_TARGET_DP} on both axes (the Android gate measured 44.19dp), and
- * a caller never shrinks it with a smaller `style` box. A row that must keep
- * its 48pt frame cancels the excess instead: a negative vertical margin of
- * {@link TOUCH_TARGET_OVERHANG_DP} a side makes the node contribute the row's
- * 27pt content band to layout, and the row's 10.5pt padding keeps the node
- * inside the row's bounds (Android delivers a touch only inside a parent
- * view). `row-trailing.tsx` holds the one switch host that does this.
+ * 63x28pt on iOS 26 — which is under `DESIGN.md:364`'s 44pt touch target.
+ *
+ * Android: the audit reads the control's own node rect, so the node renders at
+ * least {@link TOUCH_TARGET_DP} on both axes (the Android gate measured
+ * 44.19dp), and a caller never shrinks it with a smaller `style` box. The
+ * Android view centers its drawable in that box. A row that must keep its 48pt
+ * frame cancels the excess with a negative vertical margin of
+ * {@link TOUCH_TARGET_OVERHANG_DP} a side; `row-trailing.tsx` holds the one
+ * switch host that does this.
+ *
+ * iOS: `UISwitch` draws at its fixed size at the top of a taller frame, and
+ * React Native's iOS `Switch` composes `alignSelf: 'flex-start'`, so a 44pt
+ * switch node painted the control about 11pt above its row's center. The
+ * switch node keeps its native size, and a 44pt touch box centers it. `hitSlop`
+ * cannot do this: a touch outside the `UISwitch` bounds never reaches the
+ * native control (measured on the iOS 26 simulator). So the box is a `View`
+ * hidden from assistive technology that takes the JS responder and flips the
+ * value when a tap above or below the switch ends; the switch itself stays the
+ * one accessible element. The box has the same 44pt height as the Android
+ * node, so the row's negative margin fits both platforms.
  */
 export function Switch({
   disabled,
@@ -78,8 +101,9 @@ export function Switch({
   const colors = useThemeColors();
   const dark = useColorScheme() === 'dark';
   const resolvedDisabled = disabled ?? accessibilityState?.disabled;
+  const ios = Platform.OS === 'ios';
   // Only Android needs the muted pair: iOS fades a disabled `UISwitch` itself.
-  const inactive = resolvedDisabled === true && Platform.OS === 'android';
+  const inactive = resolvedDisabled === true && !ios;
   // The on pair is the olive accent at the luminance its grip needs: light
   // fills with `primary`, dark with the muted olive `selection`.
   const enabledOnTrack = dark ? colors.selection : colors.primary;
@@ -97,19 +121,34 @@ export function Switch({
   const onTrack = inactive ? disabledTrack : enabledOnTrack;
   const onGrip = inactive ? disabledGrip : enabledOnGrip;
 
-  return (
+  const control = (
     <NativeSwitch
       {...props}
-      style={[{ minHeight: TOUCH_TARGET_DP, minWidth: TOUCH_TARGET_DP }, style]}
+      style={ios ? undefined : [ANDROID_BOX_STYLE, style]}
+      // The switch claims the JS responder, so a tap on it never reaches the touch box too.
+      onStartShouldSetResponder={ios ? () => true : undefined}
       value={value}
       trackColor={trackColor ?? { false: offTrack, true: onTrack }}
       thumbColor={thumbColor ?? (value ? onGrip : offGrip)}
       disabled={resolvedDisabled}
       accessibilityState={
-        Platform.OS === 'ios'
-          ? { ...accessibilityState, disabled: resolvedDisabled }
-          : accessibilityState
+        ios ? { ...accessibilityState, disabled: resolvedDisabled } : accessibilityState
       }
     />
+  );
+  if (!ios) {
+    return control;
+  }
+  return (
+    <View
+      accessible={false}
+      style={[IOS_TOUCH_BOX_STYLE, style]}
+      onStartShouldSetResponder={() => resolvedDisabled !== true}
+      onResponderRelease={() => {
+        void props.onValueChange?.(!value);
+      }}
+    >
+      {control}
+    </View>
   );
 }

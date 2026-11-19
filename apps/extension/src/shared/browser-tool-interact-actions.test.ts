@@ -1,5 +1,7 @@
+// @vitest-environment jsdom
 /* eslint-disable id-length, jest/no-conditional-expect, jest/no-conditional-in-test, jest/prefer-strict-equal, max-lines, require-await, typescript-eslint/no-base-to-string, typescript-eslint/no-unsafe-type-assertion, typescript-eslint/require-await, unicorn/prefer-array-find, vitest/prefer-describe-function-title -- Fake CDP session records verbatim commands; assertions check conditional error branches. */
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import {
   INTERACT_BROWSER_TOOL_NAMES,
   isInteractBrowserToolName,
@@ -330,52 +332,299 @@ describe('browser_drop', () => {
   });
 });
 
+interface DomTypingFixture {
+  readonly commands: RecordedCommand[];
+  readonly events: string[];
+  readonly field: (id: string) => HTMLElement;
+  readonly session: BrowserToolInteractSession;
+}
+
+const isEditableHost = (element: Element | null): element is HTMLElement =>
+  element instanceof HTMLElement &&
+  element.closest('[contenteditable]:not([contenteditable="false"])') !== null;
+
+/** What a browser does with text that reaches the focused element: it replaces the selection. */
+const insertAtSelection = (text: string): void => {
+  const active = document.activeElement;
+
+  if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) {
+    active.setRangeText(text, active.selectionStart ?? 0, active.selectionEnd ?? 0, 'end');
+    active.dispatchEvent(new Event('input', { bubbles: true }));
+
+    return;
+  }
+
+  if (!isEditableHost(active)) {
+    return;
+  }
+
+  const selection = globalThis.getSelection();
+
+  if (selection === null) {
+    return;
+  }
+
+  if (selection.rangeCount === 0 || !active.contains(selection.getRangeAt(0).startContainer)) {
+    const caret = document.createRange();
+    caret.setStart(active, 0);
+    caret.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(caret);
+  }
+
+  const range = selection.getRangeAt(0);
+  range.deleteContents();
+  const node = document.createTextNode(text);
+  range.insertNode(node);
+  range.setStartAfter(node);
+  range.collapse(true);
+  active.dispatchEvent(new Event('input', { bubbles: true }));
+};
+
+/**
+ * A tab whose CDP commands run against a real jsdom document: functions the
+ * tool calls on a node run with that element as `this`, and inserted text or
+ * typed keys land where the browser would put them.
+ */
+const createDomTypingSession = (html: string): DomTypingFixture => {
+  // The `isContentEditable` getter is missing from jsdom, which does implement contenteditable focus and selection.
+  Object.defineProperty(HTMLElement.prototype, 'isContentEditable', {
+    configurable: true,
+    get(this: HTMLElement) {
+      return isEditableHost(this);
+    },
+  });
+  document.body.innerHTML = html;
+  const commands: RecordedCommand[] = [];
+  const events: string[] = [];
+  const elements = [...document.body.querySelectorAll<HTMLElement>('[id]')];
+  const backendIdOf = (element: HTMLElement): number => 100 + elements.indexOf(element);
+  const elementOf = (params: Record<string, unknown> | undefined): HTMLElement | undefined => {
+    const objectId = params?.['objectId'];
+    const backendNodeId =
+      typeof objectId === 'string'
+        ? Number(objectId.replace('node-', ''))
+        : params?.['backendNodeId'];
+
+    return typeof backendNodeId === 'number' ? elements[backendNodeId - 100] : undefined;
+  };
+
+  for (const element of elements) {
+    for (const type of ['input', 'change', 'keydown']) {
+      element.addEventListener(type, event => {
+        const key = event instanceof KeyboardEvent ? `:${event.key}` : '';
+        events.push(`${element.id}:${type}${key}`);
+      });
+    }
+  }
+
+  const session: BrowserToolInteractSession = {
+    resolveTarget: async target => {
+      const element = document.querySelector<HTMLElement>(`#${target}`);
+
+      return element === null ? undefined : ref(backendIdOf(element));
+    },
+    send: async (method, params) => {
+      commands.push({ method, params });
+
+      switch (method) {
+        case 'DOM.getBoxModel': {
+          return { model: { content: REF_BOX } };
+        }
+        case 'DOM.focus': {
+          elementOf(params)?.focus();
+
+          return {};
+        }
+        case 'DOM.resolveNode': {
+          const element = elementOf(params);
+
+          return element === undefined
+            ? undefined
+            : { object: { objectId: `node-${String(backendIdOf(element))}` } };
+        }
+        case 'Runtime.callFunctionOn': {
+          const element = elementOf(params);
+          const declaration = String(params?.['functionDeclaration'] ?? '');
+          const callArguments = z
+            .array(z.object({ value: z.unknown() }))
+            .parse(params?.['arguments'] ?? []);
+          // eslint-disable-next-line eslint/no-new-func, typescript-eslint/no-implied-eval -- runs the page function the way Runtime.callFunctionOn does
+          const declare = new Function(`return (${declaration});`) as () => (
+            ...values: unknown[]
+          ) => unknown;
+          const run = declare();
+
+          try {
+            return {
+              result: {
+                value: run.apply(
+                  element,
+                  callArguments.map(entry => entry.value)
+                ),
+              },
+            };
+          } catch (error) {
+            return { exceptionDetails: { exception: { description: String(error) } } };
+          }
+        }
+        case 'Input.insertText': {
+          insertAtSelection(String(params?.['text'] ?? ''));
+
+          return {};
+        }
+        case 'Input.dispatchKeyEvent': {
+          const key = String(params?.['key'] ?? '');
+
+          if (params?.['type'] === 'keyDown') {
+            document.activeElement?.dispatchEvent(
+              new KeyboardEvent('keydown', { bubbles: true, key })
+            );
+
+            if (key === 'Delete') {
+              insertAtSelection('');
+            } else if (key !== 'Enter' && typeof params['text'] === 'string') {
+              insertAtSelection(params['text']);
+            }
+          }
+
+          return {};
+        }
+        default: {
+          return {};
+        }
+      }
+    },
+  };
+
+  return {
+    commands,
+    events,
+    field: id => {
+      const element = document.querySelector<HTMLElement>(`#${id}`);
+
+      if (element === null) {
+        throw new Error(`no fixture element #${id}`);
+      }
+
+      return element;
+    },
+    session,
+  };
+};
+
+const valueOf = (element: HTMLElement): string =>
+  element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement
+    ? element.value
+    : (element.textContent ?? '');
+
+const typeInto = (
+  fixture: DomTypingFixture,
+  args: { slowly?: boolean; submit?: boolean; target: string; text: string }
+) => runInteractBrowserTool('browser_type', args, fixture.session);
+
 describe('browser_type', () => {
-  it('focuses the element and inserts the whole string by default', async () => {
-    const { commands, session } = createFakeSession({ targets: { e70: ref(70) } });
+  it.each([
+    ['an input', '<input id="field" value="draft">'],
+    ['a textarea', '<textarea id="field">draft</textarea>'],
+    ['a contenteditable element', '<div id="field" contenteditable="true">draft</div>'],
+  ])('replaces what %s holds on every call, like Playwright fill', async (_label, html) => {
+    const fixture = createDomTypingSession(html);
 
-    const result = await runInteractBrowserTool(
-      'browser_type',
-      { target: 'e70', text: 'hello' },
-      session
-    );
+    for (const text of ['c2', 'c6', 'c10']) {
+      // eslint-disable-next-line no-await-in-loop -- each call types into the field the previous call left
+      const result = await typeInto(fixture, { target: 'field', text });
 
-    expect(result.ok).toBe(true);
-    expect(commands.some(command => command.method === 'DOM.focus')).toBe(true);
-    const inserts = commands.filter(command => command.method === 'Input.insertText');
-    expect(inserts).toHaveLength(1);
-    expect(inserts[0]?.params).toEqual({ text: 'hello' });
+      expect(result.ok).toBe(true);
+      expect(valueOf(fixture.field('field'))).toBe(text);
+    }
+
+    expect(fixture.events.filter(event => event === 'field:input')).toHaveLength(3);
   });
 
-  it('types one key event pair per character when slowly is set', async () => {
-    const { commands, session } = createFakeSession({ targets: { e70: ref(70) } });
+  it('clears the field when the text is empty', async () => {
+    const fixture = createDomTypingSession('<input id="field" value="draft">');
 
-    await runInteractBrowserTool(
-      'browser_type',
-      { slowly: true, target: 'e70', text: 'ab' },
-      session
+    const result = await typeInto(fixture, { target: 'field', text: '' });
+
+    expect(result.ok).toBe(true);
+    expect(valueOf(fixture.field('field'))).toBe('');
+  });
+
+  it('sets a date input the way fill does, firing input and change', async () => {
+    const fixture = createDomTypingSession('<input id="when" type="date" value="2026-01-01">');
+
+    const result = await typeInto(fixture, { target: 'when', text: '2026-11-19' });
+
+    expect(result.ok).toBe(true);
+    expect(valueOf(fixture.field('when'))).toBe('2026-11-19');
+    expect(fixture.events).toStrictEqual(['when:input', 'when:change']);
+  });
+
+  it('fills the control a label names when the target is the label', async () => {
+    const fixture = createDomTypingSession(
+      '<label id="label">Email <input id="email" value="old@example.com"></label>'
     );
 
-    expect(commands.some(command => command.method === 'Input.insertText')).toBe(false);
-    const events = keyEvents(commands);
-    expect(events).toHaveLength(4);
-    expect(events[0]).toMatchObject({ key: 'a', text: 'a', type: 'keyDown' });
-    expect(events[1]).toMatchObject({ key: 'a', type: 'keyUp' });
+    await typeInto(fixture, { target: 'label', text: 'new@example.com' });
+
+    expect(valueOf(fixture.field('email'))).toBe('new@example.com');
+  });
+
+  it('fails instead of reporting typed text for an element that cannot take it', async () => {
+    const fixture = createDomTypingSession(
+      '<p id="status">idle</p><input id="locked" value="kept" readonly>'
+    );
+
+    const notEditable = await typeInto(fixture, { target: 'status', text: 'x' });
+    const readOnly = await typeInto(fixture, { target: 'locked', text: 'x' });
+
+    expect(notEditable).toStrictEqual({
+      error: 'Element is not an <input>, <textarea> or [contenteditable] element',
+      ok: false,
+    });
+    expect(readOnly.ok).toBe(false);
+    expect(valueOf(fixture.field('status'))).toBe('idle');
+    expect(valueOf(fixture.field('locked'))).toBe('kept');
+  });
+
+  it('presses Enter on the field after replacing its text when submit is set', async () => {
+    const fixture = createDomTypingSession('<input id="query" value="old">');
+
+    const result = await typeInto(fixture, { submit: true, target: 'query', text: 'new' });
+
+    expect(result.ok).toBe(true);
+    expect(valueOf(fixture.field('query'))).toBe('new');
+    expect(fixture.events.at(-1)).toBe('query:keydown:Enter');
+  });
+
+  it('types slowly at the caret a fresh focus gives, then keeps appending while focused', async () => {
+    const fixture = createDomTypingSession('<input id="other"><input id="field" value="abc">');
+    fixture.field('other').focus();
+
+    await typeInto(fixture, { slowly: true, target: 'field', text: 'x' });
+
+    // Playwright's pressSequentially puts the caret at the start of an input it focuses.
+    expect(valueOf(fixture.field('field'))).toBe('xabc');
+
+    await typeInto(fixture, { slowly: true, target: 'field', text: 'yz' });
+
+    expect(valueOf(fixture.field('field'))).toBe('xyzabc');
+    expect(fixture.events.filter(event => event.startsWith('field:keydown:'))).toStrictEqual([
+      'field:keydown:x',
+      'field:keydown:y',
+      'field:keydown:z',
+    ]);
   });
 
   it('types punctuation in slowly mode instead of dropping it', async () => {
-    const { commands, session } = createFakeSession({ targets: { e70: ref(70) } });
+    const fixture = createDomTypingSession('<input id="field">');
 
-    await runInteractBrowserTool(
-      'browser_type',
-      { slowly: true, target: 'e70', text: 'a.b' },
-      session
-    );
+    await typeInto(fixture, { slowly: true, target: 'field', text: 'a.b' });
 
-    expect(commands.some(command => command.method === 'Input.insertText')).toBe(false);
-    const events = keyEvents(commands);
-    expect(events.map(event => event['key'])).toEqual(['a', 'a', '.', '.', 'b', 'b']);
-    expect(events[2]).toMatchObject({
+    expect(valueOf(fixture.field('field'))).toBe('a.b');
+    expect(fixture.commands.some(command => command.method === 'Input.insertText')).toBe(false);
+    expect(keyEvents(fixture.commands)[2]).toMatchObject({
       code: 'Period',
       text: '.',
       type: 'keyDown',
@@ -384,31 +633,12 @@ describe('browser_type', () => {
   });
 
   it('inserts a character the US layout cannot type when slowly is set', async () => {
-    const { commands, session } = createFakeSession({ targets: { e70: ref(70) } });
+    const fixture = createDomTypingSession('<input id="field">');
 
-    await runInteractBrowserTool(
-      'browser_type',
-      { slowly: true, target: 'e70', text: 'é' },
-      session
-    );
+    await typeInto(fixture, { slowly: true, target: 'field', text: 'é' });
 
-    expect(keyEvents(commands)).toHaveLength(0);
-    const inserts = commands.filter(command => command.method === 'Input.insertText');
-    expect(inserts.map(command => command.params)).toEqual([{ text: 'é' }]);
-  });
-
-  it('presses Enter after typing when submit is set', async () => {
-    const { commands, session } = createFakeSession({ targets: { e70: ref(70) } });
-
-    await runInteractBrowserTool(
-      'browser_type',
-      { submit: true, target: 'e70', text: 'x' },
-      session
-    );
-
-    const events = keyEvents(commands);
-    expect(events.at(-2)).toMatchObject({ key: 'Enter', type: 'keyDown' });
-    expect(events.at(-1)).toMatchObject({ key: 'Enter', type: 'keyUp' });
+    expect(keyEvents(fixture.commands)).toHaveLength(0);
+    expect(valueOf(fixture.field('field'))).toBe('é');
   });
 });
 

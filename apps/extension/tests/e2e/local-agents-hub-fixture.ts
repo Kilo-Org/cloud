@@ -23,6 +23,8 @@ export type FakeHub = {
   close(): Promise<void>;
   connected: boolean;
   frames: FakeHubFrame[];
+  /** A form whose fields hold text already, laid out in the unnamed wrappers real pages use. */
+  formUrl: string;
   /** A single-use page: its document loads are counted, so a second request is visible. */
   oncePageHits(): number;
   onceUrl: string;
@@ -70,6 +72,22 @@ const AGENT_PAGE_HTML = `<!doctype html>
     <p>The agent reached this page through the extension runtime.</p>
     <a href="/next">Next</a>
     <button type="button">Go</button>
+  </body>
+</html>`;
+
+const FORM_PAGE_HTML = `<!doctype html>
+<html>
+  <head><title>Form page</title></head>
+  <body>
+    <main>
+      <div>
+        <h2>Contact</h2>
+        <div><label for="email">Email</label><input id="email" value="draft@example.com"></div>
+      </div>
+      <div><textarea id="notes" aria-label="Notes">draft notes</textarea></div>
+      <div><div id="bio" contenteditable="true" role="textbox" aria-label="Bio">draft bio</div></div>
+      <div><button type="button">Submit</button><div><p id="status">idle</p></div></div>
+    </main>
   </body>
 </html>`;
 
@@ -159,6 +177,13 @@ const startServer = async (state: PairingState): Promise<Server> => {
       return;
     }
 
+    if (url.pathname === '/form') {
+      response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      response.end(FORM_PAGE_HTML);
+
+      return;
+    }
+
     // A single-use destination: the first document load is the one the agent asked for, a second one would spend it again.
     if (url.pathname === '/once') {
       state.oncePageHits += 1;
@@ -200,6 +225,7 @@ export const startFakeHub = async (): Promise<FakeHub> => {
     },
     connected: false,
     frames: [],
+    formUrl: `http://127.0.0.1:${port}/form`,
     oncePageHits: () => state.oncePageHits,
     onceUrl: `http://127.0.0.1:${port}/once`,
     origin: undefined,

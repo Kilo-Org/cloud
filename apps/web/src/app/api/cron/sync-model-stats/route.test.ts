@@ -267,7 +267,10 @@ describe('GET /api/cron/sync-model-stats', () => {
 
     expect((await GET(request())).status).toBe(200);
     expect(syncOpenRouterModels).toHaveBeenCalledWith(
-      [monitoredModel, { ...raw, name: enhanced.name, pricing: enhanced.pricing }],
+      [
+        monitoredModel,
+        { ...raw, name: enhanced.name, pricing: enhanced.pricing, retires_on: enhanced.retires_on },
+      ],
       [monitoredModel.id]
     );
     expectExistingSyncCalls();
@@ -302,7 +305,7 @@ describe('GET /api/cron/sync-model-stats', () => {
     expect(syncOpenRouterModels).toHaveBeenCalledWith(
       [
         monitoredModel,
-        { ...raw, name: enhanced.name, pricing: enhanced.pricing },
+        { ...raw, name: enhanced.name, pricing: enhanced.pricing, retires_on: enhanced.retires_on },
         suppressed,
         enhancedOnly,
       ],

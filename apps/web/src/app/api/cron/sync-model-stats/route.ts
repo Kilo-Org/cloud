@@ -65,6 +65,7 @@ export async function GET(request: NextRequest) {
           ...model,
           pricing: enhancedModel.pricing,
           name: enhancedModel.name,
+          retires_on: enhancedModel.retires_on,
         };
       }
       return model;

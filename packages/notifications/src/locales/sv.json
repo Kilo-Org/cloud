@@ -17,7 +17,7 @@
   },
   "internal": {
     "lowBalance": {
-      "title": "Lågbalansvarning",
+      "title": "Varning för lågt saldo",
       "body": "{{organizationName}}s saldo föll under ${{minimumBalanceUsd}}"
     },
     "spendAlert": {

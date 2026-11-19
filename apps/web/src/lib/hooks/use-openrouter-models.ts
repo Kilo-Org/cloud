@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import type {
   OpenRouterModelsResponse,
   OpenRouterProvidersResponse,
-} from '@kilocode/web-shared/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import * as z from 'zod';
 import { type OrganizationModelAudience } from '@kilocode/app-shared/organizations';
@@ -80,7 +80,7 @@ export function useOpenRouterModels() {
       }
       const body = await response.json();
       const { OpenRouterModelsResponseSchema } =
-        await import('@kilocode/web-shared/lib/organizations/organization-types');
+        await import('@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas');
       return OpenRouterModelsResponseSchema.parse(body);
     },
   });
@@ -96,7 +96,7 @@ export function useOpenRouterProviders() {
       }
       const data = await response.json();
       const { OpenRouterProvidersResponseSchema } =
-        await import('@kilocode/web-shared/lib/organizations/organization-types');
+        await import('@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas');
       return OpenRouterProvidersResponseSchema.parse(data);
     },
   });

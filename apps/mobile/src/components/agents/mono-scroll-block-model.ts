@@ -22,6 +22,13 @@ export function prepareMonoScrollContent(content: string, maxLength?: number) {
 export const DEFAULT_MONO_SCROLL_MAX_LENGTH = 20_000;
 
 /**
+ * The cap a code-read card and a document preview share: one source for the
+ * character budget both gates apply, so a change to it moves every caller.
+ * 50k chars matches the markdown fence cap.
+ */
+export const READ_CODE_CHARACTER_CAP = 50_000;
+
+/**
  * The cap a block actually applies: the caller's when given, the default
  * otherwise. Kept out of `prepareMonoScrollContent` so that function stays a
  * pure slice and callers can still ask for an uncapped string.

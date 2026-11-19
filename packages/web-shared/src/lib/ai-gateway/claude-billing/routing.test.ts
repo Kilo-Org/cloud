@@ -55,7 +55,7 @@ beforeEach(() => {
     .mockResolvedValue({ id: 'connector', google_user_email: 'connector@kilocode.ai' } as never);
 });
 
-function request(kind: 'messages' | 'chat_completions'): GatewayRequest {
+function request(kind: 'messages' | 'chat_completions' = 'messages'): GatewayRequest {
   return {
     kind,
     body: {
@@ -66,9 +66,9 @@ function request(kind: 'messages' | 'chat_completions'): GatewayRequest {
   };
 }
 
-function input(kind: 'messages' | 'chat_completions' = 'messages') {
+function input() {
   return {
-    request: request(kind),
+    request: request(),
     requestedModel: '~anthropic/latest',
     userId: 'user',
     organizationId: undefined,
@@ -168,38 +168,36 @@ describe('Claude customer-billed routing', () => {
     }
   });
 
-  it.each(['messages', 'chat_completions'] as const)(
-    'bills the profile over %s without a Kilo charge',
-    async kind => {
-      const args = input(kind);
-      const result = await checkClaudeBilling(args);
-      if (result?.kind !== 'provider') throw new Error('Expected customer-billed provider');
-      expect(result.provider).toMatchObject({
-        type: 'claude-billing',
-        inferenceProviderId: 'anthropic',
-        apiUrl: 'https://api.anthropic.com/v1',
-      });
-      const headers: Record<string, string> = {};
-      await result.provider.transformRequest({
-        provider: result.provider,
-        model: args.requestedModel,
-        request: args.request,
-        extraHeaders: headers,
-        originalHeaders: {} as never,
-        userByok: null,
-        kilo_user_id: 'user',
-        organization_id: null,
-        session_id: null,
-      });
-      expect(args.request.body).toMatchObject({
-        model: 'claude-sonnet-4-6',
-        billing_policy: { type: 'billing_policy', bill_to: 'user_profile' },
-      });
-      expect(headers['anthropic-user-profile-id']).toBe('uprof_test');
-      expect(headers['anthropic-beta']).toContain('user-profiles-billing-2026-10-01');
-      expect(result.skipBalanceCheck).toBe(true);
-    }
-  );
+  it('bills the profile over the Messages API without a Kilo charge', async () => {
+    const args = input();
+    const result = await checkClaudeBilling(args);
+    if (result?.kind !== 'provider') throw new Error('Expected customer-billed provider');
+    expect(result.provider).toMatchObject({
+      type: 'claude-billing',
+      inferenceProviderId: 'anthropic',
+      apiUrl: 'https://api.anthropic.com/v1',
+      supportedChatApis: ['messages'],
+    });
+    const headers: Record<string, string> = {};
+    await result.provider.transformRequest({
+      provider: result.provider,
+      model: args.requestedModel,
+      request: args.request,
+      extraHeaders: headers,
+      originalHeaders: {} as never,
+      userByok: null,
+      kilo_user_id: 'user',
+      organization_id: null,
+      session_id: null,
+    });
+    expect(args.request.body).toMatchObject({
+      model: 'claude-sonnet-4-6',
+      billing_policy: { type: 'billing_policy', bill_to: 'user_profile' },
+    });
+    expect(headers['anthropic-user-profile-id']).toBe('uprof_test');
+    expect(headers['anthropic-beta']).toContain('user-profiles-billing-2026-10-01');
+    expect(result.skipBalanceCheck).toBe(true);
+  });
 
   it('does not serve an organization request from a personal connection', async () => {
     jest
@@ -394,16 +392,17 @@ describe('Claude customer-billed routing', () => {
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });
 
-  it('does not switch payer for an unsupported API shape', async () => {
-    expect(
-      await checkClaudeBilling({
-        ...input(),
-        request: {
-          kind: 'responses',
-          body: { model: 'anthropic/claude-sonnet-4.6', input: 'hello' },
-        },
-      })
-    ).toMatchObject({ kind: 'unavailable' });
+  it.each<[string, GatewayRequest]>([
+    [
+      'Responses',
+      { kind: 'responses', body: { model: 'anthropic/claude-sonnet-4.6', input: 'hello' } },
+    ],
+    ['Chat Completions', request('chat_completions')],
+  ])('does not switch payer for the %s API', async (_name, gatewayRequest) => {
+    expect(await checkClaudeBilling({ ...input(), request: gatewayRequest })).toMatchObject({
+      kind: 'unavailable',
+      message: 'Use the Messages API with your Claude link.',
+    });
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });
 

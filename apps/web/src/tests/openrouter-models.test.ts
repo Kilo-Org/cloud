@@ -1,5 +1,6 @@
 import { test, expect, describe, afterEach, beforeEach } from '@jest/globals';
 import {
+  cataloguePayload,
   mockOpenRouterModels,
   createMockResponse,
 } from '@kilocode/web-shared/tests/helpers/openrouter-models.helper';
@@ -27,9 +28,9 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getDirectByokModelsForUser } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import type * as DirectByok from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { getEnkryptBenchmarks } from '@kilocode/web-shared/lib/model-stats/enkrypt';
-import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { NextRequest } from 'next/server';
-import { OpenRouterModelsResponseSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { OpenRouterModelsResponseSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { invalidateModelStatsCache } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
 import { fingerprintEnkryptScore } from '@kilocode/web-shared/lib/model-stats/enkrypt-fingerprint';
 import type { ModelStats } from '@kilocode/db/schema';
@@ -248,6 +249,8 @@ function createTestRequest(path: string, headers?: HeadersInit) {
 }
 
 const originalFetch = global.fetch;
+/** The live `/models` fixture padded to the catalogue floor the reader now enforces. */
+const liveCatalogue = cataloguePayload(mockOpenRouterModels.data);
 const realFreeModel = jest.requireActual<typeof FreeModel>(
   '@kilocode/web-shared/lib/ai-gateway/is-free-model'
 );
@@ -317,7 +320,36 @@ describe('GET /api/v1/models', () => {
     expect(responseData.message).toBe('Error from OpenRouter API');
   });
 
-  test('should handle unexpected response format', async () => {
+  test('answers 500 when the live catalogue fails the schema', async () => {
+    const request = createTestRequest('/api/v1/models');
+
+    // Every field the catalogue uses is present and well-typed; a single optional
+    // field carries the wrong type, so only the schema can reject this body.
+    const schemaInvalidModel = {
+      ...mockOpenRouterModels.data[0],
+      per_request_limits: 'unlimited',
+    };
+
+    global.fetch = jest.fn(() => {
+      return Promise.resolve(
+        createMockResponse({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          jsonData: cataloguePayload([schemaInvalidModel]),
+        })
+      );
+    }) as unknown as typeof fetch;
+
+    const response = await GET(request);
+    const responseData = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(responseData.error).toBe('Failed to fetch models');
+    expect(responseData.message).toBe('Error from OpenRouter API');
+  });
+
+  test('answers 500 when the live catalogue is below the floor', async () => {
     const request = createTestRequest('/api/v1/models');
 
     global.fetch = jest.fn(() => {
@@ -326,7 +358,7 @@ describe('GET /api/v1/models', () => {
           ok: true,
           status: 200,
           statusText: 'OK',
-          jsonData: { unexpected: 'format' },
+          jsonData: { data: [mockOpenRouterModels.data[0]] },
         })
       );
     }) as unknown as typeof fetch;
@@ -334,8 +366,9 @@ describe('GET /api/v1/models', () => {
     const response = await GET(request);
     const responseData = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(responseData.unexpected).toBe('format');
+    expect(response.status).toBe(500);
+    expect(responseData.error).toBe('Failed to fetch models');
+    expect(responseData.message).toBe('Error from OpenRouter API');
   });
 
   test('should include defaultModel field in response', async () => {
@@ -347,7 +380,7 @@ describe('GET /api/v1/models', () => {
           ok: true,
           status: 200,
           statusText: 'OK',
-          jsonData: mockOpenRouterModels,
+          jsonData: liveCatalogue,
         })
       );
     }) as unknown as typeof fetch;
@@ -364,22 +397,20 @@ describe('GET /api/v1/models', () => {
   test('excludes unavailable free models advertised upstream while retaining paid Gemma', async () => {
     const original = mockOpenRouterModels.data.find(model => model.id === 'some-other-model');
     if (!original) throw new Error('Expected catalog fixture');
-    const upstream = {
-      data: [
-        ...mockOpenRouterModels.data,
-        { ...original, id: 'google/gemma-4-31b-it', name: 'Google: Gemma 4 31B IT' },
-        ...[
-          'google/gemma-4-26b-a4b-it:free',
-          'google/gemma-4-31b-it:free',
-          'thinkingmachines/inkling:free',
-        ].map(id => ({
-          ...original,
-          id,
-          name: id,
-          pricing: { ...original.pricing, prompt: '0', completion: '0' },
-        })),
-      ],
-    };
+    const upstream = cataloguePayload([
+      ...mockOpenRouterModels.data,
+      { ...original, id: 'google/gemma-4-31b-it', name: 'Google: Gemma 4 31B IT' },
+      ...[
+        'google/gemma-4-26b-a4b-it:free',
+        'google/gemma-4-31b-it:free',
+        'thinkingmachines/inkling:free',
+      ].map(id => ({
+        ...original,
+        id,
+        name: id,
+        pricing: { ...original.pricing, prompt: '0', completion: '0' },
+      })),
+    ]);
     global.fetch = jest
       .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
       .mockResolvedValue(createMockResponse({ jsonData: upstream }));
@@ -405,7 +436,7 @@ describe('GET /api/v1/models', () => {
           ok: true,
           status: 200,
           statusText: 'OK',
-          jsonData: mockOpenRouterModels,
+          jsonData: liveCatalogue,
         })
       );
     }) as unknown as typeof fetch;
@@ -422,7 +453,7 @@ describe('GET /api/v1/models', () => {
     jest.mocked(mockRows).mockResolvedValueOnce(new Map([['some-other-model', enkryptBenchmark]]));
     global.fetch = jest
       .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
-      .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+      .mockResolvedValue(createMockResponse({ jsonData: liveCatalogue }));
 
     const response = await GET(createTestRequest('/api/v1/models'));
     const responseData = OpenRouterModelsResponseSchema.parse(await response.json());
@@ -439,7 +470,7 @@ describe('GET /api/v1/models', () => {
     jest.mocked(getTerminalBenchSummaries).mockResolvedValueOnce(new Map());
     global.fetch = jest
       .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
-      .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+      .mockResolvedValue(createMockResponse({ jsonData: liveCatalogue }));
 
     const response = await GET(createTestRequest('/api/v1/models'));
     const responseData = OpenRouterModelsResponseSchema.parse(await response.json());
@@ -462,7 +493,7 @@ describe('GET /api/v1/models', () => {
       );
     global.fetch = jest
       .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
-      .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+      .mockResolvedValue(createMockResponse({ jsonData: liveCatalogue }));
 
     const response = await GET(createTestRequest('/api/v1/models'));
     const responseData = OpenRouterModelsResponseSchema.parse(await response.json());
@@ -503,7 +534,7 @@ describe('GET /api/v1/models', () => {
     );
     global.fetch = jest
       .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
-      .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+      .mockResolvedValue(createMockResponse({ jsonData: liveCatalogue }));
 
     const response = await GET(createTestRequest('/api/openrouter/models'));
     const responseData = OpenRouterModelsResponseSchema.parse(await response.json());
@@ -558,7 +589,7 @@ describe('GET /api/v1/models', () => {
       );
       global.fetch = jest
         .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
-        .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+        .mockResolvedValue(createMockResponse({ jsonData: liveCatalogue }));
 
       const response = await GET(
         createTestRequest(
@@ -578,7 +609,7 @@ describe('GET /api/v1/models', () => {
   test('omits the Enkrypt field when no score is available', async () => {
     global.fetch = jest
       .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
-      .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+      .mockResolvedValue(createMockResponse({ jsonData: liveCatalogue }));
 
     const response = await GET(createTestRequest('/api/v1/models'));
     const responseData = OpenRouterModelsResponseSchema.parse(await response.json());
@@ -596,7 +627,7 @@ describe('gateway catalog response', () => {
     jest.mocked(mockRows).mockResolvedValueOnce(new Map([['some-other-model', enkryptBenchmark]]));
     global.fetch = jest
       .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
-      .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+      .mockResolvedValue(createMockResponse({ jsonData: liveCatalogue }));
 
     const response = await GET(createTestRequest('/api/v1/models'));
 
@@ -616,12 +647,11 @@ describe('Enkrypt catalog publication boundaries', () => {
     async (path, handler) => {
       mockPublicationEnabled = false;
       jest.mocked(mockRows).mockResolvedValue(new Map([['some-other-model', enkryptBenchmark]]));
-      const upstream = {
-        data: mockOpenRouterModels.data.map(model => ({
-          ...model,
-          enkrypt: publishedEnkryptBenchmark,
-        })),
-      };
+      const upstreamModels = mockOpenRouterModels.data.map(model => ({
+        ...model,
+        enkrypt: publishedEnkryptBenchmark,
+      }));
+      const upstream = cataloguePayload(upstreamModels);
       global.fetch = jest
         .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
         .mockResolvedValue(createMockResponse({ jsonData: upstream }));
@@ -635,7 +665,7 @@ describe('Enkrypt catalog publication boundaries', () => {
         overallScore: 0.551,
         avgAttemptCostUsd: 53.37,
       });
-      expect(upstream.data[0].enkrypt).toEqual(publishedEnkryptBenchmark);
+      expect(upstreamModels[0]?.enkrypt).toEqual(publishedEnkryptBenchmark);
     }
   );
 
@@ -643,9 +673,11 @@ describe('Enkrypt catalog publication boundaries', () => {
     'never trusts raw upstream scores with publication %s',
     async enabled => {
       mockPublicationEnabled = enabled;
-      const upstream = {
-        data: mockOpenRouterModels.data.map(model => ({ ...model, enkrypt: { untrusted: true } })),
-      };
+      const upstreamModels = mockOpenRouterModels.data.map(model => ({
+        ...model,
+        enkrypt: { untrusted: true },
+      }));
+      const upstream = cataloguePayload(upstreamModels);
       global.fetch = jest
         .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
         .mockResolvedValue(createMockResponse({ jsonData: upstream }));
@@ -661,37 +693,16 @@ describe('Enkrypt catalog publication boundaries', () => {
         const data = OpenRouterModelsResponseSchema.parse(response);
         for (const model of data.data) expect(model).not.toHaveProperty('enkrypt');
       }
-      expect(upstream.data[0].enkrypt).toEqual({ untrusted: true });
+      expect(upstreamModels[0]?.enkrypt).toEqual({ untrusted: true });
     }
   );
-
-  test('removes raw scores even when unrelated schema validation fails', async () => {
-    mockPublicationEnabled = false;
-    const upstream = {
-      data: [{ id: 'provider/invalid', enkrypt: publishedEnkryptBenchmark, unrelated: 'retained' }],
-    };
-    global.fetch = jest
-      .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
-      .mockResolvedValue(createMockResponse({ jsonData: upstream }));
-    expect(await getRawOpenRouterModels()).toEqual({
-      data: [{ id: 'provider/invalid', unrelated: 'retained' }],
-    });
-    const transcription = await transcriptionModelsGET(
-      createTestRequest('/api/v1/transcription-models')
-    );
-    expect(transcription.status).toBe(200);
-    expect(await transcription.json()).toEqual({
-      data: [{ id: 'provider/invalid', unrelated: 'retained' }],
-    });
-    expect(upstream.data[0].enkrypt).toEqual(publishedEnkryptBenchmark);
-  });
 
   test('recomputes freshness and the kill switch on each response from the same cached snapshot', async () => {
     const cached = new Map([['some-other-model', enkryptBenchmark]]);
     jest.mocked(mockRows).mockResolvedValue(cached);
     global.fetch = jest
       .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
-      .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+      .mockResolvedValue(createMockResponse({ jsonData: liveCatalogue }));
     const staleAfter = Date.parse(publishedEnkryptBenchmark.staleAfter);
     jest.mocked(Date.now).mockReturnValue(staleAfter - 1);
     const freshResponse = await GET(createTestRequest('/api/v1/models'));
@@ -724,7 +735,7 @@ describe('Enkrypt catalog publication boundaries', () => {
       jest.mocked(mockRows).mockResolvedValue(new Map([['some-other-model', snapshot]]));
       global.fetch = jest
         .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
-        .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+        .mockResolvedValue(createMockResponse({ jsonData: liveCatalogue }));
       const checked = {
         ...publishedEnkryptBenchmark,
         lastCheckedAt: checkedAt,
@@ -770,7 +781,7 @@ describe('Enkrypt catalog publication boundaries', () => {
     jest.mocked(mockRows).mockResolvedValue(new Map([['some-other-model', withoutSource]]));
     global.fetch = jest
       .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
-      .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+      .mockResolvedValue(createMockResponse({ jsonData: liveCatalogue }));
     const response = await GET(createTestRequest('/api/v1/models'));
     const data = OpenRouterModelsResponseSchema.parse(await response.json());
     const published = data.data.find(model => model.id === 'some-other-model')?.enkrypt;
@@ -803,7 +814,7 @@ describe('shared stats and catalog snapshot', () => {
     mockRows.mockResolvedValue(new Map([['some-other-model', enkryptBenchmark]]));
     global.fetch = jest
       .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
-      .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+      .mockResolvedValue(createMockResponse({ jsonData: liveCatalogue }));
   });
 
   test('loads one snapshot per read client for concurrent and sequential list, detail, and catalog responses', async () => {
@@ -972,7 +983,7 @@ describe('final Enkrypt serialization boundaries', () => {
     mockRows.mockResolvedValue(new Map([['some-other-model', enkryptBenchmark]]));
     global.fetch = jest
       .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
-      .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+      .mockResolvedValue(createMockResponse({ jsonData: liveCatalogue }));
   });
 
   describe.each(['deadline', 'invalidation'] as const)('%s while awaiting enrichment', boundary => {
@@ -1100,7 +1111,7 @@ describe('getOpenRouterTranscriptionModels', () => {
   function mockTranscriptionFetch() {
     const fetchMock = jest
       .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
-      .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+      .mockResolvedValue(createMockResponse({ jsonData: liveCatalogue }));
     global.fetch = fetchMock as unknown as typeof fetch;
     return fetchMock;
   }

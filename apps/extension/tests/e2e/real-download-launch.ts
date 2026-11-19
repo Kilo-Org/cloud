@@ -266,8 +266,8 @@ export const launchRealDownloadBrowser = async (
   });
 
   const removeDirs = async (): Promise<void> => {
-    // Chrome's zygote and renderer children can outlive the browser's exit by a moment and keep writing
-    // inside the profile, so a plain rm loses an ENOTEMPTY race. Retry until the tree is finally quiet.
+    // Chrome's zygote and renderer children can outlive the browser and keep writing in the profile for a moment.
+    // A plain rm then loses an ENOTEMPTY race, so retry until the tree is quiet.
     await rm(userDataDir, { force: true, maxRetries: 20, recursive: true, retryDelay: 100 });
     await rm(downloadsPath, { force: true, maxRetries: 20, recursive: true, retryDelay: 100 });
   };

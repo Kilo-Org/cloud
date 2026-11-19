@@ -1605,6 +1605,8 @@
       "renameAccessibility": "Ganti nama sesi: {{title}}",
       "cloningSession": "Menyalin sesi",
       "couldNotLoadThisSession": "Tidak dapat memuat sesi ini.",
+      "historyTooLarge": "Transkrip sesi ini terlalu besar untuk dimuat.",
+      "historyUnavailable": "Transkrip sesi ini tidak dapat dibaca.",
       "cloneFailedRetry": "Tidak dapat menyalin sesi ini. Coba lagi.",
       "notEnoughCredits": "Kredit tidak cukup untuk permintaan ini. Tambah kredit dan coba lagi.",
       "previousTaskFinishing": "Tugas sebelumnya belum selesai. Tunggu sebentar.",

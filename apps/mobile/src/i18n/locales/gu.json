@@ -2148,6 +2148,8 @@
       "renameAccessibility": "સત્રનું નામ બદલો: {{title}}",
       "cloningSession": "સત્રની નકલ બની રહી છે",
       "couldNotLoadThisSession": "આ સત્ર લોડ કરી શકાયું નહીં",
+      "historyTooLarge": "આ સત્રનું ટ્રાન્સ્ક્રિપ્ટ લોડ કરવા માટે ખૂબ મોટું છે.",
+      "historyUnavailable": "આ સત્રનું ટ્રાન્સ્ક્રિપ્ટ વાંચી શકાતું નથી.",
       "cloneFailedRetry": "આ સત્રની નકલ બનાવી શકાઈ નહીં. ફરી પ્રયાસ કરો.",
       "notEnoughCredits": "આ વિનંતી માટે પૂરતા ક્રેડિટ નથી. ક્રેડિટ ઉમેરીને ફરી પ્રયાસ કરો.",
       "previousTaskFinishing": "પાછલું કાર્ય હજી પૂરું થઈ રહ્યું છે. થોડી રાહ જુઓ.",

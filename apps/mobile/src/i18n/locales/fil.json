@@ -2148,6 +2148,8 @@
       "renameAccessibility": "Palitan ang pangalan ng sesyon: {{title}}",
       "cloningSession": "Kinokopya ang sesyon",
       "couldNotLoadThisSession": "Hindi ma-load ang sesyong ito.",
+      "historyTooLarge": "Sobrang laki ng transkrip ng sesyong ito para i-load.",
+      "historyUnavailable": "Hindi mabasa ang transkrip ng sesyong ito.",
       "cloneFailedRetry": "Hindi makopya ang sesyong ito. Subukang muli.",
       "notEnoughCredits": "Kulang ang kredito para sa kahilingang ito. Magdagdag ng kredito at subukang muli.",
       "previousTaskFinishing": "Tinatapos pa ang naunang gawain. Maghintay sandali.",

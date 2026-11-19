@@ -40,10 +40,29 @@ export type SessionHistoryFailureKind = keyof typeof SESSION_HISTORY_FAILURES;
  * unreadable, so the same read answers the same way every time. A retryable
  * failure is absent by design — offering Retry for it is correct.
  */
-export const TERMINAL_SESSION_HISTORY_FAILURE_MESSAGES: readonly string[] = [
-  SESSION_HISTORY_FAILURES.too_large.message,
-  SESSION_HISTORY_FAILURES.invalid_data.message,
+export const TERMINAL_SESSION_HISTORY_FAILURE_KINDS: readonly SessionHistoryFailureKind[] = [
+  'too_large',
+  'invalid_data',
 ];
+
+/** True when the failure kind is one a retry cannot recover. */
+export function isTerminalSessionHistoryFailure(kind: SessionHistoryFailureKind): boolean {
+  return TERMINAL_SESSION_HISTORY_FAILURE_KINDS.includes(kind);
+}
+
+/**
+ * The reader copy key for a failure kind, so the terminal state names the
+ * failure from its type instead of matching the wire's English message. Only
+ * a terminal kind has one; a retryable failure never resolves through it.
+ * The English `message` stays the wire identity of the row itself.
+ */
+export function sessionHistoryFailureCopyKey(
+  kind: SessionHistoryFailureKind
+): 'agentChat.session.historyTooLarge' | 'agentChat.session.historyUnavailable' {
+  return kind === 'too_large'
+    ? 'agentChat.session.historyTooLarge'
+    : 'agentChat.session.historyUnavailable';
+}
 
 /**
  * A typed worker failure, carrying the `code` the query error readers classify

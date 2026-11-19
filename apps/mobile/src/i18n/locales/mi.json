@@ -2148,6 +2148,8 @@
       "renameAccessibility": "Whakaingoatia anō te wātū: {{title}}",
       "cloningSession": "Kei te tārua i te wātū",
       "couldNotLoadThisSession": "Kāore i taea te uta i tēnei wātū",
+      "historyTooLarge": "He rahi rawa te tuhinga kōrero o tēnei wātū kāore e taea te uta.",
+      "historyUnavailable": "Kāore e taea te pānui i te tuhinga kōrero o tēnei wātū.",
       "cloneFailedRetry": "Kāore i taea te tārua i tēnei wātū. Whakamātau anō.",
       "notEnoughCredits": "Kāore e rahi ana ngā moni tōmua hei whakahaere i tēnei tono. Tāpirihia he moni tōmua, kātahi ka whakamātau anō.",
       "previousTaskFinishing": "Kei te whakaoti tonu i te mahi o mua. Tatari mō tētahi wā poto.",

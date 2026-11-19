@@ -1593,6 +1593,8 @@
       "renameAccessibility": "Rinomina la sessione: {{title}}",
       "cloningSession": "Clonazione in corso…",
       "couldNotLoadThisSession": "Impossibile caricare questa sessione.",
+      "historyTooLarge": "La trascrizione di questa sessione è troppo grande da caricare.",
+      "historyUnavailable": "Impossibile leggere la trascrizione di questa sessione.",
       "cloneFailedRetry": "Impossibile clonare questa sessione. Riprova.",
       "notEnoughCredits": "Crediti insufficienti per questa richiesta. Aggiungi crediti e riprova.",
       "previousTaskFinishing": "L'attività precedente non è ancora terminata. Attendi un momento.",

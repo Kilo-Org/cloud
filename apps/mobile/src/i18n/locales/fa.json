@@ -2148,6 +2148,8 @@
       "renameAccessibility": "تغییر نام نشست: {{title}}",
       "cloningSession": "در حال کپی کردن نشست",
       "couldNotLoadThisSession": "بارگذاری این نشست ممکن نشد.",
+      "historyTooLarge": "پیوند این نشست برای بارگذاری بیش از حد بزرگ است.",
+      "historyUnavailable": "پیوند این نشست خوانده نمی‌شود.",
       "cloneFailedRetry": "کپی کردن این نشست ممکن نشد. دوباره تلاش کنید.",
       "notEnoughCredits": "اعتبار کافی برای این درخواست وجود ندارد. اعتبار اضافه کنید و دوباره تلاش کنید.",
       "previousTaskFinishing": "کار قبلی هنوز تمام نشده است. لطفاً کمی صبر کنید.",

@@ -1605,6 +1605,8 @@
       "renameAccessibility": "重新命名工作階段：{{title}}",
       "cloningSession": "複製工作階段中",
       "couldNotLoadThisSession": "無法載入此工作階段。",
+      "historyTooLarge": "此工作階段的對話記錄過大，無法載入。",
+      "historyUnavailable": "無法讀取此工作階段的對話記錄。",
       "cloneFailedRetry": "無法複製此工作階段。請再試一次。",
       "notEnoughCredits": "點數不足，無法執行此請求。請加值後再試一次。",
       "previousTaskFinishing": "上一個任務仍在收尾。請稍候。",

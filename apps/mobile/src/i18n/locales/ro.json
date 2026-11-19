@@ -2192,6 +2192,8 @@
       "renameAccessibility": "Redenumește sesiunea: {{title}}",
       "cloningSession": "Se clonează sesiunea",
       "couldNotLoadThisSession": "Nu s-a putut încărca această sesiune.",
+      "historyTooLarge": "Transcrierea acestei sesiuni este prea mare pentru a fi încărcată.",
+      "historyUnavailable": "Transcrierea acestei sesiuni nu poate fi citită.",
       "cloneFailedRetry": "Nu s-a putut clona această sesiune. Încearcă din nou.",
       "notEnoughCredits": "Nu ai suficiente credite pentru această solicitare. Adaugă credite și încearcă din nou.",
       "previousTaskFinishing": "Sarcina anterioară este în curs de finalizare. Așteaptă puțin.",

@@ -2198,6 +2198,8 @@
       "renameAccessibility": "Renomear sessão: {{title}}",
       "cloningSession": "A clonar a sessão",
       "couldNotLoadThisSession": "Não foi possível carregar esta sessão.",
+      "historyTooLarge": "A transcrição desta sessão é demasiado grande para ser carregada.",
+      "historyUnavailable": "Não é possível ler a transcrição desta sessão.",
       "cloneFailedRetry": "Não foi possível clonar esta sessão. Tente novamente.",
       "notEnoughCredits": "Créditos insuficientes para este pedido. Adicione créditos e tente novamente.",
       "previousTaskFinishing": "A tarefa anterior ainda está a terminar. Aguarde um momento.",

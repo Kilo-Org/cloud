@@ -879,6 +879,19 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
     // The SDK maps `query_directory` onto the `directory` query parameter and
     // `body_directory` onto the `directory` body field, so the wire request is
     // what the wrapper's argument turns into.
+    type EnsureSessionRecord = {
+      id: string;
+      directory: string;
+      title?: string;
+      workspaceID?: string;
+      parentID?: string;
+      share?: { url: string };
+      summary?: { additions: number; deletions: number; files: number };
+      revert?: { messageID: string; partID?: string; snapshot?: string; diff?: string };
+      permission?: unknown;
+      time?: { created: number; updated: number; compacting?: number; archived?: number };
+    };
+
     type EnsureSessionImport = {
       queryDirectory: string | null;
       body: {
@@ -887,21 +900,29 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
         directory?: string;
         projectID?: string;
         title?: string;
+        workspaceID?: string;
+        parentID?: string;
+        shareURL?: string;
+        summary?: EnsureSessionRecord['summary'];
+        revert?: EnsureSessionRecord['revert'];
         timeCreated?: number;
         timeUpdated?: number;
+        timeCompacting?: number;
+        timeArchived?: number;
       };
+    };
+
+    type EnsureSessionUpdate = {
+      queryDirectory: string | null;
+      body: { permission?: EnsureSessionRecord['permission'] };
     };
 
     function startEnsureSessionStub(
       sessionId: string,
-      record?: {
-        id: string;
-        directory: string;
-        title?: string;
-        time?: { created: number; updated: number };
-      }
-    ): { url: string; imports: EnsureSessionImport[] } {
+      record?: EnsureSessionRecord
+    ): { url: string; imports: EnsureSessionImport[]; updates: EnsureSessionUpdate[] } {
       const imports: EnsureSessionImport[] = [];
+      const updates: EnsureSessionUpdate[] = [];
       const server = Bun.serve({
         port: 0,
         async fetch(request) {
@@ -923,6 +944,11 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
                   { status: 404 }
                 );
           }
+          if (request.method === 'PATCH' && url.pathname === `/session/${sessionId}`) {
+            const body = (await request.json()) as EnsureSessionUpdate['body'];
+            updates.push({ queryDirectory: url.searchParams.get('directory'), body });
+            return Response.json({ ...record, id: sessionId });
+          }
           if (request.method === 'POST' && url.pathname === '/kilocode/session-import/session') {
             const body = (await request.json()) as EnsureSessionImport['body'];
             imports.push({ queryDirectory: url.searchParams.get('directory'), body });
@@ -932,17 +958,29 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
         },
       });
       startedServers.push(server);
-      return { url: server.url.toString(), imports };
+      return { url: server.url.toString(), imports, updates };
     }
 
     it('returns without importing when the record already belongs to this directory', async () => {
       const sessionId = 'ses_record_same_directory';
       const directory = temporaryDirectory('kilo-api-same-directory-');
-      const stub = startEnsureSessionStub(sessionId, { id: sessionId, directory });
+      const stub = startEnsureSessionStub(sessionId, {
+        id: sessionId,
+        directory,
+        title: 'keep this title',
+        workspaceID: 'wrk_same',
+        parentID: 'ses_same_parent',
+        share: { url: 'https://share.example/ses_same' },
+        summary: { additions: 3, deletions: 1, files: 2 },
+        revert: { messageID: 'msg_same_revert' },
+        permission: [{ permission: 'bash', pattern: 'git push*', action: 'allow' }],
+        time: { created: 1, updated: 2, compacting: 3, archived: 4 },
+      });
 
       await createClient(stub.url).ensureSession(sessionId, directory);
 
       expect(stub.imports).toHaveLength(0);
+      expect(stub.updates).toHaveLength(0);
     });
 
     it('rebinds a record held by another directory with a forced import', async () => {
@@ -950,11 +988,19 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       const directory = temporaryDirectory('kilo-api-rebind-target-');
       const otherDirectory = temporaryDirectory('kilo-api-rebind-other-');
       const created = 1_700_000_000_000;
+      const revert = { messageID: 'msg_revert', partID: 'prt_revert', snapshot: 'snap_revert' };
+      const permission = [{ permission: 'bash', pattern: 'git push*', action: 'allow' }];
       const stub = startEnsureSessionStub(sessionId, {
         id: sessionId,
         directory: otherDirectory,
         title: 'keep this title',
-        time: { created, updated: created },
+        workspaceID: 'wrk_carried',
+        parentID: 'ses_carried_parent',
+        share: { url: 'https://share.example/ses_carried' },
+        summary: { additions: 7, deletions: 2, files: 3 },
+        revert,
+        permission,
+        time: { created, updated: created + 1, compacting: created + 2, archived: created + 3 },
       });
 
       await createClient(stub.url).ensureSession(sessionId, directory);
@@ -962,14 +1008,57 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       expect(stub.imports).toHaveLength(1);
       const parameters = stub.imports[0];
       if (!parameters) throw new Error('Expected a session import');
-      expect(parameters.body.force).toBe(true);
-      expect(parameters.body.id).toBe(sessionId);
       expect(parameters.queryDirectory).toBe(directory);
-      expect(parameters.body.directory).toBe(directory);
-      // The record keeps the title and times it already has.
-      expect(parameters.body.title).toBe('keep this title');
-      expect(parameters.body.timeCreated).toBe(created);
-      expect(parameters.body.timeUpdated).toBe(created);
+      // The re-point carries every field the record already holds.
+      expect(parameters.body).toMatchObject({
+        id: sessionId,
+        directory,
+        force: true,
+        title: 'keep this title',
+        workspaceID: 'wrk_carried',
+        parentID: 'ses_carried_parent',
+        shareURL: 'https://share.example/ses_carried',
+        summary: { additions: 7, deletions: 2, files: 3 },
+        revert,
+        timeCreated: created,
+        timeUpdated: created + 1,
+        timeCompacting: created + 2,
+        timeArchived: created + 3,
+      });
+    });
+
+    it('applies a record ruleset through the update endpoint', async () => {
+      const sessionId = 'ses_record_permission';
+      const directory = temporaryDirectory('kilo-api-permission-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-permission-other-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' }];
+      const stub = startEnsureSessionStub(sessionId, {
+        id: sessionId,
+        directory: otherDirectory,
+        permission,
+      });
+
+      await createClient(stub.url).ensureSession(sessionId, directory);
+
+      expect(stub.updates).toHaveLength(1);
+      expect(stub.updates[0]).toEqual({ queryDirectory: directory, body: { permission } });
+    });
+
+    it('does not apply a record permission that is not a ruleset', async () => {
+      const sessionId = 'ses_record_permission_map';
+      const directory = temporaryDirectory('kilo-api-permission-map-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-permission-map-other-');
+      const stub = startEnsureSessionStub(sessionId, {
+        id: sessionId,
+        directory: otherDirectory,
+        permission: { bash: 'deny' },
+      });
+
+      await createClient(stub.url).ensureSession(sessionId, directory);
+
+      expect(stub.imports).toHaveLength(1);
+      expect(stub.imports[0]?.body).not.toHaveProperty('permission');
+      expect(stub.updates).toHaveLength(0);
     });
 
     it('imports an absent record without a force flag', async () => {

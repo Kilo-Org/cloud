@@ -634,21 +634,20 @@ export function createWrapperKiloClient(
       // A record outside this directory is not this route's session. The
       // native import re-points a record it already holds only when the caller
       // sets `force`, so the mismatch case sets it and the absent case does not.
-      let rebind = false;
-      let record: { title?: string; time?: { created: number; updated: number } } | undefined;
-      if (existing.response?.status !== 404) {
-        const data = requireSdkData(existing, `Session get for ${sessionId}`);
-        if (data.id !== sessionId) {
+      const record =
+        existing.response?.status === 404
+          ? undefined
+          : requireSdkData(existing, `Session get for ${sessionId}`);
+      if (record) {
+        if (record.id !== sessionId) {
           throw new Error(`Session get for ${sessionId} returned an invalid session`);
         }
         if (
-          typeof data.directory === 'string' &&
-          (await sameDirectory(data.directory, directory))
+          typeof record.directory === 'string' &&
+          (await sameDirectory(record.directory, directory))
         ) {
           return;
         }
-        rebind = true;
-        record = { title: data.title, time: data.time };
       }
       const currentProject = await v2Client.project.current(
         { directory },
@@ -667,18 +666,39 @@ export function createWrapperKiloClient(
           id: sessionId,
           projectID: project.id,
           slug: sessionId.slice(0, 24),
-          // A re-pointed record keeps the title and times it already has.
+          // A re-pointed record keeps the fields it already carries.
           title: record?.title ?? 'New session - ' + new Date(now).toISOString(),
           version: KILO_CLI_VERSION,
-          ...(rebind ? { force: true } : {}),
+          ...(record ? { force: true } : {}),
+          ...(record?.workspaceID === undefined ? {} : { workspaceID: record.workspaceID }),
+          ...(record?.parentID === undefined ? {} : { parentID: record.parentID }),
+          ...(record?.share === undefined ? {} : { shareURL: record.share.url }),
+          ...(record?.summary === undefined ? {} : { summary: record.summary }),
+          ...(record?.revert === undefined ? {} : { revert: record.revert }),
           timeCreated: record?.time?.created ?? now,
           timeUpdated: record?.time?.updated ?? now,
+          ...(record?.time?.compacting === undefined
+            ? {}
+            : { timeCompacting: record.time.compacting }),
+          ...(record?.time?.archived === undefined ? {} : { timeArchived: record.time.archived }),
         },
         { signal: signal ? AbortSignal.any([signal, importTimeout]) : importTimeout }
       );
       const data = requireSdkData(imported, `Session import for ${sessionId}`);
       if (!data.ok || data.id !== sessionId) {
         throw new Error(`Session import for ${sessionId} returned an invalid session`);
+      }
+      // The import body types `permission` as a string map, while a record
+      // carries a ruleset, so the ruleset is applied through the update
+      // endpoint that accepts it. The read is unvalidated JSON, so check the
+      // shape before applying it.
+      if (record?.permission !== undefined && Array.isArray(record.permission)) {
+        const restoreTimeout = AbortSignal.timeout(8_000);
+        const restored = await v2Client.session.update(
+          { sessionID: sessionId, directory, permission: record.permission },
+          { signal: signal ? AbortSignal.any([signal, restoreTimeout]) : restoreTimeout }
+        );
+        requireSdkData(restored, `Session permission restore for ${sessionId}`);
       }
     },
 

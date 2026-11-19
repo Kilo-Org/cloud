@@ -550,11 +550,20 @@ describe('createWrapperKiloClient session initialization', () => {
   });
 
   it('preserves an existing custom-titled session in its attached directory without importing', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(
-        Response.json({ id: 'kilo_sess', title: 'My chosen title', directory: workspacePath })
-      );
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({
+        id: 'kilo_sess',
+        title: 'My chosen title',
+        directory: workspacePath,
+        workspaceID: 'wrk_same',
+        parentID: 'ses_same_parent',
+        share: { url: 'https://share.example/kilo_sess' },
+        summary: { additions: 3, deletions: 1, files: 2 },
+        revert: { messageID: 'msg_same_revert' },
+        permission: [{ permission: 'edit', pattern: '*', action: 'deny' }],
+        time: { created: 1, updated: 2, compacting: 3, archived: 4 },
+      })
+    );
     vi.stubGlobal('fetch', fetchMock);
     const client = createWrapperKiloClient(createSdkClient(), { url: 'http://127.0.0.1:0' }, '/');
 
@@ -624,21 +633,57 @@ describe('createWrapperKiloClient session initialization', () => {
 
   it('re-points a record held by another directory with a forced import', async () => {
     const otherDirectory = `${workspacePath}-other`;
+    const payload = {
+      title: 'Keep me',
+      workspaceID: 'wrk_carried',
+      parentID: 'ses_parent',
+      share: { url: 'https://share.example/kilo_sess' },
+      summary: { additions: 4, deletions: 2, files: 2 },
+      revert: { messageID: 'msg_revert', partID: 'prt_revert', snapshot: 'snap_revert' },
+      permission: [{ permission: 'bash', pattern: 'git push*', action: 'allow' }],
+      time: {
+        created: 1_700_000_000_000,
+        updated: 1_700_000_000_001,
+        compacting: 1_700_000_000_002,
+        archived: 1_700_000_000_003,
+      },
+    };
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(Response.json({ id: 'kilo_sess', directory: otherDirectory }))
+      .mockResolvedValueOnce(
+        Response.json({ id: 'kilo_sess', directory: otherDirectory, ...payload })
+      )
       .mockResolvedValueOnce(Response.json({ id: nativeProjectId }))
-      .mockResolvedValueOnce(Response.json({ ok: true, id: 'kilo_sess' }));
+      .mockResolvedValueOnce(Response.json({ ok: true, id: 'kilo_sess' }))
+      .mockResolvedValueOnce(Response.json({ id: 'kilo_sess' }));
     vi.stubGlobal('fetch', fetchMock);
     const client = createWrapperKiloClient(createSdkClient(), { url: 'http://127.0.0.1:0' }, '/');
 
     await client.ensureSession('kilo_sess', workspacePath);
 
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
     const imported = fetchMock.mock.calls[2]?.[0] as Request;
     expect(new URL(imported.url).pathname).toBe('/kilocode/session-import/session');
-    const body = await imported.json();
-    expect(body).toMatchObject({ id: 'kilo_sess', directory: workspacePath, force: true });
+    expect(await imported.json()).toMatchObject({
+      id: 'kilo_sess',
+      directory: workspacePath,
+      force: true,
+      title: payload.title,
+      workspaceID: payload.workspaceID,
+      parentID: payload.parentID,
+      shareURL: payload.share.url,
+      summary: payload.summary,
+      revert: payload.revert,
+      timeCreated: payload.time.created,
+      timeUpdated: payload.time.updated,
+      timeCompacting: payload.time.compacting,
+      timeArchived: payload.time.archived,
+    });
+    const restored = fetchMock.mock.calls[3]?.[0] as Request;
+    expect(restored.method).toBe('PATCH');
+    expect(new URL(restored.url).pathname).toBe('/session/kilo_sess');
+    expect(new URL(restored.url).searchParams.get('directory')).toBe(workspacePath);
+    expect(await restored.json()).toEqual({ permission: payload.permission });
   });
 
   it('requires the lookup to return the requested session', async () => {

@@ -14,6 +14,7 @@ import {
   insetsState,
   mountTab,
   pushMock,
+  renderNode,
   replyScrollFns,
   rerenderTab,
   resetState,
@@ -22,6 +23,7 @@ import {
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
 import { type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 
 beforeEach(() => {
@@ -126,6 +128,42 @@ describe('PrReviewDiscussionTab full-body states', () => {
       BASE_PROPS.onRequestFiles
     );
     expect(bottomPaddedViews(renderer)).toHaveLength(0);
+  });
+
+  it('gives the empty body the provider link when the server cut the conversation', () => {
+    discussionState.conversation = [{ nodeId: 'c1', createdAt: null }];
+    discussionState.conversationTruncated = true;
+    const renderer = mountTab();
+    const list = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+
+    // The page carries rows, so the list owns the empty body and renders this
+    // tab-owned node there; render it to read the action it fills.
+    const body = renderNode(list.props.emptyState as React.ReactElement);
+    const action = body.root.find(node => String(node.type) === 'StateAction');
+    expect(action.props.label).toBe(i18n.t('common.viewOnGitHub'));
+    expect(action.props.onPress).not.toBe(BASE_PROPS.onRequestFiles);
+    expect(list.props.truncatedConversationCount).toBe(1);
+
+    act(() => {
+      body.unmount();
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the Files action on the empty body when the conversation is complete', () => {
+    discussionState.conversation = [{ nodeId: 'c1', createdAt: null }];
+    const renderer = mountTab();
+    const list = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+
+    const body = renderNode(list.props.emptyState as React.ReactElement);
+    const action = body.root.find(node => String(node.type) === 'StateAction');
+    expect(action.props.label).toBe(i18n.t('prReview.discussion.reviewFiles'));
+    expect(action.props.onPress).toBe(BASE_PROPS.onRequestFiles);
+
+    act(() => {
+      body.unmount();
+      renderer.unmount();
+    });
   });
 
   it('keeps retained comments and a retry action after a transient first-page failure', () => {

@@ -4,7 +4,7 @@
 // the test file must import this module FIRST, before the tab or any other
 // module that has to resolve against these mocks.
 
-import { createElement } from 'react';
+import { createElement, type ReactElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { expect, vi } from 'vitest';
 
@@ -110,13 +110,17 @@ vi.mock('@/components/pr-review/pr-review-unavailable-actions', () => ({
   PrReviewUnavailableActions: 'PrReviewUnavailableActions',
 }));
 vi.mock('@/components/empty-state', () => ({
-  EmptyState: 'EmptyState',
+  // Renders the action slot as a child so a test reads the `StateAction` the
+  // tab fills it with; the host node keeps the props the tests already assert.
+  EmptyState: ({ action, ...props }: { action?: ReactNode }) =>
+    createElement('EmptyState', { ...props, action }, action),
   StateAction: 'StateAction',
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
+  ExternalLink: 'ExternalLink',
   FolderOpen: 'FolderOpen',
   MessageSquarePlus: 'MessageSquarePlus',
 }));
@@ -151,6 +155,10 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
     warning: vi.fn(),
   },
 }));
+// The tab's empty action reuses `ProviderViewAction` from the list footer, so
+// the footer module's imports resolve here too. The one this node environment
+// cannot load is the opener: the real module reaches expo-web-browser.
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 
 export const BASE_PROPS = {
   owner: 'octocat',
@@ -186,6 +194,20 @@ export function rerenderTab(renderer: TestRenderer.ReactTestRenderer): void {
   act(() => {
     renderer.update(createElement(PrReviewDiscussionTab, BASE_PROPS));
   });
+}
+
+/** Renders a node the tab hands down — its empty state, say — on its own, so a
+ * test reads what that node renders rather than the element's props. */
+export function renderNode(node: ReactElement): TestRenderer.ReactTestRenderer {
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  act(() => {
+    ref.current = TestRenderer.create(node);
+  });
+  const renderer = ref.current;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
 }
 
 export function bottomPaddedViews(

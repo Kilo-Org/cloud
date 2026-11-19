@@ -1,7 +1,9 @@
 // The Discussion list's footer: the cut-conversation notice, the later-page
 // retry row and the Load more button, in that order. Extracted from
 // pr-review-discussion-list.tsx so the list stays under the max-lines cap; the
-// list still mounts it in both the normal and the filtered-empty branch.
+// list still mounts it in both the normal and the filtered-empty branch. The
+// notice renders only when the list carries rows; an empty body's way out
+// lives in provider-view-action.tsx.
 
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -11,17 +13,12 @@ import { ExternalLink } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { openExternalUrl } from '@/lib/external-link';
 import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import {
-  type ProviderPrRef,
-  providerPrTermKey,
-  providerPrWebUrl,
-  providerViewOnLabel,
-  useProviderPrWebUrl,
-} from '@/lib/pr-review/provider-pr-ref';
+import { type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
+
+import { useProviderPrLink } from './provider-view-action';
 
 export type ListFooterProps = {
   readonly prRef: ProviderPrRef;
@@ -112,7 +109,8 @@ export function ListFooter({
 /**
  * The server's conversation ceiling notice: how much of the discussion the app
  * has, and the one place the rest of it is reachable. The count is what the
- * list actually carries, so it stays true if the ceiling moves.
+ * list actually carries, so it stays true if the ceiling moves. Renders only
+ * when the list carries rows: an empty body has nothing to count.
  */
 function TruncatedConversationNotice({
   count,
@@ -120,13 +118,7 @@ function TruncatedConversationNotice({
 }: Readonly<{ count: number; prRef: ProviderPrRef }>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const serverWebUrl = useProviderPrWebUrl();
-  // GitHub and Bitbucket host every repository, so the ref alone is the whole
-  // URL; GitLab needs the instance the read resolved, which is the published
-  // one. The GitHub arm publishes null on purpose, so reading the context
-  // alone would leave the one recovery affordance off the GitHub surface.
-  const prUrl = providerPrWebUrl({ ref: prRef, serverWebUrl });
-  const label = providerViewOnLabel(t, prRef.platform);
+  const { url, label, open } = useProviderPrLink(prRef);
   return (
     <View className="w-full items-center gap-2">
       <Text variant="muted" className="text-center text-xs">
@@ -135,15 +127,12 @@ function TruncatedConversationNotice({
           displayCount: formatNumber(count, i18n.language),
         })}
       </Text>
-      {prUrl === null ? null : (
+      {url === null ? null : (
         <Button
           size="sm"
           variant="outline"
           className={STATE_ACTION_CLASS}
-          onPress={() => {
-            // "Could not open {{label}}" names the thing, not the action.
-            void openExternalUrl(prUrl, { label: t(providerPrTermKey(prRef.platform)) });
-          }}
+          onPress={open}
           accessibilityLabel={label}
         >
           <View className="flex-row items-center gap-2">

@@ -4,6 +4,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { openExternalUrl } from '@/lib/external-link';
 import { type ProviderPrRef, ProviderPrWebUrlProvider } from '@/lib/pr-review/provider-pr-ref';
 import { ListFooter, type ListFooterProps } from './pr-review-discussion-list-footer';
+import { ProviderViewAction } from './provider-view-action';
 
 const GITHUB_REF: ProviderPrRef = {
   platform: 'github',
@@ -39,6 +40,9 @@ vi.mock('@/lib/screen-insets', () => ({ useDetailScreenBottomPadding: () => 32 }
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({ ExternalLink: 'ExternalLink' }));
+// The action slot belongs to the shared empty state; the notice's own suites
+// read it as a host node, the way they read Button and Text.
+vi.mock('@/components/empty-state', () => ({ StateAction: 'StateAction' }));
 
 const BASE_PROPS: ListFooterProps = {
   prRef: GITHUB_REF,
@@ -213,6 +217,58 @@ describe('ListFooter truncated conversation notice', () => {
       node => (node.type as unknown) === 'View' && node.props.style !== undefined
     );
     expect(spacer.props.style).toEqual({ height: 32 });
+
+    renderer.unmount();
+  });
+});
+
+// The empty body's way out: the same provider link the notice offers, filled
+// into a state's action slot instead of an outlined button under a count.
+describe('ProviderViewAction', () => {
+  function mountAction(
+    prRef: ProviderPrRef,
+    webUrl: string | null = null
+  ): TestRenderer.ReactTestRenderer {
+    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+    act(() => {
+      ref.current = TestRenderer.create(
+        <ProviderPrWebUrlProvider value={webUrl}>
+          <ProviderViewAction prRef={prRef} />
+        </ProviderPrWebUrlProvider>
+      );
+    });
+    const renderer = ref.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    return renderer;
+  }
+
+  it('fills the state action slot with the provider link', () => {
+    const renderer = mountAction(GITHUB_REF);
+
+    const action = renderer.root.find(node => (node.type as unknown) === 'StateAction');
+    expect(action.props.label).toBe('common.viewOnGitHub');
+    expect(action.props.icon).toBe('ExternalLink');
+
+    act(() => {
+      (action.props.onPress as () => void)();
+    });
+    expect(openExternalUrl).toHaveBeenCalledWith(PR_WEB_URL, {
+      label: 'prReview.terms.pullRequest',
+    });
+
+    renderer.unmount();
+  });
+
+  it('renders nothing when the ref cannot resolve a URL', () => {
+    const renderer = mountAction({
+      platform: 'gitlab',
+      projectPath: 'octocat/hello-world',
+      mrIid: 7,
+    });
+
+    expect(renderer.root.findAll(node => (node.type as unknown) === 'StateAction')).toHaveLength(0);
 
     renderer.unmount();
   });

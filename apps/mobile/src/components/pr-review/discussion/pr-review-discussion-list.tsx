@@ -13,6 +13,7 @@ import { EmptyState } from '@/components/empty-state';
 import { CommentRow } from '@/components/pr-review/discussion/comment-row';
 import { DiscussionThread } from '@/components/pr-review/discussion/discussion-thread';
 import { ListFooter } from '@/components/pr-review/discussion/pr-review-discussion-list-footer';
+import { ProviderViewAction } from '@/components/pr-review/discussion/provider-view-action';
 import { Card } from '@/components/ui/card';
 import { MessageSquarePlus } from '@/components/ui/icons';
 import { commentAuthorRowTopPadding } from '@/lib/pr-review/comment-trailing-controls';
@@ -159,6 +160,14 @@ export function PrReviewDiscussionList({
     }
     return result;
   }, [listItems, hiddenLogins]);
+  // The counted notice describes rows the body actually carries. An empty body
+  // carries none, so handing the count down would have "No discussion yet" and
+  // a "500 were cut" claim side by side; the empty state's action is that
+  // body's way out instead.
+  const visibleEmpty = visibleItems.length === 0;
+  // Both footer mounts read this: the counted notice never renders under a
+  // body that carries no rows.
+  const footerTruncatedCount = visibleEmpty ? null : truncatedConversationCount;
 
   // Landscape: side insets keep comment/thread cards clear of the sensor
   // housing (rows keep their px-4 gutter, so the insets add to it); portrait
@@ -175,7 +184,7 @@ export function PrReviewDiscussionList({
   // tab hands down the empty state it already owns for this surface; the
   // footer stays mounted so later pages (whose rows may be visible) and a
   // later-page retry stay reachable from the filtered body.
-  if (visibleItems.length === 0 && emptyState) {
+  if (visibleEmpty && emptyState) {
     return (
       <View className="flex-1">
         {emptyState}
@@ -184,7 +193,7 @@ export function PrReviewDiscussionList({
           hasNextPage={hasNextPage}
           isFetchingNextPage={isFetchingNextPage}
           laterPageError={laterPageError}
-          truncatedConversationCount={truncatedConversationCount}
+          truncatedConversationCount={footerTruncatedCount}
           onLoadMore={onLoadMore}
           onRetryLoadMore={onRetryLoadMore}
         />
@@ -283,6 +292,13 @@ export function PrReviewDiscussionList({
               ? t('prReview.terms.noDiscussionDescription')
               : t('prReview.discussion.noDiscussionDescription')
           }
+          // A cut conversation has more to read on the provider's page, and
+          // with no rows to count the state's action is the body's one way out.
+          action={
+            visibleEmpty && (truncatedConversationCount ?? 0) > 0 ? (
+              <ProviderViewAction prRef={ref} />
+            ) : null
+          }
         />
       }
       ListFooterComponent={
@@ -291,7 +307,7 @@ export function PrReviewDiscussionList({
           hasNextPage={hasNextPage}
           isFetchingNextPage={isFetchingNextPage}
           laterPageError={laterPageError}
-          truncatedConversationCount={truncatedConversationCount}
+          truncatedConversationCount={footerTruncatedCount}
           onLoadMore={onLoadMore}
           onRetryLoadMore={onRetryLoadMore}
         />

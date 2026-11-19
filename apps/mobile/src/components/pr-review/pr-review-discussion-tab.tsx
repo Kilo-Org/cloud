@@ -38,7 +38,9 @@
 //                   conversation comments AND no terminal error;
 //                   render `EmptyState` with copy covering both
 //                   kinds and a "Review files" CTA that switches
-//                   to the Files tab via `onRequestFiles`.
+//                   to the Files tab via `onRequestFiles`. When the
+//                   server cut the conversation, the CTA is the
+//                   provider link instead: the rest is on its page.
 //
 //   - bottom CTA:   the happy and empty views render a static
 //                   "Comment on this pull request" bar under the
@@ -70,6 +72,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CommentModerationProvider } from '@/components/pr-review/discussion/comment-moderation';
 import { PrReviewDiscussionList } from '@/components/pr-review/discussion/pr-review-discussion-list';
+import { ProviderViewAction } from '@/components/pr-review/discussion/provider-view-action';
 import { PrCommentCta } from '@/components/pr-review/discussion/pr-comment-cta';
 import { providerPrSheetHref } from '@/components/pr-review/pr-review-provider-sheet-href';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
@@ -417,6 +420,24 @@ export function PrReviewDiscussionTab({
     </View>
   );
 
+  // The server cut the conversation at its page ceiling while the page still
+  // carried comments: the rest is on the provider's page, so that page is the
+  // empty body's way out. A complete conversation keeps the Files action.
+  const conversationCut = conversationTruncated && conversation.length > 0;
+  // The empty body's one way out, in that order.
+  let emptyAction: ReactNode = null;
+  if (conversationCut) {
+    emptyAction = <ProviderViewAction prRef={ref} />;
+  } else if (onRequestFiles) {
+    emptyAction = (
+      <StateAction
+        label={t('prReview.discussion.reviewFiles')}
+        icon={FolderOpen}
+        onPress={onRequestFiles}
+      />
+    );
+  }
+
   // The tab owns the empty copy for both the empty view and the list, whose
   // blocked / muted filter can remove every row the page returned. The list
   // renders this node instead of its rows when that happens, so the body never
@@ -430,15 +451,7 @@ export function PrReviewDiscussionTab({
           ? t('prReview.terms.noDiscussionDescription')
           : t('prReview.discussion.noDiscussionDescription')
       }
-      action={
-        onRequestFiles ? (
-          <StateAction
-            label={t('prReview.discussion.reviewFiles')}
-            icon={FolderOpen}
-            onPress={onRequestFiles}
-          />
-        ) : null
-      }
+      action={emptyAction}
     />
   );
 
@@ -582,9 +595,7 @@ export function PrReviewDiscussionTab({
         hasNextPage={query.hasNextPage}
         isFetchingNextPage={query.isFetchingNextPage}
         laterPageError={laterPageError || retainedContentError}
-        truncatedConversationCount={
-          conversationTruncated && conversation.length > 0 ? conversation.length : null
-        }
+        truncatedConversationCount={conversationCut ? conversation.length : null}
         onLoadMore={() => {
           void query.fetchNextPage();
         }}

@@ -87,7 +87,14 @@ vi.mock('@/lib/trpc', () => ({
     },
   },
 }));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    // The cut-conversation notice is the one interpolated string this suite
+    // asserts, so the mock spells its count placeholders out.
+    t: (key: string, options?: { count?: number; displayCount?: string }) =>
+      options ? `${key}=${String(options.count)}/${String(options.displayCount)}` : key,
+  }),
+}));
 // The real `@/i18n` module initializes i18next at import time; the delete
 // mutation only needs `t` for its failure copy, which this suite asserts.
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key, language: 'en' } }));
@@ -125,7 +132,10 @@ vi.mock('@/components/pr-review/discussion/discussion-thread', () => ({
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/empty-state', () => ({
-  EmptyState: 'EmptyState',
+  // Renders the action slot as a child so a test reads the action the list
+  // fills it with; the host node keeps the props the suite already asserts.
+  EmptyState: ({ action, ...props }: { action?: ReactNode }) =>
+    createElement('EmptyState', { ...props, action }, action),
   StateAction: 'StateAction',
 }));
 vi.mock('@/components/ui/icons', () => ({
@@ -633,6 +643,57 @@ describe('PrReviewDiscussionList hidden-author filtering', () => {
     // empty state to fall back to, it keeps the list contract (here: no rows).
     expect(renderer.root.findAll(node => String(node.type) === 'CommentRow')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyStateMarker')).toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+// The server can cut the conversation while the visible body is empty. The
+// counted notice would then sit under "No discussion yet" claiming a count the
+// body does not carry, so the empty body's way out is the state action instead.
+describe('PrReviewDiscussionList cut conversation under an empty body', () => {
+  beforeEach(() => {
+    moderation.blockedLogins = [];
+    moderation.mutedLogins = [];
+  });
+
+  function noticeTexts(renderer: TestRenderer.ReactTestRenderer): unknown[] {
+    return renderer.root
+      .findAll(node => String(node.type) === 'Text')
+      .map(node => node.props.children);
+  }
+
+  it('offers the provider link through the state action and drops the count', () => {
+    const renderer = mountList(undefined, {
+      listItems: [],
+      truncatedConversationCount: 500,
+    });
+
+    const actions = renderer.root.findAll(node => String(node.type) === 'StateAction');
+    expect(actions).toHaveLength(1);
+    expect(actions[0]?.props.label).toBe('common.viewOnGitHub');
+    expect(
+      renderer.root.find(node => String(node.type) === 'EmptyState').props.action
+    ).toBeDefined();
+    expect(
+      noticeTexts(renderer).filter(
+        text =>
+          typeof text === 'string' && text.includes('prReview.discussion.conversationTruncated')
+      )
+    ).toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('renders the counted notice when the list carries a row', () => {
+    const renderer = mountList(undefined, { truncatedConversationCount: 500 });
+
+    expect(noticeTexts(renderer)).toContain('prReview.discussion.conversationTruncated=500/500');
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
 
     act(() => {
       renderer.unmount();

@@ -33,6 +33,7 @@ import {
 } from '@/lib/hooks/use-security-remediation';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { remediationNeedsAnalysisRefresh, type SecurityAnalysis } from '@/lib/security-agent';
 import { getRemediationUnavailableKey } from '@/lib/security-agent-copy';
 import { openFindingLink } from '@/lib/security-agent-link';
@@ -175,6 +176,7 @@ export function FindingRemediationPanel({
   onRetry,
 }: Readonly<FindingRemediationPanelProps>) {
   const colors = useThemeColors();
+  const sideInsetStyle = useSideInsetStyle();
   const mutedDisabledInk = useMutedDisabledInk();
   const router = useRouter();
   const { t } = useTranslation();
@@ -190,10 +192,12 @@ export function FindingRemediationPanel({
 
   if (isLoading && !analysis) {
     return (
-      <View className={SCREEN_BODY_CLASS}>
-        <Skeleton className="h-16 w-full rounded-xl" />
-        <Skeleton className="h-32 w-full rounded-xl" />
-        {dialog}
+      <View style={sideInsetStyle}>
+        <View className={SCREEN_BODY_CLASS}>
+          <Skeleton className="h-16 w-full rounded-xl" />
+          <Skeleton className="h-32 w-full rounded-xl" />
+          {dialog}
+        </View>
       </View>
     );
   }

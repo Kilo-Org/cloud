@@ -3463,6 +3463,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Finalizado",
+      "planStatusTrialEndsOn": " · La prueba termina el {{date}}",
+      "planStatusTrialing": " · Prueba",
       "planEnded": "La prueba de la organización ha finalizado y no tiene ningún plan activo.",
       "manageBilling": "Gestionar facturación",
       "renamePlaceholder": "Nombre de la organización",

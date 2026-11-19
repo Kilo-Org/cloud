@@ -3588,6 +3588,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · lõppenud",
+      "planStatusTrialEndsOn": " · prooviperiood lõpeb {{date}}",
+      "planStatusTrialing": " · prooviperiood",
       "planEnded": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti.",
       "manageBilling": "Halda arveldust",
       "lowBalanceBelow": "Alla {{amount}}"

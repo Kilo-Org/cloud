@@ -3405,6 +3405,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Berakhir",
+      "planStatusTrialEndsOn": " · Uji coba berakhir pada {{date}}",
+      "planStatusTrialing": " · Uji coba",
       "planEnded": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif.",
       "manageBilling": "Kelola penagihan",
       "renamePlaceholder": "Nama organisasi",

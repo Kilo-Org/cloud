@@ -3588,6 +3588,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Fini",
+      "planStatusTrialEndsOn": " · Esè a ap fini {{date}}",
+      "planStatusTrialing": " · Esè",
       "planEnded": "Esè òganizasyon an fini epi li pa gen okenn plan aktif.",
       "manageBilling": "Jere faktirasyon",
       "lowBalanceBelow": "Anba {{amount}}"

@@ -3405,6 +3405,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Sona erdi",
+      "planStatusTrialEndsOn": " · Deneme {{date}} tarihinde bitiyor",
+      "planStatusTrialing": " · Deneme",
       "planEnded": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok.",
       "manageBilling": "Faturalandırmayı yönet",
       "renamePlaceholder": "Kuruluş adı",

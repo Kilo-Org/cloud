@@ -3824,6 +3824,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Wedi dod i ben",
+      "planStatusTrialEndsOn": " · Treial yn dod i ben ar {{date}}",
+      "planStatusTrialing": " · Treial",
       "planEnded": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol.",
       "manageBilling": "Rheoli bilio",
       "lowBalanceBelow": "O dan {{amount}}"

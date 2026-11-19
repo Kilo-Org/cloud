@@ -3588,6 +3588,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · አልቋል",
+      "planStatusTrialEndsOn": " · ሙከራው {{date}} ላይ ያበቃል",
+      "planStatusTrialing": " · ሙከራ",
       "planEnded": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም።",
       "manageBilling": "ክፍያን አስተዳድር",
       "lowBalanceBelow": "ከ{{amount}} በታች"

@@ -3588,6 +3588,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · ကုန်ဆုံးသွားပြီ",
+      "planStatusTrialEndsOn": " · အစမ်းသုံးကာလ {{date}} တွင် ကုန်ဆုံးမည်",
+      "planStatusTrialing": " · အစမ်းသုံးကာလ",
       "planEnded": "အဖွဲ့အစည်း၏ အစမ်းသုံးကာလ ကုန်ဆုံးသွားပြီး သက်ဝင်သော အစီအစဉ် မရှိတော့ပါ။",
       "manageBilling": "ငွေတောင်းခံမှု စီမံခန့်ခွဲရန်",
       "lowBalanceBelow": "{{amount}} အောက်"

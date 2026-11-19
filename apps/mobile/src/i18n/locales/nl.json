@@ -3405,6 +3405,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Afgelopen",
+      "planStatusTrialEndsOn": " · Proefperiode eindigt op {{date}}",
+      "planStatusTrialing": " · Proefperiode",
       "planEnded": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement.",
       "manageBilling": "Facturering beheren",
       "renamePlaceholder": "Naam van de organisatie",

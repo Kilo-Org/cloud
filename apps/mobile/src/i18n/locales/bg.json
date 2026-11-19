@@ -3588,6 +3588,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Приключил",
+      "planStatusTrialEndsOn": " · Пробният период изтича на {{date}}",
+      "planStatusTrialing": " · Пробен период",
       "planEnded": "Пробният период на организацията е приключил и тя няма активен план.",
       "manageBilling": "Управление на плащанията",
       "lowBalanceBelow": "Под {{amount}}"

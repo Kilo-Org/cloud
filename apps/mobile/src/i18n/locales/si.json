@@ -3588,6 +3588,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · කාලය අවසන් වී ඇත",
+      "planStatusTrialEndsOn": " · අත්හදා බැලීම {{date}} දින අවසන් වේ",
+      "planStatusTrialing": " · අත්හදා බැලීම",
       "planEnded": "සංවිධානයේ පරීක්ෂණ කාලය අවසන් වී ඇති අතර එයට සක්‍රීය සැලැස්මක් නොමැත.",
       "manageBilling": "බිල්පත් කළමනාකරණය",
       "lowBalanceBelow": "{{amount}} ට පහළින්"

@@ -3588,6 +3588,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Natapos",
+      "planStatusTrialEndsOn": " · Matatapos ang trial sa {{date}}",
+      "planStatusTrialing": " · Trial",
       "planEnded": "Natapos na ang trial ng organisasyon at wala itong aktibong plano.",
       "manageBilling": "Pamahalaan ang pagsingil",
       "lowBalanceBelow": "Mas mababa sa {{amount}}"

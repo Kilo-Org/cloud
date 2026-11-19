@@ -3521,6 +3521,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Закончился",
+      "planStatusTrialEndsOn": " · Пробный период закончится {{date}}",
+      "planStatusTrialing": " · Пробный период",
       "planEnded": "Пробный период организации закончился, и у неё нет активного плана.",
       "manageBilling": "Управление оплатой",
       "renamePlaceholder": "Название организации",

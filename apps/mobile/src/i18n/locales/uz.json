@@ -3588,6 +3588,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Muddati tugagan",
+      "planStatusTrialEndsOn": " · Sinov muddati {{date}} kuni tugaydi",
+      "planStatusTrialing": " · Sinov muddati",
       "planEnded": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas.",
       "manageBilling": "To'lovni boshqarish",
       "lowBalanceBelow": "{{amount}} dan kam"

@@ -3588,6 +3588,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Başa çatıb",
+      "planStatusTrialEndsOn": " · Sınaq müddəti {{date}} tarixində bitir",
+      "planStatusTrialing": " · Sınaq müddəti",
       "planEnded": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur.",
       "manageBilling": "Ödənişi idarə et",
       "lowBalanceBelow": "{{amount}}-dan aşağı"

@@ -3588,6 +3588,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Amaitua",
+      "planStatusTrialEndsOn": " · Proba-aldiaren amaiera: {{date}}",
+      "planStatusTrialing": " · Proba-aldia",
       "planEnded": "Erakundearen probaldia amaitu da eta ez du plan aktiborik.",
       "manageBilling": "Kudeatu fakturazioa",
       "lowBalanceBelow": "{{amount}} baino gutxiago"

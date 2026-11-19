@@ -3588,6 +3588,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Аяқталды",
+      "planStatusTrialEndsOn": " · Сынақ мерзімі {{date}} күні аяқталады",
+      "planStatusTrialing": " · Сынақ мерзімі",
       "planEnded": "Ұйымның сынақ мерзімі аяқталды және оның белсенді жоспары жоқ.",
       "manageBilling": "Төлемдерді басқару",
       "lowBalanceBelow": "{{amount}} сомасынан төмен"

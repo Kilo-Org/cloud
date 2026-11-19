@@ -3706,6 +3706,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Pasibaigęs",
+      "planStatusTrialEndsOn": " · Bandomasis laikotarpis baigsis {{date}}",
+      "planStatusTrialing": " · Bandomasis laikotarpis",
       "planEnded": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano.",
       "manageBilling": "Atsiskaitymų valdymas",
       "lowBalanceBelow": "Mažiau nei {{amount}}"

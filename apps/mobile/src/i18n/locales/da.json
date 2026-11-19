@@ -3588,6 +3588,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Udløbet",
+      "planStatusTrialEndsOn": " · Prøveperioden slutter den {{date}}",
+      "planStatusTrialing": " · Prøveperiode",
       "planEnded": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan.",
       "manageBilling": "Administrer fakturering",
       "lowBalanceBelow": "Under {{amount}}"

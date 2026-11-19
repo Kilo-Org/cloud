@@ -5,6 +5,7 @@ import {
   getAutoTopUpLinkLabel,
   getAutoTopUpReadout,
   getOrgSubscriptionState,
+  getOrgTrialHubStatusPill,
   getOrgTrialStatusPill,
   getScheduledSeatChange,
   type OrgSeatSubscription,
@@ -274,6 +275,37 @@ describe('getOrgTrialStatusPill', () => {
       getOrgTrialStatusPill({ trialStatus: 'trial_expired_hard', trialEndsAt: null })
     ).toBeNull();
     expect(getOrgTrialStatusPill({ trialStatus: null, trialEndsAt: null })).toBeNull();
+  });
+});
+
+describe('getOrgTrialHubStatusPill', () => {
+  it('states the end date of a running trial with the row separator', () => {
+    const pill = getOrgTrialHubStatusPill({
+      trialStatus: 'trial_ending_very_soon',
+      trialEndsAt: '2026-11-19T00:00:00.000Z',
+    });
+    expect(pill?.tone).toBe('default');
+    // The hub label carries its own leading separator: KvRow concatenates the
+    // value and the status with none of its own.
+    expect(pill?.label.startsWith(' · ')).toBe(true);
+    expect(pill?.label).toContain('Trial ends on ');
+  });
+
+  it('falls back to the short status when the trial has no usable end', () => {
+    const pill = getOrgTrialHubStatusPill({
+      trialStatus: 'trial_ending_very_soon',
+      trialEndsAt: 'not-a-timestamp',
+    });
+    expect(pill?.tone).toBe('default');
+    expect(pill?.label.startsWith(' · ')).toBe(true);
+  });
+
+  it('has no pill when the trial is not what governs the organization', () => {
+    expect(getOrgTrialHubStatusPill({ trialStatus: 'subscribed', trialEndsAt: null })).toBeNull();
+    expect(
+      getOrgTrialHubStatusPill({ trialStatus: 'trial_expired_hard', trialEndsAt: null })
+    ).toBeNull();
+    expect(getOrgTrialHubStatusPill({ trialStatus: null, trialEndsAt: null })).toBeNull();
   });
 });
 

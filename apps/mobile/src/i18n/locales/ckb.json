@@ -3588,6 +3588,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · کۆتایی هاتووە",
+      "planStatusTrialEndsOn": " · تاقیکردنەوە لە {{date}} کۆتایی دێت",
+      "planStatusTrialing": " · تاقیکردنەوە",
       "planEnded": "تاقیکردنەوەی ڕێکخراوەکە کۆتایی هاتووە و هیچ پلانێکی چالاکی نییە.",
       "manageBilling": "بەڕێوەبردنی پارەدان",
       "lowBalanceBelow": "کەمتر لە {{amount}}"

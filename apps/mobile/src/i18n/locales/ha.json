@@ -3588,6 +3588,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Ya ƙare",
+      "planStatusTrialEndsOn": " · Gwaji zai ƙare a ranar {{date}}",
+      "planStatusTrialing": " · Gwaji",
       "planEnded": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki.",
       "manageBilling": "Sarrafa biyan kuɗi",
       "lowBalanceBelow": "Ƙasa da {{amount}}"

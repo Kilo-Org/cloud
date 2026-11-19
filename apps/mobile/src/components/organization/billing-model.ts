@@ -95,35 +95,79 @@ function formattedPeriodEnd(input: OrgSeatSubscription): string | null {
 }
 
 /**
- * The trial readout as a state pill, or `null` when the organization is not on
- * a running trial. Both surfaces that name the plan state read this one
- * function, so the copy and the criteria cannot drift between them. The
- * running-stage set is the server's own predicate
- * (`isRunningTrialStage` in `@kilocode/app-shared/organizations`, defined in
- * `@kilocode/organization-entitlement` beside the day-boundary classifier), so
- * a renamed stage fails there at type time, and the entitlement suite ties the
- * set to the classifier's output day by day, which fails if a new stage is
- * added without joining the set.
+ * The decision both trial readouts share: `null` unless the organization is on
+ * a running trial, else the trial's end. The running-stage set is the server's
+ * own predicate (`isRunningTrialStage` in `@kilocode/app-shared/organizations`,
+ * defined in `@kilocode/organization-entitlement` beside the day-boundary
+ * classifier), so a renamed stage fails there at type time, and the
+ * entitlement suite ties the set to the classifier's output day by day, which
+ * fails if a new stage is added without joining the set.
  *
  * The date is parsed with `parseTimestamp`: `new Date()` throws on the
  * PostgreSQL timestamps Hermes cannot read, and the server sends the trial end
- * as an ISO instant either way.
+ * as an ISO instant either way. An absent or unparseable readout is no known
+ * end (`null`), never a fabricated date.
  */
-export function getOrgTrialStatusPill(trial: OrgTrialState): BillingState | null {
+function runningTrialEnd(trial: OrgTrialState): { endsAt: Date | null } | null {
   if (!isRunningTrialStage(trial.trialStatus)) {
     return null;
   }
   const endsAt = trial.trialEndsAt;
   const date = endsAt == null ? null : parseTimestamp(endsAt);
+  return { endsAt: date != null && !Number.isNaN(date.getTime()) ? date : null };
+}
+
+/** The trial end's date imprint; both trial readouts print the same date. */
+const TRIAL_END_FORMAT: Intl.DateTimeFormatOptions = {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+};
+
+/**
+ * The trial readout as a state pill, or `null` when the organization is not on
+ * a running trial. The criteria and the date formatting come from
+ * `runningTrialEnd` and `TRIAL_END_FORMAT`, shared with the hub readout below,
+ * so they cannot drift between the surfaces.
+ */
+export function getOrgTrialStatusPill(trial: OrgTrialState): BillingState | null {
+  const end = runningTrialEnd(trial);
+  if (end == null) {
+    return null;
+  }
   // Neutral ink: the end date is a fact the reader schedules around, not a
   // success badge — the only saturated green value on a screen of facts pulled
   // the eye off the plan.
-  if (date == null || Number.isNaN(date.getTime())) {
+  if (end.endsAt == null) {
     return { label: i18n.t('organization.billing.stateTrialing'), tone: 'default' };
   }
   return {
     label: i18n.t('organization.billing.stateTrialEndsOn', {
-      date: formatDate(date, i18n.language, { year: 'numeric', month: 'short', day: 'numeric' }),
+      date: formatDate(end.endsAt, i18n.language, TRIAL_END_FORMAT),
+    }),
+    tone: 'default',
+  };
+}
+
+/**
+ * The hub's trial readout, in the copy the plan row shows beside its value.
+ * `KvRow` concatenates value and status with no separator, so the hub label
+ * carries its own leading one; the trial criteria and the date formatting
+ * still come from the one shared helper (`runningTrialEnd` and the format
+ * above), so this readout and the billing one cannot drift.
+ */
+export function getOrgTrialHubStatusPill(trial: OrgTrialState): BillingState | null {
+  const end = runningTrialEnd(trial);
+  if (end == null) {
+    return null;
+  }
+  // Same neutral ink as the billing readout: a trial end date is a fact.
+  if (end.endsAt == null) {
+    return { label: i18n.t('organization.hub.planStatusTrialing'), tone: 'default' };
+  }
+  return {
+    label: i18n.t('organization.hub.planStatusTrialEndsOn', {
+      date: formatDate(end.endsAt, i18n.language, TRIAL_END_FORMAT),
     }),
     tone: 'default',
   };

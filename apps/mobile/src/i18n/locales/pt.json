@@ -3653,6 +3653,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Terminado",
+      "planStatusTrialEndsOn": " · Período experimental termina a {{date}}",
+      "planStatusTrialing": " · Período experimental",
       "planEnded": "O período de teste da organização terminou e esta não tem um plano ativo.",
       "manageBilling": "Gerir faturação",
       "lowBalanceBelow": "Abaixo de {{amount}}"

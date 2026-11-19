@@ -3637,6 +3637,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · منتهية",
+      "planStatusTrialEndsOn": " · تنتهي الفترة التجريبية في {{date}}",
+      "planStatusTrialing": " · فترة تجريبية",
       "planEnded": "انتهت الفترة التجريبية للمؤسسة ولم تعد لديها خطة نشطة.",
       "manageBilling": "إدارة الفوترة",
       "renamePlaceholder": "اسم المؤسسة",

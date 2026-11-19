@@ -3588,6 +3588,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Umeisha",
+      "planStatusTrialEndsOn": " · Majaribio yanaisha tarehe {{date}}",
+      "planStatusTrialing": " · Majaribio",
       "planEnded": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika.",
       "manageBilling": "Dhibiti bili",
       "lowBalanceBelow": "Chini ya {{amount}}"

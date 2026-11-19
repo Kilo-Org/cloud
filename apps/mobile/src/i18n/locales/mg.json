@@ -3588,6 +3588,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Lany",
+      "planStatusTrialEndsOn": " · Hifarana amin'ny {{date}} ny fanandramana",
+      "planStatusTrialing": " · Fanandramana",
       "planEnded": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy.",
       "manageBilling": "Hitantana faktiora",
       "lowBalanceBelow": "Latsaky ny {{amount}}"

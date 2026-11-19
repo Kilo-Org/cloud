@@ -18,6 +18,7 @@ import { renderWithProviders } from '@/test/render-with-providers';
 import { compiledDimensions, compiledLengthDp } from '@/test/native-dimensions';
 
 import { i18n } from '@/i18n';
+import { formatDate } from '@/lib/format';
 import { AddCreditsRow } from '@/components/add-credits-row';
 import { type OrgKiloPassRowState, type OrgKiloPassSummary } from './org-kilo-pass-row-state';
 import { OrganizationHubScreen } from './hub-screen';
@@ -466,14 +467,23 @@ describe('Organization hub plan', () => {
     const { renderer, unmount } = await renderHub();
 
     const row = planRow(renderer);
-    // The tier keeps the row's ordinary ink; the trial is the state beside it,
-    // in the same words the billing screen's state row uses.
+    // The tier keeps the row's ordinary ink and is never folded into a status
+    // word; the trial is the state beside it, in the hub's own words.
     expect(row?.props.value).toBe(i18n.t('organization.hub.planEnterprise'));
     expect(row?.props.valueTone).toBeUndefined();
+    // The status label is the composed hub readout, and it carries its own
+    // leading separator — KvRow concatenates value and status with none of
+    // its own, so a label like `TeamsTrial ends on …` fails here.
+    const expectedDate = formatDate(new Date('2026-11-24T00:00:00.000Z'), i18n.language, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
     expect(row?.props.valueStatus).toMatchObject({
-      label: 'Trial ends on 2026-11-24',
+      label: i18n.t('organization.hub.planStatusTrialEndsOn', { date: expectedDate }),
       tone: 'default',
     });
+    expect(row?.props.valueStatus?.label.startsWith(' · ')).toBe(true);
     // A running trial is not the lapsed state, so nothing above the card
     // explains an ending that has not happened.
     expect(refusals(renderer)).toHaveLength(0);

@@ -3588,6 +3588,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · ਖਤਮ ਹੋ ਗਈ",
+      "planStatusTrialEndsOn": " · ਟ੍ਰਾਇਲ {{date}} ਨੂੰ ਖ਼ਤਮ ਹੋਵੇਗਾ",
+      "planStatusTrialing": " · ਟ੍ਰਾਇਲ",
       "planEnded": "ਸੰਸਥਾ ਦਾ ਟ੍ਰਾਇਲ ਖਤਮ ਹੋ ਗਿਆ ਹੈ ਅਤੇ ਇਸਦੀ ਕੋਈ ਸਰਗਰਮ ਯੋਜਨਾ ਨਹੀਂ ਹੈ।",
       "manageBilling": "ਬਿਲਿੰਗ ਪ੍ਰਬੰਧ ਕਰੋ",
       "lowBalanceBelow": "{{amount}} ਤੋਂ ਘੱਟ"

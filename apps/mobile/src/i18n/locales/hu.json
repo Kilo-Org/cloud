@@ -3588,6 +3588,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Lejárt",
+      "planStatusTrialEndsOn": " · A próbaidőszak vége: {{date}}",
+      "planStatusTrialing": " · Próbaidőszak",
       "planEnded": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja.",
       "manageBilling": "Számlázás kezelése",
       "lowBalanceBelow": "{{amount}} alatt"

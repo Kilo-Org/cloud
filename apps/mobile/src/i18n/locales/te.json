@@ -3588,6 +3588,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · ముగిసింది",
+      "planStatusTrialEndsOn": " · ట్రయల్ {{date}}న ముగుస్తుంది",
+      "planStatusTrialing": " · ట్రయల్",
       "planEnded": "సంస్థ యొక్క ట్రయల్ ముగిసింది మరియు దానికి సక్రియ ప్లాన్ లేదు.",
       "manageBilling": "బిల్లింగ్ను నిర్వహించండి",
       "lowBalanceBelow": "{{amount}} కంటే తక్కువ"

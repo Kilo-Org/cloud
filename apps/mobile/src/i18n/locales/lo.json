@@ -3588,6 +3588,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · ສິ້ນສຸດ",
+      "planStatusTrialEndsOn": " · ການທົດລອງໃຊ້ສິ້ນສຸດໃນວັນທີ {{date}}",
+      "planStatusTrialing": " · ທົດລອງໃຊ້",
       "planEnded": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່.",
       "manageBilling": "ຈັດການການຮຽກເກັບເງິນ",
       "lowBalanceBelow": "ຕໍ່າກວ່າ {{amount}}"

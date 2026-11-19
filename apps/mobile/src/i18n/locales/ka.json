@@ -3588,6 +3588,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · დასრულებული",
+      "planStatusTrialEndsOn": " · საცდელი პერიოდი სრულდება {{date}}",
+      "planStatusTrialing": " · საცდელი პერიოდი",
       "planEnded": "ორგანიზაციის საცდელი პერიოდი დასრულდა და მას აქტიური გეგმა არ აქვს.",
       "manageBilling": "ანგარიშსწორების მართვა",
       "lowBalanceBelow": "{{amount}}-ზე ნაკლები"

@@ -3706,6 +3706,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Skončil",
+      "planStatusTrialEndsOn": " · Zkušební období končí {{date}}",
+      "planStatusTrialing": " · Zkušební období",
       "planEnded": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán.",
       "manageBilling": "Spravovat fakturaci",
       "lowBalanceBelow": "Pod {{amount}}"

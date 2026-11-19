@@ -22,7 +22,10 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { AddCreditsRow } from '@/components/add-credits-row';
 import { KiloPassIcon } from '@/components/kilo-pass/kilo-pass-icon';
-import { getOrgTrialStatusPill, seatCountReadout } from '@/components/organization/billing-model';
+import {
+  getOrgTrialHubStatusPill,
+  seatCountReadout,
+} from '@/components/organization/billing-model';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import {
   getOrgKiloPassRowState,
@@ -219,11 +222,11 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   // exactly as it does for the new-session composer. Only the server's boolean
   // is read; nothing re-derives the plan state from seats or balance.
   const planEnded = org.isTrialExpiredForEnforcement;
-  // The pill speaks the trial's own words — the same readout the billing
-  // screen's state row uses, from the boundary row the server already
-  // classified — and is absent whenever the trial is not what governs the
-  // organization.
-  const trialPill = getOrgTrialStatusPill(org);
+  // The pill speaks the trial's own words with the separator the plan row
+  // needs (KvRow concatenates value and status) — the hub readout, from the
+  // boundary row the server already classified — and is absent whenever the
+  // trial is not what governs the organization.
+  const trialPill = getOrgTrialHubStatusPill(org);
   const planName =
     org.plan === 'enterprise'
       ? t('organization.hub.planEnterprise')

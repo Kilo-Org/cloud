@@ -3405,6 +3405,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · 종료됨",
+      "planStatusTrialEndsOn": " · {{date}}에 체험 종료",
+      "planStatusTrialing": " · 체험 중",
       "planEnded": "조직의 체험이 종료되었으며 활성 요금제가 없습니다.",
       "manageBilling": "결제 관리",
       "renamePlaceholder": "조직 이름",

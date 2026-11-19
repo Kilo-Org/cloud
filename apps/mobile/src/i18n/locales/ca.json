@@ -3647,6 +3647,8 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Caducat",
+      "planStatusTrialEndsOn": " · La prova acaba el {{date}}",
+      "planStatusTrialing": " · Prova",
       "planEnded": "El període de prova de l'organització ha finalitzat i no té cap pla actiu.",
       "manageBilling": "Gestiona la facturació",
       "lowBalanceBelow": "Per sota de {{amount}}"

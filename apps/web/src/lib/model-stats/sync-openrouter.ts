@@ -117,7 +117,7 @@ export async function syncOpenRouterModels(
           // Note: NOT updating isActive - preserve user's setting
           isRecommended,
           ...deriveModelStatsIdentity(updatedModelData.id),
-          name: updatedModelData.name,
+          name: modelNameWithRetirement(updatedModelData),
           description: updatedModelData.description,
           priceInput: toPricePerMillion(updatedModelData.pricing?.prompt),
           priceOutput: toPricePerMillion(updatedModelData.pricing?.completion),

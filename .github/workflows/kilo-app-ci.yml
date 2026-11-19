@@ -587,12 +587,13 @@ jobs:
   # entry a failed audit would leave the required check green.
   #
   # The harness SDK producer starts beside change detection, so it also runs on
-  # a change this suite does not cover. A failed job would fail that run, and
-  # the release reuses only a run that concluded successfully, so the producer
-  # reports a failed build as an output and does not fail its own job. This job
-  # counts that output only when detection reported a mobile change: a real
-  # build failure then fails this required check, while on other runs its
-  # consumers fail on the missing artifact.
+  # a change this suite does not cover, where no job reads its artifact. Two
+  # failures of that job can only come from that change: a failed build, which
+  # the producer reports as an output instead of failing its own job, because a
+  # failed job fails a run the release reuses; and a failed job step that is not
+  # the build. This job counts both only when detection reported a mobile
+  # change. A real build failure then fails this required check, while on other
+  # runs the missing artifact fails the jobs that need it.
   mobile-test-result:
     needs: [mobile-changes, prepare-harness-sdk, prepare-trpc, mobile-test, i18n-catalogs]
     if: ${{ !cancelled() }}
@@ -601,18 +602,22 @@ jobs:
     steps:
       - name: Check test results
         env:
-          RESULTS: ${{ toJSON(needs.*.result) }}
+          RESULTS: ${{ toJSON(needs) }}
           MOBILE: ${{ needs.mobile-changes.outputs.mobile }}
-          SDK_FAILED: ${{ needs.prepare-harness-sdk.outputs.failed }}
         run: |
           echo "$RESULTS"
-          if jq -e 'any(.[]; . == "failure" or . == "cancelled")' <<< "$RESULTS" > /dev/null; then
-            exit 1
-          fi
-          # The harness producer reports a failed build instead of failing its
-          # own job, because a failed job fails a run the release reuses. Count
-          # that report only when detection selected the suite: otherwise no job
-          # reads the artifact and the failure cannot come from this change.
-          if [ "$MOBILE" = "true" ] && [ "$SDK_FAILED" = "true" ]; then
+          # The harness producer starts beside change detection, so it also runs
+          # on a change this suite does not cover, where no job reads its
+          # artifact. Its job result and its reported build failure therefore
+          # count only when detection selected the suite: otherwise the failure
+          # cannot come from this change. Every other need always counts.
+          if jq -e --arg mobile "$MOBILE" '
+            [
+              to_entries[]
+              | select(($mobile == "true") or (.key != "prepare-harness-sdk"))
+              | if .value.outputs.failed == "true" then "failure" else .value.result end
+            ]
+            | any(.[]; . == "failure" or . == "cancelled")
+          ' <<< "$RESULTS" > /dev/null; then
             exit 1
           fi

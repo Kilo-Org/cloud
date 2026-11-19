@@ -356,19 +356,22 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   );
 }
 
-// A dev-only forced data state (`force-state-fixture.ts`) answers its
-// procedures in this link's fetch, so the split below sends them here.
+// Both links share one latency-measured fetch. In a dev build it also answers
+// a dev-only forced data state (`force-state-fixture.ts`); the split below
+// sends every forced procedure to the single link, and a batched call passes.
+const linkFetch = __DEV__ ? withForceState(measuredFetch) : measuredFetch;
+
 const singleLink = httpLink({
   url: trpcUrl,
   headers: getAuthHeaders,
-  fetch: __DEV__ ? withForceState(measuredFetch) : measuredFetch,
+  fetch: linkFetch,
   methodOverride: 'POST',
 });
 
 const batchLink = httpBatchLink({
   url: trpcUrl,
   headers: getAuthHeaders,
-  fetch: measuredFetch,
+  fetch: linkFetch,
   methodOverride: 'POST',
 });
 

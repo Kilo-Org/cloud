@@ -202,15 +202,19 @@ async function forcedFetch(
   return errorResponse(FORCED_ERRORS[mode], path);
 }
 
+/** The query parameter tRPC's batch link adds to every batched call. */
+const BATCH_QUERY = /[?&]batch=1(?:&|$)/;
+
 /**
- * The fetch of the unbatched tRPC link, answering a forced procedure in the
- * mode. The tRPC link routes every forced procedure here (a batch would mix
- * forced and live calls); a batched URL reaches the backend unchanged.
+ * The links' shared fetch, answering a forced procedure in the mode. The split
+ * link routes every forced procedure to the single link (a batch would mix
+ * forced and live calls), so a batched URL reaches the backend unchanged.
  */
 export function withForceState(fetchImpl: typeof fetch): typeof fetch {
   return (input, init) => {
-    const procedure = trpcProcedureText(requestUrlString(input));
-    if (procedure === undefined || procedure.includes(',')) {
+    const url = requestUrlString(input);
+    const procedure = trpcProcedureText(url);
+    if (procedure === undefined || BATCH_QUERY.test(url)) {
       return fetchImpl(input, init);
     }
     return forcedFetch(procedure, () => fetchImpl(input, init), init?.signal);

@@ -278,4 +278,14 @@ describe('forced answers through the real tRPC link', () => {
     );
     expect(transport).toHaveBeenCalledTimes(2);
   });
+
+  it('passes a batched call through while a mode holds', async () => {
+    force('kiloapp:///dev/force-state/permission');
+    const url = `${TRPC_URL}/codeReviews.listForUser?batch=1`;
+
+    const response = await withForceState(transport)(url, { method: 'POST' });
+
+    expect(response.status).toBe(200);
+    expect(transport).toHaveBeenCalledExactlyOnceWith(url, { method: 'POST' });
+  });
 });

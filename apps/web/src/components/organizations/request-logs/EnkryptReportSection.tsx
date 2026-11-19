@@ -1,13 +1,14 @@
 import type { EnkryptDetectorId } from '@kilocode/db/schema-types';
-import type {
-  EnkryptFlaggedTool,
-  EnkryptGuardrailReport,
-  EnkryptInputScanReport,
-  EnkryptOutputGuardrailReport,
-  EnkryptOutputScanReport,
-  EnkryptToolScanReport,
+import {
+  ENKRYPT_GUARDRAIL_TIMEOUT_MS,
+  type EnkryptFlaggedTool,
+  type EnkryptGuardrailReport,
+  type EnkryptInputScanReport,
+  type EnkryptOutputGuardrailReport,
+  type EnkryptOutputScanReport,
+  type EnkryptToolScanReport,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { PII_ENTITY_DETAILS } from '@/components/organizations/guardrails/EnkryptDetectorList';
 import { DetailGrid, DetailSection, ToneBadge, yesNo, type DetailItem } from './detail-primitives';
 import { detectorLabel } from './enkrypt-usage-labels';
@@ -34,6 +35,14 @@ const DECISIONS: Record<Scan['decision'], { label: string; tone: StepTone }> = {
   error_fail_open: { label: 'Enkrypt failed, allowed unscanned', tone: 'deferred' },
   error_logged: { label: 'Error, logged only', tone: 'deferred' },
   client_aborted: { label: 'Client aborted', tone: 'skipped' },
+};
+
+/** For a scan some of whose calls finished and others failed or were never sent. */
+const PARTLY_FAILED_DECISIONS: Partial<
+  Record<Scan['decision'], { label: string; tone: StepTone }>
+> = {
+  error_fail_open: { label: 'Enkrypt partly failed, rest allowed unscanned', tone: 'deferred' },
+  error_logged: { label: 'Partly failed, logged only', tone: 'deferred' },
 };
 
 const SKIPPED = { label: 'Not scanned, request blocked', tone: 'skipped' } as const;
@@ -121,24 +130,52 @@ const STORED_DESPITE_ERROR_NOTES = {
   possible: 'Failed text may be cached as allowed until its entry expires.',
 };
 
+function storedValue(scan: EnkryptInputScanReport): ReactNode {
+  if (scan.verdict_cache_write !== 'written') return null;
+  const failed = storedDespiteError(scan) === 'certain' ? (scan.failed_calls_cached ?? 0) : 0;
+  if (scan.calls_cached === undefined) {
+    return failed > 0 ? (
+      <span className="text-status-warning whitespace-nowrap">stored (failed, 5 min)</span>
+    ) : (
+      'stored'
+    );
+  }
+  const verdicts = scan.calls_cached > 0 && (
+    <span className="whitespace-nowrap">
+      {formatCount(scan.calls_cached)} {scan.calls_cached === 1 ? 'verdict' : 'verdicts'}
+    </span>
+  );
+  const failures = failed > 0 && (
+    <span className="text-status-warning whitespace-nowrap">
+      {formatCount(failed)} failed (5 min)
+    </span>
+  );
+  if (!verdicts && !failures) return 'stored';
+  return (
+    <>
+      stored {verdicts}
+      {verdicts && failures && ', '}
+      {failures}
+    </>
+  );
+}
+
 function verdictCacheItem(scan: EnkryptInputScanReport): DetailItem {
   const lookup = isPartialHit(scan) ? 'Partial hit' : VERDICT_CACHE_LABELS[scan.verdict_cache];
-  const stored = scan.verdict_cache_write === 'written';
+  const stored = storedValue(scan);
   return {
     label: 'Verdict cache',
     hint:
       scan.total_units === undefined
         ? 'Hit: at least one unit cached. Stored: new verdicts cached.'
-        : 'Hit: every unit cached. Partial hit: some. Stored: new verdicts cached.',
-    value:
-      storedDespiteError(scan) === 'certain' ? (
-        <>
-          {lookup},{' '}
-          <span className="text-status-warning whitespace-nowrap">stored (failed, 5 min)</span>
-        </>
-      ) : (
-        `${lookup}${stored ? ', stored' : ''}`
-      ),
+        : 'Hit: every unit cached. Partial hit: some. Stored: new verdicts cached, failed calls only for 5 minutes.',
+    value: stored ? (
+      <>
+        {lookup}, {stored}
+      </>
+    ) : (
+      lookup
+    ),
   };
 }
 
@@ -190,7 +227,7 @@ function charactersSent(scan: Scan): DetailItem {
   }
   return {
     label: 'Characters sent',
-    hint: 'Includes slice headers and overlaps, so it can exceed the total.',
+    hint: 'Only calls that were sent. Includes slice headers and overlaps, so it can exceed the total.',
     value: `${formatCount(scan.scanned_characters)} of ${formatCount(scan.total_characters)}`,
   };
 }
@@ -211,10 +248,10 @@ function charactersCached(scan: EnkryptInputScanReport): DetailItem {
   };
 }
 
-function attempts(scan: Scan): DetailItem {
+function callsMade(scan: Scan): DetailItem {
   return {
-    label: 'Attempts',
-    hint: 'Enkrypt calls made.',
+    label: 'Calls made',
+    hint: 'Enkrypt calls sent.',
     value: formatCount(scan.attempts),
   };
 }
@@ -226,6 +263,133 @@ function callsSkipped(scan: EnkryptInputScanReport): DetailItem[] {
       label: 'Calls skipped',
       hint: 'Not made, since the request was already blocked. Not cached.',
       value: formatCount(scan.calls_skipped),
+    },
+  ];
+}
+
+type CallOutcomes = NonNullable<EnkryptInputScanReport['call_outcomes']>;
+
+function sentCalls(outcomes: CallOutcomes): number {
+  return outcomes.allowed + outcomes.flagged + outcomes.blocked + outcomes.failed;
+}
+
+/** Whether some calls finished while others failed or were never sent. */
+function isPartlyFailed(scan: Scan): boolean {
+  if (scan.part === 'response' || !scan.call_outcomes) return false;
+  const { allowed, flagged, blocked, failed, not_sent } = scan.call_outcomes;
+  return allowed + flagged + blocked > 0 && failed + not_sent > 0;
+}
+
+/** Every uncached unit's call and how it ended, in one row. */
+function callsBreakdown(scan: EnkryptInputScanReport, outcomes: CallOutcomes): DetailItem {
+  const skipped = scan.calls_skipped ?? 0;
+  const needed = sentCalls(outcomes) + outcomes.not_sent + skipped;
+  const counts = [
+    [outcomes.allowed, 'allowed'],
+    [outcomes.flagged, 'flagged'],
+    [outcomes.blocked, 'blocked'],
+    [outcomes.failed, 'failed'],
+    [outcomes.not_sent, 'not sent'],
+    [skipped, 'skipped'],
+  ] as const;
+  return {
+    label: 'Calls',
+    hint: 'One per uncached unit. Failed: sent, but no result, for example cut off by the deadline. Not sent: no time was left, or the client disconnected. Skipped: the request was already blocked.',
+    value:
+      needed === 0 ? (
+        'None needed'
+      ) : (
+        <>
+          {[
+            `${formatCount(needed)} needed`,
+            ...counts.flatMap(([count, label]) =>
+              count > 0 ? [`${formatCount(count)} ${label}`] : []
+            ),
+          ].map((text, index) => (
+            <Fragment key={text}>
+              {index > 0 && ' · '}
+              <span className="whitespace-nowrap">{text}</span>
+            </Fragment>
+          ))}
+        </>
+      ),
+  };
+}
+
+/** Older reports: what was needed and made, and, where derivable, what was never sent. */
+function legacyCallItems(scan: EnkryptInputScanReport): DetailItem[] {
+  const notSent =
+    scan.part !== 'tools' && scan.calls_skipped !== undefined
+      ? scan.chunks - scan.attempts - scan.calls_skipped
+      : 0;
+  return [
+    ...(scan.part === 'tools'
+      ? []
+      : [
+          {
+            label: 'Calls needed',
+            hint:
+              scan.calls_skipped === undefined
+                ? 'Uncached units, packed into calls of up to 100k characters (older report).'
+                : 'One call per uncached unit.',
+            value: formatCount(scan.chunks),
+          },
+        ]),
+    callsMade(scan),
+    ...(notSent > 0
+      ? [
+          {
+            label: 'Calls not sent',
+            hint: 'No time was left before the deadline, or the client disconnected.',
+            value: formatCount(notSent),
+          },
+        ]
+      : []),
+    ...callsSkipped(scan),
+  ];
+}
+
+function callItems(scan: EnkryptInputScanReport): DetailItem[] {
+  return scan.call_outcomes ? [callsBreakdown(scan, scan.call_outcomes)] : legacyCallItems(scan);
+}
+
+function pluralCalls(count: number, singular: string, plural: string): string {
+  return `${formatCount(count)} ${count === 1 ? singular : plural}`;
+}
+
+/** What a timed-out input scan ran out of, and why its calls stopped. */
+function timeoutMessage(scan: EnkryptInputScanReport, sharedWithBlocking: boolean): string {
+  const deadline = `All of the request's calls share one ${ENKRYPT_GUARDRAIL_TIMEOUT_MS / 1_000} s deadline${
+    sharedWithBlocking ? ', and the blocking scan runs first.' : '.'
+  }`;
+  const outcomes = scan.call_outcomes;
+  if (!outcomes || outcomes.failed + outcomes.not_sent === 0) return `Timed out. ${deadline}`;
+  const stopped = [
+    ...(outcomes.failed > 0 ? [pluralCalls(outcomes.failed, 'call failed', 'calls failed')] : []),
+    ...(outcomes.not_sent > 0
+      ? [pluralCalls(outcomes.not_sent, 'call was not sent', 'calls were not sent')]
+      : []),
+  ].join(' and ');
+  return `Timed out: ${stopped}. ${deadline}`;
+}
+
+function scanError(scan: Scan, sharedWithBlocking: boolean): string | null {
+  if (scan.error !== 'timeout' || scan.part === 'response') return scan.error;
+  return timeoutMessage(scan, sharedWithBlocking && scan.scan === 'log_only');
+}
+
+/** Hidden when no segment was split into slices, so it would repeat the units cached. */
+function segmentsFullyCached(
+  scan: Extract<EnkryptInputScanReport, { part: 'system' | 'conversation' }>
+): DetailItem[] {
+  if (scan.total_units === scan.total_segments && scan.cached_units === scan.cached_segments) {
+    return [];
+  }
+  return [
+    {
+      label: 'Segments fully cached',
+      hint: 'Segments with every unit cached. A segment is a message, tool call, or tool result.',
+      value: `${formatCount(scan.cached_segments)} of ${formatCount(scan.total_segments)}`,
     },
   ];
 }
@@ -259,8 +423,7 @@ function scanItems(scan: Scan): DetailItem[] {
         ...unitsCached(scan),
         charactersSent(scan),
         charactersCached(scan),
-        attempts(scan),
-        ...callsSkipped(scan),
+        ...callItems(scan),
       ];
     case 'system':
     case 'conversation':
@@ -271,33 +434,39 @@ function scanItems(scan: Scan): DetailItem[] {
         charactersCached(scan),
         ...(scan.part === 'conversation'
           ? [
-              {
-                label: 'Segments fully cached',
-                hint: 'Segments with every unit cached. A segment is a message, tool call, or tool result.',
-                value: `${formatCount(scan.cached_segments)} of ${formatCount(scan.total_segments)}`,
-              },
+              ...segmentsFullyCached(scan),
               { label: 'Attachments omitted', value: formatCount(scan.omitted_attachments) },
             ]
           : []),
-        {
-          label: 'Calls needed',
-          hint:
-            scan.calls_skipped === undefined
-              ? 'Uncached units, packed into calls of up to 100k characters (older report).'
-              : 'One call per uncached unit.',
-          value: formatCount(scan.chunks),
-        },
-        attempts(scan),
-        ...callsSkipped(scan),
+        ...callItems(scan),
       ];
     case 'response':
-      return [charactersSent(scan), attempts(scan)];
+      return [charactersSent(scan), callsMade(scan)];
   }
 }
 
-/** `failedOpen` hides the scan's note on failed content, which the report's notice already gives. */
-function ScanCard({ scan, failedOpen }: { scan: Scan; failedOpen: boolean }) {
-  const decision = isSkipped(scan) ? SKIPPED : DECISIONS[scan.decision];
+function scanDecision(scan: Scan): { label: string; tone: StepTone } {
+  if (isSkipped(scan)) return SKIPPED;
+  return (
+    (isPartlyFailed(scan) && PARTLY_FAILED_DECISIONS[scan.decision]) || DECISIONS[scan.decision]
+  );
+}
+
+/**
+ * `failedOpen` hides the scan's note on failed content, which the report's notice already gives.
+ * `sharedWithBlocking` says the request's blocking scan ran first, within the same deadline.
+ */
+function ScanCard({
+  scan,
+  failedOpen,
+  sharedWithBlocking,
+}: {
+  scan: Scan;
+  failedOpen: boolean;
+  sharedWithBlocking: boolean;
+}) {
+  const decision = scanDecision(scan);
+  const error = scanError(scan, sharedWithBlocking);
   const part = PART_LABELS[scan.part];
   const stored = scan.part === 'response' || failedOpen ? null : storedDespiteError(scan);
   const storedNote = stored && STORED_DESPITE_ERROR_NOTES[stored];
@@ -331,7 +500,7 @@ function ScanCard({ scan, failedOpen }: { scan: Scan; failedOpen: boolean }) {
         ]}
       />
       {scan.part === 'tools' && <FlaggedTools scan={scan} />}
-      {scan.error && <p className="text-status-destructive text-xs">{scan.error}</p>}
+      {error && <p className="text-status-destructive text-xs">{error}</p>}
       {storedNote && <p className="text-status-warning text-xs">{storedNote}</p>}
     </li>
   );
@@ -421,6 +590,7 @@ function GuardrailReportBody({
               key={`${scan.scan}-${index}`}
               scan={scan}
               failedOpen={report.verdict === 'fail_open'}
+              sharedWithBlocking={!!settings?.detectors.some(each => each.action === 'block')}
             />
           ))}
         </ol>

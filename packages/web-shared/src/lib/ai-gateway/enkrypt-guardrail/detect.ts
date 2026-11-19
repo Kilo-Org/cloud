@@ -25,14 +25,7 @@ type ReadyEnkryptGuardrailConfig = Extract<EnkryptGuardrailConfig, { status: 're
 
 export const ENKRYPT_DETECT_URL = 'https://api.enkryptai.com/guardrails/detect';
 
-/**
- * Bounds a scan. The input guardrail starts one deadline for all Enkrypt calls of a request, which
- * run one at a time: those of its blocking detectors first, then those of its log-only detectors.
- * The gateway awaits the blocking scans just before the upstream request, so this is the most
- * latency an enabled organization's request can gain. The log-only scans, which the request does
- * not wait for, get what the blocking scans leave of it.
- */
-export const ENKRYPT_GUARDRAIL_TIMEOUT_MS = 60_000;
+export { ENKRYPT_GUARDRAIL_TIMEOUT_MS } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 
 const MAX_ERROR_BODY_BYTES = 64 * 1024;
 const ERROR_BODY_TIMEOUT_MS = 1_000;

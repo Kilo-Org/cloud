@@ -744,3 +744,92 @@ export const EnkryptInputGuardrailFailedOpen: Story = {
     details: enkryptFailedOpenDetails,
   },
 };
+
+type EnkryptReport = NonNullable<Routing['enkrypt']>;
+type EnkryptScan = EnkryptReport['scans'][number];
+
+const deadlineBlockingScan: EnkryptScan = {
+  scan: 'blocking',
+  part: 'conversation',
+  detectors_enabled: ['keyword_detector'],
+  detectors_blocking: ['keyword_detector'],
+  verdict_cache: 'hit',
+  verdict_cache_write: 'written',
+  total_characters: 576_476,
+  total_segments: 1_097,
+  cached_characters: 569_536,
+  cached_segments: 1_080,
+  total_units: 1_097,
+  cached_units: 1_080,
+  failed_calls_cached: 0,
+  calls_cached: 17,
+  call_outcomes: { allowed: 17, flagged: 0, blocked: 0, failed: 0, not_sent: 0 },
+  calls_skipped: 0,
+  omitted_attachments: 2,
+  scanned_characters: 6_940,
+  decision: 'allowed',
+  error: null,
+  detectors_fired: [],
+  attempts: 17,
+  credits_cost: 17,
+  latency_ms: 3_120,
+  chunks: 17,
+};
+
+const deadlineLogOnlyScan: EnkryptScan = {
+  ...deadlineBlockingScan,
+  scan: 'log_only',
+  detectors_enabled: ['injection_attack', 'policy_violation'],
+  detectors_blocking: [],
+  failed_calls_cached: 9,
+  calls_cached: 8,
+  call_outcomes: { allowed: 8, flagged: 0, blocked: 0, failed: 1, not_sent: 8 },
+  scanned_characters: 3_444,
+  decision: 'error_logged',
+  error: 'timeout',
+  attempts: 9,
+  credits_cost: 8,
+  latency_ms: 56_730,
+};
+
+function deadlineDetails(scans: EnkryptScan[]): RequestLogDetails {
+  return {
+    ...directByokDetails,
+    metadata: {
+      status: 'available',
+      routing: {
+        ...availableRouting(directByokDetails),
+        enkrypt: {
+          settings: {
+            status: 'ready',
+            detectors: [
+              { detector: 'injection_attack', action: 'log' },
+              { detector: 'keyword_detector', action: 'block', banned_keyword_count: 12 },
+              { detector: 'policy_violation', action: 'log', policy_format: 'text' },
+            ],
+          },
+          verdict: 'allow',
+          unavailable_reason: null,
+          added_latency_ms: 3_141,
+          scans,
+        },
+      },
+    },
+  };
+}
+
+function olderReport(scan: EnkryptScan): EnkryptScan {
+  const { calls_cached: _cached, call_outcomes: _outcomes, ...rest } = scan;
+  return rest;
+}
+
+export const EnkryptLogOnlyDeadlineRanOut: Story = {
+  args: { row, details: deadlineDetails([deadlineBlockingScan, deadlineLogOnlyScan]) },
+};
+
+export const EnkryptLogOnlyDeadlineRanOutOlderReport: Story = {
+  args: {
+    row,
+    details: deadlineDetails([olderReport(deadlineBlockingScan), olderReport(deadlineLogOnlyScan)]),
+  },
+};

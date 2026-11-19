@@ -916,8 +916,10 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
 
     it('does not open a socket with the pre-refresh ticket while a pre-connect refresh is in flight', async () => {
       jest.spyOn(Math, 'random').mockReturnValue(0);
-      const { promise: firstRefresh, resolve: releaseFirstRefresh } =
-        Promise.withResolvers<void>();
+      let releaseFirstRefresh!: () => void;
+      const firstRefresh = new Promise<void>(resolve => {
+        releaseFirstRefresh = resolve;
+      });
       const refreshAuth = jest
         .fn()
         .mockImplementationOnce(() => firstRefresh)

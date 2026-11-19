@@ -15,11 +15,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SheetHeaderTopInset, useSheetHeaderTopClearance } from '@/lib/form-sheet';
 import { offlineHeaderReservation } from '@/lib/offline-banner-state';
 import { useScreenInsets, useSideInsetStyle } from '@/lib/screen-insets';
-import {
-  HEADER_TITLE_TARGET_CLASS,
-  ICON_TARGET_BOX_CLASS,
-  ICON_TARGET_DP,
-} from '@/lib/a11y/tap-target';
+import { HEADER_TITLE_TARGET_CLASS, ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 /**
@@ -36,20 +32,9 @@ const MODAL_HEADER_TOP_PADDING = 32;
 /**
  * The gap a header keeps between the top of what the surface already clears and
  * its own content. One value for a pinned screen and a modal, so the same title
- * sits at the same distance from the system bar on both. It is measured to
- * whatever the header paints highest, so a leading control that reaches above
- * its line raises it (see `backControlOverhang`).
+ * sits at the same distance from the system bar on both.
  */
 const HEADER_TOP_GAP = 8;
-
-/**
- * The title's line height at font scale 1 — the line the back control centres
- * on. `text-lg`'s Tailwind line height is `1.75rem`, 24.5dp at NativeWind's
- * 14pt rem; the large 30pt root title takes the same 36px line its reserve
- * holds (see `reservedTitleHeightClass`).
- */
-const TITLE_LINE_HEIGHT = 24.5;
-const LARGE_TITLE_LINE_HEIGHT = 36;
 
 /**
  * Content width (dp, at font scale 1) a header needs for its title and its
@@ -509,11 +494,8 @@ export function ScreenHeader({
     });
 
   // Which of the heading's lines the header paints, which decides whether the
-  // leading control has a line above the title to reach into (see
-  // `backControlOverhang`).
+  // header centres a leading spacer opposite the back control.
   const hasEyebrowLine = Boolean(eyebrow) || reserveEyebrow;
-  const hasSubtitleLine = Boolean(subtitle) || reserveSubtitle || Boolean(subtitlePlaceholder);
-  const stackedTitleLines = hasEyebrowLine || hasSubtitleLine;
   // A centered title shares its row with the leading and trailing controls.
   // A spacer opposite the back control keeps the title centered on the full
   // width without placing either control out of flow. A reserved eyebrow is one
@@ -522,25 +504,16 @@ export function ScreenHeader({
   // when the label lands.
   const separateHeading = centerTitle && (Boolean(title) || hasEyebrowLine);
 
-  // How far the back control's 48dp target reaches above the title line it
-  // centres on. A header that paints a second line pulls the control onto the
-  // title's line with a negative margin (see the `-my-3.5` note on
-  // `backControl`), so half of the target hangs above that line. An eyebrow
-  // above puts the overhang inside the eyebrow's own line; with the title row
-  // as the header's first line nothing is above it, and the overhang landed in
-  // the surface's own top edge — 11.75dp against an 8dp gap put the target
-  // 3.4dp inside the status bar (design gate, the profile-management
-  // instructions screen). The gap is measured to the header's highest content,
-  // so it takes the overhang as its floor. A one-line header keeps the
-  // control's full height, so its row already starts at the gap, and a title
-  // line taller than the target (a large font scale) has no overhang at all.
-  const titleLineHeight =
-    (size === 'large' ? LARGE_TITLE_LINE_HEIGHT : TITLE_LINE_HEIGHT) * fontScale;
-  const backControlOverhang =
-    canGoBack && !separateHeading && !hasEyebrowLine && stackedTitleLines
-      ? Math.max(0, (ICON_TARGET_DP - titleLineHeight) / 2)
-      : 0;
-  const headerTopGap = Math.max(HEADER_TOP_GAP, backControlOverhang);
+  // The title's row is the header's band: it is at least the leading control's
+  // 48dp target tall, so the target sits whole inside its parent and Android
+  // hit-tests the full box instead of only the `text-lg` line's 24.5dp. One
+  // line of the title is shorter than the target, so the band takes the
+  // control's height; a deeper title cap grows the row with the text and the
+  // row's `items-center` keeps the control on the title's own line at every
+  // font scale. Nothing hangs outside the row, so the header's top gap stays
+  // the plain `HEADER_TOP_GAP` below the surface's own clearance.
+  const titleBandClass = cn('flex-row items-center', canGoBack && 'min-h-[48px] gap-1');
+  const lineRowClass = cn('flex-row items-center', canGoBack && 'gap-1');
 
   // A surface that reaches the window top (a full-window modal) needs the
   // status bar and corner pad added on top of the header's gap; one that
@@ -549,8 +522,8 @@ export function ScreenHeader({
   // window's own surface and reads no sheet clearance at all.
   const surfaceTopClearance = useSheetHeaderTopClearance(modal ? modalTopInset : undefined);
   const baseTopPadding = modal
-    ? Math.max(MODAL_HEADER_TOP_PADDING, surfaceTopClearance + headerTopGap)
-    : insets.top + headerTopGap;
+    ? Math.max(MODAL_HEADER_TOP_PADDING, surfaceTopClearance + HEADER_TOP_GAP)
+    : insets.top + HEADER_TOP_GAP;
 
   // The offline banner is an absolute overlay pinned at the safe-area top of
   // the app window, so a pinned header must reserve its height while it is
@@ -774,25 +747,14 @@ export function ScreenHeader({
   // icon button while it stays focusable and keeps the same rect, gutter pull
   // and label.
   //
-  // A header that paints a second line keeps the back control on the title's own
-  // line: the control is a plain sibling of the title, and its own height would
-  // otherwise set the title row's height and push the eyebrow and subtitle away
-  // from the title. The negative margin cancels that overhang (the technique
-  // `renderRowTrailing` uses for a row's switch), so the row contributes the
-  // title's line height and the 48dp target paints centred on the line: 12.25dp
-  // a side leaves 23.5dp of a 48dp target in a 24.5dp `text-lg` line. The
-  // overhang above that line belongs to the line above it — the eyebrow's, or
-  // the header's own top padding when the title row is the first line (see
-  // `backControlOverhang`). A one-line header keeps the control's full height,
-  // the row it has always had.
+  // A header that paints a second line keeps the back control on the title's
+  // own line through the band the row is: the control is a plain sibling of the
+  // title, and the title row is at least the control's 48dp height, so the
+  // row's `items-center` centres the target on the title line without any
+  // negative margin and the target stays inside its parent. A one-line header
+  // keeps the control's full height, the row it has always had.
   const backControl = canGoBack ? (
-    <View
-      className={cn(
-        'shrink-0 overflow-hidden rounded-full',
-        !separateHeading && '-ms-4',
-        !separateHeading && stackedTitleLines && '-my-3.5'
-      )}
-    >
+    <View className={cn('shrink-0 overflow-hidden rounded-full', !separateHeading && '-ms-4')}>
       <Pressable
         onPress={handleBack}
         accessibilityRole="button"
@@ -815,10 +777,12 @@ export function ScreenHeader({
   // The control is the row's leading sibling, so the title after it is placed by
   // the row and not by the page column. A header with no control renders no
   // leading box and no gap, so its title starts on the 14dp gutter itself — the
-  // title is the start-most content of its column.
-  const titleRowClassName = cn('flex-row items-center', canGoBack && 'gap-1');
+  // title is the start-most content of its column. When the row holds the
+  // control it is the 48dp band, so the target is whole inside its parent and
+  // the title centres on the control rather than the control overflowing the
+  // title's line.
   const titleRow = (
-    <View className={titleRowClassName}>
+    <View className={titleBandClass}>
       {backControl}
       <View className="min-w-0 flex-1">{titleNode}</View>
     </View>
@@ -826,19 +790,21 @@ export function ScreenHeader({
   // The heading is one block on the 14dp page gutter. Inside it every line
   // starts on the title's column — 34dp of the 48dp target plus the row gap —
   // which the `gutter` rule reads as the header's own column rather than a page
-  // column, so the block needs no surface of its own.
+  // column, so the block needs no surface of its own. The eyebrow and subtitle
+  // rows keep the control's column as a spacer without the band's height, so
+  // the band's extra space stays on the title's line alone.
   const headingBlockClassName = 'min-w-0 flex-1 justify-center';
   const titledHeading = (
     <View className={headingBlockClassName}>
       {eyebrowSlot ? (
-        <View className={titleRowClassName}>
+        <View className={lineRowClass}>
           {backControlSpacer}
           <View className="min-w-0 flex-1">{eyebrowSlot}</View>
         </View>
       ) : null}
       {titleRow}
       {subtitleSlot ? (
-        <View className={titleRowClassName}>
+        <View className={lineRowClass}>
           {backControlSpacer}
           <View className="min-w-0 flex-1">{subtitleSlot}</View>
         </View>

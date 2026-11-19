@@ -940,10 +940,13 @@ describe('ScreenHeader mounted', () => {
 
     const control = findBackFrame(renderer.root);
     // A single line has no second line to pull the control onto: the row is the
-    // 48dp target it has always been.
+    // 48dp band the target has always filled, and the control keeps its own
+    // box inside it.
     expect(control.props.className).not.toContain('-my-');
+    expect(control.parent?.props.className).toContain('min-h-[48px]');
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
     expect(title.parent?.parent?.children).toHaveLength(2);
+    expect(title.parent?.parent).toBe(control.parent);
   });
 
   it('keeps the back control inside the header when the title row is its first line', () => {
@@ -959,17 +962,14 @@ describe('ScreenHeader mounted', () => {
     // no eyebrow above, so the title row is the header's first line.
     const twoLine = { title: 'Instructions', subtitle: 'Shared Agency Review Profile' };
 
-    // The control still centres on the title's own line, so half of its 48dp
-    // target hangs above that line. With no eyebrow to reach into, the header's
-    // top padding carries the overhang: the surface inset plus 11.75dp, not the
-    // standard 8dp gap that left the target 3.4dp inside the status bar.
-    expect(findBackFrame(renderHeader(twoLine).root).props.className).toContain('-my-3.5');
-    expect(paddingTopOf(twoLine)).toBe(48 + (48 - 24.5) / 2);
-
-    // An eyebrow above is the line that overhang reaches into, so a header that
-    // paints one keeps the standard gap — as a one-line header (whose row is
-    // the control itself) and a title line taller than the target (a 2x font
-    // scale, the accessibility setting) already do.
+    // The control sits whole inside the title row's 48dp band, so nothing
+    // reaches above the row into the surface's own top edge: the header keeps
+    // the plain 8dp gap under the surface's clearance, whatever lines it paints
+    // and however large the font scale is.
+    const frame = findBackFrame(renderHeader(twoLine).root);
+    expect(frame.props.className).not.toContain('-my-');
+    expect(frame.parent?.props.className).toContain('min-h-[48px]');
+    expect(paddingTopOf(twoLine)).toBe(48 + 8);
     expect(paddingTopOf({ ...twoLine, eyebrow: 'KILO-ORG/CLOUD' })).toBe(48 + 8);
     expect(paddingTopOf({ title: 'Instructions' })).toBe(48 + 8);
     layout.fontScale = 2;
@@ -984,17 +984,21 @@ describe('ScreenHeader mounted', () => {
     });
 
     const control = findBackFrame(renderer.root);
-    // The control cancels its own overhang, so the row contributes the title's
-    // line height and the 48dp target paints centred on that line.
-    expect(control.props.className).toContain('-my-3.5');
 
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
     const titleRow = title.parent?.parent;
-    expect(titleRow?.children[0]).toBe(control);
+    // The control sits in the title row's band: the row is at least the 48dp
+    // target, so the target is whole inside its parent, and the row's
+    // `items-center` centres it on the title line without a negative margin.
+    expect(control.props.className).not.toContain('-my-');
+    expect(control.parent).toBe(titleRow);
+    expect(titleRow?.props.className).toContain('min-h-[48px]');
     expect(titleRow?.props.className).toContain('gap-1');
 
     // The eyebrow above and the subtitle below carry the control's column plus
-    // the row gap as a spacer, so all three lines start on one column.
+    // the row gap as a spacer, so all three lines start on one column. Those
+    // rows keep the spacer without the band's height: the band's space belongs
+    // to the title's line alone.
     const headingRows = titleRow?.parent?.children ?? [];
     expect(headingRows).toHaveLength(3);
     const instanceAt = (nodes: typeof headingRows, index: number) => {
@@ -1006,10 +1010,33 @@ describe('ScreenHeader mounted', () => {
     };
     const eyebrowRow = instanceAt(headingRows, 0);
     const subtitleRow = instanceAt(headingRows, 2);
-    expect(eyebrowRow.props.className).toBe(titleRow?.props.className);
-    expect(subtitleRow.props.className).toBe(titleRow?.props.className);
+    expect(eyebrowRow.props.className).toContain('flex-row items-center');
+    expect(eyebrowRow.props.className).not.toContain('min-h-');
+    expect(subtitleRow.props.className).toContain('flex-row items-center');
+    expect(subtitleRow.props.className).not.toContain('min-h-');
     expect(instanceAt(eyebrowRow.children, 0).props.className).toBe('h-0 w-[48px] shrink-0 -ms-4');
     expect(instanceAt(subtitleRow.children, 0).props.className).toBe('h-0 w-[48px] shrink-0 -ms-4');
+  });
+
+  it('seats the title and the back control in one full-height band', () => {
+    const renderer = renderHeader({
+      title: 'Instructions',
+      subtitle: 'Shared Agency Review Profile',
+    });
+
+    const control = findBackFrame(renderer.root);
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    const band = control.parent;
+    // The control and the title are the band's own children. React Native
+    // hit-tests inside each view's bounds, so a 48dp target in a row only as
+    // tall as the title's line answers touches across that line alone; the band
+    // is what puts the whole target inside its parent. It floors the row rather
+    // than fixing it, so a deeper title cap grows the band instead of clipping
+    // the target or the text.
+    expect(band?.props.className).toContain('min-h-[48px]');
+    expect(band?.props.className).toContain('items-center');
+    expect(title.parent?.parent).toBe(band);
+    expect(band?.children[0]).toBe(control);
   });
 
   it('keeps the modal close control on the centered title row with a mirroring spacer', () => {

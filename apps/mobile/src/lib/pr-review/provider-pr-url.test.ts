@@ -90,9 +90,7 @@ describe('parseProviderPrUrl — GitHub', () => {
 
   it('still rejects a non-review GitHub URL inside wrappers', () => {
     // Tidying may not promote a URL the checker would refuse unwrapped.
-    expect(
-      parseProviderPrUrl('[diff](https://github.com/o/r/blob/branch/path.md)')
-    ).toBeNull();
+    expect(parseProviderPrUrl('[diff](https://github.com/o/r/blob/branch/path.md)')).toBeNull();
   });
 });
 

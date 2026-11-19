@@ -172,6 +172,8 @@ describe('parseGitHubPrUrl', () => {
 
   it('keeps rejecting a wrapped non-PR GitHub URL', () => {
     // Tidying may not promote a URL the checker would refuse unwrapped.
-    expect(parseGitHubPrUrl('[diff](https://github.com/octocat/hello-world/blob/main/a.md)')).toBeNull();
+    expect(
+      parseGitHubPrUrl('[diff](https://github.com/octocat/hello-world/blob/main/a.md)')
+    ).toBeNull();
   });
 });

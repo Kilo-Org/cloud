@@ -19,7 +19,8 @@ const MARKDOWN_LINK = /^\[[^\]]*]\(([^)]*)\)$/s;
 const MARKDOWN_LINK_IN_TEXT = /\[[^\]\n]*]\(([^)\s]*)\)/;
 const SCHEME_PREFIX = /^https?:\/\//i;
 // Quote glyphs platforms borrow as link delimiters, peeled at string edges.
-const EDGE_QUOTES = /^["'\u00AB\u00BB\u201A\u201E\u2019\u2018\u201C\u201D`]+|["'\u00AB\u00BB\u201A\u201E\u2019\u2018\u201C\u201D`]+$/g;
+const EDGE_QUOTES =
+  /^["'\u00AB\u00BB\u201A\u201E\u2019\u2018\u201C\u201D`]+|["'\u00AB\u00BB\u201A\u201E\u2019\u2018\u201C\u201D`]+$/g;
 // Sentence punctuation stripped only while a digit still ends the string.
 const TRAILING_SENTENCE_PUNCT = /[.,;:!?\u2026\u3002\uFF0C\uFF01\uFF1F]$/;
 const DIGIT_END = /\d$/;

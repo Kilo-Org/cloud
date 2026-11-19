@@ -2837,6 +2837,7 @@
     "revokeConsent": "إزالة الموافقة",
     "revokeConsentTitle": "إلغاء الموافقة على مشاركة البيانات؟",
     "acceptAndContinue": "القبول والمتابعة",
+    "loadingConsentSettings": "جارٍ تحميل إعدادات الموافقة…",
     "decline": "رفض",
     "declineAndSignOut": "رفض وتسجيل الخروج",
     "declineTitle": "رفض مشاركة البيانات؟",

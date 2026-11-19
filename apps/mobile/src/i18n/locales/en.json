@@ -3356,6 +3356,7 @@
     "revokeConsent": "Revoke consent",
     "revokeConsentTitle": "Revoke data sharing consent?",
     "acceptAndContinue": "Accept and continue",
+    "loadingConsentSettings": "Loading your consent settings…",
     "decline": "Decline",
     "declineAndSignOut": "Decline and sign out",
     "declineTitle": "Decline data sharing?",

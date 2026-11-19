@@ -3252,6 +3252,7 @@
     "revokeConsent": "Razılığı sil",
     "revokeConsentTitle": "Məlumatların paylaşılmasına verilən razılıq ləğv edilsin?",
     "acceptAndContinue": "Qəbul et və davam et",
+    "loadingConsentSettings": "Razılıq parametrləri yüklənir…",
     "decline": "Rədd et",
     "declineAndSignOut": "Rədd et və çıxış et",
     "declineTitle": "Məlumat paylaşımı rədd edilsin?",

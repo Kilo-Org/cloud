@@ -3310,6 +3310,7 @@
     "revokeConsent": "Povuci saglasnost",
     "revokeConsentTitle": "Povući saglasnost za deljenje podataka?",
     "acceptAndContinue": "Prihvati i nastavi",
+    "loadingConsentSettings": "Učitavanje tvojih podešavanja saglasnosti…",
     "decline": "Odbij",
     "declineAndSignOut": "Odbij i odjavi se",
     "declineTitle": "Odbiti deljenje podataka?",

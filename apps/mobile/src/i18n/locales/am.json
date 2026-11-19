@@ -3252,6 +3252,7 @@
     "revokeConsent": "ስምምነትዎን ይሰርዙ",
     "revokeConsentTitle": "ውሂብ ለማጋራት የሰጡትን ስምምነት መሰረዝ ይፈልጋሉ?",
     "acceptAndContinue": "ይቀበሉና ይቀጥሉ",
+    "loadingConsentSettings": "የስምምነት ቅንብሮችዎን በመጫን ላይ…",
     "decline": "ውድቅ ያድርጉ",
     "declineAndSignOut": "ውድቅ ያድርጉና ይውጡ",
     "declineTitle": "ውሂብ ማጋራትን ውድቅ ማድረግ ይፈልጋሉ?",

@@ -3252,6 +3252,7 @@
     "revokeConsent": "Ανάκληση συγκατάθεσης",
     "revokeConsentTitle": "Ανάκληση συγκατάθεσης για κοινοποίηση δεδομένων;",
     "acceptAndContinue": "Αποδοχή και συνέχεια",
+    "loadingConsentSettings": "Φόρτωση των ρυθμίσεων συγκατάθεσής σου…",
     "decline": "Απόρριψη",
     "declineAndSignOut": "Απόρριψη και αποσύνδεση",
     "declineTitle": "Απόρριψη κοινοποίησης δεδομένων;",

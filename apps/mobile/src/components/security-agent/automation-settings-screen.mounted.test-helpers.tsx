@@ -17,6 +17,10 @@ const config = vi.hoisted(() => ({
   fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
   refetch: vi.fn(),
 }));
+const retryConfig = vi.hoisted(() => ({
+  retry: vi.fn(),
+  isRetrying: false,
+}));
 const capability = vi.hoisted(() => ({
   canManage: true,
 }));
@@ -48,7 +52,13 @@ const connectivity = vi.hoisted(() => ({
   committed: 'online' as 'online' | 'offline' | 'unknown',
 }));
 const platformError = vi.hoisted(() => ({
-  props: null as { title: string; variant?: string; message?: string; onRetry?: () => void } | null,
+  props: null as {
+    title: string;
+    variant?: string;
+    message?: string;
+    onRetry?: () => void;
+    isRetrying?: boolean;
+  } | null,
 }));
 const toastSuccess = vi.hoisted(() => vi.fn());
 
@@ -74,6 +84,7 @@ vi.mock('@kilocode/app-shared/security-agent', () => ({
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentCapability: () => capability,
   useSecurityAgentConfig: () => config,
+  useRetrySecurityAgentConfig: () => retryConfig,
   useSaveSecurityAgentConfig: (_scope: string, options?: { announceSaved?: boolean }) => {
     save.options = options;
     return save;
@@ -142,6 +153,7 @@ export {
   connectivity,
   pillGroups,
   platformError,
+  retryConfig,
   save,
   saveButton,
   toastSuccess,

@@ -10,6 +10,7 @@ import {
   connectivity,
   pillGroups,
   platformError,
+  retryConfig,
   save,
   saveButton,
   toastSuccess,
@@ -74,7 +75,11 @@ describe('AutomationSettingsScreen approval gate', () => {
     config.data = null;
     config.isLoading = false;
     config.isError = false;
+    config.isPending = false;
+    config.fetchStatus = 'idle';
     capability.canManage = true;
+    retryConfig.retry.mockClear();
+    retryConfig.isRetrying = false;
     save.isPending = false;
     save.mutateAsync.mockReset();
     save.mutateAsync.mockResolvedValue({});
@@ -156,10 +161,30 @@ describe('AutomationSettingsScreen approval gate', () => {
     expect(error.variant).toBe('offline');
     expect(error.message).toBe(i18n.t('securityAgent.automation.couldNotLoad'));
     expect(error.title).toBe(i18n.t('securityAgent.automation.title'));
+    // The retry routes through the deliberate paused-read hook, not the plain
+    // query refetch, and the branch forwards the hook's busy state.
+    expect(error.isRetrying).toBe(false);
     act(() => {
       error.onRetry?.();
     });
-    expect(config.refetch).toHaveBeenCalledOnce();
+    expect(retryConfig.retry).toHaveBeenCalledOnce();
+    expect(config.refetch).not.toHaveBeenCalled();
+  });
+
+  it("pushes the retry hook's busy state into the paused failure screen", () => {
+    config.data = null;
+    config.isPending = true;
+    config.fetchStatus = 'paused';
+    connectivity.committed = 'offline';
+    retryConfig.isRetrying = true;
+    renderScreen();
+
+    const error = platformError.props;
+    if (!error) {
+      throw new Error('paused first read did not render the failure screen');
+    }
+    expect(error.isRetrying).toBe(true);
+    expect(error.variant).toBe('offline');
   });
 
   it('keeps the skeleton for a pause while connectivity is unsettled', () => {

@@ -88,13 +88,13 @@ const finding = vi.hoisted(() => ({
   data: undefined as MockedFinding | undefined,
   refetch: vi.fn(),
 }));
-const queryError = vi.hoisted(() => ({
-  props: null as {
-    variant?: string;
-    message?: string;
-    onRetry?: () => void;
-    placement?: string;
-  } | null,
+const findingRetry = vi.hoisted(() => ({
+  retry: vi.fn(),
+  isRetrying: false,
+}));
+const capabilityRetry = vi.hoisted(() => ({
+  retry: vi.fn(),
+  isRetrying: false,
 }));
 const pillGroup = vi.hoisted(() => ({
   onChange: (() => undefined) as (value: string) => void,
@@ -146,6 +146,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentCapability: () => capability,
+  useRetrySecurityAgentCapability: () => capabilityRetry,
 }));
 const connectivity = vi.hoisted(() => ({
   committed: 'online' as 'online' | 'offline' | 'unknown',
@@ -155,6 +156,7 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 vi.mock('@/lib/hooks/use-security-findings', () => ({
   useSecurityFinding: () => finding,
+  useRetrySecurityFinding: () => findingRetry,
   useDismissSecurityFinding: () => dismiss,
 }));
 vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
@@ -172,15 +174,13 @@ vi.mock('@/components/empty-state', () => ({
   StateAction: 'StateAction',
 }));
 vi.mock('@/components/query-error', () => ({
-  QueryError: (props: {
+  QueryError: (_props: {
     variant?: string;
     message?: string;
     onRetry?: () => void;
+    isRetrying?: boolean;
     placement?: string;
-  }) => {
-    queryError.props = props;
-    return 'QueryError';
-  },
+  }) => 'QueryError',
 }));
 vi.mock('@/components/security-agent/settings-recovery-status', () => ({
   SettingsRecoveryStatus: 'SettingsRecoveryStatus',
@@ -303,6 +303,8 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     capability.isPending = false;
     capability.fetchStatus = 'idle';
     capability.refetch.mockReset();
+    capabilityRetry.retry.mockClear();
+    capabilityRetry.isRetrying = false;
     finding.isLoading = false;
     finding.isFetching = false;
     finding.isError = false;
@@ -312,6 +314,8 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     connectivity.committed = 'online';
     finding.data = { status: 'open', ...FINDING_IDENTITY };
     finding.refetch.mockReset();
+    findingRetry.retry.mockClear();
+    findingRetry.isRetrying = false;
     dismissDraft.draft = null;
     dismissDraft.hydrated = true;
     dismissDraft.persist.mockClear();
@@ -414,11 +418,41 @@ describe('DismissFindingScreen dismissal CTA states', () => {
           ? i18n.t('securityAgent.dismiss.couldNotLoad')
           : i18n.t('securityAgent.dismiss.couldNotCheckPermissions')
       );
+      const retryRecord = source === 'finding' ? findingRetry : capabilityRetry;
+      const otherRetryRecord = source === 'finding' ? capabilityRetry : findingRetry;
+      // The paused branch offers the deliberate paused-read retry, not the
+      // plain query refetch, for whichever read the form waits on.
+      expect(error.props.isRetrying).toBe(false);
       act(error.props.onRetry as () => void);
-      expect(query.refetch).toHaveBeenCalledOnce();
+      expect(retryRecord.retry).toHaveBeenCalledOnce();
+      expect(otherRetryRecord.retry).not.toHaveBeenCalled();
+      expect(query.refetch).not.toHaveBeenCalled();
       expect(otherQuery.refetch).not.toHaveBeenCalled();
     }
   );
+
+  it('keeps the skeleton when a capability read pauses with the finding loaded', () => {
+    // The form's own read settled, then the capability read pauses in the
+    // unsettled window: not a connection failure yet, and no data can close
+    // it. `capability.isLoading` is `isPending && isFetching`, which stays
+    // false for a paused read, so the pre-fix gate fell through to the
+    // cannot-dismiss empty state; `status === 'loading'` holds the skeleton.
+    finding.data = { status: 'open', ...FINDING_IDENTITY };
+    finding.isPending = false;
+    finding.fetchStatus = 'idle';
+    capability.status = 'loading';
+    capability.isPending = true;
+    capability.fetchStatus = 'paused';
+    capability.canManage = false;
+    connectivity.committed = 'unknown';
+    const tree = renderScreen();
+
+    expect(findAllFailures(tree.root)).toHaveLength(0);
+    expect(
+      tree.root.findAllByProps({ title: i18n.t('securityAgent.dismiss.cannotDismissTitle') })
+    ).toHaveLength(0);
+    expect(capabilityRetry.retry).not.toHaveBeenCalled();
+  });
 
   it('keeps the skeleton for a pause while connectivity is unsettled', () => {
     // The online manager also pauses on an unsettled NetInfo report, which is

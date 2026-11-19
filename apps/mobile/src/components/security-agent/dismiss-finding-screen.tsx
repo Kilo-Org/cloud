@@ -25,7 +25,10 @@ import {
   isDismissFailureRetryable,
   resolveDismissFailure,
 } from '@/components/security-agent/dismiss-finding-failure';
-import { useSecurityAgentCapability } from '@/lib/hooks/use-security-agent';
+import {
+  useRetrySecurityAgentCapability,
+  useSecurityAgentCapability,
+} from '@/lib/hooks/use-security-agent';
 import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 import {
   isSecurityTrialRefusal,
@@ -33,7 +36,11 @@ import {
   securityMutationCopyKey,
 } from '@/lib/security-agent-ledger';
 import { useSecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
-import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
+import {
+  useDismissSecurityFinding,
+  useRetrySecurityFinding,
+  useSecurityFinding,
+} from '@/lib/hooks/use-security-findings';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { isReadPausedBeforeData } from '@/lib/query/read-failure-variant';
@@ -54,6 +61,8 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   const headerTopInset = useFormSheetHeaderTopInset();
   const capability = useSecurityAgentCapability(scope);
   const findingQuery = useSecurityFinding(scope, findingId);
+  const findingRetry = useRetrySecurityFinding(scope, findingId);
+  const capabilityRetry = useRetrySecurityAgentCapability(scope);
   const [reason, setReason] = useState<DismissReason | null>(null);
   const commentRef = useRef('');
   const dismissFinding = useDismissSecurityFinding(scope);
@@ -162,7 +171,8 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   }
 
   // A paused first read never reaches the loading gate: name the connection
-  // and offer Retry for whichever read the form waits on.
+  // and offer Retry for whichever read the form waits on. A deliberate retry
+  // above retires the paused promise a plain `refetch` would only join.
   const findingPaused = isReadPausedBeforeData({ ...findingQuery, connectivity });
   if (findingPaused || isReadPausedBeforeData({ ...capability, connectivity })) {
     return (
@@ -174,7 +184,8 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
               ? 'securityAgent.dismiss.couldNotLoad'
               : 'securityAgent.dismiss.couldNotCheckPermissions'
           )}
-          onRetry={() => void (findingPaused ? findingQuery.refetch() : capability.refetch())}
+          onRetry={findingPaused ? findingRetry.retry : capabilityRetry.retry}
+          isRetrying={findingPaused ? findingRetry.isRetrying : capabilityRetry.isRetrying}
         />
       </DismissSheetFrame>
     );
@@ -190,11 +201,16 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
       </DismissSheetFrame>
     );
   }
-
+  // `capability.isLoading` is `isPending && isFetching`, which stays false for
+  // a read paused with no data — a paused capability read in the unsettled
+  // window would fall through to the cannot-dismiss empty state with no
+  // Retry. `status === 'loading'` is the state the hook models for exactly
+  // that case (settings-overview-screen.tsx gates on it), and it makes the
+  // paused branch above true for both reads.
   if (
     findingQuery.isLoading ||
     !findingQuery.data ||
-    capability.isLoading ||
+    capability.status === 'loading' ||
     !dismissDraft.hydrated
   ) {
     return <DismissFindingSkeleton />;

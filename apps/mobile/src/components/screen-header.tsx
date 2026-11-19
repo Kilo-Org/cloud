@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- one header contract: the title, eyebrow and subtitle slots, the back control, the action reflow, and the safe-area and offline-banner rules must stay in step */
 import { type Href, useNavigationContainerRef, useRouter } from 'expo-router';
-import { type ReactElement, type Ref, useEffect, useRef, useState } from 'react';
+import { type ReactElement, type Ref, useEffect, useState } from 'react';
 import { LARGE_FONT_SCALE, useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { ChevronDown } from '@/components/ui/icons';
 import { DirectionalChevronLeft } from '@/components/ui/directional-icons';
@@ -9,6 +9,7 @@ import {
   Platform,
   Pressable,
   type TextInstance,
+  type TextLayoutEvent,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -209,9 +210,10 @@ type ScreenHeaderProps = {
    *
    * Kept to a single line with a tail ellipsis: it carries context such as the
    * profile a section edits, so a wrapped line would grow the header and move
-   * the body below it. It is not the `eyebrow`, which is a category label the
-   * text style uppercases; a user-authored name in that slot renders as
-   * letterspaced small capitals.
+   * the body below it. At a large font scale (`LARGE_FONT_SCALE`) it takes up
+   * to two lines, and a reserved subtitle reserves both. It is not the
+   * `eyebrow`, which is a category label the text style uppercases; a
+   * user-authored name in that slot renders as letterspaced small capitals.
    */
   subtitle?: string;
   /**
@@ -514,35 +516,24 @@ export function ScreenHeader({
       titleMinWidth,
       contentInset,
     });
-  // A text title that measures wider than the room the in-row cluster leaves
-  // it moves the cluster under the heading, whatever the caller allows: German
-  // "Unterhaltung" beside the account picker painted "Unterh…" at the default
-  // font size. A hidden one-line twin of the title reports its natural width,
-  // and the visible title reports the width it was given. The decision is
-  // latched to the layout it was measured in (title, window width, font scale),
-  // so the wider room the title gets once the cluster moves cannot move it
-  // back; a new layout clears the latch and measures again. A title that fits
-  // keeps today's row, so nothing moves where nothing was cut.
+  // A text title that the in-row cluster would cut moves the cluster under the
+  // heading, whatever the caller allows: German "Unterhaltung" beside the
+  // account picker painted "Unterhaltu…" at the default font size. A hidden copy
+  // of the title, with no line cap, lays out in the visible title's own box:
+  // the title is cut exactly when that copy needs a second line. A width
+  // comparison cannot say this, because the picker gives way first and the
+  // title loses only a fraction of a point — enough for Android to ellipsize,
+  // and inside the two Texts' pixel rounding.
+  //
+  // The decision is the copy's last report from the title's row, for the
+  // layout it was measured in (title, window width, font scale): the room the
+  // title gets once the cluster has moved says nothing about the row, so it is
+  // not recorded, and a new layout (another language, a rotation) holds no
+  // report until the copy, remounted for it, measures the row again.
   const measuresTitleFit = inlineActions != null && title != null && !titleContent && !largeFont;
   const titleFitKey = JSON.stringify([title, windowWidth, fontScale]);
-  const [titleOverflowKey, setTitleOverflowKey] = useState<string | null>(null);
-  const titleWidths = useRef({ natural: Number.NaN, shown: Number.NaN });
-  const titleOverflows = measuresTitleFit && titleOverflowKey === titleFitKey;
-  const latchTitleOverflow = () => {
-    const { natural, shown } = titleWidths.current;
-    // A 1dp margin keeps the two Texts' pixel rounding from reading as a cut.
-    if (!titleOverflows && natural - shown > 1) {
-      setTitleOverflowKey(titleFitKey);
-    }
-  };
-  const onTitleNaturalLayout = (event: LayoutChangeEvent) => {
-    titleWidths.current.natural = event.nativeEvent.layout.width;
-    latchTitleOverflow();
-  };
-  const onTitleShownLayout = (event: LayoutChangeEvent) => {
-    titleWidths.current.shown = event.nativeEvent.layout.width;
-    latchTitleOverflow();
-  };
+  const [titleFit, setTitleFit] = useState<{ key: string; cut: boolean } | null>(null);
+  const titleOverflows = measuresTitleFit && titleFit?.key === titleFitKey && titleFit.cut;
   // The inline controls row reflows the same way: a caller that declares its
   // width drops it beneath the title before it squeezes the title's own
   // readable minimum, so the 30px Agents title never breaks inside a word. At
@@ -561,6 +552,15 @@ export function ScreenHeader({
           titleMinWidth,
           contentInset,
         })));
+  const onTitleFitTextLayout = (event: TextLayoutEvent) => {
+    if (stackInlineActions) {
+      return;
+    }
+    const cut = event.nativeEvent.lines.length > 1;
+    setTitleFit(previous =>
+      previous?.key === titleFitKey && previous.cut === cut ? previous : { key: titleFitKey, cut }
+    );
+  };
   // A caller that turns the reflow off keeps its inline controls beside the
   // title while the title fits, so on that row the title is the primary text
   // and the controls (a tab root's account picker) are secondary: they truncate
@@ -652,17 +652,34 @@ export function ScreenHeader({
 
   let titleNode: React.ReactNode = null;
   if (title != null) {
-    const titleLabel = (
+    const titleLabelText = (
       <Text
         ref={titleRef}
         className={cn(titleClass, centerTitle && 'text-center')}
         numberOfLines={titleLines}
         ellipsizeMode="tail"
         accessibilityRole="header"
-        onLayout={measuresTitleFit ? onTitleShownLayout : undefined}
       >
         {title}
       </Text>
+    );
+    // The fit check's copy (see `measuresTitleFit`) shares the visible title's
+    // box and paints nothing; a new layout remounts it, so it always reports.
+    const titleLabel = measuresTitleFit ? (
+      <View className="min-w-0 shrink">
+        {titleLabelText}
+        <Text
+          key={titleFitKey}
+          className={cn(titleClass, 'absolute inset-x-0 top-0 opacity-0')}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          onTextLayout={onTitleFitTextLayout}
+        >
+          {title}
+        </Text>
+      </View>
+    ) : (
+      titleLabelText
     );
     let titleText: React.ReactNode = titleLabel;
     if (titleContent) {
@@ -742,6 +759,28 @@ export function ScreenHeader({
       </View>
     ) : null;
 
+  const subtitleText = (
+    <Text
+      variant="muted"
+      className={cn(
+        largeFont && reserveSubtitle && 'min-w-0 shrink',
+        centerTitle && 'text-center',
+        !subtitle && 'opacity-0'
+      )}
+      // One line: the subtitle is context for the title, so it truncates at its
+      // tail instead of taking a second line and moving the body. The reserved
+      // copy is a no-break space in the same style, so the height it holds is
+      // the height the name will take. At a large font scale the name takes up
+      // to two lines instead of losing its tail.
+      numberOfLines={largeFont ? 2 : 1}
+      ellipsizeMode="tail"
+      accessible={Boolean(subtitle)}
+      accessibilityElementsHidden={!subtitle}
+      importantForAccessibility={subtitle ? 'auto' : 'no-hide-descendants'}
+    >
+      {subtitle ?? '\u00A0'}
+    </Text>
+  );
   const subtitleSlot =
     subtitle || reserveSubtitle || subtitlePlaceholder ? (
       <View className={cn('mt-0.5', centerTitle && 'items-center')}>
@@ -758,21 +797,18 @@ export function ScreenHeader({
             {subtitlePlaceholder}
           </View>
         ) : null}
-        <Text
-          variant="muted"
-          className={cn(centerTitle && 'text-center', !subtitle && 'opacity-0')}
-          // One line: the subtitle is context for the title, so it truncates at
-          // its tail instead of taking a second line and moving the body. The
-          // reserved copy is a no-break space in the same style, so the height
-          // it holds is the height the name will take.
-          numberOfLines={1}
-          ellipsizeMode="tail"
-          accessible={Boolean(subtitle)}
-          accessibilityElementsHidden={!subtitle}
-          importantForAccessibility={subtitle ? 'auto' : 'no-hide-descendants'}
-        >
-          {subtitle ?? '\u00A0'}
-        </Text>
+        {largeFont && reserveSubtitle ? (
+          // A name that arrives later may take both lines, so the reserve holds
+          // both from the first frame: the body below never moves.
+          <View className="flex-row">
+            {subtitleText}
+            <View className="w-0 overflow-hidden" aria-hidden>
+              <Text variant="muted">{'\u00A0\n\u00A0'}</Text>
+            </View>
+          </View>
+        ) : (
+          subtitleText
+        )}
       </View>
     ) : null;
 
@@ -1058,19 +1094,6 @@ export function ScreenHeader({
   return (
     <View className={cn('bg-background px-4 pb-3', className)} style={safeAreaStyle}>
       <View style={sideInsetStyle}>
-        {measuresTitleFit ? (
-          // The title's natural one-line width, for the fit check above. It
-          // paints nothing and no reader reaches it.
-          <Text
-            className={cn(titleClass, 'absolute opacity-0')}
-            numberOfLines={1}
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
-            onLayout={onTitleNaturalLayout}
-          >
-            {title}
-          </Text>
-        ) : null}
         {separateHeading ? (
           <>
             <View className="min-h-11 flex-row items-center" onLayout={onRowLayout}>

@@ -214,6 +214,7 @@ patchedDependencies:
   expo-notifications@58.1.9: 87db448990be2e060e88fb06df2b1c154c79609cc89aba32fa4c689dc4bd1f88
   expo-router@58.0.31: d265bce840c0fd0a50b6eaf5b08d52f2aadf18b4819c73ba8cb5d49fb97a8802
   expo-server-sdk@6.1.0: 7850520582b5b394397b35d1ea195192fe78589d8a6a748fe15177b818c4ed0b
+  expo-share-intent@9.0.0: 13586e19900ffe6926d21e5d1657c6e7aeb12c832c9c20f26248b0afc5e7deb1
   expo-speech-recognition@58.0.1: 1a2e356801d98a4955ba1840994bcc9f2838aad151396fa3a0d6e4ec09883e79
   expo-task-manager@58.0.14: 5310bfb951fa26cf0c71fbf2265ae0359b012e6e887d4b3c813aa5de40bef377
   expo-widgets@58.0.28: 61b0a3ecc41b84060f86ac5a5a1146fee148186275b131152383dd2924a487d1
@@ -723,7 +724,7 @@ importers:
         version: 58.0.3(expo@58.0.25)
       expo-share-intent:
         specifier: 9.0.0
-        version: 9.0.0(expo-constants@58.0.16)(expo-linking@58.0.17)(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)
+        version: 9.0.0(patch_hash=13586e19900ffe6926d21e5d1657c6e7aeb12c832c9c20f26248b0afc5e7deb1)(expo-constants@58.0.16)(expo-linking@58.0.17)(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)
       expo-sharing:
         specifier: ~58.0.23
         version: 58.0.23(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)
@@ -35833,7 +35834,7 @@ snapshots:
 
   expo-server@58.1.0: {}
 
-  expo-share-intent@9.0.0(expo-constants@58.0.16)(expo-linking@58.0.17)(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2):
+  expo-share-intent@9.0.0(patch_hash=13586e19900ffe6926d21e5d1657c6e7aeb12c832c9c20f26248b0afc5e7deb1)(expo-constants@58.0.16)(expo-linking@58.0.17)(expo@58.0.25)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2):
     dependencies:
       '@expo/config-plugins': 58.0.9(typescript@7.0.2)
       '@expo/plist': 0.10.1

@@ -125,17 +125,20 @@ export type AdminAccessAttribution = {
   /** Capability issuance id (`jti`) when the event records a capability mint. */
   issuanceId: string | null;
   /**
-   * Best-effort route identifier. For tRPC this is the exact procedure path;
-   * for REST and server components it is the concrete pathname (`x-pathname`)
-   * when available, falling back to Vercel's matched route pattern
-   * (`x-matched-path`), which may be templated (e.g. `/admin/api/users/[id]/...`).
+   * Route identifier. For tRPC this is the exact procedure path; for REST and
+   * server components it is the route the caller supplied explicitly (see
+   * {@link AdminAuditContext.auditRoute}) when present, otherwise the concrete
+   * pathname (`x-pathname`) when available, falling back to Vercel's matched
+   * route pattern (`x-matched-path`), which may be templated (e.g.
+   * `/admin/api/users/[id]/...`).
    */
   route: string | null;
   /**
    * The tRPC operation type (`query`, `mutation`) on `surface:"trpc"`; the HTTP
-   * method on `surface:"rest"`, forwarded by `proxy.ts` as `x-http-method`.
-   * Null when no reliable value exists (for example a unit test that invokes a
-   * shared helper without the proxy).
+   * method on `surface:"rest"`, supplied explicitly by the caller (see
+   * {@link AdminAuditContext.auditMethod}) or forwarded by `proxy.ts` as
+   * `x-http-method`. Null when no reliable value exists (for example a unit
+   * test that invokes a shared helper without the proxy).
    */
   method: string | null;
   ip: string | null;
@@ -587,6 +590,10 @@ export async function recordKiloAdminElevation(
       surface: ctx.auditSurface,
       method: ctx.auditMethod,
       route: ctx.auditRoute,
+      // Keep every header-derived field on one source when the caller carries
+      // its own request headers: mixing the caller's route with attribution
+      // read from the ambient store would attribute one event to two requests.
+      headersList: ctx.headersList,
       delegatedWorkload: ctx.delegatedWorkload,
       membershipRole: params.membershipRole,
       wouldPassWithoutAdmin: params.wouldPassWithoutAdmin,

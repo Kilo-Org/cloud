@@ -54,4 +54,11 @@ describe('modeSlugFromName', () => {
     expect(suggestion).toBe('mode-50');
     expect(suggestion.length).toBeLessThanOrEqual(MODE_SLUG_MAX_LENGTH);
   });
+
+  it('never suggests a taken slug, even past the last fallback inside the bound', () => {
+    const taken = Array.from({ length: 50 }, (_, index) =>
+      index === 0 ? 'mode' : `mode-${index + 1}`
+    );
+    expect(modeSlugFromName('###', taken)).toBe('mode-51');
+  });
 });

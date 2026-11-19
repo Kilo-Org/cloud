@@ -1,6 +1,8 @@
 /**
- * The server's mode-slug bound. A slug longer than this, or holding a character
- * outside `a-z`, `0-9` and `-`, is refused, so the derivation stays inside both.
+ * The server's mode-slug bound. The server refuses a slug longer than this, or
+ * one holding a character outside `a-z`, `0-9` and `-`. The fallback branch
+ * counts inside this bound; a folded name keeps its own length, and the form and
+ * the server refuse a slug longer than the bound.
  */
 export const MODE_SLUG_MAX_LENGTH = 50;
 
@@ -16,12 +18,12 @@ const FALLBACK_SLUG = 'mode';
  * decomposed and its combining marks dropped, so `Código` derives `codigo`.
  * The rest lowercases, every run of other characters folds to one hyphen, and
  * the ends carry no hyphen. A name that folds away completely — Arabic, Hebrew,
- * `###` — suggests `mode`, then `mode-2`, `mode-3`, … past the ones the
- * organization already holds, so the suggestion is never taken; the counter
- * stops at `MODE_SLUG_MAX_LENGTH`, so the fallback always fits the bound. An
- * empty or whitespace-only name suggests nothing (`''`): the fallback covers a
- * name that folds away, not a field the person has not filled. A derived slug is
- * a suggestion the person can replace.
+ * `###` — suggests `mode`, then `mode-2`, `mode-3`, … Each fallback candidate is
+ * a few characters, and the counter runs past every taken slug, so the fallback
+ * is never taken. A folded name keeps its own length: the form and the server
+ * refuse a slug longer than the bound. An empty or whitespace-only name suggests
+ * nothing (`''`): the fallback covers a name that folds away, not a field the
+ * person has not filled. A derived slug is a suggestion the person can replace.
  */
 export function modeSlugFromName(name: string, takenSlugs: readonly string[] = []): string {
   // Nothing typed derives nothing; only a name whose characters fold away
@@ -41,7 +43,9 @@ export function modeSlugFromName(name: string, takenSlugs: readonly string[] = [
   const taken = new Set(takenSlugs);
   let attempt = 1;
   const candidate = () => (attempt === 1 ? FALLBACK_SLUG : `${FALLBACK_SLUG}-${attempt}`);
-  while (attempt < MODE_SLUG_MAX_LENGTH && taken.has(candidate())) {
+  // Count past every taken slug. A candidate is at most a few characters, so the
+  // count stays far below the server bound in practice.
+  while (taken.has(candidate())) {
     attempt += 1;
   }
   return candidate();

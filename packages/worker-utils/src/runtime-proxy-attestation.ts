@@ -1,5 +1,6 @@
-import { jwtVerify, SignJWT } from 'jose';
+import { SignJWT } from 'jose';
 import { z } from 'zod';
+import { verifyKiloTokenSignature } from './kilo-token-verification';
 
 export const RUNTIME_PROXY_ATTESTATION_HEADER = 'X-Kilo-Runtime-Proxy-Attestation';
 export const RUNTIME_PROXY_ATTESTATION_ISSUER = 'kilocode-runtime-proxy';
@@ -105,8 +106,7 @@ export async function verifyRuntimeProxyAttestation(input: {
 }): Promise<boolean> {
   if (!input.value || input.value.length > 4096) return false;
   try {
-    const { payload } = await jwtVerify(input.value, signingKey(input.secret), {
-      algorithms: ['HS256'],
+    const { payload } = await verifyKiloTokenSignature(input.value, input.secret, {
       issuer: RUNTIME_PROXY_ATTESTATION_ISSUER,
       audience: input.audience,
       currentDate: input.now,

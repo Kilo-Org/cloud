@@ -14,6 +14,7 @@ import type {
 import {
   AGENT_TAB_OUTSIDE_GROUP_ERROR,
   DOWNLOAD_PERMISSION_MISSING_ERROR,
+  DOWNLOAD_STEP_TAB_GONE_ERROR,
   hashBrowserToolArguments,
   NEEDS_PERMISSION_ERROR,
   ORIGIN_CHANGED_ERROR,
@@ -21,6 +22,7 @@ import {
 } from './browser-agent-checks';
 import { createRuntimeBrowserBridge } from './local-agents/browser-bridge';
 import { LOCAL_AGENT_ERROR_CODES } from './local-agents/jsonrpc';
+import { TAB_TAKEN_ERROR } from './browser-caller';
 import type { BrowserCaller } from './browser-caller';
 import type {
   BrowserTabInfo,
@@ -48,8 +50,10 @@ const panel = (): BrowserCaller => ({
 });
 
 type CdpHandler = (
-  params: Record<string, unknown> | undefined
-) => Record<string, unknown> | undefined;
+  params: Record<string, unknown> | undefined,
+  /** The tab the command was sent to: a deferred answer can be scoped to the tab a call drives. */
+  target?: { readonly tabId: number }
+) => Promise<Record<string, unknown>> | Record<string, unknown> | undefined;
 
 type AgentResult = Extract<EvalTabResult, { readonly ok: true }>;
 
@@ -84,6 +88,12 @@ const originChangedResultOf = (outcome: BrowserToolRunOutcome): EvalTabResult | 
 interface FakeCdp {
   /** Records the ordered CDP method names. */
   readonly commands: () => readonly string[];
+  /** Every command with the tab it went to and the url it named. */
+  readonly sent: () => readonly {
+    readonly method: string;
+    readonly tabId: number;
+    readonly url: string | undefined;
+  }[];
   readonly downloadsDenied: () => number;
   readonly downloadsRestored: () => number;
   readonly emit: (method: string, params: Record<string, unknown>) => void;
@@ -139,6 +149,8 @@ const frameTreePayload = (mainUrl: string): Record<string, unknown> => ({
 
 const createFakeCdp = (): FakeCdp => {
   const commands: string[] = [];
+  /** Every command with the tab it went to and the url it named, so a test can tell one tab's call from another's. */
+  const sent: { method: string; tabId: number; url: string | undefined }[] = [];
   const eventListeners: ChromeDebuggerEventListener[] = [];
   let denied = 0;
   let restored = 0;
@@ -149,12 +161,13 @@ const createFakeCdp = (): FakeCdp => {
 
   const sendMailbox = (
     method: string,
-    params: Record<string, unknown> | undefined
-  ): Record<string, unknown> | undefined => {
+    params: Record<string, unknown> | undefined,
+    target?: { readonly tabId: number }
+  ): Promise<Record<string, unknown>> | Record<string, unknown> | undefined => {
     const handler = handlers[method];
 
     if (handler !== undefined) {
-      return handler(params);
+      return handler(params, target);
     }
 
     switch (method) {
@@ -267,6 +280,11 @@ const createFakeCdp = (): FakeCdp => {
     },
     sendCommand: async (target, method, params) => {
       commands.push(method);
+      sent.push({
+        method,
+        tabId: target.tabId,
+        url: typeof params?.['url'] === 'string' ? params['url'] : undefined,
+      });
 
       if (method === 'Input.dispatchMouseEvent' && emitDownloadOnClick) {
         emitDownloadOnClick = false;
@@ -281,7 +299,7 @@ const createFakeCdp = (): FakeCdp => {
         }
       }
 
-      return sendMailbox(method, params);
+      return sendMailbox(method, params, target);
     },
   };
 
@@ -300,6 +318,7 @@ const createFakeCdp = (): FakeCdp => {
         listener({ sessionId, tabId: TAB_ID }, method, params);
       }
     },
+    sent: () => sent,
     setFrameUrl: url => {
       mainUrl = url;
     },
@@ -2062,7 +2081,7 @@ describe('agent browser calls', () => {
     const guarded = await openTab([]);
 
     if (guarded.kind !== 'needs_permission') {
-      throw new Error(`expected a refusal, got ${guarded.kind}`);
+      throw new Error(`expected a refusal, got ${JSON.stringify(guarded)}`);
     }
 
     // The token binds the call the model made, and the tab never opens at the destination.
@@ -2078,7 +2097,14 @@ describe('agent browser calls', () => {
 
     const approved = await openTab([expectStepToken(guarded)]);
 
-    // The approved repeat drives the tab the refused step opened: no second tab, and the kept file is the result.
+    // The approved repeat navigates the tab the refused step opened — that tab, at that url — not the caller's.
+    // The last navigate is the repeat's: the guarded call's own navigate came first.
+    expect(cdp.sent().findLast(command => command.method === 'Page.navigate')).toStrictEqual({
+      method: 'Page.navigate',
+      tabId: newTab,
+      url,
+    });
+    // No second tab, and the kept file is the result.
     expect([created.length, downloads.cancelled]).toStrictEqual([1, [71]]);
     expect(
       approved.kind === 'result' && approved.result.ok ? String(approved.result.value) : ''
@@ -2363,6 +2389,262 @@ describe('agent browser calls', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  /** A tabs-new harness whose opened tab can be closed, with the download and frame fakes of the group. */
+  const tabsNewFixture = async (
+    options: {
+      readonly deferredNavigate?: boolean;
+      readonly granted?: boolean;
+      /** A navigate that loads a page instead of becoming the download the guard stops. */
+      readonly plain?: boolean;
+    } = {}
+  ) => {
+    const downloads = createFakeDownloads();
+    const created: Record<string, unknown>[] = [];
+    const openedListeners: ((tab: {
+      readonly id?: number;
+      readonly openerTabId?: number;
+    }) => void)[] = [];
+    const newTab = TAB_ID + 11;
+    let closed = false;
+
+    const tabsApi: BrowserTabsApi & {
+      readonly create: (properties: { readonly url?: string }) => Promise<BrowserTabInfo>;
+    } = {
+      create: async (properties: { readonly url?: string }) => {
+        created.push({ ...properties });
+
+        for (const listener of openedListeners) {
+          listener({ id: newTab, openerTabId: TAB_ID });
+        }
+
+        return { id: newTab, title: '', url: properties.url ?? 'about:blank', windowId: 1 };
+      },
+      get: async (tabId: number) => {
+        if (tabId !== newTab) {
+          return { id: TAB_ID, title: 'Example', url: MAIN_ORIGIN };
+        }
+
+        // A closed step tab is one the browser no longer has: no id is how the runtime reads that.
+        return closed
+          ? { title: '', url: '' }
+          : { id: newTab, title: '', url: `${MAIN_ORIGIN}/report.txt` };
+      },
+      onCreated: {
+        addListener: (
+          listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+        ) => {
+          openedListeners.push(listener);
+        },
+        removeListener: () => {},
+      },
+      query: async () => [
+        { active: true, id: TAB_ID, title: 'Example', url: MAIN_ORIGIN, windowId: 1 },
+      ],
+    };
+    const { controller } = createGroups();
+    const harness = await createHarness({
+      ...(options.granted === false
+        ? { downloadsGranted: false }
+        : { downloadsApi: downloads.api }),
+      tabGroups: controller,
+      tabsApi,
+    });
+
+    // The file the approved repeat keeps, as the browser reports it once it is written.
+    downloads.searched.push({ filename: '/home/me/Downloads/report.txt', id: 72 });
+    // A navigate the test answers by hand, so two calls can be interleaved on purpose.
+    const navigateGate = Promise.withResolvers<void>();
+
+    harness.cdp.setHandlers({
+      'Page.navigate': async () => {
+        await (options.deferredNavigate === true ? navigateGate.promise : Promise.resolve());
+
+        if (options.plain === true) {
+          return { frameId: 'main' };
+        }
+
+        // The destination became a download, which the guard stops and reports as the step to approve.
+        downloads.emit({ id: 75, tabId: newTab });
+
+        return { errorText: 'net::ERR_ABORTED' };
+      },
+    });
+
+    const url = `${MAIN_ORIGIN}/report.txt`;
+    const run = (caller: BrowserCaller, sensitive: readonly string[] = [], tabId = TAB_ID) =>
+      harness.runtime.runTool({
+        agent: {
+          authorized: [readGrant, actGrant, { class: 'navigate', origin: MAIN_ORIGIN }],
+          sensitive: [...sensitive],
+        },
+        arguments: { action: 'new', url },
+        caller,
+        tabId,
+        toolName: 'browser_tabs',
+      });
+
+    return {
+      ...harness,
+      closeTab: (next: boolean) => {
+        closed = next;
+      },
+      created,
+      newTab,
+      releaseNavigate: () => {
+        navigateGate.resolve();
+      },
+      run,
+    };
+  };
+
+  it('lets no panel call run on the tab an agent tabs-new is driving', async () => {
+    vi.useFakeTimers();
+
+    const fixture = await tabsNewFixture({ deferredNavigate: true });
+    const pending = fixture.run(agent());
+
+    await vi.advanceTimersByTimeAsync(50);
+
+    const before = fixture.cdp.sent().filter(command => command.tabId === fixture.newTab).length;
+    // The agent holds the opened tab, so a panel call on it asks for a take-over instead of interleaving.
+    const panelOutcome = await fixture.runtime.runTool({
+      arguments: {},
+      caller: panel(),
+      tabId: fixture.newTab,
+      toolName: 'browser_snapshot',
+    });
+    const after = fixture.cdp.sent().filter(command => command.tabId === fixture.newTab).length;
+
+    expect([panelOutcome.kind, after]).toStrictEqual(['needs_take_over', before]);
+
+    fixture.releaseNavigate();
+
+    const finished = await pending;
+
+    // The agent's own call still completes on that tab: the file it started is the refusal it reports.
+    expect(finished.kind).toBe('needs_permission');
+    vi.useRealTimers();
+  });
+
+  it('ends a tabs-new call on the tab a take-over names, not on the caller tab', async () => {
+    vi.useFakeTimers();
+
+    const fixture = await tabsNewFixture({ deferredNavigate: true });
+    const pending = fixture.run(agent());
+
+    await vi.advanceTimersByTimeAsync(50);
+
+    // A panel takes the caller's tab: the call is running on the opened tab and must survive it. The panel's own
+    // Snapshot then waits for the caller tab's chain, so the navigate is released before either is awaited.
+    const callerTakeOver = fixture.runtime.runTool({
+      arguments: {},
+      caller: panel(),
+      tabId: TAB_ID,
+      takeOver: true,
+      toolName: 'browser_snapshot',
+    });
+
+    fixture.releaseNavigate();
+    await vi.advanceTimersByTimeAsync(500);
+
+    const [panelOutcome, survived] = await Promise.all([callerTakeOver, pending]);
+
+    expect([panelOutcome.kind, survived.kind]).toStrictEqual(['result', 'needs_permission']);
+
+    if (survived.kind === 'needs_take_over') {
+      throw new Error('expected a call outcome, got a take-over request');
+    }
+
+    expect(survived.result.ok ? '' : survived.result.error).not.toBe(TAB_TAKEN_ERROR);
+
+    vi.useRealTimers();
+  });
+
+  it('does not deadlock a call that holds the caller tab while a panel works on it', async () => {
+    vi.useFakeTimers();
+
+    const fixture = await tabsNewFixture({ deferredNavigate: true });
+    const pending = fixture.run(agent());
+
+    await vi.advanceTimersByTimeAsync(50);
+
+    // The caller tab is not the tab being driven, so a panel call there runs to its own end.
+    const panelOutcome = await fixture.runtime.runTool({
+      arguments: {},
+      caller: panel(),
+      tabId: TAB_ID,
+      toolName: 'browser_snapshot',
+    });
+
+    fixture.releaseNavigate();
+
+    const finished = await pending;
+
+    // The panel asked for a tab the agent holds, so it waits for the take-over rather than interleaving; the agent
+    // Call finishes on its own tab either way, which is the no-deadlock property.
+    expect([panelOutcome.kind, finished.kind]).toStrictEqual([
+      'needs_take_over',
+      'needs_permission',
+    ]);
+    vi.useRealTimers();
+  });
+
+  it('refuses a guarded tabs-new without the downloads permission before it opens a tab', async () => {
+    const fixture = await tabsNewFixture({ granted: false });
+
+    const outcome = await fixture.run(agent());
+
+    // The refusal names the missing permission, and no tab was created, grouped or left for the next call.
+    if (outcome.kind !== 'result' || outcome.result.ok) {
+      throw new Error(`expected the permission refusal, got ${JSON.stringify(outcome)}`);
+    }
+
+    expect([outcome.result.error, fixture.created.length]).toStrictEqual([
+      DOWNLOAD_PERMISSION_MISSING_ERROR,
+      0,
+    ]);
+  });
+
+  it('refuses a repeat whose step tab was closed, without burning its token', async () => {
+    const fixture = await tabsNewFixture();
+    const guarded = await fixture.run(agent());
+
+    if (guarded.kind !== 'needs_permission') {
+      throw new Error(`expected a refusal, got ${guarded.kind}`);
+    }
+
+    const token = expectStepToken(guarded);
+
+    // The tab is gone: the repeat is the gone refusal, and the same token still buys the approval once it is back.
+    fixture.closeTab(true);
+    const gone = await fixture.run(agent(), [token]);
+
+    if (gone.kind !== 'result' || gone.result.ok) {
+      throw new Error(`expected the gone refusal, got ${JSON.stringify(gone)}`);
+    }
+
+    expect(gone.result.error).toBe(DOWNLOAD_STEP_TAB_GONE_ERROR);
+
+    fixture.closeTab(false);
+    const approved = await fixture.run(agent(), [token]);
+
+    expect(
+      approved.kind === 'result' && approved.result.ok ? String(approved.result.value) : ''
+    ).toContain('The file was downloaded; the page did not change.');
+  });
+
+  it('reports the withheld frames after a guarded tabs-new navigation', async () => {
+    const fixture = await tabsNewFixture({ plain: true });
+    const outcome = await fixture.run(agent());
+
+    // The navigate landed a page, and the frames the agent may not read are named on the tabs-new answer too.
+    if (outcome.kind !== 'result') {
+      throw new Error(`expected a result, got ${outcome.kind}`);
+    }
+
+    expect(outcome.withheldFrames).toStrictEqual([FRAME_ORIGIN]);
   });
 
   const refusalSchema = z.object({

@@ -1434,6 +1434,17 @@ export const createBrowserRuntime = ({
       : entry.tabId;
   };
 
+  /** The tab's id while the browser still has it: a step whose tab was closed cannot run anywhere. */
+  const liveTabOrUndefined = async (tabId: number): Promise<number | undefined> => {
+    try {
+      const tab = await tabsApi.get?.(tabId);
+
+      return tab === undefined || tab.id === undefined ? undefined : tab.id;
+    } catch {
+      return undefined;
+    }
+  };
+
   /** The tab a refused step opened, taken once: the repeat that redeems the token is the only call that may have it. */
   const takeStepTab = (binding: {
     readonly argumentHash: string;
@@ -1452,6 +1463,14 @@ export const createBrowserRuntime = ({
     downloadRecords.delete(session);
     approvedWindows.delete(session);
     lastApprovedAt.delete(session);
+
+    // The session's steps are over with it: no later call may resolve one of their tabs.
+    for (const key of stepTabs.keys()) {
+      if (key.startsWith(`${session}|`)) {
+        stepTabs.delete(key);
+      }
+    }
+
     closedSessions.add(session);
 
     // Bounded: an old handle that is reused is reopened explicitly, and only the live ones can hold a record.
@@ -1913,6 +1932,13 @@ export const createBrowserRuntime = ({
 
   const disposeTab = async (tabId: number): Promise<void> => {
     chains.delete(tabId);
+    // A step that opened this tab can never be repeated on it: forgetting the entry keeps a stale approval from
+    // Resolving to a dead tab id.
+    for (const [key, entry] of stepTabs) {
+      if (entry.tabId === tabId) {
+        stepTabs.delete(key);
+      }
+    }
     inFlight.delete(tabId);
     // A closed tab has no next call, so its linger is over and nothing will report what it left: both go with it.
     takeOverDownloads(tabId);
@@ -2339,6 +2365,8 @@ export const createBrowserRuntime = ({
 
       const { promise: takenAway, resolve: markTaken } = Promise.withResolvers<void>();
       let taken = false;
+      // The tab this call ends up driving: the caller's, or the one its step opened. Read by the cleanup below.
+      let drivenTabId = tabId;
 
       inFlight.set(tabId, () => {
         taken = true;
@@ -2431,14 +2459,34 @@ export const createBrowserRuntime = ({
           stepUrl !== undefined;
         // A `browser_tabs new` step ran on the tab it opened, so its token binds that tab. The repeat may arrive on
         // That tab or on the one the CLI held before, and both are the same approval.
-        const stepTab = stepOpensTab
+        const rememberedTab = stepOpensTab
           ? peekStepTab({ argumentHash: stepHash, session: sessionKey, toolName: stepToolName })
           : undefined;
+        // A remembered tab the browser no longer has is gone: the step cannot run, and asking must not console the
+        // Approval by burning its token, so the call is refused before anything is consumed.
+        const stepTab =
+          rememberedTab === undefined ? undefined : await liveTabOrUndefined(rememberedTab);
+
+        if (stepOpensTab && stepTab === undefined && rememberedTab !== undefined) {
+          return {
+            kind: 'result',
+            result: { error: DOWNLOAD_STEP_TAB_GONE_ERROR, ok: false },
+          };
+        }
+
+        const presentedTokens = agentContext?.sensitive ?? [];
+
+        if (stepOpensTab && stepTab === undefined && presentedTokens.length > 0) {
+          return {
+            kind: 'result',
+            result: { error: DOWNLOAD_STEP_TAB_GONE_ERROR, ok: false },
+          };
+        }
 
         // A download approval is post-action, so the gate cannot classify it on retry; a presented token bound to this session, tab, tool and argument set disables the guard once.
         const downloadApproved =
           agentContext !== undefined && preflight !== undefined && preflight.ok
-            ? (agentContext.sensitive ?? []).some(token =>
+            ? presentedTokens.some(token =>
                 tokens.consume(token, {
                   argumentHash: stepHash,
                   origin: preflight.origin,
@@ -2488,6 +2536,15 @@ export const createBrowserRuntime = ({
         // Guard: a tab opened at the destination lets the browser start the download before any guard exists, and
         // The file is then kept with no approval. This is the one path that must not reach the tool as written.
         const opensGuardedTab = guardDownloads && toolName === 'browser_tabs' && stepOpensTab;
+        // The permission is read before any tab exists: a refusal must not leave a blank tab in the session's
+        // Group, where it would become the next call's target.
+        if (opensGuardedTab && downloadsApi?.() === undefined) {
+          return {
+            kind: 'result',
+            result: { error: DOWNLOAD_PERMISSION_MISSING_ERROR, ok: false },
+          };
+        }
+
         const openedForStep = opensGuardedTab
           ? await openSessionTab({ sessionHandle: sessionKey })
           : undefined;
@@ -2501,6 +2558,38 @@ export const createBrowserRuntime = ({
 
         // The tab, session, tool and arguments this call really drives: the caller's, or the tab its step opened.
         const runTabId = reusedTab ?? openedForStep?.tabId ?? tabId;
+
+        // The call drives runTabId, so a take-over has to end this call: the caller's entry would abort the wrong
+        // One, and a take-over of the caller's tab must leave this call running.
+        drivenTabId = runTabId;
+
+        if (runTabId !== tabId) {
+          inFlight.delete(tabId);
+          inFlight.set(runTabId, () => {
+            taken = true;
+            markTaken();
+          });
+        }
+
+        // The driven tab's own lease: a panel call on it asks for a take-over instead of interleaving with this call.
+        // Lock order is fixed — the caller tab's chain first (already held), then the driven tab's lease — and a
+        // Driven tab is one this session opened, never another live call's caller, so the order cannot invert.
+        const drivenLease =
+          runTabId === tabId
+            ? undefined
+            : await leases.acquire(runTabId, caller, {
+                ...(takeOver === undefined ? {} : { takeOver }),
+                ...(title === undefined ? {} : { title }),
+              });
+
+        if (drivenLease?.kind === 'needs_take_over') {
+          return { holder: drivenLease.holder, kind: 'needs_take_over' };
+        }
+
+        if (drivenLease?.kind === 'busy') {
+          return { kind: 'result', result: { error: TAB_BUSY_ERROR, ok: false } };
+        }
+
         const runSession =
           runTabId === tabId
             ? session
@@ -2752,20 +2841,26 @@ export const createBrowserRuntime = ({
           }
 
           const info = await tabInfo(runTabId);
-
-          return {
-            kind: 'result',
-            result: {
-              ok: true,
-              value: {
-                selected: true,
-                tabId: runTabId,
-                title: info?.title ?? openedForStep.title,
-                // Chrome withholds the url of an `about:blank` tab without the `tabs` permission, so an empty one falls back.
-                url: info?.url === undefined || info.url === '' ? openedForStep.url : info.url,
-              },
-            },
+          const opened = {
+            selected: true,
+            tabId: runTabId,
+            title: info?.title ?? openedForStep.title,
+            // Chrome withholds the url of an `about:blank` tab without the `tabs` permission, so an empty one falls back.
+            url: info?.url === undefined || info.url === '' ? openedForStep.url : info.url,
           };
+
+          // The navigation ran on a tab this call opened, so the agent's withheld frames are read from it: a plain
+          // Return here would tell the model nothing about the frames it could not read.
+          return agentContext === undefined
+            ? { kind: 'result', result: { ok: true, value: opened } }
+            : {
+                kind: 'result',
+                result: { ok: true, value: opened },
+                withheldFrames: await withheldOriginsFor(
+                  createAgentFrameReader(runSession),
+                  agentContext.authorized
+                ),
+              };
         }
 
         // An approved navigate to an attachment keeps its file and still answers `ERR_ABORTED`: that is a success with no page change, not a failure.
@@ -2806,6 +2901,11 @@ export const createBrowserRuntime = ({
         };
       } finally {
         inFlight.delete(tabId);
+        inFlight.delete(drivenTabId);
+
+        if (drivenTabId !== tabId) {
+          leases.release(drivenTabId, caller);
+        }
       }
     });
   };

@@ -111,12 +111,6 @@ export const canStartDownload = (toolName: string, args: Record<string, unknown>
 };
 
 /**
- * A refusal for a download-capable call when neither guard can run: the
- * optional `downloads` permission is missing and the tab's target cannot
- * intercept responses either. The switch re-requests the permission, so the
- * message names the one action that fixes it.
- */
-/**
  * The tab an approved download step opened is gone, so there is no tab to
  * repeat that step on. Opening a fresh one would download the file again
  * without the approval the human gave.
@@ -124,6 +118,12 @@ export const canStartDownload = (toolName: string, args: Record<string, unknown>
 export const DOWNLOAD_STEP_TAB_GONE_ERROR =
   'The tab that step opened is gone. Take a fresh snapshot and try again (blocked).';
 
+/**
+ * A refusal for a download-capable call when neither guard can run: the
+ * optional `downloads` permission is missing and the tab's target cannot
+ * intercept responses either. The switch re-requests the permission, so the
+ * message names the one action that fixes it.
+ */
 export const DOWNLOAD_PERMISSION_MISSING_ERROR =
   'The browser cannot cancel downloads for this agent call: the optional Downloads permission is not granted (blocked). Turn "Allow local agents" off and on again to grant it, then retry.';
 

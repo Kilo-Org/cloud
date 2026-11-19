@@ -939,6 +939,62 @@ describe('CliLiveTransport unified user web connection', () => {
     transport.destroy();
   });
 
+  it('drops the owner when catalog discovery is fenced by SESSION_OWNER_CHANGED', async () => {
+    const connection = createConnection();
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      return Promise.reject(
+        new UserWebCommandError({ code: 'SESSION_OWNER_CHANGED', message: 'Session owner changed' })
+      );
+    });
+    const modelStates: RemoteModelState[] = [];
+    const commandStates: RemoteCommandState[] = [];
+    const { transport, serviceEvents } = createTransportWithSinks({
+      connection,
+      onRemoteModelStateChange: state => modelStates.push(state),
+      onRemoteCommandStateChange: state => commandStates.push(state),
+    });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Command discovery is fenced: the owner is dropped instead of the fence
+    // being published as a catalog error.
+    expect(commandStates.at(-1)?.ownerConnectionId).toBeNull();
+    expect(commandStates.some(state => state.refresh === 'error')).toBe(false);
+
+    // The same fence on model discovery. `sendCommand` runs synchronously when
+    // the owner is adopted, so the new implementation must be in place before
+    // the second owner is emitted.
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') {
+        return Promise.reject(
+          new UserWebCommandError({
+            code: 'SESSION_OWNER_CHANGED',
+            message: 'Session owner changed',
+          })
+        );
+      }
+      return Promise.resolve(COMMAND_WIRE_CATALOG);
+    });
+    const modelStatesBeforeModelFence = modelStates.length;
+
+    emitOwner(connection, 'second-owner');
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(modelStates.at(-1)?.ownerConnectionId).toBeNull();
+    expect(
+      modelStates.slice(modelStatesBeforeModelFence).some(state => state.refresh === 'error')
+    ).toBe(false);
+    expect(serviceEvents.some(event => event.type === 'stopped' && event.reason === 'error')).toBe(
+      false
+    );
+    transport.destroy();
+  });
+
   it('takes a session subscription lease without starting or destroying the injected connection', () => {
     const { userWebConnection, transport } = createTransportWithSinks();
 

@@ -151,8 +151,14 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     }
   }
 
-  function notifyReplacingConnection(expectedGeneration = generation): boolean {
+  // Tell consumers the current route is going away before its socket is dropped.
+  // Callers notify first and then check the gate, so an aborted replacement still
+  // reports the route loss consumers already saw.
+  function notifyReplacingConnection(): void {
     config.onReplacingConnection?.();
+  }
+
+  function isConnectionReplacementAllowed(expectedGeneration = generation): boolean {
     return !destroyed && !intentionalDisconnect && expectedGeneration === generation;
   }
 
@@ -160,7 +166,8 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   // old socket with its reference cleared first so its onclose is ignored.
   // Callers decide whether the replacement also reports a disconnection.
   function closeCurrentSocket(expectedGeneration = generation): boolean {
-    if (!notifyReplacingConnection(expectedGeneration)) return false;
+    notifyReplacingConnection();
+    if (!isConnectionReplacementAllowed(expectedGeneration)) return false;
     const staleWs = ws;
     if (staleWs !== null) {
       ws = null;
@@ -364,7 +371,8 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       const isAuthFailure = config.isAuthFailure?.(event) ?? false;
 
       if (isAuthFailure && !authRefreshAttempted && config.refreshAuth) {
-        if (!notifyReplacingConnection(expectedGeneration)) return;
+        notifyReplacingConnection();
+        if (!isConnectionReplacementAllowed(expectedGeneration)) return;
         void refreshAuthAndReconnect(expectedGeneration);
         return;
       }
@@ -373,7 +381,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       // The current physical route is gone even though no new socket follows.
       if (isAuthFailure && authRefreshAttempted) {
         mutationRecovery = 'idle';
-        notifyReplacingConnection(expectedGeneration);
+        notifyReplacingConnection();
         if (exhaustionReason === null) {
           exhaustionReason = 'auth-failure';
           config.onReconnectExhaustionChange?.(true);

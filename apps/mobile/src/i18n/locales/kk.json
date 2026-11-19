@@ -3804,6 +3804,8 @@
       "fieldName": "Көрсетілетін атау",
       "fieldUrl": "Сервер URL мекенжайы",
       "fieldUrlInvalid": "Жарамды сервер URL мекенжайын енгізіңіз.",
+      "duplicateUrl": "Бұл URL әлдеқашан сақталған.",
+      "serverNotFound": "Бұл сервер енді сақтаулы емес.",
       "enableServer": "Осы серверді қосу: {{name}}",
       "editServer": "Серверді өңдеу",
       "deleteServer": "Серверді жою",

@@ -3804,6 +3804,8 @@
       "fieldName": "Maqaa mul'atu",
       "fieldUrl": "URL sarvarii",
       "fieldUrlInvalid": "URL sarvarii sirrii galchi.",
+      "duplicateUrl": "URL sarvarii sun duraan qabameera.",
+      "serverNotFound": "Sarvariin kun amma qabamee hin jiru.",
       "enableServer": "Sarvarii kana dandeessisi: {{name}}",
       "editServer": "Sarvarii sirreessi",
       "deleteServer": "Sarvarii balleessi",

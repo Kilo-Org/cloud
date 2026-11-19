@@ -8,6 +8,7 @@ import {
   type GatewayChatApiKind,
   type Provider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { deleteAtPath } from '@kilocode/web-shared/lib/ai-gateway/providers/delete-at-path';
 import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 
@@ -59,8 +60,8 @@ export function buildDirectProvider(
     async transformRequest(context) {
       const body = context.request.body as Record<string, unknown>;
       if (upstream.remove_from_body) {
-        for (const key of upstream.remove_from_body) {
-          delete body[key];
+        for (const path of upstream.remove_from_body) {
+          deleteAtPath(body, path);
         }
       }
       Object.assign(body, upstream.extra_body ?? {});

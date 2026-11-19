@@ -3804,6 +3804,8 @@
       "fieldName": "Ingoa whakaatu",
       "fieldUrl": "URL o te tūmau",
       "fieldUrlInvalid": "Whakaurua he URL tūmau tika.",
+      "duplicateUrl": "Kua tiakina kētia tērā URL.",
+      "serverNotFound": "Kua kore tēnei tūmau e tiakina ināianei.",
       "enableServer": "Whakahohea tēnei tūmau: {{name}}",
       "editServer": "Whakatika tūmau",
       "deleteServer": "Muku tūmau",

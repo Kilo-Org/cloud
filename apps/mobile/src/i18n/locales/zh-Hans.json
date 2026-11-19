@@ -3804,6 +3804,8 @@
       "fieldName": "显示名称",
       "fieldUrl": "服务器 URL",
       "fieldUrlInvalid": "请输入有效的服务器 URL。",
+      "duplicateUrl": "该 URL 已保存。",
+      "serverNotFound": "该服务器已不再保存。",
       "enableServer": "启用此服务器：{{name}}",
       "editServer": "编辑服务器",
       "deleteServer": "删除服务器",

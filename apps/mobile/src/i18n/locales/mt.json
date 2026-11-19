@@ -3984,6 +3984,8 @@
       "fieldName": "Isem muri",
       "fieldUrl": "URL tas-server",
       "fieldUrlInvalid": "Daħħal URL tas-server validu.",
+      "duplicateUrl": "Dan l-URL tas-server diġà hija salvata.",
+      "serverNotFound": "Dan is-server m'għadux isalvat.",
       "enableServer": "Ippermetti dan is-server: {{name}}",
       "editServer": "Editja s-server",
       "deleteServer": "Ħassar is-server",

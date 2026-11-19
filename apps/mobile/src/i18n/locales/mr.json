@@ -3804,6 +3804,8 @@
       "fieldName": "दर्शवलेले नाव",
       "fieldUrl": "सर्व्हर URL",
       "fieldUrlInvalid": "वैध सर्व्हर URL प्रविष्ट करा.",
+      "duplicateUrl": "हा सर्व्हर URL आधीच जतन केलेला आहे.",
+      "serverNotFound": "हा सर्व्हर आता जतन केलेला नाही.",
       "enableServer": "हा सर्व्हर सक्षम करा: {{name}}",
       "editServer": "सर्व्हर संपादित करा",
       "deleteServer": "सर्व्हर हटवा",

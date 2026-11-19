@@ -3804,6 +3804,8 @@
       "fieldName": "প্রদর্শিত নাম",
       "fieldUrl": "সার্ভার URL",
       "fieldUrlInvalid": "একটি বৈধ সার্ভার URL লিখুন।",
+      "duplicateUrl": "এই URL ইতিমধ্যে সংরক্ষিত আছে।",
+      "serverNotFound": "এই সার্ভার আর সংরক্ষিত নেই।",
       "enableServer": "এই সার্ভার সক্রিয় করুন: {{name}}",
       "editServer": "সার্ভার সম্পাদনা করুন",
       "deleteServer": "সার্ভার মুছুন",

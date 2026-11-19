@@ -3804,6 +3804,8 @@
       "fieldName": "Görünen ad",
       "fieldUrl": "Sunucu URL'si",
       "fieldUrlInvalid": "Geçerli bir sunucu URL'si girin.",
+      "duplicateUrl": "Bu URL zaten kayıtlı.",
+      "serverNotFound": "Bu sunucu artık kayıtlı değil.",
       "enableServer": "Bu sunucuyu etkinleştir: {{name}}",
       "editServer": "Sunucuyu düzenle",
       "deleteServer": "Sunucuyu sil",

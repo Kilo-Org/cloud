@@ -3804,6 +3804,8 @@
       "fieldName": "Kuvatav nimi",
       "fieldUrl": "Serveri URL",
       "fieldUrlInvalid": "Sisesta kehtiv serveri URL.",
+      "duplicateUrl": "See URL on juba salvestatud.",
+      "serverNotFound": "See server ei ole enam salvestatud.",
       "enableServer": "Luba see server: {{name}}",
       "editServer": "Muuda serverit",
       "deleteServer": "Kustuta server",

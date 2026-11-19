@@ -3804,6 +3804,8 @@
       "fieldName": "ਦਿਖਾਇਆ ਨਾਮ",
       "fieldUrl": "ਸਰਵਰ URL",
       "fieldUrlInvalid": "ਇੱਕ ਵੈਧ ਸਰਵਰ URL ਦਾਖਲ ਕਰੋ।",
+      "duplicateUrl": "ਇਹ URL ਪਹਿਲਾਂ ਹੀ ਸੰਭਾਲਿਆ ਗਿਆ ਹੈ।",
+      "serverNotFound": "ਇਹ ਸਰਵਰ ਹੁਣ ਸੰਭਾਲਿਆ ਨਹੀਂ ਰਿਹਾ।",
       "enableServer": "ਇਹ ਸਰਵਰ ਚਾਲੂ ਕਰੋ: {{name}}",
       "editServer": "ਸਰਵਰ ਸੰਪਾਦਿਤ ਕਰੋ",
       "deleteServer": "ਸਰਵਰ ਮਿਟਾਓ",

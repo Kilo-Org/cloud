@@ -4048,6 +4048,8 @@
       "fieldName": "Display name",
       "fieldUrl": "Server URL",
       "fieldUrlInvalid": "Enter a valid server URL.",
+      "duplicateUrl": "That URL is already saved.",
+      "serverNotFound": "This server is no longer saved.",
       "enableServer": "Enable this server: {{name}}",
       "editServer": "Edit server",
       "deleteServer": "Delete server",

@@ -89,9 +89,12 @@ async function connectorGone(
   return connector.kind === 'gone';
 }
 
-/** Billing connections serve the Messages API and Anthropic's OpenAI-compatible endpoint. */
+/**
+ * Billing connections serve only the Messages API. Anthropic's OpenAI-compatible
+ * endpoint ignores prompt caching and drops reasoning output.
+ */
 function servesApiKind(kind: GatewayChatApiKind): boolean {
-  return kind === 'messages' || kind === 'chat_completions';
+  return kind === 'messages';
 }
 
 /**
@@ -134,11 +137,11 @@ export function buildClaudeBillingProvider(
     disableUrlSuffix: false,
     apiKey: accessToken,
     apiKeyHeader: null,
-    supportedChatApis: ['messages', 'chat_completions'],
+    supportedChatApis: ['messages'],
     responseTransforms: null,
     async transformRequest(context) {
-      // Only the billed API kinds reach this provider; `responses` never does.
-      if (context.request.kind === 'responses') return;
+      // Only the Messages API reaches this provider.
+      if (context.request.kind !== 'messages') return;
       context.extraHeaders['anthropic-version'] ??= ANTHROPIC_VERSION;
       appendAnthropicBetaHeader(context.extraHeaders, OAUTH_API_BETA);
       appendAnthropicBetaHeader(context.extraHeaders, CLAUDE_BILLING_BETA);
@@ -206,7 +209,7 @@ export async function checkClaudeBilling(
     if (!servesApiKind(input.request.kind)) {
       return {
         kind: 'unavailable',
-        message: 'Use the Messages or Chat Completions API with your Claude link.',
+        message: 'Use the Messages API with your Claude link.',
       };
     }
     if (!isClaudeOperatorConfigured()) {

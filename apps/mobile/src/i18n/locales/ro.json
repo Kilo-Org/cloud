@@ -3864,6 +3864,8 @@
       "fieldName": "Nume afișat",
       "fieldUrl": "URL server",
       "fieldUrlInvalid": "Introdu un URL de server valid.",
+      "duplicateUrl": "Acest URL este deja salvat.",
+      "serverNotFound": "Acest server nu mai este salvat.",
       "enableServer": "Activează acest server: {{name}}",
       "editServer": "Editează serverul",
       "deleteServer": "Șterge serverul",

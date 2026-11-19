@@ -3804,6 +3804,8 @@
       "fieldName": "Orúkọ tí a fi hàn",
       "fieldUrl": "URL olupin",
       "fieldUrlInvalid": "Tẹ URL olupin tí ó tọ́ sí.",
+      "duplicateUrl": "URL yẹn ti fipamọ́ tẹ́lẹ̀.",
+      "serverNotFound": "Olupin yìí kò fipamọ́ mọ́.",
       "enableServer": "Mú olupin yìí ṣiṣẹ́: {{name}}",
       "editServer": "Ṣàtúnṣe olupin",
       "deleteServer": "Pa olupin rẹ́",

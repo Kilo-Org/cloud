@@ -3804,6 +3804,8 @@
       "fieldName": "표시 이름",
       "fieldUrl": "서버 URL",
       "fieldUrlInvalid": "유효한 서버 URL을 입력하세요.",
+      "duplicateUrl": "이미 저장된 URL입니다.",
+      "serverNotFound": "이 서버는 더 이상 저장되어 있지 않습니다.",
       "enableServer": "이 서버 사용: {{name}}",
       "editServer": "서버 편집",
       "deleteServer": "서버 삭제",

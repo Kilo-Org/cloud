@@ -3804,6 +3804,8 @@
       "fieldName": "देखाइने नाम",
       "fieldUrl": "सर्भर URL",
       "fieldUrlInvalid": "मान्य सर्भर URL प्रविष्ट गर्नुहोस्।",
+      "duplicateUrl": "त्यो सर्भर URL पहिले नै सुरक्षित गरिसकिएको छ।",
+      "serverNotFound": "यो सर्भर अब सुरक्षित गरिएको छैन।",
       "enableServer": "यो सर्भर सक्षम गर्नुहोस्: {{name}}",
       "editServer": "सर्भर सम्पादन गर्नुहोस्",
       "deleteServer": "सर्भर मेट्नुहोस्",

@@ -3864,6 +3864,8 @@
       "fieldName": "Parādāmais nosaukums",
       "fieldUrl": "Servera URL",
       "fieldUrlInvalid": "Ievadi derīgu servera URL.",
+      "duplicateUrl": "Šis URL jau ir saglabāts.",
+      "serverNotFound": "Šis serveris vairs nav saglabāts.",
       "enableServer": "Iespējot šo serveri: {{name}}",
       "editServer": "Rediģēt serveri",
       "deleteServer": "Dzēst serveri",

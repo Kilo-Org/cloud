@@ -3864,6 +3864,8 @@
       "fieldName": "Nom que es mostra",
       "fieldUrl": "URL del servidor",
       "fieldUrlInvalid": "Introdueix una URL de servidor vàlida.",
+      "duplicateUrl": "Aquesta URL ja està desada.",
+      "serverNotFound": "Aquest servidor ja no està desat.",
       "enableServer": "Activa aquest servidor: {{name}}",
       "editServer": "Edita el servidor",
       "deleteServer": "Elimina el servidor",

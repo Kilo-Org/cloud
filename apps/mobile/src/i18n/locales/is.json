@@ -3804,6 +3804,8 @@
       "fieldName": "Sýnt heiti",
       "fieldUrl": "Slóð þjóns",
       "fieldUrlInvalid": "Sláðu inn gilda slóð þjóns.",
+      "duplicateUrl": "Þessi slóð er þegar vistuð.",
+      "serverNotFound": "Þessi þjónn er ekki lengur vistaður.",
       "enableServer": "Virkja þennan þjón: {{name}}",
       "editServer": "Breyta þjóni",
       "deleteServer": "Eyða þjóni",

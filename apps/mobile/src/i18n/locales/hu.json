@@ -3804,6 +3804,8 @@
       "fieldName": "Megjelenített név",
       "fieldUrl": "Szerver URL-címe",
       "fieldUrlInvalid": "Adj meg érvényes szerver URL-címet.",
+      "duplicateUrl": "Ez az URL már el van mentve.",
+      "serverNotFound": "Ez a szerver már nincs elmentve.",
       "enableServer": "Szerver engedélyezése: {{name}}",
       "editServer": "Szerver szerkesztése",
       "deleteServer": "Szerver törlése",

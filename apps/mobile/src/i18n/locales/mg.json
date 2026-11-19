@@ -3804,6 +3804,8 @@
       "fieldName": "Anarana aseho",
       "fieldUrl": "URL-n'ny mpizara",
       "fieldUrlInvalid": "Ampidiro URL mpizara mety.",
+      "duplicateUrl": "Efa voatahiry io URL io.",
+      "serverNotFound": "Tsy voatahiry intsony ity mpizara ity.",
       "enableServer": "Alefaso ity mpizara ity: {{name}}",
       "editServer": "Ovaina ny mpizara",
       "deleteServer": "Fafao ny mpizara",

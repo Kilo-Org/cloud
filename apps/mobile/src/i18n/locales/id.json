@@ -3804,6 +3804,8 @@
       "fieldName": "Nama tampilan",
       "fieldUrl": "URL server",
       "fieldUrlInvalid": "Masukkan URL server yang valid.",
+      "duplicateUrl": "URL tersebut sudah disimpan.",
+      "serverNotFound": "Server ini tidak lagi tersimpan.",
       "enableServer": "Aktifkan server ini: {{name}}",
       "editServer": "Edit server",
       "deleteServer": "Hapus server",

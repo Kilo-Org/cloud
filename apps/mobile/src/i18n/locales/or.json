@@ -3804,6 +3804,8 @@
       "fieldName": "ଦେଖାଯାଉଥିବା ନାମ",
       "fieldUrl": "ସର୍ଭର URL",
       "fieldUrlInvalid": "ବୈଧ ସର୍ଭର URL ଦିଅନ୍ତୁ।",
+      "duplicateUrl": "ଏହି URL ପୂର୍ବରୁ ସଞ୍ଚିତ ହୋଇଛି।",
+      "serverNotFound": "ଏହି ସର୍ଭର ଆଉ ସଞ୍ଚିତ ହୋଇନାହିଁ।",
       "enableServer": "ଏହି ସର୍ଭର ସକ୍ଷମ କରନ୍ତୁ: {{name}}",
       "editServer": "ସର୍ଭର ସମ୍ପାଦନ କରନ୍ତୁ",
       "deleteServer": "ସର୍ଭର ବିଲୋପ କରନ୍ତୁ",

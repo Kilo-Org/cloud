@@ -3804,6 +3804,8 @@
       "fieldName": "Erakusteko izena",
       "fieldUrl": "Zerbitzariaren URLa",
       "fieldUrlInvalid": "Sartu baliozko zerbitzari URLa.",
+      "duplicateUrl": "URLa jada gordeta dago.",
+      "serverNotFound": "Zerbitzari hau ez dago jada gordeta.",
       "enableServer": "Gaitu zerbitzari hau: {{name}}",
       "editServer": "Editatu zerbitzaria",
       "deleteServer": "Ezabatu zerbitzaria",

@@ -3870,6 +3870,8 @@
       "fieldName": "Nome de exibição",
       "fieldUrl": "URL do servidor",
       "fieldUrlInvalid": "Insira uma URL de servidor válida.",
+      "duplicateUrl": "Essa URL já está salva.",
+      "serverNotFound": "Esse servidor não está mais salvo.",
       "enableServer": "Ativar este servidor: {{name}}",
       "editServer": "Editar servidor",
       "deleteServer": "Excluir servidor",

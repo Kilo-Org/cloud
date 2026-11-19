@@ -12,7 +12,6 @@ function matchesRule(rule: PreferredProviderOrderRule, requestedModel: string): 
   );
 }
 
-/** Index of the first rule matching the model, or -1 when no rule matches. */
 export function findPreferredProviderOrderRuleIndex(
   config: PreferredProviderOrderConfig,
   requestedModel: string

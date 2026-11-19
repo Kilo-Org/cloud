@@ -3924,6 +3924,8 @@
       "fieldName": "Wyświetlana nazwa",
       "fieldUrl": "Adres URL serwera",
       "fieldUrlInvalid": "Wprowadź prawidłowy adres URL serwera.",
+      "duplicateUrl": "Ten adres URL jest już zapisany.",
+      "serverNotFound": "Ten serwer nie jest już zapisany.",
       "enableServer": "Włącz ten serwer: {{name}}",
       "editServer": "Edytuj serwer",
       "deleteServer": "Usuń serwer",

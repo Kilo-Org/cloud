@@ -23,7 +23,12 @@ export type FakeHub = {
   close(): Promise<void>;
   connected: boolean;
   frames: FakeHubFrame[];
+  /** A single-use page: its document loads are counted, so a second request is visible. */
+  oncePageHits(): number;
+  onceUrl: string;
   origin: string | undefined;
+  /** A plain HTML page the agent can navigate to; same loopback host as the pairing URL. */
+  pageUrl: string;
   pairingUrl(hubId: string, token: string): string;
   port: number;
   send(frame: FakeHubFrame): void;
@@ -48,9 +53,25 @@ export const FAKE_HUB_ID = HUB_ID;
 type PairingState = {
   allowedOrigin: string | null;
   key: string | null;
+  /** Document requests the one-time page has served: a second load would mean the URL was requested twice. */
+  oncePageHits: number;
   token: string | null;
   wsUrl: string;
 };
+
+const PAIRING_PAGE_HTML = '<!doctype html><html><body>Pairing in progress…</body></html>';
+
+/** A plain page for the agent to navigate to and snapshot; no script, no secrets. */
+const AGENT_PAGE_HTML = `<!doctype html>
+<html>
+  <head><title>Bridge page</title></head>
+  <body>
+    <h1>Bridge page</h1>
+    <p>The agent reached this page through the extension runtime.</p>
+    <a href="/next">Next</a>
+    <button type="button">Go</button>
+  </body>
+</html>`;
 
 const startServer = async (state: PairingState): Promise<Server> => {
   const handleRequest = async (request: IncomingMessage, response: ServerResponse) => {
@@ -125,7 +146,24 @@ const startServer = async (state: PairingState): Promise<Server> => {
 
     if (url.pathname.startsWith('/__kilo_browser_pair')) {
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      response.end('<!doctype html><html><body>Pairing in progress…</body></html>');
+      response.end(PAIRING_PAGE_HTML);
+
+      return;
+    }
+
+    // The page the agent drives: same loopback host, no credentials, no script.
+    if (url.pathname === '/page') {
+      response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      response.end(AGENT_PAGE_HTML);
+
+      return;
+    }
+
+    // A single-use destination: the first document load is the one the agent asked for, a second one would spend it again.
+    if (url.pathname === '/once') {
+      state.oncePageHits += 1;
+      response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      response.end(AGENT_PAGE_HTML);
 
       return;
     }
@@ -144,7 +182,13 @@ const startServer = async (state: PairingState): Promise<Server> => {
 };
 
 export const startFakeHub = async (): Promise<FakeHub> => {
-  const state: PairingState = { allowedOrigin: null, key: null, token: null, wsUrl: '' };
+  const state: PairingState = {
+    allowedOrigin: null,
+    key: null,
+    oncePageHits: 0,
+    token: null,
+    wsUrl: '',
+  };
   const server = await startServer(state);
   const address = server.address();
   const port = typeof address === 'object' && address !== null ? address.port : 0;
@@ -156,7 +200,10 @@ export const startFakeHub = async (): Promise<FakeHub> => {
     },
     connected: false,
     frames: [],
+    oncePageHits: () => state.oncePageHits,
+    onceUrl: `http://127.0.0.1:${port}/once`,
     origin: undefined,
+    pageUrl: `http://127.0.0.1:${port}/page`,
     setAllowedOrigin: () => {
       /* Rebound to the live state below. */
     },
@@ -198,7 +245,9 @@ export const startFakeHub = async (): Promise<FakeHub> => {
       hub.connected = true;
 
       client.on('message', (data: Buffer) => {
-        hub.frames.push(frameSchema.parse(JSON.parse(data.toString())));
+        const text = data.toString();
+
+        hub.frames.push(frameSchema.parse(JSON.parse(text)));
       });
       client.on('close', () => {
         hub.connected = false;

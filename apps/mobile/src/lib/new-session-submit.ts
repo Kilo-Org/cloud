@@ -470,3 +470,27 @@ export function resolveContinueStartDisabled(input: {
     staleSelection
   );
 }
+
+/**
+ * Whether the gateway model catalog failed with nothing to list, so the
+ * new-session footer names that failure and carries its Retry.
+ *
+ * TanStack Query v5 resets a no-data query to `pending` on refetch and clears
+ * `error`, so `isError` alone would drop the failure (and its Retry) the moment
+ * Retry is pressed; `isFetched` keeps it through the refetch. A populated cache
+ * behind a failed background refetch is not a failure. A remote target lists
+ * its computer's catalog, not the gateway's.
+ */
+export function resolveGatewayModelsReadFailed(input: {
+  isRemoteTargetSelected: boolean;
+  isError: boolean;
+  isLoading: boolean;
+  isFetched: boolean;
+  modelCount: number;
+}): boolean {
+  return (
+    !input.isRemoteTargetSelected &&
+    (input.isError || (input.isLoading && input.isFetched)) &&
+    input.modelCount === 0
+  );
+}

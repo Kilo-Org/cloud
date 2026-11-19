@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   resolveContinueStartDisabled,
+  resolveGatewayModelsReadFailed,
   resolveNewSessionConnectProvider,
   resolveNewSessionProfileGate,
   resolveNewSessionStartBlockedReason,
@@ -946,5 +947,47 @@ describe('resolveNewSessionStartBlockedReason', () => {
         })
       )
     ).toBeNull();
+  });
+});
+
+describe('resolveGatewayModelsReadFailed', () => {
+  const failed = {
+    isRemoteTargetSelected: false,
+    isError: true,
+    isLoading: false,
+    isFetched: true,
+    modelCount: 0,
+  };
+
+  it('names a failed read that left nothing to list', () => {
+    expect(resolveGatewayModelsReadFailed(failed)).toBe(true);
+  });
+
+  it('keeps the failure through the no-data refetch that Retry starts', () => {
+    // v5 resets the query to pending and clears the error while it refetches.
+    expect(
+      resolveGatewayModelsReadFailed({ ...failed, isError: false, isLoading: true })
+    ).toBe(true);
+  });
+
+  it('is not a failure on the first load', () => {
+    expect(
+      resolveGatewayModelsReadFailed({
+        ...failed,
+        isError: false,
+        isLoading: true,
+        isFetched: false,
+      })
+    ).toBe(false);
+  });
+
+  it('ignores a failed background refetch behind a populated cache', () => {
+    expect(resolveGatewayModelsReadFailed({ ...failed, modelCount: 3 })).toBe(false);
+  });
+
+  it('ignores the gateway catalog while a remote target is selected', () => {
+    expect(resolveGatewayModelsReadFailed({ ...failed, isRemoteTargetSelected: true })).toBe(
+      false
+    );
   });
 });

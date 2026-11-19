@@ -92,6 +92,7 @@ import {
   resolveCloneCapabilityRefusal,
 } from '@/lib/hooks/remote-instance-spawn-classifier';
 import {
+  resolveGatewayModelsReadFailed,
   resolveContinueStartDisabled,
   resolveNewSessionConnectProvider,
   resolveNewSessionProfileGate,
@@ -351,6 +352,7 @@ export function NewSessionScreenBody() {
     isLoading: isLoadingModels,
     isError: isModelsError,
     isFetching: isFetchingModels,
+    isFetched: isFetchedModels,
     refetch: refetchModels,
   } = useAvailableModels(organizationId);
   const instanceCatalog = useInstanceModelCatalog(runOnInstance?.connectionId ?? null);
@@ -1294,6 +1296,14 @@ export function NewSessionScreenBody() {
         }
   );
 
+  const gatewayModelsReadFailed = resolveGatewayModelsReadFailed({
+    isRemoteTargetSelected,
+    isError: isModelsError,
+    isLoading: isLoadingModels,
+    isFetched: isFetchedModels,
+    modelCount: models.length,
+  });
+
   let startBlockedReason: string | null = null;
   let startBlockedAction: { label: string; onPress: () => void; isBusy?: boolean } | null = null;
   // `connect-provider` is not mapped here: the repository section's connect card
@@ -1308,6 +1318,17 @@ export function NewSessionScreenBody() {
     startBlockedReason = stripInlineCodeMarkers(
       t('agentChat.instancePicker.noCliInstancesDescription')
     );
+  } else if (gatewayModelsReadFailed) {
+    // The composer keeps its toolbar and does not state the failure, so the
+    // footer names it and carries its Retry whatever else is still missing:
+    // with a remembered model the picker would otherwise open empty with no
+    // explanation, and with none it would ask for a pick it cannot offer.
+    startBlockedReason = t('agentChat.newSession.couldNotLoadModels');
+    startBlockedAction = {
+      label: t('common.retry'),
+      onPress: () => void refetchModels(),
+      isBusy: isFetchingModels,
+    };
   } else if (startBlockedReasonKey === 'refresh-repositories') {
     startBlockedReason = t('common.noRepositoriesFound');
     startBlockedAction = {
@@ -1340,16 +1361,6 @@ export function NewSessionScreenBody() {
     // retry re-runs: the picked profile cannot be submitted until it resolves.
     startBlockedReason = t('agentChat.newSession.couldNotLoadEnvironment');
     startBlockedAction = { label: t('common.retry'), onPress: () => void refetchProfile() };
-  } else if (startBlockedReasonKey === 'model-missing' && isModelsError) {
-    // Nothing to pick from: the failed read is the blocker, so the footer names
-    // it and carries its Retry instead of asking for a pick the picker cannot
-    // offer. The composer keeps its toolbar and does not repeat the failure.
-    startBlockedReason = t('agentChat.newSession.couldNotLoadModels');
-    startBlockedAction = {
-      label: t('common.retry'),
-      onPress: () => void refetchModels(),
-      isBusy: isFetchingModels,
-    };
   } else if (startBlockedReasonKey === 'model-missing') {
     startBlockedReason = t('agentChat.newSession.modelMissingToStart');
   } else if (startBlockedReasonKey === 'stale-selection') {

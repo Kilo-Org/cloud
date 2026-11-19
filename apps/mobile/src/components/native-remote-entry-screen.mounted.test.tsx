@@ -27,6 +27,8 @@ vi.mock('expo-router', () => ({
 vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
+  // The shared `cn` helper reaches `@/i18n`, which installs this plugin.
+  initReactI18next: { type: '3rdParty', init: () => undefined },
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));

@@ -208,7 +208,9 @@ export function readNativeConversation(state: NativeSessionState): NativeConvers
       messages = readKilo2Messages(
         session,
         complete
-          .filter(item => !undisplayable.includes(item) && !unresolvedByProjection.has(item.message.id))
+          .filter(
+            item => !undisplayable.includes(item) && !unresolvedByProjection.has(item.message.id)
+          )
           .map(item => item.message),
         { assetURLs: state.assetURLs }
       );

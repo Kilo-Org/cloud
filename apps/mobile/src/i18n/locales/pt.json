@@ -22,7 +22,8 @@
     "expired": "Expirado",
     "recoveryGaps_one": "Falta {{displayCount}} parte desta transcrição.",
     "recoveryGaps_many": "Faltam {{displayCount}} partes desta transcrição.",
-    "recoveryGaps_other": "Faltam {{displayCount}} partes desta transcrição."
+    "recoveryGaps_other": "Faltam {{displayCount}} partes desta transcrição.",
+    "recoveryGaps_zero": "Faltam {{displayCount}} partes desta transcrição."
   },
   "common": {
     "manageOnWeb": "Gerir na web",

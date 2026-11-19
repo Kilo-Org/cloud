@@ -840,8 +840,9 @@ export async function say(
   question: Question,
   target: ChatTarget
 ): Promise<void> {
-  const { text, images } = question;
-  const { model, effort } = target;
+  let { text, images } = question;
+  let { model, effort } = target;
+  let from = question.from;
   await runTurn(sessionId, { skippable: false }, async () => {
     let current = resolveSessionId(sessionId);
     try {
@@ -852,7 +853,7 @@ export async function say(
           images,
           model,
           effort,
-          ...(question.from === undefined ? {} : { from: question.from }),
+          ...(from === undefined ? {} : { from }),
         });
         change(current, { waiting: questionsIn(held.waiting) });
         return;
@@ -861,6 +862,18 @@ export async function say(
         throw new Error('the chat is not open');
       }
       const before = snapshotOf(current);
+      if (before.asked !== null && held.waiting.length > 0) {
+        /* A failed attempt keeps its Retry, and the line it holds is what the
+           person asked before that failure. A new send joins the line rather
+           than overtaking it, so questions reach the model in the order they
+           were typed. */
+        held.waiting.push({ text, images, model, effort, ...(from === undefined ? {} : { from }) });
+        const next = held.waiting.shift();
+        if (next !== undefined) {
+          ({ text, images, model, effort, from } = next);
+          change(current, { waiting: questionsIn(held.waiting) });
+        }
+      }
       await keepAsked(current);
       if (before.turns.length === 0 && before.asked === null && before.displaced.length === 0) {
         await rememberFirstQuestion(current, text);
@@ -870,7 +883,7 @@ export async function say(
         askedImages: images,
         askedModel: model,
         askedEffort: effort,
-        askedFrom: question.from ?? null,
+        askedFrom: from ?? null,
       });
       await rememberAsked(current, {
         text,
@@ -878,7 +891,7 @@ export async function say(
         effort,
         images,
         ...(before.turns.length === 0 ? {} : { after: before.turns.length }),
-        ...(question.from == null ? {} : { from: question.from }),
+        ...(from == null ? {} : { from }),
       });
       current = await ontoForUse(current, { model, effort }, held);
       const chat = chats.get(current);
@@ -895,7 +908,7 @@ export async function say(
         askedImages: images,
         askedModel: model,
         askedEffort: effort,
-        askedFrom: question.from ?? null,
+        askedFrom: from ?? null,
         failed: null,
         failureKey: null,
         record: { ...snapshotOf(current).record, updatedAt: at },
@@ -912,7 +925,7 @@ export async function say(
         askedImages: images,
         askedModel: model,
         askedEffort: effort,
-        askedFrom: question.from ?? null,
+        askedFrom: from ?? null,
         failed: reason(error),
         failureKey,
       });

@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- the registry suite pins one question at a time, the moves onto another model or tool set, and the MCP discovery around an open on one fake SDK harness. */
 import { type ModelEvent, type ModelUsage, type PartDraft, type Turn } from '@kilocode/harness-sdk';
-import { Effect, Layer, Queue, Stream } from 'effect';
+import { Cause, Effect, Layer, Queue, Stream } from 'effect';
 import { type StoredChatBackend } from './backend-store';
 import { backendTargetId, CREDITS_FAILURE_KEY } from './backend-target';
 import { asMessages } from './turns';
@@ -47,6 +47,8 @@ let storedEffort: string | null = null;
 let storedTools: readonly string[] | null = null;
 /** Ends the answer that is arriving, so a test decides when a turn finishes. */
 let finish: (() => void) | undefined = undefined;
+/** Fails the answer that is arriving without a done event, so a test decides when a turn breaks. */
+let crash: (() => void) | undefined = undefined;
 let emitEvent: ((event: ModelEvent) => void) | undefined = undefined;
 let storedHistory: readonly Turn[] | undefined = undefined;
 /** A session id whose reopen fails, so the failed-open path can be exercised. */
@@ -197,7 +199,7 @@ const handleFor = (id: string) => {
           modelError.failed({ reason: 'status', status: 402, cause: PAYMENT_REQUIRED_BODY })
         );
       }
-      return Stream.callback<ModelEvent>(queue =>
+      return Stream.callback<ModelEvent, Error>(queue =>
         Effect.sync(() => {
           asked.push(said);
           emitEvent = event => {
@@ -215,6 +217,9 @@ const handleFor = (id: string) => {
             });
             Queue.offerUnsafe(queue, { kind: 'done', usage: CALL, stop: 'end' });
             Queue.endUnsafe(queue);
+          };
+          crash = () => {
+            Queue.failCauseUnsafe(queue, Cause.fail(new Error('the answer failed mid-stream')));
           };
           return Effect.void;
         })
@@ -603,6 +608,7 @@ beforeEach(async () => {
   questionRead.gate = undefined;
   questionRead.started = false;
   finish = undefined;
+  crash = undefined;
   emitEvent = undefined;
   storedHistory = undefined;
   failOpenFor = undefined;
@@ -1535,6 +1541,43 @@ describe('a question a later send took the slot from', () => {
     await settled();
 
     expect(asked.map(one => one.text)).toEqual(['first']);
+  });
+
+  it('is asked before a question sent while the failure is on screen', async () => {
+    /* What the person sent while the first answer was arriving is already a
+       question they asked, and a failed answer holds it in the line. A new send
+       while that failure waits joins the line as well: the questions reach the
+       model in the order they were typed, not with the newest one first. */
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    // The second question is typed while the first answer is still arriving, so
+    // it is held; the first answer's own end is what fails the attempt.
+    const endFirst = crash;
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    expect(waitingWords(opened)).toEqual(['second']);
+
+    // The first answer fails and leaves its Retry; the held question stays.
+    endFirst?.();
+    await settled();
+    expect(snapshotOf(opened).displaced).toEqual([]);
+    expect(snapshotOf(opened).asked).toBe('first');
+
+    // A new send takes the slot from the failed question, and the held one is
+    // asked rather than answered behind the newcomer.
+    asked.length = 0;
+    await say(opened, { text: 'third', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    expect(asked.map(one => one.text)).toEqual(['second']);
+    expect(waitingWords(opened)).toEqual(['third']);
+    expect(snapshotOf(opened).displaced.map(one => one.text)).toEqual(['first']);
+
+    finish?.();
+    await settled();
+
+    expect(asked.map(one => one.text)).toEqual(['second', 'third']);
+    expect(snapshotOf(opened).waiting).toEqual([]);
   });
 
   it('is queued once when its Retry is pressed twice while another answer arrives', async () => {
@@ -3000,12 +3043,12 @@ describe('custom backend question targets', () => {
       expect(asked.map(one => one.text)).toEqual([
         'first',
         'explicit Kilo recovery',
-        'explicit replacement question',
         'queued Kilo question',
+        'explicit replacement question',
       ]);
       expect(snapshotOf(opened)).toMatchObject({
         model: 'kilo/one',
-        asked: 'queued Kilo question',
+        asked: 'explicit replacement question',
         askedModel: 'kilo/one',
         waiting: [],
         failed: null,

@@ -32,7 +32,8 @@ vi.mock('@/lib/config', () => ({
   WEB_BASE_URL: 'https://app.kilo.ai',
 }));
 
-vi.mock('@/lib/auth/device-auth-poll', () => ({
+vi.mock('@/lib/auth/device-auth-poll', async importOriginal => ({
+  ...(await importOriginal<typeof DeviceAuthPoll>()),
   startDeviceAuthPoll: vi.fn(() => ({ cleanup: vi.fn(), pollNow: vi.fn() })),
 }));
 
@@ -51,6 +52,7 @@ vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/lib/trpc', () => ({ trpcClient: {} }));
 
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
+import type * as DeviceAuthPoll from '@/lib/auth/device-auth-poll';
 import { startDeviceAuthPoll } from '@/lib/auth/device-auth-poll';
 import { pendingDeviceAuthState } from '@/lib/auth/device-auth-state';
 import { openAuthSessionAsync, openBrowserAsync } from 'expo-web-browser';
@@ -234,7 +236,7 @@ type PendingExternalAuthRecord = {
   deviceCode: string;
   userCode: string;
   verificationUrl: string;
-  startedAt: number;
+  expiresAt: number;
 };
 
 type DeviceAuthResult = ReturnType<typeof useDeviceAuth>;
@@ -313,7 +315,7 @@ describe('useDeviceAuth hook', () => {
       deviceCode: 'device-secret',
       userCode: 'UC-1234',
       verificationUrl: 'https://example.com/device-auth?code=UC-1234',
-      startedAt: Date.now(),
+      expiresAt: Date.now() + 600_000,
     };
     vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'valid', record });
 
@@ -350,7 +352,7 @@ describe('useDeviceAuth hook', () => {
           deviceCode: 'stale-device',
           userCode: 'STALE',
           verificationUrl: 'https://stale.example',
-          startedAt: Date.now(),
+          expiresAt: Date.now() + 600_000,
         },
       });
       await Promise.resolve();
@@ -512,6 +514,28 @@ describe('useDeviceAuth hook', () => {
 
     const init = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
     expect(init).not.toHaveProperty('body');
+  });
+
+  it('gives the poll and the stored record the server code lifetime', async () => {
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+    fetchMock.mockResolvedValue(
+      Response.json({
+        code: 'UC',
+        verificationUrl: 'https://app.kilo.ai/device-auth?code=UC',
+        expiresIn: 600,
+      })
+    );
+    const before = Date.now();
+
+    const result = requireResult(await mountSettled());
+    await act(async () => {
+      await result.start('signin');
+    });
+
+    const expiresAt = vi.mocked(startDeviceAuthPoll).mock.calls[0]?.[0].expiresAt ?? 0;
+    expect(expiresAt).toBeGreaterThanOrEqual(before + 600_000);
+    expect(expiresAt).toBeLessThanOrEqual(Date.now() + 600_000);
+    expect(vi.mocked(writePendingExternalAuth).mock.calls[0]?.[0].expiresAt).toBe(expiresAt);
   });
 
   it('reports a refused pending link as expired instead of a start error', async () => {

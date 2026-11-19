@@ -288,6 +288,12 @@ beforeEach(() => {
   mutations.updateDetails.mutate.mockReset();
   mutations.remove.mutate.mockReset();
   confirmMock.mockReset();
+  // Every navigation double is cleared here: each assertion below reads its
+  // calls as this test's only calls, so a leftover from an earlier test would
+  // make a "did not navigate" assertion observe that test's dismissal.
+  router.dismissTo.mockReset();
+  popOnce.mockReset();
+  stackSafeReplace.replace.mockReset();
   guard.leave = [];
   resetLeaveSettle();
   members.data = undefined;

@@ -265,7 +265,7 @@ function nativeAssetURLsAfterMessages(
     if (before?.message === item.message) continue;
     for (const file of readKilo2FileReferences(item.message)) {
       const key = kilo2AssetKey(file.id, file.uri, file.mime);
-      if (/^(media:|data:|https?:\/\/)/.test(file.uri) || assetURLs[key] === undefined) continue;
+      if (/^(media:|data:)/.test(file.uri) || assetURLs[key] === undefined) continue;
       const replaced =
         file.contentIndex === undefined
           ? before?.message.files !== item.message.files

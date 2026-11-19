@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { hasUnresolvedKilo2Assets, readKilo2Messages } from './kilo2-source-messages';
+import {
+  hasUndisplayableKilo2Assets,
+  hasUnresolvedKilo2Assets,
+  readKilo2Messages,
+} from './kilo2-source-messages';
 import type { NativeEvent, NativeSessionState } from './native-sync';
 import type { NativeSnapshotMessage, NativeSnapshotSession } from './native-sync-snapshot';
 import { upsertByRequestId } from './pending-requests';
@@ -142,6 +146,12 @@ export function reduceNativePendingRequests(
 /** Shared native display boundary. It never opens a socket or owns replay/recovery. */
 export function readNativeConversation(state: NativeSessionState): NativeConversation {
   const complete = state.messages.filter(item => !item.incomplete);
+  // No authorized bytes means no projection either way. A reference that a later
+  // snapshot may still authorize is a recovery gap and stays explicit; one that no
+  // snapshot can ever authorize is simply not displayed, as live and history do.
+  const undisplayable = complete.filter(item =>
+    hasUndisplayableKilo2Assets(item.message, state.assetURLs)
+  );
   const unresolved = complete.filter(item =>
     hasUnresolvedKilo2Assets(item.message, state.assetURLs)
   );
@@ -163,7 +173,9 @@ export function readNativeConversation(state: NativeSessionState): NativeConvers
     try {
       messages = readKilo2Messages(
         session,
-        complete.filter(item => !unresolved.includes(item)).map(item => item.message),
+        complete
+          .filter(item => !undisplayable.includes(item) && !unresolved.includes(item))
+          .map(item => item.message),
         { assetURLs: state.assetURLs }
       );
     } catch (error) {

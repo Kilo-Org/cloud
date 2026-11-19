@@ -9,7 +9,7 @@ import {
   customerBillingFailureSchema,
 } from '@kilocode/session-ingest-contracts';
 import { preparationStepSchema } from './preparation-step';
-import { hasUnresolvedKilo2Assets, readKilo2Messages } from './kilo2-source-messages';
+import { hasUndisplayableKilo2Assets, readKilo2Messages } from './kilo2-source-messages';
 import type {
   CloudAgentSessionId,
   CloudSessionSnapshotPage,
@@ -332,7 +332,7 @@ export const cloudSessionMessagesPageSchema = cloudSessionMessagesPageWireSchema
         // The per-message guard keeps any projection failure from failing the
         // whole page; the omitted-item count is the visible signal.
         let display: SessionSnapshot['messages'][number] | undefined;
-        if (hasUnresolvedKilo2Assets(parsed.data)) {
+        if (hasUndisplayableKilo2Assets(parsed.data)) {
           display = undefined;
         } else {
           try {

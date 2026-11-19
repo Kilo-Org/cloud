@@ -14,6 +14,11 @@ export function isCompactionSummaryPart(
   return part.type === 'text' && part.metadata?.['compactionSummary'] === true;
 }
 
+/** Inline bytes are the only URI a display may build without authorization. */
+function isInlineDataUri(uri: string): boolean {
+  return uri.startsWith('data:');
+}
+
 export type Kilo2ContentLayout = { positions: Map<string, number>; next: number };
 
 export type Kilo2ProjectionOptions = {
@@ -80,6 +85,12 @@ export function readKilo2FileReferences(message: Kilo2Message): Kilo2FileReferen
   return result;
 }
 
+/**
+ * The recoverable set: a later snapshot may still authorize these references, so
+ * recovery machinery keeps waiting on them. Neither inline nor absolute bytes need
+ * that wait — inline bytes already display, and an absolute remote reference never
+ * receives a mapping, so recovery must never chase it.
+ */
 export function hasUnresolvedKilo2Assets(
   message: Kilo2Message,
   assetURLs?: Readonly<Record<string, string>>
@@ -87,7 +98,23 @@ export function hasUnresolvedKilo2Assets(
   return readKilo2FileReferences(message).some(
     file =>
       assetURLs?.[kilo2AssetKey(file.id, file.uri, file.mime)] === undefined &&
-      !/^(data:|https?:\/\/)/.test(file.uri)
+      !isInlineDataUri(file.uri) &&
+      !/^https?:\/\//.test(file.uri)
+  );
+}
+
+/**
+ * The display gate: a reference with no authorized entry and no inline bytes has no
+ * display, ever — no later snapshot can turn it into one.
+ */
+export function hasUndisplayableKilo2Assets(
+  message: Kilo2Message,
+  assetURLs?: Readonly<Record<string, string>>
+): boolean {
+  return readKilo2FileReferences(message).some(
+    file =>
+      assetURLs?.[kilo2AssetKey(file.id, file.uri, file.mime)] === undefined &&
+      !isInlineDataUri(file.uri)
   );
 }
 
@@ -117,7 +144,7 @@ export function readKilo2Messages(
   const fileURL = (id: string, uri: string, mime: string): string => {
     const resolved = options.assetURLs?.[kilo2AssetKey(id, uri, mime)];
     if (resolved !== undefined) return resolved;
-    if (/^(data:|https?:\/\/)/.test(uri)) return uri;
+    if (isInlineDataUri(uri)) return uri;
     throw Object.assign(new Error(`Native attachment ${id} requires authorized asset resolution`), {
       code: 'native_asset_unresolved',
     });
@@ -150,11 +177,10 @@ export function readKilo2Messages(
           },
           ...(message.files ?? []).map((file, index): Part => {
             const id = kilo2PartId(message.id, index + 1);
+            // Inline bytes are the display; a source uri may be remote and is not authorized.
             const uri =
               typeof file.data === 'string'
-                ? file.source.type === 'uri' && /^(data:|https?:\/\/)/.test(file.source.uri)
-                  ? file.source.uri
-                  : `data:${file.mime};base64,${file.data}`
+                ? `data:${file.mime};base64,${file.data}`
                 : typeof file.uri === 'string'
                   ? file.uri
                   : '';

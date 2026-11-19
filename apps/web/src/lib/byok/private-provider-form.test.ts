@@ -128,30 +128,34 @@ describe('setPrivateModelFlag', () => {
 });
 
 describe('buildPrivateProviderCredentials', () => {
-  test('keeps the stored credentials when an optional form is untouched', () => {
+  test('keeps the stored credentials only when the user chose to keep them', () => {
     expect(
-      buildPrivateProviderCredentials(EMPTY_PRIVATE_PROVIDER_CREDENTIALS_FORM, { optional: true })
-    ).toEqual({
-      success: true,
-      data: null,
-    });
-    expect(
-      buildPrivateProviderCredentials(EMPTY_PRIVATE_PROVIDER_CREDENTIALS_FORM, { optional: false })
-        .success
-    ).toBe(false);
+      buildPrivateProviderCredentials(EMPTY_PRIVATE_PROVIDER_CREDENTIALS_FORM, { keepSaved: true })
+    ).toEqual({ success: true, data: null });
+  });
+
+  test('requires credentials once the user replaces them, whatever the authentication type', () => {
+    for (const type of ['api_key', 'x-api-key', 'aws_bedrock', 'service_account'] as const) {
+      expect(
+        buildPrivateProviderCredentials(
+          { ...EMPTY_PRIVATE_PROVIDER_CREDENTIALS_FORM, type },
+          { keepSaved: false }
+        )
+      ).toEqual({ success: false, errors: ['Enter the private provider credentials.'] });
+    }
   });
 
   test('builds x-api-key and AWS credentials', () => {
     expect(
       buildPrivateProviderCredentials(
         { ...EMPTY_PRIVATE_PROVIDER_CREDENTIALS_FORM, type: 'x-api-key', api_key: ' secret ' },
-        { optional: false }
+        { keepSaved: false }
       )
     ).toEqual({ success: true, data: { type: 'x-api-key', api_key: 'secret' } });
     expect(
       buildPrivateProviderCredentials(
         { ...EMPTY_PRIVATE_PROVIDER_CREDENTIALS_FORM, type: 'aws_bedrock', region: 'us-east-1' },
-        { optional: true }
+        { keepSaved: false }
       ).success
     ).toBe(false);
   });
@@ -164,7 +168,7 @@ describe('buildPrivateProviderCredentials', () => {
           type: 'service_account',
           service_account_json: '{',
         },
-        { optional: false }
+        { keepSaved: false }
       )
     ).toEqual({ success: false, errors: ['The service account key is not valid JSON.'] });
   });

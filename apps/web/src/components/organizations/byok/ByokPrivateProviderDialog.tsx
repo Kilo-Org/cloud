@@ -638,16 +638,13 @@ function ByokPrivateProviderForm({
     ? !editingKey.private_provider ||
       privateProviderOriginChanged(editingKey.private_provider.base_url, form.base_url)
     : false;
-  const credentialsRequired = !isEditing || hostChanged;
-  const showsCredentialInputs = credentialsRequired || replacingCredentials;
+  // Saved credentials are kept only when the user has not asked to replace them.
+  const keepsSavedCredentials = isEditing && !hostChanged && !replacingCredentials;
   const catalogModelIds = usePrivateProviderCatalogModelIds(
     organizationId,
     form.models.map(row => row.id),
     editingKey?.serve_catalog_models ?? false
   );
-  const credentialsInput = showsCredentialInputs
-    ? credentials
-    : EMPTY_PRIVATE_PROVIDER_CREDENTIALS_FORM;
 
   const mutationOptions = {
     onSuccess: () => {
@@ -677,8 +674,8 @@ function ByokPrivateProviderForm({
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
   const handleImport = () => {
-    const builtCredentials = buildPrivateProviderCredentials(credentialsInput, {
-      optional: !credentialsRequired,
+    const builtCredentials = buildPrivateProviderCredentials(credentials, {
+      keepSaved: keepsSavedCredentials,
     });
     if (!builtCredentials.success) {
       setErrors(builtCredentials.errors);
@@ -696,8 +693,8 @@ function ByokPrivateProviderForm({
 
   const handleSave = () => {
     const definition = buildPrivateProviderDefinition(form);
-    const builtCredentials = buildPrivateProviderCredentials(credentialsInput, {
-      optional: !credentialsRequired,
+    const builtCredentials = buildPrivateProviderCredentials(credentials, {
+      keepSaved: keepsSavedCredentials,
     });
     const nextErrors = [
       ...(definition.success ? [] : definition.errors),
@@ -760,7 +757,7 @@ function ByokPrivateProviderForm({
           </p>
         </div>
 
-        {showsCredentialInputs ? (
+        {!keepsSavedCredentials ? (
           <CredentialsFields
             value={credentials}
             onChange={update => setCredentials(current => ({ ...current, ...update }))}

@@ -232,17 +232,16 @@ function hasCredentialsInput(form: PrivateProviderCredentialsForm): boolean {
 }
 
 /**
- * The credentials the form describes. With `optional`, an untouched form yields null, which keeps
- * the stored credentials.
+ * The credentials the form describes. Only with `keepSaved`, the user's explicit choice to keep
+ * the stored credentials, does it yield null without reading the form; otherwise they are required.
  */
 export function buildPrivateProviderCredentials(
   form: PrivateProviderCredentialsForm,
-  { optional }: { optional: boolean }
+  { keepSaved }: { keepSaved: boolean }
 ): BuildResult<ByokPrivateProviderCredentials | null> {
+  if (keepSaved) return { success: true, data: null };
   if (!hasCredentialsInput(form)) {
-    return optional
-      ? { success: true, data: null }
-      : { success: false, errors: ['Enter the private provider credentials.'] };
+    return { success: false, errors: ['Enter the private provider credentials.'] };
   }
   let input: unknown;
   switch (form.type) {

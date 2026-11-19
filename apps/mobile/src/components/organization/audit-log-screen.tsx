@@ -1,6 +1,12 @@
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { memo, type ReactNode, useCallback, useRef, useState } from 'react';
-import { Pressable, type TextLayoutEvent, View, type ViewStyle } from 'react-native';
+import {
+  type LayoutChangeEvent,
+  Pressable,
+  type TextLayoutEvent,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
@@ -57,6 +63,21 @@ function formatAuditTime(createdAt: string): string {
   return `${day} · ${formatClockTime(date, i18n.language)}`;
 }
 
+/** The collapsed clamp: the measured painted lines for this exact sentence, else two. */
+function collapsedClampFor(
+  expanded: boolean,
+  detail: string | null,
+  measured: { text: string; lines: number } | null
+): number | undefined {
+  if (expanded || detail == null) {
+    return undefined;
+  }
+  if (measured?.text === detail) {
+    return measured.lines;
+  }
+  return 2;
+}
+
 const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAuditLogEntry }>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -74,18 +95,28 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
   // measured: FlashList recycles row instances across entries, so a cell that
   // held a short detail must not clamp the longer sentence it renders next —
   // a count from another text reads as unknown and the clamp starts at two.
+  // A box-width change (rotation, the compact layout) drops the count for the
+  // same reason: the same sentence wraps elsewhere, and the text layout pass
+  // the width change triggers measures it again.
   // `expanded` rows measure unclamped and could report a longer count, so
   // their reports never move the collapsed clamp.
   const [measured, setMeasured] = useState<{ text: string; lines: number } | null>(null);
-  // The callback reads the expanded flag through a ref: a state read would
-  // need the callback in the dependency array, and a re-created callback makes
-  // the memoized row re-render on every toggle for nothing. The flag flips
-  // synchronously with the press, so no report from the expanded layout can
-  // land after the collapse begins. The sentence rides a ref too: the callback
-  // stores the text its measurement belongs to, so a recycled cell never
-  // applies a count measured for another entry.
+  // The callbacks read the expanded flag and the sentence through refs: a
+  // state read would need the callback in the dependency array, and a
+  // re-created callback makes the memoized row re-render on every toggle for
+  // nothing. The flag flips synchronously with the press, so no report from
+  // the expanded layout can land after the collapse begins.
   const expandedRef = useRef(false);
   const measuredTextRef = useRef('');
+  const boxWidthRef = useRef<number | null>(null);
+  const onDetailBoxLayout = useCallback((e: LayoutChangeEvent) => {
+    const width = e.nativeEvent.layout.width;
+    if (boxWidthRef.current === width) {
+      return;
+    }
+    boxWidthRef.current = width;
+    setMeasured(null);
+  }, []);
   const onDetailLayout = useCallback((e: TextLayoutEvent) => {
     if (expandedRef.current) {
       return;
@@ -95,7 +126,9 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
       e.nativeEvent.lines.filter(line => line.text.trim().length > 0).length
     );
     setMeasured(current =>
-      current?.lines === lines ? current : { text: measuredTextRef.current, lines }
+      current?.text === measuredTextRef.current && current.lines === lines
+        ? current
+        : { text: measuredTextRef.current, lines }
     );
   }, []);
   const actor = entry.actor_email ?? entry.actor_name;
@@ -112,8 +145,7 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
   // render that changed the sentence; keeping it in sync here makes every
   // stored count name the sentence on screen when it was measured.
   measuredTextRef.current = detail ?? '';
-  const clamp =
-    expanded || detail == null ? undefined : (measured?.text === detail && measured.lines) || 2;
+  const clamp = collapsedClampFor(expanded, detail, measured);
   const showsDetail = entry.action !== 'organization.created' && detail != null;
   // The actor and the time render as two elements in one row, never one
   // interpolated string: the row shrinks the actor, not the time, and each
@@ -181,6 +213,7 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
       <Text
         className="text-xs text-muted-foreground"
         numberOfLines={clamp}
+        onLayout={onDetailBoxLayout}
         onTextLayout={onDetailLayout}
       >
         {detail}

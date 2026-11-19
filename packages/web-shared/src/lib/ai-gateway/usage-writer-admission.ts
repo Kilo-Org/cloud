@@ -13,7 +13,7 @@ type QueueSource = 'queue' | 'queue_vercel';
 type WriterClass = 'queue' | 'non_llm';
 type RejectionReason = 'queue_limit' | 'pool_waiting' | 'pool_busy';
 type Admission =
-  | { admitted: false; reason: RejectionReason }
+  | { admitted: false; reason: RejectionReason; classOnly?: true }
   | { admitted: true; release: () => void };
 type PoolGauges = { total: number; idle: number; waiting: number };
 type SlotWait = { slotWaitMs: number; waited: boolean };
@@ -127,7 +127,22 @@ export function createQueueWriterAdmission(writerPool: WriterPool) {
       take(writerClass);
     }
     report(source, writerClass, usageId, reason, gauges, wait);
-    return reason === null ? heldSlot(writerClass) : { admitted: false, reason };
+    if (reason === null) return heldSlot(writerClass);
+    // Only a consistent pool snapshot can rule out shared pressure at the class ceiling.
+    if (
+      reason === 'queue_limit' &&
+      active < limit &&
+      Number.isSafeInteger(poolMax) &&
+      Number.isSafeInteger(gauges.total) &&
+      Number.isSafeInteger(gauges.idle) &&
+      gauges.waiting === 0 &&
+      gauges.idle >= 0 &&
+      gauges.idle <= gauges.total &&
+      gauges.total <= poolMax &&
+      gauges.total - gauges.idle < limit
+    )
+      return { admitted: false, reason, classOnly: true };
+    return { admitted: false, reason };
   }
 
   return {

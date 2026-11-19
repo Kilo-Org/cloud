@@ -128,3 +128,60 @@ it('routes tagged Enkrypt messages through workerd and keeps untagged LLM dispos
     }
   });
 }, 30_000);
+
+it('isolates only explicit non-LLM class quota retries within a mixed batch', async () => {
+  let llmLimited = false;
+  let status = 429;
+  let reason = 'queue_limit';
+  let marker: string | undefined = 'non_llm';
+  const writer: RequestListener = (request, response) => {
+    if (request.url === '/api/internal/usage/record' && !llmLimited) {
+      response.end(
+        JSON.stringify({
+          status: 'recorded',
+          result: {
+            usageId: usage.core.id,
+            createdAt: usage.core.created_at,
+            newMicrodollarsUsed: 1,
+          },
+        })
+      );
+      return;
+    }
+    response.statusCode = status;
+    if (marker) response.setHeader('x-usage-class-limit', marker);
+    response.end(JSON.stringify({ error: 'Usage writer overloaded', reason }));
+  };
+  await withTaggedConsumerRuntime('class-quota', writer, async ({ deliver }) => {
+    for (const [code, rejection, header, expected] of [
+      [429, 'queue_limit', 'non_llm', 'ok'],
+      [429, 'queue_limit', undefined, 'exception'],
+      [429, 'queue_limit', 'unknown', 'exception'],
+      [429, 'pool_busy', 'non_llm', 'exception'],
+      [429, 'pool_waiting', 'non_llm', 'exception'],
+      [429, 'unknown', 'non_llm', 'exception'],
+      [503, 'queue_limit', 'non_llm', 'exception'],
+    ] as const) {
+      status = code;
+      reason = rejection;
+      marker = header;
+      const result = await deliver(usage, enkryptMessage);
+      expect(result.outcome).toBe(expected);
+      expect(result.explicitAcks).toEqual(['queue-0']);
+      expect(result.retryMessages.map(message => message.msgId)).toEqual(['queue-1']);
+      if (expected === 'ok') {
+        expect(result.retryMessages[0].delaySeconds).toBeGreaterThanOrEqual(1);
+        expect(result.retryMessages[0].delaySeconds).toBeLessThanOrEqual(4);
+      }
+    }
+    status = 429;
+    llmLimited = true;
+    const result = await deliver(enkryptMessage, usage);
+    expect(result.outcome).toBe('exception');
+    expect(result.explicitAcks).toEqual([]);
+    expect(result.retryMessages.map(message => message.msgId).toSorted()).toEqual([
+      'queue-0',
+      'queue-1',
+    ]);
+  });
+}, 30_000);

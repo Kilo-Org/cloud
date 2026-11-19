@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import {
+  USAGE_CLASS_LIMIT_HEADER,
   ExaUsageRecordSchema,
   ExaUsageWriteResponseSchema,
   type ExaUsageWriteResponse,
@@ -60,7 +61,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (admission && !admission.admitted) {
     return NextResponse.json(
       { error: 'Usage writer overloaded', reason: admission.reason },
-      { status: 429 }
+      {
+        status: 429,
+        headers: admission.classOnly ? { [USAGE_CLASS_LIMIT_HEADER]: 'non_llm' } : undefined,
+      }
     );
   }
 

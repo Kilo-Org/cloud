@@ -2380,12 +2380,18 @@ export const createBrowserRuntime = ({
       // Remove exactly its own and let the next call on that tab in only once its guard has settled.
       let drivenHook: (() => void) | null = null;
       let drivenHeldBefore = false;
+      /** Whether the tool itself has started: a throw before that leaves a tab this call opened unused. */
+      let dispatched = false;
+      /** The tab this call opened for its step, if any, so a refusal after the open can close it again. */
+      let stepOpenedTab: number | null = null;
       const drivenChain = Promise.withResolvers<void>();
 
-      inFlight.set(tabId, () => {
+      const callerHook = (): void => {
         taken = true;
         markTaken();
-      });
+      };
+
+      inFlight.set(tabId, callerHook);
 
       // A taken call stops issuing commands instead of interleaving them with the panel's.
       // The guard is read before every command this call sends.
@@ -2486,6 +2492,12 @@ export const createBrowserRuntime = ({
             kind: 'result',
             result: { error: DOWNLOAD_STEP_TAB_GONE_ERROR, ok: false },
           };
+        }
+
+        // The liveness read above awaited: a take-over of the caller tab in that window must not spend a token on a
+        // Call that is already over.
+        if (taken) {
+          return { kind: 'result', result: { error: TAB_TAKEN_ERROR, ok: false } };
         }
 
         const presentedTokens = agentContext?.sensitive ?? [];
@@ -2594,6 +2606,8 @@ export const createBrowserRuntime = ({
 
         // A take-over that landed while the tab was being opened ends the call here, and the tab it just created is
         // Closed rather than left in the session's group for the next call to inherit.
+        stepOpenedTab = openedForStep?.tabId ?? null;
+
         if (openedForStep !== undefined && taken) {
           await closeOpenedTab(openedForStep.tabId);
 
@@ -2639,6 +2653,20 @@ export const createBrowserRuntime = ({
             // An agent never takes a tab over, so a panel's hold is a refusal here, not a prompt.
             return { kind: 'result', result: { error: TAB_BUSY_ERROR, ok: false } };
           }
+        }
+
+        // A take-over that landed while a lease was being acquired ends the call here: the driven tab goes back to
+        // Whoever had it (or is closed when this call opened it) and the approval is not spent on a cancelled call.
+        if (taken) {
+          if (runTabId !== tabId && !heldBefore) {
+            leases.release(runTabId, caller);
+          }
+
+          if (openedForStep !== undefined) {
+            await closeOpenedTab(openedForStep.tabId);
+          }
+
+          return { kind: 'result', result: { error: TAB_TAKEN_ERROR, ok: false } };
         }
 
         // The call drives runTabId and now owns it: a take-over of that tab ends this call, and no other call can
@@ -2771,6 +2799,12 @@ export const createBrowserRuntime = ({
 
         // No guard without the optional permission: no file may be started, so the call is refused instead of run unguarded.
         if (guardDownloads && downloadGuard === undefined) {
+          // The permission was revoked between the check and this point: the tab this call opened is not the next
+          // Call's to inherit.
+          if (openedForStep !== undefined) {
+            await closeOpenedTab(openedForStep.tabId);
+          }
+
           return {
             kind: 'result',
             result: { error: DOWNLOAD_PERMISSION_MISSING_ERROR, ok: false },
@@ -2795,6 +2829,8 @@ export const createBrowserRuntime = ({
         let settlement: GuardSettlement = { kept: [], stopped: 0 };
 
         try {
+          dispatched = true;
+
           const call = runKiloBrowserTool({
             arguments: runArguments,
             options: {
@@ -2976,8 +3012,18 @@ export const createBrowserRuntime = ({
           result: finalResult,
           withheldFrames: await withheldOriginsFor(withheldReader, agentContext.authorized),
         };
+      } catch (error) {
+        // A throw before the tool ran leaves the tab this call opened unused: close it rather than orphan it.
+        if (!dispatched && stepOpenedTab !== null) {
+          await closeOpenedTab(stepOpenedTab);
+        }
+
+        throw error;
       } finally {
-        inFlight.delete(tabId);
+        // Only this call's own hook goes on the caller tab too: a concurrent call that replaced it must keep its own.
+        if (inFlight.get(tabId) === callerHook) {
+          inFlight.delete(tabId);
+        }
 
         // Only this call's own hook goes: another holder's hook on the driven tab is not this call's to remove.
         if (drivenHook !== null && inFlight.get(drivenTabId) === drivenHook) {

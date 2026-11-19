@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { createBrowserTabGroupController } from './browser-tab-groups';
 import type { BrowserTabGroupController } from './browser-tab-groups';
 import { createTabLeaseRegistry } from './browser-tab-leases';
+import type { TabLeaseRegistry } from './browser-tab-leases';
 import { createBrowserRuntime } from './browser-runtime';
 import type {
   BrowserDownloadItem,
@@ -444,13 +445,14 @@ const createHarness = async (
     readonly downloadsApi?: BrowserDownloadsApi | undefined;
     readonly downloadsGranted?: boolean;
     readonly downloadsResolver?: () => BrowserDownloadsApi | undefined;
+    readonly leases?: TabLeaseRegistry;
     readonly share?: boolean;
     readonly tabGroups?: BrowserTabGroupController;
     readonly tabsApi?: BrowserTabsApi;
   } = {}
 ) => {
   const cdp = createFakeCdp();
-  const leases = createTabLeaseRegistry({});
+  const leases = options.leases ?? createTabLeaseRegistry({});
   // The normal state is the granted permission: the switch asks for it, and without it every page load is refused.
   const grantedByDefault =
     options.downloadsGranted !== false &&
@@ -2398,9 +2400,8 @@ describe('agent browser calls', () => {
       readonly deferredNavigate?: boolean;
       /** A frame read the test answers by hand, so a call can be parked before it opens its tab. */
       readonly deferredPreflight?: boolean;
-      /** The guard's restore of the download behaviour, held open so a take-over's first command can be observed. */
-      readonly deferredRestore?: boolean;
       readonly granted?: boolean;
+      readonly leases?: TabLeaseRegistry;
       /** A navigate that loads a page instead of becoming the download the guard stops. */
       readonly plain?: boolean;
     } = {}
@@ -2419,8 +2420,6 @@ describe('agent browser calls', () => {
     const navigateReached = Promise.withResolvers<void>();
     const preflightGate = Promise.withResolvers<void>();
     const preflightReached = Promise.withResolvers<void>();
-    const restoreGate = Promise.withResolvers<void>();
-    const restoreReached = Promise.withResolvers<void>();
 
     const tabsApi: BrowserTabsApi & {
       readonly create: (properties: { readonly url?: string }) => Promise<BrowserTabInfo>;
@@ -2466,6 +2465,7 @@ describe('agent browser calls', () => {
       ...(options.granted === false
         ? { downloadsGranted: false }
         : { downloadsApi: downloads.api }),
+      ...(options.leases === undefined ? {} : { leases: options.leases }),
       tabGroups: controller,
       tabsApi,
     });
@@ -2493,18 +2493,6 @@ describe('agent browser calls', () => {
                   frame: { id: 'main', securityOrigin: MAIN_ORIGIN, url: MAIN_ORIGIN },
                 },
               };
-            },
-          }
-        : {}),
-      ...(options.deferredRestore === true
-        ? {
-            'Page.setDownloadBehavior': async (params: Record<string, unknown> | undefined) => {
-              if (params?.['behavior'] !== 'deny') {
-                restoreReached.resolve();
-                await restoreGate.promise;
-              }
-
-              return {};
             },
           }
         : {}),
@@ -2546,7 +2534,6 @@ describe('agent browser calls', () => {
       reachedCreate: () => createReached.promise,
       reachedNavigate: () => navigateReached.promise,
       reachedPreflight: () => preflightReached.promise,
-      reachedRestore: () => restoreReached.promise,
       releaseCreate: () => {
         createGate.resolve();
       },
@@ -2555,9 +2542,6 @@ describe('agent browser calls', () => {
       },
       releasePreflight: () => {
         preflightGate.resolve();
-      },
-      releaseRestore: () => {
-        restoreGate.resolve();
       },
       removed,
       run,
@@ -2713,6 +2697,103 @@ describe('agent browser calls', () => {
       // The call is over and no tab was opened for it.
       expect(outcome).toMatchObject({ kind: 'result', result: { error: TAB_TAKEN_ERROR } });
       expect(fixture.created).toStrictEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('closes the tab it opened when the caller tab is taken over while that tab is being created', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const fixture = await tabsNewFixture({ deferredCreate: true });
+      const pending = fixture.run(agent());
+
+      await fixture.reachedCreate();
+
+      // The take-over lands while the new tab exists in the browser but not yet in this call's hands.
+      const takeover = fixture.runtime.runTool({
+        arguments: {},
+        caller: panel(),
+        tabId: TAB_ID,
+        takeOver: true,
+        toolName: 'browser_snapshot',
+      });
+
+      await vi.advanceTimersByTimeAsync(100);
+      fixture.releaseCreate();
+
+      const outcome = await pending;
+
+      await takeover;
+
+      // The call is over and the tab it opened is closed again rather than left for the next call.
+      expect(outcome).toMatchObject({ kind: 'result', result: { error: TAB_TAKEN_ERROR } });
+      expect(fixture.removed).toStrictEqual([fixture.newTab]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('closes the tab it opened when its lease is not granted', async () => {
+    const real = createTabLeaseRegistry({});
+    const refused: TabLeaseRegistry = {
+      ...real,
+      acquire: async (tabId, caller, options) =>
+        tabId === TAB_ID
+          ? real.acquire(tabId, caller, options)
+          : { holder: { key: 'panel', tabId }, kind: 'busy' },
+    };
+    const fixture = await tabsNewFixture({ leases: refused });
+
+    const outcome = await fixture.run(agent());
+
+    // Another holder's tab is refused, and the tab this call opened is not left in the session's group.
+    expect(outcome).toMatchObject({ kind: 'result', result: { error: TAB_BUSY_ERROR } });
+    expect(fixture.removed).toStrictEqual([fixture.newTab]);
+  });
+
+  it('ends a call taken over while its tab lease was being acquired, and closes the tab', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const acquired = Promise.withResolvers<void>();
+      const gate = Promise.withResolvers<void>();
+      const real = createTabLeaseRegistry({});
+      const parked: TabLeaseRegistry = {
+        ...real,
+        acquire: async (tabId, caller, options) => {
+          if (tabId !== TAB_ID) {
+            acquired.resolve();
+            await gate.promise;
+          }
+
+          return real.acquire(tabId, caller, options);
+        },
+      };
+      const fixture = await tabsNewFixture({ leases: parked });
+      const pending = fixture.run(agent());
+
+      await acquired.promise;
+
+      const takeover = fixture.runtime.runTool({
+        arguments: {},
+        caller: panel(),
+        tabId: TAB_ID,
+        takeOver: true,
+        toolName: 'browser_snapshot',
+      });
+
+      await vi.advanceTimersByTimeAsync(100);
+      gate.resolve();
+
+      const outcome = await pending;
+
+      await takeover;
+
+      // The take-over that landed during the acquire is not ignored: the call is over and the tab is closed.
+      expect(outcome).toMatchObject({ kind: 'result', result: { error: TAB_TAKEN_ERROR } });
+      expect(fixture.removed).toStrictEqual([fixture.newTab]);
     } finally {
       vi.useRealTimers();
     }

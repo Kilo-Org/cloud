@@ -142,9 +142,7 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
     <div className="bg-background mx-auto h-full w-full max-w-[1200px] px-4 py-8 md:px-6 md:py-12">
       <div className="mb-10 text-center">
         <h1 className="mb-2 text-3xl font-bold lg:text-4xl">
-          Create an organization and start your
-          <br />
-          14-day free trial for Kilo Enterprise
+          Create an organization for Kilo Enterprise
         </h1>
         <Link
           href="/get-started/personal"
@@ -157,7 +155,7 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
       <div className="mx-auto grid max-w-5xl grid-cols-1 gap-8 lg:grid-cols-2">
         <Card className="border-2">
           <CardContent className="p-6 lg:p-8">
-            <h3 className="mb-4 text-lg font-bold">What your Kilo Enterprise trial includes:</h3>
+            <h3 className="mb-4 text-lg font-bold">What Kilo Enterprise includes:</h3>
             <ul className="space-y-2">
               {enterpriseTrialFeatures.map((feature, index) => {
                 const Icon = feature.icon;
@@ -251,14 +249,14 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
                   'Processing...'
                 ) : (
                   <span className="flex items-center gap-2">
-                    Start 14-day free trial for Kilo Enterprise
+                    Create organization for Kilo Enterprise
                     <ArrowRight className="h-5 w-5" />
                   </span>
                 )}
               </Button>
               <p className="text-muted-foreground italic">
-                (after the trial pricing for Kilo Teams starts at $15 per user/month, billed
-                annually. You can choose your tier at the end of your trial)
+                (pricing for Kilo Teams starts at $15 per user/month, billed annually. You can
+                choose your tier when you subscribe)
               </p>
             </CardContent>
           </Card>

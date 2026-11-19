@@ -224,6 +224,27 @@ describe('logAutoModelChangesForAllOrgs', () => {
     expect(logs).toHaveLength(0);
   });
 
+  test('does not write audit logs for enterprise orgs created without a trial', async () => {
+    const owner = await insertTestUser();
+    const enterpriseOrg = await createTestOrganization('No Trial Enterprise Org', owner.id, 0, {
+      provider_allow_list: ['z-ai'],
+    });
+    await db
+      .update(organizations)
+      .set({ trial_granted: false, free_trial_end_at: null, require_seats: true })
+      .where(eq(organizations.id, enterpriseOrg.id));
+
+    const oldSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5'] }]);
+    const newSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5', 'z-ai/glm-5.1'] }]);
+
+    const result = await logAutoModelChangesForAllOrgs(oldSnapshot, newSnapshot);
+
+    expect(result.orgCount).toBe(0);
+
+    const logs = await fetchAutoChangeLogs(enterpriseOrg.id);
+    expect(logs).toHaveLength(0);
+  });
+
   test('skips enterprise orgs whose effective availability did not change', async () => {
     const owner = await insertTestUser();
     const restrictedOrg = await createTestOrganization('Restricted to openai only', owner.id, 0, {

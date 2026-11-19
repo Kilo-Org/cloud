@@ -1,6 +1,7 @@
 // The Discussion tab carries a comment-count badge so an empty discussion is
-// visible without opening the tab. No count (the PR query is still loading) and
-// a zero count both draw nothing — a "0" badge is noise, not information.
+// visible without opening the tab, and its spoken name carries the same count.
+// No count (the PR query is still loading) and a zero count both draw and say
+// nothing — a "0" badge is noise, not information.
 
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -24,13 +25,18 @@ vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
   return {
     ...actual,
-    useTranslation: () => ({ t: (key: string) => key }),
+    // The key, plus the formatted count when the copy interpolates one, so a
+    // spoken name shows which count it carries.
+    useTranslation: () => ({
+      t: (key: string, options?: { displayCount?: string }) =>
+        options?.displayCount === undefined ? key : `${key}:${options.displayCount}`,
+    }),
   };
 });
 
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
-function badges(discussionCount: number | undefined) {
+function render(discussionCount: number | undefined) {
   const rendered: { current: TestRenderer.ReactTestRenderer | null } = { current: null };
   act(() => {
     rendered.current = TestRenderer.create(
@@ -44,10 +50,20 @@ function badges(discussionCount: number | undefined) {
   if (!rendered.current) {
     throw new Error('render produced no tree');
   }
-  return rendered.current.root
+  return rendered.current.root;
+}
+
+function badges(discussionCount: number | undefined) {
+  return render(discussionCount)
     .findAll(node => String(node.type) === 'Text')
     .map(node => node.props.children)
     .filter(child => typeof child === 'string' && !child.startsWith('prReview.'));
+}
+
+function spokenNames(discussionCount: number | undefined) {
+  return render(discussionCount)
+    .findAll(node => String(node.type) === 'Pressable')
+    .map(node => node.props.accessibilityLabel);
 }
 
 describe('PrReviewTabSelector', () => {
@@ -58,6 +74,25 @@ describe('PrReviewTabSelector', () => {
   it('draws no badge while the count is unknown or zero', () => {
     expect(badges(undefined)).toEqual([]);
     expect(badges(0)).toEqual([]);
+  });
+
+  it('says the comment count in the Discussion tab’s name', () => {
+    expect(spokenNames(12)).toEqual([
+      'prReview.tabs.overview',
+      'prReview.tabs.files',
+      'prReview.tabs.discussionAccessibility:12',
+    ]);
+    expect(spokenNames(0)[2]).toBe('prReview.tabs.discussion');
+  });
+
+  it('keeps tab semantics: a named tablist of tab entries', () => {
+    const root = render(undefined);
+    const [list] = root.findAll(node => node.props.accessibilityRole === 'tablist');
+    expect(list?.props.accessibilityLabel).toBe('common.prReview');
+    // iOS has no tab trait, so the entries read as buttons there (tabEntryA11y).
+    for (const tab of root.findAll(node => String(node.type) === 'Pressable')) {
+      expect(tab.props.role).toBe('button');
+    }
   });
 });
 
@@ -108,13 +143,9 @@ describe('PrReviewTabSelector failure states', () => {
       throw new Error('expected three tabs');
     }
     expect(overview.props).toEqual(expect.objectContaining({ disabled: false }));
-    expect(overview.props.accessibilityState).toEqual({
-      busy: false,
-      selected: false,
-      disabled: false,
-    });
+    expect(overview.props.accessibilityState).toEqual({ selected: false, disabled: false });
     expect(files.props).toEqual(expect.objectContaining({ disabled: true }));
-    expect(files.props.accessibilityState).toEqual({ busy: false, selected: true, disabled: true });
+    expect(files.props.accessibilityState).toEqual({ selected: true, disabled: true });
     expect(discussion.props).toEqual(expect.objectContaining({ disabled: true }));
 
     overview.props.onPress?.();

@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Text } from '@/components/ui/text';
 import { selectionHaptic } from '@/lib/haptics';
+import { tabEntryA11y } from '@/lib/a11y/tab-entry';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
@@ -26,10 +27,16 @@ type SegmentedControlProps<T extends string> = {
   options: readonly SegmentedControlOption<T>[];
   value: T;
   onChange: (value: T) => void;
-  /** The visible group name — required so the radio group is never unnamed. */
+  /** The visible group name — required so the group is never unnamed. */
   accessibilityLabel: string;
   /** The choice is fixed while a write that would replace it is in flight. */
   disabled?: boolean;
+  /**
+   * What assistive technology hears: `choice` (default) is a radio group that
+   * picks a value; `tabs` is a tab strip whose options switch the body below
+   * it, so each option reads as a tab of the `tablist`.
+   */
+  semantics?: 'choice' | 'tabs';
 };
 
 /**
@@ -59,79 +66,92 @@ export function SegmentedControl<T extends string>({
   onChange,
   accessibilityLabel,
   disabled = false,
+  semantics = 'choice',
 }: Readonly<SegmentedControlProps<T>>) {
-  return (
+  const segments = options.map(option => {
+    const selected = value === option.value;
+    const optionDisabled = disabled || option.disabled === true;
+    // Every option shows its full label: no line cap, no font shrink and
+    // no ellipsis. A label longer than its equal-width segment wraps onto
+    // as many lines as it needs, and the row's default `alignItems:
+    // stretch` keeps every segment the same height. The spoken label
+    // carries the same full text, or the option's own longer spoken name.
+    const spokenLabel = option.accessibilityLabel ?? option.label;
+    const a11y =
+      semantics === 'tabs'
+        ? {
+            ...tabEntryA11y({ selected, disabled: optionDisabled }),
+            accessibilityLabel: spokenLabel,
+          }
+        : radioItemA11y({ label: spokenLabel, checked: selected, disabled: optionDisabled });
+    const label = (
+      <Text
+        className={cn(
+          'text-center text-sm',
+          // A badge takes width beside the label, so the label must be
+          // free to shrink and wrap in what is left; without one it keeps
+          // filling the segment (see the segment's own class comment).
+          option.badge ? 'shrink' : undefined,
+          selected ? 'font-medium text-foreground' : 'text-muted-foreground'
+        )}
+      >
+        {option.label}
+      </Text>
+    );
+    return (
+      <Pressable
+        key={option.value}
+        testID={option.testID}
+        {...a11y}
+        accessibilityHint={option.accessibilityHint}
+        disabled={optionDisabled}
+        onPress={() => {
+          if (selected || optionDisabled) {
+            return;
+          }
+          selectionHaptic();
+          onChange(option.value);
+        }}
+        className={cn(
+          // No `items-center` here: a centred Text child is sized to its
+          // content, so a label wider than its segment overflows and gets
+          // clipped instead of wrapping. Stretching the child to the segment
+          // width is what lets the label wrap inside the pill.
+          //
+          // A one-line segment now fills the shared row floor. A
+          // wrapped label grows past it and keeps its vertical insets
+          // instead of touching the edges.
+          ROW_TARGET_CLASS,
+          'flex-1 justify-center rounded-md px-2 py-2 active:opacity-70',
+          selected && 'bg-background',
+          optionDisabled && 'opacity-50'
+        )}
+      >
+        {option.badge ? (
+          // The badge sits on the label's line; the row is centred and the
+          // label shrinks into the width the badge leaves, so a long label
+          // still wraps instead of pushing the badge out of the segment.
+          <View className="flex-row items-center justify-center gap-1">
+            {label}
+            {option.badge}
+          </View>
+        ) : (
+          label
+        )}
+      </Pressable>
+    );
+  });
+  return semantics === 'tabs' ? (
+    <View
+      accessibilityRole="tablist"
+      accessibilityLabel={accessibilityLabel}
+      className={SEGMENTED_FRAME_CLASS}
+    >
+      {segments}
+    </View>
+  ) : (
     <RadioGroup label={accessibilityLabel} className={SEGMENTED_FRAME_CLASS}>
-      {options.map(option => {
-        const selected = value === option.value;
-        const optionDisabled = disabled || option.disabled === true;
-        // Every option shows its full label: no line cap, no font shrink and
-        // no ellipsis. A label longer than its equal-width segment wraps onto
-        // as many lines as it needs, and the row's default `alignItems:
-        // stretch` keeps every segment the same height. The radio's
-        // accessibilityLabel carries the same full text, or the option's own
-        // longer spoken name.
-        const label = (
-          <Text
-            className={cn(
-              'text-center text-sm',
-              // A badge takes width beside the label, so the label must be
-              // free to shrink and wrap in what is left; without one it keeps
-              // filling the segment (see the segment's own class comment).
-              option.badge ? 'shrink' : undefined,
-              selected ? 'font-medium text-foreground' : 'text-muted-foreground'
-            )}
-          >
-            {option.label}
-          </Text>
-        );
-        return (
-          <Pressable
-            key={option.value}
-            testID={option.testID}
-            {...radioItemA11y({
-              label: option.accessibilityLabel ?? option.label,
-              checked: selected,
-              disabled: optionDisabled,
-            })}
-            accessibilityHint={option.accessibilityHint}
-            disabled={optionDisabled}
-            onPress={() => {
-              if (selected || optionDisabled) {
-                return;
-              }
-              selectionHaptic();
-              onChange(option.value);
-            }}
-            className={cn(
-              // No `items-center` here: a centred Text child is sized to its
-              // content, so a label wider than its segment overflows and gets
-              // clipped instead of wrapping. Stretching the child to the segment
-              // width is what lets the label wrap inside the pill.
-              //
-              // A one-line segment now fills the shared row floor. A
-              // wrapped label grows past it and keeps its vertical insets
-              // instead of touching the edges.
-              ROW_TARGET_CLASS,
-              'flex-1 justify-center rounded-md px-2 py-2 active:opacity-70',
-              selected && 'bg-background',
-              optionDisabled && 'opacity-50'
-            )}
-          >
-            {option.badge ? (
-              // The badge sits on the label's line; the row is centred and the
-              // label shrinks into the width the badge leaves, so a long label
-              // still wraps instead of pushing the badge out of the segment.
-              <View className="flex-row items-center justify-center gap-1">
-                {label}
-                {option.badge}
-              </View>
-            ) : (
-              label
-            )}
-          </Pressable>
-        );
-      })}
+      {segments}
     </RadioGroup>
   );
 }

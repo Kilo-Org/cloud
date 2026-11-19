@@ -36,8 +36,9 @@ const NO_DISABLED_TABS: readonly PrReviewTabId[] = [];
 
 /**
  * The shared segmented control at the top of the PR review surface that picks
- * between the Overview, Files, and Discussion tabs. The parent screen owns the
- * tab state; each tab body only renders itself.
+ * between the Overview, Files, and Discussion tabs. It keeps tab semantics
+ * (a `tablist` of tabs), because each option switches the body below it. The
+ * parent screen owns the tab state; each tab body only renders itself.
  */
 export function PrReviewTabSelector({
   activeTab,
@@ -46,18 +47,32 @@ export function PrReviewTabSelector({
   disabledTabs = NO_DISABLED_TABS,
 }: PrReviewTabSelectorProps) {
   const { t } = useTranslation();
-  const options = TABS.map(tab => ({
-    value: tab.id,
-    label: t(tab.labelKey),
-    disabled: disabledTabs.includes(tab.id),
-    badge:
-      tab.id === 'discussion' && discussionCount && discussionCount > 0 ? (
-        <DiscussionCountBadge count={discussionCount} />
-      ) : undefined,
-  }));
+  const options = TABS.map(tab => {
+    const label = t(tab.labelKey);
+    const count =
+      tab.id === 'discussion' && discussionCount && discussionCount > 0 ? discussionCount : null;
+    return {
+      value: tab.id,
+      label,
+      disabled: disabledTabs.includes(tab.id),
+      badge: count === null ? undefined : <DiscussionCountBadge count={count} />,
+      // The badge is drawn beside the label, so the spoken name carries the
+      // count too: a reader hears that the discussion has comments without
+      // opening the tab, as a sighted reader sees.
+      accessibilityLabel:
+        count === null
+          ? undefined
+          : t('prReview.tabs.discussionAccessibility', {
+              title: label,
+              count,
+              displayCount: formatNumber(count, i18n.language),
+            }),
+    };
+  });
   return (
     <SegmentedControl
       accessibilityLabel={t('common.prReview')}
+      semantics="tabs"
       options={options}
       value={activeTab}
       onChange={onChange}

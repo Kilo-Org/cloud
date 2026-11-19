@@ -155,6 +155,34 @@ describe('SegmentedControl', () => {
     expect(rebase?.props?.accessibilityHint).toBeUndefined();
   });
 
+  // A strip whose options switch the body below it reads as tabs, not as a
+  // radio choice: a named tablist whose entries are tabs (Android here).
+  it('reads as a tablist of tabs with tab semantics', () => {
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = SegmentedControl({
+      accessibilityLabel: 'Pull request',
+      semantics: 'tabs',
+      options: [
+        { value: 'overview', label: 'Overview' },
+        { value: 'files', label: 'Files', disabled: true },
+      ],
+      value: 'overview',
+      onChange: noopOnChange,
+    }) as ReactElement;
+
+    const root = element as unknown as ElementNode;
+    expect(root.type).toBe('View');
+    expect(root.props?.accessibilityRole).toBe('tablist');
+    expect(root.props?.accessibilityLabel).toBe('Pull request');
+    expect(root.props?.className).toBe(SEGMENTED_FRAME_CLASS);
+
+    const [overview, files] = collectByType(element, 'Pressable');
+    expect(overview?.props?.role).toBe('tab');
+    expect(overview?.props?.accessibilityLabel).toBe('Overview');
+    expect(overview?.props?.accessibilityState).toEqual({ selected: true, disabled: false });
+    expect(files?.props?.accessibilityState).toEqual({ selected: false, disabled: true });
+  });
+
   // A segment can carry a mark (a count, a status dot). It rides the label's
   // line, and the label shrinks into the width left over, so a long label still
   // wraps instead of pushing the mark out of the segment.

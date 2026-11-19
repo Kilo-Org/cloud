@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 
+import { AdminSlackNotificationError } from './admin-notifications';
+
 const WEBHOOK_URL = 'https://hooks.slack.com/services/test/webhook/url';
 
 async function loadModule(webhookUrl: string | undefined) {
@@ -109,5 +111,41 @@ describe('sendAdminSlackNotification', () => {
 
     expect(error).toMatchObject({ kind: 'network' });
     expect(String(error)).not.toContain(WEBHOOK_URL);
+  });
+});
+
+describe('AdminSlackNotificationError variants', () => {
+  it('carries a status only on the upstream variant', () => {
+    const upstream = new AdminSlackNotificationError('upstream', 429);
+    expect(upstream.kind).toBe('upstream');
+    expect(upstream.status).toBe(429);
+    expect(upstream.name).toBe('AdminSlackNotificationError');
+    expect(upstream.message).toBe('Admin Slack notification request failed');
+    expect(upstream).toBeInstanceOf(Error);
+
+    for (const kind of ['configuration', 'network'] as const) {
+      const other = new AdminSlackNotificationError(kind);
+      expect(other.kind).toBe(kind);
+      expect(other.status).toBeUndefined();
+    }
+  });
+
+  it('rejects a status on the kinds that never carry one', () => {
+    // @ts-expect-error configuration has no status
+    expect(() => new AdminSlackNotificationError('configuration', 500)).toBeDefined();
+    // @ts-expect-error network has no status
+    expect(() => new AdminSlackNotificationError('network', 500)).toBeDefined();
+    // @ts-expect-error upstream requires its status
+    expect(() => new AdminSlackNotificationError('upstream')).toBeDefined();
+  });
+
+  it('narrows the upstream status to a number', () => {
+    const error: unknown = new AdminSlackNotificationError('upstream', 500);
+    if (error instanceof AdminSlackNotificationError && error.kind === 'upstream') {
+      const status: number = error.status;
+      expect(status).toBe(500);
+    } else {
+      throw new Error('expected an upstream AdminSlackNotificationError');
+    }
   });
 });

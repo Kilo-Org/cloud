@@ -1132,21 +1132,9 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     }
 
     // Snapshot the durable inputs so a failed status write can be rolled back.
-    const previousState = structuredClone(this.state);
-    const previousAlarm = await this.ctx.storage.getAlarm();
-
     try {
-      await this.updateStatus('cancelled', { errorMessage });
+      await this.persistCancellation(errorMessage);
     } catch (error) {
-      this.state = previousState;
-      await this.saveState();
-
-      if (previousAlarm === null) {
-        await this.ctx.storage.deleteAlarm();
-      } else {
-        await this.ctx.storage.setAlarm(previousAlarm);
-      }
-
       console.warn('[CodeReviewOrchestrator] Cancellation status write failed; restored state', {
         reviewId: this.state.reviewId,
         attemptId: this.state.attemptId,
@@ -1163,6 +1151,30 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     });
 
     return true;
+  }
+
+  /**
+   * Record the terminal cancellation status. When the status write fails, restore the
+   * previous review state and alarm so the review stays cancellable, then rethrow.
+   */
+  private async persistCancellation(errorMessage: string): Promise<void> {
+    const previousState = structuredClone(this.state);
+    const previousAlarm = await this.ctx.storage.getAlarm();
+
+    try {
+      await this.updateStatus('cancelled', { errorMessage });
+    } catch (error) {
+      this.state = previousState;
+      await this.saveState();
+
+      if (previousAlarm === null) {
+        await this.ctx.storage.deleteAlarm();
+      } else {
+        await this.ctx.storage.setAlarm(previousAlarm);
+      }
+
+      throw error;
+    }
   }
 
   /** Interrupt the cloud agent session to stop it from running and posting comments. */
@@ -1262,12 +1274,24 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     }
 
     // A cancellation that has not completed must not start work: it keeps the review
-    // cancellable, and a later cancel attempt retries the terminal status.
+    // cancellable, and a later cancel attempt retries the terminal status. Retry the
+    // terminal status here as well, so a recovered backend reconciles the record.
     if (this.cancelled) {
-      console.log('[CodeReviewOrchestrator] runReview skipped - cancellation pending', {
-        reviewId: this.state.reviewId,
-      });
-      return;
+      try {
+        await this.persistCancellation('Review cancelled');
+        return;
+      } catch (error) {
+        console.warn(
+          '[CodeReviewOrchestrator] Pending cancellation still failing; retrying later',
+          {
+            reviewId: this.state.reviewId,
+            error: error instanceof Error ? error.message : String(error),
+          }
+        );
+        // Keep an alarm so the record is retried and the object is eventually reclaimed.
+        await this.ctx.storage.setAlarm(Date.now() + CodeReviewOrchestrator.CLEANUP_DELAY_MS);
+        return;
+      }
     }
 
     if (

@@ -1723,9 +1723,13 @@ describe('CodeReviewOrchestrator recovery', () => {
 
   it('leaves a queued review cancellable and does not start it when the status callback fails', async () => {
     const stub = getReviewStub();
+    let statusCallbackHealthy = false;
     const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
       const url = String(request);
       if (url.includes('/api/internal/code-review-status/')) {
+        if (statusCallbackHealthy) {
+          return Response.json({ success: true });
+        }
         return new Response('status unavailable', { status: 500 });
       }
       if (url.includes('/trpc/prepareSession')) {
@@ -1739,7 +1743,7 @@ describe('CodeReviewOrchestrator recovery', () => {
     globalThis.fetch = fetchMock;
 
     const scheduledAlarm = Date.now() + 30_000;
-    const outcome = await runInDurableObject(
+    const firstAttempt = await runInDurableObject(
       stub,
       async (instance: CodeReviewOrchestrator, state) => {
         await state.storage.put('state', codeReview());
@@ -1752,19 +1756,29 @@ describe('CodeReviewOrchestrator recovery', () => {
           cancellationError = error instanceof Error ? error.message : String(error);
         }
 
+        const restoredAlarm = await state.storage.getAlarm();
+
+        // The queued fallback fires while the cancellation is still unrecorded.
         await instance.runReview();
 
         return {
           cancellationError,
+          restoredAlarm,
           storedState: await state.storage.get<CodeReview>('state'),
           alarm: await state.storage.getAlarm(),
         };
       }
     );
 
-    expect(outcome.cancellationError).toMatch(/Failed to update DB status/);
-    expect(outcome.storedState).toMatchObject({ status: 'queued' });
-    expect(outcome.alarm).toBe(scheduledAlarm);
+    expect(firstAttempt.cancellationError).toMatch(/Failed to update DB status/);
+    expect(firstAttempt.restoredAlarm).toBe(scheduledAlarm);
+    expect(firstAttempt.storedState).toMatchObject({ status: 'queued' });
+    // The skip keeps an alarm so the record is retried and the object is reclaimed.
+    expect(firstAttempt.alarm).toEqual(expect.any(Number));
+    if (firstAttempt.alarm === null) {
+      throw new Error('Expected a retry alarm after the skipped cancellation');
+    }
+    expect(firstAttempt.alarm).toBeGreaterThanOrEqual(Date.now() + 6 * 24 * 60 * 60 * 1000);
     expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(0);
 
     const runningPosts = fetchMock.mock.calls.filter(
@@ -1773,6 +1787,12 @@ describe('CodeReviewOrchestrator recovery', () => {
         String((init as RequestInit | undefined)?.body).includes('"status":"running"')
     );
     expect(runningPosts).toHaveLength(0);
+
+    statusCallbackHealthy = true;
+
+    await expect(stub.cancel('superseded')).resolves.toBe(true);
+    await expect(storedReview(stub)).resolves.toMatchObject({ status: 'cancelled' });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(0);
   });
 
   it('does not prepare a session when the review is cancelled during the first status update', async () => {

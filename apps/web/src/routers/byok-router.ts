@@ -67,6 +67,7 @@ import {
   getByokKmsContext,
   getModelGatewayUserByokProviders,
   isGatewayUserByokEligibleModel,
+  parseByokSettings,
   servesCatalogModels,
   type ByokOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
@@ -206,10 +207,12 @@ const BYOK_KEY_COLUMNS = {
 };
 
 function inRouteOrder<T extends { provider_id: string; settings: unknown }>(keys: T[]): T[] {
-  return sortByokKeysInRouteOrder(keys, key => ({
+  const prioritized = keys.map(key => ({
+    key,
     providerId: key.provider_id,
-    priority: getByokKeyPriority(key.settings),
+    priority: getByokKeyPriority(parseByokSettings(key.settings)),
   }));
+  return sortByokKeysInRouteOrder(prioritized, entry => entry).map(({ key }) => key);
 }
 
 function ownedKeys(owner: ByokOwner) {
@@ -250,7 +253,7 @@ async function toBYOKApiKeyResponse(
   organizationRole: OrganizationRole | null
 ): Promise<BYOKApiKeyResponse> {
   const supportsCatalog = await offersCatalogMode(key.provider_id);
-  const serveCatalogModels = servesCatalogModels(settings);
+  const serveCatalogModels = servesCatalogModels(parseByokSettings(settings));
   return {
     ...key,
     provider_name: getByokProviderDisplayName(key.provider_id),

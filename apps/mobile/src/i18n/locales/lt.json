@@ -172,6 +172,7 @@
     "generating": "Generuojama…",
     "working": "Vykdoma",
     "yourOwnRepositories": "Tavo saugyklos",
+    "organizationRepositories": "Organizacijos saugyklos",
     "dismissed": "Atmesta",
     "agent": "Agentas",
     "durationMinuteShort": "min",
@@ -1071,7 +1072,12 @@
     "tabs": {
       "overview": "Apžvalga",
       "files": "Failai",
-      "discussion": "Diskusija"
+      "discussion": "Diskusija",
+      "discussionAccessibility_one": "{{title}}: {{displayCount}} komentaras",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentarų",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentarų",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} komentarai",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} komentaro"
     },
     "fileStatus": {
       "modified": "Modifikuota",
@@ -1270,7 +1276,7 @@
     },
     "instructions": {
       "title": "Pasirinktinės instrukcijos",
-      "deprecation": "Pasirinktinių instrukcijų funkcijos planuojama atsisakyti. Perkelk šias gaires į saugyklos REVIEW.md failą.",
+      "deprecation": "Pasirinktinės instrukcijos bus pašalintos. Perkelk šias gaires į saugyklos REVIEW.md failą.",
       "placeholder": "pvz., tikrinti, ar laikomasi mūsų klaidų apdorojimo taisyklių…",
       "clearTitle": "Pašalinti pasirinktines instrukcijas?",
       "clearMessage": "Išsaugojus tuščią lauką bus ištrintos šiam tikrintuvui saugomos pasirinktinės instrukcijos."
@@ -1436,6 +1442,7 @@
       "managedOnWeb": "{{organization}} Bitbucket ryšys valdomas žiniatinklyje naudojant kompiuterį.",
       "description": "Sukurk {{organization}} darbo srities prieigos raktą ir įklijuok jį žemiau.",
       "descriptionReconnect": "Sukurk naują {{organization}} darbo srities prieigos raktą ir įklijuok jį žemiau.",
+      "descriptionOverview": "Sukurk {{organization}} darbo srities prieigos raktą ir įklijuok jį kitame ekrane.",
       "scopes": "Paskyra: skaityti · Saugyklos: skaityti / rašyti · Pakeitimų užklausos: skaityti · Webhook: skaityti / rašyti",
       "tokenPlaceholder": "Darbo srities prieigos raktas",
       "tokenRefused": "Bitbucket nepriėmė šio darbo srities prieigos rakto. Patikrink, ar jis turi aukščiau nurodytas teises, tada bandyk dar kartą."
@@ -1999,7 +2006,7 @@
       "githubAppSettings": "GitHub programėlės nustatymai",
       "manageAccess": "Tvarkyti GitHub programėlės prieigą",
       "noRepositories": "Nėra saugyklų",
-      "noRepositoriesDescription": "Suteik Kilo GitHub programėlei prieigą prie saugyklų",
+      "noRepositoriesDescription": "Suteik Kilo GitHub programėlei prieigą prie saugyklų.",
       "selectAtLeastOne": "Pasirink bent vieną saugyklą."
     },
     "scopeEntry": {
@@ -3300,6 +3307,8 @@
     "retryHint": "Bando iš naujo gauti Kilo Pass būseną.",
     "endedOn": "Baigėsi {{date}}",
     "notAvailableInApp": "Kilo Pass nepasiekiamas programėlėje.",
+    "notAvailableTitle": "Kilo Pass nėra programėlėje",
+    "noPassDescription": "Ši paskyra neturi Kilo Pass.",
     "statusActive": "Aktyvi",
     "statusTrialing": "Bandomoji",
     "statusPastDue": "Mokėjimas pradelstas",
@@ -3582,7 +3591,7 @@
       "retentionLimit": "Rodomos naujausios sąskaitos."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Įjungti pranešimą apie mažą likutį",
+      "subtitle": "Siųsk įspėjimą el. paštu nurodytais adresais, kai šios organizacijos likutis nukrenta žemiau tavo nustatytos sumos.",
       "notifyEmailsLabel": "Gavėjų el. pašto adresai",
       "permissionDenied": "Neturite leidimo valdyti atsiskaitymo pranešimų.",
       "separateEmailsHint": "El. pašto adresus atskirkite kableliais.",
@@ -3731,8 +3740,7 @@
       "renameTitle": "Pervadinti organizaciją",
       "renamePlaceholder": "Organizacijos pavadinimas",
       "balance": "Likutis",
-      "organizationSeats": "Organizacijos vietos",
-      "plan": "Organizacijos planas",
+      "plan": "Planas",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Pasibaigęs",
@@ -3768,7 +3776,8 @@
     "signupStepUp": "Kad užbaigtum paskyros kūrimą, pasirink „$t(login.moreSignInOptions)“.",
     "signupStepUpApple": "Kad užbaigtum paskyros kūrimą, pasirink „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Kad užbaigtum paskyros kūrimą, pasirink „$t(login.signInWithGoogle)“.",
-    "invalidCode": "Kodas neteisingas. Bandyk dar kartą.",
+    "signupStepUpBack": "Kad užbaigtum paskyros kūrimą, grįžk atgal ir pasirink „$t(login.moreSignInOptions)“.",
+    "invalidCode": "Kodas neteisingas arba nebegalioja. Bandyk dar kartą arba pasirink „$t(login.resendCode)“.",
     "codeInProgress": "Tavo kodas apdorojamas. Palauk akimirką ir bandyk dar kartą.",
     "tooManyAttempts": "Per daug bandymų. Paprašyk naujo kodo.",
     "invalidToken": "Nepavyko prisijungti. Bandyk dar kartą.",
@@ -4039,6 +4048,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) – tai trumpa išvedimo užklausa į šį prieigos tašką su pasirinktu protokolu ir modeliu. Paslaugos teikėjas gali už ją taikyti mokestį.",
       "connectionSucceeded": "Modelis įvykdė užklausą naudodamas šį protokolą.",
       "connectionFailed": "Modelis negalėjo įvykdyti užklausos. Patikrinkite bazinį API URL, protokolą, prisijungimo duomenis ir modelio ID.",
+      "requestTimedOut": "Prieigos taškas laiku neatsakė. Patikrinkite bazinį API URL ir ryšį, tada bandykite dar kartą.",
+      "requestUnauthorized": "Prieigos taškas atmetė prisijungimo duomenis. Patikrinkite API raktą ir pasirinktines antraštes, tada bandykite dar kartą.",
+      "requestNotFound": "Prieigos taškas arba modelis nerastas. Patikrinkite bazinį API URL ir modelio ID.",
+      "requestRateLimited": "Prieigos taškas riboja užklausas. Palaukite akimirką ir bandykite dar kartą.",
+      "requestUnavailable": "Prieigos taškas šiuo metu nepasiekiamas. Bandykite dar kartą po akimirkos.",
+      "requestUnreachable": "Nepavyko pasiekti prieigos taško. Patikrinkite bazinį API URL ir ryšį.",
+      "requestInvalidResponse": "Prieigos taškas grąžino netinkamo formato atsakymą. Patikrinkite, ar bazinis API URL ir protokolas atitinka serverį, tada bandykite dar kartą.",
+      "discoveryNoModels": "Prieigos taškas nepateikė nė vieno modelio. Įveskite modelius rankiniu būdu.",
+      "connectionIncomplete": "Modelis atsakė, bet nebaigė. Bandykite dar kartą arba patikrinkite modelio ID ir protokolą.",
       "invalidInput": "Įveskite serverio pavadinimą, galiojančias antraštes ir bent vieną modelį su unikaliu ID ir pavadinimu. Žetonų skaičiaus ribos turi būti teigiami sveikieji skaičiai.",
       "invalidUrl": "Įveskite bazinį HTTP arba HTTPS API URL be prisijungimo duomenų, užklausos parametrų ar fragmento.",
       "publicHttp": "Viešieji HTTP prieigos taškai neleidžiami. Naudokite HTTPS arba privatų vietinį prieigos tašką.",
@@ -4177,7 +4195,11 @@
     "reasoningEffort": {
       "modelFlag": "Šis modelis palaiko mąstymo intensyvumą"
     },
-    "creditsRequired": "Nepakanka kreditų šiai žinutei išsiųsti."
+    "creditsRequired": "Nepakanka kreditų šiai žinutei išsiųsti.",
+    "providerKeyRefused": "Paslaugos teikėjas atmetė prisijungimo duomenis. Patikrinkite jo API raktą, tada siųskite dar kartą.",
+    "providerModelMissing": "Šis backendas nebeteikia šio modelio. Pasirinkite kitą.",
+    "providerRateLimited": "Paslaugos teikėjas riboja užklausas. Palaukite akimirką ir siųskite dar kartą.",
+    "providerUnavailable": "Paslaugos teikėjas šiuo metu nepasiekiamas. Netrukus siųskite dar kartą."
   },
   "settingsTools": {
     "confirmTitle": "Patvirtinti šį pakeitimą?"
@@ -4564,6 +4586,7 @@
     "pickPackToBuyAgain": "Pasirinkite paketą aukščiau, kad pradėtumėte naują pirkimą.",
     "purchasePending": "Parduotuvė vis dar apdoroja šį mokėjimą. Kreditus gausite, kai ji patvirtins mokestį.",
     "buyAgain": "Pirkti dar kartą",
+    "checkPurchase": "Patikrinti pirkimą",
     "purchaseOwnedByAnotherAccount": "Šios Apple Account paskyros kreditai priklauso kitai Kilo paskyrai. Norėdami juos naudoti, prisijunkite prie tos Kilo paskyros.",
     "purchaseOwnedByAnotherAccountPlay": "Šios Google Play paskyros kreditai priklauso kitai Kilo paskyrai. Norėdami juos naudoti, prisijunkite prie tos Kilo paskyros."
   },
@@ -4665,7 +4688,9 @@
     },
     "saveSheet": {
       "title": "Išsaugoti į sąrašą",
-      "saved": "Išsaugota sąraše „{{list}}“"
+      "saved": "Išsaugota sąraše „{{list}}“",
+      "saveFailed": "Nepavyko išsaugoti užduoties. Patikrinkite interneto ryšį ir bandykite dar kartą.",
+      "saveRefused": "Nepavyko išsaugoti užduoties šiame sąraše. Pasirinkite kitą sąrašą."
     }
   },
   "agentBriefing": {
@@ -4677,6 +4702,7 @@
     "empty": "Šiuo suvestinės laikotarpiu veiklos nebuvo",
     "emptyHint": "Jūsų debesies ir CLI programavimo sesijos bus rodomos čia, kai suplanuotoje suvestinėje bus veiklos.",
     "loadError": "Nepavyko įkelti suvestinių",
+    "estimateLoadError": "Nepavyko įkelti apskaičiavimo.",
     "view": "Skaityti suvestinę",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -5090,7 +5116,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Įmonės funkcija",
-    "enterpriseOnly": "Tai funkcija, skirta tik įmonėms.",
+    "enterpriseOnly": "Teikėjai ir modeliai prieinami „Enterprise“ plane.",
     "readOnly": "Tik organizacijos savininkai ir administratoriai gali keisti šiuos nustatymus.",
     "loadError": "Nepavyko įkelti teikėjų ir modelių",
     "tabModels": "Modeliai",

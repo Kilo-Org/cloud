@@ -263,10 +263,12 @@ export const renderBrowserAriaSnapshot = (snapshot: BrowserAriaSnapshot): string
 
 /**
  * Render an `Accessibility.getFullAXTree` payload as a Playwright-shaped aria
- * snapshot. Ignored wrapper nodes are flattened (their children render at the
- * wrapper's depth); interactive nodes get `[ref=eN]` where N is the backend
- * node id, so a ref resolves to the same element on every snapshot until
- * navigation clears the session registry.
+ * snapshot. A node that prints no line (ignored, unnamed, or role-less) adds
+ * no level: its children render at its depth, so a line nests only under the
+ * printed lines above it, and `depth` counts printed levels as Playwright's
+ * does. Interactive nodes get `[ref=eN]` where N is the backend node id, so a
+ * ref resolves to the same element on every snapshot until navigation clears
+ * the session registry.
  */
 export const buildBrowserAriaSnapshot = (
   nodes: readonly BrowserAriaNode[],
@@ -338,6 +340,7 @@ export const buildBrowserAriaSnapshot = (
     });
     const ignored = node.ignored === true;
     const textRole = TEXT_ROLES.has(role);
+    const linesBefore = lines.length;
 
     if (!ignored) {
       if (textRole) {
@@ -360,12 +363,14 @@ export const buildBrowserAriaSnapshot = (
       }
     }
 
-    if (options.depth !== undefined && depth >= options.depth) {
+    const childDepth = lines.length > linesBefore ? depth + 1 : depth;
+
+    if (options.depth !== undefined && childDepth > options.depth) {
       return;
     }
 
     for (const child of children) {
-      visit(child, ignored ? depth : depth + 1);
+      visit(child, childDepth);
     }
   };
 
@@ -520,6 +525,7 @@ const DOM_ARIA_SNAPSHOT_FUNCTION = `function (options) {
       refs.push({ ref: ref, selector: selectorOf(element) });
     }
     var children = Array.prototype.filter.call(element.children, visible);
+    var linesBefore = lines.length;
     if (role === '' && name !== '' && children.length === 0) {
       lines.push({ depth: depth, name: name, role: '', textLeaf: true });
     } else if (role !== '' && (name !== '' || interactive)) {
@@ -531,7 +537,8 @@ const DOM_ARIA_SNAPSHOT_FUNCTION = `function (options) {
       }
       lines.push(line);
     }
-    for (var index = 0; index < element.children.length; index++) { walk(element.children[index], depth + 1); }
+    var childDepth = lines.length > linesBefore ? depth + 1 : depth;
+    for (var index = 0; index < element.children.length; index++) { walk(element.children[index], childDepth); }
   };
   var root = rootSelector === null ? (document.body || document.documentElement) : document.querySelector(rootSelector);
   if (root) { walk(root, 0); }

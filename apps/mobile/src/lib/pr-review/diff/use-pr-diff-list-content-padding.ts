@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useStyleSideInsets } from '@/lib/screen-insets';
 
 import { prDiffListContentPadding } from './pr-diff-list-bottom-padding';
 
@@ -11,6 +11,9 @@ import { prDiffListContentPadding } from './pr-diff-list-bottom-padding';
  * style carries explicit zeros.
  */
 export function usePrDiffListContentPadding(barHeight: number | null) {
-  const insets = useSafeAreaInsets();
-  return useMemo(() => prDiffListContentPadding(barHeight, insets), [barHeight, insets]);
+  const { left, right } = useStyleSideInsets();
+  return useMemo(
+    () => prDiffListContentPadding(barHeight, { left, right }),
+    [barHeight, left, right]
+  );
 }

@@ -124,9 +124,7 @@ vi.mock('@/components/pr-review/pr-review-overview-parts', () => ({
 vi.mock('@/components/pr-review/pr-review-meta-parts', () => ({
   PrOverviewMeta: 'PrOverviewMeta',
 }));
-vi.mock('@/components/pr-review/pr-review-section-label', () => ({
-  PrReviewSectionLabel: 'PrReviewSectionLabel',
-}));
+vi.mock('@/components/ui/section', () => ({ Section: 'Section' }));
 vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
   PrReviewReconnectNotice: 'PrReviewReconnectNotice',
 }));

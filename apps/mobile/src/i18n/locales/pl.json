@@ -172,6 +172,7 @@
     "generating": "Generowanie…",
     "working": "W toku",
     "yourOwnRepositories": "Twoje repozytoria",
+    "organizationRepositories": "Repozytoria organizacji",
     "dismissed": "Odrzucone",
     "agent": "Agent",
     "durationMinuteShort": "min",
@@ -670,7 +671,7 @@
     },
     "instructions": {
       "title": "Własne instrukcje",
-      "deprecation": "Planowane jest wycofanie obsługi niestandardowych instrukcji. Przenieś te wytyczne do pliku REVIEW.md w swoim repozytorium.",
+      "deprecation": "Niestandardowe instrukcje zostaną usunięte. Przenieś te wytyczne do pliku REVIEW.md w swoim repozytorium.",
       "placeholder": "np. sprawdzaj zgodność z naszymi zasadami obsługi błędów…",
       "clearTitle": "Usunąć własne instrukcje?",
       "clearMessage": "Zapisanie pustego pola usuwa własne instrukcje zapisane dla tego recenzenta."
@@ -701,6 +702,7 @@
       "managedOnWeb": "Połączeniem {{organization}} z Bitbucket zarządza się w przeglądarce na komputerze.",
       "description": "Utwórz token dostępu do obszaru roboczego dla {{organization}} i wklej go poniżej.",
       "descriptionReconnect": "Utwórz nowy token dostępu do obszaru roboczego dla {{organization}} i wklej go poniżej.",
+      "descriptionOverview": "Utwórz token dostępu do obszaru roboczego dla {{organization}} i wklej go na następnym ekranie.",
       "scopes": "Konto: odczyt · Repozytoria: odczyt/zapis · PR: odczyt · Webhooki: odczyt/zapis",
       "tokenPlaceholder": "Token dostępu do obszaru roboczego",
       "tokenRefused": "Bitbucket nie zaakceptował tego tokenu dostępu do obszaru roboczego. Sprawdź, czy ma powyższe uprawnienia, a następnie spróbuj ponownie."
@@ -2700,6 +2702,8 @@
     "retryHint": "Ponownie sprawdza stan Kilo Pass.",
     "endedOn": "Zakończono {{date}}",
     "notAvailableInApp": "Kilo Pass nie jest dostępny w aplikacji.",
+    "notAvailableTitle": "Kilo Pass nie jest oferowany w aplikacji",
+    "noPassDescription": "To konto nie ma Kilo Pass.",
     "statusActive": "Aktywny",
     "statusTrialing": "Okres próbny",
     "statusPastDue": "Płatność zaległa",
@@ -3353,6 +3357,11 @@
     },
     "tabs": {
       "discussion": "Dyskusja",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentarza",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentarza",
+      "discussionAccessibility_one": "{{title}}: 1 komentarz",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} komentarze",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} komentarzy",
       "files": "Pliki",
       "overview": "Podsumowanie"
     },
@@ -3543,8 +3552,7 @@
     "hub": {
       "balance": "Saldo",
       "lowBalanceBelow": "Poniżej {{amount}}",
-      "organizationSeats": "Miejsca w organizacji",
-      "plan": "Plan organizacji",
+      "plan": "Plan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Zakończony",
@@ -3587,7 +3595,7 @@
       "retentionLimit": "Wyświetlane są najnowsze faktury."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Włącz powiadomienie o niskim saldzie",
+      "subtitle": "Wyślij alert e-mailem na podane adresy, gdy saldo tej organizacji spadnie poniżej ustawionej kwoty.",
       "notifyEmailsLabel": "Adresy e-mail odbiorców",
       "permissionDenied": "Nie masz uprawnień do zarządzania powiadomieniami o rozliczeniach.",
       "separateEmailsHint": "Oddziel adresy e-mail przecinkami.",
@@ -3768,7 +3776,8 @@
     "signupStepUp": "Aby dokończyć tworzenie konta, użyj opcji „$t(login.moreSignInOptions)”.",
     "signupStepUpApple": "Aby dokończyć tworzenie konta, użyj opcji „$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "Aby dokończyć tworzenie konta, użyj opcji „$t(login.signInWithGoogle)”.",
-    "invalidCode": "Ten kod jest nieprawidłowy. Spróbuj ponownie.",
+    "signupStepUpBack": "Aby dokończyć tworzenie konta, wróć i użyj opcji „$t(login.moreSignInOptions)”.",
+    "invalidCode": "Ten kod jest nieprawidłowy lub wygasł. Spróbuj ponownie albo użyj opcji „$t(login.resendCode)”.",
     "codeInProgress": "Trwa sprawdzanie twojego kodu. Poczekaj chwilę i spróbuj ponownie.",
     "tooManyAttempts": "Zbyt wiele prób. Poproś o nowy kod.",
     "invalidToken": "Logowanie nie powiodło się. Spróbuj ponownie.",
@@ -4039,6 +4048,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) wysyła krótkie żądanie wnioskowania do tego punktu końcowego, używając wybranego protokołu i modelu. Dostawca może za to naliczyć opłatę.",
       "connectionSucceeded": "Model ukończył żądanie przy użyciu tego protokołu.",
       "connectionFailed": "Model nie mógł ukończyć żądania. Sprawdź główny adres API, protokół, dane uwierzytelniające i ID modelu.",
+      "requestTimedOut": "Punkt końcowy nie odpowiedział na czas. Sprawdź główny adres API i połączenie, a następnie spróbuj ponownie.",
+      "requestUnauthorized": "Punkt końcowy odrzucił dane uwierzytelniające. Sprawdź klucz API i niestandardowe nagłówki, a następnie spróbuj ponownie.",
+      "requestNotFound": "Nie znaleziono punktu końcowego lub modelu. Sprawdź główny adres API i ID modelu.",
+      "requestRateLimited": "Punkt końcowy ogranicza liczbę żądań. Odczekaj chwilę i spróbuj ponownie.",
+      "requestUnavailable": "Punkt końcowy jest teraz niedostępny. Spróbuj ponownie za chwilę.",
+      "requestUnreachable": "Nie udało się połączyć z punktem końcowym. Sprawdź główny adres API i połączenie.",
+      "requestInvalidResponse": "Punkt końcowy odpowiedział w nieoczekiwanym formacie. Sprawdź, czy główny adres API i protokół są zgodne z serwerem, a następnie spróbuj ponownie.",
+      "discoveryNoModels": "Punkt końcowy nie zwrócił żadnych modeli. Wprowadź modele ręcznie.",
+      "connectionIncomplete": "Model odpowiedział, ale nie ukończył żądania. Spróbuj ponownie lub sprawdź ID modelu i protokół.",
       "invalidInput": "Wprowadź nazwę backendu, prawidłowe nagłówki i co najmniej jeden model z unikalnym ID i nazwą. Limity tokenów muszą być dodatnimi liczbami całkowitymi.",
       "invalidUrl": "Wprowadź główny adres API HTTP lub HTTPS bez danych uwierzytelniających, zapytania ani fragmentu.",
       "publicHttp": "Publiczne punkty końcowe HTTP są niedozwolone. Użyj HTTPS lub prywatnego lokalnego punktu końcowego.",
@@ -4177,7 +4195,11 @@
     "reasoningEffort": {
       "modelFlag": "Ten model obsługuje poziom rozumowania"
     },
-    "creditsRequired": "Brak wystarczającej liczby kredytów, aby wysłać tę wiadomość."
+    "creditsRequired": "Brak wystarczającej liczby kredytów, aby wysłać tę wiadomość.",
+    "providerKeyRefused": "Dostawca odrzucił dane uwierzytelniające. Sprawdź jego klucz API, a następnie wyślij ponownie.",
+    "providerModelMissing": "Ten backend nie obsługuje już tego modelu. Wybierz inny.",
+    "providerRateLimited": "Dostawca ogranicza liczbę żądań. Odczekaj chwilę i wyślij ponownie.",
+    "providerUnavailable": "Dostawca jest teraz niedostępny. Wyślij ponownie za chwilę."
   },
   "settingsTools": {
     "confirmTitle": "Potwierdzić tę zmianę?"
@@ -4564,6 +4586,7 @@
     "pickPackToBuyAgain": "Wybierz pakiet powyżej, aby rozpocząć nowy zakup.",
     "purchasePending": "Sklep wciąż przetwarza tę płatność. Kredyty pojawią się, gdy tylko zatwierdzi obciążenie.",
     "buyAgain": "Kup ponownie",
+    "checkPurchase": "Sprawdź zakup",
     "purchaseOwnedByAnotherAccount": "Kredyty na tym koncie Apple należą do innego konta Kilo. Zaloguj się na to konto Kilo, aby z nich korzystać.",
     "purchaseOwnedByAnotherAccountPlay": "Kredyty na tym koncie Google Play należą do innego konta Kilo. Zaloguj się na to konto Kilo, aby z nich korzystać."
   },
@@ -4665,7 +4688,9 @@
     },
     "saveSheet": {
       "title": "Zapisz na liście",
-      "saved": "Zapisano na liście {{list}}"
+      "saved": "Zapisano na liście {{list}}",
+      "saveFailed": "Nie udało się zapisać zadania. Sprawdź połączenie i spróbuj ponownie.",
+      "saveRefused": "Nie udało się zapisać zadania na tej liście. Wybierz inną listę."
     }
   },
   "agentBriefing": {
@@ -4677,6 +4702,7 @@
     "empty": "Brak aktywności w tym oknie raportu",
     "emptyHint": "Twoje sesje kodowania w chmurze i CLI pojawią się tutaj, gdy zaplanowany raport ma aktywność.",
     "loadError": "Nie udało się wczytać raportów",
+    "estimateLoadError": "Nie udało się wczytać szacunku.",
     "view": "Przeczytaj raport",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -5090,7 +5116,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Funkcja dla przedsiębiorstw",
-    "enterpriseOnly": "Ta funkcja jest dostępna tylko dla przedsiębiorstw.",
+    "enterpriseOnly": "Dostawcy i modele to funkcja dostępna w planie Enterprise.",
     "readOnly": "Tylko właściciele i administratorzy organizacji mogą zmieniać te ustawienia.",
     "loadError": "Nie udało się załadować dostawców i modeli",
     "tabModels": "Modele",

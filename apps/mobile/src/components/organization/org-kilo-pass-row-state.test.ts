@@ -34,6 +34,7 @@ describe('getOrgKiloPassRowState', () => {
     expect(row).toEqual({
       subtitle: '$49 · 8 paid seats',
       attention: false,
+      tone: 'default',
       action: 'none',
       actionLabel: null,
       accessibilityHint: null,
@@ -70,6 +71,9 @@ describe('getOrgKiloPassRowState', () => {
     expect(row.action).toBe('none');
     expect(row.accessibilityHint).toBeNull();
     expect(row.attention).toBe(false);
+    // The billing row paints an absent pass in the same muted ink as the
+    // screen's other inert values ("No subscription", "Disabled").
+    expect(row.tone).toBe('muted');
     expect(row.loading).toBe(false);
   });
 
@@ -147,6 +151,7 @@ describe('getOrgKiloPassRowState', () => {
       });
       expect(row.subtitle).toBe(subtitle);
       expect(row.attention).toBe(true);
+      expect(row.tone).toBe('warn');
       expect(row.action).toBe('none');
     }
   });
@@ -177,6 +182,7 @@ describe('getOrgKiloPassRowState', () => {
     expect(row).toEqual({
       subtitle: 'Could not load status',
       attention: true,
+      tone: 'warn',
       action: 'retry',
       actionLabel: 'Retry',
       accessibilityHint: 'Retries loading Kilo Pass status.',

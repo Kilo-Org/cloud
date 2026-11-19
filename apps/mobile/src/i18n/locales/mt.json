@@ -172,6 +172,7 @@
     "generating": "Qed jiġġenera…",
     "working": "Fix-xogħol",
     "yourOwnRepositories": "Ir-repożitorji tiegħek stess",
+    "organizationRepositories": "Ir-repożitorji tal-organizzazzjoni",
     "dismissed": "Imwarrba",
     "agent": "Aġent",
     "durationMinuteShort": "min",
@@ -1093,7 +1094,13 @@
     "tabs": {
       "overview": "Ħarsa ġenerali",
       "files": "Fajls",
-      "discussion": "Diskussjoni"
+      "discussion": "Diskussjoni",
+      "discussionAccessibility_one": "{{title}}: kumment wieħed",
+      "discussionAccessibility": "{{title}}: {{displayCount}} kummenti",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} kummenti",
+      "discussionAccessibility_two": "{{title}}: {{displayCount}} kummenti",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} kummenti",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}}-il kumment"
     },
     "fileStatus": {
       "modified": "Modifikat",
@@ -1293,7 +1300,7 @@
     },
     "instructions": {
       "title": "Struzzjonijiet personalizzati",
-      "deprecation": "Il-funzjoni tal-istruzzjonijiet personalizzati se titneħħa fil-futur. Minflok, mexxi dawn il-linji gwida f'fajl REVIEW.md fir-repożitorju tiegħek.",
+      "deprecation": "L-istruzzjonijiet personalizzati se jitneħħew. Minflok, mexxi dawn il-linji gwida f'fajl REVIEW.md fir-repożitorju tiegħek.",
       "placeholder": "eż. Infurza l-konvenzjonijiet tagħna għall-immaniġġjar tal-iżbalji…",
       "clearTitle": "Trid tneħħi l-istruzzjonijiet personalizzati?",
       "clearMessage": "Jekk tissejvja kampt vojt, tiddelimina l-istruzzjonijiet personalizzati maħżuna għal dan ir-reviżur."
@@ -1459,6 +1466,7 @@
       "managedOnWeb": "Il-konnessjoni ta' Bitbucket ta' {{organization}} tiġi ġestita fuq il-web minn kompjuter.",
       "description": "Oħloq token ta' aċċess għall-ispazju tax-xogħol għal {{organization}} u waħħlu hawn taħt.",
       "descriptionReconnect": "Oħloq token ta' aċċess ġdid għall-ispazju tax-xogħol għal {{organization}} u waħħlu hawn taħt.",
+      "descriptionOverview": "Oħloq token ta' aċċess għall-ispazju tax-xogħol għal {{organization}}, imbagħad waħħlu fl-iskrin li jmiss.",
       "scopes": "Kont: qari · Repożitorji: qari/kitba · PRs: qari · Webhooks: qari/kitba",
       "tokenPlaceholder": "Token ta' aċċess għall-ispazju tax-xogħol",
       "tokenRefused": "Bitbucket ma aċċettax dan it-token tal-ispazju tax-xogħol. Iċċekkja li għandu l-permessi ta' hawn fuq, imbagħad ipprova mill-ġdid."
@@ -3358,6 +3366,8 @@
     "retryHint": "Jerġa' jipprova jgħabbi l-istat ta' Kilo Pass.",
     "endedOn": "Spiċċa {{date}}",
     "notAvailableInApp": "Kilo Pass mhux disponibbli fl-app.",
+    "notAvailableTitle": "Kilo Pass mhux fl-app",
+    "noPassDescription": "Dan il-kont m'għandux Kilo Pass.",
     "statusActive": "Attiv",
     "statusTrialing": "Fi prova",
     "statusPastDue": "Ħlas skadut",
@@ -3640,7 +3650,7 @@
       "retentionLimit": "Qed jintwerew il-fatturi l-aktar reċenti."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Attiva t-twissija ta' bilanċ baxx",
+      "subtitle": "Ibgħat twissija bil-posta elettronika lill-indirizzi li tniżżel meta l-bilanċ ta' din l-organizzazzjoni jinżel taħt l-ammont li tissettja.",
       "notifyEmailsLabel": "Indirizzi għan-notifiki",
       "permissionDenied": "M'għandekx permess biex timmaniġġja t-twissijiet tal-ħlasijiet.",
       "separateEmailsHint": "Ifred l-indirizzi tal-posta elettronika b'virgoli.",
@@ -3790,8 +3800,7 @@
       "renameTitle": "Ibdel l-isem tal-organizzazzjoni",
       "renamePlaceholder": "Isem l-organizzazzjoni",
       "balance": "Bilanċ",
-      "organizationSeats": "Postijiet tal-organizzazzjoni",
-      "plan": "Pjan tal-organizzazzjoni",
+      "plan": "Pjan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Intemm",
@@ -3828,7 +3837,8 @@
     "signupStepUp": "Biex tlesti l-ħolqien tal-kont tiegħek, uża '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Biex tlesti l-ħolqien tal-kont tiegħek, uża '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Biex tlesti l-ħolqien tal-kont tiegħek, uża '$t(login.signInWithGoogle)'.",
-    "invalidCode": "Dak il-kodiċi huwa żbaljat. Jekk jogħġbok erġa' pprova.",
+    "signupStepUpBack": "Biex tlesti l-ħolqien tal-kont tiegħek, mur lura u uża '$t(login.moreSignInOptions)'.",
+    "invalidCode": "Dak il-kodiċi huwa żbaljat jew skada. Erġa' pprova jew uża '$t(login.resendCode)'.",
     "codeInProgress": "Il-kodiċi tiegħek qed jiġi pproċessat. Stenna mument u erġa' pprova.",
     "tooManyAttempts": "Wisq tentattivi. Jekk jogħġbok itlob kodiċi ġdid.",
     "invalidToken": "Ma stajtx tidħol. Erġa' pprova.",
@@ -4100,6 +4110,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) jibgħat talba qasira ta' inferenza lil dan il-punt ta' aċċess permezz tal-protokoll u l-mudell magħżula. Il-fornitur jista' jitlob ħlas għaliha.",
       "connectionSucceeded": "Il-mudell lesta talba permezz ta' dan il-protokoll.",
       "connectionFailed": "Il-mudell ma setax ilesti talba. Iċċekkja l-URL bażi tal-API, il-protokoll, il-kredenzjali u l-ID tal-mudell.",
+      "requestTimedOut": "Il-punt ta' aċċess ma wieġebx fil-ħin. Iċċekkja l-URL bażi tal-API u l-konnessjoni tiegħek, imbagħad erġa' pprova.",
+      "requestUnauthorized": "Il-punt ta' aċċess irrifjuta l-kredenzjali. Iċċekkja ċ-ċavetta API u l-headers personalizzati, imbagħad erġa' pprova.",
+      "requestNotFound": "Il-punt ta' aċċess jew il-mudell ma nstabx. Iċċekkja l-URL bażi tal-API u l-ID tal-mudell.",
+      "requestRateLimited": "Il-punt ta' aċċess qed jillimita t-talbiet. Stenna ftit u erġa' pprova.",
+      "requestUnavailable": "Il-punt ta' aċċess mhux disponibbli bħalissa. Erġa' pprova fi ftit ħin.",
+      "requestUnreachable": "Il-punt ta' aċċess ma setax jintlaħaq. Iċċekkja l-URL bażi tal-API u l-konnessjoni tiegħek.",
+      "requestInvalidResponse": "Il-punt ta' aċċess wieġeb b'xi ħaġa li mhijiex fil-format mistenni. Iċċekkja li l-URL bażi tal-API u l-protokoll jaqblu mas-server, imbagħad erġa' pprova.",
+      "discoveryNoModels": "Il-punt ta' aċċess ma llista l-ebda mudell. Daħħal il-mudelli manwalment.",
+      "connectionIncomplete": "Il-mudell wieġeb iżda ma lestiex. Erġa' pprova, jew iċċekkja l-ID tal-mudell u l-protokoll.",
       "invalidInput": "Daħħal isem għas-servizz, intestaturi validi u mill-inqas mudell wieħed b'ID u isem uniċi. Il-limiti tal-unitajiet tat-test iridu jkunu numri sħaħ pożittivi.",
       "invalidUrl": "Daħħal URL bażi tal-API li juża HTTP jew HTTPS mingħajr kredenzjali, parametri ta' mistoqsija jew framment.",
       "publicHttp": "Punti ta' aċċess pubbliċi li jużaw HTTP mhumiex permessi. Uża HTTPS jew punt ta' aċċess lokali privat.",
@@ -4238,7 +4257,11 @@
     "reasoningEffort": {
       "modelFlag": "Dan il-mudell jappoġġa sforz ta' ħsieb"
     },
-    "creditsRequired": "M'hemmx biżżejjed krediti biex tibgħat dan il-messaġġ."
+    "creditsRequired": "M'hemmx biżżejjed krediti biex tibgħat dan il-messaġġ.",
+    "providerKeyRefused": "Il-fornitur irrifjuta l-kredenzjali. Iċċekkja ċ-ċavetta API tiegħu, imbagħad erġa' ibgħat.",
+    "providerModelMissing": "Dan il-backend m'għadux jipprovdi dan il-mudell. Agħżel ieħor.",
+    "providerRateLimited": "Il-fornitur qed jillimita t-talbiet. Stenna ftit u erġa' ibgħat.",
+    "providerUnavailable": "Il-fornitur mhux disponibbli bħalissa. Erġa' ibgħat fi ftit ħin."
   },
   "settingsTools": {
     "confirmTitle": "Tikkonferma din il-bidla?"
@@ -4631,6 +4654,7 @@
     "pickPackToBuyAgain": "Agħżel pakkett hawn fuq biex tibda xiri ġdid.",
     "purchasePending": "Il-ħanut għadu qed jipproċessa dan il-ħlas. Il-krediti tiegħek jaslu malli japprova t-tariffa.",
     "buyAgain": "Ixtri mill-ġdid",
+    "checkPurchase": "Iċċekkja x-xiri",
     "purchaseOwnedByAnotherAccount": "Il-krediti fuq dan l-Apple Account jappartjenu għal kont ieħor ta' Kilo. Idħol f'dak il-kont ta' Kilo biex tużahom.",
     "purchaseOwnedByAnotherAccountPlay": "Il-krediti fuq dan il-kont ta' Google Play jappartjenu għal kont ieħor ta' Kilo. Idħol f'dak il-kont ta' Kilo biex tużahom."
   },
@@ -4736,7 +4760,9 @@
     },
     "saveSheet": {
       "title": "Issejvja fil-lista",
-      "saved": "Issejvjat f'{{list}}"
+      "saved": "Issejvjat f'{{list}}",
+      "saveFailed": "Il-kompitu ma ġiex salvat. Iċċekkja l-konnessjoni tiegħek u erġa’ pprova.",
+      "saveRefused": "Il-kompitu ma ġiex salvat f'din il-lista. Agħżel lista oħra."
     }
   },
   "agentBriefing": {
@@ -4748,6 +4774,7 @@
     "empty": "L-ebda attività f'dan il-perjodu tal-briefing",
     "emptyHint": "Is-sessjonijiet tal-ikkowdjar tiegħek fil-cloud u CLI jidhru hawn meta briefing skedat ikollu attività.",
     "loadError": "Ma setgħux jitgħabbew il-briefings",
+    "estimateLoadError": "Ma setgħetx tiġi mgħobbija l-istima.",
     "view": "Aqra l-briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -5165,7 +5192,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Karatteristika tal-intrapriża",
-    "enterpriseOnly": "Din hija karatteristika għall-intrapriżi biss.",
+    "enterpriseOnly": "Il-fornituri u l-mudelli huma disponibbli fil-pjan Enterprise.",
     "readOnly": "Sidien u amministraturi tal-organizzazzjoni biss jistgħu jbiddlu dawn l-impostazzjonijiet.",
     "loadError": "Il-fornituri u l-mudelli ma setgħux jitgħabbew",
     "tabModels": "Mudelli",

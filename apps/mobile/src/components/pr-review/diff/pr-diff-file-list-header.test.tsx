@@ -13,6 +13,7 @@ vi.mock('expo-router', () => ({
 }));
 
 vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false, doLeftAndRightSwapInRTL: true },
   Pressable: 'Pressable',
   View: 'View',
 }));
@@ -184,13 +185,16 @@ describe('PrDiffFileListHeader container padding', () => {
   it('pads the summary row above and below the file list', () => {
     const renderer = mountHeader();
     const pressable = findNavigatorPressable(renderer.root);
-    const container = pressable.parent?.parent;
+    const row = pressable.parent;
+    const container = row?.parent;
 
     // The owner reported the row sitting flush against the tab bar above and
     // the first file path below; `py-4` gives 16pt on both edges while the
-    // `px-4` gutter, background and hairline are unchanged.
+    // `px-4` gutter, background and hairline are unchanged. The vertical
+    // padding sits on the row the entry touches in, so its slop is delivered.
+    expect(row?.props.className).toContain('py-4');
     expect(container?.props.className).toContain('px-4');
-    expect(container?.props.className).toContain('py-4');
+    expect(container?.props.className).not.toContain('py-4');
     expect(container?.props.className).toContain('bg-background');
     expect(container?.props.className).toContain('border-b');
   });

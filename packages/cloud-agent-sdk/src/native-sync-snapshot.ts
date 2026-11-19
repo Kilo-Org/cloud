@@ -195,14 +195,20 @@ const SNAPSHOT_READ_CONCURRENCY = 4;
 // retained base64 strings, so they run with a tighter window.
 const SNAPSHOT_ASSET_READ_CONCURRENCY = 2;
 
+// Base64 encodes each 3 bytes as 4 characters, so a multiple-of-3 chunk size
+// keeps every chunk self-contained: only the final chunk pads. The largest
+// such size under the 32 KiB 8-bit string step keeps each one bounded.
+const BASE64_CHUNK_BYTES = 0x8000 - (0x8000 % 3);
+
 /** Hand the buffer's base64 form to `sink` without holding full copies alive. */
 function viewBytesAsBase64(buffer: ArrayBuffer, sink: (base64: string) => void): void {
   const bytes = new Uint8Array(buffer);
-  const chunks: string[] = [];
-  for (let start = 0; start < bytes.length; start += 0x8000) {
-    chunks.push(String.fromCharCode(...bytes.subarray(start, start + 0x8000)));
+  const encoded: string[] = [];
+  for (let start = 0; start < bytes.length; start += BASE64_CHUNK_BYTES) {
+    const chunk = bytes.subarray(start, Math.min(start + BASE64_CHUNK_BYTES, bytes.length));
+    encoded.push(btoa(String.fromCharCode(...chunk)));
   }
-  sink(btoa(chunks.join('')));
+  sink(encoded.join(''));
 }
 
 /**

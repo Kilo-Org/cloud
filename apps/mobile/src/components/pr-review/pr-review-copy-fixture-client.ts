@@ -149,6 +149,35 @@ const providerMergeState: ProviderPrMergeState = {
   blockedReasons: [],
 };
 
+/**
+ * GitLab's capability list as the ROUTER answers it, which is not the shared
+ * constant: the server's MR list drops `request_changes` because the provider
+ * has no such review event (`GITLAB_MR_REVIEW_CAPABILITIES`,
+ * apps/web/src/lib/provider-review/gitlab-write.ts). The submit screen feeds
+ * this list straight into its chips, so a fixture on the shared constant would
+ * paint a control the real route never shows.
+ */
+const gitlabCapabilities: ProviderReviewCapabilities = {
+  ...GITLAB_REVIEW_CAPABILITIES,
+  reviewEvents: ['approve', 'comment'],
+};
+
+/**
+ * The GitHub overview a surface reads. The navigator prints fetch-to-completion
+ * progress as `loaded of counts.changedFiles` while paging the fake file list,
+ * so its answer advertises the page count; the overview surfaces keep the
+ * two-file PR their copy describes, or they would read "100 of 2".
+ */
+function githubOverview(surface: string | undefined) {
+  if (surface !== 'screen-file-navigator') {
+    return reviewOverviewFixture;
+  }
+  return {
+    ...reviewOverviewFixture,
+    counts: { ...reviewOverviewFixture.counts, changedFiles: fileCount },
+  };
+}
+
 function fixtureResponse(data: FixtureReadData): Response {
   // eslint-disable-next-line unicorn/prefer-response-static-json -- React Native's fetch polyfill has no static Response.json.
   return new Response(JSON.stringify({ result: { data } }), {
@@ -216,7 +245,7 @@ export function createFixtureClient(surface: string | undefined) {
             throw new Error(FIXTURE_WRITE_REFUSED);
           }
           if (url.includes('/githubPrReview.getPullRequest')) {
-            return fixtureResponse(reviewOverviewFixture);
+            return fixtureResponse(githubOverview(surface));
           }
           // The provider route shape's reads. The screens normalize these
           // through the seam, so the provider arm paints the same cards.
@@ -227,7 +256,7 @@ export function createFixtureClient(surface: string | undefined) {
             return fixtureResponse(providerMergeState);
           }
           if (url.includes('/providerReview.getCapabilities')) {
-            return fixtureResponse(GITLAB_REVIEW_CAPABILITIES);
+            return fixtureResponse(gitlabCapabilities);
           }
           if (url.includes('/providerReview.listFiles')) {
             return fixtureResponse(fixtureFilesPage(url, surface));

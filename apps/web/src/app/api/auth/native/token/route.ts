@@ -18,7 +18,7 @@ import {
   hosted_domain_specials,
   SIGNUP_STEP_UP_METHODS,
 } from '@kilocode/web-shared/lib/auth/constants';
-import { consumeSignInTicket } from '@/lib/auth/passkey';
+import { consumeSignInTicket, readSignInTicket } from '@/lib/auth/passkey';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import {
   createOrUpdateUser,
@@ -321,10 +321,11 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
   let autoLinkToExistingUser: boolean;
 
   if (data.provider === 'passkey') {
-    // The ticket is single-use and short-lived, and was minted only after a
-    // WebAuthn assertion verified against a server-stored challenge, so
-    // redeeming it is the identity proof. A replay consumes no row.
-    const ticket = await consumeSignInTicket(data.ticket);
+    // The ticket is the identity proof: it was minted only after a WebAuthn
+    // assertion verified against a server-stored challenge. It is read here and
+    // redeemed only once this request is going to succeed, so a refusal or a
+    // provider fault below leaves the client's only proof usable.
+    const ticket = await readSignInTicket(data.ticket);
     if (!ticket) {
       return NextResponse.json({ error: 'INVALID_TICKET' }, { status: 401 });
     }
@@ -363,6 +364,13 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
           user,
         });
         sessionId = credentials.sessionId;
+
+        const redeemed = await consumeSignInTicket(data.ticket);
+        if (!redeemed) {
+          await revokeAbandonedSession(credentials.sessionId);
+          return NextResponse.json({ error: 'INVALID_TICKET' }, { status: 401 });
+        }
+
         return NextResponse.json(
           {
             token: credentials.token,
@@ -379,6 +387,12 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         userId: user.id,
         userAgent: request.headers.get('user-agent') ?? undefined,
       });
+
+      const redeemed = await consumeSignInTicket(data.ticket);
+      if (!redeemed) {
+        await revokeAbandonedSession(sessionId);
+        return NextResponse.json({ error: 'INVALID_TICKET' }, { status: 401 });
+      }
 
       return legacyTokenResponse({
         user,

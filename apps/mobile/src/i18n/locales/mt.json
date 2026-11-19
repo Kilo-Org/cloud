@@ -1092,7 +1092,13 @@
     "tabs": {
       "overview": "Ħarsa ġenerali",
       "files": "Fajls",
-      "discussion": "Diskussjoni"
+      "discussion": "Diskussjoni",
+      "discussionAccessibility_one": "{{title}}: kumment wieħed",
+      "discussionAccessibility": "{{title}}: {{displayCount}} kummenti",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} kummenti",
+      "discussionAccessibility_two": "{{title}}: {{displayCount}} kummenti",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} kummenti",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}}-il kumment"
     },
     "fileStatus": {
       "modified": "Modifikat",

@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "کورتەی گشتی",
       "files": "فایلەکان",
-      "discussion": "گفتوگۆ"
+      "discussion": "گفتوگۆ",
+      "discussionAccessibility_one": "{{title}}: ١ بۆچوون",
+      "discussionAccessibility": "{{title}}: {{displayCount}} بۆچوون",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} بۆچوون"
     },
     "fileStatus": {
       "modified": "گۆڕدراو",

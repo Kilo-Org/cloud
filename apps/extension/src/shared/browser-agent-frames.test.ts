@@ -287,11 +287,79 @@ describe('scoped snapshot', () => {
     });
 
     expect(snapshot.lines).toStrictEqual([
-      { depth: 1, name: 'Submit', ref: 'e2', role: 'button' },
-      withheldFrameLine('https://pay.example.com', 1, 'e10'),
+      { depth: 0, name: 'Submit', ref: 'e2', role: 'button' },
+      withheldFrameLine('https://pay.example.com', 0, 'e10'),
     ]);
     // The owner's ref is registered, so a targeted snapshot can resolve it.
     expect(snapshot.refs).toContainEqual({ backendNodeId: 10, ref: 'e10' });
+  });
+
+  it('nests lines, spliced frames and withheld frames only under printed lines', () => {
+    const topNodes = [
+      {
+        childIds: ['2'],
+        name: { value: 'Dashboard' },
+        nodeId: '1',
+        role: { value: 'RootWebArea' },
+      },
+      { childIds: ['3', '4', '6'], nodeId: '2', role: { value: 'generic' } },
+      { backendDOMNodeId: 3, name: { value: 'Submit' }, nodeId: '3', role: { value: 'button' } },
+      { childIds: ['5'], ignored: true, nodeId: '4', role: { value: 'none' } },
+      { childIds: ['7'], nodeId: '5', role: { value: 'paragraph' } },
+      { childIds: ['8', '9'], nodeId: '6', role: { value: 'generic' } },
+      { name: { value: 'idle' }, nodeId: '7', role: { value: 'StaticText' } },
+      { backendDOMNodeId: 10, nodeId: '8', role: { value: 'Iframe' } },
+      { backendDOMNodeId: 20, nodeId: '9', role: { value: 'Iframe' } },
+    ];
+    const widgetTree = [
+      { childIds: ['2'], name: { value: 'Widget' }, nodeId: '1', role: { value: 'RootWebArea' } },
+      { childIds: ['3'], nodeId: '2', role: { value: 'generic' } },
+      { backendDOMNodeId: 31, name: { value: 'Pay' }, nodeId: '3', role: { value: 'button' } },
+    ];
+
+    const snapshot = buildScopedSnapshot({
+      ownerFrameByBackendNodeId: new Map([
+        [10, 'f1'],
+        [20, 'f2'],
+      ]),
+      readableTrees: new Map([['f1', widgetTree]]),
+      topNodes,
+      withheld: new Map([['f2', 'https://ads.example.com']]),
+    });
+
+    expect(snapshot.lines).toStrictEqual([
+      { depth: 0, name: 'Dashboard', role: 'RootWebArea' },
+      { depth: 1, name: 'Submit', ref: 'e3', role: 'button' },
+      { depth: 1, name: 'idle', role: '', textLeaf: true },
+      { depth: 1, name: 'Widget', role: 'RootWebArea' },
+      { depth: 2, name: 'Pay', ref: 'e31', role: 'button' },
+      withheldFrameLine('https://ads.example.com', 1, 'e20'),
+    ]);
+  });
+
+  it('counts only printed levels against depth', () => {
+    const snapshot = buildScopedSnapshot({
+      depth: 1,
+      ownerFrameByBackendNodeId: new Map(),
+      readableTrees: new Map(),
+      topNodes: [
+        {
+          childIds: ['2'],
+          name: { value: 'Dashboard' },
+          nodeId: '1',
+          role: { value: 'RootWebArea' },
+        },
+        { childIds: ['3'], nodeId: '2', role: { value: 'generic' } },
+        { childIds: ['4'], name: { value: 'Help' }, nodeId: '3', role: { value: 'navigation' } },
+        { backendDOMNodeId: 4, name: { value: 'FAQ' }, nodeId: '4', role: { value: 'link' } },
+      ],
+      withheld: new Map(),
+    });
+
+    expect(snapshot.lines).toStrictEqual([
+      { depth: 0, name: 'Dashboard', role: 'RootWebArea' },
+      { depth: 1, name: 'Help', role: 'navigation' },
+    ]);
   });
 });
 

@@ -70,6 +70,7 @@ export const discussionState = hoisted.discussionState;
 
 vi.mock('react-native', () => ({
   View: 'View',
+  I18nManager: { isRTL: false, doLeftAndRightSwapInRTL: true },
   Platform: { OS: 'ios' },
 }));
 // The tab renders `{dialog}` from `useConfirmDialog`; stub the hook so the

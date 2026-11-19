@@ -7,7 +7,6 @@ import {
   DEVICE_AUTH_CODE_TTL_SECONDS,
   DeviceAuthHttpError,
   cancelDeviceAuthRequest,
-  clearStoredSession,
   clearStoredAuth,
   createDeviceAuthRequest,
   getKiloApiBaseUrl,
@@ -42,22 +41,6 @@ const createStorage = (initialValue?: unknown): AuthStorageArea & { value: unkno
     },
     get value() {
       return storedValue;
-    },
-  };
-};
-
-const createSessionStorage = (): {
-  readonly clearCalls: string[];
-  readonly storage: Parameters<typeof clearStoredSession>[0];
-} => {
-  const clearCalls: string[] = [];
-
-  return {
-    clearCalls,
-    storage: {
-      clear: base => {
-        clearCalls.push(base);
-      },
     },
   };
 };
@@ -123,14 +106,6 @@ describe('extension auth storage', () => {
 
     await clearStoredAuth(storage);
     expect(storage.value).toBeUndefined();
-  });
-
-  it('clears all local extension storage for explicit logout', async () => {
-    const { clearCalls, storage } = createSessionStorage();
-
-    await clearStoredSession(storage);
-
-    expect(clearCalls).toStrictEqual(['local']);
   });
 });
 

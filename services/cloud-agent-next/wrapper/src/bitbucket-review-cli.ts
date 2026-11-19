@@ -1075,6 +1075,10 @@ function isCodeReviewSummaryBody(value: string): boolean {
  * access token. A comment whose author is not that account is not this CLI's
  * summary, so it is neither counted as the existing summary nor accepted as an
  * update target.
+ *
+ * The check keys on the credential type the review runs as. Comparing the exact
+ * account uuid would need that uuid stored per integration, because no read-only
+ * endpoint returns it, so the check stays on the credential type alone.
  */
 function isExistingCodeReviewSummaryComment(value: unknown): boolean {
   if (

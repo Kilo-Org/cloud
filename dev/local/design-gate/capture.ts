@@ -952,6 +952,40 @@ function warningFinding(
   };
 }
 
+const RESET_ATTEMPTS = 2;
+const RESET_CONFIRM_MS = 5_000;
+const RESET_POLL_MS = 250;
+
+/**
+ * Opens a target's reset link (`kiloapp:///dev/force-state/clear`) and waits for
+ * the app to report that its own `Linking.openURL` delivered it; a send that
+ * fails or is never confirmed is sent once more. Returns why the reset was not
+ * confirmed, or undefined. Never throws: cleanup must not fail the capture.
+ */
+export async function openResetLink(
+  ctx: CaptureContext,
+  link: string
+): Promise<string | undefined> {
+  const delivered = `openLink ${link}: opened`;
+  let last = 'not sent';
+  for (let attempt = 1; attempt <= RESET_ATTEMPTS; attempt += 1) {
+    try {
+      await ctx.probe.openLink(link);
+      const deadline = ctx.clock.now() + RESET_CONFIRM_MS;
+      for (;;) {
+        last = await ctx.probe.lastOutcome();
+        if (last === delivered) return undefined;
+        if (!last.endsWith(': pending') || ctx.clock.now() >= deadline) break;
+        await ctx.clock.sleep(RESET_POLL_MS);
+      }
+    } catch (error) {
+      last = String(error);
+    }
+    ctx.log(`design-gate: reset ${link} not confirmed (attempt ${attempt}): ${last}`);
+  }
+  return last;
+}
+
 export async function runMatrix(
   ctx: CaptureContext,
   cells: readonly CellConfig[],
@@ -1040,7 +1074,14 @@ export async function runMatrix(
       if (cellLanguage === undefined) continue;
       await ctx.clock.sleep(CONFIG_SETTLE_MS);
       const seen = new Map<string, string>();
+      // A forced state that could not be cleared would leak into every later
+      // target of this cell, so those targets are skipped, not measured.
+      let leakedState: string | undefined;
       for (const [index, target] of targets.entries()) {
+        if (leakedState !== undefined) {
+          outcome.skipped.push({ cell: config.id, target: target.id, reason: leakedState });
+          continue;
+        }
         try {
           const targetLanguage = await ensureLanguage(ctx, language);
           const languageReady = targetLanguage.matched;
@@ -1048,15 +1089,19 @@ export async function runMatrix(
           // target itself caused (the previous target switched the app language)
           // leaves this target cold whatever its index.
           const warm = targetLanguage.reloaded || (cellLanguage.reloaded && index === 0);
-          // The reset runs even when the capture fails, so a forced state never
-          // leaks into the next target.
+          // The reset runs whether the capture succeeds or fails, and it never
+          // throws, so neither outcome is replaced by a reset failure.
           const { sampled, screen, unopened, image } = await captureScreen(
             ctx,
             config.id,
             target,
             warm
           ).finally(async () => {
-            if (target.after !== undefined) await ctx.probe.openLink(target.after);
+            if (target.after === undefined) return;
+            const failure = await openResetLink(ctx, target.after);
+            if (failure === undefined) return;
+            leakedState = `${target.id} left a forced state: ${failure}`;
+            ctx.log(`design-gate: ${leakedState}; the cell's later targets are skipped`);
           });
           const { dump } = sampled;
           run.env ??= dump.env;

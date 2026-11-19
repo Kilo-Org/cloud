@@ -11,6 +11,7 @@ import {
   joinPasses,
   linkPath,
   loadingPlaceholder,
+  openResetLink,
   runMatrix,
   sampleInterval,
   sampleUntilSettled,
@@ -1461,4 +1462,33 @@ test('a screen that keeps changing keeps the bracket a mismatch and says so', as
   assert.equal(captureEvidence(ctx, outcome).status, 'mismatch');
   assert.ok(logs.some(line => line.includes('screen still changing before the screenshot')));
   assert.ok(outcome.findings.some(finding => finding.rule === 'unsettled'));
+});
+
+const CLEAR = 'kiloapp:///dev/force-state/clear';
+
+test('openResetLink resends a reset whose send failed and confirms its delivery', async () => {
+  const sends: string[] = [];
+  let outcome = 'none';
+  const probe: ProbeClient = {
+    ...fakeProbe(probeState()),
+    openLink: async url => {
+      sends.push(url);
+      if (sends.length === 1) throw new InfraError('CDP Runtime.evaluate timed out');
+      outcome = `openLink ${url}: opened`;
+    },
+    lastOutcome: async () => outcome,
+  };
+  const ctx = context(fakeDevice([], probeState()), probe);
+  assert.equal(await openResetLink(ctx, CLEAR), undefined);
+  assert.deepEqual(sends, [CLEAR, CLEAR]);
+});
+
+test('openResetLink reports a reset the app never confirms instead of throwing', async () => {
+  const probe: ProbeClient = {
+    ...fakeProbe(probeState()),
+    openLink: async () => undefined,
+    lastOutcome: async () => `openLink ${CLEAR}: pending`,
+  };
+  const ctx = context(fakeDevice([], probeState()), probe);
+  assert.equal(await openResetLink(ctx, CLEAR), `openLink ${CLEAR}: pending`);
 });

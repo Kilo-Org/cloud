@@ -217,6 +217,10 @@ export function ModelSelector({
       : modelLabel;
   const allUnavailable =
     pickerOptions.length > 0 && pickerOptions.every(option => option.unavailable);
+  // An empty catalog has nothing to choose, so the chip stays disabled instead
+  // of opening a sheet with no rows; only an every-unavailable catalog keeps
+  // its press so the picker can explain each model.
+  const chipDisabled = disabled || pickerOptions.length === 0;
   const accessibilityLabel = [
     spokenModel,
     allUnavailable ? t('agentChat.modelSelector.unavailable') : undefined,
@@ -231,7 +235,7 @@ export function ModelSelector({
   const showVariantBadge = variantLabel !== '' && (hasVariants || Boolean(lockLabel));
 
   function handlePress() {
-    if (disabled) {
+    if (chipDisabled) {
       return;
     }
     onOpen?.();
@@ -248,13 +252,13 @@ export function ModelSelector({
   return (
     <Pressable
       onPress={handlePress}
-      disabled={disabled}
+      disabled={chipDisabled}
       // The chip's own 27.81pt frame is the visual; the vertical slop carries
       // its touch region past the 44pt design target without growing the row.
       hitSlop={CHIP_HIT_SLOP}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled: chipDisabled }}
       className="min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70"
     >
       <View className="min-w-0 shrink flex-row items-center gap-1.5">
@@ -284,7 +288,7 @@ export function ModelSelector({
       </View>
       {/* The label stays at full theme contrast; a disabled chip dims only its
        * chevron so the pill text keeps the WCAG AA 4.5:1 ratio (D2). */}
-      <View className={cn(disabled && 'opacity-50')}>
+      <View className={cn(chipDisabled && 'opacity-50')}>
         <ChevronDown size={14} color={colors.mutedForeground} />
       </View>
     </Pressable>

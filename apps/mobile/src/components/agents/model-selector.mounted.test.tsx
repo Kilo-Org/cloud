@@ -564,6 +564,22 @@ describe('ModelSelector chip availability disclosure', () => {
     expect(routerPush).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps a chip with no options disabled, so it never opens a blank picker', () => {
+    routerPush.mockClear();
+    const renderer = renderSelector({ value: 'missing-model', options: [] });
+    const pill = chip(renderer);
+
+    expect(pill.props.disabled).toBe(true);
+    expect(pill.props.accessibilityState).toEqual({ disabled: true });
+
+    TestRenderer.act(() => {
+      const press = pill.props.onPress as (() => void) | undefined;
+      press?.();
+    });
+
+    expect(routerPush).not.toHaveBeenCalled();
+  });
+
   it('reads a locked chip as one sentence with the lock reason', () => {
     const option = cliCatalogOption();
     const renderer = renderSelector({

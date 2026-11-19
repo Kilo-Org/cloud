@@ -31,6 +31,7 @@ export const modelsRouter = createTRPCRouter({
       // the providers snapshot (the mobile app) can still name every provider.
       inference_provider_ids: model.inference_provider_ids ?? [],
       ...(model.alias_target ? { alias_target: model.alias_target } : {}),
+      ...(model.retires_on ? { retires_on: model.retires_on } : {}),
     }));
   }),
 

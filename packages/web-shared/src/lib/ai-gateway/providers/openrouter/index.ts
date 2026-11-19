@@ -56,7 +56,11 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { convertCustomLlmToCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
 import { isCustomLlmDeniedInCountry } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
-import { addMonths } from 'date-fns';
+import {
+  isExpensiveModel,
+  isNewModel,
+  retirementDate,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 import {
   getProviderDisplayPricing,
   getVercelModelForPricing,
@@ -130,29 +134,19 @@ function buildAutoModels(): OpenRouterModel[] {
   return AUTO_MODELS.map(buildAutoModelCatalogEntry);
 }
 
+/**
+ * The name every consumer renders, without any locale-specific copy: the retirement note travels
+ * as `retires_on` so each client words it in its own language. The English note the web and the
+ * extension show is `modelNameWithRetirement` in `./retirement`.
+ */
 export function formatName(model: OpenRouterModel, preferredIndex: number) {
   const name =
     model.id.startsWith('openrouter/') && !model.name.includes('OpenRouter')
       ? 'OpenRouter ' + model.name
       : model.name;
-  const promptPrice = Number.parseFloat(model.pricing.prompt);
-  const isExpensive = Number.isFinite(promptPrice) && promptPrice >= 0.00001; // Opus 4.8 Fast price
-  if (isExpensive) return name + ' ($$$$)';
+  if (isExpensiveModel(model)) return name + ' ($$$$)';
   if (name.endsWith(')')) return name;
-  const ageDays = (Date.now() / 1_000 - model.created) / (24 * 3600);
-  const isNew = preferredIndex >= 0 && ageDays >= 0 && ageDays < 7;
-  if (isNew) return name + ' (new)';
-  if (model.expiration_date) {
-    const expirationDate = new Date(model.expiration_date);
-    if (expirationDate <= addMonths(new Date(), 1)) {
-      const suffix = expirationDate.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        timeZone: 'UTC',
-      });
-      return name + ' (retires ' + suffix + ')';
-    }
-  }
+  if (isNewModel(model, preferredIndex)) return name + ' (new)';
   return name;
 }
 
@@ -355,6 +349,7 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
         ...model,
         inference_provider_ids: inferenceProviderIds,
         name: formatName(model, preferredIndex),
+        retires_on: retirementDate(model, preferredIndex),
         description,
         preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
         isFree: model.isFree ?? isFree,

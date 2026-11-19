@@ -417,6 +417,11 @@ const OpenRouterModelSchema = z.object({
   per_request_limits: z.record(z.string(), z.unknown()).nullable().optional(),
   supported_parameters: z.array(z.string()).optional(),
   expiration_date: z.string().nullable().optional(), // format: yyyy-MM-dd
+  /**
+   * The date this entry retires, as the note date (`yyyy-MM-dd`), set only while the note applies.
+   * The note words it in the reader's own language, so the name carries no English copy.
+   */
+  retires_on: z.string().optional(),
 });
 
 export const OpenRouterModelsResponseSchema = z.object({

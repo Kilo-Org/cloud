@@ -1074,9 +1074,9 @@
       "mergeRequestUnavailable": "A módosítási kérelem nem érhető el",
       "unavailableDescription": "Lehet, hogy megszakadt a kapcsolat, vagy az elem törölve lett, vagy nem érhető el.",
       "accessDeniedMergeRequest": "Nincs jogosultságod a módosítási kérelem megtekintéséhez.",
-      "couldNotLoadMergeRequest": "Nem sikerült betölteni a módosítási kérést.",
-      "discussionAccessDenied": "Nincs jogosultságod a módosítási kéréshez tartozó beszélgetés megtekintéséhez.",
-      "discussionUnavailableMessage": "Lehet, hogy megszakadt a kapcsolat, vagy a módosítási kérést eltávolították.",
+      "couldNotLoadMergeRequest": "Nem sikerült betölteni a módosítási kérelmet.",
+      "discussionAccessDenied": "Nincs jogosultságod a módosítási kérelemhez tartozó beszélgetés megtekintéséhez.",
+      "discussionUnavailableMessage": "Lehet, hogy megszakadt a kapcsolat, vagy a módosítási kérelmet eltávolították.",
       "noDiscussionDescription": "Ehhez a módosítási kérelemhez nem tartozik kódellenőrzési beszélgetés vagy hozzászólás.",
       "noFilesChangedDescription": "Ez a módosítási kérelem nem tartalmaz fájlmódosításokat."
     }

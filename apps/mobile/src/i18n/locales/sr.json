@@ -3894,7 +3894,7 @@
     "mcpOAuth": {
       "authMethod": "Autentifikacija",
       "authNone": "Bez prijave",
-      "authBearer": "Bearer žeton",
+      "authBearer": "Bearer token",
       "authOAuth": "OAuth prijava",
       "fieldToken": "Token",
       "oauthHint": "Nakon čuvanja, dodirni $t(modelChat.mcpOAuth.signIn) na serveru da se prijaviš putem pregledača.",

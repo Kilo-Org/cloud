@@ -294,10 +294,11 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // The consent screen's analytics sentence ends in the processor's own
   // product name and domain, so every catalog spells it the same way.
   'consent.gatewayWho',
-  // Duration unit symbols and the per-hour rate format: `h` and `min` are the
-  // unit symbols the reader's clock shows, and `{{rate}}/h` is a value
-  // already formatted in the reader's locale. A catalog that localised a
-  // symbol would diverge from the number formats around it.
+  // Duration unit symbols and the per-hour rate format: a short unit a
+  // catalog writes in its own language (`sa`, `saac`, `ชม.`) is that
+  // catalog's decision and reads on the screen this key renders, so the
+  // audit does not judge whether the symbol matches English; `{{rate}}/h` is
+  // a value already formatted in the reader's locale.
   'common.durationHourShort',
   'common.durationMinuteShort',
   'cloudAgent.compute.perHour',
@@ -504,6 +505,10 @@ const MOBILE_ENGLISH_COPY_EXCEPTIONS = {
       "Hungarian borrowed technical term 'token': the established loanword here (sibling contextUsage tokens/tokens_other/tokensWithPercentage and reviewDetail.tokens all keep 'token')",
   },
   id: {
+    'Edit server: {{name}}':
+      'The accessibility twin of the same row label, so it keeps the borrowed "Edit server" wording the block uses everywhere',
+    'Edit server':
+      'Bahasa Indonesia borrows the verb-edit + server noun as-is: the whole mcp block reads "Tambah server MCP", "Hapus server", "URL server", and KBBI records "server" as the standard loan',
     commit:
       "Bahasa Indonesia keeps the Git noun at every count ('komit' is not this catalog's wording; overview commit/commit_other and toolRun labels read 'commit')",
     token:
@@ -619,6 +624,8 @@ const MOBILE_ENGLISH_COPY_EXCEPTIONS = {
       "Albanian borrows the noun unchanged: family is 'token' (one) vs 'tokene' (other); the counted singular is identical to English",
   },
   sr: {
+    'Bearer token':
+      'The HTTP scheme name "Bearer" plus the catalog\'s own "Token" noun (fieldToken "Token", tokens_other "tokeni"), so the auth row reads the scheme the way siblings spell it',
     '{{count}} agent':
       'Serbian "agent" is the same loanword (catalog: "Agent"); {{count}} agent is correct copy',
     token:

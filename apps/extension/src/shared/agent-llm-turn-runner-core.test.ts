@@ -1340,6 +1340,15 @@ describe('continue nudge', () => {
       "**I'll** save that as a workflow.",
       "- I'll search the page next.",
       '1. First, I will open the page.',
+      "Sure thing: I'll extract the prices.",
+      "All right, I'll open the page.",
+      "Got it — I'll snapshot the page now.",
+      "Sounds good, I'll create the workflow.",
+      "Of course, let me check the page first.",
+      'No problem, I am going to read the page.',
+      'Will do: I will create the workflow.',
+      "Now, I'll create the workflow now.",
+      "Next, I'll search the page.",
     ];
     const callsPerShape: number[] = [];
 
@@ -1378,7 +1387,49 @@ describe('continue nudge', () => {
     }
 
     // A nudged turn bills one extra request, so three calls means the decoration did not hide the announcement.
-    expect(callsPerShape).toStrictEqual([3, 3, 3, 3]);
+    expect(callsPerShape).toStrictEqual(shapes.map(() => 3));
+  });
+
+  it('does not nudge a settled answer that merely opens with an opener word', async () => {
+    const settled = [
+      'Sure thing, the page is already open and idle.',
+      'All right, the page is idle now.',
+      'Got it - the results are already visible.',
+      'No problem, the page shows the submitted status.',
+      'Now the page shows the submitted status.',
+      'Next, the results are already visible and complete.',
+      'The tab stays with another Kilo session. Please stop that session or choose another tab, and I will read the page.',
+    ];
+    const callsPerShape: number[] = [];
+
+    for (const shape of settled) {
+      let calls = 0;
+      const fetch: FetchLike = () => {
+        calls += 1;
+        if (calls === 1) {
+          return Promise.resolve(
+            streamResponse([
+              'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+              'data: [DONE]\n\n',
+            ])
+          );
+        }
+
+        return Promise.resolve(
+          streamResponse([
+            `data: {"choices":[{"delta":{"content":${JSON.stringify(shape)}},"finish_reason":"stop"}]}\n\n`,
+            'data: [DONE]\n\n',
+          ])
+        );
+      };
+
+      // eslint-disable-next-line no-await-in-loop -- one turn per shape, in order, so the same fixture cannot leak state.
+      await runLlmTurn(nudgeOptions(fetch, []));
+      callsPerShape.push(calls);
+    }
+
+    // Two calls means the tool round plus the settled answer, with no nudge billed on top.
+    expect(callsPerShape).toStrictEqual(settled.map(() => 2));
   });
 
   it('does not nudge a completing sign-off that offers to keep helping', async () => {

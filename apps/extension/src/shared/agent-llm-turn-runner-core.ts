@@ -141,8 +141,17 @@ const ANNOUNCEMENT_RE =
 // A model decorates its announcement with a bullet, Markdown emphasis, quotes, or a short opener ("Sure — I'll create the workflow now."). Those are the same announcements, so the anchor runs after this chrome.
 const ANNOUNCEMENT_CHROME_RE = /^[\s"'`>*_#\u2018\u2019\u201C\u201D\u2013\u2014:,-]+/u;
 const ANNOUNCEMENT_NUMBER_RE = /^\d+[.)]\s*/u;
+/*
+ * Short conversational lead-ins a model opens an announcement with. The list is bounded on
+ * purpose: every entry is a whole interjection or acknowledgement, matched at a word
+ * boundary, and a longer entry precedes the shorter one it starts with ("all right" before
+ * "right", "sure thing" before "sure"). A generic "strip whatever precedes the first verb"
+ * rule is exactly what the sentence anchor exists to prevent — it would eat the request for
+ * the user that makes an answer settled ("Please stop that session or choose another tab,
+ * and I'll read the page."), and a new opener is a one-line addition when one shows up.
+ */
 const ANNOUNCEMENT_OPENER_RE =
-  /^(?:sure|okay|ok|alright|right|great|perfect|got it|yes|absolutely|first)\b[^\p{L}\p{N}]*/iu;
+  /^(?:all right|alright|sure thing|sure|okay|ok|right|great|perfect|got it|sounds good|of course|no problem|will do|yes|absolutely|first|now|next)\b[\s,:;\u2013\u2014-]*/iu;
 
 const stripAnnouncementChrome = (sentence: string): string =>
   sentence

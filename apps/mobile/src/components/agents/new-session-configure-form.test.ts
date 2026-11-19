@@ -506,7 +506,7 @@ describe('NewSessionConfigureForm', () => {
         isRemoteTargetSelected: false,
         isSubmitting: false,
         model: 'claude-opus-4-7',
-        isProfileLoading: false,
+        profileGate: { kind: 'ready' },
       },
     });
     expect(reason).toBe('attachment-uploading');

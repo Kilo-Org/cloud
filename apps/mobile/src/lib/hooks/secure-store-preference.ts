@@ -60,9 +60,17 @@ export function createSecureStorePreference<T>(options: {
   // A set() or clear() before the initial load resolves must win over the
   // disk value.
   let dirty = false;
-  // A clear() before the initial load resolves must still win over the disk
-  // value even when mergeOnLoad is set.
+  // Whether the newest change was a clear() rather than a set(). A clear with
+  // no choice after it must not merge the disk value back in even when
+  // mergeOnLoad is set.
   let cleared = false;
+  /**
+   * The delete the latest clear() queued, and whether it landed. A read that
+   * starts after a clear waits for this: until it lands the disk still holds
+   * the snapshot the clear removed, and a read of that snapshot would bring the
+   * cleared value back into memory and back onto disk.
+   */
+  let clearDeletion: Promise<boolean> | undefined = undefined;
   let loadStarted = false;
   /**
    * Bumped by clear(), and by the `mergeOnLoad` reconcile that repaints the
@@ -192,8 +200,23 @@ export function createSecureStorePreference<T>(options: {
   };
 
   const load = async () => {
+    // A clear() that runs after this read starts must win over the bytes it
+    // returns, so the read remembers the epoch it began under.
+    const loadEpoch = clearEpoch;
+    const deletion = clearDeletion;
     try {
+      if (deletion && !(await deletion)) {
+        // The delete a clear() queued never landed, so the disk still holds the
+        // snapshot that clear removed. The clear wins: drop it.
+        return;
+      }
       const raw = await readStoredValueWithRetry(key);
+      if (clearEpoch !== loadEpoch) {
+        // A clear() ran while this read was out. Its snapshot belongs to the
+        // state that clear reset, so neither branch below may apply it, even
+        // when a set() has re-opened the merge path since.
+        return;
+      }
       if (!dirty) {
         value = parse(raw);
       } else if (mergeOnLoad && !cleared) {
@@ -225,11 +248,18 @@ export function createSecureStorePreference<T>(options: {
     }
   };
 
-  const remove = async () => {
+  /**
+   * Deletes the stored value and reports whether the delete landed, so a read
+   * that starts after a clear() knows whether the disk can still hold the
+   * snapshot the clear removed.
+   */
+  const remove = async (): Promise<boolean> => {
     try {
       await deleteAccountMetadata(key);
+      return true;
     } catch {
       // Best effort; the in-memory value is already reset.
+      return false;
     }
   };
 
@@ -366,7 +396,12 @@ export function createSecureStorePreference<T>(options: {
       // mergeOnLoad set.
       cleared = true;
       emit();
-      void remove();
+      // Recorded before clear() returns, so a read that starts right after it
+      // waits for the delete instead of reading the snapshot this clear
+      // removed. remove() never rejects, so the recorded promise is safe to
+      // hold.
+      clearDeletion = remove();
+      void clearDeletion;
       releaseDrainWaiters();
     },
   };

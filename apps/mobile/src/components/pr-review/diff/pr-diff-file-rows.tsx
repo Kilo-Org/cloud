@@ -1,12 +1,11 @@
 // File-level row components for the PR diff FlashList.
 
 import { selectionHaptic } from '@/lib/haptics';
-import { ChevronDown, Eye, EyeOff, File, Link2 } from '@/components/ui/icons';
+import { ChevronDown, ChevronUp, Eye, EyeOff, File, Link2 } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { fileStatusIcon, fileStatusLabel } from '@/components/pr-review/diff/pr-diff-file-status';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Text } from '@/components/ui/text';
 import { selectableRowA11y } from '@/lib/a11y/selectable-row';
 import { isolateLtrBidiText } from '@/lib/bidi';
@@ -22,10 +21,14 @@ function ExpandChevron({ hasDiff, expanded }: { hasDiff: boolean; expanded: bool
   if (!hasDiff) {
     return <View className="h-3 w-3" />;
   }
-  if (expanded) {
-    return <ChevronDown size={18} color={colors.mutedForeground} />;
-  }
-  return <DirectionalChevronRight size={18} color={colors.mutedForeground} />;
+  // A disclosure caret, not a navigation chevron: it names the state of the
+  // patch under the row, so it stays on the vertical pair every other
+  // disclosure row uses instead of the row-trailing `RowChevron`.
+  return expanded ? (
+    <ChevronUp size={18} color={colors.mutedForeground} />
+  ) : (
+    <ChevronDown size={18} color={colors.mutedForeground} />
+  );
 }
 
 /** Fixed-size mark-viewed icon toggle — no path-text reflow on toggle (D9/AC6). */
@@ -95,7 +98,7 @@ export function FileHeaderRow({
   const pathLine = isRename ? `${file.previousPath} → ${file.path}` : file.path;
 
   return (
-    <View className="border-b border-hair-soft bg-card px-4 py-3">
+    <View className="border-b-[0.5px] border-hair-soft bg-card px-4 py-3">
       <View className="flex-row items-center gap-2">
         <Pressable
           onPress={hasDiff ? onToggleExpand : undefined}
@@ -160,7 +163,7 @@ export function PatchMissingRow({
   const colors = useThemeColors();
   const { t } = useTranslation();
   return (
-    <View className="border-b border-hair-soft bg-secondary px-4 py-3">
+    <View className="border-b-[0.5px] border-hair-soft bg-secondary px-4 py-3">
       <View className="flex-row items-center gap-2">
         <File size={14} color={colors.mutedForeground} />
         <View className="flex-1">

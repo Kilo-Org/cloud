@@ -12,6 +12,7 @@ import {
 import type { ProbeClient, ProbeSample } from './cdp';
 import type { ElementRef, Finding, RuleId } from './findings';
 import { enterTouchMode } from './input-mode';
+import { checkDevLogOverlay } from './logbox';
 import { envMismatches, isRtlLanguage, mirrorReference, type CellConfig } from './matrix';
 import type { Rgba } from './pixels';
 import { checkMirror, checkScreen, checkShift, normalize } from './rules';
@@ -54,7 +55,12 @@ export class InfraError extends Error {
   override name = 'InfraError';
 }
 
-export type Target = Readonly<{ id: string; link: string }>;
+/**
+ * `after` is a link opened once the target is captured: the reset of a state
+ * the target link forced (`kiloapp:///dev/force-state/clear`), so the next
+ * target does not inherit it.
+ */
+export type Target = Readonly<{ id: string; link: string; after?: string }>;
 
 export type Screen = {
   target: string;
@@ -287,11 +293,28 @@ export async function waitForApp(
   const deadline = clock.now() + timeoutMs;
   let last: ProbeDump | undefined;
   let lastError: unknown;
+  let logBoxDisabled = false;
   for (;;) {
     try {
       // A probe that has just lost its page waits for it; this wait's own
       // budget caps that, so an absent app still fails within the declared time.
       if (await probe.ready(Math.max(0, deadline - clock.now()))) {
+        // Every readiness wait is a fresh app runtime after a reload and the same
+        // runtime after a cell's Activity recreation. Disabling LogBox's UI is
+        // idempotent per runtime, so doing it here covers both without the caller
+        // tracking reloads. A runtime that cannot disable it leaves the app
+        // running; the raw dump still reports any toast that then paints. The
+        // wait's own budget caps this probe call too, so a target that stops
+        // answering still fails within the declared time.
+        const disable = probe.disableLogBox;
+        if (!logBoxDisabled && disable !== undefined) {
+          try {
+            await disable(Math.max(0, deadline - clock.now()));
+            logBoxDisabled = true;
+          } catch {
+            // Retried on the next pass, inside this wait's own budget.
+          }
+        }
         last = await probe.dump(Math.max(0, deadline - clock.now()));
         if (accept(last)) return last;
       }
@@ -306,6 +329,36 @@ export async function waitForApp(
   if (lastError instanceof InfraError) throw lastError;
   const reason = lastError === undefined ? 'ready() stayed false' : String(lastError);
   throw new InfraError(`Design gate probe not ready within ${timeoutMs} ms: ${reason}`);
+}
+
+/**
+ * States in the run log what the readiness waits did to the dev overlay: the
+ * gate disables LogBox's UI so no toast or inspector paints over a capture, and
+ * a run whose runtime offered no such module says so here instead of leaving a
+ * clean matrix unexplained.
+ */
+async function reportLogBox(probe: ProbeClient, log: (line: string) => void): Promise<void> {
+  try {
+    const result = await probe.disableLogBox?.();
+    if (result === undefined) return;
+    if (result.disabled > 0) {
+      log(
+        `design-gate: disabled the LogBox UI in the app runtime (${result.disabled} of ${result.exposing} module(s) exposing setDisabled)`
+      );
+      return;
+    }
+    if (result.exposing === 0) {
+      log(
+        'design-gate: no module of the app runtime exposed LogBox setDisabled; a dev toast still painting is reported as a dev-overlay warning'
+      );
+      return;
+    }
+    log(
+      `design-gate: ${result.exposing} module(s) exposed LogBox setDisabled but none accepted the switch; a dev toast still painting is reported as a dev-overlay warning`
+    );
+  } catch (error) {
+    log(`design-gate: LogBox disable unavailable: ${String(error)}`);
+  }
 }
 
 export function rootRef(dump: ProbeDump): ElementRef {
@@ -331,6 +384,7 @@ export function screenFindings(args: {
     alignment === undefined || alignment.status === 'bracketed' ? args.image : undefined;
   const findings: Finding[] = [];
   if (args.sampled?.settled !== false) findings.push(...checkScreen(args.tree, image));
+  findings.push(...checkDevLogOverlay(args.dump));
   if (alignment !== undefined && alignment.status !== 'bracketed') {
     findings.push({
       rule: 'capture-alignment',
@@ -504,10 +558,15 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
   // Route and probe text can reveal stale navigation, but neither proves native paint.
   // Keep this bounded navigation retry separate from screenshot capture: a genuine
   // blank screenshot must survive as evidence rather than be retried until it disappears.
+  // A link to the screen navigation resets to (Home) changes nothing on glass;
+  // it opened when the settled screen is the one the link names. A URL drops
+  // groups, so the route alone cannot tell, but the probe's screen keeps them.
+  const linkScreen = linkRoute?.slice(1);
   const opened = (dump: ProbeDump) =>
     screenTexts(dump) !== beforeTexts ||
     (dump.env.screen !== undefined && dump.env.screen !== beforeScreen) ||
-    (beforeRoute === linkRoute && dump.env.route.split('?')[0] === linkRoute);
+    (beforeRoute === linkRoute && dump.env.route.split('?')[0] === linkRoute) ||
+    (linkScreen !== undefined && linkScreen !== '' && dump.env.screen === linkScreen);
   await ctx.probe.openLink(target.link);
   // A cold screen paints its own loading placeholder and holds it still, so a
   // settle loop would measure the placeholder. Wait for it to clear first, and
@@ -898,6 +957,40 @@ function warningFinding(
   };
 }
 
+const RESET_ATTEMPTS = 2;
+const RESET_CONFIRM_MS = 5_000;
+const RESET_POLL_MS = 250;
+
+/**
+ * Opens a target's reset link (`kiloapp:///dev/force-state/clear`) and waits for
+ * the app to report that its own `Linking.openURL` delivered it; a send that
+ * fails or is never confirmed is sent once more. Returns why the reset was not
+ * confirmed, or undefined. Never throws: cleanup must not fail the capture.
+ */
+export async function openResetLink(
+  ctx: CaptureContext,
+  link: string
+): Promise<string | undefined> {
+  const delivered = `openLink ${link}: opened`;
+  let last = 'not sent';
+  for (let attempt = 1; attempt <= RESET_ATTEMPTS; attempt += 1) {
+    try {
+      await ctx.probe.openLink(link);
+      const deadline = ctx.clock.now() + RESET_CONFIRM_MS;
+      for (;;) {
+        last = await ctx.probe.lastOutcome();
+        if (last === delivered) return undefined;
+        if (!last.endsWith(': pending') || ctx.clock.now() >= deadline) break;
+        await ctx.clock.sleep(RESET_POLL_MS);
+      }
+    } catch (error) {
+      last = String(error);
+    }
+    ctx.log(`design-gate: reset ${link} not confirmed (attempt ${attempt}): ${last}`);
+  }
+  return last;
+}
+
 export async function runMatrix(
   ctx: CaptureContext,
   cells: readonly CellConfig[],
@@ -915,6 +1008,20 @@ export async function runMatrix(
   const outcome: RunOutcome = { cells: [], findings: [], skipped: [] };
   const trees = new Map<string, LayoutTree>();
   let baseWindow: ProbeEnv['window'] | undefined;
+  // A forced state whose reset was not confirmed. It outlives the cell: every
+  // later target, in this cell or the next, would be measured in that state,
+  // so each cell first sends the reset again, and the run's restore does too.
+  let leaked: { link: string; reason: string } | undefined;
+  const retryLeakedReset = async (): Promise<string | undefined> => {
+    if (leaked === undefined) return undefined;
+    const failure = await openResetLink(ctx, leaked.link);
+    if (failure === undefined) {
+      ctx.log(`design-gate: the forced state is cleared now (${leaked.reason})`);
+      leaked = undefined;
+      return undefined;
+    }
+    return `${leaked.reason}; the reset is still unconfirmed: ${failure}`;
+  };
   let restored: Promise<unknown[]> | undefined;
   const restoreState = (): Promise<unknown[]> => {
     restored ??= (async () => {
@@ -924,6 +1031,8 @@ export async function runMatrix(
       } catch (error) {
         errors.push(error);
       }
+      const leftState = await retryLeakedReset();
+      if (leftState !== undefined) errors.push(new Error(leftState));
       try {
         await ensureLanguage(ctx, baseline);
       } catch (error) {
@@ -986,7 +1095,16 @@ export async function runMatrix(
       if (cellLanguage === undefined) continue;
       await ctx.clock.sleep(CONFIG_SETTLE_MS);
       const seen = new Map<string, string>();
+      const leftState = await retryLeakedReset();
       for (const [index, target] of targets.entries()) {
+        if (leaked !== undefined) {
+          outcome.skipped.push({
+            cell: config.id,
+            target: target.id,
+            reason: leftState ?? leaked.reason,
+          });
+          continue;
+        }
         try {
           const targetLanguage = await ensureLanguage(ctx, language);
           const languageReady = targetLanguage.matched;
@@ -994,12 +1112,20 @@ export async function runMatrix(
           // target itself caused (the previous target switched the app language)
           // leaves this target cold whatever its index.
           const warm = targetLanguage.reloaded || (cellLanguage.reloaded && index === 0);
+          // The reset runs whether the capture succeeds or fails, and it never
+          // throws, so neither outcome is replaced by a reset failure.
           const { sampled, screen, unopened, image } = await captureScreen(
             ctx,
             config.id,
             target,
             warm
-          );
+          ).finally(async () => {
+            if (target.after === undefined) return;
+            const failure = await openResetLink(ctx, target.after);
+            if (failure === undefined) return;
+            leaked = { link: target.after, reason: `${target.id} left a forced state: ${failure}` };
+            ctx.log(`design-gate: ${leaked.reason}; later targets are skipped until a reset lands`);
+          });
           const { dump } = sampled;
           run.env ??= dump.env;
           run.screens.push(screen);
@@ -1090,6 +1216,7 @@ export async function runMatrix(
       }
     }
     beforeRestore(outcome);
+    await reportLogBox(ctx.probe, ctx.log);
   } finally {
     unregisterCleanup?.();
     restoreErrors = await restoreState();

@@ -1,18 +1,20 @@
 import { type ReactNode } from 'react';
 import { View } from 'react-native';
 
+import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
 
 import { formatExactTokens } from './context-usage-display';
 
 /**
- * Field row shared by the agents detail sheets: a small uppercase label above
- * the value the caller renders.
+ * Field block shared by the agents detail sheets: a caption above the value the
+ * caller renders. The value keeps arbitrary content (a nested unit, a status
+ * line), which the label/value row primitives do not carry.
  */
 export function Row({ label, children }: Readonly<{ label: string; children: ReactNode }>) {
   return (
     <View className="gap-1">
-      <Text className="text-xs uppercase tracking-wide text-muted-foreground">{label}</Text>
+      <Text variant="caption">{label}</Text>
       {children}
     </View>
   );
@@ -23,12 +25,5 @@ export function Row({ label, children }: Readonly<{ label: string; children: Rea
  * exact formatted token count on the right.
  */
 export function TokenRow({ label, value }: Readonly<{ label: string; value: number }>) {
-  return (
-    <View className="flex-row items-center justify-between">
-      <Text className="text-sm text-muted-foreground">{label}</Text>
-      <Text className="text-sm font-medium text-foreground tabular-nums">
-        {formatExactTokens(value)}
-      </Text>
-    </View>
-  );
+  return <KvRow label={label} value={formatExactTokens(value)} valueFace="numeric" />;
 }

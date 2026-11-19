@@ -44,6 +44,7 @@ const state = vi.hoisted(() => ({
   liveQuery: vi.fn<(options: Parameters<typeof useLiveAgentSessions>[0]) => void>(),
 }));
 const queryClient = new ReactQuery.QueryClient();
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('@tanstack/react-query', async importOriginal => ({
   ...(await importOriginal<typeof ReactQuery>()),
   useQueryClient: () => queryClient,
@@ -120,7 +121,7 @@ vi.mock('@/components/home/new-task-from-picture-button', () => ({
 // A host element that still renders the header notice, so its text and Retry
 // stay observable beside the card. The factory is hoisted above the static
 // imports, so it loads React itself.
-vi.mock('@/components/home/section-header', async () => {
+vi.mock('@/components/ui/section-header', async () => {
   const { createElement: create } = await import('react');
   return {
     SectionHeader: (props: { notice?: ReactNode }) => create('SectionHeader', props, props.notice),
@@ -136,6 +137,7 @@ vi.mock('@/components/ui/text', async () => {
   return { Text: 'Text', TextClassContext: createContext(''), EYEBROW_LATIN_DISPLAY: '' };
 });
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: 'RotateCcw',
   AlertCircle: 'AlertCircle',
   Bot: 'Bot',
   ChevronDown: 'ChevronDown',
@@ -147,7 +149,10 @@ vi.mock('@/components/ui/icons', () => ({
   ShieldCheck: 'ShieldCheck',
   WifiOff: 'WifiOff',
 }));
-vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
+vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalArrowLeft: 'DirectionalArrowLeft',
+  DirectionalChevronRight: 'ChevronRight',
+}));
 vi.mock('@/components/agents/remote-session-row', () => ({ RemoteSessionRow: 'RemoteSessionRow' }));
 vi.mock('@/components/agents/use-agent-session-navigator', () => ({
   useAgentSessionNavigator: () => vi.fn(),
@@ -165,6 +170,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
   useOrgBoundary: () => ({ ...state.boundary, refetch: state.boundaryRefetch }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#777777',
   useThemeColors: () => ({ foreground: '#000000', mutedForeground: '#777777' }),
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
@@ -241,10 +247,8 @@ function press(label: string) {
 /** The one glanceable card's frame; absent while no card is shown. */
 // The Home card now renders through the shared adaptive frame that holds the
 // live card, the briefing and the pending placeholder.
-const CARD_FRAME =
-  'flex-row items-stretch overflow-hidden rounded-2xl border border-border bg-card';
 function cardFrame() {
-  return nodes('View').find(node => node.props.className === CARD_FRAME);
+  return nodes('View').find(node => node.props.testID === 'home-card-frame');
 }
 /** The card's newest-session title line, the card's stable identity. */
 function newestTitleNode() {
@@ -312,13 +316,24 @@ describe('HomeScreen composition', () => {
     expect(nodes('Image')).toHaveLength(1);
     expect(nodes('Image')[0]?.props).toMatchObject({
       source: 1,
-      className: 'size-[40px] shrink-0',
+      className: 'size-10 shrink-0',
       contentFit: 'contain',
       transition: 0,
       accessible: false,
     });
     expect(text()).not.toContain('Kilo');
     expect(text()).not.toContain(i18n.t('login.welcome'));
+  });
+
+  it('spaces the sections on the element that holds them', async () => {
+    await renderHome();
+
+    const scroller = nodes('ScrollView')[0];
+    // The body class spaces the scroller's own children and the animated
+    // wrapper is its only one, so the section gap has to sit on the wrapper or
+    // every Home section paints flush against the one above it.
+    const sections = scroller?.findAll(node => Object.is(node.type, 'Animated.View'))[0];
+    expect(String(sections?.props.className).split(' ')).toContain('gap-6');
   });
 
   it.each([null, 'org-1'])(
@@ -404,7 +419,7 @@ describe('HomeScreen composition', () => {
       state.live.terminalError = failure;
       await renderHome();
       expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: true });
-      expect(text()).toContain("Couldn't load active sessions");
+      expect(text()).toContain('Could not load active sessions');
       expect(typeof action('Retry').props.onPress).toBe('function');
       expect(hasLoadedCard()).toBe(retained);
       expect(nodes('NewTaskButton')).toHaveLength(1);
@@ -470,7 +485,7 @@ describe('Home live presentation', () => {
       ).toBe(false);
     }
     expect(text().includes('Nothing running right now')).toBe(Boolean(test.empty));
-    expect(text().includes("Couldn't load active sessions")).toBe(Boolean(test.error));
+    expect(text().includes('Could not load active sessions')).toBe(Boolean(test.error));
     expect(text().includes('Updating')).toBe(Boolean(test.updating));
     expect(text().includes('Loading…')).toBe(Boolean(test.skeleton));
     expect(hasLoadedCard()).toBe(Boolean(test.rows));
@@ -573,16 +588,16 @@ describe('Home live presentation', () => {
     expect(action('Retry').props.disabled).toBe(true);
     expect(action('Retry').props.accessibilityState).toMatchObject({ busy: true, disabled: true });
     expect(state.refetch).toHaveBeenCalledTimes(1);
-    expect(text()).toContain("Couldn't load active sessions");
+    expect(text()).toContain('Could not load active sessions');
     await act(async () => {
       pending.resolve(false);
       await pending.promise;
     });
     expect(action('Retry').props.disabled).toBe(false);
-    expect(text()).toContain("Couldn't load active sessions");
+    expect(text()).toContain('Could not load active sessions');
     expect(newestTitleNode()).toBe(original);
     expect(
-      state.announcements.filter(message => message === "Couldn't load active sessions")
+      state.announcements.filter(message => message === 'Could not load active sessions')
     ).toHaveLength(1);
     expect(state.announcements.filter(message => message === 'Connection lost')).toHaveLength(1);
 
@@ -597,7 +612,7 @@ describe('Home live presentation', () => {
       await Promise.resolve();
     });
     await renderHome();
-    expect(text()).not.toContain("Couldn't load active sessions");
+    expect(text()).not.toContain('Could not load active sessions');
     expect(text()).toContain('Connection lost');
 
     state.socketRetry.mockImplementation(() => {
@@ -616,8 +631,9 @@ describe('Home live presentation', () => {
   it('keeps the load failure and its Retry visible as socket rows appear and disappear', async () => {
     state.live.terminalError = failure;
     await renderHome();
-    const message = "Couldn't load active sessions";
-    expect(nodes('AlertCircle')).toHaveLength(1);
+    const message = 'Could not load active sessions';
+    expect(text()).toContain(message);
+    expect(action('Retry')).toBeDefined();
 
     async function updateSocketRows(activeSessions: ActiveSession[]) {
       state.live.activeSessions = activeSessions;
@@ -627,8 +643,9 @@ describe('Home live presentation', () => {
       // rows it is the whole surface. It is announced once either way.
       expect(typeof action('Retry').props.onPress).toBe('function');
       expect(text()).toContain(message);
-      expect.soft(state.announcements).toEqual([message]);
-      expect(nodes('AlertCircle')).toHaveLength(activeSessions.length === 0 ? 1 : 0);
+      // The block and Home's header notice each announce the failure when they
+      // take over the surface, so the last spoken message is the current one.
+      expect(state.announcements.at(-1)).toBe(message);
     }
     await updateSocketRows([row]);
     await updateSocketRows([]);

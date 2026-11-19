@@ -24,6 +24,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   Switch: 'Switch',
   Platform: { OS: 'android' },
+  StatusBar: { currentHeight: 0 },
   useColorScheme: () => 'light',
   Alert: { alert: vi.fn() },
   I18nManager: { isRTL: false },
@@ -47,7 +48,12 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
   isMoneyRole: () => false,
   useOrgBoundary: () => ({ role: undefined }),
 }));
-vi.mock('@/components/ui/icons', () => ({ ShieldOff: 'ShieldOff', Check: 'Check' }));
+vi.mock('@/components/ui/icons', () => ({
+  Bell: 'Bell',
+  Check: 'Check',
+  Clock3: 'Clock3',
+  ShieldOff: 'ShieldOff',
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useMutedDisabledInk: () => '#fff',
   useThemeColors: () => ({
@@ -130,7 +136,7 @@ vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'Activ
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/input', () => ({ Input: 'Input' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text', EYEBROW_LINE_HEIGHT_DP: 22 }));
 vi.mock('@/components/ui/radio-group', () => ({
   RadioGroup: (props: { children?: unknown }) => props.children ?? null,
   radioItemA11y: ({
@@ -148,7 +154,10 @@ vi.mock('@/components/ui/radio-group', () => ({
   }),
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/platform-error-screen', () => ({
   PlatformErrorScreen: 'PlatformErrorScreen',
@@ -220,6 +229,7 @@ describe('dismissal comment field name', () => {
     const copy = i18n.t('securityAgent.dismiss.commentLabel');
 
     expect(visibleLabel(mounted, copy)).toBeDefined();
-    expect(mounted.root.findByType('TextInput').props.accessibilityLabel).toBe(copy);
+    // The comment is a `FormField`, whose input is the shared `Input`.
+    expect(mounted.root.findByType('Input').props.accessibilityLabel).toBe(copy);
   });
 });

@@ -1,6 +1,8 @@
 import { byocVercelOwnerSchema } from '../../byoc/vercel-owner.js';
 import { z } from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
+import { egressRequestSupported } from '@kilocode/worker-utils/sandbox-provider-capabilities';
+import { PROVIDER_DESCRIPTORS } from '../../shared/sandbox-provider.js';
 import { agentSandboxProviderSchema } from '../../types.js';
 import { sandboxProviderConfigurationSchema } from '../../sandbox-control/provider.js';
 import { sandboxBillingInputEnvelopeSchema } from '../../container-usage-context.js';
@@ -33,13 +35,18 @@ export const controlPlaneSandboxSelectionSchema = egressPolicySchema
   .refine(
     selection =>
       (selection.egressMode !== 'allowlist' && selection.egressAudit !== true) ||
-      (selection.provider === 'cloudflare-containers' &&
+      (egressRequestSupported(selection.provider, selection) &&
         (selection.sandboxKind === undefined || selection.sandboxKind === 'isolated')),
-    'Egress policy requires an isolated Cloudflare containers sandbox'
+    'Egress policy requires an isolated sandbox whose provider enforces it'
   )
-  .refine(input => input.byoc === undefined || input.provider === 'vercel', 'BYOC requires Vercel')
   .refine(
-    input => input.provider !== 'vercel' || input.byoc !== undefined,
+    input =>
+      input.byoc === undefined || PROVIDER_DESCRIPTORS[input.provider].requiresCustomerCredential,
+    'BYOC requires Vercel'
+  )
+  .refine(
+    input =>
+      !PROVIDER_DESCRIPTORS[input.provider].requiresCustomerCredential || input.byoc !== undefined,
     'Vercel requires BYOC credentials'
   );
 

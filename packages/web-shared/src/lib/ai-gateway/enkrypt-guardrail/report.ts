@@ -7,6 +7,16 @@ import {
 import type { EnkryptDetectRequestDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import type { EnkryptGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 
+/**
+ * Bounds a scan. The input guardrail starts one deadline for all Enkrypt calls of a request, which
+ * run one at a time: those of its blocking detectors first, then those of its log-only detectors.
+ * The gateway awaits the blocking scans just before the upstream request, so this is the most
+ * latency an enabled organization's request can gain. The log-only scans, which the request does
+ * not wait for, get what the blocking scans leave of it. Defined here so the request log UI can
+ * show it.
+ */
+export const ENKRYPT_GUARDRAIL_TIMEOUT_MS = 60_000;
+
 const DetectorIdSchema = z.enum(ENKRYPT_DETECTOR_IDS);
 
 /**
@@ -62,7 +72,7 @@ export type EnkryptScanPart = z.infer<typeof EnkryptScanPartSchema>;
 
 const SegmentsPartSchema = EnkryptScanPartSchema.extract(['system', 'conversation']);
 
-/** A part whose segments are packed into chunks: the system prompt or the conversation. */
+/** A part scanned segment by segment: the system prompt or the conversation. */
 export type EnkryptSegmentsPart = z.infer<typeof SegmentsPartSchema>;
 
 const UnavailableReasonSchema = z.enum(['transient', 'timeout', 'failed']);
@@ -97,17 +107,55 @@ const scanOutcomeShape = {
    */
   failed_calls_cached: z.number().optional(),
   /**
-   * Includes the separators between packed segments and the headers of split segments, so it can
-   * exceed `total_characters`.
+   * Calls of an input part whose verdicts are cached for the usual TTL: a clean allow, a log-only
+   * detection, or a genuine block. Counts eligibility like `failed_calls_cached`, which counts the
+   * failed ones. Absent from reports written before it was counted, and from per-call and output
+   * scan reports.
+   */
+  calls_cached: z.number().optional(),
+  /**
+   * How each call of an input part ended, apart from those counted in `calls_skipped`. `failed`
+   * calls were sent but returned no usable result, such as one cut off by the deadline; `not_sent`
+   * calls were never sent, because the request's deadline left no time, the client disconnected,
+   * or the guardrail could not run. Absent from reports written before it was counted, and from
+   * per-call and output scan reports.
+   */
+  call_outcomes: z
+    .object({
+      allowed: z.number(),
+      flagged: z.number(),
+      blocked: z.number(),
+      failed: z.number(),
+      not_sent: z.number(),
+    })
+    .optional(),
+  /**
+   * Calls of an input part not made because an earlier call of the request's blocking scan, or a
+   * cached block, possibly of this part, blocked the request. Their units are neither scanned nor
+   * cached. A part decided by its own cached block reports `blocked`; a part all of whose calls
+   * were skipped because another part blocked the request reports `allowed`, with no attempt.
+   * Absent from reports written before scans stopped at a block, and from per-call and output scan
+   * reports.
+   */
+  calls_skipped: z.number().optional(),
+  /**
+   * Includes the headers of split segments and the text their slices overlap by, so it can exceed
+   * `total_characters`.
    */
   scanned_characters: z.number(),
   decision: ScanDecisionSchema,
   error: z.string().nullable(),
   detectors_fired: z.array(DetectorIdSchema),
-  /** Enkrypt calls made, including retries. */
+  /**
+   * Enkrypt calls made. A call the request's deadline left no time to start is not made, and fails
+   * with a `timeout` error.
+   */
   attempts: z.number(),
   credits_cost: z.number().nullable(),
-  /** Includes time spent waiting for a free call slot. */
+  /**
+   * For an input part, the sum of its calls' latencies, since a request's calls run one at a time.
+   * Reports written before that may include time spent waiting for a free call slot.
+   */
   latency_ms: z.number(),
 };
 
@@ -144,8 +192,8 @@ export type EnkryptFlaggedTool = z.infer<typeof FlaggedToolSchema>;
  * The scans of a request's tool definitions and response formats by the blocking or the log-only
  * detectors, aggregated: each segment of each is cached on its own, and each tool with uncached
  * segments is scanned by its own calls. `verdict_cache` is `hit` when the cache covered at least
- * one segment. The decision and error are those of the most severe tool. Characters, calls, and
- * credits are summed; the latency runs until the last tool's scan finished.
+ * one segment. The decision and error are those of the most severe tool. Characters, calls,
+ * credits, and latencies are summed.
  */
 const EnkryptToolScanReportSchema = z.object({
   ...scanOutcomeShape,
@@ -156,7 +204,10 @@ const EnkryptToolScanReportSchema = z.object({
    * or any segment blocked before. Not scanned again.
    */
   tools_cached: z.number(),
-  /** With segments the cache did not cover, which were scanned by the tool's own calls, or failed. */
+  /**
+   * With segments the cache did not cover, which were scanned by the tool's own calls, or failed. A
+   * tool all of whose calls were skipped, counted in `calls_skipped`, is neither cached nor scanned.
+   */
   tools_scanned: z.number(),
   tools_flagged: z.number(),
   /** The tools that fired a detector or failed, most severe first, by name only. */
@@ -176,13 +227,16 @@ const verdictCacheWriteShape = { verdict_cache_write: VerdictCacheWriteSchema };
 /**
  * The scan of a request's system prompt or conversation by the blocking or the log-only detectors.
  * Each segment has its verdict cached on its own; `cached_segments` counts those the cache covered
- * whole. The uncached ones are packed into chunks of at most one Enkrypt call each. The decision is
- * that of the most severe chunk, and the error that of the most severe chunk that failed.
- * Characters, calls, and credits are summed; the latency runs until the last chunk's scan finished.
+ * whole. Each uncached one, or each slice of one, is a chunk scanned by its own Enkrypt call. The
+ * decision is that of the most severe chunk, and the error that of the most severe chunk that failed.
+ * Characters, calls, credits, and latencies are summed.
  */
 const EnkryptSegmentsScanReportSchema = EnkryptScanReportSchema.extend({
   part: SegmentsPartSchema,
-  /** Chunks the uncached segments were packed into, so 0 when the cache covered all of them. */
+  /**
+   * Calls the uncached units needed, one each, so 0 when the cache covered all of them. Reports
+   * written before each unit had its own call count packed calls.
+   */
   chunks: z.number(),
 });
 
@@ -212,7 +266,12 @@ export const EnkryptGuardrailReportSchema = z.object({
    */
   verdict: VerdictSchema,
   unavailable_reason: UnavailableReasonSchema.nullable(),
-  /** How long the request waited for the verdict, or null when it never waited. */
+  /**
+   * How long the request waited for the verdict, or null when it never waited. Detectors that only
+   * log add no wait, so for them it is the log-only scan time: from when the request awaited the
+   * verdict until the log-only scan finished. Reports written before that hold the actual wait,
+   * about 0 ms.
+   */
   added_latency_ms: z.number().nullable(),
   scans: z.array(EnkryptInputScanReportSchema),
 });
@@ -251,7 +310,12 @@ export const EnkryptOutputGuardrailReportSchema = z.object({
    */
   verdict: VerdictSchema,
   unavailable_reason: UnavailableReasonSchema.nullable(),
-  /** How long the held-back response waited for the verdict after the upstream response ended. */
+  /**
+   * How long the held-back response waited for the verdict after the upstream response ended.
+   * Detectors that only log hold nothing back, so for them it is the log-only scan time: from the
+   * end of the upstream response until the log-only scan finished. Null in reports written before
+   * that.
+   */
   added_latency_ms: z.number().nullable(),
   scans: z.array(EnkryptOutputScanReportSchema),
 });

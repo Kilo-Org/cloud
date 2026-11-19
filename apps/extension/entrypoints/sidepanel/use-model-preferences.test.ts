@@ -1,10 +1,10 @@
 import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it } from 'vitest';
 import { ModelPreferencesError } from '@/src/shared/model-preferences-client';
+import { createSerialAsyncChain } from '@/src/shared/serial-async-chain';
 import {
   applyFavoriteToggle,
   applyFavoriteToggleCompletionUi,
-  createSerialAsyncChain,
   deriveModelPreferencesStatus,
   isFavoriteToggleCompletionCurrent,
   reduceTerminalLatch,

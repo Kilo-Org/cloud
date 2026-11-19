@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
-import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { getOpenRouterTranscriptionModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';

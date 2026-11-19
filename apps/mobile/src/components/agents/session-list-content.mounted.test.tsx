@@ -111,6 +111,16 @@ vi.mock('react-native-safe-area-context', () => ({
     right: controls.rightInset,
   }),
 }));
+// The content's skeleton rows are the shared `RowSkeleton`, whose row graph
+// reaches the haptics module and, behind the session helpers, `expo` itself.
+// Both read React Native/expo globals the test renderer does not provide
+// (`__DEV__`), so the native edges stop here.
+vi.mock('expo', () => ({ requireOptionalNativeModule: () => null }));
+vi.mock('@/lib/haptics', () => ({
+  selectionHaptic: vi.fn(),
+  impactHaptic: vi.fn(),
+  notificationHaptic: vi.fn(),
+}));
 vi.mock('@/components/agents/session-row', () => ({ StoredSessionRow: 'StoredSessionRow' }));
 vi.mock('@/components/agents/session-list-section-header', () => ({
   SessionListSectionHeader: 'SessionListSectionHeader',
@@ -124,6 +134,8 @@ vi.mock('@/components/ui/activity-indicator', () => ({
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/icons', () => ({
+  SlidersHorizontal: 'SlidersHorizontal',
+  RotateCcw: 'RotateCcw',
   History: 'History',
   SearchX: 'SearchX',
   AlertCircle: 'AlertCircle',
@@ -131,11 +143,13 @@ vi.mock('@/components/ui/icons', () => ({
   ServerCrash: 'ServerCrash',
   WifiOff: 'WifiOff',
   Plus: 'Plus',
+  X: 'X',
 }));
 vi.mock('@/lib/a11y/announce', () => ({ requestA11yFocus: vi.fn() }));
 vi.mock('@/lib/hooks/use-session-mutations', () => ({ useSessionMutations: () => controls }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#999999', primaryForeground: '#FFFFFF' }),
+  useMutedDisabledInk: () => '#777777',
 }));
 vi.mock('@/lib/session-attention', () => ({ getRevisionSnapshot: () => 17 }));
 
@@ -228,6 +242,11 @@ function press(node: TestRenderer.ReactTestInstance | undefined) {
   }
   const { onPress } = node.props as { onPress: () => void };
   act(onPress);
+}
+/** A state action's busy state, as its button announces it; its label never leaves. */
+function busy(node: TestRenderer.ReactTestInstance | undefined): boolean {
+  const state = node?.props.accessibilityState as unknown;
+  return typeof state === 'object' && state !== null && 'busy' in state && state.busy === true;
 }
 
 describe('AgentSessionListContent liveness', () => {
@@ -542,12 +561,12 @@ describe('AgentSessionListContent liveness', () => {
         renderer.update(createElement(AgentSessionListContent, { ...props, isError: false }));
       });
       expect(hosts(renderer, 'StoredSessionRow')).toHaveLength(0);
-      expect(hosts(renderer, 'Button')[0]?.props.loading).toBe(true);
+      expect(busy(hosts(renderer, 'Button')[0])).toBe(true);
       act(() => {
         vi.advanceTimersByTime(PULL_FEEDBACK_BUDGET_MS);
       });
       expect(hosts(renderer, 'StoredSessionRow')).toHaveLength(0);
-      expect(hosts(renderer, 'Button')[0]?.props.loading).toBe(false);
+      expect(busy(hosts(renderer, 'Button')[0])).toBe(false);
       await act(async () => {
         resolve(undefined);
         await promise;
@@ -603,7 +622,7 @@ describe('AgentSessionListContent liveness', () => {
         pull()?.props.onRefresh();
       });
       expect(hosts(renderer, 'StoredSessionRow')).toHaveLength(0);
-      expect(hosts(renderer, 'Button')[0]?.props.loading).toBe(true);
+      expect(busy(hosts(renderer, 'Button')[0])).toBe(true);
       await act(async () => {
         second.resolve(undefined);
         await second.promise;
@@ -639,7 +658,7 @@ describe('AgentSessionListContent liveness', () => {
     });
     const statusMessages = hosts(renderer, 'AccessibleStatus').map(node => node.props.message);
     expect(statusMessages).not.toContain(i18n.t('common.couldNotLoadSessions'));
-    expect(hosts(renderer, 'Button').some(node => node.props.loading === true)).toBe(false);
+    expect(hosts(renderer, 'Button').some(node => busy(node))).toBe(false);
   });
 
   it('retires a stale pull failure when the screen settles a later non-pull refresh', () => {
@@ -842,6 +861,7 @@ describe('AgentSessionListContent liveness', () => {
   });
 
   it('keeps stale history behind the busy Retry control until refetch completes', () => {
+    const onRetry = vi.fn<() => void>();
     const renderer = mount(
       contentProps({
         sections: [{ title: 'Today', timeZone: 'UTC', data: [session('cached')] }],
@@ -849,10 +869,25 @@ describe('AgentSessionListContent liveness', () => {
         hasAnySessions: true,
         hasFreshHistory: false,
         isRetrying: true,
+        onRetry,
       })
     );
     const retry = hosts(renderer, 'Button')[0];
-    expect(retry?.props.loading).toBe(true);
+    // Busy keeps the action's face: the spinner takes the icon slot and the
+    // label stays drawn at full strength, so the reader still reads "Retry".
+    expect(busy(retry)).toBe(true);
+    expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(1);
+    expect(
+      retry?.findAll(node => {
+        if (!isHost(node, 'Text')) {
+          return false;
+        }
+        const { children } = node.props;
+        return typeof children === 'string' && children === i18n.t('common.retry');
+      })
+    ).toHaveLength(1);
+    press(retry);
+    expect(onRetry).not.toHaveBeenCalled();
     expect(hosts(renderer, 'StoredSessionRow')).toHaveLength(0);
     act(() => {
       renderer.update(
@@ -877,7 +912,7 @@ describe('AgentSessionListContent liveness', () => {
     if (!start) {
       throw new Error('the empty history body rendered no action');
     }
-    expect(start.props.loading).toBeUndefined();
+    expect(busy(start)).toBe(false);
     press(start);
     expect(onCreateSession).toHaveBeenCalledOnce();
   });

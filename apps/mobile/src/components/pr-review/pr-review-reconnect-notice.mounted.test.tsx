@@ -14,7 +14,12 @@ const authorizationKey = ['githubApps', 'getUserAuthorization'];
 const reviewKey = ['githubPrReview', 'getPullRequest'];
 
 vi.mock('react-native', () => ({ View: 'View' }));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+  // `Card` reaches `@/lib/utils` and therefore the app's i18n singleton, which
+  // registers this plugin on load.
+  initReactI18next: { type: '3rdParty', init: () => undefined },
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));

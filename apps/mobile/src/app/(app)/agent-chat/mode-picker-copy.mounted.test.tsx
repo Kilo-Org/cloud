@@ -44,9 +44,14 @@ const flashListMock = vi.hoisted(
 
 vi.mock('@shopify/flash-list', () => ({ FlashList: flashListMock }));
 vi.mock('react-native', () => ({
+  // `ChoiceRow` picks its radio role by platform: iOS has no native
+  // checkbox trait, so it reports a selected button.
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
+  // The custom-mode list's section header hangs its eyebrow on the LTR flag.
+  I18nManager: { isRTL: false, getConstants: () => ({ isRTL: false }) },
   // The sheet shell arms hardware Back; nothing here presses it.
   BackHandler: { addEventListener: () => ({ remove: () => undefined }) },
 }));

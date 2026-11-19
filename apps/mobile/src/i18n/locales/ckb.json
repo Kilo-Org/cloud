@@ -820,7 +820,19 @@
         "fileComment": "بۆچوون لەسەر فایل",
         "outdatedOnPathLines": "کۆنبووەوە لە {{path}} {{lines}}",
         "outdatedOnLines": "کۆنبووەوە لە {{lines}}",
-        "outdatedOnPath": "کۆنبووەوە لە {{path}}"
+        "outdatedOnPath": "کۆنبووەوە لە {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "لای چەپ",
+        "sideRight": "لای ڕاست",
+        "outdatedOnLinesSide": "کۆنبووەوە لە {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "کۆنبووەوە لە {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "کۆنبووەوە ({{side}})",
+        "outdatedOnPathSide": "کۆنبووەوە لە {{path}} ({{side}})"
       },
       "deletedUser": "بەکارهێنەری سڕاوە",
       "replyForbiddenTerm": "مۆڵەتی وەڵامدانەوەی ئەم {{term}}ەت نییە.",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "ئەم هەژمارە هێشتا هیچ ڕێکخراوێکی نییە. دوای دروستکردن یان بەشداریکردن لە ڕێکخراوێکدا، دەتوانیت پێداچوونەوەی داواکارییەکانی ڕاکێشانی Bitbucket بکەیت.",
       "gitlabReconnectAdminOnlyDescription": "داوای لە خاوەنێکی ڕێکخراو، بەڕێوەبەرێک، یان بەڕێوەبەرێکی پارەدان بکە کە بیبەستێتەوە.",
       "bitbucketNotConnectedTitle": "Bitbucket نەبەستراوە",
-      "bitbucketAdminOnlyDescription": "تەنها خاوەنەکانی ڕێکخراو، بەڕێوەبەران و بەڕێوەبەرانی پارەدان دەتوانن بیبەستن.",
+      "adminOnlyConnectDescription": "تەنها خاوەنەکانی ڕێکخراو، بەڕێوەبەران و بەڕێوەبەرانی پارەدان دەتوانن بیبەستن.",
       "contextLine": "بۆ {{organization}}",
       "contextLinePersonal": "بۆ هەژماری کەسی"
     },
@@ -1373,8 +1385,9 @@
       "notConnectedReadOnly": "Bitbucket نەبەستراوە. تەنها خاوەنەکانی ڕێکخراو، بەڕێوەبەران و بەڕێوەبەرانی پارەدان دەتوانن بیبەستن."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "پەیوەندیی Bitbucket بۆ ئەم ڕێکخراوە لە وێبدا و لە کۆمپیوتەرێکەوە بەڕێوە دەبرێت.",
-      "description": "بۆ بۆشایی کار توکنێکی دەستگەیشتن بە مۆڵەتە پێویستەکان دروست بکە و لە خوارەوە بیلکێنە.",
+      "managedOnWeb": "پەیوەندیی Bitbucket بۆ {{organization}} لە وێبدا و لە کۆمپیوتەرێکەوە بەڕێوە دەبرێت.",
+      "description": "بۆ {{organization}} توکنێکی دەستگەیشتن بە بۆشایی کار دروست بکە و لە خوارەوە بیلکێنە.",
+      "descriptionReconnect": "بۆ {{organization}} توکنێکی نوێی دەستگەیشتن بە بۆشایی کار دروست بکە و لە خوارەوە بیلکێنە.",
       "scopes": "هەژمار: خوێندنەوە · کۆگاکان: خوێندنەوە/نووسین · داواکارییەکانی تێکەڵکردن: خوێندنەوە · وێبهووکەکان: خوێندنەوە/نووسین",
       "tokenPlaceholder": "توکنی دەستگەیشتن بە بۆشایی کار",
       "tokenRefused": "Bitbucket ئەم توکنی بۆشایی کارەکەی قبووڵ نەکرد. دڵنیابە کە مۆڵەتەکانی سەرەوەی هەیە، پاشان دووبارە هەوڵ بدەوە."
@@ -2148,6 +2161,8 @@
       "renameAccessibility": "گۆڕینی ناوی سێشن: {{title}}",
       "cloningSession": "سێشنەکە کۆپی دەکرێت",
       "couldNotLoadThisSession": "نەتوانرا ئەم سێشنە بار بکرێت.",
+      "historyTooLarge": "نوسینی ئەم سێشنە زۆر گەورەیە بۆ بارکردن.",
+      "historyUnavailable": "نوسینی ئەم سێشنە ناتوانرێت بخوێنرێتەوە.",
       "cloneFailedRetry": "نەتوانرا ئەم سێشنە کۆپی بکرێت. دووبارە هەوڵ بدەرەوە.",
       "notEnoughCredits": "کرێدیتەکەت بۆ ئەم داواکارییە بەس نییە. کرێدیت زیاد بکە و دووبارە هەوڵ بدەرەوە.",
       "previousTaskFinishing": "ئەرکی پێشوو هێشتا تەواو نەبووە. تکایە کەمێک چاوەڕێ بکە.",
@@ -2224,6 +2239,7 @@
       "branchDefault": "بنەڕەتی",
       "branchAccessibility": "لق: {{label}}",
       "branchLoading": "لقەکان باردەکرێن",
+      "branchInactive": "کۆگایەک هەڵبژێرە بۆ بارکردنی لقەکانی.",
       "branchLoadError": "نەتوانرا لقەکان بار بکرێن",
       "branchUnavailable": "لقەکان بۆ ئەم کۆگایە بەردەست نین. مۆڵەتەکانت لەگەڵ پێشکەشکار بپشکنە، پاشان کۆگایەکی تر هەڵبژێرە.",
       "branchEmpty": "هیچ لقێک بەردەست نییە",
@@ -3026,7 +3042,6 @@
   },
   "home": {
     "couldNotLoadSessions": "نەتوانرا دانیشتنەکان بار بکرێن.",
-    "couldNotLoadActiveSessions": "نەتوانرا دانیشتنە چالاکەکان بار بکرێن.",
     "agentSessions": "ئێستا چالاکن",
     "newCodingTask": "ئەرکی نوێی کۆدنووسین",
     "newTaskFromPicture": "ئەرکی نوێ لە وێنەوە",
@@ -3136,6 +3151,11 @@
       "billingHistory": "مێژووی پارەدان",
       "billingHistoryEmpty": "هێشتا هیچ مێژوویەکی پارەدان نییە.",
       "billingHistoryError": "نەتوانرا مێژوویەکی پارەدان بار بکرێت",
+      "billingRowInitial": "یەکەم پارەدان · {{tier}}",
+      "billingRowRenewal": "نوێکردنەوە · {{tier}}",
+      "billingRowSubscription": "بەشداریکردن · {{tier}}",
+      "billingRowTrial": "تاقیکردنەوەی بێبەرامبەر · {{tier}}",
+      "billingRowUpgrade": "گۆڕینی پلان · {{tier}}",
       "cancel": "هەڵوەشاندنەوەی بەشداریکردن",
       "cancelDescription": "Kilo Passەکەت تا کۆتایی ماوەی پارەدان چالاک دەمێنێتەوە و نوێ ناکرێتەوە.",
       "cancelScheduled": "لە {{date}} هەڵدەوەشێتەوە",
@@ -3405,7 +3425,8 @@
         "accounting_adjustment": "ڕاستکردنەوەی ژمێریاری",
         "credits_expired": "کرێدیتی بەسەرچوو"
       },
-      "truncated": "چالاکییە کۆنەکانی کرێدیت بەردەستن."
+      "truncated": "چالاکییە کۆنەکانی کرێدیت بەردەستن.",
+      "retentionLimit": "نوێترین چالاکییەکانی کرێدیت پیشان دەدرێن."
     },
     "inviteMember": {
       "emailError": "ناونیشانی ئیمەیڵێکی دروست بنووسە.",
@@ -3415,6 +3436,7 @@
       "sendInvite": "ناردنی بانگهێشت",
       "title": "بانگهێشتکردنی ئەندام",
       "alreadyInvited": "ئەو کەسە پێشتر بانگهێشت کراوە یان پێشتر ئەندامە.",
+      "organizationUnavailable": "ئەم ڕێکخراوە چیتر بەردەست نییە.",
       "sendError": "نەتوانرا بانگهێشتەکە بنێردرێت.",
       "pendingInvitation": "ئەم ئیمەیڵە پێشتر بانگهێشتێکی چاوەڕوانی هەیە.",
       "alreadyMember": "ئەم کەسە پێشتر ئەندامی ئەم ڕێکخراوەیە.",
@@ -3436,7 +3458,8 @@
         "void": "پووچەڵ",
         "uncollectible": "نەشیاوی وەرگرتن"
       },
-      "truncated": "فاکتۆرە کۆنەکان بەردەستن."
+      "truncated": "فاکتۆرە کۆنەکان بەردەستن.",
+      "retentionLimit": "نوێترین فاکتۆرەکان پیشان دەدرێن."
     },
     "lowBalanceAlert": {
       "enableA11y": "چالاککردنی ئاگادارکردنەوەی کەمی باڵانس",
@@ -3670,8 +3693,7 @@
     "imagesSectionEmpty": "هیچ خانەخوێی وێنەی متمانەپێکراو نییە",
     "revoke": "هەڵوەشاندنەوەی متمانە بە {{host}}",
     "revokeMessage": "بەستەرەکانی ئەم خانەخوێیە دیسانەوە داوای پشتڕاستکردنەوە دەکەن.",
-    "revokeImageMessage": "وێنەکانی ئەم خانەخوێیە دیسانەوە داوای پشتڕاستکردنەوە دەکەن.",
-    "backToPreferences": "گەڕانەوە بۆ ڕێکخستنەکان"
+    "revokeImageMessage": "وێنەکانی ئەم خانەخوێیە دیسانەوە داوای پشتڕاستکردنەوە دەکەن."
   },
   "glanceable": {
     "waiting": "لە نوێکردنەوەی ئەجێنتەکاندایە",
@@ -3918,6 +3940,8 @@
       "downloading": "داگرتن: {{written}} لە {{total}}",
       "downloadingUnknown": "داگرتن: {{written}}",
       "paused": "وەستێنراوە: {{written}} لە {{total}}",
+      "retrying": "دووبارە هەوڵدان: {{written}} لە {{total}}",
+      "retryingUnknown": "دووبارە هەوڵدان: {{written}}",
       "verifying": "فایلە داگیراوەکە دەپشکنرێت…",
       "downloaded": "داگیراوە · {{size}}",
       "url": "لینکی داگرتنی ڕاستەوخۆ",
@@ -4008,7 +4032,9 @@
         "androidModelUnavailable": "ئەم ئامێرە پشتگیری Gemini Nano ناکات، یان ئەپی سیستەمی AICore هێشتا ئامادە دەکرێت. دواتر دووبارە هەوڵ بدەرەوە.",
         "aicoreUpdateRequired": "بۆ بەکارهێنانی ئەم مۆدێلە، ئەپی AICore و نەرمەکاڵای سیستەمەکەت نوێ بکەرەوە.",
         "downloadable": "ئەم مۆدێلە پێش بەکارهێنان پێویستی بە یەک جار داگرتن هەیە.",
-        "downloading": "مۆدێلەکە دادەبەزێت. کاتێک داگرتنەکە تەواو بوو ئامادە دەبێت."
+        "downloading": "مۆدێلەکە دادەبەزێت. کاتێک داگرتنەکە تەواو بوو ئامادە دەبێت.",
+        "batteryQuota": "مۆدێلی سەر ئامێر بۆ ئێستا بەشی باتریی خۆی بەکارهێناوە. دواتر دووبارە هەوڵ بدەرەوە.",
+        "checkFailed": "ئەپەکە نەیتوانی ئەم مۆدێلە بپشکنێت. دووبارە هەوڵ بدەرەوە."
       },
       "unavailable": "مۆدێلی سەر ئامێر لە ئێستادا بەردەست نییە. دۆخەکەی لە $t(modelChat.backends.title) بپشکنە.",
       "busy": "مۆدێلی سەر ئامێر خەریکی وەڵامێکی ترە. کاتێک تەواو بوو دووبارە هەوڵ بدەرەوە.",
@@ -4171,6 +4197,7 @@
     "instructionsHint": "ڕێنماییەکانی markdown بۆ هەر دانیشتنێک کە ئەم پرۆفایلە بەکاردەهێنێت.",
     "instructionsEmpty": "هێشتا هیچ فایلێکی ڕێنمایی نییە",
     "instructionsEmptyDescription": "فایلی یاسا زیاد بکە کە هەر دانیشتنێک کە ئەم پرۆفایلە بەکاردەهێنێت جێبەجێی دەکات.",
+    "instructionsEmptyDescriptionReadOnly": "ئەو فایلە ڕێسایانەی کە لێرە زیادکراون، بۆ هەموو دانیشتنێک کە ئەم پرۆفایلە بەکاردەهێنێت جێبەجێ دەکرێن.",
     "instructionNameRequired": "ناوی فایلێک بنووسە",
     "instructionNameTooLong": "ناوی فایل دەبێت {{max}} پیت یان کەمتر بێت",
     "instructionNameInvalid": "بە پیت یان ژمارەیەک دەست پێ بکە و تەنها پیتی بچووک، ژمارە و داش بەکاربهێنە",
@@ -4369,7 +4396,8 @@
       "purchaseFallback": "کڕینی کرێدیت",
       "receipt": "پسوولە",
       "receiptA11y": "کردنەوەی پسوولەی {{description}}، {{amount}}، لە {{date}}",
-      "receiptUnavailable": "هیچ پسوولەیەک بۆ ئەم کڕینە بەردەست نییە."
+      "receiptUnavailable": "هیچ پسوولەیەک بۆ ئەم کڕینە بەردەست نییە.",
+      "retentionLimit": "نوێترین مێژووی کرێدیت پیشان دەدرێت."
     },
     "title": "کرێدیت بکڕە",
     "description": "کرێدیت کڕینێکی یەکجارە کە بۆ تەوازنی Kiloت زیاد دەکرێت بۆ بەڕێوەبردنی دانیشتنەکانی کۆدکردنی AI لە ئەپی Kilo. فرۆشگا پارە لە هەژمارەکەت وەردەگرێت و کرێدیت دوای پشتڕاستکردنەوەی پارەدان لەلایەن فرۆشگاوە زیاد دەکرێت.",
@@ -4514,6 +4542,7 @@
     "summary": "کورتەی AI",
     "summaryPending": "کورتەی AI لە ئامادەکردندایە. کاتێک ئامادە بوو لێرە دادەنرێت.",
     "summaryUnavailable": "کورتەی AI بەردەست نییە. ڕاپۆرتە ڕێکخراوەکەت هێشتا بەردەستە",
+    "summaryNotAdmitted": "کورتەی AI بۆ ئەم ڕاپۆرتە دروست نەکرا. ڕاپۆرتە ڕێکخراوەکەت هێشتا بەردەستە",
     "summaryCharge": "تێچووی AI: {{cost}}",
     "summaryChargePending": "تێچووی AI چاوەڕوانی یەکلاکردنەوەیە",
     "summaryModel": "$t(common.model): {{model}}",
@@ -4616,10 +4645,14 @@
     "couldNotLoad": "نەتوانرا یەکخستنەکان باربکرێن",
     "permissionDenied": "مۆڵەتی بەڕێوەبردنی ئەم یەکخستنانەت نییە.",
     "managedByOwner": "بۆ گۆڕینی پەیوەندییەک کە تۆ ناتوانیت بگۆڕیت، داوا لە خاوەنێکی ڕێکخراو بکە.",
+    "managedByOwnerOrAdmin": "بۆ گۆڕینی پەیوەندییەک کە تۆ ناتوانیت بگۆڕیت، داوا لە خاوەنێکی ڕێکخراو یان بەڕێوەبەرێک بکە.",
+    "managedByOwnerOrBilling": "بۆ گۆڕینی پەیوەندییەک کە تۆ ناتوانیت بگۆڕیت، داوا لە خاوەنێکی ڕێکخراو یان بەڕێوەبەرێکی پارەدان بکە.",
+    "managedByOwnerAdminOrBilling": "بۆ گۆڕینی پەیوەندییەک کە تۆ ناتوانیت بگۆڕیت، داوا لە خاوەنێکی ڕێکخراو، بەڕێوەبەرێک، یان بەڕێوەبەرێکی پارەدان بکە.",
     "connectFailed": "نەتوانرا پەڕەی پەیوەستکردن بکرێتەوە"
   },
   "invoices": {
-    "personalEmptyDescription": "فاکتۆرەکانی کڕینەکانی خۆت دوای ئەوەی پارەت لێ وەردەگیرێت لێرە دەردەکەون."
+    "personalEmptyDescription": "فاکتۆرەکانی کڕینەکانی خۆت دوای ئەوەی پارەت لێ وەردەگیرێت لێرە دەردەکەون. پسوولە لە App Store و Google Play لە مێژووی کرێدیت دان.",
+    "personalPeriod": "12 مانگی ڕابردوو"
   },
   "cloudAgent": {
     "compute": {
@@ -4651,7 +4684,7 @@
       "new": "چالاککەری نوێ",
       "create": "چالاککەر دروست بکە",
       "emptyTitle": "هێشتا هیچ چالاککەرێک نییە",
-      "emptyDescription": "چالاککەرێک دروست بکە بۆ دەستپێکردنی ڕاکردنی Cloud Agent لە بانگەوازی وێبهووک یان لەسەر خشتەیەک۔",
+      "emptyDescription": "یەکەم چالاککەری خۆت دروست بکە۔",
       "loadFailedTitle": "نەتوانرا چالاککەرەکان باربکرێن",
       "loadFailedDescription": "دووبارە هەوڵ بدەوە کاتێک پەیوەندیت هەیە۔",
       "detailLoadFailedTitle": "نەتوانرا ئەم چالاککەرە باربکرێت",

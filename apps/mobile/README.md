@@ -242,9 +242,11 @@ Native compatibility requirements:
   deprecation lint rule; other deprecated APIs remain checked.
 - `expo-share-intent` 9.x targets SDK 58. Keep its Expo, linking and constants
   peers aligned with the app; rebuild the development clients after upgrading it.
-- `react-native-css` forwards React Native's native component registry through its
-  CommonJS facade for Router's native screen host, so the styling facade needs no
-  patch of its own.
+- `react-native-css` resolves every `react-native` import to a styling proxy. The
+  proxy already forwards React Native's native component registry for Router's native
+  screen host; the repository patch also forwards every export the proxy does not
+  name, so a package that reads one (expo-asset's `AssetRegistry`) gets it.
+  `node scripts/assert-react-native-resolution.mjs` in `pnpm test` guards it.
 - The `llama.rn` iOS patch installs JSI bindings through React Native's TurboModule
   runtime hook and conforms to the generated native spec.
 - The iOS App Actions bridge uses `@JS` for Expo's noncopyable JavaScript values.

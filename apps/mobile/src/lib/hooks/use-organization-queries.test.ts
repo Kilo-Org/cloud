@@ -28,6 +28,8 @@ const echoInfiniteQueryOptions = (input: unknown, options: object) => ({ ...opti
 type EchoedOptions = {
   maxPages: number;
   enabled: boolean;
+  networkMode?: string;
+  refetchOnReconnect?: boolean;
   input: { organizationId: string; period?: string };
   getNextPageParam: (lastPage: Page, pages: Page[]) => string | undefined;
 };
@@ -67,6 +69,15 @@ describe('buildOrgCreditTransactionsPageQueryOptions', () => {
     expect(
       readOptions(buildOrgCreditTransactionsPageQueryOptions(createTrpcStub(), null)).enabled
     ).toBe(false);
+  });
+
+  it('lets a paused first page settle instead of waiting for connectivity', () => {
+    const options = readOptions(
+      buildOrgCreditTransactionsPageQueryOptions(createTrpcStub(), 'org-1')
+    );
+
+    expect(options.networkMode).toBe('always');
+    expect(options.refetchOnReconnect).toBe(true);
   });
 
   it('passes the organizationId through to the procedure input', () => {
@@ -219,6 +230,84 @@ describe('org invoices first page on a flaky connection', () => {
     onlineManager.setOnline(false);
     const queryFn = failingPage();
     const { observer, stop } = observeInvoicesPage(queryFn);
+
+    const settled = observer.refetch();
+    await vi.waitFor(() => {
+      expect(observer.getCurrentResult().isError).toBe(true);
+    });
+    await settled;
+
+    onlineManager.setOnline(true);
+
+    await vi.waitFor(() => {
+      expect(queryFn).toHaveBeenCalledTimes(2);
+    });
+    stop();
+  });
+});
+
+/**
+ * The same offline check for the credit-transactions builder: its first page
+ * has to settle while the manager reports offline, or the history screen keeps
+ * its skeleton with no exit.
+ */
+describe('org credit transactions first page on a flaky connection', () => {
+  afterEach(() => {
+    onlineManager.setOnline(true);
+  });
+
+  function observeCreditTransactionsPage(queryFn: () => Promise<never>) {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.mount();
+    const options = {
+      // The builder is driven by a `never`-typed stub, so its declared page
+      // types come from the real router; the observer only needs the contract
+      // the behavior under test exercises.
+      ...(buildOrgCreditTransactionsPageQueryOptions(
+        createTrpcStub(),
+        'org-1'
+      ) as unknown as InfiniteQueryObserverOptions<never>),
+      queryKey: ['org-credit-transactions-flaky-connection'],
+      queryFn,
+      initialPageParam: undefined,
+      retry: false,
+    };
+    const observer = new InfiniteQueryObserver(queryClient, options);
+    // eslint-disable-next-line no-empty-function -- a real listener is required to activate the observer; the body is intentionally empty.
+    const unsubscribe = observer.subscribe(() => {});
+    return {
+      observer,
+      stop: () => {
+        unsubscribe();
+        queryClient.unmount();
+      },
+    };
+  }
+
+  function failingPage() {
+    return vi.fn<() => Promise<never>>().mockRejectedValue(new Error('Network request failed'));
+  }
+
+  it('settles to the error state while the manager reports offline', async () => {
+    onlineManager.setOnline(false);
+    const queryFn = failingPage();
+    const { observer, stop } = observeCreditTransactionsPage(queryFn);
+
+    const settled = observer.refetch();
+    await vi.waitFor(() => {
+      expect(observer.getCurrentResult().isError).toBe(true);
+    });
+    await settled;
+
+    expect(queryFn).toHaveBeenCalledTimes(1);
+    expect(observer.getCurrentResult().isPending).toBe(false);
+    stop();
+  });
+
+  it('retries the failed first page when connectivity returns', async () => {
+    onlineManager.setOnline(false);
+    const queryFn = failingPage();
+    const { observer, stop } = observeCreditTransactionsPage(queryFn);
 
     const settled = observer.refetch();
     await vi.waitFor(() => {

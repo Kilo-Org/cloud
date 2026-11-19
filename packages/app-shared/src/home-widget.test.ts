@@ -261,6 +261,71 @@ describe('Home-only widget policy', () => {
     expect(buildHomeWidgetDetails([]).primaryKind).toBeNull();
   });
 
+  it('drops an approval key the schema rejects, keeping a valid key and null unchanged', () => {
+    const malformed = ['', 'a'.repeat(63), 'A'.repeat(64), 'g'.repeat(64), 'a'.repeat(65)];
+    for (const approvalKey of malformed) {
+      const data = buildHomeWidgetData({
+        ...scope,
+        sessions: [{ status: 'permission', title: 'Approve', approvalKey }],
+      });
+      expect(data.details.approvalKey).toBeNull();
+      expect(homeWidgetDataSchema.safeParse(data).success).toBe(true);
+      expect(buildHomeWidgetPresentation(data, now)).toMatchObject({
+        canApprove: false,
+        approvalKey: null,
+      });
+    }
+    const valid = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'permission', title: 'Approve', approvalKey: 'a'.repeat(64) }],
+    });
+    expect(valid.details.approvalKey).toBe('a'.repeat(64));
+  });
+
+  it('derives the approval key and Approve from one availability rule when the counts differ', () => {
+    const approvalKey = 'a'.repeat(64);
+    // A permission row sets both counts, so a schema-valid payload whose counts
+    // diverge moves one count on the snapshot the builder produced.
+    const approvable = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'permission', title: 'Approve', approvalKey }],
+    });
+    const approvableWithoutWait = {
+      ...approvable,
+      snapshot: { ...approvable.snapshot, needsInput: 0 },
+    };
+    expect(homeWidgetDataSchema.safeParse(approvableWithoutWait).success).toBe(true);
+    expect(buildHomeWidgetPresentation(approvableWithoutWait, now)).toMatchObject({
+      canApprove: true,
+      approvalKey,
+    });
+    // No consumer reads `home.approvalKey` without `canApprove`, so a key no
+    // Approve can submit must not leave this policy at all.
+    const waitWithoutApproval = {
+      ...approvable,
+      snapshot: { ...approvable.snapshot, needsApproval: 0 },
+    };
+    expect(homeWidgetDataSchema.safeParse(waitWithoutApproval).success).toBe(true);
+    expect(buildHomeWidgetPresentation(waitWithoutApproval, now)).toMatchObject({
+      canApprove: false,
+      approvalKey: null,
+    });
+    // An approvable count with no valid key offers no Approve and carries no key.
+    const approvalWithoutKey = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'permission', title: 'Approve' }],
+    });
+    const approvalWithoutKeyOrWait = {
+      ...approvalWithoutKey,
+      snapshot: { ...approvalWithoutKey.snapshot, needsInput: 0 },
+    };
+    expect(homeWidgetDataSchema.safeParse(approvalWithoutKeyOrWait).success).toBe(true);
+    expect(buildHomeWidgetPresentation(approvalWithoutKeyOrWait, now)).toMatchObject({
+      canApprove: false,
+      approvalKey: null,
+    });
+  });
+
   it('hides a title whose kind no longer matches the presented kind', () => {
     const data = buildHomeWidgetData({
       ...scope,

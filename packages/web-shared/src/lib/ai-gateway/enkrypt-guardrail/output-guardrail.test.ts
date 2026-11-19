@@ -463,6 +463,14 @@ describe('guardEnkryptOutput', () => {
   describe('with only log-only detectors', () => {
     it('releases the original response before the body completes and scans it afterwards', async () => {
       const fetchSpy = mockEnkrypt(allowAll);
+      // The wait a blocking scan would have added starts once the body completes; the scan reads
+      // the clock as it starts and ends.
+      jest
+        .spyOn(performance, 'now')
+        .mockReturnValueOnce(1_000)
+        .mockReturnValueOnce(1_000)
+        .mockReturnValueOnce(1_120)
+        .mockReturnValueOnce(1_180.4);
       const body = UPSTREAM_BODIES.chat_completions.sse;
       const splitAt = body.indexOf('\n\n') + 2;
       const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
@@ -486,7 +494,8 @@ describe('guardEnkryptOutput', () => {
         { text: MODEL_OUTPUT, detectors: { pii }, user_metadata: { organization_id: 'org-1' } },
       ]);
       expect(mockedRecordUsage.mock.calls).toEqual([
-        [usageRecord({ decision: 'allowed', creditsCost: 2, addedLatencyMs: 0 })],
+        // The call's own latency, not the 180 ms from the end of the body to the verdict.
+        [usageRecord({ decision: 'allowed', creditsCost: 2, addedLatencyMs: 120 })],
       ]);
     });
 
@@ -513,7 +522,7 @@ describe('guardEnkryptOutput', () => {
             apiKind: 'messages',
             decision: 'allowed',
             creditsCost: 2,
-            addedLatencyMs: 0,
+            addedLatencyMs: expect.any(Number),
             detectorsFired: ['pii'],
           }),
         ],
@@ -1031,7 +1040,7 @@ describe('guardEnkryptOutput', () => {
   });
 
   describe('usage', () => {
-    it('preserves the inference association on a failed blocking call and log-only usage, with latency only on the blocking call', async () => {
+    it('preserves the inference association on a failed blocking call and log-only usage, each with its own latency', async () => {
       const microdollarUsageId = '00000000-0000-4000-8000-000000000003';
       let blockingCalls = 0;
       const fetchSpy = mockEnkrypt(request => {
@@ -1064,7 +1073,7 @@ describe('guardEnkryptOutput', () => {
             microdollarUsageId,
             decision: 'allowed',
             creditsCost: 2,
-            addedLatencyMs: null,
+            addedLatencyMs: expect.any(Number),
           }),
         ],
       ]);
@@ -1342,7 +1351,8 @@ describe('guardEnkryptOutput', () => {
         not_scanned_reason: null,
         verdict: 'skip',
         unavailable_reason: null,
-        added_latency_ms: null,
+        // What a blocking scan would have added.
+        added_latency_ms: expect.any(Number),
         scans: [scanReport({ scan: 'log_only', detectors_blocking: [] })],
       });
     });

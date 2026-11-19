@@ -230,10 +230,19 @@ describe('gitlabRouter.connectWithPAT role gate', () => {
 });
 
 // ---------------------------------------------------------------------------
-// GitLab OAuth replacement gate (start + callback)
+// GitLab OAuth role gate: start and callback both require a role in
+// ORGANIZATION_BILLING_ROLES, with or without a stored integration row.
 // ---------------------------------------------------------------------------
 
-describe('GitLab OAuth connect replacement gate', () => {
+describe('GitLab OAuth connect billing role gate', () => {
+  const firstConnect: Array<{ roleKey: RoleKey; denial: string | null }> = [
+    { roleKey: 'owner', denial: null },
+    { roleKey: 'admin', denial: null },
+    { roleKey: 'billing_manager', denial: null },
+    { roleKey: 'member', denial: 'permission_required' },
+    { roleKey: 'non_member', denial: 'organization_access_required' },
+  ];
+
   beforeEach(async () => {
     jest.clearAllMocks();
     await db
@@ -271,50 +280,74 @@ describe('GitLab OAuth connect replacement gate', () => {
     expect(mockedBuildGitLabOAuthUrl).toHaveBeenCalledTimes(1);
   });
 
-  it('allows a member for a first-time connect', async () => {
-    const response = await handleGitLabOAuthConnect(
-      makeRequest(`/api/integrations/gitlab/connect?organizationId=${organization.id}`)
-    );
+  function postConnectRequest(): NextRequest {
+    return new NextRequest('http://localhost:3000/api/integrations/gitlab/connect', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ organizationId: organization.id }),
+    });
+  }
 
-    expect(response.headers.get('location')).toBe(
-      'https://gitlab.com/oauth/authorize?state=signed'
-    );
-    expect(mockedBuildGitLabOAuthUrl).toHaveBeenCalledTimes(1);
-  });
+  it.each(firstConnect)(
+    'gates a first connect with no integration row by billing role: $roleKey',
+    async ({ roleKey, denial }) => {
+      mockedGetUserFromAuth.mockResolvedValue({ user: users[roleKey], authFailedResponse: null });
+
+      const response = await handleGitLabOAuthConnect(
+        makeRequest(`/api/integrations/gitlab/connect?organizationId=${organization.id}`)
+      );
+
+      if (!denial) {
+        expect(response.headers.get('location')).toBe(
+          'https://gitlab.com/oauth/authorize?state=signed'
+        );
+        expect(mockedBuildGitLabOAuthUrl).toHaveBeenCalledTimes(1);
+        return;
+      }
+
+      expectRedirect(
+        response,
+        `/organizations/${organization.id}/integrations/gitlab?error=${denial}`
+      );
+      expect(mockedBuildGitLabOAuthUrl).not.toHaveBeenCalled();
+    }
+  );
 
   it('denies a member on the POST path with a permission error and non-5xx status', async () => {
+    // A stored row does not make the role requirement weaker.
     await seedGitLabIntegration();
 
-    const response = await handleGitLabOAuthConnectPost(
-      new NextRequest('http://localhost:3000/api/integrations/gitlab/connect', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ organizationId: organization.id }),
-      })
-    );
+    const response = await handleGitLabOAuthConnectPost(postConnectRequest());
 
     expect(response.status).toBe(403);
-    const body = (await response.json()) as { error: string };
-    expect(body.error).toBe('permission_required');
+    await expect(response.json()).resolves.toEqual({ error: 'permission_required' });
     expect(mockedBuildGitLabOAuthUrl).not.toHaveBeenCalled();
   });
 
-  it('redirects a non-member to organization_access_required', async () => {
-    mockedGetUserFromAuth.mockResolvedValue({ user: users.non_member, authFailedResponse: null });
+  it.each([
+    { roleKey: 'member' as const, expectedStatus: 403 },
+    { roleKey: 'owner' as const, expectedStatus: 200 },
+  ])(
+    'gates a first connect on the POST path: $roleKey returns $expectedStatus',
+    async ({ roleKey, expectedStatus }) => {
+      mockedGetUserFromAuth.mockResolvedValue({ user: users[roleKey], authFailedResponse: null });
 
-    const response = await handleGitLabOAuthConnect(
-      makeRequest(`/api/integrations/gitlab/connect?organizationId=${organization.id}`)
-    );
+      const response = await handleGitLabOAuthConnectPost(postConnectRequest());
 
-    expectRedirect(
-      response,
-      `/organizations/${organization.id}/integrations/gitlab?error=organization_access_required`
-    );
-    expect(mockedBuildGitLabOAuthUrl).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(expectedStatus);
+
+      if (expectedStatus === 403) {
+        await expect(response.json()).resolves.toEqual({ error: 'permission_required' });
+        expect(mockedBuildGitLabOAuthUrl).not.toHaveBeenCalled();
+        return;
+      }
+
+      expect(mockedBuildGitLabOAuthUrl).toHaveBeenCalledTimes(1);
+    }
+  );
 });
 
-describe('GitLab OAuth callback replacement gate', () => {
+describe('GitLab OAuth callback billing role gate', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     await db
@@ -368,7 +401,25 @@ describe('GitLab OAuth callback replacement gate', () => {
     expect(mockedExchangeGitLabOAuthCode).not.toHaveBeenCalled();
   });
 
-  it('allows a member for a first-time connect', async () => {
+  it('denies a member for a first-time connect', async () => {
+    const state = makeOrgState();
+    const response = await handleGitLabOAuthCallback(
+      makeRequest(`/api/integrations/gitlab/callback?code=abc&state=${encodeURIComponent(state)}`)
+    );
+
+    expectRedirect(
+      response,
+      `/organizations/${organization.id}/integrations/gitlab?error=permission_required`
+    );
+    expect(mockedExchangeGitLabOAuthCode).not.toHaveBeenCalled();
+    expect(mockedStoreGitLabOAuthIntegration).not.toHaveBeenCalled();
+  });
+
+  it('denies a callback when the caller lost the role after the start', async () => {
+    // Role removed mid flow. The state belongs to this caller and no row
+    // exists, so the live role check is the only guard. The exchange would
+    // succeed if the callback reached it.
+    mockedGetUserFromAuth.mockResolvedValue({ user: users.member, authFailedResponse: null });
     mockSuccessfulGitLabOAuthExchange();
 
     const state = makeOrgState();
@@ -378,10 +429,37 @@ describe('GitLab OAuth callback replacement gate', () => {
 
     expectRedirect(
       response,
-      `/organizations/${organization.id}/integrations/gitlab?success=connected`
+      `/organizations/${organization.id}/integrations/gitlab?error=permission_required`
     );
-    expect(mockedExchangeGitLabOAuthCode).toHaveBeenCalledTimes(1);
+    expect(mockedExchangeGitLabOAuthCode).not.toHaveBeenCalled();
+    expect(mockedStoreGitLabOAuthIntegration).not.toHaveBeenCalled();
   });
+
+  it.each([{ roleKey: 'admin' as const }, { roleKey: 'billing_manager' as const }])(
+    'allows $roleKey to complete a first connect',
+    async ({ roleKey }) => {
+      mockedGetUserFromAuth.mockResolvedValue({ user: users[roleKey], authFailedResponse: null });
+      mockSuccessfulGitLabOAuthExchange();
+
+      const state = makeOrgState(users[roleKey].id);
+      const response = await handleGitLabOAuthCallback(
+        makeRequest(`/api/integrations/gitlab/callback?code=abc&state=${encodeURIComponent(state)}`)
+      );
+
+      expectRedirect(
+        response,
+        `/organizations/${organization.id}/integrations/gitlab?success=connected`
+      );
+      expect(mockedExchangeGitLabOAuthCode).toHaveBeenCalledTimes(1);
+      expect(mockedStoreGitLabOAuthIntegration).toHaveBeenCalledTimes(1);
+      expect(mockedStoreGitLabOAuthIntegration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          owner: { type: 'org', id: organization.id },
+          authorizedByUserId: users[roleKey].id,
+        })
+      );
+    }
+  );
 
   it('allows a billing role to replace an existing GitLab integration', async () => {
     await seedGitLabIntegration();

@@ -19,6 +19,15 @@ import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
  * paints a lone placeholder until a usage report arrives.
  */
 
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
+vi.mock('@/components/ui/icons', () => ({
+  ArrowLeft: 'ArrowLeft',
+  ArrowRight: 'ArrowRight',
+  Check: 'Check',
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
+  LogOut: 'LogOut',
+}));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   ScrollView: 'ScrollView',

@@ -8,7 +8,6 @@ describe('getDirectByokProviderListings', () => {
   test('lists only direct BYOK providers without a general provider counterpart', () => {
     expect(listings.map(listing => listing.slug).sort()).toEqual([
       'edenai',
-      'martian',
       'neuralwatt',
       'ollama-cloud',
       'opencode-go',

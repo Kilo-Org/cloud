@@ -46,13 +46,28 @@ concurrent-index migration must therefore survive a retry:
    how long the build can wait.
 3. Precede each `CREATE ... INDEX CONCURRENTLY` with `DROP INDEX CONCURRENTLY
    IF EXISTS` for the same index name, so a retry rebuilds an `INVALID` index.
-4. If the first transaction, before `COMMIT;`, contains DDL that fails when
-   repeated (`CREATE TABLE`, `ADD COLUMN`, `ADD CONSTRAINT`), wrap that
-   unchanged generated DDL in a `DO` block that skips it when its first created
-   object exists. That transaction is atomic, so one object marks whether all
-   of it applied. Skip this step when the migration only builds indexes.
+4. Keep the first transaction, before `COMMIT;`, to DDL that locks only objects
+   the migration creates: new tables, their indexes, and foreign keys between
+   new tables. Wrap that unchanged generated DDL in a `DO` block that skips it
+   when its first created object exists. That transaction is atomic, so one
+   object marks whether all of it applied. Skip this step when the migration
+   only builds indexes.
+5. Give every generated statement that locks an existing table its own
+   transaction (`BEGIN;` … `COMMIT;`), placed after the first transaction and
+   before the concurrent-index group. That covers `ADD COLUMN`, an added foreign
+   key to an existing table, and any other `ALTER` on an existing table. Guard
+   each statement on its own catalog state, such as `pg_attribute` for a column,
+   so a retry skips it without taking a lock. Give each such transaction
+   `SET LOCAL lock_timeout` and retry a bounded number of times inside its `DO`
+   block. A transaction that waits for a lock on one busy table while it holds a
+   traffic-blocking lock on another deadlocks with live traffic that locks the
+   two tables in the opposite order, and PostgreSQL kills one side. A failed
+   attempt releases its lock request, so the retry loop stalls traffic for at
+   most the timeout per attempt. Do not use `ADD COLUMN IF NOT EXISTS` as the
+   guard: it takes the lock before it checks the column.
 
-`0314_scheduled_briefing_snapshots.sql` shows all four. Do not add `IF NOT
+`0314_scheduled_briefing_snapshots.sql` shows the first four, and
+`0370_anthropic_user_profiles.sql` shows the fifth. Do not add `IF NOT
 EXISTS` to the `CREATE ... INDEX CONCURRENTLY` statements instead of step 3: it
 skips an `INVALID` index and leaves it broken.
 
@@ -61,6 +76,13 @@ To recover a deploy that is already failing on a concurrent-index migration:
 - Check `drizzle.__drizzle_migrations` to confirm the migration is not recorded.
 - Check `pg_index.indisvalid` for each of its indexes.
 - Check `pg_stat_activity` for long-running transactions.
+- Check `pg_stat_activity` for a `CREATE INDEX CONCURRENTLY` left behind by a
+  cancelled job. A blocked index build does not notice that its client
+  disconnected, and it holds `SHARE UPDATE EXCLUSIVE` on the table, so a retry
+  waits behind it without a limit.
+- Read the message from the database log. `drizzle-kit migrate` exits with
+  status 1 without printing a failed migration's error, so the provider's
+  Postgres log is the only place that names it.
 - Then make the unrecorded migration retry-safe as above. Editing it is safe
   because drizzle only compares the newest recorded migration timestamp.
 
@@ -80,7 +102,7 @@ the tables and columns. Set `SET LOCAL lock_timeout` in each transaction, use
 snapshot and journal as generated. See `0317_drop_briefing_legacy_objects.sql`.
 
 Only intentional `UPDATE` or `INSERT` data backfills may be appended after the
-generated DDL, separated with the exact marker `-->  statement-breakpoint`.
+generated DDL, separated with the exact marker `--> statement-breakpoint`.
 Prefer one generated migration per unshipped feature branch.
 
 Load `database-migrations` for shared PostgreSQL migration work. Load

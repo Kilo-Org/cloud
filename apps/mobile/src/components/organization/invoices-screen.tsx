@@ -9,7 +9,7 @@ import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 export function OrganizationInvoicesScreen() {
   const { t } = useTranslation();
   const { organizationId, org, isResolving } = useOrgBoundary();
-  const { query, entries, hasMore } = useOrgInvoicesPage(organizationId);
+  const { query, entries, hasMore, isRetentionLimited } = useOrgInvoicesPage(organizationId);
   useRouteForegroundRefresh([[['organizations']]]);
 
   if (isResolving || organizationId == null || org == null) {
@@ -39,6 +39,7 @@ export function OrganizationInvoicesScreen() {
       query={query}
       entries={entries}
       hasMore={hasMore}
+      isRetentionLimited={isRetentionLimited}
       emptyTitle={t('organization.invoices.emptyTitle')}
       emptyDescription={t('organization.invoices.emptyDescription')}
     />

@@ -7,6 +7,7 @@ import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 import { ProviderKeyCredentialForm } from './provider-key-credential-form';
 
 vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('@/i18n', () => ({ i18n: { language: 'en', t: (key: string) => key } }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));

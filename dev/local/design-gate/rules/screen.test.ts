@@ -326,6 +326,27 @@ test('touch-target: below minimum, below touch size, hitSlop, covering pressable
   );
 });
 
+test('touch-target: read-only text a field lets you select is not a control', () => {
+  // A `SelectableText` value: a read-only multiline `TextInput` whose height is
+  // its text's, not a target's. The platform still hands it a press handler to
+  // start a selection, which the probe reports beside `readOnly`.
+  const value = (height: number): ProbeNode => ({
+    parent: 0,
+    tag: 'TextInput',
+    rect: [14, 275, 384, height],
+    pressable: true,
+    readOnly: true,
+    text: '/tmp/random.txt',
+  });
+  assert.deepEqual(run('touch-target', [value(14.1)]), []);
+  assert.deepEqual(run('touch-target', [value(28.2)]), []);
+  // The same field while editable is a target: the reader taps it to type.
+  assert.equal(
+    run('touch-target', [{ ...value(14.1), readOnly: undefined }])[0]?.severity,
+    'error'
+  );
+});
+
 test('safe-area: text under the top and bottom insets, tolerance', () => {
   const env = { safeArea: { top: 24, right: 0, bottom: 30, left: 0 } };
   const text = (y: number): ProbeNode => ({

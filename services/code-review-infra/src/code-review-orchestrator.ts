@@ -514,38 +514,35 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     });
   }
 
+  /**
+   * The reason a fresh-session retry must not requeue the review, or undefined when it may.
+   * A concurrent cancel() sets the in-memory flag, interrupts the session, and records the
+   * terminal status, so the retry helper re-reads all three after any await.
+   */
+  private freshSessionRetrySkipReason(): string | undefined {
+    if (this.state.sandboxRetryAttempted === true) {
+      return 'retry_already_attempted';
+    }
+
+    if (this.cancelled) {
+      return 'review_cancelled';
+    }
+
+    if (isTerminalStatus(this.state.status)) {
+      return 'review_already_terminal';
+    }
+
+    return undefined;
+  }
+
   private async tryRetryFreshSessionAfterSandboxError(
     source: string,
     error: unknown,
     classification: CloudAgentNextFreshRetryClassification
   ): Promise<boolean> {
-    if (this.state.sandboxRetryAttempted === true) {
-      this.logCloudAgentNextFreshSessionRetrySkipped(
-        source,
-        error,
-        classification,
-        'retry_already_attempted'
-      );
-      return false;
-    }
-
-    if (this.cancelled) {
-      this.logCloudAgentNextFreshSessionRetrySkipped(
-        source,
-        error,
-        classification,
-        'review_cancelled'
-      );
-      return false;
-    }
-
-    if (isTerminalStatus(this.state.status)) {
-      this.logCloudAgentNextFreshSessionRetrySkipped(
-        source,
-        error,
-        classification,
-        'review_already_terminal'
-      );
+    const skipReason = this.freshSessionRetrySkipReason();
+    if (skipReason) {
+      this.logCloudAgentNextFreshSessionRetrySkipped(source, error, classification, skipReason);
       return false;
     }
 
@@ -554,6 +551,22 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     const previousSessionId = this.state.sessionId;
     const previousCliSessionId = this.state.cliSessionId;
     const previousSandboxId = this.state.sandboxId;
+
+    await this.interruptDiscardedSessions(source, 'retry_replaces_session');
+
+    // The stop requests can overlap a cancellation that already owns the review: cancel()
+    // interrupts the session and records the terminal status while this wait is in flight, so
+    // requeueing here would resurrect a cancelled review after a Durable Object restart.
+    const interruptedSkipReason = this.freshSessionRetrySkipReason();
+    if (interruptedSkipReason) {
+      this.logCloudAgentNextFreshSessionRetrySkipped(
+        source,
+        error,
+        classification,
+        interruptedSkipReason
+      );
+      return false;
+    }
 
     this.state.sandboxRetryAttempted = true;
     this.state.previousCloudAgentSessionId = undefined;
@@ -1187,7 +1200,8 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
   /**
    * Stop a cloud-agent-next session that must not run or keep running.
-   * The review is already terminal, so a failed interrupt must not throw.
+   * The caller has decided the review no longer needs the session, so a failed
+   * interrupt must not throw.
    */
   private async interruptAbandonedSession(
     source: string,
@@ -1214,6 +1228,21 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         cloudAgentSessionId,
         error: interruptError instanceof Error ? interruptError.message : String(interruptError),
       });
+    }
+  }
+
+  /**
+   * Interrupt every cloud-agent-next session the caller is about to discard.
+   * Session ids that are unset or repeated across the recorded fields are
+   * interrupted once, in the order the session and the previous session are recorded.
+   */
+  private async interruptDiscardedSessions(source: string, reason: string): Promise<void> {
+    const sessionIds = [this.state.sessionId, this.state.previousCloudAgentSessionId].filter(
+      (sessionId): sessionId is string => typeof sessionId === 'string' && sessionId.length > 0
+    );
+
+    for (const cloudAgentSessionId of new Set(sessionIds)) {
+      await this.interruptAbandonedSession(source, cloudAgentSessionId, reason);
     }
   }
 

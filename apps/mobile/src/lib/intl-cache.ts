@@ -90,6 +90,51 @@ function ensureLocale(): void {
   Object.defineProperty(Intl, 'Locale', { value: Locale, configurable: true, writable: true });
 }
 
+/**
+ * Register the root-shaped plural dataset the `ht` loader just required under
+ * `ht` itself.
+ *
+ * The polyfill resolves a requested locale against whichever data modules have
+ * registered so far, so with only an `en` entry `Intl.PluralRules('ht')` stops
+ * answering `ht` the moment French data registers (a language switch loads it
+ * in the same process) and follows the French categories instead — including a
+ * `many` form no ht catalog family carries. CLDR gives `ht` no rule block, so
+ * the root selection IS Haitian; the pin keeps it so regardless of order.
+ */
+let haitianPluralRulesPinned = false;
+function pinHaitianPluralRules(): void {
+  // One registration is the whole contract: the dataset it publishes under
+  // `ht` is frozen at pin time, so re-running it on every formatter call
+  // would only re-add the identical entry.
+  if (haitianPluralRulesPinned) {
+    return;
+  }
+  // Polyfill internals the ambient globals omit; the shape is the package's
+  // own `polyfill-force.js` (`localeData` entries, the raw `__addLocaleData`
+  // entry), read through one named `unknown` widening.
+  type RawLocaleEntry = {
+    locale: string;
+    data: unknown;
+    pluralRanges?: unknown;
+  };
+  type PluralRulesInternals = {
+    localeData?: Record<string, unknown>;
+    __addLocaleData?: (entry: RawLocaleEntry) => void;
+  };
+  const polyfill: unknown = Intl.PluralRules;
+  const internals = polyfill as PluralRulesInternals;
+  const processed = internals.localeData?.en;
+  // Present whenever the data file registered through the polyfill.
+  if (processed && internals.__addLocaleData) {
+    internals.__addLocaleData({ locale: 'ht', data: processed });
+    haitianPluralRulesPinned = true;
+  }
+  // Without the polyfill (a runtime whose native `Intl.PluralRules` answers
+  // for `ht`, or the plain Node projects) there is nothing to pin: the native
+  // constructor resolves `ht` by its own rules and the entry the data file
+  // queued for the polyfill's bootstrap buffer is consumed on install.
+}
+
 // Hermes ships without Intl.PluralRules, and the NumberFormat and
 // RelativeTimeFormat polyfills construct one.
 function ensurePluralRules(language: SupportedLanguage): void {
@@ -101,6 +146,9 @@ function ensurePluralRules(language: SupportedLanguage): void {
   if (usesPluralRulesPolyfill) {
     ensureLocale();
     loadPluralRulesLocaleData(language);
+    if (language === 'ht') {
+      pinHaitianPluralRules();
+    }
   }
 }
 

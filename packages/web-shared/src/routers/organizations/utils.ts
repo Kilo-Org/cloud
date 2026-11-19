@@ -4,7 +4,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
-import { supportStepUpPort } from '@kilocode/web-shared/lib/admin/support-step-up';
+import { requireSupportWriteUseStepUp } from '@kilocode/web-shared/lib/admin/support-step-up';
 import {
   ORGANIZATION_BILLING_ROLES,
   ORGANIZATION_MANAGE_ROLES,
@@ -95,20 +95,23 @@ type CallerRoleRowWithOrganization = CallerRoleRow & { organization: Organizatio
 async function selectCallerRoleRows(
   kiloUserId: string,
   organizationFilter: OrganizationIdFilter,
-  fields: typeof callerRoleWithOrganizationFields
+  fields: typeof callerRoleWithOrganizationFields,
+  fromDb?: typeof db
 ): Promise<CallerRoleRowWithOrganization[]>;
 async function selectCallerRoleRows(
   kiloUserId: string,
   organizationFilter: OrganizationIdFilter,
-  fields: typeof callerRoleFields
+  fields: typeof callerRoleFields,
+  fromDb?: typeof db
 ): Promise<CallerRoleRow[]>;
 async function selectCallerRoleRows(
   kiloUserId: string,
   organizationFilter: OrganizationIdFilter,
-  fields: SelectedFields
+  fields: SelectedFields,
+  fromDb: typeof db = db
 ): Promise<unknown[]> {
   const [directRows, inheritedRows] = await Promise.all([
-    db
+    fromDb
       .select(fields)
       .from(organization_memberships)
       .innerJoin(
@@ -121,7 +124,7 @@ async function selectCallerRoleRows(
           organizationFilter(organization_memberships.organization_id)
         )
       ),
-    db
+    fromDb
       .select(fields)
       .from(organizations)
       .innerJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
@@ -137,7 +140,7 @@ async function selectCallerRoleRows(
 
 export function effectiveMembershipRole(
   rows: { role: OrganizationRole }[],
-  roles?: OrganizationRole[]
+  roles?: readonly OrganizationRole[]
 ): OrganizationRole | null {
   const allowedRoles = roles && roles.length > 0 ? roles : ORGANIZATION_ROLE_PRIORITY;
   return (
@@ -158,7 +161,7 @@ export function settle<T>(
 
 export async function observeMembershipRole(
   loader: () => Promise<{ role: OrganizationRole }[]>,
-  roles?: OrganizationRole[]
+  roles?: readonly OrganizationRole[]
 ): Promise<{
   membershipRole: OrganizationRole | null;
   wouldPassWithoutAdmin: boolean | null;
@@ -186,9 +189,15 @@ async function observeBatchMembershipRoles(
 
 export async function loadEffectiveMembershipRows(
   userId: string,
-  organizationId: Organization['id']
+  organizationId: Organization['id'],
+  fromDb: typeof db = db
 ): Promise<CallerRoleRow[]> {
-  return selectCallerRoleRows(userId, column => eq(column, organizationId), callerRoleFields);
+  return selectCallerRoleRows(
+    userId,
+    column => eq(column, organizationId),
+    callerRoleFields,
+    fromDb
+  );
 }
 
 export async function loadEffectiveMembershipRowsWithOrganization(
@@ -214,6 +223,9 @@ export type OrganizationAccessContext = Pick<
   | 'trpcPath'
   | 'trpcType'
   | 'webSessionId'
+  | 'adminStepUpState'
+  | 'adminStepUpDecision'
+  | 'stepUpClaims'
 > & {
   auditSurface?: 'trpc' | 'rest' | 'server-component';
   auditMethod?: string;
@@ -221,7 +233,7 @@ export type OrganizationAccessContext = Pick<
 };
 
 export type ResolveOrganizationAccessOptions = {
-  roles?: OrganizationRole[];
+  roles?: readonly OrganizationRole[];
   /** Exact REST route pattern or inventory key. Defaults to the tRPC path. */
   supportKey?: string | null;
   supportActionId?: string | null;
@@ -428,10 +440,15 @@ export async function resolveOrganizationAccess(
       const entry = key
         ? findSupportAllowEntry({ surface, key, actionClass: 'support_write' })
         : undefined;
+      let firstUseInRequest = true;
       if (entry?.stepUp === 'fresh') {
-        await supportStepUpPort.requireFresh({
+        firstUseInRequest = await requireSupportWriteUseStepUp({
           userId: ctx.user.id,
-          action: 'support_write_use',
+          organizationId,
+          upstreamStepUpState: ctx.adminStepUpState,
+          upstreamStepUpDecision: ctx.adminStepUpDecision,
+          claimStore: ctx.stepUpClaims,
+          claimKey: `${organizationId}:${surface}:${key ?? ''}`,
           credential: ctx.credential,
           webSessionId: ctx.webSessionId ?? null,
           route: ctx.trpcPath ?? null,
@@ -439,13 +456,15 @@ export async function resolveOrganizationAccess(
           surface,
         });
       }
-      await recordSupportWriteUse({
-        grantId: evaluation.access.grantId,
-        actorKiloUserId: ctx.user.id,
-        grantOrganizationId: evaluation.access.inheritedFromOrganizationId ?? organizationId,
-        targetOrganizationId: organizationId,
-        supportActionId: evaluation.access.supportActionId,
-      });
+      if (firstUseInRequest) {
+        await recordSupportWriteUse({
+          grantId: evaluation.access.grantId,
+          actorKiloUserId: ctx.user.id,
+          grantOrganizationId: evaluation.access.inheritedFromOrganizationId ?? organizationId,
+          targetOrganizationId: organizationId,
+          supportActionId: evaluation.access.supportActionId,
+        });
+      }
     }
     await recordKiloAdminElevation(ctx, {
       reason: options.auditReason ?? 'organization_access',
@@ -510,7 +529,7 @@ export function organizationAccessRole(
 export async function ensureOrganizationAccess(
   ctx: TRPCContext,
   organizationId: Organization['id'],
-  roles?: OrganizationRole[]
+  roles?: readonly OrganizationRole[]
 ): Promise<OrganizationRole> {
   const access = await resolveOrganizationAccess(ctx, organizationId, { roles });
   const role = organizationAccessRole(ctx, access);
@@ -530,7 +549,7 @@ export async function ensureOrganizationAccess(
 export async function ensureMemberOrganizationAccess(
   user: { id: string },
   organizationId: Organization['id'],
-  roles?: OrganizationRole[]
+  roles?: readonly OrganizationRole[]
 ): Promise<OrganizationRole> {
   const rows = await loadEffectiveMembershipRows(user.id, organizationId);
   const role = effectiveMembershipRole(rows, roles);
@@ -561,7 +580,7 @@ export async function requireLiveOrganization(organizationId: Organization['id']
 export async function requireLiveOrganizationForPlatformAdmin(
   ctx: TRPCContext,
   organizationId: Organization['id'],
-  roles?: OrganizationRole[]
+  roles?: readonly OrganizationRole[]
 ): Promise<void> {
   await requireLiveOrganization(organizationId);
   const observation = await observeMembershipRole(
@@ -631,7 +650,7 @@ function groupRolesByOrganization(rows: CallerRoleRow[]): Map<string, Organizati
 export async function getOrganizationsAccessRoles(
   ctx: TRPCContext,
   organizationIds: Organization['id'][],
-  roles?: OrganizationRole[]
+  roles?: readonly OrganizationRole[]
 ): Promise<Map<string, OrganizationRole>> {
   const uniqueIds = Array.from(new Set(organizationIds));
   const result = new Map<string, OrganizationRole>();
@@ -713,7 +732,7 @@ export async function getOrganizationsAccessRoles(
 export async function ensureOrganizationsAccess(
   ctx: TRPCContext,
   organizationIds: Organization['id'][],
-  roles?: OrganizationRole[]
+  roles?: readonly OrganizationRole[]
 ): Promise<void> {
   const accessByOrg = await getOrganizationsAccessRoles(ctx, organizationIds, roles);
   const allowedRoles = roles && roles.length > 0 ? roles : ORGANIZATION_ROLE_PRIORITY;
@@ -731,7 +750,7 @@ export async function ensureOrganizationsAccess(
 export async function ensureOrganizationAccessAndFetchOrg(
   ctx: TRPCContext,
   organizationId: Organization['id'],
-  roles?: OrganizationRole[]
+  roles?: readonly OrganizationRole[]
 ): Promise<Organization> {
   if (ctx.user.is_admin && !isSupportAccessEnabled()) {
     const organizationResult = settle(
@@ -791,12 +810,35 @@ export async function ensureOrganizationAccessAndFetchOrg(
   });
 }
 
+/**
+ * Membership rows read through the caller's read client when it set one (the AI
+ * gateway passes the local replica, since `db` is a cross-region round trip from
+ * `sfo1`). Only a granting result is trusted: rows that grant no role return
+ * undefined, so `resolveOrganizationAccess` re-reads the primary and replica lag
+ * cannot deny a new member. A failed replica read falls back the same way.
+ * Revocation is eventually consistent instead: a member just removed or demoted
+ * keeps passing until the replica catches up, which `packages/web-shared/AGENTS.md`
+ * accepts for gateway auth reads. Only the read-only model-list gate sets `fromDb`.
+ */
+async function loadReplicaMembershipRows(
+  ctx: TRPCContext,
+  organizationId: Organization['id']
+): Promise<CallerRoleRow[] | undefined> {
+  if (!ctx.fromDb) return undefined;
+  const rows = await loadEffectiveMembershipRows(ctx.user.id, organizationId, ctx.fromDb).catch(
+    () => undefined
+  );
+  return rows && effectiveMembershipRole(rows) ? rows : undefined;
+}
+
 // Custom procedure that ensures user has access to the organization (any role)
 export const organizationMemberProcedure = baseProcedure
   .input(OrganizationIdInputSchema)
   .use(async ({ ctx, next, input }) => {
     try {
-      const organizationAccess = await resolveOrganizationAccess(ctx, input.organizationId);
+      const organizationAccess = await resolveOrganizationAccess(ctx, input.organizationId, {
+        membershipRows: await loadReplicaMembershipRows(ctx, input.organizationId),
+      });
       if (process.env.NODE_ENV === 'development') {
         console.log('[organizationMemberProcedure] Access granted, calling next');
       }

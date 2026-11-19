@@ -11,10 +11,13 @@ import {
   type TextInputSelectionChangeEvent,
   type TextStyle,
   View,
+  type ViewProps,
 } from 'react-native';
+import { type Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { shouldEnableComposerInputScroll } from '@/components/agents/chat-composer-input-height';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { InputFrame } from '@/components/ui/input-frame';
 import { Text } from '@/components/ui/text';
 import { VoiceInputButton } from '@/components/voice-input-control';
 import { useMotionPolicy } from '@/lib/a11y/motion';
@@ -55,7 +58,24 @@ const CONTROL_HIT_TARGET = Platform.OS === 'android' ? 48 : 44;
  */
 export const COMPOSER_CONTROL_GAP_CLASS = 'ms-3';
 
+/** The pan gesture object `Gesture.Pan()` builds; RNGH exports no name for it. */
+type DismissKeyboardPanGesture = ReturnType<typeof Gesture.Pan>;
+
 type ChatComposerInputRowProps = {
+  /**
+   * Swipe-down-to-dismiss-keyboard pan, attached to the message field only.
+   * The composer owns the gesture; absent in tests that mount the row alone.
+   */
+  dismissKeyboardPan?: DismissKeyboardPanGesture;
+  /** Android touch fallback for the same dismiss swipe, on the field only. */
+  androidDismissTouchProps?: Pick<
+    ViewProps,
+    | 'onTouchStart'
+    | 'onTouchMove'
+    | 'onTouchEnd'
+    | 'onTouchCancel'
+    | 'onMoveShouldSetResponderCapture'
+  >;
   attachmentsEnabled: boolean;
   canSend: boolean;
   disabled: boolean;
@@ -114,6 +134,8 @@ type ChatComposerInputRowProps = {
  * submit/voice orchestration.
  */
 export function ChatComposerInputRow({
+  dismissKeyboardPan,
+  androidDismissTouchProps,
   attachmentsEnabled,
   canSend,
   disabled,
@@ -169,6 +191,74 @@ export function ChatComposerInputRow({
   const sendGapClass = COMPOSER_VOICE_SEND_GAP_CLASS;
   const sendHitSlop = composerFacingHitSlop(COMPOSER_CONTROL_HIT_SLOP_DP, 'start');
 
+  // The frame carries the row gap and the flex share itself, as the layout
+  // contract places it: the swipe detector and the Android touch fallback
+  // attach to this same view, so the field alone takes the dismiss swipe and
+  // no unpainted wrapper shifts the painted frame off the row's column.
+  const inputField = (
+    <InputFrame
+      className={cn(
+        COMPOSER_CONTROL_GAP_CLASS,
+        'flex-1 overflow-hidden',
+        !inputEditable && 'opacity-50'
+      )}
+      onLayout={onInputLayout}
+      {...androidDismissTouchProps}
+    >
+      {/* The placeholder is a single-line overlay, not the input's own hint:
+            Android lays the native hint out at the field's width with no line
+            cap, so copy wider than the field wraps onto a second line that the
+            field's fixed height clips against its border. A tail-ellipsized
+            Text truncates the copy at any width instead. It shares the input's
+            font metrics (same size, line height, padding and top-aligned text
+            rect) so the first typed character lands exactly where it sat, and
+            sits under the input so a keystroke paints over it. */}
+      {inputEmpty && placeholder.length > 0 ? (
+        <Text
+          accessible={false}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+          allowFontScaling={false}
+          pointerEvents="none"
+          // The design-system Text is `font-medium`; the input's own text is
+          // the platform default weight, so the hint drops to `font-normal`
+          // to keep the metrics it shares with the text it stands in for.
+          className="absolute font-normal"
+          style={placeholderStyle}
+        >
+          {placeholder}
+        </Text>
+      ) : null}
+      <TextInput
+        ref={inputRef}
+        // The hint is drawn by the overlay above, but Android still needs an
+        // accessible name for the field, and the hint used to be it.
+        accessibilityLabel={placeholder}
+        multiline
+        maxLength={CLOUD_AGENT_PROMPT_MAX_LENGTH}
+        onChangeText={onChangeText}
+        onContentSizeChange={event => {
+          onInputContentSizeChange(event.nativeEvent.contentSize.height);
+        }}
+        onFocus={onInputFocus}
+        onBlur={onInputBlur}
+        onSelectionChange={onSelectionChange}
+        style={textInputStyle}
+        scrollEnabled={inputScrollable}
+        editable={inputEditable}
+        contextMenuHidden={!inputEditable}
+        pointerEvents={inputEditable ? 'auto' : 'none'}
+        accessibilityState={{ disabled: inputAccessibilityDisabled }}
+        returnKeyType={returnSendsMessage ? 'send' : 'default'}
+        submitBehavior={returnSendsMessage ? 'submit' : 'newline'}
+        onSubmitEditing={returnSendsMessage ? onSubmit : undefined}
+        maxFontSizeMultiplier={1}
+        autoCapitalize="sentences"
+        autoCorrect
+      />
+    </InputFrame>
+  );
+
   return (
     <View className="p-2.5 px-3">
       <View className="flex-row items-center">
@@ -189,66 +279,11 @@ export function ChatComposerInputRow({
           </Pressable>
         ) : null}
 
-        <View
-          className={cn(
-            COMPOSER_CONTROL_GAP_CLASS,
-            'flex-1 overflow-hidden rounded-[20px] border border-border bg-card',
-            !inputEditable && 'opacity-50'
-          )}
-          onLayout={onInputLayout}
-        >
-          {/* The placeholder is a single-line overlay, not the input's own hint:
-            Android lays the native hint out at the field's width with no line
-            cap, so copy wider than the field wraps onto a second line that the
-            field's fixed height clips against its border. A tail-ellipsized
-            Text truncates the copy at any width instead. It shares the input's
-            font metrics (same size, line height, padding and top-aligned text
-            rect) so the first typed character lands exactly where it sat, and
-            sits under the input so a keystroke paints over it. */}
-          {inputEmpty && placeholder.length > 0 ? (
-            <Text
-              accessible={false}
-              numberOfLines={1}
-              ellipsizeMode="tail"
-              allowFontScaling={false}
-              pointerEvents="none"
-              // The design-system Text is `font-medium`; the input's own text is
-              // the platform default weight, so the hint drops to `font-normal`
-              // to keep the metrics it shares with the text it stands in for.
-              className="absolute font-normal"
-              style={placeholderStyle}
-            >
-              {placeholder}
-            </Text>
-          ) : null}
-          <TextInput
-            ref={inputRef}
-            // The hint is drawn by the overlay above, but Android still needs an
-            // accessible name for the field, and the hint used to be it.
-            accessibilityLabel={placeholder}
-            multiline
-            maxLength={CLOUD_AGENT_PROMPT_MAX_LENGTH}
-            onChangeText={onChangeText}
-            onContentSizeChange={event => {
-              onInputContentSizeChange(event.nativeEvent.contentSize.height);
-            }}
-            onFocus={onInputFocus}
-            onBlur={onInputBlur}
-            onSelectionChange={onSelectionChange}
-            style={textInputStyle}
-            scrollEnabled={inputScrollable}
-            editable={inputEditable}
-            contextMenuHidden={!inputEditable}
-            pointerEvents={inputEditable ? 'auto' : 'none'}
-            accessibilityState={{ disabled: inputAccessibilityDisabled }}
-            returnKeyType={returnSendsMessage ? 'send' : 'default'}
-            submitBehavior={returnSendsMessage ? 'submit' : 'newline'}
-            onSubmitEditing={returnSendsMessage ? onSubmit : undefined}
-            maxFontSizeMultiplier={1}
-            autoCapitalize="sentences"
-            autoCorrect
-          />
-        </View>
+        {dismissKeyboardPan ? (
+          <GestureDetector gesture={dismissKeyboardPan}>{inputField}</GestureDetector>
+        ) : (
+          inputField
+        )}
 
         {returnSendsMessage ? (
           <View className={COMPOSER_CONTROL_GAP_CLASS}>

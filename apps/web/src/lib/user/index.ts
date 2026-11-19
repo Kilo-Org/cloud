@@ -173,7 +173,6 @@ import { getDeliveredEmailAddress, normalizeEmail } from '@kilocode/web-shared/l
 import { normalizeJa4, signupDecide } from '@kilocode/web-shared/lib/bouncer/client';
 import { signupOperationId } from '@kilocode/web-shared/lib/bouncer/signup';
 import { bareIpLiteral } from '@kilocode/web-shared/lib/bouncer/inference';
-import { recordWatchwoodSignupShadow, type WatchwoodSignupAssessment } from '@/lib/auth/watchwood';
 import { getDomain } from 'tldts';
 import { authPassesDeletionFence } from '@/lib/user/deletion-queue/deletion-identity-fence';
 import { deleteUserPasskeys } from '@/lib/user/session-revocation';
@@ -329,7 +328,6 @@ export type CreateOrUpdateUserTrackingContext = {
   anonymousId?: string | null;
   locale?: string | null;
   countryCode?: string | null;
-  watchwood?: WatchwoodSignupAssessment;
 };
 
 export type DeferredSignInEvent = {
@@ -758,11 +756,6 @@ export async function createOrUpdateUser(
 
   const normalizedEmail = normalizeEmail(args.google_user_email);
   const operationId = signupOperationId(normalizedEmail);
-  recordWatchwoodSignupShadow({
-    operationId,
-    provider: args.provider,
-    assessment: trackingContext?.watchwood,
-  });
 
   // Never fall through to the insert: its dedup misses legacy rows with a NULL
   // normalized_email that findUserByNormalizedEmail matches case-insensitively.
@@ -1227,7 +1220,9 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   user_notification_preferences)
  * - the organization's shared-services openai_chatgpt_connections row is kept
  *   (it belongs to the organization): the deleted connector's reference is
- *   cleared, and `created_by` keeps the record of who connected it
+ *   cleared, and `created_by` keeps the record of who connected it, so the
+ *   organization's shared connection reports that it needs a reconnect until an
+ *   owner reconnects it
  * - spend alert settings and their rules/state, the personal-scope hourly
  *   counters, and the personal-scope deliveries (recipients contain billing
  *   contact PII); organization-scoped alert rows are retained, with the deleted
@@ -1354,6 +1349,7 @@ export async function anonymizeCloudUserData(
       customer_source: null,
       signup_ip: null,
       external_id: null,
+      anthropic_user_profile_id: null,
     })
     .where(eq(kilocode_users.id, userId));
 
@@ -1692,6 +1688,8 @@ export async function anonymizeCloudUserData(
   // row is the organization's connection, so it stays behind and only loses the
   // reference to the connector who is being deleted. `created_by` keeps the
   // record of who connected it, and the next reconnect names the new connector.
+  // Until an owner reconnects it, the organization's shared connection reports
+  // that it needs a reconnect.
   await tx
     .delete(openai_chatgpt_connections)
     .where(

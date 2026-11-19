@@ -35,7 +35,7 @@ export function NewSessionErrorScreen({ onRetry }: Props) {
   return (
     <View className="flex-1 bg-background">
       <View className="flex-1 justify-center">
-        <QueryError placement="static" className="w-full" onRetry={onRetry} />
+        <QueryError placement="static" inset="gutter" className="w-full" onRetry={onRetry} />
       </View>
       <View className="px-4" style={{ paddingBottom: insets.bottom + BACK_GAP }}>
         <Pressable

@@ -8,8 +8,9 @@ import {
   code_review_analytics_results,
   kilocode_users,
   organization_memberships,
+  organizations,
 } from '@kilocode/db/schema';
-import { and, asc, eq, like } from 'drizzle-orm';
+import { and, asc, eq, like, ne } from 'drizzle-orm';
 
 import { type SeedResult } from '../index';
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
@@ -38,9 +39,17 @@ export const usage = '<owner-email>';
  * Every row hangs off a review whose `repo_full_name` starts with
  * {@link REPO_MARKER}: a rerun deletes those reviews (attempts, results and
  * findings cascade) and inserts fresh ones under the same derived ids. The
- * account and its organizations must already exist; this seed creates neither.
+ * account must already exist; an account that belongs to no organization gets
+ * {@link FALLBACK_ORGANIZATION_ID}, so the screen always has one to report on.
  */
 const REPO_MARKER = 'dev-seed-analytics/';
+
+/**
+ * The organization the fixture falls back to when the account has no
+ * membership yet. The Analytics screen reports per organization, so an account
+ * the sign-in created without one would otherwise have nothing to report on.
+ */
+const FALLBACK_ORGANIZATION_ID = '5c1e7a90-0000-4000-8000-0000000a9a10';
 
 const PLATFORMS = ['github', 'gitlab'] as const;
 
@@ -160,7 +169,8 @@ function printUsage(): void {
   console.log(
     'Seeds completed, analytics-captured Code Reviewer reviews for every organization the owner belongs to.'
   );
-  console.log('Requires a localhost database and an existing account with memberships.');
+  console.log('Requires a localhost database and an existing account.');
+  console.log('An account that belongs to no organization gets the fixture organization.');
   console.log('Open a returned deep link in a signed-in mobile development client.');
 }
 
@@ -225,15 +235,47 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     );
   }
 
-  const memberships = await db
+  let memberships = await db
     .select({ organizationId: organization_memberships.organization_id })
     .from(organization_memberships)
     .where(eq(organization_memberships.kilo_user_id, user.id))
     .orderBy(asc(organization_memberships.organization_id));
   if (memberships.length === 0) {
-    throw new Error(
-      `${email} is not a member of any organization. Add a membership first, for example with pnpm dev:seed app:mobile-org-admin.`
-    );
+    // The screen has nothing to report on without an organization, and a fake
+    // account the device created has none until a topic gives it one. This
+    // fixture therefore seeds its own, so it does not depend on another topic
+    // having run first.
+    await db
+      .insert(organizations)
+      .values({
+        id: FALLBACK_ORGANIZATION_ID,
+        name: 'Reviewer analytics lab',
+        require_seats: false,
+        created_by_kilo_user_id: user.id,
+      })
+      .onConflictDoUpdate({
+        target: organizations.id,
+        set: { created_by_kilo_user_id: user.id },
+      });
+    // The organization belongs to one account at a time, so a run for another
+    // email takes it over instead of adding that email beside the previous owner.
+    await db
+      .delete(organization_memberships)
+      .where(
+        and(
+          eq(organization_memberships.organization_id, FALLBACK_ORGANIZATION_ID),
+          ne(organization_memberships.kilo_user_id, user.id)
+        )
+      );
+    await db
+      .insert(organization_memberships)
+      .values({
+        organization_id: FALLBACK_ORGANIZATION_ID,
+        kilo_user_id: user.id,
+        role: 'owner',
+      })
+      .onConflictDoNothing();
+    memberships = [{ organizationId: FALLBACK_ORGANIZATION_ID }];
   }
 
   const now = Date.now();
@@ -366,12 +408,12 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     }
   }
 
-  const organizations: SeedResult = {
+  const organizationLinks: SeedResult = {
     organizationCount: memberships.length,
   };
   for (const [index, membership] of memberships.entries()) {
-    organizations[`organization${index + 1}Id`] = membership.organizationId;
-    organizations[`organization${index + 1}DeepLink`] = analyticsDeepLink(
+    organizationLinks[`organization${index + 1}Id`] = membership.organizationId;
+    organizationLinks[`organization${index + 1}DeepLink`] = analyticsDeepLink(
       membership.organizationId
     );
   }
@@ -386,7 +428,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   return {
     email,
     userId: user.id,
-    ...organizations,
+    ...organizationLinks,
     ...counts,
   };
 }

@@ -7,10 +7,10 @@ import {
   type SandboxAllocation,
   type SandboxDestination,
 } from '@kilocode/worker-utils/sandbox-allocation';
-import { providerUsesOutboundCredentialProxy } from './agent-sandbox/capabilities.js';
+import { providerSupports } from '@kilocode/worker-utils/sandbox-provider-capabilities';
+import { providerUsesOutboundCredentialProxy } from './shared/sandbox-provider.js';
 import type { AgentSandboxProvider, SandboxId, Env } from './types.js';
 import { CODE_REVIEW_PLATFORM } from './session-identity.js';
-import { providerSupportsEnforcedBilling } from './sandbox-provider-eligibility.js';
 
 export const MANAGED_SCM_OUTBOUND_HANDLER = 'managedScm';
 
@@ -189,10 +189,9 @@ export function selectDefaultSandboxProvider(input: {
   userId: string;
   isolated: boolean;
 }): AgentSandboxProvider {
-  const eligible = (provider: AgentSandboxProvider): boolean =>
-    providerSupportsEnforcedBilling(provider);
-
-  const useContainers = eligible('cloudflare-containers') && input.isolated;
+  // A provider that cannot enforce billing admission is never the default.
+  const useContainers =
+    providerSupports('cloudflare-containers', 'meteredBilling') && input.isolated;
 
   return useContainers ? 'cloudflare-containers' : 'cloudflare';
 }

@@ -414,54 +414,47 @@ export class GitHubAppCredentialLifecycle {
     if (new Date(authorization.refresh_token_expires_at ?? 0).getTime() <= Date.now()) {
       return 'terminal_refresh_token';
     }
-    const refreshToken = this.decryptCredential(authorization, 'refresh');
-    let response: Response;
-    try {
-      response = await fetch('https://github.com/login/oauth/access_token', {
-        method: 'POST',
-        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          client_id: clientId,
-          client_secret: clientSecret,
-          grant_type: 'refresh_token',
-          refresh_token: refreshToken,
-        }),
-        // Bounded deadline for the provider token request.
-        signal: AbortSignal.timeout(GITHUB_USER_AUTHORIZATION_REQUEST_TIMEOUT_MS),
-      });
-    } catch {
-      return null;
-    }
-    let responseBody: unknown;
-    try {
-      responseBody = await response.json();
-    } catch {
-      return null;
-    }
-    if (RefreshErrorResponseSchema.safeParse(responseBody).success) {
-      return 'terminal_refresh_token';
-    }
-    if (!response.ok) return null;
-    const parsed = RefreshResponseSchema.safeParse(responseBody);
-    if (!parsed.success) return null;
+    // Only an attempt that holds the provider exchange lease may use the stored
+    // refresh credential, for the same reason the session refresh path
+    // documents: exchanges are serialized so each attempt sees a consistent
+    // provider answer.
+    const attemptId = newRefreshLeaseAttemptId();
+    const lease = { kind: 'user-github-app-token' as const, credentialId: authorization.id };
+    const claimed = await claimRefreshLease(db, {
+      ...lease,
+      attemptId,
+      providerRequestBudgetMs: GITHUB_USER_AUTHORIZATION_REQUEST_TIMEOUT_MS,
+    });
+    if (!claimed) return null;
+    const refreshed = await this.requestAuthorizationRefresh({
+      authorization,
+      clientId,
+      clientSecret,
+      refreshToken: this.decryptCredential(authorization, 'refresh'),
+    });
+    // Release inside the caller's transaction, so the lease never outlives it.
+    const holdsLease = await releaseRefreshLease(db, { ...lease, attemptId });
+    if (!holdsLease) return null;
+    if (refreshed.status === 'terminal_rejection') return 'terminal_refresh_token';
+    if (refreshed.status !== 'available') return null;
 
     const now = Date.now();
     const [updated] = await db
       .update(user_github_app_tokens)
       .set({
         access_token_encrypted: this.encryptCredential(
-          parsed.data.access_token,
+          refreshed.data.access_token,
           authorization,
           'access'
         ),
-        access_token_expires_at: new Date(now + parsed.data.expires_in * 1000).toISOString(),
+        access_token_expires_at: new Date(now + refreshed.data.expires_in * 1000).toISOString(),
         refresh_token_encrypted: this.encryptCredential(
-          parsed.data.refresh_token,
+          refreshed.data.refresh_token,
           authorization,
           'refresh'
         ),
         refresh_token_expires_at: new Date(
-          now + parsed.data.refresh_token_expires_in * 1000
+          now + refreshed.data.refresh_token_expires_in * 1000
         ).toISOString(),
         credential_version: sql`${user_github_app_tokens.credential_version} + 1`,
         last_used_at: new Date().toISOString(),
@@ -475,7 +468,15 @@ export class GitHubAppCredentialLifecycle {
       )
       .returning();
     if (!updated) {
-      throw new Error('GitHub authorization changed during disconnect');
+      // A concurrent writer moved the credential generation during the
+      // exchange: continue the disconnect against the current generation. An
+      // absent row means another writer already finished cleanup.
+      const [current] = await db
+        .select()
+        .from(user_github_app_tokens)
+        .where(eq(user_github_app_tokens.id, authorization.id))
+        .limit(1);
+      return current ?? null;
     }
     return updated;
   }

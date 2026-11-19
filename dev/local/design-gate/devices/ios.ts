@@ -4,6 +4,9 @@ import path from 'node:path';
 import { InfraError, type Device, type Exec, type Spawn } from '../capture';
 import type { CellConfig } from '../matrix';
 
+/** The largest Dynamic Type size `simctl ui <udid> content_size` accepts. */
+export const IOS_MAX_CONTENT_SIZE = 'accessibility-extra-extra-extra-large';
+
 export type Simulator = { udid: string; name: string };
 
 export function parseBootedSimulators(json: string): Simulator[] {
@@ -62,13 +65,55 @@ export function createIosDevice(options: {
     simctl('ui', simulator.udid, 'appearance', value);
     appearance = value;
   };
+  // Read lazily: only a run with the font-max cell changes Dynamic Type, and
+  // the restore puts back exactly the size it found.
+  let initialContentSize: string | undefined;
+  let contentSize: string | undefined;
+  const setContentSize = (value: string) => {
+    if (contentSize === value || value === 'unsupported') return;
+    simctl('ui', simulator.udid, 'content_size', value);
+    contentSize = value;
+  };
 
   return {
     platform: 'ios',
     id: simulator.udid,
     names: [simulator.name],
-    apply: (config: CellConfig) => setAppearance(config.dark ? 'dark' : 'light'),
-    restore: () => setAppearance(initialAppearance),
+    apply: (config: CellConfig) => {
+      setAppearance(config.dark ? 'dark' : 'light');
+      if (config.fontMax) {
+        initialContentSize ??= simctl('ui', simulator.udid, 'content_size');
+        if (initialContentSize === 'unsupported') {
+          throw new InfraError(
+            `simctl ui ${simulator.udid} content_size is unsupported; the font-max cell cannot run`
+          );
+        }
+        contentSize ??= initialContentSize;
+        setContentSize(IOS_MAX_CONTENT_SIZE);
+      } else if (initialContentSize !== undefined) {
+        setContentSize(initialContentSize);
+      }
+    },
+    // Each step restores on its own, so a failed appearance restore still puts
+    // Dynamic Type back.
+    restore: () => {
+      const errors: unknown[] = [];
+      for (const step of [
+        () => setAppearance(initialAppearance),
+        () => {
+          if (initialContentSize !== undefined) setContentSize(initialContentSize);
+        },
+      ]) {
+        try {
+          step();
+        } catch (error) {
+          errors.push(error);
+        }
+      }
+      if (errors.length > 0) {
+        throw new AggregateError(errors, `iOS restore failed on ${simulator.udid}`);
+      }
+    },
     screenshot: file => {
       fs.mkdirSync(path.dirname(file), { recursive: true });
       simctl('io', simulator.udid, 'screenshot', file);

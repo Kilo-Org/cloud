@@ -521,6 +521,20 @@ describe('Vercel runtime metadata', () => {
     }
   );
 
+  it('reads a ref that a newer Worker wrote and drops the fields it does not know', () => {
+    const known = {
+      sandboxName: SANDBOX_ID,
+      sessionId: 'physical-session',
+      metadata: { region: 'iad1' },
+    };
+    const newerRef = JSON.stringify({
+      ...known,
+      addedLater: 'value',
+      metadata: { ...known.metadata, addedLater: 1 },
+    });
+    expect(decodeVercelProviderRef(newerRef)).toEqual(known);
+  });
+
   it('reads old refs without metadata using the configured snapshot and no region', () => {
     const provider = createVercelProviderAdapter({
       sandboxName: SANDBOX_ID,

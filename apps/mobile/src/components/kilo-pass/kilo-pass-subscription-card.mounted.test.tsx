@@ -52,6 +52,7 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   View: 'View',
+  useColorScheme: () => 'light',
   // The card reads the window width to pick its stacked narrow presentation
   // (`narrow-layout.ts`). 390 dp keeps the standard side-by-side row, the same
   // width the narrow-layout test uses for its non-narrow cases.
@@ -84,6 +85,7 @@ vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronRight: 'DirectionalChevronRight',
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ primary: '#000000' }),

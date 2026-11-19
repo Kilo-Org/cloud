@@ -1,17 +1,14 @@
 import { type Href, useRouter } from 'expo-router';
-import { Building2, type LucideIcon } from '@/components/ui/icons';
+import { ArrowLeft, ArrowRight, Building2, type LucideIcon, Plus } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
 import { useContextPicker } from '@/components/context-control';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { CREATE_ORGANIZATION_HREF } from '@/lib/organization-navigation';
@@ -109,15 +106,13 @@ export function OrganizationBoundary({
     // 4. defensive fallback for a resolved selection the callers would not
     //    route here — org unavailable.
     const backToProfileAction = (
-      <Button
-        variant="outline"
-        className={STATE_ACTION_CLASS}
+      <StateAction
+        label={t('organization.boundary.backToProfile')}
+        icon={ArrowLeft}
         onPress={() => {
           router.replace(PROFILE_TAB_HREF);
         }}
-      >
-        <Text>{t('organization.boundary.backToProfile')}</Text>
-      </Button>
+      />
     );
     const hasOrganizations = (orgs?.length ?? 0) > 0;
     if (!hasOrganizations) {
@@ -128,14 +123,13 @@ export function OrganizationBoundary({
           description={t('organization.boundary.noOrganizationDescription')}
           action={
             <View className="gap-3">
-              <Button
-                className={STATE_ACTION_CLASS}
+              <StateAction
+                label={t('organization.create.title')}
+                icon={Plus}
                 onPress={() => {
                   router.push(CREATE_ORGANIZATION_HREF);
                 }}
-              >
-                <Text>{t('organization.create.title')}</Text>
-              </Button>
+              />
               {backToProfileAction}
             </View>
           }
@@ -199,14 +193,13 @@ function OrganizationPickerBoundaryState({
         description={t('organization.boundary.selectDescriptionWithOrganizations')}
         action={
           <View className="gap-3">
-            <Button
-              className={STATE_ACTION_CLASS}
+            <StateAction
+              label={t('organization.boundary.chooseAccount')}
+              icon={ArrowRight}
               onPress={() => {
                 openPicker();
               }}
-            >
-              <Text>{t('organization.boundary.chooseAccount')}</Text>
-            </Button>
+            />
             {backAction}
           </View>
         }

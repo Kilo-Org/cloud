@@ -9,8 +9,10 @@ import { RefusalStatus } from '@/components/refusal-status';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ChoiceRow } from '@/components/ui/choice-row';
+import { RowGroup } from '@/components/ui/row-group';
 import { RadioGroup } from '@/components/ui/radio-group';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { reviewerSaveFailure } from '@/lib/code-reviewer-save-error';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { usePopOnce } from '@/lib/navigation/pop-once';
@@ -97,31 +99,32 @@ export function OptionList<T extends string, TSaveResult>({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={title} backFallback={CODE_REVIEWER_HOME_PATH} />
-      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
+      <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
         <RadioGroup label={title}>
-          {options.map(option => (
-            <View key={option} className="relative">
-              <ChoiceRow
-                label={labels?.[option] ?? option}
-                description={descriptions?.[option]}
-                selected={selected === option}
-                disabled={Boolean(disabled) || pending !== null}
-                busy={pending === option}
-                onPress={() => {
-                  void handleSelect(option);
-                }}
-                className="border-b-[0.5px] border-hair-soft"
-              />
-              {pending === option && (
-                <View className="absolute inset-y-0 right-0 justify-center" pointerEvents="none">
-                  <ActivityIndicator size="small" color={colors.mutedForeground} />
-                </View>
-              )}
-            </View>
-          ))}
+          <RowGroup>
+            {options.map(option => (
+              <View key={option} className="relative">
+                <ChoiceRow
+                  label={labels?.[option] ?? option}
+                  description={descriptions?.[option]}
+                  selected={selected === option}
+                  disabled={Boolean(disabled) || pending !== null}
+                  busy={pending === option}
+                  onPress={() => {
+                    void handleSelect(option);
+                  }}
+                />
+                {pending === option && (
+                  <View className="absolute inset-y-0 right-0 justify-center" pointerEvents="none">
+                    <ActivityIndicator size="small" color={colors.mutedForeground} />
+                  </View>
+                )}
+              </View>
+            ))}
+          </RowGroup>
         </RadioGroup>
         {failure !== null && report !== null && (
-          <View className="mt-4 rounded-lg bg-warn-tile-bg p-4">
+          <View className="gap-3 rounded-xl bg-warn-tile-bg p-4">
             {/* `RefusalStatus` owns the announcement (the card carried a live
                 region of its own before), and the tile's own ink stays: the
                 refusal is a configuration refusal, not a destructive one. */}
@@ -135,6 +138,11 @@ export function OptionList<T extends string, TSaveResult>({
                 variant="outline"
                 size="sm"
                 className={cn(STATE_ACTION_CLASS, 'mt-3 self-start')}
+                // `loading` is the busy face the primitive owns: the spinner
+                // takes the label's slot (which stays reserved, so the retry
+                // does not resize in flight), the control refuses presses and
+                // it announces the wait. Only `disabled` left a control that
+                // looked idle while it silently refused the tap.
                 loading={retryInFlight}
                 accessibilityLabel={t('common.retry')}
                 onPress={() => {

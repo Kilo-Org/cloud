@@ -169,16 +169,25 @@ function parseEnv(source: string): Record<string, string> {
 }
 
 const committedEnv = parseEnv(envSource);
-// Every URL key except the two optional ones is a required ENV_KEYS entry
-// committed in apps/mobile/.env. The optional latency ingest endpoint's
-// committed default is LATENCY_INGEST_URL_DEFAULT; the optional Kilo MCP
-// endpoint's committed default is KILO_MCP_URL_PRODUCTION in lib/config.ts
-// (mcp.kiloapps.io, inside PRODUCTION_HOSTS) — a non-production build without
-// an override leaves it undefined and the feature hides itself, so no .env
-// value is required for either.
-const requiredUrlKeys = (Object.keys(URL_SCHEMES) as (keyof typeof URL_SCHEMES)[]).filter(
-  key => key !== 'latencyIngestUrl' && key !== 'kiloMcpUrl'
-);
+/** The config key names in `map` that are URL keys. Every URL key is named in
+ *  ENV_KEYS or OPTIONAL_ENV_KEYS; the required ones are committed in
+ *  apps/mobile/.env, while an optional one falls back to its committed default
+ *  (LATENCY_INGEST_URL_DEFAULT, or KILO_MCP_URL_PRODUCTION in lib/config.ts). */
+const urlKeysIn = (map: object): (keyof typeof URL_SCHEMES)[] =>
+  Object.keys(map).filter((key): key is keyof typeof URL_SCHEMES => key in URL_SCHEMES);
+
+const requiredUrlKeys = urlKeysIn(ENV_KEYS);
+const optionalUrlKeys = urlKeysIn(OPTIONAL_ENV_KEYS);
+
+// The derivation above is the single source for the required and optional URL
+// key lists; guard that both stay non-empty so the loop tests below cannot
+// pass vacuously.
+describe('derived URL key lists', () => {
+  it('derives a non-empty required and optional URL key list', () => {
+    expect(requiredUrlKeys.length, requiredUrlKeys.join(',')).toBeGreaterThan(0);
+    expect(optionalUrlKeys.length, optionalUrlKeys.join(',')).toBeGreaterThan(0);
+  });
+});
 
 describe('committed production URL defaults (host contract)', () => {
   it('accepts every committed .env URL value for scheme and production host', () => {
@@ -329,7 +338,13 @@ describe('URL key → environment variable resolution', () => {
     }
   });
 
-  it('keeps the optional URL key out of the required-presence values', () => {
-    expect(Object.values(ENV_KEYS)).not.toContain('LATENCY_INGEST_URL');
+  it('keeps every optional env key out of the required-presence values', () => {
+    const requiredNames = new Set(Object.values(ENV_KEYS));
+    for (const optionalName of Object.values(OPTIONAL_ENV_KEYS)) {
+      expect(
+        requiredNames.has(optionalName),
+        `${optionalName} is optional but is also listed in ENV_KEYS`
+      ).toBe(false);
+    }
   });
 });

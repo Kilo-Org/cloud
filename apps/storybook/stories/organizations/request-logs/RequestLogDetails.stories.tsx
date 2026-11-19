@@ -97,7 +97,7 @@ const directByokDetails: RequestLogDetails = {
         },
         verdict: 'skip',
         unavailable_reason: null,
-        added_latency_ms: 0,
+        added_latency_ms: 5_260,
         scans: [
           {
             scan: 'log_only',
@@ -450,7 +450,7 @@ const enkryptPartialCacheHitDetails: RequestLogDetails = {
         },
         verdict: 'skip',
         unavailable_reason: null,
-        added_latency_ms: 0,
+        added_latency_ms: 8_262,
         scans: [
           {
             scan: 'log_only',
@@ -579,6 +579,120 @@ export const BlockedByEnkryptInputGuardrail: Story = {
   },
 };
 
+const enkryptBlockStoppedScanDetails: RequestLogDetails = {
+  ...enkryptBlockedDetails,
+  metadata: {
+    status: 'available',
+    routing: {
+      ...enkryptBlockedRouting,
+      enkrypt: {
+        settings: {
+          status: 'ready',
+          detectors: [{ detector: 'injection_attack', action: 'block' }],
+        },
+        verdict: 'block',
+        unavailable_reason: null,
+        added_latency_ms: 1_412,
+        scans: [
+          {
+            scan: 'blocking',
+            part: 'tools',
+            detectors_enabled: ['injection_attack'],
+            detectors_blocking: ['injection_attack'],
+            verdict_cache: 'miss',
+            verdict_cache_write: 'skipped',
+            tools_total: 3,
+            tools_cached: 0,
+            tools_scanned: 0,
+            tools_flagged: 0,
+            total_characters: 2_184,
+            cached_characters: 0,
+            total_units: 3,
+            cached_units: 0,
+            failed_calls_cached: 0,
+            calls_skipped: 3,
+            scanned_characters: 0,
+            decision: 'allowed',
+            error: null,
+            detectors_fired: [],
+            attempts: 0,
+            credits_cost: null,
+            latency_ms: 0,
+            flagged_tools: [],
+          },
+          {
+            scan: 'blocking',
+            part: 'system',
+            detectors_enabled: ['injection_attack'],
+            detectors_blocking: ['injection_attack'],
+            verdict_cache: 'miss',
+            verdict_cache_write: 'skipped',
+            total_characters: 6_456,
+            total_segments: 1,
+            cached_characters: 0,
+            cached_segments: 0,
+            total_units: 1,
+            cached_units: 0,
+            failed_calls_cached: 0,
+            calls_skipped: 1,
+            omitted_attachments: 0,
+            scanned_characters: 0,
+            decision: 'allowed',
+            error: null,
+            detectors_fired: [],
+            attempts: 0,
+            credits_cost: null,
+            latency_ms: 0,
+            chunks: 1,
+          },
+          {
+            scan: 'blocking',
+            part: 'conversation',
+            detectors_enabled: ['injection_attack'],
+            detectors_blocking: ['injection_attack'],
+            verdict_cache: 'miss',
+            verdict_cache_write: 'written',
+            total_characters: 48_920,
+            total_segments: 6,
+            cached_characters: 0,
+            cached_segments: 0,
+            total_units: 6,
+            cached_units: 0,
+            failed_calls_cached: 0,
+            calls_skipped: 4,
+            omitted_attachments: 0,
+            scanned_characters: 9_310,
+            decision: 'blocked',
+            error: null,
+            detectors_fired: ['injection_attack'],
+            attempts: 2,
+            credits_cost: 4,
+            latency_ms: 1_398,
+            chunks: 6,
+          },
+        ],
+      },
+    },
+  },
+};
+
+export const EnkryptBlockStoppedScan: Story = {
+  args: {
+    row: {
+      ...row,
+      provider: null,
+      is_user_byok: false,
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_hit_tokens: 0,
+      has_error: true,
+      latency_ms: 1_660,
+      generation_time_ms: null,
+    },
+    details: enkryptBlockStoppedScanDetails,
+  },
+};
+
 const enkryptFailedOpenDetails: RequestLogDetails = {
   request: { ...enkryptBlockedDetails.request, status_code: 200, finish_reason: 'stop' },
   metadata: {
@@ -628,5 +742,94 @@ export const EnkryptInputGuardrailFailedOpen: Story = {
   args: {
     row: { ...row, is_user_byok: false, latency_ms: 63_120 },
     details: enkryptFailedOpenDetails,
+  },
+};
+
+type EnkryptReport = NonNullable<Routing['enkrypt']>;
+type EnkryptScan = EnkryptReport['scans'][number];
+
+const deadlineBlockingScan: EnkryptScan = {
+  scan: 'blocking',
+  part: 'conversation',
+  detectors_enabled: ['keyword_detector'],
+  detectors_blocking: ['keyword_detector'],
+  verdict_cache: 'hit',
+  verdict_cache_write: 'written',
+  total_characters: 576_476,
+  total_segments: 1_097,
+  cached_characters: 569_536,
+  cached_segments: 1_080,
+  total_units: 1_097,
+  cached_units: 1_080,
+  failed_calls_cached: 0,
+  calls_cached: 17,
+  call_outcomes: { allowed: 17, flagged: 0, blocked: 0, failed: 0, not_sent: 0 },
+  calls_skipped: 0,
+  omitted_attachments: 2,
+  scanned_characters: 6_940,
+  decision: 'allowed',
+  error: null,
+  detectors_fired: [],
+  attempts: 17,
+  credits_cost: 17,
+  latency_ms: 3_120,
+  chunks: 17,
+};
+
+const deadlineLogOnlyScan: EnkryptScan = {
+  ...deadlineBlockingScan,
+  scan: 'log_only',
+  detectors_enabled: ['injection_attack', 'policy_violation'],
+  detectors_blocking: [],
+  failed_calls_cached: 9,
+  calls_cached: 8,
+  call_outcomes: { allowed: 8, flagged: 0, blocked: 0, failed: 1, not_sent: 8 },
+  scanned_characters: 3_444,
+  decision: 'error_logged',
+  error: 'timeout',
+  attempts: 9,
+  credits_cost: 8,
+  latency_ms: 56_730,
+};
+
+function deadlineDetails(scans: EnkryptScan[]): RequestLogDetails {
+  return {
+    ...directByokDetails,
+    metadata: {
+      status: 'available',
+      routing: {
+        ...availableRouting(directByokDetails),
+        enkrypt: {
+          settings: {
+            status: 'ready',
+            detectors: [
+              { detector: 'injection_attack', action: 'log' },
+              { detector: 'keyword_detector', action: 'block', banned_keyword_count: 12 },
+              { detector: 'policy_violation', action: 'log', policy_format: 'text' },
+            ],
+          },
+          verdict: 'allow',
+          unavailable_reason: null,
+          added_latency_ms: 3_141,
+          scans,
+        },
+      },
+    },
+  };
+}
+
+function olderReport(scan: EnkryptScan): EnkryptScan {
+  const { calls_cached: _cached, call_outcomes: _outcomes, ...rest } = scan;
+  return rest;
+}
+
+export const EnkryptLogOnlyDeadlineRanOut: Story = {
+  args: { row, details: deadlineDetails([deadlineBlockingScan, deadlineLogOnlyScan]) },
+};
+
+export const EnkryptLogOnlyDeadlineRanOutOlderReport: Story = {
+  args: {
+    row,
+    details: deadlineDetails([olderReport(deadlineBlockingScan), olderReport(deadlineLogOnlyScan)]),
   },
 };

@@ -6,7 +6,7 @@ import {
   getOrganizationById,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { getAllOrganizationModes } from '@/lib/organizations/organization-modes';
-import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type { User, Organization } from '@kilocode/db/schema';
 import { organization_audit_logs } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';

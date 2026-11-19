@@ -15,15 +15,12 @@
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { type PrInboxView } from '@/components/pr-review/pr-review-inbox-view';
-import { Button } from '@/components/ui/button';
-import { GitPullRequest } from '@/components/ui/icons';
+import { ArrowRight, GitPullRequest } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { type ProviderPrPlatform } from '@/lib/pr-review/provider-pr-ref';
 
 const SKELETON_ROW_COUNT = 5;
@@ -69,7 +66,7 @@ function InboxBody({
       <View>
         {Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
           // eslint-disable-next-line react/no-array-index-key -- skeleton placeholders have no stable id
-          <View key={index} className="gap-2 border-b-[0.5px] border-hair-soft px-6 py-3">
+          <View key={index} className="gap-2 border-b-[0.5px] border-hair-soft px-4 py-3">
             <Skeleton className="h-3.5 w-2/3" />
             <Skeleton className="h-3 w-1/3" />
           </View>
@@ -92,17 +89,18 @@ function InboxBody({
         description={t('prReview.inbox.noReviewRequestsDescription')}
         placement="top"
         compact
+        inset="gutter"
         className="pt-4"
       />
     );
   }
 
   if (view.kind === 'permission') {
-    return <QueryError variant="permission" placement="top" />;
+    return <QueryError variant="permission" placement="top" inset="gutter" />;
   }
 
   if (view.kind === 'not-found') {
-    return <QueryError variant="not-found" placement="top" />;
+    return <QueryError variant="not-found" placement="top" inset="gutter" />;
   }
 
   if (view.kind === 'access-denied' || view.kind === 'organization-unavailable') {
@@ -121,18 +119,16 @@ function InboxBody({
             : 'prReview.inbox.accessLostDescription'
         )}
         placement="top"
+        inset="gutter"
         action={
           // No retry here: the server refuses this organization, so repeating
           // the same read can only be refused again. The way out is the
           // personal scope, which needs no organization membership.
-          <Button
-            className={STATE_ACTION_CLASS}
-            variant="outline"
+          <StateAction
+            label={t('prReview.inbox.continueInPersonal')}
+            icon={ArrowRight}
             onPress={onContinueInPersonal}
-            accessibilityLabel={t('prReview.inbox.continueInPersonal')}
-          >
-            <Text>{t('prReview.inbox.continueInPersonal')}</Text>
-          </Button>
+          />
         }
       />
     );
@@ -140,7 +136,7 @@ function InboxBody({
 
   if (view.kind === 'reconnect') {
     return (
-      <View className="px-6 py-6">
+      <View className="px-4 py-6">
         <PrReviewReconnectNotice
           platform={reconnectPlatform ?? undefined}
           organizationId={organizationId}
@@ -163,6 +159,7 @@ function InboxBody({
       }
       message={isServiceUnavailable ? t('prReview.reviewServiceUnavailableDescription') : undefined}
       placement="top"
+      inset="gutter"
       onRetry={onRetry}
       isRetrying={isRetrying}
     />

@@ -9,9 +9,16 @@ import { act, TestRenderer } from '@/test/renderer';
 import { PreferenceRow } from './preference-row';
 
 const schemeState = vi.hoisted(() => ({ current: 'light' as 'light' | 'dark' }));
+// The shared switch paints its own muted pair on Android only: iOS fades a
+// disabled `UISwitch` itself, so the row's light override yields on both.
+const platformState = vi.hoisted(() => ({ os: 'ios' as 'ios' | 'android' }));
 
 vi.mock('react-native', () => ({
-  Platform: { OS: 'ios' },
+  Platform: {
+    get OS() {
+      return platformState.os;
+    },
+  },
   ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },
   Pressable: 'Pressable',
@@ -24,6 +31,13 @@ vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 vi.mock('@/components/ui/activity-indicator', () => ({
   ActivityIndicator: 'ActivityIndicator',
 }));
+// A switch row renders no chevron or check mark; the frame imports the marks
+// for its other trailing variants, so this suite stubs them out of its graph.
+vi.mock('@/components/ui/row-check', () => ({ RowCheck: 'RowCheck' }));
+vi.mock('@/components/ui/row-chevron', () => ({ RowChevron: 'RowChevron' }));
+// A flip ticks the selection haptic; the native module is out of this graph.
+const haptics = vi.hoisted(() => ({ selectionHaptic: vi.fn() }));
+vi.mock('@/lib/haptics', () => haptics);
 // The real palettes, so the switch-colour assertions below hold the token pairs
 // the screen actually renders rather than values invented for the test. The
 // import has to be dynamic: `vi.mock` factories are hoisted above this file's
@@ -50,6 +64,7 @@ function renderRow(props: {
   resolveValue?: () => boolean;
   subtitle?: string;
   inactiveSubtitle?: string;
+  testID?: string;
 }) {
   act(() => {
     const element = createElement(PreferenceRow, {
@@ -75,6 +90,7 @@ afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
   schemeState.current = 'light';
+  platformState.os = 'ios';
 });
 
 /** WCAG relative luminance, for the switch's contrast floor. */
@@ -96,6 +112,15 @@ function contrast(a: string, b: string): number {
 }
 
 describe('PreferenceRow', () => {
+  it('takes the contract row anatomy without owning a card', () => {
+    const root = renderRow({ value: false, onValueChange: () => undefined });
+    const outer = root.findAll(node => Object.is(node.type, 'View'))[0];
+    const classes = String(outer?.props.className).split(' ');
+
+    expect(classes).toEqual(expect.arrayContaining(['min-h-[48px]', 'px-4', 'py-3']));
+    expect(classes.some(name => name.startsWith('rounded-') || name.startsWith('bg-'))).toBe(false);
+  });
+
   it('moves the switch when the title is pressed, so a tap on the label is a tap on the control', () => {
     const seen: boolean[] = [];
     const root = renderRow({
@@ -128,6 +153,29 @@ describe('PreferenceRow', () => {
     });
 
     expect(seen).toEqual([false]);
+  });
+
+  it('ticks the selection haptic once per flip on either control, never per store update', () => {
+    haptics.selectionHaptic.mockClear();
+    const root = renderRow({ value: false, onValueChange: () => undefined });
+
+    const toggle = root.find(node => Object.is(node.type, 'Switch'));
+    act(() => {
+      (toggle.props.onValueChange as (next: boolean) => void)(true);
+    });
+    expect(haptics.selectionHaptic).toHaveBeenCalledTimes(1);
+
+    // The switch's own flip ticks inside the row frame; tapping the title is
+    // the same flip and answers the same way.
+    const label = root.find(node => Object.is(node.type, 'Pressable'));
+    act(() => {
+      (label.props.onPress as () => void)();
+    });
+    expect(haptics.selectionHaptic).toHaveBeenCalledTimes(2);
+
+    // A store write re-renders the row with a new value; it is not a flip.
+    renderRow({ value: true, onValueChange: () => undefined });
+    expect(haptics.selectionHaptic).toHaveBeenCalledTimes(2);
   });
 
   it('exposes the row as one switch carrying the title, subtitle and state', () => {
@@ -301,5 +349,31 @@ describe('PreferenceRow', () => {
     expect(trackColor.true).toBe(darkColors.selection);
     expect(contrast(toggle.props.thumbColor as string, trackColor.false)).toBeGreaterThanOrEqual(3);
     expect(contrast(trackColor.false, darkColors.secondary)).toBeGreaterThanOrEqual(3);
+  });
+
+  it('paints an unavailable row with the muted pair instead of the accent', () => {
+    // A dimmed title beside a full-strength accent track reads as both
+    // unavailable and on, and Android folds the colours into the switch
+    // drawables with no unavailable appearance of its own. The row therefore
+    // yields the light override and lets the shared switch paint its muted pair.
+    schemeState.current = 'light';
+    platformState.os = 'android';
+    const root = renderRow({ value: true, disabled: true, onValueChange: () => undefined });
+    const toggle = root.find(node => Object.is(node.type, 'Switch'));
+    const trackColor = toggle.props.trackColor as { false: string; true: string };
+
+    expect(trackColor.false).toBe(lightColors.mutedSoft);
+    expect(trackColor.true).toBe(lightColors.mutedSoft);
+    expect(toggle.props.thumbColor).toBe(lightColors.foreground);
+  });
+});
+
+describe('PreferenceRow test handle', () => {
+  it("puts the caller's testID on the row container", () => {
+    const row = renderRow({ value: true, onValueChange: () => undefined, testID: 'pref-1' }).find(
+      node => typeof node.type === 'string' && node.props.testID === 'pref-1'
+    );
+
+    expect(row.type).toBe('View');
   });
 });

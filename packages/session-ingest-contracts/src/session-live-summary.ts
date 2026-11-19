@@ -159,17 +159,20 @@ function characterSegmenter(): Intl.Segmenter | null {
  * The end of the character at or before `maxIndex`, as the index just past it:
  * the largest extended grapheme cluster boundary no greater than `maxIndex`.
  * A runtime without segmentation falls back to a code unit boundary that keeps
- * a surrogate pair whole.
+ * a surrogate pair whole. A cap past the end of the line reads as the line end,
+ * and a cap at or below zero reads as zero.
  */
 export function characterCut(line: string, maxIndex: number): number {
+  // Clamping once keeps the two runtime branches on one contract.
+  const cap = Math.min(Math.max(maxIndex, 0), line.length);
   const segmenter = characterSegmenter();
   if (segmenter === null) {
-    const last = line.charCodeAt(maxIndex - 1);
-    return maxIndex > 0 && last >= 0xd800 && last <= 0xdbff ? maxIndex - 1 : maxIndex;
+    const last = line.charCodeAt(cap - 1);
+    return cap > 0 && last >= 0xd800 && last <= 0xdbff ? cap - 1 : cap;
   }
   let end = 0;
   for (const { index, segment } of segmenter.segment(line)) {
-    if (index + segment.length > maxIndex) break;
+    if (index + segment.length > cap) break;
     end = index + segment.length;
   }
   return end;

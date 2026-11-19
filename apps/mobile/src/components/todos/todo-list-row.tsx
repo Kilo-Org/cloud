@@ -5,10 +5,11 @@ import { Pressable, View } from 'react-native';
 import Sortable from 'react-native-sortables';
 
 import { TodoSwipeRow } from '@/components/todos/todo-swipe-row';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { IconTile } from '@/components/ui/icon-tile';
+import { RowChevron } from '@/components/ui/row-chevron';
 import { Archive, ArchiveRestore, ListTodo, Trash2 } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { type TodoList } from '@/lib/todos/todo-types';
 
 const SortableTouchable = styled(Sortable.Touchable, { className: 'style' });
@@ -30,22 +31,19 @@ export const TodoListRow = memo(function TodoListRow({
   onDelete,
 }: Readonly<TodoListRowProps>) {
   const { t } = useTranslation();
-  const colors = useThemeColors();
   const archived = list.archivedAt !== null;
   const archiveLabel = archived ? t('todos.lists.unarchive') : t('todos.lists.archive');
   const openCount = t('todos.lists.openCount', { count: list.openCount });
 
   const content = (
     <>
-      <View className="size-9 items-center justify-center rounded-lg bg-secondary">
-        {list.emoji ? (
-          <Text className="text-lg">{list.emoji}</Text>
-        ) : (
-          <ListTodo size={18} color={colors.mutedForeground} />
-        )}
-      </View>
+      <IconTile
+        tint={NEUTRAL_TINT}
+        icon={list.emoji ? undefined : ListTodo}
+        content={list.emoji ? <Text className="text-base">{list.emoji}</Text> : undefined}
+      />
       <View className="min-w-0 flex-1">
-        <Text className="text-base font-medium text-foreground" numberOfLines={1}>
+        <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
           {list.name}
         </Text>
         <Text className="text-xs text-muted-foreground" numberOfLines={1}>
@@ -53,7 +51,7 @@ export const TodoListRow = memo(function TodoListRow({
         </Text>
       </View>
       <Text className="text-sm tabular-nums text-muted-foreground">{openCount}</Text>
-      <DirectionalChevronRight size={16} color={colors.mutedForeground} />
+      <RowChevron />
     </>
   );
   const a11y = {
@@ -70,7 +68,7 @@ export const TodoListRow = memo(function TodoListRow({
       }
     },
   };
-  const rowClass = 'min-h-16 flex-row items-center gap-3 bg-background px-4 py-2';
+  const rowClass = 'min-h-14 flex-row items-center gap-3 bg-background px-4 py-3';
 
   return (
     <TodoSwipeRow

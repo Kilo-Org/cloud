@@ -18,6 +18,7 @@ import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { reportNothing, useTodoListMutations, useTodoLists } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 import {
   TODO_LIST_EMOJI_MAX_LENGTH,
   TODO_LIST_NAME_MAX_LENGTH,
@@ -43,6 +44,7 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const headerTopInset = useFormSheetHeaderTopInset();
   const { create, update } = useTodoListMutations(organizationId, reportNothing);
   const scope = organizationId ?? undefined;
   const { repositories, recents, groups } = useNewSessionRepos({ organizationId: scope });
@@ -146,6 +148,7 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
         onCancel={requestClose}
         disabled={saving}
         doneDisabled={!hasName || saving}
+        topInset={headerTopInset}
       >
         <View className="gap-5 px-4 pt-2">
           <View className="flex-row gap-3">
@@ -158,7 +161,7 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
                 }}
                 maxLength={TODO_LIST_EMOJI_MAX_LENGTH}
                 accessibilityLabel={t('todos.listSettings.emoji')}
-                className="rounded-lg border border-border bg-secondary text-base text-foreground"
+                className="rounded-md border border-input bg-background text-base text-foreground"
               />
             </View>
             <View className="min-w-0 flex-1 gap-2">

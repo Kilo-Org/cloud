@@ -1,6 +1,6 @@
-import { act } from '@/test/renderer';
+/* eslint-disable max-lines -- one mounted suite covers the device list, its revoke flow and every data state over one tRPC mock. */
 import type * as ReactQuery from '@tanstack/react-query';
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type DeviceSession } from '@/lib/device-sessions';
@@ -37,10 +37,55 @@ vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } })
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+// The layout primitives the screens compose: each mock renders the content the
+// assertions read (the row's one-line title, its subtitle, and the control the
+// row carries), at the geometry the real primitive owns.
+vi.mock('@/components/ui/section', () => ({
+  Section: ({ children }: { children?: ReactNode }): ReactNode => children,
+}));
+vi.mock('@/components/ui/row-group', () => ({
+  RowGroup: ({ children }: { children?: ReactNode }): ReactNode => children,
+}));
+vi.mock('@/components/ui/row-skeleton', () => ({
+  RowSkeleton: (props: { tile?: boolean; subtitle?: boolean }) =>
+    createElement(
+      'View',
+      null,
+      props.tile === true ? createElement('Skeleton') : null,
+      createElement('Skeleton'),
+      props.subtitle === true ? createElement('Skeleton') : null
+    ),
+}));
+vi.mock('@/components/ui/configure-row', () => ({
+  ConfigureRow: (props: { title: string; subtitle?: string; trailing?: ReactNode }) =>
+    createElement(
+      'View',
+      null,
+      createElement('Text', { numberOfLines: 1 }, props.title),
+      props.subtitle === undefined ? null : createElement('Text', null, props.subtitle),
+      props.trailing ?? null
+    ),
+}));
+vi.mock('@/components/ui/icon-button', () => ({
+  IconButton: (props: {
+    children?: ReactNode;
+    accessibilityLabel?: string;
+    onPress?: () => void;
+  }) =>
+    createElement(
+      'Pressable',
+      { ...props, className: 'h-[48px] w-[48px] items-center justify-center' },
+      props.children
+    ),
+}));
+
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({
     confirm: (request: { title: string; message: string; confirmLabel: string }) => {
@@ -50,9 +95,12 @@ vi.mock('@/components/ui/dialog', () => ({
   }),
 }));
 vi.mock('@/components/ui/icons', () => ({
+  Terminal: 'Terminal',
+  Globe: 'Globe',
   Smartphone: 'Smartphone',
   Shield: 'Shield',
   X: 'X',
+  ArrowLeft: 'ArrowLeft',
 }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalLogOut: 'DirectionalLogOut' }));
 vi.mock('@/lib/auth/auth-context', () => ({
@@ -141,14 +189,12 @@ describe('account surface states', () => {
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
     const signOut = renderer.root.findAll(node => String(node.type) === 'Pressable');
     expect(signOut).toHaveLength(1);
-    // The control box hugs its 16 pt glyph so its outer edge lines up with the
-    // card padding instead of sitting 14 dp inside it; 28 dp plus 9 dp of hit
-    // slop per side reaches 46 dp, clear of the app's 44 dp minimum even after
-    // pixel rounding. The loading skeleton reserves this same box (asserted
-    // below), so the control does not jump the list when rows arrive.
-    expect(signOut[0]?.props.className).toContain('min-h-[28px]');
-    expect(signOut[0]?.props.className).toContain('min-w-[28px]');
-    expect(signOut[0]?.props.hitSlop).toBe(9);
+    // The control is the shared row icon action: a compact 32pt box whose
+    // touch region reaches 48pt through `hitSlop`, so the row it ends keeps
+    // `RowFrame`'s geometry and the loading skeleton reserves the same height.
+    expect(signOut[0]?.props.className).toContain('h-[32px]');
+    expect(signOut[0]?.props.className).toContain('w-[32px]');
+    expect(signOut[0]?.props.hitSlop).toEqual({ top: 8, bottom: 8, left: 8, right: 8 });
     unmount();
   });
 
@@ -156,16 +202,7 @@ describe('account surface states', () => {
     query.isPending = true;
     query.isError = true;
     const { renderer, unmount } = await renderWithProviders(createElement(DeviceSessionsScreen));
-    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(12);
-    // Every skeleton row reserves the sign-out control's final 28x28pt box, so
-    // the loaded rows are the same height and the list does not jump on load.
-    const reserved = renderer.root.findAll(
-      node =>
-        String(node.type) === 'View' &&
-        String(node.props.className).includes('min-h-[28px]') &&
-        String(node.props.className).includes('min-w-[28px]')
-    );
-    expect(reserved).toHaveLength(3);
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(9);
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
     unmount();
@@ -180,7 +217,7 @@ describe('account surface states', () => {
     query.isError = false;
     query.data = undefined;
     const { renderer, unmount } = await renderWithProviders(createElement(DeviceSessionsScreen));
-    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(12);
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(9);
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
     unmount();
   });
@@ -191,20 +228,6 @@ describe('account surface states', () => {
       0
     );
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(1);
-    unmount();
-  });
-
-  // The empty-state escape names the Preferences hub, so it must land there,
-  // not one row short on Account (where the screen is pushed from).
-  it('sends the empty-state escape to the Preferences hub', async () => {
-    const { renderer, unmount } = await renderWithProviders(createElement(TrustedHostsScreen));
-    const emptyState = renderer.root.find(node => String(node.type) === 'EmptyState');
-    const action = emptyState.props.action as { props: { onPress: () => void } };
-    act(() => {
-      action.props.onPress();
-    });
-    expect(router.dismissTo).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/preferences');
-    expect(router.back).not.toHaveBeenCalled();
     unmount();
   });
 

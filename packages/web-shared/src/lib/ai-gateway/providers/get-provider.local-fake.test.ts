@@ -27,7 +27,10 @@ import type * as directByokModule from '@kilocode/web-shared/lib/ai-gateway/prov
 import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { resolveOpenAiChatGptAccessToken } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/refresh';
-import { getOpenAiChatGptStoredConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
+import {
+  getOpenAiChatGptStoredConnection,
+  type OpenAiChatGptStoredConnection,
+} from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   ReasoningDetailsTransform,
@@ -378,6 +381,12 @@ describe('getProvider ChatGPT connection routing order', () => {
     status: 'connected',
   };
 
+  function storedConnection(
+    overrides: Partial<OpenAiChatGptStoredConnection> = {}
+  ): OpenAiChatGptStoredConnection {
+    return { connection, isEnabled: true, createdBy: user.id, ...overrides };
+  }
+
   beforeEach(() => {
     jest.mocked(shouldRouteToVercel).mockReset().mockResolvedValue(false);
     jest.mocked(getModelInferenceUserByokProviders).mockReset().mockResolvedValue(['openai']);
@@ -414,9 +423,7 @@ describe('getProvider ChatGPT connection routing order', () => {
 
   test('an enabled connection beats a Vercel openai BYOK row for an eligible responses request', async () => {
     const env = replaceEnv({ OPENAI_CHATGPT_API_KEY: 'partner-project-key' });
-    jest
-      .mocked(getOpenAiChatGptStoredConnection)
-      .mockResolvedValue({ connection, isEnabled: true });
+    jest.mocked(getOpenAiChatGptStoredConnection).mockResolvedValue(storedConnection());
     const decrypt = storeKeys({ decryptedAPIKey: 'user-vercel-key', providerId: 'openai' });
     jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
 
@@ -437,9 +444,7 @@ describe('getProvider ChatGPT connection routing order', () => {
 
   test('a terminal connection failure never resolves to another billing path', async () => {
     const env = replaceEnv({ OPENAI_CHATGPT_API_KEY: 'partner-project-key' });
-    jest
-      .mocked(getOpenAiChatGptStoredConnection)
-      .mockResolvedValue({ connection, isEnabled: true });
+    jest.mocked(getOpenAiChatGptStoredConnection).mockResolvedValue(storedConnection());
     jest.mocked(resolveOpenAiChatGptAccessToken).mockResolvedValue({ kind: 'terminal' });
     jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
     const decrypt = storeKeys({ decryptedAPIKey: 'user-vercel-key', providerId: 'openai' });
@@ -490,9 +495,7 @@ describe('getProvider ChatGPT connection routing order', () => {
 
   test('an ineligible chat_completions request resolves exactly as before', async () => {
     const env = replaceEnv({ OPENAI_CHATGPT_API_KEY: 'partner-project-key' });
-    jest
-      .mocked(getOpenAiChatGptStoredConnection)
-      .mockResolvedValue({ connection, isEnabled: true });
+    jest.mocked(getOpenAiChatGptStoredConnection).mockResolvedValue(storedConnection());
 
     const result = await getProvider(getProviderInput(providerInput('openai/gpt-5-nano')));
 
@@ -508,9 +511,7 @@ describe('getProvider ChatGPT connection routing order', () => {
 
   test('an eligible request without the partner key resolves exactly as before', async () => {
     const env = replaceEnv({});
-    jest
-      .mocked(getOpenAiChatGptStoredConnection)
-      .mockResolvedValue({ connection, isEnabled: true });
+    jest.mocked(getOpenAiChatGptStoredConnection).mockResolvedValue(storedConnection());
     storeKeys({ decryptedAPIKey: 'user-vercel-key', providerId: 'openai' });
 
     const result = await getProvider(getProviderInput(responsesInput('openai/gpt-5-nano')));

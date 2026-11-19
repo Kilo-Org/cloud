@@ -820,7 +820,19 @@
         "fileComment": "Comentario sobre o ficheiro",
         "outdatedOnPathLines": "Desactualizado en {{path}} {{lines}}",
         "outdatedOnLines": "Desactualizado en {{lines}}",
-        "outdatedOnPath": "Desactualizado en {{path}}"
+        "outdatedOnPath": "Desactualizado en {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Lado esquerdo",
+        "sideRight": "Lado dereito",
+        "outdatedOnLinesSide": "Desactualizado en {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Desactualizado en {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Desactualizado ({{side}})",
+        "outdatedOnPathSide": "Desactualizado en {{path}} ({{side}})"
       },
       "deletedUser": "usuario eliminado",
       "replyForbiddenTerm": "Non tes permiso para responder a esta {{term}}.",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Esta conta aínda non ten organizacións. As solicitudes de integración de Bitbucket pódense revisar en canto crees ou te unas a unha organización.",
       "gitlabReconnectAdminOnlyDescription": "Pídelle ao propietario, ao administrador ou ao xestor de facturación da organización que a reconecte.",
       "bitbucketNotConnectedTitle": "Bitbucket non está conectado",
-      "bitbucketAdminOnlyDescription": "Só os propietarios da organización, os administradores e os xestores de facturación poden conectalo.",
+      "adminOnlyConnectDescription": "Só os propietarios da organización, os administradores e os xestores de facturación poden conectalo.",
       "contextLine": "Para {{organization}}",
       "contextLinePersonal": "Para a túa conta persoal"
     },
@@ -1373,8 +1385,9 @@
       "notConnectedReadOnly": "Bitbucket non está conectado. Só os propietarios da organización, os administradores e os xestores de facturación poden conectalo."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "A conexión de Bitbucket desta organización xestiónase na web desde un ordenador.",
-      "description": "Crea un token de acceso ao espazo de traballo cos ámbitos requiridos e pégao aquí embaixo.",
+      "managedOnWeb": "A conexión de Bitbucket con {{organization}} xestiónase na web desde un ordenador.",
+      "description": "Crea un token de acceso ao espazo de traballo para {{organization}} e pégao aquí embaixo.",
+      "descriptionReconnect": "Crea un novo token de acceso ao espazo de traballo para {{organization}} e pégao aquí embaixo.",
       "scopes": "Conta: lectura · Repositorios: lectura/escritura · Solicitudes de cambios: lectura · Webhooks: lectura/escritura",
       "tokenPlaceholder": "Token de acceso ao espazo de traballo",
       "tokenRefused": "Bitbucket non aceptou este token do espazo de traballo. Comproba que ten os ámbitos indicados arriba e téntao de novo."
@@ -2148,6 +2161,8 @@
       "renameAccessibility": "Renomear sesión: {{title}}",
       "cloningSession": "Clonando a sesión",
       "couldNotLoadThisSession": "Non se puido cargar esta sesión.",
+      "historyTooLarge": "A transcrición desta sesión é demasiado grande para cargala.",
+      "historyUnavailable": "Non se pode ler a transcrición desta sesión.",
       "cloneFailedRetry": "Non se puido clonar esta sesión. Téntao de novo.",
       "notEnoughCredits": "Non tes créditos suficientes para esta solicitude. Engade créditos e téntao de novo.",
       "previousTaskFinishing": "A tarefa anterior aínda está a rematar. Agarda un momento.",
@@ -2224,6 +2239,7 @@
       "branchDefault": "Predeterminada",
       "branchAccessibility": "Rama: {{label}}",
       "branchLoading": "Cargando ramas",
+      "branchInactive": "Selecciona un repositorio para cargar as súas ramas.",
       "branchLoadError": "Non se puideron cargar as ramas",
       "branchUnavailable": "Non hai ramas dispoñibles para este repositorio. Comproba o teu acceso co provedor e escolle outro repositorio.",
       "branchEmpty": "Non hai ramas dispoñibles",
@@ -3026,7 +3042,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Non se puideron cargar as sesións.",
-    "couldNotLoadActiveSessions": "Non se puideron cargar as sesións activas.",
     "agentSessions": "En curso agora",
     "newCodingTask": "Nova tarefa de programación",
     "newTaskFromPicture": "Nova tarefa a partir dunha imaxe",
@@ -3136,6 +3151,11 @@
       "billingHistory": "Historial de facturación",
       "billingHistoryEmpty": "Aínda non hai historial de facturación.",
       "billingHistoryError": "Non se puido cargar o historial de facturación",
+      "billingRowInitial": "Primeiro cargo · {{tier}}",
+      "billingRowRenewal": "Renovación da subscrición · {{tier}}",
+      "billingRowSubscription": "Subscrición · {{tier}}",
+      "billingRowTrial": "Proba gratuíta · {{tier}}",
+      "billingRowUpgrade": "Cambio de plan · {{tier}}",
       "cancel": "Cancelar subscrición",
       "cancelDescription": "O teu Kilo Pass seguirá activo ata o final do período de facturación e non se renovará.",
       "cancelScheduled": "Cancélase o {{date}}",
@@ -3405,7 +3425,8 @@
         "accounting_adjustment": "Axuste contable",
         "credits_expired": "Créditos caducados"
       },
-      "truncated": "Hai movementos de créditos anteriores dispoñibles."
+      "truncated": "Hai movementos de créditos anteriores dispoñibles.",
+      "retentionLimit": "Mostrando os movementos de créditos máis recentes."
     },
     "inviteMember": {
       "emailError": "Introduce un enderezo de correo válido.",
@@ -3415,6 +3436,7 @@
       "sendInvite": "Enviar invitación",
       "title": "Convidar un membro",
       "alreadyInvited": "Xa está convidado ou xa é membro.",
+      "organizationUnavailable": "Esta organización xa non está dispoñible.",
       "sendError": "Non se puido enviar a invitación.",
       "pendingInvitation": "Este correo xa ten unha invitación pendente.",
       "alreadyMember": "Esta persoa xa é membro desta organización.",
@@ -3436,7 +3458,8 @@
         "void": "Anulada",
         "uncollectible": "Incobrable"
       },
-      "truncated": "Hai facturas máis antigas dispoñibles."
+      "truncated": "Hai facturas máis antigas dispoñibles.",
+      "retentionLimit": "Mostrando as facturas máis recentes."
     },
     "lowBalanceAlert": {
       "enableA11y": "Activar a alerta de saldo baixo",
@@ -3670,8 +3693,7 @@
     "imagesSectionEmpty": "Non hai dominios de confianza de imaxes",
     "revoke": "Revogar a confianza en {{host}}",
     "revokeMessage": "As ligazóns a este dominio volverán pedir confirmación.",
-    "revokeImageMessage": "As imaxes deste dominio volverán pedir confirmación.",
-    "backToPreferences": "Volver ás preferencias"
+    "revokeImageMessage": "As imaxes deste dominio volverán pedir confirmación."
   },
   "glanceable": {
     "waiting": "Actualizando axentes",
@@ -3918,6 +3940,8 @@
       "downloading": "Descargando: {{written}} de {{total}}",
       "downloadingUnknown": "Descargando: {{written}}",
       "paused": "En pausa: {{written}} de {{total}}",
+      "retrying": "Tentando de novo: {{written}} de {{total}}",
+      "retryingUnknown": "Tentando de novo: {{written}}",
       "verifying": "Comprobando o ficheiro descargado…",
       "downloaded": "Descargado · {{size}}",
       "url": "Ligazón de descarga directa",
@@ -4008,7 +4032,9 @@
         "androidModelUnavailable": "Este dispositivo non é compatible con Gemini Nano ou a aplicación do sistema AICore aínda se está configurando. Téntao de novo máis tarde.",
         "aicoreUpdateRequired": "Actualiza a aplicación AICore e o software do sistema para usar este modelo.",
         "downloadable": "Este modelo necesita unha descarga única antes de poder usalo.",
-        "downloading": "O modelo estase descargando. Estará listo cando remate a descarga."
+        "downloading": "O modelo estase descargando. Estará listo cando remate a descarga.",
+        "batteryQuota": "O modelo no dispositivo esgotou a súa cota de batería por agora. Téntao de novo máis tarde.",
+        "checkFailed": "A aplicación non puido comprobar este modelo. Téntao de novo."
       },
       "unavailable": "O modelo no dispositivo non está dispoñible agora mesmo. Comproba o seu estado en $t(modelChat.backends.title).",
       "busy": "O modelo no dispositivo está ocupado con outra resposta. Téntao de novo cando remate.",
@@ -4171,6 +4197,7 @@
     "instructionsHint": "Regras en markdown aplicadas a cada sesión que usa este perfil.",
     "instructionsEmpty": "Aínda non hai ficheiros de instrucións",
     "instructionsEmptyDescription": "Engade ficheiros de regras que se apliquen en cada sesión que use este perfil.",
+    "instructionsEmptyDescriptionReadOnly": "Os ficheiros de regras engadidos aquí aplícanse a todas as sesións que usan este perfil.",
     "instructionNameRequired": "Introduce un nome de ficheiro",
     "instructionNameTooLong": "O nome do ficheiro debe ter {{max}} caracteres ou menos",
     "instructionNameInvalid": "Comeza cunha letra ou un díxito e usa só letras minúsculas, díxitos e guións",
@@ -4369,7 +4396,8 @@
       "purchaseFallback": "Compra de créditos",
       "receipt": "Recibo",
       "receiptA11y": "Abrir o recibo de {{description}}, {{amount}}, do {{date}}",
-      "receiptUnavailable": "Non hai ningún recibo dispoñible para esta compra."
+      "receiptUnavailable": "Non hai ningún recibo dispoñible para esta compra.",
+      "retentionLimit": "Mostrando o historial de créditos máis recente."
     },
     "title": "Mercar créditos",
     "description": "Os créditos son unha compra única que se engade ao teu saldo de Kilo para executar sesións de codificación con IA na app de Kilo. A tenda cobra na túa conta e os créditos engádense despois de que a tenda confirme o pagamento.",
@@ -4514,6 +4542,7 @@
     "summary": "Resumo con IA",
     "summaryPending": "O resumo con IA está en curso. Engadirase aquí cando estea listo.",
     "summaryUnavailable": "Resumo con IA non dispoñible. O teu informe estruturado segue dispoñible.",
+    "summaryNotAdmitted": "O resumo con IA non se xerou para este informe. O teu informe estruturado segue dispoñible.",
     "summaryCharge": "Cargo de IA: {{cost}}",
     "summaryChargePending": "Cargo de IA pendente de conciliación",
     "summaryModel": "$t(common.model): {{model}}",
@@ -4616,10 +4645,14 @@
     "couldNotLoad": "Non se puideron cargar as integracións",
     "permissionDenied": "Non tes permiso para xestionar estas integracións.",
     "managedByOwner": "Pídelle a unha persoa propietaria da organización que cambie unha conexión que non poidas cambiar.",
+    "managedByOwnerOrAdmin": "Pídelle ao propietario ou ao administrador da organización que cambie unha conexión que non poidas cambiar.",
+    "managedByOwnerOrBilling": "Pídelle ao propietario ou ao xestor de facturación da organización que cambie unha conexión que non poidas cambiar.",
+    "managedByOwnerAdminOrBilling": "Pídelle ao propietario, ao administrador ou ao xestor de facturación da organización que cambie unha conexión que non poidas cambiar.",
     "connectFailed": "Non se puido abrir a páxina de conexión"
   },
   "invoices": {
-    "personalEmptyDescription": "As facturas das túas propias compras aparecerán aquí cando se che facture."
+    "personalEmptyDescription": "As facturas das túas propias compras aparecen aquí cando se che facture. Os recibos da App Store e de Google Play están no Historial de créditos.",
+    "personalPeriod": "Últimos 12 meses"
   },
   "cloudAgent": {
     "compute": {
@@ -4651,7 +4684,7 @@
       "new": "Novo disparador",
       "create": "Crear disparador",
       "emptyTitle": "Aínda non hai disparadores",
-      "emptyDescription": "Crea un disparador para iniciar unha execución de Cloud Agent a partir dunha chamada de webhook ou segundo unha programación.",
+      "emptyDescription": "Crea o teu primeiro disparador.",
       "loadFailedTitle": "Non se puideron cargar os disparadores",
       "loadFailedDescription": "Volve tentalo cando teñas conexión.",
       "detailLoadFailedTitle": "Non se puido cargar este disparador",

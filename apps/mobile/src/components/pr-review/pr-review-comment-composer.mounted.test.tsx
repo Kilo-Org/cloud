@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the submit-phase and suggestion-availability suites need the same mock harness, and splitting them would duplicate every module mock */
 // Mounted coverage for the create-mode comment composer's one submit phase:
 // the phase the surface published is the only admission and pending authority,
 // so a second tap during the Terms round-trip is dropped and a rejection
@@ -8,7 +9,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
-import { act } from '@/test/renderer';
+import { act, type ReactTestRenderer } from '@/test/renderer';
 
 import {
   hasCopy,
@@ -36,8 +37,10 @@ const {
   confirmRequests,
   connectivity,
   createComment,
+  diffSelection,
   draftLoad,
   gate,
+  keyboard,
   pendingReview,
   termsStatus,
 } = vi.hoisted(() => ({
@@ -48,8 +51,10 @@ const {
     mutateAsync: vi.fn<() => Promise<unknown>>(),
     publish: { current: null as ((state: { error: Error | null }) => void) | null },
   },
+  diffSelection: { value: null as Record<string, unknown> | null },
   draftLoad: { value: { settled: true, value: null as string | null } },
   gate: { status: vi.fn<() => Promise<{ accepted: boolean; currentVersion: string }>>() },
+  keyboard: { visible: false },
   pendingReview: { addComment: vi.fn() },
   termsStatus: { accept: vi.fn<() => Promise<unknown>>() },
 }));
@@ -86,7 +91,7 @@ vi.mock('@/components/ui/dialog', () => ({
 vi.mock('@/components/pr-review/pr-form-sheet-chrome', () => ({
   PrFormSheetFooter: 'PrFormSheetFooter',
   PrFormSheetHeader: 'PrFormSheetHeader',
-  useFormSheetKeyboardVisible: () => false,
+  useFormSheetKeyboardVisible: () => keyboard.visible,
 }));
 vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
   PrReviewReconnectNotice: 'PrReviewReconnectNotice',
@@ -119,7 +124,9 @@ vi.mock('@/lib/persist/use-draft-load', () => ({
 vi.mock('@/lib/persist/use-draft-flush', () => ({ useDraftFlushOnBackground: vi.fn() }));
 
 vi.mock('@/lib/pr-review/build-suggestion-fence', () => ({ buildSuggestionFence: () => null }));
-vi.mock('@/lib/pr-review/diff-selection-bridge', () => ({ getDiffSelection: () => null }));
+vi.mock('@/lib/pr-review/diff-selection-bridge', () => ({
+  getDiffSelection: () => diffSelection.value,
+}));
 vi.mock('@/lib/pr-review/pending-review-provider', () => ({
   usePendingReview: () => ({
     addComment: pendingReview.addComment,
@@ -178,7 +185,9 @@ const NOT_RECORDED = 'We could not record this action. Please try again later.';
 beforeEach(() => {
   confirmRequests.length = 0;
   createComment.publish.current = null;
+  diffSelection.value = null;
   draftLoad.value = { settled: true, value: null };
+  keyboard.visible = false;
   connectivity.value = 'online';
   createComment.mutateAsync.mockReset();
   gate.status.mockReset();
@@ -355,4 +364,52 @@ describe('PrReviewCommentComposer submit phase', () => {
       expect(isDisabled(renderer, 'Comment now')).toBe(false);
     }
   );
+});
+
+describe('PrReviewCommentComposer suggestion availability', () => {
+  const SUGGESTIONS_ADDED_LINES = 'Suggestions only apply to added lines.';
+  const TAP_DIFF_LINE = 'Tap a diff line to enable suggestions.';
+  const INSERT_A11Y = 'Insert a code suggestion';
+
+  function insertButton(renderer: ReactTestRenderer) {
+    return renderer.root
+      .findAllByType('Button')
+      .find(node => node.props.accessibilityLabel === INSERT_A11Y);
+  }
+
+  it('renders the added-lines-only reason on a deleted line', async () => {
+    const renderer = await mountComposer({ ...baseProps, side: 'LEFT' });
+    // The body field still works while the reason is on screen.
+    typeBody(renderer, 'hi');
+
+    expect(hasCopy(renderer, SUGGESTIONS_ADDED_LINES)).toBe(true);
+    expect(insertButton(renderer)).toBeUndefined();
+  });
+
+  it('renders the tap-a-line reason with no diff selection', async () => {
+    const renderer = await mountComposer(baseProps);
+
+    expect(hasCopy(renderer, TAP_DIFF_LINE)).toBe(true);
+    expect(insertButton(renderer)).toBeUndefined();
+  });
+
+  it('renders the Insert button once a line is selected', async () => {
+    diffSelection.value = {
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      path: 'src/a.ts',
+      side: 'RIGHT',
+      line: 10,
+      selectedText: 'const a = 1;',
+    };
+    keyboard.visible = true;
+    const renderer = await mountComposer(baseProps);
+
+    const button = insertButton(renderer);
+    expect(button).toBeDefined();
+    expect(button?.props.accessibilityHint).toBeUndefined();
+    expect(hasCopy(renderer, SUGGESTIONS_ADDED_LINES)).toBe(false);
+    expect(hasCopy(renderer, TAP_DIFF_LINE)).toBe(false);
+  });
 });

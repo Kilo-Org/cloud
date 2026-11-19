@@ -125,7 +125,8 @@ export function parseSourceEntry(dir, root, file, text) {
  * as one `parseSourceEntry`.
  *
  * The walk is a generator, so a caller's `for … of` holds one file's text and
- * one syntax tree at a time and peak memory does not grow with the tree.
+ * one syntax tree at a time. The matched path list is collected before the
+ * first yield, so memory is the parsed file plus that list.
  *
  * A file the parser refused has an empty tree, so the keys or calls it holds
  * would leave an audit without a word. `problems` says what the parser stopped

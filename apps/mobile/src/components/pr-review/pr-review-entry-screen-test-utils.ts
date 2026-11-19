@@ -114,7 +114,10 @@ vi.mock('@/components/ui/dialog', () => ({
   }),
 }));
 
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 // The harness calls the screen as a plain function, so a composite component is
@@ -125,6 +128,9 @@ vi.mock('@/components/ui/input', () => ({ Input: 'Input' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+// The pending recents body is a `Card`; the plain-function harness never
+// renders a composite, so the card is stubbed as its own named host.
+vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
 vi.mock('@/components/ui/icons', () => ({
   Clipboard: 'ClipboardIcon',
   Link2: 'Link2',

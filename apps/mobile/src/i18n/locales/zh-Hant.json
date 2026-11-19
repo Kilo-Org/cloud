@@ -695,8 +695,9 @@
       "notConnectedReadOnly": "尚未連結 Bitbucket。只有組織擁有者、管理員和帳單管理員可以設定連結。"
     },
     "bitbucketConnect": {
-      "managedOnWeb": "此組織的 Bitbucket 連線需在電腦上透過網頁版管理。",
-      "description": "請建立具有所需權限範圍的工作區存取權杖，並貼到下方。",
+      "managedOnWeb": "{{organization}} 的 Bitbucket 連線需在電腦上透過網頁版管理。",
+      "description": "為 {{organization}} 建立工作區存取權杖，然後貼到下方。",
+      "descriptionReconnect": "為 {{organization}} 建立新的工作區存取權杖，然後貼到下方。",
       "scopes": "帳戶：讀取 · 存放庫：讀取／寫入 · PR：讀取 · Webhook：讀取／寫入",
       "tokenPlaceholder": "工作區存取權杖",
       "tokenRefused": "Bitbucket 未接受此工作區存取權杖。請確認其具有上方列出的權限範圍，然後再試一次。"
@@ -1605,6 +1606,8 @@
       "renameAccessibility": "重新命名工作階段：{{title}}",
       "cloningSession": "複製工作階段中",
       "couldNotLoadThisSession": "無法載入此工作階段。",
+      "historyTooLarge": "此工作階段的對話記錄過大，無法載入。",
+      "historyUnavailable": "無法讀取此工作階段的對話記錄。",
       "cloneFailedRetry": "無法複製此工作階段。請再試一次。",
       "notEnoughCredits": "點數不足，無法執行此請求。請加值後再試一次。",
       "previousTaskFinishing": "上一個任務仍在收尾。請稍候。",
@@ -1681,6 +1684,7 @@
       "branchDefault": "預設",
       "branchAccessibility": "分支: {{label}}",
       "branchLoading": "正在載入分支",
+      "branchInactive": "選取一個存放庫以載入其分支。",
       "branchLoadError": "無法載入分支",
       "branchUnavailable": "此存放庫沒有可用的分支。檢查你在供應商處的存取權限，然後選取另一個存放庫。",
       "branchEmpty": "沒有可用的分支",
@@ -2483,7 +2487,6 @@
   },
   "home": {
     "couldNotLoadSessions": "無法載入工作階段。",
-    "couldNotLoadActiveSessions": "無法載入進行中的工作階段。",
     "agentSessions": "目前執行中",
     "newCodingTask": "新增程式設計任務",
     "newTaskFromPicture": "從圖片新增任務",
@@ -2593,6 +2596,11 @@
       "billingHistory": "帳單紀錄",
       "billingHistoryEmpty": "尚無帳單紀錄。",
       "billingHistoryError": "無法載入帳單紀錄",
+      "billingRowInitial": "首次收費 · {{tier}}",
+      "billingRowRenewal": "續訂 · {{tier}}",
+      "billingRowSubscription": "訂閱 · {{tier}}",
+      "billingRowTrial": "免費試用 · {{tier}}",
+      "billingRowUpgrade": "方案變更 · {{tier}}",
       "cancel": "取消訂閱",
       "cancelDescription": "你的 Kilo Pass 會維持有效至本計費週期結束，且不會續訂。",
       "cancelScheduled": "將於 {{date}} 取消",
@@ -2800,7 +2808,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "此帳戶尚無任何組織。建立或加入組織後，即可審查 Bitbucket 提取請求。",
       "gitlabReconnectAdminOnlyDescription": "請要求組織的擁有者、管理員或帳單管理員重新連結。",
       "bitbucketNotConnectedTitle": "尚未連結 Bitbucket",
-      "bitbucketAdminOnlyDescription": "只有組織擁有者、管理員和帳單管理員可以設定連結。",
+      "adminOnlyConnectDescription": "只有組織擁有者、管理員和帳單管理員可以設定連結。",
       "contextLine": "適用於 {{organization}}",
       "contextLinePersonal": "適用於您的個人帳戶"
     },
@@ -2897,7 +2905,19 @@
         "fileComment": "檔案留言",
         "outdatedOnPathLines": "{{path}} {{lines}} 的留言已過時",
         "outdatedOnLines": "{{lines}} 的留言已過時",
-        "outdatedOnPath": "{{path}} 的留言已過時"
+        "outdatedOnPath": "{{path}} 的留言已過時",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "左側",
+        "sideRight": "右側",
+        "outdatedOnLinesSide": "{{lines}} ({{side}}) 的留言已過時",
+        "outdatedOnPathLinesSide": "{{path}} {{lines}} ({{side}}) 的留言已過時",
+        "outdatedSide": "({{side}}) 已過時",
+        "outdatedOnPathSide": "{{path}} ({{side}}) 已過時"
       },
       "deletedUser": "已刪除的使用者",
       "replyForbiddenTerm": "你沒有權限回覆此{{term}}。",
@@ -3397,7 +3417,8 @@
         "accounting_adjustment": "會計調整",
         "credits_expired": "點數已到期"
       },
-      "truncated": "還有更早的點數記錄可供查看。"
+      "truncated": "還有更早的點數記錄可供查看。",
+      "retentionLimit": "顯示最近的點數記錄。"
     },
     "hub": {
       "balance": "餘額",
@@ -3420,6 +3441,7 @@
       "sendInvite": "傳送邀請",
       "title": "邀請成員",
       "alreadyInvited": "該電子郵件地址已有待處理的邀請，或已是成員。",
+      "organizationUnavailable": "此組織已無法使用。",
       "sendError": "無法傳送邀請。",
       "pendingInvitation": "這個電子郵件地址已有待處理的邀請。",
       "alreadyMember": "這個人已經是此組織的成員。",
@@ -3441,7 +3463,8 @@
         "void": "已作廢",
         "uncollectible": "無法收款"
       },
-      "truncated": "還有更早的發票可供查看。"
+      "truncated": "還有更早的發票可供查看。",
+      "retentionLimit": "顯示最近的發票。"
     },
     "lowBalanceAlert": {
       "enableA11y": "啟用餘額不足提醒",
@@ -3670,8 +3693,7 @@
     "imagesSectionEmpty": "沒有信任的圖片主機",
     "revoke": "撤銷對 {{host}} 的信任",
     "revokeMessage": "前往此主機的連結將再次要求確認。",
-    "revokeImageMessage": "來自此主機的圖片將再次要求確認。",
-    "backToPreferences": "返回偏好設定"
+    "revokeImageMessage": "來自此主機的圖片將再次要求確認。"
   },
   "glanceable": {
     "waiting": "正在更新代理程式狀態",
@@ -3918,6 +3940,8 @@
       "downloading": "下載中：{{written}}／{{total}}",
       "downloadingUnknown": "下載中：{{written}}",
       "paused": "已暫停：{{written}}／{{total}}",
+      "retrying": "正在重試：{{written}}／{{total}}",
+      "retryingUnknown": "正在重試：{{written}}",
       "verifying": "正在檢查下載的檔案…",
       "downloaded": "已下載 · {{size}}",
       "url": "直接下載連結",
@@ -4008,7 +4032,9 @@
         "androidModelUnavailable": "此裝置不支援 Gemini Nano，或 AICore 系統應用程式仍在設定中。請稍後再試。",
         "aicoreUpdateRequired": "請更新 AICore 應用程式和系統軟體，才能使用此模型。",
         "downloadable": "此模型需要先下載一次才能使用。",
-        "downloading": "模型下載中，下載完成後即可使用。"
+        "downloading": "模型下載中，下載完成後即可使用。",
+        "batteryQuota": "裝置端模型已用完目前的電池用量額度。請稍後再試。",
+        "checkFailed": "應用程式無法檢查此模型。請再試一次。"
       },
       "unavailable": "裝置端模型目前無法使用。請在「$t(modelChat.backends.title)」中查看其狀態。",
       "busy": "裝置端模型正在產生另一則回覆，請在完成後再試一次。",
@@ -4171,6 +4197,7 @@
     "instructionsHint": "套用至此設定檔每個工作階段的規則 Markdown。",
     "instructionsEmpty": "尚無指示檔案",
     "instructionsEmptyDescription": "新增規則檔案，套用至使用此設定檔的每個工作階段。",
+    "instructionsEmptyDescriptionReadOnly": "在此新增的規則檔案會套用至使用此設定檔的每個工作階段。",
     "instructionNameRequired": "請輸入檔案名稱",
     "instructionNameTooLong": "檔案名稱必須為 {{max}} 個字元以內",
     "instructionNameInvalid": "請以字母或數字開頭，且只能使用小寫字母、數字與連字號",
@@ -4369,7 +4396,8 @@
       "purchaseFallback": "點數購買",
       "receipt": "收據",
       "receiptA11y": "開啟「{{description}}」，{{amount}}，{{date}} 的收據",
-      "receiptUnavailable": "此筆購買沒有可用的收據。"
+      "receiptUnavailable": "此筆購買沒有可用的收據。",
+      "retentionLimit": "顯示最近的點數紀錄。"
     },
     "title": "購買點數",
     "description": "點數是一次性購買，會加入你的 Kilo 餘額，用於在 Kilo App 中執行 AI 程式設計工作階段。商店會向你的帳戶收費，商店確認付款後點數才會入帳。",
@@ -4514,6 +4542,7 @@
     "summary": "AI 摘要",
     "summaryPending": "AI 摘要產生中，完成後會附加於此。",
     "summaryUnavailable": "無法使用 AI 摘要。你的結構化簡報仍可查看。",
+    "summaryNotAdmitted": "此簡報未產生 AI 摘要。你的結構化簡報仍可查看。",
     "summaryCharge": "AI 已收費 {{cost}}",
     "summaryChargePending": "AI 費用待核對",
     "summaryModel": "$t(common.model)：{{model}}",
@@ -4616,10 +4645,14 @@
     "couldNotLoad": "無法載入整合",
     "permissionDenied": "您沒有管理這些整合的權限。",
     "managedByOwner": "請洽詢組織擁有者來變更您無法變更的連結。",
+    "managedByOwnerOrAdmin": "請洽詢組織擁有者或管理員來變更您無法變更的連結。",
+    "managedByOwnerOrBilling": "請洽詢組織擁有者或帳單管理員來變更您無法變更的連結。",
+    "managedByOwnerAdminOrBilling": "請洽詢組織擁有者、管理員或帳單管理員來變更您無法變更的連結。",
     "connectFailed": "無法開啟連結頁面"
   },
   "invoices": {
-    "personalEmptyDescription": "你個人購買的發票會在計費後顯示在這裡。"
+    "personalEmptyDescription": "你個人購買的發票會在計費後顯示在這裡。App Store 收據與 Google Play 收據都在點數紀錄中。",
+    "personalPeriod": "最近 12 個月"
   },
   "cloudAgent": {
     "compute": {
@@ -4651,7 +4684,7 @@
       "new": "新增觸發器",
       "create": "建立觸發器",
       "emptyTitle": "尚無觸發器",
-      "emptyDescription": "建立觸發器，以透過網路鉤子呼叫或排程啟動 Cloud Agent 執行。",
+      "emptyDescription": "建立你的第一個觸發器。",
       "loadFailedTitle": "無法載入觸發器",
       "loadFailedDescription": "有連線時請再試一次。",
       "detailLoadFailedTitle": "無法載入此觸發器",

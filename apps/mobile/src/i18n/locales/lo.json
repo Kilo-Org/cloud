@@ -820,7 +820,19 @@
         "fileComment": "ຄຳເຫັນກ່ຽວກັບໄຟລ໌",
         "outdatedOnPathLines": "ອ້າງອີງໂຄດເກົ່າໃນ {{path}} {{lines}}",
         "outdatedOnLines": "ອ້າງອີງໂຄດເກົ່າໃນ {{lines}}",
-        "outdatedOnPath": "ອ້າງອີງໂຄດເກົ່າໃນ {{path}}"
+        "outdatedOnPath": "ອ້າງອີງໂຄດເກົ່າໃນ {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "ຝັ່ງຊ້າຍ",
+        "sideRight": "ຝັ່ງຂວາ",
+        "outdatedOnLinesSide": "ອ້າງອີງໂຄດເກົ່າໃນ {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "ອ້າງອີງໂຄດເກົ່າໃນ {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "ອ້າງອີງໂຄດເກົ່າ ({{side}})",
+        "outdatedOnPathSide": "ອ້າງອີງໂຄດເກົ່າໃນ {{path}} ({{side}})"
       },
       "deletedUser": "ຜູ້ໃຊ້ທີ່ຖືກລຶບ",
       "replyForbiddenTerm": "ທ່ານບໍ່ມີສິດຕອບໃນ{{term}}ນີ້.",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "ບັນຊີນີ້ຍັງບໍ່ມີອົງກອນ. ທ່ານສາມາດກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ໄດ້ເມື່ອທ່ານສ້າງ ຫຼື ເຂົ້າຮ່ວມອົງກອນ.",
       "gitlabReconnectAdminOnlyDescription": "ຂໍໃຫ້ເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການຮຽກເກັບເງິນເຊື່ອມຕໍ່.",
       "bitbucketNotConnectedTitle": "ຍັງບໍ່ໄດ້ເຊື່ອມຕໍ່ Bitbucket",
-      "bitbucketAdminOnlyDescription": "ມີພຽງເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ແລະ ຜູ້ຈັດການການຮຽກເກັບເງິນທີ່ສາມາດເຊື່ອມຕໍ່ໄດ້.",
+      "adminOnlyConnectDescription": "ມີພຽງເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ແລະ ຜູ້ຈັດການການຮຽກເກັບເງິນທີ່ສາມາດເຊື່ອມຕໍ່ໄດ້.",
       "contextLine": "ສຳລັບ {{organization}}",
       "contextLinePersonal": "ສຳລັບບັນຊີສ່ວນຕົວຂອງທ່ານ"
     },
@@ -1373,8 +1385,9 @@
       "notConnectedReadOnly": "ຍັງບໍ່ໄດ້ເຊື່ອມຕໍ່ Bitbucket. ມີພຽງເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ແລະ ຜູ້ຈັດການການຮຽກເກັບເງິນທີ່ສາມາດເຊື່ອມຕໍ່ໄດ້."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "ການເຊື່ອມຕໍ່ Bitbucket ຂອງອົງກອນນີ້ຖືກຈັດການຢູ່ໃນເວັບຈາກຄອມພິວເຕີ.",
-      "description": "ສ້າງໂທເຄັນເຂົ້າເຖິງພື້ນທີ່ເຮັດວຽກທີ່ມີສິດຕາມທີ່ກຳນົດ ແລ້ວວາງລົງດ້ານລຸ່ມ.",
+      "managedOnWeb": "ການເຊື່ອມຕໍ່ Bitbucket ຂອງ {{organization}} ຖືກຈັດການຢູ່ໃນເວັບຈາກຄອມພິວເຕີ.",
+      "description": "ສ້າງໂທເຄັນເຂົ້າເຖິງພື້ນທີ່ເຮັດວຽກສຳລັບ {{organization}} ແລ້ວວາງລົງດ້ານລຸ່ມ.",
+      "descriptionReconnect": "ສ້າງໂທເຄັນໃໝ່ເຂົ້າເຖິງພື້ນທີ່ເຮັດວຽກສຳລັບ {{organization}} ແລ້ວວາງລົງດ້ານລຸ່ມ.",
       "scopes": "ບັນຊີ: ອ່ານ · ຄັງໂຄ້ດ: ອ່ານ/ຂຽນ · ຄຳຂໍລວມໂຄ້ດ: ອ່ານ · ເວັບຮຸກ: ອ່ານ/ຂຽນ",
       "tokenPlaceholder": "ໂທເຄັນເຂົ້າເຖິງພື້ນທີ່ເຮັດວຽກ",
       "tokenRefused": "Bitbucket ບໍ່ຍອມຮັບໂທເຄັນເຂົ້າເຖິງພື້ນທີ່ເຮັດວຽກນີ້. ກວດສອບວ່າມັນມີສິດຕາມທີ່ກ່າວມາຂ້າງເທິງ ແລ້ວລອງອີກຄັ້ງ."
@@ -2148,6 +2161,8 @@
       "renameAccessibility": "ປ່ຽນຊື່ເຊດຊັນ: {{title}}",
       "cloningSession": "ກຳລັງສ້າງສຳເນົາເຊດຊັນ",
       "couldNotLoadThisSession": "ບໍ່ສາມາດໂຫຼດເຊດຊັນນີ້ໄດ້.",
+      "historyTooLarge": "ບົດບັນທຶກຂອງເຊດຊັນນີ້ໃຫຍ່ເກີນໄປ ບໍ່ສາມາດໂຫຼດໄດ້.",
+      "historyUnavailable": "ບໍ່ສາມາດອ່ານບົດບັນທຶກຂອງເຊດຊັນນີ້ໄດ້.",
       "cloneFailedRetry": "ບໍ່ສາມາດສ້າງສຳເນົາເຊດຊັນນີ້ໄດ້. ລອງໃໝ່.",
       "notEnoughCredits": "ເຄຣດິດບໍ່ພໍສຳລັບຄຳຂໍນີ້. ເຕີມເຄຣດິດແລ້ວລອງໃໝ່.",
       "previousTaskFinishing": "ວຽກກ່ອນໜ້າກຳລັງຈະສຳເລັດ. ກະລຸນາລໍຖ້າຈັກໜ້ອຍ.",
@@ -2224,6 +2239,7 @@
       "branchDefault": "ຄ່າເລີ່ມຕົ້ນ",
       "branchAccessibility": "ສາຂາໂຄ້ດ: {{label}}",
       "branchLoading": "ກຳລັງໂຫຼດສາຂາໂຄ້ດ",
+      "branchInactive": "ເລືອກຄັງໂຄ້ດເພື່ອໂຫຼດສາຂາໂຄ້ດຂອງມັນ.",
       "branchLoadError": "ໂຫຼດສາຂາໂຄ້ດບໍ່ໄດ້",
       "branchUnavailable": "ບໍ່ມີສາຂາໂຄ້ດພ້ອມໃຊ້ສຳລັບຄັງໂຄ້ດນີ້. ກວດສອບສິດເຂົ້າເຖິງຂອງທ່ານກັບຜູ້ໃຫ້ບໍລິການ, ແລ້ວເລືອກຄັງໂຄ້ດອື່ນ.",
       "branchEmpty": "ບໍ່ມີສາຂາໂຄ້ດພ້ອມໃຊ້",
@@ -3026,7 +3042,6 @@
   },
   "home": {
     "couldNotLoadSessions": "ບໍ່ສາມາດໂຫຼດເຊສຊັນໄດ້.",
-    "couldNotLoadActiveSessions": "ບໍ່ສາມາດໂຫຼດເຊສຊັນທີ່ກຳລັງໃຊ້ງານໄດ້.",
     "agentSessions": "ກຳລັງເຮັດວຽກ",
     "newCodingTask": "ວຽກຂຽນໂຄ້ດໃໝ່",
     "newTaskFromPicture": "ວຽກໃໝ່ຈາກຮູບພາບ",
@@ -3136,6 +3151,11 @@
       "billingHistory": "ປະຫວັດການຮຽກເກັບເງິນ",
       "billingHistoryEmpty": "ຍັງບໍ່ມີປະຫວັດການຮຽກເກັບເງິນ.",
       "billingHistoryError": "ບໍ່ສາມາດໂຫລດປະຫວັດການຮຽກເກັບເງິນ",
+      "billingRowInitial": "ເກັບເງິນຄັ້ງທຳອິດ · {{tier}}",
+      "billingRowRenewal": "ຕໍ່ອາຍຸ · {{tier}}",
+      "billingRowSubscription": "ການສະໝັກສະມາຊິກ · {{tier}}",
+      "billingRowTrial": "ທົດລອງຟຣີ · {{tier}}",
+      "billingRowUpgrade": "ປ່ຽນແຜນ · {{tier}}",
       "cancel": "ຍົກເລີກການສະໝັກສະມາຊິກ",
       "cancelDescription": "Kilo Pass ຂອງທ່ານຈະຍັງໃຊ້ງານໄດ້ຈົນຮອດທ້າຍຮອບການຮຽກເກັບເງິນ ແລະ ຈະບໍ່ຕໍ່ອາຍຸ.",
       "cancelScheduled": "ຈະຍົກເລີກໃນວັນທີ {{date}}",
@@ -3405,7 +3425,8 @@
         "accounting_adjustment": "ການປັບຍອດບັນຊີ",
         "credits_expired": "ເຄຣດິດໝົດອາຍຸ"
       },
-      "truncated": "ຍັງມີປະຫວັດເຄຣດິດກ່ອນໜ້ານີ້ໃຫ້ເບິ່ງ."
+      "truncated": "ຍັງມີປະຫວັດເຄຣດິດກ່ອນໜ້ານີ້ໃຫ້ເບິ່ງ.",
+      "retentionLimit": "ກຳລັງສະແດງປະຫວັດເຄຣດິດຫຼ້າສຸດ."
     },
     "inviteMember": {
       "emailError": "ໃສ່ທີ່ຢູ່ອີເມວທີ່ຖືກຕ້ອງ.",
@@ -3415,6 +3436,7 @@
       "sendInvite": "ສົ່ງຄຳເຊີນ",
       "title": "ເຊີນສະມາຊິກ",
       "alreadyInvited": "ພວກເຂົາຖືກເຊີນແລ້ວ ຫຼື ເປັນສະມາຊິກແລ້ວ.",
+      "organizationUnavailable": "ອົງກອນນີ້ບໍ່ມີຢູ່ແລ້ວ.",
       "sendError": "ບໍ່ສາມາດສົ່ງຄຳເຊີນໄດ້.",
       "pendingInvitation": "ອີເມວນີ້ມີຄຳເຊີນທີ່ລໍຖ້າຢູ່ແລ້ວ.",
       "alreadyMember": "ບຸກຄົນນີ້ເປັນສະມາຊິກຂອງອົງກອນນີ້ແລ້ວ.",
@@ -3436,7 +3458,8 @@
         "void": "ຍົກເລີກແລ້ວ",
         "uncollectible": "ເກັບເງິນບໍ່ໄດ້"
       },
-      "truncated": "ຍັງມີໃບແຈ້ງໜີ້ກ່ອນໜ້ານີ້ໃຫ້ເບິ່ງ."
+      "truncated": "ຍັງມີໃບແຈ້ງໜີ້ກ່ອນໜ້ານີ້ໃຫ້ເບິ່ງ.",
+      "retentionLimit": "ກຳລັງສະແດງໃບແຈ້ງໜີ້ຫຼ້າສຸດ."
     },
     "lowBalanceAlert": {
       "enableA11y": "ເປີດການແຈ້ງເຕືອນຍອດເງິນຕໍ່າ",
@@ -3670,8 +3693,7 @@
     "imagesSectionEmpty": "ຍັງບໍ່ມີໂຮສຮູບທີ່ໄວ້ໃຈໄດ້",
     "revoke": "ຍົກເລີກການໄວ້ໃຈ {{host}}",
     "revokeMessage": "ລິ້ງໄປຫາໂຮສນີ້ຈະຂໍການຢືນຢັນອີກຄັ້ງ.",
-    "revokeImageMessage": "ຮູບຈາກໂຮສນີ້ຈະຂໍການຢືນຢັນອີກຄັ້ງ.",
-    "backToPreferences": "ກັບໄປທີ່ການຕັ້ງຄ່າ"
+    "revokeImageMessage": "ຮູບຈາກໂຮສນີ້ຈະຂໍການຢືນຢັນອີກຄັ້ງ."
   },
   "glanceable": {
     "waiting": "ກຳລັງອັບເດດເອເຈນ",
@@ -3918,6 +3940,8 @@
       "downloading": "ກຳລັງດາວໂຫຼດ: {{written}} ຈາກ {{total}}",
       "downloadingUnknown": "ກຳລັງດາວໂຫຼດ: {{written}}",
       "paused": "ຢຸດຊົ່ວຄາວ: {{written}} ຈາກ {{total}}",
+      "retrying": "ກຳລັງລອງໃໝ່: {{written}} ຈາກ {{total}}",
+      "retryingUnknown": "ກຳລັງລອງໃໝ່: {{written}}",
       "verifying": "ກຳລັງກວດສອບໄຟລ໌ທີ່ດາວໂຫຼດ…",
       "downloaded": "ດາວໂຫຼດແລ້ວ · {{size}}",
       "url": "ລິ້ງດາວໂຫຼດໂດຍກົງ",
@@ -4008,7 +4032,9 @@
         "androidModelUnavailable": "ອຸປະກອນນີ້ບໍ່ຮອງຮັບ Gemini Nano ຫຼື ແອັບລະບົບ AICore ຍັງກຳລັງຕັ້ງຄ່າຢູ່. ກະລຸນາລອງໃໝ່ພາຍຫຼັງ.",
         "aicoreUpdateRequired": "ອັບເດດແອັບ AICore ແລະ ຊອບແວລະບົບຂອງທ່ານເພື່ອໃຊ້ໂມເດວນີ້.",
         "downloadable": "ໂມເດວນີ້ຕ້ອງດາວໂຫຼດຄັ້ງດຽວກ່ອນຈຶ່ງຈະໃຊ້ໄດ້.",
-        "downloading": "ໂມເດວກຳລັງດາວໂຫຼດ. ມັນຈະພ້ອມໃຊ້ງານເມື່ອດາວໂຫຼດສຳເລັດ."
+        "downloading": "ໂມເດວກຳລັງດາວໂຫຼດ. ມັນຈະພ້ອມໃຊ້ງານເມື່ອດາວໂຫຼດສຳເລັດ.",
+        "batteryQuota": "ໂມເດວຢູ່ໃນອຸປະກອນໄດ້ໃຊ້ໂຄຕາແບັດເຕີຣີຂອງມັນໝົດແລ້ວສຳລັບຕອນນີ້. ກະລຸນາລອງໃໝ່ພາຍຫຼັງ.",
+        "checkFailed": "ແອັບບໍ່ສາມາດກວດສອບໂມເດວນີ້ໄດ້. ກະລຸນາລອງໃໝ່."
       },
       "unavailable": "ໂມເດວຢູ່ໃນອຸປະກອນບໍ່ສາມາດໃຊ້ໄດ້ໃນຕອນນີ້. ກວດສອບສະຖານະຂອງມັນໃນ $t(modelChat.backends.title).",
       "busy": "ໂມເດວຢູ່ໃນອຸປະກອນກຳລັງຕອບຂໍ້ຄວາມອື່ນຢູ່. ກະລຸນາລອງໃໝ່ເມື່ອມັນຕອບແລ້ວ.",
@@ -4171,6 +4197,7 @@
     "instructionsHint": "ກົດເກນ markdown ທີ່ໃຊ້ກັບທຸກ session ທີ່ໃຊ້ໂປຣໄຟລ໌ນີ້.",
     "instructionsEmpty": "ຍັງບໍ່ມີໄຟລ໌ຄຳແນະນຳ",
     "instructionsEmptyDescription": "ເພີ່ມໄຟລ໌ກົດເກນທີ່ທຸກ session ທີ່ໃຊ້ໂປຣໄຟລ໌ນີ້ຈະນຳໃຊ້.",
+    "instructionsEmptyDescriptionReadOnly": "ໄຟລ໌ກົດລະບຽບທີ່ເພີ່ມຢູ່ນີ້ຈະຖືກນຳໃຊ້ກັບທຸກເຊສຊັນທີ່ໃຊ້ໂປຣໄຟລ໌ນີ້.",
     "instructionNameRequired": "ປ້ອນຊື່ໄຟລ໌",
     "instructionNameTooLong": "ຊື່ໄຟລ໌ຕ້ອງມີບໍ່ເກີນ {{max}} ໂຕອັກສອນ",
     "instructionNameInvalid": "ເລີ່ມດ້ວຍຕົວອັກສອນ ຫຼື ຕົວເລກ ແລະ ໃຊ້ພຽງຕົວອັກສອນນ້ອຍ, ຕົວເລກ ແລະ ເສັ້ນຂີດ",
@@ -4369,7 +4396,8 @@
       "purchaseFallback": "ການຊື້ເຄຣດິດ",
       "receipt": "ໃບຮັບເງິນ",
       "receiptA11y": "ເປີດໃບຮັບເງິນສຳລັບ {{description}}, {{amount}}, ຈາກ {{date}}",
-      "receiptUnavailable": "ບໍ່ມີໃບຮັບເງິນສຳລັບການຊື້ນີ້."
+      "receiptUnavailable": "ບໍ່ມີໃບຮັບເງິນສຳລັບການຊື້ນີ້.",
+      "retentionLimit": "ກຳລັງສະແດງບັນທຶກເຄຣດິດຫຼ້າສຸດ."
     },
     "title": "ຊື້ເຄຣດິດ",
     "description": "ເຄຣດິດເປັນການຊື້ຄັ້ງດຽວທີ່ເພີ່ມໃສ່ຍອດ Kilo ຂອງທ່ານສຳລັບການແລ່ນເຊດຊັນການຂຽນໂຄ້ດ AI ໃນ Kilo App. ຮ້ານຄ້າຄິດຄ່າຈາກບັນຊີຂອງທ່ານ ແລະ ເຄຣດິດຈະຖືກເພີ່ມຫຼັງຈາກຮ້ານຄ້າຢືນຢັນການຊຳລະ.",
@@ -4514,6 +4542,7 @@
     "summary": "ສະຫຼຸບໂດຍ AI",
     "summaryPending": "ກຳລັງສ້າງສະຫຼຸບ AI. ມັນຈະສະແດງຢູ່ນີ້ເມື່ອພ້ອມ.",
     "summaryUnavailable": "ສະຫຼຸບ AI ບໍ່ພ້ອມໃຊ້. ລາຍງານແບບມີໂຄງສ້າງຂອງທ່ານຍັງໃຊ້ໄດ້.",
+    "summaryNotAdmitted": "ບໍ່ໄດ້ສ້າງສະຫຼຸບ AI ສຳລັບລາຍງານນີ້. ລາຍງານແບບມີໂຄງສ້າງຂອງທ່ານຍັງໃຊ້ໄດ້.",
     "summaryCharge": "AI ຄິດຄ່າ {{cost}}",
     "summaryChargePending": "ຄ່າ AI ລໍຖ້າການກວດສອບ",
     "summaryModel": "$t(common.model): {{model}}",
@@ -4616,10 +4645,14 @@
     "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການເຊື່ອມໂຍງໄດ້",
     "permissionDenied": "ທ່ານບໍ່ມີສິດຈັດການການເຊື່ອມໂຍງເຫຼົ່ານີ້.",
     "managedByOwner": "ກະລຸນາຂໍໃຫ້ເຈົ້າຂອງອົງກອນປ່ຽນການເຊື່ອມຕໍ່ທີ່ທ່ານບໍ່ສາມາດປ່ຽນໄດ້.",
+    "managedByOwnerOrAdmin": "ກະລຸນາຂໍໃຫ້ເຈົ້າຂອງອົງກອນ ຫຼື ຜູ້ດູແລລະບົບປ່ຽນການເຊື່ອມຕໍ່ທີ່ທ່ານບໍ່ສາມາດປ່ຽນໄດ້.",
+    "managedByOwnerOrBilling": "ກະລຸນາຂໍໃຫ້ເຈົ້າຂອງອົງກອນ ຫຼື ຜູ້ຈັດການການຮຽກເກັບເງິນປ່ຽນການເຊື່ອມຕໍ່ທີ່ທ່ານບໍ່ສາມາດປ່ຽນໄດ້.",
+    "managedByOwnerAdminOrBilling": "ກະລຸນາຂໍໃຫ້ເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການຮຽກເກັບເງິນປ່ຽນການເຊື່ອມຕໍ່ທີ່ທ່ານບໍ່ສາມາດປ່ຽນໄດ້.",
     "connectFailed": "ບໍ່ສາມາດເປີດໜ້າການເຊື່ອມຕໍ່ໄດ້"
   },
   "invoices": {
-    "personalEmptyDescription": "ໃບແຈ້ງໜີ້ສຳລັບການຊື້ຂອງທ່ານເອງຈະສະແດງຢູ່ບ່ອນນີ້ເມື່ອມີການຮຽກເກັບເງິນ."
+    "personalEmptyDescription": "ໃບແຈ້ງໜີ້ສຳລັບການຊື້ຂອງທ່ານເອງສະແດງຢູ່ບ່ອນນີ້ເມື່ອມີການຮຽກເກັບເງິນ. ໃບຮັບເງິນຈາກ App Store ແລະ Google Play ຢູ່ໃນປະຫວັດເຄຣດິດ.",
+    "personalPeriod": "12 ເດືອນຜ່ານມາ"
   },
   "cloudAgent": {
     "compute": {
@@ -4651,7 +4684,7 @@
       "new": "ຕົວກະຕຸ້ນໃໝ່",
       "create": "ສ້າງຕົວກະຕຸ້ນ",
       "emptyTitle": "ຍັງບໍ່ມີຕົວກະຕຸ້ນ",
-      "emptyDescription": "ສ້າງຕົວກະຕຸ້ນເພື່ອເລີ່ມການຣັນ Cloud Agent ຈາກການເອີ້ນເວັບຮຸກ ຫຼື ຕາມຕາຕະລາງເວລາ.",
+      "emptyDescription": "ສ້າງຕົວກະຕຸ້ນທຳອິດຂອງເຈົ້າ.",
       "loadFailedTitle": "ໂຫຼດຕົວກະຕຸ້ນບໍ່ໄດ້",
       "loadFailedDescription": "ລອງອີກຄັ້ງເມື່ອມີການເຊື່ອມຕໍ່.",
       "detailLoadFailedTitle": "ໂຫຼດຕົວກະຕຸ້ນນີ້ບໍ່ໄດ້",

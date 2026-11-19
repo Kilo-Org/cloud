@@ -73,6 +73,45 @@ describe('trpcErrorFormatter step-up data', () => {
       actionClass: 'platform_read',
       purpose: 'session',
       maxAgeSeconds: 900,
+      binding: null,
+    });
+  });
+
+  test('exposes the operation binding of an operation-class refusal', () => {
+    const error = new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'MFA is required for this action',
+      cause: new StepUpRequiredError({
+        code: 'MFA_REQUIRED',
+        actionClass: 'sensitive_write',
+        purpose: 'operation',
+        maxAgeSeconds: 300,
+        binding: {
+          actionClass: 'sensitive_write',
+          surface: 'trpc',
+          route: 'admin.users.update',
+          method: 'mutation',
+          targetKind: 'user',
+          targetId: 'target-user',
+        },
+      }),
+    });
+
+    const result = trpcErrorFormatter({ shape: shapeFor(error), error } as never);
+
+    expect(result.data.stepUp).toEqual({
+      code: 'MFA_REQUIRED',
+      actionClass: 'sensitive_write',
+      purpose: 'operation',
+      maxAgeSeconds: 300,
+      binding: {
+        actionClass: 'sensitive_write',
+        surface: 'trpc',
+        route: 'admin.users.update',
+        method: 'mutation',
+        targetKind: 'user',
+        targetId: 'target-user',
+      },
     });
   });
 

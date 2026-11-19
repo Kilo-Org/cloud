@@ -49,6 +49,7 @@ describe('describeStep', () => {
     ['bounded-spending', 'the request carries a spend ceiling.'],
     ['openrouter-disabled', 'excluded by the organization gateway settings.'],
     ['provider-settings', 'excluded by provider settings.'],
+    ['unsupported-reasoning-effort', 'the requested reasoning effort is not supported.'],
   ])('explains a partner skipped for %s', (reason, detail) => {
     expect(
       describeStep({

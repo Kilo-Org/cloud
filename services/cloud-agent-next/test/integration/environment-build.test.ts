@@ -159,6 +159,7 @@ async function setup(): Promise<Harness> {
                 commands: ['pnpm install'],
                 plainVars: { PLAIN: 'value' },
                 sandboxAllocation: null,
+                egressMode: null,
                 encryptedSecrets: {
                   TOKEN: {
                     encryptedData: 'x',

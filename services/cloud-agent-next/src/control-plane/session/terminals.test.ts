@@ -306,8 +306,7 @@ describe('V2 control-plane terminals projection', () => {
     });
     expect(
       [...values.keys()].filter(
-        key =>
-          key.startsWith('control_terminal') || key.startsWith('control_terminal_operation')
+        key => key.startsWith('control_terminal') || key.startsWith('control_terminal_operation')
       )
     ).toEqual([]);
   });

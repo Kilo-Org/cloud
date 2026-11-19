@@ -277,6 +277,7 @@ export function createControlPlaneTerminals(deps: ControlPlaneTerminalsDeps) {
     try {
       await deps.state.storage.delete(keys);
     } catch {
+      // The returned failure is what the caller needs.
     }
   }
 
@@ -409,7 +410,10 @@ export function createControlPlaneTerminals(deps: ControlPlaneTerminalsDeps) {
     };
     try {
       await deps.state.storage.put(`${TERMINAL_PREFIX}${pty.id}`, record);
-      await deps.state.storage.put(`${TERMINAL_OPERATION_PREFIX}${payload.operationId}`, completion);
+      await deps.state.storage.put(
+        `${TERMINAL_OPERATION_PREFIX}${payload.operationId}`,
+        completion
+      );
     } catch (error) {
       // The shell and its record stay consistent; a record stored earlier stays.
       await closeWrapperTerminal(context, pty.id);

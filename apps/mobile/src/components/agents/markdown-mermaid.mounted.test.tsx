@@ -109,10 +109,11 @@ describe('MarkdownMermaid page rendering', () => {
     });
   });
 
-  it('redraws in place when the color scheme changes', async () => {
-    // Regression: the page was keyed on the diagram source, the resolved dark
-    // flag and the palette, so a theme change replaced the WebView and reloaded
-    // the page — reading the 2.7 MB vendored script again for every flip.
+  it('leaves the page alone when only the color scheme changes', async () => {
+    // The theme follows the card surface, not the app scheme: a scheme flip
+    // changes nothing about the injected colors, so the page is neither
+    // redrawn nor replaced (a replacement would read the 2.7 MB vendored
+    // script again for every flip).
     const renderer = await mount('flowchart TD\n  a --> b');
     await loadPage(renderer);
     const before = webViewInstance(renderer.root);
@@ -122,8 +123,15 @@ describe('MarkdownMermaid page rendering', () => {
     await rerender(renderer, 'flowchart TD\n  a --> b');
 
     expect(webViewInstance(renderer.root)).toBe(before);
+    expect(webViewMock.injectJavaScript).not.toHaveBeenCalled();
+
+    // A palette whose card surface is dark still redraws the loaded page in
+    // place, with the dark theme that surface calls for.
+    await rerender(renderer, 'flowchart TD\n  a --> b', otherPalette);
+
+    expect(webViewInstance(renderer.root)).toBe(before);
     expect(injected(webViewMock.injectJavaScript)).toEqual([
-      { source: 'flowchart TD\n  a --> b', dark: true, background: '#f4f4f4' },
+      { source: 'flowchart TD\n  a --> b', dark: true, background: '#101010' },
     ]);
 
     act(() => {
@@ -141,7 +149,7 @@ describe('MarkdownMermaid page rendering', () => {
 
     expect(webViewInstance(renderer.root)).toBe(before);
     expect(injected(webViewMock.injectJavaScript)).toEqual([
-      { source: 'flowchart TD\n  a --> b', dark: false, background: '#101010' },
+      { source: 'flowchart TD\n  a --> b', dark: true, background: '#101010' },
     ]);
 
     act(() => {
@@ -169,16 +177,15 @@ describe('MarkdownMermaid page rendering', () => {
     });
   });
 
-  it('draws the current colors when the theme changes during a page load', async () => {
+  it('draws the current colors when the palette changes during a page load', async () => {
     const renderer = await mount('flowchart TD\n  a --> b');
-    rnStub.scheme.current = 'dark';
-    await rerender(renderer, 'flowchart TD\n  a --> b');
+    await rerender(renderer, 'flowchart TD\n  a --> b', otherPalette);
     // A color change is not injected into a page that has not loaded.
     expect(webViewMock.injectJavaScript).not.toHaveBeenCalled();
 
     await loadPage(renderer);
     expect(injected(webViewMock.injectJavaScript)).toEqual([
-      { source: 'flowchart TD\n  a --> b', dark: true, background: '#f4f4f4' },
+      { source: 'flowchart TD\n  a --> b', dark: true, background: '#101010' },
     ]);
 
     act(() => {
@@ -194,13 +201,12 @@ describe('MarkdownMermaid page rendering', () => {
     await rerender(renderer, 'flowchart TD\n  c --> d');
     webViewMock.injectJavaScript.mockReset();
 
-    rnStub.scheme.current = 'dark';
-    await rerender(renderer, 'flowchart TD\n  a --> b');
+    await rerender(renderer, 'flowchart TD\n  a --> b', otherPalette);
     expect(webViewMock.injectJavaScript).not.toHaveBeenCalled();
 
     await loadPage(renderer);
     expect(injected(webViewMock.injectJavaScript)).toEqual([
-      { source: 'flowchart TD\n  a --> b', dark: true, background: '#f4f4f4' },
+      { source: 'flowchart TD\n  a --> b', dark: true, background: '#101010' },
     ]);
 
     act(() => {

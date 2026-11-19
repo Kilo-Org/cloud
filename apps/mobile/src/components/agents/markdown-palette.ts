@@ -11,6 +11,9 @@ export type MarkdownPalette = {
   textColor: string;
   mutedTextColor: string;
   codeBackground: string;
+  /** The same card as `codeBackground`, composited onto what lies beneath it:
+   * opaque, so a diagram page can paint it and its brightness can pick a theme. */
+  codeSurface: string;
   borderColor: string;
   codeTokenScheme?: TokenScheme;
 };
@@ -40,18 +43,21 @@ export function getPalette(variant: MarkdownVariant, colors: ThemeColors): Markd
     // Agent chat user bubbles sit on accent-soft (lime); use ink-on-lime.
     const ink = colors.accentSoftForeground;
     const codeBackground = withAlpha(ink, 0.1);
+    const codeSurface = compositeOver(codeBackground, colors.accentSoft);
     return {
       textColor: ink,
       mutedTextColor: withAlpha(ink, 0.7),
       codeBackground,
+      codeSurface,
       borderColor: withAlpha(ink, 0.2),
-      codeTokenScheme: tokenSchemeForSurface(compositeOver(codeBackground, colors.accentSoft)),
+      codeTokenScheme: tokenSchemeForSurface(codeSurface),
     };
   }
   return {
     textColor: colors.foreground,
     mutedTextColor: colors.mutedForeground,
     codeBackground: colors.muted,
+    codeSurface: colors.muted,
     borderColor: colors.border,
     codeTokenScheme: tokenSchemeForSurface(colors.muted),
   };

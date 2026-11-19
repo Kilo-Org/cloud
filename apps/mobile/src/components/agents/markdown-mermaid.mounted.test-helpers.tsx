@@ -10,10 +10,15 @@ const palette = {
   textColor: '#111111',
   mutedTextColor: '#666666',
   codeBackground: '#f4f4f4',
+  codeSurface: '#f4f4f4',
   borderColor: '#cccccc',
 };
 
-export const otherPalette = { ...palette, codeBackground: '#101010' };
+export const otherPalette = {
+  ...palette,
+  codeBackground: '#101010',
+  codeSurface: '#101010',
+};
 
 type HostProps = {
   onLoadStart?: () => void;

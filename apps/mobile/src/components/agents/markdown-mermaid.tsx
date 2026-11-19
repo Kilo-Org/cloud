@@ -1,11 +1,12 @@
 import { Asset } from 'expo-asset';
 import { Directory, File, Paths } from 'expo-file-system';
 import { type ComponentRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, useColorScheme, View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import { z } from 'zod';
 
 import MERMAID_SCRIPT_ASSET from '@/../assets/vendor/mermaid-11.12.0.min.txt';
+import { tokenSchemeForSurface } from '@/lib/pr-review/diff/syntax-colors';
 
 import { MarkdownCodeFence } from './markdown-code-fence';
 import { type MarkdownCopyCodeHandler } from './markdown-handlers';
@@ -137,7 +138,10 @@ export function MarkdownMermaid({
   selectable,
   onCopyCode,
 }: Readonly<MarkdownMermaidProps>) {
-  const dark = useColorScheme() === 'dark';
+  // The theme follows the surface the diagram is drawn on, not the app scheme:
+  // the page must stay legible on the palette's own card, whatever the bubble
+  // around it looks like.
+  const dark = tokenSchemeForSurface(palette.codeSurface) === 'onDark';
   // The page's imperative surface: `injectJavaScript` redraws the diagram in the
   // loaded page. `ComponentRef` is how this package's ref is typed, because its
   // JSX element infers its props type parameter from the attributes.
@@ -173,13 +177,13 @@ export function MarkdownMermaid({
   }, [source]);
   const webSource = useMemo(() => (host === null ? null : { uri: host.pageUri }), [host]);
   const webViewStyle = useMemo(
-    () => ({ backgroundColor: palette.codeBackground }),
-    [palette.codeBackground]
+    () => ({ backgroundColor: palette.codeSurface }),
+    [palette.codeSurface]
   );
   // What the page should be painting. The load handler and the color effect both
   // read it, so the injection that follows a load carries the colors in effect by
   // then instead of the ones a prop had while the page was loading.
-  const wantedRender = useRef({ source, dark, background: palette.codeBackground });
+  const wantedRender = useRef({ source, dark, background: palette.codeSurface });
   // The source whose diagram the loaded page is drawing, or `null` while the
   // page is loading or has failed. A color change may redraw a loaded page; a
   // source change remounts the page and its own load draws the new diagram.
@@ -201,15 +205,15 @@ export function MarkdownMermaid({
     const { source: wantedSource, dark: wantedDark, background } = wantedRender.current;
     webViewRef.current?.injectJavaScript(renderCall(wantedSource, wantedDark, background));
   }, []);
-  // Redraw into the page already loaded when the color scheme or the palette
+  // Redraw into the page already loaded when the surface or the palette
   // changes, instead of reloading it: the vendored script is then read once per
-  // diagram rather than once per theme flip or palette change.
+  // diagram rather than once per palette change.
   useEffect(() => {
-    wantedRender.current = { source, dark, background: palette.codeBackground };
+    wantedRender.current = { source, dark, background: palette.codeSurface };
     if (loadedSource.current === source) {
       injectWantedRender();
     }
-  }, [source, dark, palette.codeBackground, injectWantedRender]);
+  }, [source, dark, palette.codeSurface, injectWantedRender]);
 
   if (failed) {
     // The fence's source is drawn on the same card as every other code fence,
@@ -229,7 +233,7 @@ export function MarkdownMermaid({
   return (
     <View
       className="my-1 overflow-hidden rounded-lg"
-      style={{ height, backgroundColor: palette.codeBackground }}
+      style={{ height, backgroundColor: palette.codeSurface }}
     >
       {host === null || webSource === null ? null : (
         <WebView
@@ -278,7 +282,7 @@ export function MarkdownMermaid({
             loadedSource.current = null;
             setFailure({ source });
           }}
-          // The page paints the card color itself, so the native view must not
+          // The page paints the card surface itself, so the native view must not
           // flash its own white background before the diagram loads.
           style={webViewStyle}
         />

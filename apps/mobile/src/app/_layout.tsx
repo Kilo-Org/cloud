@@ -275,7 +275,7 @@ function RootLayoutNav({
   const navigationReady = useRootNavigationReady();
   // The gated pending-deep-link consumer below switches to the tapped
   // notification's organization through this provider before it navigates.
-  const { setOrganizationId } = useOrganization();
+  const { setOrganizationId, retry: retryOrganization } = useOrganization();
   const { preference: themePreference, hasLoaded: themeHasLoaded } = useThemePreference();
   const { hasLoaded: languageHasLoaded } = useLanguagePreference();
   const { t } = useTranslation();
@@ -327,9 +327,12 @@ function RootLayoutNav({
     // Every query refused while the account was blocked holds a cached
     // failure, so the reveal would show stale error cards until each surface
     // is retried by hand. Refetch the tree instead: a lifted block makes those
-    // reads answer.
+    // reads answer. The stored organization choice is not a query — its
+    // provider keeps the failed restore in its own state — so it is retried
+    // through the same call its own Retry makes.
     onAnswered: () => {
       void queryClient.invalidateQueries();
+      retryOrganization();
     },
   });
   const [consentChecked, setConsentChecked] = useState(false);

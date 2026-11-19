@@ -217,6 +217,7 @@
     "verifyCode": "Hamarino ny kaody",
     "resendCode": "Alefaso indray ny kaody",
     "termsPrefix": "Rehefa manohy ianao dia manaiky ny ",
+    "termsInSentence": "Fepetran'ny serivisy",
     "terms": "Fepetra",
     "termsConnector": " sy ",
     "termsSuffix": ".",

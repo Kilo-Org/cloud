@@ -217,6 +217,7 @@
     "verifyCode": "Verifikasi kode",
     "resendCode": "Kirim ulang kode",
     "termsPrefix": "Dengan melanjutkan, kamu menyetujui ",
+    "termsInSentence": "Ketentuan layanan",
     "terms": "Ketentuan",
     "termsConnector": " dan ",
     "termsSuffix": ".",

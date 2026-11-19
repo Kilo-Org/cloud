@@ -217,6 +217,7 @@
     "verifyCode": "Kód ellenőrzése",
     "resendCode": "Kód újraküldése",
     "termsPrefix": "A folytatással elfogadod a ",
+    "termsInSentence": "Szolgáltatási feltételeket",
     "terms": "Felhasználási feltételeket",
     "termsConnector": " és a ",
     "termsSuffix": ".",

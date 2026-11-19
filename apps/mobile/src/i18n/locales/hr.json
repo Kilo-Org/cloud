@@ -217,6 +217,7 @@
     "verifyCode": "Potvrdi kôd",
     "resendCode": "Pošalji kôd ponovno",
     "termsPrefix": "Nastavkom prihvaćaš naše ",
+    "termsInSentence": "Uvjete pružanja usluge",
     "terms": "Uvjete",
     "termsConnector": " i ",
     "termsSuffix": ".",

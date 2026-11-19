@@ -217,6 +217,7 @@
     "verifyCode": "කේතය සත්‍යාපනය කරන්න",
     "resendCode": "කේතය නැවත යවන්න",
     "termsPrefix": "ඉදිරියට යාමෙන් ඔබ පිළිගන්නේ අපගේ ",
+    "termsInSentence": "සේවා නියමයන්",
     "terms": "නියමයන්",
     "termsConnector": " සහ ",
     "termsSuffix": ".",

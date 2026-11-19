@@ -217,6 +217,7 @@
     "verifyCode": "Staðfesta kóða",
     "resendCode": "Senda kóða aftur",
     "termsPrefix": "Með því að halda áfram samþykkir þú ",
+    "termsInSentence": "Þjónustuskilmála",
     "terms": "Skilmála",
     "termsConnector": " og ",
     "termsSuffix": ".",

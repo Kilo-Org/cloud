@@ -217,6 +217,7 @@
     "verifyCode": "Vahvista koodi",
     "resendCode": "Lähetä koodi uudelleen",
     "termsPrefix": "Jatkamalla hyväksyt ",
+    "termsInSentence": "Palveluehdot",
     "terms": "Käyttöehdot",
     "termsConnector": " ja ",
     "termsSuffix": ".",

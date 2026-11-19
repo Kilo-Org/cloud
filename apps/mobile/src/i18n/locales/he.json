@@ -217,6 +217,7 @@
     "verifyCode": "אימות הקוד",
     "resendCode": "שליחת הקוד שוב",
     "termsPrefix": "המשך השימוש מהווה הסכמה למסמכים הבאים: ",
+    "termsInSentence": "תנאי השירות",
     "terms": "תנאי השימוש",
     "termsConnector": " וכן ",
     "termsSuffix": ".",

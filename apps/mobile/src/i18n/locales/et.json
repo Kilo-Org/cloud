@@ -217,6 +217,7 @@
     "verifyCode": "Kinnita kood",
     "resendCode": "Saada kood uuesti",
     "termsPrefix": "Jätkates kehtivad sulle meie ",
+    "termsInSentence": "Teenusetingimused",
     "terms": "Kasutustingimused",
     "termsConnector": " ja ",
     "termsSuffix": ".",

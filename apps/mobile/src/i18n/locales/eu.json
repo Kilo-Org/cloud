@@ -217,6 +217,7 @@
     "verifyCode": "Egiaztatu kodea",
     "resendCode": "Bidali kodea berriro",
     "termsPrefix": "Jarraitzean, onartzen dituzu gure ",
+    "termsInSentence": "Zerbitzu-baldintzak",
     "terms": "Baldintzak",
     "termsConnector": " eta ",
     "termsSuffix": ".",

@@ -111,11 +111,12 @@ export function IdleAuth({
   // with whatever separator the locale puts before the Terms link — a space
   // where words are space-separated, nothing in Chinese — `termsConnector`
   // carries the conjunction with its own spacing, and the suffix is the
-  // sentence's final punctuation. Both links name the document by the key the
-  // rest of the app uses for it, so the sentence and the screen it opens carry
-  // one name.
+  // sentence's final punctuation. The link inside the sentence paints and reads
+  // `termsInSentence`, the form the locale's consent verb governs, while it
+  // announces, and the screen it opens names, `common.termsOfService` — the
+  // document's own title.
   const legalSentence =
-    `${t('login.termsPrefix')}${t('common.termsOfService')}${t('login.termsConnector')}` +
+    `${t('login.termsPrefix')}${t('login.termsInSentence')}${t('login.termsConnector')}` +
     `${t('common.privacyPolicy')}${t('login.termsSuffix')}`;
   const [view, setView] = useState<'main' | 'otp'>('main');
   const [verifyError, setVerifyError] = useState<string | undefined>(undefined);
@@ -556,7 +557,7 @@ export function IdleAuth({
             openLegalDocument('terms');
           }}
         >
-          <Text className="text-sm text-primary underline">{t('common.termsOfService')}</Text>
+          <Text className="text-sm text-primary underline">{t('login.termsInSentence')}</Text>
         </Pressable>
         <Text
           importantForAccessibility="no-hide-descendants"

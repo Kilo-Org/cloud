@@ -217,6 +217,7 @@
     "verifyCode": "కోడ్‌ను ధృవీకరించండి",
     "resendCode": "కోడ్‌ను మళ్లీ పంపండి",
     "termsPrefix": "కొనసాగిస్తే, మీరు అంగీకరించేవి: మా ",
+    "termsInSentence": "సేవా నిబంధనలు",
     "terms": "నిబంధనలు",
     "termsConnector": " మరియు ",
     "termsSuffix": ".",

@@ -217,6 +217,7 @@
     "verifyCode": "কোড যাচাই করুন",
     "resendCode": "কোড আবার পাঠান",
     "termsPrefix": "চালিয়ে যাওয়ার মাধ্যমে আপনি আমাদের ",
+    "termsInSentence": "পরিষেবার শর্তাবলি",
     "terms": "শর্তাবলি",
     "termsConnector": " এবং ",
     "termsSuffix": "তে সম্মতি দিচ্ছেন।",

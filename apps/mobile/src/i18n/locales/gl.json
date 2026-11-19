@@ -217,6 +217,7 @@
     "verifyCode": "Verificar código",
     "resendCode": "Reenviar código",
     "termsPrefix": "Ao continuar aceptas os nosos ",
+    "termsInSentence": "Termos do servizo",
     "terms": "Termos",
     "termsConnector": " e ",
     "termsSuffix": ".",

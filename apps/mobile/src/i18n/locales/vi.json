@@ -217,6 +217,7 @@
     "verifyCode": "Xác minh mã",
     "resendCode": "Gửi lại mã",
     "termsPrefix": "Khi tiếp tục, bạn đồng ý với ",
+    "termsInSentence": "Điều khoản dịch vụ",
     "terms": "Điều khoản",
     "termsConnector": " và ",
     "termsSuffix": ".",

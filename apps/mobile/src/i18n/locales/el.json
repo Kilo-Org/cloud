@@ -217,6 +217,7 @@
     "verifyCode": "Επαλήθευση κωδικού",
     "resendCode": "Επαναποστολή κωδικού",
     "termsPrefix": "Συνεχίζοντας, αποδέχεσαι τους ",
+    "termsInSentence": "όρους παροχής υπηρεσιών",
     "terms": "όρους μας",
     "termsConnector": " και ",
     "termsSuffix": ".",

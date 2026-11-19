@@ -217,6 +217,7 @@
     "verifyCode": "Проверить код",
     "resendCode": "Отправить код повторно",
     "termsPrefix": "Продолжая, вы соглашаетесь с нашими ",
+    "termsInSentence": "Условиями обслуживания",
     "terms": "Условиями использования",
     "termsConnector": " и ",
     "termsSuffix": ".",

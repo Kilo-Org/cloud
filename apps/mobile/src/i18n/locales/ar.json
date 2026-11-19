@@ -217,6 +217,7 @@
     "verifyCode": "التحقق من الرمز",
     "resendCode": "إعادة إرسال الرمز",
     "termsPrefix": "بالمتابعة، توافق على ",
+    "termsInSentence": "شروط الخدمة",
     "terms": "الشروط",
     "termsConnector": " و",
     "termsSuffix": ".",

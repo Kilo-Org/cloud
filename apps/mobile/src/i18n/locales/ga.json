@@ -217,6 +217,7 @@
     "verifyCode": "Fíoraigh an cód",
     "resendCode": "Seol an cód arís",
     "termsPrefix": "Trí leanúint ar aghaidh, aontaíonn tú lenár ",
+    "termsInSentence": "Téarmaí seirbhíse",
     "terms": "Téarmaí",
     "termsConnector": " agus ",
     "termsSuffix": ".",

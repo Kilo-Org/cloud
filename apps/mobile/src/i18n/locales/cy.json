@@ -217,6 +217,7 @@
     "verifyCode": "Gwirio cod",
     "resendCode": "Anfon y cod eto",
     "termsPrefix": "Drwy barhau, rydych yn cytuno i'n ",
+    "termsInSentence": "Telerau gwasanaeth",
     "terms": "Telerau",
     "termsConnector": " a ",
     "termsSuffix": ".",

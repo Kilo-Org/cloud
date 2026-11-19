@@ -217,6 +217,7 @@
     "verifyCode": "验证",
     "resendCode": "重新发送验证码",
     "termsPrefix": "继续即表示你同意我们的",
+    "termsInSentence": "服务条款",
     "terms": "条款",
     "termsConnector": "和",
     "termsSuffix": "。",

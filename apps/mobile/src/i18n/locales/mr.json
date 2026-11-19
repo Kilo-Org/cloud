@@ -217,6 +217,7 @@
     "verifyCode": "कोडची पडताळणी करा",
     "resendCode": "कोड पुन्हा पाठवा",
     "termsPrefix": "पुढे गेल्याने तुम्ही खालील बाबींना सहमती देता: ",
+    "termsInSentence": "सेवेच्या अटी",
     "terms": "अटी",
     "termsConnector": " आणि ",
     "termsSuffix": ".",

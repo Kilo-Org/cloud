@@ -217,6 +217,7 @@
     "verifyCode": "Verifiko kodin",
     "resendCode": "Ridërgo kodin",
     "termsPrefix": "Duke vazhduar, pajtohesh me ",
+    "termsInSentence": "Kushtet e shërbimit",
     "terms": "Kushtet",
     "termsConnector": " dhe ",
     "termsSuffix": ".",

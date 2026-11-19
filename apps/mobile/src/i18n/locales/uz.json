@@ -217,6 +217,7 @@
     "verifyCode": "Kodni tekshirish",
     "resendCode": "Kodni qayta yuborish",
     "termsPrefix": "Davom etish orqali quyidagi hujjatlarga rozilik bildirasiz: ",
+    "termsInSentence": "Xizmat shartlari",
     "terms": "Shartlar",
     "termsConnector": " va ",
     "termsSuffix": ".",

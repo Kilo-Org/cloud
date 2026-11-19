@@ -217,6 +217,7 @@
     "verifyCode": "कोड प्रमाणित गर्नुहोस्",
     "resendCode": "कोड पुनः पठाउनुहोस्",
     "termsPrefix": "अघि बढ्दा तपाईं हाम्रा ",
+    "termsInSentence": "सेवाका सर्तहरू",
     "terms": "सर्तहरू",
     "termsConnector": " र ",
     "termsSuffix": "मा सहमत हुनुहुन्छ।",

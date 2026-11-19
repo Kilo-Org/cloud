@@ -217,6 +217,7 @@
     "verifyCode": "کوډ تایید کړئ",
     "resendCode": "کوډ بیا ولېږئ",
     "termsPrefix": "په دوام ورکولو سره، تاسو زموږ دا موارد منئ: ",
+    "termsInSentence": "د خدمت شرایط",
     "terms": "شرایط",
     "termsConnector": " او ",
     "termsSuffix": ".",

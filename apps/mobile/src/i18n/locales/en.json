@@ -307,6 +307,7 @@
     "verifyCode": "Verify code",
     "resendCode": "Resend code",
     "termsPrefix": "By continuing you agree to our ",
+    "termsInSentence": "Terms of Service",
     "terms": "Terms",
     "termsConnector": " and ",
     "termsSuffix": ".",

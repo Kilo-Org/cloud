@@ -217,6 +217,7 @@
     "verifyCode": "Кодты тексеру",
     "resendCode": "Кодты қайта жіберу",
     "termsPrefix": "Жалғастыру арқылы мына құжаттармен келісесіз: ",
+    "termsInSentence": "Қызмет көрсету шарттары",
     "terms": "Шарттар",
     "termsConnector": " және ",
     "termsSuffix": ".",

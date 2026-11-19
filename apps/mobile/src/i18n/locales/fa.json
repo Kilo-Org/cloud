@@ -217,6 +217,7 @@
     "verifyCode": "تأیید کد",
     "resendCode": "ارسال مجدد کد",
     "termsPrefix": "با ادامه، موافقت خود را با این موارد اعلام می‌کنید: ",
+    "termsInSentence": "شرایط خدمات",
     "terms": "شرایط",
     "termsConnector": " و ",
     "termsSuffix": ".",

@@ -217,6 +217,7 @@
     "verifyCode": "Verifică codul",
     "resendCode": "Retrimite codul",
     "termsPrefix": "Dacă continui, accepți ",
+    "termsInSentence": "Termenii de serviciu",
     "terms": "Termenii de utilizare",
     "termsConnector": " și ",
     "termsSuffix": ".",

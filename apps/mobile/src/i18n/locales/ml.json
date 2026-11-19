@@ -217,6 +217,7 @@
     "verifyCode": "കോഡ് പരിശോധിക്കുക",
     "resendCode": "കോഡ് വീണ്ടും അയയ്ക്കുക",
     "termsPrefix": "തുടരുന്നതിലൂടെ നിങ്ങൾ അംഗീകരിക്കുന്നു: ",
+    "termsInSentence": "സേവന നിബന്ധനകൾ",
     "terms": "നിബന്ധനകൾ",
     "termsConnector": " കൂടാതെ ",
     "termsSuffix": ".",

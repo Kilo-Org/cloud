@@ -217,6 +217,7 @@
     "verifyCode": "ኮዱን ያረጋግጡ",
     "resendCode": "ኮዱን እንደገና ይላኩ",
     "termsPrefix": "ሲቀጥሉ የሚከተሉትን ይቀበላሉ፦ ",
+    "termsInSentence": "የአገልግሎት ውሎች",
     "terms": "ውሎች",
     "termsConnector": " እና ",
     "termsSuffix": "።",

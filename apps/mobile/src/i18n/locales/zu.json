@@ -217,6 +217,7 @@
     "verifyCode": "Qinisekisa ikhodi",
     "resendCode": "Thumela ikhodi futhi",
     "termsPrefix": "Ngokuqhubeka, wamukela lokhu okulandelayo kwethu: ",
+    "termsInSentence": "Imigomo yesevisi",
     "terms": "Imigomo",
     "termsConnector": " kanye ",
     "termsSuffix": ".",

@@ -217,6 +217,7 @@
     "verifyCode": "ຢືນຢັນລະຫັດ",
     "resendCode": "ສົ່ງລະຫັດອີກຄັ້ງ",
     "termsPrefix": "ການສືບຕໍ່ໝາຍຄວາມວ່າທ່ານຍອມຮັບ",
+    "termsInSentence": "ຂໍ້ກຳນົດການໃຫ້ບໍລິການ",
     "terms": "ຂໍ້ກຳນົດ",
     "termsConnector": "ແລະ",
     "termsSuffix": ".",

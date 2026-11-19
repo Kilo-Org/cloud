@@ -217,6 +217,7 @@
     "verifyCode": "Bekreft kode",
     "resendCode": "Send koden på nytt",
     "termsPrefix": "Ved å fortsette godtar du våre ",
+    "termsInSentence": "Tjenestevilkår",
     "terms": "Vilkår",
     "termsConnector": " og ",
     "termsSuffix": ".",

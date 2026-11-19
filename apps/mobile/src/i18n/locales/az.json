@@ -217,6 +217,7 @@
     "verifyCode": "Kodu yoxla",
     "resendCode": "Kodu yenidən göndər",
     "termsPrefix": "Davam etməklə bu sənədlərlə razılaşırsan: ",
+    "termsInSentence": "Xidmət şərtləri",
     "terms": "Şərtlər",
     "termsConnector": " və ",
     "termsSuffix": ".",

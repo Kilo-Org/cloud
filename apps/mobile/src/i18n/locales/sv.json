@@ -217,6 +217,7 @@
     "verifyCode": "Verifiera kod",
     "resendCode": "Skicka koden igen",
     "termsPrefix": "Genom att fortsätta godkänner du våra ",
+    "termsInSentence": "Användarvillkor",
     "terms": "Villkor",
     "termsConnector": " och ",
     "termsSuffix": ".",

@@ -217,6 +217,7 @@
     "verifyCode": "ยืนยันรหัส",
     "resendCode": "ส่งรหัสอีกครั้ง",
     "termsPrefix": "การดำเนินการต่อแสดงว่าคุณยอมรับ",
+    "termsInSentence": "ข้อกำหนดในการให้บริการ",
     "terms": "ข้อกำหนด",
     "termsConnector": "และ",
     "termsSuffix": ".",

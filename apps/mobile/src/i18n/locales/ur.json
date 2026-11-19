@@ -217,6 +217,7 @@
     "verifyCode": "کوڈ کی تصدیق کریں",
     "resendCode": "کوڈ دوبارہ بھیجیں",
     "termsPrefix": "آگے بڑھنے سے آپ ہماری درج ذیل پالیسیوں سے اتفاق کرتے ہیں: ",
+    "termsInSentence": "سروس کی شرائط",
     "terms": "شرائط",
     "termsConnector": " اور ",
     "termsSuffix": "۔",

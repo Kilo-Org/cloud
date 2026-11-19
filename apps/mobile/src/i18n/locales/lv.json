@@ -217,6 +217,7 @@
     "verifyCode": "Pārbaudīt kodu",
     "resendCode": "Nosūtīt kodu vēlreiz",
     "termsPrefix": "Turpinot, tu piekrīti mūsu ",
+    "termsInSentence": "Pakalpojuma noteikumiem",
     "terms": "Noteikumiem",
     "termsConnector": " un ",
     "termsSuffix": ".",

@@ -217,6 +217,7 @@
     "verifyCode": "Koodii mirkaneessi",
     "resendCode": "Koodii irra deebi'ii ergi",
     "termsPrefix": "Itti fufuun, kanneen keenya armaan gadiitti walii galta: ",
+    "termsInSentence": "Ulaagaalee tajaajilaa",
     "terms": "Ulaagaalee",
     "termsConnector": " fi ",
     "termsSuffix": ".",

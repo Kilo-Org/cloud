@@ -217,6 +217,7 @@
     "verifyCode": "코드 확인",
     "resendCode": "코드 다시 보내기",
     "termsPrefix": "계속하면 다음 ",
+    "termsInSentence": "서비스 약관",
     "terms": "약관",
     "termsConnector": " 및 ",
     "termsSuffix": "에 동의합니다.",

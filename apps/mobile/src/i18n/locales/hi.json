@@ -217,6 +217,7 @@
     "verifyCode": "कोड सत्यापित करें",
     "resendCode": "कोड फिर से भेजें",
     "termsPrefix": "आगे बढ़ने का मतलब है कि आप इनसे सहमत हैं: ",
+    "termsInSentence": "सेवा की शर्तें",
     "terms": "शर्तें",
     "termsConnector": " और ",
     "termsSuffix": "।",

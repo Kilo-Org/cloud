@@ -217,6 +217,7 @@
     "verifyCode": "Потврди го кодот",
     "resendCode": "Испрати го кодот повторно",
     "termsPrefix": "Со продолжувањето се согласуваш со нашите ",
+    "termsInSentence": "Услови на услугата",
     "terms": "Услови",
     "termsConnector": " и ",
     "termsSuffix": ".",

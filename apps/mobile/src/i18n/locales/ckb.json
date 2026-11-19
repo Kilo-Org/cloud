@@ -217,6 +217,7 @@
     "verifyCode": "کۆدەکە پشتڕاست بکەرەوە",
     "resendCode": "کۆدەکە دووبارە بنێرە",
     "termsPrefix": "بە بەردەوامبوون ڕازی دەبیت بە ",
+    "termsInSentence": "مەرجەکانی خزمەتگوزاری",
     "terms": "مەرجەکان",
     "termsConnector": " و ",
     "termsSuffix": ".",

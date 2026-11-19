@@ -7,12 +7,40 @@ import { createElement, type ElementType } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { type ReactTestRenderer } from '@/test/renderer';
+import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { BitbucketConnectSheet } from './bitbucket-connect-sheet';
 
 type IntegrationMethod = 'oauth' | 'workspace_access_token';
+
+type LeaveOptions = {
+  data: { action: { type: string } };
+  repeat: () => void;
+};
+
+type ConfirmRequest = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  cancelLabel?: string;
+  onConfirm: () => void;
+  onCancel?: () => void;
+};
+
+const routerMock = vi.hoisted(() => ({ back: vi.fn(), push: vi.fn() }));
+
+// react-navigation only calls the removal handler while the route prevents the
+// removal, so the stand-in records both values: `prevent` is what says whether
+// the guard is armed, and `handler` is the leave the navigator would run.
+const preventRemoveMock = vi.hoisted(() => ({
+  prevent: false,
+  handler: undefined as ((options: LeaveOptions) => void) | undefined,
+}));
+
+// The confirm node is the native dialog, covered by its own suite; here it is a
+// request log so the assertions stay on the gate's decisions.
+const confirmMock = vi.hoisted(() => ({ requests: [] as ConfirmRequest[] }));
 
 const state = vi.hoisted(() => ({
   role: 'owner' as string | undefined,
@@ -37,7 +65,21 @@ vi.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 'success' },
   notificationAsync: vi.fn(),
 }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ back: vi.fn(), push: vi.fn() }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => routerMock,
+  usePreventRemove: (prevent: boolean, handler: (options: LeaveOptions) => void) => {
+    preventRemoveMock.prevent = prevent;
+    preventRemoveMock.handler = handler;
+  },
+}));
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({
+    confirm: (request: ConfirmRequest) => {
+      confirmMock.requests.push(request);
+    },
+    dialog: 'ConfirmDialog',
+  }),
+}));
 vi.mock('@/lib/haptics', () => ({ notificationHaptic: vi.fn() }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { success: vi.fn() } }));
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
@@ -77,9 +119,21 @@ vi.mock('@/components/organization/permission-denied', () => ({
   PermissionDenied: 'PermissionDenied',
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/code-reviewer/bitbucket-connect-form', () => ({
-  BitbucketConnectForm: 'BitbucketConnectForm',
-}));
+vi.mock('@/components/code-reviewer/bitbucket-connect-form', async () => {
+  // `vi.mock` hoists above the module's imports, so the factory cannot close
+  // over the top-level `createElement` binding.
+  const { createElement: h } = await import('react');
+  // The real form's surface that the sheet drives: the draft report the leave
+  // guard listens to and the dismissal a landed token requests.
+  function BitbucketConnectForm(props: {
+    integrationId: string | null;
+    onConnected: () => void;
+    onDirtyChange?: (dirty: boolean) => void;
+  }) {
+    return h('BitbucketConnectForm', props);
+  }
+  return { BitbucketConnectForm };
+});
 
 const BUTTON = 'Button' as ElementType;
 const FORM = 'BitbucketConnectForm' as ElementType;
@@ -101,6 +155,44 @@ function rendersText(root: ReactTestRenderer['root'], value: string): boolean {
     .some(node => node.children.includes(value));
 }
 
+type FormProps = Readonly<{
+  integrationId: string | null;
+  onConnected: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
+}>;
+
+/** The props the sheet handed the connect form, which is where its draft and dismissal live. */
+function formProps(root: ReactTestRenderer['root']): FormProps {
+  const [form] = root.findAll(node => Object.is(node.type, FORM));
+  if (!form) {
+    throw new Error('missing connect form');
+  }
+  return form.props as FormProps;
+}
+
+/** A Back the navigator would run, and whether the guard let it through. */
+async function leave(type = 'GO_BACK'): Promise<{ repeat: () => void }> {
+  const repeat = vi.fn<() => void>();
+  await act(async () => {
+    preventRemoveMock.handler?.({ data: { action: { type } }, repeat });
+    await Promise.resolve();
+  });
+  return { repeat };
+}
+
+/** Mount the token form's sheet, which is the state the guard speaks for. */
+function mountForm(): Promise<ReactTestRenderer['root']> {
+  state.status.data = { method: 'workspace_access_token', integrationId: null };
+  return mount();
+}
+
+async function reportDirty(root: ReactTestRenderer['root'], dirty: boolean): Promise<void> {
+  await act(async () => {
+    formProps(root).onDirtyChange?.(dirty);
+    await Promise.resolve();
+  });
+}
+
 beforeEach(() => {
   state.role = 'owner';
   state.readiness.integrationId = null;
@@ -108,6 +200,10 @@ beforeEach(() => {
   state.status.isPending = false;
   state.status.isError = false;
   state.status.error = undefined;
+  routerMock.back.mockClear();
+  preventRemoveMock.prevent = false;
+  preventRemoveMock.handler = undefined;
+  confirmMock.requests.length = 0;
 });
 
 describe('BitbucketConnectSheet', () => {
@@ -169,5 +265,66 @@ describe('BitbucketConnectSheet', () => {
     expect(root.findAll(node => Object.is(node.type, FORM))).toHaveLength(0);
     const [denied] = root.findAll(node => Object.is(node.type, PERMISSION_DENIED));
     expect(denied?.props.description).toBe(i18n.t('integrations.managedByOwner'));
+  });
+
+  it('asks before a typed token is dropped, and only discards on the confirm', async () => {
+    const root = await mountForm();
+    await reportDirty(root, true);
+
+    expect(preventRemoveMock.prevent).toBe(true);
+    const { repeat } = await leave();
+
+    // The Back is held while the sheet asks, so nothing leaves yet.
+    expect(repeat).not.toHaveBeenCalled();
+    const [request] = confirmMock.requests;
+    expect(request?.title).toBe(i18n.t('common.discardChangesTitle'));
+    expect(request?.message).toBe(i18n.t('common.discardChangesMessage'));
+    expect(request?.confirmLabel).toBe(i18n.t('common.discard'));
+    expect(request?.cancelLabel).toBe(i18n.t('common.keepEditing'));
+
+    // Discard replays the intercepted Back rather than replacing the route.
+    await act(async () => {
+      request?.onConfirm();
+      await Promise.resolve();
+    });
+
+    expect(repeat).toHaveBeenCalledTimes(1);
+    expect(routerMock.back).not.toHaveBeenCalled();
+  });
+
+  it('leaves a clean sheet without asking', async () => {
+    await mountForm();
+
+    expect(preventRemoveMock.prevent).toBe(false);
+    const { repeat } = await leave();
+
+    expect(repeat).toHaveBeenCalledTimes(1);
+    expect(confirmMock.requests).toHaveLength(0);
+  });
+
+  it('leaves without asking once a connect accepted the token', async () => {
+    const root = await mountForm();
+    await reportDirty(root, true);
+
+    await act(async () => {
+      formProps(root).onConnected();
+      await Promise.resolve();
+    });
+    // The dismissal waits one task for the guard to disarm before popping.
+    await act(async () => {
+      const tick = Promise.withResolvers<undefined>();
+      setTimeout(tick.resolve, 0);
+      await tick.promise;
+    });
+
+    expect(routerMock.back).toHaveBeenCalledTimes(1);
+    expect(preventRemoveMock.prevent).toBe(false);
+
+    // The guard is disarmed for the leave the connect owns, so a Back the
+    // navigator runs next is not held for a confirmation.
+    const { repeat } = await leave();
+
+    expect(repeat).toHaveBeenCalledTimes(1);
+    expect(confirmMock.requests).toHaveLength(0);
   });
 });

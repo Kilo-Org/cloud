@@ -30,10 +30,13 @@ export function BitbucketConnectForm({
   scope,
   integrationId,
   onConnected,
+  onDirtyChange,
 }: Readonly<{
   scope: string;
   integrationId: string | null;
   onConnected: () => void;
+  /** Reports whether the token field holds text, so the sheet can guard its leave. */
+  onDirtyChange?: (dirty: boolean) => void;
 }>) {
   const { t } = useTranslation();
   // iOS never lets a controlled `value` hold the caret, so the token lives in a
@@ -122,6 +125,7 @@ export function BitbucketConnectForm({
           // a lost role or a connection that changed underneath keeps the submit
           // disabled until the sheet is reopened.
           clearWhere(settled => repairNeedsAnotherToken(settled.kind));
+          onDirtyChange?.(value.trim().length > 0);
         }}
       />
 

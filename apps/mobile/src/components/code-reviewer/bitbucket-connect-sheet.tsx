@@ -7,6 +7,7 @@ import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations
 import { BitbucketConnectForm } from '@/components/code-reviewer/bitbucket-connect-form';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
+import { useMetadataLeaveGuard } from '@/components/profiles/use-metadata-leave-guard';
 import { QueryError } from '@/components/query-error';
 import { SheetScrollView } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -37,6 +38,9 @@ export function BitbucketConnectSheet({ scope }: Readonly<{ scope: string | unde
 function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const { t } = useTranslation();
+  // The token field is the sheet's only draft, and the header back arrow, the
+  // Android Back and the back gesture would drop whatever is typed in it.
+  const guard = useMetadataLeaveGuard({ enabled: true });
   const { role, org, isResolving, isError } = useOrgBoundary(scope);
   const readiness = useBitbucketReadiness(scope);
   // The readiness read describes workspace access tokens only, so this is what
@@ -151,23 +155,30 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
   }
 
   return (
-    <SheetScrollView
-      className="flex-1 bg-background"
-      contentContainerClassName="gap-6 px-6 pt-4 pb-8"
-      automaticallyAdjustKeyboardInsets
-      keyboardShouldPersistTaps="handled"
-    >
-      <SheetTitle title={title} />
-      <BitbucketConnectForm
-        scope={scope}
-        integrationId={integrationId}
-        onConnected={() => {
-          notificationHaptic(Haptics.NotificationFeedbackType.Success);
-          announcingToast.success(t('common.bitbucketConnected'));
-          router.back();
-        }}
-      />
-    </SheetScrollView>
+    <>
+      <SheetScrollView
+        className="flex-1 bg-background"
+        contentContainerClassName="gap-6 px-6 pt-4 pb-8"
+        automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="handled"
+      >
+        <SheetTitle title={title} />
+        <BitbucketConnectForm
+          scope={scope}
+          integrationId={integrationId}
+          onDirtyChange={guard.handleDirtyChange}
+          onConnected={() => {
+            notificationHaptic(Haptics.NotificationFeedbackType.Success);
+            announcingToast.success(t('common.bitbucketConnected'));
+            // The token was accepted, so there is no draft left to confirm.
+            guard.leaveWithoutAsking(() => {
+              router.back();
+            });
+          }}
+        />
+      </SheetScrollView>
+      {guard.dialog}
+    </>
   );
 }
 

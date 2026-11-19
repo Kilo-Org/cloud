@@ -55,9 +55,18 @@ function statusMessage(root: ReactTestRenderer['root']): string | null {
   return status ? (status.props.message as string | null) : null;
 }
 
-async function mount(integrationId: string | null, onConnected: () => void = vi.fn()) {
+async function mount(
+  integrationId: string | null,
+  onConnected: () => void = vi.fn(),
+  onDirtyChange?: (dirty: boolean) => void
+) {
   const view = await renderWithProviders(
-    createElement(BitbucketConnectForm, { scope: 'org-1', integrationId, onConnected })
+    createElement(BitbucketConnectForm, {
+      scope: 'org-1',
+      integrationId,
+      onConnected,
+      onDirtyChange,
+    })
   );
   return { root: view.renderer.root, onConnected };
 }
@@ -197,6 +206,18 @@ describe('BitbucketConnectForm', () => {
     expect(mutations.connect).not.toHaveBeenCalled();
     expect(statusMessage(root)).toBe(i18n.t('prReview.reconnectNotice.bitbucketTitle'));
     expect(submitButton(root).props.disabled).toBe(false);
+  });
+
+  it('reports a token in the field as a draft and an emptied field as clean', async () => {
+    const onDirtyChange = vi.fn<(dirty: boolean) => void>();
+    const { root } = await mount(null, vi.fn<() => void>(), onDirtyChange);
+
+    await edit(root, 'workspace-token');
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+
+    // Whitespace is what a submit would not send, so it is not an edit either.
+    await edit(root, '   ');
+    expect(onDirtyChange).toHaveBeenLastCalledWith(false);
   });
 
   it('holds the token field still while the submitted token is in flight', async () => {

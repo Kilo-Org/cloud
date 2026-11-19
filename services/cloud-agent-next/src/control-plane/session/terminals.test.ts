@@ -115,13 +115,18 @@ function socket(tags: string[], attachment: unknown): FakeSocket {
   };
 }
 
-function fakeState(values: Map<string, unknown>, sockets: FakeSocket[]): DurableObjectState {
+function fakeState(
+  values: Map<string, unknown>,
+  sockets: FakeSocket[],
+  putFailure?: (key: string) => boolean
+): DurableObjectState {
   return {
     storage: {
       async get<T = unknown>(key: string): Promise<T | undefined> {
         return structuredClone(values.get(key)) as T | undefined;
       },
       async put<T = unknown>(key: string, value: T): Promise<void> {
+        if (putFailure?.(key)) throw new Error('storage unavailable');
         values.set(key, structuredClone(value));
       },
       async delete(keys: string | string[]): Promise<void> {
@@ -148,6 +153,7 @@ function fixture(
     getSandboxStatus?: () => Promise<SandboxStatusSnapshot>;
     sockets?: FakeSocket[];
     metadata?: ReturnType<typeof metadata>;
+    putFailure?: (key: string) => boolean;
   } = {}
 ) {
   const { values } = fakeStorage();
@@ -156,7 +162,7 @@ function fixture(
     result: { pty: pty('pty_new') },
   }));
   const terminals = createControlPlaneTerminals({
-    state: fakeState(values, overrides.sockets ?? []),
+    state: fakeState(values, overrides.sockets ?? [], overrides.putFailure),
     sessionId: SESSION_ID,
     getMetadata: () => overrides.metadata ?? metadata(),
     getDirectory: () => DIRECTORY,
@@ -261,6 +267,49 @@ describe('V2 control-plane terminals projection', () => {
       wrapperId: CURRENT_WRAPPER,
       state: 'running',
     });
+  });
+
+  it('stores the terminal record before the creation completes', async () => {
+    const { terminals, values, request } = fixture({
+      putFailure: key => key === 'control_terminal:pty_new',
+    });
+
+    await expect(
+      terminals.create({ operationId: '11111111-1111-4111-8111-111111111111' })
+    ).resolves.toEqual({ success: false, error: 'storage unavailable' });
+
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(request).toHaveBeenNthCalledWith(2, SANDBOX_ID, {
+      operation: 'close',
+      session: { sessionId: SESSION_ID, kiloSessionId: 'kilo_session_1', directory: DIRECTORY },
+      payload: { ptyId: 'pty_new' },
+    });
+    expect([...values.keys()].filter(key => key.startsWith('control_terminal'))).toEqual([]);
+  });
+
+  it('deletes a terminal record the creation could not finish', async () => {
+    const operationId = '22222222-2222-4222-8222-222222222222';
+    const { terminals, values, request } = fixture({
+      putFailure: key => key === `control_terminal_operation:${operationId}`,
+    });
+
+    await expect(terminals.create({ operationId })).resolves.toEqual({
+      success: false,
+      error: 'storage unavailable',
+    });
+
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(request).toHaveBeenNthCalledWith(2, SANDBOX_ID, {
+      operation: 'close',
+      session: { sessionId: SESSION_ID, kiloSessionId: 'kilo_session_1', directory: DIRECTORY },
+      payload: { ptyId: 'pty_new' },
+    });
+    expect(
+      [...values.keys()].filter(
+        key =>
+          key.startsWith('control_terminal') || key.startsWith('control_terminal_operation')
+      )
+    ).toEqual([]);
   });
 
   it('closes browser terminal sockets and leaves wrapper sockets open', () => {

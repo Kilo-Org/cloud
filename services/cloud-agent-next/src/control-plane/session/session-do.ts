@@ -3414,13 +3414,18 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   /**
    * Worktree deletion, phase 2 (legacy `finishWorktreeDeletion`): purge this
-   * session's data once the Sandbox DO confirmed the worktree cleanup. Idempotent
-   * and holds no per-worktree state: the Sandbox DO already removed the routes.
+   * session's data once the Sandbox DO confirmed the worktree cleanup, for the
+   * stored worktree binding. Idempotent and holds no per-worktree state: the
+   * Sandbox DO already removed the routes.
    */
   async finishWorktreeDeletion(worktreeId: string): Promise<void> {
     await this.initialized;
-    cloudAgentWorktreeIdSchema.parse(worktreeId);
+    const requested = cloudAgentWorktreeIdSchema.parse(worktreeId);
     if (this.registration === null) return;
+    if (this.metadata === null) return;
+    if (this.metadata.workspace?.worktreeId !== requested) {
+      throw new Error('Worktree identity conflict');
+    }
     await this.enqueue(async () => {
       await this.tearDownSession();
     });

@@ -306,6 +306,7 @@ function createHarness(
   let clock = 0;
   let materializeCalls = 0;
   let observeDispatches = true;
+  let clientReadFailIn: number | undefined;
 
   const scheduler: TurnScheduler = {
     setInterval: () => 0 as unknown as ReturnType<typeof setInterval>,
@@ -376,6 +377,13 @@ function createHarness(
       directory: spec.directory,
       env: envs.get(key) as Record<string, string>,
       get client() {
+        if (clientReadFailIn !== undefined) {
+          if (clientReadFailIn === 0) {
+            clientReadFailIn = undefined;
+            throw new Error('Kilo runtime has not started');
+          }
+          clientReadFailIn -= 1;
+        }
         if (options.clientThrowsWhileRestarting && flags.get(key)?.restarting)
           throw new Error('Kilo runtime has not started');
         return clients.get(key)!.client;
@@ -419,6 +427,10 @@ function createHarness(
       clock += ms;
     },
     materializeCalls: () => materializeCalls,
+    /** Throw from the `.client` read after `skip` successful reads. */
+    failClientRead(skip = 0): void {
+      clientReadFailIn = skip;
+    },
     registerRoute(spec: ControlPlaneRouteSpec, withRuntime = true): void {
       if (withRuntime) ensureRuntime(spec);
       manager.registerRoute(spec);
@@ -2763,6 +2775,51 @@ describe('turn finalization', () => {
     release?.({ wasAborted: false, success: true });
     await settle();
     expect(outcomeFrames(h.frames)[0]).toMatchObject({ status: 'completed' });
+  });
+
+  it('completes a turn while the client is unavailable', async () => {
+    const h = createHarness({ nativeDrain: false, clientThrowsWhileRestarting: true });
+    h.registerRoute(routeSpec());
+    h.manager.submit(
+      SESSION_ID,
+      promptPayload('m1', { finalization: { condenseOnComplete: true } })
+    );
+    await settle();
+    h.setFlags(routeSpec(), { restarting: true, suspected: true });
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed', lastMessageId: 'm1' }]);
+    expect(eventFrames(h.frames).filter(event => event.type === 'error')).toEqual([
+      {
+        type: 'error',
+        properties: {
+          error: 'Finalization steps skipped: the agent is restarting',
+          fatal: false,
+        },
+      },
+    ]);
+    expect(h.manager.hasPendingWork()).toBe(false);
+  });
+
+  it('completes a turn when the runtime client is not readable', async () => {
+    const h = createHarness({ nativeDrain: false });
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1', { finalization: { autoCommit: true } }));
+    await settle();
+    h.failClientRead(1);
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed', lastMessageId: 'm1' }]);
+    expect(eventFrames(h.frames).filter(event => event.type === 'error')).toEqual([
+      {
+        type: 'error',
+        properties: {
+          error: 'Finalization steps skipped: Kilo runtime has not started',
+          fatal: false,
+        },
+      },
+    ]);
+    expect(h.manager.hasPendingWork()).toBe(false);
   });
 
   it('fails agent_restarted when a restart interrupts a finalization follow-up', async () => {

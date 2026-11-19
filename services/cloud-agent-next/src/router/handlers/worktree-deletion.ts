@@ -152,6 +152,7 @@ export async function deleteWorktreeResources(
     }
     const runtimeLocations = [...state.runtimeLocations];
     const childSessions: NonNullable<RecordCloudAgentWorktreeCleanupParams['childSessions']> = [];
+    const refusedRoots = new Set<string>();
     setStage('collect_sessions');
     const discoveries = await mapDeletionRoots(state.manifest.sessions, async session => {
       if (!session.cloudAgentSessionId) return null;
@@ -173,6 +174,7 @@ export async function deleteWorktreeResources(
         return { cloudAgentSessionId, location, children };
       } catch (error) {
         if (isHardDeletionError(error)) throw error;
+        refusedRoots.add(cloudAgentSessionId);
         unreachableRootCount += 1;
         logControlDiagnostic(
           'worktree_deletion',
@@ -303,6 +305,7 @@ export async function deleteWorktreeResources(
       const finished = await mapDeletionRoots(state.manifest.sessions, async session => {
         if (!session.cloudAgentSessionId) return true;
         const cloudAgentSessionId = session.cloudAgentSessionId;
+        if (refusedRoots.has(cloudAgentSessionId)) return false;
         try {
           await withDORetry(
             () => getSandboxSessionStub(ctx.env, ctx.userId, cloudAgentSessionId),

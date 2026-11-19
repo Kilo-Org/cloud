@@ -69,6 +69,14 @@ function hasNativeDrain(runtime: TurnKiloRuntime | undefined): boolean {
   }
 }
 
+function runtimeClient(runtime: TurnKiloRuntime | undefined): Harness | undefined {
+  try {
+    return runtime?.client;
+  } catch {
+    return undefined;
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -904,17 +912,32 @@ export function createTurnManager(deps: TurnManagerDeps) {
         controller.abort(new Error('finalization timed out'));
       }, DEFAULT_CONDENSE_TIMEOUT_MS);
       emitEvents(sessionId, [{ type: CONTROL_PLANE_WRAPPER_FINALIZING_EVENT, properties: {} }]);
+      const runtime = deps.runtimes.get(turn.route.runtimeKey);
+      const client = runtimeClient(runtime);
+      let skipped: string | undefined;
       try {
-        const client = deps.runtimes.get(turn.route.runtimeKey)?.client;
         if (client) {
           await runAutoCommitStep(turn, client, controller.signal);
           await runCondenseStep(turn, client, controller.signal);
+        } else if (runtime !== undefined) {
+          skipped = 'the agent is restarting';
         }
+      } catch (error) {
+        skipped = error instanceof Error ? error.message : String(error);
       } finally {
         scheduler.clearTimeout(timer);
         turn.stepAbort = undefined;
       }
       if (turns.get(sessionId) !== turn) return;
+      if (
+        skipped !== undefined &&
+        turn.prompts.some(
+          entry =>
+            entry.payload.finalization?.autoCommit === true ||
+            entry.payload.finalization?.condenseOnComplete === true
+        )
+      )
+        emitWarning(sessionId, `Finalization steps skipped: ${skipped}`);
       if (hasUndispatchedPrompt(turn)) {
         turn.phase = 'busy';
         return;

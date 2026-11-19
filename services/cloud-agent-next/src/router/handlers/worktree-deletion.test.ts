@@ -407,6 +407,23 @@ describe('deleteWorktree authorization and completion', () => {
     expect(f.finishSession).toHaveBeenCalledTimes(1);
   });
 
+  it('finishes cleanup after every root began deletion', async () => {
+    const f = fixture(2);
+    f.beginSession.mockImplementation(async id => {
+      if (id === workspaceId(0)) throw new Error('DO unavailable');
+      return location;
+    });
+
+    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toEqual({
+      success: true,
+      deletedSessionIds: [kiloId(0), kiloId(1)],
+      cleanup: 'pending',
+    });
+    expect(f.finishSession).toHaveBeenCalledTimes(1);
+    expect(f.finishSession).toHaveBeenCalledWith(workspaceId(1));
+    expect(f.complete).not.toHaveBeenCalled();
+  });
+
   it('skips runtime locations whose successful cleanup is already journaled', async () => {
     const f = fixture();
     f.getState().runtimeLocations = [location];

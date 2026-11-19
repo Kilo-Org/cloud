@@ -4,7 +4,7 @@ import { buildWorkflowPageCode } from './agent-workflow-runner';
 import { TAB_TAKEN_ERROR } from './browser-caller';
 import { STALE_REF_ERROR } from './browser-agent-checks';
 import { runIsolatedAgentProbe } from './browser-agent-isolated-probe-script';
-import { readIsolatedFrames } from './browser-agent-isolated-probe';
+import { MAIN_FRAME_ID, readIsolatedFrames } from './browser-agent-isolated-probe';
 import type { IsolatedAgentProbe } from './browser-agent-isolated-probe';
 import type { AgentFrameInventory } from './browser-agent-frames';
 import { spliceScriptingFrames } from './browser-tool-scripting-frames';
@@ -301,6 +301,8 @@ export interface BrowserToolDialog {
 /** One snapshot element reference: the ref the snapshot surfaced, and how to get back to the node. */
 export interface BrowserToolRefEntry {
   readonly backendNodeId?: number;
+  /** The scripting frame whose document `selector` names a node in; absent for the tab's top-level document. */
+  readonly frameId?: number;
   readonly ref: string;
   readonly selector?: string;
 }
@@ -319,6 +321,8 @@ export type BrowserToolResolvedTarget =
       readonly ref: string;
     }
   | {
+      /** The scripting frame the selector matched in; absent for the tab's top-level document. */
+      readonly frameId?: number;
       readonly kind: 'selector';
       readonly nodeId: number;
       readonly selector: string;
@@ -796,7 +800,7 @@ const __ariaAttributes = (el) => {
   if (document.activeElement === el) { parts.push('[active]'); }
   return parts;
 };
-const __buildAria = (root, maxDepth, withBoxes, refStart, withRefs) => {
+const __buildAria = (root, maxDepth, withBoxes, refStart) => {
   const interactiveRoles = [
     'button', 'checkbox', 'combobox', 'link', 'listbox', 'menuitem', 'option',
     'radio', 'searchbox', 'slider', 'spinbutton', 'switch', 'tab', 'textbox',
@@ -808,7 +812,6 @@ const __buildAria = (root, maxDepth, withBoxes, refStart, withRefs) => {
   const owners = Array.from(document.querySelectorAll('iframe, frame'));
   let nextRef = refStart;
   const refFor = (el) => {
-    if (!withRefs) { return ''; }
     nextRef += 1;
     refs.push({ ref: 'e' + nextRef, selector: __selectorFor(el) });
     return ' [ref=e' + nextRef + ']';
@@ -818,9 +821,7 @@ const __buildAria = (root, maxDepth, withBoxes, refStart, withRefs) => {
     if (!__visible(el)) { return; }
     if (el.localName === 'iframe' || el.localName === 'frame') {
       const frameRef = refFor(el);
-      const frame = { depth: depth, line: lines.length, owner: owners.indexOf(el) };
-      if (frameRef !== '') { frame.ref = 'e' + nextRef; }
-      frames.push(frame);
+      frames.push({ depth: depth, line: lines.length, owner: owners.indexOf(el), ref: 'e' + nextRef });
       lines.push('  '.repeat(depth) + '- iframe' + frameRef);
       return;
     }
@@ -914,19 +915,20 @@ const __fillElement = (el, value) => {
 const __finish = (value) => ({ done: true, result: value });
 `;
 
+/**
+ * One document's snapshot. Refs are numbered from `refStart`, so a child
+ * frame's refs, read after the top-level document's, never reuse its numbers.
+ */
 const buildSnapshotPageScript = ({
   boxes,
   depth,
   refStart,
   targetSelector,
-  withRefs,
 }: {
   readonly boxes: boolean;
   readonly depth: number | undefined;
   readonly refStart: number;
   readonly targetSelector: string | undefined;
-  /** A child frame's lines carry no refs: actions resolve refs in the top-level document only. */
-  readonly withRefs: boolean;
 }): string =>
   `${SCRIPTING_PAGE_PREAMBLE}
 const rootSelector = ${scriptJson(targetSelector ?? null)};
@@ -934,7 +936,7 @@ const maxDepth = ${scriptJson(depth ?? null)};
 const withBoxes = ${scriptJson(boxes)};
 const refStart = ${scriptJson(refStart)};
 const root = rootSelector === null ? (document.body || document.documentElement) : __element(rootSelector);
-const aria = __buildAria(root, maxDepth, withBoxes, refStart, ${scriptJson(withRefs)});
+const aria = __buildAria(root, maxDepth, withBoxes, refStart);
 return __finish({
   frames: aria.frames,
   lines: aria.lines,
@@ -1302,12 +1304,17 @@ const resolveScriptingTarget = (
   refs: ReadonlyMap<string, BrowserToolRefEntry>,
   target: string
 ):
-  | { readonly kind: 'ok'; readonly description: string; readonly selector: string }
+  | {
+      readonly description: string;
+      readonly frameId: number | undefined;
+      readonly kind: 'ok';
+      readonly selector: string;
+    }
   | { readonly error: string; readonly kind: 'error' } => {
   const ref = parseRef(target);
 
   if (ref === undefined) {
-    return { description: target, kind: 'ok', selector: target };
+    return { description: target, frameId: undefined, kind: 'ok', selector: target };
   }
 
   const entry = refs.get(ref);
@@ -1316,7 +1323,12 @@ const resolveScriptingTarget = (
     return { error: STALE_REF_ERROR, kind: 'error' };
   }
 
-  return { description: `ref=${ref}`, kind: 'ok', selector: entry.selector };
+  return {
+    description: `ref=${ref}`,
+    frameId: entry.frameId,
+    kind: 'ok',
+    selector: entry.selector,
+  };
 };
 
 const browserToolTargetArgsSchema = z.object({ target: z.string().min(1) });
@@ -2442,7 +2454,8 @@ export const createBrowserToolSession = ({
    * timeout as the other action injections and surfaces its real error.
    */
   const countScriptingSelectorMatches = async (
-    selector: string
+    selector: string,
+    frameId: number | undefined
   ): Promise<
     | { readonly kind: 'count'; readonly matches: number }
     | { readonly kind: 'error'; readonly error: string }
@@ -2453,6 +2466,7 @@ export const createBrowserToolSession = ({
 
     const result = await evalInTabWithScripting({
       code: `return document.querySelectorAll(${JSON.stringify(selector)}).length;`,
+      ...(frameId === undefined ? {} : { frameId }),
       scriptingApi,
       tabId,
       timeoutMs: SCRIPTING_ACTION_TIMEOUT_MS,
@@ -2470,12 +2484,13 @@ export const createBrowserToolSession = ({
   };
 
   const resolveSelector = async (
-    selector: string
+    selector: string,
+    frameId?: number
   ): Promise<BrowserToolResolvedTarget | undefined> => {
     if (debuggerApi === undefined) {
-      // The scripting path resolves a target by selector; there is no debugger node id, so the tool implementations in `callTool` use `selector` and never `nodeId`. The match count still has to be unique.
+      // The scripting path resolves a target by selector; there is no debugger node id, so the tool implementations in `callTool` use `selector` and never `nodeId`. The match count still has to be unique, in the document the selector belongs to.
       await attach();
-      const counted = await countScriptingSelectorMatches(selector);
+      const counted = await countScriptingSelectorMatches(selector, frameId);
 
       if (counted.kind === 'error') {
         throw new Error(counted.error);
@@ -2491,7 +2506,12 @@ export const createBrowserToolSession = ({
         return { kind: 'ambiguous', matches, selector };
       }
 
-      return { kind: 'selector', nodeId: 0, selector };
+      return {
+        kind: 'selector',
+        nodeId: 0,
+        selector,
+        ...(frameId === undefined ? {} : { frameId }),
+      };
     }
 
     await attach();
@@ -2550,7 +2570,7 @@ export const createBrowserToolSession = ({
       return undefined;
     }
 
-    const resolved = await resolveSelector(entry.selector);
+    const resolved = await resolveSelector(entry.selector, entry.frameId);
 
     return resolved;
   };
@@ -2634,7 +2654,7 @@ export const createBrowserToolSession = ({
 
   const runPageTool = async (
     script: string,
-    timeoutMs?: number
+    options: { readonly frameId?: number | undefined; readonly timeoutMs?: number } = {}
   ): Promise<BrowserToolCallResult> => {
     try {
       await attach();
@@ -2646,22 +2666,26 @@ export const createBrowserToolSession = ({
     }
 
     return runScriptingPageScript({
+      ...(options.frameId === undefined ? {} : { frameId: options.frameId }),
       script,
       scriptingApi,
       tabId,
-      ...(timeoutMs === undefined ? {} : { timeoutMs }),
+      ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
     });
   };
 
   /**
-   * One scripting snapshot: the top-level document's lines and refs, and for an
-   * agent caller every child frame spliced in or withheld by its read grants.
-   * `merge` keeps the refs earlier snapshots registered (a targeted snapshot, a find).
+   * One scripting snapshot: the lines and refs of the top-level document, or of
+   * the child frame `frameId` names for a target inside it, and for an agent
+   * caller every child frame spliced in or withheld by its read grants. Every
+   * ref outside the top-level document carries its frame id. `merge` keeps the
+   * refs earlier snapshots registered (a targeted snapshot, a find).
    */
   const captureScriptingSnapshot = async (
     options: {
       readonly boxes: boolean;
       readonly depth: number | undefined;
+      readonly frameId: number | undefined;
       readonly merge: boolean;
       readonly targetSelector: string | undefined;
     },
@@ -2670,15 +2694,10 @@ export const createBrowserToolSession = ({
     | { readonly lines: readonly string[]; readonly ok: true }
     | { readonly error: string; readonly ok: false }
   > => {
-    const { boxes, depth, merge, targetSelector } = options;
+    const { boxes, depth, frameId, merge, targetSelector } = options;
     const result = await runPageTool(
-      buildSnapshotPageScript({
-        boxes,
-        depth,
-        refStart: scriptingRefCount,
-        targetSelector,
-        withRefs: true,
-      })
+      buildSnapshotPageScript({ boxes, depth, refStart: scriptingRefCount, targetSelector }),
+      { frameId }
     );
 
     if (!result.ok) {
@@ -2693,10 +2712,14 @@ export const createBrowserToolSession = ({
 
     scriptingRefCount = snapshot.data.nextRef;
 
+    const rootRefs: readonly BrowserToolRefEntry[] =
+      frameId === undefined
+        ? snapshot.data.refs
+        : snapshot.data.refs.map(ref => ({ ...ref, frameId }));
     const { scope } = call;
 
     if (scope === undefined) {
-      registerRefs(call.refs, snapshot.data.refs, { merge });
+      registerRefs(call.refs, rootRefs, { merge });
 
       return { lines: snapshot.data.lines, ok: true };
     }
@@ -2715,15 +2738,14 @@ export const createBrowserToolSession = ({
 
         return isolatedProbe === undefined ? undefined : readIsolatedFrames(isolatedProbe);
       },
-      readFrame: async (frameId, maxDepth, timeoutMs) => {
+      readFrame: async (childFrameId, maxDepth, timeoutMs) => {
         const frame = await runScriptingPageScript({
-          frameId,
+          frameId: childFrameId,
           script: buildSnapshotPageScript({
             boxes: false,
             depth: maxDepth,
-            refStart: 0,
+            refStart: scriptingRefCount,
             targetSelector: undefined,
-            withRefs: false,
           }),
           scriptingApi,
           tabId,
@@ -2733,15 +2755,22 @@ export const createBrowserToolSession = ({
           ? browserToolSnapshotResultSchema.safeParse(frame.value)
           : undefined;
 
-        return parsed?.success === true ? parsed.data : undefined;
+        const part = parsed?.success === true ? parsed.data : undefined;
+
+        if (part !== undefined) {
+          scriptingRefCount = part.nextRef;
+        }
+
+        return part;
       },
       readableOrigins: scope.readableOrigins,
+      rootFrameId: frameId ?? MAIN_FRAME_ID,
     });
     const dropped = new Set(spliced.readableFrameRefs);
 
     registerRefs(
       call.refs,
-      snapshot.data.refs.filter(entry => !dropped.has(entry.ref)),
+      [...rootRefs.filter(entry => !dropped.has(entry.ref)), ...spliced.refs],
       { merge }
     );
 
@@ -2751,7 +2780,13 @@ export const createBrowserToolSession = ({
   const resolveTargetArg = (
     refs: ReadonlyMap<string, BrowserToolRefEntry>,
     targetText: string
-  ): { readonly description: string; readonly selector: string } | { readonly error: string } => {
+  ):
+    | {
+        readonly description: string;
+        readonly frameId: number | undefined;
+        readonly selector: string;
+      }
+    | { readonly error: string } => {
     const resolved = resolveScriptingTarget(refs, targetText);
 
     return resolved.kind === 'error' ? { error: resolved.error } : resolved;
@@ -3026,7 +3061,8 @@ export const createBrowserToolSession = ({
             doubleClick: parsed.data.doubleClick ?? false,
             modifiers: parsed.data.modifiers ?? [],
             selector: resolved.selector,
-          })
+          }),
+          { frameId: resolved.frameId }
         );
       }
 
@@ -3048,7 +3084,8 @@ export const createBrowserToolSession = ({
             data: parsed.data.data ?? {},
             paths: parsed.data.paths ?? [],
             selector: resolved.selector,
-          })
+          }),
+          { frameId: resolved.frameId }
         );
       }
 
@@ -3060,6 +3097,7 @@ export const createBrowserToolSession = ({
         }
 
         let selector: string | undefined = undefined;
+        let frameId: number | undefined = undefined;
 
         if (parsed.data.target !== undefined) {
           const resolved = resolveTargetArg(refs, parsed.data.target);
@@ -3068,11 +3106,12 @@ export const createBrowserToolSession = ({
             return { error: resolved.error, ok: false };
           }
 
-          ({ selector } = resolved);
+          ({ frameId, selector } = resolved);
         }
 
         return runPageTool(
-          buildEvaluatePageScript({ functionText: parsed.data.function, selector })
+          buildEvaluatePageScript({ functionText: parsed.data.function, selector }),
+          { frameId }
         );
       }
 
@@ -3089,6 +3128,7 @@ export const createBrowserToolSession = ({
           readonly type: string;
           readonly value: string | boolean;
         }[] = [];
+        const fieldFrameIds = new Set<number | undefined>();
 
         for (const field of parsed.data.fields) {
           const resolved = resolveTargetArg(refs, field.target);
@@ -3096,6 +3136,8 @@ export const createBrowserToolSession = ({
           if ('error' in resolved) {
             return { error: resolved.error, ok: false };
           }
+
+          fieldFrameIds.add(resolved.frameId);
 
           const value = field.value ?? '';
           const parsedBoolean = booleanValueSchema.safeParse(value);
@@ -3108,7 +3150,17 @@ export const createBrowserToolSession = ({
           });
         }
 
-        return runPageTool(buildFillFormPageScript({ fields }));
+        if (fieldFrameIds.size > 1) {
+          return {
+            error:
+              'browser_fill_form fields live in different frames: fill each frame with its own call.',
+            ok: false,
+          };
+        }
+
+        const [frameId] = fieldFrameIds;
+
+        return runPageTool(buildFillFormPageScript({ fields }), { frameId });
       }
 
       case 'browser_find': {
@@ -3123,6 +3175,7 @@ export const createBrowserToolSession = ({
         }
 
         let targetSelector: string | undefined = undefined;
+        let targetFrameId: number | undefined = undefined;
 
         if (parsed.data.target !== undefined) {
           const resolved = resolveTargetArg(refs, parsed.data.target);
@@ -3131,7 +3184,7 @@ export const createBrowserToolSession = ({
             return { error: resolved.error, ok: false };
           }
 
-          targetSelector = resolved.selector;
+          ({ frameId: targetFrameId, selector: targetSelector } = resolved);
         }
 
         let matches: (line: string) => boolean = () => false;
@@ -3152,7 +3205,13 @@ export const createBrowserToolSession = ({
 
         // A find reads the same tree a snapshot does and only adds refs: the last snapshot's refs keep resolving.
         const captured = await captureScriptingSnapshot(
-          { boxes: false, depth: parsed.data.depth, merge: true, targetSelector },
+          {
+            boxes: false,
+            depth: parsed.data.depth,
+            frameId: targetFrameId,
+            merge: true,
+            targetSelector,
+          },
           call
         );
 
@@ -3200,7 +3259,9 @@ export const createBrowserToolSession = ({
           return { error: resolved.error, ok: false };
         }
 
-        return runPageTool(buildHoverPageScript({ selector: resolved.selector }));
+        return runPageTool(buildHoverPageScript({ selector: resolved.selector }), {
+          frameId: resolved.frameId,
+        });
       }
 
       case 'browser_navigate': {
@@ -3268,7 +3329,8 @@ export const createBrowserToolSession = ({
           buildSelectOptionPageScript({
             selector: resolved.selector,
             values: parsed.data.values,
-          })
+          }),
+          { frameId: resolved.frameId }
         );
       }
 
@@ -3280,6 +3342,7 @@ export const createBrowserToolSession = ({
         }
 
         let targetSelector: string | undefined = undefined;
+        let targetFrameId: number | undefined = undefined;
 
         if (parsed.data.target !== undefined) {
           const resolved = resolveTargetArg(refs, parsed.data.target);
@@ -3288,13 +3351,14 @@ export const createBrowserToolSession = ({
             return { error: resolved.error, ok: false };
           }
 
-          targetSelector = resolved.selector;
+          ({ frameId: targetFrameId, selector: targetSelector } = resolved);
         }
 
         const captured = await captureScriptingSnapshot(
           {
             boxes: parsed.data.boxes ?? false,
             depth: parsed.data.depth,
+            frameId: targetFrameId,
             merge: targetSelector !== undefined,
             targetSelector,
           },
@@ -3371,7 +3435,8 @@ export const createBrowserToolSession = ({
             slowly: parsed.data.slowly ?? false,
             submit: parsed.data.submit ?? false,
             text: parsed.data.text,
-          })
+          }),
+          { frameId: resolved.frameId }
         );
       }
 
@@ -3404,7 +3469,7 @@ export const createBrowserToolSession = ({
             textGone: parsed.data.textGone,
             waitMs,
           }),
-          waitMs + 2000
+          { timeoutMs: waitMs + 2000 }
         );
       }
 

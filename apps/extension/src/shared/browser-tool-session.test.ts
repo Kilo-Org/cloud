@@ -1661,7 +1661,12 @@ describe('browser tool session scripting backend', () => {
       session.callTool('browser_snapshot', {}, { readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] })
     ).resolves.toStrictEqual({
       ok: true,
-      value: ['- button "Top" [ref=e1]', '- iframe', '  - button "Buy"', '  - textbox'].join('\n'),
+      value: [
+        '- button "Top" [ref=e1]',
+        '- iframe',
+        '  - button "Buy" [ref=e3]',
+        '  - textbox [ref=e4]',
+      ].join('\n'),
     });
     await expect(session.resolveTarget('e2')).resolves.toBeUndefined();
     expect(isolatedKinds).toStrictEqual(['frame']);
@@ -1692,7 +1697,12 @@ describe('browser tool session scripting backend', () => {
       )
     ).resolves.toStrictEqual({
       ok: true,
-      value: ['- button "Top" [ref=e1]', '- iframe', '  - button "Buy"', '  - textbox'].join('\n'),
+      value: [
+        '- button "Top" [ref=e1]',
+        '- iframe',
+        '  - button "Buy" [ref=e3]',
+        '  - textbox [ref=e4]',
+      ].join('\n'),
     });
     expect(readFrames.mock.calls).toStrictEqual([[]]);
     expect(isolatedKinds).toStrictEqual([]);
@@ -1712,6 +1722,72 @@ describe('browser tool session scripting backend', () => {
     await expect(session.callTool('browser_click', { target: 'e1' })).resolves.toStrictEqual({
       error: STALE_REF_ERROR,
       ok: false,
+    });
+  });
+
+  it('runs a ref from a granted frame in that frame, never in the top document', async () => {
+    const { mainWorldFrames, pay, session, shop } = createFramedScriptingSession();
+    const clicked: string[] = [];
+
+    shop.window.document.querySelector('button')?.addEventListener('click', () => {
+      clicked.push('shop');
+    });
+    pay.window.document.querySelector('button')?.addEventListener('click', () => {
+      clicked.push('pay');
+    });
+
+    await session.callTool('browser_snapshot', {}, { readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] });
+    // Both documents name their button `body > button`; only the frame id tells them apart.
+    await expect(session.resolveTarget('e3')).resolves.toStrictEqual({
+      frameId: 4,
+      kind: 'selector',
+      nodeId: 0,
+      selector: 'body > button',
+    });
+    await expect(session.resolveTarget('e1')).resolves.toStrictEqual({
+      kind: 'selector',
+      nodeId: 0,
+      selector: 'body > button',
+    });
+    // The input exists only in the frame, so its match is counted in the frame's document.
+    await expect(session.resolveTarget('e4')).resolves.toStrictEqual({
+      frameId: 4,
+      kind: 'selector',
+      nodeId: 0,
+      selector: 'body > input',
+    });
+
+    mainWorldFrames.length = 0;
+
+    await expect(session.callTool('browser_click', { target: 'e3' })).resolves.toStrictEqual({
+      ok: true,
+      value: 'Clicked ref=e3 with the left button.',
+    });
+    expect(clicked).toStrictEqual(['pay']);
+    expect(mainWorldFrames).toStrictEqual([4]);
+
+    await expect(
+      session.callTool('browser_fill_form', {
+        fields: [
+          { name: 'Top', target: 'e1', type: 'textbox', value: 'a' },
+          { name: 'Card', target: 'e4', type: 'textbox', value: 'b' },
+        ],
+      })
+    ).resolves.toStrictEqual({
+      error:
+        'browser_fill_form fields live in different frames: fill each frame with its own call.',
+      ok: false,
+    });
+
+    await expect(session.callTool('browser_snapshot', { target: 'e3' })).resolves.toStrictEqual({
+      ok: true,
+      value: '- button "Buy" [ref=e5]',
+    });
+    await expect(session.resolveTarget('e5')).resolves.toStrictEqual({
+      frameId: 4,
+      kind: 'selector',
+      nodeId: 0,
+      selector: 'body > button',
     });
   });
 

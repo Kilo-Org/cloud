@@ -276,20 +276,31 @@ const targetFrameOf = async (
 
   // Without a debugger protocol the probe names the frame a frame element hosts (Firefox).
   if (session.isolatedProbe !== undefined && resolved.kind === 'selector') {
-    const hosted = await readIsolatedHostedFrame(session.isolatedProbe, resolved.selector);
+    const hosted = await readIsolatedHostedFrame(
+      session.isolatedProbe,
+      resolved.selector,
+      resolved.frameId
+    );
+
+    // The document holding the element: the tab's own, or the spliced child frame a ref came from.
+    const holder =
+      resolved.frameId === undefined
+        ? mainFrameOf(frames)
+        : frames.find(candidate => candidate.id === String(resolved.frameId));
+    const holderFrame =
+      holder === undefined
+        ? { frame: true, origin: OPAQUE_ORIGIN }
+        : { frame: resolved.frameId !== undefined, origin: holder.origin };
 
     if (hosted !== undefined) {
       const frame = frames.find(candidate => candidate.id === hosted.frameId);
-      const main = mainFrameOf(frames);
 
-      return {
-        frame: true,
-        origin: frame?.origin ?? OPAQUE_ORIGIN,
-        owner:
-          main === undefined
-            ? { frame: true, origin: OPAQUE_ORIGIN }
-            : { frame: false, origin: main.origin },
-      };
+      return { frame: true, origin: frame?.origin ?? OPAQUE_ORIGIN, owner: holderFrame };
+    }
+
+    // A ref from a spliced child frame acts in that frame's document, so it needs that frame's grant.
+    if (resolved.frameId !== undefined) {
+      return holderFrame;
     }
   }
 

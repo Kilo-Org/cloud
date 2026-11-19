@@ -441,6 +441,114 @@ describe('isolated sensitive classification', () => {
   });
 });
 
+describe('isolated refs inside a child frame', () => {
+  const SHOP = 'https://shop.example.com';
+  const PAY = 'https://pay.example.com';
+  const PASSWORD = { probe: { fields: [{ kind: 'password' }], paymentFormSubmit: false } };
+  const PLAIN = { probe: { fields: [], paymentFormSubmit: false } };
+
+  interface FrameTargets {
+    readonly pay: unknown;
+    readonly shop: unknown;
+  }
+
+  /** The shop page embeds the pay frame 4; `body > button` names a button in each document. */
+  const framedSession = (targets: FrameTargets) => ({
+    ...sessionWith(
+      fakeProbe({
+        0: {
+          frame: { origin: SHOP, owners: [4], parentFrameId: null, url: `${SHOP}/` },
+          hosted: {},
+          target: targets.shop,
+        },
+        4: {
+          frame: { origin: PAY, owners: [], parentFrameId: 0, url: `${PAY}/` },
+          hosted: {},
+          target: targets.pay,
+        },
+      })
+    ),
+    resolveTarget: () =>
+      Promise.resolve({
+        frameId: 4,
+        kind: 'selector' as const,
+        nodeId: 0,
+        selector: 'body > button',
+      }),
+    takeDownloads: () => [],
+  });
+
+  const clickFrameRef = (
+    targets: FrameTargets,
+    authorized: readonly { readonly class: 'act'; readonly origin: string }[]
+  ) =>
+    preflightAgentCall({
+      args: { target: 'e3' },
+      authorized,
+      consumeStepToken: () => false,
+      session: framedSession(targets),
+      sessionHandle: 'session-1',
+      stepTokens: [],
+      tabId: 7,
+      toolName: 'browser_click',
+    });
+
+  it('asks for act on the frame’s origin, which the tab’s act grant does not cover', async () => {
+    await expect(
+      clickFrameRef({ pay: PLAIN, shop: PLAIN }, [{ class: 'act', origin: SHOP }])
+    ).resolves.toStrictEqual({
+      failure: { items: [{ class: 'act', frame: true, origin: PAY }], kind: 'needs_permission' },
+      ok: false,
+    });
+  });
+
+  it('runs with act on the frame’s origin, classifying the element in that frame', async () => {
+    await expect(
+      clickFrameRef({ pay: PLAIN, shop: PASSWORD }, [{ class: 'act', origin: PAY }])
+    ).resolves.toStrictEqual({ class: 'act', ok: true, origin: PAY, targetOriginFrame: true });
+  });
+
+  it('classifies a frame ref by the element in its frame, not the top document’s', async () => {
+    await expect(
+      classifyTargetElement(framedSession({ pay: PASSWORD, shop: PLAIN }), 'e3')
+    ).resolves.toStrictEqual({ kind: 'sensitive', reason: SENSITIVE_REASON.password });
+  });
+
+  it('asks for the nested frame’s grant when a frame ref is itself an iframe', async () => {
+    const ADS = 'https://ads.example.com';
+    const session = {
+      ...framedSession({ pay: PLAIN, shop: PLAIN }),
+      isolatedProbe: fakeProbe({
+        0: {
+          frame: { origin: SHOP, owners: [4], parentFrameId: null, url: `${SHOP}/` },
+          hosted: {},
+        },
+        4: {
+          frame: { origin: PAY, owners: [6], parentFrameId: 0, url: `${PAY}/` },
+          hosted: { frameId: 6 },
+        },
+        6: { frame: { origin: ADS, owners: [], parentFrameId: 4, url: `${ADS}/` } },
+      }),
+    };
+
+    await expect(
+      preflightAgentCall({
+        args: { target: 'e3' },
+        authorized: [{ class: 'read', origin: PAY }],
+        consumeStepToken: () => false,
+        session,
+        sessionHandle: 'session-1',
+        stepTokens: [],
+        tabId: 7,
+        toolName: 'browser_snapshot',
+      })
+    ).resolves.toStrictEqual({
+      failure: { items: [{ class: 'read', frame: true, origin: ADS }], kind: 'needs_permission' },
+      ok: false,
+    });
+  });
+});
+
 describe('isolated screenshot mask', () => {
   const frames = [
     { id: '0', origin: 'https://shop.example.com', url: 'https://shop.example.com/' },

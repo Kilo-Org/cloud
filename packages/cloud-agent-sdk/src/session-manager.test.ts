@@ -466,6 +466,7 @@ describe('createSessionManager', () => {
     mockSessionCallbacks.onSessionUpdated = undefined;
     mockSessionCallbacks.onReplayComplete = undefined;
     mockSessionCallbacks.onResolved = undefined;
+    mockSessionCallbacks.onRemoteModelStateChange = undefined;
     mockSessionCallbacks.onComposerCapabilityChange = undefined;
     mockSessionCallbacks.onCliCapabilitiesReported = undefined;
     mockSessionCallbacks.onEvent = undefined;

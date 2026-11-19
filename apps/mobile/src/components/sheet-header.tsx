@@ -145,9 +145,11 @@ export function SheetHeader({
   // platform places below the status bar paints once, already settled. Where
   // the platform places the sheet itself (Android), the header then covers
   // whatever the window's top inset still overlaps: the sheet can present at
-  // the window top, or stop at the status bar inside a taller display cutout.
+  // the window top, and the keyboard can expand it back into the status bar
+  // later, so the read follows the header's own layout and the keyboard too.
   const clearance = useSheetHeaderTopClearance(topInset);
-  const topInsetHeight = useSettledSheetHeaderTopClearance({ topInset, clearance, surfaceRef });
+  const { clearance: topInsetHeight, onLayout: handleSurfaceLayout } =
+    useSettledSheetHeaderTopClearance({ topInset, clearance, surfaceRef });
   // Resolved at render so each platform reads its own pair, through the same
   // helper the sheets that draw their own title row use.
   const underHandlePadding = sheetUnderHandlePaddingClass('header');
@@ -195,6 +197,7 @@ export function SheetHeader({
     // flattened header breaks that native pass and the list paints over it.
     <View
       ref={surfaceRef}
+      onLayout={handleSurfaceLayout}
       collapsable={false}
       className={cn(
         'border-b border-border px-4',

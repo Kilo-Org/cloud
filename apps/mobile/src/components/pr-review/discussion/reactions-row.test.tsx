@@ -90,9 +90,12 @@ function finishDismiss(renderer: TestRenderer.ReactTestRenderer): void {
  */
 function layoutPickerTitle(renderer: TestRenderer.ReactTestRenderer): void {
   // The modal wrapper isolates the whole picker (header included); the node
-  // that reports the presented sheet's layout is the body inside it.
+  // that reports the presented sheet's layout is the body inside it. The
+  // header reports its own layout too — it samples where the sheet settled —
+  // and it sits above the body, so the body is the last one.
   const modal = renderer.root.findByProps({ accessibilityViewIsModal: true });
-  const [body] = modal.findAll(node => typeof node.props.onLayout === 'function');
+  const bodies = modal.findAll(node => typeof node.props.onLayout === 'function');
+  const body = bodies.at(-1);
   if (!body) {
     throw new Error('picker body not found');
   }

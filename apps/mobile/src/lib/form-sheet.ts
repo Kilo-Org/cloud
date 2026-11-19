@@ -1,5 +1,11 @@
-import { type RefObject, useEffect, useState } from 'react';
-import { Platform, StatusBar, useWindowDimensions, type ViewInstance } from 'react-native';
+import { type RefObject, useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Keyboard,
+  Platform,
+  StatusBar,
+  useWindowDimensions,
+  type ViewInstance,
+} from 'react-native';
 import { initialWindowMetrics, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -198,13 +204,51 @@ export function useSheetHeaderTopClearance(topInset: SheetHeaderTopInset | undef
 }
 
 /**
- * When the header re-reads where its surface settled, in ms after mount.
+ * When the header samples where its surface sits, in ms after a movement.
  *
- * The platform slides a presenting sheet in without a React layout pass, so the
- * position has to be sampled; the samples span the presentation, and the
- * settled edge is the highest one any of them saw.
+ * The platform moves a presented sheet without a React layout pass: it slides
+ * the sheet in on presentation, and the list settings sheet expands from the
+ * half detent to the full one when its Name field raises the keyboard, which
+ * puts the header back inside the status bar well after the presentation. The
+ * mount burst spans the presentation and every later burst spans the movement
+ * that triggered it.
  */
-const SHEET_SETTLE_SAMPLE_MS = [0, 120, 280, 500, 750];
+const SHEET_PRESENT_SAMPLE_MS = [0, 120, 280, 500, 750];
+const SHEET_MOVE_SAMPLE_MS = [0, 100, 200, 320, 450, 600, 800, 1000];
+
+/** The keyboard emitter's shape; the module-level read below may find none. */
+type KeyboardEmitter = {
+  addListener: (
+    event: 'keyboardDidShow' | 'keyboardDidHide',
+    listener: () => void
+  ) => { remove: () => void };
+};
+
+/**
+ * The keyboard emitter, or null where the runtime does not expose it.
+ *
+ * A partial `react-native` mock omits the emitter and vitest throws on the
+ * property access itself, so it is read behind a guard (the same one
+ * `readInitialWindowMetrics` uses). Without it the presentation burst is the
+ * only read, which is what the header had before the movement follow.
+ */
+function readKeyboardEmitter(): KeyboardEmitter | null {
+  try {
+    return (Keyboard as KeyboardEmitter | undefined) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+const KEYBOARD_EMITTER = readKeyboardEmitter();
+
+/** What a sheet header reads from the surface it paints on. */
+export type SettledSheetHeaderTopClearance = {
+  /** The top clearance the header adds, in dp. */
+  clearance: number;
+  /** Re-reads the surface's edge; the header's own `onLayout`. */
+  onLayout: () => void;
+};
 
 /**
  * The clearance a settled sheet header adds: the inset the surface's own edge
@@ -228,7 +272,8 @@ export function sheetHeaderSettledTopClearance(input: {
 }
 
 /**
- * The clearance a sheet header adds once its surface has settled, in dp.
+ * The clearance a sheet header adds once its surface has settled, in dp, plus
+ * the layout callback that re-reads it.
  *
  * `sheetHeaderTopClearance` answers from the first frame and assumes the
  * platform settles the sheet below the inset. Android does not always: it
@@ -238,9 +283,13 @@ export function sheetHeaderSettledTopClearance(input: {
  * covers the rest, which also absorbs a sheet the platform presents at the
  * window top.
  *
- * The reserve only grows, so a sample taken while the sheet is still sliding
- * never moves a settled header, and it never removes the clearance the mode
- * reserved. iOS presents the sheet below the status bar itself, so it keeps the
+ * A presented sheet moves again after it lands — the keyboard expands the list
+ * settings sheet from the half detent to the full one and takes the header into
+ * the status bar — so the read runs on the presentation, on every keyboard
+ * change, and whenever the caller reports a new layout. The reserve only grows
+ * within a mount, so a sample taken mid-movement never moves a settled header,
+ * and a sample that finds the same edge keeps the state identity and costs no
+ * render. iOS presents the sheet below the status bar itself, so it keeps the
  * platform's own clearance.
  */
 export function useSettledSheetHeaderTopClearance(input: {
@@ -249,40 +298,89 @@ export function useSettledSheetHeaderTopClearance(input: {
   clearance: number;
   /** The header's own view, measured to find where the surface settled. */
   surfaceRef: RefObject<ViewInstance | null>;
-}): number {
+}): SettledSheetHeaderTopClearance {
   const { topInset, clearance, surfaceRef } = input;
   const insetTop = useSafeAreaInsets().top;
   const [headerTop, setHeaderTop] = useState<number | null>(null);
+  // The burst in flight: a newer one retires every sample of the older ones, so
+  // a moving sheet is only ever measured by the burst that followed its move.
+  const burstRef = useRef(0);
+  const readable = topInset !== undefined && Platform.OS === 'android' && insetTop > 0;
+
+  const sample = useCallback(() => {
+    // `getBoundingClientRect` is the transform-aware read: React Native's
+    // `measureInWindow` reports the sheet's layout slot, not the offset the
+    // presentation gives it, and would answer the pre-settled position.
+    const view = surfaceRef.current as MeasurableHostView | null;
+    const measure = view?.getBoundingClientRect;
+    if (measure === undefined) {
+      return;
+    }
+    const { top } = measure.call(view);
+    if (!Number.isFinite(top)) {
+      return;
+    }
+    // Only a higher edge is news, and an unchanged value keeps the state
+    // identity, so a sheet that did not move does not re-render.
+    setHeaderTop(current => (current === null || top < current ? top : current));
+  }, [surfaceRef]);
+
+  const followMovement = useCallback(
+    (delaysMs: readonly number[]) => {
+      const burst = burstRef.current + 1;
+      burstRef.current = burst;
+      for (const delayMs of delaysMs) {
+        setTimeout(() => {
+          if (burstRef.current === burst) {
+            sample();
+          }
+        }, delayMs);
+      }
+    },
+    [sample]
+  );
 
   useEffect(() => {
-    const sample = () => {
-      // `getBoundingClientRect` is the transform-aware read: React Native's
-      // `measureInWindow` reports the sheet's layout slot, not the offset the
-      // presentation gives it, and would answer the pre-settled position.
-      const view = surfaceRef.current as MeasurableHostView | null;
-      const measure = view?.getBoundingClientRect;
-      if (measure === undefined) {
-        return;
-      }
-      const { top } = measure.call(view);
-      if (!Number.isFinite(top)) {
-        return;
-      }
-      setHeaderTop(current => (current === null ? top : Math.min(current, top)));
+    if (readable) {
+      followMovement(SHEET_PRESENT_SAMPLE_MS);
+    }
+    return () => {
+      // Retires the samples still owed to this burst.
+      burstRef.current += 1;
     };
-    const timers =
-      topInset !== undefined && Platform.OS === 'android' && insetTop > 0
-        ? SHEET_SETTLE_SAMPLE_MS.map(delayMs => setTimeout(sample, delayMs))
+  }, [followMovement, readable]);
+
+  useEffect(() => {
+    const listeners =
+      readable && KEYBOARD_EMITTER !== null
+        ? [
+            KEYBOARD_EMITTER.addListener('keyboardDidShow', () => {
+              followMovement(SHEET_MOVE_SAMPLE_MS);
+            }),
+            KEYBOARD_EMITTER.addListener('keyboardDidHide', () => {
+              followMovement(SHEET_MOVE_SAMPLE_MS);
+            }),
+          ]
         : [];
     return () => {
-      for (const timer of timers) {
-        clearTimeout(timer);
+      burstRef.current += 1;
+      for (const listener of listeners) {
+        listener.remove();
       }
     };
-  }, [insetTop, surfaceRef, topInset]);
+  }, [followMovement, readable]);
 
-  if (headerTop === null) {
-    return clearance;
-  }
-  return sheetHeaderSettledTopClearance({ clearance, insetTop, headerTop });
+  const onLayout = useCallback(() => {
+    if (readable) {
+      followMovement(SHEET_MOVE_SAMPLE_MS);
+    }
+  }, [followMovement, readable]);
+
+  return {
+    clearance:
+      headerTop === null
+        ? clearance
+        : sheetHeaderSettledTopClearance({ clearance, insetTop, headerTop }),
+    onLayout,
+  };
 }

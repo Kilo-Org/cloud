@@ -66,7 +66,10 @@ function touchBox(root: I):
       className?: string;
       style?: unknown;
       onStartShouldSetResponder?: () => boolean;
-      onResponderRelease?: () => void;
+      onLayout?: (event: { nativeEvent: { layout: { width: number; height: number } } }) => void;
+      onResponderRelease?: (event: {
+        nativeEvent: { locationX: number; locationY: number };
+      }) => void;
     }
   | undefined {
   return root.findAll(candidate => (candidate.type as string) === 'View')[0]?.props;
@@ -186,15 +189,32 @@ describe('Switch', () => {
     expect(box?.style).toEqual([{ minHeight: TOUCH_TARGET_DP }, style]);
   });
 
-  it('flips the iOS value when a tap in the touch box ends, and not when disabled', () => {
+  it('flips the iOS value when a tap ends inside the touch box, and not when disabled', () => {
     native.os = 'ios';
     const onValueChange = vi.fn<(next: boolean) => void>();
     const enabled = touchBox(renderSwitch({ value: true, onValueChange }).root);
     expect(enabled?.onStartShouldSetResponder?.()).toBe(true);
-    act(() => enabled?.onResponderRelease?.());
+    act(() => enabled?.onLayout?.({ nativeEvent: { layout: { width: 63, height: 44 } } }));
+    act(() => enabled?.onResponderRelease?.({ nativeEvent: { locationX: 30, locationY: 4 } }));
     expect(onValueChange).toHaveBeenCalledWith(false);
     const disabled = touchBox(renderSwitch({ disabled: true, onValueChange }).root);
     expect(disabled?.onStartShouldSetResponder?.()).toBe(false);
+  });
+
+  it('keeps the iOS value when a gesture from the touch box lifts outside it', () => {
+    native.os = 'ios';
+    const onValueChange = vi.fn<(next: boolean) => void>();
+    const box = touchBox(renderSwitch({ value: true, onValueChange }).root);
+    act(() => box?.onLayout?.({ nativeEvent: { layout: { width: 63, height: 44 } } }));
+    for (const [locationX, locationY] of [
+      [-20, 20],
+      [90, 20],
+      [30, -10],
+      [30, 60],
+    ] as const) {
+      act(() => box?.onResponderRelease?.({ nativeEvent: { locationX, locationY } }));
+    }
+    expect(onValueChange).not.toHaveBeenCalled();
   });
 
   it('paints the quiet pair on a disabled on switch and keeps it on', () => {

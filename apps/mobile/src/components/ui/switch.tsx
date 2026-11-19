@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import {
   Switch as NativeSwitch,
   Platform,
@@ -64,7 +65,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * The control draws at the platform's own size — about 46.5x27dp on Android,
  * 63x28pt on iOS 26 — which is under `DESIGN.md:364`'s 44pt touch target.
  *
- * Android: the audit reads the control's own node rect, so the node renders at
+ * Android: a size audit reads the control's own node rect, so the node renders at
  * least {@link TOUCH_TARGET_DP} on both axes (the Android gate measured
  * 44.19dp), and a caller never shrinks it with a smaller `style` box. The
  * Android view centers its drawable in that box. A row that must keep its 48pt
@@ -79,9 +80,11 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * cannot do this: a touch outside the `UISwitch` bounds never reaches the
  * native control (measured on the iOS 26 simulator). So the box is a `View`
  * hidden from assistive technology that takes the JS responder and flips the
- * value when a tap above or below the switch ends; the switch itself stays the
- * one accessible element. The box has the same 44pt height as the Android
- * node, so the row's negative margin fits both platforms.
+ * value when a tap above or below the switch ends inside the box; the switch
+ * itself stays the one accessible element. A size audit therefore reads the
+ * accessible switch at 63x28pt (the gate's 28pt control minimum), while the
+ * effective touch region is the 44pt box. The box has the same 44pt height as
+ * the Android node, so the row's negative margin fits both platforms.
  */
 export function Switch({
   disabled,
@@ -113,6 +116,7 @@ export function Switch({
   const offTrack = inactive ? disabledTrack : enabledOffTrack;
   const onTrack = inactive ? disabledTrack : enabledOnTrack;
   const onGrip = inactive ? disabledGrip : enabledOnGrip;
+  const boxSize = useRef({ width: 0, height: 0 });
 
   const control = (
     <NativeSwitch
@@ -138,8 +142,15 @@ export function Switch({
       className="justify-center self-center"
       style={[{ minHeight: TOUCH_TARGET_DP }, style]}
       onStartShouldSetResponder={() => resolvedDisabled !== true}
-      onResponderRelease={() => {
-        void props.onValueChange?.(!value);
+      onLayout={event => {
+        boxSize.current = event.nativeEvent.layout;
+      }}
+      // A gesture that starts in the band and lifts outside the box is not a tap.
+      onResponderRelease={({ nativeEvent: { locationX, locationY } }) => {
+        const { width, height } = boxSize.current;
+        if (locationX >= 0 && locationX <= width && locationY >= 0 && locationY <= height) {
+          void props.onValueChange?.(!value);
+        }
       }}
     >
       {control}

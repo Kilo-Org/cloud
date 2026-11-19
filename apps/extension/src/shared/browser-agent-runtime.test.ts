@@ -1626,7 +1626,9 @@ describe('agent browser calls', () => {
       });
       await vi.advanceTimersByTimeAsync(0);
 
-      // A call in between answers without waiting: the announcement alone already names the step and the file.
+      // A call in between answers without waiting: the announcement alone already names the step and the file, so it
+      // Needs no clock. Advancing the default 300 ms here would pass the linger's own 2 s window, and the item below
+      // Would land with no guard on duty.
       const reported = await runTimed(
         runtime.runTool({
           agent: { authorized: [readGrant, actGrant] },
@@ -1634,7 +1636,8 @@ describe('agent browser calls', () => {
           caller: agent(),
           tabId: TAB_ID,
           toolName: 'browser_snapshot',
-        })
+        }),
+        0
       );
 
       expect(reported).toMatchObject({

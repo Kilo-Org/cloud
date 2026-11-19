@@ -3476,8 +3476,8 @@ export const createBrowserToolSession = ({
       },
       takeDialog,
       takeDownloads,
-      watchDownloads,
       viewportState,
+      watchDownloads,
     };
   };
 
@@ -3512,7 +3512,7 @@ export const createBrowserToolSession = ({
     send,
     takeDialog,
     takeDownloads,
-    watchDownloads,
     viewportState,
+    watchDownloads,
   };
 };

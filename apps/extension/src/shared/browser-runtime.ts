@@ -880,7 +880,7 @@ const armDownloadGuard = (
   /** The urls this guard already stopped, so an announcement cannot queue a second report for one file. */
   const stoppedUrls = new Set<string>();
   /** The pending announcement subscription: only a linger keeps one, and it ends with the linger. */
-  let stopWatching: (() => void) | undefined;
+  let stopWatching: (() => void) | undefined = undefined;
   let created = false;
   let listening = true;
   let lingering = false;
@@ -906,7 +906,9 @@ const armDownloadGuard = (
 
       if (settle !== undefined && url !== undefined) {
         announcedPending.delete(url);
-        void discarded.then(settle);
+        void (async (): Promise<void> => {
+          settle(await discarded);
+        })();
       } else if (lingering) {
         // The linger outlives this call's result, so its stops are handed over to whoever reports next.
         if (announcedUnreported > 0) {
@@ -1792,7 +1794,6 @@ export const createBrowserRuntime = ({
                 tabIds: guardTabIds,
                 witness: {
                   announced: () => session.takeDownloads().length,
-                  watchAnnounced: listener => session.watchDownloads(listener),
                   attachmentResponse: () =>
                     session
                       .networkRequests()
@@ -1810,6 +1811,7 @@ export const createBrowserRuntime = ({
                           request.finishedAt === undefined &&
                           request.failure === undefined
                       ).length,
+                  watchAnnounced: listener => session.watchDownloads(listener),
                 },
               });
 

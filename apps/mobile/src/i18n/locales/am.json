@@ -4622,7 +4622,7 @@
       "new": "አዲስ ቀስቅሴ",
       "create": "ቀስቅሴ ፍጠር",
       "emptyTitle": "እስካሁን ቀስቅሴዎች የሉም",
-      "emptyDescription": "የመጀመሪያዎቹ ቀስቅሴዎን ይፍጠሩ።",
+      "emptyDescription": "የመጀመሪያዎን ቀስቅሴ ይፍጠሩ።",
       "loadFailedTitle": "ቀስቅሴዎችን መጫን አልተቻለም",
       "loadFailedDescription": "ግንኙነት ሲኖርዎ እንደገና ይሞክሩ።",
       "detailLoadFailedTitle": "ይህን ቀስቅሴ መጫን አልተቻለም",

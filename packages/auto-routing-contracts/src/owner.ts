@@ -3,8 +3,8 @@ import * as z from 'zod';
 /**
  * Who owns an auto-routing configuration: one user or one organization.
  *
- * `OwnerTypeSchema` names the kind, `OwnerIdSchema` the id, and `OwnerIdentityShape`/`OwnerSchema`
- * pair them so every contract that scopes a row to one owner declares the pair once.
+ * `OwnerTypeSchema` names the kind, `OwnerIdSchema` the id, and `OwnerIdentityShape` pairs them
+ * so every contract that scopes a row to one owner declares the pair once.
  *
  * Leaf module: it imports nothing but zod, so `benchmark.ts`, `custom-router.ts`
  * and the package root can all share it without a package-root cycle.

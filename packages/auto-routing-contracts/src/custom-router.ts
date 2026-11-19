@@ -232,6 +232,15 @@ function validateEntryBudget(
       `Too big: expected measuredAs to have <=${MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH} characters`
     );
   }
+  // A client entry reports its provider bound before the model bound, so that check stays
+  // ahead of the shared model guard. The model guard itself is written once for both kinds.
+  if (entry.kind === 'client' && entry.provider.length > MAX_CUSTOM_ROUTER_PROVIDER_ID_LENGTH) {
+    addIssue(
+      ctx,
+      path('provider'),
+      `Too big: expected provider to have <=${MAX_CUSTOM_ROUTER_PROVIDER_ID_LENGTH} characters`
+    );
+  }
   if (entry.model.length > MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH) {
     addIssue(
       ctx,
@@ -241,13 +250,6 @@ function validateEntryBudget(
   }
   if (entry.kind === 'gateway') {
     return;
-  }
-  if (entry.provider.length > MAX_CUSTOM_ROUTER_PROVIDER_ID_LENGTH) {
-    addIssue(
-      ctx,
-      path('provider'),
-      `Too big: expected provider to have <=${MAX_CUSTOM_ROUTER_PROVIDER_ID_LENGTH} characters`
-    );
   }
   if (entry.variants.length > MAX_CLIENT_VARIANTS) {
     addIssue(ctx, path('variants'), `Too big: expected at most ${MAX_CLIENT_VARIANTS} variants`);

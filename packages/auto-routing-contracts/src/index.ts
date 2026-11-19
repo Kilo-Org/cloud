@@ -37,7 +37,12 @@ export {
   type AutoRoutingMode,
 } from './router';
 
-export { OwnerIdSchema, OwnerIdentityShape, OwnerTypeSchema, type OwnerType } from './owner';
+export {
+  OwnerIdSchema,
+  OwnerIdentityShape,
+  OwnerTypeSchema,
+  type OwnerType,
+} from './owner';
 
 // Capability-aware routing hints attached to the mirrored request payload.
 // Absent `constraints` (or absent fields within it) means "no extra

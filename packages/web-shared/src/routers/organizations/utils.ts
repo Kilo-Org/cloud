@@ -138,23 +138,22 @@ async function selectCallerRoleRows(
   return [...directRows, ...inheritedRows];
 }
 
-/**
- * The one highest-role rule: the first role in ORGANIZATION_ROLE_PRIORITY that
- * the caller holds and the caller's allowed-role filter permits. `roles` is
- * defaulted to the full priority order, matching the allowed-roles default.
- */
+/** The allowed-roles default: an absent or empty filter means the full priority order. */
 function defaultedAllowedRoles(roles?: readonly OrganizationRole[]): readonly OrganizationRole[] {
   return roles && roles.length > 0 ? roles : ORGANIZATION_ROLE_PRIORITY;
 }
 
+/**
+ * The one highest-role rule: the first role in ORGANIZATION_ROLE_PRIORITY that
+ * the caller holds and the caller's allowed-role filter permits.
+ */
 function highestOrganizationRole(
   roles: readonly OrganizationRole[],
   allowedRoles?: readonly OrganizationRole[]
 ): OrganizationRole | null {
+  const allowed = defaultedAllowedRoles(allowedRoles);
   return (
-    ORGANIZATION_ROLE_PRIORITY.find(
-      role => (allowedRoles ?? ORGANIZATION_ROLE_PRIORITY).includes(role) && roles.includes(role)
-    ) ?? null
+    ORGANIZATION_ROLE_PRIORITY.find(role => allowed.includes(role) && roles.includes(role)) ?? null
   );
 }
 
@@ -162,10 +161,9 @@ export function effectiveMembershipRole(
   rows: { role: OrganizationRole }[],
   roles?: readonly OrganizationRole[]
 ): OrganizationRole | null {
-  const allowedRoles = defaultedAllowedRoles(roles);
   return highestOrganizationRole(
     rows.map(row => row.role),
-    allowedRoles
+    roles
   );
 }
 

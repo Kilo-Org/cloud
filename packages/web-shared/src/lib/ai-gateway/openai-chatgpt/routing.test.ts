@@ -64,6 +64,7 @@ import {
   checkOpenAiChatGptByok,
   getOpenAiChatGptByokModelIds,
   OPENAI_ON_BEHALF_OF_TOKEN_HEADER,
+  resetConnectorGoneLogThrottleForTest,
   tagOpenAiChatGptByokModels,
   type OpenAiChatGptRoutingInput,
 } from './routing';
@@ -166,6 +167,7 @@ async function transformResponsesRequest(
 
 beforeEach(() => {
   jest.mocked(logExceptInTest).mockClear();
+  resetConnectorGoneLogThrottleForTest();
   process.env.OPENAI_CHATGPT_API_KEY = PARTNER_KEY;
   jest.mocked(getOpenAiChatGptStoredConnection).mockReset().mockResolvedValue(storedConnection());
   jest.mocked(openAiChatGptConnectorGone).mockReset().mockResolvedValue(false);
@@ -1382,5 +1384,51 @@ describe('shared-services routing', () => {
 
     expect(result?.kind).toBe('provider');
     expect(openAiChatGptConnectorGone).not.toHaveBeenCalled();
+  });
+
+  it('reports a gone shared connector once per organization and connector in the window', async () => {
+    function sharedConnectorGone(createdBy: string) {
+      jest
+        .mocked(getOpenAiChatGptStoredConnection)
+        .mockImplementation(async owner =>
+          owner.scope === 'shared_services' ? storedConnection({ createdBy }) : null
+        );
+      jest.mocked(openAiChatGptConnectorGone).mockResolvedValue(true);
+    }
+
+    function goneLines() {
+      return jest
+        .mocked(logExceptInTest)
+        .mock.calls.map(([line]) => String(line))
+        .filter(line => line.includes('openai_chatgpt_shared_connector_gone'));
+    }
+
+    const input = routingInput({ organizationId: ORG_ID, botId: 'reviewer' });
+    const expectedLine = JSON.stringify({
+      type: 'openai_chatgpt_shared_connector_gone',
+      organizationId: ORG_ID,
+      connectorId: 'gone-connector',
+    });
+    const otherConnectorLine = JSON.stringify({
+      type: 'openai_chatgpt_shared_connector_gone',
+      organizationId: ORG_ID,
+      connectorId: 'other-connector',
+    });
+
+    sharedConnectorGone('gone-connector');
+    await expect(checkOpenAiChatGptByok(input)).resolves.toBeNull();
+    await expect(checkOpenAiChatGptByok(input)).resolves.toBeNull();
+    expect(goneLines()).toEqual([expectedLine]);
+
+    // A different connector on the same organization is a separate report.
+    sharedConnectorGone('other-connector');
+    await checkOpenAiChatGptByok(input);
+    expect(goneLines()).toEqual([expectedLine, otherConnectorLine]);
+
+    // Once the window is cleared, the same connector reports again.
+    resetConnectorGoneLogThrottleForTest();
+    sharedConnectorGone('gone-connector');
+    await checkOpenAiChatGptByok(input);
+    expect(goneLines()).toEqual([expectedLine, otherConnectorLine, expectedLine]);
   });
 });

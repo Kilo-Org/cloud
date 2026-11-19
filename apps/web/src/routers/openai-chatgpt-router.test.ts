@@ -37,6 +37,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import { openAiChatGptConnectorGone } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/connector';
 import { OPENAI_CHATGPT_SHARED_RECONNECT_MESSAGE } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import type { OpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/types';
 
@@ -250,9 +251,10 @@ describe('openAiChatGpt.status', () => {
     });
     expect(getConnection).toHaveBeenCalledWith(SHARED_OWNER);
     expect(getStoredConnection).toHaveBeenCalledWith(SHARED_OWNER);
-    expect(connectorGone).toHaveBeenCalledWith(
-      expect.objectContaining({ createdBy: 'connector-user' })
-    );
+    // The connector lookup takes the primary, like the row read beside it.
+    expect(connectorGone).toHaveBeenCalledTimes(1);
+    expect(connectorGone.mock.calls[0]?.[0]).toMatchObject({ createdBy: 'connector-user' });
+    expect(connectorGone.mock.calls[0]?.[1]).toBe(db);
     expect(usageLimitRead).not.toHaveBeenCalled();
   });
 

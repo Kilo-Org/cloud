@@ -38,7 +38,7 @@ const FALLBACK_IDENTITY_LABEL = 'your ChatGPT account';
 const FALLBACK_ERROR_MESSAGE =
   'The shared services ChatGPT connection is not available. Reconnect to continue.';
 const FALLBACK_RECONNECT_REQUIRED_MESSAGE =
-  'The account that connected the shared-services ChatGPT connection for this organization is no longer available. An organization owner can reconnect it.';
+  'The account that connected the shared-services ChatGPT connection for this organization is no longer available. An organization owner or admin can reconnect it.';
 const LOAD_ERROR_MESSAGE = "We couldn't load the shared services connection. Try again.";
 const CONNECT_ERROR_MESSAGE = "We couldn't connect the shared services account. Try again.";
 const DISCONNECT_ERROR_MESSAGE =

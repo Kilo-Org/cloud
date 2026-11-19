@@ -32,12 +32,12 @@ import { OPENAI_CHATGPT_API_KEY_ENV, OPENAI_CHATGPT_API_URL } from './upstream';
  * Shown on the organization's shared connection card when the person recorded
  * as its connector is gone: the account row is missing, the account is
  * soft-deleted or being deleted, or it holds no usable email. The row belongs
- * to the organization, so an organization owner reconnects it instead of losing
- * it. Routing never refuses on this: it skips the shared row and falls back to
- * the caller's own connection.
+ * to the organization, so an organization owner or admin reconnects it instead
+ * of losing it. Routing never refuses on this: it skips the shared row and
+ * falls back to the caller's own connection.
  */
 export const OPENAI_CHATGPT_SHARED_RECONNECT_MESSAGE =
-  'The account that connected the shared-services ChatGPT connection for this organization is no longer available. An organization owner can reconnect it.';
+  'The account that connected the shared-services ChatGPT connection for this organization is no longer available. An organization owner or admin can reconnect it.';
 
 /**
  * The delegated access token travels in its own upstream header. `extraHeaders`
@@ -212,6 +212,34 @@ function isUsableStoredConnection(
 }
 
 /**
+ * A shared connector that cannot serve stays in that state until an owner or
+ * admin reconnects it, so the report describes one standing fact rather than an
+ * event. Emitting it at most once per organization and connector per interval
+ * keeps that fact visible without repeating it on every request.
+ *
+ * The throttle is per instance, so a fleet of N instances reports up to N lines
+ * an interval for one organization. That is the ceiling worth paying for
+ * module-level timestamps.
+ */
+const CONNECTOR_GONE_LOG_INTERVAL_MS = 60_000;
+const lastConnectorGoneLogAt = new Map<string, number>();
+
+/** Tests clear the throttle between cases; production keeps the module state. */
+export function resetConnectorGoneLogThrottleForTest() {
+  lastConnectorGoneLogAt.clear();
+}
+
+function shouldLogConnectorGone(organizationId: string, connectorId: string): boolean {
+  const now = Date.now();
+  const key = `${organizationId}:${connectorId}`;
+  if (now - (lastConnectorGoneLogAt.get(key) ?? 0) < CONNECTOR_GONE_LOG_INTERVAL_MS) {
+    return false;
+  }
+  lastConnectorGoneLogAt.set(key, now);
+  return true;
+}
+
+/**
  * The upstream model one specific owner's connection would serve the request
  * with, or null when that connection is not eligible.
  */
@@ -233,13 +261,15 @@ async function eligibleUpstreamModelForOwner(
   if (!isUsableStoredConnection(stored)) return null;
 
   if (owner.scope === 'shared_services' && (await openAiChatGptConnectorGone(stored))) {
-    logExceptInTest(
-      JSON.stringify({
-        type: 'openai_chatgpt_shared_connector_gone',
-        organizationId: owner.organizationId,
-        connectorId: stored.createdBy,
-      })
-    );
+    if (shouldLogConnectorGone(owner.organizationId, stored.createdBy)) {
+      logExceptInTest(
+        JSON.stringify({
+          type: 'openai_chatgpt_shared_connector_gone',
+          organizationId: owner.organizationId,
+          connectorId: stored.createdBy,
+        })
+      );
+    }
     return null;
   }
 

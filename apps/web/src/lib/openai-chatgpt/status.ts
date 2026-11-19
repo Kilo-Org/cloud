@@ -12,9 +12,9 @@ export const OpenAiChatGptStatusSchema = z.object({
   /**
    * `reconnect_required` is a live organization shared-services connection
    * whose connector account is gone: the row and its credential stay, and an
-   * organization owner has to reconnect it. Only the shared-services status
-   * query can report it, so a personal or member-organization connection never
-   * returns it.
+   * organization owner or admin has to reconnect it. Only the shared-services
+   * status query can report it, so a personal or member-organization
+   * connection never returns it.
    */
   state: z.enum(['disconnected', 'connected', 'error', 'reconnect_required']),
   email: z.string().optional(),

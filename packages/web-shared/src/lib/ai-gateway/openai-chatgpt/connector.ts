@@ -8,8 +8,8 @@ import type { OpenAiChatGptStoredConnection } from './store';
  * connection is gone: the account row is missing, the account is soft-deleted
  * or being deleted, or it holds no usable email. The shared-services row is the
  * organization's connection, so a dead connector does not revoke it: the row
- * and its credential stay, and an organization owner reconnects it. A row that
- * records no connector keeps serving.
+ * and its credential stay, and an organization owner or admin reconnects it. A
+ * row that records no connector keeps serving.
  */
 export async function openAiChatGptConnectorGone(
   stored: Pick<OpenAiChatGptStoredConnection, 'createdBy'>,

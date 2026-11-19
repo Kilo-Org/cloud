@@ -160,7 +160,7 @@ describe('openai-chatgpt shared-services connection (real database)', () => {
 
     // The credential is the deleted person's account, and nobody is left who
     // can refresh it: the row reads as gone so routing skips it and the status
-    // card asks an organization owner to reconnect.
+    // card asks an organization owner or admin to reconnect.
     await expect(openAiChatGptConnectorGone(stored)).resolves.toBe(true);
   });
 

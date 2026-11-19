@@ -93,13 +93,13 @@ describe('ChatGptSharedServicesCardView', () => {
         subject: 'subject-1',
         connectedAt: CONNECTED_AT,
         errorMessage:
-          'The account that connected the shared-services ChatGPT connection for this organization is no longer available. An organization owner can reconnect it.',
+          'The account that connected the shared-services ChatGPT connection for this organization is no longer available. An organization owner or admin can reconnect it.',
       },
     });
 
     expect(html).toContain('Needs reconnect');
     expect(html).toContain(
-      'The account that connected the shared-services ChatGPT connection for this organization is no longer available. An organization owner can reconnect it.'
+      'The account that connected the shared-services ChatGPT connection for this organization is no longer available. An organization owner or admin can reconnect it.'
     );
     expect(html).toContain('Reconnect');
     expect(html).toContain('Disconnect');
@@ -111,7 +111,7 @@ describe('ChatGptSharedServicesCardView', () => {
       status: { state: 'reconnect_required', email: 'shared@example.com' },
     });
 
-    expect(html).toContain('An organization owner can reconnect it.');
+    expect(html).toContain('An organization owner or admin can reconnect it.');
     expect(html).not.toContain(
       'The shared services ChatGPT connection is not available. Reconnect to continue.'
     );

@@ -50,6 +50,7 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   I18nManager: { isRTL: false },
   PixelRatio: { roundToNearestPixel: (value: number) => Math.round(value * 2) / 2 },
+  useColorScheme: () => 'light',
   useWindowDimensions: () => ({ width: 400, height: 900, scale: 2, fontScale: 1 }),
   View: 'View',
   ScrollView: ({

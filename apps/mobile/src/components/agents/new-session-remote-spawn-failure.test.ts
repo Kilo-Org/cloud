@@ -72,7 +72,7 @@ function findPropsByComponent(node: Node, component: unknown): Record<string, un
 const BILLING_COPY =
   "The organization's trial has ended and it has no active plan. You can update billing, then try again.";
 const MEMBER_COPY =
-  "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again.";
+  "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai.";
 
 const onPress = vi.fn<() => void>();
 const BILLING_STEP: TrialRefusalAction = { label: 'Manage billing', onPress };

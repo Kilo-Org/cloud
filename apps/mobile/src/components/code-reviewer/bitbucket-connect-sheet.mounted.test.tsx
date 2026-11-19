@@ -125,6 +125,22 @@ describe('BitbucketConnectSheet', () => {
         i18n.t('common.organizationTrialEnded'),
       ])
     );
+    // The plan is the blocker the reader cannot clear by role, so the denial
+    // carries the retry that re-reads the state once the owner updates billing.
+    expect(denied?.props.action).toBeDefined();
+    expect(denied?.props.action?.props?.label).toBe(i18n.t('common.retry'));
+  });
+
+  it('offers no action when the plan does not block the connection', async () => {
+    state.role = 'member';
+    state.isTrialExpiredForEnforcement = false;
+    state.status.data = { method: 'workspace_access_token', integrationId: null };
+    const root = await mount();
+
+    // The role alone refuses the connection, and a retry changes nothing, so
+    // the denial offers no control.
+    const [denied] = root.findAll(node => Object.is(node.type, PERMISSION_DENIED));
+    expect(denied?.props.action).toBeUndefined();
   });
 
   it('keeps the role sentence alone when the plan does not block the connection', async () => {

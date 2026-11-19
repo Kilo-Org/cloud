@@ -6,12 +6,14 @@ import { View } from 'react-native';
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 
 import { BitbucketConnectForm } from '@/components/code-reviewer/bitbucket-connect-form';
+import { StateAction } from '@/components/empty-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { useMetadataLeaveGuard } from '@/components/profiles/use-metadata-leave-guard';
 import { QueryError } from '@/components/query-error';
 import { SheetHeader } from '@/components/sheet-header';
 import { SheetScrollView } from '@/components/tab-screen';
+import { RotateCcw } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
@@ -72,7 +74,14 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
   // !connectLanded)`), so a running connect has already disarmed the guard, and
   // a landed one closes the sheet through `leaveWithoutAsking`.
   const guard = useMetadataLeaveGuard({ enabled: true, saving: false });
-  const { role, org, isResolving, isError } = useOrgBoundary(scope);
+  const {
+    role,
+    org,
+    isResolving,
+    isError,
+    isFetching: isOrgFetching,
+    refetch,
+  } = useOrgBoundary(scope);
   const readiness = useBitbucketReadiness(scope);
   // The readiness read describes workspace access tokens only, so this is what
   // tells a Bitbucket OAuth connection apart from a workspace with none.
@@ -98,6 +107,9 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     !(status.isError && status.data == null);
   let title = t('agentChat.repoPicker.platformBitbucket');
   let deniedDescription = t('prReview.connect.gitlabReconnectAdminOnlyDescription');
+  // The denial's way out, offered only where the sheet joins the two refusals
+  // below: a retry here re-reads the three answers the page was decided from.
+  let deniedAction: ReactNode;
   if (readsSettled) {
     if (managesExisting) {
       deniedDescription = t('integrations.managedByOwner');
@@ -106,11 +118,26 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
       const roleDenial = t('codeReviewer.bitbucket.notConnectedReadOnly');
       // The same organization's lapsed plan refuses every organization change,
       // so a member must not read the role as the only blocker: the second
-      // sentence names the owner and the billing step that unblocks it.
-      deniedDescription =
-        org?.isTrialExpiredForEnforcement === true
-          ? joinSentences([roleDenial, trialRefusalMessage(false)])
-          : roleDenial;
+      // sentence names the owner and the billing step that unblocks it. The
+      // retry re-reads the organization, the readiness and the status, because
+      // all three decide whether the plan still blocks the connection.
+      if (org?.isTrialExpiredForEnforcement === true) {
+        deniedDescription = joinSentences([roleDenial, trialRefusalMessage(false)]);
+        deniedAction = (
+          <StateAction
+            label={t('common.retry')}
+            icon={RotateCcw}
+            loading={readiness.isFetching || status.isFetching || isOrgFetching}
+            onPress={() => {
+              void refetch();
+              void readiness.refetch();
+              void status.refetch();
+            }}
+          />
+        );
+      } else {
+        deniedDescription = roleDenial;
+      }
     } else {
       title = t('prReview.connect.reconnectTitleBitbucket');
     }
@@ -181,7 +208,9 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     }
 
     if (!canManage) {
-      return <PermissionDenied description={deniedDescription} showBack={false} />;
+      return (
+        <PermissionDenied description={deniedDescription} showBack={false} action={deniedAction} />
+      );
     }
 
     // The connect mutation refuses a second Bitbucket integration for the same

@@ -1,3 +1,4 @@
+import { type ReactNode } from 'react';
 import { useRouter } from 'expo-router';
 import { Lock } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +15,12 @@ type PermissionDeniedProps = Readonly<{
    * leave by — keeps it. Defaults to `true`.
    */
   showBack?: boolean;
+  /**
+   * The state's way out when the denial has one: a caller passes the action its
+   * own state can offer (a retry), and it replaces the back control. Omitted
+   * when the caller can offer nothing to press.
+   */
+  action?: ReactNode;
 }>;
 
 /**
@@ -21,7 +28,7 @@ type PermissionDeniedProps = Readonly<{
  * the action — e.g. reached by a deep link or stale state rather than
  * through the (role-gated) entry point that would normally hide it.
  */
-export function PermissionDenied({ description, showBack = true }: PermissionDeniedProps) {
+export function PermissionDenied({ description, action, showBack = true }: PermissionDeniedProps) {
   const router = useRouter();
   const { t } = useTranslation();
 
@@ -32,7 +39,8 @@ export function PermissionDenied({ description, showBack = true }: PermissionDen
       title={t('common.accessDenied')}
       description={description}
       action={
-        showBack ? (
+        action ??
+        (showBack ? (
           <StateAction
             label={t('common.back')}
             icon={DirectionalArrowLeft}
@@ -40,7 +48,7 @@ export function PermissionDenied({ description, showBack = true }: PermissionDen
               router.back();
             }}
           />
-        ) : undefined
+        ) : undefined)
       }
     />
   );

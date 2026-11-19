@@ -43,7 +43,7 @@ describe('cloudPrepareFailureMessage', () => {
   it('explains a lapsed organization plan instead of a generic server error', () => {
     const trial = makeError('FORBIDDEN', ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
     expect(cloudPrepareFailureMessage(trial)).toBe(
-      "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again."
+      "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai."
     );
   });
 

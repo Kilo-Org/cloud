@@ -184,6 +184,9 @@ vi.mock('@/components/organization/organization-boundary', () => ({
 vi.mock('@/components/organization/permission-denied', () => ({
   PermissionDenied: 'PermissionDenied',
 }));
+// The denial's action is the shared state control: its own suite covers the
+// button, and this suite reads the label the sheet handed it.
+vi.mock('@/components/empty-state', () => ({ StateAction: 'StateAction' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/code-reviewer/bitbucket-connect-form', async () => {
   const { createElement: h } = await import('react');

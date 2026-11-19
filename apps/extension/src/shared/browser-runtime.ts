@@ -2604,8 +2604,10 @@ export const createBrowserRuntime = ({
       return { kind: 'result', result: { error: TAB_BUSY_ERROR, ok: false } };
     }
 
-    // The panel confirmed: the agent's in-flight call ends here and the panel's call waits for it to unwind.
-    inFlight.get(tabId)?.();
+    // Only a confirmed take-over ends the agent's in-flight call; a holder re-entering its own lease ends nothing.
+    if (lease.takeover !== undefined) {
+      inFlight.get(tabId)?.();
+    }
 
     return runExclusive(tabId, async () => {
       // A download an earlier call left for this session — stopped, kept, or only announced — has no result of its

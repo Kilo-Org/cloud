@@ -1,7 +1,12 @@
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
-import { memo, type ReactNode, useCallback, useState } from 'react';
+import { memo, type ReactNode, useCallback, useRef, useState } from 'react';
+import {
+  Pressable,
+  type TextLayoutEvent,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View, type ViewStyle } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { auditLogDetailFor } from '@/components/organization/audit-log-detail';
@@ -61,6 +66,38 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
   const { t } = useTranslation();
   const colors = useThemeColors();
   const [expanded, setExpanded] = useState(false);
+  // The collapsed detail must size itself to its painted lines, not to a fixed
+  // two-line clamp: a detail whose text exactly fills its first line (a long
+  // German role-change sentence) makes Android allocate a second, empty line
+  // box inside the `numberOfLines={2}` clamp, and that card stands a line
+  // taller than its neighbors with a blank gap before the meta line. The
+  // layout callback counts the lines that actually hold glyphs — the empty
+  // trailing box carries no text — and the collapsed clamp becomes that count,
+  // capped at two: one- and two-line details size to their content, and only a
+  // detail that really runs past two lines keeps the full clamp and the
+  // press-to-expand affordance. `expanded` rows measure unclamped and could
+  // report a longer count, so their reports never move the collapsed clamp.
+  const [collapsedLines, setCollapsedLines] = useState<number | null>(null);
+  // The callback reads the expanded flag through a ref: a state read would
+  // need the callback in the dependency array, and a re-created callback makes
+  // the memoized row re-render on every toggle for nothing. The flag flips
+  // synchronously with the press, so no report from the expanded layout can
+  // land after the collapse begins.
+  const expandedRef = useRef(false);
+  const onDetailLayout = useCallback(
+    (e: TextLayoutEvent) => {
+      if (expandedRef.current) {
+        return;
+      }
+      const painted = Math.max(
+        1,
+        e.nativeEvent.lines.filter(line => line.text.trim().length > 0).length
+      );
+      setCollapsedLines(current => (current === painted ? current : painted));
+    },
+    []
+  );
+  const clamp = expanded ? undefined : (collapsedLines ?? 2);
   const actor = entry.actor_email ?? entry.actor_name;
   const time = formatAuditTime(entry.created_at);
   const eventName = auditActionLabel(t, entry.action);
@@ -104,16 +141,19 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
       </View>
     );
   }
-  // The detail runs past two lines for most events, and nothing else in the
-  // app carries it, so the row itself is the detail view: it starts clamped and
-  // a press shows the whole sentence. The row cannot know whether the detail
-  // fits two lines without measuring it — a clamped text reports only the lines
-  // it drew — so every event row offers the disclosure, and the reader who
-  // needs nothing more loses nothing by ignoring it.
+  // The detail can run past two lines, and nothing else in the app carries it,
+  // so the row itself is the detail view: it starts clamped to its painted
+  // lines and a press shows the whole sentence. Until the first layout pass
+  // reports, the clamp stays at two; a detail the clamp hides keeps its
+  // disclosure, and the reader who needs nothing more loses nothing by
+  // ignoring it.
   return (
     <Pressable
       onPress={() => {
-        setExpanded(value => !value);
+        setExpanded(value => {
+          expandedRef.current = !value;
+          return !value;
+        });
       }}
       accessibilityRole="button"
       // The clamp is visual only: a reader hears the whole event whether or not
@@ -132,7 +172,11 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
         )}
         <Text className="min-w-0 flex-1 text-sm font-medium text-foreground">{eventName}</Text>
       </View>
-      <Text className="text-xs text-muted-foreground" numberOfLines={expanded ? undefined : 2}>
+      <Text
+        className="text-xs text-muted-foreground"
+        numberOfLines={clamp}
+        onTextLayout={onDetailLayout}
+      >
         {detail}
       </Text>
       {metaLine}

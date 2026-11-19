@@ -92,7 +92,7 @@ export function LaunchFolderField({
     // remote surface's Folder row but inert, since there is no connection to
     // list folders on. The setup hint under Start names the recovery.
     return (
-      <View className="mt-5">
+      <View>
         <Text className="mb-2 text-sm font-medium text-muted-foreground">
           {t('agentChat.folderPicker.fieldLabel')}
         </Text>
@@ -103,7 +103,7 @@ export function LaunchFolderField({
     );
   }
   return (
-    <View className="mt-5">
+    <View>
       <Text className="mb-2 text-sm font-medium text-muted-foreground">
         {t('agentChat.folderPicker.fieldLabel')}
       </Text>

@@ -87,8 +87,11 @@ configuration and unavailable writes retry under the queue policy,
 then reach the DLQ. Processing logs contain the usage ID when valid, queue message
 ID, delivery attempt count, and categorical outcome/reason.
 
-Writer HTTP 429 and 503 also reject the queue invocation after all messages in the
-batch have been handled. Each successful message keeps its explicit ACK; failed
+Writer HTTP 429 and 503 reject the queue invocation after all messages in the
+batch have been handled, except for a validated tagged write with a recognized
+`queue_limit` 429 and the exact response header `x-usage-class-limit: non_llm`.
+That message takes its usual admission retry. A shared overload in any sibling
+still fails the invocation. Each successful message keeps its explicit ACK; failed
 messages keep their explicit retry using the per-message delay policy below and the shared retry/DLQ budget.
 There is no extra writer attempt within an invocation. Other failures retain
 per-message retries without being classified as overload. Overload retry logs add
@@ -205,7 +208,7 @@ The consumer reads the tag before anything else:
 
 A message that never ACKs exhausts the shared 20-retry budget and goes to the DLQ,
 so the DLQ can hold all three kinds. A recognized admission 429 takes the admission
-retry schedule, and HTTP 429/503 rejects the invocation, exactly as for LLM usage.
+retry schedule. Only the explicitly marked class-only rejection is exempt from invocation failure.
 The invocation launch budget is shared. Consumer settings are unchanged. On the
 writer, these queue writes take the `non_llm` admission class described under
 [writer admission protection](#writer-admission-protection); its ceiling rejection
@@ -244,7 +247,7 @@ diagnosis and log-derived counts/latency. `entrypoint` is `gateway`,
 |---|---|---|
 | Frankfurt gateway direct write or SFO local fallback | `gateway` | `unknown` |
 | Queue consumer through HTTP writer | `writer_endpoint` | `queue` |
-| Staging Vercel queue consumer through HTTP writer | `writer_endpoint` | `queue_vercel` |
+| Retired staging Vercel queue consumer, in older deployments only | `writer_endpoint` | `queue_vercel` |
 | SFO gateway handoff through HTTP writer | `writer_endpoint` | `region_handoff` |
 | HTTP writer without a classified caller, including classifier/grader writes | `writer_endpoint` | `unknown` |
 | Unclassified local caller | `unknown` | `unknown` |
@@ -255,8 +258,9 @@ classifier and benchmark grader, omit the marker. After internal API authenticat
 the writer route accepts only `queue`, `queue_vercel`, or `region_handoff`; missing
 or other values map to `unknown` without logging the raw header. This is caller-supplied diagnostic
 context, not an authorization or accounting input. Older clients remain compatible.
-See the [Vercel queue prototype runbook](../../packages/usage-queue/README.md) for
-the isolated staging transport and its `queue_vercel` caller label.
+The staging Vercel queue prototype is retired and new gateway builds no longer
+publish to it. The writer keeps accepting `queue_vercel` so older staging
+deployments that still contain its consumer can finish any retained work.
 `execution_region` identifies the persistence function's region when available:
 SFO HTTP handoffs record `fra1`; a local fallback in SFO records `sfo1`.
 Missing or unrecognized `VERCEL_REGION` values are reported as `unknown`.
@@ -269,8 +273,7 @@ one, inside a 40-second overall elapsed retry budget. Before retries it uses
 exponential full jitter: uniformly zero up to (excluding) 500 ms, 1,000 ms, then
 2,000 ms. Attempt timeouts and sleeps are clipped to remaining budget; no new
 attempt starts after exhaustion. Runtime scheduling can delay observation of
-these deadlines. Non-retry calls retain one two-second attempt; the separate
-Vercel queue transport is unchanged. Every attempt reuses the same serialized
+these deadlines. Non-retry calls retain one two-second attempt. Every attempt reuses the same serialized
 event and usage ID;
 ambiguous acceptance can create duplicate messages, which the writer deduplicates.
 Configuration failures and HTTP outcomes other than 408/429/5xx are not retried.
@@ -312,8 +315,8 @@ under 1,000 ms is logged only when a stable hash of its usage ID falls in a nomi
 line per attempt, four per publication, and about 1% of publications plus every
 slow, failed or retried attempt. The rows are not a uniform sample: weight fast
 rows by `1 / sample_rate` and do not read either subset as population percentiles.
-An attempt cut off by a process kill writes nothing. Configuration failures and the
-Vercel queue transport make no attempt and log nothing new. If writing the line
+An attempt cut off by a process kill writes nothing. Configuration failures make no
+attempt and log nothing new. If writing the line
 throws, the publisher reports a Sentry warning tagged `usage_publisher_attempt_log`
 and the publication continues with its existing outcome.
 
@@ -403,7 +406,7 @@ Healthy events still make one HTTP call and ACK only a matching `recorded` or
 `duplicate` result, with no added delay. Failed items make no additional HTTP call
 inside the delivery: the consumer chooses a native `message.retry({delaySeconds})`
 for that item, freeing invocation slots while waiting for redelivery. Successful
-siblings retain their ACKs. Existing HTTP 429/503 overload feedback still rejects
+siblings retain their ACKs. Shared HTTP 429/503 overload feedback still rejects
 the invocation after all sibling processing and dispositions settle; other
 unavailable/configuration failures do not newly trigger that feedback.
 
@@ -485,8 +488,7 @@ because their next failure could immediately dead-letter them. Preserve stable I
 and reconcile ambiguous writes before replay; do not republish to reset attempts
 or discard accepted events.
 
-The isolated staging Vercel queue keeps its own retry settings; it shares only the
-bounded writer-response classification. No new environment knob or worker binding
+No new environment knob or worker binding
 is introduced. This preparation does not claim a healthy-traffic p95 improvement
 or authorize a production rollout, capacity increase, or replay.
 
@@ -553,6 +555,16 @@ shared limit is 1 (pool maximum 3 or less), the ceiling is 1 and a non-LLM call
 can take the only slot. The total limit is unchanged. Like the shared limit, this
 is a per-runtime counter, not a connection reservation, and it makes no
 fleet-wide fairness claim.
+
+The writer marks a class-only rejection when shared slots remain and its pool
+snapshot shows zero waiters and fewer checked-out connections than the shared
+limit. Missing or inconsistent gauges leave the rejection unmarked. Roll out
+the writer first, then the consumer. Either order retains the existing overload
+behavior until both sides support the header. Older consumers ignore it and the
+429 body stays compatible. During an authorized rollout, compare backlog slope,
+native invocation exception ratio and concurrency with pool waiting and LLM 429s.
+Halt rollout if shared pressure rises or backlog growth and exceptions worsen.
+A lower exception ratio alone does not establish recovery.
 
 `usage_writer_admission` diagnostics sample admitted decisions at 1% and warn on
 all rejected decisions. Fields contain only the bounded caller/outcome/reason,

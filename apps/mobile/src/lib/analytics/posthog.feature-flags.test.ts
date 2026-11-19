@@ -10,45 +10,29 @@ import {
 } from '@kilocode/app-shared/feature-flags';
 import type * as FeatureFlags from '@/lib/feature-flags';
 
-const hoisted = vi.hoisted(() => {
-  const client = {
-    register: vi.fn(),
-    setPersonPropertiesForFlags: vi.fn(),
-    onFeatureFlags: vi.fn(),
-    capture: vi.fn(),
-    screen: vi.fn(),
-    identify: vi.fn(),
-    reloadFeatureFlags: vi.fn(),
-    getFeatureFlag: vi.fn(),
-    reset: vi.fn(),
-    setPersistedProperty: vi.fn(),
-    optOut: vi.fn().mockResolvedValue(undefined),
-    shutdown: vi.fn(),
-    flush: vi.fn(),
-  };
-  // Mutable so each test can set the build version under test before the
-  // module loads. `useFeatureFlag` reads it at read time, not import time.
-  const application = {
-    nativeApplicationVersion: '1.0.11' as string | undefined,
-    nativeBuildVersion: '45',
-  };
-  const controller = {
-    allowsMandatory: vi.fn().mockReturnValue(true),
-    allowsOptional: vi.fn().mockReturnValue(true),
-    currentGeneration: vi.fn().mockReturnValue(0),
-  };
-  return { client, application, controller };
-});
+// The helper's vi.hoisted object merges into file scope (application stays
+// file-local). The mock factory body runs when the SDK import is evaluated, so
+// it can reach the imported doubles the same way the old local hoisted block did.
+import {
+  posthogMockConstructor,
+  postHogPersistedProperty,
+  posthogTestDouble,
+} from '../analytics/posthog-test-double';
+
+// Points at the shared double unchanged; kept so the file-level name and type
+// stay identical to the other migrated suites.
+const hoisted = posthogTestDouble;
+
+// Mutable so each test can set the build version under test before the module
+// loads. `useFeatureFlag` reads it at read time, not import time.
+const application = {
+  nativeApplicationVersion: '1.0.11' as string | undefined,
+  nativeBuildVersion: '45',
+};
 
 vi.mock('posthog-react-native', () => ({
-  default: vi.fn(function PostHogMock() {
-    return hoisted.client;
-  }),
-  PostHogPersistedProperty: {
-    Queue: 'queue',
-    LogsQueue: 'logs_queue',
-    AiQueue: 'ai_queue',
-  },
+  default: posthogMockConstructor,
+  PostHogPersistedProperty: postHogPersistedProperty,
 }));
 
 vi.mock('expo-device', () => ({
@@ -58,10 +42,10 @@ vi.mock('expo-device', () => ({
 
 vi.mock('expo-application', () => ({
   get nativeApplicationVersion() {
-    return hoisted.application.nativeApplicationVersion;
+    return application.nativeApplicationVersion;
   },
   get nativeBuildVersion() {
-    return hoisted.application.nativeBuildVersion;
+    return application.nativeBuildVersion;
   },
 }));
 
@@ -85,10 +69,10 @@ vi.mock('@/lib/telemetry/controller', () => ({
 }));
 
 vi.mock('@/lib/telemetry/posthog-storage', () => ({
-  sealPostHogStorage: vi.fn(),
-  unsealPostHogStorage: vi.fn(),
-  purgePostHogPersistence: vi.fn(),
-  posthogCustomStorage: {},
+  sealPostHogStorage: hoisted.storage.sealPostHogStorage,
+  unsealPostHogStorage: hoisted.storage.unsealPostHogStorage,
+  purgePostHogPersistence: hoisted.storage.purgePostHogPersistence,
+  posthogCustomStorage: hoisted.storage.posthogCustomStorage,
 }));
 
 vi.stubGlobal('__DEV__', false);
@@ -117,7 +101,7 @@ async function readFlag(key: FeatureFlagKey, defaultValue: boolean): Promise<boo
 beforeEach(() => {
   vi.clearAllMocks();
   vi.resetModules();
-  hoisted.application.nativeApplicationVersion = '1.0.11';
+  application.nativeApplicationVersion = '1.0.11';
   hoisted.controller.allowsMandatory.mockReturnValue(true);
   hoisted.controller.allowsOptional.mockReturnValue(true);
   hoisted.controller.currentGeneration.mockReturnValue(0);
@@ -127,7 +111,7 @@ beforeEach(() => {
 describe('version-aware feature flags', () => {
   it('an older build falls back to the default for a flag introduced in a newer version', async () => {
     // Older builds use the definition's default, not the caller's default.
-    hoisted.application.nativeApplicationVersion = '1.0.5';
+    application.nativeApplicationVersion = '1.0.5';
     hoisted.client.getFeatureFlag.mockImplementation(() => true as never);
     const { initPostHog } = await import('./posthog');
     initPostHog();
@@ -150,7 +134,7 @@ describe('version-aware feature flags', () => {
   });
 
   it('a build at exactly the minimum version applies the flag', async () => {
-    hoisted.application.nativeApplicationVersion = '1.0.11';
+    application.nativeApplicationVersion = '1.0.11';
     hoisted.client.getFeatureFlag.mockImplementation(() => true as never);
     const { initPostHog } = await import('./posthog');
     initPostHog();

@@ -51,11 +51,15 @@ describe('balanceMiddleware', () => {
     expiresAt: Math.floor(Date.now() / 1000) + 3600,
     ...overrides,
   });
-  const parentTokenEnv = (getToken: ReturnType<typeof vi.fn>) =>
+  const parentTokenEnv = (getToken: (authority: CloudAgentAuthority) => Promise<string>) =>
     ({
-      SANDBOX_SESSION: {
+      CLOUD_AGENT_WORKSPACE: {
         idFromName: (name: string) => name,
-        get: () => ({ getCloudAgentSpawnRuntimeToken: getToken }),
+        get: () => ({
+          getSpawnContext: async (authority: CloudAgentAuthority) => ({
+            token: await getToken(authority),
+          }),
+        }),
       },
     }) as unknown as Env;
 

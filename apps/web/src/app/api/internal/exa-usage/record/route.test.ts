@@ -284,6 +284,7 @@ describe(`POST ${EXA_USAGE_WRITE_PATH}`, () => {
     const response = await post(record, fromQueue);
 
     expect(response.status).toBe(429);
+    expect(response.headers.get('x-usage-class-limit')).toBeNull();
     await expect(response.json()).resolves.toEqual({
       error: 'Usage writer overloaded',
       reason: 'queue_limit',
@@ -307,6 +308,7 @@ describe(`POST ${EXA_USAGE_WRITE_PATH}`, () => {
 
     expect(nonLlm).toHaveLength(NON_LLM_CEILING);
     expect(response.status).toBe(429);
+    expect(response.headers.get('x-usage-class-limit')).toBe('non_llm');
     await expect(response.json()).resolves.toEqual({
       error: 'Usage writer overloaded',
       reason: 'queue_limit',

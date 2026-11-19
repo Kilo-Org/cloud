@@ -49,11 +49,19 @@ export const kiloTokenPayload = z.object({
 });
 
 export type KiloTokenPayload = z.infer<typeof kiloTokenPayload>;
-const signKiloTokenPayload = kiloTokenPayload.omit({ iat: true, exp: true }).strict();
+// `cloudAgentAuthority` is intentionally excluded: authority tokens are minted only by
+// the policy path (signModernKiloToken / buildModernKiloTokenPayload in
+// kilo-token-policy.ts), which enforces the delegated-workload binding. The strict
+// parse makes that boundary a runtime refusal, not just a TypeScript one.
+const signKiloTokenPayload = kiloTokenPayload
+  .omit({ iat: true, exp: true, cloudAgentAuthority: true })
+  .strict();
 
 /**
  * Optional claims beyond the core fields (userId, pepper, version, env).
- * Derived from KiloTokenPayload so sign and verify stay in sync.
+ * Derived from KiloTokenPayload so sign and verify stay in sync, minus
+ * `cloudAgentAuthority`: that claim is minted only by the token policy path
+ * (`signModernKiloToken`), and the strict sign schema rejects it here.
  */
 export type SignKiloTokenExtra = Pick<
   KiloTokenPayload,

@@ -2995,6 +2995,8 @@ export const ReasoningDetailsTransform = {
   ReasoningContent: 'reasoning-content',
   /** The upstream sends reasoning as a plain `reasoning` string, without `reasoning_details`. */
   Reasoning: 'reasoning',
+  /** The upstream is Mistral's Chat Completions API, which sends reasoning as `thinking` content chunks. */
+  MistralThinking: 'mistral-thinking',
 } as const;
 
 export const ReasoningDetailsTransformSchema = z.enum(ReasoningDetailsTransform);
@@ -3019,6 +3021,33 @@ export function getCustomLlmClientApiKind(
   }
 }
 
+/** Segments `remove_from_body` paths never traverse: they reach prototypes, not request data. */
+export const REMOVE_FROM_BODY_BLOCKED_SEGMENTS: ReadonlySet<string> = new Set([
+  '__proto__',
+  'constructor',
+  'prototype',
+]);
+
+/**
+ * A dotted path into the request body, where `*` stands for every element of an array or every
+ * value of an object, for example `usage`, `tools.*.function.strict` or
+ * `messages.*.content.*.cache_control`. The last segment names the field to delete.
+ */
+const CustomLlmRemoveFromBodyPathSchema = z.string().superRefine((path, ctx) => {
+  const segments = path.split('.');
+  if (segments.some(segment => segment === '')) {
+    ctx.addIssue({ code: 'custom', message: 'Path segments must not be empty' });
+    return;
+  }
+  if (segments[segments.length - 1] === '*') {
+    ctx.addIssue({ code: 'custom', message: 'The last path segment must name a field, not *' });
+  }
+  const blocked = segments.find(segment => REMOVE_FROM_BODY_BLOCKED_SEGMENTS.has(segment));
+  if (blocked !== undefined) {
+    ctx.addIssue({ code: 'custom', message: `Path segment ${blocked} is not allowed` });
+  }
+});
+
 export const CustomLlmApiConfigSchema = z.object({
   internal_id: z.string().min(1).optional(),
   /** Gateway APIs the upstream serves, including the one clients use. Without it, only that one. */
@@ -3030,7 +3059,7 @@ export const CustomLlmApiConfigSchema = z.object({
   sanitize_ref_fields: z.boolean().optional(),
   extra_headers: CustomLlmExtraHeadersSchema.optional(),
   extra_body: CustomLlmExtraBodySchema.optional(),
-  remove_from_body: z.array(z.string()).optional(),
+  remove_from_body: z.array(CustomLlmRemoveFromBodyPathSchema).optional(),
   reasoning_details_transform: ReasoningDetailsTransformSchema.optional(),
 });
 
@@ -3150,6 +3179,22 @@ export const CustomLlmPublicSchema = z.object({
 
 export type CustomLlmPublic = z.infer<typeof CustomLlmPublicSchema>;
 
+/**
+ * Makes a custom LLM a partner route for the gateway catalog model with the same
+ * public id. It does not own the id: Kilo-paid requests for the model try the
+ * partner first and fall back to the regular route when it answers with an
+ * unsuccessful status. User BYOK keys and other user-paid routes are unaffected. When the
+ * definition declares `opencode_settings.reasoning_options`, a request for a reasoning effort
+ * outside them skips the partner up front.
+ */
+export const CustomLlmPartnerSchema = z.object({
+  /** The provider slug the partner serves the model as. Organization provider allow
+   * lists and request provider settings decide whether the partner may serve. */
+  inference_provider: CustomLlmInferenceProviderSlugSchema,
+});
+
+export type CustomLlmPartner = z.infer<typeof CustomLlmPartnerSchema>;
+
 /** An ISO 3166-1 alpha-2 code as sent in Vercel's `x-vercel-ip-country` header. */
 export const VercelCountryCodeSchema = z
   .string()
@@ -3201,6 +3246,8 @@ export const CustomLlmDefinitionSchema = z
     organization_ids: z.array(z.uuid()).optional(),
     group_ids: z.array(z.uuid()).optional(),
     public: CustomLlmPublicSchema.optional(),
+    /** Requires pricing, and excludes public, organization_ids, group_ids, and country_deny_list. */
+    partner: CustomLlmPartnerSchema.optional(),
     /** Hidden from model lists and refused by the gateway for requests from these countries.
      * A request without a known country is not restricted. */
     country_deny_list: z.array(VercelCountryCodeSchema).optional(),
@@ -3209,7 +3256,8 @@ export const CustomLlmDefinitionSchema = z
     pricing: CustomPricingTiersSchema.optional(),
     /** Whether the upstream may train on prompts. Only allowed with pricing; without it,
      * or when unset, the model is assumed to train on prompts. Set it to false only for
-     * an upstream with zero data retention. */
+     * an upstream that does not train on prompts. It never makes a custom LLM eligible
+     * for zero data retention (`provider.zdr`), which excludes every custom LLM. */
     may_train_on_prompts: z.boolean().optional(),
   })
   .superRefine((definition, ctx) => {
@@ -3227,6 +3275,24 @@ export const CustomLlmDefinitionSchema = z
         path: ['may_train_on_prompts'],
         message: 'may_train_on_prompts must not be set without pricing',
       });
+    }
+    if (definition.partner) {
+      if (!definition.pricing) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['pricing'],
+          message: 'pricing must be set when partner is set',
+        });
+      }
+      for (const key of ['public', 'organization_ids', 'group_ids', 'country_deny_list'] as const) {
+        if (definition[key] !== undefined) {
+          ctx.addIssue({
+            code: 'custom',
+            path: [key],
+            message: `${key} must not be set when partner is set`,
+          });
+        }
+      }
     }
     if (!definition.public) return;
     for (const key of ['organization_ids', 'group_ids'] as const) {

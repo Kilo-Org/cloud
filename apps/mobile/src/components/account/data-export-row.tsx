@@ -1,8 +1,9 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
+import { ConfigureRow } from '@/components/ui/configure-row';
+import { Archive } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatDate } from '@/lib/format';
@@ -35,30 +36,28 @@ export function ExportRow({
   const ready = dataExport.status === 'ready';
 
   return (
-    <View className="flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-      <View className="min-w-0 flex-1 gap-1">
-        <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
-          {t('profile.dataExport.requestedOn', {
-            date: formatDate(parseTimestamp(dataExport.requestedAt), i18n.language),
-          })}
-        </Text>
-        <Text className="text-xs text-muted-foreground" numberOfLines={2}>
-          {dataExport.failureMessage ?? i18n.t(STATUS_KEYS[dataExport.status])}
-        </Text>
-      </View>
-      {ready ? (
-        <Button
-          variant="outline"
-          size="sm"
-          className={STATE_ACTION_CLASS}
-          loading={requestingCode}
-          disabled={requestingCode}
-          accessibilityLabel={t('profile.dataExport.getCodeA11y')}
-          onPress={onRequestCode}
-        >
-          <Text>{t('profile.dataExport.getCode')}</Text>
-        </Button>
-      ) : null}
-    </View>
+    <ConfigureRow
+      icon={Archive}
+      title={t('profile.dataExport.requestedOn', {
+        date: formatDate(parseTimestamp(dataExport.requestedAt), i18n.language),
+      })}
+      subtitle={dataExport.failureMessage ?? i18n.t(STATUS_KEYS[dataExport.status])}
+      subtitleNumberOfLines={2}
+      trailing={
+        ready ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className={STATE_ACTION_CLASS}
+            loading={requestingCode}
+            disabled={requestingCode}
+            accessibilityLabel={t('profile.dataExport.getCodeA11y')}
+            onPress={onRequestCode}
+          >
+            <Text>{t('profile.dataExport.getCode')}</Text>
+          </Button>
+        ) : null
+      }
+    />
   );
 }

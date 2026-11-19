@@ -3,6 +3,7 @@ import { type LayoutChangeEvent, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { RenameModal } from '@/components/rename-modal';
+import { SCREEN_HEADER_TITLE_CLASS } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
 import { HEADER_TITLE_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { titleKeepsNotice } from '@/lib/chat/chat-title-notice';
@@ -77,7 +78,7 @@ export function ChatTitle({ title, initialValue, canRename, onRename }: Readonly
         )}
       >
         <Text
-          className="shrink text-lg font-semibold text-foreground"
+          className={SCREEN_HEADER_TITLE_CLASS}
           numberOfLines={1}
           onLayout={measure(setTitleWidth)}
         >

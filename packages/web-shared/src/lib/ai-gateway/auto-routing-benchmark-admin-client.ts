@@ -139,10 +139,13 @@ export function requeueBenchmarkRegistry(
   );
 }
 
-export function getBenchmarkRoutingTable(router: AutoRouter = DEFAULT_AUTO_ROUTER) {
+export function getBenchmarkRoutingTable(
+  router: AutoRouter = DEFAULT_AUTO_ROUTER,
+  signal?: AbortSignal
+) {
   return fetchBenchmarkAdmin(
     `/admin/routing-table?router=${router}`,
-    { method: 'GET' },
+    { method: 'GET', signal },
     BenchmarkRoutingTableResponseSchema
   );
 }

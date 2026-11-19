@@ -46,8 +46,6 @@ export function isAnsweredAttentionRow(row: AttentionRow): boolean {
     return false;
   }
   return isAttentionAcked(row.id, {
-    // The raise identity is `statusUpdatedAt ?? status`: a row the surface
-    // cannot date names only the kind of raise. Null reads like absent.
     raiseId: row.statusUpdatedAt ?? row.status,
     status: row.status,
   });

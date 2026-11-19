@@ -12,7 +12,7 @@ import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/
 import { requestCountryCode } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import { customRouterModelId, isCustomRouterModelId } from '@kilocode/auto-routing-contracts';
 import { listUsableCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
-import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { isUnreadableOrganizationError, organizationMemberCatalog } from './organization-catalog';
 
 type ValidationResult = { valid: true } | { valid: false; reason: 'unavailable' };

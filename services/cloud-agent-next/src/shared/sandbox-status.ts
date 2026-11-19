@@ -1,5 +1,6 @@
 import * as z from 'zod';
 import { SESSION_ID_RE } from './protocol';
+import { PROVIDER_DESCRIPTORS, parseAgentSandboxProvider } from './sandbox-provider';
 
 export const SandboxStatusSessionIdSchema = z
   .string()
@@ -33,16 +34,8 @@ export const SandboxProviderLabelSchema = z.enum([
 export type SandboxProviderLabel = z.infer<typeof SandboxProviderLabelSchema>;
 
 export function getSandboxProviderLabel(provider: unknown): SandboxProviderLabel {
-  switch (provider) {
-    case 'cloudflare':
-      return 'Cloudflare';
-    case 'vercel':
-      return 'Vercel';
-    case 'cloudflare-containers':
-      return 'Cloudflare Containers';
-    default:
-      return 'Unknown';
-  }
+  const known = typeof provider === 'string' ? parseAgentSandboxProvider(provider) : undefined;
+  return known === undefined ? 'Unknown' : PROVIDER_DESCRIPTORS[known].label;
 }
 
 export const SandboxStatusDetailCodeSchema = z.enum([

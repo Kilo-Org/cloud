@@ -47,6 +47,16 @@ function mountedTexts(renderer: TestRenderer.ReactTestRenderer): TestRenderer.Re
   );
 }
 
+/**
+ * The group title's heading element: `SectionHeader` puts the header role on
+ * the eyebrow label itself, so the heading is that `Text`, not a wrapper.
+ */
+function headingNodes(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance[] {
+  return renderer.root.findAll(
+    node => typeof node.type === 'string' && node.props.accessibilityRole === 'header'
+  );
+}
+
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 describe('LanguagePickerRow section titles', () => {
@@ -62,10 +72,10 @@ describe('LanguagePickerRow section titles', () => {
 
     // A screen reader reaches a picker group only when the title is a heading:
     // the rows below are independent radio choices with no grouping container.
-    expect(mountedTexts(renderer)).toEqual([
-      expect.objectContaining({ props: expect.objectContaining({ accessibilityRole: 'header' }) }),
-    ]);
-    expect(mountedTexts(renderer)[0]?.props.children).toBe(label);
+    // `SectionHeader` names the heading on its own label node.
+    const headings = headingNodes(renderer);
+    expect(headings).toHaveLength(1);
+    expect(headings[0]?.props.children).toBe(label);
 
     renderer.unmount();
   });

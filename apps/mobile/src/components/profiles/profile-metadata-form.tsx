@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
 
 import {
   ProfileDescriptionField,
@@ -8,6 +7,7 @@ import {
 } from '@/components/profiles/profile-bound-field';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { validateProfileDescription } from '@/lib/agent-profile-forms';
 import { useProfileNameField } from '@/lib/hooks/use-profile-name-field';
@@ -86,7 +86,7 @@ export function ProfileMetadataForm({
   };
 
   return (
-    <View className="gap-4">
+    <Card>
       <ProfileNameField
         defaultValue={nameField.valueRef.current}
         error={nameField.error}
@@ -112,6 +112,6 @@ export function ProfileMetadataForm({
       <Button loading={isSaving} disabled={disabled || isSaving} onPress={submit}>
         <Text>{t(saveFailed ? 'common.retry' : 'common.save')}</Text>
       </Button>
-    </View>
+    </Card>
   );
 }

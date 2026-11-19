@@ -7,6 +7,7 @@ import { toast } from 'sonner-native';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
@@ -91,7 +92,7 @@ export function ScheduleSettings({
     update.mutate({ ...next, language: i18n.resolvedLanguage ?? i18n.language });
   };
   return (
-    <View className="gap-4">
+    <Card>
       <View className="gap-2">
         <FormField
           key={timezoneInputKey}
@@ -105,7 +106,7 @@ export function ScheduleSettings({
             setTimezoneInvalid(false);
           }}
         />
-        <Text className="text-xs text-muted-foreground">{t('agentBriefing.timezoneHint')}</Text>
+        <Text variant="caption">{t('agentBriefing.timezoneHint')}</Text>
         <Button
           variant="ghost"
           disabled={offline || update.isPending}
@@ -121,21 +122,24 @@ export function ScheduleSettings({
       {fields.map(field => {
         const time = times[field.key];
         const pickerValue = briefingPickerDate(time);
+        // One value for what the button shows and announces, in the locale
+        // convention the picker itself uses.
+        const clock = formatClockTime(pickerValue, i18n.resolvedLanguage ?? i18n.language);
         return (
           <View key={field.key} className="gap-2">
-            <Text className="text-sm">{field.label}</Text>
+            <Text>{field.label}</Text>
             <Button
               variant="outline"
               disabled={offline || update.isPending}
               accessibilityLabel={t('agentBriefing.scheduleTimeLabel', {
                 label: field.label,
-                time,
+                time: clock,
               })}
               onPress={() => {
                 setActiveTime(field.key);
               }}
             >
-              <Text>{formatClockTime(pickerValue, i18n.language)}</Text>
+              <Text>{clock}</Text>
             </Button>
             {activeTime === field.key ? (
               <>
@@ -178,11 +182,11 @@ export function ScheduleSettings({
         message={timesInvalid ? t('agentBriefing.invalidSchedule') : null}
         className="text-sm"
       />
-      <Text className="text-xs text-muted-foreground">{t('agentBriefing.timeHint')}</Text>
-      <Text className="text-xs text-muted-foreground">{t('agentBriefing.scheduleHint')}</Text>
+      <Text variant="caption">{t('agentBriefing.timeHint')}</Text>
+      <Text variant="caption">{t('agentBriefing.scheduleHint')}</Text>
       <Button disabled={offline} loading={update.isPending} onPress={save}>
         <Text>{t('common.save')}</Text>
       </Button>
-    </View>
+    </Card>
   );
 }

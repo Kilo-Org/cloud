@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  codeFieldTextStyle,
   containsJoinedScript,
   hasRtlScript,
   ltrValueTextStyle,
@@ -219,5 +220,33 @@ describe('ltrValueTextStyle', () => {
       i18nManager.isRTL = false;
     }
     expect(ltrValueTextStyle().textAlign).toBeUndefined();
+  });
+});
+
+describe('codeFieldTextStyle', () => {
+  // A command keeps its left edge in a right-to-left interface, where a named
+  // value sits on the label's right edge instead.
+  it('pins a command to the left edge in both directions', () => {
+    i18nManager.isRTL = true;
+    try {
+      expect(codeFieldTextStyle().textAlign).toBe('left');
+    } finally {
+      i18nManager.isRTL = false;
+    }
+    expect(codeFieldTextStyle()).toMatchObject({
+      direction: 'ltr',
+      writingDirection: 'ltr',
+      textAlign: 'left',
+    });
+  });
+
+  // The mono face draws the `--` of a flag as one long dash, so a command read
+  // off the screen shows a dash the shell does not accept.
+  it('turns the family ligatures off so a flag keeps its hyphens', () => {
+    expect(codeFieldTextStyle().fontVariant).toEqual([
+      'no-common-ligatures',
+      'no-discretionary-ligatures',
+      'no-contextual',
+    ]);
   });
 });

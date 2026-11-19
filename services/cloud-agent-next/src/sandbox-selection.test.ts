@@ -5,11 +5,15 @@ import {
   sandboxAllocationSchema,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import {
+  VERCEL_RUNTIME_UPGRADE_REASON,
   assertSandboxAllocationAvailable,
+  assertVercelRuntimeSupports,
   getSandboxSelectionCapabilities,
   isSandboxAllocationAvailable,
   resolveVercelSelectionReadiness,
+  vercelRuntimeUpgradeReason,
 } from './sandbox-selection.js';
+import { vercelRuntimeBaseDigest } from './byoc/vercel-runtime-base.js';
 import { classifySandboxId, selectSandboxForNewSession } from './sandbox-id.js';
 import { appRouter } from './router.js';
 import { ByocCredentialMissingError } from './byoc/vercel-credential-resolver.js';
@@ -477,19 +481,29 @@ describe('sandbox selection policy', () => {
     expect(isSandboxAllocationAvailable(capabilities, 'vercel-small')).toBe(true);
   });
 
-  it('marks Vercel unavailable for review and remediation origins while Cloudflare stays eligible', async () => {
-    for (const capability of ['review', 'remediation'] as const) {
-      const capabilities = await getSandboxSelectionCapabilities(configured as Env, owner, {
-        capability,
-      });
-      const vercel = capabilities.options.find(
-        option => getSandboxAllocation(option.allocation) === 'vercel-small'
-      );
-      expect(vercel?.unavailableReason).toBeTruthy();
-      expect(vercel?.repositoryUnavailableReason).toBeUndefined();
-      expect(isSandboxAllocationAvailable(capabilities, 'vercel-small')).toBe(false);
-      expect(isSandboxAllocationAvailable(capabilities, 'cloudflare-single')).toBe(true);
-    }
+  it('offers enrolled Vercel compute for a remediation origin on the current base', async () => {
+    const capabilities = await getSandboxSelectionCapabilities(
+      { ...configured, BYOC_VERCEL_IDS: owner.orgId } as Env,
+      owner,
+      { capability: 'remediation' }
+    );
+    expect(isSandboxAllocationAvailable(capabilities, 'vercel-small')).toBe(true);
+    expect(isSandboxAllocationAvailable(capabilities, 'cloudflare-single')).toBe(true);
+  });
+
+  it('marks Vercel unavailable with the upgrade reason while Cloudflare stays eligible', async () => {
+    const capabilities = await getSandboxSelectionCapabilities(
+      { ...configured, BYOC_VERCEL_IDS: owner.orgId } as Env,
+      owner,
+      { capability: 'remediation', vercelUnavailableReason: VERCEL_RUNTIME_UPGRADE_REASON }
+    );
+    const vercel = capabilities.options.find(
+      option => getSandboxAllocation(option.allocation) === 'vercel-small'
+    );
+    expect(vercel?.unavailableReason).toBe(VERCEL_RUNTIME_UPGRADE_REASON);
+    expect(vercel?.repositoryUnavailableReason).toBeUndefined();
+    expect(isSandboxAllocationAvailable(capabilities, 'vercel-small')).toBe(false);
+    expect(isSandboxAllocationAvailable(capabilities, 'cloudflare-single')).toBe(true);
   });
 
   it('rejects retired explicit allocations and keeps the single alias', async () => {
@@ -505,6 +519,79 @@ describe('sandbox selection policy', () => {
     expect(isSandboxAllocationAvailable({ enabled: false, options: [] }, 'cloudflare-single')).toBe(
       false
     );
+  });
+});
+
+describe('Vercel runtime upgrade gate', () => {
+  const byocEnv = {
+    ...configured,
+    SANDBOX_SELECTION_IDS: owner.orgId,
+    BYOC_VERCEL_IDS: owner.orgId,
+  } as Env;
+
+  function enrolledWith(runtimeDigest: string | null | undefined) {
+    fetchByocVercelEnrollmentMock.mockResolvedValue({
+      organizationId: owner.orgId,
+      credentialId: 'f47ac10b-58cc-4372-a567-0e02b2c3d4ad',
+      setupStatus: 'ready',
+      ...(runtimeDigest === undefined ? {} : { runtimeDigest }),
+    });
+  }
+
+  it('names the settings place and action', () => {
+    expect(VERCEL_RUNTIME_UPGRADE_REASON).toContain('Cloud Agent settings');
+    expect(VERCEL_RUNTIME_UPGRADE_REASON).toContain('Compute');
+    expect(VERCEL_RUNTIME_UPGRADE_REASON).toContain('"Upgrade runtime"');
+  });
+
+  it('accepts the current base digest for a tool-dependent session', async () => {
+    const current = await vercelRuntimeBaseDigest();
+    await expect(
+      vercelRuntimeUpgradeReason({ runtimeDigest: current }, 'remediation')
+    ).resolves.toBeUndefined();
+    enrolledWith(current);
+    await expect(resolveVercelSelectionReadiness(byocEnv, owner, 'remediation')).resolves.toEqual(
+      {}
+    );
+  });
+
+  it.each([
+    ['an older base digest', 'downloaded-base-v1:older'],
+    ['no stored digest', null],
+    ['an older web response', undefined],
+  ] as const)('asks for an upgrade for %s', async (_name, runtimeDigest) => {
+    await expect(vercelRuntimeUpgradeReason({ runtimeDigest }, 'remediation')).resolves.toBe(
+      VERCEL_RUNTIME_UPGRADE_REASON
+    );
+    enrolledWith(runtimeDigest);
+    await expect(resolveVercelSelectionReadiness(byocEnv, owner, 'remediation')).resolves.toEqual({
+      vercelUnavailableReason: VERCEL_RUNTIME_UPGRADE_REASON,
+    });
+    await expect(
+      assertVercelRuntimeSupports({ runtimeDigest }, 'remediation')
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: VERCEL_RUNTIME_UPGRADE_REASON });
+  });
+
+  it('does not block a session without a tool capability on an older base', async () => {
+    enrolledWith('downloaded-base-v1:older');
+    await expect(
+      vercelRuntimeUpgradeReason({ runtimeDigest: 'downloaded-base-v1:older' }, undefined)
+    ).resolves.toBeUndefined();
+    await expect(resolveVercelSelectionReadiness(byocEnv, owner)).resolves.toEqual({});
+    await expect(
+      assertVercelRuntimeSupports({ runtimeDigest: null }, undefined)
+    ).resolves.toBeUndefined();
+  });
+
+  it('reports setup readiness before the runtime digest', async () => {
+    fetchByocVercelEnrollmentMock.mockResolvedValue({
+      organizationId: owner.orgId,
+      credentialId: 'f47ac10b-58cc-4372-a567-0e02b2c3d4ae',
+      setupStatus: 'building',
+    });
+    const readiness = await resolveVercelSelectionReadiness(byocEnv, owner, 'remediation');
+    expect(readiness.vercelUnavailableReason).toBeTruthy();
+    expect(readiness.vercelUnavailableReason).not.toBe(VERCEL_RUNTIME_UPGRADE_REASON);
   });
 });
 

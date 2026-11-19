@@ -18,7 +18,7 @@ const settled = {
 } satisfies BranchSectionInput;
 
 describe('resolveBranchSectionState', () => {
-  it('explains a personal Bitbucket row instead of describing a request it never makes', () => {
+  it('explains a personal Bitbucket row even with a request in flight', () => {
     expect(
       resolveBranchSectionState({
         ...settled,
@@ -29,7 +29,7 @@ describe('resolveBranchSectionState', () => {
     ).toEqual({ kind: 'bitbucket-organizations-only' });
   });
 
-  it('is loading while the request runs, winning over any earlier error', () => {
+  it('is loading only while the request runs, winning over any earlier error', () => {
     expect(
       resolveBranchSectionState({
         ...settled,
@@ -40,10 +40,19 @@ describe('resolveBranchSectionState', () => {
     ).toEqual({ kind: 'loading' });
   });
 
-  it('is loading for a row whose query cannot run yet', () => {
-    expect(resolveBranchSectionState({ ...settled, isEnabled: false })).toEqual({
-      kind: 'loading',
-    });
+  it('stays quiet for a disabled row without running a request', () => {
+    // The regression the finding demands: a disabled row must never read as
+    // 'loading' — it renders the quiet 'inactive' note instead.
+    expect(
+      resolveBranchSectionState({
+        ...settled,
+        isEnabled: false,
+        isPermanentError: true,
+        isRetryableError: true,
+        branches: [],
+        defaultBranch: null,
+      })
+    ).toEqual({ kind: 'inactive' });
   });
 
   it('reports a refusal a retry cannot fix', () => {
@@ -80,6 +89,8 @@ describe('resolveBranchSectionState', () => {
   });
 
   it.each([
+    [{ isEnabled: false }, 'inactive'],
+    [{ isEnabled: false, isLoading: true }, 'inactive'],
     [{ isLoading: true }, 'loading'],
     [{ isLoading: true, isPermanentError: true, isRetryableError: true }, 'loading'],
     [{ isPermanentError: true, isRetryableError: true }, 'unavailable'],

@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from '@jest/gl
 import type { CustomPricingTiers } from '@kilocode/db/schema-types';
 import {
   hasBestEffortGuessDataCollectionRequirement,
+  isDeniedByProviderPrivacy,
   isFreeModel,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { LOCAL_FAKE_TRANSCRIPTION_MODEL_IDS } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
@@ -131,5 +132,22 @@ describe('hasBestEffortGuessDataCollectionRequirement', () => {
     await expect(hasBestEffortGuessDataCollectionRequirement('fake-deterministic')).resolves.toBe(
       false
     );
+  });
+
+  test.each([
+    ['acme/no-training-model', { zdr: true }, true],
+    ['acme/no-training-model', { data_collection: 'deny' as const }, false],
+    ['acme/no-training-model', { zdr: false }, false],
+    ['acme/no-training-model', undefined, false],
+    ['acme/training-model', { data_collection: 'deny' as const }, true],
+    ['acme/training-model', { zdr: true }, true],
+    ['openrouter/free', { zdr: true }, true],
+    ['openrouter/free', { data_collection: 'deny' as const }, true],
+    ['openai/gpt-4o', { zdr: true }, false],
+    ['openai/gpt-4o', { data_collection: 'deny' as const }, false],
+  ])('isDeniedByProviderPrivacy(%s, %j) -> %s', async (model, privacy, expected) => {
+    stubFakeLlmEnvironment('local-without-url');
+
+    await expect(isDeniedByProviderPrivacy(model, privacy)).resolves.toBe(expected);
   });
 });

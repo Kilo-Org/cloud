@@ -2,6 +2,7 @@
 // so the screen offers Add and per-row Unbind only to a caller it would accept
 // them from, and a member reads the sentence that names who may act. A role
 // still resolving claims neither.
+import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -92,10 +93,17 @@ vi.mock('@/components/agents/session-page-sheet', () => ({
   SessionPageSheet: 'SessionPageSheet',
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/screen-header', () => ({
+  ScreenHeader: ({ headerRight }: { headerRight?: ReactNode }) =>
+    createElement('ScreenHeader', null, headerRight),
+}));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: (props: { label: string; onPress: () => void }) =>
+    createElement('StateAction', props),
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -109,6 +117,7 @@ vi.mock('@/components/ui/icons', () => ({
   SlidersHorizontal: 'SlidersHorizontal',
   Trash2: 'Trash2',
   Unlock: 'Unlock',
+  Plus: 'Plus',
 }));
 
 const GITHUB_REPO: TestRepoOption = { platform: 'github', fullName: 'acme/api', private: true };
@@ -165,7 +174,9 @@ describe('RepoBindingsScreen roles', () => {
   it('allowed: offers Add and per-row Unbind, and Add opens the form', async () => {
     const { renderer, unmount } = await mountScreen('org-1');
 
-    expect(buttonLabels(renderer.root)).toContain(ADD_LABEL);
+    // The header's `+` is the screen's one create control.
+    expect(pressableLabels(renderer.root)).toContain(ADD_LABEL);
+    expect(buttonLabels(renderer.root)).not.toContain(ADD_LABEL);
     expect(pressableLabels(renderer.root)).toContain('Unbind acme/api');
     expect(textContents(renderer.root)).not.toContain(ROLE_SENTENCE);
 
@@ -180,7 +191,7 @@ describe('RepoBindingsScreen roles', () => {
 
     const { renderer, unmount } = await mountScreen('org-1');
 
-    expect(buttonLabels(renderer.root)).not.toContain(ADD_LABEL);
+    expect(pressableLabels(renderer.root)).not.toContain(ADD_LABEL);
     expect(pressableLabels(renderer.root)).not.toContain('Unbind acme/api');
     expect(textContents(renderer.root)).not.toContain(ROLE_SENTENCE);
     expect(textContents(renderer.root)).toContain('acme/api');
@@ -194,7 +205,7 @@ describe('RepoBindingsScreen roles', () => {
 
     const { renderer, unmount } = await mountScreen('org-1');
 
-    expect(buttonLabels(renderer.root)).not.toContain(ADD_LABEL);
+    expect(pressableLabels(renderer.root)).not.toContain(ADD_LABEL);
     expect(pressableLabels(renderer.root)).not.toContain('Unbind acme/api');
     expect(textContents(renderer.root).filter(text => text === ROLE_SENTENCE)).toHaveLength(1);
 
@@ -207,9 +218,11 @@ describe('RepoBindingsScreen roles', () => {
 
     const { renderer, unmount } = await mountScreen('org-1');
 
-    expect(findOne(renderer.root, 'EmptyState').props.description).toBeNull();
-    expect(textContents(renderer.root).filter(text => text === ROLE_SENTENCE)).toHaveLength(1);
-    expect(buttonLabels(renderer.root)).not.toContain(ADD_LABEL);
+    // A member's state carries the rule as its own description, so the screen
+    // names the withheld action nowhere else.
+    expect(findOne(renderer.root, 'EmptyState').props.description).toBe(ROLE_SENTENCE);
+    expect(textContents(renderer.root).filter(text => text === ROLE_SENTENCE)).toHaveLength(0);
+    expect(pressableLabels(renderer.root)).not.toContain(ADD_LABEL);
     expect(
       pressableLabels(renderer.root).filter(label => label.startsWith('Unbind '))
     ).toHaveLength(0);
@@ -220,7 +233,7 @@ describe('RepoBindingsScreen roles', () => {
   it('personal scope: keeps Add and per-row Unbind', async () => {
     const { renderer, unmount } = await mountScreen();
 
-    expect(buttonLabels(renderer.root)).toContain(ADD_LABEL);
+    expect(pressableLabels(renderer.root)).toContain(ADD_LABEL);
     expect(pressableLabels(renderer.root)).toContain('Unbind acme/api');
 
     unmount();
@@ -239,7 +252,7 @@ describe('RepoBindingsScreen roles', () => {
 
     expect(pressableLabels(renderer.root)).not.toContain('Select repository…');
     expect(textContents(renderer.root).filter(text => text === ROLE_SENTENCE)).toHaveLength(1);
-    expect(buttonLabels(renderer.root)).not.toContain(ADD_LABEL);
+    expect(pressableLabels(renderer.root)).not.toContain(ADD_LABEL);
 
     permissionState.permission = 'allowed';
     act(() => {
@@ -247,7 +260,7 @@ describe('RepoBindingsScreen roles', () => {
     });
 
     // A permission that allows the flow again opens it from the start.
-    expect(buttonLabels(renderer.root)).toContain(ADD_LABEL);
+    expect(pressableLabels(renderer.root)).toContain(ADD_LABEL);
     expect(pressableLabels(renderer.root)).not.toContain('Select repository…');
 
     unmount();
@@ -262,7 +275,7 @@ describe('RepoBindingsScreen roles', () => {
 
     expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(1);
     const empty = emptyStateProps(renderer.root, 'No profiles yet');
-    expect(empty.action?.props.children.props.children).toBe('Create profile');
+    expect(empty.action?.props.label).toBe('Create profile');
 
     permissionState.permission = 'read-only';
     act(() => {

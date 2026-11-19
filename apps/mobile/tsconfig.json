@@ -11,15 +11,17 @@
       "@/assets/*": ["./assets/*"]
     }
   },
-  // src/lib/env-keys.js and src/lib/android-notification-channels.js carry
-  // @ts-check JSDoc contracts (env keys, silent Android channels) read by
-  // app.config.ts and scripts/assert-expo-config.mjs. Explicitly listed so the
-  // check does not depend on some .ts file happening to import them.
+  // src/lib/env-keys.js, src/lib/android-notification-channels.js and
+  // src/lib/permission-prompt-plist-keys.js carry @ts-check JSDoc contracts
+  // (env keys, silent Android channels, iOS permission-prompt plist keys) read
+  // by app.config.ts and scripts/assert-expo-config.mjs. Explicitly listed so
+  // the check does not depend on some .ts file happening to import them.
   "include": [
     "**/*.ts",
     "**/*.tsx",
     "src/lib/env-keys.js",
     "src/lib/android-notification-channels.js",
+    "src/lib/permission-prompt-plist-keys.js",
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
     "nativewind-env.d.ts"

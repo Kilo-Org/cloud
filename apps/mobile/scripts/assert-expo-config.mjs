@@ -4,11 +4,13 @@ import { fileURLToPath } from 'node:url';
 
 import { ENV_KEYS } from '../src/lib/env-keys.js';
 import { SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS } from '../src/lib/android-notification-channels.js';
+import { PERMISSION_PROMPT_PLIST_KEYS } from '../src/lib/permission-prompt-plist-keys.js';
 
 // Contract values mirrored from app.config.ts (bundle id, package, scheme,
 // orientation, associated domain, blocked and requested permissions, and
-// Sentry plugin). ENV_KEYS is imported live from src/lib/env-keys.js, and
-// the silent channel list from src/lib/android-notification-channels.js. The
+// Sentry plugin). ENV_KEYS is imported live from src/lib/env-keys.js, the
+// silent channel list from src/lib/android-notification-channels.js, and the
+// permission-prompt plist keys from src/lib/permission-prompt-plist-keys.js. The
 // script runs the full evaluated config, so these must match the resolved
 // build-time output, not the raw app.config.ts source.
 const BUNDLE_IDENTIFIER = 'com.kilocode.kiloapp';
@@ -48,6 +50,9 @@ const REQUESTED_PERMISSIONS = ['android.permission.ACCESS_NOTIFICATION_POLICY'];
 const SENTRY_PLUGIN = '@sentry/react-native/expo';
 const BUILD_PROPERTIES_PLUGIN = 'expo-build-properties';
 const NOTIFICATIONS_PLUGIN = 'expo-notifications';
+// The share/export file-provider extension EAS builds and signs from
+// `extra.eas.build.experimental.ios.appExtensions` (plugins/withArtifactFileProvider).
+const ARTIFACTS_FILE_PROVIDER_TARGET = 'ArtifactsFileProvider';
 // The Android channel Firebase falls back to when an FCM message omits
 // `channel_id`, mirrored from app.config.ts. It must be a channel the app
 // creates (src/lib/notifications.ts), or Android drops the fallback push, and
@@ -119,15 +124,6 @@ const DEV_CLIENT_PLUGIN_OPTIONS = {
   showMenuAtLaunch: false,
   skipOnboarding: true,
 };
-const PERMISSION_PROMPT_PLIST_KEYS = [
-  'NSCameraUsageDescription',
-  'NSPhotoLibraryUsageDescription',
-  'NSLocalNetworkUsageDescription',
-  'NSMicrophoneUsageDescription',
-  'NSSpeechRecognitionUsageDescription',
-  'NSFaceIDUsageDescription',
-  'NSUserTrackingUsageDescription',
-];
 
 const mobileDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -330,8 +326,11 @@ check(
 // the evaluated config is the only place that shows the entry the plugin
 // composed.
 const appExtensions = config.extra?.eas?.build?.experimental?.ios?.appExtensions ?? [];
+const artifactsFileProvider = appExtensions.find(
+  extension => extension.targetName === ARTIFACTS_FILE_PROVIDER_TARGET
+);
 check(
-  appExtensions.some(extension => extension.targetName === 'ArtifactsFileProvider'),
+  artifactsFileProvider !== undefined,
   'extra.eas.build.experimental.ios.appExtensions must carry the ArtifactsFileProvider target'
 );
 // Dev-only capability, asserted where it would break a release: Apple rejects
@@ -341,9 +340,6 @@ check(
 // would fail here before Apple sees it.
 if (process.env.EAS_BUILD_PROFILE === 'production') {
   const FILE_PROVIDER_TESTING_MODE = 'com.apple.developer.fileprovider.testing-mode';
-  const fileProviderExtension = appExtensions.find(
-    extension => extension.targetName === 'ArtifactsFileProvider'
-  );
   check(
     !(FILE_PROVIDER_TESTING_MODE in (config.ios?.entitlements ?? {})),
     `a production build must not carry the ${FILE_PROVIDER_TESTING_MODE} app entitlement`
@@ -353,7 +349,7 @@ if (process.env.EAS_BUILD_PROFILE === 'production') {
     'a production build must not carry the KiloArtifactsFileProviderTesting Info.plist key'
   );
   check(
-    !(FILE_PROVIDER_TESTING_MODE in (fileProviderExtension?.entitlements ?? {})),
+    !(FILE_PROVIDER_TESTING_MODE in (artifactsFileProvider?.entitlements ?? {})),
     `a production build must not carry the ${FILE_PROVIDER_TESTING_MODE} extension entitlement`
   );
 }

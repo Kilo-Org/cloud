@@ -369,9 +369,8 @@ const config: ExpoConfig = {
     [
       'expo-speech-recognition',
       {
-        microphonePermission: 'Allow Kilo to use your microphone to turn speech into text.',
-        speechRecognitionPermission:
-          'Allow Kilo to use speech recognition to turn your voice into text.',
+        microphonePermission: PERMISSION_PROMPT_COPY.en.NSMicrophoneUsageDescription,
+        speechRecognitionPermission: PERMISSION_PROMPT_COPY.en.NSSpeechRecognitionUsageDescription,
       },
     ],
     'expo-router',
@@ -393,7 +392,7 @@ const config: ExpoConfig = {
     ['expo-secure-store', { configureAndroidBackup: false }],
     [
       'expo-local-authentication',
-      { faceIDPermission: 'Allow Kilo to use Face ID to unlock the app.' },
+      { faceIDPermission: PERMISSION_PROMPT_COPY.en.NSFaceIDUsageDescription },
     ],
     'expo-sharing',
     // Encrypts the local persistence database (kilo-persist.db) with SQLCipher.
@@ -458,8 +457,7 @@ const config: ExpoConfig = {
     [
       'expo-tracking-transparency',
       {
-        userTrackingPermission:
-          'This identifier is used to measure the effectiveness of advertising campaigns.',
+        userTrackingPermission: PERMISSION_PROMPT_COPY.en.NSUserTrackingUsageDescription,
       },
     ],
     ['react-native-appsflyer', { shouldUsePurchaseConnector: true }],

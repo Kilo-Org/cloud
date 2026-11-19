@@ -1,4 +1,5 @@
 import { SUPPORTED_LANGUAGES, type SupportedLanguage } from './languages.ts';
+import { buildCopyByLanguage, readNonEmptyCopy } from './prebuild-copy.ts';
 
 /**
  * The strings the iOS Focus filter declares as literals in
@@ -27,18 +28,6 @@ type FocusFilterStrings = Record<string, string>;
 /** One language's rendered `Localizable.strings` content, keyed by language tag. */
 export type FocusFilterStringsFiles = Record<SupportedLanguage, string>;
 
-function readString(
-  copy: Partial<Record<FocusFilterStringName, string>>,
-  tag: string,
-  name: FocusFilterStringName
-): string {
-  const value = copy[name];
-  if (value === undefined || value.trim().length === 0) {
-    throw new Error(`Missing or empty Focus-filter copy for ${tag}.${name}`);
-  }
-  return value;
-}
-
 /**
  * The entries for every supported language, keyed by English literal. Throws
  * when a supported language or any of the three strings is missing or empty, so
@@ -46,19 +35,13 @@ function readString(
  * localized device.
  */
 function stringsByLanguage(copy: FocusFilterCopy): Record<SupportedLanguage, FocusFilterStrings> {
-  const entries: [SupportedLanguage, FocusFilterStrings][] = [];
-  for (const tag of SUPPORTED_LANGUAGES) {
-    const entry = copy[tag];
-    if (!entry) {
-      throw new Error(`Missing Focus-filter copy for language: ${tag}`);
-    }
+  return buildCopyByLanguage(copy, 'Focus-filter', (entry, tag) => {
     const strings: FocusFilterStrings = {};
     for (const name of Object.keys(FOCUS_FILTER_STRINGS) as FocusFilterStringName[]) {
-      strings[FOCUS_FILTER_STRINGS[name]] = readString(entry, tag, name);
+      strings[FOCUS_FILTER_STRINGS[name]] = readNonEmptyCopy(entry, tag, name, 'Focus-filter');
     }
-    entries.push([tag, strings]);
-  }
-  return Object.fromEntries(entries) as Record<SupportedLanguage, FocusFilterStrings>;
+    return strings;
+  });
 }
 
 /** Only the quote and the backslash need escaping in a `.strings` entry. */

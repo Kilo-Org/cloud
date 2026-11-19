@@ -621,6 +621,26 @@ describe('ScreenHeader mounted', () => {
     ).toHaveLength(0);
   });
 
+  it('keeps both subtitle lines at a large font scale when a one-line name replaces the reserve', () => {
+    // A loading header reserves the line (`reserveSubtitle` while the read is
+    // pending) and the loaded one drops the flag and names the organization or
+    // provider. A name that fits one line must not shrink the header, or the
+    // body below moves when the read resolves.
+    const isReserve = (node: TestInstance) =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'View' &&
+      String(node.props.className).includes('w-0 overflow-hidden');
+    Object.assign(layout, { width: 390, fontScale: 2 });
+    const renderer = renderHeader({ title: 'Invoices', reserveSubtitle: true });
+    expect(renderer.root.findAll(isReserve)).toHaveLength(1);
+    act(() => {
+      renderer.update(createElement(ScreenHeader, { title: 'Invoices', subtitle: 'Acme' }));
+    });
+    const reserve = renderer.root.findAll(isReserve);
+    expect(reserve).toHaveLength(1);
+    expect(reserve[0]?.findByType('Text').children).toEqual(['\u00A0\n\u00A0']);
+  });
+
   describe('a title the inline cluster would cut', () => {
     // German "Unterhaltung" beside the account picker painted "Unterhaltu…" at
     // the default font size, under a caller that keeps the cluster on the title

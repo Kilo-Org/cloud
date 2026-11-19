@@ -258,9 +258,11 @@ type ScreenHeaderProps = {
    * Kept to a single line with a tail ellipsis: it carries context such as the
    * profile a section edits, so a wrapped line would grow the header and move
    * the body below it. At a large font scale (`LARGE_FONT_SCALE`) it takes up
-   * to two lines, and a reserved subtitle reserves both. It is not the
-   * `eyebrow`, which is a category label the text style uppercases; a
-   * user-authored name in that slot renders as letterspaced small capitals.
+   * to two lines, and the slot holds both lines whatever the text, so a header
+   * that reserves the line while loading keeps its height when a one-line
+   * name replaces the reserve. It is not the `eyebrow`, which is a category
+   * label the text style uppercases; a user-authored name in that slot renders
+   * as letterspaced small capitals.
    */
   subtitle?: string;
   /**
@@ -834,7 +836,7 @@ export function ScreenHeader({
     <Text
       variant="muted"
       className={cn(
-        largeFont && reserveSubtitle && 'min-w-0 shrink',
+        largeFont && 'min-w-0 shrink',
         centerTitle && 'text-center',
         !subtitle && 'opacity-0'
       )}
@@ -868,9 +870,11 @@ export function ScreenHeader({
             {subtitlePlaceholder}
           </View>
         ) : null}
-        {largeFont && reserveSubtitle ? (
-          // A name that arrives later may take both lines, so the reserve holds
-          // both from the first frame: the body below never moves.
+        {largeFont ? (
+          // The name may take both lines, so the slot holds both from the
+          // first frame and for every name: a loading header that reserves the
+          // line and the loaded one that names it are the same height, and the
+          // body below never moves.
           <View className="flex-row">
             {subtitleText}
             <View className="w-0 overflow-hidden" aria-hidden>

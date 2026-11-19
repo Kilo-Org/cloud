@@ -213,6 +213,7 @@ Usage-accounting transport is selected from deployment labels alone: staging wit
 - `CLAUDE_OPERATOR_FEDERATION_RULE_ID`, `CLAUDE_OPERATOR_ORGANIZATION_ID`, `CLAUDE_OPERATOR_SERVICE_ACCOUNT_ID` - Identify the Kilo operator service account and the federation rule that maps Kilo-signed JWTs to it. Without them, a linked owner's requests fail with an explicit error instead of falling back to Kilo credits. [SERVER]
 - `CLAUDE_OPERATOR_WORKSPACE_ID` - Optional; needed only when the operator federation rule covers more than one workspace. [SERVER]
 - `CLAUDE_OPERATOR_TOKEN_AUDIENCE` - The audience the operator federation rule expects on the identity JWT Kilo signs. [SERVER]
+- `ANTHROPIC_USER_PROFILE_HASH_PEPPER` - Secret HMAC key for the `email_hash` Kilo sends when the AI gateway creates a user's Anthropic user profile. Keep it stable: Anthropic matches profiles only by hashes computed with the same key. When unset, profiles are created without an email hash. Set it on both `kilocode-app` and `kilocode-ai-gateway`. `[SECRET]`
 
 Claude sign-in, account linking, and Linked billing with Claude Platform require their app and operator credentials.
 There is no separate release toggle: the provider is offered only when `CLAUDE_SIGN_IN_CLIENT_ID` is set.

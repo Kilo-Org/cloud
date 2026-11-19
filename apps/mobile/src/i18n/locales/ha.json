@@ -4529,7 +4529,9 @@
     },
     "saveSheet": {
       "title": "Ajiye cikin jeri",
-      "saved": "An ajiye cikin {{list}}"
+      "saved": "An ajiye cikin {{list}}",
+      "saveFailed": "Ba a iya ajiye aikin ba. Duba hanyar haɗinka ka sake gwadawa.",
+      "saveRefused": "Ba a iya ajiye aikin cikin wannan jeri ba. Zaɓi wani jeri."
     }
   },
   "agentBriefing": {

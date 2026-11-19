@@ -4529,7 +4529,9 @@
     },
     "saveSheet": {
       "title": "Stoor in lys",
-      "saved": "Gestoor in {{list}}"
+      "saved": "Gestoor in {{list}}",
+      "saveFailed": "Kon die taak nie stoor nie. Kontroleer jou verbinding en probeer weer.",
+      "saveRefused": "Kon die taak nie in hierdie lys stoor nie. Kies 'n ander lys."
     }
   },
   "agentBriefing": {

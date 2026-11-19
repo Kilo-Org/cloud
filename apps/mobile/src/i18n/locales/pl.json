@@ -4673,7 +4673,9 @@
     },
     "saveSheet": {
       "title": "Zapisz na liście",
-      "saved": "Zapisano na liście {{list}}"
+      "saved": "Zapisano na liście {{list}}",
+      "saveFailed": "Nie udało się zapisać zadania. Sprawdź połączenie i spróbuj ponownie.",
+      "saveRefused": "Nie udało się zapisać zadania na tej liście. Wybierz inną listę."
     }
   },
   "agentBriefing": {

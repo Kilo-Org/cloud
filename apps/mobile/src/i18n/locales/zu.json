@@ -4529,7 +4529,9 @@
     },
     "saveSheet": {
       "title": "Londoloza ohlwini",
-      "saved": "Kulondolozwe ku-{{list}}"
+      "saved": "Kulondolozwe ku-{{list}}",
+      "saveFailed": "Ayikwazanga ukulondoloza umsebenzi. Hlola uxhumano lwakho bese uzama futhi.",
+      "saveRefused": "Ayikwazanga ukulondoloza umsebenzi kulolu hlu. Khetha olunye uhlu."
     }
   },
   "agentBriefing": {

@@ -4529,7 +4529,9 @@
     },
     "saveSheet": {
       "title": "Opslaan in lijst",
-      "saved": "Opgeslagen in {{list}}"
+      "saved": "Opgeslagen in {{list}}",
+      "saveFailed": "Kon de taak niet opslaan. Controleer je verbinding en probeer het opnieuw.",
+      "saveRefused": "Kon de taak niet in deze lijst opslaan. Kies een andere lijst."
     }
   },
   "agentBriefing": {

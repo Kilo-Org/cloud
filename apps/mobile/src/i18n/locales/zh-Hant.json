@@ -4529,7 +4529,9 @@
     },
     "saveSheet": {
       "title": "儲存至清單",
-      "saved": "已儲存至 {{list}}"
+      "saved": "已儲存至 {{list}}",
+      "saveFailed": "無法儲存待辦事項。請檢查您的連線，然後再試一次。",
+      "saveRefused": "無法將待辦事項儲存至此清單。請選擇其他清單。"
     }
   },
   "agentBriefing": {

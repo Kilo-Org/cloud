@@ -4529,7 +4529,9 @@
     },
     "saveSheet": {
       "title": "Tallenna listalle",
-      "saved": "Tallennettu listalle {{list}}"
+      "saved": "Tallennettu listalle {{list}}",
+      "saveFailed": "Tehtävää ei voitu tallentaa. Tarkista yhteytesi ja yritä uudelleen.",
+      "saveRefused": "Tehtävää ei voitu tallentaa tälle listalle. Valitse toinen lista."
     }
   },
   "agentBriefing": {

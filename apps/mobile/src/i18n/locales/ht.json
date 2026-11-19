@@ -4529,7 +4529,9 @@
     },
     "saveSheet": {
       "title": "Anrejistre nan lis",
-      "saved": "Anrejistre nan {{list}}"
+      "saved": "Anrejistre nan {{list}}",
+      "saveFailed": "Pa t’ posib anrejistre travay la. Verifye koneksyon w la epi eseye ankò.",
+      "saveRefused": "Pa t’ posib anrejistre travay la nan lis sa a. Chwazi yon lòt lis."
     }
   },
   "agentBriefing": {

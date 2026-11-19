@@ -4673,7 +4673,9 @@
     },
     "saveSheet": {
       "title": "Uložit do seznamu",
-      "saved": "Uloženo do {{list}}"
+      "saved": "Uloženo do {{list}}",
+      "saveFailed": "Úkol se nepodařilo uložit. Zkontrolujte připojení a zkuste to znovu.",
+      "saveRefused": "Úkol se do tohoto seznamu nepodařilo uložit. Vyberte jiný seznam."
     }
   },
   "agentBriefing": {

@@ -4745,7 +4745,9 @@
     },
     "saveSheet": {
       "title": "Sábháil le liosta",
-      "saved": "Sábháilte i {{list}}"
+      "saved": "Sábháilte i {{list}}",
+      "saveFailed": "Níorbh fhéidir an tasc a shábháil. Seiceáil do cheangal agus bain triail eile as.",
+      "saveRefused": "Níorbh fhéidir an tasc a shábháil sa liosta seo. Roghnaigh liosta eile."
     }
   },
   "agentBriefing": {

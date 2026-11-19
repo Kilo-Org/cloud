@@ -4529,7 +4529,9 @@
     },
     "saveSheet": {
       "title": "Gorde zerrendan",
-      "saved": "{{list}} zerrendan gordeta"
+      "saved": "{{list}} zerrendan gordeta",
+      "saveFailed": "Ezin izan da zeregina gorde. Egiaztatu zure konexioa eta saiatu berriro.",
+      "saveRefused": "Ezin izan da zeregina zerrenda honetan gorde. Aukeratu beste zerrenda bat."
     }
   },
   "agentBriefing": {

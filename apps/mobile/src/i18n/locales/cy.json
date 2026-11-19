@@ -4817,7 +4817,9 @@
     },
     "saveSheet": {
       "title": "Cadw i'r rhestr",
-      "saved": "Wedi'i gadw i {{list}}"
+      "saved": "Wedi'i gadw i {{list}}",
+      "saveFailed": "Ni fu modd cadw'r dasg. Gwiriwch eich cysylltiad a rhowch gynnig arall.",
+      "saveRefused": "Ni fu modd cadw'r dasg i'r rhestr hon. Dewiswch restr arall."
     }
   },
   "agentBriefing": {

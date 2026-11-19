@@ -4529,7 +4529,9 @@
     },
     "saveSheet": {
       "title": "Listeye kaydet",
-      "saved": "{{list}} listesine kaydedildi"
+      "saved": "{{list}} listesine kaydedildi",
+      "saveFailed": "Görev kaydedilemedi. Bağlantınızı kontrol edip tekrar deneyin.",
+      "saveRefused": "Görev bu listeye kaydedilemedi. Başka bir liste seçin."
     }
   },
   "agentBriefing": {

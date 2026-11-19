@@ -4529,7 +4529,9 @@
     },
     "saveSheet": {
       "title": "保存到列表",
-      "saved": "已保存到 {{list}}"
+      "saved": "已保存到 {{list}}",
+      "saveFailed": "无法保存待办事项。请检查网络连接后重试。",
+      "saveRefused": "无法将待办事项保存到此列表。请选择其他列表。"
     }
   },
   "agentBriefing": {

@@ -4529,7 +4529,9 @@
     },
     "saveSheet": {
       "title": "Ku kaydi liiska",
-      "saved": "Waxaa lagu kaydiyay {{list}}"
+      "saved": "Waxaa lagu kaydiyay {{list}}",
+      "saveFailed": "Hawsha lama kaydin karin. Hubi xiriirkaaga oo mar kale isku day.",
+      "saveRefused": "Hawsha laguma kaydin karin liiskan. Dooro liis kale."
     }
   },
   "agentBriefing": {

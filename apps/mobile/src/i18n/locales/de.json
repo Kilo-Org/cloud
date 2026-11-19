@@ -4529,7 +4529,9 @@
     },
     "saveSheet": {
       "title": "In Liste speichern",
-      "saved": "In {{list}} gespeichert"
+      "saved": "In {{list}} gespeichert",
+      "saveFailed": "Aufgabe konnte nicht gespeichert werden. Prüfe deine Verbindung und versuche es erneut.",
+      "saveRefused": "Aufgabe konnte nicht in dieser Liste gespeichert werden. Wähle eine andere Liste."
     }
   },
   "agentBriefing": {

@@ -4601,7 +4601,9 @@
     },
     "saveSheet": {
       "title": "Salva nell'elenco",
-      "saved": "Salvato in {{list}}"
+      "saved": "Salvato in {{list}}",
+      "saveFailed": "Impossibile salvare l’attività. Controlla la connessione e riprova.",
+      "saveRefused": "Impossibile salvare l’attività in questo elenco. Scegli un altro elenco."
     }
   },
   "agentBriefing": {

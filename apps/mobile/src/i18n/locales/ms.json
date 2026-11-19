@@ -4529,7 +4529,9 @@
     },
     "saveSheet": {
       "title": "Simpan ke senarai",
-      "saved": "Disimpan ke {{list}}"
+      "saved": "Disimpan ke {{list}}",
+      "saveFailed": "Tugasan tidak dapat disimpan. Semak sambungan anda dan cuba lagi.",
+      "saveRefused": "Tugasan tidak dapat disimpan ke senarai ini. Pilih senarai lain."
     }
   },
   "agentBriefing": {

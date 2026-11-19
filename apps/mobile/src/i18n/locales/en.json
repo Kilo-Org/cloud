@@ -4621,7 +4621,9 @@
     },
     "saveSheet": {
       "title": "Save to list",
-      "saved": "Saved to {{list}}"
+      "saved": "Saved to {{list}}",
+      "saveFailed": "Couldn’t save the to-do. Check your connection and try again.",
+      "saveRefused": "Couldn’t save the to-do to this list. Choose another list."
     }
   },
   "systemSearch": {

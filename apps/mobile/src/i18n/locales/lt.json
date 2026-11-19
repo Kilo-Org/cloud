@@ -4673,7 +4673,9 @@
     },
     "saveSheet": {
       "title": "Išsaugoti į sąrašą",
-      "saved": "Išsaugota sąraše „{{list}}“"
+      "saved": "Išsaugota sąraše „{{list}}“",
+      "saveFailed": "Nepavyko išsaugoti užduoties. Patikrinkite interneto ryšį ir bandykite dar kartą.",
+      "saveRefused": "Nepavyko išsaugoti užduoties šiame sąraše. Pasirinkite kitą sąrašą."
     }
   },
   "agentBriefing": {

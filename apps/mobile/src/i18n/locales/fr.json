@@ -4601,7 +4601,9 @@
     },
     "saveSheet": {
       "title": "Enregistrer dans une liste",
-      "saved": "Enregistré dans {{list}}"
+      "saved": "Enregistré dans {{list}}",
+      "saveFailed": "Impossible d’enregistrer la tâche. Vérifiez votre connexion et réessayez.",
+      "saveRefused": "Impossible d’enregistrer la tâche dans cette liste. Choisissez une autre liste."
     }
   },
   "agentBriefing": {

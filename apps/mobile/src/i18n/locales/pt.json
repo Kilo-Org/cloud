@@ -4673,7 +4673,9 @@
     },
     "saveSheet": {
       "title": "Guardar numa lista",
-      "saved": "Guardado em {{list}}"
+      "saved": "Guardado em {{list}}",
+      "saveFailed": "Não foi possível guardar a tarefa. Verifica a tua ligação e tenta novamente.",
+      "saveRefused": "Não foi possível guardar a tarefa nesta lista. Escolhe outra lista."
     }
   },
   "agentBriefing": {

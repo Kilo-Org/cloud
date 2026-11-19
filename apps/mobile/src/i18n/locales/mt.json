@@ -4745,7 +4745,9 @@
     },
     "saveSheet": {
       "title": "Issejvja fil-lista",
-      "saved": "Issejvjat f'{{list}}"
+      "saved": "Issejvjat f'{{list}}",
+      "saveFailed": "Il-kompitu ma ġiex salvat. Iċċekkja l-konnessjoni tiegħek u erġa’ pprova.",
+      "saveRefused": "Il-kompitu ma ġiex salvat f'din il-lista. Agħżel lista oħra."
     }
   },
   "agentBriefing": {

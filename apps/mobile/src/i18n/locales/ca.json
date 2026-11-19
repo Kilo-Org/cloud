@@ -4601,7 +4601,9 @@
     },
     "saveSheet": {
       "title": "Desa a la llista",
-      "saved": "Desada a {{list}}"
+      "saved": "Desada a {{list}}",
+      "saveFailed": "No s’ha pogut desar la tasca. Comprova la connexió i torna-ho a provar.",
+      "saveRefused": "No s’ha pogut desar la tasca en aquesta llista. Tria una altra llista."
     }
   },
   "agentBriefing": {

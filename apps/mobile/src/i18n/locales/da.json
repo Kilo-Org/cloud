@@ -4529,7 +4529,9 @@
     },
     "saveSheet": {
       "title": "Gem på liste",
-      "saved": "Gemt på {{list}}"
+      "saved": "Gemt på {{list}}",
+      "saveFailed": "Kunne ikke gemme opgaven. Tjek din forbindelse, og prøv igen.",
+      "saveRefused": "Kunne ikke gemme opgaven på denne liste. Vælg en anden liste."
     }
   },
   "agentBriefing": {

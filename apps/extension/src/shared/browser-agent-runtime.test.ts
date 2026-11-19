@@ -1978,6 +1978,99 @@ describe('agent browser calls', () => {
     }
   });
 
+  it('names browser_tabs new as the step, and its approved repeat opens no second tab', async () => {
+    const downloads = createFakeDownloads();
+    const created: Record<string, unknown>[] = [];
+    const openedListeners: ((tab: {
+      readonly id?: number;
+      readonly openerTabId?: number;
+    }) => void)[] = [];
+    const newTab = TAB_ID + 6;
+    // The file the approved repeat keeps, as the browser reports it once it is written.
+    downloads.searched.push({ filename: '/home/me/Downloads/report.txt', id: 72 });
+
+    const tabsApi = {
+      create: async (properties: { readonly url?: string } = {}) => {
+        created.push({ ...properties });
+
+        // The browser opens the tab, so the call owns it, and the tab's document becomes the file to stop.
+        for (const listener of openedListeners) {
+          listener({ id: newTab, openerTabId: TAB_ID });
+        }
+
+        downloads.emit({ id: 71, tabId: newTab });
+
+        return { id: newTab, title: '', url: properties.url ?? 'about:blank', windowId: 1 };
+      },
+      get: async (tabId: number) =>
+        tabId === newTab
+          ? { id: newTab, title: '', url: `${MAIN_ORIGIN}/report.txt`, windowId: 1 }
+          : { id: TAB_ID, title: 'Example', url: MAIN_ORIGIN },
+      onCreated: {
+        addListener: (
+          listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+        ) => {
+          openedListeners.push(listener);
+        },
+        removeListener: (
+          listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+        ) => {
+          const index = openedListeners.indexOf(listener);
+
+          if (index !== -1) {
+            openedListeners.splice(index, 1);
+          }
+        },
+      },
+      query: async () => [
+        { active: true, id: TAB_ID, title: 'Example', url: MAIN_ORIGIN, windowId: 1 },
+      ],
+    };
+    const { controller } = createGroups();
+    const { cdp, runtime } = await createHarness({
+      downloadsApi: downloads.api,
+      tabGroups: controller,
+      tabsApi,
+    });
+
+    // A navigate that became a download never loads the page: the browser answers it with an aborted load.
+    cdp.setHandlers({ 'Page.navigate': () => ({ errorText: 'net::ERR_ABORTED' }) });
+
+    const url = `${MAIN_ORIGIN}/report.txt`;
+    const openTab = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: {
+          authorized: [readGrant, actGrant, { class: 'navigate', origin: MAIN_ORIGIN }],
+          sensitive: [...sensitive],
+        },
+        arguments: { action: 'new', url },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_tabs',
+      });
+
+    const guarded = await openTab([]);
+
+    if (guarded.kind !== 'needs_permission') {
+      throw new Error(`expected a refusal, got ${guarded.kind}`);
+    }
+
+    // The token binds the call the model made, never an internal translation of it.
+    expect(guarded.step).toStrictEqual({
+      argumentsHash: hashBrowserToolArguments({ action: 'new', url }),
+      tool: 'browser_tabs',
+    });
+    expect([created.length, downloads.cancelled]).toStrictEqual([1, [71]]);
+
+    const approved = await openTab([expectStepToken(guarded)]);
+
+    // The approved repeat drives the tab the refused step opened: no second tab, and the kept file is the result.
+    expect(created).toHaveLength(1);
+    expect(
+      approved.kind === 'result' && approved.result.ok ? String(approved.result.value) : ''
+    ).toContain('report.txt: The file was downloaded; the page did not change.');
+  });
+
   it('matches an announcement to its own item, never by order', async () => {
     const downloads = createFakeDownloads();
     const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
@@ -2244,6 +2337,13 @@ describe('agent browser calls', () => {
     const guarded = await navigate([]);
 
     expect(guarded).toMatchObject({ afterAction: true, kind: 'needs_permission' });
+    // The step is the model's own call, never a tab the runtime opened for it.
+    expect(guarded).toMatchObject({
+      step: {
+        argumentsHash: hashBrowserToolArguments({ url: `${MAIN_ORIGIN}/invoice.pdf` }),
+        tool: 'browser_navigate',
+      },
+    });
 
     // The approved repeat keeps the file: the model must read that as a success that changed no page.
     const approved = await navigate([expectStepToken(guarded)]);

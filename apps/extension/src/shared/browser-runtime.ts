@@ -260,6 +260,14 @@ const NAVIGATE_DOWNLOAD_POLLS = 15;
 const CLOSED_SESSION_LIMIT = 64;
 
 /**
+ * How long a refused `browser_tabs new` step remembers the tab it opened, and
+ * how many such tabs are remembered at once: the approved repeat redeems its
+ * token promptly, and an expired entry is memory.
+ */
+const STEP_TAB_TTL_MS = 2 * 60_000;
+const STEP_TAB_LIMIT = 32;
+
+/**
  * How long the guard waits for a download it stopped to reach `complete` or
  * `interrupted`. `cancel` resolves on an item that already finished, so the
  * only proof that no file exists is the item's own terminal state.
@@ -740,6 +748,8 @@ interface DownloadReport {
   /** The browser would not delete the file, so the human keeps it where it landed. */
   readonly kept: boolean;
   readonly step: DownloadStep | undefined;
+  /** The tab the download belongs to: for a `browser_tabs new` step, the tab that step opened. */
+  readonly tabId: number;
 }
 
 /** A download as a guard sees it: what the ledger needs to open or find its one record. */
@@ -1302,6 +1312,66 @@ export const createBrowserRuntime = ({
   const closedSessions = new Set<string>();
   /** Names one guard attempt; a record is counted by the attempt that opened it and by no other. */
   let attempts = 0;
+  /**
+   * The tab a refused download step opened, keyed by the step token's own binding. Its approved repeat navigates
+   * that tab: a `browser_tabs new` sent again would open a second tab and download the file twice.
+   */
+  const stepTabs = new Map<string, { readonly tabId: number; readonly since: number }>();
+
+  const stepTabKey = (binding: {
+    readonly argumentHash: string;
+    readonly session: string;
+    readonly tabId: number;
+    readonly toolName: string;
+  }): string =>
+    [binding.session, String(binding.tabId), binding.toolName, binding.argumentHash].join('|');
+
+  /** Remembers the tab a refused `browser_tabs new` step opened, for the one repeat its token buys. */
+  const rememberStepTab = (step: DownloadStep, openedTabId: number): void => {
+    if (step.toolName !== 'browser_tabs') {
+      return;
+    }
+
+    const at = Date.now();
+
+    for (const [key, entry] of stepTabs) {
+      if (entry.since + STEP_TAB_TTL_MS < at) {
+        stepTabs.delete(key);
+      }
+    }
+
+    stepTabs.set(stepTabKey(step), { since: at, tabId: openedTabId });
+
+    // Bounded: only a token that is about to be redeemed can still read one, and an expired entry is memory.
+    while (stepTabs.size > STEP_TAB_LIMIT) {
+      const oldest = stepTabs.keys().next().value;
+
+      if (oldest === undefined) {
+        break;
+      }
+
+      stepTabs.delete(oldest);
+    }
+  };
+
+  /** The tab a refused step opened, taken once: the repeat that redeems the token is the only call that may have it. */
+  const takeStepTab = (binding: {
+    readonly argumentHash: string;
+    readonly session: string;
+    readonly tabId: number;
+    readonly toolName: string;
+  }): number | undefined => {
+    const key = stepTabKey(binding);
+    const entry = stepTabs.get(key);
+
+    stepTabs.delete(key);
+
+    if (entry === undefined || entry.since + STEP_TAB_TTL_MS < Date.now()) {
+      return undefined;
+    }
+
+    return entry.tabId;
+  };
 
   /** A session that ends owes no approval, and its stopped files stay unreported: there is no model left to tell. */
   const closeSessionRecords = (session: string): void => {
@@ -1652,6 +1722,7 @@ export const createBrowserRuntime = ({
           filename: record.filename,
           kept: record.kind === 'kept',
           step: record.step,
+          tabId: record.tabId,
         });
       }
     }
@@ -2033,7 +2104,14 @@ export const createBrowserRuntime = ({
       return undefined;
     }
 
-    const step = files.findLast(file => file.step !== undefined)?.step;
+    const started = files.findLast(file => file.step !== undefined);
+    const step = started?.step;
+
+    // A `browser_tabs new` step opened its tab before the file landed: the approved repeat navigates that tab.
+    if (step !== undefined && started !== undefined) {
+      rememberStepTab(step, started.tabId);
+    }
+
     const origin = step?.origin ?? '';
     const stepToken =
       step === undefined
@@ -2216,6 +2294,33 @@ export const createBrowserRuntime = ({
               )
             : false;
 
+        // An approved repeat of a `browser_tabs new` download owns the tab that step opened: sending the tool again
+        // Would open a second tab and download the file twice, and the kept file would go unreported. The repeat
+        // Navigates that tab instead, which is the guarded navigate the approval was for.
+        const reusedTab =
+          downloadApproved &&
+          toolName === 'browser_tabs' &&
+          argsRecord['action'] === 'new' &&
+          argumentText(argsRecord['url']) !== undefined
+            ? takeStepTab({
+                argumentHash: hashBrowserToolArguments(argsRecord),
+                session: sessionKey,
+                tabId,
+                toolName,
+              })
+            : undefined;
+        // The tab, session, tool and arguments this call really drives: the caller's, or the tab its step opened.
+        const runTabId = reusedTab ?? tabId;
+        const runSession =
+          reusedTab === undefined
+            ? session
+            : sessionFor(reusedTab).bindCaller(browserCallerKey(caller), {
+                cancelled: () => taken,
+              });
+        const runToolName = reusedTab === undefined ? toolName : 'browser_navigate';
+        const runArguments =
+          reusedTab === undefined ? toolArguments : { url: argumentText(argsRecord['url']) ?? '' };
+
         // A call that can start a download owns the tab's downloads: an earlier call's linger and window end before
         // It runs, so neither cancels a file this call starts — an approved repeat, or the panel's own click, above
         // All. A read never starts one, so it leaves the earlier guard on duty and consumes no report: a file that
@@ -2228,6 +2333,11 @@ export const createBrowserRuntime = ({
 
         if (downloadCapable) {
           takeOverDownloads(tabId);
+        }
+
+        // A file is about to start in the tab the refused step opened: that tab's earlier linger has to end too.
+        if (reusedTab !== undefined) {
+          takeOverDownloads(reusedTab);
         }
 
         // An unapproved act call runs with downloads denied: a download it starts is cancelled, then reported as a sensitive step.
@@ -2262,7 +2372,9 @@ export const createBrowserRuntime = ({
 
         // A navigate names the document it asked for, so a download that starts after the call returns can still be found.
         const destination =
-          preflight?.class === 'navigate' ? argumentText(argsRecord['url']) : undefined;
+          preflight?.class === 'navigate' || reusedTab !== undefined
+            ? argumentText(argsRecord['url'])
+            : undefined;
         // The requests this call can be charged with: everything the tab starts from here on.
         // A download needs one, so a call that starts none never waits for a file.
         const requestsBefore = new Set(
@@ -2338,9 +2450,9 @@ export const createBrowserRuntime = ({
 
         try {
           const call = runKiloBrowserTool({
-            arguments: toolArguments,
+            arguments: runArguments,
             options: {
-              tabId,
+              tabId: runTabId,
               tabsApi,
               ...(agentContext === undefined
                 ? {}
@@ -2380,8 +2492,8 @@ export const createBrowserRuntime = ({
                 ? {}
                 : { webMcpExecute: options.webMcpExecute }),
             },
-            session,
-            toolName,
+            session: runSession,
+            toolName: runToolName,
           });
 
           result = await Promise.race([call, takenAway.then(() => null)]);
@@ -2428,6 +2540,16 @@ export const createBrowserRuntime = ({
           const reason = SENSITIVE_REASON.download;
           const stepToken = preflight?.ok ? issueSensitiveToken({ origin, reason }) : undefined;
 
+          // The tab this step opened, for the one repeat its token buys: sending `browser_tabs new` again would open
+          // A second tab and download the file twice instead of receiving the one the human approved.
+          if (downloadStep !== undefined) {
+            const openedTab = [...callTabs].find(id => id !== tabId);
+
+            if (openedTab !== undefined) {
+              rememberStepTab(downloadStep, openedTab);
+            }
+          }
+
           // The click already ran and the download was cancelled. `afterAction` tells the CLI not to replay it.
           return needsPermissionOutcome([{ class: 'sensitive', origin, reason }], {
             afterAction: true,
@@ -2447,7 +2569,7 @@ export const createBrowserRuntime = ({
         // An approved navigate to an attachment keeps its file and still answers `ERR_ABORTED`: that is a success with no page change, not a failure.
         const keptText =
           downloadApproved &&
-          preflight?.class === 'navigate' &&
+          (preflight?.class === 'navigate' || reusedTab !== undefined) &&
           destination !== undefined &&
           !settled.ok &&
           settled.error.includes('ERR_ABORTED')
@@ -2457,7 +2579,7 @@ export const createBrowserRuntime = ({
         // A download is not a document, so a navigate that became one never moved the tab.
         // An opaque or older origin there is the file's answer, not the redirect this check looks for.
         if (preflight !== undefined && preflight.class === 'navigate' && keptText === undefined) {
-          const changed = await postAgentNavigate(session, preflight.origin);
+          const changed = await postAgentNavigate(runSession, preflight.origin);
 
           if (changed !== undefined) {
             return { from: changed.from, kind: 'origin_changed', result: settled, to: changed.to };
@@ -2473,7 +2595,7 @@ export const createBrowserRuntime = ({
 
         // A read never navigates, so its tree is the one the preflight saw; an act or navigate call may have replaced it, and a stale list would under-report.
         const withheldReader =
-          preflight?.class === 'read' ? readFrames : createAgentFrameReader(session);
+          preflight?.class === 'read' ? readFrames : createAgentFrameReader(runSession);
 
         return {
           kind: 'result',

@@ -423,7 +423,8 @@ test('gutter: a row that starts off the gutter still fails at its leading conten
   const [finding, ...rest] = run(nodes);
   assert.equal(rest.length, 0);
   assert.equal(finding?.measured, 30);
-  assert.equal(finding?.element.index, 3);
+  assert.equal(finding?.element.rect[0], 30);
+  assert.equal(finding?.element.tag, 'View');
 });
 
 test('gutter: a sibling stacked above the box does not exempt its column', () => {

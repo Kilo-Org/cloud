@@ -2348,7 +2348,10 @@ session diff, so `changes` stays null. The root's idle `session.status` clears t
 and plan in the transaction that stores it, as the Kilo v1 idle transition does, so a
 turn that opens without a root user message (a background command's completion) does
 not start with the last turn's step; an idle or failed snapshot shows no step or plan.
-The failure stays until a new turn starts. The cost is the root's assistant-only cost
+That turn's busy `session.status` clears the failure in the transaction that stores it,
+as the Kilo v1 busy transition does, so the working snapshot does not show the previous
+turn's failure while the session works; the failure otherwise stays until such a busy
+status or a new root user message starts a turn. The cost is the root's assistant-only cost
 total (`cost-total.ts`), the same value an open chat shows. Both ride every snapshot of
 a root with a native transcript and are absent for Kilo v1, whose ingest client keeps
 writing them. The first summary forces a snapshot; a changed one refreshes at most once

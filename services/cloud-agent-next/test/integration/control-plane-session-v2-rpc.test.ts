@@ -659,6 +659,21 @@ describe('SandboxSessionV2 worker RPC surface', () => {
         totalCostMicrodollars: 750_000,
       });
     });
+
+    // A background command's completion opens the next turn with a busy status and no root user
+    // message: the working snapshot must not carry the failure of the turn before it.
+    await stub.onEvents({
+      events: [
+        { type: 'session.status', properties: { sessionID: kiloId, status: { type: 'busy' } } },
+      ],
+    });
+    await waitFor(async () => {
+      expect((await readPublished()).at(-1)).toMatchObject({
+        status: 'busy',
+        liveSummary: { step: null, plan: null, changes: null, failure: null },
+        totalCostMicrodollars: 750_000,
+      });
+    });
   });
 
   it('opens a Kilo v2 turn without a user message without the step and plan of the last one', async () => {

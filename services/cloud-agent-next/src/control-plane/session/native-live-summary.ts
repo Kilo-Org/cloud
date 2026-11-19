@@ -119,10 +119,11 @@ export function createNativeLiveSummary(storage: Pick<DurableObjectStorage, 'kv'
     /**
      * Fold a stored event of the root. Runs in the transaction that stores the event, so the
      * summary never misses or repeats a committed row. A `conversation.message.updated` updates
-     * the summary. An idle `session.status` ends the turn: it clears the step and plan, as the
-     * Kilo v1 idle transition does, so a turn that opens without a root user message (a
-     * background command's completion) does not start with the last turn's step. The failure
-     * stays until a new turn starts.
+     * the summary. A root `session.status` applies the Kilo v1 transitions: an idle status ends
+     * the turn and clears the step and plan, and a busy status starts a new turn and clears the
+     * failure of the turn before it. A turn that opens without a root user message (a background
+     * command's completion) therefore starts neither with the last turn's step nor with its
+     * failure.
      */
     observe(
       event: { type: string; properties: Record<string, unknown> },
@@ -130,19 +131,22 @@ export function createNativeLiveSummary(storage: Pick<DurableObjectStorage, 'kv'
     ): void {
       if (event.type === 'session.status') {
         const parsed = nativeStatusSchema.safeParse(event.properties);
-        if (
-          !parsed.success ||
-          parsed.data.sessionID !== rootKiloSessionId ||
-          parsed.data.status.type !== 'idle'
-        )
-          return;
+        if (!parsed.success || parsed.data.sessionID !== rootKiloSessionId) return;
         const state = current();
-        if (state === undefined || (state.summary.step === null && state.summary.plan === null))
-          return;
-        storage.kv.put(NATIVE_LIVE_SUMMARY_KEY, {
-          turn: state.turn,
-          summary: { ...state.summary, step: null, plan: null },
-        });
+        if (state === undefined) return;
+        const type = parsed.data.status.type;
+        if (type === 'idle') {
+          if (state.summary.step === null && state.summary.plan === null) return;
+          storage.kv.put(NATIVE_LIVE_SUMMARY_KEY, {
+            turn: state.turn,
+            summary: { ...state.summary, step: null, plan: null },
+          });
+        } else if (type === 'busy' && state.summary.failure !== null) {
+          storage.kv.put(NATIVE_LIVE_SUMMARY_KEY, {
+            turn: state.turn,
+            summary: { ...state.summary, failure: null },
+          });
+        }
         return;
       }
       if (event.type !== 'conversation.message.updated') return;

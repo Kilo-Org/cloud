@@ -121,7 +121,7 @@ describe('native live summary', () => {
     });
   });
 
-  it('ends a turn on the root idle status and only reads the summary for a snapshot', () => {
+  it('ends a turn on the root idle status and starts the next one on busy', () => {
     const values = new Map<string, unknown>();
     const storage = {
       kv: {
@@ -186,10 +186,25 @@ describe('native live summary', () => {
     // A subagent going idle does not end the root's turn.
     summary.observe(status('ses_child', 'idle'), root);
     expect(summary.settled('busy')).toEqual(working);
-    // The root going idle ends the turn, so the next one opens without its step and plan even
-    // when no root user message opens it.
+    // The root going idle ends the turn without clearing its failure.
     summary.observe(status(root, 'idle'), root);
-    summary.observe(status(root, 'busy'), root);
     expect(summary.settled('busy')).toEqual(finished);
+    // The next turn opens with a busy status and no root user message: it clears the failure of
+    // the turn before it, as the Kilo v1 busy transition does.
+    summary.observe(status(root, 'busy'), root);
+    expect(summary.settled('busy')).toEqual({
+      step: null,
+      plan: null,
+      changes: null,
+      failure: null,
+    });
+    // A repeated busy status keeps the cleared value.
+    summary.observe(status(root, 'busy'), root);
+    expect(summary.settled('busy')).toEqual({
+      step: null,
+      plan: null,
+      changes: null,
+      failure: null,
+    });
   });
 });

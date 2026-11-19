@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getOrgTrialStatusFromDays, isRunningTrialStage, RUNNING_TRIAL_STAGES } from '../trial';
+import { getOrgTrialStatusFromDays, isRunningTrialStage, TRIAL_STAGE_RUNNING } from '../trial';
 import type { OrganizationTrialStage } from '../types';
 
 describe('isRunningTrialStage', () => {
@@ -32,9 +32,9 @@ describe('isRunningTrialStage', () => {
       'trial_expired_soft',
       'trial_expired_hard',
     ];
-    expect(Object.keys(RUNNING_TRIAL_STAGES).sort()).toEqual([...stages].sort());
+    expect(Object.keys(TRIAL_STAGE_RUNNING).sort()).toEqual([...stages].sort());
 
-    const runningStages = stages.filter(stage => RUNNING_TRIAL_STAGES[stage]);
+    const runningStages = stages.filter(stage => TRIAL_STAGE_RUNNING[stage]);
     expect(runningStages).toEqual([
       'trial_active',
       'trial_ending_soon',
@@ -44,7 +44,7 @@ describe('isRunningTrialStage', () => {
 
     for (const stage of stages) {
       const running = stage !== 'trial_expired_soft' && stage !== 'trial_expired_hard';
-      expect(RUNNING_TRIAL_STAGES[stage]).toBe(running);
+      expect(TRIAL_STAGE_RUNNING[stage]).toBe(running);
       expect(isRunningTrialStage(stage)).toBe(running);
     }
   });
@@ -59,10 +59,10 @@ describe('isRunningTrialStage', () => {
       const stage = getOrgTrialStatusFromDays(days);
       expect(isRunningTrialStage(stage)).toBe(days >= 0);
     }
-    const runningKeys = Object.entries(RUNNING_TRIAL_STAGES)
+    const runningKeys = Object.entries(TRIAL_STAGE_RUNNING)
       .filter(([, running]) => running)
       .map(([stage]) => stage);
     expect(runningKeys).toHaveLength(4);
-    expect(Object.keys(RUNNING_TRIAL_STAGES)).toHaveLength(6);
+    expect(Object.keys(TRIAL_STAGE_RUNNING)).toHaveLength(6);
   });
 });

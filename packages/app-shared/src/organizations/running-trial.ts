@@ -1,13 +1,12 @@
 export {
   /**
-   * The stages in which a trial is still running, and the predicate that tests
-   * a status against them: the server's own classification from
-   * `@kilocode/organization-entitlement`, re-exported here so the apps read one
-   * answer. `organizations.list` publishes a stage only from this set, and a
-   * client renders "on trial" over the same predicate instead of carrying a
-   * mirrored copy that can drift.
+   * The stage predicate the server publishes on, and the record it reads: for
+   * every stage of the trial, whether a trial in it is still running. Both come
+   * from `@kilocode/organization-entitlement`, so the publisher and every
+   * client read one classification instead of mirrors that can drift.
+   * `organizations.list` publishes a stage only when the record answers true.
    */
   isRunningTrialStage,
-  RUNNING_TRIAL_STAGES,
+  TRIAL_STAGE_RUNNING,
 } from '@kilocode/organization-entitlement';
 export type { RunningTrialStage } from '@kilocode/organization-entitlement';

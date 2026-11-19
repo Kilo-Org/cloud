@@ -6,7 +6,7 @@ export {
   getOrganizationTrialEndDate,
   getOrgTrialStatusFromDays,
   isRunningTrialStage,
-  RUNNING_TRIAL_STAGES,
+  TRIAL_STAGE_RUNNING,
   PAID_ORGANIZATION_SEAT_SUBSCRIPTION_STATUSES,
 } from '@kilocode/organization-entitlement';
 export type {

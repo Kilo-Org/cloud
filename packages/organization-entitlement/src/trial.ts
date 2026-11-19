@@ -23,7 +23,7 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
  * silently unclassified running trial. The day-sweep suite ties the running
  * subset to the day-boundary classifier as a second guard, not the only one.
  */
-export const RUNNING_TRIAL_STAGES = {
+export const TRIAL_STAGE_RUNNING = {
   trial_active: true,
   trial_ending_soon: true,
   trial_ending_very_soon: true,
@@ -37,18 +37,18 @@ export const RUNNING_TRIAL_STAGES = {
  * values so it cannot drift from the `true` keys.
  */
 export type RunningTrialStage = {
-  [Stage in keyof typeof RUNNING_TRIAL_STAGES]: (typeof RUNNING_TRIAL_STAGES)[Stage] extends true
+  [Stage in keyof typeof TRIAL_STAGE_RUNNING]: (typeof TRIAL_STAGE_RUNNING)[Stage] extends true
     ? Stage
     : never;
-}[keyof typeof RUNNING_TRIAL_STAGES];
+}[keyof typeof TRIAL_STAGE_RUNNING];
 
 export function isRunningTrialStage(
   status: string | null | undefined
 ): status is RunningTrialStage {
   return (
     status != null &&
-    Object.hasOwn(RUNNING_TRIAL_STAGES, status) &&
-    RUNNING_TRIAL_STAGES[status as keyof typeof RUNNING_TRIAL_STAGES]
+    Object.hasOwn(TRIAL_STAGE_RUNNING, status) &&
+    TRIAL_STAGE_RUNNING[status as keyof typeof TRIAL_STAGE_RUNNING]
   );
 }
 

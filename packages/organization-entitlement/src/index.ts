@@ -4,7 +4,7 @@ export {
   getOrganizationTrialEndDate,
   getOrgTrialStatusFromDays,
   isRunningTrialStage,
-  RUNNING_TRIAL_STAGES,
+  TRIAL_STAGE_RUNNING,
   ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING,
   ORGANIZATION_TRIAL_DURATION_DAYS,
 } from './trial';

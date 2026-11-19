@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, CalendarClock } from 'lucide-react';
+import { CalendarClock } from 'lucide-react';
 import { toast } from 'sonner';
 import KiloCrabIcon from '@/components/KiloCrabIcon';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -40,13 +40,7 @@ import {
   getKiloClawRetirementDisplay,
 } from '@/app/(app)/claw/components/billing/billing-types';
 
-type SubscriptionConfirmationAction =
-  | 'cancelPlanSwitch'
-  | 'continueMonthToMonth'
-  | 'switchPlan'
-  | 'switchToCredits'
-  | 'reactivate'
-  | 'cancelSubscription';
+type SubscriptionConfirmationAction = 'cancelPlanSwitch' | 'cancelSubscription';
 
 type ConfirmationDetails = {
   title: string;
@@ -56,7 +50,6 @@ type ConfirmationDetails = {
   action: () => Promise<unknown>;
   successMessage: string;
   confirmVariant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
-  extraContent?: ReactNode;
 };
 
 export function KiloClawDetail({ instanceId }: { instanceId: string }) {
@@ -69,7 +62,6 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
     useState<SubscriptionConfirmationAction | null>(null);
 
   const detailQuery = useQuery(trpc.kiloclaw.getSubscriptionDetail.queryOptions({ instanceId }));
-  const summaryQuery = useQuery(trpc.kiloclaw.getPersonalBillingSummary.queryOptions());
   const billingQuery = useQuery(trpc.kiloclaw.getBillingHistory.queryOptions({ instanceId }));
 
   const fetchMoreBilling = (cursor: string) =>
@@ -112,7 +104,6 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
   );
   const currentFundingSource = formatKiloClawFundingSource(retirement.currentFundingSource);
   const futureFundingSource = formatKiloClawFundingSource(retirement.futureFundingSource);
-  const otherPlan = subscription.plan === 'commit' ? 'standard' : 'commit';
   const isPendingSettlement = subscription.activationState === 'pending_settlement';
   const statusNote = getKiloclawStatusNote(subscription);
   const nextRenewalLabel = formatDateLabel(
@@ -120,128 +111,38 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
     'At your next renewal'
   );
   const hasUserRequestedSwitch = subscription.scheduledBy === 'user';
-  const canSwitchPlan = otherPlan !== 'commit' || summaryQuery.data?.commitPlanAvailable === true;
-  const targetPlanLabel = capitalize(otherPlan);
-  const targetPlanDetails =
-    otherPlan === 'commit'
-      ? {
-          price: formatKiloclawPrice({ plan: otherPlan, priceVersion: subscription.priceVersion }),
-          cadence: 'Renews every 6 months',
-          summary: `Renews at ${formatKiloclawPrice({ plan: otherPlan, priceVersion: subscription.priceVersion })}.`,
-        }
-      : {
-          price: formatKiloclawPrice({ plan: otherPlan, priceVersion: subscription.priceVersion }),
-          cadence: 'Renews monthly',
-          summary: `Renews at ${formatKiloclawPrice({ plan: otherPlan, priceVersion: subscription.priceVersion })}.`,
-        };
-
   const confirmationDetails: ConfirmationDetails | null =
-    confirmationAction === 'continueMonthToMonth'
+    confirmationAction === 'cancelPlanSwitch'
       ? {
-          title: 'Continue month-to-month?',
-          description: `Standard starts on ${finalCommitEndLabel} at ${standardContinuationPrice} using ${futureFundingSource}. Your final Commit term stays active until then.`,
-          confirmLabel: 'Continue month-to-month',
-          pendingLabel: 'Scheduling continuation',
-          action: () => trpcClient.kiloclaw.continueCommitAsStandard.mutate({ instanceId }),
-          successMessage: 'Month-to-month continuation scheduled',
+          title: retirement.standardContinuationScheduled
+            ? 'Cancel month-to-month continuation?'
+            : 'Cancel scheduled plan switch?',
+          description: retirement.standardContinuationScheduled
+            ? `Standard will no longer start on ${finalCommitEndLabel}. Hosting ends when your final Commit term ends.`
+            : 'This keeps your KiloClaw subscription on its current plan and removes the pending change.',
+          confirmLabel: retirement.standardContinuationScheduled
+            ? 'Cancel month-to-month continuation'
+            : 'Cancel plan switch',
+          pendingLabel: retirement.standardContinuationScheduled
+            ? 'Canceling continuation'
+            : 'Canceling plan switch',
+          action: () => trpcClient.kiloclaw.cancelPlanSwitchAtInstance.mutate({ instanceId }),
+          successMessage: retirement.standardContinuationScheduled
+            ? 'Month-to-month continuation canceled'
+            : 'Plan switch canceled',
         }
-      : confirmationAction === 'cancelPlanSwitch'
+      : confirmationAction === 'cancelSubscription'
         ? {
-            title: retirement.standardContinuationScheduled
-              ? 'Cancel month-to-month continuation?'
-              : 'Cancel scheduled plan switch?',
-            description: retirement.standardContinuationScheduled
-              ? `Standard will no longer start on ${finalCommitEndLabel}. Hosting ends when your final Commit term ends.`
-              : 'This keeps your KiloClaw subscription on its current plan and removes the pending change.',
-            confirmLabel: retirement.standardContinuationScheduled
-              ? 'Cancel month-to-month continuation'
-              : 'Cancel plan switch',
-            pendingLabel: retirement.standardContinuationScheduled
-              ? 'Canceling continuation'
-              : 'Canceling plan switch',
-            action: () => trpcClient.kiloclaw.cancelPlanSwitchAtInstance.mutate({ instanceId }),
-            successMessage: retirement.standardContinuationScheduled
-              ? 'Month-to-month continuation canceled'
-              : 'Plan switch canceled',
+            title: 'Cancel subscription at period end?',
+            description:
+              'Your KiloClaw instance stays active through the current billing period, then the subscription ends.',
+            confirmLabel: 'Cancel subscription',
+            pendingLabel: 'Canceling subscription',
+            action: () => trpcClient.kiloclaw.cancelSubscriptionAtInstance.mutate({ instanceId }),
+            successMessage: 'Subscription will cancel at period end',
+            confirmVariant: 'destructive' as const,
           }
-        : confirmationAction === 'switchPlan'
-          ? {
-              title: `Switch to ${targetPlanLabel}?`,
-              description: `This schedules your KiloClaw subscription to switch plans at the next renewal while keeping your current plan active until then.`,
-              confirmLabel: `Switch to ${otherPlan}`,
-              pendingLabel: `Switching to ${otherPlan}`,
-              action: () =>
-                trpcClient.kiloclaw.switchPlanAtInstance.mutate({
-                  instanceId,
-                  toPlan: otherPlan,
-                }),
-              successMessage: 'Plan switch scheduled',
-              extraContent: (
-                <div className="space-y-3 rounded-lg border px-4 py-3 text-left text-sm">
-                  <div className="flex items-center justify-center gap-4">
-                    <div className="flex-1 rounded-md bg-muted/40 px-3 py-2 text-center">
-                      <div className="text-muted-foreground text-xs">Current plan</div>
-                      <div className="font-medium">{capitalize(subscription.plan)}</div>
-                      <div className="text-muted-foreground text-xs">
-                        {formatKiloclawPrice({
-                          plan: subscription.plan,
-                          priceVersion: subscription.priceVersion,
-                          renewalCostMicrodollars: subscription.renewalCostMicrodollars,
-                        })}
-                      </div>
-                    </div>
-                    <ArrowRight className="text-muted-foreground h-4 w-4 shrink-0" />
-                    <div className="flex-1 rounded-md bg-muted/40 px-3 py-2 text-center">
-                      <div className="text-muted-foreground text-xs">New plan</div>
-                      <div className="font-medium">{targetPlanLabel}</div>
-                      <div className="text-muted-foreground text-xs">{targetPlanDetails.price}</div>
-                    </div>
-                  </div>
-                  <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
-                    <ConfirmationDetailRow label="Takes effect" value={nextRenewalLabel} />
-                    <ConfirmationDetailRow label="Cadence" value={targetPlanDetails.cadence} />
-                  </div>
-                  <p className="text-muted-foreground leading-relaxed">
-                    {targetPlanDetails.summary}
-                  </p>
-                </div>
-              ),
-            }
-          : confirmationAction === 'switchToCredits'
-            ? {
-                title: 'Switch hosting billing to credits?',
-                description: retirement.isFinalCommitTerm
-                  ? `Stripe billing stays active through the final Commit term. Then Standard starts at ${standardContinuationPrice} and renews from your credit balance.`
-                  : 'Stripe billing stays active through the current period, then this subscription renews against your credit balance.',
-                confirmLabel: 'Switch to credits',
-                pendingLabel: 'Switching to credits',
-                action: () => trpcClient.kiloclaw.acceptConversionAtInstance.mutate({ instanceId }),
-                successMessage: 'Stripe billing will switch to credits at period end',
-              }
-            : confirmationAction === 'reactivate'
-              ? {
-                  title: 'Reactivate subscription?',
-                  description:
-                    'This removes the pending cancellation so the subscription keeps renewing automatically.',
-                  confirmLabel: 'Reactivate',
-                  pendingLabel: 'Reactivating subscription',
-                  action: () =>
-                    trpcClient.kiloclaw.reactivateSubscriptionAtInstance.mutate({ instanceId }),
-                  successMessage: 'Subscription reactivated',
-                }
-              : confirmationAction === 'cancelSubscription'
-                ? {
-                    title: 'Cancel subscription at period end?',
-                    description:
-                      'Your KiloClaw instance stays active through the current billing period, then the subscription ends.',
-                    confirmLabel: 'Cancel subscription',
-                    pendingLabel: 'Canceling subscription',
-                    action: () =>
-                      trpcClient.kiloclaw.cancelSubscriptionAtInstance.mutate({ instanceId }),
-                    successMessage: 'Subscription will cancel at period end',
-                    confirmVariant: 'destructive' as const,
-                  }
-                : null;
+        : null;
 
   function confirmSubscriptionAction() {
     if (!confirmationAction || !confirmationDetails) {
@@ -368,7 +269,7 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
                   <p>
                     {retirement.standardContinuationScheduled
                       ? `Standard starts on ${finalCommitEndLabel} at ${standardContinuationPrice} using ${futureFundingSource}. Your current ${currentFundingSource} funding stays active through the final Commit term.`
-                      : `Your final Commit term ends on ${finalCommitEndLabel}. Hosting ends unless you continue month-to-month at ${standardContinuationPrice} using ${futureFundingSource}.`}
+                      : `Your final Commit term ends on ${finalCommitEndLabel}. Hosting ends then.`}
                   </p>
                 </AlertDescription>
               </Alert>
@@ -403,27 +304,17 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
               <Button variant="outline" onClick={() => setConfirmationAction('cancelPlanSwitch')}>
                 Cancel month-to-month continuation
               </Button>
-            ) : (
-              <Button onClick={() => setConfirmationAction('continueMonthToMonth')}>
-                Continue month-to-month
-              </Button>
-            )
+            ) : null
           ) : subscription.plan !== 'trial' ? (
             hasUserRequestedSwitch ? (
               <Button variant="outline" onClick={() => setConfirmationAction('cancelPlanSwitch')}>
                 Cancel plan switch
               </Button>
-            ) : canSwitchPlan ? (
-              <Button variant="outline" onClick={() => setConfirmationAction('switchPlan')}>
-                Switch to {capitalize(otherPlan)} plan
-              </Button>
             ) : null
           ) : null}
 
           {!retirement.isFinalCommitTerm ? (
-            subscription.cancelAtPeriodEnd ? (
-              <Button onClick={() => setConfirmationAction('reactivate')}>Reactivate</Button>
-            ) : (
+            subscription.cancelAtPeriodEnd ? null : (
               <Button
                 variant="outline"
                 className="text-destructive hover:bg-destructive/10 hover:text-destructive"
@@ -432,12 +323,6 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
                 Cancel subscription
               </Button>
             )
-          ) : null}
-
-          {subscription.showConversionPrompt ? (
-            <Button variant="outline" onClick={() => setConfirmationAction('switchToCredits')}>
-              Switch to credits
-            </Button>
           ) : null}
 
           {subscription.hasStripeFunding ? (
@@ -482,7 +367,6 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
             <AlertDialogTitle>{confirmationDetails?.title}</AlertDialogTitle>
             <AlertDialogDescription>{confirmationDetails?.description}</AlertDialogDescription>
           </AlertDialogHeader>
-          {confirmationDetails?.extraContent ?? null}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={pendingConfirmationAction !== null}>
               Cancel
@@ -500,15 +384,6 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
-  );
-}
-
-function ConfirmationDetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="text-muted-foreground text-xs">{label}</div>
-      <div className="font-medium">{value}</div>
     </div>
   );
 }

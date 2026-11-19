@@ -1,25 +1,17 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
-import { Button } from '@/components/ui/button';
 import KiloCrabIcon from '@/components/KiloCrabIcon';
 import { KiloClawSignupUnavailable } from '@/components/subscriptions/kiloclaw/KiloClawSignupUnavailable';
 import { BillingBanner } from './BillingBanner';
 import { AccessLockedDialog } from './AccessLockedDialog';
-import { PlanSelectionDialog } from './PlanSelectionDialog';
 
 import { deriveBannerState, deriveLockReason, formatBillingDate } from './billing-types';
 
-function EarlybirdActiveCard({
-  expiresAt,
-  onSubscribeClick,
-}: {
-  expiresAt: string;
-  onSubscribeClick: () => void;
-}) {
+function EarlybirdActiveCard({ expiresAt }: { expiresAt: string }) {
   return (
     <div className="border-brand-primary/30 bg-brand-primary/5 flex shrink-0 items-center gap-3 rounded-xl border p-4">
       <KiloCrabIcon className="text-brand-primary size-5 shrink-0" />
@@ -31,9 +23,6 @@ function EarlybirdActiveCard({
           Your earlybird hosting expires {formatBillingDate(expiresAt)}.
         </span>
       </div>
-      <Button variant="outline" size="sm" onClick={onSubscribeClick} className="shrink-0">
-        Subscribe
-      </Button>
     </div>
   );
 }
@@ -49,9 +38,6 @@ export function BillingWrapper({ children, hideBanners }: BillingWrapperProps) {
   const { data: billing } = useQuery(trpc.kiloclaw.getActivePersonalBillingStatus.queryOptions());
   const instanceId = billing?.instance?.id ?? null;
 
-  const [showPlanDialog, setShowPlanDialog] = useState(false);
-
-  const reactivate = useMutation(trpc.kiloclaw.reactivateSubscriptionAtInstance.mutationOptions());
   const reprovisionAndEnrollWithCredits = useMutation(
     trpc.kiloclaw.reprovisionAndEnrollWithCredits.mutationOptions()
   );
@@ -89,42 +75,6 @@ export function BillingWrapper({ children, hideBanners }: BillingWrapperProps) {
 
   const lockReason = deriveLockReason(billing);
   const bannerState = deriveBannerState(billing);
-
-  function handleSubscribe() {
-    setShowPlanDialog(true);
-  }
-
-  function handleReactivate() {
-    if (!instanceId || reactivate.isPending) return;
-    reactivate.mutate(
-      { instanceId },
-      {
-        onSuccess: () => {
-          void Promise.all([
-            queryClient.invalidateQueries({
-              queryKey: trpc.kiloclaw.getActivePersonalBillingStatus.queryKey(),
-            }),
-            queryClient.invalidateQueries({
-              queryKey: trpc.kiloclaw.getPersonalBillingSummary.queryKey(),
-            }),
-            queryClient.invalidateQueries({
-              queryKey: trpc.kiloclaw.listPersonalSubscriptions.queryKey(),
-            }),
-            queryClient.invalidateQueries({
-              queryKey: trpc.kiloclaw.getSubscriptionDetail.queryKey({
-                instanceId,
-              }),
-            }),
-            queryClient.invalidateQueries({
-              queryKey: trpc.kiloclaw.getBillingHistory.queryKey({
-                instanceId,
-              }),
-            }),
-          ]);
-        },
-      }
-    );
-  }
 
   function handleUpdatePayment() {
     if (!instanceId) return;
@@ -174,25 +124,15 @@ export function BillingWrapper({ children, hideBanners }: BillingWrapperProps) {
       {/* Banner — or earlybird card in the banner position */}
       {!hideBanners &&
         (bannerState === 'earlybird_active' && billing.earlybird ? (
-          <EarlybirdActiveCard
-            expiresAt={billing.earlybird.expiresAt}
-            onSubscribeClick={handleSubscribe}
-          />
+          <EarlybirdActiveCard expiresAt={billing.earlybird.expiresAt} />
         ) : (
-          <BillingBanner
-            billing={billing}
-            onSubscribeClick={handleSubscribe}
-            onReactivateClick={handleReactivate}
-            onUpdatePaymentClick={handleUpdatePayment}
-            isReactivating={reactivate.isPending}
-          />
+          <BillingBanner billing={billing} onUpdatePaymentClick={handleUpdatePayment} />
         ))}
 
       {/* Lock dialog — blocks interaction when access is revoked */}
       <AccessLockedDialog
         reason={lockReason}
         billing={billing}
-        onSubscribeClick={handleSubscribe}
         onReprovisionCreditsClick={handleReprovisionCredits}
         onUpdatePaymentClick={handleUpdatePayment}
         onDestroyClick={() =>
@@ -207,9 +147,6 @@ export function BillingWrapper({ children, hideBanners }: BillingWrapperProps) {
 
       {/* Dashboard content */}
       {children}
-
-      {/* Plan selection dialog */}
-      <PlanSelectionDialog open={showPlanDialog} onOpenChange={setShowPlanDialog} />
     </>
   );
 }

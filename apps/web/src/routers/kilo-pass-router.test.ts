@@ -14,7 +14,6 @@ import {
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   kiloclaw_instances,
-  kiloclaw_subscription_change_log,
   kiloclaw_subscriptions,
   kilocode_users,
   microdollar_usage,
@@ -227,6 +226,7 @@ type KiloPassCaller = {
           | 'destroyed_instance'
           | 'requires_reprovision'
           | 'signup_unavailable'
+          | 'hosting_closed'
           | 'insufficient_credits'
           | 'expired_commit'
           | 'unexpected_error';
@@ -2673,122 +2673,6 @@ describe('kiloPassRouter', () => {
       expect(hostingRows).toHaveLength(0);
     });
 
-    it('preserves canceled legacy lineage and requires reprovision after Kilo Pass credits settle', async () => {
-      const user = await insertTestUser({
-        google_user_email: 'kilo-pass-canceled-legacy-hosting@example.com',
-        total_microdollars_acquired: 199_000_000,
-      });
-      const instanceId = crypto.randomUUID();
-      await db.insert(kiloclaw_instances).values({
-        id: instanceId,
-        user_id: user.id,
-        sandbox_id: `test-${instanceId}`,
-      });
-      await db.insert(kiloclaw_subscriptions).values({
-        user_id: user.id,
-        instance_id: instanceId,
-        payment_source: 'credits',
-        plan: 'standard',
-        status: 'canceled',
-        kiloclaw_price_version: '2026-03-19',
-        stripe_subscription_id: 'sub_deleted_legacy_hosting',
-      });
-      const { id: kiloPassSubscriptionId } = await insertSubscription({
-        kiloUserId: user.id,
-        stripeSubscriptionId: 'sub_kilo_pass_canceled_legacy_hosting',
-        tier: KiloPassTier.Tier199,
-        cadence: KiloPassCadence.Monthly,
-        status: 'active',
-      });
-      await insertBaseCreditsIssuance({
-        subscriptionId: kiloPassSubscriptionId,
-        kiloUserId: user.id,
-      });
-
-      const stripeMock = getStripeMock();
-      stripeMock.checkout.sessions.retrieve.mockResolvedValue({
-        status: 'complete',
-        subscription: 'sub_kilo_pass_canceled_legacy_hosting',
-        metadata: {
-          type: 'kilo-pass',
-          kiloUserId: user.id,
-          kiloclawHostingPlan: 'standard',
-          kiloclawInstanceId: instanceId,
-          kiloclawPriceVersion: '2026-05-10',
-        },
-      });
-      stripeMock.subscriptions.retrieve.mockResolvedValue({
-        id: 'sub_kilo_pass_canceled_legacy_hosting',
-        created: Math.floor(new Date('2026-06-10T15:00:00.000Z').getTime() / 1000),
-      });
-
-      const caller = await createCallerForUser(user.id);
-      const expectedResult = {
-        outcome: 'action_required',
-        hostingIntent: 'standard',
-        reason: 'requires_reprovision',
-      };
-      await expect(
-        Promise.all([
-          caller.kiloPass.activateCheckoutHosting({
-            sessionId: 'cs_kilo_pass_canceled_legacy_hosting',
-          }),
-          caller.kiloPass.activateCheckoutHosting({
-            sessionId: 'cs_kilo_pass_canceled_legacy_hosting',
-          }),
-        ])
-      ).resolves.toEqual([expectedResult, expectedResult]);
-      await expect(
-        caller.kiloPass.activateCheckoutHosting({
-          sessionId: 'cs_kilo_pass_canceled_legacy_hosting',
-        })
-      ).resolves.toEqual(expectedResult);
-
-      const [hosting] = await db
-        .select()
-        .from(kiloclaw_subscriptions)
-        .where(eq(kiloclaw_subscriptions.instance_id, instanceId))
-        .limit(1);
-      expect(hosting).toEqual(
-        expect.objectContaining({
-          status: 'canceled',
-          plan: 'standard',
-          payment_source: 'credits',
-          kiloclaw_price_version: '2026-03-19',
-          stripe_subscription_id: 'sub_deleted_legacy_hosting',
-          transferred_to_subscription_id: null,
-        })
-      );
-      const hostingRows = await db
-        .select()
-        .from(kiloclaw_subscriptions)
-        .where(eq(kiloclaw_subscriptions.user_id, user.id));
-      expect(hostingRows).toHaveLength(1);
-
-      const changeLog = await db
-        .select()
-        .from(kiloclaw_subscription_change_log)
-        .where(eq(kiloclaw_subscription_change_log.subscription_id, hosting?.id ?? ''));
-      expect(changeLog).toHaveLength(0);
-
-      const hostingDeductions = await db
-        .select()
-        .from(credit_transactions)
-        .where(
-          and(
-            eq(credit_transactions.kilo_user_id, user.id),
-            eq(credit_transactions.amount_microdollars, -55_000_000)
-          )
-        );
-      expect(hostingDeductions).toHaveLength(0);
-
-      const [updatedUser] = await db
-        .select({ microdollarsUsed: kilocode_users.microdollars_used })
-        .from(kilocode_users)
-        .where(eq(kilocode_users.id, user.id));
-      expect(updatedUser?.microdollarsUsed).toBe(0);
-    });
-
     it('rejects hosting activation until Kilo Pass base credits have settled', async () => {
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-hosting-awaits-settlement@example.com',
@@ -2850,9 +2734,10 @@ describe('kiloPassRouter', () => {
       expect(deductions).toHaveLength(0);
     });
 
-    it('returns non-retryable recovery when settled credits cannot cover hosting', async () => {
+    it('rejects hosting activation without deducting credits', async () => {
       const user = await insertTestUser({
-        google_user_email: 'kilo-pass-hosting-insufficient-credits@example.com',
+        google_user_email: 'kilo-pass-hosting-renewal-closed@example.com',
+        total_microdollars_acquired: 199_000_000,
       });
       const instanceId = crypto.randomUUID();
       await db.insert(kiloclaw_instances).values({
@@ -2869,7 +2754,7 @@ describe('kiloPassRouter', () => {
       });
       const { id: kiloPassSubscriptionId } = await insertSubscription({
         kiloUserId: user.id,
-        stripeSubscriptionId: 'sub_kilo_pass_hosting_insufficient_credits',
+        stripeSubscriptionId: 'sub_kilo_pass_hosting_renewal_closed',
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
         status: 'active',
@@ -2882,7 +2767,7 @@ describe('kiloPassRouter', () => {
       const stripeMock = getStripeMock();
       stripeMock.checkout.sessions.retrieve.mockResolvedValue({
         status: 'complete',
-        subscription: 'sub_kilo_pass_hosting_insufficient_credits',
+        subscription: 'sub_kilo_pass_hosting_renewal_closed',
         metadata: {
           type: 'kilo-pass',
           kiloUserId: user.id,
@@ -2892,86 +2777,27 @@ describe('kiloPassRouter', () => {
         },
       });
       stripeMock.subscriptions.retrieve.mockResolvedValue({
-        id: 'sub_kilo_pass_hosting_insufficient_credits',
+        id: 'sub_kilo_pass_hosting_renewal_closed',
         created: Math.floor(new Date('2026-06-10T15:00:00.000Z').getTime() / 1000),
       });
 
       const caller = await createCallerForUser(user.id);
       await expect(
         caller.kiloPass.activateCheckoutHosting({
-          sessionId: 'cs_kilo_pass_hosting_insufficient_credits',
+          sessionId: 'cs_kilo_pass_hosting_renewal_closed',
         })
       ).resolves.toEqual({
         outcome: 'action_required',
         hostingIntent: 'standard',
-        reason: 'insufficient_credits',
-      });
-    });
-
-    it('rejects a stale checkout price version before credit enrollment', async () => {
-      const user = await insertTestUser({
-        google_user_email: 'kilo-pass-stale-hosting-intent@example.com',
-        total_microdollars_acquired: 60_000_000,
-      });
-      const instanceId = crypto.randomUUID();
-      await db.insert(kiloclaw_instances).values({
-        id: instanceId,
-        user_id: user.id,
-        sandbox_id: `test-${instanceId}`,
-      });
-      await db.insert(kiloclaw_subscriptions).values({
-        user_id: user.id,
-        instance_id: instanceId,
-        plan: 'trial',
-        status: 'trialing',
-        kiloclaw_price_version: '2026-05-10',
-      });
-      const { id: kiloPassSubscriptionId } = await insertSubscription({
-        kiloUserId: user.id,
-        stripeSubscriptionId: 'sub_kilo_pass_stale_hosting_intent',
-        tier: KiloPassTier.Tier199,
-        cadence: KiloPassCadence.Monthly,
-        status: 'active',
-      });
-      await insertBaseCreditsIssuance({
-        subscriptionId: kiloPassSubscriptionId,
-        kiloUserId: user.id,
+        reason: 'hosting_closed',
       });
 
-      const stripeMock = getStripeMock();
-      stripeMock.checkout.sessions.retrieve.mockResolvedValue({
-        status: 'complete',
-        subscription: 'sub_kilo_pass_stale_hosting_intent',
-        metadata: {
-          type: 'kilo-pass',
-          kiloUserId: user.id,
-          kiloclawHostingPlan: 'standard',
-          kiloclawInstanceId: instanceId,
-          kiloclawPriceVersion: '2026-03-19',
-        },
-      });
-      stripeMock.subscriptions.retrieve.mockResolvedValue({
-        id: 'sub_kilo_pass_stale_hosting_intent',
-        created: Math.floor(new Date('2026-06-10T15:00:00.000Z').getTime() / 1000),
-      });
-
-      const caller = await createCallerForUser(user.id);
-      await expect(
-        caller.kiloPass.activateCheckoutHosting({
-          sessionId: 'cs_stale_hosting_intent',
-        })
-      ).resolves.toEqual({
-        outcome: 'action_required',
-        hostingIntent: 'standard',
-        reason: 'stale_intent',
-      });
-
-      const deductions = await db
+      const [hostingRow] = await db
         .select()
-        .from(credit_transactions)
-        .where(eq(credit_transactions.kilo_user_id, user.id));
-      expect(deductions).toHaveLength(1);
-      expect(deductions[0]?.amount_microdollars).toBe(1_000_000);
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.user_id, user.id));
+      expect(hostingRow?.status).toBe('trialing');
+      expect(hostingRow?.plan).toBe('trial');
     });
 
     it('rejects an unknown checkout price version at the metadata boundary', async () => {
@@ -3117,70 +2943,6 @@ describe('kiloPassRouter', () => {
         .where(eq(credit_transactions.kilo_user_id, user.id));
       expect(deductions).toHaveLength(1);
       expect(deductions[0]?.amount_microdollars).toBe(1_000_000);
-    });
-
-    it('activates verified pre-cutoff Commit hosting after cutoff as checkout-qualified', async () => {
-      const user = await insertTestUser({
-        google_user_email: 'kilo-pass-qualified-commit-hosting@example.com',
-        total_microdollars_acquired: 400_000_000,
-      });
-      const instanceId = crypto.randomUUID();
-      await db.insert(kiloclaw_instances).values({
-        id: instanceId,
-        user_id: user.id,
-        sandbox_id: `test-${instanceId}`,
-      });
-      await db.insert(kiloclaw_subscriptions).values({
-        user_id: user.id,
-        instance_id: instanceId,
-        plan: 'trial',
-        status: 'trialing',
-        kiloclaw_price_version: '2026-05-10',
-      });
-      const { id: kiloPassSubscriptionId } = await insertSubscription({
-        kiloUserId: user.id,
-        stripeSubscriptionId: 'sub_qualified_commit_hosting',
-        tier: KiloPassTier.Tier49,
-        cadence: KiloPassCadence.Yearly,
-        status: 'active',
-      });
-      await insertBaseCreditsIssuance({
-        subscriptionId: kiloPassSubscriptionId,
-        kiloUserId: user.id,
-      });
-
-      const stripeMock = getStripeMock();
-      stripeMock.checkout.sessions.retrieve.mockResolvedValue({
-        status: 'complete',
-        subscription: 'sub_qualified_commit_hosting',
-        metadata: {
-          type: 'kilo-pass',
-          kiloUserId: user.id,
-          kiloclawHostingPlan: 'commit',
-          kiloclawInstanceId: instanceId,
-          kiloclawPriceVersion: '2026-05-10',
-        },
-      });
-      stripeMock.subscriptions.retrieve.mockResolvedValue({
-        id: 'sub_qualified_commit_hosting',
-        created: Math.floor(new Date('2026-06-05T23:59:59.000Z').getTime() / 1000),
-      });
-
-      const caller = await createCallerForUser(user.id);
-      await expect(
-        caller.kiloPass.activateCheckoutHosting({
-          sessionId: 'cs_qualified_commit_hosting',
-        })
-      ).resolves.toEqual({ outcome: 'activated', hostingIntent: 'commit' });
-
-      const [hosting] = await db
-        .select()
-        .from(kiloclaw_subscriptions)
-        .where(eq(kiloclaw_subscriptions.instance_id, instanceId))
-        .limit(1);
-      expect(hosting).toMatchObject({
-        plan: 'commit',
-      });
     });
 
     it('expires Commit hosting intent confirmed at the cutoff from verified Stripe metadata', async () => {

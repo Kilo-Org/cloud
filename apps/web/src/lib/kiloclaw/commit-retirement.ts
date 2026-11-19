@@ -18,7 +18,6 @@ import {
   type KiloClawSubscription,
 } from '@kilocode/db';
 import { kiloclaw_instances, kiloclaw_subscriptions } from '@kilocode/db/schema';
-import { getStripePriceIdForClawPlan } from '@kilocode/web-shared/lib/kiloclaw/stripe-price-ids.server';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 
 const RETIREMENT_ACTOR = { actorType: 'system', actorId: 'kiloclaw-commit-retirement' } as const;
@@ -284,80 +283,6 @@ export async function makeKiloClawStripeSubscriptionNonRenewing(
   await makeStripeSubscriptionNonRenewing(live);
 }
 
-export async function continueKiloClawCommitAsStandard(params: {
-  subscriptionId: string;
-  userId: string;
-  convertToCredits?: boolean;
-}): Promise<void> {
-  const row = await readPersonalSubscription(params.subscriptionId, params.userId);
-  if (!row) throw new Error('KiloClaw subscription not found.');
-  const subscription = row.subscription;
-  const boundary = requireLiveFinalCommitBoundary(subscription);
-  let scheduleId: string | null = null;
-  if (subscription.stripe_subscription_id) {
-    const live = await stripe.subscriptions.retrieve(subscription.stripe_subscription_id);
-    if (params.convertToCredits) await makeStripeSubscriptionNonRenewing(live);
-    else scheduleId = await scheduleStripeStandardContinuation(subscription, live, boundary);
-  } else if (params.convertToCredits) {
-    throw new Error('Subscription is already credit-funded.');
-  }
-
-  await db.transaction(async tx => {
-    const [before] = await tx
-      .select()
-      .from(kiloclaw_subscriptions)
-      .where(
-        and(
-          eq(kiloclaw_subscriptions.id, subscription.id),
-          eq(kiloclaw_subscriptions.user_id, params.userId)
-        )
-      )
-      .for('update')
-      .limit(1);
-    if (
-      !before ||
-      before.plan !== 'commit' ||
-      before.status !== 'active' ||
-      before.stripe_subscription_id !== subscription.stripe_subscription_id ||
-      !timestampsEqual(before.commit_ends_at, boundary) ||
-      !timestampsEqual(before.current_period_end, subscription.current_period_end)
-    ) {
-      reportKiloClawCommitRetirementAnomaly({
-        reason: 'provider_state_mismatch',
-        summary: 'Standard continuation provider mutation won while local expected state changed.',
-        subscriptionId: subscription.id,
-        stripeSubscriptionId: subscription.stripe_subscription_id,
-      });
-      throw new Error(
-        'Commit final boundary changed. Standard continuation requires support investigation.'
-      );
-    }
-    const [after] = await tx
-      .update(kiloclaw_subscriptions)
-      .set({
-        scheduled_plan: 'standard',
-        scheduled_by: 'user',
-        stripe_schedule_id: scheduleId,
-        pending_conversion: params.convertToCredits ?? false,
-        cancel_at_period_end: params.convertToCredits ?? false,
-        commit_ends_at: boundary,
-      })
-      .where(eq(kiloclaw_subscriptions.id, before.id))
-      .returning();
-    if (!after) return;
-    await insertKiloClawSubscriptionChangeLog(tx, {
-      subscriptionId: after.id,
-      actor: { actorType: 'user', actorId: params.userId },
-      action: 'schedule_changed',
-      reason: params.convertToCredits
-        ? 'commit_retirement_standard_conversion_selected'
-        : 'commit_retirement_standard_selected',
-      before,
-      after,
-    });
-  });
-}
-
 export async function undoKiloClawCommitStandardContinuation(params: {
   subscriptionId: string;
   userId: string;
@@ -429,53 +354,6 @@ export function getLineageStandardContinuationCost(subscription: KiloClawSubscri
     priceVersion: subscription.kiloclaw_price_version,
     plan: 'standard',
   });
-}
-
-async function scheduleStripeStandardContinuation(
-  subscription: KiloClawSubscription,
-  live: Stripe.Subscription,
-  boundary: string
-): Promise<string> {
-  const existingScheduleId = resolveScheduleId(live.schedule) ?? subscription.stripe_schedule_id;
-  const schedule = existingScheduleId
-    ? await stripe.subscriptionSchedules.retrieve(existingScheduleId)
-    : await stripe.subscriptionSchedules.create({ from_subscription: live.id });
-  if (
-    existingScheduleId &&
-    subscription.stripe_schedule_id === null &&
-    schedule.metadata?.origin !== 'auto-intro' &&
-    schedule.metadata?.origin !== 'commit-retirement-standard'
-  ) {
-    throw new Error('Unexpected Stripe schedule requires support investigation.');
-  }
-  const currentPhase = schedule.phases[0];
-  const currentPrice = currentPhase ? resolvePhasePrice(currentPhase) : null;
-  if (!currentPhase || !currentPrice) throw new Error('Unable to determine current Stripe phase.');
-  await stripe.subscriptionSchedules.update(schedule.id, {
-    metadata: { origin: 'commit-retirement-standard' },
-    end_behavior: 'release',
-    phases: [
-      {
-        items: [{ price: currentPrice }],
-        start_date: currentPhase.start_date,
-        end_date: Math.floor(new Date(boundary).getTime() / 1000),
-      },
-      {
-        items: [
-          {
-            price: getStripePriceIdForClawPlan('standard', {
-              priceVersion: subscription.kiloclaw_price_version,
-            }),
-          },
-        ],
-      },
-    ],
-  });
-  const confirmed = await stripe.subscriptions.retrieve(live.id);
-  if (resolveScheduleId(confirmed.schedule) !== schedule.id || confirmed.cancel_at_period_end) {
-    throw new Error('stripe_commit_retirement_standard_continuation_not_confirmed');
-  }
-  return schedule.id;
 }
 
 async function makeStripeSubscriptionNonRenewing(live: Stripe.Subscription): Promise<void> {
@@ -582,12 +460,6 @@ function getStripeSubscriptionPeriodEnd(subscription: Stripe.Subscription): stri
 function resolveScheduleId(schedule: string | Stripe.SubscriptionSchedule | null | undefined) {
   if (!schedule) return null;
   return typeof schedule === 'string' ? schedule : schedule.id;
-}
-
-function resolvePhasePrice(phase: Stripe.SubscriptionSchedule.Phase): string | null {
-  const price = phase.items[0]?.price;
-  if (!price) return null;
-  return typeof price === 'string' ? price : price.id;
 }
 
 function timestampsEqual(

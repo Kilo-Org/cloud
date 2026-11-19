@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { CalendarClock, ExternalLink, Loader2 } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
@@ -31,7 +31,6 @@ import {
   formatBillingDate,
   formatKiloClawFundingSource,
   formatMicrodollars,
-  formatKiloClawPlanPrice,
   formatStandardContinuationPrice,
   getKiloClawRetirementDisplay,
   planLabel,
@@ -77,20 +76,6 @@ function PendingSettlementSubscriptionCard({ billing }: { billing: ClawBillingSt
   );
 }
 
-type ActiveConfirmationAction =
-  | 'switchPlan'
-  | 'continueMonthToMonth'
-  | 'cancelPlanSwitch'
-  | 'switchToCredits';
-
-type ActiveConfirmation = {
-  title: string;
-  description: string;
-  confirmLabel: string;
-  pendingLabel: string;
-  run: () => Promise<unknown>;
-};
-
 function ActiveSubscriptionCard({
   billing,
   onCancelClick,
@@ -102,60 +87,24 @@ function ActiveSubscriptionCard({
   const instanceId = billing.instance?.id ?? null;
   const invalidate = useInvalidateKiloClawBilling(instanceId);
 
-  const switchPlanMutation = useMutation(trpc.kiloclaw.switchPlanAtInstance.mutationOptions());
-  const continueCommitMutation = useMutation(
-    trpc.kiloclaw.continueCommitAsStandard.mutationOptions()
-  );
   const portalMutation = useMutation(trpc.kiloclaw.getCustomerPortalUrl.mutationOptions());
   const cancelSwitchMutation = useMutation(
     trpc.kiloclaw.cancelPlanSwitchAtInstance.mutationOptions()
   );
-  const acceptConversionMutation = useMutation(
-    trpc.kiloclaw.acceptConversionAtInstance.mutationOptions()
-  );
-
-  const [confirmationAction, setConfirmationAction] = useState<ActiveConfirmationAction | null>(
-    null
-  );
-  const [pendingAction, setPendingAction] = useState<ActiveConfirmationAction | null>(null);
-
-  const CONVERSION_DISMISSED_KEY = 'kiloclaw-conversion-dismissed';
-  const [conversionDismissed, setConversionDismissed] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return localStorage.getItem(CONVERSION_DISMISSED_KEY) === '1';
-  });
+  const [confirmingCancelSwitch, setConfirmingCancelSwitch] = useState(false);
+  const [isPending, setIsPending] = useState(false);
 
   const sub = billing.subscription;
-
-  useEffect(() => {
-    if (sub && !sub.showConversionPrompt && conversionDismissed) {
-      localStorage.removeItem(CONVERSION_DISMISSED_KEY);
-      setConversionDismissed(false);
-    }
-  }, [sub, conversionDismissed]);
 
   if (!sub) return null;
 
   const isCommit = sub.plan === 'commit';
   const retirement = getKiloClawRetirementDisplay(sub);
   const finalCommitEndsAt = retirement.finalCommitEndsAt ?? sub.currentPeriodEnd;
-  const standardContinuationPrice = formatStandardContinuationPrice(
-    retirement.standardContinuationPriceMicrodollars
-  );
-  const futureFundingSource = formatKiloClawFundingSource(retirement.futureFundingSource);
-  const otherPlan = isCommit ? 'standard' : 'commit';
-  const otherPlanLabel = formatKiloClawPlanPrice({
-    plan: otherPlan,
-    priceVersion: sub.priceVersion,
-  });
-  const canSwitchPlan = otherPlan !== 'commit' || billing.commitPlanAvailable === true;
-
   const hasUserRequestedSwitch = sub.scheduledBy === 'user';
   const isCreditFunded = !sub.hasStripeFunding && sub.paymentSource === 'credits';
   const renewalDate =
     isCreditFunded && sub.creditRenewalAt ? sub.creditRenewalAt : sub.currentPeriodEnd;
-  const showConversion = sub.showConversionPrompt && !conversionDismissed;
-
   async function handleManageBilling() {
     if (!instanceId) return;
     const result = await portalMutation.mutateAsync({
@@ -165,69 +114,28 @@ function ActiveSubscriptionCard({
     window.location.href = result.url;
   }
 
-  const confirmations: Record<ActiveConfirmationAction, ActiveConfirmation> = {
-    switchPlan: {
-      title: `Switch to ${isCommit ? 'Standard' : 'Commit'}?`,
-      description: `Schedules your KiloClaw subscription to switch plans at the next renewal. Your current plan stays active until then.`,
-      confirmLabel: `Switch to ${otherPlan}`,
-      pendingLabel: `Switching to ${otherPlan}`,
-      run: async () => {
-        if (!instanceId) return;
-        await switchPlanMutation.mutateAsync({ instanceId, toPlan: otherPlan });
-      },
-    },
-    continueMonthToMonth: {
-      title: 'Continue month-to-month?',
-      description: `Standard starts on ${formatBillingDate(finalCommitEndsAt)} at ${standardContinuationPrice} using ${futureFundingSource}. Your final Commit term stays active until then.`,
-      confirmLabel: 'Continue month-to-month',
-      pendingLabel: 'Scheduling continuation',
-      run: async () => {
-        if (!instanceId) return;
-        await continueCommitMutation.mutateAsync({ instanceId });
-      },
-    },
-    cancelPlanSwitch: {
-      title: retirement.standardContinuationScheduled
-        ? 'Cancel month-to-month continuation?'
-        : 'Cancel scheduled plan switch?',
-      description: retirement.standardContinuationScheduled
-        ? `Standard will no longer start on ${formatBillingDate(finalCommitEndsAt)}. Hosting ends when your final Commit term ends.`
-        : 'Keeps your KiloClaw subscription on its current plan and removes the pending change.',
-      confirmLabel: retirement.standardContinuationScheduled
-        ? 'Cancel month-to-month continuation'
-        : 'Cancel plan switch',
-      pendingLabel: retirement.standardContinuationScheduled
-        ? 'Canceling continuation'
-        : 'Canceling plan switch',
-      run: async () => {
-        if (!instanceId) return;
-        await cancelSwitchMutation.mutateAsync({ instanceId });
-      },
-    },
-    switchToCredits: {
-      title: 'Switch hosting billing to credits?',
-      description: retirement.isFinalCommitTerm
-        ? `Stripe billing stays active through the final Commit term. Then Standard starts at ${standardContinuationPrice} and renews from your credit balance.`
-        : 'Stripe billing stays active through the current period, then this subscription renews against your credit balance.',
-      confirmLabel: 'Switch to credits',
-      pendingLabel: 'Switching to credits',
-      run: async () => {
-        if (!instanceId) return;
-        await acceptConversionMutation.mutateAsync({ instanceId });
-      },
-    },
-  };
+  const cancelSwitchCopy = retirement.standardContinuationScheduled
+    ? {
+        title: 'Cancel month-to-month continuation?',
+        description: `Standard will no longer start on ${formatBillingDate(finalCommitEndsAt)}. Hosting ends when your final Commit term ends.`,
+        confirmLabel: 'Cancel month-to-month continuation',
+        pendingLabel: 'Canceling continuation',
+      }
+    : {
+        title: 'Cancel scheduled plan switch?',
+        description:
+          'Keeps your KiloClaw subscription on its current plan and removes the pending change.',
+        confirmLabel: 'Cancel plan switch',
+        pendingLabel: 'Canceling plan switch',
+      };
 
-  const activeConfirmation = confirmationAction ? confirmations[confirmationAction] : null;
-  const isPending = pendingAction !== null;
-
-  function confirmCurrentAction() {
-    if (!confirmationAction || !activeConfirmation) return;
-    setPendingAction(confirmationAction);
+  function confirmCancelSwitch() {
+    if (!instanceId) return;
+    setIsPending(true);
     void (async () => {
       try {
-        await activeConfirmation.run();
-        setConfirmationAction(null);
+        await cancelSwitchMutation.mutateAsync({ instanceId });
+        setConfirmingCancelSwitch(false);
         try {
           await invalidate();
         } catch (error) {
@@ -237,7 +145,7 @@ function ActiveSubscriptionCard({
       } catch (error) {
         toast.error(error instanceof Error ? error.message : 'Action failed. Try again.');
       } finally {
-        setPendingAction(null);
+        setIsPending(false);
       }
     })();
   }
@@ -297,8 +205,8 @@ function ActiveSubscriptionCard({
           <AlertDescription>
             <p>
               {retirement.standardContinuationScheduled
-                ? `Standard starts on ${formatBillingDate(finalCommitEndsAt)} at ${standardContinuationPrice} using ${futureFundingSource}.`
-                : `Your final Commit term ends on ${formatBillingDate(finalCommitEndsAt)}. Hosting ends unless you continue month-to-month at ${standardContinuationPrice} using ${futureFundingSource}.`}
+                ? `Standard starts on ${formatBillingDate(finalCommitEndsAt)} at ${formatStandardContinuationPrice(retirement.standardContinuationPriceMicrodollars)} using ${formatKiloClawFundingSource(retirement.futureFundingSource)}.`
+                : `Your final Commit term ends on ${formatBillingDate(finalCommitEndsAt)}. Hosting ends then.`}
             </p>
           </AlertDescription>
         </Alert>
@@ -313,74 +221,18 @@ function ActiveSubscriptionCard({
         </Alert>
       ) : null}
 
-      {showConversion ? (
-        <Alert variant="notice">
-          <AlertDescription>
-            <p>
-              {retirement.isFinalCommitTerm
-                ? `You have an active Kilo Pass. Switching to credits also continues hosting as pure-credit Standard at ${standardContinuationPrice} after the final Commit term.`
-                : 'You have an active Kilo Pass. Switch hosting to credit-funded billing to stop the separate Stripe charge — your current period continues as-is.'}
-            </p>
-            <div className="flex flex-wrap gap-2 pt-1">
-              <Button
-                size="sm"
-                onClick={() => setConfirmationAction('switchToCredits')}
-                disabled={!instanceId}
-              >
-                Switch to credits
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  localStorage.setItem(CONVERSION_DISMISSED_KEY, '1');
-                  setConversionDismissed(true);
-                }}
-              >
-                Dismiss
-              </Button>
-            </div>
-          </AlertDescription>
-        </Alert>
-      ) : null}
-
       <div className="flex flex-wrap gap-2 pt-1">
-        {retirement.needsSupportReview ? null : retirement.isFinalCommitTerm ? (
-          retirement.standardContinuationScheduled ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setConfirmationAction('cancelPlanSwitch')}
-              disabled={!instanceId}
-            >
-              Cancel month-to-month continuation
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              onClick={() => setConfirmationAction('continueMonthToMonth')}
-              disabled={!instanceId}
-            >
-              Continue month-to-month
-            </Button>
-          )
-        ) : hasUserRequestedSwitch ? (
+        {!retirement.needsSupportReview &&
+        (retirement.isFinalCommitTerm
+          ? retirement.standardContinuationScheduled
+          : hasUserRequestedSwitch) ? (
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setConfirmationAction('cancelPlanSwitch')}
+            onClick={() => setConfirmingCancelSwitch(true)}
             disabled={!instanceId}
           >
-            Cancel plan switch
-          </Button>
-        ) : canSwitchPlan ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setConfirmationAction('switchPlan')}
-            disabled={!instanceId}
-          >
-            Switch to {otherPlanLabel}
+            {cancelSwitchCopy.confirmLabel}
           </Button>
         ) : null}
         {!retirement.needsSupportReview && sub.hasStripeFunding ? (
@@ -413,24 +265,24 @@ function ActiveSubscriptionCard({
       </div>
 
       <AlertDialog
-        open={confirmationAction !== null}
+        open={confirmingCancelSwitch}
         onOpenChange={open => {
-          if (!open && !isPending) setConfirmationAction(null);
+          if (!open && !isPending) setConfirmingCancelSwitch(false);
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{activeConfirmation?.title}</AlertDialogTitle>
-            <AlertDialogDescription>{activeConfirmation?.description}</AlertDialogDescription>
+            <AlertDialogTitle>{cancelSwitchCopy.title}</AlertDialogTitle>
+            <AlertDialogDescription>{cancelSwitchCopy.description}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmCurrentAction}
+              onClick={confirmCancelSwitch}
               disabled={isPending}
               aria-busy={isPending}
             >
-              {isPending ? activeConfirmation?.pendingLabel : activeConfirmation?.confirmLabel}
+              {isPending ? cancelSwitchCopy.pendingLabel : cancelSwitchCopy.confirmLabel}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -439,15 +291,7 @@ function ActiveSubscriptionCard({
   );
 }
 
-function ConvertingSubscriptionCard({
-  billing,
-  onReactivateClick,
-  isReactivating,
-}: {
-  billing: ClawBillingStatus;
-  onReactivateClick: () => void;
-  isReactivating: boolean;
-}) {
+function ConvertingSubscriptionCard({ billing }: { billing: ClawBillingStatus }) {
   const sub = billing.subscription;
   if (!sub) return null;
 
@@ -469,32 +313,11 @@ function ConvertingSubscriptionCard({
           balance.
         </AlertDescription>
       </Alert>
-
-      <div className="flex flex-wrap gap-2 pt-1">
-        <Button onClick={onReactivateClick} disabled={isReactivating} aria-busy={isReactivating}>
-          {isReactivating ? (
-            <>
-              <Loader2 className="animate-spin" aria-hidden="true" />
-              Reactivating…
-            </>
-          ) : (
-            'Keep Stripe billing'
-          )}
-        </Button>
-      </div>
     </KiloClawCardShell>
   );
 }
 
-function CancelingSubscriptionCard({
-  billing,
-  onReactivateClick,
-  isReactivating,
-}: {
-  billing: ClawBillingStatus;
-  onReactivateClick: () => void;
-  isReactivating: boolean;
-}) {
+function CancelingSubscriptionCard({ billing }: { billing: ClawBillingStatus }) {
   const sub = billing.subscription;
   if (!sub) return null;
 
@@ -517,23 +340,9 @@ function CancelingSubscriptionCard({
           <p>
             Your subscription cancels on{' '}
             <span className="tabular-nums">{formatBillingDate(sub.currentPeriodEnd)}</span>.
-            Reactivate to keep it renewing.
           </p>
         </AlertDescription>
       </Alert>
-
-      <div className="flex flex-wrap gap-2 pt-1">
-        <Button onClick={onReactivateClick} disabled={isReactivating} aria-busy={isReactivating}>
-          {isReactivating ? (
-            <>
-              <Loader2 className="animate-spin" aria-hidden="true" />
-              Reactivating…
-            </>
-          ) : (
-            'Reactivate'
-          )}
-        </Button>
-      </div>
     </KiloClawCardShell>
   );
 }
@@ -591,24 +400,8 @@ function PastDueSubscriptionCard({
 export function SubscriptionCard({ billing, onCancelClick }: SubscriptionCardProps) {
   const trpc = useTRPC();
   const instanceId = billing.instance?.id ?? null;
-  const invalidate = useInvalidateKiloClawBilling(instanceId);
 
-  const reactivateMutation = useMutation(
-    trpc.kiloclaw.reactivateSubscriptionAtInstance.mutationOptions()
-  );
   const portalMutation = useMutation(trpc.kiloclaw.getCustomerPortalUrl.mutationOptions());
-
-  function handleReactivate() {
-    if (!instanceId || reactivateMutation.isPending) return;
-    reactivateMutation.mutate(
-      { instanceId },
-      {
-        onSuccess: () => {
-          void invalidate();
-        },
-      }
-    );
-  }
 
   async function handleUpdatePayment() {
     if (!instanceId) return;
@@ -633,22 +426,10 @@ export function SubscriptionCard({ billing, onCancelClick }: SubscriptionCardPro
       return <ActiveSubscriptionCard billing={billing} onCancelClick={onCancelClick} />;
     }
     if (billing.subscription.cancelAtPeriodEnd && billing.subscription.pendingConversion) {
-      return (
-        <ConvertingSubscriptionCard
-          billing={billing}
-          onReactivateClick={handleReactivate}
-          isReactivating={reactivateMutation.isPending}
-        />
-      );
+      return <ConvertingSubscriptionCard billing={billing} />;
     }
     if (billing.subscription.cancelAtPeriodEnd) {
-      return (
-        <CancelingSubscriptionCard
-          billing={billing}
-          onReactivateClick={handleReactivate}
-          isReactivating={reactivateMutation.isPending}
-        />
-      );
+      return <CancelingSubscriptionCard billing={billing} />;
     }
     if (billing.subscription.status === 'active') {
       return <ActiveSubscriptionCard billing={billing} onCancelClick={onCancelClick} />;

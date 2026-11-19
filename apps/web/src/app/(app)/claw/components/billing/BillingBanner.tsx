@@ -2,14 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import {
-  AlertCircle,
-  AlertTriangle,
-  ArrowRightLeft,
-  Clock,
-  CreditCard,
-  Loader2,
-} from 'lucide-react';
+import { AlertCircle, AlertTriangle, ArrowRightLeft, Clock, CreditCard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import type { ClawBannerState, ClawBillingStatus } from './billing-types';
@@ -21,10 +14,7 @@ function pluralizeDays(n: number | undefined): string {
 
 type BillingBannerProps = {
   billing: ClawBillingStatus;
-  onSubscribeClick: () => void;
-  onReactivateClick: () => void;
   onUpdatePaymentClick: () => void;
-  isReactivating?: boolean;
 };
 
 function getBannerStyles(state: ClawBannerState) {
@@ -93,31 +83,31 @@ function getBannerContent(state: ClawBannerState, billing: ClawBillingStatus) {
       return {
         title: `Free Trial — ${pluralizeDays(billing.trial?.daysRemaining)} remaining`,
         message: `Your trial expires on ${formatBillingDate(billing.trial?.endsAt ?? '')}.`,
-        cta: 'Subscribe Now',
-        action: 'subscribe' as const,
+        cta: null,
+        action: null,
       };
     case 'trial_ending_soon':
       return {
         title: `Free Trial Ending Soon — ${pluralizeDays(billing.trial?.daysRemaining)} left`,
-        message: `Your trial expires on ${formatBillingDate(billing.trial?.endsAt ?? '')}. Subscribe now to avoid interruption.`,
-        cta: 'Subscribe Now',
-        action: 'subscribe' as const,
+        message: `Your trial expires on ${formatBillingDate(billing.trial?.endsAt ?? '')}. KiloClaw hosting can no longer be started or renewed.`,
+        cta: null,
+        action: null,
       };
     case 'trial_ending_very_soon':
       return {
         title: `Free Trial Ending Very Soon — ${pluralizeDays(billing.trial?.daysRemaining)} left`,
         message:
-          "Your KiloClaw will be stopped when the trial ends. You won't be charged automatically — subscribe to keep it running.",
-        cta: 'Subscribe Now',
-        action: 'subscribe' as const,
+          'Your KiloClaw will be stopped when the trial ends. KiloClaw hosting can no longer be started or renewed.',
+        cta: null,
+        action: null,
       };
     case 'trial_expires_today':
       return {
         title: 'Free Trial Ends Today',
         message:
-          "Your KiloClaw will be stopped at the end of today. You won't be charged automatically — subscribe now to keep it running.",
-        cta: 'Subscribe Now',
-        action: 'subscribe' as const,
+          'Your KiloClaw will be stopped at the end of today. KiloClaw hosting can no longer be started or renewed.',
+        cta: null,
+        action: null,
       };
     case 'earlybird_active':
       return {
@@ -129,9 +119,9 @@ function getBannerContent(state: ClawBannerState, billing: ClawBillingStatus) {
     case 'earlybird_ending_soon':
       return {
         title: `Earlybird Hosting Expiring Soon — ${pluralizeDays(billing.earlybird?.daysRemaining)} left`,
-        message: `Your earlybird hosting expires on ${formatBillingDate(billing.earlybird?.expiresAt ?? '')}. Subscribe to continue.`,
-        cta: 'Subscribe',
-        action: 'subscribe' as const,
+        message: `Your earlybird hosting expires on ${formatBillingDate(billing.earlybird?.expiresAt ?? '')}. KiloClaw hosting can no longer be started or renewed.`,
+        cta: null,
+        action: null,
       };
     case 'subscription_converting':
       return {
@@ -145,9 +135,9 @@ function getBannerContent(state: ClawBannerState, billing: ClawBillingStatus) {
       return {
         title: `Your plan ends on ${formatBillingDate(billing.subscription?.currentPeriodEnd ?? '')}`,
         message:
-          'After this date your instance will be stopped. You can reactivate anytime before then.',
-        cta: 'Reactivate',
-        action: 'reactivate' as const,
+          'After this date your instance will be stopped. KiloClaw hosting can no longer be started or renewed.',
+        cta: null,
+        action: null,
       };
     case 'subscription_past_due':
       if (
@@ -175,13 +165,7 @@ function getBannerContent(state: ClawBannerState, billing: ClawBillingStatus) {
   }
 }
 
-export function BillingBanner({
-  billing,
-  onSubscribeClick,
-  onReactivateClick,
-  onUpdatePaymentClick,
-  isReactivating = false,
-}: BillingBannerProps) {
+export function BillingBanner({ billing, onUpdatePaymentClick }: BillingBannerProps) {
   const state = deriveBannerState(billing);
 
   if (state === 'subscribed' || state === 'none') return null;
@@ -193,20 +177,6 @@ export function BillingBanner({
   if (!content) return null;
 
   const Icon = getBannerIcon(state);
-
-  function handleCta() {
-    switch (content?.action) {
-      case 'subscribe':
-        onSubscribeClick();
-        break;
-      case 'reactivate':
-        onReactivateClick();
-        break;
-      case 'update_payment':
-        onUpdatePaymentClick();
-        break;
-    }
-  }
 
   return (
     <div
@@ -232,20 +202,8 @@ export function BillingBanner({
             <Link href="/credits">{content.cta}</Link>
           </Button>
         ) : (
-          <Button
-            onClick={handleCta}
-            variant="primary"
-            className="shrink-0"
-            disabled={content.action === 'reactivate' && isReactivating}
-          >
-            {content.action === 'reactivate' && isReactivating ? (
-              <>
-                <Loader2 className="animate-spin" />
-                Reactivating...
-              </>
-            ) : (
-              content.cta
-            )}
+          <Button onClick={onUpdatePaymentClick} variant="primary" className="shrink-0">
+            {content.cta}
           </Button>
         ))}
     </div>

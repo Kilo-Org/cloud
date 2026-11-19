@@ -12,12 +12,10 @@ import {
   kiloclaw_instances,
   kiloclaw_subscription_change_log,
   kiloclaw_subscriptions,
-  kilocode_users,
 } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 
 import { listCurrentPersonalSubscriptionRows } from '@/lib/kiloclaw/current-personal-subscription';
-import { enrollWithCredits as enrollWithCreditsImpl } from '@/lib/kiloclaw/credit-billing';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { bootstrapProvisionSubscriptionWithDb } from '../../../../../services/kiloclaw-billing/src/provision-bootstrap-shared';
@@ -1129,23 +1127,16 @@ describe('personal subscription destroy collapse', () => {
       trialEndsAt: '2999-04-08T00:00:00.000Z',
     });
     await db
-      .update(kilocode_users)
-      .set({ total_microdollars_acquired: 50_000_000 })
-      .where(eq(kilocode_users.id, user.id));
-    process.env.STRIPE_KILOCLAW_2026_03_19_STANDARD_INTRO_PRICE_ID ||=
-      'price_legacy_standard_intro';
-    process.env.STRIPE_KILOCLAW_2026_03_19_STANDARD_PRICE_ID ||= 'price_legacy_standard';
-    process.env.STRIPE_KILOCLAW_2026_03_19_COMMIT_PRICE_ID ||= 'price_legacy_commit';
-    process.env.STRIPE_KILOCLAW_2026_05_10_STANDARD_PRICE_ID ||= 'price_current_standard';
-    process.env.STRIPE_KILOCLAW_2026_05_10_COMMIT_PRICE_ID ||= 'price_current_commit';
-
-    await enrollWithCreditsImpl({
-      userId: user.id,
-      instanceId: oldInstanceId,
-      plan: 'standard',
-      hadPaidSubscription: false,
-      actor: TEST_ACTOR,
-    });
+      .update(kiloclaw_subscriptions)
+      .set({
+        plan: 'standard',
+        status: 'active',
+        payment_source: 'credits',
+        current_period_start: '2026-04-01T00:00:00.000Z',
+        current_period_end: '2999-05-01T00:00:00.000Z',
+        credit_renewal_at: '2999-05-01T00:00:00.000Z',
+      })
+      .where(eq(kiloclaw_subscriptions.id, subscriptionId));
 
     const [paidBefore] = await db
       .select()
@@ -1156,7 +1147,7 @@ describe('personal subscription destroy collapse', () => {
       !paidBefore.current_period_end ||
       !paidBefore.credit_renewal_at
     ) {
-      throw new Error('Expected credit enrollment to set a paid billing period');
+      throw new Error('Expected a paid billing period');
     }
 
     await db.transaction(async tx => {

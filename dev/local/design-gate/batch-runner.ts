@@ -45,7 +45,14 @@ import {
   type Platform,
 } from './matrix';
 import { APP_ID } from './report';
-import { pnpmSeedRunner, readSeedMap, SEED_STEPS, seedAll, writeSeedMap } from './seed-all';
+import {
+  pnpmSeedRunner,
+  readSeedMap,
+  SEED_STEPS,
+  seedAll,
+  stepsFor,
+  writeSeedMap,
+} from './seed-all';
 
 export const BATCHES_USAGE = `Usage: pnpm dev:mobile:design-gate batches <command> [flags]
   run --device <serial|udid>@<metro-url> [--device ...] --out <dir>
@@ -55,8 +62,9 @@ export const BATCHES_USAGE = `Usage: pnpm dev:mobile:design-gate batches <comman
       Runs the shard's batches of one phase, one gate run per batch, in parallel across the devices.
       Each device needs its own Metro (its own port and adb reverse); a device takes the next batch when
       it finishes one. Before each batch the app is restarted on that device's Metro and must reach the
-      phase's ready screen (signed-in: Home, signed-out: Login). A batch that exits 2 is retried once;
-      a second 2 stops dispatching and writes RUN-STOPPED. Rows that force a state open
+      phase's ready screen (signed-in: Home, signed-out: Login). A batch that exits 2, or whose gate
+      exits without findings.json or with a code other than 0 or 1, is retried once; a second failure
+      stops dispatching and writes RUN-STOPPED. Rows that force a state open
       ${FORCE_CLEAR_LINK} after their capture.
       Writes <out>/<batch>/ (gate artifacts, targets.json, expectations.json, gate.log),
       <out>/summary.tsv and <out>/resolved-links.tsv.
@@ -342,23 +350,39 @@ async function runBatch(
     '--out',
     dir,
   ];
+  const findingsPath = path.join(dir, 'findings.json');
   let code = 2;
   let attempt = 0;
   let notReady = false;
+  let noArtifact = false;
   while (attempt < 2) {
     attempt += 1;
     notReady = false;
+    noArtifact = false;
     log(`${batch.id}: attempt ${attempt} on ${device.id}`);
+    // A previous attempt's artifact must not stand in for this attempt's.
+    fs.rmSync(findingsPath, { force: true });
     if (options.restart) {
       try {
         await prepareApp(device, batch.phase, log);
       } catch (error) {
         notReady = true;
-        code = 2;
         log(`${batch.id}: app never reached the ready screen on ${device.id}: ${String(error)}`);
       }
     }
-    if (!notReady) code = await runGate(gateArgs, path.join(dir, 'gate.log'));
+    if (!notReady) {
+      const gateCode = await runGate(gateArgs, path.join(dir, 'gate.log'));
+      noArtifact = !fs.existsSync(findingsPath);
+      // Only 0 and 1 are measurements, and only with an artifact: a crash
+      // (Node exits 1 on an uncaught exception), a signal exit (130, 143) or
+      // a missing findings.json is an incomplete capture.
+      code = (gateCode === 0 || gateCode === 1) && !noArtifact ? gateCode : 2;
+      if (code === 2 && gateCode !== 2) {
+        log(`${batch.id}: gate exited ${gateCode}${noArtifact ? ' without findings.json' : ''}`);
+      }
+    } else {
+      code = 2;
+    }
     if (code !== 2) break;
     if (attempt < 2) {
       log(`${batch.id}: exited 2 (attempt ${attempt}); retrying once`);
@@ -366,8 +390,7 @@ async function runBatch(
     }
   }
   if (notReady) return finish(2, 'app-not-ready', attempt, true);
-  const findingsPath = path.join(dir, 'findings.json');
-  if (!fs.existsSync(findingsPath)) return finish(code, 'no-findings-json', attempt, code === 2);
+  if (noArtifact) return finish(2, 'no-findings-json', attempt, true);
   const findings: FindingsFile = JSON.parse(fs.readFileSync(findingsPath, 'utf8'));
   const counts = [errorCounts(findings)];
   const expectations = checkExpectations(dir, targets);
@@ -430,14 +453,38 @@ export async function runBatches(
       if (stopped !== undefined) return;
       const batch = queue.shift();
       if (batch === undefined) return;
-      const result = await runBatch(batch, device, options, line => log(`[${device.id}] ${line}`));
+      const deviceLog = (line: string) => log(`[${device.id}] ${line}`);
+      const started = clock.now();
+      let result: SummaryRow & { stop: boolean };
+      try {
+        result = await runBatch(batch, device, options, deviceLog);
+      } catch (error) {
+        // A runner fault in one batch (a truncated findings.json, a full disk)
+        // ends that batch as infrastructure and goes through the stop path,
+        // so the summary and RUN-STOPPED are still written.
+        const reason = error instanceof Error ? error.message : String(error);
+        deviceLog(`${batch.id}: runner error: ${reason}`);
+        result = {
+          batch: batch.id,
+          tier: batch.tier,
+          phase: batch.phase,
+          device: device.id,
+          exit: 2,
+          counts: `runner-error:${reason.replace(/\s+/g, ' ').slice(0, 120)}`,
+          durationS: Math.round((clock.now() - started) / 1000),
+          attempts: 0,
+          stop: true,
+        };
+      }
       results.set(batch.id, result);
-      writeSummary(options.out, options.batches, results);
-      log(
-        `[${device.id}] ${batch.id}\texit ${result.exit}\t${result.counts}\t${result.durationS}s`
-      );
+      deviceLog(`${batch.id}\texit ${result.exit}\t${result.counts}\t${result.durationS}s`);
       if (result.stop && stopped === undefined) {
-        stopped = `${batch.id} exited 2 twice on ${device.id} (${result.counts})`;
+        stopped = `${batch.id} failed as infrastructure on ${device.id} (${result.counts})`;
+      }
+      try {
+        writeSummary(options.out, options.batches, results);
+      } catch (error) {
+        deviceLog(`summary write failed: ${String(error)}`);
       }
     }
   };
@@ -582,9 +629,17 @@ export async function batchesMain(argv: readonly string[], deps: BatchesDeps): P
         if (values.email === undefined || values.out === undefined) {
           throw new Error('seed needs --email <fake@example.com> and --out <seed-map.json>');
         }
+        // Only the steps the selected rows reference run, so a topic the run
+        // never reads (sessions needs a GitHub integration) cannot fail it.
+        const only = values.only?.split(',').filter(Boolean);
+        const rows = readManifest(manifestFile).filter(
+          row => only === undefined || only.includes(row.batch)
+        );
+        const steps = values.step ?? stepsFor(rows);
+        deps.log(`seed steps: ${steps.join(', ') || '(none)'}`);
         const map = seedAll({
           email: values.email,
-          steps: values.step,
+          steps,
           run: pnpmSeedRunner(path.join(import.meta.dirname, '..', '..', '..')),
           log: deps.log,
         });

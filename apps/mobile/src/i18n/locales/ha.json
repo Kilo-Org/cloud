@@ -4560,7 +4560,26 @@
     "quietSnapshot": "Ba a zaɓi wani aikin zaman aiki don wannan rahoton yanayi ba. Ba a nemi taƙaitawar AI ba, kuma ba a yi caji ba.",
     "noEnabledContexts": "Babu mahallin da aka kunna rahotannin da aka tsara a cikinsa",
     "sourceBlocker": "Zaman aiki yana buƙatar kulawa",
-    "sourceMetadata": "Bayanan metadata na zaman aiki da aka adana"
+    "sourceMetadata": "Bayanan metadata na zaman aiki da aka adana",
+    "metadataPlan_one": "Tsari: an kammala mataki {{displayDone}} cikin {{displayTotal}}",
+    "metadataPlan_other": "Tsari: an kammala matakai {{displayDone}} cikin {{displayTotal}}",
+    "metadataPlan": "Tsari: an kammala matakai {{displayDone}} cikin {{displayTotal}}",
+    "metadataFiles_one": "An canza fayil {{displayCount}}",
+    "metadataFiles_other": "An canza fayiloli {{displayCount}}",
+    "metadataFiles": "An canza fayiloli {{displayCount}}",
+    "metadataLinesAdded_one": "An ƙara layi {{displayCount}}",
+    "metadataLinesAdded_other": "An ƙara layuka {{displayCount}}",
+    "metadataLinesAdded": "An ƙara layuka {{displayCount}}",
+    "metadataLinesRemoved_one": "An cire layi {{displayCount}}",
+    "metadataLinesRemoved_other": "An cire layuka {{displayCount}}",
+    "metadataLinesRemoved": "An cire layuka {{displayCount}}",
+    "metadataPlanCurrent": "Mataki na yanzu: {{current}}",
+    "metadataFailure": "Turmakon ƙarshe ya gaza: {{kind}}",
+    "sourceActivity": "Aiki mara take",
+    "metadataFailureProvider": "kuskuren mai bayarwa",
+    "metadataFailureTool": "kuskuren kayan aiki",
+    "metadataFailureCancelled": "An soke",
+    "metadataFailureOther": "kuskure mara bayani"
   },
   "systemSearch": {
     "couldNotOpenResult": "Ba a iya buɗe wannan sakamakon binciken ba"

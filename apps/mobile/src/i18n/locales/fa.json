@@ -4560,7 +4560,26 @@
     "quietSnapshot": "برای این تصویر لحظه‌ای هیچ فعالیتی انتخاب نشد. هیچ خلاصه AI درخواست نشد و هزینه‌ای دریافت نشد.",
     "noEnabledContexts": "هیچ بخشی برای گزارش‌های زمان‌بندی‌شده فعال نیست",
     "sourceBlocker": "جلسه به توجه نیاز دارد",
-    "sourceMetadata": "فراداده‌های ثبت‌شدهٔ جلسه"
+    "sourceMetadata": "فراداده‌های ثبت‌شدهٔ جلسه",
+    "metadataPlan_one": "برنامه: {{displayDone}} از {{displayTotal}} مرحله انجام شد",
+    "metadataPlan_other": "برنامه: {{displayDone}} از {{displayTotal}} مرحله انجام شد",
+    "metadataPlan": "برنامه: {{displayDone}} از {{displayTotal}} مرحله انجام شد",
+    "metadataFiles_one": "{{displayCount}} فایل تغییر کرد",
+    "metadataFiles_other": "{{displayCount}} فایل تغییر کرد",
+    "metadataFiles": "{{displayCount}} فایل تغییر کرد",
+    "metadataLinesAdded_one": "{{displayCount}} خط اضافه شد",
+    "metadataLinesAdded_other": "{{displayCount}} خط اضافه شد",
+    "metadataLinesAdded": "{{displayCount}} خط اضافه شد",
+    "metadataLinesRemoved_one": "{{displayCount}} خط حذف شد",
+    "metadataLinesRemoved_other": "{{displayCount}} خط حذف شد",
+    "metadataLinesRemoved": "{{displayCount}} خط حذف شد",
+    "metadataPlanCurrent": "مرحله فعلی: {{current}}",
+    "metadataFailure": "آخرین نوبت ناموفق بود: {{kind}}",
+    "sourceActivity": "فعالیت بدون عنوان",
+    "metadataFailureProvider": "خطای ارائهدهنده",
+    "metadataFailureTool": "خطای ابزار",
+    "metadataFailureCancelled": "لغوشده",
+    "metadataFailureOther": "خطای نامشخص"
   },
   "systemSearch": {
     "couldNotOpenResult": "باز کردن این نتیجه جست‌وجو ممکن نشد"

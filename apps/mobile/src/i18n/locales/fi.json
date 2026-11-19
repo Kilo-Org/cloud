@@ -4560,7 +4560,26 @@
     "quietSnapshot": "Tähän katsaukseen ei valikoitunut istuntotoimintaa. AI-yhteenvetoa ei pyydetty eikä siitä veloitettu.",
     "noEnabledContexts": "Ajastetut katsaukset eivät ole käytössä missään kontekstissa",
     "sourceBlocker": "Istunto vaatii huomiota",
-    "sourceMetadata": "Tallennetut istunnon metatiedot"
+    "sourceMetadata": "Tallennetut istunnon metatiedot",
+    "metadataPlan_one": "Suunnitelma: {{displayDone}}/{{displayTotal}} vaihe tehty",
+    "metadataPlan_other": "Suunnitelma: {{displayDone}}/{{displayTotal}} vaihetta tehty",
+    "metadataPlan": "Suunnitelma: {{displayDone}}/{{displayTotal}} vaihetta tehty",
+    "metadataFiles_one": "{{displayCount}} tiedosto muutettu",
+    "metadataFiles_other": "{{displayCount}} tiedostoa muutettu",
+    "metadataFiles": "{{displayCount}} tiedostoa muutettu",
+    "metadataLinesAdded_one": "{{displayCount}} rivi lisätty",
+    "metadataLinesAdded_other": "{{displayCount}} riviä lisätty",
+    "metadataLinesAdded": "{{displayCount}} riviä lisätty",
+    "metadataLinesRemoved_one": "{{displayCount}} rivi poistettu",
+    "metadataLinesRemoved_other": "{{displayCount}} riviä poistettu",
+    "metadataLinesRemoved": "{{displayCount}} riviä poistettu",
+    "metadataPlanCurrent": "Nykyinen vaihe: {{current}}",
+    "metadataFailure": "Viimeisin vuoro epäonnistui: {{kind}}",
+    "sourceActivity": "Nimetön aktiviteetti",
+    "metadataFailureProvider": "palveluntarjoajan virhe",
+    "metadataFailureTool": "työkalun virhe",
+    "metadataFailureCancelled": "Peruttu",
+    "metadataFailureOther": "määrittämätön virhe"
   },
   "systemSearch": {
     "couldNotOpenResult": "Tämän hakutuloksen avaaminen epäonnistui"

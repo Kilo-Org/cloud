@@ -4560,7 +4560,26 @@
     "quietSnapshot": "ບໍ່ມີກິດຈະກຳຂອງເຊສຊັນໃດທີ່ຖືກເລືອກສຳລັບບັນທຶກສະຖານະນີ້. ບໍ່ມີການຮ້ອງຂໍ ຫຼື ຄິດຄ່າໃຊ້ຈ່າຍສຳລັບສະຫຼຸບ AI.",
     "noEnabledContexts": "ບໍ່ມີບໍລິບົດທີ່ເປີດໃຊ້ລາຍງານທີ່ກຳນົດໄວ້",
     "sourceBlocker": "ເຊສຊັນຕ້ອງການການເອົາໃຈໃສ່",
-    "sourceMetadata": "ຂໍ້ມູນເມຕາຂອງເຊສຊັນທີ່ບັນທຶກໄວ້"
+    "sourceMetadata": "ຂໍ້ມູນເມຕາຂອງເຊສຊັນທີ່ບັນທຶກໄວ້",
+    "metadataPlan_other": "ແຜນ: ສຳເລັດ {{displayDone}} ຈາກ {{displayTotal}} ຂັ້ນຕອນ",
+    "metadataPlan": "ແຜນ: ສຳເລັດ {{displayDone}} ຈາກ {{displayTotal}} ຂັ້ນຕອນ",
+    "metadataFiles_other": "{{displayCount}} ໄຟລ໌ທີ່ປ່ຽນແປງ",
+    "metadataFiles": "{{displayCount}} ໄຟລ໌ທີ່ປ່ຽນແປງ",
+    "metadataLinesAdded_other": "ເພີ່ມ {{displayCount}} ແຖວ",
+    "metadataLinesAdded": "ເພີ່ມ {{displayCount}} ແຖວ",
+    "metadataLinesRemoved_other": "ລຶບ {{displayCount}} ແຖວ",
+    "metadataLinesRemoved": "ລຶບ {{displayCount}} ແຖວ",
+    "metadataPlanCurrent": "ຂັ້ນຕອນປັດຈຸບັນ: {{current}}",
+    "metadataFailure": "ຄັ້ງຫຼ້າລົ້ມເຫຼວ: {{kind}}",
+    "sourceActivity": "ກິດຈະກຳບໍ່ມີຊື່",
+    "metadataFailureProvider": "ຂໍ້ຜິດພາດຈາກຜູ້ໃຫ້ບໍລິການ",
+    "metadataFailureTool": "ຂໍ້ຜິດພາດຈາກເຄື່ອງມື",
+    "metadataFailureCancelled": "ຍົກເລີກແລ້ວ",
+    "metadataFailureOther": "ຂໍ້ຜິດພາດທີ່ບໍ່ລະບຸ",
+    "metadataPlan_one": "ແຜນ: ສຳເລັດ {{displayDone}} ຈາກ {{displayTotal}} ຂັ້ນຕອນ",
+    "metadataFiles_one": "{{displayCount}} ໄຟລ໌ທີ່ປ່ຽນແປງ",
+    "metadataLinesAdded_one": "ເພີ່ມ {{displayCount}} ແຖວ",
+    "metadataLinesRemoved_one": "ລຶບ {{displayCount}} ແຖວ"
   },
   "systemSearch": {
     "couldNotOpenResult": "ບໍ່ສາມາດເປີດຜົນການຄົ້ນຫານີ້ໄດ້"

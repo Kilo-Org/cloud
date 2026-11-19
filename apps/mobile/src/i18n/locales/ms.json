@@ -4560,7 +4560,26 @@
     "quietSnapshot": "Tiada aktiviti sesi dipilih untuk syot kilat ini. Tiada ringkasan AI diminta atau caj dikenakan.",
     "noEnabledContexts": "Tiada konteks didayakan untuk laporan berjadual",
     "sourceBlocker": "Sesi memerlukan perhatian",
-    "sourceMetadata": "Metadata sesi yang dirakam"
+    "sourceMetadata": "Metadata sesi yang dirakam",
+    "metadataPlan_other": "Pelan: {{displayDone}} daripada {{displayTotal}} langkah selesai",
+    "metadataPlan": "Pelan: {{displayDone}} daripada {{displayTotal}} langkah selesai",
+    "metadataFiles_other": "{{displayCount}} fail diubah",
+    "metadataFiles": "{{displayCount}} fail diubah",
+    "metadataLinesAdded_other": "{{displayCount}} baris ditambah",
+    "metadataLinesAdded": "{{displayCount}} baris ditambah",
+    "metadataLinesRemoved_other": "{{displayCount}} baris dibuang",
+    "metadataLinesRemoved": "{{displayCount}} baris dibuang",
+    "metadataPlanCurrent": "Langkah semasa: {{current}}",
+    "metadataFailure": "Pusingan terakhir gagal: {{kind}}",
+    "sourceActivity": "Aktiviti tanpa tajuk",
+    "metadataFailureProvider": "ralat pembekal",
+    "metadataFailureTool": "ralat alat",
+    "metadataFailureCancelled": "Dibatalkan",
+    "metadataFailureOther": "ralat tidak dinyatakan",
+    "metadataPlan_one": "Pelan: {{displayDone}} daripada {{displayTotal}} langkah selesai",
+    "metadataFiles_one": "{{displayCount}} fail diubah",
+    "metadataLinesAdded_one": "{{displayCount}} baris ditambah",
+    "metadataLinesRemoved_one": "{{displayCount}} baris dibuang"
   },
   "systemSearch": {
     "couldNotOpenResult": "Tidak dapat membuka hasil carian ini"

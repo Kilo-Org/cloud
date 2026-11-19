@@ -4560,7 +4560,26 @@
     "quietSnapshot": "Энэ тоймд сессийн үйл ажиллагаа сонгогдоогүй. AI хураангуй үүсгэх хүсэлт гаргаагүй бөгөөд төлбөр тооцоогүй.",
     "noEnabledContexts": "Товлосон тоймд идэвхжүүлсэн орчин алга",
     "sourceBlocker": "Сессэд анхаарал хандуулах шаардлагатай",
-    "sourceMetadata": "Хадгалсан сессийн мета өгөгдөл"
+    "sourceMetadata": "Хадгалсан сессийн мета өгөгдөл",
+    "metadataPlan_one": "Төлөвлөгөө: {{displayTotal}} алхмаас {{displayDone}} биелсэн",
+    "metadataPlan_other": "Төлөвлөгөө: {{displayTotal}} алхмаас {{displayDone}} биелсэн",
+    "metadataPlan": "Төлөвлөгөө: {{displayTotal}} алхмаас {{displayDone}} биелсэн",
+    "metadataFiles_one": "{{displayCount}} файл өөрчлөгдсөн",
+    "metadataFiles_other": "{{displayCount}} файл өөрчлөгдсөн",
+    "metadataFiles": "{{displayCount}} файл өөрчлөгдсөн",
+    "metadataLinesAdded_one": "{{displayCount}} мөр нэмэгдсэн",
+    "metadataLinesAdded_other": "{{displayCount}} мөр нэмэгдсэн",
+    "metadataLinesAdded": "{{displayCount}} мөр нэмэгдсэн",
+    "metadataLinesRemoved_one": "{{displayCount}} мөр хасагдсан",
+    "metadataLinesRemoved_other": "{{displayCount}} мөр хасагдсан",
+    "metadataLinesRemoved": "{{displayCount}} мөр хасагдсан",
+    "metadataPlanCurrent": "Одоогийн алхам: {{current}}",
+    "metadataFailure": "Сүүлийн ээлж бүтэлгүйтсэн: {{kind}}",
+    "sourceActivity": "Гарчиггүй үйл ажиллагаа",
+    "metadataFailureProvider": "үйлчилгээ үзүүлэгчийн алдаа",
+    "metadataFailureTool": "хэрэгслийн алдаа",
+    "metadataFailureCancelled": "Цуцлагдсан",
+    "metadataFailureOther": "тодорхойгүй алдаа"
   },
   "systemSearch": {
     "couldNotOpenResult": "Энэ хайлтын үр дүнг нээж чадсангүй"

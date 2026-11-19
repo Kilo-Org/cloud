@@ -4560,7 +4560,26 @@
     "quietSnapshot": "Kò sí ìṣe ìgbà iṣẹ́ tí a yàn fún àkọsílẹ̀ ipò yìí. A kò béèrè fún àkópọ̀ AI, a kò sì gba owó.",
     "noEnabledContexts": "Kò sí àyíká tí a ti mú ṣiṣẹ́ fún àwọn ìròyìn tí a ṣètò",
     "sourceBlocker": "Ìgbà iṣẹ́ nílò àfiyèsí",
-    "sourceMetadata": "Ìsọfúnni àpèjúwe ìgbà iṣẹ́ tí a gbà sílẹ̀"
+    "sourceMetadata": "Ìsọfúnni àpèjúwe ìgbà iṣẹ́ tí a gbà sílẹ̀",
+    "metadataPlan_other": "Ètò: {{displayDone}} nínú {{displayTotal}} ìgbésẹ̀ ti parí",
+    "metadataPlan": "Ètò: {{displayDone}} nínú {{displayTotal}} ìgbésẹ̀ ti parí",
+    "metadataFiles_other": "{{displayCount}} fáìlì ti yí padà",
+    "metadataFiles": "{{displayCount}} fáìlì ti yí padà",
+    "metadataLinesAdded_other": "{{displayCount}} ìlà tí a fi kún",
+    "metadataLinesAdded": "{{displayCount}} ìlà tí a fi kún",
+    "metadataLinesRemoved_other": "{{displayCount}} ìlà tí a yọ kúrò",
+    "metadataLinesRemoved": "{{displayCount}} ìlà tí a yọ kúrò",
+    "metadataPlanCurrent": "Ìgbésẹ̀ lọ́wọ́lọ́wọ́: {{current}}",
+    "metadataFailure": "Ìyí tó kẹ́yìn kùnà: {{kind}}",
+    "sourceActivity": "Ìgbéṣe tí kò ní àkọlé",
+    "metadataFailureProvider": "àṣìṣe olùpèsè",
+    "metadataFailureTool": "àṣìṣe irinṣẹ́",
+    "metadataFailureCancelled": "A ti fagilé",
+    "metadataFailureOther": "àṣìṣe àìmọ̀",
+    "metadataPlan_one": "Ètò: {{displayDone}} nínú {{displayTotal}} ìgbésẹ̀ ti parí",
+    "metadataFiles_one": "{{displayCount}} fáìlì ti yí padà",
+    "metadataLinesAdded_one": "{{displayCount}} ìlà tí a fi kún",
+    "metadataLinesRemoved_one": "{{displayCount}} ìlà tí a yọ kúrò"
   },
   "systemSearch": {
     "couldNotOpenResult": "A kò lè ṣí àbájọ́ ìwádìí yìí"

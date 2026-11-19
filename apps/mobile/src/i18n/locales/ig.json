@@ -4560,7 +4560,26 @@
     "quietSnapshot": "Enweghị ọrụ nnọkọ ahọpụtara maka ndekọ ọnọdụ a. A rịọghị nchịkọta AI, a naraghịkwa ụgwọ.",
     "noEnabledContexts": "Enweghị ọnọdụ akwadoro maka akụkọ a haziri oge ha",
     "sourceBlocker": "Nnọkọ chọrọ nlebara anya",
-    "sourceMetadata": "Ozi nkọwa nnọkọ e dekọrọ"
+    "sourceMetadata": "Ozi nkọwa nnọkọ e dekọrọ",
+    "metadataPlan_other": "Atụmatụ: {{displayDone}} n'ime {{displayTotal}} nzọụkwụ emechara",
+    "metadataPlan": "Atụmatụ: {{displayDone}} n'ime {{displayTotal}} nzọụkwụ emechara",
+    "metadataFiles_other": "{{displayCount}} faịlụ gbanwere",
+    "metadataFiles": "{{displayCount}} faịlụ gbanwere",
+    "metadataLinesAdded_other": "{{displayCount}} ahịrị agbakwunyere",
+    "metadataLinesAdded": "{{displayCount}} ahịrị agbakwunyere",
+    "metadataLinesRemoved_other": "{{displayCount}} ahịrị ewepụrụ",
+    "metadataLinesRemoved": "{{displayCount}} ahịrị ewepụrụ",
+    "metadataPlanCurrent": "Nzọụkwụ ugbu a: {{current}}",
+    "metadataFailure": "Ntụgharị ikpeazụ dara: {{kind}}",
+    "sourceActivity": "Ọrụ na-enweghị aha",
+    "metadataFailureProvider": "njehie onye na-enye ọrụ",
+    "metadataFailureTool": "njehie ngwa ọrụ",
+    "metadataFailureCancelled": "Akagbuola",
+    "metadataFailureOther": "njehie a na-akọwaghị",
+    "metadataPlan_one": "Atụmatụ: {{displayDone}} n'ime {{displayTotal}} nzọụkwụ emechara",
+    "metadataFiles_one": "{{displayCount}} faịlụ gbanwere",
+    "metadataLinesAdded_one": "{{displayCount}} ahịrị agbakwunyere",
+    "metadataLinesRemoved_one": "{{displayCount}} ahịrị ewepụrụ"
   },
   "systemSearch": {
     "couldNotOpenResult": "Enweghị ike imepe nsonaazụ ọchụchọ a"

@@ -4560,7 +4560,26 @@
     "quietSnapshot": "Ez da saioen jarduerarik hautatu egoera-argazki honetarako. Ez da AI laburpenik eskatu, eta ez da kargurik aplikatu.",
     "noEnabledContexts": "Ez dago testuingururik gaituta programatutako txostenetarako",
     "sourceBlocker": "Saioak arreta behar du",
-    "sourceMetadata": "Jasotako saioaren metadatuak"
+    "sourceMetadata": "Jasotako saioaren metadatuak",
+    "metadataPlan_one": "Plana: {{displayDone}}/{{displayTotal}} urrats eginda",
+    "metadataPlan_other": "Plana: {{displayDone}}/{{displayTotal}} urrats eginda",
+    "metadataPlan": "Plana: {{displayDone}}/{{displayTotal}} urrats eginda",
+    "metadataFiles_one": "{{displayCount}} fitxategi aldatuta",
+    "metadataFiles_other": "{{displayCount}} fitxategi aldatuta",
+    "metadataFiles": "{{displayCount}} fitxategi aldatuta",
+    "metadataLinesAdded_one": "{{displayCount}} lerro gehituta",
+    "metadataLinesAdded_other": "{{displayCount}} lerro gehituta",
+    "metadataLinesAdded": "{{displayCount}} lerro gehituta",
+    "metadataLinesRemoved_one": "{{displayCount}} lerro kenduta",
+    "metadataLinesRemoved_other": "{{displayCount}} lerro kenduta",
+    "metadataLinesRemoved": "{{displayCount}} lerro kenduta",
+    "metadataPlanCurrent": "Uneko urratsa: {{current}}",
+    "metadataFailure": "Azken txandak huts egin du: {{kind}}",
+    "sourceActivity": "Izenbururik gabeko jarduera",
+    "metadataFailureProvider": "hornitzailearen errorea",
+    "metadataFailureTool": "tresnaren errorea",
+    "metadataFailureCancelled": "Ezeztatuta",
+    "metadataFailureOther": "zehaztu gabeko errorea"
   },
   "systemSearch": {
     "couldNotOpenResult": "Ezin izan da bilaketa-emaitza hau ireki"

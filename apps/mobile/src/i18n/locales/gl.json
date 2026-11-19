@@ -4560,7 +4560,26 @@
     "quietSnapshot": "Non se seleccionou actividade de sesión para esta instantánea. Non se solicitou ningún resumo con IA nin se aplicou ningún cargo.",
     "noEnabledContexts": "Non hai contextos activados para os informes programados",
     "sourceBlocker": "A sesión precisa atención",
-    "sourceMetadata": "Metadatos da sesión capturados"
+    "sourceMetadata": "Metadatos da sesión capturados",
+    "metadataPlan_one": "Plan: {{displayDone}} de {{displayTotal}} paso completado",
+    "metadataPlan_other": "Plan: {{displayDone}} de {{displayTotal}} pasos completados",
+    "metadataPlan": "Plan: {{displayDone}} de {{displayTotal}} pasos completados",
+    "metadataFiles_one": "{{displayCount}} ficheiro modificado",
+    "metadataFiles_other": "{{displayCount}} ficheiros modificados",
+    "metadataFiles": "{{displayCount}} ficheiros modificados",
+    "metadataLinesAdded_one": "{{displayCount}} liña engadida",
+    "metadataLinesAdded_other": "{{displayCount}} liñas engadidas",
+    "metadataLinesAdded": "{{displayCount}} liñas engadidas",
+    "metadataLinesRemoved_one": "{{displayCount}} liña eliminada",
+    "metadataLinesRemoved_other": "{{displayCount}} liñas eliminadas",
+    "metadataLinesRemoved": "{{displayCount}} liñas eliminadas",
+    "metadataPlanCurrent": "Paso actual: {{current}}",
+    "metadataFailure": "O último turno fallou: {{kind}}",
+    "sourceActivity": "Actividade sen título",
+    "metadataFailureProvider": "erro do provedor",
+    "metadataFailureTool": "erro da ferramenta",
+    "metadataFailureCancelled": "Cancelado",
+    "metadataFailureOther": "erro non especificado"
   },
   "systemSearch": {
     "couldNotOpenResult": "Non se puido abrir este resultado da busca"

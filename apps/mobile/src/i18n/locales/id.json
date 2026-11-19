@@ -4560,7 +4560,26 @@
     "quietSnapshot": "Tidak ada aktivitas sesi yang terpilih untuk cuplikan ini. Tidak ada ringkasan AI yang diminta atau biaya AI yang dikenakan.",
     "noEnabledContexts": "Tidak ada konteks yang diaktifkan untuk laporan terjadwal",
     "sourceBlocker": "Sesi memerlukan perhatian",
-    "sourceMetadata": "Metadata sesi yang direkam"
+    "sourceMetadata": "Metadata sesi yang direkam",
+    "metadataPlan_other": "Rencana: {{displayDone}} dari {{displayTotal}} langkah selesai",
+    "metadataPlan": "Rencana: {{displayDone}} dari {{displayTotal}} langkah selesai",
+    "metadataFiles_other": "{{displayCount}} file diubah",
+    "metadataFiles": "{{displayCount}} file diubah",
+    "metadataLinesAdded_other": "{{displayCount}} baris ditambahkan",
+    "metadataLinesAdded": "{{displayCount}} baris ditambahkan",
+    "metadataLinesRemoved_other": "{{displayCount}} baris dihapus",
+    "metadataLinesRemoved": "{{displayCount}} baris dihapus",
+    "metadataPlanCurrent": "Langkah saat ini: {{current}}",
+    "metadataFailure": "Giliran terakhir gagal: {{kind}}",
+    "sourceActivity": "Aktivitas tanpa judul",
+    "metadataFailureProvider": "kesalahan penyedia",
+    "metadataFailureTool": "kesalahan alat",
+    "metadataFailureCancelled": "Dibatalkan",
+    "metadataFailureOther": "kesalahan tidak diketahui",
+    "metadataPlan_one": "Rencana: {{displayDone}} dari {{displayTotal}} langkah selesai",
+    "metadataFiles_one": "{{displayCount}} file diubah",
+    "metadataLinesAdded_one": "{{displayCount}} baris ditambahkan",
+    "metadataLinesRemoved_one": "{{displayCount}} baris dihapus"
   },
   "systemSearch": {
     "couldNotOpenResult": "Tidak dapat membuka hasil pencarian ini"

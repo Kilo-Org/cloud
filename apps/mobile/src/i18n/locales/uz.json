@@ -4560,7 +4560,26 @@
     "quietSnapshot": "Bu holat nusxasi uchun seans faoliyati tanlanmadi. AI xulosasi so‘ralmadi va to‘lov olinmadi.",
     "noEnabledContexts": "Rejalashtirilgan brifinglar uchun hech bir kontekst yoqilmagan",
     "sourceBlocker": "Seans e’tibor talab qiladi",
-    "sourceMetadata": "Qayd etilgan seans metama’lumotlari"
+    "sourceMetadata": "Qayd etilgan seans metama’lumotlari",
+    "metadataPlan_one": "Reja: {{displayTotal}} bosqichdan {{displayDone}} tasi bajarildi",
+    "metadataPlan_other": "Reja: {{displayTotal}} bosqichdan {{displayDone}} tasi bajarildi",
+    "metadataPlan": "Reja: {{displayTotal}} bosqichdan {{displayDone}} tasi bajarildi",
+    "metadataFiles_one": "{{displayCount}} ta fayl o‘zgartirildi",
+    "metadataFiles_other": "{{displayCount}} ta fayl o‘zgartirildi",
+    "metadataFiles": "{{displayCount}} ta fayl o‘zgartirildi",
+    "metadataLinesAdded_one": "{{displayCount}} ta qator qo‘shildi",
+    "metadataLinesAdded_other": "{{displayCount}} ta qator qo‘shildi",
+    "metadataLinesAdded": "{{displayCount}} ta qator qo‘shildi",
+    "metadataLinesRemoved_one": "{{displayCount}} ta qator o‘chirildi",
+    "metadataLinesRemoved_other": "{{displayCount}} ta qator o‘chirildi",
+    "metadataLinesRemoved": "{{displayCount}} ta qator o‘chirildi",
+    "metadataPlanCurrent": "Joriy qadam: {{current}}",
+    "metadataFailure": "Oxirgi navbat muvaffaqiyatsiz tugadi: {{kind}}",
+    "sourceActivity": "Nomsiz faoliyat",
+    "metadataFailureProvider": "provayder xatosi",
+    "metadataFailureTool": "vosita xatosi",
+    "metadataFailureCancelled": "Bekor qilindi",
+    "metadataFailureOther": "aniqlanmagan xato"
   },
   "systemSearch": {
     "couldNotOpenResult": "Bu qidiruv natijasini ochib bo'lmadi"

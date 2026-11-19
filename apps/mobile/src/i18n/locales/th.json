@@ -4560,7 +4560,26 @@
     "quietSnapshot": "ไม่มีกิจกรรมของเซสชันที่ได้รับเลือกสำหรับรายงานสถานะนี้ ไม่มีการร้องขอหรือเรียกเก็บค่าบริการสำหรับสรุปโดย AI",
     "noEnabledContexts": "ไม่มีบริบทที่เปิดใช้รายงานตามกำหนดการ",
     "sourceBlocker": "เซสชันต้องได้รับการดูแล",
-    "sourceMetadata": "เมทาดาทาของเซสชันที่บันทึกไว้"
+    "sourceMetadata": "เมทาดาทาของเซสชันที่บันทึกไว้",
+    "metadataPlan_other": "แผน: เสร็จแล้ว {{displayDone}} จาก {{displayTotal}} ขั้นตอน",
+    "metadataPlan": "แผน: เสร็จแล้ว {{displayDone}} จาก {{displayTotal}} ขั้นตอน",
+    "metadataFiles_other": "{{displayCount}} ไฟล์ที่เปลี่ยนแปลง",
+    "metadataFiles": "{{displayCount}} ไฟล์ที่เปลี่ยนแปลง",
+    "metadataLinesAdded_other": "เพิ่ม {{displayCount}} บรรทัด",
+    "metadataLinesAdded": "เพิ่ม {{displayCount}} บรรทัด",
+    "metadataLinesRemoved_other": "ลบ {{displayCount}} บรรทัด",
+    "metadataLinesRemoved": "ลบ {{displayCount}} บรรทัด",
+    "metadataPlanCurrent": "ขั้นตอนปัจจุบัน: {{current}}",
+    "metadataFailure": "รอบล่าสุดล้มเหลว: {{kind}}",
+    "sourceActivity": "กิจกรรมไม่มีชื่อ",
+    "metadataFailureProvider": "ข้อผิดพลาดผู้ให้บริการ",
+    "metadataFailureTool": "ข้อผิดพลาดเครื่องมือ",
+    "metadataFailureCancelled": "ยกเลิกแล้ว",
+    "metadataFailureOther": "ข้อผิดพลาดที่ไม่ระบุ",
+    "metadataPlan_one": "แผน: เสร็จแล้ว {{displayDone}} จาก {{displayTotal}} ขั้นตอน",
+    "metadataFiles_one": "{{displayCount}} ไฟล์ที่เปลี่ยนแปลง",
+    "metadataLinesAdded_one": "เพิ่ม {{displayCount}} บรรทัด",
+    "metadataLinesRemoved_one": "ลบ {{displayCount}} บรรทัด"
   },
   "systemSearch": {
     "couldNotOpenResult": "ไม่สามารถเปิดผลการค้นหานี้ได้"

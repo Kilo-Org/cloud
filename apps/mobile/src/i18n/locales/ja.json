@@ -4560,7 +4560,26 @@
     "quietSnapshot": "このスナップショットでは、セッションのアクティビティは選択されませんでした。AI要約はリクエストされておらず、料金も発生していません。",
     "noEnabledContexts": "スケジュールされたブリーフが有効なコンテキストはありません",
     "sourceBlocker": "セッションに対応が必要",
-    "sourceMetadata": "取得したセッションのメタデータ"
+    "sourceMetadata": "取得したセッションのメタデータ",
+    "metadataPlan_other": "プラン: {{displayTotal}}ステップ中{{displayDone}}完了",
+    "metadataPlan": "プラン: {{displayTotal}}ステップ中{{displayDone}}完了",
+    "metadataFiles_other": "{{displayCount}}件のファイルを変更",
+    "metadataFiles": "{{displayCount}}件のファイルを変更",
+    "metadataLinesAdded_other": "{{displayCount}}行を追加",
+    "metadataLinesAdded": "{{displayCount}}行を追加",
+    "metadataLinesRemoved_other": "{{displayCount}}行を削除",
+    "metadataLinesRemoved": "{{displayCount}}行を削除",
+    "metadataPlanCurrent": "現在のステップ: {{current}}",
+    "metadataFailure": "前回のターンが失敗しました: {{kind}}",
+    "sourceActivity": "無題のアクティビティ",
+    "metadataFailureProvider": "プロバイダーエラー",
+    "metadataFailureTool": "ツールエラー",
+    "metadataFailureCancelled": "キャンセル済み",
+    "metadataFailureOther": "不明なエラー",
+    "metadataPlan_one": "プラン: {{displayTotal}}ステップ中{{displayDone}}完了",
+    "metadataFiles_one": "{{displayCount}}件のファイルを変更",
+    "metadataLinesAdded_one": "{{displayCount}}行を追加",
+    "metadataLinesRemoved_one": "{{displayCount}}行を削除"
   },
   "systemSearch": {
     "couldNotOpenResult": "この検索結果を開けませんでした"

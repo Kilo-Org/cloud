@@ -4560,7 +4560,26 @@
     "quietSnapshot": "اس اسنیپ شاٹ کے لیے سیشن کی کوئی سرگرمی منتخب نہیں ہوئی۔ کوئی AI خلاصہ طلب نہیں کیا گیا، نہ کوئی چارج لیا گیا۔",
     "noEnabledContexts": "شیڈول شدہ بریفنگز کے لیے کوئی سیاق فعال نہیں ہے",
     "sourceBlocker": "سیشن کو توجہ درکار ہے",
-    "sourceMetadata": "محفوظ کردہ سیشن میٹا ڈیٹا"
+    "sourceMetadata": "محفوظ کردہ سیشن میٹا ڈیٹا",
+    "metadataPlan_one": "منصوبہ: {{displayTotal}} میں سے {{displayDone}} مرحلہ مکمل",
+    "metadataPlan_other": "منصوبہ: {{displayTotal}} میں سے {{displayDone}} مرحلے مکمل",
+    "metadataPlan": "منصوبہ: {{displayTotal}} میں سے {{displayDone}} مرحلے مکمل",
+    "metadataFiles_one": "{{displayCount}} فائل تبدیل ہوئی",
+    "metadataFiles_other": "{{displayCount}} فائلیں تبدیل ہوئیں",
+    "metadataFiles": "{{displayCount}} فائلیں تبدیل ہوئیں",
+    "metadataLinesAdded_one": "{{displayCount}} لائن شامل کی گئی",
+    "metadataLinesAdded_other": "{{displayCount}} لائنیں شامل کی گئیں",
+    "metadataLinesAdded": "{{displayCount}} لائنیں شامل کی گئیں",
+    "metadataLinesRemoved_one": "{{displayCount}} لائن ہٹائی گئی",
+    "metadataLinesRemoved_other": "{{displayCount}} لائنیں ہٹائی گئیں",
+    "metadataLinesRemoved": "{{displayCount}} لائنیں ہٹائی گئیں",
+    "metadataPlanCurrent": "موجودہ مرحلہ: {{current}}",
+    "metadataFailure": "پچھلا ٹرن ناکام: {{kind}}",
+    "sourceActivity": "بلا عنوان سرگرمی",
+    "metadataFailureProvider": "پرووائیڈر کی خرابی",
+    "metadataFailureTool": "ٹول کی خرابی",
+    "metadataFailureCancelled": "منسوخ",
+    "metadataFailureOther": "غیر متعین خرابی"
   },
   "systemSearch": {
     "couldNotOpenResult": "یہ تلاش کا نتیجہ کھولا نہیں جا سکا"

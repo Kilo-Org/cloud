@@ -4560,7 +4560,26 @@
     "quietSnapshot": "ਇਸ ਸਨੈਪਸ਼ਾਟ ਲਈ ਕੋਈ ਸੈਸ਼ਨ ਗਤੀਵਿਧੀ ਨਹੀਂ ਚੁਣੀ ਗਈ। ਨਾ ਕੋਈ AI ਸਾਰ ਮੰਗਿਆ ਗਿਆ, ਨਾ ਹੀ ਕੋਈ ਖਰਚਾ ਲੱਗਿਆ।",
     "noEnabledContexts": "ਨਿਰਧਾਰਿਤ ਬ੍ਰੀਫਿੰਗਾਂ ਲਈ ਕੋਈ ਸੰਦਰਭ ਚਾਲੂ ਨਹੀਂ ਹੈ",
     "sourceBlocker": "ਸੈਸ਼ਨ ਵੱਲ ਧਿਆਨ ਦੇਣ ਦੀ ਲੋੜ ਹੈ",
-    "sourceMetadata": "ਕੈਪਚਰ ਕੀਤਾ ਸੈਸ਼ਨ ਮੈਟਾਡੇਟਾ"
+    "sourceMetadata": "ਕੈਪਚਰ ਕੀਤਾ ਸੈਸ਼ਨ ਮੈਟਾਡੇਟਾ",
+    "metadataPlan_one": "ਯੋਜਨਾ: {{displayTotal}} ਵਿੱਚੋਂ {{displayDone}} ਕਦਮ ਪੂਰਾ",
+    "metadataPlan_other": "ਯੋਜਨਾ: {{displayTotal}} ਵਿੱਚੋਂ {{displayDone}} ਕਦਮ ਪੂਰੇ",
+    "metadataPlan": "ਯੋਜਨਾ: {{displayTotal}} ਵਿੱਚੋਂ {{displayDone}} ਕਦਮ ਪੂਰੇ",
+    "metadataFiles_one": "{{displayCount}} ਫ਼ਾਈਲ ਬਦਲੀ",
+    "metadataFiles_other": "{{displayCount}} ਫ਼ਾਈਲਾਂ ਬਦਲੀਆਂ",
+    "metadataFiles": "{{displayCount}} ਫ਼ਾਈਲਾਂ ਬਦਲੀਆਂ",
+    "metadataLinesAdded_one": "{{displayCount}} ਲਾਈਨ ਜੋੜੀ",
+    "metadataLinesAdded_other": "{{displayCount}} ਲਾਈਨਾਂ ਜੋੜੀਆਂ",
+    "metadataLinesAdded": "{{displayCount}} ਲਾਈਨਾਂ ਜੋੜੀਆਂ",
+    "metadataLinesRemoved_one": "{{displayCount}} ਲਾਈਨ ਹਟਾਈ",
+    "metadataLinesRemoved_other": "{{displayCount}} ਲਾਈਨਾਂ ਹਟਾਈਆਂ",
+    "metadataLinesRemoved": "{{displayCount}} ਲਾਈਨਾਂ ਹਟਾਈਆਂ",
+    "metadataPlanCurrent": "ਮੌਜੂਦਾ ਕਦਮ: {{current}}",
+    "metadataFailure": "ਪਿਛਲਾ ਟਰਨ ਫੇਲ੍ਹ: {{kind}}",
+    "sourceActivity": "ਬਿਨਾਂ ਸਿਰਲੇਖ ਵਾਲੀ ਗਤੀਵਿਧੀ",
+    "metadataFailureProvider": "ਪ੍ਰਦਾਤਾ ਗਲਤੀ",
+    "metadataFailureTool": "ਟੂਲ ਗਲਤੀ",
+    "metadataFailureCancelled": "ਰੱਦ",
+    "metadataFailureOther": "ਅਣਦੱਸੀ ਗਲਤੀ"
   },
   "systemSearch": {
     "couldNotOpenResult": "ਇਹ ਖੋਜ ਨਤੀਜਾ ਖੋਲ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ"

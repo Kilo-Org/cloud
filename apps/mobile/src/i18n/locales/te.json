@@ -4560,7 +4560,26 @@
     "quietSnapshot": "ఈ స్నాప్‌షాట్ కోసం సెషన్ కార్యాచరణ ఏదీ ఎంచుకోబడలేదు. AI సారాంశం అభ్యర్థించబడలేదు, ఛార్జీ విధించబడలేదు.",
     "noEnabledContexts": "షెడ్యూల్ చేసిన బ్రీఫింగ్‌ల కోసం ఏ సందర్భాలూ ప్రారంభించబడలేదు",
     "sourceBlocker": "సెషన్‌పై శ్రద్ధ అవసరం",
-    "sourceMetadata": "సంగ్రహించిన సెషన్ మెటాడేటా"
+    "sourceMetadata": "సంగ్రహించిన సెషన్ మెటాడేటా",
+    "metadataPlan_one": "ప్లాన్: {{displayTotal}} దశల్లో {{displayDone}} దశ పూర్తయింది",
+    "metadataPlan_other": "ప్లాన్: {{displayTotal}} దశల్లో {{displayDone}} దశలు పూర్తయ్యాయి",
+    "metadataPlan": "ప్లాన్: {{displayTotal}} దశల్లో {{displayDone}} దశలు పూర్తయ్యాయి",
+    "metadataFiles_one": "{{displayCount}} ఫైల్ మార్చబడింది",
+    "metadataFiles_other": "{{displayCount}} ఫైల్లు మార్చబడ్డాయి",
+    "metadataFiles": "{{displayCount}} ఫైల్లు మార్చబడ్డాయి",
+    "metadataLinesAdded_one": "{{displayCount}} లైన్ జోడించబడింది",
+    "metadataLinesAdded_other": "{{displayCount}} లైన్లు జోడించబడ్డాయి",
+    "metadataLinesAdded": "{{displayCount}} లైన్లు జోడించబడ్డాయి",
+    "metadataLinesRemoved_one": "{{displayCount}} లైన్ తీసివేయబడింది",
+    "metadataLinesRemoved_other": "{{displayCount}} లైన్లు తీసివేయబడ్డాయి",
+    "metadataLinesRemoved": "{{displayCount}} లైన్లు తీసివేయబడ్డాయి",
+    "metadataPlanCurrent": "ప్రస్తుత దశ: {{current}}",
+    "metadataFailure": "చివరి టర్న్ విఫలమైంది: {{kind}}",
+    "sourceActivity": "శీర్షిక లేని యాక్టివిటీ",
+    "metadataFailureProvider": "ప్రొవైడర్ లోపం",
+    "metadataFailureTool": "టూల్ లోపం",
+    "metadataFailureCancelled": "రద్దయింది",
+    "metadataFailureOther": "పేర్కొనని లోపం"
   },
   "systemSearch": {
     "couldNotOpenResult": "ఈ శోధన ఫలితాన్ని తెరవలేకపోయాము"

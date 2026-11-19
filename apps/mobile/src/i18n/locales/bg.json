@@ -4560,7 +4560,26 @@
     "quietSnapshot": "За тази моментна снимка не е избрана активност от сесиите. Не е заявявано AI обобщение и не е начислявана такса.",
     "noEnabledContexts": "Няма включени контексти за планирани брифинги",
     "sourceBlocker": "Сесията изисква внимание",
-    "sourceMetadata": "Запазени метаданни за сесията"
+    "sourceMetadata": "Запазени метаданни за сесията",
+    "metadataPlan_one": "План: {{displayDone}} от {{displayTotal}} стъпка изпълнена",
+    "metadataPlan_other": "План: {{displayDone}} от {{displayTotal}} стъпки изпълнени",
+    "metadataPlan": "План: {{displayDone}} от {{displayTotal}} стъпки изпълнени",
+    "metadataFiles_one": "{{displayCount}} файл променен",
+    "metadataFiles_other": "{{displayCount}} файла променени",
+    "metadataFiles": "{{displayCount}} файла променени",
+    "metadataLinesAdded_one": "{{displayCount}} ред добавен",
+    "metadataLinesAdded_other": "{{displayCount}} реда добавени",
+    "metadataLinesAdded": "{{displayCount}} реда добавени",
+    "metadataLinesRemoved_one": "{{displayCount}} ред премахнат",
+    "metadataLinesRemoved_other": "{{displayCount}} реда премахнати",
+    "metadataLinesRemoved": "{{displayCount}} реда премахнати",
+    "metadataPlanCurrent": "Текуща стъпка: {{current}}",
+    "metadataFailure": "Последният ход се провали: {{kind}}",
+    "sourceActivity": "Дейност без заглавие",
+    "metadataFailureProvider": "грешка на доставчика",
+    "metadataFailureTool": "грешка на инструмента",
+    "metadataFailureCancelled": "Отменено",
+    "metadataFailureOther": "неуточнена грешка"
   },
   "systemSearch": {
     "couldNotOpenResult": "Не можахме да отворим този резултат от търсенето"

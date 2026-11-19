@@ -4560,7 +4560,26 @@
     "quietSnapshot": "Ingen øktaktivitet ble valgt ut til dette øyeblikksbildet. Ingen AI-sammendrag ble forespurt eller belastet.",
     "noEnabledContexts": "Ingen kontekster er aktivert for planlagte briefer",
     "sourceBlocker": "Økten krever oppmerksomhet",
-    "sourceMetadata": "Lagrede øktmetadata"
+    "sourceMetadata": "Lagrede øktmetadata",
+    "metadataPlan_one": "Plan: {{displayDone}} av {{displayTotal}} trinn fullført",
+    "metadataPlan_other": "Plan: {{displayDone}} av {{displayTotal}} trinn fullført",
+    "metadataPlan": "Plan: {{displayDone}} av {{displayTotal}} trinn fullført",
+    "metadataFiles_one": "{{displayCount}} fil endret",
+    "metadataFiles_other": "{{displayCount}} filer endret",
+    "metadataFiles": "{{displayCount}} filer endret",
+    "metadataLinesAdded_one": "{{displayCount}} linje lagt til",
+    "metadataLinesAdded_other": "{{displayCount}} linjer lagt til",
+    "metadataLinesAdded": "{{displayCount}} linjer lagt til",
+    "metadataLinesRemoved_one": "{{displayCount}} linje fjernet",
+    "metadataLinesRemoved_other": "{{displayCount}} linjer fjernet",
+    "metadataLinesRemoved": "{{displayCount}} linjer fjernet",
+    "metadataPlanCurrent": "Gjeldende trinn: {{current}}",
+    "metadataFailure": "Forrige kjøring mislyktes: {{kind}}",
+    "sourceActivity": "Aktivitet uten navn",
+    "metadataFailureProvider": "leverandørfeil",
+    "metadataFailureTool": "verktøyfeil",
+    "metadataFailureCancelled": "Avbrutt",
+    "metadataFailureOther": "uspesifisert feil"
   },
   "systemSearch": {
     "couldNotOpenResult": "Kunne ikke åpne dette søkeresultatet"

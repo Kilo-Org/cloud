@@ -4560,7 +4560,26 @@
     "quietSnapshot": "এই স্ন্যাপশটের জন্য সেশনের কোনো কার্যকলাপ নির্বাচিত হয়নি। কোনো AI সারাংশ চাওয়া হয়নি বা চার্জ কাটা হয়নি।",
     "noEnabledContexts": "নির্ধারিত ব্রিফিংয়ের জন্য কোনো কনটেক্সট চালু নেই",
     "sourceBlocker": "সেশনে মনোযোগ দেওয়া প্রয়োজন",
-    "sourceMetadata": "সংরক্ষিত সেশন মেটাডেটা"
+    "sourceMetadata": "সংরক্ষিত সেশন মেটাডেটা",
+    "metadataPlan_one": "পরিকল্পনা: {{displayTotal}}টির মধ্যে {{displayDone}}টি ধাপ সম্পন্ন",
+    "metadataPlan_other": "পরিকল্পনা: {{displayTotal}}টির মধ্যে {{displayDone}}টি ধাপ সম্পন্ন",
+    "metadataPlan": "পরিকল্পনা: {{displayTotal}}টির মধ্যে {{displayDone}}টি ধাপ সম্পন্ন",
+    "metadataFiles_one": "{{displayCount}}টি ফাইল পরিবর্তিত হয়েছে",
+    "metadataFiles_other": "{{displayCount}}টি ফাইল পরিবর্তিত হয়েছে",
+    "metadataFiles": "{{displayCount}}টি ফাইল পরিবর্তিত হয়েছে",
+    "metadataLinesAdded_one": "{{displayCount}}টি লাইন যোগ হয়েছে",
+    "metadataLinesAdded_other": "{{displayCount}}টি লাইন যোগ হয়েছে",
+    "metadataLinesAdded": "{{displayCount}}টি লাইন যোগ হয়েছে",
+    "metadataLinesRemoved_one": "{{displayCount}}টি লাইন মুছে ফেলা হয়েছে",
+    "metadataLinesRemoved_other": "{{displayCount}}টি লাইন মুছে ফেলা হয়েছে",
+    "metadataLinesRemoved": "{{displayCount}}টি লাইন মুছে ফেলা হয়েছে",
+    "metadataPlanCurrent": "বর্তমান ধাপ: {{current}}",
+    "metadataFailure": "সর্বশেষ চেষ্টা ব্যর্থ হয়েছে: {{kind}}",
+    "sourceActivity": "শিরোনামহীন কার্যকলাপ",
+    "metadataFailureProvider": "প্রদানকারী ত্রুটি",
+    "metadataFailureTool": "সরঞ্জাম ত্রুটি",
+    "metadataFailureCancelled": "বাতিল",
+    "metadataFailureOther": "অনির্দিষ্ট ত্রুটি"
   },
   "systemSearch": {
     "couldNotOpenResult": "এই অনুসন্ধানের ফলাফল খোলা যায়নি"

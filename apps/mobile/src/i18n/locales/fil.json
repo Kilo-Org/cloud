@@ -4560,7 +4560,26 @@
     "quietSnapshot": "Walang aktibidad ng session na napili para sa snapshot na ito. Walang buod ng AI na hiniling o siningil.",
     "noEnabledContexts": "Walang naka-enable na konteksto para sa mga naka-iskedyul na briefing",
     "sourceBlocker": "Kailangang asikasuhin ang session",
-    "sourceMetadata": "Naitalang metadata ng session"
+    "sourceMetadata": "Naitalang metadata ng session",
+    "metadataPlan_one": "Plano: {{displayDone}} sa {{displayTotal}} hakbang ang natapos",
+    "metadataPlan_other": "Plano: {{displayDone}} sa {{displayTotal}} hakbang ang natapos",
+    "metadataPlan": "Plano: {{displayDone}} sa {{displayTotal}} hakbang ang natapos",
+    "metadataFiles_one": "{{displayCount}} file ang nabago",
+    "metadataFiles_other": "{{displayCount}} file ang nabago",
+    "metadataFiles": "{{displayCount}} file ang nabago",
+    "metadataLinesAdded_one": "{{displayCount}} linya ang naidagdag",
+    "metadataLinesAdded_other": "{{displayCount}} linya ang naidagdag",
+    "metadataLinesAdded": "{{displayCount}} linya ang naidagdag",
+    "metadataLinesRemoved_one": "{{displayCount}} linya ang natanggal",
+    "metadataLinesRemoved_other": "{{displayCount}} linya ang natanggal",
+    "metadataLinesRemoved": "{{displayCount}} linya ang natanggal",
+    "metadataPlanCurrent": "Kasalukuyang hakbang: {{current}}",
+    "metadataFailure": "Nabigo ang huling turn: {{kind}}",
+    "sourceActivity": "Aktibidad na walang pamagat",
+    "metadataFailureProvider": "error ng provider",
+    "metadataFailureTool": "error ng tool",
+    "metadataFailureCancelled": "Kinansela",
+    "metadataFailureOther": "hindi tinukoy na error"
   },
   "systemSearch": {
     "couldNotOpenResult": "Hindi mabuksan ang resulta ng paghahanap na ito"

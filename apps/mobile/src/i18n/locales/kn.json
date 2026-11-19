@@ -4560,7 +4560,26 @@
     "quietSnapshot": "ಈ ಸ್ನ್ಯಾಪ್‌ಶಾಟ್‌ಗೆ ಯಾವುದೇ ಸೆಷನ್ ಚಟುವಟಿಕೆ ಆಯ್ಕೆಯಾಗಿಲ್ಲ. AI ಸಾರಾಂಶವನ್ನು ವಿನಂತಿಸಲಾಗಿಲ್ಲ ಮತ್ತು ಯಾವುದೇ ಶುಲ್ಕ ವಿಧಿಸಲಾಗಿಲ್ಲ.",
     "noEnabledContexts": "ನಿಗದಿತ ವರದಿಗಳಿಗಾಗಿ ಯಾವುದೇ ಸಂದರ್ಭಗಳನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಲಾಗಿಲ್ಲ",
     "sourceBlocker": "ಸೆಷನ್‌ಗೆ ಗಮನ ನೀಡಬೇಕಿದೆ",
-    "sourceMetadata": "ದಾಖಲಿಸಿದ ಸೆಷನ್ ಮೆಟಾಡೇಟಾ"
+    "sourceMetadata": "ದಾಖಲಿಸಿದ ಸೆಷನ್ ಮೆಟಾಡೇಟಾ",
+    "metadataPlan_one": "ಯೋಜನೆ: {{displayTotal}} ಹಂತದಲ್ಲಿ {{displayDone}} ಪೂರ್ಣ",
+    "metadataPlan_other": "ಯೋಜನೆ: {{displayTotal}} ಹಂತಗಳಲ್ಲಿ {{displayDone}} ಪೂರ್ಣ",
+    "metadataPlan": "ಯೋಜನೆ: {{displayTotal}} ಹಂತಗಳಲ್ಲಿ {{displayDone}} ಪೂರ್ಣ",
+    "metadataFiles_one": "{{displayCount}} ಫೈಲ್ ಬದಲಾಗಿದೆ",
+    "metadataFiles_other": "{{displayCount}} ಫೈಲ್ಗಳು ಬದಲಾಗಿವೆ",
+    "metadataFiles": "{{displayCount}} ಫೈಲ್ಗಳು ಬದಲಾಗಿವೆ",
+    "metadataLinesAdded_one": "{{displayCount}} ಸಾಲು ಸೇರಿಸಲಾಗಿದೆ",
+    "metadataLinesAdded_other": "{{displayCount}} ಸಾಲುಗಳನ್ನು ಸೇರಿಸಲಾಗಿದೆ",
+    "metadataLinesAdded": "{{displayCount}} ಸಾಲುಗಳನ್ನು ಸೇರಿಸಲಾಗಿದೆ",
+    "metadataLinesRemoved_one": "{{displayCount}} ಸಾಲು ತೆಗೆದುಹಾಕಲಾಗಿದೆ",
+    "metadataLinesRemoved_other": "{{displayCount}} ಸಾಲುಗಳನ್ನು ತೆಗೆದುಹಾಕಲಾಗಿದೆ",
+    "metadataLinesRemoved": "{{displayCount}} ಸಾಲುಗಳನ್ನು ತೆಗೆದುಹಾಕಲಾಗಿದೆ",
+    "metadataPlanCurrent": "ಪ್ರಸ್ತುತ ಹಂತ: {{current}}",
+    "metadataFailure": "ಕೊನೆಯ ಸರದಿ ವಿಫಲವಾಗಿದೆ: {{kind}}",
+    "sourceActivity": "ಶೀರ್ಷಿಕೆರಹಿತ ಚಟುವಟಿಕೆ",
+    "metadataFailureProvider": "ಪೂರೈಕೆದಾರ ದೋಷ",
+    "metadataFailureTool": "ಸಾಧನ ದೋಷ",
+    "metadataFailureCancelled": "ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ",
+    "metadataFailureOther": "ಅನಿರ್ದಿಷ್ಟ ದೋಷ"
   },
   "systemSearch": {
     "couldNotOpenResult": "ಈ ಹುಡುಕು ಫಲಿತಾಂಶವನ್ನು ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ"

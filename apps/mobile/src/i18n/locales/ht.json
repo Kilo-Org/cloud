@@ -4560,7 +4560,26 @@
     "quietSnapshot": "Yo pa t chwazi okenn aktivite sesyon pou apèsi sa a. Yo pa t mande ni chaje okenn rezime AI.",
     "noEnabledContexts": "Pa gen kontèks ki aktive pou rapò pwograme yo",
     "sourceBlocker": "Sesyon an bezwen atansyon",
-    "sourceMetadata": "Metadone sesyon an ki anrejistre"
+    "sourceMetadata": "Metadone sesyon an ki anrejistre",
+    "metadataPlan_one": "Plan: {{displayDone}} sou {{displayTotal}} etap fèt",
+    "metadataPlan_other": "Plan: {{displayDone}} sou {{displayTotal}} etap fèt",
+    "metadataPlan": "Plan: {{displayDone}} sou {{displayTotal}} etap fèt",
+    "metadataFiles_one": "{{displayCount}} fichye chanje",
+    "metadataFiles_other": "{{displayCount}} fichye chanje",
+    "metadataFiles": "{{displayCount}} fichye chanje",
+    "metadataLinesAdded_one": "{{displayCount}} liy ajoute",
+    "metadataLinesAdded_other": "{{displayCount}} liy ajoute",
+    "metadataLinesAdded": "{{displayCount}} liy ajoute",
+    "metadataLinesRemoved_one": "{{displayCount}} liy retire",
+    "metadataLinesRemoved_other": "{{displayCount}} liy retire",
+    "metadataLinesRemoved": "{{displayCount}} liy retire",
+    "metadataPlanCurrent": "Etap aktyèl: {{current}}",
+    "metadataFailure": "Dènye tou a echwe: {{kind}}",
+    "sourceActivity": "Aktivite san tit",
+    "metadataFailureProvider": "erè founisè",
+    "metadataFailureTool": "erè zouti",
+    "metadataFailureCancelled": "Anile",
+    "metadataFailureOther": "erè ki pa presize"
   },
   "systemSearch": {
     "couldNotOpenResult": "Pa t ka louvri rezilta rechèch sa a"

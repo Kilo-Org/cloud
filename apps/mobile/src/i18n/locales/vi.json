@@ -4560,7 +4560,26 @@
     "quietSnapshot": "Không có hoạt động phiên nào được chọn cho bản chụp này. Không có tóm tắt AI nào được yêu cầu hay tính phí.",
     "noEnabledContexts": "Chưa bật bản tin theo lịch cho ngữ cảnh nào",
     "sourceBlocker": "Phiên cần được chú ý",
-    "sourceMetadata": "Siêu dữ liệu phiên đã ghi lại"
+    "sourceMetadata": "Siêu dữ liệu phiên đã ghi lại",
+    "metadataPlan_other": "Kế hoạch: {{displayDone}}/{{displayTotal}} bước đã xong",
+    "metadataPlan": "Kế hoạch: {{displayDone}}/{{displayTotal}} bước đã xong",
+    "metadataFiles_other": "{{displayCount}} tệp đã thay đổi",
+    "metadataFiles": "{{displayCount}} tệp đã thay đổi",
+    "metadataLinesAdded_other": "{{displayCount}} dòng đã thêm",
+    "metadataLinesAdded": "{{displayCount}} dòng đã thêm",
+    "metadataLinesRemoved_other": "{{displayCount}} dòng đã xóa",
+    "metadataLinesRemoved": "{{displayCount}} dòng đã xóa",
+    "metadataPlanCurrent": "Bước hiện tại: {{current}}",
+    "metadataFailure": "Lượt trước thất bại: {{kind}}",
+    "sourceActivity": "Hoạt động chưa đặt tên",
+    "metadataFailureProvider": "lỗi nhà cung cấp",
+    "metadataFailureTool": "lỗi công cụ",
+    "metadataFailureCancelled": "Đã hủy",
+    "metadataFailureOther": "lỗi không xác định",
+    "metadataPlan_one": "Kế hoạch: {{displayDone}}/{{displayTotal}} bước đã xong",
+    "metadataFiles_one": "{{displayCount}} tệp đã thay đổi",
+    "metadataLinesAdded_one": "{{displayCount}} dòng đã thêm",
+    "metadataLinesRemoved_one": "{{displayCount}} dòng đã xóa"
   },
   "systemSearch": {
     "couldNotOpenResult": "Không thể mở kết quả tìm kiếm này"

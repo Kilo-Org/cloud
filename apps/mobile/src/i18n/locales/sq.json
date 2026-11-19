@@ -4560,7 +4560,26 @@
     "quietSnapshot": "Nuk u zgjodh asnjë aktivitet seance për këtë pamje të çastit. Nuk u kërkua përmbledhje AI dhe nuk u aplikua asnjë tarifë.",
     "noEnabledContexts": "Asnjë kontekst i aktivizuar për raportet e planifikuara",
     "sourceBlocker": "Seanca kërkon vëmendje",
-    "sourceMetadata": "Metatëdhënat e regjistruara të seancës"
+    "sourceMetadata": "Metatëdhënat e regjistruara të seancës",
+    "metadataPlan_one": "Plani: {{displayDone}} nga {{displayTotal}} hap i kryer",
+    "metadataPlan_other": "Plani: {{displayDone}} nga {{displayTotal}} hapa të kryer",
+    "metadataPlan": "Plani: {{displayDone}} nga {{displayTotal}} hapa të kryer",
+    "metadataFiles_one": "{{displayCount}} skedar i ndryshuar",
+    "metadataFiles_other": "{{displayCount}} skedarë të ndryshuar",
+    "metadataFiles": "{{displayCount}} skedarë të ndryshuar",
+    "metadataLinesAdded_one": "{{displayCount}} rresht i shtuar",
+    "metadataLinesAdded_other": "{{displayCount}} rreshta të shtuar",
+    "metadataLinesAdded": "{{displayCount}} rreshta të shtuar",
+    "metadataLinesRemoved_one": "{{displayCount}} rresht i hequr",
+    "metadataLinesRemoved_other": "{{displayCount}} rreshta të hequr",
+    "metadataLinesRemoved": "{{displayCount}} rreshta të hequr",
+    "metadataPlanCurrent": "Hapi aktual: {{current}}",
+    "metadataFailure": "Raundi i fundit dështoi: {{kind}}",
+    "sourceActivity": "Aktivitet pa titull",
+    "metadataFailureProvider": "gabim i ofruesit",
+    "metadataFailureTool": "gabim i mjetit",
+    "metadataFailureCancelled": "Anuluar",
+    "metadataFailureOther": "gabim i paspecifikuar"
   },
   "systemSearch": {
     "couldNotOpenResult": "Nuk u hap dot ky rezultat kërkimi"

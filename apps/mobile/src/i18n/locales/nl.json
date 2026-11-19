@@ -4560,7 +4560,26 @@
     "quietSnapshot": "Voor deze momentopname is geen sessieactiviteit geselecteerd. Er is geen AI-samenvatting aangevraagd of in rekening gebracht.",
     "noEnabledContexts": "Geen contexten ingeschakeld voor geplande briefings",
     "sourceBlocker": "Sessie heeft aandacht nodig",
-    "sourceMetadata": "Vastgelegde sessiemetadata"
+    "sourceMetadata": "Vastgelegde sessiemetadata",
+    "metadataPlan_one": "Plan: {{displayDone}} van {{displayTotal}} stap gedaan",
+    "metadataPlan_other": "Plan: {{displayDone}} van {{displayTotal}} stappen gedaan",
+    "metadataPlan": "Plan: {{displayDone}} van {{displayTotal}} stappen gedaan",
+    "metadataFiles_one": "{{displayCount}} bestand gewijzigd",
+    "metadataFiles_other": "{{displayCount}} bestanden gewijzigd",
+    "metadataFiles": "{{displayCount}} bestanden gewijzigd",
+    "metadataLinesAdded_one": "{{displayCount}} regel toegevoegd",
+    "metadataLinesAdded_other": "{{displayCount}} regels toegevoegd",
+    "metadataLinesAdded": "{{displayCount}} regels toegevoegd",
+    "metadataLinesRemoved_one": "{{displayCount}} regel verwijderd",
+    "metadataLinesRemoved_other": "{{displayCount}} regels verwijderd",
+    "metadataLinesRemoved": "{{displayCount}} regels verwijderd",
+    "metadataPlanCurrent": "Huidige stap: {{current}}",
+    "metadataFailure": "Laatste beurt mislukt: {{kind}}",
+    "sourceActivity": "Activiteit zonder titel",
+    "metadataFailureProvider": "providerfout",
+    "metadataFailureTool": "toolfout",
+    "metadataFailureCancelled": "Geannuleerd",
+    "metadataFailureOther": "onbekende fout"
   },
   "systemSearch": {
     "couldNotOpenResult": "Dit zoekresultaat kon niet worden geopend"

@@ -4560,7 +4560,26 @@
     "quietSnapshot": "Kāore he mahi wātū i kōwhiria mō tēnei hopuāhua. Kāore he whakarāpopototanga AI i tonoa, ā, kāore hoki he utu i utua.",
     "noEnabledContexts": "Kāore he horopaki kua whakahohea mō ngā pūrongo kua hōtaka",
     "sourceBlocker": "Me aro ki te wātū",
-    "sourceMetadata": "Ngā raraungameta wātū kua hopukina"
+    "sourceMetadata": "Ngā raraungameta wātū kua hopukina",
+    "metadataPlan_one": "Mahere: kua oti {{displayDone}} o {{displayTotal}} hipanga",
+    "metadataPlan_other": "Mahere: kua oti {{displayDone}} o {{displayTotal}} hipanga",
+    "metadataPlan": "Mahere: kua oti {{displayDone}} o {{displayTotal}} hipanga",
+    "metadataFiles_one": "{{displayCount}} kōnae kua rerekē",
+    "metadataFiles_other": "{{displayCount}} kōnae kua rerekē",
+    "metadataFiles": "{{displayCount}} kōnae kua rerekē",
+    "metadataLinesAdded_one": "{{displayCount}} rārangi kua tāpiritia",
+    "metadataLinesAdded_other": "{{displayCount}} rārangi kua tāpiritia",
+    "metadataLinesAdded": "{{displayCount}} rārangi kua tāpiritia",
+    "metadataLinesRemoved_one": "{{displayCount}} rārangi kua tangohia",
+    "metadataLinesRemoved_other": "{{displayCount}} rārangi kua tangohia",
+    "metadataLinesRemoved": "{{displayCount}} rārangi kua tangohia",
+    "metadataPlanCurrent": "Hipanga o nāianei: {{current}}",
+    "metadataFailure": "I rahua te huringa whakamutunga: {{kind}}",
+    "sourceActivity": "Ngohe kāore he ingoa",
+    "metadataFailureProvider": "Hapa kaiwhakarato",
+    "metadataFailureTool": "Hapa taputapu",
+    "metadataFailureCancelled": "Kua whakakorea",
+    "metadataFailureOther": "Hapa kāore i tautuhia"
   },
   "systemSearch": {
     "couldNotOpenResult": "Kāore i taea te whakatuwhera i tēnei hua kimi"

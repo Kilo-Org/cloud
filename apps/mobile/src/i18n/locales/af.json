@@ -4560,7 +4560,26 @@
     "quietSnapshot": "Geen sessieaktiwiteit is vir hierdie momentopname geselekteer nie. Geen AI-opsomming is aangevra of gehef nie.",
     "noEnabledContexts": "Geen kontekste vir geskeduleerde verslae geaktiveer nie",
     "sourceBlocker": "Sessie benodig aandag",
-    "sourceMetadata": "Vasgelegde sessiemetadata"
+    "sourceMetadata": "Vasgelegde sessiemetadata",
+    "metadataPlan_one": "Plan: {{displayDone}} van {{displayTotal}} stap voltooi",
+    "metadataPlan_other": "Plan: {{displayDone}} van {{displayTotal}} stappe voltooi",
+    "metadataPlan": "Plan: {{displayDone}} van {{displayTotal}} stappe voltooi",
+    "metadataFiles_one": "{{displayCount}} lêer verander",
+    "metadataFiles_other": "{{displayCount}} lêers verander",
+    "metadataFiles": "{{displayCount}} lêers verander",
+    "metadataLinesAdded_one": "{{displayCount}} reël bygevoeg",
+    "metadataLinesAdded_other": "{{displayCount}} reëls bygevoeg",
+    "metadataLinesAdded": "{{displayCount}} reëls bygevoeg",
+    "metadataLinesRemoved_one": "{{displayCount}} reël verwyder",
+    "metadataLinesRemoved_other": "{{displayCount}} reëls verwyder",
+    "metadataLinesRemoved": "{{displayCount}} reëls verwyder",
+    "metadataPlanCurrent": "Huidige stap: {{current}}",
+    "metadataFailure": "Laaste beurt het misluk: {{kind}}",
+    "sourceActivity": "Aktiwiteit sonder titel",
+    "metadataFailureProvider": "verskafferfout",
+    "metadataFailureTool": "hulpmiddelfout",
+    "metadataFailureCancelled": "Gekanselleer",
+    "metadataFailureOther": "ongespesifiseerde fout"
   },
   "systemSearch": {
     "couldNotOpenResult": "Kon nie hierdie soektogresultaat oopmaak nie"

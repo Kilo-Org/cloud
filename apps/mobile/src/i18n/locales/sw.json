@@ -4560,7 +4560,26 @@
     "quietSnapshot": "Hakuna shughuli za vipindi zilizochaguliwa kwa rekodi hii ya hali. Hakuna muhtasari wa AI ulioombwa wala malipo yaliyotozwa.",
     "noEnabledContexts": "Hakuna miktadha iliyowezeshwa kwa ripoti zilizoratibiwa",
     "sourceBlocker": "Kipindi kinahitaji kushughulikiwa",
-    "sourceMetadata": "Metadata za kipindi zilizohifadhiwa"
+    "sourceMetadata": "Metadata za kipindi zilizohifadhiwa",
+    "metadataPlan_one": "Mpango: hatua {{displayDone}} kati ya {{displayTotal}} imekamilika",
+    "metadataPlan_other": "Mpango: hatua {{displayDone}} kati ya {{displayTotal}} zimekamilika",
+    "metadataPlan": "Mpango: hatua {{displayDone}} kati ya {{displayTotal}} zimekamilika",
+    "metadataFiles_one": "Faili {{displayCount}} limebadilika",
+    "metadataFiles_other": "Faili {{displayCount}} zimebadilika",
+    "metadataFiles": "Faili {{displayCount}} zimebadilika",
+    "metadataLinesAdded_one": "Mstari {{displayCount}} umeongezwa",
+    "metadataLinesAdded_other": "Mistari {{displayCount}} imeongezwa",
+    "metadataLinesAdded": "Mistari {{displayCount}} imeongezwa",
+    "metadataLinesRemoved_one": "Mstari {{displayCount}} umeondolewa",
+    "metadataLinesRemoved_other": "Mistari {{displayCount}} imeondolewa",
+    "metadataLinesRemoved": "Mistari {{displayCount}} imeondolewa",
+    "metadataPlanCurrent": "Hatua ya sasa: {{current}}",
+    "metadataFailure": "Zamu ya mwisho ilishindikana: {{kind}}",
+    "sourceActivity": "Shughuli isiyo na jina",
+    "metadataFailureProvider": "hitilafu ya mtoa huduma",
+    "metadataFailureTool": "hitilafu ya zana",
+    "metadataFailureCancelled": "Imeghairiwa",
+    "metadataFailureOther": "hitilafu isiyojulikana"
   },
   "systemSearch": {
     "couldNotOpenResult": "Imeshindikana kufungua matokeo haya ya utafutaji"

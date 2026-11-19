@@ -4560,7 +4560,26 @@
     "quietSnapshot": "Tsy nisy hetsika tao amin'ny fotoam-piasana voafantina ho an'ity tatitra raikitra ity. Tsy nisy famintinana AI nangatahana ary tsy nisy sarany nalaina.",
     "noEnabledContexts": "Tsy misy toe-javatra nandefasana tatitra voalahatra",
     "sourceBlocker": "Mila fikarakarana ny fotoam-piasana",
-    "sourceMetadata": "Metadata momba ny fotoam-piasana voarakitra"
+    "sourceMetadata": "Metadata momba ny fotoam-piasana voarakitra",
+    "metadataPlan_one": "Drafitra: {{displayDone}} amin'ny {{displayTotal}} dingana vita",
+    "metadataPlan_other": "Drafitra: {{displayDone}} amin'ny {{displayTotal}} dingana vita",
+    "metadataPlan": "Drafitra: {{displayDone}} amin'ny {{displayTotal}} dingana vita",
+    "metadataFiles_one": "{{displayCount}} rakitra no novaina",
+    "metadataFiles_other": "{{displayCount}} rakitra no novaina",
+    "metadataFiles": "{{displayCount}} rakitra no novaina",
+    "metadataLinesAdded_one": "{{displayCount}} andalana nampidirina",
+    "metadataLinesAdded_other": "{{displayCount}} andalana nampidirina",
+    "metadataLinesAdded": "{{displayCount}} andalana nampidirina",
+    "metadataLinesRemoved_one": "{{displayCount}} andalana nesorina",
+    "metadataLinesRemoved_other": "{{displayCount}} andalana nesorina",
+    "metadataLinesRemoved": "{{displayCount}} andalana nesorina",
+    "metadataPlanCurrent": "Dingana ankehitriny: {{current}}",
+    "metadataFailure": "Tsy nahomby ny fihodinana farany: {{kind}}",
+    "sourceActivity": "Hetsika tsy misy lohateny",
+    "metadataFailureProvider": "fahadisoan'ny mpanome tolotra",
+    "metadataFailureTool": "fahadisoan'ny fitaovana",
+    "metadataFailureCancelled": "Nofoanana",
+    "metadataFailureOther": "fahadisoana tsy voafaritra"
   },
   "systemSearch": {
     "couldNotOpenResult": "Tsy voasokatra ity valim-pikarohana ity"

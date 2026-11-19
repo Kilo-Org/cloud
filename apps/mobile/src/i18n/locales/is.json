@@ -4560,7 +4560,26 @@
     "quietSnapshot": "Engin lotuvirkni var valin fyrir þessa stöðumynd. Ekki var óskað eftir AI samantekt og ekkert gjald var tekið fyrir hana.",
     "noEnabledContexts": "Engin samhengi eru virkjuð fyrir áætluð yfirlit",
     "sourceBlocker": "Lota þarfnast athygli",
-    "sourceMetadata": "Vistuð lýsigögn lotu"
+    "sourceMetadata": "Vistuð lýsigögn lotu",
+    "metadataPlan_one": "Áætlun: {{displayDone}} af {{displayTotal}} skrefi lokið",
+    "metadataPlan_other": "Áætlun: {{displayDone}} af {{displayTotal}} skrefum lokið",
+    "metadataPlan": "Áætlun: {{displayDone}} af {{displayTotal}} skrefum lokið",
+    "metadataFiles_one": "{{displayCount}} skrá breytt",
+    "metadataFiles_other": "{{displayCount}} skrám breytt",
+    "metadataFiles": "{{displayCount}} skrám breytt",
+    "metadataLinesAdded_one": "{{displayCount}} línu bætt við",
+    "metadataLinesAdded_other": "{{displayCount}} línum bætt við",
+    "metadataLinesAdded": "{{displayCount}} línum bætt við",
+    "metadataLinesRemoved_one": "{{displayCount}} línu eytt",
+    "metadataLinesRemoved_other": "{{displayCount}} línum eytt",
+    "metadataLinesRemoved": "{{displayCount}} línum eytt",
+    "metadataPlanCurrent": "Núverandi skref: {{current}}",
+    "metadataFailure": "Síðasta umferð mistókst: {{kind}}",
+    "sourceActivity": "Ónefnd virkni",
+    "metadataFailureProvider": "villa hjá þjónustuveitanda",
+    "metadataFailureTool": "villa í verkfæri",
+    "metadataFailureCancelled": "Hætt við",
+    "metadataFailureOther": "ótilgreind villa"
   },
   "systemSearch": {
     "couldNotOpenResult": "Ekki tókst að opna þessa leitarniðurstöðu"

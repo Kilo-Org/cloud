@@ -24,7 +24,7 @@ export function BriefingSessionList({ report }: Readonly<{ report: BriefingRepor
             router.push(briefingSessionHref(report, session.sessionId));
           }}
         >
-          <Text>{session.title || t('agents.sessionRow.untitled')}</Text>
+          <Text>{session.title ?? t('agents.sessionRow.untitled')}</Text>
         </Pressable>
       ))}
     </View>

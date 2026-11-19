@@ -4560,7 +4560,26 @@
     "quietSnapshot": "ଏହି ସ୍ନାପସଟ୍ ପାଇଁ କୌଣସି ସେସନ୍ କାର୍ଯ୍ୟକଳାପ ଚୟନ କରାଯାଇନାହିଁ। AI ସାରାଂଶ ପାଇଁ ଅନୁରୋଧ କରାଯାଇନାହିଁ କିମ୍ବା କୌଣସି ଶୁଳ୍କ ଲାଗିନାହିଁ।",
     "noEnabledContexts": "ଅନୁସୂଚିତ ରିପୋର୍ଟ ପାଇଁ କୌଣସି ପ୍ରସଙ୍ଗ ସକ୍ଷମ ହୋଇନାହିଁ",
     "sourceBlocker": "ସେସନ୍ ପ୍ରତି ଧ୍ୟାନ ଦେବା ଆବଶ୍ୟକ",
-    "sourceMetadata": "ସଂରକ୍ଷିତ ସେସନ୍ ମେଟାଡାଟା"
+    "sourceMetadata": "ସଂରକ୍ଷିତ ସେସନ୍ ମେଟାଡାଟା",
+    "metadataPlan_one": "ଯୋଜନା: {{displayTotal}} ମଧ୍ୟରୁ {{displayDone}}ଟି ଷ୍ଟେପ୍ ସମ୍ପୂର୍ଣ୍ଣ",
+    "metadataPlan_other": "ଯୋଜନା: {{displayTotal}} ମଧ୍ୟରୁ {{displayDone}}ଟି ଷ୍ଟେପ୍ ସମ୍ପୂର୍ଣ୍ଣ",
+    "metadataPlan": "ଯୋଜନା: {{displayTotal}} ମଧ୍ୟରୁ {{displayDone}}ଟି ଷ୍ଟେପ୍ ସମ୍ପୂର୍ଣ୍ଣ",
+    "metadataFiles_one": "{{displayCount}}ଟି ଫାଇଲ୍ ବଦଳିଛି",
+    "metadataFiles_other": "{{displayCount}}ଟି ଫାଇଲ୍ ବଦଳିଛି",
+    "metadataFiles": "{{displayCount}}ଟି ଫାଇଲ୍ ବଦଳିଛି",
+    "metadataLinesAdded_one": "{{displayCount}}ଟି ଲାଇନ୍ ଯୋଡ଼ାଗଲା",
+    "metadataLinesAdded_other": "{{displayCount}}ଟି ଲାଇନ୍ ଯୋଡ଼ାଗଲା",
+    "metadataLinesAdded": "{{displayCount}}ଟି ଲାଇନ୍ ଯୋଡ଼ାଗଲା",
+    "metadataLinesRemoved_one": "{{displayCount}}ଟି ଲାଇନ୍ ହଟାଗଲା",
+    "metadataLinesRemoved_other": "{{displayCount}}ଟି ଲାଇନ୍ ହଟାଗଲା",
+    "metadataLinesRemoved": "{{displayCount}}ଟି ଲାଇନ୍ ହଟାଗଲା",
+    "metadataPlanCurrent": "ବର୍ତ୍ତମାନ ଷ୍ଟେପ୍: {{current}}",
+    "metadataFailure": "ଶେଷ ଟର୍ଣ୍ଣ ବିଫଳ ହେଲା: {{kind}}",
+    "sourceActivity": "ଶୀର୍ଷକହୀନ କାର୍ଯ୍ୟକଳାପ",
+    "metadataFailureProvider": "ପ୍ରୋଭାଇଡର୍ ତ୍ରୁଟି",
+    "metadataFailureTool": "ଟୁଲ୍ ତ୍ରୁଟି",
+    "metadataFailureCancelled": "ବାତିଲ",
+    "metadataFailureOther": "ଅନିର୍ଦ୍ଦିଷ୍ଟ ତ୍ରୁଟି"
   },
   "systemSearch": {
     "couldNotOpenResult": "ଏହି ଖୋଜା ଫଳାଫଳ ଖୋଲିହେଲା ନାହିଁ"

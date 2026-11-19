@@ -4560,7 +4560,26 @@
     "quietSnapshot": "ഈ സ്നാപ്ഷോട്ടിനായി സെഷൻ പ്രവർത്തനങ്ങളൊന്നും തിരഞ്ഞെടുത്തില്ല. AI സംഗ്രഹം ആവശ്യപ്പെടുകയോ നിരക്ക് ഈടാക്കുകയോ ചെയ്തിട്ടില്ല.",
     "noEnabledContexts": "ഷെഡ്യൂൾ ചെയ്ത ബ്രീഫിംഗുകൾക്കായി സന്ദർഭങ്ങളൊന്നും പ്രവർത്തനക്ഷമമാക്കിയിട്ടില്ല",
     "sourceBlocker": "സെഷനിൽ ശ്രദ്ധ ആവശ്യമാണ്",
-    "sourceMetadata": "പകർത്തിയ സെഷൻ മെറ്റാഡാറ്റ"
+    "sourceMetadata": "പകർത്തിയ സെഷൻ മെറ്റാഡാറ്റ",
+    "metadataPlan_one": "പ്ലാൻ: {{displayDone}}/{{displayTotal}} ഘട്ടം പൂർത്തിയായി",
+    "metadataPlan_other": "പ്ലാൻ: {{displayDone}}/{{displayTotal}} ഘട്ടങ്ങൾ പൂർത്തിയായി",
+    "metadataPlan": "പ്ലാൻ: {{displayDone}}/{{displayTotal}} ഘട്ടങ്ങൾ പൂർത്തിയായി",
+    "metadataFiles_one": "{{displayCount}} ഫയൽ മാറ്റി",
+    "metadataFiles_other": "{{displayCount}} ഫയലുകൾ മാറ്റി",
+    "metadataFiles": "{{displayCount}} ഫയലുകൾ മാറ്റി",
+    "metadataLinesAdded_one": "{{displayCount}} വരി ചേർത്തു",
+    "metadataLinesAdded_other": "{{displayCount}} വരികൾ ചേർത്തു",
+    "metadataLinesAdded": "{{displayCount}} വരികൾ ചേർത്തു",
+    "metadataLinesRemoved_one": "{{displayCount}} വരി നീക്കി",
+    "metadataLinesRemoved_other": "{{displayCount}} വരികൾ നീക്കി",
+    "metadataLinesRemoved": "{{displayCount}} വരികൾ നീക്കി",
+    "metadataPlanCurrent": "നിലവിലെ ഘട്ടം: {{current}}",
+    "metadataFailure": "കഴിഞ്ഞ ടേൺ പരാജയപ്പെട്ടു: {{kind}}",
+    "sourceActivity": "തലക്കെട്ടില്ലാത്ത പ്രവർത്തനം",
+    "metadataFailureProvider": "പ്രൊവൈഡർ പിശക്",
+    "metadataFailureTool": "ടൂൾ പിശക്",
+    "metadataFailureCancelled": "റദ്ദാക്കി",
+    "metadataFailureOther": "വ്യക്തമാക്കാത്ത പിശക്"
   },
   "systemSearch": {
     "couldNotOpenResult": "ഈ തിരച്ചിൽ ഫലം തുറക്കാനായില്ല"

@@ -4560,7 +4560,26 @@
     "quietSnapshot": "За оваа снимка не е избрана активност од сесиите. Не е побарано или наплатено AI резиме.",
     "noEnabledContexts": "Нема овозможени контексти за закажани извештаи",
     "sourceBlocker": "Сесијата бара внимание",
-    "sourceMetadata": "Зачувани метаподатоци за сесијата"
+    "sourceMetadata": "Зачувани метаподатоци за сесијата",
+    "metadataPlan_one": "План: {{displayDone}} од {{displayTotal}} чекор завршен",
+    "metadataPlan_other": "План: {{displayDone}} од {{displayTotal}} чекори завршени",
+    "metadataPlan": "План: {{displayDone}} од {{displayTotal}} чекори завршени",
+    "metadataFiles_one": "{{displayCount}} променета датотека",
+    "metadataFiles_other": "{{displayCount}} променети датотеки",
+    "metadataFiles": "{{displayCount}} променети датотеки",
+    "metadataLinesAdded_one": "{{displayCount}} додадена линија",
+    "metadataLinesAdded_other": "{{displayCount}} додадени линии",
+    "metadataLinesAdded": "{{displayCount}} додадени линии",
+    "metadataLinesRemoved_one": "{{displayCount}} отстранета линија",
+    "metadataLinesRemoved_other": "{{displayCount}} отстранети линии",
+    "metadataLinesRemoved": "{{displayCount}} отстранети линии",
+    "metadataPlanCurrent": "Тековен чекор: {{current}}",
+    "metadataFailure": "Последниот обид не успеа: {{kind}}",
+    "sourceActivity": "Активност без наслов",
+    "metadataFailureProvider": "грешка на провајдерот",
+    "metadataFailureTool": "грешка на алатката",
+    "metadataFailureCancelled": "Откажано",
+    "metadataFailureOther": "неодредена грешка"
   },
   "systemSearch": {
     "couldNotOpenResult": "Не успеа отворањето на овој резултат од пребарувањето"

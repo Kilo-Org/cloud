@@ -4560,7 +4560,26 @@
     "quietSnapshot": "Nem választottunk ki munkamenet-tevékenységet ehhez a pillanatképhez. Nem kértünk AI-összefoglalót, és nem történt díjfelszámítás.",
     "noEnabledContexts": "Egyetlen környezetben sincsenek engedélyezve az ütemezett jelentések",
     "sourceBlocker": "A munkamenet figyelmet igényel",
-    "sourceMetadata": "A munkamenet rögzített metaadatai"
+    "sourceMetadata": "A munkamenet rögzített metaadatai",
+    "metadataPlan_one": "Terv: {{displayDone}}/{{displayTotal}} lépés kész",
+    "metadataPlan_other": "Terv: {{displayDone}}/{{displayTotal}} lépés kész",
+    "metadataPlan": "Terv: {{displayDone}}/{{displayTotal}} lépés kész",
+    "metadataFiles_one": "{{displayCount}} fájl módosítva",
+    "metadataFiles_other": "{{displayCount}} fájl módosítva",
+    "metadataFiles": "{{displayCount}} fájl módosítva",
+    "metadataLinesAdded_one": "{{displayCount}} sor hozzáadva",
+    "metadataLinesAdded_other": "{{displayCount}} sor hozzáadva",
+    "metadataLinesAdded": "{{displayCount}} sor hozzáadva",
+    "metadataLinesRemoved_one": "{{displayCount}} sor eltávolítva",
+    "metadataLinesRemoved_other": "{{displayCount}} sor eltávolítva",
+    "metadataLinesRemoved": "{{displayCount}} sor eltávolítva",
+    "metadataPlanCurrent": "Aktuális lépés: {{current}}",
+    "metadataFailure": "Az utolsó kör sikertelen: {{kind}}",
+    "sourceActivity": "Névtelen tevékenység",
+    "metadataFailureProvider": "szolgáltatói hiba",
+    "metadataFailureTool": "eszközhiba",
+    "metadataFailureCancelled": "Megszakítva",
+    "metadataFailureOther": "meghatározatlan hiba"
   },
   "systemSearch": {
     "couldNotOpenResult": "Nem sikerült megnyitni ezt a keresési találatot"

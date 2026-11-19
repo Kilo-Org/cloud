@@ -6,19 +6,22 @@
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 
+// The two surfaces deliberately differ, so a case proves which one the diagram
+// page paints: only `diagramSurface` reaches the page and picks the theme, while
+// `codeSurface` keeps serving code fences on the bubble.
 const palette = {
   textColor: '#111111',
   mutedTextColor: '#666666',
-  codeBackground: '#f4f4f4',
-  codeSurface: '#f4f4f4',
+  codeBackground: '#e8ca02',
+  codeSurface: '#e8ca02',
   diagramSurface: '#f4f4f4',
   borderColor: '#cccccc',
 };
 
 export const otherPalette = {
   ...palette,
-  codeBackground: '#101010',
-  codeSurface: '#101010',
+  codeBackground: '#f4f4f4',
+  codeSurface: '#f4f4f4',
   diagramSurface: '#101010',
 };
 

@@ -84,6 +84,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => {
   // a fresh object per call would recreate the palette on every render and
   // mask remount regressions.
   const colors = {
+    background: '#fafafa',
     foreground: '#111111',
     mutedForeground: '#666666',
     muted: '#eeeeee',

@@ -5,7 +5,9 @@ import {
   canStartDownload,
   createStepTokenStore,
   DOWNLOAD_PERMISSION_MISSING_ERROR,
+  DOWNLOAD_BLOCKED_BY_BROWSER_ERROR,
   DOWNLOAD_STEP_TAB_GONE_ERROR,
+  downloadStoppedWithoutPermissionError,
   hashBrowserToolArguments,
   NEEDS_PERMISSION_ERROR,
   ORIGIN_CHANGED_ERROR,
@@ -24,6 +26,14 @@ import { postAgentNavigate, preflightAgentCall, takeStartedDownloads } from './b
 import type { BrowserSensitiveStep } from './browser-agent-gate';
 import { targetOf } from './browser-download-hold';
 import type { DownloadHold, DownloadStep } from './browser-download-hold';
+import {
+  DOWNLOAD_FAIL_REASON,
+  DOWNLOAD_RESPONSE_PATTERNS,
+  downloadResponseName,
+  downloadResponsePause,
+  isDownloadResponse,
+} from './browser-download-intercept';
+import type { DownloadResponsePause } from './browser-download-intercept';
 import {
   createAgentFrameReader,
   enableAgentFrameAutoAttach,
@@ -346,8 +356,9 @@ type DiscardOutcome =
   | { readonly kind: 'pending'; readonly filename: string }
   | { readonly kind: 'removed'; readonly filename: string };
 
-/** One download a guard stopped, by the tab and url that name the file it would have opened. */
+/** One download a guard stopped, by the tab and url that name the file it would have opened, and its file name. */
 interface StoppedDownload {
+  readonly filename?: string | undefined;
   readonly tabId?: number | undefined;
   readonly url?: string | undefined;
 }
@@ -358,6 +369,11 @@ interface GuardSettlement {
   readonly stopped: number;
   /** Every download this guard stopped or announced, in order: the first names the file an approval buys. */
   readonly stoppedItems?: readonly StoppedDownload[] | undefined;
+  /**
+   * The files the approval let through: the one file it bought. Empty when the call was not an approved repeat,
+   * and empty for an approved repeat the browser never created an item for — Chrome's own limiter can refuse it.
+   */
+  readonly allowed?: readonly string[] | undefined;
 }
 
 /**
@@ -836,6 +852,96 @@ type DownloadClaim =
   /** The item is already being stopped by whoever owns it: nothing left for this guard to do. */
   | 'handled';
 
+/** What the response interceptor stopped: the file's name, and where it was going. */
+interface InterceptSettlement {
+  /** The downloads this call failed before any byte was written, in the order they were paused. */
+  readonly stopped: readonly { readonly filename: string; readonly url: string }[];
+}
+
+/** One armed response interceptor: the only answer a paused response gets, and the way out at call end. */
+interface ResponseInterceptor {
+  readonly settle: () => Promise<InterceptSettlement>;
+}
+
+/**
+ * The guard a Chrome call runs when the optional `downloads` permission is not
+ * granted: `onDeterminingFilename` does not exist, so the item cannot be held
+ * or cancelled, but the response that would become a file can still be failed.
+ *
+ * The pattern is `Document` only. Every stoppable download measured on real
+ * Chrome is a document load — a navigate, a link click, or a hidden iframe —
+ * and a catch-all would pause every image, script and font on the tab, which
+ * costs a user who declined the permission the speed of every page.
+ *
+ * A pause nobody answers holds the page forever, so every paused response is
+ * answered: `failRequest` for a download, `continueResponse` for everything
+ * else. `undefined` when the tab cannot intercept, so the caller reports the
+ * announcement honestly instead of pretending a guard exists.
+ */
+const armResponseInterceptor = async (
+  session: BrowserToolSession
+): Promise<ResponseInterceptor | undefined> => {
+  if (session.backend !== 'debugger') {
+    return undefined;
+  }
+
+  const stopped: { readonly filename: string; readonly url: string }[] = [];
+  /** The answer sent per request, so a response paused twice is answered once. */
+  const answers = new Map<string, Promise<void>>();
+  const answer = async (pause: DownloadResponsePause): Promise<void> => {
+    const failed = isDownloadResponse(pause);
+
+    if (failed) {
+      stopped.push({ filename: downloadResponseName(pause), url: pause.url });
+    }
+
+    try {
+      await session.send(failed ? 'Fetch.failRequest' : 'Fetch.continueResponse', {
+        requestId: pause.requestId,
+        ...(failed ? { errorReason: DOWNLOAD_FAIL_REASON } : {}),
+      });
+    } catch {
+      // The response is already gone — its tab closed, its load cancelled — so there is nothing left to answer.
+    }
+  };
+  const stopWatching = session.watchFetchPauses(params => {
+    const pause = downloadResponsePause(params);
+
+    if (pause === undefined || answers.has(pause.requestId)) {
+      return;
+    }
+
+    const sent = answer(pause);
+
+    answers.set(pause.requestId, sent);
+  });
+
+  try {
+    await session.send('Fetch.enable', { patterns: [...DOWNLOAD_RESPONSE_PATTERNS] });
+  } catch {
+    // A target that refuses the pause has no interceptor: the caller reports what the tab announces instead.
+    stopWatching();
+
+    return undefined;
+  }
+
+  return {
+    settle: async () => {
+      // From here nothing new is paused; every answer already sent is awaited before the pause is released.
+      stopWatching();
+      await Promise.all(answers.values());
+
+      try {
+        await session.send('Fetch.disable');
+      } catch {
+        // A target that is gone has nothing left to release.
+      }
+
+      return { stopped: [...stopped] };
+    },
+  };
+};
+
 /** What a guard tells the runtime about the downloads it sees, and what the runtime says back. */
 interface DownloadLedger {
   /** The browser announced a download before creating it: open its record, or leave the one an earlier attempt opened to that attempt. */
@@ -1089,6 +1195,14 @@ const armDownloadGuard = (
   let announced = 0;
   /** Every download this guard stopped or announced: the first with a url names the file an approval would buy. */
   const stoppedSeen: StoppedDownload[] = [];
+  /** The files the approval let through: exactly the one item it bought, named as the browser wrote it. */
+  const allowed: string[] = [];
+  /** Remembers the approved file once: the announcement and the item are the same file, and it is named once. */
+  const noteAllowed = (filename: string): void => {
+    if (allowed.length === 0) {
+      allowed.push(filename);
+    }
+  };
 
   /** What the ledger needs to open or find this guard's one record for a download. */
   const sighting = (input: {
@@ -1117,7 +1231,11 @@ const armDownloadGuard = (
     const url = download.url === undefined || download.url === '' ? undefined : download.url;
 
     // The approved call's own file is announced too, and it is nobody's stop: the human already approved it.
+    // The announcement names the file before its item exists, and it is the name both the refusal and the
+    // Success use, so the model is told one name for the one file it may look for.
     if (url !== undefined && exemptUrl?.(url, tab.tabId) === true) {
+      noteAllowed(download.suggestedFilename ?? url.split('/').pop() ?? 'the downloaded file');
+
       return;
     }
 
@@ -1125,7 +1243,7 @@ const armDownloadGuard = (
 
     if (ledger.announced(sighting({ filename, guid: download.guid, url })) === 'own') {
       announced += 1;
-      stoppedSeen.push({ tabId: tab.tabId, url });
+      stoppedSeen.push({ filename, tabId: tab.tabId, url });
     }
   };
 
@@ -1144,6 +1262,9 @@ const armDownloadGuard = (
   const stop = (item: BrowserDownloadItem): void => {
     // The file the human approved is the approved call's: it is the only download of that call left alone.
     if (exempt !== undefined && exempt(item)) {
+      // The approval bought exactly this item: its name is what the success text names.
+      noteAllowed(fileNameOf(item));
+
       return;
     }
 
@@ -1164,7 +1285,7 @@ const armDownloadGuard = (
 
     if (!closed && (claim === 'own' || claim === 'linked')) {
       // Exactly the stops this call reports: an item another record owns, or one after the report, is not its file.
-      stoppedSeen.push({ tabId: item.tabId, url });
+      stoppedSeen.push({ filename: fileNameOf(item), tabId: item.tabId, url });
       stops.set(item.id, discarded);
     }
 
@@ -1219,6 +1340,7 @@ const armDownloadGuard = (
     const outcomes = await Promise.all(stops.values());
 
     return {
+      allowed: [...allowed],
       kept: outcomes.flatMap(outcome => (outcome.kind === 'kept' ? [outcome.filename] : [])),
       // A download whose file is still being written counts as stopped too: the guard is deleting whatever lands.
       stopped: outcomes.filter(outcome => outcome.kind !== 'kept').length,
@@ -1316,7 +1438,7 @@ const armDownloadGuard = (
       if (stops.size === 0 && announced === 0) {
         lingerOn();
 
-        return { kept: [], stopped: 0 };
+        return { allowed: [...allowed], kept: [], stopped: 0 };
       }
 
       const settlement = await report();
@@ -1418,6 +1540,12 @@ export const createBrowserRuntime = ({
   const openWatches = new Map<number, OpenWatch>();
   /** One record per download a session still owes a report for: the only bookkeeping a file that outlived its call has. */
   const downloadRecords = new Map<string, Map<string, DownloadRecord>>();
+  /**
+   * Downloads the browser announced where nothing could hold or cancel them — no optional `downloads`
+   * permission, so no `onDeterminingFilename` — queued per session as possibly saved. Each is reported
+   * once, by the next call of its own session.
+   */
+  const unguardedDownloads = new Map<string, DownloadReport[]>();
   /** Session handles that ended: no call can report for one again, so a lingering guard must not open a record for it. */
   const closedSessions = new Set<string>();
   /** Names one guard attempt; a record is counted by the attempt that opened it and by no other. */
@@ -1568,6 +1696,7 @@ export const createBrowserRuntime = ({
   /** A session that ends owes no approval, and its stopped files stay unreported: there is no model left to tell. */
   const closeSessionRecords = (session: string): void => {
     downloadRecords.delete(session);
+    unguardedDownloads.delete(session);
     approvedNeeds.delete(session);
     lastApprovedAt.delete(session);
 
@@ -1597,6 +1726,33 @@ export const createBrowserRuntime = ({
     closeSessionRecords(session);
     // The hold's approval dies with the session, and its reports have nobody to read them.
     downloadHold?.closeSession(session);
+  };
+
+  /**
+   * Queues one download the browser announced where nothing could hold or cancel it: no finished file can be
+   * Ruled out, so the model is told it may have been saved and that granting Downloads would guard it.
+   */
+  const noteUnguardedDownload = (
+    session: string,
+    download: { readonly suggestedFilename?: string; readonly tabId: number; readonly url?: string }
+  ): void => {
+    const existing = unguardedDownloads.get(session) ?? [];
+    const filename = download.suggestedFilename ?? 'the downloaded file';
+
+    if (existing.some(file => file.filename === filename && file.tabId === download.tabId)) {
+      return;
+    }
+
+    unguardedDownloads.set(session, [
+      ...existing,
+      {
+        filename,
+        kept: true,
+        step: undefined,
+        tabId: download.tabId,
+        url: download.url,
+      },
+    ]);
   };
 
   const recordsFor = (session: string): Map<string, DownloadRecord> => {
@@ -2528,11 +2684,28 @@ export const createBrowserRuntime = ({
    */
   const downloadRefusal = (
     file: DownloadReport,
-    context: { readonly keptFiles: readonly string[]; readonly origin: string },
+    context: {
+      readonly keptFiles: readonly string[];
+      readonly origin: string;
+      /** The file was announced where nothing could hold it: the text names the permission that would. */
+      readonly unguarded?: boolean;
+    },
     runTabId: number
   ): BrowserToolRunOutcome => {
     const { step } = file;
     const { keptFiles, origin } = context;
+
+    if (context.unguarded === true) {
+      return needsPermissionOutcome(
+        [{ class: 'sensitive', origin, reason: SENSITIVE_REASON.download }],
+        {
+          afterAction: true,
+          error: `${file.filename}: ${DOWNLOAD_PERMISSION_MISSING_ERROR}`,
+          keptFiles,
+        }
+      );
+    }
+
     const reason = SENSITIVE_REASON.download;
     const stepToken =
       step === undefined
@@ -2754,7 +2927,15 @@ export const createBrowserRuntime = ({
             for (const download of stale) {
               downloadHold.announce({ ...download, tabId });
             }
+          } else if (downloadsApi?.() === undefined) {
+            // Nothing can hold the item and no permission could cancel it, so this announcement is the last thing
+            // Anything sees of the file: it is queued as possibly saved, never silently kept.
+            for (const download of stale) {
+              noteUnguardedDownload(sessionKey, { ...download, tabId });
+            }
           }
+          // With the permission granted, the item stream is the record of what became of each file: a stale
+          // Announcement is the earlier call's, and its own ledger entry already names it.
 
           await ensureFrameAutoAttach(session, tabId);
         }
@@ -2894,6 +3075,10 @@ export const createBrowserRuntime = ({
             (preflight !== undefined &&
               (preflight.class === 'act' || preflight.class === 'navigate')));
 
+        // The optional permission this call runs with, read at call time: it can be granted or revoked while the
+        // Worker lives, so every guard decision below reads the same answer once.
+        const downloadsPermission = downloadsApi?.();
+
         // An act call runs guarded: an unapproved one denies downloads outright, and an approved one listens and
         // Stops every download but the file its approval bought, so a second file is neither kept nor silent.
         // An approved call guards nothing when its approval names no file: without a url there is nothing to exempt,
@@ -2916,7 +3101,18 @@ export const createBrowserRuntime = ({
           downloadCapable &&
           preflight !== undefined &&
           preflight.sensitiveToken === undefined;
-        const guarded = guardDownloads || holdGuards;
+
+        // Without the optional `downloads` permission nothing can hold or cancel an item, but the response that
+        // Would become a file can still be failed. Which guard this call has is decided once the permission is
+        // Read again at arming time, because it can be revoked while the tab is opened.
+        const interceptGuards =
+          downloadHold === undefined &&
+          agentContext !== undefined &&
+          downloadCapable &&
+          preflight !== undefined &&
+          preflight.sensitiveToken === undefined &&
+          !downloadApproved;
+        const guarded = guardDownloads || holdGuards || interceptGuards;
 
         // An approved repeat of a `browser_tabs new` download owns the tab that step opened: sending the tool again
         // Would open a second tab and download the file twice, and the kept file would go unreported. The repeat
@@ -2939,16 +3135,10 @@ export const createBrowserRuntime = ({
         // Guard: a tab opened at the destination lets the browser start the download before any guard exists, and
         // The file is then kept with no approval. This is the one path that must not reach the tool as written.
         // An approved repeat already owns the tab its step opened: opening a second one would download the file twice.
+        // Without the optional `downloads` permission nothing can stop the file, so the step still runs and the
+        // Announcement it produces is reported as possibly saved: a blank tab costs less than refusing every call.
         const opensGuardedTab =
           guarded && !downloadApproved && toolName === 'browser_tabs' && stepOpensTab;
-        // The permission is read before any tab exists: a refusal must not leave a blank tab in the session's
-        // Group, where it would become the next call's target.
-        if (opensGuardedTab && downloadsApi?.() === undefined) {
-          return {
-            kind: 'result',
-            result: { error: DOWNLOAD_PERMISSION_MISSING_ERROR, ok: false },
-          };
-        }
 
         // A take-over may have arrived while this call resolved its step: opening a tab for a call that is already
         // Over would leave it behind.
@@ -3083,7 +3273,11 @@ export const createBrowserRuntime = ({
           takeOverDownloads(runTabId);
 
           for (const download of takeStartedDownloads(runSession)) {
-            downloadHold?.announce({ ...download, tabId: runTabId });
+            if (downloadHold !== undefined) {
+              downloadHold.announce({ ...download, tabId: runTabId });
+            } else if (downloadsPermission === undefined) {
+              noteUnguardedDownload(sessionKey, { ...download, tabId: runTabId });
+            }
           }
 
           await ensureFrameAutoAttach(runSession, runTabId);
@@ -3219,19 +3413,25 @@ export const createBrowserRuntime = ({
                   : {}
               );
 
-        // No guard without the optional permission: no file may be started, so the call is refused instead of run unguarded.
-        if (guardDownloads && downloadGuard === undefined) {
-          // The permission was revoked between the check and this point: the tab this call opened is not the next
-          // Call's to inherit.
-          if (openedForStep !== undefined) {
-            await closeOpenedTab(openedForStep.tabId);
-          }
+        // Without an item guard nothing can hold or cancel a download: the pause on the tab's own session fails
+        // The response that would become a file, and every other response is continued untouched. Decided here,
+        // After the permission was read for the item guard, so a revoke mid-call falls back to the pause.
+        const responseInterceptor =
+          interceptGuards && downloadGuard === undefined
+            ? await armResponseInterceptor(runSession)
+            : undefined;
 
-          return {
-            kind: 'result',
-            result: { error: DOWNLOAD_PERMISSION_MISSING_ERROR, ok: false },
-          };
-        }
+        // A download no network response carries — a `blob:`, a `data:`, an `<a download>` — is announced and
+        // Saved before anything can stop it. Where nothing holds items and no permission could cancel one, the
+        // Announcement is the only thing that names the file: it is queued as possibly saved, never silently kept.
+        const stopUnguardedWatch =
+          downloadHold === undefined &&
+          downloadsPermission === undefined &&
+          agentContext !== undefined
+            ? runSession.watchDownloads(download => {
+                noteUnguardedDownload(sessionKey, { ...download, tabId: runTabId });
+              })
+            : undefined;
 
         if (downloadGuard !== undefined) {
           // The guard reports the tabs this call opened, so its listener lives exactly as long as the guard does.
@@ -3248,6 +3448,7 @@ export const createBrowserRuntime = ({
 
         let result: EvalTabResult | null = null;
         let settlement: GuardSettlement = { kept: [], stopped: 0 };
+        let intercepted: InterceptSettlement = { stopped: [] };
 
         try {
           dispatched = true;
@@ -3312,6 +3513,15 @@ export const createBrowserRuntime = ({
             tabsApi.onCreated?.removeListener?.(noteBrowserOpenedTab);
           }
 
+          if (responseInterceptor !== undefined) {
+            // Every pause this call armed is answered and the interception is released before the call answers.
+            intercepted = await responseInterceptor.settle();
+          }
+
+          // The announcement for a file no response could stop is read before the watch goes: a blob that lands
+          // While the call is still answering is still this call's to report.
+          stopUnguardedWatch?.();
+
           if (holdGuards) {
             // The call waits only for its own decision: an ordinary click pays the start grace, and a download
             // The hold is still deciding is read before the call answers, so its refusal is this call's answer.
@@ -3350,6 +3560,52 @@ export const createBrowserRuntime = ({
           ...settlement.kept,
           ...late.filter(file => file.kept).map(file => file.filename),
         ];
+
+        if (agentContext !== undefined && intercepted.stopped.length > 0) {
+          // The pause failed the response before any byte was written, so no file exists under these names. Without
+          // The optional permission no approval could be redeemed for a guard that does not exist, so the text asks
+          // For the grant instead of offering a token nobody could spend.
+          const [firstFile] = intercepted.stopped;
+
+          return needsPermissionOutcome(
+            [
+              {
+                class: 'sensitive',
+                origin: preflight?.ok ? preflight.origin : '',
+                reason: SENSITIVE_REASON.download,
+              },
+            ],
+            {
+              afterAction: true,
+              error: downloadStoppedWithoutPermissionError(
+                firstFile?.filename ?? 'the downloaded file'
+              ),
+              keptFiles: [],
+            }
+          );
+        }
+
+        if (agentContext !== undefined) {
+          // A download the browser announced where nothing could hold or cancel it: no finished file can be
+          // Ruled out, so it is named as possibly saved and the one fix that guards it is named too.
+          const unguarded = unguardedDownloads.get(sessionKey) ?? [];
+
+          unguardedDownloads.delete(sessionKey);
+
+          const [firstUnguarded] = unguarded;
+
+          if (firstUnguarded !== undefined) {
+            return downloadRefusal(
+              firstUnguarded,
+              {
+                keptFiles: unguarded.map(file => file.filename),
+                origin: preflight?.ok ? preflight.origin : '',
+                unguarded: true,
+              },
+              runTabId
+            );
+          }
+        }
 
         if (downloadHold !== undefined && agentContext !== undefined) {
           if (earlierLate.length > 0) {
@@ -3401,8 +3657,15 @@ export const createBrowserRuntime = ({
           }
 
           // The click already ran and the download was cancelled. `afterAction` tells the CLI not to replay it.
+          // The text names the file, so the model knows which download the one approval buys.
+          const refusedMessage =
+            refusedFile === undefined || (refusedFile.filename ?? '') === ''
+              ? undefined
+              : `The download of ${refusedFile.filename} was stopped before it was saved: downloading a file needs your approval. Repeat that ${downloadStep?.noun ?? 'step'} after the download is approved to receive the file.`;
+
           return needsPermissionOutcome([{ class: 'sensitive', origin, reason }], {
             afterAction: true,
+            ...(refusedMessage === undefined ? {} : { error: refusedMessage }),
             keptFiles,
             ...(downloadStep === undefined
               ? {}
@@ -3418,6 +3681,26 @@ export const createBrowserRuntime = ({
 
         // A guarded `browser_tabs new` answers with what the tool itself would: the tab it opened, at its new url.
         if (openedForStep !== undefined) {
+          if (intercepted.stopped.length > 0) {
+            // The document the tab loaded was a file, and the pause failed it: that is a refusal, not a tab answer.
+            return needsPermissionOutcome(
+              [
+                {
+                  class: 'sensitive',
+                  origin: preflight?.ok ? preflight.origin : '',
+                  reason: SENSITIVE_REASON.download,
+                },
+              ],
+              {
+                afterAction: true,
+                error: downloadStoppedWithoutPermissionError(
+                  intercepted.stopped[0]?.filename ?? 'the downloaded file'
+                ),
+                keptFiles: [],
+              }
+            );
+          }
+
           if (!settled.ok) {
             return { kind: 'result', result: settled };
           }
@@ -3455,9 +3738,67 @@ export const createBrowserRuntime = ({
             ? await keptDownloadText(guardApi, destination, callStartedAt)
             : undefined;
 
+        // The file the approval let through is named on the success too: the model must be able to point at what
+        // Landed, and the same name is what the refusal that asked for the approval carried.
+        const approvedName =
+          downloadApproved && (settled.ok || keptText !== undefined)
+            ? settlement.allowed?.[0]
+            : undefined;
+        const successText =
+          (approvedName === undefined
+            ? undefined
+            : `${approvedName}: The file was downloaded; the page did not change.`) ?? keptText;
+
+        // An approved repeat is a call for exactly one file. When the call succeeded and the browser named no item
+        // For it, Chrome's own multiple-downloads limiter has refused the file: a plain success would hide it, and a
+        // Spent approval would ask a human again for a file the browser swallowed. The approval stays unspent, and
+        // The same step token is issued again so the repeat needs no second decision once the site is allowed.
+        if (
+          downloadApproved &&
+          // Only the item-level guard can tell "no file was created" from "another guard owns the decision".
+          downloadGuard !== undefined &&
+          successText === undefined &&
+          settled.ok &&
+          settlement.stopped === 0 &&
+          intercepted.stopped.length === 0
+        ) {
+          const origin = preflight?.ok ? preflight.origin : '';
+          const approvedUrl =
+            approvedFile?.need.url ??
+            settlement.stoppedItems?.find(item => item.url !== undefined)?.url;
+          const token = issueSensitiveToken(
+            { origin, reason: SENSITIVE_REASON.download },
+            runTabId,
+            approvedUrl === undefined
+              ? undefined
+              : { tabId: approvedFile?.need.tabId ?? runTabId, url: approvedUrl }
+          );
+
+          return needsPermissionOutcome(
+            [{ class: 'sensitive', origin, reason: SENSITIVE_REASON.download }],
+            {
+              afterAction: true,
+              error: DOWNLOAD_BLOCKED_BY_BROWSER_ERROR,
+              ...(downloadStep === undefined
+                ? {}
+                : {
+                    step: {
+                      argumentsHash: downloadStep.argumentHash,
+                      tool: downloadStep.toolName,
+                    },
+                  }),
+              stepToken: token,
+            }
+          );
+        }
+
         // A download is not a document, so a navigate that became one never moved the tab.
         // An opaque or older origin there is the file's answer, not the redirect this check looks for.
-        if (preflight !== undefined && preflight.class === 'navigate' && keptText === undefined) {
+        if (
+          preflight !== undefined &&
+          preflight.class === 'navigate' &&
+          successText === undefined
+        ) {
           const changed = await postAgentNavigate(runSession, preflight.origin);
 
           if (changed !== undefined) {
@@ -3466,7 +3807,7 @@ export const createBrowserRuntime = ({
         }
 
         const finalResult: EvalTabResult =
-          keptText === undefined ? settled : { ok: true, value: keptText };
+          successText === undefined ? settled : { ok: true, value: successText };
 
         if (agentContext === undefined) {
           return { kind: 'result', result: finalResult };

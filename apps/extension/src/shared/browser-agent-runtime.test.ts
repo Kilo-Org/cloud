@@ -14,7 +14,7 @@ import type {
 } from './browser-runtime';
 import {
   AGENT_TAB_OUTSIDE_GROUP_ERROR,
-  DOWNLOAD_PERMISSION_MISSING_ERROR,
+  DOWNLOAD_BLOCKED_BY_BROWSER_ERROR,
   DOWNLOAD_STEP_TAB_GONE_ERROR,
   hashBrowserToolArguments,
   NEEDS_PERMISSION_ERROR,
@@ -725,12 +725,15 @@ describe('agent browser calls', () => {
       afterAction: true,
       items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
       kind: 'needs_permission',
-      result: { error: NEEDS_PERMISSION_ERROR, ok: false },
     });
+    // The refusal names the file the announcement named, so the one approval is for a file the model can point at.
+    expect(
+      outcome.kind === 'needs_permission' && !outcome.result.ok ? outcome.result.error : ''
+    ).toContain('invoice.pdf');
     // The click ran once: a click is a press and a release, and nothing ran the action a second time.
     expect(cdp.commands().filter(method => method === 'Input.dispatchMouseEvent')).toHaveLength(2);
-    expect(cdp.downloadsDenied()).toBe(1);
-    expect(cdp.downloadsRestored()).toBe(1);
+    // Denying is what stops an unapproved file; restoring puts the profile back as the human had it.
+    expect([cdp.downloadsDenied(), cdp.downloadsRestored()]).toStrictEqual([1, 1]);
 
     expect(expectStepToken(outcome)).toBeDefined();
   });
@@ -825,6 +828,131 @@ describe('agent browser calls', () => {
     });
     expect(expectStepToken(approved)).toBeDefined();
     expect([downloads.cancelled, downloads.removed]).toStrictEqual([[41, 43], []]);
+  });
+
+  it('reports the browser blocking an approved download, and keeps the approval unspent', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    let clicks = 0;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        clicks += 1;
+
+        // Only the press runs the step: the release is the second command of the same click.
+        if (clicks === 1) {
+          // The browser names the file first, and the item it creates is stamped well before either call: the
+          // Refusal is built from the announcement, and neither guard claims the pre-existing item as its own.
+          // No item is created for the approved repeat, which is what Chrome's multiple-downloads limiter does.
+          cdp.emit('Browser.downloadWillBegin', {
+            guid: 'blocked-1',
+            suggestedFilename: 'invoice.pdf',
+            url: `${MAIN_ORIGIN}/invoice.pdf`,
+          });
+          downloads.emit({
+            id: 41,
+            startTime: new Date(Date.now() - 60_000).toISOString(),
+            tabId: TAB_ID,
+            url: `${MAIN_ORIGIN}/invoice.pdf`,
+          });
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    const refused = await click([]);
+
+    expect(refused.kind).toBe('needs_permission');
+
+    const approved = await click([expectStepToken(refused)]);
+
+    // Never a plain success: the file the human approved never arrived, and the text says who blocked it.
+    expect(approved).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+    expect(
+      approved.kind === 'needs_permission' && !approved.result.ok ? approved.result.error : ''
+    ).toBe(DOWNLOAD_BLOCKED_BY_BROWSER_ERROR);
+
+    // The approval is unspent and a fresh token is offered, so the repeat needs no second decision once the site
+    // Is allowed: a human is never asked again for a file the browser itself refused.
+    expect(expectStepToken(approved)).not.toBe('');
+
+    // The site is still not allowed, so the next repeat is blocked the same way — and still offers an unspent token.
+    const retried = await click([expectStepToken(approved)]);
+
+    expect(
+      retried.kind === 'needs_permission' && !retried.result.ok ? retried.result.error : ''
+    ).toBe(DOWNLOAD_BLOCKED_BY_BROWSER_ERROR);
+  });
+
+  it('names the file in the refusal and in the approval text, and keeps the file it named', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    let clicks = 0;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        clicks += 1;
+
+        // One press per click: the release is the second command of the same click, and it starts nothing.
+        if (clicks % 2 === 1) {
+          cdp.emit('Browser.downloadWillBegin', {
+            guid: `download-${String(clicks)}`,
+            suggestedFilename: 'quarterly-report.txt',
+            url: `${MAIN_ORIGIN}/statement`,
+          });
+          downloads.emit({
+            filename: '/home/me/Downloads/quarterly-report.txt',
+            id: clicks === 1 ? 41 : 42,
+            tabId: TAB_ID,
+            url: `${MAIN_ORIGIN}/statement`,
+          });
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    const refused = await click([]);
+    const refusalText =
+      refused.kind === 'needs_permission' && !refused.result.ok ? refused.result.error : '';
+
+    // The refusal names the file the announcement named, not the url's last segment.
+    expect(refusalText).toContain('quarterly-report.txt');
+
+    const approved = await click([expectStepToken(refused)]);
+
+    // The success names the same file, once, and it is the item the approval kept.
+    expect(approved).toMatchObject({ kind: 'result', result: { ok: true } });
+    const approvedText =
+      approved.kind === 'result' && approved.result.ok ? String(approved.result.value) : '';
+
+    expect(approvedText).toContain('quarterly-report.txt');
+    expect(approvedText).toContain('The file was downloaded; the page did not change.');
+    // The second item is the approved file; the first was the refused one.
+    expect([downloads.cancelled, downloads.removed]).toStrictEqual([[41], []]);
   });
 
   it('never touches a download on another tab while an approved call runs', async () => {
@@ -1123,42 +1251,152 @@ describe('agent browser calls', () => {
     ).toContain('report.txt: The file was downloaded; the page did not change.');
   });
 
-  it('refuses a download-capable call when the optional permission is missing', async () => {
-    // No downloads API: the guard cannot see a blob download, so the click must not run.
+  it('runs a normal navigate without the optional permission and arms only Document pauses', async () => {
+    // No downloads API: no item can be held, so the response interceptor is the guard a call has.
     const { cdp, runtime } = await createHarness({ downloadsGranted: false });
 
     const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant, { class: 'navigate', origin: MAIN_ORIGIN }] },
+      arguments: { url: `${MAIN_ORIGIN}/dashboard` },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_navigate',
+    });
+
+    // An ordinary page load succeeds: a user who declined the permission keeps the browser.
+    expect(outcome).toMatchObject({ kind: 'result', result: { ok: true } });
+    expect(cdp.commands()).toContain('Page.navigate');
+
+    // A catch-all pattern would pause every image, script and font on the tab: only documents are paused.
+    expect(cdp.sent().find(command => command.method === 'Fetch.enable')?.params).toStrictEqual({
+      patterns: [{ requestStage: 'Response', resourceType: 'Document' }],
+    });
+    // The interceptor is released with the call, so an ordinary page keeps its own speed afterwards.
+    expect(cdp.commands()).toContain('Fetch.disable');
+  });
+
+  it('fails a download response and reports the file by the name the response asked for', async () => {
+    const { cdp, runtime } = await createHarness({ downloadsGranted: false });
+
+    cdp.setHandlers({
+      'Page.navigate': () => {
+        // The browser pauses the response that would become a file, before any byte reaches the disk.
+        cdp.emit('Fetch.requestPaused', {
+          requestId: 'interception-1',
+          responseHeaders: [
+            { name: 'Content-Disposition', value: 'attachment; filename="report.txt"' },
+            { name: 'Content-Type', value: 'text/plain' },
+          ],
+          responseStatusCode: 200,
+        });
+
+        return { errorText: 'net::ERR_ABORTED' };
+      },
+    });
+
+    const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant, { class: 'navigate', origin: MAIN_ORIGIN }] },
+      arguments: { url: `${MAIN_ORIGIN}/download` },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_navigate',
+    });
+
+    // The response is failed, never continued: continuing it would write the file the human never approved.
+    const answers = cdp
+      .sent()
+      .filter(
+        command =>
+          command.method === 'Fetch.failRequest' || command.method === 'Fetch.continueResponse'
+      )
+      .map(command => [command.method, command.params?.['requestId']]);
+
+    expect(answers).toStrictEqual([['Fetch.failRequest', 'interception-1']]);
+
+    // Without the optional permission no approval can be redeemed, so the text names the file and the grant.
+    expect(outcome).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+    expect(
+      outcome.kind === 'needs_permission' && !outcome.result.ok ? outcome.result.error : ''
+    ).toContain('report.txt');
+    // The token is offered only where it can be spent: without `downloads` nothing can honour it.
+    expect(outcome.kind === 'needs_permission' ? outcome.stepToken : 'unexpected').toBeUndefined();
+  });
+
+  it('continues a pdf document response, which is a page Chrome renders rather than a file', async () => {
+    const { cdp, runtime } = await createHarness({ downloadsGranted: false });
+
+    cdp.setHandlers({
+      'Page.navigate': () => {
+        cdp.emit('Fetch.requestPaused', {
+          requestId: 'interception-2',
+          responseHeaders: [{ name: 'Content-Type', value: 'application/pdf' }],
+          responseStatusCode: 200,
+        });
+
+        return { frameId: 'main' };
+      },
+    });
+
+    const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant, { class: 'navigate', origin: MAIN_ORIGIN }] },
+      arguments: { url: `${MAIN_ORIGIN}/file.pdf` },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_navigate',
+    });
+
+    expect(
+      cdp
+        .sent()
+        .filter(
+          command =>
+            command.method === 'Fetch.failRequest' || command.method === 'Fetch.continueResponse'
+        )
+        .map(command => [command.method, command.params?.['requestId']])
+    ).toStrictEqual([['Fetch.continueResponse', 'interception-2']]);
+    // A rendered document is a page load, and it answers as one.
+    expect(outcome).toMatchObject({ kind: 'result', result: { ok: true } });
+  });
+
+  it('reports a blob download, which no response can stop, as possibly saved', async () => {
+    const { cdp, runtime } = await createHarness({ downloadsGranted: false });
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        // No network response exists for a blob: the announcement is the only thing that names the file.
+        cdp.emit('Browser.downloadWillBegin', {
+          guid: 'blob-1',
+          suggestedFilename: 'blob.txt',
+          url: 'blob:https://app.example.com/6f1a',
+        });
+
+        return {};
+      },
+    });
+
+    const outcome = await runtime.runTool({
       agent: { authorized: [readGrant, actGrant] },
-      arguments: { target: '#pay' },
+      arguments: { target: '#export' },
       caller: agent(),
       tabId: TAB_ID,
       toolName: 'browser_click',
     });
 
     expect(outcome).toMatchObject({
-      kind: 'result',
-      result: { error: DOWNLOAD_PERMISSION_MISSING_ERROR, ok: false },
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
     });
-    expect(cdp.commands()).not.toContain('Input.dispatchMouseEvent');
-  });
+    const message =
+      outcome.kind === 'needs_permission' && !outcome.result.ok ? outcome.result.error : '';
 
-  it('refuses a navigate without the optional permission, and loads nothing', async () => {
-    const { cdp, runtime } = await createHarness({ downloadsGranted: false });
-
-    const outcome = await runtime.runTool({
-      agent: { authorized: [readGrant, actGrant, { class: 'navigate', origin: MAIN_ORIGIN }] },
-      arguments: { url: `${MAIN_ORIGIN}/invoice.pdf` },
-      caller: agent(),
-      tabId: TAB_ID,
-      toolName: 'browser_navigate',
-    });
-
-    // A page can start a download on load: no guard, no load.
-    expect(outcome).toMatchObject({
-      kind: 'result',
-      result: { error: DOWNLOAD_PERMISSION_MISSING_ERROR, ok: false },
-    });
-    expect(cdp.commands()).not.toContain('Page.navigate');
+    // Honest, not a claim that nothing was written: the file may exist under the name the page gave it.
+    expect(message).toContain('blob.txt');
+    expect(message).toContain('may have been saved');
   });
 
   it('leaves no tab listener behind when the optional permission is missing', async () => {
@@ -1171,7 +1409,7 @@ describe('agent browser calls', () => {
       },
       query: async () => [{ id: TAB_ID, title: 'Example', url: `${MAIN_ORIGIN}/dashboard` }],
     };
-    const { runtime } = await createHarness({ downloadsGranted: false, tabsApi });
+    const { cdp, runtime } = await createHarness({ downloadsGranted: false, tabsApi });
 
     const click = () =>
       runtime.runTool({
@@ -1182,12 +1420,10 @@ describe('agent browser calls', () => {
         toolName: 'browser_click',
       });
 
-    // The refusal returns before the guard exists, so the tab listener it would have fed is never registered.
-    await expect(click()).resolves.toMatchObject({
-      kind: 'result',
-      result: { error: DOWNLOAD_PERMISSION_MISSING_ERROR, ok: false },
-    });
+    // The response interceptor is the guard, so nothing subscribes to the item stream it cannot read.
+    await expect(click()).resolves.toMatchObject({ kind: 'result', result: { ok: true } });
     expect(created.size).toBe(0);
+    expect(cdp.commands()).toContain('Fetch.disable');
   });
 
   it('runs a download call unguarded once with the approval token, then burns it', async () => {
@@ -3890,21 +4126,18 @@ describe('agent browser calls', () => {
     }
   });
 
-  it('closes the tab it opened when the downloads permission is revoked before the guard', async () => {
-    // The pre-open check sees the permission; the guard, armed after the tab exists, does not.
+  it('opens the tab and intercepts its document when the permission is revoked before the guard', async () => {
+    // The pre-open check and the guard read the same permission, so the call runs with the response interceptor
+    // Instead of refusing: the tab it opened is the call's, not a leftover for the next call to inherit.
     const fixture = await tabsNewFixture({ revokeAfterOpen: true });
 
-    const outcome = await fixture.run(agent());
+    await fixture.run(agent());
 
-    if (outcome.kind !== 'result' || outcome.result.ok) {
-      throw new Error(`expected the permission refusal, got ${JSON.stringify(outcome)}`);
-    }
-
-    // The opened tab is not left in the session's group for the next call to inherit.
-    expect([outcome.result.error, fixture.removed]).toStrictEqual([
-      DOWNLOAD_PERMISSION_MISSING_ERROR,
-      [fixture.newTab],
-    ]);
+    expect(fixture.created).toHaveLength(1);
+    expect(fixture.cdp.commands()).toStrictEqual(
+      expect.arrayContaining(['Fetch.enable', 'Fetch.disable'])
+    );
+    expect(fixture.removed).toStrictEqual([]);
   });
 
   it('holds the driven tab until its guard has settled, so the panel download survives', async () => {
@@ -4166,20 +4399,18 @@ describe('agent browser calls', () => {
     }
   });
 
-  it('refuses a guarded tabs-new without the downloads permission before it opens a tab', async () => {
+  it('runs a guarded tabs-new without the downloads permission under the response interceptor', async () => {
     const fixture = await tabsNewFixture({ granted: false });
 
-    const outcome = await fixture.run(agent());
+    await fixture.run(agent());
 
-    // The refusal names the missing permission, and no tab was created, grouped or left for the next call.
-    if (outcome.kind !== 'result' || outcome.result.ok) {
-      throw new Error(`expected the permission refusal, got ${JSON.stringify(outcome)}`);
-    }
-
-    expect([outcome.result.error, fixture.created.length]).toStrictEqual([
-      DOWNLOAD_PERMISSION_MISSING_ERROR,
-      0,
-    ]);
+    // The tab is opened and its document paused rather than the call being refused: a user who declined the
+    // Permission keeps the browser, and a page that starts no download answers as it always did.
+    expect(fixture.created).toHaveLength(1);
+    // The intercept is armed for the call and released with it, so the tab keeps its own speed afterwards.
+    expect(fixture.cdp.commands()).toStrictEqual(
+      expect.arrayContaining(['Fetch.enable', 'Fetch.disable'])
+    );
   });
 
   it('refuses a repeat whose step tab was closed, without burning its token', async () => {

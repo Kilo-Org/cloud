@@ -2,6 +2,8 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { resetPendingProfileRetirementsForTests } from '@/lib/profile-stack-retirement';
+
 import { useRepairTriggerRouteStack } from './use-repair-trigger-route-stack';
 
 type Route = { key: string; name: string; params?: object };
@@ -77,6 +79,9 @@ const r = (key: string, name: string, params?: object): Route => ({ key, name, p
 beforeEach(() => {
   pushMock.mockReset();
   resetMock.mockReset();
+  // A pending removal lives outside the screens, in the retirement module's own
+  // map, so a test that recorded one must not hand it to the next test.
+  resetPendingProfileRetirementsForTests();
   nav.listeners.clear();
   nav.pathname = '/triggers/trigger-1';
 });

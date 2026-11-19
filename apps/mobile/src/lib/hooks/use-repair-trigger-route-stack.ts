@@ -10,15 +10,27 @@ import { useEffect, useRef } from 'react';
 import {
   isFocusedProfileScreen,
   profileScreenPath,
+  type ProfileStackParents,
   profileStackRepair,
   TRIGGER_ROUTE_NAMES,
   TRIGGERS_LIST_ROUTE_NAME,
   withRebuiltParents,
 } from '@/lib/profile-route-stack';
+import {
+  notePendingProfileRetirement,
+  takeRetirableProfileRoutes,
+} from '@/lib/profile-stack-retirement';
 import { triggersListHref } from '@/lib/cloud-triggers/trigger-routes';
 
 /** The navigation object a screen of a Stack sees. */
 type StackNavigation = NativeStackNavigationProp<Record<string, undefined>>;
+
+/**
+ * The Stack the trigger screens are mounted in: the Profile tab's, the Stack the
+ * retirement module scopes a pending removal to. The trigger routes exist only
+ * there, so every repair records and finishes under this name.
+ */
+const TRIGGER_STACK = 'profileTab';
 
 /**
  * Give the trigger screens the triggers list when it is missing beneath them.
@@ -36,6 +48,16 @@ type StackNavigation = NativeStackNavigationProp<Record<string, undefined>>;
  * The rebuilt pushes carry `PROFILE_STACK_REBUILT_PARAM`, which turns their
  * transitions off in the layouts' screen options and tells a rebuilt screen not
  * to repair again.
+ *
+ * The removal belongs to the rebuilt copy, not to the copy that asked for the
+ * repair: a native Stack unmounts a covered screen, so the repairing screen is
+ * already gone when its rebuilt copy lands, and a removal tracked there never
+ * ran. It therefore lives outside both screens
+ * (`profile-stack-retirement.ts`), and every trigger screen finishes a pending
+ * removal the moment a rebuilt copy of that screen is focused. A repair that
+ * leaves its original in the stack is worse than no repair: Back then steps out
+ * to the list and the leftover copy becomes the focused screen again, so the
+ * detail returns instead of the reader leaving it.
  */
 export function useRepairTriggerRouteStack({
   self,
@@ -56,37 +78,6 @@ export function useRepairTriggerRouteStack({
   useEffect(() => {
     // One decision per mounted screen, whatever it decides.
     let decided = false;
-    let retired = false;
-    let unsubscribeRetire: (() => void) | undefined = undefined;
-
-    const retireOriginal = (retiredKey: string, selfName: string) => {
-      if (retired) {
-        return;
-      }
-      const state = navigation.getState();
-      const top = state.routes[state.index];
-      // Wait until this screen's own rebuilt copy is the focused route: the
-      // removed screen is never the focused one, so the reset commits on its
-      // own. The rebuilt list on top of it is not this screen yet.
-      if (
-        top === undefined ||
-        top.key === retiredKey ||
-        top.name !== selfName ||
-        pathnameRef.current !== screenPath
-      ) {
-        return;
-      }
-      if (!state.routes.some(route => route.key === retiredKey)) {
-        retired = true;
-        return;
-      }
-      const routes = state.routes.filter(route => route.key !== retiredKey);
-      if (routes.length === state.routes.length || routes.length === 0) {
-        return;
-      }
-      retired = true;
-      navigation.reset({ ...state, routes, index: routes.length - 1 });
-    };
 
     const decide = () => {
       if (decided) {
@@ -113,17 +104,21 @@ export function useRepairTriggerRouteStack({
         routes: state.routes,
         currentIndex: state.index,
         openedOutsideProfileTree: false,
-        parents: { list: true, overview: false },
+        parents: { list: true, overview: false } satisfies ProfileStackParents,
         listRouteName: TRIGGERS_LIST_ROUTE_NAME,
         overviewRouteName: 'profiles/[profileId]/index',
       });
       if (!(toPush.list || toPush.overview)) {
         return;
       }
-      const retiredKey = current.key;
-      const selfName = current.name;
-      unsubscribeRetire = navigation.addListener('state', () => {
-        retireOriginal(retiredKey, selfName);
+      // This copy is about to be replaced by the rebuilt one above the list, and
+      // a covered screen stops running code, so the removal is recorded where
+      // any trigger screen can finish it (`profile-stack-retirement.ts`).
+      notePendingProfileRetirement({
+        key: current.key,
+        stack: TRIGGER_STACK,
+        selfName: current.name,
+        now: Date.now(),
       });
       // The rebuilt list keeps the caller's scope: `org` is what scopes the
       // list, the detail and every write, so a personal rebuild would show the
@@ -135,9 +130,30 @@ export function useRepairTriggerRouteStack({
     const unsubscribeDecide = navigation.addListener('state', decide);
     // The focused pathname settles on its own render, after a state event.
     decide();
-    return () => {
-      unsubscribeDecide();
-      unsubscribeRetire?.();
-    };
+    return unsubscribeDecide;
   }, [navigation, organizationId, router, screenPath, self]);
+
+  // The rebuilt copy of a repaired screen is what finishes the repair: every
+  // trigger screen watches the Stack for the state that puts a rebuilt copy on
+  // top, and removes the original below it then.
+  useEffect(() => {
+    const retire = () => {
+      const state = navigation.getState();
+      const next = takeRetirableProfileRoutes({
+        routes: state.routes,
+        index: state.index,
+        stack: TRIGGER_STACK,
+        now: Date.now(),
+      });
+      if (next === null) {
+        return;
+      }
+      navigation.reset({ ...state, routes: next.routes, index: next.index });
+    };
+    // A screen can mount after the state that retired its original was applied by
+    // another instance, and a navigator reports no further event for a stack that
+    // is already settled, so judge the stack once as this instance mounts.
+    retire();
+    return navigation.addListener('state', retire);
+  }, [navigation]);
 }

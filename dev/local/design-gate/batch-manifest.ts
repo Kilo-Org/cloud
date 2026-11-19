@@ -327,42 +327,72 @@ const dynamic = (part: string) => part.startsWith('[');
 const catchAll = (part: string) => part.startsWith('[...') || part.startsWith('[[...');
 const group = (part: string) => part.startsWith('(') && part.endsWith(')');
 
+/** How a route consumed a link: segments matched by name, by `[x]`, and by a catch-all. */
+type MatchScore = Readonly<{ named: number; dynamic: number; rest: number }>;
+
+/** Positive when `a` is the more specific match: more named, then more `[x]`, then less rest. */
+function compareScores(a: MatchScore, b: MatchScore): number {
+  return a.named - b.named || a.dynamic - b.dynamic || b.rest - a.rest;
+}
+
 /**
- * Whether a route file serves a link path the way Expo Router resolves it: a
- * group segment the link omits is skipped, `[x]` takes one segment, `[...x]`
- * one or more and `[[...x]]` any number.
+ * How a route file serves a link path the way Expo Router resolves it, or
+ * undefined when it does not: a group segment the link omits is skipped, `[x]`
+ * takes one segment, `[...x]` one or more and `[[...x]]` any number. Of several
+ * ways to consume the path, the most specific one counts.
  */
-function matches(route: readonly string[], segments: readonly string[]): boolean {
+function match(route: readonly string[], segments: readonly string[]): MatchScore | undefined {
   const [part, ...rest] = route;
-  if (part === undefined) return segments.length === 0;
+  if (part === undefined) {
+    return segments.length === 0 ? { named: 0, dynamic: 0, rest: 0 } : undefined;
+  }
+  const best = (candidates: (MatchScore | undefined)[]) =>
+    candidates.reduce<MatchScore | undefined>(
+      (winner, candidate) =>
+        candidate !== undefined && (winner === undefined || compareScores(candidate, winner) > 0)
+          ? candidate
+          : winner,
+      undefined
+    );
+  const add = (score: MatchScore | undefined, delta: Partial<MatchScore>) =>
+    score === undefined
+      ? undefined
+      : {
+          named: score.named + (delta.named ?? 0),
+          dynamic: score.dynamic + (delta.dynamic ?? 0),
+          rest: score.rest + (delta.rest ?? 0),
+        };
   if (group(part)) {
-    return (segments[0] === part && matches(rest, segments.slice(1))) || matches(rest, segments);
+    return best([
+      segments[0] === part ? add(match(rest, segments.slice(1)), { named: 1 }) : undefined,
+      match(rest, segments),
+    ]);
   }
   if (catchAll(part)) {
+    const takes: (MatchScore | undefined)[] = [];
     for (let take = part.startsWith('[[') ? 0 : 1; take <= segments.length; take += 1) {
-      if (matches(rest, segments.slice(take))) return true;
+      takes.push(add(match(rest, segments.slice(take)), { rest: take }));
     }
-    return false;
+    return best(takes);
   }
   const [head, ...tail] = segments;
-  return head !== undefined && (dynamic(part) || part === head) && matches(rest, tail);
+  if (head === undefined) return undefined;
+  if (part === head) return add(match(rest, tail), { named: 1 });
+  return dynamic(part) ? add(match(rest, tail), { dynamic: 1 }) : undefined;
 }
 
 export function resolveRoute(
   routes: readonly RouteFile[],
   segments: readonly string[]
 ): RouteFile | undefined {
-  const hits = routes.filter(route => matches(route.segments, segments));
-  const exact = hits.find(
-    route =>
-      route.segments.length === segments.length &&
-      route.segments.every((part, index) => part === segments[index])
-  );
-  if (exact !== undefined) return exact;
-  // The most specific route wins: a named segment over `[x]`, `[x]` over a catch-all.
-  const weight = (route: RouteFile) =>
-    route.segments.reduce((sum, part) => sum + (catchAll(part) ? 10 : dynamic(part) ? 1 : 0), 0);
-  return [...hits].sort((a, b) => weight(a) - weight(b))[0];
+  let winner: { route: RouteFile; score: MatchScore } | undefined;
+  for (const route of routes) {
+    const score = match(route.segments, segments);
+    if (score !== undefined && (winner === undefined || compareScores(score, winner.score) > 0)) {
+      winner = { route, score };
+    }
+  }
+  return winner?.route;
 }
 
 /**

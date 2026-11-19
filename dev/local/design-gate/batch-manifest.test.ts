@@ -24,6 +24,7 @@ test('a link resolves through an omitted group and a catch-all, preferring the m
     route('(app)/code-reviewer/[scope]/[platform]/(edit)/style.tsx'),
     route('(app)/code-reviewer/[scope]/[platform]/index.tsx'),
     route('(app)/pr-review/[platform]/[...identity]/index.tsx'),
+    route('(app)/pr-review/[platform]/[...identity]/merge.tsx'),
     route('(app)/pr-review/[owner]/[repo]/[number]/index.tsx'),
     route('(app)/(tabs)/(3_profile)/triggers/[trigger-id].tsx'),
   ];
@@ -35,6 +36,10 @@ test('a link resolves through an omitted group and a catch-all, preferring the m
   assert.equal(
     file('kiloapp:///(app)/pr-review/gitlab/acme/sample/7'),
     '(app)/pr-review/[platform]/[...identity]/index.tsx'
+  );
+  assert.equal(
+    file('kiloapp:///(app)/pr-review/gitlab/group/sub/repo/12/merge'),
+    '(app)/pr-review/[platform]/[...identity]/merge.tsx'
   );
   assert.equal(
     file('kiloapp:///(app)/pr-review/acme/sample/7'),

@@ -1449,7 +1449,7 @@ export const webhookTriggersRouter = createTRPCRouter({
         });
       }
 
-      // Enrich requests with kiloSessionId by looking up cloudAgentSessionId in cli_sessions
+      // Enrich requests with kiloSessionId by looking up cloudAgentSessionId in cli_sessions_v2
       const cloudAgentSessionIds = result.requests
         .map(r => r.cloudAgentSessionId)
         .filter((id): id is string => id !== null);

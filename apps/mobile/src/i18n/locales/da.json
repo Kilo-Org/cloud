@@ -177,7 +177,8 @@
     "changes": "Ændringer",
     "organizationTrialEnded": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. En ejer af organisationen kan opdatere betalingen på kilo.ai og derefter prøve igen.",
     "privateRepositoryA11y": "{{name}}, privat repository",
-    "legalDocumentEnglishOnly": "Dette dokument er kun tilgængeligt på engelsk."
+    "legalDocumentEnglishOnly": "Dette dokument er kun tilgængeligt på engelsk.",
+    "organizationTrialEndedBilling": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. Du kan opdatere betalingen og derefter prøve igen."
   },
   "language": {
     "restarting": "Genstarter for at skifte sprog",

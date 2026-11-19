@@ -177,7 +177,8 @@
     "changes": "Pakeitimai",
     "organizationTrialEnded": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Organizacijos savininkas gali atnaujinti atsiskaitymo duomenis adresu kilo.ai, tada bandykite dar kartą.",
     "privateRepositoryA11y": "{{name}}, privati saugykla",
-    "legalDocumentEnglishOnly": "Šis dokumentas prieinamas tik anglų kalba."
+    "legalDocumentEnglishOnly": "Šis dokumentas prieinamas tik anglų kalba.",
+    "organizationTrialEndedBilling": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Galite atnaujinti atsiskaitymo duomenis, tada bandykite dar kartą."
   },
   "language": {
     "restarting": "Paleidžiama iš naujo, kad būtų pakeista kalba",

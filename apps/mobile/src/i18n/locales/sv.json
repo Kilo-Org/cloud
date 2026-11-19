@@ -177,7 +177,8 @@
     "changes": "Ändringar",
     "organizationTrialEnded": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. En organisationsägare kan uppdatera faktureringen på kilo.ai och sedan försöka igen.",
     "privateRepositoryA11y": "{{name}}, privat kodarkiv",
-    "legalDocumentEnglishOnly": "Det här dokumentet finns endast på engelska."
+    "legalDocumentEnglishOnly": "Det här dokumentet finns endast på engelska.",
+    "organizationTrialEndedBilling": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. Du kan uppdatera faktureringen och sedan försöka igen."
   },
   "language": {
     "restarting": "Startar om för att byta språk",

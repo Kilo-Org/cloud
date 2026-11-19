@@ -177,7 +177,8 @@
     "changes": "Spremembe",
     "organizationTrialEnded": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Lastnik organizacije lahko posodobi obračun na kilo.ai, nato poskusi znova.",
     "privateRepositoryA11y": "{{name}}, zasebno skladišče",
-    "legalDocumentEnglishOnly": "Ta dokument je na voljo samo v angleščini."
+    "legalDocumentEnglishOnly": "Ta dokument je na voljo samo v angleščini.",
+    "organizationTrialEndedBilling": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Obračun lahko posodobiš, nato poskusi znova."
   },
   "language": {
     "restarting": "Ponovni zagon za spremembo jezika",

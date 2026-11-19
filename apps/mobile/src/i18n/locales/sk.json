@@ -177,7 +177,8 @@
     "changes": "Zmeny",
     "organizationTrialEnded": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Vlastník organizácie môže aktualizovať fakturáciu na kilo.ai a potom to skúsiť znova.",
     "privateRepositoryA11y": "{{name}}, súkromné úložisko",
-    "legalDocumentEnglishOnly": "Tento dokument je dostupný len v angličtine."
+    "legalDocumentEnglishOnly": "Tento dokument je dostupný len v angličtine.",
+    "organizationTrialEndedBilling": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Môžete aktualizovať fakturáciu a potom to skúsiť znova."
   },
   "language": {
     "restarting": "Aplikácia sa reštartuje na zmenu jazyka",

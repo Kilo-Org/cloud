@@ -177,7 +177,8 @@
     "changes": "Izmjene",
     "organizationTrialEnded": "Probno razdoblje organizacije je završilo i organizacija nema aktivan plan. Vlasnik organizacije može ažurirati naplatu na kilo.ai i zatim pokušati ponovno.",
     "privateRepositoryA11y": "{{name}}, privatni repozitorij",
-    "legalDocumentEnglishOnly": "Ovaj je dokument dostupan samo na engleskom jeziku."
+    "legalDocumentEnglishOnly": "Ovaj je dokument dostupan samo na engleskom jeziku.",
+    "organizationTrialEndedBilling": "Probno razdoblje organizacije je završilo i organizacija nema aktivan plan. Možete ažurirati naplatu i zatim pokušati ponovno."
   },
   "language": {
     "restarting": "Ponovno pokretanje radi promjene jezika",

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one suite covers the sheet's save, refusal and threshold contracts. */
 // The low balance alert sheet's save contract: an empty threshold never looks
 // filled, a rejected save names itself in localized copy on the field that
 // caused it, and correcting the field drops the line while Save stays usable.
@@ -9,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LowBalanceAlertSheet } from '@/components/organization/low-balance-alert-sheet';
 import { i18n } from '@/i18n';
 import { formatPrefixedUsd } from '@/lib/format';
+import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 const boundary = vi.hoisted(() => ({
@@ -50,6 +52,7 @@ vi.mock('react-native', () => ({
   useColorScheme: () => 'light',
   ScrollView: 'ScrollView',
   Switch: 'Switch',
+  Pressable: 'Pressable',
   View: 'View',
 }));
 vi.mock('@/components/organization/organization-boundary', () => ({
@@ -170,6 +173,18 @@ function statusMessages(renderer: ReactTestRenderer): string[] {
     .map(node => node.props.message)
     .filter((message): message is string => typeof message === 'string');
 }
+
+/** The labels of the steps painted under a refusal line, in screen order. */
+function stepLabels(renderer: ReactTestRenderer): string[] {
+  return renderer.root
+    .findAll(node => String(node.type) === 'Pressable')
+    .map(node => node.props.accessibilityLabel)
+    .filter((label): label is string => typeof label === 'string');
+}
+
+const TRIAL_REFUSAL = Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+  data: { code: 'FORBIDDEN', message: ORGANIZATION_TRIAL_EXPIRED_MESSAGE },
+});
 
 describe('low balance alert sheet', () => {
   it('shows an unfilled threshold with a hint, and keeps Save disabled, after the alert is switched on', async () => {
@@ -334,6 +349,27 @@ describe('low balance alert sheet', () => {
       i18n.t('organization.lowBalanceAlert.saveEmailsError')
     );
     expect(JSON.stringify(renderer.toJSON())).not.toContain('Failed to fetch');
+    // A failure that is not the plan refusal offers no step.
+    expect(stepLabels(renderer)).toEqual([]);
+    unmount();
+  });
+
+  it('gives a billing role the plan refusal that offers the billing step', async () => {
+    save.value = { ...save.value, isError: true, error: TRIAL_REFUSAL };
+    const { renderer, unmount } = await mountSheet();
+
+    expect(statusMessages(renderer)).toContain(i18n.t('common.organizationTrialEndedBilling'));
+    expect(statusMessages(renderer)).not.toContain(i18n.t('common.organizationTrialEnded'));
+    expect(stepLabels(renderer)).toEqual([i18n.t('organization.hub.manageBilling')]);
+    unmount();
+  });
+
+  it('keeps a member out of the form, so no member reads the plan refusal here', async () => {
+    boundary.role = 'member';
+    const { renderer, unmount } = await mountSheet();
+
+    expect(renderer.root.findAll(node => String(node.type) === 'PermissionDenied')).toHaveLength(1);
+    expect(statusMessages(renderer)).toEqual([]);
     unmount();
   });
 });

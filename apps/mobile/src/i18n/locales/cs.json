@@ -177,7 +177,8 @@
     "changes": "Změny",
     "organizationTrialEnded": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Vlastník organizace může aktualizovat fakturaci na kilo.ai a poté to zkuste znovu.",
     "privateRepositoryA11y": "{{name}}, soukromý repozitář",
-    "legalDocumentEnglishOnly": "Tento dokument je k dispozici pouze v angličtině."
+    "legalDocumentEnglishOnly": "Tento dokument je k dispozici pouze v angličtině.",
+    "organizationTrialEndedBilling": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Fakturaci můžete aktualizovat a poté to zkuste znovu."
   },
   "language": {
     "restarting": "Aplikace se restartuje kvůli změně jazyka",

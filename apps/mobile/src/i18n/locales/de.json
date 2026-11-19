@@ -177,7 +177,8 @@
     "changes": "Änderungen",
     "organizationTrialEnded": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Ein Inhaber der Organisation kann die Abrechnung unter kilo.ai aktualisieren und es dann erneut versuchen.",
     "privateRepositoryA11y": "{{name}}, privates Repository",
-    "legalDocumentEnglishOnly": "Dieses Dokument ist nur auf Englisch verfügbar."
+    "legalDocumentEnglishOnly": "Dieses Dokument ist nur auf Englisch verfügbar.",
+    "organizationTrialEndedBilling": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Sie können die Abrechnung aktualisieren und es dann erneut versuchen."
   },
   "language": {
     "restarting": "Neustart zum Übernehmen der Sprache",

@@ -177,7 +177,8 @@
     "changes": "変更内容",
     "organizationTrialEnded": "組織のトライアルは終了し、有効なプランがありません。組織のオーナーは kilo.ai で請求情報を更新してから、もう一度お試しください。",
     "privateRepositoryA11y": "{{name}}、プライベートリポジトリ",
-    "legalDocumentEnglishOnly": "この文書は英語でのみご利用いただけます。"
+    "legalDocumentEnglishOnly": "この文書は英語でのみご利用いただけます。",
+    "organizationTrialEndedBilling": "組織のトライアルは終了し、有効なプランがありません。請求情報を更新してから、もう一度お試しください。"
   },
   "language": {
     "restarting": "言語設定を適用するために再起動中",

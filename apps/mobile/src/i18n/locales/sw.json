@@ -177,7 +177,8 @@
     "changes": "Mabadiliko",
     "organizationTrialEnded": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Mmiliki wa shirika anaweza kusasisha malipo kwenye kilo.ai, kisha ajaribu tena.",
     "privateRepositoryA11y": "{{name}}, hazina ya kibinafsi",
-    "legalDocumentEnglishOnly": "Nyaraka hii inapatikana kwa Kiingereza pekee."
+    "legalDocumentEnglishOnly": "Nyaraka hii inapatikana kwa Kiingereza pekee.",
+    "organizationTrialEndedBilling": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Unaweza kusasisha malipo, kisha ujaribu tena."
   },
   "language": {
     "restarting": "Programu inaanza upya ili kutumia lugha",

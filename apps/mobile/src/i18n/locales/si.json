@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "දළ දැක්ම",
       "files": "ගොනු",
-      "discussion": "සාකච්ඡාව"
+      "discussion": "සාකච්ඡාව",
+      "discussionAccessibility_one": "{{title}}: අදහස් 1 ක්",
+      "discussionAccessibility": "{{title}}: අදහස් {{displayCount}}ක්",
+      "discussionAccessibility_other": "{{title}}: අදහස් {{displayCount}}ක්"
     },
     "fileStatus": {
       "modified": "වෙනස් කර ඇත",

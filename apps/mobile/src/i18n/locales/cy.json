@@ -1114,7 +1114,14 @@
     "tabs": {
       "overview": "Trosolwg",
       "files": "Ffeiliau",
-      "discussion": "Trafodaeth"
+      "discussion": "Trafodaeth",
+      "discussionAccessibility_one": "{{title}}: 1 sylw",
+      "discussionAccessibility": "{{title}}: {{displayCount}} sylw",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} sylw",
+      "discussionAccessibility_zero": "{{title}}: {{displayCount}} sylw",
+      "discussionAccessibility_two": "{{title}}: {{displayCount}} sylw",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} sylw",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} sylw"
     },
     "fileStatus": {
       "modified": "Wedi'i addasu",

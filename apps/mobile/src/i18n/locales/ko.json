@@ -3238,6 +3238,9 @@
     },
     "tabs": {
       "discussion": "토론",
+      "discussionAccessibility": "{{title}}: 댓글 {{displayCount}}개",
+      "discussionAccessibility_other": "{{title}}: 댓글 {{displayCount}}개",
+      "discussionAccessibility_one": "{{title}}: 댓글 1개",
       "files": "파일",
       "overview": "개요"
     },

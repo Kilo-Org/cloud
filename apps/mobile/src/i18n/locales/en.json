@@ -1117,7 +1117,10 @@
     "tabs": {
       "overview": "Overview",
       "files": "Files",
-      "discussion": "Discussion"
+      "discussion": "Discussion",
+      "discussionAccessibility_one": "{{title}}, 1 comment",
+      "discussionAccessibility": "{{title}}, {{displayCount}} comments",
+      "discussionAccessibility_other": "{{title}}, {{displayCount}} comments"
     },
     "fileStatus": {
       "modified": "Modified",

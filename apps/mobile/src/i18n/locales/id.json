@@ -3238,6 +3238,9 @@
     },
     "tabs": {
       "discussion": "Diskusi",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentar",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentar",
+      "discussionAccessibility_one": "{{title}}: 1 komentar",
       "files": "Berkas",
       "overview": "Ringkasan"
     },

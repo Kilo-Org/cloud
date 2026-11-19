@@ -3352,6 +3352,11 @@
     },
     "tabs": {
       "discussion": "Обсуждение",
+      "discussionAccessibility": "{{title}}: {{displayCount}} комментария",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} комментария",
+      "discussionAccessibility_one": "{{title}}: {{displayCount}} комментарий",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} комментария",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} комментариев",
       "files": "Файлы",
       "overview": "Обзор"
     },

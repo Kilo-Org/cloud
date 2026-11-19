@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "ခြုံငုံချက်",
       "files": "ဖိုင်များ",
-      "discussion": "ဆွေးနွေးချက်"
+      "discussion": "ဆွေးနွေးချက်",
+      "discussionAccessibility_one": "{{title}}: မှတ်ချက် ၁ ခု",
+      "discussionAccessibility": "{{title}}: မှတ်ချက် {{displayCount}} ခု",
+      "discussionAccessibility_other": "{{title}}: မှတ်ချက် {{displayCount}} ခု"
     },
     "fileStatus": {
       "modified": "ပြုပြင်ပြီး",

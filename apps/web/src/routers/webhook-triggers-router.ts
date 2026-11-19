@@ -14,7 +14,8 @@ import {
   type TRPCContext,
 } from '@kilocode/web-shared/lib/trpc/init';
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
-import { generateCloudAgentToken } from '@kilocode/web-shared/lib/tokens';
+import { generateCloudAgentWorkflowToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { prepareCloudAgentWorkflowUser } from '@/lib/auth/cloud-agent-workflow-user';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
@@ -559,7 +560,12 @@ async function getSandboxSelection(
   githubRepo?: string
 ): Promise<SandboxSelectionCapabilities | undefined> {
   if (!organizationId) return undefined;
-  return createCloudAgentNextClient(generateCloudAgentToken(user)).getSandboxSelectionOptions(
+  const workflowUser = await prepareCloudAgentWorkflowUser(user);
+  const token = generateCloudAgentWorkflowToken(workflowUser, {
+    tokenSource: 'webhook-trigger',
+    expiresIn: TOKEN_EXPIRY.oneHour,
+  });
+  return createCloudAgentNextClient(token).getSandboxSelectionOptions(
     sandboxSelectionInput(organizationId, githubRepo)
   );
 }

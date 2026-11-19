@@ -11,8 +11,10 @@ import {
 import { PrFormSheetFooter } from '@/components/pr-review/pr-form-sheet-chrome';
 import { PrReviewCapabilityBanner } from '@/components/pr-review/pr-review-capability-banner';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { formatNumber } from '@/lib/format';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { i18n } from '@/i18n';
 
 function providerBlockedReasonText(
@@ -78,7 +80,7 @@ function MergeRestrictionsList({
     return null;
   }
   return (
-    <View className="gap-2 rounded-lg border border-border bg-secondary p-4">
+    <Card className="gap-2">
       <Text className="text-sm font-medium text-foreground">
         {t('prReview.merge.restrictions.title')}
       </Text>
@@ -88,7 +90,7 @@ function MergeRestrictionsList({
           {row.text}
         </Text>
       ))}
-    </View>
+    </Card>
   );
 }
 
@@ -98,7 +100,7 @@ function ProviderAutoMergeBody({
 }: Readonly<{ mergeState: ProviderPrMergeState | null | undefined; term: string }>) {
   const { t } = useTranslation();
   return (
-    <View className="gap-4 px-6 pt-4">
+    <View className={SCREEN_BODY_CLASS}>
       {mergeState ? <MergeRestrictionsList mergeState={mergeState} term={term} /> : null}
       <Text className="text-sm text-muted-foreground">
         {t('prReview.merge.enableAutoMergeDescriptionTerm', { term })}
@@ -144,7 +146,7 @@ export function PrMergeProviderBody({
   if (providerAutoMerge && autoMergeCapability?.supported === false) {
     return (
       <>
-        <View className="gap-4 px-6 pt-4">
+        <View className="px-4 pt-3">
           <PrReviewCapabilityBanner capability={autoMergeCapability} />
         </View>
         <View className="flex-1" />
@@ -174,7 +176,7 @@ export function PrMergeProviderBody({
   if (mergeState && !mergeState.canMerge) {
     return (
       <>
-        <View className="gap-4 px-6 pt-4">
+        <View className={SCREEN_BODY_CLASS}>
           <MergeRestrictionsList mergeState={mergeState} term={term} />
         </View>
         <View className="flex-1" />
@@ -185,7 +187,7 @@ export function PrMergeProviderBody({
   return (
     <>
       {mergeState ? (
-        <View className="px-6 pt-4">
+        <View className="px-4 pt-3">
           <MergeRestrictionsList mergeState={mergeState} term={term} />
         </View>
       ) : null}

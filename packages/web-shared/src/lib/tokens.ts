@@ -395,10 +395,6 @@ export function validateAuthorizationHeader(
   };
 }
 
-export function generateCloudAgentToken(user: User) {
-  return generateApiToken(user, { tokenSource: 'cloud-agent' });
-}
-
 /**
  * Refuse to mint a token while the current pepper is the empty string. A `null`
  * pepper means the account has no pepper, and stays accepted.

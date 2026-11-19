@@ -1,14 +1,12 @@
-import { act, createElement, type ElementType, useState } from 'react';
+import { act, createElement, type ElementType, type ReactNode, useState } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import { CenteredState } from '@/components/centered-state';
-import { Button } from '@/components/ui/button';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { SecurityAgentSetup } from './security-agent-setup';
 
 const authorization = vi.hoisted(() => vi.fn());
 const reportLate = vi.hoisted(() => vi.fn());
-vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
@@ -22,9 +20,14 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: () => undefined },
 }));
 vi.mock('@/components/ui/icons', () => ({ ShieldCheck: 'ShieldCheck', Info: 'Info' }));
+vi.mock('@/components/icons/github-icon', () => ({ GitHubIcon: 'GitHubIcon' }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
-vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: ({ action, ...props }: { action?: ReactNode }) =>
+    createElement('EmptyState', props, action),
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useMutedDisabledInk: () => '#FFFFFF',
@@ -65,7 +68,10 @@ it('centers setup, disables Connect while authorizing, and refreshes on return',
     })
   );
   const body = mounted.renderer.root.findByType(CenteredState);
-  const button = body.findByType(Button);
+  const state = body.findByType('EmptyState' as ElementType);
+  expect(state.props.placement).toBe('static');
+  expect(state.props.icon).toBe('ShieldCheck');
+  const button = body.findByType('StateAction' as ElementType);
   expect(button.props.disabled).toBe(false);
   act(button.props.onPress as () => void);
   await act(async () => {
@@ -97,7 +103,7 @@ it('shows the setup failure in the body and stays mounted when no URL can be res
     })
   );
   const body = mounted.renderer.root.findByType(CenteredState);
-  const button = body.findByType(Button);
+  const button = body.findByType('StateAction' as ElementType);
   act(button.props.onPress as () => void);
   await act(async () => {
     await Promise.resolve();
@@ -136,7 +142,7 @@ it('keeps a reported launch failure through the next attempt and clears it when 
     })
   );
   const body = mounted.renderer.root.findByType(CenteredState);
-  const button = body.findByType(Button);
+  const button = body.findByType('StateAction' as ElementType);
   const failureLine = () => body.findAllByType('AccessibleStatus' as ElementType)[0]?.props.message;
   expect(failureLine()).toBeNull();
   act(button.props.onPress as () => void);
@@ -185,11 +191,11 @@ it('drops the failed-press line when a refusal takes the action’s place', asyn
   }
   mounted = await renderWithProviders(createElement(RefusingSetup));
   const body = mounted.renderer.root.findByType(CenteredState);
-  act(body.findByType(Button).props.onPress as () => void);
+  act(body.findByType('StateAction' as ElementType).props.onPress as () => void);
   await act(async () => {
     await Promise.resolve();
   });
-  expect(body.findAllByType(Button)).toHaveLength(0);
+  expect(body.findAllByType('StateAction' as ElementType)).toHaveLength(0);
   expect(body.findAllByType('Text' as ElementType).map(node => node.props.children)).toContain(
     'Ask an organization owner or admin to connect GitHub.'
   );

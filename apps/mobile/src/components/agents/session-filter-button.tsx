@@ -84,10 +84,10 @@ export function SessionFilterButton({
           // whole target on the Pressable underneath.
           <View
             pointerEvents="none"
-            className="absolute -right-1.5 -top-1.5 h-[15px] min-w-[15px] items-center justify-center rounded-full bg-primary px-1"
+            className="absolute -right-1.5 -top-1.5 h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1"
           >
             <Text
-              className="font-mono-medium text-[10px] leading-[normal] text-primary-foreground"
+              className="text-xs font-semibold text-primary-foreground"
               testID="session-filter-badge"
             >
               {activeCount}

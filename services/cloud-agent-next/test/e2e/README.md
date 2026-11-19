@@ -897,6 +897,7 @@ exactly `auth-reject`. The end-of-run output is a machine-readable contract:
 
 ```
 unsupported: <name>
+retried: <name>
 Summary: <pass> passed, <fail> failed, <unsupported> unsupported
 Wall time: <seconds>s
 ```
@@ -907,6 +908,14 @@ scenarios are filtered before spawn, a non-zero child exit is a failure: exit `1
 if any scenario failed, else `0`. A child that exceeds its watchdog deadline (its
 scenario budget plus ten minutes) is killed and reported as a failure. When
 `GITHUB_STEP_SUMMARY` is set the runner appends its `Summary:` line to that file.
+
+The matrix retries a scenario once if its failure result line names a known
+transient infrastructure fault, such as `Failed query:`, `fetch failed`,
+`Stream did not connect`, or a tRPC 502/503/504 response. Earlier logs and
+event summaries do not affect retry eligibility. The runner does not retry
+children killed by a signal or the watchdog. The retry starts after 60 s in a
+fresh child and fake-LLM scope and appears on a `retried:` line. If the second
+attempt fails, the matrix reports a failure.
 
 The `cloud-agent-e2e-tests` GitHub workflow
 (`.github/workflows/cloud-agent-e2e-tests.yml`) supports `workflow_dispatch`

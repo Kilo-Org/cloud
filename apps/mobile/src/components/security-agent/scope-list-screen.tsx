@@ -7,10 +7,12 @@ import { useTranslation } from 'react-i18next';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { classifyListBody } from '@/lib/query/list-body-state';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
@@ -48,49 +50,48 @@ export function ScopeListScreen() {
     connectivityKnown,
   });
 
-  const renderOrgSection = () => {
-    if (orgsBody.status === 'error') {
-      return (
-        <QueryError
-          placement="top"
-          variant={orgsBody.cause === 'offline' ? 'offline' : 'server'}
-          title={t('common.couldNotLoadOrganizations')}
-          onRetry={() => void refetch()}
-          isRetrying={orgsBody.isRetrying}
-          className="mt-3"
-        />
-      );
-    }
-    if (orgsBody.status === 'loading') {
-      return <Skeleton className="mt-3 h-[54px] w-full rounded-lg" />;
-    }
-    return orgs?.map((org, index) => (
-      <ConfigureRow
-        key={org.organizationId}
-        icon={Building2}
-        title={org.organizationName}
-        onPress={() => {
-          openScope(org.organizationId);
-        }}
-        last={index === orgs.length - 1}
-      />
-    ));
-  };
-
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader className="px-6" title={t('common.securityAgent')} />
-      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
-        <ConfigureRow
-          icon={User}
-          title={t('common.personal')}
-          subtitle={t('common.yourOwnRepositories')}
-          onPress={() => {
-            openScope(PERSONAL_SECURITY_SCOPE);
-          }}
-          last={orgsBody.status === 'empty'}
-        />
-        {renderOrgSection()}
+      <ScreenHeader title={t('common.securityAgent')} />
+      <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
+        <RowGroup leadingTile>
+          <ConfigureRow
+            icon={User}
+            title={t('common.personal')}
+            subtitle={t('common.yourOwnRepositories')}
+            onPress={() => {
+              openScope(PERSONAL_SECURITY_SCOPE);
+            }}
+          />
+          {orgsBody.status === 'rows'
+            ? orgs?.map(org => (
+                <ConfigureRow
+                  key={org.organizationId}
+                  icon={Building2}
+                  title={org.organizationName}
+                  onPress={() => {
+                    openScope(org.organizationId);
+                  }}
+                />
+              ))
+            : null}
+          {/* The organization placeholders join the group the organizations
+              land in, so the rows replace them inside one surface instead of
+              a second card appearing and disappearing below it. */}
+          {orgsBody.status === 'loading'
+            ? [0, 1].map(index => <RowSkeleton key={index} tile />)
+            : null}
+        </RowGroup>
+
+        {orgsBody.status === 'error' ? (
+          <QueryError
+            placement="top"
+            variant={orgsBody.cause === 'offline' ? 'offline' : 'server'}
+            title={t('common.couldNotLoadOrganizations')}
+            onRetry={() => void refetch()}
+            isRetrying={orgsBody.isRetrying}
+          />
+        ) : null}
       </TabScreenScrollView>
     </View>
   );

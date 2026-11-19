@@ -6,10 +6,10 @@
 // limitations after it) renders it through here so the wording stays one.
 
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
 
 import { type ProviderReviewCapability } from '@kilocode/app-shared/provider-review';
 
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 
 export function PrReviewCapabilityBanner({
@@ -22,8 +22,7 @@ export function PrReviewCapabilityBanner({
     return null;
   }
   return (
-    <View
-      className="gap-1.5 rounded-lg border border-border bg-secondary p-4"
+    <Card
       accessibilityLabel={t('prReview.capabilities.banner.accessibility', {
         reason: capability.reason,
       })}
@@ -32,6 +31,6 @@ export function PrReviewCapabilityBanner({
         {t('prReview.capabilities.banner.title')}
       </Text>
       <Text className="text-sm text-muted-foreground">{capability.reason}</Text>
-    </View>
+    </Card>
   );
 }

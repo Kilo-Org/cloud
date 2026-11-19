@@ -1,5 +1,5 @@
 import { type Href } from 'expo-router';
-import { GitPullRequest } from '@/components/ui/icons';
+import { ArrowRight, GitPullRequest, Settings } from '@/components/ui/icons';
 import { FlashList } from '@shopify/flash-list';
 import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -8,15 +8,13 @@ import Animated, { FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { ReviewListFooter, ReviewRow } from '@/components/code-reviewer/review-list-rows';
-import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-screen';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useTabBarBottomPadding } from '@/components/tab-screen';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+
 import { canConnectAnyProvider } from '@/lib/code-reviewer-status';
 import { isPersonal } from '@/lib/code-reviewer-config';
 import { useReviewerScopeTitle } from '@/lib/hooks/use-reviewer-scope-title';
@@ -35,11 +33,6 @@ import { isRetryableTrpcError, readTrpcErrorField, trpcErrorVariant } from '@/li
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
 
-// The gutter each row keeps inside the safe-area side insets. In landscape those
-// insets are what clear the sensor housing, so a title never starts under it;
-// portrait insets are zero and this gutter is the whole margin.
-const LIST_CONTENT_GUTTER = 24;
-
 export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
@@ -51,13 +44,12 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   const now = useRelativeTimeNow();
   const paddingBottom = useTabBarBottomPadding();
   const insets = useSafeAreaInsets();
-  // One style for the whole content container: every row starts at the same
-  // offset, including the recycled ones, and a rotation re-derives it once.
+  // One style for the whole content container: every row keeps the screen's own
+  // side insets, and the rows draw the page gutter themselves.
   const listContentContainerStyle = useMemo<ViewStyle>(
     () => ({
-      paddingTop: 16,
-      paddingLeft: insets.left + LIST_CONTENT_GUTTER,
-      paddingRight: insets.right + LIST_CONTENT_GUTTER,
+      paddingLeft: insets.left,
+      paddingRight: insets.right,
     }),
     [insets.left, insets.right]
   );
@@ -165,7 +157,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
     <QueryError
       variant={stalePaused ? 'offline' : trpcErrorVariant(error)}
       placement="top"
-      className="px-0 pt-0"
+      inset="gutter"
       title={stalePaused ? t('queryError.offlineTitle') : t('common.somethingWentWrong')}
       onRetry={stalePaused || isRetryableTrpcError(error) ? () => void refetch() : undefined}
       isRetrying={isFetching}
@@ -173,14 +165,19 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   ) : null;
 
   let body: ReactNode = null;
+  // The rows are full-bleed with the gutter inside, so the placeholder repeats
+  // that frame: no scroll body gutter, one skeleton per row at the row's own
+  // three-line height, and the hairline between them that the loaded list draws.
   const reviewsLoadingBody = (
-    <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
-      <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
-        <Skeleton className="h-20 w-full rounded-lg" />
-        <Skeleton className="h-20 w-full rounded-lg" />
-        <Skeleton className="h-20 w-full rounded-lg" />
-      </Animated.View>
-    </TabScreenScrollView>
+    <Animated.View
+      exiting={FadeOut.duration(150)}
+      style={listContentContainerStyle}
+      className="flex-1"
+    >
+      <RowSkeleton lines={3} />
+      <RowSkeleton lines={3} />
+      <RowSkeleton lines={3} last />
+    </Animated.View>
   );
   if (!isLoading && firstPage?.success && reviews.length === 0) {
     const offersAction = hasConnectedProvider || canConnect;
@@ -207,8 +204,13 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
         }
         action={
           offersAction ? (
-            <Button
-              className={STATE_ACTION_CLASS}
+            <StateAction
+              label={
+                hasConnectedProvider
+                  ? t('codeReviewer.reviewList.startManualReview')
+                  : t('codeReviewer.reviewList.configureProvider')
+              }
+              icon={hasConnectedProvider ? ArrowRight : Settings}
               onPress={() => {
                 pushOnce(
                   (hasConnectedProvider
@@ -216,13 +218,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
                     : `/(app)/code-reviewer/${scope}`) as Href
                 );
               }}
-            >
-              <Text>
-                {hasConnectedProvider
-                  ? t('codeReviewer.reviewList.startManualReview')
-                  : t('codeReviewer.reviewList.configureProvider')}
-              </Text>
-            </Button>
+            />
           ) : undefined
         }
       />
@@ -237,7 +233,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
     } else {
       body = (
         <View className="flex-1">
-          <View className="px-6 pt-4">{staleNotice}</View>
+          {staleNotice}
           {emptyState}
         </View>
       );

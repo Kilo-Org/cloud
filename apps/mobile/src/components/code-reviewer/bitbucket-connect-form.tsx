@@ -29,11 +29,13 @@ const CREATE_WORKSPACE_TOKEN_URL =
 export function BitbucketConnectForm({
   scope,
   integrationId,
+  organizationName,
   onConnected,
   onDirtyChange,
 }: Readonly<{
   scope: string;
   integrationId: string | null;
+  organizationName: string;
   onConnected: () => void;
   /**
    * Reports whether a dismissal would drop a draft: text in the token field
@@ -114,7 +116,11 @@ export function BitbucketConnectForm({
     <View className="gap-5">
       <View className="gap-2">
         <Text variant="muted" className="text-sm">
-          {t('codeReviewer.bitbucketConnect.description')}
+          {integrationId === null
+            ? t('codeReviewer.bitbucketConnect.description', { organization: organizationName })
+            : t('codeReviewer.bitbucketConnect.descriptionReconnect', {
+                organization: organizationName,
+              })}
         </Text>
         <Text variant="muted" className="text-sm">
           {t('codeReviewer.bitbucketConnect.scopes')}
@@ -157,7 +163,7 @@ export function BitbucketConnectForm({
 
       {failure?.kind === 'connection-changed' ? (
         <Text variant="muted" className="text-sm">
-          {t('codeReviewer.bitbucketConnect.managedOnWeb')}
+          {t('codeReviewer.bitbucketConnect.managedOnWeb', { organization: organizationName })}
         </Text>
       ) : null}
 

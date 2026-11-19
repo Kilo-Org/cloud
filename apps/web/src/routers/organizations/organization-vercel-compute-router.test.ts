@@ -847,12 +847,22 @@ describe('Vercel connection JSON updates', () => {
       expect(result.status).toBe(200);
       expect(await result.json()).toEqual({ updated: true });
     };
+    const enrollmentDigest = async () => {
+      const response = await getPersonalEnrollment(
+        new NextRequest('http://localhost/internal', {
+          headers: { 'x-internal-api-key': INTERNAL_API_SECRET },
+        }),
+        { params: Promise.resolve({ userId: personalUser.id }) }
+      );
+      return ((await response.json()) as { runtimeDigest?: unknown }).runtimeDigest;
+    };
     await project({});
     expect(await caller.getStatus()).toMatchObject({
       setupStatus: 'ready',
       runtimeSnapshotId: 'snapshot-ready',
       runtimeDigest: 'digest-ready',
     });
+    expect(await enrollmentDigest()).toBe('digest-ready');
     await project({
       setupStatus: 'building',
       setupStep: 'create_builder',
@@ -863,6 +873,8 @@ describe('Vercel connection JSON updates', () => {
       runtimeSnapshotId: 'snapshot-ready',
       upgradeStatus: 'building',
     });
+    // The Worker keeps reading the digest of the snapshot it still selects.
+    expect(await enrollmentDigest()).toBe('digest-ready');
     await project({
       setupStatus: 'failed',
       setupError: 'setup_start_failed',
@@ -880,6 +892,7 @@ describe('Vercel connection JSON updates', () => {
       runtimeDigest: 'digest-upgraded',
       upgradeStatus: null,
     });
+    expect(await enrollmentDigest()).toBe('digest-upgraded');
     expect(
       await db.query.byoc_connections.findFirst({
         where: eq(byoc_connections.id, added.credentialId),
@@ -989,7 +1002,10 @@ describe('Shared BYOC connections', () => {
             }
           );
       expect(enrollmentResponse.status).toBe(200);
-      expect(await enrollmentResponse.json()).toMatchObject({ credentialId: added.credentialId });
+      expect(await enrollmentResponse.json()).toMatchObject({
+        credentialId: added.credentialId,
+        runtimeDigest: null,
+      });
       const response = await getInternalCredential(
         new NextRequest(
           `http://localhost/api/internal/byoc/vercel-credentials/${other.id}?${query}`,

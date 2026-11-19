@@ -591,7 +591,10 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(rawMarkdown).toContain('body starts with `## Code Review Summary`');
     expect(rawMarkdown).toContain('wrapper rejects duplicate summary creates');
     expect(rawMarkdown).toContain('Do not include top-level summary bodies in `create-batch`');
-    expect(rawMarkdown).toContain('update the newest candidate');
+    expect(rawMarkdown).toContain('update the newest such candidate');
+    expect(rawMarkdown).toContain('`user.kind` is `workspace_access_token`');
+    expect(rawMarkdown).toContain('ignore that comment entirely');
+    expect(rawMarkdown).toContain('On `comment_not_owned`, do not retry that same target');
     expect(rawMarkdown).toContain('Bitbucket renders HTML comments visibly');
     expect(rawMarkdown).toContain('top-level summary last');
     expect(rawMarkdown).toContain('Retry an ambiguous provider write at most once');

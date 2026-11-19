@@ -36,6 +36,15 @@ const saveButton = vi.hoisted(() => ({
   onSave: null as (() => Promise<void>) | null,
 }));
 
+vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
+vi.mock('@/components/ui/icons', () => ({
+  Check: 'Check',
+  CircleCheck: 'CircleCheck',
+  Clock: 'Clock',
+  GitPullRequest: 'GitPullRequest',
+  ScanSearch: 'ScanSearch',
+  Trash2: 'Trash2',
+}));
 vi.mock('react-native', () => ({
   View: 'View',
   Alert: { alert: vi.fn() },
@@ -70,8 +79,8 @@ vi.mock('@/components/security-agent/settings-save-button', () => ({
     return null;
   },
 }));
-vi.mock('@/components/security-agent/settings-toggle-row', () => ({
-  ToggleRow: (props: {
+vi.mock('@/components/ui/preference-row', () => ({
+  PreferenceRow: (props: {
     title: string;
     value: boolean;
     disabled: boolean;

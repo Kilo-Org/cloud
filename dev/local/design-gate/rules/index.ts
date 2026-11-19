@@ -1,6 +1,7 @@
 import type { Finding } from '../findings';
 import type { Rgba } from '../pixels';
 import type { LayoutTree } from '../tree';
+import { checkGutter } from './gutter';
 import { checkInkCentering } from './ink';
 import { checkInsetAsymmetry } from './inset';
 import { checkLeadingGap } from './lead';
@@ -30,5 +31,6 @@ export function checkScreen(tree: LayoutTree, image?: Rgba): Finding[] {
     ...checkInsetAsymmetry(tree),
     ...checkSafeArea(tree),
     ...checkLeadingGap(tree),
+    ...checkGutter(tree),
   ];
 }

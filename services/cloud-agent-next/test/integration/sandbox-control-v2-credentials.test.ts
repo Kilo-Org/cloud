@@ -4400,26 +4400,56 @@ describe('SandboxControlV2 environment repository credentials', () => {
     expect(broker.githubIssued()).toBeGreaterThan(0);
   });
 
-  it('fails a V2 start on a Vercel sandbox and still starts a V1 session there', async () => {
+  it('starts a V2 session on a Vercel sandbox and forwards each member host to the Worker', async () => {
     const provider = createFakeProvider();
-    const broker = createFakeCredentialBroker();
-    const stub = await setupVercel(provider, broker);
-    const capture = captureRouteFailed();
-    const view = await stub.prepare(environmentInput([WIDGETS, GADGETS]));
-    const events = capture.forAttempt(failedAttemptId(view));
-    capture.restore();
+    const { stub, admission } = await setupSyntheticVercel(provider);
+    const environment = environmentOf([WIDGETS, GADGETS]);
+    const input = {
+      ...prepareInput(SESSION),
+      environment: {
+        ...environment,
+        repositories: [
+          ...environment.repositories,
+          {
+            identity: {
+              platform: 'gitlab' as const,
+              cloneUrl: 'https://gitlab.example/acme/widgets.git',
+            },
+            repoFullName: 'acme/widgets',
+            leaf: 'widgets-gitlab',
+            branch: 'kilo/session',
+          },
+        ],
+      },
+    } as ControlPlanePrepareInput;
+    await prepareWarmRoute(stub, provider, input);
 
-    expect(events[0]).toMatchObject({
-      grantPhase: 'validation',
-      grantFailureReason: 'invalid_grant',
-      provider: 'vercel',
-    });
-    expect(broker.githubIssued()).toBe(0);
-    // The same sandbox serves a V1 session.
+    const grant = await readGrant(stub);
+    const [gadgets, project] = grant.additionalRepositories ?? [];
+    expect(gadgets?.repository.repo).toBe(GADGETS);
+    expect(project?.repository.type).toBe('gitlab');
+    // The policy sends every member host to the Worker, which selects the capability.
+    const policy = provider.policyCalls.at(-1) as ReturnType<typeof buildControlNetworkPolicy>;
+    const forward = { forwardURL: `${VERCEL_TARGET}/scm/vercel/${SANDBOX_ID}` };
+    expect(policy.allow['github.com']?.at(-1)).toEqual(forward);
+    expect(policy.allow['gitlab.example']?.at(-1)).toEqual(forward);
+    const capabilityOf = async (url: string, alias = grant.scm.alias) => {
+      const admitted = await admission(url, { authorization: `Bearer ${alias}` });
+      return admitted.ok && admitted.authority.type === 'managed'
+        ? admitted.authority.capability
+        : null;
+    };
+    expect(await capabilityOf('https://github.com/acme/gadgets.git/info/refs')).toBe(
+      gadgets?.scm.capability.credential
+    );
+    expect(await capabilityOf('https://api.github.com/repos/acme/widgets/pulls')).toBe(
+      grant.scm.capability.credential
+    );
     expect(
-      await stub.prepare(prepareInput(SESSION_NEXT, vercelSource(SESSION_NEXT)))
-    ).toMatchObject({
-      state: 'preparing',
-    });
+      await capabilityOf(
+        'https://gitlab.example/api/v4/projects/acme%2Fwidgets/merge_requests',
+        project?.scm.alias
+      )
+    ).toBe(project?.scm.capability.credential);
   });
 });

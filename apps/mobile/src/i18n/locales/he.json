@@ -698,8 +698,9 @@
       "notConnectedReadOnly": "Bitbucket לא מחובר. רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לחבר אותו."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "החיבור של הארגון הזה ל-Bitbucket מנוהל באתר דרך מחשב.",
-      "description": "צור אסימון גישה לסביבת העבודה עם ההרשאות הנדרשות והדבק אותו למטה.",
+      "managedOnWeb": "החיבור של {{organization}} ל-Bitbucket מנוהל באתר דרך מחשב.",
+      "description": "צור אסימון גישה לסביבת העבודה עבור {{organization}} והדבק אותו למטה.",
+      "descriptionReconnect": "צור אסימון גישה חדש לסביבת העבודה עבור {{organization}} והדבק אותו למטה.",
       "scopes": "חשבון: קריאה · מאגרים: קריאה/כתיבה · בקשות משיכה: קריאה · התראות אוטומטיות: קריאה/כתיבה",
       "tokenPlaceholder": "אסימון גישה לסביבת העבודה",
       "tokenRefused": "Bitbucket לא קיבל את אסימון הגישה לסביבת העבודה הזה. בדוק שיש לו את ההרשאות שלמעלה, ולאחר מכן נסה שוב."
@@ -1629,6 +1630,8 @@
       "renameAccessibility": "שינוי שם הסשן: {{title}}",
       "cloningSession": "משכפל סשן…",
       "couldNotLoadThisSession": "לא ניתן היה לטעון את הסשן הזה.",
+      "historyTooLarge": "ההתעתק של הסשן הזה גדול מדי מכדי לטעון.",
+      "historyUnavailable": "לא ניתן לקרוא את ההתעתק של הסשן הזה.",
       "cloneFailedRetry": "לא ניתן היה לשכפל את הסשן הזה. נסה שוב.",
       "notEnoughCredits": "אין מספיק קרדיטים לבקשה הזו. הוסף קרדיטים ונסה שוב.",
       "previousTaskFinishing": "המשימה הקודמת עדיין לא הסתיימה. המתן רגע.",
@@ -1705,6 +1708,7 @@
       "branchDefault": "ברירת מחדל",
       "branchAccessibility": "ענף: {{label}}",
       "branchLoading": "טוען ענפים",
+      "branchInactive": "בחרו מאגר כדי לטעון את הענפים שלו.",
       "branchLoadError": "לא ניתן היה לטעון את הענפים",
       "branchUnavailable": "הענפים אינם זמינים למאגר הזה. בדקו את הגישה שלך מול הספק, ואז בחרו מאגר אחר.",
       "branchEmpty": "אין ענפים זמינים",
@@ -2519,7 +2523,6 @@
   },
   "home": {
     "couldNotLoadSessions": "לא ניתן לטעון את הסשנים.",
-    "couldNotLoadActiveSessions": "לא ניתן לטעון את הסשנים הפעילים.",
     "agentSessions": "פעילים עכשיו",
     "newCodingTask": "משימת תכנות חדשה",
     "newTaskFromPicture": "משימה חדשה מתמונה",
@@ -2842,7 +2845,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "לחשבון הזה אין עדיין ארגונים. אפשר לסקור בקשות משיכה ב-Bitbucket לאחר שתיצרו או תצטרפו לארגון.",
       "gitlabReconnectAdminOnlyDescription": "בקש מבעלים של הארגון, מנהל או מנהל חיובים לחבר אותו מחדש.",
       "bitbucketNotConnectedTitle": "Bitbucket לא מחובר",
-      "bitbucketAdminOnlyDescription": "רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לחבר אותו.",
+      "adminOnlyConnectDescription": "רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לחבר אותו.",
       "contextLine": "עבור {{organization}}",
       "contextLinePersonal": "עבור החשבון האישי"
     },
@@ -3470,7 +3473,8 @@
         "accounting_adjustment": "התאמה חשבונאית",
         "credits_expired": "פג תוקף הקרדיטים"
       },
-      "truncated": "יש תנועות קודמות בקרדיטים."
+      "truncated": "יש תנועות קודמות בקרדיטים.",
+      "retentionLimit": "מוצגות תנועות הקרדיטים העדכניות ביותר."
     },
     "hub": {
       "balance": "יתרה",
@@ -3515,7 +3519,8 @@
         "void": "בוטלה",
         "uncollectible": "לא ניתנת לגבייה"
       },
-      "truncated": "קיימות חשבוניות ישנות יותר."
+      "truncated": "קיימות חשבוניות ישנות יותר.",
+      "retentionLimit": "מוצגות החשבוניות העדכניות ביותר."
     },
     "lowBalanceAlert": {
       "enableA11y": "הפעלת התראה על יתרה נמוכה",
@@ -3746,8 +3751,7 @@
     "imagesSectionEmpty": "אין אתרי תמונות מהימנים",
     "revoke": "ביטול האמון באתר {{host}}",
     "revokeMessage": "קישורים לאתר זה יבקשו אישור שוב.",
-    "revokeImageMessage": "תמונות מאתר זה יבקשו אישור שוב.",
-    "backToPreferences": "חזרה להעדפות"
+    "revokeImageMessage": "תמונות מאתר זה יבקשו אישור שוב."
   },
   "glanceable": {
     "waiting": "נתוני הסוכנים מתעדכנים",
@@ -3995,6 +3999,8 @@
       "downloading": "מוריד: {{written}} מתוך {{total}}",
       "downloadingUnknown": "מוריד: {{written}}",
       "paused": "מושהה: {{written}} מתוך {{total}}",
+      "retrying": "מנסה שוב: {{written}} מתוך {{total}}",
+      "retryingUnknown": "מנסה שוב: {{written}}",
       "verifying": "בודק את הקובץ שהורד…",
       "downloaded": "הורד · {{size}}",
       "url": "קישור הורדה ישיר",
@@ -4085,7 +4091,9 @@
         "androidModelUnavailable": "המכשיר הזה לא תומך ב-Gemini Nano, או שאפליקציית המערכת AICore עדיין בהגדרה. יש לנסות שוב מאוחר יותר.",
         "aicoreUpdateRequired": "כדי להשתמש במודל הזה צריך לעדכן את אפליקציית AICore ואת תוכנת המערכת.",
         "downloadable": "לפני השימוש הראשון צריך להוריד את המודל הזה. ההורדה נדרשת פעם אחת בלבד.",
-        "downloading": "המודל בהורדה. אפשר יהיה להשתמש בו כשההורדה תסתיים."
+        "downloading": "המודל בהורדה. אפשר יהיה להשתמש בו כשההורדה תסתיים.",
+        "batteryQuota": "המודל במכשיר מיצה את מכסת הסוללה שלו לעת עתה. אפשר לנסות שוב מאוחר יותר.",
+        "checkFailed": "האפליקציה לא הצליחה לבדוק את המודל הזה. אפשר לנסות שוב."
       },
       "unavailable": "המודל במכשיר לא זמין כרגע. אפשר לבדוק את הסטטוס שלו ב$t(modelChat.backends.title).",
       "busy": "המודל במכשיר עסוק בתשובה אחרת. יש לנסות שוב כשהוא יסיים.",
@@ -4452,7 +4460,8 @@
       "purchaseFallback": "רכישת קרדיטים",
       "receipt": "קבלה",
       "receiptA11y": "פתיחת הקבלה עבור {{description}}, {{amount}}, מתאריך {{date}}",
-      "receiptUnavailable": "אין קבלה זמינה עבור רכישה זו."
+      "receiptUnavailable": "אין קבלה זמינה עבור רכישה זו.",
+      "retentionLimit": "מוצגת היסטוריית הקרדיטים העדכנית ביותר."
     },
     "title": "קניית קרדיטים",
     "description": "קרדיטים הם רכישה חד-פעמית שמתווספת ליתרת ה-Kilo שלך להרצת מפגשי קידוד בינה מלאכותית ב-Kilo App. החנות מחייבת את החשבון שלך והקרדיטים מתווספים לאחר שהחנות מאשרת את התשלום.",
@@ -4707,6 +4716,9 @@
     "couldNotLoad": "לא ניתן לטעון את האינטגרציות",
     "permissionDenied": "אין לך הרשאה לנהל את האינטגרציות האלה.",
     "managedByOwner": "כדי לשנות חיבור שאין באפשרותך לשנות, יש לפנות לבעלים של הארגון.",
+    "managedByOwnerOrAdmin": "כדי לשנות חיבור שאין באפשרותך לשנות, יש לפנות לבעלים של הארגון או מנהל.",
+    "managedByOwnerOrBilling": "כדי לשנות חיבור שאין באפשרותך לשנות, יש לפנות לבעלים של הארגון או מנהל חיובים.",
+    "managedByOwnerAdminOrBilling": "כדי לשנות חיבור שאין באפשרותך לשנות, יש לפנות לבעלים של הארגון, מנהל או מנהל חיובים.",
     "connectFailed": "לא ניתן לפתוח את דף החיבור"
   },
   "invoices": {
@@ -4743,7 +4755,7 @@
       "new": "טריגר חדש",
       "create": "צור טריגר",
       "emptyTitle": "אין טריגרים עדיין",
-      "emptyDescription": "צרו טריגר כדי להתחיל הרצת Cloud Agent מקריאת וובהוק או לפי לוח זמנים.",
+      "emptyDescription": "צרו את הטריגר הראשון שלכם.",
       "loadFailedTitle": "לא ניתן היה לטעון טריגרים",
       "loadFailedDescription": "נסו שוב כשיש חיבור.",
       "detailLoadFailedTitle": "לא ניתן היה לטעון את הטריגר הזה",

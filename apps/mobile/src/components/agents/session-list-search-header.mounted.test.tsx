@@ -1,12 +1,12 @@
 import { createRef, type ElementType, type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { compiledDimensions, compiledLengthDp } from '@/test/native-dimensions';
+import { compiledLengthDp } from '@/test/native-dimensions';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type TextInput } from 'react-native';
 
 import '@/i18n';
-import { MIN_TAP_TARGET_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
+import { FIELD_CLEAR_BOX_CLASS, MIN_TAP_TARGET_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import { SessionListSearchHeader } from './session-list-search-header';
 
 const state = vi.hoisted(() => ({
@@ -56,13 +56,29 @@ function fieldRow(renderer: TestRenderer.ReactTestRenderer) {
       node =>
         node.type === ('View' as ElementType) &&
         typeof node.props.className === 'string' &&
-        node.props.className.includes('rounded-[10px]')
+        node.props.className.includes('rounded-md')
     )
     .at(0);
   if (!row) {
     throw new Error('search field row was not found');
   }
   return row;
+}
+
+/** The un-bordered frame that owns the page gutter and the sensor insets. */
+function fieldGutter(renderer: TestRenderer.ReactTestRenderer) {
+  const gutter = renderer.root
+    .findAll(
+      node =>
+        node.type === ('View' as ElementType) &&
+        typeof node.props.className === 'string' &&
+        node.props.className.split(' ').includes('px-4')
+    )
+    .at(0);
+  if (!gutter) {
+    throw new Error('search field gutter was not found');
+  }
+  return gutter;
 }
 
 function searchInput(renderer: TestRenderer.ReactTestRenderer) {
@@ -93,27 +109,32 @@ describe('SessionListSearchHeader landscape sensor insets', () => {
     });
   });
 
-  it('keeps the fixed 22px margins in portrait where the side insets are 0', async () => {
+  it('keeps the page gutter in portrait where the side insets are 0', async () => {
     state.insets = { top: 59, right: 0, bottom: 34, left: 0 };
     const renderer = await mount(<SessionListSearchHeader {...baseProps} />);
-    expect(fieldRow(renderer).props.style).toEqual({ marginLeft: 22, marginRight: 22 });
+    expect(String(fieldGutter(renderer).props.className).split(' ')).toContain('px-4');
+    expect(fieldGutter(renderer).props.style).toBeUndefined();
+    // The bordered field keeps its own inset, outside the page gutter.
+    expect(String(fieldRow(renderer).props.className).split(' ')).toContain('px-2');
+    expect(String(fieldRow(renderer).props.className).split(' ')).not.toContain('px-4');
   });
 
   it('gains the landscape sensor insets on both sides so the field clears the housing', async () => {
     state.insets = { top: 59, right: 59, bottom: 34, left: 47 };
     const renderer = await mount(<SessionListSearchHeader {...baseProps} />);
-    expect(fieldRow(renderer).props.style).toEqual({ marginLeft: 69, marginRight: 81 });
+    expect(fieldGutter(renderer).props.style).toEqual({ paddingLeft: 47, paddingRight: 59 });
+    expect(fieldRow(renderer).props.style).toBeUndefined();
   });
 
-  it('updates the margins on rotation without a remount', async () => {
+  it('updates the insets on rotation without a remount', async () => {
     state.insets = { top: 59, right: 0, bottom: 34, left: 0 };
     const renderer = await mount(<SessionListSearchHeader {...baseProps} />);
-    expect(fieldRow(renderer).props.style).toEqual({ marginLeft: 22, marginRight: 22 });
+    expect(fieldGutter(renderer).props.style).toBeUndefined();
     state.insets = { top: 59, right: 59, bottom: 34, left: 47 };
     await act(() => {
       renderer.update(<SessionListSearchHeader {...baseProps} />);
     });
-    expect(fieldRow(renderer).props.style).toEqual({ marginLeft: 69, marginRight: 81 });
+    expect(fieldGutter(renderer).props.style).toEqual({ paddingLeft: 47, paddingRight: 59 });
   });
 
   it('asks the IME for no full-screen editor so the screen keeps the keyboard', async () => {
@@ -194,80 +215,39 @@ describe('SessionListSearchHeader clear control', () => {
         node.type === ('Pressable' as ElementType) &&
         node.props.accessibilityLabel === 'Clear search'
     );
-    const declarations = (await compiledDimensions(clear.props.className as string)) as {
-      height?: number;
-      width?: number;
-    }[];
+    const className = clear.props.className as string;
+    const box = {
+      height: await compiledLengthDp(className, 'height'),
+      width: await compiledLengthDp(className, 'width'),
+    };
     return {
       renderer,
-      box: Object.assign({}, ...declarations) as { height: number; width: number },
-      slop: clear.props.hitSlop as { top: number; right: number; bottom: number; left: number },
+      box,
+      className,
       rowClassName: fieldRow(renderer).props.className as string,
     };
   }
 
-  it('lays out a box at least 28dp on a side', async () => {
-    const { box } = await mountWithClear();
+  it('lays out the shared clear box on the control itself', async () => {
+    const { box, className } = await mountWithClear();
+    expect(className).toContain(FIELD_CLEAR_BOX_CLASS);
     expect(box.height).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
     expect(box.width).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+    // The box alone now clears the design target, so the frame carries no reach
+    // toward the field beside it.
+    expect(box.height).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    expect(box.width).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
   });
 
-  it('carries the reach past the 44pt minimum target, not onto it', async () => {
-    const { box, slop } = await mountWithClear();
-    expect(box.height + slop.top + slop.bottom).toBeGreaterThan(TOUCH_TARGET_DP);
-    expect(box.width + slop.left + slop.right).toBeGreaterThan(TOUCH_TARGET_DP);
-  });
-
-  it('stops the clear control left of the row gap, so it cannot cover the input', async () => {
-    const { slop, rowClassName } = await mountWithClear();
-    // The row's `gap-2` compiles to 7pt at the app's 14pt rem; the control's
-    // left slop meets the input at that gap instead of reaching into it.
-    expect(await compiledLengthDp(rowClassName, 'gap')).toBe(7);
-    expect(slop.left).toBeLessThanOrEqual(7);
-  });
-
-  it('reserves the box height on the field, so typing cannot shift the list', async () => {
+  it('keeps the clear control inside the shared field floor', async () => {
     const { renderer, box } = await mountWithClear();
-    const rowClassName = fieldRow(renderer).props.className as string;
-    const declarations = (await compiledDimensions(rowClassName)) as { minHeight?: number }[];
-    const field = Object.assign({}, ...declarations) as { minHeight?: number };
+    const rowClasses = String(fieldRow(renderer).props.className).split(' ');
 
-    // The row's `py-1.5` compiles to a 5.25pt `paddingBlock` per side at the
-    // app's 14pt rem — 10.5pt, not the 12pt a 16pt rem would give — and its
-    // `border` adds 1pt per side, 2pt vertically. React Native lays the row out
-    // as a border box, so the field's floor must already hold the control's box
-    // plus both. Read the padding and the border from the compiled row rather
-    // than a hand-written rem figure.
-    const rowVerticalPaddingDp = 2 * (await compiledLengthDp(rowClassName, 'paddingBlock'));
-    const rowVerticalBorderDp = 2 * (await compiledLengthDp(rowClassName, 'borderWidth'));
-    expect(rowVerticalPaddingDp).toBe(10.5);
-    expect(rowVerticalBorderDp).toBe(2);
-    expect(field.minHeight).toBeGreaterThanOrEqual(
-      box.height + rowVerticalPaddingDp + rowVerticalBorderDp
-    );
-  });
-
-  it('takes the row height from the shared field floor, not the row floor', async () => {
-    const renderer = await mount(<SessionListSearchHeader {...baseProps} hasText />);
-    const rowClassName = fieldRow(renderer).props.className as string;
-    const rowDeclarations = (await compiledDimensions(rowClassName)) as { minHeight?: number }[];
-    const row = Object.assign({}, ...rowDeclarations) as { minHeight?: number };
-    const inputDeclarations = (await compiledDimensions(
-      searchInput(renderer).props.className as string
-    )) as { minHeight?: number }[];
-    const input = Object.assign({}, ...inputDeclarations) as { minHeight?: number };
-
-    const rowVerticalPaddingDp = 2 * (await compiledLengthDp(rowClassName, 'paddingBlock'));
-    const rowVerticalBorderDp = 2 * (await compiledLengthDp(rowClassName, 'borderWidth'));
-
-    // The shared field's 44pt floor is taller than the 38pt clear control, so
-    // the field's floor lays the row out: 44 + 10.5 + 2 = 56.5pt. The row's own
-    // `min-h-[51px]` is a lower bound the field dominates, not the height the
-    // row takes.
-    const fieldFloorDp = input.minHeight ?? 0;
-    expect(fieldFloorDp).toBe(44);
-    const laidOutHeightDp = fieldFloorDp + rowVerticalPaddingDp + rowVerticalBorderDp;
-    expect(laidOutHeightDp).toBe(56.5);
-    expect(row.minHeight).toBeLessThan(laidOutHeightDp);
+    // The row carries no vertical padding or floor of its own: the shared
+    // input box's 44pt `min-h` lays it out, and the clear box's `-my-[7px]`
+    // leaves 34pt of cross size, so typing cannot shift the list.
+    expect(rowClasses.some(name => /^(?:py|p)-/.test(name))).toBe(false);
+    expect(rowClasses.some(name => name.startsWith('min-h-'))).toBe(false);
+    expect(box.height - 14).toBeLessThanOrEqual(44);
   });
 });

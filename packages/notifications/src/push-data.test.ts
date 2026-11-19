@@ -481,3 +481,51 @@ describe('pushDataSchema session_live_update approvalKey', () => {
     }
   });
 });
+
+describe('a session_live_update payload', () => {
+  const content = {
+    sessionId: 'session-1',
+    title: 'Fix the login bug',
+    statusKind: 'needsInput',
+    statusSince: '2026-11-12T09:00:00.000Z',
+    scheduledAt: null,
+    awaitingPermission: false,
+    approvalKey: null,
+    updatedAt: '2026-11-12T09:01:00.000Z',
+  };
+
+  const payload = (event: 'update' | 'end', dismissAfterMs?: number) => ({
+    type: 'session_live_update',
+    schemaVersion: 1,
+    event,
+    content,
+    ...(dismissAfterMs === undefined ? {} : { dismissAfterMs }),
+  });
+
+  it('parses and round-trips an update and an end without dismissAfterMs', () => {
+    for (const event of ['update', 'end'] as const) {
+      const withoutDismiss = payload(event);
+      expect('dismissAfterMs' in withoutDismiss).toBe(false);
+      expect(pushDataSchema.parse(withoutDismiss)).toEqual(withoutDismiss);
+    }
+  });
+
+  it('parses and round-trips an end carrying dismissAfterMs', () => {
+    for (const dismissAfterMs of [0, 900_000]) {
+      const end = payload('end', dismissAfterMs);
+      expect(pushDataSchema.parse(end)).toEqual(end);
+    }
+  });
+
+  it('rejects dismissAfterMs on an update at that field', () => {
+    const result = pushDataSchema.safeParse(payload('update', 900_000));
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map(issue => issue.path)).toContainEqual(['dismissAfterMs']);
+  });
+
+  it('rejects a negative or a non-integer dismissAfterMs on an end', () => {
+    for (const dismissAfterMs of [-1, 1.5]) {
+      expect(pushDataSchema.safeParse(payload('end', dismissAfterMs)).success).toBe(false);
+    }
+  });
+});

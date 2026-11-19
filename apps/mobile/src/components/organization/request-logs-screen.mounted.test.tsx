@@ -14,7 +14,8 @@ import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { i18n } from '@/i18n';
-import { canStepOlderTo, HISTORY_DAYS, OrganizationRequestLogsScreen } from './request-logs-screen';
+import { canStepOlderTo, HISTORY_DAYS } from './request-log-window';
+import { OrganizationRequestLogsScreen } from './request-logs-screen';
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -90,11 +91,14 @@ vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: 'black' }),
+  useMutedDisabledInk: () => '#999999',
 }));
 
 vi.mock('@/components/ui/icons', () => ({ Logs: 'Logs' }));
 
 vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalArrowLeft: 'DirectionalArrowLeft',
+  DirectionalArrowRight: 'DirectionalArrowRight',
   DirectionalChevronLeft: 'DirectionalChevronLeft',
   DirectionalChevronRight: 'DirectionalChevronRight',
   DirectionalLogs: 'DirectionalLogs',
@@ -129,6 +133,7 @@ vi.mock('@/components/query-error', async () => {
 vi.mock('@/components/empty-state', async () => {
   const { createElement: h } = await import('react');
   return {
+    StateAction: 'StateAction',
     EmptyState: (props: { title?: string; description?: string }) => h('EmptyState', props),
   };
 });

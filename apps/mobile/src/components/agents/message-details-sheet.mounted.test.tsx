@@ -29,6 +29,14 @@ const native = vi.hoisted(() => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ background: '#000', mutedForeground: '#999' }),
 }));
+vi.mock('@/components/ui/icons', () => ({
+  ArrowLeft: 'ArrowLeft',
+  ArrowRight: 'ArrowRight',
+  Check: 'Check',
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
+  LogOut: 'LogOut',
+}));
 vi.mock('react-native', () => ({
   AccessibilityInfo: { announceForAccessibility: native.announce },
   ActivityIndicator: 'ActivityIndicator',

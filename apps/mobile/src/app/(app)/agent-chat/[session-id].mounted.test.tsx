@@ -136,6 +136,7 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
 }));
 vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalArrowLeft: 'DirectionalArrowLeft',
   DirectionalChevronLeft: 'ChevronLeft',
   DirectionalChevronRight: 'ChevronRight',
 }));
@@ -151,8 +152,12 @@ vi.mock('@/lib/user-web-connection-lifecycle', () => ({
   createNativeUserWebConnectionLifecycleHooks: () => ({}),
 }));
 vi.mock('@/lib/a11y/announce', () => ({ announceForA11y: vi.fn() }));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#999999',
+  useThemeColors: () => ({}),
+}));
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: 'RotateCcw',
   AlertCircle: 'AlertCircle',
   ChevronDown: 'ChevronDown',
   Clock: 'Clock',
@@ -797,7 +802,7 @@ describe('SessionDetailScreen display scope', () => {
         const buttonLabels = findByType(renderer.root, 'Button').flatMap(button =>
           findByType(button, 'Text').flatMap(node => node.children)
         );
-        expect(buttonLabels).toEqual(['Copy', 'Back to sessions']);
+        expect(buttonLabels).toEqual(['Back to sessions']);
       }
       expect(globalContext.organizationId).toBe('global-org');
       expect(globalContext.setOrganizationId).not.toHaveBeenCalled();
@@ -1551,7 +1556,13 @@ describe('SessionDetailScreen owner-scoped metadata and recovery', () => {
     expect(propOf(error, 'variant')).toBe(variant);
     expect(propOf(error, 'onRetry')).toBeUndefined();
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
-    expect(findByType(renderer.root, 'Button')).toHaveLength(2);
+    // Copy left the card when the state took one recovery action; the way back
+    // is the only button the body draws.
+    const buttons = findByType(renderer.root, 'Button');
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0] && findByType(buttons[0], 'Text').flatMap(text => text.children)).toEqual([
+      i18n.t('agentChat.session.backToSessions'),
+    ]);
   });
 });
 
@@ -1666,7 +1677,7 @@ describe.each([true, false])('SessionDetailScreen header return with history=%s'
     });
 
     expect(navigationRoutes).toEqual(
-      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)/']
+      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)']
     );
     expect(rootRequests).toEqual([]);
   });
@@ -1818,7 +1829,7 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
     });
 
     // Truncated to the tabs entry: the composer is no longer on the stack.
-    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)/']);
+    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)']);
     expect(rootRequests).toEqual([]);
   });
 

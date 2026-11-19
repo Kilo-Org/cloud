@@ -24,6 +24,10 @@ import {
   profileStackRepair,
   withRebuiltParents,
 } from '@/lib/profile-route-stack';
+import {
+  notePendingProfileRetirement,
+  takeRetirableProfileRoutes,
+} from '@/lib/profile-stack-retirement';
 
 /** The navigation object a screen of a Stack sees. */
 type StackNavigation = NativeStackNavigationProp<Record<string, undefined>>;
@@ -44,6 +48,16 @@ type StackNavigation = NativeStackNavigationProp<Record<string, undefined>>;
  * that keeps the focused screen where it is. The rebuilt pushes carry
  * `PROFILE_STACK_REBUILT_PARAM`, which turns their transitions off in the
  * layouts' screen options and tells a rebuilt screen not to repair again.
+ *
+ * The removal belongs to the rebuilt copy, not to the copy that asked for the
+ * repair: a native Stack unmounts a covered screen, so the repairing screen is
+ * already gone when its rebuilt copy lands, and a removal tracked there never
+ * ran. It therefore lives outside both screens
+ * (`profile-stack-retirement.ts`), and every profile screen finishes a pending
+ * removal the moment a rebuilt copy of that screen is focused. A repair that
+ * leaves its original in the stack is worse than no repair: Back then steps out
+ * to the parents and the leftover copy becomes the focused screen again, so the
+ * section returns instead of the reader leaving it.
  *
  * The decision is taken once this screen is the focused one, never from its own
  * first render: a route renders before the navigator's state lists it as
@@ -81,39 +95,6 @@ export function useRepairProfileRouteStack({
   useEffect(() => {
     // One decision per mounted screen, whatever it decides.
     let decided = false;
-    let retired = false;
-    // The retirement listener is owned by this effect, so it lives exactly as
-    // long as the screen that may still need to retire its original copy.
-    let unsubscribeRetire: (() => void) | undefined = undefined;
-
-    const retireOriginal = (retiredKey: string, selfName: string) => {
-      if (retired) {
-        return;
-      }
-      const state = navigation.getState();
-      const top = state.routes[state.index];
-      // Wait until this screen's own rebuilt copy is the focused route: the
-      // removed screen is never the focused one, so the reset commits on its
-      // own. Another rebuilt parent on top is not this screen yet.
-      if (
-        top === undefined ||
-        top.key === retiredKey ||
-        top.name !== selfName ||
-        pathnameRef.current !== screenPath
-      ) {
-        return;
-      }
-      if (!state.routes.some(route => route.key === retiredKey)) {
-        retired = true;
-        return;
-      }
-      const routes = state.routes.filter(route => route.key !== retiredKey);
-      if (routes.length === state.routes.length || routes.length === 0) {
-        return;
-      }
-      retired = true;
-      navigation.reset({ ...state, routes, index: routes.length - 1 });
-    };
 
     const decide = () => {
       if (decided) {
@@ -147,10 +128,14 @@ export function useRepairProfileRouteStack({
       if (!hasParentsToPush(toPush)) {
         return;
       }
-      const retiredKey = current.key;
-      const selfName = current.name;
-      unsubscribeRetire = navigation.addListener('state', () => {
-        retireOriginal(retiredKey, selfName);
+      // This copy is about to be replaced by the rebuilt one above the parents,
+      // and a covered screen stops running code, so the removal is recorded where
+      // any profile screen can finish it (`profile-stack-retirement.ts`).
+      notePendingProfileRetirement({
+        key: current.key,
+        stack,
+        selfName: current.name,
+        now: Date.now(),
       });
       if (toPush.list) {
         router.push(withRebuiltParents(getProfilesPath(stack)));
@@ -164,9 +149,32 @@ export function useRepairProfileRouteStack({
     const unsubscribeDecide = navigation.addListener('state', decide);
     // The focused pathname settles on its own render, after a state event.
     decide();
-    return () => {
-      unsubscribeDecide();
-      unsubscribeRetire?.();
-    };
+    return unsubscribeDecide;
   }, [navigation, organizationId, parents, profile, router, screenPath, self, stack]);
+
+  // The rebuilt copy of a repaired screen is what finishes the repair: every
+  // profile screen watches the Stack for the state that puts a rebuilt copy on
+  // top, and removes the original below it then. Watching here rather than in the
+  // repairing screen is what makes the removal happen at all — the repairing
+  // screen is covered (and unmounted) by the time its rebuilt copy lands.
+  useEffect(() => {
+    const retire = () => {
+      const state = navigation.getState();
+      const next = takeRetirableProfileRoutes({
+        routes: state.routes,
+        index: state.index,
+        stack,
+        now: Date.now(),
+      });
+      if (next === null) {
+        return;
+      }
+      navigation.reset({ ...state, routes: next.routes, index: next.index });
+    };
+    // A screen can mount after the state that retired its original was applied by
+    // another instance, and a navigator reports no further event for a stack that
+    // is already settled, so judge the stack once as this instance mounts.
+    retire();
+    return navigation.addListener('state', retire);
+  }, [navigation, stack]);
 }

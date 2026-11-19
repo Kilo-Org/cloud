@@ -1,4 +1,5 @@
-import { createElement, type ReactNode, useSyncExternalStore } from 'react';
+/* eslint-disable max-lines -- one shared harness mocks every native module and the tRPC surface the passkey suites reach. */
+import { createElement, type ElementType, type ReactNode, useSyncExternalStore } from 'react';
 import { vi } from 'vitest';
 
 import '@/i18n';
@@ -94,7 +95,7 @@ const toastError = vi.hoisted(() => vi.fn());
 const confirmSpy = vi.hoisted(() => vi.fn());
 // `vi.hoisted` results cannot be exported at their declaration (vitest hoists
 // them above the export), so they are exported after the declaration instead.
-export { browser, confirmSpy, list, store, toastError, toastSuccess, windowSize };
+export { browser, confirmSpy, list, store, toastError, toastSuccess };
 
 /**
  * The confirmation the stubbed `useConfirmDialog` captured; mirrors the
@@ -169,12 +170,37 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     secondaryForeground: '#333333',
   }),
 }));
-vi.mock('@/lib/format', () => ({ formatDate: () => 'Jan 1, 2026' }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/lib/format', () => ({
+  formatDate: () => 'Jan 1, 2026',
+}));
+vi.mock('@/components/screen-header', () => ({
+  // The header renders its trailing slot, so the suite can read and press the
+  // screen's one create control.
+  ScreenHeader: (props: { headerRight?: ReactNode }) =>
+    createElement('ScreenHeader', null, props.headerRight),
+}));
 vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
 vi.mock('@/components/empty-state', () => ({
   // Renders the action so a test can reach the CTA that lives inside it.
   EmptyState: (props: { action?: ReactNode }) => createElement('EmptyState', props, props.action),
+  // The action is a control: the suites read its label and its busy state from
+  // the node and press it through the same `Pressable` shape a row control has.
+  StateAction: (props: {
+    label?: string;
+    onPress?: () => void;
+    loading?: boolean;
+    disabled?: boolean;
+  }) =>
+    createElement(
+      'Pressable',
+      {
+        accessibilityLabel: props.label,
+        onPress: props.onPress,
+        loading: props.loading,
+        disabled: props.disabled,
+      },
+      createElement('Text', null, props.label)
+    ),
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
@@ -188,10 +214,81 @@ vi.mock('@/components/ui/dialog', () => ({
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+// The layout primitives the screen composes. Each mock renders what the
+// assertions read: the row's icon, its title and secondary line, the control
+// the row carries, and one bar per skeleton line.
+vi.mock('@/components/ui/section', () => ({
+  Section: (props: { children?: ReactNode }) => props.children,
+}));
+vi.mock('@/components/ui/row-group', () => ({
+  RowGroup: (props: { children?: ReactNode }) => props.children,
+}));
+vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
+vi.mock('@/components/ui/row-skeleton', () => ({
+  RowSkeleton: (props: { tile?: boolean; subtitle?: boolean }) =>
+    createElement(
+      'View',
+      null,
+      props.tile === true ? createElement('Skeleton') : null,
+      createElement('Skeleton'),
+      props.subtitle === true ? createElement('Skeleton') : null
+    ),
+}));
+vi.mock('@/components/ui/configure-row', () => ({
+  ConfigureRow: (props: {
+    icon?: ElementType;
+    title: string;
+    subtitle?: string;
+    trailing?: ReactNode;
+  }) =>
+    createElement(
+      'View',
+      null,
+      props.icon === undefined ? null : createElement(props.icon),
+      createElement('Text', { numberOfLines: 1 }, props.title),
+      props.subtitle === undefined ? null : createElement('Text', null, props.subtitle),
+      props.trailing ?? null
+    ),
+}));
+// The passkey row keeps each fact on its own line, so it composes the frame
+// directly: the title, the added date and the optional last-used line.
+vi.mock('@/components/ui/row-frame', () => ({
+  RowFrame: (props: {
+    icon?: ElementType;
+    title?: string;
+    subtitle?: { text: string };
+    secondSubtitle?: { text: string };
+    trailing?: { kind: 'node'; node: ReactNode };
+  }) =>
+    createElement(
+      'View',
+      null,
+      props.icon === undefined ? null : createElement(props.icon),
+      props.title === undefined ? null : createElement('Text', { numberOfLines: 1 }, props.title),
+      props.subtitle === undefined ? null : createElement('Text', null, props.subtitle.text),
+      props.secondSubtitle === undefined
+        ? null
+        : createElement('Text', null, props.secondSubtitle.text),
+      props.trailing === undefined ? null : props.trailing.node
+    ),
+}));
+vi.mock('@/components/ui/icon-button', () => ({
+  IconButton: (props: {
+    children?: ReactNode;
+    accessibilityLabel?: string;
+    onPress?: () => void;
+  }) =>
+    createElement(
+      'Pressable',
+      { ...props, className: 'h-[48px] w-[48px] items-center justify-center' },
+      props.children
+    ),
+}));
 vi.mock('@/components/ui/icons', () => ({
   KeyRound: 'KeyRound',
   Pencil: 'Pencil',
   Plus: 'Plus',
+  RotateCcw: 'RotateCcw',
   Trash2: 'Trash2',
 }));
 
@@ -298,8 +395,11 @@ export function emptyDescription(view: PasskeysView): string {
 }
 
 export function buttonByLabel(view: PasskeysView, label: string): ReactTestInstance {
-  const button = nodes(view, 'Button').find(
+  // The create control is the header's icon button, whose announced name is
+  // its label; a row action carries its label as text.
+  const button = [...nodes(view, 'Button'), ...nodes(view, 'Pressable')].find(
     node =>
+      node.props.accessibilityLabel === label ||
       node.findAll(inner => String(inner.type) === 'Text' && inner.props.children === label)
         .length > 0
   );
@@ -310,8 +410,14 @@ export function buttonByLabel(view: PasskeysView, label: string): ReactTestInsta
 }
 
 export function hasButtonLabel(view: PasskeysView, label: string): boolean {
-  return nodes(view, 'Button').some(
+  return [
+    ...nodes(view, 'Button'),
+    ...nodes(view, 'StateAction'),
+    ...nodes(view, 'Pressable'),
+  ].some(
     node =>
+      node.props.label === label ||
+      node.props.accessibilityLabel === label ||
       node.findAll(inner => String(inner.type) === 'Text' && inner.props.children === label)
         .length > 0
   );

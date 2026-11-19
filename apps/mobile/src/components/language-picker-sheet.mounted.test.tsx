@@ -116,7 +116,10 @@ vi.mock('@/i18n/direction-attempt', () => ({
   // relaunches once for the language it names.
   readDirectionAttemptAsync: vi.fn(() => Promise.resolve(null)),
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/picker-sheet', () => ({
   // Mirrors the shell: `headerContent` is pinned chrome unless the caller put
   // it in its own body (`headerInBody`), and the prop is exposed for assertions.
@@ -297,7 +300,8 @@ describe('LanguagePickerSheet apply', () => {
     // list starts instead of being pushed down a filled body.
     const listContentStyle: unknown =
       renderer.root.findByType(flashListMock).props.contentContainerStyle;
-    expect(listContentStyle).toEqual({ paddingHorizontal: 16, paddingBottom: 16 });
+    // Rows own the page gutter themselves, so the list adds no horizontal pad.
+    expect(listContentStyle).toEqual({ paddingBottom: 16 });
 
     renderer.unmount();
   });
@@ -328,10 +332,9 @@ describe('LanguagePickerSheet apply', () => {
     const field = renderer.root.findByType(LanguageSearchField);
     const pill = field.findByType('View');
     expect(String(pill.props.className)).toContain('rounded-full');
-    // The list's content padding replaces the pinned side margin, so the field
-    // keeps its width and lines up with the rows it now scrolls with.
-    expect(String(pill.props.className)).not.toContain('mx-4');
-    expect(String(pill.props.className)).toContain('mx-0');
+    // The field keeps the page gutter as the list header too, so the rows it
+    // scrolls with and the field itself share one inset.
+    expect(String(pill.props.className)).toContain('mx-4');
     // One field on screen: the list header, not a second copy in the chrome.
     expect(findByType(renderer.root, 'TextInput')).toHaveLength(1);
 
@@ -395,7 +398,7 @@ describe('LanguagePickerSheet apply', () => {
     // top-aligned: centring the empty state would push the field off the top.
     const compactContentStyle: unknown =
       renderer.root.findByType(flashListMock).props.contentContainerStyle;
-    expect(compactContentStyle).toEqual({ paddingHorizontal: 16, paddingBottom: 16 });
+    expect(compactContentStyle).toEqual({ paddingBottom: 16 });
 
     act(() => {
       (input.props.onChangeText as (value: string) => void)('');

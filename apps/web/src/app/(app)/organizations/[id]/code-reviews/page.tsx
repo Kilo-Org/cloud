@@ -1,4 +1,5 @@
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
+import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 import { isLocalCodeReviewDevelopmentEnabled } from '@kilocode/web-shared/lib/config.server';
 import { ReviewAgentPageClient } from './ReviewAgentPageClient';
 import { validateReturnPath } from '@/lib/integrations/validate-return-path';
@@ -25,9 +26,10 @@ export default async function ReviewAgentPage({ params, searchParams }: ReviewAg
   return (
     <OrganizationByPageLayout
       params={params}
-      render={({ organization }) => (
+      render={({ organization, role }) => (
         <ReviewAgentPageClient
           organizationId={organization.id}
+          canManageGitLab={canManageOrganizationBilling(role)}
           organizationName={organization.name}
           successMessage={search.success}
           errorMessage={search.error}

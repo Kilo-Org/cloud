@@ -315,15 +315,16 @@ describe('device-sessions', () => {
 
     test('a claim write through the transaction is rolled back with a lost claim', async () => {
       // A claim that writes through its executor must leave nothing behind when
-      // it loses. This only holds when the executor is the session transaction.
+      // it loses. The write must be an INSERT: an update matches no row through
+      // the pool either, because the session this transaction inserted is not
+      // committed yet, so an update could not tell the two executors apart. An
+      // insert through the pool commits and survives the rollback; an insert
+      // through the transaction rolls back with the session.
       const marker = `claim-marker-${Date.now()}`;
       const lost = await createDeviceSession({
         userId: testUserId,
         claim: async (tx: DrizzleTransaction) => {
-          await tx
-            .update(device_sessions)
-            .set({ user_agent: marker })
-            .where(eq(device_sessions.kilo_user_id, testUserId));
+          await tx.insert(device_sessions).values({ kilo_user_id: testUserId, user_agent: marker });
           return false;
         },
       });

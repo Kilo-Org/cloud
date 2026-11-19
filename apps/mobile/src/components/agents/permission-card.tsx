@@ -128,12 +128,18 @@ export function PermissionCard({
   // Only the command is display copy. Other metadata entries are control flags
   // or machine payloads and must not reach the card as raw key/value rows.
   const parsedCommand = commandSchema.safeParse(metadata?.command);
-  const command = parsedCommand.success ? parsedCommand.data : null;
-  // Patterns are the rule-matching form of the request, not display copy. When
-  // the verbatim command is present they repeat it in a different spelling, so
-  // the card shows the command alone and keeps the patterns for requests that
-  // have no command, such as path scopes.
-  const showPatterns = patterns.length > 0 && !command;
+  // An empty or whitespace-only command names no text to show; treat it as
+  // absent so the stored scope stays visible in the standalone block.
+  const command =
+    parsedCommand.success && parsedCommand.data.trim() !== '' ? parsedCommand.data : null;
+  // The patterns name the scope a stored rule covers. With a command visible,
+  // only the patterns that differ from the command after trimming and
+  // collapsing whitespace need a scope caption, and the command stays visible.
+  const normalized = (value: string) => value.replaceAll(/\s+/g, ' ').trim();
+  const scopePatterns =
+    command === null
+      ? patterns
+      : patterns.filter(pattern => normalized(pattern) !== normalized(command));
 
   return (
     <View className="mx-4 my-2 shrink overflow-hidden rounded-xl border border-border bg-card">
@@ -158,14 +164,15 @@ export function PermissionCard({
             {t('agentChat.permissionCard.allowQuestion', { permission: permissionDisplay })}
           </Text>
 
-          {showPatterns ? (
+          {command === null && patterns.length > 0 ? (
             <View className="gap-1 rounded-lg bg-muted p-2">
               <Text className="text-xs font-medium text-muted-foreground">
                 {t('agentChat.permissionCard.appliesTo')}
               </Text>
               {patterns.map((pattern, index) => (
                 <Text key={index} className="text-xs text-muted-foreground">
-                  • {isolateLtrBidiText(displaySafeText(pattern))}
+                  {patterns.length > 1 ? '• ' : null}
+                  {isolateLtrBidiText(displaySafeText(pattern))}
                 </Text>
               ))}
             </View>
@@ -179,6 +186,12 @@ export function PermissionCard({
               <Text className="text-xs text-muted-foreground">
                 {isolateLtrBidiText(displaySafeText(command))}
               </Text>
+              {scopePatterns.map((pattern, index) => (
+                <Text key={index} className="text-xs text-muted-foreground">
+                  {t('agentChat.permissionCard.appliesTo')}{' '}
+                  {isolateLtrBidiText(displaySafeText(pattern))}
+                </Text>
+              ))}
             </View>
           ) : null}
         </View>

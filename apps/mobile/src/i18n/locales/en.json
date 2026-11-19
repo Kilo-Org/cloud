@@ -2778,7 +2778,7 @@
       "subjectDoomLoop": "repeated tool calls",
       "subjectAgentManager": "agent management",
       "subjectSandboxEscalation": "host access",
-      "appliesTo": "Applies to:",
+      "appliesTo": "Applies to",
       "denyPermission": "Deny permission",
       "deny": "Deny",
       "allowOnce": "Allow Once",

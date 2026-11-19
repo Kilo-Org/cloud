@@ -1,8 +1,11 @@
-import { useState } from 'react';
+/* eslint-disable max-lines -- The form composes the segments, the plan gate, the save machinery and the three lists on one screen. */
+
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { ModelDenyList, ProviderAllowList } from '@/components/organization/model-access-lists';
+import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { GatewaySettingsSection } from '@/components/organization/providers-gateways-section';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
@@ -112,6 +115,7 @@ function syncedFormState(params: {
 export function ModelAccessForm({
   organizationId,
   canEdit,
+  planEnded,
   models,
   catalog,
   catalogUnavailable,
@@ -126,6 +130,12 @@ export function ModelAccessForm({
 }: Readonly<{
   organizationId: string;
   canEdit: boolean;
+  /**
+   * The organization's plan gate verdict: a hard-expired trial refuses every
+   * organization mutation, so this disables the draft controls and the save,
+   * and the plan-ended sentence replaces the read-only role sentence.
+   */
+  planEnded: boolean;
   models: readonly AvailableModel[];
   /** The gateway's whole catalog; empty while it is unavailable. */
   catalog: readonly CatalogModel[];
@@ -175,6 +185,22 @@ export function ModelAccessForm({
   }
   const { baseline, draft } = form;
 
+  // The gateways tab exists only when the settings read reports it is
+  // available, like the web page's Advanced policies tab: an unavailable
+  // organization has nothing to show on it. A read that failed keeps the
+  // segment offered so the section's error-and-retry branch stays reachable —
+  // the section is the only surface that can refetch this read. A read that
+  // lands or changes while the tab is selected falls back to the models tab;
+  // the effect below makes that fallback persistent, so availability returning
+  // later cannot move the user off the tab they picked.
+  const gatewaysOffered = gateway?.available === true || (gateway == null && gatewayIsError);
+  const activeTab = gatewaysOffered || tab !== 'gateways' ? tab : 'models';
+  useEffect(() => {
+    if (!gatewaysOffered) {
+      setTab(current => (current === 'gateways' ? 'models' : current));
+    }
+  }, [gatewaysOffered]);
+
   const dirty = !draftsEqual(draft, baseline);
   const saving = feedback.status === 'pending';
   const savePayload = modelAccessSave({
@@ -186,7 +212,15 @@ export function ModelAccessForm({
   });
   const blockingIssue =
     savePayload.kind === 'ready' ? null : t(BLOCKING_ISSUE_KEYS[savePayload.kind]);
-  const cannotSave = !dirty || saving || savePayload.kind !== 'ready';
+  // A hard-expired trial refuses every organization mutation on the server, so
+  // the form states the blocker on its own controls instead of letting an
+  // owner or admin build a draft only to collect the refusal — the same shape
+  // as the hub's blocked rename control. The notice under the segments is the
+  // one place the reason is painted; the status line stays clear because no
+  // edit is possible while the gate holds. Cancel is exempt from that gate,
+  // because it touches no server state and is the only way to discard a draft
+  // the gate trapped.
+  const cannotSave = planEnded || !dirty || saving || savePayload.kind !== 'ready';
   const onDraftChange = (next: ModelAccessDraft) => {
     clearWhere(() => true);
     setForm(previous => ({ ...previous, draft: next }));
@@ -259,21 +293,38 @@ export function ModelAccessForm({
             </Button>
           </View>
         ) : null}
+        {/* See the fallback above: the segment and the rendered list both read
+            the derived tab, so a read that removes the gateways settings can
+            never leave the control on a tab whose content it hides. */}
         <SegmentedControl
           options={[
             { value: 'models' as const, label: t('organizationModelAccess.tabModels') },
             { value: 'providers' as const, label: t('organizationModelAccess.tabProviders') },
-            { value: 'gateways' as const, label: t('organizationModelAccess.tabGateways') },
+            ...(gatewaysOffered
+              ? [
+                  {
+                    value: 'gateways' as const,
+                    label: t('organizationModelAccess.tabGateways'),
+                  },
+                ]
+              : []),
           ]}
-          value={tab}
+          value={activeTab}
           onChange={setTab}
           accessibilityLabel={t('organization.settingsOnWeb.providersAndModels')}
         />
-        {canEdit ? null : (
+        {/* The lapsed plan blocks every edit on this screen, so the block under
+            the segments names that state, its cause and who can end it: the
+            shared organization plan refusal, as the hub, the billing screen and
+            the new-session form paint it. */}
+        {planEnded ? (
+          <OrganizationPlanRefusal message={t('common.organizationTrialEnded')} />
+        ) : null}
+        {!canEdit && !planEnded ? (
           <Text className="text-xs text-muted-foreground">
             {t('organizationModelAccess.readOnly')}
           </Text>
-        )}
+        ) : null}
         {/* The buttons keep their place while the draft is clean, so a save
             that settles never moves the list below them. */}
         <View className="flex-row items-center gap-2">
@@ -295,21 +346,27 @@ export function ModelAccessForm({
           >
             <Text>{t('common.cancel')}</Text>
           </Button>
-          <Button size="sm" loading={saving} disabled={cannotSave} onPress={() => void onSave()}>
+          <Button
+            variant={planEnded ? 'outline' : 'default'}
+            size="sm"
+            loading={saving}
+            disabled={cannotSave}
+            onPress={() => void onSave()}
+          >
             <Text>{t('common.save')}</Text>
           </Button>
         </View>
       </View>
 
-      {tab === 'models' ? (
+      {activeTab === 'models' ? (
         <ModelDenyList
           models={denyRows}
           draft={draft}
           onChange={onDraftChange}
-          disabled={!canEdit || saving}
+          disabled={planEnded || !canEdit || saving}
         />
       ) : null}
-      {tab === 'providers' ? (
+      {activeTab === 'providers' ? (
         <View className="flex-1">
           {catalogUnavailable ? (
             <Text className="px-4 pb-2 text-xs text-muted-foreground">
@@ -320,17 +377,17 @@ export function ModelAccessForm({
             providers={providers}
             draft={draft}
             onChange={onDraftChange}
-            disabled={!canEdit || saving || catalogUnavailable}
+            disabled={planEnded || !canEdit || saving || catalogUnavailable}
           />
         </View>
       ) : null}
-      {tab === 'gateways' ? (
+      {activeTab === 'gateways' ? (
         <GatewaySettingsSection
           organizationId={organizationId}
           settings={gateway}
           isError={gatewayIsError}
           isFetching={gatewayIsFetching}
-          canEdit={canEdit}
+          canEdit={canEdit && !planEnded}
           onRetry={onRetryGateway}
         />
       ) : null}

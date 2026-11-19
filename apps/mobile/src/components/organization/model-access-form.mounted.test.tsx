@@ -26,6 +26,12 @@ const saved = vi.hoisted(() => ({ mutateAsync: vi.fn<(input: unknown) => Promise
 vi.mock('@/lib/hooks/use-org-settings-queries', () => ({
   useSaveOrgModelAccess: () => ({ mutateAsync: saved.mutateAsync, isPending: false }),
 }));
+// The form hands the lapsed-plan state to the shared refusal, which owns the
+// mark, the tint and the ink: the primitive's own suite proves its paint, so
+// this harness only needs the host node.
+vi.mock('@/components/organization/plan-refusal', () => ({
+  OrganizationPlanRefusal: 'OrganizationPlanRefusal',
+}));
 
 vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
@@ -63,18 +69,19 @@ const WIDE_CATALOG = [...CATALOG, model('google/gemini', ['google'])];
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
-function element(
-  providerAllowList: readonly string[] | undefined,
-  overrides: {
-    catalogUnavailable?: boolean;
-    onRetryCatalog?: () => void;
-    modelDenyList?: readonly string[];
-    catalog?: readonly CatalogModel[];
-  } = {}
-) {
+type Overrides = {
+  catalogUnavailable?: boolean;
+  onRetryCatalog?: () => void;
+  modelDenyList?: readonly string[];
+  catalog?: readonly CatalogModel[];
+  planEnded?: boolean;
+};
+
+function element(providerAllowList: readonly string[] | undefined, overrides: Overrides = {}) {
   return createElement(ModelAccessForm, {
     organizationId: 'org-1',
     canEdit: true,
+    planEnded: overrides.planEnded ?? false,
     models: [],
     catalog: overrides.catalogUnavailable === true ? [] : (overrides.catalog ?? CATALOG),
     catalogUnavailable: overrides.catalogUnavailable === true,
@@ -89,15 +96,7 @@ function element(
   });
 }
 
-function render(
-  providerAllowList: readonly string[] | undefined,
-  overrides: {
-    catalogUnavailable?: boolean;
-    onRetryCatalog?: () => void;
-    modelDenyList?: readonly string[];
-    catalog?: readonly CatalogModel[];
-  } = {}
-) {
+function render(providerAllowList: readonly string[] | undefined, overrides: Overrides = {}) {
   saved.mutateAsync.mockResolvedValue(undefined);
   act(() => {
     renderer = TestRenderer.create(element(providerAllowList, overrides));
@@ -111,11 +110,7 @@ function render(
 /** Render the same form again with the catalog now loaded. */
 function renderWithCatalog(
   providerAllowList: readonly string[] | undefined,
-  overrides: {
-    catalogUnavailable?: boolean;
-    modelDenyList?: readonly string[];
-    catalog?: readonly CatalogModel[];
-  } = {}
+  overrides: Overrides = {}
 ) {
   if (!renderer) {
     throw new Error('Missing form renderer');

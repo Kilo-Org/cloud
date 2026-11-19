@@ -115,6 +115,7 @@ export function OrganizationProvidersAndModelsScreen() {
       <ModelAccessForm
         organizationId={organizationId}
         canEdit={canManageOrganization(role)}
+        planEnded={org.isTrialExpiredForEnforcement}
         models={models.data.data}
         catalog={catalog.data ?? []}
         catalogUnavailable={catalog.data == null && catalog.isError}

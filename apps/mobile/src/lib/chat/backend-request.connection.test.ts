@@ -102,12 +102,13 @@ describe('the backend connection check', () => {
 
   it('removes its abort listener from the caller signal when the check ends', async () => {
     const controller = new AbortController();
-    const recorded: ((...args: unknown[]) => void)[] = [];
-    vi.spyOn(controller.signal, 'addEventListener').mockImplementation(
-      listener => void recorded.push(listener)
-    );
-    vi.spyOn(controller.signal, 'removeEventListener').mockImplementation(listener => {
-      const at = recorded.indexOf(listener);
+    type Listener = (event: Event) => void;
+    const recorded: Listener[] = [];
+    vi.spyOn(controller.signal, 'addEventListener').mockImplementation((_type, listener) => {
+      recorded.push(listener as Listener);
+    });
+    vi.spyOn(controller.signal, 'removeEventListener').mockImplementation((_type, listener) => {
+      const at = recorded.indexOf(listener as Listener);
       if (at !== -1) {
         recorded.splice(at, 1);
       }

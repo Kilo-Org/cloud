@@ -17,6 +17,24 @@ const FIXTURE_FILENAME = 'quarterly-revenue-forecast-northern-region-2026-q4-fin
 const FIXTURE_BYTES = 564;
 
 /**
+ * A markdown chip over the preview budget: the sheet must show a bounded
+ * prefix and the Truncated marker instead of rendering the whole file.
+ * Deterministic content, so every capture of this fixture shows the same text.
+ */
+const FIXTURE_MD_FILENAME = 'oversized-notes.md';
+const FIXTURE_MD_PARAGRAPH =
+  'This paragraph exists only to push the attachment preview past its bound.';
+const FIXTURE_MD_CHARS = 60_000;
+// ASCII, one byte per character.
+const FIXTURE_MD_BYTES = FIXTURE_MD_CHARS;
+
+function fixtureMarkdown(): string {
+  const paragraphs = Math.ceil(FIXTURE_MD_CHARS / (FIXTURE_MD_PARAGRAPH.length + 1));
+  const header = '# Oversized notes\n\n';
+  return header + Array.from({ length: paragraphs }, () => FIXTURE_MD_PARAGRAPH).join('\n\n');
+}
+
+/**
  * A one-page PDF with a valid cross-reference table, so the chip's document has
  * real bytes and a platform viewer can present it.
  */
@@ -49,15 +67,23 @@ export function AttachmentChipFixture() {
     return new File(directory, FIXTURE_FILENAME).uri;
   }, []);
 
+  const markdownUri = useMemo(() => {
+    const directory = new Directory(Paths.cache, FIXTURE_DIR_NAME);
+    return new File(directory, FIXTURE_MD_FILENAME).uri;
+  }, []);
+
   useEffect(() => {
     async function writeFixture() {
       const directory = new Directory(Paths.cache, FIXTURE_DIR_NAME);
       directory.create({ idempotent: true, intermediates: true });
       const file = new File(directory, FIXTURE_FILENAME);
-      if (file.exists) {
-        return;
+      if (!file.exists) {
+        await file.write(FIXTURE_PDF_BASE64, { encoding: 'base64' });
       }
-      await file.write(FIXTURE_PDF_BASE64, { encoding: 'base64' });
+      const markdown = new File(directory, FIXTURE_MD_FILENAME);
+      if (!markdown.exists) {
+        await markdown.write(fixtureMarkdown());
+      }
     }
     void writeFixture();
   }, []);
@@ -76,8 +102,20 @@ export function AttachmentChipFixture() {
         status: 'uploaded',
         progress: 1,
       },
+      {
+        id: 'attachment-chip-fixture-md',
+        filename: FIXTURE_MD_FILENAME,
+        kind: 'document',
+        extension: 'md',
+        mimeType: 'text/plain',
+        size: FIXTURE_MD_BYTES,
+        localUri: markdownUri,
+        localFileOwned: true,
+        status: 'uploaded',
+        progress: 1,
+      },
     ],
-    [localUri]
+    [localUri, markdownUri]
   );
 
   return (

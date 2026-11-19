@@ -664,11 +664,9 @@ for (const [name, entrySource, expected, absent] of [
 }
 
 test('keeps the pins quiet when the control and the holding declarations compile', context => {
-  const root = stubbedCompilerFixture(
-    context,
-    compilerStub(),
-    { 'apps/mobile/src/screen.tsx': screen('<ScrollView contentContainerClassName="px-4" />') }
-  );
+  const root = stubbedCompilerFixture(context, compilerStub(), {
+    'apps/mobile/src/screen.tsx': screen('<ScrollView contentContainerClassName="px-4" />'),
+  });
   const result = spawnSync(process.execPath, [join(root, 'tools/nativewind/check-classes.mjs')], {
     cwd: root,
     encoding: 'utf8',

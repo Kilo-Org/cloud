@@ -69,6 +69,27 @@ describe('RowGroup', () => {
     expect(separators).toHaveLength(1);
     expect(classesOf(first(separators[0]))).toContain('ms-[54.5px]');
   });
+
+  it('draws one separator per row when a fragment groups the middle rows', () => {
+    const root = renderGroup(
+      <RowGroup leadingTile>
+        <Text>opening-row</Text>
+        <>
+          <Text>credit-activity-row</Text>
+          <Text>invoices-row</Text>
+        </>
+        <Text>closing-row</Text>
+      </RowGroup>
+    );
+    const rows = root.findAll(node => Object.is(node.type, 'Text'));
+
+    expect(rows).toHaveLength(4);
+    expect(
+      root.findAll(
+        node => Object.is(node.type, 'View') && classesOf(node).includes('border-b-[0.5px]')
+      )
+    ).toHaveLength(3);
+  });
 });
 
 describe('RowGroupItem', () => {

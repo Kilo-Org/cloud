@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from 'react';
+import { Children, Fragment, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { View } from 'react-native';
 
 import { cn } from '@/lib/utils';
@@ -48,6 +48,26 @@ type RowGroupProps = {
 };
 
 /**
+ * The rows a group's children hold, in order, with arrays and fragments
+ * expanded.
+ *
+ * A caller that keeps its conditional rows in a fragment passes one child to
+ * React but several rows to the card, and a fragment is not an array: without
+ * expanding it the group draws one child and no hairline between the rows
+ * inside, so the same rows get separators or not depending on how the caller
+ * spelled them.
+ */
+function groupRows(children: ReactNode): ReactNode[] {
+  return Children.toArray(children).flatMap(row =>
+    isFragmentElement(row) ? groupRows(row.props.children) : [row]
+  );
+}
+
+function isFragmentElement(row: ReactNode): row is ReactElement<{ children?: ReactNode }> {
+  return isValidElement(row) && (row.type as unknown) === Fragment;
+}
+
+/**
  * The grouped settings card: one rounded surface per section, a hairline
  * between consecutive rows and none after the last. Rows never draw their own
  * divider.
@@ -56,9 +76,7 @@ type RowGroupProps = {
  * `RowGroupItem` per cell instead; both draw the same surface and separator.
  */
 export function RowGroup({ leadingTile = false, className, children }: Readonly<RowGroupProps>) {
-  const rows = (Array.isArray(children) ? children : [children])
-    .flat(Infinity)
-    .filter((row): row is ReactNode => row !== null && row !== undefined && row !== false);
+  const rows = groupRows(children);
   return (
     <View className={cn('overflow-hidden rounded-xl bg-secondary', className)}>
       {rows.map((row, index) => (

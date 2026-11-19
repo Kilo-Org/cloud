@@ -400,6 +400,7 @@ it('retries an aborted request and records the failure at the bound', async () =
   expect(fetcher).toHaveBeenCalledTimes(SUMMARY_MAX_ATTEMPTS);
   const [failed] = await db.select().from(agent_briefing_snapshots);
   expect(failed?.summary.status).toBe('failed');
+  expect(failed?.summary.error).toBe('time_limit');
 }, 20_000);
 it('settles a delayed usage delivery against its immutable occurrence generation', async () => {
   const { now, user } = await scheduled();
@@ -737,6 +738,63 @@ it('preserves saved snapshot readability while disabling future paid generation'
   expect(failed?.summary.costMicrodollars).toBe(0);
   expect(failed?.facts).toEqual(row.facts);
   expect((await caller.get({ reportId: row.id })).summary.error).toBe('permission_unavailable');
+});
+
+it('fails rows their disabled context refuses without holding a generation slot', async () => {
+  // A refusal must be recorded without claiming a generation slot, so the due row
+  // behind it is still admitted in the same run.
+  const first = await scheduled();
+  const second = await scheduled();
+  const third = await scheduled();
+  await sweepAgentBriefings(first.now);
+  const rows = await db.select().from(agent_briefing_snapshots);
+  expect(rows).toHaveLength(3);
+  const [refusedFirst, refusedSecond] = [first.user.id, second.user.id].map(userId =>
+    rows.find(row => row.kilo_user_id === userId)
+  );
+  const valid = rows.find(row => row.kilo_user_id === third.user.id);
+  if (!refusedFirst || !refusedSecond || !valid) throw new Error('Missing captured snapshot');
+  await agentBriefingRouter
+    .createCaller({ user: first.user })
+    .updateContextPreferences({ enabled: false });
+  await agentBriefingRouter
+    .createCaller({ user: second.user })
+    .updateContextPreferences({ enabled: false });
+  const fetcher = jest
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValue(Response.json({ choices: [{ message: { content: 'Summary' } }] }));
+  await Promise.all([
+    runBriefingSummary(refusedFirst.id),
+    runBriefingSummary(refusedSecond.id),
+    runBriefingSummary(valid.id),
+  ]);
+  const finished = await db.select().from(agent_briefing_snapshots);
+  for (const id of [refusedFirst.id, refusedSecond.id]) {
+    const refused = finished.find(entry => entry.id === id);
+    expect(refused?.summary.status).toBe('failed');
+    expect(refused?.summary.error).toBe('permission_unavailable');
+    expect(refused?.generation_id).toBeNull();
+  }
+  const admitted = finished.find(entry => entry.id === valid.id);
+  expect(admitted?.summary.status).toBe('ready');
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+
+it('records a pending row whose window closed as not admitted', async () => {
+  const { now } = await scheduled();
+  await sweepAgentBriefings(now);
+  const [row] = await db.select().from(agent_briefing_snapshots);
+  if (!row) throw new Error('No captured snapshot');
+  const past = new Date(now.getTime() - 60_000).toISOString();
+  await db
+    .update(agent_briefing_snapshots)
+    .set({ job_due_at: past, morning_end_at: past })
+    .where(eq(agent_briefing_snapshots.id, row.id));
+  await sweepAgentBriefings(new Date(now.getTime() + 60_000));
+  const [expired] = await db.select().from(agent_briefing_snapshots);
+  expect(expired?.summary.status).toBe('unavailable');
+  expect(expired?.summary.error).toBe('not_admitted');
+  expect(expired?.job_due_at).toBeNull();
 });
 
 it('keeps declined notification delivery due until a later accepted morning dispatch', async () => {

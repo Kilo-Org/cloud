@@ -576,13 +576,153 @@ export async function reconcileBriefingCharge(row: BriefingReportRow): Promise<B
     return current ? reconcileLockedBriefingCharge(tx, current) : row;
   });
 }
+/** The context settings the authorization match reads, as live settings report them. */
+type BriefingContextSetting = {
+  enabled: boolean;
+  model: string;
+  maxSpendMicrodollars: number;
+  maxDurationSeconds: number;
+};
+
+/** The priced bounds `briefingPriceBound` computes for one generation. */
+type BriefingPriceBound = {
+  maxTokens: number;
+  upperBound: number;
+  inputRate: number;
+  outputRate: number;
+  estimatedCost: number;
+};
+
+const briefingAuthorizationSchema = z.object({
+  model: z.string(),
+  maxSpendMicrodollars: z.number().positive(),
+  maxDurationSeconds: z.number().int().min(1).max(600),
+});
+
+/**
+ * The authorization a stored row carries must still match the live context
+ * settings; an edit to the context revokes the stored authorization outright.
+ */
+function briefingAuthorizationMatches(
+  setting: BriefingContextSetting,
+  authorization: z.infer<typeof briefingAuthorizationSchema>
+): boolean {
+  return (
+    setting.enabled &&
+    authorization.model === setting.model &&
+    authorization.maxSpendMicrodollars === setting.maxSpendMicrodollars &&
+    authorization.maxDurationSeconds === setting.maxDurationSeconds
+  );
+}
+
+/** Records an admission refusal from `pending`: no generation stamp, no accounting. */
+async function refuseBriefingAdmission(
+  reportId: string,
+  code: z.infer<typeof briefingSummaryErrorSchema>
+): Promise<void> {
+  const finishedAt = new Date().toISOString();
+  await db
+    .update(agent_briefing_snapshots)
+    .set({
+      job_due_at: null,
+      summary: sql`${agent_briefing_snapshots.summary} || ${JSON.stringify({ status: 'failed', text: null, finishedAt, error: code })}::jsonb`,
+    })
+    .where(
+      and(
+        eq(agent_briefing_snapshots.id, reportId),
+        isNull(agent_briefing_snapshots.generation_id),
+        sql`${agent_briefing_snapshots.summary}->>'status' = 'pending'`
+      )
+    );
+}
+
+/** The error code a failed generation records; admission refusals share the mapping. */
+function briefingFailureCode(error: unknown): z.infer<typeof briefingSummaryErrorSchema> {
+  // An abort can surface as a DOMException whose prototype does not extend
+  // `Error` in every realm (a worker VM context among them), so the abort is
+  // recognized by `name` under the same guard the retry phase uses, rather
+  // than by `instanceof Error`.
+  const name = error instanceof Error || error instanceof DOMException ? error.name : null;
+  if (name === 'TimeoutError' || name === 'AbortError') return 'time_limit';
+  return briefingSummaryErrorSchema
+    .catch('generation_failed')
+    .parse(error instanceof Error ? error.message : null);
+}
+
+/** The values an admitted row carries into its claimed generation. */
+type BriefingAdmission = {
+  row: BriefingReportRow;
+  user: User;
+  prompt: string;
+  bound: BriefingPriceBound;
+  deadlineMs: number;
+};
+
+/**
+ * Runs every check that can refuse the row, with the codes each check reports,
+ * without claiming the two-slot pool: a refusal is recorded from `pending`
+ * (window boundaries are `not_admitted`), while a missing row or a full pool
+ * returns without touching the row.
+ */
+async function admitBriefingSummary(reportId: string): Promise<BriefingAdmission | undefined> {
+  const [row] = await db
+    .select()
+    .from(agent_briefing_snapshots)
+    .where(
+      and(
+        eq(agent_briefing_snapshots.id, reportId),
+        isNull(agent_briefing_snapshots.generation_id),
+        sql`${agent_briefing_snapshots.summary}->>'status' = 'pending'`
+      )
+    );
+  if (!row) return undefined;
+  try {
+    const { facts } = await assertBriefingSourcesAccessible(row);
+    if (!briefingHasActivity(facts.scorecard)) throw new Error('permission_unavailable');
+    const setting = await briefingContextSettings(row.kilo_user_id, row.organization_id);
+    const authorization = briefingAuthorizationSchema.parse(row.summary.authorization);
+    if (!briefingAuthorizationMatches(setting, authorization))
+      throw new Error('permission_unavailable');
+    // A window closed (or a duration the remaining window cannot hold) before any
+    // model request records no admission, and maps to no provider time limit below.
+    if (Date.now() >= Date.parse(row.morning_end_at)) throw new Error('not_admitted');
+    const [user] = await db
+      .select()
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, row.kilo_user_id));
+    if (!user) throw new Error('permission_unavailable');
+    const prompt = briefingPrompt(row, facts, row.language);
+    const bound = await briefingPriceBound(
+      authorization.model,
+      prompt,
+      authorization.maxSpendMicrodollars
+    );
+    await preflight(user, row.organization_id, authorization.model, bound.upperBound);
+    const deadlineMs = Math.min(
+      Date.now() + authorization.maxDurationSeconds * 1000,
+      Date.parse(row.morning_end_at)
+    );
+    if (deadlineMs <= Date.now()) throw new Error('not_admitted');
+    return { row, user, prompt, bound, deadlineMs };
+  } catch (error) {
+    await refuseBriefingAdmission(reportId, briefingFailureCode(error));
+    return undefined;
+  }
+}
+
 export async function runBriefingSummary(reportId: string): Promise<void> {
+  const admission = await admitBriefingSummary(reportId);
+  if (!admission) return;
+  const { row, user, prompt, bound, deadlineMs } = admission;
   const startedAt = new Date().toISOString();
   const generationId = `agent-briefing:${crypto.randomUUID()}`;
-  const row = await db.transaction(async tx => {
+  const claimed = await db.transaction(async tx => {
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtext('agent-briefing-generation-slots'))`
     );
+    // Two live generations alongside the 600-second duration ceiling are the
+    // chosen policy, not an accidental limit: the shared lock serializes this
+    // claim and no generation runs past its own bound.
     const [active] = await tx
       .select({ count: sql<number>`count(*)::int` })
       .from(agent_briefing_snapshots)
@@ -612,45 +752,16 @@ export async function runBriefingSummary(reportId: string): Promise<void> {
       .returning();
     return claimed;
   });
-  if (!row) return;
+  if (!claimed) return;
   try {
-    const { facts } = await assertBriefingSourcesAccessible(row);
-    if (!briefingHasActivity(facts.scorecard)) throw new Error('permission_unavailable');
+    // A settings change between the admission checks and this claim must not run
+    // a generation with stale authorization, so the stored authorization and the
+    // live settings are required to match again after the slot is held.
     const setting = await briefingContextSettings(row.kilo_user_id, row.organization_id);
-    const authorization = z
-      .object({
-        model: z.string(),
-        maxSpendMicrodollars: z.number().positive(),
-        maxDurationSeconds: z.number().int().min(1).max(600),
-      })
-      .parse(row.summary.authorization);
-    if (
-      !setting.enabled ||
-      authorization.model !== setting.model ||
-      authorization.maxSpendMicrodollars !== setting.maxSpendMicrodollars ||
-      authorization.maxDurationSeconds !== setting.maxDurationSeconds
-    )
+    const authorization = briefingAuthorizationSchema.parse(row.summary.authorization);
+    if (!briefingAuthorizationMatches(setting, authorization))
       throw new Error('permission_unavailable');
-    if (Date.now() >= Date.parse(row.morning_end_at)) throw new Error('time_limit');
-    const [user] = await db
-      .select()
-      .from(kilocode_users)
-      .where(eq(kilocode_users.id, row.kilo_user_id));
-    if (!user) throw new Error('permission_unavailable');
-    const prompt = briefingPrompt(row, facts, row.language);
-    const bound = await briefingPriceBound(
-      authorization.model,
-      prompt,
-      authorization.maxSpendMicrodollars
-    );
-    await preflight(user, row.organization_id, authorization.model, bound.upperBound);
     await assertBriefingSourcesAccessible(row);
-    const deadlineMs = Math.min(
-      Date.parse(startedAt) + authorization.maxDurationSeconds * 1000,
-      Date.parse(row.morning_end_at)
-    );
-    const remainingMs = deadlineMs - Date.now();
-    if (remainingMs <= 0) throw new Error('time_limit');
     const deadlineAt = new Date(deadlineMs).toISOString();
     const settlementToken = crypto.randomUUID();
     const accounting = {
@@ -730,12 +841,7 @@ export async function runBriefingSummary(reportId: string): Promise<void> {
       );
   } catch (error) {
     const finishedAt = new Date().toISOString();
-    const code =
-      error instanceof Error && ['TimeoutError', 'AbortError'].includes(error.name)
-        ? 'time_limit'
-        : briefingSummaryErrorSchema
-            .catch('generation_failed')
-            .parse(error instanceof Error ? error.message : null);
+    const code = briefingFailureCode(error);
     await db
       .update(agent_briefing_snapshots)
       .set({

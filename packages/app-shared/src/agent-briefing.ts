@@ -55,6 +55,7 @@ export const briefingSummaryErrorSchema = z.enum([
   'gateway_declined',
   'invalid_summary',
   'time_limit',
+  'not_admitted',
   'generation_failed',
 ]);
 export const briefingSummarySchema = z.object({

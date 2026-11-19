@@ -6334,13 +6334,7 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       message: 'session_clone_unavailable',
     });
 
-    expect(deleteCliSessionMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        sessionId: KILO_SESSION_ID,
-        kiloUserId: USER_ID,
-        onlyIfEmpty: true,
-      })
-    );
+    expect(deleteCliSessionMock).not.toHaveBeenCalled();
     expect(markReconcilePendingMock).toHaveBeenCalledWith(expect.any(Object), { rowId: ROW_ID });
     expect(settleOperationMock).not.toHaveBeenCalled();
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();

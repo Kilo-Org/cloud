@@ -2793,23 +2793,12 @@ async function resumeFirstWorktreeCreate(
     }
 
     if (ingestResult === undefined) {
-      // The ingest outcome is unknown without the acknowledgement: remove the
-      // empty destination row best-effort, keep the ledger row non-terminal,
-      // and surface the typed unavailable error so a same-key retry can finish
-      // the create. This mirrors the clone resume above.
-      try {
-        await ctx.env.SESSION_INGEST.deleteSessionForCloudAgent({
-          sessionId: allocation.kiloSessionId,
-          kiloUserId: ctx.userId,
-          onlyIfEmpty: true,
-        });
-      } catch (deleteError) {
-        logger
-          .withFields({
-            error: deleteError instanceof Error ? deleteError.message : String(deleteError),
-          })
-          .error('Failed to remove empty destination row after an unacknowledged ingest create');
-      }
+      // The ingest outcome is unknown without the acknowledgement. Leave the
+      // recorded destination in place: a first worktree create copies nothing,
+      // and the create is idempotent for the recorded ids, so the destination
+      // is either absent or the row this session already owns. The ledger row
+      // stays non-terminal so a same-key retry re-issues the create and the
+      // typed unavailable error tells the caller to retry.
       await hooks.onTransportFailure();
       throw new TRPCError({ code: 'SERVICE_UNAVAILABLE', message: 'session_clone_unavailable' });
     }

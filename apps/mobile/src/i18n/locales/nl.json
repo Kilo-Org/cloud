@@ -66,7 +66,7 @@
     "discardChangesMessage": "Je wijzigingen gaan verloren.",
     "discardChangesTitle": "Wijzigingen verwerpen?",
     "findings": "Bevindingen",
-    "mergeRequest": "merge request",
+    "mergeRequest": "mergeverzoek",
     "notConnected": "Niet gekoppeld",
     "notifications": "Meldingen",
     "pullRequest": "PR",
@@ -704,8 +704,8 @@
     "followReviewMd": "REVIEW.md volgen",
     "followReviewMdSubtitle": "Volg de REVIEW.md-instructiebestanden per repository",
     "manualReview": {
-      "invalidMergeRequestUrl": "Voer een geldige URL van een merge request in.",
-      "mergeRequestUrl": "URL van de merge request",
+      "invalidMergeRequestUrl": "Voer een geldige URL van een mergeverzoek in.",
+      "mergeRequestUrl": "URL van het mergeverzoek",
       "instructionsAtLimit": "Instructies zijn beperkt tot {{max}} tekens",
       "couldNotCheckProviderStatus": "De platformstatus kon niet worden gecontroleerd.",
       "couldNotLoadProviders": "Je gekoppelde platformen konden niet worden geladen. Probeer het opnieuw.",
@@ -2433,9 +2433,9 @@
     },
     "toolRun": {
       "sheetTitle": "Tool-aanroepen",
-      "condensedLabel": "{{itemCount}} items; {{last}}",
-      "condensedLabel_one": "{{itemCount}} item; {{last}}",
-      "condensedLabel_other": "{{itemCount}} items; {{last}}"
+      "condensedLabel": "{{itemCount}} onderdelen; {{last}}",
+      "condensedLabel_one": "{{itemCount}} onderdeel; {{last}}",
+      "condensedLabel_other": "{{itemCount}} onderdelen; {{last}}"
     }
   },
   "bootstrap": {
@@ -2790,9 +2790,9 @@
       "reconnectTitleGitLab": "GitLab opnieuw verbinden",
       "reconnectTitleBitbucket": "Bitbucket opnieuw verbinden",
       "reconnectDescription": "De toegang tot je GitHub-account is ingetrokken.",
-      "gitlabDescription": "Merge requests op je mobiel beoordelen",
+      "gitlabDescription": "Mergeverzoeken op je mobiel beoordelen",
       "gitlabInstanceMismatchTitle": "GitLab-verbinding is voor een andere instantie",
-      "gitlabInstanceMismatchDescription": "Je GitLab-verbinding is voor {{connected}}, maar deze merge request staat op {{requested}}. Verbind GitLab op die instantie om hem te beoordelen.",
+      "gitlabInstanceMismatchDescription": "Je GitLab-verbinding is voor {{connected}}, maar dit mergeverzoek staat op {{requested}}. Verbind GitLab op die instantie om hem te beoordelen.",
       "checkActiveConnection": "De verbinding is actief, maar dit item kan nog steeds niet worden geladen.",
       "bitbucketOrgOnlyDescription": "Wissel het account hierboven naar een organisatie om diens Bitbucket-PR's te beoordelen.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Dit account heeft nog geen organisaties. Je kunt Bitbucket-PR's beoordelen zodra je een organisatie aanmaakt of er lid van wordt.",
@@ -2915,11 +2915,11 @@
       "removeFromRecentsTitle": "Uit recente items verwijderen?",
       "removeFromRecentsMessage": "Deze beoordeling wordt uit je recente items verwijderd.",
       "removeRecentAccessibility": "{{repo}} uit recente items verwijderen",
-      "urlAccessibility": "Voer een PR- of merge request-URL in",
-      "urlPlaceholder": "URL van een PR of merge request",
-      "openAccessibility": "PR of merge request openen",
+      "urlAccessibility": "Voer een PR- of mergeverzoek-URL in",
+      "urlPlaceholder": "URL van een PR of mergeverzoek",
+      "openAccessibility": "PR of mergeverzoek openen",
       "clearLink": "Koppeling wissen",
-      "pasteLink": "PR- of merge request-koppeling plakken",
+      "pasteLink": "PR- of mergeverzoek-koppeling plakken",
       "open": "Openen"
     },
     "eventChips": {
@@ -3072,7 +3072,7 @@
       },
       "terminal": {
         "closed": "Deze PR is gesloten",
-        "closedMergeRequest": "Deze merge request is gesloten"
+        "closedMergeRequest": "Dit mergeverzoek is gesloten"
       },
       "partialSuccessBanner": {
         "accessibility": "Samengevoegd. De branch kon niet worden verwijderd. Reden: {{reason}}",
@@ -3229,7 +3229,7 @@
     },
     "linkPasteClipboardEmpty": "Het klembord is leeg.",
     "linkPasteDenied": "Toegang om te plakken is geweigerd. Sta plakken toe en probeer het opnieuw.",
-    "linkPasteNotAPullRequest": "Dit is geen koppeling naar een PR of merge request",
+    "linkPasteNotAPullRequest": "Dit is geen koppeling naar een PR of mergeverzoek",
     "announce": {
       "commentPosted": "Opmerking geplaatst",
       "commentUpdated": "Opmerking bijgewerkt",
@@ -3262,18 +3262,18 @@
     },
     "terms": {
       "pullRequest": "PR",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "Merge request !{{number}}",
-      "shareMergeRequest": "Merge request delen",
+      "mergeRequest": "Mergeverzoek",
+      "mergeRequestNumber": "Mergeverzoek !{{number}}",
+      "shareMergeRequest": "Mergeverzoek delen",
       "viewOnProvider": "Bekijken op {{provider}}",
-      "mergeRequestUnavailable": "Merge request niet beschikbaar",
+      "mergeRequestUnavailable": "Mergeverzoek niet beschikbaar",
       "unavailableDescription": "Mogelijk is de verbinding verbroken, of is het item verwijderd of ontoegankelijk.",
-      "accessDeniedMergeRequest": "Je hebt geen toestemming om deze merge request te bekijken.",
-      "couldNotLoadMergeRequest": "De merge request kon niet worden geladen.",
-      "discussionAccessDenied": "Je hebt geen toestemming om de discussie van deze merge request te bekijken.",
-      "discussionUnavailableMessage": "Mogelijk is de verbinding verbroken, of is de merge request verwijderd.",
-      "noDiscussionDescription": "Er zijn nog geen discussies over de beoordeling of algemene opmerkingen bij deze merge request.",
-      "noFilesChangedDescription": "Deze merge request bevat geen bestandswijzigingen."
+      "accessDeniedMergeRequest": "Je hebt geen toestemming om dit mergeverzoek te bekijken.",
+      "couldNotLoadMergeRequest": "Het mergeverzoek kon niet worden geladen.",
+      "discussionAccessDenied": "Je hebt geen toestemming om de discussie van dit mergeverzoek te bekijken.",
+      "discussionUnavailableMessage": "Mogelijk is de verbinding verbroken, of is het mergeverzoek verwijderd.",
+      "noDiscussionDescription": "Er zijn nog geen discussies over de beoordeling of algemene opmerkingen bij dit mergeverzoek.",
+      "noFilesChangedDescription": "Dit mergeverzoek bevat geen bestandswijzigingen."
     }
   },
   "organization": {
@@ -3820,8 +3820,8 @@
       "settingsToolsOn": "Aan — de instellingstools worden naar het model gestuurd",
       "settingsToolsOff": "Uit — er wordt geen instellingstool naar het model gestuurd",
       "serverChecking": "Deze server controleren…",
-      "serverToolCount_one": "{{count}} tool",
-      "serverToolCount_other": "{{count}} tools",
+      "serverToolCount_one": "{{count}} hulpmiddel",
+      "serverToolCount_other": "{{count}} hulpmiddelen",
       "serverUnreachable": "Kon deze server niet bereiken",
       "serverOff": "Deze server staat uit",
       "app": {

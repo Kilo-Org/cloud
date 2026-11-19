@@ -66,7 +66,7 @@
     "discardChangesMessage": "Vaše izmene će biti izgubljene.",
     "discardChangesTitle": "Odbaci izmene?",
     "findings": "Nalazi",
-    "mergeRequest": "merge request",
+    "mergeRequest": "zahtev za spajanje",
     "notConnected": "Nepovezano",
     "notifications": "Obaveštenja",
     "pullRequest": "PR",
@@ -173,7 +173,7 @@
     "dismissed": "Odbačeno",
     "agent": "Agent",
     "durationMinuteShort": "min",
-    "durationHourShort": "h",
+    "durationHourShort": "č",
     "changes": "Izmene",
     "organizationTrialEnded": "Probni period organizacije je završen i ona nema aktivan plan. Vlasnik organizacije može da ažurira naplatu na kilo.ai, a zatim pokuša ponovo.",
     "privateRepositoryA11y": "{{name}}, privatno spremište",
@@ -409,7 +409,7 @@
       "authMethod": "Metod autentifikacije",
       "authMethodAccessKeys": "Pristupni ključevi",
       "resourceName": "Naziv Azure resursa",
-      "region": "AWS region",
+      "region": "AWS oblast",
       "accessKeyId": "ID pristupnog ključa",
       "secretAccessKey": "Tajni pristupni ključ",
       "project": "Google Cloud projekat",
@@ -694,7 +694,7 @@
       },
       "terminal": {
         "closed": "Zahtev za spajanje je zatvoren",
-        "closedMergeRequest": "Ovaj merge request je zatvoren"
+        "closedMergeRequest": "Ovaj zahtev za spajanje je zatvoren"
       },
       "partialSuccessBanner": {
         "body": "Nije moguće obrisati granu: {{reason}}.",
@@ -864,11 +864,11 @@
       "removeFromRecentsTitle": "Ukloniti sa spiska nedavnih zahteva?",
       "removeFromRecentsMessage": "Ovaj pregled će biti uklonjen iz skorašnjih.",
       "removeRecentAccessibility": "Ukloni {{repo}} sa spiska nedavnih zahteva",
-      "urlAccessibility": "Unesite URL zahteva za spajanje ili merge requesta",
-      "urlPlaceholder": "URL zahteva za spajanje ili merge requesta",
-      "openAccessibility": "Otvori zahtev za spajanje ili merge request",
+      "urlAccessibility": "Unesite URL zahteva za spajanje",
+      "urlPlaceholder": "URL zahteva za spajanje",
+      "openAccessibility": "Otvori zahtev za spajanje",
       "clearLink": "Obriši vezu",
-      "pasteLink": "Nalepi vezu do zahteva za spajanje ili merge requesta",
+      "pasteLink": "Nalepi vezu do zahteva za spajanje",
       "open": "Otvori"
     },
     "checks": {
@@ -941,9 +941,9 @@
       "reconnectTitleGitLab": "Ponovo poveži GitLab",
       "reconnectTitleBitbucket": "Ponovo poveži Bitbucket",
       "reconnectDescription": "Tvoja veza sa GitHub-om je opozvana.",
-      "gitlabDescription": "Pregledaj merge requeste na mobilnom uređaju",
+      "gitlabDescription": "Pregledaj zahteve za spajanje na mobilnom uređaju",
       "gitlabInstanceMismatchTitle": "Veza sa GitLab-om je za drugu instancu",
-      "gitlabInstanceMismatchDescription": "Tvoja veza sa GitLab-om je za {{connected}}, ali ovaj merge request je na {{requested}}. Poveži GitLab na toj instanci da ga pregledaš.",
+      "gitlabInstanceMismatchDescription": "Tvoja veza sa GitLab-om je za {{connected}}, ali ovaj zahtev za spajanje je na {{requested}}. Poveži GitLab na toj instanci da ga pregledaš.",
       "checkActiveConnection": "Veza je aktivna, ali ova stavka i dalje ne može da se učita.",
       "bitbucketOrgOnlyDescription": "Prebaci nalog gore na organizaciju da pregledaš njene zahteve za spajanje na Bitbucktu.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ovaj nalog još nema organizacije. Zahteve za spajanje na Bitbucktu možeš pregledati kada kreiraš ili se pridružiš organizaciji.",
@@ -1057,7 +1057,7 @@
     },
     "linkPasteClipboardEmpty": "Ostava je prazna.",
     "linkPasteDenied": "Pristup za nalepljivanje je odbijen. Dozvolite nalepljivanje i pokušajte ponovo.",
-    "linkPasteNotAPullRequest": "Ovo nije veza do zahteva za spajanje ili merge requesta",
+    "linkPasteNotAPullRequest": "Ovo nije veza do zahteva za spajanje",
     "announce": {
       "commentPosted": "Komentar objavljen",
       "commentUpdated": "Komentar ažuriran",
@@ -1090,18 +1090,18 @@
     },
     "terms": {
       "pullRequest": "PR",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "Merge request !{{number}}",
-      "shareMergeRequest": "Podeli merge request",
+      "mergeRequest": "Zahtev za spajanje",
+      "mergeRequestNumber": "Zahtev za spajanje !{{number}}",
+      "shareMergeRequest": "Podeli zahtev za spajanje",
       "viewOnProvider": "Pogledaj na {{provider}}",
-      "mergeRequestUnavailable": "Merge request nije dostupan",
+      "mergeRequestUnavailable": "Zahtev za spajanje nije dostupan",
       "unavailableDescription": "Možda je veza prekinuta ili je stavka obrisana ili nedostupna.",
-      "accessDeniedMergeRequest": "Nemaš dozvolu da vidiš ovaj merge request.",
-      "couldNotLoadMergeRequest": "Nije moguće učitati merge request.",
-      "discussionAccessDenied": "Nemaš dozvolu da vidiš diskusiju o ovom merge requestu.",
-      "discussionUnavailableMessage": "Možda je veza prekinuta ili je merge request uklonjen.",
-      "noDiscussionDescription": "Ovaj merge request još nema niti pregleda ni komentara u diskusiji.",
-      "noFilesChangedDescription": "U ovom merge requestu nema izmena datoteka."
+      "accessDeniedMergeRequest": "Nemaš dozvolu da vidiš ovaj zahtev za spajanje.",
+      "couldNotLoadMergeRequest": "Nije moguće učitati zahtev za spajanje.",
+      "discussionAccessDenied": "Nemaš dozvolu da vidiš diskusiju o ovom zahtevu za spajanje.",
+      "discussionUnavailableMessage": "Možda je veza prekinuta ili je zahtev za spajanje uklonjen.",
+      "noDiscussionDescription": "Ovaj zahtev za spajanje još nema niti pregleda ni komentara u diskusiji.",
+      "noFilesChangedDescription": "U ovom zahtevu za spajanje nema izmena datoteka."
     }
   },
   "notifications": {
@@ -1361,8 +1361,8 @@
       }
     },
     "manualReview": {
-      "invalidMergeRequestUrl": "Unesi važeći URL merge request-a.",
-      "mergeRequestUrl": "URL merge request-a",
+      "invalidMergeRequestUrl": "Unesi važeći URL zahteva za spajanje.",
+      "mergeRequestUrl": "URL zahteva za spajanje",
       "instructionsAtLimit": "Instrukcije su ograničene na {{max}} znakova",
       "title": "Ručni pregled",
       "invalidUrl": "Unesi važeći URL PR-a.",
@@ -3894,7 +3894,7 @@
     "mcpOAuth": {
       "authMethod": "Autentifikacija",
       "authNone": "Bez prijave",
-      "authBearer": "Bearer token",
+      "authBearer": "Bearer žeton",
       "authOAuth": "OAuth prijava",
       "fieldToken": "Token",
       "oauthHint": "Nakon čuvanja, dodirni $t(modelChat.mcpOAuth.signIn) na serveru da se prijaviš putem pregledača.",

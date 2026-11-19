@@ -66,7 +66,7 @@
     "discardChangesMessage": "Tus cambios se perderán.",
     "discardChangesTitle": "¿Descartar cambios?",
     "findings": "Hallazgos",
-    "mergeRequest": "merge request",
+    "mergeRequest": "solicitud de fusión",
     "notConnected": "Sin conexión",
     "notifications": "Notificaciones",
     "pullRequest": "solicitud de cambios",
@@ -704,8 +704,8 @@
     "followReviewMd": "Seguir las instrucciones de REVIEW.md",
     "followReviewMdSubtitle": "Respeta las instrucciones del archivo REVIEW.md de cada repositorio",
     "manualReview": {
-      "invalidMergeRequestUrl": "Introduce una URL válida de un merge request.",
-      "mergeRequestUrl": "URL del merge request",
+      "invalidMergeRequestUrl": "Introduce una URL válida de una solicitud de fusión.",
+      "mergeRequestUrl": "URL de la solicitud de fusión",
       "instructionsAtLimit": "Las instrucciones están limitadas a {{max}} caracteres",
       "couldNotCheckProviderStatus": "No se pudo comprobar el estado del proveedor.",
       "couldNotLoadProviders": "No se pudieron cargar los proveedores que has conectado. Inténtalo de nuevo.",
@@ -2829,9 +2829,9 @@
       "reconnectTitleGitLab": "Volver a conectar GitLab",
       "reconnectTitleBitbucket": "Volver a conectar Bitbucket",
       "reconnectDescription": "Se revocó tu conexión con GitHub.",
-      "gitlabDescription": "Revisar merge requests en el móvil",
+      "gitlabDescription": "Revisar solicitudes de fusión en el móvil",
       "gitlabInstanceMismatchTitle": "La conexión de GitLab es para otra instancia",
-      "gitlabInstanceMismatchDescription": "Tu conexión de GitLab es para {{connected}}, pero este merge request está en {{requested}}. Conecta GitLab en esa instancia para revisarlo.",
+      "gitlabInstanceMismatchDescription": "Tu conexión de GitLab es para {{connected}}, pero esta solicitud de fusión está en {{requested}}. Conecta GitLab en esa instancia para revisarla.",
       "checkActiveConnection": "La conexión está activa, pero este elemento aún no se puede cargar.",
       "bitbucketOrgOnlyDescription": "Cambia la cuenta de arriba a una organización para revisar sus PR en Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Esta cuenta todavía no tiene organizaciones. Podrás revisar los PR de Bitbucket cuando crees una organización o te unas a una.",
@@ -2957,11 +2957,11 @@
       "removeFromRecentsTitle": "¿Quitar de la lista de recientes?",
       "removeFromRecentsMessage": "Esta revisión se quitará de tu lista de recientes.",
       "removeRecentAccessibility": "Quitar {{repo}} de la lista de recientes",
-      "urlAccessibility": "Introduce una URL de PR o de merge request",
-      "urlPlaceholder": "URL de PR o de merge request",
-      "openAccessibility": "Abrir una PR o un merge request",
+      "urlAccessibility": "Introduce una URL de PR o de solicitud de fusión",
+      "urlPlaceholder": "URL de PR o de solicitud de fusión",
+      "openAccessibility": "Abrir una PR o una solicitud de fusión",
       "clearLink": "Borrar el enlace",
-      "pasteLink": "Pegar el enlace de PR o de merge request",
+      "pasteLink": "Pegar el enlace de PR o de solicitud de fusión",
       "open": "Abrir"
     },
     "eventChips": {
@@ -3123,7 +3123,7 @@
       },
       "terminal": {
         "closed": "PR cerrada",
-        "closedMergeRequest": "Este merge request está cerrado"
+        "closedMergeRequest": "Esta solicitud de fusión está cerrada"
       },
       "partialSuccessBanner": {
         "accessibility": "Fusionada. No se pudo eliminar la rama: {{reason}}",
@@ -3287,7 +3287,7 @@
     },
     "linkPasteClipboardEmpty": "El portapapeles está vacío.",
     "linkPasteDenied": "Se denegó el permiso para pegar. Permite pegar e inténtalo de nuevo.",
-    "linkPasteNotAPullRequest": "No es un enlace a una PR o una merge request",
+    "linkPasteNotAPullRequest": "No es un enlace a una PR o a una solicitud de fusión",
     "announce": {
       "commentPosted": "Comentario publicado",
       "commentUpdated": "Comentario actualizado",
@@ -3320,18 +3320,18 @@
     },
     "terms": {
       "pullRequest": "Solicitud de cambios",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "Merge request !{{number}}",
-      "shareMergeRequest": "Compartir el merge request",
+      "mergeRequest": "Solicitud de fusión",
+      "mergeRequestNumber": "Solicitud de fusión !{{number}}",
+      "shareMergeRequest": "Compartir la solicitud de fusión",
       "viewOnProvider": "Ver en {{provider}}",
-      "mergeRequestUnavailable": "Merge request no disponible",
+      "mergeRequestUnavailable": "Solicitud de fusión no disponible",
       "unavailableDescription": "Es posible que la conexión haya fallado o que el elemento se haya eliminado o no sea accesible.",
-      "accessDeniedMergeRequest": "No tienes permiso para ver este merge request.",
-      "couldNotLoadMergeRequest": "No se pudo cargar el merge request.",
-      "discussionAccessDenied": "No tienes permiso para ver la conversación de este merge request.",
-      "discussionUnavailableMessage": "Es posible que la conexión haya fallado o que el merge request se haya eliminado.",
-      "noDiscussionDescription": "Este merge request aún no tiene hilos de revisión ni comentarios en la conversación.",
-      "noFilesChangedDescription": "Este merge request no contiene cambios en los archivos."
+      "accessDeniedMergeRequest": "No tienes permiso para ver esta solicitud de fusión.",
+      "couldNotLoadMergeRequest": "No se pudo cargar la solicitud de fusión.",
+      "discussionAccessDenied": "No tienes permiso para ver la conversación de esta solicitud de fusión.",
+      "discussionUnavailableMessage": "Es posible que la conexión haya fallado o que la solicitud de fusión se haya eliminado.",
+      "noDiscussionDescription": "Esta solicitud de fusión aún no tiene hilos de revisión ni comentarios en la conversación.",
+      "noFilesChangedDescription": "Esta solicitud de fusión no contiene cambios en los archivos."
     }
   },
   "organization": {

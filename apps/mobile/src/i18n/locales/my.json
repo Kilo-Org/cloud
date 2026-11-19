@@ -66,7 +66,7 @@
     "discardChangesMessage": "သင်၏ အပြောင်းအလဲများ ဆုံးရှုံးသွားပါလိမ့်မည်။",
     "discardChangesTitle": "အပြောင်းအလဲများကို ပယ်ဖျက်မလား?",
     "findings": "တွေ့ရှိချက်များ",
-    "mergeRequest": "merge request",
+    "mergeRequest": "ပေါင်းစပ်တောင်းဆိုချက်",
     "notConnected": "မချိတ်ဆက်ထား",
     "notifications": "အသိပေးချက်များ",
     "pullRequest": "PR",
@@ -209,7 +209,7 @@
     "signInWithGoogle": "Google ဖြင့် အကောင့်ဝင်ရန်",
     "signInWithPasskey": "ပက်စ်ကီးဖြင့် အကောင့်ဝင်ရန်",
     "emailAddress": "အီးမေးလ်လိပ်စာ",
-    "emailPlaceholder": "you@example.com",
+    "emailPlaceholder": "သင်@example.com",
     "continueWithEmail": "အီးမေးလ်ဖြင့် ဆက်လုပ်ပါ",
     "enterCodeSentTo": "{{email}} သို့ ပို့ထားသော ကုဒ်ကို ထည့်ပါ။",
     "codeArrivalHint": "ဤအီးမေးလ်လိပ်စာဖြင့် ဝင်ရောက်ခွင့်ရှိပါက ကုဒ်သည် တစ်မိနစ်အတွင်း ရောက်လာမည်။",
@@ -419,7 +419,7 @@
       "modelMappings": "မော်ဒယ် ချိတ်ဆက်မှုများ",
       "modelMappingsDescription": "Gateway မော်ဒယ်ကို စိတ်ကြိုက် deployment အမည်သို့ ပို့ပါ။",
       "mappingTitle": "ချိတ်ဆက်မှု {{number}}",
-      "mappingGatewayModel": "Gateway model slug",
+      "mappingGatewayModel": "Gateway မော်ဒယ် slug",
       "mappingCustomModel": "Deployment အမည်",
       "addMapping": "ချိတ်ဆက်မှု ထည့်ရန်",
       "removeMapping": "ချိတ်ဆက်မှု {{number}} ကို ဖယ်ရှားရန်"
@@ -685,7 +685,7 @@
       },
       "terminal": {
         "closed": "ဒီ PR ကို ပိတ်ထားသည်",
-        "closedMergeRequest": "ဒီ merge request ကို ပိတ်ထားသည်"
+        "closedMergeRequest": "ဒီပေါင်းစပ်တောင်းဆိုချက်ကို ပိတ်ထားသည်"
       },
       "partialSuccessBanner": {
         "body": "ဘရန်ချ်ကို ဖျက်၍မရပါ: {{reason}}။",
@@ -851,11 +851,11 @@
       "removeFromRecentsTitle": "မကြာသေးမီက ကြည့်ထားသော စာရင်းမှ ဖယ်ရှားမလား",
       "removeFromRecentsMessage": "ဤသုံးသပ်ချက်ကို သင့်မကြာသေးမီက စာရင်းမှ ဖယ်ရှားပါမည်။",
       "removeRecentAccessibility": "{{repo}} ကို မကြာသေးမီက ကြည့်ထားသော စာရင်းမှ ဖယ်ရှားပါ",
-      "urlAccessibility": "PR သို့မဟုတ် merge request URL ကို ထည့်သွင်းပါ",
-      "urlPlaceholder": "PR သို့မဟုတ် merge request URL",
-      "openAccessibility": "PR သို့မဟုတ် merge request ကို ဖွင့်ရန်",
+      "urlAccessibility": "PR သို့မဟုတ် ပေါင်းစပ်တောင်းဆိုချက် URL ကို ထည့်သွင်းပါ",
+      "urlPlaceholder": "PR သို့မဟုတ် ပေါင်းစပ်တောင်းဆိုချက် URL",
+      "openAccessibility": "PR သို့မဟုတ် ပေါင်းစပ်တောင်းဆိုချက်ကို ဖွင့်ရန်",
       "clearLink": "လင့်ခ်ကို ရှင်းပါ",
-      "pasteLink": "PR သို့မဟုတ် merge request လင့်ခ်ကို ကူးထည့်ပါ",
+      "pasteLink": "PR သို့မဟုတ် ပေါင်းစပ်တောင်းဆိုချက် လင့်ခ်ကို ကူးထည့်ပါ",
       "open": "ဖွင့်"
     },
     "checks": {
@@ -924,9 +924,9 @@
       "reconnectTitleGitLab": "GitLab ပြန်ချိတ်ဆက်ခြင်း",
       "reconnectTitleBitbucket": "Bitbucket ပြန်ချိတ်ဆက်ခြင်း",
       "reconnectDescription": "သင့် GitHub ချိတ်ဆက်ခွင့်ကို ရုပ်သိမ်းထားပါသည်။",
-      "gitlabDescription": "မိုဘိုင်းတွင် merge request များကို သုံးသပ်ပါ",
+      "gitlabDescription": "မိုဘိုင်းတွင် ပေါင်းစပ်တောင်းဆိုချက် များကို သုံးသပ်ပါ",
       "gitlabInstanceMismatchTitle": "GitLab ချိတ်ဆက်မှုသည် အခြား instance တစ်ခုအတွက် ဖြစ်သည်",
-      "gitlabInstanceMismatchDescription": "သင့် GitLab ချိတ်ဆက်မှုသည် {{connected}} အတွက် ဖြစ်သော်လည်း ဤ merge request သည် {{requested}} ပေါ်တွင် ရှိပါသည်။ ၎င်းကို သုံးသပ်ရန် ထို instance ပေါ်တွင် GitLab ကို ချိတ်ဆက်ပါ။",
+      "gitlabInstanceMismatchDescription": "သင့် GitLab ချိတ်ဆက်မှုသည် {{connected}} အတွက် ဖြစ်သော်လည်း ဤပေါင်းစပ်တောင်းဆိုချက်သည် {{requested}} ပေါ်တွင် ရှိပါသည်။ ၎င်းကို သုံးသပ်ရန် ထို instance ပေါ်တွင် GitLab ကို ချိတ်ဆက်ပါ။",
       "checkActiveConnection": "ချိတ်ဆက်မှု အသက်ဝင်နေပါသည်၊ သို့သော် ဤအရာကို မဖွင့်နိုင်သေးပါ။",
       "bitbucketOrgOnlyDescription": "၎င်း၏ Bitbucket PR များကို သုံးသပ်ရန် အပေါ်ရှိ အကောင့်ကို အဖွဲ့တစ်ခုသို့ ပြောင်းပါ။",
       "bitbucketOrgOnlyNoOrganizationDescription": "ဤအကောင့်တွင် အဖွဲ့များ မရှိသေးပါ။ အဖွဲ့တစ်ခုကို ဖန်တီးပါ သို့မဟုတ် ပါဝင်ပါက Bitbucket PR များကို သုံးသပ်နိုင်ပါသည်။",
@@ -1034,7 +1034,7 @@
     },
     "linkPasteClipboardEmpty": "ကလစ်ဘုတ်တွင် ဘာမျှမရှိပါ။",
     "linkPasteDenied": "ပေါ့စ်တ် လုပ်ခွင့်ကို ငြင်းပယ်ခဲ့သည်။ ပေါ့စ်တ် ခွင့်ပြုပြီး ထပ်စမ်းကြည့်ပါ။",
-    "linkPasteNotAPullRequest": "ဤသည် PR သို့မဟုတ် merge request လင့်ခ် မဟုတ်ပါ",
+    "linkPasteNotAPullRequest": "ဤသည် PR သို့မဟုတ် ပေါင်းစပ်တောင်းဆိုချက် လင့်ခ် မဟုတ်ပါ",
     "announce": {
       "commentPosted": "မှတ်ချက် တင်ပြီးပါပြီ",
       "commentUpdated": "မှတ်ချက် အပ်ဒိတ်လုပ်ပြီးပါပြီ",
@@ -1067,18 +1067,18 @@
     },
     "terms": {
       "pullRequest": "PR",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "Merge request !{{number}}",
-      "shareMergeRequest": "Merge request ကို မျှဝေပါ",
+      "mergeRequest": "ပေါင်းစပ်တောင်းဆိုချက်",
+      "mergeRequestNumber": "ပေါင်းစပ်တောင်းဆိုချက် !{{number}}",
+      "shareMergeRequest": "ပေါင်းစပ်တောင်းဆိုချက်ကို မျှဝေပါ",
       "viewOnProvider": "{{provider}} တွင် ကြည့်ရန်",
-      "mergeRequestUnavailable": "Merge request မရနိုင်ပါ",
+      "mergeRequestUnavailable": "ပေါင်းစပ်တောင်းဆိုချက် မရနိုင်ပါ",
       "unavailableDescription": "ချိတ်ဆက်မှု မအောင်မြင်ခဲ့ခြင်း၊ ၎င်းကို ဖျက်ထားခြင်း သို့မဟုတ် ဝင်ရောက်၍မရခြင်းတို့ကြောင့် ဖြစ်နိုင်ပါသည်။",
-      "accessDeniedMergeRequest": "ဒီ merge request ကို ကြည့်ရှုခွင့် မရှိပါ။",
-      "couldNotLoadMergeRequest": "Merge request ကို ရယူ၍မရပါ။",
-      "discussionAccessDenied": "ဒီ merge request ၏ ဆွေးနွေးချက်ကို ကြည့်ရှုခွင့် မရှိပါ။",
-      "discussionUnavailableMessage": "ချိတ်ဆက်မှု မအောင်မြင်ခဲ့ခြင်း သို့မဟုတ် ဒီ Merge request ကို ဖယ်ရှားထားခြင်းကြောင့် ဖြစ်နိုင်ပါသည်။",
-      "noDiscussionDescription": "ဒီ merge request တွင် သုံးသပ်မှု ဆွေးနွေးချက်တွဲများ သို့မဟုတ် စကားဝိုင်းမှတ်ချက်များ မရှိပါ။",
-      "noFilesChangedDescription": "ဒီ merge request တွင် ဖိုင်ပြောင်းလဲမှု မရှိပါ။"
+      "accessDeniedMergeRequest": "ဒီပေါင်းစပ်တောင်းဆိုချက်ကို ကြည့်ရှုခွင့် မရှိပါ။",
+      "couldNotLoadMergeRequest": "ပေါင်းစပ်တောင်းဆိုချက်ကို ရယူ၍မရပါ။",
+      "discussionAccessDenied": "ဒီပေါင်းစပ်တောင်းဆိုချက် ၏ ဆွေးနွေးချက်ကို ကြည့်ရှုခွင့် မရှိပါ။",
+      "discussionUnavailableMessage": "ချိတ်ဆက်မှု မအောင်မြင်ခဲ့ခြင်း သို့မဟုတ် ဒီပေါင်းစပ်တောင်းဆိုချက်ကို ဖယ်ရှားထားခြင်းကြောင့် ဖြစ်နိုင်ပါသည်။",
+      "noDiscussionDescription": "ဒီပေါင်းစပ်တောင်းဆိုချက်တွင် သုံးသပ်မှု ဆွေးနွေးချက်တွဲများ သို့မဟုတ် စကားဝိုင်းမှတ်ချက်များ မရှိပါ။",
+      "noFilesChangedDescription": "ဒီပေါင်းစပ်တောင်းဆိုချက်တွင် ဖိုင်ပြောင်းလဲမှု မရှိပါ။"
     }
   },
   "notifications": {
@@ -1338,8 +1338,8 @@
       }
     },
     "manualReview": {
-      "invalidMergeRequestUrl": "မှန်ကန်သော merge request URL ကို ထည့်ပါ။",
-      "mergeRequestUrl": "merge request ၏ URL",
+      "invalidMergeRequestUrl": "မှန်ကန်သော ပေါင်းစပ်တောင်းဆိုချက် URL ကို ထည့်ပါ။",
+      "mergeRequestUrl": "ပေါင်းစပ်တောင်းဆိုချက် ၏ URL",
       "instructionsAtLimit": "ညွှန်ကြားချက်ကို စာလုံး {{max}} လုံးအထိ ကန့်သတ်ထားသည်။",
       "title": "ကိုယ်တိုင် စတင်သည့် စစ်ဆေးမှု",
       "invalidUrl": "မှန်ကန်သော PR URL ကို ထည့်ပါ။",

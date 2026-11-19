@@ -209,7 +209,7 @@
     "signInWithGoogle": "بە Google بچۆ ژوورەوە",
     "signInWithPasskey": "بە کلیلی چوونەژوورەوە بچۆ ژوورەوە",
     "emailAddress": "ناونیشانی ئیمەیڵ",
-    "emailPlaceholder": "you@example.com",
+    "emailPlaceholder": "to@example.com",
     "continueWithEmail": "بە ئیمەیڵ بەردەوام بە",
     "enterCodeSentTo": "ئەو کۆدە بنووسە کە بۆ {{email}} نێردراوە.",
     "codeArrivalHint": "ئەگەر ئەم ناونیشانە مەرجەکان پڕ بکاتەوە، کۆدەکە لە ماوەی خولەکێکدا دەگات.",

@@ -66,7 +66,7 @@
     "discardChangesMessage": "Jūsu izmaiņas tiks zaudētas.",
     "discardChangesTitle": "Atmest izmaiņas?",
     "findings": "Konstatējumi",
-    "mergeRequest": "merge request",
+    "mergeRequest": "apvienošanas pieprasījums",
     "notConnected": "Nav pievienots",
     "notifications": "Paziņojumi",
     "pullRequest": "izmaiņu pieprasījums",
@@ -694,7 +694,7 @@
       },
       "terminal": {
         "closed": "Izmaiņu pieprasījums ir slēgts",
-        "closedMergeRequest": "Šis merge request ir slēgts"
+        "closedMergeRequest": "Šis apvienošanas pieprasījums ir slēgts"
       },
       "partialSuccessBanner": {
         "body": "Neizdevās dzēst zaru: {{reason}}.",
@@ -864,11 +864,11 @@
       "removeFromRecentsTitle": "Noņemt no nesen atvērtajiem?",
       "removeFromRecentsMessage": "Šī pārskatīšana tiks noņemta no nesenajiem vienumiem.",
       "removeRecentAccessibility": "Noņemt {{repo}} no nesen atvērtajiem",
-      "urlAccessibility": "Ievadiet izmaiņu pieprasījuma vai merge request URL",
-      "urlPlaceholder": "Izmaiņu pieprasījuma vai merge request URL",
-      "openAccessibility": "Atvērt izmaiņu pieprasījumu vai merge request",
+      "urlAccessibility": "Ievadiet izmaiņu pieprasījuma vai apvienošanas pieprasījuma URL",
+      "urlPlaceholder": "Izmaiņu pieprasījuma vai apvienošanas pieprasījuma URL",
+      "openAccessibility": "Atvērt izmaiņu pieprasījumu vai apvienošanas pieprasījumu",
       "clearLink": "Notīrīt saiti",
-      "pasteLink": "Ielīmēt izmaiņu pieprasījuma vai merge request saiti",
+      "pasteLink": "Ielīmēt izmaiņu pieprasījuma vai apvienošanas pieprasījuma saiti",
       "open": "Atvērt"
     },
     "checks": {
@@ -941,9 +941,9 @@
       "reconnectTitleGitLab": "Atkārtoti savienot GitLab",
       "reconnectTitleBitbucket": "Atkārtoti savienot Bitbucket",
       "reconnectDescription": "Tavam GitHub savienojumam ir atsaukta piekļuve.",
-      "gitlabDescription": "Pārbaudīt merge requests mobilajā ierīcē",
+      "gitlabDescription": "Pārbaudīt apvienošanas pieprasījumus mobilajā ierīcē",
       "gitlabInstanceMismatchTitle": "GitLab savienojums ir paredzēts citai instancei",
-      "gitlabInstanceMismatchDescription": "Tavs GitLab savienojums ir paredzēts {{connected}}, bet šis merge request atrodas uz {{requested}}. Savieno GitLab ar šo instanci, lai to pārskatītu.",
+      "gitlabInstanceMismatchDescription": "Tavs GitLab savienojums ir paredzēts {{connected}}, bet šis apvienošanas pieprasījums atrodas uz {{requested}}. Savieno GitLab ar šo instanci, lai to pārskatītu.",
       "checkActiveConnection": "Savienojums ir aktīvs, bet šo vienumu joprojām nevar ielādēt.",
       "bitbucketOrgOnlyDescription": "Pārslēdz augstāk redzamo kontu uz organizāciju, lai pārskatītu tās Bitbucket izmaiņu pieprasījumus.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Šim kontam vēl nav organizāciju. Bitbucket izmaiņu pieprasījumus varēs pārskatīt, kad izveidosi organizāciju vai tai pievienosies.",
@@ -1057,7 +1057,7 @@
     },
     "linkPasteClipboardEmpty": "Starpliktuve ir tukša.",
     "linkPasteDenied": "Ielīmēšanas piekļuve tika liegta. Atļaujiet ielīmēšanu un mēģiniet vēlreiz.",
-    "linkPasteNotAPullRequest": "Šī nav izmaiņu pieprasījuma vai merge request saite",
+    "linkPasteNotAPullRequest": "Šī nav izmaiņu pieprasījuma vai apvienošanas pieprasījuma saite",
     "announce": {
       "commentPosted": "Komentārs publicēts",
       "commentUpdated": "Komentārs atjaunināts",
@@ -1090,18 +1090,18 @@
     },
     "terms": {
       "pullRequest": "Izmaiņu pieprasījums",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "Merge request !{{number}}",
-      "shareMergeRequest": "Kopīgot merge request",
+      "mergeRequest": "Apvienošanas pieprasījums",
+      "mergeRequestNumber": "Apvienošanas pieprasījums !{{number}}",
+      "shareMergeRequest": "Kopīgot apvienošanas pieprasījumu",
       "viewOnProvider": "Skatīt {{provider}}",
-      "mergeRequestUnavailable": "Merge request nav pieejams",
+      "mergeRequestUnavailable": "Apvienošanas pieprasījums nav pieejams",
       "unavailableDescription": "Savienojums varētu būt neizdevies, vai arī vienums varētu būt dzēsts vai nepieejams.",
-      "accessDeniedMergeRequest": "Tev nav atļaujas skatīt šo merge request.",
-      "couldNotLoadMergeRequest": "Neizdevās ielādēt merge request.",
-      "discussionAccessDenied": "Tev nav atļaujas skatīt šī merge request diskusiju.",
-      "discussionUnavailableMessage": "Savienojums varētu būt neizdevies, vai arī šis merge request varētu būt noņemts.",
-      "noDiscussionDescription": "Šajā merge request nav pārskatīšanas pavedienu vai diskusijas komentāru.",
-      "noFilesChangedDescription": "Šajā merge request nav failu izmaiņu."
+      "accessDeniedMergeRequest": "Tev nav atļaujas skatīt šo apvienošanas pieprasījumu.",
+      "couldNotLoadMergeRequest": "Neizdevās ielādēt apvienošanas pieprasījumu.",
+      "discussionAccessDenied": "Tev nav atļaujas skatīt šī apvienošanas pieprasījuma diskusiju.",
+      "discussionUnavailableMessage": "Savienojums varētu būt neizdevies, vai arī šis apvienošanas pieprasījums varētu būt noņemts.",
+      "noDiscussionDescription": "Šajā apvienošanas pieprasījumā nav pārskatīšanas pavedienu vai diskusijas komentāru.",
+      "noFilesChangedDescription": "Šajā apvienošanas pieprasījumā nav failu izmaiņu."
     }
   },
   "notifications": {
@@ -1361,8 +1361,8 @@
       }
     },
     "manualReview": {
-      "invalidMergeRequestUrl": "Ievadi derīgu merge request URL.",
-      "mergeRequestUrl": "Merge request URL",
+      "invalidMergeRequestUrl": "Ievadi derīgu apvienošanas pieprasījuma URL.",
+      "mergeRequestUrl": "Apvienošanas pieprasījuma URL",
       "instructionsAtLimit": "Instrukcijas ir ierobežotas līdz {{max}} rakstzīmēm.",
       "title": "Manuāla koda pārskatīšana",
       "invalidUrl": "Ievadi derīgu izmaiņu pieprasījuma URL.",

@@ -66,7 +66,7 @@
     "discardChangesMessage": "It-tibdiliet tiegħek jintilfu.",
     "discardChangesTitle": "Warrab it-tibdiliet?",
     "findings": "Sejbiet",
-    "mergeRequest": "merge request",
+    "mergeRequest": "il-merge request",
     "notConnected": "Mhux imqabbad",
     "notifications": "Notifiki",
     "pullRequest": "PR",
@@ -173,7 +173,7 @@
     "dismissed": "Imwarrba",
     "agent": "Aġent",
     "durationMinuteShort": "min",
-    "durationHourShort": "h",
+    "durationHourShort": "s",
     "changes": "Bidliet",
     "organizationTrialEnded": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Sid l-organizzazzjoni jista' jaġġorna l-fatturazzjoni fuq kilo.ai, imbagħad jerġa' jipprova.",
     "privateRepositoryA11y": "{{name}}, repositorju privat",
@@ -890,11 +890,11 @@
       "removeFromRecentsTitle": "Trid tneħħiha mir-riċenti?",
       "removeFromRecentsMessage": "Din ir-reviżjoni se titneħħa mil-lista tar-riċenti tiegħek.",
       "removeRecentAccessibility": "Neħħi {{repo}} mir-riċenti",
-      "urlAccessibility": "Daħħal URL ta' PR jew merge request",
-      "urlPlaceholder": "URL ta' PR jew merge request",
-      "openAccessibility": "Iftaħ PR jew merge request",
+      "urlAccessibility": "Daħħal URL ta' PR jew il-merge request",
+      "urlPlaceholder": "URL ta' PR jew il-merge request",
+      "openAccessibility": "Iftaħ PR jew il-merge request",
       "clearLink": "Neħħi l-ħolqa",
-      "pasteLink": "Waħħal il-ħolqa ta' PR jew merge request",
+      "pasteLink": "Waħħal il-ħolqa ta' PR jew il-merge request",
       "open": "Ftuħ"
     },
     "checks": {
@@ -1103,7 +1103,7 @@
     },
     "linkPasteClipboardEmpty": "Il-klibbord huwa vojt.",
     "linkPasteDenied": "L-aċċess għat-twaħħil ġie miċħud. Ippermetti t-twaħħil u erġa' pprova.",
-    "linkPasteNotAPullRequest": "Din mhix ħolqa ta' PR jew merge request",
+    "linkPasteNotAPullRequest": "Din mhix ħolqa ta' PR jew il-merge request",
     "announce": {
       "commentPosted": "Il-kumment ġie ppubblikat",
       "commentUpdated": "Il-kumment ġie aġġornat",
@@ -1136,8 +1136,8 @@
     },
     "terms": {
       "pullRequest": "PR",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "Merge request !{{number}}",
+      "mergeRequest": "Il-merge request",
+      "mergeRequestNumber": "Il-merge request !{{number}}",
       "shareMergeRequest": "Aqsam il-merge request",
       "viewOnProvider": "Ara fuq {{provider}}",
       "mergeRequestUnavailable": "Il-merge request mhux disponibbli",
@@ -1407,7 +1407,7 @@
       }
     },
     "manualReview": {
-      "invalidMergeRequestUrl": "Daħħal URL validu għal merge request.",
+      "invalidMergeRequestUrl": "Daħħal URL validu għall-merge request.",
       "mergeRequestUrl": "URL tal-merge request",
       "instructionsAtLimit": "L-istruzzjonijiet huma limitati għal {{max}} karattru.",
       "title": "Reviżjoni manwali",

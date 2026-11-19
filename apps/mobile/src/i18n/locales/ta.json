@@ -209,7 +209,7 @@
     "signInWithGoogle": "Google மூலம் உள்நுழையவும்",
     "signInWithPasskey": "பாஸ்கீ மூலம் உள்நுழையவும்",
     "emailAddress": "மின்னஞ்சல் முகவரி",
-    "emailPlaceholder": "you@example.com",
+    "emailPlaceholder": "நீங்கள்@example.com",
     "continueWithEmail": "மின்னஞ்சல் மூலம் தொடரவும்",
     "enterCodeSentTo": "{{email}} முகவரிக்கு அனுப்பிய குறியீட்டை உள்ளிடவும்.",
     "codeArrivalHint": "இந்த முகவரி தகுதி பெற்றிருந்தால், குறியீடு ஒரு நிமிடத்திற்குள் வரும்.",

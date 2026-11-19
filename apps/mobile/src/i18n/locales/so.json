@@ -66,7 +66,7 @@
     "discardChangesMessage": "Isbedeladaada way lumi doonaan.",
     "discardChangesTitle": "Isbedelada tuur?",
     "findings": "Natiijooyin",
-    "mergeRequest": "merge request",
+    "mergeRequest": "codsi isku-darid",
     "notConnected": "Kuma xirna",
     "notifications": "Ogeysiisyada",
     "pullRequest": "codsi isku-darid",
@@ -685,7 +685,7 @@
       },
       "terminal": {
         "closed": "Codsigan isku-darka waa xiran yahay",
-        "closedMergeRequest": "Codsigan merge request waa xiran yahay"
+        "closedMergeRequest": "Codsigan isku-darka waa xiran yahay"
       },
       "partialSuccessBanner": {
         "body": "Laanta lama tirtiri karin: {{reason}}.",
@@ -851,11 +851,11 @@
       "removeFromRecentsTitle": "Ma laga saaraa kuwii dhowaan la isticmaalay?",
       "removeFromRecentsMessage": "Dib-u-eegistan waxaa laga saari doonaa liiska kuwii aad dhowaan isticmaashay.",
       "removeRecentAccessibility": "Ka saar {{repo}} liiska kuwii dhowaan la isticmaalay",
-      "urlAccessibility": "Geli URL-ka PR ama merge request",
-      "urlPlaceholder": "URL-ka PR ama merge request",
-      "openAccessibility": "Fur PR ama merge request",
+      "urlAccessibility": "Geli URL-ka PR ama codsiga isku-darka",
+      "urlPlaceholder": "URL-ka PR ama codsiga isku-darka",
+      "openAccessibility": "Fur PR ama codsiga isku-darka",
       "clearLink": "Ka saar xiriiriyaha",
-      "pasteLink": "Ku dheji xiriiriyaha PR ama merge request",
+      "pasteLink": "Ku dheji xiriiriyaha PR ama codsiga isku-darka",
       "open": "Furan"
     },
     "checks": {
@@ -924,9 +924,9 @@
       "reconnectTitleGitLab": "Dib u xir GitLab",
       "reconnectTitleBitbucket": "Dib u xir Bitbucket",
       "reconnectDescription": "Oggolaanshaha xiriirkaaga GitHub waa lagala noqday.",
-      "gitlabDescription": "Taleefanka ku eeg merge request-yada",
+      "gitlabDescription": "Taleefanka ku eeg codsiyada isku-darid",
       "gitlabInstanceMismatchTitle": "Xiriirka GitLab waa server kale",
-      "gitlabInstanceMismatchDescription": "Xiriirkaaga GitLab waa {{connected}}, laakiin merge request-kani wuxuu ku yaal {{requested}}. Ku xir GitLab server-kaas si aad u eegto.",
+      "gitlabInstanceMismatchDescription": "Xiriirkaaga GitLab waa {{connected}}, laakiin codsigan isku-darka wuxuu ku yaal {{requested}}. Ku xir GitLab server-kaas si aad u eegto.",
       "checkActiveConnection": "Xiriirku waa firfircoon, laakiin weli shaygan lama soo rari karo.",
       "bitbucketOrgOnlyDescription": "Beddel xisaabta kor ku qoran hay'ad si aad u eegto PR-yadeeda Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Xisaabtan weli ma laha hay'ado. PR-yada Bitbucket waxaad eegi kartaa marka aad abuurto ama aad ku biirto hay'ad.",
@@ -1034,7 +1034,7 @@
     },
     "linkPasteClipboardEmpty": "Sabuuradda nuqulladu waa madhan tahay.",
     "linkPasteDenied": "Helitaanka ku-dhejinta waa laga diiday. U ogolow ku-dhejinta oo mar kale isku day.",
-    "linkPasteNotAPullRequest": "Kani ma aha xiriiriye PR ama merge request ah",
+    "linkPasteNotAPullRequest": "Kani ma aha xiriiriye PR ama codsi isku-darid ah",
     "announce": {
       "commentPosted": "Faallada waa la daabacay",
       "commentUpdated": "Faallada waa la cusboonaysiiyay",
@@ -1067,18 +1067,18 @@
     },
     "terms": {
       "pullRequest": "Codsi isku-darid",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "Merge request !{{number}}",
-      "shareMergeRequest": "La wadaag merge request-ka",
+      "mergeRequest": "Codsi isku-darid",
+      "mergeRequestNumber": "Codsi isku-darid !{{number}}",
+      "shareMergeRequest": "La wadaag codsiga isku-darka",
       "viewOnProvider": "Kasoo eeg {{provider}}",
-      "mergeRequestUnavailable": "Merge request-ka lama heli karo",
+      "mergeRequestUnavailable": "Codsiga isku-darka lama heli karo",
       "unavailableDescription": "Waxaa laga yaabaa in xiriirku guuldareystay, ama in shayga la tirtiray ama in aan la gaari karin.",
-      "accessDeniedMergeRequest": "Ma haysatid oggolaansho aad ku aragto merge request-kan.",
-      "couldNotLoadMergeRequest": "Merge request-ka lama soo rari karin.",
-      "discussionAccessDenied": "Ma haysatid oggolaansho aad ku aragto doodda merge request-kan.",
-      "discussionUnavailableMessage": "Waxaa laga yaabaa in xiriirku guuldareystay, ama in merge request-kan la saaray.",
-      "noDiscussionDescription": "Merge request-kan kuma jiraan dooddo dib-u-eegis ama faallooyin wada hadal.",
-      "noFilesChangedDescription": "Merge request-kan kuma jiraan isbeddello faylal."
+      "accessDeniedMergeRequest": "Ma haysatid oggolaansho aad ku aragto codsigan isku-darka.",
+      "couldNotLoadMergeRequest": "Codsiga isku-darka lama soo rari karin.",
+      "discussionAccessDenied": "Ma haysatid oggolaansho aad ku aragto doodda codsigan isku-darka.",
+      "discussionUnavailableMessage": "Waxaa laga yaabaa in xiriirku guuldareystay, ama in codsigan isku-darka la saaray.",
+      "noDiscussionDescription": "Codsigan isku-darka kuma jiraan dooddo dib-u-eegis ama faallooyin wada hadal.",
+      "noFilesChangedDescription": "Codsigan isku-darka kuma jiraan isbeddello faylal."
     }
   },
   "notifications": {
@@ -1338,8 +1338,8 @@
       }
     },
     "manualReview": {
-      "invalidMergeRequestUrl": "Geli URL ansax ah oo merge request ah.",
-      "mergeRequestUrl": "URL-ka merge request",
+      "invalidMergeRequestUrl": "Geli URL ansax ah oo codsi isku-darid ah.",
+      "mergeRequestUrl": "URL-ka codsiga isku-darka",
       "instructionsAtLimit": "Tilmaamuhu wuxuu ku xaddidan yahay {{max}} xaraf",
       "title": "Dib-u-eegis gacmeed",
       "invalidUrl": "Geli URL ansax ah oo codsi isku dar ah.",

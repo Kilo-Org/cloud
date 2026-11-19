@@ -66,7 +66,7 @@
     "discardChangesMessage": "A módosításai elvesznek.",
     "discardChangesTitle": "Elveti a módosításokat?",
     "findings": "Találatok",
-    "mergeRequest": "merge request",
+    "mergeRequest": "módosítási kérelem",
     "notConnected": "Nincs csatlakoztatva",
     "notifications": "Értesítések",
     "pullRequest": "PR",
@@ -685,7 +685,7 @@
       },
       "terminal": {
         "closed": "A módosítási kérelem lezárva",
-        "closedMergeRequest": "Ez a merge request le van zárva"
+        "closedMergeRequest": "Ez a módosítási kérelem le van zárva"
       },
       "partialSuccessBanner": {
         "body": "Nem sikerült törölni az ágat. Az ok: {{reason}}.",
@@ -851,11 +851,11 @@
       "removeFromRecentsTitle": "Eltávolítod az előzményekből?",
       "removeFromRecentsMessage": "Ez a kódellenőrzés eltűnik az előzményeidből.",
       "removeRecentAccessibility": "{{repo}} eltávolítása az előzményekből",
-      "urlAccessibility": "Add meg egy módosítási kérelem vagy merge request URL-címét",
-      "urlPlaceholder": "Módosítási kérelem vagy merge request URL",
-      "openAccessibility": "Módosítási kérelem vagy merge request megnyitása",
+      "urlAccessibility": "Add meg egy módosítási kérelem URL-címét",
+      "urlPlaceholder": "Módosítási kérelem URL",
+      "openAccessibility": "Módosítási kérelem megnyitása",
       "clearLink": "Hivatkozás törlése",
-      "pasteLink": "Módosítási kérelem vagy merge request-hivatkozás beillesztése",
+      "pasteLink": "Módosítási kérelem hivatkozásának beillesztése",
       "open": "Megnyitás"
     },
     "checks": {
@@ -924,9 +924,9 @@
       "reconnectTitleGitLab": "Újracsatlakozás a GitLabhoz",
       "reconnectTitleBitbucket": "Újracsatlakozás a Bitbuckethoz",
       "reconnectDescription": "Visszavonták a GitHub-kapcsolatod engedélyét.",
-      "gitlabDescription": "Merge requestek ellenőrzése mobilon",
+      "gitlabDescription": "Módosítási kérelemek ellenőrzése mobilon",
       "gitlabInstanceMismatchTitle": "A GitLab-kapcsolat egy másik példányhoz tartozik",
-      "gitlabInstanceMismatchDescription": "A GitLab-kapcsolatod a(z) {{connected}} példányhoz tartozik, de ez a merge request a(z) {{requested}} példányon van. Az ellenőrzéshez csatlakoztass GitLabot ahhoz a példányhoz.",
+      "gitlabInstanceMismatchDescription": "A GitLab-kapcsolatod a(z) {{connected}} példányhoz tartozik, de ez a módosítási kérelem a(z) {{requested}} példányon van. Az ellenőrzéshez csatlakoztass GitLabot ahhoz a példányhoz.",
       "checkActiveConnection": "A kapcsolat aktív, de ez az elem továbbra sem tölthető be.",
       "bitbucketOrgOnlyDescription": "Váltsd a fenti fiókot egy szervezetre a Bitbucket-módosítási kérelmek kódellenőrzéséhez.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ez a fiók még nem tagja egyetlen szervezetnek sem. A Bitbucket-módosítási kérelmek kódellenőrzéséhez hozz létre egy szervezetet, vagy csatlakozz egyhez.",
@@ -1034,7 +1034,7 @@
     },
     "linkPasteClipboardEmpty": "A vágólap üres.",
     "linkPasteDenied": "A beillesztéshez való hozzáférés elutasítva. Engedélyezze a beillesztést, és próbálja újra.",
-    "linkPasteNotAPullRequest": "Ez nem egy PR vagy merge request hivatkozása",
+    "linkPasteNotAPullRequest": "Ez nem egy PR vagy módosítási kérelem hivatkozása",
     "announce": {
       "commentPosted": "Hozzászólás közzétéve",
       "commentUpdated": "Hozzászólás frissítve",
@@ -1067,18 +1067,18 @@
     },
     "terms": {
       "pullRequest": "PR",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "Merge request !{{number}}",
-      "shareMergeRequest": "Merge request megosztása",
+      "mergeRequest": "Módosítási kérelem",
+      "mergeRequestNumber": "Módosítási kérelem !{{number}}",
+      "shareMergeRequest": "A módosítási kérelem megosztása",
       "viewOnProvider": "Megtekintés itt: {{provider}}",
-      "mergeRequestUnavailable": "A merge request nem érhető el",
+      "mergeRequestUnavailable": "A módosítási kérelem nem érhető el",
       "unavailableDescription": "Lehet, hogy megszakadt a kapcsolat, vagy az elem törölve lett, vagy nem érhető el.",
-      "accessDeniedMergeRequest": "Nincs jogosultságod a merge request megtekintéséhez.",
-      "couldNotLoadMergeRequest": "Nem sikerült betölteni a merge request.",
-      "discussionAccessDenied": "Nincs jogosultságod a merge request-hez tartozó beszélgetés megtekintéséhez.",
-      "discussionUnavailableMessage": "Lehet, hogy megszakadt a kapcsolat, vagy a merge requestet eltávolították.",
-      "noDiscussionDescription": "Ehhez a merge request nem tartozik kódellenőrzési beszélgetés vagy hozzászólás.",
-      "noFilesChangedDescription": "Ez a merge request nem tartalmaz fájlmódosításokat."
+      "accessDeniedMergeRequest": "Nincs jogosultságod a módosítási kérelem megtekintéséhez.",
+      "couldNotLoadMergeRequest": "Nem sikerült betölteni a módosítási kérést.",
+      "discussionAccessDenied": "Nincs jogosultságod a módosítási kéréshez tartozó beszélgetés megtekintéséhez.",
+      "discussionUnavailableMessage": "Lehet, hogy megszakadt a kapcsolat, vagy a módosítási kérést eltávolították.",
+      "noDiscussionDescription": "Ehhez a módosítási kérelemhez nem tartozik kódellenőrzési beszélgetés vagy hozzászólás.",
+      "noFilesChangedDescription": "Ez a módosítási kérelem nem tartalmaz fájlmódosításokat."
     }
   },
   "notifications": {
@@ -1338,8 +1338,8 @@
       }
     },
     "manualReview": {
-      "invalidMergeRequestUrl": "Adj meg egy érvényes URL-t a merge request-hez.",
-      "mergeRequestUrl": "Merge request URL-címe",
+      "invalidMergeRequestUrl": "Adj meg egy érvényes URL-t a módosítási kéréshez.",
+      "mergeRequestUrl": "Módosítási kérelem URL-címe",
       "instructionsAtLimit": "Az utasítások legfeljebb {{max}} karakter lehetnek",
       "title": "Kézi kódellenőrzés",
       "invalidUrl": "Adj meg egy érvényes URL-t a PR-hez.",
@@ -3833,7 +3833,7 @@
     "mcpOAuth": {
       "authMethod": "Hitelesítés",
       "authNone": "Nincs bejelentkezés",
-      "authBearer": "Bearer token",
+      "authBearer": "Bearer-token",
       "authOAuth": "OAuth-bejelentkezés",
       "fieldToken": "Token",
       "oauthHint": "Mentés után koppints a(z) $t(modelChat.mcpOAuth.signIn) gombra a szervernél, hogy a böngésződben bejelentkezz.",

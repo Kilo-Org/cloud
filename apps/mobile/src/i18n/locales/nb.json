@@ -66,7 +66,7 @@
     "discardChangesMessage": "Endringene dine vil gå tapt.",
     "discardChangesTitle": "Forkast endringer?",
     "findings": "Funn",
-    "mergeRequest": "merge request",
+    "mergeRequest": "fletteforespørsel",
     "notConnected": "Ikke tilkoblet",
     "notifications": "Varsler",
     "pullRequest": "PR",
@@ -685,7 +685,7 @@
       },
       "terminal": {
         "closed": "Denne PR-en er lukket",
-        "closedMergeRequest": "Denne merge request-en er lukket"
+        "closedMergeRequest": "Denne fletteforespørselen er lukket"
       },
       "partialSuccessBanner": {
         "body": "Kunne ikke slette grenen: {{reason}}.",
@@ -851,11 +851,11 @@
       "removeFromRecentsTitle": "Fjerne fra listen over nylige PR-er?",
       "removeFromRecentsMessage": "Denne gjennomgangen fjernes fra listen over nylige.",
       "removeRecentAccessibility": "Fjern {{repo}} fra listen over nylige PR-er",
-      "urlAccessibility": "Skriv inn en PR- eller merge request-URL",
-      "urlPlaceholder": "URL for PR eller merge request",
-      "openAccessibility": "Åpne PR eller merge request",
+      "urlAccessibility": "Skriv inn en PR- eller fletteforespørsel-URL",
+      "urlPlaceholder": "URL for PR eller fletteforespørsel",
+      "openAccessibility": "Åpne PR eller fletteforespørsel",
       "clearLink": "Fjern lenken",
-      "pasteLink": "Lim inn PR- eller merge request-lenke",
+      "pasteLink": "Lim inn PR- eller fletteforespørsel-lenke",
       "open": "Åpne"
     },
     "checks": {
@@ -924,9 +924,9 @@
       "reconnectTitleGitLab": "Koble til GitLab på nytt",
       "reconnectTitleBitbucket": "Koble til Bitbucket på nytt",
       "reconnectDescription": "Tilgangen til GitHub-kontoen din er trukket tilbake.",
-      "gitlabDescription": "Gå gjennom merge requests på mobilen",
+      "gitlabDescription": "Gå gjennom fletteforespørsler på mobilen",
       "gitlabInstanceMismatchTitle": "GitLab-tilkoblingen er for en annen instans",
-      "gitlabInstanceMismatchDescription": "GitLab-tilkoblingen din er for {{connected}}, men denne merge requesten er på {{requested}}. Koble til GitLab på den instansen for å gå gjennom den.",
+      "gitlabInstanceMismatchDescription": "GitLab-tilkoblingen din er for {{connected}}, men denne fletteforespørselen er på {{requested}}. Koble til GitLab på den instansen for å gå gjennom den.",
       "checkActiveConnection": "Tilkoblingen er aktiv, men dette elementet kan fortsatt ikke lastes inn.",
       "bitbucketOrgOnlyDescription": "Bytt kontoen over til en organisasjon for å gå gjennom dens PR-er på Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Denne kontoen har ingen organisasjoner ennå. Du kan gå gjennom PR-er på Bitbucket når du oppretter eller blir med i en organisasjon.",
@@ -1034,7 +1034,7 @@
     },
     "linkPasteClipboardEmpty": "Utklippstavlen er tom.",
     "linkPasteDenied": "Tilgang til å lime inn ble avslått. Tillat innliming og prøv igjen.",
-    "linkPasteNotAPullRequest": "Dette er ikke en lenke til en PR eller merge request",
+    "linkPasteNotAPullRequest": "Dette er ikke en lenke til en PR eller fletteforespørsel",
     "announce": {
       "commentPosted": "Kommentar publisert",
       "commentUpdated": "Kommentar oppdatert",
@@ -1067,18 +1067,18 @@
     },
     "terms": {
       "pullRequest": "PR",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "Merge request !{{number}}",
-      "shareMergeRequest": "Del merge request",
+      "mergeRequest": "Fletteforespørsel",
+      "mergeRequestNumber": "Fletteforespørsel !{{number}}",
+      "shareMergeRequest": "Del fletteforespørsel",
       "viewOnProvider": "Vis på {{provider}}",
-      "mergeRequestUnavailable": "Merge request er utilgjengelig",
+      "mergeRequestUnavailable": "Fletteforespørsel er utilgjengelig",
       "unavailableDescription": "Tilkoblingen kan ha feilet, eller elementet kan være slettet eller utilgjengelig.",
-      "accessDeniedMergeRequest": "Du har ikke tilgang til å se denne merge request.",
-      "couldNotLoadMergeRequest": "Kunne ikke laste inn merge request.",
-      "discussionAccessDenied": "Du har ikke tilgang til diskusjonen om denne merge request.",
-      "discussionUnavailableMessage": "Tilkoblingen kan ha feilet, eller merge requesten kan ha blitt fjernet.",
-      "noDiscussionDescription": "Denne merge request har ingen diskusjonstråder fra kodegjennomganger eller andre kommentarer.",
-      "noFilesChangedDescription": "Denne merge request inneholder ingen filendringer."
+      "accessDeniedMergeRequest": "Du har ikke tilgang til å se denne fletteforespørselen.",
+      "couldNotLoadMergeRequest": "Kunne ikke laste inn fletteforespørselen.",
+      "discussionAccessDenied": "Du har ikke tilgang til diskusjonen om denne fletteforespørselen.",
+      "discussionUnavailableMessage": "Tilkoblingen kan ha feilet, eller fletteforespørselen kan ha blitt fjernet.",
+      "noDiscussionDescription": "Denne fletteforespørselen har ingen diskusjonstråder fra kodegjennomganger eller andre kommentarer.",
+      "noFilesChangedDescription": "Denne fletteforespørselen inneholder ingen filendringer."
     }
   },
   "notifications": {
@@ -1338,8 +1338,8 @@
       }
     },
     "manualReview": {
-      "invalidMergeRequestUrl": "Skriv inn en gyldig URL til en merge request.",
-      "mergeRequestUrl": "URL til merge request",
+      "invalidMergeRequestUrl": "Skriv inn en gyldig URL til en fletteforespørsel.",
+      "mergeRequestUrl": "URL til fletteforespørsel",
       "instructionsAtLimit": "Instruksjonene er begrenset til {{max}} tegn",
       "title": "Manuell gjennomgang",
       "invalidUrl": "Skriv inn en gyldig URL til en PR.",

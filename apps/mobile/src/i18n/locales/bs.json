@@ -4295,7 +4295,7 @@
       "add": "Dodaj agenta",
       "empty": "Još nema agenata",
       "name": "Ime agenta",
-      "slug": "Agent slug",
+      "slug": "Slug agenta",
       "description": "Opis agenta",
       "model": "Nadjačavanje modela",
       "modelPlaceholder": "Koristi zadanu sesiju",

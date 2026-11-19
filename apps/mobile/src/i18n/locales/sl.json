@@ -66,7 +66,7 @@
     "discardChangesMessage": "Vaše spremembe bodo izgubljene.",
     "discardChangesTitle": "Zavrzi spremembe?",
     "findings": "Ugotovitve",
-    "mergeRequest": "merge request",
+    "mergeRequest": "zahteva za združitev",
     "notConnected": "Ni povezano",
     "notifications": "Obvestila",
     "pullRequest": "zahteva za združitev",
@@ -173,7 +173,7 @@
     "dismissed": "Zavrženo",
     "agent": "Agent",
     "durationMinuteShort": "min",
-    "durationHourShort": "h",
+    "durationHourShort": "u",
     "changes": "Spremembe",
     "organizationTrialEnded": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Lastnik organizacije lahko posodobi obračun na kilo.ai, nato poskusi znova.",
     "privateRepositoryA11y": "{{name}}, zasebno skladišče",
@@ -703,7 +703,7 @@
       },
       "terminal": {
         "closed": "Zahtevek za združitev je zaprt",
-        "closedMergeRequest": "Ta merge request je zaprt"
+        "closedMergeRequest": "Ta zahtevek za združitev je zaprt"
       },
       "partialSuccessBanner": {
         "body": "Veje ni bilo mogoče izbrisati: {{reason}}.",
@@ -877,11 +877,11 @@
       "removeFromRecentsTitle": "Odstranim s seznama nedavnih?",
       "removeFromRecentsMessage": "Ta pregled bo odstranjen iz nedavnih.",
       "removeRecentAccessibility": "Odstrani {{repo}} s seznama nedavnih",
-      "urlAccessibility": "Vnesite URL zahtevka za združitev ali merge requesta",
-      "urlPlaceholder": "URL zahteve za združitev ali merge requesta",
-      "openAccessibility": "Odpri zahtevo za združitev ali merge request",
+      "urlAccessibility": "Vnesite URL zahtevka za združitev",
+      "urlPlaceholder": "URL zahteve za združitev",
+      "openAccessibility": "Odpri zahtevo za združitev",
       "clearLink": "Počisti povezavo",
-      "pasteLink": "Prilepi povezavo do zahtevka za združitev ali merge requesta",
+      "pasteLink": "Prilepi povezavo do zahtevka za združitev",
       "open": "Odprto"
     },
     "checks": {
@@ -958,9 +958,9 @@
       "reconnectTitleGitLab": "Ponovna povezava z GitLabom",
       "reconnectTitleBitbucket": "Ponovna povezava z Bitbucketom",
       "reconnectDescription": "Tvoja povezava z GitHubom je bila preklicana.",
-      "gitlabDescription": "Preglej merge requeste na mobilni napravi",
+      "gitlabDescription": "Preglej zahteve za združitev na mobilni napravi",
       "gitlabInstanceMismatchTitle": "Povezava z GitLabom je za drugo instanco",
-      "gitlabInstanceMismatchDescription": "Tvoja povezava z GitLabom je za {{connected}}, vendar je ta merge request na {{requested}}. Poveži GitLab na tej instanci, da ga pregledaš.",
+      "gitlabInstanceMismatchDescription": "Tvoja povezava z GitLabom je za {{connected}}, vendar je ta zahtevek za združitev na {{requested}}. Poveži GitLab na tej instanci, da ga pregledaš.",
       "checkActiveConnection": "Povezava je aktivna, vendar tega elementa še vedno ni mogoče naložiti.",
       "bitbucketOrgOnlyDescription": "Preklopi zgornji račun na organizacijo, da lahko pregleduješ njene zahtevke za združitev na Bitbucktu.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ta račun še nima nobenih organizacij. Zahtevke za združitev na Bitbucktu boš lahko pregledoval, ko ustvariš organizacijo ali se ji pridružiš.",
@@ -1080,7 +1080,7 @@
     },
     "linkPasteClipboardEmpty": "Odložišče je prazno.",
     "linkPasteDenied": "Dostop za lepljenje je bil zavrnjen. Dovolite lepljenje in poskusite znova.",
-    "linkPasteNotAPullRequest": "To ni povezava do zahtevka za združitev ali merge requesta",
+    "linkPasteNotAPullRequest": "To ni povezava do zahtevka za združitev",
     "announce": {
       "commentPosted": "Komentar objavljen",
       "commentUpdated": "Komentar posodobljen",
@@ -1113,18 +1113,18 @@
     },
     "terms": {
       "pullRequest": "Zahteva za združitev",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "Merge request !{{number}}",
-      "shareMergeRequest": "Deli merge request",
+      "mergeRequest": "Zahteva za združitev",
+      "mergeRequestNumber": "Zahteva za združitev !{{number}}",
+      "shareMergeRequest": "Deli zahtevek za združitev",
       "viewOnProvider": "Poglej na {{provider}}",
-      "mergeRequestUnavailable": "Merge request ni na voljo",
+      "mergeRequestUnavailable": "Zahtevek za združitev ni na voljo",
       "unavailableDescription": "Povezava je morda spodletela, element pa je morda izbrisan ali nedostopen.",
-      "accessDeniedMergeRequest": "Nimaš dovoljenja za ogled tega merge requesta.",
-      "couldNotLoadMergeRequest": "Merge requesta ni bilo mogoče naložiti.",
-      "discussionAccessDenied": "Nimaš dovoljenja za ogled razprave o tem merge requestu.",
-      "discussionUnavailableMessage": "Povezava je morda spodletela, merge request pa je bil morda odstranjen.",
-      "noDiscussionDescription": "Ta merge request še nima niti razprave o pregledu ali drugih komentarjev.",
-      "noFilesChangedDescription": "Ta merge request ne vsebuje sprememb datotek."
+      "accessDeniedMergeRequest": "Nimaš dovoljenja za ogled tega zahtevka za združitev.",
+      "couldNotLoadMergeRequest": "Zahtevka za združitev ni bilo mogoče naložiti.",
+      "discussionAccessDenied": "Nimaš dovoljenja za ogled razprave o tem zahtevku za združitev.",
+      "discussionUnavailableMessage": "Povezava je morda spodletela, zahteva za združitev pa je bila morda odstranjena.",
+      "noDiscussionDescription": "Ta zahtevek za združitev še nima niti razprave o pregledu ali drugih komentarjev.",
+      "noFilesChangedDescription": "Ta zahtevek za združitev ne vsebuje sprememb datotek."
     }
   },
   "notifications": {
@@ -1384,8 +1384,8 @@
       }
     },
     "manualReview": {
-      "invalidMergeRequestUrl": "Vnesi veljaven URL merge requesta.",
-      "mergeRequestUrl": "URL merge requesta",
+      "invalidMergeRequestUrl": "Vnesi veljaven URL zahteve za združitev.",
+      "mergeRequestUrl": "URL zahteve za združitev",
       "instructionsAtLimit": "Navodila so omejena na {{max}} znakov",
       "title": "Ročni pregled",
       "invalidUrl": "Vnesi veljaven URL zahteve za združitev.",

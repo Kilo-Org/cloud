@@ -143,9 +143,7 @@ async function selectCallerRoleRows(
  * the caller holds and the caller's allowed-role filter permits. `roles` is
  * defaulted to the full priority order, matching the allowed-roles default.
  */
-function defaultedAllowedRoles(
-  roles?: readonly OrganizationRole[]
-): readonly OrganizationRole[] {
+function defaultedAllowedRoles(roles?: readonly OrganizationRole[]): readonly OrganizationRole[] {
   return roles && roles.length > 0 ? roles : ORGANIZATION_ROLE_PRIORITY;
 }
 
@@ -723,9 +721,7 @@ export async function getOrganizationsAccessRoles(
       wouldPassWithoutAdmin:
         rolesByOrg === null
           ? null
-          : liveIds.every(
-              id => highestOrganizationRole(rolesByOrg.get(id) ?? [], roles) !== null
-            ),
+          : liveIds.every(id => highestOrganizationRole(rolesByOrg.get(id) ?? [], roles) !== null),
     });
     for (const id of liveIds) result.set(id, grant);
     return result;

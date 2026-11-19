@@ -42,7 +42,7 @@ import type { BrowserToolSession } from './browser-tool-session';
  * single-use token bound to this exact call.
  */
 
-type GateSession = Pick<BrowserToolPageSession, 'send' | 'resolveTarget'> &
+type GateSession = Pick<BrowserToolPageSession, 'isolatedProbe' | 'send' | 'resolveTarget'> &
   Pick<BrowserToolSession, 'takeDownloads'>;
 
 export interface BrowserSensitiveStep {
@@ -470,6 +470,13 @@ const sensitiveStepFor = async (input: {
       return { origin: input.origin, reason: SENSITIVE_REASON.unknownField };
     }
 
+    if (verdict.frameId !== undefined) {
+      const frameOrigin =
+        input.frames.find(frame => frame.id === verdict.frameId)?.origin ?? OPAQUE_ORIGIN;
+
+      return { origin: frameOrigin, reason: `typing into a field inside ${frameOrigin}` };
+    }
+
     if (verdict.frameBackendNodeId === undefined) {
       return { origin: input.origin, reason: verdict.reason };
     }
@@ -709,7 +716,7 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
  * that origin and decide whether to stay.
  */
 export const postAgentNavigate = async (
-  session: Pick<BrowserToolPageSession, 'send'>,
+  session: Pick<BrowserToolPageSession, 'isolatedProbe' | 'send'>,
   approvedOrigin: string
 ): Promise<BrowserOriginChanged | undefined> => {
   const frames = await readAgentFrameTree(session);

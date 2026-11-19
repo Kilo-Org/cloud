@@ -14,6 +14,7 @@ export type BrowserToolPageSession = Pick<
   | 'attach'
   | 'captureViewportImage'
   | 'consoleMessages'
+  | 'isolatedProbe'
   | 'networkRequestsSinceLoad'
   | 'registerRefs'
   | 'resolveTarget'

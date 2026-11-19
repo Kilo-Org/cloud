@@ -13,6 +13,7 @@ import {
   readFrameSensitiveBoxes,
   readFrameSensitiveValues,
 } from './browser-agent-probes';
+import { readIsolatedFrames } from './browser-agent-isolated-probe';
 import type {
   BrowserConsoleMessage,
   BrowserNetworkRequest,
@@ -148,7 +149,7 @@ export interface AgentFrameInventory {
   readonly complete: boolean;
 }
 
-export type AgentFrameSession = Pick<BrowserToolPageSession, 'send'> & {
+export type AgentFrameSession = Pick<BrowserToolPageSession, 'isolatedProbe' | 'send'> & {
   readonly childFrames?: () => ReadonlyMap<
     string,
     { readonly url: string; readonly sessionId: string }
@@ -194,6 +195,13 @@ const readChildFrame = async (
 };
 
 export const readAgentFrames = async (session: AgentFrameSession): Promise<AgentFrameInventory> => {
+  // Without a debugger protocol the frame list comes from one content-script injection per frame.
+  if (session.isolatedProbe !== undefined) {
+    const isolated = await readIsolatedFrames(session.isolatedProbe);
+
+    return { childSessions: new Map(), complete: isolated.complete, frames: isolated.frames };
+  }
+
   const sameProcess = await readSameProcessFrames(session);
   const frames: BrowserAgentFrame[] = [...(sameProcess ?? [])];
   const main = mainFrameOf(frames);

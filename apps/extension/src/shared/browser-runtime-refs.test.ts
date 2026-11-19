@@ -69,7 +69,7 @@ const createScriptingHarness = () => {
       readonly args: string[];
       readonly func: (...args: string[]) => InjectionResult;
       readonly target: { readonly tabId: number; readonly documentIds?: string[] };
-      readonly world: 'MAIN';
+      readonly world: 'ISOLATED' | 'MAIN';
     }): Promise<BrowserScriptingInjectionResult[]> => {
       const code = details.args[0] ?? '';
 

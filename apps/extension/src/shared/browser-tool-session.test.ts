@@ -306,7 +306,7 @@ const createScriptingApi = (
       readonly args: string[];
       readonly func: (...args: string[]) => InjectionResult;
       readonly target: { readonly tabId: number; readonly documentIds?: string[] };
-      readonly world: 'MAIN';
+      readonly world: 'ISOLATED' | 'MAIN';
     }): Promise<BrowserScriptingInjectionResult[]> => {
       const code = details.args[0] ?? '';
 
@@ -1278,6 +1278,90 @@ describe('browser tool session scripting backend', () => {
 
     expect(session.backend).toBe('scripting');
     expect(debuggerBackedSession.backend).toBe('debugger');
+  });
+
+  it('navigates through the tabs API and answers only once the page has loaded', async () => {
+    type Updated = (tabId: number, changeInfo: { readonly status?: string }) => void;
+    const listeners: Updated[] = [];
+    const updates: unknown[] = [];
+    let shown = { title: 'Tab', url: 'https://example.com/' };
+    const tabsApi: BrowserTabsApi = {
+      get: tabId => ({ id: tabId, ...shown }),
+      onUpdated: {
+        addListener: listener => {
+          listeners.push(listener);
+        },
+        removeListener: () => {
+          listeners.length = 0;
+        },
+      },
+      query: () => [],
+      update: (tabId, properties) => {
+        updates.push(properties);
+        shown = { title: 'Next', url: 'https://example.com/next' };
+
+        return { id: tabId };
+      },
+    };
+    const emit = (status: string) => {
+      for (const listener of listeners) {
+        listener(7, { status });
+      }
+    };
+    const session = createBrowserToolSession({
+      scriptingApi: createScriptingApi().api,
+      tabId: 7,
+      tabsApi,
+    });
+    let settled = false;
+    const navigated = (async () => {
+      const result = await session.callTool('browser_navigate', { url: '/next' });
+
+      settled = true;
+
+      return result;
+    })();
+
+    await vi.waitFor(() => {
+      expect(updates).toStrictEqual([{ url: 'https://example.com/next' }]);
+    });
+    emit('loading');
+    await flushPendingWork();
+    expect(settled).toBe(false);
+
+    emit('complete');
+
+    await expect(navigated).resolves.toStrictEqual({
+      ok: true,
+      value: { title: 'Next', url: 'https://example.com/next' },
+    });
+    expect(listeners).toHaveLength(0);
+  });
+
+  it('refuses a data: navigation without touching the tab', async () => {
+    const updates: unknown[] = [];
+    const tabsApi: BrowserTabsApi = {
+      ...createTabsApi().api,
+      onUpdated: { addListener: () => {}, removeListener: () => {} },
+      update: (tabId, properties) => {
+        updates.push(properties);
+
+        return { id: tabId };
+      },
+    };
+    const session = createBrowserToolSession({
+      scriptingApi: createScriptingApi().api,
+      tabId: 7,
+      tabsApi,
+    });
+
+    await expect(
+      session.callTool('browser_navigate', { url: 'data:text/html,<p>hi</p>' })
+    ).resolves.toStrictEqual({
+      error: 'Refusing to navigate to a data: URL.',
+      ok: false,
+    });
+    expect(updates).toStrictEqual([]);
   });
 
   it('sends the page the canonical WebMCP signature it rebuilds', async () => {

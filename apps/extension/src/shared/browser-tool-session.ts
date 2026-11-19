@@ -2,6 +2,8 @@
 import { z } from 'zod';
 import { buildWorkflowPageCode } from './agent-workflow-runner';
 import { TAB_TAKEN_ERROR } from './browser-caller';
+import { runIsolatedAgentProbe } from './browser-agent-isolated-probe-script';
+import type { IsolatedAgentProbe } from './browser-agent-isolated-probe';
 import { KILO_BROWSER_TOOL_PREFIX, toKiloBrowserToolName } from './browser-tool-contract';
 import {
   redactSensitiveBody,
@@ -84,6 +86,10 @@ export const getFirefoxUnsupportedToolError = (tool: string): string | undefined
 export const MAX_BROWSER_TOOL_WAIT_MS = 15_000;
 /** Soft timeout for one scripting tool action; larger than the debugger's default for snapshot-sized results. */
 const SCRIPTING_ACTION_TIMEOUT_MS = 20_000;
+/** Longest a navigation waits for the browser to report the new page complete; the debugger path waits as long. */
+const SCRIPTING_NAVIGATION_TIMEOUT_MS = 15_000;
+/** URL schemes a navigation refuses: they would run code or carry a whole page inline instead of loading one. */
+const REFUSED_NAVIGATION_SCHEMES: ReadonlySet<string> = new Set(['data', 'javascript']);
 /** Lines of aria-snapshot context `find` reports around each match. */
 const FIND_CONTEXT_LINES = 3;
 
@@ -402,6 +408,12 @@ export interface BrowserToolSession {
    * `browser.scripting.executeScript` in the MAIN world.
    */
   readonly backend: BrowserToolBackend;
+  /**
+   * The agent gate's probes on the scripting backend: one function run in the
+   * content-script world of every frame (or the listed ones). Absent where
+   * `send` reaches the page through the debugger protocol instead.
+   */
+  readonly isolatedProbe?: IsolatedAgentProbe | undefined;
   /**
    * One base64 image of the tab's viewport, of the page as it is now, taken
    * without activating the tab. Chrome renders an inactive tab about one frame
@@ -1186,19 +1198,9 @@ active.dispatchEvent(new KeyboardEvent('keydown', Object.assign({ bubbles: true,
 active.dispatchEvent(new KeyboardEvent('keyup', Object.assign({ bubbles: true, key: keyValue }, flags)));
 return __finish('Pressed ' + key + '.');`;
 
-const buildNavigatePageScript = ({ url }: { readonly url: string }): string =>
-  `${SCRIPTING_PAGE_PREAMBLE}
-let resolved;
-try { resolved = new URL(${scriptJson(url)}, location.href); } catch (error) { throw new Error('Invalid URL: ' + ${scriptJson(url)}); }
-if (resolved.protocol === 'javascript:' || resolved.protocol === 'data:') {
-  throw new Error('Refusing to navigate to a ' + resolved.protocol + ' URL.');
-}
-setTimeout(() => { location.assign(resolved.toString()); }, 0);
-return __finish('Navigating to ' + resolved.toString() + '.');`;
-
 const buildNavigateBackPageScript = (): string =>
   `${SCRIPTING_PAGE_PREAMBLE}
-setTimeout(() => { history.back(); }, 0);
+history.back();
 return __finish('Went back one history entry.');`;
 
 const buildResizePageScript = ({
@@ -1375,11 +1377,6 @@ const browserToolSelectOptionArgsSchema = z.object({
 const browserToolPressKeyArgsSchema = z.object({ key: z.string().min(1) });
 const browserToolNavigateArgsSchema = z.object({ url: z.string().min(1) });
 const browserToolResizeArgsSchema = z.object({ height: z.number(), width: z.number() });
-const browserToolTabsArgsSchema = z.object({
-  action: z.enum(['close', 'list', 'new', 'select']),
-  index: z.number().int().nonnegative().optional(),
-  url: z.string().optional(),
-});
 const browserToolWebMcpCallArgsSchema = z.object({
   name: z.string().min(1),
   params: z.union([z.record(z.string(), z.unknown()), z.undefined()]).optional(),
@@ -1414,16 +1411,6 @@ const browserToolFindResultSchema = z.object({
   refs: z.array(z.object({ ref: z.string(), selector: z.string() })),
   total: z.number(),
 });
-const browserToolTabSchema = z.object({
-  active: z.boolean().optional(),
-  id: z.number().optional(),
-  title: z.string().optional(),
-  url: z.string().optional(),
-  windowId: z.number().optional(),
-});
-
-type BrowserToolTab = z.infer<typeof browserToolTabSchema>;
-const browserToolTabListSchema = z.array(browserToolTabSchema);
 const browserToolWebMcpDiscoverySchema = z.object({
   documentId: z.string(),
   tools: z.array(
@@ -1522,15 +1509,6 @@ const formatNetworkRequestDetail = (request: BrowserNetworkRequest): string => {
 
   return lines.join('\n');
 };
-
-const formatTabList = (tabs: readonly BrowserToolTab[], selectedTabId: number): string =>
-  tabs
-    .map((tab, index) => {
-      const marker = tab.id === selectedTabId ? ' [selected]' : '';
-
-      return `${String(index)}: ${tab.title ?? ''} - ${tab.url ?? ''}${marker}`;
-    })
-    .join('\n');
 
 interface MutableNetworkRequest {
   failure?: string;
@@ -2657,38 +2635,89 @@ export const createBrowserToolSession = ({
     return resolved.kind === 'error' ? { error: resolved.error } : resolved;
   };
 
-  const listTabs = async (): Promise<readonly BrowserToolTab[] | undefined> => {
-    try {
-      const tabs = await tabsApi.query({});
-      const parsed = browserToolTabListSchema.safeParse(tabs);
+  /**
+   * Starts a navigation and answers with the tab's title and url once the
+   * browser reports the new document complete, like the debugger path does.
+   * The wait is bounded: a page that never finishes loading answers with what
+   * the tab shows then.
+   */
+  const loadInTab = async (
+    start: () => Promise<{ readonly error?: string }>
+  ): Promise<BrowserToolCallResult> => {
+    const { onUpdated } = tabsApi;
+    const getTab = tabsApi.get?.bind(tabsApi);
 
-      return parsed.success ? parsed.data : undefined;
-    } catch {
-      return undefined;
+    if (onUpdated === undefined || getTab === undefined) {
+      return { error: 'The browser tab API cannot report a page load.', ok: false };
+    }
+
+    const loaded = Promise.withResolvers<void>();
+    let loading = false;
+    const listener = (updatedTabId: number, changeInfo: { readonly status?: string }): void => {
+      if (updatedTabId !== tabId) {
+        return;
+      }
+
+      loading ||= changeInfo.status === 'loading';
+
+      if (loading && changeInfo.status === 'complete') {
+        loaded.resolve();
+      }
+    };
+    const timer = setTimeout(loaded.resolve, SCRIPTING_NAVIGATION_TIMEOUT_MS);
+
+    onUpdated.addListener(listener);
+
+    try {
+      const started = await start();
+
+      if (started.error !== undefined) {
+        return { error: started.error, ok: false };
+      }
+
+      await loaded.promise;
+      const tab = await getTab(tabId);
+
+      return { ok: true, value: { title: tab.title ?? '', url: tab.url ?? '' } };
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : 'The navigation failed.',
+        ok: false,
+      };
+    } finally {
+      clearTimeout(timer);
+      onUpdated.removeListener(listener);
     }
   };
 
-  const closeTab = async (id: number): Promise<BrowserToolCallResult> => {
-    const remove = tabsApi.remove?.bind(tabsApi);
-
-    if (remove === undefined) {
-      return { error: 'The browser cannot close tabs through this API.', ok: false };
-    }
+  const navigateTab = async (url: string): Promise<BrowserToolCallResult> => {
+    const update = tabsApi.update?.bind(tabsApi);
+    const current = await tabsApi.get?.(tabId);
+    let destination: URL | undefined = undefined;
 
     try {
-      await remove(id);
-    } catch (error) {
-      return {
-        error: error instanceof Error ? error.message : 'Closing the tab failed.',
-        ok: false,
-      };
+      destination = new URL(url, current?.url);
+    } catch {
+      return { error: `Invalid URL: ${url}`, ok: false };
     }
 
-    if (id === tabId) {
-      void dispose();
+    const scheme = destination.protocol.slice(0, -1);
+
+    if (REFUSED_NAVIGATION_SCHEMES.has(scheme)) {
+      return { error: `Refusing to navigate to a ${scheme}: URL.`, ok: false };
     }
 
-    return { ok: true, value: 'Closed the tab.' };
+    if (update === undefined) {
+      return { error: 'The browser cannot navigate tabs through this API.', ok: false };
+    }
+
+    const { href } = destination;
+
+    return loadInTab(async () => {
+      await update(tabId, { url: href });
+
+      return {};
+    });
   };
 
   const discoverPageWebMcpTools = async (): Promise<BrowserToolCallResult> => {
@@ -2854,10 +2883,6 @@ export const createBrowserToolSession = ({
             selector: resolved.selector,
           })
         );
-      }
-
-      case 'browser_close': {
-        return closeTab(tabId);
       }
 
       case 'browser_drag': {
@@ -3051,11 +3076,15 @@ export const createBrowserToolSession = ({
           return { error: 'browser_navigate needs a url.', ok: false };
         }
 
-        return runPageTool(buildNavigatePageScript({ url: parsed.data.url }));
+        return navigateTab(parsed.data.url);
       }
 
       case 'browser_navigate_back': {
-        return runPageTool(buildNavigateBackPageScript());
+        return loadInTab(async () => {
+          const back = await runPageTool(buildNavigateBackPageScript());
+
+          return back.ok ? {} : { error: back.error };
+        });
       }
 
       case 'browser_press_key': {
@@ -3156,76 +3185,6 @@ export const createBrowserToolSession = ({
             : `\nFilename "${parsed.data.filename}" was not written: this extension has no workspace root, so the snapshot is returned inline.`;
 
         return { ok: true, value: `${snapshot.data.lines.join('\n')}${note}` };
-      }
-
-      case 'browser_tabs': {
-        const parsed = browserToolTabsArgsSchema.safeParse(args);
-
-        if (!parsed.success) {
-          return { error: 'browser_tabs arguments were invalid.', ok: false };
-        }
-
-        const tabs = await listTabs();
-
-        if (tabs === undefined) {
-          return { error: 'The browser tab API is unavailable.', ok: false };
-        }
-
-        if (parsed.data.action === 'list') {
-          return { ok: true, value: formatTabList(tabs, tabId) };
-        }
-
-        if (parsed.data.action === 'new') {
-          const create = tabsApi.create?.bind(tabsApi);
-
-          if (create === undefined) {
-            return { error: 'The browser cannot open a new tab through this API.', ok: false };
-          }
-
-          const created = await create(
-            parsed.data.url === undefined ? {} : { url: parsed.data.url }
-          );
-
-          return {
-            ok: true,
-            value: `Opened tab ${String(created.id ?? '')}${parsed.data.url === undefined ? '' : ` at ${parsed.data.url}`}.`,
-          };
-        }
-
-        const index =
-          parsed.data.index ??
-          (parsed.data.action === 'close' ? tabs.findIndex(tab => tab.id === tabId) : undefined);
-
-        if (index === undefined) {
-          return { error: `browser_tabs ${parsed.data.action} needs an index.`, ok: false };
-        }
-
-        const tab = tabs[index];
-
-        if (tab?.id === undefined) {
-          return { error: `No tab at index ${String(index)}.`, ok: false };
-        }
-
-        if (parsed.data.action === 'close') {
-          const closed = await closeTab(tab.id);
-
-          return closed.ok
-            ? { ok: true, value: `Closed tab ${String(index)} (${tab.title ?? ''}).` }
-            : closed;
-        }
-
-        const update = tabsApi.update?.bind(tabsApi);
-
-        if (update === undefined) {
-          return { error: 'The browser cannot select tabs through this API.', ok: false };
-        }
-
-        await update(tab.id, { active: true });
-
-        return {
-          ok: true,
-          value: `Selected tab ${String(index)} (${tab.title ?? ''} - ${tab.url ?? ''}).`,
-        };
       }
 
       case 'browser_take_screenshot': {
@@ -3432,6 +3391,28 @@ export const createBrowserToolSession = ({
   const getToolUnavailableError = (tool: string): string | undefined =>
     backend === 'scripting' ? getFirefoxUnsupportedToolError(tool) : undefined;
 
+  const isolatedProbe: IsolatedAgentProbe | undefined =
+    backend === 'scripting' && scriptingApi !== undefined
+      ? async (request, frameIds) => {
+          const results = await scriptingApi.executeScript({
+            args: [request.kind, request.selector ?? ''],
+            func: runIsolatedAgentProbe,
+            target:
+              frameIds === undefined
+                ? { allFrames: true, tabId }
+                : { frameIds: [...frameIds], tabId },
+            world: 'ISOLATED',
+          });
+
+          return results.flatMap(entry =>
+            entry.frameId === undefined || entry.error !== undefined
+              ? []
+              : [{ frameId: entry.frameId, result: entry.result }]
+          );
+        }
+      : undefined;
+  const isolatedProbeMember = isolatedProbe === undefined ? {} : { isolatedProbe };
+
   const createCallerView = (
     callerKey: string,
     refs: Map<string, BrowserToolRefEntry>,
@@ -3446,6 +3427,7 @@ export const createBrowserToolSession = ({
     return {
       attach,
       backend,
+      ...isolatedProbeMember,
       bindCaller: nextKey => createCallerView(nextKey, callerRefs(nextKey), guard),
       callTool: (toolName, args) => {
         throwIfCancelled();
@@ -3500,6 +3482,7 @@ export const createBrowserToolSession = ({
   return {
     attach,
     backend,
+    ...isolatedProbeMember,
     bindCaller: (callerKey, guard) => createCallerView(callerKey, callerRefs(callerKey), guard),
     callTool: (toolName, args) => runCallTool(toolName, args ?? {}, defaultRefs),
     captureViewportImage,

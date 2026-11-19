@@ -3114,7 +3114,7 @@
   "queryError": {
     "neutralDescription": "Tenta novamente.",
     "offlineTitle": "Não foi possível carregar os dados.",
-    "offlineDescription": "Não foi possível contactar o servidor. Verifica a tua ligação e tenta novamente.",
+    "offlineDescription": "Não foi possível contactar o servidor.",
     "permissionDescription": "Não tens permissão para ver este conteúdo.",
     "notFoundDescription": "Este item pode ter sido removido ou já não está disponível.",
     "serverTitle": "Não foi possível carregar os dados.",

@@ -3220,7 +3220,7 @@
   "queryError": {
     "neutralDescription": "Jekk jogħġbok erġa' pprova.",
     "offlineTitle": "Ma setax jitgħabba l-kontenut.",
-    "offlineDescription": "Ma setax jintlaħaq is-server. Iċċekkja l-konnessjoni u erġa' pprova.",
+    "offlineDescription": "Ma setax jintlaħaq is-server.",
     "permissionDescription": "M'għandekx permess biex tara dan.",
     "notFoundDescription": "Dan l-oġġett seta' tneħħa jew m'għadux disponibbli.",
     "serverTitle": "Ma setax jitgħabba l-kontenut.",

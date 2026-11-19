@@ -3052,7 +3052,7 @@
   "queryError": {
     "neutralDescription": "Irra deebi'ii yaali.",
     "offlineTitle": "Fe'uun hin milkoofne.",
-    "offlineDescription": "Sarvarii bira ga'uun hin danda'amne. Walqunnamtii kee ilaali, irra deebi'ii yaali.",
+    "offlineDescription": "Sarvarii bira ga'uun hin danda'amne.",
     "permissionDescription": "Kana ilaaluuf hayyama hin qabdu.",
     "notFoundDescription": "Wantichi haqamee ta'uu danda'a yookaan kana booda hin argamu.",
     "serverTitle": "Fe'uun hin danda'amne.",

@@ -3131,7 +3131,7 @@
   "queryError": {
     "neutralDescription": "Please try again.",
     "offlineTitle": "Failed to load",
-    "offlineDescription": "Could not reach the server. Check your connection and try again.",
+    "offlineDescription": "Could not reach the server.",
     "permissionDescription": "You don't have permission to view this.",
     "notFoundDescription": "This item may have been removed or is no longer available.",
     "serverTitle": "Could not load",

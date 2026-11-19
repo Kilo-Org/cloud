@@ -3052,7 +3052,7 @@
   "queryError": {
     "neutralDescription": "कृपया पुन्हा प्रयत्न करा.",
     "offlineTitle": "लोड करता आले नाही",
-    "offlineDescription": "सर्व्हरला पोहोचता आले नाही. तुमची जोडणी तपासा आणि पुन्हा प्रयत्न करा.",
+    "offlineDescription": "सर्व्हरला पोहोचता आले नाही.",
     "permissionDescription": "तुम्हाला हे पाहण्याची परवानगी नाही.",
     "notFoundDescription": "ही बाब काढून टाकली असू शकते किंवा आता उपलब्ध नाही.",
     "serverTitle": "लोड करता आले नाही",

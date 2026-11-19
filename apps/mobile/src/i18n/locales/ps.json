@@ -3052,7 +3052,7 @@
   "queryError": {
     "neutralDescription": "مهرباني وکړئ بیا هڅه وکړئ.",
     "offlineTitle": "بارول ناکام شو",
-    "offlineDescription": "له برسېرونکي سره اړیکه ټینګه نه شوه. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
+    "offlineDescription": "له برسېرونکي سره اړیکه ټینګه نه شوه.",
     "permissionDescription": "تاسو د دې د لیدلو اجازه نه لرئ.",
     "notFoundDescription": "ښايي دا توکی لرې شوی وي یا نور شتون ونه لري.",
     "serverTitle": "بار نه شو",

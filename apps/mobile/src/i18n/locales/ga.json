@@ -3220,7 +3220,7 @@
   "queryError": {
     "neutralDescription": "Bain triail as arís.",
     "offlineTitle": "Theip ar an lódáil.",
-    "offlineDescription": "Níorbh fhéidir an freastalaí a shroicheadh. Seiceáil do nasc agus bain triail as arís.",
+    "offlineDescription": "Níorbh fhéidir an freastalaí a shroicheadh.",
     "permissionDescription": "Níl cead agat é seo a fheiceáil.",
     "notFoundDescription": "Seans gur baineadh an mhír seo nó nach bhfuil sí ar fáil a thuilleadh.",
     "serverTitle": "Níorbh fhéidir an t-ábhar a lódáil.",

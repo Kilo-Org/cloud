@@ -3108,7 +3108,7 @@
   "queryError": {
     "neutralDescription": "Pokušaj ponovo.",
     "offlineTitle": "Učitavanje nije uspelo.",
-    "offlineDescription": "Nije moguće doći do servera. Proveri vezu i pokušaj ponovo.",
+    "offlineDescription": "Nije moguće doći do servera.",
     "permissionDescription": "Nemaš dozvolu za prikaz ovog sadržaja.",
     "notFoundDescription": "Ova stavka je možda uklonjena ili više nije dostupna.",
     "serverTitle": "Nije moguće učitati podatke.",

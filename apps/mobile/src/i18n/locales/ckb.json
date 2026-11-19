@@ -3052,7 +3052,7 @@
   "queryError": {
     "neutralDescription": "تکایە دووبارە هەوڵ بدە.",
     "offlineTitle": "بارکردن سەرکەوتوو نەبوو.",
-    "offlineDescription": "نەتوانرا بگەینە ڕاژەکە. پەیوەندییەکەت بپشکنە و دووبارە هەوڵ بدە.",
+    "offlineDescription": "نەتوانرا بگەینە ڕاژەکە.",
     "permissionDescription": "ڕێگەپێدراو نیت ئەمە ببینیت.",
     "notFoundDescription": "ڕەنگە ئەم بڕگەیە لابرابێت یان چیتر بەردەست نەبێت.",
     "serverTitle": "نەتوانرا بار بکرێت.",

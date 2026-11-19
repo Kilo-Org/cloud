@@ -3052,7 +3052,7 @@
   "queryError": {
     "neutralDescription": "Probeer asseblief weer.",
     "offlineTitle": "Die inhoud kon nie gelaai word nie.",
-    "offlineDescription": "Kon nie die bediener bereik nie. Kontroleer jou verbinding en probeer asseblief weer.",
+    "offlineDescription": "Kon nie die bediener bereik nie.",
     "permissionDescription": "Jy het nie toestemming om dit te bekyk nie.",
     "notFoundDescription": "Hierdie item is moontlik verwyder of is nie meer beskikbaar nie.",
     "serverTitle": "Die inhoud kon nie gelaai word nie.",

@@ -2542,7 +2542,7 @@
   "queryError": {
     "neutralDescription": "Inténtalo de nuevo.",
     "offlineTitle": "No se pudo cargar el contenido.",
-    "offlineDescription": "No se pudo conectar con el servidor. Comprueba tu conexión e inténtalo de nuevo.",
+    "offlineDescription": "No se pudo conectar con el servidor.",
     "permissionDescription": "No tienes permiso para ver esto.",
     "notFoundDescription": "Es posible que este elemento se haya eliminado o ya no esté disponible.",
     "serverTitle": "No se pudo cargar el contenido.",

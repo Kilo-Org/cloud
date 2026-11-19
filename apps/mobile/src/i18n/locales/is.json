@@ -3052,7 +3052,7 @@
   "queryError": {
     "neutralDescription": "Reyndu aftur.",
     "offlineTitle": "Ekki tókst að sækja gögn.",
-    "offlineDescription": "Ekki tókst að ná sambandi við netþjóninn. Athugaðu tenginguna og reyndu aftur.",
+    "offlineDescription": "Ekki tókst að ná sambandi við netþjóninn.",
     "permissionDescription": "Þú hefur ekki heimild til að skoða þetta.",
     "notFoundDescription": "Efnið hefur hugsanlega verið fjarlægt eða er ekki lengur tiltækt.",
     "serverTitle": "Ekki tókst að sækja gögn.",

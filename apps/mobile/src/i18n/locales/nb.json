@@ -3052,7 +3052,7 @@
   "queryError": {
     "neutralDescription": "Prøv igjen.",
     "offlineTitle": "Kunne ikke laste inn innholdet.",
-    "offlineDescription": "Kunne ikke nå serveren. Sjekk tilkoblingen og prøv igjen.",
+    "offlineDescription": "Kunne ikke nå serveren.",
     "permissionDescription": "Du har ikke tillatelse til å se dette.",
     "notFoundDescription": "Dette elementet kan ha blitt fjernet eller er ikke lenger tilgjengelig.",
     "serverTitle": "Kunne ikke laste inn innholdet.",

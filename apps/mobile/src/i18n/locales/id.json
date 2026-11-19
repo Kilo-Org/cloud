@@ -2509,7 +2509,7 @@
   "queryError": {
     "neutralDescription": "Coba lagi.",
     "offlineTitle": "Gagal memuat.",
-    "offlineDescription": "Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.",
+    "offlineDescription": "Tidak dapat terhubung ke server.",
     "permissionDescription": "Kamu tidak punya izin untuk melihat ini.",
     "notFoundDescription": "Item ini mungkin telah dihapus atau tidak lagi tersedia.",
     "serverTitle": "Tidak dapat memuat.",

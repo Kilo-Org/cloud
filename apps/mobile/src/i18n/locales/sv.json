@@ -3052,7 +3052,7 @@
   "queryError": {
     "neutralDescription": "Försök igen.",
     "offlineTitle": "Kunde inte läsa in",
-    "offlineDescription": "Kunde inte nå servern. Kontrollera anslutningen och försök igen.",
+    "offlineDescription": "Kunde inte nå servern.",
     "permissionDescription": "Du har inte behörighet att se det här.",
     "notFoundDescription": "Det här objektet kan ha tagits bort eller är inte längre tillgängligt.",
     "serverTitle": "Kunde inte läsa in innehållet.",

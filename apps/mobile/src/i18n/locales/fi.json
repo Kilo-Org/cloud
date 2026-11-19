@@ -3052,7 +3052,7 @@
   "queryError": {
     "neutralDescription": "Yritä uudelleen.",
     "offlineTitle": "Lataus epäonnistui",
-    "offlineDescription": "Palvelimeen ei saatu yhteyttä. Tarkista yhteys ja yritä uudelleen.",
+    "offlineDescription": "Palvelimeen ei saatu yhteyttä.",
     "permissionDescription": "Sinulla ei ole oikeutta tarkastella tätä.",
     "notFoundDescription": "Tämä kohde on saatettu poistaa tai se ei ole enää käytettävissä.",
     "serverTitle": "Lataaminen ei onnistunut",

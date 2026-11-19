@@ -2509,7 +2509,7 @@
   "queryError": {
     "neutralDescription": "もう一度お試しください。",
     "offlineTitle": "読み込みに失敗しました。",
-    "offlineDescription": "サーバーに接続できませんでした。接続を確認して、もう一度お試しください。",
+    "offlineDescription": "サーバーに接続できませんでした。",
     "permissionDescription": "この内容を表示する権限がありません。",
     "notFoundDescription": "この項目は削除されたか、利用できなくなった可能性があります。",
     "serverTitle": "読み込めませんでした。",

@@ -2641,7 +2641,7 @@
   "queryError": {
     "neutralDescription": "حاول مرة أخرى.",
     "offlineTitle": "تعذّر التحميل.",
-    "offlineDescription": "تعذّر الوصول إلى الخادم. تحقق من اتصالك وحاول مرة أخرى.",
+    "offlineDescription": "تعذّر الوصول إلى الخادم.",
     "permissionDescription": "لا تملك صلاحية عرض هذا المحتوى.",
     "notFoundDescription": "ربما تمت إزالة هذا العنصر أو لم يعد متاحًا.",
     "serverTitle": "تعذّر التحميل.",

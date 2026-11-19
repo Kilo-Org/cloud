@@ -3108,7 +3108,7 @@
   "queryError": {
     "neutralDescription": "Lūdzu, mēģini vēlreiz.",
     "offlineTitle": "Neizdevās ielādēt.",
-    "offlineDescription": "Neizdevās savienoties ar serveri. Pārbaudi savienojumu un mēģini vēlreiz.",
+    "offlineDescription": "Neizdevās savienoties ar serveri.",
     "permissionDescription": "Tev nav atļaujas to skatīt.",
     "notFoundDescription": "Iespējams, šis vienums ir noņemts vai vairs nav pieejams.",
     "serverTitle": "Neizdevās ielādēt.",

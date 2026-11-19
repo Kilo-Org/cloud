@@ -111,7 +111,16 @@ export function LegalDocumentScreen({
             </Text>
           </View>
         ) : null}
-        <MarkdownText value={state.html} documentDirection="ltr" onPressLink={openInContentLink} />
+        {/* The body is static prose with links inside it. Selectable text takes
+         * the press before the link handler sees it on Android, and it exposes
+         * every heading and paragraph to a screen reader as a control that
+         * does nothing. */}
+        <MarkdownText
+          value={state.html}
+          documentDirection="ltr"
+          selectable={false}
+          onPressLink={openInContentLink}
+        />
       </ScrollView>
     );
   }

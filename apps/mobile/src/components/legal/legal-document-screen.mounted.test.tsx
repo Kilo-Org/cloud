@@ -152,6 +152,17 @@ describe('LegalDocumentScreen English-only notice', () => {
     expect(body?.props.documentDirection).toBe('ltr');
   });
 
+  it('renders the document body as non-selectable text', async () => {
+    await i18n.changeLanguage('en');
+    const renderer = mountScreen();
+
+    // Selectable text takes the press before an in-content link sees it, and
+    // it announces the static prose as controls that do nothing.
+    const bodies = renderer.root.findAll(node => isBody(node));
+    expect(bodies).toHaveLength(1);
+    expect(bodies.at(0)?.props.selectable).toBe(false);
+  });
+
   it('shows no notice when the app language is English', async () => {
     await i18n.changeLanguage('en');
     const renderer = mountScreen();

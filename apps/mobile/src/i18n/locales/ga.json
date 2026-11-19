@@ -4727,7 +4727,7 @@
     "summary": "Achoimre AI",
     "summaryPending": "Tá an achoimre AI á hullmhú. Ceanglófar anseo í nuair a bheidh sí réidh.",
     "summaryUnavailable": "Níl achoimre AI ar fáil. Tá do thuarascáil struchtúrtha ar fáil fós.",
-    "summaryNotAdmitted": "Níor cruthaíodh an achoimre AI inniu. Tá do thuarascáil struchtúrtha ar fáil fós.",
+    "summaryNotAdmitted": "Níor cruthaíodh an achoimre AI don tuarascáil seo. Tá do thuarascáil struchtúrtha ar fáil fós.",
     "summaryCharge": "Muirear AI: {{cost}}",
     "summaryChargePending": "Muirear AI ag fanacht le réiteach",
     "summaryModel": "$t(common.model): {{model}}",

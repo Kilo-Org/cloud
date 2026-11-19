@@ -4514,7 +4514,7 @@
     "summary": "Famintinana AI",
     "summaryPending": "Eo am-panomanana ny famintinana AI. Hiseho eto izy rehefa vita.",
     "summaryUnavailable": "Tsy misy ny famintinana AI. Mbola azo jerena ny tatitra voalamina.",
-    "summaryNotAdmitted": "Tsy natao ny famintinana AI androany. Mbola azo jerena ny tatitra voalamina.",
+    "summaryNotAdmitted": "Tsy natao ny famintinana AI ho an'ity tatitra ity. Mbola azo jerena ny tatitra voalamina.",
     "summaryCharge": "Sarany AI {{cost}}",
     "summaryChargePending": "Sarany AI miandry fanamarinana",
     "summaryModel": "$t(common.model): {{model}}",

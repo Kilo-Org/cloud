@@ -4656,7 +4656,7 @@
     "summary": "Підсумок AI",
     "summaryPending": "Підсумок AI готується. Він з’явиться тут, коли буде готовий.",
     "summaryUnavailable": "Підсумок AI недоступний. Структурований звіт і далі доступний.",
-    "summaryNotAdmitted": "Підсумок AI сьогодні не формувався. Структурований звіт і далі доступний.",
+    "summaryNotAdmitted": "Підсумок AI не формувався для цього звіту. Структурований звіт і далі доступний.",
     "summaryCharge": "Списано за AI: {{cost}}",
     "summaryChargePending": "Плата за AI очікує звірки",
     "summaryModel": "$t(common.model): {{model}}",

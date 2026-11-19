@@ -4514,7 +4514,7 @@
     "summary": "AI-sammendrag",
     "summaryPending": "AI-sammendraget lages. Det legges til her når det er klart.",
     "summaryUnavailable": "AI-sammendrag er ikke tilgjengelig. Den strukturerte briefen er fortsatt tilgjengelig.",
-    "summaryNotAdmitted": "AI-sammendraget ble ikke generert i dag. Den strukturerte briefen er fortsatt tilgjengelig.",
+    "summaryNotAdmitted": "AI-sammendraget ble ikke generert for denne briefen. Den strukturerte briefen er fortsatt tilgjengelig.",
     "summaryCharge": "AI belastet {{cost}}",
     "summaryChargePending": "AI-belastning venter på avstemming",
     "summaryModel": "$t(common.model): {{model}}",

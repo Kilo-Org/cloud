@@ -4656,7 +4656,7 @@
     "summary": "Podsumowanie AI",
     "summaryPending": "Trwa tworzenie podsumowania AI. Pojawi się tutaj, gdy będzie gotowe.",
     "summaryUnavailable": "Podsumowanie AI niedostępne. Ustrukturyzowany raport jest nadal dostępny.",
-    "summaryNotAdmitted": "Podsumowanie AI nie zostało dziś wygenerowane. Ustrukturyzowany raport jest nadal dostępny.",
+    "summaryNotAdmitted": "Podsumowanie AI nie zostało wygenerowane dla tego raportu. Ustrukturyzowany raport jest nadal dostępny.",
     "summaryCharge": "Opłata za AI: {{cost}}",
     "summaryChargePending": "Opłata za AI oczekuje na rozliczenie",
     "summaryModel": "$t(common.model): {{model}}",

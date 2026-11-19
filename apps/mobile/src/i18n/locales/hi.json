@@ -4514,7 +4514,7 @@
     "summary": "AI सारांश",
     "summaryPending": "AI सारांश बन रहा है। तैयार होने पर यहाँ जुड़ जाएगा।",
     "summaryUnavailable": "AI सारांश उपलब्ध नहीं है। आपकी संरचित ब्रीफ़िंग अभी भी उपलब्ध है।",
-    "summaryNotAdmitted": "AI सारांश आज जनरेट नहीं हुआ। आपकी संरचित ब्रीफ़िंग अभी भी उपलब्ध है।",
+    "summaryNotAdmitted": "AI सारांश इस ब्रीफ़िंग के लिए जनरेट नहीं हुआ। आपकी संरचित ब्रीफ़िंग अभी भी उपलब्ध है।",
     "summaryCharge": "AI शुल्क {{cost}}",
     "summaryChargePending": "AI शुल्क का मिलान बाकी है",
     "summaryModel": "$t(common.model): {{model}}",

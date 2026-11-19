@@ -4514,7 +4514,7 @@
     "summary": "AI સારાંશ",
     "summaryPending": "AI સારાંશ તૈયાર થઈ રહ્યો છે. તૈયાર થયે અહીં જોડાશે.",
     "summaryUnavailable": "AI સારાંશ ઉપલબ્ધ નથી. તમારો માળખાગત રિપોર્ટ હજુ ઉપલબ્ધ છે.",
-    "summaryNotAdmitted": "AI સારાંશ આજે બનાવવામાં આવ્યો નથી. તમારો માળખાગત રિપોર્ટ હજુ ઉપલબ્ધ છે.",
+    "summaryNotAdmitted": "આ રિપોર્ટ માટે AI સારાંશ બનાવવામાં આવ્યો નથી. તમારો માળખાગત રિપોર્ટ હજુ ઉપલબ્ધ છે.",
     "summaryCharge": "AI ચાર્જ {{cost}}",
     "summaryChargePending": "AI ચાર્જ મેળવણી બાકી",
     "summaryModel": "$t(common.model): {{model}}",

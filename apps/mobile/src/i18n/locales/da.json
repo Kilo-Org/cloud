@@ -4514,7 +4514,7 @@
     "summary": "AI-resumé",
     "summaryPending": "AI-resuméet er i gang. Det vises her, når det er klar.",
     "summaryUnavailable": "AI-resumé er ikke tilgængeligt. Din strukturerede briefing er stadig tilgængelig.",
-    "summaryNotAdmitted": "AI-resuméet blev ikke genereret i dag. Din strukturerede briefing er stadig tilgængelig.",
+    "summaryNotAdmitted": "AI-resuméet blev ikke genereret til denne briefing. Din strukturerede briefing er stadig tilgængelig.",
     "summaryCharge": "AI opkrævede {{cost}}",
     "summaryChargePending": "AI-betaling afventer afstemning",
     "summaryModel": "$t(common.model): {{model}}",

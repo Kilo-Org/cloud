@@ -4514,7 +4514,7 @@
     "summary": "AI ସାରାଂଶ",
     "summaryPending": "AI ସାରାଂଶ ପ୍ରସ୍ତୁତ ହେଉଛି। ପ୍ରସ୍ତୁତ ହେଲେ ଏଠାରେ ଯୋଡାଯିବ।",
     "summaryUnavailable": "AI ସାରାଂଶ ଉପଲବ୍ଧ ନାହିଁ। ଆପଣଙ୍କ ସଂରଚିତ ରିପୋର୍ଟ ଏବେ ବି ଉପଲବ୍ଧ।",
-    "summaryNotAdmitted": "AI ସାରାଂଶ ଆଜି ସୃଷ୍ଟି କରାଯାଇନାହିଁ। ଆପଣଙ୍କ ସଂରଚିତ ରିପୋର୍ଟ ଏବେ ବି ଉପଲବ୍ଧ।",
+    "summaryNotAdmitted": "AI ସାରାଂଶ ଏହି ରିପୋର୍ଟ ପାଇଁ ସୃଷ୍ଟି କରାଯାଇନାହିଁ। ଆପଣଙ୍କ ସଂରଚିତ ରିପୋର୍ଟ ଏବେ ବି ଉପଲବ୍ଧ।",
     "summaryCharge": "AI ଶୁଳ୍କ {{cost}}",
     "summaryChargePending": "AI ଶୁଳ୍କ ମିଳାଣ ବାକି ଅଛି",
     "summaryModel": "$t(common.model): {{model}}",

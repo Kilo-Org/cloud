@@ -4514,7 +4514,7 @@
     "summary": "Resumo con IA",
     "summaryPending": "O resumo con IA está en curso. Engadirase aquí cando estea listo.",
     "summaryUnavailable": "Resumo con IA non dispoñible. O teu informe estruturado segue dispoñible.",
-    "summaryNotAdmitted": "O resumo con IA non se xerou hoxe. O teu informe estruturado segue dispoñible.",
+    "summaryNotAdmitted": "O resumo con IA non se xerou para este informe. O teu informe estruturado segue dispoñible.",
     "summaryCharge": "Cargo de IA: {{cost}}",
     "summaryChargePending": "Cargo de IA pendente de conciliación",
     "summaryModel": "$t(common.model): {{model}}",

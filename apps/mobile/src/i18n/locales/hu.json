@@ -4514,7 +4514,7 @@
     "summary": "AI-összefoglaló",
     "summaryPending": "Az AI-összefoglaló készül. Elkészülte után itt jelenik meg.",
     "summaryUnavailable": "Az AI-összefoglaló nem érhető el. A strukturált jelentés továbbra is elérhető.",
-    "summaryNotAdmitted": "Az AI-összefoglaló ma nem készült el. A strukturált jelentés továbbra is elérhető.",
+    "summaryNotAdmitted": "Az AI-összefoglaló nem készült el ehhez a jelentéshez. A strukturált jelentés továbbra is elérhető.",
     "summaryCharge": "AI-díj: {{cost}}",
     "summaryChargePending": "Az AI-díj elszámolása folyamatban",
     "summaryModel": "$t(common.model): {{model}}",

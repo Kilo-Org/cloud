@@ -4514,7 +4514,7 @@
     "summary": "د AI لنډیز",
     "summaryPending": "د AI لنډیز په جریان کې دی. چې چمتو شي، دلته به ونښلول شي.",
     "summaryUnavailable": "د AI لنډیز شتون نه لري. ستاسو منظم راپور لا هم شته.",
-    "summaryNotAdmitted": "د AI لنډیز نن رامنځته نه شو. ستاسو منظم راپور لا هم شته.",
+    "summaryNotAdmitted": "د AI لنډیز د دې راپور لپاره رامنځته نه شو. ستاسو منظم راپور لا هم شته.",
     "summaryCharge": "AI {{cost}} واخیستل",
     "summaryChargePending": "د AI لګښت د تطبیق په تمه دی",
     "summaryModel": "$t(common.model): {{model}}",

@@ -4514,7 +4514,7 @@
     "summary": "AI laburpena",
     "summaryPending": "AI laburpena prestatzen ari da. Prest dagoenean hemen erantsiko da.",
     "summaryUnavailable": "AI laburpena ez dago erabilgarri. Zure txosten egituratua erabilgarri dago oraindik.",
-    "summaryNotAdmitted": "AI laburpena ez da gaur sortu. Zure txosten egituratua erabilgarri dago oraindik.",
+    "summaryNotAdmitted": "AI laburpena ez da txosten honetarako sortu. Zure txosten egituratua erabilgarri dago oraindik.",
     "summaryCharge": "AI kargua: {{cost}}",
     "summaryChargePending": "AI kargua egiaztatzeko zain",
     "summaryModel": "$t(common.model): {{model}}",

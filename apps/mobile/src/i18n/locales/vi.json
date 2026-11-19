@@ -4514,7 +4514,7 @@
     "summary": "Tóm tắt AI",
     "summaryPending": "Đang tạo tóm tắt AI. Tóm tắt sẽ hiển thị tại đây khi sẵn sàng.",
     "summaryUnavailable": "Tóm tắt AI không khả dụng. Bản tin có cấu trúc vẫn khả dụng.",
-    "summaryNotAdmitted": "Tóm tắt AI chưa được tạo hôm nay. Bản tin có cấu trúc vẫn khả dụng.",
+    "summaryNotAdmitted": "Tóm tắt AI không được tạo cho bản tin này. Bản tin có cấu trúc vẫn khả dụng.",
     "summaryCharge": "AI đã tính phí {{cost}}",
     "summaryChargePending": "Phí AI đang chờ đối soát",
     "summaryModel": "$t(common.model): {{model}}",

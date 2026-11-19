@@ -4585,7 +4585,7 @@
     "summary": "AI kopsavilkums",
     "summaryPending": "AI kopsavilkums tiek veidots. Tas parādīsies šeit, kad būs gatavs.",
     "summaryUnavailable": "AI kopsavilkums nav pieejams. Jūsu strukturētā atskaite joprojām ir pieejama.",
-    "summaryNotAdmitted": "AI kopsavilkums šodien netika izveidots. Jūsu strukturētā atskaite joprojām ir pieejama.",
+    "summaryNotAdmitted": "AI kopsavilkums netika izveidots šai atskaitei. Jūsu strukturētā atskaite joprojām ir pieejama.",
     "summaryCharge": "AI maksa: {{cost}}",
     "summaryChargePending": "AI maksa gaida saskaņošanu",
     "summaryModel": "$t(common.model): {{model}}",

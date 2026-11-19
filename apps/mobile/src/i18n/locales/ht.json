@@ -4514,7 +4514,7 @@
     "summary": "Rezime AI",
     "summaryPending": "Rezime AI a ap prepare. L ap parèt isit la lè l pare.",
     "summaryUnavailable": "Rezime AI a pa disponib. Rapò estriktire ou a toujou disponib.",
-    "summaryNotAdmitted": "Rezime AI a pa te fèt jodi a. Rapò estriktire ou a toujou disponib.",
+    "summaryNotAdmitted": "Rezime AI a pa te fèt pou rapò sa a. Rapò estriktire ou a toujou disponib.",
     "summaryCharge": "AI te koute {{cost}}",
     "summaryChargePending": "Frè AI an atant verifikasyon",
     "summaryModel": "$t(common.model): {{model}}",

@@ -16,6 +16,7 @@ import {
   recordBriefingUsage,
 } from '@kilocode/web-shared/lib/agent-briefing-usage';
 import type { UsageAccountingResult } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { sweepAgentBriefings, generatePendingAgentBriefings } from './sweep';
 import { reconcileBriefingCharge, runBriefingSummary, SUMMARY_MAX_ATTEMPTS } from './summary';
 import { briefingFactsSchema, buildBriefingSnapshot, collectBriefingSnapshot } from './evidence';
@@ -316,6 +317,31 @@ it('fails a terminal decline without a second request', async () => {
   const [failed] = await db.select().from(agent_briefing_snapshots);
   expect(failed?.summary.status).toBe('failed');
   expect(failed?.summary.error).toBe('gateway_declined');
+});
+
+// A transient admission failure leaves the row pending with its unchanged
+// due timestamp, so the next due run can generate it.
+it('retries a row whose admission hit a transient failure and later generates it', async () => {
+  const { now } = await scheduled();
+  await sweepAgentBriefings(now);
+  const [row] = await db.select().from(agent_briefing_snapshots);
+  if (!row) throw new Error('No captured snapshot');
+  const balance = jest.mocked(getBalanceAndOrgSettings);
+  balance.mockRejectedValueOnce(new Error('_transient'));
+  const fetcher = jest.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('fetch failed'));
+  await expect(runBriefingSummary(row.id)).rejects.toThrow('_transient');
+  expect(fetcher).not.toHaveBeenCalled();
+  const [stalled] = await db.select().from(agent_briefing_snapshots);
+  expect(stalled?.summary.status).toBe('pending');
+  expect(stalled?.generation_id).toBeNull();
+  expect(stalled?.job_due_at).toBe(row.job_due_at);
+  fetcher.mockResolvedValue(
+    Response.json({ choices: [{ message: { content: 'Recovered summary.' } }] })
+  );
+  await runBriefingSummary(row.id);
+  const [finished] = await db.select().from(agent_briefing_snapshots);
+  expect(finished?.summary.status).toBe('ready');
+  expect(finished?.summary.text).toBe('Recovered summary.');
 });
 
 it('does not repeat a successful answer whose body cannot be read', async () => {

@@ -4514,7 +4514,7 @@
     "summary": "AI සාරාංශය",
     "summaryPending": "AI සාරාංශය සකසමින් පවතී. සූදානම් වූ විට මෙහි එක් වේ.",
     "summaryUnavailable": "AI සාරාංශය ලබා ගත නොහැක. ඔබේ ව්‍යුහගත වාර්තාව තවමත් ලබා ගත හැක.",
-    "summaryNotAdmitted": "AI සාරාංශය අද ජනනය කර නොමැත. ඔබේ ව්‍යුහගත වාර්තාව තවමත් ලබා ගත හැක.",
+    "summaryNotAdmitted": "AI සාරාංශය මෙම වාර්තාව සඳහා ජනනය කර නොමැත. ඔබේ ව්‍යුහගත වාර්තාව තවමත් ලබා ගත හැක.",
     "summaryCharge": "AI ගාස්තුව {{cost}}",
     "summaryChargePending": "AI ගාස්තුව සැසඳීම පොරොත්තුවෙන්",
     "summaryModel": "$t(common.model): {{model}}",

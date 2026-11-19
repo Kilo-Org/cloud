@@ -4585,7 +4585,7 @@
     "summary": "Résumé IA",
     "summaryPending": "Résumé IA en cours. Il s’affichera ici une fois prêt.",
     "summaryUnavailable": "Résumé IA indisponible. Votre briefing structuré reste disponible.",
-    "summaryNotAdmitted": "Le résumé IA n'a pas été généré aujourd'hui. Votre briefing structuré reste disponible.",
+    "summaryNotAdmitted": "Le résumé IA n'a pas été généré pour ce briefing. Votre briefing structuré reste disponible.",
     "summaryCharge": "IA facturée {{cost}}",
     "summaryChargePending": "Facturation IA en attente de rapprochement",
     "summaryModel": "$t(common.model) : {{model}}",

@@ -4656,7 +4656,7 @@
     "summary": "AI santrauka",
     "summaryPending": "AI santrauka rengiama. Kai bus paruošta, ji atsiras čia.",
     "summaryUnavailable": "AI santrauka nepasiekiama. Struktūruota suvestinė vis dar prieinama.",
-    "summaryNotAdmitted": "AI santrauka šiandien nesukurta. Struktūruota suvestinė vis dar prieinama.",
+    "summaryNotAdmitted": "AI santrauka šiai suvestinei nesukurta. Struktūruota suvestinė vis dar prieinama.",
     "summaryCharge": "AI mokestis {{cost}}",
     "summaryChargePending": "AI mokestis laukia suderinimo",
     "summaryModel": "$t(common.model): {{model}}",

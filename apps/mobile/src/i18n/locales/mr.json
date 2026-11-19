@@ -4514,7 +4514,7 @@
     "summary": "AI सारांश",
     "summaryPending": "AI सारांश तयार होत आहे. तयार झाल्यावर तो येथे जोडला जाईल.",
     "summaryUnavailable": "AI सारांश उपलब्ध नाही. तुमचा संरचित आढावा अजूनही उपलब्ध आहे.",
-    "summaryNotAdmitted": "AI सारांश आज तयार झाला नाही. तुमचा संरचित आढावा अजूनही उपलब्ध आहे.",
+    "summaryNotAdmitted": "AI सारांश या आढाव्यासाठी तयार झाला नाही. तुमचा संरचित आढावा अजूनही उपलब्ध आहे.",
     "summaryCharge": "AI शुल्क {{cost}}",
     "summaryChargePending": "AI शुल्क ताळमेळ प्रलंबित",
     "summaryModel": "$t(common.model): {{model}}",

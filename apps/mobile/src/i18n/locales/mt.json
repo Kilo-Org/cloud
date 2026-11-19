@@ -4727,7 +4727,7 @@
     "summary": "Sommarju AI",
     "summaryPending": "Is-sommarju AI qed jitħejja. Jitwaħħal hawn meta jkun lest.",
     "summaryUnavailable": "Is-sommarju AI mhux disponibbli. Il-briefing strutturat tiegħek għadu disponibbli.",
-    "summaryNotAdmitted": "Is-sommarju AI ma ġenerax illum. Il-briefing strutturat tiegħek għadu disponibbli.",
+    "summaryNotAdmitted": "Is-sommarju AI ma ġiex ġenerat għal dan il-briefing. Il-briefing strutturat tiegħek għadu disponibbli.",
     "summaryCharge": "Ġie ddebitat {{cost}} għall-AI",
     "summaryChargePending": "Ħlas tal-AI qed jistenna r-rikonċiljazzjoni",
     "summaryModel": "$t(common.model): {{model}}",

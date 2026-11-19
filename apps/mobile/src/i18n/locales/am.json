@@ -4514,7 +4514,7 @@
     "summary": "AI ማጠቃለያ",
     "summaryPending": "AI ማጠቃለያ በሂደት ላይ ነው። ሲዘጋጅ እዚህ ይያያዛል።",
     "summaryUnavailable": "AI ማጠቃለያ አይገኝም። የተዋቀረ ሪፖርትዎ አሁንም ይገኛል።",
-    "summaryNotAdmitted": "AI ማጠቃለያ ዛሬ አልተፈጠረም። የተዋቀረ ሪፖርትዎ አሁንም ይገኛል።",
+    "summaryNotAdmitted": "AI ማጠቃለያ ለዚህ ሪፖርት አልተፈጠረም። የተዋቀረ ሪፖርትዎ አሁንም ይገኛል።",
     "summaryCharge": "AI {{cost}} አስከፍሏል",
     "summaryChargePending": "የAI ክፍያ ማስታረቅ በመጠባበቅ ላይ",
     "summaryModel": "$t(common.model): {{model}}",

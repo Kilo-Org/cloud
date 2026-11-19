@@ -4514,7 +4514,7 @@
     "summary": "Soo koobid AI",
     "summaryPending": "Soo koobidda AI waa socotaa. Halkan ayay ku soo xirmi doontaa marka ay diyaar noqoto.",
     "summaryUnavailable": "Soo koobidda AI lama heli karo. Warbixintaada habaysan weli waa la heli karaa.",
-    "summaryNotAdmitted": "Soo koobidda AI ma samaysmin maanta. Warbixintaada habaysan weli waa la heli karaa.",
+    "summaryNotAdmitted": "Soo koobidda AI ee ku saabsan warbixintan lama samaysmin. Warbixintaada habaysan weli waa la heli karaa.",
     "summaryCharge": "AI waxay ku dallacday {{cost}}",
     "summaryChargePending": "Lacagta AI waxay sugaysaa hubin",
     "summaryModel": "$t(common.model): {{model}}",

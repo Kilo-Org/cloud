@@ -4585,7 +4585,7 @@
     "summary": "AI sažetak",
     "summaryPending": "AI sažetak je u izradi. Pojavit će se ovdje kad bude spreman.",
     "summaryUnavailable": "AI sažetak nije dostupan. Strukturirano izvješće i dalje je dostupno.",
-    "summaryNotAdmitted": "AI sažetak danas nije generiran. Strukturirano izvješće i dalje je dostupno.",
+    "summaryNotAdmitted": "AI sažetak nije generiran za ovo izvješće. Strukturirano izvješće i dalje je dostupno.",
     "summaryCharge": "AI naplata: {{cost}}",
     "summaryChargePending": "AI naplata čeka usklađivanje",
     "summaryModel": "$t(common.model): {{model}}",

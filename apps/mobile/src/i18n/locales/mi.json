@@ -4514,7 +4514,7 @@
     "summary": "Whakarāpopototanga AI",
     "summaryPending": "Kei te mahia te whakarāpopototanga AI. Ka tāpirihia ki konei ina rite.",
     "summaryUnavailable": "Kāore te whakarāpopototanga AI e wātea ana. Kei te wātea tonu tō pūrongo hanganga.",
-    "summaryNotAdmitted": "Kāore te whakarāpopototanga AI i hangaia i tēnei rā. Kei te wātea tonu tō pūrongo hanganga.",
+    "summaryNotAdmitted": "Kāore te whakarāpopototanga AI i hangaia mō tēnei pūrongo. Kei te wātea tonu tō pūrongo hanganga.",
     "summaryCharge": "Kua utaina he utu AI: {{cost}}",
     "summaryChargePending": "Kei te tatari te utu AI kia whakaōritehia",
     "summaryModel": "$t(common.model): {{model}}",

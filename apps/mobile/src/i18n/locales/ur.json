@@ -4514,7 +4514,7 @@
     "summary": "AI خلاصہ",
     "summaryPending": "AI خلاصہ تیار ہو رہا ہے۔ تیار ہونے پر یہاں منسلک ہو جائے گا۔",
     "summaryUnavailable": "AI خلاصہ دستیاب نہیں۔ آپ کی منظم بریفنگ اب بھی دستیاب ہے۔",
-    "summaryNotAdmitted": "AI خلاصہ آج تیار نہیں ہوا۔ آپ کی منظم بریفنگ اب بھی دستیاب ہے۔",
+    "summaryNotAdmitted": "AI خلاصہ اس بریفنگ کے لیے تیار نہیں ہوا۔ آپ کی منظم بریفنگ اب بھی دستیاب ہے۔",
     "summaryCharge": "AI چارج {{cost}}",
     "summaryChargePending": "AI چارج کی تصدیق زیر التوا ہے",
     "summaryModel": "$t(common.model): {{model}}",

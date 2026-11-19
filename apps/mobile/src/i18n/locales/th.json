@@ -4514,7 +4514,7 @@
     "summary": "สรุปโดย AI",
     "summaryPending": "กำลังสร้างสรุปโดย AI จะแนบไว้ที่นี่เมื่อพร้อม",
     "summaryUnavailable": "สรุปโดย AI ไม่พร้อมใช้งาน แต่ยังดูรายงานแบบมีโครงสร้างได้",
-    "summaryNotAdmitted": "สรุปโดย AI ยังไม่ได้สร้างในวันนี้ แต่ยังดูรายงานแบบมีโครงสร้างได้",
+    "summaryNotAdmitted": "สรุปโดย AI ยังไม่ได้สร้างสำหรับรายงานฉบับนี้ แต่ยังดูรายงานแบบมีโครงสร้างได้",
     "summaryCharge": "ค่าบริการ AI {{cost}}",
     "summaryChargePending": "ค่าบริการ AI รอการกระทบยอด",
     "summaryModel": "$t(common.model): {{model}}",

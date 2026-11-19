@@ -4514,7 +4514,7 @@
     "summary": "AI ਸਾਰ",
     "summaryPending": "AI ਸਾਰ ਤਿਆਰ ਹੋ ਰਿਹਾ ਹੈ। ਤਿਆਰ ਹੋਣ 'ਤੇ ਇੱਥੇ ਜੁੜ ਜਾਵੇਗਾ।",
     "summaryUnavailable": "AI ਸਾਰ ਉਪਲਬਧ ਨਹੀਂ। ਤੁਹਾਡੀ ਢਾਂਚਾਗਤ ਬ੍ਰੀਫਿੰਗ ਅਜੇ ਵੀ ਉਪਲਬਧ ਹੈ।",
-    "summaryNotAdmitted": "ਅੱਜ AI ਸਾਰ ਨਹੀਂ ਬਣਾਇਆ ਗਿਆ। ਤੁਹਾਡੀ ਢਾਂਚਾਗਤ ਬ੍ਰੀਫਿੰਗ ਅਜੇ ਵੀ ਉਪਲਬਧ ਹੈ।",
+    "summaryNotAdmitted": "ਇਸ ਬ੍ਰੀਫਿੰਗ ਲਈ AI ਸਾਰ ਨਹੀਂ ਬਣਾਇਆ ਗਿਆ। ਤੁਹਾਡੀ ਢਾਂਚਾਗਤ ਬ੍ਰੀਫਿੰਗ ਅਜੇ ਵੀ ਉਪਲਬਧ ਹੈ।",
     "summaryCharge": "AI ਖਰਚਾ {{cost}}",
     "summaryChargePending": "AI ਖਰਚੇ ਦਾ ਮਿਲਾਨ ਬਾਕੀ ਹੈ",
     "summaryModel": "$t(common.model): {{model}}",

@@ -4514,7 +4514,7 @@
     "summary": "AI-Zusammenfassung",
     "summaryPending": "AI-Zusammenfassung wird erstellt. Sie erscheint hier, sobald sie fertig ist.",
     "summaryUnavailable": "AI-Zusammenfassung nicht verfügbar. Dein strukturiertes Briefing ist weiterhin verfügbar.",
-    "summaryNotAdmitted": "AI-Zusammenfassung wurde heute nicht erstellt. Dein strukturiertes Briefing ist weiterhin verfügbar.",
+    "summaryNotAdmitted": "AI-Zusammenfassung wurde für dieses Briefing nicht erstellt. Dein strukturiertes Briefing ist weiterhin verfügbar.",
     "summaryCharge": "AI-Kosten: {{cost}}",
     "summaryChargePending": "AI-Kosten werden noch abgerechnet",
     "summaryModel": "$t(common.model): {{model}}",

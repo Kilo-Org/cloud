@@ -4514,7 +4514,7 @@
     "summary": "AI要約",
     "summaryPending": "AI要約を作成中です。完了するとここに追加されます。",
     "summaryUnavailable": "AI要約は利用できません。構造化ブリーフィングは引き続き利用できます。",
-    "summaryNotAdmitted": "AI要約は本日生成されていません。構造化ブリーフィングは引き続き利用できます。",
+    "summaryNotAdmitted": "このブリーフィングではAI要約は生成されていません。構造化ブリーフィングは引き続き利用できます。",
     "summaryCharge": "AI料金 {{cost}}",
     "summaryChargePending": "AI料金は精算待ちです",
     "summaryModel": "$t(common.model): {{model}}",

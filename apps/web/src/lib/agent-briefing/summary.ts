@@ -649,6 +649,34 @@ function briefingFailureCode(error: unknown): z.infer<typeof briefingSummaryErro
     .parse(error instanceof Error ? error.message : null);
 }
 
+/**
+ * Whether each reported code describes the row itself, so an admission check
+ * that reports it has decided: re-running the checks over the row's stored
+ * authorization, context, sources, and window would come out the same way, and
+ * the refusal is recorded. `false` marks the codes that mean a check could not
+ * decide - either only the billed request phase reports it
+ * (`gateway_declined`, `invalid_summary`, `time_limit`) or it traces to a
+ * lookup against live data (`model_pricing_unavailable`,
+ * `invalid_model_pricing`, and any unmapped error, read as
+ * `generation_failed`). A failure with one of those is thrown again, which
+ * leaves the row `pending` on its unchanged `job_due_at` for the next due run
+ * instead of ending it for the morning.
+ */
+const CODE_DESCRIBES_ROW: Record<z.infer<typeof briefingSummaryErrorSchema>, boolean> = {
+  permission_unavailable: true,
+  not_admitted: true,
+  model_not_allowed: true,
+  balance_unavailable: true,
+  spend_limit_too_low: true,
+  input_too_large: true,
+  model_pricing_unavailable: false,
+  invalid_model_pricing: false,
+  gateway_declined: false,
+  invalid_summary: false,
+  time_limit: false,
+  generation_failed: false,
+} satisfies Record<z.infer<typeof briefingSummaryErrorSchema>, boolean>;
+
 /** The values an admitted row carries into its claimed generation. */
 type BriefingAdmission = {
   row: BriefingReportRow;
@@ -705,7 +733,12 @@ async function admitBriefingSummary(reportId: string): Promise<BriefingAdmission
     if (deadlineMs <= Date.now()) throw new Error('not_admitted');
     return { row, user, prompt, bound, deadlineMs };
   } catch (error) {
-    await refuseBriefingAdmission(reportId, briefingFailureCode(error));
+    // A code that does not describe the row means a check could not decide, so
+    // the error is thrown again: the due run reports a rejection and the row
+    // stays `pending` with its unchanged `job_due_at` for the next tick.
+    const code = briefingFailureCode(error);
+    if (!CODE_DESCRIBES_ROW[code]) throw error;
+    await refuseBriefingAdmission(reportId, code);
     return undefined;
   }
 }

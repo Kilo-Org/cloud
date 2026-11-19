@@ -4585,7 +4585,7 @@
     "summary": "Resum d'IA",
     "summaryPending": "El resum d'IA està en curs. S'adjuntarà aquí quan estigui llest.",
     "summaryUnavailable": "El resum d'IA no està disponible. L'informe estructurat continua disponible.",
-    "summaryNotAdmitted": "El resum d'IA no s'ha generat avui. L'informe estructurat continua disponible.",
+    "summaryNotAdmitted": "El resum d'IA no s'ha generat per a aquest informe. L'informe estructurat continua disponible.",
     "summaryCharge": "Càrrec d'IA: {{cost}}",
     "summaryChargePending": "Càrrec d'IA pendent de conciliació",
     "summaryModel": "$t(common.model): {{model}}",

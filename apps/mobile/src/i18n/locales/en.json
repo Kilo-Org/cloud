@@ -21,7 +21,7 @@
     "summary": "AI summary",
     "summaryPending": "AI summary is in progress. It will attach here when ready.",
     "summaryUnavailable": "AI summary unavailable. Your structured brief is still available.",
-    "summaryNotAdmitted": "AI summary was not generated today. Your structured brief is still available.",
+    "summaryNotAdmitted": "AI summary was not generated for this brief. Your structured brief is still available.",
     "summaryCharge": "AI charged {{cost}}",
     "summaryChargePending": "AI charge pending reconciliation",
     "summaryModel": "$t(common.model): {{model}}",

@@ -4514,7 +4514,7 @@
     "summary": "ສະຫຼຸບໂດຍ AI",
     "summaryPending": "ກຳລັງສ້າງສະຫຼຸບ AI. ມັນຈະສະແດງຢູ່ນີ້ເມື່ອພ້ອມ.",
     "summaryUnavailable": "ສະຫຼຸບ AI ບໍ່ພ້ອມໃຊ້. ລາຍງານແບບມີໂຄງສ້າງຂອງທ່ານຍັງໃຊ້ໄດ້.",
-    "summaryNotAdmitted": "ບໍ່ໄດ້ສ້າງສະຫຼຸບ AI ໃນມື້ນີ້. ລາຍງານແບບມີໂຄງສ້າງຂອງທ່ານຍັງໃຊ້ໄດ້.",
+    "summaryNotAdmitted": "ບໍ່ໄດ້ສ້າງສະຫຼຸບ AI ສຳລັບລາຍງານນີ້. ລາຍງານແບບມີໂຄງສ້າງຂອງທ່ານຍັງໃຊ້ໄດ້.",
     "summaryCharge": "AI ຄິດຄ່າ {{cost}}",
     "summaryChargePending": "ຄ່າ AI ລໍຖ້າການກວດສອບ",
     "summaryModel": "$t(common.model): {{model}}",

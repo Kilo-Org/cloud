@@ -53,7 +53,9 @@ export function readKilo2FileReferences(message: Kilo2Message): Kilo2FileReferen
   const result: Kilo2FileReference[] = [];
   if (message.type === 'user' || message.type === 'synthetic') {
     for (const [fileIndex, file] of (message.files ?? []).entries()) {
-      if (typeof file.data === 'string' || typeof file.uri !== 'string') continue;
+      // Empty bytes are absent bytes, so such a file is still a reference position.
+      const hasBytes = typeof file.data === 'string' && file.data !== '';
+      if (hasBytes || typeof file.uri !== 'string') continue;
       result.push({
         id: kilo2PartId(message.id, fileIndex + 1),
         uri: file.uri,
@@ -86,10 +88,10 @@ export function readKilo2FileReferences(message: Kilo2Message): Kilo2FileReferen
 }
 
 /**
- * The recoverable set: a later snapshot may still authorize these references, so
- * recovery machinery keeps waiting on them. Neither inline nor absolute bytes need
- * that wait — inline bytes already display, and an absolute remote reference never
- * receives a mapping, so recovery must never chase it.
+ * The recovery queue: references a later snapshot can still authorize, so recovery
+ * keeps waiting on them. Only `media:` and workspace-relative references qualify —
+ * inline bytes already display, and an absolute remote reference never receives a
+ * mapping, so recovery must never chase either.
  */
 export function hasUnresolvedKilo2Assets(
   message: Kilo2Message,
@@ -104,8 +106,12 @@ export function hasUnresolvedKilo2Assets(
 }
 
 /**
- * The display gate: a reference with no authorized entry and no inline bytes has no
- * display, ever — no later snapshot can turn it into one.
+ * The rendering gate for the current context: this reference has no authorized entry
+ * and no inline bytes, so it has no display with the authorization available now. It
+ * is not a claim of permanence — a later snapshot still authorizes an unmapped
+ * `media:` reference. Contrast `hasUnresolvedKilo2Assets`, the recovery queue: every
+ * reference in that queue is also undisplayable, while this set additionally holds
+ * references no authorization can ever bind (absolute `http(s)` references).
  */
 export function hasUndisplayableKilo2Assets(
   message: Kilo2Message,
@@ -175,24 +181,41 @@ export function readKilo2Messages(
             text: message.text ?? '',
             ...(message.type === 'synthetic' ? { synthetic: true } : {}),
           },
-          ...(message.files ?? []).map((file, index): Part => {
+          ...(message.files ?? []).flatMap((file, index): Part[] => {
             const id = kilo2PartId(message.id, index + 1);
-            // Inline bytes are the display; a source uri may be remote and is not authorized.
+            // Empty bytes are absent bytes: a `data:` url of nothing would be a
+            // zero-byte file. Bytes win; then an inline source uri; then a reference
+            // the authorization gate may still accept; otherwise emit no part.
             const uri =
-              typeof file.data === 'string'
+              typeof file.data === 'string' && file.data !== ''
                 ? `data:${file.mime};base64,${file.data}`
-                : typeof file.uri === 'string'
-                  ? file.uri
-                  : '';
-            return {
-              ...base,
-              id,
-              messageID: message.id,
-              type: 'file',
-              mime: file.mime,
-              url: fileURL(id, uri, file.mime),
-              ...(file.name === undefined ? {} : { filename: file.name }),
-            };
+                : file.source.type === 'uri' && isInlineDataUri(file.source.uri)
+                  ? file.source.uri
+                  : typeof file.uri === 'string'
+                    ? file.uri
+                    : undefined;
+            if (uri === undefined) return [];
+            // A reference without authorization keeps the projector's throwing contract;
+            // empty bytes are the one absent case, and they emit no part rather than a
+            // zero-byte one. Every call site gates the message before it reaches here.
+            const url =
+              file.data === ''
+                ? isInlineDataUri(uri)
+                  ? uri
+                  : (options.assetURLs?.[kilo2AssetKey(id, uri, file.mime)] ?? undefined)
+                : fileURL(id, uri, file.mime);
+            if (url === undefined) return [];
+            return [
+              {
+                ...base,
+                id,
+                messageID: message.id,
+                type: 'file',
+                mime: file.mime,
+                url,
+                ...(file.name === undefined ? {} : { filename: file.name }),
+              },
+            ];
           }),
         ],
       });

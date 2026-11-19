@@ -1,5 +1,10 @@
 import { fetchNativeSnapshot, projectNativeSnapshot } from './native-sync-snapshot';
-import { readKilo2Messages, kilo2ToolFileId, kilo2AssetKey } from './kilo2-source-messages';
+import {
+  readKilo2Messages,
+  hasUnresolvedKilo2Assets,
+  kilo2ToolFileId,
+  kilo2AssetKey,
+} from './kilo2-source-messages';
 import {
   kilo2MessageSchema,
   kilo2PartId,
@@ -1093,13 +1098,20 @@ describe('canonical native snapshot projection', () => {
       displayable.filter(message => message.type !== 'shell').map(message => message.id)
     );
     expect(JSON.stringify(projection.messages)).not.toContain('https://fixture.invalid/image.png');
-    expect(projection.messages[0]?.parts).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ type: 'file', url: 'data:text/plain;base64,aGVsbG8=' }),
-        // Bytes display as inline data; the remote source uri is never the display url.
-        expect.objectContaining({ type: 'file', url: 'data:image/png;base64,' }),
-      ])
-    );
+    // Empty bytes are absent bytes: the header-only file has no part at all, and the
+    // sibling file with real bytes keeps its own part and id.
+    const userParts = projection.messages[0]?.parts ?? [];
+    expect(userParts.filter(part => part.type === 'file')).toEqual([
+      expect.objectContaining({
+        id: kilo2PartId('msg_user', 1),
+        type: 'file',
+        mime: 'text/plain',
+        url: 'data:text/plain;base64,aGVsbG8=',
+      }),
+    ]);
+    expect(
+      userParts.some(part => part.type === 'file' && part.url === 'data:image/png;base64,')
+    ).toBe(false);
     expect(projection.messages[1]?.info).toMatchObject({
       parentID: 'msg_user',
       cost: 0.25,
@@ -1175,6 +1187,80 @@ describe('canonical native snapshot projection', () => {
       messages: [],
       incompleteMessageIDs: [],
     });
+  });
+});
+
+describe('native user file display fallbacks', () => {
+  const session = {
+    id: sessionID,
+    location: { directory: '/workspace' },
+    time: { created: 1, updated: 2 },
+  };
+
+  it('emits a part only for bytes or an inline source uri, keyed to the file index', () => {
+    const message = kilo2MessageSchema.parse({
+      id: 'msg_fallback_files',
+      type: 'user',
+      time: { created: 1 },
+      text: 'attached',
+      files: [
+        {
+          mime: 'text/plain',
+          name: 'inline.txt',
+          data: '',
+          source: { type: 'uri', uri: 'data:text/plain;base64,aGVsbG8=' },
+        },
+        {
+          mime: 'image/png',
+          name: 'remote.png',
+          data: '',
+          source: { type: 'uri', uri: 'https://example.test/image.png' },
+        },
+        { mime: 'image/png', name: 'empty.png', data: '', source: { type: 'inline' } },
+        {
+          mime: 'image/png',
+          name: 'inline-source.png',
+          data: '',
+          source: { type: 'uri', uri: 'data:image/png;base64,AQID' },
+        },
+      ],
+    });
+    // Empty bytes are absent bytes: files 1 and 2 emit no part, and skipping them
+    // leaves the surviving parts on their own file indexes.
+    expect(readKilo2Messages(session, [message])[0]?.parts).toMatchObject([
+      { id: kilo2PartId(message.id, 0), type: 'text', text: 'attached' },
+      {
+        id: kilo2PartId(message.id, 1),
+        type: 'file',
+        mime: 'text/plain',
+        filename: 'inline.txt',
+        url: 'data:text/plain;base64,aGVsbG8=',
+      },
+      {
+        id: kilo2PartId(message.id, 4),
+        type: 'file',
+        mime: 'image/png',
+        filename: 'inline-source.png',
+        url: 'data:image/png;base64,AQID',
+      },
+    ]);
+  });
+
+  it('emits no part for an empty-bytes media reference, and still reports it as recoverable', () => {
+    const message = kilo2MessageSchema.parse({
+      id: 'msg_empty_media',
+      type: 'user',
+      time: { created: 1 },
+      files: [
+        { mime: 'image/png', data: '', uri: `media:${'a'.repeat(64)}`, source: { type: 'inline' } },
+      ],
+    });
+    // Empty bytes are absent bytes, so the reference is a real position: it waits on
+    // recovery, and the display gate omits the message until then, so no text is shown.
+    expect(hasUnresolvedKilo2Assets(message)).toBe(true);
+    expect(readKilo2Messages(session, [message])[0]?.parts).toMatchObject([
+      { id: kilo2PartId(message.id, 0), type: 'text' },
+    ]);
   });
 });
 

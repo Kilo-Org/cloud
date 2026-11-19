@@ -1,10 +1,19 @@
 import { z } from 'zod';
+import { egressDomainSchema } from './egress-allowlist';
 
-export const AWS_BYOC_TEMPLATE_VERSION = 1;
+export const AWS_BYOC_TEMPLATE_VERSION = 2;
 export const AWS_BYOC_PROXY_PROTOCOL_VERSION = 1;
 export const AWS_BYOC_ENVELOPE_SCHEME = 'byoc-aws-configuration-rsa-aes-256-gcm';
 export const AWS_BYOC_ENVELOPE_KEY_ID = 'agent-env-vars-v1';
 export const AWS_MICROVM_MAXIMUM_DURATION_SECONDS = 28_800;
+
+export const awsProxyPinSchema = z
+  .object({
+    generation: z.uuid(),
+    hostname: egressDomainSchema,
+    caFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .strict();
 
 export const awsByocConfigurationSchema = z
   .object({
@@ -24,6 +33,8 @@ export const awsByocConfigurationSchema = z
       .regex(/^arn:aws:lambda:us-east-1:\d{12}:network-connector:[A-Za-z0-9_-]+:[1-9]\d*$/),
     templateVersion: z.number().int().nonnegative(),
     proxyProtocolVersion: z.number().int().positive(),
+    // Older operation checkpoints remain readable for physical cleanup. New proxy launches require these pins.
+    proxy: awsProxyPinSchema.optional(),
   })
   .strict()
   .superRefine((value, ctx) => {

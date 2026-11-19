@@ -1,3 +1,4 @@
+import { assertAwsScmRepositories } from '../scm-broker/aws-policy.js';
 import { containedKiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
@@ -1203,6 +1204,7 @@ export async function prepareCredentialGrant(
     repository: additionalRepositoryOf(member, existing, source, diagnostic),
   }));
   const additionalRepositories = additionalEntries.map(entry => entry.repository);
+  if (provider === 'aws') assertAwsScmRepositories([repository, ...additionalRepositories]);
   if (repository !== undefined) diagnostic?.fact({ repositoryKind: repository.type });
   if (
     existing &&

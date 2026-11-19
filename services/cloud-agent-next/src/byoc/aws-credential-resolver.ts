@@ -13,6 +13,7 @@ import {
   type AwsByocConfiguration,
 } from '@kilocode/worker-utils/aws-byoc';
 import { z } from 'zod';
+import { createAwsEgressMetadataReader } from '@kilocode/worker-utils/aws-egress-store';
 import { byocOwnerKey, byocOwnerSchema, type ByocOwner, type ByocSource } from './owner.js';
 import type { Env } from '../types.js';
 import { createMicrovmClient } from '../agent-sandbox/aws/microvm-client.js';
@@ -35,6 +36,9 @@ export class ByocAwsProviderError extends Error {
       | 'byoc_aws_not_ready'
       | 'byoc_aws_forbidden'
       | 'byoc_aws_stack_outdated'
+      | 'byoc_aws_proxy_unavailable'
+      | 'byoc_aws_proxy_expired'
+      | 'byoc_aws_connection_changed'
   ) {
     super(reason);
     this.name = 'ByocAwsProviderError';
@@ -125,7 +129,12 @@ export async function resolveAwsByocConfiguration(
 export async function awsRuntimeAccess(
   env: Env,
   configuration: AwsByocConfiguration
-): Promise<AwsRuntimeAccess & { expiresAt: number }> {
+): Promise<
+  AwsRuntimeAccess & {
+    expiresAt: number;
+    readProxyMetadata: ReturnType<typeof createAwsEgressMetadataReader>;
+  }
+> {
   let bootstrap;
   try {
     bootstrap = awsCredentialsSchema.parse(JSON.parse(env.AWS_BYOC_CREDENTIALS ?? ''));
@@ -150,6 +159,12 @@ export async function awsRuntimeAccess(
       config: configuration,
       expiresAt: credentials.expiresAt,
       client: createMicrovmClient({ credentials, region: configuration.region }),
+      readProxyMetadata: createAwsEgressMetadataReader({
+        credentials,
+        region: configuration.region,
+        bucket: configuration.bucket,
+        stackId: configuration.stackId,
+      }),
       objects: createAwsObjectStore({
         credentials,
         region: configuration.region,

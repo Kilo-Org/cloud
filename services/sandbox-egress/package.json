@@ -1,0 +1,21 @@
+{
+  "name": "@kilocode/sandbox-egress",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun build src/main.ts --target=node --outfile=dist/main.mjs",
+    "test": "vitest run",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/sandbox-egress/src"
+  },
+  "dependencies": {
+    "@kilocode/worker-utils": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "vitest": "catalog:"
+  }
+}

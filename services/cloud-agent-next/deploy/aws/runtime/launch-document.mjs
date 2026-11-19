@@ -1,4 +1,7 @@
-import { createHash } from 'node:crypto';
+import { createHash, X509Certificate } from 'node:crypto';
+import { chmod, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { spawn } from 'node:child_process';
 
 const MAX_DOCUMENT_BYTES = 262_144;
@@ -102,12 +105,41 @@ export async function readLaunchDocument(envelope, fetcher = fetch) {
   return { argv: input.argv, env: input.env };
 }
 
+/** The public proxy CA extends public roots. It never replaces the ordinary HTTPS trust store. */
+export async function installProxyTrust(env, options = {}) {
+  const pem = env.KILO_AWS_EGRESS_CA_CERTIFICATE;
+  if (pem === undefined) return env;
+  if (typeof pem !== 'string' || pem.length > 16_384 || !new X509Certificate(pem).ca)
+    throw new Error('Invalid AWS proxy CA');
+  const publicRoots = await readFile(
+    options.publicRootsPath ?? '/etc/ssl/certs/ca-certificates.crt',
+    'utf8'
+  );
+  if (!publicRoots.includes('-----BEGIN CERTIFICATE-----'))
+    throw new Error('AWS public trust store unavailable');
+  const directory = await mkdtemp(join(options.tempRoot ?? tmpdir(), 'kilo-aws-trust-'));
+  // These files contain public certificates. The runtime workload can use them after dropping root.
+  await chmod(directory, 0o755);
+  const extra = join(directory, 'proxy-ca.pem');
+  const combined = join(directory, 'public-and-proxy.pem');
+  await writeFile(extra, pem, { mode: 0o644 });
+  await writeFile(combined, publicRoots + '\n' + pem, { mode: 0o644 });
+  const { KILO_AWS_EGRESS_CA_CERTIFICATE: _publicCertificate, ...rest } = env;
+  return {
+    ...rest,
+    NODE_EXTRA_CA_CERTS: extra,
+    SSL_CERT_FILE: combined,
+    GIT_SSL_CAINFO: combined,
+    CURL_CA_BUNDLE: combined,
+  };
+}
+
 export async function startLaunchDocument(input) {
   const envelope = parseLaunchEnvelope(input);
   const document = await readLaunchDocument(envelope);
   // Supply the complete environment explicitly. Image-build or platform credentials cannot be inherited.
   const child = spawn(document.argv[0], document.argv.slice(1), {
-    env: document.env,
+    env: await installProxyTrust(document.env),
     stdio: 'inherit',
   });
   process.on('SIGTERM', () => child.kill('SIGTERM'));

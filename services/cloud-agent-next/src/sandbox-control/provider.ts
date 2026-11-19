@@ -178,6 +178,8 @@ export type ProviderStartupCommand = {
   user?: 'root';
 };
 
+export type ProviderStartup = { command: ProviderStartupCommand; env: Record<string, string> };
+
 export type ProviderAdapter = {
   /** Recover an issued launch after coordinator restart. Unlike observe, this may replay provisioning. */
   reconcileLaunch?(ref: string): Promise<ProviderLaunchResult | undefined>;
@@ -204,7 +206,7 @@ export type ProviderAdapter = {
   create(intent: ProviderCreateIntent): Promise<{ providerRef: string } | { unresolved: true }>;
   launch(
     ref: string,
-    startup: { command: ProviderStartupCommand; env: Record<string, string> },
+    startup: ProviderStartup,
     options?: ProviderLaunchOptions
   ): Promise<ProviderLaunchResult>;
   observe(

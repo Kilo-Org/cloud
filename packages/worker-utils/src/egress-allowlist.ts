@@ -47,3 +47,17 @@ export const egressPolicySchema = z
     message: 'egressAllowlist requires egressMode to be allowlist',
     path: ['egressAllowlist'],
   });
+
+/** The shared egress check: http or https, the default port, no userinfo, an exact listed host. */
+export function isAllowedEgressUrl(url: URL, allowlist: readonly string[]): boolean {
+  if (
+    (url.protocol !== 'http:' && url.protocol !== 'https:') ||
+    url.port !== '' ||
+    url.username !== '' ||
+    url.password !== ''
+  ) {
+    return false;
+  }
+  const hostname = egressDomainSchema.safeParse(url.hostname);
+  return hostname.success && allowlist.includes(hostname.data);
+}

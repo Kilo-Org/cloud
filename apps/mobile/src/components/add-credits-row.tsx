@@ -15,8 +15,9 @@ import { cn } from '@/lib/utils';
 
 /**
  * How prominent the control reads where it sits. `quiet` is the balance line's
- * outline control. `primary` fills with the accent surface, which is how a
- * transcript marks the one action that settles a refused send.
+ * outline control. `primary` takes the palette's one action fill — olive in
+ * light, Kilo yellow in dark — with the label ink that reads on it: that is how
+ * a transcript marks the one action that settles a refused send.
  */
 export type AddCreditsEmphasis = 'quiet' | 'primary';
 

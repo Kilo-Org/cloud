@@ -621,9 +621,14 @@ function OrgKiloPassRow({ state, onRetry, onOpen }: OrgKiloPassRowProps) {
   return (
     <Pressable
       onPress={onPress}
+      // A row whose summary is still loading has no read to open, so the press
+      // waits; the state below is what tells assistive tech the row is working
+      // rather than idle.
+      disabled={state.loading}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={retries ? (state.accessibilityHint ?? undefined) : undefined}
+      accessibilityState={{ busy: state.loading, disabled: state.loading }}
       className="active:opacity-70"
     >
       {inner}

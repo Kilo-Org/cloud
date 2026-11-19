@@ -83,19 +83,6 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     );
   }
 
-  // Idempotent rerun: the two fixtures are the only rows this topic owns, so it
-  // deletes them by their stable source ids before inserting fresh copies. The
-  // returned rows are the ones `--empty` reports it removed.
-  const removedFindings = await db
-    .delete(security_findings)
-    .where(
-      and(
-        eq(security_findings.owned_by_user_id, user.id),
-        inArray(security_findings.source_id, [...SOURCE_IDS])
-      )
-    )
-    .returning({ id: security_findings.id });
-
   if (deniedOrganizationId !== null) {
     // The denial is the server's role refusal, not a row: the audit-report
     // procedure is owner-or-billing-only, so a plain member's read is refused.
@@ -137,6 +124,20 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       settingsDeepLink: `kiloapp:///(app)/security-agent/${deniedOrganizationId}/settings`,
     };
   }
+
+  // Idempotent rerun: the two fixtures are the only rows this topic owns, so it
+  // deletes them by their stable source ids before inserting fresh copies. The
+  // returned rows are the ones `--empty` reports it removed. The delete runs
+  // after the `--denied` return, which writes nothing.
+  const removedFindings = await db
+    .delete(security_findings)
+    .where(
+      and(
+        eq(security_findings.owned_by_user_id, user.id),
+        inArray(security_findings.source_id, [...SOURCE_IDS])
+      )
+    )
+    .returning({ id: security_findings.id });
 
   if (emptyVariant) {
     console.log('This fixture represents:');

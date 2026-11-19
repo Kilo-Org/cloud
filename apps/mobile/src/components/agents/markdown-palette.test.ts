@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { getPalette } from './markdown-palette';
 import { type ThemeColors } from '@/lib/hooks/use-theme-colors';
+import { compositeOver, tokenSchemeForSurface } from '@/lib/pr-review/diff/syntax-colors';
 
 const colors = {
   background: '#FBFAF5',
@@ -76,5 +77,44 @@ describe('markdown palette', () => {
     // token ever becomes translucent.
     expect(palette.codeSurface).toBe('#f0eee6');
     expect(palette.codeSurface.startsWith('#') && palette.codeSurface.length === 7).toBe(true);
+  });
+
+  it('derives the assistant code token scheme from the composited code surface', () => {
+    const palette = getPalette('assistant', colors);
+
+    // The scheme classifies the surface the code card actually renders on:
+    // muted composited over card, not card on its own.
+    expect(palette.codeSurface).toBe(compositeOver(colors.muted, colors.card));
+    expect(palette.codeTokenScheme).toBe(tokenSchemeForSurface(palette.codeSurface));
+    expect(palette.codeTokenScheme).toBe('onLight');
+  });
+
+  it('keeps a translucent assistant code card on the dark token scheme', () => {
+    const darkCard: ThemeColors = { ...colors, muted: 'rgba(255,255,255,0.08)', card: '#14130f' };
+    const palette = getPalette('assistant', darkCard);
+
+    // The raw token is translucent, so only the composite is a paintable
+    // surface; it stays opaque and dark.
+    const expectedSurface = compositeOver(darkCard.muted, darkCard.card);
+    expect(palette.codeSurface).toBe(expectedSurface);
+    expect(palette.codeSurface).toBe('#272622');
+    expect(palette.codeSurface.startsWith('#') && palette.codeSurface.length === 7).toBe(true);
+    expect(palette.codeTokenScheme).toBe(tokenSchemeForSurface(expectedSurface));
+    expect(palette.codeTokenScheme).toBe('onDark');
+  });
+
+  it('classifies the composite rather than the card behind it', () => {
+    const tintedCard: ThemeColors = {
+      ...colors,
+      muted: 'rgba(20,19,15,0.92)',
+      card: '#FFFFFF',
+    };
+    const palette = getPalette('assistant', tintedCard);
+
+    // A bright card under a heavy translucent tint composites to the same dim
+    // surface, so a scheme derived from `colors.card` would be wrong here.
+    expect(tokenSchemeForSurface(tintedCard.card)).toBe('onLight');
+    expect(palette.codeSurface).toBe(compositeOver(tintedCard.muted, tintedCard.card));
+    expect(palette.codeTokenScheme).toBe('onDark');
   });
 });

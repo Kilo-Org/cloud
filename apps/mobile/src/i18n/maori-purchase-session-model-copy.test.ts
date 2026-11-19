@@ -8,11 +8,11 @@ import { i18n } from '@/i18n';
  * the `whakamutunga` modifier, gave one "Finished" state two completion verbs
  * on the glanceable card, dropped the infinitive marker from the permission
  * caption, and made Kilo Pass the agent of its own loading failure instead of
- * the thing loaded. It also called the brand mark a `moko`, shipped both the
- * model-backends "Messages" label and the Auto Frontier tier label in the
- * wrong form, commanded a download where the row describes one, split the chat
- * noun between `kōrero` and `kōrerorero`, invited a retry with a second verb,
- * and phrased the groups empty state with a definite article.
+ * the thing loaded. It also called the brand mark a `moko`, lowercased the
+ * second word of the Auto Frontier tier label, commanded a download where the
+ * row describes one, split the chat noun between `kōrero` and `kōrerorero`,
+ * invited a retry with a second verb, and phrased the groups empty state with a
+ * definite article.
  *
  * These assertions pin the corrected copy, so a later edit cannot silently
  * restore it.

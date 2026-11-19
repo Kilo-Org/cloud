@@ -1434,6 +1434,15 @@ export const createBrowserRuntime = ({
       : entry.tabId;
   };
 
+  /** Closes a tab this call opened and then cannot use: a refusal must not leave it in the session's group. */
+  const closeOpenedTab = async (tabId: number): Promise<void> => {
+    try {
+      await tabsApi.remove?.(tabId);
+    } catch {
+      // The browser would not close it; the refusal is still the caller's answer.
+    }
+  };
+
   /** The tab's id while the browser still has it: a step whose tab was closed cannot run anywhere. */
   const liveTabOrUndefined = async (tabId: number): Promise<number | undefined> => {
     try {
@@ -2367,6 +2376,11 @@ export const createBrowserRuntime = ({
       let taken = false;
       // The tab this call ends up driving: the caller's, or the one its step opened. Read by the cleanup below.
       let drivenTabId = tabId;
+      // The in-flight hook and the exclusive-chain gate this call installed on the driven tab, so the cleanup can
+      // Remove exactly its own and let the next call on that tab in only once its guard has settled.
+      let drivenHook: (() => void) | null = null;
+      let drivenHeldBefore = false;
+      const drivenChain = Promise.withResolvers<void>();
 
       inFlight.set(tabId, () => {
         taken = true;
@@ -2483,6 +2497,16 @@ export const createBrowserRuntime = ({
           };
         }
 
+        // The tab this approval would drive may be held by a panel: the approval must not be spent on a call that
+        // Cannot run, so the busy refusal comes before the token is consumed or the step tab is taken.
+        if (stepOpensTab && stepTab !== undefined && presentedTokens.length > 0) {
+          const held = leases.holder(stepTab);
+
+          if (held !== undefined && held.key !== browserCallerKey(caller)) {
+            return { kind: 'result', result: { error: TAB_BUSY_ERROR, ok: false } };
+          }
+        }
+
         // A download approval is post-action, so the gate cannot classify it on retry; a presented token bound to this session, tab, tool and argument set disables the guard once.
         const downloadApproved =
           agentContext !== undefined && preflight !== undefined && preflight.ok
@@ -2545,9 +2569,21 @@ export const createBrowserRuntime = ({
           };
         }
 
+        // A take-over may have arrived while this call resolved its step: opening a tab for a call that is already
+        // Over would leave it behind.
+        if (opensGuardedTab && taken) {
+          return { kind: 'result', result: { error: TAB_TAKEN_ERROR, ok: false } };
+        }
+
         const openedForStep = opensGuardedTab
           ? await openSessionTab({ sessionHandle: sessionKey })
           : undefined;
+        // Whether the session already held the tab it just opened: it cannot have, but the release below depends on
+        // A decision made before this call's own acquire.
+        const freshTabHeldBefore =
+          openedForStep === undefined
+            ? false
+            : leases.holder(openedForStep.tabId)?.key === browserCallerKey(caller);
 
         if (opensGuardedTab && openedForStep === undefined) {
           return {
@@ -2556,38 +2592,79 @@ export const createBrowserRuntime = ({
           };
         }
 
+        // A take-over that landed while the tab was being opened ends the call here, and the tab it just created is
+        // Closed rather than left in the session's group for the next call to inherit.
+        if (openedForStep !== undefined && taken) {
+          await closeOpenedTab(openedForStep.tabId);
+
+          return { kind: 'result', result: { error: TAB_TAKEN_ERROR, ok: false } };
+        }
+
+        // The fresh tab is this call's from the moment it exists: its lease is taken now, so no later step waits on
+        // A lock for a tab nobody else has seen. A lease that is not granted releases the tab instead of leaving it.
+        if (openedForStep !== undefined) {
+          const openedLease = await leases.acquire(openedForStep.tabId, caller);
+
+          if (openedLease.kind !== 'granted') {
+            await closeOpenedTab(openedForStep.tabId);
+
+            return { kind: 'result', result: { error: TAB_BUSY_ERROR, ok: false } };
+          }
+        }
+
         // The tab, session, tool and arguments this call really drives: the caller's, or the tab its step opened.
         const runTabId = reusedTab ?? openedForStep?.tabId ?? tabId;
+        // The driven tab's lease is this call's only if it did not already belong to this caller, and only then does
+        // The finally release it: a session's own lease outlives the call that happened to run on it.
+        const heldBefore =
+          runTabId !== tabId &&
+          (openedForStep === undefined
+            ? leases.holder(runTabId)?.key === browserCallerKey(caller)
+            : freshTabHeldBefore);
 
-        // The call drives runTabId, so a take-over has to end this call: the caller's entry would abort the wrong
-        // One, and a take-over of the caller's tab must leave this call running.
+        drivenHeldBefore = heldBefore;
+
+        // The caller's hook was for the caller's tab: a take-over of that tab must leave this call running. The
+        // Driven tab's hook is installed only once this call really owns it (below).
+        if (runTabId !== tabId) {
+          inFlight.delete(tabId);
+        }
+
+        // A reused step tab may be held by a panel: refuse rather than wait, so the call cannot park for half a
+        // Minute with the caller's hook gone. A fresh tab was leased the moment it existed, so this waits on nobody.
+        if (runTabId !== tabId && openedForStep === undefined && !heldBefore) {
+          const drivenLease = await leases.acquire(runTabId, caller);
+
+          if (drivenLease.kind !== 'granted') {
+            // An agent never takes a tab over, so a panel's hold is a refusal here, not a prompt.
+            return { kind: 'result', result: { error: TAB_BUSY_ERROR, ok: false } };
+          }
+        }
+
+        // The call drives runTabId and now owns it: a take-over of that tab ends this call, and no other call can
+        // Fire the hook before this point.
         drivenTabId = runTabId;
 
         if (runTabId !== tabId) {
-          inFlight.delete(tabId);
-          inFlight.set(runTabId, () => {
+          const hook = (): void => {
             taken = true;
             markTaken();
-          });
+          };
+
+          inFlight.set(runTabId, hook);
+          drivenHook = hook;
         }
 
-        // The driven tab's own lease: a panel call on it asks for a take-over instead of interleaving with this call.
-        // Lock order is fixed — the caller tab's chain first (already held), then the driven tab's lease — and a
-        // Driven tab is one this session opened, never another live call's caller, so the order cannot invert.
-        const drivenLease =
-          runTabId === tabId
-            ? undefined
-            : await leases.acquire(runTabId, caller, {
-                ...(takeOver === undefined ? {} : { takeOver }),
-                ...(title === undefined ? {} : { title }),
-              });
+        // Hold the driven tab's exclusive chain for the whole call, without awaiting it here: a take-over of that
+        // Tab may run its own tool only after this call's guard has settled, so it cannot stop the user's download.
+        if (runTabId !== tabId) {
+          const previous = chains.get(runTabId) ?? Promise.resolve();
+          const afterThisCall = async (): Promise<void> => {
+            await previous;
+            await drivenChain.promise;
+          };
 
-        if (drivenLease?.kind === 'needs_take_over') {
-          return { holder: drivenLease.holder, kind: 'needs_take_over' };
-        }
-
-        if (drivenLease?.kind === 'busy') {
-          return { kind: 'result', result: { error: TAB_BUSY_ERROR, ok: false } };
+          chains.set(runTabId, afterThisCall());
         }
 
         const runSession =
@@ -2901,9 +2978,16 @@ export const createBrowserRuntime = ({
         };
       } finally {
         inFlight.delete(tabId);
-        inFlight.delete(drivenTabId);
 
-        if (drivenTabId !== tabId) {
+        // Only this call's own hook goes: another holder's hook on the driven tab is not this call's to remove.
+        if (drivenHook !== null && inFlight.get(drivenTabId) === drivenHook) {
+          inFlight.delete(drivenTabId);
+        }
+
+        // The guard has settled by now (its own finally ran first), so the next call on the driven tab may start.
+        drivenChain.resolve();
+
+        if (drivenTabId !== tabId && !drivenHeldBefore) {
           leases.release(drivenTabId, caller);
         }
       }

@@ -22,7 +22,7 @@ import {
 } from './browser-agent-checks';
 import { createRuntimeBrowserBridge } from './local-agents/browser-bridge';
 import { LOCAL_AGENT_ERROR_CODES } from './local-agents/jsonrpc';
-import { TAB_TAKEN_ERROR } from './browser-caller';
+import { TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from './browser-caller';
 import type { BrowserCaller } from './browser-caller';
 import type {
   BrowserTabInfo,
@@ -2394,7 +2394,12 @@ describe('agent browser calls', () => {
   /** A tabs-new harness whose opened tab can be closed, with the download and frame fakes of the group. */
   const tabsNewFixture = async (
     options: {
+      readonly deferredCreate?: boolean;
       readonly deferredNavigate?: boolean;
+      /** A frame read the test answers by hand, so a call can be parked before it opens its tab. */
+      readonly deferredPreflight?: boolean;
+      /** The guard's restore of the download behaviour, held open so a take-over's first command can be observed. */
+      readonly deferredRestore?: boolean;
       readonly granted?: boolean;
       /** A navigate that loads a page instead of becoming the download the guard stops. */
       readonly plain?: boolean;
@@ -2408,11 +2413,21 @@ describe('agent browser calls', () => {
     }) => void)[] = [];
     const newTab = TAB_ID + 11;
     let closed = false;
+    const removed: number[] = [];
+    const createGate = Promise.withResolvers<void>();
+    const createReached = Promise.withResolvers<void>();
+    const navigateReached = Promise.withResolvers<void>();
+    const preflightGate = Promise.withResolvers<void>();
+    const preflightReached = Promise.withResolvers<void>();
+    const restoreGate = Promise.withResolvers<void>();
+    const restoreReached = Promise.withResolvers<void>();
 
     const tabsApi: BrowserTabsApi & {
       readonly create: (properties: { readonly url?: string }) => Promise<BrowserTabInfo>;
     } = {
       create: async (properties: { readonly url?: string }) => {
+        createReached.resolve();
+        await (options.deferredCreate === true ? createGate.promise : Promise.resolve());
         created.push({ ...properties });
 
         for (const listener of openedListeners) {
@@ -2442,6 +2457,9 @@ describe('agent browser calls', () => {
       query: async () => [
         { active: true, id: TAB_ID, title: 'Example', url: MAIN_ORIGIN, windowId: 1 },
       ],
+      remove: async (tabId: number) => {
+        removed.push(tabId);
+      },
     };
     const { controller } = createGroups();
     const harness = await createHarness({
@@ -2458,7 +2476,40 @@ describe('agent browser calls', () => {
     const navigateGate = Promise.withResolvers<void>();
 
     harness.cdp.setHandlers({
+      ...(options.deferredPreflight === true
+        ? {
+            'Page.getFrameTree': async (
+              _params: Record<string, unknown> | undefined,
+              target?: { readonly tabId: number }
+            ) => {
+              if (target?.tabId === TAB_ID) {
+                preflightReached.resolve();
+                await preflightGate.promise;
+              }
+
+              return {
+                frameTree: {
+                  childFrames: [],
+                  frame: { id: 'main', securityOrigin: MAIN_ORIGIN, url: MAIN_ORIGIN },
+                },
+              };
+            },
+          }
+        : {}),
+      ...(options.deferredRestore === true
+        ? {
+            'Page.setDownloadBehavior': async (params: Record<string, unknown> | undefined) => {
+              if (params?.['behavior'] !== 'deny') {
+                restoreReached.resolve();
+                await restoreGate.promise;
+              }
+
+              return {};
+            },
+          }
+        : {}),
       'Page.navigate': async () => {
+        navigateReached.resolve();
         await (options.deferredNavigate === true ? navigateGate.promise : Promise.resolve());
 
         if (options.plain === true) {
@@ -2492,103 +2543,179 @@ describe('agent browser calls', () => {
       },
       created,
       newTab,
+      reachedCreate: () => createReached.promise,
+      reachedNavigate: () => navigateReached.promise,
+      reachedPreflight: () => preflightReached.promise,
+      reachedRestore: () => restoreReached.promise,
+      releaseCreate: () => {
+        createGate.resolve();
+      },
       releaseNavigate: () => {
         navigateGate.resolve();
       },
+      releasePreflight: () => {
+        preflightGate.resolve();
+      },
+      releaseRestore: () => {
+        restoreGate.resolve();
+      },
+      removed,
       run,
     };
   };
 
-  it('lets no panel call run on the tab an agent tabs-new is driving', async () => {
+  it('ends the call on the driven tab when that tab is taken over, after its guard settles', async () => {
     vi.useFakeTimers();
 
-    const fixture = await tabsNewFixture({ deferredNavigate: true });
-    const pending = fixture.run(agent());
+    try {
+      const fixture = await tabsNewFixture({ deferredNavigate: true });
+      const pending = fixture.run(agent());
 
-    await vi.advanceTimersByTimeAsync(50);
+      await fixture.reachedNavigate();
 
-    const before = fixture.cdp.sent().filter(command => command.tabId === fixture.newTab).length;
-    // The agent holds the opened tab, so a panel call on it asks for a take-over instead of interleaving.
-    const panelOutcome = await fixture.runtime.runTool({
-      arguments: {},
-      caller: panel(),
-      tabId: fixture.newTab,
-      toolName: 'browser_snapshot',
-    });
-    const after = fixture.cdp.sent().filter(command => command.tabId === fixture.newTab).length;
+      // A panel takes the opened tab over while the agent is parked in the navigate.
+      const panelCall = fixture.runtime.runTool({
+        arguments: {},
+        caller: panel(),
+        tabId: fixture.newTab,
+        takeOver: true,
+        toolName: 'browser_snapshot',
+      });
 
-    expect([panelOutcome.kind, after]).toStrictEqual(['needs_take_over', before]);
+      await vi.advanceTimersByTimeAsync(1000);
 
-    fixture.releaseNavigate();
+      const outcome = await pending;
 
-    const finished = await pending;
+      // The take-over ended the agent's call on that tab.
+      expect(outcome).toMatchObject({ kind: 'result', result: { error: TAB_TAKEN_ERROR } });
 
-    // The agent's own call still completes on that tab: the file it started is the refusal it reports.
-    expect(finished.kind).toBe('needs_permission');
-    vi.useRealTimers();
-  });
+      await panelCall;
 
-  it('ends a tabs-new call on the tab a take-over names, not on the caller tab', async () => {
-    vi.useFakeTimers();
+      // The panel's frame read on that tab comes after the guard put the download behaviour back, so the guard the
+      // Finished call left cannot cancel the panel's download.
+      const onTab = fixture.cdp
+        .sent()
+        .filter(command => command.tabId === fixture.newTab)
+        .map(command => command.method);
+      const restoreAt = onTab.lastIndexOf('Page.setDownloadBehavior');
+      const frameReadAt = onTab.indexOf('Accessibility.getFullAXTree');
 
-    const fixture = await tabsNewFixture({ deferredNavigate: true });
-    const pending = fixture.run(agent());
-
-    await vi.advanceTimersByTimeAsync(50);
-
-    // A panel takes the caller's tab: the call is running on the opened tab and must survive it. The panel's own
-    // Snapshot then waits for the caller tab's chain, so the navigate is released before either is awaited.
-    const callerTakeOver = fixture.runtime.runTool({
-      arguments: {},
-      caller: panel(),
-      tabId: TAB_ID,
-      takeOver: true,
-      toolName: 'browser_snapshot',
-    });
-
-    fixture.releaseNavigate();
-    await vi.advanceTimersByTimeAsync(500);
-
-    const [panelOutcome, survived] = await Promise.all([callerTakeOver, pending]);
-
-    expect([panelOutcome.kind, survived.kind]).toStrictEqual(['result', 'needs_permission']);
-
-    if (survived.kind === 'needs_take_over') {
-      throw new Error('expected a call outcome, got a take-over request');
+      expect([restoreAt !== -1, frameReadAt === -1 || restoreAt < frameReadAt]).toStrictEqual([
+        true,
+        true,
+      ]);
+    } finally {
+      vi.useRealTimers();
     }
-
-    expect(survived.result.ok ? '' : survived.result.error).not.toBe(TAB_TAKEN_ERROR);
-
-    vi.useRealTimers();
   });
 
-  it('does not deadlock a call that holds the caller tab while a panel works on it', async () => {
+  it('leaves the call running when the caller tab is taken over', async () => {
     vi.useFakeTimers();
 
-    const fixture = await tabsNewFixture({ deferredNavigate: true });
-    const pending = fixture.run(agent());
+    try {
+      const fixture = await tabsNewFixture({ deferredNavigate: true });
+      const pending = fixture.run(agent());
 
-    await vi.advanceTimersByTimeAsync(50);
+      await fixture.reachedNavigate();
 
-    // The caller tab is not the tab being driven, so a panel call there runs to its own end.
-    const panelOutcome = await fixture.runtime.runTool({
-      arguments: {},
-      caller: panel(),
-      tabId: TAB_ID,
-      toolName: 'browser_snapshot',
-    });
+      // The panel takes the caller's tab, which this call is not driving.
+      const callerTakeOver = fixture.runtime.runTool({
+        arguments: {},
+        caller: panel(),
+        tabId: TAB_ID,
+        takeOver: true,
+        toolName: 'browser_snapshot',
+      });
 
-    fixture.releaseNavigate();
+      fixture.releaseNavigate();
+      await vi.advanceTimersByTimeAsync(1000);
 
-    const finished = await pending;
+      const [panelOutcome, survived] = await Promise.all([callerTakeOver, pending]);
 
-    // The panel asked for a tab the agent holds, so it waits for the take-over rather than interleaving; the agent
-    // Call finishes on its own tab either way, which is the no-deadlock property.
-    expect([panelOutcome.kind, finished.kind]).toStrictEqual([
-      'needs_take_over',
-      'needs_permission',
-    ]);
-    vi.useRealTimers();
+      expect([panelOutcome.kind, survived.kind]).toStrictEqual(['result', 'needs_permission']);
+
+      if (survived.kind === 'needs_take_over') {
+        throw new Error('expected a call outcome, got a take-over request');
+      }
+
+      expect(survived.result.ok ? '' : survived.result.error).not.toBe(TAB_TAKEN_ERROR);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('refuses a repeat while a panel holds the step tab, and the token still redeems', async () => {
+    const fixture = await tabsNewFixture();
+    const guarded = await fixture.run(agent());
+    const token = expectStepToken(guarded);
+
+    // A panel holds an idle lease on the tab the step opened.
+    await fixture.leases.acquire(fixture.newTab, panel());
+
+    const busy = await fixture.run(agent(), [token]);
+
+    // The approval is not spent on a call that cannot run.
+    expect(busy).toMatchObject({ kind: 'result', result: { error: TAB_BUSY_ERROR } });
+
+    fixture.leases.release(fixture.newTab, panel());
+
+    const approved = await fixture.run(agent(), [token]);
+
+    expect(
+      approved.kind === 'result' && approved.result.ok ? String(approved.result.value) : ''
+    ).toContain('The file was downloaded; the page did not change.');
+  });
+
+  it('releases only the lease it took, and keeps a lease the session already held', async () => {
+    const fixture = await tabsNewFixture();
+    const guarded = await fixture.run(agent());
+
+    await fixture.run(agent(), [expectStepToken(guarded)]);
+
+    // A call that took the step tab's lease gives it back when it ends.
+    expect(fixture.leases.holder(fixture.newTab)).toBeUndefined();
+
+    const second = await tabsNewFixture();
+    const guardedAgain = await second.run(agent());
+
+    // The session already holds that tab: the repeat must not free a lease it never took.
+    await second.leases.acquire(second.newTab, agent());
+    await second.run(agent(), [expectStepToken(guardedAgain)]);
+
+    expect(second.leases.holder(second.newTab)).toBeDefined();
+  });
+
+  it('opens no tab when the caller tab is taken over before the tab is opened', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const fixture = await tabsNewFixture({ deferredPreflight: true });
+      const pending = fixture.run(agent());
+
+      await fixture.reachedPreflight();
+
+      // The take-over lands while the call is still reading the caller tab, before any tab exists.
+      const takeover = fixture.runtime.runTool({
+        arguments: {},
+        caller: panel(),
+        tabId: TAB_ID,
+        takeOver: true,
+        toolName: 'browser_snapshot',
+      });
+
+      await vi.advanceTimersByTimeAsync(100);
+      fixture.releasePreflight();
+
+      const outcome = await pending;
+
+      await takeover;
+
+      // The call is over and no tab was opened for it.
+      expect(outcome).toMatchObject({ kind: 'result', result: { error: TAB_TAKEN_ERROR } });
+      expect(fixture.created).toStrictEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('refuses a guarded tabs-new without the downloads permission before it opens a tab', async () => {

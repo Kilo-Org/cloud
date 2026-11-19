@@ -151,6 +151,8 @@ export interface BrowserTabsApi {
   readonly query: (
     queryInfo: Record<string, unknown>
   ) => Promise<BrowserTabInfo[]> | BrowserTabInfo[];
+  /** `chrome.tabs.remove` — a call that opened a tab and cannot use it closes it again. */
+  readonly remove?: ((tabId: number) => Promise<void> | void) | undefined;
   readonly update?: (
     tabId: number,
     updateProperties: { readonly active: boolean }

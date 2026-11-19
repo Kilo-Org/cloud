@@ -18,7 +18,7 @@ import {
   mockOpenRouterModels,
   withoutFillerModels,
 } from '@kilocode/web-shared/tests/helpers/openrouter-models.helper';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   AUTO_MODELS,
   AUTO_SMALL_TARGET_MODELS,
@@ -35,7 +35,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type * as MapModelIdToVercelModule from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { resolveCatalogVariant } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
-import { OpenRouterModelsResponseSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { OpenRouterModelsResponseSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type * as UnavailableModelsModule from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getVercelOnlyCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models';

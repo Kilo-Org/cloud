@@ -1385,8 +1385,9 @@
       "notConnectedReadOnly": "Bitbucket tidak disambungkan. Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Sambungan Bitbucket organisasi ini diurus di web melalui komputer.",
-      "description": "Cipta token akses ruang kerja dengan skop yang diperlukan dan tampalkannya di bawah.",
+      "managedOnWeb": "Sambungan Bitbucket untuk {{organization}} diurus di web melalui komputer.",
+      "description": "Cipta token akses ruang kerja untuk {{organization}} dan tampalkannya di bawah.",
+      "descriptionReconnect": "Cipta token akses ruang kerja baharu untuk {{organization}} dan tampalkannya di bawah.",
       "scopes": "Akaun: baca · Repositori: baca/tulis · Permintaan penarikan: baca · Webhook: baca/tulis",
       "tokenPlaceholder": "Token akses ruang kerja",
       "tokenRefused": "Bitbucket tidak menerima token ruang kerja ini. Semak bahawa ia mempunyai skop di atas, kemudian cuba lagi."
@@ -2160,6 +2161,8 @@
       "renameAccessibility": "Namakan semula sesi: {{title}}",
       "cloningSession": "Mengklon sesi",
       "couldNotLoadThisSession": "Tidak dapat memuatkan sesi ini.",
+      "historyTooLarge": "Transkrip sesi ini terlalu besar untuk dimuatkan.",
+      "historyUnavailable": "Transkrip sesi ini tidak dapat dibaca.",
       "cloneFailedRetry": "Tidak dapat mengklon sesi ini. Cuba semula.",
       "notEnoughCredits": "Kredit tidak mencukupi untuk permintaan ini. Tambah kredit dan cuba semula.",
       "previousTaskFinishing": "Tugasan sebelumnya masih dalam proses penyelesaian. Sila tunggu sebentar.",
@@ -2236,6 +2239,7 @@
       "branchDefault": "Lalai",
       "branchAccessibility": "Cabang: {{label}}",
       "branchLoading": "Memuatkan cabang",
+      "branchInactive": "Pilih repositori untuk memuatkan cabangnya.",
       "branchLoadError": "Tidak dapat memuatkan cabang",
       "branchUnavailable": "Cabang tidak tersedia untuk repositori ini. Semak akses anda dengan penyedia, kemudian pilih repositori lain.",
       "branchEmpty": "Tiada cabang tersedia",
@@ -4673,7 +4677,7 @@
       "new": "Pencetus baharu",
       "create": "Cipta pencetus",
       "emptyTitle": "Belum ada pencetus",
-      "emptyDescription": "Cipta pencetus untuk memulakan larian Cloud Agent daripada panggilan webhook atau pada jadual.",
+      "emptyDescription": "Cipta pencetus pertama anda.",
       "loadFailedTitle": "Tidak dapat memuatkan pencetus",
       "loadFailedDescription": "Cuba lagi apabila anda mempunyai sambungan.",
       "detailLoadFailedTitle": "Tidak dapat memuatkan pencetus ini",

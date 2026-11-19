@@ -1408,8 +1408,9 @@
       "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije, administratori i upravitelji naplate mogu ga povezati."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Bitbucket vezom ove organizacije upravlja se na webu s računala.",
-      "description": "Stvori token za pristup radnom prostoru s potrebnim dopuštenjima i zalijepi ga u nastavku.",
+      "managedOnWeb": "Bitbucket vezom s {{organization}} upravlja se na webu s računala.",
+      "description": "Stvori token za pristup radnom prostoru za {{organization}} i zalijepi ga u nastavku.",
+      "descriptionReconnect": "Stvori novi token za pristup radnom prostoru za {{organization}} i zalijepi ga u nastavku.",
       "scopes": "Račun: čitanje · Repozitoriji: čitanje/pisanje · Zahtjevi za spajanje: čitanje · Webhookovi: čitanje/pisanje",
       "tokenPlaceholder": "Token za pristup radnom prostoru",
       "tokenRefused": "Bitbucket nije prihvatio ovaj token za pristup radnom prostoru. Provjeri ima li gore navedena dopuštenja, pa pokušaj ponovno."
@@ -2204,6 +2205,8 @@
       "renameAccessibility": "Preimenuj sesiju: {{title}}",
       "cloningSession": "Kloniranje sesije",
       "couldNotLoadThisSession": "Nije moguće učitati ovu sesiju.",
+      "historyTooLarge": "Prijepis ove sesije je prevelik za učitavanje.",
+      "historyUnavailable": "Prijepis ove sesije se ne može pročitati.",
       "cloneFailedRetry": "Nije moguće klonirati ovu sesiju. Pokušaj ponovno.",
       "notEnoughCredits": "Nema dovoljno kredita za ovaj zahtjev. Dodaj kredite i pokušaj ponovno.",
       "previousTaskFinishing": "Prethodni se zadatak još dovršava. Pričekaj trenutak.",
@@ -2280,6 +2283,7 @@
       "branchDefault": "Zadano",
       "branchAccessibility": "Grana: {{label}}",
       "branchLoading": "Učitavanje grana",
+      "branchInactive": "Odaberi repozitorij da bi se učitale njegove grane.",
       "branchLoadError": "Nije moguće učitati grane",
       "branchUnavailable": "Grene nisu dostupne za ovaj repozitorij. Provjeri svoj pristup kod pružatelja usluge, pa odaberi drugi repozitorij.",
       "branchEmpty": "Nema dostupnih grana",
@@ -4748,7 +4752,7 @@
       "new": "Novi okidač",
       "create": "Stvorite okidač",
       "emptyTitle": "Još nema okidača",
-      "emptyDescription": "Stvorite okidač za pokretanje Cloud Agent iz webhook poziva ili po rasporedu.",
+      "emptyDescription": "Stvorite svoj prvi okidač.",
       "loadFailedTitle": "Nije moguće učitati okidače",
       "loadFailedDescription": "Pokušajte ponovno kada imate vezu.",
       "detailLoadFailedTitle": "Nije moguće učitati ovaj okidač",

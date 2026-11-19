@@ -1408,8 +1408,9 @@
       "notConnectedReadOnly": "O Bitbucket não está ligado. Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ligar."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "A ligação ao Bitbucket desta organização é gerida na Web, a partir de um computador.",
-      "description": "Cria um token de acesso ao espaço de trabalho com as permissões necessárias e cola-o abaixo.",
+      "managedOnWeb": "A ligação ao Bitbucket para {{organization}} é gerida na Web, a partir de um computador.",
+      "description": "Cria um token de acesso ao espaço de trabalho para {{organization}} e cola-o abaixo.",
+      "descriptionReconnect": "Cria um novo token de acesso ao espaço de trabalho para {{organization}} e cola-o abaixo.",
       "scopes": "Conta: leitura · Repositórios: leitura/escrita · Pedidos de integração: leitura · Webhooks: leitura/escrita",
       "tokenPlaceholder": "Token de acesso ao espaço de trabalho",
       "tokenRefused": "O Bitbucket não aceitou este token de acesso ao espaço de trabalho. Verifica se tem as permissões acima e tenta novamente."
@@ -2210,6 +2211,8 @@
       "renameAccessibility": "Renomear sessão: {{title}}",
       "cloningSession": "A clonar a sessão",
       "couldNotLoadThisSession": "Não foi possível carregar esta sessão.",
+      "historyTooLarge": "A transcrição desta sessão é demasiado grande para ser carregada.",
+      "historyUnavailable": "Não é possível ler a transcrição desta sessão.",
       "cloneFailedRetry": "Não foi possível clonar esta sessão. Tente novamente.",
       "notEnoughCredits": "Créditos insuficientes para este pedido. Adicione créditos e tente novamente.",
       "previousTaskFinishing": "A tarefa anterior ainda está a terminar. Aguarde um momento.",
@@ -2286,6 +2289,7 @@
       "branchDefault": "Predefinido",
       "branchAccessibility": "Ramo: {{label}}",
       "branchLoading": "A carregar ramos",
+      "branchInactive": "Seleciona um repositório para carregar os ramos dele.",
       "branchLoadError": "Não foi possível carregar os ramos",
       "branchUnavailable": "Não há ramos disponíveis para este repositório. Verifica o teu acesso junto do fornecedor e escolhe outro repositório.",
       "branchEmpty": "Nenhum ramo disponível",
@@ -4754,7 +4758,7 @@
       "new": "Novo acionador",
       "create": "Criar acionador",
       "emptyTitle": "Ainda não há acionadores",
-      "emptyDescription": "Crie um acionador para iniciar uma execução do Cloud Agent a partir de uma chamada de webhook ou segundo uma programação.",
+      "emptyDescription": "Crie o seu primeiro acionador.",
       "loadFailedTitle": "Não foi possível carregar os acionadores",
       "loadFailedDescription": "Tente novamente quando tiver ligação.",
       "detailLoadFailedTitle": "Não foi possível carregar este acionador",

@@ -4,7 +4,7 @@ import { device_auth_requests, device_sessions, kilocode_users } from '@kilocode
 import { eq, and, gt, isNull, isNotNull, not, sql, type SQL } from 'drizzle-orm';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { randomInt, randomBytes } from 'node:crypto';
-import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
+import { createDeviceSessionWithCredentials } from '@/lib/auth/device-sessions';
 import { hashOpaqueSecret } from '@/lib/auth/secret-hash';
 import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { requestingClientOfRow, type RequestingClient } from './requesting-client';
@@ -676,16 +676,17 @@ export async function consumeDeviceAuthByDeviceCode(
           userEmail: user.google_user_email,
         };
       }
-      sessionId = await createDeviceSession({
+      const credentials = await createDeviceSessionWithCredentials({
         userId: user.id,
         userAgent: request.user_agent ?? undefined,
+        user: user,
         deviceAuthRequestId: request.id,
       });
-      const pair = await issueSessionCredentials(user, sessionId);
+      sessionId = credentials.sessionId;
       return {
-        token: pair.token,
-        refreshToken: pair.refreshToken,
-        expiresIn: pair.expiresIn,
+        token: credentials.token,
+        refreshToken: credentials.refreshToken,
+        expiresIn: credentials.expiresIn,
         userId: user.id,
         userEmail: user.google_user_email,
       };

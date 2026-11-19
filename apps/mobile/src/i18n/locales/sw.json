@@ -1385,8 +1385,9 @@
       "notConnectedReadOnly": "Bitbucket haijaunganishwa. Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuiunganisha."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Muunganisho wa Bitbucket wa shirika hili unasimamiwa kwenye wavuti kutoka kwenye kompyuta.",
-      "description": "Unda tokeni ya kufikia nafasi ya kazi yenye ruhusa zinazohitajika kisha uibandike hapa chini.",
+      "managedOnWeb": "Muunganisho wa Bitbucket wa {{organization}} unasimamiwa kwenye wavuti kutoka kwenye kompyuta.",
+      "description": "Unda tokeni ya kufikia nafasi ya kazi kwa ajili ya {{organization}} kisha uibandike hapa chini.",
+      "descriptionReconnect": "Unda tokeni mpya ya kufikia nafasi ya kazi kwa ajili ya {{organization}} kisha uibandike hapa chini.",
       "scopes": "Akaunti: kusoma · Hazina: kusoma/kuandika · Maombi ya kuunganisha: kusoma · Arifa za wavuti: kusoma/kuandika",
       "tokenPlaceholder": "Tokeni ya kufikia nafasi ya kazi",
       "tokenRefused": "Bitbucket haikukubali tokeni hii ya kufikia nafasi ya kazi. Hakikisha kuwa ina ruhusa zilizo hapo juu, kisha ujaribu tena."
@@ -2160,6 +2161,8 @@
       "renameAccessibility": "Badilisha jina la kikao: {{title}}",
       "cloningSession": "Inanakili kikao",
       "couldNotLoadThisSession": "Imeshindikana kupakia kikao hiki.",
+      "historyTooLarge": "Andiko la kikao hiki ni kikubwa mno kupakia.",
+      "historyUnavailable": "Andiko la kikao hiki haliwezi kusomeka.",
       "cloneFailedRetry": "Imeshindikana kunakili kikao hiki. Jaribu tena.",
       "notEnoughCredits": "Salio halitoshi kwa ombi hili. Ongeza salio na ujaribu tena.",
       "previousTaskFinishing": "Kazi iliyotangulia bado inakamilika. Tafadhali subiri kidogo.",
@@ -2236,6 +2239,7 @@
       "branchDefault": "Chaguomsingi",
       "branchAccessibility": "Tawi: {{label}}",
       "branchLoading": "Inapakia matawi",
+      "branchInactive": "Chagua hazina ili kupakia matawi yake.",
       "branchLoadError": "Imeshindikana kupakia matawi",
       "branchUnavailable": "Matawi hayapatikani kwa hazina hii. Angalia ruhusa yako kwa mtoa huduma, kisha chagua hazina nyingine.",
       "branchEmpty": "Hakuna matawi yanayopatikana",
@@ -4673,7 +4677,7 @@
       "new": "Kichocheo kipya",
       "create": "Unda kichocheo",
       "emptyTitle": "Hakuna vichocheo bado",
-      "emptyDescription": "Unda kichocheo ili kuanzisha utekelezaji wa Cloud Agent kutoka mwito wa ndoano ya wavuti au kwa ratiba.",
+      "emptyDescription": "Unda kichocheo chako cha kwanza.",
       "loadFailedTitle": "Imeshindwa kupakia vichocheo",
       "loadFailedDescription": "Jaribu tena ukiwa na muunganisho.",
       "detailLoadFailedTitle": "Imeshindwa kupakia kichocheo hiki",

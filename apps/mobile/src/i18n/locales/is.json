@@ -1385,8 +1385,9 @@
       "notConnectedReadOnly": "Bitbucket er ekki tengt. Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta tengt það."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Bitbucket-tengingu þessarar stofnunar er stjórnað á vefnum í tölvu.",
-      "description": "Búðu til aðgangstóka fyrir vinnusvæðið með tilskildum heimildum og límdu hann hér fyrir neðan.",
+      "managedOnWeb": "Bitbucket-tengingu við {{organization}} er stjórnað á vefnum í tölvu.",
+      "description": "Búðu til aðgangstóka vinnusvæðis fyrir {{organization}} og límdu hann hér fyrir neðan.",
+      "descriptionReconnect": "Búðu til nýjan aðgangstóka vinnusvæðis fyrir {{organization}} og límdu hann hér fyrir neðan.",
       "scopes": "Reikningur: lestur · Geymslur: lestur/skrift · Samrunabeiðnir: lestur · Vefkrækjur: lestur/skrift",
       "tokenPlaceholder": "Aðgangstóki vinnusvæðis",
       "tokenRefused": "Bitbucket tók ekki við þessum aðgangstóka vinnusvæðis. Athugaðu að hann hafi heimildirnar hér fyrir ofan og reyndu svo aftur."
@@ -2160,6 +2161,8 @@
       "renameAccessibility": "Endurnefna lotu: {{title}}",
       "cloningSession": "Klónar lotuna",
       "couldNotLoadThisSession": "Ekki tókst að hlaða þessari lotu.",
+      "historyTooLarge": "Spjallslóð þessarar lotu er of stór til að hlaða.",
+      "historyUnavailable": "Ekki er hægt að lesa spjallslóð þessarar lotu.",
       "cloneFailedRetry": "Ekki tókst að klóna þessa lotu. Reyndu aftur.",
       "notEnoughCredits": "Inneignin nægir ekki fyrir þessa beiðni. Bættu við inneign og reyndu aftur.",
       "previousTaskFinishing": "Fyrra verkefninu er ekki alveg lokið. Bíddu augnablik.",
@@ -2236,6 +2239,7 @@
       "branchDefault": "Sjálfgefið",
       "branchAccessibility": "Kvistur: {{label}}",
       "branchLoading": "Hleður kvista",
+      "branchInactive": "Veldu kóðasafn til að hlaða inn kvistunum þess.",
       "branchLoadError": "Ekki tókst að hlaða kvistum",
       "branchUnavailable": "Engir kvistar eru tiltækir fyrir þetta kóðasafn. Athugaðu aðganginn þinn hjá veitunni og veldu annað kóðasafn.",
       "branchEmpty": "Engir kvistar tiltækir",
@@ -4673,7 +4677,7 @@
       "new": "Ný kveikja",
       "create": "Búðu til kveikju",
       "emptyTitle": "Engar kveikjur ennþá",
-      "emptyDescription": "Búðu til kveikju til að hefja keyrslu Cloud Agent úr vefkrókarkalli eða á áætlun.",
+      "emptyDescription": "Búðu til fyrstu kveikjuna þína.",
       "loadFailedTitle": "Gat ekki hlaðið kveikjum",
       "loadFailedDescription": "Reyndu aftur þegar þú hefur nettengingu.",
       "detailLoadFailedTitle": "Gat ekki hlaðið þessari kveikju",

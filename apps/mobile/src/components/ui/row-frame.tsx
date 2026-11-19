@@ -301,20 +301,34 @@ export function RowFrame({
       accessibilityHint: contentAccessibilityHint,
       accessibilityState: contentOwnsName ? { disabled } : undefined,
     };
+    const contentPress = (
+      <Pressable
+        {...contentProps}
+        className={cn(
+          'min-w-0 flex-1 flex-row items-center gap-3 self-stretch',
+          ROW_FRAME_CONTENT_PRESS_CLASS,
+          !disabled && 'active:opacity-70'
+        )}
+      >
+        {leadingNode}
+        {textBlock}
+      </Pressable>
+    );
+    if (footer === undefined) {
+      return (
+        <View testID={testID} className={frameClass} onLayout={onLayout}>
+          {contentPress}
+          {trailingNode}
+        </View>
+      );
+    }
     return (
       <View testID={testID} className={frameClass} onLayout={onLayout}>
-        <Pressable
-          {...contentProps}
-          className={cn(
-            'min-w-0 flex-1 flex-row items-center gap-3 self-stretch',
-            ROW_FRAME_CONTENT_PRESS_CLASS,
-            !disabled && 'active:opacity-70'
-          )}
-        >
-          {leadingNode}
-          {textBlock}
-        </Pressable>
-        {trailingNode}
+        <View className={ROW_FRAME_LINE_CLASS}>
+          {contentPress}
+          {trailingNode}
+        </View>
+        {footer}
       </View>
     );
   }

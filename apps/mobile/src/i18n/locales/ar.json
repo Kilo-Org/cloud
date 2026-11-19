@@ -695,8 +695,9 @@
       "notConnectedReadOnly": "Bitbucket غير متصل. يمكن لمالكي المؤسسة والمشرفين ومديري الفوترة فقط ربطه."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "تتم إدارة اتصال Bitbucket الخاص بهذه المؤسسة عبر الويب من جهاز كمبيوتر.",
-      "description": "أنشئ رمز وصول لمساحة العمل بالصلاحيات المطلوبة والصقه أدناه.",
+      "managedOnWeb": "تتم إدارة اتصال Bitbucket الخاص بالمؤسسة {{organization}} عبر الويب من جهاز كمبيوتر.",
+      "description": "أنشئ رمز وصول لمساحة العمل للمؤسسة {{organization}} ثم الصقه أدناه.",
+      "descriptionReconnect": "أنشئ رمز وصول جديدًا لمساحة العمل للمؤسسة {{organization}} ثم الصقه أدناه.",
       "scopes": "الصلاحيات المطلوبة: الحساب: قراءة · المستودعات: قراءة/كتابة · طلبات السحب: قراءة · خطافات الويب: قراءة/كتابة.",
       "tokenPlaceholder": "رمز وصول مساحة العمل",
       "tokenRefused": "لم يقبل Bitbucket رمز وصول مساحة العمل هذا. تحقق من أنه يتضمن الصلاحيات المذكورة أعلاه، ثم أعد المحاولة."
@@ -1689,6 +1690,8 @@
       "renameAccessibility": "إعادة تسمية الجلسة: {{title}}",
       "cloningSession": "جارٍ استنساخ الجلسة",
       "couldNotLoadThisSession": "تعذّر تحميل هذه الجلسة.",
+      "historyTooLarge": "بروكول هذه الجلسة كبير جدًا بحيث لا يمكن تحميله.",
+      "historyUnavailable": "لا يمكن قراءة بروكول هذه الجلسة.",
       "cloneFailedRetry": "تعذّر استنساخ هذه الجلسة. حاول مرة أخرى.",
       "notEnoughCredits": "رصيدك غير كافٍ لهذا الطلب. اشحن رصيدك وحاول مرة أخرى.",
       "previousTaskFinishing": "لم تنتهِ المهمة السابقة بعد. انتظر لحظة.",
@@ -1765,6 +1768,7 @@
       "branchDefault": "افتراضي",
       "branchAccessibility": "الفرع: {{label}}",
       "branchLoading": "جارٍ تحميل الفروع",
+      "branchInactive": "اختر مستودعًا لتحميل فروعه.",
       "branchLoadError": "تعذّر تحميل الفروع",
       "branchUnavailable": "الفروع غير متاحة لهذا المستودع. تحقق من صلاحيتك لدى المزوّد، ثم اختر مستودعًا آخر.",
       "branchEmpty": "لا توجد فروع متاحة",
@@ -4973,7 +4977,7 @@
       "new": "مشغل جديد",
       "create": "أنشئ مشغلاً",
       "emptyTitle": "لا توجد مشغلات بعد",
-      "emptyDescription": "أنشئ مشغلاً لبدء تشغيل Cloud Agent من استدعاء ويب هوك أو وفق جدول زمني.",
+      "emptyDescription": "أنشئ أول مشغّل.",
       "loadFailedTitle": "تعذر تحميل المشغلات",
       "loadFailedDescription": "أعد المحاولة عندما يكون لديك اتصال.",
       "detailLoadFailedTitle": "تعذر تحميل هذا المشغل",

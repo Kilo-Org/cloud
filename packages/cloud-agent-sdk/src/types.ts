@@ -42,8 +42,9 @@ export type {
 export type ReadonlyPart = Readonly<Part>;
 
 /**
- * Payload sent to a cloud agent session transport — either a chat prompt or a
- * slash command. Pairs with the SDK transport send types.
+ * The single declaration of the payload sent to a cloud agent session
+ * transport — either a chat prompt or a slash command. Pairs with the SDK
+ * transport send types, which alias this declaration.
  */
 export type SendMessagePayload =
   | {
@@ -364,10 +365,7 @@ export type ResolvedSession =
 
 export type SessionSnapshot = {
   info: SessionInfo;
-  messages: Array<{
-    info: MessageInfo;
-    parts: Part[];
-  }>;
+  messages: ProcessedMessage[];
 };
 
 /**
@@ -446,7 +444,7 @@ export type CachedSessionSnapshotPage = SessionSnapshotPage & {
  * failures (`retryable_failure` for transient DO read issues,
  * `invalid_data` for shape mismatches, `too_large` for oversize pages) so
  * retry semantics can be surfaced without inferring them from the worker's
- * text. `null` represents an access-not-found outcome (worker returns 404).
+ * text.
  */
 export type SessionSnapshotPageOutcome =
   | (SessionSnapshotPage & { kind: 'success' })

@@ -1385,8 +1385,9 @@
       "notConnectedReadOnly": "Bitbucket ulanmagan. Faqat tashkilot egalar, administratorlar va to'lov menejerlari uni ulashi mumkin."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Bu tashkilotning Bitbucket ulanishi kompyuterdan veb orqali boshqariladi.",
-      "description": "Kerakli ruxsatlarga ega ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
+      "managedOnWeb": "{{organization}} uchun Bitbucket ulanishi kompyuterdan veb orqali boshqariladi.",
+      "description": "{{organization}} uchun ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
+      "descriptionReconnect": "{{organization}} uchun yangi ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
       "scopes": "Hisob: o'qish · Repozitoriyalar: o'qish/yozish · PRlar: o'qish · Vebhuklar: o'qish/yozish",
       "tokenPlaceholder": "Ish maydoniga kirish tokeni",
       "tokenRefused": "Bitbucket bu ish maydoniga kirish tokenini qabul qilmadi. U yuqoridagi ruxsatlarga ega ekanligini tekshirib, qayta urinib ko'ring."
@@ -2160,6 +2161,8 @@
       "renameAccessibility": "Sessiya nomini o'zgartirish: {{title}}",
       "cloningSession": "Sessiya klonlanmoqda",
       "couldNotLoadThisSession": "Bu sessiyani yuklab bo'lmadi.",
+      "historyTooLarge": "Bu sessiya transkripti yuklash uchun juda katta.",
+      "historyUnavailable": "Bu sessiya transkriptini o'qish mumkin emas.",
       "cloneFailedRetry": "Ushbu sessiyani klonlab bo'lmadi. Qayta urinib ko'ring.",
       "notEnoughCredits": "Bu so'rov uchun kreditlar yetarli emas. Kreditlar qo'shing va qayta urinib ko'ring.",
       "previousTaskFinishing": "Oldingi vazifa hali yakunlanmoqda. Biroz kuting.",
@@ -2236,6 +2239,7 @@
       "branchDefault": "Standart",
       "branchAccessibility": "Tarmoq: {{label}}",
       "branchLoading": "Tarmoqlar yuklanmoqda",
+      "branchInactive": "Tarmoqlarini yuklash uchun repozitoriya tanlang.",
       "branchLoadError": "Tarmoqlarni yuklab bo‘lmadi",
       "branchUnavailable": "Ushbu repozitoriy uchun tarmoqlar mavjud emas. Provayderdagi kirish huquqingizni tekshiring, so‘ng boshqa repozitoriy tanlang.",
       "branchEmpty": "Mavjud tarmoqlar yo‘q",
@@ -4673,7 +4677,7 @@
       "new": "Yangi ishga tushirgich",
       "create": "Ishga tushirgich yarating",
       "emptyTitle": "Hozircha ishga tushirgichlar yoʻq",
-      "emptyDescription": "Cloud Agent ishga tushirishini vebhook chaqiruvi yoki jadval boʻyicha boshlash uchun ishga tushirgich yarating.",
+      "emptyDescription": "Birinchi ishga tushirgichingizni yarating.",
       "loadFailedTitle": "Ishga tushirgichlarni yuklab boʻlmadi",
       "loadFailedDescription": "Ulanish mavjud boʻlganda qayta urinib koʻring.",
       "detailLoadFailedTitle": "Bu ishga tushirgichni yuklab boʻlmadi",

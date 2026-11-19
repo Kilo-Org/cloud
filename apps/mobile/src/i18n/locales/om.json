@@ -1385,8 +1385,9 @@
       "notConnectedReadOnly": "Bitbucket hin walqabsiifamne. Abbootiin dhaabbataa, bulchitootaa fi bulchitoonni kaffaltii qofa isa walqabsiisuu danda'u."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Walqunnamtiin Bitbucket dhaabbata kanaa weebii irratti kompiitara irraa bulfama.",
-      "description": "Tokanii hayyama iddoo hojii kan hayyamoota barbaachisan qabu uumiitii armaan gaditti maxxansi.",
+      "managedOnWeb": "Walqunnamtiin Bitbucket {{organization}}iif weebii irratti kompiitara irraa bulfama.",
+      "description": "{{organization}}iif tokanii hayyama iddoo hojii uumiitii armaan gaditti maxxansi.",
+      "descriptionReconnect": "{{organization}}iif tokanii haaraa hayyama iddoo hojii uumiitii armaan gaditti maxxansi.",
       "scopes": "Herrega: dubbisuu · Kuusaawwan koodii: dubbisuu/barreessuu · Gaaffii makuu: dubbisuu · Weebhuukii: dubbisuu/barreessuu",
       "tokenPlaceholder": "Tokanii hayyama iddoo hojii",
       "tokenRefused": "Bitbucket tokanii hayyama iddoo hojii kana hin fudhanne. Hayyamoonni armaan olii isa keessa jiraachuu mirkaneessi, sana booda ammas yaali."
@@ -2160,6 +2161,8 @@
       "renameAccessibility": "Maqaa turtii jijjiiri: {{title}}",
       "cloningSession": "Turtii kopii gochaa jira",
       "couldNotLoadThisSession": "Turtii kana fe'uu hin danda'amne.",
+      "historyTooLarge": "Galcheen turtii kanaa fe'uu baay'ee guddaa dha.",
+      "historyUnavailable": "Galchi turtii kanaa hin dubbifamu.",
       "cloneFailedRetry": "Turtii kana kopii gochuu hin danda'amne. Deebi'ii yaali.",
       "notEnoughCredits": "Gaaffii kanaaf kiriiditii gahaa hin qabdu. Kiriiditii dabaliitii deebi'ii yaali.",
       "previousTaskFinishing": "Hojiin duraanii amma iyyuu xumuramaa jira. Yeroo muraasa eegi.",
@@ -2236,6 +2239,7 @@
       "branchDefault": "Ofumaan",
       "branchAccessibility": "Damee: {{label}}",
       "branchLoading": "Dameewwan fe'amaa jiru",
+      "branchInactive": "Dameewwan isaa fe'uuf kuusaa koodii filadhu.",
       "branchLoadError": "Dameewwan fe'uu hin danda'amne",
       "branchUnavailable": "Kuusaa koodii kanaaf dameewwan hin argaman. Hayyama waltajjii waliin qabdu ilaali, erga kanaan booda kuusaa koodii bira filadhu.",
       "branchEmpty": "Damee hin jiru",
@@ -4673,7 +4677,7 @@
       "new": "Kakaawwaa haaraa",
       "create": "Kakaawwaa uumi",
       "emptyTitle": "Kakaawwan ammaaf hin jiran",
-      "emptyDescription": "Kakaawwaa uumi akka hojii Cloud Agent waamicha weebhuukii irraa yookaan sagantaa irratti jalqabuuf.",
+      "emptyDescription": "Kakaawwaa jalqabaa kee uumi.",
       "loadFailedTitle": "Kakaawwan fiduu hin dandeenye",
       "loadFailedDescription": "Yeroo qunnamtii qabaattu irra deebi'ii yaali.",
       "detailLoadFailedTitle": "Kakaawwaa kana fiduu hin dandeenye",

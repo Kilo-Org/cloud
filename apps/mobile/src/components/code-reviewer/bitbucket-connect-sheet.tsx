@@ -179,7 +179,9 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
       return (
         <View className="px-4 pt-3">
           <Text variant="muted" className="text-sm">
-            {t('codeReviewer.bitbucketConnect.managedOnWeb')}
+            {t('codeReviewer.bitbucketConnect.managedOnWeb', {
+              organization: org.organizationName,
+            })}
           </Text>
         </View>
       );
@@ -195,6 +197,7 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
         <BitbucketConnectForm
           scope={scope}
           integrationId={integrationId}
+          organizationName={org.organizationName}
           onDirtyChange={guard.handleDirtyChange}
           onConnected={() => {
             notificationHaptic(Haptics.NotificationFeedbackType.Success);

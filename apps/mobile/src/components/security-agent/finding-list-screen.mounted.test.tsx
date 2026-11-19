@@ -74,6 +74,7 @@ vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',
+  useColorScheme: () => 'light',
 }));
 vi.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
 vi.mock('expo-router', () => ({

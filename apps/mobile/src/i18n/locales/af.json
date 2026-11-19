@@ -1385,8 +1385,9 @@
       "notConnectedReadOnly": "Bitbucket is nie gekoppel nie. Slegs organisasie-eienaars, administrateurs en faktureringsbestuurders kan dit koppel."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Hierdie organisasie se Bitbucket-verbinding word op die web vanaf 'n rekenaar bestuur.",
-      "description": "Skep 'n toegangstoken vir die werkruimte met die vereiste toestemmings en plak dit hieronder.",
+      "managedOnWeb": "Die Bitbucket-verbinding vir {{organization}} word op die web vanaf 'n rekenaar bestuur.",
+      "description": "Skep vir {{organization}} 'n toegangstoken vir die werkruimte en plak dit hieronder.",
+      "descriptionReconnect": "Skep weer vir {{organization}} 'n toegangstoken vir die werkruimte en plak dit hieronder.",
       "scopes": "Rekening: lees · Bewaarplekke: lees/skryf · Trekversoeke: lees · Webhake: lees/skryf",
       "tokenPlaceholder": "Toegangstoken vir die werkruimte",
       "tokenRefused": "Bitbucket het nie hierdie toegangstoken vir die werkruimte aanvaar nie. Kontroleer dat dit die toestemmings hierbo het en probeer dan weer."
@@ -2160,6 +2161,8 @@
       "renameAccessibility": "Hernoem sessie: {{title}}",
       "cloningSession": "Sessie word gekloon",
       "couldNotLoadThisSession": "Hierdie sessie kon nie gelaai word nie.",
+      "historyTooLarge": "Hierdie sessie se transkripsie is te groot om te laai.",
+      "historyUnavailable": "Daar is 'n probleem met die lees van hierdie sessie se transkripsie.",
       "cloneFailedRetry": "Hierdie sessie kon nie gekloon word nie. Probeer weer.",
       "notEnoughCredits": "Jy het nie genoeg krediete vir hierdie versoek nie. Voeg krediete by en probeer weer.",
       "previousTaskFinishing": "Die vorige taak word nog afgehandel. Wag asseblief 'n oomblik.",
@@ -2236,6 +2239,7 @@
       "branchDefault": "Verstek",
       "branchAccessibility": "Tak: {{label}}",
       "branchLoading": "Takke word gelaai",
+      "branchInactive": "Kies 'n bewaarplek om sy takke te laai",
       "branchLoadError": "Takke kon nie gelaai word nie",
       "branchUnavailable": "Takke is nie beskikbaar vir hierdie bewaarplek nie. Gaan jou toegang by die verskaffer na en kies 'n ander bewaarplek.",
       "branchEmpty": "Geen takke beskikbaar nie",
@@ -4673,7 +4677,7 @@
       "new": "Nuwe sneller",
       "create": "Skep sneller",
       "emptyTitle": "Nog geen snellers nie",
-      "emptyDescription": "Skep ’n sneller om ’n Cloud Agent-lopie vanaf ’n webhaakoproep of volgens ’n skedule te begin.",
+      "emptyDescription": "Skep jou eerste sneller.",
       "loadFailedTitle": "Kon nie snellers laai nie",
       "loadFailedDescription": "Probeer weer wanneer jy ’n verbinding het.",
       "detailLoadFailedTitle": "Kon nie hierdie sneller laai nie",

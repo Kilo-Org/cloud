@@ -695,8 +695,9 @@
       "notConnectedReadOnly": "尚未連結 Bitbucket。只有組織擁有者、管理員和帳單管理員可以設定連結。"
     },
     "bitbucketConnect": {
-      "managedOnWeb": "此組織的 Bitbucket 連線需在電腦上透過網頁版管理。",
-      "description": "請建立具有所需權限範圍的工作區存取權杖，並貼到下方。",
+      "managedOnWeb": "{{organization}} 的 Bitbucket 連線需在電腦上透過網頁版管理。",
+      "description": "為 {{organization}} 建立工作區存取權杖，然後貼到下方。",
+      "descriptionReconnect": "為 {{organization}} 建立新的工作區存取權杖，然後貼到下方。",
       "scopes": "帳戶：讀取 · 存放庫：讀取／寫入 · PR：讀取 · Webhook：讀取／寫入",
       "tokenPlaceholder": "工作區存取權杖",
       "tokenRefused": "Bitbucket 未接受此工作區存取權杖。請確認其具有上方列出的權限範圍，然後再試一次。"
@@ -1605,6 +1606,8 @@
       "renameAccessibility": "重新命名工作階段：{{title}}",
       "cloningSession": "複製工作階段中",
       "couldNotLoadThisSession": "無法載入此工作階段。",
+      "historyTooLarge": "此工作階段的對話記錄過大，無法載入。",
+      "historyUnavailable": "無法讀取此工作階段的對話記錄。",
       "cloneFailedRetry": "無法複製此工作階段。請再試一次。",
       "notEnoughCredits": "點數不足，無法執行此請求。請加值後再試一次。",
       "previousTaskFinishing": "上一個任務仍在收尾。請稍候。",
@@ -1681,6 +1684,7 @@
       "branchDefault": "預設",
       "branchAccessibility": "分支: {{label}}",
       "branchLoading": "正在載入分支",
+      "branchInactive": "選取一個存放庫以載入其分支。",
       "branchLoadError": "無法載入分支",
       "branchUnavailable": "此存放庫沒有可用的分支。檢查你在供應商處的存取權限，然後選取另一個存放庫。",
       "branchEmpty": "沒有可用的分支",
@@ -4673,7 +4677,7 @@
       "new": "新增觸發器",
       "create": "建立觸發器",
       "emptyTitle": "尚無觸發器",
-      "emptyDescription": "建立觸發器，以透過網路鉤子呼叫或排程啟動 Cloud Agent 執行。",
+      "emptyDescription": "建立你的第一個觸發器。",
       "loadFailedTitle": "無法載入觸發器",
       "loadFailedDescription": "有連線時請再試一次。",
       "detailLoadFailedTitle": "無法載入此觸發器",

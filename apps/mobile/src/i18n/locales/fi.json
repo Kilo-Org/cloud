@@ -1385,8 +1385,9 @@
       "notConnectedReadOnly": "Bitbucketia ei ole yhdistetty. Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat yhdistää sen."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Tämän organisaation Bitbucket-yhteyttä hallitaan verkossa tietokoneella.",
-      "description": "Luo työtilan käyttöoikeustunnus vaadituilla oikeuksilla ja liitä se alla olevaan kenttään.",
+      "managedOnWeb": "{{organization}}-organisaation Bitbucket-yhteyttä hallitaan verkossa tietokoneella.",
+      "description": "Luo työtilan käyttöoikeustunnus {{organization}}-organisaatiolle ja liitä se alla olevaan kenttään.",
+      "descriptionReconnect": "Luo uusi työtilan käyttöoikeustunnus {{organization}}-organisaatiolle ja liitä se alla olevaan kenttään.",
       "scopes": "Tili: luku · Koodivarastot: luku/kirjoitus · Muutospyynnöt: luku · Webhookit: luku/kirjoitus",
       "tokenPlaceholder": "Työtilan käyttöoikeustunnus",
       "tokenRefused": "Bitbucket ei hyväksynyt tätä työtilan käyttöoikeustunnusta. Tarkista, että siinä on yllä olevat oikeudet, ja yritä sitten uudelleen."
@@ -2160,6 +2161,8 @@
       "renameAccessibility": "Nimeä istunto uudelleen: {{title}}",
       "cloningSession": "Kloonataan istuntoa",
       "couldNotLoadThisSession": "Tätä istuntoa ei voitu ladata",
+      "historyTooLarge": "Tämän istunnon keskustelutallenne on liian suuri ladattavaksi.",
+      "historyUnavailable": "Tämän istunnon keskustelutallennetta ei voi lukea.",
       "cloneFailedRetry": "Tätä istuntoa ei voitu kloonata. Yritä uudelleen.",
       "notEnoughCredits": "Krediitit eivät riitä tähän pyyntöön. Lisää krediittejä ja yritä uudelleen.",
       "previousTaskFinishing": "Edellistä tehtävää viimeistellään vielä. Odota hetki.",
@@ -2236,6 +2239,7 @@
       "branchDefault": "Oletus",
       "branchAccessibility": "Haara: {{label}}",
       "branchLoading": "Ladataan haaroja",
+      "branchInactive": "Valitse koodivarasto, jotta sen haarat latautuvat.",
       "branchLoadError": "Haarojen lataaminen epäonnistui",
       "branchUnavailable": "Tämän koodivaraston haarat eivät ole käytettävissä. Tarkista pääsysi palveluntarjoajalta ja valitse toinen koodivarasto.",
       "branchEmpty": "Haaroja ei ole käytettävissä",
@@ -4673,7 +4677,7 @@
       "new": "Uusi liipaisin",
       "create": "Luo liipaisin",
       "emptyTitle": "Ei liipaisimia vielä",
-      "emptyDescription": "Luo liipaisin, joka käynnistää Cloud Agent -ajon verkkokoukun kutsusta tai aikataulusta.",
+      "emptyDescription": "Luo ensimmäinen liipaisin.",
       "loadFailedTitle": "Liipaisimien lataus epäonnistui",
       "loadFailedDescription": "Yritä uudelleen, kun yhteys on käytettävissä.",
       "detailLoadFailedTitle": "Tämän liipaisimen lataus epäonnistui",

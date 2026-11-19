@@ -1385,8 +1385,9 @@
       "notConnectedReadOnly": "Kāore anō kia honoa a Bitbucket. Ko ngā rangatira o te rōpū, ngā kaiwhakahaere me ngā kaiwhakahaere utu anake ka āhei ki te hono."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Ka whakahaerehia te hononga Bitbucket o tēnei rōpū i runga ipurangi, mā tētahi rorohiko.",
-      "description": "Hangaia he tohu uru mokowāmahi me ngā whakaaetanga e hiahiatia ana, kātahi ka whakapiri ki raro nei.",
+      "managedOnWeb": "Ka whakahaerehia te hononga Bitbucket o {{organization}} i runga ipurangi, mā tētahi rorohiko.",
+      "description": "Hangaia he tohu uru mokowāmahi mō {{organization}}, kātahi ka whakapiri ki raro nei.",
+      "descriptionReconnect": "Hangaia he tohu uru mokowāmahi hōu mō {{organization}}, kātahi ka whakapiri ki raro nei.",
       "scopes": "Pūkete: pānui · Pūranga: pānui/tuhi · Tono kume: pānui · Matau tukutuku: pānui/tuhi",
       "tokenPlaceholder": "Tohu uru mokowāmahi",
       "tokenRefused": "Kāore a Bitbucket i whakaae ki tēnei tohu uru mokowāmahi. Tirohia kei a ia ngā whakaaetanga kei runga ake nei, kātahi ka whakamātau anō."
@@ -2160,6 +2161,8 @@
       "renameAccessibility": "Whakaingoatia anō te wātū: {{title}}",
       "cloningSession": "Kei te tārua i te wātū",
       "couldNotLoadThisSession": "Kāore i taea te uta i tēnei wātū",
+      "historyTooLarge": "He rahi rawa te tuhinga kōrero o tēnei wātū kāore e taea te uta.",
+      "historyUnavailable": "Kāore e taea te pānui i te tuhinga kōrero o tēnei wātū.",
       "cloneFailedRetry": "Kāore i taea te tārua i tēnei wātū. Whakamātau anō.",
       "notEnoughCredits": "Kāore e rahi ana ngā moni tōmua hei whakahaere i tēnei tono. Tāpirihia he moni tōmua, kātahi ka whakamātau anō.",
       "previousTaskFinishing": "Kei te whakaoti tonu i te mahi o mua. Tatari mō tētahi wā poto.",
@@ -2236,6 +2239,7 @@
       "branchDefault": "Taunoa",
       "branchAccessibility": "Peka: {{label}}",
       "branchLoading": "E uta ana i ngā peka",
+      "branchInactive": "Kōwhiria he pūranga waehere kia utaina ai ōna peka.",
       "branchLoadError": "Kāore i taea te uta i ngā peka",
       "branchUnavailable": "Kāore ngā peka e wātea ana mō tēnei pūranga waehere. Tirohia tō urunga ki te kaiwhakarato, kātahi ka kōwhiri i tētahi atu pūranga waehere.",
       "branchEmpty": "Kāore he peka e wātea ana",
@@ -4673,7 +4677,7 @@
       "new": "Kaiwhakaara hou",
       "create": "Waihanga kaiwhakaara",
       "emptyTitle": "Kāore anō he kaiwhakaara",
-      "emptyDescription": "Waihanga i tētahi kaiwhakaara hei tīmata i tētahi rerenga Cloud Agent mai i tētahi karanga hononga tukutuku, i tētahi hōtaka wā rānei.",
+      "emptyDescription": "Waihangatia tō tuatahi kaiwhakaara.",
       "loadFailedTitle": "Kāore i taea te uta i ngā kaiwhakaara",
       "loadFailedDescription": "Whakamātauria anō ina whai hononga koe.",
       "detailLoadFailedTitle": "Kāore i taea te uta i tēnei kaiwhakaara",

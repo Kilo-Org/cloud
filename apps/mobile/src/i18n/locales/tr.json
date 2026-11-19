@@ -695,8 +695,9 @@
       "notConnectedReadOnly": "Bitbucket bağlı değil. Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Bu kuruluşun Bitbucket bağlantısı bir bilgisayardan web üzerinden yönetilir.",
-      "description": "Gerekli izinlere sahip bir çalışma alanı erişim belirteci oluştur ve aşağıya yapıştır.",
+      "managedOnWeb": "{{organization}} için Bitbucket bağlantısı bir bilgisayardan web üzerinden yönetilir.",
+      "description": "{{organization}} için bir çalışma alanı erişim belirteci oluştur ve aşağıya yapıştır.",
+      "descriptionReconnect": "{{organization}} için yeni bir çalışma alanı erişim belirteci oluştur ve aşağıya yapıştır.",
       "scopes": "İzinler: Hesap okuma · Depo okuma/yazma · Çekme isteği okuma · Webhook okuma/yazma.",
       "tokenPlaceholder": "Çalışma alanı erişim belirteci",
       "tokenRefused": "Bitbucket bu çalışma alanı erişim belirtecini kabul etmedi. Yukarıdaki izinlere sahip olduğunu kontrol et ve yeniden dene."
@@ -1605,6 +1606,8 @@
       "renameAccessibility": "Oturumu yeniden adlandır: {{title}}",
       "cloningSession": "Oturum kopyalanıyor",
       "couldNotLoadThisSession": "Bu oturum yüklenemedi.",
+      "historyTooLarge": "Bu oturumun dökümü yüklenemeyecek kadar büyük.",
+      "historyUnavailable": "Bu oturumun dökümü okunamıyor.",
       "cloneFailedRetry": "Bu oturum kopyalanamadı. Tekrar dene.",
       "notEnoughCredits": "Bu istek için yeterli kredi yok. Kredi ekleyip tekrar dene.",
       "previousTaskFinishing": "Önceki görev henüz tamamlanmadı. Biraz bekle.",
@@ -1681,6 +1684,7 @@
       "branchDefault": "Varsayılan",
       "branchAccessibility": "Dal: {{label}}",
       "branchLoading": "Dallar yükleniyor",
+      "branchInactive": "Dallarının yüklenmesi için bir depo seç.",
       "branchLoadError": "Dallar yüklenemedi",
       "branchUnavailable": "Bu depo için dal kullanılamıyor. Sağlayıcıdaki erişimini kontrol et, ardından başka bir depo seç.",
       "branchEmpty": "Kullanılabilir dal yok",
@@ -4673,7 +4677,7 @@
       "new": "Yeni tetikleyici",
       "create": "Tetikleyici oluştur",
       "emptyTitle": "Henüz tetikleyici yok",
-      "emptyDescription": "Bir web kancası çağrısıyla veya bir zamanlamayla Cloud Agent çalıştırması başlatmak için bir tetikleyici oluşturun.",
+      "emptyDescription": "İlk tetikleyicinizi oluşturun.",
       "loadFailedTitle": "Tetikleyiciler yüklenemedi",
       "loadFailedDescription": "Bağlantınız olduğunda tekrar deneyin.",
       "detailLoadFailedTitle": "Bu tetikleyici yüklenemedi",

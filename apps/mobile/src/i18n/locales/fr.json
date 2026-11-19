@@ -662,8 +662,9 @@
       "notConnectedReadOnly": "Bitbucket n'est pas connecté. Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent établir la connexion."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "La connexion Bitbucket de cette organisation se gère sur le web, depuis un ordinateur.",
-      "description": "Créez un jeton d'accès à l'espace de travail avec les autorisations requises, puis collez-le ci-dessous.",
+      "managedOnWeb": "La connexion Bitbucket à {{organization}} se gère sur le web, depuis un ordinateur.",
+      "description": "Créez un jeton d'accès à l'espace de travail pour {{organization}}, puis collez-le ci-dessous.",
+      "descriptionReconnect": "Créez un nouveau jeton d'accès à l'espace de travail pour {{organization}}, puis collez-le ci-dessous.",
       "scopes": "Compte : lecture · Dépôts : lecture/écriture · Demandes de fusion : lecture · Webhooks : lecture/écriture",
       "tokenPlaceholder": "Jeton d'accès à l'espace de travail",
       "tokenRefused": "Bitbucket n'a pas accepté ce jeton d'accès à l'espace de travail. Vérifiez qu'il dispose des autorisations ci-dessus, puis réessayez."
@@ -1522,6 +1523,8 @@
       "renameAccessibility": "Renommer la session : {{title}}",
       "cloningSession": "Clonage de la session…",
       "couldNotLoadThisSession": "Impossible de charger cette session",
+      "historyTooLarge": "La transcription de cette session est trop volumineuse pour être chargée.",
+      "historyUnavailable": "Impossible de lire la transcription de cette session.",
       "cloneFailedRetry": "Impossible de cloner cette session. Réessayez.",
       "notEnoughCredits": "Crédits insuffisants pour cette requête. Ajoutez des crédits et réessayez.",
       "previousTaskFinishing": "La tâche précédente se termine. Patientez un instant.",
@@ -1598,6 +1601,7 @@
       "branchDefault": "Par défaut",
       "branchAccessibility": "Branche : {{label}}",
       "branchLoading": "Chargement des branches",
+      "branchInactive": "Sélectionnez un dépôt pour charger ses branches.",
       "branchLoadError": "Impossible de charger les branches",
       "branchUnavailable": "Aucune branche n'est disponible pour ce dépôt. Vérifiez votre accès auprès du fournisseur, puis choisissez un autre dépôt.",
       "branchEmpty": "Aucune branche disponible",
@@ -4748,7 +4752,7 @@
       "new": "Nouveau déclencheur",
       "create": "Créer un déclencheur",
       "emptyTitle": "Aucun déclencheur pour l’instant",
-      "emptyDescription": "Créez un déclencheur pour lancer une exécution de Cloud Agent à partir d’un appel webhook ou selon une planification.",
+      "emptyDescription": "Créez votre premier déclencheur.",
       "loadFailedTitle": "Impossible de charger les déclencheurs",
       "loadFailedDescription": "Réessayez lorsque vous avez une connexion.",
       "detailLoadFailedTitle": "Impossible de charger ce déclencheur",

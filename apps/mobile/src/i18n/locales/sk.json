@@ -1431,8 +1431,9 @@
       "notConnectedReadOnly": "Bitbucket nie je pripojený. Pripojiť ho môžu iba vlastníci organizácie, správcovia a správcovia fakturácie."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Pripojenie tejto organizácie k Bitbucketu sa spravuje na webe z počítača.",
-      "description": "Vytvorte prístupový token pracovného priestoru s požadovanými oprávneniami a vložte ho nižšie.",
+      "managedOnWeb": "Pripojenie {{organization}} k Bitbucketu sa spravuje na webe z počítača.",
+      "description": "Vytvorte prístupový token pracovného priestoru pre {{organization}} a vložte ho nižšie.",
+      "descriptionReconnect": "Vytvorte nový prístupový token pracovného priestoru pre {{organization}} a vložte ho nižšie.",
       "scopes": "Účet: čítanie · Repozitáre: čítanie/zápis · PR: čítanie · Webhooky: čítanie/zápis",
       "tokenPlaceholder": "Prístupový token pracovného priestoru",
       "tokenRefused": "Bitbucket neprijal tento token pracovného priestoru. Skontrolujte, či má oprávnenia uvedené vyššie, a potom to skúste znova."
@@ -2248,6 +2249,8 @@
       "renameAccessibility": "Premenovať reláciu: {{title}}",
       "cloningSession": "Klonuje sa relácia",
       "couldNotLoadThisSession": "Túto reláciu sa nepodarilo načítať.",
+      "historyTooLarge": "Pepis tejto relácie je na načítanie príliš veľký.",
+      "historyUnavailable": "Pepis tejto relácie nie je možné prečítať.",
       "cloneFailedRetry": "Túto reláciu sa nepodarilo naklonovať. Skús to znova.",
       "notEnoughCredits": "Na túto požiadavku nemáš dosť kreditov. Doplň kredity a skús to znova.",
       "previousTaskFinishing": "Predchádzajúca úloha sa ešte dokončuje. Chvíľu počkaj.",
@@ -2324,6 +2327,7 @@
       "branchDefault": "Predvolená",
       "branchAccessibility": "Vetva: {{label}}",
       "branchLoading": "Načítavajú sa vetvy",
+      "branchInactive": "Vyberte repozitár, aby sa načítali jeho vetvy.",
       "branchLoadError": "Vetvy sa nepodarilo načítať",
       "branchUnavailable": "Pre tento repozitár nie sú vetvy dostupné. Skontroluj svoj prístup u poskytovateľa a vyber iný repozitár.",
       "branchEmpty": "Žiadne dostupné vetvy",
@@ -4823,7 +4827,7 @@
       "new": "Nový spúšťač",
       "create": "Vytvorte spúšťač",
       "emptyTitle": "Zatiaľ žiadne spúšťače",
-      "emptyDescription": "Vytvorte spúšťač na spustenie Cloud Agent z volania webhooku alebo podľa plánu.",
+      "emptyDescription": "Vytvorte svoj prvý spúšťač.",
       "loadFailedTitle": "Nepodarilo sa načítať spúšťače",
       "loadFailedDescription": "Skúste to znova, keď budete mať pripojenie.",
       "detailLoadFailedTitle": "Nepodarilo sa načítať tento spúšťač",

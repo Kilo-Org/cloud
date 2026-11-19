@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { type TextInput, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
@@ -64,7 +64,12 @@ export function EmailOtpForm({
   onVerify: (code: string) => void;
   /** Fires on every code-input change so the caller can retire a stale refusal message. */
   onCodeChange?: () => void;
-  onResend: () => void;
+  /**
+   * Requests a new code and reports whether the server accepted the request, so
+   * the field can empty the code it has just replaced. The old code stays
+   * visible when the request fails: it may still be the code that works.
+   */
+  onResend: () => Promise<boolean>;
   onBack: () => void;
   /**
    * Reports the height of everything below the code field, so the login shell
@@ -76,7 +81,14 @@ export function EmailOtpForm({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const codeRef = useRef('');
+  const inputRef = useRef<TextInput>(null);
   const [hasCompleteCode, setHasCompleteCode] = useState(false);
+  /**
+   * The keystroke count a resend started at. A keystroke or a second resend
+   * moves it on, so only the resend this count still belongs to empties the
+   * field: a code typed while the request was in flight is not thrown away.
+   */
+  const resendAttemptRef = useRef(0);
   const authBusy = busy !== undefined;
   const destination = formatCodeDestination(
     t('login.enterCodeSentTo', { email: ADDRESS_SLOT }),
@@ -93,6 +105,7 @@ export function EmailOtpForm({
         {t('login.codeArrivalHint')}
       </Text>
       <Input
+        ref={inputRef}
         // The shared box supplies the single line inset (`INPUT_BOX_SHAPE_CLASS`,
         // min-h-44 and the horizontal padding); the call site keeps its chrome —
         // border, fill and radius — the way every single-line field does. The
@@ -116,6 +129,9 @@ export function EmailOtpForm({
           // the server work on ASCII: the sign-in code is issued in ASCII, and a
           // keyboard in another script types the same code in its own digits.
           const digits = foldDecimalDigits(value);
+          // Typing is what a pending resend must respect: the field now holds a
+          // code that resend's reply did not replace.
+          resendAttemptRef.current += 1;
           codeRef.current = digits;
           setHasCompleteCode(/^\d{6}$/.test(digits));
           onCodeChange?.();
@@ -160,7 +176,23 @@ export function EmailOtpForm({
         variant="outline"
         disabled={authBusy}
         loading={busy === 'otp-send'}
-        onPress={onResend}
+        onPress={() => {
+          const attempt = (resendAttemptRef.current += 1);
+          void (async () => {
+            const sent = await onResend();
+            // Only a request the field still owns may empty it: a code typed (or
+            // a second resend started) while this one ran stays as it is.
+            if (!sent || attempt !== resendAttemptRef.current) {
+              return;
+            }
+            // The field is uncontrolled (iOS text input rules), so the native
+            // box is emptied through the ref: the resend replaces the code, and
+            // the old one left in place read as if the new one had arrived.
+            inputRef.current?.clear();
+            codeRef.current = '';
+            setHasCompleteCode(false);
+          })();
+        }}
         accessibilityLabel={t('login.resendCode')}
       >
         {/* One line, like every other label in this stack: the Arabic secondary

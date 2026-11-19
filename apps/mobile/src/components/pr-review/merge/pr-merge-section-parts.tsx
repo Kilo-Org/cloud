@@ -10,10 +10,10 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { mergeBlockedReasonIcon } from '@/components/pr-review/merge/pr-merge-icons';
-import { PrReviewSectionLabel } from '@/components/pr-review/pr-review-section-label';
 import {
   type MergeBlockedReason,
   prMergeMethodName,
@@ -50,12 +50,11 @@ export function ClosedChip({
   const { t } = useTranslation();
   const label = t(closedLabelKey(nounKey));
   return (
-    <View className="gap-2">
-      <PrReviewSectionLabel label={t('prReview.merge.mergeTitle')} />
+    <Section label={t('prReview.merge.mergeTitle')}>
       <Card>
         <Text className="text-sm text-muted-foreground">{label}</Text>
       </Card>
-    </View>
+    </Section>
   );
 }
 
@@ -137,24 +136,25 @@ export function BlockedPanel({
   const hasBehindReason = reasons.some(r => r.id === 'behind');
   const { t } = useTranslation();
   return (
-    <View className="gap-2">
-      <PrReviewSectionLabel label={t('prReview.merge.blockedTitle')} />
-      <RowGroup>
-        {reasons.map(reason => (
-          <BlockedReasonRow key={reason.id} reason={reason} />
-        ))}
-      </RowGroup>
-      {hasBehindReason && allowUpdateBranch ? (
-        <Button
-          variant="outline"
-          onPress={onUpdateBranch}
-          loading={isUpdatePending}
-          accessibilityLabel={t('prReview.merge.updateBranchFromBase')}
-        >
-          <Text>{t('prReview.merge.updateBranch')}</Text>
-        </Button>
-      ) : null}
-    </View>
+    <Section label={t('prReview.merge.blockedTitle')}>
+      <View className="gap-2">
+        <RowGroup>
+          {reasons.map(reason => (
+            <BlockedReasonRow key={reason.id} reason={reason} />
+          ))}
+        </RowGroup>
+        {hasBehindReason && allowUpdateBranch ? (
+          <Button
+            variant="outline"
+            onPress={onUpdateBranch}
+            loading={isUpdatePending}
+            accessibilityLabel={t('prReview.merge.updateBranchFromBase')}
+          >
+            <Text>{t('prReview.merge.updateBranch')}</Text>
+          </Button>
+        ) : null}
+      </View>
+    </Section>
   );
 }
 

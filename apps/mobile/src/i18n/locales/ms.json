@@ -1226,7 +1226,7 @@
     },
     "instructions": {
       "title": "Arahan tersuai",
-      "deprecation": "Ciri arahan tersuai akan dihentikan. Pindahkan garis panduan ini ke dalam fail REVIEW.md dalam repositori anda.",
+      "deprecation": "Ciri arahan tersuai akan dialih keluar. Pindahkan garis panduan ini ke dalam fail REVIEW.md dalam repositori anda.",
       "placeholder": "contohnya, pastikan kod mematuhi konvensyen pengendalian ralat kami…",
       "clearTitle": "Buang arahan tersuai?",
       "clearMessage": "Menyimpan medan kosong akan memadamkan arahan tersuai yang disimpan untuk pengulas ini."
@@ -1392,6 +1392,7 @@
       "managedOnWeb": "Sambungan Bitbucket untuk {{organization}} diurus di web melalui komputer.",
       "description": "Cipta token akses ruang kerja untuk {{organization}} dan tampalkannya di bawah.",
       "descriptionReconnect": "Cipta token akses ruang kerja baharu untuk {{organization}} dan tampalkannya di bawah.",
+      "descriptionOverview": "Cipta token akses ruang kerja untuk {{organization}} dan tampalkannya pada skrin seterusnya.",
       "scopes": "Akaun: baca · Repositori: baca/tulis · Permintaan penarikan: baca · Webhook: baca/tulis",
       "tokenPlaceholder": "Token akses ruang kerja",
       "tokenRefused": "Bitbucket tidak menerima token ruang kerja ini. Semak bahawa ia mempunyai skop di atas, kemudian cuba lagi."
@@ -3186,6 +3187,8 @@
     "retryHint": "Mencuba semula untuk mendapatkan status Kilo Pass.",
     "endedOn": "Berakhir pada {{date}}",
     "notAvailableInApp": "Kilo Pass tidak tersedia dalam aplikasi.",
+    "notAvailableTitle": "Kilo Pass tiada dalam aplikasi",
+    "noPassDescription": "Akaun ini tidak mempunyai Kilo Pass.",
     "statusActive": "Aktif",
     "statusTrialing": "Dalam percubaan",
     "statusPastDue": "Pembayaran tertunggak",
@@ -3468,7 +3471,7 @@
       "retentionLimit": "Memaparkan invois terkini."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Dayakan amaran baki rendah",
+      "subtitle": "Hantar amaran melalui e-mel kepada alamat yang anda senaraikan apabila baki organisasi ini jatuh di bawah jumlah yang anda tetapkan.",
       "notifyEmailsLabel": "Alamat e-mel penerima",
       "permissionDenied": "Anda tidak mempunyai kebenaran untuk mengurus amaran pengebilan.",
       "separateEmailsHint": "Pisahkan alamat e-mel dengan koma.",
@@ -3650,7 +3653,8 @@
     "signupStepUp": "Untuk melengkapkan penciptaan akaun anda, gunakan '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Untuk melengkapkan penciptaan akaun anda, gunakan '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Untuk melengkapkan penciptaan akaun anda, gunakan '$t(login.signInWithGoogle)'.",
-    "invalidCode": "Kod itu tidak betul. Sila cuba lagi.",
+    "signupStepUpBack": "Untuk melengkapkan penciptaan akaun anda, kembali dan gunakan '$t(login.moreSignInOptions)'.",
+    "invalidCode": "Kod itu tidak betul atau telah tamat tempoh. Sila cuba lagi atau gunakan '$t(login.resendCode)'.",
     "codeInProgress": "Kod anda sedang diproses. Tunggu seketika dan cuba lagi.",
     "tooManyAttempts": "Terlalu banyak percubaan. Sila minta kod baharu.",
     "invalidToken": "Log masuk gagal. Sila cuba lagi.",
@@ -3919,6 +3923,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) menghantar permintaan inferens ringkas ke titik akhir ini menggunakan protokol dan model yang dipilih. Penyedia mungkin mengenakan caj untuk permintaan ini.",
       "connectionSucceeded": "Model berjaya menyelesaikan permintaan menggunakan protokol ini.",
       "connectionFailed": "Model tidak dapat menyelesaikan permintaan. Periksa URL akar API, protokol, bukti kelayakan dan ID model.",
+      "requestTimedOut": "Titik akhir tidak menjawab dalam masa yang ditetapkan. Periksa URL akar API dan sambungan anda, kemudian cuba lagi.",
+      "requestUnauthorized": "Titik akhir menolak bukti kelayakan. Periksa kunci API dan pengepala tersuai, kemudian cuba lagi.",
+      "requestNotFound": "Titik akhir atau model tidak ditemui. Periksa URL akar API dan ID model.",
+      "requestRateLimited": "Titik akhir sedang mengehadkan permintaan. Tunggu sebentar dan cuba lagi.",
+      "requestUnavailable": "Titik akhir tidak tersedia buat masa ini. Cuba lagi sebentar lagi.",
+      "requestUnreachable": "Titik akhir tidak dapat dihubungi. Periksa URL akar API dan sambungan anda.",
+      "requestInvalidResponse": "Titik akhir menjawab dengan format yang tidak dijangka. Periksa URL akar API dan protokol sepadan dengan pelayan, kemudian cuba lagi.",
+      "discoveryNoModels": "Titik akhir tidak menyenaraikan sebarang model. Masukkan model secara manual.",
+      "connectionIncomplete": "Model menjawab tetapi tidak selesai. Cuba lagi, atau periksa ID model dan protokol.",
       "invalidInput": "Masukkan nama sistem pelayan, pengepala yang sah dan sekurang-kurangnya satu model dengan ID dan nama yang unik. Had token mestilah nombor bulat positif.",
       "invalidUrl": "Masukkan URL akar API HTTP atau HTTPS tanpa bukti kelayakan, pertanyaan atau fragmen.",
       "publicHttp": "Titik akhir HTTP awam tidak dibenarkan. Gunakan HTTPS atau titik akhir setempat persendirian.",
@@ -4057,7 +4070,11 @@
     "reasoningEffort": {
       "modelFlag": "Model ini menyokong tahap pemikiran"
     },
-    "creditsRequired": "Kredit tidak mencukupi untuk menghantar mesej ini."
+    "creditsRequired": "Kredit tidak mencukupi untuk menghantar mesej ini.",
+    "providerKeyRefused": "Penyedia menolak bukti kelayakan. Periksa kunci API-nya, kemudian hantar semula.",
+    "providerModelMissing": "Backend ini tidak lagi menyediakan model ini. Pilih yang lain.",
+    "providerRateLimited": "Penyedia sedang mengehadkan permintaan. Tunggu sebentar dan hantar semula.",
+    "providerUnavailable": "Penyedia tidak tersedia buat masa ini. Hantar semula sebentar lagi."
   },
   "settingsTools": {
     "confirmTitle": "Sahkan perubahan ini?"
@@ -4525,7 +4542,9 @@
     },
     "saveSheet": {
       "title": "Simpan ke senarai",
-      "saved": "Disimpan ke {{list}}"
+      "saved": "Disimpan ke {{list}}",
+      "saveFailed": "Tugasan tidak dapat disimpan. Semak sambungan anda dan cuba lagi.",
+      "saveRefused": "Tugasan tidak dapat disimpan ke senarai ini. Pilih senarai lain."
     }
   },
   "agentBriefing": {
@@ -4537,6 +4556,7 @@
     "empty": "Tiada aktiviti dalam tempoh laporan ini",
     "emptyHint": "Sesi pengekodan awan dan CLI anda muncul di sini apabila laporan berjadual mempunyai aktiviti.",
     "loadError": "Tidak dapat memuatkan laporan",
+    "estimateLoadError": "Tidak dapat memuatkan anggaran.",
     "view": "Baca laporan",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4942,7 +4962,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Ciri perusahaan",
-    "enterpriseOnly": "Ini ialah ciri khusus perusahaan.",
+    "enterpriseOnly": "Pembekal dan model tersedia pada pelan Enterprise.",
     "readOnly": "Hanya pemilik dan pentadbir organisasi boleh mengubah tetapan ini.",
     "loadError": "Pembekal dan model tidak dapat dimuatkan",
     "tabModels": "Model",

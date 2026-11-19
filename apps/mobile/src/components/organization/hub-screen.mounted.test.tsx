@@ -154,6 +154,7 @@ const kiloPassRowState = vi.hoisted(() => ({
   current: null as null | {
     subtitle: string;
     attention: boolean;
+    tone: 'default' | 'muted' | 'warn';
     action: 'retry' | 'none';
     actionLabel: string | null;
     accessibilityHint: string | null;
@@ -761,6 +762,7 @@ describe('Organization hub Kilo Pass placeholder', () => {
   const loadingState = {
     subtitle: 'Loading…',
     attention: false,
+    tone: 'default',
     action: 'none',
     actionLabel: null,
     accessibilityHint: null,
@@ -778,6 +780,39 @@ describe('Organization hub Kilo Pass placeholder', () => {
       node => String(node.type) === 'Text' && node.props.children === subtitle
     )[0];
   }
+
+  it('tells assistive tech the row is busy and holds its press while the summary loads', async () => {
+    function kiloPassRow(root: TestRenderer.ReactTestInstance) {
+      const row = root
+        .findAll(node => String(node.type) === 'Pressable')
+        .find(node => String(node.props.accessibilityLabel).startsWith(i18n.t('kiloPass.title')));
+      if (!row) {
+        throw new Error('Kilo Pass row missing');
+      }
+      return row;
+    }
+
+    kiloPassRowState.current = { ...loadingState };
+    const loading = await renderHub();
+    // A settled row announces itself idle; while the summary loads the same
+    // control is busy and refuses the press, because the page behind it has no
+    // read to show yet.
+    expect(kiloPassRow(loading.renderer.root).props.accessibilityState).toEqual({
+      busy: true,
+      disabled: true,
+    });
+    expect(kiloPassRow(loading.renderer.root).props.disabled).toBe(true);
+    loading.unmount();
+
+    kiloPassRowState.current = { ...loadingState, loading: false, subtitle: 'Not subscribed' };
+    const settled = await renderHub();
+    expect(kiloPassRow(settled.renderer.root).props.accessibilityState).toEqual({
+      busy: false,
+      disabled: false,
+    });
+    expect(kiloPassRow(settled.renderer.root).props.disabled).toBe(false);
+    settled.unmount();
+  });
 
   it('renders the loading bar on the subtitle line box, not above it', async () => {
     // Compile the box the subtitle actually lays out, from the class the screen
@@ -831,6 +866,7 @@ describe('Organization hub Kilo Pass placeholder', () => {
     kiloPassRowState.current = {
       subtitle: 'Not subscribed',
       attention: false,
+      tone: 'muted',
       action: 'none',
       actionLabel: null,
       accessibilityHint: null,
@@ -1261,6 +1297,7 @@ describe('Organization hub Kilo Pass icon tile', () => {
     kiloPassRowState.current = {
       subtitle: 'Not subscribed',
       attention: false,
+      tone: 'muted',
       action: 'none',
       actionLabel: 'Set up',
       accessibilityHint: 'Opens Kilo Pass setup on web.',
@@ -1279,6 +1316,7 @@ describe('Organization hub Kilo Pass icon tile', () => {
     kiloPassRowState.current = {
       subtitle: 'Could not load status',
       attention: true,
+      tone: 'warn',
       action: 'retry',
       actionLabel: 'Retry',
       accessibilityHint: 'Retries loading Kilo Pass status.',

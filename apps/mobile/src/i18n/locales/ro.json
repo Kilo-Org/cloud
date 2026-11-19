@@ -1250,7 +1250,7 @@
     },
     "instructions": {
       "title": "Instrucțiuni personalizate",
-      "deprecation": "Funcția de instrucțiuni personalizate urmează să fie retrasă. Mută aceste instrucțiuni într-un fișier REVIEW.md din depozitul tău.",
+      "deprecation": "Funcția de instrucțiuni personalizate va fi eliminată. Mută aceste instrucțiuni într-un fișier REVIEW.md din depozitul tău.",
       "placeholder": "de exemplu: respectarea convențiilor noastre de gestionare a erorilor…",
       "clearTitle": "Elimini instrucțiunile personalizate?",
       "clearMessage": "Salvând un câmp gol, ștergi instrucțiunile personalizate stocate pentru acest recenzor."
@@ -1416,6 +1416,7 @@
       "managedOnWeb": "Conexiunea Bitbucket pentru {{organization}} se gestionează pe web, de pe un computer.",
       "description": "Creează un token de acces la spațiul de lucru pentru {{organization}} și lipește-l mai jos.",
       "descriptionReconnect": "Creează un nou token de acces la spațiul de lucru pentru {{organization}} și lipește-l mai jos.",
+      "descriptionOverview": "Creează un token de acces la spațiul de lucru pentru {{organization}} și lipește-l pe ecranul următor.",
       "scopes": "Cont: citire · Depozite: citire/scriere · PR-uri: citire · Webhook-uri: citire/scriere",
       "tokenPlaceholder": "Token de acces la spațiul de lucru",
       "tokenRefused": "Bitbucket nu a acceptat acest token de acces la spațiul de lucru. Verifică dacă are permisiunile de mai sus, apoi încearcă din nou."
@@ -3245,6 +3246,8 @@
     "retryHint": "Încearcă din nou să încarce starea Kilo Pass.",
     "endedOn": "Încheiat {{date}}",
     "notAvailableInApp": "Kilo Pass nu este disponibil în aplicație.",
+    "notAvailableTitle": "Kilo Pass nu este oferit în aplicație",
+    "noPassDescription": "Acest cont nu are Kilo Pass.",
     "statusActive": "Activ",
     "statusTrialing": "Perioadă de probă",
     "statusPastDue": "Plată restantă",
@@ -3527,7 +3530,7 @@
       "retentionLimit": "Se afișează cele mai recente facturi."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Activează alerta de sold scăzut",
+      "subtitle": "Trimite o alertă prin e-mail la adresele indicate când soldul acestei organizații scade sub suma setată.",
       "notifyEmailsLabel": "Adrese de e-mail pentru notificări",
       "permissionDenied": "Nu ai permisiunea de a gestiona alertele de facturare.",
       "separateEmailsHint": "Separă adresele de e-mail prin virgule.",
@@ -3711,7 +3714,8 @@
     "signupStepUp": "Pentru a finaliza crearea contului, folosește „$t(login.moreSignInOptions)”.",
     "signupStepUpApple": "Pentru a finaliza crearea contului, folosește „$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "Pentru a finaliza crearea contului, folosește „$t(login.signInWithGoogle)”.",
-    "invalidCode": "Codul este incorect. Încearcă din nou.",
+    "signupStepUpBack": "Pentru a finaliza crearea contului, revino la ecranul anterior și folosește „$t(login.moreSignInOptions)”.",
+    "invalidCode": "Codul este incorect sau a expirat. Încearcă din nou sau folosește „$t(login.resendCode)”.",
     "codeInProgress": "Codul tău este procesat. Așteaptă puțin și încearcă din nou.",
     "tooManyAttempts": "Prea multe încercări. Solicită un cod nou.",
     "invalidToken": "Autentificarea a eșuat. Încearcă din nou.",
@@ -3981,6 +3985,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) trimite o scurtă cerere de inferență către acest endpoint folosind protocolul și modelul selectate. Furnizorul o poate taxa.",
       "connectionSucceeded": "Modelul a finalizat o cerere folosind acest protocol.",
       "connectionFailed": "Modelul nu a putut finaliza o cerere. Verifică rădăcina API, protocolul, credențialele și ID-ul modelului.",
+      "requestTimedOut": "Endpointul nu a răspuns la timp. Verifică rădăcina API și conexiunea, apoi încearcă din nou.",
+      "requestUnauthorized": "Endpointul a refuzat credențialele. Verifică cheia API și antetele personalizate, apoi încearcă din nou.",
+      "requestNotFound": "Endpointul sau modelul nu a fost găsit. Verifică rădăcina API și ID-ul modelului.",
+      "requestRateLimited": "Endpointul limitează cererile. Așteaptă puțin și încearcă din nou.",
+      "requestUnavailable": "Endpointul este indisponibil acum. Încearcă din nou în câteva momente.",
+      "requestUnreachable": "Endpointul nu a putut fi contactat. Verifică rădăcina API și conexiunea.",
+      "requestInvalidResponse": "Endpointul nu a răspuns în formatul așteptat. Verifică dacă rădăcina API și protocolul corespund serverului, apoi încearcă din nou.",
+      "discoveryNoModels": "Endpointul nu a listat niciun model. Introdu modelele manual.",
+      "connectionIncomplete": "Modelul a răspuns, dar nu a terminat. Încearcă din nou sau verifică ID-ul modelului și protocolul.",
       "invalidInput": "Introdu un nume de backend, antete valide și cel puțin un model cu ID și nume unice. Limitele de tokenuri trebuie să fie numere întregi pozitive.",
       "invalidUrl": "Introdu o rădăcină API HTTP sau HTTPS fără credențiale, interogare sau fragment.",
       "publicHttp": "Endpointurile HTTP publice nu sunt permise. Folosește HTTPS sau un endpoint local privat.",
@@ -4119,7 +4132,11 @@
     "reasoningEffort": {
       "modelFlag": "Acest model acceptă efort de raționament"
     },
-    "creditsRequired": "Nu ai suficiente credite pentru a trimite acest mesaj."
+    "creditsRequired": "Nu ai suficiente credite pentru a trimite acest mesaj.",
+    "providerKeyRefused": "Furnizorul a refuzat credențialele. Verifică cheia API a acestuia, apoi trimite din nou.",
+    "providerModelMissing": "Acest backend nu mai servește acest model. Alege altul.",
+    "providerRateLimited": "Furnizorul limitează cererile. Așteaptă puțin și trimite din nou.",
+    "providerUnavailable": "Furnizorul este indisponibil acum. Trimite din nou în curând."
   },
   "settingsTools": {
     "confirmTitle": "Confirmi această modificare?"
@@ -4597,7 +4614,9 @@
     },
     "saveSheet": {
       "title": "Salvează în listă",
-      "saved": "Salvat în {{list}}"
+      "saved": "Salvat în {{list}}",
+      "saveFailed": "Nu s-a putut salva sarcina. Verifică conexiunea și încearcă din nou.",
+      "saveRefused": "Nu s-a putut salva sarcina în această listă. Alege altă listă."
     }
   },
   "agentBriefing": {
@@ -4609,6 +4628,7 @@
     "empty": "Nicio activitate în acest interval de raport",
     "emptyHint": "Sesiunile tale de programare din cloud și CLI apar aici când un raport programat are activitate.",
     "loadError": "Rapoartele nu au putut fi încărcate",
+    "estimateLoadError": "Estimarea nu a putut fi încărcată.",
     "view": "Citește raportul",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -5018,7 +5038,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Funcție pentru întreprinderi",
-    "enterpriseOnly": "Aceasta este o funcție disponibilă doar pentru întreprinderi.",
+    "enterpriseOnly": "Furnizorii și modelele sunt disponibile în planul Enterprise.",
     "readOnly": "Doar proprietarii și administratorii organizației pot modifica aceste setări.",
     "loadError": "Nu s-au putut încărca furnizorii și modelele.",
     "tabModels": "Modele",

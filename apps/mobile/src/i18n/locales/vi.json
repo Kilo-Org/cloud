@@ -669,7 +669,7 @@
     },
     "instructions": {
       "title": "Hướng dẫn tùy chỉnh",
-      "deprecation": "Tính năng hướng dẫn tùy chỉnh dự kiến sẽ ngừng được hỗ trợ. Hãy chuyển các hướng dẫn này vào tệp REVIEW.md trong kho lưu trữ.",
+      "deprecation": "Tính năng hướng dẫn tùy chỉnh sẽ bị gỡ bỏ. Hãy chuyển các hướng dẫn này vào tệp REVIEW.md trong kho lưu trữ.",
       "placeholder": "ví dụ: Tuân thủ các quy ước xử lý lỗi của nhóm…",
       "clearTitle": "Xóa hướng dẫn tùy chỉnh?",
       "clearMessage": "Lưu trường trống sẽ xóa hướng dẫn tùy chỉnh đã lưu cho người duyệt mã này."
@@ -700,6 +700,7 @@
       "managedOnWeb": "Kết nối Bitbucket của {{organization}} được quản lý trên web từ máy tính.",
       "description": "Tạo mã truy cập không gian làm việc cho {{organization}} rồi dán vào bên dưới.",
       "descriptionReconnect": "Tạo mã truy cập không gian làm việc mới cho {{organization}} rồi dán vào bên dưới.",
+      "descriptionOverview": "Tạo mã truy cập không gian làm việc cho {{organization}} rồi dán vào màn hình tiếp theo.",
       "scopes": "Tài khoản: đọc · Kho lưu trữ: đọc/ghi · Yêu cầu hợp nhất: đọc · Webhook: đọc/ghi",
       "tokenPlaceholder": "Mã truy cập không gian làm việc",
       "tokenRefused": "Bitbucket không chấp nhận mã truy cập không gian làm việc này. Hãy kiểm tra rằng mã có các quyền ở trên, rồi thử lại."
@@ -2629,6 +2630,8 @@
     "retryHint": "Thử tải lại trạng thái Kilo Pass.",
     "endedOn": "Đã kết thúc {{date}}",
     "notAvailableInApp": "Kilo Pass không khả dụng trong ứng dụng.",
+    "notAvailableTitle": "Kilo Pass không có trong ứng dụng",
+    "noPassDescription": "Tài khoản này không có Kilo Pass.",
     "statusActive": "Đang hoạt động",
     "statusTrialing": "Đang dùng thử",
     "statusPastDue": "Thanh toán quá hạn",
@@ -3473,7 +3476,7 @@
       "retentionLimit": "Đang hiển thị các hóa đơn gần đây nhất."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Bật cảnh báo số dư thấp",
+      "subtitle": "Gửi cảnh báo qua email tới các địa chỉ bạn liệt kê khi số dư của tổ chức này giảm xuống dưới mức bạn đặt.",
       "notifyEmailsLabel": "Email nhận thông báo",
       "permissionDenied": "Bạn không có quyền quản lý cảnh báo thanh toán.",
       "separateEmailsHint": "Dùng dấu phẩy để ngăn cách các địa chỉ email.",
@@ -3650,7 +3653,8 @@
     "signupStepUp": "Để hoàn tất việc tạo tài khoản, hãy dùng '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Để hoàn tất việc tạo tài khoản, hãy dùng '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Để hoàn tất việc tạo tài khoản, hãy dùng '$t(login.signInWithGoogle)'.",
-    "invalidCode": "Mã đó không đúng. Vui lòng thử lại.",
+    "signupStepUpBack": "Để hoàn tất việc tạo tài khoản, hãy quay lại và dùng '$t(login.moreSignInOptions)'.",
+    "invalidCode": "Mã đó không đúng hoặc đã hết hạn. Vui lòng thử lại hoặc dùng '$t(login.resendCode)'.",
     "codeInProgress": "Mã của bạn đang được xử lý. Chờ một chút rồi thử lại.",
     "tooManyAttempts": "Quá nhiều lần thử. Vui lòng yêu cầu mã mới.",
     "invalidToken": "Đăng nhập thất bại. Vui lòng thử lại.",
@@ -3919,6 +3923,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) gửi một yêu cầu suy luận ngắn đến điểm cuối này bằng giao thức và mô hình đã chọn. Nhà cung cấp có thể tính phí cho yêu cầu này.",
       "connectionSucceeded": "Mô hình đã hoàn thành một yêu cầu bằng giao thức này.",
       "connectionFailed": "Mô hình không thể hoàn thành yêu cầu. Kiểm tra URL gốc của API, giao thức, thông tin xác thực và ID mô hình.",
+      "requestTimedOut": "Điểm cuối không phản hồi kịp. Kiểm tra URL gốc của API và kết nối của bạn, rồi thử lại.",
+      "requestUnauthorized": "Điểm cuối đã từ chối thông tin xác thực. Kiểm tra khóa API và header tùy chỉnh, rồi thử lại.",
+      "requestNotFound": "Không tìm thấy điểm cuối hoặc mô hình. Kiểm tra URL gốc của API và ID mô hình.",
+      "requestRateLimited": "Điểm cuối đang giới hạn yêu cầu. Đợi một lát rồi thử lại.",
+      "requestUnavailable": "Điểm cuối hiện không khả dụng. Hãy thử lại sau một lát.",
+      "requestUnreachable": "Không thể kết nối tới điểm cuối. Kiểm tra URL gốc của API và kết nối của bạn.",
+      "requestInvalidResponse": "Điểm cuối trả về nội dung không đúng định dạng mong đợi. Kiểm tra xem URL gốc của API và giao thức có khớp với máy chủ không, sau đó thử lại.",
+      "discoveryNoModels": "Điểm cuối không liệt kê mô hình nào. Hãy nhập mô hình thủ công.",
+      "connectionIncomplete": "Mô hình đã phản hồi nhưng không hoàn tất. Hãy thử lại, hoặc kiểm tra ID mô hình và giao thức.",
       "invalidInput": "Nhập tên máy chủ, các trường tiêu đề hợp lệ và ít nhất một mô hình có ID và tên không trùng lặp. Giới hạn token phải là số nguyên dương.",
       "invalidUrl": "Nhập URL gốc của API dùng HTTP hoặc HTTPS, không có thông tin xác thực, chuỗi truy vấn hoặc phần định danh đoạn.",
       "publicHttp": "Không cho phép các điểm cuối HTTP công khai. Hãy dùng HTTPS hoặc một điểm cuối riêng trong mạng cục bộ.",
@@ -4057,7 +4070,11 @@
     "reasoningEffort": {
       "modelFlag": "Mô hình này hỗ trợ mức độ suy luận"
     },
-    "creditsRequired": "Không đủ tín dụng để gửi tin nhắn này."
+    "creditsRequired": "Không đủ tín dụng để gửi tin nhắn này.",
+    "providerKeyRefused": "Nhà cung cấp đã từ chối thông tin xác thực. Kiểm tra khóa API của nhà cung cấp, rồi gửi lại.",
+    "providerModelMissing": "Máy chủ phụ trợ này không còn phục vụ mô hình này. Hãy chọn một cái khác.",
+    "providerRateLimited": "Nhà cung cấp đang giới hạn yêu cầu. Đợi một lát rồi gửi lại.",
+    "providerUnavailable": "Nhà cung cấp hiện không khả dụng. Hãy gửi lại sau ít phút."
   },
   "settingsTools": {
     "confirmTitle": "Xác nhận thay đổi này?"
@@ -4525,7 +4542,9 @@
     },
     "saveSheet": {
       "title": "Lưu vào danh sách",
-      "saved": "Đã lưu vào {{list}}"
+      "saved": "Đã lưu vào {{list}}",
+      "saveFailed": "Không thể lưu việc cần làm. Kiểm tra kết nối của bạn và thử lại.",
+      "saveRefused": "Không thể lưu việc cần làm vào danh sách này. Hãy chọn danh sách khác."
     }
   },
   "agentBriefing": {
@@ -4537,6 +4556,7 @@
     "empty": "Không có hoạt động trong khung thời gian bản tin này.",
     "emptyHint": "Các phiên lập trình trên đám mây và CLI của bạn sẽ hiển thị tại đây khi một bản tin theo lịch có hoạt động.",
     "loadError": "Không thể tải bản tin",
+    "estimateLoadError": "Không thể tải ước tính.",
     "view": "Đọc bản tin",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4942,7 +4962,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Tính năng doanh nghiệp",
-    "enterpriseOnly": "Đây là tính năng chỉ dành cho doanh nghiệp.",
+    "enterpriseOnly": "Nhà cung cấp và mô hình có sẵn trên gói Enterprise.",
     "readOnly": "Chỉ chủ sở hữu và quản trị viên tổ chức mới có thể thay đổi các cài đặt này.",
     "loadError": "Không thể tải nhà cung cấp và mô hình",
     "tabModels": "Mô hình",

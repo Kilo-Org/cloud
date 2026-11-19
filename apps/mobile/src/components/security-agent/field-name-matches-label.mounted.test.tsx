@@ -175,6 +175,7 @@ vi.mock('@/components/security-agent/settings-save-button', () => ({
 }));
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: (props: { children?: unknown }) => props.children ?? null,
+  SheetScrollView: (props: { children?: unknown }) => props.children ?? null,
 }));
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;

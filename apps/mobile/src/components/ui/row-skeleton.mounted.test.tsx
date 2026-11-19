@@ -6,7 +6,7 @@ import { SWITCH_HOST_CLASS } from '@/lib/a11y/tap-target';
 import { act, TestRenderer } from '@/test/renderer';
 
 import { ROW_FRAME_CLASS, ROW_TILE_CLASS } from './row-frame';
-import { RowSkeleton } from './row-skeleton';
+import { RowSkeleton, SwitchPlaceholder } from './row-skeleton';
 
 vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('react-native', () => ({ View: 'View' }));
@@ -111,6 +111,20 @@ describe('RowSkeleton', () => {
     // A loaded switch row is 48pt because its 44pt node cancels the row's
     // overhang; a pill hosted without that cancel would set a 52pt row.
     expect(classesOf(host)).toEqual(expect.arrayContaining(SWITCH_HOST_CLASS.split(' ')));
+  });
+
+  it('paints the switch pill inside the host the loaded control occupies', () => {
+    act(() => {
+      renderer = TestRenderer.create(createElement(SwitchPlaceholder, {}));
+    });
+    const host = first(renderer?.root).findByType('View' as never);
+    const [pill] = skeletons(host);
+
+    expect(classesOf(host)).toEqual(expect.arrayContaining(SWITCH_HOST_CLASS.split(' ')));
+    expect(skeletons(host)).toHaveLength(1);
+    expect(classesOf(first(pill))).toEqual(
+      expect.arrayContaining(['h-[31px]', 'w-[51px]', 'rounded-full'])
+    );
   });
 
   it('stacks the leading cell above the text block in a narrow window', () => {

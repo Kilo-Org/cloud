@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { ShieldOff } from '@/components/ui/icons';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 
 import { DismissSheetFrame } from '@/components/security-agent/dismiss-sheet-frame';
 import {
@@ -14,6 +14,7 @@ import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { RefusalStatus } from '@/components/refusal-status';
 import { SheetHeader } from '@/components/sheet-header';
+import { SheetScrollView } from '@/components/tab-screen';
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
 import { DismissFindingSkeleton } from '@/components/security-agent/dismiss-finding-skeleton';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
@@ -44,7 +45,6 @@ import {
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { isReadPausedBeforeData } from '@/lib/query/read-failure-variant';
-import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 import { cn } from '@/lib/utils';
 
@@ -60,7 +60,6 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   // settles a status-bar inset below the window top and the header reserves no
   // clearance of its own (`useFormSheetHeaderTopInset`).
   const headerTopInset = useFormSheetHeaderTopInset();
-  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const capability = useSecurityAgentCapability(scope);
   const findingQuery = useSecurityFinding(scope, findingId);
   const findingRetry = useRetrySecurityFinding(scope, findingId);
@@ -278,9 +277,12 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
         doneDisabled={!reason || dismissBlocked}
         doneBusy={dismissFinding.isPending}
       />
-      <ScrollView
+      {/* SheetScrollView keeps the iOS native keyboard inset and, on Android
+          where that inset does nothing, ends the frame at the keyboard's top
+          so the focused comment field scrolls clear of it. It also applies
+          the side insets. */}
+      <SheetScrollView
         className="flex-1"
-        style={sideInsetMarginStyle}
         contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-8')}
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
@@ -352,7 +354,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
               className="text-sm"
             />
           ))}
-      </ScrollView>
+      </SheetScrollView>
     </View>
   );
 }

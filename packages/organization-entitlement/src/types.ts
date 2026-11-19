@@ -78,12 +78,13 @@ export type OrganizationEntitlementOrganization = {
    * no active or grace period to classify. Undefined keeps the previous
    * behavior, which reads a missing value as granted.
    *
-   * Every entitlement consumer in `apps/web` and in the shared packages supplies
-   * this flag. A worker-side billing consumer that omits it therefore reads a
-   * no-trial organization as trial-active; that consumer owns its own copy of
-   * this rule. Do not remove the flag from an in-scope caller without deciding
-   * that caller's entitlement in the same change, and keep this guard the single
-   * place that turns the flag into a stage.
+   * The callers that pass a full organization row supply this flag, so they
+   * classify a no-trial organization as hard-expired from creation. A caller
+   * that builds a partial organization without the flag instead reads it as
+   * granted and keeps the creation window. Dropping the flag from a caller
+   * therefore restores the previous behavior for that caller, so decide that
+   * caller's entitlement in the same change; keep this guard the single place
+   * that turns the flag into a stage.
    */
   trial_granted?: boolean;
 };

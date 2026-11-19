@@ -62,14 +62,21 @@ const notificationMutation = vi.hoisted(() => {
     notificationPreviews: 'full',
   };
   const stored: Record<string, unknown> = { ...defaults };
+  const mutate = vi.fn((patch: Record<string, unknown>) => {
+    Object.assign(stored, patch);
+    return Promise.resolve();
+  });
+  const query = vi.fn(() => Promise.resolve({ ...stored }));
   return {
     // A write lands in this record, so a read after it proves the value moved.
-    reset: () => Object.assign(stored, defaults),
-    mutate: vi.fn((patch: Record<string, unknown>) => {
-      Object.assign(stored, patch);
-      return Promise.resolve();
-    }),
-    query: vi.fn(() => Promise.resolve({ ...stored })),
+    // The call history goes too, so this test's calls are its own.
+    reset: () => {
+      Object.assign(stored, defaults);
+      mutate.mockClear();
+      query.mockClear();
+    },
+    mutate,
+    query,
   };
 });
 vi.mock('@/lib/trpc', () => ({
@@ -316,6 +323,7 @@ describe('guarded settings ask the person first', () => {
 
     expect(confirmSettingChange).not.toHaveBeenCalled();
     expect(notificationMutation.mutate).toHaveBeenCalledWith({ spendAlerts: true });
+    expect(notificationMutation.mutate).toHaveBeenCalledTimes(1);
   });
 });
 

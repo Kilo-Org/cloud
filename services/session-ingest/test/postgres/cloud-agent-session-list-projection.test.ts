@@ -28,6 +28,9 @@ vi.mock('../../src/dos/SessionIngestDO', () => ({
   CLONE_ITEM_TYPES: ['session', 'message', 'part', 'session_diff'],
 }));
 vi.mock('../../src/dos/SessionAccessCacheDO', () => ({ getSessionAccessCacheDO: vi.fn() }));
+// The real UserConnectionDO imports the metadata module while the session-events
+// mock below loads its original, which would bind metadata to the real notifier.
+vi.mock('../../src/dos/UserConnectionDO', () => ({ getUserConnectionDO: vi.fn() }));
 vi.mock('../../src/session-events', async importOriginal => ({
   ...(await importOriginal<typeof SessionEvents>()),
   notifyUserSessionEvent: vi.fn(),
@@ -38,6 +41,8 @@ const userId = 'oauth/cloud-agent-list-projection-test';
 const sessionId = 'ses_12345678901234567890123456';
 const cloudAgentSessionId = 'workspace_11111111-1111-4111-8111-111111111111';
 const env = { HYPERDRIVE: { connectionString: 'unused' } };
+const firstTransitionId = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
+const laterTransitionId = '01ARZ3NDEKTSV4RRFFQ69G5FAW';
 const ctx = { waitUntil: vi.fn() } as unknown as ExecutionContext;
 let client: DrizzleClient;
 
@@ -78,7 +83,7 @@ function publish(update: Partial<PublishCloudAgentSessionStatusParams>) {
     cloudAgentSessionId,
     status: 'busy',
     occurredAt: '2026-01-01T00:00:00.000Z',
-    transitionId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+    transitionId: firstTransitionId,
     ...update,
   });
 }
@@ -103,7 +108,7 @@ describe('Cloud Agent list projection from the Session DO', () => {
     await publish({
       status: 'idle',
       occurredAt: '2026-01-01T00:06:00.000Z',
-      transitionId: '01ARZ3NDEKTSV4RRFFQ69G5FAW',
+      transitionId: laterTransitionId,
       lastActivityAt: '2026-01-01T00:04:00.000Z',
     });
     expect(await storedRow()).toMatchObject({
@@ -122,7 +127,7 @@ describe('Cloud Agent list projection from the Session DO', () => {
   });
 
   it('applies a native rename over a generated title and announces it', async () => {
-    await publish({ title: 'Renamed by the agent' });
+    await publish({ rename: { title: 'Renamed by the agent', transitionId: firstTransitionId } });
     expect((await storedRow()).title).toBe('Renamed by the agent');
     expect(notifyUserSessionEvent).toHaveBeenCalledWith(
       env,
@@ -137,11 +142,35 @@ describe('Cloud Agent list projection from the Session DO', () => {
     );
   });
 
+  it('keeps a newer native rename when an older publication lands late', async () => {
+    await publish({
+      status: 'idle',
+      occurredAt: '2026-01-01T00:06:00.000Z',
+      transitionId: laterTransitionId,
+      rename: { title: 'Newer rename', transitionId: laterTransitionId },
+    });
+    await publish({ rename: { title: 'Older rename', transitionId: firstTransitionId } });
+    expect(await storedRow()).toMatchObject({ status: 'idle', title: 'Newer rename' });
+  });
+
+  it('keeps a user rename when a newer publication repeats an applied native rename', async () => {
+    const rename = { title: 'Renamed by the agent', transitionId: firstTransitionId };
+    await publish({ rename });
+    await client.db.update(cli_sessions_v2).set({ title: 'Renamed by the user' });
+    await publish({
+      status: 'idle',
+      occurredAt: '2026-01-01T00:06:00.000Z',
+      transitionId: laterTransitionId,
+      rename,
+    });
+    expect(await storedRow()).toMatchObject({ status: 'idle', title: 'Renamed by the user' });
+  });
+
   it('leaves the row of another Cloud Agent session alone', async () => {
     await publish({
       cloudAgentSessionId: 'workspace_22222222-2222-4222-8222-222222222222',
       lastActivityAt: '2026-01-01T00:05:00.000Z',
-      title: 'Renamed by the agent',
+      rename: { title: 'Renamed by the agent', transitionId: firstTransitionId },
     });
     expect(await storedRow()).toEqual({
       status: null,

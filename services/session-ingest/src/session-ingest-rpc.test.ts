@@ -103,9 +103,10 @@ describe('publishCloudAgentSessionStatus', () => {
   const ctx = { waitUntil: vi.fn() } as unknown as ExecutionContext;
   const env = { HYPERDRIVE: { connectionString: 'postgres://unused' } };
 
-  it('forwards only the validated status projection with an immutable runtime-owner fence', async () => {
+  it('forwards only the validated status projection and rename with an immutable runtime-owner fence', async () => {
     const rpc = new SessionIngestRPC(ctx, env as never);
-    await rpc.publishCloudAgentSessionStatus(input);
+    const rename = { title: 'Renamed by the agent', transitionId: input.transitionId };
+    await rpc.publishCloudAgentSessionStatus({ ...input, rename });
     expect(applyMetadataChanges).toHaveBeenCalledWith(
       env,
       input.kiloUserId,
@@ -116,7 +117,8 @@ describe('publishCloudAgentSessionStatus', () => {
         ['statusTransitionId', input.transitionId],
       ]),
       ctx,
-      input.cloudAgentSessionId
+      input.cloudAgentSessionId,
+      rename
     );
   });
 

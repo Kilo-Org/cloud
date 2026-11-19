@@ -618,45 +618,23 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         ['statusTransitionId', input.transitionId],
       ]),
       this.ctx,
-      input.cloudAgentSessionId
+      input.cloudAgentSessionId,
+      input.rename
     );
-    if (input.lastActivityAt === undefined && input.title === undefined) return;
-
-    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
-    const runtimeOwner = eq(cli_sessions_v2.cloud_agent_session_id, input.cloudAgentSessionId);
-    if (input.lastActivityAt !== undefined) {
-      await db
-        .update(cli_sessions_v2)
-        .set({ last_activity_at: laterLastActivityAt(input.lastActivityAt) })
-        .where(
-          and(
-            eq(cli_sessions_v2.session_id, input.sessionId),
-            eq(cli_sessions_v2.kilo_user_id, input.kiloUserId),
-            runtimeOwner
-          )
-        );
-    }
-    if (input.title !== undefined) {
-      // A native rename names the session as a CLI's rename report does, so it
-      // replaces a generated title too.
-      const result = await applyReportedSessionTitle(db, {
-        sessionId: input.sessionId,
-        kiloUserId: input.kiloUserId,
-        input: { title: input.title, generated: false },
-        scope: runtimeOwner,
-      });
-      if (result.kind !== 'applied') return;
-      const session = mapSessionEventRow(result.row);
-      notifyUserSessionEvent(
-        this.env,
-        input.kiloUserId,
-        {
-          type: 'session.updated',
-          data: { source: 'v2', session, changedAt: session.updatedAt },
-        },
-        this.ctx
+    if (input.lastActivityAt === undefined) return;
+    // The Session DO's clock can run ahead of the database, and the active-session list treats a
+    // future last_activity_at as live; no writer would lower it, so the report is clamped.
+    const activity = sql`LEAST(${input.lastActivityAt}::timestamptz, now())`;
+    await getWorkerDb(this.env.HYPERDRIVE.connectionString)
+      .update(cli_sessions_v2)
+      .set({ last_activity_at: laterLastActivityAt(activity) })
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, input.sessionId),
+          eq(cli_sessions_v2.kilo_user_id, input.kiloUserId),
+          eq(cli_sessions_v2.cloud_agent_session_id, input.cloudAgentSessionId)
+        )
       );
-    }
   }
 
   async recordCloudAgentSessionHarness(

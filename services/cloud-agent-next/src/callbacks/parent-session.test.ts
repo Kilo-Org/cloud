@@ -7,10 +7,14 @@ import { deliverWorkspaceSessionCallback, parentSessionCallbackPrompt } from './
 import { createCallbackQueueConsumer } from './queue-consumer.js';
 import type { CallbackJob } from './types.js';
 
-const { getMetadata, assertAccess, queuePrompt } = vi.hoisted(() => ({
+const { getMetadata, assertAccess, queuePrompt, describeWorkspace } = vi.hoisted(() => ({
   getMetadata: vi.fn(),
   assertAccess: vi.fn(),
   queuePrompt: vi.fn(),
+  describeWorkspace: vi.fn(),
+}));
+vi.mock('../control-plane/workspace/workspace-stub.js', () => ({
+  getWorkspaceStub: () => ({ describe: describeWorkspace }),
 }));
 vi.mock('../session/metadata.js', () => ({ fetchSessionMetadata: getMetadata }));
 vi.mock('../session-access.js', () => ({ requireCurrentSessionAccess: assertAccess }));
@@ -107,6 +111,67 @@ describe('workspace session callback delivery', () => {
         : null
     );
     job.target = { url: `workspace:${targetId}` };
+    describeWorkspace.mockReset().mockResolvedValue({
+      state: 'active',
+      authorizationId: '32345678-1234-4234-8234-123456789abc',
+      worktreeId,
+      organizationId: null,
+    });
+  });
+
+  it('delivers after the chat that created the workspace was deleted', async () => {
+    const target = {
+      ...parent,
+      identity: { userId, sessionId: targetId },
+      parentCloudAgentSessionId: undefined,
+    };
+    getMetadata.mockImplementation(async (_env, owner, sessionId) =>
+      owner !== userId
+        ? null
+        : sessionId === childId
+          ? child
+          : sessionId === targetId
+            ? target
+            : null
+    );
+    expect(await deliverWorkspaceSessionCallback(env, job, 1)).toEqual({ type: 'success' });
+    expect(queuePrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ cloudAgentSessionId: targetId }),
+      expect.anything(),
+      'workspace_session_callback'
+    );
+  });
+
+  it('delivers to an existing chat while the workspace authority is expired', async () => {
+    describeWorkspace.mockResolvedValue({
+      state: 'expired',
+      authorizationId: '32345678-1234-4234-8234-123456789abc',
+      worktreeId,
+      organizationId: null,
+    });
+    expect(await deliverWorkspaceSessionCallback(env, job, 1)).toEqual({ type: 'success' });
+  });
+
+  it.each(['revoked', 'deleted', 'unestablished'] as const)(
+    'does not deliver into a %s workspace',
+    async state => {
+      describeWorkspace.mockResolvedValue({
+        state,
+        authorizationId: null,
+        worktreeId: state === 'revoked' ? worktreeId : null,
+        organizationId: null,
+      });
+      expect(await deliverWorkspaceSessionCallback(env, job, 1)).toMatchObject({ type: 'failed' });
+      expect(queuePrompt).not.toHaveBeenCalled();
+    }
+  );
+
+  it('does not redirect a callback whose target chat was deleted', async () => {
+    getMetadata.mockImplementation(async (_env, owner, sessionId) =>
+      owner === userId && sessionId === childId ? child : null
+    );
+    expect(await deliverWorkspaceSessionCallback(env, job, 1)).toMatchObject({ type: 'failed' });
+    expect(queuePrompt).not.toHaveBeenCalled();
   });
 
   it('preserves gate and structured failure results in the queued parent prompt', async () => {

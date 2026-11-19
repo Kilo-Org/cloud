@@ -31,6 +31,7 @@ import { PrConversationCommentComposer } from './discussion/pr-conversation-comm
 import {
   buttonByText,
   failureCopy as composerFailureCopy,
+  mount as mountComposer,
   typeBody,
   unmountAll as unmountComposers,
 } from './discussion/pr-conversation-comment-composer.test-helpers';
@@ -196,7 +197,7 @@ describe('PR-review screen links', () => {
 describe('PR-review fixture writes', () => {
   it('settles the conversation composer on its retryable error with the body kept', async () => {
     addComment.mutateAsync.mockRejectedValueOnce(new Error(FIXTURE_WRITE_REFUSED));
-    const renderer = await mountSheet(
+    const renderer = await mountComposer(
       createElement(PrConversationCommentComposer, conversationProps)
     );
     typeBody(renderer, 'a body the refusal must not lose');

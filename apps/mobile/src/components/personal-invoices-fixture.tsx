@@ -49,7 +49,7 @@ const INVOICES: InvoicesPage['entries'] = [
     created: Date.parse('2026-04-01T12:00:00Z') / 1000,
     hosted_invoice_url: null,
     invoice_pdf: null,
-    invoice_type: 'subscription',
+    invoice_type: 'seats',
     description: 'Kilo Pass',
   },
 ];

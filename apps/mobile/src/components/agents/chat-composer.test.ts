@@ -25,6 +25,9 @@ const remoteExitState: RemoteCommandState = {
 
 const layoutDirection = vi.hoisted(() => ({ isRTL: false }));
 const safeAreaInsets = vi.hoisted(() => ({ bottom: 0, left: 0, right: 0, top: 0 }));
+// The side insets as the shared helper reports them for the style props: the
+// physical safe-area sides, swapped in a right-to-left layout.
+const styleSideInsets = vi.hoisted(() => ({ left: 0, right: 0 }));
 const voiceStatus = vi.hoisted(() => ({ value: 'idle' }));
 const announceForAccessibility = vi.hoisted(() => vi.fn());
 const TEXT_DIRECTIONS = [
@@ -127,10 +130,10 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 
 // The pure suite calls the composer as a function, outside a React render, so
-// the real helper's context read cannot run; serve the mocked safe-area sides.
+// the real helper's context read cannot run; the suite serves its sides.
 vi.mock('@/lib/screen-insets', async importOriginal => ({
   ...(await importOriginal<typeof ScreenInsets>()),
-  useStyleSideInsets: () => ({ left: safeAreaInsets.left, right: safeAreaInsets.right }),
+  useStyleSideInsets: () => styleSideInsets,
 }));
 
 // The shared counter row reads its phrase through `useTranslation`; the mocked
@@ -619,6 +622,8 @@ beforeEach(() => {
   safeAreaInsets.left = 0;
   safeAreaInsets.right = 0;
   safeAreaInsets.top = 0;
+  styleSideInsets.left = 0;
+  styleSideInsets.right = 0;
 });
 
 // The restore contract has one axis: whether the host resolved a draft. Both
@@ -1154,6 +1159,8 @@ describe('ChatComposer landscape side insets', () => {
     // iPhone sensor notch in landscape: a wider left inset than right.
     safeAreaInsets.left = 59;
     safeAreaInsets.right = 47;
+    styleSideInsets.left = 59;
+    styleSideInsets.right = 47;
     const render = await mount(makeProps({}));
 
     const container = findComposerInsetContainer(render);
@@ -1162,6 +1169,22 @@ describe('ChatComposer landscape side insets', () => {
     // they live inside the padded container.
     expect(findNode(container, type => type === MockChatToolbar)).not.toBeNull();
     expect(findNode(container, type => type === MockInputRow)).not.toBeNull();
+  });
+
+  it('pads by the swap-aware side insets, not the raw safe area', async () => {
+    // Right-to-left landscape: React Native moves `paddingLeft` to the start
+    // side, so the helper hands the physical sides back swapped and the
+    // composer must use them, as the skeleton that reserves its slot does.
+    safeAreaInsets.left = 59;
+    safeAreaInsets.right = 47;
+    styleSideInsets.left = 47;
+    styleSideInsets.right = 59;
+    const render = await mount(makeProps({}));
+
+    expect(findComposerInsetContainer(render).props.style).toEqual({
+      paddingLeft: 47,
+      paddingRight: 59,
+    });
   });
 });
 

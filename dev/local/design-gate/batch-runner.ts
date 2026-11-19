@@ -63,8 +63,9 @@ export const BATCHES_USAGE = `Usage: pnpm dev:mobile:design-gate batches <comman
       [--manifest <file>] [--no-restart]
       A seed map holds one account's ids, so give each device the map of the account it is signed
       in as (the third part of --device); --seeds is the map for devices that name none. A batch
-      whose links use seeded ids runs only on a device with a map; when no device has one, the batch
-      is recorded as exit 2 (no-seed-map) instead of opening another account's ids.
+      whose links use seeded ids runs on a device whose map resolves them all; when no map does, on
+      a device with a map, where it ends as exit 2 (unresolved-seed); when no device has a map, it is
+      recorded as exit 2 (no-seed-map) instead of opening another account's ids.
       Runs the shard's batches of one phase, one gate run per batch, in parallel across the devices.
       Each device needs its own Metro (its own port and adb reverse); a device takes the next batch when
       it finishes one. Before each batch the app is restarted on that device's Metro and must reach the
@@ -113,11 +114,40 @@ export function parseDeviceSpec(value: string, platform: Platform): DeviceSpec {
 }
 
 /** A device of a run, with the seed map of the account it is signed in as. */
-type RunDevice = DeviceSpec & Readonly<{ seeds?: SeedMap }>;
+export type RunDevice = DeviceSpec & Readonly<{ seeds?: SeedMap }>;
 
-/** Whether any link of the batch names a seeded id. */
-export function needsSeeds(batch: Batch): boolean {
-  return batch.rows.some(row => templateReferences(row.link).length > 0);
+/**
+ * Which device may take which batch. A batch with no seeded id runs anywhere.
+ * A seeded batch runs on a device whose own map resolves every seeded link
+ * (one account's failed step leaves its map partial, and the batch then waits
+ * for a device whose map answers it); when no map resolves it, on any device
+ * with a map, where it ends as unresolved-seed naming the missing ids. A device
+ * without a map never takes a seeded batch.
+ */
+export function batchTaker(
+  batches: readonly Batch[],
+  devices: readonly RunDevice[]
+): (device: RunDevice, batch: Batch) => boolean {
+  const resolvers = new Map(
+    batches.map(batch => [
+      batch.id,
+      devices.filter(device => {
+        if (device.seeds === undefined) return false;
+        try {
+          batchTargets(batch, device.seeds);
+          return true;
+        } catch (error) {
+          if (error instanceof TemplateError) return false;
+          throw error;
+        }
+      }),
+    ])
+  );
+  return (device, batch) => {
+    if (!batch.rows.some(row => templateReferences(row.link).length > 0)) return true;
+    const able = resolvers.get(batch.id) ?? [];
+    return able.length > 0 ? able.includes(device) : device.seeds !== undefined;
+  };
 }
 
 type SummaryRow = Readonly<{
@@ -469,13 +499,11 @@ export async function runBatches(
   const queue = [...options.batches];
   const results = new Map<string, SummaryRow>();
   let stopped: string | undefined;
+  const takes = batchTaker(options.batches, options.devices);
   const worker = async (device: RunDevice) => {
     for (;;) {
       if (stopped !== undefined) return;
-      // A device without a seed map takes only batches that need no seeded id.
-      const next = queue.findIndex(
-        candidate => device.seeds !== undefined || !needsSeeds(candidate)
-      );
+      const next = queue.findIndex(candidate => takes(device, candidate));
       if (next === -1) return;
       const [batch] = queue.splice(next, 1);
       if (batch === undefined) return;

@@ -73,6 +73,7 @@ import { addMissingToolSchemaEnumTypes } from '@kilocode/web-shared/lib/ai-gatew
 import { removeRecursiveToolSchemaRefs } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-recursive-tool-schema-refs';
 import { removeTopLevelToolSchemaCombinators } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-top-level-tool-schema-combinators';
 import { repairGeminiToolSchemas } from '@kilocode/web-shared/lib/ai-gateway/providers/repair-gemini-tool-schemas';
+import { moveInvalidToolPropertyKeys } from '@kilocode/web-shared/lib/ai-gateway/providers/move-invalid-tool-property-keys';
 import { removePaidServerFeatures } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-paid-server-features';
 import { removeWhitespaceOnlyMessages } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-whitespace-only-messages';
 import {
@@ -359,6 +360,8 @@ export async function applyProviderSpecificLogic(
   if (isClaudeModel(requestedModel)) {
     // Anthropic rejects tools with "input_schema does not support oneOf, allOf, or anyOf at the top level"
     removeTopLevelToolSchemaCombinators(requestToMutate);
+    // Anthropic rejects tools with "input_schema.properties: Property keys should match pattern '^[a-zA-Z0-9_.-]{1,64}$'"
+    moveInvalidToolPropertyKeys(requestToMutate);
   }
 
   if (isKimiModel(requestedModel)) {

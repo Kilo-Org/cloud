@@ -650,6 +650,15 @@ export function CustomLlmsContent() {
                     as <code>/messages</code>.
                   </li>
                   <li>
+                    <code>remove_from_body</code> lists dotted paths to delete from the request
+                    body, such as <code>usage</code>, <code>tools.*.function.strict</code>, or{' '}
+                    <code>messages.*.content.*.cache_control</code>. <code>*</code> stands for every
+                    array element or object value; a plain segment does not reach into arrays.
+                    Missing fields are skipped, the last segment must be a field name, and{' '}
+                    <code>__proto__</code>, <code>constructor</code>, and <code>prototype</code> are
+                    rejected.
+                  </li>
+                  <li>
                     <code>api_kinds</code> lists the served APIs (<code>chat_completions</code>,{' '}
                     <code>messages</code>, <code>responses</code>). It must include the one{' '}
                     <code>opencode_settings.ai_sdk_provider</code> picks: Messages for{' '}

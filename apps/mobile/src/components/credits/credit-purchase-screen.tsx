@@ -21,8 +21,7 @@ import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
-  BALANCE_RETRY_FRAME_CLASS,
-  BALANCE_RETRY_HIT_SLOP,
+  BALANCE_RETRY_TARGET_CLASS,
   LEGAL_LINK_BOX_CLASS,
   LEGAL_LINK_ROW_CLASS,
 } from '@/lib/a11y/tap-target';
@@ -271,10 +270,12 @@ export function CreditPurchaseScreen() {
   };
 
   const renderBalanceValue = () => {
-    // Each branch is one `figure` line box: the amount's own, so the card's
-    // height stays the same and the packs below never move when the read
-    // settles. The failed read's target keeps that box too: its tap area comes
-    // from the hit slop, not from a taller box.
+    // Every branch paints inside the amount's own line box: the card's height
+    // stays the same in all three states, so the packs below never move when
+    // the read settles. The skeleton keeps the value's box, and the failed
+    // read's target keeps it in flow too: its own node is the full target and
+    // `BALANCE_RETRY_TARGET_CLASS`'s negative margin cancels the half that
+    // overflows the line, which a taller in-flow box would add to the card.
     if (balancePending) {
       return <Skeleton className="h-8 w-24 rounded" />;
     }
@@ -283,8 +284,7 @@ export function CreditPurchaseScreen() {
         <Pressable
           accessibilityLabel={t('profile.failedToLoadBalance')}
           accessibilityRole="button"
-          className={cn(BALANCE_RETRY_FRAME_CLASS, 'justify-center active:opacity-70')}
-          hitSlop={BALANCE_RETRY_HIT_SLOP}
+          className={cn(BALANCE_RETRY_TARGET_CLASS, 'justify-center active:opacity-70')}
           onPress={() => {
             void refetchBalance();
           }}
@@ -361,6 +361,12 @@ export function CreditPurchaseScreen() {
               </View>
               <View
                 className="justify-center"
+                // The slot paints text only and holds nothing to press, so it
+                // stays out of touch dispatch: it is the card's later sibling
+                // under the amount, and a view that takes a point back would
+                // swallow the failed read's retry target wherever the two
+                // overlap.
+                pointerEvents="none"
                 style={{ minHeight: expiryCaptionFloor(fontScale) }}
                 testID="credit-expiry-slot"
               >

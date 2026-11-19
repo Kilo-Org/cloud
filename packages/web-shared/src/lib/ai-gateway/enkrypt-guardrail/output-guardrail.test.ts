@@ -331,6 +331,8 @@ function scanReport(overrides: Record<string, unknown>) {
     total_segments: 1,
     cached_characters: 0,
     cached_segments: 0,
+    total_units: 1,
+    cached_units: 0,
     omitted_attachments: 0,
     scanned_characters: MODEL_OUTPUT.length,
     decision: 'allowed',

@@ -46,6 +46,8 @@ function makeScan(overrides: Partial<EnkryptGuardrailScan> = {}): EnkryptGuardra
       totalSegments: 1,
       cachedCharacters: 0,
       cachedSegments: 0,
+      totalUnits: 1,
+      cachedUnits: 0,
       omittedAttachments: 0,
     },
     config,
@@ -186,6 +188,8 @@ describe('scanRequest', () => {
       total_segments: 1,
       cached_characters: 0,
       cached_segments: 0,
+      total_units: 1,
+      cached_units: 0,
       omitted_attachments: 0,
       scanned_characters: 32,
       decision: 'blocked',
@@ -541,6 +545,8 @@ describe('scanRequest', () => {
       totalSegments: 12,
       cachedCharacters: 8_000,
       cachedSegments: 10,
+      totalUnits: 14,
+      cachedUnits: 12,
       omittedAttachments: 2,
     } as const;
 
@@ -562,6 +568,8 @@ describe('scanRequest', () => {
         verdict_cache: 'hit',
         cached_characters: 8_000,
         cached_segments: 10,
+        total_units: 14,
+        cached_units: 12,
         omitted_attachments: 2,
       })
     );
@@ -580,6 +588,8 @@ describe('scanRequest', () => {
           totalSegments: 3,
           cachedCharacters: 900,
           cachedSegments: 3,
+          totalUnits: 3,
+          cachedUnits: 3,
           omittedAttachments: 0,
         },
       }),
@@ -598,6 +608,8 @@ describe('scanRequest', () => {
         decision: 'allowed',
         scanned_characters: 0,
         cached_segments: 3,
+        total_units: 3,
+        cached_units: 3,
         attempts: 0,
         credits_cost: null,
       })

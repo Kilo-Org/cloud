@@ -34,6 +34,11 @@ vi.mock('./sandbox-session/session-stub.js', () => ({
   getSandboxSessionStub: getSandboxSessionStubMock,
 }));
 
+// The workspace and its chats share one fake namespace keyed by session id.
+vi.mock('./control-plane/workspace/workspace-stub.js', () => ({
+  getWorkspaceStub: getSandboxSessionStubMock,
+}));
+
 vi.mock('./session-access.js', () => ({
   requireCurrentSessionAccess: requireCurrentSessionAccessMock,
 }));
@@ -75,16 +80,16 @@ function managementRequest(
 }
 
 type Stub = {
-  assertCloudAgentManagementAuthority: ReturnType<typeof vi.fn>;
+  assertAuthority: ReturnType<typeof vi.fn>;
   getMetadata: ReturnType<typeof vi.fn>;
-  listCloudAgentChildSessions: ReturnType<typeof vi.fn>;
+  listChildren: ReturnType<typeof vi.fn>;
 };
 
 function stub(overrides: Partial<Stub> = {}): Stub {
   return {
-    assertCloudAgentManagementAuthority: vi.fn().mockResolvedValue(undefined),
+    assertAuthority: vi.fn().mockResolvedValue(undefined),
     getMetadata: vi.fn().mockResolvedValue(null),
-    listCloudAgentChildSessions: vi.fn().mockResolvedValue({ sessions: [] }),
+    listChildren: vi.fn().mockResolvedValue({ sessions: [] }),
     ...overrides,
   };
 }
@@ -225,7 +230,7 @@ describe('assertCloudAgentManagementRequest', () => {
     ['expired', () => Promise.reject(new Error('Cloud Agent parent authority denied'))],
     ['replaced', () => Promise.reject(new Error('Cloud Agent parent authority denied'))],
   ])('rejects a %s parent authority', async (_name, reject) => {
-    const parent = stub({ assertCloudAgentManagementAuthority: vi.fn(reject) });
+    const parent = stub({ assertAuthority: vi.fn(reject) });
     mockDirectChild();
     getSandboxSessionStubMock.mockImplementation((_env, _owner, sessionId) =>
       sessionId === PARENT_ID
@@ -244,7 +249,7 @@ describe('assertCloudAgentManagementRequest', () => {
 
   it('maps a transient parent lookup failure to SERVICE_UNAVAILABLE', async () => {
     const parent = stub({
-      assertCloudAgentManagementAuthority: vi.fn().mockRejectedValue(new Error('network down')),
+      assertAuthority: vi.fn().mockRejectedValue(new Error('network down')),
     });
     getSandboxSessionStubMock.mockImplementation((_env, _owner, sessionId) =>
       sessionId === PARENT_ID ? parent : stub()
@@ -373,7 +378,7 @@ describe('assertCloudAgentManagementRequest', () => {
 describe('listCloudAgentChildSessions', () => {
   it('pages a registry hint but filters entries that no longer authorize', async () => {
     const parent = stub({
-      listCloudAgentChildSessions: vi.fn().mockResolvedValue({
+      listChildren: vi.fn().mockResolvedValue({
         sessions: [
           { cloudAgentSessionId: CHILD_ID },
           { cloudAgentSessionId: 'workspace_dddddddd-dddd-4ddd-8ddd-dddddddddddd' },
@@ -411,12 +416,12 @@ describe('listCloudAgentChildSessions', () => {
       ],
       nextCursor: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
     });
-    expect(parent.listCloudAgentChildSessions).toHaveBeenCalledWith({ limit: 20 });
+    expect(parent.listChildren).toHaveBeenCalledWith({ limit: 20 });
   });
 
   it('propagates a database service outage instead of returning an empty page', async () => {
     const parent = stub({
-      listCloudAgentChildSessions: vi.fn().mockResolvedValue({
+      listChildren: vi.fn().mockResolvedValue({
         sessions: [{ cloudAgentSessionId: CHILD_ID }],
       }),
     });
@@ -437,7 +442,7 @@ describe('listCloudAgentChildSessions', () => {
 
   it('propagates a child metadata outage instead of returning an empty page', async () => {
     const parent = stub({
-      listCloudAgentChildSessions: vi.fn().mockResolvedValue({
+      listChildren: vi.fn().mockResolvedValue({
         sessions: [{ cloudAgentSessionId: CHILD_ID }],
       }),
     });

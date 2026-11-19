@@ -86,16 +86,69 @@ function DetectorList({ detectors }: { detectors: EnkryptDetectorId[] }) {
   return <>{detectors.map(detectorLabel).join(', ')}</>;
 }
 
-/** A failed scan's content is stored as allowed only briefly, so it is scanned again soon. */
-function verdictCacheValue(scan: EnkryptInputScanReport): string {
-  const failed = scan.decision === 'error_fail_open' || scan.decision === 'error_logged';
-  const stored =
-    scan.verdict_cache_write !== 'written'
-      ? ''
-      : failed
-        ? ', stored (failed content for 5 minutes)'
-        : ', stored';
-  return `${VERDICT_CACHE_LABELS[scan.verdict_cache]}${stored}`;
+function isPartialHit(scan: EnkryptInputScanReport): boolean {
+  return (
+    scan.verdict_cache === 'hit' &&
+    scan.total_units !== undefined &&
+    scan.cached_units !== undefined &&
+    scan.cached_units < scan.total_units
+  );
+}
+
+/**
+ * Whether text that failed to scan was cached as allowed for a short while, so it is not rescanned
+ * until then. `failed_calls_cached` counts calls eligible for that write, so it is `certain` only
+ * when the scan wrote entries: a failed write may have been one of theirs, and a skipped one found
+ * an existing entry, such as a longer allow or a block. A report without the count is `possible` when
+ * a call failed and verdicts were stored. See `isFailedAllow` in the verdict cache.
+ */
+function storedDespiteError(scan: EnkryptInputScanReport): 'certain' | 'possible' | null {
+  if (scan.failed_calls_cached !== undefined) {
+    if (scan.failed_calls_cached === 0) return null;
+    return scan.verdict_cache_write === 'written' ? 'certain' : 'possible';
+  }
+  const failed =
+    scan.decision === 'error_fail_open' ||
+    scan.decision === 'error_logged' ||
+    (scan.decision === 'blocked' && scan.error !== null);
+  return failed && scan.verdict_cache_write === 'written' ? 'possible' : null;
+}
+
+const STORED_DESPITE_ERROR_NOTES = {
+  certain: 'Failed text counts as allowed for 5 minutes, then is rescanned.',
+  possible: 'Failed text may be cached as allowed until its entry expires.',
+};
+
+function verdictCacheItem(scan: EnkryptInputScanReport): DetailItem {
+  const lookup = isPartialHit(scan) ? 'Partial hit' : VERDICT_CACHE_LABELS[scan.verdict_cache];
+  const stored = scan.verdict_cache_write === 'written';
+  return {
+    label: 'Verdict cache',
+    hint:
+      scan.total_units === undefined
+        ? 'Hit: at least one unit cached. Stored: new verdicts cached.'
+        : 'Hit: every unit cached. Partial hit: some. Stored: new verdicts cached.',
+    value:
+      storedDespiteError(scan) === 'certain' ? (
+        <>
+          {lookup},{' '}
+          <span className="text-status-warning whitespace-nowrap">stored (failed, 5 min)</span>
+        </>
+      ) : (
+        `${lookup}${stored ? ', stored' : ''}`
+      ),
+  };
+}
+
+function unitsCached(scan: EnkryptInputScanReport): DetailItem[] {
+  if (scan.total_units === undefined || scan.cached_units === undefined) return [];
+  return [
+    {
+      label: 'Units cached',
+      hint: 'A segment, or a slice of one over 100k characters. Only uncached units are sent.',
+      value: `${formatCount(scan.cached_units)} of ${formatCount(scan.total_units)}`,
+    },
+  ];
 }
 
 function flaggedToolName(tool: EnkryptFlaggedTool): string {
@@ -129,20 +182,42 @@ function FlaggedTools({ scan }: { scan: EnkryptToolScanReport }) {
   );
 }
 
-/** Counts separators between packed segments and headers of split segments, so it can exceed the part's length. */
 function charactersSent(scan: Scan): DetailItem {
-  return { label: 'Characters sent', value: formatCount(scan.scanned_characters) };
+  if (scan.part === 'response') {
+    return { label: 'Characters sent', value: formatCount(scan.scanned_characters) };
+  }
+  return {
+    label: 'Characters sent',
+    hint: 'Includes separators and slice headers, so it can exceed the total.',
+    value: `${formatCount(scan.scanned_characters)} of ${formatCount(scan.total_characters)}`,
+  };
 }
 
-function charactersCached(scan: Scan): DetailItem {
+function charactersCached(scan: EnkryptInputScanReport): DetailItem {
+  const value = `${formatCount(scan.cached_characters)} of ${formatCount(scan.total_characters)}`;
+  if (scan.total_units === undefined) {
+    return {
+      label: 'Characters cached',
+      hint: 'Fully cached segments only (older report).',
+      value,
+    };
+  }
   return {
     label: 'Characters cached',
-    value: `${formatCount(scan.cached_characters)} of ${formatCount(scan.total_characters)}`,
+    hint: 'Fully cached segments, plus cached slices of long ones.',
+    value,
+  };
+}
+
+function attempts(scan: Scan): DetailItem {
+  return {
+    label: 'Attempts',
+    hint: 'Enkrypt calls made.',
+    value: formatCount(scan.attempts),
   };
 }
 
 function scanItems(scan: Scan): DetailItem[] {
-  const calls = { label: 'Enkrypt calls', value: formatCount(scan.attempts) };
   switch (scan.part) {
     case 'tools':
       return [
@@ -150,37 +225,47 @@ function scanItems(scan: Scan): DetailItem[] {
           label: 'Tools',
           value: `${formatCount(scan.tools_total)} total, ${formatCount(scan.tools_cached)} cached, ${formatCount(scan.tools_scanned)} scanned`,
         },
-        { label: 'Verdict cache', value: verdictCacheValue(scan) },
+        verdictCacheItem(scan),
+        ...unitsCached(scan),
         charactersSent(scan),
         charactersCached(scan),
-        calls,
+        attempts(scan),
       ];
     case 'system':
     case 'conversation':
       return [
-        { label: 'Verdict cache', value: verdictCacheValue(scan) },
+        verdictCacheItem(scan),
+        ...unitsCached(scan),
         charactersSent(scan),
         charactersCached(scan),
         ...(scan.part === 'conversation'
           ? [
               {
-                label: 'Segments cached',
+                label: 'Segments fully cached',
+                hint: 'Segments with every unit cached. A segment is a message, tool call, or tool result.',
                 value: `${formatCount(scan.cached_segments)} of ${formatCount(scan.total_segments)}`,
               },
               { label: 'Attachments omitted', value: formatCount(scan.omitted_attachments) },
             ]
           : []),
-        { label: 'Chunks', value: formatCount(scan.chunks) },
-        calls,
+        {
+          label: 'Calls needed',
+          hint: 'Uncached units, packed into calls of up to 100k characters.',
+          value: formatCount(scan.chunks),
+        },
+        attempts(scan),
       ];
     case 'response':
-      return [charactersSent(scan), calls];
+      return [charactersSent(scan), attempts(scan)];
   }
 }
 
-function ScanCard({ scan }: { scan: Scan }) {
+/** `failedOpen` hides the scan's note on failed content, which the report's notice already gives. */
+function ScanCard({ scan, failedOpen }: { scan: Scan; failedOpen: boolean }) {
   const decision = DECISIONS[scan.decision];
   const part = PART_LABELS[scan.part];
+  const stored = scan.part === 'response' || failedOpen ? null : storedDespiteError(scan);
+  const storedNote = stored && STORED_DESPITE_ERROR_NOTES[stored];
   return (
     <li className="flex flex-col gap-3 rounded-md border p-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -212,6 +297,7 @@ function ScanCard({ scan }: { scan: Scan }) {
       />
       {scan.part === 'tools' && <FlaggedTools scan={scan} />}
       {scan.error && <p className="text-status-destructive text-xs">{scan.error}</p>}
+      {storedNote && <p className="text-status-warning text-xs">{storedNote}</p>}
     </li>
   );
 }
@@ -283,7 +369,11 @@ function GuardrailReportBody({
       {scans.length > 0 && (
         <ol className="flex flex-col gap-2" aria-label={`${title} scans`}>
           {scans.map((scan, index) => (
-            <ScanCard key={`${scan.scan}-${index}`} scan={scan} />
+            <ScanCard
+              key={`${scan.scan}-${index}`}
+              scan={scan}
+              failedOpen={report.verdict === 'fail_open'}
+            />
           ))}
         </ol>
       )}

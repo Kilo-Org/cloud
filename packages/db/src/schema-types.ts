@@ -2989,6 +2989,33 @@ export function getCustomLlmClientApiKind(
   }
 }
 
+/** Segments `remove_from_body` paths never traverse: they reach prototypes, not request data. */
+export const REMOVE_FROM_BODY_BLOCKED_SEGMENTS: ReadonlySet<string> = new Set([
+  '__proto__',
+  'constructor',
+  'prototype',
+]);
+
+/**
+ * A dotted path into the request body, where `*` stands for every element of an array or every
+ * value of an object, for example `usage`, `tools.*.function.strict` or
+ * `messages.*.content.*.cache_control`. The last segment names the field to delete.
+ */
+const CustomLlmRemoveFromBodyPathSchema = z.string().superRefine((path, ctx) => {
+  const segments = path.split('.');
+  if (segments.some(segment => segment === '')) {
+    ctx.addIssue({ code: 'custom', message: 'Path segments must not be empty' });
+    return;
+  }
+  if (segments[segments.length - 1] === '*') {
+    ctx.addIssue({ code: 'custom', message: 'The last path segment must name a field, not *' });
+  }
+  const blocked = segments.find(segment => REMOVE_FROM_BODY_BLOCKED_SEGMENTS.has(segment));
+  if (blocked !== undefined) {
+    ctx.addIssue({ code: 'custom', message: `Path segment ${blocked} is not allowed` });
+  }
+});
+
 export const CustomLlmApiConfigSchema = z.object({
   internal_id: z.string().min(1).optional(),
   /** Gateway APIs the upstream serves, including the one clients use. Without it, only that one. */
@@ -3000,7 +3027,7 @@ export const CustomLlmApiConfigSchema = z.object({
   sanitize_ref_fields: z.boolean().optional(),
   extra_headers: CustomLlmExtraHeadersSchema.optional(),
   extra_body: CustomLlmExtraBodySchema.optional(),
-  remove_from_body: z.array(z.string()).optional(),
+  remove_from_body: z.array(CustomLlmRemoveFromBodyPathSchema).optional(),
   reasoning_details_transform: ReasoningDetailsTransformSchema.optional(),
 });
 

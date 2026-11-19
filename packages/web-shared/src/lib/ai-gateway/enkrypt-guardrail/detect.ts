@@ -68,8 +68,14 @@ export type EnkryptScanCoverage = {
   cache: EnkryptScanReport['verdict_cache'];
   totalCharacters: number;
   totalSegments: number;
+  /** Characters covered by cached verdicts: whole segments, and cached slices of the others. */
   cachedCharacters: number;
+  /** Segments whose units all have a cached verdict. */
   cachedSegments: number;
+  /** Units: segments, or slices of a segment too long for one call; repeats count each time. */
+  totalUnits: number;
+  /** Units with a cached verdict. */
+  cachedUnits: number;
   /** Attachments, such as images, represented only by an omission marker. */
   omittedAttachments: number;
   chunk?: { index: number; count: number };
@@ -548,6 +554,8 @@ type CoverageReport = Pick<
   | 'total_segments'
   | 'cached_characters'
   | 'cached_segments'
+  | 'total_units'
+  | 'cached_units'
   | 'omitted_attachments'
 >;
 
@@ -577,6 +585,8 @@ export function coverageReport(
     total_segments: coverage.totalSegments,
     cached_characters: coverage.cachedCharacters,
     cached_segments: coverage.cachedSegments,
+    total_units: coverage.totalUnits,
+    cached_units: coverage.cachedUnits,
     omitted_attachments: coverage.omittedAttachments,
   };
 }

@@ -415,12 +415,12 @@ export function createControlPlaneTerminals(deps: ControlPlaneTerminalsDeps) {
         completion
       );
     } catch (error) {
-      // The shell and its record stay consistent; a record stored earlier stays.
+      // The shell is closed below, so no record may stay `running`. A record this
+      // attempt wrote is dropped; one that already existed is marked ended.
       await closeWrapperTerminal(context, pty.id);
-      await deleteCreationKeys([
-        ...(existing === null ? [`${TERMINAL_PREFIX}${pty.id}`] : []),
-        `${TERMINAL_OPERATION_PREFIX}${payload.operationId}`,
-      ]);
+      if (existing !== null) await markEnded(existing).catch(() => undefined);
+      else await deleteCreationKeys([`${TERMINAL_PREFIX}${pty.id}`]);
+      await deleteCreationKeys([`${TERMINAL_OPERATION_PREFIX}${payload.operationId}`]);
       return thrownFailure(error);
     }
     return { success: true, data: result.data };

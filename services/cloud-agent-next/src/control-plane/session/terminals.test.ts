@@ -311,6 +311,28 @@ describe('V2 control-plane terminals projection', () => {
     ).toEqual([]);
   });
 
+  it('ends a record that already existed when the creation write fails', async () => {
+    const operationId = '33333333-3333-4333-8333-333333333333';
+    const { terminals, values, request } = fixture({
+      putFailure: key => key === `control_terminal_operation:${operationId}`,
+    });
+    values.set('control_terminal:pty_new', record(CURRENT_WRAPPER, 'pty_new'));
+
+    await expect(terminals.create({ operationId })).resolves.toEqual({
+      success: false,
+      error: 'storage unavailable',
+    });
+
+    expect(request).toHaveBeenNthCalledWith(2, SANDBOX_ID, {
+      operation: 'close',
+      session: { sessionId: SESSION_ID, kiloSessionId: 'kilo_session_1', directory: DIRECTORY },
+      payload: { ptyId: 'pty_new' },
+    });
+    // The shell is closed, so its record may not stay running.
+    expect(values.get('control_terminal:pty_new')).toMatchObject({ state: 'ended' });
+    expect(values.get(`control_terminal_operation:${operationId}`)).toBeUndefined();
+  });
+
   it('closes browser terminal sockets and leaves wrapper sockets open', () => {
     const browser = socket(['terminal', 'terminal:browser:pty_1'], {
       role: 'browser',

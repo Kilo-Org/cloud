@@ -58,13 +58,19 @@ export const TRANSCRIPT_EVENT_TYPES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * The name a Kilo v2 `conversation.source` gives its session; undefined for a
- * missing title or a creation placeholder. Kilo v1 never sends this event: its
- * CLI reports its own titles to session-ingest.
+ * The name a Kilo v2 `conversation.source` gives the session `sessionId`;
+ * undefined for the source of another session, a missing title or a creation
+ * placeholder. Kilo v1 never sends this event: its CLI reports its own titles
+ * to session-ingest.
  */
-export function nativeSessionTitle(source: unknown): string | undefined {
+export function nativeSessionTitle(source: unknown, sessionId: string): string | undefined {
   const parsed = kilo2ConversationSourceSchema.safeParse(source);
-  if (!parsed.success || isDefaultSessionTitle(parsed.data.session.title)) return undefined;
+  if (
+    !parsed.success ||
+    parsed.data.session.id !== sessionId ||
+    isDefaultSessionTitle(parsed.data.session.title)
+  )
+    return undefined;
   return sessionTitleSchema.safeParse(parsed.data.session.title).data;
 }
 

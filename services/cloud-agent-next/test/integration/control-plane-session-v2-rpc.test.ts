@@ -451,10 +451,10 @@ describe('SandboxSessionV2 worker RPC surface', () => {
           state.storage.kv.get<{ update: { transitionId: string } }>('session_list_status')?.update
             .transitionId
       );
-    const source = (title?: string) => ({
+    const source = (title?: string, id = kiloId) => ({
       version: 'v2',
       session: {
-        id: kiloId,
+        id,
         location: { directory: '/workspace/app' },
         ...(title === undefined ? {} : { title }),
         time: { created: 1, updated: 2 },
@@ -530,6 +530,20 @@ describe('SandboxSessionV2 worker RPC surface', () => {
         {
           type: 'session.updated',
           properties: { info: { id: kiloId, title: 'A title the CLI reports itself' } },
+        },
+      ],
+    });
+    expect(await readTransitionId()).toBe(settled);
+
+    // A root event whose source names another session is never stored, so it is no rename.
+    await stub.onEvents({
+      events: [
+        {
+          type: 'conversation.source',
+          properties: {
+            sessionID: kiloId,
+            source: source('A title from another session', 'ses_another_session'),
+          },
         },
       ],
     });

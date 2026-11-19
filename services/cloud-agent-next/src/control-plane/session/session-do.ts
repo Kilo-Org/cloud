@@ -4577,15 +4577,23 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     properties: Record<string, unknown>;
   }): string | undefined {
     const rootKiloSessionId = this.registration?.spec.kiloSessionId;
-    if (event.type !== 'conversation.source' || event.properties.sessionID !== rootKiloSessionId)
+    if (
+      rootKiloSessionId === undefined ||
+      event.type !== 'conversation.source' ||
+      event.properties.sessionID !== rootKiloSessionId
+    )
       return undefined;
-    const title = nativeSessionTitle(event.properties.source);
+    // persistConversationEvent drops a source that names another session, so it is no rename.
+    const title = nativeSessionTitle(event.properties.source, rootKiloSessionId);
     if (title === undefined) return undefined;
     const stored = this.eventQueries.findByEntityId(`conversation-source/${rootKiloSessionId}`);
     const previous =
       stored === null
         ? undefined
-        : nativeSessionTitle(readNativeEventPayload(stored.payload)?.properties.source);
+        : nativeSessionTitle(
+            readNativeEventPayload(stored.payload)?.properties.source,
+            rootKiloSessionId
+          );
     return title === previous ? undefined : title;
   }
 

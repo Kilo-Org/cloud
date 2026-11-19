@@ -2321,9 +2321,10 @@ the active-session list and dates its row. It rides status changes and refreshes
 each at most once a minute: busy and retry refresh on any event, and any other
 status refreshes when transcript activity is newer than the last snapshot, so a
 wait on input while subagents keep working still proves the session live.
-`rename` is a native rename of the
-root: a `conversation.source` whose session title differs from the stored source and
-is not a creation placeholder. A rename forces a snapshot and stays in newer snapshots
+`rename` is a native rename of the root: a root `conversation.source` whose source
+names the root too (one naming another session is never stored), whose session title
+differs from the stored source and is not a creation placeholder. A rename forces a
+snapshot and stays in newer snapshots
 until one is delivered, naming the snapshot that first carried it. Ingest applies it
 like a CLI rename report (it replaces a generated title), with a `session.updated`
 notification, in the status transaction and only while the stored

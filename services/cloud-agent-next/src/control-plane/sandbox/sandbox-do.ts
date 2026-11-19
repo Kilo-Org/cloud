@@ -7,6 +7,8 @@ import {
   RUNTIME_HARNESSES,
   RUNTIME_INSTRUCTIONS_HEADER,
   RUNTIME_INSTRUCTIONS_VERSION,
+  RUNTIME_WEB_SEARCH_HEADER,
+  RUNTIME_WEB_SEARCH_VERSION,
   type RuntimeHarness,
   WORKSPACE_CONFIGURATION_HEADER,
   WORKSPACE_CONFIGURATION_VERSION,
@@ -82,9 +84,11 @@ import {
 } from '../../container-usage-context.js';
 import { resolveSecret } from '../../auth.js';
 import {
-  workspaceMcpAnchorSessionId,
+  workspaceSessionIdForScope,
   type WorkspaceMcpBinding,
 } from '../../cloud-agent-authority.js';
+import { getWorkspaceStub } from '../workspace/workspace-stub.js';
+import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
 import { getContainerCapacityFailureReason } from '../../container-concurrency.js';
 import {
   generateSandboxCredential,
@@ -138,7 +142,7 @@ import {
   type SessionCredentialGrant,
 } from '../../sandbox-control/session-credentials.js';
 import { providerUsesOutboundCredentialProxy } from '../../agent-sandbox/capabilities.js';
-import { getManagedOutboundContainerId } from '../../sandbox-id.js';
+import { classifySandboxId, getManagedOutboundContainerId } from '../../sandbox-id.js';
 import {
   resolveSandboxIdClass,
   sandboxKindMatchesKey,
@@ -246,6 +250,7 @@ import {
   controlPlaneRouteSpecSchema,
   controlPlaneSessionCredentialsPayloadSchema,
   controlPlaneSessionRefPayloadSchema,
+  controlPlaneReleasePayloadSchema,
   controlPlaneTerminalInputSchema,
   controlPlaneWorktreeCaptureInputSchema,
   controlPlaneWorktreeDeletionPayloadSchema,
@@ -271,6 +276,7 @@ import {
   type ControlPlaneRouteView,
   type ControlPlaneSessionCredentialsPayload,
   type ControlPlaneSessionRefPayload,
+  type ControlPlaneReleasePayload,
   type ControlPlaneStatusResult,
   type ControlPlaneTerminalInput,
   type ControlPlaneWorktreeCaptureInput,
@@ -468,6 +474,8 @@ import {
   type SnapshotValidatorInput,
 } from './snapshot-validator.js';
 
+import { readSentryIdentity, sentryIdentityFromBilling } from '../../sentry-identity.js';
+
 const GENERATION_KEY = 'control_plane_generation';
 const GENERATION = 2;
 const WORKSPACE_ARTIFACT_ORPHAN_SWEEP_DELAY_MS = 60_000;
@@ -541,6 +549,7 @@ const wrapperSocketAttachmentSchema = z.object({
   transferGrants: z.literal(true).optional(),
   workspaceConfiguration: z.literal(true).optional(),
   runtimeInstructions: z.literal(true).optional(),
+  runtimeWebSearch: z.literal(true).optional(),
   runtimeCapability: z.literal('worktree').optional(),
   runtimeHarness: z.enum(RUNTIME_HARNESSES).optional(),
   kiloCliVersion: SandboxRuntimeVersionSchema.optional(),
@@ -703,10 +712,9 @@ function materializationStage(error: unknown): PrepareFrameMaterializationStage 
  * DO is B4, so the production factory resolves a stub only when the test-only
  * binding exists; tests inject a fake peer instead.
  */
+export type CloudAgentMcpGrant = { url: string; token: string; expiresAt: number };
+
 export type ControlPlaneSessionPeer = HistoryPageSession & {
-  issueCloudAgentMcpGrant?(
-    workspace?: WorkspaceMcpBinding
-  ): Promise<{ url: string; token: string; expiresAt: number } | undefined>;
   onRoute(update: ControlPlaneRouteUpdate): Promise<void>;
   /** The whole workspace stopped during preparation; settle this chat. */
   onWorkspaceStopped(payload: ControlPlaneWorkspaceStoppedPayload): Promise<void>;
@@ -755,10 +763,13 @@ export type ControlRuntimeCredentialProxyFence = {
   wrapperInstanceId: string;
 };
 
+/** Why an adopted handle cannot serve the caller's canonical scope view. */
+export type RuntimeProxyScopeViewUnavailableReason = 'scope_mismatch' | 'missing_canonical_grant';
+
 /** The fence plus, for an adopted handle, the current scope view or the reason it is unavailable. */
 export type ControlRuntimeCredentialProxyFenceScope = ControlRuntimeCredentialProxyFence & {
   scopeView?: ScopeGrantView;
-  scopeViewUnavailable?: string;
+  scopeViewUnavailable?: RuntimeProxyScopeViewUnavailableReason;
 };
 
 /** The adopted-handle state a scope is already serving, if any. */
@@ -1025,6 +1036,21 @@ export class SandboxControlV2 extends DurableObject<Env> {
     sessionId
   ) => this.resolveSessionPeer(ownerId, sessionId);
   /**
+   * Issues the workspace MCP credential through the workspace authority. The
+   * default resolves the workspace Durable Object; tests inject a fake.
+   */
+  cloudAgentMcpGrantFor: (
+    ownerId: string,
+    binding: WorkspaceMcpBinding
+  ) => Promise<CloudAgentMcpGrant | undefined> = (ownerId, binding) =>
+    getWorkspaceStub(this.env, ownerId, binding.workspaceSessionId).issueMcpGrant(binding);
+  /**
+   * Expiry (seconds) of the newest workspace MCP credential sent to this
+   * allocation, per workspace. In memory: after eviction the next delivery
+   * offers one fresh credential, which the wrapper keeps only if it is newer.
+   */
+  private readonly sentCloudAgentMcpExpiresAt = new Map<string, number>();
+  /**
    * Current organization membership for an organization-attributed grant. The
    * default reads the Worker's database through Hyperdrive; tests inject a fake
    * because the fake-provider suite has no Postgres binding.
@@ -1060,6 +1086,20 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
     this.provider = this.createProviderAdapter(this.defaultPin('cloudflare-containers'));
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
+  }
+
+  async [readSentryIdentity]() {
+    const pin = this.providerPin;
+    const billing = pin?.billing ? sentryIdentityFromBilling(pin.billing) : undefined;
+    return {
+      userId: (await this.requireOwner().catch(() => null)) ?? billing?.userId ?? pin?.byoc?.userId,
+      orgId:
+        billing?.orgId ??
+        pin?.byoc?.organizationId ??
+        (pin?.byoc?.userId ? '(personal)' : undefined),
+      sessionId: billing?.sessionId,
+      sandboxId: this.sandboxId,
+    };
   }
 
   async requestBillingStop(input: NativeBillingStopRequest): Promise<boolean> {
@@ -1583,10 +1623,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
     );
   }
 
-  async release(payload: ControlPlaneSessionRefPayload): Promise<void> {
+  async release(payload: ControlPlaneReleasePayload): Promise<void> {
     await this.initialized;
-    const parsed = controlPlaneSessionRefPayloadSchema.parse(payload);
-    await this.enqueue(() => this.retireRoute(parsed.sessionId));
+    const parsed = controlPlaneReleasePayloadSchema.parse(payload);
+    await this.enqueue(async () => {
+      await this.retireRoute(parsed.sessionId);
+      if (parsed.reason !== 'standalone_session_deleted') return;
+      const sandboxClass = classifySandboxId(this.sandboxId);
+      if (sandboxClass === 'shared' || sandboxClass === 'legacy-shared') return;
+      if ((await listRoutes(this.db)).length !== 0) return;
+      await this.applyEvent({ type: 'stop-requested', at: Date.now(), reason: 'sandbox_stopped' });
+      await this.clearWorkspaceArtifactsForDeletion();
+    });
   }
 
   /**
@@ -2110,20 +2158,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   async listWorkspaceArtifacts(): Promise<WorkspaceArtifactList> {
     await this.initialized;
-    return this.enqueue(async () => {
-      const result = this.workspaceArtifacts.list();
-      await this.scheduleWorkspaceArtifactOrphanSweepIfNeeded();
-      return result;
-    });
+    return this.enqueue(async () => this.workspaceArtifacts.list());
   }
 
   async getWorkspaceArtifact(relativePath: string): Promise<WorkspaceArtifactEntryLookup | null> {
     await this.initialized;
-    return this.enqueue(async () => {
-      const result = this.workspaceArtifacts.get(relativePath);
-      await this.scheduleWorkspaceArtifactOrphanSweepIfNeeded();
-      return result;
-    });
+    return this.enqueue(async () => this.workspaceArtifacts.get(relativePath));
   }
 
   /**
@@ -2561,14 +2601,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
       if (scopeGrantId(grant) !== match.scopeGrantId) {
         return {
           ...fence,
-          scopeViewUnavailable: 'Accepted scope handle does not belong to the caller grant',
+          scopeViewUnavailable: 'scope_mismatch',
         };
       }
       const scopeGrant = readScopeGrant(this.db, match.scopeGrantId);
       if (scopeGrant === null) {
         return {
           ...fence,
-          scopeViewUnavailable: 'Accepted scope handle has no canonical grant',
+          scopeViewUnavailable: 'missing_canonical_grant',
         };
       }
       return { ...fence, scopeView: readScopeGrantView(this.db, scopeGrant) };
@@ -2909,6 +2949,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
           : {}),
         ...(request.headers.get(RUNTIME_INSTRUCTIONS_HEADER) === RUNTIME_INSTRUCTIONS_VERSION
           ? { runtimeInstructions: true as const }
+          : {}),
+        ...(request.headers.get(RUNTIME_WEB_SEARCH_HEADER) === RUNTIME_WEB_SEARCH_VERSION
+          ? { runtimeWebSearch: true as const }
           : {}),
         ...runtimeHarnessField(parseRuntimeHarness(request.headers.get(RUNTIME_HARNESS_HEADER))),
         ...(observedRuntime.kiloCliVersion === null
@@ -3892,9 +3935,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // Credentials half of B3: a due grant is re-issued and `session.credentials`
     // is sent before the prompts. A failed re-issue still delivers on the
     // previous grant while it is valid; a route that was released ends here.
+    const grantExpiresAt = route.grant?.expiresAt;
     const renewal = await this.renewRouteGrant(route, state);
     if (renewal.kind !== 'ready') return 'not_ready';
     route = renewal.route;
+    // A re-issued grant already offered a fresh MCP credential.
+    if (route.grant?.expiresAt === grantExpiresAt) await this.refreshCloudAgentMcp(route, state);
 
     // One verified-expiry check immediately before the prompts, for adopted
     // handles only. A per-session scope keeps its historical behavior: the
@@ -4067,6 +4113,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ...(cloudAgentMcp ? { cloudAgentMcp } : {}),
     });
     if (this.trySendFrame(socket, { type: 'session.credentials', ...payload })) {
+      this.recordCloudAgentMcpSent(next, cloudAgentMcp);
       await this.markRouteCredentialsSent(route.sessionId, issued.grant);
     }
     return 'issued';
@@ -4742,6 +4789,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
     };
     // Pre-deploy wrappers reject unknown fields in both prepare and attach frames.
     if (attachment?.runtimeInstructions !== true) delete wireSpec.runtimeInstructions;
+    if (attachment?.runtimeWebSearch !== true) {
+      if (wireSpec.webSearchDisabled && attachment?.runtimeHarness === 'kilo2') {
+        wireSpec.permission = { ...wireSpec.permission, websearch: 'deny' };
+      }
+      delete wireSpec.webSearchDisabled;
+      delete wireSpec.webSearchProvider;
+    }
     // A restored workspace tail runs no commands, so the frame carries none. A
     // non-tail start sends the environment build boundary and start list.
     if (snapshotFrame.workspaceSnapshot !== undefined) {
@@ -5074,7 +5128,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ...(cloudAgentMcp ? { cloudAgentMcp } : {}),
     });
     const sent = this.trySendFrame(socket, { ...frame, credentials });
-    if (sent) await this.markRouteCredentialsSent(sessionId, sendRoute.grant);
+    if (sent) {
+      this.recordCloudAgentMcpSent(sendRoute, cloudAgentMcp);
+      await this.markRouteCredentialsSent(sessionId, sendRoute.grant);
+    }
   }
 
   /**
@@ -5268,25 +5325,30 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return claims === null ? null : { exp: claims.exp, sessionId: claims.sessionId };
   }
 
+  /** The workspace whose MCP credential this route carries, or null when it has none. */
+  private workspaceMcpBinding(route: RouteRecord): WorkspaceMcpBinding | null {
+    const source = route.credentialSource;
+    if (source === null) return null;
+    const workspaceSessionId = workspaceSessionIdForScope(source.scopeId, route.sessionId);
+    if (workspaceSessionId === undefined) return null;
+    return {
+      workspaceSessionId,
+      worktreeId: source.scopeId?.startsWith('worktree_') ? source.scopeId : null,
+      ownerId: source.userId,
+      organizationId: source.orgId ?? null,
+    };
+  }
+
   private async tryIssueCloudAgentMcpGrant(
     route: RouteRecord
-  ): Promise<{ url: string; token: string; expiresAt: number } | undefined> {
-    const anchor = workspaceMcpAnchorSessionId(route.credentialSource?.scopeId, route.sessionId);
-    if (anchor === undefined) return undefined;
+  ): Promise<CloudAgentMcpGrant | undefined> {
+    const binding = this.workspaceMcpBinding(route);
+    if (binding === null) return undefined;
     try {
       const ownerId = await this.requireOwner();
-      const peer = ownerId === null ? null : this.sessionPeerFor(ownerId, anchor);
-      if (peer?.issueCloudAgentMcpGrant === undefined) return undefined;
+      if (ownerId === null || ownerId !== binding.ownerId) return undefined;
       return await withTimeout(
-        peer.issueCloudAgentMcpGrant(
-          route.credentialSource?.scopeId?.startsWith('worktree_')
-            ? {
-                worktreeId: route.credentialSource.scopeId,
-                ownerId: route.credentialSource.userId,
-                organizationId: route.credentialSource.orgId ?? null,
-              }
-            : undefined
-        ),
+        this.cloudAgentMcpGrantFor(ownerId, binding),
         this.grantIssueTimeoutMs(),
         'Cloud Agent MCP grant issuance timed out'
       );
@@ -5295,10 +5357,56 @@ export class SandboxControlV2 extends DurableObject<Env> {
         .withFields({
           sandboxId: this.sandboxId,
           sessionId: route.sessionId,
-          anchorSessionId: anchor,
+          workspaceSessionId: binding.workspaceSessionId,
         })
         .warn('Optional Cloud Agent MCP grant unavailable; continuing without it');
       return undefined;
+    }
+  }
+
+  private recordCloudAgentMcpSent(route: RouteRecord, grant: CloudAgentMcpGrant | undefined): void {
+    const binding = grant === undefined ? null : this.workspaceMcpBinding(route);
+    if (grant === undefined || binding === null) return;
+    const sent = this.sentCloudAgentMcpExpiresAt.get(binding.workspaceSessionId);
+    if (sent === undefined || grant.expiresAt > sent) {
+      this.sentCloudAgentMcpExpiresAt.set(binding.workspaceSessionId, grant.expiresAt);
+    }
+  }
+
+  /**
+   * Offers a newer workspace MCP credential before a prompt when the one this
+   * allocation last received is missing or due. This is how a renewed
+   * workspace authority reaches a running runtime without a restart. The
+   * current route grant is resent unchanged with it.
+   */
+  private async refreshCloudAgentMcp(route: RouteRecord, state: AllocationState): Promise<void> {
+    const binding = this.workspaceMcpBinding(route);
+    // Only interactive workspaces can launch children; automation never asks.
+    if (
+      binding === null ||
+      route.grant === null ||
+      !isInteractiveSessionOrigin(route.credentialSource?.createdOnPlatform)
+    ) {
+      return;
+    }
+    const sent = this.sentCloudAgentMcpExpiresAt.get(binding.workspaceSessionId);
+    if (
+      sent !== undefined &&
+      sent * 1000 - Date.now() >= this.sandboxTimers().credentialGrantReissueBelowMs
+    ) {
+      return;
+    }
+    const grant = await this.tryIssueCloudAgentMcpGrant(route);
+    if (grant === undefined || (sent !== undefined && grant.expiresAt <= sent)) return;
+    const socket = this.boundWrapperSocket(state);
+    const current = await readRoute(this.db, route.sessionId);
+    if (socket === null || current?.state !== 'ready' || current.grant === null) return;
+    const payload = controlPlaneSessionCredentialsPayloadSchema.parse({
+      ...sessionCredentialsPayloadFromGrant(current.grant, route.sessionId),
+      cloudAgentMcp: grant,
+    });
+    if (this.trySendFrame(socket, { type: 'session.credentials', ...payload })) {
+      this.recordCloudAgentMcpSent(current, grant);
     }
   }
 
@@ -7046,6 +7154,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(frame.transferGrants ? { transferGrants: true } : {}),
         ...(attachment?.workspaceConfiguration ? { workspaceConfiguration: true } : {}),
         ...(attachment?.runtimeInstructions ? { runtimeInstructions: true } : {}),
+        ...(attachment?.runtimeWebSearch ? { runtimeWebSearch: true } : {}),
         ...runtimeHarnessField(attachment?.runtimeHarness),
       });
       logControlDiagnostic('workspace_snapshot_capability', {
@@ -7233,13 +7342,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
             ...(frame.subtype === undefined ? {} : { subtype: frame.subtype }),
           })
           .warn('Control-plane prepare failed');
-        if (frame.reason === 'workspace_setup_failed') {
+        if (frame.reason === 'workspace_setup_failed' && frame.step === 'restore') {
+          if (!current) return;
+          const route = await readRoute(this.db, frame.sessionId);
           const disk = readWorkspaceSnapshotAllocation(this.db);
           if (
+            route?.state === 'preparing' &&
             currentState.allocationId !== null &&
             disk?.allocationId === currentState.allocationId &&
-            disk.restore !== undefined &&
-            frame.step === 'restore'
+            disk.restore !== undefined
           ) {
             // A wrapper-side tail failure is permanent: the descriptor is kept
             // for an explicit "Start fresh" and this attempt never relaunches
@@ -7752,8 +7863,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private async clearWorkspaceArtifactsForDeletion(): Promise<void> {
-    const removed = this.workspaceArtifacts.clear();
-    if (removed > 0) await this.scheduleWorkspaceArtifactOrphanSweep();
+    this.workspaceArtifacts.clear();
+    await this.scheduleWorkspaceArtifactOrphanSweep();
   }
 
   private async sweepWorkspaceArtifactOrphans(): Promise<void> {

@@ -77,6 +77,9 @@ jest.mock('./RepositoryOverridesSection', () => ({
 }));
 
 jest.mock('./EnvironmentsSection', () => ({ EnvironmentsSection: () => null }));
+jest.mock('./WebSearchSection', () => ({
+  WebSearchSection: () => createElement('div', null, 'Web search'),
+}));
 
 jest.mock('./VercelComputeSettings', () => ({
   VercelComputeSettings: () => createElement('div', { 'data-section': 'vercel-compute' }),
@@ -551,6 +554,7 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
       'This browser',
       'This browser',
     ]);
+    expect(section('personal-preferences-heading').textContent).toContain('Web search');
   });
 
   it('keeps the personal preference control available while settings load', () => {

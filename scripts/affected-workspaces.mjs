@@ -80,6 +80,10 @@ const CHECK_INPUTS = [
 const OWNED = [
   [/^scripts\/web-env\//, 'apps/web'],
   [/^tools\/(i18n|nativewind)\//, 'apps/mobile'],
+  // The shared source walk, syntax tree and catalog helpers every tool above
+  // reads: a change there is read by the app's own catalog and class checks,
+  // which `i18n-leftover` runs and whose tests the same job carries.
+  [/^tools\/lib\//, 'apps/mobile'],
   // A build action for one package, and the script that decides its cache key,
   // change that package's dist and nothing else. Either one is an input of the
   // dist key, so a change to it forces a rebuild; the package's readers follow

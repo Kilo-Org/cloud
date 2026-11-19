@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import type * as DirectByokTypes from './types';
+import type * as AutoModel from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { AUTO_SMALL_TARGET_MODELS } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import type { EnabledByokProvider } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { getEnabledByokProviders } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import {
@@ -9,6 +11,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   createDirectByokReferenceResolver,
+  getDirectByokCatalogModelId,
   listDirectByokCatalogModels,
   offersCatalogMode,
   findDirectByokCatalogModels,
@@ -53,6 +56,8 @@ function mockModel(id: string, catalog_model_id?: string): DirectByokTypes.Direc
   return { id, name: id, context_length: 4096, max_completion_tokens: 1024, catalog_model_id };
 }
 
+const FREE_CATALOG_MODEL_ID = 'vendor/free-model:free';
+
 jest.mock('./direct-byok-definitions', () => ({
   __esModule: true,
   default: [
@@ -61,6 +66,12 @@ jest.mock('./direct-byok-definitions', () => ({
       mockModel('hf:moonshotai/Kimi-K2.6-fast', 'moonshotai/kimi-k2.6'),
       mockModel('hf:example/finetune'),
       mockModel('hf:moonshotai/retired', 'moonshotai/retired'),
+      mockModel('hf:vendor/free-model', 'vendor/free-model:free'),
+      mockModel(
+        'hf:vendor/auto-small-free',
+        jest.requireActual<typeof AutoModel>('@kilocode/web-shared/lib/ai-gateway/auto-model')
+          .AUTO_SMALL_TARGET_MODELS.free
+      ),
     ]),
     mockProvider(
       'zai-coding',
@@ -68,7 +79,9 @@ jest.mock('./direct-byok-definitions', () => ({
       [mockModel('glm-5.2', 'z-ai/glm-5.2'), mockModel('kimi-k2.6', 'moonshotai/kimi-k2.6')],
       'z-ai'
     ),
-    mockProvider('martian', undefined, [mockModel('moonshotai/kimi-k2.6', 'moonshotai/kimi-k2.6')]),
+    mockProvider('kimi-coding', undefined, [
+      mockModel('moonshotai/kimi-k2.6', 'moonshotai/kimi-k2.6'),
+    ]),
     mockProvider('morph-byok', 'morph', [mockModel('morph-v3-fast')]),
     mockProvider('chutes-byok', 'chutes', [mockModel('moonshotai/retired', 'moonshotai/retired')]),
   ],
@@ -107,11 +120,11 @@ beforeEach(() => {
 describe('catalog mode support', () => {
   test('requires a models.dev id and at least one current catalog mapping', async () => {
     expect(supportsCatalogMode('synthetic')).toBe(true);
-    expect(supportsCatalogMode('martian')).toBe(false);
+    expect(supportsCatalogMode('kimi-coding')).toBe(false);
     await expect(offersCatalogMode('synthetic')).resolves.toBe(true);
     await expect(offersCatalogMode('morph-byok')).resolves.toBe(false);
     await expect(offersCatalogMode('chutes-byok')).resolves.toBe(false);
-    await expect(offersCatalogMode('martian')).resolves.toBe(false);
+    await expect(offersCatalogMode('kimi-coding')).resolves.toBe(false);
   });
 
   test('lists the current catalog ids a provider serves with their primary model', async () => {
@@ -123,21 +136,58 @@ describe('catalog mode support', () => {
   });
 });
 
+describe('free models in catalog mode', () => {
+  test('does not list a free catalog id or the auto small free model', async () => {
+    const entries = await listDirectByokCatalogModels('synthetic');
+
+    expect(entries.map(({ catalogModelId }) => catalogModelId)).toEqual(['moonshotai/kimi-k2.6']);
+  });
+
+  test('does not mark a free catalog id as served, and still marks paid ids', async () => {
+    mockedKeys.mockResolvedValueOnce(keys({ synthetic: true }));
+
+    const catalogIds = await getDirectByokCatalogModelIds({ type: 'user', id: 'user-id' });
+
+    expect(catalogIds.has(FREE_CATALOG_MODEL_ID)).toBe(false);
+    expect(catalogIds.has(AUTO_SMALL_TARGET_MODELS.free)).toBe(false);
+    expect(catalogIds.has('moonshotai/kimi-k2.6')).toBe(true);
+  });
+
+  test('does not route a free catalog id, and still routes paid ids', async () => {
+    await expect(findDirectByokCatalogModels(FREE_CATALOG_MODEL_ID)).resolves.toEqual([]);
+    await expect(findDirectByokCatalogModels(AUTO_SMALL_TARGET_MODELS.free)).resolves.toEqual([]);
+    await expect(findDirectByokCatalogModels('moonshotai/kimi-k2.6')).resolves.not.toEqual([]);
+  });
+
+  test('does not map a bespoke model to a free catalog id', async () => {
+    await expect(
+      getDirectByokCatalogModelId(mockModel('hf:vendor/free-model', FREE_CATALOG_MODEL_ID))
+    ).resolves.toBeNull();
+    await expect(
+      getDirectByokCatalogModelId(mockModel('hf:moonshotai/Kimi-K2.6', 'moonshotai/kimi-k2.6'))
+    ).resolves.toBe('moonshotai/kimi-k2.6');
+  });
+});
+
 describe('direct BYOK model lists in catalog mode', () => {
   test('omits bespoke entries of catalog-mode keys', async () => {
-    mockedKeys.mockResolvedValueOnce(keys({ synthetic: true, 'zai-coding': false, martian: true }));
+    mockedKeys.mockResolvedValueOnce(
+      keys({ synthetic: true, 'zai-coding': false, 'kimi-coding': true })
+    );
 
     const models = await getDirectByokModelsForUser('user-id');
 
     expect(models.map(entry => entry.id)).toEqual([
       'zai-coding/glm-5.2',
       'zai-coding/kimi-k2.6',
-      'martian/moonshotai/kimi-k2.6',
+      'kimi-coding/moonshotai/kimi-k2.6',
     ]);
   });
 
   test('lists current catalog ids served by catalog-mode keys only', async () => {
-    mockedKeys.mockResolvedValueOnce(keys({ synthetic: true, 'zai-coding': false, martian: true }));
+    mockedKeys.mockResolvedValueOnce(
+      keys({ synthetic: true, 'zai-coding': false, 'kimi-coding': true })
+    );
 
     const catalogIds = await getDirectByokCatalogModelIds({ type: 'user', id: 'user-id' });
 

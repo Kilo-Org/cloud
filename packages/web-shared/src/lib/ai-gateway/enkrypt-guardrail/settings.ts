@@ -28,8 +28,8 @@ import { claimReportWindow } from '@kilocode/web-shared/lib/ai-gateway/report-wi
 
 /**
  * `invalid`: the organization enabled the guardrail but its saved detectors do not match the
- * schema, so every scanned request is rejected as if Enkrypt were unavailable rather than falling
- * back to a weaker policy.
+ * schema, so every scanned request is rejected rather than falling back to a weaker policy. Unlike
+ * an Enkrypt failure, this does not fail open.
  */
 export type EnkryptGuardrailConfig =
   | {
@@ -86,7 +86,6 @@ export function readStoredEnkryptOutputDetectors(
   return readStored(EnkryptOutputDetectorsSchema, 'output', organizationId, detectors);
 }
 
-/** The settings section that holds each direction's guardrail. */
 const GUARDRAIL_SETTINGS_KEYS = {
   input: 'input_guardrail',
   output: 'output_guardrail',

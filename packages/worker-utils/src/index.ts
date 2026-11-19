@@ -6,6 +6,7 @@ export type { DORetryConfig, DORetryScope } from './do-retry.js';
 export {
   isTransientDurableObjectFailure,
   isDurableObjectRetryDeadline,
+  isNetworkConnectionLost,
 } from './durable-object-failure.js';
 
 export { backendAuthMiddleware } from './backend-auth-middleware.js';

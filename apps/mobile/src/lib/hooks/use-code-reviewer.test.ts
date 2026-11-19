@@ -120,7 +120,25 @@ vi.mock('@/lib/trpc', () => ({
 }));
 
 vi.mock('@/lib/a11y/announcing-toast', () => ({
-  announcingToast: { error: (msg: string) => toastErrorMock(msg) },
+  // Mirrors the adapter: the options argument reaches the toast only when the
+  // caller passed one, so a bare-copy call stays a one-argument call.
+  announcingToast: {
+    error: (msg: string, options?: unknown) =>
+      options === undefined ? toastErrorMock(msg) : toastErrorMock(msg, options),
+  },
+}));
+
+// The reader's role lives behind `@/lib/trial-refusal`, whose hooks reach
+// expo-router and the organization query chain; the pure project has no Expo
+// build, so the two hooks are stubbed and driven per test.
+const billing = vi.hoisted(() => ({
+  canManage: false,
+  action: undefined as { label: string; onPress: () => void } | undefined,
+}));
+vi.mock('@/lib/trial-refusal', () => ({
+  useCanManageBilling: () => billing.canManage,
+  useBillingAction: () => billing.action,
+  useTrialRefusalAction: (isRefusal: boolean) => (isRefusal ? billing.action : undefined),
 }));
 
 // use-code-reviewer.ts re-exports from use-reviewer-permission, which
@@ -173,6 +191,8 @@ beforeEach(() => {
   getQueryDataMock.mockReset();
   setQueryDataMock.mockReset();
   toastErrorMock.mockReset();
+  billing.canManage = false;
+  billing.action = undefined;
   // Default: each patch mutate resolves to a successful payload. Tests
   // override per-case when they need a different outcome.
   personalPatchMutateMock.mockResolvedValue({ success: true, webhookSync: null });
@@ -523,6 +543,69 @@ describe('useSaveReviewConfig onError', () => {
 
     expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('common.organizationTrialEnded'));
     expect(toastErrorMock).not.toHaveBeenCalledWith(ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
+  });
+
+  it('offers a billing role the plan step beside the copy that offers it', async () => {
+    billing.canManage = true;
+    billing.action = {
+      label: i18n.t('organization.hub.manageBilling'),
+      onPress: vi.fn<() => void>(),
+    };
+    orgPatchMutateMock.mockReset();
+    orgPatchMutateMock.mockRejectedValue(
+      makeServerError('FORBIDDEN', ORGANIZATION_TRIAL_EXPIRED_MESSAGE)
+    );
+    const opts = getSaveOptions('org-1', 'github');
+
+    try {
+      await opts.mutationFn?.({ focusAreas: ['bugs'] });
+    } catch (error) {
+      opts.onError?.(error);
+    }
+
+    expect(toastErrorMock).toHaveBeenCalledTimes(1);
+    expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('common.organizationTrialEndedBilling'), {
+      action: { label: billing.action.label, onClick: billing.action.onPress },
+    });
+    expect(toastErrorMock).not.toHaveBeenCalledWith(i18n.t('common.organizationTrialEnded'));
+  });
+
+  it('keeps the copy and no step for a member of the organization', async () => {
+    orgPatchMutateMock.mockReset();
+    orgPatchMutateMock.mockRejectedValue(
+      makeServerError('FORBIDDEN', ORGANIZATION_TRIAL_EXPIRED_MESSAGE)
+    );
+    const opts = getSaveOptions('org-1', 'github');
+
+    try {
+      await opts.mutationFn?.({ focusAreas: ['bugs'] });
+    } catch (error) {
+      opts.onError?.(error);
+    }
+
+    // One argument: no step rides a refusal this reader cannot take.
+    expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('common.organizationTrialEnded'));
+    expect(toastErrorMock.mock.calls[0]).toHaveLength(1);
+  });
+
+  it('offers the plan step only for the trial refusal, not for another refusal on the same role', async () => {
+    billing.canManage = true;
+    billing.action = {
+      label: i18n.t('organization.hub.manageBilling'),
+      onPress: vi.fn<() => void>(),
+    };
+    orgPatchMutateMock.mockReset();
+    orgPatchMutateMock.mockRejectedValue(makeServerError('FORBIDDEN', 'Not a reviewer manager'));
+    const opts = getSaveOptions('org-1', 'github');
+
+    try {
+      await opts.mutationFn?.({ focusAreas: ['bugs'] });
+    } catch (error) {
+      opts.onError?.(error);
+    }
+
+    expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('codeReviewer.configSaveFailed'));
+    expect(toastErrorMock.mock.calls[0]).toHaveLength(1);
   });
 });
 

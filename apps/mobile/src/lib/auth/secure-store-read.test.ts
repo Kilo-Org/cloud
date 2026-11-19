@@ -359,8 +359,6 @@ describe('readStoredValueWithRetry', () => {
     getItemAsync.mockResolvedValue('stored-token');
     const readStoredValueWithRetry = await loadHelper();
 
-    // The window opens at module load; the 250 ms backoff alone is not enough
-    // to leave it, the 500 ms one is.
     const read = readStoredValueWithRetry('auth-token');
     await vi.advanceTimersByTimeAsync(2000);
 

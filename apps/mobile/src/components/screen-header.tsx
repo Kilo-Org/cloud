@@ -1,10 +1,16 @@
 /* eslint-disable max-lines -- one header contract: the title, eyebrow and subtitle slots, the back control, the action reflow, and the safe-area and offline-banner rules must stay in step */
 import { type Href, useNavigationContainerRef, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { type ReactElement, useEffect, useState } from 'react';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { ChevronDown } from '@/components/ui/icons';
 import { DirectionalChevronLeft } from '@/components/ui/directional-icons';
-import { Platform, Pressable, useWindowDimensions, View } from 'react-native';
+import {
+  type LayoutChangeEvent,
+  Platform,
+  Pressable,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
@@ -51,10 +57,12 @@ const HEADER_TOP_GAP = 8;
 const HEADER_SINGLE_ROW_MIN_CONTENT_WIDTH = 120;
 
 /**
- * The horizontal gutter a header's content sits inside. The list screens use
- * the widest one in service (`px-[22px]`, 44dp); the default `px-4` is
- * narrower, so the check reflows a hair early for those callers instead of
- * squeezing them.
+ * The horizontal gutter a header's content sits inside, and the default for the
+ * stacking check's `contentInset`. The list screens use the widest one in
+ * service (`px-[22px]`, 44dp); the default `px-4` is narrower, so the check
+ * reflows a hair early for those callers instead of squeezing them. A header
+ * that shows a leading control beside its title, or needs an exact decision,
+ * declares its own inset instead of inheriting this one.
  */
 const HEADER_CONTENT_GUTTER = 44;
 
@@ -66,27 +74,61 @@ const HEADER_CONTENT_GUTTER = 44;
 const HEADER_ACTIONS_GAP = 12;
 
 /**
+ * The centered row's leading extent (dp): the width of the 48dp icon target
+ * the back control draws, whichever call site renders it. The balance filler
+ * treats the whole 48dp box as the leading weight, matching the audit's
+ * control rect (see `ICON_TARGET_BOX_CLASS`).
+ */
+const HEADER_LEADING_COLUMN_WIDTH = 48;
+
+type HeaderStackingWidths = {
+  /**
+   * Width the caller's trailing cluster lays out at, in dp — the widths the
+   * caller renders, not a worst case it may never show. A cluster wide enough
+   * to leave the title below its readable minimum reflows too. It is taken as
+   * laid out and is not scaled here, so a caller whose cluster paints text at
+   * the current scale declares the width it lays out at in that scale.
+   */
+  headerRightWidth?: number;
+  /**
+   * Content width the caller's own title needs to stay readable, at font scale
+   * 1. It defaults to the list footer's 30px title; a detail header whose title
+   * is the 18px style needs less, and declaring that width keeps the header on
+   * one row where the larger default would already have reflowed it.
+   */
+  titleMinWidth?: number;
+  /**
+   * Horizontal space, in dp, the caller's row loses before its title: the
+   * gutter its own padding paints plus the width of a leading control that
+   * shares the title's row, such as a back button. It defaults to the widest
+   * list gutter, which the check takes as covering both. A caller that declares
+   * the space it really loses makes the check exact: it neither reflows a row
+   * that still holds the title nor squeezes a title that no longer fits.
+   */
+  contentInset?: number;
+};
+
+/**
  * Whether the header's actions drop to their own row instead of sharing the
  * title's. `width` is the window width in dp; `fontScale` is the system font
  * scale, so a large font reflows before a small one at the same width.
- * `headerRightWidth` is the width the caller's trailing cluster lays out at, in
- * dp — the widths the caller renders, not a worst case it may never show. A
- * cluster wide enough to leave the title below its readable minimum reflows
- * too. Fixed-size children (icon buttons, a label capped at its own max-w) do
- * not grow with the font scale, so this width is taken as laid out and is not
- * scaled.
  */
 export function shouldStackHeaderActions(
   width: number,
   fontScale: number,
-  headerRightWidth = 0
+  widths: HeaderStackingWidths = {}
 ): boolean {
   if (!Number.isFinite(width)) {
     return false;
   }
+  const {
+    headerRightWidth = 0,
+    titleMinWidth = HEADER_SINGLE_ROW_MIN_CONTENT_WIDTH,
+    contentInset = HEADER_CONTENT_GUTTER,
+  } = widths;
   const scale = Number.isFinite(fontScale) && fontScale > 0 ? fontScale : 1;
-  const titleWidth = width - HEADER_CONTENT_GUTTER - HEADER_ACTIONS_GAP - headerRightWidth;
-  return titleWidth < HEADER_SINGLE_ROW_MIN_CONTENT_WIDTH * scale;
+  const titleWidth = width - contentInset - HEADER_ACTIONS_GAP - headerRightWidth;
+  return titleWidth < titleMinWidth * scale;
 }
 
 /**
@@ -97,8 +139,11 @@ export function shouldStackHeaderActions(
 const MAX_TITLE_LINES = 3;
 
 /**
- * What a reserved band's eyebrow twin lays out with: a space, so the twin
- * holds one eyebrow line without painting a label that is not on screen.
+ * What a reserve paints when it has no label yet: a no-break space, which paints
+ * no ink. It holds the eyebrow variant's single line box
+ * (`EYEBROW_LINE_HEIGHT_DP` in `ui/text.tsx`), which no longer depends on the
+ * script, so a zero-ink filler reserves exactly the height the arriving label
+ * takes.
  */
 const blankEyebrow = '\u00A0';
 
@@ -156,7 +201,25 @@ type ScreenHeaderProps = {
   reserveTitleSpace?: boolean;
   /** Optional mono-uppercase line above the title. */
   eyebrow?: string;
+  /**
+   * Reserve the eyebrow's line even while it has no text, so the label arriving
+   * later cannot change the header's height. The reserved line stays in flow
+   * above the title: the heading block — label line plus title — is what centres
+   * against the leading control, so a line painted only once the label lands
+   * would push the title down by half a line. A caller whose read settles
+   * without a label drops the reserve, which lets the title centre alone.
+   */
   reserveEyebrow?: boolean;
+  /**
+   * What the reserved eyebrow line paints while the caller's label is not
+   * available yet, such as a bar one eyebrow line tall. It is drawn over the
+   * reserved text, which still holds the line's height, so neither the
+   * placeholder nor the arriving label moves the body. The caller supplies the
+   * node, so the header itself pulls in no loading surface; a read that stopped
+   * passes none, leaving the reserved line blank. `eyebrowHeaderProps` maps the
+   * caller's `HeaderEyebrow` state to all three props.
+   */
+  eyebrowPlaceholder?: React.ReactNode;
   centerTitle?: boolean;
   /** Use Focus's large 30px H1 style (list roots). Default 18px (detail). */
   size?: 'default' | 'large';
@@ -165,10 +228,31 @@ type ScreenHeaderProps = {
    * Width the `headerRight` cluster lays out at, in dp. The stacking decision
    * reserves it (see `shouldStackHeaderActions`), so a wide cluster reflows the
    * actions onto their own row instead of squeezing the title to a few
-   * characters. Pass the widths of the controls actually rendered. Omit it for
-   * a cluster no wider than a single icon button.
+   * characters. Pass the widths of the controls actually rendered: a cluster
+   * whose text grows with the font scale declares the width it lays out at in
+   * the current scale, and a cluster of fixed-size controls declares the same
+   * width at every scale. Omit it for a cluster no wider than a single icon
+   * button.
    */
   headerRightWidth?: number;
+  /**
+   * Content width (dp, at font scale 1) this screen's own title needs to stay
+   * readable beside the trailing cluster, for the stacking decision above. The
+   * default reserves the 30px list title's width; a header whose title is the
+   * 18px style declares the smaller width it actually paints, so a cluster that
+   * still leaves the title its own text does not reflow the header.
+   */
+  titleMinWidth?: number;
+  /**
+   * Horizontal space (dp) the title's row loses before the title, for the
+   * stacking decision above: this header's own content gutter plus the width of
+   * a leading control such as the back button. It defaults to the 44 dp list
+   * gutter, which the check takes as covering both. A header that paints a
+   * narrower gutter, or shows a back control beside its title, declares the
+   * space it really loses so the check reflows where its title stops fitting
+   * rather than a whole control-width late.
+   */
+  contentInset?: number;
   /** Keep compact fixed-width controls beside the title even on narrow screens. */
   allowHeaderRightStacking?: boolean;
   /**
@@ -241,6 +325,22 @@ type ScreenHeaderProps = {
 };
 
 /**
+ * The eyebrow line a header paints when its label comes from a read: the label
+ * itself once the read answers, a reserved line while the read is pending —
+ * with the caller's placeholder bar over it, because the label is still on its
+ * way — a reserved line with nothing painted after the read failed, where the
+ * title holds the position the label will take without an animation that may
+ * never finish, or no line at all once the read settled without a label, where
+ * the title centres on the leading control alone. A caller keeps one of these
+ * values as its single source of truth.
+ */
+export type HeaderEyebrow =
+  | { readonly kind: 'ready'; readonly text: string }
+  | { readonly kind: 'loading' }
+  | { readonly kind: 'held' }
+  | { readonly kind: 'none' };
+
+/**
  * Height of the reserved title box for `reserveTitleSpace`, one title line
  * height per line the title can paint: the default 18px title's Tailwind line
  * height is `1.75rem`, the large 30px variant's is 36px. Class names must be
@@ -270,6 +370,21 @@ function reservedTitleHeightClass(size: ScreenHeaderProps['size'], titleLines: n
     return 'min-h-21';
   }
   return titleLines === 1 ? 'min-h-7' : 'min-h-14';
+}
+
+/**
+ * The band the header's title occupies, and the band the leading control
+ * occupies beside it. One class for both, so the two cells measure the same
+ * height and the row's `items-center` lines the control up with the title at
+ * every font scale. One line of a detail title is shorter than the control's
+ * 48 dp target, and a control has to live in a box of its own size for
+ * React Native to deliver its touches — a 48 dp box inside a 24.8 dp parent is
+ * reachable only across the parent's bounds — so the band is the control's
+ * height whenever the title's own reserve is shorter. A deeper title cap keeps
+ * its reserve, so a name that wraps cannot move the body either.
+ */
+function titleBandClass(size: ScreenHeaderProps['size'], titleLines: number): string {
+  return titleLines === 1 ? 'min-h-[48px]' : reservedTitleHeightClass(size, titleLines);
 }
 
 /**
@@ -312,9 +427,12 @@ export function ScreenHeader({
   reserveTitleSpace = false,
   eyebrow,
   reserveEyebrow = false,
+  eyebrowPlaceholder,
   size = 'default',
   headerRight,
   headerRightWidth,
+  titleMinWidth,
+  contentInset,
   allowHeaderRightStacking = true,
   headerRightShrinks = false,
   inlineActions,
@@ -349,14 +467,22 @@ export function ScreenHeader({
   const stackActions =
     allowHeaderRightStacking &&
     headerRight != null &&
-    shouldStackHeaderActions(windowWidth, fontScale, headerRightWidth ?? 0);
+    shouldStackHeaderActions(windowWidth, fontScale, {
+      headerRightWidth: headerRightWidth ?? 0,
+      titleMinWidth,
+      contentInset,
+    });
   // The inline controls row reflows the same way: a caller that declares its
   // width drops it beneath the title before it squeezes the title's own
   // readable minimum, so the 30px Agents title never breaks inside a word.
   const stackInlineActions =
     allowInlineActionsStacking &&
     inlineActions != null &&
-    shouldStackHeaderActions(windowWidth, fontScale, inlineActionsWidth ?? 0);
+    shouldStackHeaderActions(windowWidth, fontScale, {
+      headerRightWidth: inlineActionsWidth ?? 0,
+      titleMinWidth,
+      contentInset,
+    });
 
   // A surface that reaches the window top (a full-window modal) needs the
   // status bar and corner pad added on top of the standard gap; one that
@@ -465,26 +591,63 @@ export function ScreenHeader({
     );
   }
 
+  // A centered title shares its row with the leading and trailing controls.
+  // A spacer opposite the back control keeps the title centered on the full
+  // width without placing either control out of flow. A reserved eyebrow is one
+  // of that title's own lines, painted from the first frame: counting it here
+  // keeps the row's shape (and the back control's gutter pull) from changing
+  // when the label lands.
+  const separateHeading = centerTitle && (Boolean(title) || Boolean(eyebrow) || reserveEyebrow);
+
+  // One decision for two cells: the heading lays the subtitle under its title
+  // and the leading column lays a zero-ink twin of that same line under its
+  // band, so the column always measures what the heading measures.
+  const hasSubtitleLine = Boolean(subtitle) || reserveSubtitle || Boolean(subtitlePlaceholder);
+
+  // The title and the leading control share one band, so the caret has a real
+  // 48 x 48 dp box inside its parent instead of a target clipped by a 24.8 dp
+  // line, and the two cells measure the same height at every font scale (see
+  // `titleBandClass`). Only a non-centred header that draws a back control has
+  // that column; without one the heading keeps the tree — and the height — it
+  // has always had, so the band class never applies and no wrapper is added.
+  const hasBackControl = canGoBack && !separateHeading;
+  const bandClass = cn('justify-center', hasBackControl && titleBandClass(size, titleLines));
+
   const heading = (
     <View className="min-w-0 flex-1">
       {eyebrow || reserveEyebrow ? (
-        <Eyebrow
-          className={cn('mb-0.5', centerTitle && 'text-center', !eyebrow && 'opacity-0')}
-          // A status line is one line: a narrow window truncates it rather than
-          // stacking it into a column beside the title. A caller that raises
-          // `eyebrowNumberOfLines` opts into the extra lines and the middle
-          // ellipsis that keeps a path's distinguishing tail.
-          numberOfLines={eyebrowNumberOfLines ?? 1}
-          ellipsizeMode={eyebrowNumberOfLines === undefined ? 'tail' : 'middle'}
-          accessible={Boolean(eyebrow)}
-          accessibilityElementsHidden={!eyebrow}
-          importantForAccessibility={eyebrow ? 'auto' : 'no-hide-descendants'}
-        >
-          {eyebrow ?? '\u00A0'}
-        </Eyebrow>
+        <View className={cn('mb-0.5', centerTitle && 'items-center')}>
+          {eyebrow === undefined && eyebrowPlaceholder ? (
+            // The reserved text below still holds the line's height, so the
+            // placeholder is painted over it rather than sizing the slot.
+            <View
+              className={cn(
+                'absolute inset-0 justify-center',
+                centerTitle ? 'items-center' : 'items-start'
+              )}
+              pointerEvents="none"
+            >
+              {eyebrowPlaceholder}
+            </View>
+          ) : null}
+          <Eyebrow
+            className={cn(centerTitle && 'text-center', !eyebrow && 'opacity-0')}
+            // A status line is one line: a narrow window truncates it rather than
+            // stacking it into a column beside the title. A caller that raises
+            // `eyebrowNumberOfLines` opts into the extra lines and the middle
+            // ellipsis that keeps a path's distinguishing tail.
+            numberOfLines={eyebrowNumberOfLines ?? 1}
+            ellipsizeMode={eyebrowNumberOfLines === undefined ? 'tail' : 'middle'}
+            accessible={Boolean(eyebrow)}
+            accessibilityElementsHidden={!eyebrow}
+            importantForAccessibility={eyebrow ? 'auto' : 'no-hide-descendants'}
+          >
+            {eyebrow ?? '\u00A0'}
+          </Eyebrow>
+        </View>
       ) : null}
-      {titleNode}
-      {subtitle || reserveSubtitle || subtitlePlaceholder ? (
+      {hasBackControl ? <View className={bandClass}>{titleNode}</View> : titleNode}
+      {hasSubtitleLine ? (
         <View className={cn('mt-0.5', centerTitle && 'items-center')}>
           {subtitle === undefined && subtitlePlaceholder ? (
             // The reserved text below still holds the line's height, so the
@@ -518,10 +681,6 @@ export function ScreenHeader({
       ) : null}
     </View>
   );
-  // A centered title shares its row with the leading and trailing controls.
-  // A spacer opposite the back control keeps the title centered on the full
-  // width without placing either control out of flow.
-  const separateHeading = centerTitle && (Boolean(title) || Boolean(eyebrow));
 
   // The reserve, as a band rather than a box around the title: a zero-width,
   // clipped twin of the eyebrow and the title's line cap holds the header's text
@@ -539,7 +698,7 @@ export function ScreenHeader({
     </View>
   ) : null;
 
-  // The leading control's pull into the gutter is a START-side margin, never a
+  // The leading column's pull into the gutter is a START-side margin, never a
   // hand-picked `mr` under RTL. With `I18nManager.doLeftAndRightSwapInRTL` on
   // (the default) React Native rewrites margin Left/Right to Yoga Start/End
   // before layout (YogaLayoutableShadowNode `swapLeftAndRightInYogaStyleProps`),
@@ -561,10 +720,10 @@ export function ScreenHeader({
   // whenever the device had keyboard or D-pad focus (measured on the emulator:
   // `#E8E7E3` over the target's full rect, sharp corners, from the first TAB
   // press). The frame clips that surface to a circle, so the control reads as an
-  // icon button while it stays focusable and keeps the same rect, gutter pull
-  // and label.
+  // icon button while it stays focusable and keeps the same rect and label; the
+  // leading column around it carries the gutter pull.
   const backControl = canGoBack ? (
-    <View className={cn('shrink-0 overflow-hidden rounded-full', !separateHeading && '-ms-4')}>
+    <View className="shrink-0 overflow-hidden rounded-full">
       <Pressable
         onPress={handleBack}
         accessibilityRole="button"
@@ -577,6 +736,63 @@ export function ScreenHeader({
           <DirectionalChevronLeft size={24} color={colors.foreground} />
         )}
       </Pressable>
+    </View>
+  ) : null;
+
+  // The leading column holds one 48dp control and mirrors the heading's own
+  // lines beside it — the eyebrow twin, the band the title sits in, the
+  // subtitle twin — so the two cells always measure the same height and the
+  // header's own height is unchanged by the control.
+  //
+  // The control has to live in a box of its own size. React Native hit-tests
+  // inside each view's bounds, so the caret laid over the title's line in an
+  // absolutely positioned overlay was reachable only across 48 x 24.8 dp — the
+  // 11.6 dp above and below the title line ignored the touch — and that box
+  // also crossed about 1 dp into the screen body past the header's `pb-3`. The
+  // band is that box: the very `titleBandClass` string the heading wraps its
+  // title in, so the caret's 48dp target sits whole inside a parent at least
+  // that tall, in normal flow, with nothing positioned absolutely.
+  //
+  // One class for both cells is also what keeps them the same height at any
+  // font scale: `min-h-[48px]` for a one-line title, the title's own reserve
+  // for a deeper cap (`min-h-14` for two lines), so a name that wraps cannot
+  // move the body past either cell. The twins hold the lines the heading lays
+  // above and below the band, so the row's `items-center` centres the caret on
+  // the TITLE BAND rather than on the eyebrow-plus-title block, which left the
+  // glyph about 12dp above the title line it belongs to (the organization
+  // invoices header: its eyebrow is the screen's name, its title the
+  // organization's).
+  //
+  // The twins paint nothing (a no-break space) and reach no reader. A heading
+  // with no eyebrow or subtitle lays out neither twin, and the column is then
+  // just the band: the plain 48dp box the caret has always had.
+  const hasEyebrowLine = Boolean(eyebrow) || reserveEyebrow;
+  const leadingControl = hasBackControl ? (
+    <View className="w-[48px] shrink-0 -ms-4">
+      {hasEyebrowLine ? (
+        <Eyebrow
+          className="mb-0.5"
+          numberOfLines={1}
+          aria-hidden
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          {blankEyebrow}
+        </Eyebrow>
+      ) : null}
+      <View className={bandClass}>{backControl}</View>
+      {hasSubtitleLine ? (
+        <Text
+          variant="muted"
+          className="mt-0.5"
+          numberOfLines={1}
+          aria-hidden
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          {blankEyebrow}
+        </Text>
+      ) : null}
     </View>
   ) : null;
   // A fixed-width trailing cluster sizes to its content and never shrinks
@@ -596,17 +812,119 @@ export function ScreenHeader({
   const headerRightSlotClassName = headerRightShrinks
     ? 'ms-3 max-w-[50%] min-w-0 shrink'
     : 'ms-3 shrink-0';
-  const centeredControls =
-    separateHeading &&
-    backControl &&
-    (!inlineActions || stackInlineActions) &&
-    (!headerRight || stackActions) ? (
+  // A centered title balances against BOTH row ends, not just the leading one.
+  // `centeredControls` mirrored only the 48dp back control, which left the
+  // heading's flex box asymmetric whenever an in-row trailing cluster shared
+  // the row: `[48][flex heading][cluster]` puts the title's center (L - T)/2
+  // off the window axis — a 140dp Save-style cluster biases it ~52dp left, an
+  // icon cluster ~14dp, and a cluster with NO back control biases it by half
+  // its own extent. The fix gives each end the FULL extent it mirrors:
+  //
+  //   leading filler  = clamp(T - L, 0, free/2)  behind the back control
+  //   trailing filler = clamp(L - T, 0, free/2)  before the trailing slots
+  //
+  // where L is the leading extent (48 for a back control, else 0), T the
+  // in-row trailing extent (slot extents plus their shared gap) and
+  // `free = rowWidth - L - T`. Identical buts, complementary extents: when
+  // T > L the leading filler carries the whole T-minus-shared-gap weight the
+  // old spacer put only on 48dp — so the back-only header keeps exactly
+  // `centeredControls`' 48dp mirror (T = 0 → trailing filler = 48) — and when
+  // L > T (no, or narrower, trailing slots) the trailing filler takes over
+  // the balancing duty on that end. The `free/2` cap keeps the heading at
+  // least half of the free space, so a measured-width cluster can never
+  // recreate the feedback loop reading its own mirror would open, and a
+  // fully-mirrored fixed cluster keeps at least its own measured width — a
+  // 0-width heading is impossible in both directions.
+  //
+  // The seeds come from the declared `headerRightWidth`/`inlineActionsWidth`
+  // (the same declared widths the stacking decision reserves), so the FIRST
+  // frame is already balanced and nothing shifts when `onLayout` reports; the
+  // layout handlers then refine each slot's real laid-out width. Stale seeds
+  // can never reapply across a cluster's mount state: the mirror is derived
+  // from which slots are in the row at render time, so a reflowed (absent)
+  // slot contributes nothing, and each slot's measured extent rides that
+  // slot's own `onLayout`. A slot removed from the row by a reflow never
+  // reports: its stale number is excluded at derive time, from the render
+  // where it left.
+  const inRowHeaderRight = headerRight && !stackActions ? headerRight : null;
+  const inRowInlineActions = inlineActions && !stackInlineActions ? inlineActions : null;
+  // Measured extents live in one state pair; both hooks stay mounted at the
+  // top level, whatever the row currently draws.
+  const [layoutExtents, setLayoutExtents] = useState({
+    headerRight: Number.NaN,
+    inlineActions: Number.NaN,
+  });
+  const [rowWidth, setRowWidth] = useState<number | null>(null);
+  const onHeaderRightLayout = (event: LayoutChangeEvent) => {
+    const next = event.nativeEvent.layout.width;
+    setLayoutExtents(state => ({ ...state, headerRight: next }));
+  };
+  const onInlineActionsLayout = (event: LayoutChangeEvent) => {
+    const next = event.nativeEvent.layout.width;
+    setLayoutExtents(state => ({ ...state, inlineActions: next }));
+  };
+  const onRowLayout = (event: LayoutChangeEvent) => {
+    const next = event.nativeEvent.layout.width;
+    setRowWidth(next);
+  };
+  const measuredHeaderRightSlot = inRowHeaderRight ? layoutExtents.headerRight : Number.NaN;
+  const measuredInlineActionsSlot = inRowInlineActions ? layoutExtents.inlineActions : Number.NaN;
+  // The declared widths are the same dp the caller gives the stacking decision;
+  // a slot that has not laid out yet balances on its declared extent instead,
+  // so the first paint is already on the axis and nothing shifts when the
+  // layout handler lands.
+  const seededHeaderRight = inRowHeaderRight ? (headerRightWidth ?? 0) : 0;
+  const seededInlineActions = inRowInlineActions ? (inlineActionsWidth ?? 0) : 0;
+  const headerRightExtent = Number.isFinite(measuredHeaderRightSlot)
+    ? measuredHeaderRightSlot
+    : seededHeaderRight;
+  const inlineActionsExtent = Number.isFinite(measuredInlineActionsSlot)
+    ? measuredInlineActionsSlot
+    : seededInlineActions;
+  // Each in-row slot pays its own `ms-3` gap to the title; a reflowed
+  // (absent) slot pays nothing. Presence decides the gap, never the seed: a
+  // slot with no declared width and no layout yet still owns its gap. Both
+  // slots in one row pay it once each — the mirror is short by the missing
+  // gap otherwise, and the title lands half a gap off the axis.
+  const inRowSlotCount = Number(inRowHeaderRight != null) + Number(inRowInlineActions != null);
+  const trailingExtent =
+    inRowSlotCount * HEADER_ACTIONS_GAP + headerRightExtent + inlineActionsExtent;
+  const leadingExtent = separateHeading && backControl ? HEADER_LEADING_COLUMN_WIDTH : 0;
+  // The row's widest possible measure, for the seed fallback below: the
+  // window minus the header's own gutters. The seed uses the widest gutter
+  // this file documents (`HEADER_CONTENT_GUTTER`, the widest one in service),
+  // which is conservative for every caller: a narrower gutter only means the
+  // seed understates the row, and the filler cap under an understated row can
+  // never overstate the room the first frame lands in. The measured row's own
+  // `onLayout` then replaces the seed exactly.
+  const resolvedRowWidth =
+    rowWidth ?? Math.max(0, windowWidth - HEADER_CONTENT_GUTTER - insets.left - insets.right);
+  const free = Math.max(0, resolvedRowWidth - leadingExtent - trailingExtent);
+  const leadingFillerWidth = Math.max(0, Math.min(trailingExtent - leadingExtent, free / 2));
+  const trailingFillerWidth = Math.max(0, Math.min(leadingExtent - trailingExtent, free / 2));
+  // The mirrored extents are spacer boxes, not controls: they paint nothing,
+  // hold no reader, and never take a touch. An extent that balances to zero
+  // lays out no filler node at all, but each filler keeps its row ORDER fixed:
+  // `leadingFiller` is always the back control's next sibling and
+  // `trailingFiller` always sits between the real trailing slots and the
+  // inline slot, so a reflowed cluster's gap can never be stranded on the
+  // filler's far side.
+  const balanceFiller = (width: number, testID: string): ReactElement | null => {
+    if (width <= 0) {
+      return null;
+    }
+    return (
       <View
-        className="h-[48px] w-[48px] shrink-0"
-        accessibilityElementsHidden
+        testID={testID}
+        style={{ width: Math.round(width) }}
+        className="shrink-0"
+        aria-hidden
         pointerEvents="none"
       />
-    ) : null;
+    );
+  };
+  const leadingFiller = balanceFiller(leadingFillerWidth, 'screen-header-leading-filler');
+  const trailingFiller = balanceFiller(trailingFillerWidth, 'screen-header-trailing-filler');
   // The inline controls keep the title's row only while it can still hold a
   // readable title; below that they take a row of their own. On their own row
   // they keep the header's full width, so a long translation (Croatian
@@ -621,7 +939,10 @@ export function ScreenHeader({
   // free space can never go negative, so the heading always keeps its share.
   const inlineActionsSlot =
     inlineActions && !stackInlineActions ? (
-      <View className={cn('ms-3 min-w-0 shrink', !allowInlineActionsStacking && 'max-w-[50%]')}>
+      <View
+        className={cn('ms-3 min-w-0 shrink', !allowInlineActionsStacking && 'max-w-[50%]')}
+        onLayout={onInlineActionsLayout}
+      >
         {inlineActions}
       </View>
     ) : null;
@@ -635,15 +956,17 @@ export function ScreenHeader({
       <View style={sideInsetStyle}>
         {separateHeading ? (
           <>
-            <View className="min-h-11 flex-row items-center">
+            <View className="min-h-11 flex-row items-center" onLayout={onRowLayout}>
               {backControl}
+              {leadingFiller}
               <View className="min-w-0 flex-1 flex-row items-center justify-center">{heading}</View>
               {reservedTitleBand}
               {headerRight && !stackActions ? (
-                <View className={headerRightSlotClassName}>{headerRight}</View>
-              ) : (
-                centeredControls
-              )}
+                <View className={headerRightSlotClassName} onLayout={onHeaderRightLayout}>
+                  {headerRight}
+                </View>
+              ) : null}
+              {trailingFiller}
               {inlineActionsSlot}
             </View>
             {headerRight && stackActions ? (
@@ -657,9 +980,9 @@ export function ScreenHeader({
           </>
         ) : (
           <>
-            <View className="flex-row items-center">
+            <View className="flex-row items-center" onLayout={onRowLayout}>
               <View className="min-w-0 flex-1 flex-row items-center gap-1">
-                {backControl}
+                {leadingControl}
                 {heading}
               </View>
               {reservedTitleBand}

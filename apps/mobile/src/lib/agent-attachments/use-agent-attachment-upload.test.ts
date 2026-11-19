@@ -1598,6 +1598,73 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     renderer.unmount();
   });
 
+  it('deletes the stripped copy when reset runs during the strip window', async () => {
+    // The strip runs while measurement resolves: hold the re-encode promise so
+    // the continuation suspends inside the strip/measure loop with an
+    // app-owned stripped copy pending.
+    const strip = Promise.withResolvers<{ uri: string; width: number; height: number }>();
+    hoisted.manipulateAsync.mockReturnValueOnce(strip.promise);
+    const renderer = await mountHook();
+
+    let addPromise: Promise<void> | undefined = undefined;
+    await act(async () => {
+      addPromise = hookApi().addCandidates([
+        { name: 'IMG_0001.HEIC', uri: 'file:///cache/IMG_0001.HEIC' },
+      ]);
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      hookApi().reset();
+      await settle();
+    });
+
+    // The reset must not delete the picker-owned original; only the stripped
+    // app-owned copy is deletable.
+    await act(async () => {
+      strip.resolve({ uri: 'file:///cache/stripped.jpg', width: 100, height: 100 });
+      await addPromise;
+      await settle();
+    });
+
+    // The stale-generation discard deletes the app-owned stripped copy the
+    // loop created: no orphaned cache file, no chip, no upload.
+    expect(hoisted.fileDelete).toHaveBeenCalledWith('file:///cache/stripped.jpg');
+    expect(hoisted.fileDelete).not.toHaveBeenCalledWith('file:///cache/IMG_0001.HEIC');
+    expect(hookApi().attachments).toHaveLength(0);
+    expect(hoisted.uploadOne).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  it('deletes the stripped copy when the composer unmounts during the strip window', async () => {
+    const strip = Promise.withResolvers<{ uri: string; width: number; height: number }>();
+    hoisted.manipulateAsync.mockReturnValueOnce(strip.promise);
+    const renderer = await mountHook();
+
+    let addPromise: Promise<void> | undefined = undefined;
+    await act(async () => {
+      addPromise = hookApi().addCandidates([
+        { name: 'IMG_0001.HEIC', uri: 'file:///cache/IMG_0001.HEIC' },
+      ]);
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      renderer.unmount();
+      await settle();
+    });
+
+    await act(async () => {
+      strip.resolve({ uri: 'file:///cache/stripped.jpg', width: 100, height: 100 });
+      await addPromise;
+      await settle();
+    });
+
+    expect(hoisted.fileDelete).toHaveBeenCalledWith('file:///cache/stripped.jpg');
+    expect(hoisted.fileDelete).not.toHaveBeenCalledWith('file:///cache/IMG_0001.HEIC');
+    renderer.unmount();
+  });
+
   it('cancels the in-flight upload and deletes a cache-owned file on remove', async () => {
     const renderer = await mountHook();
     await addDocument();

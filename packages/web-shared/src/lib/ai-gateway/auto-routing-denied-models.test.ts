@@ -15,6 +15,11 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { getDirectByokCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import {
+  customLlmDefinition,
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
+import {
   candidateModelIdsFromTable,
   collectDataCollectionRequiredAutoRoutingModelIds,
   collectDeniedAutoRoutingModelIds,
@@ -348,6 +353,44 @@ describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
     ]);
     expect(getCachedRoutingTable).toHaveBeenCalledWith('frontier');
     expect(getCachedRoutingTable).not.toHaveBeenCalledWith('efficient');
+  });
+
+  it('also denies custom LLMs that do not train on prompts under zero data retention', async () => {
+    const customModel = 'acme/zdr-custom-model';
+    await insertCustomLlmForTest(
+      customModel,
+      customLlmDefinition({
+        pricing: [
+          {
+            start_context_length: 0,
+            pricing: {
+              prompt_per_million: 1,
+              completion_per_million: 2,
+              input_cache_read_per_million: null,
+              input_cache_write_per_million: null,
+            },
+          },
+        ],
+        may_train_on_prompts: false,
+      })
+    );
+    try {
+      jest.mocked(getCachedRoutingTable).mockResolvedValue({
+        routes: {
+          'implementation/code_generation': [{ model: customModel }, { model: 'openai/gpt-4o' }],
+        },
+      } as never);
+      jest.mocked(getDataCollectionRequiredModelIds).mockResolvedValue(new Set());
+
+      await expect(collectDataCollectionRequiredAutoRoutingModelIds('efficient')).resolves.toEqual(
+        []
+      );
+      await expect(
+        collectDataCollectionRequiredAutoRoutingModelIds('efficient', { zdr: true })
+      ).resolves.toEqual([customModel]);
+    } finally {
+      await deleteCustomLlmForTest(customModel);
+    }
   });
 });
 

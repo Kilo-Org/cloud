@@ -183,6 +183,15 @@ export const SECTION_ACTION_HIT_SLOP_DP = 9;
 /** The vertical padding of a Home section header row, as {@link SECTION_ACTION_HIT_SLOP_DP}. */
 export const SECTION_HEADER_ROW_PADDING_CLASS = 'py-[9px]';
 
+/**
+ * The negated counterpart of {@link SECTION_ACTION_HIT_SLOP_DP}: a row that
+ * reserves the action's hit slop as padding gives up the same amount as its own
+ * height, so it holds the whole reach in its bounds without growing the card it
+ * sits on. A literal class string, because NativeWind only compiles the classes
+ * it finds in source.
+ */
+export const SECTION_ACTION_ROW_CANCEL_CLASS = '-my-[9px]';
+
 /** The `hitSlop` a Home section header action renders, as {@link SECTION_ACTION_HIT_SLOP_DP}. */
 export const SECTION_ACTION_HIT_SLOP = {
   top: SECTION_ACTION_HIT_SLOP_DP,
@@ -299,22 +308,33 @@ export const CHIP_HIT_SLOP = {
 } as const;
 
 /**
- * The frame the credits screen's failed-balance retry renders: the amount's
- * own line box, so the card keeps its height in every state of the read and
- * the copy below the card never moves. Its 44pt touch minimum comes from the
- * hit slop, not from a taller box (`hitSlop` widens the touch region, not the
- * rect — the trap `attachment-preview-strip.tsx` documents), and the gate's own
- * rule accepts a node at the audit floor.
+ * The box the credits screen's failed-balance retry renders, in dp. The box is
+ * the touch target on its own node, as `DESIGN.md:364` measures: 46dp is past
+ * the 44pt floor even after Android truncates the fractional layout to whole
+ * pixels (46dp is 120.75px at 2.625px/dp, so 120px still measures 45.7dp), the
+ * same reach the command card's controls carry ({@link LINE_ACTION_REACH_DP}).
+ *
+ * A 28dp frame plus a uniform slop does not hold here, which is why this
+ * control breaks from the slop shapes above. The amount slot's 28dp box
+ * measures about 28.2dp on this device, and the retry's bottom side faces the
+ * caption slot, the card's later sibling: touch dispatch hands a point inside
+ * a sibling's box to that sibling, so the slot took back the bottom side past
+ * the 3.5dp gap under the amount (delivered: the full 8dp above, about 3dp
+ * below — under `DESIGN.md`'s 44pt). The caption slot paints text only, so it
+ * is touch-transparent and the box's own bottom edge reaches the target.
  */
-export const BALANCE_RETRY_FRAME_DP = 28;
-export const BALANCE_RETRY_FRAME_CLASS = 'h-8';
-export const BALANCE_RETRY_HIT_SLOP_DP = 8;
-export const BALANCE_RETRY_HIT_SLOP = {
-  top: BALANCE_RETRY_HIT_SLOP_DP,
-  bottom: BALANCE_RETRY_HIT_SLOP_DP,
-  left: BALANCE_RETRY_HIT_SLOP_DP,
-  right: BALANCE_RETRY_HIT_SLOP_DP,
-} as const;
+export const BALANCE_RETRY_TARGET_DP = 46;
+
+/**
+ * The negative vertical margin the retry's box carries, per side: the box
+ * overflows its own flex line without adding height to the amount slot, so
+ * `46 - 2 * 9 = 28dp` stays in flow and the credits card keeps one height in
+ * every state of the balance read, with the copy below it never moving. A
+ * literal class string, because NativeWind only compiles the classes it finds
+ * in source.
+ */
+export const BALANCE_RETRY_CANCEL_DP = 9;
+export const BALANCE_RETRY_TARGET_CLASS = 'min-h-[46px] -my-[9px]';
 
 /**
  * The box a text-only action renders so its own node carries the platform's
@@ -542,6 +562,52 @@ export const LINE_ACTION_BOX_CLASS = 'min-h-[28px] -my-[7px]';
 
 /** The `hitSlop` {@link LINE_ACTION_BOX_CLASS} renders, reaching past 44dp each way. */
 export const LINE_ACTION_HIT_SLOP = { top: 9, bottom: 9, left: 5, right: 5 } as const;
+
+/**
+ * The full vertical reach of a {@link LINE_ACTION_BOX_CLASS} control: the
+ * `h-[46px]` box the command card's controls render as, past the 44pt
+ * target. The reach is the box itself, not `box + hitSlop`: the box is the
+ * target on its own node, and React Native's parent-bounds rule makes any
+ * slop past a control's frame unreliable at a row's outer side (measured:
+ * the vertical slop band reorders, a tap past the outer edge does nothing).
+ */
+export const LINE_ACTION_REACH_DP = 46;
+
+/**
+ * The overlay a command card renders its reorder and delete controls in, as
+ * the absolutely positioned row the card itself parents. Each control's box
+ * is the whole touch target ({@link LINE_ACTION_REACH_DP} tall and wide on
+ * its own node), so the parent-bounds rule cannot clip either axis and no
+ * `hitSlop` is involved; the band is the boxes' parent and exactly their
+ * height.
+ *
+ * `top-0` pins the band to the card's top edge, so the boxes reach into the
+ * card's top padding: the glyph centres at the band's 23dp midpoint, a
+ * quarter dp from the one-text-line label row's centre (22.75dp). The band's
+ * bottom edge (46dp from the card's top) stops above the field, whose gap
+ * from the label row the card widens with {@link COMMAND_ROW_FIELD_GAP_CLASS}
+ * (field top 47.5dp), so a tap aimed at the field's top strip lands on the
+ * field. `end-[14px]` puts the boxes' outer edge on the card's content edge
+ * (`p-4` = 14dp), so the delete control's whole 46dp width is tappable where
+ * the old slop past its box was dead. `gap-3` keeps a 10.5dp band between
+ * neighbouring boxes that the boxes do not cover, so a tap beside one control
+ * cannot reach the next. The row covers the label's tail horizontally, so
+ * `box-none` keeps the band itself touch-transparent and the label under it
+ * stays pressable.
+ */
+export const LINE_ACTION_OVERLAY_CLASS =
+  'absolute end-[14px] top-0 flex-row items-center gap-3 h-[46px]';
+
+/**
+ * The gap between a command card's label row and its field, as a literal
+ * class. The 46dp control band ({@link LINE_ACTION_REACH_DP}) ends at 46dp
+ * from the card's top; the label row ends at `p-4` + one `text-sm` line
+ * (14 + 17.5 = 31.5dp), so a 16dp gap puts the field's top edge at 47.5dp —
+ * 1.5dp below the band's bottom edge. The shared field's own `gap-1.5` (6dp)
+ * would put the band's bottom 8dp into the field, where a tap aimed at the
+ * input's top strip would reorder or delete instead.
+ */
+export const COMMAND_ROW_FIELD_GAP_CLASS = 'gap-y-[16px]';
 
 /**
  * The class an inline-link connector carries so the two links' facing reaches do

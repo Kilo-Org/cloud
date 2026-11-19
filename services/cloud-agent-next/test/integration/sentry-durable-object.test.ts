@@ -6,8 +6,19 @@ import {
   runInDurableObject,
 } from 'cloudflare:test';
 import type { ErrorEvent } from '@sentry/core';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
+import { setBillingContext } from '@kilocode/container-usage';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { containerLimitError } from '../../src/container-limit-test-helpers.js';
+import {
+  SandboxControlV2,
+  type StoredProviderPin,
+} from '../../src/control-plane/sandbox/sandbox-do.js';
+import { allocation } from '../../src/control-plane/sandbox/sqlite-schema.js';
+import { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
+import { SandboxContainers } from '../../src/sandbox-containers/SandboxContainers.js';
+import { instrumentCloudAgentDurableObject } from '../../src/sentry.js';
+import type { Env } from '../../src/types.js';
 import type {
   SentryBillingAdmissionContainer,
   SentryDurableObjectProbe,
@@ -67,6 +78,16 @@ async function captured(count: number): Promise<void> {
   expect(envelopeTypes).toEqual(Array.from({ length: count }, () => 'event'));
 }
 
+const telemetryEnv = {
+  ...env,
+  CLOUD_AGENT_SENTRY_DSN: 'https://public@o1.ingest.sentry.io/42',
+  CLOUD_AGENT_SENTRY_ENVIRONMENT: 'test',
+} as Env;
+const sandboxId = `ses-${'a'.repeat(48)}`;
+const sessionId = 'workspace_stored';
+const userId = 'oauth/google:123456';
+const subject = { type: 'org', id: 'org-stored' } as const;
+
 describe('Cloud Agent Durable Object real SDK boundaries', () => {
   it('returns a container limit rejection across RPC without sending it to Sentry', async () => {
     const stub = probes.SENTRY_BILLING_ADMISSION_CONTAINER.getByName(billingInput.sandboxId);
@@ -96,6 +117,105 @@ describe('Cloud Agent Durable Object real SDK boundaries', () => {
       type: 'auto.faas.cloudflare.durable_object',
       handled: false,
     });
+  });
+
+  it('uses persisted session metadata instead of deriving user identity from the DO name', async () => {
+    const InstrumentedSession = instrumentCloudAgentDurableObject(SandboxSessionV2, 'session');
+    const stub = env.SANDBOX_SESSION.getByName('private-do-owner:workspace_name');
+    await runInDurableObject(stub, async (instance, ctx) => {
+      await instance.getMetadata();
+      await ctx.storage.put('session_metadata', {
+        metadataSchemaVersion: 2,
+        identity: { userId, orgId: subject.id, sessionId },
+        auth: { kilocodeToken: 'private-session-token' },
+        workspace: { sandboxId, sandboxProvider: 'cloudflare-containers' },
+        lifecycle: { version: 1, timestamp: 1 },
+      });
+      const session = new InstrumentedSession(ctx, telemetryEnv);
+      await expect(session.finishWorktreeDeletion('not-a-worktree')).rejects.toThrow();
+    });
+    await captured(1);
+    expect(events[0]?.user).toEqual({ id: userId });
+    expect(events[0]?.tags).toEqual({
+      component: 'session',
+      orgId: subject.id,
+      sessionId,
+      sandboxId,
+    });
+    expect(JSON.stringify(events)).not.toContain('private-');
+  });
+
+  it('uses the stored sandbox owner and allocation attribution', async () => {
+    const InstrumentedSandbox = instrumentCloudAgentDurableObject(
+      SandboxControlV2,
+      'sandbox-control'
+    );
+    const stub = env.SANDBOX_CONTROL.getByName(sandboxId);
+    await runInDurableObject(stub, async (instance, ctx) => {
+      await instance.getAllocationState();
+      await ctx.storage.put('control_plane_owner', userId);
+      const pin: StoredProviderPin = {
+        provider: 'cloudflare-containers',
+        allocationName: sandboxId,
+        configuration: null,
+        locator: null,
+        containment: null,
+        billing: {
+          sandboxId,
+          sessionId,
+          subject,
+          actor: { type: 'bot', id: 'private-bot-id' },
+          onBehalfOf: subject,
+        },
+      };
+      drizzle(ctx.storage)
+        .update(allocation)
+        .set({ provider_pin: JSON.stringify(pin) })
+        .run();
+      const sandbox = new InstrumentedSandbox(ctx, telemetryEnv);
+      await expect(sandbox.getSnapshotValidatorStatus()).rejects.toThrow('not registered');
+    });
+    await captured(1);
+    expect(events[0]?.user).toEqual({ id: userId });
+    expect(events[0]?.tags).toEqual({
+      component: 'sandbox-control',
+      orgId: subject.id,
+      sessionId,
+      sandboxId,
+    });
+    expect(JSON.stringify(events)).not.toContain('private-');
+  });
+
+  it('uses the persisted Kilo user, not the bot actor, from native container billing', async () => {
+    const InstrumentedContainers = instrumentCloudAgentDurableObject(
+      SandboxContainers,
+      'sandbox-container'
+    );
+    const stub = env.SANDBOX_CONTAINERS.getByName(sandboxId);
+    await runInDurableObject(stub, async (_instance, ctx) => {
+      await setBillingContext(ctx.storage, {
+        service: 'cloud-agent-next-test',
+        instanceId: sandboxId,
+        sku: 'test-sku',
+        startEpochMs: 0,
+        sessionId,
+        subject,
+        actor: { type: 'bot', id: 'private-bot-id' },
+        onBehalfOf: subject,
+        metadata: { billingUserId: userId, prompt: 'private-billing-metadata' },
+      });
+      const containers = new InstrumentedContainers(ctx, telemetryEnv);
+      await expect(containers.forceDestroyForControlPlane()).rejects.toThrow('unavailable');
+    });
+    await captured(1);
+    expect(events[0]?.user).toEqual({ id: userId });
+    expect(events[0]?.tags).toEqual({
+      component: 'sandbox-container',
+      orgId: subject.id,
+      sessionId,
+      sandboxId,
+    });
+    expect(JSON.stringify(events)).not.toContain('private-');
   });
 
   it.each([
@@ -144,6 +264,8 @@ describe('Cloud Agent Durable Object real SDK boundaries', () => {
       );
       await captured(1);
       expect(events[0]?.contexts?.cloud_agent).toEqual({ component, [identity]: canonicalId });
+      expect(events[0]).not.toHaveProperty('user');
+      expect(events[0]?.tags).not.toHaveProperty('orgId');
       expect(events[0]?.exception?.values?.[0]?.type).toBe('TypeError');
       expect(events[0]?.exception?.values?.[0]?.mechanism).toEqual({
         type: 'auto.faas.cloudflare.durable_object',

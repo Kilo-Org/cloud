@@ -303,6 +303,7 @@ async function connectAndHello(
   options: {
     workspaceConfiguration?: boolean;
     runtimeInstructions?: boolean;
+    runtimeWebSearch?: boolean;
     runtimeHarness?: string;
   } = {}
 ): Promise<{ wrapper: FakeWrapper; credential: string; allocationId: string }> {
@@ -1359,30 +1360,72 @@ describe('SandboxControlV2 routes and forwarding', () => {
     }
   );
 
-  it('binds sibling MCP credentials to the canonical workspace root rather than the attaching chat', async () => {
+  it.each([
+    { workspaceConfiguration: false, runtimeWebSearch: false, off: false },
+    { workspaceConfiguration: false, runtimeWebSearch: false, off: true },
+    { workspaceConfiguration: true, runtimeWebSearch: false, off: false },
+    { workspaceConfiguration: true, runtimeWebSearch: false, off: true },
+    { workspaceConfiguration: true, runtimeWebSearch: true, off: false },
+    { workspaceConfiguration: true, runtimeWebSearch: true, off: true },
+  ])(
+    'negotiates web search (attach: $workspaceConfiguration, capability: $runtimeWebSearch, off: $off)',
+    async ({ off, ...options }) => {
+      const preference = off
+        ? { webSearchDisabled: true as const }
+        : { webSearchProvider: 'parallel' as const };
+      const provider = createFakeProvider();
+      const { stub } = await setup(provider);
+      const input = configuredPrepareInput(SESSION, SHARED_DIRECTORY);
+      await stub.prepare({ ...input, spec: { ...input.spec, ...preference } });
+      const { wrapper } = await connectAndHello(provider, 'wr_search', {
+        ...options,
+        runtimeHarness: 'kilo2',
+      });
+      try {
+        const frame = await wrapper.next();
+        expect(frame?.type).toBe(
+          options.workspaceConfiguration ? 'session.attach' : 'session.prepare'
+        );
+        if (frame?.type !== 'session.attach' && frame?.type !== 'session.prepare') {
+          throw new Error('expected a preparation frame');
+        }
+        const workspace = frame.type === 'session.attach' ? frame.workspace : frame.spec;
+        if (options.runtimeWebSearch) {
+          expect(workspace).toMatchObject(preference);
+        } else {
+          expect(workspace).not.toHaveProperty('webSearchDisabled');
+          expect(workspace).not.toHaveProperty('webSearchProvider');
+        }
+        if (frame.type === 'session.attach') {
+          expect(frame.spec).not.toHaveProperty('webSearchDisabled');
+          expect(frame.spec).not.toHaveProperty('webSearchProvider');
+        }
+        expect(frame.spec.permission?.websearch).toBe(
+          !options.runtimeWebSearch && off ? 'deny' : undefined
+        );
+        wrapper.send({ type: 'session.ready', sessionId: SESSION });
+        await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+      } finally {
+        wrapper.close();
+      }
+    }
+  );
+
+  it('binds sibling MCP credentials to the canonical workspace rather than the attaching chat', async () => {
     const root = 'workspace_12345678-1234-4234-8234-123456789abc';
     const scopeId = 'worktree_12345678-1234-4234-8234-123456789abc';
     const provider = createFakeProvider();
     const { stub } = await setup(provider);
-    const issuances: { sessionId: string; binding: unknown }[] = [];
+    const issuances: { ownerId: string; binding: unknown }[] = [];
     const grant = {
       url: 'https://mcp.kiloapps.io/mcp',
       token: 'workspace-root-grant',
       expiresAt: 1_900_000_000,
     };
     await runInDurableObject(stub, instance => {
-      const peerFor = instance.sessionPeerFor.bind(instance);
-      instance.sessionPeerFor = (ownerId, sessionId) => {
-        const peer = peerFor(ownerId, sessionId);
-        return peer
-          ? {
-              ...peer,
-              issueCloudAgentMcpGrant: async binding => {
-                issuances.push({ sessionId, binding });
-                return grant;
-              },
-            }
-          : null;
+      instance.cloudAgentMcpGrantFor = async (ownerId, binding) => {
+        issuances.push({ ownerId, binding });
+        return grant;
       };
     });
     for (const sessionId of [root, SESSION_NEXT]) {
@@ -1396,15 +1439,15 @@ describe('SandboxControlV2 routes and forwarding', () => {
       if (frame?.type !== 'session.attach') throw new Error('expected session.attach');
       expect(frame.credentials?.cloudAgentMcp).toEqual(grant);
     }
+    const binding = {
+      workspaceSessionId: root,
+      worktreeId: scopeId,
+      ownerId: 'user_123',
+      organizationId: 'org_123',
+    };
     expect(issuances).toEqual([
-      {
-        sessionId: root,
-        binding: { worktreeId: scopeId, ownerId: 'user_123', organizationId: 'org_123' },
-      },
-      {
-        sessionId: root,
-        binding: { worktreeId: scopeId, ownerId: 'user_123', organizationId: 'org_123' },
-      },
+      { ownerId: 'user_123', binding },
+      { ownerId: 'user_123', binding },
     ]);
   });
 

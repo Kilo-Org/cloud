@@ -247,6 +247,19 @@ export function dataCollectionRequiredResponse() {
   );
 }
 
+export function zeroDataRetentionUnavailableResponse() {
+  const error =
+    'Zero data retention is not available for this model. Remove the zdr provider preference or choose another model.';
+  return NextResponse.json(
+    {
+      error: error, // this field is shown in the extension
+      error_type: ProxyErrorType.data_collection_required,
+      message: error,
+    },
+    { status: 400 }
+  );
+}
+
 /** The inference providers that every given provider config's only/ignore lists allow. */
 export function allowedInferenceProviders(
   inferenceProviders: readonly string[],

@@ -244,7 +244,7 @@ diagnosis and log-derived counts/latency. `entrypoint` is `gateway`,
 |---|---|---|
 | Frankfurt gateway direct write or SFO local fallback | `gateway` | `unknown` |
 | Queue consumer through HTTP writer | `writer_endpoint` | `queue` |
-| Staging Vercel queue consumer through HTTP writer | `writer_endpoint` | `queue_vercel` |
+| Retired staging Vercel queue consumer, in older deployments only | `writer_endpoint` | `queue_vercel` |
 | SFO gateway handoff through HTTP writer | `writer_endpoint` | `region_handoff` |
 | HTTP writer without a classified caller, including classifier/grader writes | `writer_endpoint` | `unknown` |
 | Unclassified local caller | `unknown` | `unknown` |
@@ -255,8 +255,9 @@ classifier and benchmark grader, omit the marker. After internal API authenticat
 the writer route accepts only `queue`, `queue_vercel`, or `region_handoff`; missing
 or other values map to `unknown` without logging the raw header. This is caller-supplied diagnostic
 context, not an authorization or accounting input. Older clients remain compatible.
-See the [Vercel queue prototype runbook](../../packages/usage-queue/README.md) for
-the isolated staging transport and its `queue_vercel` caller label.
+The staging Vercel queue prototype is retired and new gateway builds no longer
+publish to it. The writer keeps accepting `queue_vercel` so older staging
+deployments that still contain its consumer can finish any retained work.
 `execution_region` identifies the persistence function's region when available:
 SFO HTTP handoffs record `fra1`; a local fallback in SFO records `sfo1`.
 Missing or unrecognized `VERCEL_REGION` values are reported as `unknown`.
@@ -269,8 +270,7 @@ one, inside a 40-second overall elapsed retry budget. Before retries it uses
 exponential full jitter: uniformly zero up to (excluding) 500 ms, 1,000 ms, then
 2,000 ms. Attempt timeouts and sleeps are clipped to remaining budget; no new
 attempt starts after exhaustion. Runtime scheduling can delay observation of
-these deadlines. Non-retry calls retain one two-second attempt; the separate
-Vercel queue transport is unchanged. Every attempt reuses the same serialized
+these deadlines. Non-retry calls retain one two-second attempt. Every attempt reuses the same serialized
 event and usage ID;
 ambiguous acceptance can create duplicate messages, which the writer deduplicates.
 Configuration failures and HTTP outcomes other than 408/429/5xx are not retried.
@@ -312,8 +312,8 @@ under 1,000 ms is logged only when a stable hash of its usage ID falls in a nomi
 line per attempt, four per publication, and about 1% of publications plus every
 slow, failed or retried attempt. The rows are not a uniform sample: weight fast
 rows by `1 / sample_rate` and do not read either subset as population percentiles.
-An attempt cut off by a process kill writes nothing. Configuration failures and the
-Vercel queue transport make no attempt and log nothing new. If writing the line
+An attempt cut off by a process kill writes nothing. Configuration failures make no
+attempt and log nothing new. If writing the line
 throws, the publisher reports a Sentry warning tagged `usage_publisher_attempt_log`
 and the publication continues with its existing outcome.
 
@@ -485,8 +485,7 @@ because their next failure could immediately dead-letter them. Preserve stable I
 and reconcile ambiguous writes before replay; do not republish to reset attempts
 or discard accepted events.
 
-The isolated staging Vercel queue keeps its own retry settings; it shares only the
-bounded writer-response classification. No new environment knob or worker binding
+No new environment knob or worker binding
 is introduced. This preparation does not claim a healthy-traffic p95 improvement
 or authorize a production rollout, capacity increase, or replay.
 
@@ -913,7 +912,7 @@ unchanged. Authentication, body reads and schema and size checks run first, as b
 | `USAGE_INGEST_HEDGE_DELAY_MS` | Whole milliseconds, clamped to 250–10000 | `1000` when missing or not a whole number |
 | `USAGE_INGEST_HEDGE_PERCENT` | Whole number 0–100; only read when the mode is `on` | `100` when missing or invalid |
 
-Production config sets `on`, delay 1000 and percent 50. Staging sets `on`, delay
+Production config sets `on`, delay 1000 and percent 100. Staging sets `on`, delay
 1000 and percent 100.
 
 - `off`, or an event that is not eligible: the single-queue path and its logs, unchanged.
@@ -1008,8 +1007,12 @@ EU and the hedge protocol/settings intact; verify readback and recovery afterwar
 
 Change the variable in `wrangler.jsonc` in a small PR and redeploy the Worker through
 the normal workflow. `wrangler deploy` replaces dashboard-edited variables, so a
-dashboard change does not last. For the first production trial, set
-`USAGE_INGEST_HEDGE_MODE` to `on` and keep `USAGE_INGEST_HEDGE_PERCENT` at `50`.
+dashboard change does not last. The first production trial set
+`USAGE_INGEST_HEDGE_MODE` to `on` and kept `USAGE_INGEST_HEDGE_PERCENT` at `50`;
+production has since expanded to percent 100. Rolling production back to the
+earlier bounded 50% is a separate follow-up PR that restores
+`USAGE_INGEST_HEDGE_PERCENT` to `50` and redeploys the Worker; it is not an
+automatic or live action.
 
 ### Merge prerequisite
 
@@ -1041,20 +1044,27 @@ first, then remove forward.
 ### Measuring
 
 The Worker's `usage_ingest_hedge` event and `batch.queue` are not in Axiom, but the
-usage ID is. At percent 50, last hex digits `0`–`7` of `usage_id` are the treatment
-and `8`–`f` the control, inside the same stalls. The primary measurement splits by
-that digit within the same hours:
+usage ID is. Production now runs at percent 100, so every eligible LLM usage ID is
+hedged and there is no simultaneous non-eligible control arm. The historical
+treatment/control split — at percent 50, last hex digits `0`–`7` of `usage_id` were
+the treatment and `8`–`f` the control inside the same stalls — no longer describes an
+active arm; those earlier digit-based comparisons are history after activation. The
+primary measurement is a before/after comparison of:
 
 - `usage_record_completion`: age and the over-5 s share of recorded completions,
   especially in stall hours.
 - `usage_publisher_attempt`: `duration_ms` of publisher attempts, and the share of
   5 s or more.
 
-The treatment should show fewer attempts of 5 s or more and a lower over-5 s share,
-with duplicate completions rising by roughly the hedged share. In Cloudflare Workers
-Logs, `usage_ingest_hedge` winner counts show whether the second queue accepts while
-the first is blocked. A before/after comparison is only supporting evidence, because
-stalls vary a lot from day to day. No benefit is claimed before that measurement.
+Expanding 50→100 can roughly double eligible hedge attempts at equal workload; it
+does not double all publications, because a fast EU send still never hedges and
+off-mode or non-hex-digit events are unchanged. Duplicate completions can rise by
+roughly the newly eligible share. The hedge consumer cap of 25 is unchanged and does
+not by itself guarantee the extra traffic is harmless to speed or load. In
+Cloudflare Workers Logs, `usage_ingest_hedge` winner counts show whether the second
+queue accepts while the first is blocked. A before/after comparison is only
+supporting evidence, because stalls vary a lot from day to day. No benefit is
+claimed before that measurement.
 
 ## First writer-admission retry spread
 

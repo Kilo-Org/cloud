@@ -303,8 +303,6 @@ describe('org infinite-list retention', () => {
       INFINITE_QUERY_MAX_PAGES + 2
     );
 
-    // Page one (`entry-0`, the newest entry) is still at the front, every page
-    // that was loaded is retained, and no sixth request was issued.
     expect(ids).toEqual(['entry-0', 'entry-1', 'entry-2', 'entry-3', 'entry-4']);
     expect(fetched).toBe(INFINITE_QUERY_MAX_PAGES);
     expect(hasNextPage).toBe(false);

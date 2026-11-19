@@ -12,6 +12,7 @@ import {
   getAcceptInviteUrl,
   lockOrganizationMembershipMutation,
   CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER,
+  ORGANIZATION_MISSING_MESSAGE,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { lockOrganizationGroupPolicy } from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { updateOrganizationUserLimit } from '@kilocode/web-shared/lib/organizations/organization-usage';
@@ -702,6 +703,15 @@ export const organizationsMembersRouter = createTRPCRouter({
             throw new TRPCError({
               code: 'PRECONDITION_FAILED',
               message: ORGANIZATION_INVITE_SEAT_LIMIT_REACHED,
+            });
+          }
+          // The router already 404s an unknown organization before the
+          // transaction; this mapping covers a row deleted between that check
+          // and the invite write.
+          if (error.message === ORGANIZATION_MISSING_MESSAGE) {
+            throw new TRPCError({
+              code: 'NOT_FOUND',
+              message: ORGANIZATION_MISSING_MESSAGE,
             });
           }
           if (error.message === 'User must join this organization through SSO') {

@@ -74,6 +74,49 @@ export const TestBYOKKeyInputSchema = OptionalOrganizationIdSchema.extend({
   id: BYOKKeyIdSchema,
 });
 
+/**
+ * The outcome of testing a stored key. `outcome` is what both current clients
+ * render, so a test failure is a value rather than a message the server words
+ * for one client.
+ *
+ * `success` and `message` are legacy: installed app builds predate the union
+ * and read only these two fields, so the server keeps sending the sentence
+ * those builds already know. They go with the next release train.
+ */
+export const BYOKKeyTestResultSchema = z.discriminatedUnion('outcome', [
+  z.object({
+    outcome: z.literal('ok'),
+    provider: z.string(),
+    model: z.string(),
+    success: z.boolean(),
+    message: z.string(),
+  }),
+  z.object({ outcome: z.literal('incomplete'), success: z.boolean(), message: z.string() }),
+  z.object({
+    outcome: z.literal('unsupported-provider'),
+    success: z.boolean(),
+    message: z.string(),
+  }),
+  z.object({ outcome: z.literal('unreadable-key'), success: z.boolean(), message: z.string() }),
+  z.object({
+    outcome: z.literal('deprecated-provider'),
+    success: z.boolean(),
+    message: z.string(),
+  }),
+  z.object({
+    outcome: z.literal('rejected'),
+    success: z.boolean(),
+    message: z.string(),
+  }),
+  z.object({
+    outcome: z.literal('failed'),
+    detail: z.string().optional(),
+    success: z.boolean(),
+    message: z.string(),
+  }),
+]);
+export type BYOKKeyTestResult = z.infer<typeof BYOKKeyTestResultSchema>;
+
 export const PreviewBYOKRoutingInputSchema = OptionalOrganizationIdSchema.extend({
   modelId: z.string().trim().min(1).max(256),
   apiKind: z.enum(['chat_completions', 'responses', 'messages']).default('chat_completions'),

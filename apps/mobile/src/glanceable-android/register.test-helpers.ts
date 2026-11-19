@@ -1,6 +1,7 @@
 import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
+  type GlanceableSnapshotStatusOverride,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { isValidElement, type ReactNode } from 'react';
 import { type WidgetRepresentation, type WidgetTaskHandler } from 'react-native-android-widget';
@@ -32,11 +33,11 @@ export function snapshotFor(
     { status: 'busy' },
     { status: 'busy' },
   ],
-  status: GlanceableAgentsSnapshot['status'] = 'happy'
+  status?: GlanceableSnapshotStatusOverride
 ): GlanceableAgentsSnapshot {
   return buildGlanceableSnapshot({
     sessions,
-    status,
+    ...(status === undefined ? {} : { status }),
     userId: 'u1',
     organizationId: null,
     now: NOW,

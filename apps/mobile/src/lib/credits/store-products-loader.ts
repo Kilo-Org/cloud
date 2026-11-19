@@ -123,10 +123,8 @@ function storeFailureTitleText(token: string): string {
 type StoreProductsOutcome = 'store-unavailable' | 'store-timeout' | 'store-error';
 
 /**
- * Three outcomes, told apart by what the store did. No cause: it answered and
- * priced nothing. A deadline: it never answered. Any other cause: it answered
- * with a failure. The message, the level and the fingerprint all read this, so
- * they cannot disagree.
+ * The message, the level and the fingerprint all read this, so they cannot
+ * disagree.
  */
 function storeProductsOutcome(cause: unknown): StoreProductsOutcome {
   if (cause === undefined) {

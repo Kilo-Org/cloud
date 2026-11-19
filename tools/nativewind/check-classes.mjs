@@ -34,7 +34,14 @@ import { isTestArtifact, parseSourceTree } from '../lib/source-files.mjs';
 // Resolve from the app: react-native-css is the app's dependency, not the repo root's.
 const require = createRequire(new URL('../../apps/mobile/package.json', import.meta.url));
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const SOURCE_DIRS = [join(ROOT, 'apps/mobile/src'), join(ROOT, 'packages/app-shared/src')];
+/**
+ * The app's source root, built once. The walk below scans it, the theme tokens
+ * come from its `global.css`, and the formatter rule scopes itself by it, so a
+ * moved or renamed app root reaches all three together instead of leaving one
+ * of them reading a path the walk no longer parses.
+ */
+const APP_SRC = join(ROOT, 'apps/mobile/src');
+const SOURCE_DIRS = [APP_SRC, join(ROOT, 'packages/app-shared/src')];
 
 /** Utilities that take a colour, so `<utility>-black/<alpha>` can appear. */
 const COLOR_UTILITIES = [
@@ -70,7 +77,7 @@ const COLOR_UTILITIES = [
 let themeTokenCache;
 function themeTokens() {
   if (themeTokenCache === undefined) {
-    const css = readFileSync(join(ROOT, 'apps/mobile/src/global.css'), 'utf8');
+    const css = readFileSync(join(APP_SRC, 'global.css'), 'utf8');
     const block = css.match(/@theme inline \{([\s\S]*?)\n\}/)?.[1];
     if (!block) {
       throw new Error('check-classes: no @theme inline block in apps/mobile/src/global.css');
@@ -296,7 +303,6 @@ const INTL_CONSTRUCTORS = new Set([
   'Segmenter',
 ]);
 const TO_LOCALE_STRING = /^toLocale(?:Date|Time)?String$/;
-const DIRECT_INTL_DIR = join(ROOT, 'apps/mobile/src');
 // These layouts are stringified and run in the iOS widget extension, which
 // cannot import @/lib/intl-cache; they normalise the locale tag themselves.
 const WIDGET_PROCESS_LAYOUTS = new Set([
@@ -328,7 +334,7 @@ function formatterProblem(relative, line, quote) {
 export function checkDirectIntl(relative, absolute, program, lineOf) {
   const problems = [];
   if (
-    !absolute.startsWith(DIRECT_INTL_DIR) ||
+    !absolute.startsWith(APP_SRC) ||
     relative.endsWith('lib/intl-cache.ts') ||
     WIDGET_PROCESS_LAYOUTS.has(relative)
   ) {

@@ -92,14 +92,21 @@ function settle(id: number, confirmed: boolean): void {
 }
 
 /**
- * Answers the request with this id. A late answer — for a request that was
- * answered, forgotten, or withdrawn — does nothing: only a request still
- * waiting is settled, so a second press on the still-rendered sheet cannot
- * answer twice.
+ * Delivers the answer a sheet report carries for the request with this id. A
+ * request still waiting is settled once and removed, so a second press on the
+ * still-rendered sheet cannot answer twice. A delivered answer for a withdrawn
+ * request removes it from the queue instead: the closure a press captured
+ * before the withdrawal still reports through the dialog after the fact, and
+ * no sheet is left to dismiss the withdrawn entry again — an answer that
+ * nothing can settle must not pin the queue behind itself.
  */
 export function answerSettingsConfirm(id: number, confirmed: boolean): void {
   const request = requests.find(item => item.id === id);
-  if (request === undefined || request.withdrawn) {
+  if (request === undefined) {
+    return;
+  }
+  if (request.withdrawn) {
+    forgetSettingsConfirm(id);
     return;
   }
   requests = requests.filter(item => item.id !== id);

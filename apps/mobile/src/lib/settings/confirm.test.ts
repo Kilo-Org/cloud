@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   answerSettingsConfirm,
   confirmSettingChange,
-  forgetSettingsConfirm,
   getSettingsConfirmRequest,
   requestSettingsConfirmChange,
   setSettingsConfirmHostMounted,
@@ -129,12 +128,15 @@ describe('confirmSettingChange', () => {
     // the host has drawn out the sheet it presented and reports it.
     expect(getSettingsConfirmRequest()).toMatchObject({ id, withdrawn: true });
 
-    // A late answer for the withdrawn request settles nothing.
+    // A delivered answer for the withdrawn request removes it from the queue:
+    // the answer a pre-withdrawal press still reports through the dialog
+    // settles nothing, but no sheet is left to dismiss the entry again, so it
+    // must not pin the queue behind itself.
     answerSettingsConfirm(id, true);
-    expect(getSettingsConfirmRequest()).toMatchObject({ id, withdrawn: true });
+    expect(getSettingsConfirmRequest()).toBeUndefined();
 
-    // The host removes the request after the sheet reported its dismissal.
-    forgetSettingsConfirm(id);
+    // A second answer for the removed request still does nothing.
+    answerSettingsConfirm(id, false);
     expect(getSettingsConfirmRequest()).toBeUndefined();
   });
 

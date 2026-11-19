@@ -1721,6 +1721,60 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(alarm).toBeGreaterThan(Date.now());
   });
 
+  it('leaves a queued review cancellable and does not start it when the status callback fails', async () => {
+    const stub = getReviewStub();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return new Response('status unavailable', { status: 500 });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcSuccess({
+          cloudAgentSessionId: 'agent-unexpected',
+          kiloSessionId: 'ses_unexpected',
+        });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    const scheduledAlarm = Date.now() + 30_000;
+    const outcome = await runInDurableObject(
+      stub,
+      async (instance: CodeReviewOrchestrator, state) => {
+        await state.storage.put('state', codeReview());
+        await state.storage.setAlarm(scheduledAlarm);
+
+        let cancellationError: string | null = null;
+        try {
+          await instance.cancel('superseded');
+        } catch (error) {
+          cancellationError = error instanceof Error ? error.message : String(error);
+        }
+
+        await instance.runReview();
+
+        return {
+          cancellationError,
+          storedState: await state.storage.get<CodeReview>('state'),
+          alarm: await state.storage.getAlarm(),
+        };
+      }
+    );
+
+    expect(outcome.cancellationError).toMatch(/Failed to update DB status/);
+    expect(outcome.storedState).toMatchObject({ status: 'queued' });
+    expect(outcome.alarm).toBe(scheduledAlarm);
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(0);
+
+    const runningPosts = fetchMock.mock.calls.filter(
+      ([request, init]) =>
+        String(request).includes('/api/internal/code-review-status/') &&
+        String((init as RequestInit | undefined)?.body).includes('"status":"running"')
+    );
+    expect(runningPosts).toHaveLength(0);
+  });
+
   it('does not prepare a session when the review is cancelled during the first status update', async () => {
     const stub = getReviewStub();
     const runningUpdateStarted = deferredSignal();

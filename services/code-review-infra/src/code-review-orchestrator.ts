@@ -1261,6 +1261,15 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       return;
     }
 
+    // A cancellation that has not completed must not start work: it keeps the review
+    // cancellable, and a later cancel attempt retries the terminal status.
+    if (this.cancelled) {
+      console.log('[CodeReviewOrchestrator] runReview skipped - cancellation pending', {
+        reviewId: this.state.reviewId,
+      });
+      return;
+    }
+
     if (
       this.state.previousCloudAgentSessionId &&
       this.state.sessionInput.platform !== 'bitbucket'

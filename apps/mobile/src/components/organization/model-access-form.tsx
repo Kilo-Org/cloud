@@ -331,7 +331,7 @@ export function ModelAccessForm({
           <Button
             variant="outline"
             size="sm"
-            disabled={!dirty || saving}
+            disabled={planEnded || !dirty || saving}
             onPress={() => {
               clearWhere(() => true);
               setForm(previous => ({ ...previous, draft: previous.baseline }));
@@ -339,7 +339,13 @@ export function ModelAccessForm({
           >
             <Text>{t('common.cancel')}</Text>
           </Button>
-          <Button size="sm" loading={saving} disabled={cannotSave} onPress={() => void onSave()}>
+          <Button
+            variant={planEnded ? 'outline' : 'default'}
+            size="sm"
+            loading={saving}
+            disabled={cannotSave}
+            onPress={() => void onSave()}
+          >
             <Text>{t('common.save')}</Text>
           </Button>
         </View>

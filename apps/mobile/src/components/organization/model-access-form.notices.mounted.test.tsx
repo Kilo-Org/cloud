@@ -27,23 +27,25 @@ vi.mock('@/components/organization/plan-refusal', () => ({
   OrganizationPlanRefusal: 'OrganizationPlanRefusal',
 }));
 
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false },
+  Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
+  View: 'View',
+}));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
-vi.mock('@/components/ui/button', async () => {
-  const { createElement: h } = await import('react');
-  return {
-    Button: (props: Record<string, unknown> & { children?: unknown }) =>
-      h('Button', props, props.children as never),
-  };
-});
+// The real Button stays mounted: the lapsed-plan paint is the class the control
+// derives from its own `variant` and `disabled`, so a stub that forwards props
+// would only restate the arguments the form passes.
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
 vi.mock('@/components/ui/text', async () => {
-  const { createElement: h } = await import('react');
-  return {
-    Text: (props: Record<string, unknown> & { children?: unknown }) =>
-      h('Text', props, props.children as never),
-  };
+  const { createContext } = await import('react');
+  return { Text: 'Text', TextClassContext: createContext(undefined) };
 });
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ primaryForeground: '#000000', foreground: '#000000' }),
+}));
 vi.mock('@/components/organization/model-access-lists', () => ({
   ModelDenyList: 'ModelDenyList',
   ProviderAllowList: 'ProviderAllowList',
@@ -144,6 +146,21 @@ function selectTab(root: ReactTestInstance, tab: 'models' | 'providers' | 'gatew
 
 function gatewaySections(root: ReactTestInstance) {
   return root.findAllByType('GatewaySettingsSection' as never);
+}
+
+/** The control whose single label `Text` reads `label`, as the rendered pressable. */
+function labelledControl(root: ReactTestInstance, label: string): ReactTestInstance {
+  const found = root
+    .findAll(node => Object.is(node.type, 'Pressable'))
+    .find(
+      node =>
+        node.findAll(child => Object.is(child.type, 'Text') && child.props.children === label)
+          .length === 1
+    );
+  if (!found) {
+    throw new Error(`the ${label} control is missing`);
+  }
+  return found;
 }
 
 /** The shared plan refusal the form renders, which owns the sentence's paint. */
@@ -283,7 +300,7 @@ describe('ModelAccessForm lapsed-plan controls', () => {
 
     const active = render({ canEdit: true, planEnded: false });
     changeDraft(active, deny);
-    expect(active.findAllByType('Button' as never).at(-1)?.props.disabled).toBe(false);
+    expect(labelledControl(active, appI18n.t('common.save')).props.disabled).toBe(false);
     expect(active.findByType('ModelDenyList' as never).props.disabled).toBe(false);
     selectTab(active, 'providers');
     expect(active.findByType('ProviderAllowList' as never).props.disabled).toBe(false);
@@ -291,7 +308,7 @@ describe('ModelAccessForm lapsed-plan controls', () => {
 
     const lapsed = render({ canEdit: true, planEnded: true });
     changeDraft(lapsed, deny);
-    expect(lapsed.findAllByType('Button' as never).at(-1)?.props.disabled).toBe(true);
+    expect(labelledControl(lapsed, appI18n.t('common.save')).props.disabled).toBe(true);
     expect(lapsed.findByType('ModelDenyList' as never).props.disabled).toBe(true);
     selectTab(lapsed, 'providers');
     expect(lapsed.findByType('ProviderAllowList' as never).props.disabled).toBe(true);
@@ -300,10 +317,38 @@ describe('ModelAccessForm lapsed-plan controls', () => {
   it('releases the save when the plan gate clears', () => {
     const lapsed = render({ canEdit: true, planEnded: true });
     changeDraft(lapsed, draft => ({ ...draft, modelDenyList: ['anthropic/claude'] }));
-    expect(lapsed.findAllByType('Button' as never).at(-1)?.props.disabled).toBe(true);
+    expect(labelledControl(lapsed, appI18n.t('common.save')).props.disabled).toBe(true);
 
     const next = rerender({ canEdit: true, planEnded: false });
 
-    expect(next.findAllByType('Button' as never).at(-1)?.props.disabled).toBe(false);
+    expect(labelledControl(next, appI18n.t('common.save')).props.disabled).toBe(false);
+  });
+
+  it('paints save and cancel as the dimmed chips while the plan lapsed', () => {
+    const root = render({ canEdit: true, planEnded: true });
+    changeDraft(root, draft => ({ ...draft, modelDenyList: ['anthropic/claude'] }));
+
+    const save = String(labelledControl(root, appI18n.t('common.save')).props.className ?? '');
+    const cancel = String(labelledControl(root, appI18n.t('common.cancel')).props.className ?? '');
+
+    // A disabled primary keeps a filled plate beside the outlined chips around
+    // it, which would make the one action the plan refuses the most prominent
+    // element on the screen; the lapsed Save is the same dimmed outline the
+    // Cancel and the bulk-action chips paint.
+    expect(save).toContain('opacity-50');
+    expect(save).not.toContain('bg-primary');
+    expect(cancel).toContain('opacity-50');
+    expect(cancel).not.toContain('bg-primary');
+  });
+
+  it('keeps save on the primary fill for a dirty draft on an active plan', () => {
+    const root = render({ canEdit: true, planEnded: false });
+    changeDraft(root, draft => ({ ...draft, modelDenyList: ['anthropic/claude'] }));
+
+    const save = String(labelledControl(root, appI18n.t('common.save')).props.className ?? '');
+
+    expect(save).toContain('bg-primary');
+    expect(save).not.toContain('bg-primary-disabled-action');
+    expect(save).not.toContain('opacity-50');
   });
 });

@@ -818,8 +818,8 @@ describe('CreditPurchaseScreen', () => {
     expect(rows).toHaveLength(4);
     // The card above is the one visible statement; no row repeats the status.
     expect(allText(renderer)).not.toContain('Price unavailable');
-    // The rows keep their disabled style, their pack title and their expiry
-    // note, and a screen reader still hears why each one is inactive.
+    // The rows keep their title and their expiry note, and a screen reader
+    // still hears why each one is inactive.
     const labels = rows.map(
       row => (row.props as { accessibilityLabel: string }).accessibilityLabel
     );
@@ -827,10 +827,53 @@ describe('CreditPurchaseScreen', () => {
       `Add ${packAmount('$10.00')} of credits, Price unavailable, Credits purchased through the App Store do not expire.`
     );
     expect(allText(renderer)).toContain(`Add ${packAmount('$10.00')} of credits`);
+    // A disabled row recedes by its own labels rather than its whole surface:
+    // it dims its title and price to 70% foreground ink, leaves the secondary
+    // line at full muted ink so the expiry note stays readable, and keeps the
+    // row's shell, which carries no opacity.
     expect(
       classNamesOf(rows).every(
-        classes => classes.includes(PACK_ROW_SHELL) && classes.includes('opacity-50')
+        classes =>
+          classes.includes(PACK_ROW_SHELL) &&
+          !classes.includes('opacity-50') &&
+          !classes.includes('opacity-70')
       )
+    ).toBe(true);
+    expect(
+      rows.every(row => {
+        const head = row.children[0];
+        const line = row.children[1];
+        if (head === undefined || line === undefined) {
+          return false;
+        }
+        if (typeof head === 'string' || typeof line === 'string') {
+          return false;
+        }
+        const headTexts = head.findAll(node => String(node.type) === 'Text');
+        const lineTexts = line.findAll(node => String(node.type) === 'Text');
+        return (
+          headTexts.length > 0 &&
+          headTexts.every(text => {
+            const className = classNameOf(text);
+            return (
+              className.includes('text-foreground') &&
+              className.includes('opacity-70') &&
+              !className.includes('text-muted-foreground') &&
+              !className.includes('opacity-50')
+            );
+          }) &&
+          lineTexts.length === 1 &&
+          lineTexts.every(text => {
+            const className = classNameOf(text);
+            return (
+              className.includes('text-xs') &&
+              className.includes('text-muted-foreground') &&
+              !className.includes('opacity-50') &&
+              !className.includes('opacity-70')
+            );
+          })
+        );
+      })
     ).toBe(true);
     // No row keeps an empty band for a status it does not state: the title row
     // and the row's one note line are its only children. The note line keeps a

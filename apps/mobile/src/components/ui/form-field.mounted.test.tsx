@@ -231,3 +231,52 @@ describe('FormField direction-aware content alignment', () => {
     expect(textAlign(mountInput({ textAlign: 'center' }))).toBe('center');
   });
 });
+
+describe('FormField label-to-input gap', () => {
+  function mountField(gapClassName?: string) {
+    act(() => {
+      renderer = TestRenderer.create(
+        createElement(FormField, {
+          label: i18n.t('login.emailAddress'),
+          ...(gapClassName === undefined ? {} : { gapClassName }),
+        })
+      );
+    });
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    // The block root carries `gap-1.5`; the wrapper carries the caller's gap
+    // class and wraps the label row and the input. `findAllByType` is
+    // self-inclusive and pre-order, so the root can also match the default
+    // class — exclude it to hold the pair's own node.
+    const root = renderer.root.findByType('View');
+    const wrapper = root
+      .findAllByType('View')
+      .find(node => node !== root && String(node.props.className) === (gapClassName ?? 'gap-1.5'));
+    if (wrapper === undefined) {
+      throw new Error('the label-to-input wrapper was not rendered');
+    }
+    return { root, wrapper };
+  }
+
+  it('keeps the compact default on the label-to-input pair', () => {
+    // An ordinary field's label row and input sit one small gap apart: the
+    // wrapper's own default is the compact gap, distinct from the block
+    // root's gap to the message slot below.
+    const { root, wrapper } = mountField();
+    expect(wrapper).not.toBe(root);
+    expect(String(wrapper.props.className)).toContain('gap-1.5');
+    expect(String(root.props.className)).toContain('gap-1.5');
+  });
+
+  it('puts the caller gap on the label-to-input pair only', () => {
+    // A screen whose row controls hover over the label line passes
+    // COMMAND_ROW_FIELD_GAP_CLASS so the controls' touch band ends above the
+    // input's edge. The class lands on the wrapper around the label row and
+    // the input; the block root keeps `gap-1.5`, so an error or reserved
+    // message below the input keeps the ordinary spacing.
+    const { root, wrapper } = mountField('gap-y-[16px]');
+    expect(String(wrapper.props.className)).toBe('gap-y-[16px]');
+    expect(String(root.props.className)).toBe('gap-1.5');
+  });
+});

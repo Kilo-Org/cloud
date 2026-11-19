@@ -2,7 +2,7 @@ import 'server-only';
 
 import { and, eq, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 import { openai_chatgpt_connections } from '@kilocode/db/schema';
-import { db, readDb, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb, type DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
 import {
   decryptApiKey,
   encryptApiKey,
@@ -79,7 +79,7 @@ export function openAiChatGptOwnerWhere(owner: OpenAiChatGptOwner): SQL | undefi
 }
 
 /** Either the primary database or an open transaction. */
-export type OpenAiChatGptDatabase = typeof db | DrizzleTransaction;
+export type OpenAiChatGptDatabase = DrizzleConnection;
 
 /**
  * Reads the raw connection row. `options.forUpdate` takes a `SELECT ... FOR

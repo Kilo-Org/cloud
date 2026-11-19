@@ -19,9 +19,11 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as OrganizationsModule from '@kilocode/app-shared/organizations';
 import type * as SecurityAgentModule from '@kilocode/app-shared/security-agent';
 
 import type * as ReactQuery from '@tanstack/react-query';
+import type * as ReactI18nextModule from 'react-i18next';
 
 import type * as OperationKeyModule from '@/lib/operation-key';
 import {
@@ -149,10 +151,36 @@ vi.mock('@/lib/trpc', () => ({
 
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: {
-    error: (msg: string) => toastErrorMock(msg),
+    // The adapter forwards options only when the caller passed one, so the
+    // bare-copy assertions below keep matching a call with a single argument.
+    error: (msg: string, options?: unknown) =>
+      options === undefined ? toastErrorMock(msg) : toastErrorMock(msg, options),
     success: (msg: string) => announcingSuccessMock(msg),
     warning: vi.fn(),
   },
+}));
+
+// The reader's role in the mutated organization. The hooks read it through the
+// organization query chain, which reaches expo-router and the Expo runtime this
+// pure project has no build for, so the boundary is stubbed and the real
+// `isMoneyRole` rule is applied to whatever role a case sets.
+const trialRole = vi.hoisted(() => ({ role: undefined as string | undefined }));
+
+vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('@/lib/hooks/use-organization-queries', async () => {
+  const { canManageOrganizationBilling } = await vi.importActual<typeof OrganizationsModule>(
+    '@kilocode/app-shared/organizations'
+  );
+  return {
+    isMoneyRole: canManageOrganizationBilling,
+    useOrgBoundary: () => ({ role: trialRole.role }),
+  };
+});
+// The billing step's label is catalog copy read through `useTranslation`, and
+// this pure suite mounts no renderer for it: the double returns the key.
+vi.mock('react-i18next', async importOriginal => ({
+  ...(await importOriginal<typeof ReactI18nextModule>()),
+  useTranslation: () => ({ t: (key: string) => key }),
 }));
 
 const ORG_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -161,9 +189,26 @@ const ORG_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const TRIAL_ENDED_COPY =
   "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again.";
 
+// The sentence a billing role gets instead: it offers the plan step rather than
+// naming the person who can take it.
+const TRIAL_ENDED_BILLING_COPY =
+  "The organization's trial has ended and it has no active plan. You can update billing, then try again.";
+
+// The step's label, read as the catalog key this suite's translation double
+// returns for it.
+const BILLING_ACTION_LABEL = 'organization.hub.manageBilling';
+
+/** A lapsed-trial rejection as the organization gate sends it. */
+function trialRejection(): Error {
+  return Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+    data: { code: 'FORBIDDEN' },
+  });
+}
+
 describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
   beforeEach(() => {
     lastCapturedOptions = null;
+    trialRole.role = undefined;
     personalTriggerSyncMutateMock.mockReset();
     orgTriggerSyncMutateMock.mockReset();
     personalSaveConfigMutateMock.mockReset();
@@ -278,14 +323,31 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
     expect(toastErrorMock).toHaveBeenCalledWith('The security service is unavailable. Try again.');
   });
 
-  it('onError explains a lapsed organization trial instead of the generic line', () => {
+  it('maps a lapsed-trial sync refusal onto the member copy, with no step', async () => {
+    trialRole.role = 'member';
+    orgTriggerSyncMutateMock.mockRejectedValueOnce(trialRejection());
     useTriggerSecuritySync(ORG_ID);
-    const rejection = Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
-      data: { code: 'FORBIDDEN' },
-    });
-    lastCapturedOptions?.onError?.(mapSecuritySyncOperationError(rejection));
+
+    const mapped = await lastCapturedOptions?.mutationFn?.({}).catch((error: unknown) => error);
+    lastCapturedOptions?.onError?.(mapped);
+
+    expect(mapped).toMatchObject({ message: TRIAL_ENDED_COPY });
     expect(toastErrorMock).toHaveBeenCalledWith(TRIAL_ENDED_COPY);
     expect(toastErrorMock).not.toHaveBeenCalledWith(ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
+  });
+
+  it('gives a billing role the trial copy that offers the step, and toasts the step', async () => {
+    trialRole.role = 'owner';
+    orgTriggerSyncMutateMock.mockRejectedValueOnce(trialRejection());
+    useTriggerSecuritySync(ORG_ID);
+
+    const mapped = await lastCapturedOptions?.mutationFn?.({}).catch((error: unknown) => error);
+    lastCapturedOptions?.onError?.(mapped);
+
+    expect(mapped).toMatchObject({ message: TRIAL_ENDED_BILLING_COPY });
+    expect(toastErrorMock).toHaveBeenCalledWith(TRIAL_ENDED_BILLING_COPY, {
+      action: { label: BILLING_ACTION_LABEL, onClick: expect.any(Function) },
+    });
   });
 
   it('stays silent for the in-progress conflict, whose screen shows the running sync', async () => {
@@ -587,6 +649,7 @@ describe('useSetSecurityAgentEnabled (generation guard + scope)', () => {
 describe('config-write onError copy', () => {
   beforeEach(() => {
     lastCapturedOptions = null;
+    trialRole.role = undefined;
     getQueryDataMock.mockReset();
     setQueryDataMock.mockReset();
     cancelQueriesMock.mockReset();
@@ -654,11 +717,7 @@ describe('config-write onError copy', () => {
 
   it('explains a lapsed organization trial on a settings save', () => {
     useSaveSecurityAgentConfig(ORG_ID);
-    lastCapturedOptions?.onError?.(
-      Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
-        data: { code: 'FORBIDDEN' },
-      })
-    );
+    lastCapturedOptions?.onError?.(trialRejection());
 
     expect(toastErrorMock).toHaveBeenCalledWith(TRIAL_ENDED_COPY);
     expect(toastErrorMock).not.toHaveBeenCalledWith(ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
@@ -666,13 +725,41 @@ describe('config-write onError copy', () => {
 
   it('explains a lapsed organization trial on the enable toggle too', () => {
     useSetSecurityAgentEnabled(ORG_ID);
-    lastCapturedOptions?.onError?.(
-      Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
-        data: { code: 'FORBIDDEN' },
-      })
-    );
+    lastCapturedOptions?.onError?.(trialRejection());
 
     expect(toastErrorMock).toHaveBeenCalledWith(TRIAL_ENDED_COPY);
+  });
+
+  it('gives a billing role the trial copy and the step on a settings save', () => {
+    trialRole.role = 'billing_manager';
+    useSaveSecurityAgentConfig(ORG_ID);
+    lastCapturedOptions?.onError?.(trialRejection());
+
+    expect(toastErrorMock).toHaveBeenCalledWith(TRIAL_ENDED_BILLING_COPY, {
+      action: { label: BILLING_ACTION_LABEL, onClick: expect.any(Function) },
+    });
+  });
+
+  it('gives a billing role the trial copy and the step on the enable toggle', () => {
+    trialRole.role = 'admin';
+    useSetSecurityAgentEnabled(ORG_ID);
+    lastCapturedOptions?.onError?.(trialRejection());
+
+    expect(toastErrorMock).toHaveBeenCalledWith(TRIAL_ENDED_BILLING_COPY, {
+      action: { label: BILLING_ACTION_LABEL, onClick: expect.any(Function) },
+    });
+  });
+
+  it('keeps the member copy and no step for a role that cannot change the plan', () => {
+    trialRole.role = 'member';
+    useSaveSecurityAgentConfig(ORG_ID);
+    lastCapturedOptions?.onError?.(trialRejection());
+
+    expect(toastErrorMock).toHaveBeenCalledWith(TRIAL_ENDED_COPY);
+    expect(toastErrorMock).not.toHaveBeenCalledWith(
+      TRIAL_ENDED_COPY,
+      expect.objectContaining({ action: expect.anything() })
+    );
   });
 });
 

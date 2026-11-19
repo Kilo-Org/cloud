@@ -322,11 +322,12 @@ jobs:
       # that builds its own href cannot fail the check below. `expo customize
       # tsconfig.json` runs the same generator with no server, no bundler and no
       # network, and reads the app's committed `.env`. `tsgo` accepts an include
-      # glob that matches nothing, so the step fails when the file is missing.
+      # glob that matches nothing, so the step fails unless the declarations
+      # exist and list the sign-in route.
       - name: Generate the Expo Router types
         run: |
           pnpm --filter kilo-app exec expo customize tsconfig.json > /dev/null
-          test -f apps/mobile/.expo/types/router.d.ts
+          grep -q '}/login`' apps/mobile/.expo/types/router.d.ts
 
       - name: Typecheck
         run: pnpm --filter kilo-app run typecheck

@@ -187,9 +187,11 @@ const refreshGlanceableSessionsInputShape = z.object({
 
 /**
  * Both hint lists name sessions the refresh already carries. An id outside
- * `cliSessionIds` names no session in this batch, so the server could not act
- * on it: reject it rather than silently ignore it. Omitted lists parse as
- * before, and duplicates stay allowed (the server treats each list as a set).
+ * `cliSessionIds` names no session in this batch, and the server resolves such
+ * an id to the personal scope, so an out-of-batch approval hint would exempt
+ * the wrong scope from the delivery window. Reject it instead of acting on it.
+ * Omitted lists parse as before, and duplicates stay allowed (the server
+ * treats each list as a set).
  */
 function refineRefreshSessionSubset(
   data: z.infer<typeof refreshGlanceableSessionsInputShape>,

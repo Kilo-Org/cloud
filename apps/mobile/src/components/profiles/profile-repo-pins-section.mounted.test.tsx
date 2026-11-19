@@ -86,7 +86,11 @@ vi.mock('@/components/empty-state', () => ({
   StateAction: 'StateAction',
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text', EYEBROW_LATIN_DISPLAY: '' }));
+vi.mock('@/components/ui/text', () => ({
+  Text: 'Text',
+  EYEBROW_LATIN_DISPLAY: '',
+  EYEBROW_LINE_HEIGHT_DP: 22,
+}));
 vi.mock('@/components/ui/icons', () => ({
   Check: 'Check',
   GitBranch: 'GitBranch',

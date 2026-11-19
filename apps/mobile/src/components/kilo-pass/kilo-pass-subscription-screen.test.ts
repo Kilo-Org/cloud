@@ -81,7 +81,7 @@ vi.mock('@/lib/haptics', () => ({
   notificationHaptic: () => undefined,
   selectionHaptic: () => undefined,
 }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text', EYEBROW_LINE_HEIGHT_DP: 22 }));
 // The body's blocks have their own suites. The screen owns which state it
 // shows and when it prints the page, so they render as hosts here.
 vi.mock('@/components/kilo-pass/kilo-pass-management', () => ({

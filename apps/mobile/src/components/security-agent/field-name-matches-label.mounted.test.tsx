@@ -136,7 +136,7 @@ vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'Activ
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/input', () => ({ Input: 'Input' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text', EYEBROW_LINE_HEIGHT_DP: 22 }));
 vi.mock('@/components/ui/radio-group', () => ({
   RadioGroup: (props: { children?: unknown }) => props.children ?? null,
   radioItemA11y: ({

@@ -165,7 +165,7 @@ vi.mock('@/components/security-agent/settings-pill-group', () => ({
   },
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text', EYEBROW_LINE_HEIGHT_DP: 22 }));
 
 type R = TestRenderer.ReactTestRenderer;
 type I = TestRenderer.ReactTestInstance;

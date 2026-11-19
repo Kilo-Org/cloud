@@ -1273,25 +1273,23 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       return;
     }
 
-    // A cancellation that has not completed must not start work: it keeps the review
-    // cancellable, and a later cancel attempt retries the terminal status. Retry the
-    // terminal status here as well, so a recovered backend reconciles the record.
+    // A cancellation that has not completed must not start work. Retry recording the
+    // terminal status so a recovered backend reconciles the record; a queued review has
+    // no session, so settling it locally is equivalent and lets cleanup reclaim it.
     if (this.cancelled) {
       try {
         await this.persistCancellation('Review cancelled');
-        return;
       } catch (error) {
         console.warn(
-          '[CodeReviewOrchestrator] Pending cancellation still failing; retrying later',
+          '[CodeReviewOrchestrator] Pending cancellation not recorded; settled locally',
           {
             reviewId: this.state.reviewId,
             error: error instanceof Error ? error.message : String(error),
           }
         );
-        // Keep an alarm so the record is retried and the object is eventually reclaimed.
-        await this.ctx.storage.setAlarm(Date.now() + CodeReviewOrchestrator.CLEANUP_DELAY_MS);
-        return;
+        await this.setLocalTerminalStateFromDB('cancelled');
       }
+      return;
     }
 
     if (

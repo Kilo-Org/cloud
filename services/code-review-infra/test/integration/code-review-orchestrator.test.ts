@@ -1772,11 +1772,11 @@ describe('CodeReviewOrchestrator recovery', () => {
 
     expect(firstAttempt.cancellationError).toMatch(/Failed to update DB status/);
     expect(firstAttempt.restoredAlarm).toBe(scheduledAlarm);
-    expect(firstAttempt.storedState).toMatchObject({ status: 'queued' });
-    // The skip keeps an alarm so the record is retried and the object is reclaimed.
+    // The fallback settles the queued review locally so cleanup reclaims it.
+    expect(firstAttempt.storedState).toMatchObject({ status: 'cancelled' });
     expect(firstAttempt.alarm).toEqual(expect.any(Number));
     if (firstAttempt.alarm === null) {
-      throw new Error('Expected a retry alarm after the skipped cancellation');
+      throw new Error('Expected a cleanup alarm after the settled cancellation');
     }
     expect(firstAttempt.alarm).toBeGreaterThanOrEqual(Date.now() + 6 * 24 * 60 * 60 * 1000);
     expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(0);
@@ -1788,11 +1788,8 @@ describe('CodeReviewOrchestrator recovery', () => {
     );
     expect(runningPosts).toHaveLength(0);
 
-    statusCallbackHealthy = true;
-
-    await expect(stub.cancel('superseded')).resolves.toBe(true);
-    await expect(storedReview(stub)).resolves.toMatchObject({ status: 'cancelled' });
-    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(0);
+    // The review is settled, so a further cancel reports that it is no longer running.
+    await expect(stub.cancel('superseded')).resolves.toBe(false);
   });
 
   it('does not prepare a session when the review is cancelled during the first status update', async () => {

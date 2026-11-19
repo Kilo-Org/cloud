@@ -6,7 +6,7 @@ import {
 
 /**
  * The services the mobile hub shows, in the order `apps/web`'s integrations
- * hub lists them (`PLATFORM_DEFINITIONS`). DoltHub is web-only for now.
+ * hub lists them (`PLATFORM_DEFINITIONS`).
  */
 export const INTEGRATION_PROVIDERS = [
   'github',

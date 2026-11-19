@@ -58,7 +58,8 @@ describe('platformIntegrationsRouter', () => {
     });
     await insertPlatformIntegration({
       userId: ownerUser.id,
-      platform: PLATFORM.DOLTHUB,
+      platform: 'dolthub',
+      integrationType: 'oauth',
       platformAccountLogin: 'kilocode',
       status: INTEGRATION_STATUS.ACTIVE,
     });
@@ -81,11 +82,6 @@ describe('platformIntegrationsRouter', () => {
       {
         platform: PLATFORM.GITHUB,
         installed: false,
-        installation: { accountLogin: 'kilocode' },
-      },
-      {
-        platform: PLATFORM.DOLTHUB,
-        installed: true,
         installation: { accountLogin: 'kilocode' },
       },
     ]);

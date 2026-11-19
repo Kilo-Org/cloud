@@ -77,9 +77,6 @@ describe('appShellTargetSchema', () => {
     expect(
       appShellTargetSchema.safeParse({ page: 'integration', platform: 'bitbucket' }).success
     ).toBe(false);
-    expect(
-      appShellTargetSchema.safeParse({ page: 'integration', platform: 'dolthub' }).success
-    ).toBe(false);
   });
 
   it('refuses a malformed organization id', () => {

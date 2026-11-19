@@ -153,7 +153,6 @@ export const PLATFORM = {
   SLACK: 'slack',
   DISCORD: 'discord',
   LINEAR: 'linear',
-  DOLTHUB: 'dolthub',
 } as const;
 
 /**

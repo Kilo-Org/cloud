@@ -43,7 +43,6 @@ export const OAUTH_STATE_PROVIDERS = [
   'slack',
   'discord',
   'linear',
-  'dolthub',
   'google',
 ] as const;
 

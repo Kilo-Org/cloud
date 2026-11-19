@@ -19,7 +19,6 @@ import { gitlabRouter } from '@/routers/gitlab-router';
 import { platformIntegrationsRouter } from '@/routers/platform-integrations-router';
 import { slackRouter } from '@/routers/slack-router';
 import { linearRouter } from '@/routers/linear-router';
-import { dolthubRouter } from '@/routers/dolthub-router';
 import { discordRouter } from '@/routers/discord-router';
 import { codeReviewRouter } from '@/routers/code-reviews/code-reviews-router';
 import { reviewMemoryRouter } from '@/routers/code-reviews/review-memory-router';
@@ -74,7 +73,6 @@ export const rootRouter = createTRPCRouter({
   platformIntegrations: platformIntegrationsRouter,
   slack: slackRouter,
   linear: linearRouter,
-  dolthub: dolthubRouter,
   discord: discordRouter,
   cloudAgentNext: cloudAgentNextRouter,
   cloudAgentNextFailures: cloudAgentNextFailuresRouter,

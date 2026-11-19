@@ -820,7 +820,19 @@
         "fileComment": "ਫਾਈਲ 'ਤੇ ਟਿੱਪਣੀ",
         "outdatedOnPathLines": "{{path}} {{lines}} 'ਤੇ ਪੁਰਾਣਾ",
         "outdatedOnLines": "{{lines}} 'ਤੇ ਪੁਰਾਣਾ",
-        "outdatedOnPath": "{{path}} 'ਤੇ ਪੁਰਾਣਾ"
+        "outdatedOnPath": "{{path}} 'ਤੇ ਪੁਰਾਣਾ",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "ਖੱਬਾ ਪਾਸਾ",
+        "sideRight": "ਸੱਜਾ ਪਾਸਾ",
+        "outdatedOnLinesSide": "{{lines}} 'ਤੇ ਪੁਰਾਣਾ ({{side}})",
+        "outdatedOnPathLinesSide": "{{path}} {{lines}} 'ਤੇ ਪੁਰਾਣਾ ({{side}})",
+        "outdatedSide": "ਪੁਰਾਣਾ ({{side}})",
+        "outdatedOnPathSide": "{{path}} 'ਤੇ ਪੁਰਾਣਾ ({{side}})"
       },
       "deletedUser": "ਮਿਟਾਇਆ ਗਿਆ ਵਰਤੋਂਕਾਰ",
       "replyForbiddenTerm": "ਤੁਹਾਨੂੰ ਇਸ {{term}} 'ਤੇ ਜਵਾਬ ਦੇਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
@@ -3415,6 +3427,7 @@
       "sendInvite": "ਸੱਦਾ ਭੇਜੋ",
       "title": "ਮੈਂਬਰ ਨੂੰ ਸੱਦਾ ਦਿਓ",
       "alreadyInvited": "ਉਹ ਪਹਿਲਾਂ ਹੀ ਸੱਦਿਆ ਹੋਇਆ ਹੈ ਜਾਂ ਪਹਿਲਾਂ ਹੀ ਮੈਂਬਰ ਹੈ।",
+      "organizationUnavailable": "ਇਹ ਸੰਸਥਾ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
       "sendError": "ਸੱਦਾ ਭੇਜਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
       "pendingInvitation": "ਇਸ ਈਮੇਲ ਲਈ ਪਹਿਲਾਂ ਹੀ ਇੱਕ ਸੱਦਾ ਬਕਾਇਆ ਹੈ।",
       "alreadyMember": "ਇਹ ਵਿਅਕਤੀ ਪਹਿਲਾਂ ਹੀ ਇਸ ਸੰਸਥਾ ਦਾ ਮੈਂਬਰ ਹੈ।",
@@ -4619,7 +4632,8 @@
     "connectFailed": "ਕਨੈਕਸ਼ਨ ਪੰਨਾ ਖੋਲ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ"
   },
   "invoices": {
-    "personalEmptyDescription": "ਤੁਹਾਡੇ ਤੋਂ ਬਿੱਲ ਲਏ ਜਾਣ ਤੋਂ ਬਾਅਦ ਤੁਹਾਡੀਆਂ ਆਪਣੀਆਂ ਖਰੀਦਾਂ ਦੇ ਇਨਵੌਇਸ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੇ।"
+    "personalEmptyDescription": "ਤੁਹਾਡੇ ਤੋਂ ਬਿੱਲ ਲਏ ਜਾਣ ਤੋਂ ਬਾਅਦ ਤੁਹਾਡੀਆਂ ਆਪਣੀਆਂ ਖਰੀਦਾਂ ਦੇ ਇਨਵੌਇਸ ਇੱਥੇ ਦਿਖਾਈ ਦਿੰਦੇ ਹਨ। App Store ਅਤੇ Google Play ਤੋਂ ਰਸੀਦਾਂ ਕ੍ਰੈਡਿਟ ਇਤਿਹਾਸ ਵਿੱਚ ਹਨ।",
+    "personalPeriod": "ਪਿਛਲੇ 12 ਮਹੀਨੇ"
   },
   "cloudAgent": {
     "compute": {

@@ -75,7 +75,14 @@ import { isKiloCatalogModelId } from '@kilocode/web-shared/lib/ai-gateway/byok/s
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import * as z from 'zod';
 import {
+  getReasoningEffort,
+  isReasoningExplicitlyDisabled,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import { getSupportedReasoningEfforts } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
+import {
   CustomLlmCredentialsSchema,
+  ReasoningDetailsTransform,
+  ReasoningEffortSchema,
   type CustomLlmCredentials,
   type CustomPricingTiers,
 } from '@kilocode/db/schema-types';
@@ -432,6 +439,47 @@ function providerSettingsAllowPartner(
 }
 
 /**
+ * The reasoning effort the upstream receives, following the partner's reasoning transform: an
+ * explicit disable is `none`, otherwise the effort the request carries for its API kind. The
+ * `reasoning-content` and `reasoning` transforms drop the `reasoning` object and forward only its
+ * effort, behind an existing `reasoning_effort`, so `reasoning.enabled: false` does not reach the
+ * upstream there and `reasoning_effort` wins over `reasoning.effort`. Null when the request
+ * carries no effort, even though `mistral-thinking` then sends `high`: the partner is not skipped
+ * for an effort the client did not choose.
+ */
+function getUpstreamReasoningEffort(
+  request: GatewayRequest,
+  transform: ReasoningDetailsTransform | undefined
+): string | null {
+  const replacesReasoningObject =
+    transform === ReasoningDetailsTransform.ReasoningContent ||
+    transform === ReasoningDetailsTransform.Reasoning;
+  if (replacesReasoningObject && request.kind === 'chat_completions') {
+    const effort = request.body.reasoning_effort ?? request.body.reasoning?.effort;
+    if (effort) return effort;
+    return isReasoningExplicitlyDisabled(request) ? 'none' : null;
+  }
+  const disabledByReasoningObject =
+    request.kind === 'chat_completions' && request.body.reasoning?.enabled === false;
+  if (disabledByReasoningObject || isReasoningExplicitlyDisabled(request)) return 'none';
+  return getReasoningEffort(request);
+}
+
+/** Whether the partner declares its supported efforts and the request asks for one it lacks. */
+function requestsUnsupportedReasoningEffort(
+  partner: PartnerCustomLlm,
+  request: GatewayRequest
+): boolean {
+  const { definition } = partner;
+  const supported = getSupportedReasoningEfforts(definition.opencode_settings?.reasoning_options);
+  if (!supported) return false;
+  const effort = ReasoningEffortSchema.safeParse(
+    getUpstreamReasoningEffort(request, definition.reasoning_details_transform)
+  );
+  return effort.success && !supported.has(effort.data);
+}
+
+/**
  * A partner serves the catalog model ahead of Kilo's gateway route, which stays behind it as the
  * failover; see `CustomLlmPartnerSchema`. Returns the skip reason when the partner may not serve.
  */
@@ -454,6 +502,10 @@ async function resolvePartnerRoute(
   );
   if (!providerSettingsAllowPartner(partner, providerConfig, await input.getAllowedProviders())) {
     return 'provider-settings';
+  }
+  // The partner would answer 400, and the failover would cost a wasted round trip.
+  if (requestsUnsupportedReasoningEffort(partner, input.request)) {
+    return 'unsupported-reasoning-effort';
   }
   // Unlike a custom LLM that owns its id, a partner has a fallback, so unusable
   // credentials skip it instead of failing the request.

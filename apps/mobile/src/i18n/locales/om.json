@@ -820,7 +820,19 @@
         "fileComment": "Yaada faayilii",
         "outdatedOnPathLines": "Yeroon kan darbe: {{path}} {{lines}}",
         "outdatedOnLines": "Yeroon kan darbe: {{lines}}",
-        "outdatedOnPath": "Yeroon kan darbe: {{path}}"
+        "outdatedOnPath": "Yeroon kan darbe: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Cinaa bitaa",
+        "sideRight": "Cinaa mirgaa",
+        "outdatedOnLinesSide": "Yeroon kan darbe {{lines}} irratti ({{side}})",
+        "outdatedOnPathLinesSide": "Yeroon kan darbe {{path}} {{lines}} irratti ({{side}})",
+        "outdatedSide": "Yeroon kan darbe ({{side}})",
+        "outdatedOnPathSide": "Yeroon kan darbe {{path}} irratti ({{side}})"
       },
       "deletedUser": "fayyadamaa haqame",
       "replyForbiddenTerm": "{{term}} kanaaf deebii kennuuf hayyama hin qabdu.",
@@ -3415,6 +3427,7 @@
       "sendInvite": "Affeerraa ergi",
       "title": "Miseensa afeeri",
       "alreadyInvited": "Duraan ni affeeramaniiru ykn miseensa dha.",
+      "organizationUnavailable": "Dhaabbanni kun amma hin argamu.",
       "sendError": "Affeerraa erguun hin danda'amne.",
       "pendingInvitation": "Teessoon imeelii kun duraanuu affeerraa eeggachaa jiru qaba.",
       "alreadyMember": "Namni kun duraanuu miseensa dhaabbata kanaati.",
@@ -4619,7 +4632,8 @@
     "connectFailed": "Fuula walitti hidhamiinsaa banuun hin danda'amne"
   },
   "invoices": {
-    "personalEmptyDescription": "Beeksisni kaffaltii bittaa mataa keetii erga kaffaltiin siif herregamee booda asitti mul'ata."
+    "personalEmptyDescription": "Beeksisni kaffaltii bittaa mataa keetii erga kaffaltiin siif herregamee booda asitti mul'ata. Nagaheewwan App Store irraa fi Google Play irraa Seenaa kireeditii keessa jiru.",
+    "personalPeriod": "Ji'oota 12 darban"
   },
   "cloudAgent": {
     "compute": {

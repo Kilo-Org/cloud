@@ -196,7 +196,7 @@ function EditTab() {
 
         <div className="text-muted-foreground text-xs">
           <p>
-            Changes apply without a deploy. Domains are stored in Postgres and signup TLDs in Redis;
+            Changes apply without a deploy. Domains and signup TLDs are stored in Postgres. Domain
             access checks can take up to a minute to see a change. BLOCKED_SIGNUP_TLDS is the
             fallback until a TLD list is saved.
           </p>

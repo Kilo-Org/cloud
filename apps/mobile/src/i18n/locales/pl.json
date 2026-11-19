@@ -2979,7 +2979,19 @@
         "fileComment": "Komentarz do pliku",
         "outdatedOnPathLines": "Nieaktualny: {{path}}, {{lines}}",
         "outdatedOnLines": "Nieaktualny: {{lines}}",
-        "outdatedOnPath": "Nieaktualny: {{path}}"
+        "outdatedOnPath": "Nieaktualny: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}}, L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}}, {{lineRange}} ({{side}})",
+        "sideLeft": "Lewa strona",
+        "sideRight": "Prawa strona",
+        "outdatedOnLinesSide": "Nieaktualny: {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Nieaktualny: {{path}}, {{lines}} ({{side}})",
+        "outdatedSide": "Nieaktualny ({{side}})",
+        "outdatedOnPathSide": "Nieaktualny: {{path}} ({{side}})"
       },
       "deletedUser": "usunięty użytkownik",
       "replyForbiddenTerm": "Nie masz uprawnień do odpowiadania w tym {{term}}.",
@@ -3536,6 +3548,7 @@
       "sendInvite": "Wyślij zaproszenie",
       "title": "Zaproś członka",
       "alreadyInvited": "Ten adres e-mail ma już oczekujące zaproszenie lub należy już do członka tej organizacji.",
+      "organizationUnavailable": "Ta organizacja nie jest już dostępna.",
       "sendError": "Nie udało się wysłać zaproszenia.",
       "pendingInvitation": "Ten adres e-mail ma już oczekujące zaproszenie.",
       "alreadyMember": "Ta osoba jest już członkiem tej organizacji.",
@@ -4769,7 +4782,8 @@
     "connectFailed": "Nie udało się otworzyć strony połączenia"
   },
   "invoices": {
-    "personalEmptyDescription": "Faktury za Twoje zakupy pojawią się tutaj po pierwszym obciążeniu."
+    "personalEmptyDescription": "Faktury za Twoje zakupy pojawiają się tutaj po pierwszym obciążeniu. Potwierdzenia w App Store i Google Play znajdują się w sekcji Historia kredytów.",
+    "personalPeriod": "Ostatnie 12 miesięcy"
   },
   "cloudAgent": {
     "compute": {

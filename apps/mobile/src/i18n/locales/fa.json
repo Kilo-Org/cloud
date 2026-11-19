@@ -820,7 +820,19 @@
         "fileComment": "نظر دربارهٔ فایل",
         "outdatedOnPathLines": "مربوط به نسخهٔ قبلی: {{path}} {{lines}}",
         "outdatedOnLines": "مربوط به نسخهٔ قبلی: {{lines}}",
-        "outdatedOnPath": "مربوط به نسخهٔ قبلی: {{path}}"
+        "outdatedOnPath": "مربوط به نسخهٔ قبلی: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "سمت چپ",
+        "sideRight": "سمت راست",
+        "outdatedOnLinesSide": "مربوط به نسخهٔ قبلی: {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "مربوط به نسخهٔ قبلی: {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "مربوط به نسخهٔ قبلی ({{side}})",
+        "outdatedOnPathSide": "مربوط به نسخهٔ قبلی: {{path}} ({{side}})"
       },
       "deletedUser": "کاربر حذف‌شده",
       "replyForbiddenTerm": "اجازهٔ پاسخ دادن در این {{term}} را ندارید.",
@@ -3415,6 +3427,7 @@
       "sendInvite": "ارسال دعوت‌نامه",
       "title": "دعوت از عضو",
       "alreadyInvited": "این آدرس ایمیل قبلاً دعوت شده است یا از قبل عضو است.",
+      "organizationUnavailable": "این سازمان دیگر در دسترس نیست.",
       "sendError": "ارسال دعوت‌نامه ممکن نشد.",
       "pendingInvitation": "این ایمیل از قبل یک دعوت‌نامه در انتظار دارد.",
       "alreadyMember": "این شخص از قبل عضو این سازمان است.",
@@ -4619,7 +4632,8 @@
     "connectFailed": "باز کردن صفحهٔ اتصال ممکن نشد"
   },
   "invoices": {
-    "personalEmptyDescription": "فاکتورهای خریدهای شخصی‌تان پس از صدور صورتحساب در اینجا نمایش داده می‌شوند."
+    "personalEmptyDescription": "فاکتورهای خریدهای شخصی‌تان پس از صدور صورتحساب در اینجا نمایش داده می‌شوند. رسید از App Store و رسید از Google Play در تاریخچهٔ اعتبار هستند.",
+    "personalPeriod": "12 ماه اخیر"
   },
   "cloudAgent": {
     "compute": {

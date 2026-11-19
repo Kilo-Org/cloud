@@ -2897,7 +2897,19 @@
         "fileComment": "檔案留言",
         "outdatedOnPathLines": "{{path}} {{lines}} 的留言已過時",
         "outdatedOnLines": "{{lines}} 的留言已過時",
-        "outdatedOnPath": "{{path}} 的留言已過時"
+        "outdatedOnPath": "{{path}} 的留言已過時",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "左側",
+        "sideRight": "右側",
+        "outdatedOnLinesSide": "{{lines}} ({{side}}) 的留言已過時",
+        "outdatedOnPathLinesSide": "{{path}} {{lines}} ({{side}}) 的留言已過時",
+        "outdatedSide": "({{side}}) 已過時",
+        "outdatedOnPathSide": "{{path}} ({{side}}) 已過時"
       },
       "deletedUser": "已刪除的使用者",
       "replyForbiddenTerm": "你沒有權限回覆此{{term}}。",
@@ -3420,6 +3432,7 @@
       "sendInvite": "傳送邀請",
       "title": "邀請成員",
       "alreadyInvited": "該電子郵件地址已有待處理的邀請，或已是成員。",
+      "organizationUnavailable": "此組織已無法使用。",
       "sendError": "無法傳送邀請。",
       "pendingInvitation": "這個電子郵件地址已有待處理的邀請。",
       "alreadyMember": "這個人已經是此組織的成員。",
@@ -4619,7 +4632,8 @@
     "connectFailed": "無法開啟連結頁面"
   },
   "invoices": {
-    "personalEmptyDescription": "你個人購買的發票會在計費後顯示在這裡。"
+    "personalEmptyDescription": "你個人購買的發票會在計費後顯示在這裡。App Store 收據與 Google Play 收據都在點數紀錄中。",
+    "personalPeriod": "最近 12 個月"
   },
   "cloudAgent": {
     "compute": {

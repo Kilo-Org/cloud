@@ -17,7 +17,7 @@
   },
   "internal": {
     "lowBalance": {
-      "title": "Foláireamh faoi iarmhéid íseal",
+      "title": "Foláireamh iarmhéid ísil",
       "body": "Thit iarmhéid {{organizationName}} faoi ${{minimumBalanceUsd}}"
     },
     "spendAlert": {

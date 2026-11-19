@@ -820,7 +820,19 @@
         "fileComment": "Файлға пікір",
         "outdatedOnPathLines": "Ескірген: {{path}}, {{lines}}",
         "outdatedOnLines": "Ескірген: {{lines}}",
-        "outdatedOnPath": "Ескірген: {{path}}"
+        "outdatedOnPath": "Ескірген: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Сол жақ",
+        "sideRight": "Оң жақ",
+        "outdatedOnLinesSide": "Ескірген: {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Ескірген: {{path}}, {{lines}} ({{side}})",
+        "outdatedSide": "Ескірген ({{side}})",
+        "outdatedOnPathSide": "Ескірген: {{path}} ({{side}})"
       },
       "deletedUser": "жойылған пайдаланушы",
       "replyForbiddenTerm": "Бұл {{term}}на жауап беруге рұқсатыңыз жоқ.",
@@ -3415,6 +3427,7 @@
       "sendInvite": "Шақыру жіберу",
       "title": "Мүшені шақыру",
       "alreadyInvited": "Бұл мекенжайға шақыру бұрын жіберілген немесе ол әлдеқашан ұйым мүшесі болып табылады.",
+      "organizationUnavailable": "Бұл ұйым бұдан былай қолжетімді емес.",
       "sendError": "Шақыруды жіберу мүмкін болмады.",
       "pendingInvitation": "Бұл электрондық пошта мекенжайына күтіп тұрған шақыру бар.",
       "alreadyMember": "Бұл адам осы ұйымның мүшесі болып табылады.",
@@ -4619,7 +4632,8 @@
     "connectFailed": "Қосылу бетін ашу мүмкін болмады"
   },
   "invoices": {
-    "personalEmptyDescription": "Сізге төлем есептелгеннен кейін жеке сатып алуларыңыздың шот-фактуралары осында көрсетіледі."
+    "personalEmptyDescription": "Сізге төлем есептелгеннен кейін жеке сатып алуларыңыздың шот-фактуралары осында көрсетіледі. App Store және Google Play түбіртектері Кредиттер тарихында орналасқан.",
+    "personalPeriod": "Соңғы 12 ай"
   },
   "cloudAgent": {
     "compute": {

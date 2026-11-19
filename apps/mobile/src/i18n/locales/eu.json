@@ -820,7 +820,19 @@
         "fileComment": "Fitxategi-iruzkina",
         "outdatedOnPathLines": "Zaharkitua: {{path}} {{lines}}",
         "outdatedOnLines": "Zaharkitua: {{lines}}",
-        "outdatedOnPath": "Zaharkitua: {{path}}"
+        "outdatedOnPath": "Zaharkitua: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Ezkerraldea",
+        "sideRight": "Eskuinaldea",
+        "outdatedOnLinesSide": "Zaharkitua: {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Zaharkitua: {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Zaharkitua ({{side}})",
+        "outdatedOnPathSide": "Zaharkitua: {{path}} ({{side}})"
       },
       "deletedUser": "erabiltzaile ezabatua",
       "replyForbiddenTerm": "Ez duzu baimenik {{term}} honi erantzuteko.",
@@ -3415,6 +3427,7 @@
       "sendInvite": "Bidali gonbidapena",
       "title": "Gonbidatu kidea",
       "alreadyInvited": "Dagoeneko gonbidatuta dago edo dagoeneko kidea da.",
+      "organizationUnavailable": "Erakunde hau ez dago jada erabilgarri.",
       "sendError": "Ezin izan da gonbidapena bidali.",
       "pendingInvitation": "Helbide elektroniko honek dagoeneko gonbidapen bat du zain.",
       "alreadyMember": "Pertsona hau dagoeneko erakunde honetako kidea da.",
@@ -4619,7 +4632,8 @@
     "connectFailed": "Ezin izan da konexio-orria ireki"
   },
   "invoices": {
-    "personalEmptyDescription": "Zure erosketen fakturak hemen agertuko dira fakturatzen zaizunean."
+    "personalEmptyDescription": "Zure erosketen fakturak hemen agertzen dira fakturatzen zaizunean. App Store-ko eta Google Play-ko ordainagiriak Kredituen historian daude.",
+    "personalPeriod": "Azken 12 hilabeteak"
   },
   "cloudAgent": {
     "compute": {

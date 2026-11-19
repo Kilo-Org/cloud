@@ -832,7 +832,19 @@
         "fileComment": "Komentar na datoteku",
         "outdatedOnPathLines": "Zastarjelo na {{path}} {{lines}}",
         "outdatedOnLines": "Zastarjelo na {{lines}}",
-        "outdatedOnPath": "Zastarjelo na {{path}}"
+        "outdatedOnPath": "Zastarjelo na {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Lijeva strana",
+        "sideRight": "Desna strana",
+        "outdatedOnLinesSide": "Zastarjelo na {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Zastarjelo na {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Zastarjelo ({{side}})",
+        "outdatedOnPathSide": "Zastarjelo na {{path}} ({{side}})"
       },
       "deletedUser": "obrisani korisnik",
       "replyForbiddenTerm": "Nemaš dozvolu da odgovoriš na ovaj {{term}}.",
@@ -3473,6 +3485,7 @@
       "sendInvite": "Pošalji pozivnicu",
       "title": "Pozovi člana",
       "alreadyInvited": "Osoba je već pozvana ili je već član.",
+      "organizationUnavailable": "Ova organizacija više nije dostupna.",
       "sendError": "Slanje pozivnice nije uspjelo.",
       "pendingInvitation": "Ova e-pošta već ima pozivnicu na čekanju.",
       "alreadyMember": "Ova osoba je već član ove organizacije.",
@@ -4694,7 +4707,8 @@
     "connectFailed": "Nije moguće otvoriti stranicu za povezivanje"
   },
   "invoices": {
-    "personalEmptyDescription": "Fakture za vaše lične kupovine pojavit će se ovdje nakon što vam se izvrši naplata."
+    "personalEmptyDescription": "Fakture za vaše lične kupovine pojavljuju se ovdje nakon što vam se izvrši naplata. Potvrde iz trgovine App Store i Google Play nalaze se u Historiji kredita.",
+    "personalPeriod": "Posljednjih 12 mjeseci"
   },
   "cloudAgent": {
     "compute": {

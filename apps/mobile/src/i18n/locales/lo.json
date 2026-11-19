@@ -820,7 +820,19 @@
         "fileComment": "ຄຳເຫັນກ່ຽວກັບໄຟລ໌",
         "outdatedOnPathLines": "ອ້າງອີງໂຄດເກົ່າໃນ {{path}} {{lines}}",
         "outdatedOnLines": "ອ້າງອີງໂຄດເກົ່າໃນ {{lines}}",
-        "outdatedOnPath": "ອ້າງອີງໂຄດເກົ່າໃນ {{path}}"
+        "outdatedOnPath": "ອ້າງອີງໂຄດເກົ່າໃນ {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "ຝັ່ງຊ້າຍ",
+        "sideRight": "ຝັ່ງຂວາ",
+        "outdatedOnLinesSide": "ອ້າງອີງໂຄດເກົ່າໃນ {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "ອ້າງອີງໂຄດເກົ່າໃນ {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "ອ້າງອີງໂຄດເກົ່າ ({{side}})",
+        "outdatedOnPathSide": "ອ້າງອີງໂຄດເກົ່າໃນ {{path}} ({{side}})"
       },
       "deletedUser": "ຜູ້ໃຊ້ທີ່ຖືກລຶບ",
       "replyForbiddenTerm": "ທ່ານບໍ່ມີສິດຕອບໃນ{{term}}ນີ້.",
@@ -3415,6 +3427,7 @@
       "sendInvite": "ສົ່ງຄຳເຊີນ",
       "title": "ເຊີນສະມາຊິກ",
       "alreadyInvited": "ພວກເຂົາຖືກເຊີນແລ້ວ ຫຼື ເປັນສະມາຊິກແລ້ວ.",
+      "organizationUnavailable": "ອົງກອນນີ້ບໍ່ມີຢູ່ແລ້ວ.",
       "sendError": "ບໍ່ສາມາດສົ່ງຄຳເຊີນໄດ້.",
       "pendingInvitation": "ອີເມວນີ້ມີຄຳເຊີນທີ່ລໍຖ້າຢູ່ແລ້ວ.",
       "alreadyMember": "ບຸກຄົນນີ້ເປັນສະມາຊິກຂອງອົງກອນນີ້ແລ້ວ.",
@@ -4619,7 +4632,8 @@
     "connectFailed": "ບໍ່ສາມາດເປີດໜ້າການເຊື່ອມຕໍ່ໄດ້"
   },
   "invoices": {
-    "personalEmptyDescription": "ໃບແຈ້ງໜີ້ສຳລັບການຊື້ຂອງທ່ານເອງຈະສະແດງຢູ່ບ່ອນນີ້ເມື່ອມີການຮຽກເກັບເງິນ."
+    "personalEmptyDescription": "ໃບແຈ້ງໜີ້ສຳລັບການຊື້ຂອງທ່ານເອງສະແດງຢູ່ບ່ອນນີ້ເມື່ອມີການຮຽກເກັບເງິນ. ໃບຮັບເງິນຈາກ App Store ແລະ Google Play ຢູ່ໃນປະຫວັດເຄຣດິດ.",
+    "personalPeriod": "12 ເດືອນຜ່ານມາ"
   },
   "cloudAgent": {
     "compute": {

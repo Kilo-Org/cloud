@@ -820,7 +820,19 @@
         "fileComment": "Σχόλιο για το αρχείο",
         "outdatedOnPathLines": "Παρωχημένο στο {{path}} {{lines}}",
         "outdatedOnLines": "Παρωχημένο: {{lines}}",
-        "outdatedOnPath": "Παρωχημένο στο {{path}}"
+        "outdatedOnPath": "Παρωχημένο στο {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Αριστερή πλευρά",
+        "sideRight": "Δεξιά πλευρά",
+        "outdatedOnLinesSide": "Παρωχημένο: {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Παρωχημένο στο {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Παρωχημένο ({{side}})",
+        "outdatedOnPathSide": "Παρωχημένο στο {{path}} ({{side}})"
       },
       "deletedUser": "διαγραμμένος χρήστης",
       "replyForbiddenTerm": "Δεν έχεις δικαίωμα να απαντήσεις σε αυτό το {{term}}.",
@@ -3415,6 +3427,7 @@
       "sendInvite": "Αποστολή πρόσκλησης",
       "title": "Πρόσκληση μέλους",
       "alreadyInvited": "Ο χρήστης έχει ήδη προσκληθεί ή είναι ήδη μέλος.",
+      "organizationUnavailable": "Αυτός ο οργανισμός δεν είναι πλέον διαθέσιμος.",
       "sendError": "Δεν ήταν δυνατή η αποστολή της πρόσκλησης.",
       "pendingInvitation": "Αυτό το email έχει ήδη μια εκκρεμή πρόσκληση.",
       "alreadyMember": "Αυτό το άτομο είναι ήδη μέλος αυτού του οργανισμού.",
@@ -4619,7 +4632,8 @@
     "connectFailed": "Δεν ήταν δυνατό το άνοιγμα της σελίδας σύνδεσης"
   },
   "invoices": {
-    "personalEmptyDescription": "Τα τιμολόγια για τις δικές σας αγορές θα εμφανίζονται εδώ μόλις χρεωθείτε."
+    "personalEmptyDescription": "Τα τιμολόγια για τις δικές σας αγορές εμφανίζονται εδώ μόλις χρεωθείτε. Οι αποδείξεις από το App Store και το Google Play βρίσκονται στο Ιστορικό μονάδων.",
+    "personalPeriod": "Τελευταίοι 12 μήνες"
   },
   "cloudAgent": {
     "compute": {

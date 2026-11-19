@@ -2979,7 +2979,19 @@
         "fileComment": "Комментарий к файлу",
         "outdatedOnPathLines": "Устаревший комментарий: {{path}}, {{lines}}",
         "outdatedOnLines": "Устаревший комментарий: {{lines}}",
-        "outdatedOnPath": "Устаревший комментарий: {{path}}"
+        "outdatedOnPath": "Устаревший комментарий: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}}, L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}}, {{lineRange}} ({{side}})",
+        "sideLeft": "Левая сторона",
+        "sideRight": "Правая сторона",
+        "outdatedOnLinesSide": "Устаревший комментарий: {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Устаревший комментарий: {{path}}, {{lines}} ({{side}})",
+        "outdatedSide": "Устаревший комментарий ({{side}})",
+        "outdatedOnPathSide": "Устаревший комментарий: {{path}} ({{side}})"
       },
       "deletedUser": "удалённый пользователь",
       "replyForbiddenTerm": "У вас нет прав для ответа в {{term}}.",
@@ -3536,6 +3548,7 @@
       "sendInvite": "Отправить приглашение",
       "title": "Пригласить участника",
       "alreadyInvited": "Этот адрес уже приглашён или уже принадлежит участнику организации.",
+      "organizationUnavailable": "Эта организация больше недоступна.",
       "sendError": "Не удалось отправить приглашение.",
       "pendingInvitation": "Для этого адреса электронной почты уже есть ожидающее приглашение.",
       "alreadyMember": "Этот человек уже является участником этой организации.",
@@ -4769,7 +4782,8 @@
     "connectFailed": "Не удалось открыть страницу подключения"
   },
   "invoices": {
-    "personalEmptyDescription": "Счета за ваши личные покупки появятся здесь после первого списания."
+    "personalEmptyDescription": "Счета за ваши личные покупки появляются здесь после первого списания. Чеки в App Store и Google Play находятся в разделе «История кредитов».",
+    "personalPeriod": "Последние 12 месяцев"
   },
   "cloudAgent": {
     "compute": {

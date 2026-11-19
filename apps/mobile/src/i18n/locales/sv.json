@@ -820,7 +820,19 @@
         "fileComment": "Filkommentar",
         "outdatedOnPathLines": "Inaktuell i {{path}} {{lines}}",
         "outdatedOnLines": "Inaktuell på {{lines}}",
-        "outdatedOnPath": "Inaktuell i {{path}}"
+        "outdatedOnPath": "Inaktuell i {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Vänster sida",
+        "sideRight": "Höger sida",
+        "outdatedOnLinesSide": "Inaktuell på {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Inaktuell i {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Inaktuell ({{side}})",
+        "outdatedOnPathSide": "Inaktuell i {{path}} ({{side}})"
       },
       "deletedUser": "borttagen användare",
       "replyForbiddenTerm": "Du har inte behörighet att svara på {{term}}.",
@@ -3415,6 +3427,7 @@
       "sendInvite": "Skicka inbjudan",
       "title": "Bjud in medlem",
       "alreadyInvited": "Personen är redan inbjuden eller redan medlem.",
+      "organizationUnavailable": "Den här organisationen är inte längre tillgänglig.",
       "sendError": "Inbjudan kunde inte skickas.",
       "pendingInvitation": "Den här e-postadressen har redan en väntande inbjudan.",
       "alreadyMember": "Den här personen är redan medlem i den här organisationen.",
@@ -4619,7 +4632,8 @@
     "connectFailed": "Det gick inte att öppna anslutningssidan"
   },
   "invoices": {
-    "personalEmptyDescription": "Fakturor för dina egna köp visas här när du har fakturerats."
+    "personalEmptyDescription": "Fakturor för dina egna köp visas här när du har fakturerats. Kvitton från App Store och Google Play finns i Kredithistorik.",
+    "personalPeriod": "Senaste 12 månaderna"
   },
   "cloudAgent": {
     "compute": {

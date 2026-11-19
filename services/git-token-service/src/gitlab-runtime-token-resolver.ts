@@ -6,10 +6,8 @@ import {
   type GitLabLookupService,
   type GitLabRepositoryMatch,
 } from './gitlab-lookup-service.js';
-import {
-  sha256Digest,
-  type GitLabCapabilityCredentialSource,
-} from './gitlab-session-capability.js';
+import { sha256Hex } from '@kilocode/worker-utils/sha256';
+import type { GitLabCapabilityCredentialSource } from './gitlab-session-capability.js';
 import { readBoundedJsonBody } from './lib/bounded-read.js';
 
 export type GetGitLabTokenParams = {
@@ -269,7 +267,7 @@ export async function resolveGitLabRuntimeToken(
       : {
           type: 'project',
           projectId: candidate.projectId,
-          tokenDigest: await sha256Digest(candidate.token),
+          tokenDigest: await sha256Hex(candidate.token),
         };
   return {
     success: true,

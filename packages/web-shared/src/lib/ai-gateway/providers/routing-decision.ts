@@ -54,6 +54,7 @@ const PartnerSkipReasonSchema = z.enum([
   'bounded-spending',
   'openrouter-disabled',
   'provider-settings',
+  'unsupported-reasoning-effort',
   'invalid-credentials',
 ]);
 

@@ -247,10 +247,6 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     url: 'https://api.inceptron.io/v1/models',
   }),
   openAICompatibleFetcher({
-    providerId: 'martian',
-    url: 'https://api.withmartian.com/v1/models',
-  }),
-  openAICompatibleFetcher({
     providerId: 'synthetic',
     url: 'https://api.synthetic.new/v1/models',
   }),

@@ -2897,7 +2897,19 @@
         "fileComment": "Komentar file",
         "outdatedOnPathLines": "Sudah tidak sesuai di {{path}} {{lines}}",
         "outdatedOnLines": "Sudah tidak sesuai di {{lines}}",
-        "outdatedOnPath": "Sudah tidak sesuai di {{path}}"
+        "outdatedOnPath": "Sudah tidak sesuai di {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Sisi kiri",
+        "sideRight": "Sisi kanan",
+        "outdatedOnLinesSide": "Sudah tidak sesuai di {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Sudah tidak sesuai di {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Sudah tidak sesuai ({{side}})",
+        "outdatedOnPathSide": "Sudah tidak sesuai di {{path}} ({{side}})"
       },
       "deletedUser": "pengguna yang dihapus",
       "replyForbiddenTerm": "Kamu tidak memiliki izin untuk membalas {{term}} ini.",
@@ -3420,6 +3432,7 @@
       "sendInvite": "Kirim undangan",
       "title": "Undang anggota",
       "alreadyInvited": "Alamat email tersebut sudah diundang atau sudah menjadi anggota.",
+      "organizationUnavailable": "Organisasi ini sudah tidak tersedia lagi.",
       "sendError": "Tidak dapat mengirim undangan.",
       "pendingInvitation": "Email ini sudah memiliki undangan yang tertunda.",
       "alreadyMember": "Orang ini sudah menjadi anggota organisasi ini.",
@@ -4619,7 +4632,8 @@
     "connectFailed": "Tidak dapat membuka halaman koneksi"
   },
   "invoices": {
-    "personalEmptyDescription": "Faktur untuk pembelian pribadi Anda akan muncul di sini setelah Anda ditagih."
+    "personalEmptyDescription": "Faktur untuk pembelian pribadi Anda muncul di sini setelah Anda ditagih. Tanda terima dari App Store dan Google Play ada di Riwayat kredit.",
+    "personalPeriod": "12 Bulan Terakhir"
   },
   "cloudAgent": {
     "compute": {

@@ -820,7 +820,19 @@
         "fileComment": "फाइलवरील टिप्पणी",
         "outdatedOnPathLines": "{{path}} {{lines}} वर कालबाह्य",
         "outdatedOnLines": "{{lines}} वर कालबाह्य",
-        "outdatedOnPath": "{{path}} वर कालबाह्य"
+        "outdatedOnPath": "{{path}} वर कालबाह्य",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "डावीकडची बाजू",
+        "sideRight": "उजवीकडची बाजू",
+        "outdatedOnLinesSide": "{{lines}} वर कालबाह्य ({{side}})",
+        "outdatedOnPathLinesSide": "{{path}} {{lines}} वर कालबाह्य ({{side}})",
+        "outdatedSide": "कालबाह्य ({{side}})",
+        "outdatedOnPathSide": "{{path}} वर कालबाह्य ({{side}})"
       },
       "deletedUser": "हटवलेला वापरकर्ता",
       "replyForbiddenTerm": "तुम्हाला या {{term}}ला उत्तर देण्याची परवानगी नाही.",
@@ -3415,6 +3427,7 @@
       "sendInvite": "आमंत्रण पाठवा",
       "title": "सदस्याला आमंत्रित करा",
       "alreadyInvited": "त्यांना आधीच आमंत्रित केले आहे किंवा ते आधीपासूनच सदस्य आहेत.",
+      "organizationUnavailable": "ही संस्था आता उपलब्ध नाही.",
       "sendError": "आमंत्रण पाठवता आले नाही.",
       "pendingInvitation": "या ईमेलकडे आधीच एक प्रलंबित आमंत्रण आहे.",
       "alreadyMember": "ही व्यक्ती या संस्थेचा आधीच सदस्य आहे.",
@@ -4619,7 +4632,8 @@
     "connectFailed": "कनेक्शन पेज उघडता आले नाही"
   },
   "invoices": {
-    "personalEmptyDescription": "तुम्हाला बिल आकारले गेल्यावर तुमच्या स्वतःच्या खरेदीचे इनव्हॉइस येथे दिसतील."
+    "personalEmptyDescription": "तुम्हाला बिल आकारले गेल्यावर तुमच्या स्वतःच्या खरेदीचे इनव्हॉइस येथे दिसतात. App Store कडून पावती आणि Google Play कडून पावती क्रेडिट इतिहासात आहेत.",
+    "personalPeriod": "मागील 12 महिने"
   },
   "cloudAgent": {
     "compute": {

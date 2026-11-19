@@ -820,7 +820,19 @@
         "fileComment": "Athugasemd við skrá",
         "outdatedOnPathLines": "Úrelt við {{path}} {{lines}}",
         "outdatedOnLines": "Úrelt við {{lines}}",
-        "outdatedOnPath": "Úrelt við {{path}}"
+        "outdatedOnPath": "Úrelt við {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Vinstri hlið",
+        "sideRight": "Hægri hlið",
+        "outdatedOnLinesSide": "Úrelt við {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Úrelt við {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Úrelt ({{side}})",
+        "outdatedOnPathSide": "Úrelt við {{path}} ({{side}})"
       },
       "deletedUser": "eyddur notandi",
       "replyForbiddenTerm": "Þú hefur ekki heimild til að svara við {{term}}.",
@@ -3415,6 +3427,7 @@
       "sendInvite": "Senda boð",
       "title": "Bjóða meðlim að taka þátt",
       "alreadyInvited": "Tölvupóstfangið er þegar boðið eða meðlimurinn er þegar í félaginu.",
+      "organizationUnavailable": "Þetta fyrirtæki er ekki lengur í boði.",
       "sendError": "Ekki tókst að senda boðið.",
       "pendingInvitation": "Þetta tölvupóstfang er þegar með boð í bið.",
       "alreadyMember": "Þessi einstaklingur er þegar meðlimur í þessu fyrirtæki.",
@@ -4619,7 +4632,8 @@
     "connectFailed": "Ekki tókst að opna tengingarsíðuna"
   },
   "invoices": {
-    "personalEmptyDescription": "Reikningar fyrir þín eigin kaup birtast hér eftir fyrstu greiðslu."
+    "personalEmptyDescription": "Reikningar fyrir þín eigin kaup birtast hér eftir fyrstu greiðslu. Kvittanir frá App Store og Google Play eru í Inneignarferli.",
+    "personalPeriod": "Síðustu 12 mánuðir"
   },
   "cloudAgent": {
     "compute": {

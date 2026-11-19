@@ -820,7 +820,19 @@
         "fileComment": "Kōrero mō te kōnae",
         "outdatedOnPathLines": "Kua tawhito i {{path}} {{lines}}",
         "outdatedOnLines": "Kua tawhito i {{lines}}",
-        "outdatedOnPath": "Kua tawhito i {{path}}"
+        "outdatedOnPath": "Kua tawhito i {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Taha mauī",
+        "sideRight": "Taha matau",
+        "outdatedOnLinesSide": "Kua tawhito i {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Kua tawhito i {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Kua tawhito ({{side}})",
+        "outdatedOnPathSide": "Kua tawhito i {{path}} ({{side}})"
       },
       "deletedUser": "kaiwhakamahi kua mukua",
       "replyForbiddenTerm": "Kāore koe e whakaaetia kia whakautu ki tēnei {{term}}.",
@@ -3415,6 +3427,7 @@
       "sendInvite": "Tukuna te pōwhiri",
       "title": "Pōwhiritia he mema",
       "alreadyInvited": "Kua pōwhiritia kē, kua mema kē rānei.",
+      "organizationUnavailable": "Kua kore tēnei rōpū e wātea ana.",
       "sendError": "Kāore i taea te tuku i te pōwhiri.",
       "pendingInvitation": "Kua whai kē tēnei īmēra i tētahi pōwhiri e tatari ana.",
       "alreadyMember": "He mema kē tēnei tangata o tēnei rōpū.",
@@ -4619,7 +4632,8 @@
     "connectFailed": "Kāore i taea te huaki i te whārangi hononga"
   },
   "invoices": {
-    "personalEmptyDescription": "Ka puta mai ki konei ngā pire mō āu ake hoko ina tukuna he pire ki a koe."
+    "personalEmptyDescription": "E puta mai ana ki konei ngā pire mō āu ake hoko ina tukuna he pire ki a koe. Kei roto i te Hītori whiwhinga ngā rihīti mai i te App Store me te Rihīti mai i Google Play.",
+    "personalPeriod": "Ngā marama 12 kua pahure"
   },
   "cloudAgent": {
     "compute": {

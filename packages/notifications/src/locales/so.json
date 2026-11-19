@@ -6,7 +6,7 @@
       "lowBalance": "Hadhaagaagu wuxuu u baahan yahay feejignaan",
       "spendAlert": "Kharashkaagu wuxuu u baahan yahay feejignaan",
       "securityFinding": "Natiijo amnigu wuxuu u baahan yahay feejignaan",
-      "securityUpdate": "Hubin ammin ayaa leh cusboonaysiin",
+      "securityUpdate": "Hubin amni ayaa leh cusboonaysiin",
       "activeAgentsGlanceable": "Wakiillada firfircoon waxay leeyihiin cusboonaysiin"
     }
   },
@@ -28,7 +28,7 @@
       "body": "{{findingTitle}} gudaha {{repoFullName}}"
     },
     "securityFindingNew": {
-      "title": "Natiijo ammin cusub ({{severity}})"
+      "title": "Natiijo amni cusub ({{severity}})"
     },
     "securityFindingSlaWarning": {
       "title": "Digniin SLA"

@@ -820,7 +820,19 @@
         "fileComment": "Hozzászólás a fájlhoz",
         "outdatedOnPathLines": "Elavult: {{path}}, {{lines}}",
         "outdatedOnLines": "Elavult: {{lines}}",
-        "outdatedOnPath": "Elavult: {{path}}"
+        "outdatedOnPath": "Elavult: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}}, L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}}, {{lineRange}} ({{side}})",
+        "sideLeft": "Bal oldal",
+        "sideRight": "Jobb oldal",
+        "outdatedOnLinesSide": "Elavult: {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Elavult: {{path}}, {{lines}} ({{side}})",
+        "outdatedSide": "Elavult ({{side}})",
+        "outdatedOnPathSide": "Elavult: {{path}} ({{side}})"
       },
       "deletedUser": "törölt felhasználó",
       "replyForbiddenTerm": "Nincs jogosultságod a {{term}} megválaszolására.",
@@ -3415,6 +3427,7 @@
       "sendInvite": "Meghívó küldése",
       "title": "Tag meghívása",
       "alreadyInvited": "Már meg van hívva, vagy már tag.",
+      "organizationUnavailable": "Ez a szervezet már nem érhető el.",
       "sendError": "Nem sikerült elküldeni a meghívót.",
       "pendingInvitation": "Erre az e-mail-címre már van egy függőben lévő meghívó.",
       "alreadyMember": "Ez a személy már tagja ennek a szervezetnek.",
@@ -4619,7 +4632,8 @@
     "connectFailed": "Nem sikerült megnyitni a csatlakozási oldalt"
   },
   "invoices": {
-    "personalEmptyDescription": "A saját vásárlásaid számlái itt jelennek meg, amint kiállítjuk őket."
+    "personalEmptyDescription": "A saját vásárlásaid számlái itt jelennek meg, amint kiállítjuk őket. Az App Store és a Google Play nyugtái a Kreditelőzményekben érhetők el.",
+    "personalPeriod": "Elmúlt 12 hónap"
   },
   "cloudAgent": {
     "compute": {

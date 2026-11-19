@@ -820,7 +820,19 @@
         "fileComment": "Maoni kuhusu faili",
         "outdatedOnPathLines": "Yaliyopitwa na wakati kwenye {{path}} {{lines}}",
         "outdatedOnLines": "Yaliyopitwa na wakati kwenye {{lines}}",
-        "outdatedOnPath": "Yaliyopitwa na wakati kwenye {{path}}"
+        "outdatedOnPath": "Yaliyopitwa na wakati kwenye {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Upande wa kushoto",
+        "sideRight": "Upande wa kulia",
+        "outdatedOnLinesSide": "Yaliyopitwa na wakati kwenye {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Yaliyopitwa na wakati kwenye {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Yaliyopitwa na wakati ({{side}})",
+        "outdatedOnPathSide": "Yaliyopitwa na wakati kwenye {{path}} ({{side}})"
       },
       "deletedUser": "mtumiaji aliyefutwa",
       "replyForbiddenTerm": "Huna ruhusa ya kujibu {{term}}.",
@@ -3415,6 +3427,7 @@
       "sendInvite": "Tuma mwaliko",
       "title": "Alika mwanachama",
       "alreadyInvited": "Wamekwishaalikwa au ni wanachama tayari.",
+      "organizationUnavailable": "Shirika hili halipatikani tena.",
       "sendError": "Imeshindikana kutuma mwaliko.",
       "pendingInvitation": "Barua pepe hii tayari ina mwaliko unaosubiri.",
       "alreadyMember": "Mtu huyu tayari ni mwanachama wa shirika hili.",
@@ -4619,7 +4632,8 @@
     "connectFailed": "Imeshindwa kufungua ukurasa wa kuunganisha"
   },
   "invoices": {
-    "personalEmptyDescription": "Ankara za ununuzi wako binafsi zitaonekana hapa baada ya kutozwa."
+    "personalEmptyDescription": "Ankara za ununuzi wako binafsi zinaonekana hapa baada ya kutozwa. Risiti kutoka App Store na Google Play ziko katika Historia ya salio.",
+    "personalPeriod": "Miezi 12 iliyopita"
   },
   "cloudAgent": {
     "compute": {

@@ -820,7 +820,19 @@
         "fileComment": "Koment për skedarin",
         "outdatedOnPathLines": "I vjetëruar te {{path}} {{lines}}",
         "outdatedOnLines": "I vjetëruar te {{lines}}",
-        "outdatedOnPath": "I vjetëruar te {{path}}"
+        "outdatedOnPath": "I vjetëruar te {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Ana e majtë",
+        "sideRight": "Ana e djathtë",
+        "outdatedOnLinesSide": "I vjetëruar te {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "I vjetëruar te {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "I vjetëruar ({{side}})",
+        "outdatedOnPathSide": "I vjetëruar te {{path}} ({{side}})"
       },
       "deletedUser": "përdorues i fshirë",
       "replyForbiddenTerm": "Nuk ke leje të përgjigjesh në këtë {{term}}.",
@@ -3415,6 +3427,7 @@
       "sendInvite": "Dërgo ftesën",
       "title": "Fto anëtar",
       "alreadyInvited": "Ky person është ftuar tashmë ose është tashmë anëtar.",
+      "organizationUnavailable": "Kjo organizatë nuk është më e disponueshme.",
       "sendError": "Ftesa nuk u dërgua.",
       "pendingInvitation": "Ky email ka tashmë një ftesë në pritje.",
       "alreadyMember": "Ky person është tashmë anëtar i kësaj organizate.",
@@ -4619,7 +4632,8 @@
     "connectFailed": "Faqja e lidhjes nuk mund të hapej"
   },
   "invoices": {
-    "personalEmptyDescription": "Faturat për blerjet e tua personale do të shfaqen këtu pasi të faturohesh."
+    "personalEmptyDescription": "Faturat për blerjet e tua personale shfaqen këtu pasi të faturohesh. Dëftesat nga App Store dhe Google Play janë në Historikun e kredive.",
+    "personalPeriod": "12 muajt e fundit"
   },
   "cloudAgent": {
     "compute": {

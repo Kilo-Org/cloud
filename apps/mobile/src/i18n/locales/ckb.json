@@ -820,7 +820,19 @@
         "fileComment": "بۆچوون لەسەر فایل",
         "outdatedOnPathLines": "کۆنبووەوە لە {{path}} {{lines}}",
         "outdatedOnLines": "کۆنبووەوە لە {{lines}}",
-        "outdatedOnPath": "کۆنبووەوە لە {{path}}"
+        "outdatedOnPath": "کۆنبووەوە لە {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "لای چەپ",
+        "sideRight": "لای ڕاست",
+        "outdatedOnLinesSide": "کۆنبووەوە لە {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "کۆنبووەوە لە {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "کۆنبووەوە ({{side}})",
+        "outdatedOnPathSide": "کۆنبووەوە لە {{path}} ({{side}})"
       },
       "deletedUser": "بەکارهێنەری سڕاوە",
       "replyForbiddenTerm": "مۆڵەتی وەڵامدانەوەی ئەم {{term}}ەت نییە.",
@@ -3415,6 +3427,7 @@
       "sendInvite": "ناردنی بانگهێشت",
       "title": "بانگهێشتکردنی ئەندام",
       "alreadyInvited": "ئەو کەسە پێشتر بانگهێشت کراوە یان پێشتر ئەندامە.",
+      "organizationUnavailable": "ئەم ڕێکخراوە چیتر بەردەست نییە.",
       "sendError": "نەتوانرا بانگهێشتەکە بنێردرێت.",
       "pendingInvitation": "ئەم ئیمەیڵە پێشتر بانگهێشتێکی چاوەڕوانی هەیە.",
       "alreadyMember": "ئەم کەسە پێشتر ئەندامی ئەم ڕێکخراوەیە.",
@@ -4619,7 +4632,8 @@
     "connectFailed": "نەتوانرا پەڕەی پەیوەستکردن بکرێتەوە"
   },
   "invoices": {
-    "personalEmptyDescription": "فاکتۆرەکانی کڕینەکانی خۆت دوای ئەوەی پارەت لێ وەردەگیرێت لێرە دەردەکەون."
+    "personalEmptyDescription": "فاکتۆرەکانی کڕینەکانی خۆت دوای ئەوەی پارەت لێ وەردەگیرێت لێرە دەردەکەون. پسوولە لە App Store و Google Play لە مێژووی کرێدیت دان.",
+    "personalPeriod": "12 مانگی ڕابردوو"
   },
   "cloudAgent": {
     "compute": {

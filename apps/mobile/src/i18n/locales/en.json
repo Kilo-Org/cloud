@@ -917,7 +917,19 @@
         "fileComment": "File comment",
         "outdatedOnPathLines": "Outdated on {{path}} {{lines}}",
         "outdatedOnLines": "Outdated on {{lines}}",
-        "outdatedOnPath": "Outdated on {{path}}"
+        "outdatedOnPath": "Outdated on {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Left side",
+        "sideRight": "Right side",
+        "outdatedOnLinesSide": "Outdated on {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Outdated on {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Outdated ({{side}})",
+        "outdatedOnPathSide": "Outdated on {{path}} ({{side}})"
       },
       "deletedUser": "deleted user",
       "replyForbiddenTerm": "You don't have permission to reply to this {{term}}.",
@@ -3518,6 +3530,7 @@
       "sendInvite": "Send invite",
       "title": "Invite member",
       "alreadyInvited": "They're already invited or already a member.",
+      "organizationUnavailable": "This organization is no longer available.",
       "sendError": "Couldn't send the invite.",
       "pendingInvitation": "This email already has a pending invitation.",
       "alreadyMember": "This person is already a member of this organization.",
@@ -4619,7 +4632,8 @@
     "connectFailed": "Could not open the connection page"
   },
   "invoices": {
-    "personalEmptyDescription": "Invoices for your own purchases will appear here once you are billed."
+    "personalPeriod": "Last 12 months",
+    "personalEmptyDescription": "Invoices for your own purchases appear here once you are billed. App Store and Google Play receipts are in Credit history."
   },
   "cloudAgent": {
     "compute": {

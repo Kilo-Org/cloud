@@ -83,7 +83,9 @@ jest.mock('./direct-byok-definitions', () => ({
       [mockModel('glm-5.2', 'z-ai/glm-5.2'), mockModel('kimi-k2.6', 'moonshotai/kimi-k2.6')],
       'z-ai'
     ),
-    mockProvider('martian', undefined, [mockModel('moonshotai/kimi-k2.6', 'moonshotai/kimi-k2.6')]),
+    mockProvider('kimi-coding', undefined, [
+      mockModel('moonshotai/kimi-k2.6', 'moonshotai/kimi-k2.6'),
+    ]),
     mockProvider('morph-byok', 'morph', [mockModel('morph-v3-fast')]),
     mockProvider('chutes-byok', 'chutes', [mockModel('moonshotai/retired', 'moonshotai/retired')]),
   ],
@@ -128,11 +130,11 @@ beforeEach(() => {
 describe('catalog mode support', () => {
   test('requires a models.dev id and at least one current catalog mapping', async () => {
     expect(supportsCatalogMode(provider('synthetic'))).toBe(true);
-    expect(supportsCatalogMode(provider('martian'))).toBe(false);
+    expect(supportsCatalogMode(provider('kimi-coding'))).toBe(false);
     await expect(offersCatalogMode(provider('synthetic'))).resolves.toBe(true);
     await expect(offersCatalogMode(provider('morph-byok'))).resolves.toBe(false);
     await expect(offersCatalogMode(provider('chutes-byok'))).resolves.toBe(false);
-    await expect(offersCatalogMode(provider('martian'))).resolves.toBe(false);
+    await expect(offersCatalogMode(provider('kimi-coding'))).resolves.toBe(false);
   });
 
   test('lists the current catalog ids a provider serves with their primary model', async () => {
@@ -179,19 +181,23 @@ describe('free models in catalog mode', () => {
 
 describe('direct BYOK model lists in catalog mode', () => {
   test('omits bespoke entries of catalog-mode keys', async () => {
-    mockedKeys.mockResolvedValueOnce(keys({ synthetic: true, 'zai-coding': false, martian: true }));
+    mockedKeys.mockResolvedValueOnce(
+      keys({ synthetic: true, 'zai-coding': false, 'kimi-coding': true })
+    );
 
     const models = await getDirectByokModelsForUser('user-id');
 
     expect(models.map(entry => entry.id)).toEqual([
       'zai-coding/glm-5.2',
       'zai-coding/kimi-k2.6',
-      'martian/moonshotai/kimi-k2.6',
+      'kimi-coding/moonshotai/kimi-k2.6',
     ]);
   });
 
   test('lists current catalog ids served by catalog-mode keys only', async () => {
-    mockedKeys.mockResolvedValueOnce(keys({ synthetic: true, 'zai-coding': false, martian: true }));
+    mockedKeys.mockResolvedValueOnce(
+      keys({ synthetic: true, 'zai-coding': false, 'kimi-coding': true })
+    );
 
     const catalogIds = await getDirectByokCatalogModelIds({ type: 'user', id: 'user-id' });
 

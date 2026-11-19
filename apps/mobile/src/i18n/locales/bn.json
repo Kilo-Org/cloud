@@ -820,7 +820,19 @@
         "fileComment": "ফাইলের মন্তব্য",
         "outdatedOnPathLines": "পুরোনো সংস্করণের {{path}} {{lines}}-এ",
         "outdatedOnLines": "পুরোনো সংস্করণের {{lines}}-এ",
-        "outdatedOnPath": "পুরোনো সংস্করণের {{path}}-এ"
+        "outdatedOnPath": "পুরোনো সংস্করণের {{path}}-এ",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "বাম দিক",
+        "sideRight": "ডান দিক",
+        "outdatedOnLinesSide": "পুরোনো সংস্করণের {{lines}}-এ ({{side}})",
+        "outdatedOnPathLinesSide": "পুরোনো সংস্করণের {{path}} {{lines}}-এ ({{side}})",
+        "outdatedSide": "পুরোনো সংস্করণের ({{side}})",
+        "outdatedOnPathSide": "পুরোনো সংস্করণের {{path}}-এ ({{side}})"
       },
       "deletedUser": "মুছে ফেলা ব্যবহারকারী",
       "replyForbiddenTerm": "এই {{term}}ে উত্তর দেওয়ার অনুমতি আপনার নেই।",
@@ -3415,6 +3427,7 @@
       "sendInvite": "আমন্ত্রণ পাঠান",
       "title": "সদস্যকে আমন্ত্রণ জানান",
       "alreadyInvited": "এই ব্যক্তি ইতোমধ্যে আমন্ত্রিত অথবা সদস্য।",
+      "organizationUnavailable": "এই সংস্থাটি আর উপলব্ধ নেই।",
       "sendError": "আমন্ত্রণ পাঠানো যায়নি।",
       "pendingInvitation": "এই ইমেইলে ইতিমধ্যে একটি অপেক্ষমাণ আমন্ত্রণ রয়েছে।",
       "alreadyMember": "এই ব্যক্তি ইতিমধ্যে এই সংস্থার একজন সদস্য।",
@@ -4619,7 +4632,8 @@
     "connectFailed": "সংযোগের পেজটি খোলা যায়নি"
   },
   "invoices": {
-    "personalEmptyDescription": "আপনার কাছ থেকে বিল নেওয়া হলে আপনার নিজের কেনাকাটার ইনভয়েস এখানে দেখা যাবে।"
+    "personalEmptyDescription": "আপনার কাছ থেকে বিল নেওয়া হলে আপনার নিজের কেনাকাটার ইনভয়েস এখানে দেখা যায়। App Store-এর রসিদ এবং Google Play-এর রসিদ ক্রেডিট ইতিহাসে আছে।",
+    "personalPeriod": "শেষ 12 মাস"
   },
   "cloudAgent": {
     "compute": {

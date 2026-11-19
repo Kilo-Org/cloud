@@ -2897,7 +2897,19 @@
         "fileComment": "Opmerking bij bestand",
         "outdatedOnPathLines": "Verouderd in {{path}}, {{lines}}",
         "outdatedOnLines": "Verouderd bij {{lines}}",
-        "outdatedOnPath": "Verouderd in {{path}}"
+        "outdatedOnPath": "Verouderd in {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Linkerkant",
+        "sideRight": "Rechterkant",
+        "outdatedOnLinesSide": "Verouderd bij {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Verouderd in {{path}}, {{lines}} ({{side}})",
+        "outdatedSide": "Verouderd ({{side}})",
+        "outdatedOnPathSide": "Verouderd in {{path}} ({{side}})"
       },
       "deletedUser": "verwijderde gebruiker",
       "replyForbiddenTerm": "Je hebt geen toestemming om op deze {{term}} te reageren.",
@@ -3420,6 +3432,7 @@
       "sendInvite": "Uitnodiging verzenden",
       "title": "Lid uitnodigen",
       "alreadyInvited": "Dit e-mailadres is al uitgenodigd of is al lid.",
+      "organizationUnavailable": "Deze organisatie is niet meer beschikbaar.",
       "sendError": "De uitnodiging kon niet worden verzonden.",
       "pendingInvitation": "Dit e-mailadres heeft al een openstaande uitnodiging.",
       "alreadyMember": "Deze persoon is al lid van deze organisatie.",
@@ -4619,7 +4632,8 @@
     "connectFailed": "Kan de koppelingspagina niet openen"
   },
   "invoices": {
-    "personalEmptyDescription": "Facturen voor je eigen aankopen verschijnen hier zodra je wordt gefactureerd."
+    "personalEmptyDescription": "Facturen voor je eigen aankopen verschijnen hier zodra je wordt gefactureerd. Bonnen in de App Store en Google Play staan in Tegoedgeschiedenis.",
+    "personalPeriod": "Laatste 12 maanden"
   },
   "cloudAgent": {
     "compute": {

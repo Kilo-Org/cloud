@@ -820,7 +820,19 @@
         "fileComment": "Fayla şərh",
         "outdatedOnPathLines": "Köhnəlib: {{path}}, {{lines}}",
         "outdatedOnLines": "Köhnəlib: {{lines}}",
-        "outdatedOnPath": "Köhnəlib: {{path}}"
+        "outdatedOnPath": "Köhnəlib: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Sol tərəf",
+        "sideRight": "Sağ tərəf",
+        "outdatedOnLinesSide": "Köhnəlib: {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Köhnəlib: {{path}}, {{lines}} ({{side}})",
+        "outdatedSide": "Köhnəlib ({{side}})",
+        "outdatedOnPathSide": "Köhnəlib: {{path}} ({{side}})"
       },
       "deletedUser": "silinmiş istifadəçi",
       "replyForbiddenTerm": "Bu {{term}}na cavab vermək icazən yoxdur.",
@@ -3415,6 +3427,7 @@
       "sendInvite": "Dəvət göndər",
       "title": "Üzv dəvət et",
       "alreadyInvited": "Bu e-poçt ünvanı artıq dəvət olunub və ya artıq üzvdür.",
+      "organizationUnavailable": "Bu təşkilat artıq mövcud deyil.",
       "sendError": "Dəvət göndərilmədi.",
       "pendingInvitation": "Bu e-poçt ünvanının artıq gözləyən dəvəti var.",
       "alreadyMember": "Bu şəxs artıq bu təşkilatın üzvüdür.",
@@ -4619,7 +4632,8 @@
     "connectFailed": "Qoşulma səhifəsini açmaq mümkün olmadı"
   },
   "invoices": {
-    "personalEmptyDescription": "Ödəniş tutulduqdan sonra şəxsi alışlarınızın fakturaları burada görünəcək."
+    "personalEmptyDescription": "Ödəniş tutulduqdan sonra şəxsi alışlarınızın fakturaları burada görünür. App Store və Google Play qəbzləri Kredit tarixçəsindədir.",
+    "personalPeriod": "Son 12 ay"
   },
   "cloudAgent": {
     "compute": {

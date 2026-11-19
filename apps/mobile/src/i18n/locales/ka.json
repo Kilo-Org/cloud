@@ -820,7 +820,19 @@
         "fileComment": "კომენტარი ფაილზე",
         "outdatedOnPathLines": "მოძველებული · {{path}} · {{lines}}",
         "outdatedOnLines": "მოძველებული · {{lines}}",
-        "outdatedOnPath": "მოძველებული · {{path}}"
+        "outdatedOnPath": "მოძველებული · {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "მარცხენა მხარე",
+        "sideRight": "მარჯვენა მხარე",
+        "outdatedOnLinesSide": "მოძველებული · {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "მოძველებული · {{path}} · {{lines}} ({{side}})",
+        "outdatedSide": "მოძველებული ({{side}})",
+        "outdatedOnPathSide": "მოძველებული · {{path}} ({{side}})"
       },
       "deletedUser": "წაშლილი მომხმარებელი",
       "replyForbiddenTerm": "ამ {{term}}-ზე პასუხის გაცემის უფლება არ გაქვს.",
@@ -3415,6 +3427,7 @@
       "sendInvite": "მოწვევის გაგზავნა",
       "title": "წევრის მოწვევა",
       "alreadyInvited": "ის უკვე მოწვეულია ან უკვე არის წევრი.",
+      "organizationUnavailable": "ეს ორგანიზაცია აღარ არის ხელმისაწვდომი.",
       "sendError": "მოწვევის გაგზავნა ვერ მოხერხდა.",
       "pendingInvitation": "ამ ელფოსტაზე უკვე არის მოლოდინში მყოფი მოწვევა.",
       "alreadyMember": "ეს პირი უკვე ამ ორგანიზაციის წევრია.",
@@ -4619,7 +4632,8 @@
     "connectFailed": "დაკავშირების გვერდის გახსნა ვერ მოხერხდა"
   },
   "invoices": {
-    "personalEmptyDescription": "თქვენი პირადი შენაძენების ინვოისები აქ გამოჩნდება, როგორც კი თანხა ჩამოგეჭრებათ."
+    "personalEmptyDescription": "თქვენი პირადი შენაძენების ინვოისები აქ გამოჩნდება, როგორც კი თანხა ჩამოგეჭრებათ. ქვითრები App Store-იდან და Google Play-დან კრედიტების ისტორიაშია.",
+    "personalPeriod": "ბოლო 12 თვე"
   },
   "cloudAgent": {
     "compute": {

@@ -820,7 +820,19 @@
         "fileComment": "ફાઇલ પરની ટિપ્પણી",
         "outdatedOnPathLines": "{{path}} {{lines}} પર જૂનું",
         "outdatedOnLines": "{{lines}} પર જૂનું",
-        "outdatedOnPath": "{{path}} પર જૂનું"
+        "outdatedOnPath": "{{path}} પર જૂનું",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "ડાબી બાજુ",
+        "sideRight": "જમણી બાજુ",
+        "outdatedOnLinesSide": "{{lines}} પર જૂનું ({{side}})",
+        "outdatedOnPathLinesSide": "{{path}} {{lines}} પર જૂનું ({{side}})",
+        "outdatedSide": "જૂનું ({{side}})",
+        "outdatedOnPathSide": "{{path}} પર જૂનું ({{side}})"
       },
       "deletedUser": "કાઢી નાખેલો વપરાશકર્તા",
       "replyForbiddenTerm": "તમને આ {{term}} પર જવાબ આપવાની પરવાનગી નથી.",
@@ -3415,6 +3427,7 @@
       "sendInvite": "આમંત્રણ મોકલો",
       "title": "સભ્યને આમંત્રિત કરો",
       "alreadyInvited": "તેઓ પહેલેથી આમંત્રિત છે અથવા પહેલેથી સભ્ય છે.",
+      "organizationUnavailable": "આ સંસ્થા હવે ઉપલબ્ધ નથી.",
       "sendError": "આમંત્રણ મોકલી શકાયું નહીં.",
       "pendingInvitation": "આ ઇમેઇલ પર પહેલેથી જ એક આમંત્રણ બાકી છે.",
       "alreadyMember": "આ વ્યક્તિ પહેલેથી જ આ સંસ્થાના સભ્ય છે.",
@@ -4619,7 +4632,8 @@
     "connectFailed": "કનેક્શન પેજ ખોલી શકાયું નહીં"
   },
   "invoices": {
-    "personalEmptyDescription": "તમને બિલ મોકલવામાં આવે પછી તમારી પોતાની ખરીદીઓના ઇન્વૉઇસ અહીં દેખાશે."
+    "personalEmptyDescription": "તમને બિલ મોકલવામાં આવે પછી તમારી પોતાની ખરીદીઓના ઇન્વૉઇસ અહીં દેખાય છે. App Store અને Google Playની રસીદો ક્રેડિટ ઇતિહાસમાં છે.",
+    "personalPeriod": "છેલ્લા 12 મહિના"
   },
   "cloudAgent": {
     "compute": {

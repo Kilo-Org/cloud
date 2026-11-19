@@ -441,11 +441,10 @@ export function resolveSessionTerminalError(input: {
     // copy and keep the original for the clipboard. The class decides the
     // Retry for a transport failure; the typed transcript-read failure is
     // decided by its kind instead, ahead of the classification.
-    const loadFailureTitle = i18n.t('agentChat.session.couldNotLoadThisSession');
     if (isTerminalSessionHistoryFailure(input.historyFailureKind)) {
       return {
         variant: 'server',
-        title: loadFailureTitle,
+        title: i18n.t('agentChat.session.couldNotLoadThisSession'),
         message: i18n.t(sessionHistoryFailureCopyKey(input.historyFailureKind)),
         retryable: false,
         retryWith: 'session',
@@ -465,7 +464,7 @@ export function resolveSessionTerminalError(input: {
     }
     return {
       variant: 'server',
-      title: loadFailureTitle,
+      title: i18n.t('agentChat.session.couldNotLoadThisSession'),
       message: i18n.t('agentChat.session.failedToLoadDetails'),
       retryable: true,
       retryWith: 'session',

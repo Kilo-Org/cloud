@@ -213,6 +213,11 @@ export const createRuntimeBrowserBridge = ({
    * never reused, so nothing else would ever reclaim them.
    */
   const ended = new Map<string, number>();
+  /**
+   * Calls each session has running per tab. A model step may send several tool
+   * calls at once; the lease is the session's until the last of them ends.
+   */
+  const callsInFlight = new Map<string, number>();
 
   const pruneEnded = (): void => {
     const expiredBefore = clock() - ENDED_SESSION_TTL_MS;
@@ -300,6 +305,10 @@ export const createRuntimeBrowserBridge = ({
   ): Promise<JsonRpcResult> => {
     const { step, tabId } = tab;
     const caller = sessionCaller(input);
+    const flightKey = JSON.stringify([input.controllerId, input.sessionHandle, tabId]);
+
+    callsInFlight.set(flightKey, (callsInFlight.get(flightKey) ?? 0) + 1);
+
     const outcome = await runtime()
       .runTool({
         agent: {
@@ -312,8 +321,16 @@ export const createRuntimeBrowserBridge = ({
         tabId,
         toolName: parsed.name,
       })
-      // Turn end: this call's lease goes, its refs stay, and the session's other tabs keep theirs.
+      // Turn end: the lease goes with the session's last call on this tab, its refs stay, and its other tabs keep theirs.
       .finally(() => {
+        const remaining = (callsInFlight.get(flightKey) ?? 1) - 1;
+
+        if (remaining > 0) {
+          callsInFlight.set(flightKey, remaining);
+          return;
+        }
+
+        callsInFlight.delete(flightKey);
         runtime().releaseTab({ caller, tabId });
       });
 

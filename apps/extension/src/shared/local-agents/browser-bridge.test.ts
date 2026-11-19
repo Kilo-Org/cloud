@@ -258,6 +258,42 @@ describe('local agent browser bridge', () => {
     expect(fake.released).toStrictEqual([]);
   });
 
+  it('keeps the session lease while another of its calls on the tab still runs', async () => {
+    const fake = createFakeRuntime();
+    const pending: (() => void)[] = [];
+    const runtime: LocalAgentBrowserRuntime = {
+      ...fake.runtime,
+      runTool: async input => {
+        const { promise, resolve } = Promise.withResolvers<void>();
+
+        pending.push(resolve);
+        await promise;
+
+        return fake.runtime.runTool(input);
+      },
+    };
+    const bridge = createRuntimeBrowserBridge({ runtime: () => runtime });
+
+    await openAndShare(bridge);
+
+    // A model step with two tool calls: the CLI sends both at once on the session's tab.
+    const first = bridge.callTool(CONTROLLER, snapshotParams());
+    const second = bridge.callTool(CONTROLLER, snapshotParams());
+
+    await vi.waitFor(() => {
+      expect(pending).toHaveLength(2);
+    });
+    pending[0]?.();
+    await first;
+
+    // The second call still runs on the tab: the lease must not be free for another caller yet.
+    expect(fake.releasedTabs).toStrictEqual([]);
+
+    pending[1]?.();
+    await second;
+    expect(fake.releasedTabs).toStrictEqual([{ caller: `${CONTROLLER}:${HANDLE}`, tabId: 5 }]);
+  });
+
   it('prefers the browser\u2019s active tab when the session owns it', async () => {
     const fake = createFakeRuntime({ share: { tabId: 5 } });
     const bridge = createRuntimeBrowserBridge({

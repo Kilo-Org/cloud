@@ -279,7 +279,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
   // Last CLI row the watcher accepted as new evidence for the current
   // read-only open. A payload whose watched row carries the same status and
   // connection as this one brings nothing new, so it must not re-resolve.
-  let lastUpgradeEvidence: { status: string; connectionId?: string } | null = null;
+  let lastUpgradeEvidence: { status: string; connectionId?: string | undefined } | null = null;
   let rearmTimer: ReturnType<typeof setTimeout> | null = null;
 
   // A session resolves to 'read-only' when the CLI hasn't (yet) reported it as

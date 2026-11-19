@@ -633,6 +633,7 @@ Abrupt OOM/SIGKILL failures and synthetic session failure events are not capture
 
 - `DOCKER_SOCKET` - Path or URL for the Docker daemon socket; `services/cloud-agent-next/scripts/dev.sh` maps it to `DOCKER_HOST` for local Wrangler. [SERVER]
 - `SECRET` - Generic secret env var used in `services/kiloclaw/src/auth/sandbox-id-adversarial.test.ts` for sandbox auth tests. `[SECRET]`
+- `SESSION_SHARE_JWT_SECRET_PROD` - Secrets Store binding of `services/session-ingest` that signs and verifies public session share tokens. Only that Worker reads it, so `pnpm dev:env` generates a random local value (`@dev-generate base64 32`) and no `.env.local` key is needed. `[SECRET]`
 
 ## Browser Extension (apps/extension)
 

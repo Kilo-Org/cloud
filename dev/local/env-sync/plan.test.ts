@@ -601,6 +601,37 @@ test('generates an annotated secret instead of copying a plaintext env source', 
   }
 });
 
+test('generates the session share signing secret for the local session ingest Worker', () => {
+  const sessionIngestDir = 'services/session-ingest';
+  const repo = createRepo({
+    '.env.local':
+      'NEXTAUTH_SECRET=synthetic-auth-key\nINTERNAL_API_SECRET=synthetic-internal-key\n',
+    [`${sessionIngestDir}/package.json`]: fs.readFileSync(
+      new URL(`../../../${sessionIngestDir}/package.json`, import.meta.url),
+      'utf-8'
+    ),
+    [`${sessionIngestDir}/wrangler.jsonc`]: fs.readFileSync(
+      new URL(`../../../${sessionIngestDir}/wrangler.jsonc`, import.meta.url),
+      'utf-8'
+    ),
+  });
+  try {
+    withFakePnpm('', () => {
+      const plan = computePlan(repo.root, new Set(['cloudflare-session-ingest']));
+      assert.deepEqual(plan.secretStoreWarnings, []);
+      const create = plan.secretStoreAutoCreates.find(
+        item => item.binding.secret_name === 'SESSION_SHARE_JWT_SECRET_PROD'
+      );
+      assert.ok(create);
+      assert.equal(create.workerDir, sessionIngestDir);
+      assert.equal(create.sourceKey, '@dev-generate base64 32');
+      assert.equal(Buffer.from(create.value, 'base64').length, 32);
+    });
+  } finally {
+    repo.cleanup();
+  }
+});
+
 test('applies generation only to the annotated Secrets Store binding', () => {
   const repo = createGitTokenServiceRepo({
     rootSecretBinding: `{

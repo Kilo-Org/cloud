@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one suite for the manual-review start's failure contract: code-based copy, the reader's role for the trial refusal and the step it offers, retryability and the deadline stall share one mounted harness */
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -28,6 +29,9 @@ const startMutation = vi.hoisted(() => ({
   mutate: vi.fn(),
   lastOptions: null as StartMutationOptions | null,
 }));
+// The reader's organization role: only `owner`, `admin` and `billing_manager`
+// may take the plan step a trial refusal offers.
+const orgState = vi.hoisted(() => ({ role: 'member' as string | undefined }));
 
 vi.mock('react-native', () => ({
   AccessibilityInfo: { announceForAccessibility: vi.fn(), setAccessibilityFocus: vi.fn() },
@@ -63,6 +67,24 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: vi.fn(), push: status.push }),
   useFocusEffect: () => undefined,
 }));
+// The screen reads the reader's organization role for a trial refusal, so the
+// membership list it resolves through is driven per test.
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ organizationId: 'org_1', isLoaded: true }),
+}));
+vi.mock('@/lib/hooks/use-organizations-list', () => ({
+  useOrganizationsList: () => ({
+    data: [{ organizationId: 'org_1', role: orgState.role }],
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    refetch: vi.fn(),
+  }),
+}));
+vi.mock('@/lib/trpc', () => ({
+  trpcClient: {},
+  useTRPC: () => ({}),
+}));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
@@ -77,6 +99,7 @@ vi.mock('@/components/ui/radio-group', () => ({
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/code-reviewer-config', () => ({
+  isPersonal: (scope: string) => scope === 'personal',
   PLATFORM_CAPABILITIES: { github: { label: 'GitHub' }, gitlab: { label: 'GitLab' } },
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -166,6 +189,14 @@ function startAction(renderer: TestRenderer.ReactTestRenderer) {
   );
 }
 
+/** The plan step a trial refusal offers a money role, or none. */
+function billingStep(renderer: TestRenderer.ReactTestRenderer) {
+  const label = i18n.t('organization.hub.manageBilling');
+  return findAllOfType(renderer.root, 'Pressable').find(
+    node => (node.props as { accessibilityLabel?: string }).accessibilityLabel === label
+  );
+}
+
 /** Fill the URL and tap the start action; returns the handlers the start passed. */
 function startReview(renderer: TestRenderer.ReactTestRenderer): StartMutationOptions {
   const [urlInput] = findAllOfType(renderer.root, 'TextInput');
@@ -191,6 +222,8 @@ function startReview(renderer: TestRenderer.ReactTestRenderer): StartMutationOpt
 beforeEach(() => {
   status.connected = true;
   status.pending = false;
+  orgState.role = 'member';
+  status.push.mockClear();
   startMutation.mutate.mockClear();
   startMutation.lastOptions = null;
 });
@@ -233,6 +266,49 @@ describe('ManualReviewScreen start failure copy', () => {
     expect(retryButton(renderer)).toBeUndefined();
     // The form keeps its one way forward.
     expect(startAction(renderer)).toBeDefined();
+
+    unmount();
+  });
+
+  it('offers a billing role the plan step with the copy that offers it', async () => {
+    orgState.role = 'owner';
+    const { renderer, unmount } = await renderScreen();
+    const handlers = startReview(renderer);
+
+    act(() => handlers.onError?.(trpcError('FORBIDDEN', 'Organization trial has expired.')));
+
+    const texts = renderedTexts(renderer);
+    expect(texts).toContain(i18n.t('common.organizationTrialEndedBilling'));
+    expect(texts).not.toContain(i18n.t('common.organizationTrialEnded'));
+    // Re-sending cannot restore a lapsed plan; the plan step is the way out.
+    expect(retryButton(renderer)).toBeUndefined();
+    expect(startAction(renderer)).toBeDefined();
+
+    const step = billingStep(renderer);
+    if (!step) {
+      throw new Error('Expected the billing step under the refusal');
+    }
+    expect(texts).toContain(i18n.t('organization.hub.manageBilling'));
+    act(() => {
+      (step.props as { onPress: () => void }).onPress();
+    });
+    expect(status.push).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/organization/billing');
+
+    unmount();
+  });
+
+  it('keeps the owner-naming copy and no step for a member', async () => {
+    const { renderer, unmount } = await renderScreen();
+    const handlers = startReview(renderer);
+
+    act(() => handlers.onError?.(trpcError('FORBIDDEN', 'Organization trial has expired.')));
+
+    const texts = renderedTexts(renderer);
+    expect(texts).toContain(i18n.t('common.organizationTrialEnded'));
+    expect(texts).not.toContain(i18n.t('common.organizationTrialEndedBilling'));
+    expect(billingStep(renderer)).toBeUndefined();
+    expect(status.push).not.toHaveBeenCalled();
+    expect(retryButton(renderer)).toBeUndefined();
 
     unmount();
   });

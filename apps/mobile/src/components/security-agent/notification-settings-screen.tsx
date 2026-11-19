@@ -14,15 +14,17 @@ import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { SettingsScreenSkeleton } from '@/components/security-agent/settings-screen-skeleton';
 import { i18n } from '@/i18n';
 import { formatList, formatNumber, parseLocalizedNumber } from '@/lib/format';
+import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
 } from '@/lib/hooks/use-settings-back-guard';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import {
   useSaveSecurityAgentConfig,
   useSecurityAgentCapability,
@@ -46,20 +48,6 @@ const NOTIFICATION_SEVERITY_OPTIONS = [
   { value: 'low', labelKey: 'securityAgent.filter.severityLow' },
 ] as const satisfies readonly { value: NotificationSeverity; labelKey: string }[];
 
-function NotificationSettingsSkeleton() {
-  const { t } = useTranslation();
-  return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader className="px-6" title={t('common.notifications')} />
-      <View className="gap-3 px-6 pt-4">
-        <Skeleton className="h-16 w-full rounded-lg" />
-        <Skeleton className="h-16 w-full rounded-lg" />
-        <Skeleton className="h-12 w-full rounded-lg" />
-      </View>
-    </View>
-  );
-}
-
 export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -69,6 +57,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
   const feedback = useSettingsSaveFeedback();
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
   const personal = isPersonalSecurityScope(scope);
+  const connectivity = useCommittedConnectivityStatus();
 
   const [newFindingNotificationsEnabled, setNewFindingNotificationsEnabled] = useState(false);
   const [newFindingNotificationMinSeverity, setNewFindingNotificationMinSeverity] =
@@ -168,14 +157,18 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
     return (
       <PlatformErrorScreen
         title={t('common.notifications')}
-        variant="offline"
+        variant={classifyReadFailureVariant({
+          errors: [config.error],
+          isPaused: config.fetchStatus === 'paused',
+          connectivity,
+        })}
         message={t('securityAgent.notifications.couldNotLoad')}
         onRetry={() => void config.refetch()}
       />
     );
   }
   if (config.isLoading || !config.data) {
-    return <NotificationSettingsSkeleton />;
+    return <SettingsScreenSkeleton titleKey="common.notifications" />;
   }
   if (!config.data.isEnabled && !dirty) {
     // Keep a dirty draft and its controls usable if the redirect is cancelled.
@@ -185,7 +178,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
   // would show the default toggles and then push every control below them down
   // when their pickers appear.
   if (baseline === null) {
-    return <NotificationSettingsSkeleton />;
+    return <SettingsScreenSkeleton titleKey="common.notifications" />;
   }
 
   return (

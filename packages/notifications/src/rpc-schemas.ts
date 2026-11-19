@@ -1,9 +1,8 @@
 import { z } from 'zod';
 
 import { securityLifecyclePayloadShape } from './notification-events';
-import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
 import { nonEmptyStringSchema } from './non-empty-string';
-import { pushDataSchema, cloudAgentSessionCategorySchema } from './push-data';
+import { pushDataSchema, cloudAgentSessionRaiseShape } from './push-data';
 import { refineSpendAlertScope, spendAlertScopeShape } from './spend-alert-scope';
 
 // The pre-localized copy a producer may attach to a push.
@@ -129,12 +128,7 @@ export const sendCloudAgentSessionNotificationInputSchema = z.object({
   status: cloudAgentSessionPushStatusSchema,
   body: z.string(),
   suppressIfViewingSession: z.boolean().optional(),
-  // Absent category is treated as 'status' at the enforcement read site.
-  category: cloudAgentSessionCategorySchema.optional(),
-  // Needs-input raise detail: which answer the waiting agent wants, and the PR
-  // that can be opened from the notification. Absent on status pushes.
-  attentionKind: z.enum(NEEDS_INPUT_ATTENTION_KINDS).optional(),
-  prUrl: nonEmptyStringSchema.optional(),
+  ...cloudAgentSessionRaiseShape,
   ...i18nCopyFields,
 });
 export type SendCloudAgentSessionNotificationParams = z.infer<

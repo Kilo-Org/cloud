@@ -86,6 +86,10 @@ const createFakeDebugger = (): FakeDebugger => {
     sendCommand: async (_target, method) => {
       commands.push(method);
 
+      if (method === 'Page.getFrameTree') {
+        return { frameTree: { frame: { id: 'main', url: 'https://example.com/' } } };
+      }
+
       if (heldMethod === method) {
         heldMethod = undefined;
 
@@ -160,6 +164,8 @@ const createHarness = () => {
 /** One evaluate tool call: the panel-side tool path the models reach. */
 const evaluateToolCall = (runtime: BrowserRuntime, caller: BrowserCaller) =>
   runtime.runTool({
+    // An agent caller is checked against the real origin first (SPEC "Permission flow").
+    agent: { authorized: [{ class: 'act', origin: 'https://example.com' }] },
     arguments: { function: '() => 1' },
     caller,
     tabId: TAB_ID,
@@ -262,10 +268,12 @@ describe('browser runtime', () => {
     debugger_.holdNextCommand('Page.navigate');
 
     const agentCall = runtime.runTool({
+      // An agent caller is checked against the navigation origin first (SPEC "Permission flow").
+      agent: { authorized: [{ class: 'navigate', origin: 'https://example.com' }] },
       arguments: { url: 'https://example.com/next' },
       caller: agentCaller,
       tabId: TAB_ID,
-      toolName: 'kilo_browser_navigate',
+      toolName: 'browser_navigate',
     });
 
     await debugger_.whenCommandHeld();

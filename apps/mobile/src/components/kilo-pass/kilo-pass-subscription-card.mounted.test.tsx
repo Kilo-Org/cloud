@@ -100,6 +100,7 @@ vi.mock('@/lib/kilo-pass/state', () => ({
         title: 'kiloPass.unavailable',
         description: 'kiloPass.loadFailedRetry',
         actionLabel: 'common.retry',
+        accessibilityLabel: 'kiloPass.unavailable. kiloPass.loadFailedRetry. common.retry',
       };
     }
     return {
@@ -198,6 +199,10 @@ describe('KiloPassSubscriptionCard mounted', () => {
     const renderer = await renderCard();
     const retry = renderer.root.findByProps({ accessibilityHint: 'kiloPass.retryHint' });
     const onRetryPress = retry.props.onPress as () => void;
+
+    expect(retry.props.accessibilityLabel).toBe(
+      'kiloPass.unavailable. kiloPass.loadFailedRetry. common.retry'
+    );
 
     act(() => {
       onRetryPress();

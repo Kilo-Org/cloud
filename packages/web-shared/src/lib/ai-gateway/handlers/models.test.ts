@@ -179,10 +179,23 @@ describe('GET /api/openrouter/models', () => {
     expect(mockedGetEnhancedOpenRouterModels.mock.calls[0]?.[0]?.fromDb).toBe(readDb);
   });
 
+  test('labels an unexpected upstream catalog shape for the request country', async () => {
+    mockedGetEnhancedOpenRouterModels.mockResolvedValue({ error: 'upstream error' } as never);
+
+    const response = await handleModelsRequest(request({ 'x-vercel-ip-country': 'CU' }));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('private, max-age=0, must-revalidate');
+    expect(response.headers.get('Vary')).toBe('x-vercel-ip-country');
+    await expect(response.json()).resolves.toEqual({ error: 'upstream error' });
+  });
+
   test('leaves BYOK availability undefined for unauthenticated requests', async () => {
     const response = await handleModelsRequest(request());
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('private, max-age=0, must-revalidate');
+    expect(response.headers.get('Vary')).toBe('x-vercel-ip-country');
     await expect(response.json()).resolves.toEqual({ data: [makeModel('public/model')] });
     expect(mockedGetUserByokProviderIds).not.toHaveBeenCalled();
     expect(mockedAddUserByokAvailability).not.toHaveBeenCalled();
@@ -217,6 +230,8 @@ describe('GET /api/openrouter/models', () => {
     const response = await handleModelsRequest(request());
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+    expect(response.headers.get('Vary')).toBeNull();
     await expect(response.json()).resolves.toEqual({
       data: [{ ...publicModel, hasUserByokAvailable: true, isFree: false }, directModel],
     });
@@ -350,6 +365,7 @@ describe('GET /api/openrouter/models', () => {
     const response = await handleModelsRequest(request());
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store');
     await expect(response.json()).resolves.toEqual({
       data: [
         {

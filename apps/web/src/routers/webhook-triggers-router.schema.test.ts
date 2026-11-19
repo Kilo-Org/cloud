@@ -68,12 +68,14 @@ const mockDbUpdate = jest.fn();
 const mockDbDelete = jest.fn();
 const mockFindAdmin = jest.fn<() => Promise<Partial<User> | undefined>>();
 const mockSelectWhere = jest.fn<(condition?: SQL) => Promise<Array<Record<string, unknown>>>>();
+const mockSelectChat = jest.fn<() => Promise<Array<Record<string, unknown>>>>();
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     query: { kilocode_users: { findFirst: mockFindAdmin } },
     select: () => ({
       from: () => ({
+        leftJoin: () => ({ where: () => ({ limit: mockSelectChat }) }),
         where: (condition?: SQL) => {
           const result = mockSelectWhere(condition);
           return {
@@ -159,6 +161,116 @@ beforeAll(async () => {
   WebhookTriggerUpdateInput = router.WebhookTriggerUpdateInput;
   const adminRouter = await import('./admin-webhook-triggers-router');
   createAdminCaller = createCallerFactory(adminRouter.adminWebhookTriggersRouter);
+});
+
+describe('existing Cloud Agent chat targets', () => {
+  const chatId = 'workspace_00000000-0000-4000-8000-000000000003';
+  const input = {
+    triggerId: 'trigger-id',
+    targetType: 'cloud_agent_chat',
+    cloudAgentSessionId: chatId,
+    mode: 'code',
+    model: 'model',
+    promptTemplate: 'Run task',
+  } as const;
+  const chat = {
+    userId: user.id,
+    organizationId: null,
+    worktreeId: 'worktree-1',
+    workspaceOwner: user.id,
+    workspaceOrganization: null,
+    deletionStartedAt: null,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateWorkerTrigger.mockResolvedValue({ success: true, inboundUrl: 'https://inbound' });
+    mockSelectWhere.mockResolvedValue([
+      {
+        id: 'registry-id',
+        target_type: input.targetType,
+        cloud_agent_session_id: chatId,
+        activation_mode: 'webhook',
+      },
+    ]);
+  });
+
+  it.each([
+    ['missing chat', []],
+    ['different owner', [{ ...chat, userId: 'other-user' }]],
+    ['different scope', [{ ...chat, organizationId: 'different-scope' }]],
+    ['missing workspace', [{ ...chat, worktreeId: null }]],
+    ['workspace deletion in progress', [{ ...chat, deletionStartedAt: new Date().toISOString() }]],
+  ])('rejects an invalid target without disclosing the reason: %s', async (_label, rows) => {
+    mockSelectChat.mockResolvedValue(rows);
+    const caller = createCaller({ user });
+    const error = {
+      code: 'NOT_FOUND',
+      message: 'Cloud Agent chat not found or not accessible',
+    };
+    await expect(caller.create(input)).rejects.toMatchObject(error);
+    await expect(
+      caller.update({ triggerId: input.triggerId, model: 'other-model' })
+    ).rejects.toMatchObject(error);
+    expect(mockCreateWorkerTrigger).not.toHaveBeenCalled();
+    expect(mockUpdateWorkerTrigger).not.toHaveBeenCalled();
+  });
+
+  it('creates a trigger without workspace settings', async () => {
+    mockSelectChat.mockResolvedValue([chat]);
+    await createCaller({ user }).create(input);
+    expect(mockCreateWorkerTrigger).toHaveBeenCalledWith(
+      user.id,
+      undefined,
+      input.triggerId,
+      expect.objectContaining({
+        targetType: input.targetType,
+        cloudAgentSessionId: chatId,
+        githubRepo: undefined,
+        profileId: undefined,
+      })
+    );
+  });
+
+  it('can disable a trigger without checking its missing target chat', async () => {
+    mockSelectChat.mockResolvedValue([]);
+    mockUpdateWorkerTrigger.mockResolvedValue({ success: true, config: triggerConfig });
+
+    await createCaller({ user }).update({ triggerId: input.triggerId, isActive: false });
+
+    expect(mockSelectChat).not.toHaveBeenCalled();
+    expect(mockUpdateWorkerTrigger).toHaveBeenCalledWith(
+      user.id,
+      undefined,
+      input.triggerId,
+      expect.objectContaining({ isActive: false })
+    );
+    expect(mockDbUpdate).toHaveBeenCalled();
+  });
+
+  it.each([{ isActive: true }, { isActive: false, variant: null }])(
+    'still validates the target for update %j',
+    async patch => {
+      mockSelectChat.mockResolvedValue([]);
+      await expect(
+        createCaller({ user }).update({ triggerId: input.triggerId, ...patch })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+      expect(mockUpdateWorkerTrigger).not.toHaveBeenCalled();
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects bot-run organization triggers and workspace settings', () => {
+    expect(
+      WebhookTriggerCreateInput.safeParse({
+        ...input,
+        organizationId: '00000000-0000-4000-8000-000000000004',
+      }).error?.issues
+    ).toEqual(expect.arrayContaining([expect.objectContaining({ path: ['runAsCreator'] })]));
+    expect(
+      WebhookTriggerCreateInput.safeParse({ ...input, githubRepo: 'owner/repo' }).success
+    ).toBe(false);
+  });
 });
 
 describe('webhook trigger variant inputs', () => {

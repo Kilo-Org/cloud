@@ -32,6 +32,7 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { z } from 'zod';
 import {
   sandboxAllocationSchema,
   type SandboxAllocation,
@@ -385,6 +386,7 @@ async function runLocal(parsed: ParsedArgs): Promise<void> {
   loadRepoEnvFiles(SERVICE_PACKAGE_DIR);
   const devVars = loadDevVars(SERVICE_PACKAGE_DIR);
   const seededEmail = process.env.E2E_USER_EMAIL?.trim();
+  const kilocodeOrganizationId = z.uuid().optional().parse(process.env.E2E_ORG_ID);
   // Parallel matrix children start in the same millisecond, so the clock alone
   // collides on the unique email.
   const email =
@@ -403,6 +405,7 @@ async function runLocal(parsed: ParsedArgs): Promise<void> {
   const config: DriverConfig = {
     ...DEFAULT_CONFIG,
     user,
+    kilocodeOrganizationId,
     nextAuthSecret: devVars.NEXTAUTH_SECRET ?? '',
     internalApiSecret: devVars.INTERNAL_API_SECRET,
     workerUrl: process.env.WORKER_URL ?? DEFAULT_CONFIG.workerUrl,

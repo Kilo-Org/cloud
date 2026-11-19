@@ -56,10 +56,10 @@ const ALLOCATION_WAIT_SLACK_MS = 1_000;
 
 /**
  * Attempt cap for recovering an observed post-open stream drop while booting.
- * The boot budget is the other bound; the cap keeps a session whose socket
+ * The terminal budget is the other bound; the cap keeps a session whose socket
  * drops repeatedly from reconnecting without limit.
  */
-const MAX_BOOT_RECONNECTS = 5;
+const MAX_TERMINAL_RECONNECTS = 5;
 const PACED_PROBE_TIMEOUT_MS = 5_000;
 
 export type ScenarioDeadline = {
@@ -489,7 +489,7 @@ export async function sendTurn(
     }
     return Math.min(scenarioLeft, turnLeft);
   };
-  const stream = await deadline.within(
+  let stream = await deadline.within(
     `${label} stream`,
     signal => openConnectedStream(config, sessionId, false, undefined, signal),
     phaseBudget('stream')
@@ -500,9 +500,22 @@ export async function sendTurn(
       signal => sendMessage(config, { cloudAgentSessionId: sessionId, prompt, signal }, 'unified'),
       phaseBudget('send')
     );
-    const terminal = await stream.waitForTerminal(phaseBudget('terminal'), sent.messageId);
-    if (!terminal) {
-      throw new Error(`${label} did not reach a terminal stream event`);
+    const terminalResult = await waitForTerminalWithReplay({
+      deadline,
+      config,
+      sessionId,
+      messageId: sent.messageId,
+      stream,
+      budgetMs: phaseBudget('terminal'),
+      label: `${label} terminal`,
+    });
+    stream = terminalResult.stream;
+    const { terminal, transport } = terminalResult;
+    if (terminal === null) {
+      throw new Error(
+        `${label} (${sent.messageId}) did not reach a terminal stream event` +
+          (transport === '' ? '' : `; ${transport}`)
+      );
     }
     const status = await deadline.within(
       `${label} durable status`,
@@ -511,8 +524,10 @@ export async function sendTurn(
       phaseBudget('durable')
     );
     if (status !== 'completed') {
+      const reason = failureReasonFromEvent(terminal);
       throw new Error(
-        `${label} durable status=${status} (stream=${terminal.streamEventType} for ${sent.messageId})`
+        `${label} durable status=${status} (stream=${terminal.streamEventType} for ${sent.messageId})` +
+          (reason === undefined ? '' : ` reason=${reason}`)
       );
     }
     return { messageId: sent.messageId, terminal, stream };
@@ -588,21 +603,11 @@ export async function bootToCompletion(
 }
 
 /**
- * Recover a boot turn from an observed post-open stream drop.
- *
- * `waitForTerminal` resolves `null` both on a genuine timeout and when the
- * socket finalizes, so the caller cannot otherwise tell a dropped transport from
- * a slow turn. This helper waits for the terminal within one absolute boot
- * budget, and when the socket has actually finalized (`isOpen === false`) it
- * reconnects with replay, bounded by that same budget and
- * `MAX_BOOT_RECONNECTS`; any observed close on a finalized socket triggers that
- * path, and the close code/reason is attached when one was observed. A healthy
- * socket that reaches the timeout is reported as a missing terminal and is never
- * reconnected. Only a failure to establish a replacement stream aborts recovery:
- * the error is rethrown with the accumulated close evidence attached, never
- * retried and never swallowed.
+ * Wait for the turn within one budget. Reconnect with replay only after the
+ * socket closes. Report close details if the terminal is still missing or
+ * if a replacement stream cannot connect.
  */
-export async function waitForBootTerminal(input: {
+export async function waitForTerminalWithReplay(input: {
   deadline: ScenarioDeadline;
   config: DriverConfig;
   sessionId: string;
@@ -612,13 +617,14 @@ export async function waitForBootTerminal(input: {
   label: string;
 }): Promise<{ terminal: StreamEvent | null; stream: StreamConnection; transport: string }> {
   const { deadline, config, sessionId, messageId, budgetMs, label } = input;
-  const bootDeadlineAt = Date.now() + Math.max(1, Math.min(budgetMs, deadline.remaining(label)));
+  const terminalDeadlineAt =
+    Date.now() + Math.max(1, Math.min(budgetMs, deadline.remaining(label)));
   let stream = input.stream;
   let attempts = 0;
   let transport = '';
 
-  while (Date.now() < bootDeadlineAt) {
-    const terminal = await stream.waitForTerminal(bootDeadlineAt - Date.now(), messageId);
+  while (Date.now() < terminalDeadlineAt) {
+    const terminal = await stream.waitForTerminal(terminalDeadlineAt - Date.now(), messageId);
     if (terminal !== null) return { terminal, stream, transport };
     if (stream.isOpen) {
       // A live socket that reached the budget is a genuine missing terminal, not
@@ -626,8 +632,8 @@ export async function waitForBootTerminal(input: {
       return { terminal: null, stream, transport };
     }
     transport = appendClose(transport, stream.closeInfo);
-    if (Date.now() >= bootDeadlineAt || attempts >= MAX_BOOT_RECONNECTS) break;
-    const remaining = bootDeadlineAt - Date.now();
+    if (Date.now() >= terminalDeadlineAt || attempts >= MAX_TERMINAL_RECONNECTS) break;
+    const remaining = terminalDeadlineAt - Date.now();
     if (remaining <= 0) break;
     attempts += 1;
     try {

@@ -81,6 +81,7 @@ vi.mock('expo-router', () => ({
   useFocusEffect: (effect: () => (() => void) | undefined) => {
     h.focusEffect = effect;
   },
+  useRouter: () => ({ push: vi.fn() }),
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
@@ -107,6 +108,21 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
 }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { success: h.success, error: h.error },
+}));
+// The proposal sheet reads the reader's organization role for its refusal line
+// (`@/lib/trial-refusal`), which resolves the membership list; only the list and
+// the persisted selection are faked here.
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ organizationId: 'org_1', isLoaded: true }),
+}));
+vi.mock('@/lib/hooks/use-organizations-list', () => ({
+  useOrganizationsList: () => ({
+    data: [{ organizationId: 'org_1', role: 'member' }],
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    refetch: vi.fn(),
+  }),
 }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: h.openUrl }));
 vi.mock('@/lib/trpc', () => ({
@@ -204,6 +220,24 @@ function firstRow(root: ReactTestInstance) {
     throw new Error('Missing proposal row');
   }
   return row;
+}
+
+/**
+ * Reports the native dismissal the presented sheet waits for: closing sets its
+ * `visible` false, and the screen drops it only from this report.
+ */
+async function dismissSheet(root: ReactTestInstance) {
+  await waitFor(() => one(root, 'SessionPageSheet').props.visible === false);
+  const { onDismiss } = one(root, 'SessionPageSheet').props as {
+    visible?: boolean;
+    onDismiss?: () => void;
+  };
+  if (onDismiss === undefined) {
+    throw new TypeError('Missing sheet dismissal report');
+  }
+  act(() => {
+    onDismiss();
+  });
 }
 async function mountOpen() {
   const ui = await renderWithProviders(createElement(ReviewMemoryScreen, { scope: 'personal' }));
@@ -420,6 +454,7 @@ describe('review memory proposal interaction', () => {
     act(() => {
       confirmation.onConfirm();
     });
+    await dismissSheet(ui.renderer.root);
     await waitFor(() => hosts(ui.renderer.root, 'SessionPageSheet').length === 0);
     expect(h.rows[0]?.status).toBe('rejected');
     expect(
@@ -579,6 +614,7 @@ describe('review memory proposal interaction', () => {
     act(() => {
       h.preventRemoveHandler?.({ data: { action: { type: 'POP' } }, repeat: () => undefined });
     });
+    await dismissSheet(ui.renderer.root);
     await waitFor(() => hosts(ui.renderer.root, 'SessionPageSheet').length === 0);
     expect(
       hosts(ui.renderer.root, 'Pressable').filter(node => node.props.accessibilityRole === 'button')
@@ -628,6 +664,7 @@ describe('review memory proposal interaction', () => {
     // A replace or reset is the app's own redirect (sign-out, consent,
     // force-update), not an abandoned screen: the form goes with it and the
     // intercepted action still runs.
+    await dismissSheet(ui.renderer.root);
     await waitFor(() => hosts(ui.renderer.root, 'SessionPageSheet').length === 0);
     expect(repeat).toHaveBeenCalledOnce();
     expect(h.confirm).not.toHaveBeenCalled();

@@ -255,6 +255,11 @@ describe('ProfileSkillsScreen', () => {
       accessible: false,
       importantForAccessibility: 'no',
     });
+    // The source is painted under the name and merged into the content press,
+    // so it rides the control's spoken name instead of disappearing.
+    expect(
+      findAll(renderer.root, 'Pressable').map(node => node.props.accessibilityLabel)
+    ).toContain(`Edit skill code-review, ${i18n.t('profiles.skillSourceCustom')}`);
     act(() => {
       (toggle.props as { onValueChange: (v: boolean) => void }).onValueChange(false);
     });
@@ -276,6 +281,11 @@ describe('ProfileSkillsScreen', () => {
     const texts = findAll(renderer.root, 'Text').map(node => node.props.children);
     expect(texts).toContain('code-review');
     expect(texts).not.toContain('Custom');
+    // Nothing else is painted under the name, so the press is named by the
+    // action alone, with no separator trailing it.
+    expect(
+      findAll(renderer.root, 'Pressable').map(node => node.props.accessibilityLabel)
+    ).toContain('Edit skill code-review');
 
     unmount();
   });

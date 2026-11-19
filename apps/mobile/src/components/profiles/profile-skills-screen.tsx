@@ -74,10 +74,11 @@ function hasUsableMessage(error: unknown): boolean {
  * no delete of its own — so the row carries two trailing controls instead of
  * three; a skills.sh reference has no edit surface here, so its content is inert.
  * While the content opens the form, its press and the switch are what a reader
- * reaches. A row with no content to open (a read-only profile, or a skills.sh
- * reference) renders the frame's static row instead, where the source stays a
- * text stop of its own rather than being hidden for a control that does not
- * exist.
+ * reaches: the press is one element, so the source painted under the name rides
+ * its spoken name. A row with no content to open (a read-only profile, or a
+ * skills.sh reference) renders the frame's static row instead, where the source
+ * stays a text stop of its own rather than being hidden for a control that does
+ * not exist.
  */
 function SkillRow({ skill, showSource, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>) {
   const { t } = useTranslation();
@@ -89,6 +90,14 @@ function SkillRow({ skill, showSource, onToggle, onEdit, onDelete }: Readonly<Sk
   const contentIsPress = edit !== undefined;
   // Only a row whose press names the source hides it; a static row keeps it.
   const factLineA11y = contentIsPress ? HIDDEN_LABEL_PROPS : {};
+  // The source says what the name cannot (a rule the reader imported, a
+  // skills.sh reference), so it rides the press's name the way the MCP row's
+  // type and key count do.
+  const contentAccessibilityLabel = contentIsPress
+    ? [t('profiles.skillEdit', { name: skill.name }), showSource ? subtitle : null]
+        .filter((fact): fact is string => fact !== null && fact.length > 0)
+        .join(', ')
+    : undefined;
   const trailing: ReactNode[] = [
     <Fragment key="enable">
       {renderRowTrailing({
@@ -118,9 +127,7 @@ function SkillRow({ skill, showSource, onToggle, onEdit, onDelete }: Readonly<Sk
       leading={<IconTile icon={Sparkles} tint={NEUTRAL_TINT} />}
       pressTarget={contentIsPress ? 'content' : 'row'}
       onPress={edit}
-      contentAccessibilityLabel={
-        contentIsPress ? t('profiles.skillEdit', { name: skill.name }) : undefined
-      }
+      contentAccessibilityLabel={contentAccessibilityLabel}
       trailing={{ kind: 'nodes', nodes: trailing }}
     >
       <Text variant="mono" numberOfLines={1} {...HIDDEN_LABEL_PROPS}>

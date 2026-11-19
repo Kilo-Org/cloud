@@ -68,11 +68,12 @@ function hasUsableMessage(error: unknown): boolean {
  * One instruction row: the rules file name in mono, the path it is applied as,
  * the enabled switch and delete. The content is the edit action, so the row
  * carries two trailing controls instead of three; while the content opens the
- * form, both painted lines are hidden from assistive technology — the path
- * repeats the name — and the content press and the switch are what a reader
- * reaches. A row without an edit handler has no content to open: it renders
- * the frame's static row, where the path stays a text stop of its own instead
- * of being hidden for a control that does not exist.
+ * form, both painted lines are hidden from assistive technology and the content
+ * press and the switch are what a reader reaches: the path says more than the
+ * name (the folder it applies from and its extension), so it rides the press's
+ * name instead of disappearing. A row without an edit handler has no content to
+ * open: it renders the frame's static row, where the path stays a text stop of
+ * its own instead of being hidden for a control that does not exist.
  */
 function InstructionRow({
   instruction,
@@ -85,6 +86,10 @@ function InstructionRow({
   const contentIsPress = onEdit !== undefined;
   // Only a row whose press names the path hides it; a static row keeps it.
   const pathLineA11y = contentIsPress ? HIDDEN_LABEL_PROPS : {};
+  const rulesPath = `.kilocode/rules/${instruction.name}.md`;
+  const contentAccessibilityLabel = contentIsPress
+    ? [t('profiles.instructionEdit', { name: instruction.name }), rulesPath].join(', ')
+    : undefined;
   const trailing: ReactNode[] = [
     <Fragment key="enable">
       {renderRowTrailing({
@@ -114,9 +119,7 @@ function InstructionRow({
       leading={<IconTile icon={FileText} tint={NEUTRAL_TINT} />}
       pressTarget={contentIsPress ? 'content' : 'row'}
       onPress={onEdit}
-      contentAccessibilityLabel={
-        contentIsPress ? t('profiles.instructionEdit', { name: instruction.name }) : undefined
-      }
+      contentAccessibilityLabel={contentAccessibilityLabel}
       trailing={{ kind: 'nodes', nodes: trailing }}
     >
       <Text variant="mono" numberOfLines={1} {...HIDDEN_LABEL_PROPS}>
@@ -131,7 +134,7 @@ function InstructionRow({
         ellipsizeMode="middle"
         {...pathLineA11y}
       >
-        {`.kilocode/rules/${instruction.name}.md`}
+        {rulesPath}
       </Text>
     </RowFrame>
   );

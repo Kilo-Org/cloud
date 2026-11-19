@@ -336,6 +336,32 @@ describe('ProfileInstructionsScreen instruction cap', () => {
   });
 });
 
+describe('ProfileInstructionsScreen row controls', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    permission.value = 'allowed';
+    h.query.data = [testInstruction()];
+    h.query.isError = false;
+    h.query.isPending = false;
+    h.query.isRefetching = false;
+  });
+
+  it('names the path it opens after the file name', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    // The path is painted under the name and merged into the content press, so
+    // it rides the control's spoken name instead of disappearing.
+    expect(rowControls(renderer.root)).toContain(
+      [
+        i18n.t('profiles.instructionEdit', { name: INSTRUCTION_NAME }),
+        `.kilocode/rules/${INSTRUCTION_NAME}.md`,
+      ].join(', ')
+    );
+
+    unmount();
+  });
+});
+
 describe('ProfileInstructionsScreen read-only row', () => {
   beforeEach(() => {
     vi.clearAllMocks();

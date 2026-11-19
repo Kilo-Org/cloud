@@ -161,11 +161,7 @@ describe('createMemoryStorage', () => {
       s.upsertPart('msg-A', makeToolPart('p-1', 'running', { start: 1 }, 'msg-B'));
       // The terminal postdates the run's start, so it applies: the deleted
       // part's event time of 200 must no longer make it look stale.
-      s.upsertPart(
-        'msg-A',
-        makeToolPart('p-1', 'completed', { start: 1, end: 150 }, 'msg-B'),
-        150
-      );
+      s.upsertPart('msg-A', makeToolPart('p-1', 'completed', { start: 1, end: 150 }, 'msg-B'), 150);
 
       const parts = s.getParts('msg-A');
       const part = parts.find(p => p.id === 'p-1');

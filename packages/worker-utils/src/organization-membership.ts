@@ -113,6 +113,23 @@ export function activeOrganizationJoinCondition(organizationIdColumn: Organizati
 }
 
 /**
+ * Equality filters for the caller's own membership in a given organization.
+ * Pair it with {@link activeOrganizationJoinCondition} for the live-organization
+ * check.
+ */
+export function directOrganizationMembershipCondition(
+  organizationId: string,
+  kiloUserId: string
+): SQL {
+  return (
+    and(
+      eq(organization_memberships.organization_id, organizationId),
+      eq(organization_memberships.kilo_user_id, kiloUserId)
+    ) ?? sql`false`
+  );
+}
+
+/**
  * Join condition for the parent organization of the row's organization.
  * Add it after {@link activeOrganizationJoinCondition}; a soft-deleted parent
  * never satisfies the join.
@@ -242,12 +259,7 @@ export function organizationAccessQuery(
       organizations,
       activeOrganizationJoinCondition(organization_memberships.organization_id)
     )
-    .where(
-      and(
-        eq(organization_memberships.organization_id, params.organizationId),
-        eq(organization_memberships.kilo_user_id, params.kiloUserId)
-      )
-    )
+    .where(directOrganizationMembershipCondition(params.organizationId, params.kiloUserId))
     .limit(1);
 }
 

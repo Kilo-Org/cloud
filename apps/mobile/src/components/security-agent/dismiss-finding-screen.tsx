@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { ShieldOff } from '@/components/ui/icons';
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 
@@ -53,6 +53,29 @@ type DismissFindingScreenProps = {
   scope: string;
   findingId: string;
 };
+
+/**
+ * The chrome the states without a form share: the sheet's title and its close
+ * button, over one of the body states below.
+ */
+function DismissSheetFrame({ children }: Readonly<{ children: ReactNode }>) {
+  const router = useRouter();
+  const { t } = useTranslation();
+  const headerTopInset = useFormSheetHeaderTopInset();
+  return (
+    <View className="flex-1 bg-background">
+      <SheetHeader
+        title={t('securityAgent.dismiss.title')}
+        variant="close"
+        topInset={headerTopInset}
+        onDone={() => {
+          router.back();
+        }}
+      />
+      {children}
+    </View>
+  );
+}
 
 export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindingScreenProps>) {
   const router = useRouter();
@@ -148,59 +171,35 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
 
   if (notFound) {
     return (
-      <View className="flex-1 bg-background">
-        <SheetHeader
-          title={t('securityAgent.dismiss.title')}
-          variant="close"
-          topInset={headerTopInset}
-          onDone={() => {
-            router.back();
-          }}
-        />
+      <DismissSheetFrame>
         <EmptyState
           icon={ShieldOff}
           title={t('securityAgent.dismiss.notFoundTitle')}
           description={t('securityAgent.dismiss.notFoundDescription')}
         />
-      </View>
+      </DismissSheetFrame>
     );
   }
 
   if (findingQuery.isError && !findingQuery.data) {
     return (
-      <View className="flex-1 bg-background">
-        <SheetHeader
-          title={t('securityAgent.dismiss.title')}
-          variant="close"
-          topInset={headerTopInset}
-          onDone={() => {
-            router.back();
-          }}
-        />
+      <DismissSheetFrame>
         <QueryError
           message={t('securityAgent.dismiss.couldNotLoad')}
           onRetry={() => void findingQuery.refetch()}
         />
-      </View>
+      </DismissSheetFrame>
     );
   }
 
   if (capability.status === 'error') {
     return (
-      <View className="flex-1 bg-background">
-        <SheetHeader
-          title={t('securityAgent.dismiss.title')}
-          variant="close"
-          topInset={headerTopInset}
-          onDone={() => {
-            router.back();
-          }}
-        />
+      <DismissSheetFrame>
         <QueryError
           message={t('securityAgent.dismiss.couldNotCheckPermissions')}
           onRetry={() => void capability.refetch()}
         />
-      </View>
+      </DismissSheetFrame>
     );
   }
 
@@ -217,41 +216,25 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
 
   if (!capability.canManage) {
     return (
-      <View className="flex-1 bg-background">
-        <SheetHeader
-          title={t('securityAgent.dismiss.title')}
-          variant="close"
-          topInset={headerTopInset}
-          onDone={() => {
-            router.back();
-          }}
-        />
+      <DismissSheetFrame>
         <EmptyState
           icon={ShieldOff}
           title={t('securityAgent.dismiss.cannotDismissTitle')}
           description={t('securityAgent.dismiss.cannotDismissDescription')}
         />
-      </View>
+      </DismissSheetFrame>
     );
   }
 
   if (finding.status !== 'open') {
     return (
-      <View className="flex-1 bg-background">
-        <SheetHeader
-          title={t('securityAgent.dismiss.title')}
-          variant="close"
-          topInset={headerTopInset}
-          onDone={() => {
-            router.back();
-          }}
-        />
+      <DismissSheetFrame>
         <EmptyState
           icon={ShieldOff}
           title={t('securityAgent.dismiss.cannotDismissTitle')}
           description={t('securityAgent.dismiss.alreadyResolvedDescription')}
         />
-      </View>
+      </DismissSheetFrame>
     );
   }
 

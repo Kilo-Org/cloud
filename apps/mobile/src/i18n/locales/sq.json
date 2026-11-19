@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "Përmbledhja",
       "files": "Skedarë",
-      "discussion": "Diskutimi"
+      "discussion": "Diskutimi",
+      "discussionAccessibility_one": "{{title}}: 1 koment",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komente",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komente"
     },
     "fileStatus": {
       "modified": "I modifikuar",

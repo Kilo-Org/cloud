@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "ସାରାଂଶ",
       "files": "ଫାଇଲ୍",
-      "discussion": "ଆଲୋଚନା"
+      "discussion": "ଆଲୋଚନା",
+      "discussionAccessibility_one": "{{title}}: 1ଟି ମନ୍ତବ୍ୟ",
+      "discussionAccessibility": "{{title}}: {{displayCount}} ମନ୍ତବ୍ୟ",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} ମନ୍ତବ୍ୟ"
     },
     "fileStatus": {
       "modified": "ପରିବର୍ତ୍ତିତ",

@@ -3349,6 +3349,10 @@
     },
     "tabs": {
       "discussion": "Discussão",
+      "discussionAccessibility": "{{title}}: {{displayCount}} comentários",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} comentários",
+      "discussionAccessibility_one": "{{title}}: 1 comentário",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} comentários",
       "files": "Arquivos",
       "overview": "Visão geral"
     },

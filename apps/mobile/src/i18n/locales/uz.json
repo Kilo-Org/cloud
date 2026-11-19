@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "Umumiy ko'rinish",
       "files": "Fayllar",
-      "discussion": "Muhokama"
+      "discussion": "Muhokama",
+      "discussionAccessibility_one": "{{title}}: 1 izoh",
+      "discussionAccessibility": "{{title}}: {{displayCount}} ta izoh",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} ta izoh"
     },
     "fileStatus": {
       "modified": "O'zgartirildi",

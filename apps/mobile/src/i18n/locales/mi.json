@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "Tirohanga whānui",
       "files": "Ngā kōnae",
-      "discussion": "Kōrerorero"
+      "discussion": "Kōrerorero",
+      "discussionAccessibility_one": "{{title}}: 1 kōrero",
+      "discussionAccessibility": "{{title}}: {{displayCount}} kōrero",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} kōrero"
     },
     "fileStatus": {
       "modified": "Kua whakarerekētia",

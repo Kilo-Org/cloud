@@ -1069,7 +1069,12 @@
     "tabs": {
       "overview": "Агляд",
       "files": "Файлы",
-      "discussion": "Абмеркаванне"
+      "discussion": "Абмеркаванне",
+      "discussionAccessibility_one": "{{title}}: {{displayCount}} каментар",
+      "discussionAccessibility": "{{title}}: {{displayCount}} каментара",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} каментара",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} каментары",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} каментароў"
     },
     "fileStatus": {
       "modified": "Зменены",

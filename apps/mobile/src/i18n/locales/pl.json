@@ -3349,6 +3349,11 @@
     },
     "tabs": {
       "discussion": "Dyskusja",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentarza",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentarza",
+      "discussionAccessibility_one": "{{title}}: 1 komentarz",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} komentarze",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} komentarzy",
       "files": "Pliki",
       "overview": "Podsumowanie"
     },

@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "अवलोकन",
       "files": "फाइलहरू",
-      "discussion": "छलफल"
+      "discussion": "छलफल",
+      "discussionAccessibility_one": "{{title}}: १ टिप्पणी",
+      "discussionAccessibility": "{{title}}: {{displayCount}} टिप्पणी",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} टिप्पणी"
     },
     "fileStatus": {
       "modified": "परिमार्जित",

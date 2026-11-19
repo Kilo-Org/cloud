@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "Ukubuka konke",
       "files": "Amafayela",
-      "discussion": "Ingxoxo"
+      "discussion": "Ingxoxo",
+      "discussionAccessibility_one": "{{title}}: amazwana awodwa",
+      "discussionAccessibility": "{{title}}: Amazwana angu-{{displayCount}}",
+      "discussionAccessibility_other": "{{title}}: Amazwana angu-{{displayCount}}"
     },
     "fileStatus": {
       "modified": "Lishintshiwe",

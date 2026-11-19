@@ -3235,6 +3235,9 @@
     },
     "tabs": {
       "discussion": "ディスカッション",
+      "discussionAccessibility": "{{title}}：{{displayCount}}件のコメント",
+      "discussionAccessibility_other": "{{title}}：{{displayCount}}件のコメント",
+      "discussionAccessibility_one": "{{title}}：1件のコメント",
       "files": "ファイル",
       "overview": "概要"
     },

@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "সারসংক্ষেপ",
       "files": "ফাইল",
-      "discussion": "আলোচনা"
+      "discussion": "আলোচনা",
+      "discussionAccessibility_one": "{{title}}: ১টি মন্তব্য",
+      "discussionAccessibility": "{{title}}: {{displayCount}}টি মন্তব্য",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}}টি মন্তব্য"
     },
     "fileStatus": {
       "modified": "পরিবর্তিত",

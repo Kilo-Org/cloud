@@ -3292,6 +3292,10 @@
     },
     "tabs": {
       "discussion": "Discussione",
+      "discussionAccessibility": "{{title}}: {{displayCount}} commenti",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} commenti",
+      "discussionAccessibility_one": "{{title}}: 1 commento",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} commenti",
       "files": "Documenti",
       "overview": "Panoramica"
     },

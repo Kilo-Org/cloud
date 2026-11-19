@@ -1069,7 +1069,12 @@
     "tabs": {
       "overview": "Pregled",
       "files": "Datoteke",
-      "discussion": "Razprava"
+      "discussion": "Razprava",
+      "discussionAccessibility_one": "{{title}}: {{displayCount}} komentar",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentarjev",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentarjev",
+      "discussionAccessibility_two": "{{title}}: {{displayCount}} komentarja",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} komentarji"
     },
     "fileStatus": {
       "modified": "Spremenjeno",

@@ -3235,6 +3235,9 @@
     },
     "tabs": {
       "discussion": "Discussie",
+      "discussionAccessibility": "{{title}}: {{displayCount}} opmerkingen",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} opmerkingen",
+      "discussionAccessibility_one": "{{title}}: 1 opmerking",
       "files": "Bestanden",
       "overview": "Overzicht"
     },

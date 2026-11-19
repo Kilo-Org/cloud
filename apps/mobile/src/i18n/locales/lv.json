@@ -1047,7 +1047,11 @@
     "tabs": {
       "overview": "Pārskats",
       "files": "Faili",
-      "discussion": "Diskusija"
+      "discussion": "Diskusija",
+      "discussionAccessibility_one": "{{title}}: {{displayCount}} komentārs",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentāri",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentāri",
+      "discussionAccessibility_zero": "{{title}}: {{displayCount}} komentāru"
     },
     "fileStatus": {
       "modified": "Mainīts",

@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "Oorsig",
       "files": "Lêers",
-      "discussion": "Bespreking"
+      "discussion": "Bespreking",
+      "discussionAccessibility_one": "{{title}}: 1 kommentaar",
+      "discussionAccessibility": "{{title}}: {{displayCount}} kommentare",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} kommentare"
     },
     "fileStatus": {
       "modified": "Gewysig",

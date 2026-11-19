@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "ພາບລວມ",
       "files": "ໄຟລ໌",
-      "discussion": "ການສົນທະນາ"
+      "discussion": "ການສົນທະນາ",
+      "discussionAccessibility_one": "{{title}}: ຄຳເຫັນ 1 ລາຍການ",
+      "discussionAccessibility": "{{title}}: ຄຳເຫັນ {{displayCount}} ລາຍການ",
+      "discussionAccessibility_other": "{{title}}: ຄຳເຫັນ {{displayCount}} ລາຍການ"
     },
     "fileStatus": {
       "modified": "ແກ້ໄຂແລ້ວ",

@@ -3349,6 +3349,11 @@
     },
     "tabs": {
       "discussion": "Обговорення",
+      "discussionAccessibility": "{{title}}: Коментарів: {{displayCount}}",
+      "discussionAccessibility_other": "{{title}}: Коментарів: {{displayCount}}",
+      "discussionAccessibility_one": "{{title}}: {{displayCount}} коментар",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} коментарі",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} коментарів",
       "files": "Файли",
       "overview": "Огляд"
     },

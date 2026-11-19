@@ -181,9 +181,7 @@ describe('classifyRuntimeProxyFenceError', () => {
 
   it('falls back only for a revoked or expired local runtime authorization', () => {
     expect(classifyRuntimeProxyFenceError(new RuntimeAuthorizationRevokedError())).toBe('fallback');
-    expect(classifyRuntimeProxyFenceError(new RuntimeAuthorizationExpiredError())).toBe(
-      'fallback'
-    );
+    expect(classifyRuntimeProxyFenceError(new RuntimeAuthorizationExpiredError())).toBe('fallback');
   });
 
   it('retries an unrecognized failure', () => {

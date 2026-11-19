@@ -183,7 +183,6 @@ type PreparedRoute = {
   directory: string;
   home: string;
   kilo: WorktreeKiloAuth;
-  env: Record<string, string>;
 };
 
 type PreparingRoute = {
@@ -1509,7 +1508,6 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         directory,
         home,
         kilo: kiloAuth,
-        env: builtEnv,
       });
       // A credentials frame that arrived while this route was preparing is
       // applied before the route reports ready; a release during the apply
@@ -1604,7 +1602,6 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       ),
       route.spec
     );
-    route.env = nextEnv;
     await deps.runtimes.installCredentials(route.key, nextEnv, cloudAgentMcp);
     commitWorkspaceMcpGrant(route.key, cloudAgentMcp);
     if (credentials.git?.token && route.spec.git) {

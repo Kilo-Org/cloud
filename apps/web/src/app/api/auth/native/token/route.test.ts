@@ -38,6 +38,7 @@ jest.mock('@/lib/auth/passkey', () => ({
 }));
 jest.mock('@/lib/user');
 jest.mock('@kilocode/web-shared/lib/user/find-user-by-id');
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 jest.mock('@kilocode/web-shared/lib/tokens');
 jest.mock('@/lib/auth/email-signin-eligibility');
 jest.mock('@/lib/auth/native-admission', () => ({
@@ -125,10 +126,29 @@ const mockCheckDomainSignInEligibility = jest.mocked(checkDomainSignInEligibilit
 const mockRequireAdmissionPayload = jest.mocked(requireAdmissionPayload);
 const mockVerifyAdmissionAsync = jest.mocked(verifyAdmissionAsync);
 const mockPersistAttestedKey = jest.mocked(persistAttestedKey);
-const mockCreateDeviceSession = jest.mocked(createDeviceSession);
+const mockCreateDeviceSession = createDeviceSession as unknown as jest.MockedFunction<
+  (params: {
+    userId: string;
+    userAgent?: string;
+    claim?: (tx: DrizzleTransaction) => Promise<unknown>;
+  }) => Promise<string | null>
+>;
 const mockIssueSessionCredentials = jest.mocked(issueSessionCredentials);
 const mockCreateDeviceSessionWithAttestedKey = jest.mocked(createDeviceSessionWithAttestedKey);
-const mockCreateDeviceSessionWithCredentials = jest.mocked(createDeviceSessionWithCredentials);
+const mockCreateDeviceSessionWithCredentials =
+  createDeviceSessionWithCredentials as unknown as jest.MockedFunction<
+    (params: {
+      userId: string;
+      userAgent?: string;
+      user: User;
+      claim?: (tx: DrizzleTransaction) => Promise<unknown>;
+    }) => Promise<{
+      token: string;
+      refreshToken: string;
+      expiresIn: number;
+      sessionId: string;
+    } | null>
+  >;
 const mockIsNativeTokenAddressRateLimited = jest.mocked(isNativeTokenAddressRateLimited);
 const mockIsNativeTokenUserRateLimited = jest.mocked(isNativeTokenUserRateLimited);
 const mockRevokeDeviceSession = jest.mocked(revokeDeviceSession);
@@ -2032,15 +2052,27 @@ describe('POST /api/auth/native/token', () => {
   describe('passkey', () => {
     const ticketBody = { provider: 'passkey', ticket: 'ticket-1' } as const;
 
+    // The tx stub is opaque: the route only forwards it to the claim, and the
+    // real helper owns its construction.
+    const stubTx = {} as never;
+
     beforeEach(() => {
       mockFindUserById.mockResolvedValue(fakeUser);
-      mockCreateDeviceSession.mockResolvedValue('device-session-1');
-      mockCreateDeviceSessionWithCredentials.mockResolvedValue({
-        token: 'session-jwt',
-        refreshToken: 'session-refresh',
-        expiresIn: 3600,
-        sessionId: 'device-session-1',
-      });
+      // The mocked factories honor the real helpers' contract: the claim runs
+      // after the (mocked) insert, and a falsy claim result resolves null.
+      mockCreateDeviceSession.mockImplementation(async params =>
+        params.claim && !(await params.claim(stubTx)) ? null : 'legacy-session-1'
+      );
+      mockCreateDeviceSessionWithCredentials.mockImplementation(async params =>
+        params.claim && !(await params.claim(stubTx))
+          ? null
+          : {
+              token: 'session-jwt',
+              refreshToken: 'session-refresh',
+              expiresIn: 3600,
+              sessionId: 'refresh-session-1',
+            }
+      );
     });
 
     it('exchanges a valid ticket for a device session without touching settlement or the OTP path', async () => {
@@ -2054,14 +2086,17 @@ describe('POST /api/auth/native/token', () => {
         created: false,
       });
       expect(mockReadSignInTicket).toHaveBeenCalledWith('ticket-1');
-      expect(mockConsumeSignInTicket).toHaveBeenCalledWith('ticket-1');
-      expect(mockConsumeSignInTicket).toHaveBeenCalledTimes(1);
       expect(mockFindUserById).toHaveBeenCalledWith(fakeUser.id);
+      // The redemption is the claim the mock runs inside the session
+      // transaction; the route itself never spends the ticket post-insert.
       expect(mockCreateDeviceSessionWithCredentials).toHaveBeenCalledWith({
         userId: fakeUser.id,
         userAgent: undefined,
         user: fakeUser,
+        claim: expect.any(Function),
       });
+      expect(mockConsumeSignInTicket).toHaveBeenCalledTimes(1);
+      expect(mockConsumeSignInTicket).toHaveBeenCalledWith('ticket-1', expect.anything());
       expect(mockCreateDeviceSession).not.toHaveBeenCalled();
       expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
       // The ticket is the identity proof: no account settlement.
@@ -2084,32 +2119,74 @@ describe('POST /api/auth/native/token', () => {
       expect(mockCreateDeviceSession).toHaveBeenCalledWith({
         userId: fakeUser.id,
         userAgent: undefined,
+        claim: expect.any(Function),
       });
+      expect(mockConsumeSignInTicket).toHaveBeenCalledTimes(1);
+      expect(mockConsumeSignInTicket).toHaveBeenCalledWith('ticket-1', expect.anything());
       expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser, {
-        deviceSessionId: 'device-session-1',
+        deviceSessionId: 'legacy-session-1',
       });
       expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
     });
 
-    it('refuses a replayed ticket with 401 INVALID_TICKET and revokes the session it would have delivered', async () => {
+    it('resolves the pending link only after the redemption settles', async () => {
+      let pendingLinkAskedBeforeClaim = -1;
+      mockResolvePendingLink.mockImplementation(async () => {
+        pendingLinkAskedBeforeClaim = mockConsumeSignInTicket.mock.calls.length;
+        return undefined;
+      });
+
+      const response = await POST(
+        createRequest({ ...ticketBody, pendingLinkToken: 'pending-secret', supportsRefresh: true })
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        token: 'session-jwt',
+        refreshToken: 'session-refresh',
+        expiresIn: 3600,
+        created: false,
+      });
+      // The claim runs inside the helper's transaction before the helper
+      // reports a session, so by the time the route asks for the pending link
+      // the redemption has already settled.
+      expect(mockCreateDeviceSessionWithCredentials).toHaveBeenCalledTimes(1);
+      expect(mockConsumeSignInTicket).toHaveBeenCalledTimes(1);
+      expect(pendingLinkAskedBeforeClaim).toBe(1);
+      expect(mockResolvePendingLink).toHaveBeenCalledWith('pending-secret', fakeUser.id);
+    });
+
+    it('does not resolve the pending link when the redemption loses the race', async () => {
+      mockCreateDeviceSessionWithCredentials.mockResolvedValueOnce(null);
+
+      const response = await POST(
+        createRequest({ ...ticketBody, pendingLinkToken: 'pending-secret', supportsRefresh: true })
+      );
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ error: 'INVALID_TICKET' });
+      expect(mockResolvePendingLink).not.toHaveBeenCalled();
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+      // The insert rolled back, so there is no session row left to compensate.
+      expect(mockRevokeDeviceSession).not.toHaveBeenCalled();
+      expect(mockCaptureMessage).not.toHaveBeenCalledWith('native_token_session_cleanup_failed');
+    });
+
+    it('refuses a replayed ticket with 401 INVALID_TICKET and leaves nothing to revoke', async () => {
       const first = await POST(createRequest({ ...ticketBody, supportsRefresh: true }));
       expect(first.status).toBe(200);
-      expect(mockConsumeSignInTicket).toHaveBeenCalledTimes(1);
-
-      // The non-consuming read still finds the row this request holds; the
-      // redemption is atomic, so the replay loses it and the session it just
-      // created is revoked instead of delivered.
-      mockConsumeSignInTicket.mockResolvedValue(null);
+      // The claim ran once for the delivered session (the contract stub runs
+      // it). The replay loses the redemption: with the ticket spent its claim
+      // returns null, and the helper rolls the session back instead of
+      // delivering credentials.
+      mockConsumeSignInTicket.mockResolvedValueOnce(null);
       const replayed = await POST(createRequest({ ...ticketBody, supportsRefresh: true }));
 
       expect(replayed.status).toBe(401);
       expect(await replayed.json()).toEqual({ error: 'INVALID_TICKET' });
-      expect(mockRevokeDeviceSession).toHaveBeenCalledWith(
-        'device-session-1',
-        'sign_in_not_completed'
-      );
-      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
-      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+      expect(mockRevokeDeviceSession).not.toHaveBeenCalled();
+      expect(mockConsumeSignInCode).not.toHaveBeenCalled();
     });
 
     it('refuses an expired ticket with 401 INVALID_TICKET and redeems nothing', async () => {
@@ -2185,38 +2262,77 @@ describe('POST /api/auth/native/token', () => {
       expect(mockConsumeSignInTicket).toHaveBeenCalledTimes(1);
     });
 
-    it('revokes the session and refuses when another request redeemed the ticket first', async () => {
-      // The read finds the row, so this request mints a session; the atomic
-      // redemption is what a concurrent request already won.
-      mockConsumeSignInTicket.mockResolvedValue(null);
+    it('refuses a loser of the ticket race on both paths and leaves nothing to revoke', async () => {
+      // The read finds the row, so this request reaches session creation; the
+      // redemption is what a concurrent request already won, and the helper
+      // reports it by resolving null with nothing committed.
+      mockCreateDeviceSessionWithCredentials.mockResolvedValueOnce(null);
 
       const refreshed = await POST(createRequest({ ...ticketBody, supportsRefresh: true }));
 
       expect(refreshed.status).toBe(401);
       expect(await refreshed.json()).toEqual({ error: 'INVALID_TICKET' });
-      expect(mockRevokeDeviceSession).toHaveBeenCalledWith(
-        'device-session-1',
-        'sign_in_not_completed'
-      );
+      expect(mockRevokeDeviceSession).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+      expect(mockCaptureMessage).not.toHaveBeenCalledWith('native_token_session_cleanup_failed');
 
+      mockCreateDeviceSession.mockResolvedValueOnce(null);
       const legacy = await POST(createRequest(ticketBody));
 
       expect(legacy.status).toBe(401);
       expect(await legacy.json()).toEqual({ error: 'INVALID_TICKET' });
-      expect(mockRevokeDeviceSession).toHaveBeenCalledWith(
-        'device-session-1',
-        'sign_in_not_completed'
-      );
+      expect(mockRevokeDeviceSession).not.toHaveBeenCalled();
       expect(mockGenerateApiToken).not.toHaveBeenCalled();
+      expect(mockCaptureMessage).not.toHaveBeenCalledWith('native_token_session_cleanup_failed');
     });
 
-    it('does not redeem the ticket when the session cannot be created', async () => {
+    it('keeps the route catch harmless when the claim itself throws', async () => {
+      // The helper's contract stub runs the claim after its insert; a claim
+      // that THROWS (a real error, not a lost claim) propagates out of the
+      // helper while no session id was assigned, and the route's catch must
+      // not mask the error with a revoke of nothing.
+      mockConsumeSignInTicket.mockRejectedValueOnce(new Error('claim db down'));
+
+      await expect(POST(createRequest({ ...ticketBody, supportsRefresh: true }))).rejects.toThrow(
+        'claim db down'
+      );
+
+      // The stub never returned credentials, so the route never assigned a
+      // session id; there is nothing for the catch to revoke, and the thrown
+      // error propagates unchanged.
+      expect(mockRevokeDeviceSession).not.toHaveBeenCalled();
+    });
+
+    it('revokes the session when a later throw arrives after the session was assigned', async () => {
+      // Simulate the session helper succeeding, but a later step inside the
+      // try (pendingLink resolution) throwing.
+      mockResolvePendingLink.mockRejectedValueOnce(new Error('pending link db down'));
+
+      await expect(
+        POST(
+          createRequest({
+            ...ticketBody,
+            pendingLinkToken: 'pending-secret',
+            supportsRefresh: true,
+          })
+        )
+      ).rejects.toThrow('pending link db down');
+
+      expect(mockRevokeDeviceSession).toHaveBeenCalledWith(
+        'refresh-session-1',
+        'sign_in_not_completed'
+      );
+    });
+
+    it('does not spend the ticket when the session cannot be created', async () => {
       mockCreateDeviceSessionWithCredentials.mockRejectedValueOnce(new Error('db down'));
 
       await expect(POST(createRequest({ ...ticketBody, supportsRefresh: true }))).rejects.toThrow(
         'db down'
       );
 
+      // The helper throws before its transaction can run the claim.
       expect(mockConsumeSignInTicket).not.toHaveBeenCalled();
     });
 

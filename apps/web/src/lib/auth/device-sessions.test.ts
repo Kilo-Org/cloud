@@ -9,7 +9,7 @@ import {
   native_attested_keys,
 } from '@kilocode/db/schema';
 import type { Organization } from '@workos-inc/node';
-import { and, eq, getTableName, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, eq, getTableName, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
 import {
   cleanupExpiredDeviceRefreshTokens,
@@ -214,6 +214,113 @@ describe('device-sessions', () => {
       expect(live.map(row => row.id)).toEqual(
         expect.arrayContaining([...seeded.map(row => row.id), deviceAuthSessionId])
       );
+    });
+
+    test('a lost claim rolls back the session and the cap eviction it caused', async () => {
+      // Fill the account to the cap so the next insert displaces the oldest
+      // session. A claim that loses must undo both writes, or a duplicate
+      // sign-in at the cap signs another device out for nothing.
+      const seeded: string[] = [];
+      for (let index = 0; index < MAX_LIVE_APP_SESSIONS; index += 1) {
+        seeded.push(await createDeviceSession({ userId: testUserId }));
+      }
+      const oldestSessionId = seeded[0]!;
+
+      const lost = await createDeviceSession({
+        userId: testUserId,
+        claim: async () => false,
+      });
+
+      expect(lost).toBeNull();
+
+      const rows = await db
+        .select({
+          id: device_sessions.id,
+          revoked_at: device_sessions.revoked_at,
+          revoked_reason: device_sessions.revoked_reason,
+        })
+        .from(device_sessions)
+        .where(eq(device_sessions.kilo_user_id, testUserId));
+
+      // No surplus row survived the rollback.
+      expect(rows).toHaveLength(MAX_LIVE_APP_SESSIONS);
+      // The session the insert had displaced is still live.
+      const oldest = rows.find(row => row.id === oldestSessionId);
+      expect(oldest?.revoked_at).toBeNull();
+      expect(oldest?.revoked_reason).toBeNull();
+      expect(rows.filter(row => row.revoked_at === null)).toHaveLength(MAX_LIVE_APP_SESSIONS);
+    });
+
+    test('a lost claim on the credential path rolls back the session and its tokens', async () => {
+      const seeded: string[] = [];
+      for (let index = 0; index < MAX_LIVE_APP_SESSIONS; index += 1) {
+        seeded.push(await createDeviceSession({ userId: testUserId }));
+      }
+      const oldestSessionId = seeded[0]!;
+
+      const lost = await createDeviceSessionWithCredentials({
+        userId: testUserId,
+        user: fakeUser,
+        claim: async () => false,
+      });
+
+      expect(lost).toBeNull();
+
+      const rows = await db
+        .select({ id: device_sessions.id, revoked_at: device_sessions.revoked_at })
+        .from(device_sessions)
+        .where(eq(device_sessions.kilo_user_id, testUserId));
+
+      expect(rows).toHaveLength(MAX_LIVE_APP_SESSIONS);
+      expect(rows.find(row => row.id === oldestSessionId)?.revoked_at).toBeNull();
+
+      // The attempt minted no refresh token for any session of this account.
+      const tokens = await db
+        .select({ token_hash: device_refresh_tokens.token_hash })
+        .from(device_refresh_tokens)
+        .where(
+          inArray(
+            device_refresh_tokens.device_session_id,
+            rows.map(row => row.id)
+          )
+        );
+      expect(tokens).toHaveLength(0);
+    });
+
+    test('a claim that settles runs inside the transaction and the session commits', async () => {
+      let claimCalls = 0;
+      const sessionId = await createDeviceSession({
+        userId: testUserId,
+        claim: async () => {
+          claimCalls += 1;
+          return true;
+        },
+      });
+
+      expect(claimCalls).toBe(1);
+      expect(sessionId).not.toBeNull();
+      const [row] = await db
+        .select({ revoked_at: device_sessions.revoked_at })
+        .from(device_sessions)
+        .where(eq(device_sessions.id, sessionId!));
+      expect(row?.revoked_at).toBeNull();
+    });
+
+    test('a claim that throws rejects instead of reporting a lost claim', async () => {
+      await expect(
+        createDeviceSession({
+          userId: testUserId,
+          claim: async () => {
+            throw new Error('claim store down');
+          },
+        })
+      ).rejects.toThrow('claim store down');
+
+      const rows = await db
+        .select({ id: device_sessions.id })
+        .from(device_sessions)
+        .where(eq(device_sessions.kilo_user_id, testUserId));
+      expect(rows).toHaveLength(0);
     });
   });
 

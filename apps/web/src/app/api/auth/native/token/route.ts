@@ -46,6 +46,7 @@ import {
   createDeviceSessionWithAttestedKey,
   createDeviceSessionWithCredentials,
   revokeDeviceSession,
+  type DeviceSessionClaim,
 } from '@/lib/auth/device-sessions';
 import {
   isNativeTokenAddressRateLimited,
@@ -355,21 +356,27 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     let sessionId: string | undefined;
 
     try {
-      const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, user.id);
+      // The redemption is the session's claim: it runs after the insert (and
+      // the cap enforcement) inside the session's transaction, so a lost
+      // redemption rolls the session back and resolves to null with nothing
+      // left to revoke — the session-limit eviction rides the same rollback.
+      const claim: DeviceSessionClaim = tx => consumeSignInTicket(data.ticket, tx);
 
       if (data.supportsRefresh) {
         const credentials = await createDeviceSessionWithCredentials({
           userId: user.id,
           userAgent: request.headers.get('user-agent') ?? undefined,
           user,
+          claim,
         });
-        sessionId = credentials.sessionId;
-
-        const redeemed = await consumeSignInTicket(data.ticket);
-        if (!redeemed) {
-          await revokeAbandonedSession(credentials.sessionId);
+        if (!credentials) {
           return NextResponse.json({ error: 'INVALID_TICKET' }, { status: 401 });
         }
+        sessionId = credentials.sessionId;
+        // The pending link is resolved only after the redemption settled and
+        // the session committed — the email branch's ordering, so the link is
+        // claimed by the request that owns the ticket.
+        const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, user.id);
 
         return NextResponse.json(
           {
@@ -383,16 +390,16 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         );
       }
 
-      sessionId = await createDeviceSession({
+      const session = await createDeviceSession({
         userId: user.id,
         userAgent: request.headers.get('user-agent') ?? undefined,
+        claim,
       });
-
-      const redeemed = await consumeSignInTicket(data.ticket);
-      if (!redeemed) {
-        await revokeAbandonedSession(sessionId);
+      if (!session) {
         return NextResponse.json({ error: 'INVALID_TICKET' }, { status: 401 });
       }
+      sessionId = session;
+      const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, user.id);
 
       return legacyTokenResponse({
         user,

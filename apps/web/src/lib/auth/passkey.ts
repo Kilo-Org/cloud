@@ -661,11 +661,18 @@ export async function readSignInTicket(ticket: string): Promise<PasskeySignInTic
 /**
  * Redeem a sign-in ticket. The redemption is a single atomic UPDATE: a ticket
  * is usable exactly once, and never after its two-minute expiry.
+ *
+ * `fromDb` lets a caller redeem the ticket inside the transaction that it
+ * guards, so a redemption lost to a concurrent winner also rolls back that
+ * transaction's writes (defaults to the pool, matching `createSignInTicket`).
  */
-export async function consumeSignInTicket(ticket: string): Promise<PasskeySignInTicket | null> {
+export async function consumeSignInTicket(
+  ticket: string,
+  fromDb: DrizzleConnection = db
+): Promise<PasskeySignInTicket | null> {
   const ticket_hash = hashSignInTicket(ticket);
 
-  const [row] = await db
+  const [row] = await fromDb
     .update(passkey_sign_in_tickets)
     .set({ consumed_at: sql`NOW()` })
     .where(

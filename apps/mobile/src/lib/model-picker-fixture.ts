@@ -34,25 +34,6 @@ export function modelPickerFixtureRoute(path: string): string | null {
     { id: 'openai', name: 'OpenAI' },
     { id: 'google', name: 'Google' },
   ];
-  const options: SessionModelOption[] = [
-    ...autoOptions,
-    ...pricedOptions,
-    ...providers.flatMap(({ id: providerID, name: providerName }, providerIndex) =>
-      Array.from({ length: 40 }, (_, index) => {
-        const modelID = `${providerID}-model-${String(index).padStart(2, '0')}`;
-        return {
-          id: `remote-model-${providerIndex * 40 + index}`,
-          name: `${providerName} Model ${String(index).padStart(2, '0')}`,
-          displayId: modelID,
-          modelRef: { providerID, modelID },
-          provider: { id: providerID, name: providerName },
-          variants: [],
-          isPreferred: false,
-          showGatewayMetadata: false,
-        };
-      })
-    ),
-  ];
   // One priced shape per cost line the picker paints, so a catalog change to
   // `agentChat.modelCost.*` renders without a live gateway: a sub-cent side
   // shows the `lessThan` label, the others show the two-decimal shape.
@@ -79,6 +60,25 @@ export function modelPickerFixtureRoute(path: string): string | null {
       showGatewayMetadata: false,
       pricing: { prompt: '0.000003', completion: '0.000014' },
     },
+  ];
+  const options: SessionModelOption[] = [
+    ...autoOptions,
+    ...pricedOptions,
+    ...providers.flatMap(({ id: providerID, name: providerName }, providerIndex) =>
+      Array.from({ length: 40 }, (_, index) => {
+        const modelID = `${providerID}-model-${String(index).padStart(2, '0')}`;
+        return {
+          id: `remote-model-${providerIndex * 40 + index}`,
+          name: `${providerName} Model ${String(index).padStart(2, '0')}`,
+          displayId: modelID,
+          modelRef: { providerID, modelID },
+          provider: { id: providerID, name: providerName },
+          variants: [],
+          isPreferred: false,
+          showGatewayMetadata: false,
+        };
+      })
+    ),
   ];
   const selectionScope: ModelPickerBridge['selectionScope'] = {
     sessionId: routeKey,

@@ -823,7 +823,13 @@ it('atomically initializes a fresh enabled context schedule in the requested tim
     timezone: 'America/Los_Angeles',
     language: 'ja',
   });
-  expect((await db.select().from(agent_briefing_preferences))[0]).toEqual(schedule);
+  // The language rides every context update, so the stored row carries it; the
+  // schedule's own fields (timezone and next run) stay on the first enable.
+  expect((await db.select().from(agent_briefing_preferences))[0]).toEqual({
+    ...schedule,
+    language: 'ja',
+    updated_at: expect.any(String),
+  });
 });
 
 function maintenanceSnapshot(

@@ -184,7 +184,7 @@ describe('PersonalInvoicesScreen header', () => {
     expect(screenHeaders.rendered[0]?.reserveEyebrow).toBeUndefined();
   });
 
-  it('labels the header with the list\'s fixed one-year window', async () => {
+  it("labels the header with the list's fixed one-year window", async () => {
     pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: null, hasMore: false }] };
     pageHook.entries = [INVOICE];
 
@@ -194,7 +194,7 @@ describe('PersonalInvoicesScreen header', () => {
     expect(screenHeaders.rendered[0]?.subtitle).toBe(i18n.t('invoices.personalPeriod'));
   });
 
-  it('routes the empty state\'s action to the credit history screen', async () => {
+  it("routes the empty state's action to the credit history screen", async () => {
     // No pages: the read settled with zero invoices, so the empty state with
     // its action renders in the centered branch.
     pageQuery.data = { pages: [] };

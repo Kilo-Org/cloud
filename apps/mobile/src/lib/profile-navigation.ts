@@ -12,5 +12,4 @@ export const PROFILE_TAB_HREF = '/(app)/(tabs)/(3_profile)' as Href;
  * purchase's receipt lives, for callers that route to it (`credits-links`, the
  * personal invoices empty state).
  */
-export const CREDIT_HISTORY_HREF =
-  '/(app)/(tabs)/(3_profile)/credit-history' as Href;
+export const CREDIT_HISTORY_HREF = '/(app)/(tabs)/(3_profile)/credit-history' as Href;

@@ -141,11 +141,15 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 vi.mock('@/lib/hooks/use-reviewer-models', () => ({
   useReviewerModels: () => ({ models: [], isLoading: false }),
 }));
+const orgBoundaryCalls = vi.hoisted(() => [] as (string | undefined)[]);
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
-  useOrgBoundary: () => ({
-    org: { organizationId: 'org_1', organizationName: 'Acme Robotics', role: 'owner' },
-    isResolving: false,
-  }),
+  useOrgBoundary: (organizationIdOverride?: string) => {
+    orgBoundaryCalls.push(organizationIdOverride);
+    return {
+      org: { organizationId: 'org_1', organizationName: 'Acme Robotics', role: 'owner' },
+      isResolving: false,
+    };
+  },
 }));
 
 function makeConfig(over: Record<string, unknown> = {}) {
@@ -199,6 +203,7 @@ beforeEach(() => {
   readiness.integrationId = 'bitbucket-1';
   readiness.workspaceSlug = 'ws';
   readiness.fetchStatus = 'idle';
+  orgBoundaryCalls.length = 0;
   connectivity.known = true;
   queryError.variants = [];
   queryError.retries = [];
@@ -320,5 +325,7 @@ describe('BitbucketOverview not-connected state', () => {
 
     expect(text).toContain('Acme Robotics');
     expect(text).not.toContain('{{');
+    expect(orgBoundaryCalls.length).toBeGreaterThan(0);
+    expect(orgBoundaryCalls.every(scope => scope === 'org_1')).toBe(true);
   });
 });

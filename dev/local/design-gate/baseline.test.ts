@@ -503,13 +503,9 @@ test('pre-existing findings are not attributed to head', async t => {
   );
 });
 
-test('a screen captured under a LogBox error makes the pair inconclusive, never introduced', async t => {
-  const fixture = syntheticRepo(t);
-  const preparation = await prepareProof(fixture);
-  const baseRun = path.join(fixture.root, 'base-run');
-  const headRun = path.join(fixture.root, 'head-run');
-  const message = 'Text strings must be rendered within a <Text> component.';
-  const overlay: Finding = {
+/** The finding the dev-overlay rule writes for a LogBox error over a screen. */
+function logBoxOverlay(text: string): Finding {
+  return {
     rule: 'dev-overlay',
     severity: 'error',
     cell: 'base',
@@ -519,16 +515,24 @@ test('a screen captured under a LogBox error makes the pair inconclusive, never 
       path: 'testID:logbox_notification_message_text',
       tag: 'Paragraph',
       testID: 'logbox_notification_message_text',
-      text: message,
+      text,
       rect: [60.95, 830.48, 303.62, 22.86],
     },
     measured: 22.86,
     expected: 'no LogBox toast painted over the screen',
     unit: 'dp',
-    message: `LogBox painted "${message}" over this screen`,
+    message: `LogBox painted "${text}" over this screen`,
   };
+}
+
+test('a screen captured under a LogBox error makes the pair inconclusive, never introduced', async t => {
+  const fixture = syntheticRepo(t);
+  const preparation = await prepareProof(fixture);
+  const baseRun = path.join(fixture.root, 'base-run');
+  const headRun = path.join(fixture.root, 'head-run');
+  const message = 'Text strings must be rendered within a <Text> component.';
   capture(preparation, 'base', baseRun);
-  capture(preparation, 'head', headRun, { findings: [overlay] });
+  capture(preparation, 'head', headRun, { findings: [logBoxOverlay(message)] });
   const result = await compareProof(
     preparation,
     baseRun,
@@ -542,6 +546,27 @@ test('a screen captured under a LogBox error makes the pair inconclusive, never 
   assert.deepEqual(result.reasons, [
     `head: a LogBox error painted over base/${TARGET.id}: ${message}`,
   ]);
+});
+
+test('a LogBox error only in the base is a fix, not a blocked pair', async t => {
+  const fixture = syntheticRepo(t);
+  const preparation = await prepareProof(fixture);
+  const baseRun = path.join(fixture.root, 'base-run');
+  const headRun = path.join(fixture.root, 'head-run');
+  const message = 'Text strings must be rendered within a <Text> component.';
+  // The base run's own report and exit status carry its overlay error; the head
+  // is what a critic reads, so a clean head means the screens were compared.
+  capture(preparation, 'base', baseRun, { findings: [logBoxOverlay(message)] });
+  capture(preparation, 'head', headRun);
+  const result = await compareProof(
+    preparation,
+    baseRun,
+    headRun,
+    path.join(fixture.root, 'comparison')
+  );
+  assert.equal(result.status, 'comparable');
+  assert.deepEqual(result.introduced, []);
+  assert.deepEqual(result.reasons, []);
 });
 
 test('a landing notice persisted in both findings artifacts still compares', async t => {

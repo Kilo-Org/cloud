@@ -222,16 +222,27 @@ test('a dump whose LogBox node carries no text has no overlay finding', () => {
 });
 
 const RENDER_ERROR = 'Text strings must be rendered within a <Text> component.';
+const ARBITRARY = 'Loaded 4 items';
+type Level = 'warn' | 'error' | undefined;
 
-/** A dump holding the toast's message node plus the chrome that repeats it. */
-function toastDump(...texts: readonly string[]): ProbeDump {
+/**
+ * A dump holding the toast's message node, the chrome that repeats it and the
+ * buttons LogBox paints its level into.
+ */
+function toastDump(level: Level, ...texts: readonly string[]): ProbeDump {
   const dump = warningDump(texts[0] ?? '');
   // LogBox paints the same string twice: the message paragraph, and the
   // notification chrome that renders it. One notification must read as one
   // finding, and the paragraph names the message, so it wins.
   const message = dump.nodes[7];
   dump.nodes.push(
-    { parent: 5, tag: 'View', rect: [9.9, 556.19, 340.19, 48], testID: 'logbox', text: texts[0] ?? '' },
+    {
+      parent: 5,
+      tag: 'View',
+      rect: [9.9, 556.19, 340.19, 48],
+      testID: 'logbox',
+      text: texts[0] ?? '',
+    },
     // The badge carries the count, never a message: it must not read as one.
     {
       parent: 5,
@@ -240,13 +251,29 @@ function toastDump(...texts: readonly string[]): ProbeDump {
       testID: 'logbox_notification_count_text',
       text: '!',
     },
+    ...(level === undefined
+      ? []
+      : [
+          {
+            parent: 5,
+            tag: 'View',
+            rect: [9.9, 817.52, 391.62, 48],
+            testID: `logbox_open_button_${level}`,
+          },
+          {
+            parent: 5,
+            tag: 'View',
+            rect: [369.52, 831.62, 19.81, 19.81],
+            testID: `logbox_dismiss_button_${level}`,
+          },
+        ]),
     ...texts.slice(1).map(text => ({ ...message, text }))
   );
   return dump;
 }
 
-test('a LogBox error painted over the screen is an error, not a screen defect', () => {
-  const findings = checkDevLogOverlay(toastDump(RENDER_ERROR));
+test('an error-level notification makes any message an error, not a screen defect', () => {
+  const findings = checkDevLogOverlay(toastDump('error', RENDER_ERROR));
   // The chrome repeats the message; the notification still yields one finding.
   assert.equal(findings.length, 1);
   const [overlay] = findings;
@@ -261,16 +288,40 @@ test('a LogBox error painted over the screen is an error, not a screen defect', 
   assert.match(overlay.message, new RegExp(RENDER_ERROR.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 });
 
-test('a benign not-yet-mounted toast stays a warning beside a real LogBox error', () => {
-  const findings = checkDevLogOverlay(toastDump(WARNING, RENDER_ERROR));
+test('LogBox decides the severity: an error-level unlock of an arbitrary message still fails the run', () => {
+  // The message says nothing the gate could recognize; the notification's own
+  // level does, which is why the text is never the classifier.
+  const [overlay] = checkDevLogOverlay(toastDump('error', ARBITRARY));
+  assert.equal(overlay.severity, 'error');
+  assert.equal(overlay.element.text, ARBITRARY);
+});
+
+test('LogBox decides the severity: a warn-level notification stays a warning whatever it says', () => {
+  const [overlay] = checkDevLogOverlay(toastDump('warn', RENDER_ERROR));
+  assert.equal(overlay.severity, 'warning');
+  assert.equal(overlay.element.text, RENDER_ERROR);
+  // The quoted text stays in the finding, so the run says what painted over it.
+  assert.match(overlay.message, new RegExp(RENDER_ERROR.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+});
+
+test('a warn-level not-yet-mounted toast keeps its environment wording', () => {
+  const [overlay] = checkDevLogOverlay(toastDump('warn', WARNING));
+  assert.equal(overlay.severity, 'warning');
+  assert.match(overlay.message, /Disabling failed in this runtime/);
+});
+
+test('without level chrome the message text is the only classification left', () => {
+  // A dump from a runtime whose LogBox chrome the probe did not model: the one
+  // message the gate knows is an environment warning stays a warning, and
+  // anything else is assumed to be the error it would be.
   assert.deepEqual(
-    findings.map(entry => [entry.severity, entry.element.text]),
+    checkDevLogOverlay(toastDump(undefined, WARNING, RENDER_ERROR)).map(entry => [
+      entry.severity,
+      entry.element.text,
+    ]),
     [
       ['warning', WARNING],
       ['error', RENDER_ERROR],
     ]
   );
-  const [warning, error] = findings;
-  assert.match(warning.message, /Disabling failed in this runtime/);
-  assert.match(error.message, /Text strings must be rendered within a <Text> component\./);
 });

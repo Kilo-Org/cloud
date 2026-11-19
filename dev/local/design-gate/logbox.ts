@@ -80,6 +80,26 @@ export function logBoxDisableExpression(): string {
 const LOGBOX_MESSAGE_TEST_ID = 'logbox_notification_message_text';
 /** The badge that counts notifications, whose text is not a message. */
 const LOGBOX_COUNT_TEST_ID = 'logbox_notification_count_text';
+/**
+ * LogBox carries the level it painted at in its buttons' test IDs:
+ * `logbox_open_button_error`, `logbox_dismiss_button_warn` and so on. That is
+ * LogBox's own classification, which the message text cannot stand in for: a
+ * dev warning quoted in the text is not an error, and an error need not mention
+ * anything the gate could recognize.
+ */
+const LOGBOX_LEVEL_TEST_ID = /^logbox_(?:open|dismiss)_button_(warn|error)$/;
+
+function notificationLevel(dump: ProbeDump): 'warn' | 'error' | undefined {
+  // A notification paints one level's buttons; error wins only because a dump
+  // holding both would be two notifications and the stricter reading is safe.
+  const levels = new Set(
+    dump.nodes.flatMap(node => {
+      const match = node.testID === undefined ? null : LOGBOX_LEVEL_TEST_ID.exec(node.testID);
+      return match === null ? [] : [match[1]];
+    })
+  );
+  return levels.has('error') ? 'error' : levels.has('warn') ? 'warn' : undefined;
+}
 
 /**
  * The raw dump, not the normalized tree: `normalize` drops LogBox chrome (its
@@ -88,15 +108,15 @@ const LOGBOX_COUNT_TEST_ID = 'logbox_notification_count_text';
  *
  * Every readiness wait has disabled LogBox's UI by the time a screen is
  * captured, so a toast in the dump means either the switch failed in this
- * runtime (the not-yet-mounted warning: an environment problem, not a layout
- * defect, and therefore a warning rather than the product error the gate reports
- * for a screen's own faults) or that some code really did raise an error while
- * the screen was up. The second case is not graded: the capture shows the toast,
- * not the screen under it, so the gate reports it as an error that fails the run
- * and the screen is judged only once the overlay is gone. Reporting it as a
- * product finding instead lets whatever painted the toast — a fixture, the run's
- * own diagnostic manifest, or the product — be mistaken for a defect of the
- * screen a critic would then see only through the toast.
+ * runtime or that some code really did raise a message while the screen was up.
+ * The gate cannot tell a dev warning the environment painted (an app whose
+ * runtime refused the switch) from an error the run's own fixture, diagnostic
+ * manifest or product raised, so it takes LogBox's level: an error paints over
+ * the screen the gate meant to grade, so it fails the run and the screen is
+ * judged only once the overlay is gone, while a warning keeps the screen's own
+ * faults as the errors the run reports. Reporting a painted error as a product
+ * finding instead lets whatever painted the toast be mistaken for a defect of
+ * the screen a critic would then see only through the toast.
  *
  * The run log says whether any module exposed the switch, which is what tells a
  * runtime without LogBox apart from one that refused it.
@@ -121,10 +141,21 @@ export function checkDevLogOverlay(dump: ProbeDump): Finding[] {
     if (seen !== undefined && !better) return;
     messages.set(text, { node, index, text });
   });
+  const level = notificationLevel(dump);
   return [...messages.values()].map(({ node, index, text }) =>
     finding({
       rule: 'dev-overlay',
-      severity: text.includes(NOT_YET_MOUNTED_WARNING) ? 'warning' : 'error',
+      // Without level chrome the dump cannot say how LogBox painted this: fall
+      // back to the one message the gate knows is an environment warning and
+      // treat anything else as the error it must be assumed to be.
+      severity:
+        level === undefined
+          ? text.includes(NOT_YET_MOUNTED_WARNING)
+            ? 'warning'
+            : 'error'
+          : level === 'error'
+            ? 'error'
+            : 'warning',
       element: {
         index,
         path: node.testID === undefined ? node.tag : `testID:${node.testID}`,
@@ -140,7 +171,7 @@ export function checkDevLogOverlay(dump: ProbeDump): Finding[] {
       unit: 'dp',
       message: text.includes(NOT_YET_MOUNTED_WARNING)
         ? `LogBox painted React's "${NOT_YET_MOUNTED_WARNING}" over this screen although the gate disables its UI at every readiness wait. Disabling failed in this runtime, which is an environment problem rather than a fault of the screen: the gate never wraps console.*, so a toast it cannot close is reported and not graded. Dev warnings are for Metro and LogBox in normal use.`
-        : `LogBox painted "${text}" over this screen, so the capture shows a dev overlay rather than the screen alone and the gate cannot grade what it covers. The overlay is the run's to fix — its fixture or diagnostic manifest, or the product — before this screen is judged; it is an error of the run, not a finding about the screen.`,
+        : `LogBox painted "${text}" over this screen, so the capture shows a dev overlay rather than the screen alone and the gate cannot grade what it covers. The overlay is the run's to fix — its fixture or diagnostic manifest, or the product — before this screen is judged; it is a finding about the run, not about the screen.`,
     })
   );
 }

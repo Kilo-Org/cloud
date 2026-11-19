@@ -134,7 +134,13 @@ export const createBrowserTabGroupController = ({
     sessions.set(sessionHandle, created);
     return created;
   };
+  /** A tab sits in one group at a time: joining this session's group takes it out of every other session's record. */
   const recordTab = (session: SessionState, tabId: number): void => {
+    for (const other of sessions.values()) {
+      if (other !== session) {
+        other.tabs = other.tabs.filter(id => id !== tabId);
+      }
+    }
     if (!session.tabs.includes(tabId)) {
       session.tabs.push(tabId);
     }

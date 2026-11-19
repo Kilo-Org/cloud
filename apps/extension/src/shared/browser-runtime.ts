@@ -2583,9 +2583,11 @@ export const createBrowserRuntime = ({
 
     const title = groups
       .listSessions()
-      .find(session => session.sessionHandle === sessionHandle)?.title;
+      .find(session => session.sessionHandle === sessionHandle)
+      ?.title.trim();
 
-    return { sessionHandle, ...(title === undefined ? {} : { title }) };
+    // A blank title names nobody: the card falls back to its generic session name.
+    return { sessionHandle, ...(title === undefined || title === '' ? {} : { title }) };
   };
 
   const runTool = async ({

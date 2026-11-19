@@ -4841,10 +4841,8 @@ describe('agent browser calls', () => {
     let announced = 0;
 
     for (const sessionHandle of ['session-1', 'session-2']) {
-      // eslint-disable-next-line no-await-in-loop -- one session per share, in order
+      // eslint-disable-next-line no-await-in-loop -- one session per open, in order
       await runtime.openSession({ controllerId: 'controller-1', sessionHandle, title: 'Work' });
-      // eslint-disable-next-line no-await-in-loop -- see above
-      await runtime.shareActiveTab({ sessionHandle, tabId: TAB_ID });
     }
 
     cdp.setHandlers({
@@ -4862,6 +4860,9 @@ describe('agent browser calls', () => {
 
     const click = async (sessionHandle: string, sensitive: readonly string[] = []) => {
       const caller = { controllerId: 'controller-1', kind: 'agent' as const, sessionHandle };
+
+      // A tab sits in one session's group at a time: the calling session shares it into its own group first.
+      await runtime.shareActiveTab({ sessionHandle, tabId: TAB_ID });
 
       try {
         return await runtime.runTool({

@@ -365,6 +365,54 @@ describe('browser runtime', () => {
     });
   });
 
+  it('asks about, and owes tab_taken to, the session that shared the tab last', async () => {
+    const { runtime } = await createHarness();
+    const panelCaller = panel('conversation-a');
+
+    await runtime.openSession({
+      controllerId: 'controller-1',
+      sessionHandle: 'session-2',
+      title: 'Later',
+    });
+    await runtime.shareActiveTab({ sessionHandle: 'session-2', tabId: TAB_ID });
+
+    await expect(evaluateToolCall(runtime, panelCaller)).resolves.toStrictEqual({
+      kind: 'needs_take_over',
+      owner: { sessionHandle: 'session-2', title: 'Later' },
+    });
+
+    await runtime.runTool({
+      arguments: { function: '() => 1' },
+      caller: panelCaller,
+      tabId: TAB_ID,
+      takeOver: true,
+      toolName: 'kilo_browser_evaluate',
+    });
+    runtime.releaseCaller(panelCaller);
+
+    await expect(evaluateToolCall(runtime, agent('session-2'))).resolves.toStrictEqual({
+      kind: 'result',
+      result: { error: TAB_TAKEN_ERROR, ok: false },
+    });
+    // The tab left the older session's group, so that session no longer reaches it.
+    await expect(evaluateToolCall(runtime, agent('session-1'))).resolves.toMatchObject({
+      kind: 'result',
+      result: { ok: false },
+    });
+  });
+
+  it('leaves a blank session title out of the take-over card', async () => {
+    const { runtime } = await createHarness();
+
+    await runtime.openSession({ controllerId: 'controller-1', sessionHandle: 'blank', title: ' ' });
+    await runtime.shareActiveTab({ sessionHandle: 'blank', tabId: TAB_ID });
+
+    await expect(evaluateToolCall(runtime, panel('conversation-a'))).resolves.toStrictEqual({
+      kind: 'needs_take_over',
+      owner: { sessionHandle: 'blank' },
+    });
+  });
+
   it('stops a taken call from sending the page commands that follow the one in flight', async () => {
     const { debugger_, runtime } = await createHarness();
     const agentCaller = agent('session-1');

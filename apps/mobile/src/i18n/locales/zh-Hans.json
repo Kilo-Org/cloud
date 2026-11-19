@@ -26,6 +26,7 @@
     "creditHistory": "积分记录",
     "sentenceJoiner": "。",
     "listJoiner": "、",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "取消",
     "done": "完成",
     "retry": "重试",
@@ -176,7 +177,8 @@
     "changes": "更改",
     "organizationTrialEnded": "组织的试用期已结束，且没有生效的套餐。组织所有者可以在 kilo.ai 更新账单信息，然后重试。",
     "privateRepositoryA11y": "{{name}}，私有仓库",
-    "legalDocumentEnglishOnly": "本文件仅提供英文版本。"
+    "legalDocumentEnglishOnly": "本文件仅提供英文版本。",
+    "organizationTrialEndedBilling": "组织的试用期已结束，且没有生效的套餐。您可以更新账单信息，然后重试。"
   },
   "language": {
     "restarting": "正在重启以应用语言设置",
@@ -386,12 +388,24 @@
       "editKeyDescription": "已存储的值无法显示。请输入新值进行替换。",
       "editKeyMappingsWarning": "替换密钥也会替换已保存的模型映射：请重新输入所有仍需使用的映射。",
       "saveFailed": "无法保存密钥。",
-      "invalidCredentials": "请检查凭据后重试。",
       "fieldRequired": "{{field}} 为必填项。",
+      "keyIncomplete": "密钥缺少必填的值。",
       "incompleteMapping": "映射 {{number}} 需要同时填写网关模型 slug 和部署名称。",
       "apiKeyLabel": "API 密钥",
       "apiKeyPlaceholder": "粘贴密钥",
       "apiKeyRequired": "请输入密钥。",
+      "keyAlreadyExists": "你已有此提供商的密钥。请先移除它，再添加另一个。",
+      "keyStoreFailed": "密钥无法保存。",
+      "invalidCredentials": "此密钥的格式与此提供商要求的不符。请检查后重试。",
+      "testSucceeded": "密钥可用。提供商：{{provider}}。模型：{{model}}。",
+      "testRejected": "提供商拒绝了此密钥。请检查其是否正确且未被撤销。",
+      "testIncomplete": "提供商在测试完成前结束了测试。请重试。",
+      "testUnsupportedProvider": "此提供商已不再受支持。请移除该密钥。",
+      "testUnreadableKey": "无法读取已存储的密钥。请稍后重试。",
+      "testDeprecatedProvider": "此提供商已弃用，因此其密钥无法测试。",
+      "keyManagedByCodingPlan": "编程套餐管理着此提供商的密钥，该密钥为只读。要添加你自己的密钥，请先取消编程套餐。",
+      "providerUnavailable": "此提供商尚未开放，因此无法为其添加密钥。",
+      "testFailed": "密钥测试失败。请重试。",
       "authMethod": "身份验证方式",
       "authMethodAccessKeys": "访问密钥",
       "resourceName": "Azure 资源名称",
@@ -482,7 +496,14 @@
       "viewReceipt": "查看回执"
     },
     "changelog": "更新内容",
-    "changelogVersionPending": "此版本的更新说明将随下次应用更新提供。"
+    "changelogVersionPending": "{{version}} 版本的更新说明将随下次应用更新提供。",
+    "changelogGroupNew": "新增",
+    "changelogFixesIn": "{{areas}}方面的修复与改进。",
+    "changelogFixesPolish": "全应用范围的修复与改进。",
+    "changelogAreas": {
+      "signIn": "登录",
+      "profileOrganizations": "个人资料和组织"
+    }
   },
   "preferences": {
     "general": "通用",
@@ -925,13 +946,24 @@
       "empty": "还没有带分析数据的审查",
       "emptyDescription": "在组织启用分析期间，系统会记录已完成的审查。",
       "offTitle": "已关闭 {{platform}} 的分析",
-      "offDescription": "在网页版组织设置中启用分析，即可记录已完成的审查。",
-      "couldNotLoad": "无法加载分析数据"
+      "offDescription": "组织账单角色（所有者、管理员和账单管理员）可以在网页版组织设置中启用分析，以记录已完成的审查。",
+      "couldNotLoad": "无法加载分析数据",
+      "trackedReviewsCaption": "本时间段内启用分析后完成的审查。运行中和失败的审查永不计入。",
+      "trackedReviewsUncounted": "未计入：组织已有 {{displayTotal}} 个已完成的审查，其中 {{displayCount}} 个未捕获结果。",
+      "trackedReviewsUncounted_one": "未计入：组织已有 {{displayTotal}} 个已完成的审查，其中 {{displayCount}} 个未捕获结果。",
+      "trackedReviewsUncounted_other": "未计入：组织已有 {{displayTotal}} 个已完成的审查，其中 {{displayCount}} 个未捕获结果。"
     },
     "council": {
       "title": "评审团审查",
       "subtitle": "多位专家分别审查每个拉取请求，他们的投票汇总为一个决定。",
-      "unavailable": "此组织无法使用评审团审查。",
+      "unavailablePersonallyTitle": "需要 Enterprise 组织",
+      "unavailablePersonally": "评审团审查不包含在个人账户中。",
+      "unavailablePersonallyAction": "创建组织",
+      "unavailablePersonallySwitchAction": "切换组织",
+      "unavailableOrganizationTitle": "评审团审查目前无法使用",
+      "unavailableForOrganization": "评审团审查需要具备生效订阅或试用期的企业套餐。此组织目前不具备此项。",
+      "unavailableForOrganizationNeutral": "此组织目前无法使用评审团审查。请稍后再试。",
+      "unavailableOnBitbucket": "评审团审查不适用于 Bitbucket 仓库。",
       "noRepositories": "尚未选择任何仓库。请先在仓库设置中选择仓库。",
       "specialists": "专家",
       "labels": "触发评审团审查的标签",
@@ -2582,7 +2614,6 @@
     "completingPurchase": "正在完成购买流程",
     "subscriptionLoading": "Kilo Pass 订阅加载中",
     "retryHint": "重新获取 Kilo Pass 状态。",
-    "cardAccessibility": "{{title}}。{{description}}。{{actionLabel}}",
     "endedOn": "{{date}} 已结束",
     "notAvailableInApp": "Kilo Pass 在应用中不可用。",
     "statusActive": "生效中",
@@ -3320,6 +3351,7 @@
       "manageOnWeb": "网页版账单设置",
       "changePlan": "更改套餐",
       "buySeats": "购买席位",
+      "managedOnWeb": "套餐、席位和自动充值在网页版中管理。",
       "setupAutoTopUp": "设置自动充值",
       "manageAutoTopUp": "管理自动充值",
       "opensOnWeb": "在网页中打开"
@@ -3481,12 +3513,11 @@
       "requestLogs": "请求日志"
     },
     "requestLogs": {
-      "hint": "显示时段结束前一小时内的请求，最新的在前。",
       "older": "上一小时",
       "newer": "下一小时",
       "truncated": "该小时的请求数超出列表可显示的数量。",
-      "emptyTitle": "暂无请求",
-      "emptyDescription": "该小时内没有网关请求。",
+      "emptyTitle": "该小时暂无请求",
+      "emptyDescription": "使用“上一小时”查看更早的请求。",
       "loadError": "无法加载请求日志。",
       "permissionDenied": "只有组织的所有者、管理员或账单管理员才能查看其请求日志。",
       "tokens": "输入 {{input}} · 输出 {{output}}",
@@ -4285,8 +4316,7 @@
       "repoValue": "仓库: {{name}}",
       "profileValue": "配置文件: {{name}}",
       "profileUnavailable": "此配置文件已不可用。请选择其他配置文件。",
-      "pickerEmptyDescriptionOrganization": "创建组织配置文件，以跨会话重复使用环境变量、设置命令和技能。",
-      "pickerEmptyDescriptionOrganizationReadOnly": "组织所有者或管理员可以创建组织配置文件。"
+      "pickerEmptyDescriptionOrganization": "创建组织配置文件，以跨会话重复使用环境变量、设置命令和技能。"
     },
     "variablesDeleteFailed": "无法删除变量",
     "deleteVariable": "删除变量 {{key}}",
@@ -4472,7 +4502,6 @@
     "dismiss": "忽略简报",
     "offline": "离线 · 已保存的简报",
     "cached": "已保存的报告 · 无法刷新",
-    "window": "{{start}} – {{end}}",
     "summary": "AI 摘要",
     "summaryPending": "AI 摘要生成中，完成后将附在此处。",
     "summaryUnavailable": "AI 摘要不可用。结构化报告仍可查看。",
@@ -4591,6 +4620,7 @@
       "title": "触发器和 Webhook",
       "subtitle": "通过 Webhook 调用或计划自动运行 Cloud Agent。",
       "new": "新建触发器",
+      "create": "创建触发器",
       "emptyTitle": "还没有触发器",
       "emptyDescription": "创建触发器，以便通过 Webhook 调用或按计划启动 Cloud Agent 运行。",
       "loadFailedTitle": "无法加载触发器",
@@ -4644,6 +4674,8 @@
       "created": "触发器已创建",
       "saved": "触发器已保存",
       "statusArrived": "已到达",
+      "defaultPromptWebhook": "描述此 Webhook 请求的请求体：\n\n{{body}}",
+      "defaultPromptScheduled": "运行计划任务。触发时间为 {{scheduledTime}}。",
       "problems": {
         "nameRequired": "请输入名称。",
         "nameTooShort": "请使用至少 8 个字符。",
@@ -4692,6 +4724,7 @@
     "superseded": "此链接已在其他设备上被替换，现已失效。"
   },
   "sharedSession": {
+    "startedAt": "开始于 {{time}}",
     "title": "已分享的会话",
     "someone": "某人",
     "sharedBy": "由{{owner}}分享",
@@ -4847,6 +4880,8 @@
     "modelsDescription": "关闭某个模型即可为所有成员阻止该模型。来自已允许提供商的模型初始为开启。",
     "modelsDeniedOnly": "仅显示已拒绝",
     "modelsEmpty": "没有匹配此搜索的模型。",
+    "modelsDeniedEmpty": "没有已拒绝的模型。",
+    "modelsDeniedSearchEmpty": "没有匹配此搜索的已拒绝模型。",
     "providersDescription": "关闭某个提供商即可阻止 Kilo 为此组织路由到该提供商。",
     "providersNeedCatalog": "在完整模型目录加载完成前，提供商开关为只读状态。点按上方的重试即可编辑。",
     "providersEmpty": "没有匹配此搜索的提供商。",

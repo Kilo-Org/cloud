@@ -11,13 +11,14 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useFocusEffect } from 'expo-router';
 import { RefreshCw, Settings, ShieldAlert } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { toast } from 'sonner-native';
 
 import { QueryError } from '@/components/query-error';
+import { RefusalStatus } from '@/components/refusal-status';
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { Button } from '@/components/ui/button';
 import { ScreenHeader } from '@/components/screen-header';
@@ -49,6 +50,8 @@ import {
 import {
   isSecuritySyncInProgress,
   isSecuritySyncRetryable,
+  isSecurityTrialRefusal,
+  isSecurityTrialRefusalCopyKey,
   securitySyncPreconditionFor,
   securitySyncReconcileCopy,
 } from '@/lib/security-agent-ledger';
@@ -66,6 +69,7 @@ import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { type SinglePushRoute, useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { getSecurityAgentPath } from '@/lib/security-agent';
+import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 
@@ -337,6 +341,13 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const scopeTitle = useSecurityScopeTitle(scope);
+  // The step a trial refusal offers, for the reader who can take it. A stored
+  // dismissal failure records which refusal it was, not which reader saw it, so
+  // this one role answer feeds both the sentence a failure card paints and the
+  // step under it, which `useBillingAction` builds from the same predicate; the
+  // two cannot describe different readers.
+  const canManageBilling = useCanManageBilling(scope);
+  const billingAction = useBillingAction(scope);
   const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const [repoFullName, setRepoFullName] = useState<string | undefined>(undefined);
@@ -690,6 +701,57 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
     syncPrecondition === 'noRepositories' && repositoryPolicyReadOnly
       ? t('securityAgent.mutations.syncNoRepositoriesNoManage')
       : syncFailure?.message;
+  // The lapsed-trial refusal is the one failed sync the reader can end from
+  // here: its fix is the plan, so a reader who can change the plan gets the
+  // step that opens billing, and everyone else keeps the sentence alone. The
+  // precondition and retry actions below are untouched by it — a trial refusal
+  // is terminal and has neither.
+  const syncRefusalAction = isSecurityTrialRefusal(syncFailure) ? billingAction : undefined;
+
+  // The sync failure row. A trial refusal the reader can end routes through
+  // `RefusalStatus`, so its step sits under the sentence the way every other
+  // refusal offers one; every other failure keeps its own sentence and the
+  // precondition or retry control beside it.
+  let syncFailureRow: ReactNode = null;
+  if (syncFailure !== null && !syncFailureInProgress) {
+    syncFailureRow =
+      syncRefusalAction === undefined ? (
+        <View className="flex-row items-center gap-3">
+          {/* While a retry runs this sentence is the failure being retried,
+              not a fresh one, so it steps back from error red — to the warn
+              tone this screen already gives its other degraded state — while
+              the control reports the attempt. */}
+          <Text
+            className={cn(
+              'flex-1 text-xs',
+              triggerSync.isPending ? 'text-warn' : 'text-destructive'
+            )}
+          >
+            {syncFailureMessage}
+          </Text>
+          {syncAction ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              loading={syncAction.pending}
+              // A busy non-primary control dims itself, spinner included, which
+              // left the control the reader just pressed fainter than the
+              // header icon spinning beside it.
+              className={cn(syncAction.pending && 'opacity-100')}
+              onPress={syncAction.handlePress}
+            >
+              <Text>{syncAction.label}</Text>
+            </Button>
+          ) : null}
+        </View>
+      ) : (
+        <RefusalStatus
+          message={syncFailureMessage ?? null}
+          action={syncRefusalAction}
+          className="text-xs"
+        />
+      );
+  }
 
   // A grant that holds nothing blocks every scan, so the repository card's
   // empty state carries the step out of it. A manager opens the repository
@@ -844,42 +906,14 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           <Text className="text-xs text-warn">{refreshFailure.message}</Text>
         ) : null}
 
-        {syncFailure !== null && !syncFailureInProgress ? (
-          <View className="flex-row items-center gap-3">
-            {/* While a retry runs this sentence is the failure being retried,
-                not a fresh one, so it steps back from error red — to the warn
-                tone this screen already gives its other degraded state — while
-                the control reports the attempt. */}
-            <Text
-              className={cn(
-                'flex-1 text-xs',
-                triggerSync.isPending ? 'text-warn' : 'text-destructive'
-              )}
-            >
-              {syncFailureMessage}
-            </Text>
-            {syncAction ? (
-              <Button
-                size="sm"
-                variant="ghost"
-                loading={syncAction.pending}
-                // A busy non-primary control dims itself, spinner included,
-                // which left the control the reader just pressed fainter than
-                // the header icon spinning beside it.
-                className={cn(syncAction.pending && 'opacity-100')}
-                onPress={syncAction.handlePress}
-              >
-                <Text>{syncAction.label}</Text>
-              </Button>
-            ) : null}
-          </View>
-        ) : null}
+        {syncFailureRow}
 
         {dismissFailures.failures.map(failure => (
           <SecurityCommandRetryCard
             key={failure.findingId}
-            lastError={securityDismissFailureCopy(failure)}
+            lastError={securityDismissFailureCopy(failure, canManageBilling)}
             retryable={failure.retryable === true}
+            action={isSecurityTrialRefusalCopyKey(failure.lastErrorKey) ? billingAction : undefined}
             onRetry={() => {
               pushOnce(getSecurityAgentPath(scope, `dismiss/${failure.findingId}`));
             }}

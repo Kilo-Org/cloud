@@ -156,6 +156,20 @@ async function selectNextActiveGrant(
   return grant ?? null;
 }
 
+/**
+ * The owner-to-columns projection for inserts: a personal row stores the user
+ * id, an organization row the organization id; neither stores both.
+ */
+function ownerColumns(owner: ClaudeBillingOwner): {
+  kilo_user_id: string | null;
+  organization_id: string | null;
+} {
+  return {
+    kilo_user_id: owner.kind === 'organization' ? null : owner.kiloUserId,
+    organization_id: owner.kind === 'personal' ? null : owner.organizationId,
+  };
+}
+
 async function upsertClaudeBillingGrant(
   owner: ClaudeBillingOwner,
   payerConnectionId: string,
@@ -166,8 +180,7 @@ async function upsertClaudeBillingGrant(
     .insert(claude_billing_connection_grants)
     .values({
       payer_connection_id: payerConnectionId,
-      kilo_user_id: owner.kind === 'organization' ? null : owner.kiloUserId,
-      organization_id: owner.kind === 'personal' ? null : owner.organizationId,
+      ...ownerColumns(owner),
       created_by: createdBy,
     })
     .onConflictDoNothing();
@@ -319,8 +332,7 @@ export async function insertClaudeBillingProfile(
   await onDb
     .insert(claude_billing_connections)
     .values({
-      kilo_user_id: owner.kind === 'organization' ? null : owner.kiloUserId,
-      organization_id: owner.kind === 'personal' ? null : owner.organizationId,
+      ...ownerColumns(owner),
       user_profile_id: userProfileId,
       created_by: createdBy,
     })
@@ -436,10 +448,9 @@ export async function shareClaudeBillingConnection(
         )
         .limit(1);
       if (!otherActiveGrant) {
-        await tx
-          .update(claude_billing_connections)
-          .set({ status: ClaudeBillingConnectionStatus.Removed })
-          .where(eq(claude_billing_connections.id, target.id));
+        // A Pending row never carries the retirement columns: only the insert
+        // default writes Pending, and the approval callback sets the columns.
+        await retireClaudeBillingConnection(tx, target.id);
       }
     }
     if (targetOwner.kind === 'personal') {
@@ -587,6 +598,18 @@ function scopeSortRank(
   return 2;
 }
 
+function compareScopes(
+  a: ClaudeBillingOwner,
+  b: ClaudeBillingOwner,
+  targetOrganizationId: string | undefined,
+  orgNames: ReadonlyMap<string, string>
+): number {
+  return (
+    scopeSortRank(a, targetOrganizationId) - scopeSortRank(b, targetOrganizationId) ||
+    formatScopeLabel(a, orgNames).localeCompare(formatScopeLabel(b, orgNames))
+  );
+}
+
 export async function describeClaudeBillingSharing(
   userId: string,
   targetOwner: ClaudeBillingOwner,
@@ -668,11 +691,7 @@ export async function describeClaudeBillingSharing(
       if (!owner || claudeBillingOwnerKey(owner) === targetKey) continue;
       siblingOwners.push(owner);
     }
-    siblingOwners.sort(
-      (a, b) =>
-        scopeSortRank(a, targetOrganizationId) - scopeSortRank(b, targetOrganizationId) ||
-        formatScopeLabel(a, orgNames).localeCompare(formatScopeLabel(b, orgNames))
-    );
+    siblingOwners.sort((a, b) => compareScopes(a, b, targetOrganizationId, orgNames));
     sharedWith = siblingOwners.map(owner => formatScopeLabel(owner, orgNames));
   }
 
@@ -775,11 +794,7 @@ export async function describeClaudeBillingSharing(
     if (payer.created_by !== userId && !scopes.some(scope => scope.kind === 'personal')) {
       continue;
     }
-    scopes.sort(
-      (a, b) =>
-        scopeSortRank(a, targetOrganizationId) - scopeSortRank(b, targetOrganizationId) ||
-        formatScopeLabel(a, orgNames).localeCompare(formatScopeLabel(b, orgNames))
-    );
+    scopes.sort((a, b) => compareScopes(a, b, targetOrganizationId, orgNames));
     const primary = scopes[0];
     if (!primary) continue;
     shareableLinks.push({

@@ -26,6 +26,7 @@
     "creditHistory": "د کریډیټ تاریخچه",
     "sentenceJoiner": ". ",
     "listJoiner": "، ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "لغوه کړئ",
     "done": "بشپړ شو",
     "retry": "بیا هڅه وکړئ",
@@ -176,7 +177,8 @@
     "changes": "بدلونونه",
     "organizationTrialEnded": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. د سازمان مالک کولی شي په kilo.ai کې بیلنګ تازه کړي، بیا یو ځل بیا هڅه وکړي.",
     "privateRepositoryA11y": "{{name}}، شخصي زېرمتون",
-    "legalDocumentEnglishOnly": "دا سند یوازې په انګلیسي ژبه کې د لاسرسي وړ دی."
+    "legalDocumentEnglishOnly": "دا سند یوازې په انګلیسي ژبه کې د لاسرسي وړ دی.",
+    "organizationTrialEndedBilling": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. تاسو کولی شئ بیلنګ تازه کړئ، بیا یو ځل بیا هڅه وکړئ."
   },
   "language": {
     "restarting": "د ژبې د پلي کولو لپاره بیا پیلېږي",
@@ -386,12 +388,24 @@
       "editKeyDescription": "ساتل شوی ارزښت نشي ښودل کېدای. د بدلولو لپاره یې نوی ارزښت ولیکئ.",
       "editKeyMappingsWarning": "د کیلي بدلول ساتل شوې د ماډلونو نښلونې هم بدلوي: هره هغه نښلونه چې تاسو ورته لا اړتیا لرئ بیا ولیکئ.",
       "saveFailed": "کیلي خوندي نه شوه.",
-      "invalidCredentials": "اعتبارنامې وګورئ او بیا هڅه وکړئ.",
       "fieldRequired": "{{field}} اړین دی.",
+      "keyIncomplete": "په کیلي کې اړینه ارزښت نشته.",
       "incompleteMapping": "نښلونه {{number}} د gateway ماډل slug او د deployment نوم دواړو ته اړتیا لري.",
       "apiKeyLabel": "API کیلي",
       "apiKeyPlaceholder": "کیلي پیسټ کړئ",
       "apiKeyRequired": "کیلي ولیکئ.",
+      "keyAlreadyExists": "تاسو لا دمخه د دې چمتو کوونکي لپاره یوه کیلي لرئ. مخکې لدې چې بله زیاته کړئ، هغه لرې کړئ.",
+      "keyStoreFailed": "کیلي ونه ساتل شوه.",
+      "invalidCredentials": "دا کیلي په هغه بڼه کې نه ده چې دا چمتو کوونکي ورته تمه لري. هغه وګورئ او بیا هڅه وکړئ.",
+      "testSucceeded": "کیلي کار کوي. چمتو کوونکی: {{provider}}. ماډل: {{model}}.",
+      "testRejected": "چمتو کوونکي دا کیلي رد کړه. وګورئ چې هغه سمه ده او نه ده لغوه شوې.",
+      "testIncomplete": "چمتو کوونکي ازموینه پای ته ورسوله مخکې لدې چې بشپړه شي. بیا هڅه وکړئ.",
+      "testUnsupportedProvider": "دا چمتو کوونکی نور نه ملاتړ کېږي. کیلي لرې کړئ.",
+      "testUnreadableKey": "ساتل شوې کیلي ونه لوستل شوه. وروسته بیا هڅه وکړئ.",
+      "testDeprecatedProvider": "دا چمتو کوونکی منسوخ شوی، نو د هغه کیلي نشي ازمویل کېدای.",
+      "keyManagedByCodingPlan": "د کوډینګ پلان د دې چمتو کوونکي کیلي اداره کوي او کیلي یوازې د لوستلو وړ ده. د خپلې کیلي د زیاتولو لپاره د کوډینګ پلان لغوه کړئ.",
+      "providerUnavailable": "دا چمتو کوونکی لا تر اوسه د لاسرسي وړ نه دی، نو د دې لپاره کیلي نشئ زیاتولی.",
+      "testFailed": "د کیلي ازموینه پاتې راغله. بیا هڅه وکړئ.",
       "authMethod": "د تصدیق طریقه",
       "authMethodAccessKeys": "د لاسرسي کیلي",
       "resourceName": "د Azure سرچینې نوم",
@@ -482,7 +496,14 @@
       "viewReceipt": "رسید وګورئ"
     },
     "changelog": "نوي بدلونونه",
-    "changelogVersionPending": "د دې نسخې یادښتونه د اپ له راتلونکي تازه کېدو سره راځي."
+    "changelogVersionPending": "د {{version}} نسخې یادښتونه د اپ له راتلونکي تازه کېدو سره راځي.",
+    "changelogGroupNew": "نوي",
+    "changelogFixesIn": "په {{areas}} کې سمونې او ښه والی.",
+    "changelogFixesPolish": "په ټول اپ کې سمونې او ښه والی.",
+    "changelogAreas": {
+      "signIn": "ننوتل",
+      "profileOrganizations": "پروفایل او سازمانونه"
+    }
   },
   "preferences": {
     "general": "عمومي",
@@ -1468,13 +1489,24 @@
       "empty": "تر اوسه د احصایو لرونکې بیاکتنې نشته",
       "emptyDescription": "احصایې بشپړې شوې بیاکتنې ثبتوي، تر هغې چې د سازمان لپاره فعالې وي.",
       "offTitle": "د {{platform}} احصایې غیرفعالې دي",
-      "offDescription": "په ویب کې د سازمان په ترتیباتو کې احصایې فعالې کړئ، څو بشپړې شوې بیاکتنې ثبت شي.",
-      "couldNotLoad": "احصایې بار نه شوې"
+      "offDescription": "د سازمان د تادیې اړوندې ونډې (مالکان، ادمینان او د تادیې مدیران) کولای شي احصایې په ویب کې د سازمان د تنظیماتو له لارې فعالې کړي، ترڅو بشپړې شوې بیاکتنې ثبت شي.",
+      "couldNotLoad": "احصایې بار نه شوې",
+      "trackedReviewsCaption": "بشپړې شوې بیاکتنې چې احصایې پرې فعالې وې او په دې موده کې پای ته ورسېدلې. جاري او ناکامې شوې بیاکتنې هېڅکله نه شمېرل کېږي.",
+      "trackedReviewsUncounted": "نه شمېرل کېږي: {{displayCount}} له {{displayTotal}} بشپړو شوو بیاکتنو چې سازمان یې لري، د دوی پایله ثبت نشوه.",
+      "trackedReviewsUncounted_one": "نه شمېرل کېږي: {{displayCount}} له {{displayTotal}} بشپړو شوو بیاکتنو چې سازمان یې لري، د دوی پایله ثبت نشوه.",
+      "trackedReviewsUncounted_other": "نه شمېرل کېږي: {{displayCount}} له {{displayTotal}} بشپړو شوو بیاکتنو چې سازمان یې لري، د دوی پایله ثبت نشوه."
     },
     "council": {
       "title": "د شورا بیاکتنه",
       "subtitle": "څو متخصصین هر پل ریکویسټ بیاکتنه کوي او د هغوی رایې په یوه پرېکړه کې یوځای کېږي.",
-      "unavailable": "د شورا بیاکتنه د دې سازمان لپاره د لاسرسي وړ نه ده.",
+      "unavailablePersonallyTitle": "یو Enterprise سازمان ته اړتیا ده",
+      "unavailablePersonally": "د شورا بیاکتنه د شخصي حساب برخه نه ده.",
+      "unavailablePersonallyAction": "سازمان جوړ کړئ",
+      "unavailablePersonallySwitchAction": "سازمان بدل کړئ",
+      "unavailableOrganizationTitle": "د شورا بیاکتنه اوس نشته",
+      "unavailableForOrganization": "د شورا بیاکتنې ته د فعال سبسکرېپشن یا ازمویښتې مودې سره Enterprise پلان ته اړتیا لري. دا سازمان دا اوس نه لري.",
+      "unavailableForOrganizationNeutral": "د شورا بیاکتنې ته د دې سازمان لپاره اوس لاسرسی نشته. وروسته بیا هڅه وکړئ.",
+      "unavailableOnBitbucket": "د شورا بیاکتنه د Bitbucket زېرمتونونو لپاره شتون نه لري.",
       "noRepositories": "تر اوسه هېڅ زېرمتون نه دی ټاکل شوی. لومړی په زېرمتون تنظیماتو کې زېرمتونونه وټاکئ.",
       "specialists": "متخصصین",
       "labels": "هغه نښې چې د شورا بیاکتنه پیلوي",
@@ -3125,7 +3157,6 @@
     "completingPurchase": "پېرود بشپړېږي",
     "subscriptionLoading": "د Kilo Pass ګډون بارېږي",
     "retryHint": "د Kilo Pass د حالت ترلاسه کولو بیا هڅه کوي.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "په {{date}} پای ته رسېدلی",
     "notAvailableInApp": "Kilo Pass په اپ کې شتون نلري.",
     "statusActive": "فعال",
@@ -3328,6 +3359,7 @@
       "manageOnWeb": "په ویب کې د بیلینګ ترتیبات",
       "changePlan": "پلان بدل کړئ",
       "buySeats": "د غړیتوب ځایونه واخلئ",
+      "managedOnWeb": "پلان، د غړیتوب ځایونه او اتومات بیا ډکول په ویب کې اداره کېږي.",
       "setupAutoTopUp": "اتومات بیا ډکول تنظیم کړئ",
       "manageAutoTopUp": "اتومات بیا ډکول اداره کړئ",
       "opensOnWeb": "په وېب کې پرانیستل کېږي"
@@ -3476,12 +3508,11 @@
       "requestLogs": "د غوښتنو لاګونه"
     },
     "requestLogs": {
-      "hint": "د کړکۍ تر پای وړاندې د یو ساعت غوښتنې، نوې یې لومړی.",
       "older": "پخوانی ساعت",
       "newer": "نوی ساعت",
       "truncated": "په دې ساعت کې له ښودل شویو ډېرې غوښتنې شته.",
-      "emptyTitle": "غوښتنې نشته",
-      "emptyDescription": "په دې ساعت کې د ګېټوې غوښتنې نشته.",
+      "emptyTitle": "په دې ساعت کې غوښتنې نشته",
+      "emptyDescription": "د پخوانیو غوښتنو لیدو لپاره «پخوانی ساعت» وکاروئ.",
       "loadError": "د غوښتنو لاګونه بار نه شول.",
       "permissionDenied": "یوازې د سازمان مالک، اډمین یا د بیلنګ مدیر کولی شي د هغه د غوښتنو لاګونه ولولي.",
       "tokens": "{{input}} ننوتي · {{output}} وتلي",
@@ -4285,8 +4316,7 @@
       "repoValue": "زېرمتون: {{name}}",
       "profileValue": "پروفایل: {{name}}",
       "profileUnavailable": "دا پروفایل نور شتون نه لري. بل پروفایل غوره کړئ.",
-      "pickerEmptyDescriptionOrganization": "د چاپېریال متغیرونو، تنظیم کولو امرونو، او په ناستو کې مهارتونه د بیا کارولو لپاره د سازمان پروفایل رامینځته کړئ.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "د سازمان خاوند یا مدیر کولی شي د سازمان پروفایل رامینځته کړي."
+      "pickerEmptyDescriptionOrganization": "د چاپېریال متغیرونو، تنظیم کولو امرونو، او په ناستو کې مهارتونه د بیا کارولو لپاره د سازمان پروفایل رامینځته کړئ."
     },
     "variablesDeleteFailed": "متغیر ړنګول نشو کړای",
     "deleteVariable": "د {{key}} متغیر ړنګ کړئ",
@@ -4472,7 +4502,6 @@
     "dismiss": "راپور له پامه وغورځوئ",
     "offline": "آفلاین · خوندي شوی راپور",
     "cached": "خوندي شوی راپور · تازه کول شونی نه دی",
-    "window": "{{start}} – {{end}}",
     "summary": "د AI لنډیز",
     "summaryPending": "د AI لنډیز په جریان کې دی. چې چمتو شي، دلته به ونښلول شي.",
     "summaryUnavailable": "د AI لنډیز شتون نه لري. ستاسو منظم راپور لا هم شته.",
@@ -4591,6 +4620,7 @@
       "title": "ټرېګرونه او ویب‌هوکونه",
       "subtitle": "د ویب‌هوک غوښتنې یا مهالویش څخه د Cloud Agent چلېدل اتومات کړئ.",
       "new": "نوی ټرېګر",
+      "create": "ټرېګر جوړ کړئ",
       "emptyTitle": "تر اوسه هېڅ ټرېګر نشته",
       "emptyDescription": "یو ټرېګر جوړ کړئ ترڅو د ویب‌هوک غوښتنې یا مهالویش له مخې د Cloud Agent چل پیل کړئ.",
       "loadFailedTitle": "ټرېګرونه بار نشول",
@@ -4644,6 +4674,8 @@
       "created": "ټرېګر جوړ شو",
       "saved": "ټرېګر خوندي شو",
       "statusArrived": "ورسېد",
+      "defaultPromptWebhook": "د دې ویب‌هوک غوښتنې د بدن تشریح وکړئ:\n\n{{body}}",
+      "defaultPromptScheduled": "مهالویز کار وچلوئ. {{scheduledTime}} کې ټرېګر شو.",
       "problems": {
         "nameRequired": "نوم ولیکئ.",
         "nameTooShort": "لږ تر لږه 8 توري وکاروئ.",
@@ -4692,6 +4724,7 @@
     "superseded": "دا لینک په بل ځای کې بدل شوی دی، نو نور کار نه کوي."
   },
   "sharedSession": {
+    "startedAt": "په {{time}} کې پیل شو",
     "title": "شریکه شوې ناسته",
     "someone": "یو څوک",
     "sharedBy": "د {{owner}} لخوا شریک شوې",
@@ -4847,6 +4880,8 @@
     "modelsDescription": "یو ماډل غیر فعال کړئ تر څو یې د هر غړي لپاره بند کړئ. د اجازه ورکړل شوو عرضه کوونکو ماډلونه په پیل کې فعال وي.",
     "modelsDeniedOnly": "یوازې منع شوي",
     "modelsEmpty": "هیڅ ماډل دې پلټنې سره سمون نه لري.",
+    "modelsDeniedEmpty": "هیڅ ماډل منع شوی نه دی.",
+    "modelsDeniedSearchEmpty": "هیڅ منع شوی ماډل دې پلټنې سره سمون نه لري.",
     "providersDescription": "یو عرضه کوونکی غیر فعال کړئ تر څو Kilo دې سازمان لپاره هغه ته د غوښتنو لېږل ودروي.",
     "providersNeedCatalog": "تر هغه چې د ماډلونو بشپړ کتلاګ بار نه شي، د عرضه کوونکو سویچونه یوازې د لوستلو لپاره پاتې کېږي. د هغوی د سمولو لپاره پورته د بیا هڅه وکړئ تڼۍ کېکاږئ.",
     "providersEmpty": "هیڅ عرضه کوونکی دې پلټنې سره سمون نه لري.",

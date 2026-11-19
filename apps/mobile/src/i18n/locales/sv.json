@@ -26,6 +26,7 @@
     "creditHistory": "Kredithistorik",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Avbryt",
     "done": "Klar",
     "retry": "Försök igen",
@@ -176,7 +177,8 @@
     "changes": "Ändringar",
     "organizationTrialEnded": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. En organisationsägare kan uppdatera faktureringen på kilo.ai och sedan försöka igen.",
     "privateRepositoryA11y": "{{name}}, privat kodarkiv",
-    "legalDocumentEnglishOnly": "Det här dokumentet finns endast på engelska."
+    "legalDocumentEnglishOnly": "Det här dokumentet finns endast på engelska.",
+    "organizationTrialEndedBilling": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. Du kan uppdatera faktureringen och sedan försöka igen."
   },
   "language": {
     "restarting": "Startar om för att byta språk",
@@ -386,12 +388,24 @@
       "editKeyDescription": "Det lagrade värdet kan inte visas. Ange ett nytt för att ersätta det.",
       "editKeyMappingsWarning": "Att ersätta nyckeln ersätter även de sparade modellmappningarna: ange alla mappningar du fortfarande behöver på nytt.",
       "saveFailed": "Det gick inte att spara nyckeln.",
-      "invalidCredentials": "Kontrollera autentiseringsuppgifterna och försök igen.",
       "fieldRequired": "{{field}} måste anges.",
+      "keyIncomplete": "Nyckeln saknar ett obligatoriskt värde.",
       "incompleteMapping": "Mappning {{number}} måste ha både gatewaymodellens slug och ett distributionsnamn.",
       "apiKeyLabel": "API-nyckel",
       "apiKeyPlaceholder": "Klistra in nyckeln",
       "apiKeyRequired": "Ange nyckeln.",
+      "keyAlreadyExists": "Du har redan en nyckel för den här leverantören. Ta bort den innan du lägger till en annan.",
+      "keyStoreFailed": "Nyckeln kunde inte sparas.",
+      "invalidCredentials": "Den här nyckeln har inte det format som den här leverantören förväntar sig. Kontrollera den och försök igen.",
+      "testSucceeded": "Nyckeln fungerar. Leverantör: {{provider}}. Modell: {{model}}.",
+      "testRejected": "Leverantören avvisade den här nyckeln. Kontrollera att den är korrekt och inte har återkallats.",
+      "testIncomplete": "Leverantören avslutade testet innan det var klart. Försök igen.",
+      "testUnsupportedProvider": "Den här leverantören stöds inte längre. Ta bort nyckeln.",
+      "testUnreadableKey": "Den lagrade nyckeln kunde inte läsas. Försök igen senare.",
+      "testDeprecatedProvider": "Den här leverantören är föråldrad, så dess nyckel kan inte testas.",
+      "keyManagedByCodingPlan": "En kodningsplan hanterar den här leverantörens nyckel, och nyckeln är skrivskyddad. Avbryt kodningsplanen för att lägga till en egen nyckel.",
+      "providerUnavailable": "Den här leverantören är ännu inte tillgänglig, så du kan inte lägga till någon nyckel för den.",
+      "testFailed": "Nyckeltestet misslyckades. Försök igen.",
       "authMethod": "Autentiseringsmetod",
       "authMethodAccessKeys": "Åtkomstnycklar",
       "resourceName": "Azure-resursnamn",
@@ -482,7 +496,14 @@
       "viewReceipt": "Visa kvitto"
     },
     "changelog": "Nyheter",
-    "changelogVersionPending": "Nyheter för denna version kommer med nästa appuppdatering."
+    "changelogVersionPending": "Nyheter för version {{version}} kommer med nästa appuppdatering.",
+    "changelogGroupNew": "Nytt",
+    "changelogFixesIn": "Korrigeringar och förbättringar i {{areas}}.",
+    "changelogFixesPolish": "Korrigeringar och förbättringar i hela appen.",
+    "changelogAreas": {
+      "signIn": "Inloggning",
+      "profileOrganizations": "Profil och organisationer"
+    }
   },
   "preferences": {
     "general": "Allmänt",
@@ -1468,13 +1489,24 @@
       "empty": "Inga granskningar med statistik än",
       "emptyDescription": "Statistiken registrerar slutförda granskningar så länge den är aktiverad för organisationen.",
       "offTitle": "Statistiken är avstängd för {{platform}}",
-      "offDescription": "Aktivera den i organisationsinställningarna på webben för att registrera slutförda granskningar.",
-      "couldNotLoad": "Det gick inte att läsa in statistiken"
+      "offDescription": "Organisationens faktureringsroller (ägare, administratörer och fakturahanterare) kan aktivera statistiken i organisationens inställningar på webben för att registrera slutförda granskningar.",
+      "couldNotLoad": "Det gick inte att läsa in statistiken",
+      "trackedReviewsCaption": "Slutförda granskningar som avslutades under den här perioden medan statistiken var aktiverad. Pågående och misslyckade granskningar räknas aldrig.",
+      "trackedReviewsUncounted": "Räknas inte: {{displayCount}} av organisationens {{displayTotal}} avslutade granskningar utan registrerat resultat.",
+      "trackedReviewsUncounted_one": "Räknas inte: {{displayCount}} av organisationens {{displayTotal}} avslutade granskningar utan registrerat resultat.",
+      "trackedReviewsUncounted_other": "Räknas inte: {{displayCount}} av organisationens {{displayTotal}} avslutade granskningar utan registrerat resultat."
     },
     "council": {
       "title": "Rådsgranskning",
       "subtitle": "Flera experter granskar varje pull-begäran och deras röster kombineras till ett beslut.",
-      "unavailable": "Rådsgranskning är inte tillgänglig för denna organisation.",
+      "unavailablePersonallyTitle": "Kräver en Enterprise-organisation",
+      "unavailablePersonally": "Rådsgranskning ingår inte i ett personligt konto.",
+      "unavailablePersonallyAction": "Skapa organisation",
+      "unavailablePersonallySwitchAction": "Byt organisation",
+      "unavailableOrganizationTitle": "Rådsgranskning är inte tillgänglig",
+      "unavailableForOrganization": "Rådsgranskning kräver Enterprise-planen med ett aktivt abonnemang eller en provperiod. Den här organisationen har det inte just nu.",
+      "unavailableForOrganizationNeutral": "Rådsgranskning är inte tillgänglig för den här organisationen just nu. Försök igen senare.",
+      "unavailableOnBitbucket": "Rådsgranskning är inte tillgänglig för Bitbucket-kodarkiv.",
       "noRepositories": "Inga kodarkiv har valts än. Välj kodarkiv i inställningarna för kodarkiv först.",
       "specialists": "Experter",
       "labels": "Etiketter som utlöser rådsgranskning",
@@ -3125,7 +3157,6 @@
     "completingPurchase": "Slutför köpet…",
     "subscriptionLoading": "Läser in Kilo Pass-prenumerationen",
     "retryHint": "Försöker läsa in Kilo Pass-status igen.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Avslutad {{date}}",
     "notAvailableInApp": "Kilo Pass är inte tillgängligt i appen.",
     "statusActive": "Aktiv",
@@ -3328,6 +3359,7 @@
       "manageOnWeb": "Faktureringsinställningar på webben",
       "changePlan": "Byt plan",
       "buySeats": "Köp platser",
+      "managedOnWeb": "Planen, platserna och den automatiska påfyllningen hanteras på webben.",
       "setupAutoTopUp": "Konfigurera automatisk påfyllning",
       "manageAutoTopUp": "Hantera automatisk påfyllning",
       "opensOnWeb": "Öppnas på webben"
@@ -3476,12 +3508,11 @@
       "requestLogs": "Förfrågningsloggar"
     },
     "requestLogs": {
-      "hint": "Förfrågningar från timmen före fönstrets sluttid, nyaste först.",
       "older": "Tidigare timme",
       "newer": "Senare timme",
       "truncated": "Den här timmen har fler förfrågningar än listan visar.",
-      "emptyTitle": "Inga förfrågningar",
-      "emptyDescription": "Den här timmen har inga gateway-förfrågningar.",
+      "emptyTitle": "Inga förfrågningar den här timmen",
+      "emptyDescription": "Använd Tidigare timme för att se tidigare förfrågningar.",
       "loadError": "Det gick inte att läsa in förfrågningsloggarna.",
       "permissionDenied": "Endast en ägare, administratör eller faktureringsansvarig i organisationen kan läsa dess förfrågningsloggar.",
       "tokens": "{{input}} in · {{output}} ut",
@@ -4285,8 +4316,7 @@
       "repoValue": "Kodarkiv: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Den här profilen är inte längre tillgänglig. Välj en annan.",
-      "pickerEmptyDescriptionOrganization": "Skapa en organisationsprofil för att återanvända miljövariabler, installationskommandon och färdigheter över sessioner.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "En organisationsägare eller administratör kan skapa en organisationsprofil."
+      "pickerEmptyDescriptionOrganization": "Skapa en organisationsprofil för att återanvända miljövariabler, installationskommandon och färdigheter över sessioner."
     },
     "variablesDeleteFailed": "Det gick inte att ta bort variabeln",
     "deleteVariable": "Ta bort variabel {{key}}",
@@ -4472,7 +4502,6 @@
     "dismiss": "Avskriv rapport",
     "offline": "Offline · sparad rapport",
     "cached": "Sparad rapport · kan inte uppdateras",
-    "window": "{{start}} – {{end}}",
     "summary": "AI-sammanfattning",
     "summaryPending": "AI-sammanfattningen pågår. Den bifogas här när den är klar.",
     "summaryUnavailable": "AI-sammanfattningen är inte tillgänglig. Din strukturerade rapport finns fortfarande.",
@@ -4591,6 +4620,7 @@
       "title": "Utlösare och webhooks",
       "subtitle": "Automatisera Cloud Agent-körningar från ett webhookanrop eller enligt ett schema.",
       "new": "Ny utlösare",
+      "create": "Skapa utlösare",
       "emptyTitle": "Inga utlösare än",
       "emptyDescription": "Skapa en utlösare för att starta en Cloud Agent-körning från ett webhookanrop eller enligt ett schema.",
       "loadFailedTitle": "Det gick inte att läsa in utlösare",
@@ -4644,6 +4674,8 @@
       "created": "Utlösare skapad",
       "saved": "Utlösare sparad",
       "statusArrived": "Anlänt",
+      "defaultPromptWebhook": "Beskriv innehållet i den här webhookbegäran:\n\n{{body}}",
+      "defaultPromptScheduled": "Kör den schemalagda uppgiften. Utlöst vid {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Ange ett namn.",
         "nameTooShort": "Använd minst 8 tecken.",
@@ -4692,6 +4724,7 @@
     "superseded": "Den här länken har ersatts på annat håll och fungerar därför inte längre."
   },
   "sharedSession": {
+    "startedAt": "Startade kl. {{time}}",
     "title": "Delad session",
     "someone": "Någon",
     "sharedBy": "Delad av {{owner}}",
@@ -4847,6 +4880,8 @@
     "modelsDescription": "Stäng av en modell för att blockera den för alla medlemmar. Modeller från tillåtna leverantörer är på från början.",
     "modelsDeniedOnly": "Endast nekade",
     "modelsEmpty": "Inga modeller matchar den här sökningen.",
+    "modelsDeniedEmpty": "Ingen modell är nekad.",
+    "modelsDeniedSearchEmpty": "Inga nekade modeller matchar den här sökningen.",
     "providersDescription": "Stäng av en leverantör för att stoppa Kilo från att dirigera till den för den här organisationen.",
     "providersNeedCatalog": "Leverantörsreglagen är skrivskyddade tills hela modellkatalogen har lästs in. Tryck på Försök igen ovan för att ändra dem.",
     "providersEmpty": "Inga leverantörer matchar den här sökningen.",

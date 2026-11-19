@@ -2,7 +2,7 @@ import 'server-only';
 
 import { and, eq, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 import { openai_chatgpt_connections } from '@kilocode/db/schema';
-import { db, readDb, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb, type DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
 import {
   decryptApiKey,
   encryptApiKey,
@@ -11,6 +11,17 @@ import {
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { OpenAiChatGptConnectionSchema, type OpenAiChatGptConnection } from './types';
 import { isChatGptUsageLimitCurrent, type ChatGptUsageLimit } from './usage-limit';
+
+/**
+ * The clean usage-limit column state. A save, a reconnect, and a successful
+ * delegated request each leave no recorded limit, so the three writes must
+ * spell the same columns and nulls.
+ */
+const NO_USAGE_LIMIT = {
+  usage_limit_reached_at: null,
+  usage_limit_resets_at: null,
+  usage_limit_error_code: null,
+} as const;
 
 /**
  * The delegated "Sign in with ChatGPT" tokens are the OpenAI BYOK credential.
@@ -68,7 +79,7 @@ export function openAiChatGptOwnerWhere(owner: OpenAiChatGptOwner): SQL | undefi
 }
 
 /** Either the primary database or an open transaction. */
-export type OpenAiChatGptDatabase = typeof db | DrizzleTransaction;
+export type OpenAiChatGptDatabase = DrizzleConnection;
 
 /**
  * Reads the raw connection row. `options.forUpdate` takes a `SELECT ... FOR
@@ -171,9 +182,7 @@ export async function saveOpenAiChatGptConnection(
     encrypted_connection,
     is_enabled: true,
     created_by: createdBy,
-    usage_limit_reached_at: null,
-    usage_limit_resets_at: null,
-    usage_limit_error_code: null,
+    ...NO_USAGE_LIMIT,
   };
 
   // Each owner shape upserts through its own partial unique index.
@@ -211,9 +220,7 @@ export async function saveOpenAiChatGptConnection(
         created_by: values.created_by,
         encrypted_connection,
         is_enabled: true,
-        usage_limit_reached_at: null,
-        usage_limit_resets_at: null,
-        usage_limit_error_code: null,
+        ...NO_USAGE_LIMIT,
       },
     });
 }
@@ -327,11 +334,7 @@ export async function clearOpenAiChatGptUsageLimit(
   await withConnectionHoldingToken(owner, accessToken, async tx => {
     await tx
       .update(openai_chatgpt_connections)
-      .set({
-        usage_limit_reached_at: null,
-        usage_limit_resets_at: null,
-        usage_limit_error_code: null,
-      })
+      .set({ ...NO_USAGE_LIMIT })
       .where(
         and(
           openAiChatGptOwnerWhere(owner),

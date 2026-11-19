@@ -125,6 +125,9 @@ export function EditWebhookTriggerContent({
     if (!triggerData) return undefined;
     return {
       triggerId: triggerData.triggerId,
+      targetType:
+        triggerData.targetType === 'cloud_agent_chat' ? 'cloud_agent_chat' : 'cloud_agent',
+      cloudAgentSessionId: triggerData.cloudAgentSessionId,
       executionUserId: triggerData.executionUserId,
       activationMode: triggerData.activationMode === 'scheduled' ? 'scheduled' : 'webhook',
       cronExpression: triggerData.cronExpression,
@@ -446,6 +449,23 @@ export function EditWebhookTriggerContent({
           {isKiloclawChat && (
             <Button variant="outline" size="sm" asChild>
               <Link href="/claw/settings">Manage in KiloClaw Settings</Link>
+            </Button>
+          )}
+          {triggerData?.targetType === 'cloud_agent_chat' && triggerData.isActive && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isActionPending}
+              onClick={() => {
+                if (!window.confirm('Pause this trigger? Unsaved changes will be discarded.')) {
+                  return;
+                }
+                void updateTrigger({ triggerId, organizationId, isActive: false }).catch(
+                  () => undefined
+                );
+              }}
+            >
+              Pause trigger
             </Button>
           )}
         </div>

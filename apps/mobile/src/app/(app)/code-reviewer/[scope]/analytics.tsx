@@ -28,6 +28,7 @@ import { reviewerScopeTitle } from '@/lib/code-reviewer-scope-title';
 import { useReviewerScopeName } from '@/lib/hooks/use-reviewer-scope-title';
 import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access';
 import { CODE_REVIEWER_HOME_PATH } from '@/lib/profile-agent-navigation';
+import { queryBodyFailure, useQueryBodyState } from '@/lib/hooks/use-query-body-state';
 import { useTRPC } from '@/lib/trpc';
 import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
 
@@ -133,6 +134,22 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
     errors: [dashboard.error],
   });
 
+  // The dashboard read classifies through the shared body state: a read the
+  // online manager pauses while the device is offline never reaches
+  // react-query's error branch, so the screen would keep its skeleton forever.
+  // The classifier names a confirmed pause as the offline state with Retry and
+  // keeps an unsettled probe inside loading.
+  const readState = useQueryBodyState({
+    data: dashboard.data,
+    isError: dashboard.isError,
+    isFetching: dashboard.isFetching,
+    fetchStatus: dashboard.fetchStatus,
+    refetch: () => {
+      void dashboard.refetch();
+    },
+  });
+  const failure = queryBodyFailure(readState, dashboard.isFetching);
+
   const periodOptions = PERIOD_OPTIONS.map(option => ({
     value: option.value,
     label: t(option.labelKey),
@@ -158,20 +175,41 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
 
   const number = (value: number) => formatNumber(value, i18n.language);
 
+  // Cached metrics with a refresh that cannot run: the notice carries the
+  // action that refreshes them, and it stays mounted while that retry runs, so
+  // stale figures never pose as current without a way out.
+  const stale = dashboard.data != null && (dashboard.isError || dashboard.fetchStatus === 'paused');
+  const stalePaused = !dashboard.isError && dashboard.fetchStatus === 'paused';
+
   let body: ReactNode = null;
-  if (dashboard.isPending) {
-    body = <AnalyticsSkeleton />;
-  } else if (dashboard.isError && !dashboard.data) {
+  if (failure) {
+    // A paused read names itself offline; a failed one keeps its own tRPC
+    // variant and offers Retry only for a retryable code.
+    const failedVariant = stalePaused ? 'offline' : trpcErrorVariant(dashboard.error);
     body = (
       <QueryError
-        variant={trpcErrorVariant(dashboard.error)}
-        title={t('codeReviewer.analytics.couldNotLoad')}
-        onRetry={isRetryableTrpcError(dashboard.error) ? () => void dashboard.refetch() : undefined}
-        isRetrying={dashboard.isFetching}
+        variant={failedVariant}
+        title={
+          failedVariant === 'offline'
+            ? t('queryError.offlineTitle')
+            : t('codeReviewer.analytics.couldNotLoad')
+        }
+        onRetry={
+          stalePaused || isRetryableTrpcError(dashboard.error)
+            ? () => void dashboard.refetch()
+            : undefined
+        }
+        isRetrying={failure.isRetrying}
       />
     );
+  } else if (readState.body.status === 'loading' || dashboard.data === undefined) {
+    body = <AnalyticsSkeleton />;
   } else {
-    const { summary, repositories, settings } = dashboard.data;
+    const { summary, repositories, settings, coverage } = dashboard.data;
+    // Tracked counts only captured results, so the amount the reader's review
+    // list shows but the dashboard does not count is every captured miss: the
+    // capture is missing, its result failed validation, or it was omitted.
+    const uncapturedReviews = coverage.missing + coverage.invalid + coverage.omitted;
     body = !settings.enabled ? (
       // Analytics is enabled per platform, so a disabled one is a state, not an
       // empty dataset: the zero stat cards and the generic empty state would
@@ -189,6 +227,20 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
       />
     ) : (
       <View className="gap-6 pt-4">
+        {stale ? (
+          <QueryError
+            variant={stalePaused ? 'offline' : trpcErrorVariant(dashboard.error)}
+            placement="top"
+            className="px-0 pt-0"
+            title={stalePaused ? t('queryError.offlineTitle') : t('common.somethingWentWrong')}
+            onRetry={
+              stalePaused || isRetryableTrpcError(dashboard.error)
+                ? () => void dashboard.refetch()
+                : undefined
+            }
+            isRetrying={dashboard.isFetching}
+          />
+        ) : null}
         <View className="gap-3">
           <View className="flex-row gap-3">
             <MetricCard
@@ -214,6 +266,19 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
               value={number(summary.estimatedImpactPoints)}
             />
           </View>
+          <Text variant="muted" className="text-xs">
+            {t('codeReviewer.analytics.trackedReviewsCaption')}
+          </Text>
+          {/* The line always renders, so a period or platform change never
+          moves the list below it; at zero the count names the problem none. */}
+          <Text variant="muted" className="text-xs">
+            {t('codeReviewer.analytics.trackedReviewsUncounted', {
+              count: uncapturedReviews,
+              displayCount: number(uncapturedReviews),
+              total: coverage.enrolledCompletedReviews,
+              displayTotal: number(coverage.enrolledCompletedReviews),
+            })}
+          </Text>
         </View>
 
         {repositories.length === 0 ? (

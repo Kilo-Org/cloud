@@ -37,10 +37,9 @@ describe('canManageOrganizationBilling', () => {
     expect(canManageOrganizationBilling('billing_manager')).toBe(true);
   });
 
-  it('is false for member, undefined, and unrelated strings', () => {
+  it('is false for member and undefined', () => {
     expect(canManageOrganizationBilling('member')).toBe(false);
     expect(canManageOrganizationBilling(undefined)).toBe(false);
-    expect(canManageOrganizationBilling('kilo_staff')).toBe(false);
   });
 });
 

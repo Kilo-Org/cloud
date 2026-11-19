@@ -22,6 +22,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
 import { Input } from '@/components/ui/input';
+import { RemainingCharactersCounter } from '@/components/ui/remaining-characters-counter';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
@@ -33,8 +34,10 @@ import {
   useReviewerPermission,
 } from '@/lib/hooks/use-code-reviewer';
 import { useCreateManualReview } from '@/lib/hooks/use-code-reviews';
+import { useReviewerBillingRefusal } from '@/lib/hooks/reviewer-refusal';
 import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { isTrialExpiredRefusal } from '@/lib/server-error-copy';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
 
@@ -114,6 +117,11 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const statusesError = githubStatus.isError || gitlabStatus.isError;
   const firstConnected = MANUAL_REVIEW_PLATFORMS.find(option => isConnected(option));
   const permission = useReviewerPermission(scope);
+  // The organization trial gate refuses a start for the whole organization, so
+  // the reader's role decides the refusal's copy and whether it offers the plan
+  // step. The read resolves against this route's scope, never the device's
+  // selected organization.
+  const refusal = useReviewerBillingRefusal(scope);
   const [platformChoice, setPlatformChoice] = useState<ManualReviewPlatform | null>(null);
   const platform = platformChoice ?? firstConnected ?? 'github';
   // The field names the request the selected platform serves: GitHub calls it a
@@ -218,8 +226,16 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               settle({ message: t('common.takingLonger'), retryable: true });
               return;
             }
-            const failure = manualReviewStartFailure(error, platform);
-            if (!settle(failure)) {
+            const failure = manualReviewStartFailure(error, platform, refusal.canManageBilling);
+            // The step a lapsed plan offers rides with the refusal, from the
+            // same role answer that chose the copy above: a member never sees
+            // a step the server would refuse them.
+            if (
+              !settle({
+                ...failure,
+                action: isTrialExpiredRefusal(error) ? refusal.action : undefined,
+              })
+            ) {
               return;
             }
             if (!failure.retryable) {
@@ -443,21 +459,10 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               }}
             />
             {/* One line at a time: the room left while the draft nears the
-                bound, the bound itself once it is reached. The counted sentence
-                is the row's accessible name, so the number is not read alone. */}
+                bound, the bound itself once it is reached. */}
             {instructionsRemaining > 0 &&
             instructionsRemaining <= INSTRUCTIONS_COUNTER_VISIBLE_REMAINING ? (
-              <View className="flex-row justify-end">
-                {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
-                <Text
-                  className="text-xs font-normal text-muted-foreground"
-                  accessibilityLabel={t('agentChat.composer.charactersRemaining', {
-                    count: instructionsRemaining,
-                  })}
-                >
-                  {instructionsRemaining}
-                </Text>
-              </View>
+              <RemainingCharactersCounter remaining={instructionsRemaining} />
             ) : null}
             {instructionsRemaining <= 0 ? (
               <AccessibleStatus

@@ -10,10 +10,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SectionHeader } from '@/components/home/section-header';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
-import { ScreenHeader } from '@/components/screen-header';
+import { type HeaderEyebrow, ScreenHeader } from '@/components/screen-header';
 import { TodoNotesSection } from '@/components/todos/todo-notes-section';
 import { TodoSessionRow } from '@/components/todos/todo-session-row';
 import { TodoStartActions } from '@/components/todos/todo-start-actions';
+import { eyebrowHeaderProps } from '@/components/ui/eyebrow-placeholder';
 import { Circle, CircleCheck } from '@/components/ui/icons';
 import { IconButton } from '@/components/ui/icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -164,13 +165,20 @@ export function TodoDetailScreen({ itemId }: Readonly<{ itemId: string }>) {
     return <TodoDetailBody key={todo.id} todo={todo} />;
   }
 
+  // The loaded screen draws the to-do's list on the eyebrow line. A to-do that
+  // loads always carries its list, so this shell keeps the line reserved: while
+  // the read runs it carries the placeholder bar, and after the read fails the
+  // same line stays blank, so the title holds the position the payload gives it
+  // without an animation that the failure cannot finish.
+  const eyebrow: HeaderEyebrow =
+    query.isFetching && !query.isError ? { kind: 'loading' } : { kind: 'held' };
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
         title=""
         titleNumberOfLines={2}
         reserveTitleSpace
-        reserveEyebrow
+        {...eyebrowHeaderProps(eyebrow)}
         backFallback={LISTS_HREF}
       />
       {query.isError ? (

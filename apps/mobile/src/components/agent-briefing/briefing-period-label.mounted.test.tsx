@@ -70,7 +70,7 @@ it('shows each window endpoint in the briefing zone and no separate date line', 
       .findAll(node => (node.type as string) === 'Text')
       .map(node => node.props.children);
     expect(lines).toEqual([
-      'agentBriefing.window 2026-10-19T22:00:00Z pt-BR Europe/Berlin – 2026-10-20T08:00:00Z pt-BR Europe/Berlin',
+      'common.timeRange 2026-10-19T22:00:00Z pt-BR Europe/Berlin – 2026-10-20T08:00:00Z pt-BR Europe/Berlin',
       'Europe/Berlin',
       'agentBriefing.capturedAt 2026-10-20T08:00:00Z pt-BR Europe/Berlin',
     ]);

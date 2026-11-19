@@ -111,6 +111,54 @@ describe('SandboxControlV2 snapshot start diagnostics', () => {
     expect(launch).toHaveBeenCalledTimes(1);
   });
 
+  it('times each restore attempt separately from the stop between attempts', async () => {
+    const fields = vi.spyOn(logger, 'withFields');
+    const launch = vi
+      .fn<ProviderAdapter['launch']>()
+      .mockImplementationOnce(async () => {
+        vi.setSystemTime(Date.now() + 120);
+        return { startSource: 'image', snapshotFailed: true };
+      })
+      .mockImplementationOnce(async () => {
+        vi.setSystemTime(Date.now() + 230);
+        return { startSource: 'repository' };
+      });
+    const sandbox = unit(launch);
+    sandbox.stopRef = async () => {
+      vi.setSystemTime(Date.now() + 500);
+      return { confirmed: true, errorName: 'none', cause: 'stop_confirmed' };
+    };
+
+    await expect(sandbox.launchWithSnapshotRetry(input)).resolves.toMatchObject({
+      result: { startSource: 'repository' },
+    });
+    expect(
+      fields.mock.calls
+        .map(([record]) => record)
+        .filter(record => record.diagnosticEvent === 'snapshot_restore_attempt_finished')
+    ).toEqual([
+      expect.objectContaining({
+        allocationId: ALLOCATION_ID,
+        stage: 'provider_launch',
+        snapshotKind: 'environment',
+        attempt: 1,
+        durationMs: 120,
+        outcome: 'failed',
+        reason: 'transient',
+        willRetry: true,
+      }),
+      expect.objectContaining({
+        allocationId: ALLOCATION_ID,
+        stage: 'provider_launch',
+        snapshotKind: 'environment',
+        attempt: 2,
+        durationMs: 230,
+        outcome: 'restored',
+        willRetry: false,
+      }),
+    ]);
+  });
+
   it.each([
     {
       name: 'DO launch deadline without a provider error',

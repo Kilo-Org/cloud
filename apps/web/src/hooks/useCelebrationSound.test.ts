@@ -3,12 +3,15 @@ import { createRoot } from 'react-dom/client';
 import { parseHTML } from 'linkedom';
 import { useCelebrationSound } from './useCelebrationSound';
 
-let mockEnabled = true;
+let mockEnabled: boolean | undefined;
 jest.mock('@/hooks/useLocalStorage', () => ({
-  useLocalStorage: () => [mockEnabled, jest.fn()],
+  useLocalStorage: (_key: string, defaultValue: boolean) => [
+    mockEnabled ?? defaultValue,
+    jest.fn(),
+  ],
 }));
 
-it('loads no audio on mount, creates it on first enabled play, and releases it on unmount', async () => {
+it('plays no sound by default, creates audio on first enabled play, and releases it on unmount', async () => {
   const { window } = parseHTML('<html><body><div id="root"></div></body></html>');
   const previous = {
     window: globalThis.window,
@@ -42,7 +45,6 @@ it('loads no audio on mount, creates it on first enabled play, and releases it o
     return null;
   }
   try {
-    mockEnabled = false;
     act(() => root.render(createElement(Harness)));
     expect(Audio).not.toHaveBeenCalled();
     act(() => sound?.play());

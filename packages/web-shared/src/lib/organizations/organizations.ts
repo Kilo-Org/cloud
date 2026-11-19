@@ -1261,22 +1261,6 @@ export async function mutateOrganizationSettings(
   return txn ? run(txn) : db.transaction(run);
 }
 
-export async function updateOrganizationSettings(
-  organizationId: Organization['id'],
-  settings: OrganizationSettings,
-  txn?: DrizzleTransaction
-): Promise<OrganizationSettings> {
-  const validated = OrganizationSettingsSchema.parse(settings);
-  await (txn || db)
-    .update(organizations)
-    .set({
-      settings: validated,
-    })
-    .where(eq(organizations.id, organizationId));
-
-  return validated;
-}
-
 // Atomically update the recommendations-digest flag inside the settings JSONB
 // without a read-modify-write of the whole object, so a concurrent settings
 // mutation can't clobber other fields. Persist false to distinguish an explicit

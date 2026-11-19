@@ -124,6 +124,8 @@ const visibilityStateSchema = z.object({
 });
 
 export interface BrowserConsoleMessage {
+  /** The frame that produced it, when the debugger reported one. */
+  readonly frameId?: string;
   readonly level: string;
   readonly text: string;
   readonly timestamp?: number;
@@ -151,6 +153,18 @@ export interface BrowserNetworkRequest {
   readonly url: string;
 }
 
+/**
+ * One download the tab started (`Browser.downloadWillBegin`). The agent's
+ * check module cancels a download that began without a step token, so the
+ * buffer keeps only what a caller needs to name it.
+ */
+export interface BrowserToolDownload {
+  readonly guid?: string;
+  readonly startedAt?: number;
+  readonly suggestedFilename?: string;
+  readonly url?: string;
+}
+
 export interface BrowserToolDialog {
   readonly defaultValue?: string;
   readonly message: string;
@@ -175,7 +189,19 @@ export type BrowserToolResolvedTarget =
       readonly kind: 'selector';
       readonly nodeId: number;
       readonly selector: string;
+    }
+  | {
+      /** The selector parses, but matches several elements: a target must be unique. */
+      readonly kind: 'ambiguous';
+      readonly matches: number;
+      readonly selector: string;
     };
+
+/** A target that can be acted on: an ambiguous selector has no element to act on. */
+export type BrowserToolUniqueTarget = Exclude<
+  BrowserToolResolvedTarget,
+  { readonly kind: 'ambiguous' }
+>;
 
 export type BrowserToolBackend = 'debugger' | 'scripting';
 
@@ -275,6 +301,8 @@ export interface BrowserToolSession {
    * result.
    */
   readonly getToolUnavailableError: (tool: string) => string | undefined;
+  /** Every download the session has seen, oldest first. */
+  readonly downloads: () => readonly BrowserToolDownload[];
   readonly isAttached: () => boolean;
   /** Every request the session has seen, including earlier documents. */
   readonly networkRequests: () => BrowserNetworkRequest[];
@@ -306,6 +334,8 @@ export interface BrowserToolSession {
   ) => Promise<Record<string, unknown> | undefined>;
   /** Returns the pending dialog and clears it, so a second call cannot re-answer it. */
   readonly takeDialog: () => BrowserToolDialog | undefined;
+  /** Returns the downloads seen since the last call and clears them. */
+  readonly takeDownloads: () => readonly BrowserToolDownload[];
   /** The tab's viewport identity, shared with every caller view of this tab. */
   readonly viewportState: BrowserToolViewportState;
 }
@@ -324,8 +354,18 @@ const remoteObjectSchema = z.object({
 });
 const consoleApiCalledParamsSchema = z.object({
   args: z.array(z.unknown()).optional(),
+  executionContextId: z.number().optional(),
   timestamp: z.number().optional(),
   type: z.string().optional(),
+});
+const executionContextCreatedParamsSchema = z.object({
+  context: z.object({
+    auxData: z.object({ frameId: z.string().optional() }).optional(),
+    id: z.number(),
+  }),
+});
+const executionContextDestroyedParamsSchema = z.object({
+  executionContextId: z.number(),
 });
 const logEntryAddedParamsSchema = z.object({
   entry: z.object({
@@ -384,7 +424,8 @@ const frameNavigatedParamsSchema = z.object({
 const domGetDocumentResponseSchema = z.object({
   root: z.object({ nodeId: z.number() }).optional(),
 });
-const domQuerySelectorResponseSchema = z.object({ nodeId: z.number() });
+const domQuerySelectorAllResponseSchema = z.object({ nodeIds: z.array(z.number()) });
+const injectedNumberSchema = z.number();
 
 const refPattern = /^(?:ref=)?((?:f\d+)?e\d+)$/u;
 const parseRef = (target: string): string | undefined => refPattern.exec(target.trim())?.[1];
@@ -1216,6 +1257,12 @@ const networkBodySchema = z.object({
   body: z.string(),
 });
 
+const downloadWillBeginSchema = z.object({
+  guid: z.string().optional(),
+  suggestedFilename: z.string().optional(),
+  url: z.string().optional(),
+});
+
 /**
  * CDP methods that back a tool Firefox cannot express, so a handler that still
  * calls the debugger path fails by the tool's name instead of a bare method.
@@ -1343,6 +1390,7 @@ export const createBrowserToolSession = ({
   const target: ChromeDebuggerTarget = { tabId };
   const viewportState: BrowserToolViewportState = { tabId };
   const consoleBuffer: BrowserConsoleMessage[] = [];
+  const downloadBuffer: BrowserToolDownload[] = [];
   const networkById = new Map<string, MutableNetworkRequest>();
   // Refs belong to a caller, not a tab: two side-panel conversations (or a workflow and a panel) must not invalidate each other's snapshots.
   const refsByCaller = new Map<string, Map<string, BrowserToolRefEntry>>();
@@ -1359,6 +1407,8 @@ export const createBrowserToolSession = ({
   let scriptingRefCount = 0;
   // Console messages pushed since the last main-frame navigation, for `all: false`.
   let consoleMessagesSinceNavigation = 0;
+  // `Runtime.executionContextId` → frame id, so a console entry can be attributed to its frame.
+  const frameIdByExecutionContext = new Map<number, string>();
   // The tab's main frame id, learned from `Page.frameNavigated`. A `Document` request in this frame is a page load.
   let mainFrameId: string | undefined = undefined;
   let webMcpDiscovery: { documentId: string; tools: readonly WebMcpToolDescriptor[] } | undefined =
@@ -1419,13 +1469,40 @@ export const createBrowserToolSession = ({
       return;
     }
 
-    const { args, timestamp, type } = parsed.data;
+    const { args, executionContextId, timestamp, type } = parsed.data;
+    const frameId =
+      executionContextId === undefined
+        ? undefined
+        : frameIdByExecutionContext.get(executionContextId);
 
     pushConsoleMessage({
+      ...(frameId === undefined ? {} : { frameId }),
       level: type ?? 'log',
       text: truncateText((args ?? []).map(argument => remoteObjectText(argument)).join(' ')),
       ...(timestamp === undefined ? {} : { timestamp }),
     });
+  };
+
+  const handleExecutionContextCreated = (params: Record<string, unknown> | undefined): void => {
+    const parsed = executionContextCreatedParamsSchema.safeParse(params);
+
+    if (!parsed.success) {
+      return;
+    }
+
+    const frameId = parsed.data.context.auxData?.frameId;
+
+    if (frameId !== undefined) {
+      frameIdByExecutionContext.set(parsed.data.context.id, frameId);
+    }
+  };
+
+  const handleExecutionContextDestroyed = (params: Record<string, unknown> | undefined): void => {
+    const parsed = executionContextDestroyedParamsSchema.safeParse(params);
+
+    if (parsed.success) {
+      frameIdByExecutionContext.delete(parsed.data.executionContextId);
+    }
   };
 
   const handleLogEntryAdded = (params: Record<string, unknown> | undefined): void => {
@@ -1632,6 +1709,16 @@ export const createBrowserToolSession = ({
       return;
     }
 
+    if (method === 'Runtime.executionContextCreated') {
+      handleExecutionContextCreated(params);
+      return;
+    }
+
+    if (method === 'Runtime.executionContextDestroyed') {
+      handleExecutionContextDestroyed(params);
+      return;
+    }
+
     if (method === 'Log.entryAdded') {
       handleLogEntryAdded(params);
       return;
@@ -1664,6 +1751,11 @@ export const createBrowserToolSession = ({
 
     if (method === 'Page.javascriptDialogClosed') {
       dialog = undefined;
+      return;
+    }
+
+    if (method === 'Browser.downloadWillBegin' || method === 'Page.downloadWillBegin') {
+      handleDownloadWillBegin(params);
       return;
     }
 
@@ -1932,12 +2024,60 @@ export const createBrowserToolSession = ({
     return documentNodeId;
   };
 
+  /**
+   * How many elements a selector matches on the scripting backend, where there is
+   * no DOM node id. Runs through the shared injection helper, so it has the same
+   * timeout as the other action injections and surfaces its real error.
+   */
+  const countScriptingSelectorMatches = async (
+    selector: string
+  ): Promise<
+    | { readonly kind: 'count'; readonly matches: number }
+    | { readonly kind: 'error'; readonly error: string }
+  > => {
+    if (scriptingApi === undefined) {
+      return { error: 'Page scripting is unavailable in this browser.', kind: 'error' };
+    }
+
+    const result = await evalInTabWithScripting({
+      code: `return document.querySelectorAll(${JSON.stringify(selector)}).length;`,
+      scriptingApi,
+      tabId,
+      timeoutMs: SCRIPTING_ACTION_TIMEOUT_MS,
+    });
+
+    if (!result.ok) {
+      return { error: result.error, kind: 'error' };
+    }
+
+    const parsed = injectedNumberSchema.safeParse(result.value);
+
+    return parsed.success
+      ? { kind: 'count', matches: parsed.data }
+      : { error: 'The selector match count could not be read.', kind: 'error' };
+  };
+
   const resolveSelector = async (
     selector: string
   ): Promise<BrowserToolResolvedTarget | undefined> => {
     if (debuggerApi === undefined) {
-      // The scripting path resolves a target by selector; there is no debugger node id, so the tool implementations in `callTool` use `selector` and never `nodeId`.
+      // The scripting path resolves a target by selector; there is no debugger node id, so the tool implementations in `callTool` use `selector` and never `nodeId`. The match count still has to be unique.
       await attach();
+      const counted = await countScriptingSelectorMatches(selector);
+
+      if (counted.kind === 'error') {
+        throw new Error(counted.error);
+      }
+
+      const { matches } = counted;
+
+      if (matches === 0) {
+        return undefined;
+      }
+
+      if (matches > 1) {
+        return { kind: 'ambiguous', matches, selector };
+      }
 
       return { kind: 'selector', nodeId: 0, selector };
     }
@@ -1950,17 +2090,28 @@ export const createBrowserToolSession = ({
       return undefined;
     }
 
-    const response = await debuggerApi.sendCommand(target, 'DOM.querySelector', {
+    // A selector must name exactly one element: querySelector would silently take the first match, so an ambiguous selector would type into an arbitrary field.
+    const response = await debuggerApi.sendCommand(target, 'DOM.querySelectorAll', {
       nodeId: rootNodeId,
       selector,
     });
-    const parsed = domQuerySelectorResponseSchema.safeParse(response);
+    const parsed = domQuerySelectorAllResponseSchema.safeParse(response);
 
-    if (!parsed.success || parsed.data.nodeId === 0) {
+    if (!parsed.success) {
       return undefined;
     }
 
-    return { kind: 'selector', nodeId: parsed.data.nodeId, selector };
+    if (parsed.data.nodeIds.length > 1) {
+      return { kind: 'ambiguous', matches: parsed.data.nodeIds.length, selector };
+    }
+
+    const [nodeId] = parsed.data.nodeIds;
+
+    if (nodeId === undefined || nodeId === 0) {
+      return undefined;
+    }
+
+    return { kind: 'selector', nodeId, selector };
   };
 
   const resolveTarget = async (
@@ -2005,6 +2156,35 @@ export const createBrowserToolSession = ({
     for (const entry of entries) {
       refs.set(entry.ref, entry);
     }
+  };
+
+  const handleDownloadWillBegin = (params: Record<string, unknown> | undefined): void => {
+    const parsed = downloadWillBeginSchema.safeParse(params ?? {});
+
+    if (!parsed.success) {
+      return;
+    }
+
+    downloadBuffer.push({
+      ...(parsed.data.guid === undefined ? {} : { guid: parsed.data.guid }),
+      ...(parsed.data.suggestedFilename === undefined
+        ? {}
+        : { suggestedFilename: parsed.data.suggestedFilename }),
+      ...(parsed.data.url === undefined ? {} : { url: parsed.data.url }),
+      startedAt: Date.now(),
+    });
+
+    if (downloadBuffer.length > MAX_BROWSER_TOOL_CONSOLE_MESSAGES) {
+      downloadBuffer.shift();
+    }
+  };
+
+  const takeDownloads = (): readonly BrowserToolDownload[] => {
+    const seen = [...downloadBuffer];
+
+    downloadBuffer.length = 0;
+
+    return seen;
   };
 
   const takeDialog = (): BrowserToolDialog | undefined => {
@@ -2850,6 +3030,7 @@ export const createBrowserToolSession = ({
         refsByCaller.get(key)?.clear();
         refsByCaller.delete(key);
       },
+      downloads: () => [...downloadBuffer],
       evaluateInTab,
       getToolUnavailableError,
       isAttached: () => attached,
@@ -2867,6 +3048,7 @@ export const createBrowserToolSession = ({
         return send(method, params);
       },
       takeDialog,
+      takeDownloads,
       viewportState,
     };
   };
@@ -2887,6 +3069,7 @@ export const createBrowserToolSession = ({
       refsByCaller.get(callerKey)?.clear();
       refsByCaller.delete(callerKey);
     },
+    downloads: () => [...downloadBuffer],
     evaluateInTab,
     getToolUnavailableError,
     isAttached: () => attached,
@@ -2898,6 +3081,7 @@ export const createBrowserToolSession = ({
     resolveTarget: targetText => resolveTarget(targetText, defaultRefs),
     send,
     takeDialog,
+    takeDownloads,
     viewportState,
   };
 };

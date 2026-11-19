@@ -1,11 +1,17 @@
 /* eslint-disable max-lines -- One module owns the page and lifecycle browser tools; the shared CDP helpers keep their shapes consistent. */
 import { z } from 'zod';
 import { createWebMcpToolCall } from './agent-conversation';
+import {
+  ambiguousSelectorError,
+  originPatternMatches,
+  toBrowserOrigin,
+} from './browser-agent-checks';
 import { KILO_BROWSER_TOOL_PREFIX } from './browser-tool-contract';
 import { pressKeyChord } from './browser-tool-interact-actions';
 import type {
   BrowserToolDialog,
   BrowserToolResolvedTarget,
+  BrowserToolUniqueTarget,
   BrowserToolViewportState,
 } from './browser-tool-session';
 import { listInspectableTabsWithTabsApi } from './tab-debugger';
@@ -122,7 +128,19 @@ export interface BrowserToolPageTabsApi extends BrowserTabsApi {
   readonly remove?: ((tabId: number) => Promise<void> | void) | undefined;
 }
 
+/** What an agent caller may do with tabs: its grants and its session's group. */
+export interface BrowserAgentAccess {
+  readonly actOrigins: readonly string[];
+  readonly groupTabs?: readonly number[] | undefined;
+  readonly navigateOrigins: readonly string[];
+  readonly readableOrigins: readonly string[];
+}
+
 export interface BrowserToolPageActionOptions {
+  /** Present only for a CLI agent caller: the tab actions enforce the D9 boundary and per-origin grants. */
+  readonly agentAccess?: BrowserAgentAccess | undefined;
+  /** Records a tab the call opened, with the tab that opened it, so the session may use it later. */
+  readonly noteTabCreated?: ((tabId: number, openerTabId: number | undefined) => void) | undefined;
   /** WebMCP discovery across frames; wired to the existing WebMCP runtime. */
   readonly webMcpDiscover?: (tabId: number) => Promise<WebMcpDiscoveryResult | undefined>;
   /** WebMCP execution by tool name; wired to the existing WebMCP runtime. */
@@ -369,7 +387,7 @@ const navigateToUrl = async (
 
 const resolveElementObjectId = async (
   session: BrowserToolPageActionSession,
-  resolved: BrowserToolResolvedTarget
+  resolved: BrowserToolUniqueTarget
 ): Promise<string | undefined> => {
   const response = await session.send(
     'DOM.resolveNode',
@@ -398,6 +416,10 @@ const evaluateFunctionInPage = async (
   }
 
   const resolved = await session.resolveTarget(target);
+
+  if (resolved?.kind === 'ambiguous') {
+    return fail(ambiguousSelectorError(resolved.matches));
+  }
 
   if (resolved === undefined) {
     return fail(`Element was not found for target: ${target}`);
@@ -785,6 +807,29 @@ const closeTab = async (
   return done('Closed the tab.');
 };
 
+const WITHHELD_TAB_URL = '[origin withheld]';
+const TAB_GROUP_BLOCKED_ERROR =
+  'This tab is not in the agent session\u2019s tab group (blocked). Share it first or pick a tab in the group.';
+
+const grantsOrigin = (origins: readonly string[], url: string | undefined): boolean => {
+  const origin = toBrowserOrigin(url);
+
+  return origin !== undefined && origins.some(pattern => originPatternMatches(pattern, origin));
+};
+
+const tabReadable = (
+  access: BrowserAgentAccess,
+  tab: { readonly id: number; readonly url?: string | undefined }
+): boolean =>
+  access.groupTabs?.includes(tab.id) === true || grantsOrigin(access.readableOrigins, tab.url);
+
+/**
+ * Acting on another tab is the D9 boundary: the session's group (which includes
+ * tabs the user shared) is the only allowance; a grant for that origin is not.
+ */
+const tabActable = (access: BrowserAgentAccess, tab: { readonly id: number }): boolean =>
+  access.groupTabs?.includes(tab.id) === true;
+
 const runTabs = async (
   args: Record<string, unknown>,
   session: BrowserToolPageActionSession | undefined,
@@ -804,12 +849,11 @@ const runTabs = async (
     }
 
     return done({
-      tabs: tabs.map((tab, index) => ({
-        index,
-        selected: tab.id === options.tabId,
-        title: tab.title,
-        url: tab.url,
-      })),
+      tabs: tabs.map((tab, index) =>
+        options.agentAccess !== undefined && !tabReadable(options.agentAccess, tab)
+          ? { index, selected: tab.id === options.tabId, title: '', url: WITHHELD_TAB_URL }
+          : { index, selected: tab.id === options.tabId, title: tab.title, url: tab.url }
+      ),
     });
   }
 
@@ -821,7 +865,20 @@ const runTabs = async (
     }
 
     const url = getStringArgument(args, 'url');
+
+    if (
+      options.agentAccess !== undefined &&
+      url !== undefined &&
+      !grantsOrigin(options.agentAccess.navigateOrigins, url)
+    ) {
+      return fail(`Opening a tab at ${url} needs a navigate grant for that origin (blocked).`);
+    }
+
     const tab = await create(url === undefined ? {} : { url });
+
+    if (tab?.id !== undefined) {
+      options.noteTabCreated?.(tab.id, options.tabId);
+    }
 
     return done({
       selected: true,
@@ -841,6 +898,10 @@ const runTabs = async (
 
       if (tab === undefined) {
         return fail(`No tab at index ${String(index)}.`);
+      }
+
+      if (options.agentAccess !== undefined && !tabActable(options.agentAccess, tab)) {
+        return fail(TAB_GROUP_BLOCKED_ERROR);
       }
 
       tabId = tab.id;
@@ -870,6 +931,10 @@ const runTabs = async (
 
     if (tab === undefined) {
       return fail(`No tab at index ${String(index)}.`);
+    }
+
+    if (options.agentAccess !== undefined && !tabActable(options.agentAccess, tab)) {
+      return fail(TAB_GROUP_BLOCKED_ERROR);
     }
 
     const update = options.tabsApi?.update?.bind(options.tabsApi);

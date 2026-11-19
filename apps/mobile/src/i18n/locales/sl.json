@@ -26,6 +26,7 @@
     "creditHistory": "Zgodovina kreditov",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Prekliči",
     "done": "Končano",
     "retry": "Poskusi znova",
@@ -176,7 +177,8 @@
     "changes": "Spremembe",
     "organizationTrialEnded": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Lastnik organizacije lahko posodobi obračun na kilo.ai, nato poskusi znova.",
     "privateRepositoryA11y": "{{name}}, zasebno skladišče",
-    "legalDocumentEnglishOnly": "Ta dokument je na voljo samo v angleščini."
+    "legalDocumentEnglishOnly": "Ta dokument je na voljo samo v angleščini.",
+    "organizationTrialEndedBilling": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Obračun lahko posodobiš, nato poskusi znova."
   },
   "language": {
     "restarting": "Ponovni zagon za spremembo jezika",
@@ -386,12 +388,24 @@
       "editKeyDescription": "Shranjene vrednosti ni mogoče prikazati. Za zamenjavo vnesi novo.",
       "editKeyMappingsWarning": "Zamenjava ključa zamenja tudi shranjene preslikave modelov: znova vnesi vse preslikave, ki jih še potrebuješ.",
       "saveFailed": "Ključa ni bilo mogoče shraniti.",
-      "invalidCredentials": "Preveri poverilnice in poskusi znova.",
       "fieldRequired": "Polje {{field}} je obvezno.",
+      "keyIncomplete": "V ključu manjka obvezna vrednost.",
       "incompleteMapping": "Preslikava {{number}} potrebuje tako oznako modela prehoda kot ime namestitve.",
       "apiKeyLabel": "Ključ API",
       "apiKeyPlaceholder": "Prilepi ključ",
       "apiKeyRequired": "Vnesi ključ.",
+      "keyAlreadyExists": "Za tega ponudnika že imaš ključ. Odstrani ga, preden dodaš novega.",
+      "keyStoreFailed": "Ključa ni bilo mogoče shraniti.",
+      "invalidCredentials": "Ta ključ ni v obliki, ki jo pričakuje ta ponudnik. Preveri ga in poskusi znova.",
+      "testSucceeded": "Ključ deluje. Ponudnik: {{provider}}. Model: {{model}}.",
+      "testRejected": "Ponudnik je ta ključ zavrnil. Preveri, da je pravilen in ni preklican.",
+      "testIncomplete": "Ponudnik je preizkus prekinil, preden se je končal. Poskusi znova.",
+      "testUnsupportedProvider": "Ta ponudnik ni več podprt. Odstrani ključ.",
+      "testUnreadableKey": "Shranjenega ključa ni bilo mogoče prebrati. Poskusi znova pozneje.",
+      "testDeprecatedProvider": "Ta ponudnik je opuščen, zato njegovega ključa ni mogoče preizkusiti.",
+      "keyManagedByCodingPlan": "Tvoj paket za kodiranje upravlja ključ za tega ponudnika, ki je samo za branje. Če želiš dodati svojega, prekliči paket za kodiranje.",
+      "providerUnavailable": "Tega ponudnika še ni na voljo, zato zanj ne moreš dodati ključa.",
+      "testFailed": "Preizkus ključa ni uspel. Poskusi znova.",
       "authMethod": "Način preverjanja pristnosti",
       "authMethodAccessKeys": "Ključi za dostop",
       "resourceName": "Ime vira Azure",
@@ -482,7 +496,14 @@
       "viewReceipt": "Prikaži potrdilo"
     },
     "changelog": "Kaj je novega",
-    "changelogVersionPending": "Opombe za to različico prinese naslednja posodobitev aplikacije."
+    "changelogVersionPending": "Opombe za različico {{version}} prinese naslednja posodobitev aplikacije.",
+    "changelogGroupNew": "Novosti",
+    "changelogFixesIn": "Popravki in izboljšave na področjih: {{areas}}.",
+    "changelogFixesPolish": "Popravki in izboljšave v celotni aplikaciji.",
+    "changelogAreas": {
+      "signIn": "Prijava",
+      "profileOrganizations": "Profil in organizacije"
+    }
   },
   "preferences": {
     "general": "Splošno",
@@ -1516,13 +1537,26 @@
       "empty": "Še ni pregledov z analitiko",
       "emptyDescription": "Analitika beleži dokončane preglede, dokler je omogočena za organizacijo.",
       "offTitle": "Analitika je za {{platform}} izklopljena",
-      "offDescription": "Vklopi jo v nastavitvah organizacije na spletu, da beleži dokončane preglede.",
-      "couldNotLoad": "Analitike ni bilo mogoče naložiti"
+      "offDescription": "Lastniki, skrbniki in upravitelji obračunavanja v organizaciji lahko vklopijo analitiko v nastavitvah organizacije na spletu, da se beležijo dokončani pregledi.",
+      "couldNotLoad": "Analitike ni bilo mogoče naložiti",
+      "trackedReviewsCaption": "Dokončani pregledi, ki so se zaključili v tem obdobju z vklopljeno analitiko. Pregledi v teku in neuspešni pregledi se nikoli ne štejejo.",
+      "trackedReviewsUncounted": "Ni preštetih: {{displayCount}} od {{displayTotal}} dokončanih pregledov organizacije, njihov rezultat ni bil zajet.",
+      "trackedReviewsUncounted_few": "Ni preštetih: {{displayCount}} od {{displayTotal}} dokončanih pregledov organizacije, njihov rezultat ni bil zajet.",
+      "trackedReviewsUncounted_one": "Ni preštetih: {{displayCount}} od {{displayTotal}} dokončanih pregledov organizacije, njihov rezultat ni bil zajet.",
+      "trackedReviewsUncounted_other": "Ni preštetih: {{displayCount}} od {{displayTotal}} dokončanih pregledov organizacije, njihov rezultat ni bil zajet.",
+      "trackedReviewsUncounted_two": "Ni preštetih: {{displayCount}} od {{displayTotal}} dokončanih pregledov organizacije, njihov rezultat ni bil zajet."
     },
     "council": {
       "title": "Kolegijski pregled",
       "subtitle": "Vsak zahtevek za združitev pregleda več strokovnjakov, njihovi glasovi pa se združijo v eno odločitev.",
-      "unavailable": "Kolegijski pregled za to organizacijo ni na voljo.",
+      "unavailablePersonallyTitle": "Potrebuje organizacijo Enterprise",
+      "unavailablePersonally": "Kolegijski pregled ni del osebnega računa.",
+      "unavailablePersonallyAction": "Ustvari organizacijo",
+      "unavailablePersonallySwitchAction": "Preklopi organizacijo",
+      "unavailableOrganizationTitle": "Kolegijski pregled trenutno ni na voljo",
+      "unavailableForOrganization": "Kolegijski pregled zahteva paket Enterprise z aktivno naročnino ali preizkusnim obdobjem. Ta organizacija ga trenutno nima.",
+      "unavailableForOrganizationNeutral": "Kolegijski pregled za to organizacijo trenutno ni na voljo. Poskusite znova pozneje.",
+      "unavailableOnBitbucket": "Kolegijski pregled ni na voljo za skladišča Bitbucket.",
       "noRepositories": "Nobeno skladišče še ni izbrano. Najprej izberi skladišča v nastavitvah skladišč.",
       "specialists": "Strokovnjaki",
       "labels": "Oznake, ki sprožijo kolegijski pregled",
@@ -3239,7 +3273,6 @@
     "completingPurchase": "Dokončevanje nakupa",
     "subscriptionLoading": "Nalaganje naročnine Kilo Pass",
     "retryHint": "Znova poskusi naložiti stanje naročnine Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Končano {{date}}",
     "notAvailableInApp": "Kilo Pass v aplikaciji ni na voljo.",
     "statusActive": "Aktiven",
@@ -3442,6 +3475,7 @@
       "manageOnWeb": "Nastavitve obračunavanja na spletu",
       "changePlan": "Spremeni načrt",
       "buySeats": "Kupi uporabniška mesta",
+      "managedOnWeb": "Načrt, uporabniška mesta in samodejno polnjenje se upravljajo na spletu.",
       "setupAutoTopUp": "Nastavi samodejno polnjenje",
       "manageAutoTopUp": "Upravljaj samodejno polnjenje",
       "opensOnWeb": "Odpre se v spletu"
@@ -3590,12 +3624,11 @@
       "requestLogs": "Dnevniki zahtev"
     },
     "requestLogs": {
-      "hint": "Zahteve iz ure pred koncem časovnega okna, od najnovejše naprej.",
       "older": "Prejšnja ura",
       "newer": "Naslednja ura",
       "truncated": "V tej uri je več zahtev, kot jih prikazuje seznam.",
-      "emptyTitle": "Ni zahtev",
-      "emptyDescription": "V tej uri ni zahtev prek prehoda.",
+      "emptyTitle": "V tej uri ni zahtev",
+      "emptyDescription": "Uporabite Prejšnja ura za ogled prejšnjih zahtev.",
       "loadError": "Dnevnikov zahtev ni bilo mogoče naložiti.",
       "permissionDenied": "Dnevnike zahtev organizacije lahko bere samo njen lastnik, skrbnik ali upravitelj obračunavanja.",
       "tokens": "{{input}} vhod · {{output}} izhod",
@@ -4417,8 +4450,7 @@
       "repoValue": "Repozitorij: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Ta profil ni več na voljo. Izberi drugega.",
-      "pickerEmptyDescriptionOrganization": "Ustvarite organizacijski profil za ponovno uporabo spremenljivk okolja, nastavitvenih ukazov in veščin med sejami.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Organizacijski profil lahko ustvari lastnik organizacije ali skrbnik."
+      "pickerEmptyDescriptionOrganization": "Ustvarite organizacijski profil za ponovno uporabo spremenljivk okolja, nastavitvenih ukazov in veščin med sejami."
     },
     "variablesDeleteFailed": "Spremenljivke ni bilo mogoče izbrisati",
     "deleteVariable": "Izbriši spremenljivko {{key}}",
@@ -4612,7 +4644,6 @@
     "dismiss": "Zavrzi poročilo",
     "offline": "Brez povezave · shranjeno poročilo",
     "cached": "Shranjeno poročilo · osvežitev ni na voljo",
-    "window": "{{start}} – {{end}}",
     "summary": "AI povzetek",
     "summaryPending": "AI povzetek je v pripravi. Ko bo pripravljen, bo priložen tukaj.",
     "summaryUnavailable": "AI povzetek ni na voljo. Strukturirano poročilo je še vedno na voljo.",
@@ -4731,6 +4762,7 @@
       "title": "Sprožilci in spletni kavlji",
       "subtitle": "Avtomatizirajte izvajanja Cloud Agent s klicem spletnega kavlja ali po urniku.",
       "new": "Nov sprožilec",
+      "create": "Ustvari sprožilec",
       "emptyTitle": "Ni še nobenega sprožilca",
       "emptyDescription": "Ustvarite sprožilec za zagon Cloud Agent s klicem spletnega kavlja ali po urniku.",
       "loadFailedTitle": "Sprožilcev ni bilo mogoče naložiti",
@@ -4784,6 +4816,8 @@
       "created": "Sprožilec je ustvarjen",
       "saved": "Sprožilec je shranjen",
       "statusArrived": "Prispelo",
+      "defaultPromptWebhook": "Opišite telo zahteve tega spletnega kavlja:\n\n{{body}}",
+      "defaultPromptScheduled": "Zaženite načrtovano opravilo. Sproženo ob {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Vnesite ime.",
         "nameTooShort": "Uporabite vsaj 8 znakov.",
@@ -4832,6 +4866,7 @@
     "superseded": "Ta povezava je bila zamenjana drugje, zato ne deluje več."
   },
   "sharedSession": {
+    "startedAt": "Začeto ob {{time}}",
     "title": "Deljena seja",
     "someone": "Nekdo",
     "sharedBy": "Deli: {{owner}}",
@@ -4987,6 +5022,8 @@
     "modelsDescription": "Izklopite model, da ga blokirate za vse člane. Modeli dovoljenih ponudnikov so privzeto vklopljeni.",
     "modelsDeniedOnly": "Samo zavrnjeni",
     "modelsEmpty": "Noben model ne ustreza temu iskanju.",
+    "modelsDeniedEmpty": "Noben model ni zavrnjen.",
+    "modelsDeniedSearchEmpty": "Noben zavrnjen model ne ustreza temu iskanju.",
     "providersDescription": "Izklopite ponudnika, da Kilo za to organizacijo preneha usmerjati vanj.",
     "providersNeedCatalog": "Stikala ponudnikov ostanejo samo za branje, dokler se ne naloži celoten katalog modelov. Če jih želite urejati, zgoraj tapnite Poskusi znova.",
     "providersEmpty": "Noben ponudnik ne ustreza temu iskanju.",

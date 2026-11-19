@@ -26,6 +26,7 @@
     "creditHistory": "Kreditthistorikk",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Avbryt",
     "done": "Ferdig",
     "retry": "Prøv igjen",
@@ -176,7 +177,8 @@
     "changes": "Endringer",
     "organizationTrialEnded": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. En organisasjonseier kan oppdatere faktureringen på kilo.ai og deretter prøve igjen.",
     "privateRepositoryA11y": "{{name}}, privat repository",
-    "legalDocumentEnglishOnly": "Dette dokumentet er kun tilgjengelig på engelsk."
+    "legalDocumentEnglishOnly": "Dette dokumentet er kun tilgjengelig på engelsk.",
+    "organizationTrialEndedBilling": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. Du kan oppdatere faktureringen og deretter prøve igjen."
   },
   "language": {
     "restarting": "Starter på nytt for å bruke språket",
@@ -386,12 +388,24 @@
       "editKeyDescription": "Den lagrede verdien kan ikke vises. Skriv inn en ny for å erstatte den.",
       "editKeyMappingsWarning": "Når du erstatter nøkkelen, erstattes også de lagrede modelltilordningene: skriv inn alle tilordningene du fortsatt trenger.",
       "saveFailed": "Kunne ikke lagre nøkkelen.",
-      "invalidCredentials": "Kontroller legitimasjonen og prøv igjen.",
       "fieldRequired": "{{field}} må fylles ut.",
+      "keyIncomplete": "Nøkkelen mangler en påkrevd verdi.",
       "incompleteMapping": "Tilordning {{number}} må ha både en slug for gateway-modell og et deployment-navn.",
       "apiKeyLabel": "API-nøkkel",
       "apiKeyPlaceholder": "Lim inn nøkkelen",
       "apiKeyRequired": "Skriv inn nøkkelen.",
+      "keyAlreadyExists": "Du har allerede en nøkkel for denne leverandøren. Fjern den før du legger til en ny.",
+      "keyStoreFailed": "Nøkkelen kunne ikke lagres.",
+      "invalidCredentials": "Denne nøkkelen er ikke i det formatet denne leverandøren forventer. Kontroller den og prøv igjen.",
+      "testSucceeded": "Nøkkelen fungerer. Leverandør: {{provider}}. Modell: {{model}}.",
+      "testRejected": "Leverandøren avviste denne nøkkelen. Kontroller at den er riktig og ikke er tilbakekalt.",
+      "testIncomplete": "Leverandøren avsluttet testen før den var ferdig. Prøv igjen.",
+      "testUnsupportedProvider": "Denne leverandøren støttes ikke lenger. Fjern nøkkelen.",
+      "testUnreadableKey": "Den lagrede nøkkelen kunne ikke leses. Prøv igjen senere.",
+      "testDeprecatedProvider": "Denne leverandøren er utdatert, så nøkkelen kan ikke testes.",
+      "keyManagedByCodingPlan": "Et kodeabonnement administrerer denne leverandørens nøkkel, og nøkkelen er skrivebeskyttet. Avbryt kodeabonnementet for å legge til din egen nøkkel.",
+      "providerUnavailable": "Denne leverandøren er ikke tilgjengelig ennå, så du kan ikke legge til en nøkkel for den.",
+      "testFailed": "Nøkkeltesten mislyktes. Prøv igjen.",
       "authMethod": "Autentiseringsmetode",
       "authMethodAccessKeys": "Tilgangsnøkler",
       "resourceName": "Azure-ressursnavn",
@@ -482,7 +496,14 @@
       "viewReceipt": "Vis kvittering"
     },
     "changelog": "Nyheter",
-    "changelogVersionPending": "Merknadene for denne versjonen kommer med neste appoppdatering."
+    "changelogVersionPending": "Merknadene for versjon {{version}} kommer med neste appoppdatering.",
+    "changelogGroupNew": "Nytt",
+    "changelogFixesIn": "Feilrettinger og forbedringer i {{areas}}.",
+    "changelogFixesPolish": "Feilrettinger og forbedringer i hele appen.",
+    "changelogAreas": {
+      "signIn": "Innlogging",
+      "profileOrganizations": "Profil og organisasjoner"
+    }
   },
   "preferences": {
     "general": "Generelt",
@@ -1468,13 +1489,24 @@
       "empty": "Ingen gjennomganger med statistikk ennå",
       "emptyDescription": "Statistikken registrerer fullførte gjennomganger så lenge den er aktivert for organisasjonen.",
       "offTitle": "Statistikken er slått av for {{platform}}",
-      "offDescription": "Aktiver den i organisasjonsinnstillingene på nettet for å registrere fullførte gjennomganger.",
-      "couldNotLoad": "Kunne ikke laste statistikken"
+      "offDescription": "Organisasjonens faktureringsroller (eiere, administratorer og faktureringsansvarlige) kan slå på statistikken i organisasjonens innstillinger på nettet for å registrere fullførte gjennomganger.",
+      "couldNotLoad": "Kunne ikke laste statistikken",
+      "trackedReviewsCaption": "Fullførte gjennomganger som ble avsluttet i denne perioden med statistikken slått på. Gjennomganger som pågår eller feiler, telles aldri med.",
+      "trackedReviewsUncounted": "Ikke talt med: {{displayCount}} av de {{displayTotal}} fullførte gjennomgangene organisasjonen har, uten registrert resultat.",
+      "trackedReviewsUncounted_one": "Ikke talt med: {{displayCount}} av de {{displayTotal}} fullførte gjennomgangene organisasjonen har, uten registrert resultat.",
+      "trackedReviewsUncounted_other": "Ikke talt med: {{displayCount}} av de {{displayTotal}} fullførte gjennomgangene organisasjonen har, uten registrert resultat."
     },
     "council": {
       "title": "Panelvurdering",
       "subtitle": "Flere spesialister vurderer hver PR, og stemmene deres kombineres til én avgjørelse.",
-      "unavailable": "Panelvurdering er ikke tilgjengelig for denne organisasjonen.",
+      "unavailablePersonallyTitle": "Trenger en Enterprise-organisasjon",
+      "unavailablePersonally": "Panelvurdering er ikke en del av en personlig konto.",
+      "unavailablePersonallyAction": "Opprett organisasjon",
+      "unavailablePersonallySwitchAction": "Bytt organisasjon",
+      "unavailableOrganizationTitle": "Panelvurdering er ikke tilgjengelig",
+      "unavailableForOrganization": "Panelvurdering krever Enterprise-planen med et aktivt abonnement eller en prøveperiode. Denne organisasjonen har det ikke akkurat nå.",
+      "unavailableForOrganizationNeutral": "Panelvurdering er ikke tilgjengelig for denne organisasjonen akkurat nå. Prøv igjen senere.",
+      "unavailableOnBitbucket": "Panelvurdering er ikke tilgjengelig for Bitbucket-kodelagre.",
       "noRepositories": "Ingen kodelagre er valgt ennå. Velg kodelagre i kodelagerinnstillingene først.",
       "specialists": "Spesialister",
       "labels": "Etiketter som utløser panelvurdering",
@@ -3125,7 +3157,6 @@
     "completingPurchase": "Fullfører kjøp",
     "subscriptionLoading": "Laster inn Kilo Pass-abonnementet",
     "retryHint": "Prøver å hente statusen for Kilo Pass på nytt.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Avsluttet {{date}}",
     "notAvailableInApp": "Kilo Pass er ikke tilgjengelig i appen.",
     "statusActive": "Aktiv",
@@ -3328,6 +3359,7 @@
       "manageOnWeb": "Faktureringsinnstillinger på nettet",
       "changePlan": "Endre plan",
       "buySeats": "Kjøp brukerplasser",
+      "managedOnWeb": "Planen, brukerplassene og automatisk påfylling administreres på nettet.",
       "setupAutoTopUp": "Sett opp automatisk påfylling",
       "manageAutoTopUp": "Administrer automatisk påfylling",
       "opensOnWeb": "Åpnes på nettet"
@@ -3476,12 +3508,11 @@
       "requestLogs": "Forespørselslogger"
     },
     "requestLogs": {
-      "hint": "Forespørsler fra timen før vinduet slutter, nyeste først.",
       "older": "Eldre time",
       "newer": "Nyere time",
       "truncated": "Denne timen har flere forespørsler enn listen viser.",
-      "emptyTitle": "Ingen forespørsler",
-      "emptyDescription": "Denne timen har ingen gateway-forespørsler.",
+      "emptyTitle": "Ingen forespørsler denne timen",
+      "emptyDescription": "Bruk «Eldre time» for å se tidligere forespørsler.",
       "loadError": "Kunne ikke laste inn forespørselslogger.",
       "permissionDenied": "Bare en eier, administrator eller faktureringsansvarlig i organisasjonen kan lese forespørselsloggene.",
       "tokens": "{{input}} inn · {{output}} ut",
@@ -4285,8 +4316,7 @@
       "repoValue": "Depot: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Denne profilen er ikke lenger tilgjengelig. Velg en annen.",
-      "pickerEmptyDescriptionOrganization": "Opprett en organisasjonsprofil for å gjenbruke miljøvariabler, oppsettkommandoer og ferdigheter på tvers av økter.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "En organisasjonseier eller administrator kan opprette en organisasjonsprofil."
+      "pickerEmptyDescriptionOrganization": "Opprett en organisasjonsprofil for å gjenbruke miljøvariabler, oppsettkommandoer og ferdigheter på tvers av økter."
     },
     "variablesDeleteFailed": "Kunne ikke slette variabelen",
     "deleteVariable": "Slett variabel {{key}}",
@@ -4472,7 +4502,6 @@
     "dismiss": "Avvis brief",
     "offline": "Frakoblet · lagret brief",
     "cached": "Lagret rapport · kan ikke oppdateres",
-    "window": "{{start}} – {{end}}",
     "summary": "AI-sammendrag",
     "summaryPending": "AI-sammendraget lages. Det legges til her når det er klart.",
     "summaryUnavailable": "AI-sammendrag er ikke tilgjengelig. Den strukturerte rapporten er fortsatt tilgjengelig.",
@@ -4591,6 +4620,7 @@
       "title": "Triggere og webhooker",
       "subtitle": "Automatiser Cloud Agent-kjøringer fra et webhook-kall eller en tidsplan.",
       "new": "Ny trigger",
+      "create": "Opprett trigger",
       "emptyTitle": "Ingen triggere ennå",
       "emptyDescription": "Opprett en trigger for å starte en Cloud Agent-kjøring fra et webhook-kall eller etter en tidsplan.",
       "loadFailedTitle": "Kunne ikke laste inn triggere",
@@ -4644,6 +4674,8 @@
       "created": "Trigger opprettet",
       "saved": "Trigger lagret",
       "statusArrived": "Ankommet",
+      "defaultPromptWebhook": "Beskriv innholdet i webhook-forespørselen:\n\n{{body}}",
+      "defaultPromptScheduled": "Kjør den planlagte oppgaven. Utløst ved {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Skriv inn et navn.",
         "nameTooShort": "Bruk minst 8 tegn.",
@@ -4692,6 +4724,7 @@
     "superseded": "Denne lenken ble erstattet et annet sted, så den virker ikke lenger."
   },
   "sharedSession": {
+    "startedAt": "Startet kl. {{time}}",
     "title": "Delt økt",
     "someone": "Noen",
     "sharedBy": "Delt av {{owner}}",
@@ -4847,6 +4880,8 @@
     "modelsDescription": "Slå av en modell for å blokkere den for alle medlemmer. Modeller fra tillatte leverandører er slått på som standard.",
     "modelsDeniedOnly": "Kun nektet",
     "modelsEmpty": "Ingen modeller samsvarer med dette søket.",
+    "modelsDeniedEmpty": "Ingen modell er nektet.",
+    "modelsDeniedSearchEmpty": "Ingen nektet modell samsvarer med dette søket.",
     "providersDescription": "Slå av en leverandør for å hindre at Kilo ruter til den for denne organisasjonen.",
     "providersNeedCatalog": "Leverandørbryterne er skrivebeskyttet til hele modellkatalogen er lastet inn. Trykk på Prøv igjen ovenfor for å endre dem.",
     "providersEmpty": "Ingen leverandører samsvarer med dette søket.",

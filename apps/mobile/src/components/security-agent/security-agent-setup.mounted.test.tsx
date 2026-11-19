@@ -14,7 +14,13 @@ vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Platform: { OS: 'ios' },
 }));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+// The refusal notice shares classes through the app's own `cn`, which imports
+// the i18n instance; this suite mocks `useTranslation`, so the plugin it
+// installs on init has to exist too.
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+  initReactI18next: { type: '3rdParty', init: () => undefined },
+}));
 vi.mock('@/components/ui/icons', () => ({ ShieldCheck: 'ShieldCheck', Info: 'Info' }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));

@@ -9,7 +9,10 @@ import { MAX_INLINE_COMMENT_BODY_CHARS } from '@/lib/code-reviews/core/constants
 import { type GitHubAppType, getGitHubAppCredentials } from './app-selector';
 import { isGitHubOwnerName, isGitHubRepositoryName } from './repository-coordinates';
 import { lastLinkedPage } from './link-header';
-import { assertGitHubInstallationRuntimeAuthorized } from '../../github/runtime-authorization';
+import {
+  assertGitHubInstallationRuntimeAuthorized,
+  GitHubRuntimeAuthorizationError,
+} from '../../github/runtime-authorization';
 
 export type { GitHubAppType } from './app-selector';
 
@@ -440,7 +443,16 @@ export async function hasPRCommentWithMarker(
 
 /**
  * Returns the permission string ('admin' | 'maintain' | 'write' | 'read' | 'none') or null
- * if the lookup fails (e.g. the App lacks permission to query collaborators).
+ * when GitHub gives a definitive non-answer: the collaborator is unknown (404), GitHub
+ * reports a permission outside the known set, a 403 or 422 from the token mint or the
+ * lookup, or the installation is unavailable (the mint answers 404 or the runtime
+ * authorization rejects the installation). Rate limits are thrown as typed
+ * {@link GitHubRateLimitError}s so callers can surface the reset time; other thrown
+ * failures — App-credential rejections (typed
+ * {@link GitHubCredentialRejectionError}), installation-token rejections on the
+ * lookup (raw 401), server errors, and network failures — are thrown so callers
+ * can decide whether to retry rather than treating a temporary failure as a
+ * denial.
  */
 export type CollaboratorPermission = 'admin' | 'maintain' | 'write' | 'read' | 'none';
 
@@ -454,14 +466,53 @@ export async function getCollaboratorPermissionLevel(
   appType: GitHubAppType = 'standard',
   expectedIntegrationId?: string
 ): Promise<CollaboratorPermission | null> {
+  let tokenData: InstallationToken;
   try {
-    const tokenData = await generateGitHubInstallationToken(
+    tokenData = await generateGitHubInstallationToken(
       installationId,
       appType,
       expectedIntegrationId
     );
-    const octokit = new Octokit({ auth: tokenData.token });
+  } catch (error) {
+    // GitHub answers the token mint for an installation it no longer exposes
+    // (removed or suspended) with a 404; without a token this App cannot query
+    // collaborators at all, so that is a definitive null.
+    if (isHttpError(error) && error.status === 404) return null;
+    // A rejected installation runtime authorization means no installation is
+    // connected for this request — a definitive "no installation connected"
+    // answer, not something to retry.
+    if (error instanceof GitHubRuntimeAuthorizationError) return null;
+    // 429 and rate-shaped 403s are typed rate-limit failures so callers can
+    // surface the reset time.
+    const rateLimit = toGitHubRateLimitError(error);
+    if (rateLimit) throw rateLimit;
+    // A 401 means the App credentials were rejected — Kilo's own failure, not
+    // a permission answer — so it must not settle the check as a denial. A
+    // fresh mint cannot clear it (the same credentials are sent again), so it
+    // is typed as a persistent configuration failure callers do not retry.
+    if (isHttpError(error) && error.status === 401) {
+      warnExceptInTest('[getCollaboratorPermissionLevel] Installation token mint failed', {
+        installationId,
+        owner,
+        repo,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new GitHubCredentialRejectionError(error);
+    }
+    // Any other 4xx (403 the installation cannot query collaborators, 422) is
+    // a definitive non-answer, not something to retry.
+    if (isHttpError(error) && error.status >= 400 && error.status < 500) return null;
+    warnExceptInTest('[getCollaboratorPermissionLevel] Installation token mint failed', {
+      installationId,
+      owner,
+      repo,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
+  const octokit = new Octokit({ auth: tokenData.token });
 
+  try {
     const { data } = await octokit.repos.getCollaboratorPermissionLevel({
       owner,
       repo,
@@ -473,8 +524,38 @@ export async function getCollaboratorPermissionLevel(
       return data.permission as CollaboratorPermission;
     }
     return null;
-  } catch {
-    return null;
+  } catch (error) {
+    // GitHub answers for an unknown collaborator (or a repository the
+    // installation cannot reach) with a 404; that is a definitive null.
+    if (isHttpError(error) && error.status === 404) return null;
+    // 429 and rate-shaped 403s are typed rate-limit failures so callers can
+    // surface the reset time.
+    const rateLimit = toGitHubRateLimitError(error);
+    if (rateLimit) throw rateLimit;
+    // A 401 means the installation token was rejected — the permission was
+    // never evaluated, so it must not settle the check as a denial. Unlike the
+    // mint 401 this is not a credential-rejection class: a fresh mint can
+    // clear it (the installation token, not the App credentials, was
+    // refused), so the raw error is rethrown and stays retryable.
+    if (isHttpError(error) && error.status === 401) {
+      warnExceptInTest('[getCollaboratorPermissionLevel] Collaborator lookup failed', {
+        owner,
+        repo,
+        username,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+    // Any other 4xx (403 the installation cannot query collaborators, 422) is
+    // a definitive non-answer, not something to retry.
+    if (isHttpError(error) && error.status >= 400 && error.status < 500) return null;
+    warnExceptInTest('[getCollaboratorPermissionLevel] Collaborator lookup failed', {
+      owner,
+      repo,
+      username,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
   }
 }
 
@@ -539,16 +620,24 @@ export async function exchangeGitHubOAuthCode(
     throw new Error(`Missing GitHub ${appType} App credentials`);
   }
 
-  const response = await fetch('https://github.com/login/oauth/access_token', {
-    method: 'POST',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_id: credentials.clientId,
-      client_secret: credentials.clientSecret,
-      code,
-      ...(codeVerifier ? { code_verifier: codeVerifier } : {}),
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      signal: AbortSignal.timeout(10_000),
+      redirect: 'error',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: credentials.clientId,
+        client_secret: credentials.clientSecret,
+        code,
+        ...(codeVerifier ? { code_verifier: codeVerifier } : {}),
+      }),
+    });
+  } catch (error) {
+    logExceptInTest('[exchangeGitHubOAuthCode] Token exchange request failed', { error });
+    throw error;
+  }
   if (!response.ok) {
     throw new Error(`GitHub OAuth code exchange failed (${response.status})`);
   }
@@ -581,7 +670,9 @@ export async function exchangeGitHubOAuthCode(
     auth: accessToken,
   });
 
-  const { data: githubUser } = await octokit.rest.users.getAuthenticated();
+  const { data: githubUser } = await octokit.rest.users.getAuthenticated({
+    request: { signal: AbortSignal.timeout(10_000) },
+  });
 
   return {
     id: githubUser.id.toString(),
@@ -978,6 +1069,7 @@ export async function createGitHubBranch(params: {
     owner,
     repo,
     ref: `heads/${baseBranch}`,
+    request: { signal: AbortSignal.timeout(10_000) },
   });
 
   try {
@@ -986,6 +1078,7 @@ export async function createGitHubBranch(params: {
       repo,
       ref: `refs/heads/${branchName}`,
       sha: baseRef.object.sha,
+      request: { signal: AbortSignal.timeout(10_000) },
     });
   } catch (error) {
     if (
@@ -1013,10 +1106,23 @@ export async function createOrUpdateGitHubRootTextFile(params: {
   let sha: string | undefined;
 
   try {
-    const { data } = await octokit.repos.getContent({ owner, repo, path, ref: branch });
+    const { data } = await octokit.repos.getContent({
+      owner,
+      repo,
+      path,
+      ref: branch,
+      request: { signal: AbortSignal.timeout(10_000) },
+    });
     if (!Array.isArray(data)) {
       const existing = data as GitHubRepositoryContent;
       if (existing.type === 'file') {
+        if (
+          existing.encoding === 'base64' &&
+          typeof existing.content === 'string' &&
+          decodeGitHubBase64Content(existing.content) === content
+        ) {
+          return;
+        }
         sha = existing.sha;
       }
     }
@@ -1034,6 +1140,7 @@ export async function createOrUpdateGitHubRootTextFile(params: {
     message,
     content: Buffer.from(content, 'utf8').toString('base64'),
     ...(sha ? { sha } : {}),
+    request: { signal: AbortSignal.timeout(10_000) },
   });
 }
 
@@ -1055,9 +1162,38 @@ export async function createGitHubPullRequest(params: {
     body,
     head: headBranch,
     base: baseBranch,
+    request: { signal: AbortSignal.timeout(10_000) },
   });
 
   return { number: data.number, url: data.html_url };
+}
+
+export type GitHubHeadPullRequest = { number: number; url: string };
+
+/**
+ * Lists the repository's pull requests for a head branch, preferring the open
+ * one; the API returns newest first.
+ */
+export async function fetchGitHubPullRequestForHeadBranch(params: {
+  token: string;
+  owner: string;
+  repo: string;
+  headBranch: string;
+}): Promise<GitHubHeadPullRequest | null> {
+  const { token, owner, repo, headBranch } = params;
+  const octokit = new Octokit({ auth: token });
+  const { data } = await octokit.pulls.list({
+    owner,
+    repo,
+    state: 'all',
+    head: `${owner}:${headBranch}`,
+    per_page: 100,
+    request: { signal: AbortSignal.timeout(10_000) },
+  });
+
+  const matching = data.filter(pull => pull.head.ref === headBranch);
+  const pull = matching.find(candidate => candidate.state === 'open') ?? matching[0];
+  return pull ? { number: pull.number, url: pull.html_url } : null;
 }
 
 export async function getGitHubReviewComment(
@@ -1172,6 +1308,28 @@ export class GitHubRateLimitError extends Error {
     this.name = 'GitHubRateLimitError';
     this.resetAt = resetAt;
   }
+}
+
+/**
+ * Thrown when GitHub rejects the App credentials with a 401 on the
+ * installation-token mint in {@link getCollaboratorPermissionLevel}. A mint
+ * 401 means the App ID or private key Kilo configured is not accepted, a
+ * persistent Kilo-side configuration failure that no retry or fresh mint can
+ * clear, so callers classify it as configuration instead of retrying. A 401 on
+ * the collaborator lookup is NOT wrapped: there a fresh mint can clear the
+ * rejection (the installation token was refused, not the App credentials), so
+ * the lookup rethrows the raw error and callers may retry.
+ */
+export class GitHubCredentialRejectionError extends Error {
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause));
+    this.name = 'GitHubCredentialRejectionError';
+    this.cause = cause;
+  }
+}
+
+export function isGitHubCredentialRejection(error: unknown): boolean {
+  return error instanceof GitHubCredentialRejectionError;
 }
 
 function getResponseHeader(error: unknown, name: string): string | undefined {

@@ -29,10 +29,13 @@ describe('workspace artifact schemas', () => {
     });
   });
 
-  it('accepts an entry with the server-computed expiry', () => {
+  it('drops the per-file expiry sent by older Workers', () => {
     expect(
-      workspaceArtifactEntrySchema.parse({ ...entry, expiresAt: entry.updatedAt + 1_000 })
-    ).toEqual({ ...entry, expiresAt: entry.updatedAt + 1_000 });
+      listWorkspaceArtifactsOutputSchema.parse({
+        revision: 3,
+        entries: [{ ...entry, expiresAt: entry.updatedAt + 1_000 }],
+      })
+    ).toEqual({ revision: 3, entries: [entry] });
   });
 
   it('rejects a malformed content hash', () => {

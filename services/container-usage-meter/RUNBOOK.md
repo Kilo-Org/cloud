@@ -147,6 +147,7 @@ Canary organization Kilo Pass compensation requires a separate account/agreement
 - Paid interval starts per hour: alert on an unexpected drop to zero after rollout.
 - Admin `usageHealth`: alert on open intervals older than the reconciliation cutoff.
 - Producer `Container usage shadow delivery deferred`: alert on sustained delivery failures.
+- Producer `Billing usage delivery deferred after a retryable failure`: alert on sustained billing alarm delivery failures and check whether pending segments are making progress.
 - Admission latency and errors: watch organization bursts that contend for the capacity advisory lock.
 
 Create these monitors through the operations workflow. This repository change does not install external monitors.

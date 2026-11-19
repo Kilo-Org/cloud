@@ -22,10 +22,10 @@ export const SCREEN_SECTION_GAP_CLASS = 'gap-6';
 export const SCREEN_BODY_CLASS = 'gap-6 px-4 pt-3';
 
 /**
- * The top offset of a section that starts inside another section's group and
- * carries the break itself. The form puts its sibling sections 17.5pt below the
- * field before them, and a nested block's own offset is what lands: the group's
- * `gap-2` does not add above it. This offset therefore holds the whole
- * 17.5pt break, so a nested section reads at the same rhythm as a top-level one.
+ * The top offset a nested section keeps inside a tighter group: the contract's
+ * 21pt section gap (`SCREEN_SECTION_GAP_CLASS`) less the 7pt the group's
+ * `gap-2` already lands above the child. Measured on the new-session form, the
+ * branch block then starts 21.4pt under the repository field, the same break
+ * the Run on and Repository sections keep.
  */
-export const NESTED_SECTION_GAP_CLASS = 'mt-5';
+export const NESTED_SECTION_GAP_CLASS = 'mt-4';

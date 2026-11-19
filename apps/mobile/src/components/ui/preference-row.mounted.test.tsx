@@ -371,9 +371,9 @@ describe('PreferenceRow', () => {
     expect(
       overridden.findAll(node => Object.is(node.type, 'Text')).map(node => node.props.children)
     ).toEqual(['openrouter']);
-    expect(
-      overridden.find(node => Object.is(node.type, 'Switch')).props.accessibilityLabel
-    ).toBe('Spend alerts for Acme');
+    expect(overridden.find(node => Object.is(node.type, 'Switch')).props.accessibilityLabel).toBe(
+      'Spend alerts for Acme'
+    );
   });
 
   it('draws its icon in the shared neutral tile, the column the neighbouring destination rows use', () => {

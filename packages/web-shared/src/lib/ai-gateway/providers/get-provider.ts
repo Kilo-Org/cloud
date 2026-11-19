@@ -20,6 +20,7 @@ import {
 import {
   createRoutingDecisionRecorder,
   type ByokCandidateSkipReason,
+  type PartnerSkipReason,
   type ProviderRoutingDecision,
   type RoutingDecisionRecorder,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
@@ -66,12 +67,28 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import { checkOpenAiChatGptByok } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import { checkClaudeBilling } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/routing';
-import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import * as z from 'zod';
-import { CustomLlmCredentialsSchema, type CustomLlmCredentials } from '@kilocode/db/schema-types';
 import {
+  isValidOpenRouterModelId,
+  resolveOpenRouterModelAlias,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import * as z from 'zod';
+import {
+  getReasoningEffort,
+  isReasoningExplicitlyDisabled,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import { getSupportedReasoningEfforts } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
+import {
+  CustomLlmCredentialsSchema,
+  ReasoningDetailsTransform,
+  ReasoningEffortSchema,
+  type CustomLlmCredentials,
+  type CustomPricingTiers,
+} from '@kilocode/db/schema-types';
+import {
+  findPartnerCustomLlm,
   isPublicCustomLlm,
   type CustomLlm,
+  type PartnerCustomLlm,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { getCustomLlmApiKinds } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/api-kinds';
 import {
@@ -88,7 +105,10 @@ import {
   resolveEmbeddingOrDecisionRoute,
   resolveTranscriptionRoute,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/non-chat-routes';
-import { removePaidServerFeatures } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-paid-server-features';
+import {
+  removePaidServerFeatures,
+  requestsPaidServerFeatures,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/remove-paid-server-features';
 import {
   getLocalFakeLlmProvider,
   getLocalFakeTranscriptionProvider,
@@ -110,6 +130,11 @@ export type ProviderRoute = {
    *  outside Kilo credits pays for the request, such as the ChatGPT
    *  subscription, while abuse and organization policy checks still apply. */
   skipBalanceCheck?: boolean;
+  /** What Kilo bills for the route instead of the model's own pricing. Set on partner routes. */
+  customLlmPricing?: CustomPricingTiers;
+  /** The provider the organization policy checks when a direct BYOK key serves the request (see
+   *  `getDirectByokPolicyProviderId`). */
+  directByokPolicyProviderId?: string;
 };
 
 /** Resolves a route. A BYOK key is decrypted only when its route is resolved. */
@@ -119,9 +144,9 @@ export type GetProviderProviderResult = {
   kind: 'provider';
   /**
    * The routes that can serve the request, in order. The first takes it; a later route is tried
-   * only when the upstream of every route before it failed. Only the owner's BYOK keys follow the
-   * first route, never the ChatGPT connection or Kilo's route, so a failing key never makes another
-   * payer, or Kilo, pay.
+   * only when the upstream of every route before it failed. Only the owner's BYOK keys follow a
+   * BYOK key, never the ChatGPT connection or Kilo's route, so a failing key never makes another
+   * payer, or Kilo, pay. Kilo's own route follows a partner route, which Kilo also pays for.
    */
   routes: readonly [ResolveProviderRoute, ...ResolveProviderRoute[]];
 };
@@ -160,7 +185,6 @@ async function directByokRoute(
   directByok: DirectByokProvider,
   directByokModel: DirectByokModel,
   credential: BYOKResult,
-  requestedModel: string,
   request: GatewayRequest,
   servesCatalogId: boolean
 ): Promise<ProviderRoute> {
@@ -182,10 +206,13 @@ async function directByokRoute(
       },
     } satisfies Provider,
     userByok: [{ decryptedAPIKey: credential.decryptedAPIKey, providerId: credential.providerId }],
-    isFree: isFreeModel(requestedModel),
+    // The key's owner pays its upstream, never Kilo, whatever the id looks like: a bespoke id is
+    // named by its provider or organization, and catalog-mode keys never serve free models.
+    isFree: false,
     // Organization model and provider policies cover catalog ids. A bespoke id is only served by a
     // key outside catalog mode, which stays exempt as before.
     bypassAccessCheck: !servesCatalogId,
+    directByokPolicyProviderId: getDirectByokPolicyProviderId(directByok),
   };
 }
 
@@ -197,7 +224,7 @@ async function directByokRoute(
 async function resolveDirectByokModel(
   directByok: DirectByokProvider,
   directByokModel: DirectByokModel,
-  { user, organizationId, requestedModel, request }: GetProviderInput,
+  { user, organizationId, request }: GetProviderInput,
   decision: RoutingDecisionRecorder
 ): Promise<GetProviderProviderResult | DirectByokCatalogOnlyResult | null> {
   const providerId = directByok.id;
@@ -225,9 +252,7 @@ async function resolveDirectByokModel(
     return { kind: 'direct-byok-catalog-only', providerId, catalogModelId };
   }
   decision.step({ step: 'direct-byok-model', outcome: 'selected', provider_id: providerId });
-  return servedBy(
-    await directByokRoute(directByok, directByokModel, credential, requestedModel, request, false)
-  );
+  return servedBy(await directByokRoute(directByok, directByokModel, credential, request, false));
 }
 
 async function isEligibleForCustomLlm(
@@ -334,6 +359,127 @@ function withoutPaidServerFeatures(provider: Provider): Provider {
       removePaidServerFeatures(provider, context.model, context.request, context.kilo_user_id);
       await provider.transformRequest(context);
     },
+  };
+}
+
+/** Whether the provider settings let the partner's provider serve the request. */
+function providerSettingsAllowPartner(
+  partner: PartnerCustomLlm,
+  provider: OpenRouterProviderConfig | undefined,
+  allowedProviders: ReadonlySet<string> | undefined
+): boolean {
+  // The slug schema keeps partner slugs lowercase; callers may send provider ids in any case.
+  const slug = partner.definition.partner.inference_provider;
+  const names = (providerIds: Iterable<string>) =>
+    [...providerIds].some(providerId => providerId.toLowerCase() === slug);
+  if (allowedProviders && !names(allowedProviders)) return false;
+  if (!provider) return true;
+  if (provider.only && !names(provider.only)) return false;
+  if (provider.ignore && names(provider.ignore)) return false;
+  if (provider.allow_fallbacks === false && provider.order && !names(provider.order)) {
+    return false;
+  }
+  // The partner bills its own pricing, which a price ceiling does not cover.
+  if (provider.max_price) return false;
+  // Kilo does not vouch for zero data retention on any custom LLM, partners included.
+  if (provider.zdr === true) return false;
+  if (provider.data_collection === 'deny' && partner.definition.may_train_on_prompts !== false) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * The reasoning effort the upstream receives, following the partner's reasoning transform: an
+ * explicit disable is `none`, otherwise the effort the request carries for its API kind. The
+ * `reasoning-content` and `reasoning` transforms drop the `reasoning` object and forward only its
+ * effort, behind an existing `reasoning_effort`, so `reasoning.enabled: false` does not reach the
+ * upstream there and `reasoning_effort` wins over `reasoning.effort`. Null when the request
+ * carries no effort, even though `mistral-thinking` then sends `high`: the partner is not skipped
+ * for an effort the client did not choose.
+ */
+function getUpstreamReasoningEffort(
+  request: GatewayRequest,
+  transform: ReasoningDetailsTransform | undefined
+): string | null {
+  const replacesReasoningObject =
+    transform === ReasoningDetailsTransform.ReasoningContent ||
+    transform === ReasoningDetailsTransform.Reasoning;
+  if (replacesReasoningObject && request.kind === 'chat_completions') {
+    const effort = request.body.reasoning_effort ?? request.body.reasoning?.effort;
+    if (effort) return effort;
+    return isReasoningExplicitlyDisabled(request) ? 'none' : null;
+  }
+  const disabledByReasoningObject =
+    request.kind === 'chat_completions' && request.body.reasoning?.enabled === false;
+  if (disabledByReasoningObject || isReasoningExplicitlyDisabled(request)) return 'none';
+  return getReasoningEffort(request);
+}
+
+/** Whether the partner declares its supported efforts and the request asks for one it lacks. */
+function requestsUnsupportedReasoningEffort(
+  partner: PartnerCustomLlm,
+  request: GatewayRequest
+): boolean {
+  const { definition } = partner;
+  const supported = getSupportedReasoningEfforts(definition.opencode_settings?.reasoning_options);
+  if (!supported) return false;
+  const effort = ReasoningEffortSchema.safeParse(
+    getUpstreamReasoningEffort(request, definition.reasoning_details_transform)
+  );
+  return effort.success && !supported.has(effort.data);
+}
+
+/**
+ * A partner serves the catalog model ahead of Kilo's gateway route, which stays behind it as the
+ * failover; see `CustomLlmPartnerSchema`. Returns the skip reason when the partner may not serve.
+ */
+async function resolvePartnerRoute(
+  partner: PartnerCustomLlm,
+  input: GetProviderInput
+): Promise<ProviderRoute | PartnerSkipReason> {
+  const { definition } = partner;
+  if (!getCustomLlmApiKinds(definition).includes(input.request.kind)) {
+    return 'unsupported-api-kind';
+  }
+  // Only the gateways run and bill plugins and server tools, so the gateway serves those requests.
+  if (requestsPaidServerFeatures(input.request)) return 'server-features';
+  if (input.boundedSpending) return 'bounded-spending';
+  // Implied by an inference region, which admits only Kilo's Vercel AI Gateway route.
+  if (input.openRouterDisabled) return 'openrouter-disabled';
+  const providerConfig = withIgnoredProviders(
+    await input.getRoutingProviderConfig(),
+    input.kiloIgnoredProviders ?? []
+  );
+  if (!providerSettingsAllowPartner(partner, providerConfig, await input.getAllowedProviders())) {
+    return 'provider-settings';
+  }
+  // The partner would answer 400, and the failover would cost a wasted round trip.
+  if (requestsUnsupportedReasoningEffort(partner, input.request)) {
+    return 'unsupported-reasoning-effort';
+  }
+  // Unlike a custom LLM that owns its id, a partner has a fallback, so unusable
+  // credentials skip it instead of failing the request.
+  let auth: DirectUpstreamAuth;
+  try {
+    const credentials = readCustomLlmCredentials(partner);
+    if (!credentials) throw new Error('missing or unparseable');
+    auth = await resolveCustomLlmAuth(credentials);
+  } catch (error) {
+    console.error('Partner custom LLM credentials are unusable', partner.public_id, {
+      errorType: error instanceof Error ? error.name : 'unknown',
+    });
+    return 'invalid-credentials';
+  }
+  return {
+    provider: {
+      ...buildDirectProvider('partner', getCustomLlmApiKinds(definition), definition, auth),
+      inferenceProviderId: definition.partner.inference_provider,
+    },
+    userByok: null,
+    isFree: isFreeModel(input.requestedModel),
+    bypassAccessCheck: false,
+    customLlmPricing: definition.pricing,
   };
 }
 
@@ -528,7 +674,7 @@ async function selectProvider(
   const resolveKey = async (step: KeyPlanStep): Promise<ProviderRoute> => {
     const credential = await decryptKey(step);
     return step.route === 'direct-byok'
-      ? directByokRoute(step.provider, step.model, credential, requestedModel, request, true)
+      ? directByokRoute(step.provider, step.model, credential, request, true)
       : gatewayRoutedByokRoute(step, credential, requestedModel);
   };
 
@@ -632,9 +778,7 @@ async function selectProvider(
           provider_id: key.providerId,
           supported_api_kinds: [...getDirectByokModelChatApis(provider, model)],
         });
-        return servedBy(
-          await directByokRoute(provider, model, credential, requestedModel, request, true)
-        );
+        return servedBy(await directByokRoute(provider, model, credential, request, true));
       }
       case 'kilo': {
         recordNoKeyServed();
@@ -648,19 +792,41 @@ async function selectProvider(
           async () =>
             withIgnoredProviders(await input.getRoutingProviderConfig(), kiloIgnoredProviders)
         );
-        decision.step({
+        const kiloRoute: ProviderRoute = {
+          provider: routesToVercel ? VERCEL_AI_GATEWAY : OPENROUTER,
+          userByok: null,
+          isFree: isFreeModel(requestedModel),
+          bypassAccessCheck: false,
+        };
+        const kiloStep = {
           step: 'kilo',
           outcome: 'selected',
           gateway: routesToVercel ? 'vercel' : 'openrouter',
           bounded_spending: boundedSpending,
           kilo_ignored_providers: kiloIgnoredProviders,
-        });
-        return servedBy({
-          provider: routesToVercel ? VERCEL_AI_GATEWAY : OPENROUTER,
-          userByok: null,
-          isFree: isFreeModel(requestedModel),
-          bypassAccessCheck: false,
-        });
+        } as const;
+        // A `~` latest alias reaches the partner of the catalog model it currently points at.
+        const partner = await findPartnerCustomLlm(
+          await resolveOpenRouterModelAlias(requestedModel)
+        );
+        if (!partner) {
+          decision.step(kiloStep);
+          return servedBy(kiloRoute);
+        }
+        const inferenceProvider = partner.definition.partner.inference_provider;
+        const partnerRoute = await resolvePartnerRoute(partner, input);
+        if (typeof partnerRoute === 'string') {
+          decision.step({
+            step: 'partner',
+            outcome: 'skipped',
+            partner_inference_provider: inferenceProvider,
+            reason: partnerRoute,
+          });
+          decision.step(kiloStep);
+          return servedBy(kiloRoute);
+        }
+        decision.step({ ...kiloStep, partner_inference_provider: inferenceProvider });
+        return { kind: 'provider', routes: [async () => partnerRoute, async () => kiloRoute] };
       }
     }
   }

@@ -5,7 +5,11 @@ import {
   classNameOf,
   expectHiddenPill,
   findAll,
+  hasClassToken,
   info,
+  PILL_BARE_TOKENS,
+  PILL_BORDER_WIDTH_TOKEN,
+  PILL_CAPSULE_TOKENS,
   PILL_LAYOUT_TOKENS,
   pillOf,
   propsOf,
@@ -16,6 +20,56 @@ vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('./context-usage-ring', () => ({ ContextUsageRing: 'ContextUsageRing' }));
+
+/** The texts the pill paints: everything except the invisible slot sizers. */
+function visibleTextsOf(pill: React.ReactElement): React.ReactElement[] {
+  return findAll(pill, el => el.type === 'Text' && !classNameOf(el).includes('opacity-0'));
+}
+
+/** The invisible copies that hold each slot's width. */
+function sizersOf(pill: React.ReactElement): React.ReactElement[] {
+  return findAll(pill, el => el.type === 'Text' && classNameOf(el).includes('opacity-0'));
+}
+
+/** The class that keeps the ring's button a circle: its height's own width. */
+const RING_BUTTON_SQUARE_TOKEN = 'aspect-square';
+
+const RING_BUTTON_LAYOUT_TOKENS = [
+  'h-12',
+  RING_BUTTON_SQUARE_TOKEN,
+  'shrink-0',
+  'items-center',
+  'justify-center',
+  'rounded-full',
+] as const;
+
+/** The ring's own container: the pill's only trailing child. */
+function ringButtonOf(pill: React.ReactElement): React.ReactElement {
+  const [button] = findAll(
+    pill,
+    el => el.type === 'View' && hasClassToken(classNameOf(el), RING_BUTTON_SQUARE_TOKEN)
+  );
+  if (button === undefined) {
+    throw new Error('expected the ring button');
+  }
+  return button;
+}
+
+/**
+ * The pill body's children in layout order. The body is one fragment, so the
+ * elements the walk sees are the row it reserves and the ring that ends it.
+ */
+function bodyChildrenOf(pill: React.ReactElement): React.ReactElement[] {
+  const body: unknown = propsOf(pill).children;
+  if (body === null || typeof body !== 'object' || !('props' in body)) {
+    throw new Error('expected the pill body');
+  }
+  const { props } = body;
+  if (props === null || typeof props !== 'object' || !('children' in props)) {
+    return [];
+  }
+  return Array.isArray(props.children) ? (props.children as React.ReactElement[]) : [];
+}
 
 describe('SessionContextMetrics', () => {
   it.each([
@@ -221,9 +275,8 @@ describe('SessionContextMetrics', () => {
   });
 
   // The header caps the trailing cluster, and RN's flexShrink is 0 by default,
-  // so the pill and its reading must all opt in or they paint off-screen. The
-  // percentage keeps its width and the cost is the part that truncates.
-  it('lets the pill and its reading compress inside a constrained header row', () => {
+  // so the pill and its reading must all opt in or they paint off-screen.
+  it('keeps the pill compressible and each reading on one line', () => {
     const root = render({
       hasMessages: true,
       info: info(),
@@ -233,32 +286,36 @@ describe('SessionContextMetrics', () => {
     expect(classNameOf(root)).toContain('min-w-0');
     expect(classNameOf(root)).toContain('shrink');
     const pill = pillOf(root);
-    const runs = findAll(pill, el => propsOf(el).numberOfLines === 1);
-    expect(runs).toHaveLength(2);
-    const [percentage, cost] = runs;
-    expect(classNameOf(percentage ?? root).split(' ')).toContain('shrink-0');
-    const costClasses = classNameOf(cost ?? root).split(' ');
-    expect(costClasses).not.toContain('shrink-0');
-    expect(costClasses).toEqual(expect.arrayContaining(['shrink', 'min-w-0']));
+    // Every text the pill paints, its sizers included, is capped to one line:
+    // the slot gives up width before the pill paints past the header's edge.
+    expect(findAll(pill, el => el.type === 'Text')).toHaveLength(4);
+    for (const text of findAll(pill, el => el.type === 'Text')) {
+      expect(propsOf(text).numberOfLines).toBe(1);
+    }
   });
 
-  // A transcript that reports no usage and no cost paints a bare ring: the pill
-  // hugs what it holds instead of holding a value slot open for a reading that
-  // will never arrive.
-  it('paints only the ring when there is no value to show', () => {
+  // A transcript that reports no usage and no cost paints a bare ring inside a
+  // rect that is already the width of the reading it will show: the slots hold
+  // their width invisibly instead of showing a dash or collapsing.
+  it('paints no value and holds both slot widths when there is nothing to show', () => {
     const root = render({ hasMessages: true, info: undefined, totalCostMicrodollars: null });
     const pill = pillOf(root);
     expect(propsOf(pill).className ?? '').not.toContain('opacity-0');
     expect(propsOf(pill).accessibilityElementsHidden).toBeUndefined();
-    // Nothing paints beside the ring: a value that has not arrived is not a
-    // value, so no text holds a dash in its place.
     expect(findAll(pill, el => el.type === 'ContextUsageRing')).toHaveLength(1);
-    expect(findAll(pill, el => el.type === 'Text')).toHaveLength(0);
+    // Two sizers hold the two slots; neither paints and neither is read out.
+    expect(sizersOf(pill)).toHaveLength(2);
+    expect(visibleTextsOf(pill)).toHaveLength(0);
+    for (const sizer of sizersOf(pill)) {
+      expect(propsOf(sizer).accessibilityElementsHidden).toBe(true);
+      expect(propsOf(sizer).importantForAccessibility).toBe('no');
+    }
   });
 
   // A session that reported tokens but no context window has no percentage.
   // The pill paints the cost alone: a marker in the percentage slot sat right
-  // before the price and read as a negative amount.
+  // before the price and read as a negative amount. The percentage slot keeps
+  // its width while painting nothing.
   it('paints no marker before the cost when the context window is unknown', () => {
     const root = render({
       hasMessages: true,
@@ -266,23 +323,23 @@ describe('SessionContextMetrics', () => {
       totalCostMicrodollars: 20_000,
     });
     const pill = pillOf(root);
-    const texts = findAll(pill, el => el.type === 'Text');
+    const texts = visibleTextsOf(pill);
     expect(texts).toHaveLength(1);
     const cost = texts[0];
     if (cost == null) {
       throw new Error('expected the cost text');
     }
     expect(String(propsOf(cost).children)).toContain('$0.02');
+    expect(sizersOf(pill)).toHaveLength(2);
     expect(findAll(pill, el => el.type === 'ContextUsageRing')).toHaveLength(1);
     expect(
       findAll(pill, el => el.type === 'ContextUsageRing' && propsOf(el).arcFraction === undefined)
     ).toHaveLength(1);
   });
 
-  // The pill hugs what it holds: the header's trailing cluster ends with the
-  // Follow control, so a reading that arrives widens the pill instead of moving
-  // that control. The reading itself is two texts with one small gap.
-  it('paints the percentage and the cost as two texts with one gap', () => {
+  // The reading is two values with one small gap, painted over the slots that
+  // already held their widths before the values existed.
+  it('paints the percentage and the cost over their reserved slots', () => {
     const root = render({
       hasMessages: true,
       info: info(),
@@ -290,19 +347,22 @@ describe('SessionContextMetrics', () => {
       onPress: vi.fn<() => void>(),
     });
     const pill = pillOf(root);
-    const row = findAll(pill, el => classNameOf(el).includes('items-baseline'))[0];
+    const [row] = findAll(pill, el => classNameOf(el).split(' ').includes('gap-1'));
     expect(row).toBeDefined();
-    expect(classNameOf(row ?? root)).toContain('gap-1');
-    const texts = findAll(pill, el => el.type === 'Text');
-    expect(texts.map(el => propsOf(el).children)).toHaveLength(2);
+    expect(classNameOf(row ?? root)).toContain('flex-row');
+    const texts = visibleTextsOf(pill);
+    expect(texts).toHaveLength(2);
     expect(propsOf(texts[0] ?? root).children).toBe('16%');
     expect(String(propsOf(texts[1] ?? root).children)).toContain('$0.15');
+    // Each painted value sits over the slot that reserved its width.
+    expect(classNameOf(texts[0] ?? root)).toContain('absolute');
+    expect(classNameOf(texts[1] ?? root)).toContain('absolute');
   });
 
-  // One silhouette from the first paint: until a value exists the pill paints
-  // its ring and nothing else, so a session that settles without usage never
-  // grows a value slot beside it.
-  it('paints the ring alone until a value exists, while loading and after', () => {
+  // One silhouette from the first paint: the slots reserve the width of the
+  // reading that will fill them, so a settled empty pill is already the size it
+  // keeps once usage arrives. While the open resolves, one bar covers the row.
+  it('holds the reading-row width while loading and after it settles', () => {
     const onPress = vi.fn<() => void>();
     const bare = (loading = false) =>
       render({
@@ -315,11 +375,104 @@ describe('SessionContextMetrics', () => {
 
     for (const pill of [pillOf(bare(false)), pillOf(bare(true))]) {
       expect(findAll(pill, el => el.type === 'ContextUsageRing')).toHaveLength(1);
-      expect(
-        findAll(pill, el => el.type === 'Text' && !classNameOf(el).includes('opacity-0'))
-      ).toHaveLength(0);
+      expect(visibleTextsOf(pill)).toHaveLength(0);
+      expect(sizersOf(pill)).toHaveLength(2);
     }
+    // The bar belongs to the resolving state only; the settled pill carries none.
+    expect(findAll(pillOf(bare(true)), el => el.type === 'Skeleton')).toHaveLength(1);
+    expect(findAll(pillOf(bare(false)), el => el.type === 'Skeleton')).toHaveLength(0);
     expect(propsOf(pillOf(bare(false))).accessibilityLabel).toContain('usage unavailable');
     expect(propsOf(pillOf(bare(true))).accessibilityLabel ?? '').not.toContain('usage unavailable');
+  });
+
+  // Exactly one chrome is visible in every state, and it is the one that has
+  // something to show. A pill that paints nothing shows none of its own — an
+  // empty wide capsule beside a ring reads as a control that broke or never
+  // finished loading — and its ring's trailing button carries the capsule
+  // instead, so the header shows one round bordered button where a reading will
+  // appear. Each box keeps its own one-dp border slot, so the swap moves
+  // neither of them.
+  it('wears exactly one capsule: the pill while it reads, the ring button while it does not', () => {
+    const onPress = vi.fn<() => void>();
+    const expectLayout = (className: string) => {
+      for (const token of PILL_LAYOUT_TOKENS) {
+        expect(className).toContain(token);
+      }
+      // Asserted as a whole token: `border` is a prefix of both chrome classes,
+      // so a substring check could not show that the one-dp border slot is on the
+      // base class rather than on only one chrome class.
+      expect(hasClassToken(className, PILL_BORDER_WIDTH_TOKEN)).toBe(true);
+    };
+    const expectBare = (root: React.ReactElement) => {
+      const pill = pillOf(root);
+      const className = classNameOf(pill);
+      expectLayout(className);
+      for (const token of PILL_BARE_TOKENS) {
+        expect(className).toContain(token);
+      }
+      for (const token of PILL_CAPSULE_TOKENS) {
+        expect(className).not.toContain(token);
+      }
+      // The ring ends the pill and draws inside its own button, which wears the
+      // capsule the pill gave up.
+      const ringButton = ringButtonOf(pill);
+      expect(bodyChildrenOf(pill).at(-1)).toBe(ringButton);
+      expect(findAll(ringButton, el => el.type === 'ContextUsageRing')).toHaveLength(1);
+      for (const token of RING_BUTTON_LAYOUT_TOKENS) {
+        expect(classNameOf(ringButton)).toContain(token);
+      }
+      for (const token of PILL_CAPSULE_TOKENS) {
+        expect(classNameOf(ringButton)).toContain(token);
+      }
+      expect(hasClassToken(classNameOf(ringButton), PILL_BORDER_WIDTH_TOKEN)).toBe(true);
+      // The reserved row still leads the ring, both slots laid out and neither
+      // painting a value.
+      expect(sizersOf(pill)).toHaveLength(2);
+      expect(visibleTextsOf(pill)).toHaveLength(0);
+    };
+    const expectCapsule = (root: React.ReactElement) => {
+      const pill = pillOf(root);
+      const className = classNameOf(pill);
+      expectLayout(className);
+      for (const token of PILL_CAPSULE_TOKENS) {
+        expect(className).toContain(token);
+      }
+      expect(className).not.toContain('border-transparent');
+      // The pill's own capsule is the only chrome: the ring button inside it is
+      // transparent, with its border slot still one dp wide.
+      const ringButton = ringButtonOf(pill);
+      for (const token of PILL_CAPSULE_TOKENS) {
+        expect(classNameOf(ringButton)).not.toContain(token);
+      }
+      expect(classNameOf(ringButton)).toContain('border-transparent');
+      expect(classNameOf(ringButton)).toContain('bg-transparent');
+      expect(hasClassToken(classNameOf(ringButton), PILL_BORDER_WIDTH_TOKEN)).toBe(true);
+    };
+
+    // Settled empty chat, and a transcript that reported nothing yet.
+    expectBare(
+      render({ info: undefined, totalCostMicrodollars: null, hasMessages: false, onPress })
+    );
+    expectBare(
+      render({ info: undefined, totalCostMicrodollars: null, hasMessages: true, onPress })
+    );
+    // The resolving open paints its bar over the reserved row, so the pill keeps
+    // the capsule and the ring button gives it up.
+    const loading = render({
+      info: undefined,
+      totalCostMicrodollars: null,
+      hasMessages: false,
+      loading: true,
+      onPress,
+    });
+    expectCapsule(loading);
+    expect(findAll(pillOf(loading), el => el.type === 'Skeleton')).toHaveLength(1);
+    // Any reading wears the capsule.
+    expectCapsule(
+      render({ info: info(), totalCostMicrodollars: 150_000, hasMessages: true, onPress })
+    );
+    expectCapsule(
+      render({ info: undefined, totalCostMicrodollars: 150_000, hasMessages: true, onPress })
+    );
   });
 });

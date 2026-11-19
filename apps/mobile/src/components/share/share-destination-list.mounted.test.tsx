@@ -39,23 +39,27 @@ vi.mock('@shopify/flash-list', () => ({
 }));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 12 }) }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/icons', () => ({
   Search: 'Search',
   Share2: 'Share2',
   Terminal: 'Terminal',
+  X: 'X',
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
+vi.mock('@/components/ui/row-group', () => ({ RowGroup: 'RowGroup' }));
+vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/agents/session-list-section-header', () => ({
   SessionListSectionHeader: 'SectionHeader',
 }));
 vi.mock('@/components/agents/session-row', () => ({ StoredSessionRow: 'StoredSessionRow' }));
-vi.mock('@/components/destination-option-row', () => ({
-  DestinationOptionRow: 'DestinationOptionRow',
-}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 
 const instance: ShareCliSpawnRow = {
@@ -102,7 +106,6 @@ async function mount(
   const onRetry = vi.fn<() => void>();
   const onSelect = vi.fn<(row: ShareDestinationRow) => void>();
   const onSpawnInstance = vi.fn<(row: ShareCliSpawnRow) => void>();
-  const onDismiss = vi.fn<() => void>();
   const mounted = await renderWithProviders(
     createElement(ShareDestinationList, {
       headerContent: createElement('Header'),
@@ -114,11 +117,10 @@ async function mount(
       destinationsDisabled: false,
       onRetry,
       onSelect,
-      onDismiss,
       onSpawnInstance,
     })
   );
-  return { ...mounted, onDismiss };
+  return mounted;
 }
 
 describe('ShareDestinationList surface states', () => {
@@ -138,7 +140,7 @@ describe('ShareDestinationList surface states', () => {
   it.each([empty, retryable])('keeps $kind inline beside connected CLI choices', async state => {
     const { renderer, unmount } = await mount(state, [instance]);
     const list = renderer.root.find(node => String(node.type) === 'FlashList');
-    expect(list.findAll(node => String(node.type) === 'DestinationOptionRow')).toHaveLength(1);
+    expect(list.findAll(node => String(node.type) === 'ConfigureRow')).toHaveLength(1);
     expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(0);
     if (state.kind === 'retryable') {
       expect(list.find(node => String(node.type) === 'QueryError').props).toMatchObject({
@@ -148,8 +150,8 @@ describe('ShareDestinationList surface states', () => {
     unmount();
   });
 
-  it('renders the stale share as the shared empty state with a way out', async () => {
-    const { renderer, unmount, onDismiss } = await mount(
+  it('renders the stale share as the shared empty state without a second close', async () => {
+    const { renderer, unmount } = await mount(
       {
         kind: 'stale-share',
         message: 'Unavailable share',
@@ -161,20 +163,14 @@ describe('ShareDestinationList surface states', () => {
     );
     expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
-    expect(
-      renderer.root.findAll(node => String(node.type) === 'DestinationOptionRow')
-    ).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'ConfigureRow')).toHaveLength(0);
     const emptyState = renderer.root.find(node => String(node.type) === 'EmptyState');
     expect(emptyState.props).toMatchObject({
       title: 'Share unavailable',
       description: 'Unavailable share',
     });
-    const action = emptyState.props.action as { props: { onPress: () => void } };
-    expect(action.props).toMatchObject({ accessibilityLabel: 'Close' });
-    act(() => {
-      action.props.onPress();
-    });
-    expect(onDismiss).toHaveBeenCalledTimes(1);
+    // The sheet header owns the close control, so the state carries no action.
+    expect(emptyState.props.action).toBeUndefined();
     unmount();
   });
 
@@ -191,9 +187,7 @@ describe('ShareDestinationList surface states', () => {
     );
     expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(1);
     expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
-    expect(
-      renderer.root.findAll(node => String(node.type) === 'DestinationOptionRow')
-    ).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'ConfigureRow')).toHaveLength(0);
     unmount();
   });
 
@@ -246,9 +240,7 @@ describe('ShareDestinationList surface states', () => {
       (input.props as { onChangeText: (text: string) => void }).onChangeText('no match');
     });
     expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(0);
-    expect(
-      renderer.root.findAll(node => String(node.type) === 'DestinationOptionRow')
-    ).toHaveLength(1);
+    expect(renderer.root.findAll(node => String(node.type) === 'ConfigureRow')).toHaveLength(1);
     expect(renderer.root.findAll(node => String(node.type) === 'StoredSessionRow')).toHaveLength(0);
     unmount();
   });
@@ -261,7 +253,7 @@ describe('ShareDestinationList surface states', () => {
       showList: true,
       listMode: 'skeleton',
     });
-    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(5);
+    expect(renderer.root.findAll(node => String(node.type) === 'RowSkeleton')).toHaveLength(5);
     expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(0);
     unmount();
   });

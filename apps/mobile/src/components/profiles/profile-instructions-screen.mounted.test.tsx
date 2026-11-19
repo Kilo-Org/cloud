@@ -30,12 +30,13 @@ const h = vi.hoisted(() => ({
   },
 }));
 
-const permissionState = vi.hoisted(() => ({
-  permission: 'allowed' as 'resolving' | 'allowed' | 'read-only',
+/** The manage permission the mocked profile hook reports; read-only drops every control. */
+const permission = vi.hoisted(() => ({
+  value: 'allowed' as 'allowed' | 'read-only' | 'resolving',
 }));
 
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useOrganizationProfilePermission: () => permissionState.permission,
+  useOrganizationProfilePermission: () => permission.value,
 }));
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileInstructions: () => h.query,
@@ -86,6 +87,7 @@ vi.mock('@/components/empty-state', async () => {
   const { createElement: create } = await import('react');
   return {
     EmptyState: (props: { action?: unknown }) => create('EmptyState', props, props.action as never),
+    StateAction: 'StateAction',
   };
 });
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
@@ -197,14 +199,18 @@ function rowControls(root: ReactTestInstance): string[] {
   return findAll(root, 'Pressable').map(node => String(node.props.accessibilityLabel));
 }
 
+beforeEach(() => {
+  vi.clearAllMocks();
+  permission.value = 'allowed';
+  h.query.data = [testInstruction()];
+  h.query.isError = false;
+  h.query.isPending = false;
+  h.query.isRefetching = false;
+});
+
 describe('ProfileInstructionsScreen delete confirmation', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    permissionState.permission = 'allowed';
-    h.query.data = [testInstruction()];
-    h.query.isError = false;
-    h.query.isPending = false;
-    h.query.isRefetching = false;
+
     h.mutations.deleteInstruction.mutateAsync.mockReset();
     h.mutations.deleteInstruction.mutateAsync.mockResolvedValue({ success: true });
     h.mutations.setInstructionEnabled.mutate.mockReset();
@@ -306,13 +312,6 @@ describe('ProfileInstructionsScreen delete confirmation', () => {
 });
 
 describe('ProfileInstructionsScreen instruction cap', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    permissionState.permission = 'allowed';
-    h.query.isError = false;
-    h.query.isPending = false;
-    h.query.isRefetching = false;
-  });
 
   it('names the cap above the disabled add control', async () => {
     const capCopy = i18n.t('profiles.instructionLimitReached', { max: MAX_PROFILE_INSTRUCTIONS });
@@ -343,8 +342,7 @@ describe('ProfileInstructionsScreen instruction cap', () => {
 
 describe('ProfileInstructionsScreen empty state', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    permissionState.permission = 'allowed';
+    permission.value = 'allowed';
     Object.assign(h.query, { data: [], isError: false, isPending: false, isRefetching: false });
   });
 
@@ -356,21 +354,63 @@ describe('ProfileInstructionsScreen empty state', () => {
     expect(emptyStateOf(renderer.root)?.props.description).toBe(
       i18n.t('profiles.instructionsEmptyDescription')
     );
-    expect(findAll(renderer.root, 'Button')).toHaveLength(1);
+    expect(findAll(renderer.root, 'StateAction')).toHaveLength(1);
     unmount();
   });
 
   // A member used to read an invitation to add rule files directly above the
   // sentence that says they cannot change the profile.
   it('states what the files do and offers no action a member cannot take', async () => {
-    permissionState.permission = 'read-only';
+    permission.value = 'read-only';
     const member = await mountScreen();
     expect(emptyStateOf(member.renderer.root)?.props.description).toBe(
       i18n.t('profiles.instructionsEmptyDescriptionReadOnly')
     );
     const texts = findAll(member.renderer.root, 'Text').map(node => node.props.children);
     expect(texts).toContain(i18n.t('profiles.organizationRoleRequired'));
-    expect(findAll(member.renderer.root, 'Button')).toHaveLength(0);
+    expect(findAll(member.renderer.root, 'StateAction')).toHaveLength(0);
     member.unmount();
+  });
+});
+
+describe('ProfileInstructionsScreen row controls', () => {
+  it('names the path it opens after the file name', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    // The path is painted under the name and merged into the content press, so
+    // it rides the control's spoken name instead of disappearing.
+    expect(rowControls(renderer.root)).toContain(
+      [
+        i18n.t('profiles.instructionEdit', { name: INSTRUCTION_NAME }),
+        `.kilocode/rules/${INSTRUCTION_NAME}.md`,
+      ].join(', ')
+    );
+
+    unmount();
+  });
+});
+
+describe('ProfileInstructionsScreen read-only row', () => {
+  beforeEach(() => {
+    permission.value = 'read-only';
+  });
+
+  it('drops the edit control and keeps the rules path readable', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    // The content is the edit action, so a read-only profile renders no row
+    // control at all — and, because there is no press to name the row, the path
+    // it paints stays a text stop instead of being hidden for that control.
+    expect(rowControls(renderer.root)).not.toContain(
+      i18n.t('profiles.instructionEdit', { name: INSTRUCTION_NAME })
+    );
+    const pathLine = findAll(renderer.root, 'Text').find(
+      node => node.props.children === `.kilocode/rules/${INSTRUCTION_NAME}.md`
+    );
+    expect(pathLine?.props.accessible).toBeUndefined();
+    expect(pathLine?.props.importantForAccessibility).toBeUndefined();
+    expect(findAll(renderer.root, 'Switch')[0]?.props.accessibilityLabel).toBe(INSTRUCTION_NAME);
+
+    unmount();
   });
 });

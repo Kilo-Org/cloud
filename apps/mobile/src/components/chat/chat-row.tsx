@@ -110,8 +110,6 @@ export function ChatRow({
           live={working}
           metaWhileLive
           last={last}
-          stripMode="inline"
-          className="pl-[22px] pr-[22px]"
         />
       </Pressable>
       {dialog}

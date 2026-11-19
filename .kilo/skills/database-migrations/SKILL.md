@@ -17,7 +17,7 @@ This skill covers shared PostgreSQL migrations only. It does not govern Durable 
    additive or staged schema changes. If generated DDL is unsafe, wrong, or too
    broad, correct the schema and regenerate. Do not hand-edit generated DDL,
    snapshots, or journal entries.
-6. Append only intentional `UPDATE` or `INSERT` data backfills after generated DDL, separated with `-->  statement-breakpoint`.
+6. Append only intentional `UPDATE` or `INSERT` data backfills after generated DDL, separated with `--> statement-breakpoint`.
 7. Apply migrations with `pnpm drizzle migrate` or run `pnpm drizzle:verify-bootstrap` when relevant.
 8. Run `pnpm format` and targeted schema or migration checks.
 9. Prefer one generated migration per unshipped feature branch. To squash

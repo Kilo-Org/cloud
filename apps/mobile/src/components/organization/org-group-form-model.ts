@@ -102,3 +102,57 @@ export function isOrgGroupFormDirty(
     values.memberIds.some(id => !initial.memberIds.includes(id))
   );
 }
+
+/** How a group form leaves to the Groups list. */
+export type OrgGroupFormExit =
+  | {
+      kind: 'list';
+      /** The key of the list route the pop-to truncates to. */
+      listRouteKey: string;
+    }
+  | { kind: 'back' }
+  | { kind: 'push-list' };
+
+/**
+ * The way out of a saved group's form.
+ *
+ * The reader reaches this form from the Groups list, so returning to it truncates
+ * the stack with one pop-to commit over the list that is already beneath. That
+ * truncation also cuts a form the reader can never see again: the create form
+ * this screen replaced on the first save stays in the stack when the retire that
+ * `stack-safe-replace` schedules is dropped (its transition end is lost inside
+ * the hook's short bound), and a plain pop would then land on that stale create
+ * form, prefilled with the saved group's name — one Save away from a duplicate.
+ *
+ * Pop-to with no matching route rewrites the stack in one commit — the
+ * remove-and-insert shape that crashes the Android native stack
+ * (`stack-safe-replace.ts`) — so when no list is beneath, the form goes back to
+ * the route that opened it. A form with nothing beneath it — restored or linked
+ * as the only route of its stack — has neither a pop to make nor a list to
+ * reuse: it replaces itself with the list through the stack-safe replace.
+ */
+export function orgGroupFormExit({
+  routes,
+  currentIndex,
+  listRouteName,
+}: Readonly<{
+  /** The routes of the Stack this form is mounted in, bottom first. */
+  routes: readonly { readonly name: string; readonly key: string }[];
+  /** The index of this form in `routes`. */
+  currentIndex: number;
+  /** The route name the Groups list registers in this Stack. */
+  listRouteName: string;
+}>): OrgGroupFormExit {
+  // The nearest list beneath: the pop-to truncates the stack to it, so its key
+  // is the scene the leave reveals.
+  const listIndex = routes
+    .slice(0, Math.max(currentIndex, 0))
+    .findLastIndex(route => route.name === listRouteName);
+  if (listIndex !== -1) {
+    const route = routes[listIndex];
+    if (route !== undefined) {
+      return { kind: 'list', listRouteKey: route.key };
+    }
+  }
+  return currentIndex <= 0 ? { kind: 'push-list' } : { kind: 'back' };
+}

@@ -2,8 +2,8 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "Shumarra agent kee keessa bakka jijjiiramni jira",
-      "lowBalance": "Baalansii kee xiyyeeffannaa barbaada",
+      "cloudAgentSession": "Shumarra eejentii kee keessa bakka jijjiiramni jira",
+      "lowBalance": "Hafteen kee xiyyeeffannaa barbaada",
       "spendAlert": "Baasiin kee xiyyeeffannaa barbaada",
       "securityFinding": "Arganni nagaa xiyyeeffannaa barbaada",
       "securityUpdate": "Sakatta'a nagaa keessa bakka jijjiiramni jira",
@@ -17,8 +17,8 @@
   },
   "internal": {
     "lowBalance": {
-      "title": "Akeekkachiisa baalansii xiqqaa",
-      "body": "Baalansiin {{organizationName}} gadii ${{minimumBalanceUsd}} bu'eera"
+      "title": "Akeekkachiisa haftee xiqqaa",
+      "body": "Hafteen {{organizationName}} gadii ${{minimumBalanceUsd}} bu'eera"
     },
     "spendAlert": {
       "title": "Akeekkachiisa baasii",

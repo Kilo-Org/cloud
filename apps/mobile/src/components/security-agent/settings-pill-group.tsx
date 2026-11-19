@@ -1,34 +1,21 @@
-import { selectionHaptic } from '@/lib/haptics';
-import { Check } from '@/components/ui/icons';
-import { Pressable, View } from 'react-native';
-
-import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
-import { Text } from '@/components/ui/text';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { selectionCheckColor } from '@/lib/selection-check-color';
-import { cn } from '@/lib/utils';
+import { ChoiceRow } from '@/components/ui/choice-row';
+import { RadioGroup } from '@/components/ui/radio-group';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 
 /**
  * Labeled single-select picker for a fixed set of enum options — shared by
  * the Automation screen's severity/confidence pickers and the Notification
- * screen's severity pickers. Renders a vertical row list (like the dismiss
+ * and dismiss screens' pickers. Renders a vertical row list (like the dismiss
  * reason and finding-filter pickers) so long labels stay fully readable
  * instead of being squeezed into a horizontal pill row.
  *
- * A read-only group dims once, by token, never by row opacity: every option
- * label — the selected one included — sits on `text-muted-foreground`, and the
- * check takes the same muted ink, so the whole list reads as unavailable. The
- * selected row still stands apart by its weight and its check, which is what a
- * disabled single-select looks like: a control whose choice is dimmed with
- * everything else. Halving the row on top of that muted ink lands the label
- * near 2:1 on the row's `secondary` surface in both schemes — under the 4.5:1
- * text floor, so a member who cannot manage the settings could not read which
- * options exist. The muted token keeps 4.5:1.
- *
- * An editable group keeps the selected label and its check on the row's
- * `foreground` ink, so the two states differ by more than the row's tap
- * response.
+ * The group is the contract's section shape: the 10pt mono eyebrow names it,
+ * one `RowGroup` holds the choice rows, and `ChoiceRow` owns the row anatomy,
+ * the selection mark and its haptic. A read-only group is the rows' own
+ * disabled cue — every label mutes, the selected one still stands apart by its
+ * weight and its check — never a row opacity, so a member who cannot manage
+ * the settings can still read which options exist.
  */
 export function PillGroup<T extends string>({
   label,
@@ -50,52 +37,23 @@ export function PillGroup<T extends string>({
   disabled: boolean;
   onChange: (value: T) => void;
 }>) {
-  const colors = useThemeColors();
   return (
-    <View className="gap-1.5">
-      <Text className="text-sm font-medium text-muted-foreground">{label}</Text>
-      <RadioGroup
-        label={accessibilityLabel ?? label}
-        className="overflow-hidden rounded-lg bg-secondary"
-      >
-        {options.map((option, index) => {
-          const active = value === option.value;
-          return (
-            <Pressable
+    <Section label={label}>
+      <RadioGroup label={accessibilityLabel ?? label}>
+        <RowGroup>
+          {options.map(option => (
+            <ChoiceRow
               key={option.value}
+              label={option.label}
+              selected={value === option.value}
               disabled={disabled}
-              className={cn(
-                // A row sized by its one label line sat at 38.5 dp under the
-                // design target; the floor has to be the row's own class,
-                // because `hitSlop` does not move the rect an audit reads.
-                ROW_TARGET_CLASS,
-                'flex-row items-center justify-between px-4 py-3 active:opacity-70',
-                index < options.length - 1 && 'border-b-[0.5px] border-hair-soft'
-              )}
               onPress={() => {
-                selectionHaptic();
                 onChange(option.value);
               }}
-              {...radioItemA11y({ label: option.label, checked: active, disabled })}
-            >
-              <Text
-                className={cn(
-                  'flex-1 text-sm',
-                  active && 'font-medium',
-                  // A read-only group dims every label, the selected one
-                  // included, to the muted token; the selected row still stands
-                  // apart by its weight and its check. An editable group keeps
-                  // the selected label on the full `foreground` ink.
-                  active && !disabled ? 'text-foreground' : 'text-muted-foreground'
-                )}
-              >
-                {option.label}
-              </Text>
-              {active && <Check size={16} color={selectionCheckColor(colors, disabled)} />}
-            </Pressable>
-          );
-        })}
+            />
+          ))}
+        </RowGroup>
       </RadioGroup>
-    </View>
+    </Section>
   );
 }

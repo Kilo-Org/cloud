@@ -529,7 +529,7 @@ describe('handleNeedsInputNotificationResponse — approve and reply', () => {
     });
   });
 
-  it('falls back to retryable when the headless envelope is unparseable JSON', async () => {
+  it('dismisses an answer action whose headless envelope is unparseable JSON', async () => {
     await handleNeedsInputNotificationResponse(raiseResponse({ data: '{not json' }), {
       runInteraction: mocks.runNeedsInputInteraction,
     });

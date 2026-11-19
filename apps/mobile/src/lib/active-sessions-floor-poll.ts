@@ -228,9 +228,6 @@ export function useActiveSessionsFloorPoll({
         return;
       }
       // The payload this tick compares against, captured before the fetch.
-      // `next` is a snapshot taken when the request started, so any write that
-      // lands while it is in flight (a socket write, a pull-to-refresh, another
-      // mount) has already replaced this reference with a newer payload.
       const before = queryClient.getQueryData<CachedActiveSessionsData>(queryKey);
       if (before === undefined) {
         return;

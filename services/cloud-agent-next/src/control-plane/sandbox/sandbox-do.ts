@@ -84,9 +84,11 @@ import {
 } from '../../container-usage-context.js';
 import { resolveSecret } from '../../auth.js';
 import {
-  workspaceMcpAnchorSessionId,
+  workspaceSessionIdForScope,
   type WorkspaceMcpBinding,
 } from '../../cloud-agent-authority.js';
+import { getWorkspaceStub } from '../workspace/workspace-stub.js';
+import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
 import { getContainerCapacityFailureReason } from '../../container-concurrency.js';
 import {
   generateSandboxCredential,
@@ -98,11 +100,7 @@ import {
 } from '../../sandbox-control/credential.js';
 import { rejectSandboxWrapperUpgrade } from '../../sandbox-control/socket-admission.js';
 import { DEADLINE_MS } from '../../sandbox-control/deadlines.js';
-import { createCloudflareContainersProviderAdapter } from '../../sandbox-control/cloudflare-containers-provider.js';
-import {
-  createRetiredCloudflareProviderAdapter,
-  RetiredSandboxProviderError,
-} from '../../sandbox-control/retired-cloudflare-provider.js';
+import { RetiredSandboxProviderError } from '../../sandbox-control/retired-cloudflare-provider.js';
 import {
   sandboxProviderConfigurationSchema,
   ProviderCreationError,
@@ -139,7 +137,10 @@ import {
   sessionCredentialsPayloadFromGrant,
   type SessionCredentialGrant,
 } from '../../sandbox-control/session-credentials.js';
-import { providerUsesOutboundCredentialProxy } from '../../agent-sandbox/capabilities.js';
+import {
+  PROVIDER_DESCRIPTORS,
+  providerUsesOutboundCredentialProxy,
+} from '../../shared/sandbox-provider.js';
 import { classifySandboxId, getManagedOutboundContainerId } from '../../sandbox-id.js';
 import {
   resolveSandboxIdClass,
@@ -459,12 +460,9 @@ import type { WorktreeChangesReady } from '../worktree-changes-ready.js';
 import type { WorktreeChangesContext } from '../../sandbox-session/worktree-changes.js';
 import { buildNativeEgressAllowlist } from '../../sandbox-control/egress-policy.js';
 import { nativeEgressAllowlistSchema } from '../../sandbox-containers/egress-policy.js';
-import {
-  createByocVercelProviderAdapter,
-  unavailableVercelProviderAdapter,
-  ByocVercelProviderError,
-  type ByocVercelSource,
-} from '../../byoc/vercel-provider.js';
+import { ByocVercelProviderError, type ByocVercelSource } from '../../byoc/vercel-provider.js';
+import { createProviderAdapter, type StoredProviderPin } from './provider-adapters.js';
+import { providerSupports } from '@kilocode/worker-utils/sandbox-provider-capabilities';
 import {
   SNAPSHOT_VALIDATOR_REF_KEY,
   snapshotValidatorAllocation,
@@ -503,20 +501,6 @@ const COMMAND_FAILURE_NOTE_KEY_PREFIX = 'command_failure_note:';
 type PendingCommandFailureNote = { attemptId: string; note: string };
 
 const ALLOCATION_ROW_ID = 'current';
-
-export type StoredProviderPin = {
-  byoc?: ByocVercelSource;
-  provider: AgentSandboxProvider;
-  allocationName: string | null;
-  configuration: SandboxProviderConfiguration | null;
-  locator: VercelProviderLocator | null;
-  billing: SandboxBillingInput | null;
-  containment: CredentialContainmentRequirements | null;
-  /** Stored kind of a placed key. Legacy prefixed keys have none. */
-  sandboxKind?: SandboxKind;
-  egressAllowlist?: string[];
-  egressAudit?: boolean;
-};
 
 export type EnsureAllocationInput = {
   byoc?: ByocVercelSource;
@@ -710,10 +694,9 @@ function materializationStage(error: unknown): PrepareFrameMaterializationStage 
  * DO is B4, so the production factory resolves a stub only when the test-only
  * binding exists; tests inject a fake peer instead.
  */
+export type CloudAgentMcpGrant = { url: string; token: string; expiresAt: number };
+
 export type ControlPlaneSessionPeer = HistoryPageSession & {
-  issueCloudAgentMcpGrant?(
-    workspace?: WorkspaceMcpBinding
-  ): Promise<{ url: string; token: string; expiresAt: number } | undefined>;
   onRoute(update: ControlPlaneRouteUpdate): Promise<void>;
   /** The whole workspace stopped during preparation; settle this chat. */
   onWorkspaceStopped(payload: ControlPlaneWorkspaceStoppedPayload): Promise<void>;
@@ -1035,6 +1018,21 @@ export class SandboxControlV2 extends DurableObject<Env> {
     sessionId
   ) => this.resolveSessionPeer(ownerId, sessionId);
   /**
+   * Issues the workspace MCP credential through the workspace authority. The
+   * default resolves the workspace Durable Object; tests inject a fake.
+   */
+  cloudAgentMcpGrantFor: (
+    ownerId: string,
+    binding: WorkspaceMcpBinding
+  ) => Promise<CloudAgentMcpGrant | undefined> = (ownerId, binding) =>
+    getWorkspaceStub(this.env, ownerId, binding.workspaceSessionId).issueMcpGrant(binding);
+  /**
+   * Expiry (seconds) of the newest workspace MCP credential sent to this
+   * allocation, per workspace. In memory: after eviction the next delivery
+   * offers one fresh credential, which the wrapper keeps only if it is newer.
+   */
+  private readonly sentCloudAgentMcpExpiresAt = new Map<string, number>();
+  /**
    * Current organization membership for an organization-attributed grant. The
    * default reads the Worker's database through Hyperdrive; tests inject a fake
    * because the fake-provider suite has no Postgres binding.
@@ -1092,7 +1090,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return this.enqueue(async () => {
       const state = await this.readAllocation();
       if (
-        this.currentProvider() !== 'cloudflare-containers' ||
+        !providerSupports(this.currentProvider(), 'meteredBilling') ||
         state.providerRef !== request.allocationRef
       ) {
         logger
@@ -1366,7 +1364,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
       );
       return reason === 'eligible';
     };
-    if (this.currentProvider() !== 'cloudflare-containers') return result('unsupported_provider');
+    if (!providerSupports(this.currentProvider(), 'workspaceSnapshots'))
+      return result('unsupported_provider');
     if (route.credentialSource === null) return result('missing_credentials');
     if (!workspaceSnapshotsEnabled(this.env, route.credentialSource))
       return result('not_allowlisted');
@@ -2812,7 +2811,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       if (owner === null || owner !== input.ownerId) {
         throw new Error('Sandbox owner mismatch');
       }
-      if (this.currentProvider() !== 'vercel') {
+      if (PROVIDER_DESCRIPTORS[this.currentProvider()].credentialTransport !== 'network-policy') {
         throw new Error('Sandbox network policy requires a Vercel provider');
       }
       const state = await this.readAllocation();
@@ -2999,7 +2998,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       this.redispatchPendingWorkspaceStops();
       let state = await this.readAllocation();
       const admissionDeadline =
-        state.kind === 'creating' && this.currentProvider() === 'cloudflare-containers'
+        state.kind === 'creating' && providerSupports(this.currentProvider(), 'meteredBilling')
           ? await storedNativeBillingAdmissionDeadlineAt(
               this.ctx.storage,
               await listRoutes(this.db),
@@ -3181,6 +3180,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
     };
   }
 
+  /** A restricted egress policy needs a provider that enforces it and an isolated sandbox. */
+  private egressPolicyAllowed(
+    provider: AgentSandboxProvider,
+    sandboxKind: SandboxKind | undefined
+  ): boolean {
+    return (
+      providerSupports(provider, 'egressPolicy') &&
+      (sandboxKind === undefined ? this.sandboxId.startsWith('ses-') : sandboxKind === 'isolated')
+    );
+  }
+
   private pinFromInput(
     input: EnsureAllocationInput,
     repositoryUrl?: string,
@@ -3191,18 +3201,22 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (!sandboxKindMatchesKey(this.sandboxId, input.sandboxKind)) {
       throw new Error('Sandbox selection kind does not match the sandbox key');
     }
-    const provider = input.provider ?? 'cloudflare-containers';
+    // `ensureAllocation` forwards its input unparsed, so an unknown id must
+    // fail as a creation error rather than a descriptor lookup `TypeError`.
+    const parsedProvider = agentSandboxProviderSchema.safeParse(
+      input.provider ?? 'cloudflare-containers'
+    );
+    if (!parsedProvider.success) throw new ProviderCreationError('invalid_configuration');
+    const provider = parsedProvider.data;
     if (
       (policy.data.egressMode === 'allowlist' || policy.data.egressAudit === true) &&
-      (provider !== 'cloudflare-containers' ||
-        (input.sandboxKind === undefined
-          ? !this.sandboxId.startsWith('ses-')
-          : input.sandboxKind !== 'isolated'))
+      !this.egressPolicyAllowed(provider, input.sandboxKind)
     ) {
       throw new ProviderCreationError('invalid_configuration');
     }
-    if (input.byoc && provider !== 'vercel') throw new Error('BYOC requires Vercel');
-    if (provider === 'vercel' && !input.byoc)
+    const { requiresCustomerCredential } = PROVIDER_DESCRIPTORS[provider];
+    if (input.byoc && !requiresCustomerCredential) throw new Error('BYOC requires Vercel');
+    if (requiresCustomerCredential && !input.byoc)
       throw new ByocVercelProviderError('byoc_credential_missing');
     return {
       provider,
@@ -3313,7 +3327,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
       state.kind === 'creating' &&
       state.allocationId !== null &&
       state.allocationId !== previous.allocationId &&
-      this.providerPin?.provider === 'vercel'
+      this.providerPin !== null &&
+      PROVIDER_DESCRIPTORS[this.providerPin.provider].uniqueAllocationName
     ) {
       // Vercel retains stopped names. Pin a unique physical name before create,
       // so retries and reconstruction address this allocation's exact resource.
@@ -3488,7 +3503,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (state.kind === 'connected' || state.kind === 'disconnected')
       this.fenceWorkspaceSnapshot('preparation', spec.sessionId);
     if (
-      (sandboxSelection?.provider ?? this.currentProvider()) === 'vercel' &&
+      PROVIDER_DESCRIPTORS[sandboxSelection?.provider ?? this.currentProvider()]
+        .requiresCustomerCredential &&
       (sandboxSelection?.byoc ?? this.providerPin?.byoc) === undefined
     ) {
       return { state: 'failed', attemptId: crypto.randomUUID(), reason: 'byoc_credential_missing' };
@@ -3919,9 +3935,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // Credentials half of B3: a due grant is re-issued and `session.credentials`
     // is sent before the prompts. A failed re-issue still delivers on the
     // previous grant while it is valid; a route that was released ends here.
+    const grantExpiresAt = route.grant?.expiresAt;
     const renewal = await this.renewRouteGrant(route, state);
     if (renewal.kind !== 'ready') return 'not_ready';
     route = renewal.route;
+    // A re-issued grant already offered a fresh MCP credential.
+    if (route.grant?.expiresAt === grantExpiresAt) await this.refreshCloudAgentMcp(route, state);
 
     // One verified-expiry check immediately before the prompts, for adopted
     // handles only. A per-session scope keeps its historical behavior: the
@@ -4094,6 +4113,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ...(cloudAgentMcp ? { cloudAgentMcp } : {}),
     });
     if (this.trySendFrame(socket, { type: 'session.credentials', ...payload })) {
+      this.recordCloudAgentMcpSent(next, cloudAgentMcp);
       await this.markRouteCredentialsSent(route.sessionId, issued.grant);
     }
     return 'issued';
@@ -4390,9 +4410,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // containment namespaces (the e2e Worker strips them).
     if (!this.credentialContainmentEnabled()) return null;
     const provider = this.currentProvider();
-    if (provider === 'cloudflare') return null;
-    if (provider === 'vercel') return this.sandboxId;
-    if (!providerUsesOutboundCredentialProxy(provider)) return null;
+    const { retired, credentialTransport } = PROVIDER_DESCRIPTORS[provider];
+    if (retired) return null;
+    if (credentialTransport === 'network-policy') return this.sandboxId;
     return (
       getManagedOutboundContainerId(provider, this.env, {
         logicalSandboxId: this.sandboxId,
@@ -4444,7 +4464,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private async refreshVercelNetworkPolicy(
     grantsOverride?: readonly SessionCredentialGrant[]
   ): Promise<boolean> {
-    if (this.currentProvider() !== 'vercel') return true;
+    if (PROVIDER_DESCRIPTORS[this.currentProvider()].credentialTransport !== 'network-policy')
+      return true;
     try {
       const state = await this.readAllocation();
       const providerRef = state.providerRef;
@@ -5108,7 +5129,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ...(cloudAgentMcp ? { cloudAgentMcp } : {}),
     });
     const sent = this.trySendFrame(socket, { ...frame, credentials });
-    if (sent) await this.markRouteCredentialsSent(sessionId, sendRoute.grant);
+    if (sent) {
+      this.recordCloudAgentMcpSent(sendRoute, cloudAgentMcp);
+      await this.markRouteCredentialsSent(sessionId, sendRoute.grant);
+    }
   }
 
   /**
@@ -5302,25 +5326,30 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return claims === null ? null : { exp: claims.exp, sessionId: claims.sessionId };
   }
 
+  /** The workspace whose MCP credential this route carries, or null when it has none. */
+  private workspaceMcpBinding(route: RouteRecord): WorkspaceMcpBinding | null {
+    const source = route.credentialSource;
+    if (source === null) return null;
+    const workspaceSessionId = workspaceSessionIdForScope(source.scopeId, route.sessionId);
+    if (workspaceSessionId === undefined) return null;
+    return {
+      workspaceSessionId,
+      worktreeId: source.scopeId?.startsWith('worktree_') ? source.scopeId : null,
+      ownerId: source.userId,
+      organizationId: source.orgId ?? null,
+    };
+  }
+
   private async tryIssueCloudAgentMcpGrant(
     route: RouteRecord
-  ): Promise<{ url: string; token: string; expiresAt: number } | undefined> {
-    const anchor = workspaceMcpAnchorSessionId(route.credentialSource?.scopeId, route.sessionId);
-    if (anchor === undefined) return undefined;
+  ): Promise<CloudAgentMcpGrant | undefined> {
+    const binding = this.workspaceMcpBinding(route);
+    if (binding === null) return undefined;
     try {
       const ownerId = await this.requireOwner();
-      const peer = ownerId === null ? null : this.sessionPeerFor(ownerId, anchor);
-      if (peer?.issueCloudAgentMcpGrant === undefined) return undefined;
+      if (ownerId === null || ownerId !== binding.ownerId) return undefined;
       return await withTimeout(
-        peer.issueCloudAgentMcpGrant(
-          route.credentialSource?.scopeId?.startsWith('worktree_')
-            ? {
-                worktreeId: route.credentialSource.scopeId,
-                ownerId: route.credentialSource.userId,
-                organizationId: route.credentialSource.orgId ?? null,
-              }
-            : undefined
-        ),
+        this.cloudAgentMcpGrantFor(ownerId, binding),
         this.grantIssueTimeoutMs(),
         'Cloud Agent MCP grant issuance timed out'
       );
@@ -5329,10 +5358,56 @@ export class SandboxControlV2 extends DurableObject<Env> {
         .withFields({
           sandboxId: this.sandboxId,
           sessionId: route.sessionId,
-          anchorSessionId: anchor,
+          workspaceSessionId: binding.workspaceSessionId,
         })
         .warn('Optional Cloud Agent MCP grant unavailable; continuing without it');
       return undefined;
+    }
+  }
+
+  private recordCloudAgentMcpSent(route: RouteRecord, grant: CloudAgentMcpGrant | undefined): void {
+    const binding = grant === undefined ? null : this.workspaceMcpBinding(route);
+    if (grant === undefined || binding === null) return;
+    const sent = this.sentCloudAgentMcpExpiresAt.get(binding.workspaceSessionId);
+    if (sent === undefined || grant.expiresAt > sent) {
+      this.sentCloudAgentMcpExpiresAt.set(binding.workspaceSessionId, grant.expiresAt);
+    }
+  }
+
+  /**
+   * Offers a newer workspace MCP credential before a prompt when the one this
+   * allocation last received is missing or due. This is how a renewed
+   * workspace authority reaches a running runtime without a restart. The
+   * current route grant is resent unchanged with it.
+   */
+  private async refreshCloudAgentMcp(route: RouteRecord, state: AllocationState): Promise<void> {
+    const binding = this.workspaceMcpBinding(route);
+    // Only interactive workspaces can launch children; automation never asks.
+    if (
+      binding === null ||
+      route.grant === null ||
+      !isInteractiveSessionOrigin(route.credentialSource?.createdOnPlatform)
+    ) {
+      return;
+    }
+    const sent = this.sentCloudAgentMcpExpiresAt.get(binding.workspaceSessionId);
+    if (
+      sent !== undefined &&
+      sent * 1000 - Date.now() >= this.sandboxTimers().credentialGrantReissueBelowMs
+    ) {
+      return;
+    }
+    const grant = await this.tryIssueCloudAgentMcpGrant(route);
+    if (grant === undefined || (sent !== undefined && grant.expiresAt <= sent)) return;
+    const socket = this.boundWrapperSocket(state);
+    const current = await readRoute(this.db, route.sessionId);
+    if (socket === null || current?.state !== 'ready' || current.grant === null) return;
+    const payload = controlPlaneSessionCredentialsPayloadSchema.parse({
+      ...sessionCredentialsPayloadFromGrant(current.grant, route.sessionId),
+      cloudAgentMcp: grant,
+    });
+    if (this.trySendFrame(socket, { type: 'session.credentials', ...payload })) {
+      this.recordCloudAgentMcpSent(current, grant);
     }
   }
 
@@ -5587,7 +5662,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
             [RUNTIME_HARNESS_KEY]: harness,
             [CREDENTIAL_HASH_KEY]: await hashSandboxCredential(credential),
           });
-          if (pin.provider === 'cloudflare-containers') {
+          if (providerSupports(pin.provider, 'meteredBilling')) {
             billingAdmissionDeadlineAt = await nativeBillingAdmissionDeadlineAt(
               this.ctx.storage,
               await listRoutes(this.db),
@@ -7268,13 +7343,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
             ...(frame.subtype === undefined ? {} : { subtype: frame.subtype }),
           })
           .warn('Control-plane prepare failed');
-        if (frame.reason === 'workspace_setup_failed') {
+        if (frame.reason === 'workspace_setup_failed' && frame.step === 'restore') {
+          if (!current) return;
+          const route = await readRoute(this.db, frame.sessionId);
           const disk = readWorkspaceSnapshotAllocation(this.db);
           if (
+            route?.state === 'preparing' &&
             currentState.allocationId !== null &&
             disk?.allocationId === currentState.allocationId &&
-            disk.restore !== undefined &&
-            frame.step === 'restore'
+            disk.restore !== undefined
           ) {
             // A wrapper-side tail failure is permanent: the descriptor is kept
             // for an explicit "Start fresh" and this attempt never relaunches
@@ -7428,7 +7505,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
       logControlDiagnostic('hello_admission', { ...admission, accepted: false, reason, ...extra });
       return false;
     };
-    if (this.currentProvider() === 'vercel' && this.providerPin?.byoc === undefined)
+    if (
+      PROVIDER_DESCRIPTORS[this.currentProvider()].requiresCustomerCredential &&
+      this.providerPin?.byoc === undefined
+    )
       return reject('byoc_credential_missing');
     if (state.kind === 'stopped' || state.kind === 'stopping') {
       return reject(`allocation_${state.kind}`);
@@ -7513,7 +7593,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
       const customerFailure: CustomerBillingFailure | undefined =
         billingFailure ??
         (reason === 'billing_unavailable' &&
-        pin?.provider === 'cloudflare-containers' &&
+        pin !== null &&
+        providerSupports(pin.provider, 'meteredBilling') &&
         pin.billing
           ? billingFailureFromAdmission(pin.billing.subject, { code: 'meter_unavailable' })
           : undefined);
@@ -7545,60 +7626,28 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private createProviderAdapter(pin: StoredProviderPin): ProviderAdapter {
-    const allocationName = pin.allocationName ?? this.sandboxId;
-    switch (pin.provider) {
-      case 'vercel': {
-        const resources =
-          pin.configuration?.provider === 'vercel' ? pin.configuration.resources : undefined;
-        if (pin.byoc) {
-          return createByocVercelProviderAdapter({
-            env: this.env,
-            source: pin.byoc,
-            sandboxName: allocationName,
-            resources,
-            locator: pin.locator,
-            persistRuntimeLocator: locator =>
-              this.enqueue(async () => {
-                if (
-                  this.providerPin?.allocationName !== allocationName ||
-                  JSON.stringify(this.providerPin.byoc) !== JSON.stringify(pin.byoc)
-                ) {
-                  throw new Error('Vercel allocation changed during runtime resolution');
-                }
-                const resolved = { ...this.providerPin, locator };
-                await this.writeProviderPin(resolved);
-                this.providerPin = resolved;
-              }),
-            // Authoritative live grants: read at create and on every credential
-            // refresh, never frozen into the adapter at construction.
-            readContainedGrants: () => this.activeGrants(Date.now()),
-            readAcceptedRuntimeProxyHandles: () =>
-              listAcceptedHandleStringsByScopeId(this.ctx.storage, Date.now()),
-          });
-        }
-        return unavailableVercelProviderAdapter();
-      }
-      case 'cloudflare-containers': {
-        const instance =
-          pin.configuration?.provider === 'cloudflare-containers'
-            ? pin.configuration.instance
-            : undefined;
-        return createCloudflareContainersProviderAdapter({
-          logicalSandboxId: this.sandboxId,
-          allocationName,
-          ...(instance === undefined ? {} : { instance }),
-          ...(pin.egressAllowlist === undefined ? {} : { egressAllowlist: pin.egressAllowlist }),
-          ...(pin.egressAudit === true ? { egressAudit: true } : {}),
-          getContainer: id => this.env.SANDBOX_CONTAINERS.getByName(id),
-        });
-      }
-      case 'cloudflare':
-        return createRetiredCloudflareProviderAdapter();
-      default: {
-        void (pin.provider satisfies never);
-        throw new ProviderCreationError('invalid_configuration');
-      }
-    }
+    return createProviderAdapter(pin, {
+      env: this.env,
+      sandboxId: this.sandboxId,
+      persistRuntimeLocator: (allocationName, locator) =>
+        this.enqueue(async () => {
+          if (
+            this.providerPin?.allocationName !== allocationName ||
+            JSON.stringify(this.providerPin.byoc) !== JSON.stringify(pin.byoc)
+          ) {
+            throw new Error('Vercel allocation changed during runtime resolution');
+          }
+          const resolved = { ...this.providerPin, locator };
+          await this.writeProviderPin(resolved);
+          this.providerPin = resolved;
+        }),
+      // Authoritative live grants: read at create and on every credential
+      // refresh, never frozen into the adapter at construction.
+      readContainedGrants: () => this.activeGrants(Date.now()),
+      readAcceptedRuntimeProxyHandles: () =>
+        listAcceptedHandleStringsByScopeId(this.ctx.storage, Date.now()),
+      getSandboxContainer: id => this.env.SANDBOX_CONTAINERS.getByName(id),
+    });
   }
 
   private async retryAllowed(): Promise<boolean> {
@@ -7726,12 +7775,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       pin.egressAllowlist = nativeEgressAllowlistSchema.parse(pin.egressAllowlist);
     }
     if (pin.egressAllowlist !== undefined || pin.egressAudit === true) {
-      if (
-        pin.provider !== 'cloudflare-containers' ||
-        (pin.sandboxKind === undefined
-          ? !this.sandboxId.startsWith('ses-')
-          : pin.sandboxKind !== 'isolated')
-      ) {
+      if (!this.egressPolicyAllowed(pin.provider, pin.sandboxKind)) {
         throw new ProviderCreationError('invalid_configuration');
       }
     }
@@ -7871,7 +7915,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       { coalesceIdentity: `workspace_snapshot_schedule:${this.sandboxId}` }
     );
     const admissionAt =
-      state.kind === 'creating' && this.currentProvider() === 'cloudflare-containers'
+      state.kind === 'creating' && providerSupports(this.currentProvider(), 'meteredBilling')
         ? await storedNativeBillingAdmissionDeadlineAt(
             this.ctx.storage,
             await listRoutes(this.db),

@@ -5,10 +5,13 @@ import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 /**
  * OpenAI (Sign in with ChatGPT) OAuth/OIDC configuration.
  *
- * The authorization, token, and JWKS endpoints are discovery-driven: the
- * NextAuth provider resolves them from `OPENAI_DISCOVERY_URL`. Nothing here
- * inlines an authorization URL or a JWKS, so a rotation on OpenAI's side is
- * picked up without a code change.
+ * The authorization and JWKS endpoints are discovery-driven: the NextAuth
+ * provider resolves them from `OPENAI_DISCOVERY_URL`, so a rotation on OpenAI's
+ * side is picked up without a code change.
+ *
+ * The delegated ChatGPT token refresh is the exception. `OPENAI_TOKEN_ENDPOINT`
+ * is an environment-overridable constant with a fixed default, and the refresh
+ * code posts to it directly instead of reading the discovery document.
  */
 
 export const OPENAI_ISSUER = 'https://auth.openai.com';

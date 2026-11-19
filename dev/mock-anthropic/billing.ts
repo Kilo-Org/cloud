@@ -222,9 +222,7 @@ export function createBillingStub(
     }
     if (!url.pathname.startsWith('/v1/')) return false;
     if (
-      !['/v1/user_profiles', '/v1/models', '/v1/messages', '/v1/chat/completions'].includes(
-        url.pathname
-      ) &&
+      !['/v1/user_profiles', '/v1/models', '/v1/messages'].includes(url.pathname) &&
       !url.pathname.startsWith('/v1/user_profiles/')
     )
       return false;
@@ -314,7 +312,6 @@ export function createBillingStub(
       });
       return true;
     }
-    const compat = url.pathname === '/v1/chat/completions';
     const code = overloads-- > 0 ? 'overloaded' : refusal;
     if (code) {
       const status =
@@ -326,13 +323,10 @@ export function createBillingStub(
       const type =
         status === 503 ? 'overloaded_error' : status === 403 ? 'permission_error' : 'billing_error';
       if (status === 503) response.setHeader('retry-after', '0');
-      send(
-        response,
-        status,
-        compat
-          ? { error: { type: 'invalid_request_error', code: type, message: code } }
-          : { type: 'error', error: { type, message: code, details: { error_code: code } } }
-      );
+      send(response, status, {
+        type: 'error',
+        error: { type, message: code, details: { error_code: code } },
+      });
       return true;
     }
     const id = `msg_${randomUUID()}`;
@@ -351,7 +345,7 @@ export function createBillingStub(
         cache_read_input_tokens: 0,
       },
     };
-    if (body.stream && !compat) {
+    if (body.stream) {
       response.writeHead(200, { 'content-type': 'text/event-stream' });
       for (const [event, data] of [
         [
@@ -391,21 +385,6 @@ export function createBillingStub(
       ])
         response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
       response.end();
-    } else if (compat) {
-      send(response, 200, {
-        id,
-        object: 'chat.completion',
-        created: Math.floor(Date.now() / 1000),
-        model: body.model,
-        choices: [
-          {
-            index: 0,
-            message: { role: 'assistant', content: 'Local Claude billing proof.' },
-            finish_reason: 'stop',
-          },
-        ],
-        usage: { prompt_tokens: 12, completion_tokens: 6, total_tokens: 18 },
-      });
     } else send(response, 200, message);
     return true;
   };

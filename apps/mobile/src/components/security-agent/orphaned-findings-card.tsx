@@ -78,7 +78,7 @@ export function OrphanedFindingsCard({
 
   return (
     <>
-      <View className="mt-4 gap-2 rounded-lg bg-warn-tile-bg p-4">
+      <View className="gap-3 rounded-xl bg-warn-tile-bg p-4">
         <View className="flex-row items-center gap-2">
           <ShieldAlert size={16} color={colors.foreground} />
           <Text className="flex-1 text-sm font-medium">
@@ -88,12 +88,15 @@ export function OrphanedFindingsCard({
         <Text variant="muted" className="text-xs">
           {t('securityAgent.orphanedFindings.description')}
         </Text>
-        {orphans.data.map(repository => {
+        {orphans.data.map((repository, index) => {
           const busy = removals.snapshot.states.get(repository.repoFullName)?.status === 'pending';
           return (
             <View
               key={repository.repoFullName}
-              className="flex-row items-center gap-3 border-t border-hair-soft pt-2"
+              className={cn(
+                'flex-row items-center gap-3',
+                index > 0 && 'border-t-[0.5px] border-hair-soft pt-2'
+              )}
             >
               <View className="min-w-0 flex-1 py-1">
                 <Text className="text-sm" numberOfLines={1}>

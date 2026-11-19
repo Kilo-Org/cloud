@@ -3,6 +3,7 @@ import type { WorkerDb } from '@kilocode/db/client';
 import type * as CloudAgentProfileModule from '@kilocode/cloud-agent-profile';
 import type * as ByocCredentialResolverModule from '../byoc/vercel-credential-resolver.js';
 import type { Env } from '../types.js';
+import { vercelRuntimeBaseDigest } from '../byoc/vercel-runtime-base.js';
 import {
   assertEnvironmentSupportsSandbox,
   requestedSandboxAllocation,
@@ -236,19 +237,60 @@ describe('resolveSavedSandboxAllocation', () => {
     ).resolves.toBe('vercel-large');
   });
 
-  it.each(['review', 'remediation'] as const)(
-    'skips a saved Vercel choice for a %s origin',
-    async capability => {
+  it('keeps a saved Vercel choice for a remediation origin on the current base', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      repositoryAllocation: 'vercel-small',
+      contextAllocation: 'cloudflare-containers-standard-4',
+    });
+    fetchByocVercelEnrollmentMock.mockResolvedValue({
+      organizationId: owner.orgId,
+      credentialId: 'f47ac10b-58cc-4372-a567-0e02b2c3d4aa',
+      setupStatus: 'ready',
+      runtimeDigest: await vercelRuntimeBaseDigest(),
+    });
+
+    await expect(
+      resolve({ env: { ...env, BYOC_VERCEL_IDS: owner.orgId } as Env, capability: 'remediation' })
+    ).resolves.toBe('vercel-small');
+  });
+
+  it.each([
+    ['an older base digest', { runtimeDigest: 'downloaded-base-v1:older' }],
+    ['no stored digest', { runtimeDigest: null }],
+    ['an older web response', {}],
+  ] as const)(
+    'skips a saved Vercel choice for a remediation origin with %s',
+    async (_name, fields) => {
       getSandboxAllocationCandidatesMock.mockResolvedValue({
         repositoryAllocation: 'vercel-small',
         contextAllocation: 'cloudflare-containers-standard-4',
       });
+      fetchByocVercelEnrollmentMock.mockResolvedValue({
+        organizationId: owner.orgId,
+        credentialId: 'f47ac10b-58cc-4372-a567-0e02b2c3d4aa',
+        setupStatus: 'ready',
+        ...fields,
+      });
 
-      await expect(resolve({ env: env, capability })).resolves.toBe(
-        'cloudflare-containers-standard-4'
-      );
+      await expect(
+        resolve({ env: { ...env, BYOC_VERCEL_IDS: owner.orgId } as Env, capability: 'remediation' })
+      ).resolves.toBe('cloudflare-containers-standard-4');
     }
   );
+
+  it('keeps a saved Vercel choice for a normal session on an older base', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({ contextAllocation: 'vercel-small' });
+    fetchByocVercelEnrollmentMock.mockResolvedValue({
+      organizationId: owner.orgId,
+      credentialId: 'f47ac10b-58cc-4372-a567-0e02b2c3d4aa',
+      setupStatus: 'ready',
+      runtimeDigest: 'downloaded-base-v1:older',
+    });
+
+    await expect(resolve({ env: { ...env, BYOC_VERCEL_IDS: owner.orgId } as Env })).resolves.toBe(
+      'vercel-small'
+    );
+  });
 
   it('keeps a saved Vercel choice for a BYOC-enrolled owner with ready credentials', async () => {
     getSandboxAllocationCandidatesMock.mockResolvedValue({ contextAllocation: 'vercel-small' });

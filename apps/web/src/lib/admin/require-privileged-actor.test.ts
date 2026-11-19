@@ -7,8 +7,15 @@ import { TRPCError } from '@trpc/server';
 import { eq } from 'drizzle-orm';
 import { kilocode_users, passkey_credentials, session_step_up_proofs } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { StepUpRequiredError } from '@kilocode/web-shared/lib/admin/privileged-access';
-import { hashWebSessionId, revokeStepUpProofs } from '@kilocode/web-shared/lib/admin/step-up-store';
+import {
+  StepUpRequiredError,
+  type StepUpOperationBinding,
+} from '@kilocode/web-shared/lib/admin/privileged-access';
+import {
+  hashStepUpBinding,
+  hashWebSessionId,
+  revokeStepUpProofs,
+} from '@kilocode/web-shared/lib/admin/step-up-store';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createBearerCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
 import { assertPrivilegedPermission, requirePrivilegedActor } from './require-privileged-actor';
@@ -60,6 +67,37 @@ async function insertProof(
   return proof!;
 }
 
+/**
+ * A proof minted for one operation: the stored binding is the same hash the
+ * guard computes from its own request.
+ */
+async function insertOperationProof(
+  userId: string,
+  credentialUuid: string,
+  binding: StepUpOperationBinding
+) {
+  const verifiedAt = new Date();
+  const [proof] = await db
+    .insert(session_step_up_proofs)
+    .values({
+      kilo_user_id: userId,
+      session_id_hash: hashWebSessionId(webSessionId),
+      method: 'webauthn_uv',
+      passkey_credential_id: credentialUuid,
+      purpose: 'operation',
+      action_binding_hash: hashStepUpBinding(binding.actionClass, {
+        surface: binding.surface,
+        route: binding.route,
+        method: binding.method,
+        target: { kind: binding.targetKind, id: binding.targetId },
+      }),
+      verified_at: verifiedAt.toISOString(),
+      expires_at: new Date(verifiedAt.getTime() + 5 * 60_000).toISOString(),
+    })
+    .returning();
+  return proof!;
+}
+
 function contextFor(user: Awaited<ReturnType<typeof adminUser>>) {
   return {
     user,
@@ -69,6 +107,15 @@ function contextFor(user: Awaited<ReturnType<typeof adminUser>>) {
     headersList: new Headers(),
     trpcPath: 'admin.test',
     trpcType: 'query',
+  };
+}
+
+function freshUpstreamState() {
+  return {
+    status: 'fresh' as const,
+    method: 'webauthn_uv' as const,
+    verifiedAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 60_000).toISOString(),
   };
 }
 
@@ -269,21 +316,86 @@ describe('requirePrivilegedActor', () => {
       expect(cause?.code).toBe('STEP_UP_UNAVAILABLE');
     });
 
-    it('uses the same uniform freshness for a sensitive write', async () => {
+    it('refuses a session proof for a sensitive write', async () => {
       const { user, credential } = await setup();
       await insertProof(user.id, credential.id);
 
-      const actor = await requirePrivilegedActor(
-        {
-          permission: 'admin',
-          actionClass: 'sensitive_write',
-          inventoryId: 'trpc.admin.users',
-          target: { kind: 'user', id: 'target-user' },
-        },
-        contextFor(user)
+      const cause = await refusal(
+        requirePrivilegedActor(
+          {
+            permission: 'admin',
+            actionClass: 'sensitive_write',
+            inventoryId: 'trpc.admin.users',
+            target: { kind: 'user', id: 'target-user' },
+          },
+          contextFor(user)
+        )
       );
 
+      // A session proof never authorizes an operation class, even when fresh.
+      expect(cause).toMatchObject({
+        code: 'MFA_REQUIRED',
+        actionClass: 'sensitive_write',
+        purpose: 'operation',
+        maxAgeSeconds: 300,
+        binding: {
+          actionClass: 'sensitive_write',
+          route: 'admin.test',
+          method: 'query',
+          targetKind: 'user',
+          targetId: 'target-user',
+        },
+      });
+    });
+
+    it('accepts an operation proof bound to this action and target once', async () => {
+      const { user, credential } = await setup();
+      await insertOperationProof(user.id, credential.id, {
+        actionClass: 'sensitive_write',
+        surface: 'trpc',
+        route: 'admin.test',
+        method: 'query',
+        targetKind: 'user',
+        targetId: 'target-user',
+      });
+
+      const params = {
+        permission: 'admin' as const,
+        actionClass: 'sensitive_write' as const,
+        inventoryId: 'trpc.admin.users',
+        target: { kind: 'user' as const, id: 'target-user' },
+      };
+
+      const actor = await requirePrivilegedActor(params, contextFor(user));
       expect(actor.assurance.stepUp.status).toBe('fresh');
+
+      const reused = await refusal(requirePrivilegedActor(params, contextFor(user)));
+      expect(reused?.code).toBe('MFA_REQUIRED');
+    });
+
+    it('refuses an operation proof minted for another target', async () => {
+      const { user, credential } = await setup();
+      await insertOperationProof(user.id, credential.id, {
+        actionClass: 'sensitive_write',
+        surface: 'trpc',
+        route: 'admin.test',
+        method: 'query',
+        targetKind: 'user',
+        targetId: 'another-user',
+      });
+
+      const cause = await refusal(
+        requirePrivilegedActor(
+          {
+            permission: 'admin',
+            actionClass: 'sensitive_write',
+            target: { kind: 'user', id: 'target-user' },
+          },
+          contextFor(user)
+        )
+      );
+
+      expect(cause?.code).toBe('MFA_REQUIRED');
     });
 
     it('reuses the state measured by the admin middleware', async () => {
@@ -293,16 +405,134 @@ describe('requirePrivilegedActor', () => {
         { permission: 'admin', actionClass: 'platform_read' },
         {
           ...contextFor(user),
-          adminStepUpState: {
-            status: 'fresh',
-            method: 'webauthn_uv',
-            verifiedAt: new Date().toISOString(),
-            expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          adminStepUpState: freshUpstreamState(),
+          adminStepUpDecision: {
+            actionClass: 'platform_read',
+            target: { kind: 'none', id: null },
           },
         }
       );
 
       expect(actor.assurance.stepUp.status).toBe('fresh');
+    });
+
+    it('reuses a fresh decision that covers the requested operation and target', async () => {
+      const { user } = await setup();
+      const { evaluateStepUp } = jest.requireMock(
+        '@kilocode/web-shared/lib/admin/step-up-store'
+      ) as { evaluateStepUp: jest.Mock };
+      evaluateStepUp.mockClear();
+
+      const actor = await requirePrivilegedActor(
+        {
+          permission: 'admin',
+          actionClass: 'sensitive_write',
+          target: { kind: 'user', id: 'target-user' },
+        },
+        {
+          ...contextFor(user),
+          adminStepUpState: freshUpstreamState(),
+          adminStepUpDecision: {
+            actionClass: 'sensitive_write',
+            target: { kind: 'user', id: 'target-user' },
+          },
+        }
+      );
+
+      expect(actor.assurance.stepUp.status).toBe('fresh');
+      expect(evaluateStepUp).not.toHaveBeenCalled();
+    });
+
+    it('reuses an operation decision when the caller names no target', async () => {
+      const { user } = await setup();
+      const { evaluateStepUp } = jest.requireMock(
+        '@kilocode/web-shared/lib/admin/step-up-store'
+      ) as { evaluateStepUp: jest.Mock };
+      evaluateStepUp.mockClear();
+
+      const actor = await requirePrivilegedActor(
+        { permission: 'admin', actionClass: 'sensitive_write' },
+        {
+          ...contextFor(user),
+          adminStepUpState: freshUpstreamState(),
+          adminStepUpDecision: {
+            actionClass: 'sensitive_write',
+            target: { kind: 'none', id: null },
+          },
+        }
+      );
+
+      expect(actor.assurance.stepUp.status).toBe('fresh');
+      expect(evaluateStepUp).not.toHaveBeenCalled();
+    });
+
+    it('reuses a decision bound to a target when the caller names none', async () => {
+      const { user } = await setup();
+
+      const actor = await requirePrivilegedActor(
+        { permission: 'admin', actionClass: 'sensitive_write' },
+        {
+          ...contextFor(user),
+          adminStepUpState: freshUpstreamState(),
+          adminStepUpDecision: {
+            actionClass: 'sensitive_write',
+            target: { kind: 'user', id: 'target-user' },
+          },
+        }
+      );
+
+      expect(actor.assurance.stepUp.status).toBe('fresh');
+    });
+
+    it('refuses a fresh decision that does not name the requested target', async () => {
+      const { user } = await setup();
+
+      // A decision without a target id covers a request that names none, so
+      // this request needs its own decision.
+      await expect(
+        requirePrivilegedActor(
+          {
+            permission: 'admin',
+            actionClass: 'sensitive_write',
+            target: { kind: 'user', id: 'target-user' },
+          },
+          {
+            ...contextFor(user),
+            adminStepUpState: freshUpstreamState(),
+            adminStepUpDecision: {
+              actionClass: 'sensitive_write',
+              target: { kind: 'user', id: null },
+            },
+          }
+        )
+      ).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        message: 'This request was verified for a different operation',
+      });
+    });
+
+    it('binds an operation proof to the user id the request input names', async () => {
+      const { user: admin, credential } = await setup();
+      const userA = await insertTestUser({});
+      const userB = await insertTestUser({});
+      createdUserIds.push(userA.id, userB.id);
+      await insertOperationProof(admin.id, credential.id, {
+        actionClass: 'sensitive_write',
+        surface: 'trpc',
+        route: 'admin.users.resetAPIKey',
+        method: 'mutation',
+        targetKind: 'user',
+        targetId: userA.id,
+      });
+      const caller = await createSessionCallerForUser(admin.id, { webSessionId });
+
+      await expect(caller.admin.users.resetAPIKey({ userId: userA.id })).resolves.toMatchObject({
+        success: true,
+      });
+
+      const cause = await refusal(caller.admin.users.resetAPIKey({ userId: userB.id }));
+      expect(cause?.code).toBe('MFA_REQUIRED');
+      expect(cause?.binding).toMatchObject({ targetKind: 'user', targetId: userB.id });
     });
 
     it('denies an admin procedure without a proof', async () => {

@@ -138,18 +138,16 @@ export type SelectPrReviewConnectActionInput = {
 /**
  * Whether the gate may offer the integration-page CTA.
  *
- * The CTA opens the web integration page, and its server rules are narrower
- * for an organization than for a personal account: every Bitbucket connect
- * (`organizations.bitbucket.connect` and the Bitbucket OAuth route) and an
- * organization GitLab *re*-authorization (an integration row already exists)
- * require `ORGANIZATION_BILLING_ROLES`. A narrower role that presses the CTA
- * reaches a page that refuses it, with no action of its own — so the gate says
- * who can act instead. A first-time GitLab connect keeps member-level access
- * on the server, and a personal scope only ever acts on the caller's own
- * token, so both keep the CTA.
+ * The CTA opens the web integration page. In an organization that page asks for
+ * `ORGANIZATION_BILLING_ROLES` on every GitLab and Bitbucket connect and on
+ * every reconnect, because the server binds the organization's shared token.
+ * Both platforms and both views follow that one rule. A narrower role that
+ * presses the CTA reaches a page that refuses it, with no action of its own, so
+ * the gate names who can act instead.
  *
- * An unsettled role read (`null`) keeps the CTA too: the provider procedures
- * stay server-authorized, matching the code-reviewer screens' treatment of a
+ * A personal scope acts on the caller's own token, so it keeps the CTA. An
+ * unsettled role read (`null`) keeps the CTA too: the provider procedures stay
+ * server-authorized, matching the code-reviewer screens' treatment of a
  * permission that has not resolved.
  */
 export function selectPrReviewConnectAction(
@@ -158,8 +156,5 @@ export function selectPrReviewConnectAction(
   if (args.organizationId === null) {
     return 'connect';
   }
-  const billingRoleRequired = args.platform === 'bitbucket' || args.view === 'reconnect';
-  return billingRoleRequired && args.canManageOrganizationBilling === false
-    ? 'organization-admin-only'
-    : 'connect';
+  return args.canManageOrganizationBilling === false ? 'organization-admin-only' : 'connect';
 }

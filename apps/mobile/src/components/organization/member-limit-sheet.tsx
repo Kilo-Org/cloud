@@ -1,7 +1,6 @@
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic } from '@/lib/haptics';
-import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -16,6 +15,7 @@ import {
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
 import { RefusalStatus } from '@/components/refusal-status';
+import { SheetHeader } from '@/components/sheet-header';
 import { SheetScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
@@ -23,6 +23,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
   type ActiveOrgMember,
@@ -32,9 +33,11 @@ import {
   useOrgBoundary,
   useOrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
+import { usePopOnce } from '@/lib/navigation/pop-once';
+import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 import { isTrialExpiredRefusal } from '@/lib/server-error-copy';
 import { useTrialRefusalAction } from '@/lib/trial-refusal';
-import { cn, firstNonEmpty } from '@/lib/utils';
+import { firstNonEmpty } from '@/lib/utils';
 
 type MemberLimitFormProps = Readonly<{
   memberId: string;
@@ -50,8 +53,9 @@ function MemberLimitForm({
   member,
   canManageBilling,
 }: MemberLimitFormProps) {
-  const router = useRouter();
   const { t } = useTranslation();
+  const closeSheet = usePopOnce();
+  const headerTopInset = useFormSheetHeaderTopInset();
   const mutations = useOrganizationMutations(organizationId ?? '', {
     silenceMemberToast: true,
   });
@@ -91,7 +95,9 @@ function MemberLimitForm({
 
   const onSaved = () => {
     notificationHaptic(Haptics.NotificationFeedbackType.Success);
-    router.back();
+    // The user may have closed the sheet while the write was in flight;
+    // popping again would take the screen underneath with it.
+    closeSheet();
   };
 
   const onSave = () => {
@@ -108,69 +114,70 @@ function MemberLimitForm({
 
   return (
     <>
-      <FormField
-        label={t('organization.memberLimit.limitLabel')}
-        required
-        placeholder={t('organization.memberLimit.noLimitPlaceholder')}
-        keyboardType="decimal-pad"
-        defaultValue={initialValue || undefined}
-        error={limitFieldError ?? undefined}
-        onChangeText={value => {
-          limitRef.current = value;
-          setFieldError(limitError(value, hasCurrentLimit));
-          setFieldTouched(true);
-          clearSaveError();
-        }}
-        onBlur={() => {
-          setFieldTouched(true);
-        }}
+      <SheetHeader
+        title={t('organization.memberLimit.title')}
+        eyebrow={firstNonEmpty(member.name, member.email)}
+        onDone={onSave}
+        onCancel={closeSheet}
+        doneLabel={t('common.save')}
+        doneDisabled={!canSave}
+        doneBusy={mutations.updateMember.isPending}
+        topInset={headerTopInset}
       />
-
-      {/* updateMember's toast is silenced for this caller, so the status line is
-          the single announcement owner: one announcement per platform, visuals
-          preserved (tone error). A plan refusal this reader can end carries the
-          billing step under the copy. */}
-      <RefusalStatus
-        message={saveError?.field === 'form' ? saveError.message : null}
-        action={trialRefusalAction}
-        className="text-sm"
-      />
-
-      {/* This footer has one filled action, so the fill keeps the scheme's
-          brand olive in both themes: the dark theme's accent fill glares at
-          this width and drops the hue the light sheet shows, which is why the
-          session screens fill their large action with the muted selection
-          olive too. An invalid amount keeps the button's own muted disabled
-          fill, so the label still reads as unavailable. */}
-      <Button
-        className={canSave ? 'bg-primary dark:bg-selection' : undefined}
-        disabled={!canSave}
-        loading={mutations.updateMember.isPending}
-        onPress={onSave}
+      <SheetScrollView
+        className="flex-1 bg-background"
+        contentContainerClassName={SCREEN_BODY_CLASS}
+        automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="handled"
       >
-        <Text className={cn(canSave && 'text-primary-foreground dark:text-selection-foreground')}>
-          {t('common.save')}
-        </Text>
-      </Button>
+        <FormField
+          label={t('organization.memberLimit.limitLabel')}
+          required
+          placeholder={t('organization.memberLimit.noLimitPlaceholder')}
+          keyboardType="decimal-pad"
+          defaultValue={initialValue || undefined}
+          error={limitFieldError ?? undefined}
+          onChangeText={value => {
+            limitRef.current = value;
+            setFieldError(limitError(value, hasCurrentLimit));
+            setFieldTouched(true);
+            clearSaveError();
+          }}
+          onBlur={() => {
+            setFieldTouched(true);
+          }}
+        />
 
-      {currentLimit != null && (
-        // Removing the limit sits beside the forward action, so it keeps the
-        // destructive ink and paints no fill of its own: Save stays the only
-        // filled control in the sheet.
-        <Button
-          variant="outline-destructive"
-          disabled={mutations.updateMember.isPending}
-          onPress={onRemove}
-        >
-          {t('organization.memberLimit.removeLimit')}
-        </Button>
-      )}
+        {/* updateMember's toast is silenced for this caller, so the status line
+            is the single announcement owner: one announcement per platform,
+            visuals preserved (tone error). A plan refusal this reader can end
+            carries the billing step under the copy. */}
+        <RefusalStatus
+          message={saveError?.field === 'form' ? saveError.message : null}
+          action={trialRefusalAction}
+          className="text-sm"
+        />
+
+        {currentLimit != null && (
+          // Removing the limit keeps the destructive ink and paints no fill of
+          // its own: the header's Save stays the only filled control.
+          <Button
+            variant="outline-destructive"
+            disabled={mutations.updateMember.isPending}
+            onPress={onRemove}
+          >
+            {t('organization.memberLimit.removeLimit')}
+          </Button>
+        )}
+      </SheetScrollView>
     </>
   );
 }
 
 export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
   const { t } = useTranslation();
+  const headerTopInset = useFormSheetHeaderTopInset();
+  const closeSheet = usePopOnce();
   const { organizationId, role, org, isResolving } = useOrgBoundary();
   const orgWithMembers = useOrgWithMembers(organizationId);
   const members: OrgMember[] = orgWithMembers.data?.members ?? [];
@@ -186,17 +193,20 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
   // to OrganizationBoundary below.
   if (isResolving || (organizationId != null && orgWithMembers.isPending)) {
     return (
-      <SheetScrollView
-        className="flex-1 bg-background"
-        contentContainerClassName="px-6 gap-6 pb-8 pt-4"
-      >
-        <View className="gap-1">
-          <Text className="text-center text-lg font-semibold text-foreground">
-            {t('organization.memberLimit.title')}
-          </Text>
-        </View>
-        <Skeleton className="h-11 rounded-lg" />
-      </SheetScrollView>
+      <>
+        <SheetHeader
+          title={t('organization.memberLimit.title')}
+          variant="close"
+          onDone={closeSheet}
+          topInset={headerTopInset}
+        />
+        <SheetScrollView
+          className="flex-1 bg-background"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+        >
+          <Skeleton className="h-11 rounded-lg" />
+        </SheetScrollView>
+      </>
     );
   }
 
@@ -209,18 +219,34 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
   // `organizationAdminMutationProcedure`, and the web members card gates its
   // limit editor on `canManageMembers`.
   if (!canManageOrganization(role)) {
-    return <PermissionDenied description={t('organization.memberLimit.permissionDenied')} />;
+    return (
+      <View className="flex-1 bg-background">
+        <SheetHeader
+          title={t('organization.memberLimit.title')}
+          variant="close"
+          onDone={closeSheet}
+          topInset={headerTopInset}
+        />
+        <PermissionDenied
+          description={t('organization.memberLimit.permissionDenied')}
+          showBack={false}
+        />
+      </View>
+    );
   }
 
   const loadFailed = orgWithMembers.isError && !orgWithMembers.data;
   if (loadFailed || !member) {
     return (
       <>
-        <View collapsable={false} className="bg-background px-6 pt-4">
-          <Text className="text-center text-lg font-semibold text-foreground">
-            {t('organization.memberLimit.title')}
-          </Text>
-        </View>
+        {/* Nothing to commit without the member, so the header only closes; a
+            failed read still names its retry below. */}
+        <SheetHeader
+          title={t('organization.memberLimit.title')}
+          variant="close"
+          onDone={closeSheet}
+          topInset={headerTopInset}
+        />
         {loadFailed ? (
           <QueryError
             className="bg-background"
@@ -228,8 +254,8 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
             isRetrying={orgWithMembers.isFetching}
           />
         ) : (
-          <CenteredState className="bg-background" contentContainerClassName="px-6">
-            <Text className="text-center text-sm text-muted-foreground">
+          <CenteredState className="bg-background" contentContainerClassName="px-4">
+            <Text variant="muted" className="text-center">
               {t('organization.memberLimit.memberNotFound')}
             </Text>
           </CenteredState>
@@ -239,27 +265,11 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
   }
 
   return (
-    <SheetScrollView
-      className="flex-1 bg-background"
-      contentContainerClassName="px-6 gap-6 pb-8 pt-4"
-      automaticallyAdjustKeyboardInsets
-      keyboardShouldPersistTaps="handled"
-    >
-      <View className="gap-1">
-        <Text className="text-center text-lg font-semibold text-foreground">
-          {t('organization.memberLimit.title')}
-        </Text>
-        <Text className="text-center text-sm text-muted-foreground" numberOfLines={1}>
-          {firstNonEmpty(member.name, member.email)}
-        </Text>
-      </View>
-
-      <MemberLimitForm
-        memberId={memberId}
-        organizationId={organizationId}
-        member={member}
-        canManageBilling={isMoneyRole(role)}
-      />
-    </SheetScrollView>
+    <MemberLimitForm
+      memberId={memberId}
+      organizationId={organizationId}
+      member={member}
+      canManageBilling={isMoneyRole(role)}
+    />
   );
 }

@@ -73,7 +73,7 @@ export const STATES = {
     ],
   },
   'scheduled unknown time': { sessions: [{ status: 'scheduled', title: 'Dependency audit' }] },
-  empty: { sessions: [], status: 'empty' },
+  empty: { sessions: [] },
   updating: { sessions: [], status: 'waiting' },
   privacy: { sessions: PERMISSION, status: 'privacy' },
   'signed out': { sessions: PERMISSION, status: 'signed_out' },

@@ -3,6 +3,7 @@ import {
   getProvider,
   type GetProviderProviderResult,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { getProviderInput } from '@kilocode/web-shared/tests/helpers/get-provider-input.helper';
 import {
   expectProviderResult,
@@ -790,6 +791,33 @@ describe('getProvider routing decision', () => {
       payer: 'owner-byok-key',
       is_free: false,
     });
+  });
+
+  test('never reports a provider model id its own key pays for as free', async () => {
+    const user = await insertTestUser();
+    await insertKeys(user, [{ providerId: 'zai-coding' }]);
+    const { provider, model } = catalogModel('zai-coding', ['chat_completions']);
+    jest.mocked(getDirectByokModel).mockResolvedValueOnce({
+      provider,
+      model: { ...model, id: 'kimi-k2.6-free' },
+    });
+    const requestedModel = 'zai-coding/kimi-k2.6-free';
+    expect(isFreeModel(requestedModel)).toBe(true);
+    const decisions: ProviderRoutingDecision[] = [];
+
+    const result = await getProvider(
+      getProviderInput({
+        requestedModel,
+        request: request('chat_completions'),
+        user,
+        organizationId: undefined,
+        onDecision: decision => decisions.push(decision),
+      })
+    );
+
+    expect(await onlyRoute(result)).toMatchObject({ isFree: false });
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0].result).toMatchObject({ route: 'direct-byok-model', is_free: false });
   });
 
   test('records a provider model id without a key before the later steps', async () => {

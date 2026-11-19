@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Kjo llogari nuk ka ende organizata. Kërkesat për bashkim në Bitbucket mund të rishikohen sapo të krijosh ose të bëhesh pjesë e një organizate.",
       "gitlabReconnectAdminOnlyDescription": "Kërkoni nga një pronar, administrator ose menaxher faturimi i organizatës ta rilidhë atë.",
       "bitbucketNotConnectedTitle": "Bitbucket nuk është i lidhur",
-      "bitbucketAdminOnlyDescription": "Vetëm pronarët e organizatës, administratorët dhe menaxherët e faturimit mund ta lidhin.",
+      "adminOnlyConnectDescription": "Vetëm pronarët e organizatës, administratorët dhe menaxherët e faturimit mund ta lidhin.",
       "contextLine": "Për {{organization}}",
       "contextLinePersonal": "Për llogarinë personale"
     },
@@ -4630,6 +4630,9 @@
     "couldNotLoad": "Integrimet nuk mund të ngarkoheshin",
     "permissionDenied": "Nuk ke leje për të menaxhuar këto integrime.",
     "managedByOwner": "Kërkoji një pronari të organizatës të ndryshojë një lidhje që nuk mund ta ndryshosh.",
+    "managedByOwnerOrAdmin": "Kërkoji një pronari ose administratori të organizatës të ndryshojë një lidhje që nuk mund ta ndryshosh.",
+    "managedByOwnerOrBilling": "Kërkoji një pronari ose menaxheri faturimi të organizatës të ndryshojë një lidhje që nuk mund ta ndryshosh.",
+    "managedByOwnerAdminOrBilling": "Kërkoji një pronari, administratori ose menaxheri faturimi të organizatës të ndryshojë një lidhje që nuk mund ta ndryshosh.",
     "connectFailed": "Faqja e lidhjes nuk mund të hapej"
   },
   "invoices": {

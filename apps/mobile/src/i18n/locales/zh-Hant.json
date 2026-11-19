@@ -2801,7 +2801,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "此帳戶尚無任何組織。建立或加入組織後，即可審查 Bitbucket 提取請求。",
       "gitlabReconnectAdminOnlyDescription": "請要求組織的擁有者、管理員或帳單管理員重新連結。",
       "bitbucketNotConnectedTitle": "尚未連結 Bitbucket",
-      "bitbucketAdminOnlyDescription": "只有組織擁有者、管理員和帳單管理員可以設定連結。",
+      "adminOnlyConnectDescription": "只有組織擁有者、管理員和帳單管理員可以設定連結。",
       "contextLine": "適用於 {{organization}}",
       "contextLinePersonal": "適用於您的個人帳戶"
     },
@@ -4630,6 +4630,9 @@
     "couldNotLoad": "無法載入整合",
     "permissionDenied": "您沒有管理這些整合的權限。",
     "managedByOwner": "請洽詢組織擁有者來變更您無法變更的連結。",
+    "managedByOwnerOrAdmin": "請洽詢組織擁有者或管理員來變更您無法變更的連結。",
+    "managedByOwnerOrBilling": "請洽詢組織擁有者或帳單管理員來變更您無法變更的連結。",
+    "managedByOwnerAdminOrBilling": "請洽詢組織擁有者、管理員或帳單管理員來變更您無法變更的連結。",
     "connectFailed": "無法開啟連結頁面"
   },
   "invoices": {

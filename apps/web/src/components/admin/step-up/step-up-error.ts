@@ -1,28 +1,65 @@
-import type { StepUpErrorCode } from '@kilocode/web-shared/lib/admin/privileged-access';
+import * as z from 'zod';
+import {
+  PRIVILEGED_ACTION_CLASSES,
+  type PrivilegedActionClass,
+  type PrivilegedTargetKind,
+  type StepUpErrorCode,
+  type StepUpOperationBinding,
+} from '@kilocode/web-shared/lib/admin/privileged-access';
+import { stepUpOperationSchema } from '@kilocode/web-shared/lib/admin/step-up-binding';
 
 export type StepUpRequirement = {
   code: StepUpErrorCode;
-  actionClass?: string;
+  actionClass?: PrivilegedActionClass;
   purpose?: 'session' | 'operation';
   maxAgeSeconds?: number;
+  /** The operation an operation-class proof must be minted for. */
+  binding?: StepUpOperationBinding;
 };
 
 export class StepUpCancelledError extends Error {
-  constructor() {
+  constructor(requirement: StepUpRequirement) {
     super('Step-up cancelled');
     this.name = 'StepUpCancelledError';
+    this.data = { stepUp: requirement };
   }
+
+  readonly data: { stepUp: StepUpRequirement };
 }
 
-const STEP_UP_CODES = new Set<string>([
-  'MFA_REQUIRED',
-  'MFA_EXPIRED',
-  'NOT_ENROLLED',
-  'SESSION_UNBOUND',
-  'BEARER_NOT_ALLOWED',
-  'REAUTH_REQUIRED',
-  'STEP_UP_UNAVAILABLE',
-]);
+const stepUpRequirementSchema = z.object({
+  code: z.enum([
+    'MFA_REQUIRED',
+    'MFA_EXPIRED',
+    'NOT_ENROLLED',
+    'SESSION_UNBOUND',
+    'BEARER_NOT_ALLOWED',
+    'REAUTH_REQUIRED',
+    'STEP_UP_UNAVAILABLE',
+  ]),
+  actionClass: z.enum(PRIVILEGED_ACTION_CLASSES).optional(),
+  purpose: z.enum(['session', 'operation']).optional(),
+  maxAgeSeconds: z.number().optional(),
+  binding: stepUpOperationSchema.nullish(),
+});
+
+/**
+ * Read one client-visible step-up requirement from an untrusted payload. A
+ * malformed payload reads as absent, so the caller falls back to the plain
+ * session prompt instead of minting a proof for a descriptor the server cannot
+ * match.
+ */
+export function parseStepUpRequirement(value: unknown): StepUpRequirement | null {
+  const parsed = stepUpRequirementSchema.safeParse(value);
+  if (!parsed.success) return null;
+  return {
+    code: parsed.data.code,
+    actionClass: parsed.data.actionClass,
+    purpose: parsed.data.purpose,
+    maxAgeSeconds: parsed.data.maxAgeSeconds,
+    binding: parsed.data.binding ?? undefined,
+  };
+}
 
 /**
  * Read the formatter's `data.stepUp` contract without importing a client
@@ -30,23 +67,10 @@ const STEP_UP_CODES = new Set<string>([
  */
 export function stepUpRequirementFromError(error: unknown): StepUpRequirement | null {
   if (typeof error !== 'object' || error === null) return null;
-  const data = (error as { data?: unknown }).data;
-  if (typeof data !== 'object' || data === null) return null;
-  const stepUp = (data as { stepUp?: unknown }).stepUp;
-  if (typeof stepUp !== 'object' || stepUp === null) return null;
-  const candidate = stepUp as Record<string, unknown>;
-  if (typeof candidate.code !== 'string' || !STEP_UP_CODES.has(candidate.code)) return null;
-
-  return {
-    code: candidate.code as StepUpErrorCode,
-    actionClass: typeof candidate.actionClass === 'string' ? candidate.actionClass : undefined,
-    purpose:
-      candidate.purpose === 'session' || candidate.purpose === 'operation'
-        ? candidate.purpose
-        : undefined,
-    maxAgeSeconds:
-      typeof candidate.maxAgeSeconds === 'number' ? candidate.maxAgeSeconds : undefined,
-  };
+  if (!('data' in error)) return null;
+  const data = error.data;
+  if (typeof data !== 'object' || data === null || !('stepUp' in data)) return null;
+  return parseStepUpRequirement(data.stepUp);
 }
 
 export function stepUpDialogTitle(requirement: StepUpRequirement): string {
@@ -68,6 +92,22 @@ export function stepUpDialogTitle(requirement: StepUpRequirement): string {
   }
 }
 
+const stepUpTargetNouns = {
+  user: 'account',
+  organization: 'organization',
+  service: 'service',
+  none: 'target',
+} satisfies Record<PrivilegedTargetKind, string>;
+
+/** Name the operation an operation-class proof is minted for. */
+function stepUpOperationSentence(binding: StepUpOperationBinding): string {
+  const target =
+    binding.targetId === null
+      ? ''
+      : ` for ${stepUpTargetNouns[binding.targetKind]} ${binding.targetId}`;
+  return `This confirmation covers ${binding.method.toUpperCase()} ${binding.route}${target}.`;
+}
+
 export function stepUpDialogDescription(requirement: StepUpRequirement): string {
   switch (requirement.code) {
     case 'NOT_ENROLLED':
@@ -81,9 +121,12 @@ export function stepUpDialogDescription(requirement: StepUpRequirement): string 
     case 'STEP_UP_UNAVAILABLE':
       return 'MFA verification could not be checked. Try again in a moment. If it keeps failing, contact support.';
     case 'MFA_EXPIRED':
-      return 'Confirm it is you with your passkey to continue.';
-    case 'MFA_REQUIRED':
-      return 'Confirm it is you with your passkey to continue.';
+    case 'MFA_REQUIRED': {
+      const prompt = 'Confirm it is you with your passkey to continue.';
+      const binding = requirement.binding;
+      if (!binding || requirement.purpose === 'session') return prompt;
+      return `${prompt} ${stepUpOperationSentence(binding)}`;
+    }
   }
 }
 
@@ -96,9 +139,10 @@ export function formatStepUpRemaining(expiresAt: string, now: number = Date.now(
   return `${minutes} min left`;
 }
 
-const STEP_UP_HTTP_CODES: ReadonlySet<string> = STEP_UP_CODES;
-
-/** Read the REST 403 `{ error: code }` contract used by adminOnly routes. */
+/**
+ * Read the REST 403 `{ error, stepUp }` contract used by adminOnly routes. The
+ * older `{ error }`-only refusal still reads as a plain requirement.
+ */
 export async function stepUpRequirementFromResponse(
   response: Response
 ): Promise<StepUpRequirement | null> {
@@ -110,7 +154,12 @@ export async function stepUpRequirementFromResponse(
     return null;
   }
   if (typeof body !== 'object' || body === null) return null;
-  const code = (body as { error?: unknown }).error;
-  if (typeof code !== 'string' || !STEP_UP_HTTP_CODES.has(code)) return null;
-  return { code: code as StepUpErrorCode };
+  if ('stepUp' in body && body.stepUp !== undefined && body.stepUp !== null) {
+    const requirement = parseStepUpRequirement(body.stepUp);
+    if (requirement) return requirement;
+  }
+  if (!('error' in body)) return null;
+  const { error } = body;
+  const requirement = parseStepUpRequirement({ code: error });
+  return requirement;
 }

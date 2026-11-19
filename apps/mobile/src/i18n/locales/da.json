@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Denne konto har endnu ingen organisationer. Bitbucket pull requests kan gennemgås, når du opretter eller tilslutter dig en organisation.",
       "gitlabReconnectAdminOnlyDescription": "Bed en organisationsejer, administrator eller faktureringsansvarlig om at tilslutte den.",
       "bitbucketNotConnectedTitle": "Bitbucket er ikke tilsluttet",
-      "bitbucketAdminOnlyDescription": "Kun organisationsejere, administratorer og faktureringsansvarlige kan oprette forbindelsen.",
+      "adminOnlyConnectDescription": "Kun organisationsejere, administratorer og faktureringsansvarlige kan oprette forbindelsen.",
       "contextLine": "Til {{organization}}",
       "contextLinePersonal": "Til din personlige konto"
     },
@@ -4630,6 +4630,9 @@
     "couldNotLoad": "Integrationerne kunne ikke indlæses",
     "permissionDenied": "Du har ikke tilladelse til at administrere disse integrationer.",
     "managedByOwner": "Bed en ejer i organisationen om at ændre en forbindelse, du ikke kan ændre.",
+    "managedByOwnerOrAdmin": "Bed en ejer eller administrator i organisationen om at ændre en forbindelse, du ikke kan ændre.",
+    "managedByOwnerOrBilling": "Bed en ejer eller faktureringsansvarlig i organisationen om at ændre en forbindelse, du ikke kan ændre.",
+    "managedByOwnerAdminOrBilling": "Bed en ejer, administrator eller faktureringsansvarlig i organisationen om at ændre en forbindelse, du ikke kan ændre.",
     "connectFailed": "Siden til oprettelse af forbindelse kunne ikke åbnes"
   },
   "invoices": {

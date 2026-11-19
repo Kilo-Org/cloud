@@ -961,7 +961,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Esta conta ainda não tem organizações. Os PRs do Bitbucket podem ser revistos depois de criares ou aderires a uma organização.",
       "gitlabReconnectAdminOnlyDescription": "Peça a um proprietário, administrador ou gestor de faturação da organização que a volte a ligar.",
       "bitbucketNotConnectedTitle": "O Bitbucket não está ligado",
-      "bitbucketAdminOnlyDescription": "Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ligar.",
+      "adminOnlyConnectDescription": "Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ligar.",
       "contextLine": "Para {{organization}}",
       "contextLinePersonal": "Para a sua conta pessoal"
     },
@@ -4711,6 +4711,9 @@
     "couldNotLoad": "Não foi possível carregar as integrações",
     "permissionDenied": "Você não tem permissão para gerenciar estas integrações.",
     "managedByOwner": "Peça a um proprietário da organização para alterar uma conexão que não consegue alterar.",
+    "managedByOwnerOrAdmin": "Peça a um proprietário ou administrador da organização para alterar uma conexão que não consegue alterar.",
+    "managedByOwnerOrBilling": "Peça a um proprietário ou gestor de faturação da organização para alterar uma conexão que não consegue alterar.",
+    "managedByOwnerAdminOrBilling": "Peça a um proprietário, administrador ou gestor de faturação da organização para alterar uma conexão que não consegue alterar.",
     "connectFailed": "Não foi possível abrir a página de conexão"
   },
   "invoices": {

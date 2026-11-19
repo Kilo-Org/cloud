@@ -995,7 +995,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Níl aon eagraíocht ag an gcuntas seo fós. Is féidir iarratais tharraingthe Bitbucket a athbhreithniú nuair a chruthaíonn tú eagraíocht nó nuair a thagann tú isteach i gceann acu.",
       "gitlabReconnectAdminOnlyDescription": "Iarr ar Úinéir eagraíochta, Riarthóir, nó Bainisteoir billeála é a athnascadh.",
       "bitbucketNotConnectedTitle": "Níl Bitbucket nasctha",
-      "bitbucketAdminOnlyDescription": "Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta é a cheangal.",
+      "adminOnlyConnectDescription": "Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta é a cheangal.",
       "contextLine": "Do {{organization}}",
       "contextLinePersonal": "Do do chuntas pearsanta"
     },
@@ -4855,6 +4855,9 @@
     "couldNotLoad": "Níorbh fhéidir na comhtháthuithe a lódáil",
     "permissionDenied": "Níl cead agat na comhtháthuithe seo a bhainistiú.",
     "managedByOwner": "Iarr ar úinéir eagraíochta ceangal nach féidir leat a athrú.",
+    "managedByOwnerOrAdmin": "Iarr ar úinéir eagraíochta nó riarthóir ceangal nach féidir leat a athrú.",
+    "managedByOwnerOrBilling": "Iarr ar úinéir eagraíochta nó bainisteoir billeála ceangal nach féidir leat a athrú.",
+    "managedByOwnerAdminOrBilling": "Iarr ar úinéir eagraíochta, riarthóir, nó bainisteoir billeála ceangal nach féidir leat a athrú.",
     "connectFailed": "Níorbh fhéidir an leathanach ceangail a oscailt"
   },
   "invoices": {

@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Àkọọ́lẹ̀ yìí kò tíì ní àjọ rárá. A ó lè ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ Bitbucket nígbà tí o bá dá àjọ sílẹ̀ tàbí darapọ̀ mọ́ àjọ kan.",
       "gitlabReconnectAdminOnlyDescription": "Ẹ bẹ̀ Ẹni tó ni àjọ, Alákòóso, tàbí Olùṣàkóso ìsanwó kí wọ́n tún so ó pọ̀.",
       "bitbucketNotConnectedTitle": "A kò tíì so Bitbucket pọ̀",
-      "bitbucketAdminOnlyDescription": "Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè so ó pọ̀.",
+      "adminOnlyConnectDescription": "Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè so ó pọ̀.",
       "contextLine": "Fún {{organization}}",
       "contextLinePersonal": "Fún ti ara ẹni"
     },
@@ -4630,6 +4630,9 @@
     "couldNotLoad": "Kò ṣeé ṣe láti gbé àwọn ìsopọ̀ wá",
     "permissionDenied": "O kò ní àṣẹ láti ṣàkóso àwọn ìsopọ̀ wọ̀nyí.",
     "managedByOwner": "Bèèrè lọ́wọ́ ẹni tó ni àjọ náà láti yí ìsopọ̀ kan tí o kò lè yí padà.",
+    "managedByOwnerOrAdmin": "Bèèrè lọ́wọ́ ẹni tó ni àjọ tàbí alákòóso láti yí ìsopọ̀ kan tí o kò lè yí padà.",
+    "managedByOwnerOrBilling": "Bèèrè lọ́wọ́ ẹni tó ni àjọ tàbí olùṣàkóso ìsanwó láti yí ìsopọ̀ kan tí o kò lè yí padà.",
+    "managedByOwnerAdminOrBilling": "Bèèrè lọ́wọ́ ẹni tó ni àjọ, alákòóso, tàbí olùṣàkóso ìsanwó láti yí ìsopọ̀ kan tí o kò lè yí padà.",
     "connectFailed": "Kò ṣeé ṣe láti ṣí ojú-ìwé ìsopọ̀"
   },
   "invoices": {

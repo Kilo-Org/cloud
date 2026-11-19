@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Sellel kontol pole veel organisatsioone. Bitbucketi tõmbetaotlusi saab üle vaadata, kui lood või liitud organisatsiooniga.",
       "gitlabReconnectAdminOnlyDescription": "Palu organisatsiooni omanikul, administraatoril või arveldushalduril see uuesti ühendada.",
       "bitbucketNotConnectedTitle": "Bitbucket pole ühendatud",
-      "bitbucketAdminOnlyDescription": "Selle saavad ühendada ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid.",
+      "adminOnlyConnectDescription": "Selle saavad ühendada ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid.",
       "contextLine": "{{organization}} jaoks",
       "contextLinePersonal": "Sinu isikliku konto jaoks"
     },
@@ -4630,6 +4630,9 @@
     "couldNotLoad": "Integratsioone ei õnnestunud laadida",
     "permissionDenied": "Sul pole õigust neid integratsioone hallata.",
     "managedByOwner": "Kui sa ei saa ühendust muuta, pöördu selle muutmiseks organisatsiooni omaniku poole.",
+    "managedByOwnerOrAdmin": "Kui sa ei saa ühendust muuta, pöördu selle muutmiseks organisatsiooni omaniku või administraatori poole.",
+    "managedByOwnerOrBilling": "Kui sa ei saa ühendust muuta, pöördu selle muutmiseks organisatsiooni omaniku või arveldushalduri poole.",
+    "managedByOwnerAdminOrBilling": "Kui sa ei saa ühendust muuta, pöördu selle muutmiseks organisatsiooni omaniku, administraatori või arveldushalduri poole.",
     "connectFailed": "Ühendamise lehte ei õnnestunud avada"
   },
   "invoices": {

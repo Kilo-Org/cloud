@@ -2879,7 +2879,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "To konto nie ma jeszcze żadnych organizacji. PR-y na Bitbucketu będzie można przeglądać po utworzeniu organizacji lub dołączeniu do niej.",
       "gitlabReconnectAdminOnlyDescription": "Poproś Właściciela, Administratora lub Osobę zarządzającą rozliczeniami w organizacji, aby je ponownie połączyć.",
       "bitbucketNotConnectedTitle": "Brak połączenia z Bitbucket",
-      "bitbucketAdminOnlyDescription": "Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je połączyć.",
+      "adminOnlyConnectDescription": "Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je połączyć.",
       "contextLine": "Dla {{organization}}",
       "contextLinePersonal": "Dla konta osobistego"
     },
@@ -4780,6 +4780,9 @@
     "couldNotLoad": "Nie udało się wczytać integracji",
     "permissionDenied": "Nie masz uprawnień do zarządzania tymi integracjami.",
     "managedByOwner": "Poproś właściciela organizacji o zmianę połączenia, którego nie możesz zmienić.",
+    "managedByOwnerOrAdmin": "Poproś właściciela organizacji lub administratora o zmianę połączenia, którego nie możesz zmienić.",
+    "managedByOwnerOrBilling": "Poproś właściciela organizacji lub osobę zarządzającą rozliczeniami o zmianę połączenia, którego nie możesz zmienić.",
+    "managedByOwnerAdminOrBilling": "Poproś właściciela organizacji, administratora lub osobę zarządzającą rozliczeniami o zmianę połączenia, którego nie możesz zmienić.",
     "connectFailed": "Nie udało się otworzyć strony połączenia"
   },
   "invoices": {

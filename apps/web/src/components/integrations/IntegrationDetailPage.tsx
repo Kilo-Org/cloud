@@ -65,7 +65,7 @@ const integrationDetailRegistry = {
     userSubtitle: 'Manage your personal GitLab integration',
     organizationSubtitle: organizationName =>
       `Manage GitLab OAuth integration for ${organizationName}`,
-    render: async ({ organizationId, search }) => {
+    render: async ({ organizationId, role, search }) => {
       const { GitLabIntegrationDetails } =
         await import('@/components/integrations/GitLabIntegrationDetails');
       return (
@@ -73,6 +73,12 @@ const integrationDetailRegistry = {
           organizationId={organizationId}
           success={search.success === 'connected'}
           error={search.error}
+          // An organization render names the viewer's role, and the controls
+          // appear for a role that may manage billing. The personal page has no
+          // organization to govern, so it keeps its own controls.
+          canManage={
+            organizationId === undefined || (role != null && canManageOrganizationBilling(role))
+          }
         />
       );
     },

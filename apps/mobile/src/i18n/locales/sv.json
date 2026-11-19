@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Det här kontot har inga organisationer ännu. Bitbucket-PR:er kan granskas när du har skapat eller gått med i en organisation.",
       "gitlabReconnectAdminOnlyDescription": "Be en organisationsägare, administratör eller faktureringsansvarig att ansluta den på nytt.",
       "bitbucketNotConnectedTitle": "Bitbucket är inte anslutet",
-      "bitbucketAdminOnlyDescription": "Endast organisationsägare, administratörer och faktureringsansvariga kan ansluta Bitbucket.",
+      "adminOnlyConnectDescription": "Endast organisationsägare, administratörer och faktureringsansvariga kan ansluta Bitbucket.",
       "contextLine": "För {{organization}}",
       "contextLinePersonal": "För ditt personliga konto"
     },
@@ -4630,6 +4630,9 @@
     "couldNotLoad": "Det gick inte att läsa in integrationerna",
     "permissionDenied": "Du har inte behörighet att hantera de här integrationerna.",
     "managedByOwner": "Be en ägare i organisationen att ändra en anslutning som du inte kan ändra.",
+    "managedByOwnerOrAdmin": "Be en ägare eller administratör att ändra en anslutning som du inte kan ändra.",
+    "managedByOwnerOrBilling": "Be en ägare eller faktureringsansvarig att ändra en anslutning som du inte kan ändra.",
+    "managedByOwnerAdminOrBilling": "Be en ägare, administratör eller faktureringsansvarig att ändra en anslutning som du inte kan ändra.",
     "connectFailed": "Det gick inte att öppna anslutningssidan"
   },
   "invoices": {

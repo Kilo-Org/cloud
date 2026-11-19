@@ -2801,7 +2801,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "이 계정에는 아직 조직이 없습니다. 조직을 만들거나 참여하면 Bitbucket 풀 리퀘스트를 검토할 수 있습니다.",
       "gitlabReconnectAdminOnlyDescription": "조직 소유자, 관리자 또는 결제 관리자에게 다시 연결해 달라고 요청하세요.",
       "bitbucketNotConnectedTitle": "Bitbucket이 연결되지 않았습니다",
-      "bitbucketAdminOnlyDescription": "조직 소유자, 관리자, 결제 관리자만 연결할 수 있습니다.",
+      "adminOnlyConnectDescription": "조직 소유자, 관리자, 결제 관리자만 연결할 수 있습니다.",
       "contextLine": "{{organization}}용",
       "contextLinePersonal": "개인용"
     },
@@ -4630,6 +4630,9 @@
     "couldNotLoad": "연동 목록을 불러오지 못했습니다",
     "permissionDenied": "이 연동을 관리할 권한이 없습니다.",
     "managedByOwner": "변경할 수 없는 연결은 조직 소유자에게 변경을 요청하세요.",
+    "managedByOwnerOrAdmin": "변경할 수 없는 연결은 조직 소유자 또는 관리자에게 변경을 요청하세요.",
+    "managedByOwnerOrBilling": "변경할 수 없는 연결은 조직 소유자 또는 결제 관리자에게 변경을 요청하세요.",
+    "managedByOwnerAdminOrBilling": "변경할 수 없는 연결은 조직 소유자, 관리자 또는 결제 관리자에게 변경을 요청하세요.",
     "connectFailed": "연결 페이지를 열지 못했습니다"
   },
   "invoices": {

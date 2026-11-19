@@ -978,7 +978,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Tento účet zatím nemá žádnou organizaci. PR na Bitbucketu půjde kontrolovat, jakmile nějakou vytvoříš nebo se k ní přidáš.",
       "gitlabReconnectAdminOnlyDescription": "Požádejte vlastníka organizace, správce nebo správce fakturace, aby ho znovu připojil.",
       "bitbucketNotConnectedTitle": "Bitbucket není připojen",
-      "bitbucketAdminOnlyDescription": "Připojit ho mohou pouze vlastníci organizace, správci a správci fakturace.",
+      "adminOnlyConnectDescription": "Připojit ho mohou pouze vlastníci organizace, správci a správci fakturace.",
       "contextLine": "Pro {{organization}}",
       "contextLinePersonal": "Pro osobní účet"
     },
@@ -4780,6 +4780,9 @@
     "couldNotLoad": "Integrace se nepodařilo načíst",
     "permissionDenied": "Nemáte oprávnění spravovat tyto integrace.",
     "managedByOwner": "Požádejte vlastníka organizace o změnu připojení, které nemůžete změnit.",
+    "managedByOwnerOrAdmin": "Požádejte vlastníka organizace nebo správce o změnu připojení, které nemůžete změnit.",
+    "managedByOwnerOrBilling": "Požádejte vlastníka organizace nebo správce fakturace o změnu připojení, které nemůžete změnit.",
+    "managedByOwnerAdminOrBilling": "Požádejte vlastníka organizace, správce nebo správce fakturace o změnu připojení, které nemůžete změnit.",
     "connectFailed": "Stránku pro připojení se nepodařilo otevřít"
   },
   "invoices": {

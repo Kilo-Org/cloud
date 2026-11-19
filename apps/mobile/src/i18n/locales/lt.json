@@ -978,7 +978,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Ši paskyra dar neturi jokių organizacijų. Sukūręs arba prisijungęs prie organizacijos galėsi peržiūrėti Bitbucket pakeitimų užklausas.",
       "gitlabReconnectAdminOnlyDescription": "Paprašyk organizacijos savininko, administratoriaus ar atsiskaitymų administratoriaus jį prijungti iš naujo.",
       "bitbucketNotConnectedTitle": "Bitbucket neprijungtas",
-      "bitbucketAdminOnlyDescription": "Jį prijungti gali tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai.",
+      "adminOnlyConnectDescription": "Jį prijungti gali tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai.",
       "contextLine": "Skirta {{organization}}",
       "contextLinePersonal": "Skirta asmeninei paskyrai"
     },
@@ -4780,6 +4780,9 @@
     "couldNotLoad": "Nepavyko įkelti integracijų",
     "permissionDenied": "Neturite teisių tvarkyti šių integracijų.",
     "managedByOwner": "Paprašykite organizacijos savininko pakeisti jungtį, kurios negalite pakeisti.",
+    "managedByOwnerOrAdmin": "Paprašykite organizacijos savininko ar administratoriaus pakeisti jungtį, kurios negalite pakeisti.",
+    "managedByOwnerOrBilling": "Paprašykite organizacijos savininko ar atsiskaitymų administratoriaus pakeisti jungtį, kurios negalite pakeisti.",
+    "managedByOwnerAdminOrBilling": "Paprašykite organizacijos savininko, administratoriaus ar atsiskaitymų administratoriaus pakeisti jungtį, kurios negalite pakeisti.",
     "connectFailed": "Nepavyko atidaryti prijungimo puslapio"
   },
   "invoices": {

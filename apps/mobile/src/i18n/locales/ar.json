@@ -2957,7 +2957,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "لا توجد مؤسسات في هذا الحساب بعد. يمكنك مراجعة طلبات السحب على Bitbucket بعد إنشاء مؤسسة أو الانضمام إلى واحدة.",
       "gitlabReconnectAdminOnlyDescription": "اطلب من مالك مؤسسة أو مشرف أو مدير الفوترة ربطه.",
       "bitbucketNotConnectedTitle": "Bitbucket غير متصل",
-      "bitbucketAdminOnlyDescription": "يمكن لمالكي المؤسسة والمشرفين ومديري الفوترة فقط ربطه.",
+      "adminOnlyConnectDescription": "يمكن لمالكي المؤسسة والمشرفين ومديري الفوترة فقط ربطه.",
       "contextLine": "للمؤسسة: {{organization}}",
       "contextLinePersonal": "لحسابك الشخصي"
     },
@@ -4930,6 +4930,9 @@
     "couldNotLoad": "تعذّر تحميل التكاملات",
     "permissionDenied": "ليس لديك إذن لإدارة هذه التكاملات.",
     "managedByOwner": "اطلب من مالك المؤسسة تغيير اتصال لا يمكنك تغييره.",
+    "managedByOwnerOrAdmin": "اطلب من مالك المؤسسة أو مشرف تغيير اتصال لا يمكنك تغييره.",
+    "managedByOwnerOrBilling": "اطلب من مالك المؤسسة أو مدير الفوترة تغيير اتصال لا يمكنك تغييره.",
+    "managedByOwnerAdminOrBilling": "اطلب من مالك المؤسسة أو مشرف أو مدير الفوترة تغيير اتصال لا يمكنك تغييره.",
     "connectFailed": "تعذّر فتح صفحة الاتصال"
   },
   "invoices": {

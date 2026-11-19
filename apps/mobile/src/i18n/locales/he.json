@@ -2840,7 +2840,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "לחשבון הזה אין עדיין ארגונים. אפשר לסקור בקשות משיכה ב-Bitbucket לאחר שתיצרו או תצטרפו לארגון.",
       "gitlabReconnectAdminOnlyDescription": "בקש מבעלים של הארגון, מנהל או מנהל חיובים לחבר אותו מחדש.",
       "bitbucketNotConnectedTitle": "Bitbucket לא מחובר",
-      "bitbucketAdminOnlyDescription": "רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לחבר אותו.",
+      "adminOnlyConnectDescription": "רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לחבר אותו.",
       "contextLine": "עבור {{organization}}",
       "contextLinePersonal": "עבור החשבון האישי"
     },
@@ -4705,6 +4705,9 @@
     "couldNotLoad": "לא ניתן לטעון את האינטגרציות",
     "permissionDenied": "אין לך הרשאה לנהל את האינטגרציות האלה.",
     "managedByOwner": "כדי לשנות חיבור שאין באפשרותך לשנות, יש לפנות לבעלים של הארגון.",
+    "managedByOwnerOrAdmin": "כדי לשנות חיבור שאין באפשרותך לשנות, יש לפנות לבעלים של הארגון או מנהל.",
+    "managedByOwnerOrBilling": "כדי לשנות חיבור שאין באפשרותך לשנות, יש לפנות לבעלים של הארגון או מנהל חיובים.",
+    "managedByOwnerAdminOrBilling": "כדי לשנות חיבור שאין באפשרותך לשנות, יש לפנות לבעלים של הארגון, מנהל או מנהל חיובים.",
     "connectFailed": "לא ניתן לפתוח את דף החיבור"
   },
   "invoices": {

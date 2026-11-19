@@ -1294,6 +1294,12 @@ cursor is accepted. Recovery keeps its snapshot revision/position requirement an
 native part identity until authoritative state covers the gap. Neither an unchanged
 snapshot nor a newer unrelated snapshot proves that a missing tool/result arrived.
 Exhausted recovery remains an explicit error, not a complete empty transcript.
+Repeated snapshot failures are bounded per connection: after three failed read cycles —
+a hello/reset read that throws, or a recovery that ends without converging — the client
+stops automatic reads and reconnection, publishes `snapshotFailure` with the reason, and
+resumes only through `NativeSessionConnection.refresh()`, which re-reads the authoritative
+transcript, or a new connection. A stored reference with no authorized asset mapping is terminal
+on its first read, because no retry can make it resolvable.
 
 Native stored-media and tool-file references retain their original canonical
 values. The native reader resolves only authorized asset mappings using the same

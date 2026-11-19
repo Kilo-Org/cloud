@@ -67,6 +67,7 @@ export default async function AppShellIntegrationPage({ params, searchParams }: 
       <AppShellIntegrationDetails
         platform={platform}
         canManage
+        canManageBilling
         success={false}
         selfPath={`${APP_SHELL_PREFIX}/integrations/${platform}`}
       />

@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Le akhawunti ayikaze ibe nezinhlangano. Uma usuka inhlangano noma ungena kuyinhlangano, uzokwazi ukubuyekeza ama-PR e-Bitbucket.",
       "gitlabReconnectAdminOnlyDescription": "Cela umnikazi, umlawuli, noma umphathi wokukhokha wenhlangano ukuxhuma kabusha.",
       "bitbucketNotConnectedTitle": "I-Bitbucket ayixhunyiwe",
-      "bitbucketAdminOnlyDescription": "Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangayixhuma.",
+      "adminOnlyConnectDescription": "Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangayixhuma.",
       "contextLine": "Ku-{{organization}}",
       "contextLinePersonal": "Kwokomuntu siqu"
     },
@@ -4630,6 +4630,9 @@
     "couldNotLoad": "Akukwazekanga ukulayisha ukuhlanganiswa",
     "permissionDenied": "Awunayo imvume yokuphatha lokhu kuhlanganiswa.",
     "managedByOwner": "Cela umnikazi wenhlangano ukuthi ashintshe ukuxhumana ongakwazi ukukushintsha.",
+    "managedByOwnerOrAdmin": "Cela umnikazi noma umlawuli wenhlangano ukuthi ashintshe ukuxhumana ongakwazi ukukushintsha.",
+    "managedByOwnerOrBilling": "Cela umnikazi noma umphathi wokukhokha wenhlangano ukuthi ashintshe ukuxhumana ongakwazi ukukushintsha.",
+    "managedByOwnerAdminOrBilling": "Cela umnikazi, umlawuli, noma umphathi wokukhokha wenhlangano ukuthi ashintshe ukuxhumana ongakwazi ukukushintsha.",
     "connectFailed": "Akukwazekanga ukuvula ikhasi lokuxhuma"
   },
   "invoices": {

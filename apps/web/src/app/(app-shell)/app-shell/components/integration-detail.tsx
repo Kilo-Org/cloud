@@ -14,6 +14,11 @@ type AppShellIntegrationDetailsProps = {
   organizationId?: string;
   /** True for an organization owner/admin, which Slack shows as edit authority. */
   canManage: boolean;
+  /**
+   * True for a role that may manage organization billing, which GitLab shows as
+   * edit authority: the same role set the GitLab connect routes enforce.
+   */
+  canManageBilling: boolean;
   success: boolean;
   error?: string;
   /** The shell page an install started here returns to. */
@@ -29,6 +34,7 @@ export function AppShellIntegrationDetails({
   platform,
   organizationId,
   canManage,
+  canManageBilling,
   success,
   error,
   selfPath,
@@ -54,6 +60,7 @@ export function AppShellIntegrationDetails({
           // from these props, so the start route is handed over without one.
           connectPath={buildAppShellConnectPath('gitlab')}
           shell
+          canManage={canManageBilling}
         />
       );
     case 'slack':

@@ -4232,6 +4232,7 @@
     "instructionsHint": "Regles en markdown aplicades a cada sessió que utilitza aquest perfil.",
     "instructionsEmpty": "Encara no hi ha fitxers d'instruccions",
     "instructionsEmptyDescription": "Afegeix fitxers de regles que s'apliquin a cada sessió que utilitzi aquest perfil.",
+    "instructionsEmptyDescriptionReadOnly": "Els fitxers de regles afegits aquí s'apliquen a totes les sessions que utilitzen aquest perfil.",
     "instructionNameRequired": "Introdueix un nom de fitxer",
     "instructionNameTooLong": "El nom del fitxer ha de tenir {{max}} caràcters o menys",
     "instructionNameInvalid": "Comença amb una lletra o un dígit i utilitza només lletres minúscules, dígits i guions",

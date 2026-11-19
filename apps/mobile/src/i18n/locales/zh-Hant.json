@@ -4166,6 +4166,7 @@
     "instructionsHint": "套用至此設定檔每個工作階段的規則 Markdown。",
     "instructionsEmpty": "尚無指示檔案",
     "instructionsEmptyDescription": "新增規則檔案，套用至使用此設定檔的每個工作階段。",
+    "instructionsEmptyDescriptionReadOnly": "在此新增的規則檔案會套用至使用此設定檔的每個工作階段。",
     "instructionNameRequired": "請輸入檔案名稱",
     "instructionNameTooLong": "檔案名稱必須為 {{max}} 個字元以內",
     "instructionNameInvalid": "請以字母或數字開頭，且只能使用小寫字母、數字與連字號",

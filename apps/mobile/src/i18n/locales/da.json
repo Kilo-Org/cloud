@@ -4166,6 +4166,7 @@
     "instructionsHint": "Regler i markdown anvendes på hver session, der bruger denne profil.",
     "instructionsEmpty": "Ingen instruktionsfiler endnu",
     "instructionsEmptyDescription": "Tilføj regelfiler, som hver session med denne profil anvender.",
+    "instructionsEmptyDescriptionReadOnly": "Regelfiler, der tilføjes her, anvendes på alle sessioner, der bruger denne profil.",
     "instructionNameRequired": "Angiv et filnavn",
     "instructionNameTooLong": "Filnavnet må højst være {{max}} tegn",
     "instructionNameInvalid": "Start med et bogstav eller tal, og brug kun små bogstaver, tal og bindestreger",

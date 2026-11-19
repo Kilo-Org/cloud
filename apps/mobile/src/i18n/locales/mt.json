@@ -4364,6 +4364,7 @@
     "instructionsHint": "Regoli markdown applikati għal kull sessjoni li tuża dan il-profil.",
     "instructionsEmpty": "Għad m'hemmx fajls ta' struzzjonijiet",
     "instructionsEmptyDescription": "Żid fajls tar-regoli li kull sessjoni li tuża dan il-profil tapplika.",
+    "instructionsEmptyDescriptionReadOnly": "Il-fajls tar-regoli miżjuda hawn japplikaw għal kull sessjoni li tuża dan il-profil.",
     "instructionNameRequired": "Daħħal isem tal-fajl",
     "instructionNameTooLong": "Isem il-fajl irid ikun {{max}} karattri jew inqas",
     "instructionNameInvalid": "Ibda b'ittra jew numru u uża biss ittri żgħar, numri u sing tal-linja",

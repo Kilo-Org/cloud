@@ -4298,6 +4298,7 @@
     "instructionsHint": "Pravidlá v markdowne sa uplatňujú na každú reláciu, ktorá používa tento profil.",
     "instructionsEmpty": "Zatiaľ žiadne súbory pokynov",
     "instructionsEmptyDescription": "Pridajte súbory pravidiel, ktoré sa použijú v každej relácii s týmto profilom.",
+    "instructionsEmptyDescriptionReadOnly": "Súbory pravidiel pridané sem sa uplatňujú na každú reláciu, ktorá používa tento profil.",
     "instructionNameRequired": "Zadajte názov súboru",
     "instructionNameTooLong": "Názov súboru môže mať najviac {{max}} znakov",
     "instructionNameInvalid": "Začnite písmenom alebo číslicou a používajte len malé písmená, číslice a pomlčky",

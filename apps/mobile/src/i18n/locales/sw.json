@@ -4166,6 +4166,7 @@
     "instructionsHint": "Kanuni za markdown zinazotumika kwa kila kipindi kinachotumia wasifu huu.",
     "instructionsEmpty": "Bado hakuna faili za elekezo",
     "instructionsEmptyDescription": "Ongeza faili za kanuni ambazo kila kipindi kinachotumia wasifu huu hutumia.",
+    "instructionsEmptyDescriptionReadOnly": "Faili za kanuni zilizoongezwa hapa hutumika kwa kila kipindi kinachotumia wasifu huu.",
     "instructionNameRequired": "Weka jina la faili",
     "instructionNameTooLong": "Jina la faili lazima liwe na herufi {{max}} au chini yake",
     "instructionNameInvalid": "Anza na herufi au tarakimu na tumia herufi ndogo, tarakimu, na vistari pekee",

@@ -4166,6 +4166,7 @@
     "instructionsHint": "ច្បាប់ markdown ដែលបានអនុវត្តលើរាល់ session ដែលប្រើ profile នេះ។",
     "instructionsEmpty": "មិនទាន់មានឯកសារណែនាំនៅឡើយទេ",
     "instructionsEmptyDescription": "បន្ថែមឯកសារច្បាប់ដែលរាល់ session ដែលប្រើ profile នេះអនុវត្ត។",
+    "instructionsEmptyDescriptionReadOnly": "ឯកសារក្បួនដែលបានបន្ថែមនៅទីនេះ ត្រូវបានអនុវត្តចំពោះរាល់សេសសិនដែលប្រើប្រវត្តិរូបនេះ។",
     "instructionNameRequired": "បញ្ចូលឈ្មោះឯកសារ",
     "instructionNameTooLong": "ឈ្មោះឯកសារត្រូវតែមាន {{max}} តួអក្សរ ឬតិចជាងនេះ",
     "instructionNameInvalid": "ចាប់ផ្តើមដោយអក្សរ ឬលេខ ហើយប្រើតែអក្សរតូច លេខ និងសញ្ញាដក",

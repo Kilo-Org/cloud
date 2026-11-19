@@ -4166,6 +4166,7 @@
     "instructionsHint": "Markdown peraturan digunakan pada setiap sesi yang menggunakan profil ini.",
     "instructionsEmpty": "Belum ada fail arahan",
     "instructionsEmptyDescription": "Tambah fail peraturan yang digunakan oleh setiap sesi dengan profil ini.",
+    "instructionsEmptyDescriptionReadOnly": "Fail peraturan yang ditambahkan di sini digunakan pada setiap sesi yang menggunakan profil ini.",
     "instructionNameRequired": "Masukkan nama fail",
     "instructionNameTooLong": "Nama fail mesti {{max}} aksara atau kurang",
     "instructionNameInvalid": "Mulakan dengan huruf atau digit dan gunakan hanya huruf kecil, digit dan sengkang",

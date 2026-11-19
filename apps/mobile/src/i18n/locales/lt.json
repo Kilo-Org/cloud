@@ -4298,6 +4298,7 @@
     "instructionsHint": "Taisyklės „markdown“ formatu, taikomos kiekvienai sesijai, naudojančiai šį profilį.",
     "instructionsEmpty": "Instrukcijų failų dar nėra",
     "instructionsEmptyDescription": "Pridėkite taisyklių failus, kuriuos taikys kiekviena šį profilį naudojanti sesija.",
+    "instructionsEmptyDescriptionReadOnly": "Čia pridėti taisyklių failai taikomi kiekvienai sesijai, kurioje naudojamas šis profilis.",
     "instructionNameRequired": "Įveskite failo pavadinimą",
     "instructionNameTooLong": "Failo pavadinimas turi būti ne ilgesnis kaip {{max}} simbolių",
     "instructionNameInvalid": "Pradėkite raide arba skaičiumi ir naudokite tik mažąsias raides, skaičius ir brūkšnelius",

@@ -4166,6 +4166,7 @@
     "instructionsHint": "قواعد کی مارک ڈاؤن جو اس پروفائل استعمال کرنے والے ہر سیشن پر لاگو ہوتی ہے۔",
     "instructionsEmpty": "ابھی کوئی ہدایت فائل نہیں",
     "instructionsEmptyDescription": "ایسی قاعدہ فائلیں شامل کریں جو اس پروفائل استعمال کرنے والا ہر سیشن لاگو کرے۔",
+    "instructionsEmptyDescriptionReadOnly": "یہاں شامل کی گئی رول فائلیں ہر اس سیشن پر لاگو ہوتی ہیں جو یہ پروفائل استعمال کرتا ہے۔",
     "instructionNameRequired": "فائل کا نام درج کریں",
     "instructionNameTooLong": "فائل کا نام {{max}} حروف یا کم ہونا چاہیے",
     "instructionNameInvalid": "حرف یا ہندسے سے شروع کریں اور صرف چھوٹے حروف، ہندسے اور ڈیش استعمال کریں",

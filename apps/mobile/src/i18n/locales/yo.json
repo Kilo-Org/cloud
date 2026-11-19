@@ -4166,6 +4166,7 @@
     "instructionsHint": "Markdown ìlànà tí a ń lò fún gbogbo ìpàdé tó ń lo profáìlì yìí.",
     "instructionsEmpty": "Kò sí fáìlì ìlànà tí",
     "instructionsEmptyDescription": "Fi àwọn fáìlì ìlànà kún tí gbogbo ìpàdé tó ń lo profáìlì yìí yóò lò.",
+    "instructionsEmptyDescriptionReadOnly": "Àwọn fáìlì ìlànà tí a fi kún níbí ni a máa ń lò nínú gbogbo àkókò ìlò tí ó bá ń lo profáìlì yìí.",
     "instructionNameRequired": "Tẹ orúkọ fáìlì kan",
     "instructionNameTooLong": "Orúkọ fáìlì gbọ́dọ̀ jẹ́ {{max}} kíkà tàbí kéré sí i",
     "instructionNameInvalid": "Bẹ̀rẹ̀ pẹ̀lú lẹ́tà tàbí nọ́mbà, kí o sì lo lẹ́tà kékeré, nọ́mbà àti dáàṣì nìkan",

@@ -4232,6 +4232,7 @@
     "instructionsHint": "Noteikumu markdown, kas tiek piemērots katrai sesijai, kura izmanto šo profilu.",
     "instructionsEmpty": "Vēl nav instrukciju failu",
     "instructionsEmptyDescription": "Pievienojiet noteikumu failus, ko piemēro katra sesija, kura izmanto šo profilu.",
+    "instructionsEmptyDescriptionReadOnly": "Šeit pievienotie noteikumu faili tiek piemēroti visām sesijām, kurās tiek izmantots šis profils.",
     "instructionNameRequired": "Ievadiet faila nosaukumu",
     "instructionNameTooLong": "Faila nosaukumā drīkst būt ne vairāk kā {{max}} rakstzīmes",
     "instructionNameInvalid": "Sāciet ar burtu vai ciparu un izmantojiet tikai mazos burtus, ciparus un domuzīmes",

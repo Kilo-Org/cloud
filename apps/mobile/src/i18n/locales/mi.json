@@ -4166,6 +4166,7 @@
     "instructionsHint": "Ture markdown ka whakamahia ki ia wātū e whakamahi ana i tēnei kōtaha.",
     "instructionsEmpty": "Kāore anō he kōnae tohutohu",
     "instructionsEmptyDescription": "Tāpirihia he kōnae ture ka whakamahia e ia wātū e whakamahi ana i tēnei kōtaha.",
+    "instructionsEmptyDescriptionReadOnly": "Ka whakamahia ngā kōnae ture kua tāpirihia ki konei mō ia wātū e whakamahi ana i tēnei kōtaha.",
     "instructionNameRequired": "Whakaurua he ingoa kōnae",
     "instructionNameTooLong": "Kia {{max}} pūāhua iti iho rānei te ingoa kōnae",
     "instructionNameInvalid": "Tīmata ki tētahi pūāhua, mati rānei, ā, whakamahia anake ngā pūāhua iti, ngā mati, me ngā tohu rīhanga",

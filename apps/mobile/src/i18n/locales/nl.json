@@ -4166,6 +4166,7 @@
     "instructionsHint": "Regels-markdown die wordt toegepast op elke sessie met dit profiel.",
     "instructionsEmpty": "Nog geen instructiebestanden",
     "instructionsEmptyDescription": "Voeg regelbestanden toe die elke sessie met dit profiel toepast.",
+    "instructionsEmptyDescriptionReadOnly": "Regelbestanden die hier zijn toegevoegd, worden toegepast op elke sessie die dit profiel gebruikt.",
     "instructionNameRequired": "Voer een bestandsnaam in",
     "instructionNameTooLong": "Bestandsnaam mag maximaal {{max}} tekens bevatten",
     "instructionNameInvalid": "Begin met een letter of cijfer en gebruik alleen kleine letters, cijfers en streepjes",

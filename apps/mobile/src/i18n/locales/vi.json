@@ -4166,6 +4166,7 @@
     "instructionsHint": "Quy tắc markdown áp dụng cho mọi phiên dùng hồ sơ này.",
     "instructionsEmpty": "Chưa có tệp hướng dẫn nào",
     "instructionsEmptyDescription": "Thêm các tệp quy tắc mà mọi phiên dùng hồ sơ này sẽ áp dụng.",
+    "instructionsEmptyDescriptionReadOnly": "Các tệp quy tắc được thêm ở đây sẽ được áp dụng cho mọi phiên sử dụng hồ sơ này.",
     "instructionNameRequired": "Nhập tên tệp",
     "instructionNameTooLong": "Tên tệp phải có {{max}} ký tự trở xuống",
     "instructionNameInvalid": "Bắt đầu bằng chữ cái hoặc chữ số, chỉ dùng chữ thường, chữ số và dấu gạch ngang",

@@ -4166,6 +4166,7 @@
     "instructionsHint": "এই প্রোফাইল ব্যবহার করা প্রতিটি সেশনে প্রয়োগ হওয়া নিয়মের markdown।",
     "instructionsEmpty": "এখনও কোনো নির্দেশনা ফাইল নেই",
     "instructionsEmptyDescription": "এমন নিয়ম ফাইল যোগ করুন যা এই প্রোফাইল ব্যবহার করা প্রতিটি সেশনে প্রয়োগ হয়।",
+    "instructionsEmptyDescriptionReadOnly": "এখানে যোগ করা রুল ফাইলগুলো এই প্রোফাইল ব্যবহার করে এমন প্রতিটি সেশনে প্রয়োগ করা হয়।",
     "instructionNameRequired": "একটি ফাইলের নাম দিন",
     "instructionNameTooLong": "ফাইলের নাম {{max}} অক্ষর বা তার কম হতে হবে",
     "instructionNameInvalid": "অক্ষর বা সংখ্যা দিয়ে শুরু করুন এবং শুধু ছোট হাতের অক্ষর, সংখ্যা ও ড্যাশ ব্যবহার করুন",

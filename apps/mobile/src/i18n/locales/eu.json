@@ -4166,6 +4166,7 @@
     "instructionsHint": "Profil hau erabiltzen duen saio bakoitzari aplikatzen zaizkion erregelen markdowna.",
     "instructionsEmpty": "Oraindik ez dago jarraibide-fitxategirik",
     "instructionsEmptyDescription": "Gehitu profil hau erabiltzen duen saio bakoitzak aplikatzen dituen erregela-fitxategiak.",
+    "instructionsEmptyDescriptionReadOnly": "Hemen gehitutako arau-fitxategiak profil hau erabiltzen duen saio bakoitzari aplikatzen zaizkio.",
     "instructionNameRequired": "Sartu fitxategi-izen bat",
     "instructionNameTooLong": "Fitxategi-izenak {{max}} karaktere edo gutxiago izan behar ditu",
     "instructionNameInvalid": "Hasi letra edo zenbaki batekin, eta erabili soilik letra xeheak, zenbakiak eta marratxoak",

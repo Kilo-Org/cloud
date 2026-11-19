@@ -4166,6 +4166,7 @@
     "instructionsHint": "Markdown fitsipika ampiharina amin'ny fotoam-piasana rehetra mampiasa ity profil ity.",
     "instructionsEmpty": "Tsy mbola misy rakitra torolalana",
     "instructionsEmptyDescription": "Ampio rakitra fitsipika ampiharina amin'ny fotoam-piasana rehetra mampiasa ity profil ity.",
+    "instructionsEmptyDescriptionReadOnly": "Ny rakitra fitsipika ampidirina eto dia ampiharina isaky ny mampiasa ity profil ity.",
     "instructionNameRequired": "Ampidiro ny anaran'ny rakitra",
     "instructionNameTooLong": "Tsy tokony hihoatra {{max}} tarehintsoratra ny anaran'ny rakitra",
     "instructionNameInvalid": "Atombohy amin'ny litera na isa ary ampiasao litera kely, isa ary tsipika fotsiny",

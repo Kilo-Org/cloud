@@ -4166,6 +4166,7 @@
     "instructionsHint": "દરેક સેશન પર લાગુ થતા નિયમોનું માર્કડાઉન જે આ પ્રોફાઇલ વાપરે છે.",
     "instructionsEmpty": "હજી કોઈ સૂચના ફાઇલ નથી",
     "instructionsEmptyDescription": "એવી નિયમ ફાઇલો ઉમેરો જે આ પ્રોફાઇલ વાપરતું દરેક સેશન લાગુ કરે.",
+    "instructionsEmptyDescriptionReadOnly": "અહીં ઉમેરાયેલી રૂલ ફાઇલો આ પ્રોફાઇલનો ઉપયોગ કરતા દરેક સેશન પર લાગુ થાય છે.",
     "instructionNameRequired": "ફાઇલનું નામ દાખલ કરો",
     "instructionNameTooLong": "ફાઇલનું નામ {{max}} અક્ષરો કે તેથી ઓછું હોવું જોઈએ",
     "instructionNameInvalid": "અક્ષર કે અંકથી શરૂ કરો અને ફક્ત નાના અક્ષરો, અંકો અને ડેશ વાપરો",

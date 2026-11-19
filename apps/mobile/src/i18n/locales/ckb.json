@@ -4166,6 +4166,7 @@
     "instructionsHint": "ڕێنماییەکانی markdown بۆ هەر دانیشتنێک کە ئەم پرۆفایلە بەکاردەهێنێت.",
     "instructionsEmpty": "هێشتا هیچ فایلێکی ڕێنمایی نییە",
     "instructionsEmptyDescription": "فایلی یاسا زیاد بکە کە هەر دانیشتنێک کە ئەم پرۆفایلە بەکاردەهێنێت جێبەجێی دەکات.",
+    "instructionsEmptyDescriptionReadOnly": "ئەو فایلە ڕێسایانەی کە لێرە زیادکراون، بۆ هەموو دانیشتنێک کە ئەم پرۆفایلە بەکاردەهێنێت جێبەجێ دەکرێن.",
     "instructionNameRequired": "ناوی فایلێک بنووسە",
     "instructionNameTooLong": "ناوی فایل دەبێت {{max}} پیت یان کەمتر بێت",
     "instructionNameInvalid": "بە پیت یان ژمارەیەک دەست پێ بکە و تەنها پیتی بچووک، ژمارە و داش بەکاربهێنە",

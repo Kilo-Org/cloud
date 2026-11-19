@@ -4166,6 +4166,7 @@
     "instructionsHint": "Regler i markdown som tillämpas på varje session som använder den här profilen.",
     "instructionsEmpty": "Inga instruktionsfiler än",
     "instructionsEmptyDescription": "Lägg till regel­filer som varje session med den här profilen tillämpar.",
+    "instructionsEmptyDescriptionReadOnly": "Regelfiler som läggs till här tillämpas på varje session som använder den här profilen.",
     "instructionNameRequired": "Ange ett filnamn",
     "instructionNameTooLong": "Filnamnet får vara högst {{max}} tecken",
     "instructionNameInvalid": "Börja med en bokstav eller siffra och använd bara gemena bokstäver, siffror och bindestreck",

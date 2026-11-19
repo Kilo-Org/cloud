@@ -4166,6 +4166,7 @@
     "instructionsHint": "Regler i markdown brukes på hver økt som bruker denne profilen.",
     "instructionsEmpty": "Ingen instruksjonsfiler ennå",
     "instructionsEmptyDescription": "Legg til regelfiler som hver økt med denne profilen bruker.",
+    "instructionsEmptyDescriptionReadOnly": "Regelfiler som legges til her, gjelder for alle økter som bruker denne profilen.",
     "instructionNameRequired": "Skriv inn et filnavn",
     "instructionNameTooLong": "Filnavnet kan ha maksimalt {{max}} tegn",
     "instructionNameInvalid": "Start med en bokstav eller et tall, og bruk bare små bokstaver, tall og bindestreker",

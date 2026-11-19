@@ -4166,6 +4166,7 @@
     "instructionsHint": "हर उस सत्र पर लागू होने वाला नियम markdown जो इस प्रोफ़ाइल का उपयोग करता है।",
     "instructionsEmpty": "अभी कोई निर्देश फ़ाइल नहीं",
     "instructionsEmptyDescription": "ऐसी नियम फ़ाइलें जोड़ें जो इस प्रोफ़ाइल वाले हर सत्र पर लागू हों।",
+    "instructionsEmptyDescriptionReadOnly": "यहाँ जोड़ी गई नियम फ़ाइलें इस प्रोफ़ाइल का उपयोग करने वाले हर सत्र पर लागू होती हैं।",
     "instructionNameRequired": "फ़ाइल नाम दर्ज करें",
     "instructionNameTooLong": "फ़ाइल नाम {{max}} वर्ण या कम होना चाहिए",
     "instructionNameInvalid": "अक्षर या अंक से शुरू करें और केवल छोटे अक्षर, अंक और डैश रखें",

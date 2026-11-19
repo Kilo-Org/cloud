@@ -4232,6 +4232,7 @@
     "instructionsHint": "Reglas en markdown aplicadas a cada sesión que use este perfil.",
     "instructionsEmpty": "Aún no hay archivos de instrucciones",
     "instructionsEmptyDescription": "Añade archivos de reglas que se apliquen a cada sesión que use este perfil.",
+    "instructionsEmptyDescriptionReadOnly": "Los archivos de reglas que se añaden aquí se aplican a todas las sesiones que utilizan este perfil.",
     "instructionNameRequired": "Introduce un nombre de archivo",
     "instructionNameTooLong": "El nombre debe tener {{max}} caracteres o menos",
     "instructionNameInvalid": "Empieza con una letra o número y usa solo minúsculas, números y guiones",

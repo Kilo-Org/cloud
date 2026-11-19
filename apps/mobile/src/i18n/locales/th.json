@@ -4166,6 +4166,7 @@
     "instructionsHint": "กฎแบบมาร์กดาวน์ที่ใช้กับทุกเซสชันที่ใช้โปรไฟล์นี้",
     "instructionsEmpty": "ยังไม่มีไฟล์คำแนะนำ",
     "instructionsEmptyDescription": "เพิ่มไฟล์กฎที่ทุกเซสชันที่ใช้โปรไฟล์นี้จะนำไปใช้",
+    "instructionsEmptyDescriptionReadOnly": "ไฟล์กฎที่เพิ่มไว้ที่นี่จะถูกนำไปใช้กับทุกเซสชันที่ใช้โปรไฟล์นี้",
     "instructionNameRequired": "กรอกชื่อไฟล์",
     "instructionNameTooLong": "ชื่อไฟล์ต้องมีความยาวไม่เกิน {{max}} ตัวอักษร",
     "instructionNameInvalid": "เริ่มด้วยตัวอักษรหรือตัวเลข และใช้เฉพาะตัวพิมพ์เล็ก ตัวเลข และขีดกลางเท่านั้น",

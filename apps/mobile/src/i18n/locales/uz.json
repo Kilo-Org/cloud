@@ -4166,6 +4166,7 @@
     "instructionsHint": "Ushbu profildan foydalanadigan har bir sessiyaga qo'llaniladigan qoidalar markdown fayli.",
     "instructionsEmpty": "Hozircha ko'rsatma fayllari yo'q",
     "instructionsEmptyDescription": "Ushbu profildan foydalanadigan har bir sessiya qo'llaydigan qoida fayllarini qo'shing.",
+    "instructionsEmptyDescriptionReadOnly": "Bu yerga qo'shilgan qoidalar fayllari ushbu profildan foydalanadigan har bir sessiyaga qo'llaniladi.",
     "instructionNameRequired": "Fayl nomini kiriting",
     "instructionNameTooLong": "Fayl nomi {{max}} belgidan oshmasligi kerak",
     "instructionNameInvalid": "Harf yoki raqam bilan boshlang va faqat kichik harflar, raqamlar va tire ishlating",

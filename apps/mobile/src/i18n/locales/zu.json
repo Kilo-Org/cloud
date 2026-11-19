@@ -4166,6 +4166,7 @@
     "instructionsHint": "Imitherho ye-markdown esetshenziswa kuyo yonke iseshini esebenzisa le phrofayela.",
     "instructionsEmpty": "Awekho amafayela omyalo okwamanje",
     "instructionsEmptyDescription": "Engeza amafayela emitherho asetshenziswa yiyo yonke iseshini esebenzisa le phrofayela.",
+    "instructionsEmptyDescriptionReadOnly": "Amafayela emithetho afakwe lapha asetshenziswa kuyo yonke iseshini esebenzisa le phrofayela.",
     "instructionNameRequired": "Faka igama lefayela",
     "instructionNameTooLong": "Igama lefayela kufanele libe nezinhlamvu ezingu-{{max}} noma ngaphansi",
     "instructionNameInvalid": "Qala ngohlamvu noma ngedijithi futhi sebenzisa kuphela izinhlamvu ezincane, amadijithi, nemigqa",

@@ -4166,6 +4166,7 @@
     "instructionsHint": "このプロファイルを使うすべてのセッションに適用されるルールのマークダウンです。",
     "instructionsEmpty": "指示ファイルはまだありません",
     "instructionsEmptyDescription": "このプロファイルを使うすべてのセッションに適用するルールファイルを追加します。",
+    "instructionsEmptyDescriptionReadOnly": "ここに追加されたルールファイルは、このプロファイルを使用するすべてのセッションに適用されます。",
     "instructionNameRequired": "ファイル名を入力してください",
     "instructionNameTooLong": "ファイル名は{{max}}文字以内にしてください",
     "instructionNameInvalid": "英小文字または数字で始め、英小文字・数字・ハイフンのみ使用できます",

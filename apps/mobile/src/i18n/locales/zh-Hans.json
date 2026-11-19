@@ -4166,6 +4166,7 @@
     "instructionsHint": "应用于使用此配置的每个会话的规则 markdown。",
     "instructionsEmpty": "尚无指令文件",
     "instructionsEmptyDescription": "添加使用此配置的每个会话都会应用的规则文件。",
+    "instructionsEmptyDescriptionReadOnly": "此处添加的规则文件会应用于使用此配置文件的每个会话。",
     "instructionNameRequired": "请输入文件名",
     "instructionNameTooLong": "文件名不得超过 {{max}} 个字符",
     "instructionNameInvalid": "以字母或数字开头，仅使用小写字母、数字和连字符",

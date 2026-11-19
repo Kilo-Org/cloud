@@ -4232,6 +4232,7 @@
     "instructionsHint": "חוקי Markdown שמוחלים על כל הפעלה שמשתמשת בפרופיל הזה.",
     "instructionsEmpty": "אין עדיין קבצי הוראות",
     "instructionsEmptyDescription": "הוסיפו קבצי חוקים שכל הפעלה שמשתמשת בפרופיל הזה תחיל.",
+    "instructionsEmptyDescriptionReadOnly": "קובצי כללים שנוספים כאן חלים על כל סשן שמשתמש בפרופיל הזה.",
     "instructionNameRequired": "הזינו שם קובץ",
     "instructionNameTooLong": "שם הקובץ חייב להכיל {{max}} תווים לכל היותר",
     "instructionNameInvalid": "התחילו באות או בספרה והשתמשו רק באותיות לטיניות קטנות, ספרות ומקפים",

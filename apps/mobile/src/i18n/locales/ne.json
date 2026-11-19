@@ -4166,6 +4166,7 @@
     "instructionsHint": "यो प्रोफाइल प्रयोग गर्ने हरेक सत्रमा लागू हुने नियम मार्कडाउन।",
     "instructionsEmpty": "अझै कुनै निर्देशन फाइल छैन",
     "instructionsEmptyDescription": "यो प्रोफाइल प्रयोग गर्ने हरेक सत्रमा लागू हुने नियम फाइलहरू थप्नुहोस्।",
+    "instructionsEmptyDescriptionReadOnly": "यहाँ थपिएका नियम फाइलहरू यो प्रोफाइल प्रयोग गर्ने प्रत्येक सत्रमा लागू हुन्छन्।",
     "instructionNameRequired": "फाइल नाम लेख्नुहोस्",
     "instructionNameTooLong": "फाइल नाम {{max}} अक्षर वा कम हुनुपर्छ",
     "instructionNameInvalid": "अक्षर वा अंकबाट सुरु गर्नुहोस् र साना अक्षर, अंक र ड्यास मात्र प्रयोग गर्नुहोस्",

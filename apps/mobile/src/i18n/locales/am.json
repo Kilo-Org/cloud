@@ -4166,6 +4166,7 @@
     "instructionsHint": "ይህን መገለጫ በሚጠቀም ሁሉም ክፍለ ጊዜ ላይ የሚተገበር የሕግ ማርክዳውን።",
     "instructionsEmpty": "እስካሁን የመመሪያ ፋይሎች የሉም",
     "instructionsEmptyDescription": "ይህን መገለጫ የሚጠቀም ሁሉም ክፍለ ጊዜ የሚተገብራቸውን የሕግ ፋይሎች ያክሉ።",
+    "instructionsEmptyDescriptionReadOnly": "እዚህ የተጨመሩ የደንብ ፋይሎች ይህን ፕሮፋይል በሚጠቀም በእያንዳንዱ ክፍለ ጊዜ ላይ ይተገበራሉ።",
     "instructionNameRequired": "የፋይል ስም ያስገቡ",
     "instructionNameTooLong": "የፋይል ስም {{max}} ቁምፊዎች ወይም ከዚያ በታች መሆን አለበት",
     "instructionNameInvalid": "በፊደል ወይም በቁጥር ይጀምሩ እና ትንንሽ ፊደሎች፣ ቁጥሮች እና ሰረዞችን ብቻ ይጠቀሙ",

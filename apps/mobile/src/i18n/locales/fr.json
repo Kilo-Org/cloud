@@ -4232,6 +4232,7 @@
     "instructionsHint": "Règles markdown appliquées à chaque session utilisant ce profil.",
     "instructionsEmpty": "Aucun fichier d'instructions",
     "instructionsEmptyDescription": "Ajoutez des fichiers de règles appliqués à chaque session utilisant ce profil.",
+    "instructionsEmptyDescriptionReadOnly": "Les fichiers de règles ajoutés ici s'appliquent à chaque session qui utilise ce profil.",
     "instructionNameRequired": "Saisissez un nom de fichier",
     "instructionNameTooLong": "Le nom doit faire {{max}} caractères ou moins",
     "instructionNameInvalid": "Commencez par une lettre ou un chiffre, puis uniquement des minuscules, chiffres et tirets",

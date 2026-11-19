@@ -4166,6 +4166,7 @@
     "instructionsHint": "Xeerar markdown oo lagu dabaqo fadhi kasta oo isticmaala borofilkan.",
     "instructionsEmpty": "Weli ma jiraan faylal tilmaame",
     "instructionsEmptyDescription": "Ku dar faylal xeerar ah oo fadhi kastoo isticmaala borofilkan uu dabaqo.",
+    "instructionsEmptyDescriptionReadOnly": "Faylalka xeerarka ee halkan lagu daro waxay khuseeyaan fadhi kasta oo isticmaala borofaylkan.",
     "instructionNameRequired": "Geli magaca faylka",
     "instructionNameTooLong": "Magaca faylku waa inuu ka badnaan {{max}} xaraf",
     "instructionNameInvalid": "Ku bilow xaraf ama lambar, oo isticmaal oo kaliya xarfaha yaryar, lambarrada, iyo xariijimo",

@@ -4166,6 +4166,7 @@
     "instructionsHint": "Dokokin markdown da ake amfani da su ga kowane zama da ke amfani da wannan bayanin.",
     "instructionsEmpty": "Babu fayilolin umarni tukuna",
     "instructionsEmptyDescription": "Ƙara fayilolin doka waɗanda kowane zama da ke amfani da wannan bayanin zai yi amfani da su.",
+    "instructionsEmptyDescriptionReadOnly": "Ana amfani da fayilolin ƙa'idojin da aka ƙara a nan ga kowace zama da ke amfani da wannan profile ɗin.",
     "instructionNameRequired": "Shigar da sunan fayil",
     "instructionNameTooLong": "Sunan fayil dole ya kasance har haruffa {{max}} ko ƙasa da haka",
     "instructionNameInvalid": "Fara da harafi ko lamba sannan yi amfani da ƙananan haruffa, lambobi, da dashes kawai",

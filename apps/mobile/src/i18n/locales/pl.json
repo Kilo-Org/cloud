@@ -4298,6 +4298,7 @@
     "instructionsHint": "Reguły w formacie markdown stosowane w każdej sesji używającej tego profilu.",
     "instructionsEmpty": "Brak plików instrukcji",
     "instructionsEmptyDescription": "Dodaj pliki reguł stosowane w każdej sesji używającej tego profilu.",
+    "instructionsEmptyDescriptionReadOnly": "Dodane tutaj pliki reguł są stosowane w każdej sesji korzystającej z tego profilu.",
     "instructionNameRequired": "Podaj nazwę pliku",
     "instructionNameTooLong": "Nazwa pliku może mieć maksymalnie {{max}} znaków",
     "instructionNameInvalid": "Zacznij od litery lub cyfry i używaj tylko małych liter, cyfr i myślników",

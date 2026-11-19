@@ -4232,6 +4232,7 @@
     "instructionsHint": "Pravila u markdownu koja se primjenjuju na svaku sesiju koja koristi ovaj profil.",
     "instructionsEmpty": "Još nema datoteka s uputstvima",
     "instructionsEmptyDescription": "Dodajte datoteke s pravilima koja će primjenjivati svaka sesija koja koristi ovaj profil.",
+    "instructionsEmptyDescriptionReadOnly": "Datoteke s pravilima dodane ovdje primjenjuju se na svaku sesiju koja koristi ovaj profil.",
     "instructionNameRequired": "Unesite naziv datoteke",
     "instructionNameTooLong": "Naziv datoteke može imati najviše {{max}} znakova",
     "instructionNameInvalid": "Počnite slovom ili brojem i koristite samo mala slova, brojeve i crtice",

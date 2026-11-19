@@ -4166,6 +4166,7 @@
     "instructionsHint": "د اصولو markdown چې په دې پروفایل کاروونکې هره ناسته کې پلي کېږي.",
     "instructionsEmpty": "تر اوسه د لارښوونې فایلونه نشته",
     "instructionsEmptyDescription": "د اصولو فایلونه زیات کړه چې په دې پروفایل کاروونکې هره ناسته یې پلي کوي.",
+    "instructionsEmptyDescriptionReadOnly": "دلته اضافه شوي د قواعدو فایلونه په هر هغه سېشن کې چې دا پروفایل کاروي تطبیقېږي.",
     "instructionNameRequired": "د فایل نوم ولیکه",
     "instructionNameTooLong": "د فایل نوم باید {{max}} توري یا لږ وي",
     "instructionNameInvalid": "د توري یا عدد سره پیل کړه او یوازې کوچني لاتیني توري، عددونه او ډشونه وکاروه",

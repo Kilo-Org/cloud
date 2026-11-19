@@ -4166,6 +4166,7 @@
     "instructionsHint": "Reeglite markdown, mida rakendatakse igale sessioonile, mis seda profiili kasutab.",
     "instructionsEmpty": "Juhisefaile veel pole",
     "instructionsEmptyDescription": "Lisa reeglifailid, mida iga seda profiili kasutav sessioon rakendab.",
+    "instructionsEmptyDescriptionReadOnly": "Siia lisatud reeglifailid rakenduvad igale sessioonile, mis seda profiili kasutab.",
     "instructionNameRequired": "Sisesta faili nimi",
     "instructionNameTooLong": "Faili nimi tohib olla kuni {{max}} märki",
     "instructionNameInvalid": "Alusta tähe või numbriga ning kasuta ainult väiketähti, numbreid ja sidekriipse",

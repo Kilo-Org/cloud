@@ -246,7 +246,11 @@ export function ProfileInstructionsScreen({
       <EmptyState
         icon={FileText}
         title={t('profiles.instructionsEmpty')}
-        description={t('profiles.instructionsEmptyDescription')}
+        description={
+          canManage
+            ? t('profiles.instructionsEmptyDescription')
+            : t('profiles.instructionsEmptyDescriptionReadOnly')
+        }
         placement="top"
         action={
           <ProfileManageSlot permission={permission}>

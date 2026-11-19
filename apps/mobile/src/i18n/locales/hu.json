@@ -4166,6 +4166,7 @@
     "instructionsHint": "Minden munkamenetre érvényes szabályok markdown formátumban, amelyek ezt a profilt használják.",
     "instructionsEmpty": "Még nincsenek utasításfájlok",
     "instructionsEmptyDescription": "Adj hozzá szabályfájlokat, amelyeket minden ilyen profilt használó munkamenet alkalmaz.",
+    "instructionsEmptyDescriptionReadOnly": "Az itt hozzáadott szabályfájlok minden, ezt a profilt használó munkamenetre érvényesek.",
     "instructionNameRequired": "Adj meg egy fájlnevet",
     "instructionNameTooLong": "A fájlnév legfeljebb {{max}} karakter lehet",
     "instructionNameInvalid": "Kezdődjön betűvel vagy számmal, és csak kisbetűket, számokat és kötőjeleket tartalmazzon",

@@ -4166,6 +4166,7 @@
     "instructionsHint": "ກົດເກນ markdown ທີ່ໃຊ້ກັບທຸກ session ທີ່ໃຊ້ໂປຣໄຟລ໌ນີ້.",
     "instructionsEmpty": "ຍັງບໍ່ມີໄຟລ໌ຄຳແນະນຳ",
     "instructionsEmptyDescription": "ເພີ່ມໄຟລ໌ກົດເກນທີ່ທຸກ session ທີ່ໃຊ້ໂປຣໄຟລ໌ນີ້ຈະນຳໃຊ້.",
+    "instructionsEmptyDescriptionReadOnly": "ໄຟລ໌ກົດລະບຽບທີ່ເພີ່ມຢູ່ນີ້ຈະຖືກນຳໃຊ້ກັບທຸກເຊສຊັນທີ່ໃຊ້ໂປຣໄຟລ໌ນີ້.",
     "instructionNameRequired": "ປ້ອນຊື່ໄຟລ໌",
     "instructionNameTooLong": "ຊື່ໄຟລ໌ຕ້ອງມີບໍ່ເກີນ {{max}} ໂຕອັກສອນ",
     "instructionNameInvalid": "ເລີ່ມດ້ວຍຕົວອັກສອນ ຫຼື ຕົວເລກ ແລະ ໃຊ້ພຽງຕົວອັກສອນນ້ອຍ, ຕົວເລກ ແລະ ເສັ້ນຂີດ",

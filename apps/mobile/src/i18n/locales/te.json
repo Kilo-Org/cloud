@@ -4166,6 +4166,7 @@
     "instructionsHint": "ఈ ప్రొఫైల్ వాడే ప్రతి సెషన్‌కు వర్తించే రూల్స్ మార్క్‌డౌన్.",
     "instructionsEmpty": "ఇంకా సూచన ఫైల్‌లు లేవు",
     "instructionsEmptyDescription": "ఈ ప్రొఫైల్ వాడే ప్రతి సెషన్‌కు వర్తించే రూల్ ఫైల్‌లను జోడించండి.",
+    "instructionsEmptyDescriptionReadOnly": "ఇక్కడ జోడించిన రూల్స్ ఫైల్స్ ఈ ప్రొఫైల్‌ను ఉపయోగించే ప్రతి సెషన్‌కు వర్తిస్తాయి.",
     "instructionNameRequired": "ఫైల్ పేరు నమోదు చేయండి",
     "instructionNameTooLong": "ఫైల్ పేరు {{max}} అక్షరాలకు మించకూడదు",
     "instructionNameInvalid": "అక్షరం లేదా అంకెతో మొదలుపెట్టండి; చిన్న అక్షరాలు, అంకెలు, డాష్‌లు మాత్రమే వాడండి",

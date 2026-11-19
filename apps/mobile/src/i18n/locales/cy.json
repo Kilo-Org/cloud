@@ -4430,6 +4430,7 @@
     "instructionsHint": "Rheolau markdown a gymhwysir i bob sesiwn sy'n defnyddio'r proffil hwn.",
     "instructionsEmpty": "Dim ffeiliau cyfarwyddyd eto",
     "instructionsEmptyDescription": "Ychwanegwch ffeiliau rheolau y bydd pob sesiwn sy'n defnyddio'r proffil hwn yn eu cymhwyso.",
+    "instructionsEmptyDescriptionReadOnly": "Mae ffeiliau rheolau a ychwanegir yma yn cael eu cymhwyso i bob sesiwn sy'n defnyddio'r proffil hwn.",
     "instructionNameRequired": "Rhowch enw ffeil",
     "instructionNameTooLong": "Rhaid i enw'r ffeil fod yn {{max}} nod neu lai",
     "instructionNameInvalid": "Dechreuwch gyda llythyren neu rif a defnyddiwch lythrennau bach, rhifau a llinellau tosturiol yn unig",

@@ -4166,6 +4166,7 @@
     "instructionsHint": "Энэ профайлыг ашигладаг бүх сессэд хэрэгжих дүрмийн markdown.",
     "instructionsEmpty": "Одоогоор зааврын файл алга",
     "instructionsEmptyDescription": "Энэ профайлыг ашигладаг бүх сессэд хэрэгжих дүрмийн файл нэмнэ үү.",
+    "instructionsEmptyDescriptionReadOnly": "Энд нэмсэн дүрмийн файлууд энэ профайлыг ашигладаг бүх сешнд хэрэгжинэ.",
     "instructionNameRequired": "Файлын нэр оруулна уу",
     "instructionNameTooLong": "Файлын нэр {{max}} тэмдэгтээс ихгүй байх ёстой",
     "instructionNameInvalid": "Үсэг эсвэл тоогоор эхэлж, зөвхөн жижиг үсэг, тоо, зураас ашиглана уу",

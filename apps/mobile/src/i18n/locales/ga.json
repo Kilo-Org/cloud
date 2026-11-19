@@ -4364,6 +4364,7 @@
     "instructionsHint": "Rialacha markdown a chuirtear i bhfeidhm ar gach seisiún a úsáideann an próifíl seo.",
     "instructionsEmpty": "Níl aon chomhad treorach ann fós",
     "instructionsEmptyDescription": "Cuir comhaid rialacha leis a úsáideann gach seisiún a bhaineann úsáid as an bpróifíl seo.",
+    "instructionsEmptyDescriptionReadOnly": "Cuirtear na comhaid rialacha a chuirtear leis anseo i bhfeidhm ar gach seisiún a úsáideann an próifíl seo.",
     "instructionNameRequired": "Iontráil ainm comhaid",
     "instructionNameTooLong": "Caithfidh ainm an chomhaid a bheith {{max}} carachtar nó níos lú",
     "instructionNameInvalid": "Tosaigh le litir nó le digit agus ná húsáid ach litreacha beaga, digití agus fleiscíní",

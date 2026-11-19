@@ -4166,6 +4166,7 @@
     "instructionsHint": "Markdown ng mga patakaran na inilalapat sa bawat sesyon na gumagamit ng profile na ito.",
     "instructionsEmpty": "Wala pang mga file ng tagubilin",
     "instructionsEmptyDescription": "Magdagdag ng mga file ng patakaran na inilalapat sa bawat sesyong gumagamit ng profile na ito.",
+    "instructionsEmptyDescriptionReadOnly": "Ang mga rules file na idinagdag dito ay inilalapat sa bawat session na gumagamit ng profile na ito.",
     "instructionNameRequired": "Maglagay ng pangalan ng file",
     "instructionNameTooLong": "Ang pangalan ng file ay dapat {{max}} character o mas kaunti",
     "instructionNameInvalid": "Magsimula sa titik o digit at gumamit lamang ng maliliit na titik, digit, at gitling",

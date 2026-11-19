@@ -4166,6 +4166,7 @@
     "instructionsHint": "Bu profili kullanan her oturumda uygulanan kural markdown'u.",
     "instructionsEmpty": "Henüz talimat dosyası yok",
     "instructionsEmptyDescription": "Bu profili kullanan her oturumda uygulanacak kural dosyaları ekleyin.",
+    "instructionsEmptyDescriptionReadOnly": "Buraya eklenen kural dosyaları, bu profili kullanan her oturuma uygulanır.",
     "instructionNameRequired": "Bir dosya adı girin",
     "instructionNameTooLong": "Dosya adı en fazla {{max}} karakter olabilir",
     "instructionNameInvalid": "Bir harf veya rakamla başlayın; yalnızca küçük harf, rakam ve tire kullanın",

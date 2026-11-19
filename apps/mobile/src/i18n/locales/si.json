@@ -4166,6 +4166,7 @@
     "instructionsHint": "මෙම පැතිකඩ භාවිතා කරන සෑම සැසියකටම යෙදෙන markdown රීති.",
     "instructionsEmpty": "තවම උපදෙස් ගොනු නැත",
     "instructionsEmptyDescription": "මෙම පැතිකඩ භාවිතා කරන සෑම සැසියකටම යෙදෙන රීති ගොනු එකතු කරන්න.",
+    "instructionsEmptyDescriptionReadOnly": "මෙහි එකතු කරන ලද නියම ගොනු මෙම පැතිකඩ භාවිතා කරන සෑම සැසියකටම යොදනු ලැබේ.",
     "instructionNameRequired": "ගොනු නමක් ඇතුළත් කරන්න",
     "instructionNameTooLong": "ගොනු නම අක්ෂර {{max}}කට නොවැඩි විය යුතුය",
     "instructionNameInvalid": "අකුරකින් හෝ අංකයකින් ආරම්භ කර කුඩා අකුරු, අංක සහ ඉරි පමණක් භාවිතා කරන්න",

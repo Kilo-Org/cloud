@@ -4298,6 +4298,7 @@
     "instructionsHint": "Pravila v markdownu, ki se uporabijo v vsaki seji s tem profilom.",
     "instructionsEmpty": "Ni še nobene datoteke z navodili",
     "instructionsEmptyDescription": "Dodajte datoteke s pravili, ki jih uporabi vsaka seja s tem profilom.",
+    "instructionsEmptyDescriptionReadOnly": "Datoteke s pravili, dodane tukaj, veljajo za vsako sejo, ki uporablja ta profil.",
     "instructionNameRequired": "Vnesite ime datoteke",
     "instructionNameTooLong": "Ime datoteke lahko ima največ {{max}} znakov",
     "instructionNameInvalid": "Začnite s črko ali številko in uporabite le male črke, številke in pomišljaje",

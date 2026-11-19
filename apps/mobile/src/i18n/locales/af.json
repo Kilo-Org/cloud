@@ -4166,6 +4166,7 @@
     "instructionsHint": "Reëls-markdown toegepas op elke sessie wat hierdie profiel gebruik.",
     "instructionsEmpty": "Nog geen instruksielêers nie",
     "instructionsEmptyDescription": "Voeg reëlêers by wat elke sessie met hierdie profiel toepas.",
+    "instructionsEmptyDescriptionReadOnly": "Reëllêers wat hier bygevoeg word, word op elke sessie toegepas wat hierdie profiel gebruik.",
     "instructionNameRequired": "Voer 'n lêernaam in",
     "instructionNameTooLong": "Lêernaam moet {{max}} karakters of minder wees",
     "instructionNameInvalid": "Begin met 'n letter of syfer en gebruik net kleinletters, syfers en strepies",

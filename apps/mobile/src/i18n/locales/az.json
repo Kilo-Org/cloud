@@ -4166,6 +4166,7 @@
     "instructionsHint": "Qaydalar markdown-u bu profildən istifadə edən hər sessiyaya tətbiq olunur.",
     "instructionsEmpty": "Hələ təlimat faylı yoxdur",
     "instructionsEmptyDescription": "Bu profildən istifadə edən hər sessiyanın tətbiq etdiyi qayda faylları əlavə edin.",
+    "instructionsEmptyDescriptionReadOnly": "Buraya əlavə edilmiş qayda faylları bu profildən istifadə edən hər bir sessiyaya tətbiq olunur.",
     "instructionNameRequired": "Fayl adı daxil edin",
     "instructionNameTooLong": "Fayl adı ən çoxu {{max}} simvol ola bilər",
     "instructionNameInvalid": "Hərflə və ya rəqəmlə başlayın və yalnız kiçik hərflər, rəqəmlər və defislər istifadə edin",

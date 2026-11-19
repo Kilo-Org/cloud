@@ -4166,6 +4166,7 @@
     "instructionsHint": "Reglur í markdown sem gilda fyrir hverja lotu sem notar þetta snið.",
     "instructionsEmpty": "Engar leiðbeiningarskrár ennþá",
     "instructionsEmptyDescription": "Bættu við regluskrám sem hver lota með þessu sniði notar.",
+    "instructionsEmptyDescriptionReadOnly": "Regluskrár sem bætt er við hér gilda fyrir hverja lotu sem notar þennan prófíl.",
     "instructionNameRequired": "Sláðu inn skráarnafn",
     "instructionNameTooLong": "Skráarnafn má vera að hámarki {{max}} stafir",
     "instructionNameInvalid": "Byrjaðu á bókstaf eða tölustaf og notaðu aðeins lágstafi, tölustafi og bandstrik",

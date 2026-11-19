@@ -4166,6 +4166,7 @@
     "instructionsHint": "Правила в markdown, прилагани към всяка сесия с този профил.",
     "instructionsEmpty": "Още няма файлове с инструкции",
     "instructionsEmptyDescription": "Добавете файлове с правила, които всяка сесия с този профил да прилага.",
+    "instructionsEmptyDescriptionReadOnly": "Добавените тук файлове с правила се прилагат към всяка сесия, която използва този профил.",
     "instructionNameRequired": "Въведете име на файл",
     "instructionNameTooLong": "Името на файла трябва да е до {{max}} знака",
     "instructionNameInvalid": "Започнете с буква или цифра и използвайте само малки букви, цифри и тирета",

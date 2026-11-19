@@ -4166,6 +4166,7 @@
     "instructionsHint": "Regeln als Markdown, angewendet auf jede Sitzung mit diesem Profil.",
     "instructionsEmpty": "Noch keine Anweisungsdateien",
     "instructionsEmptyDescription": "Füge Regeldateien hinzu, die jede Sitzung mit diesem Profil anwendet.",
+    "instructionsEmptyDescriptionReadOnly": "Hier hinzugefügte Regeldateien gelten für jede Sitzung, die dieses Profil verwendet.",
     "instructionNameRequired": "Gib einen Dateinamen ein",
     "instructionNameTooLong": "Der Dateiname darf höchstens {{max}} Zeichen haben",
     "instructionNameInvalid": "Beginne mit Buchstabe oder Ziffer, nur Kleinbuchstaben, Ziffern und Bindestriche",

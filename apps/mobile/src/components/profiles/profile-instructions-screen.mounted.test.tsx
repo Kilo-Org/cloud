@@ -30,8 +30,12 @@ const h = vi.hoisted(() => ({
   },
 }));
 
+const permissionState = vi.hoisted(() => ({
+  permission: 'allowed' as 'resolving' | 'allowed' | 'read-only',
+}));
+
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useOrganizationProfilePermission: () => 'allowed',
+  useOrganizationProfilePermission: () => permissionState.permission,
 }));
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileInstructions: () => h.query,
@@ -74,7 +78,16 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', async () => {
+  // vi.mock factories are hoisted above the module's imports, so the React
+  // helper is loaded inside the factory. The real state renders its `action`
+  // below the description, so the manage slot's sentence reaches the tree the
+  // way the screen hands it over.
+  const { createElement: create } = await import('react');
+  return {
+    EmptyState: (props: { action?: unknown }) => create('EmptyState', props, props.action as never),
+  };
+});
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScrollView' }));
 vi.mock('@/components/profiles/profile-section-header', () => ({
@@ -187,6 +200,7 @@ function rowControls(root: ReactTestInstance): string[] {
 describe('ProfileInstructionsScreen delete confirmation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    permissionState.permission = 'allowed';
     h.query.data = [testInstruction()];
     h.query.isError = false;
     h.query.isPending = false;
@@ -294,6 +308,7 @@ describe('ProfileInstructionsScreen delete confirmation', () => {
 describe('ProfileInstructionsScreen instruction cap', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    permissionState.permission = 'allowed';
     h.query.isError = false;
     h.query.isPending = false;
     h.query.isRefetching = false;
@@ -323,5 +338,39 @@ describe('ProfileInstructionsScreen instruction cap', () => {
     expect(findAll(belowCap.renderer.root, 'AccessibleStatus')).toHaveLength(0);
     expect(findAll(belowCap.renderer.root, 'Button')[0]?.props.disabled).toBe(false);
     belowCap.unmount();
+  });
+});
+
+describe('ProfileInstructionsScreen empty state', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    permissionState.permission = 'allowed';
+    Object.assign(h.query, { data: [], isError: false, isPending: false, isRefetching: false });
+  });
+
+  const emptyStateOf = (root: ReactTestInstance) =>
+    root.findAll(node => String(node.type) === 'EmptyState')[0];
+
+  it('offers the add control and its invitation to a manager', async () => {
+    const { renderer, unmount } = await mountScreen();
+    expect(emptyStateOf(renderer.root)?.props.description).toBe(
+      i18n.t('profiles.instructionsEmptyDescription')
+    );
+    expect(findAll(renderer.root, 'Button')).toHaveLength(1);
+    unmount();
+  });
+
+  // A member used to read an invitation to add rule files directly above the
+  // sentence that says they cannot change the profile.
+  it('states what the files do and offers no action a member cannot take', async () => {
+    permissionState.permission = 'read-only';
+    const member = await mountScreen();
+    expect(emptyStateOf(member.renderer.root)?.props.description).toBe(
+      i18n.t('profiles.instructionsEmptyDescriptionReadOnly')
+    );
+    const texts = findAll(member.renderer.root, 'Text').map(node => node.props.children);
+    expect(texts).toContain(i18n.t('profiles.organizationRoleRequired'));
+    expect(findAll(member.renderer.root, 'Button')).toHaveLength(0);
+    member.unmount();
   });
 });

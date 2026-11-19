@@ -4166,6 +4166,7 @@
     "instructionsHint": "Markdown aturan yang diterapkan ke setiap sesi yang memakai profil ini.",
     "instructionsEmpty": "Belum ada file instruksi",
     "instructionsEmptyDescription": "Tambahkan file aturan yang diterapkan ke setiap sesi yang memakai profil ini.",
+    "instructionsEmptyDescriptionReadOnly": "Berkas aturan yang ditambahkan di sini diterapkan ke setiap sesi yang menggunakan profil ini.",
     "instructionNameRequired": "Masukkan nama file",
     "instructionNameTooLong": "Nama file harus {{max}} karakter atau kurang",
     "instructionNameInvalid": "Awali dengan huruf atau angka dan gunakan hanya huruf kecil, angka, dan tanda hubung",

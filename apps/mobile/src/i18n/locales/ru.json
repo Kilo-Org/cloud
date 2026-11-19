@@ -4298,6 +4298,7 @@
     "instructionsHint": "Markdown-правила, применяемые к каждой сессии с этим профилем.",
     "instructionsEmpty": "Пока нет файлов инструкций",
     "instructionsEmptyDescription": "Добавьте файлы правил, которые применяются к каждой сессии с этим профилем.",
+    "instructionsEmptyDescriptionReadOnly": "Файлы правил, добавленные здесь, применяются ко всем сессиям, использующим этот профиль.",
     "instructionNameRequired": "Введите имя файла",
     "instructionNameTooLong": "Имя файла должно содержать не более {{max}} символов",
     "instructionNameInvalid": "Начинайте с буквы или цифры и используйте только строчные буквы, цифры и дефисы",

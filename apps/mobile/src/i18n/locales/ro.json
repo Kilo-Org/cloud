@@ -4232,6 +4232,7 @@
     "instructionsHint": "Reguli markdown aplicate fiecărei sesiuni care folosește acest profil.",
     "instructionsEmpty": "Niciun fișier de instrucțiuni încă",
     "instructionsEmptyDescription": "Adaugă fișiere de reguli pe care le aplică fiecare sesiune ce folosește acest profil.",
+    "instructionsEmptyDescriptionReadOnly": "Fișierele de reguli adăugate aici se aplică fiecărei sesiuni care utilizează acest profil.",
     "instructionNameRequired": "Introdu un nume de fișier",
     "instructionNameTooLong": "Numele fișierului trebuie să aibă cel mult {{max}} caractere",
     "instructionNameInvalid": "Începe cu o literă sau cifră și folosește doar litere mici, cifre și cratime",

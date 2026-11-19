@@ -4166,6 +4166,7 @@
     "instructionsHint": "Sääntöjen markdown, jota käytetään jokaisessa tämän profiilin istunnossa.",
     "instructionsEmpty": "Ei vielä ohjetiedostoja",
     "instructionsEmptyDescription": "Lisää sääntötiedostot, joita jokainen tätä profiilia käyttävä istunto soveltaa.",
+    "instructionsEmptyDescriptionReadOnly": "Tähän lisätyt sääntötiedostot koskevat jokaista tätä profiilia käyttävää istuntoa.",
     "instructionNameRequired": "Anna tiedoston nimi",
     "instructionNameTooLong": "Tiedoston nimi saa olla enintään {{max}} merkkiä",
     "instructionNameInvalid": "Aloita kirjaimella tai numerolla ja käytä vain pieniä kirjaimia, numeroita ja viivoja",

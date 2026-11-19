@@ -4166,6 +4166,7 @@
     "instructionsHint": "Rregulla markdown që zbatohen për çdo sesion që përdor këtë profil.",
     "instructionsEmpty": "Nuk ka ende skedarë udhëzimesh",
     "instructionsEmptyDescription": "Shto skedarë rregullash që zbatohen në çdo sesion me këtë profil.",
+    "instructionsEmptyDescriptionReadOnly": "Skedarët e rregullave të shtuar këtu zbatohen për çdo sesion që përdor këtë profil.",
     "instructionNameRequired": "Jep një emër skedari",
     "instructionNameTooLong": "Emri i skedarit duhet të ketë {{max}} karaktere ose më pak",
     "instructionNameInvalid": "Fillo me një shkronjë ose shifër dhe përdor vetëm shkronja të vogla, shifra dhe viza",

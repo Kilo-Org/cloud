@@ -4166,6 +4166,7 @@
     "instructionsHint": "Iwu markdown na-emetụta nnọkọ ọ bụla na-eji profaịlụ a.",
     "instructionsEmpty": "Enwebeghị faịlụ ntụziaka",
     "instructionsEmptyDescription": "Tinye faịlụ iwu nke nnọkọ ọ bụla na-eji profaịlụ a ga-etinye.",
+    "instructionsEmptyDescriptionReadOnly": "Faịlụ iwu ndị a gbakwụnyere ebe a na-emetụta nnọkọ ọ bụla nke na-eji profaịlụ a.",
     "instructionNameRequired": "Tinye aha faịlụ",
     "instructionNameTooLong": "Aha faịlụ aghaghị ịdị mkpụrụ edemede {{max}} ma ọ bụ obere",
     "instructionNameInvalid": "Malite na mkpụrụ edemede ma ọ bụ ọnụọgụ, jiri naanị mkpụrụ edemede obere, ọnụọgụ, na akara dịka (-)",

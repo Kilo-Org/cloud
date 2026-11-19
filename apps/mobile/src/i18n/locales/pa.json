@@ -4166,6 +4166,7 @@
     "instructionsHint": "ਨਿਯਮ markdown ਹਰ ਉਸ ਸੈਸ਼ਨ 'ਤੇ ਲਾਗੂ ਹੁੰਦੇ ਹਨ ਜੋ ਇਹ ਪ੍ਰੋਫ਼ਾਈਲ ਵਰਤਦਾ ਹੈ।",
     "instructionsEmpty": "ਹਾਲੇ ਕੋਈ ਹਦਾਇਤ ਫ਼ਾਈਲ ਨਹੀਂ",
     "instructionsEmptyDescription": "ਅਜਿਹੀਆਂ ਨਿਯਮ ਫ਼ਾਈਲਾਂ ਸ਼ਾਮਲ ਕਰੋ ਜੋ ਇਹ ਪ੍ਰੋਫ਼ਾਈਲ ਵਰਤਣ ਵਾਲਾ ਹਰ ਸੈਸ਼ਨ ਲਾਗੂ ਕਰੇ।",
+    "instructionsEmptyDescriptionReadOnly": "ਇੱਥੇ ਸ਼ਾਮਲ ਕੀਤੀਆਂ ਨਿਯਮ ਫ਼ਾਈਲਾਂ ਹਰ ਉਸ ਸੈਸ਼ਨ 'ਤੇ ਲਾਗੂ ਹੁੰਦੀਆਂ ਹਨ ਜੋ ਇਸ ਪ੍ਰੋਫ਼ਾਈਲ ਦੀ ਵਰਤੋਂ ਕਰਦਾ ਹੈ।",
     "instructionNameRequired": "ਫ਼ਾਈਲ ਦਾ ਨਾਮ ਦਰਜ ਕਰੋ",
     "instructionNameTooLong": "ਫ਼ਾਈਲ ਦਾ ਨਾਮ {{max}} ਅੱਖਰਾਂ ਜਾਂ ਘੱਟ ਹੋਣਾ ਚਾਹੀਦਾ ਹੈ",
     "instructionNameInvalid": "ਅੱਖਰ ਜਾਂ ਅੰਕ ਨਾਲ ਸ਼ੁਰੂ ਕਰੋ ਅਤੇ ਸਿਰਫ਼ ਛੋਟੇ ਅੱਖਰ, ਅੰਕ ਤੇ ਡੈਸ਼ ਵਰਤੋ",

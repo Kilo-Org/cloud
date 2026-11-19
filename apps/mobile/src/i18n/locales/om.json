@@ -4166,6 +4166,7 @@
     "instructionsHint": "Seera markdown seennaa hundatti kan profaayilii kana fayyadamu irratti hojiirra oolu.",
     "instructionsEmpty": "Faayilii qajeelfamaa hin jiru",
     "instructionsEmptyDescription": "Faayilii seeraa dabali; seennaan profaayilii kana fayyadamu hundi isa fayyadama.",
+    "instructionsEmptyDescriptionReadOnly": "Faayiloonni seeraa asitti dabalaman seshinii hunda kan profaayilii kana fayyadamu irratti hojiirra oolamu.",
     "instructionNameRequired": "Maqaa faayilii galchi",
     "instructionNameTooLong": "Maqaan faayilii qubee {{max}} gadi ykn walqixa ta'uu qaba",
     "instructionNameInvalid": "Qubee ykn lakkoofsaan jalqabi; qubee xixiqqaa, lakkoofsaa fi '-' qofa fayyadami",

@@ -354,7 +354,7 @@ describe('buildGlanceableSnapshot', () => {
     expect(snapshot.status).toBe('happy');
   });
 
-  it('sets organizationBound only when organizationId is a string', () => {
+  it('sets organizationBound only for a non-empty organization id', () => {
     const personal = buildGlanceableSnapshot({
       sessions: [],
       userId: 'u1',

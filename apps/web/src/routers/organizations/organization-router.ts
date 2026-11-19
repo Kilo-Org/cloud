@@ -89,6 +89,9 @@ import { organizationMcpGuardrailsRouter } from './organization-mcp-guardrails-r
 import { organizationGuardrailsRouter } from '@/routers/organizations/organization-guardrails-router';
 import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { createChildOrganization } from '@/lib/organizations/organization-hierarchy';
+import { runAfterResponse } from '@/lib/after-response';
+import { renameAnthropicUserProfile } from '@kilocode/web-shared/lib/ai-gateway/anthropic-user-profiles/api';
+import { isClaudeOperatorConfigured } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
 
 const OrganizationUpdateSchema = OrganizationIdInputSchema.extend({
   name: OrganizationNameSchema,
@@ -411,8 +414,12 @@ export const organizationsRouter = createTRPCRouter({
               configurationError: ssoPolicy.status === 'misconfigured',
             };
 
+      // The Anthropic user profile id is internal to the AI gateway; no role gets it.
+      const { anthropic_user_profile_id: _anthropicUserProfileId, ...publicOrganization } =
+        organization;
+
       if (callerRole === 'member') {
-        const { stripe_customer_id: _stripeCustomerId, ...memberOrganization } = organization;
+        const { stripe_customer_id: _stripeCustomerId, ...memberOrganization } = publicOrganization;
         const memberPayload = membersWithChildOrganizations.map(member => {
           if (member.status === 'active') {
             const { currentDailyUsageUsd: _currentDailyUsageUsd, ...activeMember } = member;
@@ -437,7 +444,7 @@ export const organizationsRouter = createTRPCRouter({
       }
 
       return {
-        ...organization,
+        ...publicOrganization,
         callerRole,
         members: membersWithChildOrganizations,
         childOrganizations,
@@ -477,9 +484,13 @@ export const organizationsRouter = createTRPCRouter({
   update: organizationBillingMutationProcedure
     .input(OrganizationUpdateSchema)
     .mutation(async opts => {
-      await db.transaction(async tx => {
+      const anthropicUserProfileId = await db.transaction(async tx => {
         const [current] = await tx
-          .select({ name: organizations.name })
+          .select({
+            name: organizations.name,
+            parentOrganizationId: organizations.parent_organization_id,
+            anthropicUserProfileId: organizations.anthropic_user_profile_id,
+          })
           .from(organizations)
           .where(eq(organizations.id, opts.input.organizationId));
         const oldName = current?.name;
@@ -498,7 +509,14 @@ export const organizationsRouter = createTRPCRouter({
             tx,
           });
         }
+        // A sub-organization shares its parent's profile, which carries the parent's name.
+        return current?.parentOrganizationId ? null : (current?.anthropicUserProfileId ?? null);
       });
+      if (anthropicUserProfileId && isClaudeOperatorConfigured()) {
+        await runAfterResponse(() =>
+          renameAnthropicUserProfile(anthropicUserProfileId, opts.input.name)
+        );
+      }
       return {
         organization: {
           id: opts.input.organizationId,

@@ -9,7 +9,6 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -112,38 +111,36 @@ function ProfileLinkForm({ linkedinUrl, githubUrl, onDone }: FieldsProps) {
 
   return (
     <>
-      <Card>
-        <FormField
-          label={t('profile.editProfile.linkedinLabel')}
-          defaultValue={linkedinUrl ?? ''}
-          placeholder="https://www.linkedin.com/in/…"
-          keyboardType="url"
-          autoCapitalize="none"
-          autoCorrect={false}
-          validate={validateUrl}
-          error={linkedinError ?? undefined}
-          disabled={update.isPending}
-          onChangeText={value => {
-            linkedinRef.current = value;
-            setLinkedinError(null);
-          }}
-        />
-        <FormField
-          label={t('profile.editProfile.githubLabel')}
-          defaultValue={githubUrl ?? ''}
-          placeholder="https://github.com/…"
-          keyboardType="url"
-          autoCapitalize="none"
-          autoCorrect={false}
-          validate={validateUrl}
-          error={githubError ?? undefined}
-          disabled={update.isPending}
-          onChangeText={value => {
-            githubRef.current = value;
-            setGithubError(null);
-          }}
-        />
-      </Card>
+      <FormField
+        label={t('profile.editProfile.linkedinLabel')}
+        defaultValue={linkedinUrl ?? ''}
+        placeholder="https://www.linkedin.com/in/…"
+        keyboardType="url"
+        autoCapitalize="none"
+        autoCorrect={false}
+        validate={validateUrl}
+        error={linkedinError ?? undefined}
+        disabled={update.isPending}
+        onChangeText={value => {
+          linkedinRef.current = value;
+          setLinkedinError(null);
+        }}
+      />
+      <FormField
+        label={t('profile.editProfile.githubLabel')}
+        defaultValue={githubUrl ?? ''}
+        placeholder="https://github.com/…"
+        keyboardType="url"
+        autoCapitalize="none"
+        autoCorrect={false}
+        validate={validateUrl}
+        error={githubError ?? undefined}
+        disabled={update.isPending}
+        onChangeText={value => {
+          githubRef.current = value;
+          setGithubError(null);
+        }}
+      />
       <Button
         className={STATE_ACTION_CLASS}
         onPress={onSubmit}
@@ -192,16 +189,14 @@ export function ProfileEditScreen() {
   if (links.isPending) {
     body = (
       <>
-        <Card>
-          <View className="gap-1">
-            <Skeleton className="h-3 w-24" />
-            <Skeleton className="h-12 rounded-md" />
-          </View>
-          <View className="gap-1">
-            <Skeleton className="h-3 w-24" />
-            <Skeleton className="h-12 rounded-md" />
-          </View>
-        </Card>
+        <View className="gap-1">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-12 rounded-md" />
+        </View>
+        <View className="gap-1">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-12 rounded-md" />
+        </View>
         <Skeleton className="h-11 rounded-md" />
       </>
     );

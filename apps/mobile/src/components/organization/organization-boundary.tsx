@@ -1,11 +1,12 @@
 import { type Href, useRouter } from 'expo-router';
-import { ArrowLeft, ArrowRight, Building2, type LucideIcon, Plus } from '@/components/ui/icons';
+import { Building2, type LucideIcon, Plus } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { EmptyState, StateAction } from '@/components/empty-state';
+import { DirectionalArrowLeft, DirectionalArrowRight } from '@/components/ui/directional-icons';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useContextPicker } from '@/components/context-control';
@@ -108,7 +109,7 @@ export function OrganizationBoundary({
     const backToProfileAction = (
       <StateAction
         label={t('organization.boundary.backToProfile')}
-        icon={ArrowLeft}
+        icon={DirectionalArrowLeft}
         onPress={() => {
           router.replace(PROFILE_TAB_HREF);
         }}
@@ -195,7 +196,7 @@ function OrganizationPickerBoundaryState({
           <View className="gap-3">
             <StateAction
               label={t('organization.boundary.chooseAccount')}
-              icon={ArrowRight}
+              icon={DirectionalArrowRight}
               onPress={() => {
                 openPicker();
               }}

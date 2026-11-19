@@ -1,8 +1,9 @@
 import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, inArray, ne } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
+import { findSeedUserId } from '../lib/users';
 
 export const usage = '<fake-email>';
 
@@ -52,14 +53,9 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error('This fixture requires a local development database.');
   }
   const db = getSeedDb();
-  const userId = `dev-seed:mobile-picker-orgs:${email}`;
-  const [existing] = await db
-    .select({ id: kilocode_users.id })
-    .from(kilocode_users)
-    .where(eq(kilocode_users.normalized_email, email));
-  if (existing && existing.id !== userId) {
-    throw new Error('The requested email belongs to a different account; choose a new fake email.');
-  }
+  // A fake account that already signed in keeps its own row: the fixture joins
+  // it, so the seed runs before or after the device-code sign-in.
+  const userId = (await findSeedUserId(email)) ?? `dev-seed:mobile-picker-orgs:${email}`;
   await db
     .insert(kilocode_users)
     .values({
@@ -89,8 +85,23 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         require_seats: false,
         settings: {},
       })
-      .onConflictDoNothing();
+      .onConflictDoUpdate({
+        target: organizations.id,
+        set: { created_by_kilo_user_id: userId },
+      });
   }
+  // The ids stay fixed so the picker's links stay stable, and the six
+  // organizations belong to one account at a time: a run for another email
+  // takes them over instead of adding that email beside the previous owner.
+  await db.delete(organization_memberships).where(
+    and(
+      inArray(
+        organization_memberships.organization_id,
+        memberships.map(organization => organization.id)
+      ),
+      ne(organization_memberships.kilo_user_id, userId)
+    )
+  );
   for (const organization of memberships) {
     await db
       .insert(organization_memberships)

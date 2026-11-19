@@ -10,8 +10,8 @@ import {
 } from '@kilocode/db/schema';
 import { type OrganizationGroupPolicies } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import {
-  DEFAULT_ORGANIZATION_GROUP_POLICIES,
   parseOrganizationGroupPolicies,
+  canonicalSettingsFrom,
 } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies.server';
 import { and, eq, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
@@ -121,12 +121,10 @@ export async function getOrganizationGroupPolicyContext(params: {
     .where(eq(organization_group_policy_settings.organization_id, params.organizationId))
     .limit(1);
 
-  const defaultPolicies = settings
-    ? parseOrganizationGroupPolicies(settings.default_policies, {
-        organizationId: params.organizationId,
-        source: 'default',
-      })
-    : DEFAULT_ORGANIZATION_GROUP_POLICIES;
+  const { defaultPolicies, policyRevision } = canonicalSettingsFrom(
+    settings,
+    params.organizationId
+  );
 
   let groupIds: string[] = [];
   let groupPolicies: OrganizationGroupPolicies[] = [];
@@ -164,6 +162,6 @@ export async function getOrganizationGroupPolicyContext(params: {
     defaultPolicies,
     groupIds,
     groupPolicies,
-    policyRevision: settings?.policy_revision ?? 0,
+    policyRevision,
   };
 }

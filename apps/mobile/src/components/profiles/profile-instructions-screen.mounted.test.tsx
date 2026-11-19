@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted harness drives the screen's list rows, its cap and both empty-state permissions */
 import { type Href } from 'expo-router';
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -72,6 +73,7 @@ vi.mock('@/components/ui/dialog', () => ({
 vi.mock('@/components/ui/icons', () => ({
   FileText: 'FileText',
   Pencil: 'Pencil',
+  Plus: 'Plus',
   Trash2: 'Trash2',
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -79,10 +81,17 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
-vi.mock('@/components/empty-state', () => ({
-  EmptyState: 'EmptyState',
-  StateAction: 'StateAction',
-}));
+vi.mock('@/components/empty-state', async () => {
+  // vi.mock factories are hoisted above the module's imports, so the React
+  // helper is loaded inside the factory. The real state renders its `action`
+  // below the description, so the manage slot's sentence reaches the tree the
+  // way the screen hands it over.
+  const { createElement: create } = await import('react');
+  return {
+    EmptyState: (props: { action?: unknown }) => create('EmptyState', props, props.action as never),
+    StateAction: 'StateAction',
+  };
+});
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScrollView' }));
 vi.mock('@/components/profiles/profile-section-header', () => ({
@@ -328,6 +337,34 @@ describe('ProfileInstructionsScreen instruction cap', () => {
     expect(findAll(belowCap.renderer.root, 'AccessibleStatus')).toHaveLength(0);
     expect(findAll(belowCap.renderer.root, 'Button')[0]?.props.disabled).toBe(false);
     belowCap.unmount();
+  });
+});
+
+describe('ProfileInstructionsScreen empty state', () => {
+  beforeEach(() => {
+    permission.value = 'allowed';
+    Object.assign(h.query, { data: [], isError: false, isPending: false, isRefetching: false });
+  });
+
+  // A member used to read an invitation to add rule files directly above the
+  // sentence that says they cannot change the profile.
+  it('picks the description and the action by the manage permission', async () => {
+    const manager = await mountScreen();
+    expect(findAll(manager.renderer.root, 'EmptyState')[0]?.props.description).toBe(
+      i18n.t('profiles.instructionsEmptyDescription')
+    );
+    expect(findAll(manager.renderer.root, 'StateAction')).toHaveLength(1);
+    manager.unmount();
+
+    permission.value = 'read-only';
+    const member = await mountScreen();
+    expect(findAll(member.renderer.root, 'EmptyState')[0]?.props.description).toBe(
+      i18n.t('profiles.instructionsEmptyDescriptionReadOnly')
+    );
+    const texts = findAll(member.renderer.root, 'Text').map(node => node.props.children);
+    expect(texts).toContain(i18n.t('profiles.organizationRoleRequired'));
+    expect(findAll(member.renderer.root, 'StateAction')).toHaveLength(0);
+    member.unmount();
   });
 });
 

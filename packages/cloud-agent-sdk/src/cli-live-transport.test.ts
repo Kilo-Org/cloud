@@ -20,6 +20,7 @@ import {
   type UserWebSystemEvent,
 } from './user-web-connection';
 import type { KiloSessionId, SessionSnapshot, SessionSnapshotPageOutcome } from './types';
+import type { SessionSnapshotFailure } from './snapshot-page';
 import { kiloId, makeSnapshot, stubTextPart, stubUserMessage } from './test-helpers';
 import type { RemoteAttachmentPart } from './transport';
 
@@ -187,7 +188,7 @@ function createConnection(): FakeUserWebConnection {
 function createTransportWithSinks(opts?: {
   connection?: FakeUserWebConnection;
   fetchSnapshot?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
-  onError?: (message: string) => void;
+  onError?: (message: string, failure?: SessionSnapshotFailure) => void;
   onRemoteModelStateChange?: (state: RemoteModelState) => void;
   onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
   onCapabilityChange?: () => void;
@@ -1287,7 +1288,7 @@ describe('CliLiveTransport unified user web connection', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(onError).toHaveBeenCalledWith('snapshot unavailable');
+    expect(onError).toHaveBeenCalledWith('snapshot unavailable', undefined);
     expect(chatEvents).toHaveLength(1);
     expect(userWebConnection.subscribeToCliSession).toHaveBeenCalledWith(KILO_SESSION_ID);
     transport.destroy();
@@ -2372,6 +2373,46 @@ describe('CliLiveTransport remote command catalog', () => {
       type: 'commands.available',
       commands: replacementCatalog.commands,
     });
+    transport.destroy();
+  });
+
+  it('clears the published command catalog when connect supersedes a live owner', async () => {
+    const connection = createConnection();
+    jest
+      .mocked(connection.sendCommand)
+      .mockImplementation((_sessionId, command) =>
+        Promise.resolve(command === 'list_models' ? WIRE_CATALOG : COMMAND_WIRE_CATALOG)
+      );
+    const { transport, serviceEvents } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(serviceEvents.filter(event => event.type === 'commands.available').at(-1)).toEqual({
+      type: 'commands.available',
+      commands: PARSED_COMMAND_CATALOG,
+    });
+
+    // A second connect re-enters with the owner still known, so it must take the
+    // same owner-replacement path as a real owner change: drop the cached
+    // catalog rather than keep serving commands the new connection may not have.
+    transport.connect();
+
+    expect(serviceEvents.filter(event => event.type === 'commands.available').at(-1)).toEqual({
+      type: 'commands.available',
+      commands: [],
+    });
+    transport.destroy();
+  });
+
+  it('keeps the command catalog when connect starts from no owner', async () => {
+    const { transport, serviceEvents } = createTransportWithSinks();
+
+    transport.connect();
+
+    expect(serviceEvents.filter(event => event.type === 'commands.available')).toEqual([]);
     transport.destroy();
   });
 
@@ -3721,7 +3762,7 @@ type CreatePageTransportOptions = {
     nextCursor: string | null;
     omittedItemCount: number;
   }) => void;
-  onError?: (message: string) => void;
+  onError?: (message: string, failure?: SessionSnapshotFailure) => void;
 };
 
 function createPageTransport(options: CreatePageTransportOptions) {
@@ -3923,7 +3964,10 @@ describe('CliLiveTransport page-seam + reconnect', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(onError).toHaveBeenCalledWith('Session history temporarily unavailable');
+    expect(onError).toHaveBeenCalledWith('Session history temporarily unavailable', {
+      kind: 'retryable_failure',
+      message: 'Session history temporarily unavailable',
+    });
     expect(onInitialPageLoaded).not.toHaveBeenCalled();
     // No session.created was emitted because no successful page replayed.
     expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(0);
@@ -3944,7 +3988,10 @@ describe('CliLiveTransport page-seam + reconnect', () => {
       transport.connect();
       await Promise.resolve();
       await Promise.resolve();
-      expect(onError).toHaveBeenCalledWith(failure.expected);
+      expect(onError).toHaveBeenCalledWith(failure.expected, {
+        kind: failure.kind,
+        message: failure.expected,
+      });
       expect(onInitialPageLoaded).not.toHaveBeenCalled();
       transport.destroy();
     }
@@ -3961,7 +4008,7 @@ describe('CliLiveTransport page-seam + reconnect', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(onError).toHaveBeenCalledWith('Session not found');
+    expect(onError).toHaveBeenCalledWith('Session not found', undefined);
     expect(onInitialPageLoaded).not.toHaveBeenCalled();
     transport.destroy();
   });

@@ -17,6 +17,7 @@ import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { selectionHaptic } from '@/lib/haptics';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { modalSheetSurfaceClass } from '@/lib/form-sheet';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { useOrganization } from '@/lib/organization-context';
@@ -206,13 +207,14 @@ export function TourScreen() {
     }, [dismiss])
   );
 
+  const surfaceClass = modalSheetSurfaceClass();
   return (
-    <View className="flex-1 bg-background">
+    <View className={cn('flex-1', surfaceClass)}>
       {/* The tour is presented `modal` (apps/mobile/src/app/(app)/_layout.tsx),
           so the header keeps the clearance the native sheet owns. The eyebrow
           belongs to the centred step header above the title. The fork has no
           back control to return to. */}
-      <ScreenHeader modal showBackButton={false} />
+      <ScreenHeader modal showBackButton={false} className={surfaceClass} />
 
       <View className="flex-1">
         <ForkStep onChoose={choosePath} />
@@ -220,7 +222,7 @@ export function TourScreen() {
 
       {/* Skip is always available as the one alternate exit; the shared footer
           owns the bottom band and the keyboard rule. */}
-      <ScreenFooter>
+      <ScreenFooter className={surfaceClass}>
         <Button variant="ghost" onPress={dismiss}>
           <Text>{t('tour.skip')}</Text>
         </Button>

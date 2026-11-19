@@ -204,6 +204,20 @@ export function useSheetHeaderTopClearance(topInset: SheetHeaderTopInset | undef
 }
 
 /**
+ * The surface a `presentation: 'modal'` route paints behind its header, body
+ * and footer. iOS presents the route as a page sheet over a dimmed, near-black
+ * backdrop: in dark the canvas colour is that backdrop's colour, so the sheet
+ * edge disappears and the band above the title reads as empty page. The raised
+ * card surface separates the sheet from the backdrop. Android presents the
+ * route full-window, where the canvas stays.
+ *
+ * Resolved at render, so the class follows the platform the screen paints on.
+ */
+export function modalSheetSurfaceClass(): string {
+  return Platform.OS === 'ios' ? 'bg-background dark:bg-card' : 'bg-background';
+}
+
+/**
  * When the header samples where its surface sits, in ms after a movement.
  *
  * The platform moves a presented sheet without a React layout pass: it slides

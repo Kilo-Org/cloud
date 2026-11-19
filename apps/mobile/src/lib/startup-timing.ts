@@ -4,8 +4,11 @@
 // not "since process start". Pre-JS native startup is not observable from JS;
 // Sentry's app-start measurement covers that half.
 //
-// Deliberately imports nothing: anything imported here would evaluate before
-// the origin is captured and its own cost would disappear from the numbers.
+// Imports nothing at runtime; its types come from a type-only import that is
+// erased, so nothing here evaluates before the origin is captured and no
+// import cost disappears from the numbers.
+
+import { type AnalyticsEventMap, type StartupOutcome } from '@kilocode/app-shared/analytics';
 
 type StartupMark =
   | 'auth_ready'
@@ -15,17 +18,9 @@ type StartupMark =
   | 'consent_ready'
   | 'splash_hidden';
 
-// Why the splash hid — the startup path this launch actually took. Stable enum
-// strings only, per the payload rules in src/lib/analytics/posthog.ts.
-type StartupOutcome =
-  | 'app'
-  | 'login'
-  | 'consent'
-  | 'force-update'
-  | 'user-error'
-  | 'consent-error'
-  | 'language-error'
-  | 'restore-error';
+// The payload type the producer must return. The literal map key is required
+// here because the producer must return exactly the cataloged payload type.
+type StartupTimingsPayload = AnalyticsEventMap['app_startup'];
 
 let origin: number | undefined = undefined;
 const marks = new Map<StartupMark, number>();
@@ -71,10 +66,16 @@ export function isStartupComplete(): boolean {
 // Returns the event payload exactly once per launch, and only after startup
 // actually finished. Null means "nothing to send" — never send a partial
 // launch, and never send twice. Callers may poll this freely.
-export function takeStartupTimings(): Record<string, string | number> | null {
+export function takeStartupTimings(): StartupTimingsPayload | null {
   if (taken || outcome === undefined) {
     return null;
   }
   taken = true;
-  return { outcome, ...Object.fromEntries(marks) };
+  // Writes each mark to its named optional field instead of spreading a
+  // `Map` widening to `Record<string, number>`; only `StartupMark` keys exist.
+  const payload: StartupTimingsPayload = { outcome };
+  for (const [mark, delta] of marks) {
+    payload[mark] = delta;
+  }
+  return payload;
 }

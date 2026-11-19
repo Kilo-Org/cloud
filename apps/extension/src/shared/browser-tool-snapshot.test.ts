@@ -45,6 +45,7 @@ const createFakeSession = ({
 
   const session: BrowserToolPageSession = {
     attach: async () => undefined,
+    captureViewportImage: async () => undefined,
     consoleMessages: () => [],
     networkRequestsSinceLoad: () => [],
     registerRefs: (entries, options) => {
@@ -283,6 +284,7 @@ describe('captureBrowserAriaSnapshot', () => {
   it('surfaces an uninspectable tab instead of an empty result', async () => {
     const session: BrowserToolPageSession = {
       attach: async () => undefined,
+      captureViewportImage: async () => undefined,
       consoleMessages: () => [],
       networkRequestsSinceLoad: () => [],
       registerRefs: () => undefined,

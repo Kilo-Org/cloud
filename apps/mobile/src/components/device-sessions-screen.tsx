@@ -6,8 +6,8 @@ import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState, StateAction } from '@/components/empty-state';
-import { DirectionalLogOut } from '@/components/ui/directional-icons';
-import { ArrowLeft, Globe, Smartphone, Terminal } from '@/components/ui/icons';
+import { DirectionalArrowLeft, DirectionalLogOut } from '@/components/ui/directional-icons';
+import { Globe, Smartphone, Terminal } from '@/components/ui/icons';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -190,7 +190,7 @@ export function DeviceSessionsScreen() {
         action={
           <StateAction
             label={t('deviceSessions.viewProfile')}
-            icon={ArrowLeft}
+            icon={DirectionalArrowLeft}
             onPress={() => {
               router.back();
             }}

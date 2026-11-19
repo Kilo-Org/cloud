@@ -73,16 +73,33 @@ function enforcesRequestedEgress(
 }
 
 /**
- * Resolves the allocation that an owner's saved settings give a repository: the
- * eligible repository environment allocation first, then the eligible
- * repository override, then the eligible context default. Stale or
- * incompatible saved keys are skipped; the unavailable saved key is never
- * disabled or deleted. Every selectable allocation can hold a V2 environment,
- * so the result does not depend on the environment. When `runtime` needs an
- * egress policy, an owner default whose provider cannot enforce one is skipped.
- * The environment allocation is never skipped for that reason: the start fails
- * it with the reason. The new-session picker does not know the egress policy,
- * so it can show a default that a restricted session skips.
+ * Resolves the sandbox allocation that an owner's saved settings give a
+ * repository: the environment's own allocation when the owner can use it, then
+ * the saved repository override, then the saved context default.
+ *
+ * A candidate is used only when it is a selectable key and the owner's current
+ * selection capabilities offer it (`isSandboxAllocationAvailable`). A key that
+ * later becomes unavailable, or that is retired, is skipped and the next
+ * candidate applies; the saved key is never disabled or deleted. The
+ * environment allocation is not part of the egress skip below: it is chosen
+ * whenever it is available, and `assertEgressPolicyAllocation` at start fails
+ * it with the reason when its provider cannot enforce the policy. An owner
+ * default whose provider cannot enforce the egress policy that `runtime` asks
+ * for is skipped. Resolution returns `undefined` when selection is disabled for
+ * the owner or no candidate is available; the session then runs on the platform
+ * default.
+ *
+ * `withSavedSandboxAllocation` stores the result as the create's saved
+ * allocation unless the client named one of its own, and `allocateNewSession`
+ * treats a defined value as the requested allocation. That caller validates it
+ * once more with `assertSandboxAllocationAvailable`, which refuses a value the
+ * owner can no longer use: a retired key with its own message, disabled
+ * selection, or the picker's reason. `assertEnvironmentSupportsSandbox` then
+ * rejects the allocated sandbox of a multi-repository environment when it is
+ * the shared one.
+ *
+ * The new-session picker does not know the egress policy, so it can show a
+ * default that a restricted session skips.
  */
 export async function resolveSavedSandboxAllocation(args: {
   db: WorkerDb;

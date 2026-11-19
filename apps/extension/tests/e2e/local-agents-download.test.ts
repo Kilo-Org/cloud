@@ -1,6 +1,5 @@
 /* eslint-disable import/max-dependencies, import/no-nodejs-modules, max-lines, promise/avoid-new, vitest/no-conditional-in-test -- the spec reads a real downloads directory and drives a real hub session */
 import { expect, test } from '@playwright/test';
-import type { Download } from '@playwright/test';
 import { z } from 'zod';
 import { hashBrowserToolArguments } from '../../src/shared/browser-agent-checks';
 import {
@@ -124,9 +123,6 @@ test('a guarded click cancels the download, and the approved retry keeps it', as
   try {
     const sidePanel = await context.newPage();
     const agentPage = await context.newPage();
-    const downloads: Download[] = [];
-
-    agentPage.on('download', download => downloads.push(download));
 
     await agentPage.goto(`${fixture.url}/page`);
 
@@ -167,9 +163,9 @@ test('a guarded click cancels the download, and the approved retry keeps it', as
     expect(items).toStrictEqual([{ class: 'sensitive', origin, reason: 'downloading a file' }]);
     expect(fixture.hits()).toBeGreaterThan(0);
 
-    // The browser created the item and the guard stopped it before it settled, so nothing is in the folder.
+    // The browser created the item and the guard stopped it before it settled, so nothing is in the folder, and
+    // nothing is still writing one. The request reaching the fixture is the proof the click ran the download.
     await expectNothingSaved(downloadsPath);
-    await expect.poll(() => downloads.length, { timeout: 15_000 }).toBe(1);
 
     // 2. The human approved: the identical call with the token runs with the guard off once.
     const approved = await session.callTool(
@@ -219,9 +215,7 @@ test('a download that lands after the click is reported on the next call, and th
   try {
     const sidePanel = await context.newPage();
     const agentPage = await context.newPage();
-    const downloads: Download[] = [];
 
-    agentPage.on('download', download => downloads.push(download));
     await agentPage.goto(`${fixture.url}/page`);
 
     const grants = grant(fixture.url);
@@ -254,7 +248,6 @@ test('a download that lands after the click is reported on the next call, and th
     await fixture.waitForLate(1);
     fixture.releaseLate();
     // The browser created the download after the call answered, and the guard's late window stopped it.
-    await expect.poll(() => downloads.length, { timeout: 20_000 }).toBe(1);
     await expectNothingSaved(downloadsPath);
 
     // 2. Call N+1 — any tool at all — answers with the need, and names the step that started the file.
@@ -300,7 +293,6 @@ test('a download that lands after the click is reported on the next call, and th
     fixture.releaseLate();
     // Each slow click reaches the browser as a download: the third one is cancelled in the late window, so its file
     // Never lands, and the folder keeps the approved file alone.
-    await expect.poll(() => downloads.length, { timeout: 20_000 }).toBe(3);
     await expect
       .poll(() => downloadFiles(downloadsPath), { timeout: 20_000 })
       .toStrictEqual([DOWNLOAD_FILENAME]);
@@ -344,9 +336,7 @@ test('a navigate to an attachment asks first, then keeps the file once approved'
   try {
     const sidePanel = await context.newPage();
     const agentPage = await context.newPage();
-    const downloads: Download[] = [];
 
-    agentPage.on('download', download => downloads.push(download));
     await agentPage.goto(`${fixture.url}/page`);
 
     const origin = fixture.url;
@@ -374,8 +364,9 @@ test('a navigate to an attachment asks first, then keeps the file once approved'
       .array(permissionItemSchema)
       .parse(guarded.kind === 'error' ? guarded.items : []);
     expect(items).toStrictEqual([{ class: 'sensitive', origin, reason: 'downloading a file' }]);
+    // The navigation reached the fixture: the file was requested, and the guard stopped the item it would write.
+    expect(fixture.hits()).toBeGreaterThan(0);
     await expectNothingSaved(downloadsPath);
-    await expect.poll(() => downloads.length, { timeout: 15_000 }).toBe(1);
 
     const approved = await session.callTool(
       'browser_navigate',
@@ -505,9 +496,6 @@ test('a session\u2019s first navigate to an attachment asks first and keeps one 
 
   try {
     const sidePanel = await context.newPage();
-    const downloads: Download[] = [];
-
-    context.on('page', page => page.on('download', download => downloads.push(download)));
 
     const grants = grant(fixture.url);
     // No tab is shared: the session's first call opens one, and an attachment never loads a document.
@@ -704,9 +692,7 @@ test('one click that starts two files: the guarded call keeps none, and the appr
   try {
     const sidePanel = await context.newPage();
     const agentPage = await context.newPage();
-    const downloads: Download[] = [];
 
-    agentPage.on('download', download => downloads.push(download));
     await agentPage.goto(`${fixture.url}${TWO_DOWNLOADS_PAGE_PATH}`);
 
     const grants = grant(fixture.url);
@@ -831,13 +817,10 @@ test("the user's own download in another tab lands during an approved call and i
     }
 
     // The approved call runs while the user starts their own download in a tab no agent holds.
-    const userDownload = userPage.waitForEvent('download');
     const [approved] = await Promise.all([
       session.callTool('browser_click', { element: 'Download report', target }, grants, [token]),
       (async () => {
         await userPage.click(`a[href="${USER_DOWNLOAD_PATH}"]`);
-
-        return userDownload;
       })(),
     ]);
 

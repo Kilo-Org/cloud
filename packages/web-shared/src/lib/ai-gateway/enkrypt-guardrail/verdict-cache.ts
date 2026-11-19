@@ -472,6 +472,7 @@ async function planSegmentsPart(
   const block = cachedBlock(units);
   if (block && cache) {
     const { detectors } = block;
+    const skipped = uncachedUnits(units).length;
     const report: EnkryptInputPartScanReport = {
       ...coverageReport(cache.config, coverage),
       part,
@@ -482,9 +483,9 @@ async function planSegmentsPart(
       attempts: 0,
       credits_cost: null,
       latency_ms: 0,
-      chunks: 0,
+      chunks: skipped,
       failed_calls_cached: 0,
-      calls_skipped: 0,
+      calls_skipped: skipped,
     };
     console.debug('[enkrypt-guardrail] decision', { ...scanLogFields(request), ...report });
     return {
@@ -547,7 +548,7 @@ type ToolOutcome = {
   totalUnits: number;
   cachedUnits: number;
   outcome:
-    | { kind: 'cached'; verdict: EnkryptVerdictCacheEntry['verdict'] }
+    | { kind: 'cached'; verdict: EnkryptVerdictCacheEntry['verdict']; callsSkipped: number }
     | {
         kind: 'scanned';
         result: EnkryptGuardrailScanResult;
@@ -609,9 +610,7 @@ function toolsReport(
     failed_calls_cached: sum(
       outcomes.map(({ outcome }) => (outcome.kind === 'scanned' ? outcome.failedCallsCached : 0))
     ),
-    calls_skipped: sum(
-      outcomes.map(({ outcome }) => (outcome.kind === 'scanned' ? outcome.callsSkipped : 0))
-    ),
+    calls_skipped: sum(outcomes.map(({ outcome }) => outcome.callsSkipped)),
     scanned_characters: sum(reports.map(report => report.scanned_characters)),
     decision: mostSevereDecision([
       ...reports.map(report => report.decision),
@@ -642,7 +641,10 @@ type ToolPlan = {
   characters: number;
   totalUnits: number;
   cachedUnits: number;
-} & ({ verdict: CachedVerdict } | { calls: KeyedUnit[]; scans: EnkryptGuardrailScan[] });
+} & (
+  | { verdict: CachedVerdict; callsSkipped: number }
+  | { calls: KeyedUnit[]; scans: EnkryptGuardrailScan[] }
+);
 
 /**
  * Plans the tool definitions and response formats. Each segment of each is cached on its own, as
@@ -678,9 +680,12 @@ async function planTools(
       cachedUnits: units.filter(unit => unit.verdict).length,
     };
     const block = cachedBlock(units);
-    if (block) return { tool, characters, ...unitCounts, verdict: block };
+    if (block) {
+      const callsSkipped = uncachedUnits(units).length;
+      return { tool, characters, ...unitCounts, verdict: block, callsSkipped };
+    }
     if (units.every(unit => unit.verdict === 'allow')) {
-      return { tool, characters, ...unitCounts, verdict: 'allow' };
+      return { tool, characters, ...unitCounts, verdict: 'allow', callsSkipped: 0 };
     }
     const calls = uncachedUnits(units);
     const coverage: EnkryptScanCoverage = {
@@ -711,7 +716,7 @@ async function planTools(
             characters,
             totalUnits,
             cachedUnits,
-            outcome: { kind: 'cached', verdict: plan.verdict },
+            outcome: { kind: 'cached', verdict: plan.verdict, callsSkipped: plan.callsSkipped },
           };
         }
         const results = plan.scans.map(resultOf);

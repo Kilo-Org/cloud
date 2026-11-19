@@ -706,7 +706,8 @@ describe('scanRequestWithVerdictCache', () => {
             total_units: segments.length,
             cached_units: 1,
             failed_calls_cached: 0,
-            calls_skipped: 0,
+            // The other, uncached segments are not scanned.
+            calls_skipped: segments.length - 1,
             omitted_attachments: 0,
             scanned_characters: 0,
             decision: 'blocked',
@@ -715,7 +716,7 @@ describe('scanRequestWithVerdictCache', () => {
             attempts: 0,
             credits_cost: null,
             latency_ms: 0,
-            chunks: 0,
+            chunks: segments.length - 1,
           },
         });
         expect(dependencies.fetch).not.toHaveBeenCalled();
@@ -1303,7 +1304,7 @@ describe('scanRequestWithVerdictCache', () => {
 
         expect(retry.fetch).not.toHaveBeenCalled();
         expect(retried.verdict.action).toBe('block');
-        expect(retried.report).toMatchObject({ cached_units: 2, chunks: 0 });
+        expect(retried.report).toMatchObject({ cached_units: 2, chunks: 3, calls_skipped: 3 });
       });
     });
 
@@ -2104,7 +2105,7 @@ describe('scanRequestWithVerdictCache', () => {
         dependencies
       );
 
-      // The cached block rejects the request, so the uncached tools and conversation are skipped.
+      // The cached block rejects the request, so every uncached unit is skipped, its own included.
       expect(dependencies.fetch).not.toHaveBeenCalled();
       expect(resultByPart(results, 'system')).toMatchObject({
         verdict: { action: 'block', message: guardrailBlockMessage(['injection_attack'], null) },
@@ -2113,12 +2114,12 @@ describe('scanRequestWithVerdictCache', () => {
           verdict_cache: 'hit',
           decision: 'blocked',
           cached_segments: 1,
-          chunks: 0,
+          chunks: 1,
         },
       });
       expect(results.map(result => [result.verdict.action, result.report?.calls_skipped])).toEqual([
         ['skip', 2],
-        ['block', 0],
+        ['block', 1],
         ['skip', conversation.length],
       ]);
       expect(results.flatMap(result => result.cacheEntries)).toEqual([]);
@@ -2818,6 +2819,7 @@ describe('scanRequestWithVerdictCache', () => {
         tools_scanned: 0,
         total_units: keys.length,
         cached_units: 1,
+        calls_skipped: keys.length - 1,
         decision: 'blocked',
       });
       expect(dependencies.fetch).not.toHaveBeenCalled();

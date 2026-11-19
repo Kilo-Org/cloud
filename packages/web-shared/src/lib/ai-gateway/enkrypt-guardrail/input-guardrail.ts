@@ -65,9 +65,10 @@ function splitScan(scan: EnkryptGuardrailRequest | null): EnkryptGuardrailScans 
 }
 
 /**
- * The request's wait for its verdict is counted once, on the final call of its blocking scan, or
- * on the final log-only call when the blocking scan recorded no call. Without blocking detectors
- * the request waits for no scan, so that wait is about 0 ms.
+ * The request's wait for its verdict is counted once, on the last usage record of its blocking scan
+ * in report order, or on the last log-only record when the blocking scan recorded no call. That is
+ * not necessarily the last call made, since the calls run in another order. Without blocking
+ * detectors the request waits for no scan, so that wait is about 0 ms.
  */
 export function usageRecordsWithAddedLatency(
   blockingCalls: EnkryptGuardrailCall[],
@@ -135,9 +136,9 @@ export function startEnkryptInputGuardrail(
   const captureResponse = Promise.withResolvers<boolean>();
   const runScan = async (
     resolved: EnkryptGuardrailRequest | null,
-    deadline: AbortSignal
+    deadline: AbortSignal | null
   ): Promise<EnkryptCachedScanResult[]> =>
-    resolved
+    resolved && deadline
       ? scanRequestWithVerdictCache(resolved, {
           apiKey: ENKRYPT_API_KEY,
           fetch,
@@ -154,7 +155,7 @@ export function startEnkryptInputGuardrail(
       : [];
   const scans = scan.then(resolved => ({
     ...splitScan(resolved),
-    deadline: AbortSignal.timeout(ENKRYPT_GUARDRAIL_TIMEOUT_MS),
+    deadline: resolved && AbortSignal.timeout(ENKRYPT_GUARDRAIL_TIMEOUT_MS),
   }));
   const blockingResults = scans
     .then(({ blocking, deadline }) => runScan(blocking, deadline))

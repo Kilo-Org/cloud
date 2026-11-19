@@ -41,6 +41,7 @@ function fixture(options: Partial<KiloHarnessOptions> = {}) {
     ensureSession: async (id: string) => {
       ensured.push(id);
     },
+    settleOutstandingRuleset: async () => undefined,
     answerPermission: async (...input: unknown[]) => {
       answers.push(input);
       return true;
@@ -556,6 +557,40 @@ describe('Kilo harness', () => {
       await native.stop(true);
       await fsp.rm(linkPath, { force: true });
       await fsp.rm(path.dirname(linkPath), { recursive: true, force: true });
+      await fsp.rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('settles an owed ruleset before the restore path returns', async () => {
+    const tempDir = await temporaryDirectory();
+    const settled: string[] = [];
+    try {
+      const harness = createKiloHarness({
+        server: { url: 'http://127.0.0.1:1' },
+        directory: tempDir,
+        seedRegistration: async () => undefined,
+        client: {
+          settleOutstandingRuleset: async (sessionId: string) => void settled.push(sessionId),
+        } as unknown as WrapperKiloClient,
+        sessionExists: async () => false,
+        restore: async () => ({
+          ok: true,
+          downloaded: true,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      });
+      const opened = await harness.open({
+        sessionId,
+        directory: tempDir,
+        env: {},
+        restoreFiles: false,
+        onRestore() {},
+      });
+      // The restore reports success, so the opener returns without the create path.
+      expect(opened).toBe(true);
+      expect(settled).toEqual([sessionId]);
+    } finally {
       await fsp.rm(tempDir, { recursive: true, force: true });
     }
   });

@@ -227,8 +227,20 @@ export async function rememberOutstandingRuleset(
   permission: PermissionRuleset
 ): Promise<void> {
   const file = outstandingRulesetPath(sessionId);
-  await fsp.mkdir(path.dirname(file), { recursive: true });
-  await fsp.writeFile(file, JSON.stringify(permission), { mode: 0o600 });
+  const directory = path.dirname(file);
+  await fsp.mkdir(directory, { recursive: true });
+  // Write beside the target and rename, so a kill mid-write cannot leave a
+  // truncated marker that reads as "nothing owed".
+  const temporary = path.join(directory, `${encodeURIComponent(sessionId)}.${process.pid}.tmp`);
+  try {
+    await fsp.writeFile(temporary, JSON.stringify(permission), { mode: 0o600 });
+    await fsp.rename(temporary, file);
+  } catch (error) {
+    await fsp.rm(temporary, { force: true }).catch(() => undefined);
+    // The record is already committed, so a marker that cannot be stored is
+    // the same failure as a ruleset that could not be applied.
+    throw new SessionRulesetNotAppliedError(sessionId, error);
+  }
 }
 
 export async function forgetOutstandingRuleset(sessionId: string): Promise<void> {
@@ -241,9 +253,15 @@ export async function readOutstandingRuleset(
   try {
     const raw = await fsp.readFile(outstandingRulesetPath(sessionId), 'utf8');
     const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as PermissionRuleset) : undefined;
-  } catch {
-    return undefined;
+    // Present but unreadable is still owed: never treat a damaged marker as
+    // permission to accept the record.
+    if (Array.isArray(parsed)) return parsed as PermissionRuleset;
+    throw new Error(`Outstanding ruleset for ${sessionId} is malformed`);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    // A marker that exists but cannot be read reports the same final failure,
+    // so the route does not prepare on an assumption about its ruleset.
+    throw new SessionRulesetNotAppliedError(sessionId, error);
   }
 }
 
@@ -400,6 +418,12 @@ export type WrapperKiloClient = {
     signal: AbortSignal
   ) => Promise<{ status: string; outputBytes?: number } | null>;
   ensureSession: (sessionId: string, directory: string, signal?: AbortSignal) => Promise<void>;
+  /** Applies a ruleset a committed record still owes, if any. */
+  settleOutstandingRuleset: (
+    sessionId: string,
+    directory: string,
+    signal?: AbortSignal
+  ) => Promise<void>;
   sendPrompt: (opts: PromptOptions) => Promise<SessionPromptResponse>;
   sendPromptAsync: (opts: PromptOptions) => Promise<void>;
   abortSession: (opts: {
@@ -801,6 +825,18 @@ export function createWrapperKiloClient(
       if (record?.permission !== undefined && Array.isArray(record.permission)) {
         await applyRuleset(record.permission);
       }
+    },
+
+    settleOutstandingRuleset: async (sessionId, directory, signal) => {
+      const owed = await readOutstandingRuleset(sessionId);
+      if (owed === undefined) return;
+      const restoreTimeout = AbortSignal.timeout(8_000);
+      const restored = await v2Client.session.update(
+        { sessionID: sessionId, directory, permission: owed },
+        { signal: signal ? AbortSignal.any([signal, restoreTimeout]) : restoreTimeout }
+      );
+      requireSdkData(restored, `Session permission restore for ${sessionId}`);
+      await forgetOutstandingRuleset(sessionId);
     },
 
     sendPrompt: async opts => {

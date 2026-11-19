@@ -792,9 +792,10 @@ keep environment snapshots and existing history/worktree recovery.
   that names another directory takes history-only recovery, as Kilo v2 already requires.
   Missing native sessions use history-only recovery.
   A re-pointed record keeps the fields it already carries. The native import cannot carry a
-  session permission ruleset, so the ruleset is applied right after it; a ruleset that could not be
-  applied is remembered beside the wrapper's durable state until a later prepare applies it, and an
-  incomplete record is never treated as reusable.
+  session permission ruleset, so the ruleset is applied right after it and, when that could not
+  complete, remembered beside the wrapper's durable state. Every prepare settles a remembered
+  ruleset before the route accepts work, on both the reuse and the restore path, and only then
+  clears it.
   New chats and later siblings share that runtime and directory without resetting files.
 
   On a shared-workspace Kilo v2 runtime start without a workspace snapshot, the wrapper also preloads

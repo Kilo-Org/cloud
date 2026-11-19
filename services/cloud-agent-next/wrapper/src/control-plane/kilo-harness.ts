@@ -5,7 +5,6 @@ import { createWorktreeKiloCleanupClient } from '../control/delete-worktree.js';
 import { summarizeWithTimeout } from '../condense-on-complete.js';
 import {
   createWrapperKiloClient,
-  hasOutstandingRuleset,
   isKiloServerUnreachableError,
   sameDirectory,
   type WrapperKiloClient,
@@ -60,11 +59,9 @@ async function sessionExists(
   }
   // A session is reused only when the record is stored under this route's
   // directory. Otherwise the caller restores or creates its own session, as
-  // the v2 opener does. A record that still owes a ruleset is not complete, so
-  // it takes the same path and the create step applies the ruleset.
+  // the v2 opener does.
   const recorded = parsed.data.directory;
   if (typeof recorded !== 'string') return false;
-  if (await hasOutstandingRuleset(sessionId)) return false;
   return sameDirectory(recorded, directory);
 }
 
@@ -85,6 +82,10 @@ export function createKiloHarness(options: KiloHarnessOptions): Harness {
         input.env,
         signal
       );
+      // Every prepare passes through here, whether it reuses the record or
+      // restores history: settle a ruleset that a committed record still owes
+      // before the route can accept work.
+      await client.settleOutstandingRuleset?.(input.sessionId, input.directory, signal);
       if (
         await (options.sessionExists ?? sessionExists)(
           client,

@@ -699,6 +699,8 @@ const maskAgentScreenshot = async (
     readonly clip?: ScreenshotClip | undefined;
     /** The clip's render scale: 1 for a CSS-pixel capture, the device pixel ratio for a device one. */
     readonly clipScale?: number | undefined;
+    /** Whether the caller asked for a CSS-pixel viewport capture, whose mask needs a proven scale. */
+    readonly cssCapture?: boolean | undefined;
     readonly dataUrl: string;
     readonly fullPage: boolean;
     /** Geometry the caller already read for the capture (a device-scale clip), so the mask does not ask again. */
@@ -772,6 +774,15 @@ const maskAgentScreenshot = async (
 
   if (boxes.length === 0) {
     return { dataUrl: input.dataUrl, mediaType: input.mediaType };
+  }
+
+  // Nothing proves the image's pixels per CSS pixel: the CSS viewport was not read, so the capture is the tab's
+  // Own pixels, and no ratio was given. Masking at a guessed 1x would leave the withheld pixels visible.
+  if (input.cssCapture === true && input.imageScale === undefined) {
+    return {
+      error:
+        'The page’s viewport could not be measured, so no masked screenshot was returned. Try again once the page has loaded.',
+    };
   }
 
   const mask = deps.maskScreenshot ?? maskScreenshotDataUrl;
@@ -1055,10 +1066,19 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
           clip: { height: clip.height, left: clip.x, top: clip.y, width: clip.width },
           clipScale,
         }),
+    // A css viewport capture is masked at 1 only when the CSS viewport proved the image is that size; otherwise
+    // The masker scales the boxes by the device ratio or fails closed rather than masking at a guess.
+    ...(requestedScale === 'css' && fullPage !== true && clip === undefined
+      ? { cssCapture: true }
+      : {}),
     dataUrl: `data:${mediaType};base64,${data}`,
     fullPage: fullPage === true,
     ...(geometry === undefined ? {} : { geometry }),
-    ...(requestedScale === 'css' && fullPage !== true ? { imageScale: 1 } : {}),
+    // Only a capture cut at the CSS viewport is one CSS pixel per image pixel; without that viewport the image is
+    // The tab's own pixels, and the masker scales the boxes by the device ratio instead.
+    ...(requestedScale === 'css' && fullPage !== true && geometry?.viewport !== undefined
+      ? { imageScale: 1 }
+      : {}),
     mediaType,
   });
 

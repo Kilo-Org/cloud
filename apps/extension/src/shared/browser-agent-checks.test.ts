@@ -144,6 +144,13 @@ describe('argument hashing', () => {
         },
         hash: 'a243193a:114',
       },
+      // An astral character contributes its full code point and then its low surrogate, one per UTF-16 index; a
+      // Code-unit-only fold would disagree, and the CLI's hash must equal this one to find a step token.
+      { args: { text: 'café' }, hash: '4acfafd3:15' },
+      { args: { text: 'a😀b' }, hash: 'c3f119:15' },
+      { args: { text: '日本語テキスト' }, hash: 'edae66dd:18' },
+      { args: { ключ: 'значение' }, hash: '2d42327b:19' },
+      { args: { target: 'e1', text: 'naïve 😀 漢字' }, hash: 'd54a8501:36' },
     ];
 
     for (const vector of vectors) {

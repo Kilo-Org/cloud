@@ -275,6 +275,17 @@ const STEP_TAB_TTL_MS = 2 * 60_000;
 const STEP_TAB_LIMIT = 32;
 
 /**
+ * How long an approved call's downloads are its own — the guard's late window, since that is how long a file it
+ * Started could still land — and how many such windows a session keeps.
+ */
+const APPROVED_DOWNLOAD_WINDOW_MS = DOWNLOAD_GUARD_LINGER_MS;
+/** How far before an approved call an item may have started and still be its file: a click's request races. */
+const APPROVED_WINDOW_SLACK_MS = 50;
+/** How long a finished window is remembered, and how many are kept: a search can arrive just after it ends. */
+const APPROVED_WINDOW_KEEP_MS = 60_000;
+const APPROVED_WINDOW_LIMIT = 8;
+
+/**
  * How long the guard waits for a download it stopped to reach `complete` or
  * `interrupted`. `cancel` resolves on an item that already finished, so the
  * only proof that no file exists is the item's own terminal state.
@@ -351,7 +362,7 @@ const keptDownloadText = async (
     return undefined;
   }
 
-  const requested = destination.split('/').findLast(Boolean);
+  const requested = requestedFileName(destination);
   /** Whether the browser created a download at all: a navigate that started none keeps its own error. */
   let created = false;
 
@@ -815,6 +826,24 @@ const startedSince = (item: BrowserDownloadItem, since: number): boolean => {
   const created = Date.parse(item.startTime);
 
   return Number.isNaN(created) || created >= since;
+};
+
+/** When the browser created this item, for the record whose window has to cover that moment: now if unreadable. */
+const itemStartOf = (item: BrowserDownloadItem): number => {
+  const created = item.startTime === undefined ? Number.NaN : Date.parse(item.startTime);
+
+  return Number.isNaN(created) ? Date.now() : created;
+};
+
+/** The file name a url asks for: its path's last non-empty segment, decoded, without the query. */
+const requestedFileName = (url: string): string | undefined => {
+  try {
+    const last = new URL(url).pathname.split('/').findLast(Boolean);
+
+    return last === undefined || last === '' ? undefined : decodeURIComponent(last);
+  } catch {
+    return undefined;
+  }
 };
 
 /**
@@ -1320,6 +1349,35 @@ export const createBrowserRuntime = ({
   /** Names one guard attempt; a record is counted by the attempt that opened it and by no other. */
   let attempts = 0;
   /**
+   * The windows in which a call ran with its downloads approved, per session: a file a human approved is that
+   * call's, so no later search may stop it however closely it matches an older record for the same url.
+   */
+  const approvedWindows = new Map<string, { readonly from: number; readonly to: number }[]>();
+  /** When each session last ran a call with its downloads approved: a later item of the same url is that call's. */
+  const lastApprovedAt = new Map<string, number>();
+
+  /** Notes that this session's call runs with its downloads approved, and forgets windows that are over. */
+  const noteApprovedWindow = (session: string, from: number): void => {
+    const kept = (approvedWindows.get(session) ?? []).filter(
+      window => window.to >= from - APPROVED_WINDOW_KEEP_MS
+    );
+
+    kept.push({ from, to: from + APPROVED_DOWNLOAD_WINDOW_MS });
+
+    approvedWindows.set(session, kept.slice(-APPROVED_WINDOW_LIMIT));
+    lastApprovedAt.set(session, from);
+  };
+
+  /** Whether the browser created this item while an approved call was running: then it is that call's file. */
+  const startedByApprovedCall = (session: string, item: BrowserDownloadItem): boolean => {
+    const at = itemStartOf(item);
+
+    return (approvedWindows.get(session) ?? []).some(
+      window => window.from - APPROVED_WINDOW_SLACK_MS <= at && at <= window.to
+    );
+  };
+
+  /**
    * The tab a refused download step opened, keyed by the step itself. Its approved repeat navigates that tab: a
    * `browser_tabs new` sent again would open a second tab and download the file twice.
    */
@@ -1392,6 +1450,8 @@ export const createBrowserRuntime = ({
   /** A session that ends owes no approval, and its stopped files stay unreported: there is no model left to tell. */
   const closeSessionRecords = (session: string): void => {
     downloadRecords.delete(session);
+    approvedWindows.delete(session);
+    lastApprovedAt.delete(session);
     closedSessions.add(session);
 
     // Bounded: an old handle that is reused is reopened explicitly, and only the live ones can hold a record.
@@ -1420,10 +1480,14 @@ export const createBrowserRuntime = ({
     return created;
   };
 
-  /** A download's one record: by the item the browser created, else by the url its announcement named. */
+  /**
+   * A download's one record: by the item the browser created, else by the url its announcement named, and only
+   * while that record's own window is live around `at` — a later download of the same url is another call's file.
+   */
   const findRecord = (
     session: string,
     input: {
+      readonly at?: number | undefined;
       readonly itemId?: number | undefined;
       readonly tabId: number;
       readonly url: string | undefined;
@@ -1451,10 +1515,22 @@ export const createBrowserRuntime = ({
 
     // An item already linked is another download of the same url: only an unlinked announcement is this one, and
     // A repeated url answers with the newest of them, which is the announcement this item belongs to.
+    const at = input.at ?? Date.now();
+
     return [...records.values()]
       .filter(
         record =>
-          record.itemId === undefined && record.url === input.url && record.tabId === input.tabId
+          record.itemId === undefined &&
+          // A reported record may still link the file it announced, but only while that item predates the
+          // Session's last approved call: anything the browser started after an approval is that call's file.
+          (record.kind !== 'reported' ||
+            at < (lastApprovedAt.get(session) ?? Number.POSITIVE_INFINITY)) &&
+          record.url === input.url &&
+          record.tabId === input.tabId &&
+          // A record speaks only for the downloads of its own window: an approved repeat's kept file of the same
+          // Url started later, and stopping it would delete a file the human approved and report nothing.
+          record.since <= at &&
+          at <= record.since + DOWNLOAD_GUARD_LINGER_MS
       )
       .toSorted((left, right) => left.since - right.since)
       .at(-1);
@@ -1508,10 +1584,12 @@ export const createBrowserRuntime = ({
     const records = recordsFor(sighting.session);
     const existing =
       findRecord(sighting.session, {
+        at: Date.now(),
         itemId: sighting.itemId,
         tabId: sighting.tabId,
         url: undefined,
-      }) ?? findRecord(sighting.session, { tabId: sighting.tabId, url: sighting.url });
+      }) ??
+      findRecord(sighting.session, { at: Date.now(), tabId: sighting.tabId, url: sighting.url });
 
     if (existing === undefined) {
       if (closedSessions.has(sighting.session)) {
@@ -1638,6 +1716,27 @@ export const createBrowserRuntime = ({
       ...records.map(record => record.since),
       ...watches.map(watch => watch.since)
     );
+    // A download the browser reports without a tab is attributed by the page that started it, exactly as the live
+    // Listener does, so the candidate tabs' pages are read once for this search.
+    const pageByTab = new Map<number, string | undefined>();
+    const getTab = tabsApi.get?.bind(tabsApi);
+
+    if (getTab !== undefined) {
+      for (const tabId of new Set([
+        ...records.map(record => record.tabId),
+        ...watches.map(watch => watch.tabId),
+      ])) {
+        try {
+          // eslint-disable-next-line no-await-in-loop -- one read per candidate tab, once per search
+          const tab = await getTab(tabId);
+
+          pageByTab.set(tabId, pageOf(tab?.url));
+        } catch {
+          pageByTab.set(tabId, undefined);
+        }
+      }
+    }
+
     let found: readonly BrowserDownloadItem[] = [];
 
     try {
@@ -1648,7 +1747,10 @@ export const createBrowserRuntime = ({
     }
 
     for (const item of found) {
-      const owner = startedSince(item, since) ? ownerOf(session, item, watches) : undefined;
+      const owner =
+        startedSince(item, since) && !startedByApprovedCall(session, item)
+          ? ownerOf({ item, pageByTab, records, session, watches })
+          : undefined;
 
       if (owner !== undefined) {
         // eslint-disable-next-line no-await-in-loop -- one item at a time, and each stop settles its own record
@@ -1658,53 +1760,60 @@ export const createBrowserRuntime = ({
   };
 
   /** The record, or the armed watch, that owns a download the search found: `undefined` when it is another call's. */
-  const ownerOf = (
-    session: string,
-    item: BrowserDownloadItem,
-    watches: readonly OpenWatch[]
-  ): (DownloadSighting & { readonly itemId: number }) | undefined => {
-    if (item.tabId === undefined) {
+  const ownerOf = (input: {
+    readonly item: BrowserDownloadItem;
+    readonly pageByTab: ReadonlyMap<number, string | undefined>;
+    readonly records: readonly DownloadRecord[];
+    readonly session: string;
+    readonly watches: readonly OpenWatch[];
+  }): (DownloadSighting & { readonly itemId: number }) | undefined => {
+    const { item, pageByTab, records, session, watches } = input;
+    const at = itemStartOf(item);
+    // A download without a tab belongs to the page that started it, the tie the live listener uses; a download
+    // With a tab is that tab's, and the session's other tabs belong to the user or to another call.
+    const referrer = pageOf(item.referrer);
+    const candidateTabs =
+      item.tabId === undefined
+        ? [
+            ...new Set([
+              ...records.map(record => record.tabId),
+              ...watches.map(watch => watch.tabId),
+            ]),
+          ].filter(tabId => referrer !== undefined && pageByTab.get(tabId) === referrer)
+        : [item.tabId];
+
+    // An item a record already links is being stopped by whoever owns it: a second cancel would report it twice.
+    if (
+      findRecord(session, { at, itemId: item.id, tabId: item.tabId ?? 0, url: undefined }) !==
+      undefined
+    ) {
       return undefined;
     }
 
-    const { tabId } = item;
-    const record =
-      findRecord(session, { itemId: item.id, tabId, url: undefined }) ??
-      findRecord(session, { tabId, url: downloadUrlOf(item) });
+    for (const tabId of candidateTabs) {
+      const record = findRecord(session, { at, tabId, url: downloadUrlOf(item) });
+      const watch = watches.find(candidate => candidate.tabId === tabId);
+      const owner =
+        record ?? (watch !== undefined && startedSince(item, watch.since) ? watch : undefined);
 
-    if (record !== undefined) {
-      if (record.itemId !== undefined) {
+      if (owner === undefined) {
         return undefined;
       }
 
       return {
-        attempt: record.attempt,
-        filename: record.filename,
+        attempt: owner.attempt,
+        // The record knows the name the browser announced; a watch only knows the item it just found.
+        filename: record === undefined ? fileNameOf(item) : record.filename,
         guid: undefined,
         itemId: item.id,
         session,
-        step: record.step,
+        step: owner.step,
         tabId,
         url: downloadUrlOf(item),
       };
     }
 
-    const watch = watches.find(candidate => candidate.tabId === tabId);
-
-    if (watch === undefined || !startedSince(item, watch.since)) {
-      return undefined;
-    }
-
-    return {
-      attempt: watch.attempt,
-      filename: fileNameOf(item),
-      guid: undefined,
-      itemId: item.id,
-      session,
-      step: watch.step,
-      tabId,
-      url: downloadUrlOf(item),
-    };
+    return undefined;
   };
 
   /** Stops a download a guard left behind and settles its one record: the report reads the true outcome later. */
@@ -1731,7 +1840,9 @@ export const createBrowserRuntime = ({
     const reports: DownloadReport[] = [];
 
     for (const [key, record] of records) {
-      if (record.kind !== 'reported') {
+      // A stop that has not settled is not reported yet: its file may still be kept, and a report now would say it
+      // Was deleted and never name the file that survived. The next call reports it once its outcome is known.
+      if (record.kind !== 'stopping' && record.kind !== 'reported') {
         // Reported once: the record itself stays, so the same item is never stopped or named a second time.
         records.set(key, { ...record, kind: 'reported' });
         reports.push({
@@ -1757,7 +1868,13 @@ export const createBrowserRuntime = ({
     }
 
     for (const [key, record] of records) {
-      if (record.kind === 'reported' && record.since + DOWNLOAD_GUARD_LINGER_MS < at) {
+      // A stop that never settled is memory too: nothing will report it, so it may not grow the map.
+      const stale =
+        record.kind === 'reported' || record.kind === 'stopping'
+          ? record.since + DOWNLOAD_GUARD_LINGER_MS < at
+          : false;
+
+      if (stale) {
         records.delete(key);
       }
     }
@@ -2501,6 +2618,13 @@ export const createBrowserRuntime = ({
         }
 
         const callStartedAt = Date.now();
+
+        // A file an approved call starts belongs to that approval: no later search may stop it, however closely it
+        // Matches an older record for the same url.
+        if (downloadApproved) {
+          noteApprovedWindow(sessionKey, callStartedAt);
+        }
+
         let result: EvalTabResult | null = null;
         let settlement: GuardSettlement = { kept: [], stopped: 0 };
 

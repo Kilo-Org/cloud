@@ -2085,6 +2085,286 @@ describe('agent browser calls', () => {
     ).toContain('report.txt: The file was downloaded; the page did not change.');
   });
 
+  it('leaves a later download of the same url alone when the record for it is stale', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+
+    cdp.setHandlers({ 'Input.dispatchMouseEvent': () => ({}) });
+
+    const click = () =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+    const shot = () =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: {},
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_take_screenshot',
+      });
+
+    vi.useFakeTimers();
+
+    try {
+      // The click leaves an announcement behind, which the next call reports: the record keeps its url.
+      await runTimed(click());
+      await vi.advanceTimersByTimeAsync(1500);
+      cdp.emit('Browser.downloadWillBegin', {
+        guid: 'stale',
+        suggestedFilename: 'same.bin',
+        url: `${MAIN_ORIGIN}/same.bin`,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+
+      const carried = await runTimed(shot(), 0);
+
+      expect(carried.kind).toBe('needs_permission');
+
+      // Long after that window an approved repeat downloads the same url again and the browser writes a file.
+      await vi.advanceTimersByTimeAsync(10_000);
+      downloads.record({
+        id: 161,
+        startTime: new Date(Date.now()).toISOString(),
+        tabId: TAB_ID,
+        url: `${MAIN_ORIGIN}/same.bin`,
+      });
+
+      const after = await runTimed(shot(), 400);
+
+      // The stale record speaks only for its own window: the approved file stays where the human kept it.
+      expect(after.kind).toBe('result');
+      expect([downloads.cancelled, downloads.removed]).toStrictEqual([[], []]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('leaves the file an approved call started alone, under an older record for the same url', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+
+    cdp.setHandlers({ 'Input.dispatchMouseEvent': () => ({}) });
+
+    const click = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+    const shot = () =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: {},
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_take_screenshot',
+      });
+
+    vi.useFakeTimers();
+
+    try {
+      // The guarded click leaves an announcement record behind, reported by the very next call.
+      await runTimed(click([]));
+      await vi.advanceTimersByTimeAsync(1500);
+      cdp.emit('Browser.downloadWillBegin', {
+        guid: 'approved',
+        suggestedFilename: 'same.bin',
+        url: `${MAIN_ORIGIN}/same.bin`,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+
+      const carried = await runTimed(shot(), 0);
+
+      // The approved repeat runs with its downloads approved, and the browser writes the file it was for.
+      await runTimed(click([expectStepToken(carried)]));
+      downloads.record({
+        id: 170,
+        startTime: new Date(Date.now()).toISOString(),
+        tabId: TAB_ID,
+        url: `${MAIN_ORIGIN}/same.bin`,
+      });
+
+      const after = await runTimed(shot(), 400);
+
+      // The approval is the file's owner: the older record may not delete it or report it as stopped.
+      expect([after.kind, downloads.cancelled, downloads.removed]).toStrictEqual([
+        'result',
+        [],
+        [],
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops a late download the search finds without a tab, by the page that started it', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+
+    cdp.setHandlers({ 'Input.dispatchMouseEvent': () => ({}) });
+
+    const click = () =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+    const shot = () =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: {},
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_take_screenshot',
+      });
+
+    vi.useFakeTimers();
+
+    try {
+      // The click stops nothing and leaves its window open on the tab whose page is the guard's.
+      await runTimed(click());
+      await vi.advanceTimersByTimeAsync(1500);
+      // The browser reports the file without a tab: only the referrer ties it to this call's page.
+      downloads.record({
+        id: 91,
+        // The guard tab's page, as the tab reported it when the guard armed.
+        referrer: `${MAIN_ORIGIN}/dashboard`,
+        startTime: new Date(Date.now()).toISOString(),
+        url: `${MAIN_ORIGIN}/late.bin`,
+      });
+
+      const reported = await runTimed(shot(), 400);
+
+      expect(reported.kind).toBe('needs_permission');
+      expect(downloads.cancelled).toStrictEqual([91]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('names the requested path, not the whole url, when the kept item has no name yet', async () => {
+    const downloads = createFakeDownloads();
+    // The browser reports the item while it is still writing, so it has no file name of its own.
+    downloads.searched.push({ filename: '/home/me/Downloads/', id: 54 });
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+
+    cdp.setHandlers({ 'Page.navigate': () => ({ errorText: 'net::ERR_ABORTED' }) });
+
+    const navigate = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: {
+          authorized: [readGrant, { class: 'navigate', origin: MAIN_ORIGIN }],
+          sensitive: [...sensitive],
+        },
+        arguments: { url: `${MAIN_ORIGIN}/files/report%20one.pdf?token=1` },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_navigate',
+      });
+
+    const guarded = await navigate([]);
+
+    vi.useFakeTimers();
+
+    try {
+      const pending = navigate([expectStepToken(guarded)]);
+
+      await vi.advanceTimersByTimeAsync(4000);
+      const approved = await pending;
+      const text =
+        approved.kind === 'result' && approved.result.ok ? String(approved.result.value) : '';
+
+      // The path's last segment, decoded and without the query: a name the model can look for.
+      expect(text).toContain('report one.pdf');
+      expect(text).not.toContain('token=1');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('holds a stop whose outcome is unknown, then names the file it kept', async () => {
+    const downloads = createFakeDownloads({ removeRejects: true });
+    const held = Promise.withResolvers<readonly BrowserDownloadItem[]>();
+    let holding = true;
+    const api: BrowserDownloadsApi = {
+      ...downloads.api,
+      search: query => {
+        if (holding && query.id === 71) {
+          holding = false;
+
+          return held.promise;
+        }
+
+        return downloads.api.search?.(query);
+      },
+    };
+    const { cdp, runtime } = await createHarness({ downloadsApi: api });
+
+    cdp.setHandlers({ 'Input.dispatchMouseEvent': () => ({}) });
+
+    const click = () =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+    const shot = () =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: {},
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_take_screenshot',
+      });
+
+    vi.useFakeTimers();
+
+    try {
+      await runTimed(click());
+      await vi.advanceTimersByTimeAsync(1500);
+      // The linger stops the file, and its own read of the item has not answered yet: the outcome is unknown.
+      downloads.emit({
+        filename: '/home/me/Downloads/kept.bin',
+        id: 71,
+        state: 'complete',
+        tabId: TAB_ID,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+
+      const early = await runTimed(shot(), 0);
+
+      // Nothing is reported while the stop is unsettled: it may yet keep the file, and the report must say so.
+      expect(early.kind).toBe('result');
+
+      held.resolve([
+        { filename: '/home/me/Downloads/kept.bin', id: 71, state: 'complete', tabId: TAB_ID },
+      ]);
+      await vi.advanceTimersByTimeAsync(50);
+
+      const reported = await runTimed(shot(), 0);
+
+      if (reported.kind !== 'needs_permission') {
+        throw new Error(`expected a refusal, got ${reported.kind}`);
+      }
+
+      // The file the browser had already written is named, not reported as deleted.
+      expect(reported.result.ok ? '' : reported.result.error).toContain('already saved kept.bin');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   const refusalSchema = z.object({
     code: z.number(),
     data: z.record(z.string(), z.unknown()).optional(),

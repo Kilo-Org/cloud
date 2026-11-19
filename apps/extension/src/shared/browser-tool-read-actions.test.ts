@@ -434,7 +434,16 @@ describe('browser_take_screenshot', () => {
   });
 
   it('masks the forced frame with the viewport geometry, in the image the mask is applied to', async () => {
-    const { session } = createSession({ frameTree: FRAME_TREE_WITH_PAY, freshFrame: 'RlJFU0g=' });
+    const { session } = createSession({
+      frameTree: FRAME_TREE_WITH_PAY,
+      freshFrame: 'RlJFU0g=',
+      // A masked css capture needs a proven scale: the CSS viewport is what makes the image CSS-sized.
+      layoutMetrics: {
+        cssLayoutViewport: { clientHeight: 400, clientWidth: 800 },
+        cssVisualViewport: { pageX: 0, pageY: 0 },
+        layoutViewport: { clientHeight: 400, clientWidth: 800 },
+      },
+    });
     const { inputs, mask } = recordMask();
 
     const result = await runReadBrowserTool('browser_take_screenshot', { type: 'png' }, session, {
@@ -611,9 +620,9 @@ describe('browser_take_screenshot', () => {
       boxes: { 99: viewportRect },
       frameTree: FRAME_TREE_WITH_PAY,
       layoutMetrics: {
-        cssLayoutViewport: { clientWidth: 800 },
+        cssLayoutViewport: { clientHeight: 200, clientWidth: 400 },
         cssVisualViewport: { pageX: 100, pageY: 50 },
-        layoutViewport: { clientWidth: 800 },
+        layoutViewport: { clientHeight: 200, clientWidth: 400 },
       },
     });
     const { inputs, mask } = recordMask();
@@ -648,6 +657,29 @@ describe('browser_take_screenshot', () => {
     expect(freshSizes).toStrictEqual([{ height: 400, width: 800 }]);
     // The mask boxes are CSS pixels, so they map onto that image one for one.
     expect(inputs[0]?.scale).toBe(1);
+  });
+
+  it('refuses a masked css capture when the CSS viewport is unknown, instead of masking at a guess', async () => {
+    const { session } = createSession({
+      frameTree: FRAME_TREE_WITH_PAY,
+      layoutMetrics: {
+        // The layout viewport is in device pixels; without a CSS width there is neither a viewport nor a ratio.
+        layoutViewport: { clientHeight: 800, clientWidth: 1600 },
+      },
+    });
+    const { inputs, mask } = recordMask();
+
+    const result = await runReadBrowserTool(
+      'browser_take_screenshot',
+      { scale: 'css', type: 'png' },
+      session,
+      { agentScope: { readableOrigins: ['https://app.example.com'] }, maskScreenshot: mask }
+    );
+
+    // A 1x mask over a device-pixel image would leave a withheld frame's pixels visible: fail closed instead.
+    expect(result.ok).toBe(false);
+    expect(inputs).toStrictEqual([]);
+    expect(result.ok ? '' : result.error).toContain('viewport could not be measured');
   });
 
   it('clips a device-scale viewport capture at the tab\u2019s ratio and masks at the same scale', async () => {

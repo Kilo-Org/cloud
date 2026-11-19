@@ -451,11 +451,13 @@ export const parseToolArguments = (args: unknown): Record<string, unknown> => {
  *   its JSON quotes, `undefined` becomes `null`, and absent arguments hash as
  *   `null`.
  *
- * The hash is 32-bit FNV-1a over the canonical text's UTF-16 code units, one
- * per index (`codePointAt`), starting from `2_166_136_261` and multiplying by
- * `16_777_619` each step. The result is `hex:length`: the hash in unpadded
- * lowercase hexadecimal, a colon, and the canonical text's length in UTF-16
- * code units.
+ * The hash starts at `2_166_136_261` and walks the canonical text once per
+ * UTF-16 index (`index < text.length`): at each index it XORs
+ * `text.codePointAt(index) ?? 0` and multiplies by `16_777_619`. An astral
+ * character therefore contributes its full code point at its first index and
+ * its low surrogate at the second, which a plain code-unit fold would not. The
+ * result is `hex:length`: the hash in unpadded lowercase hexadecimal, a colon,
+ * and the canonical text's length counted in UTF-16 code units.
  */
 export const hashBrowserToolArguments = (args: unknown): string => {
   const canonical = (value: unknown): string => {

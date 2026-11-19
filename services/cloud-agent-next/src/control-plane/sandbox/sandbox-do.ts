@@ -460,10 +460,14 @@ import type { WorktreeChangeStates } from '../session/worktree-changes.js';
 import type { WorktreeChangesReady } from '../worktree-changes-ready.js';
 import type { WorktreeChangesContext } from '../../sandbox-session/worktree-changes.js';
 import { buildNativeEgressAllowlist } from '../../sandbox-control/egress-policy.js';
-import { nativeEgressAllowlistSchema } from '../../sandbox-containers/egress-policy.js';
+import { nativeEgressAllowlistSchema } from '../../sandbox-control/egress-policy.js';
 import { ByocVercelProviderError, type ByocVercelSource } from '../../byoc/vercel-provider.js';
 import { createProviderAdapter, type StoredProviderPin } from './provider-adapters.js';
-import { providerSupports } from '@kilocode/worker-utils/sandbox-provider-capabilities';
+import {
+  egressRequestSupported,
+  providerSupports,
+  type EgressRequest,
+} from '@kilocode/worker-utils/sandbox-provider-capabilities';
 import {
   SNAPSHOT_VALIDATOR_REF_KEY,
   snapshotValidatorAllocation,
@@ -3205,13 +3209,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
     };
   }
 
-  /** A restricted egress policy needs a provider that enforces it and an isolated sandbox. */
-  private egressPolicyAllowed(
+  /** An egress request needs a provider that enforces it and an isolated sandbox. */
+  private egressRequestAllowed(
     provider: AgentSandboxProvider,
-    sandboxKind: SandboxKind | undefined
+    sandboxKind: SandboxKind | undefined,
+    request: EgressRequest
   ): boolean {
+    if (request.egressMode !== 'allowlist' && request.egressAudit !== true) return true;
     return (
-      providerSupports(provider, 'egressPolicy') &&
+      egressRequestSupported(provider, request) &&
       (sandboxKind === undefined ? this.sandboxId.startsWith('ses-') : sandboxKind === 'isolated')
     );
   }
@@ -3233,10 +3239,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     );
     if (!parsedProvider.success) throw new ProviderCreationError('invalid_configuration');
     const provider = parsedProvider.data;
-    if (
-      (policy.data.egressMode === 'allowlist' || policy.data.egressAudit === true) &&
-      !this.egressPolicyAllowed(provider, input.sandboxKind)
-    ) {
+    if (!this.egressRequestAllowed(provider, input.sandboxKind, policy.data)) {
       throw new ProviderCreationError('invalid_configuration');
     }
     const { requiresCustomerCredential } = PROVIDER_DESCRIPTORS[provider];
@@ -7801,10 +7804,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (pin.egressAllowlist !== undefined) {
       pin.egressAllowlist = nativeEgressAllowlistSchema.parse(pin.egressAllowlist);
     }
-    if (pin.egressAllowlist !== undefined || pin.egressAudit === true) {
-      if (!this.egressPolicyAllowed(pin.provider, pin.sandboxKind)) {
-        throw new ProviderCreationError('invalid_configuration');
-      }
+    const request: EgressRequest = {
+      egressMode: pin.egressAllowlist === undefined ? undefined : 'allowlist',
+      egressAudit: pin.egressAudit,
+    };
+    if (!this.egressRequestAllowed(pin.provider, pin.sandboxKind, request)) {
+      throw new ProviderCreationError('invalid_configuration');
     }
     return pin;
   }

@@ -778,26 +778,38 @@ describe('explicit sandbox session creation', () => {
   );
 
   it.each([
-    { egressMode: 'allowlist' as const },
-    { egressAudit: true },
-    { egressMode: 'unrestricted' as const, egressAudit: true },
-  ])('rejects egress policy on a resolved legacy Cloudflare sandbox: %j', async policy => {
-    const doStub = makeDoStub();
-    selectControlPlaneSandboxMock.mockResolvedValueOnce({
-      ...PLACED_SANDBOX_DECISION,
-      provider: 'cloudflare',
-    });
-    await expect(
-      registerNewSession(
-        {
-          ...requestForPreset('cloudflare-single'),
-          runtime: { sandboxAllocation: 'cloudflare-single', ...policy },
-        },
-        selectedContext(doStub)
-      )
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
-    expect(createCliSessionMock).not.toHaveBeenCalled();
-  });
+    {
+      policy: { egressMode: 'allowlist' as const },
+      message: 'Restricted network access is not available for Cloudflare sandboxes.',
+    },
+    {
+      policy: { egressAudit: true },
+      message: 'Egress audit is not available for Cloudflare sandboxes.',
+    },
+    {
+      policy: { egressMode: 'unrestricted' as const, egressAudit: true },
+      message: 'Egress audit is not available for Cloudflare sandboxes.',
+    },
+  ])(
+    'rejects egress policy on a resolved legacy Cloudflare sandbox: %j',
+    async ({ policy, message }) => {
+      const doStub = makeDoStub();
+      selectControlPlaneSandboxMock.mockResolvedValueOnce({
+        ...PLACED_SANDBOX_DECISION,
+        provider: 'cloudflare',
+      });
+      await expect(
+        registerNewSession(
+          {
+            ...requestForPreset('cloudflare-single'),
+            runtime: { sandboxAllocation: 'cloudflare-single', ...policy },
+          },
+          selectedContext(doStub)
+        )
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST', message });
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+    }
+  );
 
   it('forwards legacy prepare mode-only input without an explicit allocation', () => {
     const request = prepareInputToSessionCreateRequest(
@@ -2307,8 +2319,7 @@ describe('explicit sandbox session creation', () => {
             })
           ).rejects.toMatchObject({
             code: 'BAD_REQUEST',
-            message:
-              'Egress policy requires an isolated control-plane Cloudflare containers sandbox',
+            message: 'Restricted network access is not available for Vercel sandboxes.',
           });
           expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
         }

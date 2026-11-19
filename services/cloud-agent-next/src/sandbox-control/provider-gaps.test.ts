@@ -37,9 +37,15 @@ const PROVIDER_GAPS: readonly ProviderGap[] = [
   },
   {
     provider: 'vercel',
-    feature: 'egressPolicy',
+    feature: 'egressProxy',
     class: 'gap',
-    reason: 'The allowlist and the audit do not map to the Vercel network policy.',
+    reason: 'The Vercel network policy does not forward egress to the Worker proxy yet.',
+  },
+  {
+    provider: 'vercel',
+    feature: 'egressProxySeesAll',
+    class: 'intentional',
+    reason: 'Vercel forwards listed hosts only; other names fail in DNS.',
   },
   {
     provider: 'vercel',
@@ -50,7 +56,8 @@ const PROVIDER_GAPS: readonly ProviderGap[] = [
   { provider: 'cloudflare', feature: 'preview', class: 'retired', reason: RETIRED },
   { provider: 'cloudflare', feature: 'workspaceSnapshots', class: 'retired', reason: RETIRED },
   { provider: 'cloudflare', feature: 'environmentSnapshots', class: 'retired', reason: RETIRED },
-  { provider: 'cloudflare', feature: 'egressPolicy', class: 'retired', reason: RETIRED },
+  { provider: 'cloudflare', feature: 'egressProxy', class: 'retired', reason: RETIRED },
+  { provider: 'cloudflare', feature: 'egressProxySeesAll', class: 'retired', reason: RETIRED },
   { provider: 'cloudflare', feature: 'meteredBilling', class: 'retired', reason: RETIRED },
 ];
 

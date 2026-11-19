@@ -1,7 +1,27 @@
+import { z } from 'zod';
 import { deriveKiloSandboxTargets, type KiloTargetEnv } from '../kilo/kilo-targets.js';
-import { nativeEgressAllowlistSchema } from '../sandbox-containers/egress-policy.js';
 import { ProviderCreationError } from './provider.js';
 import { CLOUD_AGENT_SESSION_SYNC_ORIGIN } from '@kilocode/worker-utils/cloud-agent-session-sync';
+import { egressDomainSchema } from '@kilocode/worker-utils/egress-allowlist';
+
+/** The canonical effective allowlist of a sandbox, for every provider. */
+export const nativeEgressAllowlistSchema = z
+  .array(egressDomainSchema)
+  .transform(domains => [...new Set(domains)].sort());
+
+/** The shared egress check: http or https, the default port, no userinfo, an exact listed host. */
+export function isAllowedEgressUrl(url: URL, allowlist: readonly string[]): boolean {
+  if (
+    (url.protocol !== 'http:' && url.protocol !== 'https:') ||
+    url.port !== '' ||
+    url.username !== '' ||
+    url.password !== ''
+  ) {
+    return false;
+  }
+  const hostname = egressDomainSchema.safeParse(url.hostname);
+  return hostname.success && allowlist.includes(hostname.data);
+}
 
 const GIT_DOMAINS = [
   'github.com',

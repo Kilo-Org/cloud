@@ -3,7 +3,7 @@ import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View, type ViewStyle } from 'react-native';
+import { View, type ViewStyle } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -13,7 +13,9 @@ import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-sc
 import { Button } from '@/components/ui/button';
 import { Flag } from '@/components/ui/icons';
 import { RefreshControl } from '@/components/ui/refresh-control';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowFrame } from '@/components/ui/row-frame';
+import { RowGroup, RowGroupItem, rowGroupPosition } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import {
@@ -34,8 +36,9 @@ const PAGE_SIZE = 30;
 const MAX_PAGES = 10;
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
+// The page gutter and the top pad live on the content container; the cells are
+// one continuous grouped card, so no per-cell inset and no gap between them.
 const listContentContainerStyle = {
-  gap: 12,
   paddingHorizontal: 16,
   paddingTop: 16,
 } satisfies ViewStyle;
@@ -133,10 +136,13 @@ export function ReportReceiptsScreen() {
       <ScreenHeader title={t('profile.reportReceipts.title')} showBackButton />
       <View className="flex-1">
         {loading ? (
-          <TabScreenScrollView className="flex-1" contentContainerClassName="gap-3 px-4 pt-4">
-            <Skeleton className="h-[62px] rounded-lg" />
-            <Skeleton className="h-[62px] rounded-lg" />
-            <Skeleton className="h-[62px] rounded-lg" />
+          <TabScreenScrollView className="flex-1" contentContainerClassName="px-4 pt-4">
+            {/* The loaded rows are one grouped card, so the reserve is one. */}
+            <RowGroup>
+              <RowSkeleton subtitle />
+              <RowSkeleton subtitle />
+              <RowSkeleton subtitle />
+            </RowGroup>
           </TabScreenScrollView>
         ) : null}
 
@@ -171,21 +177,21 @@ export function ReportReceiptsScreen() {
             style={listStyle}
             data={items}
             keyExtractor={item => item.receiptId}
-            renderItem={({ item }) => (
-              <Pressable
-                accessibilityRole="button"
-                className="rounded-lg bg-secondary px-3 py-3 active:opacity-70"
-                onPress={() => {
-                  router.push(reportReceiptRoute(item.receiptId));
-                }}
+            renderItem={({ item, index }) => (
+              <RowGroupItem
+                position={rowGroupPosition({
+                  first: index === 0,
+                  last: index === items.length - 1,
+                })}
               >
-                <Text className="text-sm font-medium" numberOfLines={1}>
-                  {statusLabel(TRIAGE_KEYS, item.triageStatus)}
-                </Text>
-                <Text variant="muted" className="mt-0.5 text-xs">
-                  {timeAgo(parseTimestamp(item.createdAt), undefined, now)}
-                </Text>
-              </Pressable>
+                <RowFrame
+                  title={statusLabel(TRIAGE_KEYS, item.triageStatus)}
+                  subtitle={{ text: timeAgo(parseTimestamp(item.createdAt), undefined, now) }}
+                  onPress={() => {
+                    router.push(reportReceiptRoute(item.receiptId));
+                  }}
+                />
+              </RowGroupItem>
             )}
             contentContainerStyle={listContentContainerStyle}
             // FlashList adds its own control from this pair; the element
@@ -202,7 +208,11 @@ export function ReportReceiptsScreen() {
             onEndReachedThreshold={0.5}
             ListFooterComponent={
               <View className="pt-3">
-                {query.isFetchingNextPage ? <Skeleton className="h-[62px] rounded-lg" /> : null}
+                {query.isFetchingNextPage ? (
+                  <RowGroupItem position="only">
+                    <RowSkeleton subtitle />
+                  </RowGroupItem>
+                ) : null}
                 {query.isFetchNextPageError ? (
                   <Button
                     variant="ghost"

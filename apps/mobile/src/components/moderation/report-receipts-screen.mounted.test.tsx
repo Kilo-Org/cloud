@@ -176,13 +176,15 @@ vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshCont
 // The package ships TypeScript source the mounted project does not transform;
 // the screen only needs the one call it makes on a failed refresh.
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+// The placeholder rows: the screen reserves the loaded rows' own shape through
+// the row primitive, so the case counts placeholders, not the bars inside them.
+vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/icons', () => ({ Flag: 'Flag' }));
 
 const PRESSABLE = 'Pressable' as ElementType;
-const SKELETON = 'Skeleton' as ElementType;
+const ROW_SKELETON = 'RowSkeleton' as ElementType;
 const EMPTY_STATE = 'EmptyState' as ElementType;
 const QUERY_ERROR = 'QueryError' as ElementType;
 const RETRY = 'Retry' as ElementType;
@@ -443,7 +445,7 @@ describe('ReportReceiptsScreen', () => {
     state.isPending = true;
     const root = await mount();
 
-    expect(root.findAll(node => Object.is(node.type, SKELETON))).toHaveLength(3);
+    expect(root.findAll(node => Object.is(node.type, ROW_SKELETON))).toHaveLength(3);
     expect(rows(root)).toHaveLength(0);
   });
 

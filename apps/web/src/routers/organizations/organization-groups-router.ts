@@ -4,11 +4,21 @@ import {
 } from '@kilocode/app-shared/organizations';
 import { MAX_ORGANIZATION_GROUP_ASSIGNMENTS } from '@kilocode/db/schema-types';
 import {
+  MAX_ORGANIZATION_GROUP_POLICIES,
+  ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_TYPE,
   OrganizationGroupMetadataSchema,
-  OrganizationGroupPoliciesSchema,
-  OrganizationGroupPolicySchema,
-  OrganizationGroupPolicyTypeSchema,
+  OrganizationGroupModelAccessPolicySchema,
+  type OrganizationGroupPolicies,
+  type OrganizationGroupModelAccessPolicy,
 } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
+import {
+  OrganizationPermissionPolicySchema,
+  OrganizationPermissionPolicyTypeSchema,
+} from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.schema';
+import {
+  getOrganizationPermissionPolicy,
+  getStoredOrganizationPermissionPolicy,
+} from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.server';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import {
@@ -26,7 +36,7 @@ import {
   updateOrganizationGroupMetadata,
   updateOrganizationGroupDetails,
 } from '@kilocode/web-shared/lib/organizations/organization-groups';
-import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { createTRPCRouter, type TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import {
   ensureOrganizationAccess,
   OrganizationIdInputSchema,
@@ -38,9 +48,20 @@ import { getModelAccessPolicyEditorData } from '@kilocode/web-shared/lib/organiz
 
 const GroupIdInputSchema = OrganizationIdInputSchema.extend({ groupId: z.uuid() }).strict();
 
+const ModelPolicyTypeSchema = z.enum([ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_TYPE]);
+const ModelPolicySchema = z.discriminatedUnion('type', [OrganizationGroupModelAccessPolicySchema]);
+
 const CreateGroupInputSchema = OrganizationIdInputSchema.extend({
   ...OrganizationGroupMetadataSchema.shape,
-  policies: OrganizationGroupPoliciesSchema.optional().default([]),
+  policies: z
+    .array(ModelPolicySchema)
+    .max(MAX_ORGANIZATION_GROUP_POLICIES)
+    .refine(policies => policies.length < 2, {
+      message: 'Duplicate organization group policy type: model_access',
+      path: [1, 'type'],
+    })
+    .optional()
+    .default([]),
 }).strict();
 
 const UpdateMetadataInputSchema = GroupIdInputSchema.extend({
@@ -53,7 +74,7 @@ const UpdateMetadataInputSchema = GroupIdInputSchema.extend({
   });
 
 const SetPolicyInputSchema = GroupIdInputSchema.extend({
-  policy: OrganizationGroupPolicySchema,
+  policy: ModelPolicySchema,
 }).strict();
 
 const UpdateGroupDetailsInputSchema = GroupIdInputSchema.extend({
@@ -62,7 +83,7 @@ const UpdateGroupDetailsInputSchema = GroupIdInputSchema.extend({
 }).strict();
 
 const RemovePolicyInputSchema = GroupIdInputSchema.extend({
-  policyType: OrganizationGroupPolicyTypeSchema,
+  policyType: ModelPolicyTypeSchema,
 }).strict();
 
 const SetMembersInputSchema = GroupIdInputSchema.extend({
@@ -75,8 +96,44 @@ const SetMemberGroupsInputSchema = OrganizationIdInputSchema.extend({
 }).strict();
 
 const SetDefaultPolicyInputSchema = OrganizationIdInputSchema.extend({
-  policy: OrganizationGroupPolicySchema,
+  policy: ModelPolicySchema,
 }).strict();
+
+const PermissionPolicyTargetSchema = OrganizationIdInputSchema.extend({
+  groupId: z.uuid().optional(),
+});
+
+function modelPolicies(policies: OrganizationGroupPolicies): OrganizationGroupModelAccessPolicy[] {
+  return policies.filter(policy => policy.type === 'model_access');
+}
+
+function modelOnlyGroup<Group extends { policies: OrganizationGroupPolicies }>({
+  policies,
+  ...group
+}: Group) {
+  return { ...group, policies: modelPolicies(policies) };
+}
+
+// MCP can forward a personal bearer, so human_bearer is not a browser session.
+function isPermissionPolicyAdminSession(ctx: TRPCContext) {
+  return (
+    ctx.credential === 'session' &&
+    !ctx.authViaToken &&
+    !ctx.headersList?.has('authorization') &&
+    !ctx.cloudAgentAuthority &&
+    !ctx.internalApiUse &&
+    !ctx.tokenSource
+  );
+}
+
+function assertPermissionPolicyAdminSession(ctx: TRPCContext) {
+  if (!isPermissionPolicyAdminSession(ctx)) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Use a browser session to administer organization permission policy.',
+    });
+  }
+}
 
 function actor(ctx: { user: { id: string; google_user_email: string; google_user_name: string } }) {
   return {
@@ -87,6 +144,50 @@ function actor(ctx: { user: { id: string; google_user_email: string; google_user
 }
 
 export const organizationGroupsRouter = createTRPCRouter({
+  adminPermissionPolicy: createTRPCRouter({
+    settings: organizationBillingProcedure
+      .input(PermissionPolicyTargetSchema.strict())
+      .query(async ({ input, ctx }) => {
+        assertPermissionPolicyAdminSession(ctx);
+        return await getStoredOrganizationPermissionPolicy(input.organizationId, input.groupId);
+      }),
+
+    set: organizationAdminMutationProcedure
+      .input(
+        PermissionPolicyTargetSchema.extend({ policy: OrganizationPermissionPolicySchema }).strict()
+      )
+      .mutation(async ({ input, ctx }) => {
+        assertPermissionPolicyAdminSession(ctx);
+        const params = { ...input, actor: actor(ctx) };
+        const { result, policyRevision } = input.groupId
+          ? await setOrganizationGroupPolicy({ ...params, groupId: input.groupId })
+          : await setDefaultOrganizationGroupPolicy(params);
+        return { result: result.filter(policy => policy.type !== 'model_access'), policyRevision };
+      }),
+
+    remove: organizationAdminMutationProcedure
+      .input(
+        PermissionPolicyTargetSchema.extend({
+          policyType: OrganizationPermissionPolicyTypeSchema,
+        }).strict()
+      )
+      .mutation(async ({ input, ctx }) => {
+        assertPermissionPolicyAdminSession(ctx);
+        const params = { ...input, actor: actor(ctx) };
+        const { result, policyRevision } = input.groupId
+          ? await removeOrganizationGroupPolicy({ ...params, groupId: input.groupId })
+          : await removeDefaultOrganizationGroupPolicy(params);
+        return { result: result.filter(policy => policy.type !== 'model_access'), policyRevision };
+      }),
+
+    diagnostics: organizationBillingProcedure
+      .input(OrganizationIdInputSchema.extend({ userId: z.string().min(1) }).strict())
+      .query(async ({ input, ctx }) => {
+        assertPermissionPolicyAdminSession(ctx);
+        return await getOrganizationPermissionPolicy(input.organizationId, input.userId);
+      }),
+  }),
+
   list: organizationMemberProcedure
     .input(OrganizationIdInputSchema)
     .query(async ({ input, ctx }) => {
@@ -98,7 +199,9 @@ export const organizationGroupsRouter = createTRPCRouter({
       if (canManageOrganizationBilling(role)) {
         return {
           access: 'manager' as const,
-          groups: await listOrganizationGroupsForManager(input.organizationId),
+          groups: (await listOrganizationGroupsForManager(input.organizationId)).map(
+            modelOnlyGroup
+          ),
           canEdit: canManageOrganization(role),
         };
       }
@@ -113,66 +216,72 @@ export const organizationGroupsRouter = createTRPCRouter({
     const groups = await listOrganizationGroupsForManager(input.organizationId);
     const group = groups.find(candidate => candidate.id === input.groupId);
     if (!group) throw new TRPCError({ code: 'NOT_FOUND', message: 'Group not found' });
-    return { group };
+    return { group: modelOnlyGroup(group) };
   }),
 
   create: organizationAdminMutationProcedure
     .input(CreateGroupInputSchema)
     .mutation(async ({ input, ctx }) => {
-      return await createOrganizationGroup({
+      const { result, policyRevision } = await createOrganizationGroup({
         organizationId: input.organizationId,
         actor: actor(ctx),
         name: input.name,
         description: input.description,
         policies: input.policies,
       });
+      return { result: modelOnlyGroup(result), policyRevision };
     }),
 
   updateMetadata: organizationAdminMutationProcedure
     .input(UpdateMetadataInputSchema)
     .mutation(async ({ input, ctx }) => {
-      return await updateOrganizationGroupMetadata({
+      const { result, policyRevision } = await updateOrganizationGroupMetadata({
         organizationId: input.organizationId,
         groupId: input.groupId,
         actor: actor(ctx),
         name: input.name,
         description: input.description,
       });
+      return { result: modelOnlyGroup(result), policyRevision };
     }),
 
   updateDetails: organizationAdminMutationProcedure
     .input(UpdateGroupDetailsInputSchema)
     .mutation(async ({ input, ctx }) => {
-      return await updateOrganizationGroupDetails({
+      const { result, policyRevision } = await updateOrganizationGroupDetails({
         organizationId: input.organizationId,
         groupId: input.groupId,
         actor: actor(ctx),
         name: input.name,
         description: input.description,
         userIds: input.userIds,
+        permissionPolicyAdmin: isPermissionPolicyAdminSession(ctx),
       });
+      return { result: modelOnlyGroup(result), policyRevision };
     }),
 
   setPolicy: organizationAdminMutationProcedure
     .input(SetPolicyInputSchema)
     .mutation(async ({ input, ctx }) => {
-      return await setOrganizationGroupPolicy({
+      const { result, policyRevision } = await setOrganizationGroupPolicy({
         organizationId: input.organizationId,
         groupId: input.groupId,
         actor: actor(ctx),
         policy: input.policy,
       });
+      return { result: modelPolicies(result), policyRevision };
     }),
 
   removePolicy: organizationAdminMutationProcedure
     .input(RemovePolicyInputSchema)
     .mutation(async ({ input, ctx }) => {
-      return await removeOrganizationGroupPolicy({
+      const { result, policyRevision } = await removeOrganizationGroupPolicy({
         organizationId: input.organizationId,
         groupId: input.groupId,
         actor: actor(ctx),
         policyType: input.policyType,
       });
+      return { result: modelPolicies(result), policyRevision };
     }),
 
   setMembers: organizationAdminMutationProcedure
@@ -183,6 +292,7 @@ export const organizationGroupsRouter = createTRPCRouter({
         groupId: input.groupId,
         actor: actor(ctx),
         userIds: input.userIds,
+        permissionPolicyAdmin: isPermissionPolicyAdminSession(ctx),
       });
     }),
 
@@ -194,6 +304,7 @@ export const organizationGroupsRouter = createTRPCRouter({
         userId: input.userId,
         actor: actor(ctx),
         groupIds: input.groupIds,
+        permissionPolicyAdmin: isPermissionPolicyAdminSession(ctx),
       });
     }),
 
@@ -204,45 +315,40 @@ export const organizationGroupsRouter = createTRPCRouter({
         organizationId: input.organizationId,
         groupId: input.groupId,
         actor: actor(ctx),
+        permissionPolicyAdmin: isPermissionPolicyAdminSession(ctx),
       });
     }),
 
   getPolicySettings: organizationBillingProcedure
     .input(OrganizationIdInputSchema)
     .query(async ({ input }) => {
-      return await getOrganizationGroupPolicySettings(input.organizationId);
+      const settings = await getOrganizationGroupPolicySettings(input.organizationId);
+      return { ...settings, defaultPolicies: modelPolicies(settings.defaultPolicies) };
     }),
 
   getPolicyEditorData: organizationBillingProcedure
-    .input(
-      OrganizationIdInputSchema.extend({ policyType: OrganizationGroupPolicyTypeSchema }).strict()
-    )
-    .query(async ({ input }) => {
-      switch (input.policyType) {
-        case 'model_access':
-          return await getModelAccessPolicyEditorData(input.organizationId);
-      }
-    }),
+    .input(OrganizationIdInputSchema.extend({ policyType: ModelPolicyTypeSchema }).strict())
+    .query(async ({ input }) => getModelAccessPolicyEditorData(input.organizationId)),
 
   setDefaultPolicy: organizationAdminMutationProcedure
     .input(SetDefaultPolicyInputSchema)
     .mutation(async ({ input, ctx }) => {
-      return await setDefaultOrganizationGroupPolicy({
+      const { result, policyRevision } = await setDefaultOrganizationGroupPolicy({
         organizationId: input.organizationId,
         actor: actor(ctx),
         policy: input.policy,
       });
+      return { result: modelPolicies(result), policyRevision };
     }),
 
   removeDefaultPolicy: organizationAdminMutationProcedure
-    .input(
-      OrganizationIdInputSchema.extend({ policyType: OrganizationGroupPolicyTypeSchema }).strict()
-    )
+    .input(OrganizationIdInputSchema.extend({ policyType: ModelPolicyTypeSchema }).strict())
     .mutation(async ({ input, ctx }) => {
-      return await removeDefaultOrganizationGroupPolicy({
+      const { result, policyRevision } = await removeDefaultOrganizationGroupPolicy({
         organizationId: input.organizationId,
         actor: actor(ctx),
         policyType: input.policyType,
       });
+      return { result: modelPolicies(result), policyRevision };
     }),
 });

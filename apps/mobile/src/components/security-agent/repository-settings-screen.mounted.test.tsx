@@ -42,6 +42,7 @@ const manageAccess = vi.hoisted(() => ({
 }));
 
 vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false, doLeftAndRightSwapInRTL: true },
   Platform: { OS: 'ios' },
   View: 'View',
   Pressable: 'Pressable',

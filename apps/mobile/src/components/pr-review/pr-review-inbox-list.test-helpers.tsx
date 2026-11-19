@@ -40,7 +40,11 @@ const hoisted = vi.hoisted(() => ({
 export const insetsState = hoisted.insets;
 export const inboxState = hoisted.inbox;
 
-vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
+vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false, doLeftAndRightSwapInRTL: true },
+  Pressable: 'Pressable',
+  View: 'View',
+}));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insetsState,
 }));

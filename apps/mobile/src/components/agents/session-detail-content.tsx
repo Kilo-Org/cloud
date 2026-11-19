@@ -2,6 +2,7 @@
 import {
   type KiloSessionId,
   type MessageDeliveryState,
+  type PreparationAttempt,
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
 import { useActionSheet } from '@expo/react-native-action-sheet';
@@ -14,7 +15,8 @@ import {
   useRouter,
 } from 'expo-router';
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
-import { ArrowLeft, MessageSquare, RotateCcw } from '@/components/ui/icons';
+import { MessageSquare, RotateCcw } from '@/components/ui/icons';
+import { DirectionalArrowLeft } from '@/components/ui/directional-icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic } from '@/lib/haptics';
@@ -398,6 +400,9 @@ export function SessionDetailContent({
   messagesRef.current = messages;
   const isLoading = useAtomValue(manager.atoms.isLoading);
   const error = useAtomValue(manager.atoms.error);
+  // The typed kind of the transcript-read failure that set `error`, when the
+  // failure carries one; it decides retry-vs-terminal ahead of the error text.
+  const failedHistoryKind = useAtomValue(manager.atoms.failedHistoryKind);
   const fetchedData = useAtomValue(manager.atoms.fetchedSessionData);
   const sessionConfig = useAtomValue(manager.atoms.sessionConfig);
   const isStreaming = useAtomValue(manager.atoms.isStreaming);
@@ -1292,7 +1297,7 @@ export function SessionDetailContent({
   // transport, the next build restores the normal streaming behavior.
   const dropUnrenderableUserRows = activeSessionType === 'read-only';
 
-  const { transcript: baseTranscript, preparationFailureTriggers } = useMemo(() => {
+  const { transcript: baseTranscript, failedPreparationByTrigger } = useMemo(() => {
     // A superseded submission's preparation goes with its row: dropping only
     // the row would leave `mergeSessionTranscript` re-emitting the attempt at
     // the end (its trigger id is no longer in the message list).
@@ -1302,21 +1307,37 @@ export function SessionDetailContent({
         : preparationAttempts.filter(
             attempt => !supersededMessageIds.has(attempt.triggerMessageId)
           );
-    // A failed attempt states its own failure in the group it renders, with the
-    // stage and the reason. The question that triggered it must not repeat the
-    // generic response failure on top of that statement.
-    const failed = new Set<string>();
+    const merged = mergeSessionTranscript(displayedMessages, attempts, {
+      deliveryStates: pendingMessages,
+      dropUnrenderableUserRows,
+    });
+    // A failed attempt states its own failure, with the stage and the reason,
+    // and the row that triggered it carries the turn's recovery actions. The
+    // row draws the group itself, between its bubble and those actions, so the
+    // cause comes before the recovery; the attempt's own transcript item goes.
+    // An attempt whose row is not in the transcript keeps its own item.
+    const rowIds = new Set<string>();
+    for (const item of merged) {
+      if (item.type === 'message') {
+        rowIds.add(item.message.info.id);
+      }
+    }
+    const failed = new Map<string, PreparationAttempt>();
     for (const attempt of attempts) {
-      if (attempt.status === 'failed') {
-        failed.add(attempt.triggerMessageId);
+      if (attempt.status === 'failed' && rowIds.has(attempt.triggerMessageId)) {
+        failed.set(attempt.triggerMessageId, attempt);
       }
     }
     return {
-      transcript: mergeSessionTranscript(displayedMessages, attempts, {
-        deliveryStates: pendingMessages,
-        dropUnrenderableUserRows,
-      }),
-      preparationFailureTriggers: failed,
+      transcript:
+        failed.size === 0
+          ? merged
+          : merged.filter(
+              item =>
+                item.type !== 'preparation' ||
+                failed.get(item.attempt.triggerMessageId) !== item.attempt
+            ),
+      failedPreparationByTrigger: failed,
     };
   }, [
     displayedMessages,
@@ -1764,9 +1785,15 @@ export function SessionDetailContent({
   // delivery states say what happened to it. The note is bound to the same
   // resolved kind as the read-only footer, so it withdraws with that footer when
   // the kind turns out to be live after all.
-  const unansweredPromptId =
+  // A prompt whose own row draws its failed preparation states the turn's
+  // failure there, so it is answered even when it is the transcript's last item.
+  const promptWithNoReply =
     activeSessionType === 'read-only' && !isStreaming
       ? unansweredPromptMessageId(displayedMessages, baseTranscript, pendingMessages)
+      : null;
+  const unansweredPromptId =
+    promptWithNoReply !== null && !failedPreparationByTrigger.has(promptWithNoReply)
+      ? promptWithNoReply
       : null;
 
   const renderItem = useCallback(
@@ -1832,7 +1859,7 @@ export function SessionDetailContent({
           addCredits={addCredits}
           retryAvailable={retryAvailable}
           onCopyToComposer={handleCopyToComposer}
-          failureStatedByPreparation={preparationFailureTriggers.has(item.message.info.id)}
+          failedPreparation={failedPreparationByTrigger.get(item.message.info.id)}
           onRestoreQueued={
             canceledQueuedMessages.has(item.message.info.id) ? handleRestoreQueued : undefined
           }
@@ -1866,7 +1893,7 @@ export function SessionDetailContent({
       pendingMessages,
       heldQueuedIds,
       retryAvailable,
-      preparationFailureTriggers,
+      failedPreparationByTrigger,
       handleRetryMessage,
       addCredits,
       handleCopyToComposer,
@@ -2039,11 +2066,19 @@ export function SessionDetailContent({
       resolveSessionTerminalError({
         error,
         statusIndicator,
+        historyFailureKind: failedHistoryKind?.kind ?? null,
         messageCount: messages.length,
         hasFailedPreparation,
         connectionLost,
       }),
-    [error, statusIndicator, messages.length, hasFailedPreparation, connectionLost]
+    [
+      error,
+      statusIndicator,
+      failedHistoryKind,
+      messages.length,
+      hasFailedPreparation,
+      connectionLost,
+    ]
   );
   // Acknowledging a terminal error's Retry. The reopen clears `errorAtom` and
   // sets the loading flag before its first await, so the card that carries the
@@ -2963,12 +2998,14 @@ export function SessionDetailContent({
               entering={FadeIn.duration(200)}
               exiting={FadeOut.duration(150)}
               layout={reducedMotion ? undefined : LinearTransition.duration(150)}
-              className="px-4 pb-3"
+              style={sideInsetStyle}
             >
-              <ActiveProfileIndicator
-                state={sessionProfileIndicatorState}
-                onPress={openSessionProfileEditor}
-              />
+              <View className="px-4 pb-3">
+                <ActiveProfileIndicator
+                  state={sessionProfileIndicatorState}
+                  onPress={openSessionProfileEditor}
+                />
+              </View>
             </Animated.View>
           ) : null}
           {sessionGoal !== null ? (
@@ -3189,6 +3226,7 @@ export function SessionDetailContent({
             entering={FadeIn.duration(200)}
             exiting={FadeOut.duration(150)}
             className="bg-background"
+            style={sideInsetStyle}
           >
             {sessionFooterItem === 'working' ? (
               /* Raw list on purpose: working-indicator.tsx derives the label
@@ -3219,42 +3257,46 @@ export function SessionDetailContent({
           </Animated.View>
         ) : null}
 
-        {unreadablePermissions.length > 0 ? <PermissionUnreadableNotice /> : null}
+        {/* The blocking cards sit beside the side insets the transcript and
+            the composer clear. */}
+        <View className="shrink" style={sideInsetStyle}>
+          {unreadablePermissions.length > 0 ? <PermissionUnreadableNotice /> : null}
 
-        {blockingInteraction === 'question' && activeQuestion ? (
-          <QuestionCard
-            key={activeQuestion.requestId}
-            questions={activeQuestion.questions}
-            onAnswer={answers => {
-              void handleAnswerQuestion(answers);
-            }}
-            onReject={() => {
-              void handleRejectQuestion();
-            }}
-            isSubmitting={isAnswering}
-            requestId={activeQuestion.requestId}
-            submissionError={questionSubmissionError}
-            pendingCount={blockingRequestCount}
-          />
-        ) : null}
+          {blockingInteraction === 'question' && activeQuestion ? (
+            <QuestionCard
+              key={activeQuestion.requestId}
+              questions={activeQuestion.questions}
+              onAnswer={answers => {
+                void handleAnswerQuestion(answers);
+              }}
+              onReject={() => {
+                void handleRejectQuestion();
+              }}
+              isSubmitting={isAnswering}
+              requestId={activeQuestion.requestId}
+              submissionError={questionSubmissionError}
+              pendingCount={blockingRequestCount}
+            />
+          ) : null}
 
-        {blockingInteraction === 'permission' &&
-        activePermission &&
-        activePermission.requestId !== suppressedRequestId ? (
-          <PermissionCard
-            key={activePermission.requestId}
-            permission={activePermission.permission}
-            patterns={activePermission.patterns}
-            metadata={activePermission.metadata}
-            onRespond={response => {
-              void handleRespondToPermission(response);
-            }}
-            isSubmitting={isRespondingToPermission}
-            requestId={activePermission.requestId}
-            submissionError={permissionSubmissionError}
-            pendingCount={blockingRequestCount}
-          />
-        ) : null}
+          {blockingInteraction === 'permission' &&
+          activePermission &&
+          activePermission.requestId !== suppressedRequestId ? (
+            <PermissionCard
+              key={activePermission.requestId}
+              permission={activePermission.permission}
+              patterns={activePermission.patterns}
+              metadata={activePermission.metadata}
+              onRespond={response => {
+                void handleRespondToPermission(response);
+              }}
+              isSubmitting={isRespondingToPermission}
+              requestId={activePermission.requestId}
+              submissionError={permissionSubmissionError}
+              pendingCount={blockingRequestCount}
+            />
+          ) : null}
+        </View>
 
         {isReadOnlyFooterPlaceholderVisible ? <SessionReadOnlyFooterPlaceholder /> : null}
 
@@ -3415,7 +3457,7 @@ export function SessionDetailContent({
                   one action slot instead of the card handing one its own. */}
               <StateAction
                 label={t('agentChat.session.backToSessions')}
-                icon={ArrowLeft}
+                icon={DirectionalArrowLeft}
                 onPress={handleBackToSessions}
               />
             </View>

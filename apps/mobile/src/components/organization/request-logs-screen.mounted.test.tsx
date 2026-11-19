@@ -306,9 +306,9 @@ describe('OrganizationRequestLogsScreen', () => {
 
     const [empty] = renderer.root.findAllByType('EmptyState');
     expect(empty?.props.title).toBe('No requests in this hour');
-    // A pointer at a disabled control would be a dead end; the scoped title
-    // alone is the truth here.
-    expect(empty?.props.description).toBeUndefined();
+    // A pointer at a disabled control would be a dead end; at the bound the
+    // state names the bound instead, so the reader knows why Older hour is off.
+    expect(empty?.props.description).toBe('This is as far back as request logs go.');
     unmount();
   });
 

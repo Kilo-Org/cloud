@@ -1,8 +1,9 @@
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Lock } from '@/components/ui/icons';
+import { Lock } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 
 import { EmptyState, StateAction } from '@/components/empty-state';
+import { DirectionalArrowLeft } from '@/components/ui/directional-icons';
 
 type PermissionDeniedProps = Readonly<{
   description: string;
@@ -34,7 +35,7 @@ export function PermissionDenied({ description, showBack = true }: PermissionDen
         showBack ? (
           <StateAction
             label={t('common.back')}
-            icon={ArrowLeft}
+            icon={DirectionalArrowLeft}
             onPress={() => {
               router.back();
             }}

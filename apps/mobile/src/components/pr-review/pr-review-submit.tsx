@@ -163,7 +163,8 @@ type PrReviewSubmitProps = Readonly<{
   number: number;
   headSha: string;
   title: string;
-  eyebrow: string;
+  /** The reference under the title; absent when the route names no request. */
+  eyebrow?: string;
   /**
    * The provider ref (s6). Present on the GitLab/Bitbucket surface: the
    * submit posts one `providerReview.submitReview` event whose fresh pending
@@ -496,7 +497,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
             </Text>
             {queueHint}
             {/* Keyboard-open viewport is tight; keep the count, hide per-item
-                rows so Submit + Cancel stay above the keyboard at offset 0. */}
+                rows so Submit stays above the keyboard at offset 0. */}
             {!keyboardVisible
               ? pending.items.map(item => (
                   <PrReviewPendingCommentRow
@@ -548,19 +549,6 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
             accessibilityLabel={submitLabel}
           >
             <Text>{submitLabel}</Text>
-          </Button>
-          <Button
-            variant="ghost"
-            onPress={() => {
-              if (!isSubmitting) {
-                onDismiss();
-              }
-            }}
-            disabled={isSubmitting}
-            className="mt-2"
-            accessibilityLabel={t('common.cancel')}
-          >
-            <Text>{t('common.cancel')}</Text>
           </Button>
         </PrFormSheetFooter>
       </ScrollView>

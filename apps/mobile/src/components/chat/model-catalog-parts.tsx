@@ -25,20 +25,25 @@ const FIT_STYLES = {
   },
 } as const satisfies Record<DeviceFit, { key: string; tile: string; text: string }>;
 
+/** The copy key that names how a file fits this device, or that the fit is unknown. */
+export function fitLabelKey(fit: DeviceFit | undefined): string {
+  return fit === undefined ? 'modelChat.catalog.fit.unknown' : FIT_STYLES[fit].key;
+}
+
 /** Says how the file fits this device, or that the device cannot judge the fit. */
 export function FitBadge({ fit }: Readonly<{ fit: DeviceFit | undefined }>) {
   const { t } = useTranslation();
   if (fit === undefined) {
     return (
       <View className="shrink-0 rounded-full bg-secondary px-2 py-0.5">
-        <Text className="text-xs text-muted-foreground">{t('modelChat.catalog.fit.unknown')}</Text>
+        <Text className="text-xs text-muted-foreground">{t(fitLabelKey(fit))}</Text>
       </View>
     );
   }
   const style = FIT_STYLES[fit];
   return (
     <View className={cn('shrink-0 rounded-full px-2 py-0.5', style.tile)}>
-      <Text className={cn('text-xs font-medium', style.text)}>{t(style.key)}</Text>
+      <Text className={cn('text-xs font-medium', style.text)}>{t(fitLabelKey(fit))}</Text>
     </View>
   );
 }

@@ -11,9 +11,11 @@ const policy = vi.hoisted(() => ({ reducedMotion: false }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'NativeActivityIndicator',
   RefreshControl: 'NativeRefreshControl',
+  useColorScheme: () => 'light',
   View: 'View',
 }));
 vi.mock('@/components/ui/icons', () => ({ Loader2: 'Loader2' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/a11y/motion', () => ({
   useMotionPolicy: () => ({
     reducedMotion: policy.reducedMotion,
@@ -133,6 +135,9 @@ describe('motion primitives', () => {
         node.type === ('View' as ElementType) &&
         node.props.className === 'h-0 items-center justify-center'
     );
+    // Inert reserve: even the reduced-motion mount keeps the progress
+    // semantics out of this box; the accessible indicator is a child that
+    // mounts only with a pull in flight (see the RefreshProgress note).
     expect(refreshSlot.props.accessibilityRole).toBeUndefined();
 
     const nativeIndicator = mountedRenderer.root.findByType(
@@ -159,7 +164,15 @@ describe('motion primitives', () => {
           node.props.className === 'h-9 items-center justify-center'
       )
     ).toBe(refreshSlot);
-    expect(refreshSlot.props.accessibilityRole).toBe('progressbar');
+    // The box keeps its own identity; the progressbar semantics ride the
+    // child that mounts with the pull, so the busy state can never outlive
+    // the flight (RN never clears the tag on a kept view). Scope to the
+    // RefreshProgress band: the RefreshControl stub can host a progressbar
+    // too.
+    const staticProgress = refreshSlot.find(node => node.props.accessibilityRole === 'progressbar');
+    expect(staticProgress.props.accessible).toBe(true);
+    expect(staticProgress.props.accessibilityState).toEqual({ busy: true });
+    expect(staticProgress.props.className).toBe('absolute inset-0 items-center justify-center');
 
     const staticIndicators = mountedRenderer.root.findAllByType('Loader2' as ElementType);
     expect(staticIndicators).toHaveLength(2);
@@ -199,7 +212,10 @@ describe('motion primitives', () => {
           node.props.className === 'h-9 items-center justify-center'
       )
     ).toBe(refreshSlot);
-    expect(refreshSlot.props.accessibilityRole).toBeUndefined();
+    // The band's own progressbar unmounted with the pull. (The mounted
+    // `ActivityIndicator`'s reduced-motion fallback keeps its progressbar —
+    // its own wait is still animating — so the assertion scopes to the band.)
+    expect(refreshSlot.findAllByProps({ accessibilityRole: 'progressbar' })).toHaveLength(0);
     expect(mountedRenderer.root.findAllByType('Loader2' as ElementType)).toHaveLength(1);
 
     policy.reducedMotion = false;

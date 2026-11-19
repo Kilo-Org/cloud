@@ -3,17 +3,18 @@ import {
   agent_environment_profiles,
   kilocode_users,
 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
-import { isValidEmail } from '../lib/users';
+import { findSeedUserId, isValidEmail } from '../lib/users';
 import type { SeedResult } from '../index';
 
 export const usage = '<email>';
 
 const PROFILE_NAME = 'Design gate variables';
-const USER_ID = 'user_design_gate_variables';
+/** The row an account with no sign-in yet gets; a signed-in one keeps its id. */
+const SEED_USER_ID = 'user_design_gate_variables';
 /** Stable, so the deep link a previous run printed keeps opening the screen. */
 const PROFILE_ID = '5d0f3a61-8c47-4b2e-9f14-7a6c2d8e0b53';
 const STRIPE_CUSTOMER_ID = 'cus_local_design_gate_variables';
@@ -49,8 +50,8 @@ function printUsage(): void {
   console.log('');
   console.log('Creates a fake user and one personal agent environment profile whose variables');
   console.log('cover the profile Variables screen: a long key with a longer value, a long secret');
-  console.log('key, and a short key with a short value. Re-running replaces the profile, its');
-  console.log('variables, and the user row.');
+  console.log('key, and a short key with a short value. Re-running replaces the profile and its');
+  console.log('variables, and joins the account that already signed in.');
   console.log('');
   console.log('The deep link it prints opens the profile Variables screen in a dev build:');
   console.log('  kiloapp:///(app)/(tabs)/(3_profile)/profiles/<profileId>/variables');
@@ -81,16 +82,21 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   const normalizedEmail = normalizeSeedEmail(trimmedEmail);
   assertLocalSeedDatabase('app:mobile-profile-variables');
   const db = getSeedDb();
+  // A fake account that already signed in keeps its own row and its own
+  // sign-in address: the fixture joins it. A row this fixture left under an
+  // earlier email is its own fixture, so it takes the requested address.
+  const adoptedUserId = await findSeedUserId(trimmedEmail);
+  const userId = adoptedUserId ?? SEED_USER_ID;
 
   // Direct insert, no Stripe customer: the profile screens never call Stripe,
   // and dev/seed/lib/stripe.ts refuses the example file's placeholder key.
   // The onboarding flags below match dev/seed/app/create-user.ts so the seeded
   // account reaches product surfaces instead of the survey and verification
-  // gates.
+  // gates. The address is written only for the fixture's own row.
   await db
     .insert(kilocode_users)
     .values({
-      id: USER_ID,
+      id: userId,
       google_user_email: trimmedEmail,
       google_user_name: 'Design Gate',
       google_user_image_url: 'https://example.com/design-gate.png',
@@ -101,25 +107,38 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     })
     .onConflictDoUpdate({
       target: kilocode_users.id,
-      set: {
-        google_user_email: trimmedEmail,
-        normalized_email: normalizedEmail,
-        has_validation_stytch: true,
-        customer_source: 'dev-seed',
-      },
+      set:
+        adoptedUserId === null
+          ? {
+              google_user_email: trimmedEmail,
+              normalized_email: normalizedEmail,
+              has_validation_stytch: true,
+              customer_source: 'dev-seed',
+            }
+          : { has_validation_stytch: true, customer_source: 'dev-seed' },
     });
 
-  // The profile cascade removes its variables, so only the profile is deleted.
+  // Replace this fixture's own profile; its variables cascade with it. The
+  // account's other profiles stay, so another topic's links keep opening.
+  await db.delete(agent_environment_profiles).where(eq(agent_environment_profiles.id, PROFILE_ID));
+  // One personal profile per account is the default, and this fixture's takes
+  // the slot: another topic's default is demoted rather than removed.
   await db
-    .delete(agent_environment_profiles)
-    .where(eq(agent_environment_profiles.owned_by_user_id, USER_ID));
+    .update(agent_environment_profiles)
+    .set({ is_default: false })
+    .where(
+      and(
+        eq(agent_environment_profiles.owned_by_user_id, userId),
+        eq(agent_environment_profiles.is_default, true)
+      )
+    );
 
   const [profile] = await db
     .insert(agent_environment_profiles)
     .values({
       id: PROFILE_ID,
-      owned_by_user_id: USER_ID,
-      created_by_user_id: USER_ID,
+      owned_by_user_id: userId,
+      created_by_user_id: userId,
       name: PROFILE_NAME,
       description: 'Variables the design gate opens on the profile Variables screen.',
       is_default: true,
@@ -144,7 +163,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   console.log(`Deep link: ${deepLink}`);
 
   return {
-    userId: USER_ID,
+    userId,
     email: trimmedEmail,
     profileId: profile.id,
     variableCount: VARIABLES.length,

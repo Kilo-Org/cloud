@@ -1,5 +1,6 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import 'server-only';
+import { readFileSync } from 'node:fs';
 import Stripe from 'stripe';
 import { captureMessage } from '@sentry/nextjs';
 
@@ -21,6 +22,101 @@ export const client: Stripe = new Stripe(stripeSecretKey, {
   apiVersion: '2026-09-30.endive',
   maxNetworkRetries: STRIPE_MAX_NETWORK_RETRIES,
 });
+
+/**
+ * A dev-only fixture client for reads a local E2E cannot reach any other way.
+ *
+ * `SKIP_STRIPE_API=true` already keeps every write local, but a billing-history
+ * proof needs an invoice read, and no local stack can produce one. When the
+ * fixture file is set (dev builds only, next to `SKIP_STRIPE_API`), the invoice
+ * list the Kilo Pass billing history reads answers from the file instead of the
+ * provider. The file's shape mirrors the Stripe SDK response, so the router runs
+ * unchanged.
+ */
+const fixtureInvoicesPath =
+  skipStripeApi && process.env.E2E_KILO_PASS_INVOICES_JSON
+    ? process.env.E2E_KILO_PASS_INVOICES_JSON
+    : null;
+
+function fixtureInvoicesFor(subscription: string): Stripe.Invoice[] {
+  if (!fixtureInvoicesPath) return [];
+  const parsed = JSON.parse(readFileSync(fixtureInvoicesPath, 'utf8')) as {
+    subscriptionId: string;
+    invoices: Array<{
+      id: string;
+      created: number;
+      amount_due: number;
+      subtotal: number;
+      billing_reason: string;
+      currency: string;
+      status: string;
+      description: string;
+      priceId: string | null;
+    }>;
+  };
+  if (parsed.subscriptionId !== subscription) return [];
+  return parsed.invoices.map(invoice => ({
+    id: invoice.id,
+    object: 'invoice',
+    created: invoice.created,
+    amount_due: invoice.amount_due,
+    subtotal: invoice.subtotal,
+    billing_reason: invoice.billing_reason,
+    currency: invoice.currency,
+    status: invoice.status,
+    lines: {
+      object: 'list',
+      data: [
+        {
+          description: invoice.description,
+          ...(invoice.priceId
+            ? {
+                pricing: {
+                  price_details: {
+                    price: invoice.priceId,
+                  },
+                },
+              }
+            : {}),
+        },
+      ],
+      has_more: false,
+      total_count: 1,
+      url: `/v1/invoices/${invoice.id}/lines`,
+    },
+  })) as unknown as Stripe.Invoice[];
+}
+
+if (fixtureInvoicesPath) {
+  // Stripe declares each resource's methods on its class prototype, so replacing
+  // `client.invoices` wholesale would drop every other method and break the local
+  // Stripe calls that use it. The cast is needed because the SDK types `list` on
+  // the concrete resource class, and only this one read is replaced.
+  client.invoices.list = (async (params: {
+    subscription?: string;
+    limit?: number;
+    starting_after?: string;
+  }) => {
+    const all = fixtureInvoicesFor(params.subscription ?? '');
+    // The billing history reads back to front and pages with a cursor, so the
+    // fixture answers the same slice the provider would: after the named invoice,
+    // then at most `limit` (one extra so the caller can see there is more).
+    const afterIndex =
+      params.starting_after === undefined
+        ? -1
+        : all.findIndex(invoice => invoice.id === params.starting_after);
+    const start = afterIndex < 0 ? 0 : afterIndex + 1;
+    const end = params.limit === undefined ? all.length : start + params.limit;
+    const data = all.slice(start, end);
+    return {
+      object: 'list',
+      data,
+      has_more: end < all.length,
+      total_count: all.length,
+      url: '/v1/invoices',
+    };
+  }) as unknown as typeof client.invoices.list;
+}
 
 // The profile page asks whether a customer has a card on every render, and the
 // answer only changes when a card is attached to or detached from that

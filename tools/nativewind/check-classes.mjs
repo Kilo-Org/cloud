@@ -1151,10 +1151,13 @@ export function checkCompilerStillDropsThese() {
    *
    * Selecting by the property name the runtime receives keeps the pin on the
    * declaration the Metro transformer ships, not on one position in the
-   * compiler's private stylesheet tree. `present` is reported separately
-   * because an absent declaration is an outcome of its own: the compiler
-   * stopped shipping what the ban warns about, so the runtime still paints
-   * nothing and the ban still applies.
+   * compiler's private stylesheet tree. The stylesheet encodes a declaration
+   * two ways — a literal value is a plain object (`{ textAlign: 'left' }`) and
+   * a value kept for the runtime is a `[value, property, important]` tuple —
+   * and both are read. `present` is reported separately because an absent
+   * declaration is an outcome of its own: the compiler stopped shipping what
+   * the ban warns about, so the runtime still paints nothing and the ban still
+   * applies.
    */
   function emittedValue(css, options, property) {
     const sheet = compile(css, options).stylesheet();
@@ -1163,6 +1166,14 @@ export function checkCompilerStillDropsThese() {
         for (const declaration of rule?.d ?? []) {
           if (declaration?.[1] === property) {
             return { present: true, value: declaration[0] };
+          }
+          if (
+            declaration !== null &&
+            typeof declaration === 'object' &&
+            !Array.isArray(declaration) &&
+            Object.hasOwn(declaration, property)
+          ) {
+            return { present: true, value: declaration[property] };
           }
         }
       }
@@ -1200,19 +1211,34 @@ export function checkCompilerStillDropsThese() {
     };
   }
 
-  // `start` and `end` are separate rules, so each keyword is pinned on its
-  // own: the compiler handling one keyword retires only that keyword's rule.
-  // The check reads the warning report as text, so a change to the report's
-  // shape leaves the pin holding instead of retiring the rule. The keyword is
-  // matched quoted, which cannot land inside a warning sentence.
-  for (const keyword of ['start', 'end']) {
-    pin(`the text-align: ${keyword} fixture`, () => {
-      const report = JSON.stringify(compile(`.x { text-align: ${keyword}; }`).warnings() ?? null);
-      if (report.includes('text-align') && report.includes(JSON.stringify(keyword))) {
-        return undefined;
-      }
-      return `check-classes: text-align: ${keyword} is no longer dropped — drop the text-${keyword} rule`;
-    });
+  // The `left` control fixture, which the runtime accepts, proves the read
+  // selects a real declaration rather than an empty stylesheet: the pins only
+  // mean something once reading a declaration that exists is known to work.
+  let control;
+  try {
+    control = emittedValue('.x { text-align: left; }', undefined, 'textAlign');
+  } catch (error) {
+    problems.push(compilerPinFailure('the text-align: left control fixture', error));
+  }
+  if (control !== undefined && !control.present) {
+    problems.push(
+      'check-classes: the text-align: left control fixture emits no textAlign declaration — the text-align pins cannot be verified without it'
+    );
+  }
+  if (control?.present) {
+    // Each keyword is its own rule and its own fixture. The pin reads the
+    // `textAlign` declaration the Metro transformer ships, holds while the
+    // compiler emits none for the keyword, and retires that keyword's rule
+    // when the declaration appears.
+    for (const keyword of ['start', 'end']) {
+      pin(`the text-align: ${keyword} fixture`, () => {
+        const { present } = emittedValue(`.x { text-align: ${keyword}; }`, undefined, 'textAlign');
+        if (!present) {
+          return undefined;
+        }
+        return `check-classes: text-align: ${keyword} is no longer dropped — drop the text-${keyword} rule`;
+      });
+    }
   }
 
   // A `/opacity` modifier on an `@theme inline` variable is emitted as a

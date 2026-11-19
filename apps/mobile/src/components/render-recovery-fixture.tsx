@@ -12,6 +12,7 @@ import {
   RENDER_RECOVERY_PAYLOAD_MARKER,
   subscribeRenderRecoveryFault,
 } from '@/lib/render-recovery-fixture';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 import { E2eInjectedFaultError } from '@/lib/telemetry/e2e-fault';
 
 /**
@@ -31,6 +32,7 @@ export function RenderRecoveryFixture() {
   const organizations = useOrganizationsList();
   const fault = useSyncExternalStore(subscribeRenderRecoveryFault, getRenderRecoveryFault);
   const organizationName = organizations.data?.[0]?.organizationName ?? '';
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
 
   if (fault === 'transient') {
     throw new E2eInjectedFaultError('render recovery fixture: armed transient render fault');
@@ -42,7 +44,7 @@ export function RenderRecoveryFixture() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Render recovery fixture" />
-      <ScrollView contentContainerClassName={SCREEN_BODY_CLASS}>
+      <ScrollView style={sideInsetMarginStyle} contentContainerClassName={SCREEN_BODY_CLASS}>
         <Text className="text-sm text-muted-foreground">Organization</Text>
         <Text className="text-base text-foreground">
           {organizationName.length > 0 ? organizationName : 'None'}

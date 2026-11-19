@@ -6485,6 +6485,31 @@
     ],
     "searchBlob": "cloudAgentNext.createWorktreeChat Create a new chat session backed by a git worktree for a cloud agent. cloudagentnext createworktreechat sourcekilosessionid operationkey kilosessionid sourceKiloSessionId operationKey kiloSessionId"
   },
+  "cloudAgentNext.getAgentBoard": {
+    "path": "cloudAgentNext.getAgentBoard",
+    "kind": "query",
+    "summary": "Read the shared coordination board for a Cloud Agent session, showing messages such as updates, questions, and results posted between the main agent and its task children. Returns the latest page of board messages with a revision and pagination cursor, or null when the session's runtime is offline.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_[\\w-]+$"
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudagentnext",
+      "getagentboard",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "cloudAgentNext.getAgentBoard Read the shared coordination board for a Cloud Agent session, showing messages such as updates, questions, and results posted between the main agent and its task children. Returns the latest page of board messages with a revision and pagination cursor, or null when the session's runtime is offline. cloudagentnext getagentboard cloudagentsessionid cloudAgentSessionId"
+  },
   "cloudAgentNext.getAttachmentDownloadUrl": {
     "path": "cloudAgentNext.getAttachmentDownloadUrl",
     "kind": "mutation",
@@ -7705,7 +7730,9 @@
             "mcpServers": {
               "type": "object",
               "propertyNames": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
               },
               "additionalProperties": {
                 "oneOf": [
@@ -7718,15 +7745,19 @@
                       },
                       "command": {
                         "minItems": 1,
+                        "maxItems": 50,
                         "type": "array",
                         "items": {
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 8192
                         }
                       },
                       "environment": {
                         "type": "object",
                         "propertyNames": {
-                          "type": "string"
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
                         },
                         "additionalProperties": {
                           "anyOf": [
@@ -7738,10 +7769,12 @@
                               "type": "object",
                               "properties": {
                                 "encryptedData": {
-                                  "type": "string"
+                                  "type": "string",
+                                  "maxLength": 32816
                                 },
                                 "encryptedDEK": {
-                                  "type": "string"
+                                  "type": "string",
+                                  "maxLength": 684
                                 },
                                 "algorithm": {
                                   "type": "string",
@@ -7786,12 +7819,15 @@
                       },
                       "url": {
                         "type": "string",
+                        "maxLength": 4096,
                         "format": "uri"
                       },
                       "headers": {
                         "type": "object",
                         "propertyNames": {
-                          "type": "string"
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
                         },
                         "additionalProperties": {
                           "anyOf": [
@@ -7803,10 +7839,12 @@
                               "type": "object",
                               "properties": {
                                 "encryptedData": {
-                                  "type": "string"
+                                  "type": "string",
+                                  "maxLength": 32816
                                 },
                                 "encryptedDEK": {
-                                  "type": "string"
+                                  "type": "string",
+                                  "maxLength": 684
                                 },
                                 "algorithm": {
                                   "type": "string",
@@ -8368,7 +8406,9 @@
             "mcpServers": {
               "type": "object",
               "propertyNames": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
               },
               "additionalProperties": {
                 "oneOf": [
@@ -8381,15 +8421,19 @@
                       },
                       "command": {
                         "minItems": 1,
+                        "maxItems": 50,
                         "type": "array",
                         "items": {
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 8192
                         }
                       },
                       "environment": {
                         "type": "object",
                         "propertyNames": {
-                          "type": "string"
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
                         },
                         "additionalProperties": {
                           "anyOf": [
@@ -8401,10 +8445,12 @@
                               "type": "object",
                               "properties": {
                                 "encryptedData": {
-                                  "type": "string"
+                                  "type": "string",
+                                  "maxLength": 32816
                                 },
                                 "encryptedDEK": {
-                                  "type": "string"
+                                  "type": "string",
+                                  "maxLength": 684
                                 },
                                 "algorithm": {
                                   "type": "string",
@@ -8449,12 +8495,15 @@
                       },
                       "url": {
                         "type": "string",
+                        "maxLength": 4096,
                         "format": "uri"
                       },
                       "headers": {
                         "type": "object",
                         "propertyNames": {
-                          "type": "string"
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
                         },
                         "additionalProperties": {
                           "anyOf": [
@@ -8466,10 +8515,12 @@
                               "type": "object",
                               "properties": {
                                 "encryptedData": {
-                                  "type": "string"
+                                  "type": "string",
+                                  "maxLength": 32816
                                 },
                                 "encryptedDEK": {
-                                  "type": "string"
+                                  "type": "string",
+                                  "maxLength": 684
                                 },
                                 "algorithm": {
                                   "type": "string",
@@ -18506,6 +18557,56 @@
     ],
     "searchBlob": "organizations.cloudAgentNext.createWorktreeChat Create a worktree-based chat from an existing cloud agent session. Use to branch a session into a new worktree. organizations cloudagentnext createworktreechat organizationid sourcekilosessionid operationkey kilosessionid organizationId sourceKiloSessionId operationKey kiloSessionId"
   },
+  "organizations.cloudAgentNext.getAgentBoard": {
+    "path": "organizations.cloudAgentNext.getAgentBoard",
+    "kind": "query",
+    "summary": "Get the shared agent board (task notes and peer coordination messages) for a cloud agent session in an organization. Use to read tasks, findings, questions, or blockers posted by the main agent and its child agents.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cloudAgentSessionId": {
+              "type": "string",
+              "pattern": "^workspace_[\\w-]+$"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "cloudAgentSessionId",
+            "organizationId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "getagentboard",
+      "organizationid",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.getAgentBoard Get the shared agent board (task notes and peer coordination messages) for a cloud agent session in an organization. Use to read tasks, findings, questions, or blockers posted by the main agent and its child agents. organizations cloudagentnext getagentboard organizationid cloudagentsessionid organizationId cloudAgentSessionId"
+  },
   "organizations.cloudAgentNext.getAttachmentUploadUrl": {
     "path": "organizations.cloudAgentNext.getAttachmentUploadUrl",
     "kind": "mutation",
@@ -20091,7 +20192,9 @@
                 "mcpServers": {
                   "type": "object",
                   "propertyNames": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
                   },
                   "additionalProperties": {
                     "oneOf": [
@@ -20104,15 +20207,19 @@
                           },
                           "command": {
                             "minItems": 1,
+                            "maxItems": 50,
                             "type": "array",
                             "items": {
-                              "type": "string"
+                              "type": "string",
+                              "maxLength": 8192
                             }
                           },
                           "environment": {
                             "type": "object",
                             "propertyNames": {
-                              "type": "string"
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
                             },
                             "additionalProperties": {
                               "anyOf": [
@@ -20124,10 +20231,12 @@
                                   "type": "object",
                                   "properties": {
                                     "encryptedData": {
-                                      "type": "string"
+                                      "type": "string",
+                                      "maxLength": 32816
                                     },
                                     "encryptedDEK": {
-                                      "type": "string"
+                                      "type": "string",
+                                      "maxLength": 684
                                     },
                                     "algorithm": {
                                       "type": "string",
@@ -20172,12 +20281,15 @@
                           },
                           "url": {
                             "type": "string",
+                            "maxLength": 4096,
                             "format": "uri"
                           },
                           "headers": {
                             "type": "object",
                             "propertyNames": {
-                              "type": "string"
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
                             },
                             "additionalProperties": {
                               "anyOf": [
@@ -20189,10 +20301,12 @@
                                   "type": "object",
                                   "properties": {
                                     "encryptedData": {
-                                      "type": "string"
+                                      "type": "string",
+                                      "maxLength": 32816
                                     },
                                     "encryptedDEK": {
-                                      "type": "string"
+                                      "type": "string",
+                                      "maxLength": 684
                                     },
                                     "algorithm": {
                                       "type": "string",
@@ -20760,7 +20874,9 @@
                 "mcpServers": {
                   "type": "object",
                   "propertyNames": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
                   },
                   "additionalProperties": {
                     "oneOf": [
@@ -20773,15 +20889,19 @@
                           },
                           "command": {
                             "minItems": 1,
+                            "maxItems": 50,
                             "type": "array",
                             "items": {
-                              "type": "string"
+                              "type": "string",
+                              "maxLength": 8192
                             }
                           },
                           "environment": {
                             "type": "object",
                             "propertyNames": {
-                              "type": "string"
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
                             },
                             "additionalProperties": {
                               "anyOf": [
@@ -20793,10 +20913,12 @@
                                   "type": "object",
                                   "properties": {
                                     "encryptedData": {
-                                      "type": "string"
+                                      "type": "string",
+                                      "maxLength": 32816
                                     },
                                     "encryptedDEK": {
-                                      "type": "string"
+                                      "type": "string",
+                                      "maxLength": 684
                                     },
                                     "algorithm": {
                                       "type": "string",
@@ -20841,12 +20963,15 @@
                           },
                           "url": {
                             "type": "string",
+                            "maxLength": 4096,
                             "format": "uri"
                           },
                           "headers": {
                             "type": "object",
                             "propertyNames": {
-                              "type": "string"
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
                             },
                             "additionalProperties": {
                               "anyOf": [
@@ -20858,10 +20983,12 @@
                                   "type": "object",
                                   "properties": {
                                     "encryptedData": {
-                                      "type": "string"
+                                      "type": "string",
+                                      "maxLength": 32816
                                     },
                                     "encryptedDEK": {
-                                      "type": "string"
+                                      "type": "string",
+                                      "maxLength": 684
                                     },
                                     "algorithm": {
                                       "type": "string",

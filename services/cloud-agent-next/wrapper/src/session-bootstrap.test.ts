@@ -41,7 +41,6 @@ function makeRequest(tmpDir: string, overrides: Partial<WrapperSessionReadyReque
     },
     materialized: {
       env: {
-        HOME: path.join(tmpDir, 'home'),
         KILOCODE_TOKEN: 'kilo-capability',
         [PNPM_STORE_ENV_VAR]: PNPM_STORE_DIR,
       },
@@ -214,6 +213,41 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(JSON.parse(authFile)).toEqual({ kilo: { type: 'api', key: 'kilo-capability' } });
     expect(authFile).not.toContain('wrapper-dispatch-ticket');
     expect(process.env.GH_TOKEN).toBe('profile-github-token');
+  });
+
+  it('runs the preparation with the session home of the prepared workspace', async () => {
+    const request = makeRequest(tmpDir);
+    const decoyHome = path.join(tmpDir, 'decoy-home');
+    const wrapperLogPath = path.join(tmpDir, 'home.log');
+    await fsp.mkdir(decoyHome, { recursive: true });
+    process.env.HOME = decoyHome;
+    process.env.WRAPPER_LOG_PATH = wrapperLogPath;
+
+    await prepareWrapperBootstrapWorkspace(
+      request,
+      mock(() => {}),
+      {
+        git: async args => {
+          if (args[0] === 'clone') {
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+          }
+          if (args[0] === 'rev-parse') return { stdout: '', stderr: '', exitCode: 1 };
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        runProcess: async () => ({ stdout: '', stderr: '', exitCode: 0 }),
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      }
+    );
+
+    expect(process.env.HOME).toBe(request.workspace.sessionHome);
+    expect(await fsp.readFile(wrapperLogPath, 'utf8')).toContain('homeMatchesSessionHome=true');
   });
 
   it('writes profile instruction files beside cloud-agent.md and never overwrites it', async () => {
@@ -2442,7 +2476,6 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       },
       materialized: {
         env: {
-          HOME: path.join(tmpDir, 'home'),
           KILOCODE_TOKEN: 'kilo-token',
           KILO_PLATFORM: 'code-review',
         },

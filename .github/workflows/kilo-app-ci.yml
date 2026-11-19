@@ -175,9 +175,10 @@ jobs:
   # declarations. Building it inside each job made a cache miss pay the typia
   # compile once per job, because the shards start together and actions/cache
   # saves at the end of a job, so no job can hit another's save. The action
-  # still runs here, so its cache serves a later run with the same inputs, and
-  # the `mobile-test-result` aggregator needs this one, so a failed build fails
-  # the gate instead of leaving the suites skipped.
+  # still runs here, so its cache serves a later run with the same inputs. The
+  # build publishes a `failed` output instead of failing its job: its consumers
+  # then fail on the missing artifact, and the `mobile-test-result` aggregator
+  # counts that output when change detection selected the suite.
   #
   # This producer reads no change-detection output, so it starts beside change
   # detection instead of behind it. The shard row is then released as soon as
@@ -203,6 +204,8 @@ jobs:
   prepare-harness-sdk:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 20
+    outputs:
+      failed: ${{ steps.mark.outputs.failed }}
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
 
@@ -227,12 +230,25 @@ jobs:
         run: pnpm install --frozen-lockfile --filter '@kilocode/harness-sdk...' --filter kilocode-monorepo
 
       - name: Restore or build the harness SDK
+        id: build
         uses: ./.github/actions/harness-sdk-build
+        continue-on-error: true
+
+      # The producer starts beside change detection, so it also runs on a change
+      # this suite does not cover, where no job reads its artifact. A failed job
+      # would fail that run, and the release reuses only a run that concluded
+      # successfully, so the failure is published as an output instead and the
+      # aggregator decides whether it counts.
+      - name: Record a failed build
+        id: mark
+        if: steps.build.outcome == 'failure'
+        run: echo "failed=true" >> "$GITHUB_OUTPUT"
 
       # A directory path makes the directory the artifact root, so a consumer
       # that unpacks into packages/harness-sdk/dist gets the tree the build
       # wrote, with no extra path segment.
       - name: Upload the harness SDK build
+        if: steps.build.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: harness-sdk-dist
@@ -564,17 +580,19 @@ jobs:
         run: pnpm --filter kilo-app run test --shard=${{ matrix.shard }}/4
 
   # Skipped shards (no mobile change) pass; a failed or cancelled shard fails
-  # this job. It needs both producers for the same reason: a failed producer
-  # only skips the jobs that consume it, and a skipped check passes, so this job
-  # carries that failure to the gate. The catalog job belongs here too: its
-  # paths never select a shard, so without this needs entry a failed audit
-  # would leave the required check green.
+  # this job. It needs both producers for the same reason: a producer that
+  # failed its job only skips the jobs that consume it, and a skipped check
+  # passes, so this job carries that failure to the gate. The catalog job
+  # belongs here too: its paths never select a shard, so without this needs
+  # entry a failed audit would leave the required check green.
   #
   # The harness SDK producer starts beside change detection, so it also runs on
-  # a change this suite does not cover. On such a run no job downloads its
-  # artifact, so this job counts the producer result only when detection
-  # reported a mobile change. A producer failure still fails this check on a run
-  # that did report one.
+  # a change this suite does not cover. A failed job would fail that run, and
+  # the release reuses only a run that concluded successfully, so the producer
+  # reports a failed build as an output and does not fail its own job. This job
+  # counts that output only when detection reported a mobile change: a real
+  # build failure then fails this required check, while on other runs its
+  # consumers fail on the missing artifact.
   mobile-test-result:
     needs: [mobile-changes, prepare-harness-sdk, prepare-trpc, mobile-test, i18n-catalogs]
     if: ${{ !cancelled() }}
@@ -583,14 +601,18 @@ jobs:
     steps:
       - name: Check test results
         env:
-          RESULTS: ${{ toJSON(needs) }}
+          RESULTS: ${{ toJSON(needs.*.result) }}
           MOBILE: ${{ needs.mobile-changes.outputs.mobile }}
+          SDK_FAILED: ${{ needs.prepare-harness-sdk.outputs.failed }}
         run: |
           echo "$RESULTS"
-          if jq -e --arg mobile "$MOBILE" '
-            to_entries
-            | map(select(($mobile == "true") or (.key != "prepare-harness-sdk")).value.result)
-            | any(.[]; . == "failure" or . == "cancelled")
-          ' <<< "$RESULTS" > /dev/null; then
+          if jq -e 'any(.[]; . == "failure" or . == "cancelled")' <<< "$RESULTS" > /dev/null; then
+            exit 1
+          fi
+          # The harness producer reports a failed build instead of failing its
+          # own job, because a failed job fails a run the release reuses. Count
+          # that report only when detection selected the suite: otherwise no job
+          # reads the artifact and the failure cannot come from this change.
+          if [ "$MOBILE" = "true" ] && [ "$SDK_FAILED" = "true" ]; then
             exit 1
           fi

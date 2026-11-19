@@ -665,8 +665,9 @@ test('kilo-app CI builds the harness SDK once and every suite downloads it', () 
     assert.equal(download.with.path, sdkDist, `${name} restores it where the build writes`);
   }
 
-  // A failed build leaves the suite jobs skipped, and a skipped required check
-  // passes, so the aggregator must carry each producer's failure.
+  // A producer that failed its job only skips the jobs that consume it, and a
+  // skipped required check passes, so the aggregator must carry each producer's
+  // failure.
   for (const requiredProducer of [harnessProducer, trpcProducer]) {
     assert.ok(
       [jobs['mobile-test-result'].needs].flat().includes(requiredProducer),
@@ -674,29 +675,130 @@ test('kilo-app CI builds the harness SDK once and every suite downloads it', () 
     );
   }
 
-  // With an unconditional producer, its failure must only count when the suite
-  // ran: the step drops the producer result unless detection reported a mobile
-  // change.
+  // The producer cannot fail its own job: the release reuses only a run that
+  // concluded successfully, and the producer now runs on every run. Pin the
+  // wiring that reports the failure instead: the build step swallows its own
+  // failure, a mark step writes the output, the upload is skipped, and the job
+  // publishes the mark step's output. A failed job would fail a run the release
+  // reuses.
+  const buildStep = producerSteps.find(step => step.uses === './.github/actions/harness-sdk-build');
+  assert.equal(
+    buildStep.id,
+    'build',
+    'the build step is addressable, or the mark step below finds nothing'
+  );
+  assert.equal(
+    buildStep['continue-on-error'],
+    true,
+    'a failed build must not fail the job, because a failed job fails a run the release reuses'
+  );
+  const markStep = producerSteps.find(step => step.name === 'Record a failed build');
+  assert.ok(markStep, 'a failed build must publish the failure as an output');
+  assert.equal(
+    markStep.if,
+    "steps.build.outcome == 'failure'",
+    'the mark step records exactly a failed build outcome'
+  );
+  assert.match(
+    markStep.run,
+    /failed=true/,
+    'the mark step writes the failed output'
+  );
+  assert.match(
+    markStep.run,
+    /\$GITHUB_OUTPUT/,
+    'the mark step publishes the output GitHub can collect'
+  );
+  const sdkUpload = producerSteps.find(
+    step => step.uses?.startsWith('actions/upload-artifact@') && step.with?.name === sdkArtifact
+  );
+  assert.equal(
+    sdkUpload.if,
+    "steps.build.outcome == 'success'",
+    'a failed build publishes no artifact, so consumers fail on the missing artifact'
+  );
+  assert.equal(
+    jobs[harnessProducer].outputs.failed,
+    '${{ steps.mark.outputs.failed }}',
+    'the job output publishes the mark step output'
+  );
+
+  // The aggregator reads a plain result list for the shards, and the producer
+  // failure as one explicit input it counts by the detection flag.
   const aggregateStep = jobs['mobile-test-result'].steps.find(
     step => step.name === 'Check test results'
   );
-  assert.match(
-    aggregateStep.run,
-    /prepare-harness-sdk/,
-    'the aggregator decides about the harness producer result'
+  assert.equal(
+    aggregateStep.env.RESULTS,
+    '${{ toJSON(needs.*.result) }}',
+    'the aggregator reads every needed job result as an array'
   );
-  assert.match(aggregateStep.run, /--arg mobile/, 'the aggregator reads a mobile flag');
   assert.equal(
     aggregateStep.env.MOBILE,
     '${{ needs.mobile-changes.outputs.mobile }}',
     'the aggregator takes that flag from change detection'
   );
   assert.equal(
-    aggregateStep.env.RESULTS,
-    '${{ toJSON(needs) }}',
-    'the aggregator reads every needed job as an object'
+    aggregateStep.env.SDK_FAILED,
+    '${{ needs.prepare-harness-sdk.outputs.failed }}',
+    'the aggregator reads the producer failure report'
   );
 });
+
+// The assertions above pin the wiring, not the predicate: a rewrite of the run
+// block could pass unnoticed. This fixture runs the step's own script against
+// result fixtures, so an edit to the predicate cannot pass unnoticed.
+test(
+  'the required check fails on a shard or producer failure only when the suite was selected',
+  t => {
+    const work = mkdtempSync(join(tmpdir(), 'kilo-app-aggregate-'));
+    t.after(() => rmSync(work, { recursive: true, force: true }));
+    const step = workflows['kilo-app-ci.yml'].jobs['mobile-test-result'].steps.find(
+      step => step.name === 'Check test results'
+    );
+    // `needs.*.result` expands to a JSON array of result strings; run the step
+    // with `RESULTS` holding that same array and `jq` reading it back.
+    const aggregate = (results, { mobile = 'true', sdkFailed = '' } = {}) =>
+      spawnSync('bash', ['-c', step.run], {
+        encoding: 'utf8',
+        cwd: work,
+        env: {
+          ...process.env,
+          RESULTS: JSON.stringify(results),
+          MOBILE: mobile,
+          SDK_FAILED: sdkFailed,
+        },
+      }).status;
+
+    const all = ['success', 'success', 'success', 'success', 'success'];
+    assert.equal(aggregate(all), 0, 'all shards pass');
+    assert.notEqual(
+      aggregate(['success', 'success', 'success', 'failure', 'success']),
+      0,
+      'a failed shard fails the check'
+    );
+    assert.notEqual(
+      aggregate(['success', 'success', 'success', 'cancelled', 'success']),
+      0,
+      'a cancelled shard fails the check'
+    );
+    assert.notEqual(
+      aggregate(all, { sdkFailed: 'true' }),
+      0,
+      'a reported build failure fails the check when detection selected the suite'
+    );
+    assert.equal(
+      aggregate(['success', 'skipped', 'skipped', 'skipped', 'skipped'], { mobile: 'false' }),
+      0,
+      'a run without a selected suite passes'
+    );
+    assert.equal(
+      aggregate(['success', 'skipped', 'skipped', 'skipped', 'skipped'], { mobile: 'false', sdkFailed: 'true' }),
+      0,
+      'a producer failure without a selected suite passes'
+    );
+  }
+);
 
 // mobile-native-build needs the same single producer for a different reason:
 // both platform jobs start together after the gate, so running the action in

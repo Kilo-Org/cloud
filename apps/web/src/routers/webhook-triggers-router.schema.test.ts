@@ -56,7 +56,10 @@ const mockDbUpdate = jest.fn();
 const mockDbDelete = jest.fn();
 const mockFindAdmin = jest.fn<() => Promise<Partial<User> | undefined>>();
 const mockSelectWhere = jest.fn<(condition?: SQL) => Promise<Array<Record<string, unknown>>>>();
-const mockSelectSessions = jest.fn<() => Promise<Array<Record<string, unknown>>>>(() =>
+const mockSelectV1Sessions = jest.fn<() => Promise<Array<Record<string, unknown>>>>(() =>
+  Promise.resolve([])
+);
+const mockSelectV2Sessions = jest.fn<() => Promise<Array<Record<string, unknown>>>>(() =>
   Promise.resolve([])
 );
 const mockSelectChat = jest.fn<() => Promise<Array<Record<string, unknown>>>>();
@@ -73,10 +76,10 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => {
         from: (table: unknown) => ({
           leftJoin: () => ({ where: () => ({ limit: mockSelectChat }) }),
           where: (condition?: SQL) => {
-            const result =
-              table === cliSessions || table === cli_sessions_v2
-                ? mockSelectSessions()
-                : mockSelectWhere(condition);
+            let result: Promise<Array<Record<string, unknown>>>;
+            if (table === cliSessions) result = mockSelectV1Sessions();
+            else if (table === cli_sessions_v2) result = mockSelectV2Sessions();
+            else result = mockSelectWhere(condition);
             return {
               limit: () => result,
               orderBy: () => result,
@@ -1735,6 +1738,10 @@ describe('scheduled trigger invocation', () => {
 describe('webhook trigger request listing', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSelectV1Sessions.mockReset();
+    mockSelectV1Sessions.mockResolvedValue([]);
+    mockSelectV2Sessions.mockReset();
+    mockSelectV2Sessions.mockResolvedValue([]);
     mockSelectWhere.mockResolvedValue([
       {
         id: '00000000-0000-4000-8000-000000000002',
@@ -1792,42 +1799,54 @@ describe('webhook trigger request listing', () => {
   it('resolves session ids from cli_sessions_v2 only by default', async () => {
     const bothId = crypto.randomUUID();
     const v1OnlyId = crypto.randomUUID();
-    const v2SessionId = 'ses_2f0aa1c1c1c1c1c1c1c1c1c1';
+    const v2SessionId = 'ses_2f0aa1c1c1c1c1c1c1c1c1c1c1';
     mockListWorkerRequests.mockResolvedValueOnce({
       success: true,
       requests: [capturedRequest(bothId), capturedRequest(v1OnlyId)],
     });
-    mockSelectSessions.mockResolvedValueOnce([
+    mockSelectV2Sessions.mockResolvedValueOnce([
       { cloudAgentSessionId: bothId, sessionId: v2SessionId },
+    ]);
+    mockSelectV1Sessions.mockResolvedValueOnce([
+      { cloudAgentSessionId: bothId, sessionId: crypto.randomUUID() },
+      { cloudAgentSessionId: v1OnlyId, sessionId: crypto.randomUUID() },
     ]);
 
     const requests = await createCaller({ user }).listRequests({ triggerId: 'trigger-id' });
 
     expect(requests.map(r => r.kiloSessionId)).toEqual([v2SessionId, null]);
+    expect(mockSelectV2Sessions).toHaveBeenCalledTimes(1);
+    expect(mockSelectV1Sessions).not.toHaveBeenCalled();
   });
 
   it('resolves legacy v1 session ids when includeLegacySessionIds is set', async () => {
     const bothId = crypto.randomUUID();
     const v1OnlyId = crypto.randomUUID();
+    const v2OnlyId = crypto.randomUUID();
     const v1SessionIdForBoth = crypto.randomUUID();
     const v1SessionIdOnly = crypto.randomUUID();
     mockListWorkerRequests.mockResolvedValueOnce({
       success: true,
-      requests: [capturedRequest(bothId), capturedRequest(v1OnlyId)],
+      requests: [capturedRequest(bothId), capturedRequest(v1OnlyId), capturedRequest(v2OnlyId)],
     });
-    mockSelectSessions
-      .mockResolvedValueOnce([
-        { cloudAgentSessionId: bothId, sessionId: v1SessionIdForBoth },
-        { cloudAgentSessionId: v1OnlyId, sessionId: v1SessionIdOnly },
-      ])
-      .mockResolvedValueOnce([]);
+    mockSelectV1Sessions.mockResolvedValueOnce([
+      { cloudAgentSessionId: bothId, sessionId: v1SessionIdForBoth },
+      { cloudAgentSessionId: v1OnlyId, sessionId: v1SessionIdOnly },
+    ]);
+    mockSelectV2Sessions.mockResolvedValueOnce([]);
 
     const requests = await createCaller({ user }).listRequests({
       triggerId: 'trigger-id',
       includeLegacySessionIds: true,
     });
 
-    expect(requests.map(r => r.kiloSessionId)).toEqual([v1SessionIdForBoth, v1SessionIdOnly]);
+    expect(requests.map(r => r.kiloSessionId)).toEqual([
+      v1SessionIdForBoth,
+      v1SessionIdOnly,
+      null,
+    ]);
+    expect(mockSelectV1Sessions).toHaveBeenCalledTimes(1);
+    expect(mockSelectV2Sessions).toHaveBeenCalledTimes(1);
   });
 });
 

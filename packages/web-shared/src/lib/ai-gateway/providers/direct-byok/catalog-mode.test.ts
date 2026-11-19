@@ -17,6 +17,7 @@ import {
   offersCatalogMode,
   findDirectByokCatalogModels,
   getDirectByokCatalogModelIds,
+  getDirectByokCatalogServing,
   getDirectByokModelsForUser,
   supportsCatalogMode,
   type DirectByokPolicyTarget,
@@ -195,6 +196,16 @@ describe('direct BYOK model lists in catalog mode', () => {
     const catalogIds = await getDirectByokCatalogModelIds({ type: 'user', id: 'user-id' });
 
     expect([...catalogIds]).toEqual(['moonshotai/kimi-k2.6', '~moonshotai/kimi-latest']);
+  });
+
+  test('lists the APIs of each key serving a catalog id, aliases included', async () => {
+    mockedKeys.mockResolvedValueOnce(keys({ synthetic: true, 'zai-coding': true }));
+    const chatCompletions = { chatApis: ['chat_completions'], clientApi: 'chat_completions' };
+
+    const serving = await getDirectByokCatalogServing({ type: 'user', id: 'user-id' });
+
+    expect(serving.get('moonshotai/kimi-k2.6')).toEqual([chatCompletions, chatCompletions]);
+    expect(serving.get('~moonshotai/kimi-latest')).toEqual([chatCompletions, chatCompletions]);
   });
 
   test('omits latest aliases that left the catalog', async () => {

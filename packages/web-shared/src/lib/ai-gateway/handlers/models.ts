@@ -5,7 +5,7 @@ import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
-  getDirectByokCatalogModelIds,
+  getDirectByokCatalogServing,
   getDirectByokModelsForUser,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { organizationMemberCatalog, usableCustomRouters } from './organization-catalog';
@@ -81,11 +81,11 @@ export async function getPersonalModelList(params: {
   }
   const models = await addAutoRoutingModels(data.data);
 
-  const [byokModels, enabledByokProviderIds, directByokCatalogModelIds, customRouters] =
+  const [byokModels, enabledByokProviderIds, directByokCatalogServing, customRouters] =
     await Promise.all([
       getDirectByokModelsForUser(user.id),
       getUserByokProviderIds(readDb, user.id),
-      getDirectByokCatalogModelIds({ type: 'user', id: user.id }),
+      getDirectByokCatalogServing({ type: 'user', id: user.id }),
       usableCustomRouters({ userId: user.id, organizationId: null, endpoint }),
     ]);
   const modelsWithByokAvailability = await tagClaudeBillingByokModels(
@@ -94,7 +94,7 @@ export async function getPersonalModelList(params: {
       { kiloUserId: user.id, organizationId: null },
       addDirectByokCatalogAvailability(
         await addUserByokAvailability(models, enabledByokProviderIds),
-        directByokCatalogModelIds
+        directByokCatalogServing
       )
     )
   );

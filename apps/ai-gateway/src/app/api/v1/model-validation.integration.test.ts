@@ -34,7 +34,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForUser: jest.fn(),
-  getDirectByokCatalogModelIds: jest.fn(async () => new Set()),
+  getDirectByokCatalogServing: jest.fn(async () => new Map()),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   addDirectByokCatalogAvailability: jest.requireActual('@kilocode/web-shared/lib/ai-gateway/byok')

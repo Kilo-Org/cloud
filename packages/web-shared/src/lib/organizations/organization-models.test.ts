@@ -3,6 +3,10 @@ import type { ModelStats, Organization } from '@kilocode/db/schema';
 import type { EnkryptBenchmark } from '@kilocode/db/schema-types';
 import type { OpenRouterModel, OpenRouterModelsResponse } from './organization-types';
 import type {
+  DirectByokCatalogServing,
+  DirectByokCatalogServingKey,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
+import type {
   OrganizationGroupPolicyContext,
   OrganizationPolicySubject,
 } from './organization-group-policy-context.server';
@@ -72,13 +76,19 @@ const mockEnabledKeys = jest.fn(async (_db: unknown, _owner: unknown): Promise<M
 ]);
 /** Replica snapshot loads a test expects; anything else fails the test teardown. */
 let expectedReplicaLoads = 0;
-const mockCatalogModelIds = new Set(['provider/allowed']);
-const mockDirectByokCatalogModelIds = jest.fn(
-  async (_organizationId: string, _policy: unknown): Promise<ReadonlySet<string>> =>
-    mockCatalogModelIds
+const CHAT_COMPLETIONS_KEYS: DirectByokCatalogServingKey[] = [
+  { chatApis: ['chat_completions'], clientApi: 'chat_completions' },
+];
+function catalogServing(modelIds: string[]): DirectByokCatalogServing {
+  return new Map(modelIds.map(modelId => [modelId, CHAT_COMPLETIONS_KEYS]));
+}
+const mockCatalogServing = catalogServing(['provider/allowed']);
+const mockDirectByokCatalogServing = jest.fn(
+  async (_organizationId: string, _policy: unknown): Promise<DirectByokCatalogServing> =>
+    mockCatalogServing
 );
 const mockCatalogAvailability = jest.fn(
-  (models: OpenRouterModel[], _catalogModelIds: ReadonlySet<string>) => models
+  (models: OpenRouterModel[], _serving: DirectByokCatalogServing) => models
 );
 const mockAvailability = jest.fn(
   async (
@@ -134,7 +144,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
 }));
 jest.mock(
   '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok',
-  () => ({ getAllowedDirectByokCatalogModelIds: mockDirectByokCatalogModelIds })
+  () => ({ getAllowedDirectByokCatalogServing: mockDirectByokCatalogServing })
 );
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model', () => ({
   ...jest.requireActual<Record<string, unknown>>('@kilocode/web-shared/lib/ai-gateway/auto-model'),
@@ -429,13 +439,13 @@ describe('organization model producer publication', () => {
       type: 'organization',
       id: 'fixture-org',
     });
-    expect(mockDirectByokCatalogModelIds).toHaveBeenCalledWith('fixture-org', mockPolicy);
+    expect(mockDirectByokCatalogServing).toHaveBeenCalledWith('fixture-org', mockPolicy);
     expect(mockAvailability).toHaveBeenCalledWith(
       [mockCatalog.data[0], mockCatalog.data[2]],
       ['openai'],
       expect.any(Function)
     );
-    expect(mockCatalogAvailability).toHaveBeenCalledWith(expect.any(Array), mockCatalogModelIds);
+    expect(mockCatalogAvailability).toHaveBeenCalledWith(expect.any(Array), mockCatalogServing);
     const getAllowedProviders = mockAvailability.mock.calls[0][2];
     expect(getAllowedProviders?.('provider/allowed')).toEqual(ALLOWED_MODEL_ROUTES);
     expect(getAllowedProviders?.('provider/training')).toBeUndefined();
@@ -619,12 +629,12 @@ describe('organization model producer publication', () => {
   });
 
   it('lists denied models only when an inference provider key the policy admits serves them', async () => {
-    const catalogModelIds = new Set([
+    const serving = catalogServing([
       'provider/allowed',
       'provider/ceiling-catalog',
       'provider/ungranted-catalog',
     ]);
-    mockDirectByokCatalogModelIds.mockResolvedValueOnce(catalogModelIds);
+    mockDirectByokCatalogServing.mockResolvedValueOnce(serving);
     mockEnabledKeys.mockResolvedValueOnce([
       { providerId: 'moonshotai', serveCatalogModels: false },
       { providerId: 'openrouter', serveCatalogModels: false },
@@ -652,8 +662,8 @@ describe('organization model producer publication', () => {
       'morph-byok/private',
       'kilo-internal/private',
     ]);
-    expect(mockDirectByokCatalogModelIds).toHaveBeenCalledWith('fixture-org', mockPolicy);
-    expect(mockCatalogAvailability).toHaveBeenCalledWith(expect.any(Array), catalogModelIds);
+    expect(mockDirectByokCatalogServing).toHaveBeenCalledWith('fixture-org', mockPolicy);
+    expect(mockCatalogAvailability).toHaveBeenCalledWith(expect.any(Array), serving);
     expect(mockInferenceProviderUserByok).toHaveBeenCalledWith('provider/ceiling-gateway', [
       'moonshotai',
       'openrouter',

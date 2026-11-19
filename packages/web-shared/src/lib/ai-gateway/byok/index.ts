@@ -3,6 +3,7 @@ import { byok_api_keys } from '@kilocode/db/schema';
 import {
   ByokApiKeySettingsSchema,
   ByokPrivateProviderDefinitionSchema,
+  getCustomLlmClientApiKind,
   isByokPrivateProviderId,
   type ByokPrivateProviderDefinition,
 } from '@kilocode/db/schema-types';
@@ -24,7 +25,12 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { isCodestralModel } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import {
+  AI_SDK_PROVIDER_FOR_CHAT_API,
+  type BYOKResult,
+  type GatewayChatApiKind,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { toLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 import {
   getVercelModelsFromDatabase,
   getVercelModelsMetadataFromDatabase,
@@ -455,20 +461,57 @@ export function isInferenceProviderUserByok(userByok: readonly BYOKResult[] | nu
   );
 }
 
+/** A catalog-mode direct BYOK key that serves a catalog id: its APIs, and the one clients use. */
+export type DirectByokCatalogServingKey = {
+  chatApis: readonly GatewayChatApiKind[];
+  clientApi: GatewayChatApiKind;
+};
+
+/** The keys that serve each catalog id, by catalog id (see `getDirectByokCatalogServing`). */
+export type DirectByokCatalogServing = ReadonlyMap<string, readonly DirectByokCatalogServingKey[]>;
+
+/**
+ * The client API metadata of a catalog model only catalog-mode keys serve. When none of them
+ * serves the API the catalog tells clients to use, routing would refuse those requests instead of
+ * billing Kilo, so clients are told to use the client API of the first key instead.
+ */
+function withServedClientApi(
+  model: OpenRouterModel,
+  keys: readonly DirectByokCatalogServingKey[]
+): OpenRouterModel {
+  const catalogApi = getCustomLlmClientApiKind(model.opencode?.ai_sdk_provider);
+  if (keys.length === 0 || keys.some(key => key.chatApis.includes(catalogApi))) return model;
+  const ai_sdk_provider = AI_SDK_PROVIDER_FOR_CHAT_API[keys[0].clientApi];
+  const { ai_sdk_provider: _catalogProvider, ...opencode } = model.opencode ?? {};
+  return {
+    ...model,
+    opencode: {
+      ...opencode,
+      ...(ai_sdk_provider && { ai_sdk_provider }),
+      variants: opencode.reasoning_options
+        ? toLegacyVariants(opencode.reasoning_options, ai_sdk_provider)
+        : opencode.variants,
+    },
+  };
+}
+
 /**
  * Marks catalog models the caller's direct BYOK keys in catalog mode serve
- * (`getDirectByokCatalogModelIds`), alongside the gateway and Vercel BYOK availability.
+ * (`getDirectByokCatalogServing`), alongside the gateway and Vercel BYOK availability, which must
+ * already be marked.
  */
 export function addDirectByokCatalogAvailability(
   models: OpenRouterModel[],
-  directByokCatalogModelIds: ReadonlySet<string>
+  serving: DirectByokCatalogServing
 ): OpenRouterModel[] {
-  if (directByokCatalogModelIds.size === 0) return models;
-  return models.map(model =>
-    directByokCatalogModelIds.has(model.id)
-      ? { ...model, hasUserByokAvailable: true, isFree: false }
-      : model
-  );
+  if (serving.size === 0) return models;
+  return models.map(model => {
+    const keys = serving.get(model.id);
+    if (!keys) return model;
+    // A request over the catalog's API still reaches another BYOK key that serves the model.
+    const served = model.hasUserByokAvailable ? model : withServedClientApi(model, keys);
+    return { ...served, hasUserByokAvailable: true, isFree: false };
+  });
 }
 
 export function getByokKmsContext(row: {

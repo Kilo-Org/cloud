@@ -6,16 +6,19 @@ import {
   type DirectByokUpstream,
   type StaticDirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
-import type { CustomLlmProvider, OpenRouterProvider } from '@kilocode/db/schema-types';
-import type {
-  GatewayChatApiKind,
-  Provider,
+import type { OpenRouterProvider } from '@kilocode/db/schema-types';
+import {
+  AI_SDK_PROVIDER_FOR_CHAT_API,
+  type GatewayChatApiKind,
+  type Provider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import DIRECT_BYOK_PROVIDERS from './direct-byok-definitions';
 import {
   getEnabledByokProviders,
   type ByokOwner,
+  type DirectByokCatalogServing,
+  type DirectByokCatalogServingKey,
   type EnabledByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { getPrimaryCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/catalog-models';
@@ -92,12 +95,6 @@ export function getDirectByokKeyLabel(provider: DirectByokProvider): string {
 export function formatDirectByokModelId(provider: DirectByokProvider, model: DirectByokModel) {
   return (provider.id + '/' + model.id).toLowerCase();
 }
-
-const AI_SDK_PROVIDER_FOR_CHAT_API = {
-  chat_completions: undefined,
-  messages: 'anthropic',
-  responses: 'openai',
-} as const satisfies Record<GatewayChatApiKind, CustomLlmProvider | undefined>;
 
 function getDirectByokAiSdkProvider(
   provider: DirectByokProvider,
@@ -314,21 +311,17 @@ export async function findDirectByokCatalogModels(
   return found;
 }
 
-/** Serving providers per catalog id; a latest alias is served by the providers of its target. */
-type CatalogModeProviders = Map<string, DirectByokProvider[]>;
+/** Serving models per catalog id; a latest alias is served by the models of its target. */
+type CatalogModeModels = Map<string, DirectByokCatalogModel[]>;
 
-async function addLatestAliasModelIds(providersByModelId: CatalogModeProviders): Promise<void> {
-  if (providersByModelId.size === 0) return;
+async function addLatestAliasModelIds(modelsByModelId: CatalogModeModels): Promise<void> {
+  if (modelsByModelId.size === 0) return;
   const storedModels = await getOpenRouterModelsMetadataFromDatabase();
   for (const [modelId, storedModel] of Object.entries(storedModels)) {
     const targetModelId = storedModel.alias_target?.slug;
-    const targetProviders = targetModelId ? providersByModelId.get(targetModelId) : undefined;
-    if (
-      modelId.startsWith('~') &&
-      targetProviders &&
-      (await isByokServableCatalogModelId(modelId))
-    ) {
-      providersByModelId.set(modelId, targetProviders);
+    const targetModels = targetModelId ? modelsByModelId.get(targetModelId) : undefined;
+    if (modelId.startsWith('~') && targetModels && (await isByokServableCatalogModelId(modelId))) {
+      modelsByModelId.set(modelId, targetModels);
     }
   }
 }
@@ -341,41 +334,55 @@ export type DirectByokCatalogServingCheck = (
 
 const allowEveryCatalogProvider: DirectByokCatalogServingCheck = async () => true;
 
-async function getCatalogModeModelIds(
+function servingKey({ provider, model }: DirectByokCatalogModel): DirectByokCatalogServingKey {
+  const chatApis = getDirectByokModelChatApis(provider, model);
+  return { chatApis, clientApi: provider.getModelChatApi?.(model) ?? chatApis[0] };
+}
+
+async function getCatalogModeServing(
   keys: EnabledByokProvider[],
   isServingAllowed: DirectByokCatalogServingCheck
-): Promise<ReadonlySet<string>> {
-  const providersByModelId: CatalogModeProviders = new Map();
+): Promise<DirectByokCatalogServing> {
+  const modelsByModelId: CatalogModeModels = new Map();
   for (const provider of providersOfKeys(keys, { catalogMode: true })) {
-    for (const { catalogModelId } of await listDirectByokCatalogModels(provider)) {
-      providersByModelId.set(catalogModelId, [
-        ...(providersByModelId.get(catalogModelId) ?? []),
-        provider,
+    for (const { catalogModelId, model } of await listDirectByokCatalogModels(provider)) {
+      modelsByModelId.set(catalogModelId, [
+        ...(modelsByModelId.get(catalogModelId) ?? []),
+        { provider, model },
       ]);
     }
   }
-  await addLatestAliasModelIds(providersByModelId);
-  const modelIds = new Set<string>();
-  for (const [modelId, providers] of providersByModelId) {
-    for (const provider of providers) {
-      if (await isServingAllowed(modelId, getDirectByokPolicyTarget(provider))) {
-        modelIds.add(modelId);
-        break;
+  await addLatestAliasModelIds(modelsByModelId);
+  const serving = new Map<string, DirectByokCatalogServingKey[]>();
+  for (const [modelId, catalogModels] of modelsByModelId) {
+    const allowed: DirectByokCatalogServingKey[] = [];
+    for (const catalogModel of catalogModels) {
+      if (await isServingAllowed(modelId, getDirectByokPolicyTarget(catalogModel.provider))) {
+        allowed.push(servingKey(catalogModel));
       }
     }
+    if (allowed.length > 0) serving.set(modelId, allowed);
   }
-  return modelIds;
+  return serving;
 }
 
 /**
- * Catalog ids the owner's catalog-mode keys serve. With `isServingAllowed`, an id counts only when
- * one of the keys serving it passes, as routing skips the others.
+ * The catalog ids the owner's catalog-mode keys serve, each with the APIs of its serving keys. With
+ * `isServingAllowed`, only the keys that pass count, as routing skips the others.
  */
+export async function getDirectByokCatalogServing(
+  owner: ByokOwner,
+  isServingAllowed: DirectByokCatalogServingCheck = allowEveryCatalogProvider
+): Promise<DirectByokCatalogServing> {
+  return getCatalogModeServing(await getEnabledByokProviders(readDb, owner), isServingAllowed);
+}
+
+/** The catalog ids of `getDirectByokCatalogServing`. */
 export async function getDirectByokCatalogModelIds(
   owner: ByokOwner,
   isServingAllowed: DirectByokCatalogServingCheck = allowEveryCatalogProvider
 ): Promise<ReadonlySet<string>> {
-  return getCatalogModeModelIds(await getEnabledByokProviders(readDb, owner), isServingAllowed);
+  return new Set((await getDirectByokCatalogServing(owner, isServingAllowed)).keys());
 }
 
 /**

@@ -33,10 +33,15 @@ import {
   getModelUserByokProviders,
   hasInferenceProviderUserByokForModel,
   isInferenceProviderUserByok,
+  type DirectByokCatalogServingKey,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 
 const mockedGetVercelModelsMetadata = jest.mocked(getVercelModelsMetadataFromDatabase);
 const mockedMapModelIdToVercel = jest.mocked(mapModelIdToVercel);
+
+const servedOverChatCompletions = new Map([
+  ['moonshotai/kimi-k2.6', [{ chatApis: ['chat_completions'], clientApi: 'chat_completions' }]],
+] satisfies Array<[string, DirectByokCatalogServingKey[]]>);
 
 function makeModel(id: string): OpenRouterModel {
   return {
@@ -204,12 +209,74 @@ describe('addUserByokAvailability', () => {
       model => ({ ...model, hasUserByokAvailable: false })
     );
 
-    const result = addDirectByokCatalogAvailability(models, new Set(['moonshotai/kimi-k2.6']));
+    const result = addDirectByokCatalogAvailability(models, servedOverChatCompletions);
 
     expect(result.map(model => [model.id, model.hasUserByokAvailable])).toEqual([
       ['moonshotai/kimi-k2.6', true],
       ['openai/gpt-fixture', false],
     ]);
+  });
+
+  describe('the client API a model only catalog-mode keys serve advertises', () => {
+    const reasoningOptions = [
+      { type: 'effort' as const, values: ['low' as const, 'high' as const] },
+    ];
+    const gpt: OpenRouterModel = {
+      ...makeModel('openai/gpt-fixture'),
+      hasUserByokAvailable: false,
+      opencode: { ai_sdk_provider: 'openai', reasoning_options: reasoningOptions },
+    };
+    const chatCompletionsKey: DirectByokCatalogServingKey = {
+      chatApis: ['chat_completions'],
+      clientApi: 'chat_completions',
+    };
+    const messagesKey: DirectByokCatalogServingKey = {
+      chatApis: ['messages'],
+      clientApi: 'messages',
+    };
+    const responsesKey: DirectByokCatalogServingKey = {
+      chatApis: ['chat_completions', 'responses'],
+      clientApi: 'chat_completions',
+    };
+
+    test.each([
+      {
+        name: 'the catalog API when a key serves it',
+        keys: [chatCompletionsKey, responsesKey],
+        expected: 'openai',
+      },
+      {
+        name: "the first key's client API when none serves the catalog API",
+        keys: [messagesKey, chatCompletionsKey],
+        expected: 'anthropic',
+      },
+      {
+        name: 'Chat Completions for a Chat Completions-only key',
+        keys: [chatCompletionsKey],
+        expected: undefined,
+      },
+    ] satisfies Array<{
+      name: string;
+      keys: DirectByokCatalogServingKey[];
+      expected: 'openai' | 'anthropic' | undefined;
+    }>)('is $name', ({ keys, expected }) => {
+      const [result] = addDirectByokCatalogAvailability([gpt], new Map([[gpt.id, keys]]));
+
+      expect(result.hasUserByokAvailable).toBe(true);
+      expect(result.opencode?.ai_sdk_provider).toBe(expected);
+      expect(result.opencode?.reasoning_options).toEqual(reasoningOptions);
+    });
+
+    test('keeps the catalog API when another BYOK key serves the model', () => {
+      const servedElsewhere = { ...gpt, hasUserByokAvailable: true };
+
+      const [result] = addDirectByokCatalogAvailability(
+        [servedElsewhere],
+        new Map([[gpt.id, [chatCompletionsKey]]])
+      );
+
+      expect(result.opencode).toEqual(gpt.opencode);
+    });
   });
 
   test('does not mark direct BYOK catalog models as free', () => {
@@ -218,7 +285,7 @@ describe('addUserByokAvailability', () => {
       { ...makeModel('openai/gpt-fixture'), isFree: true },
     ];
 
-    const result = addDirectByokCatalogAvailability(models, new Set(['moonshotai/kimi-k2.6']));
+    const result = addDirectByokCatalogAvailability(models, servedOverChatCompletions);
 
     expect(result[0]).toEqual({ ...models[0], hasUserByokAvailable: true, isFree: false });
     expect(result[1]).toBe(models[1]);

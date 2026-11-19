@@ -7,6 +7,7 @@ import type { ClaudeBillingOwner } from '@kilocode/web-shared/lib/ai-gateway/cla
 import {
   ReasoningDetailsTransform,
   type CustomLlmAwsBedrockCredentials,
+  type CustomLlmProvider,
   type ReasoningDetailsTransform as ReasoningDetailsTransformType,
 } from '@kilocode/db/schema-types';
 
@@ -54,6 +55,13 @@ export const GatewayChatApiKindSchema = z.enum([
   'responses',
   'messages',
 ]) satisfies z.ZodType<GatewayChatApiKind>;
+
+/** The `opencode.ai_sdk_provider` that tells clients to use each API. */
+export const AI_SDK_PROVIDER_FOR_CHAT_API = {
+  chat_completions: undefined,
+  messages: 'anthropic',
+  responses: 'openai',
+} as const satisfies Record<GatewayChatApiKind, CustomLlmProvider | undefined>;
 
 export type ProviderApiUrlOverrides = Readonly<Partial<Record<GatewayChatApiKind, string>>>;
 

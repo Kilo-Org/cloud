@@ -15,7 +15,7 @@ import {
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { listAvailableCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
 import { getDirectByokModels } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
-import { getAllowedDirectByokCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
+import { getAllowedDirectByokCatalogServing } from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
 import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { isOrganizationAutoEnabled } from '@kilocode/web-shared/lib/organizations/organization-auto-model';
 import {
@@ -76,10 +76,10 @@ export async function getAvailableModelsForOrganization(
   const organization = context.organization;
   const policy = evaluateEffectiveModelAccessPolicy(context);
 
-  const [responseData, byokKeys, directByokCatalogModelIds] = await Promise.all([
+  const [responseData, byokKeys, directByokCatalogServing] = await Promise.all([
     getEnhancedOpenRouterModels({ countryCode, fromDb }),
     getEnabledByokProviders(readDb, { type: 'organization', id: organizationId }),
-    getAllowedDirectByokCatalogModelIds(organizationId, policy),
+    getAllowedDirectByokCatalogServing(organizationId, policy),
   ]);
   const byokProviderIds = byokKeys.map(key => key.providerId);
   const restrictionCandidates = [...responseData.data];
@@ -88,14 +88,14 @@ export async function getAvailableModelsForOrganization(
     policy,
     restrictionCandidates,
     byokProviderIds,
-    directByokCatalogModelIds
+    new Set(directByokCatalogServing.keys())
   );
 
   let availableModels = addDirectByokCatalogAvailability(
     await addUserByokAvailability(filteredModels, byokProviderIds, modelId =>
       allowedProvidersByModel.get(modelId)
     ),
-    directByokCatalogModelIds
+    directByokCatalogServing
   );
 
   if (organization.plan === 'teams' && organization.settings.data_collection === 'deny') {

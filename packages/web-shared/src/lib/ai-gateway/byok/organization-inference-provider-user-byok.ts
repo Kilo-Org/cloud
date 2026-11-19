@@ -2,9 +2,12 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   getOrganizationByokProviderIds,
   hasInferenceProviderUserByokForModel,
+  type DirectByokCatalogServing,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import {
   getDirectByokCatalogModelIds,
+  getDirectByokCatalogServing,
+  type DirectByokCatalogServingCheck,
   type DirectByokPolicyTarget,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
@@ -31,6 +34,15 @@ export async function isModelAllowedForDirectByokKey(
     : allowsInferenceProviderUserByok(await getEffectiveModelDecision(policy, modelId));
 }
 
+/** Admits a catalog-mode key as `getProvider` routes it; see `getAllowedDirectByokCatalogModelIds`. */
+function allowedCatalogServing(
+  policy: EffectiveOrganizationModelPolicy
+): DirectByokCatalogServingCheck {
+  return async (catalogModelId, target) =>
+    !(await isCustomLlm(catalogModelId)) &&
+    (await isModelAllowedForDirectByokKey(policy, catalogModelId, target));
+}
+
 /**
  * The catalog ids the organization's catalog-mode direct BYOK keys and private providers serve under
  * `policy`, as `getProvider` routes them: an id counts when the policy admits it for a key that
@@ -43,9 +55,18 @@ export async function getAllowedDirectByokCatalogModelIds(
 ): Promise<ReadonlySet<string>> {
   return getDirectByokCatalogModelIds(
     { type: 'organization', id: organizationId },
-    async (catalogModelId, target) =>
-      !(await isCustomLlm(catalogModelId)) &&
-      (await isModelAllowedForDirectByokKey(policy, catalogModelId, target))
+    allowedCatalogServing(policy)
+  );
+}
+
+/** `getAllowedDirectByokCatalogModelIds` with the keys that serve each id. */
+export async function getAllowedDirectByokCatalogServing(
+  organizationId: string,
+  policy: EffectiveOrganizationModelPolicy
+): Promise<DirectByokCatalogServing> {
+  return getDirectByokCatalogServing(
+    { type: 'organization', id: organizationId },
+    allowedCatalogServing(policy)
   );
 }
 

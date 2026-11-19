@@ -28,10 +28,10 @@ export const client: Stripe = new Stripe(stripeSecretKey, {
  *
  * `SKIP_STRIPE_API=true` already keeps every write local, but a billing-history
  * proof needs an invoice read, and no local stack can produce one. When the
- * fixture file is set (dev builds only, next to `SKIP_STRIPE_API`), the two
- * reads the Kilo Pass surfaces make answer from the file instead of the
- * provider. The file's shape mirrors the Stripe SDK responses these calls
- * return, so the routers run unchanged.
+ * fixture file is set (dev builds only, next to `SKIP_STRIPE_API`), the invoice
+ * list the Kilo Pass billing history reads answers from the file instead of the
+ * provider. The file's shape mirrors the Stripe SDK response, so the router runs
+ * unchanged.
  */
 const fixtureInvoicesPath =
   skipStripeApi && process.env.E2E_KILO_PASS_INVOICES_JSON
@@ -46,11 +46,12 @@ function fixtureInvoicesFor(subscription: string): Stripe.Invoice[] {
       id: string;
       created: number;
       amount_due: number;
+      subtotal: number;
       billing_reason: string;
       currency: string;
       status: string;
       description: string;
-      tier: string | null;
+      priceId: string | null;
     }>;
   };
   if (parsed.subscriptionId !== subscription) return [];
@@ -59,6 +60,7 @@ function fixtureInvoicesFor(subscription: string): Stripe.Invoice[] {
     object: 'invoice',
     created: invoice.created,
     amount_due: invoice.amount_due,
+    subtotal: invoice.subtotal,
     billing_reason: invoice.billing_reason,
     currency: invoice.currency,
     status: invoice.status,
@@ -67,11 +69,11 @@ function fixtureInvoicesFor(subscription: string): Stripe.Invoice[] {
       data: [
         {
           description: invoice.description,
-          ...(invoice.tier
+          ...(invoice.priceId
             ? {
                 pricing: {
                   price_details: {
-                    price: `price_fixture_${invoice.tier}`,
+                    price: invoice.priceId,
                   },
                 },
               }
@@ -86,24 +88,20 @@ function fixtureInvoicesFor(subscription: string): Stripe.Invoice[] {
 }
 
 if (fixtureInvoicesPath) {
-  const realClient = client;
-  const fixtureClient = realClient as unknown as Record<string, unknown>;
-  fixtureClient.invoices = {
-    ...realClient.invoices,
-    list: async (params: { subscription?: string }) => ({
+  // Stripe declares each resource's methods on its class prototype, so replacing
+  // `client.invoices` wholesale would drop every other method and break the local
+  // Stripe calls that use it. The cast is needed because the SDK types `list` on
+  // the concrete resource class, and only this one read is replaced.
+  client.invoices.list = (async (params: { subscription?: string }) => {
+    const data = fixtureInvoicesFor(params.subscription ?? '');
+    return {
       object: 'list',
-      data: fixtureInvoicesFor(params.subscription ?? ''),
+      data,
       has_more: false,
-      total_count: fixtureInvoicesFor(params.subscription ?? '').length,
+      total_count: data.length,
       url: '/v1/invoices',
-    }),
-  };
-  fixtureClient.subscriptions = {
-    ...realClient.subscriptions,
-    retrieve: async () => {
-      throw new Error('E2E fixture client does not serve subscriptions.retrieve');
-    },
-  };
+    };
+  }) as unknown as typeof client.invoices.list;
 }
 
 // The profile page asks whether a customer has a card on every render, and the

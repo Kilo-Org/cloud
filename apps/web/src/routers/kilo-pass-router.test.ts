@@ -4650,6 +4650,7 @@ describe('kiloPassRouter', () => {
             id: 'in_trial_1',
             created: invoiceCreatedTs,
             amount_due: 0,
+            subtotal: 0,
             billing_reason: 'subscription_create',
             currency: 'usd',
             status: 'paid',
@@ -4688,6 +4689,56 @@ describe('kiloPassRouter', () => {
       expect(entry.id).toBe('in_trial_1');
       expect(entry.amountCents).toBe(0);
       expect(entry.line).toEqual({ kind: 'trial', tier: 'tier_49' });
+    });
+
+    it('maps a promotion-covered first invoice to an initial line', async () => {
+      const stripeMock = getStripeMock();
+      const invoiceCreatedTs = Math.floor(Date.now() / 1000) - 86400;
+      stripeMock.invoices.list.mockResolvedValue({
+        data: [
+          {
+            id: 'in_promo_1',
+            created: invoiceCreatedTs,
+            amount_due: 0,
+            subtotal: 4900,
+            billing_reason: 'subscription_create',
+            currency: 'usd',
+            status: 'paid',
+            hosted_invoice_url: 'https://stripe.example.test/invoice/promo',
+            invoice_pdf: 'https://stripe.example.test/invoice/promo.pdf',
+            lines: {
+              data: [
+                {
+                  description: 'Kilo Pass subscription (tier_49) with a 100% off promotion code',
+                  pricing: { price_details: { price: 'price_test_tier_49_monthly' } },
+                },
+              ],
+            },
+          },
+        ],
+      });
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-billing-history-promo@example.com',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_promo_history_test',
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getBillingHistory({});
+
+      expect(result.entries).toHaveLength(1);
+      const entry = result.entries[0];
+      if (!entry) throw new Error('Expected at least one billing history entry');
+      if (entry.kind !== 'stripe') throw new Error('Expected stripe entry');
+      expect(entry.id).toBe('in_promo_1');
+      expect(entry.amountCents).toBe(0);
+      expect(entry.line).toEqual({ kind: 'initial', tier: 'tier_49' });
     });
   });
 

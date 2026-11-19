@@ -1,8 +1,7 @@
 import type Stripe from 'stripe';
 import * as z from 'zod';
 import { capitalize } from '@/lib/utils';
-import { getKiloPassPriceMetadataForId } from '@kilocode/web-shared/lib/kilo-pass/stripe-price-ids.server';
-import { isServiceFeeInvoiceLine } from '@kilocode/web-shared/lib/service-fees/stripe-lines';
+import { getKiloPassPriceMetadataFromInvoice } from '@kilocode/web-shared/lib/kilo-pass/stripe-handlers-metadata';
 
 export const stripeBillingHistoryLineSchema = z.object({
   // The tier values stay inline rather than the KiloPassTier enum: the mobile
@@ -88,19 +87,20 @@ export function mapStripeInvoiceToBillingHistoryEntry(
  * no line to classify.
  *
  * The kind comes from the billing reason, with the $0 first invoice read as the
- * trial it is; the tier comes from the line's known Kilo Pass price id. Service
- * fee lines say nothing about the plan, so the first non-fee line wins.
+ * trial it is. The tier comes from the dominant known Kilo Pass price across
+ * every line, so a leading proration or a service-fee line cannot name a plan
+ * the invoice did not move to.
  */
 export function mapKiloPassInvoiceLine(
   invoice: Stripe.Invoice
 ): NonNullable<StripeBillingHistoryEntry['line']> | null {
   const lines = invoice.lines?.data ?? [];
-  const line = lines.find(candidate => !isServiceFeeInvoiceLine(candidate));
-  if (!line) return null;
+  if (lines.length === 0) return null;
 
-  const tier = getKiloPassPriceMetadataForId(line.pricing?.price_details?.price)?.tier ?? null;
-
-  return { kind: getInvoiceLineKind(invoice), tier };
+  return {
+    kind: getInvoiceLineKind(invoice),
+    tier: getKiloPassPriceMetadataFromInvoice(invoice)?.tier ?? null,
+  };
 }
 
 function getInvoiceLineKind(
@@ -108,7 +108,8 @@ function getInvoiceLineKind(
 ): NonNullable<StripeBillingHistoryEntry['line']>['kind'] {
   switch (invoice.billing_reason) {
     case 'subscription_create':
-      return (invoice.amount_due ?? 0) === 0 ? 'trial' : 'initial';
+      // Only a zero invoice is the trial; a 100%-off promotion code zeroes amount_due alone.
+      return (invoice.amount_due ?? 0) === 0 && (invoice.subtotal ?? 0) === 0 ? 'trial' : 'initial';
     case 'subscription_cycle':
       return 'renewal';
     case 'subscription_update':

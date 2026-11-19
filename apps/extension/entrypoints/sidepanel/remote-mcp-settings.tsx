@@ -488,10 +488,12 @@ export const RemoteMcpSettings = (): JSX.Element => {
 
   const handleSave = async (form: FormState): Promise<string | null> => {
     const existing = editingServer;
-    const draft = buildDraftFromForm(form, existing?.auth);
     /* The atom can be stale (a connect or OAuth write may have landed since it
-       was set), so the upsert runs on the store the serialized update loads. */
+       was set), so the upsert runs on the store the serialized update loads and
+       takes the saved auth from that store rather than from the atom. */
     const saved = await updateRemoteMcpStore<SaveOutcome>(storage, freshStore => {
+      const existingAuth = freshStore.servers.find(server => server.id === form.id)?.auth;
+      const draft = buildDraftFromForm(form, existingAuth);
       const previousIds = new Set(freshStore.servers.map(server => server.id));
       const upserted = applyUpsert(freshStore, draft);
       if (upserted.error !== null) {

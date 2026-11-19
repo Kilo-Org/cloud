@@ -52,6 +52,9 @@ const buildAuth = (
       return { headerName: fields.headerName, type: 'header' };
     }
     case 'oauth': {
+      if (existingAuth?.type === 'oauth' && existingAuth.oauth !== undefined) {
+        return { oauth: existingAuth.oauth, type: 'oauth' };
+      }
       return { type: 'oauth' };
     }
     case 'none': {

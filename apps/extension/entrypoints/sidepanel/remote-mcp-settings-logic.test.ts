@@ -236,6 +236,28 @@ describe('remote-mcp-settings pure logic', () => {
       const draft = buildDraftFromForm({ ...baseFields, authType: 'bearer' });
       expect(draft.auth).toStrictEqual({ type: 'bearer' });
     });
+
+    const savedOAuth = {
+      clientInformation: { client_id: 'c1' },
+      codeVerifier: 'v1',
+      tokens: { access_token: 't1', token_type: 'Bearer' },
+    };
+    const savedOAuthAuth = { oauth: savedOAuth, type: 'oauth' as const };
+
+    it('oauth edit — existing oauth state is preserved', () => {
+      const draft = buildDraftFromForm({ ...baseFields, authType: 'oauth' }, savedOAuthAuth);
+      expect(draft.auth).toStrictEqual(savedOAuthAuth);
+    });
+
+    it('oauth edit without existing state — no oauth blob', () => {
+      const draft = buildDraftFromForm({ ...baseFields, authType: 'oauth' });
+      expect(draft.auth).toStrictEqual({ type: 'oauth' });
+    });
+
+    it('oauth server switched to bearer — oauth blob dropped', () => {
+      const draft = buildDraftFromForm({ ...baseFields, authType: 'bearer' }, savedOAuthAuth);
+      expect(draft.auth).toStrictEqual({ type: 'bearer' });
+    });
   });
 
   describe('secret saved check', () => {

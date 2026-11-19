@@ -344,6 +344,7 @@ const storedServerSchema = z
     auth: z.object({ oauth: storedOAuthStateSchema.optional(), type: z.string() }).loose(),
     displayName: z.string(),
     id: z.string(),
+    lastError: z.string().optional(),
     status: z.string(),
   })
   .loose();
@@ -374,6 +375,11 @@ const writeServerOAuthState = async (page: Page, patch: StoredOAuthState): Promi
 const readFixtureServerStatus = async (page: Page): Promise<string | undefined> => {
   const store = await readStoredStore(page);
   return store.servers.find(server => server.displayName === 'Fixture MCP')?.status;
+};
+
+const readFixtureServerLastError = async (page: Page): Promise<string | undefined> => {
+  const store = await readStoredStore(page);
+  return store.servers.find(server => server.displayName === 'Fixture MCP')?.lastError;
 };
 
 /** The requests that would open the authorization page. */
@@ -527,6 +533,11 @@ test('a model-initiated OAuth tool call asks for credentials and records that th
       .poll(() => readFixtureServerStatus(sidePanel), { timeout: 30_000 })
       .toBe('needs_auth');
 
+    // The row shows why it needs credentials, not a bare Connect control.
+    await expect
+      .poll(() => readFixtureServerLastError(sidePanel), { timeout: 30_000 })
+      .toBe(NEEDS_CREDENTIALS_MESSAGE);
+
     // The sign-in step stays with the settings Connect flow; this path asks for credentials.
     expect(authorizeRequests(mcp.requests)).toStrictEqual([]);
     // Discovery still ran: the 401's resource-metadata pointer was followed before the flow stopped.
@@ -576,6 +587,53 @@ test('a model-initiated OAuth tool call runs with stored tokens', async () => {
     // The call carried the stored bearer token, and no authorization page was requested.
     expect(mcp.requests.length).toBeGreaterThan(0);
     expect(mcp.requests.map(request => request.authorization)).toContain(`Bearer ${ACCESS_TOKEN}`);
+    expect(authorizeRequests(mcp.requests)).toStrictEqual([]);
+  } finally {
+    await context.close();
+    await mcp.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('editing an OAuth server keeps its stored credentials', async () => {
+  const fixture = await startFixtureServer();
+  const mcp = await startOAuthMcpFixtureServer();
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context, turnMockConfig);
+
+    const page = await context.newPage();
+    await page.goto(fixture.url);
+
+    const sidePanel = await openSidePanel(context, extensionId);
+    await addOAuthServerAndAllowInSafeMode(sidePanel, mcp.url);
+
+    await writeServerOAuthState(sidePanel, {
+      clientInformation: { client_id: CLIENT_ID },
+      tokens: { access_token: ACCESS_TOKEN, token_type: 'Bearer' },
+    });
+    await reloadUntilToolCached(sidePanel);
+
+    // Only the edit's own requests matter, so drop the setup traffic first.
+    mcp.requests.length = 0;
+
+    await sidePanel.getByRole('button', { name: 'Edit Fixture MCP' }).click();
+    await sidePanel.getByLabel('Name').fill('Fixture MCP Renamed');
+    await sidePanel.getByRole('button', { name: 'Save' }).click();
+
+    await expect(sidePanel.getByText('Fixture MCP Renamed')).toBeVisible();
+    // Saving reconnects, so the row must settle with its stored token, not a Connect control.
+    await expect(sidePanel.getByRole('button', { name: 'Refresh' })).toBeEnabled({
+      timeout: 60_000,
+    });
+
+    const store = await readStoredStore(sidePanel);
+    const edited = store.servers.find(server => server.displayName === 'Fixture MCP Renamed');
+    expect(edited?.auth.oauth?.tokens?.access_token).toBe(ACCESS_TOKEN);
+    expect(edited?.auth.oauth?.clientInformation?.client_id).toBe(CLIENT_ID);
+    // The edit reused the stored client and token, so it never opened the authorization page.
     expect(authorizeRequests(mcp.requests)).toStrictEqual([]);
   } finally {
     await context.close();

@@ -3776,6 +3776,7 @@
   },
   "modelChat": {
     "offlineFailure": "Modeeliin kun walqunnamtii interneetii barbaada. Walqunnamii irra deebi'ii yaali, ykn gara modeelii meeshaa kana irra jiruutti jijjiiri.",
+    "connectionLost": "Walqunnamtiin modeelii wajjin qabdu cite. Walqabannaa kee ilaaliitii deebi'ii yaali.",
     "empty": {
       "title": "Chaat jalqabi",
       "description": "Modeelii wajjin haasa'uuf ergaa ergi."

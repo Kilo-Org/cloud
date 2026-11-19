@@ -23,6 +23,7 @@ import {
   providerKeyScopeInput,
 } from '@/lib/byok/provider-key-scope';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -76,6 +77,7 @@ export function ProviderKeyProviderPickerScreen({
   organizationId,
 }: Readonly<{ organizationId?: string }>) {
   const { t, i18n } = useTranslation();
+  const sideInsetStyle = useSideInsetStyle();
   const trpc = useTRPC();
   const listRef = useRef<FlashListRef<ProviderOption>>(null);
   const [query, setQuery] = useState('');
@@ -171,16 +173,18 @@ export function ProviderKeyProviderPickerScreen({
         title={t('profile.providerKeys.chooseProvider')}
         backFallback={PROFILE_TAB_HREF}
       />
-      <View className={cn(SCREEN_GUTTER_CLASS, 'pb-1 pt-2')}>
-        {/* The page gutter, not a hand-picked inset: the field's edges sit on
-            the same 14pt line as the rows below it. */}
-        <SearchField
-          placeholder={t('profile.providerKeys.searchProviders')}
-          hasText={query !== ''}
-          onChangeText={setQuery}
-        />
+      <View className="flex-1" style={sideInsetStyle}>
+        <View className={cn(SCREEN_GUTTER_CLASS, 'pb-1 pt-2')}>
+          {/* The page gutter, not a hand-picked inset: the field's edges sit on
+              the same 14pt line as the rows below it. */}
+          <SearchField
+            placeholder={t('profile.providerKeys.searchProviders')}
+            hasText={query !== ''}
+            onChangeText={setQuery}
+          />
+        </View>
+        {body}
       </View>
-      {body}
     </View>
   );
 }

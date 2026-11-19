@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { base64UrlEncode, computeHubMac, decodePairingKey } from './encoding';
-import { LOCAL_AGENT_ENDPOINTS_STORAGE_KEY } from './endpoints';
+import { LOCAL_AGENT_ENDPOINT_STALE_MS, LOCAL_AGENT_ENDPOINTS_STORAGE_KEY } from './endpoints';
 import type { LoopbackSocketConnect, LoopbackSocketHandlers } from './loopback-transport';
 import { LOCAL_AGENT_CONTROLLERS_STORAGE_KEY, loadLocalAgentConnectedAgents } from './registry';
 import { loadPairingNotice } from './pairing-notice';
@@ -28,6 +28,12 @@ const NEW_TOKEN = 'MDEyMzQ1Njc4OWFiY2RlZg';
 const NEW_WS = 'ws://127.0.0.1:48100/__kilo_browser';
 const PAIRING_URL = `http://127.0.0.1:47917/__kilo_browser_pair#v=1&hub=${HUB_ID}&t=${TOKEN}&ws=${encodeURIComponent(WS)}`;
 const REPAIRING_URL = `http://127.0.0.1:48100/__kilo_browser_pair#v=1&hub=${HUB_ID}&t=${NEW_TOKEN}&ws=${encodeURIComponent(NEW_WS)}`;
+/* A hub started later on the same port: a new id, the same socket URL. */
+const NEXT_HUB_ID = '7a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d';
+const NEXT_TOKEN = 'QUJDREVGR0hJSktMTU5PUA';
+const NEXT_HUB_PAIRING_URL = `http://127.0.0.1:47917/__kilo_browser_pair#v=1&hub=${NEXT_HUB_ID}&t=${NEXT_TOKEN}&ws=${encodeURIComponent(WS)}`;
+const OTHER_CONTROLLER_ID = '22222222-3333-4444-8555-666666666666';
+const PANEL_SENDER = { id: EXTENSION_ID, url: `chrome-extension://${EXTENSION_ID}/sidepanel.html` };
 
 const recordSchema = z.record(z.string(), z.unknown());
 const stringRecordSchema = z.record(z.string(), z.string());
@@ -120,7 +126,9 @@ const createHarness = () => {
   const pairingResults = new Map<string, { key: string; ws: string } | { status: number }>([
     [TOKEN, { key: KEY, ws: WS }],
     [NEW_TOKEN, { key: NEW_KEY, ws: NEW_WS }],
+    [NEXT_TOKEN, { key: NEW_KEY, ws: WS }],
   ]);
+  const clock = { now: 1000 };
   const createSocket: LoopbackSocketConnect = (url, handlers) => {
     const socket: FakeSocket = { closed: 0, handlers, sent: [], url };
     sockets.push(socket);
@@ -165,7 +173,14 @@ const createHarness = () => {
       },
     },
   };
+  /* What each tab shows now: the last committed navigation, unless a test moves the tab on. */
+  const tabUrls = new Map<number, string>();
   const tabs = {
+    get: (tabId: number) => {
+      const url = tabUrls.get(tabId);
+
+      return Promise.resolve(url === undefined ? {} : { url });
+    },
     onUpdated: {
       addListener: (
         listener: (
@@ -174,7 +189,13 @@ const createHarness = () => {
           tab: { openerTabId?: number; url?: string }
         ) => void
       ) => {
-        listeners.tabUpdated = listener;
+        listeners.tabUpdated = (tabId, changeInfo, tab) => {
+          if (changeInfo.url !== undefined) {
+            tabUrls.set(tabId, changeInfo.url);
+          }
+
+          listener(tabId, changeInfo, tab);
+        };
       },
     },
     remove: removeTab,
@@ -214,7 +235,7 @@ const createHarness = () => {
         status: 200,
       });
     },
-    now: () => 1000,
+    now: () => clock.now,
     storage,
     timers: {
       clearTimeout: (_handle: number) => {
@@ -229,6 +250,7 @@ const createHarness = () => {
   return {
     alarms,
     bridge,
+    clock,
     commands,
     hostOptions,
     listeners,
@@ -412,7 +434,7 @@ describe('local agents host over a loopback endpoint', () => {
 
     await vi.waitFor(() => {
       expect(harness.storage.items.get(LOCAL_AGENT_ENDPOINTS_STORAGE_KEY)).toStrictEqual({
-        endpoints: [{ hubId: HUB_ID, key: KEY, ws: WS }],
+        endpoints: [{ hubId: HUB_ID, key: KEY, lastConnectedAt: 1000, ws: WS }],
       });
     });
     await vi.waitFor(() => {
@@ -581,6 +603,25 @@ describe('local agents host over a loopback endpoint', () => {
     await connectSocketIfNeeded(harness);
 
     expect(harness.storage.items.get(LOCAL_AGENT_CONTROLLERS_STORAGE_KEY)).toBeUndefined();
+    host.stop();
+  });
+
+  it('dials an endpoint stored by an earlier version and stamps it once it connects', async () => {
+    const harness = createHarness();
+    // The shape every endpoint had before the reachability stamp: no `lastConnectedAt`.
+    seedEnabledWithEndpoint(harness.storage);
+    const host = startHost(harness);
+    await host.ready;
+    const socket = await connectSocketIfNeeded(harness);
+
+    expect(socket.url).toBe(WS);
+    await completeHandshake(socket);
+
+    await vi.waitFor(() => {
+      expect(harness.storage.items.get(LOCAL_AGENT_ENDPOINTS_STORAGE_KEY)).toStrictEqual({
+        endpoints: [{ hubId: HUB_ID, key: KEY, lastConnectedAt: 1000, ws: WS }],
+      });
+    });
     host.stop();
   });
 });
@@ -939,7 +980,7 @@ describe('pairing admission', () => {
     expect(harness.sockets[1]?.url).toBe(NEW_WS);
     await expect(loadLocalAgentConnectedAgents(harness.storage)).resolves.toStrictEqual([]);
     expect(harness.storage.items.get(LOCAL_AGENT_ENDPOINTS_STORAGE_KEY)).toStrictEqual({
-      endpoints: [{ hubId: HUB_ID, key: NEW_KEY, ws: NEW_WS }],
+      endpoints: [{ hubId: HUB_ID, key: NEW_KEY, lastConnectedAt: 1000, ws: NEW_WS }],
     });
     host.stop();
   });
@@ -964,6 +1005,315 @@ describe('pairing admission', () => {
 
     expect(harness.sockets).toHaveLength(0);
     await expect(loadLocalAgentStatus(harness.storage)).resolves.toStrictEqual([]);
+    host.stop();
+  });
+});
+
+const SESSION_OPEN = { cliVersion: '1', cwd: '/tmp', sessionId: 'session-2', title: 'next' };
+
+/** A `session.open` from one CLI on the hub, as the hub forwards it. */
+const openFrom = (socket: FakeSocket, controllerId: string, id: number) => {
+  socket.handlers.onText(
+    JSON.stringify({
+      controllerId,
+      message: { id, jsonrpc: '2.0', method: 'session.open', params: SESSION_OPEN },
+      type: 'rpc',
+    })
+  );
+};
+
+describe('disconnecting one CLI', () => {
+  it('refuses the disconnected controller until its CLI connection ends', async () => {
+    const harness = createHarness();
+    seedEnabledWithEndpoint(harness.storage);
+    const host = startHost(harness);
+    await host.ready;
+    const socket = await connectSocketIfNeeded(harness);
+
+    await completeHandshake(socket);
+    const sessionHandle = sessionHandleOf(
+      await openSession(socket, { cliVersion: '1', cwd: '/tmp', title: 't' })
+    );
+    const sendResponse = vi.fn();
+
+    harness.listeners.message?.(
+      { controllerId: CONTROLLER_ID, kind: 'disconnect', type: LOCAL_AGENTS_COMMAND_MESSAGE },
+      PANEL_SENDER,
+      sendResponse
+    );
+
+    await vi.waitFor(() => {
+      expect(sendResponse).toHaveBeenCalledWith({ ok: true });
+    });
+    expect(messageOf(rpcWith(socket.sent, 'method', 'session.revoked'))?.['params']).toStrictEqual({
+      reason: 'disconnect',
+      sessionHandle,
+    });
+
+    // The hub announces the same CLI again after a reconnect, and its next conversation asks for a session.
+    socket.handlers.onText(
+      JSON.stringify({ controllerId: CONTROLLER_ID, type: 'controller.connected' })
+    );
+    openFrom(socket, CONTROLLER_ID, 3);
+
+    await vi.waitFor(() => {
+      expect(rpcWith(socket.sent, 'id', 3)).toBeDefined();
+    });
+    expect(messageOf(rpcWith(socket.sent, 'id', 3))?.['error']).toStrictEqual({
+      code: -32_004,
+      message: 'The user disconnected this agent.',
+    });
+    expect(harness.bridge.openSession.mock.calls).toStrictEqual([
+      [{ controllerId: CONTROLLER_ID, sessionHandle, title: 't' }],
+    ]);
+    await expect(loadLocalAgentConnectedAgents(harness.storage)).resolves.toStrictEqual([]);
+
+    // Another CLI on the same hub keeps working.
+    openFrom(socket, OTHER_CONTROLLER_ID, 4);
+
+    await vi.waitFor(() => {
+      expect(sessionHandleOf(messageOf(rpcWith(socket.sent, 'id', 4)))).toBeTypeOf('string');
+    });
+    host.stop();
+  });
+
+  it.each([
+    ['stop_all', 'user_stop'],
+    ['disconnect', 'disconnect'],
+  ] as const)(
+    'still tells the CLI when %s cannot end the sessions, and answers that it failed',
+    async (kind, reason) => {
+      const harness = createHarness();
+      seedEnabledWithEndpoint(harness.storage);
+      harness.bridge.endSessions.mockRejectedValueOnce(new Error('the runtime is gone'));
+      const host = startHost(harness);
+      await host.ready;
+      const socket = await connectSocketIfNeeded(harness);
+
+      await completeHandshake(socket);
+      const sessionHandle = sessionHandleOf(
+        await openSession(socket, { cliVersion: '1', cwd: '/tmp', title: 't' })
+      );
+      const sendResponse = vi.fn();
+
+      harness.listeners.message?.(
+        kind === 'stop_all'
+          ? { kind, type: LOCAL_AGENTS_COMMAND_MESSAGE }
+          : { controllerId: CONTROLLER_ID, kind, type: LOCAL_AGENTS_COMMAND_MESSAGE },
+        PANEL_SENDER,
+        sendResponse
+      );
+
+      await vi.waitFor(() => {
+        expect(sendResponse).toHaveBeenCalledWith({ ok: false });
+      });
+      expect(
+        messageOf(rpcWith(socket.sent, 'method', 'session.revoked'))?.['params']
+      ).toStrictEqual({ reason, sessionHandle });
+      host.stop();
+    }
+  );
+});
+
+describe('paired CLI state', () => {
+  const loopbackStatus = async (harness: ReturnType<typeof createHarness>) => {
+    const status = await loadLocalAgentStatus(harness.storage);
+
+    return status.find(endpoint => endpoint.transport === 'loopback');
+  };
+
+  it('reports where each paired CLI listens and when it was last reachable', async () => {
+    const harness = createHarness();
+    harness.storage.items.set(LOCAL_AGENT_SETTINGS_STORAGE_KEY, { enabled: true });
+    harness.storage.items.set(LOCAL_AGENT_ENDPOINTS_STORAGE_KEY, {
+      endpoints: [{ hubId: HUB_ID, key: KEY, lastConnectedAt: 0, ws: WS }],
+    });
+    harness.clock.now = 5000;
+    const host = startHost(harness);
+    await host.ready;
+    const socket = await connectSocketIfNeeded(harness);
+
+    await completeHandshake(socket);
+
+    await vi.waitFor(async () => {
+      await expect(loopbackStatus(harness)).resolves.toStrictEqual({
+        address: '127.0.0.1:47917',
+        endpointId: HUB_ID,
+        hubId: HUB_ID,
+        lastConnectedAt: 5000,
+        state: { attempt: 1, kind: 'connected' },
+        transport: 'loopback',
+      });
+    });
+
+    // The hub exits: the drop is the last moment it was reachable.
+    harness.clock.now = 9000;
+    socket.handlers.onClose();
+
+    await vi.waitFor(async () => {
+      await expect(loopbackStatus(harness)).resolves.toMatchObject({
+        lastConnectedAt: 9000,
+        state: { kind: 'backoff' },
+      });
+    });
+    await vi.waitFor(() => {
+      expect(harness.storage.items.get(LOCAL_AGENT_ENDPOINTS_STORAGE_KEY)).toStrictEqual({
+        endpoints: [{ hubId: HUB_ID, key: KEY, lastConnectedAt: 9000, ws: WS }],
+      });
+    });
+    host.stop();
+  });
+
+  it('removes a paired CLI that stayed unreachable for a day and keeps a connected one', async () => {
+    const harness = createHarness();
+    harness.storage.items.set(LOCAL_AGENT_SETTINGS_STORAGE_KEY, { enabled: true });
+    harness.storage.items.set(LOCAL_AGENT_ENDPOINTS_STORAGE_KEY, {
+      endpoints: [
+        { hubId: HUB_ID, key: KEY, lastConnectedAt: 0, ws: WS },
+        { hubId: NEXT_HUB_ID, key: NEW_KEY, lastConnectedAt: 0, ws: NEW_WS },
+      ],
+    });
+    const host = startHost(harness);
+    await host.ready;
+
+    await vi.waitFor(() => {
+      expect(harness.sockets).toHaveLength(2);
+    });
+    const [gone, live] = harness.sockets;
+
+    if (gone === undefined || live === undefined) {
+      throw new Error('expected two loopback sockets');
+    }
+
+    gone.handlers.onError();
+    await completeHandshake(live, NEW_KEY);
+
+    // A day later the watchdog finds the first hub still unreachable; the second has stayed connected all along.
+    harness.clock.now = LOCAL_AGENT_ENDPOINT_STALE_MS + 5000;
+    harness.listeners.alarm?.({ name: 'kilo-local-agents-watchdog' });
+
+    await vi.waitFor(() => {
+      expect(harness.storage.items.get(LOCAL_AGENT_ENDPOINTS_STORAGE_KEY)).toStrictEqual({
+        endpoints: [
+          {
+            hubId: NEXT_HUB_ID,
+            key: NEW_KEY,
+            lastConnectedAt: LOCAL_AGENT_ENDPOINT_STALE_MS + 5000,
+            ws: NEW_WS,
+          },
+        ],
+      });
+    });
+    await vi.waitFor(async () => {
+      const status = await loadLocalAgentStatus(harness.storage);
+
+      expect(
+        status.flatMap(endpoint => (endpoint.transport === 'loopback' ? [endpoint.hubId] : []))
+      ).toStrictEqual([NEXT_HUB_ID]);
+    });
+    expect(live.closed).toBe(0);
+    host.stop();
+  });
+
+  it('replaces a paired CLI when a newer one pairs on the same port', async () => {
+    const harness = createHarness();
+    seedEnabledWithEndpoint(harness.storage);
+    const host = startHost(harness);
+    await host.ready;
+    const firstSocket = await connectSocketIfNeeded(harness);
+
+    harness.listeners.tabUpdated?.(
+      70,
+      { url: NEXT_HUB_PAIRING_URL },
+      { url: NEXT_HUB_PAIRING_URL }
+    );
+
+    await vi.waitFor(() => {
+      expect(harness.sockets).toHaveLength(2);
+    });
+    expect(firstSocket.closed).toBeGreaterThan(0);
+    expect(harness.storage.items.get(LOCAL_AGENT_ENDPOINTS_STORAGE_KEY)).toStrictEqual({
+      endpoints: [{ hubId: NEXT_HUB_ID, key: NEW_KEY, lastConnectedAt: 1000, ws: WS }],
+    });
+    await vi.waitFor(async () => {
+      await expect(loopbackStatus(harness)).resolves.toMatchObject({ hubId: NEXT_HUB_ID });
+    });
+    host.stop();
+  });
+});
+
+describe('broken pairing links', () => {
+  const BROKEN_URL = PAIRING_URL.replace(HUB_ID, 'not-a-uuid');
+
+  it('closes a pairing link it cannot read and says the link is invalid', async () => {
+    const harness = createHarness();
+    harness.storage.items.set(LOCAL_AGENT_SETTINGS_STORAGE_KEY, { enabled: true });
+    const host = startHost(harness);
+    await host.ready;
+
+    harness.listeners.tabUpdated?.(90, { url: BROKEN_URL }, { url: BROKEN_URL });
+
+    await vi.waitFor(async () => {
+      await expect(loadPairingNotice(harness.storage)).resolves.toBe('invalid');
+    });
+    expect(harness.removeTab).toHaveBeenCalledWith(90);
+    expect(harness.sockets).toHaveLength(0);
+    expect(harness.storage.items.get(LOCAL_AGENT_ENDPOINTS_STORAGE_KEY)).toBeUndefined();
+    host.stop();
+  });
+
+  it('leaves the tab alone when it moved on while the settings read was pending', async () => {
+    const harness = createHarness();
+    harness.storage.items.set(LOCAL_AGENT_SETTINGS_STORAGE_KEY, { enabled: true });
+    const settingsRead = Promise.withResolvers<void>();
+    harness.storage.getItem = async (key: LocalAgentStorageKey) => {
+      if (key === LOCAL_AGENT_SETTINGS_STORAGE_KEY) {
+        await settingsRead.promise;
+      }
+
+      return harness.storage.items.get(key) ?? null;
+    };
+    const host = startHost(harness);
+
+    harness.listeners.tabUpdated?.(95, { url: BROKEN_URL }, { url: BROKEN_URL });
+    // The broken page redirects before the extension knows the switch is on.
+    harness.listeners.tabUpdated?.(95, { url: 'https://example.com/' }, {});
+    settingsRead.resolve();
+    await host.ready;
+
+    await vi.waitFor(async () => {
+      await expect(loadPairingNotice(harness.storage)).resolves.toBe('invalid');
+    });
+    expect(harness.removeTab).not.toHaveBeenCalled();
+    host.stop();
+  });
+
+  it('leaves a link a page opened, and every link while the switch is off', async () => {
+    const harness = createHarness();
+    harness.storage.items.set(LOCAL_AGENT_SETTINGS_STORAGE_KEY, { enabled: true });
+    const host = startHost(harness);
+    await host.ready;
+
+    harness.listeners.tabUpdated?.(91, { url: BROKEN_URL }, { openerTabId: 1, url: BROKEN_URL });
+    harness.storage.items.set(LOCAL_AGENT_SETTINGS_STORAGE_KEY, { enabled: false });
+    harness.storage.notify(LOCAL_AGENT_SETTINGS_STORAGE_KEY);
+    await vi.waitFor(() => {
+      expect(harness.alarms.clear).toHaveBeenCalledWith('kilo-local-agents-watchdog');
+    });
+    harness.listeners.tabUpdated?.(92, { url: BROKEN_URL }, { url: BROKEN_URL });
+
+    // Turning the switch back on takes longer than the refusal above, so a later link proves it already ran.
+    harness.storage.items.set(LOCAL_AGENT_SETTINGS_STORAGE_KEY, { enabled: true });
+    harness.storage.notify(LOCAL_AGENT_SETTINGS_STORAGE_KEY);
+    await vi.waitFor(() => {
+      expect(harness.alarms.create).toHaveBeenCalledTimes(2);
+    });
+    harness.listeners.tabUpdated?.(93, { url: BROKEN_URL }, { url: BROKEN_URL });
+
+    await vi.waitFor(() => {
+      expect(harness.removeTab).toHaveBeenCalledWith(93);
+    });
+    expect(harness.removeTab.mock.calls).toStrictEqual([[93]]);
     host.stop();
   });
 });

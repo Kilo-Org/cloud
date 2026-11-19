@@ -120,6 +120,7 @@ import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useStyleSideInsets } from '@/lib/screen-insets';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { resolveMessageInputAppStateTransition } from '@/lib/message-input-app-state';
 import { createFrameCoalescer, type FrameCoalescer } from '@/lib/coalesce-frame';
@@ -364,6 +365,7 @@ export function ChatComposer({
   const { height: windowHeight } = useWindowDimensions();
   const fontScale = useLiveFontScale();
   const insets = useSafeAreaInsets();
+  const sideInsets = useStyleSideInsets();
   const { reducedMotion } = useMotionPolicy();
   const { returnSendsMessage } = useReturnSendsMessagePreference();
   // Draft persistence is fenced on identity: while the user id is unknown,
@@ -1551,7 +1553,7 @@ export function ChatComposer({
   // remount, so the uncontrolled input keeps its text.
   return (
     <BlurBar className={barClassName}>
-      <View style={{ paddingLeft: insets.left, paddingRight: insets.right }}>
+      <View style={{ paddingLeft: sideInsets.left, paddingRight: sideInsets.right }}>
         <ChatComposerMeasure
           handleRef={measureHandleRef}
           fontSize={TEXT_INPUT_FONT_SIZE}

@@ -29,7 +29,7 @@ import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
-import { useSideInsetStyle } from '@/lib/screen-insets';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 import { cn } from '@/lib/utils';
 
 /**
@@ -169,7 +169,9 @@ export function NewSessionConfigureForm({
   onRetryRemoteSpawn,
 }: Readonly<NewSessionConfigureFormProps & NewSessionProfileOverrideProps>) {
   const { t } = useTranslation();
-  const sideInsetStyle = useSideInsetStyle();
+  // The body clears the side insets itself; the pinned footer clears them on
+  // its own bar, so the container around both must not add them again.
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   // The footer reserves the platform inset. The lift above moves the scroll
   // body and footer together; the prompt yields height to the viewport.
   // The scroll view takes no keyboard inset of its own: iOS sized that inset
@@ -256,6 +258,7 @@ export function NewSessionConfigureForm({
     <ScrollView
       ref={scrollRef}
       className="flex-1"
+      style={sideInsetMarginStyle}
       contentContainerClassName={cn('flex-grow', SCREEN_BODY_CLASS)}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
@@ -487,7 +490,7 @@ export function NewSessionConfigureForm({
   // a navigation-bar height above it. It follows the keyboard and never
   // depends on a frame the platform reported late.
   return (
-    <View className="flex-1" style={sideInsetStyle} onLayout={handleContainerLayout}>
+    <View className="flex-1" onLayout={handleContainerLayout}>
       <KeyboardLiftView
         className="flex-1 bg-background"
         height={Math.max(0, keyboardHeight - bottom)}

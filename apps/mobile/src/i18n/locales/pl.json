@@ -3896,6 +3896,7 @@
   },
   "modelChat": {
     "offlineFailure": "Ten model wymaga połączenia z internetem. Połącz się i spróbuj ponownie lub przełącz się na model na tym urządzeniu.",
+    "connectionLost": "Połączenie z modelem zostało przerwane. Sprawdź połączenie i spróbuj ponownie.",
     "empty": {
       "title": "Rozpocznij czat",
       "description": "Wyślij wiadomość, aby porozmawiać z modelem."

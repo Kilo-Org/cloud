@@ -3836,6 +3836,7 @@
   },
   "modelChat": {
     "offlineFailure": "Este modelo necesita conexión a internet. Conéctate y vuelve a intentarlo, o cambia a un modelo de este dispositivo.",
+    "connectionLost": "Se perdió la conexión con el modelo. Comprueba tu conexión e inténtalo de nuevo.",
     "empty": {
       "title": "Inicia un chat",
       "description": "Envía un mensaje para hablar con un modelo."

@@ -3776,6 +3776,7 @@
   },
   "modelChat": {
     "offlineFailure": "Þetta líkan þarf nettengingu. Tengstu og reyndu aftur, eða skiptu yfir í líkan á þessu tæki.",
+    "connectionLost": "Tengingin við líkanið rofnaði. Athugaðu tenginguna og reyndu aftur.",
     "empty": {
       "title": "Byrjaðu spjall",
       "description": "Sendu skilaboð til að tala við líkan."

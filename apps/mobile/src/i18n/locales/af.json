@@ -3776,6 +3776,7 @@
   },
   "modelChat": {
     "offlineFailure": "Hierdie model het 'n internetverbinding nodig. Koppel en probeer weer, of skakel oor na 'n model op hierdie toestel.",
+    "connectionLost": "Die verbinding met die model het verlore gegaan. Gaan jou verbinding na en probeer weer.",
     "empty": {
       "title": "Begin 'n klets",
       "description": "Stuur 'n boodskap om met 'n model te gesels."

@@ -1,11 +1,11 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from '@jest/globals';
+import { LOCAL_FAKE_TRANSCRIPTION_MODEL_IDS } from '@kilocode/app-shared/local-fake-llm';
 import type { CustomPricingTiers } from '@kilocode/db/schema-types';
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isDeniedByProviderPrivacy,
   isFreeModel,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
-import { LOCAL_FAKE_TRANSCRIPTION_MODEL_IDS } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import {
   customLlmDefinition,
   deleteCustomLlmForTest,

@@ -100,10 +100,10 @@ interface FakeCdp {
   readonly downloadsDenied: () => number;
   readonly downloadsRestored: () => number;
   readonly emit: (method: string, params: Record<string, unknown>) => void;
-  /** One event on a named tab, for a call that drives a tab the call itself opened. */
-  readonly emitOn: (tabId: number, method: string, params: Record<string, unknown>) => void;
   /** One event from a child (out-of-process frame) session, the way chrome.debugger reports it. */
   readonly emitFrom: (method: string, params: Record<string, unknown>, sessionId: string) => void;
+  /** One event on a named tab, for a call that drives a tab the call itself opened. */
+  readonly emitOn: (tabId: number, method: string, params: Record<string, unknown>) => void;
   readonly setHandlers: (handlers: Record<string, CdpHandler>) => void;
   readonly setFrameUrl: (url: string) => void;
   readonly setProbe: (probe: Record<string, unknown>) => void;
@@ -340,14 +340,14 @@ const createFakeCdp = (): FakeCdp => {
         listener({ tabId: TAB_ID }, method, params);
       }
     },
-    emitOn: (tabId, method, params) => {
-      for (const listener of eventListeners) {
-        listener({ tabId }, method, params);
-      }
-    },
     emitFrom: (method, params, sessionId) => {
       for (const listener of eventListeners) {
         listener({ sessionId, tabId: TAB_ID }, method, params);
+      }
+    },
+    emitOn: (tabId, method, params) => {
+      for (const listener of eventListeners) {
+        listener({ tabId }, method, params);
       }
     },
     sent: () => sent,
@@ -4239,6 +4239,8 @@ describe('agent browser calls', () => {
         fixture.cdp.emitOn(fixture.newTab, 'Page.javascriptDialogOpening', {
           message: 'Saved',
           type: 'alert',
+          // `url` is required by the protocol: the page that opened the dialog.
+          url: `${MAIN_ORIGIN}/report.txt`,
         });
 
         return { frameId: 'main' };
@@ -4252,7 +4254,7 @@ describe('agent browser calls', () => {
     }
 
     // The dialog is what the caller acts on next, and the tab it acted on stays named: its id and url are how the
-    // caller answers the dialog on that tab.
+    // Caller answers the dialog on that tab.
     expect(outcome.result.ok ? outcome.result.value : '').toBe(
       '### Modal state\n- ["alert" dialog with message "Saved"]: can be handled by browser_handle_dialog\n\n' +
         `The call opened tab ${String(fixture.newTab)} (${MAIN_ORIGIN}/report.txt).`

@@ -3336,10 +3336,11 @@ export const createBrowserRuntime = ({
 
           // A guarded `browser_tabs new` names the tab it opened even when the dialog swallowed its answer:
           // Its id and url are how the caller answers the dialog on that tab, and they were lost before.
+          const openedInfo = openedForStep === undefined ? undefined : await tabInfo(runTabId);
           const openedNote =
             openedForStep === undefined
               ? ''
-              : `\n\nThe call opened tab ${String(runTabId)} (${(await tabInfo(runTabId))?.url ?? openedForStep.url}).`;
+              : `\n\nThe call opened tab ${String(runTabId)} (${openedInfo?.url ?? openedForStep.url}).`;
 
           return {
             kind: 'result',

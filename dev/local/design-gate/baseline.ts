@@ -266,12 +266,14 @@ function generatedFiles(
       `  if (__DEV__ && !initial && ${JSON.stringify([target.link, target.route, target.route.slice(1)])}.includes(path)) return ${JSON.stringify(`/${target.screen}`)};`
     );
   }
-  const declaration =
-    'export function redirectSystemPath({ path, initial }: { path: string; initial: boolean }) {';
+  // The signature wraps differently across prettier runs, so match its shape rather than one line.
   if (branches.length > 0) {
-    if (intent.split(declaration).length !== 2)
+    const declarations = intent.match(
+      /export function redirectSystemPath\([\s\S]*?\)\s*\{/gu
+    );
+    if (declarations?.length !== 1)
       throw new Error('Unsupported native-intent diagnostic insertion point');
-    intent = intent.replace(declaration, `${declaration}\n${branches.join('\n')}`);
+    intent = intent.replace(declarations[0], `${declarations[0]}\n${branches.join('\n')}`);
   }
   intent += `\n// Temporary diagnostic source receipt; forces stale Metro bundles to fail closed.\nif (__DEV__) (globalThis as typeof globalThis & { ${MARKER}?: string }).${MARKER} = ${JSON.stringify(marker)};\n`;
   files.set(INTENT, intent);

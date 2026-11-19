@@ -26,11 +26,14 @@ type AwsEgressEndpoint = {
     request: AwsScmAdmission
   ): Promise<ControlPlaneScmForwardAdmissionResult>;
 };
+/** Identifies the sandbox or build in Worker logs. */
+type AwsEgressLogContext = { sandboxId: string } | { environmentId: string; buildId: string };
 async function handleAwsEgressOperation(
   request: Request,
   operation: string,
   endpoint: AwsEgressEndpoint,
-  env: Env
+  env: Env,
+  logContext: AwsEgressLogContext
 ): Promise<Response> {
   const credential = request.headers.get(AWS_EGRESS_CREDENTIAL_HEADER);
   const identity = request.headers.get(AWS_EGRESS_IDENTITY_HEADER);
@@ -61,7 +64,7 @@ async function handleAwsEgressOperation(
       });
       if (!admission.ok) {
         logger
-          .withFields({ sandboxId, code: admission.code, status: admission.status })
+          .withFields({ ...logContext, code: admission.code, status: admission.status })
           .warn('AWS SCM egress admission rejected');
         return Response.json(
           { code: admission.code },
@@ -95,7 +98,7 @@ async function handleAwsEgressOperation(
     // Error messages can carry the target URL; log only the error class.
     logger
       .withFields({
-        sandboxId,
+        ...logContext,
         operation,
         errorName: error instanceof Error ? error.name : 'unknown',
       })
@@ -121,7 +124,8 @@ export async function handleAwsEgress(
       audit: (proof, value) => stub().recordAwsEgressAudit(proof, value),
       admitScm: (proof, metadata) => stub().admitAwsScm(proof, metadata),
     },
-    env
+    env,
+    { sandboxId }
   );
 }
 
@@ -153,7 +157,8 @@ export async function handleAwsBuildEgress(
       admitScm: (proof, metadata) =>
         stub().admitAwsBuildScm(environmentId, buildId, proof, metadata),
     },
-    env
+    env,
+    { environmentId, buildId }
   );
 }
 

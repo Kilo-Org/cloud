@@ -1079,6 +1079,26 @@ describe('delivery registerTokens', () => {
     expect(rows.size).toBe(0);
   });
 
+  it('registers the cached push-to-start token when a read switch turns back on', async () => {
+    // The preference is already known and off, so turning it on leaves it known:
+    // no unknown -> known transition fires, and only the value change signals
+    // the retry. A token refused while the switch was off must not wait for a
+    // scope refresh or a new native token event.
+    _resetLiveActivitySwitchForTests();
+    setNotificationPermissionGrantedValue(true);
+    setLiveActivityEnabledValue(false);
+    const rows = trackRemoteTokens();
+    expoWidgetsMock.pushToStartListener?.({ activityPushToStartToken: 'scope-token' });
+    getGlanceableDelivery().registerScopeTokens('org-1', 'u1');
+    await flushRegistration();
+    expect(rows.size).toBe(0);
+
+    setLiveActivityEnabledValue(true);
+    await flushRegistration();
+
+    expect(rows).toEqual(new Map([['scope-token', 'org-1']]));
+  });
+
   it('registers a cached push-to-start token when the permission is granted later', async () => {
     setNotificationPermissionGrantedValue(false);
     const rows = trackRemoteTokens();

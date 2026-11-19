@@ -47,16 +47,15 @@ import {
 } from './unregister-session';
 import {
   canRegisterActivityTokenKind,
-  subscribeLiveActivityPreferenceKnown,
-  subscribeNotificationPermissionGranted,
+  subscribePushToStartGate,
 } from './live-activity-switch';
 import { type GlanceableDelivery, setGlanceableDelivery } from './sink-registry';
 
 let pushToStartToken: string | null = null;
 let scopeRegistration: Registration | null = null;
 let startSubscription: ReturnType<typeof addPushToStartTokenListener> | null = null;
-// The unsubscribe handles of the gate listeners below, so a re-arm can drop them.
-let gateSubscriptions: (() => void)[] = [];
+// The unsubscribe of the gate listener below, so a re-arm can drop it.
+let gateSubscription: (() => void) | null = null;
 // Keep every attempted token until its delete succeeds, including tokens rotated away by native.
 const scopeTokens = new Set<string>();
 const activityTokens = new Set<string>();
@@ -129,11 +128,9 @@ async function registerToken(target: Registration, token: string): Promise<void>
 }
 
 /**
- * A push-to-start token the native listener cached while the switch or the
- * permission was still unknown never reached the server: `registerToken`
- * refuses it, and nothing retried once an answer landed. Each answer signal
- * runs this guarded retry, so the token registers as soon as both allow it and
- * a gate that is still unknown or off stays a no-op.
+ * A push-to-start token the native listener cached while a gate refused it
+ * retries on every gate signal, so it registers as soon as both answers allow
+ * it. A gate that is still unknown or off stays a no-op.
  */
 function retryCachedPushToStartToken(): void {
   if (scopeRegistration !== null && pushToStartToken !== null) {
@@ -141,15 +138,10 @@ function retryCachedPushToStartToken(): void {
   }
 }
 
-/** The two answers an iOS push-to-start token waits for. */
-const gateSignals = [subscribeLiveActivityPreferenceKnown, subscribeNotificationPermissionGranted];
-
 function observePushToStart(target: Registration | null): void {
-  // Replace the gate listeners, so a reset never leaves a stale pair behind.
-  for (const unsubscribe of gateSubscriptions) {
-    unsubscribe();
-  }
-  gateSubscriptions = gateSignals.map(subscribe => subscribe(retryCachedPushToStartToken));
+  // Replace the gate listener, so a reset never leaves a stale one behind.
+  gateSubscription?.();
+  gateSubscription = subscribePushToStartGate(retryCachedPushToStartToken);
   startSubscription?.remove();
   const epoch = registerEpoch;
   startSubscription = addPushToStartTokenListener(({ activityPushToStartToken }) => {

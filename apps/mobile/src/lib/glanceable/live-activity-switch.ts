@@ -105,6 +105,11 @@ export function setLiveActivityEnabledValue(next: boolean): void {
   }
 }
 
+/**
+ * Told on every change of the resolved value, including an off -> on turn after
+ * the read landed (which leaves the preference known, so no known signal
+ * fires). A token refused while the switch was read off retries on this one.
+ */
 export function subscribeLiveActivityEnabled(listener: () => void): () => void {
   listeners.add(listener);
   return () => {
@@ -121,6 +126,23 @@ export function subscribeLiveActivityPreferenceKnown(listener: () => void): () =
   knownListeners.add(listener);
   return () => {
     knownListeners.delete(listener);
+  };
+}
+
+/**
+ * Told when a push-to-start decision may have changed: the read landing, a read
+ * switch turning from off to on, or the permission answer. A cached token
+ * refused by any of those retries on this one signal, so it registers as soon
+ * as both answers allow it without waiting for another native token event.
+ */
+export function subscribePushToStartGate(listener: () => void): () => void {
+  const unsubscribeKnown = subscribeLiveActivityPreferenceKnown(listener);
+  const unsubscribeValue = subscribeLiveActivityEnabled(listener);
+  const unsubscribePermission = subscribeNotificationPermissionGranted(listener);
+  return () => {
+    unsubscribeKnown();
+    unsubscribeValue();
+    unsubscribePermission();
   };
 }
 

@@ -2789,7 +2789,28 @@ async function resumeFirstWorktreeCreate(
       throw error;
     }
 
-    if (ingestResult?.status === 'rejected') {
+    if (ingestResult === undefined) {
+      // The ingest outcome is unknown without the acknowledgement: remove the
+      // empty destination row best-effort, keep the ledger row non-terminal,
+      // and surface the typed unavailable error so a same-key retry can finish
+      // the create. This mirrors the clone resume above.
+      try {
+        await ctx.env.SESSION_INGEST.deleteSessionForCloudAgent({
+          sessionId: allocation.kiloSessionId,
+          kiloUserId: ctx.userId,
+          onlyIfEmpty: true,
+        });
+      } catch (deleteError) {
+        logger
+          .withFields({
+            error: deleteError instanceof Error ? deleteError.message : String(deleteError),
+          })
+          .error('Failed to remove empty destination row after an unacknowledged ingest create');
+      }
+      await hooks.onTransportFailure();
+      throw new TRPCError({ code: 'SERVICE_UNAVAILABLE', message: 'session_clone_unavailable' });
+    }
+    if (ingestResult.status === 'rejected') {
       // A destination the ingest plane refuses must not be resumed: record
       // the IDs as retired so a same-key retry allocates fresh ones.
       if (ingestResult.code === 'session_retired') {
@@ -2801,7 +2822,7 @@ async function resumeFirstWorktreeCreate(
       await hooks.onFailure('ownership_row', ingestResult.code);
       throw ingestRejectionError(ingestResult.code);
     }
-    if (ingestResult?.status === 'in_progress') {
+    if (ingestResult.status === 'in_progress') {
       await hooks.onTransportFailure();
       throw creationInProgressError();
     }

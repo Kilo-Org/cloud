@@ -5545,7 +5545,9 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
     settleOperationMock.mockResolvedValue({ settled: true });
     markReconcilePendingMock.mockResolvedValue({});
     recordOperationProgressMock.mockResolvedValue(undefined);
-    createCliSessionMock.mockReset().mockResolvedValue(undefined);
+    // A resumed ingest create requires a ready acknowledgement, so the default
+    // mock answers with one for paths that reach the ingest.
+    createCliSessionMock.mockReset().mockResolvedValue({ status: 'ready' });
     recordSessionFailureMock.mockResolvedValue(undefined);
   });
 
@@ -6306,6 +6308,42 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       expect(storedProgress[SESSION_CREATE_FINALIZATION_VERSION_KEY]).toBeUndefined();
     }
   );
+
+  it('surfaces SERVICE_UNAVAILABLE session_clone_unavailable when the worktree resume ingest resolves without an acknowledgement', async () => {
+    const input = request();
+    const doStub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
+    const ctx = context(doStub);
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: makeLedgerRow({
+        status: 'reconcile_pending',
+        canonical_result: await canonicalProgress(input, {
+          [SESSION_CREATE_WORKTREE_ENABLED_KEY]: true,
+        }),
+      }),
+    });
+    // Ownership row absent: the worktree resume re-issues the ingest create,
+    // and a worker without acknowledgement support resolves to undefined.
+    getPgDbMock.mockReturnValue(makeDb([[], [{ email: 'test@example.com' }]]));
+    createCliSessionMock.mockResolvedValueOnce(undefined);
+
+    await expect(runCreate(ctx, input)).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'session_clone_unavailable',
+    });
+
+    expect(deleteCliSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: KILO_SESSION_ID,
+        kiloUserId: USER_ID,
+        onlyIfEmpty: true,
+      })
+    );
+    expect(markReconcilePendingMock).toHaveBeenCalledWith(expect.any(Object), { rowId: ROW_ID });
+    expect(settleOperationMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(doStub.registerSessionFromMetadata).not.toHaveBeenCalled();
+  });
 
   it('resumes an ownership-absent continuation clone with the worktree placement', async () => {
     const input = request({

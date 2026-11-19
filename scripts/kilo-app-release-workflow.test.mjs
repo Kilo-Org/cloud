@@ -190,6 +190,16 @@ function validate(workflow) {
     checkChangesSteps.indexOf(mint) < checkChangesSteps.indexOf(notes),
     'the mint must run before the notes step'
   );
+  // The minted token is a real credential, so both steps that touch it run on
+  // main only: a non-main run must neither mint it nor read its output.
+  for (const id of ['mint-notes', 'notes']) {
+    const guarded = step(workflow, 'check-changes', id);
+    assert.equal(
+      guarded.if,
+      "steps.check.outputs.should_build == 'true' && github.ref == 'refs/heads/main'",
+      `check-changes: the ${id} step must run on main only`
+    );
+  }
 
   const cap = step(workflow, 'check-changes', 'cap');
   assert.ok(cap, 'check-changes: the cap step (id cap) is missing');
@@ -1452,6 +1462,14 @@ const mutations = {
   'the notes step loses the heredoc': workflow => {
     const notes = step(workflow, 'check-changes', 'notes');
     notes.run = notes.run.replace('notes<<NOTES_EOF', 'notes=');
+  },
+  'the mint step runs on any ref': workflow => {
+    const mint = step(workflow, 'check-changes', 'mint-notes');
+    mint.if = "steps.check.outputs.should_build == 'true'";
+  },
+  'the notes step runs on any ref': workflow => {
+    const notes = step(workflow, 'check-changes', 'notes');
+    notes.if = "steps.check.outputs.should_build == 'true'";
   },
   'the cap is raised': workflow => {
     const cap = step(workflow, 'check-changes', 'cap');

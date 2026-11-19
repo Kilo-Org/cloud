@@ -219,8 +219,8 @@ export function BriefingListScreen() {
                 router.push(`${BRIEFING_PATH}/${item.id}` as Href);
               }}
             >
-              <Card padding="none">
-                <View className="gap-1 px-4 pt-3">
+              <Card>
+                <View className="gap-1">
                   <Text>
                     {item.context.organizationId === null
                       ? t('common.personal')
@@ -232,9 +232,7 @@ export function BriefingListScreen() {
                     <Text variant="caption">{t('common.dismissed')}</Text>
                   ) : null}
                 </View>
-                <View className="px-4 pb-3">
-                  <BriefingScorecard report={item} />
-                </View>
+                <BriefingScorecard report={item} />
               </Card>
             </Pressable>
           )}

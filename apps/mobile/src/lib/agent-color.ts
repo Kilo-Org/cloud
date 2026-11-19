@@ -163,9 +163,20 @@ export function isPlaceholderTint(tint: Tint): boolean {
  *
  * The unknown origin, `platform` and `repository` name the row's context
  * rather than the session, so each takes {@link PLACEHOLDER_TINT} and the
- * title leads. Idle and live are states on a real session, so each keeps the ramp
- * entry the English word already hashed to (`agentColor('IDLE')` /
- * `agentColor('LIVE')` → agent-sky).
+ * title leads. Idle and live are states on a real session, so each is pinned
+ * to its own step of the ramp, and no two states in this table share one
+ * entry:
+ *
+ * | State        | Tint            |
+ * | ------------ | --------------- |
+ * | `unknown`    | PLACEHOLDER_TINT |
+ * | `platform`   | PLACEHOLDER_TINT |
+ * | `repository` | PLACEHOLDER_TINT |
+ * | `idle`       | AGENT_RAMP[0] (`agent-cloud`) |
+ * | `live`       | AGENT_RAMP[4] (`agent-sky`) |
+ *
+ * A later ramp change must keep `idle` and `live` on distinct entries, or the
+ * two opposite states stop being separable by colour again.
  */
 
 /** Tint for a row whose eyebrow names a state, a type or its context, not an agent. */
@@ -173,9 +184,10 @@ export function stateTint(state: 'unknown' | 'platform' | 'repository' | 'idle' 
   if (state === 'unknown' || state === 'platform' || state === 'repository') {
     return PLACEHOLDER_TINT;
   }
-  // Literal index into the `as const` ramp resolves non-null (same rule as
-  // `agentColor` below).
-  return AGENT_RAMP[4];
+  // Idle and live pin to different ramp entries so the two opposite states
+  // stay separable by colour. Literal indexes into the `as const` ramp
+  // resolve non-null (same rule as `agentColor` below).
+  return state === 'idle' ? AGENT_RAMP[0] : AGENT_RAMP[4];
 }
 
 /** Deterministic agent hue from the agent name. */
@@ -266,14 +278,6 @@ export const ROW_PALETTE = {
     tileBorderClass: 'border-row-moss-tile-border',
     hueThemeKey: 'rowMoss',
   },
-  fern: {
-    hueClass: 'bg-row-fern',
-    hueTextClass: 'text-row-fern',
-    hueBorderClass: 'border-row-fern',
-    tileBgClass: 'bg-row-fern-tile-bg',
-    tileBorderClass: 'border-row-fern-tile-border',
-    hueThemeKey: 'rowFern',
-  },
   pine: {
     hueClass: 'bg-row-pine',
     hueTextClass: 'text-row-pine',
@@ -281,6 +285,14 @@ export const ROW_PALETTE = {
     tileBgClass: 'bg-row-pine-tile-bg',
     tileBorderClass: 'border-row-pine-tile-border',
     hueThemeKey: 'rowPine',
+  },
+  fern: {
+    hueClass: 'bg-row-fern',
+    hueTextClass: 'text-row-fern',
+    hueBorderClass: 'border-row-fern',
+    tileBgClass: 'bg-row-fern-tile-bg',
+    tileBorderClass: 'border-row-fern-tile-border',
+    hueThemeKey: 'rowFern',
   },
 } as const satisfies Record<RowHue, Tint>;
 

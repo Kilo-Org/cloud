@@ -30,12 +30,48 @@ describe('stateTint', () => {
     expect(stateTint('repository').hueClass).toBe('bg-session-strip');
   });
 
-  it('keeps each live state at the tint its English word first rendered', () => {
+  it('keeps live at the tint its English word first rendered', () => {
     // The continuity contract: the pre-pin row tint was the hash of the
-    // rendered English word, so each state pin must equal that hash or an
-    // existing live surface changes hue for no reason.
-    expect(stateTint('idle')).toBe(agentColor('IDLE'));
+    // rendered English word, so the LIVE state pin must equal that hash or
+    // an existing live surface changes hue for no reason.
     expect(stateTint('live')).toBe(agentColor('LIVE'));
+    expect(stateTint('live').hueTextClass).toBe('text-agent-sky');
+  });
+
+  it('pins idle to its own muted-cool step, distinct from live', () => {
+    // The state contract: idle and live are opposite states on a real
+    // session, so each must pin its own ramp entry — never the entry another
+    // state already took, and never an agent hash.
+    const idle = stateTint('idle');
+    expect(idle).toBe(agentColor('IDLE'));
+    expect(idle.hueTextClass).toBe('text-agent-cloud');
+    expect(idle.hueClass).toBe('bg-agent-cloud');
+    expect(idle.hueThemeKey).toBe('agentCloud');
+    expect(idle).not.toBe(stateTint('live'));
+    expect(idle).not.toBe(stateTint('unknown'));
+  });
+
+  it('collapses no two states onto one token, so no state tint distinguishes nothing', () => {
+    // The regression the doc's table guards: a ramp edit that re-collapses
+    // two states fails here before the palette ships. The muted trio shares
+    // PLACEHOLDER_TINT by design; idle and live each own one ramp entry.
+    const tints = {
+      unknown: stateTint('unknown'),
+      platform: stateTint('platform'),
+      repository: stateTint('repository'),
+      idle: stateTint('idle'),
+      live: stateTint('live'),
+    };
+    const identityGroups = new Map<unknown, string[]>();
+    for (const [state, tint] of Object.entries(tints)) {
+      const list = identityGroups.get(tint) ?? [];
+      list.push(state);
+      identityGroups.set(tint, list);
+    }
+    expect(new Set(identityGroups.keys())).toHaveLength(3);
+    expect(identityGroups.get(stateTint('unknown'))).toEqual(['unknown', 'platform', 'repository']);
+    expect(identityGroups.get(stateTint('idle'))).toEqual(['idle']);
+    expect(identityGroups.get(stateTint('live'))).toEqual(['live']);
   });
 });
 

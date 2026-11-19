@@ -403,3 +403,4 @@ Make a fixture when you test your work end to end (E2E) and the state you need i
 - Put backend fixtures in `dev/seed/<scope>/<topic>.ts`, and follow the contract in `dev/seed/AGENTS.md`.
 - Commit every fixture you make, so that the next agent can use it again. Do not keep a fixture only in a scratch directory.
 - Write in the fixture what it represents and how to open it, for example the deep link that the seed topic returns.
+- For a data screen's loading, retryable error, terminal error, permission or offline state, use the forced data state instead of a new fixture: `kiloapp:///dev/force-state/<loading|retryable|non-retryable|permission|offline>?next=<url-encoded app link>`, then `kiloapp:///dev/force-state/clear`. `src/lib/force-state-fixture.ts` says what each mode answers and what it leaves live.

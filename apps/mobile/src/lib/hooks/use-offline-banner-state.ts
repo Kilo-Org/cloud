@@ -3,6 +3,7 @@ import { addEventListener } from '@react-native-community/netinfo';
 import { useSyncExternalStore } from 'react';
 
 import { API_BASE_URL } from '@/lib/config';
+import { isForcedOffline, subscribeConnectivityWithForceState } from '@/lib/force-state-fixture';
 import {
   type BannerState,
   type ConnectivitySource,
@@ -13,7 +14,10 @@ import {
 } from '@/lib/offline-banner-state';
 
 const netInfoSource: ConnectivitySource = {
-  subscribe: listener => addEventListener(listener),
+  subscribe: listener =>
+    __DEV__
+      ? subscribeConnectivityWithForceState(addEventListener, listener)
+      : addEventListener(listener),
 };
 
 const defaultTimer: OfflineBannerTimer = {
@@ -37,6 +41,10 @@ function getStore(): OfflineBannerStore {
     source: netInfoSource,
     timer: defaultTimer,
     probe: async () => {
+      // Dev-only `force-state/offline` link: the backend is unreachable too.
+      if (__DEV__ && isForcedOffline()) {
+        return false;
+      }
       await withDeadline(3000, async signal => {
         await fetch(API_BASE_URL, { method: 'HEAD', signal });
       });

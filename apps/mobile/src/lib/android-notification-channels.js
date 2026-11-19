@@ -12,3 +12,17 @@ export const SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS = Object.freeze([
   'agent-progress',
   'followed-sessions-lock-screen',
 ]);
+
+/** The Android notification channels this app creates: one entry per channel
+ *  its writer (src/lib/notifications.ts) sets up at startup and on a headless
+ *  start, so a push addressed to any of these reaches the system list. Plain
+ *  .js for the same reason as the silent list above.
+ *  @type {ReadonlyArray<import('@kilocode/notifications').AndroidNotificationChannelId>} */
+export const CREATED_ANDROID_NOTIFICATION_CHANNEL_IDS = Object.freeze([
+  'needs-input',
+  'agent-progress',
+  'agent-briefing',
+  'balance',
+  'security',
+  'followed-sessions-lock-screen',
+]);

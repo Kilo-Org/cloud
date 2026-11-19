@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { ModelOption } from '@/app/admin/alerting/types';
-import { OpenRouterModelsResponseSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { OpenRouterModelsResponseSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { z } from 'zod';

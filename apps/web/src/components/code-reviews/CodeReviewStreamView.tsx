@@ -54,6 +54,7 @@ type DisplayEvent = CodeReviewDisplayEvent;
 // ---------------------------------------------------------------------------
 
 const formatTimestamp = (timestamp: string): string => {
+  if (!timestamp) return '';
   const date = new Date(timestamp);
   return date.toLocaleTimeString('en-US', {
     hour12: false,

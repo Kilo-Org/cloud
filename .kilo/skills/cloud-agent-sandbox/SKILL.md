@@ -332,6 +332,19 @@ pgrep -a dnsmasq
 docker exec <sandbox container> git ls-remote https://github.com/octocat/Hello-World.git
 ```
 
+## Docker build TLS trust
+
+If the image build reports an unknown issuer while downloading `glab` from
+`gitlab.com`, check that `NODE_EXTRA_CA_CERTS` points to the readable CA file
+provided by the sandbox. This is the sandbox's HTTPS inspection CA, not a
+GitLab certificate. The local Docker wrapper installs it in development images,
+including images with a platform-qualified `FROM` line.
+
+If the generated wrapper is stale, rerun `bash .kilo/cloud-agent-setup.sh`.
+`--resume` does not regenerate the wrapper. Restart the local Cloud Agent Worker
+and wait for `Container image(s) ready`. Do not disable certificate verification
+or add the sandbox CA to the production Dockerfile.
+
 ## Pitfalls
 
 - `pkill -f next-server` also matches the shell that runs it. Use

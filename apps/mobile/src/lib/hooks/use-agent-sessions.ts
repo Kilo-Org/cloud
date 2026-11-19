@@ -248,12 +248,6 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     [active.canRead, active.data]
   );
 
-  // The sections are calendar days of the device's own zone and day. Watching
-  // the shared relative-time clock (the one the row labels read) rebuilds them
-  // when a zone change or a midnight moves the boundary, so a stale heading
-  // cannot sit above a row that already reads a different day. The zone is
-  // resolved here rather than inside the grouping, so the rows under a heading
-  // can be handed the very zone that heading was grouped in.
   const now = useRelativeTimeNow();
   // Same traced tick as the search hook above, so a zone change reaches the
   // stored list's headings on the next minute tick instead of never.

@@ -31,3 +31,7 @@ export function firedDetectorsLabel(call: EnkryptUsageRow): string | null {
     ? call.fired_detectors.map(detectorLabel).join(', ')
     : null;
 }
+
+/** What a call's latency is: the guardrail's added wait, or, for one that only logs, its scan time. */
+export const ENKRYPT_LATENCY_HINT =
+  'The wait the guardrail added. A guardrail that only logs adds none, so this is how long its scan ran after the point where a blocking scan would hold the request or response.';

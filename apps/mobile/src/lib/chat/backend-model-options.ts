@@ -23,7 +23,6 @@ export function backendModelOptions(backends: readonly StoredChatBackend[]): Ses
   );
 }
 
-/** An on-device model is offered only while its provider says it is available. */
 export function localModelOptions(
   statuses: readonly LocalModelStatus[],
   t: TFunction

@@ -591,9 +591,9 @@ describe('Reviewer repository bodies', () => {
     expect(empty.props.title).toBe(i18n.t('codeReviewer.bitbucketConnect.managedOnWebTitle'));
     expect(empty.props.description).toBe(i18n.t('codeReviewer.bitbucketConnect.managedOnWebShort'));
     expect(String(empty.props.description)).not.toContain('{{');
-    expect(renderer.root.findAll(node => String(node.type) === 'BitbucketSetupRecovery')).toHaveLength(
-      0
-    );
+    expect(
+      renderer.root.findAll(node => String(node.type) === 'BitbucketSetupRecovery')
+    ).toHaveLength(0);
     unmount();
   });
 

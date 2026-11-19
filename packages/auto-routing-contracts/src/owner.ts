@@ -16,10 +16,7 @@ export type OwnerType = z.infer<typeof OwnerTypeSchema>;
 export const OwnerIdSchema = z.string().trim().min(1);
 
 /**
- * Field shape for the owner identity pair, so a schema that needs the pair can spread it and
- * a schema that needs both fields optional can spread `OwnerSchema.partial().shape`.
+ * Field shape for the owner identity pair, so a schema that needs the pair spreads it and a
+ * schema that needs both fields optional spreads `z.object(OwnerIdentityShape).partial().shape`.
  */
 export const OwnerIdentityShape = { ownerType: OwnerTypeSchema, ownerId: OwnerIdSchema };
-
-export const OwnerSchema = z.object(OwnerIdentityShape);
-export type Owner = z.infer<typeof OwnerSchema>;

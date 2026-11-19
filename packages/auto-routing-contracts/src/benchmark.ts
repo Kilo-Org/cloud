@@ -12,7 +12,7 @@ import { ReasoningEffortSchema, refineVariantExclusivity, VariantSchema } from '
 import { addDuplicateKeyIssues } from './duplicate-keys';
 import { TaxonomyRouteKeySchema } from './taxonomy';
 import { AutoRouterSchema, DEFAULT_AUTO_ROUTER, type AutoRouter } from './router';
-import { OwnerIdentityShape, OwnerSchema } from './owner';
+import { OwnerIdentityShape } from './owner';
 import {
   POLICY_SETTING_VALUE_DEFAULTS,
   POLICY_SETTING_VALUE_SCHEMAS,
@@ -499,7 +499,7 @@ export type SyncBenchmarkSubscriptionsRequest = z.infer<
 const OwnerScopedPoolRequestSchema = z
   .object({
     router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
-    ...OwnerSchema.partial().shape,
+    ...z.object(OwnerIdentityShape).partial().shape,
     entries: EfficientModelPoolSchema,
   })
   .superRefine((request, ctx) => {

@@ -995,7 +995,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Dan il-kont m'għandux organizzazzjonijiet għadu. Tista' tirrevedi l-PRs Bitbucket ladarba toħloq organizzazzjoni jew tingħaqad ma' waħda.",
       "gitlabReconnectAdminOnlyDescription": "Itlob lis-sid ta' organizzazzjoni, lill-amministratur jew lill-maniġer tal-ħlasijiet biex jikkonnettjaha.",
       "bitbucketNotConnectedTitle": "Bitbucket mhux konness",
-      "bitbucketAdminOnlyDescription": "Is-sidien, l-amministraturi u l-maniġers tal-ħlasijiet tal-organizzazzjoni biss jistgħu jikkonnettjawh.",
+      "adminOnlyConnectDescription": "Is-sidien, l-amministraturi u l-maniġers tal-ħlasijiet tal-organizzazzjoni biss jistgħu jikkonnettjawh.",
       "contextLine": "Għal {{organization}}",
       "contextLinePersonal": "Għall-kont personali tiegħek"
     },
@@ -1454,8 +1454,9 @@
       "notConnectedReadOnly": "Bitbucket mhux konness. Is-sidien, l-amministraturi u l-maniġers tal-ħlasijiet tal-organizzazzjoni biss jistgħu jikkonnettjawh."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Il-konnessjoni ta' Bitbucket ta' din l-organizzazzjoni tiġi ġestita fuq il-web minn kompjuter.",
-      "description": "Oħloq token ta' aċċess għall-ispazju tax-xogħol bil-permessi meħtieġa u waħħlu hawn taħt.",
+      "managedOnWeb": "Il-konnessjoni ta' Bitbucket ta' {{organization}} tiġi ġestita fuq il-web minn kompjuter.",
+      "description": "Oħloq token ta' aċċess għall-ispazju tax-xogħol għal {{organization}} u waħħlu hawn taħt.",
+      "descriptionReconnect": "Oħloq token ta' aċċess ġdid għall-ispazju tax-xogħol għal {{organization}} u waħħlu hawn taħt.",
       "scopes": "Kont: qari · Repożitorji: qari/kitba · PRs: qari · Webhooks: qari/kitba",
       "tokenPlaceholder": "Token ta' aċċess għall-ispazju tax-xogħol",
       "tokenRefused": "Bitbucket ma aċċettax dan it-token tal-ispazju tax-xogħol. Iċċekkja li għandu l-permessi ta' hawn fuq, imbagħad ipprova mill-ġdid."
@@ -2292,6 +2293,8 @@
       "renameAccessibility": "Ibdel l-isem tas-sessjoni: {{title}}",
       "cloningSession": "Qed tiġi kklonjata s-sessjoni",
       "couldNotLoadThisSession": "Ma setgħetx titgħabba din is-sessjoni.",
+      "historyTooLarge": "It-transkrizzjoni ta' din is-sessjoni hija kbira wisq biex titgħabba.",
+      "historyUnavailable": "It-transkrizzjoni ta' din is-sessjoni ma tistax tiġi maqruża.",
       "cloneFailedRetry": "Ma setgħetx tiġi kklonjata din is-sessjoni. Erġa' pprova.",
       "notEnoughCredits": "M'għandekx biżżejjed krediti għal din it-talba. Żid krediti u erġa' pprova.",
       "previousTaskFinishing": "Il-kompitu ta' qabel għadu qed jitlesta. Stenna ftit.",
@@ -2368,6 +2371,7 @@
       "branchDefault": "Predefinit",
       "branchAccessibility": "Fergħa: {{label}}",
       "branchLoading": "Tagħbija tal-fergħat",
+      "branchInactive": "Agħżel repożitorju biex jitgħabbew il-fergħat tiegħu.",
       "branchLoadError": "Ma setgħetx titgħabba l-fergħat",
       "branchUnavailable": "M'hemmx fergħat disponibbli għal dan ir-repożitorju. Iċċekkja l-aċċess tiegħek mal-fornitur, imbagħad agħżel repożitorju ieħor.",
       "branchEmpty": "Ebda fergħa disponibbli",
@@ -3206,7 +3210,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Ma setgħux jitgħabbew is-sessjonijiet.",
-    "couldNotLoadActiveSessions": "Ma setgħux jitgħabbew is-sessjonijiet attivi.",
     "agentSessions": "Attivi bħalissa",
     "newCodingTask": "Kompitu ġdid ta' programmazzjoni",
     "newTaskFromPicture": "Kompitu ġdid minn ritratt",
@@ -3591,7 +3594,8 @@
         "accounting_adjustment": "Aġġustament tal-kontabilità",
         "credits_expired": "Krediti skaduti"
       },
-      "truncated": "Hemm attività tal-krediti ta' qabel disponibbli."
+      "truncated": "Hemm attività tal-krediti ta' qabel disponibbli.",
+      "retentionLimit": "Qed tintwera l-attività tal-krediti l-aktar reċenti."
     },
     "inviteMember": {
       "emailError": "Daħħal indirizz tal-posta elettronika validu.",
@@ -3623,7 +3627,8 @@
         "void": "Annullata",
         "uncollectible": "Ma tistax tinġabar"
       },
-      "truncated": "Hemm fatturi ta' qabel disponibbli."
+      "truncated": "Hemm fatturi ta' qabel disponibbli.",
+      "retentionLimit": "Qed jintwerew il-fatturi l-aktar reċenti."
     },
     "lowBalanceAlert": {
       "enableA11y": "Attiva t-twissija ta' bilanċ baxx",
@@ -3863,8 +3868,7 @@
     "imagesSectionEmpty": "L-ebda ospitant fdat tal-immaġnijiet",
     "revoke": "Irtira l-fiduċja f'{{host}}",
     "revokeMessage": "Linkijiet lejn dan l-ospitant se jerġgħu jitolbu konferma.",
-    "revokeImageMessage": "L-immaġnijiet minn dan l-ospitant se jerġgħu jitolbu konferma.",
-    "backToPreferences": "Lura għall-preferenzi"
+    "revokeImageMessage": "L-immaġnijiet minn dan l-ospitant se jerġgħu jitolbu konferma."
   },
   "glanceable": {
     "waiting": "Qed jiġu aġġornati l-aġenti",
@@ -4114,6 +4118,8 @@
       "downloading": "Qed jitniżżel: {{written}} minn {{total}}",
       "downloadingUnknown": "Qed jitniżżel: {{written}}",
       "paused": "Ippawżat: {{written}} minn {{total}}",
+      "retrying": "Qed jerġa' jipprova: {{written}} minn {{total}}",
+      "retryingUnknown": "Qed jerġa' jipprova: {{written}}",
       "verifying": "Qed jiġi vverifikat il-fajl imniżżel…",
       "downloaded": "Imniżżel · {{size}}",
       "url": "Link dirett għat-tniżżil",
@@ -4204,7 +4210,9 @@
         "androidModelUnavailable": "Dan l-apparat ma jappoġġjax Gemini Nano, jew l-app tas-sistema AICore għadha qed titħejja. Erġa' pprova aktar tard.",
         "aicoreUpdateRequired": "Aġġorna l-app AICore u s-software tas-sistema biex tuża dan il-mudell.",
         "downloadable": "Dan il-mudell jeħtieġ jitniżżel darba qabel ma tkun tista' tużah.",
-        "downloading": "Il-mudell qed jitniżżel. Ikun lest meta jispiċċa t-tniżżil."
+        "downloading": "Il-mudell qed jitniżżel. Ikun lest meta jispiċċa t-tniżżil.",
+        "batteryQuota": "Il-mudell fuq l-apparat uża l-kwota tal-batterija tiegħu għal issa. Erġa' pprova aktar tard.",
+        "checkFailed": "L-app ma setgħetx tiċċekkja dan il-mudell. Erġa' pprova."
       },
       "unavailable": "Il-mudell fuq l-apparat mhux disponibbli bħalissa. Iċċekkja l-istatus tiegħu f'$t(modelChat.backends.title).",
       "busy": "Il-mudell fuq l-apparat għadu qed iwieġeb messaġġ ieħor. Erġa' pprova meta jispiċċa.",
@@ -4583,7 +4591,8 @@
       "purchaseFallback": "Xiri ta' krediti",
       "receipt": "Irċevuta",
       "receiptA11y": "Iftaħ l-irċevuta għal {{description}}, {{amount}}, minn {{date}}",
-      "receiptUnavailable": "M'hemmx irċevuta disponibbli għal dan ix-xiri."
+      "receiptUnavailable": "M'hemmx irċevuta disponibbli għal dan ix-xiri.",
+      "retentionLimit": "Qed tintwera l-istorja tal-krediti l-aktar reċenti."
     },
     "title": "Ixtri krediti",
     "description": "Il-krediti huma xiri ta' darba li jiżdied mal-bilanċ Kilo tiegħek biex imexxi sessjonijiet ta' kodifikazzjoni bl-AI fl-App Kilo. Il-ħanut jaddebita l-kont tiegħek u l-krediti jiżdiedu wara li l-ħanut jikkonferma l-ħlas.",
@@ -4855,6 +4864,9 @@
     "couldNotLoad": "L-integrazzjonijiet ma setgħux jitgħabbew",
     "permissionDenied": "M'għandekx permess timmaniġġja dawn l-integrazzjonijiet.",
     "managedByOwner": "Itlob lil sid tal-organizzazzjoni biex ibiddel konnessjoni li ma tistax tbiddel.",
+    "managedByOwnerOrAdmin": "Itlob lis-sid ta' organizzazzjoni jew lill-amministratur biex ibiddel konnessjoni li ma tistax tbiddel.",
+    "managedByOwnerOrBilling": "Itlob lis-sid ta' organizzazzjoni jew lill-maniġer tal-ħlasijiet biex ibiddel konnessjoni li ma tistax tbiddel.",
+    "managedByOwnerAdminOrBilling": "Itlob lis-sid ta' organizzazzjoni, lill-amministratur jew lill-maniġer tal-ħlasijiet biex ibiddel konnessjoni li ma tistax tbiddel.",
     "connectFailed": "Il-paġna tal-konnessjoni ma setgħetx tinfetaħ"
   },
   "invoices": {
@@ -4891,7 +4903,7 @@
       "new": "Skattatur ġdid",
       "create": "Oħloq skattatur",
       "emptyTitle": "Għadhom ma hemmx skattaturi",
-      "emptyDescription": "Oħloq skattatur biex tibda eżekuzzjoni tal-Cloud Agent minn sejħa webhook jew fuq skeda.",
+      "emptyDescription": "Oħloq l-ewwel skattatur tiegħek.",
       "loadFailedTitle": "Ma setgħux jitgħabbew l-iskattaturi",
       "loadFailedDescription": "Erġa' pprova meta jkollok konnessjoni.",
       "detailLoadFailedTitle": "Ma setax jitgħabba dan l-iskattatur",

@@ -24,7 +24,11 @@ vi.mock('@shopify/flash-list', () => ({
     ListEmptyComponent: ReactElement;
   }) => createElement('FlashList', props, props.data.length === 0 ? ListEmptyComponent : null),
 }));
-vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
+vi.mock('react-native', () => ({
+  Pressable: 'Pressable',
+  View: 'View',
+  useColorScheme: () => 'light',
+}));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: requests.push }) }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
@@ -35,7 +39,7 @@ vi.mock('@/components/empty-state', () => ({
   }: {
     title: string;
     description?: string;
-    refreshControl?: ReactElement;
+    placement?: 'center' | 'top' | 'static';
     action?: ReactElement;
   }) => createElement('EmptyState', props, action),
 }));
@@ -44,8 +48,9 @@ vi.mock('@/components/screen-header', () => ({
     createElement('ScreenHeader', null, headerRight),
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/icons', () => ({ Newspaper: 'Newspaper' }));
-vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
+vi.mock('@/components/ui/icon-button', () => ({ IconButton: 'IconButton' }));
+vi.mock('@/components/ui/icons', () => ({ Newspaper: 'Newspaper', Settings: 'Settings' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('./briefing-card', () => ({ BriefingScorecard: 'BriefingScorecard' }));
@@ -95,11 +100,14 @@ const report = {
 };
 
 function pressSettings(root: ReactTestInstance): void {
-  const [button] = root.findAllByType('Button' as ElementType);
+  const [button] = [
+    ...root.findAllByType('IconButton' as ElementType),
+    ...root.findAllByType('Button' as ElementType),
+  ];
   if (!button) {
     throw new Error('Briefing settings control is missing');
   }
-  // The Button stub keeps the caller's onPress; the renderer exposes props untyped.
+  // The control stub keeps the caller's onPress; the renderer exposes props untyped.
   const props: { onPress: () => void } = button.props as { onPress: () => void };
   act(() => {
     props.onPress();
@@ -224,16 +232,17 @@ it('renders the shared empty state with its settings action when no context is e
   // the filter hint stays on screen instead.
   expect(emptyState.props.description).toBeUndefined();
   expect(emptyState.props.icon).toBe('Newspaper');
-  // Pull to refresh moved with the body: the state owns the gesture now.
-  expect((emptyState.props.refreshControl as ReactElement).type).toBe('RefreshControl');
+  // The branch's empty phase owns the body, so no list renders beside it: the
+  // list with its pull-to-refresh gesture exists only once reports arrive.
   expect(mounted.root.findAllByType('FlashList' as ElementType)).toHaveLength(0);
+  expect(emptyState.props.placement).toBeUndefined();
   const texts = mounted.root
     .findAllByType('Text' as ElementType)
     .map(node => String(node.props.children));
   expect(texts).toContain('agentBriefing.allContexts');
-  // The empty state's own button is the only settings entry point while it shows.
+  // The empty state's own action is the only settings entry point while it shows.
   const header = mounted.root.findByType('ScreenHeader' as ElementType);
-  expect(header.findAllByType('Button' as ElementType)).toHaveLength(0);
+  expect(header.findAllByType('IconButton' as ElementType)).toHaveLength(0);
   const buttons = mounted.root.findAllByType('Button' as ElementType);
   expect(buttons).toHaveLength(1);
   pressSettings(mounted.root);
@@ -250,7 +259,7 @@ it('explains the empty window and keeps the header action when a context is enab
   expect(
     mounted.root
       .findAllByType('ScreenHeader' as ElementType)[0]
-      ?.findAllByType('Button' as ElementType)
+      ?.findAllByType('IconButton' as ElementType)
   ).toHaveLength(1);
 });
 
@@ -271,8 +280,8 @@ it('keeps the settings action in the header while the list has reports', () => {
   const mounted = mountBriefings([report]);
   expect(mounted.root.findAllByType('EmptyState' as ElementType)).toHaveLength(0);
   const header = mounted.root.findByType('ScreenHeader' as ElementType);
-  expect(header.findAllByType('Button' as ElementType)).toHaveLength(1);
-  expect(mounted.root.findAllByType('Button' as ElementType)).toHaveLength(1);
+  expect(header.findAllByType('IconButton' as ElementType)).toHaveLength(1);
+  expect(mounted.root.findAllByType('Button' as ElementType)).toHaveLength(0);
   pressSettings(header);
   expect(requests.push).toHaveBeenCalledWith('/(app)/agent-briefing/settings');
 });

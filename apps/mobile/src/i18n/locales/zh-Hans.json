@@ -695,8 +695,9 @@
       "notConnectedReadOnly": "尚未连接 Bitbucket。只有组织所有者、管理员和账单管理员可以完成连接。"
     },
     "bitbucketConnect": {
-      "managedOnWeb": "此组织的 Bitbucket 连接需在电脑上通过网页版进行管理。",
-      "description": "创建具有所需权限范围的工作区访问令牌，并粘贴到下方。",
+      "managedOnWeb": "{{organization}} 的 Bitbucket 连接需在电脑上通过网页版进行管理。",
+      "description": "为 {{organization}} 创建工作区访问令牌，然后粘贴到下方。",
+      "descriptionReconnect": "为 {{organization}} 创建新的工作区访问令牌，然后粘贴到下方。",
       "scopes": "账户：读取 · 仓库：读/写 · 拉取请求：读取 · Webhook：读/写",
       "tokenPlaceholder": "工作区访问令牌",
       "tokenRefused": "Bitbucket 未接受此工作区访问令牌。请检查其是否具有上述权限范围，然后重试。"
@@ -1605,6 +1606,8 @@
       "renameAccessibility": "重命名会话：{{title}}",
       "cloningSession": "正在克隆会话",
       "couldNotLoadThisSession": "无法加载此会话",
+      "historyTooLarge": "此会话的对话记录过大，无法加载。",
+      "historyUnavailable": "无法读取此会话的对话记录。",
       "cloneFailedRetry": "无法克隆此会话。请重试。",
       "notEnoughCredits": "额度不足，无法处理此请求。请充值后重试。",
       "previousTaskFinishing": "上一个任务正在收尾，请稍等。",
@@ -1681,6 +1684,7 @@
       "branchDefault": "默认",
       "branchAccessibility": "分支: {{label}}",
       "branchLoading": "正在加载分支",
+      "branchInactive": "选择一个仓库以加载其分支。",
       "branchLoadError": "无法加载分支",
       "branchUnavailable": "此仓库没有可用的分支。检查你在提供商处的访问权限，然后选择另一个仓库。",
       "branchEmpty": "没有可用的分支",
@@ -2483,7 +2487,6 @@
   },
   "home": {
     "couldNotLoadSessions": "无法加载会话。",
-    "couldNotLoadActiveSessions": "无法加载进行中的会话。",
     "agentSessions": "正在进行",
     "newCodingTask": "新建编程任务",
     "newTaskFromPicture": "从图片新建任务",
@@ -2800,7 +2803,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "此账户尚未加入任何组织。创建或加入组织后，即可审查 Bitbucket 拉取请求。",
       "gitlabReconnectAdminOnlyDescription": "请让组织所有者、管理员或账单管理员重新连接。",
       "bitbucketNotConnectedTitle": "尚未连接 Bitbucket",
-      "bitbucketAdminOnlyDescription": "只有组织所有者、管理员和账单管理员可以完成连接。",
+      "adminOnlyConnectDescription": "只有组织所有者、管理员和账单管理员可以完成连接。",
       "contextLine": "适用于 {{organization}}",
       "contextLinePersonal": "适用于个人账户"
     },
@@ -3409,7 +3412,8 @@
         "accounting_adjustment": "账务调整",
         "credits_expired": "额度已过期"
       },
-      "truncated": "还有更早的额度变动记录可供查看。"
+      "truncated": "还有更早的额度变动记录可供查看。",
+      "retentionLimit": "仅显示最近的额度变动记录。"
     },
     "hub": {
       "balance": "余额",
@@ -3454,7 +3458,8 @@
         "void": "已作废",
         "uncollectible": "无法收款"
       },
-      "truncated": "可查看更早的发票。"
+      "truncated": "可查看更早的发票。",
+      "retentionLimit": "仅显示最近的发票。"
     },
     "lowBalanceAlert": {
       "enableA11y": "启用余额不足提醒",
@@ -3683,8 +3688,7 @@
     "imagesSectionEmpty": "暂无受信任的图片主机",
     "revoke": "撤销对 {{host}} 的信任",
     "revokeMessage": "指向此主机的链接将再次请求确认。",
-    "revokeImageMessage": "来自此主机的图片将再次请求确认。",
-    "backToPreferences": "返回偏好设置"
+    "revokeImageMessage": "来自此主机的图片将再次请求确认。"
   },
   "glanceable": {
     "waiting": "正在更新智能体状态",
@@ -3931,6 +3935,8 @@
       "downloading": "正在下载：{{written}} / {{total}}",
       "downloadingUnknown": "正在下载：{{written}}",
       "paused": "已暂停：{{written}} / {{total}}",
+      "retrying": "正在重试：{{written}} / {{total}}",
+      "retryingUnknown": "正在重试：{{written}}",
       "verifying": "正在检查下载的文件…",
       "downloaded": "已下载 · {{size}}",
       "url": "直接下载链接",
@@ -4021,7 +4027,9 @@
         "androidModelUnavailable": "此设备不支持 Gemini Nano，或 AICore 系统应用仍在设置中。请稍后再试。",
         "aicoreUpdateRequired": "请更新 AICore 应用和系统软件后再使用此模型。",
         "downloadable": "此模型需要先下载一次才能使用。",
-        "downloading": "模型正在下载，下载完成后即可使用。"
+        "downloading": "模型正在下载，下载完成后即可使用。",
+        "batteryQuota": "本机模型已用完当前的电池用量额度。请稍后再试。",
+        "checkFailed": "应用无法检查此模型。请重试。"
       },
       "unavailable": "本机模型目前不可用。请在“$t(modelChat.backends.title)”中查看其状态。",
       "busy": "本机模型正忙于生成另一条回复，请在其完成后再试。",
@@ -4382,7 +4390,8 @@
       "purchaseFallback": "积分购买",
       "receipt": "收据",
       "receiptA11y": "打开 {{description}}，{{amount}}，{{date}} 的收据",
-      "receiptUnavailable": "此购买暂无可用收据。"
+      "receiptUnavailable": "此购买暂无可用收据。",
+      "retentionLimit": "仅显示最近的积分记录。"
     },
     "title": "购买额度",
     "description": "额度是一次性购买，会添加到你的 Kilo 余额中，用于在 Kilo App 中运行 AI 编程会话。商店会向你的账户收费，商店确认付款后额度才会到账。",
@@ -4630,6 +4639,9 @@
     "couldNotLoad": "无法加载集成",
     "permissionDenied": "你没有管理这些集成的权限。",
     "managedByOwner": "请联系组织所有者更改你无法更改的连接。",
+    "managedByOwnerOrAdmin": "请让组织所有者或管理员更改你无法更改的连接。",
+    "managedByOwnerOrBilling": "请让组织所有者或账单管理员更改你无法更改的连接。",
+    "managedByOwnerAdminOrBilling": "请让组织所有者、管理员或账单管理员更改你无法更改的连接。",
     "connectFailed": "无法打开连接页面"
   },
   "invoices": {
@@ -4666,7 +4678,7 @@
       "new": "新建触发器",
       "create": "创建触发器",
       "emptyTitle": "还没有触发器",
-      "emptyDescription": "创建触发器，以便通过 Webhook 调用或按计划启动 Cloud Agent 运行。",
+      "emptyDescription": "创建你的第一个触发器。",
       "loadFailedTitle": "无法加载触发器",
       "loadFailedDescription": "请在连接可用后重试。",
       "detailLoadFailedTitle": "无法加载此触发器",

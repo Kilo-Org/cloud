@@ -1,11 +1,8 @@
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
-import { EmptyState } from '@/components/empty-state';
-import { Building2 } from '@/components/ui/icons';
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { EmptyState, StateAction } from '@/components/empty-state';
+import { ArrowRight, Building2, Plus } from '@/components/ui/icons';
 import { isPersonal } from '@/lib/hooks/use-code-reviewer';
 import { type CouncilRefusalReason } from '@/lib/hooks/use-reviewer-council';
 import { CREATE_ORGANIZATION_HREF } from '@/lib/organization-navigation';
@@ -78,8 +75,9 @@ export function CouncilRefusalScreen({
       description={t(unavailableCopyKey(scope, platformSupportsCouncil, refusalReason))}
       action={
         personal ? (
-          <Button
-            className={STATE_ACTION_CLASS}
+          <StateAction
+            label={t(actionKey)}
+            icon={hasMemberships ? ArrowRight : Plus}
             onPress={() => {
               if (hasMemberships) {
                 // The reviewer scope list is the account switcher: every
@@ -90,10 +88,7 @@ export function CouncilRefusalScreen({
               }
               router.push(CREATE_ORGANIZATION_HREF);
             }}
-            accessibilityLabel={t(actionKey)}
-          >
-            <Text>{t(actionKey)}</Text>
-          </Button>
+          />
         ) : undefined
       }
     />

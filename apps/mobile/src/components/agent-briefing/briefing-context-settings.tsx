@@ -12,8 +12,9 @@ import {
 } from '@/components/agent-briefing/briefing-estimate-line';
 import { useBriefingEnableFlow } from '@/components/agent-briefing/use-briefing-enable-flow';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
-import { Switch } from '@/components/ui/switch';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
@@ -168,34 +169,30 @@ export function BriefingContextSettings({
   const estimateLoading = estimate.data === undefined && estimate.isFetching;
   /** Exactly one line per quote phase, rendered by the line's own component. */
   return (
-    <View className="gap-4 rounded-2xl border border-border bg-card p-4">
-      <Text className="font-semibold">
-        {t('agentBriefing.scheduledContextSettings', { context: contextName })}
-      </Text>
-      <Text className="text-sm text-muted-foreground">
-        {t('agentBriefing.scheduledContextHint')}
-      </Text>
+    <Card>
+      <Text variant="muted">{t('agentBriefing.scheduledContextHint')}</Text>
       <View className="flex-row items-center justify-between gap-3">
-        <Text className="min-w-0 flex-1 text-sm">{t('agentBriefing.scheduledContextEnabled')}</Text>
-        <Switch
-          value={preference.enabled}
-          disabled={offline || update.isPending || enableFlow.pending}
-          accessibilityLabel={t('agentBriefing.scheduledContextEnabled')}
-          accessibilityState={{
+        <Text className="min-w-0 flex-1">{t('agentBriefing.scheduledContextEnabled')}</Text>
+        {renderRowTrailing({
+          kind: 'switch',
+          value: preference.enabled,
+          disabled: offline || update.isPending || enableFlow.pending,
+          accessibilityLabel: t('agentBriefing.scheduledContextEnabled'),
+          accessibilityState: {
             checked: preference.enabled,
             disabled: offline || update.isPending || enableFlow.pending,
             // Both paths are busy while a quote is in flight: the estimate's own
             // fetch, and the confirm-and-enable flow that refetches it.
             busy: enableFlow.pending || estimate.isFetching,
-          }}
-          onValueChange={next => {
+          },
+          onValueChange: next => {
             if (next) {
               startEnable();
             } else {
               update.mutate({ organizationId, enabled: false, timezone, language: locale });
             }
-          }}
-        />
+          },
+        })}
       </View>
       <ModelSelector
         value={model}
@@ -251,9 +248,7 @@ export function BriefingContextSettings({
             updateLimits();
           }}
         />
-        <Text className="text-xs text-muted-foreground">
-          {t('agentBriefing.snapshotSafeguards')}
-        </Text>
+        <Text variant="caption">{t('agentBriefing.snapshotSafeguards')}</Text>
       </View>
       <BriefingEstimateLine quote={limitQuote} />
       {limitQuote.kind === 'failed' ? (
@@ -279,6 +274,6 @@ export function BriefingContextSettings({
       >
         <Text>{t(preference.enabled ? 'common.save' : 'agentBriefing.enable')}</Text>
       </Button>
-    </View>
+    </Card>
   );
 }

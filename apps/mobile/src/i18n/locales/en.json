@@ -1035,7 +1035,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "This account has no organizations yet. Bitbucket pull requests can be reviewed once you create or join an organization.",
       "gitlabReconnectAdminOnlyDescription": "Ask an organization owner, admin, or billing manager to reconnect it.",
       "bitbucketNotConnectedTitle": "Bitbucket not connected",
-      "bitbucketAdminOnlyDescription": "Only organization owners, admins, and billing managers can connect it.",
+      "adminOnlyConnectDescription": "Only organization owners, admins, and billing managers can connect it.",
       "contextLine": "For {{organization}}",
       "contextLinePersonal": "For your personal account"
     },
@@ -1476,8 +1476,9 @@
       "notConnectedReadOnly": "Bitbucket isn't connected. Only organization owners, admins, and billing managers can connect it."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "This organization's Bitbucket connection is managed on the web from a computer.",
-      "description": "Create a Workspace Access Token with the required scopes and paste it below.",
+      "managedOnWeb": "The Bitbucket connection for {{organization}} is managed on the web from a computer.",
+      "description": "Create a Workspace Access Token for {{organization}}, then paste it below.",
+      "descriptionReconnect": "Create a new Workspace Access Token for {{organization}}, then paste it below.",
       "scopes": "Account: read · Repositories: read/write · Pull requests: read · Webhooks: read/write",
       "tokenPlaceholder": "Workspace access token",
       "tokenRefused": "Bitbucket did not accept this workspace token. Check that it has the scopes above, then try again."
@@ -2251,6 +2252,8 @@
       "renameAccessibility": "Rename session: {{title}}",
       "cloningSession": "Cloning session",
       "couldNotLoadThisSession": "Couldn't load this session",
+      "historyTooLarge": "This session's transcript is too large to load.",
+      "historyUnavailable": "This session's transcript can't be read.",
       "cloneFailedRetry": "Couldn't clone this session. Try again.",
       "notEnoughCredits": "Not enough credits for this request. Add credits and try again.",
       "previousTaskFinishing": "The previous task is still finishing. Please wait a moment.",
@@ -2327,6 +2330,7 @@
       "branchDefault": "Default",
       "branchAccessibility": "Branch: {{label}}",
       "branchLoading": "Loading branches",
+      "branchInactive": "Choose a repository to load its branches",
       "branchLoadError": "Couldn't load branches",
       "branchUnavailable": "Branches aren't available for this repository. Check your access with the provider, then pick another repository.",
       "branchEmpty": "No branches available",
@@ -2779,7 +2783,7 @@
       "subjectDoomLoop": "repeated tool calls",
       "subjectAgentManager": "agent management",
       "subjectSandboxEscalation": "host access",
-      "appliesTo": "Applies to:",
+      "appliesTo": "Applies to",
       "denyPermission": "Deny permission",
       "deny": "Deny",
       "allowOnce": "Allow Once",
@@ -3130,8 +3134,7 @@
     "imagesSectionEmpty": "No trusted image hosts",
     "revoke": "Revoke {{host}}",
     "revokeMessage": "Links to this host will ask for confirmation again.",
-    "revokeImageMessage": "Images from this host will ask for confirmation again.",
-    "backToPreferences": "Back to preferences"
+    "revokeImageMessage": "Images from this host will ask for confirmation again."
   },
   "forceUpdate": {
     "couldNotOpenStore": "Could not open the app store.",
@@ -3142,7 +3145,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Couldn't load sessions",
-    "couldNotLoadActiveSessions": "Couldn't load active sessions",
     "agentSessions": "Live now",
     "newCodingTask": "New coding task",
     "newTaskFromPicture": "New task from a picture",
@@ -3512,6 +3514,7 @@
       "title": "Credit activity",
       "transactionFallback": "Credit transaction",
       "truncated": "Older credit activity is available.",
+      "retentionLimit": "Showing the most recent credit activity.",
       "category": {
         "organization_custom": "Organization custom",
         "parent_to_child_transfer_in": "Parent to child transfer in",
@@ -3545,6 +3548,7 @@
       "emptyTitle": "No invoices",
       "invoiceFallback": "Invoice",
       "truncated": "Older invoices are available.",
+      "retentionLimit": "Showing the most recent invoices.",
       "title": "Invoices",
       "downloadFailed": "Couldn't download invoice. Check your connection and try again.",
       "sharingUnavailable": "Sharing is not available on this device.",
@@ -3953,6 +3957,8 @@
       "downloading": "Downloading: {{written}} of {{total}}",
       "downloadingUnknown": "Downloading: {{written}}",
       "paused": "Paused: {{written}} of {{total}}",
+      "retrying": "Retrying: {{written}} of {{total}}",
+      "retryingUnknown": "Retrying: {{written}}",
       "verifying": "Checking the downloaded file…",
       "downloaded": "Downloaded · {{size}}",
       "url": "Direct download link",
@@ -4043,7 +4049,9 @@
         "androidModelUnavailable": "This device doesn't support Gemini Nano, or the AICore system app is still setting up. Try again later.",
         "aicoreUpdateRequired": "Update the AICore app and your system software to use this model.",
         "downloadable": "This model needs a one-time download before you can use it.",
-        "downloading": "The model is downloading. It'll be ready when the download finishes."
+        "downloading": "The model is downloading. It'll be ready when the download finishes.",
+        "batteryQuota": "The on-device model has used its battery allowance for now. Try again later.",
+        "checkFailed": "The app couldn't check this model. Try again."
       },
       "unavailable": "The on-device model isn't available right now. Check its status in $t(modelChat.backends.title).",
       "busy": "The on-device model is busy with another reply. Try again when it finishes.",
@@ -4473,7 +4481,8 @@
       "purchaseFallback": "Credit purchase",
       "receipt": "Receipt",
       "receiptA11y": "Open the receipt for {{description}}, {{amount}}, from {{date}}",
-      "receiptUnavailable": "A receipt is not available for this purchase."
+      "receiptUnavailable": "A receipt is not available for this purchase.",
+      "retentionLimit": "Showing the most recent credit history."
     },
     "title": "Buy credits",
     "description": "Credits are a one-time purchase added to your Kilo balance for running AI coding sessions in Kilo App. The store charges your account and credits are added after the store confirms payment.",
@@ -4630,6 +4639,9 @@
     "couldNotLoad": "Could not load integrations",
     "permissionDenied": "You do not have permission to manage these integrations.",
     "managedByOwner": "Ask an organization owner to change connections you can't edit.",
+    "managedByOwnerOrAdmin": "Ask an organization owner or admin to change connections you can't edit.",
+    "managedByOwnerOrBilling": "Ask an organization owner or billing manager to change connections you can't edit.",
+    "managedByOwnerAdminOrBilling": "Ask an organization owner, admin, or billing manager to change connections you can't edit.",
     "connectFailed": "Could not open the connection page"
   },
   "invoices": {
@@ -4666,7 +4678,7 @@
       "new": "New trigger",
       "create": "Create trigger",
       "emptyTitle": "No triggers yet",
-      "emptyDescription": "Create a trigger to start a Cloud Agent run from a webhook call or on a schedule.",
+      "emptyDescription": "Create your first trigger.",
       "loadFailedTitle": "Couldn't load triggers",
       "loadFailedDescription": "Try again when you have a connection.",
       "detailLoadFailedTitle": "Couldn't load this trigger",

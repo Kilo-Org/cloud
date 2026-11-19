@@ -5,7 +5,10 @@ import { type QueryErrorVariant } from '@/components/query-error';
 
 import { type MessageFailure } from './message-failure-state';
 import { isSafeFailureMessage } from './safe-failure-messages';
-import { TERMINAL_SESSION_HISTORY_FAILURE_MESSAGES } from './session-history-failures';
+import {
+  isTerminalSessionHistoryFailure,
+  sessionHistoryFailureCopyKey,
+} from './session-history-failures';
 
 /**
  * Terminal error class for a session startup failure. The session manager's
@@ -26,9 +29,10 @@ export type TerminalErrorClass =
 /**
  * Classify a terminal session error message. Matches the session manager's
  * `formatError` output strings, which are English and never translated —
- * the class is what the screen renders its own copy from. Unknown text is
- * `'unknown'`, which shows the generic message and offers no retry (safer
- * than a fake one).
+ * the class is what the screen renders its own copy from. A typed transcript
+ * read failure never reaches here: its kind decides retry-vs-terminal before
+ * this runs. Unknown text is `'unknown'`, which shows the generic message and
+ * offers no retry (safer than a fake one).
  *
  * The credits phrase is matched case-insensitively: the Durable Object's safe
  * projection writes `Assistant request failed: insufficient credits`
@@ -395,10 +399,11 @@ export function describeSessionRuntimeFailure(message: string): SessionRuntimeFa
  * Resolve the terminal error for a session with no messages. Returns `null`
  * when there is nothing terminal to show (loading, empty, or a live session).
  *
- * Precedence: a populated transcript never shows a terminal error; an
- * `errorAtom` value is a retryable server failure; a lost agent transport is a
- * retryable connection failure; any other `statusIndicator` of type `error` is
- * classified by its message.
+ * Precedence: a populated transcript never shows a terminal error; a typed
+ * transcript-read failure a retry cannot recover is terminal with its own
+ * copy; any other `errorAtom` value is a retryable server failure; a lost
+ * agent transport is a retryable connection failure; any other
+ * `statusIndicator` of type `error` is classified by its message.
  *
  * A failed preparation row counts as content. A run whose sandbox preparation
  * failed has zero messages, so `messageCount` alone reads it as a failed open:
@@ -410,7 +415,7 @@ export function describeSessionRuntimeFailure(message: string): SessionRuntimeFa
  * `connectionLost` is the app-wide transport leg's answer (`reconnectExhausted`)
  * for a session whose own status atom carries nothing yet. It only counts while
  * nothing has loaded: a transcript already on screen keeps its rows and its own
- * status line instead of being replaced by a full-screen error.
+ * status line.
  */
 export function resolveSessionTerminalError(input: {
   error: string | null;
@@ -418,6 +423,11 @@ export function resolveSessionTerminalError(input: {
   messageCount: number;
   hasFailedPreparation: boolean;
   connectionLost?: boolean;
+  /**
+   * The typed transcript-read failure the manager recorded with `error`, when
+   * it carries one. The kind decides the branch; the string stays untyped.
+   */
+  historyFailureKind?: 'retryable_failure' | 'too_large' | 'invalid_data' | null;
 }): SessionTerminalError | null {
   // A session with rows on screen is not a failed open. A failed preparation
   // group is the run's own statement of what went wrong, with the failed stage
@@ -429,20 +439,14 @@ export function resolveSessionTerminalError(input: {
   if (input.error !== null) {
     // The atom carries the transport's own English text: an SDK fixed string,
     // or a server failure the transport forwards. Show the reader translated
-    // copy and keep the original for the clipboard.
-    //
-    // The class decides the Retry. A typed transcript failure that a retry
-    // cannot recover (the stored page is oversize or unreadable) answers the
-    // same way every time; a denial, an empty wallet, a model the agent cannot
-    // use and a session the server no longer has each need the reader to
-    // change something first. Those keep their own copy and offer no Retry,
-    // which could only repeat them. An unclassifiable failure keeps its Retry:
-    // only the transport can recover one the app cannot name.
-    if (TERMINAL_SESSION_HISTORY_FAILURE_MESSAGES.includes(input.error)) {
+    // copy and keep the original for the clipboard. The class decides the
+    // Retry for a transport failure; the typed transcript-read failure is
+    // decided by its kind instead, ahead of the classification.
+    if (isTerminalSessionHistoryFailure(input.historyFailureKind)) {
       return {
         variant: 'server',
         title: i18n.t('agentChat.session.couldNotLoadThisSession'),
-        message: i18n.t('agentChat.session.failedToLoadDetails'),
+        message: i18n.t(sessionHistoryFailureCopyKey(input.historyFailureKind)),
         retryable: false,
         retryWith: 'session',
         detail: input.error,

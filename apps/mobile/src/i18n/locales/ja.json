@@ -376,7 +376,7 @@
       "added": "キーを追加しました",
       "updated": "キーを更新しました",
       "emptyTitle": "プロバイダーキーがありません",
-      "emptyDescription": "キーを追加して始める。",
+      "emptyDescription": "キーを追加して始めましょう。",
       "chooseProvider": "プロバイダーを選択",
       "searchProviders": "プロバイダーを検索",
       "noProvidersTitle": "一致するプロバイダーがありません",
@@ -695,8 +695,9 @@
       "notConnectedReadOnly": "Bitbucketが接続されていません。接続できるのは組織のオーナー、管理者、請求管理者のみです。"
     },
     "bitbucketConnect": {
-      "managedOnWeb": "この組織のBitbucket接続は、パソコンからWebで管理されています。",
-      "description": "必要なスコープを指定してワークスペースアクセストークンを作成し、下に貼り付けてください。",
+      "managedOnWeb": "{{organization}}のBitbucket接続は、パソコンからWebで管理されています。",
+      "description": "{{organization}}用のワークスペースアクセストークンを作成し、下に貼り付けてください。",
+      "descriptionReconnect": "{{organization}}用の新しいワークスペースアクセストークンを作成し、下に貼り付けてください。",
       "scopes": "アカウント：読み取り、リポジトリ：読み取り・書き込み、プルリクエスト：読み取り、Webhook：読み取り・書き込み",
       "tokenPlaceholder": "ワークスペースアクセストークン",
       "tokenRefused": "Bitbucketはこのワークスペースアクセストークンを受け付けませんでした。上記のスコープが付与されていることを確認してから、もう一度お試しください。"
@@ -1605,6 +1606,8 @@
       "renameAccessibility": "セッション「{{title}}」の名前を変更",
       "cloningSession": "セッションを複製中",
       "couldNotLoadThisSession": "このセッションを読み込めませんでした。",
+      "historyTooLarge": "このセッションの履歴は大きすぎて読み込めません。",
+      "historyUnavailable": "このセッションの履歴を読み取れません。",
       "cloneFailedRetry": "このセッションを複製できませんでした。もう一度お試しください。",
       "notEnoughCredits": "このリクエストに必要なクレジットが不足しています。クレジットを追加して、もう一度お試しください。",
       "previousTaskFinishing": "前のタスクの終了処理中です。少々お待ちください。",
@@ -1681,6 +1684,7 @@
       "branchDefault": "デフォルト",
       "branchAccessibility": "ブランチ: {{label}}",
       "branchLoading": "ブランチを読み込み中",
+      "branchInactive": "リポジトリを選択すると、そのブランチが読み込まれます。",
       "branchLoadError": "ブランチを読み込めませんでした",
       "branchUnavailable": "このリポジトリではブランチが利用できません。プロバイダーでのアクセスを確認し、別のリポジトリを選択してください。",
       "branchEmpty": "利用可能なブランチがありません",
@@ -2483,7 +2487,6 @@
   },
   "home": {
     "couldNotLoadSessions": "セッションを読み込めませんでした。",
-    "couldNotLoadActiveSessions": "実行中のセッションを読み込めませんでした。",
     "agentSessions": "現在実行中",
     "newCodingTask": "新しいコーディングタスク",
     "newTaskFromPicture": "画像から新しいタスク",
@@ -2800,7 +2803,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "このアカウントにはまだ組織がありません。組織を作成または参加すると、Bitbucketのプルリクエストをレビューできるようになります。",
       "gitlabReconnectAdminOnlyDescription": "組織のオーナー、管理者、または請求管理者に再接続を依頼してください。",
       "bitbucketNotConnectedTitle": "Bitbucketが接続されていません",
-      "bitbucketAdminOnlyDescription": "接続できるのは組織のオーナー、管理者、請求管理者のみです。",
+      "adminOnlyConnectDescription": "接続できるのは組織のオーナー、管理者、請求管理者のみです。",
       "contextLine": "{{organization}}用",
       "contextLinePersonal": "個人用"
     },
@@ -3409,7 +3412,8 @@
         "accounting_adjustment": "会計調整",
         "credits_expired": "クレジット失効"
       },
-      "truncated": "これより前のクレジットの履歴も確認できます。"
+      "truncated": "これより前のクレジットの履歴も確認できます。",
+      "retentionLimit": "最新のクレジットの履歴を表示しています。"
     },
     "hub": {
       "balance": "残高",
@@ -3454,7 +3458,8 @@
         "void": "無効",
         "uncollectible": "回収不能"
       },
-      "truncated": "これより前の請求書も確認できます。"
+      "truncated": "これより前の請求書も確認できます。",
+      "retentionLimit": "最新の請求書を表示しています。"
     },
     "lowBalanceAlert": {
       "enableA11y": "残高アラートを有効にする",
@@ -3683,8 +3688,7 @@
     "imagesSectionEmpty": "信頼済み画像ホストはありません",
     "revoke": "{{host}}を信頼済みホストから削除",
     "revokeMessage": "このホストへのリンクは再び確認を求めます。",
-    "revokeImageMessage": "このホストの画像は再び確認を求めます。",
-    "backToPreferences": "設定に戻る"
+    "revokeImageMessage": "このホストの画像は再び確認を求めます。"
   },
   "glanceable": {
     "waiting": "エージェントの状態を更新中",
@@ -3931,6 +3935,8 @@
       "downloading": "ダウンロード中: {{written}} / {{total}}",
       "downloadingUnknown": "ダウンロード中: {{written}}",
       "paused": "一時停止中: {{written}} / {{total}}",
+      "retrying": "再試行中: {{written}} / {{total}}",
+      "retryingUnknown": "再試行中: {{written}}",
       "verifying": "ダウンロードしたファイルを確認しています…",
       "downloaded": "ダウンロード済み · {{size}}",
       "url": "直接ダウンロードリンク",
@@ -4021,7 +4027,9 @@
         "androidModelUnavailable": "このデバイスはGemini Nanoに対応していないか、AICoreシステムアプリがまだセットアップ中です。しばらくしてからもう一度お試しください。",
         "aicoreUpdateRequired": "このモデルを使用するには、AICoreアプリとシステムソフトウェアをアップデートしてください。",
         "downloadable": "このモデルを使用するには、初回のみダウンロードが必要です。",
-        "downloading": "モデルをダウンロード中です。ダウンロードが完了すると使用可能になります。"
+        "downloading": "モデルをダウンロード中です。ダウンロードが完了すると使用可能になります。",
+        "batteryQuota": "オンデバイスモデルは、いま使えるバッテリー枠を使い尽くしました。しばらくしてからもう一度お試しください。",
+        "checkFailed": "アプリがこのモデルを確認できませんでした。もう一度お試しください。"
       },
       "unavailable": "オンデバイスモデルは現在利用できません。$t(modelChat.backends.title)で状態を確認してください。",
       "busy": "オンデバイスモデルは別の返信を処理中です。完了してからもう一度お試しください。",
@@ -4382,7 +4390,8 @@
       "purchaseFallback": "クレジットの購入",
       "receipt": "領収書",
       "receiptA11y": "{{description}}、{{amount}}、{{date}}の領収書を開く",
-      "receiptUnavailable": "この購入の領収書はありません。"
+      "receiptUnavailable": "この購入の領収書はありません。",
+      "retentionLimit": "最新のクレジット履歴を表示しています。"
     },
     "title": "クレジットを購入",
     "description": "クレジットは、Kilo AppでAIコーディングセッションを実行するためにKilo残高に追加される買い切りの購入です。ストアがアカウントに請求し、ストアが支払いを確認した後にクレジットが追加されます。",
@@ -4630,6 +4639,9 @@
     "couldNotLoad": "連携を読み込めませんでした",
     "permissionDenied": "これらの連携を管理する権限がありません。",
     "managedByOwner": "変更できない接続については、組織のオーナーに変更を依頼してください。",
+    "managedByOwnerOrAdmin": "変更できない接続については、組織のオーナー、または管理者に変更を依頼してください。",
+    "managedByOwnerOrBilling": "変更できない接続については、組織のオーナー、または請求管理者に変更を依頼してください。",
+    "managedByOwnerAdminOrBilling": "変更できない接続については、組織のオーナー、管理者、または請求管理者に変更を依頼してください。",
     "connectFailed": "接続ページを開けませんでした"
   },
   "invoices": {
@@ -4666,7 +4678,7 @@
       "new": "新規トリガー",
       "create": "トリガーを作成",
       "emptyTitle": "トリガーはまだありません",
-      "emptyDescription": "ウェブフック呼び出しまたはスケジュールでCloud Agentの実行を開始するトリガーを作成します。",
+      "emptyDescription": "最初のトリガーを作成します。",
       "loadFailedTitle": "トリガーを読み込めませんでした",
       "loadFailedDescription": "接続があるときに再試行してください。",
       "detailLoadFailedTitle": "このトリガーを読み込めませんでした",

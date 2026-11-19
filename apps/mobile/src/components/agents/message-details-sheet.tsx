@@ -8,9 +8,15 @@ import { getLanguageSnapshot } from '@/i18n';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SheetHeader } from '@/components/sheet-header';
+import { Card } from '@/components/ui/card';
+import { KvRow } from '@/components/ui/kv-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useConfirmDialog } from '@/components/ui/dialog';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
@@ -91,14 +97,14 @@ export function MessageDetailsSheet({
         key={cancelQueuedFeedback?.attempt}
         message={visible ? (cancelQueuedFeedback?.message ?? null) : null}
         tone="error"
-        className="px-6 pt-4 text-sm"
+        className="px-4 pt-4 text-sm"
       />
       {/* Keep recovery guidance readable without replaying the outcome announcement. */}
       {visible &&
       message &&
       cancelQueuedGuidance &&
       cancelQueuedFeedback?.message !== cancelQueuedGuidance ? (
-        <Text className="px-6 pt-4 text-sm text-destructive">{cancelQueuedGuidance}</Text>
+        <Text className="px-4 pt-4 text-sm text-destructive">{cancelQueuedGuidance}</Text>
       ) : null}
       {selectVisible ? (
         <MessageTextSelectSheet
@@ -117,7 +123,10 @@ export function MessageDetailsSheet({
           />
 
           {content ? (
-            <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
+            <ScrollView
+              className="flex-1"
+              contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}
+            >
               {/* The two actions are independent: Copy is scoped to the message
                   text, while Select text also offers the thinking block and tool
                   output, so a message with only those parts still renders the
@@ -207,43 +216,40 @@ export function MessageDetailsSheet({
               ) : null}
 
               <View className="gap-4">
-                <Row label={t('common.role')}>
-                  <Text className="text-base font-medium text-foreground">{content.roleLabel}</Text>
-                </Row>
-
-                {content.sentTimeLabel ? (
-                  <Row label={t('agentChat.messageDetails.sent')}>
-                    <Text className="text-base font-medium text-foreground tabular-nums">
-                      {content.sentTimeLabel}
-                    </Text>
-                  </Row>
-                ) : null}
-
-                {content.modelLabel ? (
-                  <Row label={t('common.model')}>
+                <Card>
+                  <Row label={t('common.role')}>
                     <Text className="text-base font-medium text-foreground">
-                      {content.modelLabel}
+                      {content.roleLabel}
                     </Text>
                   </Row>
-                ) : null}
+
+                  {content.sentTimeLabel ? (
+                    <Row label={t('agentChat.messageDetails.sent')}>
+                      <Text className="text-base font-medium text-foreground tabular-nums">
+                        {content.sentTimeLabel}
+                      </Text>
+                    </Row>
+                  ) : null}
+
+                  {content.modelLabel ? (
+                    <Row label={t('common.model')}>
+                      <Text className="text-base font-medium text-foreground">
+                        {content.modelLabel}
+                      </Text>
+                    </Row>
+                  ) : null}
+                </Card>
               </View>
 
               {content.costLabel && content.tokenRows ? (
-                <View className="mt-8 gap-4">
-                  <Text className="text-sm font-semibold text-foreground">
-                    {t('agentChat.messageDetails.costAndTokens')}
-                  </Text>
-                  <Row label={t('common.cost')}>
-                    <Text className="text-base font-medium text-foreground tabular-nums">
-                      {content.costLabel}
-                    </Text>
-                  </Row>
-                  <View className="gap-3">
+                <Section label={t('agentChat.messageDetails.costAndTokens')}>
+                  <RowGroup>
+                    <KvRow label={t('common.cost')} value={content.costLabel} valueFace="numeric" />
                     {content.tokenRows.map(row => (
                       <TokenRow key={row.label} label={row.label} value={row.value} />
                     ))}
-                  </View>
-                </View>
+                  </RowGroup>
+                </Section>
               ) : null}
             </ScrollView>
           ) : null}

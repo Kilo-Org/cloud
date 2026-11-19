@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "دا حساب تر اوسه هېڅ سازمان نه لري. د Bitbucket پل ریکویسټونو بیاکتنه به وشي چې یو وخت تاسو یو سازمان جوړ کړئ یا یو سازمان ته ورشئ.",
       "gitlabReconnectAdminOnlyDescription": "له یو سازمان مالک، مدیر، یا د بلونو مدیر څخه وغواړئ چې دا بیا ونښلوي.",
       "bitbucketNotConnectedTitle": "Bitbucket نښلول شوی نه دی",
-      "bitbucketAdminOnlyDescription": "یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي دا ونښلوي.",
+      "adminOnlyConnectDescription": "یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي دا ونښلوي.",
       "contextLine": "{{organization}} لپاره",
       "contextLinePersonal": "ستاسو د شخصي حساب لپاره"
     },
@@ -1385,8 +1385,9 @@
       "notConnectedReadOnly": "Bitbucket نښلول شوی نه دی. یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي دا ونښلوي."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "د دې سازمان د Bitbucket اړیکه له کمپیوټر څخه په وېب کې اداره کېږي.",
-      "description": "د کاري چاپېریال لپاره د اړینو اجازو لرونکی لاسرسي ټوکن جوړ کړئ او لاندې یې پیسټ کړئ.",
+      "managedOnWeb": "د {{organization}} د Bitbucket اړیکه له کمپیوټر څخه په وېب کې اداره کېږي.",
+      "description": "د کاري چاپېریال د لاسرسي ټوکن {{organization}} لپاره جوړ کړئ او لاندې یې پیسټ کړئ.",
+      "descriptionReconnect": "د کاري چاپېریال د لاسرسي یو نوی ټوکن {{organization}} لپاره جوړ کړئ او لاندې یې پیسټ کړئ.",
       "scopes": "حساب: لوستل · زېرمتونونه: لوستل/لیکل · PR: لوستل · وېب هوکونه: لوستل/لیکل",
       "tokenPlaceholder": "د کاري چاپېریال د لاسرسي ټوکن",
       "tokenRefused": "Bitbucket دا د کاري چاپېریال د لاسرسي ټوکن ونه منل. وګورئ چې پورتنۍ اجازې لري، بیاځلي هڅه وکړئ."
@@ -2160,6 +2161,8 @@
       "renameAccessibility": "د ناستې نوم بدل کړئ: {{title}}",
       "cloningSession": "د ناستې کاپي جوړېږي",
       "couldNotLoadThisSession": "دا ناسته بار نه شوه.",
+      "historyTooLarge": "د دې ناستې لیکن د بارولو لپاره ډېره لویه ده.",
+      "historyUnavailable": "د دې ناستې لیکن نه شي لوستل کېدای.",
       "cloneFailedRetry": "د دې ناستې کاپي جوړه نه شوه. بیا هڅه وکړئ.",
       "notEnoughCredits": "د دې غوښتنې لپاره کافي کریډیټ نشته. کریډیټ زیات کړئ او بیا هڅه وکړئ.",
       "previousTaskFinishing": "مخکینۍ دنده لا د بشپړېدو په حال کې ده. یوه شېبه صبر وکړئ.",
@@ -2236,6 +2239,7 @@
       "branchDefault": "ډیفالټ",
       "branchAccessibility": "څانګه: {{label}}",
       "branchLoading": "څانګې بارېږي",
+      "branchInactive": "د څانګو د بارولو لپاره یو زېرمتون وټاکئ.",
       "branchLoadError": "څانګې بار نه شوې",
       "branchUnavailable": "د دې زېرمتون لپاره څانګې شتون نلري. له چمتو کوونکي سره خپل لاسرسی وګورئ، بیا بل زېرمتون وټاکئ.",
       "branchEmpty": "هېڅ څانګه شتون نلري",
@@ -3038,7 +3042,6 @@
   },
   "home": {
     "couldNotLoadSessions": "ناستې بار نه شوې.",
-    "couldNotLoadActiveSessions": "فعالې ناستې بار نه شوې.",
     "agentSessions": "اوس روانې",
     "newCodingTask": "د کوډ کولو نوې دنده",
     "newTaskFromPicture": "له انځور څخه نوې دنده",
@@ -3417,7 +3420,8 @@
         "accounting_adjustment": "د محاسبې سمون",
         "credits_expired": "د کریډیټ موده پای ته رسېدلې"
       },
-      "truncated": "د کریډیټ پخوانی فعالیت هم شته."
+      "truncated": "د کریډیټ پخوانی فعالیت هم شته.",
+      "retentionLimit": "تر ټولو وروستی د کریډیټ فعالیت ښودل کېږي."
     },
     "inviteMember": {
       "emailError": "د برېښنالیک سمه پته ولیکئ.",
@@ -3449,7 +3453,8 @@
         "void": "لغوه شوی",
         "uncollectible": "نه وصولېدونکی"
       },
-      "truncated": "پخواني بلونه هم شته."
+      "truncated": "پخواني بلونه هم شته.",
+      "retentionLimit": "تر ټولو وروستي بلونه ښودل کېږي."
     },
     "lowBalanceAlert": {
       "enableA11y": "د کم بیلانس خبرتیا فعاله کړئ",
@@ -3683,8 +3688,7 @@
     "imagesSectionEmpty": "هېڅ باوري انځور کوربه نشته",
     "revoke": "پر {{host}} باور لغوه کړئ",
     "revokeMessage": "د دې کوربه لینکونه به بیا د تایید غوښتنه وکړي.",
-    "revokeImageMessage": "د دې کوربه انځورونه به بیا د تایید غوښتنه وکړي.",
-    "backToPreferences": "بېرته تنظیماتو ته ورشئ"
+    "revokeImageMessage": "د دې کوربه انځورونه به بیا د تایید غوښتنه وکړي."
   },
   "glanceable": {
     "waiting": "اجنټان تازه کېږي",
@@ -3931,6 +3935,8 @@
       "downloading": "ډاونلوډ کېږي: {{written}} له {{total}}",
       "downloadingUnknown": "ډاونلوډ کېږي: {{written}}",
       "paused": "ودرول شو: {{written}} له {{total}}",
+      "retrying": "بیا هڅه کېږي: {{written}} له {{total}}",
+      "retryingUnknown": "بیا هڅه کېږي: {{written}}",
       "verifying": "د ډاونلوډ شوي فایل کتنه روانه ده…",
       "downloaded": "ډاونلوډ شو · {{size}}",
       "url": "د ډاونلوډ مستقیم لینک",
@@ -4021,7 +4027,9 @@
         "androidModelUnavailable": "دا وسیله د Gemini Nano ملاتړ نه کوي، یا د AICore سیسټم اپ لا هم چمتو کېږي. وروسته بیا هڅه وکړئ.",
         "aicoreUpdateRequired": "د دې ماډل د کارولو لپاره د AICore اپ او د خپل سیسټم سافټویر تازه کړئ.",
         "downloadable": "دا ماډل د کارولو مخکې یو ځل ښکته کولو ته اړتیا لري.",
-        "downloading": "ماډل ښکته کېږي. کله چې ښکته کول پای ته ورسي، چمتو به وي."
+        "downloading": "ماډل ښکته کېږي. کله چې ښکته کول پای ته ورسي، چمتو به وي.",
+        "batteryQuota": "په وسیله کې ماډل اوسمهال خپله د بیټرۍ ونډه کارولې ده. وروسته بیا هڅه وکړئ.",
+        "checkFailed": "اپلیکیشن ونه توانېد دې ماډل کتنه وکړي. بیا هڅه وکړئ."
       },
       "unavailable": "په وسیله کې ماډل اوس مهال شتون نه لري. د هغه حالت په $t(modelChat.backends.title) کې وګورئ.",
       "busy": "په وسیله کې ماډل د بل ځواب په لیکلو بوخت دی. کله چې پای ته ورسي، بیا هڅه وکړئ.",
@@ -4382,7 +4390,8 @@
       "purchaseFallback": "د کریډیټ پېرود",
       "receipt": "رسید",
       "receiptA11y": "د {{description}}، {{amount}}، {{date}} رسید پرانیزئ",
-      "receiptUnavailable": "د دې پېرود لپاره رسید نشته."
+      "receiptUnavailable": "د دې پېرود لپاره رسید نشته.",
+      "retentionLimit": "تر ټولو وروستې د کریډیټ تاریخچه ښودل کېږي."
     },
     "title": "کریډیټ وپېرئ",
     "description": "کریډیټ یو ځل پېرود دی چې ستاسو Kilo توازن ته په Kilo App کې د AI کوډ کولو ناستو چلولو لپاره زیاتېږي. پلورنځی ستاسو له حساب څخه پیسې اخلي او کریډیټ وروسته له هغه زیاتېږي چې پلورنځی تادیه تایید کړي.",
@@ -4630,6 +4639,9 @@
     "couldNotLoad": "ادغامونه راوړل نه شول",
     "permissionDenied": "تاسو د دې ادغامونو د مدیریت اجازه نه لرئ.",
     "managedByOwner": "د سازمان له مالک څخه وغواړئ چې هغه اړیکه بدله کړي چې تاسو یې نشئ کولی بدله کړئ.",
+    "managedByOwnerOrAdmin": "د سازمان له مالک، یا مدیر څخه وغواړئ چې هغه اړیکه بدله کړي چې تاسو یې نشئ کولی بدله کړئ.",
+    "managedByOwnerOrBilling": "د سازمان له مالک، یا د بلونو مدیر څخه وغواړئ چې هغه اړیکه بدله کړي چې تاسو یې نشئ کولی بدله کړئ.",
+    "managedByOwnerAdminOrBilling": "د سازمان له مالک، مدیر، یا د بلونو مدیر څخه وغواړئ چې هغه اړیکه بدله کړي چې تاسو یې نشئ کولی بدله کړئ.",
     "connectFailed": "د نښلولو پاڼه پرانیستل نه شوه"
   },
   "invoices": {
@@ -4666,7 +4678,7 @@
       "new": "نوی ټرېګر",
       "create": "ټرېګر جوړ کړئ",
       "emptyTitle": "تر اوسه هېڅ ټرېګر نشته",
-      "emptyDescription": "یو ټرېګر جوړ کړئ ترڅو د ویب‌هوک غوښتنې یا مهالویش له مخې د Cloud Agent چل پیل کړئ.",
+      "emptyDescription": "خپل لومړی ټرېګر جوړ کړئ.",
       "loadFailedTitle": "ټرېګرونه بار نشول",
       "loadFailedDescription": "کله چې اړیکه ولرئ بیا هڅه وکړئ.",
       "detailLoadFailedTitle": "دا ټرېګر بار نشو",

@@ -91,6 +91,11 @@ vi.mock('@/lib/trpc', () => ({
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
+vi.mock('@/lib/utils', () => ({
+  cn: (...classes: unknown[]) => classes.filter(Boolean).join(' '),
+}));
+
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
 vi.mock('@/lib/hooks/use-available-models', () => ({

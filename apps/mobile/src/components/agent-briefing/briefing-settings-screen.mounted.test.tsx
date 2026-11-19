@@ -41,9 +41,15 @@ const state = vi.hoisted(() => ({
 
 vi.mock('react-native', () => ({ View: 'View', ScrollView: 'ScrollView' }));
 vi.mock('expo-router', () => ({}));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+  // The screen's `cn` from `@/lib/utils` imports the i18n instance, whose
+  // plugin registration needs the mock to carry this export too.
+  initReactI18next: { type: '3rdParty', init: () => undefined },
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/ui/section', () => ({ Section: 'Section' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
@@ -138,7 +144,7 @@ it('reserves the settings card while the first read is pending', () => {
 
   const skeletons = mounted.root.findAllByType('Skeleton');
   expect(skeletons).toHaveLength(1);
-  expect(skeletons[0]?.props.className).toBe('h-96 rounded-2xl');
+  expect(skeletons[0]?.props.className).toBe('h-96 rounded-xl');
   expect(mounted.root.findAllByType('ScrollView')).toHaveLength(0);
   expect(mounted.root.findAllByType('QueryError')).toHaveLength(0);
 });

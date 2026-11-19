@@ -11,8 +11,8 @@ import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
-import { Newspaper } from '@/components/ui/icons';
-import { RefreshControl } from '@/components/ui/refresh-control';
+import { IconButton } from '@/components/ui/icon-button';
+import { Newspaper, Settings } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
@@ -24,6 +24,7 @@ import {
 } from '@/lib/agent-briefing';
 import { briefingAccessDenied, selectBriefingListPhase } from '@/lib/agent-briefing-state';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useBriefingListFilters } from '@/lib/hooks/use-briefing-list-filters';
 import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
@@ -34,6 +35,7 @@ export function BriefingListScreen() {
   const trpc = useTRPC();
   const router = useRouter();
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const access = useBriefingAccess();
   const offline = useOfflineBannerState();
   const { history, setHistory, organizationId, setOrganizationId } = useBriefingListFilters();
@@ -98,7 +100,6 @@ export function BriefingListScreen() {
     phase === 'empty' && !emptySettingsAction
       ? t(history ? 'agentBriefing.historyHint' : 'agentBriefing.emptyHint')
       : undefined;
-  const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />;
   let footer = <View className="h-8" />;
   if (query.isFetchNextPageError) {
     footer = (
@@ -122,15 +123,14 @@ export function BriefingListScreen() {
         backFallback={'/(app)/(tabs)/(0_home)' as Href}
         headerRight={
           emptySettingsAction ? undefined : (
-            <Button
-              variant="ghost"
-              size="sm"
+            <IconButton
+              accessibilityLabel={t('agentBriefing.settings')}
               onPress={() => {
                 router.push(`${BRIEFING_PATH}/settings` as Href);
               }}
             >
-              <Text>{t('agentBriefing.settings')}</Text>
-            </Button>
+              <Settings size={20} color={colors.mutedForeground} />
+            </IconButton>
           )
         }
       />
@@ -174,15 +174,11 @@ export function BriefingListScreen() {
           }}
         />
       )}
-      {/* The empty state owns the body so the shared centered form measures the
-          band the header and the filters leave, instead of sitting at the top
-          of a list that has nothing to scroll. */}
       {phase === 'empty' && (
         <EmptyState
           icon={Newspaper}
           title={t(emptyLabel)}
           description={emptyDescription}
-          refreshControl={refreshControl}
           action={
             emptySettingsAction ? (
               <Button

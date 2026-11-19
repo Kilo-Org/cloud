@@ -100,6 +100,26 @@ describe('buildFrameEnv', () => {
     expect(result.secretEnvKeys).toEqual([]);
   });
 
+  it('omits a session-identity name the spec did not carry', () => {
+    const result = buildFrameEnv({
+      specEnv: {},
+      encryptedSecrets: { SESSION_HOME: secret('/tmp/other-home') },
+      privateKey,
+    });
+    expect(Object.hasOwn(result.env ?? {}, 'SESSION_HOME')).toBe(false);
+    expect(result.secretEnvKeys).toEqual([]);
+  });
+
+  it('keeps a session-identity name the pre-overlay spec already carried', () => {
+    const result = buildFrameEnv({
+      specEnv: { SESSION_HOME: '/home/session' },
+      encryptedSecrets: { SESSION_HOME: secret('/tmp/other-home') },
+      privateKey,
+    });
+    expect(Object.hasOwn(result.env ?? {}, 'SESSION_HOME')).toBe(true);
+    expect(result.secretEnvKeys).toEqual(['SESSION_HOME']);
+  });
+
   it('keeps a secret name the grant did not issue and the spec did not carry', () => {
     const result = buildFrameEnv({
       specEnv: {},

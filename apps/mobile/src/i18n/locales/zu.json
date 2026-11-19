@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Le akhawunti ayikaze ibe nezinhlangano. Uma usuka inhlangano noma ungena kuyinhlangano, uzokwazi ukubuyekeza ama-PR e-Bitbucket.",
       "gitlabReconnectAdminOnlyDescription": "Cela umnikazi, umlawuli, noma umphathi wokukhokha wenhlangano ukuxhuma kabusha.",
       "bitbucketNotConnectedTitle": "I-Bitbucket ayixhunyiwe",
-      "bitbucketAdminOnlyDescription": "Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangayixhuma.",
+      "adminOnlyConnectDescription": "Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangayixhuma.",
       "contextLine": "Ku-{{organization}}",
       "contextLinePersonal": "Kwokomuntu siqu"
     },
@@ -1385,8 +1385,9 @@
       "notConnectedReadOnly": "I-Bitbucket ayixhunyiwe. Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangayixhuma."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Uxhumano lwe-Bitbucket lwale nhlangano luphathwa kuwebhu ngekhompyutha.",
-      "description": "Dala ithokheni yokufinyelela endaweni yokusebenza enezimvume ezidingekayo bese uyinamathisela ngezansi.",
+      "managedOnWeb": "Uxhumano lwe-Bitbucket lwe-{{organization}} luphathwa kuwebhu ngekhompyutha.",
+      "description": "Dala ithokheni yokufinyelela endaweni yokusebenza ka-{{organization}}, bese uyinamathisela ngezansi.",
+      "descriptionReconnect": "Dala ithokheni entsha yokufinyelela endaweni yokusebenza ka-{{organization}}, bese uyinamathisela ngezansi.",
       "scopes": "I-akhawunti: ukufunda · Izinqolobane zekhodi: ukufunda/ukubhala · Izicelo zokuhlanganisa ikhodi: ukufunda · Ama-webhook: ukufunda/ukubhala",
       "tokenPlaceholder": "Ithokheni yokufinyelela endaweni yokusebenza",
       "tokenRefused": "I-Bitbucket ayikwamukelanga le thokheni yokufinyelela endaweni yokusebenza. Hlola ukuthi inazo izimvume ezingenhla, bese uzama futhi."
@@ -2160,6 +2161,8 @@
       "renameAccessibility": "Qamba kabusha iseshini: {{title}}",
       "cloningSession": "Iseshini iyakopishwa",
       "couldNotLoadThisSession": "Asikwazanga ukulayisha le seshini.",
+      "historyTooLarge": "Umyalezo wale seshini mude kakhulu ukuthi ulayishwe.",
+      "historyUnavailable": "Iyalelephu wale seshini ayikwazi ukufundwa.",
       "cloneFailedRetry": "Asikwazanga ukwenza ikhophi yale seshini. Zama futhi.",
       "notEnoughCredits": "Awekho amakhredithi anele kulesi sicelo. Engeza amakhredithi bese uzama futhi.",
       "previousTaskFinishing": "Umsebenzi wangaphambilini usaphethwa. Sicela ulinde isikhashana.",
@@ -2236,6 +2239,7 @@
       "branchDefault": "Okuzenzakalelayo",
       "branchAccessibility": "Igatsha: {{label}}",
       "branchLoading": "Kulayishwa amagatsha",
+      "branchInactive": "Khetha inqolobane yekhodi ukuze kulayishwe amagatsha ayo.",
       "branchLoadError": "Kwehlulekile ukulayisha amagatsha",
       "branchUnavailable": "Amagatsha awatholakali kule nqolobane yekhodi. Hlola ukufinyelela kwakho kumhlinzeki, bese ukhetha enye inqolobane yekhodi.",
       "branchEmpty": "Akukho gatsha elitholakalayo",
@@ -3038,7 +3042,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Asikwazanga ukulayisha amaseshini.",
-    "couldNotLoadActiveSessions": "Asikwazanga ukulayisha amaseshini asebenzayo.",
     "agentSessions": "Okusebenza manje",
     "newCodingTask": "Umsebenzi omusha wokubhala ikhodi",
     "newTaskFromPicture": "Umsebenzi omusha ovela esithombeni",
@@ -3417,7 +3420,8 @@
         "accounting_adjustment": "Ukulungiswa kwezimali",
         "credits_expired": "Amakhredithi aphelelwe yisikhathi"
       },
-      "truncated": "Umnyakazo wamakhredithi wangaphambili uyatholakala."
+      "truncated": "Umnyakazo wamakhredithi wangaphambili uyatholakala.",
+      "retentionLimit": "Kuboniswa umnyakazo wamakhredithi wakamuva."
     },
     "inviteMember": {
       "emailError": "Faka ikheli le-imeyili elivumelekile.",
@@ -3449,7 +3453,8 @@
         "void": "Ikhanseliwe",
         "uncollectible": "Ayisakhokheleki"
       },
-      "truncated": "Ama-invoyisi amadala ayatholakala."
+      "truncated": "Ama-invoyisi amadala ayatholakala.",
+      "retentionLimit": "Kuboniswa ama-invoyisi akamuva."
     },
     "lowBalanceAlert": {
       "enableA11y": "Vula isaziso sebhalansi ephansi",
@@ -3683,8 +3688,7 @@
     "imagesSectionEmpty": "Awekho abasingathi bezithombe abathenjwayo",
     "revoke": "Hoxisa ukwethenjwa kuka-{{host}}",
     "revokeMessage": "Izixhumanisi eziya kulo msingathi zizocela imvume futhi.",
-    "revokeImageMessage": "Izithombe ezivela kulo msingathi zizocela imvume futhi.",
-    "backToPreferences": "Buyela ezilungiselelweni"
+    "revokeImageMessage": "Izithombe ezivela kulo msingathi zizocela imvume futhi."
   },
   "glanceable": {
     "waiting": "Kubuyekezwa ama-ejenti",
@@ -3931,6 +3935,8 @@
       "downloading": "Iyalandwa: {{written}} kwe-{{total}}",
       "downloadingUnknown": "Iyalandwa: {{written}}",
       "paused": "Kumisiwe: {{written}} kwe-{{total}}",
+      "retrying": "Kuzamiwa futhi: {{written}} kwe-{{total}}",
+      "retryingUnknown": "Kuzamiwa futhi: {{written}}",
       "verifying": "Kuhlolwa ifayela elilandiwe…",
       "downloaded": "Kulandiwe · {{size}}",
       "url": "Isixhumanisi sokulanda ngqo",
@@ -4021,7 +4027,9 @@
         "androidModelUnavailable": "Le divayisi ayiyisekeli i-Gemini Nano, noma uhlelo lwesistimu lwe-AICore lusalungiswa. Zama futhi emuva kwesikhathi.",
         "aicoreUpdateRequired": "Buyekeza uhlelo lwe-AICore nesofthiwe yesistimu yakho ukuze usebenzise le modeli.",
         "downloadable": "Le modeli idinga ukudawunilodwa kanye kuphela ngaphambi kokuthi uyisebenzise.",
-        "downloading": "Imodeli iyadawunilodwa. Izolunga uma ukudawuniloda sekuqedile."
+        "downloading": "Imodeli iyadawunilodwa. Izolunga uma ukudawuniloda sekuqedile.",
+        "batteryQuota": "Imodeli esedivayisini isisebenzise isabelo sayo sebhethri okwamanje. Zama futhi emuva kwesikhathi.",
+        "checkFailed": "I-app ayikwazanga ukuhlola le modeli. Zama futhi."
       },
       "unavailable": "Imodeli esedivayisini ayitholakali okwamanje. Hlola isimo sayo ku-$t(modelChat.backends.title).",
       "busy": "Imodeli esedivayisini isamatasa nenye impendulo. Zama futhi uma isiqedile.",
@@ -4382,7 +4390,8 @@
       "purchaseFallback": "Ukuthengwa kwamakhredithi",
       "receipt": "Irisidi",
       "receiptA11y": "Vula irisidi ye-{{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Ayikho irisidi etholakalayo yalokhu kuthenga."
+      "receiptUnavailable": "Ayikho irisidi etholakalayo yalokhu kuthenga.",
+      "retentionLimit": "Kuboniswa umlando wamakhredithi wakamuva."
     },
     "title": "Thenga amakhredithi",
     "description": "Amakhredithi ukuthenga kwesikhathi esisodwa okwengezwa kubhalansi yakho ye-Kilo ukuze usebenzise amaseshini okubhala ikhodi e-AI ku-Kilo App. Isitolo sikhokhisa i-akhawunti yakho futhi amakhredithi engezwa ngemva kokuba isitolo siqinisekise inkokhelo.",
@@ -4630,6 +4639,9 @@
     "couldNotLoad": "Akukwazekanga ukulayisha ukuhlanganiswa",
     "permissionDenied": "Awunayo imvume yokuphatha lokhu kuhlanganiswa.",
     "managedByOwner": "Cela umnikazi wenhlangano ukuthi ashintshe ukuxhumana ongakwazi ukukushintsha.",
+    "managedByOwnerOrAdmin": "Cela umnikazi noma umlawuli wenhlangano ukuthi ashintshe ukuxhumana ongakwazi ukukushintsha.",
+    "managedByOwnerOrBilling": "Cela umnikazi noma umphathi wokukhokha wenhlangano ukuthi ashintshe ukuxhumana ongakwazi ukukushintsha.",
+    "managedByOwnerAdminOrBilling": "Cela umnikazi, umlawuli, noma umphathi wokukhokha wenhlangano ukuthi ashintshe ukuxhumana ongakwazi ukukushintsha.",
     "connectFailed": "Akukwazekanga ukuvula ikhasi lokuxhuma"
   },
   "invoices": {
@@ -4666,7 +4678,7 @@
       "new": "Isibangeli esisha",
       "create": "Dala isibangeli",
       "emptyTitle": "Azikho izibangeli okwamanje",
-      "emptyDescription": "Dala isibangeli ukuze uqale ukusebenza kwe-Cloud Agent kusuka ocingweni lwe-webhook noma ngohlelo lwesikhathi.",
+      "emptyDescription": "Dala isibangeli sakho sokuqala.",
       "loadFailedTitle": "Akukwazekanga ukulayisha izibangeli",
       "loadFailedDescription": "Zama futhi uma usuxhunyiwe.",
       "detailLoadFailedTitle": "Akukwazekanga ukulayisha lesi sibangeli",

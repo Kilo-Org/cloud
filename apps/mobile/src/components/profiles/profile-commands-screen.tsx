@@ -3,8 +3,7 @@ import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
-import { EmptyState } from '@/components/empty-state';
-import { ProfileCommandRowControls } from '@/components/profiles/profile-command-row-controls';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import {
   addCommand,
   commandRowA11yLabel,
@@ -17,20 +16,21 @@ import {
 } from '@/components/profiles/profile-commands-model';
 import { CommandsSkeleton } from '@/components/profiles/profile-commands-skeleton';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
+import { ReorderableItem, ReorderableItemActions } from '@/components/profiles/reorderable-item';
 import { SetupCommandField } from '@/components/profiles/setup-command-field';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
-import { Terminal } from '@/components/ui/icons';
+import { Plus, Terminal } from '@/components/ui/icons';
+import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileCommands } from '@/lib/hooks/use-agent-profiles';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useProfileCommandsSave } from '@/lib/hooks/use-profile-commands-save';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { clearFormDraft, useFormDraftState } from '@/lib/form-draft';
-import { COMMAND_ROW_FIELD_GAP_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 
 type CommandRow = Readonly<{ sequence: number; command: string }>;
 
@@ -62,7 +62,6 @@ export function ProfileCommandsScreen({
     }
     router.dismissTo(backFallback);
   }, [router, backFallback]);
-  const colors = useThemeColors();
   const commandsQuery = useAgentProfileCommands(profileId, organizationId);
   const permission = useOrganizationProfilePermission(organizationId);
   const canManage = permission === 'allowed';
@@ -218,59 +217,55 @@ export function ProfileCommandsScreen({
     // position the row's move and delete controls announce.
     const commandLabel = t('profiles.commandLabelPosition', { position });
     const rowHint = commandRowA11yLabel(index, commands.length);
-    // The controls stay out of the field's accessible name and keep their own
-    // positions. The controls are the card's own overlay band: the card
-    // positions them, so their touch area escapes the label row's bounds (a
-    // parent-bounds clip) and each control reaches 44 dp on both axes.
-    const rowControls = canManage ? (
-      <ProfileCommandRowControls
-        color={colors.mutedForeground}
-        hint={rowHint}
-        upLabel={upLabel}
-        downLabel={downLabel}
-        deleteLabel={deleteLabel}
-        canMoveUp={!isFirst}
-        canMoveDown={!isLast}
-        onMoveUp={() => {
-          move(index, -1);
-        }}
-        onMoveDown={() => {
-          move(index, 1);
-        }}
-        onDelete={() => {
-          remove(index);
-        }}
-      />
-    ) : undefined;
     return (
-      // The card's 14 dp padding holds the control band's reach into the top
-      // edge; see tap-target.ts for the arithmetic. The band renders after the
-      // card so it paints on top of the card's opaque background and Android
-      // dispatches its touches last. Only a manager's row carries the widened
-      // label-to-field gap, because only it renders the control band that
-      // needs the field's top edge pushed below the band; a viewer's read-only
-      // card keeps the ordinary compact block.
-      <View key={`${generation}-${index}`} className="relative">
-        <View className="rounded-lg bg-secondary p-4">
-          <SetupCommandField
-            command={command}
-            label={commandLabel}
-            gapClassName={canManage ? COMMAND_ROW_FIELD_GAP_CLASS : undefined}
-            accessibilityHint={rowHint}
-            readOnly={!canManage}
-            onChangeText={value => {
-              setCommands(current => replaceCommand(current, index, value));
-            }}
-            onEndEditing={() => {
-              commit(index);
-            }}
-            onSubmitEditing={() => {
-              commit(index);
-            }}
-          />
-        </View>
-        {rowControls}
-      </View>
+      <ReorderableItem
+        key={`${generation}-${index}`}
+        actions={
+          canManage ? (
+            <ReorderableItemActions
+              moveUp={{
+                label: upLabel,
+                hint: rowHint,
+                disabled: isFirst,
+                onPress: () => {
+                  move(index, -1);
+                },
+              }}
+              moveDown={{
+                label: downLabel,
+                hint: rowHint,
+                disabled: isLast,
+                onPress: () => {
+                  move(index, 1);
+                },
+              }}
+              remove={{
+                label: deleteLabel,
+                hint: rowHint,
+                onPress: () => {
+                  remove(index);
+                },
+              }}
+            />
+          ) : undefined
+        }
+      >
+        <SetupCommandField
+          command={command}
+          label={commandLabel}
+          accessibilityHint={rowHint}
+          readOnly={!canManage}
+          onChangeText={value => {
+            setCommands(current => replaceCommand(current, index, value));
+          }}
+          onEndEditing={() => {
+            commit(index);
+          }}
+          onSubmitEditing={() => {
+            commit(index);
+          }}
+        />
+      </ReorderableItem>
     );
   };
 
@@ -296,17 +291,15 @@ export function ProfileCommandsScreen({
         placement="top"
         action={
           <ProfileManageSlot permission={permission}>
-            <Button className={STATE_ACTION_CLASS} onPress={add}>
-              <Text>{t('profiles.addCommand')}</Text>
-            </Button>
+            <StateAction label={t('profiles.addCommand')} icon={Plus} onPress={add} />
           </ProfileManageSlot>
         }
       />
     );
   } else {
     content = (
-      <>
-        {commands.map((command, index) => renderCommandRow(command, index))}
+      <View className="gap-3">
+        <RowGroup>{commands.map((command, index) => renderCommandRow(command, index))}</RowGroup>
         <ProfileManageSlot permission={permission}>
           {commands.length >= MAX_SETUP_COMMANDS ? (
             <AccessibleStatus
@@ -319,7 +312,7 @@ export function ProfileCommandsScreen({
             <Text>{t('profiles.addCommand')}</Text>
           </Button>
         </ProfileManageSlot>
-      </>
+      </View>
     );
   }
 
@@ -334,7 +327,7 @@ export function ProfileCommandsScreen({
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-3 px-6 pt-4 pb-8"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}

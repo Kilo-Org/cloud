@@ -5,9 +5,8 @@ import {
   getUserFromSessionForCredentialIssuance,
 } from '@kilocode/web-shared/lib/user/server';
 import {
-  createDeviceSession,
   createDeviceSessionWithAttestedKey,
-  issueSessionCredentials,
+  createDeviceSessionWithCredentials,
 } from '@/lib/auth/device-sessions';
 import {
   requireAdmissionPayload,
@@ -120,15 +119,17 @@ export const POST = withRestTiming('/api/auth/native/exchange', async (request: 
     }
   }
 
-  const sessionId = await createDeviceSession({ userId: auth.user.id, userAgent });
-
-  const pair = await issueSessionCredentials(auth.user, sessionId);
+  const credentials = await createDeviceSessionWithCredentials({
+    userId: auth.user.id,
+    userAgent,
+    user: auth.user,
+  });
 
   return NextResponse.json(
     {
-      token: pair.token,
-      refreshToken: pair.refreshToken,
-      expiresIn: pair.expiresIn,
+      token: credentials.token,
+      refreshToken: credentials.refreshToken,
+      expiresIn: credentials.expiresIn,
     },
     { status: 200, headers: { 'Cache-Control': 'no-store' } }
   );

@@ -121,7 +121,7 @@ describe('PasskeysScreen inline failures', () => {
 
     // A rejection must not leave the control loading forever: it is free again
     // and starts a fresh attempt, exactly like any other retryable failure.
-    expect(buttonByLabel(view, 'Add a passkey').props.loading).toBe(false);
+    expect(buttonByLabel(view, 'Add a passkey').props.disabled).toBe(false);
     view.unmount();
   });
 
@@ -136,7 +136,7 @@ describe('PasskeysScreen inline failures', () => {
     await waitFor(() => texts(view).includes('Could not add a passkey. Try again.'));
     // The label re-derivation itself is covered in button.mounted.test.tsx;
     // here the failed ceremony settles back to an enabled, offered control.
-    expect(buttonByLabel(view, 'Add a passkey').props.loading).toBe(false);
+    expect(buttonByLabel(view, 'Add a passkey').props.disabled).toBe(false);
     view.unmount();
   });
 

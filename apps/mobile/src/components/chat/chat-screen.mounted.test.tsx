@@ -8,7 +8,7 @@ import { ChatScreen } from '@/components/chat/chat-screen';
 import { type SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { shouldStackHeaderActions } from '@/components/screen-header';
 import type * as ScreenHeaderModule from '@/components/screen-header';
-import { act, type ReactTestRenderer } from '@/test/renderer';
+import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { type StoredChatBackend } from '@/lib/chat/backend-store';
@@ -205,7 +205,11 @@ vi.mock('@/components/agents/part-detail-sheet-host', () => ({
 vi.mock('@/components/agents/session-message-list', () => ({
   SessionMessageList: 'SessionMessageList',
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: (props: { action?: ReactElement }) =>
+    createElement('EmptyState', props, props.action),
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
 vi.mock('@/components/screen-header', async importOriginal => ({
@@ -221,6 +225,8 @@ vi.mock('@/components/ui/icons', () => ({
   ServerCrash: 'ServerCrash',
   WifiOff: 'WifiOff',
   Wrench: 'Wrench',
+  ArrowLeft: 'ArrowLeft',
+  RotateCcw: 'RotateCcw',
 }));
 vi.mock('@/components/ui/status-dot', () => ({ StatusDot: 'StatusDot' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
@@ -345,16 +351,34 @@ const messagesOf = (tree: ReactTestRenderer): unknown[] =>
     .findAll(node => (node.type as string) === 'AccessibleStatus')
     .map(node => node.props.message);
 
+/** A control's visible label: `Button` carries it as text, `StateAction` as its `label`. */
+const actionLabel = (action: ReactTestInstance): unknown => {
+  if ((action.type as string) === 'StateAction') {
+    return action.props.label;
+  }
+  const label = action.findAll(node => (node.type as string) === 'Text')[0];
+  return label === undefined ? undefined : label.props.children;
+};
+
 const buttonLabels = (tree: ReactTestRenderer): unknown[] =>
   tree.root
-    .findAll(node => (node.type as string) === 'Button')
-    .map(button => button.find(node => (node.type as string) === 'Text').props.children);
+    .findAll(node => {
+      const type = node.type as string;
+      return type === 'Button' || type === 'StateAction';
+    })
+    .flatMap(action => {
+      const label = actionLabel(action);
+      return label === undefined ? [] : [label];
+    });
 
 /** The button carrying the given label, for the props a press alone cannot show. */
 function buttonOf(tree: ReactTestRenderer, label: unknown) {
   const button = tree.root
-    .findAll(node => (node.type as string) === 'Button')
-    .find(node => node.find(child => (child.type as string) === 'Text').props.children === label);
+    .findAll(node => {
+      const type = node.type as string;
+      return type === 'Button' || type === 'StateAction';
+    })
+    .find(node => actionLabel(node) === label);
   if (button === undefined) {
     throw new TypeError(`No button ${String(label)}`);
   }

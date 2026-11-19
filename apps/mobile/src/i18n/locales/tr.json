@@ -695,8 +695,9 @@
       "notConnectedReadOnly": "Bitbucket bağlı değil. Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Bu kuruluşun Bitbucket bağlantısı bir bilgisayardan web üzerinden yönetilir.",
-      "description": "Gerekli izinlere sahip bir çalışma alanı erişim belirteci oluştur ve aşağıya yapıştır.",
+      "managedOnWeb": "{{organization}} için Bitbucket bağlantısı bir bilgisayardan web üzerinden yönetilir.",
+      "description": "{{organization}} için bir çalışma alanı erişim belirteci oluştur ve aşağıya yapıştır.",
+      "descriptionReconnect": "{{organization}} için yeni bir çalışma alanı erişim belirteci oluştur ve aşağıya yapıştır.",
       "scopes": "İzinler: Hesap okuma · Depo okuma/yazma · Çekme isteği okuma · Webhook okuma/yazma.",
       "tokenPlaceholder": "Çalışma alanı erişim belirteci",
       "tokenRefused": "Bitbucket bu çalışma alanı erişim belirtecini kabul etmedi. Yukarıdaki izinlere sahip olduğunu kontrol et ve yeniden dene."
@@ -1605,6 +1606,8 @@
       "renameAccessibility": "Oturumu yeniden adlandır: {{title}}",
       "cloningSession": "Oturum kopyalanıyor",
       "couldNotLoadThisSession": "Bu oturum yüklenemedi.",
+      "historyTooLarge": "Bu oturumun dökümü yüklenemeyecek kadar büyük.",
+      "historyUnavailable": "Bu oturumun dökümü okunamıyor.",
       "cloneFailedRetry": "Bu oturum kopyalanamadı. Tekrar dene.",
       "notEnoughCredits": "Bu istek için yeterli kredi yok. Kredi ekleyip tekrar dene.",
       "previousTaskFinishing": "Önceki görev henüz tamamlanmadı. Biraz bekle.",
@@ -1681,6 +1684,7 @@
       "branchDefault": "Varsayılan",
       "branchAccessibility": "Dal: {{label}}",
       "branchLoading": "Dallar yükleniyor",
+      "branchInactive": "Dallarının yüklenmesi için bir depo seç.",
       "branchLoadError": "Dallar yüklenemedi",
       "branchUnavailable": "Bu depo için dal kullanılamıyor. Sağlayıcıdaki erişimini kontrol et, ardından başka bir depo seç.",
       "branchEmpty": "Kullanılabilir dal yok",
@@ -2483,7 +2487,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Oturumlar yüklenemedi.",
-    "couldNotLoadActiveSessions": "Etkin oturumlar yüklenemedi.",
     "agentSessions": "Şu anda etkin",
     "newCodingTask": "Yeni kodlama görevi",
     "newTaskFromPicture": "Resimden yeni görev",
@@ -2800,7 +2803,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Bu hesabın henüz bir kuruluşu yok. Bitbucket çekme isteklerini, bir kuruluş oluşturduktan ya da birine katıldıktan sonra gözden geçirebilirsin.",
       "gitlabReconnectAdminOnlyDescription": "Yeniden bağlaması için bir kuruluş sahibi, yönetici veya faturalandırma yöneticisinden istekte bulunun.",
       "bitbucketNotConnectedTitle": "Bitbucket bağlı değil",
-      "bitbucketAdminOnlyDescription": "Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir.",
+      "adminOnlyConnectDescription": "Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir.",
       "contextLine": "{{organization}} için",
       "contextLinePersonal": "Kişisel hesabınız için"
     },
@@ -3409,7 +3412,8 @@
         "accounting_adjustment": "Muhasebe düzeltmesi",
         "credits_expired": "Kredilerin süresi doldu"
       },
-      "truncated": "Daha eski kredi hareketleri mevcut."
+      "truncated": "Daha eski kredi hareketleri mevcut.",
+      "retentionLimit": "En son kredi hareketleri gösteriliyor."
     },
     "hub": {
       "balance": "Bakiye",
@@ -3454,7 +3458,8 @@
         "void": "İptal edildi",
         "uncollectible": "Tahsil edilemez"
       },
-      "truncated": "Daha eski faturalar mevcut."
+      "truncated": "Daha eski faturalar mevcut.",
+      "retentionLimit": "En son faturalar gösteriliyor."
     },
     "lowBalanceAlert": {
       "enableA11y": "Düşük bakiye uyarısını etkinleştir",
@@ -3683,8 +3688,7 @@
     "imagesSectionEmpty": "Güvenilen görsel sunucusu yok",
     "revoke": "{{host}} sunucusuna verilen güveni kaldır",
     "revokeMessage": "Bu sunucuya verilen bağlantılar yeniden onay isteyecek.",
-    "revokeImageMessage": "Bu sunucudaki görseller yeniden onay isteyecek.",
-    "backToPreferences": "Tercihlere dön"
+    "revokeImageMessage": "Bu sunucudaki görseller yeniden onay isteyecek."
   },
   "glanceable": {
     "waiting": "Ajanlar güncelleniyor",
@@ -3931,6 +3935,8 @@
       "downloading": "İndiriliyor: {{written}} / {{total}}",
       "downloadingUnknown": "İndiriliyor: {{written}}",
       "paused": "Duraklatıldı: {{written}} / {{total}}",
+      "retrying": "Yeniden deneniyor: {{written}} / {{total}}",
+      "retryingUnknown": "Yeniden deneniyor: {{written}}",
       "verifying": "İndirilen dosya denetleniyor…",
       "downloaded": "İndirildi · {{size}}",
       "url": "Doğrudan indirme bağlantısı",
@@ -4021,7 +4027,9 @@
         "androidModelUnavailable": "Bu cihaz Gemini Nano'yu desteklemiyor veya AICore sistem uygulaması hâlâ kuruluyor. Daha sonra yeniden deneyin.",
         "aicoreUpdateRequired": "Bu modeli kullanmak için AICore uygulamasını ve sistem yazılımınızı güncelleyin.",
         "downloadable": "Bu modeli kullanabilmek için bir kereliğine indirmeniz gerekiyor.",
-        "downloading": "Model indiriliyor. İndirme tamamlandığında kullanıma hazır olacak."
+        "downloading": "Model indiriliyor. İndirme tamamlandığında kullanıma hazır olacak.",
+        "batteryQuota": "Cihazdaki model şimdilik kendisine ayrılan pil kotasını kullandı. Daha sonra yeniden deneyin.",
+        "checkFailed": "Uygulama bu modeli denetleyemedi. Yeniden deneyin."
       },
       "unavailable": "Cihazdaki model şu anda kullanılamıyor. Durumunu $t(modelChat.backends.title) bölümünden denetleyin.",
       "busy": "Cihazdaki model başka bir yanıtla meşgul. Tamamlandığında yeniden deneyin.",
@@ -4382,7 +4390,8 @@
       "purchaseFallback": "Kredi satın alımı",
       "receipt": "Makbuz",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} için makbuzu aç",
-      "receiptUnavailable": "Bu satın alım için makbuz mevcut değil."
+      "receiptUnavailable": "Bu satın alım için makbuz mevcut değil.",
+      "retentionLimit": "En son kredi geçmişi gösteriliyor."
     },
     "title": "Kredi satın al",
     "description": "Krediler, Kilo App'te AI kodlama oturumları yürütmek için Kilo bakiyenize eklenen tek seferlik bir satın alımdır. Mağaza hesabınızdan ücret alır ve mağaza ödemeyi onayladıktan sonra krediler eklenir.",
@@ -4630,6 +4639,9 @@
     "couldNotLoad": "Entegrasyonlar yüklenemedi",
     "permissionDenied": "Bu entegrasyonları yönetme izniniz yok.",
     "managedByOwner": "Değiştiremediğiniz bir bağlantıyı değiştirmesi için bir kuruluş sahibine başvurun.",
+    "managedByOwnerOrAdmin": "Değiştiremediğiniz bir bağlantıyı değiştirmesi için bir kuruluş sahibi veya yöneticiye başvurun.",
+    "managedByOwnerOrBilling": "Değiştiremediğiniz bir bağlantıyı değiştirmesi için bir kuruluş sahibi veya faturalandırma yöneticisine başvurun.",
+    "managedByOwnerAdminOrBilling": "Değiştiremediğiniz bir bağlantıyı değiştirmesi için bir kuruluş sahibi, yönetici veya faturalandırma yöneticisine başvurun.",
     "connectFailed": "Bağlantı sayfası açılamadı"
   },
   "invoices": {
@@ -4666,7 +4678,7 @@
       "new": "Yeni tetikleyici",
       "create": "Tetikleyici oluştur",
       "emptyTitle": "Henüz tetikleyici yok",
-      "emptyDescription": "Bir web kancası çağrısıyla veya bir zamanlamayla Cloud Agent çalıştırması başlatmak için bir tetikleyici oluşturun.",
+      "emptyDescription": "İlk tetikleyicinizi oluşturun.",
       "loadFailedTitle": "Tetikleyiciler yüklenemedi",
       "loadFailedDescription": "Bağlantınız olduğunda tekrar deneyin.",
       "detailLoadFailedTitle": "Bu tetikleyici yüklenemedi",

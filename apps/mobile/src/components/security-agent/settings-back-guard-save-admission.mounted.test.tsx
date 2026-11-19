@@ -57,6 +57,7 @@ const confirmDialog = vi.hoisted(() => ({
 // and the dialog Save both flow through the real `useSettingsSaveFeedback`.
 // Only the native surfaces render as stubs.
 vi.mock('react-native', () => ({
+  useColorScheme: () => 'light',
   View: 'View',
   Pressable: 'Pressable',
   Text: 'Text',
@@ -105,7 +106,11 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 vi.mock('@/lib/a11y/motion', () => ({ useMotionPolicy: () => ({ reducedMotion: false }) }));
-vi.mock('@/components/ui/icons', () => ({ Loader2: 'Loader2' }));
+vi.mock('@/components/ui/icons', () => ({ Clock: 'Clock', Loader2: 'Loader2' }));
+// The screen's rows are the shared `PreferenceRow`, whose control is the real
+// `Switch`; that component wraps the native one, which a Node suite does not
+// have. The family's other suites stub it the same way.
+vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
 vi.mock('@rn-primitives/dialog', () => ({
   Action: 'AlertDialog.Action',
   Cancel: 'AlertDialog.Cancel',
@@ -158,7 +163,6 @@ vi.mock('@/components/screen-header', () => ({
   ScreenHeader: (props: { headerRight?: ReactNode }): ReactNode => props.headerRight ?? null,
 }));
 vi.mock('@/components/security-agent/settings-pill-group', () => ({ PillGroup: 'PillGroup' }));
-vi.mock('@/components/security-agent/settings-toggle-row', () => ({ ToggleRow: 'ToggleRow' }));
 
 const mounted: TestRenderer.ReactTestRenderer[] = [];
 

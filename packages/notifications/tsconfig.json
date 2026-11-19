@@ -3,7 +3,7 @@
     "target": "es2017",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": ["esnext"],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

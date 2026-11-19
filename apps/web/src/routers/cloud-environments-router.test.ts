@@ -971,18 +971,19 @@ describe('cloudEnvironmentsRouter', () => {
     });
 
     test.each(['vercel-small', 'vercel-large'] as const)(
-      'create rejects the %s allocation and accepts an isolated one',
+      'create accepts the %s allocation and an isolated one',
       async allocation => {
         const owner = await insertTestUser();
         const caller = await createCallerForUser(owner.id);
 
-        await expect(
-          caller.cloudEnvironments.create({
-            name: 'multi',
-            repositories: [widgets],
-            sandboxAllocation: allocation,
-          })
-        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+        const { id } = await caller.cloudEnvironments.create({
+          name: 'multi',
+          repositories: [widgets],
+          sandboxAllocation: allocation,
+        });
+        expect((await caller.cloudEnvironments.get({ environmentId: id })).sandboxAllocation).toBe(
+          allocation
+        );
         await expect(
           caller.cloudEnvironments.create({
             name: 'multi',
@@ -1016,7 +1017,7 @@ describe('cloudEnvironmentsRouter', () => {
     });
 
     test.each(['vercel-small', 'vercel-large'] as const)(
-      'update rejects the %s allocation on a V2 environment and accepts it on a V1 one',
+      'update accepts the %s allocation on a V2 environment and on a V1 one',
       async allocation => {
         const owner = await insertTestUser();
         const caller = await createCallerForUser(owner.id);
@@ -1034,7 +1035,7 @@ describe('cloudEnvironmentsRouter', () => {
             environmentId: multi.id,
             sandboxAllocation: allocation,
           })
-        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+        ).resolves.toMatchObject({ success: true });
         await expect(
           caller.cloudEnvironments.update({
             environmentId: single.id,
@@ -1046,7 +1047,7 @@ describe('cloudEnvironmentsRouter', () => {
         ).toBe(allocation);
         expect(
           (await caller.cloudEnvironments.get({ environmentId: multi.id })).sandboxAllocation
-        ).toBeNull();
+        ).toBe(allocation);
       }
     );
 
@@ -1069,8 +1070,32 @@ describe('cloudEnvironmentsRouter', () => {
       });
     });
 
+    test('conversion rejects a saved retired shared allocation unless it is replaced', async () => {
+      const owner = await insertTestUser();
+      const caller = await createCallerForUser(owner.id);
+      const { id } = await caller.cloudEnvironments.create({ name: 'single', repository: widgets });
+      await db
+        .update(cloud_agent_environments)
+        .set({ sandbox_allocation: 'cloudflare-shared' })
+        .where(eq(cloud_agent_environments.id, id));
+
+      await expect(
+        caller.cloudEnvironments.update({ environmentId: id, repositories: [widgets, api] })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'A multi-repository environment cannot run on the shared sandbox',
+      });
+      await expect(
+        caller.cloudEnvironments.update({
+          environmentId: id,
+          repositories: [widgets, api],
+          sandboxAllocation: null,
+        })
+      ).resolves.toMatchObject({ success: true, configurationRevision: 2 });
+    });
+
     test.each(['vercel-small', 'vercel-large'] as const)(
-      'conversion rejects the saved %s allocation unless it is replaced',
+      'conversion keeps the saved %s allocation',
       async sandboxAllocation => {
         const owner = await insertTestUser();
         const caller = await createCallerForUser(owner.id);
@@ -1081,18 +1106,10 @@ describe('cloudEnvironmentsRouter', () => {
         });
         await expect(
           caller.cloudEnvironments.update({ environmentId: id, repositories: [widgets, api] })
-        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+        ).resolves.toMatchObject({ success: true, configurationRevision: 2 });
         expect(await caller.cloudEnvironments.get({ environmentId: id })).toMatchObject({
-          repoFullName: GITHUB_REPO,
           sandboxAllocation,
         });
-        await expect(
-          caller.cloudEnvironments.update({
-            environmentId: id,
-            repositories: [widgets, api],
-            sandboxAllocation: null,
-          })
-        ).resolves.toMatchObject({ success: true, configurationRevision: 2 });
       }
     );
   });

@@ -978,7 +978,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Ta račun še nima nobenih organizacij. Zahtevke za združitev na Bitbucktu boš lahko pregledoval, ko ustvariš organizacijo ali se ji pridružiš.",
       "gitlabReconnectAdminOnlyDescription": "Prosite lastnika organizacije, skrbnika ali skrbnika obračunavanja, da jo ponovno poveže.",
       "bitbucketNotConnectedTitle": "Bitbucket ni povezan",
-      "bitbucketAdminOnlyDescription": "Povežejo ga lahko samo lastniki organizacije, skrbniki in skrbniki obračunavanja.",
+      "adminOnlyConnectDescription": "Povežejo ga lahko samo lastniki organizacije, skrbniki in skrbniki obračunavanja.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za osebni račun"
     },
@@ -1431,8 +1431,9 @@
       "notConnectedReadOnly": "Bitbucket ni povezan. Povežejo ga lahko samo lastniki organizacije, skrbniki in skrbniki obračunavanja."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Povezava Bitbucket za to organizacijo se upravlja v spletu z računalnika.",
-      "description": "Ustvari žeton za dostop do delovnega prostora z zahtevanimi dovoljenji in ga prilepi spodaj.",
+      "managedOnWeb": "Povezava Bitbucket za {{organization}} se upravlja v spletu z računalnika.",
+      "description": "Ustvari žeton za dostop do delovnega prostora za {{organization}} in ga prilepi spodaj.",
+      "descriptionReconnect": "Ustvari nov žeton za dostop do delovnega prostora za {{organization}} in ga prilepi spodaj.",
       "scopes": "Račun: branje · Skladišča: branje/pisanje · Zahteve za združitev: branje · Spletni povratni klici: branje/pisanje",
       "tokenPlaceholder": "Žeton za dostop do delovnega prostora",
       "tokenRefused": "Bitbucket ni sprejel tega žetona za dostop do delovnega prostora. Preveri, ali ima zgoraj navedena dovoljenja, nato poskusi znova."
@@ -2248,6 +2249,8 @@
       "renameAccessibility": "Preimenuj sejo: {{title}}",
       "cloningSession": "Kloniranje seje",
       "couldNotLoadThisSession": "Te seje ni bilo mogoče naložiti.",
+      "historyTooLarge": "Zapis te seje je prevelik za nalaganje.",
+      "historyUnavailable": "Zapisa te seje ni mogoče prebrati.",
       "cloneFailedRetry": "Te seje ni bilo mogoče klonirati. Poskusi znova.",
       "notEnoughCredits": "Za to zahtevo ni dovolj kreditov. Dodaj kredite in poskusi znova.",
       "previousTaskFinishing": "Prejšnja naloga se še zaključuje. Počakaj trenutek.",
@@ -2324,6 +2327,7 @@
       "branchDefault": "Privzeta",
       "branchAccessibility": "Veja: {{label}}",
       "branchLoading": "Nalaganje vej",
+      "branchInactive": "Izberi skladišče za nalaganje njegovih vej.",
       "branchLoadError": "Vej ni bilo mogoče naložiti",
       "branchUnavailable": "Veje za to skladišče niso na voljo. Preveri svoj dostop pri ponudniku in izberi drugo skladišče.",
       "branchEmpty": "Ni razpoložljivih vej",
@@ -3150,7 +3154,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Sej ni bilo mogoče naložiti.",
-    "couldNotLoadActiveSessions": "Aktivnih sej ni bilo mogoče naložiti.",
     "agentSessions": "Trenutno aktivno",
     "newCodingTask": "Nova programska naloga",
     "newTaskFromPicture": "Nova naloga iz slike",
@@ -3533,7 +3536,8 @@
         "accounting_adjustment": "Računovodska prilagoditev",
         "credits_expired": "Potek veljavnosti kreditov"
       },
-      "truncated": "Na voljo so starejše transakcije s krediti."
+      "truncated": "Na voljo so starejše transakcije s krediti.",
+      "retentionLimit": "Prikazane so najnovejše transakcije s krediti."
     },
     "inviteMember": {
       "emailError": "Vnesi veljaven e-poštni naslov.",
@@ -3565,7 +3569,8 @@
         "void": "Razveljavljeno",
         "uncollectible": "Neizterljivo"
       },
-      "truncated": "Starejši računi so na voljo."
+      "truncated": "Starejši računi so na voljo.",
+      "retentionLimit": "Prikazani so najnovejši računi."
     },
     "lowBalanceAlert": {
       "enableA11y": "Omogoči opozorilo o nizkem stanju",
@@ -3803,8 +3808,7 @@
     "imagesSectionEmpty": "Ni zaupanja vrednih gostiteljev slik",
     "revoke": "Prekliči zaupanje gostitelju {{host}}",
     "revokeMessage": "Povezave do tega gostitelja bodo znova zahtevale potrditev.",
-    "revokeImageMessage": "Slike s tega gostitelja bodo znova zahtevale potrditev.",
-    "backToPreferences": "Nazaj na nastavitve"
+    "revokeImageMessage": "Slike s tega gostitelja bodo znova zahtevale potrditev."
   },
   "glanceable": {
     "waiting": "Posodabljanje agentov",
@@ -4053,6 +4057,8 @@
       "downloading": "Prenašanje: {{written}} od {{total}}",
       "downloadingUnknown": "Prenašanje: {{written}}",
       "paused": "Začasno ustavljeno: {{written}} od {{total}}",
+      "retrying": "Ponovni poskus: {{written}} od {{total}}",
+      "retryingUnknown": "Ponovni poskus: {{written}}",
       "verifying": "Preverjanje prenesene datoteke…",
       "downloaded": "Preneseno · {{size}}",
       "url": "Neposredna povezava za prenos",
@@ -4143,7 +4149,9 @@
         "androidModelUnavailable": "Ta naprava ne podpira modela Gemini Nano ali pa se sistemska aplikacija AICore še nastavlja. Poskusite znova pozneje.",
         "aicoreUpdateRequired": "Za uporabo tega modela posodobite aplikacijo AICore in sistemsko programsko opremo.",
         "downloadable": "Pred uporabo je treba ta model enkrat prenesti.",
-        "downloading": "Model se prenaša. Pripravljen bo, ko se prenos konča."
+        "downloading": "Model se prenaša. Pripravljen bo, ko se prenos konča.",
+        "batteryQuota": "Model v napravi je porabil dovoljeno porabo baterije. Poskusite znova pozneje.",
+        "checkFailed": "Aplikacija ni mogla preveriti tega modela. Poskusite znova."
       },
       "unavailable": "Model v napravi trenutno ni na voljo. Njegovo stanje preverite v razdelku $t(modelChat.backends.title).",
       "busy": "Model v napravi je zaseden z drugim odgovorom. Poskusite znova, ko ga dokonča.",
@@ -4516,7 +4524,8 @@
       "purchaseFallback": "Nakup kreditov",
       "receipt": "Potrdilo",
       "receiptA11y": "Odpri potrdilo za {{description}}, {{amount}}, z dne {{date}}",
-      "receiptUnavailable": "Potrdilo za ta nakup ni na voljo."
+      "receiptUnavailable": "Potrdilo za ta nakup ni na voljo.",
+      "retentionLimit": "Prikazana je najnovejša zgodovina kreditov."
     },
     "title": "Kupi kredite",
     "description": "Krediti so enkraten nakup, ki se doda tvojemu Kilo stanju za izvajanje sej kodiranja z umetno inteligenco v aplikaciji Kilo. Trgovina obremeni tvoj račun in krediti se dodajo, ko trgovina potrdi plačilo.",
@@ -4780,6 +4789,9 @@
     "couldNotLoad": "Integracij ni bilo mogoče naložiti",
     "permissionDenied": "Nimate dovoljenja za upravljanje teh integracij.",
     "managedByOwner": "Za spremembo povezave, ki je ne morete spremeniti, prosite lastnika organizacije.",
+    "managedByOwnerOrAdmin": "Za spremembo povezave, ki je ne morete spremeniti, prosite lastnika organizacije ali skrbnika.",
+    "managedByOwnerOrBilling": "Za spremembo povezave, ki je ne morete spremeniti, prosite lastnika organizacije ali skrbnika obračunavanja.",
+    "managedByOwnerAdminOrBilling": "Za spremembo povezave, ki je ne morete spremeniti, prosite lastnika organizacije, skrbnika ali skrbnika obračunavanja.",
     "connectFailed": "Strani za povezavo ni bilo mogoče odpreti"
   },
   "invoices": {
@@ -4816,7 +4828,7 @@
       "new": "Nov sprožilec",
       "create": "Ustvari sprožilec",
       "emptyTitle": "Ni še nobenega sprožilca",
-      "emptyDescription": "Ustvarite sprožilec za zagon Cloud Agent s klicem spletnega kavlja ali po urniku.",
+      "emptyDescription": "Ustvarite svoj prvi sprožilec.",
       "loadFailedTitle": "Sprožilcev ni bilo mogoče naložiti",
       "loadFailedDescription": "Poskusite znova, ko boste imeli povezavo.",
       "detailLoadFailedTitle": "Tega sprožilca ni bilo mogoče naložiti",

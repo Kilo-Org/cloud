@@ -7,6 +7,7 @@ import { BriefingNotificationToggle } from './briefing-notification-toggle';
 import { ScheduleSettings } from './briefing-schedule-settings';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
@@ -17,6 +18,8 @@ import {
 } from '@/lib/agent-briefing';
 import { briefingAccessDenied, selectBriefingSettingsPhase } from '@/lib/agent-briefing-state';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { cn } from '@/lib/utils';
 
 export function BriefingSettingsScreen() {
   const { t } = useTranslation();
@@ -42,30 +45,42 @@ export function BriefingSettingsScreen() {
         backFallback={BRIEFING_PATH as Href}
       />
       {readyPreferences !== undefined && (
-        <ScrollView automaticallyAdjustKeyboardInsets contentContainerClassName="gap-6 p-4 pb-12">
-          {offline ? (
-            <Text className="text-xs text-muted-foreground">{t('agentBriefing.offline')}</Text>
-          ) : null}
+        <ScrollView
+          automaticallyAdjustKeyboardInsets
+          contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-12')}
+        >
+          {offline ? <Text variant="caption">{t('agentBriefing.offline')}</Text> : null}
           {/* The keys name the slot, not the saved values: a card that remounts
               when a save lands would drop the text a person is still typing in
               its fields. */}
-          <ScheduleSettings key="schedule" preferences={readyPreferences} />
-          <BriefingNotificationToggle />
+          <Section>
+            <ScheduleSettings key="schedule" preferences={readyPreferences} />
+          </Section>
+          <Section>
+            <BriefingNotificationToggle />
+          </Section>
           {readyPreferences.contexts
             .filter(item => access.canRead(item.context.organizationId))
             .map(item => (
-              <BriefingContextSettings
+              <Section
                 key={`ctx-${item.context.id}`}
-                preference={item}
-                defaultModel={readyPreferences.defaultModel}
-                timezone={readyPreferences.timezone}
-              />
+                label={t('agentBriefing.scheduledContextSettings', {
+                  context:
+                    item.context.organizationId === null ? t('common.personal') : item.context.name,
+                })}
+              >
+                <BriefingContextSettings
+                  preference={item}
+                  defaultModel={readyPreferences.defaultModel}
+                  timezone={readyPreferences.timezone}
+                />
+              </Section>
             ))}
         </ScrollView>
       )}
       {phase === 'loading' && (
-        <View className="p-4">
-          <Skeleton className="h-96 rounded-2xl" />
+        <View className={SCREEN_BODY_CLASS}>
+          <Skeleton className="h-96 rounded-xl" />
         </View>
       )}
       {/* Connectivity pauses the first fetch instead of failing it, so the screen

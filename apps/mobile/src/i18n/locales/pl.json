@@ -695,8 +695,9 @@
       "notConnectedReadOnly": "Brak połączenia z Bitbucket. Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je skonfigurować."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Połączeniem tej organizacji z Bitbucket zarządza się w przeglądarce na komputerze.",
-      "description": "Utwórz token dostępu do obszaru roboczego z wymaganymi uprawnieniami i wklej go poniżej.",
+      "managedOnWeb": "Połączeniem {{organization}} z Bitbucket zarządza się w przeglądarce na komputerze.",
+      "description": "Utwórz token dostępu do obszaru roboczego dla {{organization}} i wklej go poniżej.",
+      "descriptionReconnect": "Utwórz nowy token dostępu do obszaru roboczego dla {{organization}} i wklej go poniżej.",
       "scopes": "Konto: odczyt · Repozytoria: odczyt/zapis · PR: odczyt · Webhooki: odczyt/zapis",
       "tokenPlaceholder": "Token dostępu do obszaru roboczego",
       "tokenRefused": "Bitbucket nie zaakceptował tego tokenu dostępu do obszaru roboczego. Sprawdź, czy ma powyższe uprawnienia, a następnie spróbuj ponownie."
@@ -1647,6 +1648,8 @@
       "renameAccessibility": "Zmień nazwę sesji: {{title}}",
       "cloningSession": "Klonowanie sesji",
       "couldNotLoadThisSession": "Nie udało się wczytać tej sesji.",
+      "historyTooLarge": "Zapis tej sesji jest zbyt duży, żeby go wczytać.",
+      "historyUnavailable": "Nie można odczytać zapisu tej sesji.",
       "cloneFailedRetry": "Nie udało się sklonować tej sesji. Spróbuj ponownie.",
       "notEnoughCredits": "Brakuje środków na to żądanie. Doładuj konto i spróbuj ponownie.",
       "previousTaskFinishing": "Trwa kończenie poprzedniego zadania. Poczekaj chwilę.",
@@ -1723,6 +1726,7 @@
       "branchDefault": "Domyślna",
       "branchAccessibility": "Gałąź: {{label}}",
       "branchLoading": "Wczytywanie gałęzi",
+      "branchInactive": "Wybierz repozytorium, aby wczytać jego gałęzie.",
       "branchLoadError": "Nie udało się wczytać gałęzi",
       "branchUnavailable": "Gałęzie nie są dostępne dla tego repozytorium. Sprawdź swój dostęp u dostawcy, a potem wybierz inne repozytorium.",
       "branchEmpty": "Brak dostępnych gałęzi",
@@ -2549,7 +2553,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nie udało się wczytać sesji.",
-    "couldNotLoadActiveSessions": "Nie udało się wczytać aktywnych sesji.",
     "agentSessions": "Teraz aktywne",
     "newCodingTask": "Nowe zadanie programistyczne",
     "newTaskFromPicture": "Nowe zadanie ze zdjęcia",
@@ -2878,7 +2881,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "To konto nie ma jeszcze żadnych organizacji. PR-y na Bitbucketu będzie można przeglądać po utworzeniu organizacji lub dołączeniu do niej.",
       "gitlabReconnectAdminOnlyDescription": "Poproś Właściciela, Administratora lub Osobę zarządzającą rozliczeniami w organizacji, aby je ponownie połączyć.",
       "bitbucketNotConnectedTitle": "Brak połączenia z Bitbucket",
-      "bitbucketAdminOnlyDescription": "Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je połączyć.",
+      "adminOnlyConnectDescription": "Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je połączyć.",
       "contextLine": "Dla {{organization}}",
       "contextLinePersonal": "Dla konta osobistego"
     },
@@ -3525,7 +3528,8 @@
         "accounting_adjustment": "Korekta księgowa",
         "credits_expired": "Wygaśnięcie środków"
       },
-      "truncated": "Dostępne są wcześniejsze operacje na saldzie."
+      "truncated": "Dostępne są wcześniejsze operacje na saldzie.",
+      "retentionLimit": "Wyświetlane są najnowsze operacje na saldzie."
     },
     "hub": {
       "balance": "Saldo",
@@ -3570,7 +3574,8 @@
         "void": "Unieważniona",
         "uncollectible": "Nieściągalna"
       },
-      "truncated": "Dostępne są starsze faktury."
+      "truncated": "Dostępne są starsze faktury.",
+      "retentionLimit": "Wyświetlane są najnowsze faktury."
     },
     "lowBalanceAlert": {
       "enableA11y": "Włącz powiadomienie o niskim saldzie",
@@ -3803,8 +3808,7 @@
     "imagesSectionEmpty": "Brak zaufanych hostów obrazów",
     "revoke": "Cofnij zaufanie do {{host}}",
     "revokeMessage": "Linki do tego hosta ponownie poproszą o potwierdzenie.",
-    "revokeImageMessage": "Obrazy z tego hosta ponownie poproszą o potwierdzenie.",
-    "backToPreferences": "Wróć do preferencji"
+    "revokeImageMessage": "Obrazy z tego hosta ponownie poproszą o potwierdzenie."
   },
   "glanceable": {
     "waiting": "Aktualizowanie stanu agentów",
@@ -4053,6 +4057,8 @@
       "downloading": "Pobieranie: {{written}} z {{total}}",
       "downloadingUnknown": "Pobieranie: {{written}}",
       "paused": "Wstrzymano: {{written}} z {{total}}",
+      "retrying": "Ponowna próba: {{written}} z {{total}}",
+      "retryingUnknown": "Ponowna próba: {{written}}",
       "verifying": "Sprawdzanie pobranego pliku…",
       "downloaded": "Pobrano · {{size}}",
       "url": "Bezpośredni link do pobrania",
@@ -4143,7 +4149,9 @@
         "androidModelUnavailable": "To urządzenie nie obsługuje Gemini Nano albo aplikacja systemowa AICore jest jeszcze konfigurowana. Spróbuj ponownie później.",
         "aicoreUpdateRequired": "Zaktualizuj aplikację AICore i oprogramowanie systemowe, aby korzystać z tego modelu.",
         "downloadable": "Przed użyciem ten model trzeba jednorazowo pobrać.",
-        "downloading": "Model jest pobierany. Będzie gotowy po zakończeniu pobierania."
+        "downloading": "Model jest pobierany. Będzie gotowy po zakończeniu pobierania.",
+        "batteryQuota": "Model na urządzeniu wykorzystał na razie swój limit baterii. Spróbuj ponownie później.",
+        "checkFailed": "Aplikacja nie mogła sprawdzić tego modelu. Spróbuj ponownie."
       },
       "unavailable": "Model na urządzeniu jest teraz niedostępny. Sprawdź jego stan w sekcji $t(modelChat.backends.title).",
       "busy": "Model na urządzeniu generuje inną odpowiedź. Spróbuj ponownie, gdy skończy.",
@@ -4516,7 +4524,8 @@
       "purchaseFallback": "Zakup kredytów",
       "receipt": "Potwierdzenie",
       "receiptA11y": "Otwórz potwierdzenie dla: {{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Potwierdzenie dla tego zakupu nie jest dostępne."
+      "receiptUnavailable": "Potwierdzenie dla tego zakupu nie jest dostępne.",
+      "retentionLimit": "Wyświetlana jest najnowsza historia kredytów."
     },
     "title": "Kup kredyty",
     "description": "Kredyty to jednorazowy zakup dodawany do Twojego salda Kilo na potrzeby sesji kodowania AI w aplikacji Kilo. Sklep obciąża Twoje konto, a kredyty są dodawane po potwierdzeniu płatności przez sklep.",
@@ -4780,6 +4789,9 @@
     "couldNotLoad": "Nie udało się wczytać integracji",
     "permissionDenied": "Nie masz uprawnień do zarządzania tymi integracjami.",
     "managedByOwner": "Poproś właściciela organizacji o zmianę połączenia, którego nie możesz zmienić.",
+    "managedByOwnerOrAdmin": "Poproś właściciela organizacji lub administratora o zmianę połączenia, którego nie możesz zmienić.",
+    "managedByOwnerOrBilling": "Poproś właściciela organizacji lub osobę zarządzającą rozliczeniami o zmianę połączenia, którego nie możesz zmienić.",
+    "managedByOwnerAdminOrBilling": "Poproś właściciela organizacji, administratora lub osobę zarządzającą rozliczeniami o zmianę połączenia, którego nie możesz zmienić.",
     "connectFailed": "Nie udało się otworzyć strony połączenia"
   },
   "invoices": {
@@ -4816,7 +4828,7 @@
       "new": "Nowy wyzwalacz",
       "create": "Utwórz wyzwalacz",
       "emptyTitle": "Brak wyzwalaczy",
-      "emptyDescription": "Utwórz wyzwalacz, aby uruchomić Cloud Agent przez wywołanie webhooka lub według harmonogramu.",
+      "emptyDescription": "Utwórz swój pierwszy wyzwalacz.",
       "loadFailedTitle": "Nie udało się wczytać wyzwalaczy",
       "loadFailedDescription": "Spróbuj ponownie po nawiązaniu połączenia.",
       "detailLoadFailedTitle": "Nie udało się wczytać tego wyzwalacza",

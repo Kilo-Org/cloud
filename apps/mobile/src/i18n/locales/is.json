@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Þessi reikningur er ekki með neinar stofnanir ennþá. Hægt er að yfirfara sameiningarbeiðnir á Bitbucket um leið og þú býrð til eða þiggur boð um aðild að stofnun.",
       "gitlabReconnectAdminOnlyDescription": "Biddu eiganda, stjórnanda eða innheimtustjóra samtakanna um að tengja það aftur.",
       "bitbucketNotConnectedTitle": "Bitbucket er ekki tengt",
-      "bitbucketAdminOnlyDescription": "Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta tengt það.",
+      "adminOnlyConnectDescription": "Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta tengt það.",
       "contextLine": "Fyrir {{organization}}",
       "contextLinePersonal": "Fyrir persónulegan reikning"
     },
@@ -1385,8 +1385,9 @@
       "notConnectedReadOnly": "Bitbucket er ekki tengt. Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta tengt það."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Bitbucket-tengingu þessarar stofnunar er stjórnað á vefnum í tölvu.",
-      "description": "Búðu til aðgangstóka fyrir vinnusvæðið með tilskildum heimildum og límdu hann hér fyrir neðan.",
+      "managedOnWeb": "Bitbucket-tengingu við {{organization}} er stjórnað á vefnum í tölvu.",
+      "description": "Búðu til aðgangstóka vinnusvæðis fyrir {{organization}} og límdu hann hér fyrir neðan.",
+      "descriptionReconnect": "Búðu til nýjan aðgangstóka vinnusvæðis fyrir {{organization}} og límdu hann hér fyrir neðan.",
       "scopes": "Reikningur: lestur · Geymslur: lestur/skrift · Samrunabeiðnir: lestur · Vefkrækjur: lestur/skrift",
       "tokenPlaceholder": "Aðgangstóki vinnusvæðis",
       "tokenRefused": "Bitbucket tók ekki við þessum aðgangstóka vinnusvæðis. Athugaðu að hann hafi heimildirnar hér fyrir ofan og reyndu svo aftur."
@@ -2160,6 +2161,8 @@
       "renameAccessibility": "Endurnefna lotu: {{title}}",
       "cloningSession": "Klónar lotuna",
       "couldNotLoadThisSession": "Ekki tókst að hlaða þessari lotu.",
+      "historyTooLarge": "Spjallslóð þessarar lotu er of stór til að hlaða.",
+      "historyUnavailable": "Ekki er hægt að lesa spjallslóð þessarar lotu.",
       "cloneFailedRetry": "Ekki tókst að klóna þessa lotu. Reyndu aftur.",
       "notEnoughCredits": "Inneignin nægir ekki fyrir þessa beiðni. Bættu við inneign og reyndu aftur.",
       "previousTaskFinishing": "Fyrra verkefninu er ekki alveg lokið. Bíddu augnablik.",
@@ -2236,6 +2239,7 @@
       "branchDefault": "Sjálfgefið",
       "branchAccessibility": "Kvistur: {{label}}",
       "branchLoading": "Hleður kvista",
+      "branchInactive": "Veldu kóðasafn til að hlaða inn kvistunum þess.",
       "branchLoadError": "Ekki tókst að hlaða kvistum",
       "branchUnavailable": "Engir kvistar eru tiltækir fyrir þetta kóðasafn. Athugaðu aðganginn þinn hjá veitunni og veldu annað kóðasafn.",
       "branchEmpty": "Engir kvistar tiltækir",
@@ -3038,7 +3042,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Ekki tókst að sækja lotur.",
-    "couldNotLoadActiveSessions": "Ekki tókst að sækja virkar lotur.",
     "agentSessions": "Í gangi núna",
     "newCodingTask": "Nýtt forritunarverkefni",
     "newTaskFromPicture": "Nýtt verkefni úr mynd",
@@ -3417,7 +3420,8 @@
         "accounting_adjustment": "Bókhaldsleiðrétting",
         "credits_expired": "Inneign rann út"
       },
-      "truncated": "Hægt er að skoða eldri inneignarfærslur."
+      "truncated": "Hægt er að skoða eldri inneignarfærslur.",
+      "retentionLimit": "Nýjustu inneignarfærslurnar eru sýndar."
     },
     "inviteMember": {
       "emailError": "Sláðu inn gilt tölvupóstfang.",
@@ -3449,7 +3453,8 @@
         "void": "Ógildur",
         "uncollectible": "Óinnheimtanlegur"
       },
-      "truncated": "Hægt er að skoða eldri reikninga."
+      "truncated": "Hægt er að skoða eldri reikninga.",
+      "retentionLimit": "Nýjustu reikningarnir eru sýndir."
     },
     "lowBalanceAlert": {
       "enableA11y": "Virkja viðvörun um lága inneign",
@@ -3683,8 +3688,7 @@
     "imagesSectionEmpty": "Engir traustir myndavefþjónar",
     "revoke": "Afturkalla traust á {{host}}",
     "revokeMessage": "Tenglar á þennan vefþjón munu biðja um staðfestingu aftur.",
-    "revokeImageMessage": "Myndir frá þessum vefþjóni munu biðja um staðfestingu aftur.",
-    "backToPreferences": "Til baka í stillingar"
+    "revokeImageMessage": "Myndir frá þessum vefþjóni munu biðja um staðfestingu aftur."
   },
   "glanceable": {
     "waiting": "Uppfæri fulltrúa",
@@ -3931,6 +3935,8 @@
       "downloading": "Hleður niður: {{written}} af {{total}}",
       "downloadingUnknown": "Hleður niður: {{written}}",
       "paused": "Í hléi: {{written}} af {{total}}",
+      "retrying": "Reynt er aftur: {{written}} af {{total}}",
+      "retryingUnknown": "Reynt er aftur: {{written}}",
       "verifying": "Athuga niðurhalaða skrána…",
       "downloaded": "Niðurhalað · {{size}}",
       "url": "Beinn niðurhalstengill",
@@ -4021,7 +4027,9 @@
         "androidModelUnavailable": "Þetta tæki styður ekki Gemini Nano, eða AICore-kerfisforritið er enn í uppsetningu. Reyndu aftur síðar.",
         "aicoreUpdateRequired": "Uppfærðu AICore-forritið og kerfishugbúnaðinn til að nota þetta líkan.",
         "downloadable": "Það þarf að sækja þetta líkan einu sinni áður en hægt er að nota það.",
-        "downloading": "Verið er að sækja líkanið. Það verður tilbúið þegar niðurhalinu lýkur."
+        "downloading": "Verið er að sækja líkanið. Það verður tilbúið þegar niðurhalinu lýkur.",
+        "batteryQuota": "Líkanið í tækinu hefur notað rafhlöðukvótann sinn í bili. Reyndu aftur síðar.",
+        "checkFailed": "Forritið gat ekki athugað þetta líkan. Reyndu aftur."
       },
       "unavailable": "Líkanið í tækinu er ekki í boði eins og er. Athugaðu stöðu þess í $t(modelChat.backends.title).",
       "busy": "Líkanið í tækinu er upptekið við annað svar. Reyndu aftur þegar því lýkur.",
@@ -4382,7 +4390,8 @@
       "purchaseFallback": "Kaup á inneign",
       "receipt": "Kvittun",
       "receiptA11y": "Opna kvittun fyrir {{description}}, {{amount}}, frá {{date}}",
-      "receiptUnavailable": "Engin kvittun er tiltæk fyrir þessi kaup."
+      "receiptUnavailable": "Engin kvittun er tiltæk fyrir þessi kaup.",
+      "retentionLimit": "Nýjasti inneignarferillinn er sýndur."
     },
     "title": "Kaupa inneign",
     "description": "Inneign er einstakt kaup sem bætist við Kilo-stöðuna þína til að keyra AI-forritunarlotur í Kilo App. Verslunin rukkar reikninginn þinn og inneign bætist við eftir að verslunin staðfestir greiðsluna.",
@@ -4630,6 +4639,9 @@
     "couldNotLoad": "Ekki tókst að hlaða inn samþættingum",
     "permissionDenied": "Þú hefur ekki heimild til að stjórna þessum samþættingum.",
     "managedByOwner": "Biddu eiganda stofnunarinnar um að breyta tengingu sem þú getur ekki breytt.",
+    "managedByOwnerOrAdmin": "Biddu eiganda eða stjórnanda stofnunarinnar um að breyta tengingu sem þú getur ekki breytt.",
+    "managedByOwnerOrBilling": "Biddu eiganda eða innheimtustjóra stofnunarinnar um að breyta tengingu sem þú getur ekki breytt.",
+    "managedByOwnerAdminOrBilling": "Biddu eiganda, stjórnanda eða innheimtustjóra stofnunarinnar um að breyta tengingu sem þú getur ekki breytt.",
     "connectFailed": "Ekki tókst að opna tengingarsíðuna"
   },
   "invoices": {
@@ -4666,7 +4678,7 @@
       "new": "Ný kveikja",
       "create": "Búðu til kveikju",
       "emptyTitle": "Engar kveikjur ennþá",
-      "emptyDescription": "Búðu til kveikju til að hefja keyrslu Cloud Agent úr vefkrókarkalli eða á áætlun.",
+      "emptyDescription": "Búðu til fyrstu kveikjuna þína.",
       "loadFailedTitle": "Gat ekki hlaðið kveikjum",
       "loadFailedDescription": "Reyndu aftur þegar þú hefur nettengingu.",
       "detailLoadFailedTitle": "Gat ekki hlaðið þessari kveikju",

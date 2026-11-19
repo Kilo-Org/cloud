@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ExternalLink, RefreshCw } from '@/components/ui/icons';
 
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { providerLabelKey } from '@/lib/integrations/provider-catalog';
@@ -95,12 +96,10 @@ export function RepositoryActionRow({
     provider: t(providerLabelKey(platform)),
     joiner: t('common.sentenceJoiner'),
   });
-  // The label takes the row's remaining width and is pinned to one line: a
-  // label sized to its own content is measured at its longest word's width and
-  // wraps onto a second line the button's min height then clips. The logical
-  // `me-[24px]` inset keeps the centred label clear of the leading glyph in RTL
-  // as well, which a physical `mr-` would not. The explorer captures
-  // new-session-filled and new-session-kb-down both showed that wrap.
+  // The icon and the label share the row's centre as one group, so the glyph
+  // sits beside its text instead of at the start edge. The label stays on one
+  // line; a label wider than the button ellipsizes rather than wrapping into
+  // the button's min height.
   return (
     <View className="flex-row gap-2">
       <Button
@@ -116,7 +115,7 @@ export function RepositoryActionRow({
         loading={isConnecting}
       >
         <ExternalLink size={16} color={colors.foreground} />
-        <Text className="me-[24px] flex-1 text-center" numberOfLines={1}>
+        <Text className="shrink text-center" numberOfLines={1}>
           {t(labelKey)}
         </Text>
       </Button>
@@ -143,7 +142,7 @@ export function RepositoryUnavailableCard({
     return null;
   }
   return (
-    <View className="mt-3 gap-3 rounded-lg border border-border bg-card p-4">
+    <Card className="mt-4">
       <View className="gap-1">
         <Text className="text-sm font-semibold text-foreground">{t(attention.title)}</Text>
         <Text variant="muted">{t(attention.description)}</Text>
@@ -156,7 +155,7 @@ export function RepositoryUnavailableCard({
         onRefreshRepos={onRefreshRepos}
         isRetrying={isRetrying}
       />
-    </View>
+    </Card>
   );
 }
 
@@ -179,11 +178,11 @@ export function RepositoryPartialNotice({
     return null;
   }
   return (
-    <View className="mt-3 flex-row items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
+    <Card className="mt-4 flex-row items-center gap-2">
       <Text variant="muted" className="flex-1">
         {t(key)}
       </Text>
       <RepositoryRefreshButton onRefreshRepos={onRefreshRepos} isRetrying={isRetrying} />
-    </View>
+    </Card>
   );
 }

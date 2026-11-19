@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { canManageOrganization } from '@kilocode/app-shared/organizations';
+import {
+  canManageOrganization,
+  canManageOrganizationBilling,
+} from '@kilocode/app-shared/organizations';
 import { requireAppShellUser } from '@/lib/app-shell/session';
 import { loadAppShellOrganization, readSearchParam } from '@/lib/app-shell/guards';
 import {
@@ -80,6 +83,7 @@ export default async function AppShellOrganizationIntegrationPage({
         platform={platform}
         organizationId={access.organization.id}
         canManage={canManageOrganization(access.role)}
+        canManageBilling={canManageOrganizationBilling(access.role)}
         success={false}
         selfPath={`${APP_SHELL_PREFIX}/organizations/${access.organization.id}/integrations/${platform}`}
       />

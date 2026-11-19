@@ -7,7 +7,7 @@ import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-
 import { TodoStatusChip } from '@/components/todos/todo-status-chip';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { IconButton } from '@/components/ui/icon-button';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { RowChevron } from '@/components/ui/row-chevron';
 import { MoreHorizontal } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -80,17 +80,17 @@ export function TodoSessionRow({ todo, session, now, onUnlink }: Readonly<TodoSe
         className="min-w-0 flex-1 flex-row items-center gap-2 py-2 active:opacity-70"
       >
         <View className="min-w-0 flex-1 gap-0.5">
-          <Text className="text-base text-foreground" numberOfLines={1}>
+          <Text className="text-sm text-foreground" numberOfLines={1}>
             {title}
           </Text>
           {ownTitle === undefined ? (
-            <Text className="text-sm text-ink2">
+            <Text className="text-xs text-ink2">
               {timeAgo(parseTimestamp(session.linkedAt), undefined, now)}
             </Text>
           ) : null}
           <TodoStatusChip sessions={[session]} />
         </View>
-        <DirectionalChevronRight size={20} color={colors.mutedForeground} />
+        <RowChevron />
       </Pressable>
       <IconButton
         onPress={openSessionActions}

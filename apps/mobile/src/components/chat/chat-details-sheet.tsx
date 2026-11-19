@@ -24,6 +24,7 @@ import { type ChatRecord } from '@/lib/chat/store';
 import { formatDate, formatPercent } from '@/lib/format';
 import { thinkingEffortLabel } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
 
 import { backendLabel, modelCostLabel, ModelsSection, ToolsSection } from './chat-details-sections';
@@ -122,7 +123,7 @@ export function ChatDetailsSheet({
         onDone={onClose}
         topInset="ios-page-sheet"
       />
-      <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
+      <ScrollView className="flex-1" contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}>
         <View className="items-center gap-3 pt-2">
           <ContextUsageRing
             size={SHEET_RING_SIZE}
@@ -131,9 +132,9 @@ export function ChatDetailsSheet({
             tone={tone}
             testID="chat-details-ring"
           />
-          <View className="min-h-[32px] justify-center">
+          <View className="min-h-9 justify-center">
             {content.percentage ? (
-              <Text className={cn('text-2xl font-semibold tabular-nums', TONE_TEXT_CLASS[tone])}>
+              <Text variant="figure" className={TONE_TEXT_CLASS[tone]}>
                 {content.percentage}
               </Text>
             ) : (
@@ -144,7 +145,7 @@ export function ChatDetailsSheet({
           </View>
         </View>
 
-        <View className="mt-6 gap-4">
+        <View className="gap-4">
           <Row label={t('agentChat.contextUsage.used')}>
             <Text className="text-base font-medium text-foreground tabular-nums">
               {content.usedTokens ?? '-'}
@@ -214,7 +215,7 @@ export function ChatDetailsSheet({
           </Text>
         </View>
 
-        <View className="mt-8 gap-4">
+        <View className="gap-4">
           <Text className="text-sm font-semibold text-foreground">
             {t('agentChat.contextUsage.tokenUsage')}
           </Text>
@@ -268,7 +269,7 @@ export function ChatDetailsSheet({
 
         <ToolsSection model={model} imagesSupported={imagesSupported} mcp={mcp} />
 
-        <View className="mt-8 gap-4">
+        <View className="gap-4">
           {record.createdAt === null ? null : (
             <Row label={t('codeReviewer.reviewDetail.created')}>
               <Text className="text-base font-medium text-foreground">

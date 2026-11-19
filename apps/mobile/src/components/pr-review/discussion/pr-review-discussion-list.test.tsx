@@ -31,6 +31,7 @@ vi.mock('@tanstack/react-query', () => ({
   useQuery: () => ({ data: undefined }),
 }));
 vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false, doLeftAndRightSwapInRTL: true },
   View: 'View',
 }));
 vi.mock('react-native-safe-area-context', () => ({
@@ -44,7 +45,10 @@ vi.mock('@/lib/trpc', () => ({
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/icons', () => ({ MessageSquarePlus: 'MessageSquarePlus' }));
 vi.mock('@/components/pr-review/discussion/comment-row', () => ({ CommentRow: 'CommentRow' }));
 vi.mock('@/components/pr-review/discussion/discussion-thread', () => ({

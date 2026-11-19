@@ -17,9 +17,9 @@ import { type Href, useRouter } from 'expo-router';
 import { MessageCirclePlus } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/button';
+import { ScreenFooter } from '@/components/ui/screen-footer';
 import { Text } from '@/components/ui/text';
 import { providerPrSheetHref } from '@/components/pr-review/pr-review-provider-sheet-href';
 import { clearDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
@@ -65,17 +65,8 @@ export function PrDiffFloatingActions({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const pending = usePendingReview();
-  // The footer is an in-flow bar below the list, so no row is ever clipped
-  // by it and nothing shows through around the opaque (`bg-background`)
-  // card. Its bottom padding clears the Android system inset, floored at 8
-  // points for devices that report none. It used to add a redundant 24
-  // points on top of the inset, which left a blank band under the card
-  // (owner capture finish-review-space.png). The landscape side insets
-  // (`insets.left` / `insets.right`) clear the sensor housing; like
-  // ScreenHeader they are spread only when nonzero, so the `px-4` gutter
-  // survives portrait (inline style wins over className), and they are
-  // horizontal-only, so the bottom padding stays untouched.
-  const insets = useSafeAreaInsets();
+  // The footer is the shared pinned bar: page gutter, the bottom band the
+  // platform needs, and the landscape side insets handled by the primitive.
 
   const showSelectionAction = viewMode === 'unified' && selection !== null;
   // P1-F-46b: the submit affordance must always be reachable from the
@@ -118,15 +109,8 @@ export function PrDiffFloatingActions({
   }
 
   return (
-    <View
-      className="w-full items-center gap-2 bg-background px-4 pt-3"
-      style={{
-        paddingBottom: Math.max(insets.bottom, 8),
-        ...(insets.left > 0 ? { paddingLeft: insets.left } : undefined),
-        ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
-      }}
-    >
-      <View className="w-full gap-2 rounded-2xl border border-border bg-background px-3 py-3 shadow-lg shadow-[#0000001A]">
+    <ScreenFooter edge="background" keyboard="host">
+      <View className="w-full gap-2 rounded-xl border border-border bg-background px-3 py-3 shadow-lg shadow-[#0000001A]">
         {showSelectionAction ? (
           <View className="flex-row items-center gap-2">
             <Text className="flex-1 text-xs text-muted-foreground" numberOfLines={1}>
@@ -172,7 +156,7 @@ export function PrDiffFloatingActions({
           ) : null}
         </Button>
       </View>
-    </View>
+    </ScreenFooter>
   );
 }
 

@@ -9,15 +9,13 @@ import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { EmptyState } from '@/components/empty-state';
-import { Button } from '@/components/ui/button';
-import { Lock } from '@/components/ui/icons';
+import { EmptyState, StateAction } from '@/components/empty-state';
+import { Lock, Mail } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { openExternalUrl } from '@/lib/external-link';
 import { useOrgGuardrails } from '@/lib/hooks/use-org-settings-queries';
 import { useOrgBoundary, useOrgWithMembers } from '@/lib/hooks/use-organization-queries';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 
 const TITLE_KEY = 'organizationGuardrails.title';
@@ -45,7 +43,10 @@ export function OrganizationGuardrailsScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t(TITLE_KEY)} backFallback={ORGANIZATION_HUB_PATH} />
-        <PermissionDenied description={t('organizationGuardrails.permissionDenied')} />
+        <PermissionDenied
+          description={t('organizationGuardrails.permissionDenied')}
+          showBack={false}
+        />
       </View>
     );
   }
@@ -62,7 +63,7 @@ export function OrganizationGuardrailsScreen() {
             isRetrying={membership.isFetching}
           />
         ) : (
-          <View className="gap-3 px-6 pt-4">
+          <View className="gap-3 px-4 pt-3">
             <Skeleton className="h-40 w-full rounded-lg bg-muted-soft" />
             <Skeleton className="h-64 w-full rounded-lg bg-muted-soft" />
           </View>
@@ -81,17 +82,15 @@ export function OrganizationGuardrailsScreen() {
           title={t('organizationGuardrails.unavailableTitle')}
           description={t('organizationGuardrails.unavailable')}
           action={
-            <Button
-              variant="outline"
-              className={STATE_ACTION_CLASS}
+            <StateAction
+              label={t('organizationGuardrails.contactSupport')}
+              icon={Mail}
               onPress={() => {
                 void openExternalUrl(`mailto:${SUPPORT_EMAIL}`, {
                   label: t('organizationGuardrails.contactSupport'),
                 });
               }}
-            >
-              <Text>{t('organizationGuardrails.contactSupport')}</Text>
-            </Button>
+            />
           }
         />
       </View>
@@ -102,7 +101,7 @@ export function OrganizationGuardrailsScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t(TITLE_KEY)} backFallback={ORGANIZATION_HUB_PATH} />
-        <View className="gap-3 px-6 pt-4">
+        <View className="gap-3 px-4 pt-3">
           <Skeleton className="h-40 w-full rounded-lg bg-muted-soft" />
           <Skeleton className="h-64 w-full rounded-lg bg-muted-soft" />
         </View>
@@ -130,7 +129,7 @@ export function OrganizationGuardrailsScreen() {
       <TabScreenScrollView
         automaticallyAdjustKeyboardInsets
         className="flex-1"
-        contentContainerClassName="px-4 gap-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >

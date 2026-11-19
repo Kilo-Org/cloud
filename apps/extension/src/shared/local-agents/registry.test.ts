@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { LOCAL_AGENT_ERROR_CODES } from './jsonrpc';
 import {
   createLocalAgentControllerRegistry,
   loadLocalAgentConnectedAgents,
@@ -27,18 +28,16 @@ const createMemoryStorage = (): LocalAgentStorageArea & {
   };
 };
 
-const createRegistry = () => {
-  const storage = createMemoryStorage();
-
-  return {
-    registry: createLocalAgentControllerRegistry({
-      createHandle: () => crypto.randomUUID(),
-      now: () => 1000,
-      storage,
-    }),
+const createRegistry = (storage = createMemoryStorage()) => ({
+  registry: createLocalAgentControllerRegistry({
+    createHandle: () => crypto.randomUUID(),
+    now: () => 1000,
     storage,
-  };
-};
+  }),
+  storage,
+});
+
+const SESSION = { cliVersion: '1', cwd: '/tmp', sessionId: 's', title: 't' };
 
 describe('controller registry', () => {
   it('records a controller and its sessions for the connected-agents list', async () => {
@@ -80,6 +79,34 @@ describe('controller registry', () => {
     await expect(registry.closeSession(CONTROLLER_ID, opened.sessionHandle)).resolves.toBe(true);
     await expect(registry.listConnectedAgents()).resolves.toStrictEqual([]);
     await expect(registry.listControllers()).resolves.toHaveLength(1);
+  });
+
+  it('names the controller that owns a session handle', async () => {
+    const { registry } = createRegistry();
+
+    await registry.registerController({ controllerId: CONTROLLER_ID, transport: 'native' });
+    await registry.registerController({
+      controllerId: SECOND_CONTROLLER_ID,
+      transport: 'loopback',
+    });
+    const first = await registry.openSession(CONTROLLER_ID, {
+      cliVersion: '1',
+      cwd: '/tmp',
+      sessionId: 's',
+      title: 't',
+    });
+    const second = await registry.openSession(SECOND_CONTROLLER_ID, {
+      cliVersion: '1',
+      cwd: '/tmp',
+      sessionId: 's2',
+      title: 't2',
+    });
+
+    await expect(registry.sessionOwner(first.sessionHandle)).resolves.toBe(CONTROLLER_ID);
+    await expect(registry.sessionOwner(second.sessionHandle)).resolves.toBe(SECOND_CONTROLLER_ID);
+    await expect(
+      registry.sessionOwner('99999999-8888-4777-8666-555555555555')
+    ).resolves.toBeUndefined();
   });
 
   it('refuses session.open for a controller that never announced itself', async () => {
@@ -157,5 +184,64 @@ describe('controller registry', () => {
 
     expect(new Set(handles.map(handle => handle.sessionHandle)).size).toBe(3);
     await expect(registry.listConnectedAgents()).resolves.toHaveLength(3);
+  });
+
+  it('drops a disconnected controller and refuses it after a restart', async () => {
+    const { registry, storage } = createRegistry();
+
+    await registry.registerController({ controllerId: CONTROLLER_ID, transport: 'loopback' });
+    await registry.openSession(CONTROLLER_ID, SESSION);
+
+    await expect(registry.revokeController(CONTROLLER_ID)).resolves.toMatchObject({
+      sessions: [{ sessionId: 's' }],
+    });
+
+    // The hub announces the same controller again after the extension reconnects or restarts.
+    const restarted = createRegistry(storage).registry;
+
+    await expect(
+      restarted.registerController({ controllerId: CONTROLLER_ID, transport: 'loopback' })
+    ).resolves.toBe(false);
+    await expect(restarted.openSession(CONTROLLER_ID, SESSION)).rejects.toMatchObject({
+      code: LOCAL_AGENT_ERROR_CODES.userStopped,
+    });
+    await expect(loadLocalAgentControllers(storage)).resolves.toStrictEqual([]);
+  });
+
+  it('keeps refusing a disconnected controller through Stop all until its CLI connection ends', async () => {
+    const { registry } = createRegistry();
+
+    await registry.revokeController(CONTROLLER_ID);
+    await registry.takeAllSessions();
+
+    await expect(
+      registry.registerController({ controllerId: CONTROLLER_ID, transport: 'loopback' })
+    ).resolves.toBe(false);
+
+    // Its CLI socket closed; the hub never reuses the id, so the refusal is no longer needed.
+    await registry.removeController(CONTROLLER_ID);
+
+    await expect(
+      registry.registerController({ controllerId: CONTROLLER_ID, transport: 'loopback' })
+    ).resolves.toBe(true);
+  });
+
+  it('keeps only the most recent refusals', async () => {
+    const { registry } = createRegistry();
+    const controllerIds = [
+      CONTROLLER_ID,
+      SECOND_CONTROLLER_ID,
+      ...Array.from({ length: 63 }, () => crypto.randomUUID()),
+    ];
+
+    // The registry queue runs the revocations in call order.
+    await Promise.all(controllerIds.map(controllerId => registry.revokeController(controllerId)));
+
+    await expect(
+      registry.registerController({ controllerId: CONTROLLER_ID, transport: 'native' })
+    ).resolves.toBe(true);
+    await expect(
+      registry.registerController({ controllerId: SECOND_CONTROLLER_ID, transport: 'native' })
+    ).resolves.toBe(false);
   });
 });

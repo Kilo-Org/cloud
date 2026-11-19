@@ -101,6 +101,7 @@ function workspaceSummary(
 const COORDINATES: PreviewTargetResult = {
   status: 'ok' as const,
   coordinates: {
+    transport: 'durable-object' as const,
     provider: 'cloudflare-containers' as const,
     logicalSandboxId: SANDBOX_ID,
     allocationRef: 'allocation-ref',

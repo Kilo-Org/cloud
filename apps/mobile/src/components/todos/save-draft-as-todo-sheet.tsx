@@ -1,11 +1,10 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic } from '@/lib/haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { QueryError } from '@/components/query-error';
@@ -13,15 +12,24 @@ import { SheetTitleRow } from '@/components/sheet-title-row';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Button } from '@/components/ui/button';
 import { ListTodo } from '@/components/ui/icons';
+import { IconTile } from '@/components/ui/icon-tile';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
+import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { i18n } from '@/i18n';
+import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { isSignOutActive } from '@/lib/auth/sign-out-state';
+import {
+  isExpectedAuthFailure,
+  settledTrpcUnauthorizedHandling,
+} from '@/lib/auth/trpc-unauthorized';
 import { invalidateTodoQueries, useTodoLists } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { todoFromDraft } from '@/lib/todos/todo-model';
 import { todoListSettingsPath } from '@/lib/todos/todo-routes';
 import { type TodoList } from '@/lib/todos/todo-types';
-import { trpcClient, useTRPC } from '@/lib/trpc';
+import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
 import { TODO_SHEET_STATE_BODY_CLASS } from './todo-sheet-body';
@@ -34,6 +42,25 @@ type SaveDraftAsTodoSheetProps = {
   onSaved: () => void;
   onClose: () => void;
 };
+
+/**
+ * Reports a save that failed. The draft stays in the composer either way: only
+ * a saved to-do lets the screen discard it. A refused session credential
+ * reaches the auth handler through the mutation cache. When that handler ends
+ * the session, its own toast is the report, and the draft waits for the same
+ * account's next sign-in; when it renews the token, the save still failed and
+ * says so.
+ */
+async function reportSaveFailure(error: unknown, epoch: number): Promise<void> {
+  if (isExpectedAuthFailure(error)) {
+    // Waits for the handler run the mutation cache started for this error.
+    await settledTrpcUnauthorizedHandling();
+    if (!isCurrentAuthEpoch(epoch) || isSignOutActive()) {
+      return;
+    }
+  }
+  toast.error(error instanceof Error ? error.message : i18n.t('common.somethingWentWrong'));
+}
 
 /**
  * The list picker behind the new-session discard confirm's "Save as to-do":
@@ -51,9 +78,17 @@ export function SaveDraftAsTodoSheet({
   const router = useRouter();
   const queryClient = useQueryClient();
   const colors = useThemeColors();
-  const { bottom } = useSafeAreaInsets();
+  const bottomClearance = useDetailScreenBottomPadding();
   const lists = useTodoLists(organizationId, visible);
   const [savingListId, setSavingListId] = useState<string | null>(null);
+  // Through the query client, so the mutation cache sees a failure: a 401
+  // there goes to the auth handler, as it does for every other mutation.
+  // `networkMode: 'always'` keeps an offline save settling with its network
+  // error instead of pausing: a paused save would hold the rows disabled and
+  // could resume after the sheet closed, discarding the draft then.
+  const createTodo = useMutation(
+    trpc.todos.items.create.mutationOptions({ networkMode: 'always' })
+  );
   // The create-list route is a formSheet, and the native sheet stacks above a
   // formSheet route: with the sheet up, the form would render behind it. Drop
   // the sheet while the form is open and restore it on return, so the picker
@@ -77,18 +112,26 @@ export function SaveDraftAsTodoSheet({
     if (!todo || savingListId !== null) {
       return;
     }
+    const epoch = currentAuthEpoch();
     setSavingListId(list.id);
     try {
-      await trpcClient.todos.items.create.mutate({ listId: list.id, ...todo });
+      await createTodo.mutateAsync({ listId: list.id, ...todo });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : i18n.t('common.somethingWentWrong'));
+      // The rows stay locked until the failure is reported, so a second tap
+      // cannot succeed first and then be followed by this attempt's toast.
+      await reportSaveFailure(error, epoch);
       setSavingListId(null);
+      return;
+    }
+    setSavingListId(null);
+    // A save that settles after the account changed must not discard the
+    // draft or announce itself to the next account.
+    if (!isCurrentAuthEpoch(epoch)) {
       return;
     }
     void invalidateTodoQueries(queryClient, trpc);
     notificationHaptic(Haptics.NotificationFeedbackType.Success);
     toast.success(t('todos.saveSheet.saved', { list: list.name }));
-    setSavingListId(null);
     onSaved();
   }
 
@@ -103,6 +146,7 @@ export function SaveDraftAsTodoSheet({
     body = (
       <QueryError
         placement="static"
+        inset="gutter"
         onRetry={() => void lists.refetch()}
         isRetrying={lists.isFetching}
       />
@@ -129,16 +173,14 @@ export function SaveDraftAsTodoSheet({
         accessibilityRole="button"
         accessibilityLabel={list.name}
         accessibilityState={{ disabled: savingListId !== null }}
-        className="min-h-14 flex-row items-center gap-3 border-b border-hair-soft px-5 py-2 active:opacity-70"
+        className="min-h-14 flex-row items-center gap-3 border-b-[0.5px] border-hair-soft px-4 py-3 active:opacity-70"
       >
-        <View className="size-8 items-center justify-center rounded-lg bg-secondary">
-          {list.emoji ? (
-            <Text className="text-base">{list.emoji}</Text>
-          ) : (
-            <ListTodo size={16} color={colors.mutedForeground} />
-          )}
-        </View>
-        <Text className="min-w-0 flex-1 text-base text-foreground" numberOfLines={1}>
+        <IconTile
+          tint={NEUTRAL_TINT}
+          icon={list.emoji ? undefined : ListTodo}
+          content={list.emoji ? <Text className="text-base">{list.emoji}</Text> : undefined}
+        />
+        <Text className="min-w-0 flex-1 text-sm text-foreground" numberOfLines={1}>
           {list.name}
         </Text>
         {savingListId === list.id ? <ActivityIndicator color={colors.mutedForeground} /> : null}
@@ -167,7 +209,7 @@ export function SaveDraftAsTodoSheet({
       {/* The title row takes the under-handle padding itself. */}
       <View className="flex-1">
         <SheetTitleRow title={t('todos.saveSheet.title')} onClose={onClose} />
-        <ScrollView nestedScrollEnabled contentContainerStyle={{ paddingBottom: bottom + 16 }}>
+        <ScrollView nestedScrollEnabled contentContainerStyle={{ paddingBottom: bottomClearance }}>
           {body}
         </ScrollView>
       </View>

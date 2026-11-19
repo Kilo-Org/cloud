@@ -2,14 +2,13 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
-import { CenteredState } from '@/components/centered-state';
+import { StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
+import { DirectionalArrowLeft } from '@/components/ui/directional-icons';
+import { RotateCcw } from '@/components/ui/icons';
 import { AGENTS_SESSIONS_INDEX_HREF } from '@/lib/agents-sessions-route';
 
 import { RestoredRouteFallback } from './restored-route-fallback';
-import { performCopy } from './use-message-copy';
 
 type SessionErrorVariant = 'neutral' | 'not-found' | 'permission' | 'server';
 
@@ -20,16 +19,18 @@ type SessionPermanentErrorProps = {
   /** The denial only a retry can clear; omitted for a permanent one. */
   readonly retry?: (() => void) | undefined;
   readonly isRetrying: boolean;
-  /** The session id and denial, so the person can report what they hit. */
-  readonly copyText: string;
   /** This open was the relaunch repair's automatic restore, not a choice. */
   readonly restoredRouteOpen: boolean;
 };
 
 /**
  * The session route's terminal body: a session the server refuses to answer
- * for, or one that never resolved. It keeps Copy and Back, and it never offers
- * a retry for a permanent denial.
+ * for, or one that never resolved. A retryable denial offers its retry beside
+ * the way back; a permanent one offers the way back alone, and never a retry.
+ *
+ * The way back truncates every `agent-chat` route above the sessions index, so
+ * a composer still on the stack under a failed session is gone with it instead
+ * of being revealed by a plain back.
  *
  * An automatic restore that lands here leaves instead: nobody asked for this
  * screen, so the app returns to the screen it starts on instead of holding a
@@ -42,58 +43,44 @@ export function SessionPermanentError({
   message,
   retry,
   isRetrying,
-  copyText,
   restoredRouteOpen,
 }: Readonly<SessionPermanentErrorProps>) {
   const router = useRouter();
   const { t } = useTranslation();
+  const backToSessions = (
+    <StateAction
+      label={t('agentChat.session.backToSessions')}
+      icon={DirectionalArrowLeft}
+      onPress={() => {
+        // POP_TO reuses the `(tabs)` route under this screen and truncates
+        // every `agent-chat` route above it.
+        router.dismissTo(AGENTS_SESSIONS_INDEX_HREF);
+      }}
+    />
+  );
   return (
     <>
       {restoredRouteOpen ? <RestoredRouteFallback /> : null}
-      <CenteredState>
-        <View className="items-center gap-3 px-6">
-          <QueryError
-            variant={variant}
-            placement="top"
-            className="px-0 pt-0"
-            title={title}
-            message={message}
-            onRetry={retry}
-            isRetrying={isRetrying}
-          />
-          {/* One primary action per surface (DESIGN.md): Back is the recovery
-              action, so it fills; Copy stays outlined as the utility. Dark takes
-              the lifted olive `--selection` with its own label tone instead of
-              the glare of #ffdd00, so both themes give the control the light
-              mode's weight. */}
-          <View className="flex-row gap-3">
-            <Button
-              variant="outline"
-              size="action"
-              accessibilityLabel={t('agentChat.session.copyErrorDetails')}
-              onPress={() => {
-                void performCopy(copyText);
-              }}
-            >
-              <Text>{t('common.copy')}</Text>
-            </Button>
-            <Button
-              size="action"
-              className="bg-primary dark:bg-selection"
-              onPress={() => {
-                // POP_TO reuses the `(tabs)` route under this screen and
-                // truncates every `agent-chat` route above it, so a composer
-                // still on the stack under a missing session is gone with it.
-                router.dismissTo(AGENTS_SESSIONS_INDEX_HREF);
-              }}
-            >
-              <Text className="text-primary-foreground dark:text-selection-foreground">
-                {t('agentChat.session.backToSessions')}
-              </Text>
-            </Button>
-          </View>
-        </View>
-      </CenteredState>
+      <QueryError
+        variant={variant}
+        title={title}
+        message={message}
+        action={
+          retry === undefined ? (
+            backToSessions
+          ) : (
+            <View className="flex-row flex-wrap items-center justify-center gap-3">
+              <StateAction
+                label={t('common.retry')}
+                icon={RotateCcw}
+                loading={isRetrying}
+                onPress={retry}
+              />
+              {backToSessions}
+            </View>
+          )
+        }
+      />
     </>
   );
 }

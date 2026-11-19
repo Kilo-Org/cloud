@@ -16,7 +16,11 @@ vi.mock('@/i18n', () => ({
 vi.mock('expo-localization', () => ({
   getCalendars: () => [{ uses24hourClock: settings.uses24hourClock }],
 }));
-vi.mock('@/lib/utils', () => ({ parseTimestamp: (at: string) => new Date(at), timeAgo: () => '' }));
+vi.mock('@/lib/utils', () => ({
+  parseTimestamp: (at: string) => new Date(at),
+  relativeTime: () => '',
+  timeAgo: () => '',
+}));
 
 beforeEach(() => {
   vi.useFakeTimers();

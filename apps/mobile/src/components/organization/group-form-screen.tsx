@@ -1,8 +1,8 @@
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
-import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
-import { Users } from '@/components/ui/icons';
+import { Lock } from '@/components/ui/icons';
 
 import { EmptyState } from '@/components/empty-state';
 import { GroupForm } from '@/components/organization/group-form';
@@ -11,9 +11,7 @@ import { PermissionDenied } from '@/components/organization/permission-denied';
 import { selectOrgListErrorView } from '@/components/organization/org-list-error-view';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Text } from '@/components/ui/text';
 import { useOrgGroup } from '@/lib/hooks/use-org-groups-queries';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 
@@ -52,7 +50,11 @@ export function OrganizationGroupFormScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('organization.settingsOnWeb.groups')} />
-        <EmptyState icon={Users} placement="top" title={t('organization.groups.enterpriseOnly')} />
+        <EmptyState
+          icon={Lock}
+          title={t('organizationModelAccess.enterpriseOnlyTitle')}
+          description={t('organization.groups.enterpriseOnly')}
+        />
       </View>
     );
   }
@@ -61,7 +63,10 @@ export function OrganizationGroupFormScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('organization.settingsOnWeb.groups')} />
-        <PermissionDenied description={t('organization.groups.permissionDenied')} />
+        <PermissionDenied
+          description={t('organization.groups.permissionDenied')}
+          showBack={false}
+        />
       </View>
     );
   }
@@ -70,7 +75,7 @@ export function OrganizationGroupFormScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('organization.settingsOnWeb.groups')} />
-        <View className="gap-4 px-6 pt-4">
+        <View className="gap-3 px-4 pt-3">
           <Skeleton className="h-11 rounded-lg" />
           <Skeleton className="h-20 rounded-lg" />
         </View>
@@ -80,9 +85,17 @@ export function OrganizationGroupFormScreen() {
 
   if (groupQuery.isError) {
     const errorView = selectOrgListErrorView(groupQuery.error);
+    // `groups.get` answers an unknown or deleted group with NOT_FOUND, so the
+    // missing group arrives here, not as an empty success.
+    if (errorView.variant === 'not-found') {
+      return <GroupNotFound />;
+    }
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('organization.settingsOnWeb.groups')} />
+        <ScreenHeader
+          title={t('organization.settingsOnWeb.groups')}
+          backFallback={GROUPS_LIST_PATH as Href}
+        />
         <QueryError
           variant={errorView.variant}
           onRetry={errorView.showRetry ? () => void groupQuery.refetch() : undefined}
@@ -101,27 +114,19 @@ export function OrganizationGroupFormScreen() {
   return <GroupForm key={group?.id ?? 'new'} organizationId={organizationId} group={group} />;
 }
 
+/**
+ * The shared not-found state. The header owns the one way out, and its
+ * fallback lands on the groups list when a deep link left no history to pop.
+ */
 function GroupNotFound() {
-  const router = useRouter();
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('organization.settingsOnWeb.groups')} />
-      <EmptyState
-        icon={Users}
-        placement="top"
-        title={t('organization.groups.notFound')}
-        action={
-          <Button
-            variant="outline"
-            onPress={() => {
-              router.replace(GROUPS_LIST_PATH as Href);
-            }}
-          >
-            <Text>{t('common.back')}</Text>
-          </Button>
-        }
+      <ScreenHeader
+        title={t('organization.settingsOnWeb.groups')}
+        backFallback={GROUPS_LIST_PATH as Href}
       />
+      <QueryError variant="not-found" message={t('organization.groups.notFound')} />
     </View>
   );
 }

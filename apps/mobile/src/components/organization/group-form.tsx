@@ -2,7 +2,6 @@ import { type Href, useNavigation, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
-import { Search } from '@/components/ui/icons';
 
 import { GroupMemberPicker } from '@/components/organization/group-member-picker';
 import {
@@ -23,9 +22,10 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
-import { Input } from '@/components/ui/input';
+import { SearchField } from '@/components/ui/search-field';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 import { type OrgGroup, useOrgGroupMutations } from '@/lib/hooks/use-org-groups-queries';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import {
   type ActiveOrgMember,
   isActiveOrgMember,
@@ -34,7 +34,6 @@ import {
 import { usePopOnce } from '@/lib/navigation/pop-once';
 import { armLeaveSettle } from '@/lib/navigation/leave-settle';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 const GROUPS_LIST_PATH = '/(app)/(tabs)/(3_profile)/organization/groups' as const;
 const GROUP_FORM_PATH = '/(app)/(tabs)/(3_profile)/organization/group-form' as const;
@@ -76,7 +75,6 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
   const popOnce = usePopOnce();
   const stackSafeReplace = useStackSafeReplace();
   const { t } = useTranslation();
-  const colors = useThemeColors();
   const mutations = useOrgGroupMutations(organizationId);
   const orgWithMembers = useOrgWithMembers(organizationId);
   const nameRef = useRef(group?.name ?? '');
@@ -89,7 +87,10 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
   const [nameError, setNameError] = useState<'required' | 'tooLong' | null>(null);
   const [dirty, setDirty] = useState(false);
   const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<'name'>();
-  const guard = useMetadataLeaveGuard({ enabled: true });
+  const saving = mutations.create.isPending || mutations.updateDetails.isPending;
+  const removing = mutations.remove.isPending;
+  const busy = saving || removing;
+  const guard = useMetadataLeaveGuard({ enabled: true, saving: busy });
   const { confirm, dialog } = useConfirmDialog();
   const initial =
     group === undefined
@@ -109,10 +110,14 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
       },
       initial
     );
-    if (next !== dirty) {
-      setDirty(next);
-      guard.handleDirtyChange(next);
-    }
+    setDirty(next);
+    // Reported on every edit, not only on a change of this form's own verdict: a
+    // caller-driven leave whose pop the navigator dropped leaves the form mounted
+    // with `dirty` still true while the guard stands down, so a gated report would
+    // never re-arm it and a later Back would leave silently with the draft. The
+    // hook's `setState` bails out on an unchanged value, so repeating the verdict
+    // costs nothing.
+    guard.handleDirtyChange(next);
   };
 
   const leaveToList = () => {
@@ -222,17 +227,13 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
     });
   };
 
-  const saving = mutations.create.isPending || mutations.updateDetails.isPending;
-  const removing = mutations.remove.isPending;
-  const busy = saving || removing;
-
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={group === undefined ? t('organization.groups.create') : group.name} />
       <TabScreenScrollView
         ref={scrollRef}
         className="flex-1"
-        contentContainerClassName="gap-5 px-6 pb-10 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
@@ -278,20 +279,15 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
         {group === undefined ? null : (
           <View className="gap-2">
             <FormFieldLabel label={t('organization.groups.membersLabel')} />
-            <View className="flex-row items-center gap-2 rounded-lg bg-secondary px-3">
-              <Search size={16} color={colors.mutedForeground} />
-              <Input
-                className="min-h-10 flex-1 border-0 bg-transparent pl-0"
-                placeholder={t('organization.groups.searchMembers')}
-                accessibilityLabel={t('organization.groups.membersLabel')}
-                autoCapitalize="none"
-                autoCorrect={false}
-                onChangeText={value => {
-                  memberSearchRef.current = value;
-                  setMemberQuery(value);
-                }}
-              />
-            </View>
+            <SearchField
+              accessibilityLabel={t('organization.groups.membersLabel')}
+              placeholder={t('organization.groups.searchMembers')}
+              hasText={memberQuery !== ''}
+              onChangeText={value => {
+                memberSearchRef.current = value;
+                setMemberQuery(value);
+              }}
+            />
             <GroupMemberPicker
               picker={memberPicker}
               error={orgWithMembers.error}

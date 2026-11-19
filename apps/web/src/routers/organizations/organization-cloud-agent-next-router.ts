@@ -127,7 +127,10 @@ import { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-
 import { TRPCError } from '@trpc/server';
 import { getBalanceForOrganizationUser } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { APP_CLIENT_HEADER, isMobileClient } from '@kilocode/web-shared/lib/app-headers';
-import { backgroundActivityInventorySchema } from '@kilocode/session-ingest-contracts';
+import {
+  agentBoardSchema,
+  backgroundActivityInventorySchema,
+} from '@kilocode/session-ingest-contracts';
 import { buildCloudAgentNextEligibility } from '../cloud-agent-next-eligibility';
 import {
   getWorktreeChangesOutputSchema,
@@ -1474,6 +1477,30 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         input.organizationId
       );
       return createCloudAgentNextClient(token).getBackgroundActivity(input.cloudAgentSessionId);
+    }),
+
+  getAgentBoard: organizationMemberProcedure
+    .input(
+      z
+        .object({
+          cloudAgentSessionId: z.string().regex(/^workspace_[\w-]+$/),
+          organizationId: z.string().uuid(),
+        })
+        .strict()
+    )
+    .output(agentBoardSchema.nullable())
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+      const token = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      return createCloudAgentNextClient(token).getAgentBoard(input.cloudAgentSessionId);
     }),
 
   /** Complete stored details for an expanded tool preview; authorized on every read. */

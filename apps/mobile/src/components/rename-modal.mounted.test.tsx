@@ -29,11 +29,19 @@ vi.mock('react-native', () => ({
     },
   },
   Pressable: 'Pressable',
+  StatusBar: { currentHeight: 0 },
   TextInput: 'TextInput',
+  useWindowDimensions: () => ({ fontScale: 1, height: 844, scale: 3, width: 390 }),
   View: 'View',
   // `@/components/ui/input` reads `I18nManager.isRTL` through
   // `withRtlInputAlignment` on every render.
   I18nManager: { isRTL: false },
+}));
+// The card hosts the app's confirm sheet, whose header draws its own close
+// control and reads the window insets.
+vi.mock('@/components/ui/icons', () => ({ Share: 'Share', X: 'X' }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 // `withUiDeadline` reads its timeout copy from here; the field contract under

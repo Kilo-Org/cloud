@@ -38,7 +38,14 @@ export function visibleHomeBriefing(
   );
 }
 
-export function briefingSummaryStatusKey(status: string): string {
+/**
+ * `not_admitted` marks a scheduled row the morning window never admitted, a
+ * skipped generation rather than a failure or a timeout.
+ */
+export function briefingSummaryStatusKey(status: string, error?: string | null): string {
+  if ((status === 'failed' || status === 'unavailable') && error === 'not_admitted') {
+    return 'agentBriefing.summaryNotAdmitted';
+  }
   switch (status) {
     case 'disabled': {
       return 'agentBriefing.summaryUnavailable';
@@ -103,6 +110,114 @@ export function briefingAccessDenied(error: unknown): boolean {
  */
 export function briefingReportMissing(error: unknown): boolean {
   return readTrpcErrorField(error, 'code') === 'NOT_FOUND';
+}
+
+/**
+ * The phase one brief read renders in. Each state is a literal, so a screen
+ * switches on it and renders exactly one branch; a set of booleans read beside
+ * the data is the implicit state machine the State Machines rule forbids.
+ *
+ * `offline` is its own phase because an offline-paused first fetch stays
+ * pending forever: `isPending` alone cannot tell a slow network from a fetch
+ * that will not start, so connectivity is the discriminator. The detail screen
+ * renders this whole union; the list screen's settled-no-data state is `empty`
+ * instead of `failed` ({@link BriefingListPhase}).
+ */
+export type BriefingDetailPhase = 'loading' | 'offline' | 'denied' | 'missing' | 'failed' | 'ready';
+
+export type BriefingListPhase = 'loading' | 'offline' | 'denied' | 'failed' | 'empty' | 'ready';
+
+type BriefingReadSignals = {
+  /** A brief or preferences object the cache holds, so data can render now. */
+  readonly hasData: boolean;
+  readonly offline: boolean;
+  readonly isPending: boolean;
+  readonly isError: boolean;
+  readonly accessDenied: boolean;
+};
+
+/**
+ * The shared precedence of a brief read, in the one order the phases can claim
+ * their signals:
+ *
+ * 1. cached data is `ready`, whatever the live flags say — a read the cache can
+ *    answer keeps rendering it while offline, refetching or retrying;
+ * 2. `offline` beats a pending fetch (which never starts), a denial and a
+ *    transient failure, so the screen says why it is waiting;
+ * 3. `denied` beats the remaining signals: the abandoned pending read settles as
+ *    FORBIDDEN, and only that phase's copy tells the person what happened;
+ * 4. a pending fetch is `loading`;
+ * 5. anything else without data is `failed` — a settled read that answered
+ *    neither data nor a denial offers the retry the screen can start.
+ */
+function briefingReadPhase(signals: BriefingReadSignals): Exclude<BriefingDetailPhase, 'missing'> {
+  if (signals.hasData) {
+    return 'ready';
+  }
+  if (signals.offline) {
+    return 'offline';
+  }
+  if (signals.accessDenied) {
+    return 'denied';
+  }
+  if (signals.isPending) {
+    return 'loading';
+  }
+  return 'failed';
+}
+
+/**
+ * The list screen's phase. Data first, then offline, denial and loading, as
+ * {@link briefingReadPhase} orders them; a settled list with no reports and no
+ * error is `empty`, the one phase whose copy invites a first brief.
+ */
+export function selectBriefingListPhase(input: {
+  readonly hasReports: boolean;
+  readonly offline: boolean;
+  readonly isPending: boolean;
+  readonly isError: boolean;
+  readonly accessDenied: boolean;
+}): BriefingListPhase {
+  const phase = briefingReadPhase({ ...input, hasData: input.hasReports });
+  if (phase !== 'failed') {
+    return phase;
+  }
+  return input.isError ? 'failed' : 'empty';
+}
+
+/**
+ * The detail screen's phase. Precedence of {@link briefingReadPhase}, plus
+ * `missing` ahead of loading: a report the server says is gone (expired,
+ * deleted, or whose sources were removed) needs its own copy, never a retry
+ * loop or a permission claim.
+ */
+export function selectBriefingDetailPhase(input: {
+  readonly hasReport: boolean;
+  readonly offline: boolean;
+  readonly isPending: boolean;
+  readonly isError: boolean;
+  readonly accessDenied: boolean;
+  readonly missing: boolean;
+}): BriefingDetailPhase {
+  if (!input.hasReport && !input.offline && !input.accessDenied && input.missing) {
+    return 'missing';
+  }
+  return briefingReadPhase({ ...input, hasData: input.hasReport });
+}
+
+/**
+ * The settings screen's phase: the same precedence over the preferences read,
+ * which has no empty state — settled without data is a failure to retry, and a
+ * report cannot be missing here.
+ */
+export function selectBriefingSettingsPhase(input: {
+  readonly hasPreferences: boolean;
+  readonly offline: boolean;
+  readonly isPending: boolean;
+  readonly isError: boolean;
+  readonly accessDenied: boolean;
+}): Exclude<BriefingDetailPhase, 'missing'> {
+  return briefingReadPhase({ ...input, hasData: input.hasPreferences });
 }
 
 /** `agentBriefing.safeguardInput`: whole seconds, 1 to 600, and a positive safe-integer spend. */

@@ -1161,6 +1161,11 @@ const controlPlaneHelloFrameSchema = z
      * advertise it keeps the launch-time grant.
      */
     transferGrants: z.literal(true).optional(),
+    /**
+     * Optional capability: the wrapper opens the preview tunnel when it gets a
+     * `preview.tunnel` frame. A wrapper without it has no preview.
+     */
+    previewTunnel: z.literal(true).optional(),
   })
   .strict();
 
@@ -1573,6 +1578,7 @@ export const controlPlaneNativeOperationSchema = z.discriminatedUnion('name', [
   z.object({ name: z.literal('session.status') }).strict(),
   z.object({ name: z.literal('session.todo') }).strict(),
   z.object({ name: z.literal('session.background') }).strict(),
+  z.object({ name: z.literal('session.board') }).strict(),
   z
     .object({
       name: z.literal('session.diff'),
@@ -1657,6 +1663,15 @@ const controlPlaneTransferGrantResultFrameSchema = z.discriminatedUnion('ok', [
     })
     .strict(),
 ]);
+
+/**
+ * Sandbox DO -> wrapper: open the preview tunnel now. The frame carries no
+ * address or secret; the wrapper derives the tunnel URL from its control URL
+ * and authenticates with its launch credential.
+ */
+const controlPlanePreviewTunnelFrameSchema = z
+  .object({ type: z.literal('preview.tunnel') })
+  .strict();
 
 const controlPlanePreviewResultFrameSchema = z.discriminatedUnion('ok', [
   z
@@ -1767,6 +1782,7 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlanePreviewResultFrameSchema,
   controlPlaneTransferGrantFrameSchema,
   controlPlaneTransferGrantResultFrameSchema,
+  controlPlanePreviewTunnelFrameSchema,
   controlPlaneHistoryPageFrameSchema,
   controlPlaneHistoryRecentFrameSchema,
   controlPlaneHistoryResultFrameSchema,
@@ -1874,6 +1890,7 @@ export type ControlPlaneKiloRequestInput = z.infer<typeof controlPlaneKiloReques
 export type ControlPlaneKiloRequestFrame = z.infer<typeof controlPlaneKiloRequestFrameSchema>;
 export type ControlPlaneKiloResultFrame = z.infer<typeof controlPlaneKiloResultFrameSchema>;
 export type ControlPlanePreviewListFrame = z.infer<typeof controlPlanePreviewListFrameSchema>;
+export type ControlPlanePreviewTunnelFrame = z.infer<typeof controlPlanePreviewTunnelFrameSchema>;
 export type ControlPlanePreviewResultFrame = z.infer<typeof controlPlanePreviewResultFrameSchema>;
 export type ControlPlaneTransferGrantFrame = z.infer<typeof controlPlaneTransferGrantFrameSchema>;
 export type ControlPlaneTransferGrantResultFrame = z.infer<

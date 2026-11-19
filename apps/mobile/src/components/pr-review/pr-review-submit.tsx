@@ -34,9 +34,11 @@ import {
 } from '@/components/pr-review/pr-form-sheet-chrome';
 import { ReviewEventChips } from '@/components/pr-review/review-event-chips';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Text } from '@/components/ui/text';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
@@ -109,9 +111,7 @@ function CapabilityReviewEventChips(props: {
   const { t } = useTranslation();
   return (
     <View className="gap-1.5">
-      <Text className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-        {t('prReview.eventChips.label')}
-      </Text>
+      <Text variant="eyebrow">{t('prReview.eventChips.label')}</Text>
       <RadioGroup label={t('prReview.eventChips.label')} className="flex-row flex-wrap gap-2">
         {props.events.map(providerEvent => {
           const event = (Object.keys(EVENT_TO_PROVIDER) as ReviewEvent[]).find(
@@ -163,7 +163,8 @@ type PrReviewSubmitProps = Readonly<{
   number: number;
   headSha: string;
   title: string;
-  eyebrow: string;
+  /** The reference under the title; absent when the route names no request. */
+  eyebrow?: string;
   /**
    * The provider ref (s6). Present on the GitLab/Bitbucket surface: the
    * submit posts one `providerReview.submitReview` event whose fresh pending
@@ -452,7 +453,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode="interactive"
       >
-        <View className="gap-4 px-6 pt-4">
+        <View className={SCREEN_BODY_CLASS}>
           {reviewEvents ? (
             <CapabilityReviewEventChips
               events={reviewEvents}
@@ -489,14 +490,14 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
             />
           </View>
 
-          <View className="gap-1 rounded-lg border border-hair-soft bg-secondary px-3 py-1.5">
+          <Card className="gap-1">
             <Text className="text-sm font-medium text-foreground">
               {formatNumber(queuedCount, i18n.language)}{' '}
               {t('prReview.submit.pendingComment', { count: queuedCount })}
             </Text>
             {queueHint}
             {/* Keyboard-open viewport is tight; keep the count, hide per-item
-                rows so Submit + Cancel stay above the keyboard at offset 0. */}
+                rows so Submit stays above the keyboard at offset 0. */}
             {!keyboardVisible
               ? pending.items.map(item => (
                   <PrReviewPendingCommentRow
@@ -513,7 +514,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
                   />
                 ))
               : null}
-          </View>
+          </Card>
 
           {partialResult ? (
             <AccessibleStatus message={partialResult} tone="status" className="text-xs" />
@@ -548,19 +549,6 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
             accessibilityLabel={submitLabel}
           >
             <Text>{submitLabel}</Text>
-          </Button>
-          <Button
-            variant="ghost"
-            onPress={() => {
-              if (!isSubmitting) {
-                onDismiss();
-              }
-            }}
-            disabled={isSubmitting}
-            className="mt-2"
-            accessibilityLabel={t('common.cancel')}
-          >
-            <Text>{t('common.cancel')}</Text>
           </Button>
         </PrFormSheetFooter>
       </ScrollView>

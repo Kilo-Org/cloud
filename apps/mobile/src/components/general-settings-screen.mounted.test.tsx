@@ -24,6 +24,7 @@ const storage = vi.hoisted(() => ({
   setItemAsync: vi.fn(),
 }));
 vi.mock('expo-local-authentication', () => native);
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('expo-secure-store', () => storage);
 // The E2E fault hook stays closed: rejected reads come from the SecureStore
 // mock, not the bundle-time fault window.

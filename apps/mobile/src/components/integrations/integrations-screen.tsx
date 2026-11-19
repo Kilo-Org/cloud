@@ -10,6 +10,9 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { useConfirmDialog } from '@/components/ui/dialog';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { openAppShellHandoff } from '@/lib/app-shell-handoff';
@@ -23,6 +26,7 @@ import { useBitbucketIntegrationStatus } from '@/lib/hooks/use-bitbucket';
 import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useOrgDeepLinkSelection } from '@/lib/hooks/use-org-deep-link-selection';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { buildIntegrationRows, type IntegrationRow } from '@/lib/integrations/integration-rows';
@@ -129,7 +133,16 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
   // once they exist; only a read that never landed takes over the screen.
   if (statuses.isError && statuses.data == null) {
     if (isPermissionDeniedError(statuses.error)) {
-      return <PermissionDenied description={t('integrations.permissionDenied')} />;
+      return (
+        <View className="flex-1 bg-background">
+          <ScreenHeader
+            title={t('integrations.title')}
+            subtitle={organizationName}
+            backFallback={PROFILE_TAB_HREF}
+          />
+          <PermissionDenied description={t('integrations.permissionDenied')} showBack={false} />
+        </View>
+      );
     }
     return (
       <View className="flex-1 bg-background">
@@ -219,15 +232,15 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
-        <View className="gap-4">
-          <Text className="text-sm text-muted-foreground">{t('integrations.subtitle')}</Text>
-          {noteKey ? <Text className="text-xs text-muted-foreground">{t(noteKey)}</Text> : null}
+        <Section>
+          <Text variant="muted">{t('integrations.subtitle')}</Text>
+          {noteKey ? <Text variant="caption">{t(noteKey)}</Text> : null}
           {rows.length > 0 ? (
-            <View className="rounded-lg bg-secondary px-3">
-              {rows.map((row, index) => (
+            <RowGroup leadingTile>
+              {rows.map(row => (
                 <IntegrationProviderRow
                   key={row.provider}
                   row={row}
@@ -248,12 +261,11 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
                   }}
                   onRetryConnection={() => void bitbucket.refetch()}
                   retryingConnection={bitbucket.isFetching}
-                  last={index === rows.length - 1}
                 />
               ))}
-            </View>
+            </RowGroup>
           ) : null}
-        </View>
+        </Section>
       </TabScreenScrollView>
       {dialog}
     </View>
@@ -272,16 +284,21 @@ function IntegrationsSkeleton({ organizationName }: Readonly<{ organizationName?
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View exiting={FadeOut.duration(150)} className="gap-4">
-          <Skeleton className="h-4 w-3/4 rounded" />
-          <View className="rounded-lg bg-secondary px-3">
-            {Array.from({ length: 5 }, (_, index) => (
-              <Skeleton key={index} className="my-3 h-9 w-full rounded" />
-            ))}
-          </View>
+        <Animated.View exiting={FadeOut.duration(150)}>
+          <Section>
+            {/* The section's intro copy runs to two lines on a phone; it is
+                reserved here so the rows do not rise when it arrives. */}
+            <Skeleton className="h-4 w-full rounded" />
+            <Skeleton className="h-4 w-2/3 rounded" />
+            <RowGroup leadingTile>
+              {Array.from({ length: 5 }, (_, index) => (
+                <RowSkeleton key={index} tile subtitle />
+              ))}
+            </RowGroup>
+          </Section>
         </Animated.View>
       </TabScreenScrollView>
     </View>

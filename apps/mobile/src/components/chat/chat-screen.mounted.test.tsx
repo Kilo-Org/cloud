@@ -8,7 +8,7 @@ import { ChatScreen } from '@/components/chat/chat-screen';
 import { type SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { shouldStackHeaderActions } from '@/components/screen-header';
 import type * as ScreenHeaderModule from '@/components/screen-header';
-import { act, type ReactTestRenderer } from '@/test/renderer';
+import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { type StoredChatBackend } from '@/lib/chat/backend-store';
@@ -29,6 +29,7 @@ const state = vi.hoisted(() => ({
   messages: [] as { info: { id: string; role?: string } }[],
   asked: null as string | null,
   askedFrom: null as string | null,
+  askedAnswer: null as string | null,
   displaced: [] as {
     id: string;
     text: string;
@@ -146,6 +147,7 @@ vi.mock('@/lib/chat/use-chat', () => ({
       status: state.status,
       asked: state.asked,
       askedFrom: state.askedFrom,
+      askedAnswer: state.askedAnswer,
       displaced: state.displaced,
       waiting: [],
       failed: state.failed,
@@ -162,6 +164,7 @@ vi.mock('@/lib/chat/turns', () => ({
   asMessages: () => state.messages,
   askedMessageId: (sessionId: string) => `${sessionId}:asked`,
   displacedMessageId: (sessionId: string, id: string) => `${sessionId}:displaced:${id}`,
+  partialAnswerMessageId: (questionId: string) => `${questionId}:partial`,
 }));
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({ organizationId: null }),
@@ -205,7 +208,11 @@ vi.mock('@/components/agents/part-detail-sheet-host', () => ({
 vi.mock('@/components/agents/session-message-list', () => ({
   SessionMessageList: 'SessionMessageList',
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: (props: { action?: ReactElement }) =>
+    createElement('EmptyState', props, props.action),
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
 vi.mock('@/components/screen-header', async importOriginal => ({
@@ -221,6 +228,8 @@ vi.mock('@/components/ui/icons', () => ({
   ServerCrash: 'ServerCrash',
   WifiOff: 'WifiOff',
   Wrench: 'Wrench',
+  ArrowLeft: 'ArrowLeft',
+  RotateCcw: 'RotateCcw',
 }));
 vi.mock('@/components/ui/status-dot', () => ({ StatusDot: 'StatusDot' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
@@ -283,6 +292,7 @@ beforeEach(() => {
   state.messages = [];
   state.asked = null;
   state.askedFrom = null;
+  state.askedAnswer = null;
   state.displaced = [];
   state.failed = null;
   state.failureKey = null;
@@ -345,16 +355,34 @@ const messagesOf = (tree: ReactTestRenderer): unknown[] =>
     .findAll(node => (node.type as string) === 'AccessibleStatus')
     .map(node => node.props.message);
 
+/** A control's visible label: `Button` carries it as text, `StateAction` as its `label`. */
+const actionLabel = (action: ReactTestInstance): unknown => {
+  if ((action.type as string) === 'StateAction') {
+    return action.props.label;
+  }
+  const label = action.findAll(node => (node.type as string) === 'Text')[0];
+  return label === undefined ? undefined : label.props.children;
+};
+
 const buttonLabels = (tree: ReactTestRenderer): unknown[] =>
   tree.root
-    .findAll(node => (node.type as string) === 'Button')
-    .map(button => button.find(node => (node.type as string) === 'Text').props.children);
+    .findAll(node => {
+      const type = node.type as string;
+      return type === 'Button' || type === 'StateAction';
+    })
+    .flatMap(action => {
+      const label = actionLabel(action);
+      return label === undefined ? [] : [label];
+    });
 
 /** The button carrying the given label, for the props a press alone cannot show. */
 function buttonOf(tree: ReactTestRenderer, label: unknown) {
   const button = tree.root
-    .findAll(node => (node.type as string) === 'Button')
-    .find(node => node.find(child => (child.type as string) === 'Text').props.children === label);
+    .findAll(node => {
+      const type = node.type as string;
+      return type === 'Button' || type === 'StateAction';
+    })
+    .find(node => actionLabel(node) === label);
   if (button === undefined) {
     throw new TypeError(`No button ${String(label)}`);
   }
@@ -998,6 +1026,7 @@ type BubbleProps = {
   onRetryMessage?: (message: unknown) => void;
   addCredits?: AddCreditsDestination;
   onCopyToComposer?: (text: string) => void;
+  composerText?: string;
 };
 
 type RenderItem = (info: { item: unknown; index: number }) => { props: BubbleProps };
@@ -1052,7 +1081,7 @@ describe('message actions', () => {
     }
   });
 
-  it('puts Retry and Copy to composer on the failed question, and states why under the transcript', async () => {
+  it('puts Retry, Copy to composer and the cause on the failed question, and nothing above the composer', async () => {
     state.status = 'idle';
     state.asked = 'what is a monad';
     state.failureKey = 'modelChat.backends.deletedBackend';
@@ -1065,12 +1094,16 @@ describe('message actions', () => {
     const tree = await mount();
     const failed = bubbleFor(tree, 's1:asked');
 
-    expect(failed.deliveryState).toEqual({ status: 'failed', error: '', reason: 'execution' });
+    expect(failed.deliveryState).toEqual({
+      status: 'failed',
+      error: '',
+      reason: 'chat-response',
+      detailKey: 'modelChat.backends.deletedBackend',
+    });
     expect(bubbleFor(tree, 's1:waiting:0').onRetryMessage).toBeUndefined();
     expect(bubbleFor(tree, 't1').deliveryState).toBeUndefined();
-    expect(tree.root.find(node => (node.type as string) === 'AccessibleStatus').props.message).toBe(
-      'This chat backend was deleted. Choose another backend to continue.'
-    );
+    // The bubble states the failure once; the row above the composer does not repeat it.
+    expect(count(tree, 'AccessibleStatus')).toBe(0);
     // The message carries the one Retry.
     expect(count(tree, 'Button')).toBe(0);
 
@@ -1120,7 +1153,12 @@ describe('message actions', () => {
     const kept = bubbleFor(tree, 's1:displaced:k1');
 
     // It keeps the footer and the recovery it had in the slot.
-    expect(kept.deliveryState).toEqual({ status: 'failed', error: '', reason: 'execution' });
+    expect(kept.deliveryState).toEqual({
+      status: 'failed',
+      error: '',
+      reason: 'chat-response',
+      detailKey: 'modelChat.backends.deletedBackend',
+    });
     expect(bubbleFor(tree, 's1:asked').deliveryState).toEqual(kept.deliveryState);
 
     act(() => {
@@ -1175,7 +1213,8 @@ describe('message actions', () => {
     expect(bubbleFor(tree, 's1:asked').deliveryState).toEqual({
       status: 'failed',
       error: '',
-      reason: 'execution',
+      reason: 'chat-response',
+      detailKey: 'modelChat.backends.deletedBackend',
     });
   });
 
@@ -1244,8 +1283,42 @@ describe('message actions', () => {
     const bubble = bubbleFor(tree, 's1:asked');
 
     // The transcript drew the slot's own bubble, so the recovery is on it.
-    expect(bubble.deliveryState).toEqual({ status: 'failed', error: '', reason: 'execution' });
+    expect(bubble.deliveryState).toEqual({
+      status: 'failed',
+      error: '',
+      reason: 'chat-response',
+      detailKey: 'modelChat.backends.deletedBackend',
+    });
     expect(bubble.onRetryMessage).toBeDefined();
+  });
+
+  it('states a failed answer once, under the words it had reached, with Retry and the question to copy', async () => {
+    state.status = 'idle';
+    state.asked = 'tell a story';
+    state.askedAnswer = 'once upon a time';
+    state.failureKey = 'modelChat.connectionLost';
+    state.messages = [
+      { info: { id: 's1:asked', role: 'user' } },
+      { info: { id: 's1:asked:partial', role: 'assistant' } },
+    ];
+    const tree = await mount();
+    const words = bubbleFor(tree, 's1:asked:partial');
+
+    expect(words.deliveryState).toEqual({
+      status: 'failed',
+      error: '',
+      reason: 'chat-response',
+      detailKey: 'modelChat.connectionLost',
+    });
+    expect(bubbleFor(tree, 's1:asked').deliveryState).toBeUndefined();
+    expect(count(tree, 'AccessibleStatus')).toBe(0);
+    // Copy to composer puts the question back, not the answer's words.
+    expect(words.composerText).toBe('tell a story');
+    expect(words.onCopyToComposer).toBeDefined();
+    act(() => {
+      words.onRetryMessage?.(state.messages[1]);
+    });
+    expect(state.retry).toHaveBeenCalledOnce();
   });
 
   it('shows no recovery under a question asked again while it is being asked', async () => {

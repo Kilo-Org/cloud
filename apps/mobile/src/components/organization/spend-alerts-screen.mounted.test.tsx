@@ -13,11 +13,7 @@ import { i18n } from '@/i18n';
 import { SpendAlertsScreen } from '@/components/organization/spend-alerts-screen';
 import { thresholdError } from '@/components/organization/spend-alert-validators';
 import { formatList } from '@/lib/format';
-import {
-  DENSE_ROW_H11_TOUCH_SLOP_DP,
-  MIN_TAP_TARGET_DP,
-  TOUCH_TARGET_DP,
-} from '@/lib/a11y/tap-target';
+import { MIN_TAP_TARGET_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import { compiledLengthDp } from '@/test/native-dimensions';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
@@ -85,6 +81,9 @@ vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronRight: 'DirectionalChevronRight',
 }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
+// The shared row primitives reach the icon barrel through their trailing cells;
+// its lucide modules cannot be parsed in the mounted environment.
+vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
 vi.mock('@/components/ui/kv-row', () => ({ KvRow: 'KvRow' }));
 vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -208,21 +207,6 @@ function byType(renderer: ReactTestRenderer, nodeType: string): ReactTestInstanc
   return renderer.root.findAll(node => node.type === nodeType);
 }
 
-/** The nearest ancestor View node whose `className` passes `matches`. */
-function findAncestorViewNode(
-  node: ReactTestInstance,
-  matches: (view: ReactTestInstance) => boolean
-): ReactTestInstance | undefined {
-  let parent = node.parent;
-  while (parent) {
-    if (String(parent.type) === 'View' && matches(parent)) {
-      return parent;
-    }
-    parent = parent.parent;
-  }
-  return undefined;
-}
-
 function switchByLabel(renderer: ReactTestRenderer, label: string): ReactTestInstance | undefined {
   return byType(renderer, 'Switch').find(node => node.props.accessibilityLabel === label);
 }
@@ -236,6 +220,14 @@ function channelSwitches(renderer: ReactTestRenderer, channelKey: string): React
   const channelLabel = i18n.t(channelKey);
   return byType(renderer, 'Switch').filter(node =>
     String(node.props.accessibilityLabel).includes(channelLabel)
+  );
+}
+
+/** The row that stands in for the push switch when push is unavailable. */
+function pushOffRow(renderer: ReactTestRenderer): ReactTestInstance | undefined {
+  const caption = i18n.t('spendAlerts.pushOffByCategory');
+  return byType(renderer, 'Pressable').find(
+    node => node.findAll(child => child.props.children === caption).length > 0
   );
 }
 
@@ -422,11 +414,7 @@ describe('SpendAlertsScreen scope line', () => {
     expect(rows).toHaveLength(2);
     expect(rows[0]?.props.label).toBe(i18n.t('preferences.account'));
     expect(rows[0]?.props.value).toBe('Ada');
-    // The owner row is not the group's last, so the divider separates it from
-    // the spend row that closes the group.
-    expect(rows[0]?.props.last).toBeFalsy();
     expect(rows[1]?.props.label).toBe(i18n.t('spendAlerts.spend24h'));
-    expect(rows[1]?.props.last).toBe(true);
   });
 
   it('names an organization scope with the organization name', async () => {
@@ -553,6 +541,11 @@ describe('SpendAlertsScreen non-retryable states', () => {
     const { renderer } = await mountScreen('org-1');
 
     await waitFor(() => byType(renderer, 'PermissionDenied').length === 1);
+    // The header owns the way out, so the state must not repeat a Back action.
+    expect(byType(renderer, 'ScreenHeader')[0]?.props.title).toBe(
+      i18n.t('notifications.channel.spend')
+    );
+    expect(byType(renderer, 'PermissionDenied')[0]?.props.showBack).toBe(false);
     expect(byType(renderer, 'Button')).toHaveLength(0);
     expect(byType(renderer, 'Switch')).toHaveLength(0);
     expect(byType(renderer, 'FormField')).toHaveLength(0);
@@ -748,7 +741,7 @@ describe('SpendAlertsScreen push agreement', () => {
     expect(channelSwitches(renderer, i18n.t('notifications.push'))).toHaveLength(0);
     expect(channelSwitches(renderer, i18n.t('common.email'))).toHaveLength(2);
 
-    press(byType(renderer, 'Pressable')[0]);
+    press(pushOffRow(renderer));
 
     expect(router.push).toHaveBeenCalledWith('/(app)/notifications');
   });
@@ -757,67 +750,31 @@ describe('SpendAlertsScreen push agreement', () => {
     const { renderer } = await mountLoaded({ pushChannelBlocked: true });
 
     expect(channelSwitches(renderer, i18n.t('notifications.push'))).toHaveLength(0);
-    expect(byType(renderer, 'Pressable')).toHaveLength(2);
+    expect(pushOffRow(renderer)).toBeDefined();
   });
 
-  it('reaches the store touch target on the off-category push row without shadowing the email switch', async () => {
+  it('carries the store touch target on the off-category push row itself', async () => {
     const { renderer } = await mountLoaded({ pushCategoryEnabled: false });
 
     // With the category off, each rule card swaps its push switch for a
-    // Pressable aimed at Notifications — the only Pressables on the screen.
-    const rows = byType(renderer, 'Pressable');
-    expect(rows).toHaveLength(2);
-    const cards: { paddingBottom: number }[] = [];
-
-    for (const row of rows) {
-      // The reach joins the row on its bottom side only. A top slop would
-      // shadow the bottom band of the 44 dp Switch node in the row above, so
-      // that side stays at 0.
-      expect(row.props.hitSlop).toEqual({
-        top: 0,
-        bottom: DENSE_ROW_H11_TOUCH_SLOP_DP,
-        left: 0,
-        right: 0,
-      });
-
-      // Android clips touches outside a parent's bounds, so the card that
-      // wraps the row keeps the delivered reach inside itself: its bottom
-      // padding must cover the row's bottom slop band. The pad renders the
-      // shared constant, so the reach stays pinned if the slop value moves.
-      const card = findAncestorViewNode(
-        row,
-        viewHolder =>
-          String(viewHolder.props.className).includes('rounded-lg bg-secondary') &&
-          String(viewHolder.props.className).includes('px-3')
-      );
-      if (!card) {
-        throw new Error('secondary card wrapping the push row not found');
-      }
-      cards.push(card.props.style as { paddingBottom: number });
-    }
-
-    // The audit reads the control's laid-out node and `hitSlop` never
-    // widens it, so assert the box the installed Tailwind and react-native-css
-    // compilers emit for the classes, not a hand-written utility map.
-    // The `toEqual` above already pins the slop shape, so the reach arithmetic
-    // reads its fields through this typed binding.
-    const compiled = await Promise.all(
-      rows.map(row =>
-        compiledLengthDp(row.props.className as string, 'minHeight').then(frame => ({
-          row,
-          frame,
-        }))
-      )
+    // RowFrame aimed at Notifications. The row's own node carries the target,
+    // so no `hitSlop` band reaches across the Email switch above it.
+    const caption = i18n.t('spendAlerts.pushOffByCategory');
+    const rows = byType(renderer, 'Pressable').filter(
+      node => node.findAll(child => child.props.children === caption).length > 0
     );
-    for (const { row, frame } of compiled) {
-      const slop = row.props.hitSlop as { top: number; bottom: number };
-      expect(frame).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
-      expect(frame + slop.top + slop.bottom).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
-    }
+    expect(rows).toHaveLength(2);
 
-    expect(cards.map(card => card.paddingBottom)).toEqual([
-      DENSE_ROW_H11_TOUCH_SLOP_DP,
-      DENSE_ROW_H11_TOUCH_SLOP_DP,
-    ]);
+    // The audit reads the control's laid-out node and `hitSlop` never widens
+    // it, so assert the box the installed Tailwind and react-native-css
+    // compilers emit for the classes, not a hand-written utility map.
+    const frames = await Promise.all(
+      rows.map(row => compiledLengthDp(row.props.className as string, 'minHeight'))
+    );
+    for (const [index, row] of rows.entries()) {
+      expect(row.props.hitSlop).toBeUndefined();
+      expect(frames[index]).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+      expect(frames[index]).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    }
   });
 });

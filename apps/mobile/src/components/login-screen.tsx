@@ -24,6 +24,7 @@ import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useAuth } from '@/lib/auth/auth-context';
 import { type PendingLinkOffer } from '@/lib/auth/native-auth-contract';
 import { announcePendingLinkOutcome, pendingLinkOutcome } from '@/lib/auth/pending-link';
@@ -39,7 +40,7 @@ import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { persistLoginDrafts, restoreLoginDrafts, type SsoRecoveryDraft } from '@/lib/login-draft';
 import { setLanguagePickerBridge } from '@/lib/picker-bridge';
-import { useScreenInsets } from '@/lib/screen-insets';
+import { useScreenInsets, useSideInsetStyle } from '@/lib/screen-insets';
 
 export function LoginScreen() {
   const { sessionEnded, signIn, token: publishedToken } = useAuth();
@@ -62,6 +63,7 @@ export function LoginScreen() {
   } = useDeviceAuth();
   const colors = useThemeColors();
   const insets = useScreenInsets();
+  const sideInsetStyle = useSideInsetStyle();
   const { t } = useTranslation();
   const fontScale = useLiveFontScale();
   // The space the keyboard reveal keeps below a focused field is the height of
@@ -199,7 +201,7 @@ export function LoginScreen() {
     if (persistFailed) {
       return (
         <CenteredState className="bg-background">
-          <View className="items-center gap-3 px-6">
+          <View className="items-center gap-3 px-4">
             <Text className="text-center text-sm text-destructive">
               {t('login.couldNotCompleteSignIn')}
             </Text>
@@ -268,11 +270,7 @@ export function LoginScreen() {
     <View
       className="flex-1 bg-background"
       // eslint-disable-next-line react-native/no-inline-styles -- dynamic chrome and safe-area padding
-      style={{
-        paddingBottom: bottomPadding,
-        paddingLeft: insets.left,
-        paddingRight: insets.right,
-      }}
+      style={{ paddingBottom: bottomPadding, ...sideInsetStyle }}
     >
       <View className="flex-row justify-end" style={headerRowStyle}>
         <Pressable
@@ -294,7 +292,10 @@ export function LoginScreen() {
       </View>
       <KeyboardAwareScrollView
         className="flex-1 bg-background"
-        contentContainerClassName="flex-grow items-center justify-center gap-6 px-6 py-8"
+        contentContainerClassName={cn(
+          SCREEN_BODY_CLASS,
+          'flex-grow items-center justify-center py-8'
+        )}
         keyboardShouldPersistTaps="handled"
         // The space the form keeps below the focused field while the keyboard is
         // up: its own measured height, floored at the primary action plus the
@@ -362,7 +363,7 @@ export function LoginScreen() {
               </Text>
               <Text
                 variant="h2"
-                className="border-b-0 pb-0 text-center tracking-widest"
+                className="border-b-0 pb-0 text-center"
                 accessibilityLabel={t('login.signInCodeAccessibility', {
                   // eslint-disable-next-line @typescript-eslint/no-misused-spread -- code is always ASCII
                   code: [...code].join(' '),

@@ -4,8 +4,7 @@ import { PlugZap, RefreshCcw, ShieldAlert } from '@/components/ui/icons';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { toast } from 'sonner-native';
 
 import { PrReviewContextLine } from '@/components/pr-review/pr-review-context-line';
@@ -15,15 +14,12 @@ import { PrReviewGateItemLine } from '@/components/pr-review/pr-review-gate-item
 import { PrReviewGateLoading } from '@/components/pr-review/pr-review-gate-loading';
 import { OrgOnlyDescription } from '@/components/pr-review/pr-review-org-only-description';
 import { QueryError } from '@/components/query-error';
-import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useReviewerPermission } from '@/lib/hooks/use-reviewer-permission';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
-import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
 import { useOrganization } from '@/lib/organization-context';
 import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform';
@@ -42,7 +38,6 @@ import {
   useProviderPrScopeOrNull,
 } from '@/lib/pr-review/provider-pr-ref';
 import { useTRPC } from '@/lib/trpc';
-import { cn } from '@/lib/utils';
 
 /**
  * The pasted MR URL's origin, when the deep link carried one and it is worth
@@ -81,8 +76,6 @@ export function ProviderConnectGate({
 }>) {
   const trpc = useTRPC();
   const pushOnce = useSinglePushRoute();
-  const colors = useThemeColors();
-  const mutedDisabledInk = useMutedDisabledInk();
   const iconColor = usePrReviewGateIconColor();
   const { t } = useTranslation();
   const scope = useProviderPrScopeOrNull();
@@ -409,8 +402,10 @@ export function ProviderConnectGate({
             // caption keeps naming only the scope.
             <PrReviewGateActionGroup instanceHint={mismatch === null ? instanceHint : undefined}>
               {action === 'connect' ? (
-                <Button
-                  className={cn('w-full flex-row gap-2', STATE_ACTION_CLASS)}
+                <StateAction
+                  label={reconnect ? reconnectActionTitle : connectTitle}
+                  icon={RefreshCcw}
+                  loading={connecting}
                   disabled={connecting}
                   onPress={() => {
                     if (platform === 'bitbucket') {
@@ -419,14 +414,7 @@ export function ProviderConnectGate({
                     }
                     void handleConnect();
                   }}
-                >
-                  {connecting ? (
-                    <ActivityIndicator size="small" color={mutedDisabledInk} />
-                  ) : (
-                    <RefreshCcw size={16} color={colors.primaryForeground} />
-                  )}
-                  <Text>{reconnect ? reconnectActionTitle : connectTitle}</Text>
-                </Button>
+                />
               ) : null}
             </PrReviewGateActionGroup>
           }

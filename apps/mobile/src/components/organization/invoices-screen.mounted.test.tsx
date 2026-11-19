@@ -136,6 +136,7 @@ vi.mock('@/lib/utils', () => ({
 }));
 
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   EmptyState: (props: { title: string; placement?: string }) =>
     createElement('EmptyState', props, `EMPTY_STATE:${props.title}`),
 }));

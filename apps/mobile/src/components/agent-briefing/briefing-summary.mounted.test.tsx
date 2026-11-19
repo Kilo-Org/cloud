@@ -26,6 +26,9 @@ vi.mock('react-i18next', () => ({
       values ? `${key}:${JSON.stringify(values)}` : key,
     i18n: { language: 'en' },
   }),
+  // The shared `cn` helper reaches `@/i18n`, which installs this plugin at
+  // module load. Partially mocked callers keep the real export instead.
+  initReactI18next: { type: '3rdParty', init: () => undefined },
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/agent-briefing-format', () => ({ briefingMoney: () => '$0' }));

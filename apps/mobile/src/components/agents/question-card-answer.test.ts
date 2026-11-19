@@ -7,11 +7,9 @@ import {
   MULTI_NONE,
   type MultiAnswer,
   pressSingleChoice,
-  pressSingleCustom,
   SINGLE_NONE,
   type SingleAnswer,
   toggleMultiChoice,
-  toggleMultiCustom,
   typeMultiCustom,
   typeSingleCustom,
 } from './question-card-answer';
@@ -19,7 +17,7 @@ import {
 const OPTIONS = [{ label: 'Continue' }, { label: 'Stop' }];
 
 describe('single-choice answers', () => {
-  it('a preset press drops the custom selection while a re-press of the selected custom radio keeps it', () => {
+  it('a preset press drops the custom selection the typed text made', () => {
     let answer: SingleAnswer = SINGLE_NONE;
     answer = typeSingleCustom(answer, true);
     expect(answer).toEqual({ kind: 'custom' });
@@ -33,13 +31,6 @@ describe('single-choice answers', () => {
     expect(answer).toEqual({ kind: 'one', choice: 0 });
     expect(answerLabels(answer, 'deploy staging', OPTIONS)).toEqual(['Continue']);
     expect(isAnswered(answer, 'deploy staging')).toBe(true);
-
-    // The radio keeps a custom answer that already holds text.
-    const custom: SingleAnswer = typeSingleCustom(SINGLE_NONE, true);
-    expect(pressSingleCustom(custom)).toBe(custom);
-    expect(answerLabels(pressSingleCustom(custom), 'deploy staging', OPTIONS)).toEqual([
-      'deploy staging',
-    ]);
   });
 
   it('typing empty text clears the custom answer and needs text to be answered', () => {
@@ -62,7 +53,7 @@ describe('single-choice answers', () => {
 });
 
 describe('multi-choice answers', () => {
-  it('toggles presets and the custom answer independently', () => {
+  it('toggles presets and keeps the typed custom answer beside them', () => {
     let answer: MultiAnswer = MULTI_NONE;
     answer = toggleMultiChoice(answer, 0);
     expect(answer).toEqual({ kind: 'presets', chosen: new Set([0]) });
@@ -71,17 +62,13 @@ describe('multi-choice answers', () => {
     answer = toggleMultiChoice(answer, 1);
     expect(answer).toEqual({ kind: 'presets', chosen: new Set([0, 1]) });
 
-    answer = toggleMultiCustom(answer);
+    answer = typeMultiCustom(answer, true);
     expect(answer).toEqual({ kind: 'presets-and-custom', chosen: new Set([0, 1]) });
     expect(answerLabels(answer, 'deploy staging', OPTIONS)).toEqual([
       'Continue',
       'Stop',
       'deploy staging',
     ]);
-
-    answer = toggleMultiCustom(answer);
-    expect(answer).toEqual({ kind: 'presets', chosen: new Set([0, 1]) });
-    expect(isCustomSelected(answer)).toBe(false);
   });
 
   it('typing text adds the custom answer and clearing it keeps the presets', () => {
@@ -97,7 +84,7 @@ describe('multi-choice answers', () => {
   });
 
   it('drops to none when the last preset and the custom answer are both removed', () => {
-    let answer: MultiAnswer = toggleMultiCustom(MULTI_NONE);
+    let answer: MultiAnswer = typeMultiCustom(MULTI_NONE, true);
     expect(answer).toEqual({ kind: 'custom' });
 
     answer = toggleMultiChoice(answer, 0);
@@ -106,6 +93,6 @@ describe('multi-choice answers', () => {
     answer = toggleMultiChoice(answer, 0);
     expect(answer).toEqual({ kind: 'custom' });
 
-    expect(toggleMultiCustom(answer)).toBe(MULTI_NONE);
+    expect(typeMultiCustom(answer, false)).toBe(MULTI_NONE);
   });
 });

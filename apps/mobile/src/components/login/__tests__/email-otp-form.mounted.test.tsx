@@ -1,9 +1,4 @@
-// eslint-disable-next-line import/no-nodejs-modules -- Use the compiler's compatible CommonJS export.
-import { createRequire } from 'node:module';
-import tailwindcss from '@tailwindcss/postcss';
-import postcss from 'postcss';
 import { type ComponentProps, createElement } from 'react';
-import type * as NativeCSSCompiler from 'react-native-css/compiler';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -65,29 +60,6 @@ function label(root: TestRenderer.ReactTestInstance, copy: string) {
       (node.type as string) === 'Text' &&
       node.props.children === copy
   );
-}
-
-const { compile } = createRequire(import.meta.url)(
-  'react-native-css/compiler'
-) as typeof NativeCSSCompiler;
-
-/**
- * The native style one action label's className compiles to, through the app's
- * own Tailwind and NativeWind pipeline — not a hand-written utility-to-property
- * map. A label with no className compiles to no declarations, which is the
- * pre-fix state this guards.
- */
-async function compiledLabelStyles(className: string | undefined): Promise<unknown[]> {
-  const utilities = className?.split(' ').filter(Boolean).join(' ') ?? '';
-  if (!utilities) {
-    return [];
-  }
-  const { css } = await postcss([tailwindcss()]).process(
-    `@reference "../../../global.css"; .label { @apply ${utilities}; }`,
-    { from: import.meta.filename }
-  );
-  const rules = compile(css, { inlineVariables: false }).stylesheet().s;
-  return rules?.find(([name]) => name === 'label')?.[1].flatMap(rule => rule.d ?? []) ?? [];
 }
 
 /** The label text drawn inside the action button with this accessibility label. */
@@ -221,15 +193,14 @@ describe('EmailOtpForm destination layout', () => {
 describe('EmailOtpForm button labels', () => {
   // The reported capture: the Arabic secondary label ("إعادة إرسال الرمز")
   // wrapped onto two lines inside a full-width button, so the copy did not fit
-  // its control. Pin the label to one line — the remedy the segmented control
-  // takes — and keep the full text as the control's accessible name.
+  // its control. Pin the label to one line and keep the full text as the
+  // control's accessible name.
   it.each(['en', 'ar'])('keeps the resend label on one line in %s', async language => {
     await i18n.changeLanguage(language);
     const { mounted } = mount();
 
     const resend = label(mounted.root, i18n.t('login.resendCode'));
     expect(resend.props.numberOfLines).toBe(1);
-    expect(resend.props.adjustsFontSizeToFit).toBe(true);
     // The full label stays the control's accessible name.
     expect(
       mounted.root.findByProps({ accessibilityLabel: i18n.t('login.resendCode') })
@@ -308,53 +279,38 @@ describe('EmailOtpForm action labels', () => {
   it.each([
     { language: 'en', isRTL: false },
     { language: 'ar', isRTL: true },
-  ])(
-    'keeps both stacked action labels one line wide at matched heights in $language',
-    async ({ language, isRTL }) => {
-      i18nManager.isRTL = isRTL;
-      await i18n.changeLanguage(language);
-      const { mounted } = mount();
+  ])('keeps both stacked action labels on one line in $language', async ({ language, isRTL }) => {
+    i18nManager.isRTL = isRTL;
+    await i18n.changeLanguage(language);
+    const { mounted } = mount();
 
-      const verify = actionLabel(mounted.root, i18n.t('login.verifyCode'));
-      const resend = actionLabel(mounted.root, i18n.t('login.resendCode'));
+    const verify = actionLabel(mounted.root, i18n.t('login.verifyCode'));
+    const resend = actionLabel(mounted.root, i18n.t('login.resendCode'));
 
-      // flex-1 gives each label the whole remaining row width instead of being
-      // measured short — the Arabic resend copy wrapped and orphaned "الرمز" on
-      // a second line, so it stood taller than the single-line verify action;
-      // text-center keeps the copy centred inside that box.
-      expect(await compiledLabelStyles(verify.props.className as string | undefined)).toEqual([
-        { flexBasis: '0%', flexGrow: 1, flexShrink: 1, textAlign: 'center' },
-      ]);
-      expect(await compiledLabelStyles(resend.props.className as string | undefined)).toEqual([
-        { flexBasis: '0%', flexGrow: 1, flexShrink: 1, textAlign: 'center' },
-      ]);
-      // The pair matches: neither stacked action can be taller than the other.
-      expect(resend.props.className).toBe(verify.props.className);
-    }
-  );
+    // The row and its content width belong to the shared Button; each label
+    // stays on one line, so neither stacked action can outgrow the other
+    // (the Arabic resend copy once wrapped and orphaned "الرمز" on a second
+    // line).
+    expect(verify.props.children).toBe(i18n.t('login.verifyCode'));
+    expect(resend.props.children).toBe(i18n.t('login.resendCode'));
+    expect(verify.props.numberOfLines).toBe(1);
+    expect(resend.props.numberOfLines).toBe(1);
+  });
 
-  it('keeps the label box unchanged while a send or verify is in flight', () => {
+  it('keeps both labels on one line while a send or verify is in flight', () => {
     const { mounted, props } = mount();
-    const idleClasses = [
-      actionLabel(mounted.root, i18n.t('login.verifyCode')).props.className,
-      actionLabel(mounted.root, i18n.t('login.resendCode')).props.className,
-    ];
 
     act(() => {
       mounted.update(createElement(EmailOtpForm, { ...props, busy: 'otp-send' }));
     });
 
     // Button owns the busy spinner (from `loading`), so the form adds no child
-    // indicator; the label keeps its full-width box, so the row height stays
-    // the same between idle and busy.
+    // indicator and the labels keep their single-line box, so the row height
+    // stays the same between idle and busy.
     const resend = mounted.root.findByProps({ accessibilityLabel: i18n.t('login.resendCode') });
     expect(resend.props.loading).toBe(true);
     expect(mounted.root.findAllByType('ActivityIndicator')).toHaveLength(0);
-    expect(actionLabel(mounted.root, i18n.t('login.verifyCode')).props.className).toBe(
-      idleClasses[0]
-    );
-    expect(actionLabel(mounted.root, i18n.t('login.resendCode')).props.className).toBe(
-      idleClasses[1]
-    );
+    expect(actionLabel(mounted.root, i18n.t('login.verifyCode')).props.numberOfLines).toBe(1);
+    expect(actionLabel(mounted.root, i18n.t('login.resendCode')).props.numberOfLines).toBe(1);
   });
 });

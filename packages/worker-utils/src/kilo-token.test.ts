@@ -64,6 +64,27 @@ describe('signKiloToken', () => {
     ).rejects.toThrow();
   });
 
+  it('refuses a cloudAgentAuthority claim through the shared signer', async () => {
+    const authority = {
+      version: 1 as const,
+      ownerId: 'user-123',
+      parentSessionId: 'workspace_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      organizationId: null,
+      authorizationId: '11111111-1111-4111-8111-111111111111',
+      expiresAt: Math.floor(Date.now() / 1000) + 600,
+    };
+
+    await expect(
+      signKiloToken({
+        userId: 'user-123',
+        pepper: 'pepper-123',
+        secret: SECRET,
+        expiresInSeconds: 60,
+        extra: { cloudAgentAuthority: authority } as unknown as SignKiloTokenExtra,
+      })
+    ).rejects.toThrow();
+  });
+
   it('returns an ISO expiresAt derived from expiresInSeconds', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-10T12:00:00.000Z'));

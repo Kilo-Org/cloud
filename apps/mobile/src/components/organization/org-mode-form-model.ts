@@ -1,3 +1,4 @@
+import { MODE_SLUG_MAX_LENGTH, modeSlugFromName } from '@kilocode/app-shared/organizations';
 import {
   type inferRouterInputs,
   type inferRouterOutputs,
@@ -67,9 +68,7 @@ export type OrgModeFormErrors = Readonly<{
 /** The server's mode-name bound. */
 export const ORG_MODE_NAME_MAX_LENGTH = 100;
 
-/** The server's mode-slug bound and character set. */
-export const ORG_MODE_SLUG_MAX_LENGTH = 50;
-
+/** The server's mode-slug character set; the length bound lives with the derivation. */
 const SLUG_PATTERN = /^[a-z0-9-]+$/;
 
 /** Whether a file pattern the person typed compiles as a regular expression. */
@@ -80,42 +79,6 @@ function isValidRegExp(source: string): boolean {
   } catch {
     return false;
   }
-}
-
-/** The fallback a name with no letters or digits at all derives. */
-const FALLBACK_SLUG = 'mode';
-
-/**
- * The slug the create form derives from a name, as the web form derives it:
- * lowercase, every run of other characters folded to one hyphen, no leading or
- * trailing hyphen. A name that folds away completely — Arabic, Hebrew, `###` —
- * suggests `mode`, then `mode-2`, `mode-3`, … past the ones the organization
- * already holds, so the suggestion is never taken. An empty or whitespace-only
- * name suggests nothing (`''`): the fallback covers a name that folds away, not
- * a field the person has not filled. A derived slug is a suggestion the person
- * can replace.
- */
-export function modeSlugFromName(name: string, takenSlugs: readonly string[] = []): string {
-  // Nothing typed derives nothing; only a name whose characters fold away
-  // reaches the fallback counter below.
-  if (name.trim().length === 0) {
-    return '';
-  }
-  const folded = name
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, '-')
-    .replaceAll(/^-+|-+$/g, '');
-  if (folded.length > 0) {
-    return folded;
-  }
-  // The candidates outrun any set of taken slugs, so the loop below stops.
-  const taken = new Set(takenSlugs);
-  let attempt = 1;
-  const candidate = () => (attempt === 1 ? FALLBACK_SLUG : `${FALLBACK_SLUG}-${attempt}`);
-  while (taken.has(candidate())) {
-    attempt += 1;
-  }
-  return candidate();
 }
 
 /**
@@ -136,7 +99,7 @@ export function validateOrgModeForm(
   let slugError: OrgModeFormErrorCode | undefined = undefined;
   if (slug.length === 0) {
     slugError = 'identifierRequired';
-  } else if (!SLUG_PATTERN.test(slug) || slug.length > ORG_MODE_SLUG_MAX_LENGTH) {
+  } else if (!SLUG_PATTERN.test(slug) || slug.length > MODE_SLUG_MAX_LENGTH) {
     slugError = 'identifierInvalid';
   } else if (existingModes.some(mode => mode.slug === slug && mode.id !== editingModeId)) {
     slugError = 'identifierTaken';

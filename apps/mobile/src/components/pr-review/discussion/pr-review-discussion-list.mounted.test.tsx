@@ -124,9 +124,15 @@ vi.mock('@/components/pr-review/discussion/discussion-thread', () => ({
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/icons', () => ({ MessageSquarePlus: 'MessageSquarePlus' }));
-vi.mock('@/lib/screen-insets', () => ({ useDetailScreenBottomPadding: () => 0 }));
+vi.mock('@/lib/screen-insets', () => ({
+  useDetailScreenBottomPadding: () => 0,
+  useStyleSideInsets: () => ({ left: 0, right: 0 }),
+}));
 
 function noop(): void {
   // Callbacks not exercised by a test are inert.

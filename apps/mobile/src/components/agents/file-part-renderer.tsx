@@ -5,19 +5,20 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { CenteredState } from '@/components/centered-state';
-import { ImageViewer } from '@/components/ui/image-viewer';
 import { SheetHeader } from '@/components/sheet-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { ImageViewer } from '@/components/ui/image-viewer';
 import { AlertCircle, File as FileIcon, Share } from '@/components/ui/icons';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { getDocumentPreviewTarget, previewRemoteDocument } from '@/lib/document-preview';
@@ -575,7 +576,7 @@ function FilePartVideo({
           accessibilityRole="button"
           accessibilityState={{ busy: sharing }}
           accessibilityLabel={t('common.share', { title: part.filename ?? t('common.file') })}
-          className="min-h-[44px] min-w-[44px] items-center justify-center rounded-md active:opacity-70"
+          className={cn(ICON_TARGET_BOX_CLASS, 'rounded-md active:opacity-70')}
         >
           {sharing ? (
             <ActivityIndicator size="small" />
@@ -707,13 +708,13 @@ function FilePreviewModal({
         sharing={sharing}
         topInset="ios-page-sheet"
       />
-      <AccessibleStatus message={shareError} className="px-6 pt-2 text-sm" />
+      <AccessibleStatus message={shareError} className="px-4 pt-2 text-sm" />
       {status === 'error' || (status === 'ready' && text === '') ? (
-        <CenteredState contentContainerClassName="px-6">
+        <CenteredState contentContainerClassName="px-4">
           <View className="items-center py-6">{renderBody()}</View>
         </CenteredState>
       ) : (
-        <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
+        <ScrollView className="flex-1" contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}>
           {renderBody()}
         </ScrollView>
       )}

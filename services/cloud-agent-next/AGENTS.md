@@ -81,6 +81,7 @@ Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved 
 - `src/control-plane/sandbox/sandbox-do.ts` - Sandbox DO
 - `src/control-plane/*/sqlite-schema.ts` and `src/control-plane/*/drizzle/` - DO SQLite schemas and migrations
 - `src/persistence/StreamTicketNonceDO.ts` - Stream-ticket replay nonce
+- `src/preview-tunnel/preview-tunnel-do.ts` - `PreviewTunnel` DO: the wrapper's preview tunnel for one allocation (`docs/control-plane.md`, Preview tunnel)
 
 ### Sandbox + Execution
 

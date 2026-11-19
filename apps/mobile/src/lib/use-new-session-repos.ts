@@ -20,6 +20,7 @@ import {
 import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { i18n } from '@/i18n';
 import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
+import { isExpectedAuthFailure } from '@/lib/auth/trpc-unauthorized';
 import { useRecentAgentRepositories } from '@/lib/hooks/use-agent-sessions';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
@@ -29,6 +30,7 @@ import {
 } from '@/lib/pr-review/connect-gate-platform';
 import { classifyProviderErrorCode } from '@/lib/code-reviewer-status';
 import { useGitHubReposRefresh } from '@/lib/use-github-repos-refresh';
+import { shouldToastRepositoryRefreshFailure } from '@/lib/use-github-repos-refresh-helpers';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 type UseNewSessionReposArgs = {
@@ -360,9 +362,12 @@ export function useNewSessionRepos({
         forceFreshGitLab(),
         forceFreshBitbucket(),
       ]);
-      // GitHub resolves always (it catches its own errors and toasts), so a
-      // rejection here is a GitLab or Bitbucket force-fresh failure. Toast once.
-      if (results[1].status === 'rejected' || results[2].status === 'rejected') {
+      // Every provider that failed in this refresh adds its rejection, and
+      // they share one toast. An ended session shows its own toast instead.
+      const failures = results.flatMap((result): unknown[] =>
+        result.status === 'rejected' ? [result.reason] : []
+      );
+      if (shouldToastRepositoryRefreshFailure(failures)) {
         toast.error(i18n.t('agentChat.newSession.couldNotRefreshRepositories'));
       }
     } finally {
@@ -398,8 +403,11 @@ export function useNewSessionRepos({
         },
       });
       await forceFreshGitLab();
-    } catch {
-      toast.error(i18n.t('codeReviewer.providerConnect.gitlabError'));
+    } catch (error: unknown) {
+      // An ended session shows its own toast over the login screen.
+      if (!isExpectedAuthFailure(error)) {
+        toast.error(i18n.t('codeReviewer.providerConnect.gitlabError'));
+      }
     }
   }, [organizationId, forceFreshGitLab]);
 
@@ -539,7 +547,8 @@ export type RepositoryBranchesState = {
  * The query runs only when a repository is selected. Bitbucket is
  * organization-only, so a personal Bitbucket row never issues a request — the
  * server would refuse it with the org-only message, and the section explains
- * the restriction instead.
+ * the restriction instead. A disabled GitHub or GitLab row is quiet too: the
+ * section renders its own inactive note, not loading.
  *
  * The organization scope is the caller's `organizationId` PROP, not a value
  * read back from a store: the screen owns the route's scope, so passing it in

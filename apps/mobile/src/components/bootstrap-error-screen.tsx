@@ -32,7 +32,7 @@ export function BootstrapErrorScreen({
 }: BootstrapErrorScreenProps) {
   return (
     <CenteredState className="bg-background">
-      <View className="items-center gap-4 px-6">
+      <View className="items-center gap-4 px-4">
         <View className="gap-2">
           <Text className="text-center text-lg font-semibold text-foreground">{title}</Text>
           <Text className="text-center text-sm text-muted-foreground">{description}</Text>

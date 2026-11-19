@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
+import { ICON_TARGET_DP } from '@/lib/a11y/tap-target';
 import { type BusyAction } from '@/lib/auth/use-native-auth';
 import { foldDecimalDigits } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -85,22 +86,25 @@ export function EmailOtpForm({
   return (
     // Keyboard avoidance is owned by the login shell in login-screen.tsx.
     <View className="gap-3">
-      <Text variant="muted" className="text-center text-sm">
+      <Text variant="muted" className="text-center">
         {destination}
       </Text>
-      <Text variant="muted" className="text-center text-xs">
+      <Text variant="caption" className="text-center">
         {t('login.codeArrivalHint')}
       </Text>
       <Input
-        // The shared box supplies the Android center gravity and the
-        // single-line line box; `min-h-[48px]` keeps the one-time-code
-        // field's `h-12`-scale look as a floor (never a fixed height), so
-        // Dynamic Type can still grow it.
-        className="min-h-[48px] rounded-md border border-input bg-background pl-3 pr-3 text-lg leading-[normal] tracking-widest text-foreground"
+        // The shared box supplies the single line inset (`INPUT_BOX_SHAPE_CLASS`,
+        // min-h-44 and the horizontal padding); the call site keeps its chrome —
+        // border, fill and radius — the way every single-line field does. The
+        // field's 48pt floor comes from the tap-target 48 constant the controls
+        // beside it use, as an inline minimum rather than a row's target class:
+        // it is a min-height, never a fixed height, so Dynamic Type still grows
+        // the box.
+        className="rounded-md border border-input bg-background text-lg tracking-widest text-foreground"
         // textAlign is applied inline, not via a `text-center` class: NativeWind maps
         // textAlign to a native prop for TextInput and crashes on it in this version.
         // eslint-disable-next-line react-native/no-inline-styles -- see comment above
-        style={{ textAlign: 'center' }}
+        style={{ textAlign: 'center', minHeight: ICON_TARGET_DP }}
         placeholder="123456"
         placeholderTextColor={colors.mutedForeground}
         keyboardType="number-pad"
@@ -128,13 +132,16 @@ export function EmailOtpForm({
         }}
       >
         {error ? (
-          <Text className="text-center text-sm text-destructive" accessibilityLiveRegion="polite">
+          <Text
+            variant="muted"
+            className="text-center text-destructive"
+            accessibilityLiveRegion="polite"
+          >
             {error}
           </Text>
         ) : null}
         <Button
           size="lg"
-          className="flex-row gap-2"
           disabled={!hasCompleteCode || authBusy}
           loading={busy === 'otp-verify'}
           onPress={() => {
@@ -151,7 +158,6 @@ export function EmailOtpForm({
       </View>
       <Button
         variant="outline"
-        className="flex-row gap-2"
         disabled={authBusy}
         loading={busy === 'otp-send'}
         onPress={onResend}
@@ -160,8 +166,9 @@ export function EmailOtpForm({
         {/* One line, like every other label in this stack: the Arabic secondary
             label ("إعادة إرسال الرمز") wrapped onto two lines inside the
             full-width button, so the copy did not fit its control (2026-09-19
-            device finding). Longer locales ellipsize instead of growing a
-            second row; the full label stays the control's accessible name. */}
+            device finding). The label shrinks to fit that one line and then
+            ellipsizes instead of growing a second row; the full label stays the
+            control's accessible name. */}
         <Text className="flex-1 text-center" numberOfLines={1} adjustsFontSizeToFit>
           {t('login.resendCode')}
         </Text>

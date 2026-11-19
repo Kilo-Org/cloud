@@ -61,12 +61,11 @@
 // (max-lines extraction). Expansion settle bookkeeping stays here.
 
 import { type FlashListRef } from '@shopify/flash-list';
-import { MessageSquarePlus } from '@/components/ui/icons';
+import { FolderOpen, MessageSquarePlus } from '@/components/ui/icons';
 import { type Href, useIsFocused, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CommentModerationProvider } from '@/components/pr-review/discussion/comment-moderation';
 import { PrReviewDiscussionList } from '@/components/pr-review/discussion/pr-review-discussion-list';
@@ -75,11 +74,11 @@ import { providerPrSheetHref } from '@/components/pr-review/pr-review-provider-s
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import { CenteredState } from '@/components/centered-state';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
-import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Text } from '@/components/ui/text';
+import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import {
   type ConversationComment,
@@ -91,7 +90,6 @@ import {
 } from '@/lib/pr-review/discussion/review-discussion-types';
 import { mergeDiscussionListItemsBySortKey } from '@/lib/pr-review/discussion/merge-discussion-list-items';
 import { useMotionPolicy } from '@/lib/a11y/motion';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import {
   expandedForThread,
   expandThread,
@@ -104,7 +102,7 @@ import { useDeletePrCommentMutation } from '@/lib/pr-review/discussion/use-pr-co
 import { type ProviderPrPlatform, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useReplyFocusScroll } from '@/lib/pr-review/discussion/use-reply-focus-scroll';
 import { selectDiscussionTabView } from '@/components/pr-review/pr-review-discussion-tab-view';
-import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
+import { useDetailScreenBottomPadding, useStyleSideInsets } from '@/lib/screen-insets';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
 
@@ -211,7 +209,7 @@ export function PrReviewDiscussionTab({
   // sensor housing. Spread only when nonzero: the skeleton wrapper's `px-4`
   // className gutter must survive portrait untouched (inline style wins over
   // className). Same treatment as the diff floating-actions bar.
-  const insets = useSafeAreaInsets();
+  const insets = useStyleSideInsets();
 
   // Full re-sort of every loaded thread + first-page conversation comments
   // (R4: "Load more" may insert rows mid-list; accepted). Both inputs are
@@ -427,14 +425,11 @@ export function PrReviewDiscussionTab({
       }
       action={
         onRequestFiles ? (
-          <Button
-            className={STATE_ACTION_CLASS}
-            variant="outline"
+          <StateAction
+            label={t('prReview.discussion.reviewFiles')}
+            icon={FolderOpen}
             onPress={onRequestFiles}
-            accessibilityLabel={t('prReview.discussion.reviewFiles')}
-          >
-            <Text>{t('prReview.discussion.reviewFiles')}</Text>
-          </Button>
+          />
         ) : null
       }
     />
@@ -485,7 +480,7 @@ export function PrReviewDiscussionTab({
   if (view.kind === 'reconnect') {
     return (
       <>
-        <CenteredState contentContainerClassName="px-6">
+        <CenteredState contentContainerClassName={SCREEN_GUTTER_CLASS}>
           <PrReviewReconnectNotice />
         </CenteredState>
         {dialog}
@@ -538,12 +533,12 @@ export function PrReviewDiscussionTab({
       >
         {Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
           // eslint-disable-next-line react/no-array-index-key -- skeleton placeholders have no stable id
-          <View key={index} className="gap-2 rounded-xl border border-border bg-card p-3.5">
+          <Card key={index} className="gap-2">
             <Skeleton className="h-3 w-1/2" />
             <Skeleton className="h-3 w-1/3" />
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-6 w-2/3" />
-          </View>
+          </Card>
         ))}
         {dialog}
       </View>

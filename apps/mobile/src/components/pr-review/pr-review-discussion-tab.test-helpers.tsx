@@ -70,6 +70,7 @@ export const discussionState = hoisted.discussionState;
 
 vi.mock('react-native', () => ({
   View: 'View',
+  I18nManager: { isRTL: false, doLeftAndRightSwapInRTL: true },
   Platform: { OS: 'ios' },
 }));
 // The tab renders `{dialog}` from `useConfirmDialog`; stub the hook so the
@@ -108,11 +109,17 @@ vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
 vi.mock('@/components/pr-review/pr-review-unavailable-actions', () => ({
   PrReviewUnavailableActions: 'PrReviewUnavailableActions',
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/ui/icons', () => ({ MessageSquarePlus: 'MessageSquarePlus' }));
+vi.mock('@/components/ui/icons', () => ({
+  FolderOpen: 'FolderOpen',
+  MessageSquarePlus: 'MessageSquarePlus',
+}));
 vi.mock('@/components/pr-review/discussion/pr-review-discussion-list', () => ({
   PrReviewDiscussionList: 'PrReviewDiscussionList',
 }));

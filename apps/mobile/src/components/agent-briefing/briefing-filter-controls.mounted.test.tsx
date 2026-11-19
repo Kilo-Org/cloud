@@ -1,22 +1,36 @@
 import { createElement } from 'react';
-import { expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
+import { scrollTo } from '@/test/scroll-view-mock';
 
 import { FilterChip } from '@/components/ui/filter-chip';
 
 import { BriefingFilterControls } from './briefing-filter-controls';
 
-vi.mock('react-native', () => ({
-  ActivityIndicator: 'ActivityIndicator',
+// Hoisted so a test can flip the interface direction and the platform between
+// renders: the row reads both on every layout pass.
+const environment = vi.hoisted(() => ({
   I18nManager: { isRTL: false },
-  Platform: { OS: 'ios' },
-  Pressable: 'Pressable',
-  ScrollView: 'ScrollView',
-  Text: 'Text',
-  View: 'View',
+  Platform: { OS: 'ios' as string },
 }));
+
+vi.mock('react-native', async () => {
+  // `vi.mock` factories are hoisted above this file's imports, so the scroll
+  // host comes in dynamically; the row's ref lands on it and a scroll records.
+  const { MockScrollView } = await import('@/test/scroll-view-mock');
+  return {
+    ActivityIndicator: 'ActivityIndicator',
+    I18nManager: environment.I18nManager,
+    Platform: environment.Platform,
+    Pressable: 'Pressable',
+    ScrollView: MockScrollView,
+    Text: 'Text',
+    View: 'View',
+  };
+});
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
+vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('@/components/ui/activity-indicator', () => ({
   ActivityIndicator: 'ActivityIndicator',
 }));
@@ -88,10 +102,11 @@ it('names the context chip row as a filter group', () => {
   if (!root) {
     throw new Error('Controls are not mounted');
   }
-  // Both rows are tablists now, so the context row is the one whose name says
-  // what it filters.
+  // The view switch is a radio group, so the context row is the tablist and the
+  // one whose name says what it filters. The row is read at its host element:
+  // the scroller is a mock component over a host, and both carry its props.
   const groups = root.root
-    .findAll(node => node.props.accessibilityRole === 'tablist')
+    .findAll(node => isHostType(node, 'ScrollView') && node.props.accessibilityRole === 'tablist')
     .filter(node => node.props.accessibilityLabel === 'agentBriefing.filterByContext');
   expect(groups).toHaveLength(1);
   const [group] = groups;
@@ -113,7 +128,7 @@ it('names the context chip row as a filter group', () => {
   });
 });
 
-it('announces the active briefing tab and context filter as selected', () => {
+it('announces the active briefing view and context filter as selected', () => {
   const holder: { renderer?: TestRenderer.ReactTestRenderer } = {};
   act(() => {
     holder.renderer = TestRenderer.create(
@@ -124,11 +139,11 @@ it('announces the active briefing tab and context filter as selected', () => {
   if (!root) {
     throw new Error('Controls are not mounted');
   }
-  expect(root.root.findAll(node => node.props.accessibilityRole === 'tablist')).toHaveLength(2);
-  // The mocked platform is iOS, where a strip entry is typed as a button so
-  // VoiceOver gives it a control trait (see lib/a11y/tab-entry).
+  expect(root.root.findAll(node => node.props.accessibilityRole === 'radiogroup')).toHaveLength(1);
+  // The mocked platform is iOS, where a radio entry is typed as a button so
+  // VoiceOver gives it a control trait (see lib/a11y/selectable-row).
   for (const label of ['agentBriefing.available', 'agentBriefing.history']) {
-    expect(optionByText(root.root, label).props.role).toBe('button');
+    expect(optionByText(root.root, label).props.accessibilityRole).toBe('button');
   }
   expect(selectedOf(root.root, 'agentBriefing.available')).toBe(true);
   expect(selectedOf(root.root, 'agentBriefing.history')).toBe(false);
@@ -151,4 +166,92 @@ it('announces the active briefing tab and context filter as selected', () => {
   expect(selectedOf(root.root, 'agentBriefing.contextAll')).toBe(false);
   expect(selectedOf(root.root, 'common.personal')).toBe(false);
   expect(selectedOf(root.root, 'Labs')).toBe(true);
+});
+
+/** The row's scroll host, on which the component's frame API lands. */
+function scrollRow(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+  const [row] = root.findAll(node => isHostType(node, 'ScrollView'));
+  if (!row) {
+    throw new Error('The context chip row is not mounted');
+  }
+  return row;
+}
+
+/** Lays the row out at `rowWidth` holding `contentWidth` of chips. */
+function layOutRow(
+  root: TestRenderer.ReactTestInstance,
+  { rowWidth, contentWidth }: { rowWidth: number; contentWidth: number }
+): void {
+  const row = scrollRow(root);
+  act(() => {
+    (row.props.onLayout as (event: unknown) => void)({
+      nativeEvent: { layout: { x: 0, y: 0, width: rowWidth, height: 36 } },
+    });
+    (row.props.onContentSizeChange as (width: number) => void)(contentWidth);
+  });
+}
+
+beforeEach(() => {
+  scrollTo.mockClear();
+  environment.I18nManager.isRTL = false;
+  environment.Platform.OS = 'ios';
+});
+
+it('moves a chip row wider than its box to the start edge in a right-to-left interface', () => {
+  // iOS anchors a horizontal scroller's content to the physical left edge, so
+  // an overflowing row in an Arabic interface hides its first chip — "All
+  // contexts" was cut at the screen edge on the gate device.
+  environment.I18nManager.isRTL = true;
+  const holder: { renderer?: TestRenderer.ReactTestRenderer } = {};
+  act(() => {
+    holder.renderer = TestRenderer.create(
+      renderFilters({ history: false, organizationId: undefined })
+    );
+  });
+  const root = holder.renderer;
+  if (!root) {
+    throw new Error('Controls are not mounted');
+  }
+  layOutRow(root.root, { rowWidth: 374, contentWidth: 398 });
+  expect(scrollTo).toHaveBeenCalledWith({ x: 24, animated: false });
+  act(() => {
+    holder.renderer?.unmount();
+  });
+});
+
+it('leaves the row where the platform put it in a left-to-right interface', () => {
+  const holder: { renderer?: TestRenderer.ReactTestRenderer } = {};
+  act(() => {
+    holder.renderer = TestRenderer.create(
+      renderFilters({ history: false, organizationId: undefined })
+    );
+  });
+  const root = holder.renderer;
+  if (!root) {
+    throw new Error('Controls are not mounted');
+  }
+  layOutRow(root.root, { rowWidth: 374, contentWidth: 398 });
+  expect(scrollTo).not.toHaveBeenCalled();
+  act(() => {
+    holder.renderer?.unmount();
+  });
+});
+
+it('does not scroll a row that fits its box', () => {
+  environment.I18nManager.isRTL = true;
+  const holder: { renderer?: TestRenderer.ReactTestRenderer } = {};
+  act(() => {
+    holder.renderer = TestRenderer.create(
+      renderFilters({ history: false, organizationId: undefined })
+    );
+  });
+  const root = holder.renderer;
+  if (!root) {
+    throw new Error('Controls are not mounted');
+  }
+  layOutRow(root.root, { rowWidth: 374, contentWidth: 320 });
+  expect(scrollTo).not.toHaveBeenCalled();
+  act(() => {
+    holder.renderer?.unmount();
+  });
 });

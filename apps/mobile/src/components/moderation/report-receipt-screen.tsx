@@ -12,7 +12,10 @@ import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { Copy } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
+import { KvRow } from '@/components/ui/kv-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import {
@@ -21,6 +24,7 @@ import {
   STATE_ACTION_CLASS,
 } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 import { i18n } from '@/i18n';
@@ -85,58 +89,6 @@ function statusLabel(dictionary: Readonly<Record<string, string>>, status: strin
 }
 
 /**
- * One label/value line. `copyLabel` turns the row into one whose value the
- * reader can carry away. The control copies the whole value it was given.
- *
- * A copy row holds its value on one line and cuts at its middle. The first and
- * last characters of an id therefore stay on screen. A row without a control
- * also holds one line, with the end cut.
- *
- * The row's `gap-5` is 17.5dp at NativeWind's 14pt rem. It is the only
- * clearance a value keeps once it fills its box, which the copy row's id does
- * when it truncates, so it stays above the 16dp a label needs from its value.
- */
-function StatusRow({
-  label,
-  value,
-  copyLabel,
-}: Readonly<{ label: string; value: string; copyLabel?: string }>) {
-  const colors = useThemeColors();
-  return (
-    <View className="flex-row items-center justify-between gap-5 rounded-lg bg-secondary p-3">
-      <Text className="shrink text-sm text-muted-foreground" numberOfLines={1}>
-        {label}
-      </Text>
-      <View className="min-w-0 flex-1 flex-row items-center justify-end gap-2">
-        <Text
-          className="min-w-0 shrink text-sm font-medium text-foreground"
-          numberOfLines={1}
-          ellipsizeMode={copyLabel === undefined ? 'tail' : 'middle'}
-        >
-          {value}
-        </Text>
-        {copyLabel === undefined ? null : (
-          <Pressable
-            // The compact box carries the whole tap target, and its negative
-            // margin cancels back to one text line, so the row is no higher than
-            // the value's single line.
-            className={cn(COMPACT_CONTROL_BOX_CLASS, '-my-[7px]', 'active:opacity-70')}
-            hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
-            accessibilityRole="button"
-            accessibilityLabel={copyLabel}
-            onPress={() => {
-              void performCopy(value);
-            }}
-          >
-            <Copy size={16} color={colors.mutedForeground} />
-          </Pressable>
-        )}
-      </View>
-    </View>
-  );
-}
-
-/**
  * The state of one moderation report, and the way to appeal it.
  *
  * The receipt id arrives as a route parameter, so it is validated as a UUID
@@ -153,6 +105,7 @@ function StatusRow({
  */
 export function ReportReceiptScreen() {
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const params = useLocalSearchParams();
@@ -184,9 +137,11 @@ export function ReportReceiptScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('profile.reportReceipt.title')} />
-        <View className="gap-3 px-4 pt-4">
-          <Skeleton className="h-[46px] rounded-lg" />
-          <Skeleton className="h-[46px] rounded-lg" />
+        <View className="gap-3 px-4 pt-3">
+          <RowGroup>
+            <RowSkeleton />
+            <RowSkeleton />
+          </RowGroup>
         </View>
       </View>
     );
@@ -217,59 +172,73 @@ export function ReportReceiptScreen() {
       <ScreenHeader title={t('profile.reportReceipt.title')} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-6 px-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
-        <Text variant="muted" className="text-xs">
-          {t('profile.reportReceipt.description')}
-        </Text>
-        <View className="gap-3">
-          <StatusRow
-            label={t('profile.reportReceipt.receiptLabel')}
-            value={receipt.data.receiptId}
-            copyLabel={t('profile.reportReceipt.copyReceiptId')}
-          />
-          <StatusRow
-            label={t('common.status')}
-            value={statusLabel(TRIAGE_KEYS, receipt.data.triageStatus)}
-          />
-          <StatusRow
-            label={t('profile.reportReceipt.appealLabel')}
-            value={statusLabel(APPEAL_KEYS, receipt.data.appealStatus)}
-          />
-        </View>
-        {nextStep === null ? null : (
-          <Text variant="muted" className="text-xs">
-            {t(nextStep)}
-          </Text>
-        )}
-        {appealable ? (
-          <Button
-            variant="outline"
-            className={STATE_ACTION_CLASS}
-            loading={appeal.isPending}
-            disabled={appeal.isPending}
-            onPress={() => {
-              Alert.alert(
-                t('profile.reportReceipt.appealTitle'),
-                t('profile.reportReceipt.appealMessage'),
-                [
-                  { text: t('common.cancel'), style: 'cancel' },
-                  {
-                    text: t('profile.reportReceipt.appealConfirm'),
-                    onPress: () => {
-                      appeal.mutate({ receiptId });
+        <Section>
+          <Text variant="caption">{t('profile.reportReceipt.description')}</Text>
+          <RowGroup>
+            <KvRow
+              label={t('profile.reportReceipt.receiptLabel')}
+              value={receipt.data.receiptId}
+              trailing={
+                <Pressable
+                  className={cn(COMPACT_CONTROL_BOX_CLASS, 'active:opacity-70')}
+                  hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('profile.reportReceipt.copyReceiptId')}
+                  onPress={() => {
+                    void performCopy(receipt.data.receiptId);
+                  }}
+                >
+                  <Copy size={16} color={colors.mutedForeground} />
+                </Pressable>
+              }
+            />
+            <KvRow
+              label={t('common.status')}
+              value={statusLabel(TRIAGE_KEYS, receipt.data.triageStatus)}
+              valueFace="text"
+              // A status is a phrase, not an identifier: cutting its middle
+              // would drop the words that say what happened.
+              valueEllipsizeMode="tail"
+            />
+            <KvRow
+              label={t('profile.reportReceipt.appealLabel')}
+              value={statusLabel(APPEAL_KEYS, receipt.data.appealStatus)}
+              valueFace="text"
+              valueEllipsizeMode="tail"
+            />
+          </RowGroup>
+          {nextStep === null ? null : <Text variant="caption">{t(nextStep)}</Text>}
+          {appealable ? (
+            <Button
+              variant="outline"
+              className={STATE_ACTION_CLASS}
+              loading={appeal.isPending}
+              disabled={appeal.isPending}
+              onPress={() => {
+                Alert.alert(
+                  t('profile.reportReceipt.appealTitle'),
+                  t('profile.reportReceipt.appealMessage'),
+                  [
+                    { text: t('common.cancel'), style: 'cancel' },
+                    {
+                      text: t('profile.reportReceipt.appealConfirm'),
+                      onPress: () => {
+                        appeal.mutate({ receiptId });
+                      },
                     },
-                  },
-                ],
-                // Android back dismisses, which equals Cancel: no appeal is sent.
-                { cancelable: true }
-              );
-            }}
-          >
-            <Text>{t('profile.reportReceipt.appeal')}</Text>
-          </Button>
-        ) : null}
+                  ],
+                  // Android back dismisses, which equals Cancel: no appeal is sent.
+                  { cancelable: true }
+                );
+              }}
+            >
+              <Text>{t('profile.reportReceipt.appeal')}</Text>
+            </Button>
+          ) : null}
+        </Section>
       </TabScreenScrollView>
     </View>
   );

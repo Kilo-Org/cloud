@@ -32,5 +32,4 @@ export function firedDetectorsLabel(call: EnkryptUsageRow): string | null {
     : null;
 }
 
-export const ENKRYPT_LATENCY_HINT =
-  'How long this Enkrypt scan took. Older calls show the wait the guardrail added to the request instead, on one call per request.';
+export const ENKRYPT_LATENCY_HINT = 'How long this Enkrypt scan took.';

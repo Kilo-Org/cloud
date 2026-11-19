@@ -11278,8 +11278,7 @@ export const enkrypt_usage = pgTable(
     enkrypt_credits_cost: real(),
     charged_microdollars: bigint({ mode: 'number' }).notNull(),
     // How long this Enkrypt call took, from sending the request until the response was read or the
-    // call failed. Older rows instead hold the request's wait for the guardrail verdict, set only on
-    // one call per guardrail and request and null on the others.
+    // call failed.
     added_latency_ms: integer(),
     // Null on rows recorded before the output guardrail existed, which are all input guardrail calls.
     guardrail_id: integer().references(() => enkrypt_usage_guardrail.guardrail_id),

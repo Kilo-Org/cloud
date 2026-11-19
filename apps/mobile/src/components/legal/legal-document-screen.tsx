@@ -111,7 +111,15 @@ export function LegalDocumentScreen({
             </Text>
           </View>
         ) : null}
-        <MarkdownText value={state.html} documentDirection="ltr" onPressLink={openInContentLink} />
+        {/* selectable={false}: a link-bearing markdown surface needs the press
+         * to reach onPressLink, and Android selectable text takes it; it also
+         * exposes every block as a pressable to screen readers. */}
+        <MarkdownText
+          value={state.html}
+          documentDirection="ltr"
+          selectable={false}
+          onPressLink={openInContentLink}
+        />
       </ScrollView>
     );
   }

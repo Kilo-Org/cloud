@@ -95,7 +95,8 @@ const isNotice = (node: I) =>
 const isBody = (node: I) =>
   typeof node.type === 'string' &&
   (node.type as string) === 'MarkdownText' &&
-  node.props.value === CONTENT_HTML;
+  node.props.value === CONTENT_HTML &&
+  node.props.selectable === false;
 
 /** The node itself and every component instance under it, host nodes included:
  * the mocked Text/View/ScrollView markers are instances whose `type` is a string. */

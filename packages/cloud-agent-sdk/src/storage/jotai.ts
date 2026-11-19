@@ -13,15 +13,14 @@ import {
 } from './lifecycle';
 import type { PartsSnapshot } from './helpers';
 import {
-  EMPTY_PARTS,
   appendPartTextChunks,
-  clonePart,
   createReadonlyPartView,
   createSubscriberRegistry,
   insertSortedBy,
   isSupportedDeltaField,
   messageIdKey,
   publishPartsChanged,
+  readPartsSnapshot,
   upsertPartDroppingStaleSyntheticParts,
 } from './helpers';
 
@@ -246,15 +245,7 @@ function createJotaiStorage(
       // the deltas that already arrived. Consume them into the parts map
       // without bumping the revision or notifying subscribers.
       applyPendingTextDeltas(messageId);
-      const cached = partsSnapshot.get(messageId);
-      if (cached) return cached;
-
-      const arr = partsMap.get(messageId);
-      if (!arr || arr.length === 0) return EMPTY_PARTS;
-
-      const snapshot = arr.map(part => createReadonlyPartView(clonePart(part)));
-      partsSnapshot.set(messageId, snapshot);
-      return snapshot;
+      return readPartsSnapshot(messageId, partsMap.get(messageId), partsSnapshot);
     },
 
     getPart(messageId, partId) {

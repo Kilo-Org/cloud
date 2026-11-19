@@ -4,6 +4,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { cloud_agent_worktrees } from '@kilocode/db/schema';
 import { activeOrganizationAccessSql } from '@kilocode/worker-utils/organization-membership';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
+import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { normalizeGitUrl } from '@/lib/integrations/platforms/github/normalize-git-url';
 import { MAX_STACK_ANCESTRY } from '@/components/cloud-agent-next/workspace-stacks';
@@ -61,8 +62,6 @@ const directoryRowSchema = z.object({
   baseSha: z.string().nullable(),
   createdAt: timestamp,
   lastActivityAt: timestamp,
-  closedSessionIds: z.array(z.string()),
-  tabOrder: z.array(z.string()),
   latest: activitySchema,
   active: z.array(activitySchema),
   pr: prSchema.nullable(),
@@ -262,7 +261,6 @@ export function workspaceDirectoryQuery(
       w.base_branch AS "baseBranch", w.base_sha AS "baseSha", w.created_at::text AS "createdAt",
       greatest(w.last_activity_at, coalesce((latest.activity->>'lastActivityAt')::timestamptz,
         (latest.activity->>'createdAt')::timestamptz, w.created_at))::text AS "lastActivityAt",
-      w.closed_session_ids AS "closedSessionIds", w.tab_order AS "tabOrder",
       latest.activity AS latest, coalesce(active.sessions, '[]'::jsonb) AS active,
       to_jsonb(pr) AS pr, coalesce(${searchMatch}, false) AS "searchMatch"
     FROM workspace_directory w
@@ -348,12 +346,17 @@ export async function readWorkspaceStackDirectory(
 
 const hydratedRowSchema = z.object({
   worktreeId: z.string(),
-  chats: z.array(workspaceChatSummarySchema),
+  rootSessionId: z.string(),
+  rootTitle: z.string().nullable(),
+  latestOpenSessionId: z.string().nullable(),
+  latestOpenCloudAgentSessionId: z.string().nullable(),
+  chatCount: z.number(),
+  closedChatCount: z.number(),
   hasOpenRun: z.boolean(),
   observations: z.unknown(),
 });
 
-export function workspaceChatHydrationQuery(scope: WorkspaceReadScope, worktreeIds: string[]) {
+function workspaceSummaryHydrationQuery(scope: WorkspaceReadScope, worktreeIds: string[]) {
   return sql`WITH scoped_workspaces AS (${scopedDirectory(scope)}),
     workspace_open_runs AS (
       SELECT DISTINCT s.cloud_agent_worktree_id AS worktree_id
@@ -372,24 +375,42 @@ export function workspaceChatHydrationQuery(scope: WorkspaceReadScope, worktreeI
               OR (newer.queued_at = open_run.queued_at AND newer.message_id > open_run.message_id))
         )
     )
-    SELECT w.worktree_id AS "worktreeId", chats.chats, open_runs.worktree_id IS NOT NULL AS "hasOpenRun",
+    SELECT w.worktree_id AS "worktreeId", root.session_id AS "rootSessionId", root.title AS "rootTitle",
+      latest_open.session_id AS "latestOpenSessionId",
+      latest_open.cloud_agent_session_id AS "latestOpenCloudAgentSessionId",
+      counts."chatCount", counts."closedChatCount", open_runs.worktree_id IS NOT NULL AS "hasOpenRun",
       pr.pr_observations AS observations
     FROM scoped_workspaces w
     LEFT JOIN workspace_open_runs open_runs ON open_runs.worktree_id = w.worktree_id
     LEFT JOIN LATERAL (${workspacePrQuery(sql`${workspacePrFields}, pr_observations`)}) pr ON true
     INNER JOIN LATERAL (
-      SELECT jsonb_agg(${chatJson} ORDER BY s.created_at, s.session_id) AS chats
+      SELECT s.session_id, s.title
       FROM cli_sessions_v2 s
-      WHERE s.kilo_user_id = w.kilo_user_id AND s.cloud_agent_worktree_id = w.worktree_id
-        AND s.organization_id IS NOT DISTINCT FROM w.organization_id
-        AND s.parent_session_id IS NULL AND ${visibleChat}
-    ) chats ON chats.chats IS NOT NULL
+      WHERE ${workspaceChatMembership}
+      ORDER BY s.created_at, s.session_id LIMIT 1
+    ) root ON true
+    LEFT JOIN LATERAL (
+      SELECT s.session_id, s.cloud_agent_session_id FROM cli_sessions_v2 s
+      WHERE ${workspaceChatMembership} AND NOT (${chatIsClosed})
+      ORDER BY coalesce(s.last_activity_at, s.created_at) DESC, s.session_id DESC LIMIT 1
+    ) latest_open ON true
+    CROSS JOIN LATERAL (
+      SELECT count(*)::int AS "chatCount",
+        count(*) FILTER (WHERE ${chatIsClosed})::int AS "closedChatCount"
+      FROM cli_sessions_v2 s WHERE ${workspaceChatMembership}
+    ) counts
     WHERE w.worktree_id = ANY(${sql.param(worktreeIds)}::text[])`;
 }
 
-export async function hydrateWorkspaceChats(scope: WorkspaceReadScope, worktreeIds: string[]) {
+const workspaceChatMembership = sql`s.kilo_user_id = w.kilo_user_id
+  AND s.cloud_agent_worktree_id = w.worktree_id
+  AND s.organization_id IS NOT DISTINCT FROM w.organization_id
+  AND s.parent_session_id IS NULL AND ${visibleChat}`;
+const chatIsClosed = sql`s.session_id = ANY(w.closed_session_ids)`;
+
+export async function hydrateWorkspaceSummaries(scope: WorkspaceReadScope, worktreeIds: string[]) {
   if (worktreeIds.length === 0) return [];
-  const { rows } = await db.execute(workspaceChatHydrationQuery(scope, worktreeIds));
+  const { rows } = await db.execute(workspaceSummaryHydrationQuery(scope, worktreeIds));
   return z.array(hydratedRowSchema).parse(rows);
 }
 
@@ -398,28 +419,74 @@ export async function readWorkspaceChatPage(
   input: {
     worktreeId: string;
     limit: number;
-    cursor?: { createdAt: string; sessionId: string };
+    cursor?: { createdAt: string; sessionId: string; tabOrderVersion?: string };
+    tabState?: 'open' | 'closed';
+    sessionId?: string;
   }
 ) {
+  const { cursor, tabState } = input;
+  const tabPosition = (sessionId: SQL) =>
+    tabState === 'closed'
+      ? sql`array_position(w.closed_session_ids, ${sessionId})`
+      : tabState === 'open'
+        ? sql`coalesce(array_position(w.tab_order, ${sessionId}), 2147483647)`
+        : sql`0`;
+  const position = tabPosition(sql`s.session_id`);
+  const tabOrderVersion =
+    tabState === 'closed'
+      ? sql`md5(jsonb_build_array(w.worktree_id, w.closed_session_ids)::text)`
+      : tabState === 'open'
+        ? sql`md5(jsonb_build_array(w.worktree_id, w.closed_session_ids, w.tab_order)::text)`
+        : sql`NULL::text`;
   const { rows } = await db.execute(sql`WITH scoped_workspaces AS (${scopedDirectory(scope)})
-    SELECT ${chatJson} AS chat,
-      to_char(s.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "cursorCreatedAt"
-    FROM cli_sessions_v2 s
-    INNER JOIN scoped_workspaces w ON w.worktree_id = s.cloud_agent_worktree_id
-      AND s.kilo_user_id = w.kilo_user_id AND s.organization_id IS NOT DISTINCT FROM w.organization_id
-    WHERE w.worktree_id = ${input.worktreeId} AND s.parent_session_id IS NULL
-      AND ${visibleChat}
-      AND ${input.cursor ? sql`(s.created_at, s.session_id) > (${input.cursor.createdAt}::timestamptz, ${input.cursor.sessionId})` : sql`true`}
-    ORDER BY s.created_at, s.session_id LIMIT ${input.limit + 1}`);
-  const parsed = z
-    .array(z.object({ chat: workspaceChatSummarySchema, cursorCreatedAt: z.iso.datetime() }))
+    SELECT ${tabOrderVersion} AS "tabOrderVersion", to_jsonb(page) AS item
+    FROM scoped_workspaces w
+    LEFT JOIN LATERAL (
+      SELECT ${chatJson} || jsonb_build_object('tabClosed', ${chatIsClosed}) AS chat,
+        ${position} AS position, s.created_at, s.session_id,
+        to_char(s.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "cursorCreatedAt"
+      FROM cli_sessions_v2 s
+      WHERE ${workspaceChatMembership}
+        AND ${tabState === 'closed' ? chatIsClosed : tabState === 'open' ? sql`NOT (${chatIsClosed})` : sql`true`}
+        AND ${input.sessionId ? sql`s.session_id = ${input.sessionId}` : sql`true`}
+        AND ${cursor ? sql`(${position}, s.created_at, s.session_id) > (${tabPosition(sql`${cursor.sessionId}::text`)}, ${cursor.createdAt}::timestamptz, ${cursor.sessionId})` : sql`true`}
+      ORDER BY position, s.created_at, s.session_id LIMIT ${input.limit + 1}
+    ) page ON true
+    WHERE w.worktree_id = ${input.worktreeId}
+    ORDER BY page.position, page.created_at, page.session_id`);
+  const parsedRows = z
+    .array(
+      z.object({
+        tabOrderVersion: z.string().nullable(),
+        item: z
+          .object({
+            chat: workspaceChatSummarySchema.extend({ tabClosed: z.boolean() }),
+            cursorCreatedAt: z.iso.datetime(),
+          })
+          .nullable(),
+      })
+    )
     .parse(rows);
+  const version = parsedRows[0]?.tabOrderVersion;
+  if (tabState && cursor && version && cursor.tabOrderVersion !== version) {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: 'Workspace tabs changed. Start paging again without a cursor.',
+    });
+  }
+  const parsed = parsedRows.flatMap(row => (row.item ? [row.item] : []));
   const hasMore = parsed.length > input.limit;
   const page = hasMore ? parsed.slice(0, input.limit) : parsed;
   const last = page.at(-1);
   return {
     chats: page.map(row => row.chat),
     nextCursor:
-      hasMore && last ? { createdAt: last.cursorCreatedAt, sessionId: last.chat.sessionId } : null,
+      hasMore && last
+        ? {
+            createdAt: last.cursorCreatedAt,
+            sessionId: last.chat.sessionId,
+            ...(version ? { tabOrderVersion: version } : {}),
+          }
+        : null,
   };
 }

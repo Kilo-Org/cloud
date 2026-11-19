@@ -82,7 +82,7 @@ it('reads hydrated summaries and standalone sessions directly from React Query, 
   );
   expect(result?.sessions).toEqual([]);
   expect(result?.workspaceRows[0]).toEqual(summary);
-  expect(result?.cachedSessions.map(chat => chat.sessionId)).toEqual(['ses_root']);
+  expect(result?.cachedSessions).toEqual([]);
   expect(result?.workspaceOrder).toBe('activity');
   expect(store.get(dbSessionsAtom)).toEqual([]);
   expect(mockLiveUpdates).toHaveBeenCalledWith(

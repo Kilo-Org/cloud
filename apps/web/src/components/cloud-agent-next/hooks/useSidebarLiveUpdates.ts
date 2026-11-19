@@ -23,6 +23,7 @@ import {
   WORKSPACE_REFRESH_TIMEOUT_MS,
 } from './workspace-refresh';
 import { sidebarQueryInput } from './sidebar-query-scope';
+import { workspaceHasNavigationSession } from './sidebar-workspace-model';
 import {
   acceptsSidebarStatusUpdate,
   workspaceRefreshChangesMembership,
@@ -251,12 +252,30 @@ export function useSidebarLiveUpdates(options: Options): void {
 
   useEffect(() => {
     if (!connection) return;
+    const tabRefresh = createWorkspaceRefreshCoordinator(
+      async ids => {
+        const worktreeIds = new Set(ids);
+        await queryClient.invalidateQueries(
+          {
+            ...trpc.cliSessionsV2.workspaceChats.pathFilter(),
+            predicate: query => {
+              const input = sidebarQueryInput(query.queryKey);
+              return (
+                input?.organizationId === options.organizationId &&
+                typeof input?.worktreeId === 'string' &&
+                worktreeIds.has(input.worktreeId)
+              );
+            },
+          },
+          { cancelRefetch: false }
+        );
+      },
+      () => undefined
+    );
     const refreshSessionWorkspace = (sessionId: string, worktreeId?: string | null) => {
       const scope = current.current;
       const hasSession = (workspace: WorkspaceSummary) =>
-        [...workspace.openChats, ...workspace.closedChats].some(
-          chat => chat.sessionId === sessionId
-        );
+        workspaceHasNavigationSession(workspace, sessionId);
       const workspaceId =
         worktreeId ??
         scope.workspaces.find(hasSession)?.worktreeId ??
@@ -269,8 +288,21 @@ export function useSidebarLiveUpdates(options: Options): void {
               ? (data?.workspaces ?? [])
               : []
           )
-          .find(hasSession)?.worktreeId;
+          .find(hasSession)?.worktreeId ??
+        queryClient
+          .getQueriesData<InfiniteData<Outputs['workspaceChats']>>(
+            trpc.cliSessionsV2.workspaceChats.pathFilter()
+          )
+          .flatMap(([key, data]) => {
+            const input = sidebarQueryInput(key);
+            return input?.organizationId === scope.organizationId &&
+              typeof input.worktreeId === 'string' &&
+              data?.pages.some(page => page.chats.some(chat => chat.sessionId === sessionId))
+              ? [input.worktreeId]
+              : [];
+          })[0];
       if (workspaceId) refresh.current?.schedule(workspaceId);
+      return workspaceId;
     };
     const patchRow = (row: SessionRow, metadataChanged: boolean) => {
       const scope = current.current;
@@ -371,11 +403,18 @@ export function useSidebarLiveUpdates(options: Options): void {
       );
     };
     const unsubscribe = [
-      connection.onSessionEvent('workspace.updated', event =>
-        refresh.current?.schedule(event.worktreeId)
-      ),
+      connection.onSessionEvent('workspace.updated', event => {
+        refresh.current?.schedule(event.worktreeId);
+        tabRefresh.schedule(event.worktreeId);
+      }),
       connection.onSessionEvent('session.created', event => {
         patchRow(event.session, true);
+        if (
+          event.session.organizationId === current.current.organizationId &&
+          event.session.worktreeId &&
+          !event.session.parentSessionId
+        )
+          tabRefresh.schedule(event.session.worktreeId);
         if (matchesRow(event.session, current.current)) refreshRepositories();
       }),
       connection.onSessionEvent('session.updated', event => {
@@ -384,10 +423,10 @@ export function useSidebarLiveUpdates(options: Options): void {
           .getQueryData<Outputs['list']>(trpc.cliSessionsV2.list.queryKey(scope.listInput))
           ?.cliSessions.find(row => row.session_id === event.session.sessionId);
         patchRow(event.session, true);
-        const previousWorkspace = scope.workspaces.find(workspace =>
-          [...workspace.openChats, ...workspace.closedChats].some(
-            chat => chat.sessionId === event.session.sessionId
-          )
+        const previousWorkspace = scope.workspaces.find(
+          workspace =>
+            workspace.worktreeId === event.session.worktreeId ||
+            workspaceHasNavigationSession(workspace, event.session.sessionId)
         );
         if (
           matchesRow(event.session, scope) &&
@@ -401,7 +440,24 @@ export function useSidebarLiveUpdates(options: Options): void {
           return;
         }
         const scope = current.current;
-        refreshSessionWorkspace(event.sessionId);
+        if (!refreshSessionWorkspace(event.sessionId) && scope.workspaces.length > 0) {
+          void queryClient
+            .fetchQuery({
+              ...trpc.cliSessionsV2.get.queryOptions({ session_id: event.sessionId }),
+              staleTime: 5_000,
+              retry: false,
+            })
+            .then(session => {
+              if (
+                current.current.organizationId === scope.organizationId &&
+                session.organization_id === scope.organizationId &&
+                !session.parent_session_id &&
+                session.cloud_agent_worktree_id
+              )
+                refresh.current?.schedule(session.cloud_agent_worktree_id);
+            })
+            .catch(() => undefined);
+        }
         const incoming = {
           statusUpdatedAt: event.statusUpdatedAt,
           updatedAt: event.updatedAt ?? event.changedAt,
@@ -471,7 +527,10 @@ export function useSidebarLiveUpdates(options: Options): void {
       connection.onSessionEvent('session.deleted', event => {
         const scope = current.current;
         if (event.organizationId !== scope.organizationId) return;
-        if (!event.parentSessionId) refreshSessionWorkspace(event.sessionId, event.worktreeId);
+        if (!event.parentSessionId) {
+          const worktreeId = refreshSessionWorkspace(event.sessionId, event.worktreeId);
+          if (worktreeId) tabRefresh.schedule(worktreeId);
+        }
         queryClient.setQueryData<Outputs['list']>(
           trpc.cliSessionsV2.list.queryKey(scope.listInput),
           data =>
@@ -535,8 +594,11 @@ export function useSidebarLiveUpdates(options: Options): void {
           );
       }),
     ];
-    return () => unsubscribe.forEach(dispose => dispose());
-  }, [connection, queryClient, refresh, trpc]);
+    return () => {
+      tabRefresh.dispose();
+      unsubscribe.forEach(dispose => dispose());
+    };
+  }, [connection, options.organizationId, queryClient, refresh, trpc]);
 
   const pollAt = useRef(new Map<string, number>());
   useEffect(() => {

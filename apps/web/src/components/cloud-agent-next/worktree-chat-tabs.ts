@@ -282,41 +282,6 @@ export function workspaceChatTabsState(
   };
 }
 
-export function patchWorkspaceChatTabs<Workspace extends WorkspaceChatTabSummary>(
-  workspace: Workspace,
-  action: WorktreeChatTabsAction
-): Workspace {
-  const before = workspaceChatTabsState([workspace]);
-  const tabs = reduceWorktreeChatTabs(before, action);
-  if (tabs === before) return workspace;
-  const chats = [...workspace.openChats, ...workspace.closedChats];
-  const byId = new Map(chats.map(chat => [chat.sessionId, chat]));
-  const orderedIds = getOpenWorktreeChatSessionIds(
-    chats.map(chat => chat.sessionId),
-    tabs.closedSessionIds,
-    tabs.sessionOrderByWorktree[workspace.worktreeId]
-  );
-  const openChats = orderedIds.flatMap(id => {
-    const chat = byId.get(id);
-    return chat ? [chat] : [];
-  });
-  const closedChats = tabs.closedSessionIds.toReversed().flatMap(id => {
-    const chat = byId.get(id);
-    return chat ? [chat] : [];
-  });
-  const latestOpen = [...openChats].sort(
-    (a, b) =>
-      Date.parse(b.lastActivityAt ?? b.createdAt) - Date.parse(a.lastActivityAt ?? a.createdAt) ||
-      b.sessionId.localeCompare(a.sessionId)
-  )[0];
-  return {
-    ...workspace,
-    openChats,
-    closedChats,
-    latestOpenSessionId: latestOpen?.sessionId ?? null,
-  };
-}
-
 export function getOpenWorktreeChatSessionIds(
   sessionIds: readonly string[],
   closedSessionIds: readonly string[],

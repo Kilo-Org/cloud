@@ -25,6 +25,7 @@ const OLDER = '2026-11-16T12:00:01.000Z';
 type Options = Parameters<typeof useSidebarLiveUpdates>[0];
 type SessionRow = UserWebSessionEventData<'session.created'>['session'];
 const mockNetwork = {
+  get: jest.fn(),
   list: jest.fn(),
   search: jest.fn(),
   listWorkspaces: jest.fn(),
@@ -51,6 +52,7 @@ function mockProcedure(name: ProcedureName) {
 
 const mockTrpc = {
   cliSessionsV2: {
+    get: mockProcedure('get'),
     list: mockProcedure('list'),
     search: mockProcedure('search'),
     listWorkspaces: mockProcedure('listWorkspaces'),
@@ -115,8 +117,12 @@ function workspace(
   worktreeId = WORKTREE_A,
   overrides: Partial<WorkspaceSummary> = {}
 ): WorkspaceSummary {
-  const summary = workspaceSummaryFixture({ worktreeId, lastActivityAt: TIME, ...overrides });
-  return { ...summary, openChats: summary.openChats.map(chat => ({ ...chat, updatedAt: TIME })) };
+  return workspaceSummaryFixture({
+    worktreeId,
+    lastActivityAt: TIME,
+    status: { ...workspaceSummaryFixture().status, statusUpdatedAt: TIME },
+    ...overrides,
+  });
 }
 
 function session(overrides: Partial<SessionRow> = {}): SessionRow {
@@ -401,6 +407,15 @@ describe('useSidebarLiveUpdates', () => {
     };
     const lookupKey = mockTrpc.cliSessionsV2.workspaceSummaries.queryKey(lookupInput);
     queryClient.setQueryData(lookupKey, { workspaces: [first] });
+    const chatsInput = { organizationId: ORGANIZATION, worktreeId: WORKTREE_A };
+    observe('workspaceChats', chatsInput, chatPages(), true);
+    observe(
+      'workspaceChats',
+      { ...chatsInput, organizationId: OTHER_ORGANIZATION },
+      chatPages(),
+      true
+    );
+    mockNetwork.workspaceChats.mockResolvedValue(chatPages());
     mockNetwork.workspaceSummaries.mockResolvedValue({
       workspaces: [
         { ...first, name: 'Updated first' },
@@ -411,14 +426,20 @@ describe('useSidebarLiveUpdates', () => {
     await act(async () => {
       emitStatus('full', 'busy', NEWER);
       emit('workspace.updated', { worktreeId: WORKTREE_A });
+    });
+    await advance(50);
+    await act(async () => {
       emit('workspace.updated', { worktreeId: WORKTREE_A });
       emit('workspace.updated', { worktreeId: WORKTREE_B });
     });
     expect(queryClient.getQueryData(listKey)).toMatchObject({ cliSessions: [{ status: 'busy' }] });
-    await advance(299);
+    await advance(249);
     expect(mockNetwork.workspaceSummaries).not.toHaveBeenCalled();
+    expect(mockNetwork.workspaceChats).not.toHaveBeenCalled();
     await advance(1);
     expect(mockNetwork.workspaceSummaries).toHaveBeenCalledTimes(1);
+    expect(mockNetwork.workspaceChats).toHaveBeenCalledTimes(1);
+    expect(mockNetwork.workspaceChats).toHaveBeenCalledWith(chatsInput);
     expect(mockNetwork.workspaceSummaries).toHaveBeenCalledWith({
       organizationId: ORGANIZATION,
       worktreeIds: [WORKTREE_A, WORKTREE_B],
@@ -532,7 +553,7 @@ describe('useSidebarLiveUpdates', () => {
       { organizationId: ORGANIZATION, worktreeIds: [WORKTREE_A], includeAncestors: true },
       { workspaces: [first] }
     );
-    const refreshed = { ...first, openChats: [], closedChats: first.openChats };
+    const refreshed = { ...first, openChatCount: 0, closedChatCount: 1, latestOpenSessionId: null };
     mockNetwork.workspaceSummaries.mockImplementation(input =>
       Promise.resolve({ workspaces: input.search ? [] : [refreshed] })
     );
@@ -613,6 +634,42 @@ describe('useSidebarLiveUpdates', () => {
       expect(mockNetwork.listWorkspaces).not.toHaveBeenCalled();
     }
   );
+
+  it('looks up a short root status event outside the loaded navigation and tab IDs', async () => {
+    const options = scope();
+    const first = workspace();
+    options.workspaces = [first];
+    const key = observe(
+      'listWorkspaces',
+      options.workspaceListInput,
+      workspacePages([first]),
+      true
+    );
+    mockNetwork.get.mockResolvedValue({
+      organization_id: ORGANIZATION,
+      parent_session_id: null,
+      cloud_agent_worktree_id: WORKTREE_A,
+    });
+    mockNetwork.workspaceSummaries.mockResolvedValue({
+      workspaces: [{ ...first, name: 'Refreshed' }],
+    });
+    await render(options);
+    await act(async () => {
+      emit('session.status.updated', {
+        source: 'v2',
+        sessionId: 'ses_off_page',
+        previousStatus: 'idle',
+        status: 'busy',
+        statusUpdatedAt: NEWER,
+        changedAt: NEWER,
+      });
+    });
+    await advance(300);
+    expect(mockNetwork.get).toHaveBeenCalledWith({ session_id: 'ses_off_page' });
+    expect(queryClient.getQueryData(key)).toMatchObject({
+      pages: [{ workspaces: [{ name: 'Refreshed' }] }],
+    });
+  });
 
   it.each(['full', 'short'] as const)(
     'does not regress list, search, or chat caches when a newer %s status precedes older events',

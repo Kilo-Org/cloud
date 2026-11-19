@@ -29,17 +29,8 @@ export function getWorkspaceSummaryRefetchInterval(
 ): number | false {
   if (workspace.pr?.reviewDecisionPending) return 5_000;
   const status = workspace.sessionStatus;
-  const source = [...workspace.openChats, ...workspace.closedChats].find(
-    chat => chat.sessionId === workspace.status.sessionId
-  );
-  const storedStatus = source?.sessionStatus ?? status;
-  const statusAt = new Date(
-    source?.updatedAt ?? workspace.status.statusUpdatedAt ?? workspace.lastActivityAt
-  ).getTime();
-  if (
-    (storedStatus === 'busy' || storedStatus === 'retry') &&
-    now - statusAt >= WORKSPACE_STALE_STATUS_MS
-  )
+  const statusAt = new Date(workspace.status.statusUpdatedAt ?? workspace.lastActivityAt).getTime();
+  if ((status === 'busy' || status === 'retry') && now - statusAt >= WORKSPACE_STALE_STATUS_MS)
     return false;
   return status === 'busy' || status === 'retry' || workspace.hasOpenRun ? 30_000 : false;
 }

@@ -592,7 +592,24 @@ const WorkspaceSummariesInputSchema = WorktreeDetailsInputSchema.extend({
 
 const WorkspaceChatsInputSchema = WorktreeInputSchema.extend({
   limit: z.number().int().min(1).max(200).default(50),
-  cursor: z.object({ createdAt: z.iso.datetime(), sessionId: z.string().min(1) }).optional(),
+  cursor: z
+    .object({
+      createdAt: z.iso.datetime(),
+      sessionId: z.string().min(1),
+      tabOrderVersion: z
+        .string()
+        .regex(/^[a-f0-9]{32}$/)
+        .optional(),
+    })
+    .describe(
+      'Pass nextCursor unchanged. With tabState, tabOrderVersion is required. On CONFLICT, restart without a cursor.'
+    )
+    .optional(),
+  tabState: z.enum(['open', 'closed']).optional(),
+  sessionId: z.string().min(1).max(200).optional(),
+}).refine(({ tabState, cursor }) => !tabState || !cursor || cursor.tabOrderVersion !== undefined, {
+  path: ['cursor', 'tabOrderVersion'],
+  message: 'Tab pagination requires the tabOrderVersion from nextCursor',
 });
 const ListSessionsInputSchema = z.object({
   cursor: z.iso.datetime().optional(),

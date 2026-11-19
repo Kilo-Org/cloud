@@ -16,10 +16,11 @@ export function cachedWorkspaceCloudSessionId(
     const workspaces =
       'pages' in data ? data.pages.flatMap(page => page.workspaces) : data.workspaces;
     for (const workspace of workspaces) {
-      const chat = [...workspace.openChats, ...workspace.closedChats].find(
-        chat => chat.sessionId === sessionId
-      );
-      if (chat?.cloudAgentSessionId) return chat.cloudAgentSessionId;
+      if (
+        (workspace.latestOpenSessionId ?? workspace.latestSessionId) === sessionId &&
+        workspace.cloudAgentSessionId
+      )
+        return workspace.cloudAgentSessionId;
     }
   }
   return null;

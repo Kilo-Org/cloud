@@ -229,6 +229,9 @@ export default function CloudChatPage({
     worktreeChats,
     openWorktreeChats,
     closedWorktreeChats,
+    openChatPages,
+    closedChatPages,
+    requestClosedHistory,
     openSession,
     composerFocusRequest,
     closeSession,
@@ -1781,6 +1784,9 @@ export default function CloudChatPage({
                             currentChatLoadingLabel={currentChatLoadingLabel}
                             openChatSessionIds={openWorktreeChats.map(chat => chat.sessionId)}
                             closedChatSessionIds={closedWorktreeChats.map(chat => chat.sessionId)}
+                            openChatPages={openChatPages}
+                            closedChatPages={closedChatPages}
+                            requestClosedHistory={requestClosedHistory}
                             currentSessionId={sessionIdFromParams}
                             worktreeId={selectedWorktreeId}
                             onSelectChat={openSession}

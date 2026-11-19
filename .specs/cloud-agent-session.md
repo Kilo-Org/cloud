@@ -511,8 +511,11 @@ repository.
    across their layers. Folder limits MUST select the newest activity before
    applying user ordering. A capped folder MUST show its full workspace total.
    Search MUST find workspaces outside these visibility limits.
-2. Each open chat in the selected worktree MUST appear as a distinct tab in the
-   main chat header. Each tab MUST reflect its chat's live title, status, and
+2. The main chat header MUST show up to 50 open chat tabs in saved order for the
+   selected worktree. If the active chat is outside those 50, it MUST replace the
+   last visible chat tab. Other open chats MUST be accessible from **More tabs**.
+   The display limit MUST NOT close chats or limit the number of chats in a
+   worktree. Each tab MUST reflect its chat's live title, status, and
    progress, with only an **X** close action and no overflow menu. Double-clicking
    or double-tapping a tab MUST rename it inline; keyboard rename MUST remain
    available. Selecting a tab MUST open that chat's own address and transcript.
@@ -555,8 +558,9 @@ repository.
     on the workspace, survive refresh, and sync across windows, browsers, and
     devices. They MUST remain scoped to the current user and personal or
     organization context. Concurrent tab changes MUST preserve unrelated changes.
-    The initial server-rendered summary MUST include tab state, so closed tabs
-    MUST NOT appear open before hydration. A browser MUST import its legacy local
+    Sidebar summaries MUST include chat counts and navigation IDs, not chat lists.
+    The selected worktree MUST load open tabs separately. Closed tabs MUST NOT
+    appear open before their state is known. A browser MUST import its legacy local
     tab preferences once and delete the local key only after successful import.
     Existing server preferences MUST take precedence over imported preferences.
     A closed chat MUST reopen only when the user opens that chat
@@ -567,6 +571,7 @@ repository.
     showing a chat closed elsewhere MUST move to an open chat or the worktree.
 11. The selected worktree MUST offer a **Sessions** list inside the split control's
     chevron menu, containing only closed chats and excluding already-open tabs.
+    The list MUST load on demand in pages of 20.
     Most recently closed chats MUST appear first, including after refresh or
     opening another browser or device;
     session creation or activity timestamps MUST NOT determine this order.

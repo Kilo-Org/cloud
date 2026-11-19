@@ -1,23 +1,20 @@
 import { cachedWorkspaceCloudSessionId } from './workspace-session-cache';
 import { workspaceSummaryFixture } from './hooks/workspace-summary-test-fixtures';
 
-it('resolves an open or closed chat from hydrated workspace summaries', () => {
-  const summary = workspaceSummaryFixture();
-  const chat = {
-    ...summary.openChats[0],
+it('resolves only the navigation target paired with the cloud session ID', () => {
+  const summary = workspaceSummaryFixture({
+    latestSessionId: 'ses_closed',
     cloudAgentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
-  };
+  });
   const key = [['cliSessionsV2', 'listWorkspaces'], { input: { organizationId: null } }];
   expect(
-    cachedWorkspaceCloudSessionId(chat.sessionId, null, [
-      [key, { pages: [{ workspaces: [{ ...summary, openChats: [chat] }] }], pageParams: [null] }],
+    cachedWorkspaceCloudSessionId('ses_root', null, [
+      [key, { pages: [{ workspaces: [summary] }], pageParams: [null] }],
     ])
-  ).toBe(chat.cloudAgentSessionId);
+  ).toBe(summary.cloudAgentSessionId);
   expect(
-    cachedWorkspaceCloudSessionId(chat.sessionId, null, [
-      [key, { workspaces: [{ ...summary, openChats: [], closedChats: [chat] }] }],
-    ])
-  ).toBe(chat.cloudAgentSessionId);
+    cachedWorkspaceCloudSessionId('ses_closed', null, [[key, { workspaces: [summary] }]])
+  ).toBeNull();
 });
 
 it('does not resolve another organization or an unknown chat', () => {
@@ -27,9 +24,7 @@ it('does not resolve another organization or an unknown chat', () => {
     { input: { organizationId: 'synthetic-other-scope' } },
   ];
   expect(
-    cachedWorkspaceCloudSessionId(summary.openChats[0].sessionId, null, [
-      [key, { workspaces: [summary] }],
-    ])
+    cachedWorkspaceCloudSessionId(summary.rootSessionId, null, [[key, { workspaces: [summary] }]])
   ).toBeNull();
   expect(
     cachedWorkspaceCloudSessionId('ses_missing', 'synthetic-other-scope', [

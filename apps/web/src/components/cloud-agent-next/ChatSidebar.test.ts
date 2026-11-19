@@ -9,7 +9,11 @@ import {
 } from '@/lib/cloud-agent/workspace-activity';
 import { workspaceSummaryFixture } from './hooks/workspace-summary-test-fixtures';
 import type { SidebarWorktreeGroup } from './hooks/sidebar-session-model';
-import { groupSidebarWorkspaces, workspaceSummaryChats } from './hooks/sidebar-workspace-model';
+import {
+  groupSidebarWorkspaces,
+  workspaceChatToStoredSession,
+} from './hooks/sidebar-workspace-model';
+import { workspaceChatFixture } from './hooks/workspace-summary-test-fixtures';
 
 Object.assign(globalThis, { React });
 
@@ -489,17 +493,19 @@ describe('ChatSidebar row rendering', () => {
   });
 
   it('keeps older matching workspace chats in search, without repeating the workspace navigation target', () => {
-    const initial = workspaceSummaryFixture();
-    const summary = {
-      ...initial,
-      openChats: [
-        { ...initial.openChats[0], title: 'Latest matching chat' },
-        { ...initial.openChats[0], sessionId: 'ses_older', title: 'Older matching chat' },
-      ],
-    };
+    const summary = workspaceSummaryFixture();
     renderSidebar({
       workspaceGroups: groupSidebarWorkspaces([], {}, [summary]),
-      sessions: workspaceSummaryChats(summary),
+      sessions: [
+        workspaceChatToStoredSession(
+          summary,
+          workspaceChatFixture({ title: 'Latest matching chat' })
+        ),
+        workspaceChatToStoredSession(
+          summary,
+          workspaceChatFixture({ sessionId: 'ses_older', title: 'Older matching chat' })
+        ),
+      ],
       searchQuery: 'matching',
     });
     expect(dom.container.querySelector('[title="Latest matching chat"]')).toBeNull();

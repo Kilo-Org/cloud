@@ -37,8 +37,12 @@ import {
 import { useActiveSessions } from './hooks/useActiveSessions';
 import { dbSessionsAtom } from './store/db-session-atoms';
 import { useWorkspaceSummaryLookup } from './hooks/useWorkspaceSummaries';
-import { mergeWorkspaceChats } from './hooks/useWorkspaceChats';
-import { latestOpenWorkspaceChat, workspaceSummaryChats } from './hooks/sidebar-workspace-model';
+import {
+  mergeWorkspaceChats,
+  useWorkspaceChats,
+  type ChatTabPages,
+} from './hooks/useWorkspaceChats';
+import { workspaceHasNavigationSession } from './hooks/sidebar-workspace-model';
 import {
   getDeletionErrorMessage,
   getWorktreeDeletionRedirect,
@@ -105,6 +109,9 @@ type WorktreeChatTabs = {
   worktreeChats: StoredSession[];
   openWorktreeChats: StoredSession[];
   closedWorktreeChats: StoredSession[];
+  openChatPages?: ChatTabPages;
+  closedChatPages?: ChatTabPages;
+  requestClosedHistory?: () => void;
   openSession: (sessionId: string) => void;
   composerFocusRequest: ComposerFocusRequest | null;
   closeSession: (sessionId: string) => void;
@@ -180,34 +187,7 @@ export function useWorktreeChatCreation() {
 }
 
 export function useWorktreeChatTabs(): WorktreeChatTabs {
-  const {
-    currentSessionId,
-    selectedWorktreeId,
-    worktreeChats,
-    openWorktreeChats,
-    closedWorktreeChats,
-    openSession,
-    composerFocusRequest,
-    closeSession,
-    renameSession,
-    deletingSessionIds,
-    retryLocalChat,
-    discardLocalChat,
-  } = useContext(SidebarLayoutContext);
-  return {
-    currentSessionId,
-    selectedWorktreeId,
-    worktreeChats,
-    openWorktreeChats,
-    closedWorktreeChats,
-    openSession,
-    composerFocusRequest,
-    closeSession,
-    renameSession,
-    deletingSessionIds,
-    retryLocalChat,
-    discardLocalChat,
-  };
+  return useContext(SidebarLayoutContext);
 }
 
 type CloudSidebarLayoutProps = {
@@ -491,10 +471,19 @@ function CloudSidebarLayoutContent({
         ? fetchedSessionData.worktreeId
         : null;
     const parsedWorktreeId = cloudAgentWorktreeIdSchema.safeParse(
-      cachedSession?.worktreeId ?? fetchedWorktreeId
+      cachedSession?.worktreeId ??
+        fetchedWorktreeId ??
+        workspaceRows.find(row => workspaceHasNavigationSession(row, currentSessionId))?.worktreeId
     );
     return parsedWorktreeId.success ? parsedWorktreeId.data : null;
-  }, [cachedSessions, currentSessionId, fetchedSessionData, organizationId, worktreeIdFromParams]);
+  }, [
+    cachedSessions,
+    currentSessionId,
+    fetchedSessionData,
+    organizationId,
+    workspaceRows,
+    worktreeIdFromParams,
+  ]);
   const selectedWorkspaceIds = useMemo(
     () => (selectedWorktreeId ? [selectedWorktreeId] : []),
     [selectedWorktreeId]
@@ -505,6 +494,44 @@ function CloudSidebarLayoutContent({
   });
   const selectedWorkspace = loadedWorkspaceSummaries.find(
     workspace => workspace.worktreeId === selectedWorktreeId
+  );
+  const {
+    serverChats: serverWorkspaceChats,
+    openChats,
+    closedChats,
+    openPages: openChatPages,
+    closedPages: closedChatPages,
+    requestClosedHistory,
+  } = useWorkspaceChats({
+    organizationId: organizationId ?? null,
+    worktreeId: selectedWorktreeId,
+    workspace: selectedWorkspace,
+    currentSessionId: currentSessionId ?? null,
+  });
+  const tabWorkspaces = useMemo(
+    () =>
+      selectedWorkspace
+        ? [
+            {
+              worktreeId: selectedWorkspace.worktreeId,
+              latestOpenSessionId: selectedWorkspace.latestOpenSessionId,
+              openChats,
+              closedChats,
+            },
+          ]
+        : [],
+    [selectedWorkspace, openChats, closedChats]
+  );
+  const syncedWorktreeBySessionId = useMemo(
+    () =>
+      new Map(
+        localSessions.flatMap(session =>
+          session.sync.state === 'synced' && session.worktreeId
+            ? [[session.kiloSessionId, session.worktreeId] as const]
+            : []
+        )
+      ),
+    [localSessions]
   );
   const {
     closedSessionIds,
@@ -518,12 +545,9 @@ function CloudSidebarLayoutContent({
     getClosedWorktreeChatTabsStorageKey(currentUserId, organizationId),
     {
       organizationId: organizationId ?? null,
-      workspaces: loadedWorkspaceSummaries,
+      workspaces: tabWorkspaces,
+      syncedWorktreeBySessionId,
     }
-  );
-  const serverWorkspaceChats = useMemo(
-    () => (selectedWorkspace ? workspaceSummaryChats(selectedWorkspace) : []),
-    [selectedWorkspace]
   );
   const selectedWorkspaceChats = useMemo(
     () => mergeWorkspaceChats(selectedWorktreeId, serverWorkspaceChats, cachedSessions),
@@ -677,18 +701,27 @@ function CloudSidebarLayoutContent({
   const openWorktreeFromSidebar = useCallback(
     (worktreeId: string, latestOpenSessionId: string | null) => {
       const workspace = loadedWorkspaceSummaries.find(row => row.worktreeId === worktreeId);
-      const sessionId = workspace
-        ? latestOpenWorkspaceChat(workspace, closedSessionIds)
-        : latestOpenSessionId && !closedSessionIds.includes(latestOpenSessionId)
-          ? latestOpenSessionId
-          : null;
+      const latestId = workspace ? workspace.latestOpenSessionId : latestOpenSessionId;
+      const sessionId =
+        latestId && !closedSessionIds.includes(latestId)
+          ? latestId
+          : worktreeId === selectedWorktreeId
+            ? openWorktreeChats[0]?.sessionId
+            : null;
       if (sessionId) {
         selectSession(sessionId);
       } else {
         openWorktree(worktreeId);
       }
     },
-    [closedSessionIds, loadedWorkspaceSummaries, openWorktree, selectSession]
+    [
+      closedSessionIds,
+      loadedWorkspaceSummaries,
+      openWorktree,
+      openWorktreeChats,
+      selectedWorktreeId,
+      selectSession,
+    ]
   );
 
   // Arriving at a chat's address from elsewhere (a link, history) reopens its
@@ -793,7 +826,11 @@ function CloudSidebarLayoutContent({
       }: { placement?: 'append' | 'replace'; composer?: LocalComposerSettings | null } = {}
     ) => {
       const knownChats = [...worktreeChats, ...cachedSessions];
-      const source = knownChats.find(session => session.sessionId === sourceKiloSessionId);
+      const source =
+        knownChats.find(session => session.sessionId === sourceKiloSessionId) ??
+        Object.values(sidebarWorktreeDetails).find(
+          details => details.prSession?.sessionId === sourceKiloSessionId
+        )?.prSession;
       const worktreeId = source?.worktreeId ?? selectedWorktreeId;
       // The server copies the setup from a chat it has, so a local source defers to one.
       const serverSourceId = source?.localSync
@@ -863,6 +900,7 @@ function CloudSidebarLayoutContent({
       replaceChatTab,
       selectedWorktreeId,
       sessionConfig,
+      sidebarWorktreeDetails,
       worktreeChats,
     ]
   );
@@ -1090,6 +1128,9 @@ function CloudSidebarLayoutContent({
       worktreeChats,
       openWorktreeChats,
       closedWorktreeChats,
+      openChatPages,
+      closedChatPages,
+      requestClosedHistory,
       openSession: selectSession,
       composerFocusRequest,
       closeSession,
@@ -1106,6 +1147,9 @@ function CloudSidebarLayoutContent({
       worktreeChats,
       openWorktreeChats,
       closedWorktreeChats,
+      openChatPages,
+      closedChatPages,
+      requestClosedHistory,
       selectSession,
       composerFocusRequest,
       closeSession,

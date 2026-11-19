@@ -141,4 +141,29 @@ describe('BitbucketConnectSheet', () => {
     });
     expect(routerMock.back).toHaveBeenCalledTimes(1);
   });
+
+  it('keeps the close control in the loading and failing states too', async () => {
+    platformMock.OS = 'android';
+
+    // Loading: the skeleton body, and the header is already there, naming the
+    // platform rather than claiming a connection the reads have not answered.
+    state.status.isPending = true;
+    const loading = await mount();
+    const loadingHeader = loading.find(node => Object.is(node.type, HEADER));
+    expect(loadingHeader.props.title).toBe(i18n.t('agentChat.repoPicker.platformBitbucket'));
+    expect(loadingHeader.props.showBackButton).toBe(true);
+
+    // A failed status read: the retry body, and the same control, outside it.
+    state.status.isPending = false;
+    state.status.isError = true;
+    state.status.error = new Error('request failed');
+    const failed = await mount();
+    const failedHeader = failed.find(node => Object.is(node.type, HEADER));
+    expect(failedHeader.props.showBackButton).toBe(true);
+    expect(failed.findAll(node => Object.is(node.type, QUERY_ERROR))).toHaveLength(1);
+
+    // One header for the surface, not one inside each body: a scroll in the form
+    // can never move it, and the loading state already had it.
+    expect(failed.findAll(node => Object.is(node.type, HEADER))).toHaveLength(1);
+  });
 });

@@ -1,5 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
+import { type TFunction } from 'i18next';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, View } from 'react-native';
@@ -66,6 +67,21 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
   // The contract the connect mutations enforce (`organizationBillingProcedure`),
   // so a deep link never offers a submit the server would refuse.
   const canManage = canManageOrganizationBilling(role);
+  // The heading is one value for the whole surface, resolved from whatever the
+  // reads have answered: a state that is still loading shows the platform name
+  // rather than claiming a connection it has not read yet.
+  const integrationId = readiness.data?.integrationId ?? null;
+  const repair = readiness.data === undefined ? null : bitbucketRepair(readiness.data, status.data);
+  // A workspace connected through Bitbucket OAuth has no token integration to
+  // name, so the sheet is about the connection itself rather than about a form.
+  const managesExisting = repair?.kind === 'manage-connection';
+  const { title, deniedDescription } = bitbucketSheetCopy({
+    t,
+    integrationId,
+    managesExisting,
+    // A read that has not answered cannot claim a connection either way.
+    resolved: readiness.data !== undefined && status.data !== undefined,
+  });
 
   // One body per state, so the guard's confirmation renders beside all of them:
   // a read that answers while a token is typed can replace the form with an
@@ -101,7 +117,7 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     if (status.isError && status.data == null) {
       return (
         <>
-          <SheetTitle title={t('agentChat.repoPicker.platformBitbucket')} />
+          <SheetTitle title={title} />
           {isPermissionDeniedError(status.error) ? (
             <PermissionDenied description={t('prReview.connect.bitbucketAdminOnlyDescription')} />
           ) : (
@@ -114,22 +130,6 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
           )}
         </>
       );
-    }
-
-    const integrationId = readiness.data?.integrationId ?? null;
-    const repair =
-      readiness.data === undefined ? null : bitbucketRepair(readiness.data, status.data);
-    // A workspace connected through Bitbucket OAuth has no token integration to
-    // name, so the sheet is about the connection itself rather than about a form.
-    const managesExisting = repair?.kind === 'manage-connection';
-    let title = t('prReview.connect.reconnectTitleBitbucket');
-    let deniedDescription = t('prReview.connect.gitlabReconnectAdminOnlyDescription');
-    if (managesExisting) {
-      title = t('agentChat.repoPicker.platformBitbucket');
-      deniedDescription = t('integrations.managedByOwner');
-    } else if (integrationId === null) {
-      title = t('common.connectBitbucket');
-      deniedDescription = t('codeReviewer.bitbucket.notConnectedReadOnly');
     }
 
     if (readiness.isError && readiness.data == null) {
@@ -203,36 +203,75 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <>
+      {/* The Android modal owns the whole window and has no native dismissal,
+          so its header is a fixed sibling of the body: every state carries the
+          same close control in the same place, and the form does not scroll the
+          heading away. iOS keeps the formSheet's grabber and its centred title
+          inside the form, so nothing moves there. */}
+      {Platform.OS === 'android' ? (
+        <View className="bg-background">
+          <ScreenHeader
+            title={title}
+            modal
+            // The surface pads the status bar itself, so the header must not.
+            safeAreaTop={false}
+            showBackButton
+            backIcon="close"
+            onBack={() => {
+              router.back();
+            }}
+          />
+        </View>
+      ) : null}
       {renderBody()}
       {guard.dialog}
     </>
   );
 }
 
+type BitbucketSheetCopy = Readonly<{ title: string; deniedDescription: string }>;
+
 /**
- * The sheet's heading. A native formSheet carries a grabber and the platform's
- * dismissal gesture, so the title alone is enough there; the Android modal has
- * neither, so it renders a header whose close control is the visible way out.
- * That control dispatches the same route removal Back does, which the leave
- * guard intercepts while a token is typed.
+ * The sheet's heading and the sentence that explains a refusal, from the
+ * integration facts the reads answered.
+ *
+ * Kept out of the component so the values are plain branches: the component
+ * renders one surface whose heading must not depend on which body branch is on
+ * screen, and a state whose reads have not answered names the platform rather
+ * than claiming a connection it has not read.
+ */
+function bitbucketSheetCopy(input: {
+  t: TFunction;
+  integrationId: string | null;
+  managesExisting: boolean;
+  resolved: boolean;
+}): BitbucketSheetCopy {
+  if (!input.resolved || input.managesExisting) {
+    return {
+      title: input.t('agentChat.repoPicker.platformBitbucket'),
+      deniedDescription: input.t('integrations.managedByOwner'),
+    };
+  }
+  if (input.integrationId === null) {
+    return {
+      title: input.t('common.connectBitbucket'),
+      deniedDescription: input.t('codeReviewer.bitbucket.notConnectedReadOnly'),
+    };
+  }
+  return {
+    title: input.t('prReview.connect.reconnectTitleBitbucket'),
+    deniedDescription: input.t('prReview.connect.gitlabReconnectAdminOnlyDescription'),
+  };
+}
+
+/**
+ * The iOS heading. The formSheet carries a grabber and the platform's dismissal
+ * gesture, so the plain centred title above the form is enough; Android draws
+ * the header above instead, and this component renders nothing there.
  */
 function SheetTitle({ title }: Readonly<{ title: string }>) {
-  const router = useRouter();
   if (Platform.OS === 'android') {
-    return (
-      <ScreenHeader
-        title={title}
-        modal
-        // The surface pads the status bar itself, so the header must not.
-        safeAreaTop={false}
-        showBackButton
-        backIcon="close"
-        onBack={() => {
-          router.back();
-        }}
-        className="bg-background"
-      />
-    );
+    return null;
   }
   return (
     <View collapsable={false} className="bg-background px-6 pt-4">

@@ -11,14 +11,14 @@ import { renderWithProviders } from '@/test/render-with-providers';
 
 import { BitbucketConnectSheet } from './bitbucket-connect-sheet';
 
-export type IntegrationMethod = 'oauth' | 'workspace_access_token';
+type IntegrationMethod = 'oauth' | 'workspace_access_token';
 
-export type LeaveOptions = {
+type LeaveOptions = {
   data: { action: { type: string } };
   repeat: () => void;
 };
 
-export type ConfirmRequest = {
+type ConfirmRequest = {
   title: string;
   message: string;
   confirmLabel: string;

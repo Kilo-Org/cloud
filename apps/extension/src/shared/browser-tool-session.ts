@@ -1301,7 +1301,7 @@ const resolveScriptingTarget = (
 
   if (entry?.selector === undefined) {
     return {
-      error: `Unknown element reference ${ref}. Take a fresh kilo_browser_snapshot and use a ref from it.`,
+      error: `Unknown element reference ${ref}. Take a new page snapshot and use a ref from it.`,
       kind: 'error',
     };
   }
@@ -2751,8 +2751,7 @@ export const createBrowserToolSession = ({
 
       if (request === undefined) {
         return {
-          error:
-            'No matching network request. Use kilo_browser_network_requests for the numbered list.',
+          error: 'No matching network request. List the network requests for the numbered list.',
           ok: false,
         };
       }
@@ -3347,7 +3346,7 @@ export const createBrowserToolSession = ({
 
         if (list === undefined || tool === undefined) {
           return {
-            error: `WebMCP tool "${parsed.data.name}" is not available. Call kilo_browser_webmcp_list first.`,
+            error: `WebMCP tool "${parsed.data.name}" is not available. List the page's WebMCP tools first.`,
             ok: false,
           };
         }

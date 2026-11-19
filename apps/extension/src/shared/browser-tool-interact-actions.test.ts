@@ -27,7 +27,6 @@ const createFakeSession = ({
   boxes = {},
   nodeConnected = true,
   pageHelper,
-  pushError,
   resolveNodeError,
   targets = {},
 }: {
@@ -37,8 +36,6 @@ const createFakeSession = ({
   /** Whether `DOM.resolveNode` + `Runtime.callFunctionOn` report the node attached. */
   nodeConnected?: boolean;
   pageHelper?: FakePageHelperEnvelope | ((expression: string) => FakePageHelperEnvelope);
-  /** A CDP rejection while resolving the ref to a frontend node id. */
-  pushError?: string;
   /** A CDP rejection while resolving the ref's node to a remote object. */
   resolveNodeError?: string;
   targets?: Record<string, BrowserToolResolvedTarget>;
@@ -66,11 +63,8 @@ const createFakeSession = ({
       }
 
       if (method === 'DOM.pushNodesByBackendIdsToFrontend') {
-        if (pushError !== undefined) {
-          throw new Error(pushError);
-        }
-
-        return { nodeIds: [77] };
+        // What Chrome answers in a session that never sent `DOM.getDocument`, which a snapshot never does.
+        throw new Error('Document needs to be requested first');
       }
 
       if (method === 'DOM.resolveNode') {
@@ -82,7 +76,11 @@ const createFakeSession = ({
       }
 
       if (method === 'Runtime.callFunctionOn') {
-        return { result: { value: nodeConnected } };
+        const declaration = String(params?.['functionDeclaration'] ?? '');
+
+        return declaration.includes('isConnected')
+          ? { result: { value: nodeConnected } }
+          : { result: {} };
       }
 
       if (method === 'Runtime.evaluate') {
@@ -109,6 +107,12 @@ const createFakeSession = ({
   };
 
   return { commands, session };
+};
+
+/** A ref error must name no tool: the side panel and the CLI call the snapshot tool by different names. */
+const expectFreshSnapshotHint = (error: string): void => {
+  expect(error).toContain('Take a new page snapshot and use a ref from it');
+  expect(error).not.toMatch(/kilo_browser_|browser_snapshot/u);
 };
 
 const ref = (backendNodeId: number): BrowserToolResolvedTarget => ({
@@ -214,7 +218,7 @@ describe('browser_click', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error).toContain('stale or unknown');
-      expect(result.error).toContain('kilo_browser_snapshot');
+      expectFreshSnapshotHint(result.error);
     }
   });
 
@@ -246,7 +250,7 @@ describe('browser_click', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error).toContain('stale or unknown');
-      expect(result.error).toContain('kilo_browser_snapshot');
+      expectFreshSnapshotHint(result.error);
     }
   });
 
@@ -532,23 +536,25 @@ describe('browser_select_option', () => {
     }
   });
 
-  it('reports a stale ref when the ref node is gone before the DOM-side lookup', async () => {
-    const { session } = createFakeSession({
-      pushError: 'Could not find node with given id',
+  it('selects through a snapshot ref in a session that never requested the document', async () => {
+    const { commands, session } = createFakeSession({
+      pageHelper: { ok: true, result: ['Tea'] },
       targets: { e70: ref(70) },
     });
 
     const result = await runInteractBrowserTool(
       'browser_select_option',
-      { target: 'e70', values: ['Tea'] },
+      { element: 'Drink', target: 'e70', values: ['Tea'] },
       session
     );
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toContain('stale or unknown');
-      expect(result.error).toContain('kilo_browser_snapshot');
-    }
+    expect(result).toEqual({ ok: true, value: 'Selected "Tea" in "Drink".' });
+    expect(commands).toContainEqual({
+      method: 'DOM.resolveNode',
+      params: { backendNodeId: 70 },
+    });
+    const evaluations = commands.filter(command => command.method === 'Runtime.evaluate');
+    expect(String(evaluations[0]?.params?.['expression'])).toContain('data-kilo-tool-target');
   });
 
   it('reports a stale ref when the ref node is detached from the document', async () => {
@@ -566,7 +572,7 @@ describe('browser_select_option', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error).toContain('stale or unknown');
-      expect(result.error).toContain('kilo_browser_snapshot');
+      expectFreshSnapshotHint(result.error);
     }
     expect(commands.some(command => command.method === 'Runtime.evaluate')).toBe(false);
   });
@@ -586,7 +592,7 @@ describe('browser_select_option', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error).toContain('stale or unknown');
-      expect(result.error).toContain('kilo_browser_snapshot');
+      expectFreshSnapshotHint(result.error);
     }
   });
 });
@@ -618,22 +624,33 @@ describe('browser_fill_form', () => {
     expect(commands.some(command => command.method === 'Input.dispatchMouseEvent')).toBe(true);
   });
 
-  it('releases the remote object it resolved to check the node', async () => {
+  it('fills a snapshot ref, then untags the node and releases its remote object', async () => {
     const { commands, session } = createFakeSession({
       pageHelper: { ok: true, result: true },
       targets: { e1: ref(1) },
     });
 
-    await runInteractBrowserTool(
+    const result = await runInteractBrowserTool(
       'browser_fill_form',
       { fields: [{ name: 'Email', target: 'e1', type: 'textbox', value: 'a@b.c' }] },
       session
     );
 
-    expect(commands).toContainEqual({
-      method: 'Runtime.releaseObject',
-      params: { objectId: 'kilo-node-object' },
+    expect(result).toEqual({
+      ok: true,
+      value: 'Filled 1 field(s).\nEmail: ok — filled with "a@b.c"',
     });
+    const fill = commands.findIndex(command => command.method === 'Runtime.evaluate');
+    const untag = commands.findIndex(
+      command =>
+        command.method === 'Runtime.callFunctionOn' &&
+        String(command.params?.['functionDeclaration']).includes('removeAttribute')
+    );
+    const release = commands.findIndex(command => command.method === 'Runtime.releaseObject');
+    expect(fill).toBeGreaterThanOrEqual(0);
+    expect(untag).toBeGreaterThan(fill);
+    expect(release).toBeGreaterThan(untag);
+    expect(commands[release]?.params).toEqual({ objectId: 'kilo-node-object' });
   });
 
   it('reports every field while failing when one field cannot resolve', async () => {
@@ -678,5 +695,9 @@ describe('browser_fill_form', () => {
       expect(result.error).toContain('stale or unknown');
     }
     expect(commands.some(command => command.method === 'Runtime.evaluate')).toBe(false);
+    expect(commands).toContainEqual({
+      method: 'Runtime.releaseObject',
+      params: { objectId: 'kilo-node-object' },
+    });
   });
 });

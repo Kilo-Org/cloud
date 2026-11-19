@@ -9,10 +9,11 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { SectionHeader } from '@/components/ui/section-header';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
-import { ScreenHeader } from '@/components/screen-header';
+import { type HeaderEyebrow, ScreenHeader } from '@/components/screen-header';
 import { TodoNotesSection } from '@/components/todos/todo-notes-section';
 import { TodoSessionRow } from '@/components/todos/todo-session-row';
 import { TodoStartActions } from '@/components/todos/todo-start-actions';
+import { eyebrowHeaderProps } from '@/components/ui/eyebrow-placeholder';
 import { Circle, CircleCheck } from '@/components/ui/icons';
 import { IconButton } from '@/components/ui/icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -164,17 +165,19 @@ export function TodoDetailScreen({ itemId }: Readonly<{ itemId: string }>) {
     return <TodoDetailBody key={todo.id} todo={todo} />;
   }
 
-  // The to-do's title and list come from the read, so the states name the
-  // surface. The header keeps the loaded body's shape — a two-line reserved
-  // title band and the lists fallback behind Back — without its eyebrow line,
-  // which would push the heading and its back control below every other pushed
-  // screen's.
+  // A live read keeps the loaded header's geometry: the only line it cannot
+  // name yet is the to-do's list, so the eyebrow line stays reserved with the
+  // placeholder bar over it, and the body lands without moving. A read that
+  // stopped has no label coming without a retry, so the terminal states wear
+  // the plain header — the title and the back control on its first line.
+  const eyebrow: HeaderEyebrow = query.isError ? { kind: 'none' } : { kind: 'loading' };
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={t('todos.segment.todos')}
         titleNumberOfLines={2}
         reserveTitleSpace
+        {...eyebrowHeaderProps(eyebrow)}
         backFallback={LISTS_HREF}
       />
       {query.isError ? (

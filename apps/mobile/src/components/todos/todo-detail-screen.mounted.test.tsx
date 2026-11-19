@@ -1,8 +1,9 @@
-// The to-do detail screen's loading and error states wear the stock
-// pushed-screen header, named with the to-do surface's title until the read
-// brings the to-do's own. They reserve no eyebrow line for the list label the
-// loaded body paints, so the heading and its back control sit on the header's
-// first line like every other pushed screen's.
+// The to-do detail screen's states wear the stock pushed-screen header, named
+// with the to-do surface's title until the read brings the to-do's own. The
+// running read also reserves the eyebrow line the loaded body paints for the
+// to-do's list, with its placeholder bar, so the body lands without moving. A
+// read that stopped has no label coming: the terminal states drop that line, so
+// the heading and its back control sit on the header's first line.
 
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -25,6 +26,7 @@ type HeaderProps = {
   titleNumberOfLines?: number;
   reserveTitleSpace?: boolean;
   reserveEyebrow?: boolean;
+  eyebrowPlaceholder?: unknown;
   backFallback?: unknown;
 };
 
@@ -100,7 +102,7 @@ beforeEach(() => {
 });
 
 describe('todo detail header', () => {
-  it('names the states with the to-do surface on the stock header', () => {
+  it('reserves the list line under the surface title while the to-do loads', () => {
     query.isFetching = true;
     const renderer = renderScreen();
 
@@ -108,22 +110,34 @@ describe('todo detail header', () => {
     expect(headers.rendered[0]?.title).toBe('To-dos');
     expect(headers.rendered[0]?.titleNumberOfLines).toBe(2);
     expect(headers.rendered[0]?.reserveTitleSpace).toBe(true);
-    // No eyebrow line: the heading and its back control stay on the header's
-    // first line, where every other pushed screen puts them.
-    expect(headers.rendered[0]?.reserveEyebrow).toBeUndefined();
+    expect(headers.rendered[0]?.reserveEyebrow).toBe(true);
+    expect(headers.rendered[0]?.eyebrowPlaceholder).toBeTruthy();
     expect(headers.rendered[0]?.backFallback).toBe('/(app)/(tabs)/(2_agents)');
     renderer.unmount();
   });
 
-  it('keeps that header when the read fails', () => {
+  it('drops the list line on a not-found state', () => {
+    query.isError = true;
+    query.error = { data: { code: 'BAD_REQUEST' } };
+    const renderer = renderScreen('not-a-seeded-item');
+
+    expect(headers.rendered).toHaveLength(1);
+    expect(headers.rendered[0]?.title).toBe('To-dos');
+    expect(headers.rendered[0]?.reserveEyebrow).toBe(false);
+    expect(headers.rendered[0]?.eyebrowPlaceholder).toBeUndefined();
+    expect(headers.rendered[0]?.backFallback).toBe('/(app)/(tabs)/(2_agents)');
+    renderer.unmount();
+  });
+
+  it('keeps the plain header when the read fails on the server', () => {
     query.isError = true;
     query.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
     const renderer = renderScreen();
 
     expect(headers.rendered).toHaveLength(1);
     expect(headers.rendered[0]?.title).toBe('To-dos');
-    expect(headers.rendered[0]?.reserveEyebrow).toBeUndefined();
-    expect(headers.rendered[0]?.backFallback).toBe('/(app)/(tabs)/(2_agents)');
+    expect(headers.rendered[0]?.reserveEyebrow).toBe(false);
+    expect(headers.rendered[0]?.eyebrowPlaceholder).toBeUndefined();
     renderer.unmount();
   });
 });

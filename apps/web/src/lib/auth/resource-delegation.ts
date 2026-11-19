@@ -21,6 +21,8 @@ import {
   buildModernKiloTokenPayload,
   isKiloCredentialExchangeEligible,
   verifyKiloTokenForPolicy,
+  type ModernKiloTokenClaims,
+  type VerifiedKiloAuthContext,
 } from '@kilocode/worker-utils/kilo-token-policy';
 import type { RuntimeAdmission } from '@kilocode/worker-utils/runtime-authorization-contract';
 import {
@@ -144,14 +146,9 @@ export async function canIssueLegacyOrganizationToken(
   const bearer = tokenFromHeaders(requestHeaders);
   if (!bearer) return false;
   try {
-    const verified = await verifyKiloTokenForPolicy(bearer, NEXTAUTH_SECRET, {
-      audience: KILO_API_AUDIENCE,
-      mode: 'allow-legacy',
-    });
+    const verified = await verifyApiBearer(bearer);
     if (
-      verified.userId !== user.id ||
-      verified.claims.env !== process.env.NODE_ENV ||
-      verified.claims.apiTokenPepper !== user.api_token_pepper ||
+      !bearerBoundToUser(verified, user.id, user.api_token_pepper) ||
       hasUnsafeLegacyClaims(verified.claimNames)
     ) {
       return false;
@@ -167,6 +164,67 @@ export async function canIssueLegacyOrganizationToken(
 
 function tokenFromHeaders(requestHeaders: Headers): string | null {
   return extractBearerToken(requestHeaders.get('authorization'));
+}
+
+type VerifiedBearer = Extract<VerifiedKiloAuthContext, { type: 'bearer' }>;
+
+/**
+ * Verifies a bearer under the one claim policy the delegation entry points accept. Callers own the
+ * failure policy: some return false, some throw unauthorized(), some rethrow.
+ */
+async function verifyApiBearer(bearer: string): Promise<VerifiedBearer> {
+  return await verifyKiloTokenForPolicy(bearer, NEXTAUTH_SECRET, {
+    audience: KILO_API_AUDIENCE,
+    mode: 'allow-legacy',
+  });
+}
+
+/**
+ * The fields a delegated bearer must match. The user id and the pepper come from separate arguments
+ * because one caller compares the id it was given with the pepper of the freshly loaded user row.
+ */
+function bearerBoundToUser(
+  verified: VerifiedBearer,
+  userId: string,
+  apiTokenPepper: string | null
+): boolean {
+  return (
+    verified.userId === userId &&
+    verified.claims.env === process.env.NODE_ENV &&
+    verified.claims.apiTokenPepper === apiTokenPepper
+  );
+}
+
+function userAdmission(user: Pick<User, 'id' | 'api_token_pepper'>): RuntimeAdmission {
+  return {
+    source: 'user',
+    authorizationUserId: user.id,
+    authorizationPepper: user.api_token_pepper,
+  };
+}
+
+/**
+ * Returns the lifetime a minted token may carry: the requested lifetime, bounded by the caller's cap
+ * and by the parent authority's expiry. A non-positive result means the authority has expired.
+ */
+function clampLifetimeSeconds(args: {
+  requested?: number;
+  cap: number;
+  authorityExpiresAt?: number;
+  now: number;
+}): number {
+  const requested = args.requested ?? args.cap;
+  const expiresIn = Math.min(
+    requested,
+    args.cap,
+    args.authorityExpiresAt ? args.authorityExpiresAt - args.now : requested
+  );
+  if (expiresIn <= 0) unauthorized('Resource delegation authority has expired');
+  return expiresIn;
+}
+
+function signModernPayload(payload: ModernKiloTokenClaims): string {
+  return jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: 'HS256' });
 }
 
 function hasUnsafeLegacyClaims(claimNames: readonly string[]): boolean {
@@ -256,29 +314,18 @@ export async function getResourceDelegationAuthority(
       user,
       credentialKind: 'human-api',
       isModern: false,
-      runtimeAdmission: {
-        source: 'user',
-        authorizationUserId: user.id,
-        authorizationPepper: user.api_token_pepper,
-      },
+      runtimeAdmission: userAdmission(user),
     };
   }
 
-  let verified: Awaited<ReturnType<typeof verifyKiloTokenForPolicy>>;
+  let verified: VerifiedBearer;
   try {
-    verified = await verifyKiloTokenForPolicy(bearer, NEXTAUTH_SECRET, {
-      audience: KILO_API_AUDIENCE,
-      mode: 'allow-legacy',
-    });
+    verified = await verifyApiBearer(bearer);
   } catch {
     unauthorized();
   }
   const claims = verified.claims;
-  if (
-    verified.userId !== expectedUser.id ||
-    claims.env !== process.env.NODE_ENV ||
-    claims.apiTokenPepper !== user.api_token_pepper
-  ) {
+  if (!bearerBoundToUser(verified, expectedUser.id, user.api_token_pepper)) {
     unauthorized();
   }
 
@@ -302,11 +349,7 @@ export async function getResourceDelegationAuthority(
       tokenSource: claims.tokenSource,
       deviceSessionId: claims.deviceSessionId,
       isModern: true,
-      runtimeAdmission: {
-        source: 'user',
-        authorizationUserId: user.id,
-        authorizationPepper: user.api_token_pepper,
-      },
+      runtimeAdmission: userAdmission(user),
     };
   }
 
@@ -328,21 +371,14 @@ export async function getResourceDelegationAuthority(
     expiresAt: claims.exp,
     isModern: false,
     deviceSessionId: claims.deviceSessionId,
-    runtimeAdmission: {
-      source: 'user',
-      authorizationUserId: user.id,
-      authorizationPepper: user.api_token_pepper,
-    },
+    runtimeAdmission: userAdmission(user),
   };
 }
 
 export async function isModernResourceDelegationRequest(requestHeaders: Headers): Promise<boolean> {
   const bearer = tokenFromHeaders(requestHeaders);
   if (!bearer) return false;
-  const verified = await verifyKiloTokenForPolicy(bearer, NEXTAUTH_SECRET, {
-    audience: KILO_API_AUDIENCE,
-    mode: 'allow-legacy',
-  });
+  const verified = await verifyApiBearer(bearer);
   return verified.claims.tokenPurpose !== undefined;
 }
 
@@ -352,13 +388,12 @@ async function createModernControlToken(
   options?: CreateControlTokenOptions
 ): Promise<{ token: string; expiresAt: string; user: User; tokenSource?: string }> {
   const now = Math.floor(Date.now() / 1000);
-  const requested = options?.expiresIn ?? ONE_HOUR_SECONDS;
-  const expiresIn = Math.min(
-    requested,
-    ONE_HOUR_SECONDS,
-    authority.expiresAt ? authority.expiresAt - now : requested
-  );
-  if (expiresIn <= 0) unauthorized('Resource delegation authority has expired');
+  const expiresIn = clampLifetimeSeconds({
+    requested: options?.expiresIn,
+    cap: ONE_HOUR_SECONDS,
+    authorityExpiresAt: authority.expiresAt,
+    now,
+  });
   const payload = buildModernKiloTokenPayload({
     userId: authority.user.id,
     pepper: authority.user.api_token_pepper,
@@ -377,7 +412,7 @@ async function createModernControlToken(
       runtimeAdmission: authority.runtimeAdmission,
     },
   });
-  const token = jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: 'HS256' });
+  const token = signModernPayload(payload);
   return {
     token,
     expiresAt: new Date((now + expiresIn) * 1000).toISOString(),
@@ -394,12 +429,9 @@ export async function createControlTokenForRequest(
   const requestHeaders = options?.headers ?? (await nextHeaders());
   const bearer = tokenFromHeaders(requestHeaders);
   if (bearer) {
-    let verified: Awaited<ReturnType<typeof verifyKiloTokenForPolicy>>;
+    let verified: VerifiedBearer;
     try {
-      verified = await verifyKiloTokenForPolicy(bearer, NEXTAUTH_SECRET, {
-        audience: KILO_API_AUDIENCE,
-        mode: 'allow-legacy',
-      });
+      verified = await verifyApiBearer(bearer);
     } catch {
       unauthorized();
     }
@@ -412,11 +444,7 @@ export async function createControlTokenForRequest(
         forbidden('Cloud Agent authority cannot broaden its resource or organization');
       }
       const current = await currentUser(user);
-      if (
-        verified.userId !== current.id ||
-        verified.claims.env !== process.env.NODE_ENV ||
-        verified.claims.apiTokenPepper !== current.api_token_pepper
-      ) {
+      if (!bearerBoundToUser(verified, current.id, current.api_token_pepper)) {
         unauthorized();
       }
       await assertCurrentOrganizationMembership(current.id, scope.organizationId ?? undefined);
@@ -439,7 +467,7 @@ export async function createControlTokenForRequest(
         },
       });
       return {
-        token: jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: 'HS256' }),
+        token: signModernPayload(payload),
         expiresAt: new Date(verified.claims.exp * 1000).toISOString(),
         user: current,
       };
@@ -525,13 +553,12 @@ export async function createDelegatedResourceToken(
   }
   const now = Math.floor(Date.now() / 1000);
   const maxLifetime = forPages ? PAGES_TOKEN_MAX_SECONDS : 15 * 60;
-  const requested = options?.expiresIn ?? maxLifetime;
-  const expiresIn = Math.min(
-    requested,
-    maxLifetime,
-    authority.expiresAt ? authority.expiresAt - now : requested
-  );
-  if (expiresIn <= 0) unauthorized('Resource delegation authority has expired');
+  const expiresIn = clampLifetimeSeconds({
+    requested: options?.expiresIn,
+    cap: maxLifetime,
+    authorityExpiresAt: authority.expiresAt,
+    now,
+  });
   if (forPages) {
     // Pages holds the token only as an opaque bearer and trades it at the exchange for identity,
     // so it carries no pepper, organization context or token source.
@@ -545,7 +572,7 @@ export async function createDelegatedResourceToken(
       credentialExchange: false,
     });
     return {
-      token: jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: 'HS256' }),
+      token: signModernPayload(payload),
       expiresAt: new Date((now + expiresIn) * 1000).toISOString(),
       user: authority.user,
     };
@@ -566,7 +593,7 @@ export async function createDelegatedResourceToken(
     },
   });
   return {
-    token: jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: 'HS256' }),
+    token: signModernPayload(payload),
     expiresAt: new Date((now + expiresIn) * 1000).toISOString(),
     user: authority.user,
     tokenSource: options?.tokenSource ?? authority.tokenSource,

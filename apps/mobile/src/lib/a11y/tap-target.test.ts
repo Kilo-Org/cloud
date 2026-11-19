@@ -3,11 +3,16 @@ import { describe, expect, it, vi } from 'vitest';
 
 // eslint-disable-next-line import/no-nodejs-modules -- Use the compiler's compatible CommonJS export.
 import { createRequire } from 'node:module';
+// eslint-disable-next-line import/no-nodejs-modules -- vitest-only parity check, runs in node, never bundled into the app
+import { readFileSync } from 'node:fs';
+// eslint-disable-next-line import/no-nodejs-modules -- vitest-only parity check, runs in node, never bundled into the app
+import { fileURLToPath } from 'node:url';
 import tailwindcss from '@tailwindcss/postcss';
 import postcss from 'postcss';
 import type * as NativeCSSCompiler from 'react-native-css/compiler';
 
 import {
+  CAPTION_ACTION_BOX_CLASS,
   CHIP_FRAME_DP,
   CHIP_HIT_SLOP,
   CHIP_HIT_SLOP_DP,
@@ -52,11 +57,17 @@ import {
   LINE_ACTION_REACH_DP,
   MIN_TAP_TARGET_DP,
   ROW_TARGET_CLASS,
+  SECTION_ACTION_BOX_CLASS,
+  SECTION_ACTION_FRAME_DP,
+  SECTION_ACTION_HIT_SLOP_DP,
+  SECTION_ACTION_LABEL_LINE_DP,
   STATE_ACTION_CLASS,
   STATE_ACTION_TARGET_DP,
+  SWITCH_HOST_CLASS,
   tapTargetReachDp,
   textActionTargetClass,
   TOUCH_TARGET_DP,
+  TOUCH_TARGET_OVERHANG_DP,
   UNDER_COPY_ACTION_BOX_CLASS,
   UNDER_COPY_ACTION_HIT_SLOP,
 } from './tap-target';
@@ -72,6 +83,12 @@ vi.mock('react-native', () => ({ I18nManager: rtl, Platform: platform }));
 const { compile } = createRequire(import.meta.url)(
   'react-native-css/compiler'
 ) as typeof NativeCSSCompiler;
+
+/** The `Text` primitive's source: the eyebrow's line is declared there. */
+const TEXT_SOURCE = readFileSync(
+  fileURLToPath(new URL('../../components/ui/text.tsx', import.meta.url)),
+  'utf8'
+);
 
 /** The value a compiled style declaration holds for one property. */
 function declarationValue(declaration: unknown, property: string): unknown {
@@ -221,6 +238,25 @@ describe('shared tap-target geometry', () => {
     const height = await compiledDp(ROW_TARGET_CLASS, 'minHeight');
     expect(height).toBe(ICON_TARGET_DP);
     expect(height).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+  });
+
+  it('holds a switch in a host as tall as the control and keeps the row band', async () => {
+    // The regression this guards: the slash command row gave its switch a
+    // zero-padding wrapper, so the wrapper laid out to the switch's cancelled
+    // height (27dp) and that wrapper was the parent a touch had to land in.
+    // Android delivers a touch only inside the parent view, and the audit reads
+    // the control's own node, so the control's 44dp target was cut to 27dp.
+    const height = await compiledDp(SWITCH_HOST_CLASS, 'height');
+    const margin = await compiledDp(SWITCH_HOST_CLASS, 'marginBlock');
+    expect(height).toBe(TOUCH_TARGET_DP);
+    expect(height).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    // The host cancels the same overhang as the switch, so the row still sees
+    // the content band instead of the box.
+    expect(height + 2 * margin).toBe(TOUCH_TARGET_DP - 2 * TOUCH_TARGET_OVERHANG_DP);
+    expect(margin).toBe(-TOUCH_TARGET_OVERHANG_DP);
+    // A single child sits on the host's centre line, so the node fills the box.
+    expect(SWITCH_HOST_CLASS).toContain('justify-center');
+    expect(SWITCH_HOST_CLASS).toContain('items-center');
   });
 
   it('renders a screen header title control on its own 48dp node', async () => {
@@ -413,6 +449,52 @@ describe('shared tap-target geometry', () => {
     });
 
     rtl.isRTL = false;
+  });
+});
+
+describe('section header action geometry', () => {
+  it('cancels the action box against the eyebrow line it sits on', async () => {
+    // The regression this guards: the cancel was calibrated to a 12dp glyph
+    // line while the eyebrow lays its label out on `EYEBROW_LINE_HEIGHT_DP`
+    // (22dp). The action then sat 5dp low and its box reached past the row's
+    // padding. The box's margin box is the label's line, so it centres on it.
+    const frame = await compiledDp(SECTION_ACTION_BOX_CLASS, 'minHeight');
+    expect(frame).toBe(SECTION_ACTION_FRAME_DP);
+    expect(frame).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+    const margin = await compiledDp(SECTION_ACTION_BOX_CLASS, 'marginBlock');
+    expect(margin).toBe(-(SECTION_ACTION_FRAME_DP - SECTION_ACTION_LABEL_LINE_DP) / 2);
+    expect(frame + 2 * margin).toBe(SECTION_ACTION_LABEL_LINE_DP);
+    // The overhang a side stays inside the header row's `py-2` (7pt a side at
+    // the app's 14pt rem), so the box never paints or receives a touch past the
+    // row. Android delivers a touch only inside a parent view, so the row is
+    // the whole delivered area of this control.
+    expect(Math.abs(margin)).toBeLessThan(7);
+    expect(tapTargetReachDp(frame, SECTION_ACTION_HIT_SLOP_DP)).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP
+    );
+  });
+
+  it('keeps its line in step with the eyebrow variant', () => {
+    // The line is the eyebrow's, not the glyph's: a second, drifting copy in
+    // this module would move the action the moment `Text` retunes the variant.
+    expect(TEXT_SOURCE).toContain(
+      `export const EYEBROW_LINE_HEIGHT_DP = ${SECTION_ACTION_LABEL_LINE_DP};`
+    );
+  });
+
+  it('cancels a caption-line action to that line, not the eyebrow line', async () => {
+    // The code fence's copy control sits beside a `caption` label, whose line
+    // is 14dp at `text-xs`. Cancelling the eyebrow line instead would add the
+    // difference to the fence header, growing a row to a control's box.
+    const frame = await compiledDp(CAPTION_ACTION_BOX_CLASS, 'minHeight');
+    const margin = await compiledDp(CAPTION_ACTION_BOX_CLASS, 'marginBlock');
+    expect(frame).toBe(SECTION_ACTION_FRAME_DP);
+    expect(margin).toBe(-7);
+    expect(frame + 2 * margin).toBe(14);
+    expect(frame + 2 * margin).toBeLessThan(SECTION_ACTION_LABEL_LINE_DP);
+    expect(await compiledDp(CAPTION_ACTION_BOX_CLASS, 'minWidth')).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP
+    );
   });
 });
 

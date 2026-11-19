@@ -163,12 +163,33 @@ export const DENSE_ROW_HIT_SLOP = {
 export const SECTION_ACTION_FRAME_DP = 28;
 
 /**
- * The box a section header's text action renders, as {@link SECTION_ACTION_FRAME_DP}:
- * `-my-[8px]` is `-(28 - 12) / 2`, the eyebrow's line. The box then holds no
- * height of its own — it overlaps the header row's own `py-2`, which is tall
- * enough to hold it — and the label keeps its line and its padding.
+ * The line a section header's eyebrow label lays out on, in dp: `Text`'s
+ * `EYEBROW_LINE_HEIGHT_DP` (`components/ui/text.tsx`), which the eyebrow
+ * variant applies in every script. The action cancels against this line, not
+ * the glyph size, so its copy centres on the section label.
  */
-export const SECTION_ACTION_BOX_CLASS = 'min-h-[28px] min-w-[48px] -my-[8px]';
+export const SECTION_ACTION_LABEL_LINE_DP = 22;
+
+/**
+ * The box a section header's text action renders, as {@link SECTION_ACTION_FRAME_DP}:
+ * `-my-[3px]` is `-(28 - 22) / 2`, the eyebrow's line box. The box then holds
+ * no height of its own — its margin box is the label's line, centred on it, and
+ * the row's own `py-2` (7pt a side) is taller than the 3pt overhang — so the
+ * box neither paints nor receives a touch past the row's bounds (Android
+ * delivers a touch only inside a parent view) while the label keeps its line
+ * and its padding.
+ */
+export const SECTION_ACTION_BOX_CLASS = 'min-h-[28px] min-w-[48px] -my-[3px]';
+
+/**
+ * The box a compact action renders at the end of a caption line — the markdown
+ * code fence's copy control. The line there is the `caption` variant's 14dp box
+ * (`text-xs`), not the eyebrow's {@link SECTION_ACTION_LABEL_LINE_DP} line a
+ * section header uses, so it cancels its own slack (`-(28 - 14) / 2`) and the
+ * fence header stays one line tall instead of growing to the box. The width
+ * floor and the vertical slop are the section header action's.
+ */
+export const CAPTION_ACTION_BOX_CLASS = 'min-h-[28px] min-w-[48px] -my-[7px]';
 
 /**
  * Per-side vertical `hitSlop` of a {@link SECTION_ACTION_FRAME_DP} action:
@@ -225,6 +246,18 @@ const ROW_FRAME_CONTENT_DP = 27;
  * Android drops a touch outside a parent view.
  */
 export const TOUCH_TARGET_OVERHANG_DP = (TOUCH_TARGET_DP - ROW_FRAME_CONTENT_DP) / 2;
+
+/**
+ * The host a row gives a `Switch` when the row is not itself on
+ * {@link TOUCH_TARGET_DP} — the slash command row, whose content band is its
+ * text lines. The switch's node renders the target and cancels the excess with a
+ * negative vertical margin, so a host that took only that layout height (the
+ * row's content band) would be the parent a touch must land in, and Android
+ * delivers a touch only inside the parent view: the 44dp control would receive
+ * the band. The host takes the target as its own height, centring the node in
+ * it, and cancels the same overhang, so the row still sees only the content band.
+ */
+export const SWITCH_HOST_CLASS = 'h-[44px] -my-[8.5px] shrink-0 items-center justify-center';
 
 /**
  * The label pressable inside a `ROW_FRAME_CLASS` row cancels the frame's

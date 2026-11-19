@@ -223,6 +223,43 @@ describe('low balance alert screen form', () => {
     unmount();
   });
 
+  it('clears the rejection and its Retry when the retried write lands', async () => {
+    const { renderer, unmount } = await mountScreen();
+    await act(() => {
+      (thresholdFieldOf(renderer).props.onChangeText as (value: string) => void)('250');
+    });
+    await act(() => {
+      (thresholdFieldOf(renderer).props.onBlur as () => void)();
+    });
+    await act(() => {
+      calls.list[0]?.options.onError?.(new Error('Failed to fetch'));
+    });
+    expect(statusMessages(renderer)).toContain(i18n.t('organization.lowBalanceAlert.saveError'));
+
+    const retry = retryButtonOf(renderer);
+    if (!retry) {
+      throw new Error('the retry control did not render');
+    }
+    await act(() => {
+      (retry.props.onPress as () => void)();
+    });
+    // The rejection stays while its own resend is open: the Retry keeps the
+    // busy face instead of vanishing with no feedback.
+    expect(retryButtonOf(renderer)?.props.loading).toBe(true);
+    await act(() => {
+      calls.list[1]?.options.onSuccess?.();
+    });
+
+    // One outcome: the confirmation replaces the rejection instead of painting
+    // beside its stale failure line and Retry.
+    expect(statusMessages(renderer)).toContain(i18n.t('organizationGuardrails.statusSaved'));
+    expect(statusMessages(renderer)).not.toContain(
+      i18n.t('organization.lowBalanceAlert.saveError')
+    );
+    expect(retryButtonOf(renderer)).toBeUndefined();
+    unmount();
+  });
+
   it('puts a schema rejection on the recipient field instead of the server message', async () => {
     const { renderer, unmount } = await mountScreen();
     await act(() => {

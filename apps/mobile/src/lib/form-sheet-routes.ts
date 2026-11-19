@@ -39,7 +39,32 @@ export const FORM_SHEET_ROUTE_SUFFIXES: readonly (readonly string[])[] = [
 
 /** Is the route these segments point at presented as a form sheet? */
 export function isFormSheetRoute(segments: readonly string[]): boolean {
-  return FORM_SHEET_ROUTE_SUFFIXES.some(suffix => matchesSuffix(segments, suffix));
+  return findFormSheetSuffix(segments) !== undefined;
+}
+
+/**
+ * The route segments a presented form sheet covers: the sheet's own route
+ * removed, so a rule that decides something about the screen beneath the sheet
+ * reads that screen instead of the sheet. A route that is not a form sheet comes
+ * back unchanged, and the longest matching suffix wins when two could match.
+ */
+export function segmentsBeneathFormSheet(segments: readonly string[]): readonly string[] {
+  const suffix = findFormSheetSuffix(segments);
+  return suffix === undefined ? segments : segments.slice(0, -suffix.length);
+}
+
+/** The form-sheet route suffix these segments end with, or `undefined`. */
+function findFormSheetSuffix(segments: readonly string[]): readonly string[] | undefined {
+  let matched: readonly string[] | undefined = undefined;
+  for (const suffix of FORM_SHEET_ROUTE_SUFFIXES) {
+    if (
+      matchesSuffix(segments, suffix) &&
+      (matched === undefined || suffix.length > matched.length)
+    ) {
+      matched = suffix;
+    }
+  }
+  return matched;
 }
 
 /**

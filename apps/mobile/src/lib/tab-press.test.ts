@@ -8,7 +8,11 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { FORM_SHEET_ROUTE_SUFFIXES, isFormSheetRoute } from '@/lib/form-sheet-routes';
+import {
+  FORM_SHEET_ROUTE_SUFFIXES,
+  isFormSheetRoute,
+  segmentsBeneathFormSheet,
+} from '@/lib/form-sheet-routes';
 import { planProfileTabPress } from '@/lib/tab-press';
 
 const PROFILE_SEGMENTS = ['(app)', '(tabs)', '(3_profile)'];
@@ -41,6 +45,25 @@ describe('isFormSheetRoute', () => {
 
   it('does not match a shorter route than the suffix', () => {
     expect(isFormSheetRoute(['organization'])).toBe(false);
+  });
+});
+
+describe('segmentsBeneathFormSheet', () => {
+  it('removes the presented sheet and keeps the screen under it', () => {
+    expect(
+      segmentsBeneathFormSheet(['(app)', '(tabs)', '(3_profile)', 'organization', 'invite-member'])
+    ).toEqual(['(app)', '(tabs)', '(3_profile)', 'organization']);
+  });
+
+  it('removes a dynamic sheet route by its pattern', () => {
+    expect(
+      segmentsBeneathFormSheet(['(app)', 'security-agent', '[scope]', 'dismiss', 'abc'])
+    ).toEqual(['(app)', 'security-agent', '[scope]']);
+  });
+
+  it('returns a route that is not a sheet unchanged', () => {
+    const segments = ['(app)', '(tabs)', '(2_agents)', 'history'];
+    expect(segmentsBeneathFormSheet(segments)).toBe(segments);
   });
 });
 

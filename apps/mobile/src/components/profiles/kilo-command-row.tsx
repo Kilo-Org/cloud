@@ -11,6 +11,7 @@ import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
+import { SWITCH_HOST_CLASS } from '@/lib/a11y/tap-target';
 
 type KiloCommandRowProps = Readonly<{
   name: string;
@@ -150,7 +151,7 @@ export function KiloCommandRowView({
             </Text>
           ) : null}
         </View>
-        <View className="shrink-0">
+        <View className={SWITCH_HOST_CLASS}>
           {renderRowTrailing({
             kind: 'switch',
             value: enabled,

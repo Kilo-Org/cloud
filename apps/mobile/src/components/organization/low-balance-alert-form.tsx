@@ -38,6 +38,16 @@ type LowBalanceAlertInput = Readonly<{
 /** A rejected commit: the raw rejection, and what to retry. */
 type SaveFailure = Readonly<{ error: unknown; input: LowBalanceAlertInput }>;
 
+/**
+ * The last commit's outcome, as one value: a confirmation and a rejected write
+ * cannot paint together, because a new outcome replaces the previous one
+ * instead of setting a second flag.
+ */
+type SaveOutcome =
+  | Readonly<{ kind: 'idle' }>
+  | Readonly<{ kind: 'saved' }>
+  | Readonly<{ kind: 'failed'; failure: SaveFailure }>;
+
 type LowBalanceAlertFormProps = Readonly<{
   organizationId: string;
   settings: OrgWithMembers['settings'];
@@ -92,8 +102,7 @@ export function LowBalanceAlertForm({
   // Success and the rejected-write line are real Text nodes (AccessibleStatus),
   // not toasts: sonner-native draws outside the accessibility hierarchy, and a
   // toast-only sentence never reaches assistive tech.
-  const [saved, setSaved] = useState(false);
-  const [failure, setFailure] = useState<SaveFailure | null>(null);
+  const [outcome, setOutcome] = useState<SaveOutcome>({ kind: 'idle' });
   const [saving, setSaving] = useState(false);
 
   // One request at a time. Every draft edit bumps the version, and a response
@@ -106,8 +115,7 @@ export function LowBalanceAlertForm({
 
   function editDraft() {
     draftVersion.current += 1;
-    setSaved(false);
-    setFailure(null);
+    setOutcome({ kind: 'idle' });
   }
 
   /**
@@ -147,20 +155,21 @@ export function LowBalanceAlertForm({
     }
     inFlight.current = true;
     setSaving(true);
-    // A new write supersedes the last confirmation, so a failure can never
-    // paint beside a stale "Saved".
-    setSaved(false);
+    // A new write supersedes the last confirmation. A rejected write stays: it
+    // is the one being retried, and its Retry carries the busy state until this
+    // write settles, which then replaces it with one outcome.
+    setOutcome(previous => (previous.kind === 'saved' ? { kind: 'idle' } : previous));
     const version = draftVersion.current;
     saveMutation.mutate(input, {
       onSuccess: () => {
         settle(version, () => {
           notificationHaptic(Haptics.NotificationFeedbackType.Success);
-          setSaved(true);
+          setOutcome({ kind: 'saved' });
         });
       },
       onError: error => {
         settle(version, () => {
-          setFailure({ error, input });
+          setOutcome({ kind: 'failed', failure: { error, input } });
         });
       },
     });
@@ -184,6 +193,7 @@ export function LowBalanceAlertForm({
 
   // The sentence and the step are chosen for this reader's role: only the plan
   // refusal offers a step, and only to a role the server would let take it.
+  const failure = outcome.kind === 'failed' ? outcome.failure : null;
   const failureCopy = failure === null ? null : saveErrorCopy(failure.error, canManageBilling);
   const trialRefusalAction = useTrialRefusalAction(
     failure !== null && isTrialExpiredRefusal(failure.error),
@@ -266,10 +276,11 @@ export function LowBalanceAlertForm({
       )}
 
       {/* The error is announced once: under the recipients when the server
-          rejected an address, otherwise here. A failure outranks the last
-          confirmation, and the Retry resends the rejected write so it cannot
-          drift from the values that failed. A refusal this reader can end
-          carries the billing step under the copy. */}
+          rejected an address, otherwise here. The outcome is one value, so the
+          rejection and the confirmation never paint together; the Retry
+          resends the rejected write so it cannot drift from the values that
+          failed. A refusal this reader can end carries the billing step under
+          the copy. */}
       {saveFailureOnForm != null && (
         <RefusalStatus
           message={saveFailureOnForm}
@@ -277,7 +288,7 @@ export function LowBalanceAlertForm({
           className="text-sm"
         />
       )}
-      {saved && (
+      {outcome.kind === 'saved' && (
         <AccessibleStatus
           message={t('organizationGuardrails.statusSaved')}
           tone="status"

@@ -7,6 +7,7 @@ import {
   SECTION_ACTION_BOX_CLASS,
   SECTION_ACTION_FRAME_DP,
   SECTION_ACTION_HIT_SLOP_DP,
+  SECTION_ACTION_LABEL_LINE_DP,
   tapTargetReachDp,
   TOUCH_TARGET_DP,
 } from '@/lib/a11y/tap-target';
@@ -20,9 +21,6 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
-
-/** The eyebrow's line, in dp: the band a section action cancels itself down to. */
-const LABEL_LINE_DP = 12;
 
 /** The row's and the action's props, mounted and unmounted again. */
 function mountHeader(element: ReactElement) {
@@ -88,9 +86,11 @@ describe('SectionHeader action height', () => {
       expect(header.action?.classes).toContain(token);
     }
     // The box cancels `(frame - line) / 2` a side, so it lays out as the label
-    // line and the row is never taller for it.
+    // line and the row is never taller for it. The line is the eyebrow's own,
+    // not the glyph size: the action's copy centres on the section label.
+    expect(SECTION_ACTION_LABEL_LINE_DP).toBe(22);
     expect(SECTION_ACTION_BOX_CLASS).toContain(
-      `-my-[${String((SECTION_ACTION_FRAME_DP - LABEL_LINE_DP) / 2)}px]`
+      `-my-[${String((SECTION_ACTION_FRAME_DP - SECTION_ACTION_LABEL_LINE_DP) / 2)}px]`
     );
     expect(header.action?.hitSlop).toEqual({
       top: SECTION_ACTION_HIT_SLOP_DP,

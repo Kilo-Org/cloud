@@ -62,18 +62,3 @@ test('inset-asymmetry: safe-area insets are excluded at the window edges', () =>
   assert.deepEqual(header([0, 700, 400, 100], [10, 710, 380, 50]), []);
   assert.equal(header([0, 2, 400, 100], [10, 61.8, 380, 29.5]).length, 1);
 });
-
-test('inset-asymmetry: a card cut by its viewport is not measured on the cut axis', () => {
-  // The model catalog's third card ran past the scroll viewport's bottom edge:
-  // its rows below the edge are dropped from the tree, so the rows that remain
-  // ended 123.8 dp above the card's own bottom and read as a padding gap.
-  const findings = checkScreen(
-    tree([
-      { parent: 0, tag: 'View', rect: [0, 0, 400, 140], style: { overflow: 'hidden' } },
-      { parent: 1, tag: 'View', rect: [0, 100, 400, 100], style: { backgroundColor: '#ffffff' } },
-      { parent: 2, tag: 'Paragraph', rect: [10, 110, 380, 20], text: 'Title' },
-      { parent: 2, tag: 'Paragraph', rect: [10, 170, 380, 20], text: 'Below the edge' },
-    ])
-  ).filter(finding => finding.rule === 'inset-asymmetry');
-  assert.deepEqual(findings, []);
-});

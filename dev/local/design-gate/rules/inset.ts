@@ -44,17 +44,9 @@ export function checkInsetAsymmetry(tree: LayoutTree): Finding[] {
     );
     const left = content[0] - x;
     const rightGap = right(node.rect) - right(content);
-    // A node its viewport cuts lost the children past the cut (they are not in
-    // the tree), so its content box ends early and the gap on that axis
-    // measures the viewport, not the padding.
-    const [visibleX, visibleY, visibleWidth, visibleHeight] = node.visibleRect;
-    const cutY = visibleY > y + 0.01 || visibleY + visibleHeight < y + height - 0.01;
-    const cutX = visibleX > x + 0.01 || visibleX + visibleWidth < x + width - 0.01;
-    const vertical = cutY ? undefined : asymmetry(top, bottomGap, height);
+    const vertical = asymmetry(top, bottomGap, height);
     const horizontal =
-      !cutX && content[2] >= INSET_MIN_WIDTH_SHARE * width
-        ? asymmetry(left, rightGap, width)
-        : undefined;
+      content[2] >= INSET_MIN_WIDTH_SHARE * width ? asymmetry(left, rightGap, width) : undefined;
     const report = (measured: number, gaps: string) =>
       findings.push(
         finding({

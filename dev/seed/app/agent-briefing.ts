@@ -8,6 +8,7 @@ import {
   cli_sessions_v2,
   organization_memberships,
 } from '@kilocode/db/schema';
+import type { SessionLiveSummary } from '@kilocode/session-ingest-contracts';
 import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { isValidEmail, resolveSeedUserId } from '../lib/users';
@@ -159,6 +160,12 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       organizationId: null,
       status: 'question',
       text: 'Added a deterministic checkout regression test. The retry policy needs a decision.',
+      liveSummary: {
+        step: { verb: 'editing', target: 'checkout.ts' },
+        plan: { done: 1, total: 3, current: 'Stabilize retry policy' },
+        changes: { files: 1, added: 1, removed: 0 },
+        failure: null,
+      } satisfies SessionLiveSummary,
     },
     {
       key: 'docs',
@@ -166,6 +173,12 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       organizationId: null,
       status: 'idle',
       text: 'Regenerated the API reference and repaired the broken examples.',
+      liveSummary: {
+        step: null,
+        plan: { done: 5, total: 12, current: 'Refresh pagination example' },
+        changes: { files: 2, added: 1200, removed: 3 },
+        failure: { kind: 'tool' },
+      } satisfies SessionLiveSummary,
     },
     ...(options.organizationId
       ? [
@@ -175,6 +188,12 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
             organizationId: options.organizationId,
             status: 'idle',
             text: 'Prepared release notes from merged changes.',
+            liveSummary: {
+              step: null,
+              plan: null,
+              changes: null,
+              failure: { kind: 'other' },
+            } satisfies SessionLiveSummary,
           },
         ]
       : []),
@@ -218,6 +237,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       status: session.status,
       status_updated_at: completedAt,
       last_activity_at: completedAt,
+      live_summary: session.liveSummary,
       briefing_excerpt: { messageId: `msg_${session.key}`, completedAt, text: session.text },
       ...(session.key === 'checkout'
         ? {
@@ -300,5 +320,6 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     listDeepLink: 'kiloapp:///(app)/agent-briefing',
     organizationReportId: options.organizationId ? (organization?.id ?? null) : null,
     blockedSessionId: stableSessionId(userId, 'checkout'),
+    metadataSessionId: stableSessionId(userId, 'docs'),
   };
 }

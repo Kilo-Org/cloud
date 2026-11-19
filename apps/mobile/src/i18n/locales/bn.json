@@ -4590,7 +4590,8 @@
     "connectFailed": "সংযোগের পেজটি খোলা যায়নি"
   },
   "invoices": {
-    "personalEmptyDescription": "আপনার কাছ থেকে বিল নেওয়া হলে আপনার নিজের কেনাকাটার ইনভয়েস এখানে দেখা যাবে।"
+    "personalEmptyDescription": "আপনার কাছ থেকে বিল নেওয়া হলে আপনার নিজের কেনাকাটার ইনভয়েস এখানে দেখা যায়। App Store-এর রসিদ এবং Google Play-এর রসিদ ক্রেডিট ইতিহাসে আছে।",
+    "personalPeriod": "শেষ 12 মাস"
   },
   "cloudAgent": {
     "compute": {

@@ -4590,7 +4590,8 @@
     "connectFailed": "Hindi mabuksan ang pahina ng koneksyon"
   },
   "invoices": {
-    "personalEmptyDescription": "Lalabas dito ang mga invoice ng sarili mong mga binili kapag nasingil ka na."
+    "personalEmptyDescription": "Lalabas dito ang mga invoice ng sarili mong mga binili kapag nasingil ka na. Ang mga resibo mula sa App Store at Google Play ay nasa Kasaysayan ng credit.",
+    "personalPeriod": "Huling 12 buwan"
   },
   "cloudAgent": {
     "compute": {

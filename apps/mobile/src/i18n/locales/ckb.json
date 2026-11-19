@@ -4590,7 +4590,8 @@
     "connectFailed": "نەتوانرا پەڕەی پەیوەستکردن بکرێتەوە"
   },
   "invoices": {
-    "personalEmptyDescription": "فاکتۆرەکانی کڕینەکانی خۆت دوای ئەوەی پارەت لێ وەردەگیرێت لێرە دەردەکەون."
+    "personalEmptyDescription": "فاکتۆرەکانی کڕینەکانی خۆت دوای ئەوەی پارەت لێ وەردەگیرێت لێرە دەردەکەون. پسوولە لە App Store و Google Play لە مێژووی کرێدیت دان.",
+    "personalPeriod": "12 مانگی ڕابردوو"
   },
   "cloudAgent": {
     "compute": {

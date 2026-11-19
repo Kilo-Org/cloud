@@ -4590,7 +4590,8 @@
     "connectFailed": "Không thể mở trang kết nối"
   },
   "invoices": {
-    "personalEmptyDescription": "Hóa đơn cho các giao dịch mua của riêng bạn sẽ hiển thị tại đây sau khi bạn được tính phí."
+    "personalEmptyDescription": "Hóa đơn cho các giao dịch mua của riêng bạn hiển thị tại đây sau khi bạn được tính phí. Biên lai từ App Store và Google Play có trong Lịch sử tín dụng.",
+    "personalPeriod": "12 tháng gần nhất"
   },
   "cloudAgent": {
     "compute": {

@@ -4590,7 +4590,8 @@
     "connectFailed": "जडान पृष्ठ खोल्न सकिएन"
   },
   "invoices": {
-    "personalEmptyDescription": "तपाईंलाई बिल गरिएपछि तपाईंका आफ्नै खरिदहरूका इनभ्वाइस यहाँ देखिनेछन्।"
+    "personalEmptyDescription": "तपाईंलाई बिल गरिएपछि तपाईंका आफ्नै खरिदहरूका इनभ्वाइस यहाँ देखिन्छन्। App Store र Google Play बाट रसिदहरू क्रेडिट इतिहासमा छन्।",
+    "personalPeriod": "पछिल्लो 12 महिना"
   },
   "cloudAgent": {
     "compute": {

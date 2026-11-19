@@ -4590,7 +4590,8 @@
     "connectFailed": "Siden til oprettelse af forbindelse kunne ikke åbnes"
   },
   "invoices": {
-    "personalEmptyDescription": "Fakturaer for dine egne køb vises her, når du er blevet faktureret."
+    "personalEmptyDescription": "Fakturaer for dine egne køb vises her, når du er blevet faktureret. Kvitteringer fra App Store og Google Play findes i Kredithistorik.",
+    "personalPeriod": "Seneste 12 måneder"
   },
   "cloudAgent": {
     "compute": {

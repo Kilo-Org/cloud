@@ -4590,7 +4590,8 @@
     "connectFailed": "Die Verbindungsseite konnte nicht geöffnet werden"
   },
   "invoices": {
-    "personalEmptyDescription": "Rechnungen für deine eigenen Käufe werden hier angezeigt, sobald dir etwas in Rechnung gestellt wurde."
+    "personalEmptyDescription": "Rechnungen für deine eigenen Käufe werden hier angezeigt, sobald dir etwas in Rechnung gestellt wurde. Belege im App Store und bei Google Play findest du im Credit-Verlauf.",
+    "personalPeriod": "Letzte 12 Monate"
   },
   "cloudAgent": {
     "compute": {

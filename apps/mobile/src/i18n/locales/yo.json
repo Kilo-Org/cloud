@@ -4590,7 +4590,8 @@
     "connectFailed": "Kò ṣeé ṣe láti ṣí ojú-ìwé ìsopọ̀"
   },
   "invoices": {
-    "personalEmptyDescription": "Àwọn ìwé owó fún àwọn ìrajà tìrẹ yóò hàn níbí nígbà tí a bá ti gba owó lọ́wọ́ rẹ."
+    "personalEmptyDescription": "Àwọn ìwé owó fún àwọn ìrajà tìrẹ yóò hàn níbí nígbà tí a bá ti gba owó lọ́wọ́ rẹ. Ìwé ẹ̀rí ìsanwó láti App Store àti ìwé ẹ̀rí ìsanwó láti Google Play wà nínú Ìtàn kírẹ́dítì.",
+    "personalPeriod": "Oṣù 12 tó kọjá"
   },
   "cloudAgent": {
     "compute": {

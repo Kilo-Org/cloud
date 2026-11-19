@@ -4590,7 +4590,8 @@
     "connectFailed": "Pa t ka louvri paj koneksyon an"
   },
   "invoices": {
-    "personalEmptyDescription": "Fakti pou pwòp acha ou yo ap parèt isit la yon fwa yo faktire w."
+    "personalEmptyDescription": "Fakti pou pwòp acha ou yo ap parèt isit la yon fwa yo faktire w. Resi ki nan App Store ak Resi ki nan Google Play yo nan Istorik kredi.",
+    "personalPeriod": "Dènye 12 mwa yo"
   },
   "cloudAgent": {
     "compute": {

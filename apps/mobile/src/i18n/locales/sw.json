@@ -4590,7 +4590,8 @@
     "connectFailed": "Imeshindwa kufungua ukurasa wa kuunganisha"
   },
   "invoices": {
-    "personalEmptyDescription": "Ankara za ununuzi wako binafsi zitaonekana hapa baada ya kutozwa."
+    "personalEmptyDescription": "Ankara za ununuzi wako binafsi zinaonekana hapa baada ya kutozwa. Risiti kutoka App Store na Google Play ziko katika Historia ya salio.",
+    "personalPeriod": "Miezi 12 iliyopita"
   },
   "cloudAgent": {
     "compute": {

@@ -4732,7 +4732,8 @@
     "connectFailed": "Не удалось открыть страницу подключения"
   },
   "invoices": {
-    "personalEmptyDescription": "Счета за ваши личные покупки появятся здесь после первого списания."
+    "personalEmptyDescription": "Счета за ваши личные покупки появляются здесь после первого списания. Чеки в App Store и Google Play находятся в разделе «История кредитов».",
+    "personalPeriod": "Последние 12 месяцев"
   },
   "cloudAgent": {
     "compute": {

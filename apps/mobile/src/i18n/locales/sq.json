@@ -4590,7 +4590,8 @@
     "connectFailed": "Faqja e lidhjes nuk mund të hapej"
   },
   "invoices": {
-    "personalEmptyDescription": "Faturat për blerjet e tua personale do të shfaqen këtu pasi të faturohesh."
+    "personalEmptyDescription": "Faturat për blerjet e tua personale shfaqen këtu pasi të faturohesh. Dëftesat nga App Store dhe Google Play janë në Historikun e kredive.",
+    "personalPeriod": "12 muajt e fundit"
   },
   "cloudAgent": {
     "compute": {

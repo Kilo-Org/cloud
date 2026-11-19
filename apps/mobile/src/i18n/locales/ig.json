@@ -4590,7 +4590,8 @@
     "connectFailed": "Enweghị ike imepe ibe njikọ"
   },
   "invoices": {
-    "personalEmptyDescription": "Akwụkwọ ụgwọ maka ihe gị onwe gị zụrụ ga-apụta ebe a ozugbo a nara gị ụgwọ."
+    "personalEmptyDescription": "Akwụkwọ ụgwọ maka ihe gị onwe gị zụrụ na-apụta ebe a ozugbo a nara gị ụgwọ. Rịsịt sitere na App Store na Rịsịt sitere na Google Play dị na Akụkọ kredit.",
+    "personalPeriod": "Ọnwa 12 gara aga"
   },
   "cloudAgent": {
     "compute": {

@@ -4590,7 +4590,8 @@
     "connectFailed": "Bogga isku-xidhka lama furi karo"
   },
   "invoices": {
-    "personalEmptyDescription": "Qaansheegyada iibsiyadaada gaarka ah halkan ayay ka muuqan doonaan marka lacag lagaa qaado."
+    "personalEmptyDescription": "Qaansheegyada iibsiyadaada gaarka ah halkan ayay ka muuqdaan marka lacag lagaa qaado. Rasiidada ka yimid App Store iyo Google Play waxay ku jiraan Taariikhda kiredit-ka.",
+    "personalPeriod": "12 bilood ee ugu dambeeyay"
   },
   "cloudAgent": {
     "compute": {

@@ -4590,7 +4590,8 @@
     "connectFailed": "Ezin izan da konexio-orria ireki"
   },
   "invoices": {
-    "personalEmptyDescription": "Zure erosketen fakturak hemen agertuko dira fakturatzen zaizunean."
+    "personalEmptyDescription": "Zure erosketen fakturak hemen agertzen dira fakturatzen zaizunean. App Store-ko eta Google Play-ko ordainagiriak Kredituen historian daude.",
+    "personalPeriod": "Azken 12 hilabeteak"
   },
   "cloudAgent": {
     "compute": {

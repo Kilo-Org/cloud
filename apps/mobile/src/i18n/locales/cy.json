@@ -4874,7 +4874,8 @@
     "connectFailed": "Methu agor y dudalen gysylltu"
   },
   "invoices": {
-    "personalEmptyDescription": "Bydd anfonebau ar gyfer eich pryniannau eich hun yn ymddangos yma unwaith y cewch eich bilio."
+    "personalEmptyDescription": "Mae anfonebau ar gyfer eich pryniannau eich hun yn ymddangos yma unwaith y cewch eich bilio. Mae derbynneb gan yr App Store a derbynneb gan Google Play yn Hanes credydau.",
+    "personalPeriod": "Y 12 mis diwethaf"
   },
   "cloudAgent": {
     "compute": {

@@ -4661,7 +4661,8 @@
     "connectFailed": "No se pudo abrir la página de conexión"
   },
   "invoices": {
-    "personalEmptyDescription": "Las facturas de tus compras personales aparecerán aquí cuando se te facture."
+    "personalEmptyDescription": "Las facturas de tus compras personales aparecen aquí cuando se te facture. Los recibos del App Store y de Google Play están en el Historial de créditos.",
+    "personalPeriod": "Últimos 12 meses"
   },
   "cloudAgent": {
     "compute": {

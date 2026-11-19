@@ -4590,7 +4590,8 @@
     "connectFailed": "Could not open the connection page"
   },
   "invoices": {
-    "personalEmptyDescription": "Invoices for your own purchases will appear here once you are billed."
+    "personalPeriod": "Last 12 months",
+    "personalEmptyDescription": "Invoices for your own purchases appear here once you are billed. App Store and Google Play receipts are in Credit history."
   },
   "cloudAgent": {
     "compute": {

@@ -4661,7 +4661,8 @@
     "connectFailed": "No s'ha pogut obrir la pàgina de connexió"
   },
   "invoices": {
-    "personalEmptyDescription": "Les factures de les teves compres apareixeran aquí quan se't facturi."
+    "personalEmptyDescription": "Les factures de les teves compres apareixen aquí quan se't facturi. Els rebuts de l'App Store i de Google Play són a l'Historial de crèdits.",
+    "personalPeriod": "Últims 12 mesos"
   },
   "cloudAgent": {
     "compute": {

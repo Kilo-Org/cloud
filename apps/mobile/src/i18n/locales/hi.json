@@ -4590,7 +4590,8 @@
     "connectFailed": "कनेक्शन पेज नहीं खोला जा सका"
   },
   "invoices": {
-    "personalEmptyDescription": "आपसे बिलिंग होने के बाद, आपकी अपनी खरीदारी के इनवॉइस यहां दिखेंगे।"
+    "personalEmptyDescription": "आपसे बिलिंग होने के बाद, आपकी अपनी खरीदारी के इनवॉइस यहां दिखते हैं। App Store और Google Play की रसीदें क्रेडिट इतिहास में हैं।",
+    "personalPeriod": "पिछले 12 महीने"
   },
   "cloudAgent": {
     "compute": {

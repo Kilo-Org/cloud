@@ -4590,7 +4590,8 @@
     "connectFailed": "Ühendamise lehte ei õnnestunud avada"
   },
   "invoices": {
-    "personalEmptyDescription": "Sinu enda ostude arved kuvatakse siin pärast arve esitamist."
+    "personalEmptyDescription": "Sinu enda ostude arved kuvatakse siin pärast arve esitamist. Kviitungid App Store'ist ja Google Playst on Krediitide ajaloos.",
+    "personalPeriod": "Viimased 12 kuud"
   },
   "cloudAgent": {
     "compute": {

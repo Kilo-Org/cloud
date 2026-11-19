@@ -4732,7 +4732,8 @@
     "connectFailed": "Strani za povezavo ni bilo mogoče odpreti"
   },
   "invoices": {
-    "personalEmptyDescription": "Računi za vaše lastne nakupe bodo prikazani tukaj, ko vam bo izstavljen račun."
+    "personalEmptyDescription": "Računi za vaše lastne nakupe so prikazani tukaj, ko vam bo izstavljen račun. Potrdila iz trgovine App Store in Google Play so v Zgodovini kreditov.",
+    "personalPeriod": "Zadnjih 12 mesecev"
   },
   "cloudAgent": {
     "compute": {

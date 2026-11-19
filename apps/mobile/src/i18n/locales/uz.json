@@ -4590,7 +4590,8 @@
     "connectFailed": "Ulanish sahifasini ochib boʻlmadi"
   },
   "invoices": {
-    "personalEmptyDescription": "To‘lov amalga oshirilgach, shaxsiy xaridlaringiz uchun hisob-fakturalar shu yerda ko‘rinadi."
+    "personalEmptyDescription": "To‘lov amalga oshirilgach, shaxsiy xaridlaringiz uchun hisob-fakturalar shu yerda ko‘rinadi. App Store va Google Play cheklari Kreditlar tarixida.",
+    "personalPeriod": "So‘nggi 12 oy"
   },
   "cloudAgent": {
     "compute": {

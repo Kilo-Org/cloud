@@ -4590,7 +4590,8 @@
     "connectFailed": "Kan de koppelingspagina niet openen"
   },
   "invoices": {
-    "personalEmptyDescription": "Facturen voor je eigen aankopen verschijnen hier zodra je wordt gefactureerd."
+    "personalEmptyDescription": "Facturen voor je eigen aankopen verschijnen hier zodra je wordt gefactureerd. Bonnen in de App Store en Google Play staan in Tegoedgeschiedenis.",
+    "personalPeriod": "Laatste 12 maanden"
   },
   "cloudAgent": {
     "compute": {

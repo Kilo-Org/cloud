@@ -4590,7 +4590,8 @@
     "connectFailed": "Yhdistämissivua ei voitu avata"
   },
   "invoices": {
-    "personalEmptyDescription": "Omien ostojesi laskut näkyvät täällä, kun sinua on laskutettu."
+    "personalEmptyDescription": "Omien ostojesi laskut näkyvät täällä, kun sinua on laskutettu. Kuitti App Storessa ja Kuitti Google Playssa ovat Krediittihistoriassa.",
+    "personalPeriod": "Viimeiset 12 kuukautta"
   },
   "cloudAgent": {
     "compute": {

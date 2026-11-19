@@ -4590,7 +4590,8 @@
     "connectFailed": "कनेक्शन पेज उघडता आले नाही"
   },
   "invoices": {
-    "personalEmptyDescription": "तुम्हाला बिल आकारले गेल्यावर तुमच्या स्वतःच्या खरेदीचे इनव्हॉइस येथे दिसतील."
+    "personalEmptyDescription": "तुम्हाला बिल आकारले गेल्यावर तुमच्या स्वतःच्या खरेदीचे इनव्हॉइस येथे दिसतात. App Store कडून पावती आणि Google Play कडून पावती क्रेडिट इतिहासात आहेत.",
+    "personalPeriod": "मागील 12 महिने"
   },
   "cloudAgent": {
     "compute": {

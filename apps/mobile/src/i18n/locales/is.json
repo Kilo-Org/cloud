@@ -4590,7 +4590,8 @@
     "connectFailed": "Ekki tókst að opna tengingarsíðuna"
   },
   "invoices": {
-    "personalEmptyDescription": "Reikningar fyrir þín eigin kaup birtast hér eftir fyrstu greiðslu."
+    "personalEmptyDescription": "Reikningar fyrir þín eigin kaup birtast hér eftir fyrstu greiðslu. Kvittanir frá App Store og Google Play eru í Inneignarferli.",
+    "personalPeriod": "Síðustu 12 mánuðir"
   },
   "cloudAgent": {
     "compute": {

@@ -4590,7 +4590,8 @@
     "connectFailed": "Akukwazekanga ukuvula ikhasi lokuxhuma"
   },
   "invoices": {
-    "personalEmptyDescription": "Ama-invoyisi okuthenga kwakho azovela lapha uma usukhokhisiwe."
+    "personalEmptyDescription": "Ama-invoyisi okuthenga kwakho avela lapha uma usukhokhisiwe. Ama-irisidi avela ku-App Store naku-Google Play atholakala kuMlando wamakhredithi.",
+    "personalPeriod": "Izinyanga eziyi-12 ezidlule"
   },
   "cloudAgent": {
     "compute": {

@@ -26,13 +26,30 @@ type NoPrimaryAction = {
   readonly primaryLoading?: undefined;
 };
 
+/** A third action below the escape hatch, when the surface offers one. */
+type TertiaryAction = {
+  readonly tertiaryLabel: string;
+  readonly tertiaryAccessibilityLabel: string;
+  readonly onTertiaryPress: () => void;
+};
+
+/** A surface with no third action: the keys are declared as absent for the
+ *  same reason as {@link NoPrimaryAction}'s, and the group is all-or-nothing so
+ *  no caller passes a label with nothing behind it. */
+type NoTertiaryAction = {
+  readonly tertiaryLabel?: undefined;
+  readonly tertiaryAccessibilityLabel?: undefined;
+  readonly onTertiaryPress?: undefined;
+};
+
 type BootstrapErrorScreenProps = {
   readonly title: string;
   readonly description: string;
   readonly secondaryLabel: string;
   readonly secondaryAccessibilityLabel: string;
   readonly onSecondaryPress: () => void;
-} & (PrimaryAction | NoPrimaryAction);
+} & (PrimaryAction | NoPrimaryAction) &
+  (TertiaryAction | NoTertiaryAction);
 
 export function BootstrapErrorScreen({
   title,
@@ -44,6 +61,9 @@ export function BootstrapErrorScreen({
   secondaryLabel,
   secondaryAccessibilityLabel,
   onSecondaryPress,
+  tertiaryLabel,
+  tertiaryAccessibilityLabel,
+  onTertiaryPress,
 }: BootstrapErrorScreenProps) {
   return (
     <CenteredState className="bg-background">
@@ -53,8 +73,9 @@ export function BootstrapErrorScreen({
           <Text className="text-center text-sm text-muted-foreground">{description}</Text>
         </View>
         <View className="w-full gap-3">
-          {/* The union narrows on the label alone: a caller that omits every
-              primary prop (a surface with no retry) renders no primary row. */}
+          {/* Each group narrows on its own label alone: a caller that omits
+              every primary prop (a surface with no retry) renders no primary
+              row, and one that omits the tertiary props renders no third row. */}
           {primaryLabel !== undefined ? (
             <Button
               size="lg"
@@ -73,6 +94,16 @@ export function BootstrapErrorScreen({
           >
             <Text>{secondaryLabel}</Text>
           </Button>
+          {tertiaryLabel !== undefined ? (
+            <Button
+              variant="outline"
+              size="lg"
+              onPress={onTertiaryPress}
+              accessibilityLabel={tertiaryAccessibilityLabel}
+            >
+              <Text>{tertiaryLabel}</Text>
+            </Button>
+          ) : null}
         </View>
       </View>
     </CenteredState>

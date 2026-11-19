@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Akaunti imezuiwa",
-    "description": "Kilo imezuia akaunti hii, na kuingia tena hakutazuia zuio hilo. Timu ya usaidizi inaweza kukagua zuio hilo ikiombwa."
+    "description": "Kilo imezuia akaunti hii, na kuingia tena hakutazuia zuio hilo. Timu ya usaidizi inaweza kukagua zuio hilo ikiombwa.",
+    "contactSupport": "Wasiliana na timu ya usaidizi"
   },
   "addCredits": {
     "cta": "Ongeza salio",

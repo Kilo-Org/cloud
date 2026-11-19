@@ -3103,7 +3103,8 @@
   },
   "accountBlocked": {
     "title": "Účet je zablokovaný",
-    "description": "Kilo zablokovalo tento účet a nové prihlásenie blokovanie nezruší. Podpora môže blokovanie na požiadanie preveriť."
+    "description": "Kilo zablokovalo tento účet a nové prihlásenie blokovanie nezruší. Podpora môže blokovanie na požiadanie preveriť.",
+    "contactSupport": "Kontaktovať podporu"
   },
   "addCredits": {
     "cta": "Doplniť kredity",

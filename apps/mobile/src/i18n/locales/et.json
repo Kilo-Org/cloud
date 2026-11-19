@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Konto blokeeritud",
-    "description": "Kilo blokeeris selle konto ja uuesti sisselogimine ei tühista blokeeringut. Tugi saab blokeeringu taotluse korral üle vaadata."
+    "description": "Kilo blokeeris selle konto ja uuesti sisselogimine ei tühista blokeeringut. Tugi saab blokeeringu taotluse korral üle vaadata.",
+    "contactSupport": "Võta ühendust toega"
   },
   "addCredits": {
     "cta": "Lisa krediiti",

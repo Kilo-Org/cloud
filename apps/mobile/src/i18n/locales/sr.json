@@ -3047,7 +3047,8 @@
   },
   "accountBlocked": {
     "title": "Nalog je blokiran",
-    "description": "Kilo je blokirao ovaj nalog i ponovna prijava to neće ukloniti. Podrška može na zahtev pregledati blokadu."
+    "description": "Kilo je blokirao ovaj nalog i ponovna prijava to neće ukloniti. Podrška može na zahtev pregledati blokadu.",
+    "contactSupport": "Kontaktiraj podršku"
   },
   "addCredits": {
     "cta": "Dodaj kredite",

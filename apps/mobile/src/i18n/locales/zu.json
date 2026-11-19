@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "I-akhawunti ivinjiwe",
-    "description": "I-Kilo ivale le akhawunti, futhi ukungena kabusha ngeke kuyisule. Ithimba losizo lingabuyekeza ukuvalwa uma kuceliwe."
+    "description": "I-Kilo ivale le akhawunti, futhi ukungena kabusha ngeke kuyisule. Ithimba losizo lingabuyekeza ukuvalwa uma kuceliwe.",
+    "contactSupport": "Xhumana nethimba losizo"
   },
   "addCredits": {
     "cta": "Engeza amakhredithi",

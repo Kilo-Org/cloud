@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Llogaria e bllokuar",
-    "description": "Kilo bllokoi këtë llogari dhe një hyrje e re nuk e heq bllokimin. Mbështetja mund ta shqyrtojë bllokimin me kërkesë."
+    "description": "Kilo bllokoi këtë llogari dhe një hyrje e re nuk e heq bllokimin. Mbështetja mund ta shqyrtojë bllokimin me kërkesë.",
+    "contactSupport": "Kontakto mbështetjen"
   },
   "addCredits": {
     "cta": "Shto kredite",

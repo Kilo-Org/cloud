@@ -65,6 +65,8 @@ import {
   setBlockedAccountActive,
   subscribeBlockedAccount,
 } from '@/lib/auth/blocked-account-state';
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
+import { openExternalUrl } from '@/lib/external-link';
 import { resolveBootstrapDecision, shouldShowBootstrapLoading } from '@/lib/bootstrap-decision';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
 import { checkConsentGate } from '@/lib/consent-gate';
@@ -1117,8 +1119,10 @@ function RootLayoutNav({
   // lifted server-side needs no sign-out). The refresh route's raise has no
   // session behind it, so no read can answer for it: Sign out is then the only
   // exit, and it clears the explanation and reveals whatever the tree has
-  // settled on (login when signed out). A new sign-in clears it too, since
-  // that is the one event that proves the block no longer applies.
+  // settled on (login when signed out). Contact support sits beside Sign out
+  // as the next step the copy names; it opens a mail to the support address
+  // and leaves the explanation up. A new sign-in clears it too, since that is
+  // the one event that proves the block no longer applies.
   const showBlockedAccountError = blockedAccountActive && bootstrapErrorOwnsScreen;
 
   // The wait surface (or the held restore or blocked surface) covers the tree:
@@ -1260,6 +1264,9 @@ function RootLayoutNav({
             canRetry={token != null}
             retrying={userIdFetching}
             onRetry={refetchUserId}
+            onContactSupport={() => {
+              void openExternalUrl(`mailto:${SUPPORT_EMAIL}`, { label: SUPPORT_EMAIL });
+            }}
             onSignOut={() => {
               // The escape hatch must actually reach the login screen: the
               // flag outlives a refresh-path teardown, so this explicit

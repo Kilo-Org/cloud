@@ -2448,7 +2448,8 @@
   },
   "accountBlocked": {
     "title": "Hesap engellendi",
-    "description": "Kilo bu hesabı engelledi ve yeniden giriş yapmak engeli kaldırmaz. Destek, talep üzerine engeli inceleyebilir."
+    "description": "Kilo bu hesabı engelledi ve yeniden giriş yapmak engeli kaldırmaz. Destek, talep üzerine engeli inceleyebilir.",
+    "contactSupport": "Destekle iletişime geç"
   },
   "addCredits": {
     "cta": "Kredi ekle",

@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Akaun disekat",
-    "description": "Kilo telah menyekat akaun ini, dan log masuk semula tidak akan membatalkan sekatan itu. Sokongan boleh menyemak sekatan itu atas permintaan."
+    "description": "Kilo telah menyekat akaun ini, dan log masuk semula tidak akan membatalkan sekatan itu. Sokongan boleh menyemak sekatan itu atas permintaan.",
+    "contactSupport": "Hubungi sokongan"
   },
   "addCredits": {
     "cta": "Tambah kredit",

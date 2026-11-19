@@ -2514,7 +2514,8 @@
   },
   "accountBlocked": {
     "title": "Konto zablokowane",
-    "description": "Kilo zablokował to konto, a ponowne zalogowanie nie zdejmie blokady. Pomoc techniczna może na życzenie sprawdzić blokadę."
+    "description": "Kilo zablokował to konto, a ponowne zalogowanie nie zdejmie blokady. Pomoc techniczna może na życzenie sprawdzić blokadę.",
+    "contactSupport": "Skontaktuj się z pomocą techniczną"
   },
   "addCredits": {
     "cta": "Doładuj konto",

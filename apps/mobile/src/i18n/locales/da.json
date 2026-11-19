@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Konto blokeret",
-    "description": "Kilo har blokeret denne konto, og det hjælper ikke at logge ind igen. Support kan gennemgå blokeringen efter anmodning."
+    "description": "Kilo har blokeret denne konto, og det hjælper ikke at logge ind igen. Support kan gennemgå blokeringen efter anmodning.",
+    "contactSupport": "Kontakt support"
   },
   "addCredits": {
     "cta": "Tilføj kreditter",

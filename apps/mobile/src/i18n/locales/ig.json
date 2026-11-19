@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Akaụntụ e gbochiri",
-    "description": "Kilo egbochiri akaụntụ a, ma ịbanye ọzọ agaghị ewepụ ngbochi a. Ndị nkwado nwere ike nyochaa ngbochi a ma a rịọ ya."
+    "description": "Kilo egbochiri akaụntụ a, ma ịbanye ọzọ agaghị ewepụ ngbochi a. Ndị nkwado nwere ike nyochaa ngbochi a ma a rịọ ya.",
+    "contactSupport": "Kpọtụrụ ndị nkwado"
   },
   "addCredits": {
     "cta": "Tinye ego ojiji",

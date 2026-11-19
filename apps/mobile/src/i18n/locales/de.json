@@ -2448,7 +2448,8 @@
   },
   "accountBlocked": {
     "title": "Konto gesperrt",
-    "description": "Kilo hat dieses Konto gesperrt, und eine erneute Anmeldung hebt die Sperre nicht auf. Der Support kann die Sperre auf Anfrage prüfen."
+    "description": "Kilo hat dieses Konto gesperrt, und eine erneute Anmeldung hebt die Sperre nicht auf. Der Support kann die Sperre auf Anfrage prüfen.",
+    "contactSupport": "Support kontaktieren"
   },
   "addCredits": {
     "cta": "Guthaben aufladen",

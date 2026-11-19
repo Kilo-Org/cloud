@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Rekening geblokkeer",
-    "description": "Kilo het hierdie rekening geblokkeer, en weer aanmeld sal dit nie ophef nie. Ondersteuning kan die blokkade op versoek hersien."
+    "description": "Kilo het hierdie rekening geblokkeer, en weer aanmeld sal dit nie ophef nie. Ondersteuning kan die blokkade op versoek hersien.",
+    "contactSupport": "Kontak ondersteuning"
   },
   "addCredits": {
     "cta": "Voeg krediete by",

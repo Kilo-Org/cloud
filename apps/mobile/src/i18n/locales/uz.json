@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Hisob bloklangan",
-    "description": "Kilo bu hisobni bloklagan va qayta kirish blokni olib tashlamaydi. Yordam xizmati so'rov bo'yicha blokni ko'rib chiqishi mumkin."
+    "description": "Kilo bu hisobni bloklagan va qayta kirish blokni olib tashlamaydi. Yordam xizmati so'rov bo'yicha blokni ko'rib chiqishi mumkin.",
+    "contactSupport": "Yordam xizmatiga murojaat qilish"
   },
   "addCredits": {
     "cta": "Kreditlar qo'shish",

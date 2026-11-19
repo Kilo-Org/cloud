@@ -2448,7 +2448,8 @@
   },
   "accountBlocked": {
     "title": "Tài khoản bị chặn",
-    "description": "Kilo đã chặn tài khoản này và đăng nhập lại sẽ không gỡ được lệnh chặn. Bộ phận hỗ trợ có thể xem xét lệnh chặn theo yêu cầu."
+    "description": "Kilo đã chặn tài khoản này và đăng nhập lại sẽ không gỡ được lệnh chặn. Bộ phận hỗ trợ có thể xem xét lệnh chặn theo yêu cầu.",
+    "contactSupport": "Liên hệ hỗ trợ"
   },
   "addCredits": {
     "cta": "Nạp tiền",

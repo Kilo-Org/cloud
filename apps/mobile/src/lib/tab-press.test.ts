@@ -51,13 +51,7 @@ describe('isFormSheetRoute', () => {
 describe('segmentsBeneathFormSheet', () => {
   it('removes the presented sheet and keeps the screen under it', () => {
     expect(
-      segmentsBeneathFormSheet([
-        '(app)',
-        '(tabs)',
-        '(3_profile)',
-        'organization',
-        'invite-member',
-      ])
+      segmentsBeneathFormSheet(['(app)', '(tabs)', '(3_profile)', 'organization', 'invite-member'])
     ).toEqual(['(app)', '(tabs)', '(3_profile)', 'organization']);
   });
 

@@ -257,8 +257,7 @@ export const TOUCH_TARGET_OVERHANG_DP = (TOUCH_TARGET_DP - ROW_FRAME_CONTENT_DP)
  * the band. The host takes the target as its own height, centring the node in
  * it, and cancels the same overhang, so the row still sees only the content band.
  */
-export const SWITCH_HOST_CLASS =
-  'h-[44px] -my-[8.5px] shrink-0 items-center justify-center';
+export const SWITCH_HOST_CLASS = 'h-[44px] -my-[8.5px] shrink-0 items-center justify-center';
 
 /**
  * The label pressable inside a `ROW_FRAME_CLASS` row cancels the frame's

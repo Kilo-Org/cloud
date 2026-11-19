@@ -66,10 +66,7 @@ export function MarkdownCodeFence({
             never sets the row's height (the same rule as a section header,
             apps/mobile/AGENTS.md). */}
         <Pressable
-          className={cn(
-            CAPTION_ACTION_BOX_CLASS,
-            'items-center justify-center active:opacity-70'
-          )}
+          className={cn(CAPTION_ACTION_BOX_CLASS, 'items-center justify-center active:opacity-70')}
           hitSlop={SECTION_ACTION_HIT_SLOP}
           accessibilityRole="button"
           accessibilityLabel={t('common.copy')}

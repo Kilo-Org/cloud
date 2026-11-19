@@ -386,9 +386,9 @@ describe('shouldHideTabBar', () => {
         'invite-member',
       ])
     ).toBe(true);
-    expect(shouldHideTabBar('/share-gate', ['(app)', '(tabs)', '(0_home)', 'share-gate'])).toBe(
-      false
-    );
+    expect(
+      shouldHideTabBar('/share-gate', ['(app)', '(tabs)', '(0_home)', 'share-gate'])
+    ).toBe(false);
   });
 
   it('hides the bar on a root-stack screen', () => {

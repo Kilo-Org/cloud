@@ -97,6 +97,7 @@ vi.mock('@/components/ui/icons', () => ({
   Download: 'Download',
   FileText: 'FileText',
   Lock: 'Lock',
+  RotateCcw: 'RotateCcw',
   SearchX: 'SearchX',
   ServerCrash: 'ServerCrash',
   WifiOff: 'WifiOff',

@@ -1172,6 +1172,99 @@ describe('createNetworkErrorFetch status policy', () => {
     ]);
     expect(breadcrumbs).toHaveLength(0);
   });
+
+  it('records one breadcrumb for repeated expected answers of one endpoint', async () => {
+    // A screen polling a refused endpoint gets the same answer on every
+    // request; only the first one leaves a breadcrumb. The wrapper is built
+    // once and called repeatedly, as a polling screen does.
+    const wrapped = createNetworkErrorFetch(resolvingFetch(new Response('', { status: 404 })));
+    await Promise.all(
+      Array.from({ length: 4 }, () =>
+        wrapped('https://example.com/api/trpc/user.getMe?batch=1', { method: 'POST' })
+      )
+    );
+
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs).toHaveLength(1);
+    expect(breadcrumbs[0]?.message).toBe('POST /api/trpc/user.getMe -> 404');
+  });
+
+  it('records a breadcrumb for each expected status of one endpoint', async () => {
+    // The status is part of the fingerprint, so a 429 and a 404 are two
+    // answers, not a repeat.
+    await respond(
+      'https://example.com/api/trpc/user.getMe?batch=1',
+      new Response('', { status: 429 })
+    );
+    await respond(
+      'https://example.com/api/trpc/user.getMe?batch=1',
+      new Response('', { status: 404 })
+    );
+
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs.map(breadcrumb => breadcrumb.message)).toEqual([
+      'POST /api/trpc/user.getMe -> 429',
+      'POST /api/trpc/user.getMe -> 404',
+    ]);
+  });
+
+  it('leaves the event claim unspent for an expected answer', async () => {
+    // The screen saw the 404 first; the later real failure for the same
+    // endpoint still files its event.
+    await respond('https://example.com/api/trpc/user.getMe', new Response('', { status: 404 }));
+    await respond('https://example.com/api/trpc/user.getMe', new Response('', { status: 500 }));
+
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['network-error', 'trpc', 'user.getMe', 'http.500'],
+    ]);
+    expect(breadcrumbs).toHaveLength(1);
+  });
+
+  it('bounds the expected-answer latch and refreshes a fingerprint that keeps answering', async () => {
+    const answer = (index: number) =>
+      respond(`https://example.com/v1/files/${String(index)}`, new Response('', { status: 404 }));
+    const breadcrumbsFor = (index: number) =>
+      breadcrumbs.filter(
+        breadcrumb => breadcrumb.message === `POST /v1/files/${String(index)} -> 404`
+      ).length;
+
+    // A dynamic path segment forces one fingerprint per object id, as in the
+    // report claim; the latch remembers the 200 most recently answered ones.
+    // The calls must run in order because the order is what the cap evicts by,
+    // so they cannot be parallelised.
+    for (let index = 0; index < 200; index += 1) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- the eviction order under test is the call order
+      await answer(index);
+    }
+    expect(breadcrumbs).toHaveLength(200);
+
+    // The still-answering fingerprint is refreshed, so the next new path
+    // releases another one instead of it.
+    await answer(0);
+    await answer(200);
+    await answer(0);
+
+    expect(breadcrumbs).toHaveLength(201);
+    expect(breadcrumbsFor(0)).toBe(1);
+    expect(breadcrumbs.at(-1)?.message).toBe('POST /v1/files/200 -> 404');
+
+    // A released fingerprint records once more instead of the map growing.
+    await answer(1);
+    expect(breadcrumbs).toHaveLength(202);
+    expect(breadcrumbs.at(-1)?.message).toBe('POST /v1/files/1 -> 404');
+  });
+
+  it('clears the expected-answer latch in `resetNetworkErrorReports`', async () => {
+    await respond('https://example.com/api/trpc/user.getMe', new Response('', { status: 404 }));
+    resetNetworkErrorReports();
+    await respond('https://example.com/api/trpc/user.getMe', new Response('', { status: 404 }));
+
+    expect(breadcrumbs).toHaveLength(2);
+    expect(breadcrumbs.map(breadcrumb => breadcrumb.message)).toEqual([
+      'POST /api/trpc/user.getMe -> 404',
+      'POST /api/trpc/user.getMe -> 404',
+    ]);
+  });
 });
 
 describe('reportNetworkError', () => {

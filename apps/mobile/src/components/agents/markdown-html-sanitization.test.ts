@@ -59,11 +59,14 @@ describe('htmlSanitizesToEmpty', () => {
   it('bounds the passes over one value independently of its nesting depth', () => {
     // Regression: the loop ran to a fixpoint, so each pass re-replaced the whole
     // value and a deeply nested one cost depth × length on the JS thread — on
-    // every streamed publish. One pass is four replaces; the bound is eight.
+    // every streamed publish. The bound is eight passes, and a pass is two
+    // whole-value replaces beside the two linear removals, so the count does not
+    // grow with the nesting depth past that bound.
     const shallow = replacesOf(nestedEmptyContainers(1));
     const deep = replacesOf(nestedEmptyContainers(200));
-    expect(shallow).toBe(8);
-    expect(deep).toBe(32);
+    expect(shallow).toBeLessThanOrEqual(16);
+    expect(deep).toBeLessThanOrEqual(16);
+    expect(deep).toBeGreaterThan(0);
   });
 
   it('answers a repeated value from the memo', () => {
@@ -104,5 +107,117 @@ describe('htmlSanitizesToEmpty', () => {
         expect(htmlSanitizesToEmpty(chunk)).toBe(false);
       }
     }
+  });
+
+  it('scans a value with many void removed tags in one linear pass', () => {
+    // Regression: the container pattern paired `<input>` and `<source>` with a
+    // closer that a void element cannot have, so every occurrence walked the
+    // rest of the value on every streamed publish. Twenty thousand of them cost
+    // a scan quadratic in the value length (about half a second on a work VM);
+    // the linear scan costs about one look per tag. Measure the scaling so the
+    // assertion fails if the tail walk returns.
+    const measure = (tags: number): number => {
+      const value = `${'<input><source><link><meta>'.repeat(tags / 4)}visible`;
+      clearHtmlEmptinessCacheForTests();
+      const start = performance.now();
+      expect(htmlSanitizesToEmpty(value)).toBe(false);
+      return performance.now() - start;
+    };
+    // Warm the JIT so the first measurement is not the slow one.
+    measure(4_000);
+    const small = measure(10_000);
+    const large = measure(40_000);
+    // Four times the input costs about four times the work; a quadratic tail
+    // walk would cost about sixteen times. The bound is loose because a shared
+    // VM is noisy, and it only has to separate linear from quadratic.
+    expect(large).toBeLessThan(Math.max(small, 1) * 10);
+  });
+
+  it('answers the same as the previous pattern pipeline for generated values', () => {
+    // The oracle is the two patterns this module replaced: the lazy
+    // backreferenced container pattern and the lazy comment pattern, applied
+    // in the same order the pipeline used. The linear scans must answer
+    // identically for every value, including the shapes the patterns found
+    // surprising: unterminated comments, a void start with no closer, a start
+    // with an explicit closer, mixed case, and whitespace before a closer's
+    // `>`.
+    const container =
+      /<(script|style|link|iframe|frame|frameset|object|embed|applet|audio|video|source|track|form|input|button|select|option|optgroup|textarea|label|fieldset|legend|datalist|output|meter|progress|svg|canvas|base|head|meta|title|template|noscript)\b[^>]*>[\s\S]*?<\/\1\s*>/gi;
+    const removedTag =
+      /<\/?(?:script|style|link|iframe|frame|frameset|object|embed|applet|audio|video|source|track|form|input|button|select|option|optgroup|textarea|label|fieldset|legend|datalist|output|meter|progress|svg|canvas|base|head|meta|title|template|noscript)\b[^>]*>/gi;
+    const emptyContainer = /<([a-zA-Z][a-zA-Z0-9-]*)\b[^>]*>\s*<\/\1\s*>/g;
+    const oracleStep = (value: string) =>
+      value
+        .replaceAll(/<!--[\s\S]*?-->/g, '')
+        .replaceAll(container, '')
+        .replaceAll(removedTag, '')
+        .replaceAll(emptyContainer, '');
+    const oracle = (value: string) => {
+      let sanitized = value;
+      for (let pass = 0; pass < 8; pass += 1) {
+        const next = oracleStep(sanitized);
+        if (next === sanitized) {
+          return next.trim() === '';
+        }
+        sanitized = next;
+      }
+      return false;
+    };
+
+    const pieces = [
+      '<input>',
+      '<source>',
+      '<link>',
+      '<meta>',
+      '<base>',
+      '<embed>',
+      '<track>',
+      '<frame>',
+      '</input>',
+      '</source >',
+      '</source\n>',
+      '<svg>',
+      '</svg>',
+      '<script>',
+      '</script>',
+      '<SCRIPT>x</script>',
+      '<!--',
+      '-->',
+      '<!---->',
+      '<div>',
+      '</div>',
+      '<span>',
+      '</span>',
+      '<b>',
+      '</b>',
+      '<input',
+      '>',
+      '<',
+      '/',
+      'text',
+      ' ',
+      '\n',
+      '\t',
+      'x',
+    ];
+    // A deterministic generator: a fixed seed keeps the corpus identical on
+    // every run, so a failure is reproducible.
+    let seed = 1;
+    const random = () => {
+      seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
+      return seed / 2_147_483_648;
+    };
+    const corpus: string[] = [];
+    for (let index = 0; index < 3_000; index += 1) {
+      let value = '';
+      const length = 2 + Math.floor(random() * 12);
+      for (let part = 0; part < length; part += 1) {
+        value += pieces[Math.floor(random() * pieces.length)];
+      }
+      corpus.push(value);
+    }
+
+    const disagreements = corpus.filter(value => htmlSanitizesToEmpty(value) !== oracle(value));
+    expect(disagreements).toEqual([]);
   });
 });

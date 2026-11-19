@@ -52,9 +52,9 @@ describe('Māori device-session timestamps', () => {
       device: 'Waea a Ana',
       lastSeen,
     });
-    expect(signedIn).toBe('I takiuru i te 1 Noe 2026 · I kitea whakamutunga i te ' + lastSeen);
+    expect(signedIn).toBe(`I takiuru i te 1 Noe 2026 · I kitea whakamutunga i te ${lastSeen}`);
     expect(label).toBe(
-      'Takiputa i a Waea a Ana, i takiuru i te 1 Noe 2026, i kitea whakamutunga i te ' + lastSeen
+      `Takiputa i a Waea a Ana, i takiuru i te 1 Noe 2026, i kitea whakamutunga i te ${lastSeen}`
     );
     expect(message).toContain(`I kitea whakamutunga i te ${lastSeen}.`);
     for (const line of [signedIn, label, message]) {

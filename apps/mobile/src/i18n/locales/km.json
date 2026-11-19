@@ -3804,6 +3804,8 @@
       "fieldName": "ឈ្មោះបង្ហាញ",
       "fieldUrl": "URL ម៉ាស៊ីនមេ",
       "fieldUrlInvalid": "បញ្ចូល URL ម៉ាស៊ីនមេត្រឹមត្រូវ។",
+      "duplicateUrl": "URL នេះត្រូវបានរក្សាទុករួចហើយ។",
+      "serverNotFound": "ម៉ាស៊ីនមេនេះលែងត្រូវបានរក្សាទុកទៀតហើយ។",
       "enableServer": "បើកម៉ាស៊ីនមេនេះ: {{name}}",
       "editServer": "កែសម្រួលម៉ាស៊ីនមេ",
       "deleteServer": "លុបម៉ាស៊ីនមេ",

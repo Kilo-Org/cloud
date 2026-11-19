@@ -3804,6 +3804,8 @@
       "fieldName": "نام نمایشی",
       "fieldUrl": "نشانی URL سرور",
       "fieldUrlInvalid": "یک نشانی URL معتبر سرور وارد کنید.",
+      "duplicateUrl": "این نشانی URL قبلاً ذخیره شده است.",
+      "serverNotFound": "این سرور دیگر ذخیره نشده است.",
       "enableServer": "فعال‌کردن این سرور: {{name}}",
       "editServer": "ویرایش سرور",
       "deleteServer": "حذف سرور",

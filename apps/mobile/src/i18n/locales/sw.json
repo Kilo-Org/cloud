@@ -3804,6 +3804,8 @@
       "fieldName": "Jina linaloonyeshwa",
       "fieldUrl": "URL ya seva",
       "fieldUrlInvalid": "Weka URL sahihi ya seva.",
+      "duplicateUrl": "URL hiyo tayari imehifadhiwa.",
+      "serverNotFound": "Seva hii haihifadhiwi tena.",
       "enableServer": "Washa seva hii: {{name}}",
       "editServer": "Hariri seva",
       "deleteServer": "Futa seva",

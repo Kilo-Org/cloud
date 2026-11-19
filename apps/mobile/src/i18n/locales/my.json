@@ -3804,6 +3804,8 @@
       "fieldName": "ပြသမည့်အမည်",
       "fieldUrl": "ဆာဗာ URL",
       "fieldUrlInvalid": "မှန်ကန်သော ဆာဗာ URL ထည့်ပါ။",
+      "duplicateUrl": "ထို ဆာဗာ URL ကို သိမ်းဆည်းပြီးဖြစ်သည်။",
+      "serverNotFound": "ဤဆာဗာကို သိမ်းဆည်းထားခြင်း မရှိတော့ပါ။",
       "enableServer": "ဤဆာဗာကို ဖွင့်ပါ: {{name}}",
       "editServer": "ဆာဗာ တည်းဖြတ်ပါ",
       "deleteServer": "ဆာဗာ ဖျက်ပါ",

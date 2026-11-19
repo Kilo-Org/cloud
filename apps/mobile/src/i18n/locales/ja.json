@@ -3804,6 +3804,8 @@
       "fieldName": "表示名",
       "fieldUrl": "サーバーURL",
       "fieldUrlInvalid": "有効なサーバーURLを入力してください。",
+      "duplicateUrl": "そのURLはすでに保存されています。",
+      "serverNotFound": "このサーバーはもう保存されていません。",
       "enableServer": "このサーバーを有効にする：{{name}}",
       "editServer": "サーバーを編集",
       "deleteServer": "サーバーを削除",

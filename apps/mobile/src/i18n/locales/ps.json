@@ -3804,6 +3804,8 @@
       "fieldName": "ښکارېدونکی نوم",
       "fieldUrl": "د سرور URL",
       "fieldUrlInvalid": "د سرور سم URL ولیکئ.",
+      "duplicateUrl": "دا URL لا دمخه خوندي دی.",
+      "serverNotFound": "دا سرور نور خوندي نه دی.",
       "enableServer": "دا سرور فعال کړئ: {{name}}",
       "editServer": "سرور سم کړئ",
       "deleteServer": "سرور ړنګ کړئ",

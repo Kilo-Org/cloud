@@ -3804,6 +3804,8 @@
       "fieldName": "ชื่อที่แสดง",
       "fieldUrl": "URL ของเซิร์ฟเวอร์",
       "fieldUrlInvalid": "ป้อน URL ของเซิร์ฟเวอร์ที่ถูกต้อง",
+      "duplicateUrl": "URL นี้ถูกบันทึกไว้แล้ว",
+      "serverNotFound": "เซิร์ฟเวอร์นี้ไม่ได้ถูกบันทึกไว้อีกต่อไป",
       "enableServer": "เปิดใช้งานเซิร์ฟเวอร์นี้: {{name}}",
       "editServer": "แก้ไขเซิร์ฟเวอร์",
       "deleteServer": "ลบเซิร์ฟเวอร์",

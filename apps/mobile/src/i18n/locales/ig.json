@@ -3804,6 +3804,8 @@
       "fieldName": "Aha a na-egosi",
       "fieldUrl": "URL ihe nkesa",
       "fieldUrlInvalid": "Tinye URL ihe nkesa ziri ezi.",
+      "duplicateUrl": "URL a echekwalarị.",
+      "serverNotFound": "Ihe nkesa a echekwaghịzi.",
       "enableServer": "Mee ka ihe nkesa a rụọ ọrụ: {{name}}",
       "editServer": "Dezie ihe nkesa",
       "deleteServer": "Hichapụ ihe nkesa",

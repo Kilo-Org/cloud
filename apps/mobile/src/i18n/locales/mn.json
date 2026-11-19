@@ -3804,6 +3804,8 @@
       "fieldName": "Харагдах нэр",
       "fieldUrl": "Серверийн URL",
       "fieldUrlInvalid": "Хүчинтэй серверийн URL оруулна уу.",
+      "duplicateUrl": "Энэ серверийн URL аль хэдийн хадгалагдсан байна.",
+      "serverNotFound": "Энэ сервер цаашид хадгалагдаагүй байна.",
       "enableServer": "Энэ серверийг идэвхжүүлэх: {{name}}",
       "editServer": "Сервер засах",
       "deleteServer": "Сервер устгах",

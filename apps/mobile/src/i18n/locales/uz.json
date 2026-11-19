@@ -3804,6 +3804,8 @@
       "fieldName": "Koʻrsatiladigan nom",
       "fieldUrl": "Server URL manzili",
       "fieldUrlInvalid": "Toʻgʻri server URL manzilini kiriting.",
+      "duplicateUrl": "Bu URL allaqachon saqlangan.",
+      "serverNotFound": "Bu server boshqa saqlanmaydi.",
       "enableServer": "Bu serverni yoqish: {{name}}",
       "editServer": "Serverni tahrirlash",
       "deleteServer": "Serverni oʻchirish",

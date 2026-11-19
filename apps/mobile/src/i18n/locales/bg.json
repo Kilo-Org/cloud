@@ -3804,6 +3804,8 @@
       "fieldName": "Показвано име",
       "fieldUrl": "URL на сървъра",
       "fieldUrlInvalid": "Въведете валиден URL на сървъра.",
+      "duplicateUrl": "Този URL вече е запазен.",
+      "serverNotFound": "Този сървър вече не е запазен.",
       "enableServer": "Активиране на този сървър: {{name}}",
       "editServer": "Редактиране на сървъра",
       "deleteServer": "Изтриване на сървъра",

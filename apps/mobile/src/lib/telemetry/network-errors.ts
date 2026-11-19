@@ -59,6 +59,12 @@ export type TrpcErrorContext = {
   httpStatus?: number;
   path?: string;
   /**
+   * The account-blocked refusal marker (`data.accountBlocked`). The app answers
+   * it with the blocked-account explanation, so a 403 carrying it is a handled
+   * state, not a defect.
+   */
+  accountBlocked?: boolean;
+  /**
    * The input paths a `BAD_REQUEST` validation failure names, comma-separated,
    * never its messages: a Zod message can echo the input value back, while the
    * path only names the field. Capped by {@link MAX_INVALID_FIELD_PATHS} and
@@ -153,6 +159,10 @@ const TrpcErrorDataSchema = z.looseObject({
   // (`trpcErrorFormatter` fills it from the `ZodError` cause), and `null` for
   // every other failure. Read through {@link readValidationContext}.
   zodError: z.unknown().optional(),
+  // The account-blocked refusal marker (`data.accountBlocked`, see
+  // `packages/web-shared/src/lib/trpc/transport.ts`): the app answers it with
+  // the blocked-account explanation, so it is a handled state, not a defect.
+  accountBlocked: z.boolean().optional(),
 });
 
 const DirectTrpcErrorSchema = z.looseObject({
@@ -247,8 +257,11 @@ const HANDLED_FORBIDDEN_PROCEDURE = 'cloudAgentNext.listRepositoryBranches';
 
 /**
  * True when a status is an expected answer: one of
- * {@link EXPECTED_HTTP_STATUSES}, a 403 with no tRPC error code, or a
- * `FORBIDDEN` from {@link HANDLED_FORBIDDEN_PROCEDURE}. Production 403s come
+ * {@link EXPECTED_HTTP_STATUSES}, a 403 with no tRPC error code, a
+ * `FORBIDDEN` from {@link HANDLED_FORBIDDEN_PROCEDURE}, or a 403 whose body
+ * carries the account-blocked marker (`data.accountBlocked`), which the app
+ * answers with the blocked-account explanation — the same refusal the 401 path
+ * exempted before the dedicated error shape landed. Production 403s come
  * from the edge firewall (OFAC-sanctioned regions, IP blocks), whose body is not
  * a tRPC error. A 403 from a tRPC procedure carries its code (`FORBIDDEN`) and
  * names app code, so it is still reported unless the caller renders the refusal.
@@ -259,6 +272,9 @@ function isExpectedStatus(status: number, trpc: TrpcErrorContext): boolean {
   }
   if (status !== FORBIDDEN_STATUS) {
     return false;
+  }
+  if (trpc.accountBlocked === true) {
+    return true;
   }
   if (trpc.code === undefined) {
     return true;
@@ -330,6 +346,10 @@ export function readTrpcErrorContext(error: unknown): TrpcErrorContext {
       code: code !== undefined && isTrpcErrorCode(code) ? code : undefined,
       httpStatus: directData?.httpStatus ?? shapedData?.httpStatus,
       path: directData?.path ?? shapedData?.path,
+      accountBlocked:
+        directData?.accountBlocked === true || shapedData?.accountBlocked === true
+          ? true
+          : undefined,
       ...readValidationContext(directData?.zodError ?? shapedData?.zodError),
     };
   } catch {

@@ -109,15 +109,14 @@ export function useBlockedAccountFromAccountRead(input: BlockedAccountFromAccoun
       setBlockedAccountActive(true);
       return;
     }
-    if (verdict === 'answered' && !input.fetching && raisedHere.current) {
+    // An answered read proves the block no longer applies, whoever raised the
+    // explanation: this hook's raise, or another procedure's refusal through
+    // the shared query-cache path. The answered read clears any active
+    // explanation and refetches the tree; a flag already cleared externally
+    // (Sign out, sign-in) makes the condition false, so nothing runs.
+    if (verdict === 'answered' && !input.fetching && isBlockedAccountActive()) {
       raisedHere.current = false;
       raisedFor.current = null;
-      // A sign-in (or the surface's own Sign out) may have cleared the flag
-      // already: the explanation is gone, so there is nothing to reveal and
-      // nothing to refetch.
-      if (!isBlockedAccountActive()) {
-        return;
-      }
       setBlockedAccountActive(false);
       onAnswered.current?.();
     }

@@ -10,6 +10,7 @@ import {
 import { z } from 'zod';
 
 import { handleTrpcQueryError } from '@/lib/auth/trpc-unauthorized';
+import { raiseBlockedAccountFromRefusal } from '@/lib/auth/blocked-account-raise';
 import { reportTrpcError } from '@/lib/force-update-signal';
 import { reportAppError } from '@/lib/telemetry/app-error-reporting';
 import {
@@ -303,6 +304,12 @@ export function createKiloAppQueryClient(): QueryClient {
     queryCache: new QueryCache({
       onError: (error, query) => {
         void handleTrpcQueryError(error);
+        // A blocked account's refusal can land on any procedure first: the
+        // identity read has its own freshness window, so the surface the
+        // person touched must raise the explanation instead of a generic
+        // error. The raise is fenced and idempotent (see the module), and the
+        // identity read's hook still owns the clear and the reveal.
+        raiseBlockedAccountFromRefusal(error);
         reportTrpcError(error);
         reportAppError(error, { source: 'query', queryKey: query.queryKey });
         // A denied query drops its cached rows even while a screen observes it;
@@ -314,6 +321,7 @@ export function createKiloAppQueryClient(): QueryClient {
     mutationCache: new MutationCache({
       onError: error => {
         void handleTrpcQueryError(error);
+        raiseBlockedAccountFromRefusal(error);
         reportTrpcError(error);
         reportAppError(error, { source: 'mutation' });
       },

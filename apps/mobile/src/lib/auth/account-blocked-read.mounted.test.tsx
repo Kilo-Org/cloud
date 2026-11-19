@@ -128,11 +128,16 @@ describe('useBlockedAccountFromAccountRead', () => {
     renderer.unmount();
   });
 
-  it('does not clear a raise it did not make', () => {
+  it('clears an externally raised explanation when the read answers', () => {
+    // The raise came from another procedure's refusal (the shared query-cache
+    // path), not from this hook: an answered identity read still proves the
+    // block lifted, so it clears the explanation and refetches.
+    const onAnswered = vi.fn<() => void>();
     setBlockedAccountActive(true);
-    const renderer = mount({ error: null, userId: 'user-1', enabled: true });
+    const renderer = mount({ error: null, userId: 'user-1', enabled: true, onAnswered });
 
-    expect(isBlockedAccountActive()).toBe(true);
+    expect(isBlockedAccountActive()).toBe(false);
+    expect(onAnswered).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
   });

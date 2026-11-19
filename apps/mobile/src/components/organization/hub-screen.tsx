@@ -210,7 +210,11 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
     : `${t('organization.lowBalanceAlert.title')}. ${lowBalanceDetail}`;
 
   // One string for the painted balance and its spoken label, in the shape the
-  // Profile credits card paints the same balance.
+  // Profile credits card paints this same figure. Both screens read the
+  // balance off the same `organizations.list` row, so a money role sees one
+  // number on either screen; the card shows its member spend balance only to a
+  // role that cannot manage the organization's money, and it captions that
+  // amount with its scope.
   const balanceAmount = formatPrefixedMoney(fromMicrodollars(org.balance), i18n.language);
   // The plan and the subscription gate's own verdict arrive on the same
   // membership row that decides whether this screen renders at all, so both

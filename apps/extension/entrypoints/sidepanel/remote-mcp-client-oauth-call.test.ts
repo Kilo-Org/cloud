@@ -77,6 +77,9 @@ import { callRemoteMcpTool } from './remote-mcp-client';
 // eslint-disable-next-line promise/prefer-await-to-then, @typescript-eslint/no-unsafe-type-assertion
 const noopFetch = (() => Promise.resolve(new Response('{}'))) as unknown as typeof fetch;
 
+const NEEDS_CREDENTIALS_MESSAGE =
+  'This server needs credentials. Add a bearer token, a custom header, or OAuth in Edit.';
+
 const oauthServer: RemoteMcpServer = {
   allowInSafeMode: false,
   auth: { type: 'oauth' },
@@ -133,7 +136,10 @@ describe('remote MCP tool call against an OAuth server', () => {
     expect(JSON.stringify(result)).toContain('This server needs credentials.');
 
     const stored = await loadRemoteMcpStore(storage);
-    expect(stored.servers.find(server => server.id === 'srv-1')?.status).toBe('needs_auth');
+    expect(stored.servers.find(server => server.id === 'srv-1')).toMatchObject({
+      lastError: NEEDS_CREDENTIALS_MESSAGE,
+      status: 'needs_auth',
+    });
   });
 
   it('leaves an unrelated server status untouched when the store no longer has it', async () => {
@@ -206,6 +212,9 @@ describe('remote MCP tool call against an OAuth server', () => {
     expect(JSON.stringify(result)).toContain('This server needs credentials.');
 
     const stored = await loadRemoteMcpStore(storage);
-    expect(stored.servers.find(server => server.id === 'srv-1')?.status).toBe('needs_auth');
+    expect(stored.servers.find(server => server.id === 'srv-1')).toMatchObject({
+      lastError: NEEDS_CREDENTIALS_MESSAGE,
+      status: 'needs_auth',
+    });
   });
 });

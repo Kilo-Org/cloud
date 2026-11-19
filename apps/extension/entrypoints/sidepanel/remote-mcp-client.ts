@@ -271,12 +271,13 @@ const withoutInteractiveSignIn = (provider: RemoteMcpOAuthProvider): RemoteMcpOA
 
 /*
  * Persist needs-sign-in for a server the tool path could not authenticate, so
- * its settings row shows the Connect/Edit affordance instead of the last good
- * status.
+ * its settings row shows the Connect/Edit affordance with the reason instead of
+ * the last good status.
  */
 const persistNeedsAuth = async (
   storageArea: RemoteMcpStorageArea | undefined,
-  serverId: string
+  serverId: string,
+  message: string
 ): Promise<void> => {
   if (storageArea === undefined) {
     return;
@@ -290,7 +291,11 @@ const persistNeedsAuth = async (
 
     return {
       result: undefined,
-      store: upsertRemoteMcpServer(store, { ...freshServer, status: 'needs_auth' }),
+      store: upsertRemoteMcpServer(store, {
+        ...freshServer,
+        lastError: message,
+        status: 'needs_auth',
+      }),
     };
   });
 };
@@ -336,7 +341,7 @@ export const callRemoteMcpTool = async ({
     const described = describeConnectFailure(error);
     if (described.needsAuth) {
       // The user-facing tool result must not depend on whether the status write lands.
-      await persistNeedsAuth(storageArea, server.id).catch(() => {});
+      await persistNeedsAuth(storageArea, server.id, described.message).catch(() => {});
     }
 
     return {

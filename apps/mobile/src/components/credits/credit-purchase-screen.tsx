@@ -284,11 +284,12 @@ export function CreditPurchaseScreen() {
   };
 
   const renderBalanceValue = () => {
-    // Every branch below is one `h-8` tall, the amount's own line box: the
-    // card's height stays the same in all three states, so the packs below never
-    // move when the read settles. The skeleton keeps the value's box,
-    // and the failed read's target keeps the box too: its tap area comes from
-    // the hit slop, not from a taller box, which would move the packs below.
+    // Every branch paints inside the amount's own line box: the card's height
+    // stays the same in all three states, so the packs below never move when
+    // the read settles. The skeleton keeps the value's box, and the failed
+    // read's target keeps it in flow too: its own node is the full target and
+    // `BALANCE_RETRY_TARGET_CLASS`'s negative margin cancels the half that
+    // overflows the line, which a taller in-flow box would add to the card.
     if (balancePending) {
       return <Skeleton className="h-8 w-24 rounded" />;
     }

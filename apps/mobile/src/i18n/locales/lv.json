@@ -3985,6 +3985,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) nosūta īsu secināšanas pieprasījumu šim galapunktam, izmantojot izvēlēto protokolu un modeli. Pakalpojuma sniedzējs par to var iekasēt maksu.",
       "connectionSucceeded": "Modelis izpildīja pieprasījumu, izmantojot šo protokolu.",
       "connectionFailed": "Modelis nevarēja izpildīt pieprasījumu. Pārbaudi API saknes adresi, protokolu, piekļuves datus un modeļa ID.",
+      "requestTimedOut": "Galapunkts neatbildēja laikā. Pārbaudi API sakni un savienojumu, tad mēģini vēlreiz.",
+      "requestUnauthorized": "Galapunkts noraidīja piekļuves datus. Pārbaudi API atslēgu un pielāgotās galvenes, tad mēģini vēlreiz.",
+      "requestNotFound": "Galapunkts vai modelis nav atrasts. Pārbaudi API sakni un modeļa ID.",
+      "requestRateLimited": "Galapunkts ierobežo pieprasījumus. Nogaidi brīdi un mēģini vēlreiz.",
+      "requestUnavailable": "Galapunkts šobrīd nav pieejams. Mēģini vēlreiz pēc brīža.",
+      "requestUnreachable": "Galapunkts nav sasniedzams. Pārbaudi API sakni un savienojumu.",
+      "requestInvalidResponse": "Galapunkts neatbildēja paredzētajā formātā. Pārbaudi, vai API sakne un protokols atbilst serverim, un mēģini vēlreiz.",
+      "discoveryNoModels": "Galapunkts neuzrādīja nevienu modeli. Ievadi modeļus manuāli.",
+      "connectionIncomplete": "Modelis atbildēja, bet nepabeidza pieprasījumu. Mēģini vēlreiz vai pārbaudi modeļa ID un protokolu.",
       "invalidInput": "Ievadi aizmugursistēmas nosaukumu, derīgas galvenes un vismaz vienu modeli ar unikālu ID un nosaukumu. Tokenu ierobežojumiem jābūt pozitīviem veseliem skaitļiem.",
       "invalidUrl": "Ievadi HTTP vai HTTPS API saknes adresi bez piekļuves datiem, vaicājuma vai fragmenta.",
       "publicHttp": "Publiski HTTP galapunkti nav atļauti. Izmanto HTTPS vai privātu lokālu galapunktu.",
@@ -4123,7 +4132,11 @@
     "reasoningEffort": {
       "modelFlag": "Šis modelis atbalsta domāšanas intensitāti"
     },
-    "creditsRequired": "Nepietiek kredītu, lai nosūtītu šo ziņojumu."
+    "creditsRequired": "Nepietiek kredītu, lai nosūtītu šo ziņojumu.",
+    "providerKeyRefused": "Pakalpojumu sniedzējs noraidīja piekļuves datus. Pārbaudi tā API atslēgu, tad nosūti vēlreiz.",
+    "providerModelMissing": "Šis aizmugurējais serviss vairs nenodrošina šo modeli. Izvēlies citu.",
+    "providerRateLimited": "Pakalpojumu sniedzējs ierobežo pieprasījumus. Nogaidi brīdi un nosūti vēlreiz.",
+    "providerUnavailable": "Pakalpojumu sniedzējs šobrīd nav pieejams. Nosūti vēlreiz pēc brīža."
   },
   "settingsTools": {
     "confirmTitle": "Apstiprināt šo izmaiņu?"

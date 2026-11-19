@@ -616,25 +616,26 @@ describe('organization model producer publication', () => {
     expect(mockTagClaude).toHaveBeenLastCalledWith(owner, expect.any(Array));
   });
 
-  it('merges the ChatGPT and Claude tags, which run on the same input', async () => {
+  it('tags Claude billing models on the list the ChatGPT tagger returned', async () => {
     const tagIds = (ids: string[]) => async (_owner: unknown, models: OpenRouterModel[]) =>
       models.map(model =>
         ids.includes(model.id) ? { ...model, hasUserByokAvailable: true, isFree: false } : model
       );
-    const seenByChatGpt: string[][] = [];
-    const seenByClaude: string[][] = [];
+    const chatGptResults: OpenRouterModel[][] = [];
     mockTagChatGpt.mockImplementation(async (owner, models: OpenRouterModel[]) => {
-      seenByChatGpt.push(models.map(model => model.id));
-      return tagIds(['provider/training'])(owner, models);
+      const tagged = await tagIds(['provider/training'])(owner, models);
+      chatGptResults.push(tagged);
+      return tagged;
     });
-    mockTagClaude.mockImplementation(async (owner, models: OpenRouterModel[]) => {
-      seenByClaude.push(models.map(model => model.id));
-      return tagIds(['morph-byok/private'])(owner, models);
-    });
+    mockTagClaude.mockImplementation(async (owner, models: OpenRouterModel[]) =>
+      tagIds(['morph-byok/private'])(owner, models)
+    );
 
     const result = await resultFor();
 
-    expect(seenByClaude).toEqual(seenByChatGpt);
+    expect(chatGptResults).toHaveLength(1);
+    expect(mockTagClaude).toHaveBeenCalledTimes(1);
+    expect(mockTagClaude.mock.calls[0][1]).toBe(chatGptResults[0]);
     for (const id of ['provider/training', 'morph-byok/private']) {
       expect(result.data.find(model => model.id === id)).toMatchObject({
         hasUserByokAvailable: true,

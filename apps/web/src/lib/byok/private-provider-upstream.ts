@@ -190,10 +190,14 @@ function parseJson(text: string): unknown {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 function stringField(value: unknown, ...path: string[]): string | undefined {
   let current = value;
   for (const key of path) {
-    if (typeof current !== 'object' || current === null || !(key in current)) return undefined;
+    if (!isRecord(current)) return undefined;
     current = current[key];
   }
   return typeof current === 'string' && current.trim() !== '' ? current.trim() : undefined;
@@ -226,8 +230,7 @@ function nextModelsPageUrl({
       return undefined;
     }
   }
-  const hasMore = typeof page === 'object' && page !== null && 'has_more' in page && page.has_more;
-  if (hasMore !== true) return null;
+  if (!isRecord(page) || page.has_more !== true) return null;
   const lastId = stringField(page, 'last_id');
   if (!lastId) return undefined;
   const url = new URL(`${baseUrl}/models`);

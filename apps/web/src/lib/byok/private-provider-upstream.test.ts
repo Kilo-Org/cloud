@@ -99,7 +99,9 @@ describe('fetchByokPrivateProviderModels', () => {
   const BASE_URL = 'https://llm.example.com/v1';
   const CREDENTIALS = { type: 'api_key', api_key: 'listing-secret' } as const;
 
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   /** Answers each request in turn with the given page, or the given error status. */
   function mockPages(...pages: Array<unknown | Response>) {

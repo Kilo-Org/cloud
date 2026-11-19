@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { type Href, useLocalSearchParams } from 'expo-router';
 
 import { OrganizationUsageScreen } from '@/components/usage/organization-usage-screen';
 import { useRepairOrganizationRouteStack } from '@/lib/hooks/use-repair-organization-route-stack';
@@ -28,7 +28,7 @@ export default function OrganizationUsageRoute() {
   // push is a query string, because the object form drops params
   // (`profile-route-stack.ts`), and a rebuilt link screen without its org
   // would re-scope to the persisted selection.
-  const self =
+  const self: Href =
     orgIdOverride !== undefined
       ? `${USAGE_PATH}?org=${encodeURIComponent(orgIdOverride)}`
       : USAGE_PATH;

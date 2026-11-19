@@ -209,7 +209,7 @@
     "signInWithGoogle": "Google හරහා පිවිසෙන්න",
     "signInWithPasskey": "ප්‍රවේශ යතුරකින් පිවිසෙන්න",
     "emailAddress": "විද්‍යුත් තැපැල් ලිපිනය",
-    "emailPlaceholder": "you@example.com",
+    "emailPlaceholder": "ඔබ@example.com",
     "continueWithEmail": "විද්‍යුත් තැපෑල හරහා ඉදිරියට යන්න",
     "enterCodeSentTo": "{{email}} වෙත යැවූ කේතය ඇතුළත් කරන්න.",
     "codeArrivalHint": "මෙම ලිපිනය සුදුසුකම් සපුරන්නේ නම්, මිනිත්තුවක් ඇතුළත කේතය ලැබේ.",

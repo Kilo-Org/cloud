@@ -209,7 +209,7 @@
     "signInWithGoogle": "使用 Google 登录",
     "signInWithPasskey": "使用通行密钥登录",
     "emailAddress": "邮箱地址",
-    "emailPlaceholder": "you@example.com",
+    "emailPlaceholder": "你@example.com",
     "continueWithEmail": "通过邮箱继续",
     "enterCodeSentTo": "请输入发送至 {{email}} 的验证码",
     "codeArrivalHint": "如果此邮箱地址符合条件，你将在一分钟内收到验证码。",

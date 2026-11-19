@@ -66,7 +66,7 @@
     "discardChangesMessage": "Twoje zmiany zostaną utracone.",
     "discardChangesTitle": "Odrzuć zmiany?",
     "findings": "Wykryte problemy",
-    "mergeRequest": "merge request",
+    "mergeRequest": "żądanie scalenia",
     "notConnected": "Brak połączenia",
     "notifications": "Powiadomienia",
     "pullRequest": "PR",
@@ -704,8 +704,8 @@
     "followReviewMd": "Postępuj zgodnie z REVIEW.md",
     "followReviewMdSubtitle": "Przestrzegaj instrukcji z pliku REVIEW.md w każdym repozytorium",
     "manualReview": {
-      "invalidMergeRequestUrl": "Wpisz prawidłowy adres URL merge request.",
-      "mergeRequestUrl": "Adres URL merge request",
+      "invalidMergeRequestUrl": "Wpisz prawidłowy adres URL żądania scalenia.",
+      "mergeRequestUrl": "Adres URL żądania scalenia",
       "instructionsAtLimit": "Instrukcje mogą mieć maksymalnie {{max}} znaków",
       "couldNotCheckProviderStatus": "Nie udało się sprawdzić statusu dostawcy.",
       "couldNotLoadProviders": "Nie udało się wczytać połączonych dostawców. Spróbuj ponownie.",
@@ -2870,9 +2870,9 @@
       "reconnectTitleGitLab": "Połącz ponownie konto GitLab",
       "reconnectTitleBitbucket": "Połącz ponownie konto Bitbucket",
       "reconnectDescription": "Cofnięto dostęp do konta GitHub.",
-      "gitlabDescription": "Przeglądaj merge requesty na telefonie",
+      "gitlabDescription": "Przeglądaj żądania scalenia na telefonie",
       "gitlabInstanceMismatchTitle": "Połączenie z GitLabem dotyczy innej instancji",
-      "gitlabInstanceMismatchDescription": "Twoje połączenie z GitLabem dotyczy {{connected}}, ale ten merge request znajduje się na {{requested}}. Połącz GitLab na tej instancji, aby go przejrzeć.",
+      "gitlabInstanceMismatchDescription": "Twoje połączenie z GitLabem dotyczy {{connected}}, ale to żądanie scalenia znajduje się na {{requested}}. Połącz GitLab na tej instancji, aby je przejrzeć.",
       "checkActiveConnection": "Połączenie jest aktywne, ale nadal nie można wczytać tego elementu.",
       "bitbucketOrgOnlyDescription": "Przełącz konto powyżej na organizację, aby przeglądać jej PR-y na Bitbucketu.",
       "bitbucketOrgOnlyNoOrganizationDescription": "To konto nie ma jeszcze żadnych organizacji. PR-y na Bitbucketu będzie można przeglądać po utworzeniu organizacji lub dołączeniu do niej.",
@@ -3001,11 +3001,11 @@
       "removeFromRecentsTitle": "Usunąć z listy ostatnio otwieranych?",
       "removeFromRecentsMessage": "Ta recenzja zostanie usunięta z listy ostatnich.",
       "removeRecentAccessibility": "Usuń {{repo}} z listy ostatnio otwieranych",
-      "urlAccessibility": "Wpisz adres URL PR lub merge requestu",
-      "urlPlaceholder": "URL PR lub merge requesta",
-      "openAccessibility": "Otwórz PR lub merge request",
+      "urlAccessibility": "Wpisz adres URL PR lub żądania scalenia",
+      "urlPlaceholder": "URL PR lub żądania scalenia",
+      "openAccessibility": "Otwórz PR lub żądanie scalenia",
       "clearLink": "Wyczyść odnośnik",
-      "pasteLink": "Wklej odnośnik do PR lub merge requestu",
+      "pasteLink": "Wklej odnośnik do PR lub żądania scalenia",
       "open": "Otwórz"
     },
     "eventChips": {
@@ -3176,7 +3176,7 @@
       },
       "terminal": {
         "closed": "PR zamknięty",
-        "closedMergeRequest": "Merge request zamknięty"
+        "closedMergeRequest": "Żądanie scalenia zamknięte"
       },
       "partialSuccessBanner": {
         "accessibility": "Scalono. Nie udało się usunąć gałęzi: {{reason}}",
@@ -3347,7 +3347,7 @@
     },
     "linkPasteClipboardEmpty": "Schowek jest pusty.",
     "linkPasteDenied": "Odmówiono dostępu do wklejania. Zezwól na wklejanie i spróbuj ponownie.",
-    "linkPasteNotAPullRequest": "To nie jest odnośnik do PR ani merge requestu",
+    "linkPasteNotAPullRequest": "To nie jest odnośnik do PR ani żądania scalenia",
     "announce": {
       "commentPosted": "Opublikowano komentarz",
       "commentUpdated": "Komentarz zaktualizowany",
@@ -3380,18 +3380,18 @@
     },
     "terms": {
       "pullRequest": "PR",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "Merge request !{{number}}",
-      "shareMergeRequest": "Udostępnij merge request",
+      "mergeRequest": "Żądanie scalenia",
+      "mergeRequestNumber": "Żądanie scalenia !{{number}}",
+      "shareMergeRequest": "Udostępnij żądanie scalenia",
       "viewOnProvider": "Zobacz w {{provider}}",
-      "mergeRequestUnavailable": "Merge request niedostępny",
+      "mergeRequestUnavailable": "Żądanie scalenia niedostępne",
       "unavailableDescription": "Połączenie mogło się nie udać, a element mógł zostać usunięty lub być niedostępny.",
-      "accessDeniedMergeRequest": "Nie masz uprawnień do wyświetlenia tego merge request.",
-      "couldNotLoadMergeRequest": "Nie udało się wczytać merge request.",
-      "discussionAccessDenied": "Nie masz uprawnień do wyświetlenia dyskusji w tym merge request.",
-      "discussionUnavailableMessage": "Połączenie mogło się nie udać albo merge request mógł zostać usunięty.",
-      "noDiscussionDescription": "W tym merge request nie ma jeszcze wątków przeglądu ani komentarzy w dyskusji.",
-      "noFilesChangedDescription": "Ten merge request nie zawiera zmian w plikach."
+      "accessDeniedMergeRequest": "Nie masz uprawnień do wyświetlenia tego żądania scalenia.",
+      "couldNotLoadMergeRequest": "Nie udało się wczytać żądania scalenia.",
+      "discussionAccessDenied": "Nie masz uprawnień do wyświetlenia dyskusji w tym żądaniu scalenia.",
+      "discussionUnavailableMessage": "Połączenie mogło się nie udać albo żądanie scalenia mogło zostać usunięte.",
+      "noDiscussionDescription": "W tym żądaniu scalenia nie ma jeszcze wątków przeglądu ani komentarzy w dyskusji.",
+      "noFilesChangedDescription": "To żądanie scalenia nie zawiera zmian w plikach."
     }
   },
   "organization": {

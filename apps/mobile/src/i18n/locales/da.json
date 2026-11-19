@@ -66,7 +66,7 @@
     "discardChangesMessage": "Dine ændringer går tabt.",
     "discardChangesTitle": "Kassér ændringer?",
     "findings": "Fund",
-    "mergeRequest": "merge request",
+    "mergeRequest": "fletningsanmodning",
     "notConnected": "Ikke tilknyttet",
     "notifications": "Notifikationer",
     "pullRequest": "PR",
@@ -685,7 +685,7 @@
       },
       "terminal": {
         "closed": "Denne pull request er lukket",
-        "closedMergeRequest": "Denne merge request er lukket"
+        "closedMergeRequest": "Denne fletningsanmodning er lukket"
       },
       "partialSuccessBanner": {
         "body": "Grenen kunne ikke slettes: {{reason}}.",
@@ -851,11 +851,11 @@
       "removeFromRecentsTitle": "Fjern fra listen over seneste?",
       "removeFromRecentsMessage": "Denne gennemgang fjernes fra listen over dine seneste.",
       "removeRecentAccessibility": "Fjern {{repo}} fra listen over seneste",
-      "urlAccessibility": "Indtast en pull request- eller merge request-URL",
-      "urlPlaceholder": "URL på pull request eller merge request",
-      "openAccessibility": "Åbn pull request eller merge request",
+      "urlAccessibility": "Indtast en pull request- eller fletningsanmodnings-URL",
+      "urlPlaceholder": "URL på pull request eller fletningsanmodning",
+      "openAccessibility": "Åbn pull request eller fletningsanmodning",
       "clearLink": "Ryd link",
-      "pasteLink": "Indsæt pull request- eller merge request-link",
+      "pasteLink": "Indsæt pull request- eller fletningsanmodningslink",
       "open": "Åbn"
     },
     "checks": {
@@ -924,9 +924,9 @@
       "reconnectTitleGitLab": "Opret forbindelse til GitLab igen",
       "reconnectTitleBitbucket": "Opret forbindelse til Bitbucket igen",
       "reconnectDescription": "Adgangen til din GitHub-konto er blevet tilbagekaldt.",
-      "gitlabDescription": "Gennemgå merge requests på mobilen",
+      "gitlabDescription": "Gennemgå fletningsanmodninger på mobilen",
       "gitlabInstanceMismatchTitle": "GitLab-forbindelsen er til en anden instans",
-      "gitlabInstanceMismatchDescription": "Din GitLab-forbindelse er til {{connected}}, men denne merge request er på {{requested}}. Opret forbindelse til GitLab på den pågældende instans for at gennemgå den.",
+      "gitlabInstanceMismatchDescription": "Din GitLab-forbindelse er til {{connected}}, men denne fletningsanmodning er på {{requested}}. Opret forbindelse til GitLab på den pågældende instans for at gennemgå den.",
       "checkActiveConnection": "Forbindelsen er aktiv, men dette element kan stadig ikke indlæses.",
       "bitbucketOrgOnlyDescription": "Skift kontoen ovenfor til en organisation for at gennemgå dens pull requests i Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Denne konto har endnu ingen organisationer. Bitbucket pull requests kan gennemgås, når du opretter eller tilslutter dig en organisation.",
@@ -1034,7 +1034,7 @@
     },
     "linkPasteClipboardEmpty": "Udklipsholderen er tom.",
     "linkPasteDenied": "Adgang til indsættelse blev nægtet. Tillad indsættelse, og prøv igen.",
-    "linkPasteNotAPullRequest": "Linket fører ikke til en pull request eller merge request",
+    "linkPasteNotAPullRequest": "Linket fører ikke til en pull request eller en fletningsanmodning",
     "announce": {
       "commentPosted": "Kommentar sendt",
       "commentUpdated": "Kommentar opdateret",
@@ -1067,18 +1067,18 @@
     },
     "terms": {
       "pullRequest": "PR",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "Merge request !{{number}}",
-      "shareMergeRequest": "Del merge request",
+      "mergeRequest": "Fletningsanmodning",
+      "mergeRequestNumber": "Fletningsanmodning !{{number}}",
+      "shareMergeRequest": "Del fletningsanmodning",
       "viewOnProvider": "Se på {{provider}}",
-      "mergeRequestUnavailable": "Merge request ikke tilgængelig",
+      "mergeRequestUnavailable": "Fletningsanmodning ikke tilgængelig",
       "unavailableDescription": "Forbindelsen kan være mislykkedes, eller også kan elementet være slettet eller utilgængeligt.",
-      "accessDeniedMergeRequest": "Du har ikke tilladelse til at se denne merge request.",
-      "couldNotLoadMergeRequest": "Denne merge request kunne ikke indlæses.",
-      "discussionAccessDenied": "Du har ikke tilladelse til at se diskussionen om denne merge request.",
-      "discussionUnavailableMessage": "Forbindelsen kan være mislykkedes, eller også kan merge requesten være fjernet.",
-      "noDiscussionDescription": "Der er endnu ingen tråde med kodegennemgang eller kommentarer i diskussionen om denne merge request.",
-      "noFilesChangedDescription": "Der er ingen filændringer i denne merge request."
+      "accessDeniedMergeRequest": "Du har ikke tilladelse til at se denne fletningsanmodning.",
+      "couldNotLoadMergeRequest": "Denne fletningsanmodning kunne ikke indlæses.",
+      "discussionAccessDenied": "Du har ikke tilladelse til at se diskussionen om denne fletningsanmodning.",
+      "discussionUnavailableMessage": "Forbindelsen kan være mislykkedes, eller også kan fletningsanmodningen være fjernet.",
+      "noDiscussionDescription": "Der er endnu ingen tråde med kodegennemgang eller kommentarer i diskussionen om denne fletningsanmodning.",
+      "noFilesChangedDescription": "Der er ingen filændringer i denne fletningsanmodning."
     }
   },
   "notifications": {
@@ -1338,8 +1338,8 @@
       }
     },
     "manualReview": {
-      "invalidMergeRequestUrl": "Indtast en gyldig URL til en merge request.",
-      "mergeRequestUrl": "URL til merge request",
+      "invalidMergeRequestUrl": "Indtast en gyldig URL til en fletningsanmodning.",
+      "mergeRequestUrl": "URL til fletningsanmodning",
       "instructionsAtLimit": "Instruktionerne er begrænset til {{max}} tegn",
       "title": "Manuel gennemgang",
       "invalidUrl": "Indtast en gyldig URL til en pull request.",
@@ -4191,7 +4191,7 @@
       "add": "Tilføj MCP-server",
       "empty": "Ingen MCP-servere endnu",
       "name": "Servernavn",
-      "type": "Server type",
+      "type": "Servertype",
       "localType": "Lokal",
       "remoteType": "Fjern",
       "command": "Kommandolinje",

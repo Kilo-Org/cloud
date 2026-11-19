@@ -66,7 +66,7 @@
     "discardChangesMessage": "Perubahan Anda akan hilang.",
     "discardChangesTitle": "Buang perubahan?",
     "findings": "Temuan",
-    "mergeRequest": "merge request",
+    "mergeRequest": "permintaan penggabungan",
     "notConnected": "Tidak terhubung",
     "notifications": "Notifikasi",
     "pullRequest": "PR",
@@ -704,8 +704,8 @@
     "followReviewMd": "Ikuti REVIEW.md",
     "followReviewMdSubtitle": "Ikuti instruksi dalam berkas REVIEW.md di setiap repositori",
     "manualReview": {
-      "invalidMergeRequestUrl": "Masukkan URL merge request yang valid.",
-      "mergeRequestUrl": "URL merge request",
+      "invalidMergeRequestUrl": "Masukkan URL permintaan penggabungan yang valid.",
+      "mergeRequestUrl": "URL permintaan penggabungan",
       "instructionsAtLimit": "Instruksi dibatasi hingga {{max}} karakter.",
       "couldNotCheckProviderStatus": "Tidak dapat memeriksa status penyedia.",
       "couldNotLoadProviders": "Kami tidak dapat memuat penyedia yang terhubung. Coba lagi.",
@@ -1806,7 +1806,7 @@
       "buildsUnavailable": "Build snapshot tidak tersedia untuk lingkungan ini.",
       "onlyManagersCanBuild": "Hanya manajer organisasi yang dapat mem-build snapshot.",
       "waitForBuilder": "Tunggu hingga builder berhenti sebelum melakukan build lagi.",
-      "buildAction": "Build snapshot",
+      "buildAction": "Buat snapshot",
       "refreshAction": "Perbarui snapshot",
       "cancelBuildAction": "Batalkan build",
       "buildStarted": "Build snapshot dimulai",
@@ -2435,7 +2435,7 @@
     "toolRun": {
       "sheetTitle": "Panggilan alat",
       "condensedLabel": "{{itemCount}} item; {{last}}",
-      "condensedLabel_one": "{{itemCount}} item; {{last}}",
+      "condensedLabel_one": "{{itemCount}} elemen; item {{last}}",
       "condensedLabel_other": "{{itemCount}} item; {{last}}"
     }
   },
@@ -2792,9 +2792,9 @@
       "reconnectTitleGitLab": "Hubungkan ulang GitLab",
       "reconnectTitleBitbucket": "Hubungkan ulang Bitbucket",
       "reconnectDescription": "Akses ke akun GitHub kamu telah dicabut.",
-      "gitlabDescription": "Tinjau merge request di perangkat seluler",
+      "gitlabDescription": "Tinjau permintaan penggabungan di perangkat seluler",
       "gitlabInstanceMismatchTitle": "Koneksi GitLab untuk instance lain",
-      "gitlabInstanceMismatchDescription": "Koneksi GitLab Anda untuk {{connected}}, tetapi merge request ini berada di {{requested}}. Hubungkan GitLab di instance tersebut untuk meninjaunya.",
+      "gitlabInstanceMismatchDescription": "Koneksi GitLab Anda untuk {{connected}}, tetapi permintaan penggabungan ini berada di {{requested}}. Hubungkan GitLab di instance tersebut untuk meninjaunya.",
       "checkActiveConnection": "Koneksi aktif, tetapi item ini tetap tidak dapat dimuat.",
       "bitbucketOrgOnlyDescription": "Ganti akun di atas ke sebuah organisasi untuk meninjau PR Bitbucket-nya.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Akun ini belum memiliki organisasi. PR Bitbucket dapat ditinjau setelah Anda membuat atau bergabung dengan organisasi.",
@@ -2917,11 +2917,11 @@
       "removeFromRecentsTitle": "Hapus dari riwayat?",
       "removeFromRecentsMessage": "Tinjauan ini akan dihapus dari riwayatmu.",
       "removeRecentAccessibility": "Hapus {{repo}} dari riwayat",
-      "urlAccessibility": "Masukkan URL PR atau merge request",
-      "urlPlaceholder": "URL PR atau merge request",
-      "openAccessibility": "Buka PR atau merge request",
+      "urlAccessibility": "Masukkan URL PR atau permintaan penggabungan",
+      "urlPlaceholder": "URL PR atau permintaan penggabungan",
+      "openAccessibility": "Buka PR atau permintaan penggabungan",
       "clearLink": "Hapus tautan",
-      "pasteLink": "Tempel tautan PR atau merge request",
+      "pasteLink": "Tempel tautan PR atau permintaan penggabungan",
       "open": "Buka"
     },
     "eventChips": {
@@ -3074,7 +3074,7 @@
       },
       "terminal": {
         "closed": "PR ini sudah ditutup",
-        "closedMergeRequest": "Merge request ini sudah ditutup"
+        "closedMergeRequest": "Permintaan penggabungan ini sudah ditutup"
       },
       "partialSuccessBanner": {
         "accessibility": "Sudah digabungkan. Tidak dapat menghapus cabang: {{reason}}",
@@ -3231,7 +3231,7 @@
     },
     "linkPasteClipboardEmpty": "Papan klip kosong.",
     "linkPasteDenied": "Akses tempel ditolak. Izinkan tempel dan coba lagi.",
-    "linkPasteNotAPullRequest": "Ini bukan tautan PR atau merge request",
+    "linkPasteNotAPullRequest": "Ini bukan tautan PR atau permintaan penggabungan",
     "announce": {
       "commentPosted": "Komentar terkirim",
       "commentUpdated": "Komentar diperbarui",
@@ -3264,18 +3264,18 @@
     },
     "terms": {
       "pullRequest": "PR",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "Merge request !{{number}}",
-      "shareMergeRequest": "Bagikan merge request",
+      "mergeRequest": "Permintaan penggabungan",
+      "mergeRequestNumber": "Permintaan penggabungan !{{number}}",
+      "shareMergeRequest": "Bagikan permintaan penggabungan",
       "viewOnProvider": "Lihat di {{provider}}",
-      "mergeRequestUnavailable": "Merge request tidak tersedia",
+      "mergeRequestUnavailable": "Permintaan penggabungan tidak tersedia",
       "unavailableDescription": "Koneksi mungkin gagal, atau item mungkin sudah dihapus atau tidak dapat diakses.",
-      "accessDeniedMergeRequest": "Kamu tidak memiliki izin untuk melihat merge request ini.",
-      "couldNotLoadMergeRequest": "Tidak dapat memuat merge request.",
-      "discussionAccessDenied": "Kamu tidak memiliki izin untuk melihat diskusi merge request ini.",
-      "discussionUnavailableMessage": "Koneksi mungkin gagal, atau merge request mungkin sudah dihapus.",
-      "noDiscussionDescription": "Belum ada utas tinjauan atau komentar diskusi pada merge request ini.",
-      "noFilesChangedDescription": "Tidak ada perubahan file dalam merge request ini."
+      "accessDeniedMergeRequest": "Kamu tidak memiliki izin untuk melihat permintaan penggabungan ini.",
+      "couldNotLoadMergeRequest": "Tidak dapat memuat permintaan penggabungan",
+      "discussionAccessDenied": "Kamu tidak memiliki izin untuk melihat diskusi permintaan penggabungan ini.",
+      "discussionUnavailableMessage": "Koneksi mungkin gagal, atau permintaan penggabungan mungkin sudah dihapus.",
+      "noDiscussionDescription": "Belum ada utas tinjauan atau komentar diskusi pada permintaan penggabungan ini.",
+      "noFilesChangedDescription": "Tidak ada perubahan file dalam permintaan penggabungan ini."
     }
   },
   "organization": {

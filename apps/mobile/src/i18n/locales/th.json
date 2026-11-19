@@ -209,7 +209,7 @@
     "signInWithGoogle": "ลงชื่อเข้าใช้ด้วย Google",
     "signInWithPasskey": "ลงชื่อเข้าใช้ด้วยพาสคีย์",
     "emailAddress": "ที่อยู่อีเมล",
-    "emailPlaceholder": "you@example.com",
+    "emailPlaceholder": "คุณ@example.com",
     "continueWithEmail": "ดำเนินการต่อด้วยอีเมล",
     "enterCodeSentTo": "ป้อนรหัสที่ส่งไปที่ {{email}}",
     "codeArrivalHint": "หากอีเมลนี้มีสิทธิ์ใช้งาน คุณจะได้รับรหัสภายในหนึ่งนาที",

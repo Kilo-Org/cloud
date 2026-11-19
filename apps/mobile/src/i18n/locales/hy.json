@@ -69,7 +69,7 @@
     "mergeRequest": "միաձուլման հարցում",
     "notConnected": "Միացված չէ",
     "notifications": "Ծանուցումներ",
-    "pullRequest": "pull request",
+    "pullRequest": "ձգման հարցում",
     "repositories": "Պահոցներ",
     "securityAgent": "Անվտանգության գործակալ",
     "unknown": "Անհայտ",
@@ -1066,7 +1066,7 @@
       }
     },
     "terms": {
-      "pullRequest": "Pull request",
+      "pullRequest": "Ձգման հարցում",
       "mergeRequest": "Միաձուլման հարցում",
       "mergeRequestNumber": "Միաձուլման հարցում !{{number}}",
       "shareMergeRequest": "Կիսվել միաձուլման հարցմամբ",
@@ -2098,7 +2098,7 @@
       "dollar_other": "դոլար",
       "costSpoken": "արժեքը՝ {{cost}}",
       "costSpokenWithTime": "արժեքը՝ {{cost}}, {{time}}",
-      "pullRequest": "pull request {{number}}",
+      "pullRequest": "Ձգման հարցում {{number}}",
       "spokenJoiner": ","
     },
     "githubInstall": {

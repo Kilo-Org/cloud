@@ -209,7 +209,7 @@
     "signInWithGoogle": "د Google له لارې ننوځئ",
     "signInWithPasskey": "د ننوتلو کیلي سره ننوځئ",
     "emailAddress": "د برېښنالیک پته",
-    "emailPlaceholder": "you@example.com",
+    "emailPlaceholder": "ta@example.com",
     "continueWithEmail": "د برېښنالیک له لارې دوام ورکړئ",
     "enterCodeSentTo": "{{email}} ته لېږل شوی کوډ ولیکئ.",
     "codeArrivalHint": "که دا پته اړین شرایط پوره کړي، کوډ به په یوه دقیقه کې ورسېږي.",

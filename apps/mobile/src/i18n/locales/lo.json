@@ -66,7 +66,7 @@
     "discardChangesMessage": "ການປ່ຽນແປງຂອງທ່ານຈະສູນໄປ.",
     "discardChangesTitle": "ຖິ້ມການປ່ຽນແປງບໍ?",
     "findings": "ບັນຫາທີ່ກວດພົບ",
-    "mergeRequest": "merge request",
+    "mergeRequest": "ຄຳຂໍຮວມ",
     "notConnected": "ຍັງບໍ່ເຊື່ອມຕໍ່",
     "notifications": "ການແຈ້ງເຕືອນ",
     "pullRequest": "ຄຳຂໍລວມໂຄ້ດ",
@@ -209,7 +209,7 @@
     "signInWithGoogle": "ເຂົ້າສູ່ລະບົບດ້ວຍ Google",
     "signInWithPasskey": "ເຂົ້າສູ່ລະບົບດ້ວຍກະແຈເຂົ້າ",
     "emailAddress": "ທີ່ຢູ່ອີເມວ",
-    "emailPlaceholder": "you@example.com",
+    "emailPlaceholder": "ເຈົ້າ@example.com",
     "continueWithEmail": "ສືບຕໍ່ດ້ວຍອີເມວ",
     "enterCodeSentTo": "ໃສ່ລະຫັດທີ່ສົ່ງໄປຫາ {{email}}.",
     "codeArrivalHint": "ຖ້າອີເມວນີ້ມີສິດໃຊ້ງານ, ລະຫັດຈະມາເຖິງພາຍໃນໜຶ່ງນາທີ.",
@@ -685,7 +685,7 @@
       },
       "terminal": {
         "closed": "ປິດຄຳຂໍລວມໂຄດນີ້ແລ້ວ",
-        "closedMergeRequest": "ປິດ merge request ນີ້ແລ້ວ"
+        "closedMergeRequest": "ປິດຄຳຂໍຮວມນີ້ແລ້ວ"
       },
       "partialSuccessBanner": {
         "body": "ບໍ່ສາມາດລຶບສາຂາໄດ້: {{reason}}.",
@@ -851,11 +851,11 @@
       "removeFromRecentsTitle": "ເອົາອອກຈາກລາຍການທີ່ເປີດຫຼ້າສຸດບໍ?",
       "removeFromRecentsMessage": "ການກວດທານນີ້ຈະຖືກລຶບອອກຈາກລາຍການຫຼ້າສຸດຂອງທ່ານ",
       "removeRecentAccessibility": "ເອົາ {{repo}} ອອກຈາກລາຍການທີ່ເປີດຫຼ້າສຸດ",
-      "urlAccessibility": "ປ້ອນ URL ຂອງຄຳຂໍລວມໂຄ້ດ ຫຼື merge request",
-      "urlPlaceholder": "URL ຂອງຄຳຂໍລວມໂຄ້ດ ຫຼື merge request",
-      "openAccessibility": "ເປີດຄຳຂໍລວມໂຄ້ດ ຫຼື merge request",
+      "urlAccessibility": "ປ້ອນ URL ຂອງຄຳຂໍລວມໂຄ້ດ ຫຼື ຄຳຂໍຮວມ",
+      "urlPlaceholder": "URL ຂອງຄຳຂໍລວມໂຄ້ດ ຫຼື ຄຳຂໍຮວມ",
+      "openAccessibility": "ເປີດຄຳຂໍລວມໂຄ້ດ ຫຼື ຄຳຂໍຮວມ",
       "clearLink": "ລ້າງລິ້ງ",
-      "pasteLink": "ວາງລິ້ງຄຳຂໍລວມໂຄ້ດ ຫຼື merge request",
+      "pasteLink": "ວາງລິ້ງຄຳຂໍລວມໂຄ້ດ ຫຼື ຄຳຂໍຮວມ",
       "open": "ເປີດ"
     },
     "checks": {
@@ -924,9 +924,9 @@
       "reconnectTitleGitLab": "ເຊື່ອມຕໍ່ GitLab ໃໝ່",
       "reconnectTitleBitbucket": "ເຊື່ອມຕໍ່ Bitbucket ໃໝ່",
       "reconnectDescription": "ສິດການເຊື່ອມຕໍ່ GitHub ຂອງທ່ານຖືກຖອນແລ້ວ.",
-      "gitlabDescription": "ກວດສອບ merge request ໃນມືຖື",
+      "gitlabDescription": "ກວດສອບຄຳຂໍຮວມໃນມືຖື",
       "gitlabInstanceMismatchTitle": "ການເຊື່ອມຕໍ່ GitLab ແມ່ນສຳລັບ instance ອື່ນ",
-      "gitlabInstanceMismatchDescription": "ການເຊື່ອມຕໍ່ GitLab ຂອງທ່ານແມ່ນສຳລັບ {{connected}}, ແຕ່ merge request ນີ້ຢູ່ໃນ {{requested}}. ເຊື່ອມຕໍ່ GitLab ໃນ instance ນັ້ນເພື່ອກວດສອບມັນ.",
+      "gitlabInstanceMismatchDescription": "ການເຊື່ອມຕໍ່ GitLab ຂອງທ່ານແມ່ນສຳລັບ {{connected}}, ແຕ່ຄຳຂໍຮວມນີ້ຢູ່ໃນ {{requested}}. ເຊື່ອມຕໍ່ GitLab ໃນ instance ນັ້ນເພື່ອກວດສອບມັນ.",
       "checkActiveConnection": "ການເຊື່ອມຕໍ່ເຮັດວຽກຢູ່, ແຕ່ລາຍການນີ້ຍັງບໍ່ສາມາດໂຫຼດໄດ້.",
       "bitbucketOrgOnlyDescription": "ປ່ຽນບັນຊີຂ້າງເທິງໄປຫາອົງກອນເພື່ອກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ຂອງມັນ.",
       "bitbucketOrgOnlyNoOrganizationDescription": "ບັນຊີນີ້ຍັງບໍ່ມີອົງກອນ. ທ່ານສາມາດກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ໄດ້ເມື່ອທ່ານສ້າງ ຫຼື ເຂົ້າຮ່ວມອົງກອນ.",
@@ -1034,7 +1034,7 @@
     },
     "linkPasteClipboardEmpty": "ຄລິບບອດວ່າງເປົ່າ.",
     "linkPasteDenied": "ການເຂົ້າເຖິງການວາງສົ່ງໄດ້ຖືກປະຕິເສດ. ອະນຸຍາດໃຫ້ວາງສົ່ງ ແລະ ລອງໃໝ່ອີກຄັ້ງ.",
-    "linkPasteNotAPullRequest": "ບໍ່ແມ່ນລິ້ງຄຳຂໍລວມໂຄ້ດ ຫຼື merge request",
+    "linkPasteNotAPullRequest": "ບໍ່ແມ່ນລິ້ງຄຳຂໍລວມໂຄ້ດ ຫຼື ຄຳຂໍຮວມ",
     "announce": {
       "commentPosted": "ໂພດຄຳເຫັນແລ້ວ",
       "commentUpdated": "ອັບເດດຄຳເຫັນແລ້ວ",
@@ -1067,18 +1067,18 @@
     },
     "terms": {
       "pullRequest": "ຄຳຂໍລວມໂຄ້ດ",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "Merge request !{{number}}",
-      "shareMergeRequest": "ແບ່ງປັນ merge request",
+      "mergeRequest": "ຄຳຂໍຮວມ",
+      "mergeRequestNumber": "ຄຳຂໍຮວມ !{{number}}",
+      "shareMergeRequest": "ແບ່ງປັນຄຳຂໍຮວມ",
       "viewOnProvider": "ເບິ່ງເທິງ {{provider}}",
-      "mergeRequestUnavailable": "ບໍ່ສາມາດເປີດ merge request",
+      "mergeRequestUnavailable": "ບໍ່ສາມາດເປີດຄຳຂໍຮວມ",
       "unavailableDescription": "ການເຊື່ອມຕໍ່ອາດຈະລົ້ມເຫຼວ, ຫຼື ລາຍການອາດຈະຖືກລຶບ ຫຼື ເຂົ້າເຖິງບໍ່ໄດ້.",
-      "accessDeniedMergeRequest": "ທ່ານບໍ່ມີສິດເບິ່ງ merge request ນີ້.",
-      "couldNotLoadMergeRequest": "ບໍ່ສາມາດໂຫຼດ merge request ໄດ້.",
-      "discussionAccessDenied": "ທ່ານບໍ່ມີສິດເບິ່ງການສົນທະນາຂອງ merge request ນີ້.",
-      "discussionUnavailableMessage": "ການເຊື່ອມຕໍ່ອາດຈະລົ້ມເຫຼວ, ຫຼື Merge request ນີ້ອາດຈະຖືກລຶບໄປແລ້ວ.",
-      "noDiscussionDescription": "merge request ນີ້ຍັງບໍ່ມີເທຣດການກວດທານ ຫຼື ຄຳເຫັນການສົນທະນາ.",
-      "noFilesChangedDescription": "merge request ນີ້ບໍ່ມີການປ່ຽນແປງເຟົ້ມ."
+      "accessDeniedMergeRequest": "ທ່ານບໍ່ມີສິດເບິ່ງຄຳຂໍຮວມນີ້.",
+      "couldNotLoadMergeRequest": "ບໍ່ສາມາດໂຫຼດຄຳຂໍຮວມໄດ້.",
+      "discussionAccessDenied": "ທ່ານບໍ່ມີສິດເບິ່ງການສົນທະນາຂອງຄຳຂໍຮວມນີ້.",
+      "discussionUnavailableMessage": "ການເຊື່ອມຕໍ່ອາດຈະລົ້ມເຫຼວ, ຫຼື ຄຳຂໍຮວມນີ້ອາດຈະຖືກລຶບໄປແລ້ວ.",
+      "noDiscussionDescription": "ຄຳຂໍຮວມນີ້ຍັງບໍ່ມີເທຣດການກວດທານ ຫຼື ຄຳເຫັນການສົນທະນາ.",
+      "noFilesChangedDescription": "ຄຳຂໍຮວມນີ້ບໍ່ມີການປ່ຽນແປງໄຟລ໌."
     }
   },
   "notifications": {
@@ -1338,8 +1338,8 @@
       }
     },
     "manualReview": {
-      "invalidMergeRequestUrl": "ໃສ່ URL ຂອງ merge request ທີ່ຖືກຕ້ອງ.",
-      "mergeRequestUrl": "URL ຂອງ merge request",
+      "invalidMergeRequestUrl": "ໃສ່ URL ຂອງຄຳຂໍຮວມທີ່ຖືກຕ້ອງ.",
+      "mergeRequestUrl": "URL ຂອງຄຳຂໍຮວມ",
       "instructionsAtLimit": "ຄຳແນະນຳຈຳກັດບໍ່ເກີນ {{max}} ຕົວອັກສອນ",
       "title": "ການກວດສອບທີ່ເລີ່ມເອງ",
       "invalidUrl": "ໃສ່ URL ຂອງຄຳຂໍລວມໂຄ້ດທີ່ຖືກຕ້ອງ.",

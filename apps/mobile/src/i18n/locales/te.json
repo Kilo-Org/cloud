@@ -209,7 +209,7 @@
     "signInWithGoogle": "Googleతో సైన్ ఇన్ చేయండి",
     "signInWithPasskey": "పాస్‌కీతో సైన్ ఇన్ చేయండి",
     "emailAddress": "ఇమెయిల్ చిరునామా",
-    "emailPlaceholder": "you@example.com",
+    "emailPlaceholder": "మీరు@example.com",
     "continueWithEmail": "ఇమెయిల్‌తో కొనసాగించండి",
     "enterCodeSentTo": "{{email}}కు పంపిన కోడ్‌ను నమోదు చేయండి.",
     "codeArrivalHint": "ఈ చిరునామాకు అర్హత ఉంటే, ఒక నిమిషంలో కోడ్ వస్తుంది.",

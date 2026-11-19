@@ -2978,7 +2978,7 @@
     "toolRun": {
       "sheetTitle": "Panggilan alat",
       "condensedLabel": "{{itemCount}} item; {{last}}",
-      "condensedLabel_one": "{{itemCount}} item; {{last}}",
+      "condensedLabel_one": "{{itemCount}} elemen; {{last}}",
       "condensedLabel_other": "{{itemCount}} item; {{last}}"
     }
   },

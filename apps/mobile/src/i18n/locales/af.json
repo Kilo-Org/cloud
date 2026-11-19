@@ -66,7 +66,7 @@
     "discardChangesMessage": "Jou wysigings sal verlore gaan.",
     "discardChangesTitle": "Gooi wysigings weg?",
     "findings": "Bevindings",
-    "mergeRequest": "merge request",
+    "mergeRequest": "samesmeltingsversoek",
     "notConnected": "Nie gekoppel nie",
     "notifications": "Kennisgewings",
     "pullRequest": "trekversoek",
@@ -685,7 +685,7 @@
       },
       "terminal": {
         "closed": "Hierdie trekversoek is gesluit",
-        "closedMergeRequest": "Hierdie merge request is gesluit"
+        "closedMergeRequest": "Hierdie samesmeltingsversoek is gesluit"
       },
       "partialSuccessBanner": {
         "body": "Kon nie die tak skrap nie: {{reason}}.",
@@ -851,11 +851,11 @@
       "removeFromRecentsTitle": "Verwyder uit onlangse trekversoeke?",
       "removeFromRecentsMessage": "Hierdie hersiening sal uit jou onlangse lys verwyder word.",
       "removeRecentAccessibility": "Verwyder {{repo}} uit onlangse trekversoeke",
-      "urlAccessibility": "Voer 'n trekversoek- of merge request-URL in",
-      "urlPlaceholder": "Trekversoek- of merge request-URL",
-      "openAccessibility": "Maak trekversoek of merge request oop",
+      "urlAccessibility": "Voer 'n trekversoek- of samesmeltingsversoek-URL in",
+      "urlPlaceholder": "Trekversoek- of samesmeltingsversoek-URL",
+      "openAccessibility": "Maak trekversoek of samesmeltingsversoek oop",
       "clearLink": "Vee die skakel uit",
-      "pasteLink": "Plak trekversoek- of merge request-skakel",
+      "pasteLink": "Plak trekversoek- of samesmeltingsversoek-skakel",
       "open": "Oop"
     },
     "checks": {
@@ -924,9 +924,9 @@
       "reconnectTitleGitLab": "Koppel GitLab weer",
       "reconnectTitleBitbucket": "Koppel Bitbucket weer",
       "reconnectDescription": "Jou GitHub-verbinding is herroep.",
-      "gitlabDescription": "Hersien merge requests op jou selfoon",
+      "gitlabDescription": "Hersien samesmeltingsversoeke op jou selfoon",
       "gitlabInstanceMismatchTitle": "GitLab-koppeling is vir 'n ander instansie",
-      "gitlabInstanceMismatchDescription": "Jou GitLab-koppeling is vir {{connected}}, maar hierdie merge request is op {{requested}}. Koppel GitLab op daardie instansie om dit te hersien.",
+      "gitlabInstanceMismatchDescription": "Jou GitLab-koppeling is vir {{connected}}, maar hierdie samesmeltingsversoek is op {{requested}}. Koppel GitLab op daardie instansie om dit te hersien.",
       "checkActiveConnection": "Die koppeling is aktief, maar hierdie item kan steeds nie gelaai word nie.",
       "bitbucketOrgOnlyDescription": "Skakel die rekening hierbo oor na 'n organisasie om sy Bitbucket-trekversoeke te hersien.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Hierdie rekening het nog geen organisasies nie. Bitbucket-trekversoeke kan hersien word sodra jy 'n organisasie skep of by een aansluit.",
@@ -1034,7 +1034,7 @@
     },
     "linkPasteClipboardEmpty": "Die knipbord is leeg.",
     "linkPasteDenied": "Toegang om te plak is geweier. Laat plak toe en probeer weer.",
-    "linkPasteNotAPullRequest": "Dit is nie 'n skakel na 'n trekversoek of merge request nie",
+    "linkPasteNotAPullRequest": "Dit is nie 'n skakel na 'n trekversoek of 'n samesmeltingsversoek nie",
     "announce": {
       "commentPosted": "Kommentaar geplaas",
       "commentUpdated": "Kommentaar opgedateer",
@@ -1067,18 +1067,18 @@
     },
     "terms": {
       "pullRequest": "Trekversoek",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "Merge request !{{number}}",
-      "shareMergeRequest": "Deel merge request",
+      "mergeRequest": "Samesmeltingsversoek",
+      "mergeRequestNumber": "Samesmeltingsversoek !{{number}}",
+      "shareMergeRequest": "Deel samesmeltingsversoek",
       "viewOnProvider": "Bekyk op {{provider}}",
-      "mergeRequestUnavailable": "Merge request onbeskikbaar",
+      "mergeRequestUnavailable": "Samesmeltingsversoek onbeskikbaar",
       "unavailableDescription": "Die verbinding het dalk misluk, of die item is dalk uitgevee of ontoeganklik.",
-      "accessDeniedMergeRequest": "Jy het nie toestemming om hierdie merge request te bekyk nie.",
-      "couldNotLoadMergeRequest": "Kon nie die merge request laai nie.",
-      "discussionAccessDenied": "Jy het nie toestemming om hierdie merge request se bespreking te bekyk nie.",
-      "discussionUnavailableMessage": "Die verbinding het dalk misluk, of die merge request is dalk verwyder.",
-      "noDiscussionDescription": "Daar is nog geen hersieningsdrade of gesprekskommentare op hierdie merge request nie.",
-      "noFilesChangedDescription": "Hierdie merge request het geen lêerveranderings nie."
+      "accessDeniedMergeRequest": "Jy het nie toestemming om hierdie samesmeltingsversoek te bekyk nie.",
+      "couldNotLoadMergeRequest": "Kon nie die samesmeltingsversoek laai nie.",
+      "discussionAccessDenied": "Jy het nie toestemming om hierdie samesmeltingsversoek se bespreking te bekyk nie.",
+      "discussionUnavailableMessage": "Die verbinding het dalk misluk, of die samesmeltingsversoek is dalk verwyder.",
+      "noDiscussionDescription": "Daar is nog geen hersieningsdrade of gesprekskommentare op hierdie samesmeltingsversoek nie.",
+      "noFilesChangedDescription": "Hierdie samesmeltingsversoek het geen lêerveranderings nie."
     }
   },
   "notifications": {
@@ -1338,8 +1338,8 @@
       }
     },
     "manualReview": {
-      "invalidMergeRequestUrl": "Voer 'n geldige URL vir 'n merge request in.",
-      "mergeRequestUrl": "Merge request-URL",
+      "invalidMergeRequestUrl": "Voer 'n geldige URL vir 'n samesmeltingsversoek in.",
+      "mergeRequestUrl": "Samesmeltingsversoek-URL",
       "instructionsAtLimit": "Instruksies is beperk tot {{max}} karakters",
       "title": "Handmatige hersiening",
       "invalidUrl": "Voer 'n geldige URL vir 'n trekversoek in.",

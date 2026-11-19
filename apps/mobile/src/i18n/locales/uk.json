@@ -209,7 +209,7 @@
     "signInWithGoogle": "Увійти через Google",
     "signInWithPasskey": "Увійти з ключем доступу",
     "emailAddress": "Адреса електронної пошти",
-    "emailPlaceholder": "you@example.com",
+    "emailPlaceholder": "ви@example.com",
     "continueWithEmail": "Продовжити через електронну пошту",
     "enterCodeSentTo": "Введіть код, надісланий на {{email}}.",
     "codeArrivalHint": "Якщо для цієї адреси доступний вхід, код надійде протягом хвилини.",

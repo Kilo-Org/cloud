@@ -1384,8 +1384,8 @@
       }
     },
     "manualReview": {
-      "invalidMergeRequestUrl": "Įvesk tinkamą merge request URL",
-      "mergeRequestUrl": "Merge request adresas (URL)",
+      "invalidMergeRequestUrl": "Įvesk tinkamą sujungimo užklausos URL",
+      "mergeRequestUrl": "Sujungimo užklausos adresas (URL)",
       "instructionsAtLimit": "Instrukcijos ribojamos iki {{max}} simbolių.",
       "title": "Rankinė peržiūra",
       "invalidUrl": "Įvesk tinkamą PR URL",

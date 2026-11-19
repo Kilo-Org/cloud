@@ -209,7 +209,7 @@
     "signInWithGoogle": "Google ಮೂಲಕ ಸೈನ್ ಇನ್ ಮಾಡಿ",
     "signInWithPasskey": "ಪಾಸ್ಕೀ ಮೂಲಕ ಸೈನ್ ಇನ್ ಮಾಡಿ",
     "emailAddress": "ಇಮೇಲ್ ವಿಳಾಸ",
-    "emailPlaceholder": "you@example.com",
+    "emailPlaceholder": "ನೀವು@example.com",
     "continueWithEmail": "ಇಮೇಲ್‌ನೊಂದಿಗೆ ಮುಂದುವರಿಸಿ",
     "enterCodeSentTo": "{{email}} ಗೆ ಕಳುಹಿಸಿದ ಕೋಡ್ ನಮೂದಿಸಿ.",
     "codeArrivalHint": "ಈ ವಿಳಾಸವು ಅರ್ಹವಾಗಿದ್ದರೆ, ಕೋಡ್ ಒಂದು ನಿಮಿಷದೊಳಗೆ ಬರುತ್ತದೆ.",

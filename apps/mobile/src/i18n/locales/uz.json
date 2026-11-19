@@ -4232,7 +4232,7 @@
       "add": "Agent qo'shing",
       "empty": "Hali agentlar yo'q",
       "name": "Agent nomi",
-      "slug": "Agent slug",
+      "slug": "Agent slugi",
       "description": "Agent tavsifi",
       "model": "Modelni bekor qilish",
       "modelPlaceholder": "Standart seansdan foydalaning",

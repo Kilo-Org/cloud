@@ -209,7 +209,7 @@
     "signInWithGoogle": "تسجيل الدخول عبر Google",
     "signInWithPasskey": "تسجيل الدخول بمفتاح المرور",
     "emailAddress": "عنوان البريد الإلكتروني",
-    "emailPlaceholder": "you@example.com",
+    "emailPlaceholder": "anta@example.com",
     "continueWithEmail": "المتابعة عبر البريد الإلكتروني",
     "enterCodeSentTo": "أدخل الرمز المرسل إلى {{email}}.",
     "codeArrivalHint": "إذا كان هذا العنوان مؤهلًا لتسجيل الدخول، فسيصل الرمز خلال دقيقة.",

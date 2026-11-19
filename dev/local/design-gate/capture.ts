@@ -1003,6 +1003,20 @@ export async function runMatrix(
   const outcome: RunOutcome = { cells: [], findings: [], skipped: [] };
   const trees = new Map<string, LayoutTree>();
   let baseWindow: ProbeEnv['window'] | undefined;
+  // A forced state whose reset was not confirmed. It outlives the cell: every
+  // later target, in this cell or the next, would be measured in that state,
+  // so each cell first sends the reset again, and the run's restore does too.
+  let leaked: { link: string; reason: string } | undefined;
+  const retryLeakedReset = async (): Promise<string | undefined> => {
+    if (leaked === undefined) return undefined;
+    const failure = await openResetLink(ctx, leaked.link);
+    if (failure === undefined) {
+      ctx.log(`design-gate: the forced state is cleared now (${leaked.reason})`);
+      leaked = undefined;
+      return undefined;
+    }
+    return `${leaked.reason}; the reset is still unconfirmed: ${failure}`;
+  };
   let restored: Promise<unknown[]> | undefined;
   const restoreState = (): Promise<unknown[]> => {
     restored ??= (async () => {
@@ -1012,6 +1026,8 @@ export async function runMatrix(
       } catch (error) {
         errors.push(error);
       }
+      const leftState = await retryLeakedReset();
+      if (leftState !== undefined) errors.push(new Error(leftState));
       try {
         await ensureLanguage(ctx, baseline);
       } catch (error) {
@@ -1074,12 +1090,14 @@ export async function runMatrix(
       if (cellLanguage === undefined) continue;
       await ctx.clock.sleep(CONFIG_SETTLE_MS);
       const seen = new Map<string, string>();
-      // A forced state that could not be cleared would leak into every later
-      // target of this cell, so those targets are skipped, not measured.
-      let leakedState: string | undefined;
+      const leftState = await retryLeakedReset();
       for (const [index, target] of targets.entries()) {
-        if (leakedState !== undefined) {
-          outcome.skipped.push({ cell: config.id, target: target.id, reason: leakedState });
+        if (leaked !== undefined) {
+          outcome.skipped.push({
+            cell: config.id,
+            target: target.id,
+            reason: leftState ?? leaked.reason,
+          });
           continue;
         }
         try {
@@ -1100,8 +1118,8 @@ export async function runMatrix(
             if (target.after === undefined) return;
             const failure = await openResetLink(ctx, target.after);
             if (failure === undefined) return;
-            leakedState = `${target.id} left a forced state: ${failure}`;
-            ctx.log(`design-gate: ${leakedState}; the cell's later targets are skipped`);
+            leaked = { link: target.after, reason: `${target.id} left a forced state: ${failure}` };
+            ctx.log(`design-gate: ${leaked.reason}; later targets are skipped until a reset lands`);
           });
           const { dump } = sampled;
           run.env ??= dump.env;

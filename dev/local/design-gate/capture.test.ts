@@ -1492,3 +1492,27 @@ test('openResetLink reports a reset the app never confirms instead of throwing',
   const ctx = context(fakeDevice([], probeState()), probe);
   assert.equal(await openResetLink(ctx, CLEAR), `openLink ${CLEAR}: pending`);
 });
+
+test('an unconfirmed reset on the last target skips the next cell and fails the restore', async () => {
+  const state = probeState();
+  const sends: string[] = [];
+  const probe: ProbeClient = {
+    ...fakeProbe(state),
+    openLink: async url => {
+      sends.push(url);
+      state.open?.(url);
+    },
+    lastOutcome: async () => `openLink ${CLEAR}: failed (no route)`,
+  };
+  const ctx = context(fakeDevice([], state), probe);
+  const result = await runMatrix(ctx, matrixCells('android', 'base', ['dark']), [
+    { id: 'forced', link: 'kiloapp://forced', after: CLEAR },
+  ]);
+  assert.deepEqual(
+    result.skipped.map(entry => `${entry.cell}/${entry.target}`),
+    ['dark/forced']
+  );
+  assert.match(result.restoreError ?? '', /forced left a forced state.*still unconfirmed/);
+  // Two sends after the capture, two at the next cell, two in the restore.
+  assert.equal(sends.filter(url => url === CLEAR).length, 6);
+});

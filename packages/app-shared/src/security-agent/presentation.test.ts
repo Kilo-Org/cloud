@@ -19,6 +19,7 @@ import {
   getSupersedingFindingId,
   hasRegisteredRemediationAttempt,
   isActiveRemediationStatus,
+  isSupersededFinding,
   remediationNeedsAnalysisRefresh,
   type SecurityFinding,
   type SecurityFindingAnalysis,
@@ -497,6 +498,31 @@ describe('getSupersedingFindingId', () => {
       getSupersedingFindingId(makeFinding({ status: 'ignored', ignored_reason: 'not_exploitable' }))
     ).toBeNull();
     expect(getSupersedingFindingId(makeFinding({ status: 'open' }))).toBeNull();
+  });
+});
+
+describe('isSupersededFinding', () => {
+  it('is true only for an ignored finding that names its replacement', () => {
+    expect(
+      isSupersededFinding(
+        makeFinding({ status: 'ignored', ignored_reason: 'superseded:finding-2' })
+      )
+    ).toBe(true);
+  });
+
+  it('is false for a dismissed finding without a replacement', () => {
+    expect(
+      isSupersededFinding(makeFinding({ status: 'ignored', ignored_reason: 'not_used' }))
+    ).toBe(false);
+  });
+
+  it('is false when a row kept the replacement reference after leaving ignored', () => {
+    // Both surfaces derive their superseding id through this predicate, so a
+    // stale reference on a fixed row must not read as superseded.
+    expect(
+      isSupersededFinding(makeFinding({ status: 'fixed', ignored_reason: 'superseded:finding-2' }))
+    ).toBe(false);
+    expect(isSupersededFinding(makeFinding({ status: 'open' }))).toBe(false);
   });
 });
 

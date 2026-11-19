@@ -84,6 +84,7 @@ import {
   getFindingSourceLabel,
   getSupersedingFindingId as getSharedSupersedingFindingId,
   hasRegisteredRemediationAttempt as hasRegisteredRemediationAttemptShared,
+  isSupersededFinding,
   remediationNeedsAnalysisRefresh as remediationNeedsAnalysisRefreshShared,
 } from '@kilocode/app-shared/security-agent';
 
@@ -268,8 +269,11 @@ function formatSource(source: string): string {
   return getFindingSourceLabel(source);
 }
 
+// The reference only counts while the row is still ignored: the shared
+// predicate owns that rule, so the hero, the actions and the facts below cannot
+// disagree with the retirement badge about the same finding.
 function getSupersedingFindingId(finding: SecurityFinding): string | null {
-  return getSharedSupersedingFindingId(finding);
+  return isSupersededFinding(finding) ? getSharedSupersedingFindingId(finding) : null;
 }
 
 function getDismissalReason(reason: string | null): string {

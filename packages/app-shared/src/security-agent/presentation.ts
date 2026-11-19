@@ -277,7 +277,13 @@ export function getSupersedingFindingId(finding: SecurityFinding): string | null
   return findingId || null;
 }
 
-function isSupersededFinding(finding: SecurityFinding): boolean {
+/**
+ * Whether the finding is superseded: an ignored row that names the current
+ * finding which replaced it. Both surfaces derive their superseding id and
+ * badge from this, so a row that moved on from `ignored` is never called
+ * superseded while the rest of the row says otherwise.
+ */
+export function isSupersededFinding(finding: SecurityFinding): boolean {
   return finding.status === 'ignored' && getSupersedingFindingId(finding) !== null;
 }
 

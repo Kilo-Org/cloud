@@ -32,10 +32,14 @@ function RowSkeleton() {
   );
 }
 
-/** Three placeholder cards in the list's own gutter and section gap. */
+/**
+ * Three placeholder cards on the loaded rows' own gutter and section gap. The
+ * cards carry the page gutter themselves, exactly as `RequestLogRow` does;
+ * adding one to the wrapper would inset every placeholder twice.
+ */
 export function RequestLogsSkeleton() {
   return (
-    <View className="gap-3 px-4 pt-3">
+    <View className="gap-3 pt-3">
       <RowSkeleton />
       <RowSkeleton />
       <RowSkeleton />

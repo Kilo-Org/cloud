@@ -29,7 +29,10 @@ vi.mock('react-i18next', async importOriginal => {
   };
 });
 vi.mock('expo-router', () => ({ useRouter: () => router }));
-vi.mock('@/components/ui/icons', () => ({ ArrowLeft: 'ArrowLeft', SearchX: 'SearchX' }));
+vi.mock('@/components/ui/icons', () => ({ SearchX: 'SearchX' }));
+vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalArrowLeft: 'DirectionalArrowLeft',
+}));
 vi.mock('@/components/empty-state', () => ({
   StateAction: 'StateAction',
   EmptyState: (props: { action?: React.ReactNode }) =>

@@ -56,6 +56,7 @@ const native = vi.hoisted(() => {
 vi.mock('@/components/centered-state-surface', () => ({ useStateSurface: () => native.surface }));
 vi.mock('@/lib/utils', () => ({ cn: (...values: unknown[]) => values.filter(Boolean).join(' ') }));
 vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false },
   PixelRatio: { roundToNearestPixel: (value: number) => Math.round(value * 2) / 2 },
   // Portrait by default, so the short-band flag the scroller publishes stays
   // false and a state inside it keeps its full stack.

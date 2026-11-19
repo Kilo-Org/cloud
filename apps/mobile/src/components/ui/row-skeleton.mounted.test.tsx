@@ -2,6 +2,7 @@
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { SWITCH_HOST_CLASS } from '@/lib/a11y/tap-target';
 import { act, TestRenderer } from '@/test/renderer';
 
 import { ROW_FRAME_CLASS, ROW_TILE_CLASS } from './row-frame';
@@ -99,11 +100,17 @@ describe('RowSkeleton', () => {
     );
   });
 
-  it('reserves the switch a preference row ends in', () => {
-    const bars = skeletons(renderSkeleton({ trailing: 'switch' }));
-    const toggle = bars.at(-1);
+  it('reserves the switch a preference row ends in, on the loaded control frame', () => {
+    const root = renderSkeleton({ trailing: 'switch' });
+    const toggle = first(skeletons(root).at(-1));
+    const host = first(toggle.parent ?? undefined);
 
-    expect(classesOf(first(toggle))).toEqual(expect.arrayContaining(['rounded-full', 'shrink-0']));
+    expect(classesOf(toggle)).toEqual(
+      expect.arrayContaining(['h-[31px]', 'rounded-full', 'shrink-0'])
+    );
+    // A loaded switch row is 48pt because its 44pt node cancels the row's
+    // overhang; a pill hosted without that cancel would set a 52pt row.
+    expect(classesOf(host)).toEqual(expect.arrayContaining(SWITCH_HOST_CLASS.split(' ')));
   });
 
   it('stacks the leading cell above the text block in a narrow window', () => {

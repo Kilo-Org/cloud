@@ -2,7 +2,7 @@ import { View } from 'react-native';
 
 import { ROW_FRAME_CLASS, ROW_FRAME_STACK_CLASS, ROW_TILE_CLASS } from '@/components/ui/row-frame';
 import { Skeleton } from '@/components/ui/skeleton';
-import { COMPACT_CONTROL_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { COMPACT_CONTROL_BOX_CLASS, SWITCH_HOST_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 /** The hue strip, at the 3pt bar the session row draws. */
@@ -15,7 +15,12 @@ const EYEBROW_BAR_CLASS = 'h-2 w-24 max-w-full rounded bg-muted-soft';
 const META_BAR_CLASS = 'h-3 w-20 shrink-0 rounded bg-muted-soft';
 /** The compact box a row's trailing icon control occupies, so the loaded row is no taller than its placeholder. */
 const TRAILING_CONTROL_CLASS = 'shrink-0 rounded-lg bg-muted-soft';
-/** The switch's own pill, so the loaded control does not move the row it sits in. */
+/**
+ * The switch's own pill, painted inside {@link SWITCH_HOST_CLASS}. The host
+ * reserves the loaded control's 44pt node and cancels the same overhang, so the
+ * placeholder hands the row the 27pt content band the loaded switch does
+ * instead of setting a 52pt row from the pill's 31pt height.
+ */
 const TRAILING_SWITCH_CLASS = 'h-[31px] w-[51px] shrink-0 rounded-full bg-muted-soft';
 
 type RowSkeletonProps = {
@@ -102,7 +107,11 @@ export function RowSkeleton({
           ) : (
             <View className="flex-1" />
           )}
-          {trailing === 'switch' ? <Skeleton className={TRAILING_SWITCH_CLASS} /> : null}
+          {trailing === 'switch' ? (
+            <View className={SWITCH_HOST_CLASS}>
+              <Skeleton className={TRAILING_SWITCH_CLASS} />
+            </View>
+          ) : null}
           {trailingControl ? (
             <Skeleton className={cn(COMPACT_CONTROL_BOX_CLASS, TRAILING_CONTROL_CLASS)} />
           ) : null}
@@ -124,7 +133,11 @@ export function RowSkeleton({
         {lineCount > 1 ? <Skeleton className={SUBTITLE_BAR_CLASS} /> : null}
         {lineCount > 2 ? <Skeleton className={SECOND_SUBTITLE_BAR_CLASS} /> : null}
       </View>
-      {trailing === 'switch' ? <Skeleton className={TRAILING_SWITCH_CLASS} /> : null}
+      {trailing === 'switch' ? (
+        <View className={SWITCH_HOST_CLASS}>
+          <Skeleton className={TRAILING_SWITCH_CLASS} />
+        </View>
+      ) : null}
       {trailingControl ? (
         <Skeleton className={cn(COMPACT_CONTROL_BOX_CLASS, TRAILING_CONTROL_CLASS)} />
       ) : null}

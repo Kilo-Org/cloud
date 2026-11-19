@@ -295,6 +295,9 @@ function CardBody({
   if (status.state === 'disconnected') {
     // The plain connect state. A returned or local connect failure takes the
     // branch above, so this body is only reached without an error code.
+    // This card never receives `reconnect_required`: only the organization's
+    // shared-services owner scope produces that state, and this card manages
+    // the caller's own connection.
     return (
       <>
         <p className="type-body text-muted-foreground">

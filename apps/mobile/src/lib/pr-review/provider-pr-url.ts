@@ -14,7 +14,7 @@
 
 import { type ProviderPrRef } from '@kilocode/app-shared/provider-review';
 
-import { parseGitHubPrUrl } from '@/lib/github-pr-url';
+import { parseGitHubPrUrl, tidyReviewLinkCandidate } from '@/lib/github-pr-url';
 
 const MERGE_REQUESTS_SEGMENT = 'merge_requests';
 const PULL_REQUESTS_SEGMENT = 'pull-requests';
@@ -175,13 +175,15 @@ function parseBitbucketPrUrl(url: SplitUrl): ProviderPrRef | null {
 /**
  * Parse a pasted/shared PR/MR URL into the provider identity it names.
  *
- * GitHub (`github.com` only — the GitHub App serves no Enterprise host),
- * GitLab merge requests on ANY host including self-managed instances, and
- * Bitbucket Cloud pull requests. Returns `null` for anything else, so the
- * caller can show its invalid-link state.
+ * The candidate first passes through `tidyReviewLinkCandidate`, so review-link
+ * decoration (markdown/quoted/paren wrappers, trailing sentence punctuation)
+ * does not hide an otherwise parseable PR/MR link. GitHub (`github.com` only —
+ * the GitHub App serves no Enterprise host), GitLab merge requests on ANY host
+ * including self-managed instances, and Bitbucket Cloud pull requests. Returns
+ * `null` for anything else, so the caller can show its invalid-link state.
  */
 export function parseProviderPrUrl(href: string): ProviderPrRef | null {
-  const trimmed = href.trim();
+  const trimmed = tidyReviewLinkCandidate(href);
   if (trimmed.length === 0) {
     return null;
   }
@@ -200,8 +202,11 @@ export function parseProviderPrUrl(href: string): ProviderPrRef | null {
  * Find the first provider review URL in free text — a shared link, a title
  * with the URL appended, or a message body. The whole trimmed string is tried
  * first, then each whitespace-separated token, so surrounding words do not
- * hide the URL. Returns `null` when nothing parses, so a URL that matches no
- * provider keeps rendering as plain text.
+ * hide the URL. When those fail, the tidy of the whole text (and of each of
+ * its whitespace tokens) is retried once — that peels review-link decoration
+ * such as a markdown link or a trailing sentence period. Returns `null` when
+ * nothing parses, so a URL that matches no provider keeps rendering as plain
+ * text.
  */
 export function findFirstProviderPrUrl(text: string): ProviderPrRef | null {
   if (text.length === 0) {
@@ -213,6 +218,30 @@ export function findFirstProviderPrUrl(text: string): ProviderPrRef | null {
     return whole;
   }
   for (const token of trimmed.split(/\s+/)) {
+    const parsed = parseProviderPrUrl(token);
+    if (parsed) {
+      return parsed;
+    }
+  }
+  // A markdown link's title may hold the text's only spaces, so its
+  // `[title](url)` shape survives no whitespace token. The whole string gets
+  // the tidy retry FIRST (one peel round for every layer — markdown, quotes,
+  // trailing punctuation), then its tokens; the tidied-token pass catches a
+  // decorated URL beside undecorated prose. Plain parsing above still wins
+  // when text and URL need no peeling.
+  const tidiedWhole = tidyReviewLinkCandidate(trimmed);
+  const tidied = parseProviderPrUrl(tidiedWhole);
+  if (tidied) {
+    return tidied;
+  }
+  for (const token of trimmed.split(/\s+/)) {
+    const tidiedToken = tidyReviewLinkCandidate(token);
+    const parsed = parseProviderPrUrl(tidiedToken);
+    if (parsed) {
+      return parsed;
+    }
+  }
+  for (const token of tidiedWhole.split(/\s+/)) {
     const parsed = parseProviderPrUrl(token);
     if (parsed) {
       return parsed;

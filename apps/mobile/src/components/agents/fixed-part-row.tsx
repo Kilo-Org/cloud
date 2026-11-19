@@ -1,5 +1,5 @@
 import { AlertTriangle, type LucideIcon, XCircle } from '@/components/ui/icons';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { RowChevron } from '@/components/ui/row-chevron';
 import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +11,12 @@ import { useToolSummaryItemId } from './tool-summary-translation-scope';
 import { cn } from '@/lib/utils';
 
 import { useMessageLongPress } from './message-long-press-context';
+
+/**
+ * The status icon's square. The leading slot holds the same box in every status,
+ * so a pending spinner never sizes the row.
+ */
+const STATUS_ICON_SIZE_DP = 16;
 
 /**
  * The localized translation-failure indicator at the row's end: a text badge,
@@ -154,12 +160,19 @@ export function FixedPartRow({
           // resolved (iOS and Android alike). Pin the spinner to the icon's
           // square: the leading slot is then identical in every status and the
           // label, not the spinner, sizes the row.
-          <View className="size-[16px] items-center justify-center">
+          <View
+            className="items-center justify-center"
+            style={{ width: STATUS_ICON_SIZE_DP, height: STATUS_ICON_SIZE_DP }}
+          >
             <ActivityIndicator size="small" color={colors.mutedForeground} />
           </View>
         ) : null}
-        {status === 'error' ? <XCircle size={16} color={colors.destructive} /> : null}
-        {status === 'completed' && Icon ? <Icon size={16} color={colors.mutedForeground} /> : null}
+        {status === 'error' ? (
+          <XCircle size={STATUS_ICON_SIZE_DP} color={colors.destructive} />
+        ) : null}
+        {status === 'completed' && Icon ? (
+          <Icon size={STATUS_ICON_SIZE_DP} color={colors.mutedForeground} />
+        ) : null}
 
         {/* Baseline, not center: the label is text-sm and the badge text-xs, so
             centering the line boxes drops the badge below the label. */}
@@ -175,7 +188,7 @@ export function FixedPartRow({
           {failed ? <TranslationFailureIndicator iconOnly={failureIcon} /> : null}
         </View>
 
-        {onPress ? <DirectionalChevronRight size={14} color={colors.mutedForeground} /> : null}
+        {onPress ? <RowChevron /> : null}
       </Pressable>
     </View>
   );

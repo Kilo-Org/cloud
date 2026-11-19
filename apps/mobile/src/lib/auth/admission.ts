@@ -23,8 +23,11 @@ export type AdmissionPayload = {
 };
 
 /**
- * Error thrown when the admission challenge endpoint is unreachable
- * (5xx or network error).  Callers map this to a retryable sign-in message.
+ * Error thrown when the admission challenge could not be obtained — the
+ * endpoint answers a non-ok response, the request fails (network error), or
+ * the challenge body fails schema validation; `resolveAdmission` also rethrows
+ * this sentinel for every provider failure.  Callers map this to a retryable
+ * sign-in message.
  */
 export const ADMISSION_CHALLENGE_FAILED = 'admission_challenge_failed';
 

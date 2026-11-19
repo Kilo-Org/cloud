@@ -348,6 +348,16 @@ describe('continueHostedWorkspace fresh success', () => {
     expect(result.sessions.map(source => source.agent.variant)).toEqual(['high', 'high']);
   });
 
+  it.each([
+    { egressMode: 'allowlist', egressAllowlist: ['registry.npmjs.org'], egressAudit: true },
+    { egressAudit: true },
+    { egressAudit: false },
+  ])('preserves the resolved workspace runtime policy: %j', async runtime => {
+    mocks.preflightSessionCreation.mockImplementation(async request => ({ ...request, runtime }));
+    await caller().continueHostedWorkspace(INPUT);
+    expect(mocks.createSessionWithLedger.mock.calls[0]?.[0].runtime).toEqual(runtime);
+  });
+
   it('passes the preflight environment allocation to root creation', async () => {
     mocks.preflightSessionCreation.mockImplementation(async request => ({
       ...request,

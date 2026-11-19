@@ -81,7 +81,10 @@ export type AppleAttestError =
   | 'NONCE_MISMATCH'
   | 'KEY_ID_MISMATCH';
 
-export type AppleAssertionError = 'INVALID_ASSERTION' | 'KEY_NOT_FOUND';
+// The key-not-found outcome is owned by the caller (`verifyAppleAdmission` in
+// native-admission.ts), which resolves the key before calling this verifier,
+// so this verifier only ever reports an invalid assertion.
+export type AppleAssertionError = 'INVALID_ASSERTION';
 
 /**
  * The clientDataHash App Attest binds a challenge with.

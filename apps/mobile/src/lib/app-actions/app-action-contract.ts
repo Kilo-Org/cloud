@@ -440,9 +440,6 @@ function requestFromPayload(payload: AppActionPayload): AppActionRequest | null 
   if (request !== null) {
     return request;
   }
-  // `buildRequest` for `StartAgent` is null exactly when neither a prompt nor a
-  // session was usable: hand it to the action path for the `empty-prompt`
-  // refusal instead of rejecting the whole payload as unrecognized.
   if (id === 'StartAgent') {
     return { action: 'StartAgent', prompt: fields.prompt ?? '' };
   }

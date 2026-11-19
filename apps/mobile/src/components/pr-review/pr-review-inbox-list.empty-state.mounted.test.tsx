@@ -53,7 +53,10 @@ vi.mock('@shopify/flash-list', async () => {
     },
   };
 });
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
   PrReviewReconnectNotice: 'PrReviewReconnectNotice',
@@ -102,6 +105,7 @@ vi.mock('@/lib/pr-review/use-provider-inbox', () => ({
   }),
 }));
 vi.mock('@/lib/utils', () => ({
+  cn: (...classes: unknown[]) => classes.flat().filter(Boolean).join(' '),
   parseTimestamp: (value: string) => new Date(value),
   timeAgo: () => 'just now',
 }));

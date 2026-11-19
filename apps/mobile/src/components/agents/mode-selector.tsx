@@ -1,4 +1,4 @@
-import { Pressable } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { type Href, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown } from '@/components/ui/icons';
@@ -7,17 +7,21 @@ import { getBuiltinModeLabelKey, getModeIcon } from '@/components/agents/mode-op
 import {
   type AgentMode,
   dedupeCustomModeOptions,
-  ensureSelectedCustomOption,
   isBuiltinAgentMode,
   type ModeOption,
   normalizeAgentMode,
 } from '@/components/agents/mode-normalize';
 import { Text } from '@/components/ui/text';
-import { CHIP_HIT_SLOP } from '@/lib/a11y/tap-target';
+import {
+  CHIP_HIT_SLOP,
+  FIELD_TRIGGER_BODY_CLASS,
+  FIELD_TRIGGER_FRAME_CLASS,
+} from '@/lib/a11y/tap-target';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { parseParam } from '@/lib/route-params';
 import { modePickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
+import { cn } from '@/lib/utils';
 
 export type { AgentMode };
 
@@ -26,6 +30,12 @@ type ModeSelectorProps = {
   onChange: (mode: AgentMode) => void;
   disabled?: boolean;
   customOptions?: ModeOption[];
+  /**
+   * `chip` (default) is the composer's pill beside the model chip; `field` is
+   * a form's select box, the shared trigger frame the repository and model
+   * fields use, so a form shows one picker style. The caller labels the field.
+   */
+  presentation?: 'chip' | 'field';
 };
 
 export function ModeSelector({
@@ -33,6 +43,7 @@ export function ModeSelector({
   onChange,
   disabled = false,
   customOptions = [],
+  presentation = 'chip',
 }: Readonly<ModeSelectorProps>) {
   const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
@@ -40,12 +51,13 @@ export function ModeSelector({
   const { 'session-id': rawSessionId } = useLocalSearchParams<{ 'session-id'?: string }>();
   const selectedValue = normalizeAgentMode(value);
   const customOptionsDeduped = dedupeCustomModeOptions(customOptions);
-  const selectedCustomOption = ensureSelectedCustomOption(customOptionsDeduped, selectedValue).find(
-    m => m.value === selectedValue
-  );
+  const customMatch = customOptionsDeduped.find(option => option.value === selectedValue);
+  // An empty label means no loaded option names this mode, so the chip falls
+  // back to the generic label rather than printing the slug.
+  const customLabel = customMatch?.label ?? '';
   const selectedLabel = isBuiltinAgentMode(selectedValue)
     ? t(getBuiltinModeLabelKey(selectedValue) ?? '')
-    : (selectedCustomOption?.label ?? selectedValue);
+    : customLabel || t('agentChat.modeSelector.customMode');
   const ModeIcon = getModeIcon(selectedValue);
 
   function handlePress() {
@@ -61,24 +73,51 @@ export function ModeSelector({
     pushOnce(`/(app)/agent-chat/mode-picker?routeKey=${encodeURIComponent(routeKey)}` as Href);
   }
 
+  const pressableProps = {
+    onPress: handlePress,
+    disabled,
+    accessibilityRole: 'button' as const,
+    accessibilityLabel: t('agentChat.modeSelector.accessibility', { label: selectedLabel }),
+    accessibilityState: { disabled },
+  };
+  // The label stays at full theme contrast; a disabled picker dims only its
+  // icon so the text keeps the WCAG AA 4.5:1 ratio (D2).
+  const modeIcon = (
+    <ModeIcon size={14} color={disabled ? colors.mutedForeground : colors.foreground} />
+  );
+  const modeLabel = (
+    <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
+      {selectedLabel}
+    </Text>
+  );
+
+  if (presentation === 'field') {
+    return (
+      <Pressable
+        {...pressableProps}
+        className={cn(FIELD_TRIGGER_FRAME_CLASS, !disabled && 'active:opacity-70')}
+      >
+        <View className={cn(FIELD_TRIGGER_BODY_CLASS, 'justify-between')}>
+          <View className="min-w-0 shrink flex-row items-center gap-1.5">
+            {modeIcon}
+            {modeLabel}
+          </View>
+          <ChevronDown size={16} color={colors.mutedForeground} />
+        </View>
+      </Pressable>
+    );
+  }
+
   return (
     <Pressable
-      onPress={handlePress}
-      disabled={disabled}
+      {...pressableProps}
       // The pill's own 27.81pt frame is the visual; the vertical slop carries
       // its touch region past the 44pt design target without growing the row.
       hitSlop={CHIP_HIT_SLOP}
-      accessibilityRole="button"
-      accessibilityLabel={t('agentChat.modeSelector.accessibility', { label: selectedLabel })}
-      accessibilityState={{ disabled }}
       className="shrink-0 flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70"
     >
-      {/* The label stays at full theme contrast; a disabled chip dims only its
-       * icon so the pill text keeps the WCAG AA 4.5:1 ratio (D2). */}
-      <ModeIcon size={14} color={disabled ? colors.mutedForeground : colors.foreground} />
-      <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
-        {selectedLabel}
-      </Text>
+      {modeIcon}
+      {modeLabel}
       <ChevronDown size={14} color={colors.mutedForeground} />
     </Pressable>
   );

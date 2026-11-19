@@ -28,6 +28,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { InputFrame } from '@/components/ui/input-frame';
 import { RemainingCharactersCounter } from '@/components/ui/remaining-characters-counter';
 import {
   type ComposerSelection,
@@ -53,7 +54,6 @@ import { NewSessionPromptClone } from '@/components/agents/new-session-prompt-cl
 import { NewSessionPromptControls } from '@/components/agents/new-session-prompt-controls';
 import { type NewSessionPromptProps } from '@/components/agents/new-session-prompt-types';
 import { hasVisibleComposerText } from '@/lib/composer-text';
-import { QueryError } from '@/components/query-error';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useSharePrefill } from '@/lib/share-prefill';
 import { SharePrefillFailure } from '@/components/agents/share-prefill-failure';
@@ -516,38 +516,28 @@ export function NewSessionPrompt({
   }
 
   return (
-    <View className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-[#0000000D]">
+    <InputFrame className="overflow-hidden">
       <View
         className="pb-2"
         onLayout={event => {
           setTopChromeHeight(event.nativeEvent.layout.height);
         }}
       >
-        {isModelsError && modelOptions.length === 0 ? (
-          <QueryError
-            placement="top"
-            variant="server"
-            title={t('agentChat.newSession.couldNotLoadModels')}
-            message={t('organization.boundary.loadErrorMessage')}
-            onRetry={() => {
-              onRefetchModels();
-            }}
-            className="border-b border-border py-4"
-          />
-        ) : (
-          <ChatToolbar
-            modeControl={{ mode, onModeChange, customOptions }}
-            model={model}
-            variant={variant}
-            modelOptions={modelOptions}
-            onModelSelect={onModelSelect}
-            disabled={isCreating}
-            isLoadingModels={isLoadingModels}
-            modelLocked={modelLocked}
-            modelLockLabel={modelLockLabel}
-            className="border-b border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
-          />
-        )}
+        {/* A failed models read keeps the toolbar: the pinned footer names that
+            failure as the reason Start waits and carries its Retry, so the
+            composer does not state it a second time above the prompt. */}
+        <ChatToolbar
+          modeControl={{ mode, onModeChange, customOptions }}
+          model={model}
+          variant={variant}
+          modelOptions={modelOptions}
+          onModelSelect={onModelSelect}
+          disabled={isCreating}
+          isLoadingModels={isLoadingModels}
+          modelLocked={modelLocked}
+          modelLockLabel={modelLockLabel}
+          className="border-b-[0.5px] border-hair-soft bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
+        />
         {sharePrefill.failed ? (
           <SharePrefillFailure
             onRetry={() => {
@@ -704,6 +694,6 @@ export function NewSessionPrompt({
           </NewSessionPromptControls>
         </View>
       </View>
-    </View>
+    </InputFrame>
   );
 }

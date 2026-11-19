@@ -4,33 +4,28 @@ import { selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
-import { ChevronDown, Eye, EyeOff } from '@/components/ui/icons';
-import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import { Eye, EyeOff } from '@/components/ui/icons';
+import { Pressable, ScrollView, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
-import { AddCreditsButton, AddCreditsRow } from '@/components/add-credits-row';
 import { BalanceBlock, type BalanceBlockState } from '@/components/profile-balance-block';
-import { useContextPicker } from '@/components/context-control';
 import { CreditExpiryNote } from '@/components/credits/credit-expiry-note';
 import { PersonalCreditsLinks } from '@/components/credits/credits-links';
 import { KiloPassSubscriptionCard } from '@/components/kilo-pass/kilo-pass-subscription-card';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { useCanLinkExternalPurchase } from '@/lib/billing/external-purchase-link';
 import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
-import {
-  ICON_TARGET_BOX_CLASS,
-  LINE_ACTION_BOX_CLASS,
-  LINE_ACTION_HIT_SLOP,
-  STATE_ACTION_CLASS,
-} from '@/lib/a11y/tap-target';
+import { openExternalUrl } from '@/lib/external-link';
+import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatPrefixedMoney } from '@/lib/format';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isMoneyRole, type OrgListEntry } from '@/lib/hooks/use-organization-queries';
-import { isNarrowLayout } from '@/lib/narrow-layout';
 import { useOrganization } from '@/lib/organization-context';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
@@ -39,12 +34,11 @@ import { cn } from '@/lib/utils';
 
 /**
  * The memberships the Profile screen's `organizations.list` read stands in.
- * The card draws two things from it: the names in the account picker and a
- * money role's own balance. The second cannot come from `getContextBalance`,
- * which answers `$0.00` for a `billing_manager`, so an `undefined` list would
- * paint a money role's organization as empty. Keeping "not answered yet" and
- * "could not load" apart lets the card hold its skeleton and its retry surface
- * apart too.
+ * The card needs them for one thing: a money role's own balance. That cannot
+ * come from `getContextBalance`, which answers `$0.00` for a
+ * `billing_manager`, so an `undefined` list would paint a money role's
+ * organization as empty. Keeping "not answered yet" and "could not load" apart
+ * lets the card hold its skeleton and its retry surface apart too.
  */
 export type CreditsCardOrgList =
   | { status: 'loading' }
@@ -76,7 +70,6 @@ export function CreditsCard({ enabled, orgList }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
   const router = useRouter();
-  const { width } = useWindowDimensions();
   const fontScale = useLiveFontScale();
   const [availableWidth, setAvailableWidth] = useState<number | null>(null);
   // Stack the balance unless the expiry note keeps its two lines beside the
@@ -87,21 +80,15 @@ export function CreditsCard({ enabled, orgList }: Readonly<CreditsCardProps>) {
   // dp. The threshold stacks below 370 of them and uses the card's width rather
   // than the display's; below it the note takes a row of its own at full width.
   const stackBalance = availableWidth === null || availableWidth / fontScale < 370;
-  // Below NARROW_LAYOUT_WIDTH the account picker's 65% share leaves the
-  // "CREDITS" eyebrow too little room for one word and Android breaks it
-  // mid-word ("CREDIT S", 160 dp, e1, 2026-09-21). Stacking gives each line the
-  // row's full width.
-  const narrow = isNarrowLayout(width);
   const { t, i18n } = useTranslation();
-  // The picker and the organization names still read a plain list: only a
-  // settled read can name an account, and the card's own states above already
-  // own the pending and failed windows.
+  // The picker no longer lives here: only a settled read can name an account
+  // and carry a role, so this local feeds the balance lookup alone.
   const orgs = orgList.status === 'ready' ? orgList.orgs : undefined;
-  const { openPicker } = useContextPicker(orgs);
   const { organizationId, error, isSaving, retry } = useOrganization();
   const selectedOrgId = organizationId ?? undefined;
 
   const { hideBalance, hasLoaded: hideBalanceLoaded, setHideBalance } = useHideBalancePreference();
+  const canLinkExternalPurchase = useCanLinkExternalPurchase();
   const { userId, isError: userIdError, refetch: refetchUserId } = useCurrentUserId({ enabled });
   const hasUserId = userId !== undefined;
 
@@ -156,6 +143,23 @@ export function CreditsCard({ enabled, orgList }: Readonly<CreditsCardProps>) {
   // the balance error surface. Retry re-resolves the owner and re-fetches.
   const balanceReadFailed = balanceQueryError || userIdError;
 
+  // The credit reads are gated on `hasUserId`, so with a failed identity read
+  // they can never answer. A money role's amount still paints — it comes from
+  // the membership row — so the note slot carries that branch's exit instead.
+  const identityReadBlocked = userIdError && !hasUserId;
+
+  // A failed membership list is this surface's own failure for an organization
+  // context, and only a fresh list can tell the card which balance that context
+  // is owed, so the retry re-reads it too. The note slot's identity exit reads
+  // the same control, so it is defined before that slot is built.
+  const retryBalance = () => {
+    if (orgList.status === 'error') {
+      orgList.retry();
+    }
+    refetchUserId();
+    void refetchBalance();
+  };
+
   // Where the painted amount comes from. A money role (owner/admin/
   // billing_manager) manages the organization's money, so the card shows the
   // organization's own balance from `organizations.list` — the figure the
@@ -184,10 +188,9 @@ export function CreditsCard({ enabled, orgList }: Readonly<CreditsCardProps>) {
 
   // Microdollars for a money role's organization, dollars from the member read
   // everywhere else.
-  const balanceDollars =
-    selectedEntry !== undefined && paintsOrgListBalance
-      ? fromMicrodollars(selectedEntry.balance)
-      : (balance?.balance ?? 0);
+  const balanceDollars = paintsOrgListBalance
+    ? fromMicrodollars(selectedEntry.balance)
+    : (balance?.balance ?? 0);
   // One amount for the painted value and its spoken label: a label that stops
   // being passed keeps its old native value, so the shown amount would
   // otherwise still be announced as the hidden one.
@@ -223,12 +226,6 @@ export function CreditsCard({ enabled, orgList }: Readonly<CreditsCardProps>) {
       (!paintsOrgListBalance && (balanceLoading || balancePending || balancePlaceholder)) ||
       !hideBalanceLoaded);
 
-  const selectedLabel = selectedOrgId
-    ? (selectedEntry?.organizationName ?? t('common.organization'))
-    : t('common.personal');
-
-  const canPickContext = orgs !== undefined;
-
   // Personal credits are a consumable bought in-app, so the personal row is
   // shown on every platform and at any balance — a funded user must still be
   // able to top up. Org billing stays a web flow and only members who can
@@ -239,11 +236,12 @@ export function CreditsCard({ enabled, orgList }: Readonly<CreditsCardProps>) {
   // The member amount's scope: `getContextBalance` is the viewer's own spend
   // balance — a plain member's daily allowance, capped by the organization's
   // balance — not the organization's balance, so the row says which figure it
-  // paints. It sits in the note slot from the first frame of that branch, in
-  // its skeleton and failure states as well, so the slot never changes height
-  // when the amount lands.
+  // paints. It waits for the settled membership entry, because until the role
+  // is known the caption would claim a scope the amount may not paint. Once the
+  // role settles, the member branch keeps a row in this slot in its skeleton and
+  // failure states too, so the slot never changes height as the amount lands.
   const organizationScopeNote =
-    selectedOrgId != null && !paintsOrgListBalance ? (
+    selectedEntry !== undefined && !isMoneyRole(selectedEntry.role) ? (
       <Text className="text-xs text-muted-foreground">
         {t('profile.availableToSpendInOrganization')}
       </Text>
@@ -251,17 +249,37 @@ export function CreditsCard({ enabled, orgList }: Readonly<CreditsCardProps>) {
 
   // The note slot: the scope caption, then the expiry note, under the amount.
   // No entrance fade — the caption holds a row of this block, so a fade that
-  // paints it late leaves it empty.
+  // paints it late leaves it empty. A failing identity read joins the failure
+  // state: its credits can never load, and a money role's amount still paints
+  // from the membership row, so its exit lives here instead of over the amount.
+  const creditsNoteFailed = creditsFailed || identityReadBlocked;
+  // Only the painting branch needs this exit: everywhere else the identity
+  // failure owns the whole block, whose own retry already re-reads it.
+  const identityNoteExit = identityReadBlocked && paintsOrgListBalance;
   const noteSlot = (
     <>
       {organizationScopeNote}
-      {creditsFailed && (
-        <Text className="text-xs text-muted-foreground">{t('credits.expiryUnavailable')}</Text>
-      )}
-      {!creditsFailed && creditsPending && (
+      {creditsNoteFailed &&
+        (identityNoteExit ? (
+          <View>
+            <AccessibleStatus message={t('credits.expiryUnavailable')} className="text-sm" />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('common.retry')}
+              accessibilityHint={t('credits.expiryUnavailable')}
+              onPress={retryBalance}
+              className={cn(STATE_ACTION_CLASS, 'flex-row items-center gap-2 active:opacity-70')}
+            >
+              <Text className="text-sm text-primary">{t('common.retry')}</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Text className="text-xs text-muted-foreground">{t('credits.expiryUnavailable')}</Text>
+        ))}
+      {!creditsNoteFailed && creditsPending && (
         <Skeleton className="h-3 w-40 max-w-full rounded bg-muted-soft" />
       )}
-      {!creditsFailed && !creditsPending && (
+      {!creditsNoteFailed && !creditsPending && (
         <CreditExpiryNote
           creditBlocks={creditData.creditBlocks}
           hiddenAmount={hideBalance || !hideBalanceLoaded ? HIDDEN_BALANCE : undefined}
@@ -277,7 +295,7 @@ export function CreditsCard({ enabled, orgList }: Readonly<CreditsCardProps>) {
   const amountLine = (
     <ScrollView horizontal className="min-w-0 shrink-0 grow-0">
       <Text
-        className="text-2xl font-bold tabular-nums"
+        variant="figure"
         // A reader compares the amount digit by digit, and its symbol is
         // neutral to the line's direction, so the run keeps its own
         // left-to-right order whatever the interface language.
@@ -307,44 +325,29 @@ export function CreditsCard({ enabled, orgList }: Readonly<CreditsCardProps>) {
     </Pressable>
   );
 
-  // The purchase action: in the trailing control column with the visibility
-  // toggle. No in-progress indicator sits beside it, because this row paints a
-  // balance that belongs to the selected account and a background refresh may
-  // legitimately take a while or never finish. The first load and a context
-  // switch own the skeleton above; a refresh that fails owns the retry surface.
-  // An indicator tied to every in-flight refresh spun for as long as a stalled
-  // one lasted (and announced itself as "In progress").
-  //
-  // An organization's top-up is the external billing page, so it carries the
-  // row's App Store gate and opens for a member who can manage billing. It uses
-  // the same trailing slot as the personal purchase, and it is offered at any
-  // balance, exactly like the personal action beside it. The balance read no
-  // longer decides whether it exists: mounting the control once that read
-  // answered moved every section below the card with it (design gate, Profile,
-  // 2026-11-06), and the slot it takes is reserved in the card's other states.
-  //
-  // A stacked card holds the action on its own end-aligned row inside the
-  // balance block, so it takes the inline form: the button keeps its natural
-  // size there instead of the block width `AddCreditsRow` gives a window under
-  // the narrow threshold.
-  const orgAddCreditsAction =
-    selectedOrgId != null && canManageOrgBilling ? (
-      <AddCreditsRow url={organizationBillingUrl(selectedOrgId)} inline={stackBalance} />
-    ) : null;
-
-  const addCreditsAction =
-    selectedOrgId == null ? (
-      <View className="max-w-full flex-row flex-wrap items-center justify-end gap-2">
-        <AddCreditsButton
-          className="h-auto max-w-full py-2"
-          onPress={() => {
-            router.push('/(app)/credits' as Href);
-          }}
-        />
-      </View>
-    ) : (
-      orgAddCreditsAction
-    );
+  // One purchase entry for the section, whichever scope is selected: the
+  // personal one is the in-app purchase, and an organization's is its billing
+  // page, which only a storefront that may link to it can offer. It lives in the
+  // Credits header, so it never wraps to a row of its own in a narrow card and
+  // never reads as a muted label with nothing to press.
+  const orgBillingUrl =
+    selectedOrgId != null && canManageOrgBilling ? organizationBillingUrl(selectedOrgId) : null;
+  let purchase: Readonly<{ label: string; onPress: () => void }> | null = null;
+  if (selectedOrgId == null) {
+    purchase = {
+      label: t('addCredits.cta'),
+      onPress: () => {
+        router.push('/(app)/credits' as Href);
+      },
+    };
+  } else if (orgBillingUrl !== null && canLinkExternalPurchase) {
+    purchase = {
+      label: t('addCredits.cta'),
+      onPress: () => {
+        void openExternalUrl(orgBillingUrl, { label: t('addCredits.billingPage') });
+      },
+    };
+  }
 
   // The balance slot's state: one shell paints all three, so the card never
   // moves as the read answers, fails or retries.
@@ -355,17 +358,6 @@ export function CreditsCard({ enabled, orgList }: Readonly<CreditsCardProps>) {
     balanceState = 'failed';
   }
 
-  const retryBalance = () => {
-    // A failed membership list is this surface's own failure for an
-    // organization context, and only a fresh list can tell the card which
-    // balance that context is owed, so the retry re-reads it too.
-    if (orgList.status === 'error') {
-      orgList.retry();
-    }
-    refetchUserId();
-    void refetchBalance();
-  };
-
   return (
     <View
       className="gap-3"
@@ -373,45 +365,11 @@ export function CreditsCard({ enabled, orgList }: Readonly<CreditsCardProps>) {
         setAvailableWidth(event.nativeEvent.layout.width);
       }}
     >
-      {/* The header is one text line tall, like every other Profile section
-          heading, so "Credits" starts at the screen's top padding instead of
-          sitting at the bottom of a 44dp box. The picker keeps its touch target
-          on the shared line-action box: a 28dp frame that floats over the line
-          and reaches past 44dp with hitSlop, without growing the row. */}
-      <View
-        className={cn(
-          'gap-3',
-          narrow ? 'flex-col items-stretch' : 'flex-row items-center justify-between'
-        )}
-      >
-        <Text variant="small" className="shrink uppercase tracking-wide text-muted-foreground">
-          {t('profile.credits')}
-        </Text>
-        {canPickContext && (
-          <Pressable
-            className={cn(
-              LINE_ACTION_BOX_CLASS,
-              // A short account or org name must still carry the 44pt reach.
-              'min-w-[44px] flex-row items-center gap-1 active:opacity-70',
-              narrow ? 'max-w-full justify-start' : 'max-w-[65%] shrink justify-end'
-            )}
-            hitSlop={LINE_ACTION_HIT_SLOP}
-            onPress={openPicker}
-            accessibilityRole="button"
-            accessibilityLabel={selectedLabel}
-            accessibilityHint={t('profile.selectAccount')}
-          >
-            <Text
-              className="min-w-0 shrink text-xs font-medium text-muted-foreground"
-              numberOfLines={1}
-              ellipsizeMode="tail"
-            >
-              {selectedLabel}
-            </Text>
-            <ChevronDown size={14} color={colors.mutedForeground} />
-          </Pressable>
-        )}
-      </View>
+      <SectionHeader
+        label={t('profile.credits')}
+        actionLabel={purchase?.label}
+        onActionPress={purchase?.onPress}
+      />
       {error === 'save' && (
         <View>
           <AccessibleStatus message={t('common.couldNotSaveSetting')} className="text-sm" />
@@ -437,7 +395,6 @@ export function CreditsCard({ enabled, orgList }: Readonly<CreditsCardProps>) {
         toggle={visibilityToggle}
         note={noteSlot}
         failureLabel={t('profile.balanceLoadFailed')}
-        action={addCreditsAction}
         retryLabel={t('profile.failedToLoadBalance')}
         retryActionLabel={t('common.retry')}
         onRetry={retryBalance}

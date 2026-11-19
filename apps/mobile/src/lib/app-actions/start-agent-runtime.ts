@@ -14,6 +14,7 @@ import * as Crypto from 'expo-crypto';
 import { detectRepositoryPlatform } from '@/components/agents/new-session-repository-state';
 import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { type ParsedActionRepository } from '@/lib/app-actions/app-action-contract';
+import { i18n } from '@/i18n';
 import { readStoredValue } from '@/lib/auth/secure-store-value';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { API_BASE_URL } from '@/lib/config';
@@ -142,7 +143,8 @@ export async function modelCatalog(): Promise<ModelOption[] | null> {
     if (!response.ok) {
       return null;
     }
-    return toModelOptions(OpenRouterModelsResponseSchema.parse(await response.json()));
+    const catalog = OpenRouterModelsResponseSchema.parse(await response.json());
+    return toModelOptions(catalog, i18n.language);
   } catch {
     return null;
   }

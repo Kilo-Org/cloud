@@ -80,6 +80,8 @@ test('a scan that never settles exits 2 instead of reporting a pass', async () =
     'settings get system font_scale': '1',
     'getprop persist.sys.locale': 'en-US',
     'getprop ro.build.version.release': '16',
+    'uiautomator dump --compressed /sdcard/design-gate-ui.xml':
+      'UI hierchary dumped to: /sdcard/design-gate-ui.xml',
   };
   const out = fs.mkdtempSync(path.join(os.tmpdir(), 'design-gate-scan-'));
   const lines: string[] = [];
@@ -231,6 +233,7 @@ test('parseCliArgs parses run with repeated links and defaults', () => {
       links: ['kiloapp://sessions', 'kiloapp://profile'],
       targets: undefined,
       matrix: 'standard',
+      cells: [],
       platform: undefined,
       device: undefined,
       metro: 'http://127.0.0.1:8081',

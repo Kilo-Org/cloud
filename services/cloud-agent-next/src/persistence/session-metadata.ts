@@ -1,6 +1,7 @@
 import { environmentReferenceSchema } from '../environment-build/reference.js';
 import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
+import { egressRequestSupported } from '@kilocode/worker-utils/sandbox-provider-capabilities';
 import {
   cloudAgentWorktreeIdSchema,
   sessionIdSchema as kiloSessionIdSchema,
@@ -408,10 +409,11 @@ const MetadataWorkspaceSchema = egressPolicySchema
   .refine(
     workspace =>
       (workspace.egressMode !== 'allowlist' && workspace.egressAudit !== true) ||
-      (workspace.sandboxProvider === 'cloudflare-containers' &&
+      (workspace.sandboxProvider !== undefined &&
+        egressRequestSupported(workspace.sandboxProvider, workspace) &&
         isIsolatedProviderWorkspace(workspace) &&
         workspace.sandboxRoute === undefined),
-    'Egress policy requires an isolated Cloudflare containers sandbox'
+    'Egress policy requires an isolated sandbox whose provider enforces it'
   )
   .refine(
     workspace => workspace.sandboxProvider !== 'vercel' || isIsolatedProviderWorkspace(workspace),

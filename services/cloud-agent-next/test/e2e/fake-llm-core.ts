@@ -839,7 +839,13 @@ function supportsRequiredArguments(
 function resolveTool(
   tools: AdvertisedTool[],
   kind: ToolKind,
-  input: { path?: string; contents?: string; replacement?: string; question?: string }
+  input: {
+    path?: string;
+    contents?: string;
+    replacement?: string;
+    question?: string;
+    optionCount?: number;
+  }
 ): { tool: AdvertisedTool; arguments: Record<string, unknown> } | null {
   const names: Record<ToolKind, string[]> = {
     write: ['write', 'write_file', 'write_to_file'],
@@ -854,18 +860,29 @@ function resolveTool(
 
   const args: Record<string, unknown> = {};
   if (kind === 'question') {
+    // The default path must stay byte-identical (single `Continue` option) so
+    // existing assertions on the emitted option list keep passing.
+    const optionCount = input.optionCount ?? 1;
+    const defaultOption = { label: 'Continue', description: 'Continue the E2E scenario' };
+    const options =
+      optionCount === 1
+        ? [defaultOption]
+        : Array.from({ length: optionCount }, (_, index) => ({
+            label: `Option ${index + 1}`,
+            description: `Option ${index + 1} of ${optionCount} emitted by the E2E fake`,
+          }));
     if ('questions' in properties && input.question !== undefined) {
       args.questions = [
         {
           question: input.question,
           header: 'E2E',
-          options: [{ label: 'Continue', description: 'Continue the E2E scenario' }],
+          options,
         },
       ];
     } else if ('question' in properties && input.question !== undefined) {
       args.question = input.question;
       if ('options' in properties) {
-        args.options = [{ label: 'Continue', description: 'Continue the E2E scenario' }];
+        args.options = options;
       }
     } else {
       return null;
@@ -988,12 +1005,28 @@ const TRANSCRIPTION_MODELS = [
   {
     id: 'fake-transcribe',
     name: 'Fake Transcribe',
+    created: 0,
+    description: 'Deterministic fake speech-to-text model for cloud-agent E2E harness.',
+    architecture: {
+      input_modalities: ['audio'],
+      output_modalities: ['text'],
+      tokenizer: 'fake',
+    },
+    top_provider: { is_moderated: false, context_length: 128000 },
     context_length: 128000,
     pricing: { prompt: '0', completion: '0' },
   },
   {
     id: 'fake-transcribe-broken',
     name: 'Broken Transcriber',
+    created: 0,
+    description: 'Fake speech-to-text model whose transcription request 404s.',
+    architecture: {
+      input_modalities: ['audio'],
+      output_modalities: ['text'],
+      tokenizer: 'fake',
+    },
+    top_provider: { is_moderated: false, context_length: 128000 },
     context_length: 128000,
     pricing: { prompt: '0', completion: '0' },
   },
@@ -1121,6 +1154,17 @@ export const MAX_REALISTIC_PIECES = 512;
  * silently smaller stream.
  */
 export const MAX_TOOL_STREAM_BYTES = 1024 * 1024;
+
+/**
+ * Upper bound for the opt-in `question:<tag>:<count>:<question text>` option
+ * count. The product schema (`SESSION_QUESTION_MAX_OPTIONS`) caps one question
+ * at 32 options, and the purpose of the count form is to emit MORE than that,
+ * so the bound comfortably exceeds 32: it covers the exact legal boundary (32)
+ * and over-limit probes (33+) while keeping the generated tool-call arguments
+ * bounded for the streamed fake. A request beyond it is an invalid directive
+ * (HTTP 402) rather than a silently smaller list.
+ */
+export const MAX_QUESTION_DIRECTIVE_OPTIONS = 64;
 
 /**
  * Upper bound for the `slow:<n>:<ms>:<bytes>` per-chunk delay. Without it a
@@ -1331,7 +1375,13 @@ function runToolScenario(
   ctx: ScenarioContext,
   tag: string,
   kind: ToolKind,
-  input: { path?: string; contents?: string; replacement?: string; question?: string }
+  input: {
+    path?: string;
+    contents?: string;
+    replacement?: string;
+    question?: string;
+    optionCount?: number;
+  }
 ): void {
   const resolved = resolveTool(ctx.tools, kind, input);
   if (!resolved) {
@@ -1812,14 +1862,30 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
       );
       return;
     }
-    const [, tag, question] = parsed;
+    // Opt-in count form: `question:<tag>:<count>:<question text>` emits
+    // `<count>` options. A digits-only whole segment directly after the tag is
+    // treated as a count; anything else — including text that merely starts
+    // with digits — keeps the original single-option form.
+    const countMatch = parsed[2].match(/^(\d+):([\s\S]+)$/);
+    const optionCount = countMatch ? Number.parseInt(countMatch[1] ?? '0', 10) : 1;
+    const question = countMatch ? (countMatch[2] ?? '') : parsed[2];
+    if (countMatch && (optionCount < 1 || optionCount > MAX_QUESTION_DIRECTIVE_OPTIONS)) {
+      writeJsonError(
+        ctx.emit,
+        402,
+        `question option count must be between 1 and ${MAX_QUESTION_DIRECTIVE_OPTIONS}, got ${optionCount}`,
+        'invalid_request'
+      );
+      return;
+    }
+    const [, tag] = parsed;
     if (ctx.tools.length === 0) {
       writeAssistantResponse(ctx, `done-${tag}`);
       return;
     }
     const results = toolResults(ctx.body, tag, ctx.state);
     if (!results.some(result => result.id === toolCallId(tag, 'question'))) {
-      runToolScenario(ctx, tag, 'question', { question });
+      runToolScenario(ctx, tag, 'question', { question, optionCount });
       return;
     }
     writeAssistantResponse(ctx, `done-${tag}`);

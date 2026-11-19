@@ -21,7 +21,10 @@ import {
   isNeedsInputActionIdentifier,
   registerNeedsInputCategories,
 } from './notification-actions';
-import { notificationIdentifierForSession } from './needs-input-presentation';
+import {
+  notificationIdentifierForSession,
+  retireNeedsInputReplyResult,
+} from './needs-input-presentation';
 import { PENDING_DEEP_LINK_KEY } from './storage-keys';
 
 const mocks = vi.hoisted(() => ({
@@ -442,6 +445,45 @@ describe('handleNeedsInputNotificationResponse — approve and reply', () => {
     expect(mocks.dismissNotificationAsync).toHaveBeenCalledWith('fcm-remote-1');
   });
 
+  it('replaces an inline reply in place, because Android keeps it for the reply', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        identifier: 'fcm-remote-1',
+        actionIdentifier: NEEDS_INPUT_ACTION_IDS.reply,
+        userText: 'ship it',
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identifier: 'fcm-remote-1',
+        content: expect.objectContaining({ body: 'Reply sent' }),
+      })
+    );
+    expect(mocks.dismissNotificationAsync.mock.calls).toEqual([['needs-input:ses_1']]);
+    // The result is outside the session's identifier, so the plan's retirement reaches it.
+    await retireNeedsInputReplyResult('ses_1', vi.fn<(error: unknown) => void>());
+    expect(mocks.dismissNotificationAsync).toHaveBeenLastCalledWith('fcm-remote-1');
+  });
+
+  it('keeps the session identifier for an Approve, and records no reply result', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+
+    await handleNeedsInputNotificationResponse(raiseResponse({ identifier: 'fcm-remote-2' }), {
+      runInteraction: mocks.runNeedsInputInteraction,
+    });
+
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ identifier: 'needs-input:ses_1' })
+    );
+    expect(mocks.dismissNotificationAsync.mock.calls).toEqual([['fcm-remote-2']]);
+    await retireNeedsInputReplyResult('ses_1', vi.fn<(error: unknown) => void>());
+    expect(mocks.dismissNotificationAsync.mock.calls).toEqual([['fcm-remote-2']]);
+  });
+
   it('uses the attention title when the response notification has no title', async () => {
     mocks.runNeedsInputInteraction.mockResolvedValue('ok');
 
@@ -529,7 +571,7 @@ describe('handleNeedsInputNotificationResponse — approve and reply', () => {
     });
   });
 
-  it('falls back to retryable when the headless envelope is unparseable JSON', async () => {
+  it('dismisses an answer action whose headless envelope is unparseable JSON', async () => {
     await handleNeedsInputNotificationResponse(raiseResponse({ data: '{not json' }), {
       runInteraction: mocks.runNeedsInputInteraction,
     });

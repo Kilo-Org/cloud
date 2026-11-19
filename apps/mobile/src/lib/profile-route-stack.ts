@@ -12,7 +12,9 @@
  * through on the way in.
  *
  * These rules name the parents a profile screen needs, and mark the pushes that
- * rebuild them so those pushes land without their own transitions.
+ * rebuild them so those pushes land without their own transitions. Removing the
+ * unparented copy afterwards is `profile-stack-retirement.ts`, which outlives the
+ * screen that asked for the repair.
  *
  * No React and no React Native imports: every function here is unit-tested
  * directly in `profile-route-stack.test.ts`.

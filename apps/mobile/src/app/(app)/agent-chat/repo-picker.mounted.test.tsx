@@ -11,13 +11,14 @@ import RepoPickerScreen from '@/app/(app)/agent-chat/repo-picker';
 import { PickerSheet } from '@/components/picker-sheet';
 import { type RepoOption, type RepoPickerSection } from '@/lib/picker-bridge';
 import { repoPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
-import '@/i18n';
+import { i18n } from '@/i18n';
 
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('react-native', () => ({
   FlatList: 'FlatList',
   I18nManager: { isRTL: false },
   Keyboard: { dismiss: vi.fn() },
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   TextInput: 'TextInput',
@@ -41,6 +42,7 @@ vi.mock('@/components/ui/icons', () => ({
   Search: 'Search',
   SearchX: 'SearchX',
   Unlock: 'Unlock',
+  X: 'X',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#111111', mutedForeground: '#777777' }),
@@ -190,8 +192,16 @@ describe('repository picker row layout', () => {
     );
 
     await search(renderer, 'kubernetes');
+    // The row control is the host Pressable: `ChoiceRow` hands the name and the
+    // press to `RowFrame`, so a bare prop match would also count the frame
+    // component above the control. The search field's own clear control is
+    // not a row.
     const results = renderer.root.findAll(
-      node => typeof node.props.accessibilityLabel === 'string' && node.props.onPress
+      node =>
+        String(node.type) === 'Pressable' &&
+        typeof node.props.accessibilityLabel === 'string' &&
+        node.props.accessibilityLabel !== i18n.t('common.clearSearch') &&
+        node.props.onPress
     );
     expect(results).toHaveLength(2);
     for (const result of results) {
@@ -219,6 +229,7 @@ describe('repository picker row layout', () => {
     const renderer = await mount();
     const row = rowFor(renderer, SIBLING_NAME);
     expect(row.props.accessibilityLabel).toBe(`GitHub ${SIBLING_NAME}`);
-    expect(row.props.accessibilityState).toEqual({ selected: false });
+    // The shared choice row states selection and enablement together.
+    expect(row.props.accessibilityState).toMatchObject({ selected: false, disabled: false });
   });
 });

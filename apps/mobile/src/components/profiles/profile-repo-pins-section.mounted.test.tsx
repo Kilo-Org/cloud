@@ -8,8 +8,6 @@ import {
   SECTION_ACTION_FRAME_DP,
   SECTION_ACTION_HIT_SLOP,
   SECTION_ACTION_HIT_SLOP_DP,
-  SECTION_ACTION_ROW_CANCEL_CLASS,
-  SECTION_HEADER_ROW_PADDING_CLASS,
   tapTargetReachDp,
   TOUCH_TARGET_DP,
 } from '@/lib/a11y/tap-target';
@@ -53,8 +51,14 @@ vi.mock('@/lib/hooks/use-repo-bindings', () => ({
   useRepoOptions: () => h.repoOptions,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } }));
+vi.mock('expo-haptics', () => ({
+  selectionAsync: vi.fn(),
+  impactAsync: vi.fn(),
+  notificationAsync: vi.fn(),
+}));
 vi.mock('react-native', () => ({
   Keyboard: { dismiss: () => undefined },
+  Platform: { OS: 'ios' },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
@@ -77,9 +81,16 @@ vi.mock('@/components/agents/session-page-sheet', () => ({
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/text', () => ({
+  Text: 'Text',
+  EYEBROW_LATIN_DISPLAY: '',
+  EYEBROW_LINE_HEIGHT_DP: 22,
+}));
 vi.mock('@/components/ui/icons', () => ({
   Check: 'Check',
   GitBranch: 'GitBranch',
@@ -222,7 +233,7 @@ describe('ProfileRepoPinsSection', () => {
     unmount();
   });
 
-  it('compact: the pin action renders on the section box inside a row that cancels its height', async () => {
+  it('compact: the pin action rides the section header box, so the header stays one line', async () => {
     Object.assign(h.bindingsQuery, { isLoading: false });
 
     const { renderer, unmount } = await mountSection();
@@ -233,30 +244,18 @@ describe('ProfileRepoPinsSection', () => {
     if (!action) {
       throw new Error('the pin action was not rendered');
     }
+    // The action is the section header's own box: its negative margins cancel
+    // the 28dp frame back to the one text line it sits on, so the card never
+    // grows a second line for it.
     const actionClasses = String(action.props.className).split(/\s+/);
     for (const token of SECTION_ACTION_BOX_CLASS.split(' ')) {
       expect(actionClasses).toContain(token);
     }
     expect(action.props.hitSlop).toEqual(SECTION_ACTION_HIT_SLOP);
-    expect(action.props.accessibilityState).toEqual({ disabled: false });
-
-    const headerRow = findAll(renderer.root, 'View').find(node =>
-      String(node.props.className).includes(SECTION_HEADER_ROW_PADDING_CLASS)
-    );
-    if (!headerRow) {
-      throw new Error('the header row was not rendered');
-    }
-    const rowClasses = String(headerRow.props.className).split(/\s+/);
-    for (const token of [
-      ...SECTION_HEADER_ROW_PADDING_CLASS.split(' '),
-      ...SECTION_ACTION_ROW_CANCEL_CLASS.split(' '),
-    ]) {
-      expect(rowClasses).toContain(token);
-    }
-
-    // The row gives back exactly what it reserves, so its bounds cannot drift
-    // from the slop they hold.
-    expect(SECTION_ACTION_ROW_CANCEL_CLASS).toBe(`-my-[${SECTION_ACTION_HIT_SLOP_DP}px]`);
+    expect(action.props.accessibilityRole).toBe('button');
+    expect(action.props.accessibilityState).toBeUndefined();
+    // The declared reach clears the design target, and the box is symmetric
+    // about the label's line, so the row keeps its height either way.
     expect(
       tapTargetReachDp(SECTION_ACTION_FRAME_DP, SECTION_ACTION_HIT_SLOP_DP)
     ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);

@@ -65,7 +65,7 @@ describe('generation', () => {
     expect(currentGeneration()).toBe(afterFirst);
   });
 
-  it('increments when a new account is set after undefined', () => {
+  it('does not increment on the first decision after undefined, then increments on the next account change', () => {
     // From undefined to a defined decision is not an account change.
     setTelemetryDecision('acct-1', true);
     const afterFirst = currentGeneration();
@@ -217,6 +217,19 @@ describe('subscribeToTelemetryGeneration', () => {
     setTelemetryDecision('acct-2', true);
     clearTelemetryDecision();
 
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('drops a listener subscribed before a reset', () => {
+    const listener = vi.fn<() => void>();
+    subscribeToTelemetryGeneration(listener);
+
+    resetTelemetryControllerForTests();
+
+    // The reset drops the subscriber, so a later account change
+    // (acct-1 -> acct-2; undefined -> acct-1 is not one) reaches nobody.
+    setTelemetryDecision('acct-1', true);
+    setTelemetryDecision('acct-2', true);
     expect(listener).not.toHaveBeenCalled();
   });
 

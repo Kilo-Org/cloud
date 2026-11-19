@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BRIEFING_FALLBACK_TITLE,
   BRIEFING_MAX_EXCERPT_BYTES,
   briefingHasActivity,
   briefingSourceSchema,
@@ -131,12 +130,10 @@ describe('scheduled briefing contracts', () => {
     expect(truncateBriefingUtf8('abcdefgh', 5)).toBe('abcde');
     // A full-span cap keeps the whole string.
     expect(truncateBriefingUtf8('ab', 2)).toBe('ab');
-    // The required title is never blank: a title whose first cluster is wider than
-    // the cap truncates to nothing, so the neutral fallback stands in for it.
-    expect(redactBriefingTitle('\u{1F468}\u200D\u{1F469}\u200D\u{1F467}', 4)).toBe(
-      BRIEFING_FALLBACK_TITLE
-    );
-    expect(redactBriefingTitle(family, 10)).toBe(BRIEFING_FALLBACK_TITLE);
+    // The title is absent, never a server label: a title whose first cluster is wider
+    // than the cap truncates to nothing.
+    expect(redactBriefingTitle('\u{1F468}\u200D\u{1F469}\u200D\u{1F467}', 4)).toBeUndefined();
+    expect(redactBriefingTitle(family, 10)).toBeUndefined();
     // A title that survives the cap keeps its own text.
     expect(redactBriefingTitle('Release notes', 160)).toBe('Release notes');
   });
@@ -357,11 +354,11 @@ describe('briefing evidence screening', () => {
     expect(redactBriefingTitle(text)).not.toContain('hunter' + '2');
   });
 
-  it('screens titles with the excerpt rules and keeps a neutral title otherwise', () => {
+  it('screens titles with the excerpt rules and withholds one that screening cannot clear', () => {
     expect(redactBriefingTitle('Captured session')).toBe('Captured session');
     expect(redactBriefingTitle('Deploy ' + 'AWS_SECRET_ACCESS_KEY=' + secretKey)).toBe(
       'Deploy [redacted credential]'
     );
-    expect(redactBriefingTitle('Plan for client_' + 'secret: "' + secretKey)).toBe('Agent session');
+    expect(redactBriefingTitle('Plan for client_' + 'secret: "' + secretKey)).toBeUndefined();
   });
 });

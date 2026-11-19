@@ -5,7 +5,10 @@ import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { AlertCircle } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
+import { KvRow } from '@/components/ui/kv-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatDate, formatPrefixedMoney } from '@/lib/format';
@@ -15,18 +18,12 @@ import {
   type KiloPassCreditHistory,
 } from '@/lib/hooks/use-kilo-pass-history';
 import { type KiloPassBillingEntry, type KiloPassCreditEntry } from '@/lib/kilo-pass/management';
+import { kiloPassTierLabel } from '@/lib/kilo-pass/state';
 import { isRetryableTrpcError } from '@/lib/trpc-error';
 import { capitalize, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
 function HistorySection({ title, children }: Readonly<{ title: string; children: ReactNode }>) {
-  return (
-    <View className="gap-2">
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {title}
-      </Text>
-      <View className="gap-3 rounded-lg bg-secondary p-4">{children}</View>
-    </View>
-  );
+  return <Section label={title}>{children}</Section>;
 }
 
 function historyDate(value: string): string {
@@ -43,20 +40,26 @@ function HistoryLine({
   amount,
 }: Readonly<{ title: string; date: string; amount: string }>) {
   return (
-    <View className="gap-0.5">
-      <View className="flex-row items-center justify-between gap-3">
-        <Text className="min-w-0 flex-1 text-sm text-foreground" numberOfLines={1}>
-          {title}
-        </Text>
-        <Text className="text-sm text-foreground">{amount}</Text>
-      </View>
-      <Text className="text-xs text-muted-foreground">{date}</Text>
-    </View>
+    <KvRow
+      label={title}
+      // The description the server returns can be a sentence; the amount and
+      // the date are the column a reader scans, so the title yields its width
+      // to them instead of pushing them out of the row.
+      labelShrink
+      value={amount}
+      valueFace="numeric"
+      trailing={<Text variant="caption">{date}</Text>}
+    />
   );
 }
 
-function SectionPending({ children }: Readonly<{ children: ReactNode }>) {
-  return <View className="gap-2">{children}</View>;
+function SectionPending() {
+  return (
+    <RowGroup>
+      <RowSkeleton />
+      <RowSkeleton />
+    </RowGroup>
+  );
 }
 
 /**
@@ -80,7 +83,9 @@ function SectionError({
     <View className="gap-2">
       <View className="flex-row items-center gap-2">
         <AlertCircle size={16} color={colors.destructive} />
-        <Text className="min-w-0 flex-1 text-sm text-muted-foreground">{message}</Text>
+        <Text variant="muted" className="min-w-0 flex-1">
+          {message}
+        </Text>
       </View>
       {onRetry ? (
         <Button
@@ -97,8 +102,8 @@ function SectionError({
 }
 
 /**
- * A row title without the parts of the server's description that are not for
- * the reader.
+ * A description without the parts of the server's sentence that are not for the
+ * reader, or '' when nothing readable is left.
  *
  * The product name comes off because the screen header already prints it, and a
  * row that repeats it buries the part that tells the rows apart, the credits'
@@ -109,33 +114,68 @@ function SectionError({
  *
  * The remainder keeps its sentence capital so the title still reads as a title.
  */
-function creditRowTitle(description: string): string {
+function cleanedRowTitle(description: string): string {
   const title = description
     .replace(/^kilo pass\s+/i, '')
     .replace(/\s*\([^()]*\)\s*$/, '')
     .trim();
-  if (title.length === 0) {
-    return i18n.t('common.creditHistory');
-  }
   // The first grapheme is display text, so its case is the active locale's.
-  return capitalize(title);
+  return title.length === 0 ? '' : capitalize(title);
 }
 
 function CreditHistoryLine({ entry }: Readonly<{ entry: KiloPassCreditEntry }>) {
+  const title = firstNonEmpty(cleanedRowTitle(entry.description), i18n.t('common.creditHistory'));
   return (
     <HistoryLine
-      title={creditRowTitle(entry.description)}
+      title={title}
       date={historyDate(entry.date)}
       amount={formatPrefixedMoney(entry.amountUsd, i18n.language)}
     />
   );
 }
 
+/** The catalog key for every invoice line kind the server classifies. */
+const BILLING_ROW_TITLE_KEYS = {
+  initial: 'kiloPass.manage.billingRowInitial',
+  renewal: 'kiloPass.manage.billingRowRenewal',
+  trial: 'kiloPass.manage.billingRowTrial',
+  upgrade: 'kiloPass.manage.billingRowUpgrade',
+  // The line the server could not type still has row copy: the charge was the
+  // subscription itself.
+  unknown: 'kiloPass.manage.billingRowSubscription',
+} as const satisfies Record<string, string>;
+
+/** True for a line kind this build has row copy for. */
+function isNamedBillingRowKind(kind: string): kind is keyof typeof BILLING_ROW_TITLE_KEYS {
+  // Every kind the server classifies is named here; the wire itself is an open
+  // set, so a kind this build has never seen still falls back to the description.
+  return Object.hasOwn(BILLING_ROW_TITLE_KEYS, kind);
+}
+
+/**
+ * A billing row title.
+ *
+ * The provider's description is a sentence written for its own dashboard: it
+ * names the product, the plan's internal id, the cadence and sometimes a streak,
+ * none of which a row already under the Kilo Pass header needs to repeat. The
+ * server types the invoice line instead, so the row says what the charge was — a
+ * trial, the first charge, a renewal, a plan change, or the subscription a line
+ * the server could not otherwise type paid for — and the tier it billed, in the
+ * reader's language. Every kind the server classifies has row copy, so only a row
+ * with no typed line at all falls back to the provider's sentence, cleaned the
+ * way a credit row is.
+ */
+function billingRowTitle(entry: KiloPassBillingEntry): string {
+  const line = entry.kind === 'stripe' ? entry.line : null;
+  if (line && isNamedBillingRowKind(line.kind)) {
+    const tier = line.tier ? kiloPassTierLabel(line.tier) : i18n.t('kiloPass.title');
+    return i18n.t(BILLING_ROW_TITLE_KEYS[line.kind], { tier });
+  }
+  return firstNonEmpty(cleanedRowTitle(entry.description ?? ''), i18n.t('kiloPass.title'));
+}
+
 function BillingHistoryLine({ entry }: Readonly<{ entry: KiloPassBillingEntry }>) {
-  const title =
-    entry.kind === 'stripe'
-      ? firstNonEmpty(entry.description, i18n.t('kiloPass.title'))
-      : entry.description;
+  const title = billingRowTitle(entry);
   const amount =
     entry.kind === 'stripe'
       ? formatPrefixedMoney(entry.amountCents / 100, i18n.language)
@@ -156,12 +196,7 @@ export function KiloPassCreditHistorySection({
 
   let body: ReactNode = null;
   if (query.isPending) {
-    body = (
-      <SectionPending>
-        <Skeleton className="h-4 w-40 rounded" />
-        <Skeleton className="h-4 w-32 rounded" />
-      </SectionPending>
-    );
+    body = <SectionPending />;
   } else if (firstPageFailed) {
     body = (
       <SectionError
@@ -176,13 +211,15 @@ export function KiloPassCreditHistorySection({
       />
     );
   } else if (entries.length === 0) {
-    body = (
-      <Text variant="muted" className="text-sm">
-        {t('kiloPass.manage.creditHistoryEmpty')}
-      </Text>
-    );
+    body = <Text variant="muted">{t('kiloPass.manage.creditHistoryEmpty')}</Text>;
   } else {
-    body = entries.map(entry => <CreditHistoryLine key={entry.id} entry={entry} />);
+    body = (
+      <RowGroup>
+        {entries.map(entry => (
+          <CreditHistoryLine key={entry.id} entry={entry} />
+        ))}
+      </RowGroup>
+    );
   }
 
   return (
@@ -228,12 +265,7 @@ export function KiloPassBillingHistorySection({
 
   let body: ReactNode = null;
   if (query.isPending) {
-    body = (
-      <SectionPending>
-        <Skeleton className="h-4 w-40 rounded" />
-        <Skeleton className="h-4 w-32 rounded" />
-      </SectionPending>
-    );
+    body = <SectionPending />;
   } else if (firstPageFailed) {
     body = (
       <SectionError
@@ -248,13 +280,15 @@ export function KiloPassBillingHistorySection({
       />
     );
   } else if (entries.length === 0) {
-    body = (
-      <Text variant="muted" className="text-sm">
-        {t('kiloPass.manage.billingHistoryEmpty')}
-      </Text>
-    );
+    body = <Text variant="muted">{t('kiloPass.manage.billingHistoryEmpty')}</Text>;
   } else {
-    body = entries.map(entry => <BillingHistoryLine key={entry.id} entry={entry} />);
+    body = (
+      <RowGroup>
+        {entries.map(entry => (
+          <BillingHistoryLine key={entry.id} entry={entry} />
+        ))}
+      </RowGroup>
+    );
   }
 
   return (

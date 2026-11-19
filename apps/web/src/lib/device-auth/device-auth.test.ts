@@ -30,7 +30,6 @@ import {
   getDeviceAuthPendingLink,
 } from './device-auth';
 import { createPendingLink, hashPendingLinkSecret } from '@/lib/auth/pending-link';
-import { issueSessionCredentials } from '@/lib/auth/device-sessions';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 
 // Capture real implementations for pass-through default behaviour.
@@ -38,20 +37,7 @@ import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 // const/let initializers, but var is hoisted with an undefined initial value
 // that is safe to assign to.
 // eslint-disable-next-line no-var
-var _realIssueSessionCredentials: ((...args: any[]) => any) | undefined;
-// eslint-disable-next-line no-var
 var _realGenerateApiToken: ((...args: any[]) => any) | undefined;
-
-jest.mock('@/lib/auth/device-sessions', () => {
-  const actual = jest.requireActual('@/lib/auth/device-sessions') as any;
-  _realIssueSessionCredentials = actual.issueSessionCredentials;
-  return {
-    ...actual,
-    issueSessionCredentials: jest.fn((...args: any[]) =>
-      (_realIssueSessionCredentials as any)(...args)
-    ),
-  };
-});
 
 jest.mock('@kilocode/web-shared/lib/tokens', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/tokens') as any;
@@ -62,7 +48,6 @@ jest.mock('@kilocode/web-shared/lib/tokens', () => {
   };
 });
 
-const mockedIssueSessionCredentials = jest.mocked(issueSessionCredentials);
 const mockedGenerateApiToken = jest.mocked(generateApiToken);
 
 /**
@@ -89,9 +74,6 @@ describe('Device Auth', () => {
 
   afterEach(async () => {
     // Reset mocks to pass-through defaults.
-    mockedIssueSessionCredentials.mockImplementation((...args: any[]) =>
-      (_realIssueSessionCredentials as any)(...args)
-    );
     mockedGenerateApiToken.mockImplementation((...args: any[]) =>
       (_realGenerateApiToken as any)(...args)
     );
@@ -911,12 +893,14 @@ describe('Device Auth', () => {
     });
 
     test('failed issuance after consume restores row and removes orphan session (supportsRefresh)', async () => {
-      mockedIssueSessionCredentials.mockRejectedValue(new Error('issuance failed'));
+      mockedGenerateApiToken.mockImplementationOnce(() => {
+        throw new Error('issuance failed');
+      });
 
       const { userCode, deviceCode } = await createDeviceAuthRequest({});
       await approveDeviceAuthRequest(userCode, testUserId);
 
-      // First consume fails because issueSessionCredentials throws.
+      // First consume fails while minting the pair, inside the transaction.
       await expect(
         consumeDeviceAuthByDeviceCode(deviceCode, { supportsRefresh: true })
       ).rejects.toThrow('issuance failed');
@@ -926,17 +910,12 @@ describe('Device Auth', () => {
       expect(request?.status).toBe('approved');
       expect(request?.consumed_at).toBeNull();
 
-      // No device session was left behind.
+      // No device session was left behind: the failed mint rolled it back.
       const sessions = await db
         .select()
         .from(device_sessions)
         .where(eq(device_sessions.device_auth_request_id, request!.id));
       expect(sessions).toHaveLength(0);
-
-      // Reset mock to pass-through for the re-consume.
-      mockedIssueSessionCredentials.mockImplementation((...args: any[]) =>
-        (_realIssueSessionCredentials as any)(...args)
-      );
 
       // A later consume succeeds.
       const retry = await consumeDeviceAuthByDeviceCode(deviceCode);
@@ -996,7 +975,9 @@ describe('Device Auth', () => {
       });
       await approveDeviceAuthRequest(userCode, testUserId, { addPendingLink: true });
 
-      mockedIssueSessionCredentials.mockRejectedValueOnce(new Error('issuance failed'));
+      mockedGenerateApiToken.mockImplementationOnce(() => {
+        throw new Error('issuance failed');
+      });
       await expect(
         consumeDeviceAuthByDeviceCode(deviceCode, { supportsRefresh: true })
       ).rejects.toThrow('issuance failed');
@@ -1007,9 +988,6 @@ describe('Device Auth', () => {
         .where(eq(pending_auth_links.id, pendingLink.id));
       expect(pendingRow.consumed_at).toBeNull();
 
-      mockedIssueSessionCredentials.mockImplementation((...args: any[]) =>
-        (_realIssueSessionCredentials as any)(...args)
-      );
       const retry = await consumeDeviceAuthByDeviceCode(deviceCode, { supportsRefresh: true });
       expect(retry.status).toBe('approved');
       expect(retry.pendingLink).toEqual({ status: 'linked', provider: 'github' });
@@ -1051,13 +1029,15 @@ describe('Device Auth', () => {
       expect(result2.token).toBeDefined();
 
       // Now make the first request's issuance fail.
-      mockedIssueSessionCredentials.mockRejectedValue(new Error('issuance failed'));
+      mockedGenerateApiToken.mockImplementationOnce(() => {
+        throw new Error('issuance failed');
+      });
 
       await expect(
         consumeDeviceAuthByDeviceCode(deviceCode1, { supportsRefresh: true })
       ).rejects.toThrow('issuance failed');
 
-      // The first request's session was cleaned up.
+      // The first request's session was rolled back with the failed mint.
       const request1 = await getDeviceAuthRequest(userCode1);
       const sessions1 = await db
         .select()
@@ -1072,11 +1052,6 @@ describe('Device Auth', () => {
         .from(device_sessions)
         .where(eq(device_sessions.device_auth_request_id, request2!.id));
       expect(sessions2).toHaveLength(1);
-
-      // Reset mock.
-      mockedIssueSessionCredentials.mockImplementation((...args: any[]) =>
-        (_realIssueSessionCredentials as any)(...args)
-      );
     });
   });
 

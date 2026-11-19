@@ -222,6 +222,10 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
     [actionsFor]
   );
 
+  // A send takes the transcript position over, so the question and its answer
+  // are on screen even when the person had scrolled up to read.
+  const [followTailNonce, setFollowTailNonce] = useState(0);
+
   const handleSend = useCallback(
     (text: string, options?: ChatComposerSendOptions) => {
       // Before the stored profiles load, every custom target looks deleted. The
@@ -243,6 +247,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
       // The question is on screen the moment it is asked, so the composer
       // empties now rather than when the answer lands.
       options?.onOptimisticSend?.();
+      setFollowTailNonce(count => count + 1);
       void send(text, { model, effort }, options?.images ?? []);
     },
     [backends, effort, model, send, t]
@@ -265,11 +270,11 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const creditsRefused = state.failureKey === CREDITS_FAILURE_KEY;
   const retryable =
     !actions.hasUnanswered && state.failureKey !== CHAT_UNAVAILABLE_KEY && !creditsRefused;
-  // The refused question's own bubble states the credits cause and carries Add
-  // credits, so the row above the composer does not repeat them. With no
-  // question on screen that row is the only place that can state it, and the
-  // only place that can offer the action.
-  const rowFailureKey = creditsRefused && actions.hasUnanswered ? null : state.failureKey;
+  // A question with no answer states its own failure and carries its own
+  // recovery, so the row above the composer does not repeat it. With no
+  // question on screen that row is the only place that can state a failure, and
+  // the only place that can offer its action.
+  const rowFailureKey = actions.hasUnanswered ? null : state.failureKey;
 
   function renderTranscript() {
     if (state.status === 'opening') {
@@ -313,6 +318,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
           olderMessagesOmittedItemCount={0}
           onLoadOlderMessages={() => undefined}
           renderItem={renderItem}
+          followTailNonce={followTailNonce}
         />
       </PartDetailSheetHost>
     );

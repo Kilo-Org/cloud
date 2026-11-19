@@ -2,8 +2,8 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
-import { Button } from '@/components/ui/button';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { Card } from '@/components/ui/card';
+import { RowChevron } from '@/components/ui/row-chevron';
 import { Cpu, Download, Star } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -18,7 +18,6 @@ import { useGgufModels } from '@/lib/chat/gguf-models';
 import { type HfListedModel, hfModelName } from '@/lib/chat/hf-catalog';
 import { useHfSmallestDownload } from '@/lib/chat/use-hf-catalog';
 import { formatFileSize } from '@/lib/format';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { GgufDownloadControls } from './gguf-model-section';
 import {
@@ -26,6 +25,7 @@ import {
   CatalogStat,
   compactNumber,
   FitBadge,
+  fitLabelKey,
   useCatalogDownload,
 } from './model-catalog-parts';
 
@@ -47,12 +47,42 @@ export function RecommendedRow({
   const fit = deviceFit(downloadBytes(model), budget);
   const [, owner, repo] = new URL(model.url).pathname.split('/');
   const displayName = model.name.replace(/\s*\([^)]*\)\s*$/, '').trim();
+  const title = (
+    <>
+      <Text className="min-w-0 flex-1 font-semibold">{displayName}</Text>
+      <FitBadge fit={fit} />
+    </>
+  );
   return (
-    <View className="gap-2 rounded-xl border border-border bg-card p-4">
-      <View className="flex-row items-start justify-between gap-3">
-        <Text className="min-w-0 shrink font-semibold">{displayName}</Text>
-        <FitBadge fit={fit} />
-      </View>
+    <Card>
+      {owner !== undefined && repo !== undefined ? (
+        // The title line opens the model's page, as a list row's chevron does,
+        // so the card carries one button (its download) instead of a second
+        // full-width "Details" button repeated in every card. The press spans
+        // the card's top inset and the gap under the line, so its own node
+        // reaches the 44pt target without moving the line.
+        // An explicit label replaces the children's text for assistive
+        // technology, so it carries the fit the badge shows as well.
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={[
+            t('modelChat.catalog.detailsA11y', { name: displayName }),
+            t(fitLabelKey(fit)),
+          ].join(', ')}
+          onPress={() => {
+            router.push({
+              pathname: '/model-catalog/[owner]/[repo]',
+              params: { owner, repo },
+            });
+          }}
+          className="-mx-4 -mb-3 -mt-4 flex-row items-center gap-3 px-4 pb-3 pt-4 active:opacity-70"
+        >
+          {title}
+          <RowChevron />
+        </Pressable>
+      ) : (
+        <View className="flex-row items-center gap-3">{title}</View>
+      )}
       <CatalogCapabilities images={model.projector !== undefined} />
       <Text variant="muted" className="text-xs">
         {t(
@@ -80,21 +110,7 @@ export function RecommendedRow({
               }
         }
       />
-      {owner !== undefined && repo !== undefined && (
-        <Button
-          variant="ghost"
-          accessibilityLabel={t('modelChat.catalog.detailsA11y', { name: displayName })}
-          onPress={() => {
-            router.push({
-              pathname: '/model-catalog/[owner]/[repo]',
-              params: { owner, repo },
-            });
-          }}
-        >
-          <Text>{t('common.details')}</Text>
-        </Button>
-      )}
-    </View>
+    </Card>
   );
 }
 
@@ -105,7 +121,6 @@ export function ModelRow({
 }: Readonly<{ model: HfListedModel; budget: DeviceBudget; fitsOnly: boolean }>) {
   const { t, i18n } = useTranslation();
   const router = useRouter();
-  const colors = useThemeColors();
   const smallest = useHfSmallestDownload(model.id, model.parameters);
   const sizeBytes = smallest.data ?? undefined;
   const fit = sizeBytes === undefined ? undefined : deviceFit(sizeBytes, budget);
@@ -129,7 +144,7 @@ export function ModelRow({
         router.push({ pathname: '/model-catalog/[owner]/[repo]', params: { owner, repo } });
       }}
       accessibilityRole="button"
-      className="flex-row items-center gap-3 border-b-[0.5px] border-hair-soft px-6 py-3 active:opacity-70"
+      className="flex-row items-center gap-3 border-b-[0.5px] border-hair-soft px-4 py-3 active:opacity-70"
     >
       <View className="min-w-0 flex-1 gap-1">
         <View className="flex-row items-center gap-2">
@@ -176,7 +191,7 @@ export function ModelRow({
           />
         </View>
       </View>
-      <DirectionalChevronRight size={16} color={colors.mutedForeground} />
+      <RowChevron />
     </Pressable>
   );
 }
@@ -196,7 +211,7 @@ export function LoadingRows() {
 /** Holds a catalog row's height while its download size, and so its fit, loads. */
 function ModelRowSkeleton() {
   return (
-    <View className="gap-2 border-b-[0.5px] border-hair-soft px-6 py-3">
+    <View className="gap-2 border-b-[0.5px] border-hair-soft px-4 py-3">
       <Skeleton className="h-3.5 w-1/2" />
       <Skeleton className="h-3 w-1/4" />
       <Skeleton className="h-3 w-2/3" />

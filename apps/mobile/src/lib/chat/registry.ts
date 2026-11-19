@@ -13,6 +13,7 @@ import {
   ToolMissingError,
   type Turn,
 } from '@kilocode/harness-sdk';
+import { type Part } from '@kilocode/cloud-agent-sdk';
 import { type SQLiteDatabase } from 'expo-sqlite';
 
 import { KILO_MCP_URL } from '@/lib/config';
@@ -62,6 +63,7 @@ import {
   migrateAsked,
   moveQuestions,
   newKeptId,
+  recordAskedAnswer,
   recordAskedFailure,
   rememberAsked,
   rememberFirstQuestion,
@@ -693,6 +695,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
          retry: that record is the bubble, so it stays in the transcript where
          it was said and the slot draws no second one. */
       askedFrom: asked?.from ?? null,
+      askedAnswer: asked?.answer ?? null,
       displaced: kept,
       status: 'idle',
       failed: null,
@@ -732,6 +735,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
          retry: that record is the bubble, so it stays in the transcript where
          it was said and the slot draws no second one. */
       askedFrom: asked?.from ?? null,
+      askedAnswer: asked?.answer ?? null,
       displaced: kept,
       record: recordOfChat(database, sessionId),
       askedEffort: asked?.effort ?? null,
@@ -777,18 +781,26 @@ async function keepAsked(sessionId: string): Promise<void> {
   const failureKey = recorded?.failureKey ?? held.failureKey;
   const outcome: Displaced['outcome'] = failureKey === null ? 'stopped' : 'failed';
   const askedFrom = held.askedFrom;
+  /* The words this attempt's Stop left, which replace any an earlier attempt
+     left: the bubble stands for this attempt now. */
+  const answer = held.askedAnswer === null ? {} : { answer: held.askedAnswer };
   if (askedFrom !== null) {
     /* It is already in the transcript, where it was said. This attempt is the
        one its bubble stands for now, so only how it ended is written down. */
     change(sessionId, {
-      displaced: held.displaced.map(one =>
-        one.id === askedFrom ? { ...one, outcome, failureKey } : one
-      ),
+      displaced: held.displaced.map(one => {
+        if (one.id !== askedFrom) {
+          return one;
+        }
+        const { answer: _earlier, ...question } = one;
+        return { ...question, outcome, failureKey, ...answer };
+      }),
       asked: null,
       askedImages: [],
       askedModel: null,
       askedEffort: null,
       askedFrom: null,
+      askedAnswer: null,
     });
     try {
       await replaceKept(sessionId, snapshotOf(sessionId).displaced);
@@ -810,6 +822,7 @@ async function keepAsked(sessionId: string): Promise<void> {
     afterTurns: held.turns.length,
     outcome,
     failureKey,
+    ...answer,
   };
   change(sessionId, {
     displaced: [...snapshotOf(sessionId).displaced, stored],
@@ -818,6 +831,7 @@ async function keepAsked(sessionId: string): Promise<void> {
     askedModel: null,
     askedEffort: null,
     askedFrom: null,
+    askedAnswer: null,
   });
   try {
     await replaceKept(sessionId, snapshotOf(sessionId).displaced);
@@ -842,82 +856,119 @@ export async function say(
 ): Promise<void> {
   const { text, images } = question;
   const { model, effort } = target;
-  await runTurn(sessionId, { skippable: false }, async () => {
-    let current = resolveSessionId(sessionId);
-    try {
-      const held = chats.get(current);
-      if (held?.answering !== undefined) {
-        held.waiting.push({
-          text,
-          images,
-          model,
-          effort,
-          ...(question.from === undefined ? {} : { from: question.from }),
-        });
-        change(current, { waiting: questionsIn(held.waiting) });
-        return;
-      }
-      if (held === undefined) {
-        throw new Error('the chat is not open');
-      }
-      const before = snapshotOf(current);
-      await keepAsked(current);
-      if (before.turns.length === 0 && before.asked === null && before.displaced.length === 0) {
-        await rememberFirstQuestion(current, text);
-      }
-      change(current, {
-        asked: text,
-        askedImages: images,
-        askedModel: model,
-        askedEffort: effort,
-        askedFrom: question.from ?? null,
-      });
-      await rememberAsked(current, {
+  await runTurn(sessionId, { skippable: false }, () =>
+    askInTurn(sessionId, { text, images, model, effort, from: question.from }, true)
+  );
+}
+
+/**
+ * Asks one question inside the chat's turn.
+ *
+ * A typed question never overtakes one the chat is already holding: what was
+ * typed while the last answer was arriving, or during the failed attempt the
+ * Retry stands for, is what the person asked first, so the send joins the end
+ * of that line and the line's own first question is asked in its place.
+ * An ask the registry drained from the line skips that join: it is ahead of
+ * it already.
+ */
+async function askInTurn(
+  sessionId: string,
+  question: Question & ChatTarget,
+  typed: boolean
+): Promise<void> {
+  let { text, images } = question;
+  let { model, effort } = question;
+  let from = question.from;
+  let current = resolveSessionId(sessionId);
+  try {
+    const held = chats.get(current);
+    if (held?.answering !== undefined) {
+      held.waiting.push({
         text,
+        images,
         model,
         effort,
-        images,
-        ...(before.turns.length === 0 ? {} : { after: before.turns.length }),
-        ...(question.from == null ? {} : { from: question.from }),
+        ...(from === undefined ? {} : { from }),
       });
-      current = await ontoForUse(current, { model, effort }, held);
-      const chat = chats.get(current);
-      if (chat === undefined) {
-        throw new Error('the chat is not open');
-      }
-      const runtime = await runtimeFor(chat);
-      const at = Date.now();
-      touchChat(await open(), current, at);
-      change(current, {
-        status: 'working',
-        answering: [],
-        asked: text,
-        askedImages: images,
-        askedModel: model,
-        askedEffort: effort,
-        askedFrom: question.from ?? null,
-        failed: null,
-        failureKey: null,
-        record: { ...snapshotOf(current).record, updatedAt: at },
-      });
-      chat.answering = runtime.runFork(reading(current, { text, images }, runtime));
-    } catch (error) {
-      current = snapshotOf(current).sessionId;
-      const failureKey = backendFailureKey(error, model);
-      await keepAskedFailure(current, failureKey);
-      change(current, {
-        status: 'idle',
-        answering: [],
-        asked: text,
-        askedImages: images,
-        askedModel: model,
-        askedEffort: effort,
-        askedFrom: question.from ?? null,
-        failed: reason(error),
-        failureKey,
-      });
+      change(current, { waiting: questionsIn(held.waiting) });
+      return;
     }
-  });
+    if (held === undefined) {
+      throw new Error('the chat is not open');
+    }
+    const before = snapshotOf(current);
+    if (typed && from == null && before.asked !== null && held.waiting.length > 0) {
+      /* A failed attempt keeps its Retry, and the line it holds is what the
+         person asked before that failure. A new send joins the line rather
+         than overtaking it, so questions reach the model in the order they
+         were typed. A Retry names the question it asks again, so it is that
+         attempt, not a newcomer: it takes the slot it already holds. */
+      held.waiting.push({ text, images, model, effort });
+      const next = held.waiting.shift();
+      if (next !== undefined) {
+        ({ text, images, model, effort, from } = next);
+        change(current, { waiting: questionsIn(held.waiting) });
+      }
+    }
+    await keepAsked(current);
+    if (before.turns.length === 0 && before.asked === null && before.displaced.length === 0) {
+      await rememberFirstQuestion(current, text);
+    }
+    change(current, {
+      asked: text,
+      askedImages: images,
+      askedModel: model,
+      askedEffort: effort,
+      askedFrom: from ?? null,
+      askedAnswer: null,
+    });
+    await rememberAsked(current, {
+      text,
+      model,
+      effort,
+      images,
+      ...(before.turns.length === 0 ? {} : { after: before.turns.length }),
+      ...(from == null ? {} : { from }),
+    });
+    current = await ontoForUse(current, { model, effort }, held);
+    const chat = chats.get(current);
+    if (chat === undefined) {
+      throw new Error('the chat is not open');
+    }
+    const runtime = await runtimeFor(chat);
+    const at = Date.now();
+    touchChat(await open(), current, at);
+    change(current, {
+      status: 'working',
+      answering: [],
+      asked: text,
+      askedImages: images,
+      askedModel: model,
+      askedEffort: effort,
+      askedFrom: from ?? null,
+      askedAnswer: null,
+      failed: null,
+      failureKey: null,
+      record: { ...snapshotOf(current).record, updatedAt: at },
+    });
+    chat.answering = runtime.runFork(reading(current, { text, images }, runtime));
+  } catch (error) {
+    current = snapshotOf(current).sessionId;
+    const failureKey = backendFailureKey(error, model);
+    await keepAskedFailure(current, failureKey);
+    change(current, {
+      status: 'idle',
+      answering: [],
+      asked: text,
+      askedImages: images,
+      askedModel: model,
+      askedEffort: effort,
+      askedFrom: from ?? null,
+      askedAnswer: null,
+      failed: reason(error),
+      failureKey,
+    });
+  }
 }
 
 /**
@@ -992,7 +1043,13 @@ export async function retryChat(sessionId: string, displaced?: Displaced): Promi
     /* The slot already holds it, so asking it again takes its place back rather
        than leaving a second copy of itself in the transcript. A retry of a kept
        question stays the retry of it, so its bubble stays where it was said. */
-    change(current, { asked: null, askedImages: [], askedModel: null, askedEffort: null });
+    change(current, {
+      asked: null,
+      askedImages: [],
+      askedModel: null,
+      askedEffort: null,
+      askedAnswer: null,
+    });
     await say(
       current,
       { text: asked, images: askedImages, ...(askedFrom === null ? {} : { from: askedFrom }) },
@@ -1054,7 +1111,7 @@ async function countCall(
   try {
     recordUsage(await open(), sessionId, usage);
   } catch {
-    // The tally stays in memory and the next answer's write includes it.
+    // Swallowed by design; see the doc comment above.
   }
 }
 
@@ -1300,6 +1357,7 @@ async function settle(
     askedImages: failed === null ? [] : held.askedImages,
     askedModel: failed === null ? null : held.askedModel,
     askedFrom: failed === null ? null : held.askedFrom,
+    askedAnswer: null,
     displaced: kept,
     failed,
     failureKey: failure?.key ?? null,
@@ -1389,14 +1447,18 @@ async function drain(sessionId: string, chat: Chat, failed: boolean): Promise<vo
     return;
   }
   change(current, { waiting: questionsIn(chat.waiting) });
-  await say(
-    current,
-    {
-      text: next.text,
-      images: next.images,
-      ...(next.from === undefined ? {} : { from: next.from }),
-    },
-    { model: next.model, effort: next.effort }
+  await runTurn(current, { skippable: false }, () =>
+    askInTurn(
+      current,
+      {
+        text: next.text,
+        images: next.images,
+        model: next.model,
+        effort: next.effort,
+        from: next.from,
+      },
+      false
+    )
   );
 }
 
@@ -1910,9 +1972,9 @@ export async function retryKiloMcp(sessionId: string): Promise<void> {
  * Stops the answer that is arriving.
  *
  * Interrupting the reading aborts the request, so the provider stops sending.
- * The question stays remembered: nothing was answered, so the person is left
- * with what they asked and a Retry under it, rather than with a message that
- * vanished.
+ * The question stays remembered, with the words the answer had reached under
+ * it: the person is left with what they asked, what they already read, and a
+ * Retry, rather than with a message that vanished.
  */
 export async function stopChat(sessionId: string): Promise<void> {
   const chat = chats.get(sessionId);
@@ -1920,31 +1982,56 @@ export async function stopChat(sessionId: string): Promise<void> {
     return;
   }
   const stopped = await halt(sessionId, chat);
-  if (stopped) {
+  if (stopped !== null) {
+    await keepStoppedAnswer(sessionId, stopped);
     await drain(sessionId, chat, false);
   }
 }
 
 /**
- * Interrupts the answer arriving, and answers whether there was one.
+ * Keeps the words a stopped answer had reached beside the question it answers.
+ *
+ * They go on screen first, so a refused write costs only a restart. Only the
+ * words are kept: a tool call the Stop cut off has no result to show, and the
+ * reasoning is folded away on screen already.
+ */
+async function keepStoppedAnswer(sessionId: string, parts: readonly Part[]): Promise<void> {
+  const answer = parts
+    .flatMap(part => (part.type === 'text' && part.text.trim() !== '' ? [part.text] : []))
+    .join('\n\n');
+  if (answer === '') {
+    return;
+  }
+  change(sessionId, { askedAnswer: answer });
+  try {
+    await recordAskedAnswer(sessionId, answer);
+  } catch {
+    /* The words stay on screen for as long as this chat is open. */
+  }
+}
+
+/**
+ * Interrupts the answer arriving, and answers with what of it was on screen,
+ * or null when no answer was arriving.
  *
  * Interrupting the reading aborts the request, so the provider stops sending.
- * It is deliberately only the interrupt: a chat being stopped goes on to ask
- * what is waiting, and a chat being closed does not.
+ * It is deliberately only the interrupt: a chat being stopped goes on to keep
+ * what arrived and ask what is waiting, and a chat being closed does neither.
  */
-async function halt(sessionId: string, chat: Chat): Promise<boolean> {
+async function halt(sessionId: string, chat: Chat): Promise<readonly Part[] | null> {
   if (chat.answering === undefined) {
-    return false;
+    return null;
   }
   const runtime = await runtimeFor(chat);
   await runtime.runPromise(Fiber.interrupt(chat.answering));
   chat.answering = undefined;
+  const arrived = snapshotOf(sessionId).answering;
   change(sessionId, { status: 'idle', answering: [] });
   /* An answer interrupted while its tools ran leaves an on-device generation
      waiting for results nothing will supply. It is released here, the one place
      Stop, a close, a deletion and a sign-out all pass through. */
   await releaseNativeModelRound(sessionId);
-  return true;
+  return arrived;
 }
 
 /**
@@ -1979,8 +2066,7 @@ async function endChat(sessionId: string, chat: Chat): Promise<void> {
 }
 
 /**
- * Ends a chat, whether it is being deleted or the account is going. Closing the
- * scope is what tells the store to write down whatever it still holds.
+ * Ends a chat, whether it is being deleted or the account is going.
  *
  * The id may be one a chat moved off — a route or a list row can still name it.
  * It resolves to the chat that carried on, or releasing it would leave that

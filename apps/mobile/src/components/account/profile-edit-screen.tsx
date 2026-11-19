@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { usePopOnce } from '@/lib/navigation/pop-once';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
@@ -187,11 +188,17 @@ export function ProfileEditScreen() {
   let body: ReactNode = null;
   if (links.isPending) {
     body = (
-      <View className="gap-6">
-        <Skeleton className="h-[74px] rounded-lg" />
-        <Skeleton className="h-[74px] rounded-lg" />
-        <Skeleton className="h-11 rounded-lg" />
-      </View>
+      <>
+        <View className="gap-1">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-12 rounded-md" />
+        </View>
+        <View className="gap-1">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-12 rounded-md" />
+        </View>
+        <Skeleton className="h-11 rounded-md" />
+      </>
     );
   } else if (links.isError) {
     body = <QueryError onRetry={() => void links.refetch()} isRetrying={links.isFetching} />;
@@ -214,7 +221,7 @@ export function ProfileEditScreen() {
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-6 px-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}

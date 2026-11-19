@@ -69,7 +69,6 @@ type SearchOutcome =
 
 const failed = (reason: string): SearchOutcome => ({ ok: false, reason });
 
-/** The body read through its schema, or nothing when it is not that JSON. */
 function parsedBody<T>(text: string, schema: z.ZodType<T>): T | undefined {
   try {
     const parsed = schema.safeParse(JSON.parse(text));

@@ -31,3 +31,5 @@ export function firedDetectorsLabel(call: EnkryptUsageRow): string | null {
     ? call.fired_detectors.map(detectorLabel).join(', ')
     : null;
 }
+
+export const ENKRYPT_LATENCY_HINT = 'How long this Enkrypt scan took.';

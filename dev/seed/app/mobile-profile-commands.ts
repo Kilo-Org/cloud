@@ -7,10 +7,11 @@ import {
   organization_memberships,
   organizations,
 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
+import { findSeedUserId } from '../lib/users';
 
 export const usage = '<fake-email>';
 
@@ -78,14 +79,9 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   }
 
   const db = getSeedDb();
-  const userId = `dev-seed:mobile-profile-commands:${email}`;
-  const [existing] = await db
-    .select({ id: kilocode_users.id })
-    .from(kilocode_users)
-    .where(eq(kilocode_users.normalized_email, email));
-  if (existing && existing.id !== userId) {
-    throw new Error('The requested email belongs to a different account; choose a new fake email.');
-  }
+  // A fake account that already signed in keeps its own row: the fixture joins
+  // it, so the seed runs before or after the device-code sign-in.
+  const userId = (await findSeedUserId(email)) ?? `dev-seed:mobile-profile-commands:${email}`;
   await db
     .insert(kilocode_users)
     .values({
@@ -108,6 +104,16 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     })
     .onConflictDoNothing();
   // A plain member: reads the organization's profiles, cannot manage them.
+  // The organization belongs to one account at a time, so a run for another
+  // email takes it over instead of adding that email beside the previous owner.
+  await db
+    .delete(organization_memberships)
+    .where(
+      and(
+        eq(organization_memberships.organization_id, ORGANIZATION_ID),
+        ne(organization_memberships.kilo_user_id, userId)
+      )
+    );
   await db
     .insert(organization_memberships)
     .values({

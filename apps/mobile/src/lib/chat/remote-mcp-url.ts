@@ -1,3 +1,26 @@
+export type RemoteMcpUrlProblem = 'invalidUrl' | 'credentials' | 'fragment' | 'insecureEndpoint';
+
+/**
+ * The copy key each URL refusal is said with. The form already refuses every
+ * URL it cannot normalize with `fieldUrlInvalid`, so the toast says the same
+ * thing the form said, and no other key exists for these.
+ */
+export const REMOTE_MCP_URL_ERROR_KEYS = {
+  invalidUrl: 'modelChat.mcp.fieldUrlInvalid',
+  credentials: 'modelChat.mcp.fieldUrlInvalid',
+  fragment: 'modelChat.mcp.fieldUrlInvalid',
+  insecureEndpoint: 'modelChat.mcp.fieldUrlInvalid',
+} as const satisfies Record<RemoteMcpUrlProblem, string>;
+
+export class RemoteMcpUrlError extends Error {
+  readonly problem: RemoteMcpUrlProblem;
+
+  constructor(problem: RemoteMcpUrlProblem) {
+    super(problem);
+    this.problem = problem;
+  }
+}
+
 const parseUrl = (value: string): URL | undefined => {
   try {
     return new URL(value);
@@ -16,29 +39,31 @@ const parseUrl = (value: string): URL | undefined => {
  * trailing slash on the path, root path included — so two spellings of one
  * endpoint are one server. A query string is preserved.
  *
- * Throws an `Error` for anything else, so the caller has one failure to show.
+ * Throws a `RemoteMcpUrlError` for anything the policy refuses, so the caller
+ * has one failure to show. Its message is the problem tag, never user-visible
+ * prose; the words live in the catalog behind `REMOTE_MCP_URL_ERROR_KEYS`.
  */
 export function normalizeRemoteMcpUrl(raw: string): string {
   const trimmed = raw.trim();
   const url = parseUrl(trimmed);
 
   if (url === undefined) {
-    throw new Error('Remote MCP URL must be a valid URL.');
+    throw new RemoteMcpUrlError('invalidUrl');
   }
 
   if (url.username.length > 0 || url.password.length > 0) {
-    throw new Error('Remote MCP URL must not include credentials.');
+    throw new RemoteMcpUrlError('credentials');
   }
 
   if (trimmed.includes('#')) {
-    throw new Error('Remote MCP URL must not include a fragment.');
+    throw new RemoteMcpUrlError('fragment');
   }
 
   if (
     url.protocol !== 'https:' &&
     !(url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1'))
   ) {
-    throw new Error('Remote MCP URL must use HTTPS unless it points to localhost.');
+    throw new RemoteMcpUrlError('insecureEndpoint');
   }
 
   return `${url.protocol}//${url.host}${url.pathname.replaceAll(/\/+$/g, '')}${url.search}`;

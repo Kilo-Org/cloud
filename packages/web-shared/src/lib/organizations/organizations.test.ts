@@ -119,6 +119,27 @@ describe('Organizations', () => {
   });
 
   describe('markOrganizationAsDeleted', () => {
+    test('clears the Anthropic user profile id', async () => {
+      const user = await insertTestUser();
+      const organization = await createOrganization('Deleted Anthropic profile', user.id);
+      await db
+        .update(organizations)
+        .set({ anthropic_user_profile_id: 'uprof_test_org_delete' })
+        .where(eq(organizations.id, organization.id));
+
+      await markOrganizationAsDeleted(organization.id);
+
+      const [deleted] = await db
+        .select({
+          deleted_at: organizations.deleted_at,
+          anthropic_user_profile_id: organizations.anthropic_user_profile_id,
+        })
+        .from(organizations)
+        .where(eq(organizations.id, organization.id));
+      expect(deleted.deleted_at).not.toBeNull();
+      expect(deleted.anthropic_user_profile_id).toBeNull();
+    });
+
     test('disables only the deleted organization briefing context', async () => {
       const user = await insertTestUser();
       const organization = await createOrganization('Deleted briefing context', user.id);
@@ -1223,6 +1244,27 @@ describe('Organizations', () => {
   });
 
   describe('inviteUserToOrganization', () => {
+    test('rejects an invitation to a deleted organization with its own message', async () => {
+      const owner = await insertTestUser();
+      const organization = await createOrganization('Deleted Invite Target', owner.id);
+      await db
+        .update(organizations)
+        .set({ deleted_at: sql`now()` })
+        .where(eq(organizations.id, organization.id));
+
+      const error = await inviteUserToOrganization(
+        organization.id,
+        owner.id,
+        'missing-target@example.com',
+        'member'
+      ).then(
+        () => null,
+        (e: unknown) => (e instanceof Error ? e : null)
+      );
+
+      expect(error?.message).toBe('This organization is no longer available');
+    });
+
     test('should create invitation with correct details', async () => {
       const owner = await insertTestUser();
       const organization = await createOrganization('Test Org', owner.id);

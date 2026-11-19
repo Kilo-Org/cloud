@@ -1,16 +1,18 @@
 import { type Href, useRouter } from 'expo-router';
-import { SearchX } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 
-import { EmptyState } from '@/components/empty-state';
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { StateAction } from '@/components/empty-state';
+import { QueryError } from '@/components/query-error';
+import { DirectionalArrowLeft } from '@/components/ui/directional-icons';
 
 /**
  * Terminal state for a route whose params fail runtime validation (bad
  * scope/platform/id, or an unsupported scope+platform combination) —
  * matches the "instance not found" pattern in instance-context-boundary.tsx.
+ *
+ * It is the app's one not-found face, `QueryError`'s `not-found` variant, with
+ * the link's own copy. The route renders no header of its own (it can sit in a
+ * page or a sheet), so the state carries the one way out.
  *
  * Back replaces this route with `backTo`, the in-app parent its caller chose.
  * It never pops: a cold deep link renders on top of the tab anchor, so
@@ -22,21 +24,19 @@ export function InvalidRouteState({ backTo }: Readonly<{ backTo: Href }>) {
   const { t } = useTranslation();
 
   return (
-    <EmptyState
+    <QueryError
       className="bg-background"
-      icon={SearchX}
+      variant="not-found"
       title={t('invalidRoute.title')}
-      description={t('invalidRoute.description')}
+      message={t('invalidRoute.description')}
       action={
-        <Button
-          className={STATE_ACTION_CLASS}
-          variant="outline"
+        <StateAction
+          label={t('common.goBack')}
+          icon={DirectionalArrowLeft}
           onPress={() => {
             router.replace(backTo);
           }}
-        >
-          <Text>{t('common.goBack')}</Text>
-        </Button>
+        />
       }
     />
   );

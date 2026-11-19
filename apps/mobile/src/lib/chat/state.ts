@@ -6,14 +6,6 @@ import { type LocalImage } from '@/lib/agent-attachments/local-image';
 import { type ChatFlag } from './chat-flag';
 import { type ChatRecord, NO_RECORD } from './store';
 
-/**
- * What a chat looks like to whoever is drawing it.
- *
- * A screen never holds this: it reads it. The conversation runs in the
- * registry whether or not a screen is mounted, and every change to one is
- * published to whoever is watching.
- */
-
 /** Something a person asked: the words and the images that go with them. */
 export type Question = {
   readonly text: string;
@@ -57,6 +49,11 @@ export type Displaced = Question &
      * one the person stopped, says nothing about a cause.
      */
     readonly failureKey?: string | null;
+    /**
+     * The words the answer had reached when the person stopped it. Absent when
+     * it failed, or was stopped before any words arrived.
+     */
+    readonly answer?: string;
   };
 
 /** What a chat screen draws. */
@@ -86,6 +83,13 @@ export type ChatState = {
    * and everything said after it stays after it.
    */
   readonly askedFrom: string | null;
+  /**
+   * The words the answer to that question had reached when the person stopped
+   * it. They stay on screen, marked as stopped, instead of going with the
+   * Stop. Null while the question is being asked, and when it failed or was
+   * stopped before any words arrived.
+   */
+  readonly askedAnswer: string | null;
   /**
    * The questions asked before that one and never answered, oldest first. A
    * later send takes the one slot, and what it took the place of is kept here.
@@ -200,6 +204,7 @@ export const NOTHING = {
   asked: null,
   askedImages: [] as readonly LocalImage[],
   askedFrom: null,
+  askedAnswer: null,
   displaced: [] as readonly Displaced[],
   askedModel: null,
   askedEffort: null,

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { McpServerRowView } from '@/components/profiles/mcp-server-row';
 import { McpFormSheet, type McpSaveFailure } from '@/components/profiles/mcp-form-sheet';
 import {
@@ -19,8 +19,9 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { Server } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Plus, Server } from '@/components/ui/icons';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import {
   type AgentProfileDetail,
@@ -30,8 +31,8 @@ import {
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { MAX_PROFILE_MCP_SERVERS } from '@/lib/agent-profile-forms';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { isolateLtrBidiText } from '@/lib/bidi';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
@@ -46,11 +47,11 @@ function hasUsableMessage(error: unknown): boolean {
 /** Content-shaped rows in the same slot and height as a loaded server row. */
 function McpSkeleton() {
   return (
-    <View className="gap-3">
+    <RowGroup>
       {[0, 1, 2].map(index => (
-        <Skeleton key={index} className="h-16 w-full rounded-lg bg-muted-soft" />
+        <RowSkeleton key={index} tile subtitle trailingControl />
       ))}
-    </View>
+    </RowGroup>
   );
 }
 
@@ -73,6 +74,9 @@ export function ProfileMcpScreen({
   const canManage = permission === 'allowed';
   const servers = profileQuery.data ?? NO_MCP_SERVERS;
   const rows = mcpServerRows(servers);
+  // The type only tells rows apart in a list that holds both kinds; a list of
+  // one kind says it once for the whole group instead of on every row.
+  const mixedTypes = servers.some(server => server.type !== servers[0]?.type);
   // The server counts every row this profile holds and the list returns every
   // row unfiltered, so the loaded length is the count the cap compares.
   const atServerCap = servers.length >= MAX_PROFILE_MCP_SERVERS;
@@ -169,60 +173,61 @@ export function ProfileMcpScreen({
         placement="top"
         action={
           <ProfileManageSlot permission={permission}>
-            <Button className={STATE_ACTION_CLASS} onPress={handleStartAdd}>
-              <Text>{t('profiles.mcp.add')}</Text>
-            </Button>
+            <StateAction label={t('profiles.mcp.add')} icon={Plus} onPress={handleStartAdd} />
           </ProfileManageSlot>
         }
       />
     );
   } else {
     content = (
-      <>
-        {rows.map((row, index) => {
-          const server = servers[index];
-          if (server === undefined) {
-            return null;
-          }
-          return (
-            <McpServerRowView
-              key={row.id}
-              server={server}
-              summary={row.summary}
-              secretCount={row.secretCount}
-              onToggle={
-                canManage
-                  ? guardRowPress(enabled => {
-                      setMcpEnabled.mutate(
-                        { profileId, mcpServerId: server.id, enabled },
-                        {
-                          onError: error => {
-                            if (!hasUsableMessage(error)) {
-                              toast.error(t('profiles.mcp.updateFailed'));
-                            }
-                          },
-                        }
-                      );
-                    })
-                  : undefined
-              }
-              onEdit={
-                canManage
-                  ? guardRowPress(() => {
-                      form.startEdit(server);
-                    })
-                  : undefined
-              }
-              onDelete={
-                canManage
-                  ? guardRowPress(() => {
-                      confirmDelete(server);
-                    })
-                  : undefined
-              }
-            />
-          );
-        })}
+      <View className="gap-3">
+        <RowGroup leadingTile>
+          {rows.map((row, index) => {
+            const server = servers[index];
+            if (server === undefined) {
+              return null;
+            }
+            return (
+              <McpServerRowView
+                key={row.id}
+                server={server}
+                summary={row.summary}
+                secretCount={row.secretCount}
+                showType={mixedTypes}
+                onToggle={
+                  canManage
+                    ? guardRowPress(enabled => {
+                        setMcpEnabled.mutate(
+                          { profileId, mcpServerId: server.id, enabled },
+                          {
+                            onError: error => {
+                              if (!hasUsableMessage(error)) {
+                                toast.error(t('profiles.mcp.updateFailed'));
+                              }
+                            },
+                          }
+                        );
+                      })
+                    : undefined
+                }
+                onEdit={
+                  canManage
+                    ? guardRowPress(() => {
+                        form.startEdit(server);
+                      })
+                    : undefined
+                }
+                onDelete={
+                  canManage
+                    ? guardRowPress(() => {
+                        confirmDelete(server);
+                      })
+                    : undefined
+                }
+              />
+            );
+          })}
+        </RowGroup>
         <ProfileManageSlot permission={permission}>
           {atServerCap ? (
             <AccessibleStatus
@@ -235,7 +240,7 @@ export function ProfileMcpScreen({
             <Text>{t('profiles.mcp.add')}</Text>
           </Button>
         </ProfileManageSlot>
-      </>
+      </View>
     );
   }
 
@@ -249,7 +254,7 @@ export function ProfileMcpScreen({
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-3 px-6 pt-4 pb-8"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}

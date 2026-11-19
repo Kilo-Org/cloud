@@ -166,18 +166,21 @@ describe('shared usage completion observations', () => {
     }
   );
 
-  test('retains finite caller context without changing the write result', async () => {
-    expect(
-      await observeUsageRecordCompletion(usage, async () => recorded, {
+  test.each(['queue', 'queue_vercel'] as const)(
+    'retains finite %s caller context without changing the write result',
+    async writerCaller => {
+      expect(
+        await observeUsageRecordCompletion(usage, async () => recorded, {
+          entrypoint: 'writer_endpoint',
+          writer_caller: writerCaller,
+        })
+      ).toBe(recorded);
+      expect(JSON.parse(info.mock.calls[0][0])).toMatchObject({
         entrypoint: 'writer_endpoint',
-        writer_caller: 'queue',
-      })
-    ).toBe(recorded);
-    expect(JSON.parse(info.mock.calls[0][0])).toMatchObject({
-      entrypoint: 'writer_endpoint',
-      writer_caller: 'queue',
-    });
-  });
+        writer_caller: writerCaller,
+      });
+    }
+  );
 
   test('waits for the full operation and measures monotonic elapsed time', async () => {
     let now = 100;

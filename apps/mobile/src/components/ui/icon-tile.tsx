@@ -1,7 +1,7 @@
-import { type ReactNode } from 'react';
+import { type ComponentType, type ReactNode } from 'react';
 import { View } from 'react-native';
 
-import { type LucideIcon } from '@/components/ui/icons';
+import { type LucideProps } from '@/components/ui/icons';
 import { type Tint } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -28,7 +28,7 @@ export function IconTile({
   className,
   content,
 }: Readonly<{
-  icon?: LucideIcon;
+  icon?: ComponentType<LucideProps>;
   tint: Tint;
   className?: string;
   /** Node rendered in place of the icon, inside the same frame. */

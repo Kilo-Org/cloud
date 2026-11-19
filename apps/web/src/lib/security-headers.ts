@@ -88,7 +88,6 @@ export function buildContentSecurityPolicy({
     'https://*.js.stripe.com',
     'https://checkout.stripe.com',
     'https://challenges.cloudflare.com',
-    'https://cdn.platform.openai.com/deployments/watchwood/watchwood.js',
     'https://widget.usepylon.com',
     'https://assets.churnkey.co',
   ]);
@@ -99,7 +98,6 @@ export function buildContentSecurityPolicy({
     'https://us.i.posthog.com',
     'https://us-assets.i.posthog.com',
     'https://api.stripe.com',
-    'https://watchwood.openai.com/v1/watchwood/',
     'https://r.stripe.com',
     'https://m.stripe.com',
     'https://checkout.stripe.com',

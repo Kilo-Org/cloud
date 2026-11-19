@@ -13,7 +13,10 @@ import {
   shouldRenderReasoningPart,
 } from '@/components/cloud-agent-next/types';
 import { sortSessionMessagesForDisplay } from '@/lib/cloud-agent-next/message-ordering';
-import { readBackgroundResult } from '@kilocode/cloud-agent-sdk/background-result';
+import {
+  readBackgroundResult,
+  type BackgroundResult,
+} from '@kilocode/cloud-agent-sdk/background-result';
 
 type SnapshotMessage = {
   info: { id: string; role?: unknown; time?: unknown };
@@ -68,6 +71,41 @@ export function groupConsecutiveAssistantMessages(messages: StoredMessage[]): St
     turns.push([message]);
   }
   return turns;
+}
+
+export function readKiloV1BackgroundTaskResult(part: Part): BackgroundResult | undefined {
+  if (
+    !isTextPart(part) ||
+    part.synthetic !== true ||
+    part.metadata?.background !== true ||
+    typeof part.text !== 'string'
+  ) {
+    return;
+  }
+
+  const header = /^<task id="(ses_[\w-]+)" state="(completed|error)">\n/.exec(part.text);
+  const childID = header?.[1];
+  const state = header?.[2];
+  if (!header || !childID || !state) return;
+
+  const failed = state === 'error';
+  const tag = failed ? 'task_error' : 'task_result';
+  const prefix = `${header[0]}<summary>Background task ${failed ? 'failed' : 'completed'}: `;
+  const separator = `</summary>\n<${tag}>\n`;
+  const suffix = `\n</${tag}>\n</task>`;
+  if (!part.text.startsWith(prefix) || !part.text.endsWith(suffix)) return;
+  const summaryEnd = part.text.indexOf(separator, prefix.length);
+  if (summaryEnd === -1) return;
+
+  return {
+    kind: 'subagent',
+    childID,
+    agent: '',
+    state,
+    outcome: failed ? 'failed' : 'finished',
+    description: part.text.slice(prefix.length, summaryEnd),
+    output: part.text.slice(summaryEnd + separator.length, -suffix.length),
+  };
 }
 
 function isSnapshotProgressPart(part: Part): boolean {

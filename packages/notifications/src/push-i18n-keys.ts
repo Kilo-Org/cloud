@@ -9,8 +9,11 @@ const SESSION_TITLE_KEY = 'session.title';
 /** The payload key the security-lifecycle producer sends. */
 export const SECURITY_LIFECYCLE_I18N_KEY = 'internal.securityLifecycle';
 
+/** The leaf of the generic body the security-lifecycle notice reads. */
+export const SECURITY_LIFECYCLE_BODY_LEAF = 'securityUpdate';
+
 /** The one catalog entry the security-lifecycle push reads its body from. */
-const SECURITY_LIFECYCLE_BODY_KEY = 'generic.body.securityUpdate';
+const SECURITY_LIFECYCLE_BODY_KEY = `generic.body.${SECURITY_LIFECYCLE_BODY_LEAF}`;
 
 /** The security-finding kinds the internal dispatch producer can send. */
 type SecurityFindingNotificationKind = InternalDispatchSecurityFindingRequest['notificationKind'];

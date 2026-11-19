@@ -5,6 +5,7 @@ import {
   CONTROL_PLANE_SUPERVISOR,
   GIT_CREDENTIAL_HELPER,
   RUNTIME_DISTRIBUTION,
+  RUNTIME_PROCESS_PATH,
   RUNTIME_RESERVED_ROOT,
   WRAPPER_BUNDLES,
   runtimeInstallPath,
@@ -384,7 +385,7 @@ export function renderRuntimeBootstrap(input: {
   const environment = [
     '/usr/bin/env',
     '-i',
-    'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+    `PATH=${RUNTIME_PROCESS_PATH}`,
     'HOME=/root',
     'LANG=en_US.UTF-8',
     'LC_ALL=en_US.UTF-8',

@@ -28,6 +28,14 @@ describe('downloading a curated model', () => {
     expect(JSON.parse(h.index.text ?? '[]')).toHaveLength(1);
   });
 
+  it('reports no retry while the first attempt runs', () => {
+    const h = harness();
+    h.store.start(CATALOG);
+    expect(h.store.snapshot().download).toMatchObject({ retrying: false });
+    taskAt(h.tasks, 0).progress({ bytesWritten: 400, totalBytes: 1000 });
+    expect(h.store.snapshot().download).toMatchObject({ retrying: false });
+  });
+
   it('refuses a second download while one runs, and a model already here', async () => {
     const h = harness();
     expect(h.store.start(CATALOG)).toBe(true);
@@ -130,10 +138,13 @@ describe('pausing, resuming and cancelling', () => {
       fileId: 'small',
       phase: 'downloading',
       written: 0,
+      retrying: true,
     });
 
     await finish(taskAt(h.tasks, 1), 1000);
 
+    // The retried transfer finished, so nothing says "retrying" any more.
+    expect(h.store.snapshot().download).toBeNull();
     expect(h.store.snapshot().failure).toBeNull();
     expect(h.store.model('small')).toMatchObject({ sizeBytes: 1000, contextWindow: 4096 });
     expect(h.files.has(ggufPartialName('small'))).toBe(false);
@@ -143,6 +154,7 @@ describe('pausing, resuming and cancelling', () => {
     const h = harness();
     h.store.start(CATALOG);
     await finish(taskAt(h.tasks, 0), 900);
+    expect(h.store.snapshot().download).toMatchObject({ retrying: true });
     await finish(taskAt(h.tasks, 1), 950);
 
     expect(h.tasks).toHaveLength(2);

@@ -15,6 +15,7 @@ export function getHomeWidgetCopy() {
     lastKnown: i18n.t('glanceable.lastKnown'),
     awaitingUpdate: i18n.t('glanceable.awaitingUpdate'),
     nextRun: i18n.t('glanceable.nextRun'),
+    wasDue: i18n.t('glanceable.wasDue'),
     agent: i18n.t('common.agent'),
     waitingForYou: i18n.t('glanceable.waitingForYou'),
     nextScheduled: i18n.t('glanceable.nextScheduled'),

@@ -39,14 +39,19 @@ import {
   type PublishCloudAgentSessionStatusParams,
   recordCloudAgentSessionHarnessSchema,
   type RecordCloudAgentSessionHarnessParams,
-  cloudAgentSessionIdSchema,
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeDeletionManifestSchema,
   cloudAgentWorktreeDeletionSchema,
+  beginCloudAgentWorktreeDeletionSchema,
   cloudAgentWorktreeLocationSchema,
   recordCloudAgentWorktreeCleanupSchema,
   canDestroyCloudAgentWorktreeSandboxSchema,
   retireCloudAgentWorktreeIfSoleMemberSchema,
+  setGeneratedTitleForCloudAgentSchema,
+  canGenerateTitleForCloudAgentSchema,
+  type BeginCloudAgentWorktreeDeletionParams,
+  type SetGeneratedTitleForCloudAgentParams,
+  type CanGenerateTitleForCloudAgentParams,
   type CloudAgentWorktreeDeletionParams,
   type RecordCloudAgentWorktreeCleanupParams,
   type CanDestroyCloudAgentWorktreeSandboxParams,
@@ -139,17 +144,6 @@ import { applyMetadataChanges } from './ingest/metadata';
 const MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS = 512;
 const CLOUD_AGENT_ROOT_SESSION_IDENTITY_CONFLICT_ERROR =
   'Cloud Agent root session identity conflict';
-
-const setGeneratedTitleForCloudAgentSchema = z.object({
-  sessionId: sessionIdSchema,
-  kiloUserId: z.string().min(1),
-  cloudAgentSessionId: cloudAgentSessionIdSchema,
-  title: reportSessionTitleSchema.shape.title,
-});
-
-const canGenerateTitleForCloudAgentSchema = setGeneratedTitleForCloudAgentSchema.omit({
-  title: true,
-});
 
 type CliSessionsV2Row = typeof cli_sessions_v2.$inferSelect;
 
@@ -255,8 +249,8 @@ function destinationIdentityConflicts(
 }
 
 export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIngestRpcMethods {
-  async beginCloudAgentWorktreeDeletion(params: CloudAgentWorktreeDeletionParams) {
-    return beginWorktreeDeletion(this.env, cloudAgentWorktreeDeletionSchema.parse(params));
+  async beginCloudAgentWorktreeDeletion(params: BeginCloudAgentWorktreeDeletionParams) {
+    return beginWorktreeDeletion(this.env, beginCloudAgentWorktreeDeletionSchema.parse(params));
   }
 
   async recordCloudAgentWorktreeCleanup(params: RecordCloudAgentWorktreeCleanupParams) {
@@ -623,8 +617,29 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         ['statusTransitionId', input.transitionId],
       ]),
       this.ctx,
-      input.cloudAgentSessionId
+      input.cloudAgentSessionId,
+      input.rename
     );
+    if (input.lastActivityAt === undefined) return;
+    // The Session DO's clock can run ahead of the database, and the active-session list treats a
+    // future last_activity_at as live; no writer would lower it, so the report is clamped.
+    const activity = sql`LEAST(${input.lastActivityAt}::timestamptz, now())`;
+    // The predicate makes the write forward-only by itself, so a repeat that does not advance
+    // the stored value matches no row and writes no row version.
+    await getWorkerDb(this.env.HYPERDRIVE.connectionString)
+      .update(cli_sessions_v2)
+      .set({ last_activity_at: activity })
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, input.sessionId),
+          eq(cli_sessions_v2.kilo_user_id, input.kiloUserId),
+          eq(cli_sessions_v2.cloud_agent_session_id, input.cloudAgentSessionId),
+          or(
+            isNull(cli_sessions_v2.last_activity_at),
+            lt(cli_sessions_v2.last_activity_at, activity)
+          )
+        )
+      );
   }
 
   async recordCloudAgentSessionHarness(
@@ -634,12 +649,9 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     return setCloudAgentSessionVersion(getWorkerDb(this.env.HYPERDRIVE.connectionString), input);
   }
 
-  async setGeneratedTitleForCloudAgent(params: {
-    sessionId: string;
-    kiloUserId: string;
-    cloudAgentSessionId: string;
-    title: string;
-  }): Promise<{ applied: boolean }> {
+  async setGeneratedTitleForCloudAgent(
+    params: SetGeneratedTitleForCloudAgentParams
+  ): Promise<{ applied: boolean }> {
     const parsed = setGeneratedTitleForCloudAgentSchema.parse(params);
     const input = reportSessionTitleSchema.parse({ title: parsed.title, generated: true });
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
@@ -664,11 +676,9 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     return { applied: true };
   }
 
-  async canGenerateTitleForCloudAgent(params: {
-    sessionId: string;
-    kiloUserId: string;
-    cloudAgentSessionId: string;
-  }): Promise<boolean> {
+  async canGenerateTitleForCloudAgent(
+    params: CanGenerateTitleForCloudAgentParams
+  ): Promise<boolean> {
     const parsed = canGenerateTitleForCloudAgentSchema.parse(params);
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
 

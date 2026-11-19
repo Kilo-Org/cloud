@@ -15,7 +15,7 @@ Keep PR history clean. Treat rebases, non-fast-forward push rejections, and bran
 - Prefer `git push --force-with-lease` over `git push --force`; still ask first.
 - If hooks/checks fail, diagnose and fix or ask; do not bypass silently.
 - Run `pnpm format` before committing. For verification, prefer targeted checks; avoid full `pnpm typecheck` by default because it is slow.
-- For migration conflicts: never hand-write or hand-edit generated migration SQL, snapshots, or journal entries. Delete branch-local generated migration artifacts, rerun `pnpm drizzle generate`, then re-append intentional backfill SQL after generated DDL using `-->  statement-breakpoint` separators.
+- For migration conflicts: never hand-write or hand-edit generated migration SQL, snapshots, or journal entries. Delete branch-local generated migration artifacts, rerun `pnpm drizzle generate`, then re-append intentional backfill SQL after generated DDL using `--> statement-breakpoint` separators.
 
 ## Start every rebase/branch-cleanup task
 
@@ -108,7 +108,7 @@ When rebase conflicts touch `packages/db/src/migrations/`:
    pnpm drizzle generate
    ```
 
-6. Re-append any intentional backfill SQL after generated DDL with `-->  statement-breakpoint` separators.
+6. Re-append any intentional backfill SQL after generated DDL with `--> statement-breakpoint` separators.
 7. If regenerated migration files belong in an earlier logical commit, use the post-rebase cleanup guidance above.
 8. Prefer a single regenerated migration per feature branch when it has not shipped.
 

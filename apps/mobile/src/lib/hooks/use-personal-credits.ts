@@ -3,7 +3,11 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import { type CreditPurchaseEntry } from '@/lib/credits/credit-history';
-import { hasRetentionBudget, withInfiniteRetention } from '@/lib/query/infinite-retention';
+import {
+  hasRetentionBudget,
+  stoppedAtRetentionBound,
+  withInfiniteRetention,
+} from '@/lib/query/infinite-retention';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
@@ -63,8 +67,15 @@ export function useCreditPurchaseHistory(enabled: boolean) {
     () => (pages ?? []).flatMap(page => page.entries),
     [pages]
   );
+  // This page shape has no `hasMore`: the builder refuses the next page at the
+  // bound, so a last page that still carries a `nextCursor` means more history
+  // sits below the loaded pages.
+  const isRetentionLimited = stoppedAtRetentionBound(
+    pages?.length ?? 0,
+    pages?.at(-1)?.nextCursor != null
+  );
 
-  return { query, entries, hasMore: query.hasNextPage };
+  return { query, entries, hasMore: query.hasNextPage, isRetentionLimited };
 }
 
 /**
@@ -99,5 +110,12 @@ export function usePersonalInvoicesPage() {
     [pages]
   );
 
-  return { query, entries, hasMore: query.hasNextPage };
+  // `hasNextPage` hides at the retention bound too, so the last page's own
+  // `hasMore` is what tells a truncated list from a finished one.
+  const isRetentionLimited = stoppedAtRetentionBound(
+    pages?.length ?? 0,
+    pages?.at(-1)?.hasMore === true
+  );
+
+  return { query, entries, hasMore: query.hasNextPage, isRetentionLimited };
 }

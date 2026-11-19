@@ -1164,6 +1164,10 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
   const restore = deps.restoreSession ?? restoreSession;
 
   Object.assign(process.env, request.materialized.env);
+  // The prepared workspace carries this session's home, and every child the bootstrap starts
+  // resolves its state there, including the pinned git credential helper. Assign it after the
+  // payload merge so the prepared workspace stays authoritative.
+  process.env.HOME = request.workspace.sessionHome;
 
   let workspaceWasWarm = false;
   let workspaceNeedsBootstrap = true;

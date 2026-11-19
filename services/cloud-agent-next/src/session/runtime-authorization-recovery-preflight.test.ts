@@ -22,6 +22,11 @@ vi.mock('../sandbox-session/session-stub.js', () => ({
   }),
 }));
 
+const renewWorkspaceAuthority = vi.hoisted(() => vi.fn(async () => undefined));
+vi.mock('./workspace-authority-renewal.js', () => ({
+  renewWorkspaceAuthorityForUserSend: renewWorkspaceAuthority,
+}));
+
 vi.mock('./metadata.js', () => ({
   fetchSessionMetadata: vi.fn(async () => ({
     identity: { sessionId: 'workspace_12345678-1234-1234-1234-123456789abc', userId: 'usr_1' },
@@ -73,6 +78,31 @@ describe('preflightRuntimeAuthorizationRecovery', () => {
     getRuntimeAuthorizationStatus.mockReset();
     recoverExpiredRuntimeAuthorization.mockReset();
     recoverExpiredRuntimeAuthorization.mockResolvedValue({ status: 'recovered' });
+  });
+
+  it('offers the chat workspace for renewal after its own authorization passes', async () => {
+    getRuntimeAuthorizationStatus.mockResolvedValue({
+      state: 'active',
+      id: 'authorization-1',
+      workspaceSessionId: 'workspace_parent',
+    });
+    await preflightRuntimeAuthorizationRecovery('workspace_a', ctx);
+    expect(renewWorkspaceAuthority).toHaveBeenCalledWith({
+      env: ctx.env,
+      userId: 'usr_1',
+      authToken: delegatedToken,
+      workspaceSessionId: 'workspace_parent',
+    });
+  });
+
+  it('does not renew the workspace when the chat itself is revoked', async () => {
+    renewWorkspaceAuthority.mockClear();
+    getRuntimeAuthorizationStatus.mockResolvedValue({
+      state: 'revoked',
+      workspaceSessionId: 'workspace_parent',
+    });
+    await expect(preflightRuntimeAuthorizationRecovery('workspace_a', ctx)).rejects.toThrow();
+    expect(renewWorkspaceAuthority).not.toHaveBeenCalled();
   });
 
   it('does nothing for an active authorization', async () => {

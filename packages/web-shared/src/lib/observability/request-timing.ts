@@ -48,7 +48,6 @@ const VERSION_MAX_LENGTH = 32;
 /** Accepted request-id shape: 1-64 characters from a bounded character set. */
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{1,64}$/;
 
-/** An absent or empty header is `null`; a known value passes; anything else is `'other'`. */
 function readAllowlisted(
   raw: string | null | undefined,
   allowlist: readonly string[]
@@ -150,7 +149,12 @@ export function buildTimingLine(input: TimingLineInput): TimingLine {
   return line;
 }
 
-export type RestRouteHandler<Ctx> = (request: Request, ctx: Ctx) => Promise<Response> | Response;
+/**
+ * A Next route handler. `ctx` is optional because the wrapper is also called
+ * without one: dynamic routes receive it, while route helpers and tests invoke
+ * a handler with the request alone.
+ */
+export type RestRouteHandler<Ctx> = (request: Request, ctx?: Ctx) => Promise<Response> | Response;
 
 /**
  * The wrapped handler. `ctx` is optional because Next only passes a context to
@@ -195,13 +199,13 @@ export function withRestTiming<Ctx>(
       pathname = '';
     }
     if (!pathname.startsWith(prefix)) {
-      return handler(request, ctx as Ctx);
+      return handler(request, ctx);
     }
 
     const start = performance.now();
     let status = 500;
     try {
-      const response = await handler(request, ctx as Ctx);
+      const response = await handler(request, ctx);
       status = response.status;
       return response;
     } finally {

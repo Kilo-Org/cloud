@@ -487,6 +487,7 @@ export function createControlPlaneConnection(
           startCommands: true,
           worktreeGit: true,
           transferGrants: true,
+          previewTunnel: true,
         })
       )
         return;

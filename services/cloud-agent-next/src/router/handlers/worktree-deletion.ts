@@ -16,6 +16,8 @@ import { hasOrganizationAccess } from '@kilocode/worker-utils';
 import { getPgDb } from '../../db/pg';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub';
 import { getSandboxControlStub } from '../../sandbox-control/stub';
+import { getWorkspaceStub } from '../../control-plane/workspace/workspace-stub';
+import { workspaceSessionIdForScope } from '../../cloud-agent-authority';
 import {
   worktreeDeleteResultSchema,
   type WorktreeDeleteResult,
@@ -142,6 +144,17 @@ export async function deleteWorktreeResources(
     );
     sessionCount = state.manifest.sessions.length;
     locationCount = state.runtimeLocations.length;
+    // Deletion is now the workspace's committed intent: end its Cloud Agent
+    // authority before any chat that could be adopted from is torn down.
+    const workspaceSessionId = workspaceSessionIdForScope(params.worktreeId, params.worktreeId);
+    if (workspaceSessionId !== undefined) {
+      setStage('end_workspace_authority');
+      await withDORetry(
+        () => getWorkspaceStub(ctx.env, ctx.userId, workspaceSessionId),
+        stub => stub.markDeleted(),
+        'markDeleted'
+      );
+    }
     if (state.completed) {
       outcome = 'replayed';
       return {
@@ -152,12 +165,14 @@ export async function deleteWorktreeResources(
     }
     const runtimeLocations = [...state.runtimeLocations];
     const childSessions: NonNullable<RecordCloudAgentWorktreeCleanupParams['childSessions']> = [];
+    const refusedRoots = new Set<string>();
     setStage('collect_sessions');
     const discoveries = await mapDeletionRoots(state.manifest.sessions, async session => {
       if (!session.cloudAgentSessionId) return null;
       const cloudAgentSessionId = session.cloudAgentSessionId;
+      let rawBegin: { location: unknown; children: unknown };
       try {
-        const rawBegin = await withDORetry(
+        rawBegin = await withDORetry(
           () => getSandboxSessionStub(ctx.env, ctx.userId, cloudAgentSessionId),
           stub =>
             stub.beginWorktreeDeletion({
@@ -168,11 +183,9 @@ export async function deleteWorktreeResources(
             }),
           'beginWorktreeDeletion'
         );
-        const location = cloudAgentWorktreeLocationSchema.nullable().parse(rawBegin.location);
-        const children = z.array(cloudAgentChildSessionLineageSchema).parse(rawBegin.children);
-        return { cloudAgentSessionId, location, children };
       } catch (error) {
         if (isHardDeletionError(error)) throw error;
+        refusedRoots.add(cloudAgentSessionId);
         unreachableRootCount += 1;
         logControlDiagnostic(
           'worktree_deletion',
@@ -186,6 +199,9 @@ export async function deleteWorktreeResources(
         );
         return null;
       }
+      const location = cloudAgentWorktreeLocationSchema.nullable().parse(rawBegin.location);
+      const children = z.array(cloudAgentChildSessionLineageSchema).parse(rawBegin.children);
+      return { cloudAgentSessionId, location, children };
     });
     for (const discovery of discoveries) {
       if (!discovery) continue;
@@ -303,6 +319,7 @@ export async function deleteWorktreeResources(
       const finished = await mapDeletionRoots(state.manifest.sessions, async session => {
         if (!session.cloudAgentSessionId) return true;
         const cloudAgentSessionId = session.cloudAgentSessionId;
+        if (refusedRoots.has(cloudAgentSessionId)) return false;
         try {
           await withDORetry(
             () => getSandboxSessionStub(ctx.env, ctx.userId, cloudAgentSessionId),

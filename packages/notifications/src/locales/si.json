@@ -2,7 +2,7 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "ඔබගේ ඒජන්ත සැසියට යාවත්කාලීනයක් ඇත",
+      "cloudAgentSession": "ඔබගේ නියෝජිත සැසියට යාවත්කාලීනයක් ඇත",
       "lowBalance": "ඔබගේ ශේෂයට අවධානය අවශ්‍යයි",
       "spendAlert": "ඔබගේ වියදමට අවධානය අවශ්‍යයි",
       "securityFinding": "ආරක්ෂක සොයා ගැනීමකට අවධානය අවශ්‍යයි",

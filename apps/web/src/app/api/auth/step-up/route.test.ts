@@ -140,7 +140,49 @@ describe('POST /api/auth/step-up', () => {
       userId: 'user-1',
       webSessionId: 'browser-session',
       actionClass: 'platform_read',
+      binding: null,
     });
+  });
+
+  it('passes the class and operation binding of an operation refusal through to the mint', async () => {
+    mockCreateStepUpOptions.mockResolvedValue({
+      challengeId,
+      options: { challenge: 'stored-challenge', rpId: 'localhost' },
+    } as never);
+    const binding = {
+      actionClass: 'sensitive_write',
+      surface: 'trpc',
+      route: 'admin.users.update',
+      method: 'mutation',
+      targetKind: 'user',
+      targetId: 'target-user',
+    };
+
+    const response = await POST(
+      createRequest({ action: 'options', actionClass: 'sensitive_write', binding })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockCreateStepUpOptions).toHaveBeenCalledWith({
+      userId: 'user-1',
+      webSessionId: 'browser-session',
+      actionClass: 'sensitive_write',
+      binding,
+    });
+  });
+
+  it('refuses a malformed operation binding before minting', async () => {
+    const response = await POST(
+      createRequest({
+        action: 'options',
+        actionClass: 'sensitive_write',
+        binding: { actionClass: 'sensitive_write', route: 'admin.users.update' },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'INVALID_REQUEST' });
+    expect(mockCreateStepUpOptions).not.toHaveBeenCalled();
   });
 
   it('verifies an assertion and applies the verify rate limit', async () => {

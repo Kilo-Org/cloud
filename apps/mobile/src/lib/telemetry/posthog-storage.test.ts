@@ -8,6 +8,14 @@ import {
   unsealPostHogStorage,
 } from './posthog-storage';
 
+type MockFileOptions = {
+  exists?: boolean;
+  text?: string;
+  textReject?: Error;
+  writeReject?: Error;
+  deleteReject?: Error;
+};
+
 const expoFileSystemMock = vi.hoisted(() => {
   // Distinct, non-empty payloads per PostHog file. A reader that returns the
   // wrong file, or invents a value, cannot match both payloads.
@@ -16,23 +24,37 @@ const expoFileSystemMock = vi.hoisted(() => {
     '.posthog-rn-logs.json': '[]',
   };
 
-  const File = vi.fn(function FileMock(_base: string, name: string) {
-    const file: MockFileInstance = {
-      _exists: true,
-      get exists() {
-        return (this as { _exists: boolean })._exists;
-      },
-      text: vi.fn().mockResolvedValue(fileContents[name] ?? ''),
+  const makeFileInstance = (name: string, opts: MockFileOptions = {}): MockFileInstance => {
+    const writeReject = opts.writeReject;
+    const deleteReject = opts.deleteReject;
+    return {
+      exists: opts.exists ?? true,
+      text: opts.textReject
+        ? vi.fn().mockRejectedValue(opts.textReject)
+        : vi.fn().mockResolvedValue(opts.text ?? fileContents[name] ?? ''),
       writeSync(value: string) {
+        if (writeReject) {
+          throw writeReject;
+        }
         this.content = value;
       },
-      delete: vi.fn(),
+      delete: deleteReject
+        ? vi.fn(() => {
+            throw deleteReject;
+          })
+        : vi.fn(),
     };
-    return file;
-  });
+  };
+
+  const makeFileMock = (opts?: MockFileOptions) =>
+    vi.fn(function FileMock(_base: string, name: string) {
+      return makeFileInstance(name, opts);
+    });
+
   return {
-    File,
+    File: makeFileMock(),
     fileContents,
+    makeFileMock,
     Paths: { cache: 'file:///cache', document: 'file:///document' },
   };
 });
@@ -43,7 +65,6 @@ vi.mock('expo-file-system', () => ({
 }));
 
 type MockFileInstance = {
-  _exists: boolean;
   readonly exists: boolean;
   text: ReturnType<typeof vi.fn>;
   content?: string;
@@ -66,43 +87,8 @@ function createdFiles(): { base: string; name: string }[] {
   }));
 }
 
-function makeNextFile(opts?: {
-  exists?: boolean;
-  textReject?: Error;
-  writeReject?: Error;
-  deleteReject?: Error;
-}): void {
-  const exists = opts?.exists ?? true;
-  const textReject = opts?.textReject;
-  const writeReject = opts?.writeReject;
-  const deleteReject = opts?.deleteReject;
-  expoFileSystemMock.File.mockImplementationOnce(function FileMock(
-    this: MockFileInstance,
-    _base: string,
-    name: string
-  ) {
-    const file: MockFileInstance = {
-      _exists: exists,
-      get exists() {
-        return exists;
-      },
-      text: textReject
-        ? vi.fn().mockRejectedValue(textReject)
-        : vi.fn().mockResolvedValue(expoFileSystemMock.fileContents[name] ?? ''),
-      writeSync(value: string) {
-        if (writeReject) {
-          throw writeReject;
-        }
-        this.content = value;
-      },
-      delete: deleteReject
-        ? vi.fn(() => {
-            throw deleteReject;
-          })
-        : vi.fn(),
-    };
-    return file;
-  });
+function makeNextFile(opts?: MockFileOptions): void {
+  expoFileSystemMock.File.mockImplementationOnce(expoFileSystemMock.makeFileMock(opts));
 }
 
 beforeEach(() => {

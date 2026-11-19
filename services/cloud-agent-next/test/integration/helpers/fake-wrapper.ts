@@ -45,6 +45,7 @@ export type FakeWrapperHelloInput = {
   sessionSnapshots?: boolean;
   startCommands?: boolean;
   worktreeGit?: boolean;
+  previewTunnel?: boolean;
 };
 
 export type FakeNativeEvent = {
@@ -208,6 +209,7 @@ export class FakeWrapper {
       ...(input.sessionSnapshots ? { sessionSnapshots: true } : {}),
       ...(input.startCommands ? { startCommands: true } : {}),
       ...(input.worktreeGit ? { worktreeGit: true } : {}),
+      ...(input.previewTunnel ? { previewTunnel: true } : {}),
     });
     return this.next();
   }

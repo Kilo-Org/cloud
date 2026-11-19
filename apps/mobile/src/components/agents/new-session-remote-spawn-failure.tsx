@@ -30,7 +30,7 @@ export function NewSessionRemoteSpawnFailure({
 }: Readonly<NewSessionRemoteSpawnFailureProps>) {
   const { t } = useTranslation();
   return (
-    <View className="mt-5 gap-2">
+    <View className="gap-2">
       <RefusalStatus message={failure.message} action={failure.action} className="text-sm" />
       {failure.retryable ? (
         <Button

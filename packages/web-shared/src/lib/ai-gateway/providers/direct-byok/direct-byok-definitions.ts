@@ -7,7 +7,6 @@ import chutesByok from './chutes-byok';
 import edenai from './edenai';
 import inceptronByok from './inceptron-byok';
 import kimiCoding from './kimi-coding';
-import martian from './martian';
 import morph from './morph';
 import neuralwatt from './neurowatt';
 import nvidiaByok from './nvidia-byok';
@@ -31,7 +30,6 @@ const DIRECT_BYOK_PROVIDERS = [
   edenai,
   inceptronByok,
   kimiCoding,
-  martian,
   morph,
   neuralwatt,
   nvidiaByok,
@@ -44,6 +42,13 @@ const DIRECT_BYOK_PROVIDERS = [
   xiaomiTokenPlanSgp,
   zaiCoding,
 ] satisfies ReadonlyArray<DirectByokProvider>;
+
+/**
+ * The provider list as one widened list, for lookups and iterations: the tuple keeps
+ * `EveryDirectByokProviderHasDefinition` exhaustive, and consumers read this view instead of
+ * restating the widening.
+ */
+export const directByokProviderList: ReadonlyArray<DirectByokProvider> = DIRECT_BYOK_PROVIDERS;
 
 /** A provider the shared metadata names without a definition; such a provider cannot be used. */
 type UndefinedDirectByokProviderId = Exclude<

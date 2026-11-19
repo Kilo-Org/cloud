@@ -14,6 +14,8 @@ const state = vi.hoisted(() => ({
       },
   timestamp: vi.fn(() => 'formatted source time'),
 }));
+const formatNumber = vi.hoisted(() => vi.fn(String));
+vi.mock('@/lib/format', () => ({ formatNumber }));
 vi.mock('react-native', () => ({ View: 'View', ScrollView: 'ScrollView', Pressable: 'Pressable' }));
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ 'report-id': 'report-1' }),
@@ -51,7 +53,13 @@ vi.mock('@/lib/organization-context', () => ({
 }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/lib/utils', () => ({
+  cn: (...classes: unknown[]) => classes.filter(Boolean).join(' '),
+}));
+
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
+vi.mock('@/components/ui/section', () => ({ Section: 'Section' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
@@ -145,6 +153,8 @@ it('uses the frozen report timezone and a localized artifact heading for readabl
     id: 'metadata:session',
     sessionId: 'session',
     kind: 'artifact',
+    // A stored report still carries the old server-composed English title; the
+    // row label stays the localized kind label for every non-activity kind.
     title: 'Captured session metadata',
     excerpt: 'Plan: one step remaining.\n\nChanges: updated files.',
     url: '/cloud/sessions/session',
@@ -164,4 +174,57 @@ it('uses the frozen report timezone and a localized artifact heading for readabl
   expect(texts).toContain('agentBriefing.sourceMetadata');
   expect(texts).toContain('Plan: one step remaining.\n\nChanges: updated files.');
   expect(texts).not.toContain('Captured session metadata');
+});
+
+it('renders structured metadata from the typed payload', () => {
+  const source: BriefingReport['sources'][number] = {
+    id: 'metadata:session',
+    sessionId: 'session',
+    kind: 'artifact',
+    url: '/cloud/sessions/session',
+    occurredAt: '2026-10-28T07:00:00Z',
+    metadata: {
+      plan: { done: 1, total: 3, current: 'Editing auth.ts' },
+      changes: { files: 2, added: 1200, removed: 4 },
+      failure: { kind: 'tool' },
+    },
+  };
+  state.report = {
+    ...report,
+    scorecard: { sessions: 1, pullRequests: 0, blockers: 0 },
+    sources: [source],
+    sessions: [],
+  };
+  const mounted = mount();
+  const texts = mounted.root.findAllByType('Text' as ElementType).map(node => node.props.children);
+  expect(texts).toContain('agentBriefing.sourceMetadata');
+  expect(texts).toContain('agentBriefing.metadataPlan');
+  expect(texts).toContain('agentBriefing.metadataPlanCurrent');
+  expect(texts).toContain('agentBriefing.metadataFiles');
+  expect(texts).toContain('agentBriefing.metadataLinesAdded');
+  expect(texts).toContain('agentBriefing.metadataLinesRemoved');
+  expect(texts).toContain('agentBriefing.metadataFailure');
+  expect(texts.some(text => typeof text === 'string' && text.startsWith('Plan: '))).toBe(false);
+  expect(formatNumber).toHaveBeenCalledWith(1200, 'en');
+});
+
+it('keeps the stored excerpt for a row without structured metadata', () => {
+  const source: BriefingReport['sources'][number] = {
+    id: 'metadata:session',
+    sessionId: 'session',
+    kind: 'artifact',
+    excerpt: 'Plan: one step remaining.',
+    url: '/cloud/sessions/session',
+    occurredAt: '2026-10-28T07:00:00Z',
+  };
+  state.report = {
+    ...report,
+    scorecard: { sessions: 1, pullRequests: 0, blockers: 0 },
+    sources: [source],
+    sessions: [],
+  };
+  const mounted = mount();
+  const texts = mounted.root.findAllByType('Text' as ElementType).map(node => node.props.children);
+  expect(texts).toContain('Plan: one step remaining.');
+  expect(texts).not.toContain('agentBriefing.metadataPlan');
 });

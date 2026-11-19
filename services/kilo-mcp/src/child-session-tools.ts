@@ -32,7 +32,7 @@ const childOperations = [
     name: 'list_child_sessions',
     procedure: 'listChildSessions',
     description:
-      "List only the canonical workspace parent's direct child Cloud Agent sessions. Use to rediscover child IDs or reconcile an uncertain launch, not as a polling loop. Returns cloudAgentSessionId and, when recorded, initialMessageId and worktreeId. Pass nextCursor as cursor to read another page. Sibling chats in this workspace share the same parent and child list.",
+      "List only this workspace's direct child Cloud Agent sessions. Use to rediscover child IDs or reconcile an uncertain launch, not as a polling loop. Returns cloudAgentSessionId and, when recorded, initialMessageId and worktreeId. Pass nextCursor as cursor to read another page. Every chat in this workspace shares the same child list.",
   },
   {
     name: 'get_session',
@@ -68,7 +68,7 @@ const childOperations = [
     name: 'assign_workspace_to_folder',
     procedure: 'workspaceFolders.moveWorktree',
     description:
-      'Assign a workspace created by this canonical parent to an existing folder in the same user and organization scope, or pass folderId:null to remove its folder assignment. Use list_folders for the exact folder id and list_child_sessions or get_session for the child cloudAgentSessionId and worktreeId. Both child and worktree IDs are required and verified against live parent authorization, direct-child lineage, and stored workspace ownership. The folder applies to the entire worktree, including all sibling chats, without changing chat activity or runtime state. Cannot move the parent workspace or other workspaces owned by the same user. After a transport failure, reconcile before retrying.',
+      'Assign a child workspace launched by this workspace to an existing folder in the same user and organization scope, or pass folderId:null to remove its folder assignment. Use list_folders for the exact folder id and list_child_sessions or get_session for the child cloudAgentSessionId and worktreeId. Both child and worktree IDs are required and verified against live workspace authorization, direct-child lineage, and stored workspace ownership. The folder applies to the entire worktree, including all sibling chats, without changing chat activity or runtime state. Cannot move this workspace or other workspaces owned by the same user. After a transport failure, reconcile before retrying.',
   },
 ] as const;
 
@@ -103,7 +103,7 @@ export const CHILD_SESSION_TOOL_NAMES = [
 ];
 
 export const CHILD_SESSION_INSTRUCTIONS = [
-  "This MCP connection manages direct child Cloud Agent sessions through dedicated tools, not API search/call. It belongs to the workspace's canonical parent session, the original root chat, not to the sibling chat that invoked this tool.",
+  "This MCP connection manages direct child Cloud Agent sessions through dedicated tools, not API search/call. It belongs to the workspace, not to the chat that invoked this tool, and it remains available after the workspace's first chat is deleted.",
   'Launch a child only when the user explicitly asks to spin up a new Cloud Agent session or stacked PRs. A request to split work into stacked PRs permits the required stacked workspaces. Each child has its own sandbox and worktree with multi-chat support; use children to fan out independent tasks, not to explore or work in this worktree.',
   'First call search_models with the requested model name; copy the returned id exactly into model and use only a returned variant, passed separately. If no model was requested, use an already-established user preference and resolve it with search_models; otherwise browse search_models with {} and ask the user to choose. There is no implicit model default; isPreferred is a recommendation, not a selected account default. Omit variant unless requested. Do not guess model identifiers, silently substitute models, or treat catalog discovery as proof of organization policy approval.',
   'Call spawn_session with a complete task brief and a fresh UUID operationKey. To use a repository environment, first call list_environments with {repository:{platform:"github",fullName:"owner/repo"}} and pass a returned id as requestedEnvironment {id}; include requestedEnvironment.repositories for additional repositories of a multi-repository environment. Omit requestedEnvironment to leave environment selection to the server\'s automatic/default behavior. Organization and createdOnPlatform come from trusted parent state, not caller input. Automatic commit/push is not requested when autoCommit is omitted; set true explicitly on the launch and each follow-up where authorized, because follow-ups do not inherit it. When publication is forbidden, set false and also forbid commit/push/PR actions in the task prompt; false alone does not restrict the child agent\'s Git tools. PR creation must be requested in the task prompt.',

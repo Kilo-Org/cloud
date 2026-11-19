@@ -446,6 +446,66 @@ describe('applyProviderSpecificLogic untyped tool schema enums', () => {
   });
 });
 
+describe('applyProviderSpecificLogic Gemini tool schemas', () => {
+  async function applyToToolParameters(model: string) {
+    const request: Extract<GatewayRequest, { kind: 'chat_completions' }> = {
+      kind: 'chat_completions',
+      body: {
+        model,
+        messages: [{ role: 'user', content: 'hello' }],
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: 'edit_page',
+              parameters: {
+                type: 'object',
+                properties: {
+                  align: { anyOf: [{ type: 'string' }], nullable: true, enum: ['left', 'null'] },
+                },
+              },
+            },
+          },
+        ],
+      },
+    };
+
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false,
+      null
+    );
+
+    const tool = request.body.tools?.[0];
+    return tool?.type === 'function' ? tool.function.parameters?.properties : undefined;
+  }
+
+  it('moves keys beside anyOf into its branches for Gemini models', async () => {
+    const properties = await applyToToolParameters('google/gemini-3.7-flash');
+
+    expect(properties).toEqual({
+      align: { anyOf: [{ type: 'string', enum: ['left'] }, { type: 'null' }] },
+    });
+  });
+
+  it('preserves keys beside anyOf for other models', async () => {
+    const properties = await applyToToolParameters('vendor/model');
+
+    expect(properties).toEqual({
+      align: { anyOf: [{ type: 'string' }], nullable: true, enum: ['left', 'null'] },
+    });
+  });
+});
+
 describe('applyReasoningDetailsTransform', () => {
   function makeReasoningRequest(): Extract<GatewayRequest, { kind: 'chat_completions' }> {
     return {
@@ -865,6 +925,92 @@ describe('applyReasoningDetailsTransform', () => {
         },
       ],
     });
+  });
+
+  it('maps a Gemini detail whose id appears twice to the first matching tool call', () => {
+    const request: Extract<GatewayRequest, { kind: 'chat_completions' }> = {
+      kind: 'chat_completions',
+      body: {
+        model: 'vendor/model',
+        messages: [
+          {
+            role: 'assistant',
+            content: null,
+            tool_calls: [
+              {
+                id: 'call-1',
+                type: 'function',
+                function: { name: 'first', arguments: '{}' },
+              },
+              {
+                id: 'call-1',
+                type: 'function',
+                function: { name: 'second', arguments: '{}' },
+              },
+            ],
+            reasoning_details: [
+              {
+                type: 'reasoning.encrypted',
+                data: 'duplicate-id-signature',
+                id: 'call-1',
+                format: 'google-gemini-v1',
+              },
+            ],
+          } as never,
+        ],
+      },
+    };
+
+    applyReasoningDetailsTransform(makeProvider(ReasoningDetailsTransform.GeminiThought), request);
+
+    const assistant = request.body.messages[0] as unknown as Record<string, unknown>;
+    const toolCalls = assistant.tool_calls as Array<Record<string, unknown>>;
+    expect(toolCalls[0]).toMatchObject({
+      function: { name: 'first' },
+      extra_content: { google: { thought_signature: 'duplicate-id-signature' } },
+    });
+    expect(toolCalls[1]).toMatchObject({ function: { name: 'second' } });
+    expect(toolCalls[1]).not.toHaveProperty('extra_content');
+  });
+
+  it('keeps a Gemini detail with no matching tool-call id on the message', () => {
+    const request: Extract<GatewayRequest, { kind: 'chat_completions' }> = {
+      kind: 'chat_completions',
+      body: {
+        model: 'vendor/model',
+        messages: [
+          {
+            role: 'assistant',
+            content: null,
+            tool_calls: [
+              {
+                id: 'call-1',
+                type: 'function',
+                function: { name: 'lookup', arguments: '{}' },
+              },
+            ],
+            reasoning_details: [
+              {
+                type: 'reasoning.encrypted',
+                data: 'unmatched-signature',
+                id: 'call-other',
+                format: 'google-gemini-v1',
+              },
+            ],
+          } as never,
+        ],
+      },
+    };
+
+    applyReasoningDetailsTransform(makeProvider(ReasoningDetailsTransform.GeminiThought), request);
+
+    const assistant = request.body.messages[0] as unknown as Record<string, unknown>;
+    expect(assistant).toMatchObject({
+      extra_content: { google: { thought_signature: 'unmatched-signature' } },
+    });
+    expect((assistant.tool_calls as Array<Record<string, unknown>>)[0]).not.toHaveProperty(
+      'extra_content'
+    );
   });
 
   it('does not touch Messages requests', () => {

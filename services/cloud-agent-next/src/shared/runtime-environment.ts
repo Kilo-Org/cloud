@@ -1,4 +1,4 @@
-import { GIT_CREDENTIAL_HELPER } from './runtime-distribution.js';
+import { GIT_CREDENTIAL_HELPER } from './runtime-distribution';
 
 export const PNPM_STORE_DIR = '/var/cache/kilo/pnpm-store';
 export const PNPM_STORE_ENV_VAR = 'pnpm_config_store_dir';
@@ -68,6 +68,58 @@ export const CONTROL_RUNTIME_RESERVED_ENV_VARS = [
   'SANDBOX_TRANSFER_URL',
   'SANDBOX_TRANSFER_GRANT',
 ] as const;
+
+/**
+ * Session-identity names the platform sets itself.
+ */
+export const SESSION_RESERVED_ENV_VARS = [
+  'HOME',
+  'SESSION_ID',
+  'SESSION_HOME',
+  PNPM_STORE_ENV_VAR,
+] as const;
+
+/**
+ * Every name the platform sets: the session-identity names above and the
+ * control-runtime names.
+ */
+export const RESERVED_ENV_VARS = [
+  ...SESSION_RESERVED_ENV_VARS,
+  ...CONTROL_RUNTIME_RESERVED_ENV_VARS,
+] as const;
+
+export const RESERVED_ENV_VARS_MESSAGE = `Cannot set reserved environment variables: ${RESERVED_ENV_VARS.join(', ')}. These are managed by the system.`;
+
+/** The first reserved name among `names`, or `undefined` when none is reserved. */
+export function findReservedEnvVarName(names: Iterable<string>): string | undefined {
+  const reserved = new Set<string>(RESERVED_ENV_VARS);
+  for (const name of names) if (reserved.has(name)) return name;
+  return undefined;
+}
+
+/**
+ * Cap on the profile environment an attach payload may carry. Mirrors
+ * `Limits.MAX_ENV_VARS` in `../schema.ts`, which the wrapper cannot import:
+ * that module reaches the Worker's Durable Object types, which the wrapper's
+ * program does not declare. `src/reserved-env-vars.test.ts` holds the two
+ * equal.
+ */
+export const MAX_PROFILE_ENV_VARS = 50;
+
+/**
+ * Credential names a prepared attach env adds beside the profile env: every
+ * `ISSUED_CREDENTIAL_ENV_KEYS` entry that is not reserved. Mirrored here for
+ * the same reason as `MAX_PROFILE_ENV_VARS`; `src/reserved-env-vars.test.ts`
+ * holds this count equal to that list.
+ */
+const PLATFORM_ATTACH_ENV_KEY_COUNT = 13;
+
+/**
+ * Cap on an attach env once the credential preparation has added its keys. The
+ * producer starts from the profile env plus `KILOCODE_TOKEN` and adds the
+ * credential names above, so this is the largest frame the platform emits.
+ */
+export const MAX_ATTACH_ENV_KEYS = MAX_PROFILE_ENV_VARS + PLATFORM_ATTACH_ENV_KEY_COUNT;
 
 /**
  * Prefixes the sandbox runtime owns. `buildWorktreeKiloEnvironment` drops them

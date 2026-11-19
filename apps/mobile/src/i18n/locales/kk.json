@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "Шолу",
       "files": "Файлдар",
-      "discussion": "Талқылау"
+      "discussion": "Талқылау",
+      "discussionAccessibility_one": "{{title}}: 1 пікір",
+      "discussionAccessibility": "{{title}}: {{displayCount}} пікір",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} пікір"
     },
     "fileStatus": {
       "modified": "Өзгертілді",

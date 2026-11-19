@@ -3295,6 +3295,10 @@
     },
     "tabs": {
       "discussion": "Échanges",
+      "discussionAccessibility": "{{title}}: {{displayCount}} commentaires",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} commentaires",
+      "discussionAccessibility_one": "{{title}}: 1 commentaire",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} commentaires",
       "files": "Fichiers",
       "overview": "Aperçu"
     },

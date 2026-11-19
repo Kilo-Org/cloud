@@ -1,6 +1,11 @@
 /* eslint-disable eslint/id-length -- fragment keys are the wire names `t` and `v` */
 import { describe, expect, it } from 'vitest';
-import { isUsableStoredEndpoint, parseLoopbackSocketUrl, parsePairingUrl } from './pairing';
+import {
+  isBrokenPairingUrl,
+  isUsableStoredEndpoint,
+  parseLoopbackSocketUrl,
+  parsePairingUrl,
+} from './pairing';
 
 const HUB_ID = '6f1c2d3e-4a5b-4c6d-8e9f-0a1b2c3d4e5f';
 const TOKEN = 'EBESExQVFhcYGRobHB0eHw';
@@ -62,6 +67,22 @@ describe('pairing fragment parsing', () => {
     expect(parsePairingUrl(`${pairingUrl()}&t=${TOKEN}`)).toBeNull();
     expect(parsePairingUrl('http://127.0.0.1:47917/__kilo_browser_pair')).toBeNull();
     expect(parsePairingUrl('http://127.0.0.1:47917/__kilo_browser_pair#')).toBeNull();
+  });
+});
+
+describe('broken pairing links', () => {
+  it('flags a pairing page whose fragment cannot be read', () => {
+    expect(isBrokenPairingUrl(pairingUrl({ hub: 'not-a-uuid' }))).toBe(true);
+    expect(isBrokenPairingUrl(pairingUrl({ v: '2' }))).toBe(true);
+    expect(isBrokenPairingUrl(pairingUrl({ ws: 'ws://hub.kilo.ai/__kilo_browser' }))).toBe(true);
+  });
+
+  it('leaves a valid link, the bare page and every other page alone', () => {
+    expect(isBrokenPairingUrl(pairingUrl())).toBe(false);
+    expect(isBrokenPairingUrl('http://127.0.0.1:47917/__kilo_browser_pair')).toBe(false);
+    expect(isBrokenPairingUrl('http://127.0.0.1:47917/__kilo_browser_pair#')).toBe(false);
+    expect(isBrokenPairingUrl(pairingUrl({ hub: 'x' }, 'https://example.com'))).toBe(false);
+    expect(isBrokenPairingUrl(pairingUrl({ hub: 'x' }).replace('_pair', '_other'))).toBe(false);
   });
 });
 

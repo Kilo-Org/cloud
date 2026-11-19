@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "ภาพรวม",
       "files": "ไฟล์",
-      "discussion": "การสนทนา"
+      "discussion": "การสนทนา",
+      "discussionAccessibility_one": "{{title}}: ความคิดเห็น 1 รายการ",
+      "discussionAccessibility": "{{title}}: ความคิดเห็น {{displayCount}} รายการ",
+      "discussionAccessibility_other": "{{title}}: ความคิดเห็น {{displayCount}} รายการ"
     },
     "fileStatus": {
       "modified": "แก้ไขแล้ว",

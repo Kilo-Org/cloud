@@ -72,14 +72,18 @@ export type SessionLiveActivityBuildOptions = {
   previous?: Partial<SessionLiveActivityContentState> | undefined;
 };
 
-/** The larger of the stored and the new cost, so a local update never lowers it. */
+/**
+ * The larger of the new and the stored cost, so a local update never lowers
+ * it. The arguments take the order of `carried` below: the row's own value
+ * first and the remembered one second.
+ */
 function maxCost(
-  previous: number | null | undefined,
-  next: number | null | undefined
+  next: number | null | undefined,
+  previous: number | null | undefined
 ): number | null {
   if (next === null || next === undefined) return previous ?? null;
   if (previous === null || previous === undefined) return next;
-  return Math.max(previous, next);
+  return Math.max(next, previous);
 }
 
 /**
@@ -172,7 +176,7 @@ export function buildSessionLiveActivityContentState(
       approvalKey === null ? null : sessionLiveText(command, SESSION_LIVE_COMMAND_LIMIT),
     changes,
     lastActivityAt: timestampToIso(row.lastActivityAt) ?? previous?.lastActivityAt ?? null,
-    costMicrodollars: maxCost(previous?.costMicrodollars, row.costMicrodollars),
+    costMicrodollars: maxCost(row.costMicrodollars, previous?.costMicrodollars),
     outcome: finished ? { kind: outcomeKind(row, changes, previous?.outcome?.kind) } : null,
     failure: failure === null || statusKind !== 'failed' ? null : { kind: failure },
     startedAt: timestampToIso(row.startedAt) ?? previous?.startedAt ?? null,

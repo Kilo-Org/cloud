@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "Áttekintés",
       "files": "Fájlok",
-      "discussion": "Beszélgetés"
+      "discussion": "Beszélgetés",
+      "discussionAccessibility_one": "{{title}}: 1 hozzászólás",
+      "discussionAccessibility": "{{title}}: {{displayCount}} hozzászólás",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} hozzászólás"
     },
     "fileStatus": {
       "modified": "Módosítva",

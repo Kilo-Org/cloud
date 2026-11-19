@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "Ilaalcha waliigalaa",
       "files": "Faayiloota",
-      "discussion": "Marii"
+      "discussion": "Marii",
+      "discussionAccessibility_one": "{{title}}: yaada 1",
+      "discussionAccessibility": "{{title}}: Yaadota {{displayCount}}",
+      "discussionAccessibility_other": "{{title}}: Yaadota {{displayCount}}"
     },
     "fileStatus": {
       "modified": "Fooyya'e",

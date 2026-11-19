@@ -1070,7 +1070,12 @@
     "tabs": {
       "overview": "Přehled",
       "files": "Soubory",
-      "discussion": "Diskuse"
+      "discussion": "Diskuse",
+      "discussionAccessibility_one": "{{title}}: 1 komentář",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentářů",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentářů",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} komentáře",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} komentáře"
     },
     "fileStatus": {
       "modified": "Upraven",

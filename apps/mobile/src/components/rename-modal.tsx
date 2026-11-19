@@ -9,6 +9,7 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isUiDeadlineError, withUiDeadline } from '@/lib/ui-deadline';
 import { cn } from '@/lib/utils';
+import { REWRITTEN_INPUT_AUTO_CORRECT } from '@/lib/input-suggestions';
 
 const SAVE_UI_DEADLINE_MS = 15_000;
 
@@ -176,6 +177,10 @@ export function RenameModal<TSaveResult>({
         }}
         autoFocus={Platform.OS !== 'android'}
         maxLength={maxLength}
+        // The modal writes the controlled value per keystroke on Android, so
+        // the framework suggestion popup stays off — it crashes against
+        // rewritten text (see REWRITTEN_INPUT_AUTO_CORRECT).
+        autoCorrect={REWRITTEN_INPUT_AUTO_CORRECT}
         editable={!pending}
         onSubmitEditing={multiline ? undefined : submitFromKeyboard}
         returnKeyType={multiline ? undefined : 'done'}

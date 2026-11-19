@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import { buildWorkflowPageCode } from './agent-workflow-runner';
 import { ambiguousSelectorError } from './browser-agent-checks';
+import { RETARGET_TO_CONTROL_FUNCTION } from './browser-agent-probes';
 import type { BrowserToolResolvedTarget, BrowserToolUniqueTarget } from './browser-tool-session';
 import type { EvalTabResult } from './tab-debugger';
 
@@ -716,28 +717,29 @@ const typeArgsSchema = z.object({
   text: z.string(),
 });
 
+/** Why text cannot land in an element, or null when it can; shared by both typing paths. */
+const TYPING_REFUSAL_FUNCTION = `function (element) {
+  var tag = element.nodeName.toLowerCase();
+  if (tag === 'input' || tag === 'textarea') {
+    return element.disabled || element.readOnly ? 'The element is not editable: it is disabled or read-only.' : null;
+  }
+  return element.isContentEditable ? null : 'Element is not an <input>, <textarea> or [contenteditable] element';
+}`;
+
 /**
  * Playwright's `locator.fill` page half (`InjectedScript.fill` and
- * `selectText` in the pinned release): a label is retargeted to its control,
- * a date-like input gets its value set with `input` and `change`, and any
- * other editable field is focused with its whole content selected so the
- * inserted text replaces it.
+ * `selectText` in the pinned release): the target is retargeted with the rule
+ * the sensitive-step probe classifies by, a date-like input gets its value set
+ * with `input` and `change`, and any other editable field is focused with its
+ * whole content selected so the inserted text replaces it.
  */
 const FILL_PREPARE_FUNCTION = `function (value) {
-  var element = this.nodeType === 1 ? this : this.parentElement;
+  var element = (${RETARGET_TO_CONTROL_FUNCTION})(this);
   if (!element || !element.isConnected) { return { status: 'detached' }; }
-  if (!element.matches('input, textarea, select') && !element.isContentEditable) {
-    element = element.closest('button, [role=button], [role=checkbox], [role=radio]') || element;
-  }
-  if (!element.matches('a, input, textarea, button, select, [role=link], [role=button], [role=checkbox], [role=radio]') && !element.isContentEditable) {
-    var label = element.closest('label');
-    if (label && label.control) { element = label.control; }
-  }
   var refuse = function (message) { return { message: message, status: 'refused' }; };
+  var refusal = (${TYPING_REFUSAL_FUNCTION})(element);
+  if (refusal !== null) { return refuse(refusal); }
   var tag = element.nodeName.toLowerCase();
-  if ((tag === 'input' || tag === 'textarea') && (element.disabled || element.readOnly)) {
-    return refuse('The element is not editable: it is disabled or read-only.');
-  }
   if (tag === 'input') {
     var type = element.type.toLowerCase();
     var setValueTypes = ['color', 'date', 'time', 'datetime-local', 'month', 'range', 'week'];
@@ -767,9 +769,6 @@ const FILL_PREPARE_FUNCTION = `function (value) {
     element.focus();
     return { status: 'ready' };
   }
-  if (!element.isContentEditable) {
-    return refuse('Element is not an <input>, <textarea> or [contenteditable] element');
-  }
   element.focus();
   var range = element.ownerDocument.createRange();
   range.selectNodeContents(element);
@@ -787,6 +786,8 @@ const FILL_PREPARE_FUNCTION = `function (value) {
  */
 const FOCUS_FOR_TYPING_FUNCTION = `function () {
   if (!this.isConnected) { return { status: 'detached' }; }
+  var refusal = (${TYPING_REFUSAL_FUNCTION})(this);
+  if (refusal !== null) { return { message: refusal, status: 'refused' }; }
   var active = this.getRootNode().activeElement;
   var wasFocused = active === this;
   if (this.isContentEditable && !wasFocused && active && active.blur) { active.blur(); }

@@ -343,9 +343,33 @@ const isEditableHost = (element: Element | null): element is HTMLElement =>
   element instanceof HTMLElement &&
   element.closest('[contenteditable]:not([contenteditable="false"])') !== null;
 
+/**
+ * Email and number inputs expose no selection offsets, so jsdom cannot report
+ * what `select()` covered; Chrome selects the whole value. The fake records it.
+ */
+const wholeValueSelected = new WeakSet<HTMLInputElement>();
+
+const recordWholeValueSelection = (input: HTMLInputElement): void => {
+  const select = input.select.bind(input);
+
+  input.select = () => {
+    select();
+    wholeValueSelected.add(input);
+  };
+  input.addEventListener('blur', () => wholeValueSelected.delete(input));
+};
+
 /** What a browser does with text that reaches the focused element: it replaces the selection. */
 const insertAtSelection = (text: string): void => {
   const active = document.activeElement;
+
+  if (active instanceof HTMLInputElement && active.selectionStart === null) {
+    active.value = wholeValueSelected.has(active) ? text : `${active.value}${text}`;
+    wholeValueSelected.delete(active);
+    active.dispatchEvent(new Event('input', { bubbles: true }));
+
+    return;
+  }
 
   if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) {
     active.setRangeText(text, active.selectionStart ?? 0, active.selectionEnd ?? 0, 'end');
@@ -398,6 +422,10 @@ const createDomTypingSession = (html: string): DomTypingFixture => {
   const commands: RecordedCommand[] = [];
   const events: string[] = [];
   const elements = [...document.body.querySelectorAll<HTMLElement>('[id]')];
+
+  for (const input of document.body.querySelectorAll('input')) {
+    recordWholeValueSelection(input);
+  }
   const backendIdOf = (element: HTMLElement): number => 100 + elements.indexOf(element);
   const elementOf = (params: Record<string, unknown> | undefined): HTMLElement | undefined => {
     const objectId = params?.['objectId'];
@@ -525,13 +553,23 @@ const typeInto = (
 
 describe('browser_type', () => {
   it.each([
-    ['an input', '<input id="field" value="draft">'],
-    ['a textarea', '<textarea id="field">draft</textarea>'],
-    ['a contenteditable element', '<div id="field" contenteditable="true">draft</div>'],
-  ])('replaces what %s holds on every call, like Playwright fill', async (_label, html) => {
+    ['an input', '<input id="field" value="draft">', ['c2', 'c6', 'c10']],
+    [
+      'an email input',
+      '<input id="field" type="email" value="draft@example.com">',
+      ['c2@example.com', 'c6@example.com', 'c10@example.com'],
+    ],
+    ['a number input', '<input id="field" type="number" value="42">', ['2', '6', '10']],
+    ['a textarea', '<textarea id="field">draft</textarea>', ['c2', 'c6', 'c10']],
+    [
+      'a contenteditable element',
+      '<div id="field" contenteditable="true">draft</div>',
+      ['c2', 'c6', 'c10'],
+    ],
+  ])('replaces what %s holds on every call, like Playwright fill', async (_label, html, texts) => {
     const fixture = createDomTypingSession(html);
 
-    for (const text of ['c2', 'c6', 'c10']) {
+    for (const text of texts) {
       // eslint-disable-next-line no-await-in-loop -- each call types into the field the previous call left
       const result = await typeInto(fixture, { target: 'field', text });
 
@@ -571,21 +609,53 @@ describe('browser_type', () => {
     expect(valueOf(fixture.field('email'))).toBe('new@example.com');
   });
 
-  it('fails instead of reporting typed text for an element that cannot take it', async () => {
+  it('fails instead of reporting typed text for an element that cannot take it, with or without slowly', async () => {
     const fixture = createDomTypingSession(
-      '<p id="status">idle</p><input id="locked" value="kept" readonly>'
+      '<p id="status">idle</p><input id="locked" value="kept" readonly><textarea id="off" disabled>kept</textarea>'
     );
 
-    const notEditable = await typeInto(fixture, { target: 'status', text: 'x' });
-    const readOnly = await typeInto(fixture, { target: 'locked', text: 'x' });
+    const outcomes = [];
 
-    expect(notEditable).toStrictEqual({
+    for (const slowly of [false, true]) {
+      for (const target of ['status', 'locked', 'off']) {
+        // eslint-disable-next-line no-await-in-loop -- one call per target, each against an untouched page
+        outcomes.push(await typeInto(fixture, { slowly, target, text: 'x' }));
+      }
+    }
+
+    const notEditable = {
       error: 'Element is not an <input>, <textarea> or [contenteditable] element',
       ok: false,
-    });
-    expect(readOnly.ok).toBe(false);
+    };
+    const readOnly = {
+      error: 'The element is not editable: it is disabled or read-only.',
+      ok: false,
+    };
+
+    expect(outcomes).toStrictEqual([
+      notEditable,
+      readOnly,
+      readOnly,
+      notEditable,
+      readOnly,
+      readOnly,
+    ]);
     expect(valueOf(fixture.field('status'))).toBe('idle');
     expect(valueOf(fixture.field('locked'))).toBe('kept');
+    expect(valueOf(fixture.field('off'))).toBe('kept');
+    expect(keyEvents(fixture.commands)).toHaveLength(0);
+  });
+
+  it('refuses a number input text that is not a number, leaving its value', async () => {
+    const fixture = createDomTypingSession('<input id="count" type="number" value="42">');
+
+    const result = await typeInto(fixture, { target: 'count', text: 'many' });
+
+    expect(result).toStrictEqual({
+      error: 'Cannot type text into input[type=number]',
+      ok: false,
+    });
+    expect(valueOf(fixture.field('count'))).toBe('42');
   });
 
   it('presses Enter on the field after replacing its text when submit is set', async () => {

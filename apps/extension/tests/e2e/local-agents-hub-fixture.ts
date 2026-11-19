@@ -83,6 +83,8 @@ const FORM_PAGE_HTML = `<!doctype html>
       <div>
         <h2>Contact</h2>
         <div><label for="email">Email</label><input id="email" value="draft@example.com"></div>
+        <div><input id="work-email" type="email" aria-label="Work email" value="draft@example.com"></div>
+        <div><input id="age" type="number" aria-label="Age" value="42"></div>
       </div>
       <div><textarea id="notes" aria-label="Notes">draft notes</textarea></div>
       <div><div id="bio" contenteditable="true" role="textbox" aria-label="Bio">draft bio</div></div>

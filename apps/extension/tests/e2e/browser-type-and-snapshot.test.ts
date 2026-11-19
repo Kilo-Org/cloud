@@ -96,21 +96,44 @@ test('an agent snapshot nests by printed lines and browser_type replaces field t
 
     await agentPage.evaluate(`
       window.__kiloInputEvents = [];
-      for (const id of ['email', 'notes', 'bio']) {
+      for (const id of ['email', 'work-email', 'age', 'notes', 'bio']) {
         document.getElementById(id).addEventListener('input', () => window.__kiloInputEvents.push(id));
       }
     `);
 
+    const words = ['c2', 'c6', 'c10'];
     const fields = [
-      { fragment: 'textbox "Email"', read: () => agentPage.locator('#email').inputValue() },
-      { fragment: 'textbox "Notes"', read: () => agentPage.locator('#notes').inputValue() },
-      { fragment: 'textbox "Bio"', read: () => agentPage.locator('#bio').textContent() },
+      {
+        fragment: 'textbox "Email"',
+        read: () => agentPage.locator('#email').inputValue(),
+        texts: words,
+      },
+      {
+        fragment: 'textbox "Work email"',
+        read: () => agentPage.locator('#work-email').inputValue(),
+        texts: words.map(word => `${word}@example.com`),
+      },
+      {
+        fragment: 'spinbutton "Age"',
+        read: () => agentPage.locator('#age').inputValue(),
+        texts: ['2', '6', '10'],
+      },
+      {
+        fragment: 'textbox "Notes"',
+        read: () => agentPage.locator('#notes').inputValue(),
+        texts: words,
+      },
+      {
+        fragment: 'textbox "Bio"',
+        read: () => agentPage.locator('#bio').textContent(),
+        texts: words,
+      },
     ];
 
     for (const field of fields) {
       const target = refOf(snapshot, field.fragment);
 
-      for (const text of ['c2', 'c6', 'c10']) {
+      for (const text of field.texts) {
         // eslint-disable-next-line no-await-in-loop -- each call types into what the previous call left
         await call('browser_type', { target, text });
         // eslint-disable-next-line no-await-in-loop -- see above
@@ -118,17 +141,9 @@ test('an agent snapshot nests by printed lines and browser_type replaces field t
       }
     }
 
-    expect(await agentPage.evaluate('window.__kiloInputEvents')).toStrictEqual([
-      'email',
-      'email',
-      'email',
-      'notes',
-      'notes',
-      'notes',
-      'bio',
-      'bio',
-      'bio',
-    ]);
+    expect(await agentPage.evaluate('window.__kiloInputEvents')).toStrictEqual(
+      ['email', 'work-email', 'age', 'notes', 'bio'].flatMap(id => [id, id, id])
+    );
 
     const email = refOf(snapshot, 'textbox "Email"');
 

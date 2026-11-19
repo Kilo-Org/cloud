@@ -197,10 +197,10 @@ const orgHasCurrentEntitlement = sql<boolean>`(
   ${organizations.require_seats} = false
   OR ${organizations.settings}->>'suppress_trial_messaging' = 'true'
   OR ${organizations.settings}->>'oss_sponsorship_tier' IS NOT NULL
-  OR (
-    ${organizations.trial_granted}
-    AND coalesce(${organizations.free_trial_end_at}, ${organizations.created_at} + interval '14 days') >= now() - interval '3 days'
-  )
+  OR CASE
+    WHEN ${organizations.free_trial_end_at} IS NOT NULL THEN ${organizations.free_trial_end_at} >= now() - interval '3 days'
+    ELSE ${organizations.trial_granted} AND (${organizations.created_at} + interval '14 days') >= now() - interval '3 days'
+  END
   OR coalesce((
     SELECT ${organization_seats_purchases.subscription_status} <> 'ended'
     FROM ${organization_seats_purchases}

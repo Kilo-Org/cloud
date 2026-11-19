@@ -107,7 +107,7 @@ function getTrialMessage(daysRemaining: number, isOwner: boolean, hasTrialWindow
   // An organization that was never given a trial has nothing to count down, so
   // it reports the missing plan instead of a misleading elapsed count.
   if (!hasTrialWindow) {
-    return `${ownerPrefix} organization does not include a free trial.${contactOwner}`;
+    return `Your organization does not include a free trial.${contactOwner}`;
   }
 
   if (daysRemaining === 0) {

@@ -4514,6 +4514,7 @@
     "summary": "AI-opsomming",
     "summaryPending": "AI-opsomming word voorberei. Dit sal hier verskyn wanneer dit gereed is.",
     "summaryUnavailable": "AI-opsomming nie beskikbaar nie. Jou gestruktureerde verslag is steeds beskikbaar.",
+    "summaryNotAdmitted": "AI-opsomming is vandag nie gegenereer nie. Jou gestruktureerde verslag is steeds beskikbaar.",
     "summaryCharge": "AI het {{cost}} gehef",
     "summaryChargePending": "AI-heffing wag op versoening",
     "summaryModel": "$t(common.model): {{model}}",

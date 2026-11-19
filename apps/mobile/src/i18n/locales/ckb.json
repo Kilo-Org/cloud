@@ -4514,6 +4514,7 @@
     "summary": "کورتەی AI",
     "summaryPending": "کورتەی AI لە ئامادەکردندایە. کاتێک ئامادە بوو لێرە دادەنرێت.",
     "summaryUnavailable": "کورتەی AI بەردەست نییە. ڕاپۆرتە ڕێکخراوەکەت هێشتا بەردەستە",
+    "summaryNotAdmitted": "کورتەی AI ئەمڕۆ دروست نەکرا. ڕاپۆرتە ڕێکخراوەکەت هێشتا بەردەستە",
     "summaryCharge": "تێچووی AI: {{cost}}",
     "summaryChargePending": "تێچووی AI چاوەڕوانی یەکلاکردنەوەیە",
     "summaryModel": "$t(common.model): {{model}}",

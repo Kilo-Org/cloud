@@ -4514,6 +4514,7 @@
     "summary": "Cuunfaa AI",
     "summaryPending": "Cuunfaan AI hojjetamaa jira. Yeroo qophaa'u asitti ni maxxana.",
     "summaryUnavailable": "Cuunfaan AI hin jiru. Gabaasni qindaa'aan kee ammas ni argama.",
+    "summaryNotAdmitted": "Cuunfaan AI har'a hin uummamne. Gabaasni qindaa'aan kee ammas ni argama.",
     "summaryCharge": "AI {{cost}} kaffalchiseera",
     "summaryChargePending": "Kaffaltiin AI mirkaneessuu eegaa jira",
     "summaryModel": "$t(common.model): {{model}}",

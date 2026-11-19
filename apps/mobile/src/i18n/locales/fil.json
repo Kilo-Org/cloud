@@ -4514,6 +4514,7 @@
     "summary": "Buod ng AI",
     "summaryPending": "Ginagawa pa ang buod ng AI. Ilalakip ito rito kapag handa na.",
     "summaryUnavailable": "Hindi available ang buod ng AI. Available pa rin ang iyong nakaayos na briefing.",
+    "summaryNotAdmitted": "Hindi nabuo ang buod ng AI ngayong araw. Available pa rin ang iyong nakaayos na briefing.",
     "summaryCharge": "Naningil ang AI ng {{cost}}",
     "summaryChargePending": "Hinihintay ang pagtutugma ng singil ng AI",
     "summaryModel": "$t(common.model): {{model}}",

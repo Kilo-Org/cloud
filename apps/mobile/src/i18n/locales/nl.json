@@ -4514,6 +4514,7 @@
     "summary": "AI-samenvatting",
     "summaryPending": "AI-samenvatting wordt gemaakt. Deze verschijnt hier zodra hij klaar is.",
     "summaryUnavailable": "AI-samenvatting niet beschikbaar. Je gestructureerde briefing is nog steeds beschikbaar.",
+    "summaryNotAdmitted": "De AI-samenvatting is vandaag niet gegenereerd. Je gestructureerde briefing is nog steeds beschikbaar.",
     "summaryCharge": "AI-kosten: {{cost}}",
     "summaryChargePending": "AI-kosten wachten op verrekening",
     "summaryModel": "$t(common.model): {{model}}",

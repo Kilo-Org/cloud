@@ -17,7 +17,7 @@ export function BriefingSummary({ report }: { readonly report: BriefingReport })
       <Text className="font-semibold">{t('agentBriefing.summary')}</Text>
       {report.summary.status !== 'ready' ? (
         <Text className="text-sm text-muted-foreground">
-          {t(briefingSummaryStatusKey(report.summary.status))}
+          {t(briefingSummaryStatusKey(report.summary.status, report.summary.error))}
         </Text>
       ) : null}
       {report.summary.text ? (

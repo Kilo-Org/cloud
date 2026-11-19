@@ -4514,6 +4514,7 @@
     "summary": "AI 요약",
     "summaryPending": "AI 요약을 생성 중입니다. 준비되면 여기에 첨부됩니다.",
     "summaryUnavailable": "AI 요약을 사용할 수 없습니다. 구조화된 브리핑은 계속 확인할 수 있습니다.",
+    "summaryNotAdmitted": "오늘은 AI 요약이 생성되지 않았습니다. 구조화된 브리핑은 계속 확인할 수 있습니다.",
     "summaryCharge": "AI 요금 {{cost}}",
     "summaryChargePending": "AI 요금 정산 대기 중",
     "summaryModel": "$t(common.model): {{model}}",

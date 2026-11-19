@@ -4514,6 +4514,7 @@
     "summary": "AI-yhteenveto",
     "summaryPending": "AI-yhteenvetoa luodaan. Se liitetään tähän, kun se on valmis.",
     "summaryUnavailable": "AI-yhteenveto ei ole saatavilla. Jäsennelty katsauksesi on edelleen käytettävissä.",
+    "summaryNotAdmitted": "AI-yhteenvetoa ei luotu tänään. Jäsennelty katsauksesi on edelleen käytettävissä.",
     "summaryCharge": "AI veloitti {{cost}}",
     "summaryChargePending": "AI-veloitus odottaa täsmäytystä",
     "summaryModel": "$t(common.model): {{model}}",

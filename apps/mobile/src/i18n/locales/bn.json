@@ -4514,6 +4514,7 @@
     "summary": "AI সারাংশ",
     "summaryPending": "AI সারাংশ তৈরি হচ্ছে। প্রস্তুত হলে এখানে যুক্ত হবে।",
     "summaryUnavailable": "AI সারাংশ উপলব্ধ নেই। আপনার কাঠামোবদ্ধ ব্রিফিং এখনও উপলব্ধ।",
+    "summaryNotAdmitted": "AI সারাংশ আজ তৈরি হয়নি। আপনার কাঠামোবদ্ধ ব্রিফিং এখনও উপলব্ধ।",
     "summaryCharge": "AI চার্জ {{cost}}",
     "summaryChargePending": "AI চার্জ মিলিয়ে দেখা বাকি",
     "summaryModel": "$t(common.model): {{model}}",

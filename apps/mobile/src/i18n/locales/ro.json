@@ -4585,6 +4585,7 @@
     "summary": "Rezumat AI",
     "summaryPending": "Rezumatul AI este în curs. Va fi atașat aici când este gata.",
     "summaryUnavailable": "Rezumatul AI nu este disponibil. Raportul tău structurat este în continuare disponibil.",
+    "summaryNotAdmitted": "Rezumatul AI nu a fost generat astăzi. Raportul tău structurat este în continuare disponibil.",
     "summaryCharge": "AI a taxat {{cost}}",
     "summaryChargePending": "Taxa AI așteaptă reconcilierea",
     "summaryModel": "$t(common.model): {{model}}",

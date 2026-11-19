@@ -4514,6 +4514,7 @@
     "summary": "AI സംഗ്രഹം",
     "summaryPending": "AI സംഗ്രഹം തയ്യാറാക്കുന്നു. തയ്യാറാകുമ്പോൾ ഇവിടെ ചേർക്കും.",
     "summaryUnavailable": "AI സംഗ്രഹം ലഭ്യമല്ല. നിങ്ങളുടെ ഘടനാപരമായ ബ്രീഫിംഗ് ഇപ്പോഴും ലഭ്യമാണ്.",
+    "summaryNotAdmitted": "AI സംഗ്രഹം ഇന്ന് തയ്യാറാക്കിയിട്ടില്ല. നിങ്ങളുടെ ഘടനാപരമായ ബ്രീഫിംഗ് ഇപ്പോഴും ലഭ്യമാണ്.",
     "summaryCharge": "AI-ക്കായി {{cost}} ഈടാക്കി",
     "summaryChargePending": "AI നിരക്ക് ഒത്തുനോക്കൽ ബാക്കിയാണ്",
     "summaryModel": "$t(common.model): {{model}}",

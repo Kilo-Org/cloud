@@ -4514,6 +4514,7 @@
     "summary": "AI özeti",
     "summaryPending": "AI özeti hazırlanıyor. Hazır olduğunda buraya eklenecek.",
     "summaryUnavailable": "AI özeti kullanılamıyor. Yapılandırılmış raporunuz hâlâ mevcut.",
+    "summaryNotAdmitted": "AI özeti bugün oluşturulmadı. Yapılandırılmış raporunuz hâlâ mevcut.",
     "summaryCharge": "AI ücreti: {{cost}}",
     "summaryChargePending": "AI ücreti mutabakat bekliyor",
     "summaryModel": "$t(common.model): {{model}}",

@@ -4514,6 +4514,7 @@
     "summary": "AI хураангуй",
     "summaryPending": "AI хураангуй бэлтгэгдэж байна. Бэлэн болмогц энд хавсаргагдана.",
     "summaryUnavailable": "AI хураангуй боломжгүй. Бүтэцтэй тойм тань хэвээр байна.",
+    "summaryNotAdmitted": "AI хураангуй өнөөдөр хийгдээгүй. Бүтэцтэй тойм тань хэвээр байна.",
     "summaryCharge": "AI төлбөр {{cost}}",
     "summaryChargePending": "AI төлбөр тооцоо нийлүүлэлтийг хүлээж байна",
     "summaryModel": "$t(common.model): {{model}}",

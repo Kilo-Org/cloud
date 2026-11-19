@@ -89,7 +89,7 @@ export function BriefingCard({
   const aiPreview =
     report.summary.status === 'ready' && report.summary.text
       ? report.summary.text
-      : t(briefingSummaryStatusKey(report.summary.status));
+      : t(briefingSummaryStatusKey(report.summary.status, report.summary.error));
   const hasAiPreview = report.summary.status !== 'disabled';
   const preview = [
     offline ? t('agentBriefing.offline') : null,

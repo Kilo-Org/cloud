@@ -4798,6 +4798,7 @@
     "summary": "Crynodeb AI",
     "summaryPending": "Mae'r crynodeb AI ar y gweill. Bydd yn ymddangos yma pan fydd yn barod.",
     "summaryUnavailable": "Crynodeb AI ddim ar gael. Mae eich briff strwythuredig yn dal ar gael.",
+    "summaryNotAdmitted": "Ni chynhyrchwyd crynodeb AI heddiw. Mae eich briff strwythuredig yn dal ar gael.",
     "summaryCharge": "Tâl AI: {{cost}}",
     "summaryChargePending": "Tâl AI yn aros i'w gysoni",
     "summaryModel": "$t(common.model): {{model}}",

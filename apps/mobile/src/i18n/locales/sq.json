@@ -4514,6 +4514,7 @@
     "summary": "Përmbledhje AI",
     "summaryPending": "Përmbledhja AI është në proces. Do të shtohet këtu kur të jetë gati.",
     "summaryUnavailable": "Përmbledhja AI nuk është e disponueshme. Raporti i strukturuar mbetet i disponueshëm.",
+    "summaryNotAdmitted": "Përmbledhja AI nuk u gjenerua sot. Raporti i strukturuar mbetet i disponueshëm.",
     "summaryCharge": "AI tarifoi {{cost}}",
     "summaryChargePending": "Tarifa AI në pritje të rakordimit",
     "summaryModel": "$t(common.model): {{model}}",

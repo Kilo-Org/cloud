@@ -4514,6 +4514,7 @@
     "summary": "Nchịkọta AI",
     "summaryPending": "Nchịkọta AI na-aga n'ihu. Ọ ga-apụta ebe a mgbe ọ dị njikere.",
     "summaryUnavailable": "Nchịkọta AI adịghị. Akụkọ ahaziri ahazi gị ka dị.",
+    "summaryNotAdmitted": "Emebughị nchịkọta AI taa. Akụkọ ahaziri ahazi gị ka dị.",
     "summaryCharge": "A nara ụgwọ {{cost}} maka AI",
     "summaryChargePending": "Ụgwọ AI na-eche nkwekọ",
     "summaryModel": "$t(common.model): {{model}}",

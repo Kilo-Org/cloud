@@ -4514,6 +4514,7 @@
     "summary": "AI ಸಾರಾಂಶ",
     "summaryPending": "AI ಸಾರಾಂಶ ಪ್ರಗತಿಯಲ್ಲಿದೆ. ಸಿದ್ಧವಾದಾಗ ಇಲ್ಲಿ ಸೇರಿಸಲಾಗುತ್ತದೆ.",
     "summaryUnavailable": "AI ಸಾರಾಂಶ ಲಭ್ಯವಿಲ್ಲ. ನಿಮ್ಮ ರಚನಾಬದ್ಧ ವರದಿ ಇನ್ನೂ ಲಭ್ಯವಿದೆ.",
+    "summaryNotAdmitted": "AI ಸಾರಾಂಶ ಇಂದು ರಚಿಸಲಾಗಿಲ್ಲ. ನಿಮ್ಮ ರಚನಾಬದ್ಧ ವರದಿ ಇನ್ನೂ ಲಭ್ಯವಿದೆ.",
     "summaryCharge": "AI ಶುಲ್ಕ {{cost}}",
     "summaryChargePending": "AI ಶುಲ್ಕ ಹೊಂದಾಣಿಕೆ ಬಾಕಿ ಇದೆ",
     "summaryModel": "$t(common.model): {{model}}",

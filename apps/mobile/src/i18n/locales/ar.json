@@ -4798,6 +4798,7 @@
     "summary": "ملخص AI",
     "summaryPending": "جارٍ إعداد ملخص AI. سيُرفق هنا عند جاهزيته.",
     "summaryUnavailable": "ملخص AI غير متاح. لا يزال تقريرك المنظّم متاحًا.",
+    "summaryNotAdmitted": "لم يتم إنشاء ملخص AI اليوم. لا يزال تقريرك المنظّم متاحًا.",
     "summaryCharge": "رسوم AI: {{cost}}",
     "summaryChargePending": "رسوم AI بانتظار التسوية",
     "summaryModel": "$t(common.model): {{model}}",

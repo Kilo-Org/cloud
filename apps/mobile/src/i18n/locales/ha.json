@@ -4514,6 +4514,7 @@
     "summary": "Taƙaitawar AI",
     "summaryPending": "Ana shirya taƙaitawar AI. Za ta bayyana a nan idan ta kammala.",
     "summaryUnavailable": "Babu taƙaitawar AI. Rahotonka mai tsari yana nan har yanzu.",
+    "summaryNotAdmitted": "Ba a samar da taƙaitawar AI a yau ba. Rahotonka mai tsari yana nan har yanzu.",
     "summaryCharge": "AI ta caji {{cost}}",
     "summaryChargePending": "Cajin AI yana jiran tantancewa",
     "summaryModel": "$t(common.model): {{model}}",

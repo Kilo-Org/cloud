@@ -4514,6 +4514,7 @@
     "summary": "Àkópọ̀ AI",
     "summaryPending": "Àkópọ̀ AI ń lọ lọ́wọ́. Yóò so mọ́ ibí nígbà tó bá ṣetán.",
     "summaryUnavailable": "Àkópọ̀ AI kò sí. Ìròyìn onílànà rẹ ṣì wà.",
+    "summaryNotAdmitted": "A kò ṣe Àkópọ̀ AI lónìí. Ìròyìn onílànà rẹ ṣì wà.",
     "summaryCharge": "AI gba {{cost}}",
     "summaryChargePending": "Owó AI ń dúró de ìṣirò",
     "summaryModel": "$t(common.model): {{model}}",

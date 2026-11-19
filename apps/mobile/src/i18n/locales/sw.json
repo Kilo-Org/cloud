@@ -4514,6 +4514,7 @@
     "summary": "Muhtasari wa AI",
     "summaryPending": "Muhtasari wa AI unaandaliwa. Utaambatishwa hapa ukiwa tayari.",
     "summaryUnavailable": "Muhtasari wa AI haupatikani. Ripoti yako iliyopangwa bado inapatikana.",
+    "summaryNotAdmitted": "Muhtasari wa AI haukutengenezwa leo. Ripoti yako iliyopangwa bado inapatikana.",
     "summaryCharge": "AI imetoza {{cost}}",
     "summaryChargePending": "Malipo ya AI yanasubiri uhakiki",
     "summaryModel": "$t(common.model): {{model}}",

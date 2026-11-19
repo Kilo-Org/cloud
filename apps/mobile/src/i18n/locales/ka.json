@@ -4514,6 +4514,7 @@
     "summary": "AI შეჯამება",
     "summaryPending": "AI შეჯამება მზადდება. მზადყოფნისას აქ დაემატება.",
     "summaryUnavailable": "AI შეჯამება მიუწვდომელია. სტრუქტურირებული ანგარიში კვლავ ხელმისაწვდომია.",
+    "summaryNotAdmitted": "AI შეჯამება დღეს არ შემქმნილა. სტრუქტურირებული ანგარიში კვლავ ხელმისაწვდომია.",
     "summaryCharge": "AI-მ ჩამოჭრა {{cost}}",
     "summaryChargePending": "AI გადასახადი შეჯერებას ელოდება",
     "summaryModel": "$t(common.model): {{model}}",

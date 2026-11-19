@@ -4656,6 +4656,7 @@
     "summary": "AI shrnutí",
     "summaryPending": "AI shrnutí se připravuje. Až bude hotové, objeví se zde.",
     "summaryUnavailable": "AI shrnutí není k dispozici. Strukturovaný přehled je stále dostupný.",
+    "summaryNotAdmitted": "AI shrnutí nebylo dnes vytvořeno. Strukturovaný přehled je stále dostupný.",
     "summaryCharge": "AI účtovala {{cost}}",
     "summaryChargePending": "Poplatek za AI čeká na vyúčtování",
     "summaryModel": "$t(common.model): {{model}}",

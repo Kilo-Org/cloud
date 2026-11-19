@@ -4585,6 +4585,7 @@
     "summary": "AI rezime",
     "summaryPending": "AI rezime je u izradi. Pojaviće se ovde kada bude spreman.",
     "summaryUnavailable": "AI rezime nije dostupan. Strukturisan izveštaj je i dalje dostupan.",
+    "summaryNotAdmitted": "AI rezime danas nije generisan. Strukturisan izveštaj je i dalje dostupan.",
     "summaryCharge": "AI naplata: {{cost}}",
     "summaryChargePending": "AI naplata čeka usklađivanje",
     "summaryModel": "$t(common.model): {{model}}",

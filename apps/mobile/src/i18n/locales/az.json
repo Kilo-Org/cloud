@@ -4514,6 +4514,7 @@
     "summary": "AI xülasəsi",
     "summaryPending": "AI xülasəsi hazırlanır. Hazır olanda bura əlavə ediləcək.",
     "summaryUnavailable": "AI xülasəsi əlçatan deyil. Strukturlu hesabatınız hələ də mövcuddur.",
+    "summaryNotAdmitted": "Bu gün AI xülasəsi yaradilmadı. Strukturlu hesabatınız hələ də mövcuddur.",
     "summaryCharge": "AI ödənişi: {{cost}}",
     "summaryChargePending": "AI ödənişi uzlaşdırılmanı gözləyir",
     "summaryModel": "$t(common.model): {{model}}",

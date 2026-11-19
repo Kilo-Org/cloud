@@ -4585,6 +4585,7 @@
     "summary": "Riepilogo AI",
     "summaryPending": "Riepilogo AI in corso. Verrà allegato qui quando pronto.",
     "summaryUnavailable": "Riepilogo AI non disponibile. Il briefing strutturato è comunque disponibile.",
+    "summaryNotAdmitted": "Il riepilogo AI non è stato generato oggi. Il briefing strutturato è comunque disponibile.",
     "summaryCharge": "Addebito AI: {{cost}}",
     "summaryChargePending": "Addebito AI in attesa di riconciliazione",
     "summaryModel": "$t(common.model): {{model}}",

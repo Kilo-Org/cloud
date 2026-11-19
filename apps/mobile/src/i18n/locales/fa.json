@@ -4514,6 +4514,7 @@
     "summary": "خلاصه AI",
     "summaryPending": "خلاصه AI در حال تهیه است و پس از آماده شدن اینجا افزوده می‌شود.",
     "summaryUnavailable": "خلاصه AI در دسترس نیست. گزارش ساختاریافته همچنان موجود است.",
+    "summaryNotAdmitted": "خلاصه AI امروز تولید نشد. گزارش ساختاریافته همچنان موجود است.",
     "summaryCharge": "هزینه دریافت‌شده برای AI: {{cost}}",
     "summaryChargePending": "هزینه AI در انتظار تطبیق",
     "summaryModel": "$t(common.model): {{model}}",

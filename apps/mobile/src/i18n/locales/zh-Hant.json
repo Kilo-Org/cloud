@@ -4514,6 +4514,7 @@
     "summary": "AI 摘要",
     "summaryPending": "AI 摘要產生中，完成後會附加於此。",
     "summaryUnavailable": "無法使用 AI 摘要。你的結構化簡報仍可查看。",
+    "summaryNotAdmitted": "今天未產生 AI 摘要。你的結構化簡報仍可查看。",
     "summaryCharge": "AI 已收費 {{cost}}",
     "summaryChargePending": "AI 費用待核對",
     "summaryModel": "$t(common.model)：{{model}}",

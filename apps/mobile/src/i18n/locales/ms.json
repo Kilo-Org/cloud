@@ -4514,6 +4514,7 @@
     "summary": "Ringkasan AI",
     "summaryPending": "Ringkasan AI sedang diproses. Ia akan dilampirkan di sini apabila sedia.",
     "summaryUnavailable": "Ringkasan AI tidak tersedia. Laporan berstruktur anda masih tersedia.",
+    "summaryNotAdmitted": "Ringkasan AI tidak dijana hari ini. Laporan berstruktur anda masih tersedia.",
     "summaryCharge": "Caj AI {{cost}}",
     "summaryChargePending": "Caj AI menunggu penyelarasan",
     "summaryModel": "$t(common.model): {{model}}",

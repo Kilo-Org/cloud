@@ -4656,6 +4656,7 @@
     "summary": "AI povzetek",
     "summaryPending": "AI povzetek je v pripravi. Ko bo pripravljen, bo priložen tukaj.",
     "summaryUnavailable": "AI povzetek ni na voljo. Vaše strukturirano poročilo je še vedno na voljo.",
+    "summaryNotAdmitted": "AI povzetek danes ni bil ustvarjen. Vaše strukturirano poročilo je še vedno na voljo.",
     "summaryCharge": "AI bremenitev: {{cost}}",
     "summaryChargePending": "AI bremenitev čaka na uskladitev",
     "summaryModel": "$t(common.model): {{model}}",

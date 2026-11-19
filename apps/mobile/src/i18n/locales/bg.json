@@ -4514,6 +4514,7 @@
     "summary": "AI обобщение",
     "summaryPending": "AI обобщението се изготвя. Ще се появи тук, когато е готово.",
     "summaryUnavailable": "AI обобщението не е налично. Структурираният брифинг все още е достъпен.",
+    "summaryNotAdmitted": "Днес AI обобщението не беше генерирано. Структурираният брифинг все още е достъпен.",
     "summaryCharge": "AI таксуване: {{cost}}",
     "summaryChargePending": "AI таксуването очаква уравняване",
     "summaryModel": "$t(common.model): {{model}}",

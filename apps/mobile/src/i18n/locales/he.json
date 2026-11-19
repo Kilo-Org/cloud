@@ -4585,6 +4585,7 @@
     "summary": "סיכום AI",
     "summaryPending": "סיכום ה-AI בהכנה. הוא יצורף כאן כשיהיה מוכן.",
     "summaryUnavailable": "סיכום ה-AI אינו זמין. הדוח המובנה עדיין זמין.",
+    "summaryNotAdmitted": "סיכום ה-AI לא נוצר היום. הדוח המובנה עדיין זמין.",
     "summaryCharge": "חיוב AI: {{cost}}",
     "summaryChargePending": "חיוב AI ממתין להתאמה",
     "summaryModel": "$t(common.model): {{model}}",

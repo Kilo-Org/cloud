@@ -4514,6 +4514,7 @@
     "summary": "AI-sammanfattning",
     "summaryPending": "AI-sammanfattningen pågår. Den bifogas här när den är klar.",
     "summaryUnavailable": "AI-sammanfattningen är inte tillgänglig. Din strukturerade rapport finns fortfarande.",
+    "summaryNotAdmitted": "AI-sammanfattningen skapades inte idag. Din strukturerade rapport finns fortfarande.",
     "summaryCharge": "AI debiterade {{cost}}",
     "summaryChargePending": "AI-avgiften väntar på avstämning",
     "summaryModel": "$t(common.model): {{model}}",

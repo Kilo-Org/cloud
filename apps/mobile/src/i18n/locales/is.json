@@ -4514,6 +4514,7 @@
     "summary": "AI samantekt",
     "summaryPending": "AI samantekt er í vinnslu. Hún birtist hér þegar hún er tilbúin.",
     "summaryUnavailable": "AI samantekt er ekki tiltæk. Skipulagt yfirlit þitt er enn tiltækt.",
+    "summaryNotAdmitted": "AI samantekt var ekki búin til í dag. Skipulagt yfirlit þitt er enn tiltækt.",
     "summaryCharge": "AI kostaði {{cost}}",
     "summaryChargePending": "AI kostnaður bíður afstemmingar",
     "summaryModel": "$t(common.model): {{model}}",

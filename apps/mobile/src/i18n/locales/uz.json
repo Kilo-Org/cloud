@@ -4514,6 +4514,7 @@
     "summary": "AI xulosasi",
     "summaryPending": "AI xulosasi tayyorlanmoqda. Tayyor bo‘lgach shu yerga qo‘shiladi.",
     "summaryUnavailable": "AI xulosasi mavjud emas. Tuzilgan brifingiz baribir mavjud.",
+    "summaryNotAdmitted": "AI xulosasi bugun yaratilmadi. Tuzilgan brifingiz baribir mavjud.",
     "summaryCharge": "AI uchun {{cost}} olindi",
     "summaryChargePending": "AI to‘lovi solishtirilmoqda",
     "summaryModel": "$t(common.model): {{model}}",

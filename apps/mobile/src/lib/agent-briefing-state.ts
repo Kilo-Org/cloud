@@ -38,7 +38,14 @@ export function visibleHomeBriefing(
   );
 }
 
-export function briefingSummaryStatusKey(status: string): string {
+/**
+ * `not_admitted` marks a scheduled row the morning window never admitted, a
+ * skipped generation rather than a failure or a timeout.
+ */
+export function briefingSummaryStatusKey(status: string, error?: string | null): string {
+  if ((status === 'failed' || status === 'unavailable') && error === 'not_admitted') {
+    return 'agentBriefing.summaryNotAdmitted';
+  }
   switch (status) {
     case 'disabled': {
       return 'agentBriefing.summaryUnavailable';

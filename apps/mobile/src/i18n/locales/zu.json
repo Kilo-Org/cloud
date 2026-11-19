@@ -4514,6 +4514,7 @@
     "summary": "Isifinyezo se-AI",
     "summaryPending": "Isifinyezo se-AI siyaqhubeka. Sizonamathiselwa lapha uma sesilungile.",
     "summaryUnavailable": "Isifinyezo se-AI asitholakali. Umbiko wakho ohleliwe usatholakala.",
+    "summaryNotAdmitted": "Isifinyezo se-AI asizange senziwe namuhla. Umbiko wakho ohleliwe usatholakala.",
     "summaryCharge": "I-AI ikhokhise {{cost}}",
     "summaryChargePending": "Inkokhelo ye-AI ilinde ukuqhathaniswa nokuvumelaniswa kwamarekhodi ezimali",
     "summaryModel": "$t(common.model): {{model}}",

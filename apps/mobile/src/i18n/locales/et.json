@@ -4514,6 +4514,7 @@
     "summary": "AI kokkuvõte",
     "summaryPending": "AI kokkuvõtet koostatakse. See lisatakse siia, kui on valmis.",
     "summaryUnavailable": "AI kokkuvõte pole saadaval. Sinu struktureeritud ülevaade on endiselt saadaval.",
+    "summaryNotAdmitted": "Täna AI kokkuvõtet ei koostatud. Sinu struktureeritud ülevaade on endiselt saadaval.",
     "summaryCharge": "AI tasu {{cost}}",
     "summaryChargePending": "AI tasu ootab arveldusandmete kooskõlastamist",
     "summaryModel": "$t(common.model): {{model}}",

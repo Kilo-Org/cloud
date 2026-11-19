@@ -20,6 +20,7 @@ import {
   shardBatches,
   targetLink,
   TemplateError,
+  templateReferences,
   type Batch,
   type ManifestRow,
   type Phase,
@@ -56,10 +57,14 @@ import {
 } from './seed-all';
 
 export const BATCHES_USAGE = `Usage: pnpm dev:mobile:design-gate batches <command> [flags]
-  run --device <serial|udid>@<metro-url> [--device ...] --out <dir>
+  run --device <serial|udid>@<metro-url>[@<seed-map.json>] [--device ...] --out <dir>
       [--platform android|ios] [--phase signed-in|signed-out] [--shard <i>/<n>] [--only <batch>,<batch>]
       [--seeds <seed-map.json>] [--matrix base|standard|full] [--cell <id> ...] [--observe-ms <ms>]
       [--manifest <file>] [--no-restart]
+      A seed map holds one account's ids, so give each device the map of the account it is signed
+      in as (the third part of --device); --seeds is the map for devices that name none. A batch
+      whose links use seeded ids runs only on a device with a map; when no device has one, the batch
+      is recorded as exit 2 (no-seed-map) instead of opening another account's ids.
       Runs the shard's batches of one phase, one gate run per batch, in parallel across the devices.
       Each device needs its own Metro (its own port and adb reverse); a device takes the next batch when
       it finishes one. Before each batch the app is restarted on that device's Metro and must reach the
@@ -68,7 +73,7 @@ export const BATCHES_USAGE = `Usage: pnpm dev:mobile:design-gate batches <comman
       stops dispatching and writes RUN-STOPPED. Rows that force a state open
       ${FORCE_CLEAR_LINK} after their capture.
       Writes <out>/<batch>/ (gate artifacts, targets.json, expectations.json, gate.log),
-      <out>/summary.tsv and <out>/resolved-links.tsv.
+      <out>/summary.tsv and <out>/resolved-links.tsv (each batch's links as its device resolved them).
       --matrix overrides every batch's own matrix; --cell adds a cell the platform supports
       (${CELL_IDS.join(', ')}; iOS has no compact, landscape or rtl-compact).
   seed --email <fake@example.com> --out <seed-map.json> [--manifest <file>] [--only <batch>,...] [--step <name> ...]
@@ -85,16 +90,34 @@ Exit codes: 0 every batch clean; 1 measured errors or a link that did not settle
 
 export type BatchesDeps = { log: (line: string) => void; warn: (line: string) => void };
 
-type DeviceSpec = Readonly<{ id: string; metro: string; platform: Platform }>;
+type DeviceSpec = Readonly<{ id: string; metro: string; platform: Platform; seedsFile?: string }>;
 
 export function parseDeviceSpec(value: string, platform: Platform): DeviceSpec {
-  const at = value.indexOf('@');
-  const id = at === -1 ? '' : value.slice(0, at);
-  const metro = at === -1 ? '' : value.slice(at + 1);
-  if (id === '' || !/^https?:\/\/[^/]+:\d+\/?$/.test(metro)) {
-    throw new Error(`--device must be <serial|udid>@http://<host>:<port>, got "${value}"`);
+  const [id = '', metro = '', seedsFile, ...extra] = value.split('@');
+  if (
+    id === '' ||
+    !/^https?:\/\/[^/]+:\d+\/?$/.test(metro) ||
+    seedsFile === '' ||
+    extra.length > 0
+  ) {
+    throw new Error(
+      `--device must be <serial|udid>@http://<host>:<port>[@<seed-map.json>], got "${value}"`
+    );
   }
-  return { id, metro: metro.replace(/\/$/, ''), platform };
+  return {
+    id,
+    metro: metro.replace(/\/$/, ''),
+    platform,
+    ...(seedsFile === undefined ? {} : { seedsFile }),
+  };
+}
+
+/** A device of a run, with the seed map of the account it is signed in as. */
+type RunDevice = DeviceSpec & Readonly<{ seeds?: SeedMap }>;
+
+/** Whether any link of the batch names a seeded id. */
+export function needsSeeds(batch: Batch): boolean {
+  return batch.rows.some(row => templateReferences(row.link).length > 0);
 }
 
 type SummaryRow = Readonly<{
@@ -283,20 +306,21 @@ export function checkExpectations(out: string, targets: readonly ResolvedTarget[
 }
 
 type RunOptions = {
-  devices: DeviceSpec[];
+  devices: RunDevice[];
   out: string;
   phase: Phase;
   batches: Batch[];
-  seeds?: SeedMap;
   matrix?: MatrixName;
   cells: CellId[];
   observeMs?: string;
   restart: boolean;
 };
 
+const RESOLVED_HEADER = 'batch\tdevice\ttarget\tlink';
+
 async function runBatch(
   batch: Batch,
-  device: DeviceSpec,
+  device: RunDevice,
   options: RunOptions,
   log: (line: string) => void
 ): Promise<SummaryRow & { stop: boolean }> {
@@ -314,15 +338,21 @@ async function runBatch(
     attempts,
     stop,
   });
+  const resolvedFile = path.join(options.out, 'resolved-links.tsv');
   let targets: ResolvedTarget[];
   try {
-    targets = batchTargets(batch, options.seeds);
+    targets = batchTargets(batch, device.seeds);
   } catch (error) {
     if (!(error instanceof TemplateError)) throw error;
     fs.writeFileSync(path.join(dir, 'unresolved.txt'), `${error.message}\n`);
+    fs.appendFileSync(resolvedFile, `${[batch.id, device.id, '-', error.message].join('\t')}\n`);
     log(`${batch.id}: ${error.message}`);
     return finish(2, 'unresolved-seed', 0);
   }
+  fs.appendFileSync(
+    resolvedFile,
+    targets.map(target => `${[batch.id, device.id, target.id, target.link].join('\t')}\n`).join('')
+  );
   const targetsFile = path.join(dir, 'targets.json');
   fs.writeFileSync(
     targetsFile,
@@ -433,26 +463,21 @@ export async function runBatches(
   log: (line: string) => void
 ): Promise<number> {
   fs.mkdirSync(options.out, { recursive: true });
-  // Every link the run opens, resolved, before any device starts: the proof of
-  // which ids the templates became.
-  const resolved: string[] = ['batch\ttarget\tlink'];
-  for (const batch of options.batches) {
-    try {
-      for (const target of batchTargets(batch, options.seeds)) {
-        resolved.push([batch.id, target.id, target.link].join('\t'));
-      }
-    } catch (error) {
-      resolved.push([batch.id, '-', String(error)].join('\t'));
-    }
-  }
-  fs.writeFileSync(path.join(options.out, 'resolved-links.tsv'), `${resolved.join('\n')}\n`);
+  // Each batch appends its links as its device resolved them, which is the
+  // proof of which account's ids the templates became on which device.
+  fs.writeFileSync(path.join(options.out, 'resolved-links.tsv'), `${RESOLVED_HEADER}\n`);
   const queue = [...options.batches];
   const results = new Map<string, SummaryRow>();
   let stopped: string | undefined;
-  const worker = async (device: DeviceSpec) => {
+  const worker = async (device: RunDevice) => {
     for (;;) {
       if (stopped !== undefined) return;
-      const batch = queue.shift();
+      // A device without a seed map takes only batches that need no seeded id.
+      const next = queue.findIndex(
+        candidate => device.seeds !== undefined || !needsSeeds(candidate)
+      );
+      if (next === -1) return;
+      const [batch] = queue.splice(next, 1);
       if (batch === undefined) return;
       const deviceLog = (line: string) => log(`[${device.id}] ${line}`);
       const started = clock.now();
@@ -490,6 +515,23 @@ export async function runBatches(
     }
   };
   await Promise.all(options.devices.map(worker));
+  // Batches left without a stop are seeded batches no device had a map for:
+  // recorded as not measured, never opened with another account's ids.
+  if (stopped === undefined) {
+    for (const batch of queue.splice(0)) {
+      log(`${batch.id}: needs seeded ids and no --device names a seed map; not run`);
+      results.set(batch.id, {
+        batch: batch.id,
+        tier: batch.tier,
+        phase: batch.phase,
+        device: '-',
+        exit: 2,
+        counts: 'no-seed-map',
+        durationS: 0,
+        attempts: 0,
+      });
+    }
+  }
   writeSummary(options.out, options.batches, results);
   log(`summary: ${path.join(options.out, 'summary.tsv')}`);
   if (stopped !== undefined) {
@@ -606,18 +648,25 @@ export async function batchesMain(argv: readonly string[], deps: BatchesDeps): P
           only: values.only?.split(',').filter(Boolean),
           shard: values.shard === undefined ? undefined : parseShard(values.shard),
         });
+        const shared = values.seeds === undefined ? undefined : readSeedMap(values.seeds);
+        const runDevices: RunDevice[] = devices.map(device => {
+          const seeds = device.seedsFile === undefined ? shared : readSeedMap(device.seedsFile);
+          return seeds === undefined ? device : { ...device, seeds };
+        });
         deps.log(
-          `batches: ${batches.length} (${batches.map(batch => batch.id).join(', ')}) on ${devices
-            .map(device => `${device.id}@${device.metro}`)
+          `batches: ${batches.length} (${batches.map(batch => batch.id).join(', ')}) on ${runDevices
+            .map(
+              device =>
+                `${device.id}@${device.metro}${device.seeds === undefined ? ' (no seed map)' : ` (seeds ${device.seeds.email})`}`
+            )
             .join(', ')}`
         );
         return await runBatches(
           {
-            devices,
+            devices: runDevices,
             out: path.resolve(values.out),
             phase,
             batches,
-            seeds: values.seeds === undefined ? undefined : readSeedMap(values.seeds),
             matrix,
             cells,
             observeMs: values['observe-ms'],

@@ -215,7 +215,8 @@ function patternIsCoveredBy(left: string, right: string): boolean {
  * An ask also carries a session allow, as the profile's ask, but only when the
  * allow's own pattern satisfies the ask's pattern, so every command the allow
  * permits is one the profile asked about; a wider session allow keeps its own
- * verdict for the commands the ask does not cover.
+ * verdict for the commands the ask does not cover. A pattern the profile decides
+ * itself keeps the profile's own verdict, so a carried ask never overwrites it.
  *
  * A session refusal on the ask's own key comes before the carried allows,
  * because the session writes those allows to refine that refusal and they are
@@ -271,6 +272,9 @@ function composeRuleMap(
     composed.push(...refusals.filter(([refusalPattern]) => refusalPattern === pattern));
     for (const [allowPattern, allowAction] of entries) {
       if (allowAction !== 'allow' || allowPattern === pattern) continue;
+      // The profile decides that pattern itself, so a carried ask must not
+      // overwrite it and the profile's own order keeps deciding.
+      if (agent[allowPattern] !== undefined) continue;
       if (!patternIsCoveredBy(allowPattern, pattern)) continue;
       composed.push([allowPattern, 'ask']);
     }

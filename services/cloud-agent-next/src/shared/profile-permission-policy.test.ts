@@ -528,6 +528,57 @@ describe('narrowProfilePermission', () => {
     expect(resolve(session, composed, 'bash', 'rm -rf /')).toBe('deny');
   });
 
+  it('keeps a profile refusal against a covering ask in either profile key order', () => {
+    const session: PermissionMap = { bash: { 'git push --force *': 'allow' } };
+    const refusalFirst = narrowProfilePermission(session, {
+      bash: { 'git push --force *': 'deny', 'git *': 'ask' },
+    }) as PermissionMap;
+    const askFirst = narrowProfilePermission(session, {
+      bash: { 'git *': 'ask', 'git push --force *': 'deny' },
+    }) as PermissionMap;
+    const expected = [
+      ['git *', 'ask'],
+      ['git push --force *', 'deny'],
+    ];
+    expect(Object.entries(refusalFirst['bash'] as Record<string, string>).sort()).toEqual(expected);
+    expect(Object.entries(askFirst['bash'] as Record<string, string>).sort()).toEqual(expected);
+    expect(resolve(session, refusalFirst, 'bash', 'git status')).toBe('ask');
+    expect(resolve(session, askFirst, 'bash', 'git push --force origin main')).toBe('deny');
+  });
+
+  it('carries a session allow for a pattern the profile does not name in either profile key order', () => {
+    const session: PermissionMap = {
+      bash: { '*': 'deny', 'git log': 'allow', 'git log *': 'allow' },
+    };
+    const expected = {
+      '*': 'deny',
+      'git *': 'ask',
+      'git log': 'ask',
+      'git log *': 'ask',
+      'rm *': 'deny',
+    };
+    const askFirst = narrowProfilePermission(session, {
+      bash: { 'git *': 'ask', 'rm *': 'deny' },
+    }) as PermissionMap;
+    const refusalFirst = narrowProfilePermission(session, {
+      bash: { 'rm *': 'deny', 'git *': 'ask' },
+    }) as PermissionMap;
+    expect(askFirst['bash']).toEqual(expected);
+    expect(refusalFirst['bash']).toEqual(expected);
+  });
+
+  it('keeps the profile verdict for a pattern the profile decides when an ask covers it', () => {
+    const session: PermissionMap = { bash: { 'git log *': 'allow' } };
+    const refusal = narrowProfilePermission(session, {
+      bash: { 'git log *': 'deny', 'git *': 'ask' },
+    }) as PermissionMap;
+    const allowance = narrowProfilePermission(session, {
+      bash: { 'git log *': 'allow', 'git *': 'ask' },
+    }) as PermissionMap;
+    expect(refusal['bash']).toEqual({ 'git log *': 'deny', 'git *': 'ask' });
+    expect(allowance['bash']).toEqual({ 'git log *': 'allow', 'git *': 'ask' });
+  });
+
   it('drops an empty agent map', () => {
     expect(narrowProfilePermission(reviewSession, {})).toBeUndefined();
     expect(narrowProfilePermission(reviewSession, { bash: {} })).toBeUndefined();

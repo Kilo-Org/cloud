@@ -23,7 +23,6 @@ import {
   type EnkryptCachedScanResult,
   type EnkryptGuardrailRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/verdict-cache';
-import { createEnkryptCallLimiter } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/call-limiter';
 import { ENKRYPT_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
@@ -110,12 +109,18 @@ export async function recordEnkryptUsageRecords(
 
 /**
  * Starts the organization's input guardrail scans. A null scan (no organization, or the guardrail
- * is off) makes no Enkrypt call. Blocking detectors and log-only detectors are scanned
- * concurrently, each over every tool definition, the system prompt, and the conversation
- * separately; only the blocking calls gate the request, so log-only detectors never delay or
- * reject it. All of them share at most `ENKRYPT_MAX_CONCURRENT_CALLS` Enkrypt calls in flight, and
- * blocking calls get a free slot first, so log-only calls only delay the verdict by holding slots
- * they already have.
+ * is off) makes no Enkrypt call. Blocking detectors and log-only detectors are scanned separately,
+ * each over every tool definition, the system prompt, and the conversation; only the blocking calls
+ * gate the request, so log-only detectors never reject it.
+ *
+ * The request's Enkrypt calls run strictly one at a time, so one request never holds more than one
+ * call of the shared Enkrypt service: the blocking scan's first, then the log-only scan's, which
+ * starts only once the blocking scan finished. The request waits only for the blocking scan, so
+ * running it first means log-only work never delays the verdict. All calls share one deadline of
+ * `ENKRYPT_GUARDRAIL_TIMEOUT_MS`, started once the scan is prepared, so the log-only scan gets what
+ * the blocking scan leaves of it; a call with no time left is not made and fails, like any call that
+ * runs out of time. The log-only scan also runs when the blocking scan blocked the request, so the
+ * report still shows what its detectors would have flagged.
  *
  * Usage records are written in an `after()` callback registered now, so a request that returns
  * early still accounts for a scan Enkrypt performed. A request's verdict cache entries, each for
@@ -128,16 +133,16 @@ export function startEnkryptInputGuardrail(
 ): EnkryptInputGuardrail {
   const requestLogs: Promise<EnkryptRequestLog>[] = [];
   const captureResponse = Promise.withResolvers<boolean>();
-  const limiter = createEnkryptCallLimiter();
   const runScan = async (
-    resolved: EnkryptGuardrailRequest | null
+    resolved: EnkryptGuardrailRequest | null,
+    deadline: AbortSignal
   ): Promise<EnkryptCachedScanResult[]> =>
     resolved
       ? scanRequestWithVerdictCache(resolved, {
           apiKey: ENKRYPT_API_KEY,
           fetch,
           timeoutMs: ENKRYPT_GUARDRAIL_TIMEOUT_MS,
-          limiter,
+          deadline,
           signal,
           store: redisClient,
           requestLog: {
@@ -147,9 +152,12 @@ export function startEnkryptInputGuardrail(
           },
         })
       : [];
-  const scans = scan.then(splitScan);
+  const scans = scan.then(resolved => ({
+    ...splitScan(resolved),
+    deadline: AbortSignal.timeout(ENKRYPT_GUARDRAIL_TIMEOUT_MS),
+  }));
   const blockingResults = scans
-    .then(({ blocking }) => runScan(blocking))
+    .then(({ blocking, deadline }) => runScan(blocking, deadline))
     .catch((error: unknown): EnkryptCachedScanResult[] => {
       console.error('[enkrypt-guardrail] scan failed unexpectedly; request rejected', {
         error: error instanceof Error ? error.message : String(error),
@@ -165,7 +173,10 @@ export function startEnkryptInputGuardrail(
     });
   const logOnlyResults = scans
     .then(
-      ({ logOnly }) => runScan(logOnly),
+      async ({ logOnly, deadline }) => {
+        await blockingResults;
+        return runScan(logOnly, deadline);
+      },
       // The blocking result already logs and rejects a request whose scan could not be prepared.
       () => []
     )

@@ -97,6 +97,13 @@ const scanOutcomeShape = {
    */
   failed_calls_cached: z.number().optional(),
   /**
+   * Calls of an input part not made because an earlier call of the request's blocking scan, or a
+   * cached verdict, blocked the request. Their units are neither scanned nor cached. A part all of
+   * whose calls were skipped reports `allowed`, with no attempt. Absent from reports written before
+   * scans stopped at a block, and from per-call and output scan reports.
+   */
+  calls_skipped: z.number().optional(),
+  /**
    * Includes the headers of split segments and the text their slices overlap by, so it can exceed
    * `total_characters`.
    */
@@ -104,10 +111,16 @@ const scanOutcomeShape = {
   decision: ScanDecisionSchema,
   error: z.string().nullable(),
   detectors_fired: z.array(DetectorIdSchema),
-  /** Enkrypt calls made, including retries. */
+  /**
+   * Enkrypt calls made. A call the request's deadline left no time to start is not made, and fails
+   * with a `timeout` error.
+   */
   attempts: z.number(),
   credits_cost: z.number().nullable(),
-  /** Includes time spent waiting for a free call slot. */
+  /**
+   * For an input part, the sum of its calls' latencies, since a request's calls run one at a time.
+   * Reports written before that may include time spent waiting for a free call slot.
+   */
   latency_ms: z.number(),
 };
 
@@ -144,8 +157,8 @@ export type EnkryptFlaggedTool = z.infer<typeof FlaggedToolSchema>;
  * The scans of a request's tool definitions and response formats by the blocking or the log-only
  * detectors, aggregated: each segment of each is cached on its own, and each tool with uncached
  * segments is scanned by its own calls. `verdict_cache` is `hit` when the cache covered at least
- * one segment. The decision and error are those of the most severe tool. Characters, calls, and
- * credits are summed; the latency runs until the last tool's scan finished.
+ * one segment. The decision and error are those of the most severe tool. Characters, calls,
+ * credits, and latencies are summed.
  */
 const EnkryptToolScanReportSchema = z.object({
   ...scanOutcomeShape,
@@ -156,7 +169,10 @@ const EnkryptToolScanReportSchema = z.object({
    * or any segment blocked before. Not scanned again.
    */
   tools_cached: z.number(),
-  /** With segments the cache did not cover, which were scanned by the tool's own calls, or failed. */
+  /**
+   * With segments the cache did not cover, which were scanned by the tool's own calls, or failed. A
+   * tool all of whose calls were skipped, counted in `calls_skipped`, is neither cached nor scanned.
+   */
   tools_scanned: z.number(),
   tools_flagged: z.number(),
   /** The tools that fired a detector or failed, most severe first, by name only. */
@@ -178,11 +194,14 @@ const verdictCacheWriteShape = { verdict_cache_write: VerdictCacheWriteSchema };
  * Each segment has its verdict cached on its own; `cached_segments` counts those the cache covered
  * whole. Each uncached one, or each slice of one, is a chunk scanned by its own Enkrypt call. The
  * decision is that of the most severe chunk, and the error that of the most severe chunk that failed.
- * Characters, calls, and credits are summed; the latency runs until the last chunk's scan finished.
+ * Characters, calls, credits, and latencies are summed.
  */
 const EnkryptSegmentsScanReportSchema = EnkryptScanReportSchema.extend({
   part: SegmentsPartSchema,
-  /** Chunks the uncached segments were scanned in, so 0 when the cache covered all of them. */
+  /**
+   * Calls the uncached units needed, one each, so 0 when the cache covered all of them. Reports
+   * written before each unit had its own call count packed calls.
+   */
   chunks: z.number(),
 });
 

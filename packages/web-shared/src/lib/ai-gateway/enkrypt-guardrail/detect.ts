@@ -18,7 +18,6 @@ import type {
   EnkryptUnavailableReason,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { MAX_ENKRYPT_CREDITS_PER_CALL } from '@kilocode/usage-contracts';
-import type { EnkryptCallLimiter } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/call-limiter';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
 
@@ -27,11 +26,11 @@ type ReadyEnkryptGuardrailConfig = Extract<EnkryptGuardrailConfig, { status: 're
 export const ENKRYPT_DETECT_URL = 'https://api.enkryptai.com/guardrails/detect';
 
 /**
- * Bounds a scan, including time spent waiting for a free call slot. The input guardrail starts one
- * deadline for all scans of a request's blocking detectors, and one for its log-only detectors.
+ * Bounds a scan. The input guardrail starts one deadline for all Enkrypt calls of a request, which
+ * run one at a time: those of its blocking detectors first, then those of its log-only detectors.
  * The gateway awaits the blocking scans just before the upstream request, so this is the most
- * latency an enabled organization's request can gain. It also bounds the deferred work of the
- * log-only scans, which the request does not wait for.
+ * latency an enabled organization's request can gain. The log-only scans, which the request does
+ * not wait for, get what the blocking scans leave of it.
  */
 export const ENKRYPT_GUARDRAIL_TIMEOUT_MS = 60_000;
 
@@ -139,8 +138,6 @@ export type EnkryptDetectDependencies = {
   timeoutMs: number;
   /** A deadline shared with other scans of the request. */
   deadline?: AbortSignal;
-  /** Shared by the request's scans to bound their concurrent Enkrypt calls. */
-  limiter?: EnkryptCallLimiter;
   signal: AbortSignal;
   requestLog?: {
     guardrail: EnkryptRequestLog['guardrail'];
@@ -459,15 +456,12 @@ export async function scanRequest(
     deps.signal,
     deps.deadline ?? AbortSignal.timeout(deps.timeoutMs),
   ]);
-  const startedAt = performance.now();
-  const slot = deps.limiter ? await deps.limiter.acquire(kind, signal) : () => {};
-  if (!slot) {
-    // The scan ran out of time, or the client disconnected, waiting for a call slot.
-    return failedVerdict([], scope, {
-      error: abortError(signal, deps) ?? 'timeout',
-      latencyMs: Math.round(performance.now() - startedAt),
-    });
+  const notStarted = abortError(signal, deps);
+  if (notStarted) {
+    // Earlier calls of the request used up the shared deadline, so this one is not made.
+    return failedVerdict([], scope, { error: notStarted, latencyMs: 0 });
   }
+  const startedAt = performance.now();
   const requestLog: EnkryptRequestLog | undefined = deps.requestLog
     ? {
         guardrail: deps.requestLog.guardrail,
@@ -483,12 +477,7 @@ export async function scanRequest(
   // A failed call is deliberately not retried, even when the failure looks transient. Retrying
   // within the request multiplies the load on Enkrypt exactly when it is struggling; the failed
   // content fails open instead and is rescanned once its short-lived cached verdict expires.
-  let attempt: DetectAttempt;
-  try {
-    attempt = await detectOnce(body, signal, { ...deps, apiKey }, requestLog);
-  } finally {
-    slot();
-  }
+  const attempt = await detectOnce(body, signal, { ...deps, apiKey }, requestLog);
   const latencyMs = Math.round(performance.now() - startedAt);
 
   const usageRecords: EnkryptGuardrailCall[] = [
@@ -540,6 +529,30 @@ export async function scanRequest(
           },
     usageRecords,
     report,
+  };
+}
+
+/**
+ * The result of a scan whose calls were all skipped, because an earlier call or a cached verdict
+ * blocked the request: no call, so it gates nothing, and its report covers only the cache lookup.
+ */
+export function skippedScanResult({
+  config,
+  coverage,
+}: EnkryptGuardrailScan): EnkryptGuardrailScanResult {
+  return {
+    verdict: { action: 'skip' },
+    usageRecords: [],
+    report: {
+      ...coverageReport(config, coverage),
+      scanned_characters: 0,
+      decision: 'allowed',
+      error: null,
+      detectors_fired: [],
+      attempts: 0,
+      credits_cost: null,
+      latency_ms: 0,
+    },
   };
 }
 

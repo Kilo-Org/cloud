@@ -19,7 +19,7 @@ export default async function TeamsGetStartedPage({ searchParams }: GetStartedPa
         searchParams={params}
         error={error}
         accountMismatch={accountMismatch}
-        signUpText="Try out Kilo Teams with a 14-day free trial, no credit card required. After you sign up, you can directly onboard all your team members."
+        signUpText="Try out Kilo Teams, no credit card required. After you sign up, you can directly onboard all your team members."
       />
     </>
   );

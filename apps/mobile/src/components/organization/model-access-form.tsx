@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- The form composes the segments, the plan gate, the save machinery and the three lists on one screen. */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -190,11 +190,16 @@ export function ModelAccessForm({
   // organization has nothing to show on it. A read that failed keeps the
   // segment offered so the section's error-and-retry branch stays reachable —
   // the section is the only surface that can refetch this read. A read that
-  // lands or changes while the tab is selected falls back to the models tab,
-  // and the rendered lists follow that fallback rather than the stale
-  // selection.
+  // lands or changes while the tab is selected falls back to the models tab;
+  // the effect below makes that fallback persistent, so availability returning
+  // later cannot move the user off the tab they picked.
   const gatewaysOffered = gateway?.available === true || (gateway == null && gatewayIsError);
   const activeTab = gatewaysOffered || tab !== 'gateways' ? tab : 'models';
+  useEffect(() => {
+    if (!gatewaysOffered) {
+      setTab(current => (current === 'gateways' ? 'models' : current));
+    }
+  }, [gatewaysOffered]);
 
   const dirty = !draftsEqual(draft, baseline);
   const saving = feedback.status === 'pending';

@@ -214,6 +214,26 @@ describe('ModelAccessForm gateways tab', () => {
     expect(gatewaySections(next)).toHaveLength(0);
   });
 
+  it('keeps the models tab after the segment leaves and returns', () => {
+    const root = render({ gateway: GATEWAY_AVAILABLE });
+    selectTab(root, 'gateways');
+    expect(gatewaySections(root)).toHaveLength(1);
+
+    // The read drops gateways while the tab is selected: the control falls
+    // back to models, and the selection moves with it instead of staying on
+    // the segment the read removed.
+    const gone = rerender({ gateway: GATEWAY_UNAVAILABLE });
+    expect(gone.findByType('SegmentedControl' as never).props.value).toBe('models');
+
+    // A later read offers the segment again: the form keeps the models tab the
+    // fallback chose rather than jumping back to gateways on its own.
+    const back = rerender({ gateway: GATEWAY_AVAILABLE });
+
+    expect(segmentValues(back)).toEqual(['models', 'providers', 'gateways']);
+    expect(back.findByType('SegmentedControl' as never).props.value).toBe('models');
+    expect(gatewaySections(back)).toHaveLength(0);
+  });
+
   it('keeps the gateways segment offered while the settings read has failed', () => {
     const root = render({ gateway: undefined, gatewayIsError: true });
     selectTab(root, 'gateways');

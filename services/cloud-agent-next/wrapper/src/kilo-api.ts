@@ -228,11 +228,11 @@ export async function rememberOutstandingRuleset(
 ): Promise<void> {
   const file = outstandingRulesetPath(sessionId);
   const directory = path.dirname(file);
-  await fsp.mkdir(directory, { recursive: true });
   // Write beside the target and rename, so a kill mid-write cannot leave a
   // truncated marker that reads as "nothing owed".
   const temporary = path.join(directory, `${encodeURIComponent(sessionId)}.${process.pid}.tmp`);
   try {
+    await fsp.mkdir(directory, { recursive: true });
     await fsp.writeFile(temporary, JSON.stringify(permission), { mode: 0o600 });
     await fsp.rename(temporary, file);
   } catch (error) {
@@ -712,11 +712,10 @@ export function createWrapperKiloClient(
     },
 
     ensureSession: async (sessionId, directory, signal) => {
-      // The import commits the record before a ruleset is applied, so a
-      // transient failure on that second call is retried here: the enclosing
+      // The caller records the obligation before the import commits the row, so
+      // a transient failure on this second call is retried here: the enclosing
       // step retry would find the record in place and return early.
       const applyRuleset = async (permission: PermissionRuleset): Promise<void> => {
-        await rememberOutstandingRuleset(sessionId, permission);
         const attemptOnce = async () => {
           const restoreTimeout = AbortSignal.timeout(8_000);
           const restored = await v2Client.session.update(
@@ -785,6 +784,15 @@ export function createWrapperKiloClient(
       }
       const now = Date.now();
       const importTimeout = AbortSignal.timeout(8_000);
+      const owed =
+        record?.permission !== undefined && Array.isArray(record.permission)
+          ? record.permission
+          : undefined;
+      // Record the obligation before the import commits the row, so there is no
+      // window in which a committed record owes a ruleset that nothing
+      // remembers. A marker that cannot be stored fails here, before the row
+      // exists, which a step retry can safely repeat.
+      if (owed !== undefined) await rememberOutstandingRuleset(sessionId, owed);
       const imported = await v2Client.kilocode.sessionImport.session(
         {
           query_directory: directory,
@@ -822,9 +830,7 @@ export function createWrapperKiloClient(
       // without the record's rules; retry within this call, because the step
       // retry above would find the record in place and return before reaching
       // this point again.
-      if (record?.permission !== undefined && Array.isArray(record.permission)) {
-        await applyRuleset(record.permission);
-      }
+      if (owed !== undefined) await applyRuleset(owed);
     },
 
     settleOutstandingRuleset: async (sessionId, directory, signal) => {

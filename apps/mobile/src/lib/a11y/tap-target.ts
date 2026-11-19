@@ -260,6 +260,28 @@ export const TOUCH_TARGET_OVERHANG_DP = (TOUCH_TARGET_DP - ROW_FRAME_CONTENT_DP)
 export const SWITCH_HOST_CLASS = 'h-[44px] -my-[8.5px] shrink-0 items-center justify-center';
 
 /**
+ * The line a settings section's `Text variant="heading"` lays out on, in dp:
+ * `text-base` at this app's 14dp rem, measured at 21.33dp in the design gate's
+ * Android dump. A header row carrying no switch is one heading line, so a row
+ * that carries one must not lay out taller.
+ */
+export const SETTINGS_HEADING_LINE_DP = 21;
+
+/**
+ * The host a settings section header gives its master switch. The box stays a
+ * full {@link TOUCH_TARGET_DP}, because the switch's own node is the target a
+ * control-size audit reads and `hitSlop` does not move that rect; the vertical
+ * margin then cancels `(44 - 21) / 2 = 11.5` a side, so the header row lays
+ * out one {@link SETTINGS_HEADING_LINE_DP}-tall heading line instead of the
+ * {@link ROW_FRAME_CONTENT_DP} band a settings row keeps. Without the
+ * cancellation the row grew to the box, and the title-to-description gap of a
+ * section with a switch measured half a box more than one without it; with it
+ * both gaps are the header group's `gap-3` (10.5dp).
+ */
+export const SETTINGS_SWITCH_HOST_CLASS =
+  'h-[44px] -my-[11.5px] shrink-0 items-center justify-center';
+
+/**
  * The label pressable inside a `ROW_FRAME_CLASS` row cancels the frame's
  * vertical padding and pads itself back by the same amount, so its own node
  * spans the whole 48pt row while its content stays on the content band. A

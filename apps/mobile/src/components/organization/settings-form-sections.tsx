@@ -5,12 +5,19 @@ import { RowChevron } from '@/components/ui/row-chevron';
 import { RowFrame } from '@/components/ui/row-frame';
 import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
+import { SETTINGS_SWITCH_HOST_CLASS } from '@/lib/a11y/tap-target';
 
 /**
  * One titled block of an organization settings form: the title, its
  * description, and an optional master switch on the title row. The heading and
  * the fields below it are flat siblings at the page gutter, never a surface
- * inside another surface, and the title row stays one line tall.
+ * inside another surface, and the title row stays one heading line tall.
+ *
+ * The switch keeps its 44dp box — its own node is the control-size target — and
+ * the host around it cancels that box down to the heading's own line, so the
+ * row cannot be sized by the switch. That cancellation is what keeps the
+ * title-to-description gap of a section with a switch equal to the gap of a
+ * section without one: both are the header group's inner gap.
  *
  * The section gap separates the header group — title, description, and the
  * `intro` copy that explains the fields — from each child group and each child
@@ -45,14 +52,17 @@ export function SettingsSection({
           <Text variant="heading" className="min-w-0 flex-1">
             {title}
           </Text>
-          {showsSwitch &&
-            renderRowTrailing({
-              kind: 'switch',
-              value: enabled,
-              disabled: switchDisabled,
-              onValueChange: onEnabledChange,
-              accessibilityLabel: title,
-            })}
+          {showsSwitch && (
+            <View className={SETTINGS_SWITCH_HOST_CLASS}>
+              {renderRowTrailing({
+                kind: 'switch',
+                value: enabled,
+                disabled: switchDisabled,
+                onValueChange: onEnabledChange,
+                accessibilityLabel: title,
+              })}
+            </View>
+          )}
         </View>
         <Text variant="caption">{description}</Text>
         {showsFields ? intro : null}

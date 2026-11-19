@@ -746,27 +746,31 @@ function checkInlineStyles(relative, program, text, lineOf) {
     }
     // `style` and every `*Style` prop (`contentContainerStyle`,
     // `columnWrapperStyle`, `ListHeaderComponentStyle`…) reach the same native
-    // style object, so they are read the same way.
-    const attribute = node.attributes.find(
-      candidate =>
-        candidate.type === 'JSXAttribute' &&
-        candidate.name.type === 'JSXIdentifier' &&
-        (candidate.name.name === 'style' || candidate.name.name.endsWith('Style'))
-    );
-    if (attribute?.value === undefined || attribute.value === null) {
-      return;
-    }
-    for (const object of styleObjects(attribute.value)) {
-      for (const property of object.properties) {
-        const name = propertyName(property);
-        if (name === null || !LAYOUT_STYLE_PROPERTY.test(name)) {
-          continue;
+    // style object, so they are read the same way, and one element may carry
+    // several of them.
+    for (const attribute of node.attributes) {
+      if (
+        attribute.type !== 'JSXAttribute' ||
+        attribute.name.type !== 'JSXIdentifier' ||
+        (attribute.name.name !== 'style' && !attribute.name.name.endsWith('Style'))
+      ) {
+        continue;
+      }
+      if (attribute.value === undefined || attribute.value === null) {
+        continue;
+      }
+      for (const object of styleObjects(attribute.value)) {
+        for (const property of object.properties) {
+          const name = propertyName(property);
+          if (name === null || !LAYOUT_STYLE_PROPERTY.test(name)) {
+            continue;
+          }
+          if (!hasNumericLiteral(unwrap(property.value))) {
+            continue;
+          }
+          const written = text.slice(property.key.start, property.value.end).replace(/\s+/g, ' ');
+          problems.push(layoutProblem(relative, lineOf(property.start), 'L6', written));
         }
-        if (!hasNumericLiteral(unwrap(property.value))) {
-          continue;
-        }
-        const written = text.slice(property.key.start, property.value.end).replace(/\s+/g, ' ');
-        problems.push(layoutProblem(relative, lineOf(property.start), 'L6', written));
       }
     }
   });

@@ -961,6 +961,21 @@ test('flags a numeric layout value in a list style prop, not only style', () => 
   assert.match(found.join('\n'), /screen\.tsx:6: \[L6\] "marginBottom: 12"/);
 });
 
+test('flags a numeric layout value in every style prop of one element', () => {
+  const found = layoutProblems(
+    SCREEN_FILE,
+    screen(
+      '<FlatList',
+      '  style={{ marginTop: 4 }}',
+      '  contentContainerStyle={{ paddingTop: 10.5 }}',
+      '/>'
+    )
+  );
+  assert.equal(found.length, 2);
+  assert.match(found.join('\n'), /screen\.tsx:4: \[L6\] "marginTop: 4"/);
+  assert.match(found.join('\n'), /screen\.tsx:5: \[L6\] "paddingTop: 10.5"/);
+});
+
 test('accepts measured values in a list style prop', () => {
   assert.deepEqual(
     layoutProblems(

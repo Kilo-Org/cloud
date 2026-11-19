@@ -20,7 +20,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 // A "no row" read is a fail-closed verdict, so it must not outlive a fix to the
 // configuration by the full TTL. One re-read per window still keeps the SELECT
 // off every mobile request.
-const NO_ROW_CACHE_TTL_MS = 30 * 1000;
+export const NO_ROW_CACHE_TTL_MS = 30 * 1000;
 // The gate runs in front of every mobile procedure, so a read that never settles
 // must not be awaited by all of them for their whole budget. Bound how long a
 // caller waits; a read still running after that keeps its connection.

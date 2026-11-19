@@ -34,10 +34,13 @@ export const runIsolatedAgentProbe = (kind: string, selector: string): string =>
       return null;
     }
   };
+  // `tagName` is upper case only for HTML documents; an XHTML page reports `iframe`, so names come from the namespace.
+  const htmlNameOf = (element: Element): string =>
+    element.namespaceURI === 'http://www.w3.org/1999/xhtml' ? element.localName : '';
   const kindOf = (element: Element): string | null => {
     const type = (element.getAttribute('type') ?? '').toLowerCase();
 
-    if (element.tagName === 'INPUT' && type === 'password') {
+    if (htmlNameOf(element) === 'input' && type === 'password') {
       return 'password';
     }
 
@@ -63,8 +66,8 @@ export const runIsolatedAgentProbe = (kind: string, selector: string): string =>
     const role = element.getAttribute('role') ?? '';
     const type = (element.getAttribute('type') ?? '').toLowerCase();
     const isSubmit =
-      element.tagName === 'BUTTON' ||
-      (element.tagName === 'INPUT' && (type === 'submit' || type === 'image')) ||
+      htmlNameOf(element) === 'button' ||
+      (htmlNameOf(element) === 'input' && (type === 'submit' || type === 'image')) ||
       (role === 'button' && form !== null);
     const paymentFormSubmit =
       isSubmit &&
@@ -156,11 +159,11 @@ export const runIsolatedAgentProbe = (kind: string, selector: string): string =>
     const owners: { readonly box: ProbeBox; readonly frameId: number | null }[] = [];
     const scan = (root: Document | ShadowRoot): void => {
       for (const element of root.querySelectorAll('*')) {
-        if (element.tagName === 'INPUT' && kindOf(element) !== null) {
+        if (htmlNameOf(element) === 'input' && kindOf(element) !== null) {
           fields.push(boxOf(element));
         }
 
-        if (['EMBED', 'FRAME', 'IFRAME', 'OBJECT'].includes(element.tagName)) {
+        if (['embed', 'frame', 'iframe', 'object'].includes(htmlNameOf(element))) {
           owners.push({ box: boxOf(element), frameId: frameIdOf(element) });
         }
 

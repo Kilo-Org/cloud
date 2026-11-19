@@ -17,13 +17,18 @@ const runInPage = (
   html: string,
   kind: string,
   page: {
+    /** The document's MIME type; `application/xhtml+xml` makes element names case-sensitive. */
+    readonly contentType?: string;
     readonly frameIdOf?: (target: unknown) => number;
     readonly selector?: string;
     /** Builds what markup cannot: shadow roots, layout boxes, Firefox-only element members. */
     readonly setup?: (window: JSDOM['window']) => void;
   } = {}
 ): unknown => {
-  const dom = new JSDOM(html, { url: 'https://shop.example.com/cart' });
+  const dom = new JSDOM(html, {
+    contentType: page.contentType ?? 'text/html',
+    url: 'https://shop.example.com/cart',
+  });
   page.setup?.(dom.window);
   const run = new Function(
     'document',
@@ -198,6 +203,28 @@ describe('isolated agent probe in the page', () => {
         fields: [{ left: 2 }, { left: 2 }],
         owners: [{ frameId: 6 }, { frameId: 6 }],
       });
+    });
+
+    it('masks the frame and the password field of an XHTML page, whose element names are lower case', () => {
+      const xhtml =
+        '<html xmlns="http://www.w3.org/1999/xhtml"><body>' +
+        '<iframe id="frame" src="https://pay.example.com/"></iframe>' +
+        '<input id="pw" type="password"/>' +
+        '</body></html>';
+
+      expect(
+        runInPage(xhtml, 'boxes', {
+          contentType: 'application/xhtml+xml',
+          frameIdOf: () => 8,
+          setup: laidOut,
+        })
+      ).toStrictEqual({
+        fields: [{ height: 20, left: 2, top: 10, width: 30 }],
+        owners: [{ box: { height: 20, left: 5, top: 10, width: 30 }, frameId: 8 }],
+      });
+      expect(
+        runInPage(xhtml, 'target', { contentType: 'application/xhtml+xml', selector: '#pw' })
+      ).toStrictEqual({ probe: { fields: [{ kind: 'password' }], paymentFormSubmit: false } });
     });
   });
 

@@ -27,6 +27,17 @@ function getServerToolType(tool: unknown): string | null {
   return tool.type === 'function' || tool.type === 'custom' ? null : tool.type;
 }
 
+/** Whether the request asks for a plugin or server tool that a gateway bills separately. */
+export function requestsPaidServerFeatures(request: GatewayRequest): boolean {
+  // The request body is unvalidated client JSON, so its declared types are not trusted here.
+  const body: { tools?: unknown; plugins?: unknown } = request.body;
+  const plugins = body.plugins === undefined || body.plugins === null ? [] : [body.plugins].flat();
+  return (
+    plugins.some(plugin => !isFreePlugin(plugin)) ||
+    (Array.isArray(body.tools) && body.tools.some(tool => getServerToolType(tool) !== null))
+  );
+}
+
 /**
  * Gateways bill plugins (web search, PDF parsing with OCR) and server tools
  * (`openrouter:*`, `vercel:*`, and aliases such as `web_search_20250305`) to

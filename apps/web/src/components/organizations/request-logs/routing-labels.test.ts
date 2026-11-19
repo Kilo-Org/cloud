@@ -1,4 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
+import type { RequestLogRoutingResult } from '@/lib/request-logs/routing-details';
 import {
   byokSkipReasonLabel,
   describeResult,
@@ -31,6 +32,55 @@ describe('describeStep', () => {
       detail: 'Paid with Kilo credits and routed through OpenRouter.',
       tone: 'selected',
     });
+  });
+
+  test('names the partner Kilo tries before its gateway', () => {
+    expect(
+      describeStep({
+        step: 'kilo',
+        outcome: 'selected',
+        gateway: 'vercel',
+        partner_inference_provider: 'acme-ai',
+      })
+    ).toEqual({
+      title: 'Kilo credits',
+      detail:
+        'Paid with Kilo credits, with Acme Ai as the direct provider and Vercel AI Gateway as the fallback.',
+      tone: 'selected',
+    });
+  });
+
+  test.each([
+    ['unsupported-api-kind', 'this API is not supported.'],
+    ['server-features', 'the request uses plugins or server tools, which only the gateway runs.'],
+    ['bounded-spending', 'the request carries a spend ceiling.'],
+    ['openrouter-disabled', 'excluded by the organization gateway settings.'],
+    ['provider-settings', 'excluded by provider settings.'],
+  ])('explains a partner skipped for %s', (reason, detail) => {
+    expect(
+      describeStep({
+        step: 'partner',
+        outcome: 'skipped',
+        partner_inference_provider: 'acme-ai',
+        reason,
+      })
+    ).toEqual({
+      title: 'Direct provider',
+      detail: `Acme Ai was skipped: ${detail}`,
+      tone: 'skipped',
+    });
+  });
+
+  test('explains a partner skip without naming a partner that was not recorded', () => {
+    expect(
+      describeStep({ step: 'partner', outcome: 'skipped', reason: 'provider-settings' }).detail
+    ).toBe('Excluded by provider settings.');
+  });
+
+  test('shows an unknown partner skip reason as recorded', () => {
+    expect(describeStep({ step: 'partner', outcome: 'skipped', reason: 'new-reason' }).detail).toBe(
+      'new-reason'
+    );
   });
 
   test('calls custom LLMs promotional models', () => {
@@ -218,6 +268,31 @@ describe('describeResult', () => {
         is_free: isFree,
       })
     ).toEqual({ title: "Sent to the promotional model's provider", paidBy });
+  });
+});
+
+describe('describeResult for a partner', () => {
+  const partnerResult: RequestLogRoutingResult = {
+    kind: 'provider',
+    route: 'kilo',
+    provider_type: 'partner',
+    byok_provider_ids: [],
+    payer: 'kilo',
+    is_free: false,
+  };
+
+  test('names the partner from its inference provider and bills Kilo credits', () => {
+    expect(describeResult(partnerResult, 'mistral')).toEqual({
+      title: 'Sent to Mistral',
+      paidBy: 'Kilo credits',
+    });
+  });
+
+  test('falls back to a generic label when the partner is not recorded', () => {
+    expect(describeResult(partnerResult)).toEqual({
+      title: 'Sent to the direct provider',
+      paidBy: 'Kilo credits',
+    });
   });
 });
 

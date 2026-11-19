@@ -208,7 +208,6 @@ patchedDependencies:
   '@expo/ui@58.0.28': 99af3c8e07fb9059895e550aa57b74f9785a4a8123ab115b4c8da35c4ead71ee
   '@sentry/cloudflare@10.69.0': 8b0dd1b1c534b6ac3e13b1a85cbf1d5ab5b7ad5dda6c74a65d3b7b3f6a975802
   '@shopify/flash-list@2.3.3': 0788a743245aad9c9a54369df351e79faacc757717d0d3d87f1954e2e61bec65
-  '@vercel/queue@0.8.0': a0942a1d1f0521e89afba6e6f9896636c2e96b85762e12ac2fae66d3f2bac4d4
   expo-dev-launcher@58.0.20: 7ba3ff7110dbe4563648e254e484f69ad1e550adc93f6ac1436f5ebf222000ac
   expo-modules-autolinking@58.1.0: e71b820244f5318be036266aec0760ab6db134827f76458bb538833c7bfd1195
   expo-modules-core@58.1.0: b5de0ecedbbbe839cf9b2a8ea1ca22588981fb765435ed21bd62b8e792d39a47
@@ -316,9 +315,6 @@ importers:
 
   apps/ai-gateway:
     dependencies:
-      '@kilocode/usage-queue':
-        specifier: workspace:*
-        version: link:../../packages/usage-queue
       '@kilocode/web-shared':
         specifier: workspace:*
         version: link:../../packages/web-shared
@@ -2054,37 +2050,6 @@ importers:
         specifier: catalog:vitest5
         version: 5.1.0(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@5.1.0)(jsdom@29.1.1)(vite@8.1.7(@types/node@25.5.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.46.0)(tsx@4.23.15)(yaml@2.9.1))
 
-  packages/usage-queue:
-    dependencies:
-      '@kilocode/usage-contracts':
-        specifier: workspace:*
-        version: link:../usage-contracts
-      '@kilocode/worker-utils':
-        specifier: workspace:*
-        version: link:../worker-utils
-      '@opentelemetry/api':
-        specifier: 1.9.1
-        version: 1.9.1
-      '@vercel/queue':
-        specifier: 0.8.0
-        version: 0.8.0(patch_hash=a0942a1d1f0521e89afba6e6f9896636c2e96b85762e12ac2fae66d3f2bac4d4)(@opentelemetry/api@1.9.1)
-      server-only:
-        specifier: 0.0.1
-        version: 0.0.1
-    devDependencies:
-      '@types/node':
-        specifier: 'catalog:'
-        version: 24.12.4
-      '@typescript/native-preview':
-        specifier: 'catalog:'
-        version: 7.0.0-dev.20260707.2
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2
-      vitest:
-        specifier: catalog:vitest5
-        version: 5.1.0(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@5.1.0)(jsdom@29.1.1)(vite@8.1.7(@types/node@24.12.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.46.0)(tsx@4.23.15)(yaml@2.9.1))
-
   packages/web-shared:
     dependencies:
       '@ai-sdk/anthropic':
@@ -2132,9 +2097,6 @@ importers:
       '@kilocode/usage-contracts':
         specifier: workspace:*
         version: link:../usage-contracts
-      '@kilocode/usage-queue':
-        specifier: workspace:*
-        version: link:../usage-queue
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../worker-utils
@@ -12539,15 +12501,6 @@ packages:
   '@vercel/python@6.39.0':
     resolution: {integrity: sha512-BIp793WI9TL/N85r22WhSo9n99TPjqI1xXEm8RAqZNJaXcFLHfjF5Hfg14Y4uPHGKfALfEzH3gbUndD8MTA8Hw==}
 
-  '@vercel/queue@0.8.0':
-    resolution: {integrity: sha512-Rwaoq8DbSN2/qVPMdHzBdBXqpoD2h2s7+gOSaE3Gff9XI1NjNh281uMesP30k1kbsnjgeaibLTSiuYDlNPlw+g==}
-    engines: {node: '>=20.0.0'}
-    peerDependencies:
-      '@opentelemetry/api': ^1.0.0
-    peerDependenciesMeta:
-      '@opentelemetry/api':
-        optional: true
-
   '@vercel/redwood@2.4.13':
     resolution: {integrity: sha512-pXWzVctZea/J7WMQstjsYUDiMc6oJF72p8J5YZnLSCJWg7m+/dLzYGfaUSEo6Q0JpiO/NOcDmG3WENpn7kHwzg==}
 
@@ -18012,10 +17965,6 @@ packages:
   minizlib@3.1.0:
     resolution: {integrity: sha512-KZxYo1BUkWD2TVFLr0MQoM8vUUigWD3LlD83a/75BqC+4qE0Hb1Vo5v1FgcfaNXvfXzr+5EhQ6ing/CaBijTlw==}
     engines: {node: '>= 18'}
-
-  mixpart@0.0.6:
-    resolution: {integrity: sha512-CRdXtgfQH2jARmtNmPR0Q7jL20fiESbaYk1b0KvLD0jCdUuemepREtsbd8nbiY6BHV9OGGddAZITNXklupUPUQ==}
-    engines: {node: '>=20.0.0'}
 
   mkdirp@0.5.6:
     resolution: {integrity: sha512-FP+p8RB8OWpF3YZBCrP5gtADmtXApB5AMLn+vdyA+PyxCjrCs00mjyUozssO33cwDeT3wNGdLxJ5M//YqtHAJw==}
@@ -32480,15 +32429,6 @@ snapshots:
     dependencies:
       '@vercel/python-analysis': 0.11.1
 
-  '@vercel/queue@0.8.0(patch_hash=a0942a1d1f0521e89afba6e6f9896636c2e96b85762e12ac2fae66d3f2bac4d4)(@opentelemetry/api@1.9.1)':
-    dependencies:
-      '@vercel/oidc': 3.3.1
-      minimatch: 10.2.6
-      mixpart: 0.0.6
-      picocolors: 1.1.1
-    optionalDependencies:
-      '@opentelemetry/api': 1.9.1
-
   '@vercel/redwood@2.4.13(rollup@4.68.2)':
     dependencies:
       '@vercel/nft': 1.5.0(rollup@4.68.2)
@@ -39812,8 +39752,6 @@ snapshots:
   minizlib@3.1.0:
     dependencies:
       minipass: 7.1.3
-
-  mixpart@0.0.6: {}
 
   mkdirp@0.5.6:
     dependencies:

@@ -20,6 +20,7 @@ import {
 import {
   createRoutingDecisionRecorder,
   type ByokCandidateSkipReason,
+  type PartnerSkipReason,
   type ProviderRoutingDecision,
   type RoutingDecisionRecorder,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
@@ -72,11 +73,21 @@ import type {
 import { checkOpenAiChatGptByok } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import { checkClaudeBilling } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/routing';
 import { isKiloCatalogModelId } from '@kilocode/web-shared/lib/ai-gateway/byok/servable-catalog-model';
-import * as z from 'zod';
-import { CustomLlmCredentialsSchema, type CustomLlmCredentials } from '@kilocode/db/schema-types';
 import {
+  isValidOpenRouterModelId,
+  resolveOpenRouterModelAlias,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import * as z from 'zod';
+import {
+  CustomLlmCredentialsSchema,
+  type CustomLlmCredentials,
+  type CustomPricingTiers,
+} from '@kilocode/db/schema-types';
+import {
+  findPartnerCustomLlm,
   isPublicCustomLlm,
   type CustomLlm,
+  type PartnerCustomLlm,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { getCustomLlmApiKinds } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/api-kinds';
 import {
@@ -93,7 +104,10 @@ import {
   resolveEmbeddingOrDecisionRoute,
   resolveTranscriptionRoute,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/non-chat-routes';
-import { removePaidServerFeatures } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-paid-server-features';
+import {
+  removePaidServerFeatures,
+  requestsPaidServerFeatures,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/remove-paid-server-features';
 import {
   getLocalFakeLlmProvider,
   getLocalFakeTranscriptionProvider,
@@ -115,6 +129,8 @@ export type ProviderRoute = {
    *  outside Kilo credits pays for the request, such as the ChatGPT
    *  subscription, while abuse and organization policy checks still apply. */
   skipBalanceCheck?: boolean;
+  /** What Kilo bills for the route instead of the model's own pricing. Set on partner routes. */
+  customLlmPricing?: CustomPricingTiers;
   /** What the organization policy checks when a direct BYOK key serves a catalog id. */
   directByokPolicyTarget?: DirectByokPolicyTarget;
 };
@@ -126,9 +142,9 @@ export type GetProviderProviderResult = {
   kind: 'provider';
   /**
    * The routes that can serve the request, in order. The first takes it; a later route is tried
-   * only when the upstream of every route before it failed. Only the owner's BYOK keys follow the
-   * first route, never the ChatGPT connection or Kilo's route, so a failing key never makes another
-   * payer, or Kilo, pay.
+   * only when the upstream of every route before it failed. Only the owner's BYOK keys follow a
+   * BYOK key, never the ChatGPT connection or Kilo's route, so a failing key never makes another
+   * payer, or Kilo, pay. Kilo's own route follows a partner route, which Kilo also pays for.
    */
   routes: readonly [ResolveProviderRoute, ...ResolveProviderRoute[]];
 };
@@ -372,6 +388,82 @@ function withoutPaidServerFeatures(provider: Provider): Provider {
       removePaidServerFeatures(provider, context.model, context.request, context.kilo_user_id);
       await provider.transformRequest(context);
     },
+  };
+}
+
+/** Whether the provider settings let the partner's provider serve the request. */
+function providerSettingsAllowPartner(
+  partner: PartnerCustomLlm,
+  provider: OpenRouterProviderConfig | undefined,
+  allowedProviders: ReadonlySet<string> | undefined
+): boolean {
+  // The slug schema keeps partner slugs lowercase; callers may send provider ids in any case.
+  const slug = partner.definition.partner.inference_provider;
+  const names = (providerIds: Iterable<string>) =>
+    [...providerIds].some(providerId => providerId.toLowerCase() === slug);
+  if (allowedProviders && !names(allowedProviders)) return false;
+  if (!provider) return true;
+  if (provider.only && !names(provider.only)) return false;
+  if (provider.ignore && names(provider.ignore)) return false;
+  if (provider.allow_fallbacks === false && provider.order && !names(provider.order)) {
+    return false;
+  }
+  // The partner bills its own pricing, which a price ceiling does not cover.
+  if (provider.max_price) return false;
+  // Kilo does not vouch for zero data retention on any custom LLM, partners included.
+  if (provider.zdr === true) return false;
+  if (provider.data_collection === 'deny' && partner.definition.may_train_on_prompts !== false) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * A partner serves the catalog model ahead of Kilo's gateway route, which stays behind it as the
+ * failover; see `CustomLlmPartnerSchema`. Returns the skip reason when the partner may not serve.
+ */
+async function resolvePartnerRoute(
+  partner: PartnerCustomLlm,
+  input: GetProviderInput
+): Promise<ProviderRoute | PartnerSkipReason> {
+  const { definition } = partner;
+  if (!getCustomLlmApiKinds(definition).includes(input.request.kind)) {
+    return 'unsupported-api-kind';
+  }
+  // Only the gateways run and bill plugins and server tools, so the gateway serves those requests.
+  if (requestsPaidServerFeatures(input.request)) return 'server-features';
+  if (input.boundedSpending) return 'bounded-spending';
+  // Implied by an inference region, which admits only Kilo's Vercel AI Gateway route.
+  if (input.openRouterDisabled) return 'openrouter-disabled';
+  const providerConfig = withIgnoredProviders(
+    await input.getRoutingProviderConfig(),
+    input.kiloIgnoredProviders ?? []
+  );
+  if (!providerSettingsAllowPartner(partner, providerConfig, await input.getAllowedProviders())) {
+    return 'provider-settings';
+  }
+  // Unlike a custom LLM that owns its id, a partner has a fallback, so unusable
+  // credentials skip it instead of failing the request.
+  let auth: DirectUpstreamAuth;
+  try {
+    const credentials = readCustomLlmCredentials(partner);
+    if (!credentials) throw new Error('missing or unparseable');
+    auth = await resolveCustomLlmAuth(credentials);
+  } catch (error) {
+    console.error('Partner custom LLM credentials are unusable', partner.public_id, {
+      errorType: error instanceof Error ? error.name : 'unknown',
+    });
+    return 'invalid-credentials';
+  }
+  return {
+    provider: {
+      ...buildDirectProvider('partner', getCustomLlmApiKinds(definition), definition, auth),
+      inferenceProviderId: definition.partner.inference_provider,
+    },
+    userByok: null,
+    isFree: isFreeModel(input.requestedModel),
+    bypassAccessCheck: false,
+    customLlmPricing: definition.pricing,
   };
 }
 
@@ -690,19 +782,41 @@ async function selectProvider(
           async () =>
             withIgnoredProviders(await input.getRoutingProviderConfig(), kiloIgnoredProviders)
         );
-        decision.step({
+        const kiloRoute: ProviderRoute = {
+          provider: routesToVercel ? VERCEL_AI_GATEWAY : OPENROUTER,
+          userByok: null,
+          isFree: isFreeModel(requestedModel),
+          bypassAccessCheck: false,
+        };
+        const kiloStep = {
           step: 'kilo',
           outcome: 'selected',
           gateway: routesToVercel ? 'vercel' : 'openrouter',
           bounded_spending: boundedSpending,
           kilo_ignored_providers: kiloIgnoredProviders,
-        });
-        return servedBy({
-          provider: routesToVercel ? VERCEL_AI_GATEWAY : OPENROUTER,
-          userByok: null,
-          isFree: isFreeModel(requestedModel),
-          bypassAccessCheck: false,
-        });
+        } as const;
+        // A `~` latest alias reaches the partner of the catalog model it currently points at.
+        const partner = await findPartnerCustomLlm(
+          await resolveOpenRouterModelAlias(requestedModel)
+        );
+        if (!partner) {
+          decision.step(kiloStep);
+          return servedBy(kiloRoute);
+        }
+        const inferenceProvider = partner.definition.partner.inference_provider;
+        const partnerRoute = await resolvePartnerRoute(partner, input);
+        if (typeof partnerRoute === 'string') {
+          decision.step({
+            step: 'partner',
+            outcome: 'skipped',
+            partner_inference_provider: inferenceProvider,
+            reason: partnerRoute,
+          });
+          decision.step(kiloStep);
+          return servedBy(kiloRoute);
+        }
+        decision.step({ ...kiloStep, partner_inference_provider: inferenceProvider });
+        return { kind: 'provider', routes: [async () => partnerRoute, async () => kiloRoute] };
       }
     }
   }

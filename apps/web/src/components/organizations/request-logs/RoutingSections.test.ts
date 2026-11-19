@@ -284,3 +284,123 @@ describe('RoutingSections private providers', () => {
     expect(document.body.textContent).toContain('Sent to OpenRouter');
   });
 });
+
+function partnerRouting(attempts: RequestLogByokFailoverAttempt[]): RequestLogRoutingDetails {
+  return {
+    ...routing(attempts),
+    requested_model: 'deepseek/deepseek-v4.1-flash-1017',
+    steps: [
+      {
+        step: 'kilo',
+        outcome: 'selected',
+        gateway: 'vercel',
+        bounded_spending: false,
+        kilo_ignored_providers: [],
+        partner_inference_provider: 'mistral',
+      },
+    ],
+    byok_candidates: [],
+    result: {
+      kind: 'provider',
+      route: 'kilo',
+      provider_type: 'partner',
+      byok_provider_ids: [],
+      payer: 'kilo',
+      is_free: false,
+    },
+  };
+}
+
+const partnerFailed: RequestLogByokFailoverAttempt = {
+  provider_type: 'partner',
+  byok_provider_ids: [],
+  status: 400,
+  error_code: '3051',
+  duration_ms: 205,
+  outcome: 'failed-over',
+};
+
+describe('RoutingSections partner fallback', () => {
+  it('reports the gateway that served the request after the partner failed', () => {
+    const document = render(
+      partnerRouting([
+        partnerFailed,
+        {
+          provider_type: 'vercel',
+          byok_provider_ids: [],
+          status: 200,
+          duration_ms: 926,
+          outcome: 'served',
+        },
+      ])
+    );
+
+    const text = document.body.textContent ?? '';
+    expect(text).toContain(
+      'with Mistral as the direct provider and Vercel AI Gateway as the fallback'
+    );
+    expect(text).toContain('Sent to Vercel AI Gateway');
+    expect(text).toContain('Paid by: Kilo credits');
+    expect(text).toContain('Mistral failed before this attempt');
+    expect(text).toContain('Provider fallback');
+    expect(text).toContain('Mistral returned an error, so Kilo sent the request');
+    expect(text).not.toMatch(/partner/i);
+    expect(text).not.toContain('BYOK failover');
+    expect(text).not.toContain('Failover never uses Kilo credits');
+    const attempts = [
+      ...document.querySelectorAll('[aria-label="Provider fallback attempts"] li'),
+    ].map(row => row.textContent);
+    expect(attempts).toEqual([
+      expect.stringMatching(/Mistral.*Failed, fell back.*HTTP 400/),
+      expect.stringMatching(/Vercel AI Gateway.*Served.*HTTP 200/),
+    ]);
+  });
+
+  it('says both the partner and the gateway failed when the gateway failed too', () => {
+    const document = render(
+      partnerRouting([
+        partnerFailed,
+        {
+          provider_type: 'vercel',
+          byok_provider_ids: [],
+          status: 503,
+          duration_ms: 30_000,
+          outcome: 'failed',
+          stop_reason: 'no-keys-left',
+        },
+      ])
+    );
+
+    const text = document.body.textContent ?? '';
+    expect(text).toContain('Mistral and the Kilo gateway both failed');
+    expect(text).not.toContain('Kilo credits were not used');
+    expect(text).not.toContain('Every BYOK key');
+  });
+
+  it.each([
+    ['invalid-credentials', false],
+    ['provider-settings', true],
+  ])('renders a partner step skipped for %s: %s', (reason, rendered) => {
+    const base = partnerRouting([]);
+    const document = render({
+      ...base,
+      steps: [
+        { step: 'partner', outcome: 'skipped', partner_inference_provider: 'mistral', reason },
+        ...base.steps,
+      ],
+    });
+
+    const steps = [...document.querySelectorAll('[aria-label="Provider selection steps"] > li')];
+    const text = document.body.textContent ?? '';
+    expect(text.includes('Mistral was skipped')).toBe(rendered);
+    expect(steps.some(step => step.textContent?.includes('Direct provider'))).toBe(rendered);
+    expect(text).toContain('Kilo credits');
+  });
+
+  it('reports the partner that served the request without a fallback', () => {
+    const text = render(partnerRouting([])).body.textContent ?? '';
+
+    expect(text).toContain('Sent to Mistral');
+    expect(text).not.toContain('Provider fallback');
+  });
+});

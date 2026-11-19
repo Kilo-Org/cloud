@@ -842,82 +842,116 @@ export async function say(
 ): Promise<void> {
   const { text, images } = question;
   const { model, effort } = target;
-  await runTurn(sessionId, { skippable: false }, async () => {
-    let current = resolveSessionId(sessionId);
-    try {
-      const held = chats.get(current);
-      if (held?.answering !== undefined) {
-        held.waiting.push({
-          text,
-          images,
-          model,
-          effort,
-          ...(question.from === undefined ? {} : { from: question.from }),
-        });
-        change(current, { waiting: questionsIn(held.waiting) });
-        return;
-      }
-      if (held === undefined) {
-        throw new Error('the chat is not open');
-      }
-      const before = snapshotOf(current);
-      await keepAsked(current);
-      if (before.turns.length === 0 && before.asked === null && before.displaced.length === 0) {
-        await rememberFirstQuestion(current, text);
-      }
-      change(current, {
-        asked: text,
-        askedImages: images,
-        askedModel: model,
-        askedEffort: effort,
-        askedFrom: question.from ?? null,
-      });
-      await rememberAsked(current, {
+  await runTurn(sessionId, { skippable: false }, () =>
+    askInTurn(sessionId, { text, images, model, effort, from: question.from }, true)
+  );
+}
+
+/**
+ * Asks one question inside the chat's turn.
+ *
+ * A typed question never overtakes one the chat is already holding: what was
+ * typed while the last answer was arriving, or during the failed attempt the
+ * Retry stands for, is what the person asked first, so the send joins the end
+ * of that line and the line's own first question is asked in its place.
+ * An ask the registry drained from the line skips that join: it is ahead of
+ * it already.
+ */
+async function askInTurn(
+  sessionId: string,
+  question: Question & ChatTarget,
+  typed: boolean
+): Promise<void> {
+  let { text, images } = question;
+  let { model, effort } = question;
+  let from = question.from;
+  let current = resolveSessionId(sessionId);
+  try {
+    const held = chats.get(current);
+    if (held?.answering !== undefined) {
+      held.waiting.push({
         text,
+        images,
         model,
         effort,
-        images,
-        ...(before.turns.length === 0 ? {} : { after: before.turns.length }),
-        ...(question.from == null ? {} : { from: question.from }),
+        ...(from === undefined ? {} : { from }),
       });
-      current = await ontoForUse(current, { model, effort }, held);
-      const chat = chats.get(current);
-      if (chat === undefined) {
-        throw new Error('the chat is not open');
-      }
-      const runtime = await runtimeFor(chat);
-      const at = Date.now();
-      touchChat(await open(), current, at);
-      change(current, {
-        status: 'working',
-        answering: [],
-        asked: text,
-        askedImages: images,
-        askedModel: model,
-        askedEffort: effort,
-        askedFrom: question.from ?? null,
-        failed: null,
-        failureKey: null,
-        record: { ...snapshotOf(current).record, updatedAt: at },
-      });
-      chat.answering = runtime.runFork(reading(current, { text, images }, runtime));
-    } catch (error) {
-      current = snapshotOf(current).sessionId;
-      const failureKey = backendFailureKey(error, model);
-      await keepAskedFailure(current, failureKey);
-      change(current, {
-        status: 'idle',
-        answering: [],
-        asked: text,
-        askedImages: images,
-        askedModel: model,
-        askedEffort: effort,
-        askedFrom: question.from ?? null,
-        failed: reason(error),
-        failureKey,
-      });
+      change(current, { waiting: questionsIn(held.waiting) });
+      return;
     }
-  });
+    if (held === undefined) {
+      throw new Error('the chat is not open');
+    }
+    const before = snapshotOf(current);
+    if (typed && from == null && before.asked !== null && held.waiting.length > 0) {
+      /* A failed attempt keeps its Retry, and the line it holds is what the
+         person asked before that failure. A new send joins the line rather
+         than overtaking it, so questions reach the model in the order they
+         were typed. A Retry names the question it asks again, so it is that
+         attempt, not a newcomer: it takes the slot it already holds. */
+      held.waiting.push({ text, images, model, effort });
+      const next = held.waiting.shift();
+      if (next !== undefined) {
+        ({ text, images, model, effort, from } = next);
+        change(current, { waiting: questionsIn(held.waiting) });
+      }
+    }
+    await keepAsked(current);
+    if (before.turns.length === 0 && before.asked === null && before.displaced.length === 0) {
+      await rememberFirstQuestion(current, text);
+    }
+    change(current, {
+      asked: text,
+      askedImages: images,
+      askedModel: model,
+      askedEffort: effort,
+      askedFrom: from ?? null,
+    });
+    await rememberAsked(current, {
+      text,
+      model,
+      effort,
+      images,
+      ...(before.turns.length === 0 ? {} : { after: before.turns.length }),
+      ...(from == null ? {} : { from }),
+    });
+    current = await ontoForUse(current, { model, effort }, held);
+    const chat = chats.get(current);
+    if (chat === undefined) {
+      throw new Error('the chat is not open');
+    }
+    const runtime = await runtimeFor(chat);
+    const at = Date.now();
+    touchChat(await open(), current, at);
+    change(current, {
+      status: 'working',
+      answering: [],
+      asked: text,
+      askedImages: images,
+      askedModel: model,
+      askedEffort: effort,
+      askedFrom: from ?? null,
+      failed: null,
+      failureKey: null,
+      record: { ...snapshotOf(current).record, updatedAt: at },
+    });
+    chat.answering = runtime.runFork(reading(current, { text, images }, runtime));
+  } catch (error) {
+    current = snapshotOf(current).sessionId;
+    const failureKey = backendFailureKey(error, model);
+    await keepAskedFailure(current, failureKey);
+    change(current, {
+      status: 'idle',
+      answering: [],
+      asked: text,
+      askedImages: images,
+      askedModel: model,
+      askedEffort: effort,
+      askedFrom: from ?? null,
+      failed: reason(error),
+      failureKey,
+    });
+  }
 }
 
 /**
@@ -1389,14 +1423,18 @@ async function drain(sessionId: string, chat: Chat, failed: boolean): Promise<vo
     return;
   }
   change(current, { waiting: questionsIn(chat.waiting) });
-  await say(
-    current,
-    {
-      text: next.text,
-      images: next.images,
-      ...(next.from === undefined ? {} : { from: next.from }),
-    },
-    { model: next.model, effort: next.effort }
+  await runTurn(current, { skippable: false }, () =>
+    askInTurn(
+      current,
+      {
+        text: next.text,
+        images: next.images,
+        model: next.model,
+        effort: next.effort,
+        from: next.from,
+      },
+      false
+    )
   );
 }
 

@@ -2,11 +2,14 @@ import { describe, expect, it } from '@jest/globals';
 import {
   ByokPrivateProviderDefinitionSchema,
   CodeReviewCouncilConfigSchema,
+  CustomLlmApiConfigSchema,
+  CustomLlmDefinitionSchema,
   EnkryptInputGuardrailSettingsSchema,
   ModelsSchema,
   VercelModelsSchema,
   OpenRouterPricing,
   OpenRouterProvider,
+  ReasoningDetailsTransformSchema,
   OrganizationBrowserAllowedOriginSchema,
   OrganizationSettingsSchema,
   normalizeOrganizationBrowserOrigin,
@@ -394,5 +397,122 @@ describe('OrganizationSettingsSchema browser control', () => {
       browserAllowedOrigins: ['https://example.com/checkout'],
     });
     expect(parsed.success).toBe(false);
+  });
+});
+
+describe('CustomLlmDefinitionSchema partner', () => {
+  const baseDefinition = {
+    internal_id: 'upstream-model',
+    display_name: 'Partner model',
+    context_length: 128_000,
+    max_completion_tokens: 4096,
+    base_url: 'https://partner.example.com/v1',
+  };
+  const pricing = [
+    {
+      start_context_length: 0,
+      pricing: {
+        prompt_per_million: 1,
+        completion_per_million: 2,
+        input_cache_read_per_million: null,
+        input_cache_write_per_million: null,
+      },
+    },
+  ];
+  const partner = { inference_provider: 'acme-ai' };
+  const uuid = '00000000-0000-4000-8000-000000000123';
+
+  function issuePaths(definition: Record<string, unknown>) {
+    const result = CustomLlmDefinitionSchema.safeParse({ ...baseDefinition, ...definition });
+    return result.success ? null : result.error.issues.map(issue => issue.path.join('.'));
+  }
+
+  it('parses a partner definition with pricing', () => {
+    const result = CustomLlmDefinitionSchema.safeParse({ ...baseDefinition, partner, pricing });
+
+    expect(result.success).toBe(true);
+    expect(result.data?.partner).toEqual(partner);
+  });
+
+  it('parses a partner definition with a reasoning details transform', () => {
+    const result = CustomLlmDefinitionSchema.safeParse({
+      ...baseDefinition,
+      partner,
+      pricing,
+      may_train_on_prompts: false,
+      reasoning_details_transform: 'mistral-thinking',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('requires pricing', () => {
+    expect(issuePaths({ partner })).toEqual(['pricing']);
+  });
+
+  it.each([
+    ['public', { public: { inference_providers: ['acme-ai'], description: 'A public model' } }],
+    ['organization_ids', { organization_ids: [uuid] }],
+    ['organization_ids', { organization_ids: [] }],
+    ['group_ids', { group_ids: [uuid] }],
+    ['country_deny_list', { country_deny_list: ['CU'] }],
+    ['country_deny_list', { country_deny_list: [] }],
+  ])('rejects %s', (key, extra) => {
+    expect(issuePaths({ partner, pricing, ...extra })).toEqual([key]);
+  });
+
+  it('rejects an inference provider that is not a lowercase slug', () => {
+    expect(issuePaths({ partner: { inference_provider: 'Acme AI' }, pricing })).toEqual([
+      'partner.inference_provider',
+    ]);
+  });
+
+  it('keeps accepting a definition without a partner or pricing', () => {
+    expect(CustomLlmDefinitionSchema.safeParse(baseDefinition).success).toBe(true);
+  });
+});
+
+describe('ReasoningDetailsTransformSchema', () => {
+  it('accepts mistral-thinking', () => {
+    expect(ReasoningDetailsTransformSchema.parse('mistral-thinking')).toBe('mistral-thinking');
+  });
+});
+
+describe('CustomLlmApiConfigSchema remove_from_body', () => {
+  const parse = (remove_from_body: string[]) =>
+    CustomLlmApiConfigSchema.safeParse({
+      base_url: 'https://llm.example.com/v1',
+      remove_from_body,
+    });
+
+  it.each([
+    ['usage'],
+    ['tools.*.function.strict'],
+    ['messages.*.content.*.cache_control'],
+    ['a.*.*.b'],
+  ])('accepts %s', path => {
+    expect(parse([path]).success).toBe(true);
+  });
+
+  it('accepts an empty list', () => {
+    expect(parse([]).success).toBe(true);
+  });
+
+  it.each([
+    [''],
+    ['.'],
+    ['a..b'],
+    ['.a'],
+    ['a.'],
+    ['*'],
+    ['a.*'],
+    ['__proto__'],
+    ['a.__proto__.b'],
+    ['constructor.prototype.x'],
+    ['messages.*.prototype'],
+  ])('rejects %j', path => {
+    const result = parse(['usage', path]);
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map(issue => issue.path)).toEqual([['remove_from_body', 1]]);
   });
 });

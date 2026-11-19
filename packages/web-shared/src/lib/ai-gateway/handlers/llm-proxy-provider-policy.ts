@@ -410,13 +410,13 @@ export async function resolveProviderAndPolicy(
       try {
         failoverRoute = await resolveRoute();
       } catch (error) {
-        console.error('[byok-failover] Skipping a BYOK key that could not be resolved', {
+        console.error('[byok-failover] Skipping a failover route that could not be resolved', {
           errorType: error instanceof Error ? error.name : 'unknown',
         });
         return null;
       }
       if (await routeRejection(failoverRoute)) {
-        console.warn('[byok-failover] Skipping a BYOK key the policy refuses', {
+        console.warn('[byok-failover] Skipping a failover route the policy refuses', {
           providerIds: failoverRoute.userByok?.map(byok => byok.providerId) ?? [],
         });
         return null;

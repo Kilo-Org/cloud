@@ -21,7 +21,6 @@ import type {
   EnkryptUsageWriteInput,
   ExaUsageRecord,
   LlmUsageQueueMessage,
-  UsageRecordRequest,
 } from '@kilocode/usage-contracts';
 import type * as UsagePublisherModule from './usage-publisher';
 
@@ -1166,32 +1165,40 @@ describe('bounded CF confirmation policy', () => {
     expectUnavailableWarning('request_failed', true);
   });
 
-  test.each([false, true])(
-    'Vercel transport bypasses CF policy (retries=%s)',
-    async retryTransientFailures => {
-      const vercel = jest.fn(async (_payload: UsageRecordRequest) => ({
-        kind: 'accepted' as const,
-      }));
-      jest.doMock('@kilocode/usage-queue/vercel/config', () => ({
-        USAGE_VERCEL_QUEUE_ENABLED: true,
-      }));
-      jest.doMock('@kilocode/usage-queue/vercel/publisher', () => ({ enqueueVercelUsage: vercel }));
+  test.each([
+    { retryTransientFailures: false, firstTimeoutMs: USAGE_ENQUEUE_TIMEOUT_MS },
+    { retryTransientFailures: true, firstTimeoutMs: USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS },
+  ])(
+    'staging with the legacy USAGE_QUEUE_TRANSPORT=vercel publishes to Cloudflare (retries=$retryTransientFailures)',
+    async ({ retryTransientFailures, firstTimeoutMs }) => {
+      jest.replaceProperty(process, 'env', {
+        ...process.env,
+        VERCEL_TARGET_ENV: 'staging',
+        VERCEL_ENV: 'preview',
+        USAGE_QUEUE_TRANSPORT: 'vercel',
+      });
+      mockFetch.mockResolvedValue(new Response(null, { status: 202 }));
       const timeout = jest.spyOn(AbortSignal, 'timeout');
       let selected = enqueueUsage;
-      try {
-        jest.isolateModules(() => {
-          selected =
-            jest.requireActual<typeof UsagePublisherModule>('./usage-publisher').enqueueUsage;
-        });
-        expect(await selected(payload, { retryTransientFailures })).toEqual({ kind: 'accepted' });
-        expect(vercel).toHaveBeenCalledTimes(1);
-        expect(vercel).toHaveBeenCalledWith(payload);
-        expect(mockFetch).not.toHaveBeenCalled();
-        expect(timeout).not.toHaveBeenCalled();
-      } finally {
-        jest.dontMock('@kilocode/usage-queue/vercel/config');
-        jest.dontMock('@kilocode/usage-queue/vercel/publisher');
-      }
+      jest.isolateModules(() => {
+        selected =
+          jest.requireActual<typeof UsagePublisherModule>('./usage-publisher').enqueueUsage;
+      });
+
+      expect(await selected(payload, { retryTransientFailures })).toEqual({ kind: 'accepted' });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://usage.example.test/usage',
+        expect.objectContaining({
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            Authorization: 'Bearer synthetic-publisher-secret',
+          },
+          body: JSON.stringify(payload),
+        })
+      );
+      expect(timeout.mock.calls).toEqual([[firstTimeoutMs]]);
     }
   );
 });

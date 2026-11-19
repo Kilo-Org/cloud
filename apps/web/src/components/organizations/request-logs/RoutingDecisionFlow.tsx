@@ -19,6 +19,10 @@ import {
   inferenceProviderNames,
   rejectedResultLabel,
   type StepTone,
+  capitalize,
+  isPartnerFailover,
+  partnerInferenceProviderOf,
+  partnerName,
 } from './routing-labels';
 
 const TONE_ICONS: Record<StepTone, typeof CircleCheck> = {
@@ -167,7 +171,21 @@ function failoverStopLabels(stopReason: string | undefined): { title: string; de
   }
 }
 
-function FailoverNote({ attempts }: { attempts: RequestLogByokFailoverAttempt[] }) {
+function FailoverNote({
+  attempts,
+  partnerInferenceProvider,
+}: {
+  attempts: RequestLogByokFailoverAttempt[];
+  partnerInferenceProvider: string | undefined;
+}) {
+  if (isPartnerFailover(attempts)) {
+    return (
+      <p className="text-muted-foreground text-xs">
+        {capitalize(partnerName(partnerInferenceProvider))} failed before this attempt. See Provider
+        fallback.
+      </p>
+    );
+  }
   const failed = attempts.filter(attempt => attempt.outcome !== 'served').length;
   return (
     <p className="text-muted-foreground text-xs">
@@ -181,6 +199,7 @@ function ResultNode({ routing }: { routing: RequestLogRoutingDetails }) {
   const result = routing.result;
   const attempts = routing.byok_failover_attempts;
   const finalAttempt = attempts.at(-1);
+  const partnerInferenceProvider = partnerInferenceProviderOf(routing.steps);
   if (!result) {
     return (
       <FlowNode tone="info" icon={Flag} isLast>
@@ -197,7 +216,7 @@ function ResultNode({ routing }: { routing: RequestLogRoutingDetails }) {
   }
   const notSentReason = requestNotSentReason(routing);
   if (notSentReason) {
-    const { title, detail } = describeUnsentResult(result, notSentReason);
+    const { title, detail } = describeUnsentResult(result, notSentReason, partnerInferenceProvider);
     return (
       <FlowNode tone="rejected" icon={Flag} isLast>
         <span className="text-sm font-medium">{title}</span>
@@ -207,11 +226,18 @@ function ResultNode({ routing }: { routing: RequestLogRoutingDetails }) {
   }
   if (finalAttempt?.outcome === 'failed') {
     const stopped = failoverStopLabels(finalAttempt.stop_reason);
+    const partnerFailed = isPartnerFailover(attempts);
     return (
       <FlowNode tone="rejected" icon={Flag} isLast>
-        <span className="text-sm font-medium">{stopped.title}</span>
+        <span className="text-sm font-medium">
+          {partnerFailed
+            ? `${capitalize(partnerName(partnerInferenceProvider))} and the Kilo gateway both failed`
+            : stopped.title}
+        </span>
         <p className="text-muted-foreground text-xs">
-          {stopped.detail} Kilo credits were not used. See BYOK failover.
+          {partnerFailed
+            ? "The gateway's error was returned. See Provider fallback."
+            : `${stopped.detail} Kilo credits were not used. See BYOK failover.`}
         </p>
       </FlowNode>
     );
@@ -223,7 +249,8 @@ function ResultNode({ routing }: { routing: RequestLogRoutingDetails }) {
           provider_type: finalAttempt.provider_type ?? result.provider_type,
           byok_provider_ids: finalAttempt.byok_provider_ids,
         }
-      : result
+      : result,
+    partnerInferenceProvider
   );
   return (
     <FlowNode tone="selected" icon={Flag} isLast>
@@ -233,20 +260,28 @@ function ResultNode({ routing }: { routing: RequestLogRoutingDetails }) {
           Paid by: <span className="text-foreground">{paidBy}</span>
         </p>
       )}
-      {finalAttempt && <FailoverNote attempts={attempts} />}
+      {finalAttempt && (
+        <FailoverNote attempts={attempts} partnerInferenceProvider={partnerInferenceProvider} />
+      )}
     </FlowNode>
   );
 }
 
 export function RoutingDecisionFlow({ routing }: { routing: RequestLogRoutingDetails }) {
-  const byokStepIndex = routing.steps.findIndex(step => step.step === 'byok-key');
+  // `invalid-credentials` means Kilo's own stored partner credentials are unusable. That is an
+  // internal misconfiguration the customer can neither see nor fix, so the request log shows the
+  // normal Kilo route instead. The routing decision still records it for internal use.
+  const steps = routing.steps.filter(
+    step => !(step.step === 'partner' && step.reason === 'invalid-credentials')
+  );
+  const byokStepIndex = steps.findIndex(step => step.step === 'byok-key');
   const candidates = withFailoverOutcomes(routing.byok_candidates, routing.byok_failover_attempts);
   const showCandidatesSeparately = byokStepIndex === -1 && candidates.length > 0;
   const failedOver = routing.byok_failover_attempts.length > 0;
 
   return (
     <ol className="flex flex-col" aria-label="Provider selection steps">
-      {routing.steps.map((step, index) => {
+      {steps.map((step, index) => {
         const described = describeStep(step, { failedOver });
         return (
           <FlowNode

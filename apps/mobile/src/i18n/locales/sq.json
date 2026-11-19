@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Nuk mundi të ngarkohet historiku i faturimit",
       "billingRowInitial": "Pagesa e parë · {{tier}}",
       "billingRowRenewal": "Rinovimi · {{tier}}",
+      "billingRowSubscription": "Abonimi · {{tier}}",
       "billingRowTrial": "Prova falas · {{tier}}",
       "billingRowUpgrade": "Ndryshimi i planit · {{tier}}",
       "cancel": "Anulo abonimin",

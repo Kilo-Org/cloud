@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Tsy azo alaina ny tantaran'ny fandoavam-bola",
       "billingRowInitial": "Fandoavana voalohany · {{tier}}",
       "billingRowRenewal": "Fanavaozana · {{tier}}",
+      "billingRowSubscription": "Famandrihana · {{tier}}",
       "billingRowTrial": "Fanandramana maimaim-poana · {{tier}}",
       "billingRowUpgrade": "Fanovana drafitra · {{tier}}",
       "cancel": "Foano ny famandrihana",

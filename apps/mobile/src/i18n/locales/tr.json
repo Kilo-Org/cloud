@@ -2593,6 +2593,7 @@
       "billingHistoryError": "Fatura geçmişi yüklenemedi",
       "billingRowInitial": "İlk ücretlendirme · {{tier}}",
       "billingRowRenewal": "Yenileme · {{tier}}",
+      "billingRowSubscription": "Abonelik · {{tier}}",
       "billingRowTrial": "Ücretsiz deneme · {{tier}}",
       "billingRowUpgrade": "Plan değişikliği · {{tier}}",
       "cancel": "Aboneliği iptal et",

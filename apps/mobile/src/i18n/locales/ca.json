@@ -3194,6 +3194,7 @@
       "billingHistoryError": "No s'ha pogut carregar l'historial de facturació",
       "billingRowInitial": "Primer càrrec · {{tier}}",
       "billingRowRenewal": "Renovació · {{tier}}",
+      "billingRowSubscription": "Subscripció · {{tier}}",
       "billingRowTrial": "Prova gratuïta · {{tier}}",
       "billingRowUpgrade": "Canvi de pla · {{tier}}",
       "cancel": "Cancel·la la subscripció",

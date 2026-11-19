@@ -3136,6 +3136,7 @@
       "billingHistoryError": "பில்லிங் வரலாற்றை ஏற்ற முடியவில்லை",
       "billingRowInitial": "முதல் கட்டணம் · {{tier}}",
       "billingRowRenewal": "புதுப்பிப்பு · {{tier}}",
+      "billingRowSubscription": "சந்தா · {{tier}}",
       "billingRowTrial": "இலவசச் சோதனை · {{tier}}",
       "billingRowUpgrade": "திட்ட மாற்றம் · {{tier}}",
       "cancel": "சந்தாவை ரத்துசெய்",

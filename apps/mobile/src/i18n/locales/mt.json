@@ -3310,6 +3310,7 @@
       "billingHistoryError": "Ma setgħetx tintbagħad il-ħlasijiet",
       "billingRowInitial": "L-ewwel ħlas · {{tier}}",
       "billingRowRenewal": "Tiġdid · {{tier}}",
+      "billingRowSubscription": "Abbonament · {{tier}}",
       "billingRowTrial": "Prova b'xejn · {{tier}}",
       "billingRowUpgrade": "Tibdil tal-pjan · {{tier}}",
       "cancel": "Ikkanċella l-abbonament",

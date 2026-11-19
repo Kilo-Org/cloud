@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Kāore i taea te uta i te hītori utu",
       "billingRowInitial": "Utu tuatahi · {{tier}}",
       "billingRowRenewal": "Whakahoutanga · {{tier}}",
+      "billingRowSubscription": "Ohaurunga · {{tier}}",
       "billingRowTrial": "Whakamātautau kore utu · {{tier}}",
       "billingRowUpgrade": "Huringa mahere · {{tier}}",
       "cancel": "Whakakore ohaurunga",

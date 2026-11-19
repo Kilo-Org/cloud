@@ -67,11 +67,12 @@ const TYPED_LINES: [string, StripeLine, string][] = [
   // A line that names no tier still names the charge, and the tier falls back to
   // the pass's own name.
   ['upgrade', { kind: 'upgrade', tier: null }, 'Plan change · Kilo Pass'],
+  // The line the server could not type still names the subscription it billed.
+  ['unknown', { kind: 'unknown', tier: 'tier_49' as const }, 'Subscription · Pro'],
 ];
 
-/** The rows a typed line cannot name: the title, the description and the line. */
+/** The rows with no typed line: the title, the description and the line. */
 const UNTYPED_ROWS: [string, string | null, StripeLine | null][] = [
-  ['Subscription', PROVIDER_DESCRIPTION, { kind: 'unknown', tier: 'tier_49' }],
   ['Invoice', 'Kilo Pass invoice (tier_49, streak=4)', null],
   ['Kilo Pass', null, null],
 ];
@@ -110,7 +111,7 @@ describe('billing row titles', () => {
     await i18n.changeLanguage('en');
   });
 
-  it.each(TYPED_LINES)('names a %s line with its tier', async (_kind, line, expected) => {
+  it.each(TYPED_LINES)('names the %s line with its tier', async (_kind, line, expected) => {
     const renderer = await renderRow(PROVIDER_DESCRIPTION, line);
     const titles = rowTitles(renderer);
     expect(titles).toContain(expected);
@@ -138,6 +139,19 @@ describe('billing row titles', () => {
     const titles = rowTitles(renderer);
     expect(titles).toContain(localized);
     expect(titles).not.toContain('Renewal · Pro');
+    renderer.unmount();
+  });
+
+  it('names the subscription line in the active locale', async () => {
+    await i18n.changeLanguage('de');
+    const renderer = await renderRow(PROVIDER_DESCRIPTION, { kind: 'unknown', tier: 'tier_49' });
+    const localized = i18n.t('kiloPass.manage.billingRowSubscription', {
+      tier: i18n.t('kiloPass.tierPro'),
+    });
+    const titles = rowTitles(renderer);
+    expect(titles).toContain(localized);
+    expect(localized).toContain('Abonnement');
+    expect(titles).not.toContain('Subscription · Pro');
     renderer.unmount();
   });
 });

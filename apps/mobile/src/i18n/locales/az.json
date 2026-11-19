@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Ödəniş tarixçəsi yüklənə bilmədi",
       "billingRowInitial": "İlk ödəniş · {{tier}}",
       "billingRowRenewal": "Abunəliyin yenilənməsi · {{tier}}",
+      "billingRowSubscription": "Abunəlik · {{tier}}",
       "billingRowTrial": "Pulsuz sınaq · {{tier}}",
       "billingRowUpgrade": "Plan dəyişikliyi · {{tier}}",
       "cancel": "Abunəliyi ləğv et",

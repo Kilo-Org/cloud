@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Laskutushistoriaa ei voitu ladata",
       "billingRowInitial": "Ensimmäinen veloitus · {{tier}}",
       "billingRowRenewal": "Uusinta · {{tier}}",
+      "billingRowSubscription": "Tilaus · {{tier}}",
       "billingRowTrial": "Ilmainen kokeilu · {{tier}}",
       "billingRowUpgrade": "Suunnitelman vaihto · {{tier}}",
       "cancel": "Peru tilaus",

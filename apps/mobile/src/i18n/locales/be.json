@@ -3252,6 +3252,7 @@
       "billingHistoryError": "Не ўдалося загрузіць гісторыю плацяжоў",
       "billingRowInitial": "Першае спісанне · {{tier}}",
       "billingRowRenewal": "Падаўжэнне падпіскі · {{tier}}",
+      "billingRowSubscription": "Падпіска · {{tier}}",
       "billingRowTrial": "Бясплатны пробны перыяд · {{tier}}",
       "billingRowUpgrade": "Змена плана · {{tier}}",
       "cancel": "Скасаваць падпіску",

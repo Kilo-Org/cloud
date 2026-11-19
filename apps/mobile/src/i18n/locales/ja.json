@@ -2593,6 +2593,7 @@
       "billingHistoryError": "請求履歴を読み込めませんでした",
       "billingRowInitial": "初回請求 · {{tier}}",
       "billingRowRenewal": "更新 · {{tier}}",
+      "billingRowSubscription": "サブスクリプション · {{tier}}",
       "billingRowTrial": "無料トライアル · {{tier}}",
       "billingRowUpgrade": "プラン変更 · {{tier}}",
       "cancel": "サブスクリプションを解約",

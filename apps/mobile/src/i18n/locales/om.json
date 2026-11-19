@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Seenaa kaffaltii fe'uu hin dandeenye",
       "billingRowInitial": "Kaffaltii jalqabaa · {{tier}}",
       "billingRowRenewal": "Haaromsa · {{tier}}",
+      "billingRowSubscription": "Galmee tajaajilaa · {{tier}}",
       "billingRowTrial": "Yaalii bilisaa · {{tier}}",
       "billingRowUpgrade": "Jijjiirama karooraa · {{tier}}",
       "cancel": "Miseensummaa haqi",

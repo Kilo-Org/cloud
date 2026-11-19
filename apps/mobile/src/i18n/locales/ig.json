@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Enweghị ike ibudata akụkọ ịkwụ ụgwọ",
       "billingRowInitial": "Ụgwọ mbụ · {{tier}}",
       "billingRowRenewal": "Mweghachi · {{tier}}",
+      "billingRowSubscription": "Ndenye aha · {{tier}}",
       "billingRowTrial": "Nnwale n'efu · {{tier}}",
       "billingRowUpgrade": "Mgbanwe atụmatụ · {{tier}}",
       "cancel": "Kagbuo ndenye aha",

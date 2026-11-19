@@ -2628,6 +2628,7 @@
       "billingHistoryError": "לא ניתן לטעון את היסטוריית החיובים",
       "billingRowInitial": "חיוב ראשון · {{tier}}",
       "billingRowRenewal": "חידוש · {{tier}}",
+      "billingRowSubscription": "מינוי · {{tier}}",
       "billingRowTrial": "תקופת ניסיון חינם · {{tier}}",
       "billingRowUpgrade": "שינוי מסלול · {{tier}}",
       "cancel": "ביטול המינוי",

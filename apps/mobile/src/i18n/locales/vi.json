@@ -2593,6 +2593,7 @@
       "billingHistoryError": "Không thể tải lịch sử thanh toán",
       "billingRowInitial": "Lần tính phí đầu tiên · {{tier}}",
       "billingRowRenewal": "Gia hạn · {{tier}}",
+      "billingRowSubscription": "Gói đăng ký · {{tier}}",
       "billingRowTrial": "Dùng thử miễn phí · {{tier}}",
       "billingRowUpgrade": "Thay đổi gói · {{tier}}",
       "cancel": "Hủy gói đăng ký",

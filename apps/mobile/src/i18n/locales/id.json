@@ -2593,6 +2593,7 @@
       "billingHistoryError": "Tidak dapat memuat riwayat penagihan",
       "billingRowInitial": "Tagihan pertama · {{tier}}",
       "billingRowRenewal": "Perpanjangan · {{tier}}",
+      "billingRowSubscription": "Langganan · {{tier}}",
       "billingRowTrial": "Uji coba gratis · {{tier}}",
       "billingRowUpgrade": "Perubahan paket · {{tier}}",
       "cancel": "Batalkan langganan",

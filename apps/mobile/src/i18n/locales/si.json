@@ -3136,6 +3136,7 @@
       "billingHistoryError": "බිල්පත් ඉතිහාසය පූරණය කළ නොහැක",
       "billingRowInitial": "පළමු අයකිරීම · {{tier}}",
       "billingRowRenewal": "අලුත් කිරීම · {{tier}}",
+      "billingRowSubscription": "දායකත්වය · {{tier}}",
       "billingRowTrial": "නොමිලේ අත්හදා බැලීම · {{tier}}",
       "billingRowUpgrade": "සැලැස්ම වෙනස් කිරීම · {{tier}}",
       "cancel": "දායකත්වය අවලංගු කරන්න",

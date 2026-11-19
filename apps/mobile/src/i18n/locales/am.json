@@ -3136,6 +3136,7 @@
       "billingHistoryError": "የክፍያ ታሪክ ሊጫን አልቻለም",
       "billingRowInitial": "የመጀመሪያ ክፍያ · {{tier}}",
       "billingRowRenewal": "የዕድሳት ክፍያ · {{tier}}",
+      "billingRowSubscription": "የደንበኝነት ምዝገባ · {{tier}}",
       "billingRowTrial": "ነጻ ሙከራ · {{tier}}",
       "billingRowUpgrade": "የእቅድ ለውጥ · {{tier}}",
       "cancel": "የደንበኝነት ምዝገባን ሰርዝ",

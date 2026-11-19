@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Hindi ma-load ang kasaysayan ng billing",
       "billingRowInitial": "Unang singil · {{tier}}",
       "billingRowRenewal": "Pagpapanibago · {{tier}}",
+      "billingRowSubscription": "Subscription · {{tier}}",
       "billingRowTrial": "Libreng pagsubok · {{tier}}",
       "billingRowUpgrade": "Pagpapalit ng plano · {{tier}}",
       "cancel": "Kanselahin ang subscription",

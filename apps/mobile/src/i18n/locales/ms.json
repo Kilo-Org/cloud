@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Tidak dapat memuatkan sejarah pengebilan",
       "billingRowInitial": "Caj pertama · {{tier}}",
       "billingRowRenewal": "Pembaharuan · {{tier}}",
+      "billingRowSubscription": "Langganan · {{tier}}",
       "billingRowTrial": "Percubaan percuma · {{tier}}",
       "billingRowUpgrade": "Pertukaran pelan · {{tier}}",
       "cancel": "Batalkan langganan",

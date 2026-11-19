@@ -2663,6 +2663,7 @@
       "billingHistoryError": "Не удалось загрузить историю платежей",
       "billingRowInitial": "Первый платёж · {{tier}}",
       "billingRowRenewal": "Продление · {{tier}}",
+      "billingRowSubscription": "Подписка · {{tier}}",
       "billingRowTrial": "Бесплатный пробный период · {{tier}}",
       "billingRowUpgrade": "Смена тарифа · {{tier}}",
       "cancel": "Отменить подписку",

@@ -3194,6 +3194,7 @@
       "billingHistoryError": "Nije moguće učitati povijest naplate",
       "billingRowInitial": "Prva naplata · {{tier}}",
       "billingRowRenewal": "Obnova · {{tier}}",
+      "billingRowSubscription": "Pretplata · {{tier}}",
       "billingRowTrial": "Besplatno probno razdoblje · {{tier}}",
       "billingRowUpgrade": "Promjena plana · {{tier}}",
       "cancel": "Otkaži pretplatu",

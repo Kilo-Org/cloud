@@ -2663,6 +2663,7 @@
       "billingHistoryError": "Не вдалося завантажити історію платежів",
       "billingRowInitial": "Перший платіж · {{tier}}",
       "billingRowRenewal": "Поновлення · {{tier}}",
+      "billingRowSubscription": "Підписка · {{tier}}",
       "billingRowTrial": "Безкоштовний пробний період · {{tier}}",
       "billingRowUpgrade": "Зміна плану · {{tier}}",
       "cancel": "Скасувати підписку",

@@ -2628,6 +2628,7 @@
       "billingHistoryError": "No se pudo cargar el historial de facturación",
       "billingRowInitial": "Primer cargo · {{tier}}",
       "billingRowRenewal": "Renovación · {{tier}}",
+      "billingRowSubscription": "Suscripción · {{tier}}",
       "billingRowTrial": "Prueba gratuita · {{tier}}",
       "billingRowUpgrade": "Cambio de plan · {{tier}}",
       "cancel": "Cancelar suscripción",

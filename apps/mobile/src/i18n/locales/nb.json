@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Kunne ikke laste inn faktureringshistorikken",
       "billingRowInitial": "Første belastning · {{tier}}",
       "billingRowRenewal": "Fornyelse · {{tier}}",
+      "billingRowSubscription": "Abonnement · {{tier}}",
       "billingRowTrial": "Gratis prøveperiode · {{tier}}",
       "billingRowUpgrade": "Planbytte · {{tier}}",
       "cancel": "Si opp abonnement",

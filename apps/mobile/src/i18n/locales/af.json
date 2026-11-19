@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Kon nie faktureringsgeskiedenis laai nie",
       "billingRowInitial": "Eerste heffing · {{tier}}",
       "billingRowRenewal": "Hernuwing · {{tier}}",
+      "billingRowSubscription": "Intekening · {{tier}}",
       "billingRowTrial": "Gratis proeftydperk · {{tier}}",
       "billingRowUpgrade": "Planverandering · {{tier}}",
       "cancel": "Kanselleer intekening",

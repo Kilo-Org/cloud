@@ -3136,6 +3136,7 @@
       "billingHistoryError": "To‘lovlar tarixi yuklanmadi",
       "billingRowInitial": "Birinchi to'lov · {{tier}}",
       "billingRowRenewal": "Yangilanish · {{tier}}",
+      "billingRowSubscription": "Obuna · {{tier}}",
       "billingRowTrial": "Bepul sinov muddati · {{tier}}",
       "billingRowUpgrade": "Tarif o'zgarishi · {{tier}}",
       "cancel": "Obunani bekor qilish",

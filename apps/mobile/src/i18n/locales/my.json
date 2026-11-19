@@ -3136,6 +3136,7 @@
       "billingHistoryError": "ငွေတောင်းခံမှု မှတ်တမ်းကို ဖော်ပြ၍မရပါ",
       "billingRowInitial": "ပထမဆုံး ကောက်ခံမှု · {{tier}}",
       "billingRowRenewal": "သက်တမ်းတိုးမှု · {{tier}}",
+      "billingRowSubscription": "စာရင်းသွင်းမှု · {{tier}}",
       "billingRowTrial": "အခမဲ့ အစမ်းသုံး · {{tier}}",
       "billingRowUpgrade": "အစီအစဉ် ပြောင်းလဲမှု · {{tier}}",
       "cancel": "စာရင်းသွင်းမှုကို ပယ်ဖျက်ရန်",

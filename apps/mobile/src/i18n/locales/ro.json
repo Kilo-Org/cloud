@@ -3194,6 +3194,7 @@
       "billingHistoryError": "Nu s-a putut încărca istoricul de facturare",
       "billingRowInitial": "Prima taxare · {{tier}}",
       "billingRowRenewal": "Reînnoire · {{tier}}",
+      "billingRowSubscription": "Abonament · {{tier}}",
       "billingRowTrial": "Perioadă de probă gratuită · {{tier}}",
       "billingRowUpgrade": "Schimbare de plan · {{tier}}",
       "cancel": "Anulează abonamentul",

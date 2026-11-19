@@ -2553,6 +2553,7 @@
       "billingHistoryError": "Impossible de charger l'historique de facturation",
       "billingRowInitial": "Premier paiement · {{tier}}",
       "billingRowRenewal": "Renouvellement · {{tier}}",
+      "billingRowSubscription": "Abonnement · {{tier}}",
       "billingRowTrial": "Essai gratuit · {{tier}}",
       "billingRowUpgrade": "Changement de forfait · {{tier}}",
       "cancel": "Résilier l'abonnement",

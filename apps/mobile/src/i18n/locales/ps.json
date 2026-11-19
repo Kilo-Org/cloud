@@ -3136,6 +3136,7 @@
       "billingHistoryError": "د تادیاتو تاریخچه بارېدلای نشوه",
       "billingRowInitial": "لومړنۍ تادیه · {{tier}}",
       "billingRowRenewal": "تجدید · {{tier}}",
+      "billingRowSubscription": "ګډون · {{tier}}",
       "billingRowTrial": "وړیا ازموینه · {{tier}}",
       "billingRowUpgrade": "د پلان بدلون · {{tier}}",
       "cancel": "ګډون لغوه کړئ",

@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Ezin izan da fakturazio-historia kargatu",
       "billingRowInitial": "Lehenengo kobrantza · {{tier}}",
       "billingRowRenewal": "Berriztapena · {{tier}}",
+      "billingRowSubscription": "Harpidetza · {{tier}}",
       "billingRowTrial": "Doako probaldia · {{tier}}",
       "billingRowUpgrade": "Plan-aldaketa · {{tier}}",
       "cancel": "Ezeztatu harpidetza",

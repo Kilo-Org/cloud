@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Ayikwazanga ukulayisha umlando wokukhokha",
       "billingRowInitial": "Inkokhelo yokuqala · {{tier}}",
       "billingRowRenewal": "Ukuvuselelwa · {{tier}}",
+      "billingRowSubscription": "Ukubhalisela · {{tier}}",
       "billingRowTrial": "Isivivinyo samahhala · {{tier}}",
       "billingRowUpgrade": "Ukushintshwa kwepulani · {{tier}}",
       "cancel": "Khansela ukubhalisa",

@@ -3136,6 +3136,7 @@
       "billingHistoryError": "გადახდების ისტორია ვერ ჩაიტვირთა",
       "billingRowInitial": "პირველი გადახდა · {{tier}}",
       "billingRowRenewal": "განახლება · {{tier}}",
+      "billingRowSubscription": "გამოწერა · {{tier}}",
       "billingRowTrial": "უფასო საცდელი პერიოდი · {{tier}}",
       "billingRowUpgrade": "გეგმის შეცვლა · {{tier}}",
       "cancel": "გამოწერის გაუქმება",

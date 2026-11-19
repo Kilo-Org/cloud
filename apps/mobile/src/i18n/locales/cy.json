@@ -3368,6 +3368,7 @@
       "billingHistoryError": "Methwyd â llwytho hanes bilio",
       "billingRowInitial": "Tâl cyntaf · {{tier}}",
       "billingRowRenewal": "Adnewyddiad · {{tier}}",
+      "billingRowSubscription": "Tanysgrifiad · {{tier}}",
       "billingRowTrial": "Treial am ddim · {{tier}}",
       "billingRowUpgrade": "Newid cynllun · {{tier}}",
       "cancel": "Canslo tanysgrifiad",

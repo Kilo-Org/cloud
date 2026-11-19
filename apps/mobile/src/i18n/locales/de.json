@@ -2593,6 +2593,7 @@
       "billingHistoryError": "Abrechnungsverlauf konnte nicht geladen werden",
       "billingRowInitial": "Erste Zahlung · {{tier}}",
       "billingRowRenewal": "Verlängerung · {{tier}}",
+      "billingRowSubscription": "Abonnement · {{tier}}",
       "billingRowTrial": "Kostenlose Testphase · {{tier}}",
       "billingRowUpgrade": "Tarifwechsel · {{tier}}",
       "cancel": "Abo kündigen",

@@ -3252,6 +3252,7 @@
       "billingHistoryError": "Nepodařilo se načíst historii fakturace",
       "billingRowInitial": "První platba · {{tier}}",
       "billingRowRenewal": "Obnovení · {{tier}}",
+      "billingRowSubscription": "Předplatné · {{tier}}",
       "billingRowTrial": "Bezplatná zkušební verze · {{tier}}",
       "billingRowUpgrade": "Změna plánu · {{tier}}",
       "cancel": "Zrušit předplatné",

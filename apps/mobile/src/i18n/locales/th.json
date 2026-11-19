@@ -3136,6 +3136,7 @@
       "billingHistoryError": "ไม่สามารถโหลดประวัติการเรียกเก็บเงินได้",
       "billingRowInitial": "เรียกเก็บครั้งแรก · {{tier}}",
       "billingRowRenewal": "ต่ออายุ · {{tier}}",
+      "billingRowSubscription": "การสมัครใช้บริการ · {{tier}}",
       "billingRowTrial": "ทดลองใช้ฟรี · {{tier}}",
       "billingRowUpgrade": "เปลี่ยนแพ็กเกจ · {{tier}}",
       "cancel": "ยกเลิกการสมัครสมาชิก",

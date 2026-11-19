@@ -3252,6 +3252,7 @@
       "billingHistoryError": "Nepavyko įkelti atsiskaitymų istorijos",
       "billingRowInitial": "Pirmasis mokestis · {{tier}}",
       "billingRowRenewal": "Atnaujinimas · {{tier}}",
+      "billingRowSubscription": "Prenumerata · {{tier}}",
       "billingRowTrial": "Nemokamas bandomasis laikotarpis · {{tier}}",
       "billingRowUpgrade": "Plano pakeitimas · {{tier}}",
       "cancel": "Atšaukti prenumeratą",

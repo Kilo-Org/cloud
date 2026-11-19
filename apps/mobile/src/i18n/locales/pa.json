@@ -3136,6 +3136,7 @@
       "billingHistoryError": "ਬਿਲਿੰਗ ਇਤਿਹਾਸ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ",
       "billingRowInitial": "ਪਹਿਲਾ ਚਾਰਜ · {{tier}}",
       "billingRowRenewal": "ਮਿਆਦ ਨਵੀਨੀਕਰਨ · {{tier}}",
+      "billingRowSubscription": "ਸਬਸਕ੍ਰਿਪਸ਼ਨ · {{tier}}",
       "billingRowTrial": "ਮੁਫ਼ਤ ਟ੍ਰਾਇਲ · {{tier}}",
       "billingRowUpgrade": "ਪਲਾਨ ਤਬਦੀਲੀ · {{tier}}",
       "cancel": "ਸਬਸਕ੍ਰਿਪਸ਼ਨ ਰੱਦ ਕਰੋ",

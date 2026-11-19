@@ -2593,6 +2593,7 @@
       "billingHistoryError": "Kan factuurgeschiedenis niet laden",
       "billingRowInitial": "Eerste betaling · {{tier}}",
       "billingRowRenewal": "Verlenging · {{tier}}",
+      "billingRowSubscription": "Abonnement · {{tier}}",
       "billingRowTrial": "Gratis proefperiode · {{tier}}",
       "billingRowUpgrade": "Planwijziging · {{tier}}",
       "cancel": "Abonnement opzeggen",

@@ -3136,6 +3136,7 @@
       "billingHistoryError": "نەتوانرا مێژوویەکی پارەدان بار بکرێت",
       "billingRowInitial": "یەکەم پارەدان · {{tier}}",
       "billingRowRenewal": "نوێکردنەوە · {{tier}}",
+      "billingRowSubscription": "بەشداریکردن · {{tier}}",
       "billingRowTrial": "تاقیکردنەوەی بێبەرامبەر · {{tier}}",
       "billingRowUpgrade": "گۆڕینی پلان · {{tier}}",
       "cancel": "هەڵوەشاندنەوەی بەشداریکردن",

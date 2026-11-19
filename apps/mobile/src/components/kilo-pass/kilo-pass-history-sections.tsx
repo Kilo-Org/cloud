@@ -130,18 +130,21 @@ function CreditHistoryLine({ entry }: Readonly<{ entry: KiloPassCreditEntry }>) 
   );
 }
 
-/** The catalog key for each invoice line kind the server classifies. */
+/** The catalog key for every invoice line kind the server classifies. */
 const BILLING_ROW_TITLE_KEYS = {
   initial: 'kiloPass.manage.billingRowInitial',
   renewal: 'kiloPass.manage.billingRowRenewal',
   trial: 'kiloPass.manage.billingRowTrial',
   upgrade: 'kiloPass.manage.billingRowUpgrade',
+  // The line the server could not type still has row copy: the charge was the
+  // subscription itself.
+  unknown: 'kiloPass.manage.billingRowSubscription',
 } as const satisfies Record<string, string>;
 
 /** True for a line kind this build has row copy for. */
 function isNamedBillingRowKind(kind: string): kind is keyof typeof BILLING_ROW_TITLE_KEYS {
-  // The provider's kind is an open set, so match own members only and let a kind
-  // this build does not name fall back to the description.
+  // Every kind the server classifies is named here; the wire itself is an open
+  // set, so a kind this build has never seen still falls back to the description.
   return Object.hasOwn(BILLING_ROW_TITLE_KEYS, kind);
 }
 
@@ -152,9 +155,11 @@ function isNamedBillingRowKind(kind: string): kind is keyof typeof BILLING_ROW_T
  * names the product, the plan's internal id, the cadence and sometimes a streak,
  * none of which a row already under the Kilo Pass header needs to repeat. The
  * server types the invoice line instead, so the row says what the charge was — a
- * trial, the first charge, a renewal, a plan change — and the tier it billed, in
- * the reader's language. Only a line the server cannot classify falls back to
- * the provider's sentence, cleaned the way a credit row is.
+ * trial, the first charge, a renewal, a plan change, or the subscription a line
+ * the server could not otherwise type paid for — and the tier it billed, in the
+ * reader's language. Every kind the server classifies has row copy, so only a row
+ * with no typed line at all falls back to the provider's sentence, cleaned the
+ * way a credit row is.
  */
 function billingRowTitle(entry: KiloPassBillingEntry): string {
   const line = entry.kind === 'stripe' ? entry.line : null;

@@ -3136,6 +3136,7 @@
       "billingHistoryError": "بلنگ کی تاریخچہ لوڈ نہیں ہو سکا",
       "billingRowInitial": "پہلا چارج · {{tier}}",
       "billingRowRenewal": "تجدید · {{tier}}",
+      "billingRowSubscription": "سبسکرپشن · {{tier}}",
       "billingRowTrial": "مفت آزمائش · {{tier}}",
       "billingRowUpgrade": "پلان کی تبدیلی · {{tier}}",
       "cancel": "سبسکرپشن منسوخ کریں",

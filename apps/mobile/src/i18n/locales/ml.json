@@ -3136,6 +3136,7 @@
       "billingHistoryError": "ബില്ലിംഗ് ചരിത്രം ലോഡ് ചെയ്യാനായില്ല",
       "billingRowInitial": "ആദ്യ ചാർജ് · {{tier}}",
       "billingRowRenewal": "പുതുക്കൽ · {{tier}}",
+      "billingRowSubscription": "സബ്സ്ക്രിപ്ഷൻ · {{tier}}",
       "billingRowTrial": "സൗജന്യ ട്രയൽ · {{tier}}",
       "billingRowUpgrade": "പ്ലാൻ മാറ്റം · {{tier}}",
       "cancel": "സബ്‌സ്‌ക്രിപ്‌ഷൻ റദ്ദാക്കുക",

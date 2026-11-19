@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Nem sikerült betölteni a számlázási előzményeket",
       "billingRowInitial": "Első terhelés · {{tier}}",
       "billingRowRenewal": "Megújítás · {{tier}}",
+      "billingRowSubscription": "Előfizetés · {{tier}}",
       "billingRowTrial": "Ingyenes próba · {{tier}}",
       "billingRowUpgrade": "Csomagváltás · {{tier}}",
       "cancel": "Előfizetés lemondása",

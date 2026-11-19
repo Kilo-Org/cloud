@@ -3136,6 +3136,7 @@
       "billingHistoryError": "بارگذاری تاریخچهٔ صورتحسابی ممکن نشد",
       "billingRowInitial": "اولین شارژ · {{tier}}",
       "billingRowRenewal": "تمدید · {{tier}}",
+      "billingRowSubscription": "اشتراک · {{tier}}",
       "billingRowTrial": "دوره آزمایشی رایگان · {{tier}}",
       "billingRowUpgrade": "تغییر طرح · {{tier}}",
       "cancel": "لغو اشتراک",

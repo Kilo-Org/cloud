@@ -3136,6 +3136,7 @@
       "billingHistoryError": "బిల్లింగ్ చరిత్రను లోడ్ చేయడం సాధ్యపడలేదు",
       "billingRowInitial": "మొదటి ఛార్జ్ · {{tier}}",
       "billingRowRenewal": "పునరుద్ధరణ · {{tier}}",
+      "billingRowSubscription": "సబ్‌స్క్రిప్షన్ · {{tier}}",
       "billingRowTrial": "ఉచిత ట్రయల్ · {{tier}}",
       "billingRowUpgrade": "ప్లాన్ మార్పు · {{tier}}",
       "cancel": "సబ్‌స్క్రిప్షన్‌ను రద్దు చేయండి",

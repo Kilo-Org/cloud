@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Не успеа да се вчита историја на плаќања",
       "billingRowInitial": "Прво наплатување · {{tier}}",
       "billingRowRenewal": "Обновување · {{tier}}",
+      "billingRowSubscription": "Претплата · {{tier}}",
       "billingRowTrial": "Бесплатен пробен период · {{tier}}",
       "billingRowUpgrade": "Промена на план · {{tier}}",
       "cancel": "Откажи претплата",

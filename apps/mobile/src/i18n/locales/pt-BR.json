@@ -2634,6 +2634,7 @@
       "billingHistoryError": "Não foi possível carregar o histórico de cobrança",
       "billingRowInitial": "Primeira cobrança · {{tier}}",
       "billingRowRenewal": "Renovação · {{tier}}",
+      "billingRowSubscription": "Assinatura · {{tier}}",
       "billingRowTrial": "Teste gratuito · {{tier}}",
       "billingRowUpgrade": "Mudança de plano · {{tier}}",
       "cancel": "Cancelar assinatura",

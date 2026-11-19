@@ -2628,6 +2628,7 @@
       "billingHistoryError": "Impossibile caricare la cronologia di fatturazione",
       "billingRowInitial": "Primo addebito · {{tier}}",
       "billingRowRenewal": "Rinnovo · {{tier}}",
+      "billingRowSubscription": "Abbonamento · {{tier}}",
       "billingRowTrial": "Prova gratuita · {{tier}}",
       "billingRowUpgrade": "Cambio di piano · {{tier}}",
       "cancel": "Annulla abbonamento",

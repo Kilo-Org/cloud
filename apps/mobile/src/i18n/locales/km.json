@@ -3136,6 +3136,7 @@
       "billingHistoryError": "មិនអាចផ្ទុកប្រវត្តិការទូទាត់បានទេ",
       "billingRowInitial": "ការគិតថ្លៃដំបូង · {{tier}}",
       "billingRowRenewal": "ការបន្ត · {{tier}}",
+      "billingRowSubscription": "ការជាវ · {{tier}}",
       "billingRowTrial": "ការសាកល្បងឥតគិតថ្លៃ · {{tier}}",
       "billingRowUpgrade": "ការផ្លាស់ប្តូរគម្រោង · {{tier}}",
       "cancel": "បោះបង់ការជាវ",

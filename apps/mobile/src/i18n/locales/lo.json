@@ -3136,6 +3136,7 @@
       "billingHistoryError": "ບໍ່ສາມາດໂຫລດປະຫວັດການຮຽກເກັບເງິນ",
       "billingRowInitial": "ເກັບເງິນຄັ້ງທຳອິດ · {{tier}}",
       "billingRowRenewal": "ຕໍ່ອາຍຸ · {{tier}}",
+      "billingRowSubscription": "ການສະໝັກສະມາຊິກ · {{tier}}",
       "billingRowTrial": "ທົດລອງຟຣີ · {{tier}}",
       "billingRowUpgrade": "ປ່ຽນແຜນ · {{tier}}",
       "cancel": "ຍົກເລີກການສະໝັກສະມາຊິກ",

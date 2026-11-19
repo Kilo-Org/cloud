@@ -3136,6 +3136,7 @@
       "billingHistoryError": "बिलिङ इतिहास लोड गर्न सकिएन",
       "billingRowInitial": "पहिलो शुल्क · {{tier}}",
       "billingRowRenewal": "नवीकरण · {{tier}}",
+      "billingRowSubscription": "सदस्यता · {{tier}}",
       "billingRowTrial": "निःशुल्क परीक्षण · {{tier}}",
       "billingRowUpgrade": "योजना परिवर्तन · {{tier}}",
       "cancel": "सदस्यता रद्द गर्नुहोस्",

@@ -2593,6 +2593,7 @@
       "billingHistoryError": "बिलिंग इतिहास लोड नहीं हो सका",
       "billingRowInitial": "पहला शुल्क · {{tier}}",
       "billingRowRenewal": "नवीनीकरण · {{tier}}",
+      "billingRowSubscription": "सब्सक्रिप्शन · {{tier}}",
       "billingRowTrial": "निःशुल्क परीक्षण · {{tier}}",
       "billingRowUpgrade": "प्लान परिवर्तन · {{tier}}",
       "cancel": "सब्सक्रिप्शन रद्द करें",

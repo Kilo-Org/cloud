@@ -2593,6 +2593,7 @@
       "billingHistoryError": "無法載入帳單紀錄",
       "billingRowInitial": "首次收費 · {{tier}}",
       "billingRowRenewal": "續訂 · {{tier}}",
+      "billingRowSubscription": "訂閱 · {{tier}}",
       "billingRowTrial": "免費試用 · {{tier}}",
       "billingRowUpgrade": "方案變更 · {{tier}}",
       "cancel": "取消訂閱",

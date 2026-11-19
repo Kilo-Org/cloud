@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Taariikh biil lama shubin",
       "billingRowInitial": "Lacag qaadashada koowaad · {{tier}}",
       "billingRowRenewal": "Cusboonaysiin · {{tier}}",
+      "billingRowSubscription": "Isdiiwaangelinta · {{tier}}",
       "billingRowTrial": "Tijaabo bilaash ah · {{tier}}",
       "billingRowUpgrade": "Beddelka qorshaha · {{tier}}",
       "cancel": "Jooji rukummada",

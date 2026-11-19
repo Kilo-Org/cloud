@@ -3136,6 +3136,7 @@
       "billingHistoryError": "ಬಿಲ್ಲಿಂಗ್ ಇತಿಹಾಸವನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
       "billingRowInitial": "ಮೊದಲ ಶುಲ್ಕ · {{tier}}",
       "billingRowRenewal": "ನವೀಕರಣ · {{tier}}",
+      "billingRowSubscription": "ಚಂದಾದಾರಿಕೆ · {{tier}}",
       "billingRowTrial": "ಉಚಿತ ಪ್ರಾಯೋಗಿಕ ಅವಧಿ · {{tier}}",
       "billingRowUpgrade": "ಯೋಜನೆ ಬದಲಾವಣೆ · {{tier}}",
       "cancel": "ಚಂದಾದಾರಿಕೆ ರದ್ದುಮಾಡಿ",

@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Imeshindwa kupakia historia ya malipo",
       "billingRowInitial": "Malipo ya kwanza · {{tier}}",
       "billingRowRenewal": "Uhuishaji · {{tier}}",
+      "billingRowSubscription": "Usajili · {{tier}}",
       "billingRowTrial": "Jaribio la bure · {{tier}}",
       "billingRowUpgrade": "Mabadiliko ya mpango · {{tier}}",
       "cancel": "Ghairi usajili",

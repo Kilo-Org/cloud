@@ -2593,6 +2593,7 @@
       "billingHistoryError": "无法加载账单记录",
       "billingRowInitial": "首次扣费 · {{tier}}",
       "billingRowRenewal": "续费 · {{tier}}",
+      "billingRowSubscription": "订阅 · {{tier}}",
       "billingRowTrial": "免费试用 · {{tier}}",
       "billingRowUpgrade": "计划变更 · {{tier}}",
       "cancel": "取消订阅",

@@ -3215,6 +3215,7 @@
       "billingHistoryError": "Couldn't load billing history",
       "billingRowInitial": "First charge · {{tier}}",
       "billingRowRenewal": "Renewal · {{tier}}",
+      "billingRowSubscription": "Subscription · {{tier}}",
       "billingRowTrial": "Free trial · {{tier}}",
       "billingRowUpgrade": "Plan change · {{tier}}",
       "cancel": "Cancel subscription",

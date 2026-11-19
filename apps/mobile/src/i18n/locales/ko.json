@@ -2593,6 +2593,7 @@
       "billingHistoryError": "결제 내역을 불러올 수 없습니다",
       "billingRowInitial": "첫 결제 · {{tier}}",
       "billingRowRenewal": "갱신 · {{tier}}",
+      "billingRowSubscription": "구독 · {{tier}}",
       "billingRowTrial": "무료 체험 · {{tier}}",
       "billingRowUpgrade": "플랜 변경 · {{tier}}",
       "cancel": "구독 취소",

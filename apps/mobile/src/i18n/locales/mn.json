@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Төлбөрийн түүх ачаалж чадсангүй",
       "billingRowInitial": "Анхны төлбөр · {{tier}}",
       "billingRowRenewal": "Сунгалт · {{tier}}",
+      "billingRowSubscription": "Захиалга · {{tier}}",
       "billingRowTrial": "Үнэгүй туршилт · {{tier}}",
       "billingRowUpgrade": "Тарифын өөрчлөлт · {{tier}}",
       "cancel": "Захиалгыг цуцлах",

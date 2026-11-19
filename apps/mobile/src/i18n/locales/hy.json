@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Չհաջողվեց բեռնել վճարումների պատմությունը",
       "billingRowInitial": "Առաջին գանձում · {{tier}}",
       "billingRowRenewal": "Նորացում · {{tier}}",
+      "billingRowSubscription": "Բաժանորդագրություն · {{tier}}",
       "billingRowTrial": "Անվճար փորձաշրջան · {{tier}}",
       "billingRowUpgrade": "Պլանի փոփոխություն · {{tier}}",
       "cancel": "Չեղարկել բաժանորդագրությունը",

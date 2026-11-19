@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Δεν ήταν δυνατή η φόρτωση του ιστορικού χρεώσεων",
       "billingRowInitial": "Πρώτη χρέωση · {{tier}}",
       "billingRowRenewal": "Ανανέωση · {{tier}}",
+      "billingRowSubscription": "Συνδρομή · {{tier}}",
       "billingRowTrial": "Δωρεάν δοκιμή · {{tier}}",
       "billingRowUpgrade": "Αλλαγή προγράμματος · {{tier}}",
       "cancel": "Ακύρωση συνδρομής",

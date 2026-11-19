@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Arveldusajalugu ei saanud laadida",
       "billingRowInitial": "Esimene tasu · {{tier}}",
       "billingRowRenewal": "Uuendus · {{tier}}",
+      "billingRowSubscription": "Tellimus · {{tier}}",
       "billingRowTrial": "Tasuta prooviperiood · {{tier}}",
       "billingRowUpgrade": "Plaani vahetus · {{tier}}",
       "cancel": "Tühista tellimus",

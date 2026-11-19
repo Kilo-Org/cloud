@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Kunne ikke indlæse betalingshistorik",
       "billingRowInitial": "Første opkrævning · {{tier}}",
       "billingRowRenewal": "Fornyelse af abonnement · {{tier}}",
+      "billingRowSubscription": "Abonnement · {{tier}}",
       "billingRowTrial": "Gratis prøveperiode · {{tier}}",
       "billingRowUpgrade": "Ændring af plan · {{tier}}",
       "cancel": "Opsig abonnement",

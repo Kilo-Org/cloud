@@ -3194,6 +3194,7 @@
       "billingHistoryError": "Neizdevās ielādēt norēķinu vēsturi",
       "billingRowInitial": "Pirmais maksājums · {{tier}}",
       "billingRowRenewal": "Atjaunošana · {{tier}}",
+      "billingRowSubscription": "Abonements · {{tier}}",
       "billingRowTrial": "Bezmaksas izmēģinājums · {{tier}}",
       "billingRowUpgrade": "Plāna maiņa · {{tier}}",
       "cancel": "Atcelt abonementu",

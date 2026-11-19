@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Pa t ka chaje istorik faktirasyon",
       "billingRowInitial": "Premye peman · {{tier}}",
       "billingRowRenewal": "Renouvèlman · {{tier}}",
+      "billingRowSubscription": "Abònman · {{tier}}",
       "billingRowTrial": "Esè gratis · {{tier}}",
       "billingRowUpgrade": "Chanjman plan · {{tier}}",
       "cancel": "Anile abònman",

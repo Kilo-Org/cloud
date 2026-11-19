@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Kunde inte läsa in faktureringshistoriken",
       "billingRowInitial": "Första debiteringen · {{tier}}",
       "billingRowRenewal": "Förnyelse · {{tier}}",
+      "billingRowSubscription": "Prenumeration · {{tier}}",
       "billingRowTrial": "Gratis provperiod · {{tier}}",
       "billingRowUpgrade": "Planbyte · {{tier}}",
       "cancel": "Avsluta prenumeration",

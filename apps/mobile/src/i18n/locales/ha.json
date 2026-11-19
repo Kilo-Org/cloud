@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Ba a iya ɗora tarihin biyan kuɗi ba",
       "billingRowInitial": "Cajin farko · {{tier}}",
       "billingRowRenewal": "Sabuntawa · {{tier}}",
+      "billingRowSubscription": "Rajista · {{tier}}",
       "billingRowTrial": "Gwajin kyauta · {{tier}}",
       "billingRowUpgrade": "Canjin shiri · {{tier}}",
       "cancel": "Soke rajista",

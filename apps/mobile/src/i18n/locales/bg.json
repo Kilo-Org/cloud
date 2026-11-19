@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Не можа да се зареди историята на плащанията",
       "billingRowInitial": "Първо плащане · {{tier}}",
       "billingRowRenewal": "Подновяване · {{tier}}",
+      "billingRowSubscription": "Абонамент · {{tier}}",
       "billingRowTrial": "Безплатен пробен период · {{tier}}",
       "billingRowUpgrade": "Смяна на план · {{tier}}",
       "cancel": "Анулиране на абонамента",

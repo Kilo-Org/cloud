@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Tókst ekki að hlaða greiðsluferil",
       "billingRowInitial": "Fyrsta gjaldfærsla · {{tier}}",
       "billingRowRenewal": "Endurnýjun · {{tier}}",
+      "billingRowSubscription": "Áskrift · {{tier}}",
       "billingRowTrial": "Ókeypis prufutímabil · {{tier}}",
       "billingRowUpgrade": "Áskriftarbreyting · {{tier}}",
       "cancel": "Segja upp áskrift",

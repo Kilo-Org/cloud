@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Kò lè mú ìtàn ìsanwó wá",
       "billingRowInitial": "Ìsanwó àkọ́kọ́ · {{tier}}",
       "billingRowRenewal": "Ìsọdọ̀tun · {{tier}}",
+      "billingRowSubscription": "Ìforúkọsílẹ̀ · {{tier}}",
       "billingRowTrial": "Ìdánwò ọ̀fẹ́ · {{tier}}",
       "billingRowUpgrade": "Ìyípadà ètò · {{tier}}",
       "cancel": "Fagilé ìforúkọsílẹ̀",

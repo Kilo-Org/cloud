@@ -3252,6 +3252,7 @@
       "billingHistoryError": "Ni mogoče naložiti zgodovine obračunov",
       "billingRowInitial": "Prvo plačilo · {{tier}}",
       "billingRowRenewal": "Podaljšanje · {{tier}}",
+      "billingRowSubscription": "Naročnina · {{tier}}",
       "billingRowTrial": "Brezplačno preizkusno obdobje · {{tier}}",
       "billingRowUpgrade": "Sprememba paketa · {{tier}}",
       "cancel": "Prekliči naročnino",

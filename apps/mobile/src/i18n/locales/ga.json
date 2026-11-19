@@ -3310,6 +3310,7 @@
       "billingHistoryError": "Níorbh fhéidir stair bhilleála a lódáil",
       "billingRowInitial": "Céad mhuirear · {{tier}}",
       "billingRowRenewal": "Athnuachan · {{tier}}",
+      "billingRowSubscription": "Síntiús · {{tier}}",
       "billingRowTrial": "Triail saor in aisce · {{tier}}",
       "billingRowUpgrade": "Athrú plean · {{tier}}",
       "cancel": "Cealaigh an síntiús",

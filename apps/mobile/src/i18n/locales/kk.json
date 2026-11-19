@@ -3136,6 +3136,7 @@
       "billingHistoryError": "Төлемдер тарихын жүктеу мүмкін болмады",
       "billingRowInitial": "Алғашқы төлем · {{tier}}",
       "billingRowRenewal": "Жаңарту · {{tier}}",
+      "billingRowSubscription": "Жазылым · {{tier}}",
       "billingRowTrial": "Тегін сынақ · {{tier}}",
       "billingRowUpgrade": "Жоспарды өзгерту · {{tier}}",
       "cancel": "Жазылымнан бас тарту",

@@ -2533,7 +2533,8 @@
       "customModes": "Custom modes"
     },
     "modeSelector": {
-      "accessibility": "Mode: {{label}}"
+      "accessibility": "Mode: {{label}}",
+      "customMode": "Custom mode"
     },
     "modeOptions": {
       "code": "Code",
@@ -2857,7 +2858,7 @@
       "thinkingEffortAccessibility": "{{label}} thinking effort",
       "thinkingEffortSelected": "{{label}} thinking effort, selected",
       "thinkingEffortWithModel": "{{model}}, {{variant}} thinking effort",
-      "lockedByAgent": ", Locked by agent \"{{agent}}\"",
+      "lockedByAgent": "Locked by agent \"{{agent}}\"",
       "addToFavorites": "Add {{name}} to favorites",
       "removeFromFavorites": "Remove {{name}} from favorites",
       "sessionModel": "Session model"

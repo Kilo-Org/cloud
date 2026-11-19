@@ -1938,7 +1938,8 @@
       "customModes": "Modos personalizados"
     },
     "modeSelector": {
-      "accessibility": "Modo: {{label}}"
+      "accessibility": "Modo: {{label}}",
+      "customMode": "Modo personalizado"
     },
     "modeOptions": {
       "code": "Programar",
@@ -2255,7 +2256,7 @@
       "thinkingEffortAccessibility": "Esfuerzo de razonamiento: {{label}}",
       "thinkingEffortSelected": "Esfuerzo de razonamiento: {{label}}, seleccionado",
       "thinkingEffortWithModel": "{{model}}, esfuerzo de razonamiento: {{variant}}",
-      "lockedByAgent": ", Bloqueado por el agente «{{agent}}»",
+      "lockedByAgent": "Bloqueado por el agente «{{agent}}»",
       "addToFavorites": "Añadir {{name}} a favoritos",
       "removeFromFavorites": "Quitar {{name}} de favoritos",
       "sessionModel": "Modelo de la sesión"

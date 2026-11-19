@@ -1913,7 +1913,8 @@
       "customModes": "Chế độ tùy chỉnh"
     },
     "modeSelector": {
-      "accessibility": "Chế độ: {{label}}"
+      "accessibility": "Chế độ: {{label}}",
+      "customMode": "Chế độ tùy chỉnh"
     },
     "modeOptions": {
       "code": "Viết mã",
@@ -2229,7 +2230,7 @@
       "thinkingEffortAccessibility": "mức độ suy luận {{label}}",
       "thinkingEffortSelected": "mức độ suy luận {{label}}, đã chọn",
       "thinkingEffortWithModel": "{{model}}, mức độ suy luận {{variant}}",
-      "lockedByAgent": ", Do tác nhân \"{{agent}}\" khóa",
+      "lockedByAgent": "Do tác nhân \"{{agent}}\" khóa",
       "addToFavorites": "Thêm {{name}} vào mục yêu thích",
       "removeFromFavorites": "Xóa {{name}} khỏi mục yêu thích",
       "sessionModel": "Mô hình của phiên"

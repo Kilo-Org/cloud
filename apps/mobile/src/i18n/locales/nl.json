@@ -1913,7 +1913,8 @@
       "customModes": "Aangepaste modi"
     },
     "modeSelector": {
-      "accessibility": "Modus: {{label}}"
+      "accessibility": "Modus: {{label}}",
+      "customMode": "Aangepaste modus"
     },
     "modeOptions": {
       "code": "Programmeren",
@@ -2229,7 +2230,7 @@
       "thinkingEffortAccessibility": "Denkinspanning: {{label}}",
       "thinkingEffortSelected": "Denkinspanning: {{label}}, geselecteerd",
       "thinkingEffortWithModel": "{{model}}, denkinspanning: {{variant}}",
-      "lockedByAgent": ", Vergrendeld door agent \"{{agent}}\"",
+      "lockedByAgent": "Vergrendeld door agent \"{{agent}}\"",
       "addToFavorites": "{{name}} aan favorieten toevoegen",
       "removeFromFavorites": "{{name}} uit favorieten verwijderen",
       "sessionModel": "Sessiemodel"

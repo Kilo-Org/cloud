@@ -1963,7 +1963,8 @@
       "customModes": "Пользовательские режимы"
     },
     "modeSelector": {
-      "accessibility": "Режим: {{label}}"
+      "accessibility": "Режим: {{label}}",
+      "customMode": "Пользовательский режим"
     },
     "modeOptions": {
       "code": "Код",
@@ -2281,7 +2282,7 @@
       "thinkingEffortAccessibility": "Уровень рассуждений: {{label}}",
       "thinkingEffortSelected": "Уровень рассуждений: {{label}}, выбрано",
       "thinkingEffortWithModel": "{{model}}, уровень рассуждений: {{variant}}",
-      "lockedByAgent": ", Заблокировано агентом «{{agent}}»",
+      "lockedByAgent": "Заблокировано агентом «{{agent}}»",
       "addToFavorites": "Добавить {{name}} в избранное",
       "removeFromFavorites": "Убрать {{name}} из избранного",
       "sessionModel": "Модель сеанса"

@@ -2456,7 +2456,8 @@
       "customModes": "କଷ୍ଟମ୍ ମୋଡ୍"
     },
     "modeSelector": {
-      "accessibility": "ମୋଡ୍: {{label}}"
+      "accessibility": "ମୋଡ୍: {{label}}",
+      "customMode": "କଷ୍ଟମ୍ ମୋଡ୍"
     },
     "modeOptions": {
       "code": "କୋଡ୍ ଲେଖନ୍ତୁ",
@@ -2772,7 +2773,7 @@
       "thinkingEffortAccessibility": "ଚିନ୍ତନର ମାତ୍ରା: {{label}}",
       "thinkingEffortSelected": "ଚିନ୍ତନର ମାତ୍ରା: {{label}}, ଚୟନ ହୋଇଛି",
       "thinkingEffortWithModel": "{{model}}, ଚିନ୍ତନର ମାତ୍ରା: {{variant}}",
-      "lockedByAgent": ", ଏଜେଣ୍ଟ \"{{agent}}\" ଦ୍ୱାରା ଲକ୍ ହୋଇଛି",
+      "lockedByAgent": "ଏଜେଣ୍ଟ \"{{agent}}\" ଦ୍ୱାରା ଲକ୍ ହୋଇଛି",
       "addToFavorites": "{{name}} କୁ ପସନ୍ଦର ମଡେଲ୍ ତାଲିକାରେ ଯୋଡ଼ନ୍ତୁ",
       "removeFromFavorites": "{{name}} କୁ ପସନ୍ଦର ମଡେଲ୍ ତାଲିକାରୁ ହଟାନ୍ତୁ",
       "sessionModel": "ସେସନ୍ ମଡେଲ୍"

@@ -2456,7 +2456,8 @@
       "customModes": "Anpassade lägen"
     },
     "modeSelector": {
-      "accessibility": "Läge: {{label}}"
+      "accessibility": "Läge: {{label}}",
+      "customMode": "Anpassat läge"
     },
     "modeOptions": {
       "code": "Kod",
@@ -2772,7 +2773,7 @@
       "thinkingEffortAccessibility": "Resonemangsnivå: {{label}}",
       "thinkingEffortSelected": "Resonemangsnivå: {{label}}, vald",
       "thinkingEffortWithModel": "{{model}}, resonemangsnivå: {{variant}}",
-      "lockedByAgent": ", Låst av agenten ”{{agent}}”",
+      "lockedByAgent": "Låst av agenten ”{{agent}}”",
       "addToFavorites": "Lägg till {{name}} i favoriter",
       "removeFromFavorites": "Ta bort {{name}} från favoriter",
       "sessionModel": "Sessionmodell"

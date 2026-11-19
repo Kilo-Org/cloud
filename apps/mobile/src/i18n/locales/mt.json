@@ -2600,7 +2600,8 @@
       "customModes": "Modi personalizzati"
     },
     "modeSelector": {
-      "accessibility": "Mod: {{label}}"
+      "accessibility": "Mod: {{label}}",
+      "customMode": "Mod personalizzat"
     },
     "modeOptions": {
       "code": "Ikteb kodiċi",
@@ -2919,7 +2920,7 @@
       "thinkingEffortAccessibility": "sforz ta' ħsieb: {{label}}",
       "thinkingEffortSelected": "sforz ta' ħsieb: {{label}}, magħżul",
       "thinkingEffortWithModel": "{{model}}, sforz ta' ħsieb: {{variant}}",
-      "lockedByAgent": ", Imsakkar mill-aġent \"{{agent}}\"",
+      "lockedByAgent": "Imsakkar mill-aġent \"{{agent}}\"",
       "addToFavorites": "Żid {{name}} mal-favoriti",
       "removeFromFavorites": "Neħħi {{name}} mill-favoriti",
       "sessionModel": "Mudell tas-sessjoni"

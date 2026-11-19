@@ -2456,7 +2456,8 @@
       "customModes": "Pasgemaakte modusse"
     },
     "modeSelector": {
-      "accessibility": "Modus: {{label}}"
+      "accessibility": "Modus: {{label}}",
+      "customMode": "Pasgemaakte modus"
     },
     "modeOptions": {
       "code": "Skryf kode",
@@ -2772,7 +2773,7 @@
       "thinkingEffortAccessibility": "Denkinspanning: {{label}}",
       "thinkingEffortSelected": "Denkinspanning: {{label}}, gekies",
       "thinkingEffortWithModel": "{{model}}, denkinspanning: {{variant}}",
-      "lockedByAgent": ", Vergrendel deur agent \"{{agent}}\"",
+      "lockedByAgent": "Vergrendel deur agent \"{{agent}}\"",
       "addToFavorites": "Voeg {{name}} by gunstelinge",
       "removeFromFavorites": "Verwyder {{name}} uit gunstelinge",
       "sessionModel": "Sessiemodel"

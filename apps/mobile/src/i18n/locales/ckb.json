@@ -2456,7 +2456,8 @@
       "customModes": "مۆدە تایبەتەکان"
     },
     "modeSelector": {
-      "accessibility": "مۆد: {{label}}"
+      "accessibility": "مۆد: {{label}}",
+      "customMode": "مۆدی تایبەت"
     },
     "modeOptions": {
       "code": "کۆدنووسین",
@@ -2772,7 +2773,7 @@
       "thinkingEffortAccessibility": "هەوڵی بیرکردنەوەی {{label}}",
       "thinkingEffortSelected": "هەوڵی بیرکردنەوەی {{label}}، هەڵبژێردراو",
       "thinkingEffortWithModel": "{{model}}، هەوڵی بیرکردنەوەی {{variant}}",
-      "lockedByAgent": "، لەلایەن ئەجێنتی «{{agent}}» ـەوە قوفڵ کراوە",
+      "lockedByAgent": "لەلایەن ئەجێنتی «{{agent}}» ـەوە قوفڵ کراوە",
       "addToFavorites": "زیادکردنی {{name}} بۆ دڵخوازەکان",
       "removeFromFavorites": "لابردنی {{name}} لە دڵخوازەکان",
       "sessionModel": "مۆدێلی سێشن"

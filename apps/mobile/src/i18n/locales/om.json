@@ -2456,7 +2456,8 @@
       "customModes": "Haalawwan addaa"
     },
     "modeSelector": {
-      "accessibility": "Haala: {{label}}"
+      "accessibility": "Haala: {{label}}",
+      "customMode": "Haala addaa"
     },
     "modeOptions": {
       "code": "Koodii barreessi",
@@ -2772,7 +2773,7 @@
       "thinkingEffortAccessibility": "sadarkaa xiinxalaa {{label}}",
       "thinkingEffortSelected": "sadarkaa xiinxalaa {{label}}, filatame",
       "thinkingEffortWithModel": "{{model}}, sadarkaa xiinxalaa {{variant}}",
-      "lockedByAgent": ", Ergamaa \"{{agent}}\" dhaan cufame",
+      "lockedByAgent": "Ergamaa \"{{agent}}\" dhaan cufame",
       "addToFavorites": "{{name}} kan jaallattetti dabali",
       "removeFromFavorites": "{{name}} kan jaallatte keessaa baasi",
       "sessionModel": "Moodela turtii"

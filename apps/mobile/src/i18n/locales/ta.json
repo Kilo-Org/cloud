@@ -2456,7 +2456,8 @@
       "customModes": "தனிப்பயன் முறைகள்"
     },
     "modeSelector": {
-      "accessibility": "முறை: {{label}}"
+      "accessibility": "முறை: {{label}}",
+      "customMode": "தனிப்பயன் முறை"
     },
     "modeOptions": {
       "code": "நிரல் எழுதுதல்",
@@ -2772,7 +2773,7 @@
       "thinkingEffortAccessibility": "சிந்தனை அளவு: {{label}}",
       "thinkingEffortSelected": "சிந்தனை அளவு: {{label}}, தேர்ந்தெடுக்கப்பட்டது",
       "thinkingEffortWithModel": "{{model}}, சிந்தனை அளவு: {{variant}}",
-      "lockedByAgent": ", \"{{agent}}\" ஏஜென்ட்டால் மாற்ற முடியாதபடி அமைக்கப்பட்டது",
+      "lockedByAgent": "\"{{agent}}\" ஏஜென்ட்டால் மாற்ற முடியாதபடி அமைக்கப்பட்டது",
       "addToFavorites": "{{name}}-ஐப் பிடித்தவற்றில் சேர்க்கவும்",
       "removeFromFavorites": "{{name}}-ஐப் பிடித்தவற்றிலிருந்து அகற்றவும்",
       "sessionModel": "அமர்வு மாதிரி"

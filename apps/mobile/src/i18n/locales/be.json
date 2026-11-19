@@ -2552,7 +2552,8 @@
       "customModes": "Уласныя рэжымы"
     },
     "modeSelector": {
-      "accessibility": "Рэжым: {{label}}"
+      "accessibility": "Рэжым: {{label}}",
+      "customMode": "Уласны рэжым"
     },
     "modeOptions": {
       "code": "Праграмаванне",
@@ -2870,7 +2871,7 @@
       "thinkingEffortAccessibility": "узровень разважанняў: {{label}}",
       "thinkingEffortSelected": "узровень разважанняў: {{label}}, выбрана",
       "thinkingEffortWithModel": "{{model}}, узровень разважанняў: {{variant}}",
-      "lockedByAgent": ", Заблакавана агентам «{{agent}}»",
+      "lockedByAgent": "Заблакавана агентам «{{agent}}»",
       "addToFavorites": "Дадаць {{name}} у абранае",
       "removeFromFavorites": "Прыбраць {{name}} з абранага",
       "sessionModel": "Мадэль сеанса"

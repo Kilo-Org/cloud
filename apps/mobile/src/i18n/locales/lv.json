@@ -2504,7 +2504,8 @@
       "customModes": "Pielāgoti režīmi"
     },
     "modeSelector": {
-      "accessibility": "Režīms: {{label}}"
+      "accessibility": "Režīms: {{label}}",
+      "customMode": "Pielāgots režīms"
     },
     "modeOptions": {
       "code": "Programmēt",
@@ -2821,7 +2822,7 @@
       "thinkingEffortAccessibility": "Domāšanas intensitāte: {{label}}",
       "thinkingEffortSelected": "Domāšanas intensitāte: {{label}}, izvēlēta",
       "thinkingEffortWithModel": "{{model}}, domāšanas intensitāte: {{variant}}",
-      "lockedByAgent": ", Bloķējis aģents „{{agent}}”",
+      "lockedByAgent": "Bloķējis aģents „{{agent}}”",
       "addToFavorites": "Pievienot {{name}} izlasei",
       "removeFromFavorites": "Noņemt {{name}} no izlases",
       "sessionModel": "Sesijas modelis"

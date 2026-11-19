@@ -2456,7 +2456,8 @@
       "customModes": "Amamodi enziwe ngokwezifiso"
     },
     "modeSelector": {
-      "accessibility": "Imodi: {{label}}"
+      "accessibility": "Imodi: {{label}}",
+      "customMode": "Imodi enziwe ngokwezifiso"
     },
     "modeOptions": {
       "code": "Bhala ikhodi",
@@ -2772,7 +2773,7 @@
       "thinkingEffortAccessibility": "umzamo wokucabanga: {{label}}",
       "thinkingEffortSelected": "umzamo wokucabanga: {{label}}, kukhethiwe",
       "thinkingEffortWithModel": "{{model}}, umzamo wokucabanga: {{variant}}",
-      "lockedByAgent": ", Kukhiywe umenzeli othi \"{{agent}}\"",
+      "lockedByAgent": "Kukhiywe umenzeli othi \"{{agent}}\"",
       "addToFavorites": "Engeza {{name}} kokuthandwayo",
       "removeFromFavorites": "Susa {{name}} kokuthandwayo",
       "sessionModel": "Imodeli yeseshini"

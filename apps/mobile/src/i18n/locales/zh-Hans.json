@@ -1913,7 +1913,8 @@
       "customModes": "自定义模式"
     },
     "modeSelector": {
-      "accessibility": "模式：{{label}}"
+      "accessibility": "模式：{{label}}",
+      "customMode": "自定义模式"
     },
     "modeOptions": {
       "code": "编程",
@@ -2229,7 +2230,7 @@
       "thinkingEffortAccessibility": "思考强度：{{label}}",
       "thinkingEffortSelected": "思考强度：{{label}}，已选中",
       "thinkingEffortWithModel": "{{model}}，思考强度：{{variant}}",
-      "lockedByAgent": "，已由智能体“{{agent}}”锁定",
+      "lockedByAgent": "已由智能体“{{agent}}”锁定",
       "addToFavorites": "将 {{name}} 添加到收藏",
       "removeFromFavorites": "从收藏中移除 {{name}}",
       "sessionModel": "会话模型"

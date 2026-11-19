@@ -1963,7 +1963,8 @@
       "customModes": "Користувацькі режими"
     },
     "modeSelector": {
-      "accessibility": "Режим: {{label}}"
+      "accessibility": "Режим: {{label}}",
+      "customMode": "Користувацький режим"
     },
     "modeOptions": {
       "code": "Програмування",
@@ -2281,7 +2282,7 @@
       "thinkingEffortAccessibility": "рівень міркування: {{label}}",
       "thinkingEffortSelected": "рівень міркування: {{label}}, вибрано",
       "thinkingEffortWithModel": "{{model}}, рівень міркування: {{variant}}",
-      "lockedByAgent": ", Заблоковано агентом «{{agent}}»",
+      "lockedByAgent": "Заблоковано агентом «{{agent}}»",
       "addToFavorites": "Додати {{name}} до обраного",
       "removeFromFavorites": "Прибрати {{name}} з обраного",
       "sessionModel": "Модель сеансу"

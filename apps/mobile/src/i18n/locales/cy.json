@@ -2648,7 +2648,8 @@
       "customModes": "Moddau wedi'u haddasu"
     },
     "modeSelector": {
-      "accessibility": "Modd: {{label}}"
+      "accessibility": "Modd: {{label}}",
+      "customMode": "Modd wedi'i addasu"
     },
     "modeOptions": {
       "code": "Codio",
@@ -2968,7 +2969,7 @@
       "thinkingEffortAccessibility": "Ymdrech feddwl {{label}}",
       "thinkingEffortSelected": "Ymdrech feddwl {{label}}, wedi'i dewis",
       "thinkingEffortWithModel": "{{model}}, ymdrech feddwl {{variant}}",
-      "lockedByAgent": ", Wedi'i gloi gan yr asiant \"{{agent}}\"",
+      "lockedByAgent": "Wedi'i gloi gan yr asiant \"{{agent}}\"",
       "addToFavorites": "Ychwanegu {{name}} i'r ffefrynnau",
       "removeFromFavorites": "Tynnu {{name}} o'r ffefrynnau",
       "sessionModel": "Model y sesiwn"

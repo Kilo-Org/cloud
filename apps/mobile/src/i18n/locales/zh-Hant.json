@@ -1913,7 +1913,8 @@
       "customModes": "自訂模式"
     },
     "modeSelector": {
-      "accessibility": "模式：{{label}}"
+      "accessibility": "模式：{{label}}",
+      "customMode": "自訂模式"
     },
     "modeOptions": {
       "code": "寫程式",
@@ -2229,7 +2230,7 @@
       "thinkingEffortAccessibility": "思考程度：{{label}}",
       "thinkingEffortSelected": "思考程度：{{label}}，已選取",
       "thinkingEffortWithModel": "{{model}}，思考程度：{{variant}}",
-      "lockedByAgent": "，已由智慧代理「{{agent}}」鎖定",
+      "lockedByAgent": "已由智慧代理「{{agent}}」鎖定",
       "addToFavorites": "將 {{name}} 加入我的最愛",
       "removeFromFavorites": "將 {{name}} 從我的最愛移除",
       "sessionModel": "工作階段模型"

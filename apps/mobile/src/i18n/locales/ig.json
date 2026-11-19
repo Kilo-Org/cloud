@@ -2456,7 +2456,8 @@
       "customModes": "Ụdị ọrụ ahaziri iche"
     },
     "modeSelector": {
-      "accessibility": "Ụdị ọrụ: {{label}}"
+      "accessibility": "Ụdị ọrụ: {{label}}",
+      "customMode": "Ụdị ọrụ ahaziri iche"
     },
     "modeOptions": {
       "code": "Dee koodu",
@@ -2772,7 +2773,7 @@
       "thinkingEffortAccessibility": "Mgbalị iche echiche {{label}}",
       "thinkingEffortSelected": "Mgbalị iche echiche {{label}}, ahọpụtara",
       "thinkingEffortWithModel": "{{model}}, mgbalị iche echiche {{variant}}",
-      "lockedByAgent": ", Onye nnọchi anya \"{{agent}}\" kpọchiri ya",
+      "lockedByAgent": "Onye nnọchi anya \"{{agent}}\" kpọchiri ya",
       "addToFavorites": "Tinye {{name}} n'ihe kacha amasị gị",
       "removeFromFavorites": "Wepụ {{name}} n'ihe kacha amasị gị",
       "sessionModel": "Ihe nlereanya nnọkọ"

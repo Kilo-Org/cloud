@@ -2456,7 +2456,8 @@
       "customModes": "ໂໝດທີ່ກຳນົດເອງ"
     },
     "modeSelector": {
-      "accessibility": "ໂໝດ: {{label}}"
+      "accessibility": "ໂໝດ: {{label}}",
+      "customMode": "ໂໝດທີ່ກຳນົດເອງ"
     },
     "modeOptions": {
       "code": "ຂຽນໂຄດ",
@@ -2772,7 +2773,7 @@
       "thinkingEffortAccessibility": "ລະດັບການຄິດ {{label}}",
       "thinkingEffortSelected": "ລະດັບການຄິດ {{label}}, ເລືອກແລ້ວ",
       "thinkingEffortWithModel": "{{model}}, ລະດັບການຄິດ {{variant}}",
-      "lockedByAgent": ", ລັອກໂດຍເອເຈນ \"{{agent}}\"",
+      "lockedByAgent": "ລັອກໂດຍເອເຈນ \"{{agent}}\"",
       "addToFavorites": "ເພີ່ມ {{name}} ໃສ່ລາຍການທີ່ມັກ",
       "removeFromFavorites": "ເອົາ {{name}} ອອກຈາກລາຍການທີ່ມັກ",
       "sessionModel": "ໂມເດວຂອງເຊດຊັນ"

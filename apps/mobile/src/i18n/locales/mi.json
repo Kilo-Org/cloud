@@ -2456,7 +2456,8 @@
       "customModes": "Ngā aratau ritenga"
     },
     "modeSelector": {
-      "accessibility": "Aratau: {{label}}"
+      "accessibility": "Aratau: {{label}}",
+      "customMode": "Aratau ritenga"
     },
     "modeOptions": {
       "code": "Waehere",
@@ -2772,7 +2773,7 @@
       "thinkingEffortAccessibility": "te kaha whakaaro {{label}}",
       "thinkingEffortSelected": "te kaha whakaaro {{label}}, kua kōwhiria",
       "thinkingEffortWithModel": "{{model}}, te kaha whakaaro {{variant}}",
-      "lockedByAgent": ", Kua maukatihia e te māngai \"{{agent}}\"",
+      "lockedByAgent": "Kua maukatihia e te māngai \"{{agent}}\"",
       "addToFavorites": "Tāpirihia a {{name}} ki ngā makau",
       "removeFromFavorites": "Tangohia {{name}} i ngā makau",
       "sessionModel": "Te tauira o te wātū"

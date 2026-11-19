@@ -19,16 +19,10 @@ const BUILTIN_OPTIONS: ModeOption[] = [
   { value: 'ask', label: 'Ask', description: 'Get answers and explanations' },
 ];
 
-// Mirrors the exact composition `ModeSelector` performs to resolve the rows
-// and the selected label.
+// Mirrors the composition the mode picker performs to resolve its rows.
 function resolveOptions(customOptions: ModeOption[], selected: AgentMode): ModeOption[] {
   const allOptions = [...BUILTIN_OPTIONS, ...dedupeCustomModeOptions(customOptions)];
   return ensureSelectedCustomOption(allOptions, selected);
-}
-
-function resolveLabel(customOptions: ModeOption[], selected: AgentMode): string {
-  const selectedOption = resolveOptions(customOptions, selected).find(m => m.value === selected);
-  return selectedOption?.label ?? selected;
 }
 
 describe('mode selector option resolution', () => {
@@ -86,11 +80,15 @@ describe('mode selector option resolution', () => {
     ]);
   });
 
-  it('labels a selected unknown slug with the raw slug, not "Code"', () => {
-    expect(resolveLabel([], 'reviewer')).toBe('reviewer');
+  it('appends the selected unknown slug with an empty label', () => {
+    const appended = resolveOptions([], 'reviewer').find(o => o.value === 'reviewer');
+
+    expect(appended).toEqual({ value: 'reviewer', label: '', description: '' });
   });
 
   it('labels a selected built-in with its label', () => {
-    expect(resolveLabel([], 'code')).toBe('Code');
+    const selectedRow = resolveOptions([], 'code').find(o => o.value === 'code');
+
+    expect(selectedRow?.label).toBe('Code');
   });
 });

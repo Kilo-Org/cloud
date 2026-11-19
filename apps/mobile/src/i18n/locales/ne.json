@@ -2456,7 +2456,8 @@
       "customModes": "आफूले बनाएका मोडहरू"
     },
     "modeSelector": {
-      "accessibility": "मोड: {{label}}"
+      "accessibility": "मोड: {{label}}",
+      "customMode": "आफूले बनाएको मोड"
     },
     "modeOptions": {
       "code": "कोड",
@@ -2772,7 +2773,7 @@
       "thinkingEffortAccessibility": "सोच्ने प्रयासको स्तर: {{label}}",
       "thinkingEffortSelected": "सोच्ने प्रयासको स्तर: {{label}}, चयन गरिएको",
       "thinkingEffortWithModel": "{{model}}, सोच्ने प्रयासको स्तर: {{variant}}",
-      "lockedByAgent": ", एजेन्ट \"{{agent}}\" ले परिवर्तन गर्न नमिल्ने बनाएको",
+      "lockedByAgent": "एजेन्ट \"{{agent}}\" ले परिवर्तन गर्न नमिल्ने बनाएको",
       "addToFavorites": "मनपर्नेमा {{name}} थप्नुहोस्",
       "removeFromFavorites": "मनपर्नेबाट {{name}} हटाउनुहोस्",
       "sessionModel": "सत्रको मोडेल"

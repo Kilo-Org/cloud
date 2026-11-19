@@ -2456,7 +2456,8 @@
       "customModes": "Mënyrat e personalizuara"
     },
     "modeSelector": {
-      "accessibility": "Mënyra: {{label}}"
+      "accessibility": "Mënyra: {{label}}",
+      "customMode": "Mënyrë e personalizuar"
     },
     "modeOptions": {
       "code": "Shkruaj kod",
@@ -2772,7 +2773,7 @@
       "thinkingEffortAccessibility": "niveli i arsyetimit: {{label}}",
       "thinkingEffortSelected": "niveli i arsyetimit: {{label}}, i zgjedhur",
       "thinkingEffortWithModel": "{{model}}, niveli i arsyetimit: {{variant}}",
-      "lockedByAgent": ", I bllokuar nga agjenti «{{agent}}»",
+      "lockedByAgent": "I bllokuar nga agjenti «{{agent}}»",
       "addToFavorites": "Shto {{name}} te të preferuarat",
       "removeFromFavorites": "Hiq {{name}} nga të preferuarat",
       "sessionModel": "Modeli i seancës"

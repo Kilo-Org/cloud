@@ -2456,7 +2456,8 @@
       "customModes": "అనుకూల మోడ్‌లు"
     },
     "modeSelector": {
-      "accessibility": "మోడ్: {{label}}"
+      "accessibility": "మోడ్: {{label}}",
+      "customMode": "అనుకూల మోడ్"
     },
     "modeOptions": {
       "code": "కోడ్",
@@ -2772,7 +2773,7 @@
       "thinkingEffortAccessibility": "ఆలోచనా స్థాయి: {{label}}",
       "thinkingEffortSelected": "ఆలోచనా స్థాయి: {{label}}, ఎంచుకున్నది",
       "thinkingEffortWithModel": "{{model}}, ఆలోచనా స్థాయి: {{variant}}",
-      "lockedByAgent": ", \"{{agent}}\" ఏజెంట్ దీన్ని మార్చకుండా లాక్ చేసింది",
+      "lockedByAgent": "\"{{agent}}\" ఏజెంట్ దీన్ని మార్చకుండా లాక్ చేసింది",
       "addToFavorites": "{{name}}ను ఇష్టమైనవాటికి జోడించండి",
       "removeFromFavorites": "{{name}}ను ఇష్టమైనవాటి నుండి తీసివేయండి",
       "sessionModel": "సెషన్ మోడల్"

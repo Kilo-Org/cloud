@@ -10,7 +10,7 @@ import {
 import { CREDITS_FAILURE_KEY } from '@/lib/chat/backend-target';
 import { type AddCreditsDestination } from '@/lib/credits/add-credits-destination';
 import { type ChatState, type Displaced } from '@/lib/chat/state';
-import { askedMessageId, displacedMessageId, stoppedAnswerMessageId } from '@/lib/chat/turns';
+import { askedMessageId, displacedMessageId, partialAnswerMessageId } from '@/lib/chat/turns';
 
 /**
  * The bubble the slot's question is drawn as: its own, or the kept one it asks
@@ -32,12 +32,13 @@ function slotBubbleId(
 }
 
 /**
- * The bubble a question's recovery hangs off: the words its stopped answer had
- * reached when there are any, so the stop is stated under what it stopped and
- * not between the question and its words, and the question itself otherwise.
+ * The bubble a question's recovery hangs off: the words its answer had reached
+ * before it was stopped or failed, when there are any, so how it ended is
+ * stated under what the person read and not between the question and its
+ * words, and the question itself otherwise.
  */
 const recoveryHost = (questionId: string, answer: string | null | undefined): string =>
-  answer == null ? questionId : stoppedAnswerMessageId(questionId);
+  answer == null ? questionId : partialAnswerMessageId(questionId);
 
 /**
  * What a question's bubble states about an answer that did not come, from the

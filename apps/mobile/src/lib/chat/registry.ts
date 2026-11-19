@@ -1295,7 +1295,8 @@ function says(turn: Turn | undefined, question: Question): boolean {
  *
  * The turns come from the session rather than from what was streamed: the store
  * holds what was written, and a question that failed was never written. That
- * question stays remembered, which is what offers the Retry.
+ * question stays remembered, which is what offers the Retry, and so do the
+ * words its answer had reached before it failed, as they do after a Stop.
  */
 async function settle(
   sessionId: string,
@@ -1362,6 +1363,11 @@ async function settle(
     failed,
     failureKey: failure?.key ?? null,
   });
+  if (failure !== null) {
+    /* In the same tick as the change above, so the screen never draws the
+       question without the words it had already shown. */
+    await keepPartialAnswer(sessionId, held.answering);
+  }
   /* The line moves only when the answer landed. A question that failed keeps
      its Retry, and asking the next one would take the place that Retry hangs
      off — so what is waiting stays waiting until the person deals with it. A
@@ -1983,19 +1989,20 @@ export async function stopChat(sessionId: string): Promise<void> {
   }
   const stopped = await halt(sessionId, chat);
   if (stopped !== null) {
-    await keepStoppedAnswer(sessionId, stopped);
+    await keepPartialAnswer(sessionId, stopped);
     await drain(sessionId, chat, false);
   }
 }
 
 /**
- * Keeps the words a stopped answer had reached beside the question it answers.
+ * Keeps the words an answer had reached when it was stopped or failed, beside
+ * the question it answers.
  *
  * They go on screen first, so a refused write costs only a restart. Only the
- * words are kept: a tool call the Stop cut off has no result to show, and the
+ * words are kept: a tool call the end cut off has no result to show, and the
  * reasoning is folded away on screen already.
  */
-async function keepStoppedAnswer(sessionId: string, parts: readonly Part[]): Promise<void> {
+async function keepPartialAnswer(sessionId: string, parts: readonly Part[]): Promise<void> {
   const answer = parts
     .flatMap(part => (part.type === 'text' && part.text.trim() !== '' ? [part.text] : []))
     .join('\n\n');

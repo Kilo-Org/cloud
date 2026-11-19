@@ -29,6 +29,7 @@ const state = vi.hoisted(() => ({
   messages: [] as { info: { id: string; role?: string } }[],
   asked: null as string | null,
   askedFrom: null as string | null,
+  askedAnswer: null as string | null,
   displaced: [] as {
     id: string;
     text: string;
@@ -146,6 +147,7 @@ vi.mock('@/lib/chat/use-chat', () => ({
       status: state.status,
       asked: state.asked,
       askedFrom: state.askedFrom,
+      askedAnswer: state.askedAnswer,
       displaced: state.displaced,
       waiting: [],
       failed: state.failed,
@@ -162,6 +164,7 @@ vi.mock('@/lib/chat/turns', () => ({
   asMessages: () => state.messages,
   askedMessageId: (sessionId: string) => `${sessionId}:asked`,
   displacedMessageId: (sessionId: string, id: string) => `${sessionId}:displaced:${id}`,
+  partialAnswerMessageId: (questionId: string) => `${questionId}:partial`,
 }));
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({ organizationId: null }),
@@ -289,6 +292,7 @@ beforeEach(() => {
   state.messages = [];
   state.asked = null;
   state.askedFrom = null;
+  state.askedAnswer = null;
   state.displaced = [];
   state.failed = null;
   state.failureKey = null;
@@ -1285,6 +1289,32 @@ describe('message actions', () => {
       detailKey: 'modelChat.backends.deletedBackend',
     });
     expect(bubble.onRetryMessage).toBeDefined();
+  });
+
+  it('states a failed answer once, under the words it had reached, with its Retry', async () => {
+    state.status = 'idle';
+    state.asked = 'tell a story';
+    state.askedAnswer = 'once upon a time';
+    state.failureKey = 'modelChat.connectionLost';
+    state.messages = [
+      { info: { id: 's1:asked', role: 'user' } },
+      { info: { id: 's1:asked:partial', role: 'assistant' } },
+    ];
+    const tree = await mount();
+    const words = bubbleFor(tree, 's1:asked:partial');
+
+    expect(words.deliveryState).toEqual({
+      status: 'failed',
+      error: '',
+      reason: 'chat-response',
+      detailKey: 'modelChat.connectionLost',
+    });
+    expect(bubbleFor(tree, 's1:asked').deliveryState).toBeUndefined();
+    expect(count(tree, 'AccessibleStatus')).toBe(0);
+    act(() => {
+      words.onRetryMessage?.(state.messages[1]);
+    });
+    expect(state.retry).toHaveBeenCalledOnce();
   });
 
   it('shows no recovery under a question asked again while it is being asked', async () => {

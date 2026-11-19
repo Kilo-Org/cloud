@@ -379,6 +379,7 @@ export const cloudSessionMessagesPageSchema = cloudSessionMessagesPageWireSchema
       }
       messages.push({ info: info.data, parts });
     }
-    return { ...page, messages, omittedItemCount };
+    const { source: _wireSource, ...metadata } = v1;
+    return { ...metadata, sourceVersion: 'v1', messages, omittedItemCount };
   }
 ) satisfies z.ZodType<CloudSessionSnapshotPage | null>;

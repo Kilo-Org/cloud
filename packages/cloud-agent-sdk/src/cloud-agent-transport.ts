@@ -432,8 +432,14 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       }
     }
 
-    function replayInitialPage(page: SessionSnapshotPage): void {
-      if (page.sourceVersion === 'v2') backgroundEnabled = true;
+    /**
+     * Seed the connection state every snapshot page contributes, whichever path
+     * fetched it: the v2 background flag, the workspace update cursor or the
+     * event-log watermark, and — for the first page of a connect — the manager's
+     * record of it with its queued and failed turns.
+     */
+    function seedPageState(page: SessionSnapshotPage): void {
+      backgroundEnabled = backgroundEnabled || page.sourceVersion === 'v2';
       // Seed lastEventId from the page's event-log watermark. A present
       // watermark sets the cursor to 0 so the WebSocket connect uses
       // `fromId=0` — the DO replays every stored event, closing the gap when
@@ -453,6 +459,11 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         config.onInitialPageLoaded?.(page);
         replayQueuedSnapshots(page.queuedMessages);
       }
+    }
+
+    function replayInitialPage(page: SessionSnapshotPage): void {
+      seedPageState(page);
+      // Rows are the only extra step of this path.
       sources.observeProjected(page.messages);
       const version =
         workspaceSession && page.updateCursor !== undefined
@@ -554,16 +565,29 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
      * nothing else does for this connection.
      */
     function recordInitialPageOnly(page: SessionSnapshotPage): void {
-      backgroundEnabled = backgroundEnabled || page.sourceVersion === 'v2';
-      if (workspaceSession && page.updateCursor !== undefined) {
-        lastUpdateCursor = Math.max(lastUpdateCursor, page.updateCursor);
-      } else if (lastEventId === null && page.watermarkEventId != null) {
-        lastEventId = 0;
+      seedPageState(page);
+    }
+
+    /**
+     * Settle one catch-up read: drop it when a newer connect or reconnect owns the
+     * state, record a superseded page without replaying its rows, or apply it and
+     * keep the bounded retry chain alive. This is the one place the generation and
+     * episode arbitration of a catch-up read is written.
+     */
+    function settleCatchUpRead(
+      read: SnapshotRead,
+      epoch: number,
+      expectedGeneration: number,
+      onPage: (page: SessionSnapshotPage) => void,
+      nextRetry: number
+    ): void {
+      if (expectedGeneration !== lifecycleGeneration) return;
+      if (epoch !== snapshotCatchUpEpoch) {
+        if (read.kind === 'page') recordInitialPageOnly(read.page);
+        return;
       }
-      if (!initialPageRecorded) {
-        initialPageRecorded = true;
-        config.onInitialPageLoaded?.(page);
-        replayQueuedSnapshots(page.queuedMessages);
+      if (!applySnapshotRead(read, onPage, expectedGeneration)) {
+        scheduleSnapshotRetry(onPage, expectedGeneration, nextRetry);
       }
     }
 
@@ -578,15 +602,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
     function dispatchRetryRead(expectedGeneration: number): void {
       const epoch = snapshotCatchUpEpoch;
       void readSnapshot().then(read => {
-        if (expectedGeneration !== lifecycleGeneration) return;
-        // A newer reconnect superseded this read: record, same as below.
-        if (epoch !== snapshotCatchUpEpoch) {
-          if (read.kind === 'page') recordInitialPageOnly(read.page);
-          return;
-        }
-        if (!applySnapshotRead(read, recordInitialPageOnly, expectedGeneration)) {
-          scheduleSnapshotRetry(recordInitialPageOnly, expectedGeneration, 0);
-        }
+        settleCatchUpRead(read, epoch, expectedGeneration, recordInitialPageOnly, 0);
       });
     }
 
@@ -608,22 +624,11 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           if (expectedGeneration !== lifecycleGeneration) return;
           const epoch = snapshotCatchUpEpoch;
           void readSnapshot().then(read => {
-            if (expectedGeneration !== lifecycleGeneration) return;
-            // A cancel that raced this read (superseded catch-up) wins: the
-            // page may predate the latest connection's live replay, so its
-            // bounded rows must not be re-emitted on top of that state. The
-            // manager still gets the page record — the first recorded page
-            // seeds the older-messages cursor and the queued-turn rows —
-            // but the message rows are skipped, and the chain ends because
+            // A cancel that raced this read (superseded catch-up) wins: a
+            // superseded page is recorded without its rows because its rows
+            // may predate the newer live replay, and the chain ends because
             // the superseding connection owns catch-up.
-            if (epoch !== snapshotCatchUpEpoch) {
-              if (read.kind === 'page' && onPage === replayInitialPage) {
-                recordInitialPageOnly(read.page);
-              }
-              return;
-            }
-            if (applySnapshotRead(read, onPage, expectedGeneration)) return;
-            scheduleSnapshotRetry(onPage, expectedGeneration, retry + 1);
+            settleCatchUpRead(read, epoch, expectedGeneration, onPage, retry + 1);
           });
         },
         SNAPSHOT_READ_BASE_DELAY_MS * 2 ** retry
@@ -767,16 +772,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           // never reset the user's older-pages cursor back to the latest 50.
           const epoch = snapshotCatchUpEpoch;
           void readSnapshot().then(read => {
-            if (expectedGeneration !== lifecycleGeneration) return;
-            // A newer reconnect superseded this read: record its page
-            // without replaying bounded rows over the newer live replay.
-            if (epoch !== snapshotCatchUpEpoch) {
-              if (read.kind === 'page') recordInitialPageOnly(read.page);
-              return;
-            }
-            if (!applySnapshotRead(read, replayInitialPage, expectedGeneration)) {
-              scheduleSnapshotRetry(replayInitialPage, expectedGeneration, 0);
-            }
+            settleCatchUpRead(read, epoch, expectedGeneration, replayInitialPage, 0);
           });
         },
         onDisconnected: () => {

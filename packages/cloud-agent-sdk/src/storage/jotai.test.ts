@@ -18,6 +18,26 @@ function makePart(id: string, messageId: string, text = ''): Part {
   return { id, sessionID: 'ses-1', messageID: messageId, type: 'text', text } as Part;
 }
 
+function makeToolPart(
+  id: string,
+  status: 'running' | 'completed',
+  time: { start: number; end?: number },
+  messageID = 'msg-1'
+): Part {
+  return {
+    id,
+    sessionID: 'ses-1',
+    messageID,
+    type: 'tool',
+    callID: `call-${id}`,
+    tool: 'task',
+    state:
+      status === 'running'
+        ? { status, input: {}, raw: '', time }
+        : { status, input: {}, raw: '', output: 'done', title: 'task', metadata: {}, time },
+  } as unknown as Part;
+}
+
 describe('createJotaiStorage', () => {
   let store: ReturnType<typeof createStore>;
   let s: ReturnType<typeof createJotaiStorage>;
@@ -101,6 +121,29 @@ describe('createJotaiStorage', () => {
       const parts = s.getParts('msg-1');
       expect(parts).toHaveLength(1);
       expect(parts[0]).toEqual(expect.objectContaining({ id: 'prt-real', text: 'hello' }));
+    });
+
+    test('forgets ordering evidence under the message bucket when the part is deleted', () => {
+      // The bucket and the part's own label disagree. The backend records the
+      // ordering evidence under the bucket, so deleting the part from that
+      // bucket takes the evidence with it. Keyed by the label instead, the
+      // delete would miss it and the orphan would hold back this terminal.
+      s.upsertPart('msg-A', makeToolPart('p-1', 'running', { start: 1 }, 'msg-B'), 200);
+      s.deletePart('msg-A', 'p-1');
+      // A replay re-delivers the run with no event time, which records no new
+      // evidence.
+      s.upsertPart('msg-A', makeToolPart('p-1', 'running', { start: 1 }, 'msg-B'));
+      // The terminal postdates the run's start, so it applies: the deleted
+      // part's event time of 200 must no longer make it look stale.
+      s.upsertPart(
+        'msg-A',
+        makeToolPart('p-1', 'completed', { start: 1, end: 150 }, 'msg-B'),
+        150
+      );
+
+      const parts = s.getParts('msg-A');
+      const part = parts.find(p => p.id === 'p-1');
+      expect(part?.type === 'tool' ? part.state.status : undefined).toBe('completed');
     });
   });
 

@@ -307,7 +307,15 @@ beforeEach(() => {
 });
 
 function upsert(arr: Part[], part: Part, eventTime?: number): Part[] {
-  return upsertPartDroppingStaleSyntheticParts(arr, part, eventTime, orderingEvidence);
+  // Forward one identity: the message id the part carries is the bucket this
+  // suite would store it under.
+  return upsertPartDroppingStaleSyntheticParts(
+    part.messageID,
+    arr,
+    part,
+    eventTime,
+    orderingEvidence
+  );
 }
 
 describe('insertSortedBy', () => {

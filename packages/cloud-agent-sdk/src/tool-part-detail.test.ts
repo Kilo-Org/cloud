@@ -258,10 +258,16 @@ describe('preview merge guard', () => {
   test('keeps a complete stored call when a preview of the same call arrives', () => {
     expect(isPreviewOfStoredTool(tool(), preview)).toBe(true);
     const evidence = new Map<string, number>();
-    const stored = upsertPartDroppingStaleSyntheticParts([], tool(), undefined, evidence);
-    expect(upsertPartDroppingStaleSyntheticParts(stored, preview, undefined, evidence, true)).toBe(
-      stored
+    const stored = upsertPartDroppingStaleSyntheticParts(
+      'msg_1',
+      [],
+      tool(),
+      undefined,
+      evidence
     );
+    expect(
+      upsertPartDroppingStaleSyntheticParts('msg_1', stored, preview, undefined, evidence, true)
+    ).toBe(stored);
   });
 
   test('accepts complete updates and previews of a different settled call', () => {
@@ -269,9 +275,15 @@ describe('preview merge guard', () => {
     expect(isPreviewOfStoredTool(tool(), tool({ cloudDetail: marker, end: 5 }))).toBe(false);
     expect(isPreviewOfStoredTool(preview, preview)).toBe(false);
     const evidence = new Map<string, number>();
-    const stored = upsertPartDroppingStaleSyntheticParts([], preview, undefined, evidence);
+    const stored = upsertPartDroppingStaleSyntheticParts(
+      'msg_1',
+      [],
+      preview,
+      undefined,
+      evidence
+    );
     expect(
-      upsertPartDroppingStaleSyntheticParts(stored, tool(), undefined, evidence, true)
+      upsertPartDroppingStaleSyntheticParts('msg_1', stored, tool(), undefined, evidence, true)
     ).toEqual([tool()]);
   });
 

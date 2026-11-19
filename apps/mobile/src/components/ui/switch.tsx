@@ -93,12 +93,6 @@ export function Switch({
   const enabledOnGrip = dark ? colors.selectionForeground : colors.primaryForeground;
   const enabledOffGrip = dark ? colors.foreground : colors.primaryForeground;
   const enabledOffTrack = dark ? colors.mutedForeground : colors.mutedSoft;
-  // The off grip sits on the off track; the grip and track lose their strength
-  // when the control is unavailable, and the on track takes the disabled fill.
-  // The on grip leaves the scheme's on ink as well: a light thumb on the muted
-  // fill reads as a working control. Dark takes the mid neutral, a dark thumb
-  // on the light disabled fill, which keeps the thumb's overhanging arc off the
-  // row's own near-black; light keeps its white grip.
   const offGrip = inactive ? colors.mutedForeground : enabledOffGrip;
   const offTrack = inactive ? colors.mutedSoft : enabledOffTrack;
   const onTrack = inactive ? colors.primaryDisabled : enabledOnTrack;

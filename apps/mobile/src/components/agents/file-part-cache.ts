@@ -9,9 +9,7 @@ import { stripDataUrlBase64Prefix } from './tool-card-image-cache';
 
 const CACHE_DIR_NAME = 'session-file-parts';
 
-/** A captured FilePart URL. `data:` URLs are written to disk and stored as a
- *  small `file://` URI; `http(s)` URLs are stored as-is. No bytes are
- *  downloaded. */
+/** A captured FilePart URL. */
 export type FilePartCacheEntry = {
   // resolved usable URL; ABSENT on ref-only entries
   url?: string;
@@ -266,7 +264,6 @@ export function useFilePartCache(partId: string): FilePartCacheEntry | undefined
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
-/** True only for `http:`, `https:`, and `data:` URLs. */
 export function isUsableFilePartUrl(url: string): boolean {
   return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:');
 }

@@ -338,11 +338,7 @@ describe('ConsentCard', () => {
   });
 
   it('keeps the privacy line clear of the pinned actions', () => {
-    // Finding 2 (the sentence cut in half at the footer boundary) is fixed at
-    // the base revision by pinning the disclosure into the footer above the
-    // actions, so the footer edge can no longer cut it and the actions cannot
-    // overlay it. The earlier assertion that the sentence was the tail of the
-    // scrolling body no longer holds: the sentence has left the scroller.
+    // The disclosure is pinned in the footer above the actions.
     const renderer = mountCard('onboarding');
     const scroller = renderer.root.findByType('ScrollView' as never);
 

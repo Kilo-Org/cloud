@@ -358,10 +358,6 @@ if (process.env.EAS_BUILD_PROFILE === 'production') {
   );
 }
 
-// Asserted on the EVALUATED config, not on app.config.ts's source: options that
-// never reach the plugin still evaluate to the dev-menu defaults (auto-show on,
-// onboarding on), and the menu then sits over the product screen carrying the
-// raw SF Symbol names a scene dump reads aloud.
 const devClientPlugin = pluginEntry(DEV_CLIENT_PLUGIN);
 for (const [option, expected] of Object.entries(DEV_CLIENT_PLUGIN_OPTIONS)) {
   check(

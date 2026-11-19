@@ -83,7 +83,6 @@ beforeEach(() => {
  *  through this same drain, which is what makes the sign-out absence check mean
  *  "the publish ran and was refused" rather than "the publish had not run yet". */
 async function drainCacheWrites(): Promise<void> {
-  // A zero-delay macrotask is a scheduling barrier, not a timing guess.
   const { promise, resolve } = Promise.withResolvers<undefined>();
   setTimeout(resolve, 0);
   await promise;

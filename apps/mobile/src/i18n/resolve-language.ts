@@ -117,10 +117,8 @@ export function resolveSupportedLanguageTag(
 }
 
 /**
- * Resolve the supported language for a device locale list. For each device
- * tag in preference order, map Chinese scripts, map Portuguese variants, then
- * exact match, then same-language fallback. An empty list or no match resolves
- * to `en`.
+ * Resolve the supported language from a device locale list, defaulting to
+ * `en`.
  */
 export function resolveLanguageTag(
   locales: readonly { languageTag?: string; regionCode?: string | null }[]

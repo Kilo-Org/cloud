@@ -22,7 +22,7 @@ export type BuiltinAgentMode = (typeof BUILTIN_AGENT_MODES)[number];
  * slug. `(string & {})` keeps the built-in literal completions while still
  * accepting custom slugs (same shape as `apps/web` `cloud-agent-next/types.ts`).
  */
-// oxlint-disable-next-line typescript-eslint/ban-types -- `(string & {})` keeps built-in literal completions while accepting custom slugs (same as web)
+// oxlint-disable-next-line typescript-eslint/ban-types
 export type AgentMode = BuiltinAgentMode | (string & {});
 
 /** One row in the mode picker. */

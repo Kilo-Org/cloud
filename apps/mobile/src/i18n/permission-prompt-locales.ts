@@ -20,10 +20,9 @@ type PermissionPlistKey = (typeof PERMISSION_PROMPT_PLIST_KEYS)[number];
 /** Prebuild-time copy, one entry per language tag. */
 export type PermissionPromptCopy = Record<string, Partial<Record<PermissionPlistKey, string>>>;
 
-/** The prebuild-time copy for one language, nested under `ios` for Expo. */
+/** The prebuild-time copy for one language. */
 type PermissionPromptEntry = { ios: Record<PermissionPlistKey, string> };
 
-/** The Expo top-level `locales` map: one `ios` entry per supported language. */
 export type PermissionPromptLocales = Record<SupportedLanguage, PermissionPromptEntry>;
 
 function readPrompt(

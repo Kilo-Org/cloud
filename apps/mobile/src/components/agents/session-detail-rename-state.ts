@@ -182,12 +182,8 @@ export function getSessionDetailRenameState(input: {
 }): SessionDetailRenameState {
   const fallbackTitle =
     sessionDisplayTitle(input.fallbackTitle) ?? i18n.t('agentChat.session.title');
-  // A placeholder title (`New session - <ISO>`) is the ingest service's "no
-  // title yet" marker, not a name the user wrote. Count it as absent so the
-  // header falls back to the same localized label a title-less session shows;
-  // the session still exists, so renaming stays enabled. `namedSessionTitle`
-  // also keeps a title the app's own rename flow wrote, even one that happens
-  // to look like the placeholder.
+  // An untitled-but-existing session keeps renaming enabled: interactivity
+  // follows `isLoaded`, not the title.
   const serverTitle = namedSessionTitle(input.serverTitle, input.sessionId);
   const baseTitle = input.isLoaded ? (serverTitle ?? fallbackTitle) : fallbackTitle;
   const title = input.renameState.optimisticTitle ?? baseTitle;

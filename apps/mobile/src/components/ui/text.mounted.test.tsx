@@ -104,8 +104,6 @@ describe('Text joined-script letter spacing', () => {
 });
 
 describe('Text mounted letter spacing', () => {
-  // The reset belongs to the script: a joined script takes it in either
-  // direction, and an RTL interface resets its RTL-script copy as well.
   it.each([false, true])('resets the tracking for Arabic children (isRTL=%s)', isRTL => {
     i18nManager.isRTL = isRTL;
     const text = hostText(

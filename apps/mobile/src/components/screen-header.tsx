@@ -337,10 +337,7 @@ export type HeaderEyebrow =
  * fill.
  *
  * The box is the measure the header's reserved band keeps its height by (see
- * `reservedTitleBand`): an empty box at the title's own position, so a title
- * that grows a line cannot move the body below the header — and a one-line cap
- * reserves one line, not the two-line default it replaced, or the band keeps a
- * blank line it can never fill.
+ * `reservedTitleBand`): an empty box at the title's own position.
  *
  * The large branches stay in px: NativeWind's rem is 14pt, so `min-h-9` would
  * be 31.5pt under the 36px the large title paints.

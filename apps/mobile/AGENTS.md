@@ -127,9 +127,8 @@ The conversation list follows the newest message when its viewport shrinks; it m
 A surface whose content
 pads the platform's bottom inset itself passes `height={Math.max(0, keyboardHeight - bottom)}` to
 `@/components/keyboard-lift-view` — the provider's Android height spans the translucent navigation bar, so
-without the reduction the content floats a navigation-bar height above the keyboard. That view pads by the
-height the screen computes from `useKeyboardState` and animates it with the keyboard's own motion progress;
-a library `KeyboardAvoidingView` derives its lift from a container frame an async native call reports, and a
+without the reduction the content floats a navigation-bar height above the keyboard; a library
+`KeyboardAvoidingView` derives its lift from a container frame an async native call reports, and a
 frame that has not landed yet leaves the lift short by the container's own top (the pinned new-session footer
 stayed behind the keyboard that way).
 

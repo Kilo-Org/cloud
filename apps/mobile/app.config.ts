@@ -169,13 +169,7 @@ const config: ExpoConfig = {
   // page whether or not the workspace resolves `react-dom`.
   // Asserted in scripts/assert-expo-config.mjs.
   platforms: ['ios', 'android'],
-  // Per-locale native strings. Expo's built-in `withLocales` writes a
-  // `<tag>.lproj/InfoPlist.strings` per tag at prebuild from the
-  // usage-description keys (the plugin options below stay as the base Info.plist
-  // value). `ios`-nested because only iOS has this catalog: Android defines no
-  // per-locale native string file for permission prompts, so its `withLocales`
-  // resolves each tag to nothing by capability rather than by omission.
-  // `withAppIntentLocalizations` writes the same bundle's `Localizable.strings`.
+  // Per-locale native strings; the plugin options below stay as the base Info.plist value.
   locales: nativeLocales,
   ios: {
     // iOS 18+ appearance variants. `light` is the existing icon unchanged; `dark` keeps the
@@ -405,9 +399,6 @@ const config: ExpoConfig = {
       {
         icon: './assets/images/android-notification-icon.png',
         color: '#FFDD00',
-        // Name the channel Firebase falls back to when a message omits
-        // `channel_id`. Without it FirebaseMessaging logs "Missing Default
-        // Notification Channel metadata in AndroidManifest" on every message.
         defaultChannel: ANDROID_DEFAULT_NOTIFICATION_CHANNEL,
         // iOS requires `remote-notification` in UIBackgroundModes for the
         // headless background task (`registerTaskAsync`) to deliver a data-only

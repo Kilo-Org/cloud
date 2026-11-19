@@ -31,7 +31,7 @@ const DARK_SHIMMER = [
 ] as const;
 
 const SHIMMER_DURATION_MS = 1800;
-/** Half-cycle for opacity breathe (0.4→1.0). Old value was 1000 ms; full cycle is 1700 ms. */
+/** Half-cycle for opacity breathe (0.4→1.0). */
 const PULSE_HALF_CYCLE_MS = 850;
 
 /** LinearGradient is not NativeWind-mapped; fill the absolute overlay. */

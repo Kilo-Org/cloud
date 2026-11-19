@@ -116,10 +116,10 @@ function cacheFilenameForAttachment(partId: string, mime: string, filename?: str
  * an arbitrarily large attachment no longer holds the JS thread that publishes
  * the stream. The URI is recorded when the write resolves.
  *
- * When `filename` is provided (non-image attachments), the cache filename is
- * derived via `getSafeCacheFilename`. When absent (images), the legacy
- * `partId.extensionForImageMime(mime)` naming is used. The partId→uri map and
- * first-wins dedupe are unchanged.
+ * Both branches route the cache filename through `getSafeCacheFilename`: the
+ * extension is embedded behind the `_DOT_` marker and restored for the legacy
+ * `<partId>.<extension>` shape. The partId→uri map and first-wins dedupe are
+ * unchanged.
  */
 export function cacheToolAttachment(
   partId: string,
@@ -128,8 +128,6 @@ export function cacheToolAttachment(
   if (inFlightOrDone.has(partId)) {
     return;
   }
-  // Mark synchronously so a live-stream pass and a history-replay pass cannot
-  // double-write the same part.
   inFlightOrDone.add(partId);
 
   const payload = stripDataUrlBase64Prefix(dataUrl, mime);

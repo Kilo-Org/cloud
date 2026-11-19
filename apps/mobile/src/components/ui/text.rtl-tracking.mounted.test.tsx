@@ -133,17 +133,20 @@ describe('Text tracked labels', () => {
   });
 
   it('applies the same reset to the shared Eyebrow label, whose own display class is dropped in RTL', () => {
-    // The eyebrow's tracking class is LTR-only (text.tsx EYEBROW_LATIN_DISPLAY):
-    // an RTL eyebrow drops it and relies on the RTL letter-spacing reset.
+    // The eyebrow drops `EYEBROW_LATIN_DISPLAY` only for RTL-script copy in an
+    // RTL interface (text.tsx: `!(isRTL && isRtlScript)`); Latin copy keeps it
+    // in either direction. This Arabic copy takes the drop and relies on the
+    // RTL letter-spacing reset.
     i18nManager.isRTL = true;
     const root = mountTextTree(createElement(Eyebrow, null, 'استكشف'));
 
     // Arabic-script copy drops the tracked class and the mono family in an RTL
     // interface (`withoutMonoFamily`): a zero letter spacing alone does not
     // keep a cursive script's joins (text.rtl-labels, text.mounted).
-    // The eyebrow's Latin display treatment (uppercase + tracking) is LTR-only
-    // (see `Text`'s eyebrow variant and `SectionHeader`): the variant owns its
-    // display classes, so an RTL eyebrow drops them — it carries no tracked
+    // The eyebrow's Latin display treatment (uppercase + tracking) follows the
+    // same script-and-interface condition (see `Text`'s eyebrow variant and
+    // `SectionHeader`): the variant owns its display classes, so this RTL-script
+    // copy in an RTL interface drops them — it carries no tracked
     // class of its own (the rule `text.mounted.test.tsx` pins) — and drops the
     // capitals and tracked class instead of carrying a class the interface
     // language never asked for (`section-header.mounted.test.tsx`). No
@@ -156,15 +159,16 @@ describe('Text tracked labels', () => {
     expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
     // The mono family goes with them: JetBrains Mono ships no Arabic glyphs, so
     // the RTL eyebrow drops `font-mono-medium` as well (`withoutMonoFamily`),
-    // matching the LTR-only display treatment it just lost.
+    // matching the Latin display treatment it just lost.
     expect(classes.some(name => name.startsWith('font-mono'))).toBe(false);
     expect(hostStyle(root)).toContainEqual(NATURAL_LETTER_SPACING);
   });
 
   it('neutralizes a caller-supplied tracked class on the shared Eyebrow label', () => {
     i18nManager.isRTL = true;
-    // The eyebrow variant owns its Latin display classes, so an RTL eyebrow
-    // drops them (the rule `text.mounted.test.tsx` pins) rather than keeping
+    // The eyebrow variant owns its Latin display classes, so this RTL-script
+    // copy in an RTL interface drops them (the rule `text.mounted.test.tsx`
+    // pins) rather than keeping
     // them like a caller-supplied tracked class; a caller-supplied tracked
     // class stays on the element and the zero letter-spacing reset neutralizes
     // it (see rtl-text.ts).

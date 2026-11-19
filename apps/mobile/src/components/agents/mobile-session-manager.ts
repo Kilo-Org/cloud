@@ -118,7 +118,7 @@ export function isCancelQueuedUpgradeRequired(error: unknown): boolean {
   return readFetchSessionErrorCode(error) === CANCEL_QUEUED_UPGRADE_REQUIRED_CODE;
 }
 
-/* eslint-disable @typescript-eslint/promise-function-async, require-await -- thin tRPC passthrough */
+/* eslint-disable require-await -- thin tRPC passthrough */
 async function defaultFetchSessionQuery(
   sessionId: KiloSessionId
 ): Promise<SessionWithRuntimeState> {
@@ -126,7 +126,7 @@ async function defaultFetchSessionQuery(
     session_id: sessionId,
   });
 }
-/* eslint-enable @typescript-eslint/promise-function-async, require-await */
+/* eslint-enable require-await */
 
 async function defaultFetchSessionSleep(ms: number): Promise<void> {
   await new Promise<void>(resolve => {
@@ -264,10 +264,9 @@ type CreateMobileAgentSessionManagerOptions = {
   userWebConnection: UserWebConnection;
   organizationId?: string;
   /**
-   * The authenticated owner the resolved-delivery-failure memory is scoped to.
-   * The manager's own persisted transcript cache is gone, so this scope is only
-   * read by that memory; an absent owner skips it rather than writing to a
-   * shared anonymous scope.
+   * The authenticated owner the resolved-delivery-failure and
+   * pending-send-confirmation memories are scoped to. An absent owner skips
+   * them rather than writing to a shared anonymous scope.
    */
   userId?: string;
   /** A session just cloned onto a remote CLI: its first page waits for the synced transcript. */
@@ -502,7 +501,7 @@ export function createMobileAgentSessionManager({
           await trpcClient.cloudAgentNext.sendMessage.mutate(baseInput, skipBatchOptions);
         });
       },
-      /* eslint-disable @typescript-eslint/promise-function-async, require-await -- thin tRPC passthrough */
+      /* eslint-disable require-await -- thin tRPC passthrough */
       cancelQueuedMessage: async input =>
         withCloudAgentDiagnostics('cancelQueuedMessage', organizationId, async () => {
           if (organizationId) {
@@ -516,7 +515,7 @@ export function createMobileAgentSessionManager({
             skipBatchOptions
           );
         }),
-      /* eslint-enable @typescript-eslint/promise-function-async, require-await */
+      /* eslint-enable require-await */
       interrupt: async payload => {
         await withCloudAgentDiagnostics('interrupt', organizationId, async () => {
           if (organizationId) {

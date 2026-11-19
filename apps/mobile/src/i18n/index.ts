@@ -15,9 +15,7 @@ import en from './locales/en.json';
 const lazyCatalogBackend: BackendModule = {
   type: 'backend',
   init: () => undefined,
-  // i18next's backend contract is a callback, not a promise. `require` is
-  // synchronous in Metro, so the callback fires in the same tick and
-  // `changeLanguage` still resolves before the next paint.
+  // i18next's backend contract is a callback, not a promise.
   read: (language: string, _namespace: string, callback: ReadCallback) => {
     if (!isSupportedLanguage(language)) {
       callback(new Error(`unsupported language: ${language}`), false);

@@ -92,6 +92,7 @@ import {
   createDeviceSession,
   issueSessionCredentials,
   createDeviceSessionWithAttestedKey,
+  createDeviceSessionWithCredentials,
   revokeDeviceSession,
 } from '@/lib/auth/device-sessions';
 import {
@@ -125,6 +126,7 @@ const mockPersistAttestedKey = jest.mocked(persistAttestedKey);
 const mockCreateDeviceSession = jest.mocked(createDeviceSession);
 const mockIssueSessionCredentials = jest.mocked(issueSessionCredentials);
 const mockCreateDeviceSessionWithAttestedKey = jest.mocked(createDeviceSessionWithAttestedKey);
+const mockCreateDeviceSessionWithCredentials = jest.mocked(createDeviceSessionWithCredentials);
 const mockIsNativeTokenAddressRateLimited = jest.mocked(isNativeTokenAddressRateLimited);
 const mockIsNativeTokenUserRateLimited = jest.mocked(isNativeTokenUserRateLimited);
 const mockRevokeDeviceSession = jest.mocked(revokeDeviceSession);
@@ -179,6 +181,12 @@ describe('POST /api/auth/native/token', () => {
     mockCreateDeviceSessionWithAttestedKey.mockResolvedValue({
       token: 'short-jwt',
       refreshToken: 'refresh-xyz',
+      expiresIn: 3600,
+      sessionId: 'session-1',
+    });
+    mockCreateDeviceSessionWithCredentials.mockResolvedValue({
+      token: 'session-jwt',
+      refreshToken: 'session-refresh',
       expiresIn: 3600,
       sessionId: 'session-1',
     });
@@ -1974,10 +1982,11 @@ describe('POST /api/auth/native/token', () => {
       });
       mockFindUserById.mockResolvedValue(fakeUser);
       mockCreateDeviceSession.mockResolvedValue('device-session-1');
-      mockIssueSessionCredentials.mockResolvedValue({
+      mockCreateDeviceSessionWithCredentials.mockResolvedValue({
         token: 'session-jwt',
         refreshToken: 'session-refresh',
         expiresIn: 3600,
+        sessionId: 'device-session-1',
       });
     });
 
@@ -1993,11 +2002,13 @@ describe('POST /api/auth/native/token', () => {
       });
       expect(mockConsumeSignInTicket).toHaveBeenCalledWith('ticket-1');
       expect(mockFindUserById).toHaveBeenCalledWith(fakeUser.id);
-      expect(mockCreateDeviceSession).toHaveBeenCalledWith({
+      expect(mockCreateDeviceSessionWithCredentials).toHaveBeenCalledWith({
         userId: fakeUser.id,
         userAgent: undefined,
+        user: fakeUser,
       });
-      expect(mockIssueSessionCredentials).toHaveBeenCalledWith(fakeUser, 'device-session-1');
+      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
       // The ticket is the identity proof: no account settlement.
       expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
       expect(mockPersistAttestedKey).not.toHaveBeenCalled();
@@ -2034,8 +2045,8 @@ describe('POST /api/auth/native/token', () => {
 
       expect(replayed.status).toBe(401);
       expect(await replayed.json()).toEqual({ error: 'INVALID_TICKET' });
-      expect(mockCreateDeviceSession).toHaveBeenCalledTimes(1);
-      expect(mockIssueSessionCredentials).toHaveBeenCalledTimes(1);
+      expect(mockCreateDeviceSessionWithCredentials).toHaveBeenCalledTimes(1);
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
       expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
     });
 

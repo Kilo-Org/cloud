@@ -44,6 +44,7 @@ import {
   createDeviceSession,
   issueSessionCredentials,
   createDeviceSessionWithAttestedKey,
+  createDeviceSessionWithCredentials,
   revokeDeviceSession,
 } from '@/lib/auth/device-sessions';
 import {
@@ -341,16 +342,16 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, user.id);
 
     if (data.supportsRefresh) {
-      const sid = await createDeviceSession({
+      const credentials = await createDeviceSessionWithCredentials({
         userId: user.id,
         userAgent: request.headers.get('user-agent') ?? undefined,
+        user: user,
       });
-      const pair = await issueSessionCredentials(user, sid);
       return NextResponse.json(
         {
-          token: pair.token,
-          refreshToken: pair.refreshToken,
-          expiresIn: pair.expiresIn,
+          token: credentials.token,
+          refreshToken: credentials.refreshToken,
+          expiresIn: credentials.expiresIn,
           created: false,
           ...(pendingLink ? { pendingLink } : {}),
         },
@@ -761,18 +762,21 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
   }
 
   if (data.supportsRefresh) {
-    const sid =
-      sessionId ??
-      (await createDeviceSession({
-        userId: result.user.id,
-        userAgent: request.headers.get('user-agent') ?? undefined,
-      }));
-    const pair = await issueSessionCredentials(result.user, sid);
+    // A session prepared by the attested-key path already has its pair; only a
+    // fall-through from a failed key persistence creates session + pair here.
+    const credentials =
+      sessionId === undefined
+        ? await createDeviceSessionWithCredentials({
+            userId: result.user.id,
+            userAgent: request.headers.get('user-agent') ?? undefined,
+            user: result.user,
+          })
+        : { ...(await issueSessionCredentials(result.user, sessionId)), sessionId };
     return NextResponse.json(
       {
-        token: pair.token,
-        refreshToken: pair.refreshToken,
-        expiresIn: pair.expiresIn,
+        token: credentials.token,
+        refreshToken: credentials.refreshToken,
+        expiresIn: credentials.expiresIn,
         created: result.isNew,
         ...(pendingLink ? { pendingLink } : {}),
       },

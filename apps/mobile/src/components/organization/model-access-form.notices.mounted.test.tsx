@@ -236,7 +236,7 @@ describe('ModelAccessForm read-only notice', () => {
 });
 
 describe('ModelAccessForm lapsed-plan controls', () => {
-  it('paints the plan-ended sentence as a warning banner above the segments', () => {
+  it('paints the plan-ended sentence as a warning banner under the segments', () => {
     const root = render({ canEdit: true, planEnded: true });
     const copy = appI18n.t('common.organizationTrialEnded');
 
@@ -270,7 +270,7 @@ describe('ModelAccessForm lapsed-plan controls', () => {
     ).toHaveLength(0);
   });
 
-  it('paints the plan-ended sentence once, in the notice above the segments', () => {
+  it('paints the plan-ended sentence once, in the notice under the segments', () => {
     const root = render({ canEdit: true, planEnded: true });
     const copy = renderedCopy(root);
 

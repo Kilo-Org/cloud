@@ -212,7 +212,7 @@ export function ModelAccessForm({
   // A hard-expired trial refuses every organization mutation on the server, so
   // the form states the blocker on its own controls instead of letting an
   // owner or admin build a draft only to collect the refusal — the same shape
-  // as the hub's blocked rename control. The notice above the segments is the
+  // as the hub's blocked rename control. The notice under the segments is the
   // one place the reason is painted; the status line stays clear because no
   // edit is possible while the gate holds.
   const cannotSave = planEnded || !dirty || saving || savePayload.kind !== 'ready';
@@ -310,7 +310,8 @@ export function ModelAccessForm({
         />
         {/* The lapsed plan blocks every edit on this screen, so its sentence is
             a warning banner rather than helper-sized muted copy: the mark and
-            the tint separate it from the segments' labels below. */}
+            the tint separate it from the helper caption under it, and from the
+            segments' labels just above it. */}
         {planEnded ? (
           <View className="flex-row items-start gap-2 rounded-xl border border-warn-tile-border bg-warn-tile-bg px-3 py-2">
             <AlertTriangle size={16} color={colors.warn} />

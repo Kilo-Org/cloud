@@ -1016,15 +1016,22 @@ describe('organizations trpc router', () => {
         mockIsClaudeOperatorConfigured.mockReturnValue(true);
         profileOrganization = await createOrganization('Profile Rename Org', regularUser.id);
         subOrganization = await createOrganization('Profile Rename Sub Org', regularUser.id);
+        // `regularUser` already created organizations in earlier cases, so these
+        // two are created without a trial window. The rename path is gated on an
+        // active trial or subscription, and this fixture tests the profile sync,
+        // not the gate: store an explicit window, which the classifier honors on
+        // its own.
+        const trialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
         await db
           .update(organizations)
-          .set({ anthropic_user_profile_id: 'uprof_rename' })
+          .set({ anthropic_user_profile_id: 'uprof_rename', free_trial_end_at: trialEnd })
           .where(eq(organizations.id, profileOrganization.id));
         await db
           .update(organizations)
           .set({
             parent_organization_id: profileOrganization.id,
             anthropic_user_profile_id: 'uprof_rename',
+            free_trial_end_at: trialEnd,
           })
           .where(eq(organizations.id, subOrganization.id));
       });

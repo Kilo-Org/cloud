@@ -15,7 +15,7 @@ const mockListCatalogModels = jest.fn(async (providerId: string) => {
         { catalogModelId: 'example/not-in-snapshot', model: {} },
         { catalogModelId: 'z-ai/glm-5.2', model: {} },
       ];
-    case 'martian':
+    case 'orcarouter':
       throw new Error('models.dev unavailable');
     default:
       return [];
@@ -98,7 +98,7 @@ describe('injectDirectByokProviders', () => {
     );
 
     expect(slugs.filter(slug => slug === 'edenai')).toHaveLength(1);
-    expect(slugs).not.toContain('martian');
+    expect(slugs).not.toContain('orcarouter');
     expect(slugs).not.toContain('neuralwatt');
     expect(slugs).not.toContain('zai-coding');
   });

@@ -1,5 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
+import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
@@ -7,6 +8,7 @@ import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations
 import { BitbucketConnectForm } from '@/components/code-reviewer/bitbucket-connect-form';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
+import { useMetadataLeaveGuard } from '@/components/profiles/use-metadata-leave-guard';
 import { QueryError } from '@/components/query-error';
 import { SheetHeader } from '@/components/sheet-header';
 import { SheetScrollView } from '@/components/tab-screen';
@@ -28,17 +30,42 @@ import { isPermissionDeniedError, trpcErrorVariant } from '@/lib/trpc-error';
  * instead of connecting twice, which the server refuses.
  */
 export function BitbucketConnectSheet({ scope }: Readonly<{ scope: string | undefined }>) {
-  // Without a scope there is no organization to name, and the boundary explains
-  // which selection is missing instead of leaving the sheet blank.
-  if (scope === undefined) {
-    return <OrganizationBoundary />;
-  }
-  return <ScopedBitbucketConnectSheet scope={scope} />;
+  const router = useRouter();
+  const { t } = useTranslation();
+  // The route is a full-window modal on Android and a formSheet on iOS, so the
+  // surface reaches the window top there and the header clears the status bar
+  // itself; the native sheet presents below it and the header reserves nothing.
+  return (
+    <>
+      {/* Without a scope there is no organization to name, and the boundary
+          explains which selection is missing instead of leaving the sheet
+          blank. It still needs the close control, because this branch renders
+          before any scope-dependent state exists. */}
+      {scope === undefined ? (
+        <>
+          <SheetHeader
+            title={t('agentChat.repoPicker.platformBitbucket')}
+            variant="close"
+            topInset="android-window-top"
+            onDone={() => {
+              router.back();
+            }}
+          />
+          <OrganizationBoundary />
+        </>
+      ) : (
+        <ScopedBitbucketConnectSheet scope={scope} />
+      )}
+    </>
+  );
 }
 
 function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const { t } = useTranslation();
+  // The token field is the sheet's only draft, and the header close control,
+  // the Android Back and the back gesture would drop whatever is typed in it.
+  const guard = useMetadataLeaveGuard({ enabled: true });
   const { role, org, isResolving, isError } = useOrgBoundary(scope);
   const readiness = useBitbucketReadiness(scope);
   // The readiness read describes workspace access tokens only, so this is what
@@ -76,25 +103,12 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     }
   }
 
-  // The sheet's own header is the shared one: the title stays pinned above the
-  // scroll body, and Close is the way out. The route is pushed over another
-  // screen, so the sheet settles a detent below the window top and the header
-  // reserves no clearance of its own.
-  const header = (
-    <SheetHeader
-      title={title}
-      onDone={() => {
-        router.back();
-      }}
-      doneLabel={t('common.close')}
-      topInset="never"
-    />
-  );
-
-  if (isResolving || readiness.isPending || status.isPending) {
-    return (
-      <>
-        {header}
+  // One body per state, so the guard's confirmation renders beside all of them:
+  // a read that answers while a token is typed can replace the form with an
+  // error, and a Back there must still find a prompt to answer.
+  const renderBody = (): ReactNode => {
+    if (isResolving || readiness.isPending || status.isPending) {
+      return (
         <SheetScrollView
           className="flex-1 bg-background"
           contentContainerClassName={SCREEN_BODY_CLASS}
@@ -111,88 +125,67 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
           </View>
           <Skeleton className="h-11 rounded-md" />
         </SheetScrollView>
-      </>
-    );
-  }
+      );
+    }
 
-  if (isError || org == null) {
-    return <OrganizationBoundary organizationIdOverride={scope} />;
-  }
+    if (isError || org == null) {
+      return <OrganizationBoundary organizationIdOverride={scope} />;
+    }
 
-  // An unanswered status read is not "no integration": it is the only read
-  // that can name a Bitbucket OAuth connection, so a failure asks again
-  // instead of offering a token form the server would refuse.
-  if (status.isError && status.data == null) {
-    return (
-      <>
-        {header}
-        {isPermissionDeniedError(status.error) ? (
-          <PermissionDenied
-            description={t('prReview.connect.bitbucketAdminOnlyDescription')}
-            showBack={false}
-          />
-        ) : (
-          <QueryError
-            className="bg-background"
-            variant={trpcErrorVariant(status.error)}
-            onRetry={() => void status.refetch()}
-            isRetrying={status.isFetching}
-          />
-        )}
-      </>
-    );
-  }
+    // An unanswered status read is not "no integration": it is the only read
+    // that can name a Bitbucket OAuth connection, so a failure asks again
+    // instead of offering a token form the server would refuse.
+    if (status.isError && status.data == null) {
+      return isPermissionDeniedError(status.error) ? (
+        <PermissionDenied
+          description={t('prReview.connect.bitbucketAdminOnlyDescription')}
+          showBack={false}
+        />
+      ) : (
+        <QueryError
+          className="bg-background"
+          variant={trpcErrorVariant(status.error)}
+          onRetry={() => void status.refetch()}
+          isRetrying={status.isFetching}
+        />
+      );
+    }
 
-  if (readiness.isError && readiness.data == null) {
-    return (
-      <>
-        {header}
-        {isPermissionDeniedError(readiness.error) ? (
-          <PermissionDenied
-            description={t('prReview.connect.bitbucketAdminOnlyDescription')}
-            showBack={false}
-          />
-        ) : (
-          <QueryError
-            className="bg-background"
-            variant={trpcErrorVariant(readiness.error)}
-            onRetry={() => void readiness.refetch()}
-            isRetrying={readiness.isFetching}
-          />
-        )}
-      </>
-    );
-  }
+    if (readiness.isError && readiness.data == null) {
+      return isPermissionDeniedError(readiness.error) ? (
+        <PermissionDenied
+          description={t('prReview.connect.bitbucketAdminOnlyDescription')}
+          showBack={false}
+        />
+      ) : (
+        <QueryError
+          className="bg-background"
+          variant={trpcErrorVariant(readiness.error)}
+          onRetry={() => void readiness.refetch()}
+          isRetrying={readiness.isFetching}
+        />
+      );
+    }
 
-  if (!canManage) {
-    return (
-      <>
-        {header}
-        <PermissionDenied description={deniedDescription} showBack={false} />
-      </>
-    );
-  }
+    if (!canManage) {
+      return <PermissionDenied description={deniedDescription} showBack={false} />;
+    }
 
-  // The connect mutation refuses a second Bitbucket integration for the same
-  // organization, and a Bitbucket OAuth connection can only be changed on the
-  // web page that runs its callback — which the app may not link to, so the
-  // sheet states where the connection is managed and offers no action.
-  if (managesExisting) {
-    return (
-      <>
-        {header}
+    // The connect mutation refuses a second Bitbucket integration for the same
+    // organization, and a Bitbucket OAuth connection can only be changed on the
+    // web page that runs its callback — which the app may not link to, so the
+    // sheet states where the connection is managed and offers no action.
+    if (managesExisting) {
+      return (
         <View className="px-4 pt-3">
           <Text variant="muted" className="text-sm">
             {t('codeReviewer.bitbucketConnect.managedOnWeb')}
           </Text>
         </View>
-      </>
-    );
-  }
+      );
+    }
 
-  return (
-    <>
-      {header}
+    return (
       <SheetScrollView
         className="flex-1 bg-background"
         contentContainerClassName={SCREEN_BODY_CLASS}
@@ -202,13 +195,36 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
         <BitbucketConnectForm
           scope={scope}
           integrationId={integrationId}
+          onDirtyChange={guard.handleDirtyChange}
           onConnected={() => {
             notificationHaptic(Haptics.NotificationFeedbackType.Success);
             announcingToast.success(t('common.bitbucketConnected'));
-            router.back();
+            // The token was accepted, so there is no draft left to confirm.
+            guard.leaveWithoutAsking(() => {
+              router.back();
+            });
           }}
         />
       </SheetScrollView>
+    );
+  };
+
+  return (
+    <>
+      {/* The sheet's own header is the shared one: the title stays pinned above
+          the scroll body in every state, and the X is the modal's one visible
+          dismissal. It dispatches the same route removal Back does, so the
+          leave guard answers it while a token is typed. */}
+      <SheetHeader
+        title={title}
+        variant="close"
+        topInset="android-window-top"
+        onDone={() => {
+          router.back();
+        }}
+      />
+      {renderBody()}
+      {guard.dialog}
     </>
   );
 }

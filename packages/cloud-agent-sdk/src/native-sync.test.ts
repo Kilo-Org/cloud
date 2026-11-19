@@ -2072,16 +2072,19 @@ test('an unresolved private asset keeps the notice and starts recovery', async (
   connectedSocket().frame('hello', hello(), 3);
   await flush();
   if (!state) throw new Error('Missing native state');
-  // The shared projection already reports the unresolved reference as an incomplete message.
-  expect(readNativeConversation(state).error).toContain('recovery is incomplete');
+  expect(state.error).toBeUndefined();
   // No pending identity names this message, yet the unresolved asset is a gap, so recovery
   // reads the canonical snapshot that can authorize its bytes.
   await jest.advanceTimersByTimeAsync(250);
   await flush();
   expect(snapshot.mock.calls.length).toBeGreaterThan(1);
+  // A published failure stays visible through `subscribed` while the transcript is still gapped.
+  connectedSocket().frame('error', { code: 'Session command failed' });
+  await flush();
+  expect(state.error).toBe('Session command failed');
   connectedSocket().frame('subscribed', { seq: 6 }, 6);
   await flush();
-  expect(readNativeConversation(state).error).toContain('recovery is incomplete');
+  expect(state.error).toBe('Session command failed');
   snapshot.mockResolvedValueOnce({
     position: 6,
     revision: 3,

@@ -876,7 +876,8 @@ export class NativeSyncClient {
           ? SNAPSHOT_FAILURE_LIMIT
           : snapshotFailures + 1;
       if (snapshotFailures < SNAPSHOT_FAILURE_LIMIT) return undefined;
-      const message = `Native transcript is unavailable: ${reason(error)} Refresh to retry.`;
+      const cause = reason(error);
+      const message = `Native transcript is unavailable: ${/[.!?]$/.test(cause) ? cause : `${cause}.`} Refresh to retry.`;
       snapshotFailure = message;
       integrityError = undefined;
       publish({ snapshotFailure: { error: message }, error: message });

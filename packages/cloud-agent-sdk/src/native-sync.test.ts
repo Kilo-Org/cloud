@@ -861,7 +861,9 @@ test('an unreadable native asset latches on the first snapshot read', async () =
   connectedSocket().frame('hello', hello());
   await flush();
   expect(state?.connection).toBe('disconnected');
-  expect(state?.snapshotFailure?.error).toContain('asset file is not readable');
+  expect(state?.snapshotFailure?.error).toBe(
+    'Native transcript is unavailable: asset file is not readable. Refresh to retry.'
+  );
   expect(snapshot).toHaveBeenCalledTimes(1);
   await jest.advanceTimersByTimeAsync(120_000);
   await flush();

@@ -12,6 +12,7 @@ import { useListDirectories, type UseListDirectoriesResult } from './use-list-di
 
 const connection = vi.hoisted(() => ({
   isConnected: () => false,
+  isSocketOpen: () => false,
   retryConnection: () => undefined,
 }));
 

@@ -89,6 +89,14 @@ type UserWebConnection = {
    */
   isConnected: () => boolean;
   /**
+   * Returns whether the current viewer socket's `readyState` is `OPEN`. Read
+   * live from the socket the base connection holds now, so it turns false on
+   * `null` and every non-OPEN state. Independent of `isConnected`, which waits
+   * for the first parsed inbound message: a socket that is OPEN but has not
+   * delivered that message yet is a working transport.
+   */
+  isSocketOpen: () => boolean;
+  /**
    * Subscribes to transport-readiness transitions. The listener fires only
    * when the boolean value actually changes. The returned function
    * unsubscribes. Safe to call on a destroyed connection: the listener is
@@ -720,6 +728,7 @@ function createUserWebConnection(
       exhaustionSignal.clear();
     },
     isConnected: connectionSignal.get,
+    isSocketOpen: () => currentWs !== null && currentWs.readyState === WebSocket.OPEN,
     onConnectionChange(listener) {
       if (destroyed) return () => {};
       return connectionSignal.subscribe(listener);

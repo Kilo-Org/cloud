@@ -2082,6 +2082,28 @@ describe('createUserWebConnection connection-state API', () => {
     client.destroy();
   });
 
+  it('reports socket readiness before the first inbound message and after close', () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+
+    expect(client.isSocketOpen()).toBe(false);
+    expect(client.isConnected()).toBe(false);
+
+    client.retain();
+    open();
+    // The socket is OPEN but no inbound frame has been parsed yet: the
+    // transport works, the message-level readiness has not flipped.
+    expect(client.isSocketOpen()).toBe(true);
+    expect(client.isConnected()).toBe(false);
+
+    inbound({ type: 'system', event: 'sessions.list', data: { sessions: [] } });
+    expect(client.isConnected()).toBe(true);
+
+    sockets[0].onclose?.({ code: 1006 } as CloseEvent);
+    expect(client.isSocketOpen()).toBe(false);
+
+    client.destroy();
+  });
+
   it('covers a release-then-retain transition (true → release-all → false → retain → true)', () => {
     const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
     const listener = jest.fn();

@@ -13,10 +13,15 @@ import { useListDirectories, type UseListDirectoriesResult } from './use-list-di
 
 const connection = vi.hoisted(() => {
   let connected = false;
+  let socketOpen = false;
   return {
     isConnected: vi.fn(() => connected),
     setConnected: (next: boolean) => {
       connected = next;
+    },
+    isSocketOpen: vi.fn(() => socketOpen),
+    setSocketOpen: (next: boolean) => {
+      socketOpen = next;
     },
     retryConnection: vi.fn(),
   };
@@ -84,6 +89,7 @@ describe('useListDirectories transport failures, nudges and retry pacing', () =>
     // The picker only lists over a live transport; a rebuilding one is the
     // exception, and the tests below that exercise it disconnect explicitly.
     connection.setConnected(true);
+    connection.setSocketOpen(true);
   });
 
   it('resets a transport failure to the skeleton on retry, then recovers', async () => {
@@ -132,6 +138,7 @@ describe('useListDirectories transport failures, nudges and retry pacing', () =>
 
     // The socket dropped while the sheet sat on the error.
     connection.setConnected(false);
+    connection.setSocketOpen(false);
     act(() => {
       api().list('src');
     });
@@ -153,6 +160,7 @@ describe('useListDirectories transport failures, nudges and retry pacing', () =>
     const { api, unmount } = await mount('conn-1');
 
     connection.setConnected(false);
+    connection.setSocketOpen(false);
     act(() => {
       api().list('src');
     });
@@ -162,6 +170,25 @@ describe('useListDirectories transport failures, nudges and retry pacing', () =>
     // End the attempt with a listing rather than a failure: a failure would put
     // the loop's next paced send on the timers of whatever test runs next.
     send.resolve({ ok: true, path: 'src', directories: [server] });
+    unmount();
+  });
+
+  it('leaves alone an open socket that has not delivered its first message', async () => {
+    // `isConnected` waits for the first parsed inbound frame, so a socket that
+    // is OPEN but has not delivered it yet looks disconnected. It is a working
+    // transport, and nudging it would replace the socket and reject the
+    // commands sharing the connection.
+    listFn.mockResolvedValue({ ok: true, path: 'src', directories: [server] });
+    const { api, unmount } = await mount('conn-1');
+
+    connection.setConnected(false);
+    connection.setSocketOpen(true);
+    act(() => {
+      api().list('src');
+    });
+    await waitForRealTimers(() => api().state?.phase === 'ready');
+    expect(api().state).toEqual({ phase: 'ready', path: 'src', directories: [server] });
+    expect(connection.retryConnection).not.toHaveBeenCalled();
     unmount();
   });
 

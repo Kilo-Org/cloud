@@ -3804,6 +3804,8 @@
       "fieldName": "Igama eliboniswayo",
       "fieldUrl": "URL yeseva",
       "fieldUrlInvalid": "Faka i-URL yeseva evumelekile.",
+      "duplicateUrl": "Le-URL ilondoloziwe kudala.",
+      "serverNotFound": "Iseva ayisalondoloziwe.",
       "enableServer": "Nika amandla le seve: {{name}}",
       "editServer": "Hlela iseva",
       "deleteServer": "Susa iseva",

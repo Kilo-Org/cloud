@@ -1415,6 +1415,7 @@ export const webhookTriggersRouter = createTRPCRouter({
         triggerId: triggerIdSchema,
         organizationId: z.string().uuid().optional(),
         limit: z.number().min(1).max(100).default(50),
+        includeLegacySessionIds: z.boolean().default(false),
       })
     )
     .query(async ({ ctx, input }): Promise<EnrichedCapturedRequest[]> => {
@@ -1449,12 +1450,15 @@ export const webhookTriggersRouter = createTRPCRouter({
         });
       }
 
-      // Enrich requests with kiloSessionId by looking up cloudAgentSessionId in cli_sessions
+      // The mobile app, which shares this procedure, can open only cli_sessions_v2
+      // sessions; a viewer that also opens legacy v1 sessions passes includeLegacySessionIds.
       const cloudAgentSessionIds = result.requests
         .map(r => r.cloudAgentSessionId)
         .filter((id): id is string => id !== null);
 
-      const sessionIdMap = await resolveCloudAgentSessionIds(cloudAgentSessionIds);
+      const sessionIdMap = await resolveCloudAgentSessionIds(cloudAgentSessionIds, {
+        includeLegacyV1: input.includeLegacySessionIds,
+      });
 
       return result.requests.map(request => ({
         ...request,

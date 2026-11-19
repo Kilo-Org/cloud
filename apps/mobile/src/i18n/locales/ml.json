@@ -3804,6 +3804,8 @@
       "fieldName": "പ്രദർശിപ്പിക്കുന്ന പേര്",
       "fieldUrl": "സെർവർ URL",
       "fieldUrlInvalid": "സാധുവായ സെർവർ URL നൽകുക.",
+      "duplicateUrl": "ആ സെർവർ URL ഇതിനകം സംരക്ഷിച്ചിട്ടുണ്ട്.",
+      "serverNotFound": "ഈ സെർവർ ഇനി സംരക്ഷിച്ചിട്ടില്ല.",
       "enableServer": "ഈ സെർവർ പ്രവർത്തനക്ഷമമാക്കുക: {{name}}",
       "editServer": "സെർവർ എഡിറ്റ് ചെയ്യുക",
       "deleteServer": "സെർവർ ഇല്ലാതാക്കുക",

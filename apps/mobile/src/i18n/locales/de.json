@@ -3804,6 +3804,8 @@
       "fieldName": "Anzeigename",
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Gib eine gültige Server-URL ein.",
+      "duplicateUrl": "Diese URL ist bereits gespeichert.",
+      "serverNotFound": "Dieser Server ist nicht mehr gespeichert.",
       "enableServer": "Diesen Server aktivieren: {{name}}",
       "editServer": "Server bearbeiten",
       "deleteServer": "Server löschen",

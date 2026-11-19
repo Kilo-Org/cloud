@@ -3804,6 +3804,8 @@
       "fieldName": "ნაჩვენები სახელი",
       "fieldUrl": "სერვერის URL",
       "fieldUrlInvalid": "შეიყვანეთ სერვერის სწორი URL.",
+      "duplicateUrl": "ეს URL უკვე შენახულია.",
+      "serverNotFound": "ეს სერვერი აღარ არის შენახული.",
       "enableServer": "ამ სერვერის ჩართვა: {{name}}",
       "editServer": "სერვერის რედაქტირება",
       "deleteServer": "სერვერის წაშლა",

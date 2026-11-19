@@ -3864,6 +3864,8 @@
       "fieldName": "Prikazani naziv",
       "fieldUrl": "URL poslužitelja",
       "fieldUrlInvalid": "Unesite važeći URL poslužitelja.",
+      "duplicateUrl": "Taj URL je već spremljen.",
+      "serverNotFound": "Ovaj poslužitelj više nije spremljen.",
       "enableServer": "Omogući ovaj poslužitelj: {{name}}",
       "editServer": "Uredi poslužitelj",
       "deleteServer": "Izbriši poslužitelj",

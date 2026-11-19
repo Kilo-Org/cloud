@@ -3804,6 +3804,8 @@
       "fieldName": "Ցուցադրվող անուն",
       "fieldUrl": "Սերվերի URL",
       "fieldUrlInvalid": "Մուտքագրեք սերվերի վավեր URL։",
+      "duplicateUrl": "Այս URL-ն արդեն պահված է։",
+      "serverNotFound": "Այս սերվերն այլևս պահված չէ։",
       "enableServer": "Միացնել այս սերվերը: {{name}}",
       "editServer": "Խմբագրել սերվերը",
       "deleteServer": "Ջնջել սերվերը",

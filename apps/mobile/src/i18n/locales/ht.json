@@ -3804,6 +3804,8 @@
       "fieldName": "Non ki parèt",
       "fieldUrl": "URL sèvè a",
       "fieldUrlInvalid": "Antre yon URL sèvè ki valab.",
+      "duplicateUrl": "URL sa a deja anrejistre.",
+      "serverNotFound": "Sèvè sa a pa anrejistre ankò.",
       "enableServer": "Aktive sèvè sa a: {{name}}",
       "editServer": "Modifye sèvè a",
       "deleteServer": "Efase sèvè a",

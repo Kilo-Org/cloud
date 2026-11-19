@@ -2504,8 +2504,8 @@
       "reportAiResponseFailedTerminal": "ناتوانرێت ئەم وەڵامە ڕاپۆرت بکرێت."
     },
     "modelCost": {
-      "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "lessThan": "کەمتر لە {{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} بۆ هەر {{million}} {{tokens}}"
     },
     "partDetail": {
       "detailsUnavailable": "وردەکارییەکان بەردەست نین.",
@@ -3804,6 +3804,8 @@
       "fieldName": "ناوی پیشاندراو",
       "fieldUrl": "URL ی سێرڤەر",
       "fieldUrlInvalid": "URLی سێرڤەری دروست بنووسە.",
+      "duplicateUrl": "ئەم URLە پێشتر پاشەکەوت کراوە.",
+      "serverNotFound": "ئەم سێرڤەرە چیتر پاشەکەوت نەکراوە.",
       "enableServer": "چالاککردنی ئەم سێرڤەرە: {{name}}",
       "editServer": "دەستکاریکردنی سێرڤەر",
       "deleteServer": "سڕینەوەی سێرڤەر",

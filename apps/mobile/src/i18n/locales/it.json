@@ -3864,6 +3864,8 @@
       "fieldName": "Nome visualizzato",
       "fieldUrl": "URL del server",
       "fieldUrlInvalid": "Inserisci un URL del server valido.",
+      "duplicateUrl": "Questo URL è già salvato.",
+      "serverNotFound": "Questo server non è più salvato.",
       "enableServer": "Attiva questo server: {{name}}",
       "editServer": "Modifica server",
       "deleteServer": "Elimina server",

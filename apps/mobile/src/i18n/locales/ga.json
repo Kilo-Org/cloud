@@ -3984,6 +3984,8 @@
       "fieldName": "Ainm taispeána",
       "fieldUrl": "URL an fhreastalaí",
       "fieldUrlInvalid": "Cuir URL bailí freastalaí isteach.",
+      "duplicateUrl": "Tá an URL sin sábháilte cheana féin.",
+      "serverNotFound": "Níl an freastalaí seo sábháilte a thuilleadh.",
       "enableServer": "Cumasaigh an freastalaí seo: {{name}}",
       "editServer": "Cuir an freastalaí in eagar",
       "deleteServer": "Scrios an freastalaí",

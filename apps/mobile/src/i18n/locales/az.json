@@ -3804,6 +3804,8 @@
       "fieldName": "Göstərilən ad",
       "fieldUrl": "Server URL-i",
       "fieldUrlInvalid": "Etibarlı server URL-i daxil edin.",
+      "duplicateUrl": "Bu URL artıq yadda saxlanılıb.",
+      "serverNotFound": "Bu server artıq yadda saxlanılmır.",
       "enableServer": "Bu serveri aktiv et: {{name}}",
       "editServer": "Serveri redaktə et",
       "deleteServer": "Serveri sil",

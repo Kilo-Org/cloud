@@ -3804,6 +3804,8 @@
       "fieldName": "ຊື່ທີ່ສະແດງ",
       "fieldUrl": "URL ຂອງເຊີບເວີ",
       "fieldUrlInvalid": "ປ້ອນ URL ຂອງເຊີບເວີທີ່ຖືກຕ້ອງ.",
+      "duplicateUrl": "URL ນີ້ຖືກບັນທຶກໄວ້ແລ້ວ.",
+      "serverNotFound": "ເຊີບເວີນີ້ບໍ່ຖືກບັນທຶກໄວ້ອີກແລ້ວ.",
       "enableServer": "ເປີດນຳໃຊ້ເຊີບເວີນີ້: {{name}}",
       "editServer": "ແກ້ໄຂເຊີບເວີ",
       "deleteServer": "ລຶບເຊີບເວີ",

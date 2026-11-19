@@ -4044,6 +4044,8 @@
       "fieldName": "Enw dangos",
       "fieldUrl": "URL gweinydd",
       "fieldUrlInvalid": "Rhowch URL gweinydd dilys.",
+      "duplicateUrl": "Mae'r URL hwnnw eisoes wedi'i gadw.",
+      "serverNotFound": "Nid yw'r gweinydd hwn wedi'i gadw mwyach.",
       "enableServer": "Galluogi'r gweinydd hwn: {{name}}",
       "editServer": "Golygu gweinydd",
       "deleteServer": "Dileu gweinydd",

@@ -3804,6 +3804,8 @@
       "fieldName": "Pangalang ipinapakita",
       "fieldUrl": "URL ng server",
       "fieldUrlInvalid": "Maglagay ng valid na URL ng server.",
+      "duplicateUrl": "Naka-save na ang URL na iyon.",
+      "serverNotFound": "Hindi na naka-save ang server na ito.",
       "enableServer": "Paganahin ang server na ito: {{name}}",
       "editServer": "I-edit ang server",
       "deleteServer": "Burahin ang server",

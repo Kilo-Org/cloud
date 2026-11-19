@@ -3804,6 +3804,8 @@
       "fieldName": "Emri i shfaqur",
       "fieldUrl": "URL-ja e serverit",
       "fieldUrlInvalid": "Fut një URL të vlefshme serveri.",
+      "duplicateUrl": "Kjo URL është tashmë e ruajtur.",
+      "serverNotFound": "Ky server nuk është më i ruajtur.",
       "enableServer": "Aktivizo këtë server: {{name}}",
       "editServer": "Modifiko serverin",
       "deleteServer": "Fshi serverin",

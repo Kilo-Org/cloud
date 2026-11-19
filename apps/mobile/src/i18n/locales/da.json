@@ -3804,6 +3804,8 @@
       "fieldName": "Vist navn",
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Indtast en gyldig server-URL.",
+      "duplicateUrl": "Denne URL er allerede gemt.",
+      "serverNotFound": "Denne server er ikke længere gemt.",
       "enableServer": "Aktivér denne server: {{name}}",
       "editServer": "Rediger server",
       "deleteServer": "Slet server",

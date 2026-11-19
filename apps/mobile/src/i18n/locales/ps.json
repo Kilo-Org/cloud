@@ -2504,8 +2504,8 @@
       "reportAiResponseFailedTerminal": "د دې ځواب راپور نه شي ورکول کېدای."
     },
     "modelCost": {
-      "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "lessThan": "له {{amount}} څخه کم",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} هر {{million}} {{tokens}}"
     },
     "partDetail": {
       "detailsUnavailable": "جزیات د لاسرسي وړ نه دي.",
@@ -3804,6 +3804,8 @@
       "fieldName": "ښکارېدونکی نوم",
       "fieldUrl": "د سرور URL",
       "fieldUrlInvalid": "د سرور سم URL ولیکئ.",
+      "duplicateUrl": "دا URL لا دمخه خوندي دی.",
+      "serverNotFound": "دا سرور نور خوندي نه دی.",
       "enableServer": "دا سرور فعال کړئ: {{name}}",
       "editServer": "سرور سم کړئ",
       "deleteServer": "سرور ړنګ کړئ",

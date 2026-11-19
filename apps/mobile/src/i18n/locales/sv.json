@@ -3804,6 +3804,8 @@
       "fieldName": "Visningsnamn",
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Ange en giltig server-URL.",
+      "duplicateUrl": "Den här URL:en är redan sparad.",
+      "serverNotFound": "Den här servern är inte längre sparad.",
       "enableServer": "Aktivera denna server: {{name}}",
       "editServer": "Redigera server",
       "deleteServer": "Ta bort server",

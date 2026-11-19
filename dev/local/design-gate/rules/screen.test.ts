@@ -49,12 +49,50 @@ test('clipped: non-text overflow is a warning and descendants are not repeated',
   );
 });
 
-test('clipped: padding shrinks the content box', () => {
+test('clipped: padding shrinks the content box of a parent that clips', () => {
   const findings = run('clipped', [
-    { parent: 0, tag: 'View', rect: [0, 0, 100, 40], style: { paddingHorizontal: 10 } },
+    {
+      parent: 0,
+      tag: 'View',
+      rect: [0, 0, 100, 40],
+      style: { overflow: 'hidden', paddingHorizontal: 10 },
+    },
     { parent: 1, tag: 'Paragraph', rect: [0, 0, 100, 40], text: 'x' },
   ]);
   assert.equal(findings[0]?.measured, 10);
+});
+
+test('clipped: a parent that does not clip is measured by its border box', () => {
+  // An iOS tab button: 5 pt padding, a 28 pt icon, and a 14.33 pt label line
+  // box that ends 2.33 pt into the bottom padding. The label's ink stays inside
+  // the button, and nothing clips it.
+  const tab = (labelHeight: number) =>
+    run(
+      'clipped',
+      [
+        {
+          parent: 0,
+          tag: 'View',
+          rect: [301.67, 790, 100.33, 50],
+          style: { alignItems: 'center', flexDirection: 'column', padding: 5 },
+        },
+        { parent: 1, tag: 'View', rect: [336.33, 795, 31, 28] },
+        {
+          parent: 1,
+          tag: 'Paragraph',
+          rect: [306.67, 823, 90.67, labelHeight],
+          text: 'Profile',
+        },
+      ],
+      { platform: 'ios', window: { width: 402, height: 874 } }
+    );
+  assert.deepEqual(tab(14.33), []);
+  // Past the border box the label leaves the button, and that is still reported.
+  const [finding, ...rest] = tab(19.5);
+  assert.equal(rest.length, 0);
+  assert.equal(finding?.severity, 'error');
+  assert.equal(Math.round((finding?.measured ?? 0) * 10) / 10, 2.5);
+  assert.match(finding?.message ?? '', /beyond the border box of its parent/);
 });
 
 test('clipped: scroll content and absolute children are not clipped', () => {
@@ -109,14 +147,14 @@ test('clipped: real overflow still reports with transform-free frames', () => {
   assert.equal(findings[0]?.measured, 100);
 });
 
-test('clipped: a transformed parent keeps its own padding in the transform-free space', () => {
+test('clipped: a transformed clipping parent keeps its own padding in the transform-free space', () => {
   const findings = run('clipped', [
     {
       parent: 0,
       tag: 'View',
       rect: [0, 60, 400, 200],
       layoutRect: [0, 0, 400, 200],
-      style: { paddingHorizontal: 16 },
+      style: { overflow: 'hidden', paddingHorizontal: 16 },
     },
     {
       parent: 1,
@@ -145,6 +183,19 @@ test('cut-off: past the window edge, tolerance, horizontal scroll', () => {
     ]),
     []
   );
+});
+
+test('cut-off: an iOS keyboard accessory placeholder is not measured', () => {
+  // The instructions editor's "Done" bar: absolute in the app tree at x 14 with
+  // the window's width, painted only in the keyboard's accessory window.
+  const bar = (tag: string): ProbeNode[] => [
+    { parent: 0, tag, rect: [14, 139.33, 402, 45.67], style: { position: 'absolute' } },
+    { parent: 1, tag: 'View', rect: [14, 139.33, 402, 45.67], style: { flexDirection: 'row' } },
+    { parent: 2, tag: 'Paragraph', rect: [360, 151, 40, 21], text: 'Done' },
+  ];
+  const ios = { platform: 'ios', window: { width: 402, height: 874 } };
+  assert.deepEqual(run('cut-off', bar('InputAccessoryView'), ios), []);
+  assert.equal(run('cut-off', bar('View'), ios)[0]?.measured, 14);
 });
 
 test('touch-overlap: intersecting pressables, tolerance, containment', () => {
@@ -299,6 +350,101 @@ test('row-misaligned: an icon on the first line of a stacked text block is not a
   );
 });
 
+const IOS_26: Partial<ProbeEnv> = {
+  platform: 'ios',
+  osVersion: '26.5',
+  window: { width: 402, height: 874 },
+};
+
+/** An instruction row: an iOS switch in a 44 pt frame beside a 32 pt trash button. */
+function switchAndIcon(switchY: number): ProbeNode[] {
+  return [
+    {
+      parent: 0,
+      tag: 'View',
+      rect: [261.67, 170, 112.33, 32],
+      style: { alignItems: 'center', flexDirection: 'row' },
+    },
+    {
+      parent: 1,
+      tag: 'Switch',
+      role: 'switch',
+      rect: [261.67, switchY, 63, 44],
+      style: { alignSelf: 'flex-start' },
+    },
+    { parent: 1, tag: 'View', rect: [342.33, 170, 32, 32], pressable: true },
+  ];
+}
+
+test('row-misaligned: an iOS switch is measured by the track it paints', () => {
+  // UISwitch paints its 28 pt track at the top of the 44 pt frame, so the track
+  // center is 175.33 while the trash button's is 186.
+  const [finding, ...rest] = run('row-misaligned', switchAndIcon(161.33), IOS_26);
+  assert.equal(rest.length, 0);
+  assert.equal(Math.round((finding?.measured ?? 0) * 100) / 100, 10.67);
+  assert.deepEqual(
+    finding?.related?.map(ref => ref.index),
+    [2, 3]
+  );
+  // Before iOS 26 the track is 31 pt.
+  const legacy = run('row-misaligned', switchAndIcon(161.33), { ...IOS_26, osVersion: '18.4' });
+  assert.equal(Math.round((legacy[0]?.measured ?? 0) * 100) / 100, 9.17);
+  // Android centers its track in the frame, so the frame's center is the track's.
+  assert.deepEqual(
+    run('row-misaligned', switchAndIcon(164), { ...IOS_26, platform: 'android' }),
+    []
+  );
+  // A centered iOS switch frame (28 pt) beside the button passes.
+  assert.deepEqual(
+    run(
+      'row-misaligned',
+      switchAndIcon(172).map(node =>
+        node.tag === 'Switch' ? { ...node, rect: [261.67, 172, 63, 28] as const } : node
+      ),
+      IOS_26
+    ),
+    []
+  );
+});
+
+/** A notification row: a two-line text block beside a switch, in a row that centers its items. */
+function twoLineSwitchRow(switchY: number, alignItems = 'center'): ProbeNode[] {
+  return [
+    {
+      parent: 0,
+      tag: 'View',
+      rect: [14, 186.33, 374, 54.67],
+      style: { alignItems, flexDirection: 'row', paddingBlock: 10.5, paddingInline: 14 },
+    },
+    { parent: 1, tag: 'View', rect: [28, 186.33, 276, 54.67] },
+    { parent: 2, tag: 'Paragraph', rect: [28, 196.83, 276, 20], text: 'Active agents' },
+    { parent: 2, tag: 'Paragraph', rect: [28, 218.83, 276, 18], text: 'When an agent starts' },
+    { parent: 1, tag: 'Switch', role: 'switch', rect: [311, switchY, 63, 44] },
+  ];
+}
+
+test('row-misaligned: a switch beside a two-line block is measured against the row center', () => {
+  // The text block is the only other child and it wraps, so there is no
+  // single-line sibling to compare with. The row centers its items, so the
+  // track belongs on the row's center (213.67); it paints at 202.33.
+  const [finding, ...rest] = run('row-misaligned', twoLineSwitchRow(188.33), IOS_26);
+  assert.equal(rest.length, 0);
+  assert.ok(Math.abs((finding?.measured ?? 0) - 11.33) < 0.01);
+  assert.deepEqual(
+    finding?.related?.map(ref => ref.index),
+    [5]
+  );
+  assert.match(finding?.message ?? '', /off the center of row/);
+  // A centered track passes, on iOS and on Android.
+  assert.deepEqual(run('row-misaligned', twoLineSwitchRow(191.67 + 8), IOS_26), []);
+  assert.deepEqual(
+    run('row-misaligned', twoLineSwitchRow(191.67), { ...IOS_26, platform: 'android' }),
+    []
+  );
+  // A row that puts its items at the top asks for the switch there.
+  assert.deepEqual(run('row-misaligned', twoLineSwitchRow(188.33, 'flex-start'), IOS_26), []);
+});
+
 test('touch-target: below minimum, below touch size, hitSlop, covering pressable', () => {
   const pressable = (width: number, height: number, extra: Partial<ProbeNode> = {}): ProbeNode => ({
     parent: 0,
@@ -393,6 +539,27 @@ test('safe-area: a presented surface is measured from its own origin', () => {
     )[0]?.measured,
     20
   );
+});
+
+test('safe-area: an iOS page sheet is measured where UIKit places it', () => {
+  // The probe reports the 812 pt page sheet's "Go back" 32 pt from the top, in
+  // the status bar. UIKit puts the sheet 62 pt down, so the button is at 94.
+  const env = {
+    ...IOS_26,
+    safeArea: { top: 62, right: 0, bottom: 34, left: 0 },
+  };
+  const pageSheet = (footerY: number): ProbeNode[] => [
+    { parent: 0, tag: 'RNSModalScreen', rect: [0, 0, 402, 812] },
+    { parent: 1, tag: 'View', rect: [14, 32, 44, 44], label: 'Go back', pressable: true },
+    { parent: 1, tag: 'View', rect: [14, footerY, 374, 44], label: 'Buy credits', pressable: true },
+  ];
+  assert.deepEqual(run('safe-area', pageSheet(720), env), []);
+  // The sheet ends at the window's bottom, so its footer must still clear the
+  // home indicator: at 760 in the sheet it sits at 822–866, 26 pt into the inset.
+  const [finding, ...rest] = run('safe-area', pageSheet(760), env);
+  assert.equal(rest.length, 0);
+  assert.equal(finding?.element.label, 'Buy credits');
+  assert.equal(finding?.measured, 26);
 });
 
 test('touch-target: allows 0.5 dp of pixel-snapping rounding', () => {
@@ -536,4 +703,20 @@ test('touch-overlap: a presented sheet never competes with the window behind it'
     { parent: 0, tag: 'View', rect: [0, 0, 400, 44], pressable: true },
   ]);
   assert.equal(finding?.measured, 44);
+});
+
+test('touch-overlap: an iOS @expo/ui sheet never competes with the header under it', () => {
+  // T1-auth02 part-detail sheet: its Wrap segment reported 30.3 × 30 dp over
+  // the header's back button behind the sheet.
+  const nodes: ProbeNode[] = [
+    { parent: 0, tag: 'View', rect: [0, 70, 48, 48], label: 'Back', pressable: true },
+    { parent: 0, tag: 'ViewManagerAdapter_ExpoUI_HostView', rect: [0, 0, 402, 778] },
+    { parent: 2, tag: 'ViewManagerAdapter_ExpoUI_RNHostView', rect: [0, 0, 402, 778] },
+    { parent: 3, tag: 'View', rect: [17.67, 88, 183.33, 48], label: 'Wrap', pressable: true },
+  ];
+  const env = {
+    ...IOS_26,
+    safeArea: { top: 62, right: 0, bottom: 34, left: 0 },
+  };
+  assert.deepEqual(run('touch-overlap', nodes, env), []);
 });

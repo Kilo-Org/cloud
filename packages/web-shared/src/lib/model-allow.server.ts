@@ -9,11 +9,11 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { hasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
 import {
-  getByokEndpointProviders,
+  getByokPrivateProviders,
   getDirectByokModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
-import { isByokEndpointModelId } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
+import { isByokPrivateModelId } from '@kilocode/web-shared/lib/ai-gateway/byok-private-provider';
 import { getEnabledByokProviders } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
@@ -39,11 +39,11 @@ export type ModelRestrictions = {
 export type ProviderLookup = (modelId: string) => Promise<ReadonlySet<string>>;
 
 /**
- * The grantee organization's enabled endpoints outside catalog mode, which serve their models
- * under the endpoint model ids. A catalog-mode endpoint serves only catalog ids, which the policy
+ * The grantee organization's enabled private providers outside catalog mode, which serve their models
+ * under the private provider model ids. A catalog-mode private provider serves only catalog ids, which the policy
  * covers.
  */
-async function getBespokeEndpointProviders(
+async function getBespokePrivateProviders(
   customLlmGrantee: CustomLlmGrantee | undefined
 ): Promise<DirectByokProvider[]> {
   if (!customLlmGrantee) return [];
@@ -51,13 +51,13 @@ async function getBespokeEndpointProviders(
     type: 'organization',
     id: customLlmGrantee.organizationId,
   });
-  return getByokEndpointProviders(keys.filter(key => !key.serveCatalogModels));
+  return getByokPrivateProviders(keys.filter(key => !key.serveCatalogModels));
 }
 
 /**
  * A custom LLM is exempt only for a grantee it is granted to: a Kilo admin
  * allowlisted that organization or group, which overrides organization policy.
- * An endpoint model is exempt only for the organization whose enabled endpoint lists it.
+ * A private provider model is exempt only for the organization whose enabled private provider lists it.
  */
 export async function isModelRestrictionExempt(
   modelId: string,
@@ -80,8 +80,8 @@ export async function isModelRestrictionExempt(
   }
   const directByokModel = await getDirectByokModel(
     requestedModelId,
-    isByokEndpointModelId(requestedModelId)
-      ? await getBespokeEndpointProviders(customLlmGrantee)
+    isByokPrivateModelId(requestedModelId)
+      ? await getBespokePrivateProviders(customLlmGrantee)
       : undefined
   );
   return directByokModel.provider !== null && directByokModel.model !== null;

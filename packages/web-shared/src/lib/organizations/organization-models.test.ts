@@ -670,15 +670,15 @@ describe('organization model producer publication', () => {
     expect(getAllowedProviders?.('provider/ceiling-inference')).toBeUndefined();
   });
 
-  it("lists the models of the organization's direct BYOK keys and endpoints from its keys", async () => {
+  it("lists the models of the organization's direct BYOK keys and private providers from its keys", async () => {
     const keys = [
       { providerId: 'morph-byok', serveCatalogModels: false },
-      { providerId: 'endpoint-aaaaaaaaaa', serveCatalogModels: false },
+      { providerId: 'private-aaaaaaaaaa', serveCatalogModels: false },
     ];
     mockEnabledKeys.mockResolvedValueOnce(keys);
     mockByok.mockResolvedValueOnce([
       catalogModel('morph-byok/private'),
-      catalogModel('endpoint-aaaaaaaaaa/my-model'),
+      catalogModel('private-aaaaaaaaaa/my-model'),
     ]);
 
     const result = await resultFor();
@@ -687,7 +687,7 @@ describe('organization model producer publication', () => {
       'provider/allowed',
       'provider/training',
       'morph-byok/private',
-      'endpoint-aaaaaaaaaa/my-model',
+      'private-aaaaaaaaaa/my-model',
       'kilo-internal/private',
     ]);
     expect(mockByok).toHaveBeenCalledWith(keys);

@@ -18,7 +18,7 @@ import {
 /**
  * Whether `policy` admits `modelId` served by the organization's catalog-mode direct BYOK key with
  * policy target `target`: checked against the key's provider alone (see
- * `isModelAllowedForProviderKey`), or, for the organization's own endpoint, which provider
+ * `isModelAllowedForProviderKey`), or, for the organization's own private provider, which provider
  * allow-lists cannot name, against its model policy alone (see `allowsInferenceProviderUserByok`).
  */
 export async function isModelAllowedForDirectByokKey(
@@ -32,7 +32,7 @@ export async function isModelAllowedForDirectByokKey(
 }
 
 /**
- * The catalog ids the organization's catalog-mode direct BYOK keys and endpoints serve under
+ * The catalog ids the organization's catalog-mode direct BYOK keys and private providers serve under
  * `policy`, as `getProvider` routes them: an id counts when the policy admits it for a key that
  * serves it (see `isModelAllowedForDirectByokKey`), whatever it decides for Kilo's routes. An id a
  * custom LLM owns does not count, because `getProvider` serves the custom LLM first.

@@ -34,14 +34,14 @@ export type DirectByokProviderId = (typeof DIRECT_BYOK_PROVIDER_IDS)[number];
 const ids: ReadonlySet<string> = new Set(DIRECT_BYOK_PROVIDER_IDS);
 
 /**
- * An organization's own endpoint, a direct BYOK provider only its organization's keys define. Its
- * id is `ByokEndpointProviderId` from `@kilocode/db/schema-types`.
+ * An organization's own private provider, a direct BYOK provider only its organization's keys define. Its
+ * id is `ByokPrivateProviderId` from `@kilocode/db/schema-types`.
  */
-const BYOK_ENDPOINT_PROVIDER_ID_PATTERN = /^endpoint-[a-z0-9]{10}$/;
+const BYOK_PRIVATE_PROVIDER_ID_PATTERN = /^private-[a-z0-9]{10}$/;
 
-/** Whether `modelId` names a direct BYOK provider or an organization's endpoint. */
+/** Whether `modelId` names a direct BYOK provider or an organization's private provider. */
 export function isDirectByokModelId(modelId: string | undefined | null): boolean {
   if (!modelId) return false;
   const providerId = modelId.toLowerCase().split('/')[0] ?? '';
-  return ids.has(providerId) || BYOK_ENDPOINT_PROVIDER_ID_PATTERN.test(providerId);
+  return ids.has(providerId) || BYOK_PRIVATE_PROVIDER_ID_PATTERN.test(providerId);
 }

@@ -184,7 +184,7 @@ export async function resolveProviderAndPolicy(
   };
   /**
    * Whether the organization policy admits the model served by a catalog-mode direct BYOK key. The
-   * organization configured its own endpoints, so its provider allow-lists do not restrict them.
+   * organization configured its own private providers, so its provider allow-lists do not restrict them.
    */
   const isDirectByokServingAllowed = async (target: DirectByokPolicyTarget) =>
     target.kind === 'provider'
@@ -237,19 +237,19 @@ export async function resolveProviderAndPolicy(
       claudeBillingUnavailableResponse(getProviderResult.message, getProviderResult.retryable)
     );
   }
-  if (getProviderResult.kind === 'byok-endpoint-unavailable' && orgAutoRouteTarget) {
-    // The organization chose the target itself, so it may learn why its endpoint cannot serve it.
+  if (getProviderResult.kind === 'byok-private-provider-unavailable' && orgAutoRouteTarget) {
+    // The organization chose the target itself, so it may learn why its private provider cannot serve it.
     return reject(
       organizationAutoConfigurationResponse(
-        `Organization Auto route target '${orgAutoRouteTarget}' is unavailable because no enabled endpoint of this organization serves it.`
+        `Organization Auto route target '${orgAutoRouteTarget}' is unavailable because no enabled private provider of this organization serves it.`
       )
     );
   }
   if (
     getProviderResult.kind === 'custom-llm-unavailable' ||
-    getProviderResult.kind === 'byok-endpoint-unavailable'
+    getProviderResult.kind === 'byok-private-provider-unavailable'
   ) {
-    // Same response as an unknown model id, so callers cannot probe for custom LLMs or endpoints.
+    // Same response as an unknown model id, so callers cannot probe for custom LLMs or private providers.
     return reject(unknownModelResponse(model));
   }
   if (getProviderResult.kind === 'direct-byok-catalog-only') {
@@ -341,7 +341,7 @@ export async function resolveProviderAndPolicy(
 
     if (route.provider.type === 'direct-byok') {
       // A catalog-mode direct BYOK key is the request's only route, so the policy is checked
-      // against its target alone: the key's provider, or for the organization's own endpoint, only
+      // against its target alone: the key's provider, or for the organization's own private provider, only
       // the model policy. Routing already skips keys it rejects.
       if (
         !route.directByokPolicyTarget ||

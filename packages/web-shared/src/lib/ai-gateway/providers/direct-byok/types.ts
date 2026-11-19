@@ -7,7 +7,7 @@ import type {
   TransformRequestContext,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type {
-  ByokEndpointProviderId,
+  ByokPrivateProviderId,
   CustomLlmProvider,
   DirectByokModel,
   OpenRouterProvider,
@@ -93,7 +93,7 @@ type DirectByokProviderBase = {
  */
 type StaticDirectByokProviderIdentity = {
   id: DirectByokProviderMetaId;
-  organization_endpoint?: undefined;
+  private_provider?: undefined;
 } & (
   | {
       /** The general provider list entry for the same service. */
@@ -107,12 +107,12 @@ type StaticDirectByokProviderIdentity = {
 );
 
 /**
- * An organization's own endpoint, built from its key (`ByokEndpointDefinition`). Provider
+ * An organization's own private provider, built from its key (`ByokPrivateProviderDefinition`). Provider
  * allow-lists cannot name it, so only the organization's model policy applies to it.
  */
-type OrganizationEndpointIdentity = {
-  id: ByokEndpointProviderId;
-  organization_endpoint: { name: string };
+type PrivateProviderIdentity = {
+  id: ByokPrivateProviderId;
+  private_provider: { name: string };
   openrouter_inference_provider_id?: undefined;
   provider_listing?: undefined;
 };
@@ -122,7 +122,7 @@ type OrganizationEndpointIdentity = {
  * BYOK routing preview can explain the choice, without decrypting any key.
  */
 export type DirectByokProvider = DirectByokProviderBase &
-  (StaticDirectByokProviderIdentity | OrganizationEndpointIdentity) &
+  (StaticDirectByokProviderIdentity | PrivateProviderIdentity) &
   (
     | {
         /** The chat APIs the upstream serves every model over. */

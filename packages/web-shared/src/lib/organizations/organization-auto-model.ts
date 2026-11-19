@@ -14,7 +14,7 @@ import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-util
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   formatDirectByokModelId,
-  getByokEndpointProviders,
+  getByokPrivateProviders,
   getDirectByokCatalogModelId,
   getDirectByokKeyLabel,
   getDirectByokModel,
@@ -25,7 +25,7 @@ import {
   getEnabledByokProviders,
   type EnabledByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
-import { isByokEndpointModelId } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
+import { isByokPrivateModelId } from '@kilocode/web-shared/lib/ai-gateway/byok-private-provider';
 import { readDb, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   KILO_AUTO_BALANCED_MODEL,
@@ -218,11 +218,11 @@ export async function validateOrganizationAutoTarget(
       type: 'organization',
       id: organization.id,
     }));
-  const isEndpointTarget = isByokEndpointModelId(rawModelId);
-  // Only the organization's keys know its endpoints, whose model ids nobody else can use.
+  const isPrivateProviderTarget = isByokPrivateModelId(rawModelId);
+  // Only the organization's keys know its private providers, whose model ids nobody else can use.
   const directByokTarget = await getDirectByokModel(
     rawModelId,
-    isEndpointTarget ? getByokEndpointProviders(await loadEnabledKeys()) : undefined
+    isPrivateProviderTarget ? getByokPrivateProviders(await loadEnabledKeys()) : undefined
   );
   if (directByokTarget.provider && directByokTarget.model) {
     const key = (await loadEnabledKeys()).find(
@@ -262,10 +262,10 @@ export async function validateOrganizationAutoTarget(
       modelId: formatDirectByokModelId(directByokTarget.provider, directByokTarget.model),
     };
   }
-  if (isEndpointTarget) {
+  if (isPrivateProviderTarget) {
     return {
       kind: 'error',
-      message: `Organization Auto route target '${targetModelId}' is unavailable because no enabled endpoint of this organization serves it.`,
+      message: `Organization Auto route target '${targetModelId}' is unavailable because no enabled private provider of this organization serves it.`,
     };
   }
 

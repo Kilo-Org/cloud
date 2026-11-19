@@ -2197,7 +2197,7 @@ describe('POST /api/v1/chat/completions request handling', () => {
       | 'a Vercel BYOK inference provider key'
       | 'an OpenRouter key'
       | 'a Vercel AI Gateway key'
-      | 'a catalog-mode endpoint'
+      | 'a catalog-mode private provider'
       | 'no BYOK key';
     const byokRoutes: Record<
       ByokRoute,
@@ -2220,10 +2220,10 @@ describe('POST /api/v1/chat/completions request handling', () => {
         provider: { ...provider, type: 'vercel' },
         userByok: [{ decryptedAPIKey: 'key', providerId: 'vercel-ai-gateway' }],
       },
-      'a catalog-mode endpoint': {
-        provider: { ...provider, type: 'direct-byok', directByokKeyLabel: 'Acme endpoint' },
-        userByok: [{ decryptedAPIKey: 'key', providerId: 'endpoint-a1b2c3d4e5' }],
-        directByokPolicyTarget: { kind: 'organization-endpoint' },
+      'a catalog-mode private provider': {
+        provider: { ...provider, type: 'direct-byok', directByokKeyLabel: 'Acme private provider' },
+        userByok: [{ decryptedAPIKey: 'key', providerId: 'private-a1b2c3d4e5' }],
+        directByokPolicyTarget: { kind: 'private-provider' },
       },
       'no BYOK key': { provider, userByok: null },
     };
@@ -2373,8 +2373,8 @@ describe('POST /api/v1/chat/completions request handling', () => {
       }
     );
 
-    it('serves a catalog-mode endpoint whatever the provider allow-list says', async () => {
-      const response = await sendThrough('a catalog-mode endpoint', {
+    it('serves a catalog-mode private provider whatever the provider allow-list says', async () => {
+      const response = await sendThrough('a catalog-mode private provider', {
         allowed: false,
         denialSource: 'organization_provider',
       });
@@ -2383,16 +2383,16 @@ describe('POST /api/v1/chat/completions request handling', () => {
       expect(mockedUpstreamRequest).toHaveBeenCalled();
       const isDirectByokProviderAllowed =
         mockedGetProvider.mock.calls[0]?.[0].isDirectByokProviderAllowed;
-      expect(await isDirectByokProviderAllowed?.({ kind: 'organization-endpoint' })).toBe(true);
+      expect(await isDirectByokProviderAllowed?.({ kind: 'private-provider' })).toBe(true);
     });
 
     it.each([
       ['the organization model deny list', 'organization_model'],
       ['a missing group grant', 'no_grant'],
     ] as const)(
-      'denies a catalog-mode endpoint for a model excluded by %s',
+      'denies a catalog-mode private provider for a model excluded by %s',
       async (_name, denialSource) => {
-        const response = await sendThrough('a catalog-mode endpoint', {
+        const response = await sendThrough('a catalog-mode private provider', {
           allowed: false,
           denialSource,
         });
@@ -2402,7 +2402,7 @@ describe('POST /api/v1/chat/completions request handling', () => {
         expect(mockedUpstreamRequest).not.toHaveBeenCalled();
         const isDirectByokProviderAllowed =
           mockedGetProvider.mock.calls[0]?.[0].isDirectByokProviderAllowed;
-        expect(await isDirectByokProviderAllowed?.({ kind: 'organization-endpoint' })).toBe(false);
+        expect(await isDirectByokProviderAllowed?.({ kind: 'private-provider' })).toBe(false);
       }
     );
 
@@ -3705,8 +3705,8 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it('names an Organization Auto endpoint target its endpoint cannot serve', async () => {
-    const target = 'endpoint-a1b2c3d4e5/acme/coder';
+  it('names an Organization Auto private provider target its private provider cannot serve', async () => {
+    const target = 'private-a1b2c3d4e5/acme/coder';
     mockedGetUserFromAuth.mockResolvedValue({
       user: {
         id: 'user-123',
@@ -3728,7 +3728,7 @@ describe('kilo-auto/efficient classifier billing', () => {
       request.body.model = target;
       return { kind: 'ok', resolved: { model: target }, routingTarget: target };
     });
-    mockedGetProvider.mockResolvedValue({ kind: 'byok-endpoint-unavailable' });
+    mockedGetProvider.mockResolvedValue({ kind: 'byok-private-provider-unavailable' });
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/org')) as never);
@@ -3736,7 +3736,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({
       error_type: 'organization_auto_configuration',
-      message: `Organization Auto route target '${target}' is unavailable because no enabled endpoint of this organization serves it.`,
+      message: `Organization Auto route target '${target}' is unavailable because no enabled private provider of this organization serves it.`,
     });
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
@@ -3762,12 +3762,12 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it('answers an endpoint model id the organization cannot use like an unknown model', async () => {
-    mockedGetProvider.mockResolvedValue({ kind: 'byok-endpoint-unavailable' });
+  it('answers a private provider model id the organization cannot use like an unknown model', async () => {
+    mockedGetProvider.mockResolvedValue({ kind: 'byok-private-provider-unavailable' });
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody('endpoint-a1b2c3d4e5/acme/coder')) as never
+      makeRequest(makeBody('private-a1b2c3d4e5/acme/coder')) as never
     );
 
     expect(response.status).toBe(404);
@@ -3775,37 +3775,37 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it('rejects a bespoke endpoint id whose endpoint serves catalog ids, naming the catalog id', async () => {
+  it('rejects a bespoke private provider id whose private provider serves catalog ids, naming the catalog id', async () => {
     mockedGetProvider.mockResolvedValue({
       kind: 'direct-byok-catalog-only',
-      keyLabel: 'Acme endpoint',
+      keyLabel: 'Acme private provider',
       catalogModelId: 'moonshotai/kimi-k2.6',
     });
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody('endpoint-a1b2c3d4e5/moonshotai/kimi-k2.6')) as never
+      makeRequest(makeBody('private-a1b2c3d4e5/moonshotai/kimi-k2.6')) as never
     );
 
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({
       error_type: 'direct_byok_catalog_only',
       message:
-        "'endpoint-a1b2c3d4e5/moonshotai/kimi-k2.6' is disabled because the Acme endpoint uses Kilo catalog model IDs. Use 'moonshotai/kimi-k2.6' instead.",
+        "'private-a1b2c3d4e5/moonshotai/kimi-k2.6' is disabled because the Acme private provider uses Kilo catalog model IDs. Use 'moonshotai/kimi-k2.6' instead.",
     });
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it('names the endpoint when it cannot serve the API kind', async () => {
+  it('names the private provider when it cannot serve the API kind', async () => {
     mockedGetProvider.mockResolvedValue(
       providerResult({
         provider: {
           ...provider,
           type: 'direct-byok',
-          directByokKeyLabel: 'Acme endpoint',
+          directByokKeyLabel: 'Acme private provider',
           supportedChatApis: ['messages'],
         },
-        userByok: [{ decryptedAPIKey: 'key', providerId: 'endpoint-a1b2c3d4e5' }],
+        userByok: [{ decryptedAPIKey: 'key', providerId: 'private-a1b2c3d4e5' }],
         isFree: false,
         bypassAccessCheck: false,
       })
@@ -3820,7 +3820,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(await response.json()).toMatchObject({
       error_type: 'api_kind_not_supported',
       message:
-        'This model does not support the chat_completions API through your Acme endpoint, please use any of: messages',
+        'This model does not support the chat_completions API through your Acme private provider, please use any of: messages',
     });
   });
 

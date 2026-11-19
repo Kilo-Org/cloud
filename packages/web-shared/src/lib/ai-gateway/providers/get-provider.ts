@@ -34,7 +34,7 @@ import {
   type RoutePlanStep,
   type VercelByokPlanStep,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/route-plan';
-import { InvalidByokEndpointCredentialsError } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/direct-provider';
+import { InvalidByokPrivateProviderCredentialsError } from '@kilocode/web-shared/lib/ai-gateway/byok-private-provider/direct-provider';
 import { shouldRouteToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { withIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
@@ -149,10 +149,10 @@ export type DirectByokCatalogOnlyResult = {
 export type GetProviderResult =
   | GetProviderProviderResult
   /**
-   * The endpoint model id names no enabled endpoint model of the caller's organization, or the
-   * endpoint's credentials are unusable. Answered like an unknown model.
+   * The private provider model id names no enabled private provider model of the caller's organization, or the
+   * private provider's credentials are unusable. Answered like an unknown model.
    */
-  | { kind: 'byok-endpoint-unavailable' }
+  | { kind: 'byok-private-provider-unavailable' }
   | { kind: 'chatgpt-reconnect'; message: string }
   /**
    * The owner's Claude billing connection cannot bill. Serving the request any
@@ -195,15 +195,15 @@ async function directByokRoute(
   };
 }
 
-type UnavailableEndpointModelReason =
-  | Extract<RequestedModel, { kind: 'unavailable-endpoint-model' }>['reason']
+type UnavailablePrivateModelReason =
+  | Extract<RequestedModel, { kind: 'unavailable-private-model' }>['reason']
   | 'no-organization'
   | 'invalid-credentials';
 
-/** An endpoint model id its endpoint cannot serve, answered like an unknown model. */
-function rejectEndpointModel(
+/** A private provider model id its private provider cannot serve, answered like an unknown model. */
+function rejectPrivateModel(
   providerId: string,
-  reason: UnavailableEndpointModelReason,
+  reason: UnavailablePrivateModelReason,
   decision: RoutingDecisionRecorder
 ): GetProviderResult {
   decision.step({
@@ -212,13 +212,13 @@ function rejectEndpointModel(
     provider_id: providerId,
     reason,
   });
-  return { kind: 'byok-endpoint-unavailable' };
+  return { kind: 'byok-private-provider-unavailable' };
 }
 
 /**
  * Direct BYOK model IDs name their provider, such as `neuralwatt/...`, and the request goes straight
  * to that provider with the stored key, bypassing Kilo's gateways. A key in catalog mode instead
- * serves the catalog ids its provider maps. An organization's endpoint owns its model ids, so when
+ * serves the catalog ids its provider maps. An organization's private provider owns its model ids, so when
  * it cannot serve one, no other route may.
  */
 async function resolveDirectByokModel(
@@ -232,8 +232,7 @@ async function resolveDirectByokModel(
     providerId,
   ]);
   if (!credential) {
-    if (directByok.organization_endpoint)
-      return rejectEndpointModel(providerId, 'no-key', decision);
+    if (directByok.private_provider) return rejectPrivateModel(providerId, 'no-key', decision);
     decision.step({
       step: 'direct-byok-model',
       outcome: 'skipped',
@@ -261,9 +260,9 @@ async function resolveDirectByokModel(
   try {
     route = await directByokRoute(directByok, directByokModel, credential, request, false);
   } catch (error) {
-    if (!(error instanceof InvalidByokEndpointCredentialsError)) throw error;
-    console.error('[getProvider] Endpoint credentials are invalid', { providerId });
-    return rejectEndpointModel(providerId, 'invalid-credentials', decision);
+    if (!(error instanceof InvalidByokPrivateProviderCredentialsError)) throw error;
+    console.error('[getProvider] Private provider credentials are invalid', { providerId });
+    return rejectPrivateModel(providerId, 'invalid-credentials', decision);
   }
   decision.step({ step: 'direct-byok-model', outcome: 'selected', provider_id: providerId });
   return servedBy(route);
@@ -499,10 +498,10 @@ async function selectProvider(
     );
   }
   decision.step({ step: 'custom-llm', outcome: 'skipped', reason: 'no-match' });
-  if (model.kind === 'unavailable-endpoint-model') {
-    // Endpoints belong to organizations; outside one, an endpoint id names nothing.
+  if (model.kind === 'unavailable-private-model') {
+    // Private providers belong to organizations; outside one, a private provider id names nothing.
     const reason = isAnonymousContext(user) || !organizationId ? 'no-organization' : model.reason;
-    return rejectEndpointModel(model.providerId, reason, decision);
+    return rejectPrivateModel(model.providerId, reason, decision);
   }
   if (model.kind === 'direct-byok-model') {
     const result = await resolveDirectByokModel(model.provider, model.model, input, decision);

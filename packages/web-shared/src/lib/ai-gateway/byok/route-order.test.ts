@@ -31,15 +31,15 @@ describe('sortByokKeysInRouteOrder', () => {
     ]);
   });
 
-  test("ranks the organization's endpoints before every other key by default", () => {
+  test("ranks the organization's private providers before every other key by default", () => {
     expect(
       order([
         { providerId: 'openrouter' },
         { providerId: 'synthetic' },
-        { providerId: 'endpoint-a1b2c3d4e5' },
+        { providerId: 'private-a1b2c3d4e5' },
         { providerId: 'anthropic' },
       ])
-    ).toEqual(['endpoint-a1b2c3d4e5', 'synthetic', 'anthropic', 'openrouter']);
+    ).toEqual(['private-a1b2c3d4e5', 'synthetic', 'anthropic', 'openrouter']);
   });
 
   test('follows the priorities the owner chose', () => {

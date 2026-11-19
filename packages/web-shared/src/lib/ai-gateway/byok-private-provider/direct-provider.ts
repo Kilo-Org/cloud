@@ -1,16 +1,16 @@
 import type {
-  ByokEndpointCredentials,
-  ByokEndpointDefinition,
-  ByokEndpointModel,
-  ByokEndpointProviderId,
+  ByokPrivateProviderCredentials,
+  ByokPrivateProviderDefinition,
+  ByokPrivateModel,
+  ByokPrivateProviderId,
 } from '@kilocode/db/schema-types';
 import {
-  getByokEndpointModelApiKinds,
-  getByokEndpointModelClientApiKind,
-  getByokEndpointModelResponseTransform,
-  getByokEndpointModelSendsPromptCacheKey,
-  parseByokEndpointCredentials,
-} from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
+  getByokPrivateModelApiKinds,
+  getByokPrivateModelClientApiKind,
+  getByokPrivateModelResponseTransform,
+  getByokPrivateModelSendsPromptCacheKey,
+  parseByokPrivateProviderCredentials,
+} from '@kilocode/web-shared/lib/ai-gateway/byok-private-provider';
 import { getGoogleServiceAccountAccessToken } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/google-service-account';
 import {
   credentialHeaders,
@@ -22,11 +22,11 @@ import { getFallbackReasoningOptions } from '@kilocode/web-shared/lib/ai-gateway
 
 const ANTHROPIC_VERSION = '2023-06-01';
 
-/** The stored endpoint credentials do not parse, so no request can authenticate. */
-export class InvalidByokEndpointCredentialsError extends Error {
-  constructor(providerId: ByokEndpointProviderId) {
-    super(`Endpoint ${providerId} has invalid credentials`);
-    this.name = 'InvalidByokEndpointCredentialsError';
+/** The stored private provider credentials do not parse, so no request can authenticate. */
+export class InvalidByokPrivateProviderCredentialsError extends Error {
+  constructor(providerId: ByokPrivateProviderId) {
+    super(`Private provider ${providerId} has invalid credentials`);
+    this.name = 'InvalidByokPrivateProviderCredentialsError';
   }
 }
 
@@ -43,23 +43,23 @@ function removeTrackingIds(body: Record<string, unknown>) {
 }
 
 function parseCredentials(
-  providerId: ByokEndpointProviderId,
+  providerId: ByokPrivateProviderId,
   credential: string
-): ByokEndpointCredentials {
-  const credentials = parseByokEndpointCredentials(credential);
-  if (!credentials) throw new InvalidByokEndpointCredentialsError(providerId);
+): ByokPrivateProviderCredentials {
+  const credentials = parseByokPrivateProviderCredentials(credential);
+  if (!credentials) throw new InvalidByokPrivateProviderCredentialsError(providerId);
   return credentials;
 }
 
-/** A listed model of the endpoint: its id is the one clients use after the provider id. */
-function toDirectByokModel(model: ByokEndpointModel): DirectByokModel {
+/** A listed model of the private provider: its id is the one clients use after the provider id. */
+function toDirectByokModel(model: ByokPrivateModel): DirectByokModel {
   return {
     id: model.id,
     name: model.name ?? model.id,
     flags: model.flags,
     context_length: model.context_length,
     max_completion_tokens: model.max_completion_tokens,
-    // In catalog mode the endpoint serves each model under the catalog id it is named after.
+    // In catalog mode the private provider serves each model under the catalog id it is named after.
     catalog_model_id: model.id,
     reasoning_options: model.flags?.includes('reasoning')
       ? (getFallbackReasoningOptions(model.id) ?? getFallbackReasoningOptions(model.internal_id))
@@ -67,9 +67,9 @@ function toDirectByokModel(model: ByokEndpointModel): DirectByokModel {
   };
 }
 
-/** The upstream authentication for endpoint credentials. */
-export async function resolveByokEndpointUpstreamAuth(
-  credentials: ByokEndpointCredentials
+/** The upstream authentication for private provider credentials. */
+export async function resolveByokPrivateProviderUpstreamAuth(
+  credentials: ByokPrivateProviderCredentials
 ): Promise<Pick<DirectByokUpstream, 'apiKey' | 'apiKeyHeader' | 'awsBedrock'>> {
   switch (credentials.type) {
     case 'api_key':
@@ -87,40 +87,40 @@ export async function resolveByokEndpointUpstreamAuth(
 }
 
 function createProvider(
-  providerId: ByokEndpointProviderId,
-  definition: ByokEndpointDefinition
+  providerId: ByokPrivateProviderId,
+  definition: ByokPrivateProviderDefinition
 ): DirectByokProvider {
-  const endpointModels = new Map(definition.models.map(model => [model.id, model]));
+  const privateModels = new Map(definition.models.map(model => [model.id, model]));
   const models = definition.models.map(toDirectByokModel);
-  const endpointModel = ({ id }: Pick<DirectByokModel, 'id'>) => {
-    const model = endpointModels.get(id);
-    if (!model) throw new Error(`Endpoint ${providerId} has no model ${id}`);
+  const privateModel = ({ id }: Pick<DirectByokModel, 'id'>) => {
+    const model = privateModels.get(id);
+    if (!model) throw new Error(`Private provider ${providerId} has no model ${id}`);
     return model;
   };
   return {
     id: providerId,
-    organization_endpoint: { name: definition.name },
+    private_provider: { name: definition.name },
     models: async () => models,
-    upstreamModelId: model => endpointModel(model).internal_id,
-    getModelChatApi: model => getByokEndpointModelClientApiKind(definition, endpointModel(model)),
-    getModelChatApis: model => getByokEndpointModelApiKinds(definition, endpointModel(model)),
+    upstreamModelId: model => privateModel(model).internal_id,
+    getModelChatApi: model => getByokPrivateModelClientApiKind(definition, privateModel(model)),
+    getModelChatApis: model => getByokPrivateModelApiKinds(definition, privateModel(model)),
     chatCompletionsHeaders: credentialHeaders,
     async resolveUpstream({ credential, model }) {
-      const served = endpointModel(model);
+      const served = privateModel(model);
       return {
         apiUrl: definition.base_url,
         apiUrlOverrides: {},
         disableUrlSuffix: false,
-        ...(await resolveByokEndpointUpstreamAuth(parseCredentials(providerId, credential))),
-        supportedChatApis: getByokEndpointModelApiKinds(definition, served),
-        responseTransforms: getByokEndpointModelResponseTransform(definition, served),
+        ...(await resolveByokPrivateProviderUpstreamAuth(parseCredentials(providerId, credential))),
+        supportedChatApis: getByokPrivateModelApiKinds(definition, served),
+        responseTransforms: getByokPrivateModelResponseTransform(definition, served),
       };
     },
     transformRequest({ request, extraHeaders }, model) {
       const body = request.body as Record<string, unknown>;
       // An organization's upstream has no use for the user and session ids Kilo adds.
       removeTrackingIds(body);
-      if (!getByokEndpointModelSendsPromptCacheKey(definition, endpointModel(model))) {
+      if (!getByokPrivateModelSendsPromptCacheKey(definition, privateModel(model))) {
         delete body.prompt_cache_key;
       }
       // Anthropic's own API rejects Messages requests without it; compatible upstreams ignore it.
@@ -129,16 +129,16 @@ function createProvider(
   };
 }
 
-const providersByDefinition = new WeakMap<ByokEndpointDefinition, DirectByokProvider>();
+const providersByDefinition = new WeakMap<ByokPrivateProviderDefinition, DirectByokProvider>();
 
 /**
- * The direct BYOK provider of an organization's endpoint key. Its models keep their listed ids,
+ * The direct BYOK provider of an organization's private provider key. Its models keep their listed ids,
  * and requests reach the upstream under each model's `internal_id`. It is built once per loaded
  * definition, so catalog lookups that cache per model list keep working.
  */
-export function createByokEndpointDirectProvider(
-  providerId: ByokEndpointProviderId,
-  definition: ByokEndpointDefinition
+export function createByokPrivateProviderDirectProvider(
+  providerId: ByokPrivateProviderId,
+  definition: ByokPrivateProviderDefinition
 ): DirectByokProvider {
   let provider = providersByDefinition.get(definition);
   if (!provider) {

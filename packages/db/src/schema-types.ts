@@ -3069,48 +3069,50 @@ export const CustomLlmCredentialsSchema = z.discriminatedUnion('type', [
 export type CustomLlmCredentials = z.infer<typeof CustomLlmCredentialsSchema>;
 
 /**
- * An organization's own upstream endpoint, stored as a BYOK key whose provider id is
- * `endpoint-` plus a random suffix. Its models are listed as `<provider id>/<model id>`, or, in
+ * An organization's own upstream private provider, stored as a BYOK key whose provider id is
+ * `private-` plus a random suffix. Its models are listed as `<provider id>/<model id>`, or, in
  * catalog mode, serve the Kilo catalog ids they are named after.
  */
-export const BYOK_ENDPOINT_PROVIDER_ID_PREFIX = 'endpoint-';
+export const BYOK_PRIVATE_PROVIDER_ID_PREFIX = 'private-';
 
-export type ByokEndpointProviderId = `${typeof BYOK_ENDPOINT_PROVIDER_ID_PREFIX}${string}`;
+export type ByokPrivateProviderId = `${typeof BYOK_PRIVATE_PROVIDER_ID_PREFIX}${string}`;
 
-const BYOK_ENDPOINT_PROVIDER_ID_PATTERN = /^endpoint-[a-z0-9]{10}$/;
+const BYOK_PRIVATE_PROVIDER_ID_PATTERN = /^private-[a-z0-9]{10}$/;
 
-export function isByokEndpointProviderId(value: unknown): value is ByokEndpointProviderId {
-  return typeof value === 'string' && BYOK_ENDPOINT_PROVIDER_ID_PATTERN.test(value);
+export function isByokPrivateProviderId(value: unknown): value is ByokPrivateProviderId {
+  return typeof value === 'string' && BYOK_PRIVATE_PROVIDER_ID_PATTERN.test(value);
 }
 
-export const ByokEndpointProviderIdSchema = z.custom<ByokEndpointProviderId>(
-  isByokEndpointProviderId,
-  { message: 'must be an endpoint provider id such as "endpoint-a1b2c3d4e5"' }
+export const ByokPrivateProviderIdSchema = z.custom<ByokPrivateProviderId>(
+  isByokPrivateProviderId,
+  { message: 'must be a private provider id such as "private-a1b2c3d4e5"' }
 );
 
 /** How the upstream returns reasoning; `reasoning-details` is OpenRouter's shape and needs no transform. */
-export const ByokEndpointReasoningFormatSchema = z.enum([
+export const ByokPrivateProviderReasoningFormatSchema = z.enum([
   'reasoning-details',
   ReasoningDetailsTransform.ReasoningContent,
   ReasoningDetailsTransform.Reasoning,
   ReasoningDetailsTransform.GeminiThought,
 ]);
 
-export type ByokEndpointReasoningFormat = z.infer<typeof ByokEndpointReasoningFormatSchema>;
+export type ByokPrivateProviderReasoningFormat = z.infer<
+  typeof ByokPrivateProviderReasoningFormatSchema
+>;
 
 /** Lowercase like every gateway model id, without the `:` variant and `~` alias markers. */
-export const ByokEndpointModelIdSchema = z
+export const ByokPrivateModelIdSchema = z
   .string()
   .trim()
   .min(1)
   .max(200)
   .regex(/^[a-z0-9._/-]+$/, 'Model IDs may only contain lowercase letters, digits, and . / _ -');
 
-/** Settings that the endpoint sets for every model and a model may override. */
-const ByokEndpointModelOverridesSchema = z.object({
+/** Settings that the private provider sets for every model and a model may override. */
+const ByokPrivateModelOverridesSchema = z.object({
   api_kinds: z.array(CustomLlmApiKindSchema).min(1).optional(),
   client_provider: CustomLlmProviderSchema.optional(),
-  reasoning_format: ByokEndpointReasoningFormatSchema.optional(),
+  reasoning_format: ByokPrivateProviderReasoningFormatSchema.optional(),
   /**
    * Whether Chat Completions and Responses requests keep the `prompt_cache_key` the gateway sets.
    * Some upstreams reject the field, so it is sent only when turned on.
@@ -3118,28 +3120,28 @@ const ByokEndpointModelOverridesSchema = z.object({
   send_prompt_cache_key: z.boolean().optional(),
 });
 
-export const ByokEndpointModelSchema = DirectByokModelSchema.pick({ flags: true })
+export const ByokPrivateModelSchema = DirectByokModelSchema.pick({ flags: true })
   .extend({
     /** The id clients use after the provider id; in catalog mode, the Kilo catalog id it serves. */
-    id: ByokEndpointModelIdSchema,
+    id: ByokPrivateModelIdSchema,
     /** The id the upstream knows the model by. */
     internal_id: z.string().trim().min(1).max(500),
     name: z.string().trim().min(1).max(200).optional(),
     context_length: z.number().int().positive(),
     max_completion_tokens: z.number().int().positive(),
   })
-  .extend(ByokEndpointModelOverridesSchema.shape);
+  .extend(ByokPrivateModelOverridesSchema.shape);
 
-export type ByokEndpointModel = z.infer<typeof ByokEndpointModelSchema>;
+export type ByokPrivateModel = z.infer<typeof ByokPrivateModelSchema>;
 
-export const BYOK_ENDPOINT_MAX_MODELS = 500;
+export const BYOK_PRIVATE_PROVIDER_MAX_MODELS = 500;
 
 function hasNoUserInfo(url: string): boolean {
   const { username, password } = new URL(url);
   return username === '' && password === '';
 }
 
-export const ByokEndpointDefinitionSchema = z
+export const ByokPrivateProviderDefinitionSchema = z
   .object({
     name: z.string().trim().min(1).max(100),
     /** The API root without a trailing slash. */
@@ -3157,9 +3159,9 @@ export const ByokEndpointDefinitionSchema = z
     api_kinds: z.array(CustomLlmApiKindSchema).min(1),
     /** The API clients use: `anthropic` Messages, `openai` Responses, `openrouter` Chat Completions. */
     client_provider: CustomLlmProviderSchema,
-    reasoning_format: ByokEndpointReasoningFormatSchema,
-    send_prompt_cache_key: ByokEndpointModelOverridesSchema.shape.send_prompt_cache_key,
-    models: z.array(ByokEndpointModelSchema).min(1).max(BYOK_ENDPOINT_MAX_MODELS),
+    reasoning_format: ByokPrivateProviderReasoningFormatSchema,
+    send_prompt_cache_key: ByokPrivateModelOverridesSchema.shape.send_prompt_cache_key,
+    models: z.array(ByokPrivateModelSchema).min(1).max(BYOK_PRIVATE_PROVIDER_MAX_MODELS),
   })
   .superRefine((definition, ctx) => {
     const seen = new Set<string>();
@@ -3186,16 +3188,16 @@ export const ByokEndpointDefinitionSchema = z
     }
   });
 
-export type ByokEndpointDefinition = z.infer<typeof ByokEndpointDefinitionSchema>;
+export type ByokPrivateProviderDefinition = z.infer<typeof ByokPrivateProviderDefinitionSchema>;
 
-export const ByokEndpointCredentialsSchema = z.discriminatedUnion('type', [
+export const ByokPrivateProviderCredentialsSchema = z.discriminatedUnion('type', [
   CustomLlmApiKeyCredentialsSchema,
   CustomLlmXApiKeyCredentialsSchema,
   CustomLlmAwsBedrockCredentialsSchema,
   GoogleServiceAccountKeySchema,
 ]);
 
-export type ByokEndpointCredentials = z.infer<typeof ByokEndpointCredentialsSchema>;
+export type ByokPrivateProviderCredentials = z.infer<typeof ByokPrivateProviderCredentialsSchema>;
 
 /**
  * Per-key BYOK settings. Every field is optional so new settings need no backfill.
@@ -3203,13 +3205,13 @@ export type ByokEndpointCredentials = z.infer<typeof ByokEndpointCredentialsSche
  * ids, so organization model policies apply to it.
  * `priority`: the owner's chosen position of the key, lowest first, among keys that can serve the
  * same request. Keys without one keep their default order after every prioritized key.
- * `endpoint`: set exactly for an organization's endpoint key (`BYOK_ENDPOINT_PROVIDER_ID_PREFIX`),
- * whose encrypted envelope then holds `ByokEndpointCredentials` JSON.
+ * `private_provider`: set exactly for an organization's private provider key (`BYOK_PRIVATE_PROVIDER_ID_PREFIX`),
+ * whose encrypted envelope then holds `ByokPrivateProviderCredentials` JSON.
  */
 export const ByokApiKeySettingsSchema = z.object({
   serve_catalog_models: z.boolean().optional(),
   priority: z.number().int().nonnegative().optional(),
-  endpoint: ByokEndpointDefinitionSchema.optional(),
+  private_provider: ByokPrivateProviderDefinitionSchema.optional(),
 });
 
 export type ByokApiKeySettings = z.infer<typeof ByokApiKeySettingsSchema>;

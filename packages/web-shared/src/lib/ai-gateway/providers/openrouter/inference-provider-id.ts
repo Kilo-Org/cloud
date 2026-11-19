@@ -1,9 +1,9 @@
 import { DIRECT_BYOK_PROVIDER_IDS } from '@kilocode/worker-utils/direct-byok-model';
 import * as z from 'zod';
 import {
-  ByokEndpointProviderIdSchema,
+  ByokPrivateProviderIdSchema,
   GoogleServiceAccountSigningKeySchema,
-  type ByokEndpointProviderId,
+  type ByokPrivateProviderId,
 } from '@kilocode/db/schema-types';
 import { VertexCredentialsSchema } from '@kilocode/app-shared/byok-credentials';
 
@@ -159,14 +159,14 @@ export function isGatewayUserByokProviderId(
   return GatewayUserByokProviderIdSchema.safeParse(providerId).success;
 }
 
-/** An organization's own endpoint (`ByokEndpointDefinition`) under its random provider id. */
-export { ByokEndpointProviderIdSchema, type ByokEndpointProviderId };
+/** An organization's own private provider (`ByokPrivateProviderDefinition`) under its random provider id. */
+export { ByokPrivateProviderIdSchema, type ByokPrivateProviderId };
 
 export const UserByokProviderIdSchema = VercelUserByokInferenceProviderIdSchema.or(
   DirectUserByokInferenceProviderIdSchema
 )
   .or(GatewayUserByokProviderIdSchema)
-  .or(ByokEndpointProviderIdSchema);
+  .or(ByokPrivateProviderIdSchema);
 
 export type UserByokProviderId = z.infer<typeof UserByokProviderIdSchema>;
 
@@ -214,7 +214,7 @@ export const UserByokTestModels = {
   [DirectUserByokInferenceProviderIdSchema.enum['zai-coding']]: 'glm-4.7',
   [GatewayUserByokProviderIdSchema.enum['vercel-ai-gateway']]: 'openai/gpt-5-nano',
   [GatewayUserByokProviderIdSchema.enum.openrouter]: 'openai/gpt-5-nano',
-} satisfies Record<Exclude<UserByokProviderId, ByokEndpointProviderId>, string>;
+} satisfies Record<Exclude<UserByokProviderId, ByokPrivateProviderId>, string>;
 
 // This is a registry of provider IDs referenced explicitly in our mappings, not
 // an exhaustive schema for the open-ended provider IDs returned by Vercel.

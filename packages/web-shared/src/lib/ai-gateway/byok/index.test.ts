@@ -30,14 +30,14 @@ import {
   getOrganizationByokProviderIds,
   getStoredByokKeys,
   getUserByokProviderIds,
-  readByokEndpointDefinition,
+  readByokPrivateProviderDefinition,
   servesCatalogModels,
   type ByokOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { byok_api_keys, kilocode_users, organizations } from '@kilocode/db/schema';
-import type { ByokApiKeySettings, ByokEndpointDefinition } from '@kilocode/db/schema-types';
+import type { ByokApiKeySettings, ByokPrivateProviderDefinition } from '@kilocode/db/schema-types';
 import {
   testByokEnvelope,
   useFakeByokKms,
@@ -277,15 +277,19 @@ describe('servesCatalogModels', () => {
     expect(servesCatalogModels({ serve_catalog_models: 'true' })).toBe(false);
   });
 
-  test('ignores an endpoint definition that no longer parses', () => {
-    const settings = { serve_catalog_models: true, priority: 2, endpoint: { name: 'Broken' } };
+  test('ignores a private provider definition that no longer parses', () => {
+    const settings = {
+      serve_catalog_models: true,
+      priority: 2,
+      private_provider: { name: 'Broken' },
+    };
     expect(servesCatalogModels(settings)).toBe(true);
     expect(getByokKeyPriority(settings)).toBe(2);
   });
 });
 
-describe('readByokEndpointDefinition', () => {
-  const definition: ByokEndpointDefinition = {
+describe('readByokPrivateProviderDefinition', () => {
+  const definition: ByokPrivateProviderDefinition = {
     name: 'Acme',
     base_url: 'https://llm.acme.example/v1',
     api_kinds: ['chat_completions'],
@@ -296,30 +300,30 @@ describe('readByokEndpointDefinition', () => {
     ],
   };
 
-  test('reads the definition of an organization endpoint key only', () => {
+  test('reads the definition of an organization private provider key only', () => {
     const row = {
-      provider_id: 'endpoint-a1b2c3d4e5',
+      provider_id: 'private-a1b2c3d4e5',
       organization_id: 'org-id',
-      settings: { priority: 1, endpoint: definition },
+      settings: { priority: 1, private_provider: definition },
     };
-    expect(readByokEndpointDefinition(row)).toEqual(definition);
-    expect(readByokEndpointDefinition({ ...row, organization_id: null })).toBeNull();
-    expect(readByokEndpointDefinition({ ...row, provider_id: 'anthropic' })).toBeNull();
+    expect(readByokPrivateProviderDefinition(row)).toEqual(definition);
+    expect(readByokPrivateProviderDefinition({ ...row, organization_id: null })).toBeNull();
+    expect(readByokPrivateProviderDefinition({ ...row, provider_id: 'anthropic' })).toBeNull();
   });
 
   test('drops a definition that no longer parses and logs it', () => {
     const error = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-    const read = readByokEndpointDefinition({
-      provider_id: 'endpoint-a1b2c3d4e5',
+    const read = readByokPrivateProviderDefinition({
+      provider_id: 'private-a1b2c3d4e5',
       organization_id: 'org-id',
-      settings: { endpoint: { name: 'Broken' } },
+      settings: { private_provider: { name: 'Broken' } },
     });
 
     expect(read).toBeNull();
     expect(error).toHaveBeenCalledWith(
-      '[byok] Ignoring an endpoint key with an invalid definition',
-      expect.objectContaining({ providerId: 'endpoint-a1b2c3d4e5' })
+      '[byok] Ignoring a private provider key with an invalid definition',
+      expect.objectContaining({ providerId: 'private-a1b2c3d4e5' })
     );
     error.mockRestore();
   });

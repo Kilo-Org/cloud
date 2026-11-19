@@ -2,9 +2,9 @@ import { type db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizz
 import { byok_api_keys } from '@kilocode/db/schema';
 import {
   ByokApiKeySettingsSchema,
-  ByokEndpointDefinitionSchema,
-  isByokEndpointProviderId,
-  type ByokEndpointDefinition,
+  ByokPrivateProviderDefinitionSchema,
+  isByokPrivateProviderId,
+  type ByokPrivateProviderDefinition,
 } from '@kilocode/db/schema-types';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import * as z from 'zod';
@@ -158,10 +158,10 @@ function ownerColumn(owner: ByokOwner): ByokOwnerColumn {
   return owner.type === 'organization' ? byok_api_keys.organization_id : byok_api_keys.kilo_user_id;
 }
 
-// Each reader parses only its own setting, so an invalid endpoint definition cannot hide the rest.
+// Each reader parses only its own setting, so an invalid private provider definition cannot hide the rest.
 const CatalogModeSettingsSchema = ByokApiKeySettingsSchema.pick({ serve_catalog_models: true });
 const PrioritySettingsSchema = ByokApiKeySettingsSchema.pick({ priority: true });
-const EndpointSettingsSchema = z.object({ endpoint: z.unknown() });
+const PrivateProviderSettingsSchema = z.object({ private_provider: z.unknown() });
 
 /** Whether stored key settings put the key in catalog mode. */
 export function servesCatalogModels(settings: unknown): boolean {
@@ -174,21 +174,21 @@ export function getByokKeyPriority(settings: unknown): number | undefined {
 }
 
 /**
- * The definition of an organization's endpoint key, stored in its settings. Null for every other
+ * The definition of an organization's private provider key, stored in its settings. Null for every other
  * key, so a definition in the settings of a personal or provider key is never honoured, and for a
  * definition that no longer parses, which is logged.
  */
-export function readByokEndpointDefinition(row: {
+export function readByokPrivateProviderDefinition(row: {
   provider_id: string;
   organization_id: string | null;
   settings: unknown;
-}): ByokEndpointDefinition | null {
-  if (!isByokEndpointProviderId(row.provider_id) || !row.organization_id) return null;
-  const parsed = ByokEndpointDefinitionSchema.safeParse(
-    EndpointSettingsSchema.safeParse(row.settings).data?.endpoint
+}): ByokPrivateProviderDefinition | null {
+  if (!isByokPrivateProviderId(row.provider_id) || !row.organization_id) return null;
+  const parsed = ByokPrivateProviderDefinitionSchema.safeParse(
+    PrivateProviderSettingsSchema.safeParse(row.settings).data?.private_provider
   );
   if (!parsed.success) {
-    console.error('[byok] Ignoring an endpoint key with an invalid definition', {
+    console.error('[byok] Ignoring a private provider key with an invalid definition', {
       providerId: row.provider_id,
       issues: parsed.error.issues.map(issue => ({ path: issue.path, code: issue.code })),
     });
@@ -211,8 +211,8 @@ export type EnabledByokProvider = {
   providerId: UserByokProviderId;
   /** Catalog mode as stored; only providers that support it can store true. */
   serveCatalogModels: boolean;
-  /** The definition of an organization's endpoint key; set exactly for endpoint provider ids. */
-  endpoint?: ByokEndpointDefinition;
+  /** The definition of an organization's private provider key; set exactly for private provider ids. */
+  privateProvider?: ByokPrivateProviderDefinition;
 };
 
 export type ByokKeyState = EnabledByokProvider & { isEnabled: boolean; priority?: number };
@@ -253,9 +253,9 @@ function toByokKeyState(row: {
     isEnabled: row.is_enabled,
     priority: getByokKeyPriority(row.settings),
   };
-  if (!isByokEndpointProviderId(providerId.data)) return state;
-  const endpoint = readByokEndpointDefinition(row);
-  return endpoint ? { ...state, endpoint } : null;
+  if (!isByokPrivateProviderId(providerId.data)) return state;
+  const privateProvider = readByokPrivateProviderDefinition(row);
+  return privateProvider ? { ...state, privateProvider } : null;
 }
 
 async function selectByokKeyStates(
@@ -282,10 +282,10 @@ export async function getEnabledByokProviders(
   owner: ByokOwner
 ): Promise<EnabledByokProvider[]> {
   const keys = await selectByokKeyStates(fromDb, owner, { enabledOnly: true });
-  return keys.map(({ providerId, serveCatalogModels, endpoint }) => ({
+  return keys.map(({ providerId, serveCatalogModels, privateProvider }) => ({
     providerId,
     serveCatalogModels,
-    ...(endpoint && { endpoint }),
+    ...(privateProvider && { privateProvider }),
   }));
 }
 

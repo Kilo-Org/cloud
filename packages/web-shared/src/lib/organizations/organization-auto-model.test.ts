@@ -56,8 +56,8 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokCatalogModelId: jest.fn(),
   getDirectByokModelChatApis: () => ['chat_completions'],
   getDirectByokKeyLabel: (provider: { id: string }) => `${provider.id} key`,
-  getByokEndpointProviders: (keys: { providerId: string; endpoint?: unknown }[]) =>
-    keys.flatMap(key => (key.endpoint ? [{ id: key.providerId }] : [])),
+  getByokPrivateProviders: (keys: { providerId: string; privateProvider?: unknown }[]) =>
+    keys.flatMap(key => (key.privateProvider ? [{ id: key.providerId }] : [])),
   supportsCatalogMode: (provider: { id: string }) => provider.id === 'synthetic',
 }));
 
@@ -197,8 +197,8 @@ describe('validateOrganizationAutoTarget with direct BYOK targets', () => {
   });
 });
 
-describe('validateOrganizationAutoTarget with endpoint targets', () => {
-  const ENDPOINT_MODEL = 'endpoint-a1b2c3d4e5/acme/coder';
+describe('validateOrganizationAutoTarget with private provider targets', () => {
+  const PRIVATE_MODEL = 'private-a1b2c3d4e5/acme/coder';
 
   beforeEach(() => {
     mockedGetDirectByokModel.mockImplementation(async (modelId, providers) => {
@@ -209,23 +209,23 @@ describe('validateOrganizationAutoTarget with endpoint targets', () => {
     });
   });
 
-  test("keeps a bespoke target of the organization's endpoint", async () => {
+  test("keeps a bespoke target of the organization's private provider", async () => {
     mockedGetEnabledByokProviders.mockResolvedValue([
-      { providerId: 'endpoint-a1b2c3d4e5', serveCatalogModels: false, endpoint: {} as never },
+      { providerId: 'private-a1b2c3d4e5', serveCatalogModels: false, privateProvider: {} as never },
     ]);
 
-    await expect(validateOrganizationAutoTarget(organization(), ENDPOINT_MODEL)).resolves.toEqual({
+    await expect(validateOrganizationAutoTarget(organization(), PRIVATE_MODEL)).resolves.toEqual({
       kind: 'ok',
-      modelId: ENDPOINT_MODEL,
+      modelId: PRIVATE_MODEL,
     });
   });
 
-  test('rejects a target no enabled endpoint of the organization serves', async () => {
+  test('rejects a target no enabled private provider of the organization serves', async () => {
     mockedGetEnabledByokProviders.mockResolvedValue([]);
 
-    await expect(validateOrganizationAutoTarget(organization(), ENDPOINT_MODEL)).resolves.toEqual({
+    await expect(validateOrganizationAutoTarget(organization(), PRIVATE_MODEL)).resolves.toEqual({
       kind: 'error',
-      message: `Organization Auto route target '${ENDPOINT_MODEL}' is unavailable because no enabled endpoint of this organization serves it.`,
+      message: `Organization Auto route target '${PRIVATE_MODEL}' is unavailable because no enabled private provider of this organization serves it.`,
     });
   });
 });

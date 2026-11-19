@@ -23,7 +23,7 @@ import { shouldRouteToVercel } from '@kilocode/web-shared/lib/ai-gateway/provide
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
-import type { ByokEndpointDefinition } from '@kilocode/db/schema-types';
+import type { ByokPrivateProviderDefinition } from '@kilocode/db/schema-types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { byok_api_keys, type User } from '@kilocode/db/schema';
 import {
@@ -65,11 +65,13 @@ const actualDirectByok = jest.requireActual<typeof directByokModule>(
 
 const CATALOG_MODEL = 'moonshotai/kimi-k2.6';
 const LATEST_ALIAS = '~moonshotai/kimi-latest';
-const ENDPOINT_ID = 'endpoint-a1b2c3d4e5';
-const OTHER_ENDPOINT_ID = 'endpoint-f6g7h8i9j0';
-const CREDENTIALS = JSON.stringify({ type: 'api_key', api_key: 'endpoint-secret' });
+const PRIVATE_PROVIDER_ID = 'private-a1b2c3d4e5';
+const OTHER_PRIVATE_PROVIDER_ID = 'private-f6g7h8i9j0';
+const CREDENTIALS = JSON.stringify({ type: 'api_key', api_key: 'private-provider-secret' });
 
-function endpoint(overrides: Partial<ByokEndpointDefinition> = {}): ByokEndpointDefinition {
+function privateProvider(
+  overrides: Partial<ByokPrivateProviderDefinition> = {}
+): ByokPrivateProviderDefinition {
   return {
     name: 'Acme',
     base_url: 'https://llm.acme.example/v1',
@@ -102,7 +104,7 @@ function request(model: string, apiKind: GatewayChatApiKind = 'chat_completions'
 
 type KeyRow = {
   providerId: string;
-  endpoint?: ByokEndpointDefinition;
+  privateProvider?: ByokPrivateProviderDefinition;
   catalogMode?: boolean;
   isEnabled?: boolean;
   priority?: number;
@@ -110,7 +112,11 @@ type KeyRow = {
 };
 
 async function organizationWithKeys(user: User, keys: KeyRow[]): Promise<string> {
-  const organization = await createTestOrganization(`Endpoint ${crypto.randomUUID()}`, user.id, 0);
+  const organization = await createTestOrganization(
+    `Private provider ${crypto.randomUUID()}`,
+    user.id,
+    0
+  );
   await db.insert(byok_api_keys).values(
     keys.map(key => ({
       organization_id: organization.id,
@@ -121,7 +127,7 @@ async function organizationWithKeys(user: User, keys: KeyRow[]): Promise<string>
       settings: {
         serve_catalog_models: key.catalogMode ?? false,
         priority: key.priority,
-        endpoint: key.endpoint,
+        private_provider: key.privateProvider,
       },
     }))
   );
@@ -132,7 +138,7 @@ async function route(
   user: User,
   organizationId: string | undefined,
   model: string,
-  options: { apiKind?: GatewayChatApiKind; endpointModelAllowed?: boolean } = {}
+  options: { apiKind?: GatewayChatApiKind; privateModelAllowed?: boolean } = {}
 ) {
   let decision: ProviderRoutingDecision | undefined;
   const result = await getProvider(
@@ -142,7 +148,7 @@ async function route(
       user,
       organizationId,
       isDirectByokProviderAllowed: async target =>
-        target.kind !== 'organization-endpoint' || (options.endpointModelAllowed ?? true),
+        target.kind !== 'private-provider' || (options.privateModelAllowed ?? true),
       onDecision: recorded => {
         decision = recorded;
       },
@@ -152,14 +158,14 @@ async function route(
   return { result, decision };
 }
 
-function endpointSteps(decision: ProviderRoutingDecision) {
+function privateProviderSteps(decision: ProviderRoutingDecision) {
   return decision.steps.filter(step => step.step === 'direct-byok-model');
 }
 
 useFakeByokKms();
 
 beforeEach(() => {
-  // No provider of `DIRECT_BYOK_PROVIDERS` serves the catalog id; the owner's endpoints may.
+  // No provider of `DIRECT_BYOK_PROVIDERS` serves the catalog id; the owner's private providers may.
   jest
     .mocked(findDirectByokCatalogModels)
     .mockImplementation(async (catalogModelId, providers) =>
@@ -171,29 +177,33 @@ beforeEach(() => {
   jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
 });
 
-describe('getProvider for an endpoint model id', () => {
-  test('serves the model with the endpoint, exempt from the organization policy', async () => {
+describe('getProvider for a private provider model id', () => {
+  test('serves the model with the private provider, exempt from the organization policy', async () => {
     const user = await insertTestUser();
     const organizationId = await organizationWithKeys(user, [
-      { providerId: ENDPOINT_ID, endpoint: endpoint() },
+      { providerId: PRIVATE_PROVIDER_ID, privateProvider: privateProvider() },
     ]);
 
-    const { result, decision } = await route(user, organizationId, `${ENDPOINT_ID}/acme/coder`);
+    const { result, decision } = await route(
+      user,
+      organizationId,
+      `${PRIVATE_PROVIDER_ID}/acme/coder`
+    );
 
     const served = await onlyRoute(result);
     expect(served).toMatchObject({
       provider: {
         type: 'direct-byok',
         apiUrl: 'https://llm.acme.example/v1',
-        apiKey: 'endpoint-secret',
-        inferenceProviderId: ENDPOINT_ID,
+        apiKey: 'private-provider-secret',
+        inferenceProviderId: PRIVATE_PROVIDER_ID,
       },
-      userByok: [{ decryptedAPIKey: CREDENTIALS, providerId: ENDPOINT_ID }],
+      userByok: [{ decryptedAPIKey: CREDENTIALS, providerId: PRIVATE_PROVIDER_ID }],
       isFree: false,
       bypassAccessCheck: true,
     });
-    expect(endpointSteps(decision)).toEqual([
-      { step: 'direct-byok-model', outcome: 'selected', provider_id: ENDPOINT_ID },
+    expect(privateProviderSteps(decision)).toEqual([
+      { step: 'direct-byok-model', outcome: 'selected', provider_id: PRIVATE_PROVIDER_ID },
     ]);
     expect(decision.result).toMatchObject({
       kind: 'provider',
@@ -203,20 +213,22 @@ describe('getProvider for an endpoint model id', () => {
     });
   });
 
-  test('never reports a request the endpoint pays for as free, whatever the model id', async () => {
+  test('never reports a request the private provider pays for as free, whatever the model id', async () => {
     const user = await insertTestUser();
-    const base = endpoint();
+    const base = privateProvider();
     const organizationId = await organizationWithKeys(user, [
       {
-        providerId: ENDPOINT_ID,
-        endpoint: endpoint({ models: [{ ...base.models[0], id: 'acme/coder-free' }] }),
+        providerId: PRIVATE_PROVIDER_ID,
+        privateProvider: privateProvider({
+          models: [{ ...base.models[0], id: 'acme/coder-free' }],
+        }),
       },
     ]);
 
     const { result, decision } = await route(
       user,
       organizationId,
-      `${ENDPOINT_ID}/acme/coder-free`
+      `${PRIVATE_PROVIDER_ID}/acme/coder-free`
     );
 
     expect(await onlyRoute(result)).toMatchObject({ isFree: false });
@@ -226,44 +238,48 @@ describe('getProvider for an endpoint model id', () => {
   test.each([
     {
       name: 'a personal request',
-      keys: [{ providerId: ENDPOINT_ID, endpoint: endpoint() }],
+      keys: [{ providerId: PRIVATE_PROVIDER_ID, privateProvider: privateProvider() }],
       personal: true,
-      model: `${ENDPOINT_ID}/acme/coder`,
+      model: `${PRIVATE_PROVIDER_ID}/acme/coder`,
       reason: 'no-organization',
     },
     {
-      name: 'an endpoint the organization does not have',
-      keys: [{ providerId: OTHER_ENDPOINT_ID, endpoint: endpoint() }],
-      model: `${ENDPOINT_ID}/acme/coder`,
+      name: 'a private provider the organization does not have',
+      keys: [{ providerId: OTHER_PRIVATE_PROVIDER_ID, privateProvider: privateProvider() }],
+      model: `${PRIVATE_PROVIDER_ID}/acme/coder`,
       reason: 'no-key',
     },
     {
-      name: 'a disabled endpoint',
-      keys: [{ providerId: ENDPOINT_ID, endpoint: endpoint(), isEnabled: false }],
-      model: `${ENDPOINT_ID}/acme/coder`,
+      name: 'a disabled private provider',
+      keys: [
+        { providerId: PRIVATE_PROVIDER_ID, privateProvider: privateProvider(), isEnabled: false },
+      ],
+      model: `${PRIVATE_PROVIDER_ID}/acme/coder`,
       reason: 'disabled',
     },
     {
-      name: 'a model the endpoint does not list',
-      keys: [{ providerId: ENDPOINT_ID, endpoint: endpoint() }],
-      model: `${ENDPOINT_ID}/acme/other`,
+      name: 'a model the private provider does not list',
+      keys: [{ providerId: PRIVATE_PROVIDER_ID, privateProvider: privateProvider() }],
+      model: `${PRIVATE_PROVIDER_ID}/acme/other`,
       reason: 'unknown-model',
     },
     {
       name: 'credentials that do not parse',
-      keys: [{ providerId: ENDPOINT_ID, endpoint: endpoint(), secret: 'not json' }],
-      model: `${ENDPOINT_ID}/acme/coder`,
+      keys: [
+        { providerId: PRIVATE_PROVIDER_ID, privateProvider: privateProvider(), secret: 'not json' },
+      ],
+      model: `${PRIVATE_PROVIDER_ID}/acme/coder`,
       reason: 'invalid-credentials',
     },
     {
       name: 'a stored definition that no longer parses',
       keys: [
         {
-          providerId: ENDPOINT_ID,
-          endpoint: { name: 'Broken' } as unknown as ByokEndpointDefinition,
+          providerId: PRIVATE_PROVIDER_ID,
+          privateProvider: { name: 'Broken' } as unknown as ByokPrivateProviderDefinition,
         },
       ],
-      model: `${ENDPOINT_ID}/acme/coder`,
+      model: `${PRIVATE_PROVIDER_ID}/acme/coder`,
       reason: 'no-key',
     },
   ])('answers $name like an unknown model, never with another route', async testCase => {
@@ -281,42 +297,42 @@ describe('getProvider for an endpoint model id', () => {
     );
 
     error.mockRestore();
-    expect(result).toEqual({ kind: 'byok-endpoint-unavailable' });
-    expect(endpointSteps(decision)).toEqual([
+    expect(result).toEqual({ kind: 'byok-private-provider-unavailable' });
+    expect(privateProviderSteps(decision)).toEqual([
       {
         step: 'direct-byok-model',
         outcome: 'rejected',
-        provider_id: ENDPOINT_ID,
+        provider_id: PRIVATE_PROVIDER_ID,
         reason: testCase.reason,
       },
     ]);
-    expect(decision.result).toEqual({ kind: 'byok-endpoint-unavailable' });
+    expect(decision.result).toEqual({ kind: 'byok-private-provider-unavailable' });
   });
 
-  test('refuses a bespoke id of a catalog-mode endpoint, naming the catalog id', async () => {
+  test('refuses a bespoke id of a catalog-mode private provider, naming the catalog id', async () => {
     const user = await insertTestUser();
     const organizationId = await organizationWithKeys(user, [
-      { providerId: ENDPOINT_ID, endpoint: endpoint(), catalogMode: true },
+      { providerId: PRIVATE_PROVIDER_ID, privateProvider: privateProvider(), catalogMode: true },
     ]);
 
-    const catalog = await route(user, organizationId, `${ENDPOINT_ID}/${CATALOG_MODEL}`);
-    const bespoke = await route(user, organizationId, `${ENDPOINT_ID}/acme/coder`);
+    const catalog = await route(user, organizationId, `${PRIVATE_PROVIDER_ID}/${CATALOG_MODEL}`);
+    const bespoke = await route(user, organizationId, `${PRIVATE_PROVIDER_ID}/acme/coder`);
 
     expect(catalog.result).toEqual({
       kind: 'direct-byok-catalog-only',
-      keyLabel: 'Acme endpoint',
+      keyLabel: 'Acme private provider',
       catalogModelId: CATALOG_MODEL,
     });
     expect(bespoke.result).toEqual({
       kind: 'direct-byok-catalog-only',
-      keyLabel: 'Acme endpoint',
+      keyLabel: 'Acme private provider',
       catalogModelId: null,
     });
-    expect(endpointSteps(catalog.decision)).toEqual([
+    expect(privateProviderSteps(catalog.decision)).toEqual([
       {
         step: 'direct-byok-model',
         outcome: 'rejected',
-        provider_id: ENDPOINT_ID,
+        provider_id: PRIVATE_PROVIDER_ID,
         reason: 'catalog-only',
         catalog_model_id: CATALOG_MODEL,
       },
@@ -324,12 +340,12 @@ describe('getProvider for an endpoint model id', () => {
   });
 });
 
-describe('getProvider for a catalog id an endpoint serves in catalog mode', () => {
-  test('serves it with the endpoint ahead of other keys by default, failing over to them', async () => {
+describe('getProvider for a catalog id a private provider serves in catalog mode', () => {
+  test('serves it with the private provider ahead of other keys by default, failing over to them', async () => {
     const user = await insertTestUser();
     const organizationId = await organizationWithKeys(user, [
       { providerId: 'openrouter' },
-      { providerId: ENDPOINT_ID, endpoint: endpoint(), catalogMode: true },
+      { providerId: PRIVATE_PROVIDER_ID, privateProvider: privateProvider(), catalogMode: true },
     ]);
 
     const { result, decision } = await route(user, organizationId, CATALOG_MODEL);
@@ -337,15 +353,15 @@ describe('getProvider for a catalog id an endpoint serves in catalog mode', () =
     expectProviderResult(result);
     expect(result.routes).toHaveLength(2);
     expect(await result.routes[0]()).toMatchObject({
-      provider: { type: 'direct-byok', inferenceProviderId: ENDPOINT_ID },
-      userByok: [{ providerId: ENDPOINT_ID }],
+      provider: { type: 'direct-byok', inferenceProviderId: PRIVATE_PROVIDER_ID },
+      userByok: [{ providerId: PRIVATE_PROVIDER_ID }],
       bypassAccessCheck: false,
     });
     expect(await result.routes[1]?.()).toMatchObject({ userByok: [{ providerId: 'openrouter' }] });
     expect(decision.byok_candidates).toEqual([
       expect.objectContaining({
         route: 'direct-byok',
-        provider_id: ENDPOINT_ID,
+        provider_id: PRIVATE_PROVIDER_ID,
         default_rank: -1,
         outcome: 'selected',
       }),
@@ -357,7 +373,12 @@ describe('getProvider for a catalog id an endpoint serves in catalog mode', () =
     const user = await insertTestUser();
     const organizationId = await organizationWithKeys(user, [
       { providerId: 'openrouter', priority: 0 },
-      { providerId: ENDPOINT_ID, endpoint: endpoint(), catalogMode: true, priority: 1 },
+      {
+        providerId: PRIVATE_PROVIDER_ID,
+        privateProvider: privateProvider(),
+        catalogMode: true,
+        priority: 1,
+      },
     ]);
 
     const { result } = await route(user, organizationId, CATALOG_MODEL);
@@ -365,31 +386,31 @@ describe('getProvider for a catalog id an endpoint serves in catalog mode', () =
     expect(await firstRoute(result)).toMatchObject({ userByok: [{ providerId: 'openrouter' }] });
   });
 
-  test('skips the endpoint when the organization model policy does not admit the model', async () => {
+  test('skips the private provider when the organization model policy does not admit the model', async () => {
     const user = await insertTestUser();
     const organizationId = await organizationWithKeys(user, [
       { providerId: 'openrouter' },
-      { providerId: ENDPOINT_ID, endpoint: endpoint(), catalogMode: true },
+      { providerId: PRIVATE_PROVIDER_ID, privateProvider: privateProvider(), catalogMode: true },
     ]);
 
     const { result, decision } = await route(user, organizationId, CATALOG_MODEL, {
-      endpointModelAllowed: false,
+      privateModelAllowed: false,
     });
 
     expect(await onlyRoute(result)).toMatchObject({ userByok: [{ providerId: 'openrouter' }] });
     expect(decision.steps).toContainEqual({
       step: 'organization-policy',
-      excluded_provider_ids: [ENDPOINT_ID],
+      excluded_provider_ids: [PRIVATE_PROVIDER_ID],
     });
   });
 
-  test('ignores endpoints outside catalog mode and models they do not list', async () => {
+  test('ignores private providers outside catalog mode and models they do not list', async () => {
     const user = await insertTestUser();
     const organizationId = await organizationWithKeys(user, [
-      { providerId: ENDPOINT_ID, endpoint: endpoint() },
+      { providerId: PRIVATE_PROVIDER_ID, privateProvider: privateProvider() },
       {
-        providerId: OTHER_ENDPOINT_ID,
-        endpoint: endpoint({ models: [endpoint().models[0]] }),
+        providerId: OTHER_PRIVATE_PROVIDER_ID,
+        privateProvider: privateProvider({ models: [privateProvider().models[0]] }),
         catalogMode: true,
       },
     ]);
@@ -400,10 +421,10 @@ describe('getProvider for a catalog id an endpoint serves in catalog mode', () =
     expect(await onlyRoute(result)).toMatchObject({ userByok: null });
   });
 
-  test('fails with the endpoint over another API kind instead of falling back to Kilo', async () => {
+  test('fails with the private provider over another API kind instead of falling back to Kilo', async () => {
     const user = await insertTestUser();
     const organizationId = await organizationWithKeys(user, [
-      { providerId: ENDPOINT_ID, endpoint: endpoint(), catalogMode: true },
+      { providerId: PRIVATE_PROVIDER_ID, privateProvider: privateProvider(), catalogMode: true },
     ]);
     jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue([]);
 
@@ -413,20 +434,20 @@ describe('getProvider for a catalog id an endpoint serves in catalog mode', () =
 
     expect(await onlyRoute(result)).toMatchObject({
       provider: { type: 'direct-byok', supportedChatApis: ['chat_completions'] },
-      userByok: [{ providerId: ENDPOINT_ID }],
+      userByok: [{ providerId: PRIVATE_PROVIDER_ID }],
     });
     expect(decision.steps).toContainEqual({
       step: 'unsupported-api-kind',
       outcome: 'selected',
-      provider_id: ENDPOINT_ID,
+      provider_id: PRIVATE_PROVIDER_ID,
       supported_api_kinds: ['chat_completions'],
     });
   });
 
-  test("serves a latest alias with the endpoint model of the alias's target", async () => {
+  test("serves a latest alias with the private provider model of the alias's target", async () => {
     const user = await insertTestUser();
     const organizationId = await organizationWithKeys(user, [
-      { providerId: ENDPOINT_ID, endpoint: endpoint(), catalogMode: true },
+      { providerId: PRIVATE_PROVIDER_ID, privateProvider: privateProvider(), catalogMode: true },
     ]);
     jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue([]);
     jest
@@ -436,7 +457,7 @@ describe('getProvider for a catalog id an endpoint serves in catalog mode', () =
     const { result } = await route(user, organizationId, LATEST_ALIAS);
 
     const served = await onlyRoute(result);
-    expect(served).toMatchObject({ userByok: [{ providerId: ENDPOINT_ID }] });
+    expect(served).toMatchObject({ userByok: [{ providerId: PRIVATE_PROVIDER_ID }] });
     const body = { model: LATEST_ALIAS, messages: [] };
     await served.provider.transformRequest({
       provider: served.provider,
@@ -455,7 +476,7 @@ describe('getProvider for a catalog id an endpoint serves in catalog mode', () =
   test('never applies to a personal request', async () => {
     const user = await insertTestUser();
     await organizationWithKeys(user, [
-      { providerId: ENDPOINT_ID, endpoint: endpoint(), catalogMode: true },
+      { providerId: PRIVATE_PROVIDER_ID, privateProvider: privateProvider(), catalogMode: true },
     ]);
     jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue([]);
 
@@ -465,15 +486,15 @@ describe('getProvider for a catalog id an endpoint serves in catalog mode', () =
   });
 });
 
-describe('previewByokRouting with endpoints', () => {
+describe('previewByokRouting with private providers', () => {
   test.each([
     { apiKind: 'chat_completions' as const, outcome: 'used', reason: 'serves' },
     { apiKind: 'messages' as const, outcome: 'skipped', reason: 'unsupported-api-kind' },
-  ])('shows a catalog-mode endpoint for $apiKind', async ({ apiKind, outcome, reason }) => {
+  ])('shows a catalog-mode private provider for $apiKind', async ({ apiKind, outcome, reason }) => {
     const user = await insertTestUser();
     const organizationId = await organizationWithKeys(user, [
       { providerId: 'openrouter' },
-      { providerId: ENDPOINT_ID, endpoint: endpoint(), catalogMode: true },
+      { providerId: PRIVATE_PROVIDER_ID, privateProvider: privateProvider(), catalogMode: true },
     ]);
 
     const preview = await previewByokRouting({
@@ -488,16 +509,16 @@ describe('previewByokRouting with endpoints', () => {
     expect(preview.steps[0]).toEqual({
       route: 'direct-byok',
       outcome,
-      providerId: ENDPOINT_ID,
+      providerId: PRIVATE_PROVIDER_ID,
       reason,
       supportedApiKinds: ['chat_completions'],
     });
   });
 
-  test('explains an endpoint outside catalog mode that lists the catalog id', async () => {
+  test('explains a private provider outside catalog mode that lists the catalog id', async () => {
     const user = await insertTestUser();
     const organizationId = await organizationWithKeys(user, [
-      { providerId: ENDPOINT_ID, endpoint: endpoint() },
+      { providerId: PRIVATE_PROVIDER_ID, privateProvider: privateProvider() },
     ]);
 
     const preview = await previewByokRouting({
@@ -511,22 +532,22 @@ describe('previewByokRouting with endpoints', () => {
     expect(preview.steps[0]).toEqual({
       route: 'direct-byok',
       outcome: 'skipped',
-      providerId: ENDPOINT_ID,
+      providerId: PRIVATE_PROVIDER_ID,
       reason: 'not-catalog-mode',
       supportedApiKinds: ['chat_completions'],
     });
   });
 
-  test('treats an endpoint model id as outside the catalog', async () => {
+  test('treats a private provider model id as outside the catalog', async () => {
     const user = await insertTestUser();
     const organizationId = await organizationWithKeys(user, [
-      { providerId: ENDPOINT_ID, endpoint: endpoint() },
+      { providerId: PRIVATE_PROVIDER_ID, privateProvider: privateProvider() },
     ]);
 
     const preview = await previewByokRouting({
       fromDb: db,
       owner: { type: 'organization', id: organizationId },
-      requestedModel: `${ENDPOINT_ID}/acme/coder`,
+      requestedModel: `${PRIVATE_PROVIDER_ID}/acme/coder`,
       apiKind: 'chat_completions',
     });
 

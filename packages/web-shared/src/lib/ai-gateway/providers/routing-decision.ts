@@ -93,7 +93,7 @@ const RoutingDecisionStepSchema = z.union([
     reason: z.literal('catalog-only'),
     catalog_model_id: z.string().nullable(),
   }),
-  /** An organization endpoint's model id, which no other route serves, that its endpoint cannot serve. */
+  /** An organization private provider's model id, which no other route serves, that its private provider cannot serve. */
   z.object({
     step: z.literal('direct-byok-model'),
     outcome: z.literal('rejected'),
@@ -203,7 +203,7 @@ const RoutingDecisionResultSchema = z.discriminatedUnion('kind', [
       'claude-billing-unavailable',
       'claude-billing-reconnect',
       'custom-llm-unavailable',
-      'byok-endpoint-unavailable',
+      'byok-private-provider-unavailable',
       'direct-byok-catalog-only',
     ]),
   }),

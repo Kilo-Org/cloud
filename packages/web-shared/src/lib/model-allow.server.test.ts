@@ -11,7 +11,7 @@ import {
   type CustomLlmGrantee,
   type ProviderLookup,
 } from '@kilocode/web-shared/lib/model-allow.server';
-import type { ByokEndpointDefinition } from '@kilocode/db/schema-types';
+import type { ByokPrivateProviderDefinition } from '@kilocode/db/schema-types';
 import { byok_api_keys } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { testByokEnvelope } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
@@ -137,14 +137,14 @@ describe('model access predicates', () => {
     await expect(missingFromSnapshot(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(false);
   });
 
-  describe('endpoint models', () => {
-    const ENDPOINT_ID = 'endpoint-a1b2c3d4e5';
-    const CATALOG_ENDPOINT_ID = 'endpoint-b1c2d3e4f5';
-    const DISABLED_ENDPOINT_ID = 'endpoint-c1d2e3f4g5';
+  describe('private provider models', () => {
+    const PRIVATE_PROVIDER_ID = 'private-a1b2c3d4e5';
+    const CATALOG_PRIVATE_PROVIDER_ID = 'private-b1c2d3e4f5';
+    const DISABLED_PRIVATE_PROVIDER_ID = 'private-c1d2e3f4g5';
     let organizationId: string;
     let otherOrganizationId: string;
 
-    function endpointDefinition(): ByokEndpointDefinition {
+    function privateProviderDefinition(): ByokPrivateProviderDefinition {
       return {
         name: 'Acme',
         base_url: 'https://llm.acme.example/v1',
@@ -164,23 +164,27 @@ describe('model access predicates', () => {
 
     beforeAll(async () => {
       const user = await insertTestUser();
-      organizationId = (await createTestOrganization(`Endpoint ${crypto.randomUUID()}`, user.id, 0))
-        .id;
+      organizationId = (
+        await createTestOrganization(`Private provider ${crypto.randomUUID()}`, user.id, 0)
+      ).id;
       otherOrganizationId = (
-        await createTestOrganization(`Endpoint ${crypto.randomUUID()}`, user.id, 0)
+        await createTestOrganization(`Private provider ${crypto.randomUUID()}`, user.id, 0)
       ).id;
       await db.insert(byok_api_keys).values(
         [
-          { providerId: ENDPOINT_ID, catalogMode: false, isEnabled: true },
-          { providerId: CATALOG_ENDPOINT_ID, catalogMode: true, isEnabled: true },
-          { providerId: DISABLED_ENDPOINT_ID, catalogMode: false, isEnabled: false },
+          { providerId: PRIVATE_PROVIDER_ID, catalogMode: false, isEnabled: true },
+          { providerId: CATALOG_PRIVATE_PROVIDER_ID, catalogMode: true, isEnabled: true },
+          { providerId: DISABLED_PRIVATE_PROVIDER_ID, catalogMode: false, isEnabled: false },
         ].map(key => ({
           organization_id: organizationId,
           provider_id: key.providerId,
           encrypted_api_key_envelope: testByokEnvelope('{"type":"api_key","api_key":"secret"}'),
           created_by: user.id,
           is_enabled: key.isEnabled,
-          settings: { serve_catalog_models: key.catalogMode, endpoint: endpointDefinition() },
+          settings: {
+            serve_catalog_models: key.catalogMode,
+            private_provider: privateProviderDefinition(),
+          },
         }))
       );
     });
@@ -197,27 +201,35 @@ describe('model access predicates', () => {
       )(modelId);
     }
 
-    test('exempts a model the grantee organization endpoint lists', async () => {
+    test('exempts a model the grantee organization private provider lists', async () => {
       await expect(
-        isAllowed(`${ENDPOINT_ID}/acme/coder`, { organizationId, groupIds: [] })
+        isAllowed(`${PRIVATE_PROVIDER_ID}/acme/coder`, { organizationId, groupIds: [] })
       ).resolves.toBe(true);
     });
 
     test.each([
-      ['an unlisted model', `${ENDPOINT_ID}/acme/other`, () => organizationId],
-      ['a catalog-mode endpoint', `${CATALOG_ENDPOINT_ID}/acme/coder`, () => organizationId],
-      ['a disabled endpoint', `${DISABLED_ENDPOINT_ID}/acme/coder`, () => organizationId],
-      ['an unknown endpoint', 'endpoint-zzzzzzzzzz/acme/coder', () => organizationId],
-      ['another organization', `${ENDPOINT_ID}/acme/coder`, () => otherOrganizationId],
+      ['an unlisted model', `${PRIVATE_PROVIDER_ID}/acme/other`, () => organizationId],
+      [
+        'a catalog-mode private provider',
+        `${CATALOG_PRIVATE_PROVIDER_ID}/acme/coder`,
+        () => organizationId,
+      ],
+      [
+        'a disabled private provider',
+        `${DISABLED_PRIVATE_PROVIDER_ID}/acme/coder`,
+        () => organizationId,
+      ],
+      ['an unknown private provider', 'private-zzzzzzzzzz/acme/coder', () => organizationId],
+      ['another organization', `${PRIVATE_PROVIDER_ID}/acme/coder`, () => otherOrganizationId],
     ])('does not exempt %s', async (_case, modelId, grantee) => {
       await expect(isAllowed(modelId, { organizationId: grantee(), groupIds: [] })).resolves.toBe(
         false
       );
     });
 
-    test('does not exempt an endpoint model without a grantee', async () => {
-      await expect(isAllowed(`${ENDPOINT_ID}/acme/coder`, undefined)).resolves.toBe(false);
-      await expect(isAllowed('endpoint-short/acme/coder', undefined)).resolves.toBe(false);
+    test('does not exempt a private provider model without a grantee', async () => {
+      await expect(isAllowed(`${PRIVATE_PROVIDER_ID}/acme/coder`, undefined)).resolves.toBe(false);
+      await expect(isAllowed('private-provider-short/acme/coder', undefined)).resolves.toBe(false);
     });
   });
 

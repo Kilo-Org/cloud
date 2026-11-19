@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 import {
-  ByokEndpointDefinitionSchema,
+  ByokPrivateProviderDefinitionSchema,
   CodeReviewCouncilConfigSchema,
   EnkryptInputGuardrailSettingsSchema,
   ModelsSchema,
@@ -294,7 +294,7 @@ describe('OpenRouterPricing', () => {
   });
 });
 
-describe('ByokEndpointDefinitionSchema', () => {
+describe('ByokPrivateProviderDefinitionSchema', () => {
   const definition = (overrides: Record<string, unknown> = {}) => ({
     name: 'Acme',
     base_url: 'https://llm.acme.example/v1',
@@ -310,12 +310,14 @@ describe('ByokEndpointDefinitionSchema', () => {
   it.each(['https://llm.acme.example/v1', 'http://localhost:8080/v1'])(
     'accepts the base URL %s',
     base_url => {
-      expect(ByokEndpointDefinitionSchema.safeParse(definition({ base_url })).success).toBe(true);
+      expect(ByokPrivateProviderDefinitionSchema.safeParse(definition({ base_url })).success).toBe(
+        true
+      );
     }
   );
 
   it('rejects a URL template in the base URL', () => {
-    const result = ByokEndpointDefinitionSchema.safeParse(
+    const result = ByokPrivateProviderDefinitionSchema.safeParse(
       definition({ base_url: 'https://llm.acme.example/models/{model}/v1' })
     );
 
@@ -330,7 +332,7 @@ describe('ByokEndpointDefinitionSchema', () => {
     'https://user@llm.acme.example/v1',
     'https://:pass@llm.acme.example/v1',
   ])('rejects the base URL with credentials %s', base_url => {
-    const result = ByokEndpointDefinitionSchema.safeParse(definition({ base_url }));
+    const result = ByokPrivateProviderDefinitionSchema.safeParse(definition({ base_url }));
 
     expect(result.error?.issues[0]).toMatchObject({
       path: ['base_url'],

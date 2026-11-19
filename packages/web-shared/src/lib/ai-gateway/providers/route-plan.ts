@@ -19,7 +19,7 @@ import { createByokRouteRank } from '@kilocode/web-shared/lib/ai-gateway/byok/ro
 import {
   directByokProviderForKey,
   findDirectByokCatalogModels,
-  getByokEndpointProviders,
+  getByokPrivateProviders,
   getDirectByokModel,
   getDirectByokModelChatApis,
   getDirectByokPolicyTarget,
@@ -38,55 +38,53 @@ import {
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { isByokServableCatalogModelId } from '@kilocode/web-shared/lib/ai-gateway/byok/servable-catalog-model';
 import {
-  getByokEndpointProviderIdOfModel,
-  type ByokEndpointProviderId,
-} from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
+  getByokPrivateProviderIdOfModel,
+  type ByokPrivateProviderId,
+} from '@kilocode/web-shared/lib/ai-gateway/byok-private-provider';
 
 export type RequestedModel =
   /** A custom LLM owns its id, so no key or Kilo route applies. */
   | { kind: 'custom-llm'; customLlm: CustomLlm }
   /**
    * A provider model id such as `synthetic/...`, served only by that provider's key, or an
-   * organization endpoint's model id such as `endpoint-a1b2c3d4e5/...`.
+   * organization private provider's model id such as `private-a1b2c3d4e5/...`.
    */
   | { kind: 'direct-byok-model'; provider: DirectByokProvider; model: DirectByokModel }
   /**
-   * An endpoint model id that names no listed model of an enabled endpoint of the owner. Only its
-   * endpoint may serve it, so no other route applies.
+   * A private provider model id that names no listed model of an enabled private provider of the owner. Only its
+   * private provider may serve it, so no other route applies.
    */
   | {
-      kind: 'unavailable-endpoint-model';
-      providerId: ByokEndpointProviderId;
+      kind: 'unavailable-private-model';
+      providerId: ByokPrivateProviderId;
       reason: 'no-key' | 'disabled' | 'unknown-model';
     }
   | { kind: 'catalog' };
 
-async function classifyEndpointModel(
+async function classifyPrivateModel(
   requestedModel: string,
-  providerId: ByokEndpointProviderId,
+  providerId: ByokPrivateProviderId,
   loadKeys: (() => Promise<readonly ByokKeyState[]>) | null
 ): Promise<RequestedModel> {
   const key = loadKeys && (await loadKeys()).find(candidate => candidate.providerId === providerId);
   const provider = key && directByokProviderForKey(key);
-  if (!key || !provider)
-    return { kind: 'unavailable-endpoint-model', providerId, reason: 'no-key' };
-  if (!key.isEnabled) return { kind: 'unavailable-endpoint-model', providerId, reason: 'disabled' };
+  if (!key || !provider) return { kind: 'unavailable-private-model', providerId, reason: 'no-key' };
+  if (!key.isEnabled) return { kind: 'unavailable-private-model', providerId, reason: 'disabled' };
   const { model } = await getDirectByokModel(requestedModel, [provider]);
   return model
     ? { kind: 'direct-byok-model', provider, model }
-    : { kind: 'unavailable-endpoint-model', providerId, reason: 'unknown-model' };
+    : { kind: 'unavailable-private-model', providerId, reason: 'unknown-model' };
 }
 
-/** `loadKeys` loads the owner's keys, as for `RoutePlanInputs`; only endpoint model ids need them. */
+/** `loadKeys` loads the owner's keys, as for `RoutePlanInputs`; only private provider model ids need them. */
 export async function classifyRequestedModel(
   requestedModel: string,
   loadKeys: (() => Promise<readonly ByokKeyState[]>) | null
 ): Promise<RequestedModel> {
   const customLlm = await findCustomLlm(requestedModel);
   if (customLlm) return { kind: 'custom-llm', customLlm };
-  const endpointProviderId = getByokEndpointProviderIdOfModel(requestedModel);
-  if (endpointProviderId)
-    return classifyEndpointModel(requestedModel, endpointProviderId, loadKeys);
+  const privateProviderId = getByokPrivateProviderIdOfModel(requestedModel);
+  if (privateProviderId) return classifyPrivateModel(requestedModel, privateProviderId, loadKeys);
   const { provider, model } = await getDirectByokModel(requestedModel);
   if (provider && model) return { kind: 'direct-byok-model', provider, model };
   return { kind: 'catalog' };
@@ -266,7 +264,7 @@ async function planKeySteps(inputs: RoutePlanInputs): Promise<KeyPlanStep[]> {
     getAllowedProviders: inputs.getAllowedProviders,
     onExcludedByPolicy: inputs.onExcludedByPolicy,
   });
-  // The owner's endpoints are only known from its keys, which a servable catalog id may need.
+  // The owner's private providers are only known from its keys, which a servable catalog id may need.
   if (
     staticCatalogModels.length === 0 &&
     gatewayRoutedProviders.length === 0 &&
@@ -277,13 +275,13 @@ async function planKeySteps(inputs: RoutePlanInputs): Promise<KeyPlanStep[]> {
 
   const keys = await inputs.loadKeys();
   const rank = createByokRouteRank(keys);
-  const endpointProviders = getByokEndpointProviders(keys);
+  const privateProviders = getByokPrivateProviders(keys);
   const catalogModels = [
     ...staticCatalogModels,
-    ...(endpointProviders.length > 0
+    ...(privateProviders.length > 0
       ? await getAllowedDirectByokCatalogModels(
           inputs,
-          await findDirectByokCatalogModels(requestedModel, endpointProviders)
+          await findDirectByokCatalogModels(requestedModel, privateProviders)
         )
       : []),
   ];

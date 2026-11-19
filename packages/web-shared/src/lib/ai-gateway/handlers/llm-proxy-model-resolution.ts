@@ -41,7 +41,7 @@ import {
   supportsCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { byokOwner } from '@kilocode/web-shared/lib/ai-gateway/byok';
-import { isByokEndpointModelId } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
+import { isByokPrivateModelId } from '@kilocode/web-shared/lib/ai-gateway/byok-private-provider';
 import type { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { isDataCollectionExplicitlyDisallowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
@@ -330,7 +330,7 @@ async function resolveAutoModelId(
 }
 
 /**
- * The catalog id that replaces an auto-routed bespoke direct BYOK or endpoint id when the caller's
+ * The catalog id that replaces an auto-routed bespoke direct BYOK or private provider id when the caller's
  * key for it is in catalog mode. Null when the id needs no replacement or has no catalog id; an
  * unmapped id then gets the catalog-only error from `getProvider`.
  */
@@ -338,8 +338,8 @@ async function catalogModeModelForRoutedModel(
   model: string,
   callerPromise: ModelResolutionContext['callerPromise']
 ): Promise<string | null> {
-  // Only the caller's keys know its endpoints, which can all serve catalog ids.
-  if (!isByokEndpointModelId(model.toLowerCase())) {
+  // Only the caller's keys know its private providers, which can all serve catalog ids.
+  if (!isByokPrivateModelId(model.toLowerCase())) {
     const { provider } = await getDirectByokModel(model.toLowerCase());
     if (!provider || !supportsCatalogMode(provider)) return null;
   }

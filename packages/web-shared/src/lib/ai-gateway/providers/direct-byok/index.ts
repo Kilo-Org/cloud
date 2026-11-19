@@ -30,8 +30,8 @@ import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/
 import { getFallbackReasoningOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
 import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 import { signBedrockRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/aws-bedrock-signing';
-import { isByokEndpointProviderId } from '@kilocode/db/schema-types';
-import { createByokEndpointDirectProvider } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/direct-provider';
+import { isByokPrivateProviderId } from '@kilocode/db/schema-types';
+import { createByokPrivateProviderDirectProvider } from '@kilocode/web-shared/lib/ai-gateway/byok-private-provider/direct-provider';
 
 /**
  * The provider slug that organization provider allow-lists use for a direct BYOK provider: its
@@ -43,7 +43,7 @@ export function getDirectByokPolicyProviderId(provider: DirectByokProvider): str
 
 /**
  * What the organization policy checks for a request a direct BYOK key serves: the provider its
- * provider allow-list names, or, for the organization's own endpoint, which the allow-list cannot
+ * provider allow-list names, or, for the organization's own private provider, which the allow-list cannot
  * name, only its model policy.
  */
 export type DirectByokPolicyTarget =
@@ -52,11 +52,11 @@ export type DirectByokPolicyTarget =
       /** See `getDirectByokPolicyProviderId`. */
       providerSlug: string;
     }
-  | { kind: 'organization-endpoint' };
+  | { kind: 'private-provider' };
 
 export function getDirectByokPolicyTarget(provider: DirectByokProvider): DirectByokPolicyTarget {
-  return provider.organization_endpoint
-    ? { kind: 'organization-endpoint' }
+  return provider.private_provider
+    ? { kind: 'private-provider' }
     : { kind: 'provider', providerSlug: getDirectByokPolicyProviderId(provider) };
 }
 
@@ -75,17 +75,17 @@ export function getDirectByokProviderListings(): OpenRouterProvider[] {
 
 /** The name model lists and error messages show for the provider. */
 export function getDirectByokProviderName(provider: DirectByokProvider): string {
-  return provider.organization_endpoint
-    ? provider.organization_endpoint.name
+  return provider.private_provider
+    ? provider.private_provider.name
     : DIRECT_BYOK_PROVIDERS_META[provider.id];
 }
 
 /**
  * How error messages name the caller's key for the provider, such as `Synthetic key`, or
- * `Acme endpoint` for an organization's endpoint.
+ * `Acme private provider` for an organization's private provider.
  */
 export function getDirectByokKeyLabel(provider: DirectByokProvider): string {
-  const noun = provider.organization_endpoint ? 'endpoint' : 'key';
+  const noun = provider.private_provider ? 'private provider' : 'key';
   return `${getDirectByokProviderName(provider)} ${noun}`;
 }
 
@@ -203,43 +203,43 @@ export function findDirectByokProvider(providerId: string): DirectByokProvider |
   return providers.find(provider => provider.id === providerId);
 }
 
-type DirectByokKey = Pick<EnabledByokProvider, 'providerId' | 'endpoint'>;
+type DirectByokKey = Pick<EnabledByokProvider, 'providerId' | 'privateProvider'>;
 
 /**
  * The direct BYOK provider that serves the requests of `key`, when it is a direct BYOK key: a
- * provider of `DIRECT_BYOK_PROVIDERS`, or the organization's endpoint the key defines.
+ * provider of `DIRECT_BYOK_PROVIDERS`, or the organization's private provider the key defines.
  */
 export function directByokProviderForKey(key: DirectByokKey): DirectByokProvider | undefined {
-  if (key.endpoint && isByokEndpointProviderId(key.providerId)) {
-    return createByokEndpointDirectProvider(key.providerId, key.endpoint);
+  if (key.privateProvider && isByokPrivateProviderId(key.providerId)) {
+    return createByokPrivateProviderDirectProvider(key.providerId, key.privateProvider);
   }
   return findDirectByokProvider(key.providerId);
 }
 
-/** The organization endpoints among `keys`, in key order. */
-export function getByokEndpointProviders(keys: ReadonlyArray<DirectByokKey>): DirectByokProvider[] {
-  return keys.flatMap(key => (key.endpoint ? (directByokProviderForKey(key) ?? []) : []));
+/** The organization private providers among `keys`, in key order. */
+export function getByokPrivateProviders(keys: ReadonlyArray<DirectByokKey>): DirectByokProvider[] {
+  return keys.flatMap(key => (key.privateProvider ? (directByokProviderForKey(key) ?? []) : []));
 }
 
 /**
  * The direct BYOK providers of `keys`: providers of `DIRECT_BYOK_PROVIDERS` in that order, then
- * the organization endpoints in key order.
+ * the organization private providers in key order.
  */
 export function directByokProvidersForKeys(
   keys: ReadonlyArray<DirectByokKey>
 ): DirectByokProvider[] {
   return [
     ...DIRECT_BYOK_PROVIDERS.filter(provider => keys.some(key => key.providerId === provider.id)),
-    ...getByokEndpointProviders(keys),
+    ...getByokPrivateProviders(keys),
   ];
 }
 
 /**
  * Catalog mode needs models.dev data to map upstream models to catalog ids. An organization's
- * endpoint names each model by the catalog id it serves in catalog mode.
+ * private provider names each model by the catalog id it serves in catalog mode.
  */
 export function supportsCatalogMode(provider: DirectByokProvider): boolean {
-  return provider.models_dev_id !== undefined || provider.organization_endpoint !== undefined;
+  return provider.models_dev_id !== undefined || provider.private_provider !== undefined;
 }
 
 export type DirectByokCatalogEntry = { catalogModelId: string; model: DirectByokModel };

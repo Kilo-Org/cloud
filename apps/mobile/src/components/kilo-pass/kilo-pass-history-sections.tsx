@@ -5,7 +5,10 @@ import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { AlertCircle } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
+import { KvRow } from '@/components/ui/kv-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatDate, formatPrefixedMoney } from '@/lib/format';
@@ -19,14 +22,7 @@ import { isRetryableTrpcError } from '@/lib/trpc-error';
 import { capitalize, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
 function HistorySection({ title, children }: Readonly<{ title: string; children: ReactNode }>) {
-  return (
-    <View className="gap-2">
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {title}
-      </Text>
-      <View className="gap-3 rounded-lg bg-secondary p-4">{children}</View>
-    </View>
-  );
+  return <Section label={title}>{children}</Section>;
 }
 
 function historyDate(value: string): string {
@@ -43,20 +39,26 @@ function HistoryLine({
   amount,
 }: Readonly<{ title: string; date: string; amount: string }>) {
   return (
-    <View className="gap-0.5">
-      <View className="flex-row items-center justify-between gap-3">
-        <Text className="min-w-0 flex-1 text-sm text-foreground" numberOfLines={1}>
-          {title}
-        </Text>
-        <Text className="text-sm text-foreground">{amount}</Text>
-      </View>
-      <Text className="text-xs text-muted-foreground">{date}</Text>
-    </View>
+    <KvRow
+      label={title}
+      // The description the server returns can be a sentence; the amount and
+      // the date are the column a reader scans, so the title yields its width
+      // to them instead of pushing them out of the row.
+      labelShrink
+      value={amount}
+      valueFace="numeric"
+      trailing={<Text variant="caption">{date}</Text>}
+    />
   );
 }
 
-function SectionPending({ children }: Readonly<{ children: ReactNode }>) {
-  return <View className="gap-2">{children}</View>;
+function SectionPending() {
+  return (
+    <RowGroup>
+      <RowSkeleton />
+      <RowSkeleton />
+    </RowGroup>
+  );
 }
 
 /**
@@ -80,7 +82,9 @@ function SectionError({
     <View className="gap-2">
       <View className="flex-row items-center gap-2">
         <AlertCircle size={16} color={colors.destructive} />
-        <Text className="min-w-0 flex-1 text-sm text-muted-foreground">{message}</Text>
+        <Text variant="muted" className="min-w-0 flex-1">
+          {message}
+        </Text>
       </View>
       {onRetry ? (
         <Button
@@ -156,12 +160,7 @@ export function KiloPassCreditHistorySection({
 
   let body: ReactNode = null;
   if (query.isPending) {
-    body = (
-      <SectionPending>
-        <Skeleton className="h-4 w-40 rounded" />
-        <Skeleton className="h-4 w-32 rounded" />
-      </SectionPending>
-    );
+    body = <SectionPending />;
   } else if (firstPageFailed) {
     body = (
       <SectionError
@@ -176,13 +175,15 @@ export function KiloPassCreditHistorySection({
       />
     );
   } else if (entries.length === 0) {
-    body = (
-      <Text variant="muted" className="text-sm">
-        {t('kiloPass.manage.creditHistoryEmpty')}
-      </Text>
-    );
+    body = <Text variant="muted">{t('kiloPass.manage.creditHistoryEmpty')}</Text>;
   } else {
-    body = entries.map(entry => <CreditHistoryLine key={entry.id} entry={entry} />);
+    body = (
+      <RowGroup>
+        {entries.map(entry => (
+          <CreditHistoryLine key={entry.id} entry={entry} />
+        ))}
+      </RowGroup>
+    );
   }
 
   return (
@@ -228,12 +229,7 @@ export function KiloPassBillingHistorySection({
 
   let body: ReactNode = null;
   if (query.isPending) {
-    body = (
-      <SectionPending>
-        <Skeleton className="h-4 w-40 rounded" />
-        <Skeleton className="h-4 w-32 rounded" />
-      </SectionPending>
-    );
+    body = <SectionPending />;
   } else if (firstPageFailed) {
     body = (
       <SectionError
@@ -248,13 +244,15 @@ export function KiloPassBillingHistorySection({
       />
     );
   } else if (entries.length === 0) {
-    body = (
-      <Text variant="muted" className="text-sm">
-        {t('kiloPass.manage.billingHistoryEmpty')}
-      </Text>
-    );
+    body = <Text variant="muted">{t('kiloPass.manage.billingHistoryEmpty')}</Text>;
   } else {
-    body = entries.map(entry => <BillingHistoryLine key={entry.id} entry={entry} />);
+    body = (
+      <RowGroup>
+        {entries.map(entry => (
+          <BillingHistoryLine key={entry.id} entry={entry} />
+        ))}
+      </RowGroup>
+    );
   }
 
   return (

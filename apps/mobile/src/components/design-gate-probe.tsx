@@ -28,10 +28,28 @@ declare global {
  * the live defect signal it is (`setThemePreference` orders its writes around
  * exactly this warning), and the gate's capture measures the screen instead of
  * its own overlay — with no operator step and no Metro cache coupling.
+ *
+ * The receipt is written at the END of `+native-intent.tsx`, so its module can
+ * be evaluated after this component's mount effect ran and skipped the ignore;
+ * the probe therefore also installs the filters on first probe use (`ready()`/
+ * `dump()`), and LogBox re-filters logs it already holds, removing a
+ * notification shown earlier.
  */
 const DESIGN_GATE_IGNORED_LOGS = [
   "Can't perform a React state update on a component that hasn't mounted yet.",
 ] as const;
+
+/**
+ * Installs the ignored messages above in any prepared design-gate bundle.
+ * Idempotent: LogBox dedupes patterns, so repeat calls are cheap; adding a
+ * pattern re-filters the logs it already holds, so a notification shown before
+ * the receipt module was evaluated disappears.
+ */
+function installDesignGateLogFilters() {
+  if (globalThis.__kiloDesignProofSource !== undefined) {
+    LogBox.ignoreLogs([...DESIGN_GATE_IGNORED_LOGS]);
+  }
+}
 
 /**
  * Development-only: registers the design-gate layout probe while it is mounted.
@@ -55,14 +73,13 @@ export function DesignGateProbe() {
     safeArea.current = insets;
   }, [pathname, screenKey, insets]);
   useEffect(() => {
-    if (globalThis.__kiloDesignProofSource !== undefined) {
-      LogBox.ignoreLogs([...DESIGN_GATE_IGNORED_LOGS]);
-    }
+    installDesignGateLogFilters();
     const api = createDesignGateApi({
       document: () => anchor.current?.ownerDocument ?? null,
       route: () => route.current,
       screen: () => screen.current,
       safeArea: () => safeArea.current,
+      ensureLogFilters: installDesignGateLogFilters,
     });
     globalThis.__kiloDesignGate = api;
     return () => {

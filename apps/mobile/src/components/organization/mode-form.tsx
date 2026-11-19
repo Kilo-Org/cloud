@@ -30,6 +30,7 @@ import { ModeToolsFields } from '@/components/organization/mode-tools-fields';
 import { Text } from '@/components/ui/text';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 import { useOrgModeMutations } from '@/lib/hooks/use-org-modes-queries';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { usePopOnce } from '@/lib/navigation/pop-once';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 
@@ -195,7 +196,7 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
       <TabScreenScrollView
         ref={scrollRef}
         className="flex-1"
-        contentContainerClassName="gap-5 px-6 pb-10 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
@@ -241,7 +242,7 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
               }
             }}
           />
-          <Text variant="muted" className="text-xs">
+          <Text variant="caption">
             {suggestion.length === 0
               ? t('organization.modes.identifierHint')
               : `${suggestion} · ${t('organization.modes.identifierHint')}`}

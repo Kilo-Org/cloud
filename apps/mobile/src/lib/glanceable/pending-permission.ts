@@ -9,6 +9,8 @@ import {
 import { CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
 import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-connection-lifecycle';
 
+import { PendingPermissionUnreadableError } from './pending-permission-unreadable-error';
+
 /**
  * The one read of the cloud-agent pending interactions. The ids live only in the
  * control plane's pending-interaction projection and are sent on stream connect,
@@ -23,9 +25,9 @@ import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-conn
 /** The interaction identity the control plane's projection guarantees. */
 const pendingPermissionSchema = z.object({ id: z.string().min(1) });
 
-/** The `connected` frame's interaction projection; absent means none pending. */
+/** The `connected` frame's interaction projection; a present, empty list means none pending. */
 const connectedInteractionsSchema = z.object({
-  pendingInteractions: z.object({ permissions: z.array(pendingPermissionSchema) }).optional(),
+  pendingInteractions: z.object({ permissions: z.array(pendingPermissionSchema) }),
 });
 
 type StreamConnectionLike = { connect: () => void; destroy: () => void };
@@ -95,8 +97,13 @@ export class PendingPermissionTimeoutError extends Error {
 
 /**
  * The pending permission ids the connected frame carries, in the projection's
- * order. A frame with no projection, or one this module cannot decode, reads as
- * no pending request: the caller then has nothing it may answer.
+ * order. Three cases decide the result:
+ *
+ * - A present, empty `permissions` array reads as nothing pending.
+ * - An absent projection rejects with `PendingPermissionUnreadableError`. The
+ *   control plane omits the projection when it holds no snapshot. Absence is
+ *   unknown, not empty.
+ * - A frame this module cannot decode also rejects with that error.
  */
 function readPendingPermissionIds(
   input: PendingPermissionReadInput,
@@ -176,12 +183,12 @@ function readPendingPermissionIds(
             return;
           }
           const parsed = connectedInteractionsSchema.safeParse(event.data);
-          settle(
-            parsed.success
-              ? (parsed.data.pendingInteractions?.permissions.map(permission => permission.id) ??
-                  [])
-              : []
-          );
+          if (!parsed.success) {
+            // An unreadable projection is no proof that nothing is pending.
+            fail(new PendingPermissionUnreadableError());
+            return;
+          }
+          settle(parsed.data.pendingInteractions.permissions.map(permission => permission.id));
         },
         onConnected: () => undefined,
         onDisconnected: () => undefined,

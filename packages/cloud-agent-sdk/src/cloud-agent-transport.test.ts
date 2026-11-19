@@ -7,6 +7,7 @@ import { createEventHelpers } from './__fixtures__/helpers';
 import type { ChatEvent, ServiceEvent } from './normalizer';
 import type { SessionStatus } from './schemas';
 import { createCloudAgentTransport } from './cloud-agent-transport';
+import type { SessionSnapshotFailure } from './snapshot-page';
 import { createServiceState } from './service-state';
 import { createMemoryStorage } from './storage/memory';
 import { createChatProcessor } from './chat-processor';
@@ -282,7 +283,7 @@ function createMockApi() {
 
 function createTransportWithSinks(
   getTicket: (sessionId: string) => string | Promise<string> = () => 'test-ticket',
-  onError?: (message: string) => void,
+  onError?: (message: string, failure?: SessionSnapshotFailure) => void,
   api = createMockApi()
 ) {
   const chatEvents: ChatEvent[] = [];
@@ -373,7 +374,8 @@ describe('CloudAgentTransport event routing', () => {
       );
       expect(questionAsked).toHaveBeenCalledWith('live-question', []);
       mockWs.onclose?.({ code: 1006, reason: '', wasClean: false } as CloseEvent);
-      expect(state.getStatus()).toEqual({ type: 'disconnected' });
+      // A drop the transport retries reads as reconnecting, not as a loss.
+      expect(state.getStatus()).toEqual({ type: 'disconnected', reconnecting: true });
     } finally {
       transport.destroy();
       jest.useRealTimers();
@@ -394,7 +396,8 @@ describe('CloudAgentTransport event routing', () => {
   });
 
   it('publishes connection loss when authentication fails after a partial replay', async () => {
-    const { transport, state, stateNotifications, stateErrors } = createTransportWithSinks();
+    const { transport, state, stateNotifications, stateErrors, serviceEvents } =
+      createTransportWithSinks();
     transport.connect();
     await flushPromises();
     stateNotifications.mockClear();
@@ -403,9 +406,16 @@ describe('CloudAgentTransport event routing', () => {
     mockWs.onclose?.({ code: 1008, reason: 'Unauthorized', wasClean: false } as CloseEvent);
     await flushPromises();
     mockWs.onclose?.({ code: 1008, reason: 'Unauthorized', wasClean: false } as CloseEvent);
-    expect(state.getStatus()).toEqual({ type: 'disconnected' });
-    expect(stateNotifications).toHaveBeenCalledTimes(1);
+    // The first close is a drop the transport retries, so it reads as
+    // reconnecting. The second close spends the retry budget on an auth
+    // failure, which escalates to one terminal loss.
+    expect(state.getStatus()).toEqual({ type: 'disconnected', code: 'connection-lost' });
+    expect(stateNotifications).toHaveBeenCalledTimes(2);
+    expect(stateErrors).toHaveBeenCalledWith('Connection lost. Please retry in a moment.');
     expect(stateErrors).not.toHaveBeenCalledWith('Historical overload');
+    expect(
+      serviceEvents.filter(event => event.type === 'stopped' && event.exhausted === true)
+    ).toHaveLength(1);
     transport.destroy();
   });
 
@@ -540,7 +550,7 @@ describe('CloudAgentTransport event routing', () => {
     sendRaw(kilocode('session.error', { sessionID: 'ses-1', error: 'Old failure' }));
     expect(stateNotifications).not.toHaveBeenCalled();
     mockWs.onclose?.({ code: 1006, reason: '', wasClean: false } as CloseEvent);
-    expect(state.getStatus()).toEqual({ type: 'disconnected' });
+    expect(state.getStatus()).toEqual({ type: 'disconnected', reconnecting: true });
     expect(stateErrors).not.toHaveBeenCalledWith('Old failure');
     expect(stateNotifications).toHaveBeenCalledTimes(1);
     transport.destroy();
@@ -1680,7 +1690,7 @@ describe('CloudAgentTransport snapshot refetch on reconnect', () => {
 describe('CloudAgentTransport page-seam', () => {
   function createTransportWithPageFetch(
     page: SessionSnapshotPageOutcome | null,
-    onError?: (message: string) => void
+    onError?: (message: string, failure?: SessionSnapshotFailure) => void
   ) {
     const chatEvents: ChatEvent[] = [];
     const serviceEvents: ServiceEvent[] = [];
@@ -1750,6 +1760,34 @@ describe('CloudAgentTransport page-seam', () => {
     transport.destroy();
   });
 
+  it('passes no typed failure argument for a rejected read with its own message', async () => {
+    const onError = jest.fn();
+    const page = jest
+      .fn<Promise<SessionSnapshotPageOutcome | null>, []>()
+      .mockRejectedValue(new Error('Connection lost. Please retry in a moment.'));
+    const factory = createCloudAgentTransport({
+      sessionId: cloudAgentId('ses-1'),
+      kiloSessionId: kiloId('ses-1'),
+      api: createMockApi(),
+      getTicket: () => 'test-ticket',
+      fetchSnapshot: () => Promise.reject(new Error('legacy fetchSnapshot must not be called')),
+      fetchSnapshotPage: page,
+      websocketBaseUrl: 'ws://localhost:9999',
+      onError,
+    });
+    const transport = factory({
+      onChatEvent: () => undefined,
+      onServiceEvent: () => undefined,
+    });
+
+    transport.connect();
+    await flushPromises();
+
+    expect(onError).toHaveBeenCalledWith('Connection lost. Please retry in a moment.', undefined);
+
+    transport.destroy();
+  });
+
   it('surfaces invalid_data on the initial read via onError and still connects the websocket', async () => {
     const errors: string[] = [];
     const { transport, chatEvents, serviceEvents, onInitialPageLoaded } =
@@ -1771,13 +1809,18 @@ describe('CloudAgentTransport page-seam', () => {
 
   it('surfaces too_large on the initial read via onError and still connects the websocket', async () => {
     const errors: string[] = [];
+    const failures: (SessionSnapshotFailure | undefined)[] = [];
     const { transport, chatEvents, serviceEvents, onInitialPageLoaded } =
-      createTransportWithPageFetch({ kind: 'too_large' }, message => errors.push(message));
+      createTransportWithPageFetch({ kind: 'too_large' }, (message, failure) => {
+        errors.push(message);
+        failures.push(failure);
+      });
 
     transport.connect();
     await flushPromises();
 
     expect(errors).toEqual(['Session history too large to load']);
+    expect(failures).toEqual([{ kind: 'too_large', message: 'Session history too large to load' }]);
     expect(onInitialPageLoaded).not.toHaveBeenCalled();
     expect(serviceEvents.filter(e => e.type === 'session.created')).toHaveLength(0);
     expect(chatEvents).toHaveLength(0);
@@ -2386,6 +2429,51 @@ describe('CloudAgentTransport snapshot read recovery', () => {
       expect(fetchSnapshotPage).toHaveBeenCalledTimes(4);
       expect(errors).toEqual(['Connection lost.']);
       expect(webSocketConstructor).toHaveBeenCalledTimes(1);
+
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('reads a malformed snapshot page once and reports it as unavailable history', async () => {
+    jest.useFakeTimers();
+    try {
+      const cloudAgentWorkspaceId = 'workspace_' + 'w'.repeat(12);
+      const fetchCloudSnapshotPage = jest.fn(() =>
+        Promise.resolve({ kind: 'success', info: { id: 123 }, messages: 'nope' })
+      );
+      const errors: string[] = [];
+      const serviceEvents: ServiceEvent[] = [];
+      const onInitialPageLoaded = jest.fn();
+      const transport = createCloudAgentTransport({
+        sessionId: cloudAgentId(cloudAgentWorkspaceId),
+        kiloSessionId: kiloId('ses-1'),
+        api: createMockApi(),
+        getTicket: () => 'test-ticket',
+        fetchCloudSnapshotPage,
+        onInitialPageLoaded,
+        websocketBaseUrl: 'ws://localhost:9999',
+        onError: message => errors.push(message),
+      })({
+        onChatEvent: () => undefined,
+        onServiceEvent: event => serviceEvents.push(event),
+      });
+
+      transport.connect();
+      await flushMicrotasks();
+
+      // Cover the full retry window: a malformed page is terminal, so the
+      // read must not be repeated.
+      for (let attempt = 0; attempt < 4; attempt++) {
+        jest.advanceTimersByTime(5000);
+        await flushMicrotasks();
+      }
+
+      expect(fetchCloudSnapshotPage).toHaveBeenCalledTimes(1);
+      expect(errors).toEqual(['Session history is unavailable']);
+      expect(onInitialPageLoaded).not.toHaveBeenCalled();
+      expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(0);
 
       transport.destroy();
     } finally {

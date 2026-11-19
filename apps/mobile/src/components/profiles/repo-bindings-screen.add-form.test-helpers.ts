@@ -20,7 +20,9 @@ export function pressableLabels(root: ReactTestInstance): string[] {
 type EmptyStateNode = {
   props: {
     description?: string;
-    action?: { props: { onPress: () => void; children: { props: { children: string } } } };
+    // The state fills its action slot with a `StateAction`, which the suites
+    // stub as a host node carrying its label and handler as props.
+    action?: { props: { label: string; onPress: () => void } };
   };
 };
 

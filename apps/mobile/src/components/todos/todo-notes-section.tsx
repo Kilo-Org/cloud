@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, TextInput, View } from 'react-native';
 
 import { MarkdownText } from '@/components/agents/markdown-text';
-import { SectionHeader } from '@/components/home/section-header';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useTodoItemMutations } from '@/lib/hooks/use-todos';
@@ -36,7 +36,7 @@ function TodoNotesEditor({
         accessibilityLabel={t('todos.item.notes')}
         placeholder={t('todos.item.notesPrompt')}
         placeholderTextColor={colors.mutedForeground}
-        className="min-h-32 rounded-lg border border-border bg-secondary pb-2.5 pl-3 pr-3 pt-2.5 text-base leading-[1.5rem] text-foreground"
+        className="min-h-32 rounded-md border border-input bg-background py-2 text-base text-foreground"
       />
       <Text className="text-xs text-ink2">{t('todos.item.markdownSupported')}</Text>
     </View>
@@ -98,7 +98,6 @@ export function TodoNotesSection({ todo }: Readonly<{ todo: TodoItemDetail }>) {
       <SectionHeader
         label={t('todos.item.notes')}
         actionLabel={actionLabel}
-        reserveLabelAir
         onActionPress={() => {
           if (editing) {
             saveNotes();

@@ -16,6 +16,7 @@ import WIDGET_GALLERY_COPY from './plugins/widget-gallery-copy.json';
 // metadata, not app copy — see plugins/withAppIntentLocalizations.js.
 import APP_INTENT_COPY from './plugins/app-intent-copy.json';
 import { SENTRY_NATIVE_OPTIONS } from './src/lib/sentry-dsn';
+import { SPLASH_LOGO_SIZE } from './src/lib/splash-branding.ts';
 import { UNIVERSAL_LINK_PATH_PATTERNS } from './src/lib/universal-link-paths';
 import {
   assertProductionHost,
@@ -444,7 +445,7 @@ const config: ExpoConfig = {
       {
         image: './assets/images/logo-mark.png',
         backgroundColor: '#FFDD00',
-        imageWidth: 100,
+        imageWidth: SPLASH_LOGO_SIZE,
       },
     ],
     'expo-apple-authentication',

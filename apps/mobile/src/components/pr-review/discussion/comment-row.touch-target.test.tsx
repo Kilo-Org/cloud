@@ -126,11 +126,16 @@ describe('CommentRow overflow touch target', () => {
     expect(overflow.props.hitSlop).toEqual(COMMENT_ACTIONS_HIT_SLOP);
     expect(COMMENT_ACTIONS_FRAME_DP).toBeGreaterThanOrEqual(ICON_TARGET_DP);
 
-    // The visible circle keeps its compact size inside the frame.
-    const circleClass = `h-[${COMMENT_ACTIONS_VISUAL_DP}px] w-[${COMMENT_ACTIONS_VISUAL_DP}px]`;
-    const circle = overflow.find(
-      node => typeof node.type === 'string' && String(node.props.className).includes(circleClass)
-    );
+    // The visible circle keeps its compact size inside the frame. NativeWind's
+    // 14pt rem makes one spacing step 3.5pt, so the shown square has to resolve
+    // back to COMMENT_ACTIONS_VISUAL_DP rather than the 48dp box.
+    const circle = overflow.find(node => {
+      const match = /\bh-(\d+) w-(\d+)\b/.exec(String(node.props.className ?? ''));
+      if (match === null || match[1] !== match[2]) {
+        return false;
+      }
+      return Number(match[1]) * 3.5 === COMMENT_ACTIONS_VISUAL_DP;
+    });
     expect(circle).toBeDefined();
 
     renderer.unmount();

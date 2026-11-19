@@ -1,9 +1,11 @@
 import { instrumentCloudAgentDurableObject } from './sentry.js';
 import { SandboxControlV2 } from './control-plane/sandbox/sandbox-do.js';
 import { SandboxSessionV2 } from './control-plane/session/session-do.js';
+import { CloudAgentWorkspaceDO } from './control-plane/workspace/workspace-do.js';
 import { SandboxContainers as SandboxContainersBase } from './sandbox-containers/SandboxContainers.js';
 import { StreamTicketNonceDO as StreamTicketNonceDOBase } from './persistence/StreamTicketNonceDO.js';
 import { UserKiloFacade as UserKiloFacadeBase } from './kilo-facade/user-kilo-facade.js';
+import { PreviewTunnel as PreviewTunnelBase } from './preview-tunnel/preview-tunnel-do.js';
 
 export { default } from './server.js';
 export { SandboxContainment, SandboxSmallContainment } from './legacy-runtime-tombstones.js';
@@ -20,6 +22,11 @@ export const SandboxControl = instrumentCloudAgentDurableObject(
 export type SandboxControl = SandboxControlV2;
 export const SandboxSession = instrumentCloudAgentDurableObject(SandboxSessionV2, 'session');
 export type SandboxSession = SandboxSessionV2;
+export const CloudAgentWorkspace = instrumentCloudAgentDurableObject(
+  CloudAgentWorkspaceDO,
+  'workspace'
+);
+export type CloudAgentWorkspace = CloudAgentWorkspaceDO;
 export const SandboxContainers = instrumentCloudAgentDurableObject(
   SandboxContainersBase,
   'sandbox-container'
@@ -32,3 +39,5 @@ export const StreamTicketNonceDO = instrumentCloudAgentDurableObject(
 export type StreamTicketNonceDO = StreamTicketNonceDOBase;
 export const UserKiloFacade = instrumentCloudAgentDurableObject(UserKiloFacadeBase, 'kilo-facade');
 export type UserKiloFacade = UserKiloFacadeBase;
+export const PreviewTunnel = instrumentCloudAgentDurableObject(PreviewTunnelBase, 'preview-tunnel');
+export type PreviewTunnel = PreviewTunnelBase;

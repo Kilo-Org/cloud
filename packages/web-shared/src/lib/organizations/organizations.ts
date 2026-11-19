@@ -543,6 +543,13 @@ export async function updateUserRoleInOrganization(
   return txn ? run(txn) : db.transaction(run);
 }
 
+/**
+ * Raised when the target organization row is deleted or never existed. Distinct
+ * from the SSO-misconfiguration sentence below, which applies only where the
+ * policy status is `misconfigured`.
+ */
+export const ORGANIZATION_MISSING_MESSAGE = 'This organization is no longer available';
+
 export const CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER =
   'Child organizations can only invite people who are already members of the parent organization.';
 
@@ -775,9 +782,8 @@ export async function inviteUserToOrganization(
   const run = async (tx: DrizzleTransaction): Promise<OrganizationInvitation> => {
     const membershipRule = await decideChildOrganizationMembership(tx, organizationId, { email });
     if (membershipRule === 'organization_missing') {
-      throw new Error('Organization SSO policy is misconfigured');
+      throw new Error(ORGANIZATION_MISSING_MESSAGE);
     }
-    // A child org can invite only people who already belong to its live parent.
     if (membershipRule === 'refused') {
       throw new Error(CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER);
     }

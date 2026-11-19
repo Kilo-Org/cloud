@@ -70,11 +70,6 @@ export function isBitbucketSessionCapability(value: string): boolean {
   return value.startsWith(BITBUCKET_CAPABILITY_PREFIX);
 }
 
-export async function bitbucketTokenDigest(token: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
-  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
-}
-
 export class BitbucketSessionCapabilityCodec {
   constructor(private readonly encryptionKey: string) {}
 

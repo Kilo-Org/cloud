@@ -593,10 +593,10 @@ describe('redirectSystemPath', () => {
   });
 });
 
-// Android's intent filter for the organization root also matches the two web
-// create pages (a `pathPattern` cannot exclude segments). The table maps both
-// to the app's own create screen, so they navigate like any other universal
-// link instead of opening a page.
+// Android's two literal create rows are the `pathPattern` filters for these
+// paths, so a tap on either page reaches the app and the table maps both to its
+// own create screen. They navigate like any other universal link instead of
+// opening a page.
 describe('organization create links', () => {
   const CREATE_HREF = '/(app)/(tabs)/(3_profile)/organization/create';
 

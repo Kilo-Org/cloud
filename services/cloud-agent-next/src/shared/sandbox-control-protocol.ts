@@ -4,11 +4,17 @@ import {
   MAX_MCP_COMMAND_ARG_LENGTH,
   MAX_MCP_ENV_OR_HEADER_KEY_LENGTH,
   MAX_MCP_ENV_OR_HEADERS_PER_SERVER,
+  MAX_MCP_PLAINTEXT_BYTES,
   MAX_MCP_REMOTE_URL_LENGTH,
   MAX_MCP_SECRET_VALUE_LENGTH,
   MAX_MCP_SERVERS,
   MAX_MCP_SERVER_NAME_LENGTH,
 } from './prepare-session-limits.js';
+import {
+  findReservedEnvVarName,
+  MAX_ATTACH_ENV_KEYS,
+  RESERVED_ENV_VARS_MESSAGE,
+} from './runtime-environment.js';
 import { z } from 'zod';
 
 export {
@@ -173,8 +179,25 @@ export const sessionAttachMcpServersSchema = z
   .refine(servers => Object.keys(servers).length <= MAX_MCP_SERVERS, {
     message: `A session can have at most ${MAX_MCP_SERVERS} MCP servers`,
   })
-  .refine(servers => new TextEncoder().encode(JSON.stringify(servers)).byteLength <= 80 * 1024, {
-    message: 'Serialized MCP configuration exceeds the 80 KiB limit',
+  .refine(
+    servers =>
+      new TextEncoder().encode(JSON.stringify(servers)).byteLength <= MAX_MCP_PLAINTEXT_BYTES,
+    { message: 'Serialized MCP configuration exceeds the 80 KiB limit' }
+  );
+
+/**
+ * The attach env starts from the stored profile env and carries the credential
+ * names the preparation adds, so the cap is the profile cap plus those names.
+ * Reserved names are the platform's: the workspace path, session home and pnpm
+ * store are computed from them.
+ */
+const sessionAttachEnvSchema = z
+  .record(z.string().max(256), z.string().max(8192))
+  .refine(obj => Object.keys(obj).length <= MAX_ATTACH_ENV_KEYS, {
+    message: `Maximum ${MAX_ATTACH_ENV_KEYS} environment variables allowed`,
+  })
+  .refine(obj => findReservedEnvVarName(Object.keys(obj)) === undefined, {
+    message: RESERVED_ENV_VARS_MESSAGE,
   });
 
 export const sessionAttachPayloadSchema = z
@@ -219,7 +242,7 @@ export const sessionAttachPayloadSchema = z
       })
       .strict()
       .optional(),
-    env: z.record(z.string().max(256), z.string().max(8192)).optional(),
+    env: sessionAttachEnvSchema.optional(),
     mcp: sessionAttachMcpServersSchema.optional(),
     setupCommands: setupCommandsSchema.optional(),
     startCommands: setupCommandsSchema.optional(),

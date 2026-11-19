@@ -71,7 +71,6 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     isFetched: organizationsFetched,
     isFetching: organizationsFetching,
     isError: organizationsError,
-    isPaused: organizationsPaused,
     refetch: refetchOrganizations,
   } = useOrganizationsList();
   const [state, setState] = useState<OrganizationState>({
@@ -226,18 +225,9 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
       defaultFence.current = null;
       return;
     }
-    // A paused list is offline and may never fetch. Waiting on it would leave
-    // `isLoaded` false forever, so publish Personal to keep the app usable, and
-    // keep `awaitingDefault` set: the default still applies when the list
-    // arrives. Only reached when nothing explicit was stored, so this never
-    // overrides a stored choice.
-    if (!organizationsFetched && organizationsPaused) {
-      if (!state.isLoaded) {
-        activeId.current = null;
-        setState({ token, organizationId: null, isLoaded: true, isSaving: false, error: null });
-      }
-      return;
-    }
+    // The list read settles while offline too (`SETTLE_WHILE_OFFLINE`): it
+    // either answers or fails by its deadline, so the default below always has
+    // a settled snapshot to act on — there is no paused fallback to wait out.
     // A refetch of an already-failed list must settle before it republishes.
     if (!organizationsFetched || organizationsFetching) {
       return;
@@ -269,7 +259,6 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     organizationsFetched,
     organizationsFetching,
     organizationsError,
-    organizationsPaused,
     token,
     persist,
   ]);

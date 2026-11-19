@@ -23,6 +23,7 @@ import {
   verifyKiloToken,
 } from '@kilocode/worker-utils';
 import { verifyKiloTokenForResource } from '@kilocode/worker-utils/kilo-token-policy';
+import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import type {
   GitHubBrokerRejectionProvenance,
   GitHubRepositoryAuthorizationFailureReason,
@@ -56,7 +57,6 @@ import { readBoundedJsonBody } from './lib/bounded-read.js';
 import {
   GitLabSessionCapabilityCodec,
   GitLabSessionCapabilityError,
-  sha256Digest,
   validateGitLabSessionCapabilityPath,
   type GitLabAuthType,
   type GitLabCapabilityCredentialSource,
@@ -102,7 +102,6 @@ import {
 import {
   BitbucketSessionCapabilityCodec,
   BitbucketSessionCapabilityError,
-  bitbucketTokenDigest,
   type BitbucketSessionCapabilityFailureReason,
 } from './bitbucket-session-capability.js';
 import {
@@ -1118,7 +1117,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
         workspaceSlug: subject.workspaceSlug,
         repositoryUuid: subject.repositoryUuid,
         repositoryFullName: subject.repositoryFullName,
-        tokenDigest: await bitbucketTokenDigest(subject.token),
+        tokenDigest: await sha256Hex(subject.token),
         oauthCredentialId: subject.oauthCredentialId,
         outboundContainerId: params.outboundContainerId,
       });
@@ -1178,7 +1177,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
         return { success: false, reason: 'source_unavailable' };
       }
     } else {
-      const currentDigest = await bitbucketTokenDigest(subject.token);
+      const currentDigest = await sha256Hex(subject.token);
       if (!timingSafeEqual(currentDigest, claims.tokenDigest)) {
         return { success: false, reason: 'source_unavailable' };
       }
@@ -1325,7 +1324,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       return { success: false, reason: 'source_unavailable' };
     }
     if ('tokenDigest' in claims.source) {
-      const currentTokenDigest = await sha256Digest(credential.token);
+      const currentTokenDigest = await sha256Hex(credential.token);
       if (!timingSafeEqual(currentTokenDigest, claims.source.tokenDigest)) {
         return { success: false, reason: 'source_unavailable' };
       }

@@ -359,7 +359,10 @@ function renderHeader(props: ScreenHeaderProps): TestRenderer.ReactTestRenderer 
  */
 function findTitleRow(root: TestInstance): TestInstance {
   const heading = root.findByProps({ accessibilityRole: 'header' }).parent?.parent;
-  if (!heading || String(heading.props.className ?? '') !== 'min-w-0 flex-1 flex-row items-center justify-center') {
+  if (
+    !heading ||
+    String(heading.props.className ?? '') !== 'min-w-0 flex-1 flex-row items-center justify-center'
+  ) {
     throw new Error('centered heading not found');
   }
   const row = heading.parent;
@@ -1060,9 +1063,7 @@ describe('ScreenHeader mounted', () => {
     const renderer = renderHeader({ title: 'Kilo Pass', modal: true });
 
     // L = 0 and T = 0: no in-row cluster pays a gap, so both fillers collapse.
-    const { leading, trailing } = findBalanceFillers(
-      findTitleRow(renderer.root)
-    );
+    const { leading, trailing } = findBalanceFillers(findTitleRow(renderer.root));
     expect(leading).toBeUndefined();
     expect(trailing).toBeUndefined();
   });
@@ -1678,9 +1679,11 @@ describe('centered title balance', () => {
     expect(findBalanceFillers(row).leading).toBeUndefined();
 
     act(() => {
-      (slot.props.onLayout as (event: {
-        nativeEvent: { layout: { width: number; height: number } };
-      }) => void)({ nativeEvent: { layout: { width: 140, height: 48 } } });
+      (
+        slot.props.onLayout as (event: {
+          nativeEvent: { layout: { width: number; height: number } };
+        }) => void
+      )({ nativeEvent: { layout: { width: 140, height: 48 } } });
     });
 
     // T = 152, L = 48, seed window 390: free = 190 → leading

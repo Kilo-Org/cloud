@@ -331,14 +331,20 @@ function connectActions(root: TestRenderer.ReactTestRenderer) {
 }
 
 describe('BitbucketOverview not-connected state', () => {
-  it('names the organization in the connect description', async () => {
+  it('names the organization and the next screen in the connect description', async () => {
     readiness.connected = false;
     readiness.integrationId = null;
 
     const root = await renderScreen();
     const text = JSON.stringify(root.toJSON());
 
-    expect(text).toContain('Acme Robotics');
+    // The token field lives on the sheet the action opens, so the copy names
+    // that step; "paste it below" pointed at a button with no field under it.
+    expect(text).toContain(
+      i18n.t('codeReviewer.bitbucketConnect.descriptionOverview', {
+        organization: 'Acme Robotics',
+      })
+    );
     expect(text).not.toContain('{{');
     expect(connectActions(root)).toHaveLength(1);
     expect(orgBoundaryCalls.length).toBeGreaterThan(0);

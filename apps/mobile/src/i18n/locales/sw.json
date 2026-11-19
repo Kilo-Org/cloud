@@ -1226,7 +1226,7 @@
     },
     "instructions": {
       "title": "Maagizo maalum",
-      "deprecation": "Kipengele cha maagizo maalumu kimepangiwa kuondolewa. Badala yake, hamishia miongozo hii kwenye faili ya REVIEW.md katika hazina yako.",
+      "deprecation": "Maagizo maalumu yataondolewa. Badala yake, hamishia miongozo hii kwenye faili ya REVIEW.md katika hazina yako.",
       "placeholder": "mfano: Hakikisha kanuni zetu za kushughulikia hitilafu zinafuatwa…",
       "clearTitle": "Ondoa maagizo maalum?",
       "clearMessage": "Kuhifadhi sehemu tupu hufuta maagizo maalum yaliyohifadhiwa kwa mkaguzi huyu."
@@ -1392,6 +1392,7 @@
       "managedOnWeb": "Muunganisho wa Bitbucket wa {{organization}} unasimamiwa kwenye wavuti kutoka kwenye kompyuta.",
       "description": "Unda tokeni ya kufikia nafasi ya kazi kwa ajili ya {{organization}} kisha uibandike hapa chini.",
       "descriptionReconnect": "Unda tokeni mpya ya kufikia nafasi ya kazi kwa ajili ya {{organization}} kisha uibandike hapa chini.",
+      "descriptionOverview": "Unda tokeni ya kufikia nafasi ya kazi kwa ajili ya {{organization}} kisha uibandike kwenye skrini inayofuata.",
       "scopes": "Akaunti: kusoma · Hazina: kusoma/kuandika · Maombi ya kuunganisha: kusoma · Arifa za wavuti: kusoma/kuandika",
       "tokenPlaceholder": "Tokeni ya kufikia nafasi ya kazi",
       "tokenRefused": "Bitbucket haikukubali tokeni hii ya kufikia nafasi ya kazi. Hakikisha kuwa ina ruhusa zilizo hapo juu, kisha ujaribu tena."
@@ -3186,6 +3187,8 @@
     "retryHint": "Hujaribu kupakia hali ya Kilo Pass tena.",
     "endedOn": "Imekwisha {{date}}",
     "notAvailableInApp": "Kilo Pass haipatikani kwenye programu.",
+    "notAvailableTitle": "Kilo Pass haipo kwenye programu",
+    "noPassDescription": "Akaunti hii haina Kilo Pass.",
     "statusActive": "Inatumika",
     "statusTrialing": "Inajaribiwa",
     "statusPastDue": "Malipo yamechelewa",
@@ -3468,7 +3471,7 @@
       "retentionLimit": "Inaonyesha ankara za hivi karibuni."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Washa arifa ya salio la chini",
+      "subtitle": "Tuma arifa kwa barua pepe kwa anwani utakazoorodhesha salio la shirika hili linaposhuka chini ya kiasi ulichoweka.",
       "notifyEmailsLabel": "Anwani za kupokea arifa",
       "permissionDenied": "Huna ruhusa ya kusimamia arifa za bili.",
       "separateEmailsHint": "Tenganisha anwani za barua pepe kwa koma.",
@@ -4943,7 +4946,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Kipengele cha biashara",
-    "enterpriseOnly": "Hiki ni kipengele cha biashara pekee.",
+    "enterpriseOnly": "Watoa huduma na modeli wanapatikana kwenye mpango wa Enterprise.",
     "readOnly": "Wamiliki na wasimamizi wa shirika pekee wanaweza kubadilisha mipangilio hii.",
     "loadError": "Watoa huduma na modeli hawakuweza kupakiwa",
     "tabModels": "Modeli",

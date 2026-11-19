@@ -1226,7 +1226,7 @@
     },
     "instructions": {
       "title": "Ntuziaka nkeonwe",
-      "deprecation": "A na-eme atụmatụ ịkwụsị ntuziaka nkeonwe. Kama iji ha ebe a, tinye ntuziaka ndị a na faịlụ REVIEW.md n'ebe nchekwa gị.",
+      "deprecation": "A ga-ewepụ ntuziaka nkeonwe. Kama iji ha ebe a, tinye ntuziaka ndị a na faịlụ REVIEW.md n'ebe nchekwa gị.",
       "placeholder": "dịka: ịgbaso usoro anyị maka njikwa njehie…",
       "clearTitle": "Wepụ ntuziaka nkeonwe?",
       "clearMessage": "Ịchekwa oghere tọgbọrọ chakoo na-ehichapụ ntuziaka nkeonwe echekwara maka onye nyocha koodu a."
@@ -1392,6 +1392,7 @@
       "managedOnWeb": "A na-elekọta njikọ Bitbucket nke {{organization}} na weebụ site na kọmputa.",
       "description": "Mepụta akara ikike ịnweta oghere ọrụ maka {{organization}}, wee mado ya n'okpuru.",
       "descriptionReconnect": "Mepụta akara ikike ọhụrụ ịnweta oghere ọrụ maka {{organization}}, wee mado ya n'okpuru.",
+      "descriptionOverview": "Mepụta akara ikike ịnweta oghere ọrụ maka {{organization}}, wee mado ya na ihuenyo na-esote.",
       "scopes": "Akaụntụ: ịgụ · Ebe nchekwa: ịgụ/ide · Arịrịọ ijikọ koodu: ịgụ · Njikọ ngosi: ịgụ/ide",
       "tokenPlaceholder": "Akara ikike ịnweta oghere ọrụ",
       "tokenRefused": "Bitbucket anabataghị akara ikike ịnweta oghere ọrụ a. Lelee na o nwere ikike ndị dị n'elu, wee gbalịa ọzọ."
@@ -3186,6 +3187,8 @@
     "retryHint": "Na-anwale ịnweta ọnọdụ Kilo Pass ọzọ.",
     "endedOn": "Agwụla na {{date}}",
     "notAvailableInApp": "Kilo Pass adịghị na ngwa a.",
+    "notAvailableTitle": "Enweghị Kilo Pass n'ime ngwa a",
+    "noPassDescription": "Akaụntụ a enweghị Kilo Pass.",
     "statusActive": "Na-arụ ọrụ",
     "statusTrialing": "Na-anwale",
     "statusPastDue": "Ụgwọ gafere oge",
@@ -3468,7 +3471,7 @@
       "retentionLimit": "Na-egosi akwụkwọ ịgba ụgwọ ndị kachasị ọhụrụ."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Gbanye ịdọ aka na ntị mgbe ego fọdụrụ dị ntakịrị",
+      "subtitle": "Zipu ọkwa site na ozi-e nye adreesị ndị i depụtara mgbe ego fọdụrụ na nzukọ a gbadara n'okpuru ego ị setịrị.",
       "notifyEmailsLabel": "Adreesị ozi ịntanetị a ga-agwa",
       "permissionDenied": "Ị nweghị ikike ijikwa ọkwa ịdọ aka na ntị ịgba ụgwọ.",
       "separateEmailsHint": "Jiri rịkọm kewaa adreesị ozi ịntanetị.",
@@ -4943,7 +4946,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Atụmatụ ụlọ ọrụ",
-    "enterpriseOnly": "Nke a bụ atụmatụ maka ụlọ ọrụ naanị.",
+    "enterpriseOnly": "Ndị na-enye ọrụ na ihe nlere dị na atụmatụ Enterprise.",
     "readOnly": "Naanị ndị nwe nzukọ na ndị nchịkwa nwere ike ịgbanwe ntọala ndị a.",
     "loadError": "Enweghị ike ibudata ndị na-enye ọrụ na ihe nlere",
     "tabModels": "Ihe nlere",

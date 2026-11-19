@@ -636,7 +636,7 @@
     },
     "instructions": {
       "title": "Istruzioni personalizzate",
-      "deprecation": "È prevista la dismissione delle istruzioni personalizzate. Sposta queste indicazioni in un file REVIEW.md nel tuo repository.",
+      "deprecation": "Le istruzioni personalizzate verranno rimosse. Sposta queste indicazioni in un file REVIEW.md nel tuo repository.",
       "placeholder": "ad esempio: rispetto delle nostre convenzioni per la gestione degli errori…",
       "clearTitle": "Rimuovere le istruzioni personalizzate?",
       "clearMessage": "Se salvi un campo vuoto, elimini le istruzioni personalizzate memorizzate per questo revisore."
@@ -667,6 +667,7 @@
       "managedOnWeb": "La connessione Bitbucket per {{organization}} si gestisce sul web da un computer.",
       "description": "Crea un token di accesso all'area di lavoro per {{organization}} e incollalo qui sotto.",
       "descriptionReconnect": "Crea un nuovo token di accesso all'area di lavoro per {{organization}} e incollalo qui sotto.",
+      "descriptionOverview": "Crea un token di accesso all'area di lavoro per {{organization}} e incollalo nella schermata successiva.",
       "scopes": "Account: lettura · Repository: lettura/scrittura · Pull request: lettura · Webhook: lettura/scrittura",
       "tokenPlaceholder": "Token di accesso all'area di lavoro",
       "tokenRefused": "Bitbucket non ha accettato questo token dell'area di lavoro. Verifica che disponga delle autorizzazioni indicate sopra, quindi riprova."
@@ -2664,6 +2665,8 @@
     "retryHint": "Riprova a caricare lo stato di Kilo Pass.",
     "endedOn": "Terminato il {{date}}",
     "notAvailableInApp": "Kilo Pass non è disponibile nell'app.",
+    "notAvailableTitle": "Kilo Pass non è presente nell'app",
+    "noPassDescription": "Questo account non ha un Kilo Pass.",
     "statusActive": "Attivo",
     "statusTrialing": "In prova",
     "statusPastDue": "Pagamento scaduto",
@@ -3532,7 +3535,7 @@
       "retentionLimit": "Vengono mostrate le fatture più recenti."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Attiva l'avviso di saldo basso",
+      "subtitle": "Invia un avviso via email agli indirizzi indicati quando il saldo di questa organizzazione scende sotto l'importo impostato.",
       "notifyEmailsLabel": "Indirizzi email da avvisare",
       "permissionDenied": "Non hai l'autorizzazione per gestire gli avvisi di fatturazione.",
       "separateEmailsHint": "Separa gli indirizzi email con una virgola.",
@@ -5019,7 +5022,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Funzionalità aziendale",
-    "enterpriseOnly": "Questa è una funzionalità riservata alle aziende.",
+    "enterpriseOnly": "Fornitori e modelli sono disponibili con il piano Enterprise.",
     "readOnly": "Solo i proprietari e gli amministratori dell'organizzazione possono modificare queste impostazioni.",
     "loadError": "Impossibile caricare fornitori e modelli",
     "tabModels": "Modelli",

@@ -1226,7 +1226,7 @@
     },
     "instructions": {
       "title": "Àwọn ìtọ́sọ́nà àdáni",
-      "deprecation": "A ń gbèrò láti dá àwọn ìtọ́sọ́nà àdáni dúró. Gbé àwọn ìlànà wọ̀nyí sínú fáìlì REVIEW.md nínú ibi ìpamọ́ rẹ dípò rẹ̀.",
+      "deprecation": "A ó yọ àwọn ìtọ́sọ́nà àdáni kúrò. Gbé àwọn ìlànà wọ̀nyí sínú fáìlì REVIEW.md nínú ibi ìpamọ́ rẹ dípò rẹ̀.",
       "placeholder": "àpẹẹrẹ: Tẹ̀lé àwọn ìlànà wa fún bí a ṣe ń bójú tó àṣìṣe…",
       "clearTitle": "Ṣé kí a yọ àwọn ìtọ́sọ́nà àdáni kúrò?",
       "clearMessage": "Fífi àyè tó ṣòfó pamọ́ yóò pa àwọn ìtọ́sọ́nà àdáni tí a fi pamọ́ fún olùṣàyẹ̀wò yìí run."
@@ -1392,6 +1392,7 @@
       "managedOnWeb": "A ń ṣàkóso ìsopọ̀ Bitbucket ti {{organization}} lórí wẹ́ẹ̀bù láti orí kọ̀ǹpútà.",
       "description": "Ṣẹ̀dá àmi ìwọlé àyè iṣẹ́ fún {{organization}}, kí o sì lẹ̀ ẹ́ mọ́ nísàlẹ̀.",
       "descriptionReconnect": "Ṣẹ̀dá àmi ìwọlé àyè iṣẹ́ tuntun fún {{organization}}, kí o sì lẹ̀ ẹ́ mọ́ nísàlẹ̀.",
+      "descriptionOverview": "Ṣẹ̀dá àmi ìwọlé àyè iṣẹ́ fún {{organization}}, kí o sì lẹ̀ ẹ́ mọ́ ojú-ìwé tó kàn.",
       "scopes": "Àkọọ́lẹ̀: kíkà · Àwọn ibi ìpamọ́: kíkà/kíkọ · Àwọn ìbéèrè àkópọ̀: kíkà · Àwọn ìfitónilétí wẹ́bù: kíkà/kíkọ",
       "tokenPlaceholder": "Àmi ìwọlé àyè iṣẹ́",
       "tokenRefused": "Bitbucket kò gba àmi ìwọlé àyè iṣẹ́ yìí. Ṣàyẹ̀wò pé ó ní àwọn àkọọ́lẹ̀ tó wà lókè, kí o sì tún gbìyànjú lẹ́ẹ̀kan sí i."
@@ -3186,6 +3187,8 @@
     "retryHint": "Ó tún ń gbìyànjú láti gba ipò Kilo Pass.",
     "endedOn": "Ó ti parí ní {{date}}",
     "notAvailableInApp": "Kilo Pass kò sí nínú áàpù.",
+    "notAvailableTitle": "A kò pèsè Kilo Pass nínú áàpù",
+    "noPassDescription": "Àkọọ́lẹ̀ yìí kò ní Kilo Pass.",
     "statusActive": "Ń ṣiṣẹ́",
     "statusTrialing": "Ìdánwò",
     "statusPastDue": "Ìsanwó ti kọjá àkókò",
@@ -3468,7 +3471,7 @@
       "retentionLimit": "Ń ṣàfihàn àwọn ìwé ìbéèrè owó tuntun jùlọ."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Tan ìkìlọ̀ owó tó kù díẹ̀",
+      "subtitle": "Fi ìkìlọ̀ ránṣẹ́ nípasẹ̀ ímeèlì sí àwọn àdírẹ́sì tí o tò sílẹ̀ nígbà tí owó tó kù nínú àjọ yìí bá dín ju iye tí o ṣètò lọ.",
       "notifyEmailsLabel": "Fi ímeèlì ránṣẹ́ sí",
       "permissionDenied": "O kò ní ìyọ̀ǹda láti ṣàkóso àwọn ìkìlọ̀ ìsanwó.",
       "separateEmailsHint": "Lo àmì kọ́mà láti ya àwọn àdírẹ́sì ímeèlì sọ́tọ̀.",
@@ -4943,7 +4946,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Ẹ̀yà ilé-iṣẹ́",
-    "enterpriseOnly": "Èyí jẹ́ ẹ̀yà fún ilé-iṣẹ́ nìkan.",
+    "enterpriseOnly": "Àwọn olùpèsè àti àwọn àwòṣe wà pẹ̀lú ètò Enterprise.",
     "readOnly": "Àwọn onílé àjọ àti àwọn aláṣẹ nìkan lè yí àwọn ètò wọ̀nyí padà.",
     "loadError": "Àwọn olùpèsè àti àwọn àwòṣe kò lè gbé wọlé",
     "tabModels": "Àwọn àwòṣe",

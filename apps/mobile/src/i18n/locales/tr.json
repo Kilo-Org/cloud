@@ -669,7 +669,7 @@
     },
     "instructions": {
       "title": "Özel talimatlar",
-      "deprecation": "Özel talimatlar özelliğinin kullanımdan kaldırılması planlanıyor. Bu yönergeleri depondaki bir REVIEW.md dosyasına taşı.",
+      "deprecation": "Özel talimatlar özelliği kaldırılacak. Bu yönergeleri depondaki bir REVIEW.md dosyasına taşı.",
       "placeholder": "örn. Hata işleme kurallarımıza uy…",
       "clearTitle": "Özel talimatlar kaldırılsın mı?",
       "clearMessage": "Boş bir alanı kaydetmek, bu inceleyici için depolanan özel talimatları siler."
@@ -700,6 +700,7 @@
       "managedOnWeb": "{{organization}} için Bitbucket bağlantısı bir bilgisayardan web üzerinden yönetilir.",
       "description": "{{organization}} için bir çalışma alanı erişim belirteci oluştur ve aşağıya yapıştır.",
       "descriptionReconnect": "{{organization}} için yeni bir çalışma alanı erişim belirteci oluştur ve aşağıya yapıştır.",
+      "descriptionOverview": "{{organization}} için bir çalışma alanı erişim belirteci oluştur ve sonraki ekranda yapıştır.",
       "scopes": "İzinler: Hesap okuma · Depo okuma/yazma · Çekme isteği okuma · Webhook okuma/yazma.",
       "tokenPlaceholder": "Çalışma alanı erişim belirteci",
       "tokenRefused": "Bitbucket bu çalışma alanı erişim belirtecini kabul etmedi. Yukarıdaki izinlere sahip olduğunu kontrol et ve yeniden dene."
@@ -2629,6 +2630,8 @@
     "retryHint": "Kilo Pass durumunu almayı tekrar dener.",
     "endedOn": "{{date}} tarihinde sona erdi",
     "notAvailableInApp": "Kilo Pass uygulamada kullanılamıyor.",
+    "notAvailableTitle": "Kilo Pass uygulamada sunulmuyor",
+    "noPassDescription": "Bu hesabın Kilo Pass'i yok.",
     "statusActive": "Aktif",
     "statusTrialing": "Deneme döneminde",
     "statusPastDue": "Ödeme gecikti",
@@ -3473,7 +3476,7 @@
       "retentionLimit": "En son faturalar gösteriliyor."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Düşük bakiye uyarısını etkinleştir",
+      "subtitle": "Bu kuruluşun bakiyesi belirlediğin tutarın altına düştüğünde listelediğin adreslere e-posta ile uyarı gönder.",
       "notifyEmailsLabel": "Bildirim gönderilecek e-posta adresleri",
       "permissionDenied": "Faturalandırma uyarılarını yönetme iznin yok.",
       "separateEmailsHint": "Birden fazla e-posta adresini virgülle ayır.",
@@ -4943,7 +4946,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Kurumsal özellik",
-    "enterpriseOnly": "Bu yalnızca kurumsal bir özelliktir.",
+    "enterpriseOnly": "Sağlayıcılar ve modeller Enterprise planında kullanılabilir.",
     "readOnly": "Bu ayarları yalnızca kuruluş sahipleri ve yöneticileri değiştirebilir.",
     "loadError": "Sağlayıcılar ve modeller yüklenemedi",
     "tabModels": "Modeller",

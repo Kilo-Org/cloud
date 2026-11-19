@@ -669,7 +669,7 @@
     },
     "instructions": {
       "title": "Instrucciones personalizadas",
-      "deprecation": "Está previsto retirar las instrucciones personalizadas. Traslada estas directrices a un archivo REVIEW.md de tu repositorio.",
+      "deprecation": "Las instrucciones personalizadas se retirarán. Traslada estas directrices a un archivo REVIEW.md de tu repositorio.",
       "placeholder": "p. ej., aplicar nuestras convenciones de gestión de errores…",
       "clearTitle": "¿Eliminar las instrucciones personalizadas?",
       "clearMessage": "Si guardas un campo vacío, se eliminarán las instrucciones personalizadas almacenadas para este revisor."
@@ -700,6 +700,7 @@
       "managedOnWeb": "La conexión de Bitbucket con {{organization}} se gestiona en la web desde un ordenador.",
       "description": "Crea un token de acceso del espacio de trabajo para {{organization}} y pégalo abajo.",
       "descriptionReconnect": "Crea un nuevo token de acceso del espacio de trabajo para {{organization}} y pégalo abajo.",
+      "descriptionOverview": "Crea un token de acceso del espacio de trabajo para {{organization}} y pégalo en la siguiente pantalla.",
       "scopes": "Cuenta: lectura · Repositorios: lectura/escritura · PR: lectura · Webhooks: lectura/escritura",
       "tokenPlaceholder": "Token de acceso del espacio de trabajo",
       "tokenRefused": "Bitbucket no ha aceptado este token de acceso del espacio de trabajo. Comprueba que tiene los permisos indicados arriba y vuelve a intentarlo."
@@ -2664,6 +2665,8 @@
     "retryHint": "Vuelve a consultar el estado de Kilo Pass.",
     "endedOn": "Finalizado el {{date}}",
     "notAvailableInApp": "Kilo Pass no está disponible en la app.",
+    "notAvailableTitle": "Kilo Pass no se ofrece en la app",
+    "noPassDescription": "Esta cuenta no tiene Kilo Pass.",
     "statusActive": "Activo",
     "statusTrialing": "En prueba",
     "statusPastDue": "Pago atrasado",
@@ -3532,7 +3535,7 @@
       "retentionLimit": "Mostrando las facturas más recientes."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Activar la alerta de saldo bajo",
+      "subtitle": "Envía un aviso por correo a las direcciones que indiques cuando el saldo de esta organización baje del importe que establezcas.",
       "notifyEmailsLabel": "Direcciones de correo para los avisos",
       "permissionDenied": "No tienes permiso para gestionar las alertas de facturación.",
       "separateEmailsHint": "Separa las direcciones de correo con comas.",
@@ -5019,7 +5022,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Función de Enterprise",
-    "enterpriseOnly": "Esta función solo está disponible en Enterprise.",
+    "enterpriseOnly": "Los proveedores y modelos están disponibles en el plan Enterprise.",
     "readOnly": "Solo los propietarios y administradores de la organización pueden cambiar esta configuración.",
     "loadError": "No se pudieron cargar los proveedores y modelos",
     "tabModels": "Modelos",

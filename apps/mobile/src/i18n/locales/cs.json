@@ -1274,7 +1274,7 @@
     },
     "instructions": {
       "title": "Vlastní pokyny",
-      "deprecation": "Podporu vlastních pokynů plánujeme ukončit. Přesuňte tyto pokyny do souboru REVIEW.md ve svém repozitáři.",
+      "deprecation": "Vlastní pokyny budou odstraněny. Přesuňte tyto pokyny do souboru REVIEW.md ve svém repozitáři.",
       "placeholder": "např. vyžadovat dodržování našich pravidel pro zpracování chyb…",
       "clearTitle": "Odebrat vlastní pokyny?",
       "clearMessage": "Uložení prázdného pole smaže vlastní pokyny uložené pro tohoto recenzenta."
@@ -1440,6 +1440,7 @@
       "managedOnWeb": "Připojení Bitbucket k {{organization}} se spravuje na webu z počítače.",
       "description": "Vytvořte přístupový token pracovního prostoru pro {{organization}} a vložte jej níže.",
       "descriptionReconnect": "Vytvořte nový přístupový token pracovního prostoru pro {{organization}} a vložte jej níže.",
+      "descriptionOverview": "Vytvořte přístupový token pracovního prostoru pro {{organization}} a vložte jej na další obrazovce.",
       "scopes": "Účet: čtení · Repozitáře: čtení/zápis · PR: čtení · Webhooky: čtení/zápis",
       "tokenPlaceholder": "Přístupový token pracovního prostoru",
       "tokenRefused": "Bitbucket tento token pracovního prostoru nepřijal. Zkontrolujte, že má výše uvedená oprávnění, a poté to zkuste znovu."
@@ -3304,6 +3305,8 @@
     "retryHint": "Znovu načte stav Kilo Pass.",
     "endedOn": "Ukončeno {{date}}",
     "notAvailableInApp": "Kilo Pass není v aplikaci k dispozici.",
+    "notAvailableTitle": "Kilo Pass v aplikaci není",
+    "noPassDescription": "Tento účet nemá Kilo Pass.",
     "statusActive": "Aktivní",
     "statusTrialing": "Zkušební",
     "statusPastDue": "Platba po splatnosti",
@@ -3586,7 +3589,7 @@
       "retentionLimit": "Zobrazují se nejnovější faktury."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Povolit upozornění na nízký zůstatek",
+      "subtitle": "Poslat e-mailem upozornění na zadané adresy, když zůstatek této organizace klesne pod nastavenou částku.",
       "notifyEmailsLabel": "E-mailové adresy pro upozornění",
       "permissionDenied": "Nemáte oprávnění spravovat upozornění k fakturaci.",
       "separateEmailsHint": "Více e-mailových adres oddělte čárkami.",
@@ -5095,7 +5098,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Funkce pro Enterprise",
-    "enterpriseOnly": "Tato funkce je dostupná pouze v tarifu Enterprise.",
+    "enterpriseOnly": "Poskytovatelé a modely jsou k dispozici v plánu Enterprise.",
     "readOnly": "Tato nastavení mohou měnit jen vlastníci a správci organizace.",
     "loadError": "Poskytovatele a modely se nepodařilo načíst",
     "tabModels": "Modely",

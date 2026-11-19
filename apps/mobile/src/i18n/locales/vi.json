@@ -669,7 +669,7 @@
     },
     "instructions": {
       "title": "Hướng dẫn tùy chỉnh",
-      "deprecation": "Tính năng hướng dẫn tùy chỉnh dự kiến sẽ ngừng được hỗ trợ. Hãy chuyển các hướng dẫn này vào tệp REVIEW.md trong kho lưu trữ.",
+      "deprecation": "Tính năng hướng dẫn tùy chỉnh sẽ bị gỡ bỏ. Hãy chuyển các hướng dẫn này vào tệp REVIEW.md trong kho lưu trữ.",
       "placeholder": "ví dụ: Tuân thủ các quy ước xử lý lỗi của nhóm…",
       "clearTitle": "Xóa hướng dẫn tùy chỉnh?",
       "clearMessage": "Lưu trường trống sẽ xóa hướng dẫn tùy chỉnh đã lưu cho người duyệt mã này."
@@ -700,6 +700,7 @@
       "managedOnWeb": "Kết nối Bitbucket của {{organization}} được quản lý trên web từ máy tính.",
       "description": "Tạo mã truy cập không gian làm việc cho {{organization}} rồi dán vào bên dưới.",
       "descriptionReconnect": "Tạo mã truy cập không gian làm việc mới cho {{organization}} rồi dán vào bên dưới.",
+      "descriptionOverview": "Tạo mã truy cập không gian làm việc cho {{organization}} rồi dán vào màn hình tiếp theo.",
       "scopes": "Tài khoản: đọc · Kho lưu trữ: đọc/ghi · Yêu cầu hợp nhất: đọc · Webhook: đọc/ghi",
       "tokenPlaceholder": "Mã truy cập không gian làm việc",
       "tokenRefused": "Bitbucket không chấp nhận mã truy cập không gian làm việc này. Hãy kiểm tra rằng mã có các quyền ở trên, rồi thử lại."
@@ -2629,6 +2630,8 @@
     "retryHint": "Thử tải lại trạng thái Kilo Pass.",
     "endedOn": "Đã kết thúc {{date}}",
     "notAvailableInApp": "Kilo Pass không khả dụng trong ứng dụng.",
+    "notAvailableTitle": "Kilo Pass không có trong ứng dụng",
+    "noPassDescription": "Tài khoản này không có Kilo Pass.",
     "statusActive": "Đang hoạt động",
     "statusTrialing": "Đang dùng thử",
     "statusPastDue": "Thanh toán quá hạn",
@@ -3473,7 +3476,7 @@
       "retentionLimit": "Đang hiển thị các hóa đơn gần đây nhất."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Bật cảnh báo số dư thấp",
+      "subtitle": "Gửi cảnh báo qua email tới các địa chỉ bạn liệt kê khi số dư của tổ chức này giảm xuống dưới mức bạn đặt.",
       "notifyEmailsLabel": "Email nhận thông báo",
       "permissionDenied": "Bạn không có quyền quản lý cảnh báo thanh toán.",
       "separateEmailsHint": "Dùng dấu phẩy để ngăn cách các địa chỉ email.",
@@ -4943,7 +4946,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Tính năng doanh nghiệp",
-    "enterpriseOnly": "Đây là tính năng chỉ dành cho doanh nghiệp.",
+    "enterpriseOnly": "Nhà cung cấp và mô hình có sẵn trên gói Enterprise.",
     "readOnly": "Chỉ chủ sở hữu và quản trị viên tổ chức mới có thể thay đổi các cài đặt này.",
     "loadError": "Không thể tải nhà cung cấp và mô hình",
     "tabModels": "Mô hình",

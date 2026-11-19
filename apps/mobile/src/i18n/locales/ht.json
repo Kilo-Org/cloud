@@ -1226,7 +1226,7 @@
     },
     "instructions": {
       "title": "Enstriksyon pèsonalize",
-      "deprecation": "Nou prevwa sispann sipòte enstriksyon pèsonalize yo. Mete direktiv sa yo nan yon fichye REVIEW.md nan depo ou a pito.",
+      "deprecation": "Nou pral retire enstriksyon pèsonalize yo. Mete direktiv sa yo nan yon fichye REVIEW.md nan depo ou a pito.",
       "placeholder": "pa egzanp: respekte règ nou yo pou jere erè…",
       "clearTitle": "Retire enstriksyon pèsonalize yo?",
       "clearMessage": "Anrejistre yon chan vid ap efase enstriksyon pèsonalize yo ki estoke pou revizè kòd sa a."
@@ -1392,6 +1392,7 @@
       "managedOnWeb": "Koneksyon Bitbucket pou {{organization}} jere sou entènèt la, apati yon òdinatè.",
       "description": "Kreye yon jeton aksè pou espas travay la pou {{organization}}, epi kole li anba a.",
       "descriptionReconnect": "Kreye yon nouvo jeton aksè pou espas travay la pou {{organization}}, epi kole li anba a.",
+      "descriptionOverview": "Kreye yon jeton aksè pou espas travay la pou {{organization}}, epi kole li nan pwochen ekran an.",
       "scopes": "Kont: lekti · Depo: lekti/ekriti · Demann fizyon: lekti · Webhook: lekti/ekriti",
       "tokenPlaceholder": "Jeton aksè pou espas travay la",
       "tokenRefused": "Bitbucket pa aksepte jeton aksè pou espas travay sa a. Verifye ke li gen pèmisyon ki anwo a, epi eseye ankò."
@@ -3186,6 +3187,8 @@
     "retryHint": "Eseye chaje eta Kilo Pass la ankò.",
     "endedOn": "Fini {{date}}",
     "notAvailableInApp": "Kilo Pass pa disponib nan aplikasyon an.",
+    "notAvailableTitle": "Kilo Pass pa nan aplikasyon an",
+    "noPassDescription": "Kont sa a pa gen Kilo Pass.",
     "statusActive": "Aktif",
     "statusTrialing": "Nan esè",
     "statusPastDue": "Peman an reta",
@@ -3468,7 +3471,7 @@
       "retentionLimit": "Sa yo se fakti ki pi resan yo."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Aktive alèt pou balans ki ba",
+      "subtitle": "Voye yon alèt pa imèl bay adrès ou mete yo lè balans òganizasyon sa a desann pi ba pase montan ou fikse a.",
       "notifyEmailsLabel": "Adrès imel pou alèt yo",
       "permissionDenied": "Ou pa gen pèmisyon pou jere alèt faktirasyon yo.",
       "separateEmailsHint": "Si ou antre plizyè adrès imel, separe yo ak vigil.",
@@ -4943,7 +4946,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Fonksyon antrepriz",
-    "enterpriseOnly": "Sa a se yon fonksyon pou antrepriz sèlman.",
+    "enterpriseOnly": "Founisè ak modèl disponib nan plan Enterprise la.",
     "readOnly": "Sèlman pwopriyetè ak administratè òganizasyon an ka chanje paramèt sa yo.",
     "loadError": "Founisè ak modèl pa t kapab chaje",
     "tabModels": "Modèl",

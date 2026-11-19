@@ -1298,7 +1298,7 @@
     },
     "instructions": {
       "title": "Treoracha saincheaptha",
-      "deprecation": "Tá sé beartaithe deireadh a chur le treoracha saincheaptha. Bog na treoirlínte seo go comhad REVIEW.md i do stór ina ionad.",
+      "deprecation": "Bainfear na treoracha saincheaptha. Bog na treoirlínte seo go comhad REVIEW.md i do stór ina ionad.",
       "placeholder": "m.sh. Ár ngnáis maidir le láimhseáil earráidí a chur i bhfeidhm…",
       "clearTitle": "Bain na treoracha saincheaptha?",
       "clearMessage": "Má shábhálann tú réimse folamh, scriostar na treoracha saincheaptha atá stóráilte don athbhreithneoir seo."
@@ -1464,6 +1464,7 @@
       "managedOnWeb": "Bainistítear nasc Bitbucket le {{organization}} ar an ngréasán ó ríomhaire.",
       "description": "Cruthaigh comhartha rochtana don spás oibre do {{organization}} agus greamaigh thíos é.",
       "descriptionReconnect": "Cruthaigh comhartha rochtana nua don spás oibre do {{organization}} agus greamaigh thíos é.",
+      "descriptionOverview": "Cruthaigh comhartha rochtana don spás oibre do {{organization}} agus greamaigh é ar an gcéad scáileán eile.",
       "scopes": "Cuntas: léamh · Stórtha: léamh/scríobh · Iarratais tarraingthe: léamh · Crúcaí gréasáin: léamh/scríobh",
       "tokenPlaceholder": "Comhartha rochtana don spás oibre",
       "tokenRefused": "Níor ghlac Bitbucket leis an gcomhartha rochtana spáis oibre seo. Seiceáil go bhfuil na scóip thuas aige, ansin triail arís."
@@ -3363,6 +3364,8 @@
     "retryHint": "Déanann sé iarracht eile stádas Kilo Pass a lódáil.",
     "endedOn": "Críochnaithe {{date}}",
     "notAvailableInApp": "Níl Kilo Pass ar fáil san aip.",
+    "notAvailableTitle": "Níl Kilo Pass san aip",
+    "noPassDescription": "Níl Kilo Pass ag an gcuntas seo.",
     "statusActive": "Gníomhach",
     "statusTrialing": "Ar thriail",
     "statusPastDue": "Íocaíocht thar téarma",
@@ -3645,7 +3648,7 @@
       "retentionLimit": "Taispeántar na sonraisc is déanaí."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Cumasaigh foláireamh faoi iarmhéid íseal",
+      "subtitle": "Seol foláireamh trí ríomhphost chuig na seoltaí a liostálann tú nuair a thiteann iarmhéid na heagraíochta seo faoi bhun na suime a shocraíonn tú.",
       "notifyEmailsLabel": "Seoltaí ríomhphoist le haghaidh foláireamh",
       "permissionDenied": "Níl cead agat foláirimh billeála a bhainistiú.",
       "separateEmailsHint": "Scar na seoltaí ríomhphoist le camóga.",
@@ -5171,7 +5174,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Gné fiontraíochta",
-    "enterpriseOnly": "Níl an ghné seo ar fáil ach d’fhiontair.",
+    "enterpriseOnly": "Tá soláthraithe agus samhlacha ar fáil ar an bplean Enterprise.",
     "readOnly": "Ní féidir ach le húinéirí agus riarthóirí eagraíochta na socruithe seo a athrú.",
     "loadError": "Níorbh fhéidir soláthraithe agus samhlacha a lódáil",
     "tabModels": "Samhlacha",

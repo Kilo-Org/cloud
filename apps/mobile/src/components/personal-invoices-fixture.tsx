@@ -7,20 +7,32 @@ import { PersonalInvoicesScreen } from '@/components/personal-invoices-screen';
 import { TRPCProvider } from '@/lib/trpc';
 
 // In a development build, open dev/personal-invoices-fixture/<state> through the
-// app's native link scheme. The app's selected language applies.
+// app's native link scheme, where <state> is `listed`, `empty` or `error`. The
+// app's selected language applies.
 //
 // The personal invoices list is a Stripe read served by the backend, and a local
 // stack has no Stripe customer to list, so this fixture answers the one read the
 // real screen makes instead of seeding a customer. `listed` serves one page of
-// rows with every status the list colors; `empty` serves the settled empty page.
-// The screen and its pagination hook are the production ones, and the DTOs cross
-// the usual tRPC boundary. Reads never touch the network, and the mutation cache
-// rejects before any mutation function runs.
+// rows with every status the list colors; `empty` serves the settled empty page;
+// `error` makes that one read reject the way a network or backend read failure
+// does, so the screen shows its retryable neutral error state. The screen and its
+// pagination hook are the production ones, and the DTOs cross the usual tRPC
+// boundary. Reads never touch the network, and the mutation cache rejects before
+// any mutation function runs.
 
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
 type InvoicesPage = RouterOutputs['user']['invoicesPage'];
 
-type PersonalInvoicesFixtureState = 'listed' | 'empty';
+export type PersonalInvoicesFixtureState = 'listed' | 'empty' | 'error';
+
+const FIXTURE_STATES: readonly PersonalInvoicesFixtureState[] = ['listed', 'empty', 'error'];
+
+/** The fixture state a `?state=` value names; anything else opens `listed`. */
+export function personalInvoicesFixtureState(
+  value: string | undefined
+): PersonalInvoicesFixtureState {
+  return FIXTURE_STATES.find(state => state === value) ?? 'listed';
+}
 
 /**
  * Sample rows. Each `created` is noon UTC on the day its description names: the
@@ -89,6 +101,12 @@ function createFixtureClient(state: { readonly value: PersonalInvoicesFixtureSta
             throw new Error('Personal invoices fixture does not allow writes');
           }
           if (url.includes('/user.invoicesPage')) {
+            if (state.value === 'error') {
+              // A plain rejection, not an error response, so the screen
+              // classifies the failure by cause and keeps its retryable neutral
+              // variant.
+              throw new Error('Read failed');
+            }
             return fixtureResponse(
               state.value === 'listed' ? { ...EMPTY_PAGE, entries: INVOICES } : EMPTY_PAGE
             );

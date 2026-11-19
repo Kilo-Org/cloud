@@ -2,8 +2,19 @@
 // runs against the mocked connection store, never against the database.
 jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store', () => ({
   getOpenAiChatGptConnection: jest.fn(),
+  getOpenAiChatGptStoredConnection: jest.fn(),
   clearOpenAiChatGptConnection: jest.fn(),
   readOpenAiChatGptUsageLimit: jest.fn(),
+  openAiChatGptSharedServicesOwner: (organizationId: string) => ({
+    organizationId,
+    scope: 'shared_services',
+  }),
+}));
+
+// The connector lookup reads other accounts' rows; this suite decides its
+// answer per case.
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/connector', () => ({
+  openAiChatGptConnectorGone: jest.fn(),
 }));
 
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => {
@@ -20,9 +31,12 @@ import { rootRouter } from '@/routers/root-router';
 import {
   clearOpenAiChatGptConnection,
   getOpenAiChatGptConnection,
+  getOpenAiChatGptStoredConnection,
   readOpenAiChatGptUsageLimit,
   type OpenAiChatGptOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
+import { openAiChatGptConnectorGone } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/connector';
+import { OPENAI_CHATGPT_SHARED_RECONNECT_MESSAGE } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import type { OpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/types';
 
@@ -32,6 +46,7 @@ const USER_ID = 'user-1';
 const ORG_ID = '00000000-0000-4000-8000-000000000001';
 const USER_OWNER: OpenAiChatGptOwner = { kiloUserId: USER_ID, organizationId: null };
 const ORG_OWNER: OpenAiChatGptOwner = { kiloUserId: USER_ID, organizationId: ORG_ID };
+const SHARED_OWNER: OpenAiChatGptOwner = { organizationId: ORG_ID, scope: 'shared_services' };
 const CONNECTED_AT = '2026-09-16T12:00:00.000Z';
 const RECONNECT_MESSAGE = 'Your ChatGPT connection has expired. Reconnect to continue.';
 
@@ -60,11 +75,15 @@ function callerFor(user: { id: string } | null) {
 
 describe('openAiChatGpt.status', () => {
   const getConnection = jest.mocked(getOpenAiChatGptConnection);
+  const getStoredConnection = jest.mocked(getOpenAiChatGptStoredConnection);
+  const connectorGone = jest.mocked(openAiChatGptConnectorGone);
   const ensureOrgAccess = jest.mocked(ensureOrganizationAccess);
   const usageLimitRead = jest.mocked(readOpenAiChatGptUsageLimit);
 
   beforeEach(() => {
     getConnection.mockReset();
+    getStoredConnection.mockReset();
+    connectorGone.mockReset();
     ensureOrgAccess.mockReset();
     usageLimitRead.mockReset();
     usageLimitRead.mockResolvedValue(null);
@@ -176,6 +195,115 @@ describe('openAiChatGpt.status', () => {
       callerFor({ id: USER_ID }).openAiChatGpt.status({ organizationId: ORG_ID })
     ).rejects.toThrow('no access');
     expect(getConnection).not.toHaveBeenCalled();
+  });
+
+  it('never checks a personal connection for a gone connector', async () => {
+    getConnection.mockResolvedValue(connectedConnection());
+
+    await expect(callerFor({ id: USER_ID }).openAiChatGpt.status({})).resolves.toEqual({
+      state: 'connected',
+      email: 'user@example.com',
+      subject: 'subject-1',
+      connectedAt: CONNECTED_AT,
+    });
+    expect(connectorGone).not.toHaveBeenCalled();
+    expect(getStoredConnection).not.toHaveBeenCalled();
+  });
+
+  it('never checks a member organization connection for a gone connector', async () => {
+    ensureOrgAccess.mockResolvedValue('member');
+    getConnection.mockResolvedValue(connectedConnection());
+
+    await expect(
+      callerFor({ id: USER_ID }).openAiChatGpt.status({ organizationId: ORG_ID })
+    ).resolves.toEqual({
+      state: 'connected',
+      email: 'user@example.com',
+      subject: 'subject-1',
+      connectedAt: CONNECTED_AT,
+    });
+    expect(connectorGone).not.toHaveBeenCalled();
+    expect(getStoredConnection).not.toHaveBeenCalled();
+  });
+
+  it('requires a reconnect when the shared connection’s connector is gone', async () => {
+    ensureOrgAccess.mockResolvedValue('owner');
+    getConnection.mockResolvedValue(connectedConnection());
+    getStoredConnection.mockResolvedValue({
+      connection: connectedConnection(),
+      isEnabled: true,
+      createdBy: 'connector-user',
+    });
+    connectorGone.mockResolvedValue(true);
+
+    await expect(
+      callerFor({ id: USER_ID }).openAiChatGpt.status({
+        organizationId: ORG_ID,
+        scope: 'shared_services',
+      })
+    ).resolves.toEqual({
+      state: 'reconnect_required',
+      email: 'user@example.com',
+      subject: 'subject-1',
+      connectedAt: CONNECTED_AT,
+      errorMessage: OPENAI_CHATGPT_SHARED_RECONNECT_MESSAGE,
+    });
+    expect(getConnection).toHaveBeenCalledWith(SHARED_OWNER);
+    expect(getStoredConnection).toHaveBeenCalledWith(SHARED_OWNER);
+    expect(connectorGone).toHaveBeenCalledWith(
+      expect.objectContaining({ createdBy: 'connector-user' })
+    );
+    expect(usageLimitRead).not.toHaveBeenCalled();
+  });
+
+  it('reports the shared connection as connected while its connector is present', async () => {
+    ensureOrgAccess.mockResolvedValue('admin');
+    getConnection.mockResolvedValue(connectedConnection());
+    getStoredConnection.mockResolvedValue({
+      connection: connectedConnection(),
+      isEnabled: true,
+      createdBy: 'connector-user',
+    });
+    connectorGone.mockResolvedValue(false);
+
+    await expect(
+      callerFor({ id: USER_ID }).openAiChatGpt.status({
+        organizationId: ORG_ID,
+        scope: 'shared_services',
+      })
+    ).resolves.toEqual({
+      state: 'connected',
+      email: 'user@example.com',
+      subject: 'subject-1',
+      connectedAt: CONNECTED_AT,
+    });
+  });
+
+  it('keeps the stored error for an errored shared connection even when the connector is gone', async () => {
+    ensureOrgAccess.mockResolvedValue('owner');
+    getConnection.mockResolvedValue(
+      connectedConnection({ status: 'error', error_message: RECONNECT_MESSAGE })
+    );
+    getStoredConnection.mockResolvedValue({
+      connection: connectedConnection({ status: 'error', error_message: RECONNECT_MESSAGE }),
+      isEnabled: false,
+      createdBy: 'connector-user',
+    });
+    connectorGone.mockResolvedValue(true);
+
+    await expect(
+      callerFor({ id: USER_ID }).openAiChatGpt.status({
+        organizationId: ORG_ID,
+        scope: 'shared_services',
+      })
+    ).resolves.toEqual({
+      state: 'error',
+      email: 'user@example.com',
+      subject: 'subject-1',
+      connectedAt: CONNECTED_AT,
+      errorMessage: RECONNECT_MESSAGE,
+    });
+    expect(connectorGone).not.toHaveBeenCalled();
   });
 });
 

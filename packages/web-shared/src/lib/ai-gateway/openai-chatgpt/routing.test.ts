@@ -5,6 +5,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store', () => ({
     scope: 'shared_services',
   }),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/connector', () => ({
+  openAiChatGptConnectorGone: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/served-models', () => ({
   isOpenAiModelServed: jest.fn().mockResolvedValue(true),
 }));
@@ -45,6 +48,7 @@ import { afterAll, beforeEach, describe, expect, it } from '@jest/globals';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { resolveOpenAiChatGptAccessToken } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/refresh';
 import { getOpenAiChatGptStoredConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
+import { openAiChatGptConnectorGone } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/connector';
 import { isOpenAiModelServed } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/served-models';
 import type {
   GatewayRequest,
@@ -64,7 +68,7 @@ import {
   type OpenAiChatGptRoutingInput,
 } from './routing';
 import type { OpenAiChatGptConnection } from './types';
-import type { OpenAiChatGptOwner } from './store';
+import type { OpenAiChatGptOwner, OpenAiChatGptStoredConnection } from './store';
 import { OPENAI_CHATGPT_API_URL } from './upstream';
 
 const PARTNER_KEY = 'partner-project-key';
@@ -74,6 +78,7 @@ const USER_ID = 'user-1';
 const ORG_ID = '00000000-0000-4000-8000-000000000001';
 const USER_OWNER: OpenAiChatGptOwner = { kiloUserId: USER_ID, organizationId: null };
 const ORG_OWNER: OpenAiChatGptOwner = { kiloUserId: USER_ID, organizationId: ORG_ID };
+const CONNECTOR_ID = 'connector-user';
 
 const originalOpenAiChatGptApiKey = process.env.OPENAI_CHATGPT_API_KEY;
 const originalFetch = global.fetch;
@@ -91,6 +96,17 @@ function connectedConnection(): OpenAiChatGptConnection {
     email: 'user@example.com',
     connected_at: '2026-09-16T00:00:00.000Z',
     status: 'connected',
+  };
+}
+
+function storedConnection(
+  overrides: Partial<OpenAiChatGptStoredConnection> = {}
+): OpenAiChatGptStoredConnection {
+  return {
+    connection: connectedConnection(),
+    isEnabled: true,
+    createdBy: CONNECTOR_ID,
+    ...overrides,
   };
 }
 
@@ -151,10 +167,8 @@ async function transformResponsesRequest(
 beforeEach(() => {
   jest.mocked(logExceptInTest).mockClear();
   process.env.OPENAI_CHATGPT_API_KEY = PARTNER_KEY;
-  jest
-    .mocked(getOpenAiChatGptStoredConnection)
-    .mockReset()
-    .mockResolvedValue({ connection: connectedConnection(), isEnabled: true });
+  jest.mocked(getOpenAiChatGptStoredConnection).mockReset().mockResolvedValue(storedConnection());
+  jest.mocked(openAiChatGptConnectorGone).mockReset().mockResolvedValue(false);
   jest
     .mocked(resolveOpenAiChatGptAccessToken)
     .mockReset()
@@ -195,18 +209,18 @@ describe('getOpenAiChatGptByokModelIds', () => {
       getOpenAiChatGptByokModelIds(USER_OWNER, ['openai/gpt-5-nano'])
     ).resolves.toBeNull();
 
-    jest.mocked(getOpenAiChatGptStoredConnection).mockResolvedValue({
-      connection: connectedConnection(),
-      isEnabled: false,
-    });
+    jest
+      .mocked(getOpenAiChatGptStoredConnection)
+      .mockResolvedValue(storedConnection({ isEnabled: false }));
     await expect(
       getOpenAiChatGptByokModelIds(USER_OWNER, ['openai/gpt-5-nano'])
     ).resolves.toBeNull();
 
-    jest.mocked(getOpenAiChatGptStoredConnection).mockResolvedValue({
-      connection: { ...connectedConnection(), status: 'error' },
-      isEnabled: true,
-    });
+    jest
+      .mocked(getOpenAiChatGptStoredConnection)
+      .mockResolvedValue(
+        storedConnection({ connection: { ...connectedConnection(), status: 'error' } })
+      );
     await expect(
       getOpenAiChatGptByokModelIds(USER_OWNER, ['openai/gpt-5-nano'])
     ).resolves.toBeNull();
@@ -902,19 +916,20 @@ describe('checkOpenAiChatGptByok', () => {
   });
 
   it('is not eligible when the connection is disabled after a failed refresh', async () => {
-    jest.mocked(getOpenAiChatGptStoredConnection).mockResolvedValue({
-      connection: { ...connectedConnection(), status: 'error', error_message: 'expired' },
-      isEnabled: false,
-    });
+    jest.mocked(getOpenAiChatGptStoredConnection).mockResolvedValue(
+      storedConnection({
+        connection: { ...connectedConnection(), status: 'error', error_message: 'expired' },
+        isEnabled: false,
+      })
+    );
 
     await expect(checkOpenAiChatGptByok(routingInput())).resolves.toBeNull();
   });
 
   it('is not eligible when the row is disabled while the payload still says connected', async () => {
-    jest.mocked(getOpenAiChatGptStoredConnection).mockResolvedValue({
-      connection: connectedConnection(),
-      isEnabled: false,
-    });
+    jest
+      .mocked(getOpenAiChatGptStoredConnection)
+      .mockResolvedValue(storedConnection({ isEnabled: false }));
 
     await expect(checkOpenAiChatGptByok(routingInput())).resolves.toBeNull();
   });
@@ -1255,9 +1270,7 @@ describe('shared-services routing', () => {
     jest
       .mocked(getOpenAiChatGptStoredConnection)
       .mockImplementation(async owner =>
-        owner.scope === 'shared_services'
-          ? null
-          : { connection: connectedConnection(), isEnabled: true }
+        owner.scope === 'shared_services' ? null : storedConnection()
       );
 
     const result = await checkOpenAiChatGptByok(
@@ -1275,8 +1288,8 @@ describe('shared-services routing', () => {
       .mocked(getOpenAiChatGptStoredConnection)
       .mockImplementation(async owner =>
         owner.scope === 'shared_services'
-          ? { connection: connectedConnection(), isEnabled: false }
-          : { connection: connectedConnection(), isEnabled: true }
+          ? storedConnection({ isEnabled: false })
+          : storedConnection()
       );
 
     const result = await checkOpenAiChatGptByok(
@@ -1316,5 +1329,58 @@ describe('shared-services routing', () => {
 
     expect(result?.kind).toBe('provider');
     expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(USER_OWNER);
+  });
+
+  it('falls back to the caller own connection when the shared connection connector is gone', async () => {
+    jest
+      .mocked(getOpenAiChatGptStoredConnection)
+      .mockImplementation(async owner =>
+        owner.scope === 'shared_services'
+          ? storedConnection({ createdBy: 'gone-connector' })
+          : storedConnection({ createdBy: USER_ID })
+      );
+    jest.mocked(openAiChatGptConnectorGone).mockResolvedValue(true);
+
+    const result = await checkOpenAiChatGptByok(
+      routingInput({ organizationId: ORG_ID, botId: 'reviewer' })
+    );
+
+    expect(result?.kind).toBe('provider');
+    expect(openAiChatGptConnectorGone).toHaveBeenCalledWith(
+      expect.objectContaining({ createdBy: 'gone-connector' })
+    );
+    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(ORG_OWNER);
+    expect(resolveOpenAiChatGptAccessToken).not.toHaveBeenCalledWith(SHARED_OWNER);
+  });
+
+  it('does not serve the organization when the shared connector is gone and the caller has no own connection', async () => {
+    jest
+      .mocked(getOpenAiChatGptStoredConnection)
+      .mockImplementation(async owner =>
+        owner.scope === 'shared_services' ? storedConnection() : null
+      );
+    jest.mocked(openAiChatGptConnectorGone).mockResolvedValue(true);
+
+    await expect(
+      checkOpenAiChatGptByok(routingInput({ organizationId: ORG_ID, botId: 'reviewer' }))
+    ).resolves.toBeNull();
+  });
+
+  it('serves the organization shared connection while its connector resolves', async () => {
+    jest.mocked(openAiChatGptConnectorGone).mockResolvedValue(false);
+
+    const result = await checkOpenAiChatGptByok(
+      routingInput({ organizationId: ORG_ID, botId: 'reviewer' })
+    );
+
+    expect(result?.kind).toBe('provider');
+    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(SHARED_OWNER);
+  });
+
+  it('never consults the connector for a member request', async () => {
+    const result = await checkOpenAiChatGptByok(routingInput({ organizationId: ORG_ID }));
+
+    expect(result?.kind).toBe('provider');
+    expect(openAiChatGptConnectorGone).not.toHaveBeenCalled();
   });
 });

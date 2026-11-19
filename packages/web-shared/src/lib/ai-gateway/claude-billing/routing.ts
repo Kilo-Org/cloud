@@ -15,7 +15,7 @@ import {
 import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import type { ClaudeBillingOwner } from './store';
-import { resolveClaudeBillingConnector } from './connector';
+import { resolveConnectionConnector } from '../connector';
 import {
   getAuthoritativeClaudeBillingState,
   ClaudeBillingPayerStateParseError,
@@ -85,7 +85,7 @@ async function connectorGone(
   connection: ClaudeBillingPayerState
 ): Promise<boolean> {
   if (owner.kind !== 'organization' || !connection.created_by) return false;
-  const connector = await resolveClaudeBillingConnector(connection.created_by, readDb);
+  const connector = await resolveConnectionConnector(connection.created_by, readDb);
   return connector.kind === 'gone';
 }
 

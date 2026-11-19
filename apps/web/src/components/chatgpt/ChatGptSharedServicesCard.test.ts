@@ -85,6 +85,38 @@ describe('ChatGptSharedServicesCardView', () => {
     expect(html).toContain('Disconnect');
   });
 
+  it('shows the reconnect requirement when the connector account is gone', async () => {
+    const html = await render({
+      status: {
+        state: 'reconnect_required',
+        email: 'shared@example.com',
+        subject: 'subject-1',
+        connectedAt: CONNECTED_AT,
+        errorMessage:
+          'The account that connected the shared-services ChatGPT connection for this organization is no longer available. An organization owner can reconnect it.',
+      },
+    });
+
+    expect(html).toContain('Needs reconnect');
+    expect(html).toContain(
+      'The account that connected the shared-services ChatGPT connection for this organization is no longer available. An organization owner can reconnect it.'
+    );
+    expect(html).toContain('Reconnect');
+    expect(html).toContain('Disconnect');
+    expect(html).not.toContain(USAGE_LINK_SUMMARY);
+  });
+
+  it('falls back to its own reconnect copy when the status carries no message', async () => {
+    const html = await render({
+      status: { state: 'reconnect_required', email: 'shared@example.com' },
+    });
+
+    expect(html).toContain('An organization owner can reconnect it.');
+    expect(html).not.toContain(
+      'The shared services ChatGPT connection is not available. Reconnect to continue.'
+    );
+  });
+
   it('shows the usage-limit message for a current plan limit', async () => {
     const html = await render({
       status: connectedStatus({

@@ -6,9 +6,11 @@ import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
 import { and, eq } from 'drizzle-orm';
 import { kilocode_users, openai_chatgpt_connections, type User } from '@kilocode/db/schema';
+import { createSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { openAiChatGptConnectorGone } from './connector';
 import {
   clearOpenAiChatGptConnection,
   clearOpenAiChatGptUsageLimit,
@@ -43,6 +45,26 @@ function connection(email: string): OpenAiChatGptConnection {
     connected_at: '2026-09-16T00:00:00.000Z',
     status: 'connected',
   };
+}
+
+/**
+ * Removes an account the way erasure does: the person's own connection rows go
+ * first, the way `softDeleteUser` deletes them (it clears the shared row's
+ * connector reference itself, and that path has its own coverage in
+ * `lib/user/index.test.ts`). The account row then goes, so the foreign key must
+ * clear the connector reference on the shared row instead of removing the
+ * organization's connection along with it.
+ */
+async function deleteAccount(userId: string): Promise<void> {
+  await db
+    .delete(openai_chatgpt_connections)
+    .where(
+      and(
+        eq(openai_chatgpt_connections.kilo_user_id, userId),
+        eq(openai_chatgpt_connections.is_shared_services, false)
+      )
+    );
+  await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
 }
 
 describe('openai-chatgpt shared-services connection (real database)', () => {
@@ -104,31 +126,17 @@ describe('openai-chatgpt shared-services connection (real database)', () => {
     );
   });
 
-  it('keeps the organization shared row when the connector account row is deleted', async () => {
+  it('keeps the organization shared row when the connector account is deleted, and requires a reconnect', async () => {
+    const shared = openAiChatGptSharedServicesOwner(organization.id);
     const connector = await insertTestUser({
       google_user_email: `shared-services-connector-${randomUUID()}@example.com`,
     });
-    await saveOpenAiChatGptConnection(
-      openAiChatGptSharedServicesOwner(organization.id),
-      connection('kept@example.com'),
-      connector.id
-    );
+    await saveOpenAiChatGptConnection(shared, connection('kept@example.com'), connector.id);
 
-    // A person's own rows go first, the way `softDeleteUser` deletes them (it
-    // clears the shared row's connector reference itself, and that path has its
-    // own coverage in `lib/user/index.test.ts`). The account row then goes, so
-    // the foreign key must clear the connector reference instead of removing the
-    // organization's connection along with it.
-    await db
-      .delete(openai_chatgpt_connections)
-      .where(
-        and(
-          eq(openai_chatgpt_connections.kilo_user_id, connector.id),
-          eq(openai_chatgpt_connections.is_shared_services, false)
-        )
-      );
-    await db.delete(kilocode_users).where(eq(kilocode_users.id, connector.id));
+    await deleteAccount(connector.id);
 
+    // The row is the organization's connection, so it survives its connector
+    // and keeps the credential that connector connected.
     const rows = await db
       .select()
       .from(openai_chatgpt_connections)
@@ -142,9 +150,18 @@ describe('openai-chatgpt shared-services connection (real database)', () => {
     expect(rows[0].is_shared_services).toBe(true);
     expect(rows[0].kilo_user_id).toBeNull();
     expect(rows[0].created_by).toBe(connector.id);
-    await expect(
-      getOpenAiChatGptStoredConnection(openAiChatGptSharedServicesOwner(organization.id))
-    ).resolves.toMatchObject({ connection: { email: 'kept@example.com' } });
+
+    const stored = await getOpenAiChatGptStoredConnection(shared);
+    if (!stored) throw new Error('the shared row went missing with its connector');
+    expect(stored).toMatchObject({
+      connection: { email: 'kept@example.com' },
+      createdBy: connector.id,
+    });
+
+    // The credential is the deleted person's account, and nobody is left who
+    // can refresh it: the row reads as gone so routing skips it and the status
+    // card asks an organization owner to reconnect.
+    await expect(openAiChatGptConnectorGone(stored)).resolves.toBe(true);
   });
 
   it('records a plan limit on the shared row only', async () => {
@@ -200,6 +217,70 @@ describe('openai-chatgpt shared-services connection (real database)', () => {
 
     // A success on a row that never hit a limit writes nothing and must not throw.
     await expect(clearOpenAiChatGptUsageLimit(shared, ACCESS_TOKEN)).resolves.toBeUndefined();
+  });
+
+  it('restores the shared row when a live owner reconnects after its connector is gone', async () => {
+    const shared = openAiChatGptSharedServicesOwner(organization.id);
+    const connector = await insertTestUser({
+      google_user_email: `shared-services-reconnect-${randomUUID()}@example.com`,
+    });
+    await saveOpenAiChatGptConnection(
+      shared,
+      connection('before-reconnect@example.com'),
+      connector.id
+    );
+    await deleteAccount(connector.id);
+
+    const abandoned = await getOpenAiChatGptStoredConnection(shared);
+    if (!abandoned) throw new Error('the shared row went missing with its connector');
+    await expect(openAiChatGptConnectorGone(abandoned)).resolves.toBe(true);
+
+    // A live person claims the organization's row: the reconnect replaces the
+    // connector and the credential together, and the row serves again.
+    await saveOpenAiChatGptConnection(
+      shared,
+      { ...connection('after-reconnect@example.com'), access_token: REPLACEMENT_ACCESS_TOKEN },
+      owner.id
+    );
+
+    const restored = await getOpenAiChatGptStoredConnection(shared);
+    if (!restored) throw new Error('the reconnect did not leave a stored connection');
+    expect(restored.createdBy).toBe(owner.id);
+    expect(restored.connection).toMatchObject({
+      email: 'after-reconnect@example.com',
+      access_token: REPLACEMENT_ACCESS_TOKEN,
+    });
+    await expect(openAiChatGptConnectorGone(restored)).resolves.toBe(false);
+  });
+
+  it('treats a shared row whose connector is soft-deleted as needing a reconnect', async () => {
+    const shared = openAiChatGptSharedServicesOwner(organization.id);
+    const erased = await insertTestUser({
+      google_user_email: `shared-services-soft-deleted-${randomUUID()}@example.com`,
+    });
+    await saveOpenAiChatGptConnection(shared, connection('soft-deleted@example.com'), erased.id);
+
+    // Erasure keeps the account row and its address, so only the blocked
+    // reason says the person is gone.
+    await db
+      .update(kilocode_users)
+      .set({ blocked_reason: createSoftDeletedBlockedReason() })
+      .where(eq(kilocode_users.id, erased.id));
+
+    const blocked = await getOpenAiChatGptStoredConnection(shared);
+    if (!blocked) throw new Error('the shared row went missing with its connector');
+    expect(blocked.createdBy).toBe(erased.id);
+    await expect(openAiChatGptConnectorGone(blocked)).resolves.toBe(true);
+
+    // The same row with a live connector keeps serving.
+    const live = await insertTestUser({
+      google_user_email: `shared-services-live-connector-${randomUUID()}@example.com`,
+    });
+    await saveOpenAiChatGptConnection(shared, connection('live@example.com'), live.id);
+
+    const served = await getOpenAiChatGptStoredConnection(shared);
+    if (!served) throw new Error('the live connector did not leave a stored connection');
+    await expect(openAiChatGptConnectorGone(served)).resolves.toBe(false);
   });
 
   it('keeps a late report from a replaced credential off the reconnected row', async () => {

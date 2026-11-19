@@ -37,6 +37,8 @@ const SCOPE_NOTE =
 const FALLBACK_IDENTITY_LABEL = 'your ChatGPT account';
 const FALLBACK_ERROR_MESSAGE =
   'The shared services ChatGPT connection is not available. Reconnect to continue.';
+const FALLBACK_RECONNECT_REQUIRED_MESSAGE =
+  'The account that connected the shared-services ChatGPT connection for this organization is no longer available. An organization owner can reconnect it.';
 const LOAD_ERROR_MESSAGE = "We couldn't load the shared services connection. Try again.";
 const CONNECT_ERROR_MESSAGE = "We couldn't connect the shared services account. Try again.";
 const DISCONNECT_ERROR_MESSAGE =
@@ -171,12 +173,16 @@ function CardBody({
     );
   }
 
-  if (status.state === 'error') {
+  if (status.state === 'error' || status.state === 'reconnect_required') {
+    // Both states mean a stored connection exists but cannot be used, so both
+    // carry the server's message and the same pair of actions.
+    const fallbackMessage =
+      status.state === 'reconnect_required'
+        ? FALLBACK_RECONNECT_REQUIRED_MESSAGE
+        : FALLBACK_ERROR_MESSAGE;
     return (
       <>
-        <p className="type-body text-muted-foreground">
-          {status.errorMessage ?? FALLBACK_ERROR_MESSAGE}
-        </p>
+        <p className="type-body text-muted-foreground">{status.errorMessage ?? fallbackMessage}</p>
         <div className="flex flex-wrap items-center gap-2">
           <ConnectAction
             label={RECONNECT_LABEL}
@@ -207,7 +213,7 @@ export function ChatGptSharedServicesCardView(props: ChatGptSharedServicesCardVi
           <CardTitle>{CARD_TITLE}</CardTitle>
           <div className={CARD_STATUS_SLOT_CLASS}>
             {status?.state === 'connected' ? <Badge variant="new">{CONNECTED_LABEL}</Badge> : null}
-            {status?.state === 'error' ? (
+            {status?.state === 'error' || status?.state === 'reconnect_required' ? (
               <Badge variant="destructive">{RECONNECT_BADGE_LABEL}</Badge>
             ) : null}
           </div>

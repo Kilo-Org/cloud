@@ -7761,8 +7761,9 @@ export const openai_chatgpt_connections = pgTable(
     /**
      * True for the organization's shared-services connection: one row per
      * organization, used by the platform's own callers (code reviewer, Slack
-     * bot) instead of any member's personal connection. The
-     * connecting person is recorded in `kilo_user_id` and `created_by`.
+     * bot) instead of any member's personal connection. The connecting person
+     * is recorded in `created_by`, and the organization's shared connection is
+     * revalidated against that person before it serves a request.
      */
     is_shared_services: boolean().default(false).notNull(),
     /**

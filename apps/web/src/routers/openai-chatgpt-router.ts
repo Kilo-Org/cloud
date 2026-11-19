@@ -12,18 +12,25 @@ import {
   clearOpenAiChatGptConnection,
   readOpenAiChatGptUsageLimit,
   getOpenAiChatGptConnection,
+  getOpenAiChatGptStoredConnection,
   openAiChatGptSharedServicesOwner,
   type OpenAiChatGptOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
+import { openAiChatGptConnectorGone } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/connector';
+import { OPENAI_CHATGPT_SHARED_RECONNECT_MESSAGE } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import { OpenAiChatGptStatusSchema, type OpenAiChatGptStatus } from '@/lib/openai-chatgpt/status';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 
 /**
- * The "Sign in with ChatGPT" BYOK connection. It is inherently personal: it is
- * owned by the signed-in person and scoped to one account, either their
- * personal account or one organization they belong to. Any member can manage
- * their own connection for an organization; it is their credential, not the
- * organization's. Both procedures return only `OpenAiChatGptStatus`: a token, a
+ * The "Sign in with ChatGPT" BYOK connection. A member's connection is
+ * inherently personal: it is owned by the signed-in person and scoped to one
+ * account, either their personal account or one organization they belong to.
+ * Any member can manage their own connection for an organization; it is their
+ * credential, not the organization's. An organization also has one
+ * shared-services connection, which only an owner or admin may manage and which
+ * Kilo's shared services use. Its status reports `reconnect_required` while the
+ * account that connected it is gone, because only an organization owner can
+ * reconnect it. Both procedures return only `OpenAiChatGptStatus`: a token, a
  * refresh token and a raw OAuth error body are never part of the response.
  */
 
@@ -85,7 +92,18 @@ async function resolveOwner(
   return { kiloUserId: userId, organizationId };
 }
 
-/** An absent row is `disconnected`; a disabled row is `error` with its message. */
+/**
+ * An absent row is `disconnected`; a disabled row is `error` with its message;
+ * a live shared-services row whose connector account is gone is
+ * `reconnect_required`, because only an organization owner can reconnect it.
+ *
+ * The payload is read on the primary through `getOpenAiChatGptConnection`, so a
+ * terminal refresh failure surfaces its reconnect message and a just-completed
+ * disconnect never shows a lagging replica's stale row. Only the
+ * shared-services owner adds a second read, `getOpenAiChatGptStoredConnection`,
+ * for the `createdBy` the connector decision needs; every other owner reads
+ * once.
+ */
 async function readStatus(owner: OpenAiChatGptOwner): Promise<OpenAiChatGptStatus> {
   const connection = await getOpenAiChatGptConnection(owner);
   if (!connection) {
@@ -106,8 +124,23 @@ async function readStatus(owner: OpenAiChatGptOwner): Promise<OpenAiChatGptStatu
     };
   }
 
+  // Only an organization's shared-services connection names a connector whose
+  // absence the organization must fix; a personal or member connection is the
+  // caller's own and is never checked for it.
+  if (owner.scope === 'shared_services') {
+    const stored = await getOpenAiChatGptStoredConnection(owner);
+    if (stored && (await openAiChatGptConnectorGone(stored))) {
+      return {
+        state: 'reconnect_required',
+        ...identity,
+        errorMessage: OPENAI_CHATGPT_SHARED_RECONNECT_MESSAGE,
+      };
+    }
+  }
+
   // The plan limit is read only for a live connection: an errored connection
-  // needs the reconnect message, not the usage-limit message.
+  // needs the reconnect message, not the usage-limit message, and a connection
+  // whose connector is gone resumes under a new connector.
   const usageLimit = await readOpenAiChatGptUsageLimit(owner);
 
   return {

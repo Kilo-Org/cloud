@@ -1227,7 +1227,9 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   user_notification_preferences)
  * - the organization's shared-services openai_chatgpt_connections row is kept
  *   (it belongs to the organization): the deleted connector's reference is
- *   cleared, and `created_by` keeps the record of who connected it
+ *   cleared, and `created_by` keeps the record of who connected it, so the
+ *   organization's shared connection reports that it needs a reconnect until an
+ *   owner reconnects it
  * - spend alert settings and their rules/state, the personal-scope hourly
  *   counters, and the personal-scope deliveries (recipients contain billing
  *   contact PII); organization-scoped alert rows are retained, with the deleted
@@ -1692,6 +1694,8 @@ export async function anonymizeCloudUserData(
   // row is the organization's connection, so it stays behind and only loses the
   // reference to the connector who is being deleted. `created_by` keeps the
   // record of who connected it, and the next reconnect names the new connector.
+  // Until an owner reconnects it, the organization's shared connection reports
+  // that it needs a reconnect.
   await tx
     .delete(openai_chatgpt_connections)
     .where(

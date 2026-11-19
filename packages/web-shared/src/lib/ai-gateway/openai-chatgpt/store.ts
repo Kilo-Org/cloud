@@ -33,14 +33,18 @@ const NO_USAGE_LIMIT = {
  *
  * One row per organization can also be the organization's shared-services
  * connection: it is connected by an organization owner, it is what the
- * platform's own callers use, and it belongs to no member.
+ * platform's own callers use, and it belongs to no member. The row stays the
+ * organization's and records the connector in `created_by`; a shared row whose
+ * connector is gone is not served by routing (the caller's own connection
+ * serves instead) and reads as needing a reconnect on the organization's
+ * settings.
  */
 
 /**
  * The account a connection belongs to. A member connection is the
  * `(kiloUserId, organizationId)` pair. The organization's shared-services
- * connection is its own single row, and no read depends on the person who
- * connected it.
+ * connection is its own single row, so no owner matches on the person who
+ * connected it; routing revalidates that person from the row's `created_by`.
  */
 export type OpenAiChatGptOwner =
   | { kiloUserId: string; organizationId: string | null; scope?: undefined }
@@ -97,6 +101,7 @@ export async function readOpenAiChatGptConnectionRow(
     .select({
       encrypted_connection: openai_chatgpt_connections.encrypted_connection,
       is_enabled: openai_chatgpt_connections.is_enabled,
+      created_by: openai_chatgpt_connections.created_by,
     })
     .from(openai_chatgpt_connections)
     .where(openAiChatGptOwnerWhere(owner));
@@ -134,6 +139,11 @@ export async function getOpenAiChatGptConnection(
 export type OpenAiChatGptStoredConnection = {
   connection: OpenAiChatGptConnection;
   isEnabled: boolean;
+  /**
+   * The person whose delegated ChatGPT account the row holds. The column is
+   * not nullable, so every row records a connector.
+   */
+  createdBy: string;
 };
 
 /**
@@ -152,7 +162,7 @@ export async function getOpenAiChatGptStoredConnection(
   const row = await readOpenAiChatGptConnectionRow(readDb, owner);
   if (!row) return null;
   const connection = decryptOpenAiChatGptConnection(row.encrypted_connection);
-  return connection ? { connection, isEnabled: row.is_enabled } : null;
+  return connection ? { connection, isEnabled: row.is_enabled, createdBy: row.created_by } : null;
 }
 
 /**
@@ -173,8 +183,8 @@ export async function saveOpenAiChatGptConnection(
     error_at: undefined,
   };
   const encrypted_connection = encryptApiKey(JSON.stringify(stored), BYOK_ENCRYPTION_KEY);
-  // The shared-services row records the connecting person in `kilo_user_id`; its
-  // reads never match on that column.
+  // The shared-services row records the connecting person in `created_by`; its
+  // reads never match on `kilo_user_id`.
   const values = {
     kilo_user_id: owner.scope === 'shared_services' ? createdBy : owner.kiloUserId,
     organization_id: owner.organizationId,

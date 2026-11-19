@@ -4,7 +4,7 @@ import type { ClaudeBillingConnectionRow } from '@kilocode/db/schema';
 import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createClaudeUserProfile } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
-import { resolveClaudeBillingConnector } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/connector';
+import { resolveConnectionConnector } from '@kilocode/web-shared/lib/ai-gateway/connector';
 import {
   claudeBillingOwnerKey,
   getGrantedClaudeBillingConnection,
@@ -36,7 +36,7 @@ export async function claudeBillingConnectionState(
   if (row.status === ClaudeBillingConnectionStatus.Pending) return 'pending';
   if (row.status === ClaudeBillingConnectionStatus.BillingUnavailable) return 'billing_unavailable';
   if (owner.kind !== 'organization') return 'connected';
-  const connector = await resolveClaudeBillingConnector(row.created_by, db);
+  const connector = await resolveConnectionConnector(row.created_by, db);
   return connector.kind === 'gone' ? 'reconnect_required' : 'connected';
 }
 

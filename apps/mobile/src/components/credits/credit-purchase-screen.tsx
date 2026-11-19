@@ -35,7 +35,7 @@ import { useStoreCreditProducts } from '@/lib/credits/use-store-credit-products'
 import { getCreditStorefront } from '@/lib/credits/storefront';
 import { useInlinePurchaseErrorOwnership } from '@/lib/credits/use-store-credit-purchase';
 import { formatPrefixedMoney } from '@/lib/format';
-import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
+import { LARGE_FONT_SCALE, useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { useSideInsetStyle } from '@/lib/screen-insets';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
@@ -85,13 +85,6 @@ function expiryCaptionFloor(fontScale: number): number {
 /** Reserved pack-row space while the store connects, so rows never jump in. */
 const PACK_SKELETON_ROWS = 4;
 
-/**
- * The scale at which `ConfigureRow` stacks its tile above the copy, shared with
- * the loading placeholder so the reservation and the row it stands in for take
- * the same shape. `configure-row.tsx` keeps the number itself.
- */
-const CONFIGURE_ROW_STACK_FONT_SCALE = 1.8;
-
 /** The row and the pending card say the same thing about a waiting request. */
 const WAIT_COPY_KEYS = {
   store: 'credits.waitingForStore',
@@ -117,7 +110,7 @@ export function CreditPurchaseScreen() {
   // The same presentation `ConfigureRow` picks for the loaded rows: a narrow
   // window or a large Dynamic Type scale hands the copy the row's full width,
   // so the loading placeholder reserves that shape instead of a shorter one.
-  const stackRows = fontScale >= CONFIGURE_ROW_STACK_FONT_SCALE || isNarrowLayout(width);
+  const stackRows = fontScale >= LARGE_FONT_SCALE || isNarrowLayout(width);
   const trpc = useTRPC();
   const {
     connected,

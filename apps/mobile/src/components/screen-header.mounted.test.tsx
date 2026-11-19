@@ -526,10 +526,10 @@ describe('ScreenHeader mounted', () => {
 
   it("keeps a mark-only heading's inlineActions on the row when the caller forbids a reflow", () => {
     // The shared-row check reserves 120dp of readable title per font-scale
-    // unit: at a 3x accessibility scale on a 390dp phone that reserve is 360dp
-    // against 334dp free, so the picker reflowed under the mark although both
-    // fit. The home header turns the check off for its picker.
-    Object.assign(layout, { width: 390, fontScale: 3 });
+    // unit: at a 1.5x scale in a 220dp window that reserve is 180dp against
+    // 164dp free, so the picker reflowed under the mark although both fit. The
+    // home header turns the check off for its picker.
+    Object.assign(layout, { width: 220, fontScale: 1.5 });
 
     const reflowed = renderHeader({
       title: 'Kilo',
@@ -565,6 +565,80 @@ describe('ScreenHeader mounted', () => {
       inlineActions: 'ACTIONS',
     });
     expect(findInlineActionsWrapper(uncapped.root).props.className).not.toContain('max-w-[50%]');
+  });
+
+  it('gives a large font scale the whole title and the inline cluster a row of its own', () => {
+    // At the largest Android font the account picker beside the title left
+    // neither readable: the history header painted "Past sessi…" beside an
+    // organisation name cut to "Notific…ngs lab". At a large font scale the
+    // cluster takes its own row, even for a caller that forbids the shared-row
+    // reflow, and the title may wrap to a second line instead of losing its tail.
+    const props: ScreenHeaderProps = {
+      title: 'Past sessions',
+      inlineActions: 'ACTIONS',
+      allowInlineActionsStacking: false,
+    };
+    Object.assign(layout, { width: 390, fontScale: 2 });
+    const large = renderHeader(props);
+    const stacked = large.root.findAll(isStackedActionsRow);
+    expect(stacked).toHaveLength(1);
+    expect(stacked[0]?.children).toEqual(['ACTIONS']);
+    expect(large.root.findByProps({ accessibilityRole: 'header' }).props.numberOfLines).toBe(2);
+
+    // Below the threshold the same header keeps both on one row, on one line.
+    Object.assign(layout, { width: 390, fontScale: 1.5 });
+    const regular = renderHeader(props);
+    expect(regular.root.findAll(isStackedActionsRow)).toHaveLength(0);
+    expect(regular.root.findByProps({ accessibilityRole: 'header' }).props.numberOfLines).toBe(1);
+  });
+
+  it('moves the inline cluster under a title it would cut at the default font size', () => {
+    // German "Unterhaltung" beside the account picker painted "Unterh…" in a
+    // 107dp box at the default font size, under a caller that keeps the
+    // cluster on the title row.
+    const layoutEvent = (width: number) => ({
+      nativeEvent: { layout: { x: 0, y: 0, width, height: 36 } },
+    });
+    const measure = (
+      renderer: TestRenderer.ReactTestRenderer,
+      natural: number,
+      shown: number
+    ) => {
+      const [twin] = renderer.root.findAll(
+        node =>
+          typeof node.type === 'string' &&
+          (node.type as string) === 'Text' &&
+          node.props.importantForAccessibility === 'no-hide-descendants'
+      );
+      act(() => {
+        twin?.props.onLayout(layoutEvent(natural));
+        renderer.root
+          .findByProps({ accessibilityRole: 'header' })
+          .props.onLayout(layoutEvent(shown));
+      });
+    };
+    const props: ScreenHeaderProps = {
+      title: 'Unterhaltung',
+      size: 'large',
+      inlineActions: 'ACTIONS',
+      allowInlineActionsStacking: false,
+    };
+
+    const cut = renderHeader(props);
+    expect(cut.root.findAll(isStackedActionsRow)).toHaveLength(0);
+    measure(cut, 182, 107);
+    const stacked = cut.root.findAll(isStackedActionsRow);
+    expect(stacked).toHaveLength(1);
+    expect(stacked[0]?.children).toEqual(['ACTIONS']);
+    // The wider room the title gets on its own row does not move the cluster
+    // back beside it.
+    measure(cut, 182, 358);
+    expect(cut.root.findAll(isStackedActionsRow)).toHaveLength(1);
+
+    // A title that fits keeps the cluster on its row.
+    const fits = renderHeader({ ...props, title: 'Chat' });
+    measure(fits, 75, 140);
+    expect(fits.root.findAll(isStackedActionsRow)).toHaveLength(0);
   });
 
   it('keeps the title touch area out of the row gap beside it', () => {

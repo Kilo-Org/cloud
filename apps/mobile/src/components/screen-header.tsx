@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- one header contract: the title, eyebrow and subtitle slots, the back control, the action reflow, and the safe-area and offline-banner rules must stay in step */
 import { type Href, useNavigationContainerRef, useRouter } from 'expo-router';
-import { type ReactElement, type Ref, useEffect, useState } from 'react';
-import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
+import { type ReactElement, type Ref, useEffect, useRef, useState } from 'react';
+import { LARGE_FONT_SCALE, useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { ChevronDown } from '@/components/ui/icons';
 import { DirectionalChevronLeft } from '@/components/ui/directional-icons';
 import {
@@ -196,7 +196,10 @@ type ScreenHeaderProps = {
    * セキュリティエージェント rendered as 「…ジェン」 / 「ト」) — a tail
    * ellipsis is the only natural boundary a CJK title has. Callers whose
    * titles are real prose opt back into wrapping with an explicit cap
-   * (session headers: `SESSION_HEADER_TITLE_LINES`, todos: 2).
+   * (session headers: `SESSION_HEADER_TITLE_LINES`, todos: 2). At a large font
+   * scale (`LARGE_FONT_SCALE`) the cap is at least two lines: a title that no
+   * longer fits one line wraps instead of losing its tail ("Past sessi…" at
+   * the largest Android font), which is worth more there than the CJK orphan.
    */
   titleNumberOfLines?: number;
   /**
@@ -319,11 +322,15 @@ type ScreenHeaderProps = {
   inlineActionsWidth?: number;
   /**
    * Keep the `inlineActions` cluster on the title row even when the shared-row
-   * check would reflow it. That check reserves a readable title, and the home
-   * header's heading is a fixed 40dp mark with no text, so the reserve does not
-   * apply: at a 2.5x accessibility font scale the account picker would drop
-   * under the mark on a phone wide enough to hold both. Leave it on for a
-   * heading that carries text.
+   * check (`inlineActionsWidth`) would reflow it; the slot then takes at most
+   * half the row. The home header needs this: its heading is a fixed 40dp mark
+   * with no text, so the check's readable-title reserve does not apply, and in
+   * a narrow window the account picker would drop under the mark although both
+   * fit. Two cases still move the cluster under the heading, because a title
+   * never loses its tail to it: a large font scale (`LARGE_FONT_SCALE`), where
+   * the account picker's name grows with the font, and a text title that
+   * measures wider than the room the cluster leaves it (German "Unterhaltung"
+   * beside the account picker painted "Unterh…" at the default font size).
    */
   allowInlineActionsStacking?: boolean;
   modal?: boolean;
@@ -479,6 +486,7 @@ export function ScreenHeader({
   const { t } = useTranslation();
   const { width: windowWidth } = useWindowDimensions();
   const fontScale = useLiveFontScale();
+  const largeFont = fontScale >= LARGE_FONT_SCALE;
   const historyCanGoBack = useCanGoBack();
   const canGoBack = showBackButton ?? (historyCanGoBack || backFallback !== undefined);
   const handleBack = useHeaderBack({ onBack, backFallback, canGoBack: historyCanGoBack });
@@ -496,17 +504,52 @@ export function ScreenHeader({
       titleMinWidth,
       contentInset,
     });
+  // A text title that measures wider than the room the in-row cluster leaves
+  // it moves the cluster under the heading, whatever the caller allows: German
+  // "Unterhaltung" beside the account picker painted "Unterh…" at the default
+  // font size. A hidden one-line twin of the title reports its natural width,
+  // and the visible title reports the width it was given. The decision is
+  // latched to the layout it was measured in (title, window width, font scale),
+  // so the wider room the title gets once the cluster moves cannot move it
+  // back; a new layout clears the latch and measures again. A title that fits
+  // keeps today's row, so nothing moves where nothing was cut.
+  const measuresTitleFit = inlineActions != null && title != null && !titleContent && !largeFont;
+  const titleFitKey = JSON.stringify([title, windowWidth, fontScale]);
+  const [titleOverflowKey, setTitleOverflowKey] = useState<string | null>(null);
+  const titleWidths = useRef({ natural: Number.NaN, shown: Number.NaN });
+  const titleOverflows = measuresTitleFit && titleOverflowKey === titleFitKey;
+  const latchTitleOverflow = () => {
+    const { natural, shown } = titleWidths.current;
+    if (!titleOverflows && natural - shown > 0.5) {
+      setTitleOverflowKey(titleFitKey);
+    }
+  };
+  const onTitleNaturalLayout = (event: LayoutChangeEvent) => {
+    titleWidths.current.natural = event.nativeEvent.layout.width;
+    latchTitleOverflow();
+  };
+  const onTitleShownLayout = (event: LayoutChangeEvent) => {
+    titleWidths.current.shown = event.nativeEvent.layout.width;
+    latchTitleOverflow();
+  };
   // The inline controls row reflows the same way: a caller that declares its
   // width drops it beneath the title before it squeezes the title's own
-  // readable minimum, so the 30px Agents title never breaks inside a word.
+  // readable minimum, so the 30px Agents title never breaks inside a word. At
+  // a large font scale the cluster always takes its own row: its text (the
+  // account picker) grows with the font, and beside the title both ran out of
+  // room — the largest Android font cut the organisation name to
+  // "Notific…ngs lab" and the title to "Past sessi…". On its own row the
+  // cluster has the header's full width and the title keeps the row it heads.
   const stackInlineActions =
-    allowInlineActionsStacking &&
     inlineActions != null &&
-    shouldStackHeaderActions(windowWidth, fontScale, {
-      headerRightWidth: inlineActionsWidth ?? 0,
-      titleMinWidth,
-      contentInset,
-    });
+    (largeFont ||
+      titleOverflows ||
+      (allowInlineActionsStacking &&
+        shouldStackHeaderActions(windowWidth, fontScale, {
+          headerRightWidth: inlineActionsWidth ?? 0,
+          titleMinWidth,
+          contentInset,
+        })));
 
   // Which of the heading's lines the header paints, which decides whether the
   // header centres a leading spacer opposite the back control.
@@ -564,8 +607,9 @@ export function ScreenHeader({
   const titleClass = size === 'large' ? SCREEN_HEADER_LARGE_TITLE_CLASS : SCREEN_HEADER_TITLE_CLASS;
 
   // One cap for the Text and the reserved box: a title capped deeper than the
-  // reserve would shift the body the moment it reached the extra line.
-  const titleLines = Math.min(Math.max(titleNumberOfLines, 1), MAX_TITLE_LINES);
+  // reserve would shift the body the moment it reached the extra line. A large
+  // font scale raises the floor to two lines (see `titleNumberOfLines`).
+  const titleLines = Math.min(Math.max(titleNumberOfLines, largeFont ? 2 : 1), MAX_TITLE_LINES);
 
   // The title's touch area stays inside its own column. The free side beside
   // the heading is the row's gap to the trailing slot, and a trailing control
@@ -597,6 +641,7 @@ export function ScreenHeader({
         numberOfLines={titleLines}
         ellipsizeMode="tail"
         accessibilityRole="header"
+        onLayout={measuresTitleFit ? onTitleShownLayout : undefined}
       >
         {title}
       </Text>
@@ -985,6 +1030,19 @@ export function ScreenHeader({
   return (
     <View className={cn('bg-background px-4 pb-3', className)} style={safeAreaStyle}>
       <View style={sideInsetStyle}>
+        {measuresTitleFit ? (
+          // The title's natural one-line width, for the fit check above. It
+          // paints nothing and no reader reaches it.
+          <Text
+            className={cn(titleClass, 'absolute opacity-0')}
+            numberOfLines={1}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            onLayout={onTitleNaturalLayout}
+          >
+            {title}
+          </Text>
+        ) : null}
         {separateHeading ? (
           <>
             <View className="min-h-11 flex-row items-center" onLayout={onRowLayout}>

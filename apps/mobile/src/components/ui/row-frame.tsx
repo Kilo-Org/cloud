@@ -15,6 +15,7 @@ import { type RowEllipsizeMode } from '@/components/ui/row-value';
 import { renderRowTrailing, type RowTrailingSpec } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { ROW_FRAME_CONTENT_PRESS_CLASS } from '@/lib/a11y/tap-target';
+import { useIsLargeFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { NEUTRAL_TINT, type Tint } from '@/lib/agent-color';
 import { cn } from '@/lib/utils';
 
@@ -159,6 +160,11 @@ export function RowFrame({
   stack = false,
   className,
 }: RowFrameProps) {
+  // The title keeps one line at the default scales. At a large font scale a
+  // name that no longer fits wraps to a second line instead of losing its
+  // tail: the largest Android font cut profile names such as "Design gate
+  // setup commands (at the cap)" even on a stacked row with the full width.
+  const titleLines = useIsLargeFontScale() ? 2 : 1;
   const leadingNode =
     leading ??
     (icon === undefined && iconContent === undefined ? null : (
@@ -173,7 +179,7 @@ export function RowFrame({
     if (title !== undefined) {
       const titleText = (
         <Text
-          numberOfLines={1}
+          numberOfLines={titleLines}
           ellipsizeMode="tail"
           className={cn(
             TITLE_CLASS,

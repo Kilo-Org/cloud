@@ -99,6 +99,11 @@ tree, so it cannot: `useConfirmDialog` therefore presents a native sheet, not a 
 is a portal card and stays behind a presented sheet — never open one from sheet content. When a surface
 needs to stack and a form must host it, make it a `formSheet` route or a `Sheet`.
 
+A toast raised while a native sheet is open draws inside that sheet. The app's one Toaster (`AppToaster`)
+renders into the top open sheet's toast host instead of the main tree the sheet covers: `Sheet` and every
+focused presented route (a `formSheet` or `modal` scene, through the shared scene layout) wrap their content
+in `SheetToastScope` (`@/components/sheet-toast-host`), so call sites keep calling `toast.error`.
+
 Markdown images reach `react-native-enriched-markdown` only from HTTPS hosts the reader trusted or confirmed;
 `markdown-image-gate` rewrites every other image into a "Load" link before the native view can fetch it.
 `ImageViewer` measures its viewport and gives the zoom child concrete dimensions.

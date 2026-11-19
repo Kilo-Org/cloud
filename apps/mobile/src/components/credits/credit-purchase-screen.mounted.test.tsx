@@ -968,7 +968,8 @@ describe('CreditPurchaseScreen', () => {
     dimensions.fontScale = 1;
     safeAreaInsets.bottom = 0;
 
-    const textHeight = 63;
+    // Three `text-sm` lines of 17.5 dp each, the size the tile renders.
+    const textHeight = 3 * 17.5;
     // The danger tile's own padding (`py-2.5`, 8.75 above and below at the
     // app's 14pt rem), its 1 dp border on each edge, and the 8 dp gap its
     // wrapper keeps above the footer.

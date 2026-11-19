@@ -60,7 +60,7 @@ import { CreditExpiryNote } from './credit-expiry-note';
  * home-indicator band is not part of the sum: the footer below the scroller
  * owns it.
  */
-const PURCHASE_ERROR_TEXT_HEIGHT = 63;
+const PURCHASE_ERROR_TEXT_HEIGHT = 52.5;
 const PURCHASE_ERROR_CHROME = 19.5;
 const purchaseErrorClearance = (fontScale: number): number =>
   PURCHASE_ERROR_TEXT_HEIGHT * fontScale + PURCHASE_ERROR_CHROME + 8;

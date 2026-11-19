@@ -316,11 +316,12 @@ export const CHIP_HIT_SLOP = {
  *
  * A 28dp frame plus a uniform slop does not hold here, which is why this
  * control breaks from the slop shapes above. The amount slot's 28dp box
- * measures 27.8dp on Android, and the retry's own bottom side faces the
+ * measures about 28.2dp on this device, and the retry's bottom side faces the
  * caption slot, the card's later sibling: touch dispatch hands a point inside
- * a sibling's box to that sibling, so the slot took back everything below the
- * 3.5dp gap under the amount. The caption slot paints text only, so it is
- * touch-transparent and the box's own bottom edge reaches the target.
+ * a sibling's box to that sibling, so the slot took back the bottom side past
+ * the 3.5dp gap under the amount (delivered: the full 8dp above, about 3dp
+ * below — under `DESIGN.md`'s 44pt). The caption slot paints text only, so it
+ * is touch-transparent and the box's own bottom edge reaches the target.
  */
 export const BALANCE_RETRY_TARGET_DP = 46;
 

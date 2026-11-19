@@ -63,8 +63,8 @@ describe('markdown palette', () => {
   it('composites the user code card onto the bubble to an opaque surface', () => {
     const palette = getPalette('user', colors);
 
-    // rgba(26,26,16,0.1) over #FFDD00 = #e8ca02; the diagram page paints this,
-    // so it must not carry alpha.
+    // rgba(26,26,16,0.1) over #FFDD00 = #e8ca02; a code fence paints this, so
+    // it must not carry alpha.
     expect(palette.codeSurface).toBe('#e8ca02');
     expect(palette.codeSurface.startsWith('#') && palette.codeSurface.length === 7).toBe(true);
   });
@@ -101,6 +101,37 @@ describe('markdown palette', () => {
     expect(palette.codeSurface.startsWith('#') && palette.codeSurface.length === 7).toBe(true);
     expect(palette.codeTokenScheme).toBe(tokenSchemeForSurface(expectedSurface));
     expect(palette.codeTokenScheme).toBe('onDark');
+  });
+
+  it('gives a diagram its own opaque card in both variants', () => {
+    const user = getPalette('user', colors);
+    const assistant = getPalette('assistant', colors);
+
+    // A diagram page paints the app's card rather than the bubble tint, so its
+    // theme follows the app scheme instead of the yellow chat surface it sits
+    // in; the user and assistant variants therefore agree on it.
+    expect(user.diagramSurface).toBe(compositeOver(colors.muted, colors.card));
+    expect(user.diagramSurface).toBe(assistant.diagramSurface);
+    expect(user.diagramSurface).toBe('#f0eee6');
+    expect(user.diagramSurface.startsWith('#') && user.diagramSurface.length === 7).toBe(true);
+    // The code card keeps its bubble tint, which is what the diagram no longer
+    // paints.
+    expect(user.diagramSurface).not.toBe(user.codeSurface);
+    expect(user.codeSurface).toBe('#e8ca02');
+  });
+
+  it('follows the dark app scheme on the diagram card', () => {
+    const darkColors: ThemeColors = { ...colors, muted: '#1F1F24', card: '#17171A' };
+    const palette = getPalette('user', darkColors);
+
+    // The bubble stays yellow in dark mode, so a diagram that painted
+    // `codeSurface` would pick the light theme; its own card is dark instead.
+    expect(palette.diagramSurface).toBe('#1f1f24');
+    expect(palette.diagramSurface.startsWith('#') && palette.diagramSurface.length === 7).toBe(
+      true
+    );
+    expect(tokenSchemeForSurface(palette.diagramSurface)).toBe('onDark');
+    expect(tokenSchemeForSurface(palette.codeSurface)).toBe('onLight');
   });
 
   it('classifies the composite rather than the card behind it', () => {

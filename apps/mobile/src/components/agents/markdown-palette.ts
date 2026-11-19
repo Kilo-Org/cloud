@@ -12,8 +12,12 @@ export type MarkdownPalette = {
   mutedTextColor: string;
   codeBackground: string;
   /** The same card as `codeBackground`, composited onto what lies beneath it:
-   * opaque, so a diagram page can paint it and its brightness can pick a theme. */
+   * opaque, so a code fence can paint it and its brightness can pick token colors. */
   codeSurface: string;
+  /** The opaque card a diagram page paints: `muted` composited onto `card` in
+   * both variants, so a diagram follows the app scheme instead of the chat
+   * bubble it sits in, and its brightness picks the diagram theme. */
+  diagramSurface: string;
   borderColor: string;
   codeTokenScheme?: TokenScheme;
 };
@@ -39,6 +43,12 @@ function withAlpha(color: string, alpha: number): string {
 }
 
 export function getPalette(variant: MarkdownVariant, colors: ThemeColors): MarkdownPalette {
+  // A diagram page paints its own opaque card (`muted` over `card`) instead of
+  // whatever bubble it sits in, so its theme follows the app scheme in both
+  // variants. `muted` is authored opaque (`#F0EEE6` light, `#1F1F24` dark), but
+  // compositing keeps the surface paintable even if that token ever becomes
+  // translucent.
+  const diagramSurface = compositeOver(colors.muted, colors.card);
   if (variant === 'user') {
     // Agent chat user bubbles sit on accent-soft (lime); use ink-on-lime.
     const ink = colors.accentSoftForeground;
@@ -49,19 +59,20 @@ export function getPalette(variant: MarkdownVariant, colors: ThemeColors): Markd
       mutedTextColor: withAlpha(ink, 0.7),
       codeBackground,
       codeSurface,
+      diagramSurface,
       borderColor: withAlpha(ink, 0.2),
       codeTokenScheme: tokenSchemeForSurface(codeSurface),
     };
   }
-  // `muted` is authored opaque (`#F0EEE6` light, `#1F1F24` dark), but the
-  // diagram page paints this color directly, so keep the surface opaque even
-  // if the token ever becomes translucent.
-  const codeSurface = compositeOver(colors.muted, colors.card);
+  // Code fences paint the same token on the assistant card, so they reuse the
+  // composite instead of recomputing it.
+  const codeSurface = diagramSurface;
   return {
     textColor: colors.foreground,
     mutedTextColor: colors.mutedForeground,
     codeBackground: colors.muted,
     codeSurface,
+    diagramSurface,
     borderColor: colors.border,
     codeTokenScheme: tokenSchemeForSurface(codeSurface),
   };

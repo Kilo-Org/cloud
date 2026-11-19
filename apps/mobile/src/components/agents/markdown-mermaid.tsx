@@ -138,10 +138,10 @@ export function MarkdownMermaid({
   selectable,
   onCopyCode,
 }: Readonly<MarkdownMermaidProps>) {
-  // The theme follows the surface the diagram is drawn on, not the app scheme:
-  // the page must stay legible on the palette's own card, whatever the bubble
-  // around it looks like.
-  const dark = tokenSchemeForSurface(palette.codeSurface) === 'onDark';
+  // The theme follows the diagram's own card, which the palette derives from the
+  // app scheme rather than from the bubble the diagram sits in, so the page
+  // stays legible whatever the chat surface around it looks like.
+  const dark = tokenSchemeForSurface(palette.diagramSurface) === 'onDark';
   // The page's imperative surface: `injectJavaScript` redraws the diagram in the
   // loaded page. `ComponentRef` is how this package's ref is typed, because its
   // JSX element infers its props type parameter from the attributes.
@@ -177,13 +177,13 @@ export function MarkdownMermaid({
   }, [source]);
   const webSource = useMemo(() => (host === null ? null : { uri: host.pageUri }), [host]);
   const webViewStyle = useMemo(
-    () => ({ backgroundColor: palette.codeSurface }),
-    [palette.codeSurface]
+    () => ({ backgroundColor: palette.diagramSurface }),
+    [palette.diagramSurface]
   );
   // What the page should be painting. The load handler and the color effect both
   // read it, so the injection that follows a load carries the colors in effect by
   // then instead of the ones a prop had while the page was loading.
-  const wantedRender = useRef({ source, dark, background: palette.codeSurface });
+  const wantedRender = useRef({ source, dark, background: palette.diagramSurface });
   // The source whose diagram the loaded page is drawing, or `null` while the
   // page is loading or has failed. A color change may redraw a loaded page; a
   // source change remounts the page and its own load draws the new diagram.
@@ -209,11 +209,11 @@ export function MarkdownMermaid({
   // changes, instead of reloading it: the vendored script is then read once per
   // diagram rather than once per palette change.
   useEffect(() => {
-    wantedRender.current = { source, dark, background: palette.codeSurface };
+    wantedRender.current = { source, dark, background: palette.diagramSurface };
     if (loadedSource.current === source) {
       injectWantedRender();
     }
-  }, [source, dark, palette.codeSurface, injectWantedRender]);
+  }, [source, dark, palette.diagramSurface, injectWantedRender]);
 
   if (failed) {
     // The fence's source is drawn on the same card as every other code fence,
@@ -233,7 +233,7 @@ export function MarkdownMermaid({
   return (
     <View
       className="my-1 overflow-hidden rounded-lg"
-      style={{ height, backgroundColor: palette.codeSurface }}
+      style={{ height, backgroundColor: palette.diagramSurface }}
     >
       {host === null || webSource === null ? null : (
         <WebView

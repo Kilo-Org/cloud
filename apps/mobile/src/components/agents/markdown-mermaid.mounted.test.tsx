@@ -110,10 +110,10 @@ describe('MarkdownMermaid page rendering', () => {
   });
 
   it('leaves the page alone when only the color scheme changes', async () => {
-    // The theme follows the card surface, not the app scheme: a scheme flip
-    // changes nothing about the injected colors, so the page is neither
-    // redrawn nor replaced (a replacement would read the 2.7 MB vendored
-    // script again for every flip).
+    // The palette carries the diagram's own card, so a scheme flip alone
+    // changes nothing about the injected colors: the page is neither redrawn
+    // nor replaced (a replacement would read the 2.7 MB vendored script again
+    // for every flip).
     const renderer = await mount('flowchart TD\n  a --> b');
     await loadPage(renderer);
     const before = webViewInstance(renderer.root);
@@ -125,8 +125,8 @@ describe('MarkdownMermaid page rendering', () => {
     expect(webViewInstance(renderer.root)).toBe(before);
     expect(webViewMock.injectJavaScript).not.toHaveBeenCalled();
 
-    // A palette whose card surface is dark still redraws the loaded page in
-    // place, with the dark theme that surface calls for.
+    // A palette whose diagram card is dark still redraws the loaded page in
+    // place, with the dark theme that card calls for.
     await rerender(renderer, 'flowchart TD\n  a --> b', otherPalette);
 
     expect(webViewInstance(renderer.root)).toBe(before);

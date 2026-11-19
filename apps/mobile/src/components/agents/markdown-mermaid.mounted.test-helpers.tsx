@@ -11,6 +11,7 @@ const palette = {
   mutedTextColor: '#666666',
   codeBackground: '#f4f4f4',
   codeSurface: '#f4f4f4',
+  diagramSurface: '#f4f4f4',
   borderColor: '#cccccc',
 };
 
@@ -18,6 +19,7 @@ export const otherPalette = {
   ...palette,
   codeBackground: '#101010',
   codeSurface: '#101010',
+  diagramSurface: '#101010',
 };
 
 type HostProps = {

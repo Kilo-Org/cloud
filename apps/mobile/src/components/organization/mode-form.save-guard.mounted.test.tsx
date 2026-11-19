@@ -226,6 +226,19 @@ async function mountGuardForm() {
   return { ...mounted, box };
 }
 
+/** Drive a create draft to a successful save, which leaves through the guard. */
+async function saveCreateDraft(root: ReactTestInstance): Promise<void> {
+  h.mutations.create.mutate.mockImplementation(
+    (_variables: unknown, options: { onSuccess: (created: unknown) => void }) => {
+      options.onSuccess({ result: { id: 'mode-9' } });
+    }
+  );
+  changeField(root, nameLabel, 'Security Reviewer');
+  changeField(root, roleLabel, 'Reviews every change.');
+  pressSave(root);
+  await waitFor(() => h.pop.mock.calls.length > 0);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   resetLeaveSettle();
@@ -324,18 +337,9 @@ describe('ModeForm leave guard while a write is in flight', () => {
   });
 
   it('leaves without asking once the create succeeds', async () => {
-    h.mutations.create.mutate.mockImplementation(
-      (_variables: unknown, options: { onSuccess: (created: unknown) => void }) => {
-        options.onSuccess({ result: { id: 'mode-9' } });
-      }
-    );
     const { renderer, unmount } = await mountGuardForm();
 
-    changeField(renderer.root, nameLabel, 'Security Reviewer');
-    changeField(renderer.root, roleLabel, 'Reviews every change.');
-    pressSave(renderer.root);
-
-    await waitFor(() => h.pop.mock.calls.length > 0);
+    await saveCreateDraft(renderer.root);
 
     expect(h.confirm).not.toHaveBeenCalled();
     expect(h.replace).not.toHaveBeenCalled();
@@ -354,18 +358,9 @@ describe('ModeForm leave guard while a write is in flight', () => {
   // disarm-before-pop contract that replaced the forced-leave workaround.
   it('pops after a successful create that still reports pending', async () => {
     h.mutations.create.isPending = true;
-    h.mutations.create.mutate.mockImplementation(
-      (_variables: unknown, options: { onSuccess: (created: unknown) => void }) => {
-        options.onSuccess({ result: { id: 'mode-9' } });
-      }
-    );
     const { renderer, box, unmount } = await mountGuardForm();
 
-    changeField(renderer.root, nameLabel, 'Security Reviewer');
-    changeField(renderer.root, roleLabel, 'Reviews every change.');
-    pressSave(renderer.root);
-
-    await waitFor(() => h.pop.mock.calls.length > 0);
+    await saveCreateDraft(renderer.root);
 
     expect(h.pop).toHaveBeenCalledOnce();
     expect(h.confirm).not.toHaveBeenCalled();
@@ -377,6 +372,25 @@ describe('ModeForm leave guard while a write is in flight', () => {
     // The success cleared the draft, so once the create settles the guard is off.
     box.setCreatePending(false);
     expect(h.guard.enabled).toBe(false);
+
+    unmount();
+  });
+
+  // A caller-driven leave whose pop the navigator dropped leaves the form's own
+  // `dirty` true while the guard stands down; the next edit must re-arm it.
+  it('guards the next draft after a caller-driven leave whose pop the navigator dropped', async () => {
+    const { renderer, unmount } = await mountGuardForm();
+
+    await saveCreateDraft(renderer.root);
+    expect(h.enabledAtPop).toEqual([false]);
+
+    changeField(renderer.root, roleLabel, 'Reviews every change, twice.');
+    expect(h.guard.enabled).toBe(true);
+
+    pressBack();
+
+    expect(h.confirm).toHaveBeenCalledOnce();
+    expect(h.repeat).not.toHaveBeenCalled();
 
     unmount();
   });

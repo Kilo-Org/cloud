@@ -115,10 +115,14 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
       },
       initial
     );
-    if (next !== dirty) {
-      setDirty(next);
-      guard.handleDirtyChange(next);
-    }
+    setDirty(next);
+    // Reported on every edit, not only on a change of this form's own verdict: a
+    // caller-driven leave whose pop the navigator dropped leaves the form mounted
+    // with `dirty` still true while the guard stands down, so a gated report would
+    // never re-arm it and a later Back would leave silently with the draft. The
+    // hook's `setState` bails out on an unchanged value, so repeating the verdict
+    // costs nothing.
+    guard.handleDirtyChange(next);
   };
 
   const leaveToList = () => {

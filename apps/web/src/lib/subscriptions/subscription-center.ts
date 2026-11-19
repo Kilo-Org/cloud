@@ -8,6 +8,7 @@ export const stripeBillingHistoryLineSchema = z.object({
   // The tier values stay inline rather than the KiloPassTier enum: the mobile
   // app consumes this wire type without @kilocode/db, whose enum import would
   // drag server-only types into the client bundle.
+  kind: z.enum(['trial', 'initial', 'renewal', 'upgrade', 'unknown']),
   tier: z.enum(['tier_19', 'tier_49', 'tier_199']).nullable(),
 });
 
@@ -26,7 +27,7 @@ export const stripeBillingHistoryEntrySchema = z.object({
    * router classifies it. Kilo Pass rows carry it; the other routers' rows
    * omit the key, so their wire shapes stay unchanged.
    */
-  line: stripeBillingHistoryLineSchema.optional(),
+  line: stripeBillingHistoryLineSchema.optional().nullable(),
 });
 
 export const creditsBillingHistoryEntrySchema = z.object({
@@ -92,7 +93,7 @@ export function mapStripeInvoiceToBillingHistoryEntry(
  */
 export function mapKiloPassInvoiceLine(
   invoice: Stripe.Invoice
-): StripeBillingHistoryEntry['line'] {
+): NonNullable<StripeBillingHistoryEntry['line']> | null {
   const lines = invoice.lines?.data ?? [];
   const line = lines.find(candidate => !isServiceFeeInvoiceLine(candidate));
   if (!line) return null;

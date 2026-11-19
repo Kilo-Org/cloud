@@ -946,8 +946,9 @@ const readScreenshotData = async (
     readonly type: 'jpeg' | 'png' | 'webp';
   }
 ): Promise<string | undefined> => {
+  // `Page.startScreencast` has only jpeg and png, so a webp request takes the plain capture, which honours the type.
   const fresh =
-    input.clip === undefined && !input.fullPage
+    input.clip === undefined && !input.fullPage && input.type !== 'webp'
       ? await deps.session.captureViewportImage(input.type)
       : undefined;
 

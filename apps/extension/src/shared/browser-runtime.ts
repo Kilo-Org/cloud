@@ -138,7 +138,8 @@ export interface BrowserDownloadsApi {
   /** Finds a download the browser created after the listener's window, by the url the call asked for, or one item by id. */
   readonly search?: (query: {
     readonly id?: number;
-    readonly startedAfter?: number;
+    /** ISO-8601, as `chrome.downloads.DownloadQuery.startedAfter` requires; a number is rejected. */
+    readonly startedAfter?: string;
     readonly url?: string;
   }) => Promise<readonly BrowserDownloadItem[]> | undefined;
   readonly onCreated: {
@@ -370,6 +371,11 @@ const guardTabOf = async (
 
 const NON_EMPTY_STRING = z.string().min(1);
 
+/** The one field of `Page.getFrameTree` this runtime reads: the main frame's document url. */
+const FRAME_TREE_URL = z.object({
+  frameTree: z.object({ frame: z.object({ url: z.string().optional() }).optional() }),
+});
+
 /** `origin` + `pathname`: the page identity a download's referrer is compared against. */
 const pageOf = (url: string | undefined): string | undefined => {
   try {
@@ -536,7 +542,11 @@ const findNavigateDownloads = async ({
   for (let attempt = 0; attempt < NAVIGATE_DOWNLOAD_POLLS; attempt += 1) {
     try {
       // eslint-disable-next-line no-await-in-loop -- one search per bounded attempt
-      const found = await api.search?.({ startedAfter: startedAt, url: navigation.destination });
+      const found = await api.search?.({
+        // Chrome validates this as an ISO-8601 string; a number is a rejected query, not a wider window.
+        startedAfter: new Date(startedAt).toISOString(),
+        url: navigation.destination,
+      });
       // The search matches by url alone, so the same file another tab started is not this navigate's.
       const mine = (found ?? []).filter(item => owned(item));
 
@@ -597,6 +607,11 @@ interface LingerSink {
   readonly armed: (end: () => void) => void;
   /** The linger ended, by its own window or by the runtime: the tab no longer holds one. */
   readonly ended: () => void;
+  /**
+   * A download the linger stopped after its own call had answered. Nothing else will report it, so the runtime
+   * hands it to the next call on the tab instead of letting the file vanish unreported.
+   */
+  readonly late: (outcome: Promise<DiscardOutcome>) => void;
 }
 
 /**
@@ -618,7 +633,7 @@ const observeDownloads = async ({
   for (let attempt = 0; attempt < DOWNLOAD_OBSERVE_POLLS; attempt += 1) {
     try {
       // eslint-disable-next-line no-await-in-loop -- one search per bounded attempt
-      const found = await api.search?.({ startedAfter: startedAt });
+      const found = await api.search?.({ startedAfter: new Date(startedAt).toISOString() });
       const started = (found ?? []).filter(item => mine(item));
 
       if (started.length > 0) {
@@ -678,8 +693,10 @@ const awaitStartedDownload = async ({
     const now = Date.now();
     const pending = pendingNavigation();
 
-    if (count > 0 || pending > 0 || attachmentResponse()) {
+    if (!started && (count > 0 || pending > 0 || attachmentResponse())) {
       started = true;
+      // The grace starts at the first sign of a download and is never restarted by that same sign: an announced
+      // Download the browser has not named yet would otherwise hold the call open for the whole bound.
       idleAt = now;
     }
 
@@ -728,12 +745,26 @@ const armDownloadGuard = (
   let created = false;
   let listening = true;
   let lingering = false;
+  /** Downloads this call reported as announced but unnamed: the linger stops them later, already reported. */
+  let announcedUnreported = 0;
 
   const stop = (item: BrowserDownloadItem): void => {
     created = true;
 
     if (!stops.has(item.id)) {
-      stops.set(item.id, discardDownload(api, item));
+      const discarded = discardDownload(api, item);
+
+      stops.set(item.id, discarded);
+
+      // The linger outlives this call's result, so its stops are handed over to whoever reports next.
+      if (lingering) {
+        if (announcedUnreported > 0) {
+          // This call already told the model about this download; the linger only finishes stopping it.
+          announcedUnreported -= 1;
+        } else {
+          linger?.late(discarded);
+        }
+      }
     }
   };
 
@@ -817,11 +848,11 @@ const armDownloadGuard = (
         }
       }
 
-      /** Keeps the guard listening for a late item, and hands the runtime a way to end it at the next call. */
+      /** Keeps the guard listening for a late item, and hands the runtime a way to end it at the next guarded call. */
       const lingerOn = (): void => {
         // Nothing started, so the call does not pay for a window it may never need.
         // The listener stays armed for a bounded linger, so a download whose headers arrive late is deleted too.
-        // The linger owns only this call's window: downloads that start before the next call ends it.
+        // The linger owns only this call's window: downloads that start before the next download-capable call ends it.
         // That is why an approved repeat's file is never cancelled by the guard that asked for it.
         const end = (): void => {
           if (!lingering) {
@@ -855,6 +886,8 @@ const armDownloadGuard = (
       if (settlement.stopped === 0) {
         // The tab announced a download the browser has not named yet: this call reports it now.
         // The linger still deletes whatever lands, so no file is kept unapproved and none vanishes unreported.
+        // Each of those, when the linger stops it, has already been reported: it must not be reported twice.
+        announcedUnreported += announced;
         lingerOn();
 
         return { kept: settlement.kept, stopped: announced };
@@ -932,15 +965,36 @@ export const createBrowserRuntime = ({
   const chains = new Map<number, Promise<void>>();
   // The abort hook of the call currently running in the tab, keyed by tab.
   const inFlight = new Map<number, () => void>();
-  // The linger a finished call left armed on a tab: the next call on that tab ends it before it can act.
+  // The linger a finished call left armed on a tab: the next download-capable call on that tab ends it before it
+  // Can act on what that call starts. A read leaves it on duty instead of dropping it.
   const lingers = new Map<number, () => void>();
+  // Downloads a linger stopped after its own call answered, which no call has reported yet: the next call on the
+  // Tab reports them, because a file that was deleted is never silent.
+  const lateStops = new Map<number, Promise<DiscardOutcome>[]>();
 
-  /** Ends whatever linger an earlier call left on this tab: a new call owns the downloads from now on. */
+  /** Ends whatever linger an earlier call left on this tab: a new download-capable call owns the downloads from now on. */
   const endLinger = (tabId: number): void => {
     const end = lingers.get(tabId);
 
     lingers.delete(tabId);
     end?.();
+  };
+
+  /** Reports the downloads an earlier call's linger stopped, and had nobody to tell: this call tells the model. */
+  const takeLateStops = async (tabId: number): Promise<GuardSettlement> => {
+    const queued = lateStops.get(tabId);
+
+    if (queued === undefined) {
+      return { kept: [], stopped: 0 };
+    }
+
+    lateStops.delete(tabId);
+    const outcomes = await Promise.all(queued);
+
+    return {
+      kept: outcomes.flatMap(outcome => (outcome.kind === 'kept' ? [outcome.filename] : [])),
+      stopped: outcomes.filter(outcome => outcome.kind !== 'kept').length,
+    };
   };
 
   const sessionFor = (tabId: number): BrowserToolSession => {
@@ -968,6 +1022,7 @@ export const createBrowserRuntime = ({
     inFlight.delete(tabId);
     // A closed tab has no next call, so its linger is over: it must not keep listening for that tab's id.
     endLinger(tabId);
+    lateStops.delete(tabId);
     autoAttachedTabs.delete(tabId);
     sessionOwnedTabs.delete(tabId);
     groups.noteTabRemoved(tabId);
@@ -992,9 +1047,6 @@ export const createBrowserRuntime = ({
     );
 
     await previous;
-
-    // This call owns the tab's downloads from here: an earlier call's linger must not act on what this one starts.
-    endLinger(tabId);
 
     try {
       return await task();
@@ -1084,6 +1136,22 @@ export const createBrowserRuntime = ({
   };
 
   /**
+   * The url of the tab's own document, read through the debugger's frame tree —
+   * the one URL the browser withholds from `tabs.Tab` on a page the extension
+   * may not read. `undefined` when the attach cannot answer at all.
+   */
+  const frameUrlOf = async (tabId: number): Promise<string | undefined> => {
+    try {
+      const parsed = FRAME_TREE_URL.safeParse(await sessionFor(tabId).send('Page.getFrameTree'));
+
+      return parsed.success ? parsed.data.frameTree.frame?.url : undefined;
+    } catch {
+      // A tab the debugger cannot attach to has no readable document, which is what the precheck then reports.
+      return undefined;
+    }
+  };
+
+  /**
    * Whether this tab is one the runtime opened for a session and is still
    * blank. The bit is the runtime's own voucher, so it goes the moment the
    * voucher stops being true: the tab closed, the session that opened it no
@@ -1102,7 +1170,22 @@ export const createBrowserRuntime = ({
       return false;
     }
 
-    if (tab.url === undefined || tab.url === '' || tab.url === 'about:blank') {
+    // A readable url is authoritative and needs no attach: a blank page keeps the voucher, a real one ends it.
+    if (tab.url !== undefined && tab.url !== '') {
+      if (tab.url === 'about:blank') {
+        return true;
+      }
+
+      sessionOwnedTabs.delete(tabId);
+
+      return false;
+    }
+
+    // `tabs.Tab` withholds the url of a `chrome://` page, so a tab that committed one would keep the voucher
+    // Alive and repeat a failing attach; the debugger's own frame URL is not withheld.
+    const committed = await frameUrlOf(tabId);
+
+    if (committed === undefined || committed === '' || committed === 'about:blank') {
       return true;
     }
 
@@ -1165,6 +1248,14 @@ export const createBrowserRuntime = ({
       },
       ended: () => {
         lingers.delete(attribution.tab.tabId);
+      },
+      late: outcome => {
+        // The linger outlived its call, so this stop has no result to be reported on: the next call on the tab has.
+        const { tabId } = attribution.tab;
+        const queued = lateStops.get(tabId) ?? [];
+
+        queued.push(outcome);
+        lateStops.set(tabId, queued);
       },
     });
 
@@ -1273,6 +1364,13 @@ export const createBrowserRuntime = ({
     inFlight.get(tabId)?.();
 
     return runExclusive(tabId, async () => {
+      // A call the user drives through the panel owns the tab's downloads from the moment it starts, so an
+      // Earlier agent call's linger must not cancel a file this one starts. An agent call waits until its class is
+      // Known: a read arms none, and must leave the earlier linger on duty rather than drop what it owes.
+      if (caller.kind !== 'agent') {
+        endLinger(tabId);
+      }
+
       const unreachable = await reachable(tabId);
 
       if (unreachable !== undefined) {
@@ -1369,12 +1467,22 @@ export const createBrowserRuntime = ({
               )
             : false;
 
-        // An unapproved act call runs with downloads denied: a download it starts is cancelled, then reported as a sensitive step.
-        const guardDownloads =
+        // A call that can start a download owns the tab's downloads: an earlier call's linger ends before it runs,
+        // So the linger never cancels a file this call starts — an approved repeat above all.
+        const downloadCapable =
           agentContext !== undefined &&
           preflight !== undefined &&
           (preflight.class === 'act' || preflight.class === 'navigate') &&
-          canStartDownload(toolName, argsRecord) &&
+          canStartDownload(toolName, argsRecord);
+
+        if (downloadCapable) {
+          endLinger(tabId);
+        }
+
+        // An unapproved act call runs with downloads denied: a download it starts is cancelled, then reported as a sensitive step.
+        const guardDownloads =
+          downloadCapable &&
+          preflight !== undefined &&
           preflight.sensitiveToken === undefined &&
           !downloadApproved;
 
@@ -1530,11 +1638,16 @@ export const createBrowserRuntime = ({
 
         const settled = result ?? { error: 'The browser tool returned no result.', ok: false };
 
-        // The tab's own target may also have reported one (`Page.downloadWillBegin`), where that is allowed.
-        if (
-          guardDownloads &&
-          takeStartedDownloads(session) + settlement.stopped + settlement.kept.length > 0
-        ) {
+        // A download an earlier call's linger stopped while this one ran had no result to be reported on; this
+        // Call reports it, so a deleted file is never silent. The tab's own target may also have reported one
+        // (`Page.downloadWillBegin`), where that is allowed. A panel call has no model to tell, so it leaves them.
+        const late =
+          agentContext === undefined ? { kept: [], stopped: 0 } : await takeLateStops(tabId);
+        const keptFiles = [...settlement.kept, ...late.kept];
+        const stoppedFiles =
+          settlement.stopped + late.stopped + (guardDownloads ? takeStartedDownloads(session) : 0);
+
+        if (agentContext !== undefined && stoppedFiles + keptFiles.length > 0) {
           const origin = preflight?.ok ? preflight.origin : '';
           const reason = SENSITIVE_REASON.download;
           const stepToken = preflight?.ok ? issueSensitiveToken({ origin, reason }) : undefined;
@@ -1542,7 +1655,7 @@ export const createBrowserRuntime = ({
           // The click already ran and the download was cancelled. `afterAction` tells the CLI not to replay it.
           return needsPermissionOutcome([{ class: 'sensitive', origin, reason }], {
             afterAction: true,
-            keptFiles: settlement.kept,
+            keptFiles,
             ...(stepToken === undefined ? {} : { stepToken }),
           });
         }
@@ -1602,6 +1715,9 @@ export const createBrowserRuntime = ({
     }
 
     return runExclusive(tabId, async () => {
+      // Workflow page code can start a download too, so it owns the tab's downloads from here.
+      endLinger(tabId);
+
       const unreachable = await reachable(tabId);
 
       if (unreachable !== undefined) {

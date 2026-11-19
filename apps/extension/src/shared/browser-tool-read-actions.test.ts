@@ -409,6 +409,26 @@ describe('browser_take_screenshot', () => {
     expect(freshRequests).toStrictEqual([]);
   });
 
+  it('keeps a webp request off the forced frame, which has no webp format', async () => {
+    const { commands, freshRequests, session } = createSession({
+      freshFrame: 'RlJFU0g=',
+      screenshot: 'V0VCUA==',
+    });
+
+    const result = await runReadBrowserTool('browser_take_screenshot', { type: 'webp' }, session);
+
+    // `Page.startScreencast` would answer with png or jpeg bytes; the plain capture is the one that honours webp.
+    expect(freshRequests).toStrictEqual([]);
+    expect(commands).toContainEqual({
+      method: 'Page.captureScreenshot',
+      params: { format: 'webp', fromSurface: true },
+    });
+    expect(result.ok ? result.value : undefined).toMatchObject({
+      dataUrl: 'data:image/webp;base64,V0VCUA==',
+      mediaType: 'image/webp',
+    });
+  });
+
   it('masks the forced frame with the viewport geometry, in the image the mask is applied to', async () => {
     const { session } = createSession({ frameTree: FRAME_TREE_WITH_PAY, freshFrame: 'RlJFU0g=' });
     const { inputs, mask } = recordMask();

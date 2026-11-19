@@ -29,6 +29,21 @@ const ENABLED_DOMAINS = [
   'Accessibility.enable',
 ];
 
+/**
+ * A base64 png whose IHDR reports this size: the capture checks the frame's own
+ * pixels against the layout viewport, so a test frame has to carry a real header.
+ */
+const pngOfSize = (width: number, height: number): string => {
+  const header = new Uint8Array(24);
+
+  // The PNG signature, then a 4-byte chunk length, the IHDR type, and the two 4-byte dimensions.
+  header.set([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82]);
+  new DataView(header.buffer).setUint32(16, width);
+  new DataView(header.buffer).setUint32(20, height);
+
+  return btoa(String.fromCodePoint(...header));
+};
+
 const createDebuggerApi = ({
   documentNodeId = 11,
   gate,
@@ -1470,16 +1485,18 @@ describe('background tab viewport capture', () => {
   const LAYOUT = { clientHeight: 557, clientWidth: 1000 };
 
   it('returns the frame the screencast pushes, acked and then stopped', async () => {
+    const frame = pngOfSize(LAYOUT.clientWidth, LAYOUT.clientHeight);
     const { debuggerApi, session } = createSession({
       layoutViewport: LAYOUT,
+      // The metadata is in device-independent pixels; the frame's own header is what the size gate reads.
       screencast: {
-        data: 'RlJFU0g=',
+        data: frame,
         deviceHeight: LAYOUT.clientHeight,
         deviceWidth: LAYOUT.clientWidth,
       },
     });
 
-    await expect(session.captureViewportImage('png')).resolves.toBe('RlJFU0g=');
+    await expect(session.captureViewportImage('png')).resolves.toBe(frame);
 
     const methods = debuggerApi.commands.map(command => command.method);
 
@@ -1530,9 +1547,19 @@ describe('background tab viewport capture', () => {
     const { session } = createSession({
       layoutViewport: LAYOUT,
       // A frame at another scale would put the mask boxes off the pixels they must cover.
-      screencast: { data: 'TlVSU0VSQ0FTVA==', deviceHeight: 1114, deviceWidth: 2000 },
+      screencast: { data: pngOfSize(2000, 1114), deviceHeight: 1114, deviceWidth: 2000 },
     });
 
+    await expect(session.captureViewportImage('png')).resolves.toBeUndefined();
+  });
+
+  it('refuses a frame whose header it cannot read, rather than scale the mask onto a guess', async () => {
+    const { session } = createSession({
+      layoutViewport: LAYOUT,
+      screencast: { data: 'TlVSU0VSQ0FTVA==', deviceHeight: 557, deviceWidth: 1000 },
+    });
+
+    // Not a png or a jpeg: the plain capture is the only image whose pixels are known.
     await expect(session.captureViewportImage('png')).resolves.toBeUndefined();
   });
 
@@ -1540,5 +1567,113 @@ describe('background tab viewport capture', () => {
     const { session } = createScriptingSession();
 
     await expect(session.captureViewportImage('png')).resolves.toBeUndefined();
+  });
+
+  it('gives each capture its own screencast, so an older one cannot stop a newer one\u2019s frame', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const { debuggerApi, session } = createSession({ layoutViewport: LAYOUT });
+      const older = session.captureViewportImage('png');
+
+      // The older capture is still waiting for its frame when the newer one starts on the same tab.
+      await vi.advanceTimersByTimeAsync(240);
+
+      const newer = session.captureViewportImage('png');
+
+      // The older capture's bound expires while the newer one waits: only its own attempt may be given up.
+      await vi.advanceTimersByTimeAsync(20);
+
+      const frame = pngOfSize(LAYOUT.clientWidth, LAYOUT.clientHeight);
+
+      debuggerApi.emitEvent(7, 'Page.screencastFrame', {
+        data: frame,
+        metadata: { deviceHeight: LAYOUT.clientHeight, deviceWidth: LAYOUT.clientWidth },
+        sessionId: 5,
+      });
+
+      await expect(newer).resolves.toBe(frame);
+      await expect(older).resolves.toBeUndefined();
+
+      const methods = debuggerApi.commands.map(command => command.method);
+
+      // The screencast is stopped once — by the capture that owns it — not by the capture it replaced.
+      expect(methods.filter(method => method === 'Page.stopScreencast')).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('sends nothing after the tab is taken over mid-capture', async () => {
+    const { promise: gateWait, resolve: openGate } = Promise.withResolvers<void>();
+    const { debuggerApi, session } = createSession({
+      gate: { command: 'Page.getLayoutMetrics', wait: gateWait },
+      layoutViewport: LAYOUT,
+    });
+    const taken = { cancelled: false };
+    const capture = session.captureViewportImage('png', {
+      cancelled: () => taken.cancelled,
+    });
+
+    await vi.waitFor(() => {
+      expect(debuggerApi.commands.map(command => command.method)).toContain(
+        'Page.getLayoutMetrics'
+      );
+    });
+
+    // The panel took the tab while the measurement was in flight.
+    taken.cancelled = true;
+    openGate();
+
+    await expect(capture).resolves.toBeUndefined();
+
+    const methods = debuggerApi.commands.map(command => command.method);
+
+    expect(methods).not.toContain('Page.startScreencast');
+    expect(methods).not.toContain('Page.screencastFrameAck');
+    expect(methods).not.toContain('Page.stopScreencast');
+  });
+
+  it('acks no frame and stops only its own screencast once the tab is taken over', async () => {
+    const { debuggerApi, session } = createSession({ layoutViewport: LAYOUT });
+    const taken = { cancelled: false };
+    const capture = session.captureViewportImage('png', {
+      cancelled: () => taken.cancelled,
+    });
+
+    await vi.waitFor(() => {
+      expect(debuggerApi.commands.map(command => command.method)).toContain('Page.startScreencast');
+    });
+
+    taken.cancelled = true;
+    debuggerApi.emitEvent(7, 'Page.screencastFrame', {
+      data: 'VEFLRU4=',
+      metadata: { deviceHeight: LAYOUT.clientHeight, deviceWidth: LAYOUT.clientWidth },
+      sessionId: 6,
+    });
+
+    await expect(capture).resolves.toBeUndefined();
+
+    const methods = debuggerApi.commands.map(command => command.method);
+
+    // The frame belongs to nobody now: the ack is not sent, and the best-effort stop winds its own screencast down.
+    expect(methods).not.toContain('Page.screencastFrameAck');
+    expect(methods.filter(method => method === 'Page.stopScreencast')).toHaveLength(1);
+  });
+
+  it('takes no screencast frame for a webp request, which the protocol has no format for', async () => {
+    const { debuggerApi, session } = createSession({
+      layoutViewport: LAYOUT,
+      screencast: {
+        data: 'V0VCUA==',
+        deviceHeight: LAYOUT.clientHeight,
+        deviceWidth: LAYOUT.clientWidth,
+      },
+    });
+
+    await expect(session.captureViewportImage('webp')).resolves.toBeUndefined();
+    expect(debuggerApi.commands.map(command => command.method)).not.toContain(
+      'Page.startScreencast'
+    );
   });
 });

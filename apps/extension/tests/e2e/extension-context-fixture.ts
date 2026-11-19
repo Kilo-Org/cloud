@@ -197,6 +197,11 @@ export const launchExtensionContext = async (
    */
   options: {
     readonly downloadsPath?: string;
+    /**
+     * Browser switches a spec needs for the state it measures, appended to the
+     * fixture's own — the device pixel ratio a high-DPI run renders at, above all.
+     */
+    readonly extraLaunchArgs?: readonly string[];
     /** Optional permissions Chrome cannot be asked for by automation, granted at load time in a copy of the build; `[]` loads the shipped manifest. */
     readonly grantPermissions?: readonly string[];
     /**
@@ -232,6 +237,7 @@ export const launchExtensionContext = async (
       `--disable-extensions-except=${loadedExtensionPath}`,
       `--load-extension=${loadedExtensionPath}`,
       ...EXTENSION_E2E_LAUNCH_ARGS,
+      ...(options.extraLaunchArgs ?? []),
     ],
     ...(options.downloadsPath === undefined ? {} : { downloadsPath: options.downloadsPath }),
     ...(executablePath === undefined ? { channel } : { executablePath }),

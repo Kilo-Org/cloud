@@ -135,9 +135,102 @@ const layoutViewportSchema = z.object({
 });
 const screencastFrameSchema = z.object({
   data: z.string(),
-  metadata: z.object({ deviceHeight: z.number(), deviceWidth: z.number() }).optional(),
   sessionId: z.number(),
 });
+
+/**
+ * How many base64 characters of a frame are decoded to read its pixel size:
+ * a PNG header sits in the first 24 bytes, and a JPEG's frame header follows
+ * its application segments, which fit well inside this prefix.
+ */
+const IMAGE_HEADER_BASE64_CHARS = 8192;
+/** The PNG signature: 137 80 78 71 13 10 26 10 opens every PNG. */
+const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10] as const;
+/** `SOF0`..`SOF15` as decimal bytes, minus 196, 200 and 204, which carry something other than a frame. */
+const JPEG_FRAME_MARKERS = new Set([
+  192, 193, 194, 195, 197, 198, 199, 201, 202, 203, 205, 206, 207,
+]);
+
+/** The bytes of a base64 prefix, or `undefined` when it is not base64 at all. */
+const decodeBase64 = (text: string): Uint8Array | undefined => {
+  try {
+    return Uint8Array.from(atob(text), character => character.codePointAt(0) ?? 0);
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * The pixel size of a base64 png or jpeg, decoded from its own header.
+ *
+ * The screencast's `deviceWidth`/`deviceHeight` are in device-independent
+ * pixels while `Page.captureScreenshot` answers in device pixels — measured at
+ * 1280x720 against 2560x1440 on a DPR-2 Chromium — so the metadata cannot say
+ * whether the frame is the image the mask geometry was computed for. The
+ * encoded image can, whatever the ratio. `undefined` when the header cannot be
+ * read, which falls back to the plain capture rather than risk a mis-scaled one.
+ */
+const imagePixelSize = (
+  base64: string,
+  format: 'jpeg' | 'png'
+): { readonly height: number; readonly width: number } | undefined => {
+  const prefix = base64.slice(0, IMAGE_HEADER_BASE64_CHARS - (IMAGE_HEADER_BASE64_CHARS % 4));
+  const bytes = decodeBase64(prefix);
+
+  if (bytes === undefined) {
+    return undefined;
+  }
+
+  if (format === 'png') {
+    const isPng = bytes.length >= 24 && PNG_SIGNATURE.every((byte, index) => bytes[index] === byte);
+
+    if (!isPng) {
+      return undefined;
+    }
+
+    // IHDR follows the 8-byte signature, a 4-byte length and the 4-byte type: width then height,
+    // Each a 4-byte big-endian integer, so 256 ^ 3 down to 256 ^ 0 are the byte positions.
+    const at = (offset: number): number => bytes[offset] ?? 0;
+    const width = ((at(16) * 256 + at(17)) * 256 + at(18)) * 256 + at(19);
+    const height = ((at(20) * 256 + at(21)) * 256 + at(22)) * 256 + at(23);
+
+    return { height, width };
+  }
+
+  // 255 216 is the JPEG start-of-image marker: anything else is not a jpeg at all.
+  if (bytes.length < 4 || bytes[0] !== 255 || bytes[1] !== 216) {
+    return undefined;
+  }
+
+  // Walk the segment chain to the frame header: `FF <marker> <2-byte length>`.
+  let offset = 2;
+
+  while (offset + 9 < bytes.length) {
+    if (bytes[offset] !== 255) {
+      return undefined;
+    }
+
+    const marker = bytes[offset + 1] ?? 0;
+
+    if (JPEG_FRAME_MARKERS.has(marker)) {
+      // Height and width follow the 8-bit precision and the segment length.
+      return {
+        height: (bytes[offset + 5] ?? 0) * 256 + (bytes[offset + 6] ?? 0),
+        width: (bytes[offset + 7] ?? 0) * 256 + (bytes[offset + 8] ?? 0),
+      };
+    }
+
+    const length = (bytes[offset + 2] ?? 0) * 256 + (bytes[offset + 3] ?? 0);
+
+    if (length < 2) {
+      return undefined;
+    }
+
+    offset += 2 + length;
+  }
+
+  return undefined;
+};
 
 export interface BrowserConsoleMessage {
   /** The frame that produced it, when the debugger reported one. */
@@ -322,8 +415,16 @@ export interface BrowserToolSession {
    * a plain capture of the viewport is), or the platform has no screencast. The
    * caller then captures the ordinary way: a screenshot never fails because of
    * this.
+   *
+   * `guard` is checked before every command the capture sends, so a call the
+   * panel took over mid-capture stops at once; its own screencast is stopped
+   * once, and nothing else. A `webp` request takes no frame: `Page.startScreencast`
+   * has no webp format, and the plain capture keeps the media type truthful.
    */
-  readonly captureViewportImage: (format: 'jpeg' | 'png' | 'webp') => Promise<string | undefined>;
+  readonly captureViewportImage: (
+    format: 'jpeg' | 'png' | 'webp',
+    guard?: BrowserToolCallGuard
+  ) => Promise<string | undefined>;
   /**
    * Runs one upstream browser tool. On the scripting backend this is the only
    * way to reach the page: snapshot, find, screenshot, wait_for, evaluate,
@@ -1481,8 +1582,16 @@ export const createBrowserToolSession = ({
   let disposed = false;
   let focusEmulated = false;
   // The capture waiting on a screencast frame, so an event that arrives between commands is delivered.
-  let pendingScreencastFrame: ((params: Record<string, unknown> | undefined) => void) | undefined =
-    undefined;
+  // Keyed by its own attempt: a capture that has given up may not answer, clear or stop a newer capture's frame.
+  let pendingScreencastFrame:
+    | {
+        readonly attempt: number;
+        readonly resolve: (params: Record<string, unknown> | undefined) => void;
+      }
+    | undefined = undefined;
+  // The capture whose screencast is running: only it may stop the screencast.
+  let screencastOwner: number | undefined = undefined;
+  let screencastAttempt = 0;
   let attachPromise: Promise<void> | undefined = undefined;
   // Bumped by every Debugger.detach for this tab, so an attach in flight can tell that the debugger it just acquired is gone.
   let detachCount = 0;
@@ -1829,7 +1938,7 @@ export const createBrowserToolSession = ({
 
     if (method === SCREENCAST_FRAME_EVENT) {
       // The frame a capture is waiting for; one nobody waits for any more is dropped.
-      pendingScreencastFrame?.(params);
+      pendingScreencastFrame?.resolve(params);
       return;
     }
 
@@ -2092,20 +2201,35 @@ export const createBrowserToolSession = ({
     }
   };
 
+  /** A cancelled call sends nothing more: the panel owns the tab from the moment it took over. */
+  const assertCallLive = (guard: BrowserToolCallGuard | undefined): void => {
+    if (guard?.cancelled() === true) {
+      throw new Error(TAB_TAKEN_ERROR);
+    }
+  };
+
   /**
    * The screencast's next frame, asked for on this call: `Page.startScreencast`
    * makes the compositor produce one and the event brings it back. The waiter
    * is registered before the command goes out, so the answer cannot be missed,
    * and a frame that answers a capture nobody waits for any more is dropped.
    *
+   * Each capture owns one attempt: its `finally` clears the waiter only if that
+   * waiter is still its own, and stops the screencast only if it started it, so
+   * two captures overlapping on one tab cannot answer or stop each other's.
+   *
    * `undefined` when no frame arrives inside the bound — the caller falls back.
    */
   const readScreencastFrame = async (
-    format: 'jpeg' | 'png' | 'webp'
+    format: 'jpeg' | 'png',
+    guard: BrowserToolCallGuard | undefined
   ): Promise<z.infer<typeof screencastFrameSchema> | undefined> => {
     if (debuggerApi === undefined) {
       return undefined;
     }
+
+    const attempt = screencastAttempt + 1;
+    screencastAttempt = attempt;
 
     const { promise, resolve } = Promise.withResolvers<Record<string, unknown> | undefined>();
     const timer = setTimeout(() => {
@@ -2113,13 +2237,17 @@ export const createBrowserToolSession = ({
       resolve(undefined);
     }, SCREENCAST_FRAME_TIMEOUT_MS);
 
-    pendingScreencastFrame = resolve;
+    pendingScreencastFrame = { attempt, resolve };
+    let started = false;
 
     try {
+      assertCallLive(guard);
       await debuggerApi.sendCommand(target, 'Page.startScreencast', {
         everyNthFrame: 1,
         format,
       });
+      started = true;
+      screencastOwner = attempt;
 
       const parsed = screencastFrameSchema.safeParse(await promise);
 
@@ -2127,6 +2255,8 @@ export const createBrowserToolSession = ({
         return undefined;
       }
 
+      // A taken-over capture stops at once instead of acking a frame the panel's own capture now owns.
+      assertCallLive(guard);
       await debuggerApi.sendCommand(target, 'Page.screencastFrameAck', {
         sessionId: parsed.data.sessionId,
       });
@@ -2137,21 +2267,33 @@ export const createBrowserToolSession = ({
       return undefined;
     } finally {
       clearTimeout(timer);
-      pendingScreencastFrame = undefined;
-      await stopScreencast();
+
+      if (pendingScreencastFrame?.attempt === attempt) {
+        pendingScreencastFrame = undefined;
+      }
+
+      if (started && screencastOwner === attempt) {
+        // Its own screencast only: a newer capture's frame must not be stopped by the one it replaced.
+        screencastOwner = undefined;
+        await stopScreencast();
+      }
     }
   };
 
   const captureViewportImage = async (
-    format: 'jpeg' | 'png' | 'webp'
+    format: 'jpeg' | 'png' | 'webp',
+    guard?: BrowserToolCallGuard
   ): Promise<string | undefined> => {
-    if (debuggerApi === undefined) {
+    // `Page.startScreencast` has no webp: the plain capture keeps the requested type truthful.
+    if (debuggerApi === undefined || format === 'webp') {
       return undefined;
     }
 
+    assertCallLive(guard);
     await attach();
 
     try {
+      assertCallLive(guard);
       const metrics = layoutViewportSchema.safeParse(
         await debuggerApi.sendCommand(target, 'Page.getLayoutMetrics')
       );
@@ -2164,22 +2306,28 @@ export const createBrowserToolSession = ({
       // An inactive tab reports no damage to the compositor, so its first screencast frame would be
       // The stale frame the plain capture waits a second for; focus emulation makes the change paint.
       if (!focusEmulated) {
+        assertCallLive(guard);
         await applyFocusEmulation();
       }
 
-      const frame = await readScreencastFrame(format);
+      assertCallLive(guard);
+      const frame = await readScreencastFrame(format, guard);
 
-      if (frame?.metadata === undefined) {
+      if (frame === undefined) {
         return undefined;
       }
 
-      // The mask geometry is laid over this image: it must be the device-pixel size a plain capture of this viewport is.
-      return frame.metadata.deviceWidth === layout.clientWidth &&
-        frame.metadata.deviceHeight === layout.clientHeight
+      const size = imagePixelSize(frame.data, format);
+
+      // The mask geometry is laid over this image: it must be the pixel size a plain capture of this viewport is.
+      // The screencast's own metadata is in device-independent pixels, so the encoded frame is what decides.
+      return size !== undefined &&
+        size.width === layout.clientWidth &&
+        size.height === layout.clientHeight
         ? frame.data
         : undefined;
     } catch {
-      // A tab that cannot be measured is captured the ordinary way.
+      // A taken-over call sends nothing more, and a tab that cannot be measured is captured the ordinary way.
       return undefined;
     }
   };
@@ -3267,9 +3415,10 @@ export const createBrowserToolSession = ({
         throwIfCancelled();
         return runCallTool(toolName, args ?? {}, refs);
       },
-      captureViewportImage: format => {
+      captureViewportImage: (format, callGuard) => {
         throwIfCancelled();
-        return captureViewportImage(format);
+        // The capture checks the same guard before each command it sends, so a take-over mid-capture stops it.
+        return captureViewportImage(format, callGuard ?? guard);
       },
       childFrames: () => new Map(childFrames),
       consoleMessages: () => [...consoleBuffer],

@@ -1,7 +1,13 @@
 /* eslint-disable eslint/max-statements, max-lines, max-lines-per-function, max-expects, require-await, typescript/require-await, typescript-eslint/consistent-type-definitions -- one fake runtime serves every protocol branch, and its recorders read as one table */
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { AGENT_TAB_OUTSIDE_GROUP_ERROR, SENSITIVE_REASON } from '../browser-agent-checks';
+import {
+  AGENT_TAB_OUTSIDE_GROUP_ERROR,
+  SENSITIVE_REASON,
+  createStepTokenStore,
+  hashBrowserToolArguments,
+} from '../browser-agent-checks';
+import type { StepTokenIssue, StepTokenStore } from '../browser-agent-checks';
 import { TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from '../browser-caller';
 import type { BrowserCaller } from '../browser-caller';
 import type { BrowserToolRunInput, BrowserToolRunOutcome } from '../browser-runtime';
@@ -14,8 +20,6 @@ import { LOCAL_AGENT_ERROR_CODES } from './jsonrpc';
 const CONTROLLER = '6f1c2d3e-4a5b-4c6d-8e9f-0a1b2c3d4e5f';
 const HANDLE = '11111111-2222-4333-8444-555555555555';
 const SECOND_HANDLE = '99999999-8888-4777-8666-555555555555';
-/** The token the runtime hands back for a stopped download, which the CLI's repeat carries. */
-const APPROVAL_TOKEN = 'step-token-1';
 
 type FakeRuntime = {
   readonly closed: string[];
@@ -32,22 +36,6 @@ type FakeRuntime = {
 
 const callerKey = (caller: BrowserCaller): string =>
   caller.kind === 'agent' ? `${caller.controllerId}:${caller.sessionHandle}` : caller.kind;
-
-/** A fake runtime's outcomes in call order: a refusal, then the same call's approved repeat. */
-const outcomesInOrder = (...outcomes: readonly BrowserToolRunOutcome[]) => {
-  let next = 0;
-
-  return (): BrowserToolRunOutcome => {
-    const answer = outcomes[next] ?? outcomes.at(-1);
-    next += 1;
-
-    if (answer === undefined) {
-      throw new Error('the fake runtime was asked for more outcomes than it has');
-    }
-
-    return answer;
-  };
-};
 
 const createFakeRuntime = (
   options: {
@@ -173,6 +161,33 @@ const createFakeRuntime = (
     sessions,
   };
 };
+
+/**
+ * A fake runtime's download outcome over a real token store: the first call
+ * issues a token bound to the call it names, and only a repeat carrying that
+ * exact token is answered as the approved run — so redemption is what the
+ * caller's assertion is about, not a canned second answer.
+ */
+const approvalOutcome =
+  (tokens: StepTokenStore, binding: StepTokenIssue) =>
+  (input: BrowserToolRunInput): BrowserToolRunOutcome => {
+    const [presented] = input.agent?.sensitive ?? [];
+
+    if (presented !== undefined && tokens.consume(presented, binding)) {
+      return {
+        kind: 'result',
+        result: { ok: true, value: 'report.txt: The file was downloaded.' },
+      };
+    }
+
+    return {
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: binding.origin, reason: binding.reason }],
+      kind: 'needs_permission',
+      result: { ok: true, value: '' },
+      stepToken: tokens.issue(binding),
+    };
+  };
 
 const openAndShare = async (bridge: LocalAgentBrowserBridge, sessionHandle = HANDLE) => {
   await bridge.openSession({ controllerId: CONTROLLER, sessionHandle, title: 'Work' });
@@ -401,25 +416,19 @@ describe('local agent browser bridge', () => {
     });
   });
 
-  it('runs the approved repeat of browser_tabs new as the navigate it asked for', async () => {
-    const fake = createFakeRuntime({
-      outcome: outcomesInOrder(
-        {
-          afterAction: true,
-          items: [
-            {
-              class: 'sensitive',
-              origin: 'https://app.example.com',
-              reason: SENSITIVE_REASON.download,
-            },
-          ],
-          kind: 'needs_permission',
-          result: { ok: true, value: '' },
-          stepToken: APPROVAL_TOKEN,
-        },
-        { kind: 'result', result: { ok: true, value: 'report.txt: The file was downloaded.' } }
-      ),
-    });
+  it('runs the approved repeat of browser_tabs new as the navigate it asked for, and redeems its token once', async () => {
+    // The real store: the fake issues one token bound to the navigate the bridge reroutes to, and only a repeat
+    // Carrying that exact token redeems it — so the assertion is about redemption, not about a canned outcome.
+    const tokens = createStepTokenStore({});
+    const binding = {
+      argumentHash: hashBrowserToolArguments({ url: 'https://app.example.com/report.txt' }),
+      origin: 'https://app.example.com',
+      reason: SENSITIVE_REASON.download,
+      session: HANDLE,
+      tabId: 77,
+      toolName: 'browser_navigate',
+    };
+    const fake = createFakeRuntime({ outcome: approvalOutcome(tokens, binding) });
     const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
 
     await bridge.openSession({ controllerId: CONTROLLER, sessionHandle: HANDLE, title: 'Work' });
@@ -436,8 +445,10 @@ describe('local agent browser bridge', () => {
 
     expect(guarded).toMatchObject({
       code: LOCAL_AGENT_ERROR_CODES.needsPermission,
-      data: { afterAction: true, stepToken: APPROVAL_TOKEN },
+      data: { afterAction: true },
     });
+    const token = z.string().parse(guarded?.data?.['stepToken']);
+
     expect(fake.run[0]).toMatchObject({
       arguments: { url: 'https://app.example.com/report.txt' },
       tabId: 77,
@@ -448,13 +459,13 @@ describe('local agent browser bridge', () => {
     // It has to run as that navigate on the tab the first call opened: a second tab would load the url unguarded.
     const approved = await bridge.callTool(CONTROLLER, {
       ...params,
-      sensitive: [APPROVAL_TOKEN],
+      sensitive: [token],
     });
 
     expect(fake.ownTabs).toHaveLength(1);
     expect(fake.run).toHaveLength(2);
     expect(fake.run[1]).toMatchObject({
-      agent: { sensitive: [APPROVAL_TOKEN] },
+      agent: { sensitive: [token] },
       arguments: { url: 'https://app.example.com/report.txt' },
       tabId: 77,
       toolName: 'browser_navigate',
@@ -462,6 +473,9 @@ describe('local agent browser bridge', () => {
     expect(approved).toStrictEqual({
       content: [{ text: 'report.txt: The file was downloaded.', type: 'text' }],
     });
+    // The token was redeemed by the repeat: the same token cannot approve a second call.
+    expect(tokens.consume(token, binding)).toBe(false);
+    expect(tokens.size()).toBe(0);
   });
 
   it('reports the navigation that failed instead of a tab that never loaded', async () => {

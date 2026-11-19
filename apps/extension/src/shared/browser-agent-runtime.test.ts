@@ -366,9 +366,15 @@ const createFakeDownloads = (
 
       const since = query.startedAfter;
 
+      if (since !== undefined && typeof since !== 'string') {
+        // Chrome validates `DownloadQuery.startedAfter` as an ISO-8601 string and rejects the whole search otherwise.
+        throw new Error("Invalid value for argument 1. Property '.startedAfter': Expected string");
+      }
+
       if (since !== undefined) {
+        const sinceMs = Date.parse(since);
         // The items the browser created inside this call's window, plus whatever a test placed in the history itself.
-        return [...searched, ...created.filter(item => (recordedAt.get(item.id) ?? 0) >= since)];
+        return [...searched, ...created.filter(item => (recordedAt.get(item.id) ?? 0) >= sinceMs)];
       }
 
       return searched;
@@ -1326,36 +1332,92 @@ describe('agent browser calls', () => {
     });
   });
 
-  it('ends the earlier call\u2019s linger when a screenshot starts, instead of waiting it out', async () => {
+  it('leaves an earlier call\u2019s linger on duty when a read starts, and reports the download it stops', async () => {
     const downloads = createFakeDownloads();
     const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
 
     cdp.setHandlers({ 'Input.dispatchMouseEvent': () => ({}) });
 
-    await runtime.runTool({
-      agent: { authorized: [readGrant, actGrant] },
-      arguments: { target: '#pay' },
-      caller: agent(),
-      tabId: TAB_ID,
-      toolName: 'browser_click',
-    });
+    const click = () =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+    const shot = () =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: {},
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_take_screenshot',
+      });
 
+    await click();
+
+    const first = await shot();
+
+    // A read arms no guard of its own, and it must not drop the earlier one's duty either: the listener still
+    // Runs, so a download the click started that lands late is still deleted.
+    expect(first.kind).toBe('result');
     expect(downloads.live()).toBe(1);
 
-    const startedAt = Date.now();
-    const shot = await runtime.runTool({
-      agent: { authorized: [readGrant, actGrant] },
-      arguments: {},
-      caller: agent(),
-      tabId: TAB_ID,
-      toolName: 'browser_take_screenshot',
+    // The download the click started lands after the read answered: the linger cancels it, and the next call on
+    // The tab tells the model rather than letting a deleted file vanish silently.
+    downloads.emit({ id: 76, tabId: TAB_ID });
+
+    await vi.waitFor(() => {
+      expect(downloads.cancelled).toStrictEqual([76]);
     });
 
-    // A read starts no download, so it runs no guard of its own; the earlier listener is gone before it runs.
-    expect(shot.kind).toBe('result');
-    expect(downloads.live()).toBe(0);
-    // It ends the linger at once rather than paying the earlier call's window.
-    expect(Date.now() - startedAt).toBeLessThan(1000);
+    const reported = await shot();
+
+    // The next call reports the download the linger stopped, so the model can approve it with a step token.
+    expect(reported).toMatchObject({
+      afterAction: true,
+      kind: 'needs_permission',
+      stepToken: expectStepToken(reported),
+    });
+  });
+
+  it('pays the announce grace, not the whole poll bound, for a download the browser does not name', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        // The tab announces a download the browser never names: the guard waits the short grace for the item.
+        cdp.emit('Browser.downloadWillBegin', {
+          guid: 'download-81',
+          suggestedFilename: 'slow.bin',
+          url: `${MAIN_ORIGIN}/slow.bin`,
+        });
+
+        return {};
+      },
+    });
+
+    vi.useFakeTimers();
+
+    try {
+      const call = runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+      // The announce grace is 250 ms; the whole bound is 1.2 s. The call settles inside the grace — with the
+      // Grace unreachable this await never resolves under fake timers, and the test fails on its own timeout.
+      await vi.advanceTimersByTimeAsync(400);
+
+      await expect(call).resolves.toMatchObject({ afterAction: true, kind: 'needs_permission' });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('disarms the guard when the tool fails', async () => {
@@ -1741,6 +1803,9 @@ describe('agent browser calls', () => {
       tabId: 88,
     });
 
+    // The tab's document really is blank, which is the evidence the voucher is judged by.
+    cdp.setFrameUrl('about:blank');
+
     const outcome = await runtime.runTool({
       agent: { authorized: [readGrant] },
       arguments: {},
@@ -1787,11 +1852,14 @@ describe('agent browser calls', () => {
       title: 'Work',
     });
     await runtime.openSessionTab({ sessionHandle: 'session-1' });
+    // The tab is the blank document it opened with, which is what keeps the voucher alive.
+    cdp.setFrameUrl('about:blank');
 
     expect(JSON.stringify(await snapshot())).not.toContain('not inspectable');
 
     // The tab settled on a browser-internal page: it is an ordinary tab now, so the precheck judges it like one.
     urls.set(88, 'chrome://settings');
+    cdp.setFrameUrl('chrome://settings');
 
     expect(JSON.stringify(await snapshot())).toContain('not inspectable');
   });
@@ -1844,7 +1912,6 @@ describe('agent browser calls', () => {
   it('stops vouching for a tab once the session that opened it ends', async () => {
     const cdp = createFakeCdp();
     const { controller } = createGroups();
-    const urls = new Map<number, string>([[88, '']]);
 
     const runtime = createBrowserRuntime({
       debuggerApi: cdp.api,
@@ -1853,7 +1920,7 @@ describe('agent browser calls', () => {
       tabGroups: controller,
       tabsApi: {
         create: async () => ({ id: 88, title: '' }),
-        get: async tabId => ({ id: tabId, title: '', url: urls.get(tabId) ?? '' }),
+        get: async tabId => ({ id: tabId, title: '', url: '' }),
         query: async () => [
           { active: true, id: TAB_ID, title: 'Example', url: MAIN_ORIGIN, windowId: 1 },
         ],
@@ -1868,19 +1935,51 @@ describe('agent browser calls', () => {
     await runtime.openSessionTab({ sessionHandle: 'session-1' });
     await runtime.closeSession({ sessionHandle: 'session-1' });
 
-    // The ended group is adopted whole, so the tab is a live session's — but not the one whose voucher it carried.
-    await runtime.openSession({
-      controllerId: 'controller-2',
-      sessionHandle: 'session-2',
-      title: 'Adopted',
-    });
-    await runtime.adoptEnded({ sessionHandle: 'session-2' });
-    urls.set(88, 'chrome://settings');
+    // The tab's own document is still blank and the browser withholds its url, so only the ended session can end
+    // The voucher. A panel caller is in no group, which keeps the ended session itself what this call reads.
+    cdp.setFrameUrl('about:blank');
 
     const refused = await runtime.runTool({
-      agent: { authorized: [readGrant] },
       arguments: {},
-      caller: agent('session-2'),
+      caller: { conversationId: 'conversation-a', kind: 'panel', panelId: 'panel-1' },
+      tabId: 88,
+      toolName: 'browser_snapshot',
+    });
+
+    expect(JSON.stringify(refused)).toContain('not inspectable');
+  });
+
+  it('stops vouching for a session tab whose document committed a page the browser will not name', async () => {
+    const cdp = createFakeCdp();
+    const { controller } = createGroups();
+
+    const runtime = createBrowserRuntime({
+      debuggerApi: cdp.api,
+      leases: createTabLeaseRegistry({}),
+      scriptingApi: undefined,
+      tabGroups: controller,
+      tabsApi: {
+        create: async () => ({ id: 88, title: '' }),
+        // Without the `tabs` permission Chrome reports no url for a `chrome://` page.
+        get: async tabId => ({ id: tabId, title: '', url: '' }),
+        query: async () => [
+          { active: true, id: TAB_ID, title: 'Example', url: MAIN_ORIGIN, windowId: 1 },
+        ],
+      },
+    });
+
+    await runtime.openSession({
+      controllerId: 'controller-1',
+      sessionHandle: 'session-1',
+      title: 'Work',
+    });
+    await runtime.openSessionTab({ sessionHandle: 'session-1' });
+    // The tab committed a page the extension may not read: the debugger's frame URL is the evidence `tabs.Tab` withholds.
+    cdp.setFrameUrl('chrome://settings');
+
+    const refused = await runtime.runTool({
+      arguments: {},
+      caller: { conversationId: 'conversation-a', kind: 'panel', panelId: 'panel-1' },
       tabId: 88,
       toolName: 'browser_snapshot',
     });

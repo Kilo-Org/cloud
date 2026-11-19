@@ -121,8 +121,8 @@ export const OrganizationFeaturesInputSchema = z.object({
   experimental_byok: organizationIdsInput,
   enkrypt_output_guardrail: organizationIdsInput,
   gateway_settings: organizationIdsInput,
-  org_permission_policy: organizationIdsInput,
-}) satisfies z.ZodType<OrganizationFeatures, unknown>;
+  org_permission_policy: organizationIdsInput.optional(),
+});
 
 export const ANTHROPIC_USER_PROFILE_LIST_MAX_COUNT = 1000;
 

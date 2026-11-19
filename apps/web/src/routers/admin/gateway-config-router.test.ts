@@ -104,6 +104,31 @@ describe('adminGatewayConfigRouter', () => {
     });
   });
 
+  it('preserves the permission-policy allowlist when an older client omits it', async () => {
+    const caller = await createCallerForUser(admin.id);
+    const organizationId = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
+
+    await caller.admin.gatewayConfig.setOrganizationFeatures({
+      experimental_byok: [],
+      enkrypt_output_guardrail: [],
+      gateway_settings: [],
+      org_permission_policy: [organizationId],
+    });
+    const saved = await caller.admin.gatewayConfig.setOrganizationFeatures({
+      experimental_byok: [organizationId],
+      enkrypt_output_guardrail: [],
+      gateway_settings: [],
+    });
+
+    expect(saved).toEqual({
+      experimental_byok: [organizationId],
+      enkrypt_output_guardrail: [],
+      gateway_settings: [],
+      org_permission_policy: [organizationId],
+    });
+    await expect(caller.admin.gatewayConfig.getOrganizationFeatures()).resolves.toEqual(saved);
+  });
+
   it('keeps the routing configuration when organization features are saved', async () => {
     const caller = await createCallerForUser(admin.id);
 

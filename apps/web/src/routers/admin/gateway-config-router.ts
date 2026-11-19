@@ -72,7 +72,7 @@ export const adminGatewayConfigRouter = createTRPCRouter({
   previewOrganizationFeatures: adminProcedure
     .input(OrganizationFeaturesInputSchema)
     .query(async ({ input }) => {
-      const organizationIds = [...new Set(Object.values(input).flat())];
+      const organizationIds = [...new Set(Object.values(input).flatMap(ids => ids ?? []))];
       if (organizationIds.length === 0) return [];
 
       const rows = await db
@@ -94,7 +94,14 @@ export const adminGatewayConfigRouter = createTRPCRouter({
   setOrganizationFeatures: adminProcedure
     .input(OrganizationFeaturesInputSchema)
     .mutation(async ({ input }) => {
-      const organization_features: OrganizationFeatures = input;
+      const orgPermissionPolicy =
+        input.org_permission_policy ?? (await readOrganizationFeatures(db)).org_permission_policy;
+      const organization_features: OrganizationFeatures = {
+        experimental_byok: input.experimental_byok,
+        enkrypt_output_guardrail: input.enkrypt_output_guardrail,
+        gateway_settings: input.gateway_settings,
+        org_permission_policy: orgPermissionPolicy,
+      };
       await mergeIntoConfig({ organization_features });
       return organization_features;
     }),

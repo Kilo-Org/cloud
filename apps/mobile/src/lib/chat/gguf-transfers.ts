@@ -282,8 +282,9 @@ export function downloadProgress(download: GgufActiveDownload): GgufDownload {
     pending: download.pausing || download.stop !== undefined,
     written: download.done + download.written,
     total: download.total > 0 ? download.done + download.total + later : 0,
-    // `again()` counts the attempt before it starts the transfer from zero, so
-    // the counter moving backwards is published as the retry that explains it.
-    retrying: download.attempts > FIRST_ATTEMPT,
+    // `again()` counts the attempt before it starts the transfer from zero, and
+    // a refused resume drops the partial the same way (`restart()`), so either
+    // backwards move is published as the retry that explains it.
+    retrying: download.attempts > FIRST_ATTEMPT || download.restarted,
   };
 }

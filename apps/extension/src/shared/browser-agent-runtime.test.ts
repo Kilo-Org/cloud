@@ -10,6 +10,7 @@ import { createBrowserRuntime } from './browser-runtime';
 import type {
   BrowserDownloadItem,
   BrowserDownloadsApi,
+  BrowserRuntime,
   BrowserToolRunOutcome,
 } from './browser-runtime';
 import {
@@ -54,7 +55,7 @@ type CdpHandler = (
   params: Record<string, unknown> | undefined,
   /** The tab the command was sent to: a deferred answer can be scoped to the tab a call drives. */
   target?: { readonly tabId: number }
-) => Promise<Record<string, unknown>> | Record<string, unknown> | undefined;
+) => Promise<Record<string, unknown> | undefined> | Record<string, unknown> | undefined;
 
 type AgentResult = Extract<EvalTabResult, { readonly ok: true }>;
 
@@ -5463,5 +5464,260 @@ describe('agent browser calls', () => {
     expect(String(result.value)).toContain('leaked frame text');
     expect(withheldFrames).toBeUndefined();
     expect(ORIGIN_CHANGED_ERROR).toBeTruthy();
+  });
+});
+
+/** Page commands the renderer cannot answer while a JavaScript dialog is open, as measured on Chromium. */
+const RENDERER_COMMANDS = [
+  'Accessibility.getFullAXTree',
+  'DOM.describeNode',
+  'DOM.getBoxModel',
+  'DOM.getDocument',
+  'DOM.querySelectorAll',
+  'DOM.resolveNode',
+  'DOM.scrollIntoViewIfNeeded',
+  'Emulation.setFocusEmulationEnabled',
+  'Page.captureScreenshot',
+  'Page.getFrameTree',
+  'Page.getLayoutMetrics',
+  'Runtime.callFunctionOn',
+  'Runtime.evaluate',
+  'Target.setAutoAttach',
+] as const;
+
+/**
+ * Chrome around a JavaScript dialog: the page opens it from a click's handler
+ * (or, with `opener`, from another command), and from then on neither that
+ * command nor any renderer command answers until `Page.handleJavaScriptDialog`
+ * closes the dialog.
+ */
+const pageDialog = (
+  cdp: FakeCdp,
+  dialog: { readonly message: string; readonly type: string; readonly url?: string },
+  opener = 'Input.dispatchMouseEvent'
+) => {
+  // The dialog the page holds open, closed by its answer.
+  const page: { open?: PromiseWithResolvers<void> } = {};
+  const answers: Record<string, unknown>[] = [];
+  const handlers: Record<string, CdpHandler> = {};
+  // Declines to answer itself, so the fake's own answer follows once the dialog is closed.
+  const blocked: CdpHandler = async () => {
+    await page.open?.promise;
+  };
+
+  for (const method of RENDERER_COMMANDS) {
+    handlers[method] = blocked;
+  }
+
+  handlers[opener] = async params => {
+    await page.open?.promise;
+
+    // A click's handler runs on the release; any other opener opens the dialog on its own.
+    if (opener === 'Input.dispatchMouseEvent' && params?.['type'] !== 'mouseReleased') {
+      return;
+    }
+
+    const opened = Promise.withResolvers<void>();
+
+    page.open = opened;
+    cdp.emit('Page.javascriptDialogOpening', { url: `${MAIN_ORIGIN}/dashboard`, ...dialog });
+    await opened.promise;
+  };
+  handlers['Page.handleJavaScriptDialog'] = params => {
+    answers.push(params ?? {});
+    cdp.emit('Page.javascriptDialogClosed', { result: params?.['accept'] === true });
+    page.open?.resolve();
+    delete page.open;
+
+    return {};
+  };
+  cdp.setHandlers(handlers);
+
+  return { answers, blocked };
+};
+
+const ALERT_STATE =
+  '### Modal state\n- ["alert" dialog with message "Saved"]: can be handled by browser_handle_dialog';
+
+describe('agent browser calls on a page with a JavaScript dialog', () => {
+  const call = (runtime: BrowserRuntime, toolName: string, args: Record<string, unknown> = {}) =>
+    runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: args,
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName,
+    });
+
+  it('answers a click that opens a dialog with the modal state instead of waiting for the click', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    pageDialog(cdp, { message: 'Saved', type: 'alert' });
+
+    await expect(call(runtime, 'browser_click', { target: '#save' })).resolves.toStrictEqual({
+      kind: 'result',
+      result: { ok: true, value: ALERT_STATE },
+    });
+  });
+
+  it('refuses every other tool on the tab until the dialog is answered, without touching the page', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    pageDialog(cdp, { message: 'Saved', type: 'alert' });
+    await call(runtime, 'browser_click', { target: '#save' });
+    const sentBefore = cdp.commands().length;
+
+    await expect(call(runtime, 'browser_snapshot')).resolves.toStrictEqual({
+      kind: 'result',
+      result: {
+        error: `Tool "browser_snapshot" does not handle the modal state.\n\n${ALERT_STATE}`,
+        ok: false,
+      },
+    });
+    await expect(
+      call(runtime, 'browser_navigate', { url: `${MAIN_ORIGIN}/next` })
+    ).resolves.toMatchObject({ result: { ok: false } });
+    expect(cdp.commands()).toHaveLength(sentBefore);
+  });
+
+  it('accepts a prompt with the text given, and the tab takes other tools again', async () => {
+    const { cdp, runtime } = await createHarness();
+    const dialog = pageDialog(cdp, { message: 'Your name?', type: 'prompt' });
+
+    await call(runtime, 'browser_click', { target: '#ask' });
+
+    await expect(
+      call(runtime, 'browser_handle_dialog', { accept: true, promptText: 'Ada' })
+    ).resolves.toMatchObject({
+      kind: 'result',
+      result: { ok: true, value: { accepted: true, type: 'prompt' } },
+    });
+    expect(dialog.answers).toStrictEqual([{ accept: true, promptText: 'Ada' }]);
+    expect(String(expectResult(await call(runtime, 'browser_snapshot')).result.value)).toContain(
+      'Pay now'
+    );
+  });
+
+  it('dismisses a confirm', async () => {
+    const { cdp, runtime } = await createHarness();
+    const dialog = pageDialog(cdp, { message: 'Delete it?', type: 'confirm' });
+
+    await call(runtime, 'browser_click', { target: '#delete' });
+
+    await expect(call(runtime, 'browser_handle_dialog', { accept: false })).resolves.toMatchObject({
+      result: { ok: true, value: { accepted: false, type: 'confirm' } },
+    });
+    expect(dialog.answers).toStrictEqual([{ accept: false }]);
+  });
+
+  it('answers any call during which the page opens a dialog, not only a click', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    pageDialog(cdp, { message: 'Saved', type: 'alert' }, 'Accessibility.getFullAXTree');
+
+    await expect(call(runtime, 'browser_snapshot')).resolves.toStrictEqual({
+      kind: 'result',
+      result: { ok: true, value: ALERT_STATE },
+    });
+  });
+
+  it('withholds the message of a dialog from a frame the agent may not read', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    pageDialog(cdp, { message: 'Card declined', type: 'alert', url: `${FRAME_ORIGIN}/widget` });
+
+    await expect(call(runtime, 'browser_click', { target: '#save' })).resolves.toStrictEqual({
+      kind: 'result',
+      result: {
+        ok: true,
+        value:
+          '### Modal state\n- ["alert" dialog (message withheld: no read permission for the frame that opened it)]: can be handled by browser_handle_dialog',
+      },
+    });
+  });
+
+  it('names the panel’s own answering tool to the panel', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    pageDialog(cdp, { message: 'Saved', type: 'alert' });
+
+    await expect(
+      runtime.runTool({
+        arguments: { target: '#save' },
+        caller: panel(),
+        tabId: TAB_ID,
+        toolName: 'kilo_browser_click',
+      })
+    ).resolves.toStrictEqual({
+      kind: 'result',
+      result: {
+        ok: true,
+        value:
+          '### Modal state\n- ["alert" dialog with message "Saved"]: can be handled by kilo_browser_handle_dialog',
+      },
+    });
+  });
+
+  it('refuses, rather than asks about, a call whose page checks a dialog interrupted', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    // The page opens the dialog while the call's own checks read it, before the click runs.
+    pageDialog(cdp, { message: 'Saved', type: 'alert' }, 'Runtime.callFunctionOn');
+
+    await expect(call(runtime, 'browser_click', { target: '#save' })).resolves.toStrictEqual({
+      kind: 'result',
+      result: {
+        error: `Tool "browser_click" does not handle the modal state.\n\n${ALERT_STATE}`,
+        ok: false,
+      },
+    });
+  });
+
+  it('keeps the approval of a sensitive step that an open dialog refused', async () => {
+    const { cdp, runtime } = await createHarness();
+    const type = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#cc', text: 'hunter2' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_type',
+      });
+
+    cdp.setProbe({ fields: [{ kind: 'password' }], paymentFormSubmit: false });
+    const stepToken = expectStepToken(await type([]));
+
+    cdp.emit('Page.javascriptDialogOpening', { message: 'Saved', type: 'alert' });
+    await expect(type([stepToken])).resolves.toMatchObject({ result: { ok: false } });
+    await call(runtime, 'browser_handle_dialog', { accept: true });
+
+    // The refusal ran no check, so the approval is still there for the step it was given for.
+    await expect(type([stepToken])).resolves.toMatchObject({
+      kind: 'result',
+      result: { ok: true },
+    });
+  });
+
+  it('turns frame auto-attach on after a dialog that was open at the session’s first call is answered', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    // The panel's snapshot meets the dialog, so the agent's first call finds it open.
+    const dialog = pageDialog(
+      cdp,
+      { message: 'Saved', type: 'alert' },
+      'Accessibility.getFullAXTree'
+    );
+    await runtime.runTool({
+      arguments: {},
+      caller: panel(),
+      tabId: TAB_ID,
+      toolName: 'kilo_browser_snapshot',
+    });
+    runtime.releaseCaller(panel());
+    await call(runtime, 'browser_handle_dialog', { accept: true });
+    cdp.setHandlers({ 'Accessibility.getFullAXTree': dialog.blocked });
+    await call(runtime, 'browser_snapshot');
+
+    expect(cdp.commands().filter(method => method === 'Target.setAutoAttach')).toHaveLength(1);
   });
 });

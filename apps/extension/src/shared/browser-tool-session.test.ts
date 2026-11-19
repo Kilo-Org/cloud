@@ -8,6 +8,7 @@ import {
   createBrowserToolSession,
   getFirefoxUnsupportedToolError,
 } from './browser-tool-session';
+import { BROWSER_TOOL_DIALOG_OPEN_ERROR } from './browser-tool-dialog';
 import { TAB_NOT_INSPECTABLE_ERROR } from './tab-debugger';
 import { TAB_TAKEN_ERROR } from './browser-caller';
 import type {
@@ -929,6 +930,48 @@ describe('browser tool session', () => {
     debuggerApi.emitEvent(7, 'Page.javascriptDialogClosed', {});
 
     expect(session.takeDialog()).toBeUndefined();
+  });
+
+  it('refuses page commands while a dialog is open, sends its answer, and takes commands again once it closes', async () => {
+    const { debuggerApi, session } = createSession();
+
+    await session.attach();
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogOpening', { message: 'Hi', type: 'alert' });
+    const sentBefore = debuggerApi.commands.length;
+
+    await expect(session.send('Runtime.evaluate', { expression: '1' })).rejects.toThrow(
+      BROWSER_TOOL_DIALOG_OPEN_ERROR
+    );
+    await expect(
+      session.send('Input.dispatchMouseEvent', { type: 'mousePressed' })
+    ).rejects.toThrow(BROWSER_TOOL_DIALOG_OPEN_ERROR);
+    // A refused command never reaches the page, so it cannot wait behind the dialog.
+    expect(debuggerApi.commands).toHaveLength(sentBefore);
+
+    await session.send('Page.handleJavaScriptDialog', { accept: true });
+    expect(debuggerApi.commands.at(-1)).toStrictEqual({
+      method: 'Page.handleJavaScriptDialog',
+      params: { accept: true },
+    });
+
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogClosed', { result: true });
+    await expect(session.send('Runtime.evaluate', { expression: '2' })).resolves.toStrictEqual({});
+  });
+
+  it('stops waiting for a page read in flight when the page opens a dialog', async () => {
+    const { debuggerApi, session } = createSession({
+      gate: { command: 'Page.getFrameTree', wait: Promise.withResolvers<void>().promise },
+    });
+
+    await session.attach();
+    const read = session.send('Page.getFrameTree');
+
+    await vi.waitFor(() => {
+      expect(debuggerApi.commands.at(-1)?.method).toBe('Page.getFrameTree');
+    });
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogOpening', { message: 'Hi', type: 'alert' });
+
+    await expect(read).rejects.toThrow(BROWSER_TOOL_DIALOG_OPEN_ERROR);
   });
 
   it('resolves a snapshot ref to its backend node id and a selector through the DOM domain', async () => {

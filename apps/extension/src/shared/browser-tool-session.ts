@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { buildWorkflowPageCode } from './agent-workflow-runner';
 import { TAB_TAKEN_ERROR } from './browser-caller';
 import { KILO_BROWSER_TOOL_PREFIX, toKiloBrowserToolName } from './browser-tool-contract';
+import { BrowserToolDialogOpenError } from './browser-tool-dialog';
 import {
   redactSensitiveBody,
   redactSensitiveHeaders,
@@ -118,6 +119,8 @@ const DETACH_REASON_TARGET_CLOSED = 'target_closed';
  * Evidence: https://github.com/BrowserMCP/mcp/blob/main/packages/mcp/spikes/hidden-tabs/RESULTS.md
  */
 const INPUT_COMMAND_TIMEOUT_MS = 5000;
+/** The one command a session sends while a JavaScript dialog blocks the page: the dialog's own answer. */
+const DIALOG_ANSWER_METHOD = 'Page.handleJavaScriptDialog';
 /**
  * Bound on the frame a background tab's screencast is asked for. Chrome makes
  * that frame on the request in about 11 ms (measured on the click-then-
@@ -496,8 +499,16 @@ export interface BrowserToolSession {
     params?: Record<string, unknown>,
     sessionId?: string
   ) => Promise<Record<string, unknown> | undefined>;
+  /** The dialog open on the page right now, without answering it; `undefined` when none is open. */
+  readonly pendingDialog: () => BrowserToolDialog | undefined;
   /** Returns the pending dialog and clears it, so a second call cannot re-answer it. */
   readonly takeDialog: () => BrowserToolDialog | undefined;
+  /**
+   * Calls `listener` each time the page opens a dialog, and returns the
+   * function that stops it. A call races its page action against this: the
+   * action that opened a dialog is not answered until the dialog is.
+   */
+  readonly watchDialogs: (listener: (dialog: BrowserToolDialog) => void) => () => void;
   /** Returns the downloads seen since the last call and clears them. */
   readonly takeDownloads: () => readonly BrowserToolDownload[];
   /**
@@ -1609,6 +1620,8 @@ export const createBrowserToolSession = ({
   let detachCount = 0;
   let documentNodeId: number | undefined = undefined;
   let dialog: BrowserToolDialog | undefined = undefined;
+  // Calls racing their page action against a dialog: the action that opened one is not answered until it is closed.
+  const dialogListeners = new Set<(opened: BrowserToolDialog) => void>();
   // Monotonic ref numbering for scripting snapshots, so refs stay e1, e2, ... rather than restarting per snapshot.
   let scriptingRefCount = 0;
   // Console messages pushed since the last main-frame navigation, for `all: false`.
@@ -1885,12 +1898,18 @@ export const createBrowserToolSession = ({
 
     const { defaultPrompt, message, type, url } = parsed.data;
 
-    dialog = {
+    const opened: BrowserToolDialog = {
       message: message ?? '',
       type: type ?? 'alert',
       ...(defaultPrompt === undefined ? {} : { defaultValue: defaultPrompt }),
       ...(url === undefined ? {} : { url }),
     };
+
+    dialog = opened;
+
+    for (const listener of dialogListeners) {
+      listener(opened);
+    }
   };
 
   // Only a main-frame navigation replaces the document; a subframe navigation leaves the main document's node ids valid and its network boundary untouched.
@@ -2182,12 +2201,48 @@ export const createBrowserToolSession = ({
     attachPromise = undefined;
   };
 
+  /**
+   * One command the page's renderer answers. It answers none while a
+   * JavaScript dialog is open (see `browser-tool-dialog.ts`), so a command is
+   * refused at once while one is open, and stops waiting when one opens before
+   * it answered: its late answer is dropped.
+   */
+  const pageCommand = async (
+    method: string,
+    params?: Record<string, unknown>,
+    commandTarget: ChromeDebuggerTarget = target
+  ): Promise<Record<string, unknown> | undefined> => {
+    if (debuggerApi === undefined) {
+      throw new Error(`${method} is not available in Firefox: ${FIREFOX_PLATFORM_LIMIT}.`);
+    }
+
+    if (dialog !== undefined) {
+      throw new BrowserToolDialogOpenError();
+    }
+
+    const { promise: dialogOpened, reject } = Promise.withResolvers<never>();
+    const refuse = (): void => {
+      reject(new BrowserToolDialogOpenError());
+    };
+
+    dialogListeners.add(refuse);
+
+    try {
+      return await Promise.race([
+        Promise.resolve(debuggerApi.sendCommand(commandTarget, method, params)),
+        dialogOpened,
+      ]);
+    } finally {
+      dialogListeners.delete(refuse);
+    }
+  };
+
   const applyFocusEmulation = async (): Promise<void> => {
     if (debuggerApi === undefined) {
       return;
     }
 
-    await debuggerApi.sendCommand(target, FOCUS_EMULATION_METHOD, { enabled: true });
+    await pageCommand(FOCUS_EMULATION_METHOD, { enabled: true });
     focusEmulated = true;
   };
 
@@ -2196,7 +2251,7 @@ export const createBrowserToolSession = ({
       return undefined;
     }
 
-    const response = await debuggerApi.sendCommand(target, 'Runtime.evaluate', {
+    const response = await pageCommand('Runtime.evaluate', {
       expression: 'document.visibilityState',
       returnByValue: true,
     });
@@ -2392,6 +2447,12 @@ export const createBrowserToolSession = ({
     }
   };
 
+  /**
+   * Every command but the dialog's own answer goes through the dialog guard. An
+   * input command is refused while a dialog is open but left to finish once
+   * sent, because abandoning a press would leave its release unsent; the call
+   * that sent it races the dialog itself.
+   */
   const send = async (
     method: string,
     params?: Record<string, unknown>,
@@ -2410,14 +2471,21 @@ export const createBrowserToolSession = ({
 
     await attach();
 
+    if (method === DIALOG_ANSWER_METHOD) {
+      return debuggerApi.sendCommand(target, method, params);
+    }
+
     if (method.startsWith('Input.')) {
+      // Checked after the attach: a dialog can open while it is awaited.
+      if (dialog !== undefined) {
+        throw new BrowserToolDialogOpenError();
+      }
+
       return sendInputCommand(method, params);
     }
 
     // A child session runs in its own process, so the tab's input timing rules do not apply to it.
-    return sessionId === undefined
-      ? debuggerApi.sendCommand(target, method, params)
-      : debuggerApi.sendCommand({ ...target, sessionId }, method, params);
+    return pageCommand(method, params, sessionId === undefined ? target : { ...target, sessionId });
   };
 
   const getDocumentNodeId = async (): Promise<number | undefined> => {
@@ -2429,7 +2497,7 @@ export const createBrowserToolSession = ({
       return undefined;
     }
 
-    const response = await debuggerApi.sendCommand(target, 'DOM.getDocument', { depth: 0 });
+    const response = await pageCommand('DOM.getDocument', { depth: 0 });
     const parsed = domGetDocumentResponseSchema.safeParse(response);
 
     if (!parsed.success || parsed.data.root === undefined) {
@@ -2508,7 +2576,7 @@ export const createBrowserToolSession = ({
     }
 
     // A selector must name exactly one element: querySelector would silently take the first match, so an ambiguous selector would type into an arbitrary field.
-    const response = await debuggerApi.sendCommand(target, 'DOM.querySelectorAll', {
+    const response = await pageCommand('DOM.querySelectorAll', {
       nodeId: rootNodeId,
       selector,
     });
@@ -2625,6 +2693,14 @@ export const createBrowserToolSession = ({
     dialog = undefined;
 
     return pending;
+  };
+
+  const watchDialogs = (listener: (opened: BrowserToolDialog) => void): (() => void) => {
+    dialogListeners.add(listener);
+
+    return () => {
+      dialogListeners.delete(listener);
+    };
   };
 
   const runPageTool = async (
@@ -3474,6 +3550,7 @@ export const createBrowserToolSession = ({
       isAttached: () => attached,
       networkRequests: () => [...networkById.values()],
       networkRequestsSinceLoad,
+      pendingDialog: () => dialog,
       registerRefs: (entries, options) => {
         registerRefs(refs, entries, options);
       },
@@ -3488,6 +3565,7 @@ export const createBrowserToolSession = ({
       takeDialog,
       takeDownloads,
       viewportState,
+      watchDialogs,
       watchDownloads,
     };
   };
@@ -3516,6 +3594,7 @@ export const createBrowserToolSession = ({
     isAttached: () => attached,
     networkRequests: () => [...networkById.values()],
     networkRequestsSinceLoad,
+    pendingDialog: () => dialog,
     registerRefs: (entries, options) => {
       registerRefs(defaultRefs, entries, options);
     },
@@ -3524,6 +3603,7 @@ export const createBrowserToolSession = ({
     takeDialog,
     takeDownloads,
     viewportState,
+    watchDialogs,
     watchDownloads,
   };
 };

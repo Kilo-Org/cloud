@@ -867,6 +867,99 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
 
       connection.destroy();
     });
+
+    it('exhausts the reconnect budget when refreshAuth keeps failing after an auth close', async () => {
+      jest.spyOn(Math, 'random').mockReturnValue(0);
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+      const refreshAuth = jest.fn(() => Promise.reject(new Error('refresh failed')));
+      const onReconnectExhaustionChange = jest.fn();
+      const { connection, onUnexpectedDisconnect } = createTestConnection({
+        refreshAuth,
+        onReconnectExhaustionChange,
+        maxReconnectAttempts: 2,
+        isAuthFailure: event => event.code === 4001 || event.code === 1008,
+      });
+      connection.connect();
+      expect(sockets).toHaveLength(1);
+
+      closeSocket(0, 4001);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(refreshAuth).toHaveBeenCalledTimes(1);
+      expect(sockets).toHaveLength(1);
+      jest.advanceTimersByTime(60_000);
+      expect(sockets).toHaveLength(2);
+
+      closeSocket(1, 4001);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(refreshAuth).toHaveBeenCalledTimes(2);
+      expect(sockets).toHaveLength(2);
+      jest.advanceTimersByTime(60_000);
+      expect(sockets).toHaveLength(3);
+
+      closeSocket(2, 4001);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(refreshAuth).toHaveBeenCalledTimes(3);
+      expect(onReconnectExhaustionChange).toHaveBeenCalledTimes(1);
+      expect(onReconnectExhaustionChange).toHaveBeenCalledWith(true);
+
+      // Exhausted: no further retry or refresh after the cap.
+      jest.advanceTimersByTime(60_000);
+      expect(sockets).toHaveLength(3);
+      expect(refreshAuth).toHaveBeenCalledTimes(3);
+      expect(onUnexpectedDisconnect).toHaveBeenCalledTimes(3);
+
+      connection.destroy();
+    });
+
+    it('does not open a socket with the pre-refresh ticket while a pre-connect refresh is in flight', async () => {
+      jest.spyOn(Math, 'random').mockReturnValue(0);
+      const { promise: firstRefresh, resolve: releaseFirstRefresh } =
+        Promise.withResolvers<void>();
+      const refreshAuth = jest
+        .fn()
+        .mockImplementationOnce(() => firstRefresh)
+        .mockImplementation(() => Promise.resolve());
+      const onReplacingConnection = jest.fn();
+      const { connection } = createTestConnection({
+        refreshAuth,
+        onReplacingConnection,
+        shouldRefreshAuthBeforeConnect: () => true,
+      });
+      connection.connect();
+
+      // Complete the first pre-connect refresh so a socket exists, then start
+      // a second one whose completion is still pending.
+      releaseFirstRefresh();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(sockets).toHaveLength(1);
+      connectSocket(0);
+
+      connection.retryReconnect();
+      expect(refreshAuth).toHaveBeenCalledTimes(2);
+      await Promise.resolve();
+
+      // Socket 0 drops for a non-auth reason while the second refresh is in
+      // flight, so the close handler arms the reconnect timer.
+      closeSocket(0);
+      expect(sockets).toHaveLength(1);
+      jest.advanceTimersByTime(500);
+
+      // The timer must not open a socket with the ticket that the in-flight
+      // refresh is still replacing.
+      expect(sockets).toHaveLength(1);
+
+      // The refresh completes and opens exactly one socket with the new ticket.
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(sockets).toHaveLength(2);
+      expect(onReplacingConnection).not.toHaveBeenCalled();
+
+      connection.destroy();
+    });
   });
 
   describe('pause while hidden (hiddenPauseDelayMs)', () => {

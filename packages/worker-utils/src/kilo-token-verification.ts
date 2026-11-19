@@ -33,7 +33,6 @@ export function checkKiloTokenAuthorityClaims(payload: JWTPayload): boolean {
   return true;
 }
 
-/** Refuses a token whose `iat` is missing or later than `nowSeconds`. */
 export function assertKiloTokenIssuedAt(iat: unknown, nowSeconds: number): void {
   if (typeof iat !== 'number' || iat > nowSeconds) throw new Error('Token issued in the future');
 }

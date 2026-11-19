@@ -14,7 +14,11 @@ import type { LocalAgentConnectionState } from './connection-state';
 import { createLocalAgentDispatcher } from './dispatcher';
 import type { LocalAgentBrowserBridge } from './browser-bridge';
 import { createUnavailableBrowserBridge } from './browser-bridge';
-import { loadLocalAgentEndpoints, saveLocalAgentEndpoint } from './endpoints';
+import {
+  pruneLocalAgentEndpoints,
+  saveLocalAgentEndpoint,
+  touchLocalAgentEndpoint,
+} from './endpoints';
 import { createLocalAgentHello } from './environment';
 import type { LocalAgentApiAvailability } from './environment';
 import type {
@@ -34,7 +38,7 @@ import { createLoopbackDial } from './loopback-transport';
 import type { LoopbackSocketConnect } from './loopback-transport';
 import { createNativeDial } from './native-transport';
 import type { NativeMessagingRuntime } from './native-transport';
-import { parsePairingUrl } from './pairing';
+import { isBrokenPairingUrl, parsePairingUrl } from './pairing';
 import { savePairingNotice } from './pairing-notice';
 import { redeemPairingKey } from './redeem';
 import type { LocalAgentFetch } from './redeem';
@@ -208,14 +212,22 @@ export const readLocalAgentsHostApis = (): LocalAgentsHostApis => {
   };
 };
 
-const statusOf = (connections: Map<string, LocalAgentConnection>): LocalAgentEndpointStatus[] => {
+const statusOf = (
+  connections: Map<string, LocalAgentConnection>,
+  lastConnectedAt: Map<string, number>
+): LocalAgentEndpointStatus[] => {
   const statuses: LocalAgentEndpointStatus[] = [];
 
   for (const connection of connections.values()) {
     if (connection.endpoint.transport === 'loopback') {
+      const seen = lastConnectedAt.get(connection.endpoint.hubId);
+
       statuses.push({
+        // Stored socket URLs passed `parseLoopbackSocketUrl`, so they always parse.
+        address: new URL(connection.endpoint.ws).host,
         endpointId: connection.endpoint.endpointId,
         hubId: connection.endpoint.hubId,
+        ...(seen === undefined ? {} : { lastConnectedAt: seen }),
         state: connection.state(),
         transport: 'loopback',
       });
@@ -251,6 +263,8 @@ export const startLocalAgentsHost = (
 
   const connections = new Map<string, LocalAgentConnection>();
   const controllerConnections = new Map<string, LocalAgentConnection>();
+  /* Per loopback hub, the last time it was reachable, for the settings section's reconnecting/unreachable split. */
+  const lastConnectedAt = new Map<string, number>();
   const cleanup: (() => void)[] = [];
   const publish = createSerialTaskQueue();
   /* Pairing navigations can arrive before the first settings read answers. */
@@ -283,7 +297,7 @@ export const startLocalAgentsHost = (
 
   const publishStatus = (): Promise<void> =>
     publish(async () => {
-      await saveLocalAgentStatus(storage, statusOf(connections));
+      await saveLocalAgentStatus(storage, statusOf(connections, lastConnectedAt));
     });
 
   /** Connection-driven bookkeeping must never surface as an unhandled rejection. */
@@ -298,6 +312,7 @@ export const startLocalAgentsHost = (
     })();
   };
 
+  /** A controller the user disconnected stays out of the registry; its `session.open` answers `user_stopped`. */
   const ensureController = async (
     connection: LocalAgentConnection,
     controllerId: string
@@ -307,13 +322,15 @@ export const startLocalAgentsHost = (
     }
 
     const transport: LocalAgentTransport = connection.endpoint.transport;
-
-    await registry.registerController({
+    const registered = await registry.registerController({
       controllerId,
       transport,
       ...(connection.endpoint.transport === 'loopback' ? { hubId: connection.endpoint.hubId } : {}),
     });
-    controllerConnections.set(controllerId, connection);
+
+    if (registered) {
+      controllerConnections.set(controllerId, connection);
+    }
   };
 
   const handleRpc = async (
@@ -423,12 +440,22 @@ export const startLocalAgentsHost = (
         handleEnvelope(connection, envelope);
       },
       onStateChange: next => {
-        if (lastState.kind === 'connected' && next.kind !== 'connected') {
+        const wasConnected = lastState.kind === 'connected';
+
+        if (wasConnected && next.kind !== 'connected') {
           void forgetControllersOf(connection);
         }
 
         if (next.kind === 'connected' && endpoint.transport === 'loopback') {
           consumeIfConnected(connection);
+        }
+
+        // Entering or leaving `connected` proves the hub was reachable just now.
+        if (endpoint.transport === 'loopback' && wasConnected !== (next.kind === 'connected')) {
+          const at = now();
+
+          lastConnectedAt.set(endpoint.hubId, at);
+          runTask(() => touchLocalAgentEndpoint(storage, endpoint.hubId, at));
         }
 
         lastState = next;
@@ -450,6 +477,10 @@ export const startLocalAgentsHost = (
   const closeConnection = (connection: LocalAgentConnection): void => {
     connection.close();
     connections.delete(connection.endpoint.endpointId);
+
+    if (connection.endpoint.transport === 'loopback') {
+      lastConnectedAt.delete(connection.endpoint.hubId);
+    }
   };
 
   const revokeAll = async (reason: 'switch_off' | 'user_stop'): Promise<void> => {
@@ -469,10 +500,12 @@ export const startLocalAgentsHost = (
   };
 
   const disconnectController = async (controllerId: string): Promise<void> => {
-    const removed = await registry.removeController(controllerId);
     const connection = controllerConnections.get(controllerId);
 
+    // Unmapped before the registry write: a call racing the click asks the registry, which refuses it.
     controllerConnections.delete(controllerId);
+    const removed = await registry.revokeController(controllerId);
+
     rememberStopped(removed?.sessions ?? []);
     await bridge.endSessions(
       (removed?.sessions ?? []).map(session => ({
@@ -497,7 +530,10 @@ export const startLocalAgentsHost = (
       return;
     }
 
-    const endpoints = await loadLocalAgentEndpoints(storage);
+    const endpoints = await pruneLocalAgentEndpoints(storage, {
+      isConnected: hubId => connections.get(hubId)?.state().kind === 'connected',
+      now: now(),
+    });
 
     // The switch can turn off while the endpoint list loads; a late close must not resurrect it.
     if (!enabled || stopped) {
@@ -518,6 +554,12 @@ export const startLocalAgentsHost = (
       ) {
         closeConnection(existing);
       }
+
+      // A stamp taken while the list loaded is newer than the stored one.
+      lastConnectedAt.set(
+        endpoint.hubId,
+        Math.max(endpoint.lastConnectedAt, lastConnectedAt.get(endpoint.hubId) ?? 0)
+      );
 
       if (!connections.has(endpoint.hubId)) {
         addConnection(
@@ -623,7 +665,7 @@ export const startLocalAgentsHost = (
         return;
       }
 
-      await saveLocalAgentEndpoint(storage, redeemed.endpoint);
+      await saveLocalAgentEndpoint(storage, redeemed.endpoint, now());
       await reconcile();
 
       const connection = connections.get(endpoint.hubId);
@@ -651,6 +693,30 @@ export const startLocalAgentsHost = (
         await acceptPairing(endpoint, tabId, key);
       } catch {
         inFlightPairings.delete(key);
+      }
+    })();
+  };
+
+  /** A pairing link this extension cannot read: its tab closes and the notice says the link is invalid. */
+  const rejectBrokenPairing = (tabId: number): void => {
+    void (async (): Promise<void> => {
+      // The switch value is unknown until the first settings read answers.
+      await ready.promise;
+
+      if (!enabled || stopped) {
+        return;
+      }
+
+      try {
+        await tabs?.remove(tabId);
+      } catch {
+        // Already gone (the user closed it) — nothing to do.
+      }
+
+      try {
+        await savePairingNotice(storage, 'invalid');
+      } catch {
+        // The next pairing attempt writes its own notice.
       }
     })();
   };
@@ -712,14 +778,19 @@ export const startLocalAgentsHost = (
     }
 
     // Only a committed navigation counts; a tab carrying an older fragment does not pair.
-    const endpoint = parsePairingUrl(changeInfo.url ?? '');
-
-    if (endpoint === null) {
-      return;
-    }
+    const url = changeInfo.url ?? '';
+    const endpoint = parsePairingUrl(url);
 
     // A page can open this URL itself; the CLI opens a fresh tab without an opener.
     if (tab.openerTabId !== undefined) {
+      return;
+    }
+
+    if (endpoint === null) {
+      if (isBrokenPairingUrl(url)) {
+        rejectBrokenPairing(tabId);
+      }
+
       return;
     }
 

@@ -316,7 +316,7 @@ describe.each(['aws', 'aws-ecs'] as const)('%s onboarding validation service', p
     [503, 'byoc_aws_setup_unavailable'],
     [403, 'byoc_aws_role_unavailable'],
   ])('reports a %s customer role assumption as %s', async (status, code) => {
-    const f = await fixture();
+    const f = await fixture(provider);
     f.failCustomerRole(status);
     await expect(f.api.validate(f.binding, f.envelope, roleArn)).rejects.toMatchObject({ code });
   });

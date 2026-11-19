@@ -40,6 +40,7 @@ const GENERATED_LOCAL_SECRET_KEYS = new Set([
   'CALLBACK_TOKEN_SECRET',
   'BYOK_ENCRYPTION_KEY',
   'SESSION_SYNC_SECRET',
+  'CRON_SECRET',
 ]);
 const PUBLIC_SANDBOX_TUNNEL_HOST = /\.trycloudflare\.com(?:\/|$)/i;
 

@@ -1673,6 +1673,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       };
       const route = prepared.get(spec.sessionId);
       if (route) {
+        // A prepared route reuses its runtime without a new policy check: the
+        // route spec is fixed when the session registers and the runtime
+        // contract is pinned per allocation, so a re-prepare offers the
+        // permission map and review target that `ensure` already admitted.
         // M2: a failed route (spent restart budget / dead runtime) must start
         // fresh (spec §7), not short-circuit to `ready`.
         if (deps.runtimes.isUnavailable(route.key)) {

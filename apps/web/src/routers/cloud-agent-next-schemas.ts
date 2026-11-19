@@ -18,6 +18,17 @@ import {
 } from '@kilocode/cloud-agent-sdk/tool-part-detail';
 import { SandboxStatusSessionIdSchema } from '@cloud-agent-shared/sandbox-status';
 import { SESSION_ID_RE } from '@cloud-agent-shared/protocol';
+import {
+  MAX_ENCRYPTED_DATA_LENGTH,
+  MAX_ENCRYPTED_DEK_LENGTH,
+  MAX_ENV_VARS,
+  MAX_RUNTIME_SKILL_COMPANION_FILES,
+  MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL,
+  mcpCommandSchema,
+  mcpEnvOrHeadersRecordSchema,
+  mcpRemoteUrlSchema,
+  mcpServersRecordSchema,
+} from '@cloud-agent-shared/prepare-session-limits';
 import { GetEgressAuditInputSchema } from '@kilocode/worker-utils/egress-audit';
 import { selectableSandboxAllocationInputSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import {
@@ -188,10 +199,10 @@ export const messageIdNextSchema = z
   .string()
   .regex(MESSAGE_ID_PATTERN, 'Invalid message ID format');
 
-// Encrypted envelope shape (re-defined here to avoid importing server-only code).
+// Encrypted envelope shape (the shared limits module carries only the caps).
 const encryptedEnvelopeInputSchema = z.object({
-  encryptedData: z.string(),
-  encryptedDEK: z.string(),
+  encryptedData: z.string().max(MAX_ENCRYPTED_DATA_LENGTH),
+  encryptedDEK: z.string().max(MAX_ENCRYPTED_DEK_LENGTH),
   algorithm: z.literal('rsa-aes-256-gcm'),
   version: z.literal(1),
 });
@@ -205,8 +216,8 @@ const mcpSecretValueSchema = z.union([z.string().max(4096), encryptedEnvelopeInp
 const mcpLocalServerConfigSchema = z
   .object({
     type: z.literal('local'),
-    command: z.string().array().min(1, 'Command array must have at least one element'),
-    environment: z.record(z.string(), mcpSecretValueSchema).optional(),
+    command: mcpCommandSchema,
+    environment: mcpEnvOrHeadersRecordSchema(mcpSecretValueSchema).optional(),
     enabled: z.boolean().optional(),
     timeout: z.number().min(1).max(3_600_000).optional(),
   })
@@ -216,8 +227,8 @@ const mcpLocalServerConfigSchema = z
 const mcpRemoteServerConfigSchema = z
   .object({
     type: z.literal('remote'),
-    url: z.string().url('URL must be a valid URL format'),
-    headers: z.record(z.string(), mcpSecretValueSchema).optional(),
+    url: mcpRemoteUrlSchema,
+    headers: mcpEnvOrHeadersRecordSchema(mcpSecretValueSchema).optional(),
     enabled: z.boolean().optional(),
     timeout: z.number().min(1).max(3_600_000).optional(),
   })
@@ -233,7 +244,19 @@ export const runtimeSkillInputSchema = z.object({
     .regex(/^[a-z0-9][a-z0-9-]*$/, 'Skill name must be a slug'),
   rawMarkdown: z.string().min(1).max(runtimeSkillSchemaMax),
   /** Companion files keyed by relative path, excluding SKILL.md. */
-  files: z.record(z.string().max(200), z.string().max(runtimeSkillSchemaMax)).optional(),
+  files: z
+    .record(z.string().max(200), z.string().max(runtimeSkillSchemaMax))
+    .refine(
+      files => Object.keys(files).length <= MAX_RUNTIME_SKILL_COMPANION_FILES,
+      `A skill may have at most ${MAX_RUNTIME_SKILL_COMPANION_FILES} companion files`
+    )
+    .refine(
+      files =>
+        Object.values(files).reduce((total, content) => total + content.length, 0) <=
+        MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL,
+      `A skill's companion files may total at most ${MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL} characters`
+    )
+    .optional(),
 });
 
 /** Permission schema — mirrors the CLI's AgentConfig.permission shape. */
@@ -414,9 +437,14 @@ const PrepareSessionSharedFields = {
   profileId: z.uuid().optional(),
 
   // Optional configuration
-  envVars: z.record(z.string().max(256), z.string().max(256)).optional(),
+  envVars: z
+    .record(z.string().max(256), z.string().max(256))
+    .refine(envVars => Object.keys(envVars).length <= MAX_ENV_VARS, {
+      message: 'Maximum 50 environment variables allowed',
+    })
+    .optional(),
   setupCommands: setupCommandsSchema.optional(),
-  mcpServers: z.record(z.string(), mcpServerConfigNextSchema).optional(),
+  mcpServers: mcpServersRecordSchema(mcpServerConfigNextSchema).optional(),
   runtimeSkills: z.array(runtimeSkillInputSchema).max(50).optional(),
   runtimeAgents: z.array(runtimeAgentInputSchema).max(20).optional(),
   upstreamBranch: z.string().optional(),

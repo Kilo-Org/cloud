@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   AttachmentsSchema,
+  EncryptedSecretEnvelopeSchema,
   MCPServerConfigSchema,
   MetadataSchema,
   modelIdSchema,
@@ -11,6 +12,10 @@ import {
   RuntimeSkillsSchema,
   SessionProfileBundleSchema,
 } from './schemas.js';
+import {
+  MAX_ENCRYPTED_DATA_LENGTH,
+  MAX_ENCRYPTED_DEK_LENGTH,
+} from '../shared/prepare-session-limits.js';
 import type { MCPServerConfig } from './types.js';
 
 describe('AttachmentsSchema', () => {
@@ -1105,5 +1110,80 @@ describe('RuntimeAgentSchema', () => {
       config: { model: 'anthropic/claude-opus', variant: 'high' },
     };
     expect(RuntimeAgentSchema.parse(agent)).toEqual(agent);
+  });
+});
+
+describe('prepareSession config caps', () => {
+  const entries = (count: number, keyLength = 3) =>
+    Object.fromEntries(
+      Array.from({ length: count }, (_, index) => [`K${index}`.padEnd(keyLength, 'x'), 'value'])
+    );
+
+  it('caps encrypted envelope strings', () => {
+    const envelope = (encryptedData: string, encryptedDEK: string) => ({
+      encryptedData,
+      encryptedDEK,
+      algorithm: 'rsa-aes-256-gcm',
+      version: 1,
+    });
+    expect(
+      EncryptedSecretEnvelopeSchema.safeParse(
+        envelope('x'.repeat(MAX_ENCRYPTED_DATA_LENGTH), 'x'.repeat(MAX_ENCRYPTED_DEK_LENGTH))
+      ).success
+    ).toBe(true);
+    expect(
+      EncryptedSecretEnvelopeSchema.safeParse(
+        envelope('x'.repeat(MAX_ENCRYPTED_DATA_LENGTH + 1), 'x'.repeat(MAX_ENCRYPTED_DEK_LENGTH))
+      ).success
+    ).toBe(false);
+    expect(
+      EncryptedSecretEnvelopeSchema.safeParse(
+        envelope('x'.repeat(MAX_ENCRYPTED_DATA_LENGTH), 'x'.repeat(MAX_ENCRYPTED_DEK_LENGTH + 1))
+      ).success
+    ).toBe(false);
+  });
+
+  it('caps a local server environment at 50 entries and keys at 256 characters', () => {
+    const withEnvironment = (environment: Record<string, string>) => ({
+      type: 'local' as const,
+      command: ['node'],
+      environment,
+    });
+    expect(MCPServerConfigSchema.safeParse(withEnvironment(entries(50))).success).toBe(true);
+    expect(MCPServerConfigSchema.safeParse(withEnvironment(entries(51))).success).toBe(false);
+    expect(MCPServerConfigSchema.safeParse(withEnvironment(entries(1, 256))).success).toBe(true);
+    expect(MCPServerConfigSchema.safeParse(withEnvironment(entries(1, 257))).success).toBe(false);
+  });
+
+  it('caps remote server headers at 50 entries and keys at 256 characters', () => {
+    const withHeaders = (headers: Record<string, string>) => ({
+      type: 'remote' as const,
+      url: 'https://example.com/mcp',
+      headers,
+    });
+    expect(MCPServerConfigSchema.safeParse(withHeaders(entries(50))).success).toBe(true);
+    expect(MCPServerConfigSchema.safeParse(withHeaders(entries(51))).success).toBe(false);
+    expect(MCPServerConfigSchema.safeParse(withHeaders(entries(1, 256))).success).toBe(true);
+    expect(MCPServerConfigSchema.safeParse(withHeaders(entries(1, 257))).success).toBe(false);
+  });
+
+  it('caps local server commands at 50 arguments of 8192 characters', () => {
+    const withCommand = (command: string[]) => ({ type: 'local' as const, command });
+    expect(
+      MCPServerConfigSchema.safeParse(withCommand(Array.from({ length: 50 }, () => 'arg'))).success
+    ).toBe(true);
+    expect(
+      MCPServerConfigSchema.safeParse(withCommand(Array.from({ length: 51 }, () => 'arg'))).success
+    ).toBe(false);
+    expect(MCPServerConfigSchema.safeParse(withCommand(['x'.repeat(8192)])).success).toBe(true);
+    expect(MCPServerConfigSchema.safeParse(withCommand(['x'.repeat(8193)])).success).toBe(false);
+  });
+
+  it('caps a remote server URL at 4096 characters', () => {
+    const urlOf = (length: number) => `https://example.com/${'a'.repeat(length - 20)}`;
+    const withUrl = (url: string) => ({ type: 'remote' as const, url });
+    expect(urlOf(4096)).toHaveLength(4096);
+    expect(MCPServerConfigSchema.safeParse(withUrl(urlOf(4096))).success).toBe(true);
+    expect(MCPServerConfigSchema.safeParse(withUrl(urlOf(4097))).success).toBe(false);
   });
 });

@@ -1231,3 +1231,157 @@ describe('preview target schemas', () => {
     ).toBe(true);
   });
 });
+
+describe('basePrepareSessionNextSchema config caps', () => {
+  const prepareInput = {
+    githubRepo: 'acme/repo',
+    prompt: 'Prepare the session',
+    mode: 'code',
+    model: 'kilo/test-model',
+  };
+
+  const accepts = (overrides: Record<string, unknown>) =>
+    basePrepareSessionNextSchema.safeParse({ ...prepareInput, ...overrides }).success;
+
+  const filesOf = (count: number, content = 'x') =>
+    Object.fromEntries(Array.from({ length: count }, (_, index) => [`file-${index}.md`, content]));
+
+  const skillWithFiles = (files: Record<string, string>) => ({
+    name: 'skill',
+    rawMarkdown: 'body',
+    files,
+  });
+
+  const withLocalServer = (server: Record<string, unknown>) => ({
+    mcpServers: { local: { type: 'local', command: ['node'], ...server } },
+  });
+
+  const withRemoteServer = (server: Record<string, unknown>) => ({
+    mcpServers: { remote: { type: 'remote', url: 'https://example.com/mcp', ...server } },
+  });
+
+  const entries = (count: number, keyLength = 3, value = 'value') =>
+    Object.fromEntries(
+      Array.from({ length: count }, (_, index) => [`K${index}`.padEnd(keyLength, 'x'), value])
+    );
+
+  it('caps companion files at 40 per skill', () => {
+    expect(accepts({ runtimeSkills: [skillWithFiles(filesOf(40))] })).toBe(true);
+    expect(accepts({ runtimeSkills: [skillWithFiles(filesOf(41))] })).toBe(false);
+  });
+
+  it('caps companion file contents at 500,000 characters per skill', () => {
+    const atCap = filesOf(5, 'x'.repeat(100_000));
+    const overCap = { ...atCap, 'extra.md': 'x' };
+    expect(accepts({ runtimeSkills: [skillWithFiles(atCap)] })).toBe(true);
+    expect(accepts({ runtimeSkills: [skillWithFiles(overCap)] })).toBe(false);
+  });
+
+  it('caps environment variables at 50 entries', () => {
+    expect(accepts({ envVars: entries(50) })).toBe(true);
+    expect(accepts({ envVars: entries(51) })).toBe(false);
+  });
+
+  it('caps MCP servers at 20 entries and server names at 100 characters', () => {
+    const servers = (count: number) =>
+      Object.fromEntries(
+        Array.from({ length: count }, (_, index) => [
+          `server-${index}`,
+          { type: 'local', command: ['node'] },
+        ])
+      );
+    expect(accepts({ mcpServers: servers(20) })).toBe(true);
+    expect(accepts({ mcpServers: servers(21) })).toBe(false);
+
+    expect(
+      accepts({ mcpServers: { ['n'.repeat(100)]: { type: 'local', command: ['node'] } } })
+    ).toBe(true);
+    expect(
+      accepts({ mcpServers: { ['n'.repeat(101)]: { type: 'local', command: ['node'] } } })
+    ).toBe(false);
+  });
+
+  it('caps a local server environment at 50 entries and keys at 256 characters', () => {
+    expect(accepts(withLocalServer({ environment: entries(50) }))).toBe(true);
+    expect(accepts(withLocalServer({ environment: entries(51) }))).toBe(false);
+    expect(accepts(withLocalServer({ environment: entries(1, 256) }))).toBe(true);
+    expect(accepts(withLocalServer({ environment: entries(1, 257) }))).toBe(false);
+  });
+
+  it('caps remote server headers at 50 entries and keys at 256 characters', () => {
+    expect(accepts(withRemoteServer({ headers: entries(50) }))).toBe(true);
+    expect(accepts(withRemoteServer({ headers: entries(51) }))).toBe(false);
+    expect(accepts(withRemoteServer({ headers: entries(1, 256) }))).toBe(true);
+    expect(accepts(withRemoteServer({ headers: entries(1, 257) }))).toBe(false);
+  });
+
+  it('caps local server commands at 50 arguments of 8192 characters', () => {
+    expect(accepts(withLocalServer({ command: Array.from({ length: 50 }, () => 'arg') }))).toBe(
+      true
+    );
+    expect(accepts(withLocalServer({ command: Array.from({ length: 51 }, () => 'arg') }))).toBe(
+      false
+    );
+    expect(accepts(withLocalServer({ command: ['x'.repeat(8192)] }))).toBe(true);
+    expect(accepts(withLocalServer({ command: ['x'.repeat(8193)] }))).toBe(false);
+  });
+
+  it('caps a remote server URL at 4096 characters', () => {
+    const urlOf = (length: number) => `https://example.com/${'a'.repeat(length - 20)}`;
+    expect(urlOf(4096)).toHaveLength(4096);
+    expect(accepts(withRemoteServer({ url: urlOf(4096) }))).toBe(true);
+    expect(accepts(withRemoteServer({ url: urlOf(4097) }))).toBe(false);
+  });
+
+  it('caps encrypted envelope strings', () => {
+    const envelope = (dataLength: number, dekLength: number) => ({
+      encryptedData: 'x'.repeat(dataLength),
+      encryptedDEK: 'x'.repeat(dekLength),
+      algorithm: 'rsa-aes-256-gcm',
+      version: 1,
+    });
+    expect(accepts(withRemoteServer({ headers: { Authorization: envelope(32_816, 684) } }))).toBe(
+      true
+    );
+    expect(accepts(withRemoteServer({ headers: { Authorization: envelope(32_817, 684) } }))).toBe(
+      false
+    );
+    expect(accepts(withRemoteServer({ headers: { Authorization: envelope(32_816, 685) } }))).toBe(
+      false
+    );
+  });
+
+  it('accepts a realistic config that stays within every cap', () => {
+    const skill = (name: string) => ({
+      name,
+      rawMarkdown: `---\nname: ${name}\n---\nBody`,
+      files: filesOf(3, 'body'),
+    });
+    const input = {
+      ...prepareInput,
+      runtimeSkills: [skill('first-skill'), skill('second-skill')],
+      envVars: entries(10),
+      mcpServers: {
+        local: {
+          type: 'local',
+          command: ['node', 'server.js'],
+          environment: { LOCALE: 'en-US' },
+        },
+        remote: {
+          type: 'remote',
+          url: 'https://example.com/mcp',
+          headers: {
+            Authorization: {
+              encryptedData: 'x'.repeat(32_816),
+              encryptedDEK: 'x'.repeat(684),
+              algorithm: 'rsa-aes-256-gcm',
+              version: 1,
+            },
+            'X-Region': 'eu-west-1',
+          },
+        },
+      },
+    };
+    expect(basePrepareSessionNextSchema.safeParse(input).success).toBe(true);
+  });
+});

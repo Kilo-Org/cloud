@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { AWS_TEST_CONFIGURATION } from '../../test/fixtures/aws-provider.js';
-import { awsRecoveryStep, transitionAwsOperation, AWS_LAUNCH_RECOVERY_MS } from './aws-provider.js';
-import type { AwsOperation } from './aws-operation.js';
+import {
+  awsRecoveryStep,
+  transitionAwsOperation,
+  AWS_LAUNCH_RECOVERY_MS,
+} from './aws-compute-lifecycle.js';
+import type { AwsOperation as MicrovmOperation } from './aws-operation.js';
+import type { AwsComputeOperation } from './aws-compute-lifecycle.js';
+type AwsOperation = AwsComputeOperation<
+  MicrovmOperation['config'],
+  MicrovmOperation['ref'],
+  NonNullable<MicrovmOperation['request']>
+>;
 
 const now = 10_000;
 const created: AwsOperation = {
@@ -28,13 +38,21 @@ const prepared: AwsOperation = {
     runHookPayload: '{}',
   },
 };
-const apply = (operation: AwsOperation, event: Parameters<typeof transitionAwsOperation>[1]) =>
-  transitionAwsOperation(operation, event, now);
+const apply = (
+  operation: AwsOperation,
+  event: Parameters<
+    typeof transitionAwsOperation<
+      MicrovmOperation['config'],
+      MicrovmOperation['ref'],
+      NonNullable<MicrovmOperation['request']>
+    >
+  >[1]
+) => transitionAwsOperation(operation, event, now);
 
 describe('pure AWS operation decisions', () => {
   it('checkpoints preparation once and never replaces an issued request', () => {
     expect(apply(created, { type: 'prepared', operation: prepared })).toEqual(prepared);
-    const running: AwsOperation = { ...prepared, phase: 'running', microvmId: 'microvm-original' };
+    const running: AwsOperation = { ...prepared, phase: 'running', physicalId: 'microvm-original' };
     expect(apply(running, { type: 'prepared', operation: prepared })).toBe(running);
     expect(created.phase).toBe('created');
   });
@@ -87,13 +105,13 @@ describe('pure AWS operation decisions', () => {
 
   it('retains a late physical identity behind Stop, but refuses substitution or revival', () => {
     const stopping = apply(prepared, { type: 'stop' });
-    const identified = apply(stopping, { type: 'identified', microvmId: 'microvm-one' });
-    expect(identified).toMatchObject({ phase: 'stopping', microvmId: 'microvm-one' });
-    expect(() => apply(identified, { type: 'identified', microvmId: 'microvm-two' })).toThrow(
+    const identified = apply(stopping, { type: 'identified', physicalId: 'microvm-one' });
+    expect(identified).toMatchObject({ phase: 'stopping', physicalId: 'microvm-one' });
+    expect(() => apply(identified, { type: 'identified', physicalId: 'microvm-two' })).toThrow(
       'identity changed'
     );
     const terminal = apply(identified, { type: 'terminated' });
-    expect(apply(terminal, { type: 'identified', microvmId: 'microvm-two' })).toBe(terminal);
+    expect(apply(terminal, { type: 'identified', physicalId: 'microvm-two' })).toBe(terminal);
   });
 
   it('keeps phase transitions fenced and drops the request only after retirement', () => {
@@ -115,7 +133,7 @@ describe('pure AWS operation decisions', () => {
     expect(awsRecoveryStep(prepared, now + AWS_LAUNCH_RECOVERY_MS + 1)).toBe('unsubmitted');
     expect(
       awsRecoveryStep(
-        { ...uncertain, microvmId: 'microvm-known' },
+        { ...uncertain, physicalId: 'microvm-known' },
         now + AWS_LAUNCH_RECOVERY_MS + 1
       )
     ).toBe('identified');

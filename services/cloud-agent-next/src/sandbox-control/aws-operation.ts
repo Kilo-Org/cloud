@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { microvmRunRequestSchema } from '../agent-sandbox/aws/microvm-client.js';
+import type { AwsComputeStorage } from './aws-compute-lifecycle.js';
 import { awsByocConfigurationSchema } from '@kilocode/worker-utils/aws-byoc';
 
 const awsProviderRefSchema = z
@@ -34,8 +35,8 @@ export const awsOperationSchema = z
     phase: z.enum(['created', 'launching', 'running', 'stopping', 'terminated']),
     request: microvmRunRequestSchema.optional(),
     requestAt: z.number().int().nonnegative().optional(),
-    // Missing on legacy records, whose submission outcome must remain uncertain.
     submission: z.enum(['prepared', 'pending', 'uncertain']).optional(),
+    startSource: z.literal('repository').optional(),
     microvmId: z
       .string()
       .regex(/^microvm-[a-z0-9-]+$/)
@@ -46,33 +47,5 @@ export const awsOperationSchema = z
 
 export type AwsOperation = z.infer<typeof awsOperationSchema>;
 
-/** The owning Sandbox DO supplies its existing durable KV storage. */
-export type AwsOperationStorage = {
-  get(id: string): Promise<unknown>;
-  update(id: string, transition: (value: unknown) => AwsOperation): Promise<AwsOperation>;
-  list(): Promise<Map<string, unknown>>;
-  delete(id: string): Promise<void>;
-};
-
-/** Bound retained history. Unconfirmed operations are never removed to make space. */
-export async function reserveAwsOperation(
-  storage: AwsOperationStorage,
-  operation: AwsOperation
-): Promise<AwsOperation> {
-  const entries = await storage.list();
-  if (entries.has(operation.ref.intentId))
-    return awsOperationSchema.parse(entries.get(operation.ref.intentId));
-  const completed = [...entries].filter(
-    ([, value]) => awsOperationSchema.safeParse(value).data?.phase === 'terminated'
-  );
-  for (const [id] of completed) {
-    if (entries.size < 32) break;
-    await storage.delete(id);
-    entries.delete(id);
-  }
-  if (entries.size >= 32) throw new Error('AWS allocation cleanup requires attention');
-  return storage.update(operation.ref.intentId, current => {
-    if (current !== undefined) return awsOperationSchema.parse(current);
-    return operation;
-  });
-}
+/** The existing persisted shape and storage prefix remain unchanged. */
+export type AwsOperationStorage = AwsComputeStorage<AwsOperation>;

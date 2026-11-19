@@ -10,6 +10,7 @@ import { createBrowserRuntime } from './browser-runtime';
 import type {
   BrowserDownloadItem,
   BrowserDownloadsApi,
+  BrowserRuntime,
   BrowserToolRunOutcome,
 } from './browser-runtime';
 import {
@@ -5863,5 +5864,190 @@ describe('the download hold on a real call', () => {
     expect(suggested).toStrictEqual([71, 72]);
     expect(String(approved.result.ok ? approved.result.value : '')).toContain('second.txt');
     expect(downloads.cancelled).toStrictEqual([71, 72, 72]);
+  });
+});
+
+describe('a download the dialog answer starts', () => {
+  /** A hold over the fake downloads, with the reports it queued in order. */
+  const holdOver = (downloads: ReturnType<typeof createFakeDownloads>) => {
+    const reports: DownloadHoldReport[] = [];
+    const hold = createDownloadHold({
+      cancel: downloads.api.cancel,
+      erase: downloads.api.erase,
+      onReport: report => reports.push(report),
+      search: async itemId => downloads.api.search({ id: itemId }),
+    });
+
+    return { hold, reports };
+  };
+
+  const dialogOpened = (cdp: FakeCdp): void => {
+    cdp.emit('Page.javascriptDialogOpening', { message: 'Leave this page?', type: 'confirm' });
+  };
+
+  /** The tab's session records a dialog only once it exists, and a read is what creates it. */
+  const warmSession = (runtime: BrowserRuntime) =>
+    runtime.runTool({
+      agent: { authorized: [readGrant] },
+      arguments: {},
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_snapshot',
+    });
+
+  const answerDialog = (runtime: BrowserRuntime, sensitive: readonly string[] = []) =>
+    runtime.runTool({
+      agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+      arguments: { accept: true },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_handle_dialog',
+    });
+
+  it('refuses the file it starts, and names the answer as the step to repeat', async () => {
+    const downloads = createFakeDownloads();
+    const { hold } = holdOver(downloads);
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+    const url = `${MAIN_ORIGIN}/report.txt`;
+
+    // The click that opened the dialog answered already; its handler resumes inside the answer.
+    cdp.setHandlers({
+      'Page.handleJavaScriptDialog': () => {
+        hold.handle({ id: 81, referrer: `${MAIN_ORIGIN}/dashboard`, url }, () => {});
+        return {};
+      },
+    });
+    // The tab records a dialog only once its session exists, and the first call is what creates it.
+    await warmSession(runtime);
+    dialogOpened(cdp);
+
+    const guarded = await answerDialog(runtime);
+
+    expect(guarded.kind).toBe('needs_permission');
+    expect(guarded.step).toStrictEqual({
+      argumentsHash: hashBrowserToolArguments({ accept: true }),
+      tool: 'browser_handle_dialog',
+    });
+    expect(downloads.cancelled).toStrictEqual([81]);
+    expect(expectStepToken(guarded)).toEqual(expect.any(String));
+  });
+
+  it('fails the attachment response when the response interceptor is the guard', async () => {
+    const { cdp, runtime } = await createHarness({ downloadsGranted: false });
+
+    cdp.setHandlers({
+      'Page.handleJavaScriptDialog': () => {
+        cdp.emit('Fetch.requestPaused', {
+          requestId: 'dialog-1',
+          responseHeaders: [
+            { name: 'Content-Disposition', value: 'attachment; filename="report.txt"' },
+            { name: 'Content-Type', value: 'text/plain' },
+          ],
+          responseStatusCode: 200,
+        });
+
+        return {};
+      },
+    });
+    // The tab records a dialog only once its session exists, and the first call is what creates it.
+    await warmSession(runtime);
+    dialogOpened(cdp);
+
+    const outcome = await answerDialog(runtime);
+    const answers = cdp
+      .sent()
+      .filter(
+        command =>
+          command.method === 'Fetch.failRequest' || command.method === 'Fetch.continueResponse'
+      )
+      .map(command => [command.method, command.params?.['requestId']]);
+
+    expect(answers).toStrictEqual([['Fetch.failRequest', 'dialog-1']]);
+    expect(outcome).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+  });
+
+  it('keeps exactly its file when the repeat carries the token, and refuses the next one', async () => {
+    const downloads = createFakeDownloads();
+    const { hold } = holdOver(downloads);
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+    const dashboard = `${MAIN_ORIGIN}/dashboard`;
+    const first = { id: 81, url: `${MAIN_ORIGIN}/report.txt` };
+    const second = { id: 82, url: `${MAIN_ORIGIN}/second.txt` };
+    const suggested: number[] = [];
+
+    const answerStarts = (file: { readonly id: number; readonly url: string }) => {
+      hold.handle({ ...file, referrer: dashboard }, () => {
+        suggested.push(file.id);
+      });
+    };
+
+    cdp.setHandlers({
+      'Page.handleJavaScriptDialog': () => {
+        answerStarts(first);
+        return {};
+      },
+    });
+
+    // The tab records a dialog only once its session exists, and the first call is what creates it.
+    await warmSession(runtime);
+    dialogOpened(cdp);
+
+    const guarded = await answerDialog(runtime);
+
+    expect(guarded.kind).toBe('needs_permission');
+
+    const token = expectStepToken(guarded);
+
+    // A second click reopens the dialog, and the answer that carries the token is the approved one.
+    cdp.setHandlers({
+      'Page.handleJavaScriptDialog': () => {
+        answerStarts(first);
+        answerStarts(second);
+        return {};
+      },
+    });
+    dialogOpened(cdp);
+
+    const approved = await answerDialog(runtime, [token]);
+
+    expect(approved.kind).toBe('result');
+    // The approval bought one file: the other the same answer started is refused and reported.
+    expect(hold.needOf('session-1')?.kind).toBe('spent');
+    expect(downloads.cancelled).toStrictEqual([81, 82]);
+    expect(String(approved.result.ok ? approved.result.value : '')).toContain('second.txt');
+    expect(suggested).toStrictEqual([81, 81, 82]);
+  });
+
+  it('answers a dialog that starts no download without waiting for the hold’s timeout', async () => {
+    const downloads = createFakeDownloads();
+    const { hold } = holdOver(downloads);
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+
+    cdp.setHandlers({ 'Page.handleJavaScriptDialog': () => ({}) });
+
+    // The tab records a dialog only once its session exists, and the first call is what creates it.
+    await warmSession(runtime);
+    dialogOpened(cdp);
+
+    const startedAt = performance.now();
+    const answered = await answerDialog(runtime);
+
+    expect(answered.kind).toBe('result');
+    // Nothing was refused, and the call did not sit on the 2 s a download gets: only the start grace passed.
+    expect(downloads.cancelled).toStrictEqual([]);
+    expect(performance.now() - startedAt).toBeLessThan(1500);
   });
 });

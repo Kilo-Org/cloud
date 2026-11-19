@@ -109,6 +109,10 @@ const TWO_SENSE_COPY = new Map([
     'the recovery action beside a Code Reviewer alert, versus the support contact beside the AI Guardrails availability notice',
   ],
   [
+    'terms of service',
+    "the document's own title on the Legal screen and the PR-discussion alert, versus the form the sign-in consent sentence's verb governs in an inflected language",
+  ],
+  [
     'receipt',
     'the confirmation a moderation report produces, versus the proof of payment for a credit purchase',
   ],

@@ -25,14 +25,7 @@ type ReadyEnkryptGuardrailConfig = Extract<EnkryptGuardrailConfig, { status: 're
 
 export const ENKRYPT_DETECT_URL = 'https://api.enkryptai.com/guardrails/detect';
 
-/**
- * Bounds a scan. The input guardrail starts one deadline for all Enkrypt calls of a request, which
- * run one at a time: those of its blocking detectors first, then those of its log-only detectors.
- * The gateway awaits the blocking scans just before the upstream request, so this is the most
- * latency an enabled organization's request can gain. The log-only scans, which the request does
- * not wait for, get what the blocking scans leave of it.
- */
-export const ENKRYPT_GUARDRAIL_TIMEOUT_MS = 60_000;
+export { ENKRYPT_GUARDRAIL_TIMEOUT_MS } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 
 const MAX_ERROR_BODY_BYTES = 64 * 1024;
 const ERROR_BODY_TIMEOUT_MS = 1_000;
@@ -440,15 +433,15 @@ export async function scanRequest(
   }
 
   if (config.status === 'invalid') {
-    return failedVerdict([], scope, { error: 'invalid_config', latencyMs: 0 });
+    return failedVerdict([], noTextSent(scope), { error: 'invalid_config', latencyMs: 0 });
   }
 
   if (deps.signal.aborted) {
-    return failedVerdict([], scope, { error: 'client_aborted', latencyMs: 0 });
+    return failedVerdict([], noTextSent(scope), { error: 'client_aborted', latencyMs: 0 });
   }
 
   if (text.length > ENKRYPT_MAX_SCAN_CHARACTERS) {
-    return failedVerdict([], scope, {
+    return failedVerdict([], noTextSent(scope), {
       error: 'request_too_large',
       latencyMs: 0,
       closedVerdict: { action: 'block', message: REQUEST_TOO_LARGE_MESSAGE },
@@ -457,7 +450,7 @@ export async function scanRequest(
 
   const apiKey = deps.apiKey;
   if (!apiKey) {
-    return failedVerdict([], scope, { error: 'missing_api_key', latencyMs: 0 });
+    return failedVerdict([], noTextSent(scope), { error: 'missing_api_key', latencyMs: 0 });
   }
 
   const request = {

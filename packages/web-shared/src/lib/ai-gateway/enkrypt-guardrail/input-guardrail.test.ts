@@ -188,6 +188,14 @@ function allowWrites(keys: string[], ttlSeconds = ENKRYPT_VERDICT_CACHE_TTL_SECO
   return keys.map(key => [key, 'allow', { ex: ttlSeconds, nx: true }]);
 }
 
+const noCallOutcomes = { allowed: 0, flagged: 0, blocked: 0, failed: 0, not_sent: 0 };
+
+/** The call breakdown of a part whose one call allowed, and whose verdict is cached. */
+const allowedCall = {
+  calls_cached: 1,
+  call_outcomes: { ...noCallOutcomes, allowed: 1 },
+} satisfies Partial<EnkryptScanReport>;
+
 const scanReport: EnkryptScanReport = {
   scan: 'blocking',
   part: 'conversation',
@@ -707,6 +715,7 @@ describe('startEnkryptInputGuardrail', () => {
           ...scanReport,
           chunks: 1,
           failed_calls_cached: 0,
+          ...allowedCall,
           calls_skipped: 0,
           verdict_cache_write: 'written',
         },
@@ -717,6 +726,8 @@ describe('startEnkryptInputGuardrail', () => {
           error: 'timeout',
           chunks: 1,
           failed_calls_cached: 1,
+          calls_cached: 0,
+          call_outcomes: { ...noCallOutcomes, failed: 1 },
           calls_skipped: 0,
           verdict_cache_write: 'written',
         },
@@ -744,6 +755,7 @@ describe('startEnkryptInputGuardrail', () => {
         ...scanReport,
         chunks: 1,
         failed_calls_cached: 0,
+        ...allowedCall,
         calls_skipped: 0,
         verdict_cache_write: 'skipped',
       },
@@ -767,6 +779,7 @@ describe('startEnkryptInputGuardrail', () => {
         ...scanReport,
         chunks: 1,
         failed_calls_cached: 0,
+        ...allowedCall,
         calls_skipped: 0,
         verdict_cache_write: 'failed',
       },
@@ -899,6 +912,8 @@ describe('startEnkryptInputGuardrail', () => {
             attempts: 0,
             credits_cost: null,
             latency_ms: 0,
+            calls_cached: 0,
+            call_outcomes: noCallOutcomes,
             calls_skipped: 1,
           }),
           verdict_cache_write: 'skipped',
@@ -909,6 +924,8 @@ describe('startEnkryptInputGuardrail', () => {
           detectors_fired: ['injection_attack'],
           chunks: 1,
           failed_calls_cached: 0,
+          calls_cached: 1,
+          call_outcomes: { ...noCallOutcomes, blocked: 1 },
           calls_skipped: 0,
           verdict_cache_write: 'written',
         },
@@ -916,6 +933,7 @@ describe('startEnkryptInputGuardrail', () => {
           ...scanReport,
           chunks: 1,
           failed_calls_cached: 0,
+          ...allowedCall,
           calls_skipped: 0,
           verdict_cache_write: 'written',
         },

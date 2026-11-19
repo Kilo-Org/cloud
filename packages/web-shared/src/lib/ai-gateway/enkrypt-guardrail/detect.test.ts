@@ -650,7 +650,7 @@ describe('scanRequest', () => {
           part,
           decision: 'error_fail_closed',
           error: 'request_too_large',
-          scanned_characters: ENKRYPT_MAX_SCAN_CHARACTERS + 1,
+          scanned_characters: 0,
         });
         expect(dependencies.fetch).not.toHaveBeenCalled();
       }

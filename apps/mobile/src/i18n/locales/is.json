@@ -820,7 +820,19 @@
         "fileComment": "Athugasemd við skrá",
         "outdatedOnPathLines": "Úrelt við {{path}} {{lines}}",
         "outdatedOnLines": "Úrelt við {{lines}}",
-        "outdatedOnPath": "Úrelt við {{path}}"
+        "outdatedOnPath": "Úrelt við {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Vinstri hlið",
+        "sideRight": "Hægri hlið",
+        "outdatedOnLinesSide": "Úrelt við {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Úrelt við {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Úrelt ({{side}})",
+        "outdatedOnPathSide": "Úrelt við {{path}} ({{side}})"
       },
       "deletedUser": "eyddur notandi",
       "replyForbiddenTerm": "Þú hefur ekki heimild til að svara við {{term}}.",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Þessi reikningur er ekki með neinar stofnanir ennþá. Hægt er að yfirfara sameiningarbeiðnir á Bitbucket um leið og þú býrð til eða þiggur boð um aðild að stofnun.",
       "gitlabReconnectAdminOnlyDescription": "Biddu eiganda, stjórnanda eða innheimtustjóra samtakanna um að tengja það aftur.",
       "bitbucketNotConnectedTitle": "Bitbucket er ekki tengt",
-      "bitbucketAdminOnlyDescription": "Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta tengt það.",
+      "adminOnlyConnectDescription": "Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta tengt það.",
       "contextLine": "Fyrir {{organization}}",
       "contextLinePersonal": "Fyrir persónulegan reikning"
     },
@@ -3026,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Ekki tókst að sækja lotur.",
-    "couldNotLoadActiveSessions": "Ekki tókst að sækja virkar lotur.",
     "agentSessions": "Í gangi núna",
     "newCodingTask": "Nýtt forritunarverkefni",
     "newTaskFromPicture": "Nýtt verkefni úr mynd",
@@ -3405,7 +3416,8 @@
         "accounting_adjustment": "Bókhaldsleiðrétting",
         "credits_expired": "Inneign rann út"
       },
-      "truncated": "Hægt er að skoða eldri inneignarfærslur."
+      "truncated": "Hægt er að skoða eldri inneignarfærslur.",
+      "retentionLimit": "Nýjustu inneignarfærslurnar eru sýndar."
     },
     "inviteMember": {
       "emailError": "Sláðu inn gilt tölvupóstfang.",
@@ -3415,6 +3427,7 @@
       "sendInvite": "Senda boð",
       "title": "Bjóða meðlim að taka þátt",
       "alreadyInvited": "Tölvupóstfangið er þegar boðið eða meðlimurinn er þegar í félaginu.",
+      "organizationUnavailable": "Þetta fyrirtæki er ekki lengur í boði.",
       "sendError": "Ekki tókst að senda boðið.",
       "pendingInvitation": "Þetta tölvupóstfang er þegar með boð í bið.",
       "alreadyMember": "Þessi einstaklingur er þegar meðlimur í þessu fyrirtæki.",
@@ -3436,7 +3449,8 @@
         "void": "Ógildur",
         "uncollectible": "Óinnheimtanlegur"
       },
-      "truncated": "Hægt er að skoða eldri reikninga."
+      "truncated": "Hægt er að skoða eldri reikninga.",
+      "retentionLimit": "Nýjustu reikningarnir eru sýndir."
     },
     "lowBalanceAlert": {
       "enableA11y": "Virkja viðvörun um lága inneign",
@@ -3670,8 +3684,7 @@
     "imagesSectionEmpty": "Engir traustir myndavefþjónar",
     "revoke": "Afturkalla traust á {{host}}",
     "revokeMessage": "Tenglar á þennan vefþjón munu biðja um staðfestingu aftur.",
-    "revokeImageMessage": "Myndir frá þessum vefþjóni munu biðja um staðfestingu aftur.",
-    "backToPreferences": "Til baka í stillingar"
+    "revokeImageMessage": "Myndir frá þessum vefþjóni munu biðja um staðfestingu aftur."
   },
   "glanceable": {
     "waiting": "Uppfæri fulltrúa",
@@ -3918,6 +3931,8 @@
       "downloading": "Hleður niður: {{written}} af {{total}}",
       "downloadingUnknown": "Hleður niður: {{written}}",
       "paused": "Í hléi: {{written}} af {{total}}",
+      "retrying": "Reynt er aftur: {{written}} af {{total}}",
+      "retryingUnknown": "Reynt er aftur: {{written}}",
       "verifying": "Athuga niðurhalaða skrána…",
       "downloaded": "Niðurhalað · {{size}}",
       "url": "Beinn niðurhalstengill",
@@ -4008,7 +4023,9 @@
         "androidModelUnavailable": "Þetta tæki styður ekki Gemini Nano, eða AICore-kerfisforritið er enn í uppsetningu. Reyndu aftur síðar.",
         "aicoreUpdateRequired": "Uppfærðu AICore-forritið og kerfishugbúnaðinn til að nota þetta líkan.",
         "downloadable": "Það þarf að sækja þetta líkan einu sinni áður en hægt er að nota það.",
-        "downloading": "Verið er að sækja líkanið. Það verður tilbúið þegar niðurhalinu lýkur."
+        "downloading": "Verið er að sækja líkanið. Það verður tilbúið þegar niðurhalinu lýkur.",
+        "batteryQuota": "Líkanið í tækinu hefur notað rafhlöðukvótann sinn í bili. Reyndu aftur síðar.",
+        "checkFailed": "Forritið gat ekki athugað þetta líkan. Reyndu aftur."
       },
       "unavailable": "Líkanið í tækinu er ekki í boði eins og er. Athugaðu stöðu þess í $t(modelChat.backends.title).",
       "busy": "Líkanið í tækinu er upptekið við annað svar. Reyndu aftur þegar því lýkur.",
@@ -4369,7 +4386,8 @@
       "purchaseFallback": "Kaup á inneign",
       "receipt": "Kvittun",
       "receiptA11y": "Opna kvittun fyrir {{description}}, {{amount}}, frá {{date}}",
-      "receiptUnavailable": "Engin kvittun er tiltæk fyrir þessi kaup."
+      "receiptUnavailable": "Engin kvittun er tiltæk fyrir þessi kaup.",
+      "retentionLimit": "Nýjasti inneignarferillinn er sýndur."
     },
     "title": "Kaupa inneign",
     "description": "Inneign er einstakt kaup sem bætist við Kilo-stöðuna þína til að keyra AI-forritunarlotur í Kilo App. Verslunin rukkar reikninginn þinn og inneign bætist við eftir að verslunin staðfestir greiðsluna.",
@@ -4616,6 +4634,9 @@
     "couldNotLoad": "Ekki tókst að hlaða inn samþættingum",
     "permissionDenied": "Þú hefur ekki heimild til að stjórna þessum samþættingum.",
     "managedByOwner": "Biddu eiganda stofnunarinnar um að breyta tengingu sem þú getur ekki breytt.",
+    "managedByOwnerOrAdmin": "Biddu eiganda eða stjórnanda stofnunarinnar um að breyta tengingu sem þú getur ekki breytt.",
+    "managedByOwnerOrBilling": "Biddu eiganda eða innheimtustjóra stofnunarinnar um að breyta tengingu sem þú getur ekki breytt.",
+    "managedByOwnerAdminOrBilling": "Biddu eiganda, stjórnanda eða innheimtustjóra stofnunarinnar um að breyta tengingu sem þú getur ekki breytt.",
     "connectFailed": "Ekki tókst að opna tengingarsíðuna"
   },
   "invoices": {

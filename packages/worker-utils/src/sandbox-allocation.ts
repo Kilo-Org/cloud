@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { providerSupports } from './sandbox-provider-capabilities';
 
 export const sandboxAllocationSchema = z.enum([
   'isolated-standard',
@@ -209,11 +210,12 @@ export function getSandboxAllocationProvider(allocation: SandboxAllocation) {
 /**
  * A multi-repository environment keeps every repository in one workspace, so it
  * needs a sandbox that one session owns. The retired shared Cloudflare sandbox
- * and Vercel cannot give it one.
+ * cannot give it one; the provider capability table decides the rest.
  */
 export function allocationSupportsMultiRepository(allocation: SandboxAllocation): boolean {
   return (
-    allocation !== 'cloudflare-shared' && getSandboxAllocationProvider(allocation) !== 'vercel'
+    allocation !== 'cloudflare-shared' &&
+    providerSupports(getSandboxAllocationProvider(allocation), 'multiRepository')
   );
 }
 

@@ -820,7 +820,19 @@
         "fileComment": "Maoni kuhusu faili",
         "outdatedOnPathLines": "Yaliyopitwa na wakati kwenye {{path}} {{lines}}",
         "outdatedOnLines": "Yaliyopitwa na wakati kwenye {{lines}}",
-        "outdatedOnPath": "Yaliyopitwa na wakati kwenye {{path}}"
+        "outdatedOnPath": "Yaliyopitwa na wakati kwenye {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Upande wa kushoto",
+        "sideRight": "Upande wa kulia",
+        "outdatedOnLinesSide": "Yaliyopitwa na wakati kwenye {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Yaliyopitwa na wakati kwenye {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Yaliyopitwa na wakati ({{side}})",
+        "outdatedOnPathSide": "Yaliyopitwa na wakati kwenye {{path}} ({{side}})"
       },
       "deletedUser": "mtumiaji aliyefutwa",
       "replyForbiddenTerm": "Huna ruhusa ya kujibu {{term}}.",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Akaunti hii haina shirika lolote kwa sasa. Unaweza kukagua maombi ya kuunganisha kwenye Bitbucket mara tu unapounda au kujiunga na shirika.",
       "gitlabReconnectAdminOnlyDescription": "Omba mmiliki wa shirika, msimamizi, au msimamizi wa bili aiunganishe upya.",
       "bitbucketNotConnectedTitle": "Bitbucket haijaunganishwa",
-      "bitbucketAdminOnlyDescription": "Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuiunganisha.",
+      "adminOnlyConnectDescription": "Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuiunganisha.",
       "contextLine": "Kwa {{organization}}",
       "contextLinePersonal": "Kwa akaunti yako binafsi"
     },
@@ -3026,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Imeshindikana kupakia vikao.",
-    "couldNotLoadActiveSessions": "Imeshindikana kupakia vikao vinavyoendelea.",
     "agentSessions": "Vinavyoendelea sasa",
     "newCodingTask": "Kazi mpya ya kuandika msimbo",
     "newTaskFromPicture": "Kazi mpya kutoka kwenye picha",
@@ -3405,7 +3416,8 @@
         "accounting_adjustment": "Marekebisho ya uhasibu",
         "credits_expired": "Muda wa salio umeisha"
       },
-      "truncated": "Shughuli za awali za salio zinapatikana."
+      "truncated": "Shughuli za awali za salio zinapatikana.",
+      "retentionLimit": "Inaonyesha shughuli za salio za hivi karibuni."
     },
     "inviteMember": {
       "emailError": "Weka anwani halali ya barua pepe.",
@@ -3415,6 +3427,7 @@
       "sendInvite": "Tuma mwaliko",
       "title": "Alika mwanachama",
       "alreadyInvited": "Wamekwishaalikwa au ni wanachama tayari.",
+      "organizationUnavailable": "Shirika hili halipatikani tena.",
       "sendError": "Imeshindikana kutuma mwaliko.",
       "pendingInvitation": "Barua pepe hii tayari ina mwaliko unaosubiri.",
       "alreadyMember": "Mtu huyu tayari ni mwanachama wa shirika hili.",
@@ -3436,7 +3449,8 @@
         "void": "Imebatilishwa",
         "uncollectible": "Haiwezi kulipika"
       },
-      "truncated": "Ankara za zamani zinapatikana."
+      "truncated": "Ankara za zamani zinapatikana.",
+      "retentionLimit": "Inaonyesha ankara za hivi karibuni."
     },
     "lowBalanceAlert": {
       "enableA11y": "Washa arifa ya salio la chini",
@@ -3670,8 +3684,7 @@
     "imagesSectionEmpty": "Hakuna tovuti za picha zinazoaminika",
     "revoke": "Ondoa uaminifu kwa {{host}}",
     "revokeMessage": "Viungo vya tovuti hii vitaomba uthibitisho tena.",
-    "revokeImageMessage": "Picha kutoka tovuti hii zitaomba uthibitisho tena.",
-    "backToPreferences": "Rudi kwenye mapendeleo"
+    "revokeImageMessage": "Picha kutoka tovuti hii zitaomba uthibitisho tena."
   },
   "glanceable": {
     "waiting": "Inasasisha mawakala",
@@ -3918,6 +3931,8 @@
       "downloading": "Inapakuliwa: {{written}} kati ya {{total}}",
       "downloadingUnknown": "Inapakuliwa: {{written}}",
       "paused": "Imesimamishwa: {{written}} kati ya {{total}}",
+      "retrying": "Inajaribu tena: {{written}} kati ya {{total}}",
+      "retryingUnknown": "Inajaribu tena: {{written}}",
       "verifying": "Inakagua faili iliyopakuliwa…",
       "downloaded": "Imepakuliwa · {{size}}",
       "url": "Kiungo cha kupakua moja kwa moja",
@@ -4008,7 +4023,9 @@
         "androidModelUnavailable": "Kifaa hiki hakitumii Gemini Nano, au programu ya mfumo ya AICore bado inaandaliwa. Jaribu tena baadaye.",
         "aicoreUpdateRequired": "Sasisha programu ya AICore na programu ya mfumo wako ili utumie modeli hii.",
         "downloadable": "Modeli hii inahitaji kupakuliwa mara moja kabla ya kuitumia.",
-        "downloading": "Modeli inapakuliwa. Itakuwa tayari upakuaji utakapokamilika."
+        "downloading": "Modeli inapakuliwa. Itakuwa tayari upakuaji utakapokamilika.",
+        "batteryQuota": "Modeli ya kwenye kifaa imetumia kiasi chake cha betri kwa sasa. Jaribu tena baadaye.",
+        "checkFailed": "Programu haikuweza kukagua modeli hii. Jaribu tena."
       },
       "unavailable": "Modeli ya kwenye kifaa haipatikani kwa sasa. Angalia hali yake katika $t(modelChat.backends.title).",
       "busy": "Modeli ya kwenye kifaa inashughulikia jibu jingine. Jaribu tena itakapomaliza.",
@@ -4369,7 +4386,8 @@
       "purchaseFallback": "Ununuzi wa salio",
       "receipt": "Risiti",
       "receiptA11y": "Fungua risiti ya {{description}}, {{amount}}, kutoka {{date}}",
-      "receiptUnavailable": "Hakuna risiti ya ununuzi huu."
+      "receiptUnavailable": "Hakuna risiti ya ununuzi huu.",
+      "retentionLimit": "Inaonyesha historia ya salio ya hivi karibuni."
     },
     "title": "Nunua salio",
     "description": "Salio ni ununuzi wa mara moja unaoongezwa kwenye usawa wako wa Kilo kwa kuendesha vikao vya kuandika msimbo kwa AI katika Kilo App. Duka hukutoza akaunti yako na salio huongezwa baada ya duka kuthibitisha malipo.",
@@ -4616,6 +4634,9 @@
     "couldNotLoad": "Imeshindwa kupakia miunganisho",
     "permissionDenied": "Huna ruhusa ya kudhibiti miunganisho hii.",
     "managedByOwner": "Mwombe mmiliki wa shirika abadilishe muunganisho ambao huwezi kubadilisha.",
+    "managedByOwnerOrAdmin": "Mwombe mmiliki wa shirika au msimamizi abadilishe muunganisho ambao huwezi kubadilisha.",
+    "managedByOwnerOrBilling": "Mwombe mmiliki wa shirika au msimamizi wa bili abadilishe muunganisho ambao huwezi kubadilisha.",
+    "managedByOwnerAdminOrBilling": "Mwombe mmiliki wa shirika, msimamizi, au msimamizi wa bili abadilishe muunganisho ambao huwezi kubadilisha.",
     "connectFailed": "Imeshindwa kufungua ukurasa wa kuunganisha"
   },
   "invoices": {

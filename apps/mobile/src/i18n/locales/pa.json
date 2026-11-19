@@ -820,7 +820,19 @@
         "fileComment": "ਫਾਈਲ 'ਤੇ ਟਿੱਪਣੀ",
         "outdatedOnPathLines": "{{path}} {{lines}} 'ਤੇ ਪੁਰਾਣਾ",
         "outdatedOnLines": "{{lines}} 'ਤੇ ਪੁਰਾਣਾ",
-        "outdatedOnPath": "{{path}} 'ਤੇ ਪੁਰਾਣਾ"
+        "outdatedOnPath": "{{path}} 'ਤੇ ਪੁਰਾਣਾ",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "ਖੱਬਾ ਪਾਸਾ",
+        "sideRight": "ਸੱਜਾ ਪਾਸਾ",
+        "outdatedOnLinesSide": "{{lines}} 'ਤੇ ਪੁਰਾਣਾ ({{side}})",
+        "outdatedOnPathLinesSide": "{{path}} {{lines}} 'ਤੇ ਪੁਰਾਣਾ ({{side}})",
+        "outdatedSide": "ਪੁਰਾਣਾ ({{side}})",
+        "outdatedOnPathSide": "{{path}} 'ਤੇ ਪੁਰਾਣਾ ({{side}})"
       },
       "deletedUser": "ਮਿਟਾਇਆ ਗਿਆ ਵਰਤੋਂਕਾਰ",
       "replyForbiddenTerm": "ਤੁਹਾਨੂੰ ਇਸ {{term}} 'ਤੇ ਜਵਾਬ ਦੇਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "ਇਸ ਖਾਤੇ ਵਿੱਚ ਹਾਲੇ ਕੋਈ ਸੰਗਠਨ ਨਹੀਂ ਹੈ। ਇੱਕ ਸੰਗਠਨ ਬਣਾਉਣ ਜਾਂ ਉਸ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਣ ਤੋਂ ਬਾਅਦ ਹੀ Bitbucket ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕੀਤੀ ਜਾ ਸਕਦੀ ਹੈ।",
       "gitlabReconnectAdminOnlyDescription": "ਕਿਸੇ ਸੰਗਠਨ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਨੂੰ ਇਸ ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਹੋ।",
       "bitbucketNotConnectedTitle": "Bitbucket ਕਨੈਕਟ ਨਹੀਂ ਹੈ",
-      "bitbucketAdminOnlyDescription": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਅਤੇ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦੇ ਹਨ।",
+      "adminOnlyConnectDescription": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਅਤੇ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦੇ ਹਨ।",
       "contextLine": "{{organization}} ਲਈ",
       "contextLinePersonal": "ਤੁਹਾਡੇ ਨਿੱਜੀ ਖਾਤੇ ਲਈ"
     },
@@ -3026,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
-    "couldNotLoadActiveSessions": "ਸਰਗਰਮ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
     "agentSessions": "ਹੁਣ ਚੱਲ ਰਹੇ",
     "newCodingTask": "ਨਵਾਂ ਕੋਡਿੰਗ ਕੰਮ",
     "newTaskFromPicture": "ਤਸਵੀਰ ਤੋਂ ਨਵਾਂ ਕੰਮ",
@@ -3405,7 +3416,8 @@
         "accounting_adjustment": "ਲੇਖੇ ਵਿੱਚ ਸੋਧ",
         "credits_expired": "ਕ੍ਰੈਡਿਟ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ"
       },
-      "truncated": "ਕ੍ਰੈਡਿਟ ਦਾ ਪੁਰਾਣਾ ਲੇਖਾ-ਜੋਖਾ ਵੀ ਉਪਲਬਧ ਹੈ।"
+      "truncated": "ਕ੍ਰੈਡਿਟ ਦਾ ਪੁਰਾਣਾ ਲੇਖਾ-ਜੋਖਾ ਵੀ ਉਪਲਬਧ ਹੈ।",
+      "retentionLimit": "ਸਭ ਤੋਂ ਨਵਾਂ ਕ੍ਰੈਡਿਟ ਦਾ ਲੇਖਾ-ਜੋਖਾ ਦਿਖਾਇਆ ਜਾ ਰਿਹਾ ਹੈ।"
     },
     "inviteMember": {
       "emailError": "ਸਹੀ ਈਮੇਲ ਪਤਾ ਦਰਜ ਕਰੋ।",
@@ -3415,6 +3427,7 @@
       "sendInvite": "ਸੱਦਾ ਭੇਜੋ",
       "title": "ਮੈਂਬਰ ਨੂੰ ਸੱਦਾ ਦਿਓ",
       "alreadyInvited": "ਉਹ ਪਹਿਲਾਂ ਹੀ ਸੱਦਿਆ ਹੋਇਆ ਹੈ ਜਾਂ ਪਹਿਲਾਂ ਹੀ ਮੈਂਬਰ ਹੈ।",
+      "organizationUnavailable": "ਇਹ ਸੰਸਥਾ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
       "sendError": "ਸੱਦਾ ਭੇਜਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
       "pendingInvitation": "ਇਸ ਈਮੇਲ ਲਈ ਪਹਿਲਾਂ ਹੀ ਇੱਕ ਸੱਦਾ ਬਕਾਇਆ ਹੈ।",
       "alreadyMember": "ਇਹ ਵਿਅਕਤੀ ਪਹਿਲਾਂ ਹੀ ਇਸ ਸੰਸਥਾ ਦਾ ਮੈਂਬਰ ਹੈ।",
@@ -3436,7 +3449,8 @@
         "void": "ਰੱਦ",
         "uncollectible": "ਵਸੂਲੀ ਅਸੰਭਵ"
       },
-      "truncated": "ਪੁਰਾਣੇ ਇਨਵੌਇਸ ਉਪਲਬਧ ਹਨ।"
+      "truncated": "ਪੁਰਾਣੇ ਇਨਵੌਇਸ ਉਪਲਬਧ ਹਨ।",
+      "retentionLimit": "ਸਭ ਤੋਂ ਨਵੇਂ ਇਨਵੌਇਸ ਦਿਖਾਏ ਜਾ ਰਹੇ ਹਨ।"
     },
     "lowBalanceAlert": {
       "enableA11y": "ਘੱਟ ਬੈਲੰਸ ਦੀ ਚੇਤਾਵਨੀ ਚਾਲੂ ਕਰੋ",
@@ -3670,8 +3684,7 @@
     "imagesSectionEmpty": "ਕੋਈ ਭਰੋਸੇਯੋਗ ਚਿੱਤਰ ਹੋਸਟ ਨਹੀਂ",
     "revoke": "{{host}} ਨੂੰ ਭਰੋਸੇਯੋਗ ਹੋਸਟਾਂ ਤੋਂ ਹਟਾਓ",
     "revokeMessage": "ਇਸ ਹੋਸਟ ਦੇ ਲਿੰਕ ਦੁਬਾਰਾ ਪੁਸ਼ਟੀ ਮੰਗਣਗੇ।",
-    "revokeImageMessage": "ਇਸ ਹੋਸਟ ਦੇ ਚਿੱਤਰ ਦੁਬਾਰਾ ਪੁਸ਼ਟੀ ਮੰਗਣਗੇ।",
-    "backToPreferences": "ਤਰਜੀਹਾਂ 'ਤੇ ਵਾਪਸ ਜਾਓ"
+    "revokeImageMessage": "ਇਸ ਹੋਸਟ ਦੇ ਚਿੱਤਰ ਦੁਬਾਰਾ ਪੁਸ਼ਟੀ ਮੰਗਣਗੇ।"
   },
   "glanceable": {
     "waiting": "ਏਜੰਟਾਂ ਦੀ ਜਾਣਕਾਰੀ ਅੱਪਡੇਟ ਹੋ ਰਹੀ ਹੈ",
@@ -3918,6 +3931,8 @@
       "downloading": "ਡਾਊਨਲੋਡ ਹੋ ਰਿਹਾ ਹੈ: {{total}} ਵਿੱਚੋਂ {{written}}",
       "downloadingUnknown": "ਡਾਊਨਲੋਡ ਹੋ ਰਿਹਾ ਹੈ: {{written}}",
       "paused": "ਰੋਕਿਆ ਗਿਆ: {{total}} ਵਿੱਚੋਂ {{written}}",
+      "retrying": "ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ: {{total}} ਵਿੱਚੋਂ {{written}}",
+      "retryingUnknown": "ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ: {{written}}",
       "verifying": "ਡਾਊਨਲੋਡ ਕੀਤੀ ਫ਼ਾਈਲ ਦੀ ਜਾਂਚ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ…",
       "downloaded": "ਡਾਊਨਲੋਡ ਹੋ ਗਿਆ · {{size}}",
       "url": "ਸਿੱਧਾ ਡਾਊਨਲੋਡ ਲਿੰਕ",
@@ -4008,7 +4023,9 @@
         "androidModelUnavailable": "ਇਹ ਡਿਵਾਈਸ Gemini Nano ਦਾ ਸਮਰਥਨ ਨਹੀਂ ਕਰਦਾ, ਜਾਂ AICore ਸਿਸਟਮ ਐਪ ਹਾਲੇ ਸੈੱਟਅੱਪ ਹੋ ਰਿਹਾ ਹੈ। ਬਾਅਦ ਵਿੱਚ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
         "aicoreUpdateRequired": "ਇਹ ਮਾਡਲ ਵਰਤਣ ਲਈ AICore ਐਪ ਅਤੇ ਆਪਣਾ ਸਿਸਟਮ ਸਾਫ਼ਟਵੇਅਰ ਅੱਪਡੇਟ ਕਰੋ।",
         "downloadable": "ਇਸ ਮਾਡਲ ਨੂੰ ਵਰਤਣ ਤੋਂ ਪਹਿਲਾਂ ਇੱਕ ਵਾਰ ਡਾਊਨਲੋਡ ਕਰਨਾ ਪਵੇਗਾ।",
-        "downloading": "ਮਾਡਲ ਡਾਊਨਲੋਡ ਹੋ ਰਿਹਾ ਹੈ। ਡਾਊਨਲੋਡ ਪੂਰਾ ਹੋਣ 'ਤੇ ਇਹ ਤਿਆਰ ਹੋ ਜਾਵੇਗਾ।"
+        "downloading": "ਮਾਡਲ ਡਾਊਨਲੋਡ ਹੋ ਰਿਹਾ ਹੈ। ਡਾਊਨਲੋਡ ਪੂਰਾ ਹੋਣ 'ਤੇ ਇਹ ਤਿਆਰ ਹੋ ਜਾਵੇਗਾ।",
+        "batteryQuota": "ਡਿਵਾਈਸ 'ਤੇ ਚੱਲਣ ਵਾਲੇ ਮਾਡਲ ਨੇ ਇਸ ਵੇਲੇ ਲਈ ਆਪਣਾ ਬੈਟਰੀ ਕੋਟਾ ਵਰਤ ਲਿਆ ਹੈ। ਬਾਅਦ ਵਿੱਚ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "checkFailed": "ਐਪ ਇਸ ਮਾਡਲ ਦੀ ਜਾਂਚ ਨਹੀਂ ਕਰ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
       },
       "unavailable": "ਡਿਵਾਈਸ 'ਤੇ ਚੱਲਣ ਵਾਲਾ ਮਾਡਲ ਇਸ ਵੇਲੇ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। $t(modelChat.backends.title) ਵਿੱਚ ਇਸਦੀ ਸਥਿਤੀ ਜਾਂਚੋ।",
       "busy": "ਡਿਵਾਈਸ 'ਤੇ ਚੱਲਣ ਵਾਲਾ ਮਾਡਲ ਕਿਸੇ ਹੋਰ ਜਵਾਬ ਵਿੱਚ ਰੁੱਝਿਆ ਹੋਇਆ ਹੈ। ਇਸਦੇ ਪੂਰਾ ਹੋਣ 'ਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
@@ -4369,7 +4386,8 @@
       "purchaseFallback": "ਕ੍ਰੈਡਿਟ ਖਰੀਦ",
       "receipt": "ਰਸੀਦ",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} ਲਈ ਰਸੀਦ ਖੋਲ੍ਹੋ",
-      "receiptUnavailable": "ਇਸ ਖਰੀਦ ਲਈ ਕੋਈ ਰਸੀਦ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।"
+      "receiptUnavailable": "ਇਸ ਖਰੀਦ ਲਈ ਕੋਈ ਰਸੀਦ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
+      "retentionLimit": "ਸਭ ਤੋਂ ਨਵਾਂ ਕ੍ਰੈਡਿਟ ਇਤਿਹਾਸ ਦਿਖਾਇਆ ਜਾ ਰਿਹਾ ਹੈ।"
     },
     "title": "ਕ੍ਰੈਡਿਟ ਖਰੀਦੋ",
     "description": "ਕ੍ਰੈਡਿਟ ਇੱਕ-ਵਾਰ ਦੀ ਖਰੀਦ ਹੈ ਜੋ Kilo ਐਪ ਵਿੱਚ AI ਕੋਡਿੰਗ ਸੈਸ਼ਨ ਚਲਾਉਣ ਲਈ ਤੁਹਾਡੇ Kilo ਬੈਲੰਸ ਵਿੱਚ ਜੋੜੀ ਜਾਂਦੀ ਹੈ। ਸਟੋਰ ਤੁਹਾਡੇ ਖਾਤੇ ਤੋਂ ਚਾਰਜ ਲੈਂਦਾ ਹੈ ਅਤੇ ਸਟੋਰ ਵੱਲੋਂ ਭੁਗਤਾਨ ਦੀ ਪੁਸ਼ਟੀ ਕਰਨ ਤੋਂ ਬਾਅਦ ਕ੍ਰੈਡਿਟ ਜੋੜੇ ਜਾਂਦੇ ਹਨ।",
@@ -4616,6 +4634,9 @@
     "couldNotLoad": "ਇੰਟੀਗ੍ਰੇਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ",
     "permissionDenied": "ਤੁਹਾਡੇ ਕੋਲ ਇਹਨਾਂ ਇੰਟੀਗ੍ਰੇਸ਼ਨਾਂ ਦਾ ਪ੍ਰਬੰਧਨ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
     "managedByOwner": "ਜੋ ਕਨੈਕਸ਼ਨ ਤੁਸੀਂ ਨਹੀਂ ਬਦਲ ਸਕਦੇ, ਉਸ ਨੂੰ ਬਦਲਣ ਲਈ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਨੂੰ ਕਹੋ।",
+    "managedByOwnerOrAdmin": "ਜੋ ਕਨੈਕਸ਼ਨ ਤੁਸੀਂ ਨਹੀਂ ਬਦਲ ਸਕਦੇ, ਉਸ ਨੂੰ ਬਦਲਣ ਲਈ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਜਾਂ ਐਡਮਿਨ ਨੂੰ ਕਹੋ।",
+    "managedByOwnerOrBilling": "ਜੋ ਕਨੈਕਸ਼ਨ ਤੁਸੀਂ ਨਹੀਂ ਬਦਲ ਸਕਦੇ, ਉਸ ਨੂੰ ਬਦਲਣ ਲਈ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਨੂੰ ਕਹੋ।",
+    "managedByOwnerAdminOrBilling": "ਜੋ ਕਨੈਕਸ਼ਨ ਤੁਸੀਂ ਨਹੀਂ ਬਦਲ ਸਕਦੇ, ਉਸ ਨੂੰ ਬਦਲਣ ਲਈ ਸੰਸਥਾ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਨੂੰ ਕਹੋ।",
     "connectFailed": "ਕਨੈਕਸ਼ਨ ਪੰਨਾ ਖੋਲ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ"
   },
   "invoices": {

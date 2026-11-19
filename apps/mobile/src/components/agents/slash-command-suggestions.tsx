@@ -4,6 +4,7 @@ import { Pressable, View, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTranslatedToolSummary } from '@/lib/tool-summary-translation/use-translated-tool-summary';
 import { cn } from '@/lib/utils';
@@ -90,8 +91,9 @@ function SlashCommandSuggestionRow({
       accessibilityHint={sourceDescription ? description : undefined}
       hitSlop={4}
       className={cn(
-        'min-h-[44px] flex-row items-center justify-between gap-3 px-4 py-2 active:bg-muted',
-        !isLast && 'border-b border-border'
+        ROW_TARGET_CLASS,
+        'flex-row items-center justify-between gap-3 px-4 py-2 active:bg-muted',
+        !isLast && 'border-b-[0.5px] border-hair-soft'
       )}
     >
       <View className="flex-1">
@@ -101,9 +103,7 @@ function SlashCommandSuggestionRow({
           </Text>
           {isSkill ? (
             <View className="rounded-full bg-muted px-2 py-0.5">
-              <Text className="text-[10px] font-semibold uppercase tracking-[0.5px] text-muted-foreground">
-                {t('agentChat.slashCommands.skillBadge')}
-              </Text>
+              <Text variant="eyebrow">{t('agentChat.slashCommands.skillBadge')}</Text>
             </View>
           ) : null}
         </View>
@@ -113,7 +113,7 @@ function SlashCommandSuggestionRow({
           </Text>
         ) : null}
       </View>
-      <Text className="text-xs text-muted-foreground">{t('agentChat.slashCommands.insert')}</Text>
+      <Text variant="caption">{t('agentChat.slashCommands.insert')}</Text>
     </Pressable>
   );
 }

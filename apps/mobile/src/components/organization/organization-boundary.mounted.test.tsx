@@ -25,6 +25,12 @@ const routerMock = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
 vi.mock('expo-router', () => ({ useRouter: () => routerMock }));
 
 vi.mock('@/components/empty-state', () => ({
+  StateAction: (props: { label: string; onPress?: () => void }) =>
+    createElement(
+      'ButtonMock',
+      { onPress: props.onPress },
+      createElement('TextMock', null, props.label)
+    ),
   EmptyState: (props: { title?: string; description?: ReactNode; action?: ReactNode }) =>
     createElement('EmptyStateMock', null, props.title, props.description, props.action),
 }));
@@ -52,6 +58,9 @@ vi.mock('@/components/ui/text', () => ({
 
 vi.mock('@/components/ui/icons', () => ({
   Building2: 'Building2',
+  ArrowLeft: 'ArrowLeft',
+  ArrowRight: 'ArrowRight',
+  Plus: 'Plus',
 }));
 
 const openPickerMock = vi.hoisted(() => vi.fn());

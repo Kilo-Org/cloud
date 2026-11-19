@@ -43,9 +43,16 @@ function checkAll(files) {
   return Object.entries(files).flatMap(([relative, text]) => check(relative, text));
 }
 
-/** A root mirroring the repository layout, for the probes and the CLI case. */
+/**
+ * A root mirroring the repository layout, for the probes and the CLI case.
+ *
+ * `mkdtempSync` returns a path under the platform's symlinked temporary
+ * directory on macOS (`/var` → `/private/var`), and the entry-point check
+ * compares the script's real path with `process.argv[1]`, so the root is
+ * canonicalised: a spawned audit then recognises itself and runs.
+ */
 function makeFixture(context, files) {
-  const root = mkdtempSync(join(tmpdir(), 'check-classes-'));
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'check-classes-')));
   context.after(() => rmSync(root, { recursive: true, force: true }));
 
   // Both SOURCE_DIRS entries must exist, or readdirSync throws ENOENT.
@@ -182,7 +189,7 @@ test('ignores the classes of an element nested in a prop', () => {
   assert.deepEqual(
     screenProblems(
       screen(
-        '<FlatList renderItem={() => <View className="px-8" />} className="flex-1" data={[]} />'
+        '<FlatList renderItem={() => <View className="px-3" />} className="flex-1" data={[]} />'
       )
     ),
     []
@@ -191,10 +198,10 @@ test('ignores the classes of an element nested in a prop', () => {
 
 test('reports only the container classes when a prop nests a padded element', () => {
   const found = expectProblem(
-    screen('<FlatList renderItem={() => <View className="px-8" />} className="px-2" data={[]} />'),
+    screen('<FlatList renderItem={() => <View className="px-3" />} className="px-2" data={[]} />'),
     /screen\.tsx:3: <FlatList> carries "px-2" on its own className/
   );
-  assert.doesNotMatch(found.join('\n'), /px-8/);
+  assert.doesNotMatch(found.join('\n'), /px-3/);
 });
 
 function themeTokens() {
@@ -252,7 +259,7 @@ test('accepts padding on a contentContainerClassName expression', () => {
   assert.deepEqual(
     check(
       'apps/mobile/src/screen.tsx',
-      "export const a = <ScrollView className=\"flex-1\" contentContainerClassName={cn('px-6', 'pt-4')} />;\n"
+      "export const a = <ScrollView className=\"flex-1\" contentContainerClassName={cn('px-4', 'pt-4')} />;\n"
     ),
     []
   );
@@ -492,24 +499,137 @@ function stubbedCompilerFixture(context, entrySource) {
   return root;
 }
 
-for (const [name, entrySource, expected] of [
+/** A compiler stub whose two reads return the given expression sources. */
+function compilerStub({ warnings, stylesheet }) {
+  return (
+    'module.exports = {\n' +
+    '  compile() {\n' +
+    '    return {\n' +
+    `      warnings() { return ${warnings}; },\n` +
+    `      stylesheet() { return ${stylesheet}; },\n` +
+    '    };\n' +
+    '  },\n' +
+    '};\n'
+  );
+}
+
+/**
+ * A stylesheet still holding both declarations the bans warn about: a deferred
+ * colorMix for `backgroundColor` and a deferred calc for `lineHeight`. The stub
+ * answers every fixture with it, so a case that fails one pin leaves the other
+ * pins passing.
+ */
+const HOLDING_STYLESHEET =
+  "{ s: [['x', [{ d: [" +
+  "[['colorMix', [['color', '#b0483a'], ['percent', 10]]], 'backgroundColor'], " +
+  "[['calc', [['var', ['--spacing']], '*', 5]], 'lineHeight']" +
+  '] }]]] }';
+
+for (const [name, entrySource, expected, absent] of [
   [
-    'throws at compile',
+    'will not load, which is the only failure that stops the pins',
+    "throw new Error('compiler entry exploded');\n",
+    ['react-native-css/compiler did not resolve (compiler entry exploded) — run pnpm install'],
+    'the compiler failed on',
+  ],
+  [
+    'throws at compile, and every fixture still reports',
     "module.exports = { compile() { throw new Error('stubbed compiler exploded on line one'); } };\n",
-    'the compiler failed on the text-align: start fixture (stubbed compiler exploded on line one)',
+    [
+      'the compiler failed on the text-align: start fixture (stubbed compiler exploded on line one)',
+      'the compiler failed on the text-align: end fixture (stubbed compiler exploded on line one)',
+      'the compiler failed on the color-mix over an @theme inline variable fixture (stubbed compiler exploded on line one)',
+      'the compiler failed on the spacing-scale line-height fixture (stubbed compiler exploded on line one)',
+    ],
   ],
   [
-    'returns a warnings value with no text-align',
-    'module.exports = { compile() { return { warnings() { return undefined; } }; } };\n',
-    'text-align: start is no longer dropped — drop the text-start/end rule',
+    'throws for the color-mix fixture only',
+    // The fixture CSS is the stub's only input, so a throw it raises for one
+    // fixture leaves the other pins running on the same stylesheet.
+    [
+      'module.exports = {',
+      '  compile(css) {',
+      "    if (css.includes('color-mix')) throw new Error('color-mix fixture exploded');",
+      '    return {',
+      "      warnings() { return { values: { 'text-align': ['start', 'end'] } }; },",
+      '      stylesheet() {',
+      "        return { s: [['x', [{ d: [[['calc', [['var', ['--spacing']], '*', 5]], 'lineHeight']] }]]] };",
+      '      },',
+      '    };',
+      '  },',
+      '};',
+    ].join('\n') + '\n',
+    [
+      'the compiler failed on the color-mix over an @theme inline variable fixture (color-mix fixture exploded)',
+    ],
+    'drop the numeric leading rule',
   ],
   [
-    'throws at stylesheet',
-    "module.exports = { compile() { return { warnings() { return ['text-align']; }, stylesheet() { throw new Error('stylesheet boom first line'); } }; } };\n",
-    'the compiler failed on the color-mix over an @theme inline variable fixture (stylesheet boom first line)',
+    'still drops only the text-align: start keyword',
+    compilerStub({
+      warnings: `{ values: { 'text-align': ['start'] } }`,
+      stylesheet: HOLDING_STYLESHEET,
+    }),
+    // `start` still appears in the dropped values, so its rule holds; `end`
+    // no longer does, so only the text-end rule is retired.
+    ['text-align: end is no longer dropped — drop the text-end rule'],
+    'drop the text-start rule',
+  ],
+  [
+    'drops neither text-align keyword',
+    compilerStub({ warnings: '{ values: {} }', stylesheet: HOLDING_STYLESHEET }),
+    [
+      'text-align: start is no longer dropped — drop the text-start rule',
+      'text-align: end is no longer dropped — drop the text-end rule',
+    ],
+  ],
+  [
+    'reports prose around the keyword instead of the dropped value',
+    // The words `end` and `start` sit inside longer words of a warning
+    // sentence, so neither pin may read them as the dropped keyword.
+    compilerStub({
+      warnings: `{ values: {}, notes: ['text-align rendered is extended, restart'] }`,
+      stylesheet: HOLDING_STYLESHEET,
+    }),
+    [
+      'text-align: start is no longer dropped — drop the text-start rule',
+      'text-align: end is no longer dropped — drop the text-end rule',
+    ],
+  ],
+  [
+    'emits no backgroundColor declaration for the color-mix fixture',
+    compilerStub({
+      warnings: '{ values: {} }',
+      stylesheet: `{ s: [['x', [{ d: [[['calc', [['var', ['--spacing']], '*', 5]], 'lineHeight']] }]]] }`,
+    }),
+    [
+      'color-mix over an @theme inline variable emits no backgroundColor declaration — the ban still applies, so keep the theme-token opacity rule',
+    ],
+    'drop the theme-token opacity rule',
+  ],
+  [
+    'resolves the color-mix at build time',
+    compilerStub({
+      warnings: '{ values: {} }',
+      stylesheet: `{ s: [['x', [{ d: [[['calc', [['var', ['--spacing']], '*', 5]], 'lineHeight'], [{ color: '#b0483a10' }, 'backgroundColor']] }]]] }`,
+    }),
+    [
+      'now compiles to {"color":"#b0483a10"} instead of a deferred colorMix — drop the theme-token opacity rule',
+    ],
+  ],
+  [
+    'emits no lineHeight declaration for the spacing-scale fixture',
+    compilerStub({
+      warnings: '{ values: {} }',
+      stylesheet: `{ s: [['x', [{ d: [[['colorMix', [['var', ['--color-destructive']]]], 'backgroundColor']] }]]] }`,
+    }),
+    [
+      'a spacing-scale line height emits no lineHeight declaration — the ban still applies, so keep the numeric leading rule',
+    ],
+    'drop the numeric leading rule',
   ],
 ]) {
-  test(`reports compiler pins the stub ${name}, keeping the source findings`, context => {
+  test(`reports compiler pins when the stub ${name}, keeping the source findings`, context => {
     const root = stubbedCompilerFixture(context, entrySource);
     const result = spawnSync(process.execPath, [join(root, 'tools/nativewind/check-classes.mjs')], {
       cwd: root,
@@ -519,8 +639,13 @@ for (const [name, entrySource, expected] of [
     assert.ifError(result.error);
     assert.equal(result.status, 1, result.stderr);
     // The source-tree findings made it out before the stub failed the pins.
-    assert.match(result.stderr, /bans\.ts:1: "text-start" text-align: start\/end is dropped/);
-    assert.match(result.stderr, new RegExp(expected.replace(/[()]/g, m => `\\${m}`)));
+    assert.match(result.stderr, /bans\.ts:1: "text-start" text-align: start is dropped/);
+    for (const fragment of expected) {
+      assert.match(result.stderr, new RegExp(fragment.replace(/[()]/g, m => `\\${m}`)));
+    }
+    if (absent !== undefined) {
+      assert.doesNotMatch(result.stderr, new RegExp(absent));
+    }
     assert.match(result.stderr, /check-classes: \d+ problem\(s\)/);
     assert.doesNotMatch(result.stderr, /Error:|at /);
   });
@@ -634,15 +759,15 @@ test('reports each ban at its own line', () => {
     'apps/mobile/src/bans.ts',
     'const a = 1;\n' +
       '\n' +
-      'const b = "text-start";\n' +
+      'const b = "text-start text-end";\n' +
       'const c = 2;\n' +
-      'const d = "ltr: leading-9";\n' +
+      'const d = "leading-9";\n' +
       '/* "bg-primary/50" in the rule comment is documentation\n' +
       ' * text-start in a block-comment body */\n'
   );
   assert.deepEqual(found, [
-    `apps/mobile/src/bans.ts:3: "text-start" text-align: start/end is dropped; the shared Text handles RTL alignment already`,
-    `apps/mobile/src/bans.ts:5: "ltr:" the ltr: variant also matches in RTL; express the rule with rtl: instead`,
+    `apps/mobile/src/bans.ts:3: "text-start" text-align: start is dropped; the shared Text handles RTL alignment already`,
+    `apps/mobile/src/bans.ts:3: "text-end" text-align: end is dropped; the shared Text handles RTL alignment already`,
     `apps/mobile/src/bans.ts:5: "leading-9" a numeric leading-N is multiplied by the font size at runtime; use an explicit length, e.g. leading-[1.25rem]`,
   ]);
 });
@@ -656,7 +781,7 @@ test('reads a ban inside a template chunk but not one in a comment or a regular 
       '/* ltr: and leading-9 in a comment body read as documentation */\n'
   );
   assert.deepEqual(found, [
-    `apps/mobile/src/bans.ts:1: "text-start" text-align: start/end is dropped; the shared Text handles RTL alignment already`,
+    `apps/mobile/src/bans.ts:1: "text-start" text-align: start is dropped; the shared Text handles RTL alignment already`,
   ]);
 });
 
@@ -718,4 +843,622 @@ test('names every file from its root, inside the repository or a temporary tree'
   // The widget-process exemption reads the same normalised path as every check.
   const widgetSource = "export const a = Intl.DateTimeFormat('en-US');\n";
   assert.deepEqual(check(widget, widgetSource), [], 'the widget layout keeps its exemption');
+});
+
+// The layout contract's rules read a className value, a cn() argument and a
+// *_CLASS constant, and stand down inside the modules that own the scale.
+
+const ALLOWLISTED = 'apps/mobile/src/components/ui/panel.tsx';
+const SCREEN_FILE = 'apps/mobile/src/screen.tsx';
+
+function layoutProblems(relative, text) {
+  return check(relative, text).filter(problem => /\[L\d+\]/.test(problem));
+}
+
+test('flags arbitrary spacing outside the allowlist and passes it inside', () => {
+  const found = layoutProblems(SCREEN_FILE, screen('<View className="mt-[6px]" />'));
+  assert.equal(found.length, 1);
+  assert.match(found[0], /screen\.tsx:3: \[L1\] "mt-\[6px\]"/);
+  assert.match(found[0], /@\/lib\/layout/);
+  assert.deepEqual(layoutProblems(ALLOWLISTED, screen('<View className="mt-[6px]" />')), []);
+});
+
+test('flags an arbitrary text size but not an arbitrary text colour', () => {
+  assert.match(
+    layoutProblems(SCREEN_FILE, screen('<Text className="text-[13px]" />')).join('\n'),
+    /\[L1\] "text-\[13px\]"/
+  );
+  assert.deepEqual(layoutProblems(SCREEN_FILE, screen('<Text className="text-[#ffffff]" />')), []);
+});
+
+test('flags a scroll body whose content container is not the px-4 gutter', () => {
+  for (const classes of ['px-6', 'ps-3', 'p-3', 'px-[22px]']) {
+    const found = layoutProblems(
+      SCREEN_FILE,
+      screen(`<DetailScreenScrollView contentContainerClassName="${classes}" />`)
+    );
+    assert.match(
+      found.join('\n'),
+      new RegExp(`\\[L2\\] ".+ on <DetailScreenScrollView> contentContainerClassName"`)
+    );
+    assert.match(found.join('\n'), /SCREEN_BODY_CLASS/);
+  }
+});
+
+test('reads a variant-prefixed inset as the utility it applies', () => {
+  for (const classes of ['md:px-6', 'landscape:px-6', 'ios:pl-2', 'md:pe-6', 'md:p-3']) {
+    const found = layoutProblems(
+      SCREEN_FILE,
+      screen(`<DetailScreenScrollView contentContainerClassName="${classes}" />`)
+    );
+    const gutters = found.filter(problem => problem.includes('[L2]'));
+    assert.equal(gutters.length, 1, classes);
+    assert.match(gutters[0], new RegExp(`\\[L2\\] "${classes.replace(/[[\]]/g, '\\$&')} on`));
+  }
+  for (const classes of ['md:px-4', 'landscape:px-4']) {
+    assert.deepEqual(
+      layoutProblems(
+        SCREEN_FILE,
+        screen(`<DetailScreenScrollView contentContainerClassName="${classes}" />`)
+      ),
+      [],
+      classes
+    );
+  }
+  for (const classes of ['md:px-6', 'ios:pl-2', 'landscape:px-4']) {
+    assert.match(
+      layoutProblems(SCREEN_FILE, screen(`<ScreenHeader className="${classes}" />`)).join('\n'),
+      new RegExp(`\\[L2\\] "${classes.replace(/[[\]]/g, '\\$&')} on <ScreenHeader> className"`)
+    );
+  }
+});
+
+test('accepts px-4 and vertical padding on a scroll body', () => {
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      screen('<FlashList contentContainerClassName="gap-6 px-4 pt-3" />')
+    ),
+    []
+  );
+});
+
+test('flags a header className that writes the page gutter', () => {
+  const found = layoutProblems(SCREEN_FILE, screen('<ScreenHeader className="px-[22px]" />'));
+  assert.match(found.join('\n'), /\[L2\] "px-\[22px\] on <ScreenHeader> className"/);
+  assert.deepEqual(
+    layoutProblems(ALLOWLISTED, screen('<ScreenHeader className="px-[22px]" />')),
+    []
+  );
+});
+
+test('flags a section label written as a class outside the allowlist', () => {
+  const found = layoutProblems(SCREEN_FILE, screen('<Text className="uppercase tracking-wide" />'));
+  assert.equal(found.length, 2);
+  assert.match(found.join('\n'), /\[L3\] "uppercase"/);
+  assert.match(found.join('\n'), /\[L3\] "tracking-wide"/);
+  assert.deepEqual(layoutProblems(ALLOWLISTED, screen('<Text className="uppercase" />')), []);
+});
+
+test('flags a card surface built by hand, including across one cn() call', () => {
+  const found = layoutProblems(
+    SCREEN_FILE,
+    screen("<View className={cn('bg-secondary', 'rounded-lg')} />")
+  );
+  assert.equal(found.length, 1);
+  assert.match(found[0], /screen\.tsx:3: \[L4\] "bg-secondary rounded-lg"/);
+  assert.deepEqual(
+    layoutProblems(ALLOWLISTED, screen('<View className="bg-secondary rounded-lg" />')),
+    []
+  );
+});
+
+test('flags text-xl and larger outside the allowlist', () => {
+  const found = layoutProblems(SCREEN_FILE, screen('<Text className="text-2xl" />'));
+  assert.equal(found.length, 1);
+  assert.match(found[0], /\[L5\] "text-2xl"/);
+  assert.match(found[0], /ScreenHeader/);
+  assert.deepEqual(layoutProblems(SCREEN_FILE, screen('<Text className="text-lg" />')), []);
+  assert.deepEqual(layoutProblems(ALLOWLISTED, screen('<Text className="text-2xl" />')), []);
+});
+
+test('flags a numeric layout value in a style object, in a value and an array', () => {
+  const found = layoutProblems(
+    SCREEN_FILE,
+    screen(
+      '<>',
+      '<View style={{ paddingHorizontal: 16 }} />',
+      '<View style={[{ marginTop: x + 8 }]} />',
+      '</>'
+    )
+  );
+  assert.equal(found.length, 2);
+  assert.match(found.join('\n'), /screen\.tsx:4: \[L6\] "paddingHorizontal: 16"/);
+  assert.match(found.join('\n'), /screen\.tsx:5: \[L6\] "marginTop: x \+ 8"/);
+  assert.deepEqual(layoutProblems(ALLOWLISTED, screen('<View style={{ padding: 8 }} />')), []);
+});
+
+test('accepts layout read from an inset, the keyboard or a measurement', () => {
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      screen(
+        '<View style={{ paddingTop: insets.top, gap: Math.max(0, measured), marginTop: 0 }} />'
+      )
+    ),
+    []
+  );
+});
+
+test('flags a chevron imported from the icon modules outside the allowlist', () => {
+  const found = layoutProblems(
+    SCREEN_FILE,
+    "import { ChevronRight } from '@/components/ui/icons';\n" +
+      "import { DirectionalChevronRight } from '@/components/ui/directional-icons';\n" +
+      'export const a = 1;\n'
+  );
+  assert.equal(found.length, 2);
+  assert.match(found.join('\n'), /screen\.tsx:1: \[L7\] "ChevronRight"/);
+  assert.match(found.join('\n'), /screen\.tsx:2: \[L7\] "DirectionalChevronRight"/);
+  assert.match(found.join('\n'), /RowChevron/);
+  assert.deepEqual(
+    layoutProblems(ALLOWLISTED, "import { ChevronRight } from '@/components/ui/icons';\n"),
+    []
+  );
+});
+
+test('flags an arbitrary box size outside the allowlist and passes it inside', () => {
+  const found = layoutProblems(SCREEN_FILE, screen('<View className="h-[46px]" />'));
+  assert.equal(found.length, 1);
+  assert.match(found[0], /screen\.tsx:3: \[L8\] "h-\[46px\]"/);
+  assert.match(found[0], /tap-target/);
+  assert.deepEqual(layoutProblems(ALLOWLISTED, screen('<View className="h-[46px]" />')), []);
+});
+
+test('flags an arbitrary minimum height outside the allowlist', () => {
+  assert.match(
+    layoutProblems(SCREEN_FILE, screen('<View className="min-h-[44px]" />')).join('\n'),
+    /\[L8\] "min-h-\[44px\]"/
+  );
+});
+
+test('passes percentage sizes and hairline arbitrary sizes', () => {
+  assert.deepEqual(
+    layoutProblems(SCREEN_FILE, screen('<View className="w-[50%] h-[0.5px] min-h-[1px]" />')),
+    []
+  );
+});
+
+test('flags an arbitrary size written as calc()', () => {
+  assert.match(
+    layoutProblems(SCREEN_FILE, screen('<View className="h-[calc(100%-4px)]" />')).join('\n'),
+    /\[L8\] "h-\[calc\(100%-4px\)\]"/
+  );
+});
+
+test('flags a card surface split across the branches of one className expression', () => {
+  // A template literal: the fill in one chunk, the radius in a ternary branch.
+  const templateUrl =
+    "<View className={`mx-4 bg-secondary ${isFirst ? 'rounded-t-xl' : 'rounded-b-xl'}`} />";
+  const template = layoutProblems(SCREEN_FILE, screen(templateUrl));
+  assert.equal(template.length, 1);
+  assert.match(template[0], /screen\.tsx:3: \[L4\] "bg-secondary rounded-t-xl"/);
+  // A ternary between two cn() calls is still one element's class expression.
+  const branches = layoutProblems(
+    SCREEN_FILE,
+    screen("<View className={isFirst ? cn('mx-4 bg-secondary') : cn('rounded-t-xl')} />")
+  );
+  assert.equal(branches.length, 1);
+  assert.match(branches.join('\n'), /\[L4\] "bg-secondary rounded-t-xl"/);
+  assert.deepEqual(
+    layoutProblems(ALLOWLISTED, screen(templateUrl)),
+    [],
+    'the primitives own the pairing, so the allowlist still passes'
+  );
+});
+
+test('accepts a card fill and a radius that are written on their own', () => {
+  assert.deepEqual(layoutProblems(SCREEN_FILE, screen('<View className="bg-secondary" />')), []);
+  assert.deepEqual(layoutProblems(SCREEN_FILE, screen('<View className="rounded-lg" />')), []);
+});
+
+test('flags a numeric layout value in a list style prop, not only style', () => {
+  const found = layoutProblems(
+    SCREEN_FILE,
+    screen(
+      '<>',
+      '<FlashList contentContainerStyle={{ paddingTop: 10.5 }} />',
+      '<FlatList columnWrapperStyle={{ gap: 8 }} />',
+      '<SectionList ListHeaderComponentStyle={[{ marginBottom: 12 }]} />',
+      '</>'
+    )
+  );
+  assert.equal(found.length, 3);
+  assert.match(found.join('\n'), /screen\.tsx:4: \[L6\] "paddingTop: 10.5"/);
+  assert.match(found.join('\n'), /screen\.tsx:5: \[L6\] "gap: 8"/);
+  assert.match(found.join('\n'), /screen\.tsx:6: \[L6\] "marginBottom: 12"/);
+});
+
+test('flags a numeric layout value in every style prop of one element', () => {
+  const found = layoutProblems(
+    SCREEN_FILE,
+    screen(
+      '<FlatList',
+      '  style={{ marginTop: 4 }}',
+      '  contentContainerStyle={{ paddingTop: 10.5 }}',
+      '/>'
+    )
+  );
+  assert.equal(found.length, 2);
+  assert.match(found.join('\n'), /screen\.tsx:4: \[L6\] "marginTop: 4"/);
+  assert.match(found.join('\n'), /screen\.tsx:5: \[L6\] "paddingTop: 10.5"/);
+});
+
+test('accepts measured values in a list style prop', () => {
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      screen(
+        '<FlashList contentContainerStyle={{ paddingTop: insets.top }} />',
+        '<FlatList columnWrapperStyle={{ gap: measured }} />'
+      )
+    ),
+    []
+  );
+});
+
+test('flags a row divider drawn in the border colour instead of the hairline', () => {
+  const found = layoutProblems(SCREEN_FILE, screen('<View className="border-b border-border" />'));
+  assert.equal(found.length, 1);
+  assert.match(found[0], /screen\.tsx:3: \[L9\] "border-b border-border"/);
+  assert.match(found[0], /border-hair-soft/);
+  // A width on the side names the same divider.
+  assert.match(
+    layoutProblems(SCREEN_FILE, screen('<View className="border-t-2 border-border" />')).join('\n'),
+    /\[L9\] "border-t-2 border-border"/
+  );
+  // The pair is one class expression, so a cn() call is the same divider.
+  assert.match(
+    layoutProblems(
+      SCREEN_FILE,
+      screen("<View className={cn('border-b', 'border-border')} />")
+    ).join('\n'),
+    /\[L9\] "border-b border-border"/
+  );
+  assert.deepEqual(
+    layoutProblems(ALLOWLISTED, screen('<View className="border-b border-border" />')),
+    []
+  );
+});
+
+test('accepts a hairline divider and a full border', () => {
+  assert.deepEqual(
+    layoutProblems(SCREEN_FILE, screen('<View className="border-b border-hair-soft" />')),
+    []
+  );
+  assert.deepEqual(
+    layoutProblems(SCREEN_FILE, screen('<View className="border border-border" />')),
+    []
+  );
+});
+
+test('flags titleContent outside the screens that own a title line', () => {
+  const found = layoutProblems(
+    SCREEN_FILE,
+    screen('<ScreenHeader title="Sessions" titleContent={<Text />} />')
+  );
+  assert.equal(found.length, 1);
+  assert.match(found[0], /screen\.tsx:3: \[L10\] "titleContent"/);
+  assert.match(found[0], /titleAccessory/);
+});
+
+test('accepts titleContent in an allowlisted screen and titleAccessory anywhere', () => {
+  const source = screen('<ScreenHeader title="Sessions" titleContent={<Text />} />');
+  assert.deepEqual(layoutProblems('apps/mobile/src/components/home/home-screen.tsx', source), []);
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      screen('<ScreenHeader title="Sessions" titleAccessory={<Badge />} />')
+    ),
+    []
+  );
+});
+
+test('flags a Sheet rendered without its SheetHeader', () => {
+  const found = layoutProblems(
+    SCREEN_FILE,
+    "import { Sheet } from '@/components/ui/sheet';\n" +
+      screen('<Sheet visible onClose={onClose}>', '<Text>body</Text>', '</Sheet>')
+  );
+  assert.equal(found.length, 1);
+  assert.match(found.join('\n'), /screen\.tsx:4: \[L11\] "<Sheet>"/);
+  assert.match(found.join('\n'), /SheetHeader/);
+  // An aliased import is the same component.
+  assert.match(
+    layoutProblems(
+      SCREEN_FILE,
+      "import { Sheet as SheetSurface } from '@/components/ui/sheet';\n" +
+        screen('<SheetSurface visible onClose={onClose} />')
+    ).join('\n'),
+    /\[L11\] "<SheetSurface>"/
+  );
+});
+
+test('accepts a Sheet with its header, an allowlisted sheet and a local Sheet', () => {
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      "import { Sheet } from '@/components/ui/sheet';\n" +
+        screen(
+          '<Sheet visible onClose={onClose}>',
+          '<SheetHeader title="Environment" onDone={onClose} />',
+          '</Sheet>'
+        )
+    ),
+    []
+  );
+  // A confirmation dialog owns its first row instead of a title row.
+  assert.deepEqual(
+    layoutProblems(
+      'apps/mobile/src/components/destructive-confirm-dialog.tsx',
+      "import { Sheet } from '@/components/ui/sheet';\n" +
+        screen('<Sheet visible onClose={onClose}>', '<Text>body</Text>', '</Sheet>')
+    ),
+    []
+  );
+  // A local component named Sheet is not the ui primitive.
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      "import { Sheet } from './local-sheet';\n" + screen('<Sheet visible onClose={onClose} />')
+    ),
+    []
+  );
+});
+
+test('flags each sheet that lacks its own header', () => {
+  const found = layoutProblems(
+    SCREEN_FILE,
+    "import { Sheet } from '@/components/ui/sheet';\n" +
+      screen(
+        '<>',
+        '<Sheet visible onClose={onClose}>',
+        '<SheetHeader title="Environment" onDone={onClose} />',
+        '</Sheet>',
+        '<Sheet visible={other} onClose={onClose}>',
+        '<Text>body</Text>',
+        '</Sheet>',
+        '</>'
+      )
+  );
+  assert.equal(found.length, 1);
+  assert.match(found.join('\n'), /screen\.tsx:8: \[L11\] "<Sheet>"/);
+  // A header inside the sibling sheet says nothing about this one.
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      "import { Sheet } from '@/components/ui/sheet';\n" +
+        screen(
+          '<>',
+          '<Sheet visible onClose={onClose}>',
+          '<SheetHeader title="Environment" onDone={onClose} />',
+          '</Sheet>',
+          '<Sheet visible={other} onClose={onClose}>',
+          '<SheetHeader title="Advanced" onDone={onClose} />',
+          '</Sheet>',
+          '</>'
+        )
+    ),
+    []
+  );
+  // A nested sheet's header does not serve the sheet around it.
+  assert.match(
+    layoutProblems(
+      SCREEN_FILE,
+      "import { Sheet } from '@/components/ui/sheet';\n" +
+        screen(
+          '<>',
+          '<Sheet visible onClose={onClose}>',
+          '<Sheet visible={other} onClose={onClose}>',
+          '<SheetHeader title="Advanced" onDone={onClose} />',
+          '</Sheet>',
+          '</Sheet>',
+          '</>'
+        )
+    ).join('\n'),
+    /screen\.tsx:5: \[L11\] "<Sheet>"/
+  );
+});
+
+test('follows a local component that draws the sheet header', () => {
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      "import { Sheet } from '@/components/ui/sheet';\n" +
+        'function FilterContent() {\n' +
+        '  return <SheetHeader title="Filters" onDone={onClose} />;\n' +
+        '}\n' +
+        'export function Screen() {\n' +
+        '  return (\n' +
+        '    <Sheet visible onClose={onClose}>\n' +
+        '      <FilterContent />\n' +
+        '    </Sheet>\n' +
+        '  );\n' +
+        '}'
+    ),
+    []
+  );
+});
+
+test('flags horizontal padding on a CenteredState content container', () => {
+  for (const classes of ['px-6', 'ps-3', 'pe-1', 'pl-2', 'pr-2', 'p-3']) {
+    const found = layoutProblems(
+      SCREEN_FILE,
+      screen(`<CenteredState contentContainerClassName="${classes}" />`)
+    ).filter(problem => problem.includes('[L2]'));
+    assert.equal(found.length, 1, classes);
+    assert.match(found[0], /\[L2\] ".+ on <CenteredState> contentContainerClassName"/);
+    assert.match(found[0], /SCREEN_BODY_CLASS/);
+  }
+});
+
+test('flags a horizontal inset wider than the page gutter', () => {
+  const found = layoutProblems(
+    SCREEN_FILE,
+    screen('<View className="px-6 mx-6 ps-10 pe-8 me-5" />')
+  );
+  assert.equal(found.length, 5);
+  for (const token of ['px-6', 'mx-6', 'ps-10', 'pe-8', 'me-5']) {
+    assert.match(found.join('\n'), new RegExp(`\\[L12\\] "${token}"`));
+  }
+  assert.match(found[0], /SCREEN_GUTTER_CLASS/);
+  // A responsive or negative form is the same inset.
+  const variants = layoutProblems(SCREEN_FILE, screen('<View className="md:px-8 -mx-6" />'));
+  assert.equal(variants.length, 2);
+  assert.match(variants.join('\n'), /\[L12\] "px-8"/);
+  assert.match(variants.join('\n'), /\[L12\] "-mx-6"/);
+});
+
+test('accepts the gutter, a narrower inset and the modules that own one', () => {
+  assert.deepEqual(
+    layoutProblems(SCREEN_FILE, screen('<View className="px-4 gap-x-6 px-3 ps-2 mt-6" />')),
+    []
+  );
+  assert.deepEqual(layoutProblems(ALLOWLISTED, screen('<View className="px-6 mx-8" />')), []);
+});
+
+test('accepts the page gutter and vertical padding on a CenteredState', () => {
+  assert.deepEqual(
+    layoutProblems(SCREEN_FILE, screen('<CenteredState contentContainerClassName="px-4 py-6" />')),
+    []
+  );
+  // The gutter check (L2) is scoped to the centered band; a plain view is held
+  // to the page inset by the class rule instead.
+  const view = layoutProblems(SCREEN_FILE, screen('<View className="px-6" />'));
+  assert.equal(view.length, 1);
+  assert.match(view[0], /\[L12\] "px-6"/);
+});
+
+test('flags a plain Button passed as a state action', () => {
+  const found = layoutProblems(
+    SCREEN_FILE,
+    screen(
+      '<EmptyState icon={Inbox} title="Nothing" action={<Button onPress={add}><Text>Add</Text></Button>} />'
+    )
+  );
+  assert.equal(found.length, 1);
+  assert.match(found[0], /\[L13\] "<Button>"/);
+  assert.match(found[0], /StateAction/);
+
+  const nested = layoutProblems(
+    SCREEN_FILE,
+    screen(
+      '<QueryError message="Failed" action={<View><Button onPress={retry}><Text>Retry</Text></Button></View>} />'
+    )
+  );
+  assert.equal(nested.length, 1);
+  assert.match(nested[0], /\[L13\]/);
+});
+
+test('accepts StateAction and wrappers around it in a state action', () => {
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      screen(
+        '<EmptyState icon={Inbox} title="Nothing" action={<StateAction label="Add" icon={Plus} onPress={add} />} />'
+      )
+    ),
+    []
+  );
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      screen(
+        '<QueryError action={<View className="gap-3"><StateAction label="Retry" icon={RotateCcw} onPress={retry} /></View>} />'
+      )
+    ),
+    []
+  );
+});
+
+/**
+ * Run the checker's entry point over a fixture root whose sources carry one
+ * layout violation, with `baseline` written beside it.
+ */
+function runLayoutFixture(context, sources, baseline) {
+  const files = { ...sources };
+  if (baseline !== undefined) {
+    files['tools/nativewind/layout-baseline.json'] = `${JSON.stringify(baseline, null, 2)}\n`;
+  }
+  const root = makeFixture(context, files);
+  const result = spawnSync(process.execPath, [join(root, 'tools/nativewind/check-classes.mjs')], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  assert.ifError(result.error);
+  return result;
+}
+
+test('passes a layout violation the baseline admits exactly', context => {
+  const result = runLayoutFixture(
+    context,
+    { 'apps/mobile/src/screen.tsx': screen('<View className="mt-[6px]" />') },
+    { 'apps/mobile/src/screen.tsx': { L1: 1 } }
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+  assert.match(result.stdout, /1 layout violation\(s\) admitted/);
+});
+
+test('fails a file that exceeds its baseline for a rule', context => {
+  const result = runLayoutFixture(
+    context,
+    {
+      'apps/mobile/src/screen.tsx': screen(
+        '<>',
+        '<View className="mt-[6px]" />',
+        '<View className="gap-[9px]" />',
+        '</>'
+      ),
+    },
+    { 'apps/mobile/src/screen.tsx': { L1: 1 } }
+  );
+  assert.equal(result.status, 1, result.stdout);
+  assert.match(result.stderr, /\[L1\] "gap-\[9px\]"/);
+  assert.match(result.stderr, /screen\.tsx: L1 now has 2 violation\(s\) and the baseline admits 1/);
+});
+
+test('fails a baseline entry the file is now below', context => {
+  const result = runLayoutFixture(
+    context,
+    { 'apps/mobile/src/screen.tsx': screen('<View className="mt-[6px]" />') },
+    { 'apps/mobile/src/screen.tsx': { L1: 2 } }
+  );
+  assert.equal(result.status, 1, result.stdout);
+  assert.match(
+    result.stderr,
+    /layout-baseline\.json: apps\/mobile\/src\/screen\.tsx L1 baseline is 2 but the file now has 1; lower it to 1/
+  );
+});
+
+test('writes the baseline with --write-layout-baseline', context => {
+  const root = makeFixture(context, {
+    'apps/mobile/src/screen.tsx': screen(
+      '<View className="mt-[6px] uppercase bg-secondary rounded-lg" />'
+    ),
+  });
+  const result = spawnSync(
+    process.execPath,
+    [join(root, 'tools/nativewind/check-classes.mjs'), '--write-layout-baseline'],
+    { cwd: root, encoding: 'utf8', timeout: 30_000 }
+  );
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(
+    JSON.parse(readFileSync(join(root, 'tools/nativewind/layout-baseline.json'), 'utf8')),
+    {
+      'apps/mobile/src/screen.tsx': { L1: 1, L3: 1, L4: 1 },
+    }
+  );
 });

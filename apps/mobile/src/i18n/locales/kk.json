@@ -820,7 +820,19 @@
         "fileComment": "Файлға пікір",
         "outdatedOnPathLines": "Ескірген: {{path}}, {{lines}}",
         "outdatedOnLines": "Ескірген: {{lines}}",
-        "outdatedOnPath": "Ескірген: {{path}}"
+        "outdatedOnPath": "Ескірген: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Сол жақ",
+        "sideRight": "Оң жақ",
+        "outdatedOnLinesSide": "Ескірген: {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Ескірген: {{path}}, {{lines}} ({{side}})",
+        "outdatedSide": "Ескірген ({{side}})",
+        "outdatedOnPathSide": "Ескірген: {{path}} ({{side}})"
       },
       "deletedUser": "жойылған пайдаланушы",
       "replyForbiddenTerm": "Бұл {{term}}на жауап беруге рұқсатыңыз жоқ.",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Бұл тіркелгіде әзірге ешбір ұйым жоқ. Ұйым құрғаннан немесе оған қосылғаннан кейін Bitbucket тарту сұрауларын қарауға болады.",
       "gitlabReconnectAdminOnlyDescription": "Оны қайта қосу үшін ұйым иесіне, әкімшісіне немесе төлем менеджеріне жүгініңіз.",
       "bitbucketNotConnectedTitle": "Bitbucket қосылмаған",
-      "bitbucketAdminOnlyDescription": "Оны тек ұйым иелері, әкімшілері мен төлем менеджерлері қоса алады.",
+      "adminOnlyConnectDescription": "Оны тек ұйым иелері, әкімшілері мен төлем менеджерлері қоса алады.",
       "contextLine": "{{organization}} үшін",
       "contextLinePersonal": "Жеке аккаунтыңыз үшін"
     },
@@ -3026,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Сессияларды жүктеу мүмкін болмады.",
-    "couldNotLoadActiveSessions": "Белсенді сессияларды жүктеу мүмкін болмады.",
     "agentSessions": "Қазір орындалып жатыр",
     "newCodingTask": "Жаңа бағдарламалау тапсырмасы",
     "newTaskFromPicture": "Суреттен жаңа тапсырма",
@@ -3405,7 +3416,8 @@
         "accounting_adjustment": "Есептік түзету",
         "credits_expired": "Кредиттердің мерзімі аяқталды"
       },
-      "truncated": "Бұрынғы кредит операцияларын да көруге болады."
+      "truncated": "Бұрынғы кредит операцияларын да көруге болады.",
+      "retentionLimit": "Ең соңғы кредит операциялары көрсетілуде."
     },
     "inviteMember": {
       "emailError": "Жарамды электрондық пошта мекенжайын енгізіңіз.",
@@ -3415,6 +3427,7 @@
       "sendInvite": "Шақыру жіберу",
       "title": "Мүшені шақыру",
       "alreadyInvited": "Бұл мекенжайға шақыру бұрын жіберілген немесе ол әлдеқашан ұйым мүшесі болып табылады.",
+      "organizationUnavailable": "Бұл ұйым бұдан былай қолжетімді емес.",
       "sendError": "Шақыруды жіберу мүмкін болмады.",
       "pendingInvitation": "Бұл электрондық пошта мекенжайына күтіп тұрған шақыру бар.",
       "alreadyMember": "Бұл адам осы ұйымның мүшесі болып табылады.",
@@ -3436,7 +3449,8 @@
         "void": "Күші жойылған",
         "uncollectible": "Өндірілмейтін"
       },
-      "truncated": "Бұрынғы шоттарды да көруге болады."
+      "truncated": "Бұрынғы шоттарды да көруге болады.",
+      "retentionLimit": "Ең соңғы шоттар көрсетілуде."
     },
     "lowBalanceAlert": {
       "enableA11y": "Баланс азайғанда ескертуді қосу",
@@ -3670,8 +3684,7 @@
     "imagesSectionEmpty": "Сенімді сурет хосттары жоқ",
     "revoke": "Хостқа берілген сенімді қайтарып алу: {{host}}",
     "revokeMessage": "Бұл хостқа сілтемелер қайтадан растауды сұрайды.",
-    "revokeImageMessage": "Бұл хосттағы суреттер қайтадан растауды сұрайды.",
-    "backToPreferences": "Баптауларға оралу"
+    "revokeImageMessage": "Бұл хосттағы суреттер қайтадан растауды сұрайды."
   },
   "glanceable": {
     "waiting": "Агенттер жаңартылуда",
@@ -3918,6 +3931,8 @@
       "downloading": "Жүктелуде: {{written}} / {{total}}",
       "downloadingUnknown": "Жүктелуде: {{written}}",
       "paused": "Тоқтатылды: {{written}} / {{total}}",
+      "retrying": "Қайталап көру: {{written}} / {{total}}",
+      "retryingUnknown": "Қайталап көру: {{written}}",
       "verifying": "Жүктелген файл тексерілуде…",
       "downloaded": "Жүктелді · {{size}}",
       "url": "Тікелей жүктеу сілтемесі",
@@ -4008,7 +4023,9 @@
         "androidModelUnavailable": "Бұл құрылғы Gemini Nano-ны қолдамайды немесе AICore жүйелік қолданбасы әлі бапталуда. Кейінірек қайталап көріңіз.",
         "aicoreUpdateRequired": "Бұл модельді пайдалану үшін AICore қолданбасын және жүйелік бағдарламалық құралды жаңартыңыз.",
         "downloadable": "Бұл модельді пайдаланбас бұрын оны бір рет жүктеп алу керек.",
-        "downloading": "Модель жүктеп алынуда. Жүктеп алу аяқталғанда, ол дайын болады."
+        "downloading": "Модель жүктеп алынуда. Жүктеп алу аяқталғанда, ол дайын болады.",
+        "batteryQuota": "Құрылғыдағы модель батареяның рұқсат етілген мөлшерін әзірге сарқып алды. Кейінірек қайталап көріңіз.",
+        "checkFailed": "Қолданба бұл модельді тексере алмады. Қайталап көріңіз."
       },
       "unavailable": "Құрылғыдағы модель қазір қолжетімсіз. Оның күйін $t(modelChat.backends.title) бөлімінен тексеріңіз.",
       "busy": "Құрылғыдағы модель басқа жауаппен бос емес. Ол аяқталғанда қайталап көріңіз.",
@@ -4369,7 +4386,8 @@
       "purchaseFallback": "Кредит сатып алу",
       "receipt": "Түбіртек",
       "receiptA11y": "Түбіртекті ашу: {{description}}, {{amount}}, {{date}} күні",
-      "receiptUnavailable": "Бұл сатып алу үшін түбіртек қолжетімді емес."
+      "receiptUnavailable": "Бұл сатып алу үшін түбіртек қолжетімді емес.",
+      "retentionLimit": "Кредиттердің ең соңғы тарихы көрсетілуде."
     },
     "title": "Кредит сатып алу",
     "description": "Кредиттер — Kilo App-те AI бағдарламалау сессияларын жүргізу үшін Kilo балансына қосылатын бір реттік сатып алу. Дүкен шотыңыздан ақша алады және дүкен төлемді растағаннан кейін кредиттер қосылады.",
@@ -4616,6 +4634,9 @@
     "couldNotLoad": "Интеграцияларды жүктеу мүмкін болмады",
     "permissionDenied": "Бұл интеграцияларды басқаруға рұқсатыңыз жоқ.",
     "managedByOwner": "Сіз өзгерте алмайтын қосылымды өзгертуді ұйым иесінен сұраңыз.",
+    "managedByOwnerOrAdmin": "Сіз өзгерте алмайтын қосылымды өзгертуді ұйым иесінен немесе әкімшісінен сұраңыз.",
+    "managedByOwnerOrBilling": "Сіз өзгерте алмайтын қосылымды өзгертуді ұйым иесінен немесе төлем менеджерінен сұраңыз.",
+    "managedByOwnerAdminOrBilling": "Сіз өзгерте алмайтын қосылымды өзгертуді ұйым иесінен, әкімшісінен немесе төлем менеджерінен сұраңыз.",
     "connectFailed": "Қосылу бетін ашу мүмкін болмады"
   },
   "invoices": {

@@ -35,7 +35,7 @@ function sizersOf(pill: React.ReactElement): React.ReactElement[] {
 const RING_BUTTON_SQUARE_TOKEN = 'aspect-square';
 
 const RING_BUTTON_LAYOUT_TOKENS = [
-  'h-full',
+  'h-12',
   RING_BUTTON_SQUARE_TOKEN,
   'shrink-0',
   'items-center',

@@ -14,10 +14,10 @@ import {
   useRouter,
 } from 'expo-router';
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
-import { MessageSquare } from '@/components/ui/icons';
+import { ArrowLeft, MessageSquare, RotateCcw } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
-import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { Platform, type TextInstance, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -128,7 +128,7 @@ import { shouldKeepSessionAwake } from '@/components/agents/session-keep-awake';
 import { shouldRefetchOnFocus } from '@/components/agents/session-focus-refetch';
 import { TranscriptTimeMarker } from '@/components/agents/transcript-time-marker';
 import { CenteredState } from '@/components/centered-state';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import {
   resolveLoadedCliSessionPresenceId,
   useCliSessionPresence,
@@ -185,12 +185,10 @@ import { PartRenderer } from '@/components/agents/part-renderer';
 import { CondensedToolRunRow } from '@/components/agents/tool-run-rows';
 import { ToolRunSheetHost } from '@/components/agents/tool-run-sheet-host';
 import {
-  buildTerminalErrorCopyText,
   resolveSessionTerminalError,
   type SessionTerminalError,
   statusIndicatorDuplicatesMessageFailure,
 } from '@/components/agents/session-terminal-error';
-import { performCopy } from '@/components/agents/use-message-copy';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
 import { type ContextDisplayScope } from '@/components/context-control';
@@ -209,7 +207,6 @@ import {
 } from '@/lib/analytics/posthog';
 import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { useMotionPolicy } from '@/lib/a11y/motion';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
@@ -2952,7 +2949,6 @@ export function SessionDetailContent({
             backFallback={AGENTS_SESSIONS_HREF}
             headerRight={headerRight}
             headerRightShrinks
-            className="pb-1"
             {...(rename.isTitleInteractive
               ? {
                   onTitlePress: rename.openModal,
@@ -3049,9 +3045,6 @@ export function SessionDetailContent({
               cloudStatusType={cloudStatus?.type ?? null}
               autoApproveState={autoApproveState}
               onAutoApproveChange={enabled => {
-                // Selection haptic for the commit: a capability iOS and Android
-                // both have, served here by the one cross-platform call.
-                selectionHaptic();
                 setSessionAutoApproveEnabled(sessionId, enabled);
               }}
               onClose={() => {
@@ -3268,7 +3261,7 @@ export function SessionDetailContent({
         {isComposerSkeletonVisible ? <SessionComposerSkeleton /> : null}
 
         {isReadOnlyContinueVisible ? (
-          <View className="border-t border-border bg-secondary">
+          <View className="border-t-[0.5px] border-hair-soft bg-secondary">
             <View style={sideInsetStyle}>
               <View className="gap-3 px-4 py-3">
                 <Text className="text-center text-sm text-muted-foreground">
@@ -3399,67 +3392,35 @@ export function SessionDetailContent({
 
   function renderContent() {
     if (shownTerminalError) {
-      const copyText = buildTerminalErrorCopyText({
-        sessionId,
-        title: shownTerminalError.title,
-        message: shownTerminalError.message,
-        detail: shownTerminalError.detail,
-      });
       return (
-        <CenteredState>
-          <View className="items-center gap-3 px-6">
-            <QueryError
-              variant={shownTerminalError.variant}
-              placement="top"
-              className="px-0 pt-0"
-              title={shownTerminalError.title}
-              message={shownTerminalError.message}
-              onRetry={
-                shownTerminalError.retryable
-                  ? () => {
-                      handleTerminalRetry(shownTerminalError);
-                    }
-                  : undefined
-              }
-              isRetrying={terminalRetryPending}
-            />
-            {/* One primary action per surface (DESIGN.md): Back is the recovery
-                action, so it fills; Copy stays outlined as the utility. A
-                read-only transcript keeps its footer beside this card, and that
-                footer's Continue in a new session is the surface's filled
-                primary, so Back steps back to the outline there instead. Dark
-                takes the lifted olive `--selection` with its own label tone
-                instead of the glare of #ffdd00, so both themes give the control
-                the light mode's weight. */}
-            <View className="flex-row gap-3">
-              <Button
-                variant="outline"
-                size="action"
-                accessibilityLabel={t('agentChat.session.copyErrorDetails')}
-                onPress={() => {
-                  void performCopy(copyText);
-                }}
-              >
-                <Text>{t('common.copy')}</Text>
-              </Button>
-              <Button
-                variant={isReadOnlyContinueVisible ? 'outline' : undefined}
-                size="action"
-                className={cn(!isReadOnlyContinueVisible && 'bg-primary dark:bg-selection')}
+        <QueryError
+          variant={shownTerminalError.variant}
+          title={shownTerminalError.title}
+          message={shownTerminalError.message}
+          isRetrying={terminalRetryPending}
+          action={
+            <View className="flex-row items-center gap-3">
+              {shownTerminalError.retryable ? (
+                <StateAction
+                  label={t('common.retry')}
+                  icon={RotateCcw}
+                  loading={terminalRetryPending}
+                  onPress={() => {
+                    handleTerminalRetry(shownTerminalError);
+                  }}
+                />
+              ) : null}
+              {/* Back keeps truncating the stack to the outline, which the
+                  header's own back does not, so both actions share the state's
+                  one action slot instead of the card handing one its own. */}
+              <StateAction
+                label={t('agentChat.session.backToSessions')}
+                icon={ArrowLeft}
                 onPress={handleBackToSessions}
-              >
-                <Text
-                  className={cn(
-                    !isReadOnlyContinueVisible &&
-                      'text-primary-foreground dark:text-selection-foreground'
-                  )}
-                >
-                  {t('agentChat.session.backToSessions')}
-                </Text>
-              </Button>
+              />
             </View>
-          </View>
-        </CenteredState>
+          }
+        />
       );
     }
     if (sessionLoadPhase === 'slow') {
@@ -3468,7 +3429,7 @@ export function SessionDetailContent({
       // not move, and give the user the only useful action: retry.
       return (
         <CenteredState>
-          <View className="items-center gap-3 px-6">
+          <View className="items-center gap-3 px-4">
             <Text className="text-center text-sm text-muted-foreground">
               {t('common.takingLonger')}
             </Text>
@@ -3495,7 +3456,7 @@ export function SessionDetailContent({
       if (transcriptView === 'status' && statusIndicator !== null) {
         return (
           <CenteredState>
-            <View className="items-center px-6">
+            <View className="items-center px-4">
               <SessionStatusIndicator indicator={statusIndicator} />
             </View>
           </CenteredState>
@@ -3519,19 +3480,16 @@ export function SessionDetailContent({
               />
             }
             action={
-              <Button
-                variant="outline"
-                size="action"
+              <StateAction
+                label={t('common.retry')}
+                icon={RotateCcw}
                 onPress={() => {
                   void manager.loadOlderMessages();
                 }}
                 loading={isLoadingOlderMessages}
                 accessibilityLabel={t('common.retry')}
                 accessibilityHint={t('agentChat.olderMessages.retryHint')}
-                className={STATE_ACTION_CLASS}
-              >
-                <Text>{t('common.retry')}</Text>
-              </Button>
+              />
             }
           />
         );

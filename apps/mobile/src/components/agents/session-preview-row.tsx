@@ -6,13 +6,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { SheetHeader } from '@/components/sheet-header';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { RowChevron } from '@/components/ui/row-chevron';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { openExternalUrl } from '@/lib/external-link';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { isCloudAgentSessionId } from '@/lib/session-compute-total';
 import { useTRPC } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
 
 import { SessionPageSheet } from './session-page-sheet';
 import {
@@ -52,7 +55,6 @@ export function SessionPreviewRow({
   organizationId,
 }: Readonly<SessionPreviewRowProps>) {
   const { t } = useTranslation();
-  const colors = useThemeColors();
   const [visible, setVisible] = useState(false);
   if (!isCloudAgentSessionId(cloudAgentSessionId)) {
     return null;
@@ -66,11 +68,14 @@ export function SessionPreviewRow({
         }}
         accessibilityRole="button"
         accessibilityLabel={label}
-        className="min-h-[44px] flex-row items-center justify-between gap-3 active:opacity-70"
+        className={cn(
+          ROW_TARGET_CLASS,
+          'flex-row items-center justify-between gap-3 active:opacity-70'
+        )}
         testID="session-context-sheet-preview"
       >
         <Text className="text-base font-medium text-foreground">{label}</Text>
-        <DirectionalChevronRight size={16} color={colors.mutedForeground} />
+        <RowChevron />
       </Pressable>
       <SessionPreviewSheet
         visible={visible}
@@ -108,7 +113,6 @@ function SessionPreviewSheet({
 }: Readonly<SessionPreviewSheetProps>) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const colors = useThemeColors();
   const trpc = useTRPC();
   const [openingPort, setOpeningPort] = useState<number | null>(null);
 
@@ -164,7 +168,7 @@ function SessionPreviewSheet({
   let body: ReactNode = null;
   if (state.kind === 'loading') {
     body = (
-      <View className="min-h-[120px] flex-row items-center justify-center gap-2">
+      <View className="min-h-36 flex-row items-center justify-center gap-2">
         <ActivityIndicator />
         <Text className="text-sm text-muted-foreground">{t('common.loading')}</Text>
       </View>
@@ -206,7 +210,7 @@ function SessionPreviewSheet({
               name: service.name,
               port: service.port,
             })}
-            className="min-h-[44px] flex-row items-center gap-3 rounded-md border border-border px-3 py-3 active:opacity-70"
+            className="min-h-14 flex-row items-center gap-3 rounded-md border border-border px-3 py-3 active:opacity-70"
           >
             <View className="min-w-0 flex-1 gap-0.5">
               <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
@@ -221,11 +225,7 @@ function SessionPreviewSheet({
                 {t('cloudAgent.preview.portLabel', { port: service.port })}
               </Text>
             </View>
-            {openingPort === service.port ? (
-              <ActivityIndicator />
-            ) : (
-              <DirectionalChevronRight size={16} color={colors.mutedForeground} />
-            )}
+            {openingPort === service.port ? <ActivityIndicator /> : <RowChevron />}
           </Pressable>
         ))}
       </View>
@@ -239,24 +239,19 @@ function SessionPreviewSheet({
         onDone={onClose}
         topInset="ios-page-sheet"
       />
-      <ScrollView className="flex-1" contentContainerClassName="gap-3 px-6 pb-6 pt-3">
-        <View className="flex-row items-center justify-between gap-3">
-          <Text className="text-xs uppercase tracking-wide text-muted-foreground">
-            {t('cloudAgent.preview.listeningServices')}
-          </Text>
-          <Pressable
-            onPress={refetch}
-            disabled={openingPort !== null}
-            accessibilityRole="button"
-            accessibilityLabel={t('common.refresh')}
-            hitSlop={8}
-            className="active:opacity-70"
-            testID="session-preview-refresh"
-          >
-            <Text className="text-sm font-medium text-primary">{t('common.refresh')}</Text>
-          </Pressable>
+      <ScrollView className="flex-1" contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}>
+        <View>
+          <SectionHeader
+            label={t('cloudAgent.preview.listeningServices')}
+            actionLabel={t('common.refresh')}
+            onActionPress={refetch}
+            // A port being opened keeps the action in place and inert instead
+            // of removing it, so the label row never reflows mid-open.
+            actionDisabled={openingPort !== null}
+            actionTestID="session-preview-refresh"
+          />
+          <View className="pt-2">{body}</View>
         </View>
-        {body}
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
     </SessionPageSheet>
@@ -275,7 +270,7 @@ function StateBlock({
         onPress={onAction}
         accessibilityRole="button"
         accessibilityLabel={actionLabel}
-        className="min-h-[44px] justify-center active:opacity-70"
+        className={cn(ROW_TARGET_CLASS, 'justify-center active:opacity-70')}
       >
         <Text className="text-sm font-medium text-primary">{actionLabel}</Text>
       </Pressable>

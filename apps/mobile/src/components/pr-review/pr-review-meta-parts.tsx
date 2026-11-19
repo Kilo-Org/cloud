@@ -160,7 +160,7 @@ function PrLinkedIssues({ issues }: Readonly<{ issues: PrOverviewDto['linkedIssu
             className="min-h-11 flex-row items-center gap-2 active:opacity-70"
           >
             <Icon size={14} color={issue.closed ? colors.mutedForeground : colors.good} />
-            <Text variant="mono" className="text-[13px] text-muted-foreground">
+            <Text variant="mono" className="text-muted-foreground">
               #{issue.number}
             </Text>
             <Text className="flex-1 text-sm text-foreground" numberOfLines={1}>

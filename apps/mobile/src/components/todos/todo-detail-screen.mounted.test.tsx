@@ -1,9 +1,9 @@
-// The to-do detail screen's shell draws the loading and error states around one
-// header. The loaded body paints the to-do's list on the eyebrow line, so that
-// line stays reserved while the read runs and after it fails: the title holds
-// the position the payload gives it instead of dropping up when an error lands
-// and back down when a retry starts. Only the running read paints the
-// placeholder bar; the failure keeps the line blank.
+// The to-do detail screen's states wear the stock pushed-screen header, named
+// with the to-do surface's title until the read brings the to-do's own. The
+// running read also reserves the eyebrow line the loaded body paints for the
+// to-do's list, with its placeholder bar, so the body lands without moving. A
+// read that stopped has no label coming: the terminal states drop that line, so
+// the heading and its back control sit on the header's first line.
 
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -22,9 +22,12 @@ const query = vi.hoisted(() => ({
 }));
 
 type HeaderProps = {
-  eyebrow?: string;
+  title?: string;
+  titleNumberOfLines?: number;
+  reserveTitleSpace?: boolean;
   reserveEyebrow?: boolean;
   eyebrowPlaceholder?: unknown;
+  backFallback?: unknown;
 };
 
 const headers = vi.hoisted(() => ({
@@ -77,10 +80,10 @@ vi.mock('@/lib/hooks/use-todos', () => ({
   }),
 }));
 
-function renderScreen(): TestRenderer.ReactTestRenderer {
+function renderScreen(itemId = 'item-1'): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
-    ref.current = TestRenderer.create(createElement(TodoDetailScreen, { itemId: 'item-1' }));
+    ref.current = TestRenderer.create(createElement(TodoDetailScreen, { itemId }));
   });
   const renderer = ref.current;
   if (!renderer) {
@@ -98,29 +101,79 @@ beforeEach(() => {
   headers.rendered = [];
 });
 
-describe('todo detail header eyebrow', () => {
-  it('reserves the list line with the placeholder bar while the to-do loads', () => {
+describe('todo detail header', () => {
+  it('reserves the list line under the surface title while the to-do loads', () => {
     query.isFetching = true;
     const renderer = renderScreen();
 
     expect(headers.rendered).toHaveLength(1);
-    expect(headers.rendered[0]?.eyebrow).toBeUndefined();
+    expect(headers.rendered[0]?.title).toBe('To-dos');
+    expect(headers.rendered[0]?.titleNumberOfLines).toBe(2);
+    expect(headers.rendered[0]?.reserveTitleSpace).toBe(true);
     expect(headers.rendered[0]?.reserveEyebrow).toBe(true);
     expect(headers.rendered[0]?.eyebrowPlaceholder).toBeTruthy();
+    expect(headers.rendered[0]?.backFallback).toBe('/(app)/(tabs)/(2_agents)');
     renderer.unmount();
   });
 
-  it('keeps the reserved line blank when the read fails', () => {
+  it('drops the list line on a not-found state', () => {
+    query.isError = true;
+    query.error = { data: { code: 'BAD_REQUEST' } };
+    const renderer = renderScreen('not-a-seeded-item');
+
+    expect(headers.rendered).toHaveLength(1);
+    expect(headers.rendered[0]?.title).toBe('To-dos');
+    expect(headers.rendered[0]?.reserveEyebrow).toBe(false);
+    expect(headers.rendered[0]?.eyebrowPlaceholder).toBeUndefined();
+    expect(headers.rendered[0]?.backFallback).toBe('/(app)/(tabs)/(2_agents)');
+    renderer.unmount();
+  });
+
+  it('keeps the plain header when the read fails on the server', () => {
     query.isError = true;
     query.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
     const renderer = renderScreen();
 
-    // The title keeps the position the payload gives it, and no bar pulses on a
-    // header whose label can only come back through a retry.
     expect(headers.rendered).toHaveLength(1);
-    expect(headers.rendered[0]?.eyebrow).toBeUndefined();
-    expect(headers.rendered[0]?.reserveEyebrow).toBe(true);
+    expect(headers.rendered[0]?.title).toBe('To-dos');
+    expect(headers.rendered[0]?.reserveEyebrow).toBe(false);
     expect(headers.rendered[0]?.eyebrowPlaceholder).toBeUndefined();
+    renderer.unmount();
+  });
+});
+
+function propOf(instance: TestRenderer.ReactTestInstance | undefined, key: string): unknown {
+  if (!instance) {
+    return undefined;
+  }
+  /* eslint-disable typescript-eslint/no-unsafe-member-access -- renderer props are an index signature */
+  return instance.props[key];
+  /* eslint-enable typescript-eslint/no-unsafe-member-access */
+}
+
+describe('todo detail error state', () => {
+  it('reads an id the API refuses as not-found, centred and with no retry', () => {
+    query.isError = true;
+    query.error = { data: { code: 'BAD_REQUEST' } };
+    const renderer = renderScreen('not-a-seeded-item');
+
+    const error = renderer.root.findAllByType('QueryError')[0];
+    expect(propOf(error, 'variant')).toBe('not-found');
+    expect(propOf(error, 'onRetry')).toBeUndefined();
+    // The state is the whole body under the header, so it takes the shared
+    // centre placement instead of pinning to the top of the surface.
+    expect(propOf(error, 'placement')).toBeUndefined();
+    renderer.unmount();
+  });
+
+  it('keeps a read that failed on the server retryable on the same centred state', () => {
+    query.isError = true;
+    query.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+    const renderer = renderScreen();
+
+    const error = renderer.root.findAllByType('QueryError')[0];
+    expect(propOf(error, 'variant')).toBe('server');
+    expect(typeof propOf(error, 'onRetry')).toBe('function');
     renderer.unmount();
   });
 });

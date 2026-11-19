@@ -66,11 +66,23 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ canGoBack: () => false, back: vi.fn() }),
 }));
 
-vi.mock('@/components/ui/icons', () => ({ Search: 'Search' }));
+vi.mock('@/components/ui/icons', () => ({
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
+  Search: 'Search',
+}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// `Button` (the later-page retry CTA) wraps its label in this provider, so the
+// text mock must export the same context the real module does.
+vi.mock('@/components/ui/text', async () => {
+  const { createContext } = await import('react');
+  return { Text: 'Text', TextClassContext: createContext<string | undefined>(undefined) };
+});
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#888888' }),
 }));
@@ -355,10 +367,19 @@ describe('PrDiffFileNavigator stable row callbacks (finding 2)', () => {
       expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(1);
       expect(flashListProps.current).toBeNull();
       expect(findSearchInput(renderer)).toBeDefined();
-      const retries = renderer.root.findAllByProps({ accessibilityLabel: 'Retry loading files' });
+      // The retry CTA is the shared `Button`, which forwards this label to the
+      // pressable it renders; count the host node so the composite and its
+      // element are not read as two controls.
+      const retries = renderer.root.findAll(
+        node =>
+          typeof node.type === 'string' && node.props.accessibilityLabel === 'Retry loading files'
+      );
       if (kind === 'retryable' || kind === 'reconnect') {
         expect(retries).toHaveLength(1);
-        const retry = renderer.root.findByProps({ accessibilityLabel: 'Retry loading files' });
+        const retry = retries[0];
+        if (!retry) {
+          throw new Error('missing retry');
+        }
         act(() => {
           (retry.props.onPress as () => void)();
         });
@@ -759,6 +780,24 @@ describe('PrDiffFileNavigator provider wording', () => {
     };
   }
 
+  // The 0-listed-files state: the read answered, and the navigator has no row
+  // to show, which is the empty state rather than a terminal error.
+  function setEmptyState() {
+    listQueryResult = {
+      query: {
+        isLoading: false,
+        isFetching: false,
+        isFetchingNextPage: false,
+        hasNextPage: false,
+        fetchNextPage: fetchNextPageMock,
+        refetch: vi.fn(),
+      },
+      files: [],
+      firstPageErrorState: null,
+      laterPageError: false,
+    };
+  }
+
   async function mountInScope(ref: ProviderPrRef) {
     const { renderer } = await renderWithProviders(
       <ProviderPrScopeProvider value={{ ref, organizationId: null }}>
@@ -812,6 +851,41 @@ describe('PrDiffFileNavigator provider wording', () => {
     const text = renderedText(await mountInScope(GITHUB_REF));
 
     expect(text).toContain("You don't have permission to view this pull request.");
+  });
+
+  // The navigator's 0-listed-files state is the same shared empty state the
+  // Files tab renders, so it reads the provider key too: a GitLab merge
+  // request is never described as a pull request.
+  const PULL_REQUEST_EMPTY = 'This pull request has no file changes.';
+  const MERGE_REQUEST_EMPTY = 'This merge request has no file changes.';
+
+  function emptyDescription(renderer: RenderWithProvidersResult['renderer']) {
+    const empty = renderer.root.find(node => String(node.type) === 'EmptyState');
+    return empty.props.description as string;
+  }
+
+  it('describes a GitLab empty file list as a merge request', async () => {
+    setEmptyState();
+
+    const description = emptyDescription(await mountInScope(GITLAB_REF));
+
+    expect(description).toBe(MERGE_REQUEST_EMPTY);
+  });
+
+  it('keeps the pull-request empty copy for GitHub', async () => {
+    setEmptyState();
+
+    const description = emptyDescription(await mountInScope(GITHUB_REF));
+
+    expect(description).toBe(PULL_REQUEST_EMPTY);
+  });
+
+  it('keeps the pull-request empty copy for Bitbucket', async () => {
+    setEmptyState();
+
+    const description = emptyDescription(await mountInScope(BITBUCKET_REF));
+
+    expect(description).toBe(PULL_REQUEST_EMPTY);
   });
 });
 

@@ -2483,7 +2483,6 @@
   },
   "home": {
     "couldNotLoadSessions": "De sessies konden niet worden geladen.",
-    "couldNotLoadActiveSessions": "De actieve sessies konden niet worden geladen.",
     "agentSessions": "Nu actief",
     "newCodingTask": "Nieuwe programmeertaak",
     "newTaskFromPicture": "Nieuwe taak vanaf een afbeelding",
@@ -2800,7 +2799,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Dit account heeft nog geen organisaties. Je kunt Bitbucket-PR's beoordelen zodra je een organisatie aanmaakt of er lid van wordt.",
       "gitlabReconnectAdminOnlyDescription": "Vraag een eigenaar, beheerder of factuurbeheerder van de organisatie om het opnieuw te koppelen.",
       "bitbucketNotConnectedTitle": "Bitbucket is niet gekoppeld",
-      "bitbucketAdminOnlyDescription": "Alleen organisatie-eigenaren, beheerders en factuurbeheerders kunnen de koppeling instellen.",
+      "adminOnlyConnectDescription": "Alleen organisatie-eigenaren, beheerders en factuurbeheerders kunnen de koppeling instellen.",
       "contextLine": "Voor {{organization}}",
       "contextLinePersonal": "Voor je persoonlijke account"
     },
@@ -2897,7 +2896,19 @@
         "fileComment": "Opmerking bij bestand",
         "outdatedOnPathLines": "Verouderd in {{path}}, {{lines}}",
         "outdatedOnLines": "Verouderd bij {{lines}}",
-        "outdatedOnPath": "Verouderd in {{path}}"
+        "outdatedOnPath": "Verouderd in {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Linkerkant",
+        "sideRight": "Rechterkant",
+        "outdatedOnLinesSide": "Verouderd bij {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Verouderd in {{path}}, {{lines}} ({{side}})",
+        "outdatedSide": "Verouderd ({{side}})",
+        "outdatedOnPathSide": "Verouderd in {{path}} ({{side}})"
       },
       "deletedUser": "verwijderde gebruiker",
       "replyForbiddenTerm": "Je hebt geen toestemming om op deze {{term}} te reageren.",
@@ -3397,7 +3408,8 @@
         "accounting_adjustment": "Boekhoudkundige correctie",
         "credits_expired": "Tegoed verlopen"
       },
-      "truncated": "Er zijn oudere tegoedtransacties beschikbaar."
+      "truncated": "Er zijn oudere tegoedtransacties beschikbaar.",
+      "retentionLimit": "De meest recente tegoedtransacties worden weergegeven."
     },
     "hub": {
       "balance": "Saldo",
@@ -3420,6 +3432,7 @@
       "sendInvite": "Uitnodiging verzenden",
       "title": "Lid uitnodigen",
       "alreadyInvited": "Dit e-mailadres is al uitgenodigd of is al lid.",
+      "organizationUnavailable": "Deze organisatie is niet meer beschikbaar.",
       "sendError": "De uitnodiging kon niet worden verzonden.",
       "pendingInvitation": "Dit e-mailadres heeft al een openstaande uitnodiging.",
       "alreadyMember": "Deze persoon is al lid van deze organisatie.",
@@ -3441,7 +3454,8 @@
         "void": "Vervallen",
         "uncollectible": "Oninbaar"
       },
-      "truncated": "Oudere facturen zijn beschikbaar."
+      "truncated": "Oudere facturen zijn beschikbaar.",
+      "retentionLimit": "De meest recente facturen worden weergegeven."
     },
     "lowBalanceAlert": {
       "enableA11y": "Waarschuwing voor laag saldo inschakelen",
@@ -3670,8 +3684,7 @@
     "imagesSectionEmpty": "Geen vertrouwde afbeeldingshosts",
     "revoke": "Vertrouwen in {{host}} intrekken",
     "revokeMessage": "Links naar deze host vragen voortaan weer om bevestiging.",
-    "revokeImageMessage": "Afbeeldingen van deze host vragen voortaan weer om bevestiging.",
-    "backToPreferences": "Terug naar voorkeuren"
+    "revokeImageMessage": "Afbeeldingen van deze host vragen voortaan weer om bevestiging."
   },
   "glanceable": {
     "waiting": "Agents bijwerken",
@@ -3918,6 +3931,8 @@
       "downloading": "Downloaden: {{written}} van {{total}}",
       "downloadingUnknown": "Downloaden: {{written}}",
       "paused": "Gepauzeerd: {{written}} van {{total}}",
+      "retrying": "Nieuwe poging: {{written}} van {{total}}",
+      "retryingUnknown": "Nieuwe poging: {{written}}",
       "verifying": "Het gedownloade bestand wordt gecontroleerd…",
       "downloaded": "Gedownload · {{size}}",
       "url": "Directe downloadlink",
@@ -4008,7 +4023,9 @@
         "androidModelUnavailable": "Dit apparaat ondersteunt Gemini Nano niet, of de systeemapp AICore wordt nog ingesteld. Probeer het later opnieuw.",
         "aicoreUpdateRequired": "Werk de AICore-app en je systeemsoftware bij om dit model te gebruiken.",
         "downloadable": "Dit model moet eenmalig worden gedownload voordat je het kunt gebruiken.",
-        "downloading": "Het model wordt gedownload. Het is klaar voor gebruik zodra het downloaden is voltooid."
+        "downloading": "Het model wordt gedownload. Het is klaar voor gebruik zodra het downloaden is voltooid.",
+        "batteryQuota": "Het model op het apparaat heeft zijn batterijtoewijzing voorlopig gebruikt. Probeer het later opnieuw.",
+        "checkFailed": "De app kon dit model niet controleren. Probeer het opnieuw."
       },
       "unavailable": "Het model op het apparaat is nu niet beschikbaar. Controleer de status in $t(modelChat.backends.title).",
       "busy": "Het model op het apparaat is bezig met een ander antwoord. Probeer het opnieuw zodra het klaar is.",
@@ -4369,7 +4386,8 @@
       "purchaseFallback": "Tegoedaankoop",
       "receipt": "Bon",
       "receiptA11y": "Open de bon voor {{description}}, {{amount}}, van {{date}}",
-      "receiptUnavailable": "Er is geen bon beschikbaar voor deze aankoop."
+      "receiptUnavailable": "Er is geen bon beschikbaar voor deze aankoop.",
+      "retentionLimit": "De meest recente tegoedgeschiedenis wordt weergegeven."
     },
     "title": "Credits kopen",
     "description": "Credits zijn een eenmalige aankoop die aan je Kilo-saldo wordt toegevoegd voor AI-coderingssessies in Kilo App. De store belast je account en de credits worden toegevoegd nadat de store de betaling bevestigt.",
@@ -4616,6 +4634,9 @@
     "couldNotLoad": "Kan integraties niet laden",
     "permissionDenied": "Je hebt geen toestemming om deze integraties te beheren.",
     "managedByOwner": "Vraag een eigenaar van de organisatie om een koppeling te wijzigen die je zelf niet kunt wijzigen.",
+    "managedByOwnerOrAdmin": "Vraag een eigenaar of beheerder van de organisatie om een koppeling te wijzigen die je zelf niet kunt wijzigen.",
+    "managedByOwnerOrBilling": "Vraag een eigenaar of factuurbeheerder van de organisatie om een koppeling te wijzigen die je zelf niet kunt wijzigen.",
+    "managedByOwnerAdminOrBilling": "Vraag een eigenaar, beheerder of factuurbeheerder van de organisatie om een koppeling te wijzigen die je zelf niet kunt wijzigen.",
     "connectFailed": "Kan de koppelingspagina niet openen"
   },
   "invoices": {

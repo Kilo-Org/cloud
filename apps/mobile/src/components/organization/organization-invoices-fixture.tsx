@@ -159,8 +159,8 @@ export function OrganizationInvoicesFixture() {
       <TRPCProvider trpcClient={client} queryClient={queryClient}>
         <View className="flex-1 bg-background">
           {organizationId === null ? (
-            <View className="flex-1 items-center justify-center px-6">
-              <Text className="text-center text-sm text-muted-foreground">
+            <View className="flex-1 items-center justify-center px-4">
+              <Text variant="muted" className="text-center">
                 {t('organization.boundary.selectOrganization')}
               </Text>
             </View>

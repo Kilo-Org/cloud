@@ -2,6 +2,7 @@ import { TRPCError } from '@trpc/server';
 import type { WorkerDb } from '@kilocode/db/client';
 import { getSandboxAllocationCandidates, type ProfileOwner } from '@kilocode/cloud-agent-profile';
 import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
+import { providerSupports } from '@kilocode/worker-utils/sandbox-provider-capabilities';
 import {
   allocationSupportsMultiRepository,
   getSandboxAllocationProvider,
@@ -9,6 +10,7 @@ import {
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { isMultiRepositoryEnvironment } from '../environment-build/reference.js';
+import { PROVIDER_DESCRIPTORS } from '../shared/sandbox-provider.js';
 import {
   getSandboxSelectionCapabilities,
   isSandboxAllocationAvailable,
@@ -97,7 +99,7 @@ export async function resolveSavedSandboxAllocation(args: {
   let readiness = args.readiness;
   for (const allocation of allocations) {
     if (getSandboxAllocationProvider(allocation) === 'vercel' && readiness === undefined) {
-      readiness = await resolveVercelSelectionReadiness(env, owner);
+      readiness = await resolveVercelSelectionReadiness(env, owner, capability);
       capabilities = await getSandboxSelectionCapabilities(env, owner, {
         ...selectionOptions,
         ...(readiness.vercelUnavailableReason
@@ -181,10 +183,11 @@ export function assertEnvironmentSupportsSandbox(input: {
   const reject = (message: string) => new TRPCError({ code: 'BAD_REQUEST', message });
   const { allocation } = input;
   if (allocation !== undefined && !allocationSupportsMultiRepository(allocation)) {
+    const provider = getSandboxAllocationProvider(allocation);
     throw reject(
-      getSandboxAllocationProvider(allocation) === 'vercel'
-        ? 'A multi-repository environment cannot run on a Vercel sandbox'
-        : 'A multi-repository environment cannot run on the shared sandbox'
+      providerSupports(provider, 'multiRepository')
+        ? 'A multi-repository environment cannot run on the shared sandbox'
+        : `A multi-repository environment cannot run on a ${PROVIDER_DESCRIPTORS[provider].label} sandbox`
     );
   }
 }

@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { type TodoItemDetail } from '@/lib/todos/todo-types';
 import { act, TestRenderer } from '@/test/renderer';
 
@@ -140,5 +141,21 @@ describe('TodoNotesSection', () => {
     expect(renderer.root.find(node => isHost(node, 'TextInput')).props.accessibilityLabel).toBe(
       i18n.t('todos.item.notes')
     );
+  });
+
+  it('puts the notes label on the page gutter', () => {
+    const renderer = renderNotes(NOTES);
+
+    // The detail screen's scroll body has no padding of its own, so the label
+    // sits on the screen edge unless the header draws the gutter itself.
+    const label = renderer.root.find(
+      node =>
+        isHost(node, 'Text') && (node.children as unknown[]).includes(i18n.t('todos.item.notes'))
+    );
+    const row = label.parent;
+    if (!row || !isHost(row, 'View')) {
+      throw new Error('notes label has no header row');
+    }
+    expect(String(row.props.className).split(' ')).toContain(SCREEN_GUTTER_CLASS);
   });
 });

@@ -8,10 +8,13 @@
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { SectionHeader } from '@/components/ui/section-header';
+import { i18n } from '@/i18n';
+import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
+import { type TodoItemDetail } from '@/lib/todos/todo-types';
 import { act, TestRenderer } from '@/test/renderer';
 
 import { TodoDetailScreen } from './todo-detail-screen';
-import '@/i18n';
 
 const query = vi.hoisted(() => ({
   data: undefined as unknown,
@@ -52,7 +55,7 @@ vi.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 'success' },
 }));
 vi.mock('@/lib/haptics', () => ({ notificationHaptic: vi.fn() }));
-vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
+vi.mock('@/components/ui/text', () => ({ EYEBROW_LATIN_DISPLAY: '', Text: 'Text' }));
 vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
 vi.mock('@/components/todos/todo-notes-section', () => ({ TodoNotesSection: 'TodoNotesSection' }));
 vi.mock('@/components/todos/todo-session-row', () => ({ TodoSessionRow: 'TodoSessionRow' }));
@@ -60,7 +63,6 @@ vi.mock('@/components/todos/todo-start-actions', () => ({ TodoStartActions: 'Tod
 vi.mock('@/components/ui/icons', () => ({ Circle: 'Circle', CircleCheck: 'CircleCheck' }));
 vi.mock('@/components/ui/icon-button', () => ({ IconButton: 'IconButton' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({
   ScreenHeader: (props: HeaderProps) => {
@@ -174,6 +176,51 @@ describe('todo detail error state', () => {
     const error = renderer.root.findAllByType('QueryError')[0];
     expect(propOf(error, 'variant')).toBe('server');
     expect(typeof propOf(error, 'onRetry')).toBe('function');
+    renderer.unmount();
+  });
+});
+
+const LOADED_TODO = {
+  id: 'item-1',
+  listId: 'list-1',
+  title: 'Ship the release',
+  notes: null,
+  doneAt: null,
+  position: 'a0',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+  sessions: [],
+  list: {
+    id: 'list-1',
+    organizationId: null,
+    name: 'Release',
+    emoji: null,
+    gitUrl: null,
+    mode: null,
+    model: null,
+    variant: null,
+    position: 'a0',
+    archivedAt: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    openCount: 1,
+  },
+} satisfies TodoItemDetail;
+
+describe('todo detail body', () => {
+  it('puts the sessions label on the page gutter', () => {
+    query.data = LOADED_TODO;
+    const renderer = renderScreen();
+
+    // The scroll body has no padding of its own, so the label sits on the
+    // screen edge unless the header draws the gutter itself.
+    const header = renderer.root.findByType(SectionHeader);
+    expect(propOf(header, 'label')).toBe(i18n.t('todos.item.sessions'));
+    const row = header.children[0];
+    if (typeof row === 'string' || row === undefined) {
+      throw new Error('section header rendered no row');
+    }
+    expect(String(propOf(row, 'className')).split(' ')).toContain(SCREEN_GUTTER_CLASS);
     renderer.unmount();
   });
 });

@@ -278,7 +278,7 @@ export default function RepoPickerScreen() {
       return null;
     }
     return (
-      <Card className="mx-3 mt-3">
+      <Card className="mx-4 mt-3">
         <Text className="text-sm font-semibold text-foreground">
           {t('agentChat.repoPicker.platformBitbucket')}
         </Text>

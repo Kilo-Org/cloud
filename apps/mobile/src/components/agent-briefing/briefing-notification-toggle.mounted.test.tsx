@@ -3,6 +3,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
 
+import { COMPACT_CONTROL_BOX_CLASS } from '@/lib/a11y/tap-target';
+
 import {
   BriefingNotificationCategoryRow,
   BriefingNotificationToggle,
@@ -74,6 +76,7 @@ vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
 vi.mock('@/components/ui/preference-row', () => ({ PreferenceRow: 'PreferenceRow' }));
+vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
 vi.mock('@/components/ui/icons', () => ({ Newspaper: 'Newspaper' }));
 vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -111,6 +114,10 @@ function mount<P extends object>(component: FunctionComponent<P>, props: P) {
 
 function categoryRowOf(mounted: TestRenderer.ReactTestRenderer) {
   return mounted.root.find(node => (node.type as string) === 'PreferenceRow');
+}
+
+function rowSkeletonOf(mounted: TestRenderer.ReactTestRenderer) {
+  return mounted.root.find(node => (node.type as string) === 'RowSkeleton');
 }
 
 it('shows the device-notifications link from Briefing settings', () => {
@@ -197,18 +204,28 @@ it('shows the toggle placeholder instead of the switch while preferences load', 
   beginPreferencesLoad();
 
   const standalone = mount(BriefingNotificationToggle, {});
-  expect(nodesOfType(standalone, 'Skeleton')).toHaveLength(1);
+  const [placeholder] = nodesOfType(standalone, 'Skeleton');
+  expect(placeholder?.props.className).toContain('rounded-full');
+  // The placeholder takes the box the switch contributes to the row's layout,
+  // so the row the value lands in is the row already on screen.
+  const box = standalone.root.find(
+    node => (node.type as string) === 'View' && node.props.className === COMPACT_CONTROL_BOX_CLASS
+  );
+  expect(box.findAll(node => (node.type as string) === 'Skeleton')).toHaveLength(1);
   expect(nodesOfType(standalone, 'Switch')).toHaveLength(0);
   act(() => {
     standalone.unmount();
   });
 
-  // The row is main's shared primitive, so the load phase is the row's own
-  // busy and disabled state; the primitive owns the switch slot.
+  // The row is the shared skeleton, so assistive tech never meets a switch whose
+  // value nothing has read yet.
   const row = mount(BriefingNotificationCategoryRow, { disabled: false });
-  const primitive = categoryRowOf(row);
-  expect(primitive.props.busy).toBe(true);
-  expect(primitive.props.disabled).toBe(true);
+  const skeleton = rowSkeletonOf(row);
+  expect(skeleton.props.tile).toBe(true);
+  expect(skeleton.props.subtitle).toBe(true);
+  expect(skeleton.props.trailing).toBe('switch');
+  expect(nodesOfType(row, 'PreferenceRow')).toHaveLength(0);
+  expect(nodesOfType(row, 'Switch')).toHaveLength(0);
   act(() => {
     row.unmount();
   });
@@ -217,13 +234,14 @@ it('shows the toggle placeholder instead of the switch while preferences load', 
 it('swaps the toggle placeholder for the switch once preferences arrive', () => {
   beginPreferencesLoad();
   const mounted = mount(BriefingNotificationCategoryRow, { disabled: false });
-  expect(categoryRowOf(mounted).props.busy).toBe(true);
+  expect(nodesOfType(mounted, 'RowSkeleton')).toHaveLength(1);
 
   settlePreferences();
   act(() => {
     mounted.update(createElement(BriefingNotificationCategoryRow, { disabled: false }));
   });
 
+  expect(nodesOfType(mounted, 'RowSkeleton')).toHaveLength(0);
   const primitive = categoryRowOf(mounted);
   expect(primitive.props.busy).toBe(false);
   expect(primitive.props.value).toBe(false);
@@ -233,13 +251,12 @@ it('swaps the toggle placeholder for the switch once preferences arrive', () => 
   });
 });
 
-it('reads the loading category row as busy and disabled', () => {
+it('renders the loading category row as the shared row skeleton', () => {
   beginPreferencesLoad();
   const mounted = mount(BriefingNotificationCategoryRow, { disabled: false });
 
-  const primitive = categoryRowOf(mounted);
-  expect(primitive.props.busy).toBe(true);
-  expect(primitive.props.disabled).toBe(true);
+  expect(nodesOfType(mounted, 'RowSkeleton')).toHaveLength(1);
+  expect(nodesOfType(mounted, 'PreferenceRow')).toHaveLength(0);
 
   act(() => {
     mounted.unmount();

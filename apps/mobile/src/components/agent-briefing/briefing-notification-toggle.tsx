@@ -9,9 +9,11 @@ import { Card } from '@/components/ui/card';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Newspaper } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { COMPACT_CONTROL_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { type BriefingPreferences, useBriefingPreferences } from '@/lib/agent-briefing';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useTRPC } from '@/lib/trpc';
@@ -76,8 +78,9 @@ function useBriefingNotificationSwitch() {
  * the way to the device's notification permission.
  *
  * While the preferences read is pending the value is unknown, so the switch's
- * 44dp slot holds a `Skeleton` and the row does not shift when the value
- * arrives.
+ * slot holds a `Skeleton` and the row does not shift when the value arrives.
+ * The switch contributes the compact control box to the row's layout, so the
+ * placeholder takes that box and the pill inside keeps the control's own shape.
  */
 export function BriefingNotificationToggle() {
   const router = useRouter();
@@ -88,14 +91,17 @@ export function BriefingNotificationToggle() {
       <View className="flex-row items-center gap-3">
         <Text className="min-w-0 flex-1">{t('agentBriefing.title')}</Text>
         {loading ? (
-          <Skeleton className="h-11 w-11 rounded-full" />
+          <View className={COMPACT_CONTROL_BOX_CLASS}>
+            <Skeleton className="h-[31px] w-[51px] rounded-full bg-muted-soft" />
+          </View>
         ) : (
-          <Switch
-            accessibilityLabel={t('agentBriefing.title')}
-            value={value}
-            disabled={unavailable}
-            onValueChange={setEnabled}
-          />
+          renderRowTrailing({
+            kind: 'switch',
+            accessibilityLabel: t('agentBriefing.title'),
+            value,
+            disabled: unavailable,
+            onValueChange: setEnabled,
+          })
         )}
       </View>
       <Text variant="caption">{t('agentBriefing.notificationsHint')}</Text>
@@ -126,15 +132,14 @@ export function BriefingNotificationToggle() {
  * The agent brief as one row of the Notifications categories. `disabled` is the
  * screen's device-notification gate, which disables every category row.
  *
- * While the preferences read is pending the row is busy and disabled, and its
- * switch slot holds a `Skeleton`, so assistive tech does not read a control it
- * cannot use and the row does not shift when the value arrives.
+ * While the preferences read is pending the row is the shared row skeleton, so
+ * the row that will carry the value is the one already on screen, at the same
+ * height, and assistive tech never meets a switch nothing has read yet.
  */
 export function BriefingNotificationCategoryRow({ disabled }: Readonly<{ disabled: boolean }>) {
   const { t } = useTranslation();
   const { preferences, value, pending, loading, unavailable, setEnabled } =
     useBriefingNotificationSwitch();
-  const isDisabled = disabled || unavailable || loading;
   // The screens that stack this row retry their own query, which is not this
   // one: a failed brief read must offer its own retry at the row, or the
   // category is left disabled with no way back short of a screen reload.
@@ -157,14 +162,17 @@ export function BriefingNotificationCategoryRow({ disabled }: Readonly<{ disable
       />
     );
   }
+  if (loading) {
+    return <RowSkeleton tile subtitle trailing="switch" />;
+  }
   return (
     <PreferenceRow
       icon={Newspaper}
       title={t('agentBriefing.title')}
       subtitle={t('agentBriefing.notificationsHint')}
       value={value}
-      disabled={isDisabled}
-      busy={pending || loading}
+      disabled={disabled || unavailable}
+      busy={pending}
       onValueChange={setEnabled}
     />
   );

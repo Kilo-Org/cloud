@@ -33,6 +33,8 @@ vi.mock('expo-router', () => ({ useRouter: () => ({ push: requests.push }) }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({
+  StateAction: ({ label, onPress }: { label: string; onPress: () => void }) =>
+    createElement('StateAction', { label, onPress }),
   EmptyState: ({
     action,
     ...props
@@ -102,6 +104,7 @@ const report = {
 function pressSettings(root: ReactTestInstance): void {
   const [button] = [
     ...root.findAllByType('IconButton' as ElementType),
+    ...root.findAllByType('StateAction' as ElementType),
     ...root.findAllByType('Button' as ElementType),
   ];
   if (!button) {
@@ -175,20 +178,8 @@ it('keeps background updates silent and shows progress only for a pull until it 
   const pull = Promise.withResolvers<typeof page>();
   requests.list.mockReturnValueOnce(background.promise).mockReturnValueOnce(pull.promise);
   vi.useFakeTimers();
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
-  });
-  client = queryClient;
-  queryClient.setQueryData(queryKey, { pages: [page], pageParams: [undefined] });
-  act(() => {
-    renderer = TestRenderer.create(
-      createElement(QueryClientProvider, { client: queryClient }, createElement(BriefingListScreen))
-    );
-  });
-  const mounted = renderer;
-  if (!mounted) {
-    throw new Error('Briefing list did not mount');
-  }
+  const mounted = mountBriefings([report]);
+  const queryClient = client as QueryClient;
   const list = () => mounted.root.findByType('FlashList' as ElementType);
 
   let backgroundRefresh: Promise<void> | undefined = undefined;
@@ -226,16 +217,20 @@ it('keeps background updates silent and shows progress only for a pull until it 
 
 it('renders the shared empty state with its settings action when no context is enabled', () => {
   const mounted = mountBriefings([]);
+  const list = mounted.root.findByType('FlashList' as ElementType);
   const emptyState = mounted.root.findByType('EmptyState' as ElementType);
   expect(emptyState.props.title).toBe('agentBriefing.noEnabledContexts');
   // Nothing is scheduled here, so the empty-window hint would be a wrong claim;
   // the filter hint stays on screen instead.
   expect(emptyState.props.description).toBeUndefined();
   expect(emptyState.props.icon).toBe('Newspaper');
-  // The branch's empty phase owns the body, so no list renders beside it: the
-  // list with its pull-to-refresh gesture exists only once reports arrive.
-  expect(mounted.root.findAllByType('FlashList' as ElementType)).toHaveLength(0);
-  expect(emptyState.props.placement).toBeUndefined();
+  // The empty phase rides in the list, so the state sits under the controls it
+  // follows and keeps the list's pull-to-refresh gesture.
+  expect(emptyState.props.placement).toBe('top');
+  expect(emptyState.props.inset).toBe('gutter');
+  const listProps = list.props as { data: readonly unknown[]; onRefresh: unknown };
+  expect(listProps.data).toHaveLength(0);
+  expect(typeof listProps.onRefresh).toBe('function');
   const texts = mounted.root
     .findAllByType('Text' as ElementType)
     .map(node => String(node.props.children));
@@ -243,8 +238,9 @@ it('renders the shared empty state with its settings action when no context is e
   // The empty state's own action is the only settings entry point while it shows.
   const header = mounted.root.findByType('ScreenHeader' as ElementType);
   expect(header.findAllByType('IconButton' as ElementType)).toHaveLength(0);
-  const buttons = mounted.root.findAllByType('Button' as ElementType);
-  expect(buttons).toHaveLength(1);
+  const actions = mounted.root.findAllByType('StateAction' as ElementType);
+  expect(actions).toHaveLength(1);
+  expect(actions[0]?.props.label).toBe('agentBriefing.settings');
   pressSettings(mounted.root);
   expect(requests.push).toHaveBeenCalledWith('/(app)/agent-briefing/settings');
 });
@@ -301,6 +297,9 @@ it('says it is offline, not empty, while the first fetch is paused', () => {
   expect(errors[0]?.props.onRetry).toBeUndefined();
   expect(errors[0]?.props.title).toBe('offline.noInternet');
   expect(mounted.root.findAllByType('EmptyState' as ElementType)).toHaveLength(0);
+  // The paused read owns the body: no list, and with it no empty state, is a
+  // claim about a list that has not answered yet.
+  expect(mounted.root.findAllByType('FlashList' as ElementType)).toHaveLength(0);
   const texts = mounted.root
     .findAllByType('Text' as ElementType)
     .map(node => String(node.props.children));

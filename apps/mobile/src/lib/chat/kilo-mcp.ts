@@ -168,7 +168,6 @@ const keyFor = (place: ChatPlace): string =>
 const lostConnection =
   (started: number, discovery: number) =>
   (error: RemoteMcpError): void => {
-    /* A sign-out of the account that made the call wins. */
     if (started !== generation) {
       return;
     }
@@ -279,7 +278,6 @@ async function attempt(place: ChatPlace, timeoutMs: number): Promise<KiloMcpStat
  */
 export type KiloMcpRequest = 'automatic' | 'retry';
 
-/** The deadline for one request: the person's Retry waits longer than an open. */
 const deadlineFor = (request: KiloMcpRequest): number =>
   request === 'retry' ? RETRY_TIMEOUT_MS : AUTOMATIC_TIMEOUT_MS;
 

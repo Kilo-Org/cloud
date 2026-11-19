@@ -1,4 +1,5 @@
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -9,8 +10,12 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { EmptyState } from '@/components/empty-state';
+import { Button } from '@/components/ui/button';
 import { Lock } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { openExternalUrl } from '@/lib/external-link';
 import { useOrgGuardrails } from '@/lib/hooks/use-org-settings-queries';
 import { useOrgBoundary, useOrgWithMembers } from '@/lib/hooks/use-organization-queries';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
@@ -73,8 +78,21 @@ export function OrganizationGuardrailsScreen() {
         <EmptyState
           className="bg-background"
           icon={Lock}
-          title={t(TITLE_KEY)}
+          title={t('organizationGuardrails.unavailableTitle')}
           description={t('organizationGuardrails.unavailable')}
+          action={
+            <Button
+              variant="outline"
+              className={STATE_ACTION_CLASS}
+              onPress={() => {
+                void openExternalUrl(`mailto:${SUPPORT_EMAIL}`, {
+                  label: t('organizationGuardrails.contactSupport'),
+                });
+              }}
+            >
+              <Text>{t('organizationGuardrails.contactSupport')}</Text>
+            </Button>
+          }
         />
       </View>
     );

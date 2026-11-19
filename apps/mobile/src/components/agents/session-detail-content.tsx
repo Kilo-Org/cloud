@@ -2309,17 +2309,18 @@ export function SessionDetailContent({
     !isSessionChromePending;
   const headerRight = (
     // The pill leads and the Follow control takes the trailing edge. The pill
-    // grows by one reading when the session starts reporting usage, and a
-    // control after it would move by that width; at the end of the row it keeps
-    // one position instead. The growth comes out of the heading beside it, which
-    // keeps its own line cap and tail ellipsis — the trade this row makes to
-    // leave the title the width up to the pill's painted size.
+    // reserves the width of both readings, so a session that starts reporting
+    // usage paints into that box instead of widening it, and the control after
+    // it keeps one position. The reserved box comes out of the heading beside
+    // it, which keeps its own line cap and tail ellipsis — the trade this row
+    // makes to leave the title the width up to the pill's own.
     <View className="min-w-0 shrink flex-row items-center gap-2">
       <SessionContextMetrics
         info={contextInfo}
         totalCostMicrodollars={sessionCostMicrodollars}
         // The pill's values read as a settled session. While the body is still
-        // a skeleton no reading has arrived, so the pill paints its ring alone.
+        // a skeleton no reading has arrived, so the pill paints the loading bar
+        // across its reserved row and the ring button stays quiet inside it.
         hasMessages={messages.length > 0 && !isSessionChromePending}
         autoApproveAvailable={autoApproveAvailable}
         loading={isSessionChromePending}

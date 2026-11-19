@@ -22,6 +22,7 @@ type DetectorSetting = Settings['detectors'][number];
 const VERDICTS: Record<Verdict, { label: string; tone: StepTone }> = {
   skip: { label: 'Not gated', tone: 'skipped' },
   allow: { label: 'Allowed', tone: 'selected' },
+  fail_open: { label: 'Enkrypt failed, allowed unscanned', tone: 'deferred' },
   block: { label: 'Blocked', tone: 'rejected' },
   unavailable: { label: 'Unavailable', tone: 'deferred' },
 };
@@ -30,6 +31,7 @@ const DECISIONS: Record<Scan['decision'], { label: string; tone: StepTone }> = {
   allowed: { label: 'Allowed', tone: 'selected' },
   blocked: { label: 'Blocked', tone: 'rejected' },
   error_fail_closed: { label: 'Error, request blocked', tone: 'rejected' },
+  error_fail_open: { label: 'Enkrypt failed, allowed unscanned', tone: 'deferred' },
   error_logged: { label: 'Error, logged only', tone: 'deferred' },
   client_aborted: { label: 'Client aborted', tone: 'skipped' },
 };
@@ -84,9 +86,16 @@ function DetectorList({ detectors }: { detectors: EnkryptDetectorId[] }) {
   return <>{detectors.map(detectorLabel).join(', ')}</>;
 }
 
+/** A failed scan's content is stored as allowed only briefly, so it is scanned again soon. */
 function verdictCacheValue(scan: EnkryptInputScanReport): string {
-  const stored = scan.verdict_cache_write === 'written';
-  return `${VERDICT_CACHE_LABELS[scan.verdict_cache]}${stored ? ', stored' : ''}`;
+  const failed = scan.decision === 'error_fail_open' || scan.decision === 'error_logged';
+  const stored =
+    scan.verdict_cache_write !== 'written'
+      ? ''
+      : failed
+        ? ', stored (failed content for 5 minutes)'
+        : ', stored';
+  return `${VERDICT_CACHE_LABELS[scan.verdict_cache]}${stored}`;
 }
 
 function flaggedToolName(tool: EnkryptFlaggedTool): string {
@@ -213,6 +222,8 @@ type GuardrailReportBodyProps = {
   report: EnkryptGuardrailReport | EnkryptOutputGuardrailReport;
   items?: DetailItem[];
   notice?: ReactNode;
+  /** Shown when Enkrypt failed and the guardrail let the content through unscanned. */
+  failOpenNotice: string;
 };
 
 function GuardrailReportBody({
@@ -221,6 +232,7 @@ function GuardrailReportBody({
   report,
   items = [],
   notice,
+  failOpenNotice,
 }: GuardrailReportBodyProps) {
   const { settings, scans } = report;
   const verdictDetails = VERDICTS[report.verdict];
@@ -245,6 +257,9 @@ function GuardrailReportBody({
           ...items,
         ]}
       />
+      {report.verdict === 'fail_open' && report.added_latency_ms !== null && (
+        <p className="text-status-warning text-xs">{failOpenNotice}</p>
+      )}
       {notice}
       {settings && settings.detectors.length > 0 && (
         <div className="flex flex-col gap-1.5">
@@ -282,6 +297,7 @@ export function EnkryptReportSection({ report }: { report: EnkryptGuardrailRepor
       title="Enkrypt input guardrail"
       description="How the organization's Enkrypt guardrail scanned this request."
       report={report}
+      failOpenNotice="Enkrypt failed, so the guardrail failed open: the request was sent without a complete scan. The content that failed is treated as allowed for 5 minutes, then scanned again."
       notice={
         report.settings === null && (
           <p className="text-status-destructive text-xs">
@@ -299,6 +315,7 @@ export function EnkryptOutputReportSection({ report }: { report: EnkryptOutputGu
       title="Enkrypt output guardrail"
       description="How the organization's Enkrypt guardrail scanned the response."
       report={report}
+      failOpenNotice="Enkrypt failed, so the guardrail failed open: the response was released without being scanned."
       items={[
         { label: 'Held back', value: yesNo(report.held_back) },
         { label: 'Held for', value: formatDurationMs(report.held_ms) },

@@ -49,6 +49,13 @@ const VERDICT_CACHE_VERSION = 6;
 
 export const ENKRYPT_VERDICT_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
 
+/**
+ * How long content whose scan Enkrypt failed is cached as allowed. Deliberately short: long enough
+ * that the following steps of a conversation do not resend the same content to an Enkrypt that is
+ * already failing, short enough that the content is rescanned soon, once Enkrypt has recovered.
+ */
+export const ENKRYPT_FAILED_SCAN_CACHE_TTL_SECONDS = 5 * 60;
+
 const cachedBlockVerdictSchema = z
   .object({
     action: z.literal('block'),
@@ -59,6 +66,7 @@ const cachedBlockVerdictSchema = z
 export type EnkryptVerdictCacheEntry = {
   key: string;
   verdict: 'allow' | z.infer<typeof cachedBlockVerdictSchema>;
+  ttlSeconds: number;
 };
 
 export type EnkryptVerdictCacheStore = {
@@ -245,43 +253,55 @@ function uncachedCalls(units: LookedUpUnit[]): KeyedUnit[][] {
 }
 
 /**
- * A log-only scan gates nothing, so its result is cached even when it fails, unless the client
- * disconnected or the scan ran out of time before any call. Otherwise a failure that recurs, such
- * as a timeout, a detector error, or a request too large to scan, would rescan, log, and possibly be
- * charged for the same text on every later request of the conversation. A scan that never got a
- * call slot in time was not charged, and the next request scans it.
+ * A scan that let its content through without a clean result: a blocking scan that failed open, or
+ * a failed log-only scan, other than for a client disconnect. Its content is cached as allowed, but
+ * only for `ENKRYPT_FAILED_SCAN_CACHE_TTL_SECONDS`. This is a deliberate tradeoff: without a cached
+ * verdict, every later step of the conversation would resend the same content to an Enkrypt that is
+ * already failing, and with the usual TTL it would stay unscanned for days. With the short TTL it is
+ * rescanned soon anyway.
  */
-function isCacheableAllow({ verdict, report, usageRecords }: EnkryptGuardrailScanResult): boolean {
-  if (verdict.action !== 'allow') return false;
-  if (report.scan === 'log_only') {
-    return (
-      report.decision !== 'client_aborted' && !(report.error === 'timeout' && report.attempts === 0)
-    );
-  }
-  return usageRecords.at(-1)?.decision === 'allowed';
+function isFailedAllow({ verdict, report }: EnkryptGuardrailScanResult): boolean {
+  if (verdict.action === 'fail_open') return true;
+  return (
+    verdict.action === 'allow' &&
+    report.scan === 'log_only' &&
+    report.error !== null &&
+    report.decision !== 'client_aborted'
+  );
 }
 
-/** What to cache for a scan whose content had no cached verdict: an allow, a genuine block, or nothing. */
+/**
+ * What to cache for a scan whose content had no cached verdict, and for how long: an allow, a
+ * genuine block, or nothing.
+ */
 function cacheableVerdict(
   result: EnkryptGuardrailScanResult,
   config: ReadyConfig
-): EnkryptVerdictCacheEntry['verdict'] | null {
-  if (isCacheableAllow(result)) return 'allow';
+): Omit<EnkryptVerdictCacheEntry, 'key'> | null {
+  if (isFailedAllow(result)) {
+    return { verdict: 'allow', ttlSeconds: ENKRYPT_FAILED_SCAN_CACHE_TTL_SECONDS };
+  }
+  const decision = result.usageRecords.at(-1)?.decision;
+  if (result.verdict.action === 'allow' && decision === 'allowed') {
+    return { verdict: 'allow', ttlSeconds: ENKRYPT_VERDICT_CACHE_TTL_SECONDS };
+  }
   const blockingDetectors = result.report.detectors_fired.filter(detector =>
     config.blockingDetectors.includes(detector)
   );
-  return result.verdict.action === 'block' &&
-    result.usageRecords.at(-1)?.decision === 'blocked' &&
-    blockingDetectors.length > 0
-    ? { action: 'block', detectors: blockingDetectors }
+  return result.verdict.action === 'block' && decision === 'blocked' && blockingDetectors.length > 0
+    ? {
+        verdict: { action: 'block', detectors: blockingDetectors },
+        ttlSeconds: ENKRYPT_VERDICT_CACHE_TTL_SECONDS,
+      }
     : null;
 }
 
 /**
- * What to cache for the calls of a part: an allowed call caches an allow for each of its units, so
- * after another call fails or runs out of time, the next request rescans only that call's units.
- * Writes are deferred and auto-pipelined, and an allow is never overwritten. Enkrypt does not say
- * which unit of a packed call fired, so a genuine block is cached only for a call of one unit.
+ * What to cache for the calls of a part: an allowed call caches an allow for each of its units, and
+ * a failed call a short-lived allow, so the next request rescans only the units of a failed call,
+ * and only once their allow expired. Writes are deferred and auto-pipelined, and an allow is never
+ * overwritten. Enkrypt does not say which unit of a packed call fired, so a genuine block is cached
+ * only for a call of one unit.
  */
 function callCacheEntries(
   calls: KeyedUnit[][],
@@ -290,18 +310,19 @@ function callCacheEntries(
 ): EnkryptVerdictCacheEntry[] {
   if (!cache) return [];
   return calls.flatMap((call, index): EnkryptVerdictCacheEntry[] => {
-    const verdict = cacheableVerdict(required(results[index]), cache.config);
-    if (verdict === 'allow') {
-      return call.flatMap(({ key }) => (key ? [{ key, verdict }] : []));
+    const cacheable = cacheableVerdict(required(results[index]), cache.config);
+    if (cacheable?.verdict === 'allow') {
+      return call.flatMap(({ key }) => (key ? [{ key, ...cacheable }] : []));
     }
     const [only] = call;
-    return verdict && call.length === 1 && only?.key ? [{ key: only.key, verdict }] : [];
+    return cacheable && call.length === 1 && only?.key ? [{ key: only.key, ...cacheable }] : [];
   });
 }
 
 const DECISION_SEVERITY: readonly EnkryptScanReport['decision'][] = [
   'blocked',
   'error_fail_closed',
+  'error_fail_open',
   'error_logged',
   'client_aborted',
   'allowed',
@@ -327,8 +348,8 @@ function sum(values: number[]): number {
 }
 
 /**
- * The result of a part scanned in chunks: it blocks when any chunk blocks, and is otherwise
- * unavailable when any chunk's scan is, so a chunk that fails never lets the part through.
+ * The result of a part scanned in chunks: it blocks when any chunk blocks, is otherwise unavailable
+ * when any chunk's scan is, and otherwise fails open when any chunk's scan does.
  */
 function combineChunks(results: EnkryptGuardrailScanResult[]): EnkryptGuardrailScanResult {
   const first = required(results[0]);
@@ -384,8 +405,7 @@ function callScans(
  * Plans the system prompt or the conversation. Each segment, or each slice of a segment too long
  * for one Enkrypt call, has its verdict cached on its own; only the units without one are scanned,
  * packed into as few calls as fit. A cached block of any unit rejects the request. A cache failure
- * scans the part in full, so it never lets unscanned content through. A failed blocking scan is
- * never cached; see `isCacheableAllow` for log-only scans.
+ * scans the part in full. A failed scan is cached as allowed only briefly; see `isFailedAllow`.
  */
 async function planSegmentsPart(
   part: EnkryptSegmentsPart,
@@ -452,11 +472,12 @@ function required<T>(value: T | undefined): T {
   return value;
 }
 
-/** A verdict acts on its most severe source: a block, then an unavailable scan. */
+/** A verdict acts on its most severe source: a block, then an unavailable scan, then a failed one. */
 export function mostSevereVerdict(verdicts: EnkryptGuardrailVerdict[]): EnkryptGuardrailVerdict {
   return (
     verdicts.find(verdict => verdict.action === 'block') ??
     verdicts.find(verdict => verdict.action === 'unavailable') ??
+    verdicts.find(verdict => verdict.action === 'fail_open') ??
     verdicts.find(verdict => verdict.action === 'allow') ?? { action: 'skip' }
   );
 }
@@ -552,7 +573,7 @@ type ToolPlan = { tool: RequestToolDefinition; characters: number } & (
  * tool that fired it. Each call pays Enkrypt's per-call minimum, so an uncached tool set costs more
  * than one combined call would; verdicts are shared across the organization, so that is paid once
  * per tool and detector set. The results are aggregated into one result for the part: it blocks
- * when any tool blocks, and is otherwise unavailable when any tool's scan is.
+ * when any tool blocks, and is otherwise unavailable or fails open when any tool's scan is or does.
  */
 async function planTools(
   tools: RequestToolDefinition[],
@@ -676,16 +697,14 @@ export async function scanRequestWithVerdictCache(
 }
 
 export async function rememberRequestVerdict(
-  { key, verdict }: EnkryptVerdictCacheEntry,
+  { key, verdict, ttlSeconds }: EnkryptVerdictCacheEntry,
   store: EnkryptVerdictCacheStore
 ): Promise<EnkryptGuardrailReport['scans'][number]['verdict_cache_write']> {
   try {
     const result = await store.set(
       key,
       verdict,
-      verdict === 'allow'
-        ? { ex: ENKRYPT_VERDICT_CACHE_TTL_SECONDS, nx: true }
-        : { ex: ENKRYPT_VERDICT_CACHE_TTL_SECONDS }
+      verdict === 'allow' ? { ex: ttlSeconds, nx: true } : { ex: ttlSeconds }
     );
     return result === null ? 'skipped' : 'written';
   } catch (error) {

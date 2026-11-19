@@ -11,7 +11,7 @@ const blockWithRevertGuidance =
   'Blocked: prompt injection. To change it, use Revert to here under your message (or /undo in the TUI).';
 
 describe('enkryptGuardrailRejectionResponse', () => {
-  it.each(['skip', 'allow'] as const)('sends the request upstream on %s', action => {
+  it.each(['skip', 'allow', 'fail_open'] as const)('sends the request upstream on %s', action => {
     expect(enkryptGuardrailRejectionResponse('chat_completions', { action })).toBeNull();
   });
 

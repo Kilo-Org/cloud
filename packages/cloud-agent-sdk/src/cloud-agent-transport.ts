@@ -13,6 +13,7 @@ import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connecti
 import { isChatEvent, type NormalizedEvent } from './normalizer';
 import { createConversationSourceReader } from './conversation-source';
 import type { CloudAgentEvent } from './cloud-conversation-schemas';
+import type { CloudSessionSnapshotPage } from './types';
 import type { ServiceEvent } from './normalizer';
 import {
   replaySnapshotPage,
@@ -130,12 +131,24 @@ async function readCloudSnapshotPage(
   fetchPage: NonNullable<CloudAgentTransportConfig['fetchCloudSnapshotPage']>,
   sessionId: CloudAgentSessionId
 ): Promise<SnapshotRead> {
+  let payload: unknown;
   try {
-    const page = cloudSessionMessagesPageSchema.parse(await fetchPage(sessionId, {}));
-    return page === null ? { kind: 'missing' } : { kind: 'page', page };
+    payload = await fetchPage(sessionId, {});
   } catch (error) {
     return { kind: 'rejected', error };
   }
+  // A page that fails the schema is terminal: a retry replays the same
+  // persisted page, and its validation text is not a user-facing message.
+  // The schema's transform can also throw (a session-identity mismatch), and
+  // safeParse does not convert a transform throw into a failure result.
+  let parsed: { success: true; data: CloudSessionSnapshotPage | null } | { success: false };
+  try {
+    parsed = cloudSessionMessagesPageSchema.safeParse(payload);
+  } catch {
+    return { kind: 'typed', outcome: { kind: 'invalid_data' } };
+  }
+  if (!parsed.success) return { kind: 'typed', outcome: { kind: 'invalid_data' } };
+  return parsed.data === null ? { kind: 'missing' } : { kind: 'page', page: parsed.data };
 }
 
 function snapshotReadFailureMessage(error: unknown): string {
@@ -647,9 +660,6 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       if (!applySnapshotRead(read, () => {}, expectedGeneration)) {
         scheduleSnapshotRetry(replayInitialPage, expectedGeneration, 0);
       }
-      // Even on a failed read the websocket is still useful — connect without
-      // a snapshot replay. The manager surfaces the error and a retry fills the
-      // transcript when the read recovers.
       return { ticket };
     }
 

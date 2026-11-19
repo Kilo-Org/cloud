@@ -18,9 +18,15 @@ import {
 } from '@/components/profiles/profile-commands-screen.test-helpers';
 import { MAX_SETUP_COMMANDS } from '@/components/profiles/profile-commands-model';
 import { i18n } from '@/i18n';
-import { act } from '@/test/renderer';
+import { act, type ReactTestInstance } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
+import {
+  COMMAND_ROW_FIELD_GAP_CLASS,
+  LINE_ACTION_BOX_CLASS,
+  LINE_ACTION_OVERLAY_CLASS,
+  LINE_ACTION_REACH_DP,
+} from '@/lib/a11y/tap-target';
 
 const h = vi.hoisted(() => ({
   error: vi.fn(),
@@ -82,27 +88,17 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/form-field', async () => {
   const { createElement, useRef } = await import('react');
   return {
-    FormField: (props: {
-      defaultValue?: string;
-      labelAccessory?: unknown;
-      onChangeText?: (value: string) => void;
-    }) => {
+    FormField: (props: { defaultValue?: string; onChangeText?: (value: string) => void }) => {
       // Native uncontrolled text only accepts defaultValue when mounted.
       const nativeText = useRef(props.defaultValue);
-      // The real field renders its label accessory beside the label, so the
-      // caller's row controls are children of the mocked field too.
-      return createElement(
-        'FormField',
-        {
-          ...props,
-          nativeText: nativeText.current,
-          onChangeText: (value: string) => {
-            nativeText.current = value;
-            props.onChangeText?.(value);
-          },
+      return createElement('FormField', {
+        ...props,
+        nativeText: nativeText.current,
+        onChangeText: (value: string) => {
+          nativeText.current = value;
+          props.onChangeText?.(value);
         },
-        props.labelAccessory as never
-      );
+      });
     },
   };
 });
@@ -323,6 +319,83 @@ describe('ProfileCommandsScreen', () => {
         .filter(node => String(node.props.accessibilityLabel).startsWith('Delete'))
         .map(node => node.props.accessibilityHint)
     ).toEqual(['1 / 3', '2 / 3', '3 / 3']);
+
+    unmount();
+  });
+
+  it('reaches the touch target from the card-owned band without covering the input', async () => {
+    h.query.data = testCommands(['a', 'b', 'c']);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    const labels = ['Move command 1 up', 'Move command 1 down', 'Delete command 1'];
+    const controls = findAll(renderer.root, 'Pressable').filter(node =>
+      labels.includes(String(node.props.accessibilityLabel))
+    );
+    // The first card's reorder and delete controls, in the order the labels
+    // name them; the two cards below it keep their own.
+    expect(controls.map(node => node.props.accessibilityLabel)).toEqual(labels);
+
+    // The band is the controls' parent, and each control's box is the whole
+    // touch target on its own node: 46 dp past the 44 dp requirement on both
+    // axes, with no `hitSlop` whose outer side a row's end cannot dispatch.
+    // The mounted suite renders no layout engine, so it holds the contract
+    // at the tree's shape; the gate's frame dumps measure the rendered
+    // numbers. The test renderer keeps the wrapper components in the tree,
+    // so the walk climbs to the nearest host node.
+    for (const control of controls) {
+      let ancestor: ReactTestInstance | null = control.parent;
+      while (ancestor !== null && typeof ancestor.type !== 'string') {
+        ancestor = ancestor.parent;
+      }
+      expect(ancestor).not.toBeNull();
+      expect(String(ancestor?.props.className)).toBe(LINE_ACTION_OVERLAY_CLASS);
+      for (const token of LINE_ACTION_BOX_CLASS.split(' ')) {
+        expect(String(control.props.className)).toContain(token);
+      }
+      expect(control.props.hitSlop).toBeUndefined();
+      expect(String(control.props.className)).toContain('h-[46px]');
+      expect(String(control.props.className)).toContain('w-[46px]');
+    }
+
+    // Each band is the card's child and the field block's sibling, so the
+    // controls' parent is the card, not the one-text-line label row whose
+    // bounds clipped the slop before this shape.
+    const bands = findAll(renderer.root, 'View').filter(
+      node => String(node.props.className) === LINE_ACTION_OVERLAY_CLASS
+    );
+    expect(bands).toHaveLength(3);
+    for (const band of bands) {
+      // The band renders inside the ProfileCommandRowControls composite, so
+      // the card host sits one composite above the band's own node.
+      let card: ReactTestInstance | null = band.parent;
+      while (card !== null && typeof card.type !== 'string') {
+        card = card.parent;
+      }
+      expect(card).not.toBeNull();
+      expect(String(card?.props.className)).toBe('relative');
+      expect(card?.children).toHaveLength(2);
+      const fieldBlock = card?.children.find(child => {
+        if (child === band || typeof child !== 'object') {
+          return false;
+        }
+        return typeof (child as ReactTestInstance).props.className === 'string';
+      });
+      expect(String((fieldBlock as ReactTestInstance).props.className)).toContain('p-4');
+    }
+
+    // The field's gap prop reaches FormField's root, where the label row and
+    // the input are siblings, and is wide enough that the band's bottom edge
+    // (46dp from the card's top) stays above the input's top edge (the card's
+    // 14dp padding + the 17.5dp label line + this gap): 47.5 >= 46 + 1.
+    const fields = findAll(renderer.root, 'FormField');
+    expect(fields).toHaveLength(3);
+    for (const field of fields) {
+      expect(field.props.gapClassName).toBe(COMMAND_ROW_FIELD_GAP_CLASS);
+    }
+    // Band bottom above input top, with clearance, in dp: 14 + 17.5 + 16 = 47.5.
+    expect(14 + 17.5 + 16 - LINE_ACTION_REACH_DP).toBeGreaterThanOrEqual(1);
 
     unmount();
   });

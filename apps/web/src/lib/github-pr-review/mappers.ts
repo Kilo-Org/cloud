@@ -283,7 +283,6 @@ export function buildChecksResult(args: {
     detailsUrl: c.details_url ?? c.html_url ?? null,
     appName: c.app?.name ?? null,
   }));
-  // Dedupe commit statuses per context, keeping the latest by updated_at.
   const byContext = new Map<string, (typeof args.commitStatuses)[number]>();
   for (const status of args.commitStatuses) {
     const existing = byContext.get(status.context);

@@ -416,17 +416,20 @@ describe('local agent browser bridge', () => {
     });
   });
 
-  it('runs the approved repeat of browser_tabs new as the navigate it asked for, and redeems its token once', async () => {
-    // The real store: the fake issues one token bound to the navigate the bridge reroutes to, and only a repeat
-    // Carrying that exact token redeems it — so the assertion is about redemption, not about a canned outcome.
+  it('runs browser_tabs new as a guarded navigate that still binds the tabs call', async () => {
+    // The real store: the fake issues one token bound to the step the bridge names, and only a repeat carrying that
+    // Exact token redeems it — so the assertion is about redemption, not about a canned outcome.
     const tokens = createStepTokenStore({});
     const binding = {
-      argumentHash: hashBrowserToolArguments({ url: 'https://app.example.com/report.txt' }),
+      argumentHash: hashBrowserToolArguments({
+        action: 'new',
+        url: 'https://app.example.com/report.txt',
+      }),
       origin: 'https://app.example.com',
       reason: SENSITIVE_REASON.download,
       session: HANDLE,
       tabId: 77,
-      toolName: 'browser_navigate',
+      toolName: 'browser_tabs',
     };
     const fake = createFakeRuntime({ outcome: approvalOutcome(tokens, binding) });
     const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
@@ -451,12 +454,16 @@ describe('local agent browser bridge', () => {
 
     expect(fake.run[0]).toMatchObject({
       arguments: { url: 'https://app.example.com/report.txt' },
+      // The step the model made, not the navigate the transport ran for it.
+      step: {
+        arguments: { action: 'new', url: 'https://app.example.com/report.txt' },
+        toolName: 'browser_tabs',
+      },
       tabId: 77,
       toolName: 'browser_navigate',
     });
 
-    // The CLI repeats the `browser_tabs` call it sent, not the navigate the token is bound to.
-    // It has to run as that navigate on the tab the first call opened: a second tab would load the url unguarded.
+    // The CLI repeats the `browser_tabs` call it sent; the runtime finds the token and the tab that step opened.
     const approved = await bridge.callTool(CONTROLLER, {
       ...params,
       sensitive: [token],
@@ -466,10 +473,11 @@ describe('local agent browser bridge', () => {
     expect(fake.run).toHaveLength(2);
     expect(fake.run[1]).toMatchObject({
       agent: { sensitive: [token] },
-      arguments: { url: 'https://app.example.com/report.txt' },
+      arguments: { action: 'new', url: 'https://app.example.com/report.txt' },
       tabId: 77,
-      toolName: 'browser_navigate',
+      toolName: 'browser_tabs',
     });
+    expect(fake.run[1]?.step).toBeUndefined();
     expect(approved).toStrictEqual({
       content: [{ text: 'report.txt: The file was downloaded.', type: 'text' }],
     });

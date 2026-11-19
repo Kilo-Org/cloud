@@ -1,10 +1,11 @@
-/* eslint-disable import/no-nodejs-modules, max-lines, promise/avoid-new, vitest/no-conditional-in-test -- the spec reads a real downloads directory and drives a real hub session */
+/* eslint-disable import/max-dependencies, import/no-nodejs-modules, max-lines, promise/avoid-new, vitest/no-conditional-in-test -- the spec reads a real downloads directory and drives a real hub session */
 import { expect, test } from '@playwright/test';
 import type { Download } from '@playwright/test';
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { z } from 'zod';
+import { hashBrowserToolArguments } from '../../src/shared/browser-agent-checks';
 import {
   DOWNLOAD_BODY,
   DOWNLOAD_FILENAME,
@@ -40,6 +41,13 @@ const grant = (origin: string) => [
   { class: 'navigate', origin },
   { class: 'read', origin },
 ];
+
+/** How many tabs the browser holds, from a `browser_tabs list` answer: the same count is how "no second tab" shows. */
+const listedTabCount = (answer: LocalAgentToolResponse): number => {
+  const parsed: unknown = JSON.parse(answer.kind === 'result' ? answer.text : '{"tabs":[]}');
+
+  return z.object({ tabs: z.array(z.record(z.string(), z.unknown())) }).parse(parsed).tabs.length;
+};
 
 const permissionItemSchema = z.object({
   class: z.string(),
@@ -473,6 +481,9 @@ const openEmptyAgentSession = async ({
           .parse(answer['error']);
         const data = error.data ?? {};
         const items = z.array(z.record(z.string(), z.unknown())).safeParse(data['items']);
+        const step = z
+          .object({ argumentsHash: z.string(), tool: z.string() })
+          .safeParse(data['step']);
         const stepToken = z.string().safeParse(data['stepToken']);
 
         return {
@@ -480,6 +491,7 @@ const openEmptyAgentSession = async ({
           kind: 'error',
           message: error.message,
           ...(items.success ? { items: items.data } : {}),
+          ...(step.success ? { step: step.data } : {}),
           ...(stepToken.success ? { stepToken: stepToken.data } : {}),
           ...(data['afterAction'] === true ? { afterAction: true } : {}),
         };
@@ -556,6 +568,170 @@ test('a session\u2019s first navigate to an attachment asks first and keeps one 
 
     expect(again).toMatchObject({ afterAction: true, code: -32_010, kind: 'error' });
     await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toHaveLength(1);
+  } finally {
+    await context.close();
+    await hub.close();
+    await fixture.close();
+    await rm(downloadsPath, { force: true, recursive: true });
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('a first browser_tabs new to an attachment asks first, and its approved repeat keeps one file in its tab', async () => {
+  test.setTimeout(120_000);
+  const downloadsPath = await mkdtemp(join(tmpdir(), 'kilo-downloads-'));
+  const fixture = await startDownloadFixture();
+  const hub = await startFakeHub();
+  const { context, extensionId, userDataDir } = await launchExtensionContext({
+    downloadsPath,
+    grantPermissions: ['downloads'],
+  });
+  await mockKiloApi(context, {});
+  await context.addInitScript({
+    content:
+      "Object.defineProperty(chrome.permissions, 'request', { value: () => Promise.resolve(true) });",
+  });
+
+  try {
+    const sidePanel = await context.newPage();
+    const agentPage = await context.newPage();
+    const downloads: Download[] = [];
+
+    // The file lands in the tab the call opens, so every page the browser creates reports its own downloads.
+    context.on('page', page => page.on('download', download => downloads.push(download)));
+    await agentPage.goto(`${fixture.url}/page`);
+
+    const grants = grant(fixture.url);
+    const session = await openEmptyAgentSession({
+      context,
+      extensionId,
+      hub,
+      sidePanel,
+      title: 'Tabs-new download E2E session',
+    });
+
+    const url = `${fixture.url}${DOWNLOAD_PATH}`;
+    const params = { action: 'new', url };
+
+    // The call names the `browser_tabs` call the model made: the CLI keys its token by exactly that.
+    const guarded = await session.callTool('browser_tabs', params, { authorized: grants });
+
+    expect([
+      guarded.kind === 'error' ? guarded.code : undefined,
+      guarded.kind === 'error' ? guarded.afterAction : undefined,
+      guarded.kind === 'error' ? guarded.step : undefined,
+    ]).toStrictEqual([
+      -32_010,
+      true,
+      { argumentsHash: hashBrowserToolArguments(params), tool: 'browser_tabs' },
+    ]);
+
+    const token = guarded.kind === 'error' ? (guarded.stepToken ?? '') : '';
+
+    if (token === '') {
+      throw new Error('the refusal carried no step token');
+    }
+
+    await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toStrictEqual([]);
+
+    // The refused call already opened its tab; the repeat must not open another.
+    const tabsAfterGuard = listedTabCount(
+      await session.callTool('browser_tabs', { action: 'list' }, { authorized: grants })
+    );
+
+    // The CLI repeats the `browser_tabs` call with the token: the runtime drives the tab that step opened.
+    const approved = await session.callTool('browser_tabs', params, {
+      authorized: grants,
+      sensitive: [token],
+    });
+
+    await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toHaveLength(1);
+
+    // The browser stores an accepted download under its own name here; the report names that file.
+    const kept = downloads.at(-1);
+
+    if (kept === undefined) {
+      throw new Error('the approved repeat produced no download');
+    }
+
+    const keptPath = await kept.path();
+    const text = approved.kind === 'result' ? approved.text : '';
+
+    expect({
+      isError: approved.kind === 'result' ? approved.isError : true,
+      keptReport: text.includes('The file was downloaded; the page did not change.'),
+      named: text.includes(basename(keptPath ?? '')),
+      suggested: kept.suggestedFilename(),
+      tabs: listedTabCount(
+        await session.callTool('browser_tabs', { action: 'list' }, { authorized: grants })
+      ),
+    }).toStrictEqual({
+      isError: false,
+      keptReport: true,
+      named: true,
+      suggested: DOWNLOAD_FILENAME,
+      tabs: tabsAfterGuard,
+    });
+  } finally {
+    await context.close();
+    await hub.close();
+    await fixture.close();
+    await rm(downloadsPath, { force: true, recursive: true });
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('a browser_tabs new to an attachment on a session that has a tab is guarded, and keeps no file', async () => {
+  test.setTimeout(120_000);
+  const downloadsPath = await mkdtemp(join(tmpdir(), 'kilo-downloads-'));
+  const fixture = await startDownloadFixture();
+  const hub = await startFakeHub();
+  const { context, extensionId, userDataDir } = await launchExtensionContext({
+    downloadsPath,
+    grantPermissions: ['downloads'],
+  });
+  await mockKiloApi(context, {});
+  await context.addInitScript({
+    content:
+      "Object.defineProperty(chrome.permissions, 'request', { value: () => Promise.resolve(true) });",
+  });
+
+  try {
+    const sidePanel = await context.newPage();
+    const agentPage = await context.newPage();
+
+    await agentPage.goto(`${fixture.url}/page`);
+
+    const grants = grant(fixture.url);
+    const session = await openPairedAgentSession({
+      beforeShare: async () => {
+        await activateTab(sidePanel, `${fixture.url}/page`);
+      },
+      context,
+      extensionId,
+      hub,
+      sidePanel,
+      title: 'Tabs-new download E2E session',
+    });
+
+    await session.callTool('browser_navigate', { url: `${fixture.url}/page` }, grants);
+
+    // The session already holds a tab: a `browser_tabs new` at the attachment must still be guarded.
+    const guarded = await session.callTool(
+      'browser_tabs',
+      { action: 'new', url: `${fixture.url}${DOWNLOAD_PATH}` },
+      grants
+    );
+
+    expect([
+      guarded.kind === 'error' ? guarded.code : undefined,
+      guarded.kind === 'error' ? guarded.afterAction : undefined,
+      guarded.kind === 'error' ? guarded.step?.tool : undefined,
+    ]).toStrictEqual([-32_010, true, 'browser_tabs']);
+
+    // The file was cancelled before it could be written: the folder stays empty and nothing is named as saved.
+    await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toStrictEqual([]);
+    expect(guarded.kind === 'error' ? guarded.message.includes('already saved') : true).toBe(false);
   } finally {
     await context.close();
     await hub.close();

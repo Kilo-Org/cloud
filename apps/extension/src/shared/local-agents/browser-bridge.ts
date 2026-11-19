@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   AGENT_TAB_OUTSIDE_GROUP_ERROR,
   DOWNLOAD_PERMISSION_MISSING_ERROR,
+  DOWNLOAD_STEP_TAB_GONE_ERROR,
   authorizedGrantsSchema,
   NEEDS_PERMISSION_ERROR,
   ORIGIN_CHANGED_ERROR,
@@ -187,29 +188,6 @@ const navigateOf = (
   url: string
 ): z.infer<typeof toolCallSchema> => ({ ...parsed, arguments: { url }, name: 'browser_navigate' });
 
-/**
- * The navigate an approved `browser_tabs new` repeats. That call loaded its url
- * through the guarded navigate, so the step token it issued is bound to the
- * navigate's own name and arguments, and the CLI's repeat of the `browser_tabs`
- * call carries it. Opening a second tab there would start the very download the
- * guard has to attribute, so the repeat completes the navigation instead.
- */
-const approvedRepeatOf = (
-  parsed: z.infer<typeof toolCallSchema>,
-  owed: { readonly url: string }
-): z.infer<typeof toolCallSchema> | undefined => {
-  if (parsed.name !== 'browser_tabs' || (parsed.sensitive ?? []).length === 0) {
-    return undefined;
-  }
-
-  const action = argumentStringSchema.safeParse(parsed.arguments['action']);
-  const url = argumentStringSchema.safeParse(parsed.arguments['url']);
-
-  return action.success && action.data === 'new' && url.success && url.data === owed.url
-    ? navigateOf(parsed, url.data)
-    : undefined;
-};
-
 export const createRuntimeBrowserBridge = ({
   activeTabId,
   now,
@@ -235,12 +213,6 @@ export const createRuntimeBrowserBridge = ({
    * never reused, so nothing else would ever reclaim them.
    */
   const ended = new Map<string, number>();
-  /**
-   * The session's first navigation, while it is still owed an approval: the tab
-   * the first `browser_tabs new <url>` opened and the url it tried to load.
-   * Nothing else is kept, because nothing else can change what the repeat means.
-   */
-  const firstNavigations = new Map<string, { readonly tabId: number; readonly url: string }>();
 
   const pruneEnded = (): void => {
     const expiredBefore = clock() - ENDED_SESSION_TTL_MS;
@@ -310,7 +282,6 @@ export const createRuntimeBrowserBridge = ({
   const closeOne = async (input: LocalAgentBrowserSessionRef): Promise<void> => {
     markEnded(input.sessionHandle);
     // A closed session owes no approval: the tab it opened is the next session's to adopt.
-    firstNavigations.delete(input.sessionHandle);
     await runtime().closeSession({ sessionHandle: input.sessionHandle });
     // The lease and the caller's refs go with the session; the ended group keeps its tabs.
     runtime().disposeCaller(sessionCaller(input));
@@ -320,10 +291,14 @@ export const createRuntimeBrowserBridge = ({
   const runOnTab = async (
     parsed: z.infer<typeof toolCallSchema>,
     input: LocalAgentBrowserSessionRef,
-    /** The tab the call runs on. */
-    tab: { readonly tabId: number }
+    tab: {
+      /** The call the model made, when this one is an equivalent the transport runs for it. */
+      readonly step?: { readonly arguments: unknown; readonly toolName: string } | undefined;
+      /** The tab the call runs on. */
+      readonly tabId: number;
+    }
   ): Promise<JsonRpcResult> => {
-    const { tabId } = tab;
+    const { step, tabId } = tab;
     const caller = sessionCaller(input);
     const outcome = await runtime()
       .runTool({
@@ -333,6 +308,7 @@ export const createRuntimeBrowserBridge = ({
         },
         arguments: parsed.arguments,
         caller,
+        ...(step === undefined ? {} : { step }),
         tabId,
         toolName: parsed.name,
       })
@@ -391,7 +367,8 @@ export const createRuntimeBrowserBridge = ({
         throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.tabTaken, outcome.result.error);
       }
       case AGENT_TAB_OUTSIDE_GROUP_ERROR:
-      case DOWNLOAD_PERMISSION_MISSING_ERROR: {
+      case DOWNLOAD_PERMISSION_MISSING_ERROR:
+      case DOWNLOAD_STEP_TAB_GONE_ERROR: {
         throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.blocked, outcome.result.error);
       }
       default: {
@@ -443,21 +420,16 @@ export const createRuntimeBrowserBridge = ({
 
       // A tab opened *at* the destination would let Chrome start a download the gate never saw.
       // The url therefore loads through the guarded navigate path; a refused navigate leaves the tab in the session, as an after-action refusal must.
-      // The record is what lets the CLI's approved repeat of this `browser_tabs` call redeem that navigate's step token.
+      // The step override keeps the refusal, and the token it issues, bound to the `browser_tabs` call the model repeats.
       const destination = url.success && url.data !== '' ? url.data : undefined;
-
-      if (destination !== undefined) {
-        firstNavigations.set(input.sessionHandle, { tabId: opened.tabId, url: destination });
-      }
 
       const navigated =
         destination === undefined
           ? undefined
-          : await runOnTab(navigateOf(parsed, destination), input, { tabId: opened.tabId });
-
-      // The navigation ran to its own end — kept, failed, redirect — so no approval is owed for this call any more.
-      // A refusal throws instead, and leaves the record for the repeat that carries its token.
-      firstNavigations.delete(input.sessionHandle);
+          : await runOnTab(navigateOf(parsed, destination), input, {
+              step: { arguments: parsed.arguments, toolName: 'browser_tabs' },
+              tabId: opened.tabId,
+            });
 
       const info = await runtime().tabInfo(opened.tabId);
       const payload = textContent(
@@ -549,22 +521,8 @@ export const createRuntimeBrowserBridge = ({
         return callOnOwnTab(parsed.data, input);
       }
 
-      const owed = firstNavigations.get(input.sessionHandle);
-      const repeat =
-        owed === undefined || owed.tabId !== existing
-          ? undefined
-          : approvedRepeatOf(parsed.data, owed);
-
-      if (repeat === undefined) {
-        return runOnTab(parsed.data, input, { tabId: existing });
-      }
-
-      const completed = await runOnTab(repeat, input, { tabId: existing });
-
-      // The approval is spent on the call it was issued for, so the next `browser_tabs new` opens a tab again.
-      firstNavigations.delete(input.sessionHandle);
-
-      return completed;
+      // A repeat of a refused `browser_tabs new` carries its token, and the runtime drives the tab that step opened.
+      return runOnTab(parsed.data, input, { tabId: existing });
     },
 
     closeSession: closeOne,

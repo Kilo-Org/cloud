@@ -19,6 +19,8 @@ import {
   ORIGIN_CHANGED_ERROR,
   SENSITIVE_REASON,
 } from './browser-agent-checks';
+import { createRuntimeBrowserBridge } from './local-agents/browser-bridge';
+import { LOCAL_AGENT_ERROR_CODES } from './local-agents/jsonrpc';
 import type { BrowserCaller } from './browser-caller';
 import type {
   BrowserTabInfo,
@@ -1978,7 +1980,7 @@ describe('agent browser calls', () => {
     }
   });
 
-  it('names browser_tabs new as the step, and its approved repeat opens no second tab', async () => {
+  it('names browser_tabs new as the step, and its approved repeat navigates the tab it opened', async () => {
     const downloads = createFakeDownloads();
     const created: Record<string, unknown>[] = [];
     const openedListeners: ((tab: {
@@ -1986,6 +1988,7 @@ describe('agent browser calls', () => {
       readonly openerTabId?: number;
     }) => void)[] = [];
     const newTab = TAB_ID + 6;
+    let navigating = true;
     // The file the approved repeat keeps, as the browser reports it once it is written.
     downloads.searched.push({ filename: '/home/me/Downloads/report.txt', id: 72 });
 
@@ -1993,12 +1996,10 @@ describe('agent browser calls', () => {
       create: async (properties: { readonly url?: string } = {}) => {
         created.push({ ...properties });
 
-        // The browser opens the tab, so the call owns it, and the tab's document becomes the file to stop.
+        // The browser opens the tab, so the call owns it.
         for (const listener of openedListeners) {
           listener({ id: newTab, openerTabId: TAB_ID });
         }
-
-        downloads.emit({ id: 71, tabId: newTab });
 
         return { id: newTab, title: '', url: properties.url ?? 'about:blank', windowId: 1 };
       },
@@ -2033,8 +2034,17 @@ describe('agent browser calls', () => {
       tabsApi,
     });
 
-    // A navigate that became a download never loads the page: the browser answers it with an aborted load.
-    cdp.setHandlers({ 'Page.navigate': () => ({ errorText: 'net::ERR_ABORTED' }) });
+    // The navigate answers with an aborted load, and the guarded one names the download it started.
+    cdp.setHandlers({
+      'Page.navigate': () => {
+        if (navigating) {
+          navigating = false;
+          downloads.emit({ id: 71, tabId: newTab });
+        }
+
+        return { errorText: 'net::ERR_ABORTED' };
+      },
+    });
 
     const url = `${MAIN_ORIGIN}/report.txt`;
     const openTab = (sensitive: readonly string[]) =>
@@ -2055,20 +2065,254 @@ describe('agent browser calls', () => {
       throw new Error(`expected a refusal, got ${guarded.kind}`);
     }
 
-    // The token binds the call the model made, never an internal translation of it.
+    // The token binds the call the model made, and the tab never opens at the destination.
     expect(guarded.step).toStrictEqual({
       argumentsHash: hashBrowserToolArguments({ action: 'new', url }),
       tool: 'browser_tabs',
     });
-    expect([created.length, downloads.cancelled]).toStrictEqual([1, [71]]);
+    expect([created.length, created[0]?.['url'], downloads.cancelled]).toStrictEqual([
+      1,
+      'about:blank',
+      [71],
+    ]);
 
     const approved = await openTab([expectStepToken(guarded)]);
 
     // The approved repeat drives the tab the refused step opened: no second tab, and the kept file is the result.
-    expect(created).toHaveLength(1);
+    expect([created.length, downloads.cancelled]).toStrictEqual([1, [71]]);
     expect(
       approved.kind === 'result' && approved.result.ok ? String(approved.result.value) : ''
     ).toContain('report.txt: The file was downloaded; the page did not change.');
+  });
+
+  const refusalSchema = z.object({
+    code: z.number(),
+    data: z.record(z.string(), z.unknown()).optional(),
+    message: z.string(),
+  });
+
+  /** The bridge's RPC failure for one call: the protocol error the hub would relay to the CLI. */
+  const refusalOf = async (call: Promise<unknown>): Promise<z.infer<typeof refusalSchema>> => {
+    try {
+      await call;
+    } catch (error) {
+      return refusalSchema.parse(error);
+    }
+
+    throw new Error('expected the call to be refused');
+  };
+
+  it('binds a bridge-level tabs-new download to the tabs call, and its token drives the tab it opened', async () => {
+    const downloads = createFakeDownloads();
+    downloads.searched.push({ filename: '/home/me/Downloads/report.txt', id: 72 });
+    const created: Record<string, unknown>[] = [];
+    const openedListeners: ((tab: {
+      readonly id?: number;
+      readonly openerTabId?: number;
+    }) => void)[] = [];
+    const newTab = TAB_ID + 7;
+    let navigating = true;
+
+    const tabsApi = {
+      create: async (properties: { readonly url?: string } = {}) => {
+        created.push({ ...properties });
+
+        for (const listener of openedListeners) {
+          listener({ id: newTab, openerTabId: TAB_ID });
+        }
+
+        return { id: newTab, title: '', url: properties.url ?? 'about:blank', windowId: 1 };
+      },
+      get: async (tabId: number) =>
+        tabId === newTab
+          ? { id: newTab, title: '', url: `${MAIN_ORIGIN}/report.txt`, windowId: 1 }
+          : { id: TAB_ID, title: 'Example', url: MAIN_ORIGIN },
+      onCreated: {
+        addListener: (
+          listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+        ) => {
+          openedListeners.push(listener);
+        },
+        removeListener: (
+          listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+        ) => {
+          const index = openedListeners.indexOf(listener);
+
+          if (index !== -1) {
+            openedListeners.splice(index, 1);
+          }
+        },
+      },
+      query: async () => [
+        { active: true, id: TAB_ID, title: 'Example', url: MAIN_ORIGIN, windowId: 1 },
+      ],
+    };
+    const { controller } = createGroups();
+    // No tab at first: the call opens the session's own, exactly as the hub's first call does.
+    const { cdp, runtime } = await createHarness({
+      downloadsApi: downloads.api,
+      share: false,
+      tabGroups: controller,
+      tabsApi,
+    });
+
+    cdp.setHandlers({
+      'Page.navigate': () => {
+        if (navigating) {
+          navigating = false;
+          downloads.emit({ id: 71, tabId: newTab });
+        }
+
+        return { errorText: 'net::ERR_ABORTED' };
+      },
+    });
+
+    const bridge = createRuntimeBrowserBridge({ runtime: () => runtime });
+
+    await bridge.openSession({
+      controllerId: 'controller-1',
+      sessionHandle: 'session-1',
+      title: 'Work',
+    });
+
+    const url = `${MAIN_ORIGIN}/report.txt`;
+    const params = {
+      arguments: { action: 'new', url },
+      authorized: [readGrant, actGrant, { class: 'navigate' as const, origin: MAIN_ORIGIN }],
+      name: 'browser_tabs',
+      sessionHandle: 'session-1',
+    };
+
+    const guarded = await refusalOf(bridge.callTool('controller-1', params));
+
+    // The CLI keys its token by the call it sent, so the step must name that call, not the navigate it ran as.
+    expect([guarded.code, guarded.data?.['step']]).toStrictEqual([
+      LOCAL_AGENT_ERROR_CODES.needsPermission,
+      { argumentsHash: hashBrowserToolArguments({ action: 'new', url }), tool: 'browser_tabs' },
+    ]);
+
+    const token = String(guarded.data?.['stepToken']);
+
+    expect([token === '', created.length, created[0]?.['url'], downloads.cancelled]).toStrictEqual([
+      false,
+      1,
+      'about:blank',
+      [71],
+    ]);
+
+    const approved = await bridge.callTool('controller-1', { ...params, sensitive: [token] });
+
+    // The repeat redeems the token on the tab the step opened: one tab, and the kept file is the answer.
+    expect([created.length, downloads.cancelled]).toStrictEqual([1, [71]]);
+    expect(JSON.stringify(approved)).toContain(
+      'report.txt: The file was downloaded; the page did not change.'
+    );
+  });
+
+  it('guards a tabs-new download on a session that already has a tab, so the file is never kept', async () => {
+    const downloads = createFakeDownloads();
+    // The file the approved repeat keeps, as the browser reports it once it is written.
+    downloads.searched.push({ filename: '/home/me/Downloads/report.txt', id: 74 });
+    const created: Record<string, unknown>[] = [];
+    const openedListeners: ((tab: {
+      readonly id?: number;
+      readonly openerTabId?: number;
+    }) => void)[] = [];
+    const newTab = TAB_ID + 8;
+
+    const tabsApi = {
+      create: async (properties: { readonly url?: string } = {}) => {
+        created.push({ ...properties });
+
+        for (const listener of openedListeners) {
+          listener({ id: newTab, openerTabId: TAB_ID });
+        }
+
+        return { id: newTab, title: '', url: properties.url ?? 'about:blank', windowId: 1 };
+      },
+      get: async (tabId: number) =>
+        tabId === newTab
+          ? { id: newTab, title: '', url: `${MAIN_ORIGIN}/report.txt`, windowId: 1 }
+          : { id: TAB_ID, title: 'Example', url: MAIN_ORIGIN },
+      onCreated: {
+        addListener: (
+          listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+        ) => {
+          openedListeners.push(listener);
+        },
+        removeListener: (
+          listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+        ) => {
+          const index = openedListeners.indexOf(listener);
+
+          if (index !== -1) {
+            openedListeners.splice(index, 1);
+          }
+        },
+      },
+      query: async () => [
+        { active: true, id: TAB_ID, title: 'Example', url: MAIN_ORIGIN, windowId: 1 },
+      ],
+    };
+    // The session already has its tab: only the guard's own window can stop the new tab's file.
+    const { controller } = createGroups();
+    const { cdp, runtime } = await createHarness({
+      downloadsApi: downloads.api,
+      tabGroups: controller,
+      tabsApi,
+    });
+
+    let navigating = true;
+
+    cdp.setHandlers({
+      'Page.navigate': () => {
+        if (navigating) {
+          navigating = false;
+          downloads.emit({ id: 73, tabId: newTab });
+        }
+
+        return { errorText: 'net::ERR_ABORTED' };
+      },
+    });
+
+    const bridge = createRuntimeBrowserBridge({ runtime: () => runtime });
+    const url = `${MAIN_ORIGIN}/report.txt`;
+
+    const guarded = await refusalOf(
+      bridge.callTool('controller-1', {
+        arguments: { action: 'new', url },
+        authorized: [readGrant, actGrant, { class: 'navigate' as const, origin: MAIN_ORIGIN }],
+        name: 'browser_tabs',
+        sessionHandle: 'session-1',
+      })
+    );
+
+    // The tab opens blank and the navigate runs under the guard: nothing is created at the destination.
+    expect([guarded.code, created.length, created[0]?.['url']]).toStrictEqual([
+      LOCAL_AGENT_ERROR_CODES.needsPermission,
+      1,
+      'about:blank',
+    ]);
+    // The file is cancelled before it is written, so the folder keeps nothing and nothing is named as saved.
+    expect([
+      downloads.cancelled,
+      downloads.removed,
+      guarded.message.includes('already saved'),
+    ]).toStrictEqual([[73], [], false]);
+
+    // The repeat carries the token even though the session now holds the opened tab: it keeps the file there.
+    const approved = await bridge.callTool('controller-1', {
+      arguments: { action: 'new', url },
+      authorized: [readGrant, actGrant, { class: 'navigate' as const, origin: MAIN_ORIGIN }],
+      name: 'browser_tabs',
+      sensitive: [String(guarded.data?.['stepToken'])],
+      sessionHandle: 'session-1',
+    });
+
+    expect([created.length, downloads.cancelled]).toStrictEqual([1, [73]]);
+    expect(JSON.stringify(approved)).toContain(
+      'report.txt: The file was downloaded; the page did not change.'
+    );
   });
 
   it('matches an announcement to its own item, never by order', async () => {

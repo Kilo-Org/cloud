@@ -48,6 +48,8 @@ export type LocalAgentToolResponse =
       readonly items?: readonly Record<string, unknown>[] | undefined;
       readonly kind: 'error';
       readonly message: string;
+      /** The step the approval is for: a later call may carry the report of an earlier download. */
+      readonly step?: { readonly argumentsHash: string; readonly tool: string } | undefined;
       readonly stepToken?: string | undefined;
     }
   | {
@@ -251,6 +253,7 @@ const responseOf = (message: Record<string, unknown>): LocalAgentToolResponse =>
       .parse(message['error']);
     const data = error.data ?? {};
     const items = z.array(z.record(z.string(), z.unknown())).safeParse(data['items']);
+    const step = z.object({ argumentsHash: z.string(), tool: z.string() }).safeParse(data['step']);
     const stepToken = z.string().safeParse(data['stepToken']);
 
     return {
@@ -258,6 +261,7 @@ const responseOf = (message: Record<string, unknown>): LocalAgentToolResponse =>
       kind: 'error',
       message: error.message,
       ...(items.success ? { items: items.data } : {}),
+      ...(step.success ? { step: step.data } : {}),
       ...(stepToken.success ? { stepToken: stepToken.data } : {}),
       ...(data['afterAction'] === true ? { afterAction: true } : {}),
     };

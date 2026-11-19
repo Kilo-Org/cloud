@@ -5,6 +5,7 @@ import {
   canStartDownload,
   createStepTokenStore,
   DOWNLOAD_PERMISSION_MISSING_ERROR,
+  DOWNLOAD_STEP_TAB_GONE_ERROR,
   hashBrowserToolArguments,
   NEEDS_PERMISSION_ERROR,
   ORIGIN_CHANGED_ERROR,
@@ -64,6 +65,12 @@ export interface BrowserToolRunInput {
   readonly options?:
     | Pick<BrowserToolDispatchOptions, 'now' | 'webMcpDiscover' | 'webMcpExecute'>
     | undefined;
+  /**
+   * The call the model made, when the transport runs an equivalent one for it
+   * (`browser_tabs new` becomes a navigate on the tab it opened). The step a
+   * download is reported against, and the token binds, is this call.
+   */
+  readonly step?: { readonly arguments: unknown; readonly toolName: string } | undefined;
   readonly tabId: number;
   /** A panel sets this only after its take-over confirmation. */
   readonly takeOver?: boolean;
@@ -1313,18 +1320,20 @@ export const createBrowserRuntime = ({
   /** Names one guard attempt; a record is counted by the attempt that opened it and by no other. */
   let attempts = 0;
   /**
-   * The tab a refused download step opened, keyed by the step token's own binding. Its approved repeat navigates
-   * that tab: a `browser_tabs new` sent again would open a second tab and download the file twice.
+   * The tab a refused download step opened, keyed by the step itself. Its approved repeat navigates that tab: a
+   * `browser_tabs new` sent again would open a second tab and download the file twice.
    */
   const stepTabs = new Map<string, { readonly tabId: number; readonly since: number }>();
 
+  /**
+   * The step alone identifies its tab: the repeat may arrive on the caller's tab or on the one the step opened, and
+   * both are the same approval.
+   */
   const stepTabKey = (binding: {
     readonly argumentHash: string;
     readonly session: string;
-    readonly tabId: number;
     readonly toolName: string;
-  }): string =>
-    [binding.session, String(binding.tabId), binding.toolName, binding.argumentHash].join('|');
+  }): string => [binding.session, binding.toolName, binding.argumentHash].join('|');
 
   /** Remembers the tab a refused `browser_tabs new` step opened, for the one repeat its token buys. */
   const rememberStepTab = (step: DownloadStep, openedTabId: number): void => {
@@ -1354,23 +1363,30 @@ export const createBrowserRuntime = ({
     }
   };
 
+  /** The tab a refused step opened, while its entry is live: the repeat redeems its token against this tab. */
+  const peekStepTab = (binding: {
+    readonly argumentHash: string;
+    readonly session: string;
+    readonly toolName: string;
+  }): number | undefined => {
+    const entry = stepTabs.get(stepTabKey(binding));
+
+    return entry === undefined || entry.since + STEP_TAB_TTL_MS < Date.now()
+      ? undefined
+      : entry.tabId;
+  };
+
   /** The tab a refused step opened, taken once: the repeat that redeems the token is the only call that may have it. */
   const takeStepTab = (binding: {
     readonly argumentHash: string;
     readonly session: string;
-    readonly tabId: number;
     readonly toolName: string;
   }): number | undefined => {
-    const key = stepTabKey(binding);
-    const entry = stepTabs.get(key);
+    const tabId = peekStepTab(binding);
 
-    stepTabs.delete(key);
+    stepTabs.delete(stepTabKey(binding));
 
-    if (entry === undefined || entry.since + STEP_TAB_TTL_MS < Date.now()) {
-      return undefined;
-    }
-
-    return entry.tabId;
+    return tabId;
   };
 
   /** A session that ends owes no approval, and its stopped files stay unreported: there is no model left to tell. */
@@ -2157,6 +2173,7 @@ export const createBrowserRuntime = ({
     arguments: toolArguments,
     caller,
     options,
+    step: stepInput,
     tabId,
     takeOver,
     title,
@@ -2226,15 +2243,25 @@ export const createBrowserRuntime = ({
         const argsRecord = parseToolArguments(toolArguments);
         // Every step token is bound to the calling session, the tab, the tool and the exact arguments.
         const sessionKey = caller.kind === 'agent' ? caller.sessionHandle : '';
-        const issueSensitiveToken = (sensitive: BrowserSensitiveStep): string =>
+        // The call the model made: a transport may run an equivalent one for it (`browser_tabs new` becomes a
+        // Navigate on the tab it opened), and the token must still bind the call the model has to repeat.
+        const stepArgumentsRecord =
+          stepInput === undefined ? argsRecord : parseToolArguments(stepInput.arguments);
+        const stepToolName = stepInput?.toolName ?? toolName;
+        const stepHash = hashBrowserToolArguments(stepArgumentsRecord);
+        const issueSensitiveToken = (
+          sensitive: BrowserSensitiveStep,
+          /** The tab the step ran on: a `browser_tabs new` step runs on the tab it opened. */
+          tokenTabId: number = tabId
+        ): string =>
           tokens.issue({
-            argumentHash: hashBrowserToolArguments(argsRecord),
+            argumentHash: stepHash,
             element: sensitive.element,
             origin: sensitive.origin,
             reason: sensitive.reason,
             session: sessionKey,
-            tabId,
-            toolName,
+            tabId: tokenTabId,
+            toolName: stepToolName,
           });
 
         if (agentContext !== undefined) {
@@ -2273,53 +2300,37 @@ export const createBrowserRuntime = ({
 
           return needsPermissionOutcome(preflight.failure.items, {
             // This call is the step: the same shape everywhere, so the CLI has one rule.
-            step: { argumentsHash: hashBrowserToolArguments(argsRecord), tool: toolName },
+            step: { argumentsHash: stepHash, tool: stepToolName },
             ...(preflight.sensitive === undefined
               ? {}
               : { stepToken: issueSensitiveToken(preflight.sensitive) }),
           });
         }
 
+        const stepUrl = argumentText(stepArgumentsRecord['url']);
+        const stepOpensTab =
+          stepToolName === 'browser_tabs' &&
+          stepArgumentsRecord['action'] === 'new' &&
+          stepUrl !== undefined;
+        // A `browser_tabs new` step ran on the tab it opened, so its token binds that tab. The repeat may arrive on
+        // That tab or on the one the CLI held before, and both are the same approval.
+        const stepTab = stepOpensTab
+          ? peekStepTab({ argumentHash: stepHash, session: sessionKey, toolName: stepToolName })
+          : undefined;
+
         // A download approval is post-action, so the gate cannot classify it on retry; a presented token bound to this session, tab, tool and argument set disables the guard once.
         const downloadApproved =
           agentContext !== undefined && preflight !== undefined && preflight.ok
             ? (agentContext.sensitive ?? []).some(token =>
                 tokens.consume(token, {
-                  argumentHash: hashBrowserToolArguments(argsRecord),
+                  argumentHash: stepHash,
                   origin: preflight.origin,
                   session: sessionKey,
-                  tabId,
-                  toolName,
+                  tabId: stepTab ?? tabId,
+                  toolName: stepToolName,
                 })
               )
             : false;
-
-        // An approved repeat of a `browser_tabs new` download owns the tab that step opened: sending the tool again
-        // Would open a second tab and download the file twice, and the kept file would go unreported. The repeat
-        // Navigates that tab instead, which is the guarded navigate the approval was for.
-        const reusedTab =
-          downloadApproved &&
-          toolName === 'browser_tabs' &&
-          argsRecord['action'] === 'new' &&
-          argumentText(argsRecord['url']) !== undefined
-            ? takeStepTab({
-                argumentHash: hashBrowserToolArguments(argsRecord),
-                session: sessionKey,
-                tabId,
-                toolName,
-              })
-            : undefined;
-        // The tab, session, tool and arguments this call really drives: the caller's, or the tab its step opened.
-        const runTabId = reusedTab ?? tabId;
-        const runSession =
-          reusedTab === undefined
-            ? session
-            : sessionFor(reusedTab).bindCaller(browserCallerKey(caller), {
-                cancelled: () => taken,
-              });
-        const runToolName = reusedTab === undefined ? toolName : 'browser_navigate';
-        const runArguments =
-          reusedTab === undefined ? toolArguments : { url: argumentText(argsRecord['url']) ?? '' };
 
         // A call that can start a download owns the tab's downloads: an earlier call's linger and window end before
         // It runs, so neither cancels a file this call starts — an approved repeat, or the panel's own click, above
@@ -2331,15 +2342,6 @@ export const createBrowserRuntime = ({
             (preflight !== undefined &&
               (preflight.class === 'act' || preflight.class === 'navigate')));
 
-        if (downloadCapable) {
-          takeOverDownloads(tabId);
-        }
-
-        // A file is about to start in the tab the refused step opened: that tab's earlier linger has to end too.
-        if (reusedTab !== undefined) {
-          takeOverDownloads(reusedTab);
-        }
-
         // An unapproved act call runs with downloads denied: a download it starts is cancelled, then reported as a sensitive step.
         const guardDownloads =
           agentContext !== undefined &&
@@ -2348,14 +2350,69 @@ export const createBrowserRuntime = ({
           preflight.sensitiveToken === undefined &&
           !downloadApproved;
 
+        // An approved repeat of a `browser_tabs new` download owns the tab that step opened: sending the tool again
+        // Would open a second tab and download the file twice, and the kept file would go unreported. The repeat
+        // Navigates that tab instead, which is the guarded navigate the approval was for.
+        const reusedTab =
+          downloadApproved && stepOpensTab
+            ? takeStepTab({ argumentHash: stepHash, session: sessionKey, toolName: stepToolName })
+            : undefined;
+
+        // The approval is for that tab: without it a fresh `browser_tabs new` would start the file again, so the
+        // Call is blocked rather than run against a tab nobody approved.
+        if (downloadApproved && stepOpensTab && reusedTab === undefined) {
+          return {
+            kind: 'result',
+            result: { error: DOWNLOAD_STEP_TAB_GONE_ERROR, ok: false },
+          };
+        }
+
+        // A guarded `browser_tabs new` opens its tab blank, inside the session's group, and navigates it under the
+        // Guard: a tab opened at the destination lets the browser start the download before any guard exists, and
+        // The file is then kept with no approval. This is the one path that must not reach the tool as written.
+        const opensGuardedTab = guardDownloads && toolName === 'browser_tabs' && stepOpensTab;
+        const openedForStep = opensGuardedTab
+          ? await openSessionTab({ sessionHandle: sessionKey })
+          : undefined;
+
+        if (opensGuardedTab && openedForStep === undefined) {
+          return {
+            kind: 'result',
+            result: { error: DOWNLOAD_STEP_TAB_GONE_ERROR, ok: false },
+          };
+        }
+
+        // The tab, session, tool and arguments this call really drives: the caller's, or the tab its step opened.
+        const runTabId = reusedTab ?? openedForStep?.tabId ?? tabId;
+        const runSession =
+          runTabId === tabId
+            ? session
+            : sessionFor(runTabId).bindCaller(browserCallerKey(caller), {
+                cancelled: () => taken,
+              });
+        const runIsTranslation = reusedTab !== undefined || openedForStep !== undefined;
+        const runToolName = runIsTranslation ? 'browser_navigate' : toolName;
+        const runArguments = runIsTranslation ? { url: stepUrl ?? '' } : toolArguments;
+
+        if (downloadCapable) {
+          takeOverDownloads(tabId);
+        }
+
+        // A file is about to start in the tab the step opened: that tab's earlier linger has to end too.
+        if (runTabId !== tabId) {
+          takeOverDownloads(runTabId);
+          takeStartedDownloads(runSession);
+          await ensureFrameAutoAttach(runSession, runTabId);
+        }
+
         // Read the optional permission at call time: it can be granted or revoked while this worker lives.
         const guardApi = downloadsApi?.();
-        const guardTab = guardDownloads ? await guardTabOf(tabsApi, tabId) : undefined;
+        const guardTab = guardDownloads ? await guardTabOf(tabsApi, runTabId) : undefined;
         // The tabs this call owns: its own plus any it opens (`browser_tabs new`, a link with a target).
         // The session's other tabs belong to the user or to another call, so a download there is not this call's.
-        const callTabs = new Set<number>([tabId]);
+        const callTabs = new Set<number>([runTabId]);
         const noteOwnedTab = (openedTabId: number, openerTabId: number | undefined): void => {
-          if (openerTabId === tabId) {
+          if (openerTabId === runTabId) {
             callTabs.add(openedTabId);
           }
         };
@@ -2372,24 +2429,23 @@ export const createBrowserRuntime = ({
 
         // A navigate names the document it asked for, so a download that starts after the call returns can still be found.
         const destination =
-          preflight?.class === 'navigate' || reusedTab !== undefined
-            ? argumentText(argsRecord['url'])
-            : undefined;
+          preflight?.class === 'navigate' || runIsTranslation ? stepUrl : undefined;
         // The requests this call can be charged with: everything the tab starts from here on.
         // A download needs one, so a call that starts none never waits for a file.
         const requestsBefore = new Set(
-          guardDownloads ? session.networkRequests().map(request => request.requestId) : []
+          guardDownloads ? runSession.networkRequests().map(request => request.requestId) : []
         );
         // The step this call is: what a download it starts is reported against, and what the token then binds.
         const downloadStep: DownloadStep | undefined =
           guardDownloads && preflight?.ok
             ? {
-                argumentHash: hashBrowserToolArguments(argsRecord),
-                ...downloadStepText(toolName, argsRecord),
+                argumentHash: stepHash,
+                ...downloadStepText(stepToolName, stepArgumentsRecord),
                 origin: preflight.origin,
                 session: sessionKey,
-                tabId,
-                toolName,
+                // The tab the step runs on, which for `browser_tabs new` is the tab it opened: the repeat lands there.
+                tabId: runTabId,
+                toolName: stepToolName,
               }
             : undefined;
         const downloadGuard =
@@ -2401,7 +2457,7 @@ export const createBrowserRuntime = ({
                   : {
                       navigation: {
                         destination,
-                        landed: navigationLanded(tabId, destination),
+                        landed: navigationLanded(runTabId, destination),
                       },
                     }),
                 ...(downloadStep === undefined ? {} : { step: downloadStep }),
@@ -2409,13 +2465,13 @@ export const createBrowserRuntime = ({
                 tabIds: guardTabIds,
                 witness: {
                   attachmentResponse: () =>
-                    session
+                    runSession
                       .networkRequests()
                       .some(
                         request => !requestsBefore.has(request.requestId) && isAttachment(request)
                       ),
                   pendingNavigation: () =>
-                    session
+                    runSession
                       .networkRequests()
                       .filter(
                         request =>
@@ -2425,8 +2481,8 @@ export const createBrowserRuntime = ({
                           request.finishedAt === undefined &&
                           request.failure === undefined
                       ).length,
-                  takeAnnounced: () => session.takeDownloads(),
-                  watchAnnounced: listener => session.watchDownloads(listener),
+                  takeAnnounced: () => runSession.takeDownloads(),
+                  watchAnnounced: listener => runSession.watchDownloads(listener),
                 },
               });
 
@@ -2441,7 +2497,7 @@ export const createBrowserRuntime = ({
         if (downloadGuard !== undefined) {
           // The guard reports the tabs this call opened, so its listener lives exactly as long as the guard does.
           tabsApi.onCreated?.addListener(noteBrowserOpenedTab);
-          await setDownloadBehavior(session, 'deny');
+          await setDownloadBehavior(runSession, 'deny');
         }
 
         const callStartedAt = Date.now();
@@ -2500,7 +2556,7 @@ export const createBrowserRuntime = ({
         } finally {
           // Every exit — a result, a take-over, a throw — disarms the guard, so no listener or interception outlives the call.
           if (guardDownloads) {
-            await setDownloadBehavior(session, 'default');
+            await setDownloadBehavior(runSession, 'default');
           }
 
           if (downloadGuard !== undefined) {
@@ -2538,16 +2594,15 @@ export const createBrowserRuntime = ({
         } else if (agentContext !== undefined && stoppedFiles + settlement.kept.length > 0) {
           const origin = preflight?.ok ? preflight.origin : '';
           const reason = SENSITIVE_REASON.download;
-          const stepToken = preflight?.ok ? issueSensitiveToken({ origin, reason }) : undefined;
+          const stepToken = preflight?.ok
+            ? issueSensitiveToken({ origin, reason }, runTabId)
+            : undefined;
 
           // The tab this step opened, for the one repeat its token buys: sending `browser_tabs new` again would open
-          // A second tab and download the file twice instead of receiving the one the human approved.
+          // A second tab and download the file twice instead of receiving the one the human approved. The step ran
+          // On the tab it opened, whether the transport opened it or this runtime did.
           if (downloadStep !== undefined) {
-            const openedTab = [...callTabs].find(id => id !== tabId);
-
-            if (openedTab !== undefined) {
-              rememberStepTab(downloadStep, openedTab);
-            }
+            rememberStepTab(downloadStep, runTabId);
           }
 
           // The click already ran and the download was cancelled. `afterAction` tells the CLI not to replay it.
@@ -2566,10 +2621,33 @@ export const createBrowserRuntime = ({
           });
         }
 
+        // A guarded `browser_tabs new` answers with what the tool itself would: the tab it opened, at its new url.
+        if (openedForStep !== undefined) {
+          if (!settled.ok) {
+            return { kind: 'result', result: settled };
+          }
+
+          const info = await tabInfo(runTabId);
+
+          return {
+            kind: 'result',
+            result: {
+              ok: true,
+              value: {
+                selected: true,
+                tabId: runTabId,
+                title: info?.title ?? openedForStep.title,
+                // Chrome withholds the url of an `about:blank` tab without the `tabs` permission, so an empty one falls back.
+                url: info?.url === undefined || info.url === '' ? openedForStep.url : info.url,
+              },
+            },
+          };
+        }
+
         // An approved navigate to an attachment keeps its file and still answers `ERR_ABORTED`: that is a success with no page change, not a failure.
         const keptText =
           downloadApproved &&
-          (preflight?.class === 'navigate' || reusedTab !== undefined) &&
+          (preflight?.class === 'navigate' || runIsTranslation) &&
           destination !== undefined &&
           !settled.ok &&
           settled.error.includes('ERR_ABORTED')

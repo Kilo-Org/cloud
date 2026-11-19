@@ -25,3 +25,6 @@ declare var atob: (data: string) => string;
 declare var btoa: (data: string) => string;
 
 declare function structuredClone<T>(value: T): T;
+
+/** Subset of the WHATWG `URL` global used for a session card step's web host. */
+declare var URL: new (url: string) => { readonly host: string };

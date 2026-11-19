@@ -215,3 +215,94 @@ export function sessionLiveText(raw: unknown, limit: number): string | null {
   if (line.length <= limit) return line;
   return `${sessionLiveCut(line, limit - 1).trimEnd()}…`;
 }
+
+function basename(value: unknown): string | null {
+  const text = sessionLiveText(value, Number.MAX_SAFE_INTEGER);
+  if (text === null) return null;
+  const trimmed = text.replace(/[/\\]+$/, '');
+  const last = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
+  const base = last === -1 ? trimmed : trimmed.slice(last + 1);
+  return sessionLiveText(base === '' ? trimmed : base, SESSION_LIVE_TARGET_LIMIT);
+}
+
+function firstString(input: Record<string, unknown>, keys: readonly string[]): unknown {
+  for (const key of keys) {
+    if (typeof input[key] === 'string') return input[key];
+  }
+  return null;
+}
+
+/** The path a file tool acted on: `filePath` (CLI), `file_path` or `path`. */
+const FILE_PATH_KEYS = ['filePath', 'file_path', 'path'] as const;
+
+/** The URL host, or the whole trimmed URL when it does not parse. */
+function urlHost(value: unknown): string | null {
+  const text = sessionLiveText(value, Number.MAX_SAFE_INTEGER);
+  if (text === null) return null;
+  try {
+    return sessionLiveText(new URL(text).host, SESSION_LIVE_TARGET_LIMIT);
+  } catch {
+    return sessionLiveText(text, SESSION_LIVE_TARGET_LIMIT);
+  }
+}
+
+/**
+ * The step a started tool call shows: its verb and a short target (a file
+ * basename, a command, a pattern or a host). Every producer of the summary
+ * names a tool through this one table.
+ */
+export function sessionLiveToolStep(tool: string, input: Record<string, unknown>): SessionLiveStep {
+  switch (tool.toLowerCase()) {
+    case 'edit':
+    case 'write':
+    case 'multiedit':
+    case 'patch':
+    case 'apply_patch':
+      return { verb: 'editing', target: basename(firstString(input, FILE_PATH_KEYS)) };
+    case 'read':
+      return { verb: 'reading', target: basename(firstString(input, FILE_PATH_KEYS)) };
+    case 'bash':
+      return { verb: 'running', target: sessionLiveText(input.command, SESSION_LIVE_TARGET_LIMIT) };
+    case 'grep':
+    case 'glob':
+      return {
+        verb: 'searching',
+        target: sessionLiveText(input.pattern, SESSION_LIVE_TARGET_LIMIT),
+      };
+    case 'list':
+      return { verb: 'searching', target: basename(input.path) };
+    case 'codesearch':
+      return { verb: 'searching', target: sessionLiveText(input.query, SESSION_LIVE_TARGET_LIMIT) };
+    case 'websearch':
+    case 'web_search':
+      return { verb: 'searching', target: sessionLiveText(input.query, SESSION_LIVE_TARGET_LIMIT) };
+    case 'webfetch':
+    case 'web_fetch':
+      return { verb: 'searching', target: urlHost(input.url) };
+    default:
+      return { verb: 'other', target: null };
+  }
+}
+
+const todoSchema = z.object({ content: z.string(), status: z.string() });
+const todoInputSchema = z.object({ todos: z.array(z.unknown()) });
+
+/** `todowrite` input: completed count, total (cancelled excluded) and the active step. */
+export function sessionLivePlan(input: Record<string, unknown>): SessionLivePlan | null {
+  const parsed = todoInputSchema.safeParse(input);
+  if (!parsed.success) return null;
+  let done = 0;
+  let total = 0;
+  let current: string | null = null;
+  for (const raw of parsed.data.todos) {
+    const todo = todoSchema.safeParse(raw);
+    if (!todo.success || todo.data.status === 'cancelled') continue;
+    total++;
+    if (todo.data.status === 'completed') done++;
+    if (current === null && todo.data.status === 'in_progress') {
+      current = sessionLiveText(todo.data.content, SESSION_LIVE_PLAN_STEP_LIMIT);
+    }
+  }
+  if (total === 0) return null;
+  return { done, total, current };
+}

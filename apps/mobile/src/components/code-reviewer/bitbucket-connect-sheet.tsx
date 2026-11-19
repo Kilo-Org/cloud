@@ -37,15 +37,21 @@ export function BitbucketConnectSheet({ scope }: Readonly<{ scope: string | unde
   // inputs the sheet headers use, and it is applied once here so every state of
   // the sheet — the boundary, the loading skeleton and the form — clears it.
   const windowTopClearance = useSheetHeaderTopClearance('android-window-top');
+  const { t } = useTranslation();
   return (
     <View
       className="flex-1 bg-background"
       style={windowTopClearance > 0 ? { paddingTop: windowTopClearance } : undefined}
     >
+      {/* Without a scope there is no organization to name, and the boundary
+          explains which selection is missing instead of leaving the sheet
+          blank. It still needs the Android close control, because this branch
+          renders before any scope-dependent state exists. */}
       {scope === undefined ? (
-        // Without a scope there is no organization to name, and the boundary
-        // explains which selection is missing instead of leaving the sheet blank.
-        <OrganizationBoundary />
+        <>
+          <SurfaceHeader title={t('agentChat.repoPicker.platformBitbucket')} />
+          <OrganizationBoundary />
+        </>
       ) : (
         <ScopedBitbucketConnectSheet scope={scope} />
       )}
@@ -208,24 +214,41 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
           same close control in the same place, and the form does not scroll the
           heading away. iOS keeps the formSheet's grabber and its centred title
           inside the form, so nothing moves there. */}
-      {Platform.OS === 'android' ? (
-        <View className="bg-background">
-          <ScreenHeader
-            title={title}
-            modal
-            // The surface pads the status bar itself, so the header must not.
-            safeAreaTop={false}
-            showBackButton
-            backIcon="close"
-            onBack={() => {
-              router.back();
-            }}
-          />
-        </View>
-      ) : null}
+      <SurfaceHeader title={title} />
       {renderBody()}
       {guard.dialog}
     </>
+  );
+}
+
+/**
+ * The Android header of the modal: the sheet's heading plus the close control
+ * that is this presentation's only visible dismissal. It renders nothing on the
+ * iOS formSheet, which carries its own grabber and dismissal gesture and keeps
+ * `SheetTitle` inside the form.
+ *
+ * The control dispatches the same route removal Back does, so the leave guard
+ * answers it while a token is typed.
+ */
+function SurfaceHeader({ title }: Readonly<{ title: string }>) {
+  const router = useRouter();
+  if (Platform.OS !== 'android') {
+    return null;
+  }
+  return (
+    <View className="bg-background">
+      <ScreenHeader
+        title={title}
+        modal
+        // The surface pads the status bar itself, so the header must not.
+        safeAreaTop={false}
+        showBackButton
+        backIcon="close"
+        onBack={() => {
+          router.back();
+        }}
+      />
+    </View>
   );
 }
 

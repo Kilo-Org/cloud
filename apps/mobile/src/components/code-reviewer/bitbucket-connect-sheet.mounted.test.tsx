@@ -10,6 +10,7 @@ import { i18n } from '@/i18n';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 
 import {
+  BOUNDARY,
   BUTTON,
   DIALOG,
   FORM,
@@ -17,6 +18,7 @@ import {
   leave,
   mount,
   mountForm,
+  mountWithoutScope,
   PERMISSION_DENIED,
   platformMock,
   QUERY_ERROR,
@@ -165,5 +167,16 @@ describe('BitbucketConnectSheet', () => {
     // One header for the surface, not one inside each body: a scroll in the form
     // can never move it, and the loading state already had it.
     expect(failed.findAll(node => Object.is(node.type, HEADER))).toHaveLength(1);
+  });
+
+  it('carries the same close control when no scope was supplied', async () => {
+    platformMock.OS = 'android';
+    const root = await mountWithoutScope();
+
+    // This branch renders the boundary rather than any scope-dependent state,
+    // and it is still the modal's only way out.
+    const header = root.find(node => Object.is(node.type, HEADER));
+    expect(header.props.showBackButton).toBe(true);
+    expect(root.findAll(node => Object.is(node.type, BOUNDARY))).toHaveLength(1);
   });
 });

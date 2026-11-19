@@ -194,6 +194,7 @@ vi.mock('@/components/code-reviewer/bitbucket-connect-form', async () => {
   return { BitbucketConnectForm };
 });
 
+export const BOUNDARY = 'OrganizationBoundary' as ElementType;
 export const BUTTON = 'Button' as ElementType;
 export const DIALOG = 'ConfirmDialog' as ElementType;
 export const FORM = 'BitbucketConnectForm' as ElementType;
@@ -232,6 +233,15 @@ export async function leave(type = 'GO_BACK'): Promise<{ repeat: () => void }> {
     await Promise.resolve();
   });
   return { repeat };
+}
+
+/** Mount the sheet with no scope, the state that renders the boundary. */
+export function mountWithoutScope(): Promise<ReactTestRenderer['root']> {
+  return renderWithProviders(
+    createElement(BitbucketConnectSheet, { scope: undefined })
+  ).then(
+    view => view.renderer.root
+  );
 }
 
 /** Mount the token form's sheet, which is the state the guard speaks for. */

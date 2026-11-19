@@ -319,8 +319,8 @@ it('fails a terminal decline without a second request', async () => {
   expect(failed?.summary.error).toBe('gateway_declined');
 });
 
-// A transient admission failure leaves the row pending with its unchanged
-// due timestamp, so the next due run can generate it.
+// A transient admission failure leaves the row pending; the retry budget has
+// pushed its due time out, and the next due run succeeds and generates it.
 it('retries a row whose admission hit a transient failure and later generates it', async () => {
   const { now } = await scheduled();
   await sweepAgentBriefings(now);
@@ -334,7 +334,7 @@ it('retries a row whose admission hit a transient failure and later generates it
   const [stalled] = await db.select().from(agent_briefing_snapshots);
   expect(stalled?.summary.status).toBe('pending');
   expect(stalled?.generation_id).toBeNull();
-  expect(stalled?.job_due_at).toBe(row.job_due_at);
+  expect(Date.parse(stalled?.job_due_at ?? '')).toBeGreaterThan(Date.parse(row.job_due_at ?? ''));
   fetcher.mockResolvedValue(
     Response.json({ choices: [{ message: { content: 'Recovered summary.' } }] })
   );
@@ -342,6 +342,70 @@ it('retries a row whose admission hit a transient failure and later generates it
   const [finished] = await db.select().from(agent_briefing_snapshots);
   expect(finished?.summary.status).toBe('ready');
   expect(finished?.summary.text).toBe('Recovered summary.');
+});
+
+// A captured source row that is deleted afterwards is a deterministic refusal of
+// the stored snapshot: the mapped code is recorded without holding a slot, and
+// the row does not stay due to be selected ahead of newer reports every tick.
+it('records a failed refusal when a captured source row is gone', async () => {
+  const { now } = await scheduled();
+  await sweepAgentBriefings(now);
+  const [row] = await db.select().from(agent_briefing_snapshots);
+  if (!row) throw new Error('No captured snapshot');
+  const facts = briefingFactsSchema.parse(row.facts);
+  const sourceIds = facts.sessions.flatMap(session =>
+    session.sources.map(source => source.sessionId)
+  );
+  await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sourceIds[0]!));
+  const fetcher = jest.spyOn(globalThis, 'fetch');
+  await runBriefingSummary(row.id);
+  const [refused] = await db.select().from(agent_briefing_snapshots);
+  expect(refused?.summary.status).toBe('failed');
+  expect(refused?.summary.error).toBe('permission_unavailable');
+  expect(refused?.generation_id).toBeNull();
+  expect(refused?.job_due_at).toBeNull();
+  expect(fetcher).not.toHaveBeenCalled();
+});
+
+// A lookup that stays down while the row is due must not keep a selection slot:
+// each rejection is retried on a later due run, and the budget then records the
+// cause instead of rethrowing.
+it('records the mapped refusal after the admission rethrow budget', async () => {
+  const { now } = await scheduled();
+  await sweepAgentBriefings(now);
+  const [row] = await db.select().from(agent_briefing_snapshots);
+  if (!row) throw new Error('No captured snapshot');
+  const balance = jest.mocked(getBalanceAndOrgSettings);
+  // One-shot rejections: one for each rethrow under the budget and one for the
+  // call that records the refusal, leaving the module default for later tests.
+  balance
+    .mockRejectedValueOnce(new Error('_persistent'))
+    .mockRejectedValueOnce(new Error('_persistent'))
+    .mockRejectedValueOnce(new Error('_persistent'))
+    .mockRejectedValueOnce(new Error('_persistent'));
+  const fetcher = jest.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('fetch failed'));
+  const dueAt = row.job_due_at;
+  if (!dueAt) throw new Error('No due time');
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await expect(runBriefingSummary(row.id)).rejects.toThrow('_persistent');
+    const [pending] = await db.select().from(agent_briefing_snapshots);
+    expect(pending?.summary.status).toBe('pending');
+    expect(pending?.generation_id).toBeNull();
+    if (attempt === 0) {
+      expect(Date.parse(pending?.job_due_at ?? '')).toBeGreaterThan(Date.parse(dueAt));
+      await db
+        .update(agent_briefing_snapshots)
+        .set({ job_due_at: dueAt })
+        .where(eq(agent_briefing_snapshots.id, row.id));
+    }
+  }
+  await runBriefingSummary(row.id);
+  const [refused] = await db.select().from(agent_briefing_snapshots);
+  expect(refused?.summary.status).toBe('failed');
+  expect(refused?.summary.error).toBe('generation_failed');
+  expect(refused?.generation_id).toBeNull();
+  expect(refused?.summary.admissionAttempts).toBe(3);
+  expect(fetcher).not.toHaveBeenCalled();
 });
 
 it('does not repeat a successful answer whose body cannot be read', async () => {

@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { z } from 'zod';
+import { z, ZodError } from 'zod';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -644,6 +644,13 @@ function briefingFailureCode(error: unknown): z.infer<typeof briefingSummaryErro
   // than by `instanceof Error`.
   const name = error instanceof Error || error instanceof DOMException ? error.name : null;
   if (name === 'TimeoutError' || name === 'AbortError') return 'time_limit';
+  // The row-level checks throw shapes without schema members: a refusal TRPCError
+  // over the row's context or sources, and a ZodError from parsing the row's own
+  // facts or authorization against a newer schema. Both say the stored row is no
+  // longer admissible, so they map like the row's own checks do.
+  if (error instanceof TRPCError && (error.code === 'FORBIDDEN' || error.code === 'NOT_FOUND'))
+    return 'permission_unavailable';
+  if (error instanceof ZodError) return 'permission_unavailable';
   return briefingSummaryErrorSchema
     .catch('generation_failed')
     .parse(error instanceof Error ? error.message : null);
@@ -658,9 +665,15 @@ function briefingFailureCode(error: unknown): z.infer<typeof briefingSummaryErro
  * (`gateway_declined`, `invalid_summary`, `time_limit`) or it traces to a
  * lookup against live data (`model_pricing_unavailable`,
  * `invalid_model_pricing`, and any unmapped error, read as
- * `generation_failed`). A failure with one of those is thrown again, which
- * leaves the row `pending` on its unchanged `job_due_at` for the next due run
- * instead of ending it for the morning.
+ * `generation_failed`). A failure with one of those is thrown again up to the
+ * rethrow budget, which leaves the row `pending` (with the budget's due-time
+ * push) for the next due run instead of ending it for the morning. A persistent
+ * failing lookup still ends the row after the budget, with its cause stored.
+ * `model_not_allowed` stays a refusal because the code is stored and shown where
+ * the row's owner can act on it, whereas retrying would end the morning with a
+ * bare `not_admitted` and lose that specific cause; the allow-list it reads is
+ * an operator flag behind a short cache, the only reversible source for a flip,
+ * and the minute between retries under the budget rarely observes one.
  */
 const CODE_DESCRIBES_ROW: Record<z.infer<typeof briefingSummaryErrorSchema>, boolean> = {
   permission_unavailable: true,
@@ -676,6 +689,18 @@ const CODE_DESCRIBES_ROW: Record<z.infer<typeof briefingSummaryErrorSchema>, boo
   time_limit: false,
   generation_failed: false,
 } satisfies Record<z.infer<typeof briefingSummaryErrorSchema>, boolean>;
+
+/**
+ * The admission rethrow budget: a failure whose code does not describe the row is
+ * rethrown up to three times, each rethrow pushing the row's due time a minute out
+ * so it queues behind rows a retry has not failed, and after the third the mapped
+ * cause is stored instead of occupying a selection slot again.
+ */
+const ADMISSION_RETRY_BUDGET = 3;
+const ADMISSION_RETRY_DELAY_MS = 60_000;
+
+/** The rethrow counter a row's `summary` carries under the retry budget. */
+const admissionAttemptsSchema = z.number().int().nonnegative();
 
 /** The values an admitted row carries into its claimed generation. */
 type BriefingAdmission = {
@@ -733,11 +758,33 @@ async function admitBriefingSummary(reportId: string): Promise<BriefingAdmission
     if (deadlineMs <= Date.now()) throw new Error('not_admitted');
     return { row, user, prompt, bound, deadlineMs };
   } catch (error) {
-    // A code that does not describe the row means a check could not decide, so
-    // the error is thrown again: the due run reports a rejection and the row
-    // stays `pending` with its unchanged `job_due_at` for the next tick.
+    // A code that does not describe the row means a check could not decide, so the
+    // rethrow budget below applies before its cause is recorded.
     const code = briefingFailureCode(error);
-    if (!CODE_DESCRIBES_ROW[code]) throw error;
+    if (CODE_DESCRIBES_ROW[code]) {
+      await refuseBriefingAdmission(reportId, code);
+      return undefined;
+    }
+    const attempts = admissionAttemptsSchema.catch(0).parse(row.summary.admissionAttempts);
+    if (attempts < ADMISSION_RETRY_BUDGET) {
+      // Best-effort bookkeeping for an already-stale read: the guard skips a row
+      // another run claimed between the read and this write.
+      await db
+        .update(agent_briefing_snapshots)
+        .set({
+          job_due_at: new Date(Date.now() + ADMISSION_RETRY_DELAY_MS).toISOString(),
+          summary: sql`${agent_briefing_snapshots.summary} || ${JSON.stringify({
+            admissionAttempts: attempts + 1,
+          })}::jsonb`,
+        })
+        .where(
+          and(
+            eq(agent_briefing_snapshots.id, reportId),
+            sql`${agent_briefing_snapshots.summary}->>'status' = 'pending'`
+          )
+        );
+      throw error;
+    }
     await refuseBriefingAdmission(reportId, code);
     return undefined;
   }

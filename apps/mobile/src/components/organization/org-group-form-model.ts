@@ -172,7 +172,5 @@ export function filterOrgGroupMembers<T extends Readonly<{ name: string; email: 
   if (needle.length === 0) {
     return members;
   }
-  return members.filter(member =>
-    foldForSearch(`${member.name} ${member.email}`).includes(needle)
-  );
+  return members.filter(member => foldForSearch(`${member.name} ${member.email}`).includes(needle));
 }

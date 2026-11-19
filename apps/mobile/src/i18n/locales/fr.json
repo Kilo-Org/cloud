@@ -2147,6 +2147,8 @@
     "modelPicker": {
       "title": "Choix du modèle",
       "noModelsDescription": "Aucun modèle n'est disponible.",
+      "allUnavailableTitle": "Aucun modèle ne peut être utilisé",
+      "allUnavailableDescription": "Ajoutez une clé de fournisseur et réessayez.",
       "favorites": "Favoris"
     },
     "modelSelector": {

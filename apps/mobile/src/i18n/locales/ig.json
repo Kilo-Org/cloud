@@ -2782,6 +2782,8 @@
     "modelPicker": {
       "title": "Họrọ ihe nlereanya",
       "noModelsDescription": "Enweghị ihe nlereanya dị ịhọrọ.",
+      "allUnavailableTitle": "Enweghị ihe nlereanya a pụrụ iji mee ihe",
+      "allUnavailableDescription": "Tinye igodo onye na-enye ọrụ, ma nwaa ọzọ.",
       "favorites": "Ihe kacha amasị gị"
     },
     "modelSelector": {

@@ -2782,6 +2782,8 @@
     "modelPicker": {
       "title": "ជ្រើសរើសម៉ូដែល",
       "noModelsDescription": "គ្មានម៉ូដែលណាអាចជ្រើសរើសបានទេ។",
+      "allUnavailableTitle": "គ្មានម៉ូដែលណាអាចប្រើបានទេ",
+      "allUnavailableDescription": "បន្ថែមសោអ្នកផ្តល់សេវា រួចព្យាយាមម្តងទៀត។",
       "favorites": "ចំណូលចិត្ត"
     },
     "modelSelector": {

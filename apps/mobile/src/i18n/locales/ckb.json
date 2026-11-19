@@ -2782,7 +2782,9 @@
     "modelPicker": {
       "title": "هەڵبژاردنی مۆدێل",
       "favorites": "دڵخوازەکان",
-      "noModelsDescription": "هیچ مۆدێلێک بۆ هەڵبژاردن بەردەست نییە."
+      "noModelsDescription": "هیچ مۆدێلێک بۆ هەڵبژاردن بەردەست نییە.",
+      "allUnavailableTitle": "هیچ مۆدێلێک ناتوانرێت بەکاربهێنرێت",
+      "allUnavailableDescription": "کلیلێکی دابینکەر زیاد بکە، پاشان دووبارە هەوڵ بدەوە."
     },
     "modelSelector": {
       "provider": "دابینکەر: {{id}}",

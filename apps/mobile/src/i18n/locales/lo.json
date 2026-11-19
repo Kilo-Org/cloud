@@ -2782,6 +2782,8 @@
     "modelPicker": {
       "title": "ເລືອກໂມເດວ",
       "noModelsDescription": "ບໍ່ມີໂມເດວໃຫ້ເລືອກ.",
+      "allUnavailableTitle": "ບໍ່ມີໂມເດວໃດທີ່ໃຊ້ໄດ້",
+      "allUnavailableDescription": "ເພີ່ມຄີຂອງຜູ້ໃຫ້ບໍລິການ ແລ້ວລອງໃໝ່.",
       "favorites": "ລາຍການທີ່ມັກ"
     },
     "modelSelector": {

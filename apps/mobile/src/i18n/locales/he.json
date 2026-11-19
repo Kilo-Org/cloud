@@ -2251,6 +2251,8 @@
     "modelPicker": {
       "title": "בחירת מודל",
       "noModelsDescription": "אין מודלים זמינים לבחירה.",
+      "allUnavailableTitle": "לא ניתן להשתמש באף מודל",
+      "allUnavailableDescription": "הוסף מפתח ספק ונסה שוב.",
       "favorites": "מועדפים"
     },
     "modelSelector": {

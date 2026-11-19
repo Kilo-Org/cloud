@@ -2782,6 +2782,8 @@
     "modelPicker": {
       "title": "Hautatu modeloa",
       "noModelsDescription": "Ez dago hautatzeko moduko modelorik.",
+      "allUnavailableTitle": "Ezin da modelorik erabili",
+      "allUnavailableDescription": "Gehitu hornitzailearen gako bat eta saiatu berriro.",
       "favorites": "Gogokoak"
     },
     "modelSelector": {

@@ -2782,7 +2782,9 @@
     "modelPicker": {
       "title": "Moodela filadhu",
       "favorites": "Kan jaallatte",
-      "noModelsDescription": "Moodeloonni filatamuu danda'an hin jiran."
+      "noModelsDescription": "Moodeloonni filatamuu danda'an hin jiran.",
+      "allUnavailableTitle": "Moodeelli tokkollee fayyadamuu hin danda'u",
+      "allUnavailableDescription": "Furtuu dhiyeessaa dabaliitii deebi'ii yaali."
     },
     "modelSelector": {
       "provider": "Dhiyeessaa {{id}}",

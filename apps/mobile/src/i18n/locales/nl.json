@@ -2225,7 +2225,9 @@
     "modelPicker": {
       "title": "Model selecteren",
       "favorites": "Favorieten",
-      "noModelsDescription": "Er zijn geen modellen beschikbaar om te selecteren."
+      "noModelsDescription": "Er zijn geen modellen beschikbaar om te selecteren.",
+      "allUnavailableTitle": "Geen enkel model kan worden gebruikt",
+      "allUnavailableDescription": "Voeg een providersleutel toe en probeer het opnieuw."
     },
     "modelSelector": {
       "provider": "Aanbieder {{id}}",

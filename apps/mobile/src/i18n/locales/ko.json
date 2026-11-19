@@ -2225,6 +2225,8 @@
     "modelPicker": {
       "title": "모델 선택",
       "noModelsDescription": "선택할 수 있는 모델이 없습니다.",
+      "allUnavailableTitle": "어떤 모델도 사용할 수 없습니다",
+      "allUnavailableDescription": "제공업체 키를 추가한 후 다시 시도하세요.",
       "favorites": "즐겨찾기"
     },
     "modelSelector": {

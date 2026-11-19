@@ -2782,6 +2782,8 @@
     "modelPicker": {
       "title": "Pilih model",
       "noModelsDescription": "Tiada model tersedia untuk dipilih.",
+      "allUnavailableTitle": "Tiada model yang boleh digunakan",
+      "allUnavailableDescription": "Tambah kunci pembekal dan cuba semula.",
       "favorites": "Kegemaran"
     },
     "modelSelector": {

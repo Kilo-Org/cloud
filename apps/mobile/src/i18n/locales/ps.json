@@ -2782,7 +2782,9 @@
     "modelPicker": {
       "title": "د ماډل ټاکنه",
       "favorites": "د خوښې ماډلونه",
-      "noModelsDescription": "د غوره کولو لپاره هېڅ ماډل نشته."
+      "noModelsDescription": "د غوره کولو لپاره هېڅ ماډل نشته.",
+      "allUnavailableTitle": "هېڅ ماډل د کارولو وړ نه دی",
+      "allUnavailableDescription": "د چمتو کوونکي کیلي زیاته کړئ او بیا هڅه وکړئ."
     },
     "modelSelector": {
       "provider": "چمتو کوونکی {{id}}",

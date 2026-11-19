@@ -2782,7 +2782,9 @@
     "modelPicker": {
       "title": "मोडेल छनोट",
       "favorites": "मनपर्ने",
-      "noModelsDescription": "चयन गर्न कुनै मोडेल उपलब्ध छैन।"
+      "noModelsDescription": "चयन गर्न कुनै मोडेल उपलब्ध छैन।",
+      "allUnavailableTitle": "कुनै पनि मोडेल प्रयोग गर्न सकिँदैन",
+      "allUnavailableDescription": "प्रदायक कुञ्जी थपेर फेरि प्रयास गर्नुहोस्।"
     },
     "modelSelector": {
       "provider": "प्रदायक {{id}}",

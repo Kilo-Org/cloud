@@ -73,8 +73,9 @@ vi.mock('@/lib/hooks/use-model-preferences', () => ({
 }));
 
 // FlashList renders through a callback; this mock mirrors the real list (rows
-// via renderItem, key via keyExtractor, item type via getItemType) so row
-// assertions see real content, and records each commit's data length.
+// via renderItem, key via keyExtractor, item type via getItemType, the header
+// above the rows) so row and header assertions see real content, and records
+// each commit's data length.
 vi.mock('@shopify/flash-list', async () => {
   const React = await import('react');
   return {
@@ -83,6 +84,7 @@ vi.mock('@shopify/flash-list', async () => {
       renderItem?: (info: { item: ModelPickerRow; index: number }) => ReactNode;
       keyExtractor?: (item: ModelPickerRow, index: number) => string;
       getItemType?: (item: ModelPickerRow | undefined) => string | undefined;
+      ListHeaderComponent?: ReactNode;
       style?: unknown;
       contentContainerStyle?: unknown;
     }) => {
@@ -101,9 +103,11 @@ vi.mock('@shopify/flash-list', async () => {
           getItemType: props.getItemType,
           renderItem: props.renderItem,
           keyExtractor: props.keyExtractor,
+          ListHeaderComponent: props.ListHeaderComponent,
           style: props.style,
           contentContainerStyle: props.contentContainerStyle,
         },
+        props.ListHeaderComponent,
         ...rows
       );
     },
@@ -142,12 +146,16 @@ vi.mock('@/components/picker-sheet', () => ({
     ),
 }));
 // EmptyState renders its `action` node (as the real component does) so the
-// empty state's clear CTA is reachable from the tree; `title` stays a prop for
-// the existing assertions.
+// empty state's clear CTA is reachable from the tree; `title` and `description`
+// stay props for the copy assertions.
 vi.mock('@/components/empty-state', () => ({
   StateAction: 'StateAction',
-  EmptyState: (props: { title: string; action?: ReactNode }) =>
-    createElement('EmptyState', { title: props.title }, props.action),
+  EmptyState: (props: { title: string; description?: ReactNode; action?: ReactNode }) =>
+    createElement(
+      'EmptyState',
+      { title: props.title, description: props.description },
+      props.action
+    ),
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -635,6 +643,61 @@ describe('ModelPickerContent deferred search', () => {
     // would double the reserved space.
     expect(list.props.contentContainerStyle).toBeUndefined();
     /* eslint-enable typescript-eslint/no-unsafe-member-access */
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+// A remote session whose CLI reports no models projects its current selection
+// as one row carrying `unavailable: true`, so the catalog has rows but nothing
+// selectable. The sheet must explain that state above the rows — the row and
+// the search field keep their places — instead of drawing a dead row with no
+// reason. The zero-rows branch keeps its own copy and is not this state.
+describe('ModelPickerContent all models unavailable', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    buildSearchCalls.values.length = 0;
+    listCommitLengths.values.length = 0;
+    safeAreaInsets.bottom = 0;
+    routerBack.mockClear();
+  });
+
+  it('explains the dead row above the list when every model is unavailable', async () => {
+    slotState.bridge = {
+      ...makeBridge(),
+      options: [{ ...makeOption(0), unavailable: true }],
+    };
+    const renderer = await mount();
+
+    // The row stays: it is the session's current model, so the state explains
+    // why the picker offers nothing to change it to rather than hiding it.
+    expect(listedDisplayIds(renderer)).toEqual(['model-0']);
+
+    const headers = findByType(renderer.root, 'EmptyState');
+    expect(headers).toHaveLength(1);
+    /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+    expect(headers[0]?.props.title).toBe(i18n.t('agentChat.modelPicker.allUnavailableTitle'));
+    expect(headers[0]?.props.description).toBe(
+      i18n.t('agentChat.modelPicker.allUnavailableDescription')
+    );
+    /* eslint-enable typescript-eslint/no-unsafe-member-access */
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('leaves the header off when any model can be picked', async () => {
+    slotState.bridge = {
+      ...makeBridge(),
+      options: [{ ...makeOption(0), unavailable: true }, makeOption(1)],
+    };
+    const renderer = await mount();
+
+    expect(findByType(renderer.root, 'EmptyState')).toHaveLength(0);
+    expect(listedDisplayIds(renderer)).toEqual(['model-0', 'model-1']);
 
     act(() => {
       renderer.unmount();

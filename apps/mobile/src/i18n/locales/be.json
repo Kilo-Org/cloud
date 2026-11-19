@@ -2882,7 +2882,9 @@
     "modelPicker": {
       "title": "Выбар мадэлі",
       "favorites": "Абранае",
-      "noModelsDescription": "Няма мадэляў для выбару."
+      "noModelsDescription": "Няма мадэляў для выбару.",
+      "allUnavailableTitle": "Ніводную мадэль нельга выкарыстаць",
+      "allUnavailableDescription": "Дадайце ключ пастаўшчыка, затым паспрабуйце яшчэ раз."
     },
     "modelSelector": {
       "provider": "Пастаўшчык {{id}}",

@@ -2782,6 +2782,8 @@
     "modelPicker": {
       "title": "Επιλογή μοντέλου",
       "noModelsDescription": "Δεν υπάρχουν διαθέσιμα μοντέλα για επιλογή.",
+      "allUnavailableTitle": "Κανένα μοντέλο δεν μπορεί να χρησιμοποιηθεί",
+      "allUnavailableDescription": "Πρόσθεσε κλειδί παρόχου και δοκίμασε ξανά.",
       "favorites": "Αγαπημένα"
     },
     "modelSelector": {

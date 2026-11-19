@@ -2782,6 +2782,8 @@
     "modelPicker": {
       "title": "Val á líkani",
       "noModelsDescription": "Engin líkön eru í boði.",
+      "allUnavailableTitle": "Engin líkön er hægt að nota",
+      "allUnavailableDescription": "Bættu við lykli þjónustuveitanda og reyndu síðan aftur.",
       "favorites": "Eftirlæti"
     },
     "modelSelector": {

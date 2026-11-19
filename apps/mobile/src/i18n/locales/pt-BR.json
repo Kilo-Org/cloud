@@ -2244,7 +2244,9 @@
     "modelPicker": {
       "title": "Modelo",
       "favorites": "Favoritos",
-      "noModelsDescription": "Não há modelos disponíveis para escolher."
+      "noModelsDescription": "Não há modelos disponíveis para escolher.",
+      "allUnavailableTitle": "Nenhum modelo pode ser usado",
+      "allUnavailableDescription": "Adicione uma chave de provedor e tente novamente."
     },
     "modelSelector": {
       "provider": "Provedor {{id}}",

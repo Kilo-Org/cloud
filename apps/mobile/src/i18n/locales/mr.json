@@ -2782,6 +2782,8 @@
     "modelPicker": {
       "title": "मॉडेल निवडा",
       "noModelsDescription": "निवडण्यासाठी कोणतेही मॉडेल उपलब्ध नाही.",
+      "allUnavailableTitle": "कोणतेही मॉडेल वापरता येत नाही",
+      "allUnavailableDescription": "प्रदाता की जोडा, नंतर पुन्हा प्रयत्न करा.",
       "favorites": "आवडते"
     },
     "modelSelector": {

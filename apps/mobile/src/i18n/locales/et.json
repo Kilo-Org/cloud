@@ -2782,6 +2782,8 @@
     "modelPicker": {
       "title": "Vali mudel",
       "noModelsDescription": "Valimiseks pole ühtegi mudelit saadaval.",
+      "allUnavailableTitle": "Ühtegi mudelit ei saa kasutada",
+      "allUnavailableDescription": "Lisa teenusepakkuja võti ja proovi seejärel uuesti.",
       "favorites": "Lemmikud"
     },
     "modelSelector": {

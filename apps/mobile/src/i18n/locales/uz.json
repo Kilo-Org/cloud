@@ -2782,6 +2782,8 @@
     "modelPicker": {
       "title": "Modelni tanlash",
       "noModelsDescription": "Tanlash uchun modellar mavjud emas.",
+      "allUnavailableTitle": "Hech qanday modeldan foydalanib bo'lmaydi",
+      "allUnavailableDescription": "Provayder kalitini qo'shing, so'ng qayta urinib ko'ring.",
       "favorites": "Sevimlilar"
     },
     "modelSelector": {

@@ -2218,6 +2218,8 @@
     "modelPicker": {
       "title": "Modello",
       "noModelsDescription": "Non ci sono modelli da selezionare.",
+      "allUnavailableTitle": "Nessun modello può essere usato",
+      "allUnavailableDescription": "Aggiungi una chiave del fornitore, poi riprova.",
       "favorites": "Preferiti"
     },
     "modelSelector": {

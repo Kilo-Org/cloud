@@ -2782,6 +2782,8 @@
     "modelPicker": {
       "title": "மாதிரியைத் தேர்ந்தெடுக்கவும்",
       "noModelsDescription": "தேர்ந்தெடுக்கக்கூடிய மாதிரிகள் எதுவும் இல்லை.",
+      "allUnavailableTitle": "எந்த மாதிரியையும் பயன்படுத்த முடியாது",
+      "allUnavailableDescription": "வழங்குநர் விசையைச் சேர்த்து, மீண்டும் முயற்சிக்கவும்.",
       "favorites": "பிடித்தவை"
     },
     "modelSelector": {

@@ -2882,6 +2882,8 @@
     "modelPicker": {
       "title": "Vybrať model",
       "noModelsDescription": "Na výber nie sú žiadne modely.",
+      "allUnavailableTitle": "Nedá sa použiť žiadny model",
+      "allUnavailableDescription": "Pridaj kľúč poskytovateľa a skús to znova.",
       "favorites": "Obľúbené"
     },
     "modelSelector": {

@@ -2832,7 +2832,9 @@
     "modelPicker": {
       "title": "Odabir modela",
       "favorites": "Omiljeni",
-      "noModelsDescription": "Nijedan model nije dostupan za odabir."
+      "noModelsDescription": "Nijedan model nije dostupan za odabir.",
+      "allUnavailableTitle": "Nijedan model se ne može koristiti",
+      "allUnavailableDescription": "Dodaj ključ pružaoca i pokušaj ponovo."
     },
     "modelSelector": {
       "provider": "Pružalac usluge {{id}}",

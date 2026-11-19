@@ -2782,6 +2782,8 @@
     "modelPicker": {
       "title": "Загвар сонгох",
       "noModelsDescription": "Сонгох боломжтой загвар алга.",
+      "allUnavailableTitle": "Ямар ч загварыг ашиглах боломжгүй",
+      "allUnavailableDescription": "Үйлчилгээ үзүүлэгчийн түлхүүр нэмээд дахин оролдоно уу.",
       "favorites": "Дуртай загварууд"
     },
     "modelSelector": {

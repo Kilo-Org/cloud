@@ -2782,6 +2782,8 @@
     "modelPicker": {
       "title": "Vælg model",
       "noModelsDescription": "Der er ingen modeller at vælge imellem.",
+      "allUnavailableTitle": "Ingen modeller kan bruges",
+      "allUnavailableDescription": "Tilføj en udbydernøgle, og prøv igen.",
       "favorites": "Favoritter"
     },
     "modelSelector": {

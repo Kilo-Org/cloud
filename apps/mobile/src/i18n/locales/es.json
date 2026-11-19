@@ -2251,6 +2251,8 @@
     "modelPicker": {
       "title": "Seleccionar modelo",
       "noModelsDescription": "No hay ningún modelo disponible para elegir.",
+      "allUnavailableTitle": "No se puede usar ningún modelo",
+      "allUnavailableDescription": "Añade una clave de proveedor e inténtalo de nuevo.",
       "favorites": "Favoritos"
     },
     "modelSelector": {

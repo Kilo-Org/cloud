@@ -2782,6 +2782,8 @@
     "modelPicker": {
       "title": "Chwazi modèl",
       "noModelsDescription": "Pa gen modèl disponib pou chwazi.",
+      "allUnavailableTitle": "Pa gen okenn modèl ki ka itilize",
+      "allUnavailableDescription": "Ajoute yon kle founisè, epi eseye ankò.",
       "favorites": "Favori"
     },
     "modelSelector": {

@@ -2832,6 +2832,8 @@
     "modelPicker": {
       "title": "Modeļa izvēle",
       "noModelsDescription": "Nav pieejamu modeļu, ko izvēlēties.",
+      "allUnavailableTitle": "Nevienu modeli nevar izmantot",
+      "allUnavailableDescription": "Pievieno nodrošinātāja atslēgu un mēģini vēlreiz.",
       "favorites": "Izlase"
     },
     "modelSelector": {

@@ -2782,6 +2782,8 @@
     "modelPicker": {
       "title": "انتخاب مدل",
       "noModelsDescription": "هیچ مدلی برای انتخاب در دسترس نیست.",
+      "allUnavailableTitle": "هیچ مدلی قابل استفاده نیست",
+      "allUnavailableDescription": "یک کلید ارائه‌دهنده اضافه کنید، سپس دوباره تلاش کنید.",
       "favorites": "موارد دلخواه"
     },
     "modelSelector": {

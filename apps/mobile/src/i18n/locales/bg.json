@@ -2782,7 +2782,9 @@
     "modelPicker": {
       "title": "Избор на модел",
       "favorites": "Любими",
-      "noModelsDescription": "Няма налични модели за избор."
+      "noModelsDescription": "Няма налични модели за избор.",
+      "allUnavailableTitle": "Няма модели, които могат да се използват",
+      "allUnavailableDescription": "Добави ключ за доставчик и опитай отново."
     },
     "modelSelector": {
       "provider": "Доставчик {{id}}",

@@ -2782,6 +2782,8 @@
     "modelPicker": {
       "title": "Модельді таңдау",
       "noModelsDescription": "Таңдауға болатын модельдер жоқ.",
+      "allUnavailableTitle": "Ешбір модельді пайдалану мүмкін емес",
+      "allUnavailableDescription": "Провайдер кілтін қосыңыз, содан кейін қайталап көріңіз.",
       "favorites": "Таңдаулылар"
     },
     "modelSelector": {

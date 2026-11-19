@@ -2225,6 +2225,8 @@
     "modelPicker": {
       "title": "Pilih model",
       "noModelsDescription": "Tidak ada model yang dapat dipilih.",
+      "allUnavailableTitle": "Tidak ada model yang dapat digunakan",
+      "allUnavailableDescription": "Tambah kunci penyedia, lalu coba lagi.",
       "favorites": "Favorit"
     },
     "modelSelector": {

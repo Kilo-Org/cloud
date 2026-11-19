@@ -2782,6 +2782,8 @@
     "modelPicker": {
       "title": "ماڈل منتخب کریں",
       "noModelsDescription": "منتخب کرنے کے لیے کوئی ماڈل دستیاب نہیں ہے۔",
+      "allUnavailableTitle": "کوئی بھی ماڈل استعمال نہیں کیا جا سکتا",
+      "allUnavailableDescription": "فراہم کنندہ کی کلید شامل کریں اور دوبارہ کوشش کریں۔",
       "favorites": "پسندیدہ"
     },
     "modelSelector": {

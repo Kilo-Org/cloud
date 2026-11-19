@@ -2782,6 +2782,8 @@
     "modelPicker": {
       "title": "Safidio ny modely",
       "noModelsDescription": "Tsy misy modely azo fidina.",
+      "allUnavailableTitle": "Tsy misy modely azo ampiasaina",
+      "allUnavailableDescription": "Ampio lakilen'ny mpamatsy ary andramo indray.",
       "favorites": "Ankafizinao"
     },
     "modelSelector": {

@@ -2225,6 +2225,8 @@
     "modelPicker": {
       "title": "選取模型",
       "noModelsDescription": "沒有可選取的模型。",
+      "allUnavailableTitle": "沒有可使用的模型",
+      "allUnavailableDescription": "請新增供應商金鑰，然後再試一次。",
       "favorites": "我的最愛"
     },
     "modelSelector": {

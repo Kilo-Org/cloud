@@ -2225,6 +2225,8 @@
     "modelPicker": {
       "title": "Modell wählen",
       "noModelsDescription": "Es stehen keine Modelle zur Auswahl.",
+      "allUnavailableTitle": "Kein Modell kann verwendet werden",
+      "allUnavailableDescription": "Füge einen Anbieterschlüssel hinzu und versuche es erneut.",
       "favorites": "Favoriten"
     },
     "modelSelector": {

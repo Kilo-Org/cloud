@@ -2782,7 +2782,9 @@
     "modelPicker": {
       "title": "ਮਾਡਲ ਚੁਣੋ",
       "favorites": "ਪਸੰਦੀਦਾ",
-      "noModelsDescription": "ਚੁਣਨ ਲਈ ਕੋਈ ਮਾਡਲ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।"
+      "noModelsDescription": "ਚੁਣਨ ਲਈ ਕੋਈ ਮਾਡਲ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
+      "allUnavailableTitle": "ਕੋਈ ਵੀ ਮਾਡਲ ਵਰਤਿਆ ਨਹੀਂ ਜਾ ਸਕਦਾ",
+      "allUnavailableDescription": "ਪ੍ਰਦਾਤਾ ਦੀ ਕੁੰਜੀ ਸ਼ਾਮਲ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
     },
     "modelSelector": {
       "provider": "ਪ੍ਰਦਾਤਾ {{id}}",

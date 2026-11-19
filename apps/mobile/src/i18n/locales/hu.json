@@ -2782,6 +2782,8 @@
     "modelPicker": {
       "title": "Modell kiválasztása",
       "noModelsDescription": "Nincs kiválasztható modell.",
+      "allUnavailableTitle": "Egyetlen modell sem használható",
+      "allUnavailableDescription": "Adj hozzá egy szolgáltatói kulcsot, majd próbáld újra.",
       "favorites": "Kedvencek"
     },
     "modelSelector": {

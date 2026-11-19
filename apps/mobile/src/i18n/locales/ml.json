@@ -2782,6 +2782,8 @@
     "modelPicker": {
       "title": "മോഡൽ തിരഞ്ഞെടുക്കുക",
       "noModelsDescription": "തിരഞ്ഞെടുക്കാൻ മോഡലുകൾ ലഭ്യമല്ല.",
+      "allUnavailableTitle": "ഒരു മോഡലും ഉപയോഗിക്കാൻ കഴിയില്ല",
+      "allUnavailableDescription": "ഒരു പ്രൊവൈഡർ കീ ചേർത്ത ശേഷം വീണ്ടും ശ്രമിക്കുക.",
       "favorites": "പ്രിയപ്പെട്ടവ"
     },
     "modelSelector": {

@@ -245,6 +245,15 @@ export function ModelPickerContent() {
     );
   }
 
+  // A remote session whose CLI reports no models projects one row with
+  // `unavailable: true` and the session's current selection, so the sheet drew
+  // a dead row with no explanation of why it could not be picked. The state
+  // sits in the list header rather than in the zero-rows branch so the row the
+  // session is on, the search field and the sheet's height keep their places;
+  // `instance-picker`'s zero-instance state is the same shape.
+  const allOptionsUnavailable =
+    bridge.options.length > 0 && bridge.options.every(option => option.unavailable === true);
+
   return (
     <PickerSheet
       title={t('agentChat.modelPicker.title')}
@@ -312,6 +321,18 @@ export function ModelPickerContent() {
             sideInsetMarginStyle,
           ]}
           data={rows}
+          ListHeaderComponent={
+            allOptionsUnavailable ? (
+              <EmptyState
+                icon={Info}
+                placement="top"
+                inset="gutter"
+                compact
+                title={t('agentChat.modelPicker.allUnavailableTitle')}
+                description={t('agentChat.modelPicker.allUnavailableDescription')}
+              />
+            ) : undefined
+          }
           // FlashList stores its props during render. When React discards a
           // deferred search render, FlashList can keep that render's shorter
           // rows and then ask for a row past their end, so the row can be

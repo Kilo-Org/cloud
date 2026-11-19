@@ -2832,6 +2832,8 @@
     "modelPicker": {
       "title": "Odaberi model",
       "noModelsDescription": "Nema dostupnih modela za odabir.",
+      "allUnavailableTitle": "Nijedan model nije moguće koristiti",
+      "allUnavailableDescription": "Dodaj ključ pružatelja usluga, a zatim pokušaj ponovno.",
       "favorites": "Favoriti"
     },
     "modelSelector": {

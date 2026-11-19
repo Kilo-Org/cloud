@@ -2892,6 +2892,8 @@
     "modelPicker": {
       "title": "Select model",
       "noModelsDescription": "No models are available to select.",
+      "allUnavailableTitle": "No models can be used",
+      "allUnavailableDescription": "Add a provider key, then try again.",
       "favorites": "Favorites"
     },
     "modelSelector": {

@@ -2782,6 +2782,8 @@
     "modelPicker": {
       "title": "Pumili ng modelo",
       "noModelsDescription": "Walang modelong mapipili.",
+      "allUnavailableTitle": "Walang modelong magagamit",
+      "allUnavailableDescription": "Magdagdag ng key ng provider, pagkatapos ay subukang muli.",
       "favorites": "Mga paborito"
     },
     "modelSelector": {

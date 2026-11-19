@@ -2782,6 +2782,8 @@
     "modelPicker": {
       "title": "Մոդելի ընտրություն",
       "noModelsDescription": "Ընտրելու համար հասանելի մոդելներ չկան։",
+      "allUnavailableTitle": "Ոչ մի մոդել չի կարող օգտագործվել",
+      "allUnavailableDescription": "Ավելացրեք մատակարարի բանալի և կրկին փորձեք։",
       "favorites": "Նախընտրածներ"
     },
     "modelSelector": {

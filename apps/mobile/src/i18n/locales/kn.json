@@ -2782,6 +2782,8 @@
     "modelPicker": {
       "title": "ಮಾದರಿ ಆಯ್ಕೆಮಾಡಿ",
       "noModelsDescription": "ಆಯ್ಕೆ ಮಾಡಲು ಯಾವುದೇ ಮಾದರಿಗಳು ಲಭ್ಯವಿಲ್ಲ.",
+      "allUnavailableTitle": "ಯಾವುದೇ ಮಾದರಿಯನ್ನು ಬಳಸಲಾಗುವುದಿಲ್ಲ",
+      "allUnavailableDescription": "ಪೂರೈಕೆದಾರ ಕೀ ಸೇರಿಸಿ, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "favorites": "ಮೆಚ್ಚಿನವುಗಳು"
     },
     "modelSelector": {

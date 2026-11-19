@@ -2277,7 +2277,9 @@
     "modelPicker": {
       "title": "Wybór modelu",
       "favorites": "Ulubione",
-      "noModelsDescription": "Brak modeli do wyboru."
+      "noModelsDescription": "Brak modeli do wyboru.",
+      "allUnavailableTitle": "Nie można użyć żadnego modelu",
+      "allUnavailableDescription": "Dodaj klucz dostawcy, a następnie spróbuj ponownie."
     },
     "modelSelector": {
       "provider": "Dostawca {{id}}",

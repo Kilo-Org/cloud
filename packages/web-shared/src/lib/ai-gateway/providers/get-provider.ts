@@ -393,7 +393,8 @@ function providerSettingsAllowPartner(
  * The reasoning effort the upstream receives, following the partner's reasoning transform: an
  * explicit disable is `none`, otherwise the effort the request carries for its API kind. The
  * `reasoning-content` and `reasoning` transforms drop the `reasoning` object and forward only its
- * effort, so `reasoning.enabled: false` does not reach the upstream there. Null when the request
+ * effort, behind an existing `reasoning_effort`, so `reasoning.enabled: false` does not reach the
+ * upstream there and `reasoning_effort` wins over `reasoning.effort`. Null when the request
  * carries no effort, even though `mistral-thinking` then sends `high`: the partner is not skipped
  * for an effort the client did not choose.
  */
@@ -401,14 +402,17 @@ function getUpstreamReasoningEffort(
   request: GatewayRequest,
   transform: ReasoningDetailsTransform | undefined
 ): string | null {
-  const objectDisableReachesUpstream =
-    transform !== ReasoningDetailsTransform.ReasoningContent &&
-    transform !== ReasoningDetailsTransform.Reasoning;
+  const replacesReasoningObject =
+    transform === ReasoningDetailsTransform.ReasoningContent ||
+    transform === ReasoningDetailsTransform.Reasoning;
   const disabledByReasoningObject =
-    objectDisableReachesUpstream &&
+    !replacesReasoningObject &&
     request.kind === 'chat_completions' &&
     request.body.reasoning?.enabled === false;
   if (disabledByReasoningObject || isReasoningExplicitlyDisabled(request)) return 'none';
+  if (replacesReasoningObject && request.kind === 'chat_completions') {
+    return request.body.reasoning_effort ?? request.body.reasoning?.effort ?? null;
+  }
   return getReasoningEffort(request);
 }
 

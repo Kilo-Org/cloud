@@ -588,6 +588,33 @@ describe('getProvider skips the partner', () => {
       }
     );
 
+    test.each([
+      ['reasoning-content', 'medium', 'high', true],
+      ['reasoning-content', 'high', 'medium', false],
+      ['reasoning', 'medium', 'high', true],
+      ['reasoning', 'high', 'medium', false],
+    ] as const)(
+      'under the %s transform, forwards the reasoning_effort that wins over reasoning.effort (%s, %s)',
+      async (transform, effort, reasoningEffort, served) => {
+        await insertPartner({
+          ...(efforts('low', 'high') as Partial<CustomLlmDefinition>),
+          reasoning_details_transform: transform,
+        });
+        const gatewayRequest = request('chat_completions', {
+          messages: [],
+          reasoning: { effort },
+          reasoning_effort: reasoningEffort,
+        });
+
+        if (!served) {
+          await expectKiloRouteOnly({ request: gatewayRequest }, 'unsupported-reasoning-effort');
+          return;
+        }
+        const { result } = await routeAndRecord({ request: gatewayRequest });
+        expect((await result.routes[0]()).provider.type).toBe('partner');
+      }
+    );
+
     test('reads reasoning.enabled false as none under the mistral-thinking transform', async () => {
       await insertPartner({
         ...(efforts('low', 'high') as Partial<CustomLlmDefinition>),

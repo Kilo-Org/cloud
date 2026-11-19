@@ -44,6 +44,11 @@ const TIER_LABEL_KEYS = {
   tier_199: 'kiloPass.tierExpert',
 } as const satisfies Record<KiloPassSubscription['tier'], string>;
 
+/** The tier's own name, for a row that names the plan without its cadence. */
+export function kiloPassTierLabel(tier: KiloPassSubscription['tier']): string {
+  return i18n.t(TIER_LABEL_KEYS[tier]);
+}
+
 const CADENCE_LABEL_KEYS = {
   monthly: 'kiloPass.cadenceMonthly',
   yearly: 'kiloPass.cadenceYearly',
@@ -101,7 +106,7 @@ export function kiloPassPlanLabel(
   tier: KiloPassSubscription['tier'],
   cadence: KiloPassSubscription['cadence']
 ): string {
-  return `${i18n.t(TIER_LABEL_KEYS[tier])} · ${i18n.t(CADENCE_LABEL_KEYS[cadence])}`;
+  return `${kiloPassTierLabel(tier)} · ${i18n.t(CADENCE_LABEL_KEYS[cadence])}`;
 }
 
 function planLabel(subscription: KiloPassSubscription): string {

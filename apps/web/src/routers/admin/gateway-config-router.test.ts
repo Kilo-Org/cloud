@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
-import { ai_gateway_config, organizations, type User } from '@kilocode/db/schema';
+import {
+  ai_gateway_config,
+  anthropic_user_profile_deletions,
+  organizations,
+  type User,
+} from '@kilocode/db/schema';
 import {
   ORGANIZATION_FEATURE_ORGANIZATIONS_MAX_COUNT,
   VERCEL_ROUTING_OPT_OUT_MODEL_MAX_LENGTH,
@@ -84,6 +89,7 @@ describe('adminGatewayConfigRouter', () => {
       experimental_byok: [organizationId.toUpperCase()],
       enkrypt_output_guardrail: [organizationId.toUpperCase()],
       gateway_settings: [organizationId],
+      org_permission_policy: [organizationId.toUpperCase()],
     });
     await caller.admin.gatewayConfig.set(input);
 
@@ -91,10 +97,36 @@ describe('adminGatewayConfigRouter', () => {
       experimental_byok: [organizationId],
       enkrypt_output_guardrail: [organizationId],
       gateway_settings: [organizationId],
+      org_permission_policy: [organizationId],
     });
     await expect(caller.admin.gatewayConfig.get()).resolves.toMatchObject({
       vercel_routing_opt_out_models: normalizedOptOutModels,
     });
+  });
+
+  it('preserves the permission-policy allowlist when an older client omits it', async () => {
+    const caller = await createCallerForUser(admin.id);
+    const organizationId = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
+
+    await caller.admin.gatewayConfig.setOrganizationFeatures({
+      experimental_byok: [],
+      enkrypt_output_guardrail: [],
+      gateway_settings: [],
+      org_permission_policy: [organizationId],
+    });
+    const saved = await caller.admin.gatewayConfig.setOrganizationFeatures({
+      experimental_byok: [organizationId],
+      enkrypt_output_guardrail: [],
+      gateway_settings: [],
+    });
+
+    expect(saved).toEqual({
+      experimental_byok: [organizationId],
+      enkrypt_output_guardrail: [],
+      gateway_settings: [],
+      org_permission_policy: [organizationId],
+    });
+    await expect(caller.admin.gatewayConfig.getOrganizationFeatures()).resolves.toEqual(saved);
   });
 
   it('keeps the routing configuration when organization features are saved', async () => {
@@ -105,6 +137,7 @@ describe('adminGatewayConfigRouter', () => {
       experimental_byok: [],
       enkrypt_output_guardrail: [],
       gateway_settings: ['00000000-0000-4000-8000-000000000001'],
+      org_permission_policy: [],
     });
 
     await expect(caller.admin.gatewayConfig.get()).resolves.toMatchObject({
@@ -121,6 +154,7 @@ describe('adminGatewayConfigRouter', () => {
         experimental_byok: ['not-an-id'],
         enkrypt_output_guardrail: [],
         gateway_settings: [],
+        org_permission_policy: [],
       })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(await db.select().from(ai_gateway_config)).toEqual([]);
@@ -136,6 +170,7 @@ describe('adminGatewayConfigRouter', () => {
         experimental_byok: [first.id.toUpperCase(), first.id],
         enkrypt_output_guardrail: [first.id, second.id],
         gateway_settings: [first.id.toUpperCase(), second.id.toUpperCase(), second.id],
+        org_permission_policy: [second.id],
       });
 
       expect(preview).toHaveLength(2);
@@ -158,6 +193,7 @@ describe('adminGatewayConfigRouter', () => {
           experimental_byok: [crypto.randomUUID()],
           enkrypt_output_guardrail: [],
           gateway_settings: [organization.id, crypto.randomUUID()],
+          org_permission_policy: [],
         })
       ).resolves.toEqual([{ id: organization.id, name: organization.name, isDeleted: false }]);
     });
@@ -175,6 +211,7 @@ describe('adminGatewayConfigRouter', () => {
           experimental_byok: [organization.id],
           enkrypt_output_guardrail: [],
           gateway_settings: [],
+          org_permission_policy: [],
         })
       ).resolves.toEqual([{ id: organization.id, name: organization.name, isDeleted: true }]);
     });
@@ -187,47 +224,54 @@ describe('adminGatewayConfigRouter', () => {
           experimental_byok: [],
           enkrypt_output_guardrail: [],
           gateway_settings: [],
+          org_permission_policy: [],
         })
       ).resolves.toEqual([]);
       expect(await db.select().from(ai_gateway_config)).toEqual([]);
     });
 
-    it.each(['experimental_byok', 'enkrypt_output_guardrail', 'gateway_settings'] as const)(
-      'rejects invalid IDs in %s without writing configuration',
-      async feature => {
-        const caller = await createCallerForUser(admin.id);
+    it.each([
+      'experimental_byok',
+      'enkrypt_output_guardrail',
+      'gateway_settings',
+      'org_permission_policy',
+    ] as const)('rejects invalid IDs in %s without writing configuration', async feature => {
+      const caller = await createCallerForUser(admin.id);
 
-        await expect(
-          caller.admin.gatewayConfig.previewOrganizationFeatures({
-            experimental_byok: [],
-            enkrypt_output_guardrail: [],
-            gateway_settings: [],
-            [feature]: ['not-an-id'],
-          })
-        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
-        expect(await db.select().from(ai_gateway_config)).toEqual([]);
-      }
-    );
+      await expect(
+        caller.admin.gatewayConfig.previewOrganizationFeatures({
+          experimental_byok: [],
+          enkrypt_output_guardrail: [],
+          gateway_settings: [],
+          org_permission_policy: [],
+          [feature]: ['not-an-id'],
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(await db.select().from(ai_gateway_config)).toEqual([]);
+    });
 
-    it.each(['experimental_byok', 'enkrypt_output_guardrail', 'gateway_settings'] as const)(
-      'rejects more than 1000 entries in %s before deduplication',
-      async feature => {
-        const caller = await createCallerForUser(admin.id);
+    it.each([
+      'experimental_byok',
+      'enkrypt_output_guardrail',
+      'gateway_settings',
+      'org_permission_policy',
+    ] as const)('rejects more than 1000 entries in %s before deduplication', async feature => {
+      const caller = await createCallerForUser(admin.id);
 
-        await expect(
-          caller.admin.gatewayConfig.previewOrganizationFeatures({
-            experimental_byok: [],
-            enkrypt_output_guardrail: [],
-            gateway_settings: [],
-            [feature]: Array.from(
-              { length: ORGANIZATION_FEATURE_ORGANIZATIONS_MAX_COUNT + 1 },
-              () => '9d278969-5453-4ae3-a51f-a8d2274a7b56'
-            ),
-          })
-        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
-        expect(await db.select().from(ai_gateway_config)).toEqual([]);
-      }
-    );
+      await expect(
+        caller.admin.gatewayConfig.previewOrganizationFeatures({
+          experimental_byok: [],
+          enkrypt_output_guardrail: [],
+          gateway_settings: [],
+          org_permission_policy: [],
+          [feature]: Array.from(
+            { length: ORGANIZATION_FEATURE_ORGANIZATIONS_MAX_COUNT + 1 },
+            () => '9d278969-5453-4ae3-a51f-a8d2274a7b56'
+          ),
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(await db.select().from(ai_gateway_config)).toEqual([]);
+    });
 
     it('leaves existing routing configuration and organization features unchanged', async () => {
       const caller = await createCallerForUser(admin.id);
@@ -237,6 +281,7 @@ describe('adminGatewayConfigRouter', () => {
         experimental_byok: [],
         enkrypt_output_guardrail: [],
         gateway_settings: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
+        org_permission_policy: [],
       });
       const beforePreview = await db.select().from(ai_gateway_config);
 
@@ -245,6 +290,7 @@ describe('adminGatewayConfigRouter', () => {
           experimental_byok: [organization.id],
           enkrypt_output_guardrail: [],
           gateway_settings: [],
+          org_permission_policy: [],
         })
       ).resolves.toEqual([{ id: organization.id, name: organization.name, isDeleted: false }]);
 
@@ -261,9 +307,258 @@ describe('adminGatewayConfigRouter', () => {
           experimental_byok: [organization.id],
           enkrypt_output_guardrail: [],
           gateway_settings: [],
+          org_permission_policy: [],
         })
       ).rejects.toMatchObject({ code: 'FORBIDDEN' });
       expect(await db.select().from(ai_gateway_config)).toEqual([]);
+    });
+  });
+
+  describe('Anthropic user profiles', () => {
+    const organizationId = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
+    const settings = {
+      revision: 0,
+      enabled: true,
+      start_at: '2026-12-01T09:30:00.000Z',
+      opted_in_user_ids: ['user-1', 'user-1', 'user-2'],
+      opted_in_organization_ids: [organizationId.toUpperCase()],
+      opted_out_user_ids: ['user-3'],
+      opted_out_organization_ids: [],
+    };
+    const normalizedSettings = {
+      ...settings,
+      revision: 1,
+      opted_in_user_ids: ['user-1', 'user-2'],
+      opted_in_organization_ids: [organizationId],
+    };
+
+    it('returns the disabled defaults when nothing is stored', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(caller.admin.gatewayConfig.getAnthropicUserProfiles()).resolves.toEqual({
+        revision: 0,
+        enabled: false,
+        start_at: null,
+        opted_in_user_ids: [],
+        opted_in_organization_ids: [],
+        opted_out_user_ids: [],
+        opted_out_organization_ids: [],
+      });
+    });
+
+    it('stores normalized settings and reads them back', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(caller.admin.gatewayConfig.setAnthropicUserProfiles(settings)).resolves.toEqual(
+        normalizedSettings
+      );
+      await expect(caller.admin.gatewayConfig.getAnthropicUserProfiles()).resolves.toEqual(
+        normalizedSettings
+      );
+    });
+
+    it('replaces the whole stored object when saved again', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await caller.admin.gatewayConfig.setAnthropicUserProfiles(settings);
+      await caller.admin.gatewayConfig.setAnthropicUserProfiles({
+        revision: 1,
+        enabled: false,
+        start_at: null,
+        opted_in_user_ids: [],
+        opted_in_organization_ids: [],
+        opted_out_user_ids: [],
+        opted_out_organization_ids: [],
+      });
+
+      await expect(caller.admin.gatewayConfig.getAnthropicUserProfiles()).resolves.toMatchObject({
+        revision: 2,
+        enabled: false,
+        start_at: null,
+        opted_in_user_ids: [],
+      });
+    });
+
+    it('rejects a save from a stale revision and leaves the stored settings unchanged', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await caller.admin.gatewayConfig.setAnthropicUserProfiles(settings);
+      await expect(
+        caller.admin.gatewayConfig.setAnthropicUserProfiles({
+          ...settings,
+          enabled: false,
+          opted_out_user_ids: [],
+        })
+      ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+      await expect(caller.admin.gatewayConfig.getAnthropicUserProfiles()).resolves.toEqual(
+        normalizedSettings
+      );
+    });
+
+    it('rejects a revision ahead of the stored one', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.gatewayConfig.setAnthropicUserProfiles({ ...settings, revision: 1 })
+      ).rejects.toMatchObject({ code: 'CONFLICT' });
+      await expect(caller.admin.gatewayConfig.getAnthropicUserProfiles()).resolves.toMatchObject({
+        revision: 0,
+        enabled: false,
+      });
+    });
+
+    it('accepts a save with the current revision and increments it each time', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      const first = await caller.admin.gatewayConfig.setAnthropicUserProfiles(settings);
+      const second = await caller.admin.gatewayConfig.setAnthropicUserProfiles({
+        ...settings,
+        revision: first.revision,
+        opted_out_user_ids: ['user-3', 'user-4'],
+      });
+
+      expect([first.revision, second.revision]).toEqual([1, 2]);
+      await expect(caller.admin.gatewayConfig.getAnthropicUserProfiles()).resolves.toMatchObject({
+        revision: 2,
+        opted_out_user_ids: ['user-3', 'user-4'],
+      });
+    });
+
+    it('lets only one of two concurrent saves from the same revision win', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      const results = await Promise.allSettled([
+        caller.admin.gatewayConfig.setAnthropicUserProfiles(settings),
+        caller.admin.gatewayConfig.setAnthropicUserProfiles({ ...settings, enabled: false }),
+      ]);
+
+      expect(results.map(result => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+      await expect(caller.admin.gatewayConfig.getAnthropicUserProfiles()).resolves.toMatchObject({
+        revision: 1,
+      });
+    });
+
+    it('rejects an ID that is both opted in and opted out without writing', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.gatewayConfig.setAnthropicUserProfiles({
+          ...settings,
+          opted_out_user_ids: ['user-1'],
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      await expect(
+        caller.admin.gatewayConfig.setAnthropicUserProfiles({
+          ...settings,
+          opted_out_organization_ids: [organizationId],
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(await db.select().from(ai_gateway_config)).toEqual([]);
+    });
+
+    it('rejects a start date that is not an ISO date-time and an invalid organization ID', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.gatewayConfig.setAnthropicUserProfiles({ ...settings, start_at: 'tomorrow' })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      await expect(
+        caller.admin.gatewayConfig.setAnthropicUserProfiles({
+          ...settings,
+          opted_in_organization_ids: ['not-an-id'],
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(await db.select().from(ai_gateway_config)).toEqual([]);
+    });
+
+    it('keeps the other configuration keys when saved, and when they are saved', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await caller.admin.gatewayConfig.set(input);
+      await caller.admin.gatewayConfig.setOrganizationFeatures({
+        experimental_byok: [],
+        enkrypt_output_guardrail: [],
+        gateway_settings: [organizationId],
+        org_permission_policy: [],
+      });
+      await caller.admin.gatewayConfig.setAnthropicUserProfiles(settings);
+
+      await expect(caller.admin.gatewayConfig.get()).resolves.toMatchObject({
+        vercel_routing_opt_out_models: normalizedOptOutModels,
+        note: 'Holding opt-outs',
+      });
+      await expect(caller.admin.gatewayConfig.getOrganizationFeatures()).resolves.toMatchObject({
+        gateway_settings: [organizationId],
+      });
+
+      await caller.admin.gatewayConfig.set({ ...input, note: 'Updated' });
+      await expect(caller.admin.gatewayConfig.getAnthropicUserProfiles()).resolves.toEqual(
+        normalizedSettings
+      );
+    });
+
+    it('rejects non-admin users', async () => {
+      const user = await insertTestUser();
+      const caller = await createCallerForUser(user.id);
+
+      await expect(
+        caller.admin.gatewayConfig.setAnthropicUserProfiles(settings)
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      await expect(
+        caller.admin.gatewayConfig.listAnthropicUserProfileDeletions()
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('lists pending deletions first, then deletions of the last 30 days newest first', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
+      await db.insert(anthropic_user_profile_deletions).values([
+        {
+          user_profile_id: 'uprof_expired',
+          reason: 'unlinked',
+          queued_at: daysAgo(40),
+          deleted_at: daysAgo(31),
+        },
+        {
+          user_profile_id: 'uprof_new',
+          reason: 'user_blocked',
+          kilo_user_id: admin.id,
+          queued_at: daysAgo(1),
+          deleted_at: daysAgo(0.5),
+        },
+        {
+          user_profile_id: 'uprof_mid',
+          reason: 'unlinked',
+          queued_at: daysAgo(4),
+          deleted_at: daysAgo(3),
+        },
+        {
+          user_profile_id: 'uprof_pending_old',
+          reason: 'unlinked',
+          queued_at: daysAgo(20),
+          attempt_count: 5,
+          last_attempt_at: daysAgo(1),
+          deleted_at: null,
+        },
+        {
+          user_profile_id: 'uprof_pending_new',
+          reason: 'unlinked',
+          queued_at: daysAgo(0.1),
+          deleted_at: null,
+        },
+      ]);
+
+      const rows = await caller.admin.gatewayConfig.listAnthropicUserProfileDeletions();
+
+      expect(rows.map(row => row.user_profile_id)).toEqual([
+        'uprof_pending_new',
+        'uprof_pending_old',
+        'uprof_new',
+        'uprof_mid',
+      ]);
+      expect(rows[1]).toMatchObject({ attempt_count: 5, deleted_at: null });
+      expect(rows[2]).toMatchObject({ reason: 'user_blocked', kilo_user_id: admin.id });
     });
   });
 });

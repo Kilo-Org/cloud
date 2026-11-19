@@ -18,6 +18,7 @@ import type { ServiceState } from './service-state';
 import { createCloudAgentTransport, type CloudAgentTransportConfig } from './cloud-agent-transport';
 import { createCliLiveTransport } from './cli-live-transport';
 import { createCliHistoricalTransport } from './cli-historical-transport';
+import type { SessionSnapshotFailure } from './snapshot-page';
 import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
 import type { UserWebConnection } from './user-web-connection';
 import type {
@@ -80,7 +81,7 @@ type CloudAgentSessionConfig = {
   transport: CloudAgentSessionTransport;
   websocketBaseUrl?: string;
   storage?: SessionStorage;
-  onError?: (message: string) => void;
+  onError?: (message: string, failure?: SessionSnapshotFailure) => void;
   onChildSessionError?: (sessionId: string, message: string) => void;
   onQuestionAsked?: (requestId: string, questions?: QuestionInfo[]) => void;
   onQuestionResolved?: (requestId: string) => void;
@@ -188,6 +189,8 @@ type CloudAgentSessionTransport = {
    * manager can record the cursor and `omittedItemCount`; later replays do NOT
    * fire that callback so the user's already-advanced older-messages cursor
    * isn't reset to the latest 50.
+   *
+   * `null` represents an access-not-found outcome (worker returns 404).
    */
   fetchSnapshotPage?:
     | ((

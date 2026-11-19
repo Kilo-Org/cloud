@@ -471,8 +471,8 @@ describe('ScopeEntryScreen names the scope it acts on', () => {
     };
     const root = await mount('org_123');
     const header = host(root, 'ScreenHeader')[0];
-    expect(header?.props.title).toBe('Drain Labs');
-    expect(header?.props.eyebrow).toBe('Security Agent');
+    expect(header?.props.title).toBe('Security Agent');
+    expect(header?.props.subtitle).toBe('Drain Labs');
   });
 
   it('names the personal scope on the reauthorize view', async () => {
@@ -483,30 +483,30 @@ describe('ScopeEntryScreen names the scope it acts on', () => {
     };
     const root = await mount('personal');
     const header = host(root, 'ScreenHeader')[0];
-    expect(header?.props.title).toBe('Personal');
-    expect(header?.props.eyebrow).toBe('Security Agent');
+    expect(header?.props.title).toBe('Security Agent');
+    expect(header?.props.subtitle).toBe('Personal');
   });
 
   it('names the organization on the load-failure view', async () => {
     failingProcedures = new Set(['getConfig']);
     const root = await mount('org_123');
     const failure = host(root, 'PlatformErrorScreen')[0];
-    expect(failure?.props.title).toBe('Drain Labs');
-    expect(failure?.props.eyebrow).toBe('Security Agent');
+    expect(failure?.props.title).toBe('Security Agent');
+    expect(failure?.props.subtitle).toBe('Drain Labs');
   });
 
   it('names the organization on the no-access view', async () => {
     deniedProcedures = new Set(['getPermissionStatus', 'getConfig', 'getRepositories']);
     const root = await mount('org_123');
     const denied = host(root, 'ScopeAccessDeniedScreen')[0];
-    expect(denied?.props.title).toBe('Drain Labs');
-    expect(denied?.props.eyebrow).toBe('Security Agent');
+    expect(denied?.props.title).toBe('Security Agent');
+    expect(denied?.props.subtitle).toBe('Drain Labs');
   });
 
   it('keeps the header line while the membership list is still loading', async () => {
     // The name arrives with the shared membership list. Until then the header
-    // keeps a placeholder title rather than an empty line, so the body does not
-    // move when the real name lands.
+    // keeps a placeholder subtitle rather than an empty line, so the body does
+    // not move when the real name lands.
     heldProcedures = new Set(['list']);
     permissionData = {
       hasIntegration: true,
@@ -515,8 +515,8 @@ describe('ScopeEntryScreen names the scope it acts on', () => {
     };
     const root = await mount('org_123');
     const header = host(root, 'ScreenHeader')[0];
-    expect(header?.props.title).toBe('Organization');
-    expect(header?.props.eyebrow).toBe('Security Agent');
+    expect(header?.props.title).toBe('Security Agent');
+    expect(header?.props.subtitle).toBe('Organization');
     releaseHeld?.();
   });
 });

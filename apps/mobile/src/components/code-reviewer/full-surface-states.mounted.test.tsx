@@ -980,29 +980,26 @@ describe('Recent review header', () => {
       createElement(ReviewListScreen, { scope: 'org-1' })
     );
     const findHeader = () => renderer.root.find(node => String(node.type) === 'ScreenHeader');
-    await waitFor(() => findHeader().props.title === 'Drain Labs');
+    await waitFor(() => findHeader().props.subtitle === 'Drain Labs');
 
-    expect(findHeader().props.eyebrow).toBe('Recent reviews');
-    // The scope name is prose, but the header paints it on the one line the
-    // personal scope uses: a second line reserved for it made this header
-    // taller than the Personal one, pushing the eyebrow down and opening a
-    // wider gap above the first review. One line needs no reserved blank line —
-    // a name that arrives later still paints on that same line — so the header
-    // keeps the personal header's height instead of outgrowing it.
-    expect(findHeader().props.titleNumberOfLines).toBe(1);
+    // The list's own name titles the screen and the scope sits on the subtitle
+    // line below it: the same two-line header the personal scope paints, so
+    // both scopes keep one header height above the first review.
+    expect(findHeader().props.title).toBe('Recent reviews');
+    expect(findHeader().props.titleNumberOfLines).toBeUndefined();
     expect(findHeader().props.reserveTitleSpace).toBe(false);
     unmount();
   });
 
-  it('names the personal scope, on the single line it always fills', async () => {
+  it('names the personal scope on the subtitle line', async () => {
     const { renderer, unmount } = await renderWithProviders(
       createElement(ReviewListScreen, { scope: 'personal' })
     );
 
     const node = renderer.root.find(candidate => String(candidate.type) === 'ScreenHeader');
-    expect(node.props.title).toBe('Personal');
-    expect(node.props.eyebrow).toBe('Recent reviews');
-    expect(node.props.titleNumberOfLines).toBe(1);
+    expect(node.props.title).toBe('Recent reviews');
+    expect(node.props.subtitle).toBe('Personal');
+    expect(node.props.titleNumberOfLines).toBeUndefined();
     expect(node.props.reserveTitleSpace).toBe(false);
     unmount();
   });
@@ -1023,13 +1020,13 @@ describe('empty reviews connect action', () => {
   }
 
   /**
-   * The scope title paints from the same `organizations.list` read the role
+   * The scope subtitle paints from the same `organizations.list` read the role
    * comes from, so reading the name means the role has settled too.
    */
   async function settled(renderer: RenderWithProvidersResult['renderer']) {
     await waitFor(
       () =>
-        String(renderer.root.find(node => String(node.type) === 'ScreenHeader').props.title) ===
+        String(renderer.root.find(node => String(node.type) === 'ScreenHeader').props.subtitle) ===
         ORG_NAME
     );
   }

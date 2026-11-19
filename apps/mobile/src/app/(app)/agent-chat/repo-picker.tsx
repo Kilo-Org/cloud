@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Info, Lock, Search, SearchX, Unlock } from '@/components/ui/icons';
+import { Info, Lock, SearchX, Unlock } from '@/components/ui/icons';
 import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -8,7 +8,7 @@ import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { SearchField } from '@/components/ui/search-field';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
@@ -141,47 +141,13 @@ export default function RepoPickerScreen() {
       onCancel={closePicker}
       scrollable={false}
       headerContent={
-        <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">
-          <Search size={18} color={colors.mutedForeground} />
-          {/* The placeholder is a single-line Text overlay, not the input's own
-              placeholder: Android lays the native hint out at the field's width
-              with no line cap, so copy wider than a narrow field wraps onto a
-              second line inside the one-line field. A tail-ellipsized Text
-              truncates the copy at any width instead. Both texts share
-              leading-[normal] and a centred text rect so the overlay sits
-              exactly where the typed text will. The overlay box is a row, so
-              the copy starts at the field's start edge — the physical right in
-              RTL — and the hugging Text cannot drift to the other side of the
-              field. */}
-          <View className="relative flex-1">
-            <Input
-              accessibilityLabel={t('agentChat.repoPicker.searchLabel')}
-              autoCapitalize="none"
-              autoCorrect={false}
-              clearButtonMode="while-editing"
-              returnKeyType="search"
-              textAlignVertical="center"
-              className="p-0 text-base leading-[normal] text-foreground"
-              style={{ color: colors.foreground }}
-              onChangeText={setSearch}
-            />
-            {search.length === 0 ? (
-              <View
-                className="absolute inset-0 flex-row items-center justify-start"
-                pointerEvents="none"
-              >
-                <Text
-                  accessible={false}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                  className="shrink max-w-full text-base leading-[normal] font-normal text-muted-foreground"
-                >
-                  {t('agentChat.repoPicker.searchPlaceholder')}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        </View>
+        <SearchField
+          className="mx-4 my-3"
+          accessibilityLabel={t('agentChat.repoPicker.searchLabel')}
+          placeholder={t('agentChat.repoPicker.searchPlaceholder')}
+          hasText={search.length > 0}
+          onChangeText={setSearch}
+        />
       }
     >
       {listItems.length === 0 ? (

@@ -88,17 +88,17 @@ vi.mock('@/lib/trpc', () => ({
 vi.mock('@/components/organization/scope-access-denied-screen', () => ({
   ScopeAccessDeniedScreen: (props: {
     title?: string;
-    eyebrow?: string;
+    subtitle?: string;
     kind?: string;
     onRetry?: () => void;
   }) => createElement('ScopeAccessDeniedScreenMock', props),
 }));
 
 vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: (props: { title?: string; eyebrow?: string; backFallback?: string }) =>
+  ScreenHeader: (props: { title?: string; subtitle?: string; backFallback?: string }) =>
     createElement('ScreenHeaderMock', {
       title: props.title,
-      eyebrow: props.eyebrow,
+      subtitle: props.subtitle,
       backFallback: props.backFallback,
     }),
 }));
@@ -171,8 +171,8 @@ describe('PlatformListScreen organization access', () => {
     const denied = findByType(renderer.root, 'ScopeAccessDeniedScreenMock')[0];
 
     expect(denied?.props.kind).toBe('denied');
-    expect(denied?.props.title).toBe('Drain Labs');
-    expect(denied?.props.eyebrow).toBe('Code Reviewer');
+    expect(denied?.props.title).toBe('Code Reviewer');
+    expect(denied?.props.subtitle).toBe('Drain Labs');
     expect(findByType(renderer.root, 'ConfigureRowMock')).toHaveLength(0);
 
     act(() => {
@@ -180,13 +180,13 @@ describe('PlatformListScreen organization access', () => {
     });
   });
 
-  it('falls back to the generic organization title when the membership list no longer names it', () => {
+  it('falls back to the generic organization subtitle when the membership list no longer names it', () => {
     status.error = denial;
     membership.organizations = [];
     const renderer = mountScreen();
     const denied = findByType(renderer.root, 'ScopeAccessDeniedScreenMock')[0];
 
-    expect(denied?.props.title).toBe('Organization');
+    expect(denied?.props.subtitle).toBe('Organization');
 
     act(() => {
       renderer.unmount();
@@ -221,6 +221,10 @@ describe('PlatformListScreen organization access', () => {
 
     expect(findByType(renderer.root, 'ScopeAccessDeniedScreenMock')).toHaveLength(0);
     expect(findByType(renderer.root, 'ConfigureRowMock').length).toBeGreaterThan(0);
+    // The granted header is the product over the scope, like the denied one.
+    const header = findByType(renderer.root, 'ScreenHeaderMock')[0];
+    expect(header?.props.title).toBe('Code Reviewer');
+    expect(header?.props.subtitle).toBe('Drain Labs');
 
     act(() => {
       renderer.unmount();

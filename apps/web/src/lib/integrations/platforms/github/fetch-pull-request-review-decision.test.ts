@@ -36,7 +36,12 @@ jest.mock('@octokit/auth-app', () => ({
   createAppAuth: jest.fn(() => async () => ({ token: 'mock-token', expiresAt: '2099-01-01' })),
 }));
 
-import { fetchBatchedReviewDecisions, fetchPullRequestReviewDecision } from './adapter';
+import {
+  fetchBatchedReviewDecisions,
+  fetchPullRequestReviewDecision,
+  GitHubGraphQlError,
+  GitHubRateLimitError,
+} from './adapter';
 
 beforeEach(() => {
   mockRequest.mockReset();
@@ -142,6 +147,47 @@ describe('fetchPullRequestReviewDecision', () => {
 
     expect(mockRequest).not.toHaveBeenCalled();
   });
+
+  it('rejects with GitHubGraphQlError when the body reports errors and no data', async () => {
+    mockRequest.mockResolvedValueOnce({
+      status: 200,
+      data: {
+        data: null,
+        errors: [{ type: 'NOT_FOUND', message: 'Could not resolve to a Repository' }],
+      },
+    });
+
+    await expect(fetchPullRequestReviewDecision(params)).rejects.toBeInstanceOf(GitHubGraphQlError);
+  });
+
+  it('rejects instead of returning partial data when the body reports errors', async () => {
+    mockRequest.mockResolvedValueOnce({
+      status: 200,
+      data: {
+        data: { pr0: { pullRequest: { reviewDecision: 'APPROVED' } } },
+        errors: [{ type: 'INTERNAL', message: 'Something went wrong' }],
+      },
+    });
+
+    await expect(fetchPullRequestReviewDecision(params)).rejects.toBeInstanceOf(GitHubGraphQlError);
+  });
+
+  it('rejects with GitHubRateLimitError on a GraphQL rate limit with exhausted headers', async () => {
+    const resetSeconds = Math.floor(Date.parse('2026-01-01T00:05:00.000Z') / 1000);
+    mockRequest.mockResolvedValueOnce({
+      status: 200,
+      headers: {
+        'x-ratelimit-remaining': '0',
+        'x-ratelimit-reset': String(resetSeconds),
+      },
+      data: { data: null, errors: [{ type: 'RATE_LIMITED', message: 'API rate limit exceeded' }] },
+    });
+
+    const error = await fetchPullRequestReviewDecision(params).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(GitHubRateLimitError);
+    expect((error as GitHubRateLimitError).resetAt).toEqual(new Date(resetSeconds * 1000));
+  });
 });
 
 describe('fetchBatchedReviewDecisions', () => {
@@ -228,6 +274,33 @@ describe('fetchBatchedReviewDecisions', () => {
       name0: 'widgets',
       number0: 12,
     });
+  });
+
+  it('rejects when data omits a requested alias', async () => {
+    mockRequest.mockResolvedValueOnce(
+      batchWireResponse({ pr0: { pullRequest: { reviewDecision: 'APPROVED' } } })
+    );
+
+    await expect(
+      fetchBatchedReviewDecisions({
+        installationId: '42',
+        prs: [
+          { alias: 'present', owner: 'acme', repo: 'widgets', number: 5 },
+          { alias: 'missing', owner: 'acme', repo: 'widgets', number: 6 },
+        ],
+      })
+    ).rejects.toBeInstanceOf(GitHubGraphQlError);
+  });
+
+  it('rejects when the body carries no data key', async () => {
+    mockRequest.mockResolvedValueOnce({ status: 200, data: {} });
+
+    await expect(
+      fetchBatchedReviewDecisions({
+        installationId: '42',
+        prs: [{ alias: 'only', owner: 'acme', repo: 'widgets', number: 8 }],
+      })
+    ).rejects.toBeInstanceOf(GitHubGraphQlError);
   });
 
   it('makes no request when no entry is actionable', async () => {

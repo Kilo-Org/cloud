@@ -147,6 +147,23 @@ export const askedMessageId = (sessionId: string): string => `${sessionId}:asked
 export const displacedMessageId = (sessionId: string, id: string): string =>
   `${sessionId}:displaced:${id}`;
 
+/**
+ * The identifier of the words a stopped answer had reached, drawn under the
+ * question with that identifier. The stop and its Retry hang off it.
+ */
+export const stoppedAnswerMessageId = (questionId: string): string => `${questionId}:stopped`;
+
+/** The words a stopped answer had reached, as the assistant bubble under its question. */
+function stoppedAnswerMessage(questionId: string, sessionId: string, text: string): StoredMessage {
+  const id = stoppedAnswerMessageId(questionId);
+  return asMessage({
+    id,
+    sessionId,
+    role: 'assistant',
+    parts: [{ id: `${id}:text`, kind: 'text', body: text }],
+  });
+}
+
 /** A question that is not in the store yet, as the bubble a person sees. */
 function questionMessage(turn: Pick<Turn, 'id' | 'sessionId'>, question: Question): StoredMessage {
   const message = asMessage({
@@ -169,7 +186,8 @@ function questionMessage(turn: Pick<Turn, 'id' | 'sessionId'>, question: Questio
  * The pending question is drawn from what the app remembers rather than from the
  * store, because the store holds a question and its answer together or neither.
  * It is what the Retry hangs off, and it is on screen from the moment it is
- * asked rather than when its answer lands.
+ * asked rather than when its answer lands. When the person stopped its answer,
+ * the words that had arrived are drawn under it.
  *
  * A question a later send kept is drawn among the turns as well, after the ones
  * that came before it, so the conversation reads in the order it happened: a
@@ -190,6 +208,8 @@ export function asMessages(input: {
   readonly askedImages: readonly LocalImage[];
   /** The kept question the slot is asking again, when it is one. */
   readonly askedFrom?: string | null;
+  /** The words the slot's stopped answer had reached, when it has any. */
+  readonly askedAnswer?: string | null;
   /** The questions a later send took the slot from, oldest first. */
   readonly displaced?: readonly Displaced[];
   /** Questions typed while an answer was arriving, in the order they go. */
@@ -231,6 +251,13 @@ export function asMessages(input: {
       heldKept.add(question.id);
       const id = displacedMessageId(input.sessionId, question.id);
       drawn.push(questionMessage({ id, sessionId: input.sessionId }, question));
+      /* The slot asking it again is its latest attempt, so that attempt's words
+         stand under it rather than the ones an earlier Stop left. */
+      const answer =
+        question.id === input.askedFrom ? (input.askedAnswer ?? null) : (question.answer ?? null);
+      if (answer !== null) {
+        drawn.push(stoppedAnswerMessage(id, input.sessionId, answer));
+      }
     }
   };
   for (const [index, turn] of input.turns.entries()) {
@@ -252,6 +279,9 @@ export function asMessages(input: {
         { text: input.asked, images: input.askedImages }
       )
     );
+    if (input.askedAnswer != null) {
+      drawn.push(stoppedAnswerMessage(id, input.sessionId, input.askedAnswer));
+    }
   }
   if (input.answering.some(part => part.type !== 'reasoning')) {
     drawn.push({

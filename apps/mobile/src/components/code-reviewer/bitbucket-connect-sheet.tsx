@@ -65,7 +65,11 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
   const { t } = useTranslation();
   // The token field is the sheet's only draft, and the header close control,
   // the Android Back and the back gesture would drop whatever is typed in it.
-  const guard = useMetadataLeaveGuard({ enabled: true });
+  // No second in-flight source exists: the form reports `dirty: false` while a
+  // connect is pending (`onDirtyChange?.(holdsDraft && !submitting &&
+  // !connectLanded)`), so a running connect has already disarmed the guard, and
+  // a landed one closes the sheet through `leaveWithoutAsking`.
+  const guard = useMetadataLeaveGuard({ enabled: true, saving: false });
   const { role, org, isResolving, isError } = useOrgBoundary(scope);
   const readiness = useBitbucketReadiness(scope);
   // The readiness read describes workspace access tokens only, so this is what
@@ -179,7 +183,9 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
       return (
         <View className="px-4 pt-3">
           <Text variant="muted" className="text-sm">
-            {t('codeReviewer.bitbucketConnect.managedOnWeb')}
+            {t('codeReviewer.bitbucketConnect.managedOnWeb', {
+              organization: org.organizationName,
+            })}
           </Text>
         </View>
       );
@@ -195,6 +201,7 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
         <BitbucketConnectForm
           scope={scope}
           integrationId={integrationId}
+          organizationName={org.organizationName}
           onDirtyChange={guard.handleDirtyChange}
           onConnected={() => {
             notificationHaptic(Haptics.NotificationFeedbackType.Success);

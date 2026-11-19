@@ -1,6 +1,7 @@
-// Canonical organization role values. Matches apps/web's
-// OrganizationRoleSchema (lib/organizations/organization-types.ts, a
-// z.enum(ORGANIZATION_ROLES)) and packages/db's OrganizationRole type.
+// Canonical organization role values. The web validator's OrganizationRoleSchema
+// (packages/web-shared/src/lib/organizations/organization-types.ts, a
+// z.enum(ORGANIZATION_ROLES)) and packages/db's OrganizationRole type must stay in
+// sync with this list.
 export const ORGANIZATION_ROLES = ['owner', 'admin', 'member', 'billing_manager'] as const;
 export type OrganizationRole = (typeof ORGANIZATION_ROLES)[number];
 

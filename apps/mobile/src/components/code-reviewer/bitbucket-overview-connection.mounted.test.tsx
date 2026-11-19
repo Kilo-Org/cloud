@@ -144,6 +144,15 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 vi.mock('@/lib/hooks/use-reviewer-models', () => ({
   useReviewerModels: () => ({ models: [], isLoading: false }),
 }));
+// The header and connect copy name the organization from the boundary read;
+// the OAuth cases never reach that copy, so one resolved organization stands
+// in and the screen never waits on the membership list.
+vi.mock('@/lib/hooks/use-organization-queries', () => ({
+  useOrgBoundary: () => ({
+    org: { organizationId: 'org_1', organizationName: 'Acme Robotics', role: 'owner' },
+    isResolving: false,
+  }),
+}));
 
 async function renderScreen() {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };

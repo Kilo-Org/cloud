@@ -101,7 +101,6 @@ export function getGcpVertexEndpoint(model: Pick<DirectByokModel, 'id' | 'endpoi
 
 /** The Mistral region closest to the configured location. */
 export function getGcpVertexMistralLocation(location: string) {
-  if (location === MISTRAL_US_LOCATION || location === MISTRAL_EU_LOCATION) return location;
   return location === 'eu' || location.startsWith('europe-')
     ? MISTRAL_EU_LOCATION
     : MISTRAL_US_LOCATION;

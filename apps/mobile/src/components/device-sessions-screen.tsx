@@ -6,8 +6,8 @@ import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState, StateAction } from '@/components/empty-state';
-import { DirectionalLogOut } from '@/components/ui/directional-icons';
-import { ArrowLeft, Globe, Smartphone, Terminal } from '@/components/ui/icons';
+import { DirectionalArrowLeft, DirectionalLogOut } from '@/components/ui/directional-icons';
+import { Globe, Smartphone, Terminal } from '@/components/ui/icons';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -71,28 +71,16 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
     <ConfigureRow
       icon={sessionIcon(session)}
       title={device}
-      // The mark sits on the title line, so the subtitle keeps the row's full
-      // width: on the trailing side it took the room the two dates need, and a
-      // compact phone broke the line into three.
-      titleBadge={
-        session.isCurrent ? (
-          /* The badge keeps the light olive in dark mode: the dark accent
-              (#ffdd00) as a full pill glares and pulls focus, so dark swaps
-              in `--selection`, the same hue lifted to stand off the page,
-              with its own label tone. */
-          <View className="rounded-full bg-primary px-2 py-0.5 dark:bg-selection">
-            <Text
-              variant="eyebrow"
-              className="text-primary-foreground dark:text-selection-foreground"
-            >
-              {t('deviceSessions.thisDevice')}
-            </Text>
-          </View>
-        ) : undefined
+      subtitle={
+        session.isCurrent
+          ? t('deviceSessions.signedInThisDevice', {
+              signedIn,
+              thisDevice: t('deviceSessions.thisDevice'),
+            })
+          : t('deviceSessions.signedIn', { signedIn, lastSeen })
       }
-      subtitle={t('deviceSessions.signedIn', { signedIn, lastSeen })}
-      // The two dates are one sentence, so a narrow row ends it with an
-      // ellipsis instead of breaking "Last seen" away from its date.
+      // The dates are one sentence, so a narrow row ends it with an ellipsis
+      // instead of breaking "Last seen" away from its date.
       subtitleNumberOfLines={2}
       variant="action"
       trailing={
@@ -202,7 +190,7 @@ export function DeviceSessionsScreen() {
         action={
           <StateAction
             label={t('deviceSessions.viewProfile')}
-            icon={ArrowLeft}
+            icon={DirectionalArrowLeft}
             onPress={() => {
               router.back();
             }}

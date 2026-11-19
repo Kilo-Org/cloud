@@ -6,6 +6,8 @@ import {
   captureAgentSnapshotView,
   filterAgentConsoleMessages,
   filterAgentNetworkRequests,
+  frameWithOwnerNode,
+  readAgentFrames,
   readAgentFrameTree,
   readAgentScreenshotGeometry,
   readSensitiveFieldBoxes,
@@ -18,7 +20,9 @@ import type { BrowserAgentFrame } from './browser-agent-frames';
 import type { BrowserConsoleMessage, BrowserToolRefEntry } from './browser-tool-session';
 
 type CdpHandler = (
-  params: Record<string, unknown> | undefined
+  params: Record<string, unknown> | undefined,
+  /** Set when the command addressed a flattened child session (an out-of-process iframe). */
+  sessionId?: string
 ) => Record<string, unknown> | undefined;
 
 // The screenshot clip names its translation `x` and `y`; the quotes keep those
@@ -39,27 +43,39 @@ interface FakeSession {
   readonly refs: BrowserToolRefEntry[][];
   readonly send: (
     method: string,
-    params?: Record<string, unknown>
+    params?: Record<string, unknown>,
+    sessionId?: string
   ) => Promise<Record<string, unknown> | undefined>;
   readonly registerRefs: (entries: readonly BrowserToolRefEntry[]) => void;
 }
 
-const createFakeSession = (handlers: Record<string, CdpHandler>): FakeSession => {
+const createFakeSession = (
+  handlers: Record<string, CdpHandler>,
+  /** Out-of-process iframes the tab auto-attached, as `childFrames()` reports them. */
+  childFrames?: ReadonlyMap<string, { readonly sessionId: string; readonly url: string }>,
+  /** Makes every command addressed to a child session fail, like a detached OOPIF. */
+  brokenChildSession = false
+): FakeSession => {
   const refs: BrowserToolRefEntry[][] = [];
 
   return {
+    ...(childFrames === undefined ? {} : { childFrames: () => childFrames }),
     refs,
     registerRefs: entries => {
       refs.push([...entries]);
     },
-    send: async (method, params) => {
+    send: async (method, params, sessionId) => {
+      if (brokenChildSession && sessionId !== undefined) {
+        throw new Error('Session with given id not found.');
+      }
+
       const handler = handlers[method];
 
       if (handler === undefined) {
         throw new Error(`unexpected CDP method ${method}`);
       }
 
-      return handler(params);
+      return handler(params, sessionId);
     },
   };
 };
@@ -162,10 +178,53 @@ describe('scoped snapshot', () => {
       readableOrigins: ['https://app.example.com'],
     });
 
-    expect(capture.text).toContain('- iframe [origin withheld: https://pay.example.com]');
+    expect(capture.text).toContain('- iframe [ref=e10] [origin withheld: https://pay.example.com]');
     expect(capture.text).toContain('- button "Submit" [ref=e2]');
     expect(capture.text).not.toContain('marker-42');
     expect(capture.text).not.toContain('leaked inner text');
+    expect(capture.withheldFrames).toStrictEqual(['https://pay.example.com']);
+  });
+
+  it('maps an iframe owner node to the frame it hosts', async () => {
+    const session = createFakeSession({
+      ...snapshotHandlers(CHILD_TREE),
+      'DOM.getFrameOwner': () => ({ backendNodeId: 10 }),
+    });
+
+    await expect(frameWithOwnerNode(session, FRAMES, 10)).resolves.toStrictEqual(FRAMES[1]);
+    await expect(frameWithOwnerNode(session, FRAMES, 2)).resolves.toBeUndefined();
+  });
+
+  it('renders a targeted, granted frame’s own document', async () => {
+    const session = createFakeSession({
+      ...snapshotHandlers(CHILD_TREE),
+      'DOM.getFrameOwner': () => ({ backendNodeId: 10 }),
+    });
+
+    const capture = await captureAgentAriaSnapshot(
+      session,
+      { readableOrigins: ['https://app.example.com', 'https://pay.example.com'] },
+      { rootFrameId: 'f1' }
+    );
+
+    expect(capture.text).toContain('- text: card marker-42');
+    expect(capture.text).not.toContain('Submit');
+    expect(capture.withheldFrames).toStrictEqual([]);
+  });
+
+  it('fails closed when the targeted frame itself is withheld', async () => {
+    const session = createFakeSession({
+      ...snapshotHandlers(CHILD_TREE),
+      'DOM.getFrameOwner': () => ({ backendNodeId: 10 }),
+    });
+
+    const capture = await captureAgentAriaSnapshot(
+      session,
+      { readableOrigins: ['https://app.example.com'] },
+      { rootFrameId: 'f1' }
+    );
+
+    expect(capture.text).toBe('(no accessibility nodes)');
     expect(capture.withheldFrames).toStrictEqual(['https://pay.example.com']);
   });
 
@@ -229,8 +288,10 @@ describe('scoped snapshot', () => {
 
     expect(snapshot.lines).toStrictEqual([
       { depth: 1, name: 'Submit', ref: 'e2', role: 'button' },
-      withheldFrameLine('https://pay.example.com', 2),
+      withheldFrameLine('https://pay.example.com', 1, 'e10'),
     ]);
+    // The owner's ref is registered, so a targeted snapshot can resolve it.
+    expect(snapshot.refs).toContainEqual({ backendNodeId: 10, ref: 'e10' });
   });
 });
 
@@ -267,6 +328,23 @@ describe('screenshot geometry', () => {
   it('derives the device scale from the layout metrics', async () => {
     const session = createFakeSession({
       'Page.getLayoutMetrics': () => ({
+        cssLayoutViewport: { clientHeight: 400, clientWidth: 800 },
+        cssVisualViewport: { pageX: 12, pageY: 34 },
+        layoutViewport: { clientHeight: 800, clientWidth: 1600 },
+      }),
+    });
+
+    await expect(readAgentScreenshotGeometry(session)).resolves.toStrictEqual({
+      scale: 2,
+      scroll: offsetOf(12, 34),
+      viewport: { height: 400, width: 800 },
+    });
+    expect(screenshotScale({ imageWidth: undefined, layoutWidth: 800 })).toBe(1);
+  });
+
+  it('has no CSS viewport to clip when the metrics carry none', async () => {
+    const session = createFakeSession({
+      'Page.getLayoutMetrics': () => ({
         cssLayoutViewport: { clientWidth: 800 },
         cssVisualViewport: { pageX: 12, pageY: 34 },
         layoutViewport: { clientWidth: 1600 },
@@ -276,8 +354,8 @@ describe('screenshot geometry', () => {
     await expect(readAgentScreenshotGeometry(session)).resolves.toStrictEqual({
       scale: 2,
       scroll: offsetOf(12, 34),
+      viewport: undefined,
     });
-    expect(screenshotScale({ imageWidth: undefined, layoutWidth: 800 })).toBe(1);
   });
 });
 
@@ -372,5 +450,193 @@ describe('console and network filtering', () => {
         { frameId: 'f1', origin: 'https://pay.example.com' },
       ]).map(request => request.requestId)
     ).toStrictEqual(['2', '3']);
+  });
+});
+
+/*
+ * An out-of-process iframe: Chrome leaves it out of `Page.getFrameTree`, so the
+ * tab learns it only from `Target.attachedToTarget` and reads it through a
+ * flattened child session. The shapes below mirror a real cross-site frame:
+ * the parent's AX tree carries the iframe owner node without children, and the
+ * child session reports the frame's own document and its parent frame id.
+ */
+const OOPIF_ID = 'oopif-1';
+const OOPIF_ORIGIN = 'http://127.0.0.2:5555';
+const OOPIF_SESSION = 'child-session-1';
+
+const OOPIF_MAIN_TREE = {
+  nodes: [
+    { backendDOMNodeId: 1, childIds: ['2', '4'], nodeId: '1', role: { value: 'RootWebArea' } },
+    { backendDOMNodeId: 2, name: { value: 'Submit' }, nodeId: '2', role: { value: 'button' } },
+    { backendDOMNodeId: 5, childIds: [], nodeId: '4', role: { value: 'Iframe' } },
+  ],
+};
+
+const OOPIF_CHILD_TREE = {
+  nodes: [
+    { childIds: ['2'], nodeId: '1', role: { value: 'RootWebArea' } },
+    {
+      backendDOMNodeId: 51,
+      name: { value: 'oopif marker-9' },
+      nodeId: '2',
+      role: { value: 'StaticText' },
+    },
+  ],
+};
+
+/** A tab whose frame tree holds only the main frame, plus one auto-attached OOPIF. */
+const oopifSession = (
+  overrides: Record<string, CdpHandler> = {},
+  childFrames:
+    | ReadonlyMap<string, { readonly sessionId: string; readonly url: string }>
+    | undefined = new Map([[OOPIF_ID, { sessionId: OOPIF_SESSION, url: `${OOPIF_ORIGIN}/frame` }]]),
+  brokenChildSession = false
+): FakeSession =>
+  createFakeSession(
+    {
+      'Accessibility.getFullAXTree': (_params, sessionId) =>
+        sessionId === OOPIF_SESSION ? OOPIF_CHILD_TREE : OOPIF_MAIN_TREE,
+      'DOM.getBoxModel': params =>
+        params?.['backendNodeId'] === 5
+          ? { model: { content: [40, 120, 440, 120, 440, 320, 40, 320], height: 200, width: 400 } }
+          : { model: { content: [0, 0, 10, 0, 10, 10, 0, 10], height: 10, width: 10 } },
+      'DOM.getFrameOwner': params => (params?.['frameId'] === OOPIF_ID ? { backendNodeId: 5 } : {}),
+      'Page.createIsolatedWorld': () => ({ executionContextId: 7 }),
+      'Page.getFrameTree': (_params, sessionId) =>
+        sessionId === OOPIF_SESSION
+          ? {
+              frameTree: {
+                frame: { id: OOPIF_ID, parentId: 'main', url: `${OOPIF_ORIGIN}/frame` },
+              },
+            }
+          : {
+              frameTree: {
+                frame: {
+                  id: 'main',
+                  securityOrigin: 'http://127.0.0.1:4444',
+                  url: 'http://127.0.0.1:4444/',
+                },
+              },
+            },
+      'Runtime.evaluate': () => ({ result: { value: '{"hidden":[],"values":[]}' } }),
+      ...overrides,
+    },
+    childFrames,
+    brokenChildSession
+  );
+
+const MAIN_ORIGIN = 'http://127.0.0.1:4444';
+
+describe('out-of-process iframes', () => {
+  it('keeps the main frame’s nodes and emits the withheld line for a frame the frame tree omits', async () => {
+    const capture = await captureAgentAriaSnapshot(oopifSession(), {
+      readableOrigins: [MAIN_ORIGIN],
+    });
+
+    expect(capture.text).toContain('- button "Submit" [ref=e2]');
+    expect(capture.text).toContain(`- iframe [ref=e5] [origin withheld: ${OOPIF_ORIGIN}]`);
+    expect(capture.text).not.toContain('oopif marker-9');
+    expect(capture.withheldFrames).toStrictEqual([OOPIF_ORIGIN]);
+  });
+
+  it('reads the frame origin from the child session when the attach predates its document', async () => {
+    // A target attaches while the frame is still blank, which is what a tab opened before its page loads reports.
+    // The origin must come from the frame's own tree, not from the attach event.
+    const session = oopifSession(
+      {},
+      new Map([[OOPIF_ID, { sessionId: OOPIF_SESSION, url: 'about:blank' }]])
+    );
+
+    const withheld = await captureAgentAriaSnapshot(session, { readableOrigins: [MAIN_ORIGIN] });
+
+    expect(withheld.text).toContain(`[origin withheld: ${OOPIF_ORIGIN}]`);
+    expect(withheld.withheldFrames).toStrictEqual([OOPIF_ORIGIN]);
+
+    const granted = await captureAgentAriaSnapshot(
+      oopifSession({}, new Map([[OOPIF_ID, { sessionId: OOPIF_SESSION, url: 'about:blank' }]])),
+      { readableOrigins: [MAIN_ORIGIN, OOPIF_ORIGIN] }
+    );
+
+    expect(granted.text).toContain('- text: oopif marker-9');
+    expect(granted.withheldFrames).toStrictEqual([]);
+  });
+
+  it('splices the child session’s tree in when the frame origin is granted', async () => {
+    const capture = await captureAgentAriaSnapshot(oopifSession(), {
+      readableOrigins: [MAIN_ORIGIN, OOPIF_ORIGIN],
+    });
+
+    expect(capture.text).toContain('- text: oopif marker-9');
+    expect(capture.text).not.toContain('origin withheld');
+    expect(capture.withheldFrames).toStrictEqual([]);
+  });
+
+  it('renders a targeted, granted OOPIF through its child session', async () => {
+    const capture = await captureAgentAriaSnapshot(
+      oopifSession(),
+      { readableOrigins: [MAIN_ORIGIN, OOPIF_ORIGIN] },
+      { rootFrameId: OOPIF_ID }
+    );
+
+    expect(capture.text).toContain('- text: oopif marker-9');
+    expect(capture.text).not.toContain('Submit');
+  });
+
+  it('masks the owner box of an OOPIF the frame tree omits', async () => {
+    const session = oopifSession();
+    const inventory = await readAgentFrames(session);
+    const withheld = withheldFramesOf(inventory.frames, [MAIN_ORIGIN]);
+
+    expect(withheld).toStrictEqual([{ frameId: OOPIF_ID, origin: OOPIF_ORIGIN }]);
+
+    const boxes = await readWithheldFrameBoxes(session, inventory.frames, withheld);
+
+    expect(boxes).toStrictEqual({ boxes: [{ height: 200, left: 40, top: 120, width: 400 }] });
+  });
+
+  it('still withholds and masks when the child session cannot be read', async () => {
+    const session = oopifSession({}, undefined, true);
+
+    const capture = await captureAgentAriaSnapshot(session, {
+      readableOrigins: [MAIN_ORIGIN, OOPIF_ORIGIN],
+    });
+
+    // A frame whose session is broken is treated as unreadable, never as empty.
+    expect(capture.text).toContain('- button "Submit" [ref=e2]');
+    expect(capture.text).toContain(`[origin withheld: ${OOPIF_ORIGIN}]`);
+
+    const inventory = await readAgentFrames(session);
+    const withheld = withheldFramesOf(inventory.frames, [MAIN_ORIGIN]);
+    const boxes = await readWithheldFrameBoxes(session, inventory.frames, withheld);
+
+    expect(boxes).toStrictEqual({ boxes: [{ height: 200, left: 40, top: 120, width: 400 }] });
+  });
+
+  it('renders the tab’s own tree when the frame tree call fails', async () => {
+    const capture = await captureAgentAriaSnapshot(
+      createFakeSession({
+        'Accessibility.getFullAXTree': () => OOPIF_MAIN_TREE,
+        'Page.createIsolatedWorld': () => ({ executionContextId: 7 }),
+        'Page.getFrameTree': () => {
+          throw new Error('Target closed.');
+        },
+        'Runtime.evaluate': () => ({ result: { value: '{"hidden":[],"values":[]}' } }),
+      }),
+      { readableOrigins: [MAIN_ORIGIN] }
+    );
+
+    expect(capture.text).toContain('- button "Submit" [ref=e2]');
+    expect(capture.text).not.toContain('origin withheld');
+  });
+
+  it('withholds a frame whose child session is unknown and still keeps the owner box measurable', async () => {
+    // No auto-attach record means the frame is invisible to the tab, exactly as when only the frame tree is read.
+    const session = oopifSession({}, new Map());
+
+    const inventory = await readAgentFrames(session);
+
+    expect(inventory.frames).toStrictEqual([
+      { id: 'main', origin: MAIN_ORIGIN, url: `${MAIN_ORIGIN}/` },
+    ]);
   });
 });

@@ -1,8 +1,8 @@
 // The no-access surface is the product landings' shared state for an
 // organization the reader may not see. It must say who can grant access (or
-// that the organization is gone), and offer both recoveries: a Retry that
+// that the organization is gone). A denial offers both recoveries: a Retry that
 // re-resolves the membership and a way back to Profile that drops the stale
-// selection.
+// selection; a deleted organization offers the way back alone.
 
 import { type ComponentType, createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -19,8 +19,8 @@ vi.mock('expo-router', () => ({
 }));
 
 vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: (props: { title?: string; eyebrow?: string }) =>
-    createElement('ScreenHeaderMock', { title: props.title, eyebrow: props.eyebrow }),
+  ScreenHeader: (props: { title?: string; subtitle?: string }) =>
+    createElement('ScreenHeaderMock', { title: props.title, subtitle: props.subtitle }),
 }));
 
 vi.mock('@/components/query-error', () => ({
@@ -61,7 +61,11 @@ vi.mock('@/components/ui/text', () => ({
     createElement('TextMock', { className: props.className }, props.children),
 }));
 
-vi.mock('react-native', () => ({ View: 'View', useColorScheme: () => 'light' }));
+vi.mock('react-native', () => ({
+  View: 'View',
+  I18nManager: { isRTL: false },
+  useColorScheme: () => 'light',
+}));
 
 // The centered state's geometry hook reports through `@sentry/react-native`,
 // whose real module loads react-native in Node; the reporter is stubbed here.
@@ -69,7 +73,7 @@ vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 
 const Denied = ScopeAccessDeniedScreen as ComponentType<{
   title: string;
-  eyebrow?: string;
+  subtitle?: string;
   kind: 'denied' | 'not-found';
   onRetry: () => void;
   isRetrying?: boolean;
@@ -77,7 +81,7 @@ const Denied = ScopeAccessDeniedScreen as ComponentType<{
 
 function mountScreen(props: {
   title?: string;
-  eyebrow?: string;
+  subtitle?: string;
   kind?: 'denied' | 'not-found';
   isRetrying?: boolean;
 }): TestRenderer.ReactTestRenderer {
@@ -86,7 +90,7 @@ function mountScreen(props: {
     ref.current = TestRenderer.create(
       createElement(Denied, {
         title: props.title ?? 'Security Agent',
-        eyebrow: props.eyebrow,
+        subtitle: props.subtitle,
         kind: props.kind ?? 'denied',
         onRetry: () => {
           retryMock();
@@ -178,7 +182,7 @@ describe('ScopeAccessDeniedScreen', () => {
   });
 
   it('uses the unavailable copy for an organization that no longer exists', () => {
-    const renderer = mountScreen({ kind: 'not-found', eyebrow: 'Code Reviewer' });
+    const renderer = mountScreen({ kind: 'not-found', subtitle: 'Drain Labs' });
     const error = findByType(renderer.root, 'QueryErrorMock')[0];
 
     expect(error?.props.variant).toBe('not-found');
@@ -186,12 +190,13 @@ describe('ScopeAccessDeniedScreen', () => {
     expect(description?.props.message).toBe(
       'This organization is no longer available. Choose another account from the account picker to continue.'
     );
-    expect(findByType(renderer.root, 'ScreenHeaderMock')[0]?.props.eyebrow).toBe('Code Reviewer');
-    // A deleted organization does not come back by retrying either, so the
-    // order is the denied state's, with Back to profile first.
-    const [backAction, retryAction] = findByType(renderer.root, 'ButtonMock');
-    expect(backAction).toBe(button('Back to profile', renderer.root));
-    expect(retryAction).toBe(button('Retry', renderer.root));
+    expect(findByType(renderer.root, 'ScreenHeaderMock')[0]?.props.subtitle).toBe('Drain Labs');
+    // A deleted organization does not come back by retrying, so the shared
+    // not-found state keeps one way out: Back to profile.
+    const actions = findByType(renderer.root, 'ButtonMock');
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toBe(button('Back to profile', renderer.root));
+    expect(button('Retry', renderer.root)).toBeUndefined();
 
     act(() => {
       renderer.unmount();

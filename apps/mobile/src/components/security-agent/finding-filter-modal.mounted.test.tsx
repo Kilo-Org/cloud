@@ -7,8 +7,9 @@ import { renderWithProviders, type RenderWithProvidersResult } from '@/test/rend
 import { FindingFilterModal } from './finding-filter-modal';
 
 vi.mock('react-native', () => ({ View: 'View' }));
-vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
+vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
+vi.mock('@/components/ui/row-group', () => ({ RowGroup: 'RowGroup' }));
 vi.mock('@/components/ui/radio-group', () => ({ RadioGroup: 'RadioGroup' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 

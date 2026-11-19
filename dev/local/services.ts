@@ -304,8 +304,14 @@ const serviceMeta: Record<string, ServiceMeta> = {
   // worker in every dev session (`LATENCY_INGEST_URL` in the mobile env points
   // at its wrangler port), so a stack started for mobile work runs it;
   // otherwise the app POSTs to a dead listener and the ingest path cannot be
-  // observed locally.
-  mobile: { group: 'mobile', dependsOn: ['latency-ingest'], dir: 'apps/mobile' },
+  // observed locally. `pnpm dev:env:mobile` also always points
+  // `EXPO_PUBLIC_SESSION_SYNC_URL` at the session-sync worker, which shows the
+  // Profile "Native remote" row, so the stack runs that worker too.
+  mobile: {
+    group: 'mobile',
+    dependsOn: ['latency-ingest', 'cloudflare-session-sync'],
+    dir: 'apps/mobile',
+  },
   storybook: { group: 'storybook', dependsOn: [] },
   'deletion-mock': {
     group: 'deletion-mock',

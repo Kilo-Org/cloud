@@ -699,11 +699,7 @@ test('kilo-app CI builds the harness SDK once and every suite downloads it', () 
     "steps.build.outcome == 'failure'",
     'the mark step records exactly a failed build outcome'
   );
-  assert.match(
-    markStep.run,
-    /failed=true/,
-    'the mark step writes the failed output'
-  );
+  assert.match(markStep.run, /failed=true/, 'the mark step writes the failed output');
   assert.match(
     markStep.run,
     /\$GITHUB_OUTPUT/,
@@ -748,76 +744,76 @@ test('kilo-app CI builds the harness SDK once and every suite downloads it', () 
 // The assertions above pin the wiring, not the predicate: a rewrite of the run
 // block could pass unnoticed. This fixture runs the step's own script against
 // result fixtures, so an edit to the predicate cannot pass unnoticed.
-test(
-  'the required check fails on a shard or producer failure only when the suite was selected',
-  t => {
-    const work = mkdtempSync(join(tmpdir(), 'kilo-app-aggregate-'));
-    t.after(() => rmSync(work, { recursive: true, force: true }));
-    const step = workflows['kilo-app-ci.yml'].jobs['mobile-test-result'].steps.find(
-      step => step.name === 'Check test results'
-    );
-    // `toJSON(needs)` expands to an object keyed by job name, holding each
-    // job's result and outputs; run the step with `RESULTS` holding that same
-    // object and `jq` reading it back.
-    const aggregate = (needs, { mobile = 'true' } = {}) =>
-      spawnSync('bash', ['-c', step.run], {
-        encoding: 'utf8',
-        cwd: work,
-        env: {
-          ...process.env,
-          RESULTS: JSON.stringify({
-            'mobile-changes': { result: 'success', outputs: { mobile } },
-            'prepare-harness-sdk': { result: 'success', outputs: {} },
-            'prepare-trpc': { result: 'success', outputs: {} },
-            'mobile-test': { result: 'success', outputs: {} },
-            'i18n-catalogs': { result: 'success', outputs: {} },
-            ...needs,
-          }),
-          MOBILE: mobile,
-        },
-      }).status;
+test('the required check fails on a shard or producer failure only when the suite was selected', t => {
+  const work = mkdtempSync(join(tmpdir(), 'kilo-app-aggregate-'));
+  t.after(() => rmSync(work, { recursive: true, force: true }));
+  const step = workflows['kilo-app-ci.yml'].jobs['mobile-test-result'].steps.find(
+    step => step.name === 'Check test results'
+  );
+  // `toJSON(needs)` expands to an object keyed by job name, holding each
+  // job's result and outputs; run the step with `RESULTS` holding that same
+  // object and `jq` reading it back.
+  const aggregate = (needs, { mobile = 'true' } = {}) =>
+    spawnSync('bash', ['-c', step.run], {
+      encoding: 'utf8',
+      cwd: work,
+      env: {
+        ...process.env,
+        RESULTS: JSON.stringify({
+          'mobile-changes': { result: 'success', outputs: { mobile } },
+          'prepare-harness-sdk': { result: 'success', outputs: {} },
+          'prepare-trpc': { result: 'success', outputs: {} },
+          'mobile-test': { result: 'success', outputs: {} },
+          'i18n-catalogs': { result: 'success', outputs: {} },
+          ...needs,
+        }),
+        MOBILE: mobile,
+      },
+    }).status;
 
-    assert.equal(aggregate({}), 0, 'all shards pass');
-    assert.notEqual(
-      aggregate({ 'mobile-test': { result: 'failure', outputs: {} } }),
-      0,
-      'a failed shard fails the check'
-    );
-    assert.notEqual(
-      aggregate({ 'mobile-test': { result: 'cancelled', outputs: {} } }),
-      0,
-      'a cancelled shard fails the check'
-    );
-    assert.notEqual(
-      aggregate({ 'prepare-harness-sdk': { result: 'failure', outputs: {} } }),
-      0,
-      'a failed producer job fails the check when detection selected the suite'
-    );
-    assert.equal(
-      aggregate({ 'prepare-harness-sdk': { result: 'failure', outputs: {} } }, { mobile: 'false' }),
-      0,
-      'the producer failure escapes the check only when detection selected no suite'
-    );
-    assert.notEqual(
-      aggregate({ 'prepare-harness-sdk': { result: 'success', outputs: { failed: 'true' } } }),
-      0,
-      'a reported build failure fails the check when detection selected the suite'
-    );
-    assert.equal(
-      aggregate({ 'prepare-harness-sdk': { result: 'success', outputs: { failed: 'true' } } }, {
+  assert.equal(aggregate({}), 0, 'all shards pass');
+  assert.notEqual(
+    aggregate({ 'mobile-test': { result: 'failure', outputs: {} } }),
+    0,
+    'a failed shard fails the check'
+  );
+  assert.notEqual(
+    aggregate({ 'mobile-test': { result: 'cancelled', outputs: {} } }),
+    0,
+    'a cancelled shard fails the check'
+  );
+  assert.notEqual(
+    aggregate({ 'prepare-harness-sdk': { result: 'failure', outputs: {} } }),
+    0,
+    'a failed producer job fails the check when detection selected the suite'
+  );
+  assert.equal(
+    aggregate({ 'prepare-harness-sdk': { result: 'failure', outputs: {} } }, { mobile: 'false' }),
+    0,
+    'the producer failure escapes the check only when detection selected no suite'
+  );
+  assert.notEqual(
+    aggregate({ 'prepare-harness-sdk': { result: 'success', outputs: { failed: 'true' } } }),
+    0,
+    'a reported build failure fails the check when detection selected the suite'
+  );
+  assert.equal(
+    aggregate(
+      { 'prepare-harness-sdk': { result: 'success', outputs: { failed: 'true' } } },
+      {
         mobile: 'false',
-      }),
-      0,
-      'a reported build failure without a selected suite passes'
-    );
-    assert.equal(aggregate({}, { mobile: 'false' }), 0, 'a run without a selected suite passes');
-    assert.notEqual(
-      aggregate({ 'prepare-trpc': { result: 'failure', outputs: {} } }, { mobile: 'false' }),
-      0,
-      'only the harness producer is exempt, not the declaration producer'
-    );
-  }
-);
+      }
+    ),
+    0,
+    'a reported build failure without a selected suite passes'
+  );
+  assert.equal(aggregate({}, { mobile: 'false' }), 0, 'a run without a selected suite passes');
+  assert.notEqual(
+    aggregate({ 'prepare-trpc': { result: 'failure', outputs: {} } }, { mobile: 'false' }),
+    0,
+    'only the harness producer is exempt, not the declaration producer'
+  );
+});
 
 // mobile-native-build needs the same single producer for a different reason:
 // both platform jobs start together after the gate, so running the action in

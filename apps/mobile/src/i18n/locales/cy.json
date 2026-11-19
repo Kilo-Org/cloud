@@ -1478,8 +1478,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Caiff cysylltiad Bitbucket ag {{organization}} ei reoli ar y we o gyfrifiadur.",
-      "description": "Cysylltwch Bitbucket ag {{organization}}. Crëwch docyn mynediad gweithle gyda'r cwmpasau gofynnol a'i ludo isod.",
-      "descriptionReconnect": "Ailgysylltwch Bitbucket ag {{organization}}. Crëwch docyn mynediad gweithle gyda'r cwmpasau gofynnol a'i ludo isod.",
+      "description": "Crëwch docyn mynediad gweithle ar gyfer {{organization}} a'i ludo isod.",
+      "descriptionReconnect": "Crëwch docyn mynediad gweithle newydd ar gyfer {{organization}} a'i ludo isod.",
       "scopes": "Cyfrif: darllen · Ystorfeydd: darllen/ysgrifennu · Ceisiadau tynnu: darllen · Bachau gwe: darllen/ysgrifennu",
       "tokenPlaceholder": "Tocyn mynediad gweithle",
       "tokenRefused": "Ni dderbyniodd Bitbucket y tocyn mynediad gweithle hwn. Gwiriwch fod ganddo'r cwmpasau uchod, yna ceisiwch eto."

@@ -1409,8 +1409,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "La connexió de Bitbucket amb {{organization}} es gestiona al web des d'un ordinador.",
-      "description": "Connecta Bitbucket amb {{organization}}. Crea un testimoni d'accés a l'espai de treball amb els permisos necessaris i enganxa'l a continuació.",
-      "descriptionReconnect": "Torna a connectar Bitbucket amb {{organization}}. Crea un testimoni d'accés a l'espai de treball amb els permisos necessaris i enganxa'l a continuació.",
+      "description": "Crea un testimoni d'accés a l'espai de treball per a {{organization}} i enganxa'l a continuació.",
+      "descriptionReconnect": "Crea un testimoni nou d'accés a l'espai de treball per a {{organization}} i enganxa'l a continuació.",
       "scopes": "Compte: lectura · Repositoris: lectura/escriptura · Sol·licituds d'integració: lectura · Webhooks: lectura/escriptura.",
       "tokenPlaceholder": "Testimoni d'accés a l'espai de treball",
       "tokenRefused": "Bitbucket no ha acceptat aquest testimoni d'accés a l'espai de treball. Comprova que tingui els permisos indicats a dalt i torna-ho a provar."

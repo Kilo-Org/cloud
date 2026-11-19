@@ -1386,8 +1386,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "A conexión de Bitbucket con {{organization}} xestiónase na web desde un ordenador.",
-      "description": "Conecta Bitbucket con {{organization}}. Crea un token de acceso ao espazo de traballo cos ámbitos requiridos e pégao aquí embaixo.",
-      "descriptionReconnect": "Volve conectar Bitbucket con {{organization}}. Crea un token de acceso ao espazo de traballo cos ámbitos requiridos e pégao aquí embaixo.",
+      "description": "Crea un token de acceso ao espazo de traballo para {{organization}} e pégao aquí embaixo.",
+      "descriptionReconnect": "Crea un novo token de acceso ao espazo de traballo para {{organization}} e pégao aquí embaixo.",
       "scopes": "Conta: lectura · Repositorios: lectura/escritura · Solicitudes de cambios: lectura · Webhooks: lectura/escritura",
       "tokenPlaceholder": "Token de acceso ao espazo de traballo",
       "tokenRefused": "Bitbucket non aceptou este token do espazo de traballo. Comproba que ten os ámbitos indicados arriba e téntao de novo."

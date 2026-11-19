@@ -1409,8 +1409,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket vezom s {{organization}} upravlja se na webu s računala.",
-      "description": "Poveži Bitbucket s {{organization}}. Stvori token za pristup radnom prostoru s potrebnim dopuštenjima i zalijepi ga u nastavku.",
-      "descriptionReconnect": "Ponovno poveži Bitbucket s {{organization}}. Stvori token za pristup radnom prostoru s potrebnim dopuštenjima i zalijepi ga u nastavku.",
+      "description": "Stvori token za pristup radnom prostoru za {{organization}} i zalijepi ga u nastavku.",
+      "descriptionReconnect": "Stvori novi token za pristup radnom prostoru za {{organization}} i zalijepi ga u nastavku.",
       "scopes": "Račun: čitanje · Repozitoriji: čitanje/pisanje · Zahtjevi za spajanje: čitanje · Webhookovi: čitanje/pisanje",
       "tokenPlaceholder": "Token za pristup radnom prostoru",
       "tokenRefused": "Bitbucket nije prihvatio ovaj token za pristup radnom prostoru. Provjeri ima li gore navedena dopuštenja, pa pokušaj ponovno."

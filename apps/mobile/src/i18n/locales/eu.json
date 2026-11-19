@@ -1386,8 +1386,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ren Bitbucket konexioa webean kudeatzen da, ordenagailu batetik.",
-      "description": "Konektatu Bitbucket {{organization}}-rekin. Sortu lan-eremurako sarbide-token bat beharrezko baimenekin eta itsatsi behean.",
-      "descriptionReconnect": "Konektatu Bitbucket berriro {{organization}}-rekin. Sortu lan-eremurako sarbide-token bat beharrezko baimenekin eta itsatsi behean.",
+      "description": "Sortu lan-eremurako sarbide-token bat {{organization}}-rako eta itsatsi behean.",
+      "descriptionReconnect": "Sortu lan-eremurako sarbide-token berri bat {{organization}}-rako eta itsatsi behean.",
       "scopes": "Kontua: irakurtzea · Biltegiak: irakurtzea/idaztea · Bateratze-eskaerak: irakurtzea · Webhook-ak: irakurtzea/idaztea",
       "tokenPlaceholder": "Lan-eremurako sarbide-tokena",
       "tokenRefused": "Bitbucketek ez du lan-eremurako sarbide-token hau onartu. Egiaztatu goiko baimenak dituela, eta saiatu berriro."

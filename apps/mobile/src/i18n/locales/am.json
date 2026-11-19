@@ -1386,8 +1386,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "የ{{organization}} የBitbucket ግንኙነት ከኮምፒውተር በድር ላይ ይተዳደራል።",
-      "description": "Bitbucketን ለ{{organization}} አገናኝ። አስፈላጊ ፈቃዶች ያሉት የሥራ ቦታ መዳረሻ ቶከን ይፍጠሩና ከታች ይለጥፉት።",
-      "descriptionReconnect": "Bitbucketን እንደገና ለ{{organization}} አገናኝ። አስፈላጊ ፈቃዶች ያሉት የሥራ ቦታ መዳረሻ ቶከን ይፍጠሩና ከታች ይለጥፉት።",
+      "description": "ለ{{organization}} የሥራ ቦታ መዳረሻ ቶከን ይፍጠሩና ከታች ይለጥፉት።",
+      "descriptionReconnect": "ለ{{organization}} አዲስ የሥራ ቦታ መዳረሻ ቶከን እንደገና ይፍጠሩና ከታች ይለጥፉት።",
       "scopes": "መለያ፦ ማንበብ · ማከማቻዎች፦ ማንበብ/መጻፍ · የኮድ ውህደት ጥያቄዎች፦ ማንበብ · ዌብሁኮች፦ ማንበብ/መጻፍ",
       "tokenPlaceholder": "የሥራ ቦታ መዳረሻ ቶከን",
       "tokenRefused": "Bitbucket ይህን የሥራ ቦታ ቶከን አልተቀበለውም። ከላይ ያሉት አስፈላጊ ፈቃዶች እንዳሉት ያረጋግጡ፣ ከዚያ እንደገና ይሞክሩ።"

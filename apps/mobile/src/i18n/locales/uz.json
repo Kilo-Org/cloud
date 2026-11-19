@@ -1386,8 +1386,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} uchun Bitbucket ulanishi kompyuterdan veb orqali boshqariladi.",
-      "description": "Bitbucketni {{organization}} bilan ulang. Kerakli ruxsatlarga ega ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
-      "descriptionReconnect": "Bitbucketni {{organization}} bilan qayta ulang. Kerakli ruxsatlarga ega ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
+      "description": "{{organization}} uchun ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
+      "descriptionReconnect": "{{organization}} uchun yangi ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
       "scopes": "Hisob: o'qish · Repozitoriyalar: o'qish/yozish · PRlar: o'qish · Vebhuklar: o'qish/yozish",
       "tokenPlaceholder": "Ish maydoniga kirish tokeni",
       "tokenRefused": "Bitbucket bu ish maydoniga kirish tokenini qabul qilmadi. U yuqoridagi ruxsatlarga ega ekanligini tekshirib, qayta urinib ko'ring."

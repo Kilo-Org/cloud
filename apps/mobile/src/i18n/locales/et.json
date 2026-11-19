@@ -1386,8 +1386,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucketi ühendust {{organization}}-ga hallatakse arvutis veebi kaudu.",
-      "description": "Ühenda Bitbucket {{organization}}-ga. Loo nõutavate õigustega tööruumi juurdepääsutunnus ja kleebi see allolevale väljale.",
-      "descriptionReconnect": "Ühenda Bitbucket uuesti {{organization}}-ga. Loo nõutavate õigustega tööruumi juurdepääsutunnus ja kleebi see allolevale väljale.",
+      "description": "Loo tööruumi juurdepääsutunnus {{organization}} jaoks ja kleebi see allolevale väljale.",
+      "descriptionReconnect": "Loo uus tööruumi juurdepääsutunnus {{organization}} jaoks ja kleebi see allolevale väljale.",
       "scopes": "Konto: lugemine · Hoidlad: lugemine/kirjutamine · Tõmbetaotlused: lugemine · Veebihaagid: lugemine/kirjutamine",
       "tokenPlaceholder": "Tööruumi juurdepääsutunnus",
       "tokenRefused": "Bitbucket ei võtnud seda tööruumi juurdepääsutunnust vastu. Kontrolli, et sellel oleksid ülaltoodud õigused, ja proovi seejärel uuesti."

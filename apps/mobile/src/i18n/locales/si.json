@@ -1386,8 +1386,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} හි Bitbucket සම්බන්ධතාවය පරිගණකයකින් වෙබය හරහා කළමනාකරණය කෙරේ.",
-      "description": "Bitbucket {{organization}} සමඟ සම්බන්ධ කරන්න. අවශ්‍ය අවසර සහිත වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා පහත අලවන්න.",
-      "descriptionReconnect": "Bitbucket නැවත {{organization}} සමඟ සම්බන්ධ කරන්න. අවශ්‍ය අවසර සහිත වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා පහත අලවන්න.",
+      "description": "{{organization}} සඳහා වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා පහත අලවන්න.",
+      "descriptionReconnect": "{{organization}} සඳහා නව වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා පහත අලවන්න.",
       "scopes": "ගිණුම: කියවීම · ගබඩා: කියවීම/ලිවීම · PR: කියවීම · වෙබ්හුක්: කියවීම/ලිවීම",
       "tokenPlaceholder": "වැඩබිම් ප්‍රවේශ ටෝකනය",
       "tokenRefused": "Bitbucket මෙම වැඩබිම් ප්‍රවේශ ටෝකනය පිළිගත්තේ නැත. එහි ඉහත අවසර ඇත්දැයි පරීක්ෂා කර, නැවත උත්සාහ කරන්න."

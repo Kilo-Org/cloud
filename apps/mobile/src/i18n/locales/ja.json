@@ -696,8 +696,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}のBitbucket接続は、パソコンからWebで管理されています。",
-      "description": "{{organization}}とBitbucketを連携してください。必要なスコープを指定してワークスペースアクセストークンを作成し、下に貼り付けてください。",
-      "descriptionReconnect": "{{organization}}とBitbucketを再接続してください。必要なスコープを指定してワークスペースアクセストークンを作成し、下に貼り付けてください。",
+      "description": "{{organization}}用のワークスペースアクセストークンを作成し、下に貼り付けてください。",
+      "descriptionReconnect": "{{organization}}用の新しいワークスペースアクセストークンを作成し、下に貼り付けてください。",
       "scopes": "アカウント：読み取り、リポジトリ：読み取り・書き込み、プルリクエスト：読み取り、Webhook：読み取り・書き込み",
       "tokenPlaceholder": "ワークスペースアクセストークン",
       "tokenRefused": "Bitbucketはこのワークスペースアクセストークンを受け付けませんでした。上記のスコープが付与されていることを確認してから、もう一度お試しください。"

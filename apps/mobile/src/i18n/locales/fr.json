@@ -663,8 +663,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "La connexion Bitbucket à {{organization}} se gère sur le web, depuis un ordinateur.",
-      "description": "Connectez Bitbucket à {{organization}}. Créez un jeton d'accès à l'espace de travail avec les autorisations requises, puis collez-le ci-dessous.",
-      "descriptionReconnect": "Reconnectez Bitbucket à {{organization}}. Créez un jeton d'accès à l'espace de travail avec les autorisations requises, puis collez-le ci-dessous.",
+      "description": "Créez un jeton d'accès à l'espace de travail pour {{organization}}, puis collez-le ci-dessous.",
+      "descriptionReconnect": "Créez un nouveau jeton d'accès à l'espace de travail pour {{organization}}, puis collez-le ci-dessous.",
       "scopes": "Compte : lecture · Dépôts : lecture/écriture · Demandes de fusion : lecture · Webhooks : lecture/écriture",
       "tokenPlaceholder": "Jeton d'accès à l'espace de travail",
       "tokenRefused": "Bitbucket n'a pas accepté ce jeton d'accès à l'espace de travail. Vérifiez qu'il dispose des autorisations ci-dessus, puis réessayez."

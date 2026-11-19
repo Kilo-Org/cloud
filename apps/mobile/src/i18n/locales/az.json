@@ -1386,8 +1386,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} üçün Bitbucket bağlantısı kompüterdən vebdə idarə olunur.",
-      "description": "{{organization}} üçün Bitbucket hesabını qoş. Tələb olunan icazələri olan iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
-      "descriptionReconnect": "{{organization}} üçün Bitbucket hesabını yenidən qoş. Tələb olunan icazələri olan iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
+      "description": "{{organization}} üçün iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
+      "descriptionReconnect": "{{organization}} üçün yeni iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
       "scopes": "Hesab: oxuma · Repozitoriyalar: oxuma/yazma · PR-lər: oxuma · Vebhuklar: oxuma/yazma",
       "tokenPlaceholder": "İş sahəsinin giriş tokeni",
       "tokenRefused": "Bitbucket bu iş sahəsi tokenini qəbul etmədi. Yuxarıdakı icazələrin olduğunu yoxla, sonra yenidən cəhd et."

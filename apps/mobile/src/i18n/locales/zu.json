@@ -1386,8 +1386,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Uxhumano lwe-Bitbucket lwe-{{organization}} luphathwa kuwebhu ngekhompyutha.",
-      "description": "Xhuma i-Bitbucket ku-{{organization}}. Dala ithokheni yokufinyelela endaweni yokusebenza enezimvume ezidingekayo bese uyinamathisela ngezansi.",
-      "descriptionReconnect": "Xhuma kabusha i-Bitbucket ku-{{organization}}. Dala ithokheni yokufinyelela endaweni yokusebenza enezimvume ezidingekayo bese uyinamathisela ngezansi.",
+      "description": "Dala ithokheni yokufinyelela endaweni yokusebenza ka-{{organization}}, bese uyinamathisela ngezansi.",
+      "descriptionReconnect": "Dala ithokheni entsha yokufinyelela endaweni yokusebenza ka-{{organization}}, bese uyinamathisela ngezansi.",
       "scopes": "I-akhawunti: ukufunda · Izinqolobane zekhodi: ukufunda/ukubhala · Izicelo zokuhlanganisa ikhodi: ukufunda · Ama-webhook: ukufunda/ukubhala",
       "tokenPlaceholder": "Ithokheni yokufinyelela endaweni yokusebenza",
       "tokenRefused": "I-Bitbucket ayikwamukelanga le thokheni yokufinyelela endaweni yokusebenza. Hlola ukuthi inazo izimvume ezingenhla, bese uzama futhi."

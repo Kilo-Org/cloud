@@ -665,8 +665,9 @@ describe('narrowProfilePermission', () => {
     }) as PermissionMap;
     // `git p*` and `* push` overlap without containing each other, so the
     // composed order settles a command that matches both. That order is
-    // intended: the wider `git *` rule precedes `git p*`, which it contains,
-    // and the two unrelated rules keep the order the agent wrote.
+    // intended and deterministic: `git p*` has `git *` ahead of it because
+    // `git *` contains it, so the unrelated `* push` is placed first and
+    // `git p*` last.
     expect(resolve(session, composed, 'bash', 'git push')).toBe('allow');
     expect(resolve(session, composed, 'bash', 'git pull')).toBe('allow');
   });

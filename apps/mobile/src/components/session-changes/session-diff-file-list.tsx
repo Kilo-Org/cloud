@@ -6,7 +6,6 @@ import { FlashList } from '@shopify/flash-list';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   DiffFontMetricsContext,
@@ -17,7 +16,11 @@ import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { formatNumber } from '@/lib/format';
-import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-insets';
+import {
+  useDetailScreenBottomPadding,
+  useSideInsetStyle,
+  useStyleSideInsets,
+} from '@/lib/screen-insets';
 import { buildFileItems } from '@/lib/pr-review/diff/pr-diff-list-builder';
 import { itemTypeFor } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
@@ -34,7 +37,7 @@ export function SessionDiffFileList({ files }: Readonly<{ files: PrReviewFile[] 
   const diffFontMetrics = useBoundedDiffFontMetrics();
   const bottomPadding = useDetailScreenBottomPadding();
   const sideInsetStyle = useSideInsetStyle();
-  const insets = useSafeAreaInsets();
+  const insets = useStyleSideInsets();
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
     files.length <= AUTO_EXPAND_MAX_FILES
       ? Object.fromEntries(files.map(file => [file.path, true]))

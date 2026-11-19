@@ -28,6 +28,7 @@ vi.mock('@/lib/a11y/motion', () => ({
 }));
 vi.mock('react-native', () => ({
   AccessibilityInfo: { announceForAccessibility: vi.fn() },
+  I18nManager: { isRTL: false, doLeftAndRightSwapInRTL: true },
   Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',

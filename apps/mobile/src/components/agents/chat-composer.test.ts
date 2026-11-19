@@ -10,6 +10,7 @@ import { RemainingCharactersCounter } from '@/components/ui/remaining-characters
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
 import type * as ReactI18next from 'react-i18next';
+import type * as ScreenInsets from '@/lib/screen-insets';
 import '@/i18n';
 import { type ChatComposer } from './chat-composer';
 
@@ -123,6 +124,13 @@ vi.mock('react-native', () => ({
 
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => safeAreaInsets,
+}));
+
+// The pure suite calls the composer as a function, outside a React render, so
+// the real helper's context read cannot run; serve the mocked safe-area sides.
+vi.mock('@/lib/screen-insets', async importOriginal => ({
+  ...(await importOriginal<typeof ScreenInsets>()),
+  useStyleSideInsets: () => ({ left: safeAreaInsets.left, right: safeAreaInsets.right }),
 }));
 
 // The shared counter row reads its phrase through `useTranslation`; the mocked

@@ -14,7 +14,7 @@ import { Rows3 } from '@/components/ui/icons';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useStyleSideInsets } from '@/lib/screen-insets';
 
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
@@ -56,7 +56,7 @@ export function PrDiffFileListHeader({
   // bordered container would beat the className (inline style wins in React
   // Native) and swallow the gutter. Zero insets collapse the wrapper style to
   // `undefined`, so portrait pixels are byte-identical.
-  const insets = useSafeAreaInsets();
+  const insets = useStyleSideInsets();
   const sideInsetStyle =
     insets.left > 0 || insets.right > 0
       ? {

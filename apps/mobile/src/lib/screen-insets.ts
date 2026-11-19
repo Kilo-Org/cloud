@@ -49,7 +49,7 @@ export function useScreenInsets() {
  * tree (`I18nManager.doLeftAndRightSwapInRTL`, on by default), so the values
  * are swapped there to land each inset back on its own physical side.
  */
-function useStyleSideInsets() {
+export function useStyleSideInsets() {
   const { left, right } = useScreenInsets();
   if (left === right) {
     return { left, right };

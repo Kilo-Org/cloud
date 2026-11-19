@@ -60,6 +60,14 @@ const REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED =
 const REMOTE_SESSION_ORGANIZATION_MISMATCH =
   "A new session stays in this session's organization. Switch organization first.";
 
+/**
+ * Cool-down before the read-only upgrade watcher re-arms after a re-resolve
+ * that stayed read-only. Subscribing makes the server re-send sessions.list
+ * for the watched session; without this window that re-send would immediately
+ * re-fire the watcher that just armed.
+ */
+const READ_ONLY_REARM_COOLDOWN_MS = 1_000;
+
 type CloudAgentSessionConfig = {
   kiloSessionId: KiloSessionId;
   resolveSession: (kiloSessionId: KiloSessionId) => Promise<ResolvedSession>;
@@ -268,6 +276,11 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
   >();
   let connectGeneration = 0;
   let disarmUpgradeWatcher: (() => void) | null = null;
+  // Last CLI row the watcher accepted as new evidence for the current
+  // read-only open. A payload whose watched row carries the same status and
+  // connection as this one brings nothing new, so it must not re-resolve.
+  let lastUpgradeEvidence: { status: string; connectionId?: string } | null = null;
+  let rearmTimer: ReturnType<typeof setTimeout> | null = null;
 
   // A session resolves to 'read-only' when the CLI hasn't (yet) reported it as
   // active — but that signal is eventually consistent: enabling remote on the
@@ -289,8 +302,22 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       const schema = event === 'sessions.list' ? sessionsListDataSchema : heartbeatDataSchema;
       const parsed = schema.safeParse(data);
       if (!parsed.success) return;
-      if (!parsed.data.sessions.some(session => session.id === config.kiloSessionId)) return;
-      connectInternal();
+      const row = parsed.data.sessions.find(session => session.id === config.kiloSessionId);
+      if (!row) return;
+      // Subscribe-triggered sessions.list re-sends repeat the same row we
+      // already acted on. Only a status or connection change is new evidence;
+      // acting on every payload would drive a teardown/refetch loop.
+      const evidence = {
+        status: row.status,
+        connectionId: typeof row.connectionId === 'string' ? row.connectionId : undefined,
+      };
+      const unchanged =
+        lastUpgradeEvidence !== null &&
+        lastUpgradeEvidence.status === evidence.status &&
+        lastUpgradeEvidence.connectionId === evidence.connectionId;
+      if (unchanged) return;
+      lastUpgradeEvidence = evidence;
+      void handleUpgradeTrigger();
     });
     disarmUpgradeWatcher = () => {
       off();
@@ -298,9 +325,72 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     };
   }
 
-  function connectInternal(): void {
+  function clearRearmTimer(): void {
+    if (rearmTimer !== null) {
+      clearTimeout(rearmTimer);
+      rearmTimer = null;
+    }
+  }
+
+  /**
+   * Re-resolve without destroying the live read-only transport first: the
+   * transport keeps serving the historical snapshot until the resolution
+   * actually changes type, so a stay-read-only result costs one resolve call
+   * and nothing else. A 1s cool-down before re-arming keeps the
+   * subscribe-triggered sessions.list re-send from immediately re-firing the
+   * watcher that just armed.
+   */
+  async function handleUpgradeTrigger(): Promise<void> {
+    clearRearmTimer();
     disarmUpgradeWatcher?.();
     disarmUpgradeWatcher = null;
+    connectGeneration += 1;
+    const expectedGeneration = connectGeneration;
+
+    let resolved: ResolvedSession;
+    try {
+      resolved = await config.resolveSession(config.kiloSessionId);
+    } catch (error) {
+      if (expectedGeneration !== connectGeneration) return;
+      const message = error instanceof Error ? error.message : 'Failed to resolve session';
+      config.onError?.(message);
+      serviceState.setActivity({ type: 'idle' });
+      serviceState.setStatus({ type: 'error', message });
+      armUpgradeWatcher();
+      return;
+    }
+
+    if (expectedGeneration !== connectGeneration) return;
+
+    if (resolved.type !== 'read-only') {
+      // Real upgrade: destroy the historical transport and rebuild on the new
+      // resolution. resolveAndConnect reports the resolution (onResolved), so
+      // it fires exactly once per resolved session in every path.
+      if (transport) {
+        transport.destroy();
+        transport = null;
+      }
+      serviceState.setActivity({ type: 'connecting' });
+      await resolveAndConnect(expectedGeneration, resolved);
+      return;
+    }
+
+    // Still read-only: keep the current transport (snapshot and history stay
+    // intact) and re-arm after a cool-down so a heartbeat stream or a presence
+    // outage cannot drive a reconnect loop.
+    config.onResolved?.(resolved);
+    clearRearmTimer();
+    rearmTimer = setTimeout(() => {
+      rearmTimer = null;
+      armUpgradeWatcher();
+    }, READ_ONLY_REARM_COOLDOWN_MS);
+  }
+
+  function connectInternal(): void {
+    clearRearmTimer();
+    disarmUpgradeWatcher?.();
+    disarmUpgradeWatcher = null;
+    lastUpgradeEvidence = null;
     if (transport) {
       transport.destroy();
       transport = null;
@@ -480,21 +570,28 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     }
   }
 
-  async function resolveAndConnect(expectedGeneration: number): Promise<void> {
+  async function resolveAndConnect(
+    expectedGeneration: number,
+    preResolved?: ResolvedSession
+  ): Promise<void> {
     let resolved: ResolvedSession;
 
-    try {
-      resolved = await config.resolveSession(config.kiloSessionId);
-    } catch (error) {
-      if (expectedGeneration !== connectGeneration) return;
-      const message = error instanceof Error ? error.message : 'Failed to resolve session';
-      config.onError?.(message);
-      serviceState.setActivity({ type: 'idle' });
-      serviceState.setStatus({ type: 'error', message });
-      return;
-    }
+    if (preResolved) {
+      resolved = preResolved;
+    } else {
+      try {
+        resolved = await config.resolveSession(config.kiloSessionId);
+      } catch (error) {
+        if (expectedGeneration !== connectGeneration) return;
+        const message = error instanceof Error ? error.message : 'Failed to resolve session';
+        config.onError?.(message);
+        serviceState.setActivity({ type: 'idle' });
+        serviceState.setStatus({ type: 'error', message });
+        return;
+      }
 
-    if (expectedGeneration !== connectGeneration) return;
+      if (expectedGeneration !== connectGeneration) return;
+    }
 
     config.onResolved?.(resolved);
 
@@ -513,6 +610,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     transport.connect();
 
     if (resolved.type === 'read-only') {
+      lastUpgradeEvidence = null;
       armUpgradeWatcher();
     }
   }
@@ -648,6 +746,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       connectInternal();
     },
     disconnect() {
+      clearRearmTimer();
       disarmUpgradeWatcher?.();
       disarmUpgradeWatcher = null;
       connectGeneration += 1;
@@ -657,6 +756,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       }
     },
     destroy() {
+      clearRearmTimer();
       disarmUpgradeWatcher?.();
       disarmUpgradeWatcher = null;
       connectGeneration += 1;

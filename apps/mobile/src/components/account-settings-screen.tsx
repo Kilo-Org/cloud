@@ -23,7 +23,7 @@ import { ConfigureRow } from '@/components/ui/configure-row';
 import { DirectionalLogOut } from '@/components/ui/directional-icons';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { RowGroup } from '@/components/ui/row-group';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { attemptPushRegistrationReconciliation } from '@/lib/auth/push-registration-reconciliation';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { getResolvedLanguage, useLanguagePreference } from '@/lib/hooks/use-language-preference';
@@ -75,11 +75,11 @@ export function AccountSettingsScreen() {
   let body: ReactNode = null;
   if (isLoading) {
     body = (
-      <View className="gap-3">
+      <RowGroup leadingTile>
         {SKELETON_ROWS.map(row => (
-          <Skeleton key={row} className="h-[54px] rounded-lg" />
+          <RowSkeleton key={row} tile subtitle />
         ))}
-      </View>
+      </RowGroup>
     );
   } else if (isFetchError) {
     // A failed attempt keeps a cached identity, which must not be presented as

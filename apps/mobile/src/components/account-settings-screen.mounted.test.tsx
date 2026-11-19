@@ -44,7 +44,7 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalLogOut: 'DirectionalLogOut' }));
 vi.mock('@/lib/auth/push-registration-reconciliation', () => ({
   attemptPushRegistrationReconciliation: vi.fn(),
@@ -106,7 +106,7 @@ function findConfigureRow(renderer: ReactTestRenderer, title: string) {
   }
   return row;
 }
-function findStateNodes(renderer: ReactTestRenderer, type: 'QueryError' | 'Skeleton') {
+function findStateNodes(renderer: ReactTestRenderer, type: 'QueryError' | 'RowSkeleton') {
   return renderer.root.findAll(node => String(node.type) === type);
 }
 beforeEach(() => {
@@ -213,7 +213,7 @@ describe('AccountSettingsScreen', () => {
     const renderer = await mountAccount();
 
     expect(findConfigureRows(renderer)).toEqual([]);
-    expect(findStateNodes(renderer, 'Skeleton').length).toBeGreaterThan(0);
+    expect(findStateNodes(renderer, 'RowSkeleton').length).toBeGreaterThan(0);
   });
 
   it('offers a failed account read a retry in place of the rows', async () => {
@@ -248,6 +248,6 @@ describe('AccountSettingsScreen', () => {
       'Sign out of all web sessions',
     ]);
     expect(findStateNodes(renderer, 'QueryError')).toEqual([]);
-    expect(findStateNodes(renderer, 'Skeleton')).toEqual([]);
+    expect(findStateNodes(renderer, 'RowSkeleton')).toEqual([]);
   });
 });

@@ -12,6 +12,7 @@ import {
   shouldPublishForSession,
 } from './needs-input-notification';
 import {
+  markNeedsInputReplyResult,
   notificationIdentifierForSession,
   readNeedsInputPresentation,
 } from './needs-input-presentation';
@@ -733,6 +734,42 @@ describe('applyNeedsInputNotifications', () => {
         identifier: 'needs-input:ses_1',
         content: expect.not.objectContaining({ sound: false }),
       })
+    );
+  });
+
+  it("retires a reply's result left under a push's identifier when the raise ends", async () => {
+    markNeedsInputReplyResult('ses_1', 'fcm-remote-1');
+    const plan = planNeedsInputNotifications({
+      previous: [notifiedRow()],
+      next: [],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+    });
+
+    await applyNeedsInputNotifications(plan);
+
+    expect(mocks.dismissNotificationAsync.mock.calls).toEqual([
+      ['needs-input:ses_1'],
+      ['fcm-remote-1'],
+    ]);
+  });
+
+  it("retires a reply's result before a later raise of the same session is posted", async () => {
+    markNeedsInputReplyResult('ses_1', 'fcm-remote-1');
+    const plan = planNeedsInputNotifications({
+      previous: [],
+      next: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+    });
+
+    await applyNeedsInputNotifications(plan);
+
+    expect(mocks.dismissNotificationAsync).toHaveBeenCalledWith('fcm-remote-1');
+    expect(mocks.dismissNotificationAsync.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.scheduleNotificationAsync.mock.invocationCallOrder[0] ?? 0
     );
   });
 

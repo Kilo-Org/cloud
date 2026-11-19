@@ -6,10 +6,7 @@ import {
   accountReadVerdict,
   useBlockedAccountFromAccountRead,
 } from '@/lib/auth/account-blocked-read';
-import {
-  isBlockedAccountActive,
-  setBlockedAccountActive,
-} from '@/lib/auth/blocked-account-state';
+import { isBlockedAccountActive, setBlockedAccountActive } from '@/lib/auth/blocked-account-state';
 
 // ── Fixtures ───────────────────────────────────────────────────────────────
 
@@ -43,10 +40,7 @@ function mount(props: ProbeProps): TestRenderer.ReactTestRenderer {
   return renderer;
 }
 
-async function update(
-  renderer: TestRenderer.ReactTestRenderer,
-  props: ProbeProps
-): Promise<void> {
+async function update(renderer: TestRenderer.ReactTestRenderer, props: ProbeProps): Promise<void> {
   await act(async () => {
     renderer.update(createElement(Probe, props));
     await Promise.resolve();
@@ -149,7 +143,12 @@ describe('useBlockedAccountFromAccountRead', () => {
     expect(isBlockedAccountActive()).toBe(true);
     expect(onAnswered).not.toHaveBeenCalled();
 
-    await update(renderer, { error: BLOCKED_REFUSAL, userId: undefined, enabled: true, onAnswered });
+    await update(renderer, {
+      error: BLOCKED_REFUSAL,
+      userId: undefined,
+      enabled: true,
+      onAnswered,
+    });
     expect(onAnswered).not.toHaveBeenCalled();
 
     await update(renderer, { error: OTHER_FAILURE, userId: undefined, enabled: true, onAnswered });

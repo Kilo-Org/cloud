@@ -40,7 +40,9 @@ type SurfaceProps = {
 };
 
 function findPressables(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
-  return root.findAll(node => typeof node.type === 'string' && (node.type as string) === 'Pressable');
+  return root.findAll(
+    node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
+  );
 }
 
 function pressableLabels(root: TestRenderer.ReactTestInstance): (string | undefined)[] {

@@ -47,7 +47,9 @@ export default defineProject({
       'src/lib/byok/**/*.test.ts',
       'src/lib/chat/**/*.test.ts',
       'src/lib/design-gate/**/*.test.ts',
-      'src/lib/auth/**/*.test.tsx',
+      // `!(*.mounted)` keeps `*.mounted.test.tsx` in the mounted project only:
+      // this directory holds both kinds, and a file in both projects runs twice.
+      'src/lib/auth/**/!(*.mounted).test.tsx',
       'src/lib/apple-iap/**/*.test.ts',
       'src/lib/apple-iap/**/*.test.tsx',
       'src/lib/billing/**/*.test.ts',

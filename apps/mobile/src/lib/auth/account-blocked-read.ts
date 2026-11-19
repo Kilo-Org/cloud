@@ -16,10 +16,7 @@ export type AccountReadVerdict = 'refused-blocked' | 'answered' | 'unsettled';
  * read retained data as a fresh answer. `error == null` with an id present is
  * the only sound test that this attempt itself was answered.
  */
-export function accountReadVerdict(
-  error: unknown,
-  userId: string | undefined
-): AccountReadVerdict {
+export function accountReadVerdict(error: unknown, userId: string | undefined): AccountReadVerdict {
   if (isAccountBlockedTrpcError(error)) {
     return 'refused-blocked';
   }
@@ -69,9 +66,7 @@ type BlockedAccountFromAccountReadInput = {
  * an inline closure, and a dependency on its identity would re-run the effect
  * (and could refetch the tree) on every render of the layout.
  */
-export function useBlockedAccountFromAccountRead(
-  input: BlockedAccountFromAccountReadInput
-): void {
+export function useBlockedAccountFromAccountRead(input: BlockedAccountFromAccountReadInput): void {
   const raisedHere = useRef(false);
   const onAnswered = useRef(input.onAnswered);
   onAnswered.current = input.onAnswered;

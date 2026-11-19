@@ -446,6 +446,66 @@ describe('applyProviderSpecificLogic untyped tool schema enums', () => {
   });
 });
 
+describe('applyProviderSpecificLogic Gemini tool schemas', () => {
+  async function applyToToolParameters(model: string) {
+    const request: Extract<GatewayRequest, { kind: 'chat_completions' }> = {
+      kind: 'chat_completions',
+      body: {
+        model,
+        messages: [{ role: 'user', content: 'hello' }],
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: 'edit_page',
+              parameters: {
+                type: 'object',
+                properties: {
+                  align: { anyOf: [{ type: 'string' }], nullable: true, enum: ['left', 'null'] },
+                },
+              },
+            },
+          },
+        ],
+      },
+    };
+
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false,
+      null
+    );
+
+    const tool = request.body.tools?.[0];
+    return tool?.type === 'function' ? tool.function.parameters?.properties : undefined;
+  }
+
+  it('moves keys beside anyOf into its branches for Gemini models', async () => {
+    const properties = await applyToToolParameters('google/gemini-3.7-flash');
+
+    expect(properties).toEqual({
+      align: { anyOf: [{ type: 'string', enum: ['left'] }, { type: 'null' }] },
+    });
+  });
+
+  it('preserves keys beside anyOf for other models', async () => {
+    const properties = await applyToToolParameters('vendor/model');
+
+    expect(properties).toEqual({
+      align: { anyOf: [{ type: 'string' }], nullable: true, enum: ['left', 'null'] },
+    });
+  });
+});
+
 describe('applyReasoningDetailsTransform', () => {
   function makeReasoningRequest(): Extract<GatewayRequest, { kind: 'chat_completions' }> {
     return {

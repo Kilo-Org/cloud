@@ -318,11 +318,33 @@ test('incomplete native values never become a complete empty transcript and rese
   // the projector's throws are unreachable through this boundary (the
   // unresolved-asset filter subsumes them), so the helper is pinned directly.
   expect(
-    retryableGapCount([{ seq: 1, incomplete: true, message: { id: 'msg_a', type: 'assistant', time: { created: 1 } } }], ['msg_b'], new Set(['msg_c']), true)
+    retryableGapCount(
+      [
+        {
+          seq: 1,
+          incomplete: true,
+          message: { id: 'msg_a', type: 'assistant', time: { created: 1 } },
+        },
+      ],
+      ['msg_b'],
+      new Set(['msg_c']),
+      true
+    )
   ).toBe(2);
   expect(retryableGapCount([], undefined, new Set(['msg_c']), true)).toBe(0);
   expect(
-    retryableGapCount([{ seq: 1, incomplete: true, message: { id: 'msg_a', type: 'assistant', time: { created: 1 } } }], ['msg_b'], new Set(['msg_c']), false)
+    retryableGapCount(
+      [
+        {
+          seq: 1,
+          incomplete: true,
+          message: { id: 'msg_a', type: 'assistant', time: { created: 1 } },
+        },
+      ],
+      ['msg_b'],
+      new Set(['msg_c']),
+      false
+    )
   ).toBe(3);
 });
 

@@ -1301,7 +1301,15 @@ describe('useRemoteSpawnDispatch stall watchdog', () => {
     spawnMock.mockImplementationOnce(() => stale.promise);
     const onSpawnReady = vi.fn();
     const onSpawnSucceeded = vi.fn();
-    const { onStart } = runHook({ organizationId: 'org-xyz', onSpawnReady, onSpawnSucceeded });
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      onSpawnReady: () => {
+        onSpawnReady();
+      },
+      onSpawnSucceeded: sessionId => {
+        onSpawnSucceeded(sessionId);
+      },
+    });
 
     // The stall overruns the budget: the form flips to the retryable failure
     // while this attempt's spawn promise is still pending.

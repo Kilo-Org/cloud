@@ -95,10 +95,12 @@ export function pressRowContentPress(root: ReactTestInstance, action: string): v
   }
   const onPress: unknown = pressable.props.onPress;
   if (typeof onPress !== 'function') {
-    throw new Error(`row content press ${action} has no handler`);
+    throw new TypeError(`row content press ${action} has no handler`);
   }
+  // Checked to be a function above; the stub props carry no call signature.
+  const press = onPress as () => void;
   act(() => {
-    onPress();
+    press();
   });
 }
 

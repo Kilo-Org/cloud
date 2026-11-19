@@ -3359,7 +3359,8 @@ describe('organization data-collection policy on provider-policy exempt routes',
 
   // Each case returns the route its shape produces, so the assertion covers the real route: a
   // direct-BYOK route with a user key, a custom LLM route, and the local fake LLM route. A model is
-  // data-collection-required when it is free or a custom LLM, so the direct-BYOK case uses a free id.
+  // data-collection-required when it is free or a custom LLM, so the direct-BYOK case uses a free
+  // catalog id, which a catalog-mode key serves.
   const directByokRoute: ProviderRoute = {
     provider: {
       ...exemptProvider,
@@ -3392,8 +3393,8 @@ describe('organization data-collection policy on provider-policy exempt routes',
       customLlm: true,
     },
     {
-      shape: 'a bespoke direct-BYOK id with a free model',
-      model: 'acme/bespoke-model:free',
+      shape: 'a free catalog model served by a direct-BYOK key',
+      model: 'acme/catalog-model:free',
       route: directByokRoute,
       customLlm: false,
     },
@@ -3429,6 +3430,57 @@ describe('organization data-collection policy on provider-policy exempt routes',
         expect(mockedUpstreamRequest).not.toHaveBeenCalled();
       } finally {
         localFakeEnv?.restore();
+      }
+    }
+  );
+
+  it.each([
+    {
+      name: 'a private provider',
+      model: 'private-a1b2c3d4e5/acme/coder-free',
+      providerId: 'private-a1b2c3d4e5' as const,
+      direct: false,
+    },
+    {
+      name: 'a bespoke direct-BYOK',
+      model: 'synthetic/acme/coder:free',
+      providerId: 'synthetic' as const,
+      direct: true,
+    },
+  ])(
+    'serves $name id with a free name for an organization that denies data collection',
+    async ({ model, providerId, direct }) => {
+      setOrganizationDataCollection('deny');
+      if (direct) {
+        mockedGetDirectByokModel.mockImplementation(async modelId =>
+          modelId === model
+            ? { provider: { id: 'synthetic' } as never, model: {} as never }
+            : { provider: null, model: null }
+        );
+      }
+      mockedGetProvider.mockImplementationOnce(async () =>
+        providerResult({
+          provider: {
+            ...exemptProvider,
+            type: 'direct-byok',
+            async transformRequest(context) {
+              delete context.request.body.provider;
+            },
+          },
+          userByok: [{ decryptedAPIKey: 'test-key', providerId }],
+          isFree: false,
+          bypassAccessCheck: true,
+        })
+      );
+
+      try {
+        const { handleLlmProxyRequest } = await import('./llm-proxy');
+        const response = await handleLlmProxyRequest(makeRequest(makeBody(model)) as never);
+
+        expect(response.status).toBe(200);
+        expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+      } finally {
+        mockedGetDirectByokModel.mockReset().mockResolvedValue({ provider: null, model: null });
       }
     }
   );

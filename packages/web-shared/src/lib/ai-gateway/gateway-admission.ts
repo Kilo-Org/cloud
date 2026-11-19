@@ -17,6 +17,7 @@ import {
   isDeniedByProviderPrivacy,
   isFreeModel,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isOwnerByokModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/owner-byok-model-id';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import type {
   OrganizationPlan,
@@ -274,10 +275,14 @@ export async function dataCollectionPolicyRejection(
   model: string,
   effectiveProviderPolicy: OpenRouterProviderConfig | undefined
 ): Promise<NextResponse | null> {
+  const customLlm = await isCustomLlm(model);
   // Kilo does not vouch for zero data retention on any custom LLM.
-  if (effectiveProviderPolicy?.zdr === true && (await isCustomLlm(model))) {
+  if (effectiveProviderPolicy?.zdr === true && customLlm) {
     return zeroDataRetentionUnavailableResponse();
   }
+  // An organization's own upstream is not a free model whatever its id ends with, and Kilo has no
+  // data-collection knowledge of it.
+  if (!customLlm && (await isOwnerByokModelId(model))) return null;
   if (await isDeniedByProviderPrivacy(model, effectiveProviderPolicy)) {
     return dataCollectionRequiredResponse();
   }

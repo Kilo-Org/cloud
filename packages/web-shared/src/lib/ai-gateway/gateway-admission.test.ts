@@ -351,6 +351,7 @@ describe('dataCollectionPolicyRejection', () => {
 
   beforeEach(() => {
     jest.mocked(isCustomLlm).mockResolvedValue(false);
+    jest.mocked(isDeniedByProviderPrivacy).mockReset();
   });
 
   it.each<OpenRouterProviderConfig>([
@@ -382,6 +383,18 @@ describe('dataCollectionPolicyRejection', () => {
       error: expect.stringContaining('Zero data retention is not available'),
     });
   });
+
+  it.each<OpenRouterProviderConfig>([{ data_collection: 'deny' }, { zdr: true }])(
+    'does not guess that a private provider id with a free name needs data collection under %j',
+    async provider => {
+      jest.mocked(isDeniedByProviderPrivacy).mockResolvedValue(true);
+
+      await expect(
+        dataCollectionPolicyRejection('private-a1b2c3d4e5/acme/coder-free', provider)
+      ).resolves.toBeNull();
+      expect(isDeniedByProviderPrivacy).not.toHaveBeenCalled();
+    }
+  );
 
   it.each<OpenRouterProviderConfig | undefined>([
     undefined,

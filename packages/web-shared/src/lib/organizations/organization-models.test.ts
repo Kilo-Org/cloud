@@ -498,6 +498,19 @@ describe('organization model producer publication', () => {
     }
   );
 
+  it('lists a private provider model with a free name for a Teams organization that denies data collection', async () => {
+    mockContext.organization.plan = 'teams';
+    mockContext.organization.settings = { data_collection: 'deny' };
+    mockByok.mockResolvedValue([
+      catalogModel('private-a1b2c3d4e5/acme/coder-free', { hasUserByokAvailable: true }),
+    ]);
+
+    const result = await resultFor();
+
+    expect(result.data.map(model => model.id)).toContain('private-a1b2c3d4e5/acme/coder-free');
+    expect(result.data.some(model => model.id === 'provider/training')).toBe(false);
+  });
+
   it('reads the snapshot through the read client a gateway caller passes', async () => {
     const { readDb } = jest.requireMock<typeof Drizzle>('@kilocode/web-shared/lib/drizzle');
     expectedReplicaLoads = 1;

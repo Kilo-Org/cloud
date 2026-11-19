@@ -248,6 +248,9 @@ function readThemeTokens() {
       throw new Error('no @theme inline block');
     }
     const tokens = [...block.matchAll(/--color-([a-z0-9-]+):\s*var\(--/g)].map(m => m[1]);
+    if (tokens.length === 0) {
+      throw new Error('no --color token in the @theme inline block');
+    }
     // Longest first so the alternation is unambiguous (`muted-soft` before `muted`).
     tokens.sort((a, b) => b.length - a.length || a.localeCompare(b));
     return { tokens, failure: null };
@@ -1502,6 +1505,14 @@ function run() {
   const findings = layoutFindings(problems);
 
   if (process.argv.includes('--write-layout-baseline')) {
+    // A run that could not read the theme must not rewrite the baseline as if
+    // it had audited the tree.
+    if (themeFailure !== null) {
+      console.error(themeFailure);
+      console.error('\ncheck-classes: 1 problem(s)');
+      process.exitCode = 1;
+      return;
+    }
     writeLayoutBaseline(findings);
     return;
   }

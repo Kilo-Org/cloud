@@ -1525,3 +1525,49 @@ test('names the missing global.css and keeps the other findings', context => {
   assert.match(result.stderr, /check-classes: \d+ problem\(s\)/);
   assert.doesNotMatch(result.stderr, /Error:/);
 });
+
+test('--write-layout-baseline reports a theme failure instead of rewriting the baseline', context => {
+  const root = makeFixture(
+    context,
+    { 'apps/mobile/src/screen.tsx': THEME_SOURCE },
+    ':root { --x: 1; }\n'
+  );
+  const result = spawnSync(
+    process.execPath,
+    [join(root, 'tools/nativewind/check-classes.mjs'), '--write-layout-baseline'],
+    { cwd: root, encoding: 'utf8', timeout: 30_000 }
+  );
+  assert.ifError(result.error);
+  assert.equal(result.status, 1, result.stdout);
+  assert.match(
+    result.stderr,
+    /check-classes: cannot read the @theme inline tokens from apps\/mobile\/src\/global\.css \(no @theme inline block\)/
+  );
+  assert.match(result.stderr, /check-classes: 1 problem\(s\)/);
+  assert.doesNotMatch(result.stdout, /wrote/);
+  // A baseline written here would record a tree the audit never checked.
+  assert.throws(
+    () => readFileSync(join(root, 'tools/nativewind/layout-baseline.json'), 'utf8'),
+    /ENOENT/
+  );
+});
+
+test('reports an @theme inline block holding no colour token as the theme failure', context => {
+  const root = makeFixture(
+    context,
+    { 'apps/mobile/src/screen.tsx': THEME_SOURCE },
+    ':root {}\n@theme inline {\n  --font-sans: var(--font-x);\n}\n'
+  );
+  const result = spawnSync(process.execPath, [join(root, 'tools/nativewind/check-classes.mjs')], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  assert.ifError(result.error);
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /no --color token in the @theme inline block/);
+  assert.match(result.stderr, /leading-9/);
+  // The rule has no token to build its pattern from, so it must not run.
+  assert.doesNotMatch(result.stderr, /bg-primary\/50/);
+  assert.match(result.stderr, /check-classes: \d+ problem\(s\)/);
+});

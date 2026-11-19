@@ -701,6 +701,50 @@ test('unresolved live media stays explicit without hiding other messages or cras
   ).toEqual(['msg_media']);
 });
 
+test('a native message whose attachment can never display is omitted without a recovery signal', () => {
+  const messages: NativeSnapshotMessage[] = [
+    {
+      seq: 1,
+      message: {
+        id: 'msg_remote_file',
+        type: 'assistant',
+        time: { created: 1, completed: 2 },
+        content: [
+          { type: 'text', text: 'Retrieved the report' },
+          {
+            type: 'tool',
+            id: 'call_remote',
+            name: 'read',
+            state: {
+              status: 'completed',
+              input: { path: 'report.png' },
+              content: [
+                { type: 'file', uri: 'https://example.test/report.png', mime: 'image/png' },
+              ],
+            },
+          },
+        ],
+      },
+    },
+    {
+      seq: 2,
+      message: {
+        id: 'msg_after',
+        type: 'assistant',
+        time: { created: 3, completed: 4 },
+        content: [{ type: 'text', text: 'All done' }],
+      },
+    },
+  ];
+  const conversation = readNativeConversation({ ...state, messages });
+  // No snapshot can authorize this reference, so it is neither displayed nor a gap.
+  expect(conversation.messages.map(item => item.info.id)).toEqual(['msg_after']);
+  expect(conversation.incompleteMessageIDs).toEqual([]);
+  expect(conversation.error).toBeUndefined();
+  expect(JSON.stringify(conversation.messages)).not.toContain('https://example.test/report.png');
+  expect(conversation.nativeMessages).toBe(messages);
+});
+
 test.each<[string, Record<string, unknown>]>([
   ['session.text.delta', { assistantMessageID: 'msg_answer', delta: 12 }],
   ['session.tool.called', { assistantMessageID: 'msg_answer', id: 'call', input: {} }],

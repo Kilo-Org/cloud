@@ -1,4 +1,4 @@
-import { parseByokEndpointCredentials } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
+import { parseByokPrivateProviderCredentials } from '@kilocode/web-shared/lib/ai-gateway/byok-private-provider';
 import {
   createDirectByokGatewayProvider,
   formatDirectByokModelId,
@@ -10,15 +10,15 @@ import { CHAT_API_PATHS } from '@kilocode/web-shared/lib/ai-gateway/providers/up
 import { applyTrackingIds } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import {
-  ByokEndpointRequestError,
-  describeByokEndpointError,
-  fetchByokEndpoint,
-} from '@/lib/byok/endpoint-upstream';
+  ByokPrivateProviderRequestError,
+  describeByokPrivateProviderError,
+  fetchByokPrivateProvider,
+} from '@/lib/byok/private-provider-upstream';
 
 const TEST_PROMPT = 'Say hi';
 const TEST_MAX_TOKENS = 256;
 /** Stands in for the task id clients send, so the request carries what a client's request would. */
-const TEST_TASK_ID = 'byok-endpoint-test';
+const TEST_TASK_ID = 'byok-private-provider-test';
 
 function testRequest(
   apiKind: GatewayChatApiKind,
@@ -39,41 +39,42 @@ function testRequest(
   }
 }
 
-export type ByokEndpointTestResult =
+export type ByokPrivateProviderTestResult =
   | { outcome: 'ok'; provider: string; model: string }
   | { outcome: 'failed'; detail: string };
 
 /**
- * Sends a tiny prompt to one model of the endpoint over the API clients use for it, transformed
+ * Sends a tiny prompt to one model of the private provider over the API clients use for it, transformed
  * as the gateway transforms a client's request, so the test sends what real requests send. Any
  * 2xx answer counts as success: a reasoning model may spend the small token budget before
  * replying.
  */
-export async function testByokEndpoint({
+export async function testByokPrivateProvider({
   provider,
   credential,
   modelId,
   userId,
   organizationId,
 }: {
-  /** The endpoint, as `directByokProviderForKey` builds it. */
+  /** The private provider, as `directByokProviderForKey` builds it. */
   provider: DirectByokProvider;
   /** The stored credentials JSON `provider` resolves its upstream from. */
   credential: string;
   modelId?: string;
   userId: string;
   organizationId: string;
-}): Promise<ByokEndpointTestResult> {
+}): Promise<ByokPrivateProviderTestResult> {
   const models = await provider.models();
   const model = modelId ? models.find(candidate => candidate.id === modelId) : models[0];
-  const name = provider.organization_endpoint?.name ?? provider.id;
-  if (!model) return { outcome: 'failed', detail: `Endpoint ${name} has no model ${modelId}.` };
-  const credentials = parseByokEndpointCredentials(credential);
+  const name = provider.private_provider?.name ?? provider.id;
+  if (!model)
+    return { outcome: 'failed', detail: `Private provider ${name} has no model ${modelId}.` };
+  const credentials = parseByokPrivateProviderCredentials(credential);
   if (!credentials) {
-    return { outcome: 'failed', detail: 'the stored endpoint configuration is invalid.' };
+    return { outcome: 'failed', detail: 'the stored private provider configuration is invalid.' };
   }
 
-  // An endpoint names the API clients use for each model; Chat Completions is the default.
+  // A private provider names the API clients use for each model; Chat Completions is the default.
   const apiKind = provider.getModelChatApi?.(model) ?? 'chat_completions';
   const upstream = await provider.resolveUpstream({ credential, model, stream: false });
   const gatewayProvider = createDirectByokGatewayProvider(provider, model, upstream);
@@ -95,7 +96,7 @@ export async function testByokEndpoint({
       organization_id: organizationId,
       session_id: null,
     });
-    return fetchByokEndpoint({
+    return fetchByokPrivateProvider({
       url,
       method: 'POST',
       body: JSON.stringify(request.body),
@@ -115,11 +116,11 @@ export async function testByokEndpoint({
       response = await send('max_completion_tokens');
     }
     if (!response.ok) {
-      return { outcome: 'failed', detail: describeByokEndpointError(response) };
+      return { outcome: 'failed', detail: describeByokPrivateProviderError(response) };
     }
     return { outcome: 'ok', provider: name, model: model.id };
   } catch (error) {
-    if (error instanceof ByokEndpointRequestError) {
+    if (error instanceof ByokPrivateProviderRequestError) {
       return { outcome: 'failed', detail: error.message };
     }
     throw error;

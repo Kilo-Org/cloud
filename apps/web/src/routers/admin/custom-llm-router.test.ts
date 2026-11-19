@@ -620,7 +620,7 @@ describe('adminCustomLlmRouter', () => {
       ['kilo-auto/model', 'must not start with'],
       ['kilocode/model', 'must not start with'],
       ['kimi-coding/model', 'direct BYOK prefix'],
-      ['endpoint-a1b2c3d4e5/model', 'which endpoints use'],
+      ['private-a1b2c3d4e5/model', 'which private providers use'],
       ['openai/gpt-4o', 'OpenRouter model list'],
     ])('rejects %s', async (publicId, message) => {
       const caller = await createCallerForUser(admin.id);

@@ -1,10 +1,10 @@
-import { ByokEndpointModelIdSchema, type ByokEndpointModel } from '@kilocode/db/schema-types';
+import { ByokPrivateModelIdSchema, type ByokPrivateModel } from '@kilocode/db/schema-types';
 import { normalizeRawModel, type RawModel } from '@/lib/providers/direct-byok/models-dev';
 
 const MAX_MODEL_ID_LENGTH = 200;
 const MAX_INTERNAL_ID_LENGTH = 500;
 const MAX_NAME_LENGTH = 200;
-/** Bounds the import list; an endpoint itself keeps at most `BYOK_ENDPOINT_MAX_MODELS`. */
+/** Bounds the import list; a private provider itself keeps at most `BYOK_PRIVATE_PROVIDER_MAX_MODELS`. */
 const MAX_LISTED_MODELS = 5_000;
 
 /** Model kinds that cannot serve chat requests, as `type` or `model_type` name them. */
@@ -97,7 +97,7 @@ function isChatModel(entry: JsonObject, id: string): boolean {
  * A public model id for an upstream id: lowercase, with every character the gateway does not
  * allow in model ids replaced by `-`. Returns null when nothing usable is left.
  */
-export function toByokEndpointModelId(internalId: string): string | null {
+export function toByokPrivateModelId(internalId: string): string | null {
   const id = internalId
     .trim()
     .toLowerCase()
@@ -105,7 +105,7 @@ export function toByokEndpointModelId(internalId: string): string | null {
     .replace(/-{2,}/g, '-')
     .slice(0, MAX_MODEL_ID_LENGTH)
     .replace(/^[-/]+|[-/]+$/g, '');
-  return ByokEndpointModelIdSchema.safeParse(id).success ? id : null;
+  return ByokPrivateModelIdSchema.safeParse(id).success ? id : null;
 }
 
 function uniqueModelId(id: string, taken: ReadonlySet<string>): string {
@@ -157,11 +157,11 @@ function toRawModel(entry: JsonObject, internalId: string): RawModel {
 
 /**
  * Reads the models of an OpenAI-compatible `GET /models` response (`{ data: [...] }` or a bare
- * array) into endpoint models. Entries without an id and models that cannot chat are skipped;
+ * array) into private provider models. Entries without an id and models that cannot chat are skipped;
  * missing names and limits get the direct BYOK defaults, which the user can correct before saving.
  */
-export function parseByokEndpointModelsResponse(response: unknown): ByokEndpointModel[] {
-  const models: ByokEndpointModel[] = [];
+export function parseByokPrivateProviderModelsResponse(response: unknown): ByokPrivateModel[] {
+  const models: ByokPrivateModel[] = [];
   const ids = new Set<string>();
   const internalIds = new Set<string>();
   for (const entry of modelEntries(response)) {
@@ -176,7 +176,7 @@ export function parseByokEndpointModelsResponse(response: unknown): ByokEndpoint
     ) {
       continue;
     }
-    const baseId = toByokEndpointModelId(internalId);
+    const baseId = toByokPrivateModelId(internalId);
     if (!baseId) continue;
     const id = uniqueModelId(baseId, ids);
     const model = normalizeRawModel(toRawModel(entry, internalId));

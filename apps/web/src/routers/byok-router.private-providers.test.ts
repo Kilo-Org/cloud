@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from '@jest/globals';
 import { and, eq } from 'drizzle-orm';
-import type * as endpointUpstream from '@/lib/byok/endpoint-upstream';
+import type * as privateProviderUpstream from '@/lib/byok/private-provider-upstream';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
@@ -10,8 +10,8 @@ import { ai_gateway_config, byok_api_keys, organization_audit_logs } from '@kilo
 import type { Organization, User } from '@kilocode/db/schema';
 import type {
   BYOKApiKeyEnvelope,
-  ByokEndpointCredentials,
-  ByokEndpointDefinition,
+  ByokPrivateProviderCredentials,
+  ByokPrivateProviderDefinition,
 } from '@kilocode/db/schema-types';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import {
@@ -21,15 +21,17 @@ import {
   useFakeByokKms,
 } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 
-let afterEndpointUrlCheck: (() => Promise<void>) | undefined;
+let afterPrivateProviderUrlCheck: (() => Promise<void>) | undefined;
 
-jest.mock('@/lib/byok/endpoint-upstream', () => {
-  const actual = jest.requireActual<typeof endpointUpstream>('@/lib/byok/endpoint-upstream');
+jest.mock('@/lib/byok/private-provider-upstream', () => {
+  const actual = jest.requireActual<typeof privateProviderUpstream>(
+    '@/lib/byok/private-provider-upstream'
+  );
   return {
     ...actual,
-    findByokEndpointBaseUrlViolation: async (baseUrl: string) => {
-      const violation = await actual.findByokEndpointBaseUrlViolation(baseUrl);
-      await afterEndpointUrlCheck?.();
+    findByokPrivateProviderBaseUrlViolation: async (baseUrl: string) => {
+      const violation = await actual.findByokPrivateProviderBaseUrlViolation(baseUrl);
+      await afterPrivateProviderUrlCheck?.();
       return violation;
     },
   };
@@ -40,7 +42,7 @@ function decryptStoredKey(row: { encrypted_api_key_envelope: BYOKApiKeyEnvelope 
   return decryptApiKey(row.encrypted_api_key_envelope.encrypted_data, TEST_BYOK_DATA_KEY);
 }
 
-const DEFINITION: ByokEndpointDefinition = {
+const DEFINITION: ByokPrivateProviderDefinition = {
   name: 'Internal gateway',
   base_url: 'https://llm.example.com/v1',
   api_kinds: ['chat_completions'],
@@ -56,19 +58,19 @@ const DEFINITION: ByokEndpointDefinition = {
   ],
 };
 
-const ENDPOINT_API_KEY = 'endpoint-secret';
+const PRIVATE_PROVIDER_API_KEY = 'private-provider-secret';
 
-async function enableByokEndpoints(organizationIds: string[]) {
-  const config = { organization_features: { byok_endpoints: organizationIds } };
+async function enableByokPrivateProviders(organizationIds: string[]) {
+  const config = { organization_features: { byok_private_providers: organizationIds } };
   await db
     .insert(ai_gateway_config)
     .values({ config })
     .onConflictDoUpdate({ target: ai_gateway_config.id, set: { config } });
 }
 
-const API_KEY_CREDENTIALS: ByokEndpointCredentials = {
+const API_KEY_CREDENTIALS: ByokPrivateProviderCredentials = {
   type: 'api_key',
-  api_key: ENDPOINT_API_KEY,
+  api_key: PRIVATE_PROVIDER_API_KEY,
 };
 
 type UpstreamCall = { url: string; init: RequestInit | undefined };
@@ -95,7 +97,7 @@ function bodyOf(call: UpstreamCall | undefined): Record<string, unknown> {
   return JSON.parse(String(call?.init?.body));
 }
 
-describe('BYOK endpoints', () => {
+describe('BYOK private providers', () => {
   useFakeByokKms();
 
   let owner: User;
@@ -113,20 +115,28 @@ describe('BYOK endpoints', () => {
   };
 
   beforeAll(async () => {
-    owner = await insertTestUser({ google_user_email: 'byok-endpoint-owner@example.com' });
-    member = await insertTestUser({ google_user_email: 'byok-endpoint-member@example.com' });
-    otherOwner = await insertTestUser({ google_user_email: 'byok-endpoint-other@example.com' });
-    organization = await createTestOrganization('BYOK Endpoint Org', owner.id, 100000);
-    otherOrganization = await createTestOrganization('BYOK Endpoint Other', otherOwner.id, 100000);
+    owner = await insertTestUser({ google_user_email: 'byok-private-provider-owner@example.com' });
+    member = await insertTestUser({
+      google_user_email: 'byok-private-provider-member@example.com',
+    });
+    otherOwner = await insertTestUser({
+      google_user_email: 'byok-private-provider-other@example.com',
+    });
+    organization = await createTestOrganization('BYOK Private provider Org', owner.id, 100000);
+    otherOrganization = await createTestOrganization(
+      'BYOK Private provider Other',
+      otherOwner.id,
+      100000
+    );
     await addUserToOrganization(organization.id, member.id, 'member');
   });
 
-  beforeEach(() => enableByokEndpoints([organization.id, otherOrganization.id]));
+  beforeEach(() => enableByokPrivateProviders([organization.id, otherOrganization.id]));
 
   afterEach(async () => {
     restoreFetch?.();
     restoreFetch = undefined;
-    afterEndpointUrlCheck = undefined;
+    afterPrivateProviderUrlCheck = undefined;
     setNodeEnv(originalNodeEnv);
     await db.delete(byok_api_keys).where(eq(byok_api_keys.organization_id, organization.id));
     await db.delete(byok_api_keys).where(eq(byok_api_keys.organization_id, otherOrganization.id));
@@ -137,12 +147,16 @@ describe('BYOK endpoints', () => {
     await db.delete(ai_gateway_config).where(eq(ai_gateway_config.id, 1));
   });
 
-  async function createEndpoint(
-    definition: ByokEndpointDefinition = DEFINITION,
-    credentials: ByokEndpointCredentials = API_KEY_CREDENTIALS
+  async function createPrivateProvider(
+    definition: ByokPrivateProviderDefinition = DEFINITION,
+    credentials: ByokPrivateProviderCredentials = API_KEY_CREDENTIALS
   ) {
     const caller = await createCallerForUser(owner.id);
-    return caller.byok.createEndpoint({ organizationId: organization.id, definition, credentials });
+    return caller.byok.createPrivateProvider({
+      organizationId: organization.id,
+      definition,
+      credentials,
+    });
   }
 
   async function storedRow(id: string) {
@@ -151,39 +165,39 @@ describe('BYOK endpoints', () => {
   }
 
   describe('feature toggle', () => {
-    const UNAVAILABLE = 'BYOK endpoints are not available yet.';
+    const UNAVAILABLE = 'BYOK private providers are not available yet.';
 
     test('reports whether the organization has the feature', async () => {
       const caller = await createCallerForUser(owner.id);
       await expect(
-        caller.byok.byokEndpointsEnabled({ organizationId: organization.id })
+        caller.byok.privateProvidersEnabled({ organizationId: organization.id })
       ).resolves.toBe(true);
 
-      await enableByokEndpoints([otherOrganization.id]);
+      await enableByokPrivateProviders([otherOrganization.id]);
       await expect(
-        caller.byok.byokEndpointsEnabled({ organizationId: organization.id })
+        caller.byok.privateProvidersEnabled({ organizationId: organization.id })
       ).resolves.toBe(false);
-      await expect(caller.byok.byokEndpointsEnabled({})).resolves.toBe(false);
+      await expect(caller.byok.privateProvidersEnabled({})).resolves.toBe(false);
     });
 
     test('rejects creating, updating and importing models without the feature', async () => {
-      const created = await createEndpoint();
-      await enableByokEndpoints([otherOrganization.id]);
+      const created = await createPrivateProvider();
+      await enableByokPrivateProviders([otherOrganization.id]);
       const caller = await createCallerForUser(owner.id);
 
-      await expect(createEndpoint()).rejects.toMatchObject({
+      await expect(createPrivateProvider()).rejects.toMatchObject({
         code: 'FORBIDDEN',
         message: UNAVAILABLE,
       });
       await expect(
-        caller.byok.updateEndpoint({
+        caller.byok.updatePrivateProvider({
           organizationId: organization.id,
           id: created.id,
           definition: DEFINITION,
         })
       ).rejects.toMatchObject({ code: 'FORBIDDEN', message: UNAVAILABLE });
       await expect(
-        caller.byok.listModelsFromEndpoint({
+        caller.byok.listModelsFromPrivateProvider({
           organizationId: organization.id,
           base_url: DEFINITION.base_url,
           credentials: API_KEY_CREDENTIALS,
@@ -191,9 +205,9 @@ describe('BYOK endpoints', () => {
       ).rejects.toMatchObject({ code: 'FORBIDDEN', message: UNAVAILABLE });
     });
 
-    test('keeps existing endpoints listed, switchable, testable and deletable without the feature', async () => {
-      const created = await createEndpoint();
-      await enableByokEndpoints([]);
+    test('keeps existing private providers listed, switchable, testable and deletable without the feature', async () => {
+      const created = await createPrivateProvider();
+      await enableByokPrivateProviders([]);
       const upstream = mockUpstream(() => Response.json({ choices: [] }));
       restoreFetch = upstream.restore;
       const caller = await createCallerForUser(owner.id);
@@ -216,20 +230,20 @@ describe('BYOK endpoints', () => {
     });
   });
 
-  describe('createEndpoint', () => {
-    test('stores the definition and the encrypted credentials, and lists the endpoint by name', async () => {
-      const created = await createEndpoint();
+  describe('createPrivateProvider', () => {
+    test('stores the definition and the encrypted credentials, and lists the private provider by name', async () => {
+      const created = await createPrivateProvider();
 
-      expect(created.provider_id).toMatch(/^endpoint-[a-z0-9]{10}$/);
+      expect(created.provider_id).toMatch(/^private-[a-z0-9]{10}$/);
       expect(created).toMatchObject({
         provider_name: 'Internal gateway',
-        is_endpoint: true,
-        endpoint: DEFINITION,
+        is_private_provider: true,
+        private_provider: DEFINITION,
         supports_catalog_mode: true,
         serve_catalog_models: false,
       });
       const row = await storedRow(created.id);
-      expect(row.settings.endpoint).toEqual(DEFINITION);
+      expect(row.settings.private_provider).toEqual(DEFINITION);
       expect(JSON.parse(decryptStoredKey(row))).toEqual(API_KEY_CREDENTIALS);
 
       const caller = await createCallerForUser(member.id);
@@ -237,13 +251,13 @@ describe('BYOK endpoints', () => {
       expect(listed).toMatchObject({
         id: created.id,
         provider_name: 'Internal gateway',
-        is_endpoint: true,
-        endpoint: null,
+        is_private_provider: true,
+        private_provider: null,
       });
 
       const ownerCaller = await createCallerForUser(owner.id);
       const [ownerListed] = await ownerCaller.byok.list({ organizationId: organization.id });
-      expect(ownerListed).toMatchObject({ id: created.id, endpoint: DEFINITION });
+      expect(ownerListed).toMatchObject({ id: created.id, private_provider: DEFINITION });
 
       const logs = await db
         .select()
@@ -252,7 +266,8 @@ describe('BYOK endpoints', () => {
       expect(
         logs.some(
           log =>
-            log.message === `Added BYOK endpoint Internal gateway (${created.provider_id})` &&
+            log.message ===
+              `Added BYOK private provider Internal gateway (${created.provider_id})` &&
             log.actor_id === owner.id
         )
       ).toBe(true);
@@ -261,17 +276,17 @@ describe('BYOK endpoints', () => {
     test('requires an organization', async () => {
       const caller = await createCallerForUser(owner.id);
       await expect(
-        caller.byok.createEndpoint({
+        caller.byok.createPrivateProvider({
           definition: DEFINITION,
           credentials: API_KEY_CREDENTIALS,
-        } as unknown as Parameters<typeof caller.byok.createEndpoint>[0])
+        } as unknown as Parameters<typeof caller.byok.createPrivateProvider>[0])
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     });
 
     test('requires an owner or billing manager', async () => {
       const caller = await createCallerForUser(member.id);
       await expect(
-        caller.byok.createEndpoint({
+        caller.byok.createPrivateProvider({
           organizationId: organization.id,
           definition: DEFINITION,
           credentials: API_KEY_CREDENTIALS,
@@ -281,16 +296,16 @@ describe('BYOK endpoints', () => {
 
     test('rejects a definition whose client API is not supported', async () => {
       await expect(
-        createEndpoint({ ...DEFINITION, client_provider: 'anthropic' })
+        createPrivateProvider({ ...DEFINITION, client_provider: 'anthropic' })
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     });
 
     test.each([
-      ['http://llm.example.com/v1', 'The endpoint URL must use HTTPS.'],
-      ['https://127.0.0.1/v1', 'The endpoint URL must point to a public host.'],
+      ['http://llm.example.com/v1', 'The private provider URL must use HTTPS.'],
+      ['https://127.0.0.1/v1', 'The private provider URL must point to a public host.'],
     ])('rejects %s where the URL policy applies', async (base_url, message) => {
       setNodeEnv('production');
-      await expect(createEndpoint({ ...DEFINITION, base_url })).rejects.toThrow(message);
+      await expect(createPrivateProvider({ ...DEFINITION, base_url })).rejects.toThrow(message);
     });
 
     test('is not accepted through the provider key procedures', async () => {
@@ -298,41 +313,41 @@ describe('BYOK endpoints', () => {
       await expect(
         caller.byok.create({
           organizationId: organization.id,
-          provider_id: 'endpoint-abcdefghij',
+          provider_id: 'private-abcdefghij',
           api_key: 'secret',
         })
-      ).rejects.toThrow('Endpoints are added with createEndpoint.');
+      ).rejects.toThrow('Private providers are added with createPrivateProvider.');
 
-      const created = await createEndpoint();
+      const created = await createPrivateProvider();
       await expect(
         caller.byok.update({ organizationId: organization.id, id: created.id, api_key: 'raw' })
-      ).rejects.toThrow('Endpoints are updated with updateEndpoint.');
+      ).rejects.toThrow('Private providers are updated with updatePrivateProvider.');
       expect(JSON.parse(decryptStoredKey(await storedRow(created.id)))).toEqual(
         API_KEY_CREDENTIALS
       );
     });
   });
 
-  describe('updateEndpoint', () => {
+  describe('updatePrivateProvider', () => {
     test('keeps the stored credentials when none are given', async () => {
-      const created = await createEndpoint();
+      const created = await createPrivateProvider();
       const caller = await createCallerForUser(owner.id);
       const definition = { ...DEFINITION, name: 'Renamed' };
 
-      const updated = await caller.byok.updateEndpoint({
+      const updated = await caller.byok.updatePrivateProvider({
         organizationId: organization.id,
         id: created.id,
         definition,
       });
 
-      expect(updated).toMatchObject({ provider_name: 'Renamed', endpoint: definition });
+      expect(updated).toMatchObject({ provider_name: 'Renamed', private_provider: definition });
       const row = await storedRow(created.id);
-      expect(row.settings.endpoint).toEqual(definition);
+      expect(row.settings.private_provider).toEqual(definition);
       expect(JSON.parse(decryptStoredKey(row))).toEqual(API_KEY_CREDENTIALS);
     });
 
     test('keeps catalog mode and the priority', async () => {
-      const created = await createEndpoint();
+      const created = await createPrivateProvider();
       const caller = await createCallerForUser(owner.id);
       await caller.byok.setCatalogMode({
         organizationId: organization.id,
@@ -342,26 +357,29 @@ describe('BYOK endpoints', () => {
       await caller.byok.reorder({ organizationId: organization.id, keyIds: [created.id] });
       const definition = { ...DEFINITION, name: 'Renamed' };
 
-      const updated = await caller.byok.updateEndpoint({
+      const updated = await caller.byok.updatePrivateProvider({
         organizationId: organization.id,
         id: created.id,
         definition,
       });
 
-      expect(updated).toMatchObject({ serve_catalog_models: true, endpoint: definition });
+      expect(updated).toMatchObject({ serve_catalog_models: true, private_provider: definition });
       expect((await storedRow(created.id)).settings).toEqual({
         serve_catalog_models: true,
         priority: 0,
-        endpoint: definition,
+        private_provider: definition,
       });
     });
 
     test('replaces the credentials when given', async () => {
-      const created = await createEndpoint();
+      const created = await createPrivateProvider();
       const caller = await createCallerForUser(owner.id);
-      const credentials: ByokEndpointCredentials = { type: 'x-api-key', api_key: 'new-secret' };
+      const credentials: ByokPrivateProviderCredentials = {
+        type: 'x-api-key',
+        api_key: 'new-secret',
+      };
 
-      await caller.byok.updateEndpoint({
+      await caller.byok.updatePrivateProvider({
         organizationId: organization.id,
         id: created.id,
         definition: DEFINITION,
@@ -372,72 +390,79 @@ describe('BYOK endpoints', () => {
     });
 
     test('requires credentials when the host changes', async () => {
-      const created = await createEndpoint();
+      const created = await createPrivateProvider();
       const caller = await createCallerForUser(owner.id);
       const definition = { ...DEFINITION, base_url: 'https://attacker.example.com/v1' };
 
       await expect(
-        caller.byok.updateEndpoint({ organizationId: organization.id, id: created.id, definition })
+        caller.byok.updatePrivateProvider({
+          organizationId: organization.id,
+          id: created.id,
+          definition,
+        })
       ).rejects.toMatchObject({
         code: 'BAD_REQUEST',
         message: 'Enter the credentials again to use a different host',
       });
-      expect((await storedRow(created.id)).settings.endpoint).toEqual(DEFINITION);
+      expect((await storedRow(created.id)).settings.private_provider).toEqual(DEFINITION);
 
-      const credentials: ByokEndpointCredentials = { type: 'api_key', api_key: 'new-host-secret' };
-      await caller.byok.updateEndpoint({
+      const credentials: ByokPrivateProviderCredentials = {
+        type: 'api_key',
+        api_key: 'new-host-secret',
+      };
+      await caller.byok.updatePrivateProvider({
         organizationId: organization.id,
         id: created.id,
         definition,
         credentials,
       });
       const row = await storedRow(created.id);
-      expect(row.settings.endpoint).toEqual(definition);
+      expect(row.settings.private_provider).toEqual(definition);
       expect(JSON.parse(decryptStoredKey(row))).toEqual(credentials);
     });
 
     test('conflicts when the stored host changed after the host check', async () => {
-      const created = await createEndpoint();
+      const created = await createPrivateProvider();
       const caller = await createCallerForUser(owner.id);
       const changed = { ...DEFINITION, base_url: 'https://attacker.example.com/v1' };
-      afterEndpointUrlCheck = async () => {
+      afterPrivateProviderUrlCheck = async () => {
         await db
           .update(byok_api_keys)
-          .set({ settings: { endpoint: changed } })
+          .set({ settings: { private_provider: changed } })
           .where(eq(byok_api_keys.id, created.id));
       };
 
       await expect(
-        caller.byok.updateEndpoint({
+        caller.byok.updatePrivateProvider({
           organizationId: organization.id,
           id: created.id,
           definition: { ...DEFINITION, base_url: 'https://llm.example.com/v2' },
         })
       ).rejects.toMatchObject({
         code: 'CONFLICT',
-        message: 'The endpoint changed; reload and try again',
+        message: 'The private provider changed; reload and try again',
       });
-      expect((await storedRow(created.id)).settings.endpoint).toEqual(changed);
+      expect((await storedRow(created.id)).settings.private_provider).toEqual(changed);
     });
 
     test('keeps the stored credentials when only the path changes', async () => {
-      const created = await createEndpoint();
+      const created = await createPrivateProvider();
       const caller = await createCallerForUser(owner.id);
       const definition = { ...DEFINITION, base_url: 'https://llm.example.com/v2' };
 
-      await caller.byok.updateEndpoint({
+      await caller.byok.updatePrivateProvider({
         organizationId: organization.id,
         id: created.id,
         definition,
       });
 
       const row = await storedRow(created.id);
-      expect(row.settings.endpoint).toEqual(definition);
+      expect(row.settings.private_provider).toEqual(definition);
       expect(JSON.parse(decryptStoredKey(row))).toEqual(API_KEY_CREDENTIALS);
     });
 
-    test('only updates endpoints of the organization', async () => {
-      const created = await createEndpoint();
+    test('only updates private providers of the organization', async () => {
+      const created = await createPrivateProvider();
       const providerKey = await (
         await createCallerForUser(owner.id)
       ).byok.create({ organizationId: organization.id, provider_id: 'anthropic', api_key: 'k' });
@@ -445,14 +470,14 @@ describe('BYOK endpoints', () => {
       const ownerCaller = await createCallerForUser(owner.id);
 
       await expect(
-        otherCaller.byok.updateEndpoint({
+        otherCaller.byok.updatePrivateProvider({
           organizationId: otherOrganization.id,
           id: created.id,
           definition: DEFINITION,
         })
       ).rejects.toMatchObject({ code: 'NOT_FOUND' });
       await expect(
-        ownerCaller.byok.updateEndpoint({
+        ownerCaller.byok.updatePrivateProvider({
           organizationId: organization.id,
           id: providerKey.id,
           definition: DEFINITION,
@@ -462,21 +487,25 @@ describe('BYOK endpoints', () => {
   });
 
   describe('stored definitions', () => {
-    test('lists an endpoint whose definition no longer parses without it', async () => {
-      const created = await createEndpoint();
+    test('lists a private provider whose definition no longer parses without it', async () => {
+      const created = await createPrivateProvider();
       await db
         .update(byok_api_keys)
-        .set({ settings: { priority: 3, endpoint: { name: 'Broken' } } as never })
+        .set({ settings: { priority: 3, private_provider: { name: 'Broken' } } as never })
         .where(eq(byok_api_keys.id, created.id));
       const caller = await createCallerForUser(owner.id);
 
       const [listed] = await caller.byok.list({ organizationId: organization.id });
 
-      expect(listed).toMatchObject({ id: created.id, is_endpoint: true, endpoint: null });
+      expect(listed).toMatchObject({
+        id: created.id,
+        is_private_provider: true,
+        private_provider: null,
+      });
       expect(listed.provider_name).not.toBe('Broken');
     });
 
-    test('ignores an endpoint definition in the settings of a provider key', async () => {
+    test('ignores a private provider definition in the settings of a provider key', async () => {
       const caller = await createCallerForUser(owner.id);
       const providerKey = await caller.byok.create({
         organizationId: organization.id,
@@ -485,20 +514,24 @@ describe('BYOK endpoints', () => {
       });
       await db
         .update(byok_api_keys)
-        .set({ settings: { endpoint: DEFINITION } })
+        .set({ settings: { private_provider: DEFINITION } })
         .where(eq(byok_api_keys.id, providerKey.id));
 
       const [listed] = await caller.byok.list({ organizationId: organization.id });
 
-      expect(listed).toMatchObject({ id: providerKey.id, is_endpoint: false, endpoint: null });
+      expect(listed).toMatchObject({
+        id: providerKey.id,
+        is_private_provider: false,
+        private_provider: null,
+      });
       expect(listed.provider_name).not.toBe(DEFINITION.name);
     });
   });
 
-  test('listEndpointCatalogModelIds is limited to roles that manage keys', async () => {
+  test('listPrivateProviderCatalogModelIds is limited to roles that manage keys', async () => {
     const memberCaller = await createCallerForUser(member.id);
     await expect(
-      memberCaller.byok.listEndpointCatalogModelIds({
+      memberCaller.byok.listPrivateProviderCatalogModelIds({
         organizationId: organization.id,
         modelIds: ['my-model'],
       })
@@ -506,15 +539,15 @@ describe('BYOK endpoints', () => {
 
     const ownerCaller = await createCallerForUser(owner.id);
     await expect(
-      ownerCaller.byok.listEndpointCatalogModelIds({
+      ownerCaller.byok.listPrivateProviderCatalogModelIds({
         organizationId: organization.id,
         modelIds: [],
       })
     ).resolves.toEqual([]);
   });
 
-  test('setCatalogMode turns catalog mode on for an endpoint', async () => {
-    const created = await createEndpoint();
+  test('setCatalogMode turns catalog mode on for a private provider', async () => {
+    const created = await createPrivateProvider();
     const caller = await createCallerForUser(owner.id);
 
     const updated = await caller.byok.setCatalogMode({
@@ -526,7 +559,7 @@ describe('BYOK endpoints', () => {
     expect(updated).toMatchObject({ serve_catalog_models: true, can_change_catalog_mode: true });
   });
 
-  describe('listModelsFromEndpoint', () => {
+  describe('listModelsFromPrivateProvider', () => {
     const MODELS_RESPONSE = {
       data: [{ id: 'Org/My-Model', name: 'My Model', context_length: 64000 }],
     };
@@ -536,7 +569,7 @@ describe('BYOK endpoints', () => {
       restoreFetch = upstream.restore;
       const caller = await createCallerForUser(owner.id);
 
-      const result = await caller.byok.listModelsFromEndpoint({
+      const result = await caller.byok.listModelsFromPrivateProvider({
         organizationId: organization.id,
         base_url: 'https://llm.example.com/v1',
         credentials: API_KEY_CREDENTIALS,
@@ -555,16 +588,21 @@ describe('BYOK endpoints', () => {
       expect(upstream.calls).toHaveLength(1);
       expect(upstream.calls[0].url).toBe('https://llm.example.com/v1/models');
       expect(upstream.calls[0].init).toMatchObject({ method: 'GET', redirect: 'manual' });
-      expect(headersOf(upstream.calls[0]).get('authorization')).toBe('Bearer endpoint-secret');
+      expect(headersOf(upstream.calls[0]).get('authorization')).toBe(
+        'Bearer private-provider-secret'
+      );
     });
 
-    test('uses the stored credentials of an endpoint', async () => {
-      const created = await createEndpoint(DEFINITION, { type: 'x-api-key', api_key: 'stored' });
+    test('uses the stored credentials of a private provider', async () => {
+      const created = await createPrivateProvider(DEFINITION, {
+        type: 'x-api-key',
+        api_key: 'stored',
+      });
       const upstream = mockUpstream(() => Response.json(MODELS_RESPONSE));
       restoreFetch = upstream.restore;
       const caller = await createCallerForUser(owner.id);
 
-      await caller.byok.listModelsFromEndpoint({
+      await caller.byok.listModelsFromPrivateProvider({
         organizationId: organization.id,
         base_url: 'https://llm.example.com/other/v2',
         id: created.id,
@@ -583,13 +621,13 @@ describe('BYOK endpoints', () => {
       ['another scheme', 'http://llm.example.com/v1'],
       ['a host that only looks the same', 'https://llm.example.com.attacker.example/v1'],
     ])('does not send the stored credentials to %s', async (_case, base_url) => {
-      const created = await createEndpoint();
+      const created = await createPrivateProvider();
       const upstream = mockUpstream(() => Response.json(MODELS_RESPONSE));
       restoreFetch = upstream.restore;
       const caller = await createCallerForUser(owner.id);
 
       await expect(
-        caller.byok.listModelsFromEndpoint({
+        caller.byok.listModelsFromPrivateProvider({
           organizationId: organization.id,
           base_url,
           id: created.id,
@@ -606,7 +644,7 @@ describe('BYOK endpoints', () => {
       restoreFetch = upstream.restore;
       const caller = await createCallerForUser(owner.id);
 
-      await caller.byok.listModelsFromEndpoint({
+      await caller.byok.listModelsFromPrivateProvider({
         organizationId: organization.id,
         base_url: 'https://bedrock-mantle.us-east-1.api.aws/v1',
         credentials: {
@@ -622,12 +660,12 @@ describe('BYOK endpoints', () => {
       );
     });
 
-    test('does not read another organization endpoint credentials', async () => {
-      const created = await createEndpoint();
+    test('does not read another organization private provider credentials', async () => {
+      const created = await createPrivateProvider();
       const caller = await createCallerForUser(otherOwner.id);
 
       await expect(
-        caller.byok.listModelsFromEndpoint({
+        caller.byok.listModelsFromPrivateProvider({
           organizationId: otherOrganization.id,
           base_url: 'https://llm.example.com/v1',
           id: created.id,
@@ -640,20 +678,23 @@ describe('BYOK endpoints', () => {
         'a rejected key',
         'https://llm.example.com/v1',
         () => Response.json({ error: { message: 'Invalid API key' } }, { status: 401 }),
-        'The endpoint could not list its models: HTTP 401: Invalid API key',
+        'The private provider could not list its models: HTTP 401: Invalid API key',
       ],
       [
         'a rejected key the upstream echoes',
         'https://llm.example.com/v1',
         () =>
-          Response.json({ error: { message: `Invalid key ${ENDPOINT_API_KEY}` } }, { status: 401 }),
-        'The endpoint could not list its models: HTTP 401: Invalid key [redacted]',
+          Response.json(
+            { error: { message: `Invalid key ${PRIVATE_PROVIDER_API_KEY}` } },
+            { status: 401 }
+          ),
+        'The private provider could not list its models: HTTP 401: Invalid key [redacted]',
       ],
       [
         'a redirect',
         'https://llm.example.com/v1',
         () => new Response(null, { status: 307, headers: { location: 'http://10.0.0.1/' } }),
-        'The endpoint responded with a redirect',
+        'The private provider responded with a redirect',
       ],
     ])('reports %s', async (_case, base_url, respond, message) => {
       const upstream = mockUpstream(respond);
@@ -661,7 +702,7 @@ describe('BYOK endpoints', () => {
       const caller = await createCallerForUser(owner.id);
 
       await expect(
-        caller.byok.listModelsFromEndpoint({
+        caller.byok.listModelsFromPrivateProvider({
           organizationId: organization.id,
           base_url,
           credentials: API_KEY_CREDENTIALS,
@@ -672,7 +713,7 @@ describe('BYOK endpoints', () => {
 
   describe('testApiKey', () => {
     test('sends a Chat Completions request to the first model', async () => {
-      const created = await createEndpoint();
+      const created = await createPrivateProvider();
       const upstream = mockUpstream(() => Response.json({ choices: [] }));
       restoreFetch = upstream.restore;
       const caller = await createCallerForUser(owner.id);
@@ -687,21 +728,23 @@ describe('BYOK endpoints', () => {
         message: 'API key test success. Provider: Internal gateway. Model: my-model.',
       });
       expect(upstream.calls[0].url).toBe('https://llm.example.com/v1/chat/completions');
-      expect(headersOf(upstream.calls[0]).get('authorization')).toBe('Bearer endpoint-secret');
+      expect(headersOf(upstream.calls[0]).get('authorization')).toBe(
+        'Bearer private-provider-secret'
+      );
       const body = bodyOf(upstream.calls[0]);
       expect(body).toMatchObject({
         model: 'Org/My-Model',
         messages: [{ role: 'user', content: 'Say hi' }],
         max_tokens: 256,
       });
-      // Transformed like a gateway request to the endpoint.
+      // Transformed like a gateway request to the private provider.
       expect(body).not.toHaveProperty('user');
       expect(body).not.toHaveProperty('safety_identifier');
       expect(body).not.toHaveProperty('prompt_cache_key');
     });
 
-    test('sends the prompt cache key when the endpoint turns it on', async () => {
-      const created = await createEndpoint({ ...DEFINITION, send_prompt_cache_key: true });
+    test('sends the prompt cache key when the private provider turns it on', async () => {
+      const created = await createPrivateProvider({ ...DEFINITION, send_prompt_cache_key: true });
       const upstream = mockUpstream(() => Response.json({ choices: [] }));
       restoreFetch = upstream.restore;
       const caller = await createCallerForUser(owner.id);
@@ -712,7 +755,7 @@ describe('BYOK endpoints', () => {
     });
 
     test('retries with max_completion_tokens when the upstream asks for it', async () => {
-      const created = await createEndpoint();
+      const created = await createPrivateProvider();
       let attempt = 0;
       const upstream = mockUpstream(() =>
         ++attempt === 1
@@ -738,7 +781,7 @@ describe('BYOK endpoints', () => {
     });
 
     test('fails without sending anything when the stored credentials do not parse', async () => {
-      const created = await createEndpoint();
+      const created = await createPrivateProvider();
       await db
         .update(byok_api_keys)
         .set({ encrypted_api_key_envelope: testByokEnvelope('not json') })
@@ -751,15 +794,15 @@ describe('BYOK endpoints', () => {
         caller.byok.testApiKey({ organizationId: organization.id, id: created.id })
       ).resolves.toEqual({
         outcome: 'failed',
-        detail: 'the stored endpoint configuration is invalid.',
+        detail: 'the stored private provider configuration is invalid.',
         success: false,
-        message: 'API key test failed: the stored endpoint configuration is invalid.',
+        message: 'API key test failed: the stored private provider configuration is invalid.',
       });
       expect(upstream.calls).toEqual([]);
     });
 
     test('sends a Messages request to a chosen model', async () => {
-      const created = await createEndpoint({
+      const created = await createPrivateProvider({
         ...DEFINITION,
         base_url: 'https://llm.example.com/models',
         api_kinds: ['chat_completions', 'messages'],
@@ -792,10 +835,10 @@ describe('BYOK endpoints', () => {
     });
 
     test('redacts the credentials the upstream echoes', async () => {
-      const created = await createEndpoint();
+      const created = await createPrivateProvider();
       const upstream = mockUpstream(() =>
         Response.json(
-          { error: { message: `Bad key sk-...${ENDPOINT_API_KEY.slice(-4)}` } },
+          { error: { message: `Bad key sk-...${PRIVATE_PROVIDER_API_KEY.slice(-4)}` } },
           { status: 401 }
         )
       );
@@ -816,7 +859,7 @@ describe('BYOK endpoints', () => {
     });
 
     test('reports the upstream error', async () => {
-      const created = await createEndpoint();
+      const created = await createPrivateProvider();
       const upstream = mockUpstream(() =>
         Response.json({ error: { message: 'model not found' } }, { status: 404 })
       );
@@ -834,8 +877,8 @@ describe('BYOK endpoints', () => {
     });
   });
 
-  test('deleting an endpoint removes it', async () => {
-    const created = await createEndpoint();
+  test('deleting a private provider removes it', async () => {
+    const created = await createPrivateProvider();
     const caller = await createCallerForUser(owner.id);
 
     await caller.byok.delete({ organizationId: organization.id, id: created.id });

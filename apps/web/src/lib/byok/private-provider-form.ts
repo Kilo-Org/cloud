@@ -1,13 +1,13 @@
 import {
-  BYOK_ENDPOINT_MAX_MODELS,
+  BYOK_PRIVATE_PROVIDER_MAX_MODELS,
   CustomLlmApiKindSchema,
   getCustomLlmClientApiKind,
-  ByokEndpointCredentialsSchema,
-  ByokEndpointDefinitionSchema,
-  type ByokEndpointCredentials,
-  type ByokEndpointDefinition,
-  type ByokEndpointModel,
-  type ByokEndpointReasoningFormat,
+  ByokPrivateProviderCredentialsSchema,
+  ByokPrivateProviderDefinitionSchema,
+  type ByokPrivateProviderCredentials,
+  type ByokPrivateProviderDefinition,
+  type ByokPrivateModel,
+  type ByokPrivateProviderReasoningFormat,
   type CustomLlmApiKind,
   type CustomLlmProvider,
   type DirectByokModelFlag,
@@ -16,37 +16,37 @@ import type * as z from 'zod';
 import { formatZodIssues } from '@/lib/zod/format-zod-error';
 import { API_KIND_LABELS } from '@/lib/api-kind-labels';
 
-export type ByokEndpointCredentialsType = ByokEndpointCredentials['type'];
+export type ByokPrivateProviderCredentialsType = ByokPrivateProviderCredentials['type'];
 
-export const ENDPOINT_API_KINDS = CustomLlmApiKindSchema.options;
+export const PRIVATE_PROVIDER_API_KINDS = CustomLlmApiKindSchema.options;
 
 /** The AI SDK providers clients may use, in the order of the APIs they call. */
-export const ENDPOINT_CLIENT_PROVIDERS = [
+export const PRIVATE_PROVIDER_CLIENT_PROVIDERS = [
   'openrouter',
   'anthropic',
   'openai',
 ] as const satisfies readonly CustomLlmProvider[];
 
 /** A client provider is named after the API it calls. */
-export function endpointClientProviderLabel(provider: CustomLlmProvider): string {
+export function privateProviderClientProviderLabel(provider: CustomLlmProvider): string {
   return API_KIND_LABELS[getCustomLlmClientApiKind(provider)];
 }
 
-export const ENDPOINT_REASONING_FORMAT_LABELS = {
+export const PRIVATE_PROVIDER_REASONING_FORMAT_LABELS = {
   'reasoning-details': 'OpenRouter reasoning_details',
   'reasoning-content': 'reasoning_content',
   reasoning: 'reasoning',
   'gemini-thought': 'Gemini thought signatures',
-} as const satisfies Record<ByokEndpointReasoningFormat, string>;
+} as const satisfies Record<ByokPrivateProviderReasoningFormat, string>;
 
-export const ENDPOINT_CREDENTIALS_TYPE_LABELS = {
+export const PRIVATE_PROVIDER_CREDENTIALS_TYPE_LABELS = {
   api_key: 'API key (Bearer)',
   'x-api-key': 'API key (x-api-key header)',
   aws_bedrock: 'AWS access keys',
   service_account: 'Google service account JSON',
-} as const satisfies Record<ByokEndpointCredentialsType, string>;
+} as const satisfies Record<ByokPrivateProviderCredentialsType, string>;
 
-export type EndpointModelRow = {
+export type PrivateModelRow = {
   /** A stable React key; not saved. */
   rowKey: string;
   id: string;
@@ -56,21 +56,21 @@ export type EndpointModelRow = {
   max_completion_tokens: string;
   /** Kept as stored, so flags the form does not edit, such as `recommended`, survive. */
   flags: DirectByokModelFlag[];
-  /** Null uses the endpoint setting. */
+  /** Null uses the private provider setting. */
   api_kinds: CustomLlmApiKind[] | null;
   client_provider: CustomLlmProvider | null;
-  reasoning_format: ByokEndpointReasoningFormat | null;
+  reasoning_format: ByokPrivateProviderReasoningFormat | null;
   send_prompt_cache_key: boolean | null;
 };
 
-export type EndpointForm = {
+export type PrivateProviderForm = {
   name: string;
   base_url: string;
   api_kinds: CustomLlmApiKind[];
   client_provider: CustomLlmProvider;
-  reasoning_format: ByokEndpointReasoningFormat;
+  reasoning_format: ByokPrivateProviderReasoningFormat;
   send_prompt_cache_key: boolean;
-  models: EndpointModelRow[];
+  models: PrivateModelRow[];
 };
 
 /** Only Chat Completions and Responses requests carry a `prompt_cache_key`. */
@@ -78,8 +78,8 @@ export function sendsPromptCacheKeyOver(apiKinds: readonly CustomLlmApiKind[]): 
   return apiKinds.some(apiKind => apiKind === 'chat_completions' || apiKind === 'responses');
 }
 
-export type EndpointCredentialsForm = {
-  type: ByokEndpointCredentialsType;
+export type PrivateProviderCredentialsForm = {
+  type: ByokPrivateProviderCredentialsType;
   api_key: string;
   region: string;
   access_key_id: string;
@@ -87,7 +87,7 @@ export type EndpointCredentialsForm = {
   service_account_json: string;
 };
 
-export const EMPTY_ENDPOINT_CREDENTIALS_FORM: EndpointCredentialsForm = {
+export const EMPTY_PRIVATE_PROVIDER_CREDENTIALS_FORM: PrivateProviderCredentialsForm = {
   type: 'api_key',
   api_key: '',
   region: '',
@@ -100,7 +100,7 @@ const MAX_MODEL_ID_LENGTH = 200;
 
 let nextRowKey = 0;
 
-export function toEndpointModelRow(model?: ByokEndpointModel): EndpointModelRow {
+export function toPrivateModelRow(model?: ByokPrivateModel): PrivateModelRow {
   nextRowKey += 1;
   return {
     rowKey: `model-${nextRowKey}`,
@@ -117,7 +117,9 @@ export function toEndpointModelRow(model?: ByokEndpointModel): EndpointModelRow 
   };
 }
 
-export function toEndpointForm(definition: ByokEndpointDefinition | null): EndpointForm {
+export function toPrivateProviderForm(
+  definition: ByokPrivateProviderDefinition | null
+): PrivateProviderForm {
   if (!definition) {
     return {
       name: '',
@@ -126,7 +128,7 @@ export function toEndpointForm(definition: ByokEndpointDefinition | null): Endpo
       client_provider: 'openrouter',
       reasoning_format: 'reasoning-details',
       send_prompt_cache_key: false,
-      models: [toEndpointModelRow()],
+      models: [toPrivateModelRow()],
     };
   }
   return {
@@ -136,11 +138,11 @@ export function toEndpointForm(definition: ByokEndpointDefinition | null): Endpo
     client_provider: definition.client_provider,
     reasoning_format: definition.reasoning_format,
     send_prompt_cache_key: definition.send_prompt_cache_key ?? false,
-    models: definition.models.map(toEndpointModelRow),
+    models: definition.models.map(toPrivateModelRow),
   };
 }
 
-export function setEndpointModelFlag(
+export function setPrivateModelFlag(
   flags: readonly DirectByokModelFlag[],
   flag: DirectByokModelFlag,
   enabled: boolean
@@ -153,7 +155,7 @@ function toNumber(value: string): number {
   return value.trim() === '' ? Number.NaN : Number(value);
 }
 
-function toEndpointModel(row: EndpointModelRow): Record<string, unknown> {
+function toPrivateModel(row: PrivateModelRow): Record<string, unknown> {
   return {
     id: row.id.trim(),
     internal_id: row.internal_id.trim(),
@@ -182,7 +184,7 @@ const FIELD_LABELS: Record<string, string> = {
   max_completion_tokens: 'Max output tokens',
 };
 
-function describeIssue(issue: z.core.$ZodIssue, form: EndpointForm): string {
+function describeIssue(issue: z.core.$ZodIssue, form: PrivateProviderForm): string {
   const [first, index, field] = issue.path;
   if (first === 'models' && typeof index === 'number') {
     const modelId = form.models[index]?.id.trim();
@@ -198,15 +200,17 @@ function describeIssue(issue: z.core.$ZodIssue, form: EndpointForm): string {
 
 export type BuildResult<T> = { success: true; data: T } | { success: false; errors: string[] };
 
-export function buildEndpointDefinition(form: EndpointForm): BuildResult<ByokEndpointDefinition> {
-  const result = ByokEndpointDefinitionSchema.safeParse({
+export function buildPrivateProviderDefinition(
+  form: PrivateProviderForm
+): BuildResult<ByokPrivateProviderDefinition> {
+  const result = ByokPrivateProviderDefinitionSchema.safeParse({
     name: form.name,
     base_url: form.base_url.trim(),
     api_kinds: form.api_kinds,
     client_provider: form.client_provider,
     reasoning_format: form.reasoning_format,
     ...(form.send_prompt_cache_key && { send_prompt_cache_key: true }),
-    models: form.models.map(toEndpointModel),
+    models: form.models.map(toPrivateModel),
   });
   if (result.success) return result;
   return {
@@ -215,7 +219,7 @@ export function buildEndpointDefinition(form: EndpointForm): BuildResult<ByokEnd
   };
 }
 
-function hasCredentialsInput(form: EndpointCredentialsForm): boolean {
+function hasCredentialsInput(form: PrivateProviderCredentialsForm): boolean {
   switch (form.type) {
     case 'api_key':
     case 'x-api-key':
@@ -231,14 +235,14 @@ function hasCredentialsInput(form: EndpointCredentialsForm): boolean {
  * The credentials the form describes. With `optional`, an untouched form yields null, which keeps
  * the stored credentials.
  */
-export function buildEndpointCredentials(
-  form: EndpointCredentialsForm,
+export function buildPrivateProviderCredentials(
+  form: PrivateProviderCredentialsForm,
   { optional }: { optional: boolean }
-): BuildResult<ByokEndpointCredentials | null> {
+): BuildResult<ByokPrivateProviderCredentials | null> {
   if (!hasCredentialsInput(form)) {
     return optional
       ? { success: true, data: null }
-      : { success: false, errors: ['Enter the endpoint credentials.'] };
+      : { success: false, errors: ['Enter the private provider credentials.'] };
   }
   let input: unknown;
   switch (form.type) {
@@ -262,7 +266,7 @@ export function buildEndpointCredentials(
       }
       break;
   }
-  const result = ByokEndpointCredentialsSchema.safeParse(input);
+  const result = ByokPrivateProviderCredentialsSchema.safeParse(input);
   if (result.success) return result;
   return {
     success: false,
@@ -270,13 +274,13 @@ export function buildEndpointCredentials(
   };
 }
 
-function hasModelContent(row: EndpointModelRow) {
+function hasModelContent(row: PrivateModelRow) {
   return row.id.trim() !== '' || row.internal_id.trim() !== '';
 }
 
-/** How many more models the endpoint can take, as `mergeImportedModels` counts the rows. */
-export function getImportCapacity(rows: EndpointModelRow[]): number {
-  return Math.max(0, BYOK_ENDPOINT_MAX_MODELS - rows.filter(hasModelContent).length);
+/** How many more models the private provider can take, as `mergeImportedModels` counts the rows. */
+export function getImportCapacity(rows: PrivateModelRow[]): number {
+  return Math.max(0, BYOK_PRIVATE_PROVIDER_MAX_MODELS - rows.filter(hasModelContent).length);
 }
 
 /** Adds upstream ids to a selection, in order, without exceeding `capacity` selected. */
@@ -298,13 +302,13 @@ export function addToImportSelection(
  * listed and renaming a public id that is taken. A single empty row is replaced.
  */
 export function mergeImportedModels(
-  rows: EndpointModelRow[],
-  imported: ByokEndpointModel[]
-): EndpointModelRow[] {
+  rows: PrivateModelRow[],
+  imported: ByokPrivateModel[]
+): PrivateModelRow[] {
   const kept = rows.filter(hasModelContent);
   const internalIds = new Set(kept.map(row => row.internal_id.trim()));
   const ids = new Set(kept.map(row => row.id.trim()));
-  const added: EndpointModelRow[] = [];
+  const added: PrivateModelRow[] = [];
   for (const model of imported) {
     if (internalIds.has(model.internal_id)) continue;
     let id = model.id;
@@ -313,7 +317,7 @@ export function mergeImportedModels(
     }
     ids.add(id);
     internalIds.add(model.internal_id);
-    added.push(toEndpointModelRow({ ...model, id }));
+    added.push(toPrivateModelRow({ ...model, id }));
   }
   return [...kept, ...added];
 }

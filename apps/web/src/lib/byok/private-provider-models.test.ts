@@ -1,5 +1,8 @@
 import { describe, expect, test } from '@jest/globals';
-import { parseByokEndpointModelsResponse, toByokEndpointModelId } from './endpoint-models';
+import {
+  parseByokPrivateProviderModelsResponse,
+  toByokPrivateModelId,
+} from './private-provider-models';
 
 // Trimmed from real `GET /models` responses of each provider.
 const OPENROUTER = {
@@ -130,9 +133,9 @@ const OPENAI = {
   ],
 };
 
-describe('parseByokEndpointModelsResponse', () => {
+describe('parseByokPrivateProviderModelsResponse', () => {
   test('reads OpenRouter limits and image input from the architecture and top provider', () => {
-    expect(parseByokEndpointModelsResponse(OPENROUTER)).toEqual([
+    expect(parseByokPrivateProviderModelsResponse(OPENROUTER)).toEqual([
       {
         id: 'qwen/qwen4-max',
         internal_id: 'qwen/qwen4-max',
@@ -153,7 +156,7 @@ describe('parseByokEndpointModelsResponse', () => {
   });
 
   test('reads Vercel AI Gateway context windows and skips models that cannot chat', () => {
-    expect(parseByokEndpointModelsResponse(VERCEL_AI_GATEWAY)).toEqual([
+    expect(parseByokPrivateProviderModelsResponse(VERCEL_AI_GATEWAY)).toEqual([
       {
         id: 'alibaba/qwen-3-14b',
         internal_id: 'alibaba/qwen-3-14b',
@@ -174,7 +177,7 @@ describe('parseByokEndpointModelsResponse', () => {
   });
 
   test('reads Mistral capabilities', () => {
-    expect(parseByokEndpointModelsResponse(MISTRAL)).toEqual([
+    expect(parseByokPrivateProviderModelsResponse(MISTRAL)).toEqual([
       {
         id: 'codestral-2508',
         internal_id: 'codestral-2508',
@@ -195,7 +198,7 @@ describe('parseByokEndpointModelsResponse', () => {
   });
 
   test('reads Novita context sizes, output limits, and display names', () => {
-    expect(parseByokEndpointModelsResponse(NOVITA)).toEqual([
+    expect(parseByokPrivateProviderModelsResponse(NOVITA)).toEqual([
       {
         id: 'tencent/hy4-flash',
         internal_id: 'tencent/hy4-flash',
@@ -208,7 +211,7 @@ describe('parseByokEndpointModelsResponse', () => {
   });
 
   test('reads Anthropic input and output limits and image capability', () => {
-    expect(parseByokEndpointModelsResponse(ANTHROPIC)).toEqual([
+    expect(parseByokPrivateProviderModelsResponse(ANTHROPIC)).toEqual([
       {
         id: 'claude-fable-5-2',
         internal_id: 'claude-fable-5-2',
@@ -221,7 +224,7 @@ describe('parseByokEndpointModelsResponse', () => {
   });
 
   test('gives OpenAI models without metadata the default name and limits', () => {
-    expect(parseByokEndpointModelsResponse(OPENAI)).toEqual([
+    expect(parseByokPrivateProviderModelsResponse(OPENAI)).toEqual([
       {
         id: 'gpt-5.5',
         internal_id: 'gpt-5.5',
@@ -253,20 +256,20 @@ describe('parseByokEndpointModelsResponse', () => {
     'cohere/embed-english-v3.0',
     'nomic-embed-text',
   ])('skips %s, whose id names a model that cannot chat', id => {
-    expect(parseByokEndpointModelsResponse({ data: [{ id }] })).toEqual([]);
+    expect(parseByokPrivateProviderModelsResponse({ data: [{ id }] })).toEqual([]);
   });
 
   test.each(['gpt-5.5', 'gpt-4o-mini', 'o3', 'claude-sonnet-5', 'llama-3.3-70b', 'embedded-chat'])(
     'keeps %s',
     id => {
-      expect(parseByokEndpointModelsResponse({ data: [{ id }] }).map(m => m.internal_id)).toEqual([
-        id,
-      ]);
+      expect(
+        parseByokPrivateProviderModelsResponse({ data: [{ id }] }).map(m => m.internal_id)
+      ).toEqual([id]);
     }
   );
 
   test('trusts an explicit chat signal over the id', () => {
-    const models = parseByokEndpointModelsResponse({
+    const models = parseByokPrivateProviderModelsResponse({
       data: [
         { id: 'embed-chat-a', type: 'chat' },
         { id: 'embed-chat-b', capabilities: { completion_chat: true } },
@@ -278,7 +281,7 @@ describe('parseByokEndpointModelsResponse', () => {
 
   test('accepts a bare array and keeps max output within a small context', () => {
     expect(
-      parseByokEndpointModelsResponse([
+      parseByokPrivateProviderModelsResponse([
         { id: 'Local/Model:Q4', max_model_len: 8192, max_tokens: 16384 },
       ])
     ).toEqual([
@@ -295,7 +298,7 @@ describe('parseByokEndpointModelsResponse', () => {
 
   test('skips entries without an id and duplicate upstream ids, and renames clashing ids', () => {
     expect(
-      parseByokEndpointModelsResponse({
+      parseByokPrivateProviderModelsResponse({
         data: [{ name: 'no id' }, 'text', { id: 'Model-A' }, { id: 'model-a' }, { id: 'Model-A' }],
       }).map(model => [model.id, model.internal_id])
     ).toEqual([
@@ -305,22 +308,22 @@ describe('parseByokEndpointModelsResponse', () => {
   });
 
   test('returns no models for an unrecognized response', () => {
-    expect(parseByokEndpointModelsResponse({ error: 'nope' })).toEqual([]);
-    expect(parseByokEndpointModelsResponse(null)).toEqual([]);
+    expect(parseByokPrivateProviderModelsResponse({ error: 'nope' })).toEqual([]);
+    expect(parseByokPrivateProviderModelsResponse(null)).toEqual([]);
   });
 });
 
-describe('toByokEndpointModelId', () => {
+describe('toByokPrivateModelId', () => {
   test.each([
     ['anthropic.claude-sonnet-4-5-20250929-v1:0', 'anthropic.claude-sonnet-4-5-20250929-v1-0'],
     ['models/gemini-3-pro', 'models/gemini-3-pro'],
     ['  Meta Llama 4  ', 'meta-llama-4'],
     ['@cf/meta/llama', 'cf/meta/llama'],
   ])('maps %j to %j', (internalId, id) => {
-    expect(toByokEndpointModelId(internalId)).toBe(id);
+    expect(toByokPrivateModelId(internalId)).toBe(id);
   });
 
   test('returns null when nothing usable is left', () => {
-    expect(toByokEndpointModelId('::')).toBeNull();
+    expect(toByokPrivateModelId('::')).toBeNull();
   });
 });

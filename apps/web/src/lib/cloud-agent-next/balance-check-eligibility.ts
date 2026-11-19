@@ -14,7 +14,7 @@ import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/cust
 import { getAllowedDirectByokCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
 import {
   findDirectByokProvider,
-  getByokEndpointProviders,
+  getByokPrivateProviders,
   getDirectByokCatalogModelIds,
   getDirectByokModel,
   supportsCatalogMode,
@@ -37,9 +37,9 @@ import {
   type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
-  isByokEndpointModelId,
-  isByokEndpointProviderId,
-} from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
+  isByokPrivateModelId,
+  isByokPrivateProviderId,
+} from '@kilocode/web-shared/lib/ai-gateway/byok-private-provider';
 import type { User } from '@kilocode/db/schema';
 
 export type BalanceCheckModelEligibility = {
@@ -62,7 +62,7 @@ export type BalanceCheckModelEligibility = {
  * Skips the check when either:
  * - the model is Kilo-funded (free for the user), or
  * - the user has a BYOK credential that serves it: a Vercel-routed inference
- *   provider key, a gateway key, a direct BYOK key or organization endpoint
+ *   provider key, a gateway key, a direct BYOK key or organization private provider
  *   (bespoke or catalog mode), a "Sign in with ChatGPT" connection, or a
  *   Claude billing link, so the session is billed against the user's own key,
  *   plan, or Claude organization rather than their balance.
@@ -157,7 +157,7 @@ function withClaudeBilling(
 }
 
 /**
- * Whether a direct BYOK key or organization endpoint serves `modelId`, as
+ * Whether a direct BYOK key or organization private provider serves `modelId`, as
  * `getProvider` routes it: a bespoke `<provider>/<model>` id to that provider's
  * enabled key unless the key is in catalog mode, or a catalog id to a
  * catalog-mode key. Organization catalog ids also pass the organization policy.
@@ -176,10 +176,10 @@ async function hasDirectByokForModel(params: {
   let enabledKeys: Promise<EnabledByokProvider[]> | undefined;
   const loadEnabledKeys = () =>
     (enabledKeys ??= getEnabledByokProviders(params.fromDb, params.owner));
-  // Only the owner's keys know its endpoints, whose model ids nobody else can use.
+  // Only the owner's keys know its private providers, whose model ids nobody else can use.
   const { provider, model } = await getDirectByokModel(
     modelId,
-    isByokEndpointModelId(modelId) ? getByokEndpointProviders(await loadEnabledKeys()) : undefined
+    isByokPrivateModelId(modelId) ? getByokPrivateProviders(await loadEnabledKeys()) : undefined
   );
   if (provider && model) {
     const key = (await loadEnabledKeys()).find(enabled => enabled.providerId === provider.id);
@@ -187,7 +187,7 @@ async function hasDirectByokForModel(params: {
   }
 
   const catalogModeCapable = [...params.enabledProviderIds].some(providerId => {
-    if (isByokEndpointProviderId(providerId)) return true;
+    if (isByokPrivateProviderId(providerId)) return true;
     const provider = findDirectByokProvider(providerId);
     return provider !== undefined && supportsCatalogMode(provider);
   });

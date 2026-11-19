@@ -22,17 +22,17 @@ export async function isExperimentalByokEnabled(
 }
 
 /**
- * BYOK endpoints, an organization's own OpenAI- or Anthropic-compatible
+ * BYOK private providers, an organization's own OpenAI- or Anthropic-compatible
  * upstreams, can be added only by organizations an admin enabled the
- * `byok_endpoints` organization feature for in the gateway configuration.
+ * `byok_private_providers` organization feature for in the gateway configuration.
  */
-export async function isByokEndpointsEnabled(
+export async function isByokPrivateProvidersEnabled(
   organizationId: string | null | undefined
 ): Promise<boolean> {
   if (!organizationId) return false;
   return isOrganizationFeatureEnabled(
     await readOrganizationFeatures(db),
-    'byok_endpoints',
+    'byok_private_providers',
     organizationId
   );
 }

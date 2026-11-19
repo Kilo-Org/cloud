@@ -1,6 +1,9 @@
-import { type ByokEndpointCredentials, type ByokEndpointModel } from '@kilocode/db/schema-types';
-import { resolveByokEndpointUpstreamAuth } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/direct-provider';
-import { parseByokEndpointModelsResponse } from '@/lib/byok/endpoint-models';
+import {
+  type ByokPrivateProviderCredentials,
+  type ByokPrivateModel,
+} from '@kilocode/db/schema-types';
+import { resolveByokPrivateProviderUpstreamAuth } from '@kilocode/web-shared/lib/ai-gateway/byok-private-provider/direct-provider';
+import { parseByokPrivateProviderModelsResponse } from '@/lib/byok/private-provider-models';
 import { signBedrockRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/aws-bedrock-signing';
 import {
   findUpstreamUrlViolation,
@@ -16,26 +19,30 @@ const REQUEST_TIMEOUT_MS = 15_000;
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
 const ANTHROPIC_VERSION = '2023-06-01';
 
-/** A failure whose message is safe to show to the organization member who configured the endpoint. */
-export class ByokEndpointRequestError extends Error {}
+/** A failure whose message is safe to show to the organization member who configured the private provider. */
+export class ByokPrivateProviderRequestError extends Error {}
 
 const URL_POLICY_MESSAGES = {
-  invalid_url: 'The endpoint URL is not a valid URL.',
-  non_https: 'The endpoint URL must use HTTPS.',
-  non_public_host: 'The endpoint URL must point to a public host.',
-  non_public_address: 'The endpoint URL host resolves to a non-public address.',
-  dns_lookup_failed: 'The endpoint host could not be resolved. Check the URL and try again.',
-  redirect: 'The endpoint responded with a redirect, which is not followed. Use the final URL.',
+  invalid_url: 'The private provider URL is not a valid URL.',
+  non_https: 'The private provider URL must use HTTPS.',
+  non_public_host: 'The private provider URL must point to a public host.',
+  non_public_address: 'The private provider URL host resolves to a non-public address.',
+  dns_lookup_failed:
+    'The private provider host could not be resolved. Check the URL and try again.',
+  redirect:
+    'The private provider responded with a redirect, which is not followed. Use the final URL.',
 } as const satisfies Record<UpstreamUrlViolation | 'redirect', string>;
 
-/** Why `baseUrl` may not be used for an endpoint. */
-export async function findByokEndpointBaseUrlViolation(baseUrl: string): Promise<string | null> {
+/** Why `baseUrl` may not be used for a private provider. */
+export async function findByokPrivateProviderBaseUrlViolation(
+  baseUrl: string
+): Promise<string | null> {
   if (!isUpstreamUrlPolicyEnforced()) return null;
   const decision = await findUpstreamUrlViolation(baseUrl);
   return decision.allowed ? null : URL_POLICY_MESSAGES[decision.violation];
 }
 
-function credentialSecrets(credentials: ByokEndpointCredentials): string[] {
+function credentialSecrets(credentials: ByokPrivateProviderCredentials): string[] {
   switch (credentials.type) {
     case 'api_key':
     case 'x-api-key':
@@ -48,7 +55,7 @@ function credentialSecrets(credentials: ByokEndpointCredentials): string[] {
 }
 
 /**
- * Headers that authorize the request as gateway requests to the endpoint do, and every secret
+ * Headers that authorize the request as gateway requests to the private provider do, and every secret
  * value that went into them.
  */
 async function authorizedHeaders({
@@ -61,12 +68,12 @@ async function authorizedHeaders({
   url: string;
   method: string;
   body: string;
-  credentials: ByokEndpointCredentials;
+  credentials: ByokPrivateProviderCredentials;
   extraHeaders: Record<string, string>;
 }): Promise<{ headers: Headers; secrets: string[] }> {
   const headers = new Headers({ accept: 'application/json' });
   if (body) headers.set('content-type', 'application/json');
-  const auth = await resolveByokEndpointUpstreamAuth(credentials);
+  const auth = await resolveByokPrivateProviderUpstreamAuth(credentials);
   const secrets = [...credentialSecrets(credentials), auth.apiKey].filter(Boolean);
   if (auth.apiKeyHeader === 'x-api-key') {
     headers.set('x-api-key', auth.apiKey);
@@ -93,14 +100,14 @@ async function readTextWithLimit(response: Response): Promise<string> {
     size += value.byteLength;
     if (size > MAX_RESPONSE_BYTES) {
       await reader.cancel().catch(() => undefined);
-      throw new ByokEndpointRequestError('The endpoint response is too large.');
+      throw new ByokPrivateProviderRequestError('The private provider response is too large.');
     }
     chunks.push(value);
   }
   return new TextDecoder().decode(Buffer.concat(chunks));
 }
 
-export type ByokEndpointResponse = {
+export type ByokPrivateProviderResponse = {
   status: number;
   ok: boolean;
   text: string;
@@ -109,10 +116,10 @@ export type ByokEndpointResponse = {
 };
 
 /**
- * Sends one request to an organization's endpoint with its credentials, under the upstream URL
+ * Sends one request to an organization's private provider with its credentials, under the upstream URL
  * policy (`fetchWithUpstreamUrlPolicy`). The response is capped.
  */
-export async function fetchByokEndpoint({
+export async function fetchByokPrivateProvider({
   url,
   method,
   body = '',
@@ -122,9 +129,9 @@ export async function fetchByokEndpoint({
   url: string;
   method: 'GET' | 'POST';
   body?: string;
-  credentials: ByokEndpointCredentials;
+  credentials: ByokPrivateProviderCredentials;
   headers?: Record<string, string>;
-}): Promise<ByokEndpointResponse> {
+}): Promise<ByokPrivateProviderResponse> {
   const { headers, secrets } = await authorizedHeaders({
     url,
     method,
@@ -143,12 +150,14 @@ export async function fetchByokEndpoint({
     });
   } catch (error) {
     if (error instanceof UpstreamUrlPolicyError) {
-      throw new ByokEndpointRequestError(URL_POLICY_MESSAGES[error.rejection]);
+      throw new ByokPrivateProviderRequestError(URL_POLICY_MESSAGES[error.rejection]);
     }
     if (error instanceof Error && error.name === 'TimeoutError') {
-      throw new ByokEndpointRequestError('The endpoint did not respond within 15 seconds.');
+      throw new ByokPrivateProviderRequestError(
+        'The private provider did not respond within 15 seconds.'
+      );
     }
-    throw new ByokEndpointRequestError('The endpoint could not be reached.');
+    throw new ByokPrivateProviderRequestError('The private provider could not be reached.');
   }
 
   return {
@@ -159,31 +168,33 @@ export async function fetchByokEndpoint({
   };
 }
 
-/** The models the endpoint lists at `GET <base_url>/models`. */
-export async function fetchByokEndpointModels({
+/** The models the private provider lists at `GET <base_url>/models`. */
+export async function fetchByokPrivateProviderModels({
   baseUrl,
   credentials,
 }: {
   baseUrl: string;
-  credentials: ByokEndpointCredentials;
-}): Promise<ByokEndpointModel[]> {
-  const response = await fetchByokEndpoint({
+  credentials: ByokPrivateProviderCredentials;
+}): Promise<ByokPrivateModel[]> {
+  const response = await fetchByokPrivateProvider({
     url: `${baseUrl}/models`,
     method: 'GET',
     credentials,
   });
   if (!response.ok) {
-    throw new ByokEndpointRequestError(
-      `The endpoint could not list its models: ${describeByokEndpointError(response)}`
+    throw new ByokPrivateProviderRequestError(
+      `The private provider could not list its models: ${describeByokPrivateProviderError(response)}`
     );
   }
   let json: unknown;
   try {
     json = JSON.parse(response.text);
   } catch {
-    throw new ByokEndpointRequestError('The endpoint returned a model list that is not JSON.');
+    throw new ByokPrivateProviderRequestError(
+      'The private provider returned a model list that is not JSON.'
+    );
   }
-  return parseByokEndpointModelsResponse(json);
+  return parseByokPrivateProviderModelsResponse(json);
 }
 
 const REDACTED = '[redacted]';
@@ -212,7 +223,7 @@ function escapeRegExp(value: string): string {
 }
 
 /** `text` without the secrets, or the beginning or end of one, as an upstream may echo them. */
-export function redactByokEndpointSecrets(text: string, secrets: readonly string[]): string {
+export function redactByokPrivateProviderSecrets(text: string, secrets: readonly string[]): string {
   const fragments = [...new Set(secrets.filter(Boolean).flatMap(secretFragments))].sort(
     (a, b) => b.length - a.length
   );
@@ -227,7 +238,7 @@ export function redactByokEndpointSecrets(text: string, secrets: readonly string
  * A short, human-readable reason from an upstream error body: the `error.message` of a JSON body,
  * otherwise the beginning of the text. Credentials the upstream echoes are redacted.
  */
-export function describeByokEndpointError(response: ByokEndpointResponse): string {
+export function describeByokPrivateProviderError(response: ByokPrivateProviderResponse): string {
   let detail: string | undefined;
   try {
     const json: unknown = JSON.parse(response.text);
@@ -244,7 +255,7 @@ export function describeByokEndpointError(response: ByokEndpointResponse): strin
   }
   const status = `HTTP ${response.status}`;
   if (!detail) return status;
-  const redacted = redactByokEndpointSecrets(detail, response.secrets).slice(
+  const redacted = redactByokPrivateProviderSecrets(detail, response.secrets).slice(
     0,
     MAX_ERROR_DETAIL_LENGTH
   );

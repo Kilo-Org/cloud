@@ -1,8 +1,8 @@
 import { UserByokProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
-  ByokEndpointCredentialsSchema,
-  ByokEndpointDefinitionSchema,
-  ByokEndpointModelSchema,
+  ByokPrivateProviderCredentialsSchema,
+  ByokPrivateProviderDefinitionSchema,
+  ByokPrivateModelSchema,
 } from '@kilocode/db/schema-types';
 import * as z from 'zod';
 
@@ -32,10 +32,10 @@ export const BYOKApiKeyResponseSchema = z.object({
   created_at: z.string(),
   updated_at: z.string(),
   created_by: z.string(),
-  /** The key is an organization's own endpoint; its `provider_name` is the endpoint name. */
-  is_endpoint: z.boolean(),
-  /** The endpoint's non-secret configuration, or null for provider keys. */
-  endpoint: ByokEndpointDefinitionSchema.nullable(),
+  /** The key is an organization's own private provider; its `provider_name` is the private provider name. */
+  is_private_provider: z.boolean(),
+  /** The private provider's non-secret configuration, or null for provider keys. */
+  private_provider: ByokPrivateProviderDefinitionSchema.nullable(),
 });
 
 export type BYOKApiKeyResponse = z.infer<typeof BYOKApiKeyResponseSchema>;
@@ -81,33 +81,33 @@ export const ListBYOKKeysInputSchema = OptionalOrganizationIdSchema;
 
 export const TestBYOKKeyInputSchema = OptionalOrganizationIdSchema.extend({
   id: BYOKKeyIdSchema,
-  /** For endpoint keys, the model to test; the first model when omitted. */
+  /** For private provider keys, the model to test; the first model when omitted. */
   modelId: z.string().min(1).max(200).optional(),
 });
 
 const OrganizationIdSchema = z.object({ organizationId: z.string().uuid() });
 
-export const CreateByokEndpointInputSchema = OrganizationIdSchema.extend({
-  definition: ByokEndpointDefinitionSchema,
-  credentials: ByokEndpointCredentialsSchema,
+export const CreateByokPrivateProviderInputSchema = OrganizationIdSchema.extend({
+  definition: ByokPrivateProviderDefinitionSchema,
+  credentials: ByokPrivateProviderCredentialsSchema,
 });
 
 /** Omitted credentials keep the stored ones. */
-export const UpdateByokEndpointInputSchema = OrganizationIdSchema.extend({
+export const UpdateByokPrivateProviderInputSchema = OrganizationIdSchema.extend({
   id: BYOKKeyIdSchema,
-  definition: ByokEndpointDefinitionSchema,
-  credentials: ByokEndpointCredentialsSchema.optional(),
+  definition: ByokPrivateProviderDefinitionSchema,
+  credentials: ByokPrivateProviderCredentialsSchema.optional(),
 });
 
-/** Uses `credentials`, or the stored credentials of endpoint key `id` when they are omitted. */
-export const ListByokEndpointModelsInputSchema = OrganizationIdSchema.extend({
-  base_url: ByokEndpointDefinitionSchema.shape.base_url,
-  credentials: ByokEndpointCredentialsSchema.optional(),
+/** Uses `credentials`, or the stored credentials of private provider key `id` when they are omitted. */
+export const ListByokPrivateProviderModelsInputSchema = OrganizationIdSchema.extend({
+  base_url: ByokPrivateProviderDefinitionSchema.shape.base_url,
+  credentials: ByokPrivateProviderCredentialsSchema.optional(),
   id: BYOKKeyIdSchema.optional(),
 }).refine(input => input.credentials || input.id, 'Enter credentials to import models');
 
-export const ListByokEndpointModelsResponseSchema = z.object({
-  models: z.array(ByokEndpointModelSchema),
+export const ListByokPrivateProviderModelsResponseSchema = z.object({
+  models: z.array(ByokPrivateModelSchema),
 });
 
 /**

@@ -1,17 +1,17 @@
 import { describe, expect, test } from '@jest/globals';
-import { BYOK_ENDPOINT_MAX_MODELS } from '@kilocode/db/schema-types';
+import { BYOK_PRIVATE_PROVIDER_MAX_MODELS } from '@kilocode/db/schema-types';
 import {
-  EMPTY_ENDPOINT_CREDENTIALS_FORM,
+  EMPTY_PRIVATE_PROVIDER_CREDENTIALS_FORM,
   addToImportSelection,
-  buildEndpointCredentials,
-  buildEndpointDefinition,
+  buildPrivateProviderCredentials,
+  buildPrivateProviderDefinition,
   getImportCapacity,
   mergeImportedModels,
   sendsPromptCacheKeyOver,
-  setEndpointModelFlag,
-  toEndpointForm,
-  toEndpointModelRow,
-} from './endpoint-form';
+  setPrivateModelFlag,
+  toPrivateProviderForm,
+  toPrivateModelRow,
+} from './private-provider-form';
 
 const MODEL = {
   id: 'my-model',
@@ -28,16 +28,16 @@ describe('sendsPromptCacheKeyOver', () => {
   });
 });
 
-describe('buildEndpointDefinition', () => {
+describe('buildPrivateProviderDefinition', () => {
   test('builds a definition and leaves unset overrides out', () => {
     const form = {
-      ...toEndpointForm(null),
+      ...toPrivateProviderForm(null),
       name: ' Gateway ',
       base_url: ' https://api.example.com/v1 ',
-      models: [toEndpointModelRow(MODEL)],
+      models: [toPrivateModelRow(MODEL)],
     };
 
-    expect(buildEndpointDefinition(form)).toEqual({
+    expect(buildPrivateProviderDefinition(form)).toEqual({
       success: true,
       data: {
         name: 'Gateway',
@@ -70,7 +70,7 @@ describe('buildEndpointDefinition', () => {
       ],
     };
 
-    expect(buildEndpointDefinition(toEndpointForm(definition))).toEqual({
+    expect(buildPrivateProviderDefinition(toPrivateProviderForm(definition))).toEqual({
       success: true,
       data: definition,
     });
@@ -78,13 +78,13 @@ describe('buildEndpointDefinition', () => {
 
   test('names the model and field of each problem', () => {
     const form = {
-      ...toEndpointForm(null),
+      ...toPrivateProviderForm(null),
       name: 'Gateway',
       base_url: 'https://api.example.com/v1/',
-      models: [toEndpointModelRow({ ...MODEL, id: 'Bad ID' }), toEndpointModelRow()],
+      models: [toPrivateModelRow({ ...MODEL, id: 'Bad ID' }), toPrivateModelRow()],
     };
 
-    const result = buildEndpointDefinition(form);
+    const result = buildPrivateProviderDefinition(form);
 
     expect(result.success).toBe(false);
     if (result.success) return;
@@ -99,55 +99,58 @@ describe('buildEndpointDefinition', () => {
   });
 });
 
-describe('setEndpointModelFlag', () => {
+describe('setPrivateModelFlag', () => {
   test('sets and clears one flag and keeps the others', () => {
-    expect(setEndpointModelFlag(['recommended'], 'reasoning', true)).toEqual([
+    expect(setPrivateModelFlag(['recommended'], 'reasoning', true)).toEqual([
       'recommended',
       'reasoning',
     ]);
-    expect(setEndpointModelFlag(['reasoning', 'vision'], 'reasoning', true)).toEqual([
+    expect(setPrivateModelFlag(['reasoning', 'vision'], 'reasoning', true)).toEqual([
       'vision',
       'reasoning',
     ]);
-    expect(setEndpointModelFlag(['reasoning', 'vision'], 'vision', false)).toEqual(['reasoning']);
+    expect(setPrivateModelFlag(['reasoning', 'vision'], 'vision', false)).toEqual(['reasoning']);
   });
 
   test('builds a definition with the flags of a row', () => {
-    const row = toEndpointModelRow(MODEL);
+    const row = toPrivateModelRow(MODEL);
     const form = {
-      ...toEndpointForm(null),
+      ...toPrivateProviderForm(null),
       name: 'Gateway',
       base_url: 'https://api.example.com/v1',
-      models: [{ ...row, flags: setEndpointModelFlag(row.flags, 'reasoning', true) }],
+      models: [{ ...row, flags: setPrivateModelFlag(row.flags, 'reasoning', true) }],
     };
 
-    const result = buildEndpointDefinition(form);
+    const result = buildPrivateProviderDefinition(form);
 
     expect(result.success && result.data.models).toEqual([{ ...MODEL, flags: ['reasoning'] }]);
   });
 });
 
-describe('buildEndpointCredentials', () => {
+describe('buildPrivateProviderCredentials', () => {
   test('keeps the stored credentials when an optional form is untouched', () => {
-    expect(buildEndpointCredentials(EMPTY_ENDPOINT_CREDENTIALS_FORM, { optional: true })).toEqual({
+    expect(
+      buildPrivateProviderCredentials(EMPTY_PRIVATE_PROVIDER_CREDENTIALS_FORM, { optional: true })
+    ).toEqual({
       success: true,
       data: null,
     });
     expect(
-      buildEndpointCredentials(EMPTY_ENDPOINT_CREDENTIALS_FORM, { optional: false }).success
+      buildPrivateProviderCredentials(EMPTY_PRIVATE_PROVIDER_CREDENTIALS_FORM, { optional: false })
+        .success
     ).toBe(false);
   });
 
   test('builds x-api-key and AWS credentials', () => {
     expect(
-      buildEndpointCredentials(
-        { ...EMPTY_ENDPOINT_CREDENTIALS_FORM, type: 'x-api-key', api_key: ' secret ' },
+      buildPrivateProviderCredentials(
+        { ...EMPTY_PRIVATE_PROVIDER_CREDENTIALS_FORM, type: 'x-api-key', api_key: ' secret ' },
         { optional: false }
       )
     ).toEqual({ success: true, data: { type: 'x-api-key', api_key: 'secret' } });
     expect(
-      buildEndpointCredentials(
-        { ...EMPTY_ENDPOINT_CREDENTIALS_FORM, type: 'aws_bedrock', region: 'us-east-1' },
+      buildPrivateProviderCredentials(
+        { ...EMPTY_PRIVATE_PROVIDER_CREDENTIALS_FORM, type: 'aws_bedrock', region: 'us-east-1' },
         { optional: true }
       ).success
     ).toBe(false);
@@ -155,8 +158,12 @@ describe('buildEndpointCredentials', () => {
 
   test('reports a service account key that is not JSON', () => {
     expect(
-      buildEndpointCredentials(
-        { ...EMPTY_ENDPOINT_CREDENTIALS_FORM, type: 'service_account', service_account_json: '{' },
+      buildPrivateProviderCredentials(
+        {
+          ...EMPTY_PRIVATE_PROVIDER_CREDENTIALS_FORM,
+          type: 'service_account',
+          service_account_json: '{',
+        },
         { optional: false }
       )
     ).toEqual({ success: false, errors: ['The service account key is not valid JSON.'] });
@@ -165,7 +172,7 @@ describe('buildEndpointCredentials', () => {
 
 describe('mergeImportedModels', () => {
   test('replaces the empty row, skips listed upstream ids, and renames taken ids', () => {
-    const existing = [toEndpointModelRow(MODEL), toEndpointModelRow()];
+    const existing = [toPrivateModelRow(MODEL), toPrivateModelRow()];
 
     const merged = mergeImportedModels(existing, [
       { ...MODEL },
@@ -182,7 +189,7 @@ describe('mergeImportedModels', () => {
 
   test('keeps renamed ids within the length limit', () => {
     const longId = 'a'.repeat(200);
-    const existing = [toEndpointModelRow({ ...MODEL, id: longId, internal_id: 'first' })];
+    const existing = [toPrivateModelRow({ ...MODEL, id: longId, internal_id: 'first' })];
 
     const merged = mergeImportedModels(existing, [
       { ...MODEL, id: longId, internal_id: 'second' },
@@ -200,15 +207,15 @@ describe('mergeImportedModels', () => {
 
 describe('import capacity', () => {
   test('counts only the rows with content against the model limit', () => {
-    expect(getImportCapacity([toEndpointModelRow()])).toBe(BYOK_ENDPOINT_MAX_MODELS);
-    expect(getImportCapacity([toEndpointModelRow(MODEL), toEndpointModelRow()])).toBe(
-      BYOK_ENDPOINT_MAX_MODELS - 1
+    expect(getImportCapacity([toPrivateModelRow()])).toBe(BYOK_PRIVATE_PROVIDER_MAX_MODELS);
+    expect(getImportCapacity([toPrivateModelRow(MODEL), toPrivateModelRow()])).toBe(
+      BYOK_PRIVATE_PROVIDER_MAX_MODELS - 1
     );
   });
 
   test('is never negative', () => {
-    const rows = Array.from({ length: BYOK_ENDPOINT_MAX_MODELS + 1 }, (_, index) =>
-      toEndpointModelRow({ ...MODEL, id: `model-${index}`, internal_id: `model-${index}` })
+    const rows = Array.from({ length: BYOK_PRIVATE_PROVIDER_MAX_MODELS + 1 }, (_, index) =>
+      toPrivateModelRow({ ...MODEL, id: `model-${index}`, internal_id: `model-${index}` })
     );
 
     expect(getImportCapacity(rows)).toBe(0);

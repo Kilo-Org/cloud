@@ -33,10 +33,10 @@ import {
   TestBYOKKeyInputSchema,
   PreviewBYOKRoutingInputSchema,
   BYOKApiKeyResponseSchema,
-  CreateByokEndpointInputSchema,
-  UpdateByokEndpointInputSchema,
-  ListByokEndpointModelsInputSchema,
-  ListByokEndpointModelsResponseSchema,
+  CreateByokPrivateProviderInputSchema,
+  UpdateByokPrivateProviderInputSchema,
+  ListByokPrivateProviderModelsInputSchema,
+  ListByokPrivateProviderModelsResponseSchema,
   BYOKKeyTestResultSchema,
   type BYOKApiKeyResponse,
   type BYOKKeyTestResult,
@@ -70,7 +70,7 @@ import {
   decryptByokRow,
   getByokKmsContext,
   getModelGatewayUserByokProviders,
-  readByokEndpointDefinition,
+  readByokPrivateProviderDefinition,
   isGatewayUserByokEligibleModel,
   servesCatalogModels,
   type ByokOwner,
@@ -101,31 +101,37 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { parseAwsBedrockCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/bedrock-byok';
 import { parseGcpVertexCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/vertex-byok';
-import { isByokEndpointsEnabled, isExperimentalByokEnabled } from '@/lib/byok/experimental-byok';
+import {
+  isByokPrivateProvidersEnabled,
+  isExperimentalByokEnabled,
+} from '@/lib/byok/experimental-byok';
 import { ADD_BYOK_PROVIDERS, getByokProviderDisplayName } from '@/lib/byok/provider-names';
 import { sortByokKeysInRouteOrder } from '@kilocode/web-shared/lib/ai-gateway/byok/route-order';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 import {
-  generateByokEndpointProviderId,
-  isByokEndpointProviderId,
-  parseByokEndpointCredentials,
-} from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
+  generateByokPrivateProviderId,
+  isByokPrivateProviderId,
+  parseByokPrivateProviderCredentials,
+} from '@kilocode/web-shared/lib/ai-gateway/byok-private-provider';
 import { isByokServableCatalogModelId } from '@kilocode/web-shared/lib/ai-gateway/byok/servable-catalog-model';
-import { BYOK_ENDPOINT_MAX_MODELS, type ByokEndpointCredentials } from '@kilocode/db/schema-types';
 import {
-  ByokEndpointRequestError,
-  fetchByokEndpointModels,
-  findByokEndpointBaseUrlViolation,
-} from '@/lib/byok/endpoint-upstream';
-import { testByokEndpoint } from '@/lib/byok/endpoint-test';
-import { endpointOriginChanged } from '@/lib/byok/endpoint-origin';
+  BYOK_PRIVATE_PROVIDER_MAX_MODELS,
+  type ByokPrivateProviderCredentials,
+} from '@kilocode/db/schema-types';
+import {
+  ByokPrivateProviderRequestError,
+  fetchByokPrivateProviderModels,
+  findByokPrivateProviderBaseUrlViolation,
+} from '@/lib/byok/private-provider-upstream';
+import { testByokPrivateProvider } from '@/lib/byok/private-provider-test';
+import { privateProviderOriginChanged } from '@/lib/byok/private-provider-origin';
 
 const KEYS_CHANGED_MESSAGE = 'Your API keys changed. Reload the page and try again.';
-const ENDPOINT_NOT_FOUND_MESSAGE = 'BYOK endpoint not found';
-const ENDPOINT_CHANGED_MESSAGE = 'The endpoint changed; reload and try again';
-const ENDPOINT_HOST_CHANGED_MESSAGE = 'Enter the credentials again to use a different host';
-const ENDPOINT_CREDENTIALS_UNREADABLE_MESSAGE =
-  'The stored endpoint credentials could not be read. Try again, or enter the credentials again.';
+const PRIVATE_PROVIDER_NOT_FOUND_MESSAGE = 'BYOK private provider not found';
+const PRIVATE_PROVIDER_CHANGED_MESSAGE = 'The private provider changed; reload and try again';
+const PRIVATE_PROVIDER_HOST_CHANGED_MESSAGE = 'Enter the credentials again to use a different host';
+const PRIVATE_PROVIDER_CREDENTIALS_UNREADABLE_MESSAGE =
+  'The stored private provider credentials could not be read. Try again, or enter the credentials again.';
 const logByokWarning = sentryLogger('byok-key-test', 'warning');
 const logByokWriteWarning = sentryLogger('byok-key-write', 'warning');
 
@@ -265,8 +271,8 @@ type BYOKKeyRow = Omit<
   | 'serve_catalog_models'
   | 'supports_catalog_mode'
   | 'can_change_catalog_mode'
-  | 'is_endpoint'
-  | 'endpoint'
+  | 'is_private_provider'
+  | 'private_provider'
 > & { settings: unknown; organization_id: string | null };
 
 /**
@@ -277,8 +283,8 @@ function canChangeCatalogMode(organizationRole: OrganizationRole | null) {
   return organizationRole === null || canManageOrganization(organizationRole);
 }
 
-/** The endpoint definition names the organization's upstream, so only the roles that manage keys see it. */
-function canReadEndpointDefinition(organizationRole: OrganizationRole | null) {
+/** The private provider definition names the organization's upstream, so only the roles that manage keys see it. */
+function canReadPrivateProviderDefinition(organizationRole: OrganizationRole | null) {
   return (
     organizationRole === null ||
     (ORGANIZATION_BILLING_ROLES as OrganizationRole[]).includes(organizationRole)
@@ -286,7 +292,7 @@ function canReadEndpointDefinition(organizationRole: OrganizationRole | null) {
 }
 
 async function supportsCatalogMode(providerId: string) {
-  if (isByokEndpointProviderId(providerId)) return true;
+  if (isByokPrivateProviderId(providerId)) return true;
   const provider = findDirectByokProvider(providerId);
   return provider !== undefined && offersCatalogMode(provider);
 }
@@ -295,9 +301,9 @@ async function toBYOKApiKeyResponse(
   { settings, organization_id, ...key }: BYOKKeyRow,
   organizationRole: OrganizationRole | null
 ): Promise<BYOKApiKeyResponse> {
-  const isEndpoint = isByokEndpointProviderId(key.provider_id);
+  const isPrivateProvider = isByokPrivateProviderId(key.provider_id);
   // A stored definition that no longer parses is listed without it, so the rest of the list still loads.
-  const definition = readByokEndpointDefinition({
+  const definition = readByokPrivateProviderDefinition({
     provider_id: key.provider_id,
     organization_id,
     settings,
@@ -307,8 +313,9 @@ async function toBYOKApiKeyResponse(
   return {
     ...key,
     provider_name: definition?.name ?? getByokProviderDisplayName(key.provider_id),
-    is_endpoint: isEndpoint,
-    endpoint: definition && canReadEndpointDefinition(organizationRole) ? definition : null,
+    is_private_provider: isPrivateProvider,
+    private_provider:
+      definition && canReadPrivateProviderDefinition(organizationRole) ? definition : null,
     serve_catalog_models: serveCatalogModels,
     supports_catalog_mode: supportsCatalog,
     // An enabled key can always leave catalog mode, even after its provider loses its mappings.
@@ -338,22 +345,22 @@ async function rejectUnavailableExperimentalProvider(
   }
 }
 
-async function rejectUnavailableEndpoints(organizationId: string) {
-  if (!(await isByokEndpointsEnabled(organizationId))) {
+async function rejectUnavailablePrivateProviders(organizationId: string) {
+  if (!(await isByokPrivateProvidersEnabled(organizationId))) {
     throw new TRPCError({
       code: 'FORBIDDEN',
-      message: 'BYOK endpoints are not available yet.',
+      message: 'BYOK private providers are not available yet.',
     });
   }
 }
 
-async function rejectDisallowedEndpointUrl(baseUrl: string) {
-  const violation = await findByokEndpointBaseUrlViolation(baseUrl);
+async function rejectDisallowedPrivateProviderUrl(baseUrl: string) {
+  const violation = await findByokPrivateProviderBaseUrlViolation(baseUrl);
   if (violation) throw new TRPCError({ code: 'BAD_REQUEST', message: violation });
 }
 
-/** The organization's endpoint key `id`, or NOT_FOUND for any other key. */
-async function findOrganizationEndpointKey(organizationId: string, id: string) {
+/** The organization's private provider key `id`, or NOT_FOUND for any other key. */
+async function findOrganizationPrivateProviderKey(organizationId: string, id: string) {
   const [key] = await db
     .select({
       id: byok_api_keys.id,
@@ -366,8 +373,8 @@ async function findOrganizationEndpointKey(organizationId: string, id: string) {
     })
     .from(byok_api_keys)
     .where(and(eq(byok_api_keys.id, id), eq(byok_api_keys.organization_id, organizationId)));
-  if (!key || !isByokEndpointProviderId(key.provider_id)) {
-    throw new TRPCError({ code: 'NOT_FOUND', message: ENDPOINT_NOT_FOUND_MESSAGE });
+  if (!key || !isByokPrivateProviderId(key.provider_id)) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: PRIVATE_PROVIDER_NOT_FOUND_MESSAGE });
   }
   return key;
 }
@@ -376,24 +383,24 @@ async function findOrganizationEndpointKey(organizationId: string, id: string) {
  * Stored credentials may only be sent to the host they were saved for. Returns the stored base
  * URL, which a write that keeps the credentials must still find in place.
  */
-function rejectEndpointHostChange(
-  key: Parameters<typeof readByokEndpointDefinition>[0],
+function rejectPrivateProviderHostChange(
+  key: Parameters<typeof readByokPrivateProviderDefinition>[0],
   baseUrl: string
 ): string {
-  const stored = readByokEndpointDefinition(key);
-  if (!stored || endpointOriginChanged(stored.base_url, baseUrl)) {
-    throw new TRPCError({ code: 'BAD_REQUEST', message: ENDPOINT_HOST_CHANGED_MESSAGE });
+  const stored = readByokPrivateProviderDefinition(key);
+  if (!stored || privateProviderOriginChanged(stored.base_url, baseUrl)) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: PRIVATE_PROVIDER_HOST_CHANGED_MESSAGE });
   }
   return stored.base_url;
 }
 
-async function decryptEndpointCredentials(
+async function decryptPrivateProviderCredentials(
   row: Parameters<typeof decryptByokRow>[0]
-): Promise<ByokEndpointCredentials | null> {
+): Promise<ByokPrivateProviderCredentials | null> {
   try {
-    return parseByokEndpointCredentials((await decryptByokRow(row)).decryptedAPIKey);
+    return parseByokPrivateProviderCredentials((await decryptByokRow(row)).decryptedAPIKey);
   } catch (e) {
-    logByokWarning('Could not decrypt BYOK endpoint credentials', {
+    logByokWarning('Could not decrypt BYOK private provider credentials', {
       providerId: row.provider_id,
       message: e instanceof Error ? e.message : undefined,
     });
@@ -568,15 +575,15 @@ export const byokRouter = createTRPCRouter({
       return isExperimentalByokEnabled(input.organizationId);
     }),
 
-  /** Whether BYOK endpoints can be added. */
-  byokEndpointsEnabled: baseProcedure
+  /** Whether BYOK private providers can be added. */
+  privateProvidersEnabled: baseProcedure
     .input(ListBYOKKeysInputSchema)
     .output(z.boolean())
     .query(async ({ input, ctx }) => {
       if (input.organizationId) {
         await ensureOrganizationAccess(ctx, input.organizationId);
       }
-      return isByokEndpointsEnabled(input.organizationId);
+      return isByokPrivateProvidersEnabled(input.organizationId);
     }),
 
   list: baseProcedure
@@ -702,10 +709,10 @@ export const byokRouter = createTRPCRouter({
         ? await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES)
         : null;
 
-      if (isByokEndpointProviderId(provider_id)) {
+      if (isByokPrivateProviderId(provider_id)) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: 'Endpoints are added with createEndpoint.',
+          message: 'Private providers are added with createPrivateProvider.',
         });
       }
       await rejectUnavailableExperimentalProvider(provider_id, organizationId);
@@ -851,10 +858,10 @@ export const byokRouter = createTRPCRouter({
       }
 
       rejectManagedKeyMutation(existingKey.management_source);
-      if (isByokEndpointProviderId(existingKey.provider_id)) {
+      if (isByokPrivateProviderId(existingKey.provider_id)) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: 'Endpoints are updated with updateEndpoint.',
+          message: 'Private providers are updated with updatePrivateProvider.',
         });
       }
       await rejectUnavailableExperimentalProvider(
@@ -1090,18 +1097,18 @@ export const byokRouter = createTRPCRouter({
         return testResultWithLegacyCopy({ outcome: 'unreadable-key' });
       }
 
-      if (isByokEndpointProviderId(existingKey.provider_id)) {
-        const endpoint = readByokEndpointDefinition(existingKey) ?? undefined;
-        const provider = directByokProviderForKey({ providerId: providerId.data, endpoint });
+      if (isByokPrivateProviderId(existingKey.provider_id)) {
+        const privateProvider = readByokPrivateProviderDefinition(existingKey) ?? undefined;
+        const provider = directByokProviderForKey({ providerId: providerId.data, privateProvider });
         if (!provider || !existingKey.organization_id) {
           return testResultWithLegacyCopy({
             outcome: 'failed',
-            detail: 'the stored endpoint configuration is invalid.',
+            detail: 'the stored private provider configuration is invalid.',
           });
         }
         try {
           return testResultWithLegacyCopy(
-            await testByokEndpoint({
+            await testByokPrivateProvider({
               provider,
               credential: decryptedKey.decryptedAPIKey,
               modelId,
@@ -1110,7 +1117,7 @@ export const byokRouter = createTRPCRouter({
             })
           );
         } catch (e) {
-          logByokWarning('BYOK endpoint test request failed', {
+          logByokWarning('BYOK private provider test request failed', {
             providerId: existingKey.provider_id,
             message: e instanceof Error ? e.message : undefined,
           });
@@ -1127,7 +1134,8 @@ export const byokRouter = createTRPCRouter({
 
       async function setup() {
         const provider = UserByokProviderIdSchema.parse(decryptedKey.providerId);
-        if (isByokEndpointProviderId(provider)) throw new Error('Endpoint keys are tested above');
+        if (isByokPrivateProviderId(provider))
+          throw new Error('Private provider keys are tested above');
         const model = UserByokTestModels[provider];
 
         const directByokProvider = DIRECT_BYOK_PROVIDERS.find(plan => plan.id === provider);
@@ -1230,14 +1238,14 @@ export const byokRouter = createTRPCRouter({
     }),
 
   /**
-   * Which of the given endpoint model ids a catalog-mode endpoint would serve, that is, which are
-   * live Kilo catalog ids that the endpoint may take over.
+   * Which of the given private provider model ids a catalog-mode private provider would serve, that is, which are
+   * live Kilo catalog ids that the private provider may take over.
    */
-  listEndpointCatalogModelIds: baseProcedure
+  listPrivateProviderCatalogModelIds: baseProcedure
     .input(
       z.object({
         organizationId: z.string(),
-        modelIds: z.array(z.string().max(200)).max(BYOK_ENDPOINT_MAX_MODELS * 10),
+        modelIds: z.array(z.string().max(200)).max(BYOK_PRIVATE_PROVIDER_MAX_MODELS * 10),
       })
     )
     .output(z.array(z.string()))
@@ -1248,9 +1256,9 @@ export const byokRouter = createTRPCRouter({
       return modelIds.filter((_, index) => served[index]);
     }),
 
-  /** Adds an organization's own endpoint as a BYOK key. */
-  createEndpoint: baseProcedure
-    .input(CreateByokEndpointInputSchema)
+  /** Adds an organization's own private provider as a BYOK key. */
+  createPrivateProvider: baseProcedure
+    .input(CreateByokPrivateProviderInputSchema)
     .output(BYOKApiKeyResponseSchema)
     .mutation(async ({ input, ctx }): Promise<BYOKApiKeyResponse> => {
       const { organizationId, definition, credentials } = input;
@@ -1259,11 +1267,11 @@ export const byokRouter = createTRPCRouter({
         organizationId,
         ORGANIZATION_BILLING_ROLES
       );
-      await rejectUnavailableEndpoints(organizationId);
-      await rejectDisallowedEndpointUrl(definition.base_url);
+      await rejectUnavailablePrivateProviders(organizationId);
+      await rejectDisallowedPrivateProviderUrl(definition.base_url);
 
       const keyId = crypto.randomUUID();
-      const providerId = generateByokEndpointProviderId();
+      const providerId = generateByokPrivateProviderId();
       const envelope = await encryptByokForStorage({
         apiKey: JSON.stringify(credentials),
         context: {
@@ -1282,7 +1290,7 @@ export const byokRouter = createTRPCRouter({
           organization_id: organizationId,
           provider_id: providerId,
           encrypted_api_key_envelope: envelope,
-          settings: { endpoint: definition },
+          settings: { private_provider: definition },
           created_by: ctx.user.id,
         })
         .returning(BYOK_KEY_COLUMNS);
@@ -1292,16 +1300,16 @@ export const byokRouter = createTRPCRouter({
         actor_email: ctx.user.google_user_email,
         actor_id: ctx.user.id,
         actor_name: ctx.user.google_user_name,
-        message: `Added BYOK endpoint ${definition.name} (${providerId})`,
+        message: `Added BYOK private provider ${definition.name} (${providerId})`,
         organization_id: organizationId,
       });
 
       return toBYOKApiKeyResponse(newKey, organizationRole);
     }),
 
-  /** Replaces an endpoint's definition, and its credentials when given. */
-  updateEndpoint: baseProcedure
-    .input(UpdateByokEndpointInputSchema)
+  /** Replaces a private provider's definition, and its credentials when given. */
+  updatePrivateProvider: baseProcedure
+    .input(UpdateByokPrivateProviderInputSchema)
     .output(BYOKApiKeyResponseSchema)
     .mutation(async ({ input, ctx }): Promise<BYOKApiKeyResponse> => {
       const { organizationId, id, definition, credentials } = input;
@@ -1310,13 +1318,13 @@ export const byokRouter = createTRPCRouter({
         organizationId,
         ORGANIZATION_BILLING_ROLES
       );
-      await rejectUnavailableEndpoints(organizationId);
-      const existingKey = await findOrganizationEndpointKey(organizationId, id);
+      await rejectUnavailablePrivateProviders(organizationId);
+      const existingKey = await findOrganizationPrivateProviderKey(organizationId, id);
       rejectManagedKeyMutation(existingKey.management_source);
       const checkedBaseUrl = credentials
         ? undefined
-        : rejectEndpointHostChange(existingKey, definition.base_url);
-      await rejectDisallowedEndpointUrl(definition.base_url);
+        : rejectPrivateProviderHostChange(existingKey, definition.base_url);
+      await rejectDisallowedPrivateProviderUrl(definition.base_url);
 
       const envelope = credentials
         ? await encryptByokForStorage({
@@ -1329,7 +1337,7 @@ export const byokRouter = createTRPCRouter({
         .update(byok_api_keys)
         .set({
           // Merged like the other settings writes, so priority and catalog mode stay.
-          settings: sql`${byok_api_keys.settings} || ${JSON.stringify({ endpoint: definition })}::jsonb`,
+          settings: sql`${byok_api_keys.settings} || ${JSON.stringify({ private_provider: definition })}::jsonb`,
           ...(envelope && { encrypted_api_key_envelope: envelope }),
         })
         .where(
@@ -1340,15 +1348,15 @@ export const byokRouter = createTRPCRouter({
             // is valid only while it is still there.
             checkedBaseUrl === undefined
               ? undefined
-              : sql`${byok_api_keys.settings}->'endpoint'->>'base_url' = ${checkedBaseUrl}`
+              : sql`${byok_api_keys.settings}->'private_provider'->>'base_url' = ${checkedBaseUrl}`
           )
         )
         .returning(BYOK_KEY_COLUMNS);
       if (!updatedKey) {
         throw new TRPCError(
           checkedBaseUrl === undefined
-            ? { code: 'NOT_FOUND', message: ENDPOINT_NOT_FOUND_MESSAGE }
-            : { code: 'CONFLICT', message: ENDPOINT_CHANGED_MESSAGE }
+            ? { code: 'NOT_FOUND', message: PRIVATE_PROVIDER_NOT_FOUND_MESSAGE }
+            : { code: 'CONFLICT', message: PRIVATE_PROVIDER_CHANGED_MESSAGE }
         );
       }
 
@@ -1357,7 +1365,7 @@ export const byokRouter = createTRPCRouter({
         actor_email: ctx.user.google_user_email,
         actor_id: ctx.user.id,
         actor_name: ctx.user.google_user_name,
-        message: `Updated BYOK endpoint ${definition.name} (${existingKey.provider_id})${credentials ? ' and its credentials' : ''}`,
+        message: `Updated BYOK private provider ${definition.name} (${existingKey.provider_id})${credentials ? ' and its credentials' : ''}`,
         organization_id: organizationId,
       });
 
@@ -1365,26 +1373,26 @@ export const byokRouter = createTRPCRouter({
     }),
 
   /**
-   * The models an endpoint lists at `GET <base_url>/models`, ready to add to its definition. Uses
-   * the given credentials, or the stored credentials of endpoint key `id`.
+   * The models a private provider lists at `GET <base_url>/models`, ready to add to its definition. Uses
+   * the given credentials, or the stored credentials of private provider key `id`.
    */
-  listModelsFromEndpoint: baseProcedure
-    .input(ListByokEndpointModelsInputSchema)
-    .output(ListByokEndpointModelsResponseSchema)
+  listModelsFromPrivateProvider: baseProcedure
+    .input(ListByokPrivateProviderModelsInputSchema)
+    .output(ListByokPrivateProviderModelsResponseSchema)
     .mutation(async ({ input, ctx }) => {
       const { organizationId, base_url, id } = input;
       await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
-      await rejectUnavailableEndpoints(organizationId);
+      await rejectUnavailablePrivateProviders(organizationId);
 
       let credentials = input.credentials;
       if (!credentials && id) {
-        const key = await findOrganizationEndpointKey(organizationId, id);
-        rejectEndpointHostChange(key, base_url);
-        const stored = await decryptEndpointCredentials(key);
+        const key = await findOrganizationPrivateProviderKey(organizationId, id);
+        rejectPrivateProviderHostChange(key, base_url);
+        const stored = await decryptPrivateProviderCredentials(key);
         if (!stored) {
           throw new TRPCError({
             code: 'PRECONDITION_FAILED',
-            message: ENDPOINT_CREDENTIALS_UNREADABLE_MESSAGE,
+            message: PRIVATE_PROVIDER_CREDENTIALS_UNREADABLE_MESSAGE,
           });
         }
         credentials = stored;
@@ -1394,17 +1402,18 @@ export const byokRouter = createTRPCRouter({
       }
 
       try {
-        return { models: await fetchByokEndpointModels({ baseUrl: base_url, credentials }) };
+        return { models: await fetchByokPrivateProviderModels({ baseUrl: base_url, credentials }) };
       } catch (e) {
-        if (e instanceof ByokEndpointRequestError) {
+        if (e instanceof ByokPrivateProviderRequestError) {
           throw new TRPCError({ code: 'BAD_REQUEST', message: e.message });
         }
-        logByokWarning('BYOK endpoint model import failed', {
+        logByokWarning('BYOK private provider model import failed', {
           message: e instanceof Error ? e.message : undefined,
         });
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: 'The endpoint models could not be imported. Check the URL and credentials.',
+          message:
+            'The private provider models could not be imported. Check the URL and credentials.',
         });
       }
     }),

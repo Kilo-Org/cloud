@@ -82,7 +82,7 @@ describe('adminGatewayConfigRouter', () => {
 
     await caller.admin.gatewayConfig.setOrganizationFeatures({
       experimental_byok: [organizationId.toUpperCase()],
-      byok_endpoints: [organizationId.toUpperCase()],
+      byok_private_providers: [organizationId.toUpperCase()],
       enkrypt_output_guardrail: [organizationId.toUpperCase()],
       gateway_settings: [organizationId],
     });
@@ -90,7 +90,7 @@ describe('adminGatewayConfigRouter', () => {
 
     await expect(caller.admin.gatewayConfig.getOrganizationFeatures()).resolves.toEqual({
       experimental_byok: [organizationId],
-      byok_endpoints: [organizationId],
+      byok_private_providers: [organizationId],
       enkrypt_output_guardrail: [organizationId],
       gateway_settings: [organizationId],
     });
@@ -105,7 +105,7 @@ describe('adminGatewayConfigRouter', () => {
     await caller.admin.gatewayConfig.set(input);
     await caller.admin.gatewayConfig.setOrganizationFeatures({
       experimental_byok: [],
-      byok_endpoints: [],
+      byok_private_providers: [],
       enkrypt_output_guardrail: [],
       gateway_settings: ['00000000-0000-4000-8000-000000000001'],
     });
@@ -122,7 +122,7 @@ describe('adminGatewayConfigRouter', () => {
     await expect(
       caller.admin.gatewayConfig.setOrganizationFeatures({
         experimental_byok: ['not-an-id'],
-        byok_endpoints: [],
+        byok_private_providers: [],
         enkrypt_output_guardrail: [],
         gateway_settings: [],
       })
@@ -138,7 +138,7 @@ describe('adminGatewayConfigRouter', () => {
 
       const preview = await caller.admin.gatewayConfig.previewOrganizationFeatures({
         experimental_byok: [first.id.toUpperCase(), first.id],
-        byok_endpoints: [],
+        byok_private_providers: [],
         enkrypt_output_guardrail: [first.id, second.id],
         gateway_settings: [first.id.toUpperCase(), second.id.toUpperCase(), second.id],
       });
@@ -161,7 +161,7 @@ describe('adminGatewayConfigRouter', () => {
       await expect(
         caller.admin.gatewayConfig.previewOrganizationFeatures({
           experimental_byok: [crypto.randomUUID()],
-          byok_endpoints: [],
+          byok_private_providers: [],
           enkrypt_output_guardrail: [],
           gateway_settings: [organization.id, crypto.randomUUID()],
         })
@@ -179,7 +179,7 @@ describe('adminGatewayConfigRouter', () => {
       await expect(
         caller.admin.gatewayConfig.previewOrganizationFeatures({
           experimental_byok: [organization.id],
-          byok_endpoints: [],
+          byok_private_providers: [],
           enkrypt_output_guardrail: [],
           gateway_settings: [],
         })
@@ -192,7 +192,7 @@ describe('adminGatewayConfigRouter', () => {
       await expect(
         caller.admin.gatewayConfig.previewOrganizationFeatures({
           experimental_byok: [],
-          byok_endpoints: [],
+          byok_private_providers: [],
           enkrypt_output_guardrail: [],
           gateway_settings: [],
         })
@@ -202,7 +202,7 @@ describe('adminGatewayConfigRouter', () => {
 
     it.each([
       'experimental_byok',
-      'byok_endpoints',
+      'byok_private_providers',
       'enkrypt_output_guardrail',
       'gateway_settings',
     ] as const)('rejects invalid IDs in %s without writing configuration', async feature => {
@@ -211,7 +211,7 @@ describe('adminGatewayConfigRouter', () => {
       await expect(
         caller.admin.gatewayConfig.previewOrganizationFeatures({
           experimental_byok: [],
-          byok_endpoints: [],
+          byok_private_providers: [],
           enkrypt_output_guardrail: [],
           gateway_settings: [],
           [feature]: ['not-an-id'],
@@ -222,7 +222,7 @@ describe('adminGatewayConfigRouter', () => {
 
     it.each([
       'experimental_byok',
-      'byok_endpoints',
+      'byok_private_providers',
       'enkrypt_output_guardrail',
       'gateway_settings',
     ] as const)('rejects more than 1000 entries in %s before deduplication', async feature => {
@@ -231,7 +231,7 @@ describe('adminGatewayConfigRouter', () => {
       await expect(
         caller.admin.gatewayConfig.previewOrganizationFeatures({
           experimental_byok: [],
-          byok_endpoints: [],
+          byok_private_providers: [],
           enkrypt_output_guardrail: [],
           gateway_settings: [],
           [feature]: Array.from(
@@ -249,7 +249,7 @@ describe('adminGatewayConfigRouter', () => {
       await caller.admin.gatewayConfig.set(input);
       await caller.admin.gatewayConfig.setOrganizationFeatures({
         experimental_byok: [],
-        byok_endpoints: [],
+        byok_private_providers: [],
         enkrypt_output_guardrail: [],
         gateway_settings: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
       });
@@ -258,7 +258,7 @@ describe('adminGatewayConfigRouter', () => {
       await expect(
         caller.admin.gatewayConfig.previewOrganizationFeatures({
           experimental_byok: [organization.id],
-          byok_endpoints: [],
+          byok_private_providers: [],
           enkrypt_output_guardrail: [],
           gateway_settings: [],
         })
@@ -275,7 +275,7 @@ describe('adminGatewayConfigRouter', () => {
       await expect(
         caller.admin.gatewayConfig.previewOrganizationFeatures({
           experimental_byok: [organization.id],
-          byok_endpoints: [],
+          byok_private_providers: [],
           enkrypt_output_guardrail: [],
           gateway_settings: [],
         })

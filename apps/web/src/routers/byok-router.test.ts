@@ -1445,8 +1445,8 @@ describe('BYOK Router', () => {
           created_by: ownerUser.id,
           created_at: expect.any(String),
           updated_at: expect.any(String),
-          is_endpoint: false,
-          endpoint: null,
+          is_private_provider: false,
+          private_provider: null,
         });
         await expect(caller.byok.list(scope)).resolves.toEqual([created]);
 

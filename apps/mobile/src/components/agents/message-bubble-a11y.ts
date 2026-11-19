@@ -27,11 +27,17 @@ import { i18n } from '@/i18n';
  *   is an inset-matched, non-interactive, focusable `View` with no children,
  *   so it does not swallow the message subtree while still giving the rotor a
  *   target aligned with the bubble's actual bounds. It paints nothing, and it
- *   must not be transparent through opacity: a view at zero opacity is not
- *   visible to the user for Android accessibility, so TalkBack never reached
- *   it. The caller must only render this host when `accessibilityActions` is
- *   non-empty; when no action is exposed the overlay is omitted so
- *   VoiceOver/TalkBack do not stop on an empty focusable node.
+ *   must not be transparent through opacity: neither platform exposes a view
+ *   at zero opacity to its screen reader (Android reports it as not visible to
+ *   the user, UIKit skips it), so with `opacity-0` neither TalkBack nor
+ *   VoiceOver reached the row's Copy and Details actions. On both platforms
+ *   the host is therefore one stop per row that has actions, read as "User
+ *   message" or "Assistant message" before the content. It spans the row,
+ *   including the empty space beside an end-aligned user bubble, because it
+ *   is the row's own target, the same frame the long press uses. The caller
+ *   must only render this host when `accessibilityActions` is non-empty; when
+ *   no action is exposed the overlay is omitted so VoiceOver/TalkBack do not
+ *   stop on an empty focusable node.
  */
 type AgentMessageBubbleAccessibility = {
   /** Applied to the wrapping `Pressable` so the message subtree stays navigable. */

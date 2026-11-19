@@ -1834,19 +1834,17 @@ describe('browser tool session scripting backend', () => {
       selector: `#node-${String(index + 1)}`,
     }));
     const { session } = createScriptingSession({
-      result: code =>
-        code.includes('__buildAria')
-          ? {
-              lines: ['- button "One" [ref=e1]', '- button "Two" [ref=e2]'],
-              nextRef: refs.length,
-              refs,
-            }
-          : 'ok',
+      result: () => ({
+        lines: ['- button "One" [ref=e1]', '- button "Two" [ref=e2]'],
+        nextRef: refs.length,
+        refs,
+      }),
     });
 
     await expect(session.callTool('browser_snapshot', {})).resolves.toMatchObject({ ok: true });
-    await expect(session.callTool('browser_click', { target: 'e1' })).resolves.toMatchObject({
-      ok: true,
+    await expect(session.resolveTarget('e1')).resolves.toMatchObject({
+      kind: 'selector',
+      selector: '#node-1',
     });
     await expect(session.resolveTarget('e3')).resolves.toBeUndefined();
   });

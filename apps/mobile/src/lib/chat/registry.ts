@@ -1426,7 +1426,13 @@ async function drain(sessionId: string, chat: Chat, failed: boolean): Promise<vo
   await runTurn(current, { skippable: false }, () =>
     askInTurn(
       current,
-      { text: next.text, images: next.images, model: next.model, effort: next.effort, from: next.from },
+      {
+        text: next.text,
+        images: next.images,
+        model: next.model,
+        effort: next.effort,
+        from: next.from,
+      },
       false
     )
   );

@@ -961,7 +961,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Aquest compte encara no té cap organització. Les sol·licituds d'integració de Bitbucket es poden revisar quan creeu o us uniu a una organització.",
       "gitlabReconnectAdminOnlyDescription": "Demana a un Propietari, Administrador o Gestor de facturació de l'organització que la reconnecti.",
       "bitbucketNotConnectedTitle": "Bitbucket no està connectat",
-      "bitbucketAdminOnlyDescription": "Només els propietaris, els administradors i els gestors de facturació de l'organització poden connectar-lo.",
+      "adminOnlyConnectDescription": "Només els propietaris, els administradors i els gestors de facturació de l'organització poden connectar-lo.",
       "contextLine": "Per a {{organization}}",
       "contextLinePersonal": "Per a ús personal"
     },
@@ -4704,6 +4704,9 @@
     "couldNotLoad": "No s'han pogut carregar les integracions",
     "permissionDenied": "No tens permís per gestionar aquestes integracions.",
     "managedByOwner": "Demana a un propietari de l'organització que canviï una connexió que no pots canviar.",
+    "managedByOwnerOrAdmin": "Demana a un propietari o administrador de l'organització que canviï una connexió que no pots canviar.",
+    "managedByOwnerOrBilling": "Demana a un propietari o gestor de facturació de l'organització que canviï una connexió que no pots canviar.",
+    "managedByOwnerAdminOrBilling": "Demana a un propietari, administrador o gestor de facturació de l'organització que canviï una connexió que no pots canviar.",
     "connectFailed": "No s'ha pogut obrir la pàgina de connexió"
   },
   "invoices": {

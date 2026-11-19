@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Bu hesabda hələ ki, heç bir təşkilat yoxdur. Təşkilat yaratdıqdan və ya ona qoşulduqdan sonra Bitbucket birləşdirmə sorğularına baxış keçirə bilərsən.",
       "gitlabReconnectAdminOnlyDescription": "Onu yenidən qoşmaq üçün təşkilat sahibindən, inzibatçıdan və ya ödəniş menecerindən xahiş edin.",
       "bitbucketNotConnectedTitle": "Bitbucket qoşulmayıb",
-      "bitbucketAdminOnlyDescription": "Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər.",
+      "adminOnlyConnectDescription": "Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər.",
       "contextLine": "{{organization}} üçün",
       "contextLinePersonal": "Şəxsi hesabınız üçün"
     },
@@ -4629,6 +4629,9 @@
     "couldNotLoad": "İnteqrasiyaları yükləmək mümkün olmadı",
     "permissionDenied": "Bu inteqrasiyaları idarə etmək üçün icazəniz yoxdur.",
     "managedByOwner": "Dəyişə bilmədiyiniz bir bağlantını dəyişmək üçün təşkilatın sahibinə müraciət edin.",
+    "managedByOwnerOrAdmin": "Dəyişə bilmədiyiniz bir bağlantını dəyişmək üçün təşkilatın sahibinə və ya inzibatçıya müraciət edin.",
+    "managedByOwnerOrBilling": "Dəyişə bilmədiyiniz bir bağlantını dəyişmək üçün təşkilatın sahibinə və ya ödəniş menecerinə müraciət edin.",
+    "managedByOwnerAdminOrBilling": "Dəyişə bilmədiyiniz bir bağlantını dəyişmək üçün təşkilatın sahibinə, inzibatçıya və ya ödəniş menecerinə müraciət edin.",
     "connectFailed": "Qoşulma səhifəsini açmaq mümkün olmadı"
   },
   "invoices": {

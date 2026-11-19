@@ -124,7 +124,7 @@ export type BitbucketTokenRefusal = 'first-connect' | 'replace-token';
 const FAILURE_COPY_KEY = {
   // The same role rule the integration page states: an owner, admin or billing
   // manager is who can connect the workspace.
-  'role-refused': 'prReview.connect.bitbucketAdminOnlyDescription',
+  'role-refused': 'prReview.connect.adminOnlyConnectDescription',
   'connection-changed': 'prReview.connect.checkFailedTitleBitbucket',
   retryable: 'prReview.connect.providerCheckFailedMessage',
 } as const satisfies Record<Exclude<BitbucketFailure['kind'], 'token-refused'>, string>;

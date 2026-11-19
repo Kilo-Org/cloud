@@ -961,7 +961,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Šim kontam vēl nav organizāciju. Bitbucket izmaiņu pieprasījumus varēs pārskatīt, kad izveidosi organizāciju vai tai pievienosies.",
       "gitlabReconnectAdminOnlyDescription": "Lūdziet organizācijas īpašniekam, administratoram vai norēķinu pārvaldniekam to pievienot no jauna.",
       "bitbucketNotConnectedTitle": "Bitbucket nav pievienots",
-      "bitbucketAdminOnlyDescription": "To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki.",
+      "adminOnlyConnectDescription": "To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki.",
       "contextLine": "Priekš {{organization}}",
       "contextLinePersonal": "Priekš personīgā konta"
     },
@@ -4704,6 +4704,9 @@
     "couldNotLoad": "Neizdevās ielādēt integrācijas",
     "permissionDenied": "Jums nav atļaujas pārvaldīt šīs integrācijas.",
     "managedByOwner": "Lūdziet organizācijas īpašniekam mainīt savienojumu, kuru nevarat mainīt.",
+    "managedByOwnerOrAdmin": "Lūdziet organizācijas īpašniekam vai administratoram mainīt savienojumu, kuru nevarat mainīt.",
+    "managedByOwnerOrBilling": "Lūdziet organizācijas īpašniekam vai norēķinu pārvaldniekam mainīt savienojumu, kuru nevarat mainīt.",
+    "managedByOwnerAdminOrBilling": "Lūdziet organizācijas īpašniekam, administratoram vai norēķinu pārvaldniekam mainīt savienojumu, kuru nevarat mainīt.",
     "connectFailed": "Neizdevās atvērt savienojuma lapu"
   },
   "invoices": {

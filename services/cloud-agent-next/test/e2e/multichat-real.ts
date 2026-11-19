@@ -74,7 +74,7 @@ async function run(runtime: Runtime, rounds: number, turnTimeoutMs: number) {
   const phases: { name: string; status: 'running' | 'passed' | 'failed' }[] = [];
   let status: 'running' | 'passed' | 'failed' = 'running';
   const limits = [
-    'API-assisted public-Git bootstrap uses trusted Worker prepareSession and the generateCloudAgentToken claim shape, minted from verified local personal fixture claims with a maximum one-hour lifetime; not browser repository selection.',
+    'API-assisted public-Git bootstrap uses trusted Worker prepareSession with a marked personal fixture claim shape, minted from verified local personal fixture claims with a maximum one-hour lifetime; not browser repository selection.',
     'Sibling creation, follow-ups and Stop use real personal web tRPC routes and real kilo-auto/efficient inference; no balance bypass.',
     'Streams start after initial IDs are minted; initial evidence may be replayed. Follow-up observers are ready before submission.',
     'Fresh worktree plus immediate follow-ups; no forced idle, sandbox loss, provider replacement, or physical identity assertions.',

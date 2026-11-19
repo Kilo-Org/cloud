@@ -961,7 +961,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Ovaj nalog još nema organizacije. Zahteve za spajanje na Bitbucktu možeš pregledati kada kreiraš ili se pridružiš organizaciji.",
       "gitlabReconnectAdminOnlyDescription": "Zamoli vlasnika organizacije, administratora ili menadžera za naplatu da ga ponovo poveže.",
       "bitbucketNotConnectedTitle": "Bitbucket nije povezan",
-      "bitbucketAdminOnlyDescription": "Samo vlasnici organizacije, administratori i menadžeri naplate mogu da ga povežu.",
+      "adminOnlyConnectDescription": "Samo vlasnici organizacije, administratori i menadžeri naplate mogu da ga povežu.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za lični nalog"
     },
@@ -4704,6 +4704,9 @@
     "couldNotLoad": "Učitavanje integracija nije uspelo",
     "permissionDenied": "Nemate dozvolu da upravljate ovim integracijama.",
     "managedByOwner": "Zamolite vlasnika organizacije da promeni vezu koju ne možete da promenite.",
+    "managedByOwnerOrAdmin": "Zamolite vlasnika organizacije ili administratora da promeni vezu koju ne možete da promenite.",
+    "managedByOwnerOrBilling": "Zamolite vlasnika organizacije ili menadžera za naplatu da promeni vezu koju ne možete da promenite.",
+    "managedByOwnerAdminOrBilling": "Zamolite vlasnika organizacije, administratora ili menadžera za naplatu da promeni vezu koju ne možete da promenite.",
     "connectFailed": "Otvaranje stranice za povezivanje nije uspelo"
   },
   "invoices": {

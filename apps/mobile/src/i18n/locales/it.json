@@ -2839,7 +2839,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Questo account non ha ancora nessuna organizzazione. Le pull request Bitbucket possono essere revisionate una volta che crei un'organizzazione o ne entri a far parte.",
       "gitlabReconnectAdminOnlyDescription": "Chiedi a un Proprietario, a un Amministratore o a un Responsabile della fatturazione dell'organizzazione di riconnetterla.",
       "bitbucketNotConnectedTitle": "Bitbucket non è connesso",
-      "bitbucketAdminOnlyDescription": "Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono connetterlo.",
+      "adminOnlyConnectDescription": "Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono connetterlo.",
       "contextLine": "Per {{organization}}",
       "contextLinePersonal": "Per il tuo account personale"
     },
@@ -4704,6 +4704,9 @@
     "couldNotLoad": "Impossibile caricare le integrazioni",
     "permissionDenied": "Non hai l'autorizzazione per gestire queste integrazioni.",
     "managedByOwner": "Chiedi a un proprietario dell'organizzazione di modificare un collegamento che non puoi modificare.",
+    "managedByOwnerOrAdmin": "Chiedi a un proprietario dell'organizzazione o a un amministratore di modificare un collegamento che non puoi modificare.",
+    "managedByOwnerOrBilling": "Chiedi a un proprietario dell'organizzazione o a un responsabile della fatturazione di modificare un collegamento che non puoi modificare.",
+    "managedByOwnerAdminOrBilling": "Chiedi a un proprietario dell'organizzazione, a un amministratore o a un responsabile della fatturazione di modificare un collegamento che non puoi modificare.",
     "connectFailed": "Impossibile aprire la pagina di collegamento"
   },
   "invoices": {

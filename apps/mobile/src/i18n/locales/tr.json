@@ -2800,7 +2800,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Bu hesabın henüz bir kuruluşu yok. Bitbucket çekme isteklerini, bir kuruluş oluşturduktan ya da birine katıldıktan sonra gözden geçirebilirsin.",
       "gitlabReconnectAdminOnlyDescription": "Yeniden bağlaması için bir kuruluş sahibi, yönetici veya faturalandırma yöneticisinden istekte bulunun.",
       "bitbucketNotConnectedTitle": "Bitbucket bağlı değil",
-      "bitbucketAdminOnlyDescription": "Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir.",
+      "adminOnlyConnectDescription": "Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir.",
       "contextLine": "{{organization}} için",
       "contextLinePersonal": "Kişisel hesabınız için"
     },
@@ -4629,6 +4629,9 @@
     "couldNotLoad": "Entegrasyonlar yüklenemedi",
     "permissionDenied": "Bu entegrasyonları yönetme izniniz yok.",
     "managedByOwner": "Değiştiremediğiniz bir bağlantıyı değiştirmesi için bir kuruluş sahibine başvurun.",
+    "managedByOwnerOrAdmin": "Değiştiremediğiniz bir bağlantıyı değiştirmesi için bir kuruluş sahibi veya yöneticiye başvurun.",
+    "managedByOwnerOrBilling": "Değiştiremediğiniz bir bağlantıyı değiştirmesi için bir kuruluş sahibi veya faturalandırma yöneticisine başvurun.",
+    "managedByOwnerAdminOrBilling": "Değiştiremediğiniz bir bağlantıyı değiştirmesi için bir kuruluş sahibi, yönetici veya faturalandırma yöneticisine başvurun.",
     "connectFailed": "Bağlantı sayfası açılamadı"
   },
   "invoices": {

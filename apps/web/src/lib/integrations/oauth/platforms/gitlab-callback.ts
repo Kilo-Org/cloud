@@ -25,7 +25,6 @@ import {
 } from '@/lib/integrations/oauth/common';
 import { storeGitLabOAuthIntegration } from '@/lib/integrations/platforms/gitlab/oauth-integration-writer';
 import { oauthStateHash } from '@/lib/integrations/oauth/callback-safety';
-import { getIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 
 function buildGitLabRedirectPath(
@@ -117,14 +116,11 @@ export async function handleGitLabOAuthCallback(request: NextRequest) {
     const normalizedInstanceUrl = normalizeGitLabInstanceUrl(instanceUrl);
 
     if (owner.type === 'org') {
-      // Replacing an existing org GitLab integration is a billing-scoped action;
-      // a first-time connect keeps member-level access.
-      const existingIntegration = await getIntegrationForOrganization(owner.id, PLATFORM.GITLAB);
-      await ensureOrganizationAccess(
-        { user },
-        owner.id,
-        existingIntegration ? ORGANIZATION_BILLING_ROLES : undefined
-      );
+      // Fresh authorization check: the organization's stored credential is
+      // shared, so the callback asks for the same governing role set the start
+      // asked for, and refuses before exchanging a code or writing a row when
+      // the caller's role changed in between.
+      await ensureOrganizationAccess({ user }, owner.id, ORGANIZATION_BILLING_ROLES);
     } else if (user.id !== owner.id) {
       return NextResponse.redirect(
         new URL(oauthCallbackRedirectPath(request, '/integrations?error=unauthorized'), APP_URL)

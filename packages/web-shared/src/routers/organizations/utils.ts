@@ -4,7 +4,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
-import { supportStepUpPort } from '@kilocode/web-shared/lib/admin/support-step-up';
+import { requireSupportWriteUseStepUp } from '@kilocode/web-shared/lib/admin/support-step-up';
 import {
   ORGANIZATION_BILLING_ROLES,
   ORGANIZATION_MANAGE_ROLES,
@@ -223,6 +223,9 @@ export type OrganizationAccessContext = Pick<
   | 'trpcPath'
   | 'trpcType'
   | 'webSessionId'
+  | 'adminStepUpState'
+  | 'adminStepUpDecision'
+  | 'stepUpClaims'
 > & {
   auditSurface?: 'trpc' | 'rest' | 'server-component';
   auditMethod?: string;
@@ -437,10 +440,15 @@ export async function resolveOrganizationAccess(
       const entry = key
         ? findSupportAllowEntry({ surface, key, actionClass: 'support_write' })
         : undefined;
+      let firstUseInRequest = true;
       if (entry?.stepUp === 'fresh') {
-        await supportStepUpPort.requireFresh({
+        firstUseInRequest = await requireSupportWriteUseStepUp({
           userId: ctx.user.id,
-          action: 'support_write_use',
+          organizationId,
+          upstreamStepUpState: ctx.adminStepUpState,
+          upstreamStepUpDecision: ctx.adminStepUpDecision,
+          claimStore: ctx.stepUpClaims,
+          claimKey: `${organizationId}:${surface}:${key ?? ''}`,
           credential: ctx.credential,
           webSessionId: ctx.webSessionId ?? null,
           route: ctx.trpcPath ?? null,
@@ -448,13 +456,15 @@ export async function resolveOrganizationAccess(
           surface,
         });
       }
-      await recordSupportWriteUse({
-        grantId: evaluation.access.grantId,
-        actorKiloUserId: ctx.user.id,
-        grantOrganizationId: evaluation.access.inheritedFromOrganizationId ?? organizationId,
-        targetOrganizationId: organizationId,
-        supportActionId: evaluation.access.supportActionId,
-      });
+      if (firstUseInRequest) {
+        await recordSupportWriteUse({
+          grantId: evaluation.access.grantId,
+          actorKiloUserId: ctx.user.id,
+          grantOrganizationId: evaluation.access.inheritedFromOrganizationId ?? organizationId,
+          targetOrganizationId: organizationId,
+          supportActionId: evaluation.access.supportActionId,
+        });
+      }
     }
     await recordKiloAdminElevation(ctx, {
       reason: options.auditReason ?? 'organization_access',

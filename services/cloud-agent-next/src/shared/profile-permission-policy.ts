@@ -195,9 +195,43 @@ function patternIsCoveredBy(left: string, right: string): boolean {
 }
 
 /**
+ * The profile entries written with a strictly broader pattern before the
+ * narrower pattern it covers, so the profile's most specific verdict is the one
+ * the runtime resolves last. Coverage is a strict partial order, so Kahn over
+ * the broader-first edges with the author's index as the tie-break keeps equal
+ * and incomparable patterns in the order the author wrote.
+ */
+function agentEntriesBroadestFirst(
+  entries: Array<[string, PermissionAction]>
+): Array<[string, PermissionAction]> {
+  const wider: boolean[][] = entries.map(([broadPattern], broadIndex) =>
+    entries.map(([narrowPattern], narrowIndex) =>
+      broadIndex !== narrowIndex &&
+      patternIsCoveredBy(narrowPattern, broadPattern) &&
+      !patternIsCoveredBy(broadPattern, narrowPattern)
+    )
+  );
+  const placed = new Set<number>();
+  const ordered: Array<[string, PermissionAction]> = [];
+  while (placed.size < entries.length) {
+    const ready = entries.findIndex(
+      (_, narrow) =>
+        !placed.has(narrow) && wider.every((row, broad) => !row[narrow] || placed.has(broad))
+    );
+    if (ready < 0) return [...entries];
+    placed.add(ready);
+    ordered.push(entries[ready]);
+  }
+  return ordered;
+}
+
+/**
  * Combine a session pattern map with an agent pattern map so both apply.
  *
- * The composed list keeps the agent rules in their own order, so a profile's
+ * The rendered map orders each tool's profile rules from the broadest pattern to
+ * the narrowest, so the profile's most specific decision is the one the runtime
+ * applies. Rules the author writes with equal patterns, or patterns where
+ * neither covers the other, keep the order the author wrote, so a profile's
  * exception written after its own refusal survives, and each session decision it
  * carries follows it.
  *
@@ -234,7 +268,7 @@ function composeRuleMap(
   if (session === undefined) return { ...agent };
   const entries = Object.entries(session);
   const composed: Array<[string, PermissionAction]> = [];
-  for (const [pattern, action] of Object.entries(agent)) {
+  for (const [pattern, action] of agentEntriesBroadestFirst(Object.entries(agent))) {
     // A refusal and an ask apply as written; an allowance needs the session to
     // write the same pattern, which is what the session permits.
     if (action === 'allow' && session[pattern] !== 'allow') continue;

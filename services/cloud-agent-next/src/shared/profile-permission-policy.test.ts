@@ -628,6 +628,49 @@ describe('narrowProfilePermission', () => {
       todowrite: 'ask',
     });
   });
+
+  it('orders a narrower refusal after the broader ask in either profile key order', () => {
+    const session: PermissionMap = { bash: { 'git log *': 'allow' } };
+    const expectedKeys = ['git *', 'git log *'];
+    for (const agent of [
+      { bash: { 'git *': 'ask', 'git log *': 'deny' } },
+      { bash: { 'git log *': 'deny', 'git *': 'ask' } },
+    ]) {
+      const composed = narrowProfilePermission(session, agent) as PermissionMap;
+      expect(Object.keys(composed['bash'] as Record<string, string>)).toEqual(expectedKeys);
+      expect((composed['bash'] as Record<string, string>)['git log *']).toBe('deny');
+      expect(resolve(session, composed, 'bash', 'git log --oneline')).toBe('deny');
+    }
+  });
+
+  it('lets a narrower profile allowance outrank a broader profile refusal', () => {
+    const session: PermissionMap = { bash: { 'git log *': 'allow' } };
+    const composed = narrowProfilePermission(session, {
+      bash: { '*': 'deny', 'git log *': 'allow' },
+    }) as PermissionMap;
+    expect(resolve(session, composed, 'bash', 'git log --oneline')).toBe('allow');
+    expect(resolve(session, composed, 'bash', 'npm test')).toBe('deny');
+  });
+
+  it('lets a narrower profile ask outrank a broader profile refusal', () => {
+    const session: PermissionMap = { bash: { 'git *': 'allow' } };
+    const composed = narrowProfilePermission(session, {
+      bash: { '*': 'deny', 'git *': 'ask' },
+    }) as PermissionMap;
+    expect(resolve(session, composed, 'bash', 'git log --oneline')).toBe('ask');
+    expect(resolve(session, composed, 'bash', 'npm test')).toBe('deny');
+  });
+
+  it('keeps a session refusal as the last word over a profile ask', () => {
+    const session: PermissionMap = { bash: { '*': 'deny', 'cat *': 'allow' } };
+    const composed = narrowProfilePermission(session, {
+      bash: { 'gh pr diff *': 'ask' },
+    }) as PermissionMap;
+    // The session refusal covers every command, so it is carried after the ask
+    // and the ask decides nothing, whatever the ask's own breadth is.
+    expect((composed['bash'] as Record<string, string>)['*']).toBe('deny');
+    expect(resolve(session, composed, 'bash', 'gh pr diff 1')).toBe('deny');
+  });
 });
 
 describe('narrowProfileAgents', () => {

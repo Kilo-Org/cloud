@@ -690,7 +690,6 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
   }
 
   // ── Step 6: Persist attested key after settlement ────────────────────────
-  let sessionId: string | undefined;
   let refreshCredentials: { token: string; refreshToken: string; expiresIn: number } | undefined;
 
   // Cross-user ownership: a key bound to another account cannot sign this one
@@ -717,7 +716,6 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         user: result.user,
         verification: admissionVerification,
       });
-      sessionId = combined.sessionId;
       refreshCredentials = {
         token: combined.token,
         refreshToken: combined.refreshToken,
@@ -762,16 +760,13 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
   }
 
   if (data.supportsRefresh) {
-    // A session prepared by the attested-key path already has its pair; only a
-    // fall-through from a failed key persistence creates session + pair here.
-    const credentials =
-      sessionId === undefined
-        ? await createDeviceSessionWithCredentials({
-            userId: result.user.id,
-            userAgent: request.headers.get('user-agent') ?? undefined,
-            user: result.user,
-          })
-        : { ...(await issueSessionCredentials(result.user, sessionId)), sessionId };
+    // The attested-key path either returned its pair above or logged a
+    // persistence failure and fell through, so no prepared session exists here.
+    const credentials = await createDeviceSessionWithCredentials({
+      userId: result.user.id,
+      userAgent: request.headers.get('user-agent') ?? undefined,
+      user: result.user,
+    });
     return NextResponse.json(
       {
         token: credentials.token,
@@ -786,12 +781,10 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
 
   return legacyTokenResponse({
     user: result.user,
-    deviceSessionId:
-      sessionId ??
-      (await createDeviceSession({
-        userId: result.user.id,
-        userAgent: request.headers.get('user-agent') ?? undefined,
-      })),
+    deviceSessionId: await createDeviceSession({
+      userId: result.user.id,
+      userAgent: request.headers.get('user-agent') ?? undefined,
+    }),
     created: result.isNew,
     ...(pendingLink ? { pendingLink } : {}),
   });

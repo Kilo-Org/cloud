@@ -791,7 +791,7 @@ export function createWrapperKiloClient(
       // Record the obligation before the import commits the row, so there is no
       // window in which a committed record owes a ruleset that nothing
       // remembers. A marker that cannot be stored fails here, before the row
-      // exists, which a step retry can safely repeat.
+      // exists, so the failure leaves no committed record behind.
       if (owed !== undefined) await rememberOutstandingRuleset(sessionId, owed);
       const imported = await v2Client.kilocode.sessionImport.session(
         {

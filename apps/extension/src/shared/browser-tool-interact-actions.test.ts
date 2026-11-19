@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-/* eslint-disable id-length, jest/no-conditional-expect, jest/no-conditional-in-test, jest/prefer-strict-equal, max-lines, no-new-func, require-await, typescript/no-implied-eval, typescript/no-unsafe-call, typescript-eslint/no-base-to-string, typescript-eslint/no-unsafe-type-assertion, typescript-eslint/require-await, unicorn/prefer-array-find, vitest/prefer-describe-function-title -- Fake CDP session records verbatim commands and runs the page-side function strings against a JSDOM node; assertions check conditional error branches. */
-import { JSDOM } from 'jsdom';
+/* eslint-disable id-length, jest/no-conditional-expect, jest/no-conditional-in-test, jest/prefer-strict-equal, max-lines, no-new-func, require-await, typescript/no-implied-eval, typescript/no-unsafe-call, typescript-eslint/no-base-to-string, typescript-eslint/no-unsafe-type-assertion, typescript-eslint/require-await, unicorn/prefer-array-find, vitest/prefer-describe-function-title -- Fake CDP session records verbatim commands and runs the page-side function strings against the jsdom document; assertions check conditional error branches. */
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
@@ -10,9 +9,6 @@ import {
 } from './browser-tool-interact-actions';
 import type { BrowserToolInteractSession } from './browser-tool-interact-actions';
 import type { BrowserToolResolvedTarget } from './browser-tool-session';
-
-const dom = new JSDOM('<!doctype html><body></body>');
-const { document } = dom.window;
 
 /** A field attached to the document: what a fresh snapshot ref resolves to. */
 const attachedField = (): Element => {
@@ -25,7 +21,7 @@ const attachedField = (): Element => {
 /** Runs a `Runtime.callFunctionOn` declaration the way the page does: `this` is the node. */
 const callOnNode = (node: Element, declaration: string, args: unknown[]): unknown =>
   (
-    new Function('ShadowRoot', `return (${declaration});`)(dom.window.ShadowRoot) as (
+    new Function('ShadowRoot', `return (${declaration});`)(globalThis.ShadowRoot) as (
       ...values: unknown[]
     ) => unknown
   ).apply(node, args);

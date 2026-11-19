@@ -14,10 +14,12 @@ import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { formatNumber, parseLocalizedNumber } from '@/lib/format';
+import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
 } from '@/lib/hooks/use-settings-back-guard';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import {
   useSaveSecurityAgentConfig,
   useSecurityAgentCapability,
@@ -143,6 +145,7 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const save = useSaveSecurityAgentConfig(scope, { announceFailed: false });
   const feedback = useSettingsSaveFeedback();
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
+  const connectivity = useCommittedConnectivityStatus();
 
   const [slaEnabled, setSlaEnabled] = useState(false);
   const [slaDays, setSlaDays] = useState<Record<SlaSeverity, number>>({
@@ -248,7 +251,11 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     return (
       <PlatformErrorScreen
         title={t('securityAgent.sla.title')}
-        variant="offline"
+        variant={classifyReadFailureVariant({
+          errors: [config.error],
+          isPaused: config.fetchStatus === 'paused',
+          connectivity,
+        })}
         message={t('securityAgent.sla.couldNotLoad')}
         onRetry={() => void config.refetch()}
       />

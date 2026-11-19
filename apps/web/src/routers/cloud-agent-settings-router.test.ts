@@ -76,6 +76,33 @@ describe('cloud-agent-settings router', () => {
   let otherUser: User;
   let organization: Organization;
 
+  test('persists a web search provider or opt-out for the signed-in user only', async () => {
+    const owner = await createCallerForUser(ownerUser.id);
+    const member = await createCallerForUser(memberUser.id);
+    await expect(owner.cloudAgentSettings.getWebSearch()).resolves.toEqual({ provider: 'default' });
+    for (const provider of ['parallel', 'off', 'default'] as const) {
+      await expect(owner.cloudAgentSettings.setWebSearch({ provider })).resolves.toEqual({
+        provider,
+      });
+      await expect(owner.cloudAgentSettings.getWebSearch()).resolves.toEqual({ provider });
+    }
+    await expect(member.cloudAgentSettings.getWebSearch()).resolves.toEqual({
+      provider: 'default',
+    });
+  });
+
+  test('degrades an unknown stored web search provider to the default', async () => {
+    const owner = await createCallerForUser(ownerUser.id);
+    await owner.cloudAgentSettings.setWebSearch({ provider: 'parallel' });
+    await db
+      .update(cloud_agent_user_settings)
+      .set({ web_search_provider: 'retired-provider' })
+      .where(eq(cloud_agent_user_settings.kilo_user_id, ownerUser.id));
+    await expect(owner.cloudAgentSettings.getWebSearch()).resolves.toEqual({
+      provider: 'default',
+    });
+  });
+
   beforeAll(async () => {
     ({ createCallerForUser } = await import('@/routers/test-utils'));
     ownerUser = await insertTestUser({ google_user_email: 'settings-owner@example.com' });

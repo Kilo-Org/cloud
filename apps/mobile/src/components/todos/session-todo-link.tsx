@@ -153,7 +153,8 @@ function SessionTodoCandidatesSheet({
       dismissGestures={false}
       snapPoints={['70%']}
     >
-      <View className="flex-1 pt-4">
+      {/* The title row takes the under-handle padding itself. */}
+      <View className="flex-1">
         <SheetTitleRow title={t('todos.linkToTodo')} onClose={onClose} />
         <ScrollView nestedScrollEnabled contentContainerStyle={{ paddingBottom: bottom + 16 }}>
           {body}

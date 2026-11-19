@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
+import { type HeaderEyebrow, ScreenHeader } from '@/components/screen-header';
 import { FindingAnalysisPanel } from '@/components/security-agent/finding-analysis-panel';
 import { FindingDetailsPanel } from '@/components/security-agent/finding-details-panel';
 import { FindingRemediationPanel } from '@/components/security-agent/finding-remediation-panel';
@@ -14,6 +14,7 @@ import { PanelErrorBoundary } from '@/components/security-agent/panel-error-boun
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { Button } from '@/components/ui/button';
+import { eyebrowHeaderProps } from '@/components/ui/eyebrow-placeholder';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -30,6 +31,8 @@ import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { findingDetailBackTarget, findingDetailHasLocalHistory } from '@/lib/finding-detail-back';
 import { getSecurityAgentPath } from '@/lib/security-agent';
+import { isSecurityTrialRefusalCopyKey } from '@/lib/security-agent-ledger';
+import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { tabEntryA11y } from '@/lib/a11y/tab-entry';
 import { cn } from '@/lib/utils';
@@ -87,6 +90,14 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   const capability = useSecurityAgentCapability(scope);
   const dismissDraft = useSecurityDismissDraft(scope, findingId);
   const { refresh: refreshDismissDraft } = dismissDraft;
+  // One role answer decides both the sentence a stored refusal paints and the
+  // step under it: the draft records which refusal it was, not which reader saw
+  // it, so `useCanManageBilling` is handed to the copy resolver while the step
+  // comes from the same predicate inside `useBillingAction`. A draft written for
+  // a member therefore reads the billing sentence with the step when a billing
+  // role opens it, and the reverse keeps the ask-an-owner sentence with no step.
+  const canManageBilling = useCanManageBilling(scope);
+  const billingAction = useBillingAction(scope);
 
   // The detail screen stays mounted while the dismiss sheet is open, so
   // re-read the draft on focus: a fresh failure must show the retry card and
@@ -157,30 +168,21 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   }, [loadFailed, findingId]);
   const showLoadFailure = !findingQuery.data && (loadFailed || failedFindingId === findingId);
 
-  // The not-found and load-failure states share a header without an eyebrow
-  // line. Neither ever gains a repository, so the title belongs on the back
-  // control's row, centred on the chevron, rather than half a line below it
-  // above a gap no label ever fills.
+  // The not-found, load-failure and loading states share one header with its
+  // eyebrow line reserved. The payload draws the finding's repository on that
+  // line, and neither a not-found nor a failed read can be known before the
+  // first paint — the first frame is always the loading one — so dropping the
+  // line afterwards would pull the title up out of the position the loading
+  // frame gave it. Only a read that is still running paints the placeholder
+  // bar: a terminal answer, and a failure the retry surface holds, keep the
+  // same line blank so nothing pulses on a finishable screen.
+  const pendingEyebrow: HeaderEyebrow =
+    findingQuery.isFetching && !notFound ? { kind: 'loading' } : { kind: 'held' };
   const pendingHeader = (
     <ScreenHeader
       className="px-6"
       title={t('securityAgent.findingDetail.title')}
-      showBackButton
-      onBack={handleBack}
-    />
-  );
-
-  // Loading does gain the repository: the loaded header draws it on an eyebrow
-  // line above the title. The row centres the heading column against the back
-  // control, so that line moves the title down by half its height — 7.6 dp
-  // measured on the Android emulator — in the frame the payload lands. Reserving
-  // the line here puts the title where the payload will leave it, so it holds
-  // still from the first paint instead of being pushed down later.
-  const loadingHeader = (
-    <ScreenHeader
-      className="px-6"
-      title={t('securityAgent.findingDetail.title')}
-      reserveEyebrow
+      {...eyebrowHeaderProps(pendingEyebrow)}
       showBackButton
       onBack={handleBack}
     />
@@ -215,7 +217,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   if (findingQuery.isLoading || !findingQuery.data) {
     return (
       <View className="flex-1 bg-background">
-        {loadingHeader}
+        {pendingHeader}
         <View className="flex-1 gap-3 px-6 pt-4">
           <Skeleton className="h-6 w-2/3 rounded" />
           <Skeleton className="h-4 w-1/3 rounded" />
@@ -232,7 +234,6 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   // A pre-accept dismissal failure (no command id) leaves a durable draft; the
   // retry card restores it until the user retries or discards it.
   const draft = dismissDraft.draft;
-  const dismissFailure = draft?.lastError != null ? securityDismissFailureCopy(draft) : null;
 
   return (
     <View className="flex-1 bg-background">
@@ -274,11 +275,12 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
           />
         </View>
       ) : null}
-      {dismissFailure !== null && dismissDraft.draft ? (
+      {draft?.lastError != null ? (
         <View className="px-6 pb-2">
           <SecurityCommandRetryCard
-            lastError={dismissFailure}
-            retryable={dismissDraft.draft.retryable === true}
+            lastError={securityDismissFailureCopy(draft, canManageBilling)}
+            retryable={draft.retryable === true}
+            action={isSecurityTrialRefusalCopyKey(draft.lastErrorKey) ? billingAction : undefined}
             onRetry={() => {
               pushOnce(getSecurityAgentPath(scope, `dismiss/${findingId}`));
             }}

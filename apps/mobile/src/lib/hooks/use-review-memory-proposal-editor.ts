@@ -1,10 +1,13 @@
 import { usePreventRemove } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { type PermissionState } from '@/lib/code-reviewer-status';
-import { useReviewMemoryProposalActions } from '@/lib/hooks/use-review-memory';
+import {
+  reviewMemoryOrganizationId,
+  useReviewMemoryProposalActions,
+} from '@/lib/hooks/use-review-memory';
 import { isLeaveAction } from '@/lib/navigation/leave-actions';
 import {
   isProposalActionable,
@@ -14,17 +17,33 @@ import {
   sameProposalDraft,
   validProposalDraft,
 } from '@/lib/review-memory-proposals';
-import { knownServerErrorMessage } from '@/lib/server-error-copy';
+import { isTrialExpiredRefusal, knownServerErrorMessage } from '@/lib/server-error-copy';
+import { useCanManageBilling, useTrialRefusalAction } from '@/lib/trial-refusal';
 
 type ProposalAction = 'save' | 'reject' | 'approve';
-type ProposalFailure = { action: ProposalAction; message: string };
+type ProposalFailure = {
+  action: ProposalAction;
+  /**
+   * The rejection as the mutation delivered it. The copy and the step under it
+   * are derived from this and the reader's current role on every render: a
+   * refusal that lands before the membership list settles would otherwise keep
+   * the copy the then-unknown role produced beside a step the settled role
+   * offers.
+   */
+  error: unknown;
+};
 
 export type ProposalEditorInput = Readonly<{
   scope: string;
   proposal: ReviewMemoryProposal;
   permission: PermissionState;
   available: boolean;
-  onClose: () => void;
+  /**
+   * Dismiss the presented sheet. The sheet stays up until its native dismissal
+   * reports, then calls this; `after` runs at that same point, so a step that
+   * leaves for another route pushes it above a sheet that is already gone.
+   */
+  onClose: (after?: () => void) => void;
 }>;
 
 export function useReviewMemoryProposalEditor({
@@ -36,6 +55,8 @@ export function useReviewMemoryProposalEditor({
 }: ProposalEditorInput) {
   const { t } = useTranslation();
   const actions = useReviewMemoryProposalActions(scope);
+  const organizationId = reviewMemoryOrganizationId(scope);
+  const canManageBilling = useCanManageBilling(organizationId);
   const [record, setRecord] = useState(proposal);
   const baseline = useRef(proposalDraft(proposal));
   const draft = useRef(baseline.current);
@@ -66,9 +87,26 @@ export function useReviewMemoryProposalEditor({
     setValid(validProposalDraft(next));
   }, [proposal]);
 
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  // A step that leaves this sheet (the billing step) parks its navigation here
+  // and the sheet runs it from the native dismissal report. The guard's discard
+  // question sits in between, so a dirty draft is never thrown away to reach it.
+  const afterCloseRef = useRef<(() => void) | null>(null);
+  // A parked action belongs to the step that asked for it. Any other close —
+  // the header's Done, a system Back, the sheet's own dismissal request — drops
+  // it, so a reader who answers Keep editing never carries the navigation into
+  // a later close.
+  const forgetParkedAction = useCallback(() => {
+    afterCloseRef.current = null;
+  }, []);
   const guard = useSheetDismissGuard({
     isDirty: () => !sameProposalDraft(draft.current, baseline.current),
-    onDiscard: onClose,
+    onDiscard: () => {
+      const after = afterCloseRef.current;
+      afterCloseRef.current = null;
+      onCloseRef.current(after ?? undefined);
+    },
   });
 
   // The sheet is a native sheet in its own window, so the route below it is out
@@ -87,8 +125,6 @@ export function useReviewMemoryProposalEditor({
   const [leaveAllowed, setLeaveAllowed] = useState(false);
   const [leaveCount, setLeaveCount] = useState(0);
   const replayRef = useRef<(() => void) | null>(null);
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
   usePreventRemove(!leaveAllowed, ({ data, repeat }) => {
     if (!isLeaveAction(data.action.type)) {
       // The replay runs from the effect below, so this sheet is still mounted
@@ -102,6 +138,7 @@ export function useReviewMemoryProposalEditor({
     if (pendingRef.current) {
       return;
     }
+    forgetParkedAction();
     guard.requestClose();
   });
   useEffect(() => {
@@ -137,7 +174,8 @@ export function useReviewMemoryProposalEditor({
     try {
       if (action === 'reject') {
         await actions.reject(record.id);
-        onClose();
+        afterCloseRef.current = null;
+        onCloseRef.current();
         return;
       }
       const updated =
@@ -152,15 +190,30 @@ export function useReviewMemoryProposalEditor({
       setDirty(false);
       setValid(validProposalDraft(next));
     } catch (error) {
-      setFailure({
-        action,
-        message: knownServerErrorMessage(error) ?? t('common.somethingWentWrong'),
-      });
+      setFailure({ action, error });
     } finally {
       pendingRef.current = false;
       setPending(null);
     }
   };
+
+  // The refusal's sentence and the step under it are both opaque to the state:
+  // they are derived here, on every render, from the one raw rejection and the
+  // role the membership list currently reports. A refusal that lands before the
+  // list settles therefore gains the billing sentence and the step together, and
+  // a later role change moves both, instead of the sentence freezing the role
+  // the refusal happened to see.
+  const failureMessage =
+    failure === null
+      ? null
+      : (knownServerErrorMessage(failure.error, canManageBilling) ??
+        t('common.somethingWentWrong'));
+  // Only the trial refusal offers a step, and the hook withholds it from a role
+  // the server would refuse.
+  const failureAction = useTrialRefusalAction(
+    failure !== null && isTrialExpiredRefusal(failure.error),
+    organizationId
+  );
 
   return {
     record,
@@ -169,6 +222,8 @@ export function useReviewMemoryProposalEditor({
     dirty,
     valid,
     failure,
+    failureMessage,
+    failureAction,
     pending,
     canEdit,
     busy,
@@ -177,9 +232,28 @@ export function useReviewMemoryProposalEditor({
     dialog: guard.dialog,
     requestClose: () => {
       if (!pendingRef.current) {
+        forgetParkedAction();
         guard.requestClose();
       }
     },
-    requestDismiss: () => !pendingRef.current && guard.requestDismiss(),
+    /**
+     * The step of a refusal that leaves for another route: the sheet closes
+     * first (asking about a dirty draft), and `after` runs once its native
+     * dismissal reports. Pushing before that would put the route in the stack
+     * behind a sheet that is still presented, where the tap looks dead.
+     */
+    requestCloseThen: (after: () => void) => {
+      if (!pendingRef.current) {
+        afterCloseRef.current = after;
+        guard.requestClose();
+      }
+    },
+    requestDismiss: () => {
+      if (pendingRef.current) {
+        return false;
+      }
+      forgetParkedAction();
+      return guard.requestDismiss();
+    },
   };
 }

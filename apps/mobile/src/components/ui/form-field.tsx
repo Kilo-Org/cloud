@@ -19,8 +19,20 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
      * accessory, so the controls take no separate band under the input.
      */
     labelAccessory?: React.ReactNode;
-    /** Reserve the tallest localized message, including wrapping and font scaling. */
+    /** Reserve the tallest localized message, including wrapping and font scaling. The
+     * reservation opens at the field's first focus and stays for the rest of the
+     * screen's life: an untouched form keeps the section rhythm of the screen it
+     * sits on, and a focus/blur cycle grows the form once instead of oscillating
+     * around an error line that comes and goes. */
     reserveErrorMessages?: readonly string[];
+    /**
+     * Keep `reserveErrorMessages` mounted from the first render instead of at
+     * the field's first focus. For a field whose error arrives without focus
+     * (an async verification result) or that opens focused inside a sheet
+     * (`autoFocus`), the late slot is the layout shift AGENTS.md forbids, so
+     * those callers reserve permanently and pay the idle line.
+     */
+    alwaysReserve?: boolean;
     disabled?: boolean;
     /**
      * Mark the field as required: the composed accessibility label appends
@@ -42,6 +54,14 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
      * which is how a rejected submit is reported without a blur.
      */
     validate?: (value: string) => string | null;
+    /**
+     * Show the field's own rule while the person types, not only after a blur.
+     * Use it when this value gates a submit that is disabled live: a disabled
+     * Save with no message leaves the person with nothing to fix. An empty value
+     * still waits for the first blur, so a form that opens empty does not greet
+     * the reader with a required error.
+     */
+    validateWhileTyping?: boolean;
   };
 
 /**
@@ -57,19 +77,25 @@ function FormField({
   labelAccessory,
   error,
   reserveErrorMessages,
+  alwaysReserve,
   disabled,
   required,
   containerOnLayout,
   className,
   ref,
   validate,
+  validateWhileTyping,
   defaultValue,
   style,
   onChangeText,
+  onFocus,
   onBlur,
   ...props
 }: Readonly<FormFieldProps>) {
   const [validationError, setValidationError] = useState<string | null>(null);
+  // Latched at the first focus and never cleared: a slot that unmounts on blur
+  // moves everything below the field on every focus/blur cycle.
+  const [hasFocused, setHasFocused] = useState(false);
   const valueRef = useRef(defaultValue ?? '');
   const nativeInput = useRef<TextInput>(null);
   // `validate` owns what this field's own rule reports; `error` carries an
@@ -115,9 +141,13 @@ function FormField({
         onChangeText={value => {
           valueRef.current = value;
           onChangeText?.(value);
-          if (validate && validationError) {
+          if (validate && (validationError || (validateWhileTyping && value.trim() !== ''))) {
             setValidationError(validate(value));
           }
+        }}
+        onFocus={event => {
+          onFocus?.(event);
+          setHasFocused(true);
         }}
         onBlur={event => {
           onBlur?.(event);
@@ -144,10 +174,13 @@ function FormField({
           className
         )}
       />
-      {reserveErrorMessages?.length ? (
+      {reserveErrorMessages?.length && (alwaysReserve || hasFocused || displayedError) ? (
         <View>
           {/* Full-width overlapping copies reserve the maximum height in native layout,
-              before validation, without measuring or clipping larger text/RTL copy. */}
+              before validation, without measuring or clipping larger text/RTL copy. The
+              slot opens at the first focus and stays: an untouched form keeps the
+              section rhythm a screen's own gap defines, and the focus/blur cycle grows
+              the form once instead of reflowing it on every blur. */}
           <View
             className="flex-row opacity-0"
             pointerEvents="none"

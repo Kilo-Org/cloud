@@ -9373,6 +9373,17 @@
     ],
     "searchBlob": "cloudAgentSettings.getModelContextLimits Get the current user's personal Cloud Agent context caps, as a map from gateway model IDs to token counts. cloudagentsettings getmodelcontextlimits"
   },
+  "cloudAgentSettings.getWebSearch": {
+    "path": "cloudAgentSettings.getWebSearch",
+    "kind": "query",
+    "summary": "Get the current user's web search provider preference for Cloud Agent sessions. Use to check which search provider is configured.",
+    "inputSchema": {},
+    "tags": [
+      "cloudagentsettings",
+      "getwebsearch"
+    ],
+    "searchBlob": "cloudAgentSettings.getWebSearch Get the current user's web search provider preference for Cloud Agent sessions. Use to check which search provider is configured. cloudagentsettings getwebsearch"
+  },
   "cloudAgentSettings.getWorkspaceOrder": {
     "path": "cloudAgentSettings.getWorkspaceOrder",
     "kind": "query",
@@ -9629,6 +9640,48 @@
       "allocation"
     ],
     "searchBlob": "cloudAgentSettings.setRepositorySettings Save Cloud Agent sandbox settings for a specific repository, setting or clearing its assigned profile and allocation. cloudagentsettings setrepositorysettings organizationid repofullname platform profileid allocation organizationId repoFullName platform profileId allocation"
+  },
+  "cloudAgentSettings.setWebSearch": {
+    "path": "cloudAgentSettings.setWebSearch",
+    "kind": "mutation",
+    "summary": "Update the user's web search provider preference for Cloud Agent sessions, choosing which provider is used for searching the web.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "provider": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "default"
+            },
+            {
+              "type": "string",
+              "enum": [
+                "exa",
+                "firecrawl",
+                "parallel",
+                "tavily",
+                "tinyfish"
+              ]
+            },
+            {
+              "type": "string",
+              "const": "off"
+            }
+          ]
+        }
+      },
+      "required": [
+        "provider"
+      ]
+    },
+    "tags": [
+      "cloudagentsettings",
+      "setwebsearch",
+      "provider"
+    ],
+    "searchBlob": "cloudAgentSettings.setWebSearch Update the user's web search provider preference for Cloud Agent sessions, choosing which provider is used for searching the web. cloudagentsettings setwebsearch provider provider"
   },
   "cloudAgentSettings.setWorkspaceOrder": {
     "path": "cloudAgentSettings.setWorkspaceOrder",

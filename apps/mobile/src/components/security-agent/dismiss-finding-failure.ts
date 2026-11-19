@@ -1,12 +1,15 @@
+import { i18n } from '@/i18n';
 import {
   type SecurityDismissDraft,
   securityDismissFailureCopy,
 } from '@/lib/hooks/use-security-dismiss-draft';
 import {
   isSecuritySyncRetryable,
+  isSecurityTrialRefusal,
   SECURITY_LEDGER_PERSISTENCE_FAILED_MESSAGE,
   SECURITY_OPERATION_REPLAY_FAILED_MESSAGE,
 } from '@/lib/security-agent-ledger';
+import { trialRefusalCopyKey } from '@/lib/trial-refusal-copy';
 
 /** Why the dismissal did not go through, and whether the same intent may be retried. */
 export type DismissFailure =
@@ -40,14 +43,26 @@ export function isDismissFailureRetryable(error: unknown): boolean {
   return isSecuritySyncRetryable(error);
 }
 
+/**
+ * The failure the sheet shows, from the live mutation error or the draft that
+ * outlives it. Both re-translate a trial refusal for the reader rendering it,
+ * so `canManageBilling` must be the caller's own role answer — the same value
+ * that decides whether the trial refusal's step is offered under the sentence.
+ */
 export function resolveDismissFailure(
   mutationError: Error | null,
-  draft: SecurityDismissDraft | null
+  draft: SecurityDismissDraft | null,
+  canManageBilling: boolean
 ): DismissFailure | null {
   if (mutationError !== null) {
     return {
       kind: isDismissFailureRetryable(mutationError) ? 'retryable' : 'terminal',
-      message: mutationError.message,
+      // A refusal mapped before the membership list settled carries the
+      // rejection-time sentence; re-translate it for this reader, as the draft
+      // branch does, so the sentence and the step under it describe one role.
+      message: isSecurityTrialRefusal(mutationError)
+        ? i18n.t(trialRefusalCopyKey(canManageBilling))
+        : mutationError.message,
     };
   }
   if (draft?.lastError == null) {
@@ -58,6 +73,8 @@ export function resolveDismissFailure(
   const terminal = draft.retryable === false && !markerInvitesRetry(draft.lastError);
   return {
     kind: terminal ? 'terminal' : 'retryable',
-    message: securityDismissFailureCopy(draft),
+    // The draft names the refusal, so the sentence is painted for this reader
+    // from the same role answer that decides the step below it.
+    message: securityDismissFailureCopy(draft, canManageBilling),
   };
 }

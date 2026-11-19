@@ -22,7 +22,7 @@ import { PlatformOverviewSkeleton } from '@/components/code-reviewer/platform-ov
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
-import { useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
+import { useQueryBodyState } from '@/lib/hooks/use-query-body-state';
 import {
   classifyProviderState,
   useBitbucketReadiness,
@@ -56,7 +56,7 @@ export function BitbucketOverview({
   // The body of the config read has exactly one surface: rows from cache, an
   // error with retry, or a loading state -- never the header over an empty
   // scroll area.
-  const configBody = useReviewConfigBody(config);
+  const configBody = useQueryBodyState(config);
   const providerState = classifyProviderState({
     isLoading: readiness.isLoading,
     isError: readiness.isError,

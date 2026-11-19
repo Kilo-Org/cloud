@@ -229,6 +229,7 @@ type SwitchPaint = {
   trackColor?: { false?: string; true?: string };
   thumbColor?: string;
   value?: boolean;
+  style?: unknown;
 };
 
 function switchPaint(root: I, label: string): SwitchPaint | undefined {
@@ -594,12 +595,13 @@ describe('NotificationsScreen category availability', () => {
     expect(textWithChildren(renderer.root, 'SERVER PROSE SENTINEL').length).toBe(0);
   });
 
-  it('paints the unavailable row with the muted switch pair, and keeps the accent beside it', async () => {
+  it('dims the unavailable row and keeps its on pair, beside an undimmed accent', async () => {
     // A dimmed title beside a full-strength accent track reads as both
     // unavailable and on: Android folds the colours into the switch drawables
-    // and draws no unavailable appearance of its own. The shared switch paints
-    // the palette's muted pair there, so the unavailable row loses the accent
-    // while an available row beside it keeps it.
+    // and draws no unavailable appearance of its own. The shared switch keeps
+    // the scheme's pair and dims the whole control there, so the unavailable
+    // row loses its strength while the position it sits in stays readable, and
+    // an available row beside it keeps the accent undimmed.
     platform.os = 'android';
     prefsQueryFn.mockResolvedValue(
       fullPrefs({
@@ -614,13 +616,15 @@ describe('NotificationsScreen category availability', () => {
     const unavailable = switchPaint(renderer.root, 'Balance alerts');
     expect(unavailable?.disabled).toBe(true);
     expect(unavailable?.value).toBe(true);
-    expect(unavailable?.trackColor).toEqual({ false: '#A9A39A', true: '#6F6A61' });
+    expect(unavailable?.trackColor).toEqual({ false: '#A9A39A', true: '#4F5A10' });
     expect(unavailable?.thumbColor).toBe('#fff');
+    expect(unavailable?.style).toContainEqual({ opacity: 0.5 });
 
     const available = switchPaint(renderer.root, 'Agent updates');
     expect(available?.disabled).toBe(false);
     expect(available?.trackColor).toEqual({ false: '#A9A39A', true: '#4F5A10' });
     expect(available?.thumbColor).toBe('#fff');
+    expect(available?.style).not.toContainEqual({ opacity: 0.5 });
   });
 
   it('non-retryable unhappy: an unavailable category keeps its translated description, never the response sentence', async () => {

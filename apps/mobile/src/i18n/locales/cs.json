@@ -3101,6 +3101,10 @@
     "retryLoadingAccount": "Znovu načíst účet",
     "retryLoadingPrivacy": "Znovu načíst nastavení soukromí"
   },
+  "accountBlocked": {
+    "title": "Účet zablokován",
+    "description": "Přístup k našim službám byl omezen."
+  },
   "addCredits": {
     "cta": "Dobít kredity",
     "billingPage": "stránka fakturace"

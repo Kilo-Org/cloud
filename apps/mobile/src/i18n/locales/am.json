@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "መለያውን ለመጫን እንደገና ሞክር",
     "retryLoadingPrivacy": "የግላዊነት ምርጫዎችን ለመጫን እንደገና ሞክር"
   },
+  "accountBlocked": {
+    "title": "መለያ ታግዷል",
+    "description": "ወደ አገልግሎቶቻችን ያለዎት መዳረሻ ተገድቧል።"
+  },
   "addCredits": {
     "cta": "ክሬዲት ያክሉ",
     "billingPage": "የክፍያ ገጽ"

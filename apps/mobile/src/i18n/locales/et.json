@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "Proovi konto laadimist uuesti",
     "retryLoadingPrivacy": "Proovi privaatsusvalikute laadimist uuesti"
   },
+  "accountBlocked": {
+    "title": "Konto blokeeritud",
+    "description": "Teie juurdepääs meie teenustele on piiratud."
+  },
   "addCredits": {
     "cta": "Lisa krediiti",
     "billingPage": "arveldusleht"

@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "Jaribu tena kupakia akaunti",
     "retryLoadingPrivacy": "Jaribu tena kupakia chaguo za faragha"
   },
+  "accountBlocked": {
+    "title": "Akaunti imezuiwa",
+    "description": "Ufikiaji wako kwa huduma zetu umezuiwa."
+  },
   "addCredits": {
     "cta": "Ongeza salio",
     "billingPage": "ukurasa wa malipo"

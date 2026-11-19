@@ -2479,6 +2479,10 @@
     "retryLoadingAccount": "ניסיון נוסף לטעינת החשבון",
     "retryLoadingPrivacy": "ניסיון נוסף לטעינת העדפות הפרטיות"
   },
+  "accountBlocked": {
+    "title": "החשבון חסום",
+    "description": "הגישה שלך לשירותים שלנו הוגבלה."
+  },
   "addCredits": {
     "cta": "הוספת קרדיטים",
     "billingPage": "דף החיוב"

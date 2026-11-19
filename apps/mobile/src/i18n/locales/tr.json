@@ -2446,6 +2446,10 @@
     "retryLoadingAccount": "Hesabı yüklemeyi tekrar dene",
     "retryLoadingPrivacy": "Gizlilik tercihlerini yüklemeyi tekrar dene"
   },
+  "accountBlocked": {
+    "title": "Hesap engellendi",
+    "description": "Hizmetlerimize erişiminiz kısıtlandı."
+  },
   "addCredits": {
     "cta": "Kredi ekle",
     "billingPage": "faturalandırma sayfası"

@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "Eseye chaje kont lan ankò",
     "retryLoadingPrivacy": "Eseye chaje chwa konfidansyalite yo ankò"
   },
+  "accountBlocked": {
+    "title": "Kont bloke",
+    "description": "Aksè ou ak sèvis nou yo limite."
+  },
   "addCredits": {
     "cta": "Ajoute kredi",
     "billingPage": "paj faktirasyon an"

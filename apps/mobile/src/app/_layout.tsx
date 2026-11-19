@@ -58,6 +58,14 @@ import { splashContentScale } from '@/components/splash-reveal';
 import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { MotionProvider } from '@/lib/a11y/motion';
 import { useAuth } from '@/lib/auth/auth-context';
+import {
+  isBlockedAccountActive,
+  setBlockedAccountActive,
+  subscribeBlockedAccount,
+} from '@/lib/auth/blocked-account-state';
+import { isAccountBlockedTrpcError } from '@/lib/trpc-error';
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
+import { openExternalUrl } from '@/lib/external-link';
 import { resolveBootstrapDecision, shouldShowBootstrapLoading } from '@/lib/bootstrap-decision';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
 import { checkConsentGate } from '@/lib/consent-gate';
@@ -275,6 +283,7 @@ function RootLayoutNav({
     email,
     isLoading: userIdLoading,
     isError: userIdError,
+    error: userIdQueryError,
     isUnreachable: userIdUnreachable,
     refetch: refetchUserId,
   } = useCurrentUserId({ enabled: token != null });
@@ -296,6 +305,20 @@ function RootLayoutNav({
   const accountUserId = userId ?? offlineUserId ?? undefined;
   const identityLoading = userIdLoading && offlineUserId === null;
   const identityError = userIdError && offlineUserId === null;
+  const blockedAccountActive = useSyncExternalStore(
+    subscribeBlockedAccount,
+    isBlockedAccountActive
+  );
+  // The current-user read is the first authenticated call a restored account
+  // makes, so a blocked account's context-level refusal lands on it: the
+  // envelope carries `accountBlocked`, which turns the generic "could not load
+  // your account" surface into the block explanation. Read the raw query error,
+  // not the derived boolean: only the error object carries the flag.
+  useEffect(() => {
+    if (isAccountBlockedTrpcError(userIdQueryError)) {
+      setBlockedAccountActive(true);
+    }
+  }, [userIdQueryError]);
   const [consentChecked, setConsentChecked] = useState(false);
   const [needsConsent, setNeedsConsent] = useState(false);
   const [optionalConsent, setOptionalConsentState] = useState(false);
@@ -1068,11 +1091,6 @@ function RootLayoutNav({
     isSigningOut,
   });
 
-  // The wait surface (or the held restore surface) covers the tree: it leaves
-  // both accessibility trees, stops taking touches, and paints nothing that
-  // would show through the opaque surface above it.
-  const obscureTree = wrapperObscured || showRestoreError;
-
   // Sign-out from either error screen below outranks the error: the failure
   // belongs to the account being revoked, and its Sign out starts the teardown
   // behind the screen, so the branch would leave the stale error (and the
@@ -1083,7 +1101,30 @@ function RootLayoutNav({
   // fall-through also keeps Slot mounted for the login replace.
   const bootstrapErrorOwnsScreen = !signingOutWindow;
 
-  if (hasUserBootstrapError && bootstrapErrorOwnsScreen) {
+  // A blocked account is the answer behind the failed account read (and the
+  // refresh route's `USER_BLOCKED`): the person learns why their every call
+  // refuses instead of a bare session end. It is an absolute overlay like the
+  // restore surface — never an early return — because the flag outlives the
+  // refresh-path teardown that clears the token, and the bootstrap decision
+  // that then settles (redirect-login) must be able to land in a mounted Slot.
+  // Its Sign out is the explicit escape hatch: it clears the explanation and
+  // reveals whatever the tree has settled on (login when signed out).
+  const showBlockedAccountError = blockedAccountActive && bootstrapErrorOwnsScreen;
+
+  // The wait surface (or the held restore or blocked surface) covers the tree:
+  // it leaves both accessibility trees, stops taking touches, and paints
+  // nothing that would show through the opaque surface above it.
+  const obscureTree = wrapperObscured || showRestoreError || showBlockedAccountError;
+
+  // Both early returns below are guarded on `!showBlockedAccountError`: the
+  // blocked overlay explains a "could not load your account" whose retry can
+  // never succeed (every authenticated call refuses), and a blocked read can
+  // also fail the consent check, so the consent surface must not outrank it.
+  // Each visible error surface here is an early return that unmounts Slot —
+  // the blocked flag's jump to the overlay is the exception because its Sign
+  // out actions clear the flag and the surface can only appear once the
+  // person's account read has already failed, never over settled app state.
+  if (hasUserBootstrapError && bootstrapErrorOwnsScreen && !showBlockedAccountError) {
     return (
       <BootstrapErrorScreen
         title={t('bootstrap.couldNotLoadAccount')}
@@ -1100,7 +1141,7 @@ function RootLayoutNav({
     );
   }
 
-  if (hasConsentBootstrapError && bootstrapErrorOwnsScreen) {
+  if (hasConsentBootstrapError && bootstrapErrorOwnsScreen && !showBlockedAccountError) {
     return (
       <BootstrapErrorScreen
         title={t('bootstrap.couldNotLoadPrivacy')}
@@ -1195,6 +1236,30 @@ function RootLayoutNav({
             secondaryLabel={t('common.signOut')}
             secondaryAccessibilityLabel={t('common.signOut')}
             onSecondaryPress={() => {
+              void signOut();
+            }}
+          />
+        </View>
+      ) : null}
+      {showBlockedAccountError ? (
+        <View className="absolute inset-0">
+          <BootstrapErrorScreen
+            title={t('accountBlocked.title')}
+            description={t('accountBlocked.description')}
+            primaryLabel={t('codeReviewer.actionRequired.recoveryLabel')}
+            primaryAccessibilityLabel={t('codeReviewer.actionRequired.recoveryLabel')}
+            onPrimaryPress={() => {
+              void openExternalUrl(`mailto:${SUPPORT_EMAIL}`, { label: SUPPORT_EMAIL });
+            }}
+            secondaryLabel={t('common.signOut')}
+            secondaryAccessibilityLabel={t('common.signOut')}
+            onSecondaryPress={() => {
+              // The escape hatch must actually reach the login screen: the
+              // flag outlives a refresh-path teardown, so this explicit
+              // sign-out is what clears the explanation and reveals the
+              // route the bootstrap has already settled on (login once the
+              // token is gone).
+              setBlockedAccountActive(false);
               void signOut();
             }}
           />

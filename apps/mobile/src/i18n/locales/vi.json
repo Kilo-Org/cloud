@@ -2446,6 +2446,10 @@
     "retryLoadingAccount": "Thử tải lại thông tin tài khoản",
     "retryLoadingPrivacy": "Thử tải lại các tùy chọn quyền riêng tư"
   },
+  "accountBlocked": {
+    "title": "Tài khoản bị chặn",
+    "description": "Quyền truy cập dịch vụ của bạn đã bị hạn chế."
+  },
   "addCredits": {
     "cta": "Nạp tiền",
     "billingPage": "trang thanh toán"

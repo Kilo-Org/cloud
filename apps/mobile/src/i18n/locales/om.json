@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "Herrega fe'uuf irra deebi'ii yaali",
     "retryLoadingPrivacy": "Filannoowwan iccitii dhuunfaa fe'uuf irra deebi'ii yaali"
   },
+  "accountBlocked": {
+    "title": "Herregni cufame",
+    "description": "Tajaajila keenyaaf argamni kee daangeffameera."
+  },
   "addCredits": {
     "cta": "Kiriiditii dabali",
     "billingPage": "fuula kaffaltii"

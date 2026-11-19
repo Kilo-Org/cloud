@@ -4,6 +4,7 @@ import { RequestDeadlineError } from '@kilocode/event-service';
 import { describe, expect, it } from 'vitest';
 
 import {
+  isAccountBlockedTrpcError,
   isControlPlaneTimeout,
   isUsageSourceUnavailable,
   trpcErrorVariant,
@@ -92,6 +93,37 @@ describe('trpcErrorVariant', () => {
     expect(trpcErrorVariant(new Error('network down'))).toBe('server');
     expect(trpcErrorVariant(undefined)).toBe('server');
     expect(trpcErrorVariant(null)).toBe('server');
+  });
+});
+
+describe('isAccountBlockedTrpcError', () => {
+  it('recognizes the flag on a direct tRPC client error envelope', () => {
+    expect(
+      isAccountBlockedTrpcError({ data: { code: 'FORBIDDEN', accountBlocked: true } })
+    ).toBe(true);
+  });
+
+  it('recognizes the flag on the server-shaped envelope', () => {
+    expect(
+      isAccountBlockedTrpcError({ shape: { data: { code: 'FORBIDDEN', accountBlocked: true } } })
+    ).toBe(true);
+  });
+
+  it('is false for an ordinary permission denial', () => {
+    expect(isAccountBlockedTrpcError(trpcCode('FORBIDDEN'))).toBe(false);
+    expect(
+      isAccountBlockedTrpcError({ data: { code: 'FORBIDDEN', accountBlocked: false } })
+    ).toBe(false);
+  });
+
+  it('requires the boolean true, not a truthy stand-in', () => {
+    expect(isAccountBlockedTrpcError({ data: { accountBlocked: 'true' } })).toBe(false);
+  });
+
+  it('is false when there is no error at all', () => {
+    expect(isAccountBlockedTrpcError(undefined)).toBe(false);
+    expect(isAccountBlockedTrpcError(null)).toBe(false);
+    expect(isAccountBlockedTrpcError(new Error('network down'))).toBe(false);
   });
 });
 

@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "Cuba memuatkan akaun semula",
     "retryLoadingPrivacy": "Cuba memuatkan pilihan privasi semula"
   },
+  "accountBlocked": {
+    "title": "Akaun disekat",
+    "description": "Akses anda kepada perkhidmatan kami telah dihadkan."
+  },
   "addCredits": {
     "cta": "Tambah kredit",
     "billingPage": "halaman pengebilan"

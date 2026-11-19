@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "Fiók betöltésének megismétlése",
     "retryLoadingPrivacy": "Adatvédelmi beállítások betöltésének megismétlése"
   },
+  "accountBlocked": {
+    "title": "Fiók letiltva",
+    "description": "A szolgáltatásainkhoz való hozzáférése korlátozva lett."
+  },
   "addCredits": {
     "cta": "Egyenleg feltöltése",
     "billingPage": "számlázási oldal"

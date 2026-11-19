@@ -2446,6 +2446,10 @@
     "retryLoadingAccount": "खाता फिर से लोड करें",
     "retryLoadingPrivacy": "गोपनीयता के विकल्प फिर से लोड करें"
   },
+  "accountBlocked": {
+    "title": "खाता अवरुद्ध",
+    "description": "हमारी सेवाओं तक आपकी पहुँच प्रतिबंधित कर दी गई है।"
+  },
   "addCredits": {
     "cta": "क्रेडिट जोड़ें",
     "billingPage": "बिलिंग पेज"

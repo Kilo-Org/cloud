@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "اکاؤنٹ لوڈ کرنے کی دوبارہ کوشش کریں",
     "retryLoadingPrivacy": "رازداری کے اختیارات لوڈ کرنے کی دوبارہ کوشش کریں"
   },
+  "accountBlocked": {
+    "title": "اکاؤنٹ بلاک ہے",
+    "description": "ہماری خدمات تک آپ کی رسائی محدود کر دی گئی ہے۔"
+  },
   "addCredits": {
     "cta": "کریڈٹس شامل کریں",
     "billingPage": "بلنگ کا صفحہ"

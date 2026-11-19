@@ -2512,6 +2512,10 @@
     "retryLoadingAccount": "Ponów wczytywanie konta",
     "retryLoadingPrivacy": "Ponów wczytywanie ustawień prywatności"
   },
+  "accountBlocked": {
+    "title": "Konto zablokowane",
+    "description": "Dostęp do naszych usług został ograniczony."
+  },
   "addCredits": {
     "cta": "Doładuj konto",
     "billingPage": "strona rozliczeń"

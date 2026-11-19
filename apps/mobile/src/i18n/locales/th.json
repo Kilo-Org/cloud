@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "ลองโหลดบัญชีอีกครั้ง",
     "retryLoadingPrivacy": "ลองโหลดตัวเลือกความเป็นส่วนตัวอีกครั้ง"
   },
+  "accountBlocked": {
+    "title": "บัญชีถูกระงับ",
+    "description": "คุณถูกจำกัดการเข้าถึงบริการของเรา"
+  },
   "addCredits": {
     "cta": "เติมเครดิต",
     "billingPage": "หน้าการเรียกเก็บเงิน"

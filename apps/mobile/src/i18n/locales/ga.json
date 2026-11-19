@@ -3157,6 +3157,10 @@
     "retryLoadingAccount": "Bain triail as an gcuntas a lódáil arís",
     "retryLoadingPrivacy": "Bain triail as na roghanna príobháideachta a lódáil arís"
   },
+  "accountBlocked": {
+    "title": "Cuntas blocáilte",
+    "description": "Cuireadh srian ar do rochtain ar ár seirbhísí."
+  },
   "addCredits": {
     "cta": "Cuir creidmheasanna leis",
     "billingPage": "leathanach billeála"

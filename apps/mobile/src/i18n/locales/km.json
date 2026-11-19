@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "ព្យាយាមផ្ទុកគណនីម្តងទៀត",
     "retryLoadingPrivacy": "ព្យាយាមផ្ទុកជម្រើសឯកជនភាពម្តងទៀត"
   },
+  "accountBlocked": {
+    "title": "គណនីត្រូវបានទប់ស្កាត់",
+    "description": "ការចូលប្រើសេវាកម្មរបស់អ្នកត្រូវបានដាក់កំហិត។"
+  },
   "addCredits": {
     "cta": "បន្ថែមឥណទាន",
     "billingPage": "ទំព័រគិតប្រាក់"

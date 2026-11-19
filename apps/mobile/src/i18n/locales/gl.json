@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "Volver cargar a conta",
     "retryLoadingPrivacy": "Volver cargar as opcións de privacidade"
   },
+  "accountBlocked": {
+    "title": "Conta bloqueada",
+    "description": "O acceso aos nosos servizos foi restrinxido."
+  },
   "addCredits": {
     "cta": "Engadir créditos",
     "billingPage": "páxina de facturación"

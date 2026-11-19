@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "ਖਾਤਾ ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
     "retryLoadingPrivacy": "ਪਰਦੇਦਾਰੀ ਦੇ ਵਿਕਲਪ ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ"
   },
+  "accountBlocked": {
+    "title": "ਖਾਤਾ ਬਲਾਕ ਹੋ ਗਿਆ",
+    "description": "ਸਾਡੀਆਂ ਸੇਵਾਵਾਂ ਤੱਕ ਤੁਹਾਡੀ ਪਹੁੰਚ ਸੀਮਤ ਕਰ ਦਿੱਤੀ ਗਈ ਹੈ।"
+  },
   "addCredits": {
     "cta": "ਕ੍ਰੈਡਿਟ ਜੋੜੋ",
     "billingPage": "ਬਿਲਿੰਗ ਪੰਨਾ"

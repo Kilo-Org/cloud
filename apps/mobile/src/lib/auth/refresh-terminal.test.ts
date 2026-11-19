@@ -101,6 +101,26 @@ describe('refresh terminal classification', () => {
     expect(events[0]?.fingerprint).toEqual(['auth-terminal', '/api/auth/native/refresh', '401']);
   });
 
+  it('names a blocked account on the 401 refusal', async () => {
+    store.set(AUTH_TOKEN_KEY, 'dead-token');
+    store.set(REFRESH_TOKEN_KEY, 'dead-refresh');
+    store.set(TOKEN_EXPIRES_AT_KEY, '123');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({ error: 'USER_BLOCKED' }, { status: 401 })
+    );
+
+    const outcome = await performRefresh();
+
+    expect(outcome).toEqual({
+      kind: 'refused',
+      sessionVersion: currentAuthEpoch(),
+      userBlocked: true,
+    });
+    // The block ends the session exactly as any other 401 does; the flag only
+    // explains that end to the surface the sign-out leaves behind.
+    expect(store.get(REFRESH_TOKEN_KEY)).toBeUndefined();
+  });
+
   it('keeps the in-memory owner serving after the 401 clear so sign-out cleanup can authenticate', async () => {
     store.set(AUTH_TOKEN_KEY, 'dead-token');
     store.set(REFRESH_TOKEN_KEY, 'dead-refresh');

@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "Riprovo ngarkimin e llogarisë",
     "retryLoadingPrivacy": "Riprovo ngarkimin e zgjedhjeve të privatësisë"
   },
+  "accountBlocked": {
+    "title": "Llogaria e bllokuar",
+    "description": "Aksesi juaj në shërbimet tona është kufizuar."
+  },
   "addCredits": {
     "cta": "Shto kredite",
     "billingPage": "faqja e faturimit"

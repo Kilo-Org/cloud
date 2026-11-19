@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "Hesabı yükləməyə yenidən cəhd et",
     "retryLoadingPrivacy": "Məxfilik seçimlərini yükləməyə yenidən cəhd et"
   },
+  "accountBlocked": {
+    "title": "Hesab bloklanıb",
+    "description": "Xidmətlərimizə girişiniz məhdudlaşdırılıb."
+  },
   "addCredits": {
     "cta": "Kredit əlavə et",
     "billingPage": "ödəniş səhifəsi"

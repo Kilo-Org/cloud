@@ -2446,6 +2446,10 @@
     "retryLoadingAccount": "계정 정보 불러오기 다시 시도",
     "retryLoadingPrivacy": "개인정보 보호 설정 불러오기 다시 시도"
   },
+  "accountBlocked": {
+    "title": "계정이 차단되었습니다",
+    "description": "서비스 이용이 제한되었습니다."
+  },
   "addCredits": {
     "cta": "크레딧 충전",
     "billingPage": "결제 페이지"

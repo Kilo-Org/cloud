@@ -3045,6 +3045,10 @@
     "retryLoadingAccount": "Torna a provar de carregar el compte",
     "retryLoadingPrivacy": "Torna a provar de carregar les opcions de privadesa"
   },
+  "accountBlocked": {
+    "title": "Compte bloquejat",
+    "description": "L'accés als nostres serveis s'ha restringit."
+  },
   "addCredits": {
     "cta": "Afegeix crèdits",
     "billingPage": "pàgina de facturació"

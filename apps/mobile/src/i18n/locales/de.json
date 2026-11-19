@@ -2446,6 +2446,10 @@
     "retryLoadingAccount": "Konto erneut laden",
     "retryLoadingPrivacy": "Datenschutzeinstellungen erneut laden"
   },
+  "accountBlocked": {
+    "title": "Konto gesperrt",
+    "description": "Der Zugang zu unseren Diensten wurde eingeschränkt."
+  },
   "addCredits": {
     "cta": "Guthaben aufladen",
     "billingPage": "abrechnungsseite"

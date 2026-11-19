@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "Subukang i-load muli ang account",
     "retryLoadingPrivacy": "Subukang i-load muli ang mga pagpipilian sa privacy"
   },
+  "accountBlocked": {
+    "title": "Na-block ang account",
+    "description": "Nilimitahan na ang access mo sa aming mga serbisyo."
+  },
   "addCredits": {
     "cta": "Magdagdag ng kredito",
     "billingPage": "pahina ng pagsingil"

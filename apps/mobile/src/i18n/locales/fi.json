@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "Yritä ladata tili uudelleen",
     "retryLoadingPrivacy": "Yritä ladata yksityisyysasetukset uudelleen"
   },
+  "accountBlocked": {
+    "title": "Tili estetty",
+    "description": "Pääsysi palveluihimme on rajoitettu."
+  },
   "addCredits": {
     "cta": "Lisää krediittejä",
     "billingPage": "laskutussivu"

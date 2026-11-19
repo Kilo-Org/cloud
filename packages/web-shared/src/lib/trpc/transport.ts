@@ -43,6 +43,22 @@ export class AuthContextError extends Error {
   }
 }
 
+/**
+ * Marker for the context-level FORBIDDEN raised when authorization refused a
+ * blocked account or an account whose domain is blacklisted (the R0/R1
+ * branches of `validateUserAuthorization`). The error-formatter surfaces it as
+ * `data.accountBlocked`, letting the mobile client explain *why* it cannot use
+ * the account instead of signing the user out. `data.authRequired` (a genuine
+ * session failure, see `AuthContextError`) stays unset for this refusal, so
+ * the client keeps the session and only changes the screen.
+ */
+export class AccountBlockedError extends Error {
+  constructor() {
+    super('account_blocked');
+    this.name = 'AccountBlockedError';
+  }
+}
+
 export const TrpcZodFlattenedErrorSchema = z.object({
   formErrors: z.array(z.string()),
   fieldErrors: z.record(z.string(), z.array(z.string())),
@@ -57,6 +73,7 @@ export const TrpcErrorDataSchema = z
     zodError: TrpcZodFlattenedErrorSchema.nullable(),
     upstreamCode: z.string().optional(),
     authRequired: z.boolean().optional(),
+    accountBlocked: z.boolean().optional(),
     stepUp: z
       .object({
         code: z.string(),
@@ -130,6 +147,7 @@ export const trpcErrorFormatter = (({ shape, error }) => {
           : null,
       upstreamCode: error.cause instanceof UpstreamApiError ? error.cause.upstreamCode : undefined,
       authRequired: error.cause instanceof AuthContextError ? true : undefined,
+      accountBlocked: error.cause instanceof AccountBlockedError ? true : undefined,
       stepUp:
         error.cause instanceof StepUpRequiredError
           ? {

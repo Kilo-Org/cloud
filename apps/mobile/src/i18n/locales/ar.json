@@ -2578,6 +2578,10 @@
     "retryLoadingAccount": "إعادة محاولة تحميل الحساب",
     "retryLoadingPrivacy": "إعادة محاولة تحميل خيارات الخصوصية"
   },
+  "accountBlocked": {
+    "title": "الحساب محظور",
+    "description": "تم تقييد وصولك إلى خدماتنا."
+  },
   "addCredits": {
     "cta": "شحن الرصيد",
     "billingPage": "صفحة الفوترة"

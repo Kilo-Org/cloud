@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "Hisobni qayta yuklash",
     "retryLoadingPrivacy": "Maxfiylik sozlamalarini qayta yuklash"
   },
+  "accountBlocked": {
+    "title": "Hisob bloklangan",
+    "description": "Xizmatlarimizga kirish imkoniyatingiz cheklangan."
+  },
   "addCredits": {
     "cta": "Kreditlar qo'shish",
     "billingPage": "to'lov sahifasi"

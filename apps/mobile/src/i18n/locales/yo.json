@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "Tún gbìyànjú láti ṣàkójọ àkọọ́lẹ̀",
     "retryLoadingPrivacy": "Tún gbìyànjú láti ṣàkójọ àwọn àṣàyàn ìpamọ́"
   },
+  "accountBlocked": {
+    "title": "Àkọọ́lẹ̀ rẹ ti dí",
+    "description": "A ti fi àǹfààní rẹ sí àwọn iṣẹ́ wa lẹ́wọ̀n."
+  },
   "addCredits": {
     "cta": "Fi kirẹ́dítì kún un",
     "billingPage": "ojú ìwé ìsanwó"

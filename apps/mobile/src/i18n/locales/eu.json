@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "Saiatu kontua berriro kargatzen",
     "retryLoadingPrivacy": "Saiatu pribatutasun-aukerak berriro kargatzen"
   },
+  "accountBlocked": {
+    "title": "Kontua blokeatuta",
+    "description": "Zure sarbidea gure zerbitzuetara mugatuta dago."
+  },
   "addCredits": {
     "cta": "Gehitu kredituak",
     "billingPage": "fakturazio-orria"

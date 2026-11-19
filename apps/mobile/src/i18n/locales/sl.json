@@ -3101,6 +3101,10 @@
     "retryLoadingAccount": "Poskusi znova naložiti račun",
     "retryLoadingPrivacy": "Poskusi znova naložiti nastavitve zasebnosti"
   },
+  "accountBlocked": {
+    "title": "Račun blokiran",
+    "description": "Dostop do naših storitev vam je omejen."
+  },
   "addCredits": {
     "cta": "Dodaj kredite",
     "billingPage": "stran za obračunavanje"

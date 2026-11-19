@@ -2408,6 +2408,10 @@
     "translateSummaries": "Traduire les résumés",
     "autoExpandThinkingInactiveSubtitle": "Aucun effet tant que les détails de la réflexion sont masqués."
   },
+  "accountBlocked": {
+    "title": "Compte bloqué",
+    "description": "L'accès à nos services a été restreint."
+  },
   "addCredits": {
     "cta": "Ajouter des crédits",
     "billingPage": "page de facturation"

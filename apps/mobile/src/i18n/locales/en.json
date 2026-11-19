@@ -3055,6 +3055,10 @@
     "retryLoadingAccount": "Retry loading account",
     "retryLoadingPrivacy": "Retry loading privacy choices"
   },
+  "accountBlocked": {
+    "title": "Account blocked",
+    "description": "Your access to our services has been restricted."
+  },
   "addCredits": {
     "cta": "Add credits",
     "billingPage": "billing page"

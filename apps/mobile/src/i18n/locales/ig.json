@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "Nwaa ibudata akaụntụ ọzọ",
     "retryLoadingPrivacy": "Nwaa ibudata nhọrọ nzuzo ọzọ"
   },
+  "accountBlocked": {
+    "title": "Akaụntụ e gbochiri",
+    "description": "E gbochiri ohere gị ịnweta ọrụ anyị."
+  },
   "addCredits": {
     "cta": "Tinye ego ojiji",
     "billingPage": "ibe ịkwụ ụgwọ"

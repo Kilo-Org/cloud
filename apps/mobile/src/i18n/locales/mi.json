@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "Whakamātau anō ki te uta i te pūkete",
     "retryLoadingPrivacy": "Whakamātau anō ki te uta i ngā kōwhiringa matatapu"
   },
+  "accountBlocked": {
+    "title": "Kua aukatia te pūkete",
+    "description": "Kua whakawhāitihia tō āheinga ki ā mātou ratonga."
+  },
   "addCredits": {
     "cta": "Tāpirihia he moni tōmua",
     "billingPage": "te whārangi utunga"

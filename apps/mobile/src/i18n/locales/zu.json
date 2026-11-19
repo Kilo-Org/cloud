@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "Zama futhi ukulayisha i-akhawunti",
     "retryLoadingPrivacy": "Zama futhi ukulayisha izinketho zobumfihlo"
   },
+  "accountBlocked": {
+    "title": "I-akhawunti ivinjiwe",
+    "description": "Ukufinyelela kwakho kumasevisi ethu kukhawulelwe."
+  },
   "addCredits": {
     "cta": "Engeza amakhredithi",
     "billingPage": "ikhasi lokukhokha"

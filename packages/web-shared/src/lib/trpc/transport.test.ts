@@ -1,7 +1,7 @@
 import { describe, expect, test } from '@jest/globals';
 import { TRPCError } from '@trpc/server';
 import { StepUpRequiredError } from '@kilocode/web-shared/lib/admin/privileged-access';
-import { trpcErrorFormatter } from './transport';
+import { AccountBlockedError, trpcErrorFormatter } from './transport';
 
 function format(cause: unknown) {
   const error = new TRPCError({
@@ -50,6 +50,29 @@ describe('trpcErrorFormatter support access reason', () => {
 
   test('omits the field when the cause has no reason', () => {
     expect(format({ unrelated: true }).data).not.toHaveProperty('supportAccessReason');
+  });
+});
+
+describe('trpcErrorFormatter accountBlocked data', () => {
+  test('surfaces a blocked-account refusal without asking the client to sign out', () => {
+    const error = new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Account access is blocked',
+      cause: new AccountBlockedError(),
+    });
+
+    const result = trpcErrorFormatter({ shape: shapeFor(error), error } as never);
+
+    expect(result.data.accountBlocked).toBe(true);
+    expect(result.data.authRequired).toBeUndefined();
+  });
+
+  test('omits accountBlocked for an ordinary error', () => {
+    const error = new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+
+    const result = trpcErrorFormatter({ shape: shapeFor(error), error } as never);
+
+    expect(result.data.accountBlocked).toBeUndefined();
   });
 });
 

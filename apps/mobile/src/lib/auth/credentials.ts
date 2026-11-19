@@ -2,7 +2,11 @@ import * as SecureStore from 'expo-secure-store';
 
 import { API_BASE_URL } from '@/lib/config';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
-import { classifyAuthResponse, reportAuthTerminalFailure } from '@/lib/auth/auth-response-class';
+import {
+  classifyAuthResponse,
+  reportAuthTerminalFailure,
+  UserBlockRefusalBodySchema,
+} from '@/lib/auth/auth-response-class';
 import { parseTokenPair } from '@/lib/auth/native-auth-contract';
 import {
   readStoredValueRetryingNull,
@@ -58,6 +62,9 @@ type RefreshRefused = {
    *  this is no longer the current epoch: the epoch can move while the clear
    *  awaits, and signing out then would tear down the newer session. */
   sessionVersion: number;
+  /** True when the 401 body named `USER_BLOCKED`: the session ended because
+   *  the account is blocked, so the sign-out it drives can explain why. */
+  userBlocked?: boolean;
 };
 /** Anything that leaves the stored pair untouched and worth retrying later. */
 type RefreshTransient = {
@@ -278,14 +285,15 @@ async function hasStoredCredentialMember(): Promise<boolean> {
 }
 
 /**
- * The most of a 403 body the refresh route's own refusal can occupy. The route
- * writes one short JSON object; a longer body is an intermediary's page, and no
- * prefix of it can name the route's refusal.
+ * The most of a refusal body the refresh route can occupy: a 403's own refusal,
+ * or a 401 naming `USER_BLOCKED`. The route writes one short JSON object; a
+ * longer body is an intermediary's page, and no prefix of it can name the
+ * route's refusal.
  */
 const REFUSAL_BODY_MAX_CHARS = 1_024;
 
 /**
- * The first {@link REFUSAL_BODY_MAX_CHARS} of a 403 body, read inside the
+ * The first {@link REFUSAL_BODY_MAX_CHARS} of a refusal body, read inside the
  * deadline that bounds the refresh. A body that stalls after its headers cannot
  * hold the single-flight refresh open, and nothing past the cap can be the
  * route's own short refusal. An unreadable body answers `null`.
@@ -302,7 +310,7 @@ async function readRefusalText(response: Response): Promise<string | null> {
 /** The refresh response bodies, read under the deadline that bounds the call. */
 type RefreshResponseBodies = {
   response: Response;
-  /** The capped 403 body text; null for every other status and an unreadable body. */
+  /** The capped 401/403 body text; null for every other status and an unreadable body. */
   refusalText: string | null;
   /** The parsed 2xx body; undefined while the status is a failure. */
   successBody: unknown;
@@ -376,7 +384,13 @@ async function doRefresh(): Promise<RefreshOutcome> {
         if (!res.ok) {
           return {
             response: res,
-            refusalText: res.status === 403 ? await readRefusalText(res) : null,
+            // A 401 and a 403 both need their body read: the 403 body tells the
+            // route's own refusal apart from an intermediary's, and the 401 body
+            // names the one refusal that explains the session — `USER_BLOCKED`.
+            // Every other failure status is classified on the status alone, and
+            // a 2xx body must be read whole to parse.
+            refusalText:
+              res.status === 403 || res.status === 401 ? await readRefusalText(res) : null,
             successBody: undefined,
           };
         }
@@ -390,9 +404,11 @@ async function doRefresh(): Promise<RefreshOutcome> {
     }
 
     if (!response.ok) {
-      // Only a 403 body can name the route's own refusal, so only that one is
-      // parsed: a body that is not JSON — empty, an intermediary's page — offers
-      // the classifier no refusal, which keeps the 403 retryable.
+      // Both refusal bodies are parsed here: the 403's decides whether the
+      // answer came from the route (its own JSON refusal) or an intermediary
+      // (anything else, which keeps the 403 retryable), and the 401's names a
+      // blocked account. A body that is not JSON — empty, an intermediary's
+      // page — offers neither, so it stays undefined.
       let refusalBody: unknown = undefined;
       try {
         refusalBody = JSON.parse(refusalText ?? '');
@@ -413,7 +429,14 @@ async function doRefresh(): Promise<RefreshOutcome> {
           await clearStoredCredentialsAtEpoch(sessionVersion);
         }
         reportAuthTerminalFailure(REFRESH_PATH, classified.status);
-        return { kind: 'refused', sessionVersion };
+        // The 401 body is the only place this route names a blocked account.
+        // The refused outcome carries it so the unauthorized handler can
+        // explain the session end instead of only signing out.
+        const userBlocked =
+          response.status === 401 && UserBlockRefusalBodySchema.safeParse(refusalBody).success;
+        return userBlocked
+          ? { kind: 'refused', sessionVersion, userBlocked: true }
+          : { kind: 'refused', sessionVersion };
       }
       if (classified.kind === 'retry') {
         return { kind: 'transient', retryAfterMs: classified.retryAfterMs };

@@ -3045,6 +3045,10 @@
     "retryLoadingAccount": "Mēģināt ielādēt kontu vēlreiz",
     "retryLoadingPrivacy": "Mēģināt ielādēt privātuma iestatījumus vēlreiz"
   },
+  "accountBlocked": {
+    "title": "Konts bloķēts",
+    "description": "Jūsu piekļuve mūsu pakalpojumiem ir ierobežota."
+  },
   "addCredits": {
     "cta": "Papildināt kredītus",
     "billingPage": "norēķinu lapa"

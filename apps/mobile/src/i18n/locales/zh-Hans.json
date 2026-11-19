@@ -2446,6 +2446,10 @@
     "retryLoadingAccount": "重新加载账号信息",
     "retryLoadingPrivacy": "重新加载隐私选项"
   },
+  "accountBlocked": {
+    "title": "账号已被封禁",
+    "description": "你使用我们各项服务的权限已受到限制。"
+  },
   "addCredits": {
     "cta": "充值额度",
     "billingPage": "账单页面"

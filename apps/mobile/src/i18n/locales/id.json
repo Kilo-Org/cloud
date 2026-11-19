@@ -2446,6 +2446,10 @@
     "retryLoadingAccount": "Coba muat akun lagi",
     "retryLoadingPrivacy": "Coba muat pilihan privasi lagi"
   },
+  "accountBlocked": {
+    "title": "Akun diblokir",
+    "description": "Akses Anda ke layanan kami telah dibatasi."
+  },
   "addCredits": {
     "cta": "Tambah kredit",
     "billingPage": "halaman penagihan"

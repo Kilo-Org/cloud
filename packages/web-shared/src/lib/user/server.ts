@@ -190,6 +190,14 @@ type GetAuthResponse =
        * The authentication response is the answer for such a request.
        */
       authorizationRefused?: boolean;
+      /**
+       * Set only when authorization refused the account itself — R0 (domain
+       * blacklisted) or R1 (blocked account) — rather than the request. The
+       * tRPC context turns it into the blocked-account refusal so the client
+       * explains the block instead of signing the user out; every other
+       * refusal (nonadmin, org membership, 401/400) leaves it unset.
+       */
+      refusalReason?: 'account_blocked';
       rejectionReason?: 'empty_organization_context';
       isNewUser?: undefined;
       organizationId?: Organization['id'];
@@ -209,6 +217,7 @@ type GetAuthResponse =
       authFailedResponse: null;
       credentialsRejected?: undefined;
       authorizationRefused?: undefined;
+      refusalReason?: undefined;
       rejectionReason?: undefined;
       isNewUser?: boolean;
       organizationId?: Organization['id'];
@@ -636,6 +645,7 @@ function authError(
   options?: {
     credentialsRejected?: boolean;
     authorizationRefused?: boolean;
+    refusalReason?: 'account_blocked';
     rejectionReason?: 'empty_organization_context';
     internalApiUse?: boolean;
     tokenSource?: string;
@@ -648,6 +658,7 @@ function authError(
     authFailedResponse: NextResponse.json(failureResult(error), { status }),
     credentialsRejected: options?.credentialsRejected ?? false,
     authorizationRefused: options?.authorizationRefused ?? false,
+    refusalReason: options?.refusalReason,
     internalApiUse: options?.internalApiUse,
     tokenSource: options?.tokenSource,
     cloudAgentAuthority: options?.cloudAgentAuthority,
@@ -698,6 +709,7 @@ async function validateUserAuthorization({
   } else if (await isUserBlacklistedByDomain(user, readDb)) {
     return authError(403, 'Access denied (R0)', kiloUserId, {
       authorizationRefused: true,
+      refusalReason: 'account_blocked',
       internalApiUse,
       tokenSource,
       cloudAgentAuthority,
@@ -705,6 +717,7 @@ async function validateUserAuthorization({
   } else if (!opts.DANGEROUS_allowBlockedUsers && isBlockedAccount(user)) {
     return authError(403, 'Access denied (R1)', kiloUserId, {
       authorizationRefused: true,
+      refusalReason: 'account_blocked',
       internalApiUse,
       tokenSource,
       cloudAgentAuthority,

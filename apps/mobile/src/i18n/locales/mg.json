@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "Andramo ampidirina indray ny kaonty",
     "retryLoadingPrivacy": "Andramo ampidirina indray ny safidy momba ny fiainana manokana"
   },
+  "accountBlocked": {
+    "title": "Kaonty voasakana",
+    "description": "Voafetra ny fidiranao amin'ny serivisintsika."
+  },
   "addCredits": {
     "cta": "Ampio kireditra",
     "billingPage": "pejy fandoavana"

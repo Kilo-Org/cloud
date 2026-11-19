@@ -2485,6 +2485,10 @@
     "translateSummaries": "Traduzir resumos",
     "autoExpandThinkingInactiveSubtitle": "Não tem efeito enquanto os detalhes do raciocínio estiverem ocultos."
   },
+  "accountBlocked": {
+    "title": "Conta bloqueada",
+    "description": "Seu acesso aos nossos serviços foi restrito."
+  },
   "addCredits": {
     "cta": "Adicionar créditos",
     "billingPage": "página de cobrança"

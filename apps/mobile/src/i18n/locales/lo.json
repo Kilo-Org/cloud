@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "ລອງໂຫຼດບັນຊີອີກຄັ້ງ",
     "retryLoadingPrivacy": "ລອງໂຫຼດຕົວເລືອກຄວາມເປັນສ່ວນຕົວອີກຄັ້ງ"
   },
+  "accountBlocked": {
+    "title": "ບັນຊີຖືກບລັອກ",
+    "description": "ການເຂົ້າເຖິງບໍລິການຂອງທ່ານຖືກຈຳກັດ."
+  },
   "addCredits": {
     "cta": "ເຕີມເຄຣດິດ",
     "billingPage": "ໜ້າການຮຽກເກັບເງິນ"

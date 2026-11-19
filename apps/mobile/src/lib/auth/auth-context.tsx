@@ -82,6 +82,7 @@ import {
   setSignOutActive,
   subscribeSignOutActive,
 } from '@/lib/auth/sign-out-state';
+import { setBlockedAccountActive } from '@/lib/auth/blocked-account-state';
 import { clearCacheScopeForSignOut, readCachedUserId } from '@/lib/persist/read-cache';
 import { clearToolSummaryTranslationsForSignOut } from '@/lib/persist/tool-summary-translation-cache';
 import { clearToolSummaryTranslationMemoryForSignOut } from '@/lib/tool-summary-translation/tool-summary-translation-runtime';
@@ -440,6 +441,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // reads may warm the owner again.
         setSignOutTeardownActive(false);
         setSessionEnded(false);
+        // A successful sign-in is the one event that proves the block no
+        // longer applies, so it clears the blocked-account explanation the
+        // signed-out surface would otherwise keep showing.
+        setBlockedAccountActive(false);
         // Credentials published on the winning epoch: the sign-out fence opens
         // so the read-cache mount can subscribe for the new session, and the
         // reactive `isSigningOut` follows the same flag.
@@ -717,6 +722,14 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         isCurrentAuthEpoch(outcome.sessionVersion) &&
         !isSignedOutReference.current
       ) {
+        if (outcome.userBlocked === true) {
+          // The refusal explains the session it ends, so the flag is raised
+          // before the teardown and deliberately outlives it: sign-out clears
+          // the credential, not the reason, and the signed-out surface must
+          // still say why once the token is gone. Only a successful sign-in
+          // clears it.
+          setBlockedAccountActive(true);
+        }
         await signOut(true, 'session_ended');
       }
     };
@@ -775,6 +788,12 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             isCurrentAuthEpoch(outcome.sessionVersion) &&
             !isSignedOutReference.current
           ) {
+            if (outcome.userBlocked === true) {
+              // Same refusal the unauthorized handler explains: the flag is
+              // raised before the teardown and outlives it, so the
+              // signed-out surface says why instead of a bare session end.
+              setBlockedAccountActive(true);
+            }
             await signOut(true, 'session_ended');
           }
           // A set that cannot rotate is a session that cannot outlive this

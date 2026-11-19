@@ -40,6 +40,9 @@ export function useCurrentUserId(options: UseCurrentUserIdOptions = {}) {
   return {
     userId: data?.id,
     email: data?.email,
+    // The latest attempt's error object, for a caller that must read a server
+    // verdict from it (a blocked account) rather than only "the read failed".
+    error,
     isLoading,
     isError: data === undefined && (isError || (isLoading && isFetched)),
     // True when the latest attempt failed even though a cached identity is

@@ -3101,6 +3101,10 @@
     "retryLoadingAccount": "Bandyti įkelti paskyrą dar kartą",
     "retryLoadingPrivacy": "Bandyti įkelti privatumo parinktis dar kartą"
   },
+  "accountBlocked": {
+    "title": "Paskyra užblokuota",
+    "description": "Jūsų prieiga prie mūsų paslaugų buvo apribota."
+  },
   "addCredits": {
     "cta": "Papildyti kreditus",
     "billingPage": "atsiskaitymų puslapis"

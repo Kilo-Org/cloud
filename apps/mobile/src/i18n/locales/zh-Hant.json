@@ -2446,6 +2446,10 @@
     "retryLoadingAccount": "重新載入帳戶",
     "retryLoadingPrivacy": "重新載入隱私權選項"
   },
+  "accountBlocked": {
+    "title": "帳號已封鎖",
+    "description": "您對我們服務的存取權限已受到限制。"
+  },
   "addCredits": {
     "cta": "加值點數",
     "billingPage": "帳單頁面"

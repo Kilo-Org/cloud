@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "تلاش مجدد برای بارگذاری حساب",
     "retryLoadingPrivacy": "تلاش مجدد برای بارگذاری گزینه‌های حریم خصوصی"
   },
+  "accountBlocked": {
+    "title": "حساب مسدود شده",
+    "description": "دسترسی شما به خدمات ما محدود شده است."
+  },
   "addCredits": {
     "cta": "افزودن اعتبار",
     "billingPage": "صفحه صورتحساب"

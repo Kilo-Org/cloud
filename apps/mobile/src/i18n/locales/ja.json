@@ -2446,6 +2446,10 @@
     "retryLoadingAccount": "アカウントの読み込みを再試行",
     "retryLoadingPrivacy": "プライバシー設定の読み込みを再試行"
   },
+  "accountBlocked": {
+    "title": "アカウントがブロックされています",
+    "description": "サービスへのアクセスが制限されています。"
+  },
   "addCredits": {
     "cta": "クレジットを追加",
     "billingPage": "請求ページ"

@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "Försök läsa in kontot igen",
     "retryLoadingPrivacy": "Försök läsa in dina sekretessval igen"
   },
+  "accountBlocked": {
+    "title": "Kontot blockerat",
+    "description": "Din åtkomst till våra tjänster har begränsats."
+  },
   "addCredits": {
     "cta": "Fyll på krediter",
     "billingPage": "faktureringssidan"

@@ -3213,6 +3213,10 @@
     "retryLoadingAccount": "Rhoi cynnig eto ar lwytho'r cyfrif",
     "retryLoadingPrivacy": "Rhoi cynnig eto ar lwytho'r dewisiadau preifatrwydd"
   },
+  "accountBlocked": {
+    "title": "Cyfrif wedi'i rwystro",
+    "description": "Mae eich mynediad i'n gwasanaethau wedi'i gyfyngu."
+  },
   "addCredits": {
     "cta": "Ychwanegu credydau",
     "billingPage": "tudalen filio"

@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "Mar kale isku day soo rarista akoonka",
     "retryLoadingPrivacy": "Mar kale isku day soo rarista doorashooyinka asturnaanta"
   },
+  "accountBlocked": {
+    "title": "Akoonka waa xanniban yahay",
+    "description": "Helitaankaaga adeegyadeenna waa la xaddiday."
+  },
   "addCredits": {
     "cta": "Ku dar lacagta isticmaalka",
     "billingPage": "bogga biilasha"

@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "Reyna aftur að hlaða reikningnum",
     "retryLoadingPrivacy": "Reyna aftur að hlaða persónuverndarvalkostum"
   },
+  "accountBlocked": {
+    "title": "Reikningur lokaður",
+    "description": "Aðgangur þinn að þjónustunni okkar hefur verið takmarkaður."
+  },
   "addCredits": {
     "cta": "Bæta við inneign",
     "billingPage": "innheimtusíðu"

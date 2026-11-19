@@ -168,11 +168,13 @@ export function trpcErrorVariant(error: unknown): TrpcErrorVariant {
 type TrpcErrorData = {
   code?: string;
   authRequired?: boolean;
+  accountBlocked?: boolean;
 };
 
 const TrpcErrorDataSchema = z.looseObject({
   code: z.string().optional(),
   authRequired: z.boolean().optional(),
+  accountBlocked: z.boolean().optional(),
 });
 const TrpcErrorEnvelopeSchema = z.looseObject({
   data: z.unknown().optional(),
@@ -205,4 +207,18 @@ export function isPermissionDeniedError(error: unknown): boolean {
     return true;
   }
   return data?.code === 'UNAUTHORIZED' && data.authRequired !== true;
+}
+
+/**
+ * True when the server refused the call because this account is blocked. A
+ * blocked account's context-level refusal is a `FORBIDDEN` that is not a
+ * permission loss: it stays a refusal while the person is signed in, so the
+ * surface that explains it must be told apart from both an ordinary permission
+ * denial and the unauthorized handler's sign-out (which keeps
+ * `authRequired`). The formatter publishes `accountBlocked: true` and keeps
+ * `authRequired` unset; the wire carries no `cause`, so this flag is the one
+ * client-readable signal.
+ */
+export function isAccountBlockedTrpcError(error: unknown): boolean {
+  return readTrpcErrorData(error)?.accountBlocked === true;
 }

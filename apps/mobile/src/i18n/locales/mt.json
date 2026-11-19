@@ -3157,6 +3157,10 @@
     "retryLoadingAccount": "Erġa' pprova tgħabbi l-kont",
     "retryLoadingPrivacy": "Erġa' pprova tgħabbi l-għażliet tal-privatezza"
   },
+  "accountBlocked": {
+    "title": "Kont imblukkat",
+    "description": "L-aċċess tiegħek għas-servizzi tagħna ġie ristrett."
+  },
   "addCredits": {
     "cta": "Żid krediti",
     "billingPage": "paġna tal-ħlasijiet"

@@ -31,7 +31,11 @@ import {
 import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
 import { isAdminStepUpEnabled } from '@kilocode/web-shared/lib/config.server';
 import { setTag, trpcMiddleware } from '@sentry/nextjs';
-import { AuthContextError, trpcErrorFormatter } from '@kilocode/web-shared/lib/trpc/transport';
+import {
+  AccountBlockedError,
+  AuthContextError,
+  trpcErrorFormatter,
+} from '@kilocode/web-shared/lib/trpc/transport';
 import {
   appUpdateRequiredError,
   enforceMinimumVersion,
@@ -148,6 +152,7 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
     internalApiUse,
     webSessionId,
     webSessionPepper,
+    refusalReason,
   } = await withControlPlaneBudget({
     path: controlPlanePathFromInfo(opts?.info),
     type: controlPlaneTypeFromInfo(opts?.info),
@@ -161,6 +166,18 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
     startedAt,
     surface: 'context',
   });
+  // Authorization refused the account itself (R0 domain blacklist / R1 blocked
+  // account) while the session is intact. That is a different answer from a
+  // missing session: the app must show why the account cannot be used and keep
+  // the user signed in, so this refuses with its own cause and never reaches
+  // the AuthContextError branch below.
+  if (refusalReason === 'account_blocked') {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Account access is blocked',
+      cause: new AccountBlockedError(),
+    });
+  }
   if (!user) {
     throw new TRPCError({
       code: 'UNAUTHORIZED',

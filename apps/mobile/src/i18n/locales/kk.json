@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "Тіркелгіні қайта жүктеу",
     "retryLoadingPrivacy": "Құпиялылық баптауларын қайта жүктеу"
   },
+  "accountBlocked": {
+    "title": "Аккаунт бұғатталған",
+    "description": "Қызметтерімізге қолжетімділігіңіз шектелді."
+  },
   "addCredits": {
     "cta": "Кредит қосу",
     "billingPage": "төлем беті"

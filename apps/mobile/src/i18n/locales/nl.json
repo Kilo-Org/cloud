@@ -2446,6 +2446,10 @@
     "retryLoadingAccount": "Account opnieuw laden",
     "retryLoadingPrivacy": "Privacykeuzes opnieuw laden"
   },
+  "accountBlocked": {
+    "title": "Account geblokkeerd",
+    "description": "Je toegang tot onze diensten is beperkt."
+  },
   "addCredits": {
     "cta": "Tegoed aanvullen",
     "billingPage": "factureringspagina"

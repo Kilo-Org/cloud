@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "Probeer weer om die rekening te laai",
     "retryLoadingPrivacy": "Probeer weer om die privaatheidskeuses te laai"
   },
+  "accountBlocked": {
+    "title": "Rekening geblokkeer",
+    "description": "Jou toegang tot ons dienste is beperk."
+  },
   "addCredits": {
     "cta": "Voeg krediete by",
     "billingPage": "faktureringsbladsy"

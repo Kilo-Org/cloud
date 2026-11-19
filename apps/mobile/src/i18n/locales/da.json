@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "Prøv at indlæse kontoen igen",
     "retryLoadingPrivacy": "Prøv at indlæse privatlivsindstillingerne igen"
   },
+  "accountBlocked": {
+    "title": "Konto blokeret",
+    "description": "Din adgang til vores tjenester er blevet begrænset."
+  },
   "addCredits": {
     "cta": "Tilføj kreditter",
     "billingPage": "faktureringsside"

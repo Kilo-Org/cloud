@@ -3045,6 +3045,10 @@
     "retryLoadingAccount": "Reîncearcă încărcarea contului",
     "retryLoadingPrivacy": "Reîncearcă încărcarea opțiunilor de confidențialitate"
   },
+  "accountBlocked": {
+    "title": "Cont blocat",
+    "description": "Accesul tău la serviciile noastre a fost restricționat."
+  },
   "addCredits": {
     "cta": "Adaugă credite",
     "billingPage": "pagina de facturare"

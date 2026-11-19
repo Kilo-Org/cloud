@@ -2989,6 +2989,10 @@
     "retryLoadingAccount": "Бүртгэлийг дахин ачаалах",
     "retryLoadingPrivacy": "Нууцлалын сонголтуудыг дахин ачаалах"
   },
+  "accountBlocked": {
+    "title": "Бүртгэл хаагдсан",
+    "description": "Таны үйлчилгээнд хандах эрх хязгаарлагдсан."
+  },
   "addCredits": {
     "cta": "Кредит нэмэх",
     "billingPage": "төлбөрийн хуудас"

@@ -3045,6 +3045,10 @@
     "retryLoadingAccount": "Pokušaj ponovo učitati račun",
     "retryLoadingPrivacy": "Pokušaj ponovo učitati postavke privatnosti"
   },
+  "accountBlocked": {
+    "title": "Nalog blokiran",
+    "description": "Pristup našim uslugama vam je ograničen."
+  },
   "addCredits": {
     "cta": "Dodaj kredite",
     "billingPage": "stranica za naplatu"

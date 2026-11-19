@@ -2479,6 +2479,10 @@
     "translateSummaries": "Traduci i riepiloghi",
     "autoExpandThinkingInactiveSubtitle": "Non ha effetto quando i dettagli del ragionamento sono nascosti."
   },
+  "accountBlocked": {
+    "title": "Account bloccato",
+    "description": "Il tuo accesso ai nostri servizi è stato limitato."
+  },
   "addCredits": {
     "cta": "Aggiungi crediti",
     "billingPage": "pagina di fatturazione"

@@ -36,9 +36,10 @@ type UploadableAttachment = {
 
 /**
  * How the bot reads an attachment body. A platform that can authorize its own
- * attachment URL passes `fetchAttachmentUrl`, so the body is read under the size
- * cap and the transfer stops as soon as the cap is passed; other platforms fall
- * back to the adapter's `fetchData`, which returns the whole body at once.
+ * attachment URL passes `fetchAttachmentUrl`, and that body is read under the
+ * size cap. A body the adapter has already fetched is checked against the cap.
+ * The adapter's `fetchData` is used when the platform states a size, and its
+ * body is checked against the cap too.
  */
 export type AttachmentRetrievalOptions = {
   fetchAttachmentUrl?: (url: string) => Promise<Response>;
@@ -117,6 +118,11 @@ function attachmentTooLargeError(label: string, byteLength: number): Error {
   return new Error(
     `Attachment ${label} exceeds ${CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES / (1024 * 1024)}MB limit (${(byteLength / (1024 * 1024)).toFixed(1)}MB)`
   );
+}
+
+/** The error for a body the cap cannot accept because the platform stated no size. */
+function attachmentUnreadableBodyError(label: string): Error {
+  return new Error(`Attachment ${label} could not be verified under the attachment size limit`);
 }
 
 /**
@@ -200,9 +206,10 @@ async function readAttachmentUrl(
 
 /**
  * Read one attachment's bytes under `CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES`.
- * The platform URL is preferred when the caller can authorize it, because only
- * a streamed read can give up part-way; an already-fetched body and the
- * adapter's own `fetchData` are checked after they arrive.
+ * The platform URL is preferred when the caller can authorize it, so the body
+ * is streamed under the cap. An already-materialized body is checked against
+ * the cap; the adapter's own `fetchData` is used when the platform states a
+ * size, and the arriving body is checked against the cap as well.
  */
 async function readAttachmentBody(
   attachment: Attachment,
@@ -210,8 +217,13 @@ async function readAttachmentBody(
   options: AttachmentRetrievalOptions
 ): Promise<Buffer> {
   if (attachment.data !== undefined) {
-    // Already in memory: nothing is transferred, so only the cap applies.
+    // Already in memory: nothing is transferred, so the cap applies, and the
+    // resident length is checked before the body is copied into a Buffer.
     const data = attachment.data;
+    const residentLength = Buffer.isBuffer(data) ? data.byteLength : data.size;
+    if (residentLength > CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES) {
+      throw attachmentTooLargeError(label, residentLength);
+    }
     const body = Buffer.isBuffer(data) ? data : Buffer.from(await data.arrayBuffer());
     if (body.byteLength > CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES) {
       throw attachmentTooLargeError(label, body.byteLength);
@@ -225,6 +237,16 @@ async function readAttachmentBody(
   }
 
   if (typeof attachment.fetchData === 'function') {
+    // `fetchData` returns the whole body at once, so require the size the
+    // platform states and check the arriving body against the cap as well.
+    const statedSize = attachment.size;
+    if (
+      typeof statedSize !== 'number' ||
+      !Number.isFinite(statedSize) ||
+      statedSize > CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES
+    ) {
+      throw attachmentUnreadableBodyError(label);
+    }
     const data = await attachment.fetchData();
     if (data.byteLength > CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES) {
       throw attachmentTooLargeError(label, data.byteLength);
@@ -329,10 +351,16 @@ export async function extractAndUploadAttachments(
 
       // Reserve before the retrieval. The ledger owns the per-account ceiling
       // and the reaper's lease, so a file the account cannot take is declined
-      // without downloading it.
+      // without downloading it. The reservation carries the stated size, or the
+      // cap when the platform states none, so the per-account bound reflects
+      // the most the file can occupy before its body is read.
+      const declaredSize =
+        typeof attachment.size === 'number' && Number.isFinite(attachment.size)
+          ? attachment.size
+          : CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES;
       admittedKey = await admitPendingUpload({
         ...admittedUpload,
-        byteSize: typeof attachment.size === 'number' ? attachment.size : 0,
+        byteSize: declaredSize,
       });
 
       const data = await readAttachmentBody(attachment, label, options);

@@ -7,6 +7,7 @@ import { r2Client, r2CloudAgentAttachmentsBucketName } from '@kilocode/web-share
 import {
   CLOUD_AGENT_ATTACHMENT_MAX_COUNT,
   CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES,
+  CLOUD_AGENT_ATTACHMENT_PRESIGNED_URL_EXPIRY_SECONDS,
   CLOUD_AGENT_PENDING_UPLOAD_PURGE_BATCH,
   CLOUD_AGENT_PENDING_UPLOADS_MAX_PER_ACCOUNT,
 } from '@/lib/cloud-agent/constants';
@@ -37,11 +38,15 @@ export type AdmitPendingUploadParams = {
  * 'pending' row, that row is refreshed in place, keeps its key (which can be
  * an earlier fresh key), and does not count against either bound. Otherwise a
  * row for objectKey in any other state keeps its key, and the upload gets freshObjectKey:
- * a release or reaper claim sets 'reaped' before its DeleteObject runs, so a
- * PUT to the old key could land before that delete, and a 'linked' key holds
- * an attachment a dispatched message refers to. The row is later flipped to
- * 'linked' by linkPendingUploads before the message is dispatched, or to
- * 'reaped' once its object is deleted.
+ * a release claims the row as 'released', which keeps the key while the
+ * presigned URL may still be valid so a late PUT is still attributable, a
+ * reaper claim sets 'reaped' before its DeleteObject runs, so a PUT to the old
+ * key could land before that delete, and a 'linked' key holds an attachment a
+ * dispatched message refers to. Only 'pending' rows count against the
+ * per-message and per-account ceilings, so neither 'released' nor 'reaped'
+ * rows hold quota. The row is later flipped to 'linked' by linkPendingUploads
+ * before the message is dispatched, or deleted by the reaper in every
+ * non-linked state.
  */
 export async function admitPendingUpload({
   kiloUserId,
@@ -162,10 +167,11 @@ export type LinkPendingUploadsResult = {
   /** Object keys this call moved from 'pending' to 'linked', one per row. */
   linkedObjectKeys: string[];
   /**
-   * Requested keys whose row the message does not hold: 'reaped', so the object
-   * behind them is gone or being deleted, or 'pending' again after a released
-   * delete put the row back for a later attempt. A message referencing one of
-   * these must not be dispatched.
+   * Requested keys whose row the message does not hold: 'released', so a
+   * release claimed them and their object is being or has been deleted, or
+   * 'reaped', so the object behind them is gone or being deleted, or 'pending'
+   * again after a reaper claim's delete put the row back for a later attempt.
+   * A message referencing one of these must not be dispatched.
    */
   unlinkedObjectKeys: string[];
 };
@@ -215,9 +221,10 @@ async function linkPendingUploadsInTransaction(
     .returning({ object_key: cloud_agent_pending_uploads.object_key });
 
   // Read back every requested key the message does not hold. A row is left
-  // 'reaped' when a release or a claim took it, and is returned to 'pending' when
-  // its delete failed, so in either state the object is under the reaper's
-  // control and the caller must not dispatch a message that references it.
+  // 'released' when a release took it and 'reaped' when a reaper claim took it,
+  // and is returned to 'pending' when a claim's delete failed, so in every one
+  // of those states the object is under the reaper's control and the caller
+  // must not dispatch a message that references it.
   const rows = await tx
     .select({ object_key: cloud_agent_pending_uploads.object_key })
     .from(cloud_agent_pending_uploads)
@@ -394,10 +401,18 @@ async function claimAndDeleteUploadObjects(
 }
 
 /**
- * Release a set of pending rows back out of the per-message quota when the
- * caller abandons the files before sending (e.g. removes them from the
- * composer). Only the caller's own 'pending' rows are claimed; 'linked' rows
- * (already sent) and other users' rows stay untouched.
+ * Release a set of pending rows out of the per-message and per-account quota
+ * when the caller abandons the files before sending (e.g. removes them from
+ * the composer). Only the caller's own 'pending' rows are claimed, by flipping
+ * them to 'released'; 'linked' rows (already sent) and other users' rows stay
+ * untouched.
+ *
+ * The claim extends each row's `expires_at` to the presigned-URL TTL, so the
+ * key stays on the row while the URL a client already holds can still accept a
+ * PUT, and a late upload remains attributable. The objects are then deleted
+ * best effort. A failed delete leaves the row 'released' and logs it: the
+ * abandoned-upload reaper deletes every non-linked state, so it retries on its
+ * next run once the lease lapses.
  */
 export async function releasePendingUploads(
   kiloUserId: string,
@@ -405,19 +420,32 @@ export async function releasePendingUploads(
 ): Promise<void> {
   if (objectKeys.length === 0) return;
 
-  await claimAndDeleteUploadObjects(
-    and(
-      eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
-      eq(cloud_agent_pending_uploads.status, 'pending'),
-      inArray(cloud_agent_pending_uploads.object_key, objectKeys)
+  const releasedAt = new Date(
+    Date.now() + CLOUD_AGENT_ATTACHMENT_PRESIGNED_URL_EXPIRY_SECONDS * 1000
+  ).toISOString();
+
+  const claimed = await db
+    .update(cloud_agent_pending_uploads)
+    .set({ status: 'released', expires_at: releasedAt })
+    .where(
+      and(
+        eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
+        eq(cloud_agent_pending_uploads.status, 'pending'),
+        inArray(cloud_agent_pending_uploads.object_key, objectKeys)
+      )
     )
-  );
+    .returning({ object_key: cloud_agent_pending_uploads.object_key });
+
+  if (claimed.length === 0) return;
+
+  await deletePendingUploadObjects(claimed.map(row => row.object_key));
 }
 
 /**
  * Purge live upload objects in two id-ordered, bounded-batch sweeps.
  * Account deletion requires a completed purge; incomplete cleanup throws and
- * retains pending records for a later attempt.
+ * retains pending records for a later attempt. Every state that still holds a
+ * live object is swept: 'pending', 'linked' and 'released'.
  */
 export async function purgeUserPendingUploads(kiloUserId: string): Promise<void> {
   for (let pass = 0; pass < 2; pass++) {
@@ -430,7 +458,7 @@ export async function purgeUserPendingUploads(kiloUserId: string): Promise<void>
         .where(
           and(
             eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
-            inArray(cloud_agent_pending_uploads.status, ['pending', 'linked']),
+            inArray(cloud_agent_pending_uploads.status, ['pending', 'linked', 'released']),
             gt(cloud_agent_pending_uploads.id, cursor)
           )
         )
@@ -444,7 +472,7 @@ export async function purgeUserPendingUploads(kiloUserId: string): Promise<void>
       await claimAndDeleteUploadObjects(
         and(
           eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
-          inArray(cloud_agent_pending_uploads.status, ['pending', 'linked']),
+          inArray(cloud_agent_pending_uploads.status, ['pending', 'linked', 'released']),
           inArray(
             cloud_agent_pending_uploads.id,
             batch.map(row => row.id)
@@ -460,7 +488,7 @@ export async function purgeUserPendingUploads(kiloUserId: string): Promise<void>
     .where(
       and(
         eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
-        inArray(cloud_agent_pending_uploads.status, ['pending', 'linked'])
+        inArray(cloud_agent_pending_uploads.status, ['pending', 'linked', 'released'])
       )
     )
     .limit(1);
@@ -471,9 +499,11 @@ export async function purgeUserPendingUploads(kiloUserId: string): Promise<void>
 }
 
 /**
- * Delete the private R2 objects behind abandoned pending uploads whose
- * 24-hour lease has lapsed, one bounded batch per run. The batch is picked in
- * the same statement that claims it, and the claim re-checks 'pending' and the
+ * Delete the private R2 objects behind abandoned uploads whose lease has
+ * lapsed, one bounded batch per run. Both 'pending' rows (an upload that never
+ * sent) and 'released' rows (an object a release tried to delete, whose claim
+ * kept it until the presigned URL expired) are picked. The batch is selected in
+ * the same statement that claims it, and the claim re-checks the state and the
  * lease, so a row linked or refreshed since the pick is skipped rather than
  * stripped of its object.
  */
@@ -483,7 +513,7 @@ export async function reapAbandonedUploads(): Promise<ReapAbandonedUploadsSummar
     .from(cloud_agent_pending_uploads)
     .where(
       and(
-        eq(cloud_agent_pending_uploads.status, 'pending'),
+        inArray(cloud_agent_pending_uploads.status, ['pending', 'released']),
         sql`${cloud_agent_pending_uploads.expires_at} < now()`
       )
     )
@@ -491,7 +521,7 @@ export async function reapAbandonedUploads(): Promise<ReapAbandonedUploadsSummar
 
   const { deleted } = await claimAndDeleteUploadObjects(
     and(
-      eq(cloud_agent_pending_uploads.status, 'pending'),
+      inArray(cloud_agent_pending_uploads.status, ['pending', 'released']),
       // The row is re-read when the claim writes it, so a lease that a retry
       // presign refreshed after the batch was picked must not be reaped.
       sql`${cloud_agent_pending_uploads.expires_at} < now()`,

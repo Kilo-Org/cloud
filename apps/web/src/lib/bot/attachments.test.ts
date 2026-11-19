@@ -69,6 +69,9 @@ function createAttachment(
 ): Attachment {
   return {
     ...attachment,
+    // A platform states a size with the body; a test that needs an absent
+    // size passes an explicit attachment object.
+    size: attachment.size ?? Buffer.byteLength(contents),
     fetchData: jest.fn(async () => Buffer.from(contents)),
   };
 }
@@ -229,6 +232,8 @@ describe('extractAndUploadAttachments', () => {
           type: 'file',
           name: 'also-too-large.txt',
           mimeType: 'text/plain',
+          // The arriving body is checked against the cap as well.
+          size: 10,
           fetchData: oversizedDownloadFetch,
         },
         createAttachment({ type: 'file', name: 'valid.md', mimeType: 'text/plain' }),
@@ -251,6 +256,121 @@ describe('extractAndUploadAttachments', () => {
     expect(mockReleasePendingUploads).toHaveBeenCalledWith('user-1', [
       `user-1/cloud-agent/${MESSAGE_UUID}/${TEXT_ID}.txt`,
     ]);
+  });
+
+  it('declines an adapter fetch when the platform states no size', async () => {
+    mockRandomUUID
+      .mockReturnValueOnce(MESSAGE_UUID)
+      .mockReturnValueOnce(TEXT_ID)
+      .mockReturnValueOnce(FRESH_IDS[0]);
+    const adapterFetch = jest.fn(async () => Buffer.from('unknown-size'));
+
+    const result = await extractAndUploadAttachments(
+      createMessage([
+        { type: 'file', name: 'unsized.txt', mimeType: 'text/plain', fetchData: adapterFetch },
+      ]),
+      'user-1'
+    );
+
+    // No body is read when the platform states no size.
+    expect(adapterFetch).not.toHaveBeenCalled();
+    expect(result).toEqual({ objectKeys: [], declinedFilenames: ['unsized.txt'] });
+    expect(mockSend).not.toHaveBeenCalled();
+    // The reservation carries the cap when no size is stated.
+    expect(mockAdmitPendingUpload).toHaveBeenCalledTimes(1);
+    expect(mockAdmitPendingUpload).toHaveBeenCalledWith(
+      expect.objectContaining({ attachmentId: TEXT_ID, byteSize: MAX_SIZE_BYTES })
+    );
+    expect(mockReleasePendingUploads).toHaveBeenCalledWith('user-1', [
+      `user-1/cloud-agent/${MESSAGE_UUID}/${TEXT_ID}.txt`,
+    ]);
+  });
+
+  it('refuses an arriving body above the cap when the stated size is smaller', async () => {
+    mockRandomUUID
+      .mockReturnValueOnce(MESSAGE_UUID)
+      .mockReturnValueOnce(TEXT_ID)
+      .mockReturnValueOnce(FRESH_IDS[0]);
+    const adapterFetch = jest.fn(async () => Buffer.alloc(MAX_SIZE_BYTES + 1));
+
+    const result = await extractAndUploadAttachments(
+      createMessage([
+        {
+          type: 'file',
+          name: 'lying.txt',
+          mimeType: 'text/plain',
+          size: 4,
+          fetchData: adapterFetch,
+        },
+      ]),
+      'user-1'
+    );
+
+    expect(adapterFetch).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ objectKeys: [], declinedFilenames: ['lying.txt'] });
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(mockAdmitPendingUpload).toHaveBeenCalledWith(
+      expect.objectContaining({ attachmentId: TEXT_ID, byteSize: 4 })
+    );
+    expect(mockReleasePendingUploads).toHaveBeenCalledWith('user-1', [
+      `user-1/cloud-agent/${MESSAGE_UUID}/${TEXT_ID}.txt`,
+    ]);
+  });
+
+  it('declines an already-materialized body above the cap', async () => {
+    mockRandomUUID
+      .mockReturnValueOnce(MESSAGE_UUID)
+      .mockReturnValueOnce(TEXT_ID)
+      .mockReturnValueOnce(FRESH_IDS[0]);
+
+    const result = await extractAndUploadAttachments(
+      createMessage([
+        {
+          type: 'file',
+          name: 'resident.txt',
+          mimeType: 'text/plain',
+          data: new Blob([new Uint8Array(MAX_SIZE_BYTES + 1)]),
+        },
+      ]),
+      'user-1'
+    );
+
+    // A resident body is checked against the cap before it is copied.
+    expect(result).toEqual({ objectKeys: [], declinedFilenames: ['resident.txt'] });
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(mockReleasePendingUploads).toHaveBeenCalledWith('user-1', [
+      `user-1/cloud-agent/${MESSAGE_UUID}/${TEXT_ID}.txt`,
+    ]);
+  });
+
+  it('uploads an already-materialized body within the cap and records its size', async () => {
+    mockRandomUUID
+      .mockReturnValueOnce(MESSAGE_UUID)
+      .mockReturnValueOnce(TEXT_ID)
+      .mockReturnValueOnce(FRESH_IDS[0]);
+
+    const result = await extractAndUploadAttachments(
+      createMessage([
+        {
+          type: 'file',
+          name: 'resident.txt',
+          mimeType: 'text/plain',
+          data: new Blob([new TextEncoder().encode('resident')]),
+        },
+      ]),
+      'user-1'
+    );
+
+    expect(result?.attachments?.files).toEqual([`${TEXT_ID}.txt`]);
+    expect(mockAdmitPendingUpload).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ attachmentId: TEXT_ID, byteSize: 8 })
+    );
+    expect(commandInput(0)).toMatchObject({
+      Key: `user-1/cloud-agent/${MESSAGE_UUID}/${TEXT_ID}.txt`,
+      ContentLength: 8,
+      Body: Buffer.from('resident'),
+    });
   });
 
   it('continues uploading when an individual attachment upload fails', async () => {
@@ -322,15 +442,19 @@ describe('extractAndUploadAttachments', () => {
 
     await extractAndUploadAttachments(
       createMessage([
-        createAttachment({ type: 'image', mimeType: 'image/png' }, '12345'),
-        createAttachment({ type: 'file', name: 'notes.md', mimeType: 'text/plain' }, '1234567'),
+        // The stated size and the body differ.
+        createAttachment({ type: 'image', mimeType: 'image/png', size: 9 }, '12345'),
+        createAttachment(
+          { type: 'file', name: 'notes.md', mimeType: 'text/plain', size: 3 },
+          '1234567'
+        ),
       ]),
       'user-1'
     );
 
     expect(mockAdmitPendingUpload).toHaveBeenCalledTimes(4);
-    // Each file reserves capacity before its body is read, then records the
-    // size the body turned out to have on the same key.
+    // Each file reserves the size the platform stated before its body is read,
+    // then records the size the body turned out to have on the same key.
     expect(mockAdmitPendingUpload).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
@@ -339,7 +463,7 @@ describe('extractAndUploadAttachments', () => {
         attachmentId: IMAGE_ID,
         objectKey: `user-1/cloud-agent/${MESSAGE_UUID}/${IMAGE_ID}.png`,
         freshObjectKey: `user-1/cloud-agent/${MESSAGE_UUID}/${FRESH_IDS[0]}.png`,
-        byteSize: 0,
+        byteSize: 9,
       })
     );
     expect(mockAdmitPendingUpload).toHaveBeenNthCalledWith(
@@ -352,7 +476,7 @@ describe('extractAndUploadAttachments', () => {
     );
     expect(mockAdmitPendingUpload).toHaveBeenNthCalledWith(
       3,
-      expect.objectContaining({ attachmentId: MARKDOWN_ID, byteSize: 0 })
+      expect.objectContaining({ attachmentId: MARKDOWN_ID, byteSize: 3 })
     );
     expect(mockAdmitPendingUpload).toHaveBeenNthCalledWith(
       4,
@@ -638,6 +762,8 @@ describe('extractAndUploadAttachments', () => {
           name: 'notes.txt',
           mimeType: 'text/plain',
           url: 'https://files.example/notes.txt',
+          // The adapter fetch is used together with the stated size.
+          size: 12,
           fetchData: adapterFetch,
         },
       ]),

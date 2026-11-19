@@ -32,8 +32,6 @@ Useful Worker-log landmarks include:
 - `Session message terminalized`
 - `Runtime credential proxy request failed` (`logTag: runtime_proxy_request_failed`): one record per failed Kilo credential-proxy request. `rejectionStage: route` with `pathShape` means the facade has no allowlist entry for that path and answered 404 without an upstream call. When Kilo v2 then cannot load its model catalog, the run fails with `failure_reason = model_catalog_unavailable` (platform) and the user sees "The Kilo model catalog could not be loaded".
 
-After Stop, Kilo closes its model request to the credential proxy. The Worker sees that close only when it next writes to Kilo. While a model stream (`text/event-stream`) sends nothing, the proxy therefore writes an SSE comment (`: ping`) every 2 seconds. The failed write cancels the upstream request, and the gateway logs `AI gateway client disconnected` within one interval. Without a write, the upstream stream stays open until a timeout ends it. The local gateway ends an idle fake-LLM `hang` stream after 5 minutes (`UND_ERR_BODY_TIMEOUT`).
-
 ## Worker Logs
 
 From the repo root:

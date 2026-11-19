@@ -14,7 +14,6 @@ import {
   createRuntimeProxyGrant,
   issueRuntimeCredentialProxyHandle,
 } from './runtime-credential-proxy.js';
-import { EVENT_STREAM_IDLE_PING_INTERVAL_MS } from './kilo/event-stream-idle-ping.js';
 import {
   RUNTIME_PROXY_ATTESTATION_HEADER,
   verifyRuntimeProxyAttestation,
@@ -1117,61 +1116,6 @@ describe('server runtime credential proxy', () => {
     await expect(response.text()).resolves.toBe('stream-body');
     expect(resolve).toHaveBeenCalledOnce();
     vi.unstubAllGlobals();
-  });
-
-  it('keeps a silent model stream writing so a closed client cancels the upstream', async () => {
-    const env = createEnv();
-    env.SANDBOX_SESSION.get.mockReturnValue({
-      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
-        token: 'https://provider.example.test/api/openrouter:backing-token',
-        organizationId: 'org_proxy',
-        runtimeAuthorization: {
-          userId: 'usr_proxy',
-          authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'workspace_proxy',
-        },
-      }),
-    });
-    // The model has sent its headers and nothing else, as before a first token.
-    const upstreamCancel = vi.fn();
-    const upstream = vi.fn().mockResolvedValue(
-      new Response(new ReadableStream<Uint8Array>({ cancel: upstreamCancel }), {
-        headers: { 'Content-Type': 'text/event-stream; charset=utf-8' },
-      })
-    );
-    vi.stubGlobal('fetch', upstream);
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
-    try {
-      const response = await fetchWorker(
-        new Request(
-          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/chat/completions',
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${await handle()}`,
-              'Content-Type': 'application/json',
-            },
-            body: '{"stream":true}',
-          }
-        ),
-        env
-      );
-      expect(response.status).toBe(200);
-      const reader = response.body!.getReader();
-      let first: ReadableStreamReadResult<Uint8Array> | undefined;
-      void reader.read().then(result => {
-        first = result;
-      });
-      // The Workers runtime sees a closed client only when a write fails, so the
-      // proxy must write while the model is silent.
-      await vi.advanceTimersByTimeAsync(EVENT_STREAM_IDLE_PING_INTERVAL_MS);
-      expect(first?.value && new TextDecoder().decode(first.value)).toBe(': ping\n\n');
-      await reader.cancel('client closed');
-      expect(upstreamCancel).toHaveBeenCalledWith('client closed');
-    } finally {
-      vi.useRealTimers();
-      vi.unstubAllGlobals();
-    }
   });
 
   it('removes every adjacent prohibited header before injecting runtime credentials', async () => {

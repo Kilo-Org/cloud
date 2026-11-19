@@ -4,6 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type LucideProps } from '@/components/ui/icons';
 import { NEUTRAL_TINT } from '@/lib/agent-color';
+import {
+  textActionRowOverhangDp,
+  textActionTargetDp,
+  TOUCH_TARGET_DP,
+  TOUCH_TARGET_OVERHANG_DP,
+} from '@/lib/a11y/tap-target';
 import { act, TestRenderer } from '@/test/renderer';
 
 import { RowFrame } from './row-frame';
@@ -250,6 +256,34 @@ describe('RowFrame trailing cell', () => {
     expect(action.props.accessibilityRole).toBe('button');
     expect(action.props.accessibilityState).toEqual({ disabled: false });
     expect(classesOf(action).some(name => name.startsWith('min-h-'))).toBe(true);
+  });
+
+  it('cancels a text action target out of the row frame', () => {
+    // Field defect: the action holds the platform's target on its own node, and
+    // without a cancel the node, not the frame, set the row's height — the
+    // Integrations hub's Connect row laid out at 69dp beside its group's
+    // 57.75dp rows, so the group moved when the provider connected.
+    const action = renderFrame({
+      title: 'GitHub',
+      trailing: { kind: 'action', label: 'Connect', onPress: () => undefined },
+    }).find(
+      node => Object.is(node.type, 'Pressable') && node.props.accessibilityLabel === 'Connect'
+    );
+    const style: unknown = action.props.style;
+    if (typeof style !== 'object' || style === null || !('marginVertical' in style)) {
+      throw new Error('the action cell carries no vertical margin');
+    }
+
+    // The box keeps the audit's target on the node, so a control-size audit
+    // still reads it; only the layout contribution shrinks.
+    expect(classesOf(action)).toEqual(expect.arrayContaining(['min-h-[48px]', 'min-w-[48px]']));
+    expect(style.marginVertical).toBe(-textActionRowOverhangDp());
+    // What the frame sees is the row's content band — the same 27dp a switch
+    // contributes — so an action row lays out at the frame's height like the
+    // plain row beside it.
+    expect(textActionTargetDp() - 2 * textActionRowOverhangDp()).toBe(
+      TOUCH_TARGET_DP - 2 * TOUCH_TARGET_OVERHANG_DP
+    );
   });
 
   it('lets an action that is working declare its own state', () => {

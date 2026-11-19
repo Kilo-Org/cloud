@@ -425,6 +425,31 @@ export function textActionTargetClass(): string {
   return Platform.OS === 'android' ? 'min-h-[48px] min-w-[48px]' : 'min-h-[44px] min-w-[44px]';
 }
 
+/** The target {@link textActionTargetClass} renders, in dp, on the live platform. */
+export function textActionTargetDp(): number {
+  return Platform.OS === 'android' ? ICON_TARGET_DP : TOUCH_TARGET_DP;
+}
+
+/**
+ * The vertical margin a row's text action cancels per side, so the row lays out
+ * on its content band instead of on the platform's target — the switch's own
+ * cancellation ({@link TOUCH_TARGET_OVERHANG_DP}), taken at the action's
+ * target.
+ *
+ * The action keeps {@link textActionTargetClass}'s box on its own node, because
+ * a control-size audit reads that node's rect. Without the margin the node
+ * contributes its whole target to the frame: a row with a text action laid out
+ * at 65pt on iOS and 69dp on Android beside a two-line row's 57.75pt, so a
+ * group grew when one of its rows swapped a text action for a button (the
+ * Integrations hub's Connect and Disconnect rows, 2026-11-18 gate). Cancelling
+ * to {@link ROW_FRAME_CONTENT_DP} leaves the node inside the row's own `py-3`
+ * padding, which keeps every touch on it inside the row's bounds — Android
+ * delivers a touch only inside a parent view.
+ */
+export function textActionRowOverhangDp(): number {
+  return (textActionTargetDp() - ROW_FRAME_CONTENT_DP) / 2;
+}
+
 /**
  * The box an action renders when it sits on its own row under a line of copy —
  * the billing step under a notice tile's message — with the per-side vertical

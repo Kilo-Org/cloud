@@ -65,7 +65,9 @@ import {
   STATE_ACTION_TARGET_DP,
   SWITCH_HOST_CLASS,
   tapTargetReachDp,
+  textActionRowOverhangDp,
   textActionTargetClass,
+  textActionTargetDp,
   TOUCH_TARGET_DP,
   TOUCH_TARGET_OVERHANG_DP,
   UNDER_COPY_ACTION_BOX_CLASS,
@@ -190,6 +192,31 @@ describe('shared tap-target geometry', () => {
     expect(android).toContain('min-h-[48px]');
     expect(await compiledDp(android, 'minHeight')).toBeGreaterThanOrEqual(ICON_TARGET_DP);
     expect(await compiledDp(android, 'minWidth')).toBeGreaterThanOrEqual(ICON_TARGET_DP);
+
+    platform.OS = 'ios';
+  });
+
+  it('cancels a row text action down to the row content band on both platforms', () => {
+    // The regression this guards: the action's box is taller than the row's
+    // one-line content band, so the node, not the row, set the height — 65pt on
+    // iOS and 69dp on Android beside a two-line row's 57.75pt — and a group
+    // grew when one of its rows swapped the action for a button. The row
+    // cancels the overhang the switch cancels, at the action's own target.
+    const band = TOUCH_TARGET_DP - 2 * TOUCH_TARGET_OVERHANG_DP;
+
+    platform.OS = 'ios';
+    expect(textActionTargetDp()).toBe(TOUCH_TARGET_DP);
+    expect(textActionRowOverhangDp()).toBe(TOUCH_TARGET_OVERHANG_DP);
+    expect(textActionTargetDp() - 2 * textActionRowOverhangDp()).toBe(band);
+
+    platform.OS = 'android';
+    expect(textActionTargetDp()).toBe(ICON_TARGET_DP);
+    // Android's target is the taller pair, so its cancel is deeper: exactly the
+    // row's own `py-3` (10.5dp at the app's 14pt rem), which leaves the node
+    // inside the row's bounds — the platform delivers a touch only inside a
+    // parent view — while the row still sees the same 27dp band.
+    expect(textActionRowOverhangDp()).toBe(10.5);
+    expect(textActionTargetDp() - 2 * textActionRowOverhangDp()).toBe(band);
 
     platform.OS = 'ios';
   });

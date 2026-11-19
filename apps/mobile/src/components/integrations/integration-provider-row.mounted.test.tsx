@@ -11,6 +11,12 @@
 import { createElement, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  textActionRowOverhangDp,
+  textActionTargetClass,
+  TOUCH_TARGET_DP,
+  TOUCH_TARGET_OVERHANG_DP,
+} from '@/lib/a11y/tap-target';
 import { type IntegrationRow } from '@/lib/integrations/integration-rows';
 import { type IntegrationScope } from '@/lib/integrations/provider-catalog';
 import { act, TestRenderer } from '@/test/renderer';
@@ -158,6 +164,34 @@ describe('IntegrationProviderRow action cell', () => {
     const root = renderRow({ row: integrationRow(), scope: 'personal' });
 
     expect(root.findAllByType('TextMock').map(node => node.props.children)).toContain('Connect');
+  });
+
+  it('keeps the Connect cell inside the row frame the Disconnect row keeps', () => {
+    // Field defect: the Connect row laid out at the action's 44pt target plus
+    // the frame's padding, beside a sibling's two text lines, so the
+    // Integrations group grew by the difference when a provider connected and
+    // every row below it moved. The cell cancels the target's overhang the way
+    // the switch does, so both rows lay out on the frame's one height.
+    const [connect] = controls(renderRow({ row: integrationRow(), scope: 'personal' }));
+    if (!connect) {
+      throw new Error('the uninstalled row rendered no action');
+    }
+    const style: unknown = connect.props.style;
+    if (typeof style !== 'object' || style === null) {
+      throw new Error('the Connect cell carries no style');
+    }
+    const margin: unknown = 'marginVertical' in style ? style.marginVertical : undefined;
+    if (typeof margin !== 'number') {
+      throw new Error('the Connect cell carries no vertical margin');
+    }
+
+    // The box still carries the platform's target on its own node, and only the
+    // margin it renders takes the overhang back out of the frame.
+    expect(String(connect.props.className).split(' ')).toEqual(
+      expect.arrayContaining(textActionTargetClass().split(' '))
+    );
+    expect(margin).toBe(-textActionRowOverhangDp());
+    expect(TOUCH_TARGET_DP + 2 * margin).toBe(TOUCH_TARGET_DP - 2 * TOUCH_TARGET_OVERHANG_DP);
   });
 
   it('keeps the Connect control named and busy while the launch is in flight', () => {

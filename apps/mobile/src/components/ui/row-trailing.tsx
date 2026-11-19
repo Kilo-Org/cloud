@@ -9,6 +9,7 @@ import { Text } from '@/components/ui/text';
 import {
   COMPACT_CONTROL_BOX_CLASS,
   COMPACT_CONTROL_HIT_SLOP,
+  textActionRowOverhangDp,
   textActionTargetClass,
   TOUCH_TARGET_OVERHANG_DP,
 } from '@/lib/a11y/tap-target';
@@ -30,6 +31,21 @@ import { cn } from '@/lib/utils';
 const SWITCH_BOX_STYLE = {
   marginVertical: -TOUCH_TARGET_OVERHANG_DP,
 } as const;
+
+/**
+ * The vertical margin a row's text action cancels, the switch's own
+ * cancellation at the action's target. The action keeps the platform's target
+ * on its own node (see `textActionTargetClass`), because a control-size audit
+ * reads that node's rect; the margin takes the overhang back out of the frame's
+ * height, so a row with a text action lays out on the same line as the plain
+ * row beside it and a group does not grow when one of its rows swaps the action
+ * for a button. The node still sits inside the row's own `py-3` padding, which
+ * is what keeps its touches inside the row's bounds (Android delivers a touch
+ * only inside a parent view).
+ */
+function textActionBoxStyle(): { marginVertical: number } {
+  return { marginVertical: -textActionRowOverhangDp() };
+}
 
 /**
  * The trailing cell of a row. Every variant shares the row's height, so a mark,
@@ -75,7 +91,7 @@ export type RowTrailingSpec =
 /**
  * Paints a row's trailing cell. A row without one passes `undefined`; the
  * switch keeps its own accessible node and test handle, and a text action
- * carries its own 48pt target.
+ * carries its own 48pt target, which its margin cancels out of the row's height.
  */
 export function renderRowTrailing(trailing: RowTrailingSpec | undefined): ReactNode {
   if (trailing === undefined) {
@@ -154,6 +170,7 @@ export function renderRowTrailing(trailing: RowTrailingSpec | undefined): ReactN
       return (
         <Pressable
           {...props}
+          style={textActionBoxStyle()}
           className={cn('shrink-0 items-center justify-center', textActionTargetClass())}
         >
           <Text

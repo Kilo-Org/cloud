@@ -23,6 +23,7 @@ import {
   mountWithoutScope,
   PERMISSION_DENIED,
   QUERY_ERROR,
+  refetchMock,
   reportDirty,
   resetSheetMocks,
   routerMock,
@@ -128,9 +129,20 @@ describe('BitbucketConnectSheet', () => {
     );
     // The plan is the blocker the reader cannot clear by role, so the denial
     // carries the retry that re-reads the state once the owner updates billing.
-    const action = denied?.props.action as ReactElement<{ label: string }> | undefined;
+    const action = denied?.props.action as
+      | ReactElement<{ label: string; onPress: () => void }>
+      | undefined;
     expect(action).toBeDefined();
     expect(action?.props.label).toBe(i18n.t('common.retry'));
+    // Pressing it must ask all three answers again: the plan, the readiness and
+    // the existing connection each decide whether the sheet still refuses.
+    await act(async () => {
+      action?.props.onPress();
+      await Promise.resolve();
+    });
+    expect(refetchMock.org).toHaveBeenCalledTimes(1);
+    expect(refetchMock.readiness).toHaveBeenCalledTimes(1);
+    expect(refetchMock.status).toHaveBeenCalledTimes(1);
   });
 
   it('offers no action when the plan does not block the connection', async () => {

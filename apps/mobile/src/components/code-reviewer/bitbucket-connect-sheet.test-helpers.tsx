@@ -39,6 +39,14 @@ const preventRemoveMock = vi.hoisted(() => ({
 
 const confirmMock = vi.hoisted(() => ({ requests: [] as ConfirmRequest[] }));
 
+// The three reads the denial's retry re-runs, so a case can press the action
+// and read which answers it asked for again.
+const refetchMock = vi.hoisted(() => ({
+  org: vi.fn(),
+  readiness: vi.fn(),
+  status: vi.fn(),
+}));
+
 const state = vi.hoisted(() => ({
   role: 'owner' as string | undefined,
   isTrialExpiredForEnforcement: false,
@@ -137,6 +145,8 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
     },
     isResolving: false,
     isError: false,
+    isFetching: false,
+    refetch: refetchMock.org,
   }),
 }));
 vi.mock('@/lib/hooks/use-bitbucket', async () => {
@@ -150,7 +160,7 @@ vi.mock('@/lib/hooks/use-bitbucket', async () => {
       isError: false,
       isFetching: false,
       error: undefined,
-      refetch: vi.fn(),
+      refetch: refetchMock.readiness,
     }),
     useBitbucketIntegrationStatus: () => {
       useSyncExternalStore(
@@ -163,7 +173,7 @@ vi.mock('@/lib/hooks/use-bitbucket', async () => {
         isError: state.status.isError,
         error: state.status.error,
         isFetching: false,
-        refetch: vi.fn(),
+        refetch: refetchMock.status,
       };
     },
   };
@@ -277,6 +287,9 @@ export function resetSheetMocks(): void {
   preventRemoveMock.prevent = false;
   preventRemoveMock.handler = undefined;
   confirmMock.requests.length = 0;
+  refetchMock.org.mockClear();
+  refetchMock.readiness.mockClear();
+  refetchMock.status.mockClear();
 }
 
-export { confirmMock, preventRemoveMock, routerMock, state, statusStore };
+export { confirmMock, preventRemoveMock, refetchMock, routerMock, state, statusStore };

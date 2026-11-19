@@ -79,7 +79,7 @@ function AwsComputeForm({ organizationId }: { organizationId?: string }) {
     if (value) data.validate.mutate(value);
   }
 
-  if (data.enrollment.isSuccess && !enrolled && !status) return null;
+  if (data.enrollment.isSuccess && !enrolled && data.status.isSuccess && !status) return null;
   return (
     <Card className="min-w-0">
       <CardHeader>
@@ -259,7 +259,14 @@ function AwsComputeForm({ organizationId }: { organizationId?: string }) {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => data.discard.mutate(status.generation)}>
+                      <AlertDialogAction
+                        disabled={data.discard.isPending}
+                        onClick={() =>
+                          data.discard.mutate(status.generation, {
+                            onSettled: () => setDiscardOpen(false),
+                          })
+                        }
+                      >
                         Discard setup
                       </AlertDialogAction>
                     </AlertDialogFooter>

@@ -31,6 +31,8 @@ type ScreenState = {
    * one when a case needs to observe the screen while that answer is in flight.
    */
   answerPage: (pageParam: string | undefined) => Page | Promise<Page>;
+  /** The option objects the screen handed the list's query, newest last. */
+  builtQueryOptions: Record<string, unknown>[];
   now: number;
   isPending: boolean;
   isError: boolean;
@@ -54,6 +56,7 @@ const state = vi.hoisted((): ScreenState => ({
   answerPage: () => {
     throw new Error('no page source installed');
   },
+  builtQueryOptions: [],
   now: Date.parse('2026-11-15T12:00:00.000Z'),
   isPending: false,
   isError: false,
@@ -284,6 +287,7 @@ function stubInfiniteQuery() {
  * the page the page param names.
  */
 function buildReceiptsQueryOptions(input: { limit: number }, options: InfiniteOptionsOverride) {
+  state.builtQueryOptions.push(options);
   return infiniteQueryOptions({
     ...options,
     queryKey: ['moderation.listReportReceipts', input],
@@ -420,6 +424,7 @@ beforeEach(() => {
   pageByCursor.clear();
   state.pages = [];
   state.pageRequests = [];
+  state.builtQueryOptions = [];
   state.answerPage = () => {
     throw new Error('no page source installed');
   };
@@ -792,5 +797,16 @@ describe('ReportReceiptsScreen', () => {
     // The spinner ends with the read, and the rows are the refreshed page one.
     expect(pullControl(root).props.refreshing).toBe(false);
     expect(rows(root)).toHaveLength(PAGE_ROWS);
+  });
+
+  it('settles the first load offline instead of holding its skeleton', async () => {
+    // The default `networkMode: 'online'` would pause in `pending` while the
+    // online manager reports offline: no rows, no error, no retry.
+    await mount();
+
+    expect(state.builtQueryOptions.at(-1)).toMatchObject({
+      networkMode: 'always',
+      refetchOnReconnect: true,
+    });
   });
 });

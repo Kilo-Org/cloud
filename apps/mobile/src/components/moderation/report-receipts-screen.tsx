@@ -23,6 +23,8 @@ import {
   reconcileFirstPage,
   withInfiniteRetention,
 } from '@/lib/query/infinite-retention';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { reportReceiptRoute } from '@/lib/report-receipt-route';
 import { statusLabel, TRIAGE_KEYS } from '@/lib/report-receipt-status';
 import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
@@ -77,6 +79,8 @@ export function ReportReceiptsScreen() {
             hasRetentionBudget(pages.length, MAX_PAGES)
               ? (lastPage.nextCursor ?? undefined)
               : undefined,
+          // A paused first load leaves the skeleton on screen with no retry.
+          ...SETTLE_WHILE_OFFLINE,
         }
       ),
       MAX_PAGES
@@ -133,7 +137,11 @@ export function ReportReceiptsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profile.reportReceipts.title')} showBackButton />
+      <ScreenHeader
+        title={t('profile.reportReceipts.title')}
+        showBackButton
+        backFallback={PROFILE_TAB_HREF}
+      />
       <View className="flex-1">
         {loading ? (
           <TabScreenScrollView className="flex-1" contentContainerClassName="px-4 pt-4">

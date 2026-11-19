@@ -4,7 +4,6 @@ import { after } from 'next/server';
 import {
   enkryptCreditsToMicrodollars,
   recordEnkryptUsage,
-  type EnkryptGuardrailCall,
   type EnkryptUsageRecord,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import {
@@ -31,9 +30,9 @@ export type EnkryptInputGuardrail = {
   /**
    * Await immediately before the upstream call. Never rejects. Waits only for the blocking
    * detectors' scan and, for a block, its cache write. The measured wait is the latency the
-   * guardrail added to the request, and is stored on one of the request's usage records and in
-   * the report. A guardrail that only logs adds none, so it stores its log-only scan time instead.
-   * That is not what a blocking scan would add, since one stops at its first detection.
+   * guardrail added to the request, and is stored in the report. A guardrail that only logs adds
+   * none, so the report stores its log-only scan time instead. That is not what a blocking scan
+   * would add, since one stops at its first detection.
    */
   awaitVerdict(): Promise<EnkryptGuardrailVerdict>;
   /**
@@ -64,25 +63,6 @@ function splitScan(scan: EnkryptGuardrailRequest | null): EnkryptGuardrailScans 
     blocking: blocking && { ...scan, config: blocking },
     logOnly: logOnly && { ...scan, config: logOnly },
   };
-}
-
-/**
- * The request's wait for its verdict is counted once, on the last usage record of its blocking scan
- * in report order, or on the last log-only record when the blocking scan recorded no call. That is
- * not necessarily the last call made, since the calls run in another order. Without blocking
- * detectors the request waits for no scan, so callers pass the log-only scan time instead.
- */
-export function usageRecordsWithAddedLatency(
-  blockingCalls: EnkryptGuardrailCall[],
-  logOnlyCalls: EnkryptGuardrailCall[],
-  addedLatencyMs: number | null
-): EnkryptUsageRecord[] {
-  const calls = [...blockingCalls, ...logOnlyCalls];
-  const latencyIndex = (blockingCalls.length > 0 ? blockingCalls.length : calls.length) - 1;
-  return calls.map((call, index) => ({
-    ...call,
-    addedLatencyMs: index === latencyIndex ? addedLatencyMs : null,
-  }));
 }
 
 /** Never rejects: a failed write is logged, with `logFields` first, and the record dropped. */
@@ -221,17 +201,8 @@ export function startEnkryptInputGuardrail(
       : addedLatencyMs;
   };
   after(async () => {
-    const [blocking, logOnly, latency] = await Promise.all([
-      blockingResults,
-      logOnlyResults,
-      latencyMs(),
-    ]);
-    const usageRecords = usageRecordsWithAddedLatency(
-      blocking.flatMap(result => result.usageRecords),
-      logOnly.flatMap(result => result.usageRecords),
-      latency
-    );
-    await recordEnkryptUsageRecords(usageRecords);
+    const results = (await Promise.all([blockingResults, logOnlyResults])).flat();
+    await recordEnkryptUsageRecords(results.flatMap(result => result.usageRecords));
   });
   return {
     async requestLogs(shouldCaptureResponse = true) {

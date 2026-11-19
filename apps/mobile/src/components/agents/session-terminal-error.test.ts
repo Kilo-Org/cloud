@@ -6,7 +6,6 @@ import { type SdkStatusMessageCode } from '@kilocode/cloud-agent-sdk';
 import { i18n } from '@/i18n';
 
 import { type MessageFailure } from './message-failure-state';
-import { SESSION_HISTORY_FAILURES } from './session-history-failures';
 import {
   buildTerminalErrorCopyText,
   classifyTerminalError,
@@ -264,26 +263,53 @@ describe('resolveSessionTerminalError', () => {
   });
 
   it.each([
-    SESSION_HISTORY_FAILURES.too_large.message,
-    SESSION_HISTORY_FAILURES.invalid_data.message,
-  ])('offers no Retry for a stored transcript that cannot be read: %s', message => {
-    // The stored page is oversize or unreadable, so the same read answers the
-    // same way every time: the reader gets the permanent not-available state
-    // instead of a Retry that cannot succeed.
+    ['too_large', 'agentChat.session.historyTooLarge'],
+    ['invalid_data', 'agentChat.session.historyUnavailable'],
+  ] as const)(
+    'offers no Retry for a stored transcript that cannot be read: %s',
+    (kind, copyKey) => {
+      // The stored page is oversize or unreadable, so the same read answers the
+      // same way every time. The kind decides the terminal state, not the error
+      // sentence, so the arbitrary wire text stays in `detail` and the reader
+      // gets the kind's own copy instead of a Retry that cannot succeed.
+      expect(
+        resolveSessionTerminalError({
+          error: 'boom',
+          statusIndicator: null,
+          messageCount: 0,
+          hasFailedPreparation: false,
+          historyFailureKind: kind,
+        })
+      ).toEqual({
+        variant: 'server',
+        title: i18n.t('agentChat.session.couldNotLoadThisSession'),
+        message: i18n.t(copyKey),
+        retryable: false,
+        retryWith: 'session',
+        detail: 'boom',
+      });
+    }
+  );
+
+  it('still offers Retry for a retryable transcript read failure', () => {
     expect(
       resolveSessionTerminalError({
-        error: message,
+        error: 'boom',
         statusIndicator: null,
         messageCount: 0,
         hasFailedPreparation: false,
+        historyFailureKind: 'retryable_failure',
       })
-    ).toMatchObject({ retryable: false, detail: message });
+    ).toMatchObject({ retryable: true });
   });
 
-  it('still offers Retry for a transient transcript read failure', () => {
+  it('does not decide retry-vs-terminal from the error sentence alone', () => {
+    // A failure whose kind the manager did not carry (for example a plain
+    // transport failure) is classified like any other error: the transcript
+    // sentence is terminal only when its kind says so.
     expect(
       resolveSessionTerminalError({
-        error: SESSION_HISTORY_FAILURES.retryable_failure.message,
+        error: 'Session history too large to load',
         statusIndicator: null,
         messageCount: 0,
         hasFailedPreparation: false,

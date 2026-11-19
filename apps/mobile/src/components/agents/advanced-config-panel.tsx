@@ -56,7 +56,7 @@ type AdvancedConfigPanelProps = Readonly<{
   /** The route's organization scope; `undefined` is a personal session. */
   organizationId?: string;
   /**
-   * The session's profile override, or null to use the effective default.
+   * The pick this session will run on, or null when nothing picked resolves.
    * Used for the resource summary; the Environment row owns profile selection.
    */
   selectedProfileId: string | null;

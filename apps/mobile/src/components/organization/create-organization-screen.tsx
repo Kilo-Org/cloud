@@ -228,7 +228,7 @@ export function CreateOrganizationScreen() {
           disabled={!canSubmit || settling}
           loading={pending}
         >
-          <Text className="text-primary-foreground">{t('organization.create.title')}</Text>
+          <Text>{t('organization.create.title')}</Text>
         </Button>
       </TabScreenScrollView>
     </View>

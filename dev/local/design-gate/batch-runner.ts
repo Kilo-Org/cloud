@@ -629,12 +629,13 @@ export async function batchesMain(argv: readonly string[], deps: BatchesDeps): P
         if (values.email === undefined || values.out === undefined) {
           throw new Error('seed needs --email <fake@example.com> and --out <seed-map.json>');
         }
-        // Only the steps the selected rows reference run, so a topic the run
-        // never reads (sessions needs a GitHub integration) cannot fail it.
+        // Only the steps the selected rows need run, so a topic the run never
+        // reads (sessions needs a GitHub integration) cannot fail it.
         const only = values.only?.split(',').filter(Boolean);
-        const rows = readManifest(manifestFile).filter(
-          row => only === undefined || only.includes(row.batch)
-        );
+        const manifest = readManifest(manifestFile);
+        const unknown = (only ?? []).filter(id => !manifest.some(row => row.batch === id));
+        if (unknown.length > 0) throw new Error(`unknown batch(es): ${unknown.join(', ')}`);
+        const rows = manifest.filter(row => only === undefined || only.includes(row.batch));
         const steps = values.step ?? stepsFor(rows);
         deps.log(`seed steps: ${steps.join(', ') || '(none)'}`);
         const map = seedAll({

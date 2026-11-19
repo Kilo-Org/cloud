@@ -113,14 +113,13 @@ export const agentBriefingRouter = createTRPCRouter({
           });
       }
       await db.transaction(async tx => {
-        if (input.enabled) {
+        if (input.enabled || input.language !== undefined) {
           const timezone = input.timezone ?? 'UTC';
           await tx
             .insert(agent_briefing_preferences)
             .values({
               kilo_user_id: ctx.user.id,
               timezone,
-              language: input.language ?? 'en',
               next_run_at: nextBriefingTime(
                 DEFAULT_BRIEFING_SCHEDULE.morningStart,
                 timezone,
@@ -128,6 +127,12 @@ export const agentBriefingRouter = createTRPCRouter({
               ).toISOString(),
             })
             .onConflictDoNothing();
+        }
+        if (input.language !== undefined) {
+          await tx
+            .update(agent_briefing_preferences)
+            .set({ language: input.language, updated_at: new Date().toISOString() })
+            .where(eq(agent_briefing_preferences.kilo_user_id, ctx.user.id));
         }
         const values = {
           kilo_user_id: ctx.user.id,

@@ -198,55 +198,62 @@ describe('Switch', () => {
     expect(disabled?.onStartShouldSetResponder?.()).toBe(false);
   });
 
-  it('paints the muted pair on a disabled on switch and keeps it on', () => {
+  it('paints the quiet pair on a disabled on switch and keeps it on', () => {
     native.os = 'android';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({ disabled: true, value: true }).root);
     expect(props.value).toBe(true);
     expect(props.trackColor).toEqual({
-      false: lightColors.mutedSoft,
-      true: lightColors.mutedSoft,
+      false: lightColors.ringTrack,
+      true: lightColors.ringTrack,
     });
-    expect(props.thumbColor).toBe(lightColors.foreground);
-    expect(props.trackColor?.true).not.toBe(lightColors.primary);
+    expect(props.thumbColor).toBe(lightColors.muted);
   });
 
-  it('paints the same muted pair on a disabled off switch', () => {
+  it('paints the same quiet pair on a disabled off switch', () => {
     native.os = 'android';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({ disabled: true, value: false }).root);
     expect(props.trackColor).toEqual({
-      false: lightColors.mutedSoft,
-      true: lightColors.mutedSoft,
+      false: lightColors.ringTrack,
+      true: lightColors.ringTrack,
     });
-    expect(props.thumbColor).toBe(lightColors.foreground);
+    expect(props.thumbColor).toBe(lightColors.muted);
   });
 
-  it('paints one disabled pair in dark mode too, off the brand accent', () => {
+  it('never paints a disabled grip in the scheme ink, which outranks an enabled one', () => {
+    native.os = 'android';
+    for (const [scheme, colors] of [
+      ['light', lightColors],
+      ['dark', darkColors],
+    ] as const) {
+      native.scheme = scheme;
+      const disabled = nativeProps(renderSwitch({ disabled: true, value: true }).root);
+      const enabled = nativeProps(renderSwitch({ value: true }).root);
+      expect(disabled.thumbColor).not.toBe(colors.foreground);
+      expect(disabled.thumbColor).not.toBe(enabled.thumbColor);
+    }
+  });
+
+  it('paints one disabled pair shape in dark mode too, off the brand accent', () => {
     native.os = 'android';
     native.scheme = 'dark';
     const on = nativeProps(renderSwitch({ disabled: true, value: true }).root);
     const off = nativeProps(renderSwitch({ disabled: true, value: false }).root);
     expect(on.trackColor).toEqual({
-      false: darkColors.mutedSoft,
-      true: darkColors.mutedSoft,
+      false: darkColors.ringTrack,
+      true: darkColors.ringTrack,
     });
-    // The thumb keeps the scheme's ink so the grey track still reads as a
-    // control in both themes; the position alone says on or off.
-    expect(on.thumbColor).toBe(darkColors.foreground);
-    // The dark scheme's ink and the accent's grip share one token, so the
-    // readable contrast is against the accent track, not the grip token.
-    expect(on.thumbColor).not.toBe(darkColors.selection);
+    expect(on.thumbColor).toBe(darkColors.mutedForeground);
     expect(off.trackColor).toEqual(on.trackColor);
     expect(off.thumbColor).toBe(on.thumbColor);
-    expect(on.trackColor?.true).not.toBe(darkColors.primary);
   });
 
   it('takes the disabled state from the accessibility state', () => {
     native.os = 'android';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({ accessibilityState: { disabled: true } }).root);
-    expect(props.trackColor?.true).toBe(lightColors.mutedSoft);
+    expect(props.trackColor?.true).toBe(lightColors.ringTrack);
   });
 
   it('leaves the pair to the platform on iOS, which fades a disabled switch itself', () => {

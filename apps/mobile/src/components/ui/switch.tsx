@@ -45,16 +45,17 @@ const IOS_TOUCH_BOX_STYLE = {
  * without this pair a row whose title dims for "not available" keeps a
  * full-strength accent track beside it and reads as both unavailable and on.
  *
- * The pair is the same for on and off, and for light and dark: the mid-neutral
- * `mutedSoft` track under the scheme's own ink `foreground`. A grey track with
- * a contrasting thumb reads as a control that is not available in either
- * scheme, while the thumb's position still says which way it points. The
- * palette's disabled accent fill (`primaryDisabled`) made light's track a dark
- * olive with a white thumb — at a glance an active switch — and dark's a light
- * grey with a dark thumb — at a glance an off one, so one state read two ways
- * across themes (`app-notifications` gate, 2026-11-18). `mutedSoft` clears a
- * visible step on the row's `secondary` surface in both schemes (2.2:1 light,
- * 2.2:1 dark), and `foreground` clears 6.6:1 against it in both.
+ * The pair is the same for on and off and has one shape in light and dark: a
+ * soft grip on the translucent ink track `ringTrack`, `muted` in light and
+ * `mutedForeground` in dark. Each half is quieter than its enabled twin (the
+ * white or `foreground` grip, the `mutedSoft` or `mutedForeground` off track,
+ * the olive on track), so disabled reads quieter than enabled in both schemes,
+ * while the thumb's position still says which way it points. The earlier
+ * `mutedSoft` track under the ink `foreground` grip painted a near-black grip
+ * in light, the darkest mark in its card, and a light one in dark, so one
+ * state read two ways across themes (Android critic, 2026-11-19). An olive
+ * `primaryDisabled` track read as active (`app-notifications` gate,
+ * 2026-11-18).
  *
  * iOS is left alone: UIKit fades a disabled `UISwitch` itself, so painting the
  * muted pair there would dim the control twice. Android is the platform that
@@ -111,11 +112,10 @@ export function Switch({
   const enabledOffGrip = dark ? colors.foreground : colors.primaryForeground;
   const enabledOffTrack = dark ? colors.mutedForeground : colors.mutedSoft;
   // The off grip sits on the off track. A control that cannot change paints
-  // one muted pair at the position it still shows: the mid-neutral track under
-  // the scheme's ink, so light and dark both read as unavailable instead of
-  // one reading active and the other off.
-  const disabledTrack = colors.mutedSoft;
-  const disabledGrip = colors.foreground;
+  // one quiet pair at the position it still shows: a soft grip on the
+  // translucent ink track, quieter than every enabled half in both schemes.
+  const disabledTrack = colors.ringTrack;
+  const disabledGrip = dark ? colors.mutedForeground : colors.muted;
   const offGrip = inactive ? disabledGrip : enabledOffGrip;
   const offTrack = inactive ? disabledTrack : enabledOffTrack;
   const onTrack = inactive ? disabledTrack : enabledOnTrack;

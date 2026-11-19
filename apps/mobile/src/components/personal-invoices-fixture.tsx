@@ -20,7 +20,7 @@ import { TRPCProvider } from '@/lib/trpc';
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
 type InvoicesPage = RouterOutputs['user']['invoicesPage'];
 
-export type PersonalInvoicesFixtureState = 'listed' | 'empty';
+type PersonalInvoicesFixtureState = 'listed' | 'empty';
 
 /**
  * Sample rows. Each `created` is noon UTC on the day its description names: the
@@ -76,7 +76,9 @@ function createFixtureClient(state: { readonly value: PersonalInvoicesFixtureSta
             throw new Error('Personal invoices fixture does not allow writes');
           }
           if (url.includes('/user.invoicesPage')) {
-            return fixtureResponse(state.value === 'listed' ? { ...EMPTY_PAGE, entries: INVOICES } : EMPTY_PAGE);
+            return fixtureResponse(
+              state.value === 'listed' ? { ...EMPTY_PAGE, entries: INVOICES } : EMPTY_PAGE
+            );
           }
           throw new Error('Read not provided by the personal invoices fixture');
         },

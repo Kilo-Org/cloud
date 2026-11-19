@@ -4082,7 +4082,13 @@
     "creditsRequired": "Pas assez de crédits pour envoyer ce message."
   },
   "settingsTools": {
-    "confirmTitle": "Confirmer cette modification ?"
+    "confirmTitle": "Confirmer cette modification ?",
+    "guarded": {
+      "spendAlertsOff": "Désactiver les alertes de dépenses ? Vous ne recevrez plus de notifications en cas de franchissement de seuil de dépenses ou de pics horaires.",
+      "balanceAlertsOff": "Désactiver les alertes de solde ? Vous ne recevrez plus de notifications lorsque vos crédits sont bas.",
+      "securityFindingsOff": "Désactiver les résultats de sécurité ? Vous ne recevrez plus de notifications concernant les nouveaux résultats de sécurité.",
+      "hideBalanceOn": "Masquer vos soldes ? Les soldes de crédits n'apparaîtront plus sur les écrans de profil et dans le hub de l'organisation."
+    }
   },
   "appActions": {
     "start": {

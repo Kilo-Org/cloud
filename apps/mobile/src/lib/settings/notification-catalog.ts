@@ -4,6 +4,7 @@ import {
 } from '@/lib/hooks/agent-push-preference';
 
 import { notificationBooleanSetting } from './bindings';
+import { guardedChangeSummary } from './confirm';
 import { type AppSettingEntry } from './types';
 
 /**
@@ -11,6 +12,10 @@ import { type AppSettingEntry } from './types';
  * the read comes from the `getNotificationPreferences` query cache and the write
  * goes through the tRPC mutation the Notifications screen itself uses, so an
  * agent's change shows up on that screen.
+ *
+ * Turning off an alert channel — spend alerts, balance alerts, security
+ * findings — asks the person first. The attention, progress and session-status
+ * channels write at once, in both directions.
  */
 const NOTIFICATION_DESCRIPTIONS = {
   agentAttention: 'Notify when an agent needs your attention.',
@@ -22,10 +27,16 @@ const NOTIFICATION_DESCRIPTIONS = {
 } satisfies Record<NotificationCategoryKey, string>;
 
 export const notificationToggleEntries: readonly AppSettingEntry[] = NOTIFICATION_CATEGORY_KEYS.map(
-  key => ({
-    name: `notifications.${key}`,
-    description: NOTIFICATION_DESCRIPTIONS[key],
-    kind: 'boolean',
-    bind: () => notificationBooleanSetting(`notifications.${key}`, key),
-  })
+  key => {
+    const name = `notifications.${key}`;
+    return {
+      name,
+      description: NOTIFICATION_DESCRIPTIONS[key],
+      kind: 'boolean',
+      bind: () =>
+        notificationBooleanSetting(name, key, {
+          confirmWhen: value => guardedChangeSummary(name, value),
+        }),
+    };
+  }
 );

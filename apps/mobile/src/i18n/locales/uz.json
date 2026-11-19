@@ -4021,7 +4021,13 @@
     "creditsRequired": "Bu xabarni yuborish uchun kreditlar yetarli emas."
   },
   "settingsTools": {
-    "confirmTitle": "Bu oʻzgarish tasdiqlansinmi?"
+    "confirmTitle": "Bu oʻzgarish tasdiqlansinmi?",
+    "guarded": {
+      "spendAlertsOff": "Xarajat ogohlantirishlarini o'chirasizmi? Xarajat chegarasidan o'tishlar va soatlik keskin ko'tarilishlar haqida bildirishnomalar olishni to'xtatasiz.",
+      "balanceAlertsOff": "Balans ogohlantirishlarini o'chirasizmi? Kreditlaringiz kam qolganda bildirishnomalar olishni to'xtatasiz.",
+      "securityFindingsOff": "Xavfsizlik topilmalarini o'chirasizmi? Yangi xavfsizlik topilmalari haqida bildirishnomalar olishni to'xtatasiz.",
+      "hideBalanceOn": "Balanslaringizni yashirasizmi? Kredit balanslari endi profil ekranlarida va tashkilot markazida ko'rinmaydi."
+    }
   },
   "appActions": {
     "start": {

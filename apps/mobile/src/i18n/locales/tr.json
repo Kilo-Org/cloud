@@ -4021,7 +4021,13 @@
     "creditsRequired": "Bu mesajı göndermek için yeterli kredi yok."
   },
   "settingsTools": {
-    "confirmTitle": "Bu değişiklik onaylansın mı?"
+    "confirmTitle": "Bu değişiklik onaylansın mı?",
+    "guarded": {
+      "spendAlertsOff": "Harcama uyarıları kapatılsın mı? Harcama eşiği aşımları ve saatlik ani artışlar hakkında bildirim almayı bırakırsınız.",
+      "balanceAlertsOff": "Bakiye uyarıları kapatılsın mı? Kredileriniz azaldığında bildirim almayı bırakırsınız.",
+      "securityFindingsOff": "Güvenlik bulguları kapatılsın mı? Yeni güvenlik bulguları hakkında bildirim almayı bırakırsınız.",
+      "hideBalanceOn": "Bakiyeleriniz gizlensin mi? Kredi bakiyeleri artık profil ekranlarında ve kuruluş merkezinde görünmeyecek."
+    }
   },
   "appActions": {
     "start": {

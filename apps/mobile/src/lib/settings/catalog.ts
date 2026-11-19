@@ -58,6 +58,7 @@ import {
   readNotificationPreferences,
   stringSetting,
 } from './bindings';
+import { guardedChangeSummary } from './confirm';
 import { languageEntry } from './language-catalog';
 import { notificationToggleEntries } from './notification-catalog';
 import { type AppSettingEntry } from './types';
@@ -66,6 +67,11 @@ import { type AppSettingEntry } from './types';
  * Every setting an agent may read and change, each one bound to the exact store
  * the manual screen writes. This table is a view over those stores, never a
  * second copy, so a manual change and an agent change are the same change.
+ *
+ * Some settings ask the person before one direction of the change: hiding the
+ * balances and turning off the alert channels named in `guardedChangeSummary`.
+ * The guarded direction shows the confirm dialog and writes nothing on Cancel;
+ * the other direction writes at once.
  *
  * Excluded on purpose: biometric unlock (it needs a device-auth gesture an agent
  * cannot perform), feature flags (`__DEV__` only), and the account-lifecycle
@@ -83,6 +89,8 @@ type BooleanToggle = Readonly<{
   description: string;
   read: () => boolean;
   write: (next: boolean) => void;
+  /** The dialog body for a value that asks the person first. */
+  confirmWhen?: (value: boolean) => string | undefined;
 }>;
 
 const BOOLEAN_TOGGLES: readonly BooleanToggle[] = [
@@ -134,6 +142,7 @@ const BOOLEAN_TOGGLES: readonly BooleanToggle[] = [
     description: 'Hide credit balances on the profile screens and the organization hub.',
     read: getHideBalance,
     write: setHideBalance,
+    confirmWhen: value => guardedChangeSummary('hideBalance', value),
   },
   {
     name: 'gatewayTranscription',
@@ -153,7 +162,8 @@ const toggleEntries: readonly AppSettingEntry[] = BOOLEAN_TOGGLES.map(toggle => 
   name: toggle.name,
   description: toggle.description,
   kind: 'boolean',
-  bind: () => booleanSetting(toggle.name, toggle.read, toggle.write),
+  bind: () =>
+    booleanSetting(toggle.name, toggle.read, toggle.write, { confirmWhen: toggle.confirmWhen }),
 }));
 
 export const ENTRIES: readonly AppSettingEntry[] = [

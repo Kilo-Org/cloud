@@ -4021,7 +4021,13 @@
     "creditsRequired": "Ikke nok kreditter til at sende denne besked."
   },
   "settingsTools": {
-    "confirmTitle": "Bekræft denne ændring?"
+    "confirmTitle": "Bekræft denne ændring?",
+    "guarded": {
+      "spendAlertsOff": "Slå forbrugsadvarsler fra? Du vil ikke længere modtage notifikationer om overskridelser af forbrugstærskler og timebaserede stigninger.",
+      "balanceAlertsOff": "Slå saldoadvarsler fra? Du vil ikke længere modtage notifikationer, når du er ved at løbe tør for kreditter.",
+      "securityFindingsOff": "Slå sikkerhedsfund fra? Du vil ikke længere modtage notifikationer om nye sikkerhedsfund.",
+      "hideBalanceOn": "Skjul dine saldi? Kreditsaldi vil ikke længere blive vist på profilskærmene og i organisationshubben."
+    }
   },
   "appActions": {
     "start": {

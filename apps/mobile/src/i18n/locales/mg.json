@@ -4021,7 +4021,13 @@
     "creditsRequired": "Tsy ampy kireditra handefasana ity hafatra ity."
   },
   "settingsTools": {
-    "confirmTitle": "Hamafiso ity fanovana ity?"
+    "confirmTitle": "Hamafiso ity fanovana ity?",
+    "guarded": {
+      "spendAlertsOff": "Hamono ny fampitandremana momba ny fandaniana? Tsy handray fampandrenesana intsony ianao momba ny fihoaran'ny fetra fandaniana sy ny fisondrotana isan'ora.",
+      "balanceAlertsOff": "Hamono ny fampitandremana momba ny fifandanjana? Tsy handray fampandrenesana intsony ianao rehefa kely ny kreditrao.",
+      "securityFindingsOff": "Hamono ny fahitana momba ny fiarovana? Tsy handray fampandrenesana intsony ianao momba ny fahitana vaovao momba ny fiarovana.",
+      "hideBalanceOn": "Hanafina ny fifandanjanao? Tsy hiseho intsony eo amin'ny efijery mombamomba sy ny foiben'ny fikambanana ny fifandanjana kreditrao."
+    }
   },
   "appActions": {
     "start": {

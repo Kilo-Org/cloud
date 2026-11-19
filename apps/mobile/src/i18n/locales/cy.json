@@ -4265,7 +4265,13 @@
     "creditsRequired": "Dim digon o gredydau i anfon y neges hon."
   },
   "settingsTools": {
-    "confirmTitle": "Cadarnhau'r newid hwn?"
+    "confirmTitle": "Cadarnhau'r newid hwn?",
+    "guarded": {
+      "spendAlertsOff": "Diffodd hysbysiadau gwariant? Byddech yn rhoi'r gorau i gael hysbysiadau am groesi trothwyon gwariant a sbigau bob awr.",
+      "balanceAlertsOff": "Diffodd hysbysiadau balans? Byddech yn rhoi'r gorau i gael hysbysiadau pan fydd eich credydau'n brin.",
+      "securityFindingsOff": "Diffodd canfyddiadau diogelwch? Byddech yn rhoi'r gorau i gael hysbysiadau am ganfyddiadau diogelwch newydd.",
+      "hideBalanceOn": "Cuddio eich balansau? Ni fydd balansau credyd yn ymddangos mwyach ar sgriniau'r proffil a chanolfan y sefydliad."
+    }
   },
   "appActions": {
     "start": {

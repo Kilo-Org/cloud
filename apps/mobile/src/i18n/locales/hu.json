@@ -4021,7 +4021,13 @@
     "creditsRequired": "Nincs elég egyenleged ennek az üzenetnek az elküldéséhez."
   },
   "settingsTools": {
-    "confirmTitle": "Megerősíted ezt a módosítást?"
+    "confirmTitle": "Megerősíted ezt a módosítást?",
+    "guarded": {
+      "spendAlertsOff": "Kikapcsolja a költési riasztásokat? Ezután nem kap értesítéseket a költési küszöbértékek átlépéséről és az óránkénti kiugrásokról.",
+      "balanceAlertsOff": "Kikapcsolja az egyenlegriasztásokat? Ezután nem kap értesítéseket, amikor a kreditek alacsonyra csökkennek.",
+      "securityFindingsOff": "Kikapcsolja a biztonsági észleléseket? Ezután nem kap értesítéseket az új biztonsági észlelésekről.",
+      "hideBalanceOn": "Elrejti az egyenlegeit? A kreditegyenlegek többé nem jelennek meg a profilképernyőkön és a szervezeti központban."
+    }
   },
   "appActions": {
     "start": {

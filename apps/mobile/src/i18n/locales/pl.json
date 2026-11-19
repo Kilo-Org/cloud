@@ -4143,7 +4143,13 @@
     "creditsRequired": "Brak wystarczającej liczby kredytów, aby wysłać tę wiadomość."
   },
   "settingsTools": {
-    "confirmTitle": "Potwierdzić tę zmianę?"
+    "confirmTitle": "Potwierdzić tę zmianę?",
+    "guarded": {
+      "spendAlertsOff": "Wyłączyć alerty wydatków? Przestaniesz otrzymywać powiadomienia o przekroczeniu progów wydatków i skokach godzinowych.",
+      "balanceAlertsOff": "Wyłączyć alerty salda? Przestaniesz otrzymywać powiadomienia, gdy środki będą się kończyć.",
+      "securityFindingsOff": "Wyłączyć ustalenia dotyczące bezpieczeństwa? Przestaniesz otrzymywać powiadomienia o nowych ustaleniach dotyczących bezpieczeństwa.",
+      "hideBalanceOn": "Ukryć Twoje salda? Salda środków nie będą już wyświetlane na ekranach profilu i w centrum organizacji."
+    }
   },
   "appActions": {
     "start": {

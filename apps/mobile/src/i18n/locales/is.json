@@ -4021,7 +4021,13 @@
     "creditsRequired": "Ekki nógu mikil inneign til að senda þetta skilaboð."
   },
   "settingsTools": {
-    "confirmTitle": "Staðfesta þessa breytingu?"
+    "confirmTitle": "Staðfesta þessa breytingu?",
+    "guarded": {
+      "spendAlertsOff": "Slökkva á útgjaldaaðvörunum? Þú myndir hætta að fá tilkynningar þegar farið er yfir útgjaldamörk og um skyndilegar aukningar á klukkustundar fresti.",
+      "balanceAlertsOff": "Slökkva á inneignaraðvörunum? Þú myndir hætta að fá tilkynningar þegar inneign þín er farin að verða lítil.",
+      "securityFindingsOff": "Slökkva á öryggisniðurstöðum? Þú myndir hætta að fá tilkynningar um nýjar öryggisniðurstöður.",
+      "hideBalanceOn": "Fela inneignir þínar? Inneignir munu ekki lengur birtast á prófílskjáum og miðstöð stofnunarinnar."
+    }
   },
   "appActions": {
     "start": {

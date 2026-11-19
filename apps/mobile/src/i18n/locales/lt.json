@@ -4143,7 +4143,13 @@
     "creditsRequired": "Nepakanka kreditų šiai žinutei išsiųsti."
   },
   "settingsTools": {
-    "confirmTitle": "Patvirtinti šį pakeitimą?"
+    "confirmTitle": "Patvirtinti šį pakeitimą?",
+    "guarded": {
+      "spendAlertsOff": "Išjungti išlaidų įspėjimus? Nustotumėte gauti pranešimus apie išlaidų slenksčio viršijimą ir valandinius šuolius.",
+      "balanceAlertsOff": "Išjungti likučio įspėjimus? Nustotumėte gauti pranešimus, kai kreditai artėja prie nulio.",
+      "securityFindingsOff": "Išjungti saugumo radinius? Nustotumėte gauti pranešimus apie naujus saugumo radinius.",
+      "hideBalanceOn": "Slėpti savo likučius? Kreditų likučiai neberodomi profilio ekranuose ir organizacijos centre."
+    }
   },
   "appActions": {
     "start": {

@@ -4021,7 +4021,13 @@
     "creditsRequired": "Ego ojiji ezughị oke izipu ozi a."
   },
   "settingsTools": {
-    "confirmTitle": "Kwenye mgbanwe a?"
+    "confirmTitle": "Kwenye mgbanwe a?",
+    "guarded": {
+      "spendAlertsOff": "Gbanyụọ ọkwa mmefu? Ị ga-akwụsị ịnata ọkwa gbasara ịgafe oke mmefu na mmụba mberede kwa elekere.",
+      "balanceAlertsOff": "Gbanyụọ ọkwa ego fọdụrụ? Ị ga-akwụsị ịnata ọkwa mgbe kredit gị fọrọ ntakịrị.",
+      "securityFindingsOff": "Gbanyụọ nchọpụta nchebe? Ị ga-akwụsị ịnata ọkwa gbasara nchọpụta nchebe ọhụrụ.",
+      "hideBalanceOn": "Zoo ego fọdụrụ gị? Ego kredit agaghịzi apụta na ihuenyo profaịlụ na ebe nzukọ."
+    }
   },
   "appActions": {
     "start": {

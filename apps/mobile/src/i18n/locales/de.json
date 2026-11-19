@@ -4021,7 +4021,13 @@
     "creditsRequired": "Nicht genug Guthaben, um diese Nachricht zu senden."
   },
   "settingsTools": {
-    "confirmTitle": "Diese Änderung bestätigen?"
+    "confirmTitle": "Diese Änderung bestätigen?",
+    "guarded": {
+      "spendAlertsOff": "Ausgabenwarnungen ausschalten? Sie würden keine Benachrichtigungen mehr über Überschreitungen der Ausgabenschwellen und stündliche Spitzen erhalten.",
+      "balanceAlertsOff": "Guthabenwarnungen ausschalten? Sie würden keine Benachrichtigungen mehr erhalten, wenn Ihr Guthaben knapp wird.",
+      "securityFindingsOff": "Sicherheitsbefunde ausschalten? Sie würden keine Benachrichtigungen mehr über neue Sicherheitsbefunde erhalten.",
+      "hideBalanceOn": "Guthaben ausblenden? Ihre Guthaben würden dann nicht mehr auf den Profilseiten und im Organisations-Hub angezeigt."
+    }
   },
   "appActions": {
     "start": {

@@ -4021,7 +4021,13 @@
     "creditsRequired": "Niet genoeg tegoed om dit bericht te verzenden."
   },
   "settingsTools": {
-    "confirmTitle": "Deze wijziging bevestigen?"
+    "confirmTitle": "Deze wijziging bevestigen?",
+    "guarded": {
+      "spendAlertsOff": "Uitgavenmeldingen uitschakelen? Je krijgt dan geen meldingen meer over het overschrijden van uitgavendrempels en pieken per uur.",
+      "balanceAlertsOff": "Saldomeldingen uitschakelen? Je krijgt dan geen meldingen meer wanneer je credits bijna op zijn.",
+      "securityFindingsOff": "Beveiligingsbevindingen uitschakelen? Je krijgt dan geen meldingen meer over nieuwe beveiligingsbevindingen.",
+      "hideBalanceOn": "Je saldi verbergen? Je creditsaldo's worden dan niet meer weergegeven op de profielschermen en in de organisatiehub."
+    }
   },
   "appActions": {
     "start": {

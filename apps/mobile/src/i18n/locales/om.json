@@ -4021,7 +4021,13 @@
     "creditsRequired": "Kiriiditiin ergaa kanaa erguuf gahaa miti."
   },
   "settingsTools": {
-    "confirmTitle": "Jijjiirama kana mirkaneessuu?"
+    "confirmTitle": "Jijjiirama kana mirkaneessuu?",
+    "guarded": {
+      "spendAlertsOff": "Akeekkii baasii dhaabuu barbaadda? Waa'ee daangaa baasii darbuu fi ol-ka'ii sa'aatii beeksisa argachuu ni dhiifta.",
+      "balanceAlertsOff": "Akeekkii hafeena dhaabuu barbaadda? Kireediitiin kee yeroo xiqqaatu beeksisa argachuu ni dhiifta.",
+      "securityFindingsOff": "Argannoowwan nageenyaa dhaabuu barbaadda? Waa'ee argannoowwan nageenyaa haaraa beeksisa argachuu ni dhiifta.",
+      "hideBalanceOn": "Hafeena kee dhoksuu barbaadda? Hafeenni kireeditii ammas fuulota piroofaayilii fi giddugala dhaabbataa irratti hin mul'atu."
+    }
   },
   "appActions": {
     "start": {

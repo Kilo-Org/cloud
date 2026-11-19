@@ -4021,7 +4021,13 @@
     "creditsRequired": "Krediiti ei piisa selle sõnumi saatmiseks."
   },
   "settingsTools": {
-    "confirmTitle": "Kas kinnitada see muudatus?"
+    "confirmTitle": "Kas kinnitada see muudatus?",
+    "guarded": {
+      "spendAlertsOff": "Kas lülitada kulutusteated välja? Te ei saaks enam teavitusi kulutuste lävendi ületamiste ja tunniste kulutippude kohta.",
+      "balanceAlertsOff": "Kas lülitada saldoteated välja? Te ei saaks enam teavitusi, kui teie krediit hakkab otsa saama.",
+      "securityFindingsOff": "Kas lülitada turvaprobleemid välja? Te ei saaks enam teavitusi uute turvaprobleemide kohta.",
+      "hideBalanceOn": "Kas peita oma saldod? Krediidisaldod ei ilmuks enam profiilivaadetes ja organisatsiooni keskuses."
+    }
   },
   "appActions": {
     "start": {

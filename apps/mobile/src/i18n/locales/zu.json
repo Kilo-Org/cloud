@@ -4021,7 +4021,13 @@
     "creditsRequired": "Ayikho imikhredithi eyanele yokuthumela lo myalezo."
   },
   "settingsTools": {
-    "confirmTitle": "Qinisekisa lolu shintsho?"
+    "confirmTitle": "Qinisekisa lolu shintsho?",
+    "guarded": {
+      "spendAlertsOff": "Vala izaziso zokusebenzisa imali? Uzoyeka ukuthola izaziso mayelana nokweqa imikhawulo yokusebenzisa imali kanye nokwenyuka kwemali ngehora.",
+      "balanceAlertsOff": "Vala izaziso zebhalansi? Uzoyeka ukuthola izaziso lapho amakhredithi akho encipha.",
+      "securityFindingsOff": "Vala okutholakele kwezokuphepha? Uzoyeka ukuthola izaziso mayelana nokutholakele okusha kwezokuphepha.",
+      "hideBalanceOn": "Fihla amabhalansi akho? Amabhalansi amakhredithi ngeke esabonakala ezikrinini zephrofayili kanye nesizinda senhlangano."
+    }
   },
   "appActions": {
     "start": {

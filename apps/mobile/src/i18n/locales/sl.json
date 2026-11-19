@@ -4143,7 +4143,13 @@
     "creditsRequired": "Ni dovolj kreditov za pošiljanje tega sporočila."
   },
   "settingsTools": {
-    "confirmTitle": "Potrdim to spremembo?"
+    "confirmTitle": "Potrdim to spremembo?",
+    "guarded": {
+      "spendAlertsOff": "Izklopiti opozorila o porabi? Prenehali boste prejemati obvestila o preseganju pragov porabe in urnih skokih.",
+      "balanceAlertsOff": "Izklopiti opozorila o stanju? Prenehali boste prejemati obvestila, ko vam bo zmanjkalo kreditov.",
+      "securityFindingsOff": "Izklopiti varnostne ugotovitve? Prenehali boste prejemati obvestila o novih varnostnih ugotovitvah.",
+      "hideBalanceOn": "Skriti svoje stanje? Kreditna stanja se ne bodo več prikazovala na zaslonih profila in v središču organizacije."
+    }
   },
   "appActions": {
     "start": {

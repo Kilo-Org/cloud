@@ -4021,7 +4021,13 @@
     "creditsRequired": "Nie genoeg krediete om hierdie boodskap te stuur nie."
   },
   "settingsTools": {
-    "confirmTitle": "Bevestig hierdie verandering?"
+    "confirmTitle": "Bevestig hierdie verandering?",
+    "guarded": {
+      "spendAlertsOff": "Skakel bestedingswaarskuwings af? Jy sal ophou om kennisgewings te ontvang oor die oorskryding van bestedingsdrempels en uurlikse pieke.",
+      "balanceAlertsOff": "Skakel balanswaarskuwings af? Jy sal ophou om kennisgewings te ontvang wanneer jou krediete laag raak.",
+      "securityFindingsOff": "Skakel sekuriteitsbevindings af? Jy sal ophou om kennisgewings te ontvang oor nuwe sekuriteitsbevindings.",
+      "hideBalanceOn": "Versteek jou balanse? Kredietbalanse sal nie meer op die profielskerms en die organisasiehub verskyn nie."
+    }
   },
   "appActions": {
     "start": {

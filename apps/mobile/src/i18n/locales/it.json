@@ -4082,7 +4082,13 @@
     "creditsRequired": "Crediti insufficienti per inviare questo messaggio."
   },
   "settingsTools": {
-    "confirmTitle": "Confermare questa modifica?"
+    "confirmTitle": "Confermare questa modifica?",
+    "guarded": {
+      "spendAlertsOff": "Disattivare gli avvisi di spesa? Non riceverai più notifiche sul superamento delle soglie di spesa e sui picchi orari.",
+      "balanceAlertsOff": "Disattivare gli avvisi di saldo? Non riceverai più notifiche quando i tuoi crediti stanno per esaurirsi.",
+      "securityFindingsOff": "Disattivare i risultati di sicurezza? Non riceverai più notifiche sui nuovi risultati di sicurezza.",
+      "hideBalanceOn": "Nascondere i tuoi saldi? I saldi dei crediti non appariranno più nelle schermate del profilo e nell'hub dell'organizzazione."
+    }
   },
   "appActions": {
     "start": {

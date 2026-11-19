@@ -4082,7 +4082,13 @@
     "creditsRequired": "No hi ha prou crèdits per enviar aquest missatge."
   },
   "settingsTools": {
-    "confirmTitle": "Confirmar aquest canvi?"
+    "confirmTitle": "Confirmar aquest canvi?",
+    "guarded": {
+      "spendAlertsOff": "Vols desactivar les alertes de despesa? Deixaries de rebre notificacions sobre superacions dels llindars de despesa i pics horaris.",
+      "balanceAlertsOff": "Vols desactivar les alertes de saldo? Deixaries de rebre notificacions quan els teus crèdits estiguin baixos.",
+      "securityFindingsOff": "Vols desactivar les troballes de seguretat? Deixaries de rebre notificacions sobre noves troballes de seguretat.",
+      "hideBalanceOn": "Vols amagar els teus saldos? Els saldos de crèdit ja no apareixeran a les pantalles de perfil ni al centre de l'organització."
+    }
   },
   "appActions": {
     "start": {

@@ -4143,7 +4143,13 @@
     "creditsRequired": "Nedostatek kreditů k odeslání této zprávy."
   },
   "settingsTools": {
-    "confirmTitle": "Potvrdit tuto změnu?"
+    "confirmTitle": "Potvrdit tuto změnu?",
+    "guarded": {
+      "spendAlertsOff": "Vypnout upozornění na výdaje? Přestali byste dostávat oznámení o překročení prahů výdajů a hodinových špičkách.",
+      "balanceAlertsOff": "Vypnout upozornění na zůstatek? Přestali byste dostávat oznámení, když vám klesne zůstatek kreditů.",
+      "securityFindingsOff": "Vypnout bezpečnostní nálezy? Přestali byste dostávat oznámení o nových bezpečnostních nálezech.",
+      "hideBalanceOn": "Skrýt zůstatky? Zůstatky kreditů se už nebudou zobrazovat na obrazovkách profilu a v centru organizace."
+    }
   },
   "appActions": {
     "start": {

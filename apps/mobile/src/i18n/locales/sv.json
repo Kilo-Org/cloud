@@ -4021,7 +4021,13 @@
     "creditsRequired": "Det räcker inte med krediter för att skicka det här meddelandet."
   },
   "settingsTools": {
-    "confirmTitle": "Bekräfta denna ändring?"
+    "confirmTitle": "Bekräfta denna ändring?",
+    "guarded": {
+      "spendAlertsOff": "Stänga av förbrukningsvarningar? Du skulle sluta få aviseringar om överskridna förbrukningströsklar och timtoppar.",
+      "balanceAlertsOff": "Stänga av saldovarningar? Du skulle sluta få aviseringar när dina krediter börjar ta slut.",
+      "securityFindingsOff": "Stänga av säkerhetsfynd? Du skulle sluta få aviseringar om nya säkerhetsfynd.",
+      "hideBalanceOn": "Dölja dina saldon? Kreditsaldon visas inte längre på profilsidorna och organisationshubben."
+    }
   },
   "appActions": {
     "start": {

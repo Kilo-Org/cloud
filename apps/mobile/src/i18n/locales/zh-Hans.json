@@ -4021,7 +4021,13 @@
     "creditsRequired": "额度不足，无法发送此消息。"
   },
   "settingsTools": {
-    "confirmTitle": "确认此更改？"
+    "confirmTitle": "确认此更改？",
+    "guarded": {
+      "spendAlertsOff": "关闭支出提醒？你将不再收到有关支出阈值超限和每小时峰值的通知。",
+      "balanceAlertsOff": "关闭余额提醒？当你的额度不足时，你将不再收到通知。",
+      "securityFindingsOff": "关闭安全发现提醒？你将不再收到有关新安全发现的通知。",
+      "hideBalanceOn": "隐藏你的余额？额度余额将不再显示在个人资料页面和组织中心。"
+    }
   },
   "appActions": {
     "start": {

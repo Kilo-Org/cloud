@@ -4082,7 +4082,13 @@
     "creditsRequired": "Nema dovoljno kredita za slanje ove poruke."
   },
   "settingsTools": {
-    "confirmTitle": "Potvrditi ovu promenu?"
+    "confirmTitle": "Potvrditi ovu promenu?",
+    "guarded": {
+      "spendAlertsOff": "Isključiti upozorenja o potrošnji? Ne biste više dobijali obaveštenja o prekoračenju pragova potrošnje i naglim skokovima potrošnje po satu.",
+      "balanceAlertsOff": "Isključiti upozorenja o stanju? Ne biste više dobijali obaveštenja kada vam krediti budu pri kraju.",
+      "securityFindingsOff": "Isključiti bezbednosne nalaze? Ne biste više dobijali obaveštenja o novim bezbednosnim nalazima.",
+      "hideBalanceOn": "Sakriti vaša stanja? Stanja kredita se više ne bi prikazivala na ekranima profila i u centru organizacije."
+    }
   },
   "appActions": {
     "start": {

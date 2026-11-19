@@ -4021,7 +4021,13 @@
     "creditsRequired": "Kredit tidak cukup untuk mengirim pesan ini."
   },
   "settingsTools": {
-    "confirmTitle": "Konfirmasi perubahan ini?"
+    "confirmTitle": "Konfirmasi perubahan ini?",
+    "guarded": {
+      "spendAlertsOff": "Matikan peringatan pengeluaran? Anda tidak akan lagi menerima notifikasi saat melewati ambang batas pengeluaran dan saat terjadi lonjakan per jam.",
+      "balanceAlertsOff": "Matikan peringatan saldo? Anda tidak akan lagi menerima notifikasi saat kredit Anda menipis.",
+      "securityFindingsOff": "Matikan temuan keamanan? Anda tidak akan lagi menerima notifikasi tentang temuan keamanan baru.",
+      "hideBalanceOn": "Sembunyikan saldo Anda? Saldo kredit tidak akan lagi muncul di layar profil dan hub organisasi."
+    }
   },
   "appActions": {
     "start": {

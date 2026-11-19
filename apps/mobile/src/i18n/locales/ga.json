@@ -4204,7 +4204,13 @@
     "creditsRequired": "Níl creidmheasanna go leor chun an teachtaireacht seo a sheoladh."
   },
   "settingsTools": {
-    "confirmTitle": "An bhfuil tú cinnte faoin athrú seo?"
+    "confirmTitle": "An bhfuil tú cinnte faoin athrú seo?",
+    "guarded": {
+      "spendAlertsOff": "Múch na foláirimh chaiteachais? Stopfá ag fáil fógraí faoi thrasnuithe tairsí chaiteachais agus faoi bhorrthaí in aghaidh na huaire.",
+      "balanceAlertsOff": "Múch na foláirimh iarmhéid? Stopfá ag fáil fógraí nuair a íslíonn do chreidmheasanna.",
+      "securityFindingsOff": "Múch na fionnachtana slándála? Stopfá ag fáil fógraí faoi fhionnachtana slándála nua.",
+      "hideBalanceOn": "Folaigh do iarmhéideanna? Ní bheidh iarmhéideanna creidmheasa le feiceáil a thuilleadh ar na scáileáin phróifíle ná ar mhol na heagraíochta."
+    }
   },
   "appActions": {
     "start": {

@@ -4021,7 +4021,13 @@
     "creditsRequired": "Kāore i te nui ake ngā moni tōmua hei tuku i tēnei karere."
   },
   "settingsTools": {
-    "confirmTitle": "Whakaū i tēnei huringa?"
+    "confirmTitle": "Whakaū i tēnei huringa?",
+    "guarded": {
+      "spendAlertsOff": "Whakawetohia ngā mataara whakapaunga? Ka kore koe e whiwhi whakamōhiotanga mō ngā whakawhitinga paepae whakapaunga me ngā pikinga ia hāora.",
+      "balanceAlertsOff": "Whakawetohia ngā mataara toenga? Ka kore koe e whiwhi whakamōhiotanga ina iti haere ō whiwhinga moni.",
+      "securityFindingsOff": "Whakawetohia ngā kitenga haumarutanga? Ka kore koe e whiwhi whakamōhiotanga mō ngā kitenga haumarutanga hou.",
+      "hideBalanceOn": "Hunaia ō toenga? Ka kore e whakaaturia ngā toenga whiwhinga moni i ngā mata kōtaha me te pokapū whakahaere."
+    }
   },
   "appActions": {
     "start": {

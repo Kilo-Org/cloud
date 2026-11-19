@@ -4082,7 +4082,13 @@
     "creditsRequired": "No hay suficientes créditos para enviar este mensaje."
   },
   "settingsTools": {
-    "confirmTitle": "¿Confirmar este cambio?"
+    "confirmTitle": "¿Confirmar este cambio?",
+    "guarded": {
+      "spendAlertsOff": "¿Desactivar las alertas de gasto? Dejarías de recibir notificaciones sobre los cruces de umbrales de gasto y los picos por hora.",
+      "balanceAlertsOff": "¿Desactivar las alertas de saldo? Dejarías de recibir notificaciones cuando tus créditos estén bajos.",
+      "securityFindingsOff": "¿Desactivar los hallazgos de seguridad? Dejarías de recibir notificaciones sobre nuevos hallazgos de seguridad.",
+      "hideBalanceOn": "¿Ocultar tus saldos? Los saldos de créditos dejarían de aparecer en las pantallas de perfil y el centro de la organización."
+    }
   },
   "appActions": {
     "start": {

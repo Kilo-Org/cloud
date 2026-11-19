@@ -4021,7 +4021,13 @@
     "creditsRequired": "Kirẹ́dítì kò tó láti fi ìfiránṣẹ́ yìí ránṣẹ́."
   },
   "settingsTools": {
-    "confirmTitle": "Ìjẹ́rìí ìyípadà yìí?"
+    "confirmTitle": "Ìjẹ́rìí ìyípadà yìí?",
+    "guarded": {
+      "spendAlertsOff": "Ṣé kí a pa ìkìlọ̀ ìnáwó dé? Ìwọ kò ní gbà ìránnilétí mọ́ nípa ìkọjá ààlà ìnáwó àti àwọn ìgbéga ojú-wákàti.",
+      "balanceAlertsOff": "Ṣé kí a pa ìkìlọ̀ ìyọkù dé? Ìwọ kò ní gbà ìránnilétí mọ́ nígbà tí àwọn kírẹ́dìtì rẹ bá ń dín kù.",
+      "securityFindingsOff": "Ṣé kí a pa àwọn àwárí ààbò dé? Ìwọ kò ní gbà ìránnilétí mọ́ nípa àwọn àwárí ààbò tuntun.",
+      "hideBalanceOn": "Ṣé kí a fi àwọn ìyọkù rẹ pamọ́? Àwọn ìyọkù kírẹ́dìtì kò ní hàn mọ́ lórí àwọn ojú-ìbójú profáìlì àti ibùdó àjọ."
+    }
   },
   "appActions": {
     "start": {

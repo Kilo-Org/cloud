@@ -4021,7 +4021,13 @@
     "creditsRequired": "Ou pa gen ase kredi pou voye mesaj sa a."
   },
   "settingsTools": {
-    "confirmTitle": "Konfime chanjman sa a?"
+    "confirmTitle": "Konfime chanjman sa a?",
+    "guarded": {
+      "spendAlertsOff": "Fèmen alèt depans yo? Ou p ap resevwa notifikasyon ankò sou depasman limit depans ak pik chak èdtan.",
+      "balanceAlertsOff": "Fèmen alèt balans yo? Ou p ap resevwa notifikasyon ankò lè kredi w ap vin ba.",
+      "securityFindingsOff": "Fèmen dekouvèt sekirite yo? Ou p ap resevwa notifikasyon ankò sou nouvo dekouvèt sekirite.",
+      "hideBalanceOn": "Kache balans ou yo? Balans kredi yo p ap parèt ankò sou ekran pwofil yo ak sant òganizasyon an."
+    }
   },
   "appActions": {
     "start": {

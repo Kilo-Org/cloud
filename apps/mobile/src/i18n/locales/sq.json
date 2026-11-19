@@ -4021,7 +4021,13 @@
     "creditsRequired": "Nuk ka kredi të mjaftueshme për të dërguar këtë mesazh."
   },
   "settingsTools": {
-    "confirmTitle": "Të konfirmohet ky ndryshim?"
+    "confirmTitle": "Të konfirmohet ky ndryshim?",
+    "guarded": {
+      "spendAlertsOff": "Të çaktivizohen njoftimet për shpenzimet? Nuk do të merrni më njoftime për kalimin e pragut të shpenzimeve dhe për rritjet e papritura brenda orës.",
+      "balanceAlertsOff": "Të çaktivizohen njoftimet për balancën? Nuk do të merrni më njoftime kur kreditë tuaja bien në nivel të ulët.",
+      "securityFindingsOff": "Të çaktivizohen gjetjet e sigurisë? Nuk do të merrni më njoftime për gjetje të reja sigurie.",
+      "hideBalanceOn": "Të fshihen balancat tuaja? Balancat e kredive nuk do të shfaqen më në ekranet e profilit dhe në qendrën e organizatës."
+    }
   },
   "appActions": {
     "start": {

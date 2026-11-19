@@ -4082,7 +4082,13 @@
     "creditsRequired": "Nu ai suficiente credite pentru a trimite acest mesaj."
   },
   "settingsTools": {
-    "confirmTitle": "Confirmi această modificare?"
+    "confirmTitle": "Confirmi această modificare?",
+    "guarded": {
+      "spendAlertsOff": "Dezactivați alertele de cheltuieli? Nu veți mai primi notificări despre depășirea pragurilor de cheltuieli și despre vârfurile orare.",
+      "balanceAlertsOff": "Dezactivați alertele de sold? Nu veți mai primi notificări când creditele sunt aproape epuizate.",
+      "securityFindingsOff": "Dezactivați constatările de securitate? Nu veți mai primi notificări despre constatări de securitate noi.",
+      "hideBalanceOn": "Ascundeți soldurile? Soldurile de credite nu vor mai apărea pe ecranele de profil și în hub-ul organizației."
+    }
   },
   "appActions": {
     "start": {

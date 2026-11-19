@@ -4021,7 +4021,13 @@
     "creditsRequired": "Không đủ tín dụng để gửi tin nhắn này."
   },
   "settingsTools": {
-    "confirmTitle": "Xác nhận thay đổi này?"
+    "confirmTitle": "Xác nhận thay đổi này?",
+    "guarded": {
+      "spendAlertsOff": "Tắt cảnh báo chi tiêu? Bạn sẽ không còn nhận thông báo khi vượt ngưỡng chi tiêu và khi chi tiêu tăng đột biến theo giờ.",
+      "balanceAlertsOff": "Tắt cảnh báo số dư? Bạn sẽ không còn nhận thông báo khi tín dụng của bạn sắp hết.",
+      "securityFindingsOff": "Tắt cảnh báo phát hiện bảo mật? Bạn sẽ không còn nhận thông báo về các phát hiện bảo mật mới.",
+      "hideBalanceOn": "Ẩn số dư của bạn? Số dư tín dụng sẽ không còn hiển thị trên các màn hình hồ sơ và trung tâm tổ chức."
+    }
   },
   "appActions": {
     "start": {

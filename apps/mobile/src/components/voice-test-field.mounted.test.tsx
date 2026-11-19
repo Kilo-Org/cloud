@@ -32,6 +32,8 @@ vi.mock('react-native', () => ({
   // The field renders the shared Input, whose alignment helper reads
   // `I18nManager.isRTL` on every render.
   I18nManager: { isRTL: false },
+  // `input-suggestions` reads `Platform.OS` at module scope.
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',

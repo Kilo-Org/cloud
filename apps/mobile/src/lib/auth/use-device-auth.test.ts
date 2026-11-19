@@ -315,7 +315,8 @@ describe('useDeviceAuth hook', () => {
       deviceCode: 'device-secret',
       userCode: 'UC-1234',
       verificationUrl: 'https://example.com/device-auth?code=UC-1234',
-      expiresAt: Date.now() + 600_000,
+      // Not the 5-minute default, so a restarted budget cannot match it.
+      expiresAt: Date.now() + 437_000,
     };
     vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'valid', record });
 
@@ -327,6 +328,8 @@ describe('useDeviceAuth hook', () => {
     expect(startDeviceAuthPoll).toHaveBeenCalledTimes(1);
     // The resumed poll closes whatever the flow opened for this URL.
     expect(vi.mocked(startDeviceAuthPoll).mock.calls[0]?.[0].browserKind).toBe('plain-browser');
+    // The resumed poll keeps the stored server deadline instead of a new budget.
+    expect(vi.mocked(startDeviceAuthPoll).mock.calls[0]?.[0].expiresAt).toBe(record.expiresAt);
   });
 
   it('lets a start() that runs during the restore read win without a second poll', async () => {

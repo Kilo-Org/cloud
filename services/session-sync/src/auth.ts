@@ -2,6 +2,12 @@ import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import { device_sessions, kilocode_users } from '@kilocode/db/schema';
 import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
+import {
+  SESSION_TRANSCRIPT_TOKEN_AUDIENCE,
+  SESSION_TRANSCRIPT_TOKEN_ISSUER,
+  SESSION_TRANSCRIPT_TOKEN_SCHEME,
+  SESSION_TRANSCRIPT_TOKEN_TTL_SECONDS,
+} from '@kilocode/worker-utils/cloud-agent-session-sync';
 import { KILO_API_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   isKiloCredentialExchangeEligible,
@@ -12,7 +18,12 @@ import { and, eq, exists, isNull, sql } from 'drizzle-orm';
 import { jwtVerify, SignJWT } from 'jose';
 import { z } from 'zod';
 
-import { exchangeRequestSchema, principalSchema, type Principal } from './protocol';
+import {
+  exchangeRequestSchema,
+  principalSchema,
+  sessionIDSchema,
+  type Principal,
+} from './protocol';
 import { rateLimit } from './rate-limit';
 import { jsonResponse, requestMetrics, timed } from './metrics';
 import { exchangeCloudAgentUpload, type CloudAgentUploadEnv } from './cloud-agent-upload';
@@ -390,4 +401,62 @@ export async function authorize(request: Request, env: AuthEnv): Promise<Princip
   } catch (error) {
     return unavailable('authorize', error);
   }
+}
+
+const transcriptClaims = z.object({
+  sub: z.string(),
+  sessionID: sessionIDSchema,
+  organizationID: z.uuid().optional(),
+  env: z.string().min(1),
+  iat: numericDate,
+  exp: numericDate,
+});
+
+export async function authorizeTranscript(request: Request, env: AuthEnv) {
+  const prefix = `${SESSION_TRANSCRIPT_TOKEN_SCHEME} `;
+  const authorization = request.headers.get('Authorization');
+  if (!authorization?.startsWith(prefix)) return undefined;
+
+  const path = new URL(request.url).pathname;
+  const match = /^\/v1\/sessions\/([^/]+)(?:\/entities|\/blobs\/[a-f0-9]{64})?$/.exec(path);
+  if (request.method !== 'GET' || !match) {
+    return failure(403, 'transcript_read_only', 'Transcript credentials permit session reads only');
+  }
+
+  let secret: string;
+  try {
+    secret = await resolveSecret(env.NEXTAUTH_SECRET, MIN_GRANT_SECRET_BYTES);
+  } catch (error) {
+    return unavailable('authorize', error);
+  }
+  const verified = await jwtVerify(
+    authorization.slice(prefix.length),
+    new TextEncoder().encode(secret),
+    {
+      algorithms: ['HS256'],
+      audience: SESSION_TRANSCRIPT_TOKEN_AUDIENCE,
+      issuer: SESSION_TRANSCRIPT_TOKEN_ISSUER,
+      maxTokenAge: SESSION_TRANSCRIPT_TOKEN_TTL_SECONDS,
+      clockTolerance: AUTH_CLOCK_SKEW_SECONDS,
+    }
+  ).catch(() => undefined);
+  const claims = transcriptClaims.safeParse(verified?.payload);
+  if (
+    !claims.success ||
+    encodeURIComponent(claims.data.sessionID) !== match[1] ||
+    claims.data.env !== env.ENVIRONMENT ||
+    claims.data.iat > Math.floor(Date.now() / 1000) + AUTH_CLOCK_SKEW_SECONDS ||
+    claims.data.exp - claims.data.iat > SESSION_TRANSCRIPT_TOKEN_TTL_SECONDS
+  ) {
+    return invalidCredential('The session transcript credential is invalid or expired');
+  }
+
+  const { sub, organizationID } = claims.data;
+  const principal = principalSchema.safeParse({
+    userID: sub,
+    tenant: organizationID
+      ? { type: 'organization', id: organizationID }
+      : { type: 'user', id: sub },
+  });
+  return principal.success ? principal.data : invalidCredential();
 }

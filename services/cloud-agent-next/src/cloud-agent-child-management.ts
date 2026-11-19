@@ -8,6 +8,7 @@ import {
   type CloudAgentAuthority,
 } from '@kilocode/worker-utils/cloud-agent-authority';
 import { CLOUD_AGENT_PARENT_AUTHORITY_DENIED } from './cloud-agent-authority.js';
+import { getWorkspaceStub } from './control-plane/workspace/workspace-stub.js';
 import type { SandboxSessionV2 } from './control-plane/session/session-do.js';
 import type { SessionMetadata } from './persistence/session-metadata.js';
 import { getSandboxSessionStub } from './sandbox-session/session-stub.js';
@@ -62,9 +63,9 @@ function targetFromRawInput(path: CloudAgentManagementPath, rawInput: unknown) {
 async function assertParentAuthority(env: Env, authority: CloudAgentAuthority): Promise<void> {
   try {
     await withDORetry(
-      () => getSandboxSessionStub(env, authority.ownerId, authority.parentSessionId),
-      stub => stub.assertCloudAgentManagementAuthority(authority),
-      'assertCloudAgentManagementAuthority'
+      () => getWorkspaceStub(env, authority.ownerId, authority.parentSessionId),
+      stub => stub.assertAuthority(authority),
+      'assertAuthority'
     );
   } catch (error) {
     if (error instanceof Error && error.message.includes(CLOUD_AGENT_PARENT_AUTHORITY_DENIED)) {
@@ -186,14 +187,13 @@ export async function listCloudAgentChildSessions(input: {
   nextCursor?: string;
 }> {
   const page = await withDORetry(
-    () =>
-      getSandboxSessionStub(input.env, input.authority.ownerId, input.authority.parentSessionId),
+    () => getWorkspaceStub(input.env, input.authority.ownerId, input.authority.parentSessionId),
     stub =>
-      stub.listCloudAgentChildSessions({
+      stub.listChildren({
         limit: input.limit,
         ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
       }),
-    'listCloudAgentChildSessions'
+    'listChildren'
   );
   const sessions: Array<{
     cloudAgentSessionId: string;

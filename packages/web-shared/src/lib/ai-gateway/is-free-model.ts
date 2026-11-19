@@ -5,6 +5,7 @@ import {
   isLocalFakeTranscriptionModel,
 } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import { findCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
 /**
  * Whether Kilo charges nothing for the model, judged by its id alone. Custom
@@ -31,4 +32,25 @@ export async function hasBestEffortGuessDataCollectionRequirement(model: string)
   const customLlm = await findCustomLlm(model);
   if (customLlm) return customLlm.definition.may_train_on_prompts !== false;
   return isFreeModel(model);
+}
+
+/**
+ * Whether the provider privacy preferences rule the model out. `data_collection: 'deny'` rules out
+ * models that may train on prompts. `zdr` also rules out every custom LLM, since Kilo does not
+ * vouch for zero data retention on an upstream it calls directly.
+ */
+export async function isDeniedByProviderPrivacy(
+  model: string,
+  privacy: Pick<OpenRouterProviderConfig, 'data_collection' | 'zdr'> | undefined
+): Promise<boolean> {
+  if (privacy?.zdr === true) {
+    return (
+      (await findCustomLlm(model)) !== null ||
+      (await hasBestEffortGuessDataCollectionRequirement(model))
+    );
+  }
+  if (privacy?.data_collection === 'deny') {
+    return await hasBestEffortGuessDataCollectionRequirement(model);
+  }
+  return false;
 }

@@ -480,12 +480,19 @@ function pressControl(testID: string) {
 }
 /** Fire the body wrapper's layout with the height the list can use. */
 function layoutBody(height: number) {
-  const keyboardFrame = liftNode().findByType('View');
-  const wrapper = nodes('View').find(
-    node => node.props.onLayout !== undefined && node !== keyboardFrame
+  // The lift's own frame reports the keyboard container (see
+  // `layoutKeyboardFrame`); the body wrapper `useAgentsListChrome` measures is
+  // the one other `onLayout` view inside the lifted region. Scoping to the lift
+  // is what makes this the body: the header above it draws its own `onLayout`
+  // views (the row reports its width, an in-row slot its measured extent), and
+  // those must never receive a body height.
+  const frame = liftNode().findByType('View');
+  const wrappers = descendantsOf(liftNode(), 'View').filter(
+    node => node !== frame && node.props.onLayout !== undefined
   );
-  if (!wrapper) {
-    throw new Error('Missing body wrapper');
+  const [wrapper] = wrappers;
+  if (wrappers.length !== 1 || !wrapper) {
+    throw new Error(`Expected one measured body wrapper, found ${wrappers.length}`);
   }
   const onLayout = wrapper.props.onLayout as (event: {
     nativeEvent: { layout: { height: number } };

@@ -35,8 +35,8 @@ import {
   type BitbucketAuthoritativeObservation,
   type BitbucketWebhookIdentity,
 } from '@/lib/integrations/platforms/bitbucket/webhook-events';
+import { WebhookBodyTooLargeError, readBoundedRawBody } from '@/lib/webhook-body';
 
-const MAX_WEBHOOK_BODY_BYTES = 256_000;
 const BITBUCKET_PULL_REQUEST_EVENTS = new Set([
   'pullrequest:created',
   'pullrequest:updated',
@@ -91,49 +91,6 @@ type TransactionResult = {
   reviewId?: string;
   created: boolean;
 };
-
-class WebhookBodyTooLargeError extends Error {}
-
-async function readBoundedRawBody(request: NextRequest): Promise<Uint8Array> {
-  const contentLength = request.headers.get('content-length');
-  if (
-    contentLength &&
-    (!/^\d+$/.test(contentLength) || Number(contentLength) > MAX_WEBHOOK_BODY_BYTES)
-  ) {
-    throw new WebhookBodyTooLargeError();
-  }
-  if (!request.body) return new Uint8Array();
-
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let totalBytes = 0;
-  try {
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      totalBytes += chunk.value.byteLength;
-      if (totalBytes > MAX_WEBHOOK_BODY_BYTES) {
-        try {
-          await reader.cancel();
-        } catch {
-          // The request remains rejected when stream cancellation fails.
-        }
-        throw new WebhookBodyTooLargeError();
-      }
-      chunks.push(chunk.value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-
-  const body = new Uint8Array(totalBytes);
-  let offset = 0;
-  for (const chunk of chunks) {
-    body.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return body;
-}
 
 function normalizeBitbucketUuid(value: string | null): string | null {
   if (!value) return null;

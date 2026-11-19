@@ -22,6 +22,7 @@ export type ConnectionConfig = {
   onDisconnected: () => void;
   onUnexpectedDisconnect?: (() => void) | undefined;
   onReconnected?: (() => void) | undefined;
+  onReconnectExhaustionChange?: ((exhausted: boolean) => void) | undefined;
   onError?: ((error: StreamError) => void) | undefined;
   onRefreshTicket?: (() => Promise<CloudAgentStreamTicketResult>) | undefined;
   heartbeatTimeoutMs?: number | undefined;
@@ -108,6 +109,7 @@ export function createConnection(config: ConnectionConfig): Connection {
     onDisconnected: config.onDisconnected,
     onUnexpectedDisconnect: config.onUnexpectedDisconnect,
     onReconnected: config.onReconnected,
+    onReconnectExhaustionChange: config.onReconnectExhaustionChange,
     onError: config.onError
       ? message =>
           config.onError?.({

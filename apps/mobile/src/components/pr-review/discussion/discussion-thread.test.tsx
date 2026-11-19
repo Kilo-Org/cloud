@@ -154,7 +154,7 @@ describe('DiscussionThread collapsed card', () => {
     expect(node.type).toBe('Pressable');
     expect(node.props.accessibilityRole).toBe('button');
     expect(node.props.accessibilityState).toEqual({ expanded: false });
-    expect(node.props.accessibilityLabel).toBe('Discussion thread src/index.ts L10 (RIGHT)');
+    expect(node.props.accessibilityLabel).toBe('Discussion thread src/index.ts L10 (Right side)');
     expect(node.props.className).toContain('active:opacity-70');
 
     renderer.unmount();
@@ -222,7 +222,7 @@ describe('DiscussionThread expanded card', () => {
 
     expect(typeof node.type).toBe('string');
     expect(node.type).toBe('View');
-    expect(node.props.accessibilityLabel).toBe('Discussion thread src/index.ts L10 (RIGHT)');
+    expect(node.props.accessibilityLabel).toBe('Discussion thread src/index.ts L10 (Right side)');
 
     renderer.unmount();
   });
@@ -343,7 +343,7 @@ describe('DiscussionThread anchor label', () => {
     const anchorText = findNode(
       renderer.root,
       'Text',
-      p => p.children === 'src/index.ts L10 (RIGHT)'
+      p => p.children === 'src/index.ts L10 (Right side)'
     );
     expect(anchorText).toBeDefined();
     if (!anchorText) {

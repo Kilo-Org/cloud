@@ -54,6 +54,7 @@ import { OfflineBannerSpaceGate } from '@/components/offline-banner';
 import { StateSurface } from '@/components/centered-state-surface';
 import { LanguageReloadErrorScreen } from '@/components/language-reload-error-screen';
 import { RuntimeErrorScreen } from '@/components/runtime-error-screen';
+import { SettingsConfirmHost } from '@/components/settings-confirm-host';
 import { splashContentScale } from '@/components/splash-reveal';
 import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { MotionProvider } from '@/lib/a11y/motion';
@@ -991,23 +992,7 @@ function RootLayoutNav({
     hasRestoreError,
     hasBootstrapError,
     hidden,
-  } = resolveBootstrapDecision({
-    isLoading,
-    updateRequired,
-    inForceUpdate,
-    inAuthGroup,
-    hasToken: token != null,
-    userIdLoading: identityLoading,
-    userIdError: identityError,
-    consentCheckError: consentCheckError != null,
-    consentChecked,
-    needsConsent,
-    onConsentRoute,
-    onConsentReviewRoute,
-    onLegalRoute,
-    languageReloadFailed,
-    restoreFailed,
-  });
+  } = decision;
 
   // Post-startup hidden windows (a sign-in's redirect + consent check, a
   // sign-out's redirect to login) have no splash over them, so the hidden
@@ -1290,6 +1275,7 @@ function RootLayout() {
                 </StateSurface>
               </AppContentReveal>
               <AnimatedSplashOverlay />
+              <SettingsConfirmHost />
             </AppRootProviders>
           </OfflineBannerSpaceGate>
         </ThemeProvider>

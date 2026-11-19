@@ -22,9 +22,9 @@ import {
   loadLocalAgentStatus,
 } from '@/src/shared/local-agents/status';
 import type { LocalAgentEndpointStatus } from '@/src/shared/local-agents/status';
+import { createSerialAsyncChain } from '@/src/shared/serial-async-chain';
 import { setLocalAgentsEnabled } from './local-agent-toggle';
 import { deriveLocalAgentsSettingsView } from './local-agents-settings-state';
-import { createSerialAsyncChain } from './model-preferences-state';
 import { SettingsToggle } from './workflow-settings';
 
 const SWITCH_LABEL = 'Allow local agents';

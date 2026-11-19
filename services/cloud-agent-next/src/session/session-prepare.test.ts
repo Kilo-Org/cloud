@@ -260,8 +260,8 @@ type DoStubOverrides = {
   createSessionWithInitialAdmission?: ReturnType<typeof vi.fn>;
   getMetadata?: ReturnType<typeof vi.fn>;
   getMessageResult?: ReturnType<typeof vi.fn>;
-  recordCloudAgentChildSession?: ReturnType<typeof vi.fn>;
-  authorizeCloudAgentChild?: ReturnType<typeof vi.fn>;
+  recordChild?: ReturnType<typeof vi.fn>;
+  authorizeChild?: ReturnType<typeof vi.fn>;
 };
 
 function makeDoStub(overrides: DoStubOverrides = {}) {
@@ -276,10 +276,9 @@ function makeDoStub(overrides: DoStubOverrides = {}) {
         messageId: INITIAL_MESSAGE_ID,
         compatibilityDelivery: 'queued',
       } satisfies SessionMessageAdmissionResult),
-    recordCloudAgentChildSession:
-      overrides.recordCloudAgentChildSession ?? vi.fn().mockResolvedValue({ success: true }),
-    authorizeCloudAgentChild:
-      overrides.authorizeCloudAgentChild ??
+    recordChild: overrides.recordChild ?? vi.fn().mockResolvedValue({ success: true }),
+    authorizeChild:
+      overrides.authorizeChild ??
       vi.fn().mockResolvedValue({ token: 'runtime-token', seal: 'runtime-seal' }),
     getMetadata:
       overrides.getMetadata ??
@@ -340,6 +339,11 @@ function makeEnv(doStub: ReturnType<typeof makeDoStub>): Env {
       idFromName: vi.fn((name: string) => ({ toString: () => name })),
       get: vi.fn(() => doStub),
     } as unknown as Env['SANDBOX_SESSION'],
+    // One fake answers for the workspace authority and its chats.
+    CLOUD_AGENT_WORKSPACE: {
+      idFromName: vi.fn((name: string) => ({ toString: () => name })),
+      get: vi.fn(() => doStub),
+    } as unknown as Env['CLOUD_AGENT_WORKSPACE'],
     HYPERDRIVE: {
       connectionString: 'postgres://session-create-test',
     } as Env['HYPERDRIVE'],
@@ -732,8 +736,8 @@ describe('explicit sandbox session creation', () => {
     const ctx = modernContext(makeContext(doStub));
     const parentSessionId = 'workspace_12345678-1234-4234-8234-123456789abc';
     await registerNewSession(makeRequest({ parentCloudAgentSessionId: parentSessionId }), ctx);
-    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledTimes(1);
-    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledWith(
+    expect(doStub.recordChild).toHaveBeenCalledTimes(1);
+    expect(doStub.recordChild).toHaveBeenCalledWith(
       expect.objectContaining({ cloudAgentSessionId: WORKSPACE_SESSION_ID })
     );
   });
@@ -743,9 +747,7 @@ describe('explicit sandbox session creation', () => {
     // failure after the session already registered must not turn the create into
     // an unacknowledgeable error.
     const doStub = makeDoStub({
-      recordCloudAgentChildSession: vi
-        .fn()
-        .mockRejectedValue(new Error('Cloud Agent child registry denied')),
+      recordChild: vi.fn().mockRejectedValue(new Error('Cloud Agent child registry denied')),
     });
     const ctx = modernContext(makeContext(doStub));
     const parentSessionId = 'workspace_12345678-1234-4234-8234-123456789abc';
@@ -755,7 +757,7 @@ describe('explicit sandbox session creation', () => {
     ).resolves.toMatchObject({ cloudAgentSessionId: WORKSPACE_SESSION_ID });
 
     expect(doStub.registerSessionFromMetadata).toHaveBeenCalledTimes(1);
-    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledTimes(1);
+    expect(doStub.recordChild).toHaveBeenCalledTimes(1);
   });
 
   it.each(['vercel-small', 'cloudflare-shared'] as const)(
@@ -4373,7 +4375,7 @@ describe('createSessionWithLedger admission ladder', () => {
       worktreeId: WORKTREE_ID,
       replayed: true,
     });
-    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledWith({
+    expect(doStub.recordChild).toHaveBeenCalledWith({
       cloudAgentSessionId: WORKSPACE_SESSION_ID,
       initialMessageId: INITIAL_MESSAGE_ID,
       worktreeId: WORKTREE_ID,
@@ -4397,7 +4399,7 @@ describe('createSessionWithLedger admission ladder', () => {
       }),
     });
     const doStub = makeDoStub({
-      recordCloudAgentChildSession: vi.fn().mockRejectedValue(new Error('parent DO unavailable')),
+      recordChild: vi.fn().mockRejectedValue(new Error('parent DO unavailable')),
     });
 
     await expect(runCreate(makeContext(doStub), request)).resolves.toEqual({
@@ -4520,7 +4522,7 @@ describe('createSessionWithLedger admission ladder', () => {
         workspacePath: expect.stringContaining(expectedWorktreeId),
       }),
     });
-    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledWith(
+    expect(doStub.recordChild).toHaveBeenCalledWith(
       expect.objectContaining({
         cloudAgentSessionId: SANDBOX_SESSION_ID,
         worktreeId: expectedWorktreeId,
@@ -4559,7 +4561,7 @@ describe('createSessionWithLedger admission ladder', () => {
 
     expect(createCliSessionMock).not.toHaveBeenCalled();
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledWith(
+    expect(doStub.recordChild).toHaveBeenCalledWith(
       expect.objectContaining({
         cloudAgentSessionId: SANDBOX_SESSION_ID,
         worktreeId: expectedWorktreeId,
@@ -4654,7 +4656,7 @@ describe('createSessionWithLedger admission ladder', () => {
 
       expect(createCliSessionMock).not.toHaveBeenCalled();
       expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-      const childCall = doStub.recordCloudAgentChildSession.mock.calls.at(-1)?.[0];
+      const childCall = doStub.recordChild.mock.calls.at(-1)?.[0];
       expect(childCall).not.toHaveProperty('worktreeId');
       if (input.profile?.id) {
         expect(mergeProfileConfiguration).toHaveBeenCalledWith(
@@ -4720,7 +4722,7 @@ describe('createSessionWithLedger admission ladder', () => {
       });
 
       expect(createCliSessionMock).not.toHaveBeenCalled();
-      expect(doStub.recordCloudAgentChildSession).not.toHaveBeenCalled();
+      expect(doStub.recordChild).not.toHaveBeenCalled();
     }
   );
 });
@@ -5068,7 +5070,7 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
       kiloSessionId: KILO_SESSION_ID,
       replayed: true,
     });
-    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledWith({
+    expect(doStub.recordChild).toHaveBeenCalledWith({
       cloudAgentSessionId: SANDBOX_SESSION_ID,
       initialMessageId: INITIAL_MESSAGE_ID,
     });
@@ -5087,7 +5089,7 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
       makeDb([[{ sessionId: KILO_SESSION_ID }], [{ email: 'test@example.com' }]])
     );
     const doStub = makeDoStub({
-      recordCloudAgentChildSession: vi.fn().mockRejectedValue(new Error('parent DO unavailable')),
+      recordChild: vi.fn().mockRejectedValue(new Error('parent DO unavailable')),
     });
 
     await expect(runCreate(makeContext(doStub), request)).resolves.toEqual({
@@ -8113,7 +8115,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
       kiloSessionId: KILO_SESSION_ID,
       replayed: true,
     });
-    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledWith({
+    expect(doStub.recordChild).toHaveBeenCalledWith({
       cloudAgentSessionId: SANDBOX_SESSION_ID,
     });
   });

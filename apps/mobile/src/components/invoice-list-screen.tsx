@@ -72,6 +72,24 @@ function InvoiceRowSkeleton() {
 type InvoiceListScreenProps = Readonly<{
   /** The screen's own title: the personal and organization lists differ. */
   title: string;
+  /**
+   * One muted context line under the title, the header's subtitle slot: what
+   * the list covers when the title alone does not say it (the personal list's
+   * fixed one-year window).
+   */
+  subtitle?: string;
+  /**
+   * The screen's own name when the title names a scope: the organization scope
+   * titles itself with the membership's name, so this list's name keeps the
+   * header's mono category line and a user-authored name never takes it.
+   */
+  eyebrow?: string;
+  /**
+   * Hold the eyebrow's line before a scope name resolves, so the header keeps
+   * one height while the membership read settles. A caller whose title is
+   * already this screen's name paints no eyebrow and leaves this off.
+   */
+  reserveEyebrow?: boolean;
   /** Where the header's Back lands when the list opens with no history to pop. */
   backFallback: Href;
   /** The scope's paged invoice read, flattened by its own hook. */
@@ -80,6 +98,11 @@ type InvoiceListScreenProps = Readonly<{
   hasMore: boolean;
   emptyTitle: string;
   emptyDescription: string;
+  /**
+   * The empty state's way out, rendered in the state's action slot: a scope
+   * whose empty copy points elsewhere passes the control that opens it.
+   */
+  emptyAction?: ReactNode;
 }>;
 
 /**
@@ -89,12 +112,16 @@ type InvoiceListScreenProps = Readonly<{
  */
 export function InvoiceListScreen({
   title,
+  subtitle,
+  eyebrow,
+  reserveEyebrow,
   backFallback,
   query,
   entries,
   hasMore,
   emptyTitle,
   emptyDescription,
+  emptyAction,
 }: InvoiceListScreenProps) {
   const { t } = useTranslation();
   const paddingBottom = useTabBarBottomPadding();
@@ -162,6 +189,7 @@ export function InvoiceListScreen({
         icon={FileText}
         title={emptyTitle}
         description={emptyDescription}
+        action={emptyAction}
         refreshControl={refreshControl}
       />
     );
@@ -228,6 +256,7 @@ export function InvoiceListScreen({
               icon={FileText}
               title={emptyTitle}
               description={emptyDescription}
+              action={emptyAction}
             />
           }
           ListFooterComponent={footer}
@@ -238,7 +267,13 @@ export function InvoiceListScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} backFallback={backFallback} />
+      <ScreenHeader
+        title={title}
+        subtitle={subtitle}
+        eyebrow={eyebrow}
+        reserveEyebrow={reserveEyebrow}
+        backFallback={backFallback}
+      />
       {body}
     </View>
   );

@@ -4028,8 +4028,8 @@
       "modelFlag": "Denne model understøtter ræsonnementsniveau"
     },
     "creditsRequired": "Ikke nok kreditter til at sende denne besked.",
-    "providerKeyRefused": "Serveren afviste loginoplysningerne. Tjek denne servers API-nøgle, og send igen.",
-    "providerModelMissing": "Denne server leverer ikke længere denne model. Vælg en anden model.",
+    "providerKeyRefused": "Udbyderen afviste loginoplysningerne. Tjek dens API-nøgle, og send igen.",
+    "providerModelMissing": "Denne server leverer ikke længere denne model. Vælg en anden.",
     "providerRateLimited": "Udbyderen begrænser forespørgsler. Vent et øjeblik, og send igen.",
     "providerUnavailable": "Udbyderen er utilgængelig lige nu. Send igen om kort tid."
   },

@@ -4028,8 +4028,8 @@
       "modelFlag": "Modèl sa a sipòte efò refleksyon"
     },
     "creditsRequired": "Ou pa gen ase kredi pou voye mesaj sa a.",
-    "providerKeyRefused": "Sèvis la refize kont idantifikasyon yo. Verifye kle API sèvis sa a, epi voye ankò.",
-    "providerModelMissing": "Sèvis sa a pa sèvi ak modèl sa a ankò. Chwazi yon lòt modèl.",
+    "providerKeyRefused": "Founisè a refize kont idantifikasyon yo. Verifye kle API li a, epi voye ankò.",
+    "providerModelMissing": "Sèvis sa a pa sèvi ak modèl sa a ankò. Chwazi yon lòt.",
     "providerRateLimited": "Founisè a ap limite demann yo. Tann yon ti moman epi voye ankò.",
     "providerUnavailable": "Founisè a pa disponib kounye a. Voye ankò talè."
   },

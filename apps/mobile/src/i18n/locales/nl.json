@@ -4028,8 +4028,8 @@
       "modelFlag": "Dit model ondersteunt denkinspanning"
     },
     "creditsRequired": "Niet genoeg tegoed om dit bericht te verzenden.",
-    "providerKeyRefused": "De backend heeft de aanmeldgegevens geweigerd. Controleer de API-sleutel van deze backend en verzend opnieuw.",
-    "providerModelMissing": "Deze backend levert dit model niet meer. Kies een ander model.",
+    "providerKeyRefused": "De aanbieder heeft de aanmeldgegevens geweigerd. Controleer de API-sleutel ervan en verzend opnieuw.",
+    "providerModelMissing": "Deze backend levert dit model niet meer. Kies een ander.",
     "providerRateLimited": "De aanbieder beperkt het aantal verzoeken. Wacht even en verzend opnieuw.",
     "providerUnavailable": "De aanbieder is op dit moment niet beschikbaar. Verzend het zo opnieuw."
   },

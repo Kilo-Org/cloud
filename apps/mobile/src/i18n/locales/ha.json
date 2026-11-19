@@ -4028,8 +4028,8 @@
       "modelFlag": "Wannan samfurin yana goyon bayan matakin tunani"
     },
     "creditsRequired": "Kuɗin amfani bai isa don aika wannan saƙon ba.",
-    "providerKeyRefused": "Uwar garken ya ƙi bayanan shiga. Duba maɓallin API na wannan uwar garken, sannan ka sake aikawa.",
-    "providerModelMissing": "Wannan uwar garken ba ta ƙara ba da wannan samfurin ba. Zaɓi wani samfuri.",
+    "providerKeyRefused": "Mai bayar da sabis ya ƙi bayanan shiga. Duba maɓallin API nasa, sannan ka sake aikawa.",
+    "providerModelMissing": "Wannan uwar garken ba ta ƙara ba da wannan samfurin ba. Zaɓi wani.",
     "providerRateLimited": "Mai bayar da sabis yana iyakance buƙatu. Jira kaɗan ka sake aikawa.",
     "providerUnavailable": "Mai bayar da sabis ba ya samuwa a yanzu. Sake aikawa nan ba da daɗewa ba."
   },

@@ -4095,8 +4095,8 @@
       "modelFlag": "Este modelo suporta esforço de raciocínio"
     },
     "creditsRequired": "Não há créditos suficientes para enviar esta mensagem.",
-    "providerKeyRefused": "O backend recusou as credenciais. Verifica a chave da API deste backend e volta a enviar.",
-    "providerModelMissing": "Este backend já não disponibiliza este modelo. Escolhe outro modelo.",
+    "providerKeyRefused": "O fornecedor recusou as credenciais. Verifica a chave da API do fornecedor e volta a enviar.",
+    "providerModelMissing": "Este backend já não disponibiliza este modelo. Escolhe outro.",
     "providerRateLimited": "O fornecedor está a limitar pedidos. Aguarda um momento e volta a enviar.",
     "providerUnavailable": "O fornecedor está indisponível neste momento. Volta a enviar dentro de instantes."
   },

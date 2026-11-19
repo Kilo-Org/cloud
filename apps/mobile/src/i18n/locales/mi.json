@@ -4028,8 +4028,8 @@
       "modelFlag": "Ka tautoko tēnei tauira i te kaha whakaaro"
     },
     "creditsRequired": "Kāore i te nui ake ngā moni tōmua hei tuku i tēnei karere.",
-    "providerKeyRefused": "I whakakore te taha muri i ngā taipitopito motuhēhēnga. Tirohia te kī API o tēnei taha muri, kātahi ka tuku anō.",
-    "providerModelMissing": "Kua kore tēnei taha muri e whakarato i tēnei tauira. Kōwhiria tētahi atu tauira.",
+    "providerKeyRefused": "I whakakore te kaiwhakarato i ngā taipitopito motuhēhēnga. Tirohia tōna kī API, kātahi ka tuku anō.",
+    "providerModelMissing": "Kua kore tēnei taha muri e whakarato i tēnei tauira. Kōwhiria tētahi atu.",
     "providerRateLimited": "Kei te whakawhāiti te kaiwhakarato i ngā tono. Tatari mō tētahi wā poto, kātahi ka tuku anō.",
     "providerUnavailable": "Kāore te kaiwhakarato e wātea ana ināianei. Tuku anō ā tētahi wā poto."
   },

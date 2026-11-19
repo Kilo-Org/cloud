@@ -4211,8 +4211,8 @@
       "modelFlag": "Tacaíonn an tsamhail seo le leibhéal machnaimh"
     },
     "creditsRequired": "Níl creidmheasanna go leor chun an teachtaireacht seo a sheoladh.",
-    "providerKeyRefused": "Dhiúltaigh an cúlchóras do na dintiúir. Seiceáil eochair API an chúlchórais seo, agus seol arís.",
-    "providerModelMissing": "Ní fhreastalaíonn an cúlchóras seo ar an tsamhail seo a thuilleadh. Roghnaigh samhail eile.",
+    "providerKeyRefused": "Dhiúltaigh an soláthraí do na dintiúir. Seiceáil a eochair API, agus seol arís.",
+    "providerModelMissing": "Ní fhreastalaíonn an cúlchóras seo ar an tsamhail seo a thuilleadh. Roghnaigh ceann eile.",
     "providerRateLimited": "Tá an soláthraí ag teorannú iarratas. Fan nóiméad agus seol arís.",
     "providerUnavailable": "Níl an soláthraí ar fáil faoi láthair. Seol arís go luath."
   },

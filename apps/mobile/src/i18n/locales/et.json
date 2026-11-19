@@ -4028,8 +4028,8 @@
       "modelFlag": "See mudel toetab mõtlemise põhjalikkust"
     },
     "creditsRequired": "Krediiti ei piisa selle sõnumi saatmiseks.",
-    "providerKeyRefused": "Taustsüsteem keeldus autentimisandmetest. Kontrolli selle taustsüsteemi API-võtit, seejärel saada uuesti.",
-    "providerModelMissing": "See taustsüsteem ei teeninda enam seda mudelit. Vali mõni teine mudel.",
+    "providerKeyRefused": "Teenusepakkuja keeldus autentimisandmetest. Kontrolli selle API-võtit, seejärel saada uuesti.",
+    "providerModelMissing": "See taustsüsteem ei teeninda enam seda mudelit. Vali mõni teine.",
     "providerRateLimited": "Teenusepakkuja piirab päringuid. Oota hetk ja saada uuesti.",
     "providerUnavailable": "Teenusepakkuja pole praegu saadaval. Saada varsti uuesti."
   },

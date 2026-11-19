@@ -4272,8 +4272,8 @@
       "modelFlag": "Mae'r model hwn yn cefnogi ymdrech feddwl"
     },
     "creditsRequired": "Dim digon o gredydau i anfon y neges hon.",
-    "providerKeyRefused": "Gwrthododd yr ôl-ben y manylion adnabod. Gwiriwch allwedd API'r ôl-ben hwn, yna anfonwch eto.",
-    "providerModelMissing": "Nid yw'r ôl-ben hwn yn gwasanaethu'r model hwn mwyach. Dewiswch fodel arall.",
+    "providerKeyRefused": "Gwrthododd y darparwr y manylion adnabod. Gwiriwch ei allwedd API, yna anfonwch eto.",
+    "providerModelMissing": "Nid yw'r ôl-ben hwn yn gwasanaethu'r model hwn mwyach. Dewiswch un arall.",
     "providerRateLimited": "Mae'r darparwr yn cyfyngu ar geisiadau. Arhoswch eiliad ac anfonwch eto.",
     "providerUnavailable": "Nid yw'r darparwr ar gael ar hyn o bryd. Anfonwch eto cyn bo hir."
   },

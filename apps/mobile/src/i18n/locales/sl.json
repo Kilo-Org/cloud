@@ -4150,8 +4150,8 @@
       "modelFlag": "Ta model podpira stopnjo razmišljanja"
     },
     "creditsRequired": "Ni dovolj kreditov za pošiljanje tega sporočila.",
-    "providerKeyRefused": "Zaledje je zavrnilo poverilnice. Preveri ključ API tega zaledja in znova pošlji.",
-    "providerModelMissing": "To zaledje ne ponuja več tega modela. Izberi drug model.",
+    "providerKeyRefused": "Ponudnik je zavrnil poverilnice. Preveri ključ API ponudnika in znova pošlji.",
+    "providerModelMissing": "To zaledje ne ponuja več tega modela. Izberi drugega.",
     "providerRateLimited": "Ponudnik omejuje zahteve. Počakaj trenutek in znova pošlji.",
     "providerUnavailable": "Ponudnik trenutno ni na voljo. Znova pošlji kmalu."
   },

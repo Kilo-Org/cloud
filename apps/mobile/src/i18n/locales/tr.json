@@ -4028,8 +4028,8 @@
       "modelFlag": "Bu model düşünme düzeyini destekler"
     },
     "creditsRequired": "Bu mesajı göndermek için yeterli kredi yok.",
-    "providerKeyRefused": "Arka uç kimlik bilgilerini reddetti. Bu arka ucun API anahtarını kontrol edin, sonra tekrar gönderin.",
-    "providerModelMissing": "Bu arka uç artık bu modeli sunmuyor. Başka bir model seçin.",
+    "providerKeyRefused": "Sağlayıcı kimlik bilgilerini reddetti. API anahtarını kontrol edin, sonra tekrar gönderin.",
+    "providerModelMissing": "Bu arka uç artık bu modeli sunmuyor. Başka birini seçin.",
     "providerRateLimited": "Sağlayıcı istekleri sınırlıyor. Kısa bir süre bekleyip tekrar gönderin.",
     "providerUnavailable": "Sağlayıcı şu anda kullanılamıyor. Kısa süre sonra tekrar gönderin."
   },

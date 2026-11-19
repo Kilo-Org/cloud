@@ -4028,8 +4028,8 @@
       "modelFlag": "Þetta líkan styður dýpt rökhugsunar"
     },
     "creditsRequired": "Ekki nógu mikil inneign til að senda þetta skilaboð.",
-    "providerKeyRefused": "Bakendinn hafnaði auðkenningarupplýsingunum. Athugaðu API-lykil þessa bakenda og sendu aftur.",
-    "providerModelMissing": "Þessi bakendi þjónar ekki lengur þessu líkani. Veldu annað líkan.",
+    "providerKeyRefused": "Þjónustuveitandinn hafnaði auðkenningarupplýsingunum. Athugaðu API-lykil hans og sendu aftur.",
+    "providerModelMissing": "Þessi bakendi þjónar ekki lengur þessu líkani. Veldu annað.",
     "providerRateLimited": "Þjónustuveitandinn takmarkar beiðnir. Bíddu aðeins og sendu aftur.",
     "providerUnavailable": "Þjónustuveitandinn er ekki í boði núna. Sendu aftur eftir smástund."
   },

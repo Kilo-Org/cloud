@@ -4028,8 +4028,8 @@
       "modelFlag": "Awoṣe yìí ṣe àtìlẹ́yìn fún ìwọ̀n ìrònú"
     },
     "creditsRequired": "Kirẹ́dítì kò tó láti fi ìfiránṣẹ́ yìí ránṣẹ́.",
-    "providerKeyRefused": "Ẹ̀yìn ìsopọ̀ náà kọ àwọn ẹ̀rí ìwọlé. Ṣàyẹ̀wò kọ́kọ́rọ́ API ti ẹ̀yìn yìí, kí o sì tún ránṣẹ́.",
-    "providerModelMissing": "Ẹ̀yìn yìí kò tún fi awoṣe yìí ṣiṣẹ́ mọ́. Yan awoṣe mìíràn.",
+    "providerKeyRefused": "Olùpèsè kọ àwọn ẹ̀rí ìwọlé. Ṣàyẹ̀wò kọ́kọ́rọ́ API rẹ̀, kí o sì tún ránṣẹ́.",
+    "providerModelMissing": "Ẹ̀yìn yìí kò tún fi awoṣe yìí ṣiṣẹ́ mọ́. Yan òmíràn.",
     "providerRateLimited": "Olùpèsè ń dín àwọn ìbéèrè kù. Dúró díẹ̀ kí o sì tún ránṣẹ́.",
     "providerUnavailable": "Olùpèsè kò sí lárọ̀ọ́wọ́tó báyìí. Tún ránṣẹ́ ní kété."
   },

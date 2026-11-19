@@ -4028,8 +4028,8 @@
       "modelFlag": "Ky model mbështet nivelin e arsyetimit"
     },
     "creditsRequired": "Nuk ka kredi të mjaftueshme për të dërguar këtë mesazh.",
-    "providerKeyRefused": "Backend-i i refuzoi të dhënat e hyrjes. Kontrollo çelësin API të këtij backend-i, pastaj dërgo sërish.",
-    "providerModelMissing": "Ky backend nuk ofron më këtë model. Zgjidh një model tjetër.",
+    "providerKeyRefused": "Ofruesi i refuzoi të dhënat e hyrjes. Kontrollo çelësin API të tij, pastaj dërgo sërish.",
+    "providerModelMissing": "Ky backend nuk ofron më këtë model. Zgjidh një tjetër.",
     "providerRateLimited": "Ofruesi po kufizon kërkesat. Prit një çast dhe dërgo sërish.",
     "providerUnavailable": "Ofruesi nuk është i disponueshëm tani. Dërgo sërish pas pak."
   },

@@ -4028,8 +4028,8 @@
       "modelFlag": "Moodeelkani wuxuu taageeraa heerka fikirka"
     },
     "creditsRequired": "Lacagta isticmaalka kuma filna farriintan la soo diray.",
-    "providerKeyRefused": "Backend-ka xogta aqoonsiga wuu diiday. Hubi furaha API backend-kan, ka dibna dib u dir farriinta.",
-    "providerModelMissing": "Backend-kan hadda ma adeegsado moodeelkan. Dooro moodeel kale.",
+    "providerKeyRefused": "Adeeg-bixiyuhu xogta aqoonsiga wuu diiday. Hubi furaha API, ka dibna dib u dir farriinta.",
+    "providerModelMissing": "Backend-kan hadda ma adeegsado moodeelkan. Dooro mid kale.",
     "providerRateLimited": "Adeeg-bixiyuhu codsiyada lama xaddayaa. Sug waqti gaaban, dib u dir farriinta.",
     "providerUnavailable": "Adeeg-bixiyuhu hadda ma heli karo. Dib u dir farriinta dhawaan."
   },

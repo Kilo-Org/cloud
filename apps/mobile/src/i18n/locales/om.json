@@ -4028,8 +4028,8 @@
       "modelFlag": "Moodeelli kun sadarkaa xiinxalaa ni deeggara"
     },
     "creditsRequired": "Kiriiditiin ergaa kanaa erguuf gahaa miti.",
-    "providerKeyRefused": "Sarviin kun mirkaneessa eenyummaa fudhachuu dide. Furtuu API sarvii kanaa ilaali, sana booda irra deebi'ii ergi.",
-    "providerModelMissing": "Sarviin kun moodeela kana amma hin kennu. Moodeela biraa filadhu.",
+    "providerKeyRefused": "Dhiyeessaan mirkaneessa eenyummaa fudhachuu dide. Furtuu API isaa ilaali, sana booda irra deebi'ii ergi.",
+    "providerModelMissing": "Sarviin kun moodeela kana amma hin kennu. Kan biraa filadhu.",
     "providerRateLimited": "Dhiyeessaan gaaffiiwwan daangessaa jira. Yeroo gabaabaa eegii irra deebi'ii ergi.",
     "providerUnavailable": "Dhiyeessaan amma argamuu hin danda'u. Yeroo gabaabaa keessatti irra deebi'ii ergi."
   },

@@ -4150,8 +4150,8 @@
       "modelFlag": "Tento model podporuje intenzitu uvažovania"
     },
     "creditsRequired": "Na odoslanie tejto správy nemáte dostatok kreditov.",
-    "providerKeyRefused": "Backend odmietol prihlasovacie údaje. Skontrolujte API kľúč tohto backendu a skúste odoslať znova.",
-    "providerModelMissing": "Tento backend už tento model neposkytuje. Vyberte iný model.",
+    "providerKeyRefused": "Poskytovateľ odmietol prihlasovacie údaje. Skontrolujte jeho API kľúč a skúste odoslať znova.",
+    "providerModelMissing": "Tento backend už tento model neposkytuje. Vyberte iný.",
     "providerRateLimited": "Poskytovateľ obmedzuje požiadavky. Chvíľu počkajte a skúste odoslať znova.",
     "providerUnavailable": "Poskytovateľ je teraz nedostupný. O chvíľu skúste odoslať znova."
   },

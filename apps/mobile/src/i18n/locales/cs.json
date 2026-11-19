@@ -4150,8 +4150,8 @@
       "modelFlag": "Tento model podporuje úroveň uvažování"
     },
     "creditsRequired": "Nedostatek kreditů k odeslání této zprávy.",
-    "providerKeyRefused": "Server odmítl přihlašovací údaje. Zkontrolujte klíč API tohoto serveru a odešlete znovu.",
-    "providerModelMissing": "Tento server již tento model neposkytuje. Vyberte jiný model.",
+    "providerKeyRefused": "Poskytovatel odmítl přihlašovací údaje. Zkontrolujte jeho klíč API a odešlete znovu.",
+    "providerModelMissing": "Tento server již tento model neposkytuje. Vyberte jiný.",
     "providerRateLimited": "Poskytovatel omezuje požadavky. Chvíli počkejte a odešlete znovu.",
     "providerUnavailable": "Poskytovatel je nyní nedostupný. Odešlete znovu za chvíli."
   },

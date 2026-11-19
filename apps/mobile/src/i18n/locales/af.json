@@ -4028,8 +4028,8 @@
       "modelFlag": "Hierdie model ondersteun denkinspanning"
     },
     "creditsRequired": "Nie genoeg krediete om hierdie boodskap te stuur nie.",
-    "providerKeyRefused": "Die agtergrondstelsel het die aanmeldbesonderhede geweier. Kontroleer hierdie agtergrondstelsel se API-sleutel en stuur dan weer.",
-    "providerModelMissing": "Hierdie agtergrondstelsel bedien nie meer hierdie model nie. Kies 'n ander model.",
+    "providerKeyRefused": "Die verskaffer het die aanmeldbesonderhede geweier. Kontroleer sy API-sleutel en stuur dan weer.",
+    "providerModelMissing": "Hierdie agtergrondstelsel bedien nie meer hierdie model nie. Kies 'n ander.",
     "providerRateLimited": "Die verskaffer beperk versoeke. Wag 'n oomblik en stuur weer.",
     "providerUnavailable": "Die verskaffer is tans onbeskikbaar. Stuur binnekort weer."
   },

@@ -4089,8 +4089,8 @@
       "modelFlag": "Ovaj model podržava intenzitet razmišljanja"
     },
     "creditsRequired": "Nema dovoljno kredita za slanje ove poruke.",
-    "providerKeyRefused": "Pozadinski servis je odbio pristupne podatke. Provjeri API ključ ovog pozadinskog servisa, pa pošalji ponovo.",
-    "providerModelMissing": "Ovaj pozadinski servis više ne nudi ovaj model. Odaberi drugi model.",
+    "providerKeyRefused": "Pružalac usluge je odbio pristupne podatke. Provjeri njegov API ključ, pa pošalji ponovo.",
+    "providerModelMissing": "Ovaj pozadinski servis više ne nudi ovaj model. Odaberi drugi.",
     "providerRateLimited": "Pružalac usluge ograničava zahtjeve. Sačekaj trenutak i pošalji ponovo.",
     "providerUnavailable": "Pružalac usluge trenutno nije dostupan. Pošalji ponovo uskoro."
   },

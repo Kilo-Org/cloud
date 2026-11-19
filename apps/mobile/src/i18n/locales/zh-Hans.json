@@ -4028,8 +4028,8 @@
       "modelFlag": "此模型支持思考强度"
     },
     "creditsRequired": "额度不足，无法发送此消息。",
-    "providerKeyRefused": "后端拒绝了凭据。请检查该后端的 API 密钥，然后重新发送。",
-    "providerModelMissing": "此后端不再提供此模型。请选择其他模型。",
+    "providerKeyRefused": "提供商拒绝了凭据。请检查其 API 密钥，然后重新发送。",
+    "providerModelMissing": "此后端不再提供此模型。请选择其他。",
     "providerRateLimited": "提供商正在限制请求。请稍等片刻后重新发送。",
     "providerUnavailable": "提供商当前不可用。请稍后重新发送。"
   },

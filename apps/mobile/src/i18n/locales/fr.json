@@ -4089,8 +4089,8 @@
       "modelFlag": "Ce modèle prend en charge le niveau de réflexion"
     },
     "creditsRequired": "Pas assez de crédits pour envoyer ce message.",
-    "providerKeyRefused": "Le service a refusé les identifiants d'authentification. Vérifiez la clé d'API de ce service, puis renvoyez le message.",
-    "providerModelMissing": "Ce service ne propose plus ce modèle. Choisissez un autre modèle.",
+    "providerKeyRefused": "Le fournisseur a refusé les identifiants d'authentification. Vérifiez sa clé d'API, puis renvoyez le message.",
+    "providerModelMissing": "Ce service ne propose plus ce modèle. Choisissez un autre.",
     "providerRateLimited": "Le fournisseur limite les requêtes. Patientez un instant, puis renvoyez le message.",
     "providerUnavailable": "Le fournisseur est indisponible pour le moment. Renvoyez le message dans quelques instants."
   },

@@ -4028,8 +4028,8 @@
       "modelFlag": "Le modeli isekela umzamo wokucabanga"
     },
     "creditsRequired": "Ayikho imikhredithi eyanele yokuthumela lo myalezo.",
-    "providerKeyRefused": "I-backend inqabile imininingwane yokungena. Hlola ukhiye we-API wale backend, bese uthumela futhi.",
-    "providerModelMissing": "Le backend ayisanikezi le modeli. Khetha enye imodeli.",
+    "providerKeyRefused": "Umhlinzeki wenqabile imininingwane yokungena. Hlola ukhiye we-API wakhe, bese uthumela futhi.",
+    "providerModelMissing": "Le backend ayisanikezi le modeli. Khetha enye.",
     "providerRateLimited": "Umhlinzeki unciphisa izicelo. Linda isikhashana bese uthumela futhi.",
     "providerUnavailable": "Umhlinzeki akatholakali okwamanje. Thumela futhi ngemva kwesikhashana."
   },

@@ -4028,8 +4028,8 @@
       "modelFlag": "Tämä malli tukee päättelyn tasoa"
     },
     "creditsRequired": "Krediitit eivät riitä tämän viestin lähettämiseen.",
-    "providerKeyRefused": "Taustapalvelu hylkäsi tunnistetiedot. Tarkista tämän taustapalvelun API-avain ja lähetä sitten uudelleen.",
-    "providerModelMissing": "Tämä taustapalvelu ei enää tarjoa tätä mallia. Valitse toinen malli.",
+    "providerKeyRefused": "Palveluntarjoaja hylkäsi tunnistetiedot. Tarkista sen API-avain ja lähetä sitten uudelleen.",
+    "providerModelMissing": "Tämä taustapalvelu ei enää tarjoa tätä mallia. Valitse toinen.",
     "providerRateLimited": "Palveluntarjoaja rajoittaa pyyntöjä. Odota hetki ja lähetä uudelleen.",
     "providerUnavailable": "Palveluntarjoaja ei ole juuri nyt käytettävissä. Lähetä uudelleen pian."
   },

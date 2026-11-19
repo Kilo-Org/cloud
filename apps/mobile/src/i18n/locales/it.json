@@ -4089,8 +4089,8 @@
       "modelFlag": "Questo modello supporta il livello di ragionamento"
     },
     "creditsRequired": "Crediti insufficienti per inviare questo messaggio.",
-    "providerKeyRefused": "Il servizio ha rifiutato le credenziali. Controlla la chiave API di questo servizio, poi invia di nuovo.",
-    "providerModelMissing": "Questo servizio non fornisce più questo modello. Scegli un altro modello.",
+    "providerKeyRefused": "Il fornitore ha rifiutato le credenziali. Controlla la sua chiave API, poi invia di nuovo.",
+    "providerModelMissing": "Questo servizio non fornisce più questo modello. Scegli un altro.",
     "providerRateLimited": "Il fornitore sta limitando le richieste. Attendi un momento e invia di nuovo.",
     "providerUnavailable": "Il fornitore non è disponibile in questo momento. Invia di nuovo a breve."
   },

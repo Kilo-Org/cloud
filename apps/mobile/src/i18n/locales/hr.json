@@ -4089,8 +4089,8 @@
       "modelFlag": "Ovaj model podržava intenzitet razmišljanja"
     },
     "creditsRequired": "Nema dovoljno kredita za slanje ove poruke.",
-    "providerKeyRefused": "Pozadinski sustav odbio je vjerodajnice. Provjeri API ključ ovog pozadinskog sustava, pa pošalji ponovno.",
-    "providerModelMissing": "Ovaj pozadinski sustav više ne poslužuje ovaj model. Odaberi drugi model.",
+    "providerKeyRefused": "Pružatelj odbio je vjerodajnice. Provjeri njegov API ključ, pa pošalji ponovno.",
+    "providerModelMissing": "Ovaj pozadinski sustav više ne poslužuje ovaj model. Odaberi drugi.",
     "providerRateLimited": "Pružatelj ograničava zahtjeve. Pričekaj trenutak i pošalji ponovno.",
     "providerUnavailable": "Pružatelj trenutačno nije dostupan. Pošalji ponovno uskoro."
   },

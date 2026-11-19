@@ -4028,8 +4028,8 @@
       "modelFlag": "Este modelo admite esforzo de razoamento"
     },
     "creditsRequired": "Non hai créditos suficientes para enviar esta mensaxe.",
-    "providerKeyRefused": "O servizo rexeitou as credenciais. Comproba a clave de API deste servizo e envía de novo.",
-    "providerModelMissing": "Este servizo xa non ofrece este modelo. Escolle outro modelo.",
+    "providerKeyRefused": "O provedor rexeitou as credenciais. Comproba a súa clave da API e envía de novo.",
+    "providerModelMissing": "Este servizo xa non ofrece este modelo. Escolle outro.",
     "providerRateLimited": "O provedor está a limitar as peticións. Agarda un momento e envía de novo.",
     "providerUnavailable": "O provedor non está dispoñible agora mesmo. Envía de novo en breve."
   },

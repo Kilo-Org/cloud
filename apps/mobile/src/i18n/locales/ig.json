@@ -4028,8 +4028,8 @@
       "modelFlag": "Ihe nlereanya a na-akwado mgbalị iche echiche"
     },
     "creditsRequired": "Ego ojiji ezughị oke izipu ozi a.",
-    "providerKeyRefused": "Sava ahụ jụrụ ozi njirimara. Lelee nkụnye ziri ezi API nke sava a, wee ziga ọzọ.",
-    "providerModelMissing": "Sava a anaghịzi enye ihe nlereanya a. Họrọ ihe nlereanya ọzọ.",
+    "providerKeyRefused": "Onye na-enye ọrụ jụrụ ozi njirimara. Lelee nkụnye ziri ezi API ya, wee ziga ọzọ.",
+    "providerModelMissing": "Sava a anaghịzi enye ihe nlereanya a. Họrọ ọzọ.",
     "providerRateLimited": "Onye na-enye ọrụ na-egbochi arịrịọ. Chere ntakịrị ma ziga ọzọ.",
     "providerUnavailable": "Onye na-enye ọrụ adịghị ugbu a. Ziga ọzọ n'oge na-adịghị anya."
   },

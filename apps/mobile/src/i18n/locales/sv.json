@@ -4028,8 +4028,8 @@
       "modelFlag": "Den här modellen stöder resonemangsnivå"
     },
     "creditsRequired": "Det räcker inte med krediter för att skicka det här meddelandet.",
-    "providerKeyRefused": "Backenden nekade inloggningsuppgifterna. Kontrollera API-nyckeln för den här backenden och skicka igen.",
-    "providerModelMissing": "Den här backenden tillhandahåller inte längre den här modellen. Välj en annan modell.",
+    "providerKeyRefused": "Leverantören nekade inloggningsuppgifterna. Kontrollera dess API-nyckel och skicka igen.",
+    "providerModelMissing": "Den här backenden tillhandahåller inte längre den här modellen. Välj en annan.",
     "providerRateLimited": "Leverantören begränsar antalet förfrågningar. Vänta ett ögonblick och skicka igen.",
     "providerUnavailable": "Leverantören är inte tillgänglig just nu. Skicka igen om en stund."
   },

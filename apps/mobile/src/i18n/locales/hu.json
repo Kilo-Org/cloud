@@ -4028,8 +4028,8 @@
       "modelFlag": "Ez a modell támogatja a gondolkodás szintjét"
     },
     "creditsRequired": "Nincs elég egyenleged ennek az üzenetnek az elküldéséhez.",
-    "providerKeyRefused": "A háttérrendszer elutasította a hitelesítési adatokat. Ellenőrizd a háttérrendszer API-kulcsát, majd küldd el újra.",
-    "providerModelMissing": "Ez a háttérrendszer már nem szolgálja ki ezt a modellt. Válassz másik modellt.",
+    "providerKeyRefused": "A szolgáltató elutasította a hitelesítési adatokat. Ellenőrizd az API-kulcsát, majd küldd el újra.",
+    "providerModelMissing": "Ez a háttérrendszer már nem szolgálja ki ezt a modellt. Válassz másikat.",
     "providerRateLimited": "A szolgáltató korlátozza a kéréseket. Várj egy kicsit, és küldd el újra.",
     "providerUnavailable": "A szolgáltató jelenleg nem érhető el. Küldd el újra hamarosan."
   },

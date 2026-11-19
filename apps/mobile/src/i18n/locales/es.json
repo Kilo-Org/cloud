@@ -4089,8 +4089,8 @@
       "modelFlag": "Este modelo admite esfuerzo de razonamiento"
     },
     "creditsRequired": "No hay suficientes créditos para enviar este mensaje.",
-    "providerKeyRefused": "El servicio ha rechazado las credenciales. Comprueba la clave de API de este servicio y vuelve a enviar el mensaje.",
-    "providerModelMissing": "Este servicio ya no ofrece este modelo. Elige otro modelo.",
+    "providerKeyRefused": "El proveedor ha rechazado las credenciales. Comprueba su clave de API y vuelve a enviar el mensaje.",
+    "providerModelMissing": "Este servicio ya no ofrece este modelo. Elige otro.",
     "providerRateLimited": "El proveedor está limitando las solicitudes. Espera un momento y vuelve a enviar el mensaje.",
     "providerUnavailable": "El proveedor no está disponible en este momento. Vuelve a enviar el mensaje en breve."
   },

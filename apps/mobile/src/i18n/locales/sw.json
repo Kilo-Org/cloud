@@ -4028,8 +4028,8 @@
       "modelFlag": "Modeli hii inaauni juhudi za kufikiri"
     },
     "creditsRequired": "Salio halitoshi kutuma ujumbe huu.",
-    "providerKeyRefused": "Backend imekataa taarifa za uthibitishaji. Angalia ufunguo wa API wa backend hii, kisha utume tena.",
-    "providerModelMissing": "Backend hii haitoi modeli hii tena. Chagua modeli nyingine.",
+    "providerKeyRefused": "Mtoa huduma amekataa taarifa za uthibitishaji. Angalia ufunguo wake wa API, kisha utume tena.",
+    "providerModelMissing": "Backend hii haitoi modeli hii tena. Chagua nyingine.",
     "providerRateLimited": "Mtoa huduma anaweka kikomo kwa maombi. Subiri kidogo kisha utume tena.",
     "providerUnavailable": "Mtoa huduma hapatikani kwa sasa. Tuma tena baada ya muda mfupi."
   },

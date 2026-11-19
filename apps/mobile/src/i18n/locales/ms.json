@@ -4028,8 +4028,8 @@
       "modelFlag": "Model ini menyokong tahap pemikiran"
     },
     "creditsRequired": "Kredit tidak mencukupi untuk menghantar mesej ini.",
-    "providerKeyRefused": "Backend menolak bukti kelayakan. Periksa kunci API backend ini, kemudian hantar semula.",
-    "providerModelMissing": "Backend ini tidak lagi menyediakan model ini. Pilih model lain.",
+    "providerKeyRefused": "Penyedia menolak bukti kelayakan. Periksa kunci API-nya, kemudian hantar semula.",
+    "providerModelMissing": "Backend ini tidak lagi menyediakan model ini. Pilih yang lain.",
     "providerRateLimited": "Penyedia sedang mengehadkan permintaan. Tunggu sebentar dan hantar semula.",
     "providerUnavailable": "Penyedia tidak tersedia buat masa ini. Hantar semula sebentar lagi."
   },

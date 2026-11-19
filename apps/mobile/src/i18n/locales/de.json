@@ -4028,8 +4028,8 @@
       "modelFlag": "Dieses Modell unterstützt Denkaufwand"
     },
     "creditsRequired": "Nicht genug Guthaben, um diese Nachricht zu senden.",
-    "providerKeyRefused": "Das Backend hat die Zugangsdaten abgelehnt. Prüfe den API-Schlüssel dieses Backends und sende dann erneut.",
-    "providerModelMissing": "Dieses Backend stellt dieses Modell nicht mehr bereit. Wähle ein anderes Modell.",
+    "providerKeyRefused": "Der Anbieter hat die Zugangsdaten abgelehnt. Prüfe dessen API-Schlüssel und sende dann erneut.",
+    "providerModelMissing": "Dieses Backend stellt dieses Modell nicht mehr bereit. Wähle ein anderes.",
     "providerRateLimited": "Der Anbieter begrenzt Anfragen. Warte einen Moment und sende dann erneut.",
     "providerUnavailable": "Der Anbieter ist derzeit nicht verfügbar. Sende in Kürze erneut."
   },

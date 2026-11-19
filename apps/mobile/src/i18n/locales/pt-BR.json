@@ -4095,8 +4095,8 @@
       "modelFlag": "Este modelo aceita esforço de raciocínio"
     },
     "creditsRequired": "Créditos insuficientes para enviar esta mensagem.",
-    "providerKeyRefused": "O servidor recusou as credenciais. Verifique a chave de API deste servidor e envie novamente.",
-    "providerModelMissing": "Este servidor não disponibiliza mais este modelo. Escolha outro modelo.",
+    "providerKeyRefused": "O provedor recusou as credenciais. Verifique a chave de API dele e envie novamente.",
+    "providerModelMissing": "Este servidor não disponibiliza mais este modelo. Escolha outro.",
     "providerRateLimited": "O provedor está limitando solicitações. Aguarde um momento e envie novamente.",
     "providerUnavailable": "O provedor está indisponível no momento. Envie novamente em instantes."
   },

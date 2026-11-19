@@ -4094,8 +4094,8 @@
       "signInFailed": "Couldn't sign in to {{name}}. Try again."
     },
     "creditsRequired": "Not enough credits to send this message.",
-    "providerKeyRefused": "The backend refused the credentials. Check this backend's API key, then send again.",
-    "providerModelMissing": "This backend no longer serves this model. Choose another model.",
+    "providerKeyRefused": "The provider refused the credentials. Check its API key, then send again.",
+    "providerModelMissing": "This backend no longer serves this model. Choose another.",
     "providerRateLimited": "The provider is limiting requests. Wait a moment and send again.",
     "providerUnavailable": "The provider is unavailable right now. Send again shortly."
   },

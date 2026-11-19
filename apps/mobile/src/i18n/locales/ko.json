@@ -4028,8 +4028,8 @@
       "modelFlag": "이 모델은 추론 강도를 지원합니다"
     },
     "creditsRequired": "이 메시지를 보낼 크레딧이 부족합니다.",
-    "providerKeyRefused": "백엔드가 인증 정보를 거부했습니다. 이 백엔드의 API 키를 확인한 후 다시 보내세요.",
-    "providerModelMissing": "이 백엔드에서 더 이상 이 모델을 제공하지 않습니다. 다른 모델을 선택하세요.",
+    "providerKeyRefused": "제공자가 인증 정보를 거부했습니다. 제공자의 API 키를 확인한 후 다시 보내세요.",
+    "providerModelMissing": "이 백엔드에서 더 이상 이 모델을 제공하지 않습니다. 다른 것을 선택하세요.",
     "providerRateLimited": "제공자가 요청을 제한하고 있습니다. 잠시 기다린 후 다시 보내세요.",
     "providerUnavailable": "제공자를 지금 사용할 수 없습니다. 잠시 후 다시 보내세요."
   },

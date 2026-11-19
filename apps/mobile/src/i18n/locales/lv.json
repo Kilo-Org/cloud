@@ -4089,8 +4089,8 @@
       "modelFlag": "Šis modelis atbalsta domāšanas intensitāti"
     },
     "creditsRequired": "Nepietiek kredītu, lai nosūtītu šo ziņojumu.",
-    "providerKeyRefused": "Aizmugurējais serviss noraidīja piekļuves datus. Pārbaudi šī aizmugurējā servisa API atslēgu, tad nosūti vēlreiz.",
-    "providerModelMissing": "Šis aizmugurējais serviss vairs nenodrošina šo modeli. Izvēlies citu modeli.",
+    "providerKeyRefused": "Pakalpojumu sniedzējs noraidīja piekļuves datus. Pārbaudi tā API atslēgu, tad nosūti vēlreiz.",
+    "providerModelMissing": "Šis aizmugurējais serviss vairs nenodrošina šo modeli. Izvēlies citu.",
     "providerRateLimited": "Pakalpojumu sniedzējs ierobežo pieprasījumus. Nogaidi brīdi un nosūti vēlreiz.",
     "providerUnavailable": "Pakalpojumu sniedzējs šobrīd nav pieejams. Nosūti vēlreiz pēc brīža."
   },

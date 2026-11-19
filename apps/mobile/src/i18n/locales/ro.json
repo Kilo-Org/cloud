@@ -4089,8 +4089,8 @@
       "modelFlag": "Acest model acceptă efort de raționament"
     },
     "creditsRequired": "Nu ai suficiente credite pentru a trimite acest mesaj.",
-    "providerKeyRefused": "Backendul a refuzat credențialele. Verifică cheia API a acestui backend, apoi trimite din nou.",
-    "providerModelMissing": "Acest backend nu mai servește acest model. Alege alt model.",
+    "providerKeyRefused": "Furnizorul a refuzat credențialele. Verifică cheia API a acestuia, apoi trimite din nou.",
+    "providerModelMissing": "Acest backend nu mai servește acest model. Alege altul.",
     "providerRateLimited": "Furnizorul limitează cererile. Așteaptă puțin și trimite din nou.",
     "providerUnavailable": "Furnizorul este indisponibil acum. Trimite din nou în curând."
   },

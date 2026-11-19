@@ -4028,8 +4028,8 @@
       "modelFlag": "Bu model düşünmə səviyyəsini dəstəkləyir"
     },
     "creditsRequired": "Bu mesajı göndərmək üçün kifayət qədər kredit yoxdur.",
-    "providerKeyRefused": "Arxa xidmət giriş məlumatlarını rədd etdi. Bu arxa xidmətin API açarını yoxlayın, sonra yenidən göndərin.",
-    "providerModelMissing": "Bu arxa xidmət artıq bu modeli təqdim etmir. Başqa model seçin.",
+    "providerKeyRefused": "Provayder giriş məlumatlarını rədd etdi. Onun API açarını yoxlayın, sonra yenidən göndərin.",
+    "providerModelMissing": "Bu arxa xidmət artıq bu modeli təqdim etmir. Başqasını seçin.",
     "providerRateLimited": "Provayder sorğuları məhdudlaşdırır. Bir az gözləyin və yenidən göndərin.",
     "providerUnavailable": "Provayder hazırda əlçatan deyil. Bir az sonra yenidən göndərin."
   },

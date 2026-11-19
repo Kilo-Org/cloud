@@ -4028,8 +4028,8 @@
       "modelFlag": "Sinusuportahan ng modelong ito ang antas ng pag-iisip"
     },
     "creditsRequired": "Kulang ang kredito para ipadala ang mensaheng ito.",
-    "providerKeyRefused": "Tinanggihan ng backend ang mga kredensyal. Suriin ang API key ng backend na ito, pagkatapos ay muling ipadala.",
-    "providerModelMissing": "Hindi na nag-aalok ang backend na ito ng modelong ito. Pumili ng ibang modelo.",
+    "providerKeyRefused": "Tinanggihan ng provider ang mga kredensyal. Suriin ang API key nito, pagkatapos ay muling ipadala.",
+    "providerModelMissing": "Hindi na nag-aalok ang backend na ito ng modelong ito. Pumili ng iba.",
     "providerRateLimited": "Nililimitahan ng provider ang mga kahilingan. Maghintay sandali at muling ipadala.",
     "providerUnavailable": "Hindi available ang provider sa ngayon. Muling ipadala sa ilang sandali."
   },

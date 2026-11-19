@@ -4028,8 +4028,8 @@
       "modelFlag": "此模型支援思考程度"
     },
     "creditsRequired": "點數不足，無法傳送此訊息。",
-    "providerKeyRefused": "後端拒絕了驗證憑證。請檢查此後端的 API 金鑰，然後重新傳送。",
-    "providerModelMissing": "此後端已不再提供此模型。請選擇其他模型。",
+    "providerKeyRefused": "供應商拒絕了驗證憑證。請檢查其 API 金鑰，然後重新傳送。",
+    "providerModelMissing": "此後端已不再提供此模型。請選擇其他。",
     "providerRateLimited": "供應商正在限制請求。請稍候片刻再重新傳送。",
     "providerUnavailable": "供應商目前無法使用。請稍後再重新傳送。"
   },

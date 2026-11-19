@@ -4150,8 +4150,8 @@
       "modelFlag": "Ten model obsługuje poziom rozumowania"
     },
     "creditsRequired": "Brak wystarczającej liczby kredytów, aby wysłać tę wiadomość.",
-    "providerKeyRefused": "Backend odrzucił dane uwierzytelniające. Sprawdź klucz API tego backendu, a następnie wyślij ponownie.",
-    "providerModelMissing": "Ten backend nie obsługuje już tego modelu. Wybierz inny model.",
+    "providerKeyRefused": "Dostawca odrzucił dane uwierzytelniające. Sprawdź jego klucz API, a następnie wyślij ponownie.",
+    "providerModelMissing": "Ten backend nie obsługuje już tego modelu. Wybierz inny.",
     "providerRateLimited": "Dostawca ogranicza liczbę żądań. Odczekaj chwilę i wyślij ponownie.",
     "providerUnavailable": "Dostawca jest teraz niedostępny. Wyślij ponownie za chwilę."
   },

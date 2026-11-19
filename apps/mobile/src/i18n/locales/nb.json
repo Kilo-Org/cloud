@@ -4028,8 +4028,8 @@
       "modelFlag": "Denne modellen støtter resonneringsinnsats"
     },
     "creditsRequired": "Ikke nok kreditter til å sende denne meldingen.",
-    "providerKeyRefused": "Backend-en avviste påloggingsinformasjonen. Sjekk API-nøkkelen for denne backend-en, og send på nytt.",
-    "providerModelMissing": "Denne backend-en leverer ikke lenger denne modellen. Velg en annen modell.",
+    "providerKeyRefused": "Leverandøren avviste påloggingsinformasjonen. Sjekk API-nøkkelen, og send på nytt.",
+    "providerModelMissing": "Denne backend-en leverer ikke lenger denne modellen. Velg en annen.",
     "providerRateLimited": "Leverandøren begrenser antall forespørsler. Vent litt og send på nytt.",
     "providerUnavailable": "Leverandøren er utilgjengelig akkurat nå. Send på nytt om litt."
   },

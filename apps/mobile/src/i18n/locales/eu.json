@@ -4028,8 +4028,8 @@
       "modelFlag": "Modelo honek arrazoiketa-ahalegina onartzen du"
     },
     "creditsRequired": "Ez dago kreditu nahiko mezu hau bidaltzeko.",
-    "providerKeyRefused": "Atzeko zerbitzuak kredentzialak baztertu ditu. Egiaztatu atzeko zerbitzu honen APIaren gakoa, eta bidali berriro.",
-    "providerModelMissing": "Atzeko zerbitzu honek jada ez du modelo hau eskaintzen. Aukeratu beste modelo bat.",
+    "providerKeyRefused": "Hornitzaileak kredentzialak baztertu ditu. Egiaztatu bere APIaren gakoa, eta bidali berriro.",
+    "providerModelMissing": "Atzeko zerbitzu honek jada ez du modelo hau eskaintzen. Aukeratu beste bat.",
     "providerRateLimited": "Hornitzailea eskaerak mugatzen ari da. Itxaron une bat eta bidali berriro.",
     "providerUnavailable": "Hornitzailea ez dago erabilgarri une honetan. Bidali berriro laster."
   },

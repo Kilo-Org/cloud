@@ -4028,8 +4028,8 @@
       "modelFlag": "Mô hình này hỗ trợ mức độ suy luận"
     },
     "creditsRequired": "Không đủ tín dụng để gửi tin nhắn này.",
-    "providerKeyRefused": "Máy chủ phụ trợ đã từ chối thông tin xác thực. Kiểm tra khóa API của máy chủ phụ trợ này, rồi gửi lại.",
-    "providerModelMissing": "Máy chủ phụ trợ này không còn phục vụ mô hình này. Hãy chọn mô hình khác.",
+    "providerKeyRefused": "Nhà cung cấp đã từ chối thông tin xác thực. Kiểm tra khóa API của nhà cung cấp, rồi gửi lại.",
+    "providerModelMissing": "Máy chủ phụ trợ này không còn phục vụ mô hình này. Hãy chọn một cái khác.",
     "providerRateLimited": "Nhà cung cấp đang giới hạn yêu cầu. Đợi một lát rồi gửi lại.",
     "providerUnavailable": "Nhà cung cấp hiện không khả dụng. Hãy gửi lại sau ít phút."
   },

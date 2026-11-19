@@ -4211,8 +4211,8 @@
       "modelFlag": "Dan il-mudell jappoġġa sforz ta' ħsieb"
     },
     "creditsRequired": "M'hemmx biżżejjed krediti biex tibgħat dan il-messaġġ.",
-    "providerKeyRefused": "Il-backend irrifjuta l-kredenzjali. Iċċekkja ċ-ċavetta API ta' dan il-backend, imbagħad erġa' ibgħat.",
-    "providerModelMissing": "Dan il-backend m'għadux jipprovdi dan il-mudell. Agħżel mudell ieħor.",
+    "providerKeyRefused": "Il-fornitur irrifjuta l-kredenzjali. Iċċekkja ċ-ċavetta API tiegħu, imbagħad erġa' ibgħat.",
+    "providerModelMissing": "Dan il-backend m'għadux jipprovdi dan il-mudell. Agħżel ieħor.",
     "providerRateLimited": "Il-fornitur qed jillimita t-talbiet. Stenna ftit u erġa' ibgħat.",
     "providerUnavailable": "Il-fornitur mhux disponibbli bħalissa. Erġa' ibgħat fi ftit ħin."
   },

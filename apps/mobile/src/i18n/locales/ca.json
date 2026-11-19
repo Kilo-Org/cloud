@@ -4089,8 +4089,8 @@
       "modelFlag": "Aquest model admet l'esforç de raonament"
     },
     "creditsRequired": "No hi ha prou crèdits per enviar aquest missatge.",
-    "providerKeyRefused": "El servidor ha rebutjat les credencials. Comprova la clau de l'API d'aquest servidor i torna a enviar.",
-    "providerModelMissing": "Aquest servidor ja no ofereix aquest model. Tria un altre model.",
+    "providerKeyRefused": "El proveïdor ha rebutjat les credencials. Comprova la seva clau de l'API i torna a enviar.",
+    "providerModelMissing": "Aquest servidor ja no ofereix aquest model. Tria un altre.",
     "providerRateLimited": "El proveïdor està limitant les sol·licituds. Espera un moment i torna a enviar.",
     "providerUnavailable": "El proveïdor no està disponible ara mateix. Torna a enviar d'aquí a poc."
   },

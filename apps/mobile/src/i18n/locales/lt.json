@@ -4150,8 +4150,8 @@
       "modelFlag": "Šis modelis palaiko mąstymo intensyvumą"
     },
     "creditsRequired": "Nepakanka kreditų šiai žinutei išsiųsti.",
-    "providerKeyRefused": "Backendas atmetė prisijungimo duomenis. Patikrinkite šio backendo API raktą, tada siųskite dar kartą.",
-    "providerModelMissing": "Šis backendas nebeteikia šio modelio. Pasirinkite kitą modelį.",
+    "providerKeyRefused": "Paslaugos teikėjas atmetė prisijungimo duomenis. Patikrinkite jo API raktą, tada siųskite dar kartą.",
+    "providerModelMissing": "Šis backendas nebeteikia šio modelio. Pasirinkite kitą.",
     "providerRateLimited": "Paslaugos teikėjas riboja užklausas. Palaukite akimirką ir siųskite dar kartą.",
     "providerUnavailable": "Paslaugos teikėjas šiuo metu nepasiekiamas. Netrukus siųskite dar kartą."
   },

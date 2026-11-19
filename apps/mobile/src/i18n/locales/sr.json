@@ -4089,8 +4089,8 @@
       "modelFlag": "Ovaj model podržava nivo razmišljanja"
     },
     "creditsRequired": "Nema dovoljno kredita za slanje ove poruke.",
-    "providerKeyRefused": "Backend je odbio podatke za prijavu. Proveri API ključ ovog backenda, pa pošalji ponovo.",
-    "providerModelMissing": "Ovaj backend više ne nudi ovaj model. Izaberi drugi model.",
+    "providerKeyRefused": "Pružalac usluge je odbio podatke za prijavu. Proveri njegov API ključ, pa pošalji ponovo.",
+    "providerModelMissing": "Ovaj backend više ne nudi ovaj model. Izaberi drugi.",
     "providerRateLimited": "Pružalac usluge ograničava zahteve. Sačekaj trenutak i pošalji ponovo.",
     "providerUnavailable": "Pružalac usluge je trenutno nedostupan. Pošalji ponovo za koji trenutak."
   },

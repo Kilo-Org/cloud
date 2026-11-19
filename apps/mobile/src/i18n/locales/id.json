@@ -4028,8 +4028,8 @@
       "modelFlag": "Model ini mendukung tingkat penalaran"
     },
     "creditsRequired": "Kredit tidak cukup untuk mengirim pesan ini.",
-    "providerKeyRefused": "Layanan menolak kredensial. Periksa kunci API layanan ini, lalu kirim lagi.",
-    "providerModelMissing": "Layanan ini tidak lagi menyediakan model ini. Pilih model lain.",
+    "providerKeyRefused": "Penyedia menolak kredensial. Periksa kunci API-nya, lalu kirim lagi.",
+    "providerModelMissing": "Layanan ini tidak lagi menyediakan model ini. Pilih yang lain.",
     "providerRateLimited": "Penyedia membatasi permintaan. Tunggu sebentar dan kirim lagi.",
     "providerUnavailable": "Penyedia tidak tersedia saat ini. Kirim lagi sebentar lagi."
   },

@@ -4028,8 +4028,8 @@
       "modelFlag": "Bu model fikrlash darajasini qo‘llab-quvvatlaydi"
     },
     "creditsRequired": "Bu xabarni yuborish uchun kreditlar yetarli emas.",
-    "providerKeyRefused": "Backend kirish maʼlumotlarini rad etdi. Ushbu backendning API kalitini tekshirib, qaytadan yuboring.",
-    "providerModelMissing": "Bu backend endi bu modelga xizmat koʻrsatmaydi. Boshqa modelni tanlang.",
+    "providerKeyRefused": "Xizmat koʻrsatuvchi kirish maʼlumotlarini rad etdi. Uning API kalitini tekshirib, qaytadan yuboring.",
+    "providerModelMissing": "Bu backend endi bu modelga xizmat koʻrsatmaydi. Boshqasini tanlang.",
     "providerRateLimited": "Xizmat koʻrsatuvchi soʻrovlarni cheklayapti. Biroz kuting va qaytadan yuboring.",
     "providerUnavailable": "Xizmat koʻrsatuvchi hozir mavjud emas. Birozdan soʻng qaytadan yuboring."
   },

@@ -4028,8 +4028,8 @@
       "modelFlag": "Manohana ezaka amin'ny fisainana ity modely ity"
     },
     "creditsRequired": "Tsy ampy kireditra handefasana ity hafatra ity.",
-    "providerKeyRefused": "Nolavin'ny backend ny mombamomba ny fidirana. Hamarino ny lakile API an'ity backend ity, dia alefaso indray.",
-    "providerModelMissing": "Tsy manolotra ity modely ity intsony ity backend ity. Misafidiana modely hafa.",
+    "providerKeyRefused": "Nolavin'ny mpamatsy ny mombamomba ny fidirana. Hamarino ny lakile API an'ny mpamatsy, dia alefaso indray.",
+    "providerModelMissing": "Tsy manolotra ity modely ity intsony ity backend ity. Misafidiana hafa.",
     "providerRateLimited": "Mampetra ny fangatahana ny mpamatsy. Andraso kely dia alefaso indray.",
     "providerUnavailable": "Tsy misy amin'izao fotoana izao ny mpamatsy. Alefaso indray rahoway kely."
   },

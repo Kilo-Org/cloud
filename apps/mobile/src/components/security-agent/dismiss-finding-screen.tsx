@@ -20,6 +20,7 @@ import {
   resolveDismissFailure,
 } from '@/components/security-agent/dismiss-finding-failure';
 import { useSecurityAgentCapability } from '@/lib/hooks/use-security-agent';
+import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 import {
   isSecurityTrialRefusal,
   isSecurityTrialRefusalCopyKey,
@@ -56,6 +57,10 @@ type DismissFindingScreenProps = {
 export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindingScreenProps>) {
   const router = useRouter();
   const { t } = useTranslation();
+  // The route is a formSheet pushed over the scope dashboard, so the sheet
+  // settles a status-bar inset below the window top and the header reserves no
+  // clearance of its own (`useFormSheetHeaderTopInset`).
+  const headerTopInset = useFormSheetHeaderTopInset();
   const capability = useSecurityAgentCapability(scope);
   const findingQuery = useSecurityFinding(scope, findingId);
   const [reason, setReason] = useState<DismissReason | null>(null);
@@ -147,6 +152,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
         <SheetHeader
           title={t('securityAgent.dismiss.title')}
           variant="close"
+          topInset={headerTopInset}
           onDone={() => {
             router.back();
           }}
@@ -166,6 +172,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
         <SheetHeader
           title={t('securityAgent.dismiss.title')}
           variant="close"
+          topInset={headerTopInset}
           onDone={() => {
             router.back();
           }}
@@ -184,6 +191,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
         <SheetHeader
           title={t('securityAgent.dismiss.title')}
           variant="close"
+          topInset={headerTopInset}
           onDone={() => {
             router.back();
           }}
@@ -213,6 +221,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
         <SheetHeader
           title={t('securityAgent.dismiss.title')}
           variant="close"
+          topInset={headerTopInset}
           onDone={() => {
             router.back();
           }}
@@ -232,6 +241,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
         <SheetHeader
           title={t('securityAgent.dismiss.title')}
           variant="close"
+          topInset={headerTopInset}
           onDone={() => {
             router.back();
           }}
@@ -267,6 +277,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
     <View className="flex-1 bg-background">
       <SheetHeader
         title={t('securityAgent.dismiss.title')}
+        topInset={headerTopInset}
         onCancel={() => {
           router.back();
         }}

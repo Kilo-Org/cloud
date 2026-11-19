@@ -7,6 +7,7 @@ import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { SectionHeaderSkeleton } from '@/components/ui/section-header-skeleton';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 
 /** The reason choices the loaded form paints under its label. */
 const REASON_ROW_COUNT = 5;
@@ -18,9 +19,15 @@ const REASON_ROW_COUNT = 5;
  */
 export function DismissFindingSkeleton() {
   const { t } = useTranslation();
+  const headerTopInset = useFormSheetHeaderTopInset();
   return (
     <View className="flex-1 bg-background">
-      <SheetHeader title={t('securityAgent.dismiss.title')} onDone={() => undefined} disabled />
+      <SheetHeader
+        title={t('securityAgent.dismiss.title')}
+        topInset={headerTopInset}
+        onDone={() => undefined}
+        disabled
+      />
       <View className={SCREEN_BODY_CLASS}>
         {/* The identity card: the title and the two reference lines. */}
         <Skeleton className="h-24 w-full rounded-xl" />

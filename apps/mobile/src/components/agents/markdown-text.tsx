@@ -154,7 +154,9 @@ export type MarkdownTextProps = {
    * Base direction of the document body, when it has one of its own: a legal
    * document is English in every interface language, so its prose keeps a
    * left-to-right base direction and the left edge while the screen around it
-   * mirrors. Chat omits this and follows the interface.
+   * mirrors. Chat and every other content body omit this: each paragraph then
+   * resolves from its own first strong character, so English content keeps its
+   * left edge and Arabic content sits on the right in either interface.
    */
   documentDirection?: 'ltr';
   selectable?: boolean;

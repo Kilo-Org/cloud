@@ -1,5 +1,6 @@
 import { type Href } from 'expo-router';
-import { ArrowRight, GitPullRequest, Settings } from '@/components/ui/icons';
+import { DirectionalArrowRight } from '@/components/ui/directional-icons';
+import { GitPullRequest, Settings } from '@/components/ui/icons';
 import { FlashList } from '@shopify/flash-list';
 import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -210,7 +211,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
                   ? t('codeReviewer.reviewList.startManualReview')
                   : t('codeReviewer.reviewList.configureProvider')
               }
-              icon={hasConnectedProvider ? ArrowRight : Settings}
+              icon={hasConnectedProvider ? DirectionalArrowRight : Settings}
               onPress={() => {
                 pushOnce(
                   (hasConnectedProvider

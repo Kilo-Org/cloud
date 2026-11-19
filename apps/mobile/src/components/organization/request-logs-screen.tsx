@@ -189,10 +189,14 @@ export function OrganizationRequestLogsScreen() {
             inset="gutter"
             icon={DirectionalLogs}
             title={t('organization.requestLogs.emptyTitle')}
-            // The description points at the paging control, so it exists only
-            // while an older hour can still be reached; at the history bound
-            // the scoped title alone is the truth.
-            description={canStepOlder ? t('organization.requestLogs.emptyDescription') : undefined}
+            // The description points at the paging control while an older hour
+            // can still be reached; at the history bound it names the bound
+            // instead, so the state always says why the window is empty.
+            description={
+              canStepOlder
+                ? t('organization.requestLogs.emptyDescription')
+                : t('organization.requestLogs.emptyBoundDescription')
+            }
             refreshControl={refreshControl}
           />
         );

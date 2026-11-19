@@ -3,9 +3,9 @@ import {
   benchmarkPairKey,
   customRouterCandidateModel,
   customRouterEntryKey,
-  customRouterEntryRef,
   linkedAvgCostUsd,
   resolveEffectivePolicy,
+  toCustomRouterEntryRef,
   type AutoRouter,
   type BenchmarkConfig,
   type BenchmarkPair,
@@ -279,7 +279,7 @@ export async function assembleCustomRouterTable(
       }
       continue;
     }
-    const ref = customRouterEntryRef(item.entry);
+    const ref = toCustomRouterEntryRef(item.entry);
     const candidate = customRouterCandidateModel(ref);
     const ownerPricing =
       item.entry.kind === 'client'
@@ -468,7 +468,7 @@ export async function lookupCustomRouterStatuses(
     entries: resolved.map(item => {
       const key = customRouterEntryKey(item.entry);
       if (item.measuredBy === 'client') {
-        const ref = customRouterEntryRef(item.entry);
+        const ref = toCustomRouterEntryRef(item.entry);
         return {
           key,
           variants: item.variants.map(variant => {

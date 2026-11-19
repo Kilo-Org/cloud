@@ -31,6 +31,15 @@ export const nativeSnapshotSessionSchema = z.intersection(
 );
 export type NativeSnapshotSession = z.infer<typeof nativeSnapshotSessionSchema>;
 
+/** Build the display session; the local location comes from the portable origin. */
+export function withDisplayLocation(session: NativeSnapshotSession): Kilo2Session {
+  return {
+    ...session,
+    // This path labels the transcript. It is not a runtime root or filesystem grant.
+    location: { directory: session.origin.directory },
+  };
+}
+
 const positionSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const idSchema = z
   .string()
@@ -157,11 +166,7 @@ export function projectNativeSnapshot(snapshot: NativeSnapshot): NativeSnapshotP
       code: 'session_metadata_missing',
     });
   }
-  const session: Kilo2Session = {
-    ...snapshot.session,
-    // This path labels the transcript. It is not a runtime root or filesystem grant.
-    location: { directory: snapshot.session.origin.directory },
-  };
+  const session = withDisplayLocation(snapshot.session);
   const messages: Kilo2Message[] = [];
   const incompleteMessageIDs: string[] = [];
   for (const item of snapshot.messages) {
@@ -213,8 +218,11 @@ async function readWithBoundedConcurrency<T>(
   const results: T[] = new Array<T>(tasks.length);
   const workers: Promise<void>[] = [];
   let next = 0;
-  let failedIndex = -1;
-  let failure: unknown;
+  let failure: { index: number; error: unknown } | undefined;
+  // Keep the earliest started failure regardless of settlement order.
+  const recordFailure = (index: number, error: unknown): void => {
+    if (failure === undefined || index < failure.index) failure = { index, error };
+  };
   const worker = async (): Promise<void> => {
     while (failure === undefined) {
       const task = tasks[next];
@@ -223,11 +231,7 @@ async function readWithBoundedConcurrency<T>(
       try {
         results[index] = await task();
       } catch (error) {
-        // Keep the earliest started failure regardless of settlement order.
-        if (failedIndex === -1 || index < failedIndex) {
-          failedIndex = index;
-          failure = error;
-        }
+        recordFailure(index, error);
         return;
       }
     }
@@ -236,7 +240,7 @@ async function readWithBoundedConcurrency<T>(
     workers.push(worker());
   }
   await Promise.all(workers);
-  if (failure !== undefined) throw failure;
+  if (failure !== undefined) throw failure.error;
   return results;
 }
 

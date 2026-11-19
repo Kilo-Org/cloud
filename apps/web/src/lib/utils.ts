@@ -1,4 +1,3 @@
-import type { User } from '@kilocode/db/schema';
 import type { PaymentMethodInfo } from './stripePaymentMethodInfo';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -8,14 +7,6 @@ export { formatCents, formatDollars } from '@kilocode/app-shared/utils';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
-}
-
-export function getInitials(user: User) {
-  if (!user) {
-    return '';
-  }
-
-  return getInitialsFromName(user.google_user_name || user.google_user_email || '');
 }
 
 export function getInitialsFromName(name: string): string {
@@ -47,8 +38,20 @@ export function isDateOnlyString(value: unknown): value is string {
   return typeof value === 'string' && DATE_ONLY_RE.test(value);
 }
 
+/**
+ * Parses `value` and rejects both null input and an Invalid Date. This is the
+ * shared parse-and-validate step for the nullable date formatters, so a missing
+ * or malformed value renders the em-dash instead of "Invalid Date".
+ */
+function toValidDate(value: string | Date | null): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 export function formatIsoDateString_UsaDateOnlyFormat(dateString: string | Date | null): string {
-  if (!dateString) return '—';
+  const date = toValidDate(dateString);
+  if (!date) return '—';
   const formatOptions: Intl.DateTimeFormatOptions = {
     year: 'numeric',
     month: 'short',
@@ -57,10 +60,6 @@ export function formatIsoDateString_UsaDateOnlyFormat(dateString: string | Date 
   if (isDateOnlyString(dateString)) {
     formatOptions.timeZone = 'UTC';
   }
-  const date = new Date(dateString);
-  // Malformed strings (e.g. "not-a-date") produce an Invalid Date; fall back
-  // to the em-dash so the UI never renders a literal "Invalid Date".
-  if (Number.isNaN(date.getTime())) return '—';
   return date.toLocaleDateString('en-US', formatOptions);
 }
 
@@ -71,9 +70,8 @@ export function formatIsoDateString_UsaDateOnlyFormat(dateString: string | Date 
  * not pass date-only strings.
  */
 export function formatIsoHourString_UsaHourFormat(dateString: string | Date | null): string {
-  if (!dateString) return '—';
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return '—';
+  const date = toValidDate(dateString);
+  if (!date) return '—';
   return date.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
 }
 
@@ -83,17 +81,16 @@ export function formatIsoHourString_UsaHourFormat(dateString: string | Date | nu
  * granularity).
  */
 export function formatIsoDateTime_UsaDateHourFormat(dateString: string | Date | null): string {
-  if (!dateString) return '—';
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return '—';
+  const date = toValidDate(dateString);
+  if (!date) return '—';
   const datePart = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const hourPart = date.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
   return `${datePart}, ${hourPart}`;
 }
 
 export function formatIsoDateTime_IsoOrderNoSeconds(dateString: string | Date | null): string {
-  if (!dateString) return '—';
-  const date = new Date(dateString);
+  const date = toValidDate(dateString);
+  if (!date) return '—';
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
@@ -208,6 +205,10 @@ export function toNonNullish<T>(value: T, message?: string): NonNullable<T> {
   return value;
 }
 
+/**
+ * Describes the payment method types the settings UI presents: "Stripe Link"
+ * and card endings. Returns `''` for any other Stripe method type.
+ */
 export function formatPaymentMethodDescription(info: PaymentMethodInfo): string {
   if (info.type === 'link') {
     return 'Stripe Link';

@@ -7,8 +7,7 @@ import {
 } from '@native-html/render';
 import { useTranslation } from 'react-i18next';
 
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
-import { ChevronDown } from '@/components/ui/icons';
+import { ChevronDown, ChevronUp } from '@/components/ui/icons';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { withRtlWritingDirection } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
@@ -35,7 +34,10 @@ export const HtmlDetails: CustomBlockRenderer = function HtmlDetails({ tnode, st
   const summary = tnode.children.find(child => child.tagName === 'summary');
   const body = tnode.children.filter(child => child !== summary);
   const iconColor = tnode.styles.nativeTextFlow.color?.toString();
-  const Chevron = expanded ? ChevronDown : DirectionalChevronRight;
+  // A disclosure caret, not a navigation chevron: it names the block's state,
+  // and its up/down pair reads the same in either writing direction (the
+  // transcript's other disclosures use the same pair).
+  const Chevron = expanded ? ChevronUp : ChevronDown;
   return (
     <View style={style}>
       <Pressable

@@ -7,11 +7,11 @@ import {
   LOCAL_FAKE_LLM_API_KEY,
 } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   OpenRouterModelsResponseSchema,
   type OpenRouterModelsResponse,
-} from '@kilocode/web-shared/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
@@ -146,9 +146,6 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
     model.id.startsWith('openrouter/') && !model.name.includes('OpenRouter')
       ? 'OpenRouter ' + model.name
       : model.name;
-  const promptPrice = Number.parseFloat(model.pricing.prompt);
-  const isExpensive = Number.isFinite(promptPrice) && promptPrice >= 0.00001; // Opus 4.8 Fast price
-  if (isExpensive) return name + ' ($$$$)';
   if (name.endsWith(')')) return name;
   const ageDays = (Date.now() / 1_000 - model.created) / (24 * 3600);
   const isNew = preferredIndex >= 0 && ageDays >= 0 && ageDays < 7;

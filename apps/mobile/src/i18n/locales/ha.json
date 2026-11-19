@@ -820,7 +820,19 @@
         "fileComment": "Tsokacin fayil",
         "outdatedOnPathLines": "Bai dace da sabon yanayin {{path}} {{lines}} ba",
         "outdatedOnLines": "Bai dace da sabon yanayin {{lines}} ba",
-        "outdatedOnPath": "Bai dace da sabon yanayin {{path}} ba"
+        "outdatedOnPath": "Bai dace da sabon yanayin {{path}} ba",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Gefen hagu",
+        "sideRight": "Gefen dama",
+        "outdatedOnLinesSide": "Bai dace da sabon yanayin {{lines}} ba ({{side}})",
+        "outdatedOnPathLinesSide": "Bai dace da sabon yanayin {{path}} {{lines}} ba ({{side}})",
+        "outdatedSide": "Bai dace da sabon yanayin ba ({{side}})",
+        "outdatedOnPathSide": "Bai dace da sabon yanayin {{path}} ba ({{side}})"
       },
       "deletedUser": "mai amfani da aka share",
       "replyForbiddenTerm": "Ba ka da izinin amsa wannan {{term}}.",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Wannan asusu ba shi da ƙungiyoyi har yanzu. Za a iya bita buƙatun haɗa canje-canje na Bitbucket idan ka ƙirƙiri ƙungiya ko ka shiga cikin wata.",
       "gitlabReconnectAdminOnlyDescription": "Nemi Mai ƙungiya, Mai gudanarwa, ko Manajan biyan kuɗi ya sake haɗa shi.",
       "bitbucketNotConnectedTitle": "Ba a haɗa Bitbucket ba",
-      "bitbucketAdminOnlyDescription": "Masu ƙungiya, masu gudanarwa, da manajannin biyan kuɗi kawai za su iya haɗa shi.",
+      "adminOnlyConnectDescription": "Masu ƙungiya, masu gudanarwa, da manajannin biyan kuɗi kawai za su iya haɗa shi.",
       "contextLine": "Don {{organization}}",
       "contextLinePersonal": "Don kashin kanka"
     },
@@ -3026,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "An kasa loda zaman aiki.",
-    "couldNotLoadActiveSessions": "An kasa loda zaman aikin da ke gudana.",
     "agentSessions": "Masu gudana yanzu",
     "newCodingTask": "Sabon aikin rubuta lambar shiri",
     "newTaskFromPicture": "Sabon aiki daga hoto",
@@ -3405,7 +3416,8 @@
         "accounting_adjustment": "Daidaitawar lissafin kuɗi",
         "credits_expired": "Wa'adin kuɗin amfani ya ƙare"
       },
-      "truncated": "Ana samun ma'amalolin kuɗin amfani na baya."
+      "truncated": "Ana samun ma'amalolin kuɗin amfani na baya.",
+      "retentionLimit": "Ana nuna ma'amalolin kuɗin amfani na baya-bayan nan."
     },
     "inviteMember": {
       "emailError": "Shigar da adireshin imel mai inganci.",
@@ -3415,6 +3427,7 @@
       "sendInvite": "Aika gayyata",
       "title": "Gayyaci memba",
       "alreadyInvited": "An riga an aika musu gayyata ko kuma sun riga zama memba.",
+      "organizationUnavailable": "Wannan ƙungiyar ba ta samuwa kuma.",
       "sendError": "Ba a iya aika gayyata ba.",
       "pendingInvitation": "Wannan adireshin imel ɗin ya riga yana da gayyata da ke jiran amsa.",
       "alreadyMember": "Wannan mutumin ya riga ya zama memba na wannan ƙungiyar.",
@@ -3436,7 +3449,8 @@
         "void": "An soke",
         "uncollectible": "Ba a iya karɓar kuɗin"
       },
-      "truncated": "Ana samun takardun biyan kuɗi na baya."
+      "truncated": "Ana samun takardun biyan kuɗi na baya.",
+      "retentionLimit": "Ana nuna takardun biyan kuɗi na baya-bayan nan."
     },
     "lowBalanceAlert": {
       "enableA11y": "Kunna faɗakarwar ƙarancin kuɗi",
@@ -3670,8 +3684,7 @@
     "imagesSectionEmpty": "Babu rukunin yanar gizo na hoto da aka amince da shi",
     "revoke": "Soke amincewa da {{host}}",
     "revokeMessage": "Hanyoyin shiga wannan rukunin yanar gizo za su sake neman tabbaci.",
-    "revokeImageMessage": "Hotuna daga wannan rukunin yanar gizo za su sake neman tabbaci.",
-    "backToPreferences": "Koma ga zaɓuɓɓuka"
+    "revokeImageMessage": "Hotuna daga wannan rukunin yanar gizo za su sake neman tabbaci."
   },
   "glanceable": {
     "waiting": "Ana sabunta wakilai",
@@ -3918,6 +3931,8 @@
       "downloading": "Ana saukewa: {{written}} cikin {{total}}",
       "downloadingUnknown": "Ana saukewa: {{written}}",
       "paused": "An dakata: {{written}} cikin {{total}}",
+      "retrying": "Ana sake gwadawa: {{written}} cikin {{total}}",
+      "retryingUnknown": "Ana sake gwadawa: {{written}}",
       "verifying": "Ana duba fayil ɗin da aka sauke…",
       "downloaded": "An sauke · {{size}}",
       "url": "Hanyar haɗin sauke kai tsaye",
@@ -4008,7 +4023,9 @@
         "androidModelUnavailable": "Wannan na'urar ba ta goyon bayan Gemini Nano, ko kuma manhajar tsarin AICore tana ci gaba da shiryawa. Sake gwadawa daga baya.",
         "aicoreUpdateRequired": "Sabunta manhajar AICore da manhajar tsarin na'urarka don amfani da wannan samfurin.",
         "downloadable": "Wannan samfurin yana buƙatar saukewa sau ɗaya kafin ka iya amfani da shi.",
-        "downloading": "Ana sauke samfurin. Zai kasance a shirye idan saukewar ta kammala."
+        "downloading": "Ana sauke samfurin. Zai kasance a shirye idan saukewar ta kammala.",
+        "batteryQuota": "Samfurin da ke kan na'ura ya yi amfani da rabonsa na baturi a yanzu. Sake gwadawa daga baya.",
+        "checkFailed": "Manhajar ba ta iya duba wannan samfurin ba. Sake gwadawa."
       },
       "unavailable": "Samfurin da ke kan na'ura ba ya samuwa a yanzu. Duba matsayinsa a $t(modelChat.backends.title).",
       "busy": "Samfurin da ke kan na'ura yana aiki da wata amsa. Sake gwadawa idan ya gama.",
@@ -4369,7 +4386,8 @@
       "purchaseFallback": "Sayen kiredit",
       "receipt": "Rasiti",
       "receiptA11y": "Buɗe rasitin {{description}}, {{amount}}, daga {{date}}",
-      "receiptUnavailable": "Babu rasiti don wannan sayayya."
+      "receiptUnavailable": "Babu rasiti don wannan sayayya.",
+      "retentionLimit": "Ana nuna tarihin kiredit na baya-bayan nan."
     },
     "title": "Sayi kuɗin amfani",
     "description": "Kuɗin amfani saye ne na lokaci ɗaya da ake ƙarawa a ma'aunin Kilo naka don gudanar da zaman shirye-shiryen AI a cikin Kilo App. Shagon yana cajin asusunka kuma ana ƙara kuɗin amfani bayan shagon ya tabbatar da biyan kuɗi.",
@@ -4617,10 +4635,14 @@
     "couldNotLoad": "Ba a iya loda haɗe-haɗe ba",
     "permissionDenied": "Ba ka da izinin sarrafa waɗannan haɗe-haɗe.",
     "managedByOwner": "Ka roƙi mamallakin ƙungiya ya canza haɗin da ba za ka iya canza ba.",
+    "managedByOwnerOrAdmin": "Ka roƙi Mai ƙungiya ko Mai gudanarwa ya canza haɗin da ba za ka iya canza ba.",
+    "managedByOwnerOrBilling": "Ka roƙi Mai ƙungiya ko Manajan biyan kuɗi ya canza haɗin da ba za ka iya canza ba.",
+    "managedByOwnerAdminOrBilling": "Ka roƙi Mai ƙungiya, Mai gudanarwa, ko Manajan biyan kuɗi ya canza haɗin da ba za ka iya canza ba.",
     "connectFailed": "Ba a iya buɗe shafin haɗi ba"
   },
   "invoices": {
-    "personalEmptyDescription": "Takardun kuɗi na sayayyarka za su bayyana a nan da zarar an caje ka."
+    "personalEmptyDescription": "Takardun kuɗi na sayayyarka suna bayyana a nan da zarar an caje ka. Rasiti daga App Store da Google Play suna cikin Tarihin kiredit.",
+    "personalPeriod": "Watanni 12 da suka gabata"
   },
   "cloudAgent": {
     "compute": {

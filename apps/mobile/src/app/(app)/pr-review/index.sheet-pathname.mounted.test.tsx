@@ -87,7 +87,10 @@ vi.mock('@/components/screen-header', () => ({
   ScreenHeader: (props: { headerRight?: ReactNode }) =>
     createElement('ScreenHeader', null, props.headerRight),
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 // The gate's GitHub mark draws through react-native-svg, whose Flow source the
 // mounted transform cannot parse; this test reads copy and testIDs, not marks.
 vi.mock('@/components/icons/github-icon', () => ({ GitHubIcon: 'GitHubIcon' }));

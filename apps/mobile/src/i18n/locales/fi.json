@@ -820,7 +820,19 @@
         "fileComment": "Tiedostokommentti",
         "outdatedOnPathLines": "Vanhentunut: {{path}} {{lines}}",
         "outdatedOnLines": "Vanhentunut: {{lines}}",
-        "outdatedOnPath": "Vanhentunut: {{path}}"
+        "outdatedOnPath": "Vanhentunut: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Vasen puoli",
+        "sideRight": "Oikea puoli",
+        "outdatedOnLinesSide": "Vanhentunut: {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Vanhentunut: {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Vanhentunut ({{side}})",
+        "outdatedOnPathSide": "Vanhentunut: {{path}} ({{side}})"
       },
       "deletedUser": "poistettu käyttäjä",
       "replyForbiddenTerm": "Sinulla ei ole oikeutta vastata tähän {{term}}ön.",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Tällä tilillä ei ole vielä organisaatioita. Voit katselmoida Bitbucket-muutospyyntöjä, kun luot organisaation tai liityt sellaiseen.",
       "gitlabReconnectAdminOnlyDescription": "Pyydä organisaation omistajaa, ylläpitäjää tai laskutusvastaavaa yhdistämään se.",
       "bitbucketNotConnectedTitle": "Bitbucketia ei ole yhdistetty",
-      "bitbucketAdminOnlyDescription": "Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat yhdistää sen.",
+      "adminOnlyConnectDescription": "Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat yhdistää sen.",
       "contextLine": "{{organization}}-organisaatiolle",
       "contextLinePersonal": "Henkilökohtaiselle tilillesi"
     },
@@ -3026,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Istuntoja ei voitu ladata.",
-    "couldNotLoadActiveSessions": "Aktiivisia istuntoja ei voitu ladata.",
     "agentSessions": "Käynnissä nyt",
     "newCodingTask": "Uusi koodaustehtävä",
     "newTaskFromPicture": "Uusi tehtävä kuvasta",
@@ -3405,7 +3416,8 @@
         "accounting_adjustment": "Kirjanpidon oikaisu",
         "credits_expired": "Krediitit vanhentuivat"
       },
-      "truncated": "Aiempia krediittitapahtumia on saatavilla."
+      "truncated": "Aiempia krediittitapahtumia on saatavilla.",
+      "retentionLimit": "Näytetään uusimmat krediittitapahtumat."
     },
     "inviteMember": {
       "emailError": "Anna kelvollinen sähköpostiosoite.",
@@ -3415,6 +3427,7 @@
       "sendInvite": "Lähetä kutsu",
       "title": "Kutsu jäsen",
       "alreadyInvited": "Tämä sähköpostiosoite on jo kutsuttu tai kuuluu jo jäsenelle.",
+      "organizationUnavailable": "Tämä organisaatio ei ole enää saatavilla.",
       "sendError": "Kutsun lähettäminen epäonnistui.",
       "pendingInvitation": "Tällä sähköpostiosoitteella on jo odottava kutsu.",
       "alreadyMember": "Tämä henkilö on jo tämän organisaation jäsen.",
@@ -3436,7 +3449,8 @@
         "void": "Mitätöity",
         "uncollectible": "Perimiskelvoton"
       },
-      "truncated": "Vanhempia laskuja on saatavilla."
+      "truncated": "Vanhempia laskuja on saatavilla.",
+      "retentionLimit": "Näytetään uusimmat laskut."
     },
     "lowBalanceAlert": {
       "enableA11y": "Ota saldohälytys käyttöön",
@@ -3670,8 +3684,7 @@
     "imagesSectionEmpty": "Ei luotettuja kuvien verkkotunnuksia",
     "revoke": "Poista luottamus verkkotunnukseen {{host}}",
     "revokeMessage": "Tämän verkkotunnuksen linkit kysyvät jatkossa vahvistusta uudelleen.",
-    "revokeImageMessage": "Tämän verkkotunnuksen kuvat kysyvät jatkossa vahvistusta uudelleen.",
-    "backToPreferences": "Takaisin asetuksiin"
+    "revokeImageMessage": "Tämän verkkotunnuksen kuvat kysyvät jatkossa vahvistusta uudelleen."
   },
   "glanceable": {
     "waiting": "Päivitetään agentteja",
@@ -3918,6 +3931,8 @@
       "downloading": "Ladataan: {{written}} / {{total}}",
       "downloadingUnknown": "Ladataan: {{written}}",
       "paused": "Keskeytetty: {{written}} / {{total}}",
+      "retrying": "Yritetään uudelleen: {{written}} / {{total}}",
+      "retryingUnknown": "Yritetään uudelleen: {{written}}",
       "verifying": "Tarkistetaan ladattua tiedostoa…",
       "downloaded": "Ladattu · {{size}}",
       "url": "Suora latauslinkki",
@@ -4008,7 +4023,9 @@
         "androidModelUnavailable": "Tämä laite ei tue Gemini Nanoa, tai AICore-järjestelmäsovelluksen käyttöönotto on vielä kesken. Yritä myöhemmin uudelleen.",
         "aicoreUpdateRequired": "Jos haluat käyttää tätä mallia, päivitä AICore-sovellus ja laitteen järjestelmäohjelmisto.",
         "downloadable": "Malli täytyy ladata kerran ennen käyttöä.",
-        "downloading": "Mallia ladataan. Se on käyttövalmis, kun lataus on valmis."
+        "downloading": "Mallia ladataan. Se on käyttövalmis, kun lataus on valmis.",
+        "batteryQuota": "Laitteessa toimiva malli on käyttänyt akkukiintiönsä toistaiseksi. Yritä myöhemmin uudelleen.",
+        "checkFailed": "Sovellus ei voinut tarkistaa tätä mallia. Yritä uudelleen."
       },
       "unavailable": "Laitteessa toimiva malli ei ole nyt saatavilla. Tarkista sen tila kohdasta $t(modelChat.backends.title).",
       "busy": "Laitteessa toimiva malli kirjoittaa toista vastausta. Yritä uudelleen, kun se on valmis.",
@@ -4369,7 +4386,8 @@
       "purchaseFallback": "Krediittiosto",
       "receipt": "Kuitti",
       "receiptA11y": "Avaa kuitti: {{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Tälle ostolle ei ole saatavilla kuittia."
+      "receiptUnavailable": "Tälle ostolle ei ole saatavilla kuittia.",
+      "retentionLimit": "Näytetään uusin krediittihistoria."
     },
     "title": "Osta krediittejä",
     "description": "Krediitit ovat kertaostos, joka lisätään Kilo-saldoosi AI-koodausistuntojen ajamista varten Kilo-sovelluksessa. Kauppa veloittaa tiliäsi ja krediitit lisätään, kun kauppa vahvistaa maksun.",
@@ -4617,10 +4635,14 @@
     "couldNotLoad": "Integraatioita ei voitu ladata",
     "permissionDenied": "Sinulla ei ole oikeutta hallita näitä integraatioita.",
     "managedByOwner": "Pyydä organisaation omistajaa muuttamaan yhteyttä, jota et voi muuttaa.",
+    "managedByOwnerOrAdmin": "Pyydä organisaation omistajaa tai ylläpitäjää muuttamaan yhteyttä, jota et voi muuttaa.",
+    "managedByOwnerOrBilling": "Pyydä organisaation omistajaa tai laskutusvastaavaa muuttamaan yhteyttä, jota et voi muuttaa.",
+    "managedByOwnerAdminOrBilling": "Pyydä organisaation omistajaa, ylläpitäjää tai laskutusvastaavaa muuttamaan yhteyttä, jota et voi muuttaa.",
     "connectFailed": "Yhdistämissivua ei voitu avata"
   },
   "invoices": {
-    "personalEmptyDescription": "Omien ostojesi laskut näkyvät täällä, kun sinua on laskutettu."
+    "personalEmptyDescription": "Omien ostojesi laskut näkyvät täällä, kun sinua on laskutettu. Kuitti App Storessa ja Kuitti Google Playssa ovat Krediittihistoriassa.",
+    "personalPeriod": "Viimeiset 12 kuukautta"
   },
   "cloudAgent": {
     "compute": {

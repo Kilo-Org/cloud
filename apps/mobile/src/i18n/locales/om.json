@@ -820,7 +820,19 @@
         "fileComment": "Yaada faayilii",
         "outdatedOnPathLines": "Yeroon kan darbe: {{path}} {{lines}}",
         "outdatedOnLines": "Yeroon kan darbe: {{lines}}",
-        "outdatedOnPath": "Yeroon kan darbe: {{path}}"
+        "outdatedOnPath": "Yeroon kan darbe: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Cinaa bitaa",
+        "sideRight": "Cinaa mirgaa",
+        "outdatedOnLinesSide": "Yeroon kan darbe {{lines}} irratti ({{side}})",
+        "outdatedOnPathLinesSide": "Yeroon kan darbe {{path}} {{lines}} irratti ({{side}})",
+        "outdatedSide": "Yeroon kan darbe ({{side}})",
+        "outdatedOnPathSide": "Yeroon kan darbe {{path}} irratti ({{side}})"
       },
       "deletedUser": "fayyadamaa haqame",
       "replyForbiddenTerm": "{{term}} kanaaf deebii kennuuf hayyama hin qabdu.",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Herrega kun dhaabbilee ammas hin qabu. Dhaabbata uumtee yookiin dhaabbataatti seeteen, gaaffiiwwan walitti makuu Bitbucket ilaaluu ni dandeessa.",
       "gitlabReconnectAdminOnlyDescription": "Isa irra deebi'ii akka walqabsiisuuf dhaabbataa abbaa dhaabbataa, bulchaa, ykn bulchaa kaffaltii tokko gaafadhu.",
       "bitbucketNotConnectedTitle": "Bitbucket hin walqabsiifamne",
-      "bitbucketAdminOnlyDescription": "Abbootiin dhaabbataa, bulchitootaa fi bulchitoonni kaffaltii qofa isa walqabsiisuu danda'u.",
+      "adminOnlyConnectDescription": "Abbootiin dhaabbataa, bulchitootaa fi bulchitoonni kaffaltii qofa isa walqabsiisuu danda'u.",
       "contextLine": "{{organization}}iif",
       "contextLinePersonal": "Dhuunfaa'iif"
     },
@@ -3026,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Turtiiwwan fe'uun hin danda'amne.",
-    "couldNotLoadActiveSessions": "Turtiiwwan adeemaa jiran fe'uun hin danda'amne.",
     "agentSessions": "Amma adeemaa jiru",
     "newCodingTask": "Hojii koodii haaraa",
     "newTaskFromPicture": "Hojii haaraa suuraa irraa",
@@ -3405,7 +3416,8 @@
         "accounting_adjustment": "Sirreeffama herregaa",
         "credits_expired": "Kiriiditiin yeroon isaa darbe"
       },
-      "truncated": "Sochiin kiriiditii duraanii ni argama."
+      "truncated": "Sochiin kiriiditii duraanii ni argama.",
+      "retentionLimit": "Sochiin kiriiditii haaraan agarsiifamaa jira."
     },
     "inviteMember": {
       "emailError": "Teessoo imeelii sirrii galchi.",
@@ -3415,6 +3427,7 @@
       "sendInvite": "Affeerraa ergi",
       "title": "Miseensa afeeri",
       "alreadyInvited": "Duraan ni affeeramaniiru ykn miseensa dha.",
+      "organizationUnavailable": "Dhaabbanni kun amma hin argamu.",
       "sendError": "Affeerraa erguun hin danda'amne.",
       "pendingInvitation": "Teessoon imeelii kun duraanuu affeerraa eeggachaa jiru qaba.",
       "alreadyMember": "Namni kun duraanuu miseensa dhaabbata kanaati.",
@@ -3436,7 +3449,8 @@
         "void": "Haqame",
         "uncollectible": "Sassaabamuu hin danda'u"
       },
-      "truncated": "Gaaffiiwwan kaffaltii duraanii ni argamu."
+      "truncated": "Gaaffiiwwan kaffaltii duraanii ni argamu.",
+      "retentionLimit": "Gaaffiiwwan kaffaltii haaraan agarsiifamaa jiran."
     },
     "lowBalanceAlert": {
       "enableA11y": "Akeekkachiisa haftee xiqqaa bani",
@@ -3670,8 +3684,7 @@
     "imagesSectionEmpty": "Keessummeessitoota suuraa amanaman hin jiran",
     "revoke": "Amanamummaa {{host}} haqi",
     "revokeMessage": "Geessituuwwan gara keessummeessaa kanaa ammas mirkaneessa gaafatu.",
-    "revokeImageMessage": "Suuraan keessummeessaa kanaa irraa ammas mirkaneessa gaafatu.",
-    "backToPreferences": "Gara filannoowwaniitti deebi'i"
+    "revokeImageMessage": "Suuraan keessummeessaa kanaa irraa ammas mirkaneessa gaafatu."
   },
   "glanceable": {
     "waiting": "Eejentoota haaromsaa jira",
@@ -3918,6 +3931,8 @@
       "downloading": "Buufamaa jira: {{total}} keessaa {{written}}",
       "downloadingUnknown": "Buufamaa jira: {{written}}",
       "paused": "Dhaabbate: {{total}} keessaa {{written}}",
+      "retrying": "Irra deebi'ee yaalaa jira: {{total}} keessaa {{written}}",
+      "retryingUnknown": "Irra deebi'ee yaalaa jira: {{written}}",
       "verifying": "Faayilii buufame sakatta'amaa jira…",
       "downloaded": "Buufameera · {{size}}",
       "url": "Liinkii buufinsa kallattii",
@@ -4008,7 +4023,9 @@
         "androidModelUnavailable": "Meeshaan kun Gemini Nano hin deeggaru, ykn appiin sirnaa AICore ammallee qophaa'aa jira. Booda irra deebi'ii yaali.",
         "aicoreUpdateRequired": "Moodeela kana fayyadamuuf appii AICore fi sooftiweerii sirnaa kee haaromsi.",
         "downloadable": "Moodeelli kun osoo hin fayyadamin dura al tokko buufamuu qaba.",
-        "downloading": "Moodeelli buufamaa jira. Yeroo buufachuun xumuramu qophaa'a."
+        "downloading": "Moodeelli buufamaa jira. Yeroo buufachuun xumuramu qophaa'a.",
+        "batteryQuota": "Moodeelli meeshaa irratti qoonnaa baatirii isaa ammaaf fayyadameera. Booda irra deebi'ii yaali.",
+        "checkFailed": "Moodeela kana sakatta'uun hin danda'ame. Irra deebi'ii yaali."
       },
       "unavailable": "Moodeelli meeshaa irratti amma hin argamu. Haala isaa $t(modelChat.backends.title) keessatti ilaali.",
       "busy": "Moodeelli meeshaa irratti deebii biraatiin qabameera. Yeroo xumuru irra deebi'ii yaali.",
@@ -4369,7 +4386,8 @@
       "purchaseFallback": "Bittaa kireeditii",
       "receipt": "Nagahee",
       "receiptA11y": "Nagahee {{description}}, {{amount}}, {{date}} bani",
-      "receiptUnavailable": "Bittaa kanaaf nagaheen hin jiru."
+      "receiptUnavailable": "Bittaa kanaaf nagaheen hin jiru.",
+      "retentionLimit": "Seenaan kireeditii haaraan agarsiifamaa jira."
     },
     "title": "Kireedita bituu",
     "description": "Kireeditiin bittaa yeroo tokkoo kan baalansii Kilo kee irratti dabalame ta'ee, shumarra code AI Kilo App keessatti hojjechuuf oola. Suuqii ammaataa kee irraa kaffaltii fudhata, suuqiin kaffaltii erga mirkaneesse booda kireeditiin dabalama.",
@@ -4617,10 +4635,14 @@
     "couldNotLoad": "Walitti hidhamiinsota fe'uun hin danda'amne",
     "permissionDenied": "Walitti hidhamiinsota kana bulchuuf hayyama hin qabdu.",
     "managedByOwner": "Walitti hidhamiinsa ati jijjiiruu hin dandeenye jijjiiruuf abbaa dhaabbataa gaafadhu.",
+    "managedByOwnerOrAdmin": "Walitti hidhamiinsa ati jijjiiruu hin dandeenye jijjiiruuf abbaa dhaabbataa ykn bulchaa gaafadhu.",
+    "managedByOwnerOrBilling": "Walitti hidhamiinsa ati jijjiiruu hin dandeenye jijjiiruuf abbaa dhaabbataa ykn bulchaa kaffaltii gaafadhu.",
+    "managedByOwnerAdminOrBilling": "Walitti hidhamiinsa ati jijjiiruu hin dandeenye jijjiiruuf abbaa dhaabbataa, bulchaa, ykn bulchaa kaffaltii gaafadhu.",
     "connectFailed": "Fuula walitti hidhamiinsaa banuun hin danda'amne"
   },
   "invoices": {
-    "personalEmptyDescription": "Beeksisni kaffaltii bittaa mataa keetii erga kaffaltiin siif herregamee booda asitti mul'ata."
+    "personalEmptyDescription": "Beeksisni kaffaltii bittaa mataa keetii erga kaffaltiin siif herregamee booda asitti mul'ata. Nagaheewwan App Store irraa fi Google Play irraa Seenaa kireeditii keessa jiru.",
+    "personalPeriod": "Ji'oota 12 darban"
   },
   "cloudAgent": {
     "compute": {

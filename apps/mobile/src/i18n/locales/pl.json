@@ -2549,7 +2549,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nie udało się wczytać sesji.",
-    "couldNotLoadActiveSessions": "Nie udało się wczytać aktywnych sesji.",
     "agentSessions": "Teraz aktywne",
     "newCodingTask": "Nowe zadanie programistyczne",
     "newTaskFromPicture": "Nowe zadanie ze zdjęcia",
@@ -2878,7 +2877,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "To konto nie ma jeszcze żadnych organizacji. PR-y na Bitbucketu będzie można przeglądać po utworzeniu organizacji lub dołączeniu do niej.",
       "gitlabReconnectAdminOnlyDescription": "Poproś Właściciela, Administratora lub Osobę zarządzającą rozliczeniami w organizacji, aby je ponownie połączyć.",
       "bitbucketNotConnectedTitle": "Brak połączenia z Bitbucket",
-      "bitbucketAdminOnlyDescription": "Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je połączyć.",
+      "adminOnlyConnectDescription": "Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je połączyć.",
       "contextLine": "Dla {{organization}}",
       "contextLinePersonal": "Dla konta osobistego"
     },
@@ -2979,7 +2978,19 @@
         "fileComment": "Komentarz do pliku",
         "outdatedOnPathLines": "Nieaktualny: {{path}}, {{lines}}",
         "outdatedOnLines": "Nieaktualny: {{lines}}",
-        "outdatedOnPath": "Nieaktualny: {{path}}"
+        "outdatedOnPath": "Nieaktualny: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}}, L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}}, {{lineRange}} ({{side}})",
+        "sideLeft": "Lewa strona",
+        "sideRight": "Prawa strona",
+        "outdatedOnLinesSide": "Nieaktualny: {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Nieaktualny: {{path}}, {{lines}} ({{side}})",
+        "outdatedSide": "Nieaktualny ({{side}})",
+        "outdatedOnPathSide": "Nieaktualny: {{path}} ({{side}})"
       },
       "deletedUser": "usunięty użytkownik",
       "replyForbiddenTerm": "Nie masz uprawnień do odpowiadania w tym {{term}}.",
@@ -3513,7 +3524,8 @@
         "accounting_adjustment": "Korekta księgowa",
         "credits_expired": "Wygaśnięcie środków"
       },
-      "truncated": "Dostępne są wcześniejsze operacje na saldzie."
+      "truncated": "Dostępne są wcześniejsze operacje na saldzie.",
+      "retentionLimit": "Wyświetlane są najnowsze operacje na saldzie."
     },
     "hub": {
       "balance": "Saldo",
@@ -3536,6 +3548,7 @@
       "sendInvite": "Wyślij zaproszenie",
       "title": "Zaproś członka",
       "alreadyInvited": "Ten adres e-mail ma już oczekujące zaproszenie lub należy już do członka tej organizacji.",
+      "organizationUnavailable": "Ta organizacja nie jest już dostępna.",
       "sendError": "Nie udało się wysłać zaproszenia.",
       "pendingInvitation": "Ten adres e-mail ma już oczekujące zaproszenie.",
       "alreadyMember": "Ta osoba jest już członkiem tej organizacji.",
@@ -3557,7 +3570,8 @@
         "void": "Unieważniona",
         "uncollectible": "Nieściągalna"
       },
-      "truncated": "Dostępne są starsze faktury."
+      "truncated": "Dostępne są starsze faktury.",
+      "retentionLimit": "Wyświetlane są najnowsze faktury."
     },
     "lowBalanceAlert": {
       "enableA11y": "Włącz powiadomienie o niskim saldzie",
@@ -3790,8 +3804,7 @@
     "imagesSectionEmpty": "Brak zaufanych hostów obrazów",
     "revoke": "Cofnij zaufanie do {{host}}",
     "revokeMessage": "Linki do tego hosta ponownie poproszą o potwierdzenie.",
-    "revokeImageMessage": "Obrazy z tego hosta ponownie poproszą o potwierdzenie.",
-    "backToPreferences": "Wróć do preferencji"
+    "revokeImageMessage": "Obrazy z tego hosta ponownie poproszą o potwierdzenie."
   },
   "glanceable": {
     "waiting": "Aktualizowanie stanu agentów",
@@ -4040,6 +4053,8 @@
       "downloading": "Pobieranie: {{written}} z {{total}}",
       "downloadingUnknown": "Pobieranie: {{written}}",
       "paused": "Wstrzymano: {{written}} z {{total}}",
+      "retrying": "Ponowna próba: {{written}} z {{total}}",
+      "retryingUnknown": "Ponowna próba: {{written}}",
       "verifying": "Sprawdzanie pobranego pliku…",
       "downloaded": "Pobrano · {{size}}",
       "url": "Bezpośredni link do pobrania",
@@ -4130,7 +4145,9 @@
         "androidModelUnavailable": "To urządzenie nie obsługuje Gemini Nano albo aplikacja systemowa AICore jest jeszcze konfigurowana. Spróbuj ponownie później.",
         "aicoreUpdateRequired": "Zaktualizuj aplikację AICore i oprogramowanie systemowe, aby korzystać z tego modelu.",
         "downloadable": "Przed użyciem ten model trzeba jednorazowo pobrać.",
-        "downloading": "Model jest pobierany. Będzie gotowy po zakończeniu pobierania."
+        "downloading": "Model jest pobierany. Będzie gotowy po zakończeniu pobierania.",
+        "batteryQuota": "Model na urządzeniu wykorzystał na razie swój limit baterii. Spróbuj ponownie później.",
+        "checkFailed": "Aplikacja nie mogła sprawdzić tego modelu. Spróbuj ponownie."
       },
       "unavailable": "Model na urządzeniu jest teraz niedostępny. Sprawdź jego stan w sekcji $t(modelChat.backends.title).",
       "busy": "Model na urządzeniu generuje inną odpowiedź. Spróbuj ponownie, gdy skończy.",
@@ -4503,7 +4520,8 @@
       "purchaseFallback": "Zakup kredytów",
       "receipt": "Potwierdzenie",
       "receiptA11y": "Otwórz potwierdzenie dla: {{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Potwierdzenie dla tego zakupu nie jest dostępne."
+      "receiptUnavailable": "Potwierdzenie dla tego zakupu nie jest dostępne.",
+      "retentionLimit": "Wyświetlana jest najnowsza historia kredytów."
     },
     "title": "Kup kredyty",
     "description": "Kredyty to jednorazowy zakup dodawany do Twojego salda Kilo na potrzeby sesji kodowania AI w aplikacji Kilo. Sklep obciąża Twoje konto, a kredyty są dodawane po potwierdzeniu płatności przez sklep.",
@@ -4767,10 +4785,14 @@
     "couldNotLoad": "Nie udało się wczytać integracji",
     "permissionDenied": "Nie masz uprawnień do zarządzania tymi integracjami.",
     "managedByOwner": "Poproś właściciela organizacji o zmianę połączenia, którego nie możesz zmienić.",
+    "managedByOwnerOrAdmin": "Poproś właściciela organizacji lub administratora o zmianę połączenia, którego nie możesz zmienić.",
+    "managedByOwnerOrBilling": "Poproś właściciela organizacji lub osobę zarządzającą rozliczeniami o zmianę połączenia, którego nie możesz zmienić.",
+    "managedByOwnerAdminOrBilling": "Poproś właściciela organizacji, administratora lub osobę zarządzającą rozliczeniami o zmianę połączenia, którego nie możesz zmienić.",
     "connectFailed": "Nie udało się otworzyć strony połączenia"
   },
   "invoices": {
-    "personalEmptyDescription": "Faktury za Twoje zakupy pojawią się tutaj po pierwszym obciążeniu."
+    "personalEmptyDescription": "Faktury za Twoje zakupy pojawiają się tutaj po pierwszym obciążeniu. Potwierdzenia w App Store i Google Play znajdują się w sekcji Historia kredytów.",
+    "personalPeriod": "Ostatnie 12 miesięcy"
   },
   "cloudAgent": {
     "compute": {

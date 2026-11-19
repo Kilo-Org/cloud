@@ -820,7 +820,19 @@
         "fileComment": "نظر دربارهٔ فایل",
         "outdatedOnPathLines": "مربوط به نسخهٔ قبلی: {{path}} {{lines}}",
         "outdatedOnLines": "مربوط به نسخهٔ قبلی: {{lines}}",
-        "outdatedOnPath": "مربوط به نسخهٔ قبلی: {{path}}"
+        "outdatedOnPath": "مربوط به نسخهٔ قبلی: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "سمت چپ",
+        "sideRight": "سمت راست",
+        "outdatedOnLinesSide": "مربوط به نسخهٔ قبلی: {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "مربوط به نسخهٔ قبلی: {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "مربوط به نسخهٔ قبلی ({{side}})",
+        "outdatedOnPathSide": "مربوط به نسخهٔ قبلی: {{path}} ({{side}})"
       },
       "deletedUser": "کاربر حذف‌شده",
       "replyForbiddenTerm": "اجازهٔ پاسخ دادن در این {{term}} را ندارید.",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "این حساب هنوز سازمانی ندارد. پول ریکوئست‌های Bitbucket را می‌توانید پس از ایجاد یک سازمان یا پیوستن به آن بازبینی کنید.",
       "gitlabReconnectAdminOnlyDescription": "از مالک، مدیر یا مدیر صورتحساب سازمان بخواهید آن را دوباره متصل کند.",
       "bitbucketNotConnectedTitle": "Bitbucket متصل نیست",
-      "bitbucketAdminOnlyDescription": "فقط مالکان سازمان، مدیران و مدیران صورتحساب می‌توانند آن را متصل کنند.",
+      "adminOnlyConnectDescription": "فقط مالکان سازمان، مدیران و مدیران صورتحساب می‌توانند آن را متصل کنند.",
       "contextLine": "برای {{organization}}",
       "contextLinePersonal": "برای حساب شخصی شما"
     },
@@ -3026,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "بارگذاری نشست‌ها ممکن نشد.",
-    "couldNotLoadActiveSessions": "بارگذاری نشست‌های فعال ممکن نشد.",
     "agentSessions": "در حال اجرا",
     "newCodingTask": "کار کدنویسی جدید",
     "newTaskFromPicture": "کار جدید از یک تصویر",
@@ -3405,7 +3416,8 @@
         "accounting_adjustment": "تعدیل حسابداری",
         "credits_expired": "اعتبار منقضی‌شده"
       },
-      "truncated": "سوابق قبلی گردش اعتبار در دسترس است."
+      "truncated": "سوابق قبلی گردش اعتبار در دسترس است.",
+      "retentionLimit": "جدیدترین گردش‌های اعتبار نمایش داده می‌شوند."
     },
     "inviteMember": {
       "emailError": "یک آدرس ایمیل معتبر وارد کنید.",
@@ -3415,6 +3427,7 @@
       "sendInvite": "ارسال دعوت‌نامه",
       "title": "دعوت از عضو",
       "alreadyInvited": "این آدرس ایمیل قبلاً دعوت شده است یا از قبل عضو است.",
+      "organizationUnavailable": "این سازمان دیگر در دسترس نیست.",
       "sendError": "ارسال دعوت‌نامه ممکن نشد.",
       "pendingInvitation": "این ایمیل از قبل یک دعوت‌نامه در انتظار دارد.",
       "alreadyMember": "این شخص از قبل عضو این سازمان است.",
@@ -3436,7 +3449,8 @@
         "void": "باطل",
         "uncollectible": "وصول‌نشدنی"
       },
-      "truncated": "فاکتورهای قدیمی‌تر در دسترس هستند."
+      "truncated": "فاکتورهای قدیمی‌تر در دسترس هستند.",
+      "retentionLimit": "جدیدترین فاکتورها نمایش داده می‌شوند."
     },
     "lowBalanceAlert": {
       "enableA11y": "فعال‌سازی هشدار موجودی کم",
@@ -3670,8 +3684,7 @@
     "imagesSectionEmpty": "هیچ میزبان تصویر مورد اعتمادی نیست",
     "revoke": "لغو اعتماد به {{host}}",
     "revokeMessage": "پیوندهای این میزبان دوباره درخواست تأیید خواهند کرد.",
-    "revokeImageMessage": "تصاویر این میزبان دوباره درخواست تأیید خواهند کرد.",
-    "backToPreferences": "بازگشت به تنظیمات"
+    "revokeImageMessage": "تصاویر این میزبان دوباره درخواست تأیید خواهند کرد."
   },
   "glanceable": {
     "waiting": "در حال به‌روزرسانی عامل‌ها",
@@ -3918,6 +3931,8 @@
       "downloading": "در حال دانلود: {{written}} از {{total}}",
       "downloadingUnknown": "در حال دانلود: {{written}}",
       "paused": "متوقف‌شده: {{written}} از {{total}}",
+      "retrying": "تلاش مجدد: {{written}} از {{total}}",
+      "retryingUnknown": "تلاش مجدد: {{written}}",
       "verifying": "بررسی فایل دانلودشده…",
       "downloaded": "دانلود شد · {{size}}",
       "url": "پیوند دانلود مستقیم",
@@ -4008,7 +4023,9 @@
         "androidModelUnavailable": "این دستگاه از Gemini Nano پشتیبانی نمی‌کند، یا برنامه سیستمی AICore هنوز در حال راه‌اندازی است. بعداً دوباره امتحان کنید.",
         "aicoreUpdateRequired": "برای استفاده از این مدل، برنامه AICore و نرم‌افزار سیستم را به‌روزرسانی کنید.",
         "downloadable": "پیش از استفاده از این مدل، باید یک بار آن را بارگیری کنید.",
-        "downloading": "مدل در حال بارگیری است. پس از پایان بارگیری آماده استفاده می‌شود."
+        "downloading": "مدل در حال بارگیری است. پس از پایان بارگیری آماده استفاده می‌شود.",
+        "batteryQuota": "مدل روی دستگاه سهمیه باتری خود را فعلاً مصرف کرده است. بعداً دوباره تلاش کنید.",
+        "checkFailed": "برنامه نتوانست این مدل را بررسی کند. دوباره تلاش کنید."
       },
       "unavailable": "مدل روی دستگاه اکنون در دسترس نیست. وضعیت آن را در $t(modelChat.backends.title) بررسی کنید.",
       "busy": "مدل روی دستگاه مشغول پاسخ دیگری است. پس از پایان آن دوباره امتحان کنید.",
@@ -4369,7 +4386,8 @@
       "purchaseFallback": "خرید اعتبار",
       "receipt": "رسید",
       "receiptA11y": "باز کردن رسید {{description}}، {{amount}}، از {{date}}",
-      "receiptUnavailable": "رسیدی برای این خرید موجود نیست."
+      "receiptUnavailable": "رسیدی برای این خرید موجود نیست.",
+      "retentionLimit": "جدیدترین تاریخچهٔ اعتباری نمایش داده می‌شود."
     },
     "title": "خرید اعتبار",
     "description": "اعتبار یک خرید یکباره است که برای اجرای جلسات کدنویسی هوش مصنوعی در Kilo App به موجودی Kilo شما اضافه می‌شود. فروشگاه مبلغ را از حساب شما دریافت می‌کند و اعتبار پس از تأیید پرداخت توسط فروشگاه اضافه می‌شود.",
@@ -4617,10 +4635,14 @@
     "couldNotLoad": "بارگیری یکپارچه‌سازی‌ها ممکن نشد",
     "permissionDenied": "شما اجازهٔ مدیریت این یکپارچه‌سازی‌ها را ندارید.",
     "managedByOwner": "برای تغییر اتصالی که نمی‌توانید تغییر دهید، از مالک سازمان درخواست کنید.",
+    "managedByOwnerOrAdmin": "برای تغییر اتصالی که نمی‌توانید تغییر دهید، از مالک یا مدیر سازمان درخواست کنید.",
+    "managedByOwnerOrBilling": "برای تغییر اتصالی که نمی‌توانید تغییر دهید، از مالک یا مدیر صورتحساب سازمان درخواست کنید.",
+    "managedByOwnerAdminOrBilling": "برای تغییر اتصالی که نمی‌توانید تغییر دهید، از مالک، مدیر یا مدیر صورتحساب سازمان درخواست کنید.",
     "connectFailed": "باز کردن صفحهٔ اتصال ممکن نشد"
   },
   "invoices": {
-    "personalEmptyDescription": "فاکتورهای خریدهای شخصی‌تان پس از صدور صورتحساب در اینجا نمایش داده می‌شوند."
+    "personalEmptyDescription": "فاکتورهای خریدهای شخصی‌تان پس از صدور صورتحساب در اینجا نمایش داده می‌شوند. رسید از App Store و رسید از Google Play در تاریخچهٔ اعتبار هستند.",
+    "personalPeriod": "12 ماه اخیر"
   },
   "cloudAgent": {
     "compute": {

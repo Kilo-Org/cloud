@@ -1,55 +1,31 @@
 /* oxlint-disable max-lines */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const hoisted = vi.hoisted(() => {
-  const client = {
-    register: vi.fn(),
-    setPersonPropertiesForFlags: vi.fn(),
-    onFeatureFlags: vi.fn(),
-    capture: vi.fn(),
-    screen: vi.fn(),
-    identify: vi.fn(),
-    reloadFeatureFlags: vi.fn(),
-    getFeatureFlag: vi.fn(),
-    reset: vi.fn(),
-    setPersistedProperty: vi.fn(),
-    optOut: vi.fn().mockResolvedValue(undefined),
-    shutdown: vi.fn(),
-    flush: vi.fn(),
-  };
-  const holder: { options?: Record<string, unknown> } = {};
-  const device = { deviceType: null as number | null };
-  const controller = {
-    allowsMandatory: vi.fn().mockReturnValue(true),
-    allowsOptional: vi.fn().mockReturnValue(true),
-    currentGeneration: vi.fn().mockReturnValue(0),
-  };
-  const storage = {
-    sealPostHogStorage: vi.fn(),
-    unsealPostHogStorage: vi.fn(),
-    purgePostHogPersistence: vi.fn(),
-    // oxlint-disable-next-line consistent-type-assertions -- mock must match PostHogCustomStorage interface
-    posthogCustomStorage: {} as Record<string, unknown>,
-  };
-  return { client, holder, device, controller, storage };
-});
+// The helper's vi.hoisted object merges into file scope at the same import
+// position the local hoisted block used, so the vi.mock factories below reach
+// it the same way they reached the local doubles.
+import {
+  posthogMockConstructor,
+  postHogPersistedProperty,
+  posthogTestDouble,
+} from './posthog-test-double';
+
+const device = { deviceType: null as number | null };
+
+// File-local `device` joins the shared double so every `hoisted.device.*`
+// reference (mock getters and tests) keeps working, while the merged object
+// keeps the full type without mutating the shared double.
+const hoisted = { ...posthogTestDouble, device };
 
 vi.mock('posthog-react-native', () => ({
-  default: vi.fn(function PostHogMock(_key: string, options: Record<string, unknown>) {
-    hoisted.holder.options = options;
-    return hoisted.client;
-  }),
-  PostHogPersistedProperty: {
-    Queue: 'queue',
-    LogsQueue: 'logs_queue',
-    AiQueue: 'ai_queue',
-  },
+  default: posthogMockConstructor,
+  PostHogPersistedProperty: postHogPersistedProperty,
 }));
 
 vi.mock('expo-device', () => ({
   DeviceType: { UNKNOWN: 0, PHONE: 1, TABLET: 2, DESKTOP: 3, TV: 4 },
   get deviceType() {
-    return hoisted.device.deviceType;
+    return device.deviceType;
   },
 }));
 

@@ -820,7 +820,19 @@
         "fileComment": "Amazwana efayela",
         "outdatedOnPathLines": "Aphelelwe yisikhathi ku-{{path}} {{lines}}",
         "outdatedOnLines": "Aphelelwe yisikhathi ku-{{lines}}",
-        "outdatedOnPath": "Aphelelwe yisikhathi ku-{{path}}"
+        "outdatedOnPath": "Aphelelwe yisikhathi ku-{{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Uhlangothi lwesokunxele",
+        "sideRight": "Uhlangothi lwesokunene",
+        "outdatedOnLinesSide": "Aphelelwe yisikhathi ku-{{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Aphelelwe yisikhathi ku-{{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Aphelelwe yisikhathi ({{side}})",
+        "outdatedOnPathSide": "Aphelelwe yisikhathi ku-{{path}} ({{side}})"
       },
       "deletedUser": "umsebenzisi osusiwe",
       "replyForbiddenTerm": "Awunayo imvume yokuphendula ku-{{term}}.",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Le akhawunti ayikaze ibe nezinhlangano. Uma usuka inhlangano noma ungena kuyinhlangano, uzokwazi ukubuyekeza ama-PR e-Bitbucket.",
       "gitlabReconnectAdminOnlyDescription": "Cela umnikazi, umlawuli, noma umphathi wokukhokha wenhlangano ukuxhuma kabusha.",
       "bitbucketNotConnectedTitle": "I-Bitbucket ayixhunyiwe",
-      "bitbucketAdminOnlyDescription": "Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangayixhuma.",
+      "adminOnlyConnectDescription": "Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangayixhuma.",
       "contextLine": "Ku-{{organization}}",
       "contextLinePersonal": "Kwokomuntu siqu"
     },
@@ -3026,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Asikwazanga ukulayisha amaseshini.",
-    "couldNotLoadActiveSessions": "Asikwazanga ukulayisha amaseshini asebenzayo.",
     "agentSessions": "Okusebenza manje",
     "newCodingTask": "Umsebenzi omusha wokubhala ikhodi",
     "newTaskFromPicture": "Umsebenzi omusha ovela esithombeni",
@@ -3405,7 +3416,8 @@
         "accounting_adjustment": "Ukulungiswa kwezimali",
         "credits_expired": "Amakhredithi aphelelwe yisikhathi"
       },
-      "truncated": "Umnyakazo wamakhredithi wangaphambili uyatholakala."
+      "truncated": "Umnyakazo wamakhredithi wangaphambili uyatholakala.",
+      "retentionLimit": "Kuboniswa umnyakazo wamakhredithi wakamuva."
     },
     "inviteMember": {
       "emailError": "Faka ikheli le-imeyili elivumelekile.",
@@ -3415,6 +3427,7 @@
       "sendInvite": "Thumela isimemo",
       "title": "Mema ilungu",
       "alreadyInvited": "Isimemo sabo sesivele sikhona noma bese belilungu leqembu.",
+      "organizationUnavailable": "Le nhlangano ayisatholakali.",
       "sendError": "Asikwazanga ukuthumela isimemo.",
       "pendingInvitation": "Le imeyili isivele inesimemo esilindile.",
       "alreadyMember": "Lo muntu usevele eyilungu lale nhlangano.",
@@ -3436,7 +3449,8 @@
         "void": "Ikhanseliwe",
         "uncollectible": "Ayisakhokheleki"
       },
-      "truncated": "Ama-invoyisi amadala ayatholakala."
+      "truncated": "Ama-invoyisi amadala ayatholakala.",
+      "retentionLimit": "Kuboniswa ama-invoyisi akamuva."
     },
     "lowBalanceAlert": {
       "enableA11y": "Vula isaziso sebhalansi ephansi",
@@ -3670,8 +3684,7 @@
     "imagesSectionEmpty": "Awekho abasingathi bezithombe abathenjwayo",
     "revoke": "Hoxisa ukwethenjwa kuka-{{host}}",
     "revokeMessage": "Izixhumanisi eziya kulo msingathi zizocela imvume futhi.",
-    "revokeImageMessage": "Izithombe ezivela kulo msingathi zizocela imvume futhi.",
-    "backToPreferences": "Buyela ezilungiselelweni"
+    "revokeImageMessage": "Izithombe ezivela kulo msingathi zizocela imvume futhi."
   },
   "glanceable": {
     "waiting": "Kubuyekezwa ama-ejenti",
@@ -3918,6 +3931,8 @@
       "downloading": "Iyalandwa: {{written}} kwe-{{total}}",
       "downloadingUnknown": "Iyalandwa: {{written}}",
       "paused": "Kumisiwe: {{written}} kwe-{{total}}",
+      "retrying": "Kuzamiwa futhi: {{written}} kwe-{{total}}",
+      "retryingUnknown": "Kuzamiwa futhi: {{written}}",
       "verifying": "Kuhlolwa ifayela elilandiwe…",
       "downloaded": "Kulandiwe · {{size}}",
       "url": "Isixhumanisi sokulanda ngqo",
@@ -4008,7 +4023,9 @@
         "androidModelUnavailable": "Le divayisi ayiyisekeli i-Gemini Nano, noma uhlelo lwesistimu lwe-AICore lusalungiswa. Zama futhi emuva kwesikhathi.",
         "aicoreUpdateRequired": "Buyekeza uhlelo lwe-AICore nesofthiwe yesistimu yakho ukuze usebenzise le modeli.",
         "downloadable": "Le modeli idinga ukudawunilodwa kanye kuphela ngaphambi kokuthi uyisebenzise.",
-        "downloading": "Imodeli iyadawunilodwa. Izolunga uma ukudawuniloda sekuqedile."
+        "downloading": "Imodeli iyadawunilodwa. Izolunga uma ukudawuniloda sekuqedile.",
+        "batteryQuota": "Imodeli esedivayisini isisebenzise isabelo sayo sebhethri okwamanje. Zama futhi emuva kwesikhathi.",
+        "checkFailed": "I-app ayikwazanga ukuhlola le modeli. Zama futhi."
       },
       "unavailable": "Imodeli esedivayisini ayitholakali okwamanje. Hlola isimo sayo ku-$t(modelChat.backends.title).",
       "busy": "Imodeli esedivayisini isamatasa nenye impendulo. Zama futhi uma isiqedile.",
@@ -4369,7 +4386,8 @@
       "purchaseFallback": "Ukuthengwa kwamakhredithi",
       "receipt": "Irisidi",
       "receiptA11y": "Vula irisidi ye-{{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Ayikho irisidi etholakalayo yalokhu kuthenga."
+      "receiptUnavailable": "Ayikho irisidi etholakalayo yalokhu kuthenga.",
+      "retentionLimit": "Kuboniswa umlando wamakhredithi wakamuva."
     },
     "title": "Thenga amakhredithi",
     "description": "Amakhredithi ukuthenga kwesikhathi esisodwa okwengezwa kubhalansi yakho ye-Kilo ukuze usebenzise amaseshini okubhala ikhodi e-AI ku-Kilo App. Isitolo sikhokhisa i-akhawunti yakho futhi amakhredithi engezwa ngemva kokuba isitolo siqinisekise inkokhelo.",
@@ -4617,10 +4635,14 @@
     "couldNotLoad": "Akukwazekanga ukulayisha ukuhlanganiswa",
     "permissionDenied": "Awunayo imvume yokuphatha lokhu kuhlanganiswa.",
     "managedByOwner": "Cela umnikazi wenhlangano ukuthi ashintshe ukuxhumana ongakwazi ukukushintsha.",
+    "managedByOwnerOrAdmin": "Cela umnikazi noma umlawuli wenhlangano ukuthi ashintshe ukuxhumana ongakwazi ukukushintsha.",
+    "managedByOwnerOrBilling": "Cela umnikazi noma umphathi wokukhokha wenhlangano ukuthi ashintshe ukuxhumana ongakwazi ukukushintsha.",
+    "managedByOwnerAdminOrBilling": "Cela umnikazi, umlawuli, noma umphathi wokukhokha wenhlangano ukuthi ashintshe ukuxhumana ongakwazi ukukushintsha.",
     "connectFailed": "Akukwazekanga ukuvula ikhasi lokuxhuma"
   },
   "invoices": {
-    "personalEmptyDescription": "Ama-invoyisi okuthenga kwakho azovela lapha uma usukhokhisiwe."
+    "personalEmptyDescription": "Ama-invoyisi okuthenga kwakho avela lapha uma usukhokhisiwe. Ama-irisidi avela ku-App Store naku-Google Play atholakala kuMlando wamakhredithi.",
+    "personalPeriod": "Izinyanga eziyi-12 ezidlule"
   },
   "cloudAgent": {
     "compute": {

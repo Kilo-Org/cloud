@@ -820,7 +820,19 @@
         "fileComment": "የፋይል አስተያየት",
         "outdatedOnPathLines": "በ{{path}} {{lines}} ላይ፣ ከአሁኑ ኮድ ጋር አይዛመድም",
         "outdatedOnLines": "በ{{lines}} ላይ፣ ከአሁኑ ኮድ ጋር አይዛመድም",
-        "outdatedOnPath": "በ{{path}} ላይ፣ ከአሁኑ ኮድ ጋር አይዛመድም"
+        "outdatedOnPath": "በ{{path}} ላይ፣ ከአሁኑ ኮድ ጋር አይዛመድም",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "በ{{path}} L{{line}} ላይ ({{side}})",
+        "lineOnPathRangeSide": "በ{{path}} {{lineRange}} ላይ ({{side}})",
+        "sideLeft": "የግራ ጎን",
+        "sideRight": "የቀኝ ጎን",
+        "outdatedOnLinesSide": "በ{{lines}} ላይ፣ ከአሁኑ ኮድ ጋር አይዛመድም ({{side}})",
+        "outdatedOnPathLinesSide": "በ{{path}} {{lines}} ላይ፣ ከአሁኑ ኮድ ጋር አይዛመድም ({{side}})",
+        "outdatedSide": "ከአሁኑ ኮድ ጋር አይዛመድም ({{side}})",
+        "outdatedOnPathSide": "በ{{path}} ላይ፣ ከአሁኑ ኮድ ጋር አይዛመድም ({{side}})"
       },
       "deletedUser": "የተሰረዘ ተጠቃሚ",
       "replyForbiddenTerm": "ለዚህ {{term}} ምላሽ ለመስጠት ፈቃድ የለህም።",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "ይህ መለያ እስካሁን ድርጅቶች የለውም። ድርጅት ሲፈጥሩ ወይም ሲቀላቀሉ የBitbucket የማዋሃድ ጥያቄዎችን ማገምገም ይቻላል።",
       "gitlabReconnectAdminOnlyDescription": "የድርጅት ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ እንዲያገናኙት ይጠይቁ።",
       "bitbucketNotConnectedTitle": "Bitbucket አልተገናኘም",
-      "bitbucketAdminOnlyDescription": "ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
+      "adminOnlyConnectDescription": "ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
       "contextLine": "ለ{{organization}}",
       "contextLinePersonal": "ለግል መለያዎ"
     },
@@ -3026,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "ክፍለ ጊዜዎችን መጫን አልተቻለም።",
-    "couldNotLoadActiveSessions": "ንቁ ክፍለ ጊዜዎችን መጫን አልተቻለም።",
     "agentSessions": "አሁን በሂደት ላይ",
     "newCodingTask": "አዲስ የኮድ ሥራ",
     "newTaskFromPicture": "ከምስል አዲስ ሥራ",
@@ -3405,7 +3416,8 @@
         "accounting_adjustment": "የሂሳብ ማስተካከያ",
         "credits_expired": "የክሬዲቱ ጊዜ አልፏል"
       },
-      "truncated": "የቆዩ የክሬዲት እንቅስቃሴዎች ይገኛሉ።"
+      "truncated": "የቆዩ የክሬዲት እንቅስቃሴዎች ይገኛሉ።",
+      "retentionLimit": "የቅርብ ጊዜ የክሬዲት እንቅስቃሴን በማሳየት ላይ።"
     },
     "inviteMember": {
       "emailError": "ትክክለኛ የኢሜይል አድራሻ ያስገቡ።",
@@ -3415,6 +3427,7 @@
       "sendInvite": "ግብዣ ይላኩ",
       "title": "አባል ጋብዝ",
       "alreadyInvited": "አስቀድሞ ግብዣ ተልኳል ወይም አስቀድሞ አባል ነው።",
+      "organizationUnavailable": "ይህ ድርጅት ከእንግዲህ አይገኝም።",
       "sendError": "ግብዣውን መላክ አልተቻለም።",
       "pendingInvitation": "ይህ ኢሜይል አስቀድሞ በመጠባበቅ ላይ ያለ ግብዣ አለው።",
       "alreadyMember": "ይህ ሰው አስቀድሞ የዚህ ድርጅት አባል ነው።",
@@ -3436,7 +3449,8 @@
         "void": "ተሰርዟል",
         "uncollectible": "ሊሰበሰብ የማይችል"
       },
-      "truncated": "የቆዩ ደረሰኞች ይገኛሉ።"
+      "truncated": "የቆዩ ደረሰኞች ይገኛሉ።",
+      "retentionLimit": "የቅርብ ጊዜ ደረሰኞችን በማሳየት ላይ።"
     },
     "lowBalanceAlert": {
       "enableA11y": "የዝቅተኛ ቀሪ ሂሳብ ማንቂያን ያንቁ",
@@ -3670,8 +3684,7 @@
     "imagesSectionEmpty": "የታመኑ የምስል አስተናጋጆች የሉም",
     "revoke": "{{host}}ን ከታመኑ አስተናጋጆች ያስወግዱ",
     "revokeMessage": "ወደዚህ አስተናጋጅ የሚወስዱ አገናኞች እንደገና ማረጋገጫ ይጠይባሉ።",
-    "revokeImageMessage": "ከዚህ አስተናጋጅ የሚመጡ ምስሎች እንደገና ማረጋገጫ ይጠይባሉ።",
-    "backToPreferences": "ወደ ምርጫዎች ይመለሱ"
+    "revokeImageMessage": "ከዚህ አስተናጋጅ የሚመጡ ምስሎች እንደገና ማረጋገጫ ይጠይባሉ።"
   },
   "glanceable": {
     "waiting": "ወኪሎችን በማዘመን ላይ",
@@ -3918,6 +3931,8 @@
       "downloading": "በማውረድ ላይ፦ {{written}} ከ{{total}}",
       "downloadingUnknown": "በማውረድ ላይ፦ {{written}}",
       "paused": "ቆሟል፦ {{written}} ከ{{total}}",
+      "retrying": "በድጋሚ በመሞከር ላይ፦ {{written}} ከ{{total}}",
+      "retryingUnknown": "በድጋሚ በመሞከር ላይ፦ {{written}}",
       "verifying": "የወረደውን ፋይል በመፈተሽ ላይ…",
       "downloaded": "ወርዷል · {{size}}",
       "url": "ቀጥታ የማውረድ አገናኝ",
@@ -4008,7 +4023,9 @@
         "androidModelUnavailable": "ይህ መሣሪያ Gemini Nanoን አይደግፍም፣ ወይም የAICore ሥርዓት መተግበሪያ አሁንም በመዘጋጀት ላይ ነው። ቆይተው እንደገና ይሞክሩ።",
         "aicoreUpdateRequired": "ይህን ሞዴል ለመጠቀም የAICore መተግበሪያውን እና የሥርዓት ሶፍትዌርዎን ያዘምኑ።",
         "downloadable": "ይህን ሞዴል ከመጠቀምዎ በፊት አንድ ጊዜ ማውረድ ያስፈልጋል።",
-        "downloading": "ሞዴሉ በመውረድ ላይ ነው። ማውረዱ ሲጠናቀቅ ዝግጁ ይሆናል።"
+        "downloading": "ሞዴሉ በመውረድ ላይ ነው። ማውረዱ ሲጠናቀቅ ዝግጁ ይሆናል።",
+        "batteryQuota": "በመሣሪያ ላይ ያለው ሞዴል የባትሪ አቅሙን ለአሁኑ ተጠቅሟል። በኋላ እንደገና ይሞክሩ።",
+        "checkFailed": "መተግበሪያው ይህን ሞዴል ማረጋገጥ አልቻለም። እንደገና ይሞክሩ።"
       },
       "unavailable": "በመሣሪያ ላይ ያለው ሞዴል አሁን አይገኝም። ሁኔታውን በ$t(modelChat.backends.title) ውስጥ ያረጋግጡ።",
       "busy": "በመሣሪያ ላይ ያለው ሞዴል ሌላ ምላሽ በመስጠት ተጠምዷል። ሲጨርስ እንደገና ይሞክሩ።",
@@ -4369,7 +4386,8 @@
       "purchaseFallback": "የክሬዲት ግዢ",
       "receipt": "ደረሰኝ",
       "receiptA11y": "የ{{description}}፣ {{amount}}፣ ከ{{date}} ደረሰኝን ክፈት",
-      "receiptUnavailable": "ለዚህ ግዢ ደረሰኝ አይገኝም።"
+      "receiptUnavailable": "ለዚህ ግዢ ደረሰኝ አይገኝም።",
+      "retentionLimit": "የቅርብ ጊዜ የክሬዲት ታሪክን በማሳየት ላይ።"
     },
     "title": "ክሬዲት ይግዙ",
     "description": "ክሬዲት በKilo App ውስጥ የAI ኮዲንግ ክፍለ-ጊዜዎችን ለማስኬድ ወደ Kilo ቀሪ ሂሳብዎ የሚጨመር የአንድ ጊዜ ግዢ ነው። መደብሩ ሂሳብዎን ይከፍላል፣ እና መደብሩ ክፍያውን ካረጋገጠ በኋላ ክሬዲት ይጨመራል።",
@@ -4617,10 +4635,14 @@
     "couldNotLoad": "ውህደቶችን መጫን አልተቻለም",
     "permissionDenied": "እነዚህን ውህደቶች የማስተዳደር ፈቃድ የለዎትም።",
     "managedByOwner": "መቀየር የማይችሉትን ግንኙነት ለመቀየር የድርጅቱን ባለቤት ይጠይቁ።",
+    "managedByOwnerOrAdmin": "መቀየር የማይችሉትን ግንኙነት ለመቀየር የድርጅቱን ባለቤት ወይም አስተዳዳሪ ይጠይቁ።",
+    "managedByOwnerOrBilling": "መቀየር የማይችሉትን ግንኙነት ለመቀየር የድርጅቱን ባለቤት ወይም የክፍያ አስተዳዳሪ ይጠይቁ።",
+    "managedByOwnerAdminOrBilling": "መቀየር የማይችሉትን ግንኙነት ለመቀየር የድርጅቱን ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ ይጠይቁ።",
     "connectFailed": "የግንኙነት ገጹን መክፈት አልተቻለም"
   },
   "invoices": {
-    "personalEmptyDescription": "ክፍያ ከተጠየቀብዎ በኋላ ለራስዎ ግዢዎች የሚወጡ የክፍያ መጠየቂያዎች እዚህ ይታያሉ።"
+    "personalEmptyDescription": "ክፍያ ከተጠየቀብዎ በኋላ ለራስዎ ግዢዎች የሚወጡ የክፍያ መጠየቂያዎች እዚህ ይታያሉ። ደረሰኝ ከApp Store እና ደረሰኝ ከGoogle Play በክሬዲት ታሪክ ውስጥ ይገኛሉ።",
+    "personalPeriod": "ያለፉት 12 ወራት"
   },
   "cloudAgent": {
     "compute": {

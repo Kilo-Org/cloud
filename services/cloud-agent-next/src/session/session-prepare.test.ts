@@ -56,6 +56,8 @@ import {
   type SessionRegistrationContext,
 } from './session-registration.js';
 import { prepareInputToSessionCreateRequest } from '../router/handlers/session-prepare.js';
+import { VERCEL_RUNTIME_UPGRADE_REASON } from '../sandbox-selection.js';
+import { vercelRuntimeBaseDigest } from '../byoc/vercel-runtime-base.js';
 import { PrepareSessionInput, StartSessionInput } from '../router/schemas.js';
 
 const {
@@ -2300,26 +2302,80 @@ describe('explicit sandbox session creation', () => {
     });
   });
 
-  it('rejects a fresh explicit Vercel allocation for a security-remediation origin before admission', async () => {
-    const doStub = makeDoStub();
-    const ctx = selectedContext(doStub);
-    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], []]));
-    const request = makeRequest({
-      repository: { type: 'github', repo: 'acme/repo' },
-      runtime: { sandboxAllocation: 'vercel-small' },
-      options: {
-        kilocodeOrganizationId: orgId,
-        operationKey: OPERATION_KEY,
-        createdOnPlatform: 'security-remediation',
-      },
+  describe('explicit Vercel allocation and the runtime base', () => {
+    function vercelCreate(createdOnPlatform?: string) {
+      return makeRequest({
+        repository: { type: 'github', repo: 'acme/repo' },
+        runtime: { sandboxAllocation: 'vercel-small' },
+        options: {
+          kilocodeOrganizationId: orgId,
+          operationKey: OPERATION_KEY,
+          ...(createdOnPlatform ? { createdOnPlatform } : {}),
+        },
+      });
+    }
+    function enrolledContext(doStub: ReturnType<typeof makeDoStub>, runtimeDigest?: string | null) {
+      const ctx = selectedContext(doStub);
+      ctx.env.BYOC_VERCEL_IDS = orgId;
+      fetchByocVercelEnrollmentMock.mockResolvedValueOnce({
+        organizationId: orgId,
+        credentialId: 'f47ac10b-58cc-4372-a567-0e02b2c3d481',
+        setupStatus: 'ready',
+        ...(runtimeDigest === undefined ? {} : { runtimeDigest }),
+      });
+      return ctx;
+    }
+
+    it.each([
+      ['an older base digest', 'downloaded-base-v1:older'],
+      ['no stored digest', null],
+      ['an older web response', undefined],
+    ] as const)(
+      'fails a security-remediation create on %s with the upgrade reason',
+      async (_name, runtimeDigest) => {
+        const doStub = makeDoStub();
+        const ctx = enrolledContext(doStub, runtimeDigest);
+
+        await expect(runCreate(ctx, vercelCreate('security-remediation'))).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+          message: VERCEL_RUNTIME_UPGRADE_REASON,
+        });
+        expect(fetchByocVercelEnrollmentMock).toHaveBeenCalledOnce();
+        // The row was admitted, so it settles failed and does not leave the create hanging.
+        expect(admitOperationMock).toHaveBeenCalledOnce();
+        expect(settleOperationMock).toHaveBeenCalledOnce();
+        expect(settleOptions(0)?.outboxEvent).toMatchObject({
+          properties: { outcome: 'failed' },
+        });
+        expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+        expect(doStub.registerSessionFromMetadata).not.toHaveBeenCalled();
+        expect(createCliSessionMock).not.toHaveBeenCalled();
+      }
+    );
+
+    it('starts a security-remediation create on the current base', async () => {
+      const doStub = makeDoStub();
+      const ctx = enrolledContext(doStub, await vercelRuntimeBaseDigest());
+
+      await runCreate(ctx, vercelCreate('security-remediation'));
+
+      expect(createdMetadata(doStub)?.workspace).toMatchObject({
+        sandboxProvider: 'vercel',
+        sandboxAllocation: 'vercel-small',
+      });
     });
 
-    await expect(runCreate(ctx, request)).rejects.toMatchObject({
-      code: 'BAD_REQUEST',
-      message: 'Vercel sandboxes do not include the security-remediation command-line tools',
+    it('starts a normal create on an older base', async () => {
+      const doStub = makeDoStub();
+      const ctx = enrolledContext(doStub, 'downloaded-base-v1:older');
+
+      await runCreate(ctx, vercelCreate());
+
+      expect(createdMetadata(doStub)?.workspace).toMatchObject({
+        sandboxProvider: 'vercel',
+        sandboxAllocation: 'vercel-small',
+      });
     });
-    expect(admitOperationMock).not.toHaveBeenCalled();
-    expectNoAllocation(doStub);
   });
 
   it('replays a settled create of a now-unavailable Vercel GitLab allocation', async () => {

@@ -57,6 +57,7 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
   useFocusEffect: () => undefined,
 }));
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: () => undefined }));
 vi.mock('@/components/ui/icons', () => ({
   ExternalLink: 'ExternalLink',
   ScanSearch: 'ScanSearch',
@@ -84,7 +85,10 @@ vi.mock('@/components/security-agent/collapsible-section', () => ({
 vi.mock('@/components/security-agent/finding-status-badge', () => ({
   FindingStatusBadge: () => null,
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/kv-row', () => ({

@@ -2483,7 +2483,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Oturumlar yüklenemedi.",
-    "couldNotLoadActiveSessions": "Etkin oturumlar yüklenemedi.",
     "agentSessions": "Şu anda etkin",
     "newCodingTask": "Yeni kodlama görevi",
     "newTaskFromPicture": "Resimden yeni görev",
@@ -2800,7 +2799,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Bu hesabın henüz bir kuruluşu yok. Bitbucket çekme isteklerini, bir kuruluş oluşturduktan ya da birine katıldıktan sonra gözden geçirebilirsin.",
       "gitlabReconnectAdminOnlyDescription": "Yeniden bağlaması için bir kuruluş sahibi, yönetici veya faturalandırma yöneticisinden istekte bulunun.",
       "bitbucketNotConnectedTitle": "Bitbucket bağlı değil",
-      "bitbucketAdminOnlyDescription": "Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir.",
+      "adminOnlyConnectDescription": "Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir.",
       "contextLine": "{{organization}} için",
       "contextLinePersonal": "Kişisel hesabınız için"
     },
@@ -2897,7 +2896,19 @@
         "fileComment": "Dosya yorumu",
         "outdatedOnPathLines": "{{path}} · {{lines}} · Güncel değil",
         "outdatedOnLines": "{{lines}} · Güncel değil",
-        "outdatedOnPath": "{{path}} · Güncel değil"
+        "outdatedOnPath": "{{path}} · Güncel değil",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} · L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} · {{lineRange}} ({{side}})",
+        "sideLeft": "Sol taraf",
+        "sideRight": "Sağ taraf",
+        "outdatedOnLinesSide": "{{lines}} ({{side}}) · Güncel değil",
+        "outdatedOnPathLinesSide": "{{path}} · {{lines}} ({{side}}) · Güncel değil",
+        "outdatedSide": "Güncel değil ({{side}})",
+        "outdatedOnPathSide": "{{path}} üzerinde güncel değil ({{side}})"
       },
       "deletedUser": "silinen kullanıcı",
       "replyForbiddenTerm": "Bu {{term}}ne yanıt verme iznin yok.",
@@ -3397,7 +3408,8 @@
         "accounting_adjustment": "Muhasebe düzeltmesi",
         "credits_expired": "Kredilerin süresi doldu"
       },
-      "truncated": "Daha eski kredi hareketleri mevcut."
+      "truncated": "Daha eski kredi hareketleri mevcut.",
+      "retentionLimit": "En son kredi hareketleri gösteriliyor."
     },
     "hub": {
       "balance": "Bakiye",
@@ -3420,6 +3432,7 @@
       "sendInvite": "Davet gönder",
       "title": "Üye davet et",
       "alreadyInvited": "Bu kişi zaten davet edilmiş veya zaten üye.",
+      "organizationUnavailable": "Bu kuruluş artık kullanılamıyor.",
       "sendError": "Davet gönderilemedi.",
       "pendingInvitation": "Bu e-posta adresinin zaten bekleyen bir daveti var.",
       "alreadyMember": "Bu kişi zaten bu kuruluşun bir üyesi.",
@@ -3441,7 +3454,8 @@
         "void": "İptal edildi",
         "uncollectible": "Tahsil edilemez"
       },
-      "truncated": "Daha eski faturalar mevcut."
+      "truncated": "Daha eski faturalar mevcut.",
+      "retentionLimit": "En son faturalar gösteriliyor."
     },
     "lowBalanceAlert": {
       "enableA11y": "Düşük bakiye uyarısını etkinleştir",
@@ -3670,8 +3684,7 @@
     "imagesSectionEmpty": "Güvenilen görsel sunucusu yok",
     "revoke": "{{host}} sunucusuna verilen güveni kaldır",
     "revokeMessage": "Bu sunucuya verilen bağlantılar yeniden onay isteyecek.",
-    "revokeImageMessage": "Bu sunucudaki görseller yeniden onay isteyecek.",
-    "backToPreferences": "Tercihlere dön"
+    "revokeImageMessage": "Bu sunucudaki görseller yeniden onay isteyecek."
   },
   "glanceable": {
     "waiting": "Ajanlar güncelleniyor",
@@ -3918,6 +3931,8 @@
       "downloading": "İndiriliyor: {{written}} / {{total}}",
       "downloadingUnknown": "İndiriliyor: {{written}}",
       "paused": "Duraklatıldı: {{written}} / {{total}}",
+      "retrying": "Yeniden deneniyor: {{written}} / {{total}}",
+      "retryingUnknown": "Yeniden deneniyor: {{written}}",
       "verifying": "İndirilen dosya denetleniyor…",
       "downloaded": "İndirildi · {{size}}",
       "url": "Doğrudan indirme bağlantısı",
@@ -4008,7 +4023,9 @@
         "androidModelUnavailable": "Bu cihaz Gemini Nano'yu desteklemiyor veya AICore sistem uygulaması hâlâ kuruluyor. Daha sonra yeniden deneyin.",
         "aicoreUpdateRequired": "Bu modeli kullanmak için AICore uygulamasını ve sistem yazılımınızı güncelleyin.",
         "downloadable": "Bu modeli kullanabilmek için bir kereliğine indirmeniz gerekiyor.",
-        "downloading": "Model indiriliyor. İndirme tamamlandığında kullanıma hazır olacak."
+        "downloading": "Model indiriliyor. İndirme tamamlandığında kullanıma hazır olacak.",
+        "batteryQuota": "Cihazdaki model şimdilik kendisine ayrılan pil kotasını kullandı. Daha sonra yeniden deneyin.",
+        "checkFailed": "Uygulama bu modeli denetleyemedi. Yeniden deneyin."
       },
       "unavailable": "Cihazdaki model şu anda kullanılamıyor. Durumunu $t(modelChat.backends.title) bölümünden denetleyin.",
       "busy": "Cihazdaki model başka bir yanıtla meşgul. Tamamlandığında yeniden deneyin.",
@@ -4369,7 +4386,8 @@
       "purchaseFallback": "Kredi satın alımı",
       "receipt": "Makbuz",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} için makbuzu aç",
-      "receiptUnavailable": "Bu satın alım için makbuz mevcut değil."
+      "receiptUnavailable": "Bu satın alım için makbuz mevcut değil.",
+      "retentionLimit": "En son kredi geçmişi gösteriliyor."
     },
     "title": "Kredi satın al",
     "description": "Krediler, Kilo App'te AI kodlama oturumları yürütmek için Kilo bakiyenize eklenen tek seferlik bir satın alımdır. Mağaza hesabınızdan ücret alır ve mağaza ödemeyi onayladıktan sonra krediler eklenir.",
@@ -4617,10 +4635,14 @@
     "couldNotLoad": "Entegrasyonlar yüklenemedi",
     "permissionDenied": "Bu entegrasyonları yönetme izniniz yok.",
     "managedByOwner": "Değiştiremediğiniz bir bağlantıyı değiştirmesi için bir kuruluş sahibine başvurun.",
+    "managedByOwnerOrAdmin": "Değiştiremediğiniz bir bağlantıyı değiştirmesi için bir kuruluş sahibi veya yöneticiye başvurun.",
+    "managedByOwnerOrBilling": "Değiştiremediğiniz bir bağlantıyı değiştirmesi için bir kuruluş sahibi veya faturalandırma yöneticisine başvurun.",
+    "managedByOwnerAdminOrBilling": "Değiştiremediğiniz bir bağlantıyı değiştirmesi için bir kuruluş sahibi, yönetici veya faturalandırma yöneticisine başvurun.",
     "connectFailed": "Bağlantı sayfası açılamadı"
   },
   "invoices": {
-    "personalEmptyDescription": "Kendi satın alımlarınıza ait faturalar, faturalandırıldığınızda burada görünecek."
+    "personalEmptyDescription": "Kendi satın alımlarınıza ait faturalar, faturalandırıldığınızda burada görünür. Makbuz App Store'da ve Makbuz Google Play'de ise Kredi geçmişi'nde bulunur.",
+    "personalPeriod": "Son 12 Ay"
   },
   "cloudAgent": {
     "compute": {

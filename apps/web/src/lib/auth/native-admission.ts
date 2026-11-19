@@ -320,6 +320,25 @@ export async function verifyAdmissionAsync(
 
 // ── Apple (iOS) admission ──────────────────────────────────────────────────
 
+type AttestedKeyExecutor = typeof db | DrizzleTransaction;
+
+/**
+ * The attested-key row for one key id on one platform, read through the
+ * supplied executor so a caller inside a transaction sees its own writes.
+ *
+ * Ownership is not implied: the row may belong to another account, and each
+ * caller applies its own ownership predicate.
+ */
+function findAttestedKey(
+  executor: AttestedKeyExecutor,
+  keyId: string,
+  platform: AdmissionPlatform
+) {
+  return executor.query.native_attested_keys.findFirst({
+    where: and(eq(native_attested_keys.key_id, keyId), eq(native_attested_keys.platform, platform)),
+  });
+}
+
 async function verifyAppleAdmission(
   admission: AdmissionPayload
 ): Promise<VerifyAdmissionOk | { ok: false; errorCode: string }> {
@@ -340,9 +359,7 @@ async function verifyAppleAdmission(
 
     // Check whether this keyId already exists — the caller uses this for
     // preflight ownership checks before committing a sign-in code.
-    const existingKey = await db.query.native_attested_keys.findFirst({
-      where: and(eq(native_attested_keys.key_id, keyId), eq(native_attested_keys.platform, 'ios')),
-    });
+    const existingKey = await findAttestedKey(db, keyId, 'ios');
 
     return {
       ok: true,
@@ -355,9 +372,7 @@ async function verifyAppleAdmission(
 
   // kind === 'assertion': verify against existing key
   // Must have an existing attested key
-  const existingKey = await db.query.native_attested_keys.findFirst({
-    where: and(eq(native_attested_keys.key_id, keyId), eq(native_attested_keys.platform, 'ios')),
-  });
+  const existingKey = await findAttestedKey(db, keyId, 'ios');
 
   if (!existingKey) {
     captureMessage('apple_assertion_unknown_key');
@@ -485,12 +500,7 @@ export async function persistAttestedKey(
       .onConflictDoNothing();
 
     // Verify the inserted key belongs to this user (cross-user collision check)
-    const inserted = await executor.query.native_attested_keys.findFirst({
-      where: and(
-        eq(native_attested_keys.key_id, keyId),
-        eq(native_attested_keys.platform, verification.platform)
-      ),
-    });
+    const inserted = await findAttestedKey(executor, keyId, verification.platform);
 
     if (!inserted || inserted.kilo_user_id !== userId) {
       captureMessage('native_attested_key_cross_user_collision');

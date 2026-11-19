@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
 
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { type BriefingReport } from '@/lib/agent-briefing';
 import { briefingMoney } from '@/lib/agent-briefing-format';
@@ -13,20 +13,16 @@ export function BriefingSummary({ report }: { readonly report: BriefingReport })
   const catalog = useAvailableModels(report.context.organizationId ?? undefined);
   const cost = briefingMoney(report.summary.costMicrodollars, i18n.language);
   return (
-    <View className="gap-3 rounded-2xl border border-border bg-card p-4">
-      <Text className="font-semibold">{t('agentBriefing.summary')}</Text>
+    <Card>
+      <Text variant="heading">{t('agentBriefing.summary')}</Text>
       {report.summary.status !== 'ready' ? (
-        <Text className="text-sm text-muted-foreground">
+        <Text variant="muted">
           {t(briefingSummaryStatusKey(report.summary.status, report.summary.error))}
         </Text>
       ) : null}
-      {report.summary.text ? (
-        <Text className="text-sm leading-[1.5rem]" selectable>
-          {report.summary.text}
-        </Text>
-      ) : null}
+      {report.summary.text ? <Text selectable>{report.summary.text}</Text> : null}
       {report.summary.model ? (
-        <Text className="text-xs text-muted-foreground">
+        <Text variant="caption">
           {t('agentBriefing.summaryModel', {
             model: resolveCatalogModelName(report.summary.model, catalog.models),
           })}
@@ -34,12 +30,12 @@ export function BriefingSummary({ report }: { readonly report: BriefingReport })
       ) : null}
       {report.summary.costMicrodollars > 0 ||
       (report.summary.chargeStatus === 'pending' && report.summary.startedAt !== null) ? (
-        <Text className="text-xs text-muted-foreground">
+        <Text variant="caption">
           {report.summary.chargeStatus === 'settled'
             ? t('agentBriefing.summaryCharge', { cost })
             : t('agentBriefing.summaryChargePending')}
         </Text>
       ) : null}
-    </View>
+    </Card>
   );
 }

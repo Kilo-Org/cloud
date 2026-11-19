@@ -1,20 +1,23 @@
 /* eslint-disable max-lines -- The dashboard sections share one data contract and navigation scope. */
 import { getAnalysisIncompleteCount } from '@kilocode/app-shared/security-agent';
 import { type Href } from 'expo-router';
-import { FolderGit2, ShieldCheck } from '@/components/ui/icons';
+import { FolderGit2, Settings, ShieldCheck } from '@/components/ui/icons';
 import { DirectionalArrowRight } from '@/components/ui/directional-icons';
 import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { severityCountPhrase } from '@/components/security-agent/severity-count-phrase';
-import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { KvRow } from '@/components/ui/kv-row';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { Section } from '@/components/ui/section';
+import { SectionHeaderSkeleton } from '@/components/ui/section-header-skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { DENSE_ROW_HIT_SLOP, ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { DENSE_ROW_HIT_SLOP, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber, formatPercent, UNMEASURED_VALUE } from '@/lib/format';
 import { type useSecurityAgentDashboardStats } from '@/lib/hooks/use-security-agent';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
@@ -105,21 +108,12 @@ function rowTone(
 }
 
 /**
- * The frame every section card and its placeholder share. The loading state
- * repeats it instead of restating the classes, so the two cannot drift apart
- * and change the page's height when the cards arrive.
+ * A dashboard section: the 10pt mono eyebrow over the rows or block it names.
+ * The children bring their own surface — a `RowGroup` for rows, an `EmptyState`
+ * for a state block — so a section can never nest one group inside another.
  */
-const SECTION_CARD_CLASS = 'gap-1 rounded-lg bg-secondary px-3';
-
 function SectionCard({ title, children }: Readonly<{ title: string; children: ReactNode }>) {
-  return (
-    <View className={SECTION_CARD_CLASS}>
-      <Text variant="small" className="pt-3 uppercase tracking-wide text-muted-foreground">
-        {title}
-      </Text>
-      {children}
-    </View>
-  );
+  return <Section label={title}>{children}</Section>;
 }
 
 function PriorityFindingSection({ scope, data, slaEnabled, neverSynced }: SectionProps) {
@@ -137,11 +131,11 @@ function PriorityFindingSection({ scope, data, slaEnabled, neverSynced }: Sectio
   if (neverSynced) {
     return (
       <SectionCard title={t('securityAgent.dashboard.actFirst')}>
-        <View className="py-3">
+        <Card>
           <Text variant="muted" className="text-sm">
             {t('securityAgent.dashboard.priorityFindingsPending')}
           </Text>
-        </View>
+        </Card>
       </SectionCard>
     );
   }
@@ -153,24 +147,26 @@ function PriorityFindingSection({ scope, data, slaEnabled, neverSynced }: Sectio
     // measures at the design floor.
     return (
       <SectionCard title={t('securityAgent.dashboard.actFirst')}>
-        <Pressable
-          className={cn(
-            // The row's own node carries the touch target: its `py-3` frame
-            // alone renders under the design target, and `hitSlop` would not
-            // move the rect a control-size audit measures.
-            ROW_TARGET_CLASS,
-            'flex-row items-center justify-between gap-2 py-3 active:opacity-70'
-          )}
-          onPress={() => {
-            pushOnce(findingsHref(scope, { status: 'open' }));
-          }}
-        >
-          <View className="flex-row items-center gap-2">
-            <ShieldCheck size={16} color={colors.good} />
-            <Text className="text-sm">{t('securityAgent.dashboard.noOpenFindings')}</Text>
-          </View>
-          <DirectionalArrowRight size={14} color={colors.mutedForeground} />
-        </Pressable>
+        <RowGroup>
+          <Pressable
+            className={cn(
+              // The row's own node carries the touch target: its `py-3` frame
+              // alone renders under the design target, and `hitSlop` would not
+              // move the rect a control-size audit measures.
+              ROW_TARGET_CLASS,
+              'flex-row items-center justify-between gap-3 px-4 py-3 active:opacity-70'
+            )}
+            onPress={() => {
+              pushOnce(findingsHref(scope, { status: 'open' }));
+            }}
+          >
+            <View className="flex-row items-center gap-2">
+              <ShieldCheck size={16} color={colors.good} />
+              <Text className="text-sm">{t('securityAgent.dashboard.noOpenFindings')}</Text>
+            </View>
+            <DirectionalArrowRight size={14} color={colors.mutedForeground} />
+          </Pressable>
+        </RowGroup>
       </SectionCard>
     );
   }
@@ -180,29 +176,31 @@ function PriorityFindingSection({ scope, data, slaEnabled, neverSynced }: Sectio
 
   return (
     <SectionCard title={t('securityAgent.dashboard.actFirst')}>
-      <Pressable
-        className={cn(ROW_TARGET_CLASS, 'gap-1 py-3 active:opacity-70')}
-        onPress={() => {
-          pushOnce(getSecurityAgentPath(scope, `findings/${finding.id}`));
-        }}
-      >
-        <Text className="text-sm font-medium" numberOfLines={1}>
-          {finding.title}
-        </Text>
-        <Text variant="muted" className="text-xs" numberOfLines={1}>
-          {finding.repoFullName}
-          {isOverdue &&
-            ` · ${
-              // i18n-dup-ok: 'securityAgent.dashboard.daysOverdue_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules.
-              daysOverdue === 0
-                ? t('securityAgent.dashboard.deadlineToday')
-                : t('securityAgent.dashboard.daysOverdue', {
-                    count: daysOverdue,
-                    displayCount: formatNumber(daysOverdue, i18n.language),
-                  })
-            }`}
-        </Text>
-      </Pressable>
+      <RowGroup>
+        <Pressable
+          className={cn(ROW_TARGET_CLASS, 'gap-1 px-4 py-3 active:opacity-70')}
+          onPress={() => {
+            pushOnce(getSecurityAgentPath(scope, `findings/${finding.id}`));
+          }}
+        >
+          <Text className="text-sm font-medium" numberOfLines={1}>
+            {finding.title}
+          </Text>
+          <Text variant="muted" className="text-xs" numberOfLines={1}>
+            {finding.repoFullName}
+            {isOverdue &&
+              ` · ${
+                // i18n-dup-ok: 'securityAgent.dashboard.daysOverdue_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules.
+                daysOverdue === 0
+                  ? t('securityAgent.dashboard.deadlineToday')
+                  : t('securityAgent.dashboard.daysOverdue', {
+                      count: daysOverdue,
+                      displayCount: formatNumber(daysOverdue, i18n.language),
+                    })
+              }`}
+          </Text>
+        </Pressable>
+      </RowGroup>
     </SectionCard>
   );
 }
@@ -226,35 +224,36 @@ function PostureSection({ data, slaEnabled, neverSynced }: SectionProps) {
 
   return (
     <SectionCard title={t('securityAgent.dashboard.actionPosture')}>
-      <KvRow
-        label={t('securityAgent.dashboard.confirmedExploitable')}
-        value={rowValue(neverSynced, formatNumber(data.analysis.exploitable, i18n.language))}
-        valueTone="muted"
-        valueFace="numeric"
-        dotTone={rowTone(neverSynced, data.analysis.exploitable > 0 ? 'danger' : 'muted')}
-      />
-      <KvRow
-        label={t('securityAgent.dashboard.needsEvidenceReview')}
-        value={rowValue(neverSynced, formatNumber(data.analysis.needsReview, i18n.language))}
-        valueTone="muted"
-        valueFace="numeric"
-        dotTone={rowTone(neverSynced, data.analysis.needsReview > 0 ? 'warn' : 'muted')}
-      />
-      <KvRow
-        label={t('securityAgent.dashboard.analysisNotComplete')}
-        value={rowValue(neverSynced, formatNumber(analysisIncomplete, i18n.language))}
-        valueTone="muted"
-        valueFace="numeric"
-        dotTone="muted"
-      />
-      <KvRow
-        label={t('securityAgent.dashboard.noImmediateAction')}
-        value={rowValue(neverSynced, formatNumber(noImmediateAction, i18n.language))}
-        valueTone="muted"
-        valueFace="numeric"
-        dotTone={rowTone(neverSynced, noImmediateAction > 0 ? 'good' : 'muted')}
-        last
-      />
+      <RowGroup>
+        <KvRow
+          label={t('securityAgent.dashboard.confirmedExploitable')}
+          value={rowValue(neverSynced, formatNumber(data.analysis.exploitable, i18n.language))}
+          valueTone="muted"
+          valueFace="numeric"
+          dotTone={rowTone(neverSynced, data.analysis.exploitable > 0 ? 'danger' : 'muted')}
+        />
+        <KvRow
+          label={t('securityAgent.dashboard.needsEvidenceReview')}
+          value={rowValue(neverSynced, formatNumber(data.analysis.needsReview, i18n.language))}
+          valueTone="muted"
+          valueFace="numeric"
+          dotTone={rowTone(neverSynced, data.analysis.needsReview > 0 ? 'warn' : 'muted')}
+        />
+        <KvRow
+          label={t('securityAgent.dashboard.analysisNotComplete')}
+          value={rowValue(neverSynced, formatNumber(analysisIncomplete, i18n.language))}
+          valueTone="muted"
+          valueFace="numeric"
+          dotTone="muted"
+        />
+        <KvRow
+          label={t('securityAgent.dashboard.noImmediateAction')}
+          value={rowValue(neverSynced, formatNumber(noImmediateAction, i18n.language))}
+          valueTone="muted"
+          valueFace="numeric"
+          dotTone={rowTone(neverSynced, noImmediateAction > 0 ? 'good' : 'muted')}
+        />
+      </RowGroup>
     </SectionCard>
   );
 }
@@ -298,29 +297,31 @@ function CoverageSection({ scope, data, repoFullName, neverSynced }: SectionProp
 
   return (
     <SectionCard title={t('securityAgent.dashboard.codebaseRisk')}>
-      {rows.map((row, index) => (
-        <Pressable
-          key={row.label}
-          onPress={() => {
-            pushOnce(row.href);
-          }}
-          // The row keeps `KvRow`'s own `py-3` rhythm, so its counts read as one
-          // column at the pitch every other `KvRow` group uses instead of the
-          // taller interactive-row frame. The slop carries the touch region past
-          // the design target without moving the frame the divider sits on.
-          hitSlop={DENSE_ROW_HIT_SLOP}
-          className="active:opacity-70"
-        >
-          <KvRow
-            label={row.label}
-            value={rowValue(neverSynced, formatNumber(row.value, i18n.language))}
-            valueTone="muted"
-            valueFace="numeric"
-            dotTone={rowTone(neverSynced, row.value > 0 ? row.tone : 'muted')}
-            last={index === rows.length - 1}
-          />
-        </Pressable>
-      ))}
+      <RowGroup>
+        {rows.map(row => (
+          <Pressable
+            key={row.label}
+            onPress={() => {
+              pushOnce(row.href);
+            }}
+            // The row keeps `KvRow`'s own `py-3` rhythm, so its counts read as
+            // one column at the pitch every other `KvRow` group uses instead of
+            // the taller interactive-row frame. The slop carries the touch
+            // region past the design target without moving the frame the
+            // divider sits on.
+            hitSlop={DENSE_ROW_HIT_SLOP}
+            className="active:opacity-70"
+          >
+            <KvRow
+              label={row.label}
+              value={rowValue(neverSynced, formatNumber(row.value, i18n.language))}
+              valueTone="muted"
+              valueFace="numeric"
+              dotTone={rowTone(neverSynced, row.value > 0 ? row.tone : 'muted')}
+            />
+          </Pressable>
+        ))}
+      </RowGroup>
     </SectionCard>
   );
 }
@@ -356,14 +357,12 @@ function RepoHealthSection({
           }
           action={
             emptyGrantAction ? (
-              <Button
-                className={STATE_ACTION_CLASS}
-                variant="default"
+              <StateAction
+                label={emptyGrantAction.label}
+                icon={Settings}
                 loading={emptyGrantAction.pending}
                 onPress={emptyGrantAction.handlePress}
-              >
-                <Text>{emptyGrantAction.label}</Text>
-              </Button>
+              />
             ) : undefined
           }
         />
@@ -373,42 +372,43 @@ function RepoHealthSection({
 
   return (
     <SectionCard title={t('securityAgent.dashboard.repositoryActionPlan')}>
-      {data.repoHealth.map((repo, index) => (
-        <Pressable
-          key={repo.repoFullName}
-          className={cn(
-            // The row's own node carries the touch target. A row sized by its
-            // content reports only what its lines need, so a repository row
-            // that paints its name line alone measures under the design
-            // target, and `hitSlop` would not move the rect a control-size
-            // audit reads. `py-3` keeps the card's row rhythm and
-            // `items-center` centres the block in the taller box.
-            ROW_TARGET_CLASS,
-            'flex-row items-center justify-between gap-2 py-3 active:opacity-70',
-            index < data.repoHealth.length - 1 && 'border-b-[0.5px] border-hair-soft'
-          )}
-          onPress={() => {
-            pushOnce(findingsHref(scope, { status: 'open', repoFullName: repo.repoFullName }));
-          }}
-        >
-          <View className="flex-1">
-            <Text className="text-sm font-medium" numberOfLines={1}>
-              {repo.repoFullName}
+      <RowGroup>
+        {data.repoHealth.map(repo => (
+          <Pressable
+            key={repo.repoFullName}
+            className={cn(
+              // The row's own node carries the touch target. A row sized by its
+              // content reports only what its lines need, so a repository row
+              // that paints its name line alone measures under the design
+              // target, and `hitSlop` would not move the rect a control-size
+              // audit reads. `py-3` keeps the row rhythm and `items-center`
+              // centres the block in the taller box.
+              ROW_TARGET_CLASS,
+              'flex-row items-center justify-between gap-3 px-4 py-3 active:opacity-70'
+            )}
+            onPress={() => {
+              pushOnce(findingsHref(scope, { status: 'open', repoFullName: repo.repoFullName }));
+            }}
+          >
+            <View className="min-w-0 flex-1">
+              <Text className="text-sm font-medium" numberOfLines={1}>
+                {repo.repoFullName}
+              </Text>
+              <Text variant="muted" className="mt-0.5 text-xs">
+                {t('securityAgent.dashboard.repoSummary', {
+                  open: severityCountPhrase('repoOpen', repo.open),
+                  critical: severityCountPhrase('repoCritical', repo.critical),
+                  high: severityCountPhrase('repoHigh', repo.high),
+                })}
+              </Text>
+            </View>
+            <Text variant="caption" className="tabular-nums">
+              {repoTrailingLabel(repo, slaEnabled)}
             </Text>
-            <Text variant="muted" className="mt-0.5 text-xs">
-              {t('securityAgent.dashboard.repoSummary', {
-                open: severityCountPhrase('repoOpen', repo.open),
-                critical: severityCountPhrase('repoCritical', repo.critical),
-                high: severityCountPhrase('repoHigh', repo.high),
-              })}
-            </Text>
-          </View>
-          <Text className="text-xs text-muted-foreground tabular-nums">
-            {repoTrailingLabel(repo, slaEnabled)}
-          </Text>
-          <DirectionalArrowRight size={14} color={colors.mutedForeground} />
-        </Pressable>
-      ))}
+            <DirectionalArrowRight size={14} color={colors.mutedForeground} />
+          </Pressable>
+        ))}
+      </RowGroup>
     </SectionCard>
   );
 }
@@ -427,27 +427,22 @@ export function DashboardSections(props: SectionProps) {
 /** One line of a row: a label/value row, or a title over its secondary line. */
 type SkeletonRow = 1 | 2;
 
-/** The primary line of a `text-sm` row, in dp at the app's default text size. */
-const SKELETON_PRIMARY_LINE_CLASS = 'h-[17.5px] rounded';
-/** The secondary line under it, and the section title's own line. */
-const SKELETON_SECONDARY_LINE_CLASS = 'h-4 rounded';
-
 /**
- * A section card's placeholder. The card frame, the title's `pt-3`, and each
- * row's `py-3` are the loaded card's own, and a row draws the same one or two
- * line boxes the loaded row holds, so the card this replaces lands on the same
- * height instead of moving the page when the reads resolve.
+ * A section's placeholder: the shared `SectionHeaderSkeleton` label line over a
+ * `RowGroup` whose rows are the shared `RowSkeleton`, so the placeholders and
+ * the rows they stand in for share one geometry and the page does not move when
+ * the reads resolve. The label is a skeleton bar rather than a blank eyebrow,
+ * so a screen reader meets no header that names no section.
  */
 function SectionCardSkeleton({ rows }: Readonly<{ rows: readonly SkeletonRow[] }>) {
   return (
-    <View className={SECTION_CARD_CLASS}>
-      <Skeleton className={cn('mt-3 w-28', SKELETON_SECONDARY_LINE_CLASS)} />
-      {rows.map((lines, index) => (
-        <View key={index} className="gap-1 py-3">
-          <Skeleton className={cn('w-full', SKELETON_PRIMARY_LINE_CLASS)} />
-          {lines === 2 ? <Skeleton className={cn('w-2/3', SKELETON_SECONDARY_LINE_CLASS)} /> : null}
-        </View>
-      ))}
+    <View className="gap-3">
+      <SectionHeaderSkeleton />
+      <RowGroup>
+        {rows.map((lines, index) => (
+          <RowSkeleton key={index} subtitle={lines === 2} />
+        ))}
+      </RowGroup>
     </View>
   );
 }

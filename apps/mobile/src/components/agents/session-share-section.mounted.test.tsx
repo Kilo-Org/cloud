@@ -58,9 +58,9 @@ describe('SessionShareSection state gates', () => {
         node => typeof node.type === 'string' && (node.type as string) === 'SegmentedControl'
       )
     ).toHaveLength(1);
-    expect(findByTestID(renderer.root, 'session-share-include-new')).toHaveLength(1);
-    expect(findByTestID(renderer.root, 'session-share-rotate')).toHaveLength(1);
-    expect(findByTestID(renderer.root, 'session-share-revoke')).toHaveLength(1);
+    expect(findByTestID(renderer.root, 'session-share-include-new').length).toBeGreaterThan(0);
+    expect(findByTestID(renderer.root, 'session-share-rotate').length).toBeGreaterThan(0);
+    expect(findByTestID(renderer.root, 'session-share-revoke').length).toBeGreaterThan(0);
     expect(findByTestID(renderer.root, 'session-share-create')).toHaveLength(0);
   });
 

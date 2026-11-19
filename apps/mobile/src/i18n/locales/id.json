@@ -2483,7 +2483,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Tidak dapat memuat sesi.",
-    "couldNotLoadActiveSessions": "Tidak dapat memuat sesi aktif.",
     "agentSessions": "Sedang berjalan",
     "newCodingTask": "Tugas pemrograman baru",
     "newTaskFromPicture": "Tugas baru dari gambar",
@@ -2800,7 +2799,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Akun ini belum memiliki organisasi. PR Bitbucket dapat ditinjau setelah Anda membuat atau bergabung dengan organisasi.",
       "gitlabReconnectAdminOnlyDescription": "Minta pemilik, admin, atau manajer penagihan organisasi untuk menghubungkannya.",
       "bitbucketNotConnectedTitle": "Bitbucket tidak terhubung",
-      "bitbucketAdminOnlyDescription": "Hanya pemilik organisasi, admin, dan manajer penagihan yang dapat menghubungkannya.",
+      "adminOnlyConnectDescription": "Hanya pemilik organisasi, admin, dan manajer penagihan yang dapat menghubungkannya.",
       "contextLine": "Untuk {{organization}}",
       "contextLinePersonal": "Untuk akun pribadi Anda"
     },
@@ -2897,7 +2896,19 @@
         "fileComment": "Komentar file",
         "outdatedOnPathLines": "Sudah tidak sesuai di {{path}} {{lines}}",
         "outdatedOnLines": "Sudah tidak sesuai di {{lines}}",
-        "outdatedOnPath": "Sudah tidak sesuai di {{path}}"
+        "outdatedOnPath": "Sudah tidak sesuai di {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Sisi kiri",
+        "sideRight": "Sisi kanan",
+        "outdatedOnLinesSide": "Sudah tidak sesuai di {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Sudah tidak sesuai di {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Sudah tidak sesuai ({{side}})",
+        "outdatedOnPathSide": "Sudah tidak sesuai di {{path}} ({{side}})"
       },
       "deletedUser": "pengguna yang dihapus",
       "replyForbiddenTerm": "Kamu tidak memiliki izin untuk membalas {{term}} ini.",
@@ -3397,7 +3408,8 @@
         "accounting_adjustment": "Penyesuaian akuntansi",
         "credits_expired": "Kredit kedaluwarsa"
       },
-      "truncated": "Masih ada aktivitas kredit sebelumnya."
+      "truncated": "Masih ada aktivitas kredit sebelumnya.",
+      "retentionLimit": "Menampilkan aktivitas kredit terbaru."
     },
     "hub": {
       "balance": "Saldo",
@@ -3420,6 +3432,7 @@
       "sendInvite": "Kirim undangan",
       "title": "Undang anggota",
       "alreadyInvited": "Alamat email tersebut sudah diundang atau sudah menjadi anggota.",
+      "organizationUnavailable": "Organisasi ini sudah tidak tersedia lagi.",
       "sendError": "Tidak dapat mengirim undangan.",
       "pendingInvitation": "Email ini sudah memiliki undangan yang tertunda.",
       "alreadyMember": "Orang ini sudah menjadi anggota organisasi ini.",
@@ -3441,7 +3454,8 @@
         "void": "Batal",
         "uncollectible": "Tidak tertagih"
       },
-      "truncated": "Masih ada faktur sebelumnya."
+      "truncated": "Masih ada faktur sebelumnya.",
+      "retentionLimit": "Menampilkan faktur terbaru."
     },
     "lowBalanceAlert": {
       "enableA11y": "Aktifkan peringatan saldo rendah",
@@ -3670,8 +3684,7 @@
     "imagesSectionEmpty": "Tidak ada host gambar tepercaya",
     "revoke": "Cabut kepercayaan untuk {{host}}",
     "revokeMessage": "Tautan ke host ini akan meminta konfirmasi lagi.",
-    "revokeImageMessage": "Gambar dari host ini akan meminta konfirmasi lagi.",
-    "backToPreferences": "Kembali ke preferensi"
+    "revokeImageMessage": "Gambar dari host ini akan meminta konfirmasi lagi."
   },
   "glanceable": {
     "waiting": "Memperbarui agen",
@@ -3918,6 +3931,8 @@
       "downloading": "Mengunduh: {{written}} dari {{total}}",
       "downloadingUnknown": "Mengunduh: {{written}}",
       "paused": "Dijeda: {{written}} dari {{total}}",
+      "retrying": "Mencoba lagi: {{written}} dari {{total}}",
+      "retryingUnknown": "Mencoba lagi: {{written}}",
       "verifying": "Memeriksa file yang diunduh…",
       "downloaded": "Terunduh · {{size}}",
       "url": "Tautan unduhan langsung",
@@ -4008,7 +4023,9 @@
         "androidModelUnavailable": "Perangkat ini tidak mendukung Gemini Nano, atau aplikasi sistem AICore masih disiapkan. Coba lagi nanti.",
         "aicoreUpdateRequired": "Perbarui aplikasi AICore dan perangkat lunak sistem untuk menggunakan model ini.",
         "downloadable": "Model ini perlu diunduh satu kali sebelum dapat digunakan.",
-        "downloading": "Model sedang diunduh dan akan siap digunakan setelah unduhan selesai."
+        "downloading": "Model sedang diunduh dan akan siap digunakan setelah unduhan selesai.",
+        "batteryQuota": "Model di perangkat telah menggunakan jatah baterainya untuk saat ini. Coba lagi nanti.",
+        "checkFailed": "Aplikasi tidak dapat memeriksa model ini. Coba lagi."
       },
       "unavailable": "Model di perangkat sedang tidak tersedia. Periksa statusnya di $t(modelChat.backends.title).",
       "busy": "Model di perangkat sedang menyusun balasan lain. Coba lagi setelah selesai.",
@@ -4369,7 +4386,8 @@
       "purchaseFallback": "Pembelian kredit",
       "receipt": "Tanda terima",
       "receiptA11y": "Buka tanda terima untuk {{description}}, {{amount}}, dari {{date}}",
-      "receiptUnavailable": "Tanda terima tidak tersedia untuk pembelian ini."
+      "receiptUnavailable": "Tanda terima tidak tersedia untuk pembelian ini.",
+      "retentionLimit": "Menampilkan riwayat kredit terbaru."
     },
     "title": "Beli kredit",
     "description": "Kredit adalah pembelian satu kali yang ditambahkan ke saldo Kilo Anda untuk menjalankan sesi coding AI di Kilo App. Toko menagih akun Anda dan kredit ditambahkan setelah toko mengonfirmasi pembayaran.",
@@ -4617,10 +4635,14 @@
     "couldNotLoad": "Tidak dapat memuat integrasi",
     "permissionDenied": "Anda tidak memiliki izin untuk mengelola integrasi ini.",
     "managedByOwner": "Minta pemilik organisasi untuk mengubah koneksi yang tidak dapat Anda ubah.",
+    "managedByOwnerOrAdmin": "Minta pemilik atau admin organisasi untuk mengubah koneksi yang tidak dapat Anda ubah.",
+    "managedByOwnerOrBilling": "Minta pemilik atau manajer penagihan organisasi untuk mengubah koneksi yang tidak dapat Anda ubah.",
+    "managedByOwnerAdminOrBilling": "Minta pemilik, admin, atau manajer penagihan organisasi untuk mengubah koneksi yang tidak dapat Anda ubah.",
     "connectFailed": "Tidak dapat membuka halaman koneksi"
   },
   "invoices": {
-    "personalEmptyDescription": "Faktur untuk pembelian pribadi Anda akan muncul di sini setelah Anda ditagih."
+    "personalEmptyDescription": "Faktur untuk pembelian pribadi Anda muncul di sini setelah Anda ditagih. Tanda terima dari App Store dan Google Play ada di Riwayat kredit.",
+    "personalPeriod": "12 Bulan Terakhir"
   },
   "cloudAgent": {
     "compute": {

@@ -2,6 +2,7 @@ import { Pressable, View } from 'react-native';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
@@ -70,9 +71,9 @@ const RING_STROKE = 3;
  * drifted away from its neighbours.
  *
  * The row ends flush against the ring button's border, and the button's own
- * inner padding — its 42 dp square inside the 44 dp pill around a 28 dp ring,
- * 7 dp on each side — is what separates the reading from the ring. That is why
- * the pill carries no `gap-1.5` of its own: the same clearance came out of the
+ * inner padding — its 42 dp square, centred in the pill's 48 dp floor, around a
+ * 28 dp ring — is what separates the reading from the ring. That is why the
+ * pill carries no `gap-1.5` of its own: the same clearance came out of the
  * button, and the pill is the header's widest control, so the reserved dp it
  * saves is room the title keeps.
  *
@@ -89,21 +90,21 @@ const RING_STROKE = 3;
  * their border slot, so neither the box nor the button moves by a border's width
  * when the first reading arrives.
  */
-const PILL_CLASS = 'h-[44px] shrink min-w-0 flex-row items-center rounded-full border ps-2.5 pe-0';
+const PILL_CLASS = 'shrink min-w-0 flex-row items-center rounded-full border ps-2.5 pe-0';
 /** The capsule worn while the pill paints a reading: the pill's own. */
 const PILL_CAPSULE_CLASS = 'border-border bg-secondary';
 /** The chrome a settled pill wears while it paints nothing: transparent outer box. */
 const PILL_BARE_CLASS = 'border-transparent';
 
 /**
- * The ring's own round button: the pill's content height square — 42 dp inside
- * the 44 dp pill, whose one-dp borders take the other two — with one dp of
- * border on every side and fully rounded, so the ring is drawn inside a circle
- * rather than floating in an empty box. The width follows the height through
- * `aspect-square`, so the button stays circular at any pill height.
+ * The ring's own round button: `h-12` is 42 dp at NativeWind's 14 dp rem, under
+ * the pill's own 48 dp floor, so the button never sets the pill's height and
+ * centres in it. `aspect-square` derives the width from that height, so the
+ * button stays circular, and one dp of border on every side draws the ring
+ * inside a circle rather than letting it float in an empty box.
  */
 const RING_BUTTON_CLASS =
-  'h-full aspect-square shrink-0 items-center justify-center rounded-full border';
+  'h-12 aspect-square shrink-0 items-center justify-center rounded-full border';
 /** The fill a ring button wears while it is the pill's only visible chrome. */
 const RING_BUTTON_CAPSULE_CLASS = 'border-border bg-secondary';
 /** The chrome a ring button wears inside the pill's own capsule. */
@@ -249,7 +250,7 @@ export function SessionContextMetrics({
         />
         {valueRowLoading ? (
           <View style={LOADING_BAR_OVERLAY}>
-            <Skeleton className="h-2 w-full rounded-[2px] bg-muted-soft" />
+            <Skeleton className="h-2 w-full bg-muted-soft" />
           </View>
         ) : null}
       </View>
@@ -271,7 +272,7 @@ export function SessionContextMetrics({
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         hitSlop={8}
-        className={cn(PILL_CLASS, chromeClass, 'active:opacity-70')}
+        className={cn(ROW_TARGET_CLASS, PILL_CLASS, chromeClass, 'active:opacity-70')}
         testID="session-context-metrics"
       >
         {body}
@@ -285,7 +286,7 @@ export function SessionContextMetrics({
       {...(hidden
         ? { accessibilityElementsHidden: true, importantForAccessibility: 'no' as const }
         : {})}
-      className={cn(PILL_CLASS, chromeClass, hidden && 'opacity-0')}
+      className={cn(ROW_TARGET_CLASS, PILL_CLASS, chromeClass, hidden && 'opacity-0')}
       testID="session-context-metrics"
     >
       {body}

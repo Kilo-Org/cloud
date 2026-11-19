@@ -2314,6 +2314,7 @@
       "branchDefault": "Numatytoji",
       "branchAccessibility": "Šaka: {{label}}",
       "branchLoading": "Įkeliamos šakos",
+      "branchInactive": "Pasirinkite saugyklą, kad būtų įkeltos jos šakos.",
       "branchLoadError": "Nepavyko įkelti šakų",
       "branchUnavailable": "Šiai saugyklai šakos neprieinamos. Patikrinkite prieigos teises pas tiekėją ir pasirinkite kitą saugyklą.",
       "branchEmpty": "Nėra prieinamų šakų",

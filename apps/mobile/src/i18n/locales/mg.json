@@ -2226,6 +2226,7 @@
       "branchDefault": "Default",
       "branchAccessibility": "Sampana: {{label}}",
       "branchLoading": "Mampiditra ny sampana",
+      "branchInactive": "Safidio ny tahirin-kaody mba hiditra ny sampany.",
       "branchLoadError": "Tsy tafiditra ny sampana",
       "branchUnavailable": "Tsy azo ny sampana amin'ity tahirin-kaody ity. Hamarino ny alalana ananao amin'ny mpanome tolotra, dia safidio tahirin-kaody hafa.",
       "branchEmpty": "Tsy misy sampana azo",

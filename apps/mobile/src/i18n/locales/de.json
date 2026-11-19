@@ -1683,6 +1683,7 @@
       "branchDefault": "Standard",
       "branchAccessibility": "Branch: {{label}}",
       "branchLoading": "Branches werden geladen",
+      "branchInactive": "Wähle ein Repository aus, um seine Branches zu laden.",
       "branchLoadError": "Branches konnten nicht geladen werden",
       "branchUnavailable": "Für dieses Repository sind keine Branches verfügbar. Prüfe deinen Zugriff beim Anbieter und wähle dann ein anderes Repository.",
       "branchEmpty": "Keine Branches verfügbar",

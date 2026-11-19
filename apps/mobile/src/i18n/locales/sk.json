@@ -2314,6 +2314,7 @@
       "branchDefault": "Predvolená",
       "branchAccessibility": "Vetva: {{label}}",
       "branchLoading": "Načítavajú sa vetvy",
+      "branchInactive": "Vyberte repozitár, aby sa načítali jeho vetvy.",
       "branchLoadError": "Vetvy sa nepodarilo načítať",
       "branchUnavailable": "Pre tento repozitár nie sú vetvy dostupné. Skontroluj svoj prístup u poskytovateľa a vyber iný repozitár.",
       "branchEmpty": "Žiadne dostupné vetvy",

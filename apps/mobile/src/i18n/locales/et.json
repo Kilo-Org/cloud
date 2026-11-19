@@ -2226,6 +2226,7 @@
       "branchDefault": "Vaikimisi",
       "branchAccessibility": "Haru: {{label}}",
       "branchLoading": "Harude laadimine",
+      "branchInactive": "Vali hoidla, et harud laadida",
       "branchLoadError": "Harude laadimine ebaõnnestus",
       "branchUnavailable": "Selle hoidla harud pole saadaval. Kontrolli oma õigusi teenusepakkuja juures ja vali mõni teine hoidla.",
       "branchEmpty": "Ühtegi haru pole saadaval",

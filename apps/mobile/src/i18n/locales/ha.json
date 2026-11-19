@@ -2226,6 +2226,7 @@
       "branchDefault": "Na al'ada",
       "branchAccessibility": "Reshe: {{label}}",
       "branchLoading": "Ana loda rasshe",
+      "branchInactive": "Zaɓi ma'ajiya don loda rasshenta.",
       "branchLoadError": "Ba a iya loda rasshe ba",
       "branchUnavailable": "Rasshe ba su samuwa ga wannan ma'ajiya ba. Duba damar shigarka tare da mai ba da sabis, sannan ka zaɓi wata ma'ajiya.",
       "branchEmpty": "Babu reshe da ya samu",

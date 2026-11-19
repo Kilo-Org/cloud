@@ -1683,6 +1683,7 @@
       "branchDefault": "デフォルト",
       "branchAccessibility": "ブランチ: {{label}}",
       "branchLoading": "ブランチを読み込み中",
+      "branchInactive": "リポジトリを選択すると、そのブランチが読み込まれます。",
       "branchLoadError": "ブランチを読み込めませんでした",
       "branchUnavailable": "このリポジトリではブランチが利用できません。プロバイダーでのアクセスを確認し、別のリポジトリを選択してください。",
       "branchEmpty": "利用可能なブランチがありません",

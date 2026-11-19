@@ -1725,6 +1725,7 @@
       "branchDefault": "Domyślna",
       "branchAccessibility": "Gałąź: {{label}}",
       "branchLoading": "Wczytywanie gałęzi",
+      "branchInactive": "Wybierz repozytorium, aby wczytać jego gałęzie.",
       "branchLoadError": "Nie udało się wczytać gałęzi",
       "branchUnavailable": "Gałęzie nie są dostępne dla tego repozytorium. Sprawdź swój dostęp u dostawcy, a potem wybierz inne repozytorium.",
       "branchEmpty": "Brak dostępnych gałęzi",

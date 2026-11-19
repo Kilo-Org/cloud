@@ -2226,6 +2226,7 @@
       "branchDefault": "Ofumaan",
       "branchAccessibility": "Damee: {{label}}",
       "branchLoading": "Dameewwan fe'amaa jiru",
+      "branchInactive": "Dameewwan isaa fe'uuf kuusaa koodii filadhu.",
       "branchLoadError": "Dameewwan fe'uu hin danda'amne",
       "branchUnavailable": "Kuusaa koodii kanaaf dameewwan hin argaman. Hayyama waltajjii waliin qabdu ilaali, erga kanaan booda kuusaa koodii bira filadhu.",
       "branchEmpty": "Damee hin jiru",

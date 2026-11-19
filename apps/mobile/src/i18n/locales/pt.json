@@ -2276,6 +2276,7 @@
       "branchDefault": "Predefinido",
       "branchAccessibility": "Ramo: {{label}}",
       "branchLoading": "A carregar ramos",
+      "branchInactive": "Seleciona um repositório para carregar os ramos dele.",
       "branchLoadError": "Não foi possível carregar os ramos",
       "branchUnavailable": "Não há ramos disponíveis para este repositório. Verifica o teu acesso junto do fornecedor e escolhe outro repositório.",
       "branchEmpty": "Nenhum ramo disponível",

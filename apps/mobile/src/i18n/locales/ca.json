@@ -2270,6 +2270,7 @@
       "branchDefault": "Per defecte",
       "branchAccessibility": "Branca: {{label}}",
       "branchLoading": "Carregant branques",
+      "branchInactive": "Selecciona un repositori per carregar les seves branques.",
       "branchLoadError": "No s'han pogut carregar les branques",
       "branchUnavailable": "No hi ha branques disponibles per a aquest repositori. Comprova el teu accés amb el proveïdor i tria un altre repositori.",
       "branchEmpty": "No hi ha branques disponibles",

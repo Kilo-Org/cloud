@@ -2292,6 +2292,7 @@
       "branchDefault": "Default",
       "branchAccessibility": "Branch: {{label}}",
       "branchLoading": "Loading branches",
+      "branchInactive": "Choose a repository to load its branches",
       "branchLoadError": "Couldn't load branches",
       "branchUnavailable": "Branches aren't available for this repository. Check your access with the provider, then pick another repository.",
       "branchEmpty": "No branches available",

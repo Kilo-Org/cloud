@@ -2226,6 +2226,7 @@
       "branchDefault": "Parazgjedhje",
       "branchAccessibility": "Dega: {{label}}",
       "branchLoading": "Degët po ngarkohen",
+      "branchInactive": "Zgjidh një depo për të ngarkuar degët e tij.",
       "branchLoadError": "Degët nuk u ngarkuan dot",
       "branchUnavailable": "Nuk ka degë të disponueshme për këtë depo. Kontrollo aksesin tënd te ofruesi, pastaj përzgjidh një depo tjetër.",
       "branchEmpty": "Nuk ka degë të disponueshme",

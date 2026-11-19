@@ -1683,6 +1683,7 @@
       "branchDefault": "Mặc định",
       "branchAccessibility": "Nhánh: {{label}}",
       "branchLoading": "Đang tải các nhánh",
+      "branchInactive": "Chọn một kho mã để tải các nhánh của kho đó.",
       "branchLoadError": "Không tải được các nhánh",
       "branchUnavailable": "Không có nhánh khả dụng cho kho mã nguồn này. Kiểm tra quyền truy cập của bạn với nhà cung cấp, rồi chọn kho mã nguồn khác.",
       "branchEmpty": "Không có nhánh khả dụng",

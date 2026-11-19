@@ -2226,6 +2226,7 @@
       "branchDefault": "Standart",
       "branchAccessibility": "Tarmoq: {{label}}",
       "branchLoading": "Tarmoqlar yuklanmoqda",
+      "branchInactive": "Tarmoqlarini yuklash uchun repozitoriya tanlang.",
       "branchLoadError": "Tarmoqlarni yuklab bo‘lmadi",
       "branchUnavailable": "Ushbu repozitoriy uchun tarmoqlar mavjud emas. Provayderdagi kirish huquqingizni tekshiring, so‘ng boshqa repozitoriy tanlang.",
       "branchEmpty": "Mavjud tarmoqlar yo‘q",

@@ -2358,6 +2358,7 @@
       "branchDefault": "Predefinit",
       "branchAccessibility": "Fergħa: {{label}}",
       "branchLoading": "Tagħbija tal-fergħat",
+      "branchInactive": "Agħżel repożitorju biex jitgħabbew il-fergħat tiegħu.",
       "branchLoadError": "Ma setgħetx titgħabba l-fergħat",
       "branchUnavailable": "M'hemmx fergħat disponibbli għal dan ir-repożitorju. Iċċekkja l-aċċess tiegħek mal-fornitur, imbagħad agħżel repożitorju ieħor.",
       "branchEmpty": "Ebda fergħa disponibbli",

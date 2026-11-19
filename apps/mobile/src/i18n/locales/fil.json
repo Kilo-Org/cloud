@@ -2226,6 +2226,7 @@
       "branchDefault": "Default",
       "branchAccessibility": "Sangay: {{label}}",
       "branchLoading": "Ini-load ang mga sangay",
+      "branchInactive": "Pumili ng imbakan ng code para ma-load ang mga sangay nito.",
       "branchLoadError": "Hindi ma-load ang mga sangay",
       "branchUnavailable": "Walang available na sangay para sa repositoryong ito. Suriin ang access mo sa provider, tapos pumili ng ibang repositoryo.",
       "branchEmpty": "Walang available na sangay",

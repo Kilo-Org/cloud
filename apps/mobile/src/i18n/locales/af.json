@@ -2226,6 +2226,7 @@
       "branchDefault": "Verstek",
       "branchAccessibility": "Tak: {{label}}",
       "branchLoading": "Takke word gelaai",
+      "branchInactive": "Kies 'n bewaarplek om sy takke te laai",
       "branchLoadError": "Takke kon nie gelaai word nie",
       "branchUnavailable": "Takke is nie beskikbaar vir hierdie bewaarplek nie. Gaan jou toegang by die verskaffer na en kies 'n ander bewaarplek.",
       "branchEmpty": "Geen takke beskikbaar nie",

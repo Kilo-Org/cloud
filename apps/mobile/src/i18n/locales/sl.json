@@ -2314,6 +2314,7 @@
       "branchDefault": "Privzeta",
       "branchAccessibility": "Veja: {{label}}",
       "branchLoading": "Nalaganje vej",
+      "branchInactive": "Izberi skladišče za nalaganje njegovih vej.",
       "branchLoadError": "Vej ni bilo mogoče naložiti",
       "branchUnavailable": "Veje za to skladišče niso na voljo. Preveri svoj dostop pri ponudniku in izberi drugo skladišče.",
       "branchEmpty": "Ni razpoložljivih vej",

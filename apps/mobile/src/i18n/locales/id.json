@@ -1683,6 +1683,7 @@
       "branchDefault": "Bawaan",
       "branchAccessibility": "Cabang: {{label}}",
       "branchLoading": "Memuat cabang",
+      "branchInactive": "Pilih repositori untuk memuat cabangnya.",
       "branchLoadError": "Tidak dapat memuat cabang",
       "branchUnavailable": "Cabang tidak tersedia untuk repositori ini. Periksa aksesmu ke penyedia, lalu pilih repositori lain.",
       "branchEmpty": "Tidak ada cabang yang tersedia",

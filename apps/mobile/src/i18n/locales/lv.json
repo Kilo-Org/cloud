@@ -2270,6 +2270,7 @@
       "branchDefault": "Noklusējuma",
       "branchAccessibility": "Atzars: {{label}}",
       "branchLoading": "Notiek atzaru ielāde",
+      "branchInactive": "Izvēlies repozitoriju, lai ielādētu tā atzarus.",
       "branchLoadError": "Neizdevās ielādēt atzarus",
       "branchUnavailable": "Šim repozitorijam atzari nav pieejami. Pārbaudi savas tiesības pie pakalpojumu sniedzēja un izvēlies citu repozitoriju.",
       "branchEmpty": "Nav pieejamu atzaru",

@@ -1683,6 +1683,7 @@
       "branchDefault": "預設",
       "branchAccessibility": "分支: {{label}}",
       "branchLoading": "正在載入分支",
+      "branchInactive": "選取一個存放庫以載入其分支。",
       "branchLoadError": "無法載入分支",
       "branchUnavailable": "此存放庫沒有可用的分支。檢查你在供應商處的存取權限，然後選取另一個存放庫。",
       "branchEmpty": "沒有可用的分支",

@@ -2226,6 +2226,7 @@
       "branchDefault": "Standard",
       "branchAccessibility": "Gren: {{label}}",
       "branchLoading": "Läser in grenar",
+      "branchInactive": "Välj ett kodarkiv för att läsa in dess grenar.",
       "branchLoadError": "Kunde inte läsa in grenar",
       "branchUnavailable": "Inga grenar är tillgängliga för det här kodarkivet. Kontrollera din åtkomst hos leverantören och välj ett annat kodarkiv.",
       "branchEmpty": "Inga grenar tillgängliga",

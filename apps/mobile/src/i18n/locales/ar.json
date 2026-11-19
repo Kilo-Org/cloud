@@ -1767,6 +1767,7 @@
       "branchDefault": "افتراضي",
       "branchAccessibility": "الفرع: {{label}}",
       "branchLoading": "جارٍ تحميل الفروع",
+      "branchInactive": "اختر مستودعًا لتحميل فروعه.",
       "branchLoadError": "تعذّر تحميل الفروع",
       "branchUnavailable": "الفروع غير متاحة لهذا المستودع. تحقق من صلاحيتك لدى المزوّد، ثم اختر مستودعًا آخر.",
       "branchEmpty": "لا توجد فروع متاحة",

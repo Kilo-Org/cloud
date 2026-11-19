@@ -2226,6 +2226,7 @@
       "branchDefault": "Lalai",
       "branchAccessibility": "Cabang: {{label}}",
       "branchLoading": "Memuatkan cabang",
+      "branchInactive": "Pilih repositori untuk memuatkan cabangnya.",
       "branchLoadError": "Tidak dapat memuatkan cabang",
       "branchUnavailable": "Cabang tidak tersedia untuk repositori ini. Semak akses anda dengan penyedia, kemudian pilih repositori lain.",
       "branchEmpty": "Tiada cabang tersedia",

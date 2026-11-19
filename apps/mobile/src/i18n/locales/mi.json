@@ -2226,6 +2226,7 @@
       "branchDefault": "Taunoa",
       "branchAccessibility": "Peka: {{label}}",
       "branchLoading": "E uta ana i ngā peka",
+      "branchInactive": "Kōwhiria he pūranga waehere kia utaina ai ōna peka.",
       "branchLoadError": "Kāore i taea te uta i ngā peka",
       "branchUnavailable": "Kāore ngā peka e wātea ana mō tēnei pūranga waehere. Tirohia tō urunga ki te kaiwhakarato, kātahi ka kōwhiri i tētahi atu pūranga waehere.",
       "branchEmpty": "Kāore he peka e wātea ana",

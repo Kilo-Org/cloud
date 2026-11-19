@@ -2226,6 +2226,7 @@
       "branchDefault": "Ìpìlẹ̀",
       "branchAccessibility": "Ẹ̀ka: {{label}}",
       "branchLoading": "Ń gbé àwọn ẹ̀ka wọlé",
+      "branchInactive": "Yan ibi ìpamọ́ kóòdù láti gbé àwọn ẹ̀ka rẹ̀ wọlé.",
       "branchLoadError": "A kò lè gbé àwọn ẹ̀ka wọlé",
       "branchUnavailable": "Àwọn ẹ̀ka kò sí fún ibi ìpamọ́ kóòdù yìí. Ṣàyẹ̀wò àṣẹ rẹ pẹ̀lú olùpèsè, lẹ́yìn náà yan ibi ìpamọ́ kóòdù mìíràn.",
       "branchEmpty": "Kò sí ẹ̀ka kankan",

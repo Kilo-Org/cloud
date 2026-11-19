@@ -2270,6 +2270,7 @@
       "branchDefault": "Implicit",
       "branchAccessibility": "Ramură: {{label}}",
       "branchLoading": "Se încarcă ramurile",
+      "branchInactive": "Selectează un depozit pentru a-i încărca ramurile.",
       "branchLoadError": "Nu s-au putut încărca ramurile",
       "branchUnavailable": "Nu există ramuri disponibile pentru acest depozit. Verifică-ți accesul la furnizor, apoi alege alt depozit.",
       "branchEmpty": "Nicio ramură disponibilă",

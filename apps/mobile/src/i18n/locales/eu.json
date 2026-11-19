@@ -2226,6 +2226,7 @@
       "branchDefault": "Lehenetsia",
       "branchAccessibility": "Adarra: {{label}}",
       "branchLoading": "Adarrak kargatzen",
+      "branchInactive": "Hautatu biltegi bat bere adarrak kargatzeko.",
       "branchLoadError": "Ezin izan dira adarrak kargatu",
       "branchUnavailable": "Ez dago adarrik eskuragarri biltegi honetarako. Egiaztatu hornitzailearekin duzun sarbidea eta hautatu beste biltegi bat.",
       "branchEmpty": "Ez dago adarrik eskuragarri",

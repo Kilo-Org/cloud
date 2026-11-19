@@ -1704,6 +1704,7 @@
       "branchDefault": "ברירת מחדל",
       "branchAccessibility": "ענף: {{label}}",
       "branchLoading": "טוען ענפים",
+      "branchInactive": "בחרו מאגר כדי לטעון את הענפים שלו.",
       "branchLoadError": "לא ניתן היה לטעון את הענפים",
       "branchUnavailable": "הענפים אינם זמינים למאגר הזה. בדקו את הגישה שלך מול הספק, ואז בחרו מאגר אחר.",
       "branchEmpty": "אין ענפים זמינים",

@@ -2226,6 +2226,7 @@
       "branchDefault": "Okuzenzakalelayo",
       "branchAccessibility": "Igatsha: {{label}}",
       "branchLoading": "Kulayishwa amagatsha",
+      "branchInactive": "Khetha inqolobane yekhodi ukuze kulayishwe amagatsha ayo.",
       "branchLoadError": "Kwehlulekile ukulayisha amagatsha",
       "branchUnavailable": "Amagatsha awatholakali kule nqolobane yekhodi. Hlola ukufinyelela kwakho kumhlinzeki, bese ukhetha enye inqolobane yekhodi.",
       "branchEmpty": "Akukho gatsha elitholakalayo",

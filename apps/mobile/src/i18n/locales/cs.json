@@ -2314,6 +2314,7 @@
       "branchDefault": "Výchozí",
       "branchAccessibility": "Větev: {{label}}",
       "branchLoading": "Načítání větví",
+      "branchInactive": "Vyberte repozitář, aby se načetly jeho větve.",
       "branchLoadError": "Větve se nepodařilo načíst",
       "branchUnavailable": "Pro tento repozitář nejsou větve dostupné. Zkontroluj svůj přístup u poskytovatele a vyber jiný repozitář.",
       "branchEmpty": "Žádné dostupné větve",

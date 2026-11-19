@@ -2358,6 +2358,7 @@
       "branchDefault": "Réamhshocraithe",
       "branchAccessibility": "Brainse: {{label}}",
       "branchLoading": "Ag lódáil brainsí",
+      "branchInactive": "Roghnaigh stór lena chraoinsí a lódáil.",
       "branchLoadError": "Níorbh fhéidir na brainsí a lódáil",
       "branchUnavailable": "Níl brainsí ar fáil don stór seo. Seiceáil do rochtain leis an soláthraí, ansin roghnaigh stór eile.",
       "branchEmpty": "Níl aon bhrainse ar fáil",

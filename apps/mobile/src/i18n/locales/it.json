@@ -1671,6 +1671,7 @@
       "branchDefault": "Predefinito",
       "branchAccessibility": "Branch: {{label}}",
       "branchLoading": "Caricamento dei branch",
+      "branchInactive": "Seleziona un repository per caricare i suoi branch.",
       "branchLoadError": "Impossibile caricare i branch",
       "branchUnavailable": "Nessun branch disponibile per questo repository. Verifica i tuoi accessi con il provider, poi scegli un altro repository.",
       "branchEmpty": "Nessun branch disponibile",

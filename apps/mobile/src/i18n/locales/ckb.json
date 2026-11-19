@@ -2226,6 +2226,7 @@
       "branchDefault": "بنەڕەتی",
       "branchAccessibility": "لق: {{label}}",
       "branchLoading": "لقەکان باردەکرێن",
+      "branchInactive": "کۆگایەک هەڵبژێرە بۆ بارکردنی لقەکانی.",
       "branchLoadError": "نەتوانرا لقەکان بار بکرێن",
       "branchUnavailable": "لقەکان بۆ ئەم کۆگایە بەردەست نین. مۆڵەتەکانت لەگەڵ پێشکەشکار بپشکنە، پاشان کۆگایەکی تر هەڵبژێرە.",
       "branchEmpty": "هیچ لقێک بەردەست نییە",

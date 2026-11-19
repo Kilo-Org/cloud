@@ -1683,6 +1683,7 @@
       "branchDefault": "Standaard",
       "branchAccessibility": "Branch: {{label}}",
       "branchLoading": "Branches laden",
+      "branchInactive": "Selecteer een repository om zijn branches te laden.",
       "branchLoadError": "Branches konden niet worden geladen",
       "branchUnavailable": "Er zijn geen branches beschikbaar voor deze repository. Controleer je toegang bij de provider en kies een andere repository.",
       "branchEmpty": "Geen branches beschikbaar",

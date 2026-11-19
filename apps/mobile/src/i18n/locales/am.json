@@ -2226,6 +2226,7 @@
       "branchDefault": "ነባሪ",
       "branchAccessibility": "ቅርንጫፍ፦ {{label}}",
       "branchLoading": "ቅርንጫፎች በመጫን ላይ",
+      "branchInactive": "ቅርንጫፎቹ እንዲጫኑ ማከማቻ ይምረጡ።",
       "branchLoadError": "ቅርንጫፎችን መጫን አልተቻለም",
       "branchUnavailable": "ለዚህ ማከማቻ ቅርንጫፎች አይገኙም። ከአቅራቢው ጋር ያለዎትን መዳረስ ያረጋግጡ፣ ከዚያ ሌላ ማከማቻ ይምረጡ።",
       "branchEmpty": "ምንም ቅርንጫፎች አይገኙም",

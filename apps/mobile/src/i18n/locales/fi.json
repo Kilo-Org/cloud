@@ -2226,6 +2226,7 @@
       "branchDefault": "Oletus",
       "branchAccessibility": "Haara: {{label}}",
       "branchLoading": "Ladataan haaroja",
+      "branchInactive": "Valitse koodivarasto, jotta sen haarat latautuvat.",
       "branchLoadError": "Haarojen lataaminen epäonnistui",
       "branchUnavailable": "Tämän koodivaraston haarat eivät ole käytettävissä. Tarkista pääsysi palveluntarjoajalta ja valitse toinen koodivarasto.",
       "branchEmpty": "Haaroja ei ole käytettävissä",

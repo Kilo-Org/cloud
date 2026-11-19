@@ -2402,6 +2402,7 @@
       "branchDefault": "Rhagosodedig",
       "branchAccessibility": "Cangen: {{label}}",
       "branchLoading": "Yn llwytho ceangau",
+      "branchInactive": "Dewiswch ystorfa i lwytho ei cheangau.",
       "branchLoadError": "Ni lwyddwyd i lwytho ceangau",
       "branchUnavailable": "Nid yw ceangau ar gael ar gyfer yr ystorfa hon. Gwiriwch eich mynediad gyda'r darparwr, yna dewiswch ystorfa arall.",
       "branchEmpty": "Dim ceangau ar gael",

@@ -2226,6 +2226,7 @@
       "branchDefault": "Defolt",
       "branchAccessibility": "Budaq: {{label}}",
       "branchLoading": "Budaqlar yüklənir",
+      "branchInactive": "Budaqlarının yüklənməsi üçün repozitoriya seç.",
       "branchLoadError": "Budaqları yükləmək mümkün olmadı",
       "branchUnavailable": "Bu repozitoriya üçün budaq əlçatan deyil. Provayderdəki icazələrini yoxla, sonra başqa repozitoriya seç.",
       "branchEmpty": "Əlçatan budaq yoxdur",

@@ -1600,6 +1600,7 @@
       "branchDefault": "Par défaut",
       "branchAccessibility": "Branche : {{label}}",
       "branchLoading": "Chargement des branches",
+      "branchInactive": "Sélectionnez un dépôt pour charger ses branches.",
       "branchLoadError": "Impossible de charger les branches",
       "branchUnavailable": "Aucune branche n'est disponible pour ce dépôt. Vérifiez votre accès auprès du fournisseur, puis choisissez un autre dépôt.",
       "branchEmpty": "Aucune branche disponible",

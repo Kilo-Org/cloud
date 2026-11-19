@@ -349,22 +349,34 @@ const HORIZONTAL_PADDING = /^-?(?:p|px|pl|pr|ps|pe)-/;
 function stringChunks(root, text) {
   const chunks = [];
   walk(root, node => {
-    if (node.type === 'Literal') {
-      const value = stringLiteralValue(node);
-      if (value === null) {
-        return;
-      }
-      chunks.push({ start: node.start, raw: text.slice(node.start, node.end), value });
-    } else if (node.type === 'TemplateElement') {
-      // The node spans its delimiters; the chunk itself starts just inside.
-      chunks.push({
-        start: node.start + 1,
-        raw: node.value.raw,
-        value: node.value.cooked ?? node.value.raw,
-      });
+    const chunk = chunkOf(node, text);
+    if (chunk !== null) {
+      chunks.push(chunk);
     }
   });
   return chunks;
+}
+
+/**
+ * The string chunk one node holds, or null when it holds none: a string
+ * `Literal`, or a `TemplateElement`, whose node spans its delimiters so the
+ * chunk itself starts just inside.
+ */
+function chunkOf(node, text) {
+  if (node.type === 'Literal') {
+    const value = stringLiteralValue(node);
+    return value === null
+      ? null
+      : { start: node.start, raw: text.slice(node.start, node.end), value };
+  }
+  if (node.type === 'TemplateElement') {
+    return {
+      start: node.start + 1,
+      raw: node.value.raw,
+      value: node.value.cooked ?? node.value.raw,
+    };
+  }
+  return null;
 }
 
 /** The source of a JSX tag's name, `ScrollView` or `Animated.ScrollView` alike. */
@@ -1328,18 +1340,9 @@ function fileFacts(program, text) {
   const imports = [];
   const calls = [];
   walk(program, node => {
-    if (node.type === 'Literal') {
-      const value = stringLiteralValue(node);
-      if (value !== null) {
-        chunks.push({ start: node.start, raw: text.slice(node.start, node.end), value });
-      }
-    } else if (node.type === 'TemplateElement') {
-      // The node spans its delimiters; the chunk itself starts just inside.
-      chunks.push({
-        start: node.start + 1,
-        raw: node.value.raw,
-        value: node.value.cooked ?? node.value.raw,
-      });
+    const chunk = chunkOf(node, text);
+    if (chunk !== null) {
+      chunks.push(chunk);
     } else if (node.type === 'JSXOpeningElement') {
       elements.push(node);
     } else if (node.type === 'ImportDeclaration') {

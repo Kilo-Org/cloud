@@ -589,6 +589,11 @@ export async function preflightSessionCreation(
   );
   await validateEndpoint?.(resolvedRequest);
 
+  // A prompt turn on a bearer without control-plane claims is validated here. A
+  // policy-bearing bearer is validated by `issueSessionRuntimeAuthorization` after
+  // the runtime authorization exists, and a command turn dispatches no model; the
+  // persisted session model is enforced at inference time by the AI gateway
+  // (`resolveProviderAndPolicy` -> `getEffectiveModelDecision`).
   if (resolvedRequest.initialTurn?.type === 'prompt' && !isPolicyBearingAuthToken(ctx.authToken)) {
     await assertKiloModelAvailable({
       env: ctx.env,

@@ -977,6 +977,11 @@ async function issueSessionRuntimeAuthorization(
       token: created.token,
       seal: await sealRuntimeAuthorization(created.authorization, nextAuthSecret),
     };
+    // A prompt turn dispatches the session model in this request, so the catalogue
+    // preflight refuses an unavailable model here. A command turn dispatches no
+    // model; the model persisted on the session is enforced at inference time by
+    // the AI gateway, where `resolveProviderAndPolicy` -> `routeRejection` ->
+    // `getEffectiveModelDecision` answers `model_not_allowed` before any upstream call.
     if (initialTurn?.type === 'prompt') {
       await assertKiloModelAvailable({
         env: ctx.env,

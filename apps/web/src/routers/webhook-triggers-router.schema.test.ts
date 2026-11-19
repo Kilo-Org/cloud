@@ -56,43 +56,55 @@ const mockDbUpdate = jest.fn();
 const mockDbDelete = jest.fn();
 const mockFindAdmin = jest.fn<() => Promise<Partial<User> | undefined>>();
 const mockSelectWhere = jest.fn<(condition?: SQL) => Promise<Array<Record<string, unknown>>>>();
+const mockSelectSessions = jest.fn<() => Promise<Array<Record<string, unknown>>>>(() =>
+  Promise.resolve([])
+);
 const mockSelectChat = jest.fn<() => Promise<Array<Record<string, unknown>>>>();
 
-jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
-  db: {
-    query: { kilocode_users: { findFirst: mockFindAdmin } },
-    select: () => ({
-      from: () => ({
-        leftJoin: () => ({ where: () => ({ limit: mockSelectChat }) }),
-        where: (condition?: SQL) => {
-          const result = mockSelectWhere(condition);
-          return {
-            limit: () => result,
-            orderBy: () => result,
-            then: result.then.bind(result),
-          };
-        },
+jest.mock('@kilocode/web-shared/lib/drizzle', () => {
+  const { cliSessions, cli_sessions_v2 } = jest.requireActual('@kilocode/db/schema') as {
+    cliSessions: unknown;
+    cli_sessions_v2: unknown;
+  };
+  return {
+    db: {
+      query: { kilocode_users: { findFirst: mockFindAdmin } },
+      select: () => ({
+        from: (table: unknown) => ({
+          leftJoin: () => ({ where: () => ({ limit: mockSelectChat }) }),
+          where: (condition?: SQL) => {
+            const result =
+              table === cliSessions || table === cli_sessions_v2
+                ? mockSelectSessions()
+                : mockSelectWhere(condition);
+            return {
+              limit: () => result,
+              orderBy: () => result,
+              then: result.then.bind(result),
+            };
+          },
+        }),
       }),
-    }),
-    insert: mockDbInsert.mockImplementation(() => ({
-      values: () => ({
-        returning: () =>
-          Promise.resolve([
-            {
-              id: '00000000-0000-4000-8000-000000000002',
-              created_at: '2026-01-01T00:00:00.000Z',
-            },
-          ]),
-      }),
-    })),
-    update: mockDbUpdate.mockImplementation(() => ({
-      set: () => ({ where: () => Promise.resolve() }),
-    })),
-    delete: mockDbDelete.mockImplementation(() => ({
-      where: () => Promise.resolve(),
-    })),
-  },
-}));
+      insert: mockDbInsert.mockImplementation(() => ({
+        values: () => ({
+          returning: () =>
+            Promise.resolve([
+              {
+                id: '00000000-0000-4000-8000-000000000002',
+                created_at: '2026-01-01T00:00:00.000Z',
+              },
+            ]),
+        }),
+      })),
+      update: mockDbUpdate.mockImplementation(() => ({
+        set: () => ({ where: () => Promise.resolve() }),
+      })),
+      delete: mockDbDelete.mockImplementation(() => ({
+        where: () => Promise.resolve(),
+      })),
+    },
+  };
+});
 
 jest.mock('@/lib/webhook-agent/webhook-agent-client', () => ({
   buildInboundUrl: jest.fn(() => 'https://inbound'),
@@ -1757,6 +1769,62 @@ describe('webhook trigger request listing', () => {
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
 
     expect(mockDbDelete).not.toHaveBeenCalled();
+  });
+
+  const capturedRequest = (cloudAgentSessionId: string) => ({
+    id: crypto.randomUUID(),
+    timestamp: '2026-01-01T00:00:00.000Z',
+    method: 'POST',
+    path: '/',
+    queryString: null,
+    headers: {},
+    body: '',
+    contentType: null,
+    sourceIp: null,
+    startedAt: null,
+    completedAt: null,
+    processStatus: 'success' as const,
+    cloudAgentSessionId,
+    errorMessage: null,
+    triggerSource: 'webhook' as const,
+  });
+
+  it('resolves session ids from cli_sessions_v2 only by default', async () => {
+    const bothId = crypto.randomUUID();
+    const v1OnlyId = crypto.randomUUID();
+    mockListWorkerRequests.mockResolvedValueOnce({
+      success: true,
+      requests: [capturedRequest(bothId), capturedRequest(v1OnlyId)],
+    });
+    mockSelectSessions.mockResolvedValueOnce([
+      { cloudAgentSessionId: bothId, sessionId: 'ses_v2_both' },
+    ]);
+
+    const requests = await createCaller({ user }).listRequests({ triggerId: 'trigger-id' });
+
+    expect(requests.map(r => r.kiloSessionId)).toEqual(['ses_v2_both', null]);
+  });
+
+  it('resolves legacy v1 session ids when includeLegacySessionIds is set', async () => {
+    const bothId = crypto.randomUUID();
+    const v1OnlyId = crypto.randomUUID();
+    mockListWorkerRequests.mockResolvedValueOnce({
+      success: true,
+      requests: [capturedRequest(bothId), capturedRequest(v1OnlyId)],
+    });
+    mockSelectSessions
+      .mockResolvedValueOnce([
+        { cloudAgentSessionId: bothId, sessionId: 'ses_v1_both' },
+        { cloudAgentSessionId: v1OnlyId, sessionId: 'ses_v1_only' },
+      ])
+      .mockResolvedValueOnce([]);
+
+    const requests = await createCaller({ user }).listRequests({
+      triggerId: 'trigger-id',
+      includeLegacySessionIds: true,
+    });
+
+    expect(requests.map(r => r.kiloSessionId)).toEqual(['ses_v1_both', 'ses_v1_only']);
   });
 });
 

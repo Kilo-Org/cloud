@@ -3493,7 +3493,7 @@
       "nameLabel": "Nazwa organizacji",
       "nameRequired": "Wpisz nazwę organizacji.",
       "createdNotListed": "Organizacja została utworzona. Wkrótce pojawi się w selektorze.",
-      "trialNote": "Po utworzeniu organizacji rozpocznie się 14-dniowy okres próbny planu Enterprise. Plany kupuje się w wersji internetowej."
+      "trialNote": "Twoja pierwsza organizacja obejmuje 14-dniowy okres próbny planu Enterprise. Plany kupuje się w wersji internetowej."
     },
     "creditActivity": {
       "emptyDescription": "Tutaj na bieżąco pojawiają się doładowania, zużycie środków i korekty salda tej organizacji.",

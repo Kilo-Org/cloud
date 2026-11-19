@@ -3385,7 +3385,7 @@
       "nameLabel": "Təşkilatın adı",
       "nameRequired": "Təşkilatın adını daxil edin.",
       "createdNotListed": "Təşkilat yaradıldı. Qısa müddət ərzində seçicidə görünəcək.",
-      "trialNote": "14 günlük Enterprise sınaq müddətiniz təşkilatı yaratdığınız zaman başlayır. Planlar vebdə alınır."
+      "trialNote": "İlk təşkilatınız 14 günlük Enterprise sınaq müddətini əhatə edir. Planlar vebdə alınır."
     },
     "creditActivity": {
       "emptyDescription": "Bu təşkilatın alışları, kredit istifadəsi və kredit düzəlişləri baş verdikcə burada görünəcək.",

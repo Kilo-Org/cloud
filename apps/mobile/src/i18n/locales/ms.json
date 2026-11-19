@@ -3385,7 +3385,7 @@
       "nameLabel": "Nama organisasi",
       "nameRequired": "Masukkan nama organisasi.",
       "createdNotListed": "Organisasi dicipta. Ia akan muncul dalam pemilih tidak lama lagi.",
-      "trialNote": "Percubaan Enterprise 14 hari anda bermula sebaik sahaja anda menciptanya. Pelan dibeli di web."
+      "trialNote": "Organisasi pertama anda termasuk percubaan Enterprise 14 hari. Pelan dibeli di web."
     },
     "creditActivity": {
       "emptyDescription": "Pembelian, penggunaan dan pelarasan kredit organisasi ini akan dipaparkan di sini apabila berlaku.",

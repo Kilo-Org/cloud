@@ -3385,7 +3385,7 @@
       "nameLabel": "Organisaation nimi",
       "nameRequired": "Anna organisaation nimi.",
       "createdNotListed": "Organisaatio on luotu. Se ilmestyy pian valitsimeen.",
-      "trialNote": "14 päivän Enterprise-kokeilusi alkaa, kun luot organisaation. Paketit ostetaan verkossa."
+      "trialNote": "Ensimmäinen organisaatiosi sisältää 14 päivän Enterprise-kokeilun. Paketit ostetaan verkossa."
     },
     "creditActivity": {
       "emptyDescription": "Organisaation ostot, käyttö ja krediittien muutokset näkyvät tässä sitä mukaa kuin niitä kertyy.",

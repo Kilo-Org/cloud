@@ -3443,7 +3443,7 @@
       "nameLabel": "Numele organizației",
       "nameRequired": "Introdu numele organizației.",
       "createdNotListed": "Organizația a fost creată. Va apărea în selector în curând.",
-      "trialNote": "Perioada de probă Enterprise de 14 zile începe când o creezi. Planurile se cumpără pe web."
+      "trialNote": "Prima ta organizație include o perioadă de probă Enterprise de 14 zile. Planurile se cumpără pe web."
     },
     "creditActivity": {
       "emptyDescription": "Achizițiile, consumul și ajustările de credite ale acestei organizații vor apărea aici pe măsură ce au loc.",

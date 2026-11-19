@@ -3377,7 +3377,7 @@
       "nameLabel": "組織名",
       "nameRequired": "組織名を入力してください。",
       "createdNotListed": "組織が作成されました。まもなくピッカーに表示されます。",
-      "trialNote": "作成すると、14日間のEnterpriseトライアルが始まります。プランはWebで購入できます。"
+      "trialNote": "最初の組織には14日間のEnterpriseトライアルが含まれます。プランはWebで購入できます。"
     },
     "creditActivity": {
       "emptyDescription": "この組織でクレジットの購入、利用、残高調整があると、ここに表示されます。",

@@ -3443,7 +3443,7 @@
       "nameLabel": "Naziv organizacije",
       "nameRequired": "Unesite naziv organizacije.",
       "createdNotListed": "Organizacija je kreirana. Uskoro će se pojaviti u biraču.",
-      "trialNote": "Vaš 14-dnevni probni period plana Enterprise počinje kada kreirate organizaciju. Planovi se kupuju na webu."
+      "trialNote": "Vaša prva organizacija uključuje 14-dnevni probni period plana Enterprise. Planovi se kupuju na webu."
     },
     "creditActivity": {
       "emptyDescription": "Ovdje će se prikazivati kupovine, potrošnja i korekcije kredita ove organizacije.",

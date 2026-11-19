@@ -3385,7 +3385,7 @@
       "nameLabel": "Pangalan ng organisasyon",
       "nameRequired": "Maglagay ng pangalan ng organisasyon.",
       "createdNotListed": "Nagawa na ang organisasyon. Lalabas ito sa picker sa ilang sandali.",
-      "trialNote": "Magsisimula ang iyong 14 na araw na Enterprise trial kapag ginawa mo ito. Sa web binibili ang mga plano."
+      "trialNote": "Kasama sa iyong unang organisasyon ang 14 na araw na Enterprise trial. Sa web binibili ang mga plano."
     },
     "creditActivity": {
       "emptyDescription": "Lalabas dito ang mga pagbili, paggamit, at pagsasaayos ng kredito para sa organisasyong ito habang nangyayari ang mga ito.",

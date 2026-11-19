@@ -3385,7 +3385,7 @@
       "nameLabel": "Nome da organización",
       "nameRequired": "Introduce un nome para a organización.",
       "createdNotListed": "Organización creada. Aparecerá no selector en breve.",
-      "trialNote": "A túa proba de 14 días de Enterprise comeza cando a crees. Os plans cómpranse na web."
+      "trialNote": "A túa primeira organización inclúe unha proba de 14 días de Enterprise. Os plans cómpranse na web."
     },
     "creditActivity": {
       "emptyDescription": "Aquí aparecerán as compras, o consumo e os axustes de créditos desta organización a medida que se produzan.",

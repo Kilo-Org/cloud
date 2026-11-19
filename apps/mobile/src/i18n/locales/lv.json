@@ -3443,7 +3443,7 @@
       "nameLabel": "Organizācijas nosaukums",
       "nameRequired": "Ievadiet organizācijas nosaukumu.",
       "createdNotListed": "Organizācija izveidota. Tā drīzumā parādīsies atlasītājā.",
-      "trialNote": "Jūsu 14 dienu Enterprise izmēģinājums sāksies, kad izveidosiet organizāciju. Plāni tiek iegādāti tīmeklī."
+      "trialNote": "Jūsu pirmā organizācija ietver 14 dienu Enterprise izmēģinājumu. Plāni tiek iegādāti tīmeklī."
     },
     "creditActivity": {
       "emptyDescription": "Šeit parādīsies informācija par šīs organizācijas kredītu pirkumiem, patēriņu un korekcijām.",

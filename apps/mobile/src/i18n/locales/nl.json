@@ -3377,7 +3377,7 @@
       "nameLabel": "Naam van organisatie",
       "nameRequired": "Voer een naam voor de organisatie in.",
       "createdNotListed": "Organisatie aangemaakt. Deze verschijnt binnenkort in de kiezer.",
-      "trialNote": "Je proefperiode van 14 dagen voor Enterprise begint zodra je de organisatie aanmaakt. Plannen koop je op het web."
+      "trialNote": "Je eerste organisatie bevat een proefperiode van 14 dagen voor Enterprise. Plannen koop je op het web."
     },
     "creditActivity": {
       "emptyDescription": "Hier verschijnen aankopen, verbruik en aanpassingen van het tegoed van deze organisatie zodra ze plaatsvinden.",

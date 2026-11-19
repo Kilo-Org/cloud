@@ -3443,7 +3443,7 @@
       "nameLabel": "Nom de l'organització",
       "nameRequired": "Introdueix un nom per a l'organització.",
       "createdNotListed": "Organització creada. Apareixerà aviat al selector.",
-      "trialNote": "La prova d'Enterprise de 14 dies comença quan la creïs. Els plans es compren al web."
+      "trialNote": "La teva primera organització inclou una prova d'Enterprise de 14 dies. Els plans es compren al web."
     },
     "creditActivity": {
       "emptyDescription": "Aquí apareixeran les compres, el consum i els ajustos de crèdits d'aquesta organització a mesura que es produeixin.",

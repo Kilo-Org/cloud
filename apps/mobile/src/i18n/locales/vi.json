@@ -3377,7 +3377,7 @@
       "nameLabel": "Tên tổ chức",
       "nameRequired": "Nhập tên tổ chức.",
       "createdNotListed": "Đã tạo tổ chức. Tổ chức sẽ sớm xuất hiện trong bộ chọn.",
-      "trialNote": "Bản dùng thử Enterprise 14 ngày sẽ bắt đầu khi bạn tạo tổ chức. Bạn mua gói trên web."
+      "trialNote": "Tổ chức đầu tiên của bạn bao gồm bản dùng thử Enterprise 14 ngày. Bạn mua gói trên web."
     },
     "creditActivity": {
       "emptyDescription": "Các khoản nạp tiền, chi phí sử dụng và điều chỉnh số dư của tổ chức sẽ xuất hiện tại đây khi phát sinh.",

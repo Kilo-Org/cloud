@@ -34,12 +34,15 @@ type StackNavigation = {
 /**
  * Creates an organization with the same defaults the web create flow uses:
  * `autoAddCreator` (the caller becomes its owner) and the enterprise plan's
- * 14-day trial, which the procedure applies. The name is the only field the
- * app asks for; the company domain is a web dashboard setting, not part of the
- * defaults this screen reproduces.
+ * 14-day trial, which the procedure applies only when the creator has not
+ * received one already. The name is the only field the app asks for; the
+ * company domain is a web dashboard setting, not part of the defaults this
+ * screen reproduces.
  *
- * Buying a plan stays on the web: this screen starts the trial, and the
- * organization's billing screen carries the destinations that change it.
+ * The screen states the offer for the first organization and never promises a
+ * window to a creator the procedure will not grant one to. Buying a plan stays
+ * on the web: the organization's billing screen carries the destinations that
+ * change it.
  */
 export function CreateOrganizationScreen() {
   const { t } = useTranslation();

@@ -3435,7 +3435,7 @@
       "nameLabel": "Nom de l'organisation",
       "nameRequired": "Saisissez un nom d'organisation.",
       "createdNotListed": "Organisation créée. Elle apparaîtra bientôt dans le sélecteur.",
-      "trialNote": "Votre essai Enterprise de 14 jours commence dès la création de l'organisation. Les formules s'achètent sur le web."
+      "trialNote": "Votre première organisation inclut un essai Enterprise de 14 jours. Les formules s'achètent sur le web."
     },
     "creditActivity": {
       "emptyDescription": "Les achats, la consommation et les ajustements de crédits de cette organisation apparaîtront ici au fur et à mesure.",

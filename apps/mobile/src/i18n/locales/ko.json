@@ -3377,7 +3377,7 @@
       "nameLabel": "조직 이름",
       "nameRequired": "조직 이름을 입력하세요.",
       "createdNotListed": "조직이 생성되었습니다. 곧 선택기에 표시됩니다.",
-      "trialNote": "조직을 만들면 14일간의 Enterprise 체험판이 시작됩니다. 요금제는 웹에서 구매할 수 있습니다."
+      "trialNote": "첫 번째 조직에는 14일간의 Enterprise 체험판이 포함됩니다. 요금제는 웹에서 구매할 수 있습니다."
     },
     "creditActivity": {
       "emptyDescription": "이 조직의 크레딧 구매, 사용 및 조정 내역이 여기에 표시됩니다.",

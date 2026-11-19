@@ -3464,7 +3464,7 @@
       "nameLabel": "Organization name",
       "nameRequired": "Enter an organization name.",
       "createdNotListed": "Organization created. It will appear in the picker shortly.",
-      "trialNote": "Your 14-day Enterprise trial starts when you create it. Plans are bought on the web."
+      "trialNote": "Your first organization includes a 14-day Enterprise trial. Plans are bought on the web."
     },
     "creditActivity": {
       "emptyDescription": "Purchases, usage, and credit adjustments for this organization will appear here as they happen.",

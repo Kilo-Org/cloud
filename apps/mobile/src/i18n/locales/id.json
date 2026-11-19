@@ -3377,7 +3377,7 @@
       "nameLabel": "Nama organisasi",
       "nameRequired": "Masukkan nama organisasi.",
       "createdNotListed": "Organisasi telah dibuat. Ia akan segera muncul di alat pilih.",
-      "trialNote": "Uji coba Enterprise 14 hari Anda dimulai saat Anda membuatnya. Paket dibeli di web."
+      "trialNote": "Organisasi pertama Anda mencakup uji coba Enterprise 14 hari. Paket dibeli di web."
     },
     "creditActivity": {
       "emptyDescription": "Setiap pembelian, penggunaan, dan penyesuaian kredit organisasi ini akan ditampilkan di sini.",

@@ -3385,7 +3385,7 @@
       "nameLabel": "Organisationens navn",
       "nameRequired": "Angiv et navn til organisationen.",
       "createdNotListed": "Organisation oprettet. Den vises i vælgeren om lidt.",
-      "trialNote": "Din 14-dages Enterprise-prøveperiode starter, når du opretter organisationen. Planer købes på nettet."
+      "trialNote": "Din første organisation inkluderer en 14-dages Enterprise-prøveperiode. Planer købes på nettet."
     },
     "creditActivity": {
       "emptyDescription": "Her vises organisationens køb, forbrug og justeringer af kreditter løbende.",

@@ -3449,7 +3449,7 @@
       "nameLabel": "Nome da organização",
       "nameRequired": "Introduza um nome para a organização.",
       "createdNotListed": "Organização criada. Aparecerá no seletor em breve.",
-      "trialNote": "O seu período experimental Enterprise de 14 dias começa quando a criar. Os planos são adquiridos na Web."
+      "trialNote": "A sua primeira organização inclui um período experimental Enterprise de 14 dias. Os planos são adquiridos na Web."
     },
     "creditActivity": {
       "emptyDescription": "As compras, a utilização e os ajustes de créditos desta organização aparecem aqui à medida que ocorrem.",

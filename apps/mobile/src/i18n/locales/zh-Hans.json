@@ -3377,7 +3377,7 @@
       "nameLabel": "组织名称",
       "nameRequired": "请输入组织名称。",
       "createdNotListed": "组织已创建。它很快会显示在选择器中。",
-      "trialNote": "创建组织后，14 天的 Enterprise 试用即开始。套餐需在网页上购买。"
+      "trialNote": "你的首个组织包含 14 天的 Enterprise 试用。套餐需在网页上购买。"
     },
     "creditActivity": {
       "emptyDescription": "此组织的充值、用量和额度调整记录将在这里显示。",

@@ -3501,7 +3501,7 @@
       "nameLabel": "Názov organizácie",
       "nameRequired": "Zadajte názov organizácie.",
       "createdNotListed": "Organizácia bola vytvorená. Čoskoro sa zobrazí vo výbere.",
-      "trialNote": "Po jej vytvorení sa spustí vaše 14-dňové skúšobné obdobie plánu Enterprise. Plány sa kupujú na webe."
+      "trialNote": "Vaša prvá organizácia zahŕňa 14-dňové skúšobné obdobie plánu Enterprise. Plány sa kupujú na webe."
     },
     "creditActivity": {
       "emptyDescription": "Tu sa budú priebežne zobrazovať nákupy, spotreba a úpravy kreditov tejto organizácie.",

@@ -3377,7 +3377,7 @@
       "nameLabel": "Kuruluş adı",
       "nameRequired": "Bir kuruluş adı girin.",
       "createdNotListed": "Kuruluş oluşturuldu. Kısa süre içinde seçicide görünecek.",
-      "trialNote": "14 günlük Enterprise denemeniz kuruluşu oluşturduğunuzda başlar. Planlar web üzerinden satın alınır."
+      "trialNote": "İlk kuruluşunuz 14 günlük Enterprise denemesi içerir. Planlar web üzerinden satın alınır."
     },
     "creditActivity": {
       "emptyDescription": "Bu kuruluşun satın alımları, kullanımı ve kredi düzeltmeleri gerçekleştikçe burada görünür.",

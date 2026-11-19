@@ -3501,7 +3501,7 @@
       "nameLabel": "Ime organizacije",
       "nameRequired": "Vnesite ime organizacije.",
       "createdNotListed": "Organizacija je ustvarjena. Kmalu bo prikazana v izbirniku.",
-      "trialNote": "Ko jo ustvarite, se začne vaš 14-dnevni preizkus načrta Enterprise. Načrte kupite na spletu."
+      "trialNote": "Vaša prva organizacija vključuje 14-dnevni preizkus načrta Enterprise. Načrte kupite na spletu."
     },
     "creditActivity": {
       "emptyDescription": "Tukaj se sproti prikazujejo nakupi, poraba in prilagoditve kreditov te organizacije.",

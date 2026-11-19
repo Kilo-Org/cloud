@@ -3501,7 +3501,7 @@
       "nameLabel": "Organizacijos pavadinimas",
       "nameRequired": "Įveskite organizacijos pavadinimą.",
       "createdNotListed": "Organizacija sukurta. Ji netrukus pasirodys rinkiklyje.",
-      "trialNote": "Sukūrus organizaciją prasidės 14 dienų Enterprise bandomasis laikotarpis. Planai perkami žiniatinklyje."
+      "trialNote": "Jūsų pirmoji organizacija apima 14 dienų Enterprise bandomąjį laikotarpį. Planai perkami žiniatinklyje."
     },
     "creditActivity": {
       "emptyDescription": "Čia bus rodomi šios organizacijos kreditų pirkimai, naudojimas ir koregavimai, kai jie įvyksta.",

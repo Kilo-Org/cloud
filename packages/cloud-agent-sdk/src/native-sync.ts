@@ -1367,7 +1367,9 @@ export class NativeSyncClient {
       },
       refresh: () => {
         if (closed) return;
-        // Reset before the restart: the new connection's first frame may arrive synchronously.
+        // Retire any in-flight recovery first: its cancel path publishes the replay-loss notice,
+        // which this reset then supersedes instead of leaving it set behind the retry.
+        recovery?.cancel();
         snapshotFailures = 0;
         snapshotFailure = undefined;
         lastSeq = undefined;

@@ -1045,6 +1045,38 @@ test('a retry keeps a more specific transcript notice', async () => {
   connection.close();
 });
 
+test('a retry during a recovery still settles the transcript', async () => {
+  snapshot.mockResolvedValueOnce(incomplete(5));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  connectedSocket(0).frame('hello', hello(), 3);
+  await flush();
+  // A live frame is retained for replay while recovery waits out its backoff.
+  await jest.advanceTimersByTimeAsync(250);
+  connectedSocket(0).frame(
+    'session.text.delta',
+    { syncPosition: 6, data: { data: { assistantMessageID: 'msg_m', ordinal: 0, delta: 'live' } } },
+    4,
+    'events'
+  );
+  await flush();
+  snapshot.mockResolvedValueOnce(complete(6));
+  connection.refresh();
+  await flush();
+  connectedSocket(1).frame('hello', hello(), 8);
+  await flush();
+  connectedSocket(1).frame('subscribed', { seq: 8 }, 8);
+  await flush();
+  expect(state?.error).toBeUndefined();
+  expect(state?.messages[0]?.message.incomplete).toBeUndefined();
+  expect(state?.connection).toBe('connected');
+  connection.close();
+});
+
 test('an unreadable native asset latches on the first snapshot read', async () => {
   snapshot.mockRejectedValueOnce(
     Object.assign(new Error('asset file is not readable'), { code: 'native_asset_not_found' })

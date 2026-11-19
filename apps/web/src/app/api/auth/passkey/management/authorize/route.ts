@@ -213,8 +213,13 @@ export const POST = withRestTiming(AUTHORIZE_PATH, async (request: Request) => {
 
   // Redeem the ticket the account check above read. A concurrent request can
   // win the single redemption between the read and here; that request mints
-  // its own grant, so this one is dropped.
-  const redeemed = await consumeSignInTicket(data.ticket);
+  // its own grant, so this one is dropped. A redemption that fails rather than
+  // answering drops it too, so a fault cannot leave a usable grant behind.
+  const redeemed = await consumeSignInTicket(data.ticket).catch(async (error: unknown) => {
+    await discardPasskeyManagementAuthorization(minted.id).catch(() => undefined);
+    throw error;
+  });
+
   if (!redeemed || redeemed.kilo_user_id !== auth.user.id) {
     await discardPasskeyManagementAuthorization(minted.id).catch(() => undefined);
     return NextResponse.json({ error: 'INVALID_TICKET' }, { status: 401 });

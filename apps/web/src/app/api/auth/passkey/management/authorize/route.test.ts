@@ -647,4 +647,20 @@ describe('POST /api/auth/passkey/management/authorize', () => {
     expect(mockDiscardPasskeyManagementAuthorization).toHaveBeenCalledTimes(1);
     await expect(grantCount(user.id)).resolves.toBe(0);
   });
+
+  it('drops the minted grant when the redemption fails', async () => {
+    const user = await insertTestUser();
+    const deviceSessionId = await insertNativeSession(user.id);
+    authenticate(user, deviceSessionId);
+    const ticket = await createSignInTicket(user.id);
+    mockConsumeSignInTicket.mockRejectedValueOnce(new Error('ticket table unavailable'));
+
+    await expect(
+      POST(createRequest({ proof: 'passkey', operation: 'remove', ticket, admission }))
+    ).rejects.toThrow('ticket table unavailable');
+
+    // A fault while redeeming must not leave a grant that still authorizes the
+    // operation for its lifetime.
+    await expect(grantCount(user.id)).resolves.toBe(0);
+  });
 });

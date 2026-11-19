@@ -624,6 +624,7 @@ function makeManager() {
       isLoading: { value: false },
       isRefreshingCachedTranscript: { value: false },
       error: { value: null },
+      failedHistoryKind: { value: null },
       fetchedSessionData: {
         value: {
           associatedPr: null,

@@ -120,6 +120,8 @@ const NO_DESTINATION_ERROR =
 const ENDED_SESSION_LIMIT = 256;
 const ENDED_SESSION_TTL_MS = 10 * 60_000;
 const NO_ACTIVE_TAB_ERROR = 'The browser has no active tab to share.';
+const SHARED_TAB_HELD_ERROR =
+  'The active tab belongs to another agent session. Switch to another tab, then share again.';
 const SESSION_NOT_OPEN_ERROR = 'This agent session is not open.';
 const SESSION_STOPPED_ERROR = 'The user stopped this agent session.';
 
@@ -510,11 +512,10 @@ export const createRuntimeBrowserBridge = ({
   };
 
   return {
-    adopt: async input => {
+    adopt: input => {
       ended.delete(input.sessionHandle);
-      await runtime().adoptEnded({ sessionHandle: input.sessionHandle });
 
-      return {};
+      return runtime().adoptEnded({ sessionHandle: input.sessionHandle });
     },
 
     callTool: async (controllerId, params) => {
@@ -572,8 +573,16 @@ export const createRuntimeBrowserBridge = ({
 
       const shared = await runtime().shareActiveTab({ sessionHandle: input.sessionHandle });
 
-      if (shared.tabId === 0) {
+      if (shared.kind === 'no_tab') {
         throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.blocked, NO_ACTIVE_TAB_ERROR);
+      }
+
+      if (shared.kind === 'held') {
+        throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.blocked, SHARED_TAB_HELD_ERROR);
+      }
+
+      if (shared.kind === 'no_session') {
+        throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.blocked, SESSION_NOT_OPEN_ERROR);
       }
 
       return {

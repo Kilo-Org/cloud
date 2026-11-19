@@ -63,9 +63,11 @@ import {
   SECTION_ACTION_LABEL_LINE_DP,
   STATE_ACTION_CLASS,
   STATE_ACTION_TARGET_DP,
+  SWITCH_HOST_CLASS,
   tapTargetReachDp,
   textActionTargetClass,
   TOUCH_TARGET_DP,
+  TOUCH_TARGET_OVERHANG_DP,
   UNDER_COPY_ACTION_BOX_CLASS,
   UNDER_COPY_ACTION_HIT_SLOP,
 } from './tap-target';
@@ -236,6 +238,25 @@ describe('shared tap-target geometry', () => {
     const height = await compiledDp(ROW_TARGET_CLASS, 'minHeight');
     expect(height).toBe(ICON_TARGET_DP);
     expect(height).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+  });
+
+  it('holds a switch in a host as tall as the control and keeps the row band', async () => {
+    // The regression this guards: the slash command row gave its switch a
+    // zero-padding wrapper, so the wrapper laid out to the switch's cancelled
+    // height (27dp) and that wrapper was the parent a touch had to land in.
+    // Android delivers a touch only inside the parent view, and the audit reads
+    // the control's own node, so the control's 44dp target was cut to 27dp.
+    const height = await compiledDp(SWITCH_HOST_CLASS, 'height');
+    const margin = await compiledDp(SWITCH_HOST_CLASS, 'marginBlock');
+    expect(height).toBe(TOUCH_TARGET_DP);
+    expect(height).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    // The host cancels the same overhang as the switch, so the row still sees
+    // the content band instead of the box.
+    expect(height + 2 * margin).toBe(TOUCH_TARGET_DP - 2 * TOUCH_TARGET_OVERHANG_DP);
+    expect(margin).toBe(-TOUCH_TARGET_OVERHANG_DP);
+    // A single child sits on the host's centre line, so the node fills the box.
+    expect(SWITCH_HOST_CLASS).toContain('justify-center');
+    expect(SWITCH_HOST_CLASS).toContain('items-center');
   });
 
   it('renders a screen header title control on its own 48dp node', async () => {

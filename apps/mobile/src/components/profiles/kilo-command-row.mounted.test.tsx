@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { KiloCommandRowView } from '@/components/profiles/kilo-command-row';
+import { SWITCH_HOST_CLASS } from '@/lib/a11y/tap-target';
 import { act, TestRenderer } from '@/test/renderer';
 
 vi.mock('react-native', () => ({
@@ -186,5 +187,20 @@ describe('KiloCommandRowView template preview', () => {
     const [toggle] = root.findAll(node => Object.is(node.type, 'Switch'));
     // The announced name is the label on screen, slash included.
     expect(toggle?.props.accessibilityLabel).toBe('/review');
+  });
+
+  it('holds the switch node inside a host at least as tall as its target', () => {
+    const root = renderRow();
+
+    const [toggle] = root.findAll(node => Object.is(node.type, 'Switch'));
+    const host = toggle?.parent;
+    // The switch renders the 44dp target on its own node and cancels the
+    // overhang in layout. A host that took only that cancelled height would be
+    // the parent a touch must land in, and Android delivers a touch only inside
+    // the parent view, so the control would receive 27dp of its target.
+    expect(host).toBeDefined();
+    expect(String(host?.props.className).split(' ')).toEqual(
+      expect.arrayContaining(SWITCH_HOST_CLASS.split(' '))
+    );
   });
 });

@@ -248,6 +248,19 @@ const ROW_FRAME_CONTENT_DP = 27;
 export const TOUCH_TARGET_OVERHANG_DP = (TOUCH_TARGET_DP - ROW_FRAME_CONTENT_DP) / 2;
 
 /**
+ * The host a row gives a `Switch` when the row is not itself on
+ * {@link TOUCH_TARGET_DP} — the slash command row, whose content band is its
+ * text lines. The switch's node renders the target and cancels the excess with a
+ * negative vertical margin, so a host that took only that layout height (the
+ * row's content band) would be the parent a touch must land in, and Android
+ * delivers a touch only inside the parent view: the 44dp control would receive
+ * the band. The host takes the target as its own height, centring the node in
+ * it, and cancels the same overhang, so the row still sees only the content band.
+ */
+export const SWITCH_HOST_CLASS =
+  'h-[44px] -my-[8.5px] shrink-0 items-center justify-center';
+
+/**
  * The label pressable inside a `ROW_FRAME_CLASS` row cancels the frame's
  * vertical padding and pads itself back by the same amount, so its own node
  * spans the whole 48pt row while its content stays on the content band. A

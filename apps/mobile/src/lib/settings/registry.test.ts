@@ -281,9 +281,15 @@ describe('guarded settings ask the person first', () => {
   it.each(GUARDED_CHANGES.map(change => [change.name, change.direction === 'on'] as const))(
     'asks before writing the guarded direction of %s, and honours the answer',
     async (name, guardedValue) => {
+      // The unguarded direction writes at once, without asking.
       answer(true);
-      await Effect.runPromise(settingsService().write(name, !guardedValue));
+      const flipped = await Effect.runPromise(settingsService().write(name, !guardedValue));
 
+      expect(confirmSettingChange).not.toHaveBeenCalled();
+      expect(flipped).toContain(String(!guardedValue));
+      expect(await read(name)).toBe(!guardedValue);
+
+      // The guarded direction asks, and the confirmed answer writes it.
       const report = await Effect.runPromise(settingsService().write(name, guardedValue));
 
       expect(confirmSettingChange).toHaveBeenCalledTimes(1);
@@ -293,8 +299,14 @@ describe('guarded settings ask the person first', () => {
       expect(report).toContain(name);
       expect(await read(name)).toBe(guardedValue);
 
+      // Back to the unguarded value so a refused write would show in the read.
+      await Effect.runPromise(settingsService().write(name, !guardedValue));
+
+      expect(await read(name)).toBe(!guardedValue);
+
+      // A refused answer leaves the setting where it was.
       answer(false);
-      confirmSettingChange.mockClear();
+      notificationMutation.mutate.mockClear();
 
       const refused = await Effect.runPromise(
         Effect.result(settingsService().write(name, guardedValue))
@@ -304,15 +316,10 @@ describe('guarded settings ask the person first', () => {
       if (Result.isFailure(refused)) {
         expect(String(refused.failure.cause)).toContain('did not confirm');
       }
-      expect(await read(name)).toBe(guardedValue);
-
-      confirmSettingChange.mockClear();
-
-      const flipped = await Effect.runPromise(settingsService().write(name, !guardedValue));
-
-      expect(confirmSettingChange).not.toHaveBeenCalled();
-      expect(flipped).toContain(String(!guardedValue));
       expect(await read(name)).toBe(!guardedValue);
+      if (name.startsWith('notifications.')) {
+        expect(notificationMutation.mutate).not.toHaveBeenCalled();
+      }
     }
   );
 

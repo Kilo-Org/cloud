@@ -1,7 +1,9 @@
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { createElement } from 'react';
+import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import { retryPausedRead } from './retry-paused-read';
+import { retryPausedRead, usePausedReadRetry } from './retry-paused-read';
 
 describe('retryPausedRead', () => {
   it('cancels the paused query first, then refetches it forced and raw keyed', async () => {
@@ -58,5 +60,58 @@ describe('retryPausedRead', () => {
 
     expect(cancelSpy).not.toHaveBeenCalled();
     expect(querySpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('usePausedReadRetry', () => {
+  it('settles a failed attempt without an unhandled rejection and clears the busy state', async () => {
+    const queryClient = new QueryClient();
+    const queryKey = ['securityAgent', 'getConfig'] as const;
+    queryClient.setQueryData(queryKey, { autoAnalysisEnabled: true });
+    vi.spyOn(queryClient, 'cancelQueries').mockResolvedValue(undefined);
+    let rejectAttempt: (reason: Error) => void = () => undefined;
+    const attempt = Promise.withResolvers<never>();
+    rejectAttempt = attempt.reject;
+    vi.spyOn(queryClient, 'query').mockReturnValue(attempt.promise);
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => {
+      unhandled.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandled);
+
+    const observed: PausedReadRetry[] = [];
+    function Probe() {
+      observed.push(usePausedReadRetry(queryKey));
+      return null;
+    }
+    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+    act(() => {
+      ref.current = TestRenderer.create(
+        createElement(QueryClientProvider, { client: queryClient }, createElement(Probe))
+      );
+    });
+    const first = observed.at(-1);
+    if (!first) {
+      throw new Error('the hook did not render');
+    }
+
+    let settled: Promise<void> | undefined;
+    act(() => {
+      settled = first.retry();
+    });
+    expect(observed.at(-1)?.isRetrying).toBe(true);
+    rejectAttempt(new Error('still offline'));
+    // Await the attempt the hook exposed, not a guessed duration.
+    await act(async () => {
+      await settled;
+    });
+
+    process.off('unhandledRejection', onUnhandled);
+    expect(unhandled).toEqual([]);
+    expect(observed.at(-1)?.isRetrying).toBe(false);
+
+    act(() => {
+      ref.current?.unmount();
+    });
   });
 });

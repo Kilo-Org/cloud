@@ -34,7 +34,12 @@ export async function retryPausedRead(queryClient: QueryClient, queryKey: QueryK
 
 /** What a paused-read retry hook hands its screen: the action and its busy state. */
 export type PausedReadRetry = {
-  retry: () => void;
+  /**
+   * Runs one deliberate attempt. The returned promise always resolves: the
+   * read keeps its own error state, so a still-failing attempt has nobody to
+   * reject to, and an unhandled rejection would be the only result.
+   */
+  retry: () => Promise<void>;
   isRetrying: boolean;
 };
 
@@ -47,20 +52,21 @@ export function usePausedReadRetry(queryKey: QueryKey): PausedReadRetry {
   // state only mirrors it for the spinner.
   const inFlight = useRef(false);
   const [isRetrying, setIsRetrying] = useState(false);
-  const retry = useCallback(() => {
+  const retry = useCallback(async () => {
     if (inFlight.current) {
       return;
     }
     inFlight.current = true;
     setIsRetrying(true);
-    void (async () => {
-      try {
-        await retryPausedRead(queryClient, queryKey);
-      } finally {
-        inFlight.current = false;
-        setIsRetrying(false);
-      }
-    })();
+    try {
+      await retryPausedRead(queryClient, queryKey);
+    } catch {
+      // Settled here, not rethrown: the query retains the failure and the
+      // screen re-derives its failure branch from it.
+    } finally {
+      inFlight.current = false;
+      setIsRetrying(false);
+    }
   }, [queryClient, queryKey]);
   return { retry, isRetrying };
 }

@@ -26,16 +26,21 @@ permissions:
 
 jobs:
   # This workflow runs only from main, where the rewrite job mints its
-  # credential. The job holds no credential, so it can report the reason a run
-  # was rejected instead of skipping silently.
+  # credential. The job reads and reports the run's ref only: it holds no
+  # credential and keeps none of the workflow's write scopes, so it can report
+  # the reason a run was rejected instead of skipping silently.
   verify-main:
-    if: github.repository == 'Kilo-Org/cloud'
+    permissions: {}
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
 
     steps:
       - name: Verify main branch
         run: |
+          if [ "$GITHUB_REPOSITORY" != "Kilo-Org/cloud" ]; then
+            echo "::error::This workflow must be run from the canonical Kilo-Org/cloud repository. Got: $GITHUB_REPOSITORY"
+            exit 1
+          fi
           if [ "$GITHUB_REF" != "refs/heads/main" ]; then
             echo "::error::This workflow must be run from main. Got: $GITHUB_REF"
             exit 1

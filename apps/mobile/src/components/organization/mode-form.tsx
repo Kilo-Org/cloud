@@ -1,3 +1,4 @@
+import { MODE_SLUG_MAX_LENGTH, modeSlugFromName } from '@kilocode/app-shared/organizations';
 import { type Href, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -6,10 +7,8 @@ import { View } from 'react-native';
 import {
   isOrgModeFormDirty,
   MODE_TOOL_GROUPS,
-  modeSlugFromName,
   type ModeToolGroup,
   ORG_MODE_NAME_MAX_LENGTH,
-  ORG_MODE_SLUG_MAX_LENGTH,
   type OrgMode,
   orgModeConfigInput,
   type OrgModeFormErrorCode,
@@ -226,7 +225,7 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
             label={t('organization.modes.identifierLabel')}
             required
             defaultValue={values.slug}
-            maxLength={ORG_MODE_SLUG_MAX_LENGTH}
+            maxLength={MODE_SLUG_MAX_LENGTH}
             autoCapitalize="none"
             autoCorrect={false}
             disabled={busy}

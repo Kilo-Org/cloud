@@ -112,6 +112,15 @@ export async function deleteAnthropicUserProfile(userProfileId: string): Promise
   }
 }
 
-export async function* listAnthropicUserProfiles(): AsyncGenerator<UserProfile> {
-  yield* getClaudeOperatorClient().userProfiles.list({ limit: 100 }, { maxRetries: 2 });
+export type AnthropicUserProfilePage = { profiles: UserProfile[]; nextPage: string | null };
+
+/** One page of the profile list, oldest first, so a scan can resume from `nextPage`. */
+export async function listAnthropicUserProfilesPage(
+  page: string | null
+): Promise<AnthropicUserProfilePage> {
+  const result = await getClaudeOperatorClient().userProfiles.list(
+    { order: 'asc', order_by: 'created_at', limit: 100, page },
+    { maxRetries: 2 }
+  );
+  return { profiles: result.data, nextPage: result.next_page };
 }

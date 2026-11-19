@@ -6060,7 +6060,12 @@ export const ai_gateway_config = pgTable(
   table => [check('ai_gateway_config_singleton', sql`${table.id} = 1`)]
 );
 
-/** Anthropic user profiles the daily cleanup deleted; rows older than seven days are pruned. */
+/**
+ * Anthropic user profiles the daily cleanup deletes. A row is queued when the
+ * profile is detached, before the remote delete, and `deleted_at` is set once
+ * Anthropic confirms it, so a failed delete is retried without relisting the
+ * profile. Deleted rows older than seven days are pruned.
+ */
 export const anthropic_user_profile_deletions = pgTable(
   'anthropic_user_profile_deletions',
   {
@@ -6071,12 +6076,34 @@ export const anthropic_user_profile_deletions = pgTable(
     kilo_user_id: text(),
     profile_created_at: timestamp({ withTimezone: true, mode: 'string' }),
     profile_updated_at: timestamp({ withTimezone: true, mode: 'string' }),
-    deleted_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    queued_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    attempt_count: integer().default(0).notNull(),
+    last_attempt_at: timestamp({ withTimezone: true, mode: 'string' }),
+    /** When Anthropic confirmed the delete; null while it is still pending. */
+    deleted_at: timestamp({ withTimezone: true, mode: 'string' }),
   },
-  table => [index('IDX_anthropic_user_profile_deletions_deleted_at').on(table.deleted_at)]
+  table => [
+    unique('UQ_anthropic_user_profile_deletions_user_profile_id').on(table.user_profile_id),
+    index('IDX_anthropic_user_profile_deletions_deleted_at').on(table.deleted_at),
+  ]
 );
 
 export type AnthropicUserProfileDeletion = typeof anthropic_user_profile_deletions.$inferSelect;
+
+/** Where the daily Anthropic user profile cleanup continues its scan of the profile list. */
+export const anthropic_user_profile_cleanup_state = pgTable(
+  'anthropic_user_profile_cleanup_state',
+  {
+    id: integer().primaryKey().default(1),
+    /** The `next_page` token of the oldest-first profile list; null starts from the beginning. */
+    next_page: text(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [check('anthropic_user_profile_cleanup_state_singleton', sql`${table.id} = 1`)]
+);
 
 export const blacklisted_domains = pgTable('blacklisted_domains', {
   domain: text().primaryKey(),

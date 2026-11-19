@@ -1,7 +1,8 @@
 import { captureException } from '@sentry/nextjs';
-import { and, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
 import type { UserProfile } from '@anthropic-ai/sdk/resources/user-profiles/user-profiles';
 import {
+  anthropic_user_profile_cleanup_state,
   anthropic_user_profile_deletions,
   claude_billing_connections,
   kilocode_users,
@@ -11,44 +12,51 @@ import { AnthropicUserProfileDeletionReason } from '@kilocode/db/schema-types';
 import {
   deleteAnthropicUserProfile,
   isGatewayAnthropicUserProfile,
-  listAnthropicUserProfiles,
+  listAnthropicUserProfilesPage,
 } from '@kilocode/web-shared/lib/ai-gateway/anthropic-user-profiles/api';
 import { isClaudeOperatorConfigured } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 
 const GRACE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
-const BATCH_SIZE = 100;
-const DEFAULT_MAX_DELETIONS = 500;
+const DEFAULT_MAX_QUEUED = 500;
+/** Leaves headroom under the route's five-minute `maxDuration`. */
+const DEFAULT_BUDGET_MS = 4 * 60 * 1000;
+const PENDING_BATCH_SIZE = 100;
+
+type DbOrTransaction = Pick<typeof db, 'select' | 'update' | 'insert'>;
 
 export type AnthropicUserProfileCleanupCounts =
   | { skipped: true }
   | {
       skipped: false;
+      pages: number;
       scanned: number;
       candidates: number;
-      deletedUnlinked: number;
-      deletedUserBlocked: number;
-      kept: number;
+      queuedUnlinked: number;
+      queuedUserBlocked: number;
+      deleted: number;
       failed: number;
       prunedLogs: number;
+      /** Whether the scan reached the end of the list, so the next run starts over. */
+      completedPass: boolean;
     };
 
-type Decision =
-  | { action: 'keep' }
-  | { action: 'delete'; reason: AnthropicUserProfileDeletionReason; userIds: string[] };
-
-function isOldEnough(profile: UserProfile, cutoff: number): boolean {
-  return Date.parse(profile.created_at) <= cutoff && Date.parse(profile.updated_at) <= cutoff;
+function isOldEnough(profile: UserProfile, cutoff: Date): boolean {
+  return (
+    Date.parse(profile.created_at) <= cutoff.getTime() &&
+    Date.parse(profile.updated_at) <= cutoff.getTime()
+  );
 }
 
-async function decideBatch(profiles: UserProfile[], cutoff: Date): Promise<Map<string, Decision>> {
+/** Profiles of a page that nothing obviously keeps; `queueDeletion` rechecks each one. */
+async function deletionCandidates(profiles: UserProfile[], cutoff: Date): Promise<UserProfile[]> {
+  if (profiles.length === 0) return [];
   const ids = profiles.map(profile => profile.id);
-  const [users, liveOrganizations, billingConnections] = await Promise.all([
+  const [users, liveOrganizations, billingConnections, queued] = await Promise.all([
     db
       .select({
-        id: kilocode_users.id,
         profileId: kilocode_users.anthropic_user_profile_id,
-        blockedLongEnough: sql<boolean>`${kilocode_users.blocked_at} IS NOT NULL AND ${kilocode_users.blocked_at} <= ${cutoff.toISOString()}::timestamptz`,
+        blockedLongEnough: blockedSince(cutoff),
       })
       .from(kilocode_users)
       .where(inArray(kilocode_users.anthropic_user_profile_id, ids)),
@@ -62,139 +70,250 @@ async function decideBatch(profiles: UserProfile[], cutoff: Date): Promise<Map<s
       .select({ profileId: claude_billing_connections.user_profile_id })
       .from(claude_billing_connections)
       .where(inArray(claude_billing_connections.user_profile_id, ids)),
+    db
+      .select({ profileId: anthropic_user_profile_deletions.user_profile_id })
+      .from(anthropic_user_profile_deletions)
+      .where(inArray(anthropic_user_profile_deletions.user_profile_id, ids)),
   ]);
-
-  const usersByProfile = new Map<string, typeof users>();
-  for (const user of users) {
-    if (!user.profileId) continue;
-    usersByProfile.set(user.profileId, [...(usersByProfile.get(user.profileId) ?? []), user]);
-  }
-  const organizationProfiles = new Set(liveOrganizations.map(row => row.profileId));
-  const billingProfiles = new Set(billingConnections.map(row => row.profileId));
-
-  const decisions = new Map<string, Decision>();
-  for (const id of ids) {
-    const linkedUsers = usersByProfile.get(id) ?? [];
-    if (billingProfiles.has(id) || organizationProfiles.has(id)) {
-      decisions.set(id, { action: 'keep' });
-    } else if (linkedUsers.length === 0) {
-      decisions.set(id, {
-        action: 'delete',
-        reason: AnthropicUserProfileDeletionReason.Unlinked,
-        userIds: [],
-      });
-    } else if (linkedUsers.every(user => user.blockedLongEnough)) {
-      decisions.set(id, {
-        action: 'delete',
-        reason: AnthropicUserProfileDeletionReason.UserBlocked,
-        userIds: linkedUsers.map(user => user.id),
-      });
-    } else {
-      decisions.set(id, { action: 'keep' });
-    }
-  }
-  return decisions;
+  const kept = new Set<string | null>([
+    ...liveOrganizations.map(row => row.profileId),
+    ...billingConnections.map(row => row.profileId),
+    ...queued.map(row => row.profileId),
+    ...users.filter(user => !user.blockedLongEnough).map(user => user.profileId),
+  ]);
+  return profiles.filter(profile => !kept.has(profile.id));
 }
 
-async function deleteProfile(
+function blockedSince(cutoff: Date) {
+  return sql<boolean>`coalesce(${kilocode_users.blocked_at} <= ${cutoff.toISOString()}::timestamptz, false)`;
+}
+
+/**
+ * Detaches the profile and queues its remote delete in one transaction, after
+ * rechecking under row locks that nothing still needs it. Returns the reason it
+ * was queued for, or null when it is kept or already queued.
+ */
+async function queueDeletion(
   profile: UserProfile,
-  decision: Extract<Decision, { action: 'delete' }>
-): Promise<void> {
-  await deleteAnthropicUserProfile(profile.id);
-  await db.transaction(async tx => {
-    if (decision.reason === AnthropicUserProfileDeletionReason.UserBlocked) {
+  cutoff: Date
+): Promise<AnthropicUserProfileDeletionReason | null> {
+  return await db.transaction(async tx => {
+    const users = await tx
+      .select({ id: kilocode_users.id, blockedLongEnough: blockedSince(cutoff) })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.anthropic_user_profile_id, profile.id))
+      .for('update');
+    if (users.some(user => !user.blockedLongEnough)) return null;
+    if (await isReferencedOutsideUsers(tx, profile.id)) return null;
+
+    const reason =
+      users.length === 0
+        ? AnthropicUserProfileDeletionReason.Unlinked
+        : AnthropicUserProfileDeletionReason.UserBlocked;
+    if (users.length > 0) {
       await tx
         .update(kilocode_users)
         .set({ anthropic_user_profile_id: null })
         .where(eq(kilocode_users.anthropic_user_profile_id, profile.id));
     }
-    await tx.insert(anthropic_user_profile_deletions).values({
-      user_profile_id: profile.id,
-      reason: decision.reason,
-      kilo_user_id: decision.userIds[0] ?? null,
-      profile_created_at: profile.created_at,
-      profile_updated_at: profile.updated_at,
-    });
+    const [queued] = await tx
+      .insert(anthropic_user_profile_deletions)
+      .values({
+        user_profile_id: profile.id,
+        reason,
+        kilo_user_id: users[0]?.id ?? null,
+        profile_created_at: profile.created_at,
+        profile_updated_at: profile.updated_at,
+      })
+      .onConflictDoNothing({ target: anthropic_user_profile_deletions.user_profile_id })
+      .returning({ id: anthropic_user_profile_deletions.id });
+    return queued ? reason : null;
   });
-  console.info('[anthropic-user-profile-cleanup] deleted profile', {
-    userProfileId: profile.id,
-    reason: decision.reason,
-    ...(decision.userIds[0] ? { kiloUserId: decision.userIds[0] } : {}),
+}
+
+async function isReferencedOutsideUsers(tx: DbOrTransaction, userProfileId: string) {
+  const [organization] = await tx
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(
+      and(
+        eq(organizations.anthropic_user_profile_id, userProfileId),
+        isNull(organizations.deleted_at)
+      )
+    )
+    .limit(1);
+  if (organization) return true;
+  const [billing] = await tx
+    .select({ id: claude_billing_connections.id })
+    .from(claude_billing_connections)
+    .where(eq(claude_billing_connections.user_profile_id, userProfileId))
+    .limit(1);
+  return billing !== undefined;
+}
+
+async function readNextPage(): Promise<string | null> {
+  const [state] = await db
+    .select({ nextPage: anthropic_user_profile_cleanup_state.next_page })
+    .from(anthropic_user_profile_cleanup_state)
+    .where(eq(anthropic_user_profile_cleanup_state.id, 1));
+  return state?.nextPage ?? null;
+}
+
+async function saveNextPage(nextPage: string | null): Promise<void> {
+  await db
+    .insert(anthropic_user_profile_cleanup_state)
+    .values({ id: 1, next_page: nextPage })
+    .onConflictDoUpdate({
+      target: anthropic_user_profile_cleanup_state.id,
+      set: { next_page: nextPage },
+    });
+}
+
+function reportFailure(message: string, userProfileId: string | null, error: unknown) {
+  console.error(`[anthropic-user-profile-cleanup] ${message}`, {
+    userProfileId,
+    errorName: error instanceof Error ? error.name : 'UnknownError',
+  });
+  captureException(error, {
+    tags: { source: 'anthropic-user-profile-cleanup' },
+    extra: { userProfileId },
   });
 }
 
 /**
  * Deletes Anthropic user profiles that nothing uses any more: profiles no user or
- * organization references, and profiles only users blocked for a week reference.
- * Profiles younger than a week are never touched, nor are Claude billing profiles.
+ * live organization references, and profiles only users blocked for a week
+ * reference. Profiles created or updated in the last week and Claude billing
+ * profiles are never touched.
+ *
+ * A profile is detached and queued in one transaction, then deleted at
+ * Anthropic; a failed delete stays queued and is retried on later runs. The scan
+ * of the oldest-first profile list stops at a time budget and continues from
+ * the saved page on the next run.
  */
 export async function runAnthropicUserProfileCleanup({
   now = new Date(),
-  maxDeletions = DEFAULT_MAX_DELETIONS,
-}: { now?: Date; maxDeletions?: number } = {}): Promise<AnthropicUserProfileCleanupCounts> {
+  maxQueued = DEFAULT_MAX_QUEUED,
+  budgetMs = DEFAULT_BUDGET_MS,
+}: {
+  now?: Date;
+  maxQueued?: number;
+  budgetMs?: number;
+} = {}): Promise<AnthropicUserProfileCleanupCounts> {
   if (!isClaudeOperatorConfigured()) return { skipped: true };
 
+  const startedAt = Date.now();
+  // Half the budget scans, so queued deletes always get time to run.
+  const scanDeadline = startedAt + budgetMs / 2;
+  const deadline = startedAt + budgetMs;
   const cutoff = new Date(now.getTime() - GRACE_PERIOD_MS);
   const counts = {
+    pages: 0,
     scanned: 0,
     candidates: 0,
-    deletedUnlinked: 0,
-    deletedUserBlocked: 0,
-    kept: 0,
+    queuedUnlinked: 0,
+    queuedUserBlocked: 0,
+    deleted: 0,
     failed: 0,
     prunedLogs: 0,
+    completedPass: false,
   };
 
-  const processBatch = async (batch: UserProfile[]) => {
-    const decisions = await decideBatch(batch, cutoff);
-    for (const profile of batch) {
-      const decision = decisions.get(profile.id) ?? { action: 'keep' };
-      if (decision.action === 'keep') {
-        counts.kept++;
-        continue;
+  let page = await readNextPage();
+  while (
+    Date.now() < scanDeadline &&
+    counts.queuedUnlinked + counts.queuedUserBlocked < maxQueued
+  ) {
+    const { profiles, nextPage } = await listAnthropicUserProfilesPage(page);
+    counts.pages++;
+    counts.scanned += profiles.length;
+    const old = profiles.filter(
+      profile => isGatewayAnthropicUserProfile(profile) && isOldEnough(profile, cutoff)
+    );
+    let stoppedMidPage = false;
+    for (const profile of await deletionCandidates(old, cutoff)) {
+      if (counts.queuedUnlinked + counts.queuedUserBlocked >= maxQueued) {
+        stoppedMidPage = true;
+        break;
       }
-      if (counts.deletedUnlinked + counts.deletedUserBlocked >= maxDeletions) continue;
+      counts.candidates++;
       try {
-        await deleteProfile(profile, decision);
-        if (decision.reason === AnthropicUserProfileDeletionReason.Unlinked) {
-          counts.deletedUnlinked++;
-        } else {
-          counts.deletedUserBlocked++;
-        }
+        const reason = await queueDeletion(profile, cutoff);
+        if (reason === AnthropicUserProfileDeletionReason.Unlinked) counts.queuedUnlinked++;
+        if (reason === AnthropicUserProfileDeletionReason.UserBlocked) counts.queuedUserBlocked++;
       } catch (error) {
         counts.failed++;
-        console.error('[anthropic-user-profile-cleanup] failed to delete profile', {
-          userProfileId: profile.id,
-          errorName: error instanceof Error ? error.name : 'UnknownError',
-        });
-        captureException(error, {
-          tags: { source: 'anthropic-user-profile-cleanup' },
-          extra: { userProfileId: profile.id },
-        });
+        reportFailure('failed to queue profile deletion', profile.id, error);
       }
     }
-  };
-
-  const deletedCount = () => counts.deletedUnlinked + counts.deletedUserBlocked;
-  let batch: UserProfile[] = [];
-  for await (const profile of listAnthropicUserProfiles()) {
-    counts.scanned++;
-    if (!isGatewayAnthropicUserProfile(profile) || !isOldEnough(profile, cutoff.getTime())) {
-      continue;
-    }
-    counts.candidates++;
-    batch.push(profile);
-    if (batch.length >= BATCH_SIZE) {
-      await processBatch(batch);
-      batch = [];
-      if (deletedCount() >= maxDeletions) break;
+    // Rescan this page next run instead of skipping its unqueued candidates.
+    if (stoppedMidPage) break;
+    // The list is oldest first, so a profile created after the cutoff ends the
+    // useful part of the pass.
+    const reachedRecent = profiles.some(
+      profile => Date.parse(profile.created_at) > cutoff.getTime()
+    );
+    page = reachedRecent ? null : nextPage;
+    await saveNextPage(page);
+    if (page === null) {
+      counts.completedPass = true;
+      break;
     }
   }
-  if (batch.length > 0 && deletedCount() < maxDeletions) await processBatch(batch);
+
+  // Each pending delete is attempted at most once per run.
+  const runStartedAt = new Date(startedAt).toISOString();
+  while (Date.now() < deadline) {
+    const pending = await db
+      .select({
+        id: anthropic_user_profile_deletions.id,
+        userProfileId: anthropic_user_profile_deletions.user_profile_id,
+      })
+      .from(anthropic_user_profile_deletions)
+      .where(
+        and(
+          isNull(anthropic_user_profile_deletions.deleted_at),
+          or(
+            isNull(anthropic_user_profile_deletions.last_attempt_at),
+            lt(anthropic_user_profile_deletions.last_attempt_at, runStartedAt)
+          )
+        )
+      )
+      .orderBy(asc(anthropic_user_profile_deletions.queued_at))
+      .limit(PENDING_BATCH_SIZE);
+    if (pending.length === 0) break;
+    for (const job of pending) {
+      if (Date.now() >= deadline) break;
+      let deleted = false;
+      try {
+        await deleteAnthropicUserProfile(job.userProfileId);
+        deleted = true;
+        counts.deleted++;
+      } catch (error) {
+        counts.failed++;
+        reportFailure('failed to delete profile', job.userProfileId, error);
+      }
+      await db
+        .update(anthropic_user_profile_deletions)
+        .set({
+          attempt_count: sql`${anthropic_user_profile_deletions.attempt_count} + 1`,
+          // App time, like `runStartedAt`, so clock skew cannot retry it within this run.
+          last_attempt_at: new Date().toISOString(),
+          ...(deleted ? { deleted_at: sql`now()` } : {}),
+        })
+        .where(eq(anthropic_user_profile_deletions.id, job.id));
+    }
+    if (pending.length < PENDING_BATCH_SIZE) break;
+  }
 
   const pruned = await db
     .delete(anthropic_user_profile_deletions)
-    .where(lt(anthropic_user_profile_deletions.deleted_at, cutoff.toISOString()))
+    .where(
+      and(
+        isNotNull(anthropic_user_profile_deletions.deleted_at),
+        lt(anthropic_user_profile_deletions.deleted_at, cutoff.toISOString())
+      )
+    )
     .returning({ id: anthropic_user_profile_deletions.id });
   counts.prunedLogs = pruned.length;
 

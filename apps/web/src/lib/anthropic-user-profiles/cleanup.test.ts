@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { eq, like } from 'drizzle-orm';
 import type { UserProfile } from '@anthropic-ai/sdk/resources/user-profiles/user-profiles';
 import {
+  anthropic_user_profile_cleanup_state,
   anthropic_user_profile_deletions,
   claude_billing_connections,
   kilocode_users,
@@ -16,7 +17,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/operator', () => (
   isClaudeOperatorConfigured: jest.fn(() => true),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/anthropic-user-profiles/api', () => ({
-  listAnthropicUserProfiles: jest.fn(),
+  listAnthropicUserProfilesPage: jest.fn(),
   deleteAnthropicUserProfile: jest.fn(),
   isGatewayAnthropicUserProfile: (profile: UserProfile) =>
     profile.access_type === 'passthrough' && profile.metadata.kilo_source === 'ai_gateway',
@@ -26,11 +27,11 @@ import { captureException } from '@sentry/nextjs';
 import { isClaudeOperatorConfigured } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
 import {
   deleteAnthropicUserProfile,
-  listAnthropicUserProfiles,
+  listAnthropicUserProfilesPage,
 } from '@kilocode/web-shared/lib/ai-gateway/anthropic-user-profiles/api';
 import { runAnthropicUserProfileCleanup } from './cleanup';
 
-const mockList = jest.mocked(listAnthropicUserProfiles);
+const mockList = jest.mocked(listAnthropicUserProfilesPage);
 const mockDelete = jest.mocked(deleteAnthropicUserProfile);
 const mockConfigured = jest.mocked(isClaudeOperatorConfigured);
 const mockCaptureException = jest.mocked(captureException);
@@ -60,9 +61,20 @@ function makeProfile(overrides: Partial<UserProfile> & { id: string }): UserProf
 }
 
 function listsProfiles(...profiles: UserProfile[]) {
-  mockList.mockImplementation(async function* () {
-    yield* profiles;
-  });
+  mockList.mockResolvedValue({ profiles, nextPage: null });
+}
+
+async function savedNextPage() {
+  const [state] = await db.select().from(anthropic_user_profile_cleanup_state);
+  return state?.next_page ?? null;
+}
+
+async function userProfileOf(userId: string) {
+  const [row] = await db
+    .select({ id: kilocode_users.anthropic_user_profile_id })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, userId));
+  return row?.id;
 }
 
 async function deletionLogs() {
@@ -73,10 +85,13 @@ async function deletionLogs() {
 }
 
 describe('runAnthropicUserProfileCleanup', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     mockConfigured.mockReturnValue(true);
     mockDelete.mockResolvedValue(undefined);
+    await db
+      .delete(anthropic_user_profile_cleanup_state)
+      .where(eq(anthropic_user_profile_cleanup_state.id, 1));
   });
 
   afterEach(async () => {
@@ -92,6 +107,9 @@ describe('runAnthropicUserProfileCleanup', () => {
     await db
       .delete(organizations)
       .where(like(organizations.anthropic_user_profile_id, `${PREFIX}%`));
+    await db
+      .delete(anthropic_user_profile_cleanup_state)
+      .where(eq(anthropic_user_profile_cleanup_state.id, 1));
   });
 
   it('skips when the operator is not configured', async () => {
@@ -102,25 +120,21 @@ describe('runAnthropicUserProfileCleanup', () => {
   });
 
   it('keeps profiles created or updated within seven days', async () => {
-    const recentlyCreated = profileId();
-    const recentlyUpdated = profileId();
     listsProfiles(
-      makeProfile({ id: recentlyCreated, created_at: daysAgo(6).toISOString() }),
-      makeProfile({ id: recentlyUpdated, updated_at: daysAgo(6).toISOString() })
+      makeProfile({ id: profileId(), created_at: daysAgo(6).toISOString() }),
+      makeProfile({ id: profileId(), updated_at: daysAgo(6).toISOString() })
     );
 
     const counts = await runAnthropicUserProfileCleanup({ now: NOW });
 
-    expect(counts).toMatchObject({ scanned: 2, candidates: 0 });
+    expect(counts).toMatchObject({ scanned: 2, candidates: 0, completedPass: true });
     expect(mockDelete).not.toHaveBeenCalled();
   });
 
   it('ignores profiles this feature did not create', async () => {
-    const foreign = profileId();
-    const passthroughWithoutMarker = profileId();
     listsProfiles(
-      makeProfile({ id: foreign, access_type: 'standard' as UserProfile['access_type'] }),
-      makeProfile({ id: passthroughWithoutMarker, metadata: {} })
+      makeProfile({ id: profileId(), access_type: 'application' }),
+      makeProfile({ id: profileId(), metadata: {} })
     );
 
     const counts = await runAnthropicUserProfileCleanup({ now: NOW });
@@ -129,14 +143,14 @@ describe('runAnthropicUserProfileCleanup', () => {
     expect(mockDelete).not.toHaveBeenCalled();
   });
 
-  it('deletes and logs an unlinked profile', async () => {
+  it('queues, deletes and logs an unlinked profile', async () => {
     const id = profileId();
     const profile = makeProfile({ id });
     listsProfiles(profile);
 
     const counts = await runAnthropicUserProfileCleanup({ now: NOW });
 
-    expect(counts).toMatchObject({ deletedUnlinked: 1, deletedUserBlocked: 0, failed: 0 });
+    expect(counts).toMatchObject({ queuedUnlinked: 1, deleted: 1, failed: 0 });
     expect(mockDelete).toHaveBeenCalledWith(id);
     const logs = await deletionLogs();
     expect(logs).toHaveLength(1);
@@ -144,12 +158,13 @@ describe('runAnthropicUserProfileCleanup', () => {
       user_profile_id: id,
       reason: 'unlinked',
       kilo_user_id: null,
+      attempt_count: 1,
     });
+    expect(logs[0].deleted_at).not.toBeNull();
     expect(new Date(logs[0].profile_created_at ?? '').toISOString()).toBe(profile.created_at);
-    expect(new Date(logs[0].profile_updated_at ?? '').toISOString()).toBe(profile.updated_at);
   });
 
-  it('deletes a profile of a user blocked for seven days, clears the link, and logs it', async () => {
+  it('detaches and deletes the profile of a user blocked for seven days', async () => {
     const id = profileId();
     const user = await insertTestUser({
       anthropic_user_profile_id: id,
@@ -160,16 +175,14 @@ describe('runAnthropicUserProfileCleanup', () => {
 
     const counts = await runAnthropicUserProfileCleanup({ now: NOW });
 
-    expect(counts).toMatchObject({ deletedUserBlocked: 1, deletedUnlinked: 0 });
-    expect(mockDelete).toHaveBeenCalledWith(id);
-    const [updated] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, user.id));
-    expect(updated.anthropic_user_profile_id).toBeNull();
+    expect(counts).toMatchObject({ queuedUserBlocked: 1, deleted: 1 });
+    expect(await userProfileOf(user.id)).toBeNull();
     expect(await deletionLogs()).toMatchObject([
       { user_profile_id: id, reason: 'user_blocked', kilo_user_id: user.id },
     ]);
   });
 
-  it('keeps a profile of a user blocked for less than seven days', async () => {
+  it('keeps the profile of a user blocked for less than seven days', async () => {
     const id = profileId();
     const user = await insertTestUser({
       anthropic_user_profile_id: id,
@@ -180,13 +193,9 @@ describe('runAnthropicUserProfileCleanup', () => {
 
     const counts = await runAnthropicUserProfileCleanup({ now: NOW });
 
-    expect(counts).toMatchObject({ candidates: 1, kept: 1, deletedUserBlocked: 0 });
+    expect(counts).toMatchObject({ candidates: 0, queuedUserBlocked: 0 });
     expect(mockDelete).not.toHaveBeenCalled();
-    const [unchanged] = await db
-      .select()
-      .from(kilocode_users)
-      .where(eq(kilocode_users.id, user.id));
-    expect(unchanged.anthropic_user_profile_id).toBe(id);
+    expect(await userProfileOf(user.id)).toBe(id);
   });
 
   it('keeps a profile when any referencing user is not blocked', async () => {
@@ -197,7 +206,7 @@ describe('runAnthropicUserProfileCleanup', () => {
 
     const counts = await runAnthropicUserProfileCleanup({ now: NOW });
 
-    expect(counts).toMatchObject({ kept: 1 });
+    expect(counts).toMatchObject({ candidates: 0 });
     expect(mockDelete).not.toHaveBeenCalled();
   });
 
@@ -216,8 +225,9 @@ describe('runAnthropicUserProfileCleanup', () => {
 
     const counts = await runAnthropicUserProfileCleanup({ now: NOW });
 
-    expect(counts).toMatchObject({ kept: 1 });
+    expect(counts).toMatchObject({ candidates: 0 });
     expect(mockDelete).not.toHaveBeenCalled();
+    expect(await userProfileOf(owner.id)).toBe(id);
   });
 
   it('treats a profile only a deleted organization references as unlinked', async () => {
@@ -232,7 +242,7 @@ describe('runAnthropicUserProfileCleanup', () => {
 
     const counts = await runAnthropicUserProfileCleanup({ now: NOW });
 
-    expect(counts).toMatchObject({ deletedUnlinked: 1 });
+    expect(counts).toMatchObject({ queuedUnlinked: 1 });
     expect(await deletionLogs()).toMatchObject([{ user_profile_id: id, reason: 'unlinked' }]);
   });
 
@@ -248,11 +258,11 @@ describe('runAnthropicUserProfileCleanup', () => {
 
     const counts = await runAnthropicUserProfileCleanup({ now: NOW });
 
-    expect(counts).toMatchObject({ kept: 1, deletedUnlinked: 0 });
+    expect(counts).toMatchObject({ candidates: 0, queuedUnlinked: 0 });
     expect(mockDelete).not.toHaveBeenCalled();
   });
 
-  it('continues after a delete failure and does not log or unlink the failed profile', async () => {
+  it('keeps a failed delete queued with the profile detached, and retries it on the next run', async () => {
     const failing = profileId();
     const succeeding = profileId();
     const user = await insertTestUser({
@@ -265,46 +275,105 @@ describe('runAnthropicUserProfileCleanup', () => {
     });
     listsProfiles(makeProfile({ id: failing }), makeProfile({ id: succeeding }));
 
-    const counts = await runAnthropicUserProfileCleanup({ now: NOW });
+    const first = await runAnthropicUserProfileCleanup({ now: NOW });
 
-    expect(counts).toMatchObject({ failed: 1, deletedUnlinked: 1, deletedUserBlocked: 0 });
+    expect(first).toMatchObject({ failed: 1, deleted: 1, queuedUserBlocked: 1, queuedUnlinked: 1 });
     expect(mockCaptureException).toHaveBeenCalledWith(
       error,
       expect.objectContaining({ extra: { userProfileId: failing } })
     );
-    expect(await deletionLogs()).toMatchObject([{ user_profile_id: succeeding }]);
-    const [unchanged] = await db
-      .select()
-      .from(kilocode_users)
-      .where(eq(kilocode_users.id, user.id));
-    expect(unchanged.anthropic_user_profile_id).toBe(failing);
-  });
+    // The account no longer carries an ID that Anthropic may delete at any moment.
+    expect(await userProfileOf(user.id)).toBeNull();
+    const pending = (await deletionLogs()).find(log => log.user_profile_id === failing);
+    expect(pending).toMatchObject({ attempt_count: 1, deleted_at: null });
 
-  it('caps deletions per run', async () => {
-    listsProfiles(
-      makeProfile({ id: profileId() }),
-      makeProfile({ id: profileId() }),
-      makeProfile({ id: profileId() })
-    );
-
-    const counts = await runAnthropicUserProfileCleanup({ now: NOW, maxDeletions: 2 });
-
-    expect(counts).toMatchObject({ deletedUnlinked: 2 });
-    expect(mockDelete).toHaveBeenCalledTimes(2);
-  });
-
-  it('prunes deletion logs older than seven days', async () => {
-    const oldId = profileId();
-    const recentId = profileId();
-    await db.insert(anthropic_user_profile_deletions).values([
-      { user_profile_id: oldId, reason: 'unlinked', deleted_at: daysAgo(8).toISOString() },
-      { user_profile_id: recentId, reason: 'unlinked', deleted_at: daysAgo(6).toISOString() },
-    ]);
+    // The retry does not depend on Anthropic still listing the profile.
+    mockDelete.mockResolvedValue(undefined);
     listsProfiles();
+    const second = await runAnthropicUserProfileCleanup({ now: NOW });
+
+    expect(second).toMatchObject({ deleted: 1, failed: 0 });
+    const retried = (await deletionLogs()).find(log => log.user_profile_id === failing);
+    expect(retried).toMatchObject({ attempt_count: 2 });
+    expect(retried?.deleted_at).not.toBeNull();
+  });
+
+  it('caps queued deletions per run and rescans the unfinished page next run', async () => {
+    const ids = [profileId(), profileId(), profileId()];
+    const page = { profiles: ids.map(id => makeProfile({ id })), nextPage: 'page-2' };
+    mockList
+      .mockResolvedValueOnce(page)
+      .mockResolvedValueOnce(page)
+      .mockResolvedValueOnce({ profiles: [], nextPage: null });
+
+    const first = await runAnthropicUserProfileCleanup({ now: NOW, maxQueued: 2 });
+
+    expect(first).toMatchObject({ queuedUnlinked: 2, deleted: 2, completedPass: false });
+    expect(await savedNextPage()).toBeNull();
+
+    const second = await runAnthropicUserProfileCleanup({ now: NOW, maxQueued: 2 });
+
+    expect(second).toMatchObject({ candidates: 1, queuedUnlinked: 1, completedPass: true });
+    expect(mockList.mock.calls).toEqual([[null], [null], ['page-2']]);
+  });
+
+  it('follows the page cursor and starts over after the last page', async () => {
+    const [first, second] = [profileId(), profileId()];
+    mockList
+      .mockResolvedValueOnce({ profiles: [makeProfile({ id: first })], nextPage: 'page-2' })
+      .mockResolvedValueOnce({ profiles: [makeProfile({ id: second })], nextPage: null });
 
     const counts = await runAnthropicUserProfileCleanup({ now: NOW });
 
-    expect(counts).toMatchObject({ prunedLogs: expect.any(Number) });
-    expect(await deletionLogs()).toMatchObject([{ user_profile_id: recentId }]);
+    expect(counts).toMatchObject({ pages: 2, queuedUnlinked: 2, completedPass: true });
+    expect(mockList.mock.calls).toEqual([[null], ['page-2']]);
+    expect(await savedNextPage()).toBeNull();
+  });
+
+  it('resumes from the saved page', async () => {
+    await db.insert(anthropic_user_profile_cleanup_state).values({ id: 1, next_page: 'page-7' });
+    listsProfiles();
+
+    await runAnthropicUserProfileCleanup({ now: NOW });
+
+    expect(mockList).toHaveBeenCalledWith('page-7');
+  });
+
+  it('ends the pass at the first profile created after the cutoff', async () => {
+    mockList.mockResolvedValue({
+      profiles: [makeProfile({ id: profileId(), created_at: daysAgo(1).toISOString() })],
+      nextPage: 'page-2',
+    });
+
+    const counts = await runAnthropicUserProfileCleanup({ now: NOW });
+
+    expect(counts).toMatchObject({ pages: 1, completedPass: true });
+    expect(await savedNextPage()).toBeNull();
+  });
+
+  it('stops scanning when the time budget is spent and keeps the saved page', async () => {
+    await db.insert(anthropic_user_profile_cleanup_state).values({ id: 1, next_page: 'page-3' });
+
+    const counts = await runAnthropicUserProfileCleanup({ now: NOW, budgetMs: 0 });
+
+    expect(counts).toMatchObject({ pages: 0, deleted: 0 });
+    expect(mockList).not.toHaveBeenCalled();
+    expect(await savedNextPage()).toBe('page-3');
+  });
+
+  it('prunes completed deletions older than seven days but keeps pending ones', async () => {
+    const [oldId, recentId, pendingId] = [profileId(), profileId(), profileId()];
+    mockDelete.mockRejectedValue(new Error('still unavailable'));
+    await db.insert(anthropic_user_profile_deletions).values([
+      { user_profile_id: oldId, reason: 'unlinked', deleted_at: daysAgo(8).toISOString() },
+      { user_profile_id: recentId, reason: 'unlinked', deleted_at: daysAgo(6).toISOString() },
+      { user_profile_id: pendingId, reason: 'unlinked', queued_at: daysAgo(30).toISOString() },
+    ]);
+    listsProfiles();
+
+    await runAnthropicUserProfileCleanup({ now: NOW });
+
+    const remaining = (await deletionLogs()).map(log => log.user_profile_id).sort();
+    expect(remaining).toEqual([recentId, pendingId].sort());
   });
 });

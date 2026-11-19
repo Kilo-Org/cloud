@@ -40,13 +40,15 @@ describe('GET /api/cron/anthropic-user-profile-cleanup', () => {
       'a completed run',
       {
         skipped: false as const,
+        pages: 1,
         scanned: 10,
         candidates: 4,
-        deletedUnlinked: 2,
-        deletedUserBlocked: 1,
-        kept: 1,
+        queuedUnlinked: 2,
+        queuedUserBlocked: 1,
+        deleted: 3,
         failed: 0,
         prunedLogs: 3,
+        completedPass: true,
       },
     ],
   ])('returns 200 for %s', async (_description, counts) => {

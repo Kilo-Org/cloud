@@ -10,6 +10,7 @@ import { eq } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
+import { findSeedUserId } from '../lib/users';
 
 export const usage = '<fake-email>';
 
@@ -41,18 +42,10 @@ function userIdFor(email: string): string {
   return `dev-seed:mobile-security-agent-automation:${email}`;
 }
 
-/** Inserts the account row the seed owns, or refuses an email that belongs to another. */
+/** The account row the seed owns, or the one a sign-in already gave the email. */
 async function ensureUser(email: string, name: string): Promise<string> {
   const db = getSeedDb();
-  const userId = userIdFor(email);
-  const [existing] = await db
-    .select({ id: kilocode_users.id })
-    .from(kilocode_users)
-    .where(eq(kilocode_users.normalized_email, email));
-  if (existing && existing.id !== userId) {
-    throw new Error('The requested email belongs to a different account; choose a new fake email.');
-  }
-
+  const userId = (await findSeedUserId(email)) ?? userIdFor(email);
   await db
     .insert(kilocode_users)
     .values({
@@ -93,7 +86,10 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       require_seats: false,
       created_by_kilo_user_id: ownerId,
     })
-    .onConflictDoNothing();
+    .onConflictDoUpdate({
+      target: organizations.id,
+      set: { created_by_kilo_user_id: ownerId },
+    });
 
   await db
     .delete(organization_memberships)

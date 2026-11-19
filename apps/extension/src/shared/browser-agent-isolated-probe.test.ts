@@ -10,6 +10,7 @@ import type { IsolatedAgentProbe, IsolatedProbeResult } from './browser-agent-is
 import { runIsolatedAgentProbe } from './browser-agent-isolated-probe-script';
 import { classifyFocusedElement, classifyTargetElement } from './browser-agent-probes';
 import { readAgentFrames } from './browser-agent-frames';
+import { preflightAgentCall } from './browser-agent-gate';
 import { SENSITIVE_REASON } from './browser-agent-checks';
 
 /** Runs the probe's own serialized source in a jsdom page, the way `scripting.executeScript` ships it. */
@@ -228,12 +229,16 @@ describe('isolated agent probe in the page', () => {
     });
   });
 
-  it('reports its own url and origin', () => {
+  it('reports its own url and origin, and the frame each frame element hosts', () => {
     expect(runInPage('<p>x</p>', 'frame')).toStrictEqual({
       origin: 'https://shop.example.com',
+      owners: [],
       parentFrameId: null,
       url: 'https://shop.example.com/cart',
     });
+    expect(
+      runInPage('<iframe></iframe><p><iframe></iframe></p>', 'frame', { frameIdOf: () => 3 })
+    ).toMatchObject({ owners: [3, 3] });
   });
 });
 
@@ -292,6 +297,55 @@ describe('isolated frame list', () => {
 
     await expect(readIsolatedFrames(probe)).resolves.toMatchObject({
       frames: [{ id: '0', origin: 'opaque:null' }],
+    });
+  });
+
+  it('names the frame a frame element hosts, and nothing for any other element', () => {
+    const page =
+      '<iframe id="pay" src="https://pay.example.com/"></iframe><button id="go">Go</button>';
+
+    expect(runInPage(page, 'hosted', { frameIdOf: () => 12, selector: '#pay' })).toStrictEqual({
+      frameId: 12,
+    });
+    expect(runInPage(page, 'hosted', { frameIdOf: () => 12, selector: '#go' })).toStrictEqual({});
+  });
+
+  it('asks for the hosted frame’s read grant when a call targets its frame element', async () => {
+    const probe = fakeProbe({
+      0: {
+        frame: {
+          origin: 'https://shop.example.com',
+          parentFrameId: null,
+          url: 'https://shop.example.com/',
+        },
+        hosted: { frameId: 12 },
+      },
+      12: {
+        frame: {
+          origin: 'https://pay.example.com',
+          parentFrameId: 0,
+          url: 'https://pay.example.com/form',
+        },
+      },
+    });
+
+    await expect(
+      preflightAgentCall({
+        args: { target: '#pay' },
+        authorized: [{ class: 'read', origin: 'https://shop.example.com' }],
+        consumeStepToken: () => false,
+        session: { ...sessionWith(probe), takeDownloads: () => [] },
+        sessionHandle: 'session-1',
+        stepTokens: [],
+        tabId: 7,
+        toolName: 'browser_snapshot',
+      })
+    ).resolves.toStrictEqual({
+      failure: {
+        items: [{ class: 'read', frame: true, origin: 'https://pay.example.com' }],
+        kind: 'needs_permission',
+      },
+      ok: false,
     });
   });
 });

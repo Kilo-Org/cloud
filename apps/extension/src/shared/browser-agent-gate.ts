@@ -2,6 +2,8 @@
 import { z } from 'zod';
 import {
   ambiguousSelectorError,
+  looksLikeBrowserRef,
+  STALE_REF_ERROR,
   hashBrowserToolArguments,
   isOAuthConsentUrl,
   isOriginGranted,
@@ -25,6 +27,7 @@ import {
   readAgentFrameTree,
 } from './browser-agent-frames';
 import type { AgentFrameInventory, BrowserAgentFrame } from './browser-agent-frames';
+import { readIsolatedHostedFrame } from './browser-agent-isolated-probe';
 import {
   classifyFocusedElement,
   classifyTargetElement,
@@ -263,6 +266,17 @@ const targetFrameOf = async (
   if (resolved.kind === 'ambiguous') {
     // The call is refused later as ambiguous; it adds no origin requirement here.
     return undefined;
+  }
+
+  // Without a debugger protocol the probe names the frame a frame element hosts (Firefox).
+  if (session.isolatedProbe !== undefined && resolved.kind === 'selector') {
+    const hosted = await readIsolatedHostedFrame(session.isolatedProbe, resolved.selector);
+
+    if (hosted !== undefined) {
+      const frame = frames.find(candidate => candidate.id === hosted.frameId);
+
+      return { frame: true, origin: frame?.origin ?? OPAQUE_ORIGIN };
+    }
   }
 
   let node: z.infer<typeof describeNodeSchema>['node'] = undefined;
@@ -628,7 +642,7 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
     return { failure: { items, kind: 'needs_permission' }, ok: false };
   }
 
-  // The call is granted: only now spend a DOM read on cardinality. A selector that names several elements cannot run, so it is refused plainly before any sensitive-step ask instead of prompting for a call that would fail.
+  // The call is granted: only now spend a DOM read on cardinality. A selector that names several elements, or a ref no snapshot holds any more, cannot run, so it is refused plainly with the tool's own error before any sensitive-step ask instead of prompting for a call that would fail.
   for (const text of targetReferencesOf(input.args)) {
     // eslint-disable-next-line no-await-in-loop -- one resolution per reference, in argument order
     const resolved = await input.session.resolveTarget(text);
@@ -638,6 +652,10 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
         failure: { error: ambiguousSelectorError(resolved.matches), kind: 'blocked' },
         ok: false,
       };
+    }
+
+    if (resolved === undefined && looksLikeBrowserRef(text)) {
+      return { failure: { error: STALE_REF_ERROR, kind: 'blocked' }, ok: false };
     }
   }
 

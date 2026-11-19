@@ -4,6 +4,7 @@ import { createTabLeaseRegistry } from './browser-tab-leases';
 import { createBrowserRuntime } from './browser-runtime';
 import type { BrowserRuntime } from './browser-runtime';
 import type { BrowserCaller } from './browser-caller';
+import { STALE_REF_ERROR } from './browser-agent-checks';
 import type {
   BrowserScriptingApi,
   BrowserScriptingInjectionResult,
@@ -140,7 +141,7 @@ describe('browser runtime ref lifetime', () => {
 
     expect(outcome).toMatchObject({
       kind: 'result',
-      result: { error: expect.stringContaining('Unknown element reference') as unknown, ok: false },
+      result: { error: STALE_REF_ERROR, ok: false },
     });
   });
 });

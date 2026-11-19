@@ -1508,6 +1508,7 @@ describe('browser tool session scripting backend', () => {
         '<label><input type="checkbox" checked> Agree</label>' +
         '<label>Color <select><option>Red</option><option>Blue</option></select></label>' +
         '<div><span id="caption">Send it</span><button aria-labelledby="caption">x</button></div>' +
+        '<section><iframe title="Pay"></iframe></section>' +
         '</body>'
     );
     const { session } = createExecutingScriptingSession();
@@ -1527,8 +1528,30 @@ describe('browser tool session scripting backend', () => {
             '  - option "Blue" [ref=e5]',
             '- text: Send it',
             '- button "Send it" [ref=e6]',
+            '- iframe [ref=e7]',
           ].join('\n'),
         });
+      }
+    );
+  });
+
+  it('keeps the snapshot refs after a find, which only adds its own', async () => {
+    const dom = new JSDOM('<body><button id="go">Go</button><p>idle</p></body>');
+    const { session } = createExecutingScriptingSession();
+
+    await withPageGlobals(
+      { document: dom.window.document, location: dom.window.location, window: dom.window },
+      async () => {
+        await expect(session.callTool('browser_snapshot', {})).resolves.toStrictEqual({
+          ok: true,
+          value: '- button "Go" [ref=e1]\n- paragraph "idle"',
+        });
+        await expect(session.callTool('browser_find', { text: 'go' })).resolves.toStrictEqual({
+          ok: true,
+          value: 'Found 1 matching line(s):\n\n- button "Go" [ref=e2]\n- paragraph "idle"',
+        });
+        await expect(session.resolveTarget('e1')).resolves.toMatchObject({ kind: 'selector' });
+        await expect(session.resolveTarget('e2')).resolves.toMatchObject({ kind: 'selector' });
       }
     );
   });

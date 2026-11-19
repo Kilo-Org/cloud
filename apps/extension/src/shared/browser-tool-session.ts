@@ -1,9 +1,11 @@
-/* eslint-disable max-lines */
+/* eslint-disable max-lines, import/max-dependencies -- one session factory owns both backends: the debugger channel, and on Firefox the scripting tools with their probes, frame splice and redaction */
 import { z } from 'zod';
 import { buildWorkflowPageCode } from './agent-workflow-runner';
 import { TAB_TAKEN_ERROR } from './browser-caller';
+import { STALE_REF_ERROR } from './browser-agent-checks';
 import { runIsolatedAgentProbe } from './browser-agent-isolated-probe-script';
 import type { IsolatedAgentProbe } from './browser-agent-isolated-probe';
+import { spliceScriptingFrames } from './browser-tool-scripting-frames';
 import { KILO_BROWSER_TOOL_PREFIX, toKiloBrowserToolName } from './browser-tool-contract';
 import {
   redactSensitiveBody,
@@ -299,6 +301,11 @@ export interface BrowserToolRefEntry {
   readonly selector?: string;
 }
 
+/** An agent caller's read grants for one call: the origins whose frames it may read. */
+export interface BrowserToolCallScope {
+  readonly readableOrigins: readonly string[];
+}
+
 export type BrowserToolResolvedTarget =
   | {
       readonly backendNodeId: number;
@@ -447,15 +454,17 @@ export interface BrowserToolSession {
   /**
    * Runs one upstream browser tool. On the scripting backend this is the only
    * way to reach the page: snapshot, find, screenshot, wait_for, evaluate,
-   * click, type, hover, drag, drop, fill_form, select_option, press_key,
+   * click, type, hover, drop, fill_form, select_option, press_key,
    * navigate, navigate_back, close, tabs, resize, webmcp_list and webmcp_call
    * work with the upstream arguments, and the tools the scripting API cannot
    * express return a tool error naming the tool and the platform limit. Never
-   * throws and never returns a silent no-op.
+   * throws and never returns a silent no-op. `scope` is an agent caller's read
+   * grants: a snapshot or find then shows only the frames it may read.
    */
   readonly callTool: (
     tool: string,
-    args?: Record<string, unknown>
+    args?: Record<string, unknown>,
+    scope?: BrowserToolCallScope
   ) => Promise<BrowserToolCallResult>;
   readonly consoleMessages: () => BrowserConsoleMessage[];
   /**
@@ -781,7 +790,7 @@ const __ariaAttributes = (el) => {
   if (document.activeElement === el) { parts.push('[active]'); }
   return parts;
 };
-const __buildAria = (root, maxDepth, withBoxes, refStart) => {
+const __buildAria = (root, maxDepth, withBoxes, refStart, withRefs) => {
   const interactiveRoles = [
     'button', 'checkbox', 'combobox', 'link', 'listbox', 'menuitem', 'option',
     'radio', 'searchbox', 'slider', 'spinbutton', 'switch', 'tab', 'textbox',
@@ -789,19 +798,28 @@ const __buildAria = (root, maxDepth, withBoxes, refStart) => {
   ];
   const lines = [];
   const refs = [];
+  const frames = [];
+  const owners = Array.from(document.querySelectorAll('iframe, frame'));
   let nextRef = refStart;
+  const refFor = (el) => {
+    if (!withRefs) { return ''; }
+    nextRef += 1;
+    refs.push({ ref: 'e' + nextRef, selector: __selectorFor(el) });
+    return ' [ref=e' + nextRef + ']';
+  };
   const walk = (el, depth) => {
     if (maxDepth !== null && depth > maxDepth) { return; }
     if (!__visible(el)) { return; }
+    if (el.localName === 'iframe' || el.localName === 'frame') {
+      const frameRef = refFor(el);
+      frames.push({ depth: depth, line: lines.length, owner: owners.indexOf(el) });
+      lines.push('  '.repeat(depth) + '- iframe' + frameRef);
+      return;
+    }
     const role = __role(el);
     const name = __accessibleName(el);
     const children = Array.from(el.children);
-    let refPart = '';
-    if (interactiveRoles.indexOf(role) !== -1) {
-      nextRef += 1;
-      refPart = ' [ref=e' + nextRef + ']';
-      refs.push({ ref: 'e' + nextRef, selector: __selectorFor(el) });
-    }
+    const refPart = interactiveRoles.indexOf(role) !== -1 ? refFor(el) : '';
     const attributes = __ariaAttributes(el).join('');
     let box = '';
     if (withBoxes) {
@@ -819,7 +837,7 @@ const __buildAria = (root, maxDepth, withBoxes, refStart) => {
     for (const child of children) { walk(child, printed ? depth + 1 : depth); }
   };
   walk(root, 0);
-  return { lines: lines, nextRef: nextRef, refs: refs };
+  return { frames: frames, lines: lines, nextRef: nextRef, refs: refs };
 };
 const __modifiers = (modifiers) => {
   const isMac = /Mac|iPhone|iPad/u.test(navigator.platform || navigator.userAgent || '');
@@ -893,11 +911,14 @@ const buildSnapshotPageScript = ({
   depth,
   refStart,
   targetSelector,
+  withRefs,
 }: {
   readonly boxes: boolean;
   readonly depth: number | undefined;
   readonly refStart: number;
   readonly targetSelector: string | undefined;
+  /** A child frame's lines carry no refs: actions resolve refs in the top-level document only. */
+  readonly withRefs: boolean;
 }): string =>
   `${SCRIPTING_PAGE_PREAMBLE}
 const rootSelector = ${scriptJson(targetSelector ?? null)};
@@ -905,51 +926,15 @@ const maxDepth = ${scriptJson(depth ?? null)};
 const withBoxes = ${scriptJson(boxes)};
 const refStart = ${scriptJson(refStart)};
 const root = rootSelector === null ? (document.body || document.documentElement) : __element(rootSelector);
-const aria = __buildAria(root, maxDepth, withBoxes, refStart);
+const aria = __buildAria(root, maxDepth, withBoxes, refStart, ${scriptJson(withRefs)});
 return __finish({
+  frames: aria.frames,
   lines: aria.lines,
   nextRef: aria.nextRef,
   refs: aria.refs,
   title: document.title,
   url: location.href,
 });`;
-
-const buildFindPageScript = ({
-  boxes,
-  depth,
-  needle,
-  refStart,
-  regex,
-  targetSelector,
-}: {
-  readonly boxes: boolean;
-  readonly depth: number | undefined;
-  readonly needle: string | undefined;
-  readonly refStart: number;
-  readonly regex: string | undefined;
-  readonly targetSelector: string | undefined;
-}): string =>
-  `${SCRIPTING_PAGE_PREAMBLE}
-const rootSelector = ${scriptJson(targetSelector ?? null)};
-const maxDepth = ${scriptJson(depth ?? null)};
-const withBoxes = ${scriptJson(boxes)};
-const refStart = ${scriptJson(refStart)};
-const needle = ${scriptJson(needle ?? null)};
-const regexSource = ${scriptJson(regex ?? null)};
-const pattern = regexSource === null ? null : new RegExp(regexSource, 'iu');
-const matcher = (line) => pattern === null ? line.toLowerCase().indexOf(String(needle).toLowerCase()) !== -1 : pattern.test(line);
-const root = rootSelector === null ? (document.body || document.documentElement) : __element(rootSelector);
-const aria = __buildAria(root, maxDepth, withBoxes, refStart);
-const blocks = [];
-let total = 0;
-for (let index = 0; index < aria.lines.length; index += 1) {
-  if (!matcher(aria.lines[index])) { continue; }
-  total += 1;
-  const from = Math.max(0, index - ${String(FIND_CONTEXT_LINES)});
-  const to = Math.min(aria.lines.length, index + ${String(FIND_CONTEXT_LINES + 1)});
-  blocks.push(aria.lines.slice(from, to).join('\\n'));
-}
-return __finish({ blocks: blocks, refs: aria.refs, nextRef: aria.nextRef, total: total });`;
 
 const buildWaitForPageScript = ({
   text,
@@ -1223,6 +1208,12 @@ if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height 
 window.resizeTo(width, height);
 return __finish('Resized the window to ' + width + 'x' + height + '.');`;
 
+/** The caller a scripting tool runs for: its ref registry, and its read grants when it is an agent. */
+interface ScriptingCallContext {
+  readonly refs: Map<string, BrowserToolRefEntry>;
+  readonly scope?: BrowserToolCallScope | undefined;
+}
+
 const scriptingEnvelopeSchema = z.object({
   dryRunActions: z.array(z.unknown()).optional(),
   error: z.string().optional(),
@@ -1253,11 +1244,13 @@ const viewportScreenshotSchema = z.object({
 
 /** Runs one generated page script through the scripting API and unwraps the workflow-style envelope. */
 const runScriptingPageScript = async ({
+  frameId,
   script,
   scriptingApi,
   tabId,
   timeoutMs = SCRIPTING_ACTION_TIMEOUT_MS,
 }: {
+  readonly frameId?: number;
   readonly script: string;
   readonly scriptingApi: BrowserScriptingApi | undefined;
   readonly tabId: number;
@@ -1268,7 +1261,13 @@ const runScriptingPageScript = async ({
   }
 
   const code = buildWorkflowPageCode(script, {}, false);
-  const result = await evalInTabWithScripting({ code, scriptingApi, tabId, timeoutMs });
+  const result = await evalInTabWithScripting({
+    code,
+    ...(frameId === undefined ? {} : { frameId }),
+    scriptingApi,
+    tabId,
+    timeoutMs,
+  });
 
   if (!result.ok) {
     return { error: result.error, ok: false };
@@ -1306,10 +1305,7 @@ const resolveScriptingTarget = (
   const entry = refs.get(ref);
 
   if (entry?.selector === undefined) {
-    return {
-      error: `Unknown element reference ${ref}. Take a fresh kilo_browser_snapshot and use a ref from it.`,
-      kind: 'error',
-    };
+    return { error: STALE_REF_ERROR, kind: 'error' };
   }
 
   return { description: `ref=${ref}`, kind: 'ok', selector: entry.selector };
@@ -1399,15 +1395,10 @@ const browserToolScreenshotArgsSchema = z.object({
   type: z.enum(['jpeg', 'png', 'webp']).optional(),
 });
 const browserToolSnapshotResultSchema = z.object({
+  frames: z.array(z.object({ depth: z.number(), line: z.number(), owner: z.number() })).default([]),
   lines: z.array(z.string()),
   nextRef: z.number(),
   refs: z.array(z.object({ ref: z.string(), selector: z.string() })),
-});
-const browserToolFindResultSchema = z.object({
-  blocks: z.array(z.string()),
-  nextRef: z.number(),
-  refs: z.array(z.object({ ref: z.string(), selector: z.string() })),
-  total: z.number(),
 });
 const browserToolWebMcpDiscoverySchema = z.object({
   documentId: z.string(),
@@ -2624,6 +2615,78 @@ export const createBrowserToolSession = ({
     });
   };
 
+  /**
+   * One scripting snapshot: the top-level document's lines and refs, and for an
+   * agent caller every child frame spliced in or withheld by its read grants.
+   * `merge` keeps the refs earlier snapshots registered (a targeted snapshot, a find).
+   */
+  const captureScriptingSnapshot = async (
+    options: {
+      readonly boxes: boolean;
+      readonly depth: number | undefined;
+      readonly merge: boolean;
+      readonly targetSelector: string | undefined;
+    },
+    call: ScriptingCallContext
+  ): Promise<
+    | { readonly lines: readonly string[]; readonly ok: true }
+    | { readonly error: string; readonly ok: false }
+  > => {
+    const { boxes, depth, merge, targetSelector } = options;
+    const result = await runPageTool(
+      buildSnapshotPageScript({
+        boxes,
+        depth,
+        refStart: scriptingRefCount,
+        targetSelector,
+        withRefs: true,
+      })
+    );
+
+    if (!result.ok) {
+      return { error: result.error, ok: false };
+    }
+
+    const snapshot = browserToolSnapshotResultSchema.safeParse(result.value);
+
+    if (!snapshot.success) {
+      return { error: 'The page returned an invalid snapshot.', ok: false };
+    }
+
+    scriptingRefCount = snapshot.data.nextRef;
+    registerRefs(call.refs, snapshot.data.refs, { merge });
+
+    if (call.scope === undefined) {
+      return { lines: snapshot.data.lines, ok: true };
+    }
+
+    const lines = await spliceScriptingFrames(snapshot.data, depth, {
+      probe: isolatedProbe,
+      readFrame: async (frameId, maxDepth) => {
+        const frame = await runScriptingPageScript({
+          frameId,
+          script: buildSnapshotPageScript({
+            boxes: false,
+            depth: maxDepth,
+            refStart: 0,
+            targetSelector: undefined,
+            withRefs: false,
+          }),
+          scriptingApi,
+          tabId,
+        });
+        const parsed = frame.ok
+          ? browserToolSnapshotResultSchema.safeParse(frame.value)
+          : undefined;
+
+        return parsed?.success === true ? parsed.data : undefined;
+      },
+      readableOrigins: call.scope.readableOrigins,
+    });
+
+    return { lines, ok: true };
+  };
+
   const resolveTargetArg = (
     refs: ReadonlyMap<string, BrowserToolRefEntry>,
     targetText: string
@@ -2867,8 +2930,9 @@ export const createBrowserToolSession = ({
   const runCallTool = async (
     toolName: string,
     args: Record<string, unknown>,
-    refs: Map<string, BrowserToolRefEntry>
+    call: ScriptingCallContext
   ): Promise<BrowserToolCallResult> => {
+    const { refs } = call;
     const baseName = toolName.startsWith(KILO_BROWSER_TOOL_PREFIX)
       ? toolName.slice(KILO_BROWSER_TOOL_PREFIX.length)
       : toolName;
@@ -3009,31 +3073,44 @@ export const createBrowserToolSession = ({
           targetSelector = resolved.selector;
         }
 
-        const result = await runPageTool(
-          buildFindPageScript({
-            boxes: false,
-            depth: parsed.data.depth,
-            needle: parsed.data.text,
-            refStart: scriptingRefCount,
-            regex: parsed.data.regex,
-            targetSelector,
-          })
+        let matches: (line: string) => boolean = () => false;
+
+        try {
+          const pattern =
+            parsed.data.regex === undefined ? undefined : new RegExp(parsed.data.regex, 'iu');
+          const needle = (parsed.data.text ?? '').toLowerCase();
+
+          matches = line =>
+            pattern === undefined ? line.toLowerCase().includes(needle) : pattern.test(line);
+        } catch {
+          return {
+            error: `browser_find: /${parsed.data.regex ?? ''}/ is not a valid regular expression.`,
+            ok: false,
+          };
+        }
+
+        // A find reads the same tree a snapshot does and only adds refs: the last snapshot's refs keep resolving.
+        const captured = await captureScriptingSnapshot(
+          { boxes: false, depth: parsed.data.depth, merge: true, targetSelector },
+          call
         );
 
-        if (!result.ok) {
-          return result;
+        if (!captured.ok) {
+          return captured;
         }
 
-        const found = browserToolFindResultSchema.safeParse(result.value);
+        const { lines } = captured;
+        const blocks = lines.flatMap((line, index) =>
+          matches(line)
+            ? [
+                lines
+                  .slice(Math.max(0, index - FIND_CONTEXT_LINES), index + FIND_CONTEXT_LINES + 1)
+                  .join('\n'),
+              ]
+            : []
+        );
 
-        if (!found.success) {
-          return { error: 'The page returned an invalid find result.', ok: false };
-        }
-
-        scriptingRefCount = found.data.nextRef;
-        registerRefs(refs, found.data.refs);
-
-        if (found.data.total === 0) {
+        if (blocks.length === 0) {
           return {
             ok: true,
             value:
@@ -3045,7 +3122,7 @@ export const createBrowserToolSession = ({
 
         return {
           ok: true,
-          value: `Found ${String(found.data.total)} matching line(s):\n\n${found.data.blocks.join('\n--\n')}`,
+          value: `Found ${String(blocks.length)} matching line(s):\n\n${blocks.join('\n--\n')}`,
         };
       }
 
@@ -3153,34 +3230,26 @@ export const createBrowserToolSession = ({
           targetSelector = resolved.selector;
         }
 
-        const result = await runPageTool(
-          buildSnapshotPageScript({
+        const captured = await captureScriptingSnapshot(
+          {
             boxes: parsed.data.boxes ?? false,
             depth: parsed.data.depth,
-            refStart: scriptingRefCount,
+            merge: targetSelector !== undefined,
             targetSelector,
-          })
+          },
+          call
         );
 
-        if (!result.ok) {
-          return result;
+        if (!captured.ok) {
+          return captured;
         }
-
-        const snapshot = browserToolSnapshotResultSchema.safeParse(result.value);
-
-        if (!snapshot.success) {
-          return { error: 'The page returned an invalid snapshot.', ok: false };
-        }
-
-        scriptingRefCount = snapshot.data.nextRef;
-        registerRefs(refs, snapshot.data.refs, { merge: targetSelector !== undefined });
 
         const note =
           parsed.data.filename === undefined
             ? ''
             : `\nFilename "${parsed.data.filename}" was not written: this extension has no workspace root, so the snapshot is returned inline.`;
 
-        return { ok: true, value: `${snapshot.data.lines.join('\n')}${note}` };
+        return { ok: true, value: `${captured.lines.join('\n')}${note}` };
       }
 
       case 'browser_take_screenshot': {
@@ -3425,9 +3494,9 @@ export const createBrowserToolSession = ({
       backend,
       ...isolatedProbeMember,
       bindCaller: nextKey => createCallerView(nextKey, callerRefs(nextKey), guard),
-      callTool: (toolName, args) => {
+      callTool: (toolName, args, scope) => {
         throwIfCancelled();
-        return runCallTool(toolName, args ?? {}, refs);
+        return runCallTool(toolName, args ?? {}, { refs, scope });
       },
       captureViewportImage: (format, options, callGuard) => {
         throwIfCancelled();
@@ -3480,7 +3549,8 @@ export const createBrowserToolSession = ({
     backend,
     ...isolatedProbeMember,
     bindCaller: (callerKey, guard) => createCallerView(callerKey, callerRefs(callerKey), guard),
-    callTool: (toolName, args) => runCallTool(toolName, args ?? {}, defaultRefs),
+    callTool: (toolName, args, scope) =>
+      runCallTool(toolName, args ?? {}, { refs: defaultRefs, scope }),
     captureViewportImage,
     childFrames: () => new Map(childFrames),
     consoleMessages: () => [...consoleBuffer],

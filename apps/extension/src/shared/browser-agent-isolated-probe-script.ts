@@ -88,8 +88,12 @@ export const runIsolatedAgentProbe = (kind: string, selector: string): string =>
     // The content-script global is a sandbox over the page window, so the frame's own window is `window`.
     // oxlint-disable-next-line unicorn/prefer-global-this
     const parentFrameId = window === window.top ? null : frameIdOf(window.parent);
+    // The frame each `<iframe>`/`<frame>` hosts, in the document order the page-side snapshot numbers them in.
+    const owners = [...document.querySelectorAll('iframe, frame')].map(element =>
+      frameIdOf(element)
+    );
 
-    return JSON.stringify({ origin: location.origin, parentFrameId, url: location.href });
+    return JSON.stringify({ origin: location.origin, owners, parentFrameId, url: location.href });
   }
 
   if (kind === 'target') {
@@ -99,6 +103,18 @@ export const runIsolatedAgentProbe = (kind: string, selector: string): string =>
     return JSON.stringify(
       matches.length === 1 && element !== undefined ? { probe: classify(element) } : {}
     );
+  }
+
+  if (kind === 'hosted') {
+    const matches = document.querySelectorAll(selector);
+    const [element] = matches;
+    const owner =
+      matches.length === 1 &&
+      element !== undefined &&
+      ['frame', 'iframe'].includes(htmlNameOf(element));
+
+    // A frame element belongs to this document but shows another one: a call on it needs the hosted frame's origin.
+    return JSON.stringify(owner ? { frameId: frameIdOf(element) } : {});
   }
 
   if (kind === 'focused') {

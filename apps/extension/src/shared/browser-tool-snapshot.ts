@@ -717,7 +717,8 @@ const captureAxTreeSnapshot = async (
  */
 export const captureBrowserAriaSnapshot = async (
   session: BrowserToolPageSession,
-  options: BrowserSnapshotArguments
+  options: BrowserSnapshotArguments,
+  registration: { readonly mergeRefs?: boolean } = {}
 ): Promise<BrowserAriaSnapshotCapture> => {
   const rootBackendNodeId =
     options.target === undefined || options.target === ''
@@ -736,7 +737,9 @@ export const captureBrowserAriaSnapshot = async (
     }));
 
   const targeted = options.target !== undefined && options.target !== '';
-  session.registerRefs(resolvedSnapshot.refs, { merge: targeted });
+  session.registerRefs(resolvedSnapshot.refs, {
+    merge: targeted || registration.mergeRefs === true,
+  });
 
   const body =
     resolvedSnapshot.lines.length === 0

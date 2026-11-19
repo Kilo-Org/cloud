@@ -296,6 +296,25 @@ describe('browser_find', () => {
     expect(text).toContain('- button "Submit" [ref=e12]');
   });
 
+  it('keeps the refs of the last snapshot: a find only adds to the registry', async () => {
+    const { session } = createSession();
+    const registrations: unknown[] = [];
+    const recording: BrowserToolPageSession = {
+      ...session,
+      registerRefs: (_refs, options) => {
+        registrations.push(options);
+      },
+    };
+
+    await runReadBrowserTool('browser_find', { text: 'submit' }, recording);
+    await runReadBrowserTool('browser_find', { text: 'submit' }, recording, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+    });
+    await runReadBrowserTool('browser_snapshot', {}, recording);
+
+    expect(registrations).toStrictEqual([{ merge: true }, { merge: true }, { merge: false }]);
+  });
+
   it('finds by regex', async () => {
     const { session } = createSession();
     const result = await runReadBrowserTool('browser_find', { regex: '/wel+come/i' }, session);

@@ -260,8 +260,8 @@ export const runKiloBrowserTool = async ({
      * already refused the tools Firefox cannot express.
      */
     if (session.backend === 'scripting' && !TAB_ONLY_TOOL_NAMES.has(upstreamName)) {
-      const result = await session.callTool(toolName, parsedArgs.data);
       const scope = options?.agentScope;
+      const result = await session.callTool(toolName, parsedArgs.data, scope);
 
       // The capture shows every frame and field on the page; an agent sees only what it may read.
       if (upstreamName !== 'browser_take_screenshot' || scope === undefined) {

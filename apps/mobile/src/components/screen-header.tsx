@@ -125,8 +125,11 @@ export function shouldStackHeaderActions(
 const MAX_TITLE_LINES = 3;
 
 /**
- * What a reserved band's eyebrow twin lays out with: a space, so the twin
- * holds one eyebrow line without painting a label that is not on screen.
+ * What a reserve paints when it has no label yet: a no-break space, which paints
+ * no ink. It holds the eyebrow variant's single line box
+ * (`EYEBROW_LINE_HEIGHT_DP` in `ui/text.tsx`), which no longer depends on the
+ * script, so a zero-ink filler reserves exactly the height the arriving label
+ * takes.
  */
 const blankEyebrow = '\u00A0';
 
@@ -356,6 +359,21 @@ function reservedTitleHeightClass(size: ScreenHeaderProps['size'], titleLines: n
 }
 
 /**
+ * The band the header's title occupies, and the band the leading control
+ * occupies beside it. One class for both, so the two cells measure the same
+ * height and the row's `items-center` lines the control up with the title at
+ * every font scale. One line of a detail title is shorter than the control's
+ * 48 dp target, and a control has to live in a box of its own size for
+ * React Native to deliver its touches — a 48 dp box inside a 24.8 dp parent is
+ * reachable only across the parent's bounds — so the band is the control's
+ * height whenever the title's own reserve is shorter. A deeper title cap keeps
+ * its reserve, so a name that wraps cannot move the body either.
+ */
+function titleBandClass(size: ScreenHeaderProps['size'], titleLines: number): string {
+  return titleLines === 1 ? 'min-h-[48px]' : reservedTitleHeightClass(size, titleLines);
+}
+
+/**
  * Whether the header's back control can pop, re-read on every navigation
  * commit.
  *
@@ -559,6 +577,28 @@ export function ScreenHeader({
     );
   }
 
+  // A centered title shares its row with the leading and trailing controls.
+  // A spacer opposite the back control keeps the title centered on the full
+  // width without placing either control out of flow. A reserved eyebrow is one
+  // of that title's own lines, painted from the first frame: counting it here
+  // keeps the row's shape (and the back control's gutter pull) from changing
+  // when the label lands.
+  const separateHeading = centerTitle && (Boolean(title) || Boolean(eyebrow) || reserveEyebrow);
+
+  // One decision for two cells: the heading lays the subtitle under its title
+  // and the leading column lays a zero-ink twin of that same line under its
+  // band, so the column always measures what the heading measures.
+  const hasSubtitleLine = Boolean(subtitle) || reserveSubtitle || Boolean(subtitlePlaceholder);
+
+  // The title and the leading control share one band, so the caret has a real
+  // 48 x 48 dp box inside its parent instead of a target clipped by a 24.8 dp
+  // line, and the two cells measure the same height at every font scale (see
+  // `titleBandClass`). Only a non-centred header that draws a back control has
+  // that column; without one the heading keeps the tree — and the height — it
+  // has always had, so the band class never applies and no wrapper is added.
+  const hasBackControl = canGoBack && !separateHeading;
+  const bandClass = cn('justify-center', hasBackControl && titleBandClass(size, titleLines));
+
   const heading = (
     <View className="min-w-0 flex-1">
       {eyebrow || reserveEyebrow ? (
@@ -592,8 +632,8 @@ export function ScreenHeader({
           </Eyebrow>
         </View>
       ) : null}
-      {titleNode}
-      {subtitle || reserveSubtitle || subtitlePlaceholder ? (
+      {hasBackControl ? <View className={bandClass}>{titleNode}</View> : titleNode}
+      {hasSubtitleLine ? (
         <View className={cn('mt-0.5', centerTitle && 'items-center')}>
           {subtitle === undefined && subtitlePlaceholder ? (
             // The reserved text below still holds the line's height, so the
@@ -627,13 +667,6 @@ export function ScreenHeader({
       ) : null}
     </View>
   );
-  // A centered title shares its row with the leading and trailing controls.
-  // A spacer opposite the back control keeps the title centered on the full
-  // width without placing either control out of flow. A reserved eyebrow is one
-  // of that title's own lines, painted from the first frame: counting it here
-  // keeps the row's shape (and the back control's gutter pull) from changing
-  // when the label lands.
-  const separateHeading = centerTitle && (Boolean(title) || Boolean(eyebrow) || reserveEyebrow);
 
   // The reserve, as a band rather than a box around the title: a zero-width,
   // clipped twin of the eyebrow and the title's line cap holds the header's text
@@ -651,7 +684,7 @@ export function ScreenHeader({
     </View>
   ) : null;
 
-  // The leading control's pull into the gutter is a START-side margin, never a
+  // The leading column's pull into the gutter is a START-side margin, never a
   // hand-picked `mr` under RTL. With `I18nManager.doLeftAndRightSwapInRTL` on
   // (the default) React Native rewrites margin Left/Right to Yoga Start/End
   // before layout (YogaLayoutableShadowNode `swapLeftAndRightInYogaStyleProps`),
@@ -673,10 +706,10 @@ export function ScreenHeader({
   // whenever the device had keyboard or D-pad focus (measured on the emulator:
   // `#E8E7E3` over the target's full rect, sharp corners, from the first TAB
   // press). The frame clips that surface to a circle, so the control reads as an
-  // icon button while it stays focusable and keeps the same rect, gutter pull
-  // and label.
+  // icon button while it stays focusable and keeps the same rect and label; the
+  // leading column around it carries the gutter pull.
   const backControl = canGoBack ? (
-    <View className={cn('shrink-0 overflow-hidden rounded-full', !separateHeading && '-ms-4')}>
+    <View className="shrink-0 overflow-hidden rounded-full">
       <Pressable
         onPress={handleBack}
         accessibilityRole="button"
@@ -689,6 +722,63 @@ export function ScreenHeader({
           <DirectionalChevronLeft size={24} color={colors.foreground} />
         )}
       </Pressable>
+    </View>
+  ) : null;
+
+  // The leading column holds one 48dp control and mirrors the heading's own
+  // lines beside it — the eyebrow twin, the band the title sits in, the
+  // subtitle twin — so the two cells always measure the same height and the
+  // header's own height is unchanged by the control.
+  //
+  // The control has to live in a box of its own size. React Native hit-tests
+  // inside each view's bounds, so the caret laid over the title's line in an
+  // absolutely positioned overlay was reachable only across 48 x 24.8 dp — the
+  // 11.6 dp above and below the title line ignored the touch — and that box
+  // also crossed about 1 dp into the screen body past the header's `pb-3`. The
+  // band is that box: the very `titleBandClass` string the heading wraps its
+  // title in, so the caret's 48dp target sits whole inside a parent at least
+  // that tall, in normal flow, with nothing positioned absolutely.
+  //
+  // One class for both cells is also what keeps them the same height at any
+  // font scale: `min-h-[48px]` for a one-line title, the title's own reserve
+  // for a deeper cap (`min-h-14` for two lines), so a name that wraps cannot
+  // move the body past either cell. The twins hold the lines the heading lays
+  // above and below the band, so the row's `items-center` centres the caret on
+  // the TITLE BAND rather than on the eyebrow-plus-title block, which left the
+  // glyph about 12dp above the title line it belongs to (the organization
+  // invoices header: its eyebrow is the screen's name, its title the
+  // organization's).
+  //
+  // The twins paint nothing (a no-break space) and reach no reader. A heading
+  // with no eyebrow or subtitle lays out neither twin, and the column is then
+  // just the band: the plain 48dp box the caret has always had.
+  const hasEyebrowLine = Boolean(eyebrow) || reserveEyebrow;
+  const leadingControl = hasBackControl ? (
+    <View className="w-[48px] shrink-0 -ms-4">
+      {hasEyebrowLine ? (
+        <Eyebrow
+          className="mb-0.5"
+          numberOfLines={1}
+          aria-hidden
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          {blankEyebrow}
+        </Eyebrow>
+      ) : null}
+      <View className={bandClass}>{backControl}</View>
+      {hasSubtitleLine ? (
+        <Text
+          variant="muted"
+          className="mt-0.5"
+          numberOfLines={1}
+          aria-hidden
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          {blankEyebrow}
+        </Text>
+      ) : null}
     </View>
   ) : null;
   // A fixed-width trailing cluster sizes to its content and never shrinks
@@ -771,7 +861,7 @@ export function ScreenHeader({
           <>
             <View className="flex-row items-center">
               <View className="min-w-0 flex-1 flex-row items-center gap-1">
-                {backControl}
+                {leadingControl}
                 {heading}
               </View>
               {reservedTitleBand}

@@ -211,9 +211,10 @@ function countedCall(node, text) {
 }
 
 /**
- * One traversal of the source tree: every counted call, and every file the
- * parser refused. It is the one traversal the accessors below project from, so
- * an audit that asks several questions of the same tree scans it once.
+ * One traversal of the source tree: every counted call, and every file the walk
+ * could not read or the parser refused. It is the one traversal the accessors
+ * below project from, so an audit that asks several questions of the same tree
+ * scans it once.
  */
 export function auditCountedCalls(rootDir = SOURCE_DIR) {
   const calls = [];
@@ -268,10 +269,11 @@ export function collectDynamicCountedCalls(scan) {
 }
 
 /**
- * Every source file the parser refused, as one problem line per error. The
- * tree of such a file is empty, so its counted messages are invisible; saying
- * so keeps a syntax error from passing as a clean audit. It projects a scan the
- * caller made once with `auditCountedCalls`.
+ * Every problem the tree scan made, as one line each: a file the parser refused
+ * or a file the walk could not read. A refused file's tree is empty, so its
+ * counted messages are invisible; an unreadable one was never read at all.
+ * Saying so keeps either failure from passing as a clean audit. It projects a
+ * scan the caller made once with `auditCountedCalls`.
  */
 export function findUnparsedFiles(scan) {
   return scan.problems;
@@ -474,6 +476,11 @@ function declaredKeys(entry, declaration) {
  * diagnostics name it by, the syntax tree its declarations are read from, the
  * lines that say the parser refused it, and the keys read from each declaration
  * so far — the two `McpStatusKey` entries share one read.
+ *
+ * A refused read is worded exactly as the tree walk words it. The module sits
+ * below the source root, so both reads reach it; one wording means the caller's
+ * `reported` set drops the line the scan already owns instead of printing the
+ * same failure twice.
  */
 function readDeclarationModule(rootDir, source) {
   const file = join(rootDir, source);
@@ -486,7 +493,7 @@ function readDeclarationModule(rootDir, source) {
       path: source,
       entry: null,
       declarations: new Map(),
-      problems: [`${source}: cannot read the module that declares its keys: ${message}`],
+      problems: [`${source}: cannot read: ${message}`],
     };
   }
   const entry = parseSourceEntry(rootDir, rootDir, file, text);
@@ -501,9 +508,9 @@ function readDeclarationModule(rootDir, source) {
  * naming the key, the expression, the declaration and the module that owns it.
  * Empty on a healthy tree. It reads the declaration modules only, so an audit
  * can check them without walking the source tree first. A caller that also
- * scanned the tree passes the parse problems that scan already printed as
- * `reported`: the declaration modules live below the source root, so the same
- * `cannot parse` line reaches both reads, and the tree's own scan owns it.
+ * scanned the tree passes the problems that scan already printed as `reported`:
+ * the declaration modules live below the source root, so the same `cannot read`
+ * or `cannot parse` line reaches both reads, and the tree's own scan owns it.
  */
 export function checkDynamicCountedKeySources(rootDir = ROOT, reported = new Set()) {
   const problems = [];

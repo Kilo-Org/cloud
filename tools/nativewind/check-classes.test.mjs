@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import {
+  chmodSync,
   copyFileSync,
   mkdirSync,
   mkdtempSync,
@@ -426,6 +427,40 @@ test('runs the whole audit over a clean tree through the CLI and ignores test sc
     result.stdout,
     /check-classes: no dropped classes, stray raw Text or hand-built formatters/
   );
+});
+
+test('reports an unreadable file through the CLI and keeps the findings it collected', context => {
+  // The read refusal must reach the same problem list as the rules', or the
+  // audit ends on a stack trace and loses every finding already collected.
+  if (process.getuid?.() === 0) {
+    context.skip('root reads any file, so chmod 000 leaves it readable');
+    return;
+  }
+  const root = makeFixture(context, {
+    'apps/mobile/src/bans.ts': 'const b = "text-start";\n',
+    'apps/mobile/src/locked.ts': 'const c = "text-start";\n',
+  });
+  const locked = join(root, 'apps/mobile/src/locked.ts');
+  chmodSync(locked, 0o000);
+  // Restore the mode before the fixture's own cleanup runs, so removal cannot
+  // trip on the mode this case set.
+  try {
+    const result = spawnSync(process.execPath, [join(root, 'tools/nativewind/check-classes.mjs')], {
+      cwd: root,
+      encoding: 'utf8',
+      timeout: 30_000,
+    });
+
+    assert.ifError(result.error);
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stderr, /locked\.ts: cannot read: /);
+    assert.match(result.stderr, /bans\.ts:1: "text-start"/);
+    assert.match(result.stderr, /check-classes: \d+ problem\(s\)/);
+    // A stack trace means the read escaped the problem list.
+    assert.doesNotMatch(result.stderr, /\n\s+at /);
+  } finally {
+    chmodSync(locked, 0o644);
+  }
 });
 
 /**

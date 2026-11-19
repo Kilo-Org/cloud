@@ -349,6 +349,7 @@ export function NewSessionScreenBody() {
     models,
     isLoading: isLoadingModels,
     isError: isModelsError,
+    isFetching: isFetchingModels,
     refetch: refetchModels,
   } = useAvailableModels(organizationId);
   const instanceCatalog = useInstanceModelCatalog(runOnInstance?.connectionId ?? null);
@@ -1322,6 +1323,16 @@ export function NewSessionScreenBody() {
     // The Environment row already shows its busy state; the footer says why
     // Start waits on it, so a disabled control is never unexplained.
     startBlockedReason = t('agentChat.newSession.profileLoadingToStart');
+  } else if (startBlockedReasonKey === 'model-missing' && isModelsError) {
+    // Nothing to pick from: the failed read is the blocker, so the footer names
+    // it and carries its Retry instead of asking for a pick the picker cannot
+    // offer. The composer keeps its toolbar and does not repeat the failure.
+    startBlockedReason = t('agentChat.newSession.couldNotLoadModels');
+    startBlockedAction = {
+      label: t('common.retry'),
+      onPress: () => void refetchModels(),
+      isBusy: isFetchingModels,
+    };
   } else if (startBlockedReasonKey === 'model-missing') {
     startBlockedReason = t('agentChat.newSession.modelMissingToStart');
   } else if (startBlockedReasonKey === 'stale-selection') {

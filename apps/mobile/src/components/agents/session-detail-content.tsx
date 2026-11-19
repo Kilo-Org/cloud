@@ -14,7 +14,8 @@ import {
   useRouter,
 } from 'expo-router';
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
-import { ArrowLeft, MessageSquare, RotateCcw } from '@/components/ui/icons';
+import { MessageSquare, RotateCcw } from '@/components/ui/icons';
+import { DirectionalArrowLeft } from '@/components/ui/directional-icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic } from '@/lib/haptics';
@@ -3415,7 +3416,7 @@ export function SessionDetailContent({
                   one action slot instead of the card handing one its own. */}
               <StateAction
                 label={t('agentChat.session.backToSessions')}
-                icon={ArrowLeft}
+                icon={DirectionalArrowLeft}
                 onPress={handleBackToSessions}
               />
             </View>

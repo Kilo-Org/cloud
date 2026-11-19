@@ -3,6 +3,7 @@ import type { BackgroundActivityState } from './background-activity';
 import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
 import { readCloudAgentErrorFields } from '@kilocode/app-shared/cloud-agent-error';
 import { WORKSPACE_DELETING } from '@kilocode/session-ingest-contracts';
+import type { CloudSessionSnapshotPage } from './types';
 import {
   errorShapeSchema,
   cloudSessionMetadataSchema,
@@ -2540,8 +2541,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       }
       if (cloudRead) {
         // A page that fails the schema is terminal, matching the transport's
-        // snapshot read: retrying re-reads the same persisted page.
-        const parsed = cloudSessionMessagesPageSchema.safeParse(cloudPage);
+        // snapshot read: retrying re-reads the same persisted page. The
+        // schema's transform can also throw (a session-identity mismatch),
+        // and safeParse does not convert a transform throw into a failure.
+        let parsed: { success: true; data: CloudSessionSnapshotPage | null } | { success: false };
+        try {
+          parsed = cloudSessionMessagesPageSchema.safeParse(cloudPage);
+        } catch {
+          parsed = { success: false };
+        }
         outcome = parsed.success ? parsed.data : { kind: 'invalid_data' };
       }
       if (expectedGeneration !== loadOlderGeneration) return;

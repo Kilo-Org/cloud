@@ -13,7 +13,7 @@ import type {
   UserMessage,
   AssistantMessage,
   QuestionInfo,
-} from '@/types/opencode.gen';
+} from '@/types/opencode';
 
 /**
  * Message format used by the processor.

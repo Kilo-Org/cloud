@@ -4,6 +4,7 @@ import { ScrollView, type ScrollViewInstance, View } from 'react-native';
 import { PickerSheet } from '@/components/picker-sheet';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { Text } from '@/components/ui/text';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 
 type ContextPickerSheetProps = {
   /** Sheet heading, shown in the standard picker header above the rows. */
@@ -38,6 +39,7 @@ export function ContextPickerSheet({
   expired = false,
 }: Readonly<ContextPickerSheetProps>) {
   const listRef = useRef<ScrollViewInstance>(null);
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const [viewportHeight, setViewportHeight] = useState(0);
   const [checkedRow, setCheckedRow] = useState<{ y: number; height: number } | null>(null);
   const revealed = useRef(false);
@@ -78,6 +80,7 @@ export function ContextPickerSheet({
       <ScrollView
         ref={listRef}
         className="flex-1"
+        style={sideInsetMarginStyle}
         nestedScrollEnabled
         showsVerticalScrollIndicator={false}
         onLayout={event => {

@@ -234,14 +234,14 @@ function getSignupIp(requestHeaders?: Headers): string | null {
 async function checkNormalizedEmailUnique(
   normalizedEmail: string,
   tx: DrizzleTransaction
-): Promise<Result<null, 'EMAIL-ALREADY-USED'>> {
+): Promise<OptionalError<'EMAIL-ALREADY-USED'>> {
   const [existing] = await tx
     .select({ id: kilocode_users.id })
     .from(kilocode_users)
     .where(eq(kilocode_users.normalized_email, normalizedEmail))
     .limit(1);
 
-  if (!existing) return successResult(null);
+  if (!existing) return successResult();
 
   console.warn('[auth] Signup rejected: normalized_email already in use', {
     normalized_email: normalizedEmail,
@@ -1220,7 +1220,9 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   user_notification_preferences)
  * - the organization's shared-services openai_chatgpt_connections row is kept
  *   (it belongs to the organization): the deleted connector's reference is
- *   cleared, and `created_by` keeps the record of who connected it
+ *   cleared, and `created_by` keeps the record of who connected it, so the
+ *   organization's shared connection reports that it needs a reconnect until an
+ *   owner reconnects it
  * - spend alert settings and their rules/state, the personal-scope hourly
  *   counters, and the personal-scope deliveries (recipients contain billing
  *   contact PII); organization-scoped alert rows are retained, with the deleted
@@ -1347,6 +1349,7 @@ export async function anonymizeCloudUserData(
       customer_source: null,
       signup_ip: null,
       external_id: null,
+      anthropic_user_profile_id: null,
     })
     .where(eq(kilocode_users.id, userId));
 
@@ -1685,6 +1688,8 @@ export async function anonymizeCloudUserData(
   // row is the organization's connection, so it stays behind and only loses the
   // reference to the connector who is being deleted. `created_by` keeps the
   // record of who connected it, and the next reconnect names the new connector.
+  // Until an owner reconnects it, the organization's shared connection reports
+  // that it needs a reconnect.
   await tx
     .delete(openai_chatgpt_connections)
     .where(

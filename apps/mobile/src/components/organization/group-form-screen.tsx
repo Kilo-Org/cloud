@@ -1,10 +1,10 @@
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
-import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
-import { ArrowLeft, Lock, Users } from '@/components/ui/icons';
+import { Lock } from '@/components/ui/icons';
 
-import { EmptyState, StateAction } from '@/components/empty-state';
+import { EmptyState } from '@/components/empty-state';
 import { GroupForm } from '@/components/organization/group-form';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
@@ -85,9 +85,17 @@ export function OrganizationGroupFormScreen() {
 
   if (groupQuery.isError) {
     const errorView = selectOrgListErrorView(groupQuery.error);
+    // `groups.get` answers an unknown or deleted group with NOT_FOUND, so the
+    // missing group arrives here, not as an empty success.
+    if (errorView.variant === 'not-found') {
+      return <GroupNotFound />;
+    }
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('organization.settingsOnWeb.groups')} />
+        <ScreenHeader
+          title={t('organization.settingsOnWeb.groups')}
+          backFallback={GROUPS_LIST_PATH as Href}
+        />
         <QueryError
           variant={errorView.variant}
           onRetry={errorView.showRetry ? () => void groupQuery.refetch() : undefined}
@@ -106,25 +114,19 @@ export function OrganizationGroupFormScreen() {
   return <GroupForm key={group?.id ?? 'new'} organizationId={organizationId} group={group} />;
 }
 
+/**
+ * The shared not-found state. The header owns the one way out, and its
+ * fallback lands on the groups list when a deep link left no history to pop.
+ */
 function GroupNotFound() {
-  const router = useRouter();
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('organization.settingsOnWeb.groups')} />
-      <EmptyState
-        icon={Users}
-        title={t('organization.groups.notFound')}
-        action={
-          <StateAction
-            label={t('common.back')}
-            icon={ArrowLeft}
-            onPress={() => {
-              router.replace(GROUPS_LIST_PATH as Href);
-            }}
-          />
-        }
+      <ScreenHeader
+        title={t('organization.settingsOnWeb.groups')}
+        backFallback={GROUPS_LIST_PATH as Href}
       />
+      <QueryError variant="not-found" message={t('organization.groups.notFound')} />
     </View>
   );
 }

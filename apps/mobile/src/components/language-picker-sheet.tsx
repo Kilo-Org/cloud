@@ -35,6 +35,7 @@ import {
 } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 
 // The picker sheet renders its own scroll container (`scrollable={false}`), so
 // the list fills the sheet's body. The list stays transparent: the route's
@@ -74,6 +75,7 @@ export function LanguagePickerSheet({
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   // A sheet shorter than its header plus one row (a short window, and the
   // keyboard takes more of it) cannot show a pinned search field and a result
   // row at the same time. The search field then leads the scrolling list
@@ -327,12 +329,12 @@ export function LanguagePickerSheet({
       </PickerSheet>
     );
   }
-  // The field lives in `@/components/language-search-field`: the pill chrome
-  // and the shared single-line `Input`, extracted to keep this sheet within
-  // its max-lines budget.
+  // The field lives in `@/components/language-search-field`, the shared
+  // `SearchField`, extracted to keep this sheet within its max-lines budget.
   const searchField = (
     <LanguageSearchField
       editable={!busy}
+      hasText={query !== ''}
       inputRef={searchInputRef}
       draftRef={searchTextRef}
       onChangeText={text => {
@@ -367,7 +369,7 @@ export function LanguagePickerSheet({
       <FlashList<LanguagePickerItem>
         nestedScrollEnabled
         ref={listRef}
-        style={listFlexStyle}
+        style={[listFlexStyle, sideInsetMarginStyle]}
         contentContainerStyle={listIsEmpty ? emptyListContentContainerStyle : listPadStyle}
         data={items}
         extraData={rowExtraData}

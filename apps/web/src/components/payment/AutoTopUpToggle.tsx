@@ -31,13 +31,19 @@ import {
 } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import { formatCents, formatPaymentMethodDescription } from '@/lib/utils';
 import { CreditExpiryNotice, usePaidCreditPolicyReady } from './CreditExpiryNotice';
+import { AutoTopUpLoadFailure } from './AutoTopUpLoadFailure';
 
 export function AutoTopUpToggle() {
   const policyReady = usePaidCreditPolicyReady();
   const [configureModalOpen, setConfigureModalOpen] = useState(false);
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const { data: autoTopUpInfo, isSuccess: autoTopUpConfigReady } = useQuery({
+  const {
+    data: autoTopUpInfo,
+    isSuccess: autoTopUpConfigReady,
+    isError,
+    refetch,
+  } = useQuery({
     ...trpc.user.getAutoTopUpPaymentMethod.queryOptions(),
   });
   const enabled = autoTopUpInfo?.enabled ?? false;
@@ -146,6 +152,10 @@ export function AutoTopUpToggle() {
     removePaymentMethodMutation.isPending;
 
   const displayAmount = enabled ? currentAmount : selectedAmount;
+
+  if (isError && autoTopUpInfo === undefined) {
+    return <AutoTopUpLoadFailure onRetry={() => void refetch()} />;
+  }
 
   if (!enabled) {
     return (

@@ -290,6 +290,11 @@ export async function executeBatchReviewDecisionFetch(owner: TenantOwner): Promi
       appType,
     });
   } catch (error) {
+    // A failed read leaves every row claimed for this batch pending, so the next
+    // claim window retries instead of storing a decision no read produced. The
+    // blast radius is the whole batch: one repository GitHub can no longer
+    // resolve keeps the tenant's other claimed rows waiting and retrying while a
+    // client polls their pending flag. That wait is preferred to a wrong badge.
     captureException(error, { tags: { source: 'batch_review_decision_graphql' } });
     return;
   }

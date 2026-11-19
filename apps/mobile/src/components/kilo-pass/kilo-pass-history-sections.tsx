@@ -18,6 +18,7 @@ import {
   type KiloPassCreditHistory,
 } from '@/lib/hooks/use-kilo-pass-history';
 import { type KiloPassBillingEntry, type KiloPassCreditEntry } from '@/lib/kilo-pass/management';
+import { kiloPassTierLabel } from '@/lib/kilo-pass/state';
 import { isRetryableTrpcError } from '@/lib/trpc-error';
 import { capitalize, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
@@ -101,8 +102,8 @@ function SectionError({
 }
 
 /**
- * A row title without the parts of the server's description that are not for
- * the reader.
+ * A description without the parts of the server's sentence that are not for the
+ * reader, or '' when nothing readable is left.
  *
  * The product name comes off because the screen header already prints it, and a
  * row that repeats it buries the part that tells the rows apart, the credits'
@@ -113,33 +114,68 @@ function SectionError({
  *
  * The remainder keeps its sentence capital so the title still reads as a title.
  */
-function creditRowTitle(description: string): string {
+function cleanedRowTitle(description: string): string {
   const title = description
     .replace(/^kilo pass\s+/i, '')
     .replace(/\s*\([^()]*\)\s*$/, '')
     .trim();
-  if (title.length === 0) {
-    return i18n.t('common.creditHistory');
-  }
   // The first grapheme is display text, so its case is the active locale's.
-  return capitalize(title);
+  return title.length === 0 ? '' : capitalize(title);
 }
 
 function CreditHistoryLine({ entry }: Readonly<{ entry: KiloPassCreditEntry }>) {
+  const title = firstNonEmpty(cleanedRowTitle(entry.description), i18n.t('common.creditHistory'));
   return (
     <HistoryLine
-      title={creditRowTitle(entry.description)}
+      title={title}
       date={historyDate(entry.date)}
       amount={formatPrefixedMoney(entry.amountUsd, i18n.language)}
     />
   );
 }
 
+/** The catalog key for every invoice line kind the server classifies. */
+const BILLING_ROW_TITLE_KEYS = {
+  initial: 'kiloPass.manage.billingRowInitial',
+  renewal: 'kiloPass.manage.billingRowRenewal',
+  trial: 'kiloPass.manage.billingRowTrial',
+  upgrade: 'kiloPass.manage.billingRowUpgrade',
+  // The line the server could not type still has row copy: the charge was the
+  // subscription itself.
+  unknown: 'kiloPass.manage.billingRowSubscription',
+} as const satisfies Record<string, string>;
+
+/** True for a line kind this build has row copy for. */
+function isNamedBillingRowKind(kind: string): kind is keyof typeof BILLING_ROW_TITLE_KEYS {
+  // Every kind the server classifies is named here; the wire itself is an open
+  // set, so a kind this build has never seen still falls back to the description.
+  return Object.hasOwn(BILLING_ROW_TITLE_KEYS, kind);
+}
+
+/**
+ * A billing row title.
+ *
+ * The provider's description is a sentence written for its own dashboard: it
+ * names the product, the plan's internal id, the cadence and sometimes a streak,
+ * none of which a row already under the Kilo Pass header needs to repeat. The
+ * server types the invoice line instead, so the row says what the charge was — a
+ * trial, the first charge, a renewal, a plan change, or the subscription a line
+ * the server could not otherwise type paid for — and the tier it billed, in the
+ * reader's language. Every kind the server classifies has row copy, so only a row
+ * with no typed line at all falls back to the provider's sentence, cleaned the
+ * way a credit row is.
+ */
+function billingRowTitle(entry: KiloPassBillingEntry): string {
+  const line = entry.kind === 'stripe' ? entry.line : null;
+  if (line && isNamedBillingRowKind(line.kind)) {
+    const tier = line.tier ? kiloPassTierLabel(line.tier) : i18n.t('kiloPass.title');
+    return i18n.t(BILLING_ROW_TITLE_KEYS[line.kind], { tier });
+  }
+  return firstNonEmpty(cleanedRowTitle(entry.description ?? ''), i18n.t('kiloPass.title'));
+}
+
 function BillingHistoryLine({ entry }: Readonly<{ entry: KiloPassBillingEntry }>) {
-  const title =
-    entry.kind === 'stripe'
-      ? firstNonEmpty(entry.description, i18n.t('kiloPass.title'))
-      : entry.description;
+  const title = billingRowTitle(entry);
   const amount =
     entry.kind === 'stripe'
       ? formatPrefixedMoney(entry.amountCents / 100, i18n.language)

@@ -52,7 +52,7 @@ jest.mock(
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   formatDirectByokModelId: (provider: { id: string }, model: { id: string }) =>
     `${provider.id}/${model.id}`.toLowerCase(),
-  getDirectByokModel: jest.fn(async () => ({ provider: null, model: null })),
+  getDirectByokModel: jest.fn(async () => null),
   getDirectByokCatalogModelId: jest.fn(),
   getDirectByokModelChatApis: () => ['chat_completions'],
   supportsCatalogMode: (providerId: string) => providerId === 'synthetic',
@@ -97,7 +97,7 @@ beforeEach(() => {
           provider: { id: 'synthetic' } as never,
           model: { id: modelId.slice('synthetic/'.length) } as never,
         }
-      : { provider: null, model: null }
+      : null
   );
   jest.mocked(getEnhancedOpenRouterModels).mockResolvedValue({
     data: [{ id: 'moonshotai/kimi-k2.6' }],

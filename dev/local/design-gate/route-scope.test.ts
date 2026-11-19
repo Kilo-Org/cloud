@@ -126,6 +126,27 @@ test('drops the tab a pushed route was opened from', () => {
   );
 });
 
+test('drops the stack root a route was pushed over, though its path is a prefix', () => {
+  // The Profile tab's index stays mounted under the trigger screen pushed onto
+  // its stack; its text ("Profile", "Credits") once hid "Trigger not found".
+  const pushed = dump(
+    [
+      node({ parent: 0, testID: 'tab-bar', screen: TABS }),
+      node({ parent: 1, screen: './(app)/(tabs)/(3_profile)/_layout.tsx' }),
+      node({ parent: 2, screen: './(app)/(tabs)/(3_profile)/index.tsx' }),
+      node({ parent: 3, text: 'Profile' }),
+      node({ parent: 2, screen: './(app)/(tabs)/(3_profile)/triggers/[trigger-id].tsx' }),
+      node({ parent: 5, text: 'Trigger not found' }),
+    ],
+    { screen: '(app)/(tabs)/(3_profile)/triggers/[trigger-id]' }
+  );
+  const scoped = scopeToFocusedRoute(pushed);
+  assert.deepEqual(
+    scoped.nodes.map(entry => entry.text ?? entry.testID ?? entry.tag),
+    ['View', 'tab-bar', 'View', 'View', 'Trigger not found']
+  );
+});
+
 test('keeps a tab screen the key names through its index file', () => {
   const home = dump([node({ parent: 0, screen: TABS }), node({ parent: 1, screen: HOME })], {
     screen: '(app)/(tabs)/(0_home)',

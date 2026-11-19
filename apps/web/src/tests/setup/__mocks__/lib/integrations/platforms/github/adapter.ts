@@ -145,6 +145,21 @@ export class GitHubCredentialRejectionError extends Error {
   }
 }
 
+/**
+ * Mirrors the real adapter's listing-budget refusal so callers that map it to
+ * `PAYLOAD_TOO_LARGE` classify it in tests that run against this mock. Keep
+ * the copy in step with `GITHUB_LISTING_BUDGET_MESSAGE` in the real adapter.
+ */
+export const GITHUB_LISTING_BUDGET_MESSAGE =
+  'This GitHub installation has more repositories or branches than Kilo can list. Limit its repository access and try again.';
+
+export class GitHubListingBudgetExceededError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'GitHubListingBudgetExceededError';
+  }
+}
+
 export function isGitHubCredentialRejection(error: unknown): boolean {
   return error instanceof GitHubCredentialRejectionError;
 }

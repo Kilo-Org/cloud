@@ -65,7 +65,9 @@ export function getDatabaseClientConfig(postgresUrl: string): ClientConfig {
  * treated like `disable` rather than forcing a connection style the caller did
  * not pin down.
  */
-const VERIFY_CERTIFICATE_BY_SSLMODE: Record<string, boolean> = {
+type VerifyCertificateSslmode = 'prefer' | 'require' | 'no-verify' | 'verify-ca' | 'verify-full';
+
+const VERIFY_CERTIFICATE_BY_SSLMODE: Record<VerifyCertificateSslmode, boolean> = {
   prefer: false,
   require: false,
   'no-verify': false,
@@ -73,13 +75,17 @@ const VERIFY_CERTIFICATE_BY_SSLMODE: Record<string, boolean> = {
   'verify-full': true,
 };
 
+/** `Object.hasOwn` so inherited keys like `constructor` never resolve to a mode. */
+function isVerifyCertificateSslmode(value: string): value is VerifyCertificateSslmode {
+  return Object.hasOwn(VERIFY_CERTIFICATE_BY_SSLMODE, value);
+}
+
 function resolveSslFromSslmode(databaseUrl: URL): ClientConfig['ssl'] {
   const sslmode = databaseUrl.searchParams.get('sslmode')?.trim().toLowerCase();
 
   if (!sslmode || sslmode === 'disable' || sslmode === 'allow') return false;
 
-  // Object.hasOwn so inherited keys like 'constructor' never resolve to a mode.
-  if (!Object.hasOwn(VERIFY_CERTIFICATE_BY_SSLMODE, sslmode)) {
+  if (!isVerifyCertificateSslmode(sslmode)) {
     throw new Error(`Unsupported sslmode in database URL: ${sslmode}`);
   }
 

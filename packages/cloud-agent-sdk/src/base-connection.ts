@@ -137,12 +137,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     }
     clearReconnectTimer();
     clearStalenessTimeout();
-    const pausedWs = ws;
-    if (pausedWs !== null) {
-      if (!notifyReplacingConnection()) return;
-      ws = null;
-      pausedWs.close();
-    }
+    if (ws !== null && !closeCurrentSocket()) return;
     if (connected) {
       connected = false;
       config.onDisconnected();
@@ -156,9 +151,29 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     }
   }
 
-  function notifyReplacingConnection(expectedGeneration = generation): boolean {
+  // Tell consumers the current route is going away before its socket is dropped.
+  // Callers notify first and then check the gate, so an aborted replacement still
+  // reports the route loss consumers already saw.
+  function notifyReplacingConnection(): void {
     config.onReplacingConnection?.();
+  }
+
+  function isConnectionReplacementAllowed(expectedGeneration = generation): boolean {
     return !destroyed && !intentionalDisconnect && expectedGeneration === generation;
+  }
+
+  // Single owner of the replacement order: notify route loss, then drop the
+  // old socket with its reference cleared first so its onclose is ignored.
+  // Callers decide whether the replacement also reports a disconnection.
+  function closeCurrentSocket(expectedGeneration = generation): boolean {
+    notifyReplacingConnection();
+    if (!isConnectionReplacementAllowed(expectedGeneration)) return false;
+    const staleWs = ws;
+    if (staleWs !== null) {
+      ws = null;
+      staleWs.close();
+    }
+    return true;
   }
 
   async function refreshAuthAndReconnect(expectedGeneration: number) {
@@ -269,12 +284,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
 
     // Close existing socket - clear reference first so onclose ignores it.
     // Notify route loss because onOpen consumers may already have sent commands.
-    const oldWs = ws;
-    if (oldWs !== null) {
-      if (!notifyReplacingConnection(expectedGeneration)) return;
-      ws = null;
-      oldWs.close();
-    }
+    if (ws !== null && !closeCurrentSocket(expectedGeneration)) return;
 
     const url = config.buildUrl();
 
@@ -361,7 +371,8 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       const isAuthFailure = config.isAuthFailure?.(event) ?? false;
 
       if (isAuthFailure && !authRefreshAttempted && config.refreshAuth) {
-        if (!notifyReplacingConnection(expectedGeneration)) return;
+        notifyReplacingConnection();
+        if (!isConnectionReplacementAllowed(expectedGeneration)) return;
         void refreshAuthAndReconnect(expectedGeneration);
         return;
       }
@@ -370,7 +381,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       // The current physical route is gone even though no new socket follows.
       if (isAuthFailure && authRefreshAttempted) {
         mutationRecovery = 'idle';
-        notifyReplacingConnection(expectedGeneration);
+        notifyReplacingConnection();
         if (exhaustionReason === null) {
           exhaustionReason = 'auth-failure';
           config.onReconnectExhaustionChange?.(true);
@@ -388,17 +399,12 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     };
   }
 
-  // Single owner of the replacement order: notify route loss, close the old
-  // socket, report the disconnection, then re-auth and open a fresh connection.
-  // Callers reset only the state that is specific to their recovery path.
+  // Notify route loss, report the disconnection, then re-auth and open a fresh
+  // connection. Callers reset only the state that is specific to their
+  // recovery path.
   function replaceSocketAndReconnect(expectedGeneration: number): void {
     if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
-    if (!notifyReplacingConnection(expectedGeneration)) return;
-    const staleWs = ws;
-    if (staleWs !== null) {
-      ws = null;
-      staleWs.close();
-    }
+    if (!closeCurrentSocket(expectedGeneration)) return;
     if (connected) {
       connected = false;
       config.onDisconnected();

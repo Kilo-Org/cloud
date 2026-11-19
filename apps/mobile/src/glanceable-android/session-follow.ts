@@ -300,6 +300,10 @@ export function syncFollowedSessionCards(
         approvalKey: stored.approvalKey,
         updatedAt,
         statusSinceFallback: stored.content?.statusSince ?? updatedAt,
+        // A tray row carries no step, plan, diff, permission command, outcome,
+        // failure or start time: the rebuild keeps the ones the last push
+        // delivered instead of wiping them.
+        previous: stored.content ?? undefined,
       });
       if (isLiveKind(content.statusKind)) {
         render(content, stored.ctx);
@@ -385,6 +389,13 @@ export async function approveFollowedSession(
 // The aggregate card and its Approve read the followed sessions through this
 // source, so their test graphs never load the Android notification bridge.
 setFollowedSessionsSource({ ids: () => followed.keys(), counts: followedSessionCounts });
+
+/** Test-only: the content one followed session holds, or null when it holds none. */
+export function _peekFollowedContentForTests(
+  sessionId: string
+): SessionLiveActivityContentState | null {
+  return followed.get(sessionId)?.content ?? null;
+}
 
 /** Test-only: drop the followed set and the listeners. */
 export function _resetSessionFollowForTests(): void {

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import type { CloudAgentWorkspaceDO } from '../../src/control-plane/workspace/workspace-do.js';
 import { cloudAgentChildSessions } from '../../src/control-plane/session/sqlite-schema.js';
+import { CLOUD_AGENT_PARENT_AUTHORITY_DENIED } from '../../src/cloud-agent-authority.js';
 import { RUNTIME_AUTHORIZATION_KEY } from '../../src/session/runtime-authorization-persistence.js';
 import { sessionDoName } from '../../src/session-identity.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
@@ -424,9 +425,15 @@ describe('workspace authority delegation', () => {
     );
     expect(rejectedChat?.message).toContain('server-allocated');
 
+    // A well-formed id passes the format guard, so the call reaches the next
+    // check and fails there; an unattached workspace refuses it. Any other
+    // outcome means a well-formed id was refused as malformed.
     const acceptedFormat = await delegationOutcome(
-      workspace.authorizeChild({ authority, childSessionId: workspaceSessionId() })
+      workspaceStub(workspaceSessionId()).authorizeChild({
+        authority,
+        childSessionId: workspaceSessionId(),
+      })
     );
-    expect(acceptedFormat?.message ?? '').not.toContain('server-allocated');
+    expect(acceptedFormat?.message).toBe(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
   });
 });

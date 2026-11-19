@@ -42,6 +42,8 @@ export type RewriteResponseParams = {
   capture: RequestLogCapture | null;
   vercelRequestId: string | null;
   reasoningEffort: string | null;
+  /** Only for the Cloud Agent runtime proxy caller; see `startFirstByteKeepAlive`. */
+  keepAliveUntilFirstByte?: boolean;
 };
 
 export type ResponseUsageContext = Pick<
@@ -301,6 +303,37 @@ export function partialCapturedBody(capturedChunks: string[] | null): string | u
   return capturedChunks && capturedChunks.length > 0 ? capturedChunks.join('') : undefined;
 }
 
+/** The comment the gateway sends for upstream keep-alives. SSE parsers ignore comment lines. */
+export const KEEP_ALIVE_COMMENT = ': KILO PROCESSING\n\n';
+
+export const FIRST_BYTE_KEEP_ALIVE_INTERVAL_MS = 2_000;
+
+export type FirstByteKeepAlive = { stop(): void };
+
+/**
+ * Sends a keep-alive comment at once and then every interval until `stop`. Next.js sends the
+ * response headers only with the first body chunk, and the Cloud Agent runtime proxy (a Worker)
+ * notices that its own client closed only when it writes. Without these bytes, a run the user
+ * stopped keeps its upstream request open until the model sends its first byte. Start it only
+ * after the upstream answered 2xx: the status is final by then.
+ */
+export function startFirstByteKeepAlive(
+  controller: ReadableStreamDefaultController<string>
+): FirstByteKeepAlive {
+  const stop = () => clearInterval(timer);
+  const send = () => {
+    try {
+      controller.enqueue(KEEP_ALIVE_COMMENT);
+    } catch {
+      // The client stream is already closed or cancelled.
+      stop();
+    }
+  };
+  const timer = setInterval(send, FIRST_BYTE_KEEP_ALIVE_INTERVAL_MS);
+  send();
+  return { stop };
+}
+
 export async function rewriteSseStream(
   reader: ReadableStreamDefaultReader<Uint8Array>,
   parser: ReturnType<typeof createParser>,
@@ -312,7 +345,8 @@ export async function rewriteSseStream(
   vercelRequestId: string | null | undefined,
   capture: RequestLogCapture | null,
   capturedChunks: string[] | null,
-  reasoningEffort: string | null
+  reasoningEffort: string | null,
+  keepAlive: FirstByteKeepAlive | null
 ) {
   const decoder = new TextDecoder();
   const settleReadError = (error: unknown) =>
@@ -326,6 +360,7 @@ export async function rewriteSseStream(
   try {
     while (true) {
       const { done, value } = await reader.read();
+      keepAlive?.stop();
       if (done) {
         // Flush any event left buffered when the stream ends without a
         // trailing blank line, so its data isn't silently dropped.
@@ -373,6 +408,7 @@ export async function rewriteSseStream(
     controller.enqueue(serializeError(responseReadError));
     controller.close();
   } finally {
+    keepAlive?.stop();
     onFinally();
     reader.releaseLock();
   }

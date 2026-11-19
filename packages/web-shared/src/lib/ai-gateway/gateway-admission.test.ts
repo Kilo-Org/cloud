@@ -113,7 +113,17 @@ describe('resolveGatewayCaller', () => {
       user,
       organizationId: 'org-1',
       botId: 'bot-1',
+      cloudAgentRuntimeProxied: false,
     });
+  });
+
+  it('marks a caller whose runtime claim the Cloud Agent runtime proxy attested', () => {
+    const caller = resolveGatewayCaller(
+      { user, authFailedResponse: null, cloudAgentRuntimeProxied: true },
+      { allowAnonymous: true, ipAddress: '192.0.2.1' }
+    );
+
+    expect(caller).toMatchObject({ kind: 'signed-in', cloudAgentRuntimeProxied: true });
   });
 
   it.each([

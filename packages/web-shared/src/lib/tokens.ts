@@ -363,6 +363,9 @@ export function validateAuthorizationHeader(
     }
   }
 
+  // Only the Cloud Agent runtime credential proxy can attest this claim, so a
+  // verified one proves the request came through that proxy.
+  let cloudAgentRuntimeProxied = false;
   if (
     typeof payload.runtimeAuthorization === 'object' &&
     payload.runtimeAuthorization !== null &&
@@ -379,6 +382,7 @@ export function validateAuthorizationHeader(
         reason: 'runtime_attestation_required',
       };
     }
+    cloudAgentRuntimeProxied = true;
   }
 
   return {
@@ -392,6 +396,7 @@ export function validateAuthorizationHeader(
     tokenSource: payload.tokenSource,
     deviceSessionId: payload.deviceSessionId,
     cloudAgentAuthority,
+    cloudAgentRuntimeProxied,
   };
 }
 

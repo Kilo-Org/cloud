@@ -28,7 +28,12 @@ import {
   apiRequestLogBlobSchema,
   type EnkryptRequestLog,
 } from '@kilocode/web-shared/lib/r2/api-request-log';
-import type { RewriteResponseParams } from './rewriteModelResponse.shared';
+import {
+  FIRST_BYTE_KEEP_ALIVE_INTERVAL_MS,
+  KEEP_ALIVE_COMMENT,
+  startFirstByteKeepAlive,
+  type RewriteResponseParams,
+} from './rewriteModelResponse.shared';
 import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 
@@ -3639,4 +3644,162 @@ describe('request log capture', () => {
       expect(capture.setBody).not.toHaveBeenCalled();
     }
   );
+});
+
+describe('first-byte keep-alive for the Cloud Agent runtime proxy', () => {
+  type Rewrite = (params: RewriteResponseParams) => Promise<Response>;
+  const rewriters: [string, Rewrite][] = [
+    [
+      'chat_completions',
+      params => rewriteModelResponse_ChatCompletions({ ...params, responseTransforms: null }),
+    ],
+    ['responses', rewriteModelResponse_Responses],
+    ['messages', rewriteModelResponse_Messages],
+  ];
+
+  beforeEach(() => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'queueMicrotask', 'setImmediate'] });
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  function heldUpstream(status = 200) {
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    const body = new ReadableStream<Uint8Array>({
+      start(c) {
+        controller = c;
+      },
+    });
+    return {
+      response: new Response(body, { status, headers: { 'content-type': 'text/event-stream' } }),
+      send: (text: string) => controller.enqueue(new TextEncoder().encode(text)),
+      fail: (error: Error) => controller.error(error),
+    };
+  }
+
+  function params(response: Response, keepAliveUntilFirstByte?: boolean): RewriteResponseParams {
+    return {
+      response,
+      usageContext: freeUsageContext,
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+      keepAliveUntilFirstByte,
+    };
+  }
+
+  /** Reads what the client receives within `ms` of fake time; one pending read carries over. */
+  function clientReader(response: Response) {
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let pending: Promise<ReadableStreamReadResult<unknown>> | undefined;
+    return {
+      reader,
+      async within(ms: number): Promise<string | undefined> {
+        let settled: ReadableStreamReadResult<unknown> | undefined;
+        pending ??= reader.read();
+        void pending.then(result => {
+          settled = result;
+        });
+        await jest.advanceTimersByTimeAsync(ms);
+        if (!settled) return undefined;
+        pending = undefined;
+        if (settled.done) return 'done';
+        const value = settled.value;
+        return value instanceof Uint8Array ? decoder.decode(value) : String(value);
+      },
+    };
+  }
+
+  test.each(rewriters)(
+    '%s: sends a comment at once, then every 2 s until the first upstream byte',
+    async (_kind, rewrite) => {
+      const upstream = heldUpstream();
+      const client = clientReader(await rewrite(params(upstream.response, true)));
+
+      expect(await client.within(0)).toBe(KEEP_ALIVE_COMMENT);
+      expect(await client.within(FIRST_BYTE_KEEP_ALIVE_INTERVAL_MS - 1)).toBeUndefined();
+      expect(await client.within(1)).toBe(KEEP_ALIVE_COMMENT);
+
+      // An upstream comment is the first upstream byte; the gateway forwards it as before.
+      upstream.send(': OPENROUTER PROCESSING\n\n');
+      expect(await client.within(0)).toBe(KEEP_ALIVE_COMMENT);
+      expect(await client.within(FIRST_BYTE_KEEP_ALIVE_INTERVAL_MS * 5)).toBeUndefined();
+    }
+  );
+
+  test('chat_completions: passes the first event through and sends nothing after it', async () => {
+    const upstream = heldUpstream();
+    const client = clientReader(
+      await rewriteModelResponse_ChatCompletions({
+        ...params(upstream.response, true),
+        responseTransforms: null,
+      })
+    );
+    expect(await client.within(0)).toBe(KEEP_ALIVE_COMMENT);
+
+    upstream.send('data: {"id":"gen-1","choices":[{"index":0,"delta":{"content":"hi"}}]}\n\n');
+    expect(await client.within(0)).toContain('"content":"hi"');
+    expect(await client.within(FIRST_BYTE_KEEP_ALIVE_INTERVAL_MS * 5)).toBeUndefined();
+  });
+
+  test.each(rewriters)(
+    '%s: sends no comment without the runtime proxy claim',
+    async (_kind, rewrite) => {
+      const upstream = heldUpstream();
+      const client = clientReader(await rewrite(params(upstream.response)));
+
+      expect(await client.within(FIRST_BYTE_KEEP_ALIVE_INTERVAL_MS * 3)).toBeUndefined();
+    }
+  );
+
+  test.each(rewriters)('%s: sends no comment for a non-2xx answer', async (_kind, rewrite) => {
+    const upstream = heldUpstream(500);
+    const client = clientReader(await rewrite(params(upstream.response, true)));
+
+    expect(await client.within(FIRST_BYTE_KEEP_ALIVE_INTERVAL_MS * 3)).toBeUndefined();
+  });
+
+  test.each(rewriters)('%s: a client close stops the keep-alive timer', async (_kind, rewrite) => {
+    const upstream = heldUpstream();
+    const client = clientReader(await rewrite(params(upstream.response, true)));
+    expect(await client.within(0)).toBe(KEEP_ALIVE_COMMENT);
+    // The keep-alive and the existing stream progress logger.
+    expect(jest.getTimerCount()).toBe(2);
+
+    await client.reader.cancel('client closed');
+    expect(jest.getTimerCount()).toBe(1);
+
+    // The gateway's request signal then aborts the upstream read, which ends the logger too.
+    upstream.fail(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+    await jest.advanceTimersByTimeAsync(0);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+});
+
+describe('startFirstByteKeepAlive', () => {
+  beforeEach(() => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'queueMicrotask', 'setImmediate'] });
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  test('stops its timer when the client stream no longer accepts a comment', async () => {
+    let controller!: ReadableStreamDefaultController<string>;
+    const reader = new ReadableStream<string>({
+      start(c) {
+        controller = c;
+      },
+    }).getReader();
+    startFirstByteKeepAlive(controller);
+    await expect(reader.read()).resolves.toEqual({ done: false, value: KEEP_ALIVE_COMMENT });
+    expect(jest.getTimerCount()).toBe(1);
+
+    // A cancelled stream refuses the next comment; the timer ends instead of firing forever.
+    await reader.cancel('client closed');
+    jest.advanceTimersByTime(FIRST_BYTE_KEEP_ALIVE_INTERVAL_MS);
+    expect(jest.getTimerCount()).toBe(0);
+  });
 });

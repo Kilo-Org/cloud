@@ -384,11 +384,10 @@ export async function guardEnkryptOutput({
           report.output_characters = text.length;
           if (isTooLargeToScan(text)) return notScannedBecause('output_too_large');
           const result = await scanOutput(logOnly, text);
-          // A guardrail that only logs adds no latency, so its usage records the latency it would
-          // have added had its detectors blocked.
-          const wouldBeLatencyMs = Math.round(performance.now() - waitStartedAt);
-          report.added_latency_ms = wouldBeLatencyMs;
-          return outputUsageRecords([], result.usageRecords, wouldBeLatencyMs);
+          // A guardrail that only logs adds no latency, so it records its log-only scan time.
+          const scanTimeMs = Math.round(performance.now() - waitStartedAt);
+          report.added_latency_ms = scanTimeMs;
+          return outputUsageRecords([], result.usageRecords, scanTimeMs);
         } catch (error) {
           console.error('[enkrypt-guardrail] log-only output scan failed unexpectedly', {
             ...logFields,

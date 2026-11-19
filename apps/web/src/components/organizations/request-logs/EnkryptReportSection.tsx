@@ -337,15 +337,15 @@ function ScanCard({ scan, failedOpen }: { scan: Scan; failedOpen: boolean }) {
   );
 }
 
-/** Detectors that only log add no latency, so the report holds what blocking would have added. */
+/** Detectors that only log add no latency, so the report holds how long their scan ran instead. */
 function addedLatency(report: EnkryptGuardrailReport | EnkryptOutputGuardrailReport): DetailItem {
   const value = formatDurationMs(report.added_latency_ms);
   const detectors = report.settings?.detectors ?? [];
   const logOnly = detectors.length > 0 && detectors.every(detector => detector.action === 'log');
   if (!logOnly) return { label: 'Added latency', value };
   return {
-    label: 'Latency if blocking',
-    hint: 'Log-only detectors add none. Older reports show none.',
+    label: 'Log-only scan time',
+    hint: 'Log-only detectors add no latency. How long their scan ran after the point where a blocking scan would wait. Older reports show none.',
     value,
   };
 }

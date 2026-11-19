@@ -32,7 +32,8 @@ export type EnkryptInputGuardrail = {
    * Await immediately before the upstream call. Never rejects. Waits only for the blocking
    * detectors' scan and, for a block, its cache write. The measured wait is the latency the
    * guardrail added to the request, and is stored on one of the request's usage records and in
-   * the report. A guardrail that only logs stores the wait its scan would have added instead.
+   * the report. A guardrail that only logs adds none, so it stores its log-only scan time instead.
+   * That is not what a blocking scan would add, since one stops at its first detection.
    */
   awaitVerdict(): Promise<EnkryptGuardrailVerdict>;
   /**
@@ -69,8 +70,7 @@ function splitScan(scan: EnkryptGuardrailRequest | null): EnkryptGuardrailScans 
  * The request's wait for its verdict is counted once, on the last usage record of its blocking scan
  * in report order, or on the last log-only record when the blocking scan recorded no call. That is
  * not necessarily the last call made, since the calls run in another order. Without blocking
- * detectors the request waits for no scan, so callers pass the latency the log-only scan would
- * have added instead.
+ * detectors the request waits for no scan, so callers pass the log-only scan time instead.
  */
 export function usageRecordsWithAddedLatency(
   blockingCalls: EnkryptGuardrailCall[],
@@ -116,9 +116,10 @@ export async function recordEnkryptUsageRecords(
  * each over every tool definition, the system prompt, and the conversation; only the blocking calls
  * gate the request, so log-only detectors never reject it.
  *
- * The request's Enkrypt calls run strictly one at a time, so one request never holds more than one
- * call of the shared Enkrypt service: the blocking scan's first, then the log-only scan's, which
- * starts only once the blocking scan finished. The request waits only for the blocking scan, so
+ * The input guardrail's Enkrypt calls run strictly one at a time, so its scans never hold more than
+ * one call of the shared Enkrypt service: the blocking scan's first, then the log-only scan's, which
+ * starts only once the blocking scan finished. This covers the input guardrail only: the output
+ * guardrail scans separately, and can overlap with log-only input calls still running. The request waits only for the blocking scan, so
  * running it first means log-only work never delays the verdict. All calls share one deadline of
  * `ENKRYPT_GUARDRAIL_TIMEOUT_MS`, started once the scan is prepared, so the log-only scan gets what
  * the blocking scan leaves of it; a call with no time left is not made and fails, like any call that
@@ -205,9 +206,9 @@ export function startEnkryptInputGuardrail(
   let addedLatencyMs: number | null = null;
   const logOnlyFinishedAt = logOnlyResults.then(() => performance.now());
   /**
-   * The wait the guardrail added. A guardrail that only logs adds none, so this is the wait it
-   * would have added had its detectors blocked: from when the request awaited the verdict until
-   * the log-only scan finished. Settles once every scan has.
+   * The wait the guardrail added. A guardrail that only logs adds none, so this is its log-only
+   * scan time: from when the request awaited the verdict until the log-only scan finished. Settles
+   * once every scan has.
    */
   const latencyMs = async (): Promise<number | null> => {
     const [{ blocking, logOnly }, finishedAt] = await Promise.all([

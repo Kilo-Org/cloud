@@ -68,9 +68,11 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   const normalizedEmail = normalizeSeedEmail(trimmedEmail);
   assertLocalSeedDatabase('app:agent-profile-org-default');
   const db = getSeedDb();
-  // A fake account that already signed in keeps its own row: the fixture joins
-  // it, so the seed runs before or after the device-code sign-in.
-  const userId = (await findSeedUserId(trimmedEmail)) ?? SEED_USER_ID;
+  // A fake account that already signed in keeps its own row and its own
+  // sign-in address: the fixture joins it. A row this fixture left under an
+  // earlier email is its own fixture, so it takes the requested address.
+  const adoptedUserId = await findSeedUserId(trimmedEmail);
+  const userId = adoptedUserId ?? SEED_USER_ID;
 
   // Reset only this fixture's rows: the profiles, the membership and the
   // organization, by their stable ids.
@@ -105,7 +107,21 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       has_validation_stytch: true,
       customer_source: 'dev-seed',
     })
-    .onConflictDoNothing();
+    // The fixed id is this fixture's own row. When no account holds the
+    // requested email, that row takes the address, so the account the
+    // organization is attached to is the one this run reports.
+    .onConflictDoUpdate({
+      target: kilocode_users.id,
+      set:
+        adoptedUserId === null
+          ? {
+              google_user_email: trimmedEmail,
+              normalized_email: normalizedEmail,
+              has_validation_stytch: true,
+              customer_source: 'dev-seed',
+            }
+          : { has_validation_stytch: true, customer_source: 'dev-seed' },
+    });
 
   await db.insert(organizations).values({
     id: ORGANIZATION_ID,

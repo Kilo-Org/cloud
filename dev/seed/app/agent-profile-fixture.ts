@@ -111,15 +111,19 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   const normalizedEmail = normalizeSeedEmail(trimmedEmail);
   assertLocalSeedDatabase('app:agent-profile-fixture');
   const db = getSeedDb();
-  // A fake account that already signed in keeps its own row: the fixture joins
-  // it, so the seed runs before or after the device-code sign-in.
-  const userId = (await findSeedUserId(trimmedEmail)) ?? SEED_USER_ID;
+  // A fake account that already signed in keeps its own row and its own
+  // sign-in address: the fixture joins it. A row this fixture left under an
+  // earlier email is its own fixture, so it takes the requested address.
+  const adoptedUserId = await findSeedUserId(trimmedEmail);
+  const userId = adoptedUserId ?? SEED_USER_ID;
 
   // Direct insert, no Stripe customer: the profile screens never call Stripe,
   // and dev/seed/lib/stripe.ts refuses the example file's placeholder key.
   // The onboarding flags below match dev/seed/app/create-user.ts so the seeded
   // account reaches product surfaces instead of the survey and verification
-  // gates.
+  // gates. The address is written only for the fixture's own row: a signed-in
+  // account keeps the address it signed in with, so an alias argument cannot
+  // rename it.
   await db
     .insert(kilocode_users)
     .values({
@@ -134,12 +138,15 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     })
     .onConflictDoUpdate({
       target: kilocode_users.id,
-      set: {
-        google_user_email: trimmedEmail,
-        normalized_email: normalizedEmail,
-        has_validation_stytch: true,
-        customer_source: 'dev-seed',
-      },
+      set:
+        adoptedUserId === null
+          ? {
+              google_user_email: trimmedEmail,
+              normalized_email: normalizedEmail,
+              has_validation_stytch: true,
+              customer_source: 'dev-seed',
+            }
+          : { has_validation_stytch: true, customer_source: 'dev-seed' },
     });
 
   // Replace this fixture's own profile; its agents and MCP servers cascade with

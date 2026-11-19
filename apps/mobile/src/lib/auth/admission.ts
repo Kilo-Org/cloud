@@ -23,8 +23,8 @@ export type AdmissionPayload = {
 };
 
 /**
- * Error thrown when the admission challenge endpoint is unreachable
- * (5xx or network error).  Callers map this to a retryable sign-in message.
+ * Error thrown when the admission challenge endpoint answers a non-ok
+ * response (4xx or 5xx).  Callers map this to a retryable sign-in message.
  */
 export const ADMISSION_CHALLENGE_FAILED = 'admission_challenge_failed';
 

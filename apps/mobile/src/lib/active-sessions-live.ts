@@ -11,7 +11,8 @@
  * never carry a cloud rename. `session.updated` (ingest title write) does
  * apply. `capabilities` is the hybrid exception: the WS value wins when
  * present (upgrade or downgrade), and the cached value is preserved only
- * when the WS row omits the field. The functions here never touch React,
+ * when the WS row omits the field (a legacy payload). The functions here
+ * never touch React,
  * the network, or a QueryClient — they are pure and exhaustively
  * unit-tested alongside this file.
  *
@@ -256,8 +257,6 @@ function withEnrichmentAndConnectionId(
     gitUrl: row.gitUrl,
     gitBranch: row.gitBranch,
     connectionId,
-    // Wire capabilities win when present (upgrade and downgrade); cache
-    // only when the WS row omits the field (legacy payloads).
     capabilities: row.capabilities ?? current?.capabilities,
     ...enrichment,
     // Socket statuses are undated; a changed status cannot inherit the cached time.
@@ -288,8 +287,6 @@ export function mergeSnapshotForActiveSessions(
     snapshotIds.add(row.id);
     return withEnrichmentAndConnectionId(row, currentById.get(row.id), row.connectionId);
   });
-  // A sessions.list snapshot owns CLI-channel rows only; cloud rows are
-  // added/dropped exclusively by tRPC fetches.
   const preservedCloud = current.filter(
     row => row.connectionId === CLOUD_AGENT_CONNECTION_ID && !snapshotIds.has(row.id)
   );

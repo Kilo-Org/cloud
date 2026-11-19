@@ -9,6 +9,7 @@ import {
   type LiveSessions,
 } from '@/components/home/live-session-state';
 import { Text } from '@/components/ui/text';
+import { LINE_ACTION_BOX_CLASS, LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
 import { createSubmitLock } from '@/lib/submit-lock';
@@ -114,16 +115,23 @@ export function LiveSessionHeaderNotice({
         {notice.message}
       </Text>
       {notice.canRetry && (
+        // The box is the line action's: `Retry` is one `text-xs` line (14 dp),
+        // so a pressable sized by its label measured 25.1 × 14.1 dp, under the
+        // 28 dp floor. The box cancels its own height back to that line, so
+        // the header stays one line tall, and its slop carries the 44 dp reach.
         <Pressable
           onPress={notice.handleRetry}
           disabled={notice.retrying}
           accessibilityState={{ busy: notice.retrying, disabled: notice.retrying }}
-          hitSlop={8}
+          hitSlop={LINE_ACTION_HIT_SLOP}
           accessibilityRole="button"
           accessibilityLabel={
             notice.loadFailed ? t('common.retry') : t('agentChat.sessionConnection.retryConnection')
           }
-          className="shrink-0 active:opacity-70"
+          className={cn(
+            LINE_ACTION_BOX_CLASS,
+            'min-w-[36px] shrink-0 items-center justify-center active:opacity-70'
+          )}
         >
           <Text className="text-xs font-medium text-primary">{t('common.retry')}</Text>
         </Pressable>

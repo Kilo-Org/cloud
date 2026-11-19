@@ -35,7 +35,7 @@ import {
   type BitbucketAuthoritativeObservation,
   type BitbucketWebhookIdentity,
 } from '@/lib/integrations/platforms/bitbucket/webhook-events';
-import { WebhookBodyTooLargeError, readBoundedRawBody } from '@/lib/bot/platforms/webhook-body';
+import { WebhookBodyTooLargeError, readBoundedRawBody } from '@/lib/webhook-body';
 
 const BITBUCKET_PULL_REQUEST_EVENTS = new Set([
   'pullrequest:created',

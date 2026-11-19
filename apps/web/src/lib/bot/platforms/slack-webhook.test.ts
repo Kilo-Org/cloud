@@ -23,7 +23,7 @@ import { captureException } from '@sentry/nextjs';
 import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
 import { deleteInstallationByTeamId } from '@/lib/integrations/slack-service';
 import { createSlackWebhookHandler } from './slack-webhook';
-import { MAX_WEBHOOK_BODY_BYTES } from './webhook-body';
+import { MAX_WEBHOOK_BODY_BYTES } from '@/lib/webhook-body';
 
 const SIGNING_SECRET = 'test-signing-secret';
 

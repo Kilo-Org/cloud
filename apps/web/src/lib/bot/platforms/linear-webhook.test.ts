@@ -23,7 +23,7 @@ import { captureException } from '@sentry/nextjs';
 import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
 import { deleteInstallationByOrganizationId } from '@/lib/integrations/linear-service';
 import { createLinearWebhookHandler } from './linear-webhook';
-import { MAX_WEBHOOK_BODY_BYTES } from './webhook-body';
+import { MAX_WEBHOOK_BODY_BYTES } from '@/lib/webhook-body';
 
 const WEBHOOK_SECRET = 'test-webhook-secret';
 

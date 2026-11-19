@@ -6,7 +6,7 @@ import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
 import { deleteInstallationByOrganizationId } from '@/lib/integrations/linear-service';
 import { LINEAR_WEBHOOK_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { WebhookBodyTooLargeError, readBoundedRawBody } from './webhook-body';
+import { WebhookBodyTooLargeError, readBoundedRawBody } from '@/lib/webhook-body';
 
 /**
  * Linear's webhook signature format, confirmed against @linear/sdk's

@@ -1,3 +1,4 @@
+import { STARTUP_OUTCOMES } from '@kilocode/app-shared/analytics';
 import * as SplashScreen from 'expo-splash-screen';
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -80,60 +81,56 @@ describe.each(['ios', 'android'])('AnimatedSplashOverlay on %s', os => {
     vi.useRealTimers();
   });
 
-  it.each([
-    'app',
-    'login',
-    'consent',
-    'force-update',
-    'user-error',
-    'consent-error',
-    'language-error',
-    'restore-error',
-  ] as const)('hands over the same branded surface to the %s outcome', async outcome => {
-    const renderer = await mountOverlay();
+  // Derived from the canonical tuple in @kilocode/app-shared/analytics, so this
+  // table cannot drift from the vocabulary the producer may emit.
+  it.each(STARTUP_OUTCOMES)(
+    'hands over the same branded surface to the %s outcome',
+    async outcome => {
+      const renderer = await mountOverlay();
 
-    // Before completion: the logo frame is mounted and hide has not fired.
-    const logoImages = findByType(renderer.root, 'Image');
-    expect(logoImages).toHaveLength(1);
-    expect(SplashScreen.hideAsync).not.toHaveBeenCalled();
-    expect(logoImages[0]?.props.className).toBe('h-[100px] w-[100px]');
-    expect(findByType(renderer.root, 'Animated.View')[0]?.props.className).toBe(
-      'absolute inset-0 items-center justify-center bg-[#FFDD00]'
-    );
+      // Before completion: the logo frame is mounted and hide has not fired.
+      const logoImages = findByType(renderer.root, 'Image');
+      expect(logoImages).toHaveLength(1);
+      expect(SplashScreen.hideAsync).not.toHaveBeenCalled();
+      expect(logoImages[0]?.props.className).toBe('h-[100px] w-[100px]');
+      expect(findByType(renderer.root, 'Animated.View')[0]?.props.className).toBe(
+        'absolute inset-0 items-center justify-center bg-[#FFDD00]'
+      );
 
-    // The yellow frame forces dark status bar icons in either theme.
-    const statusBars = findByType(renderer.root, 'StatusBar');
-    expect(statusBars).toHaveLength(1);
-    expect(statusBars[0]?.props.style).toBe('dark');
+      // The yellow frame forces dark status bar icons in either theme.
+      const statusBars = findByType(renderer.root, 'StatusBar');
+      expect(statusBars).toHaveLength(1);
+      expect(statusBars[0]?.props.style).toBe('dark');
 
-    const logoImage = logoImages[0];
-    if (!logoImage) {
-      throw new Error('expected one Image host');
+      const logoImage = logoImages[0];
+      if (!logoImage) {
+        throw new Error('expected one Image host');
+      }
+
+      // The logo asset decodes.
+      act(() => {
+        (logoImage.props.onLoad as () => void)();
+      });
+
+      // Gates settle.
+      act(() => {
+        startup.markStartupComplete(outcome);
+      });
+
+      // Flush microtasks so the awaited hideAsync race settles and dismissal lands.
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(SplashScreen.hideAsync).toHaveBeenCalledTimes(1);
+      expect(findByType(renderer.root, 'Image')).toHaveLength(0);
+      expect(findByType(renderer.root, 'StatusBar')).toHaveLength(0);
+
+      act(() => {
+        renderer.unmount();
+      });
     }
-
-    // The logo asset decodes.
-    act(() => {
-      (logoImage.props.onLoad as () => void)();
-    });
-
-    // Gates settle.
-    act(() => {
-      startup.markStartupComplete(outcome);
-    });
-
-    // Flush microtasks so the awaited hideAsync race settles and dismissal lands.
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    expect(SplashScreen.hideAsync).toHaveBeenCalledTimes(1);
-    expect(findByType(renderer.root, 'Image')).toHaveLength(0);
-    expect(findByType(renderer.root, 'StatusBar')).toHaveLength(0);
-
-    act(() => {
-      renderer.unmount();
-    });
-  });
+  );
 
   it('keeps one full-size branded surface until startup settles, even after the logo timeout', async () => {
     const renderer = await mountOverlay();

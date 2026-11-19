@@ -216,9 +216,12 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
             />
           </View>
 
-          <View className="flex-row items-center justify-between gap-3">
+          {/* One picker style for the form: the mode and model use the same
+              select box as the repository above, not the composer's chips. */}
+          <View className="gap-2">
             <FieldLabel>{t('todos.listSettings.mode')}</FieldLabel>
             <ModeSelector
+              presentation="field"
               value={normalizeAgentMode(mode ?? undefined)}
               onChange={next => {
                 setMode(next);
@@ -226,22 +229,18 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
             />
           </View>
 
-          <View className="flex-row items-center justify-between gap-3">
-            <FieldLabel>{t('common.model')}</FieldLabel>
-            <View className="min-w-0 shrink">
-              <ModelSelector
-                value={model ?? ''}
-                variant={variant ?? ''}
-                options={models}
-                isLoading={isLoadingModels}
-                acceptsVariant
-                onSelect={(modelId, nextVariant) => {
-                  setModel(modelId);
-                  setVariant(nextVariant || null);
-                }}
-              />
-            </View>
-          </View>
+          <ModelSelector
+            presentation="field"
+            value={model ?? ''}
+            variant={variant ?? ''}
+            options={models}
+            isLoading={isLoadingModels}
+            acceptsVariant
+            onSelect={(modelId, nextVariant) => {
+              setModel(modelId);
+              setVariant(nextVariant || null);
+            }}
+          />
           {saving ? <ActivityIndicator color={colors.mutedForeground} /> : null}
           <AccessibleStatus
             message={

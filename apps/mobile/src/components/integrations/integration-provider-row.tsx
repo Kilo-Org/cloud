@@ -161,10 +161,13 @@ export function IntegrationProviderRow({
     // its control: it keeps the action's name and its label while the browser
     // is on its way, refuses a second press, and announces the wait. Replacing
     // the control with a bare spinner dropped the name the tap had, so a
-    // reader was told nothing while the row sat unanswerable.
+    // reader was told nothing while the row sat unanswerable. Every row of the
+    // hub can offer Connect, so the label takes the neutral ink: four accent
+    // labels were the strongest colour on the screen.
     action = {
       kind: 'action',
       label: t('common.connect'),
+      tone: 'neutral',
       onPress: onConnect,
       disabled: connecting,
       accessibilityLabel: namedAction(t('common.connect')),

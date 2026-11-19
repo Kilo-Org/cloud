@@ -3403,7 +3403,8 @@
         "accounting_adjustment": "Buxgalteriya tuzatmasi",
         "credits_expired": "Kreditlarning muddati tugadi"
       },
-      "truncated": "Kreditlar bo'yicha oldingi amallar ham mavjud."
+      "truncated": "Kreditlar bo'yicha oldingi amallar ham mavjud.",
+      "retentionLimit": "Eng so'nggi kredit amallari ko'rsatilmoqda."
     },
     "inviteMember": {
       "emailError": "To'g'ri elektron pochta manzilini kiriting.",
@@ -3434,7 +3435,8 @@
         "void": "Bekor qilingan",
         "uncollectible": "Undirib bo'lmaydi"
       },
-      "truncated": "Oldingi hisob-fakturalar ham mavjud."
+      "truncated": "Oldingi hisob-fakturalar ham mavjud.",
+      "retentionLimit": "Eng so'nggi hisob-fakturalar ko'rsatilmoqda."
     },
     "lowBalanceAlert": {
       "enableA11y": "Balans kamayishi haqida ogohlantirishni yoqish",
@@ -4364,7 +4366,8 @@
       "purchaseFallback": "Kredit xaridi",
       "receipt": "Chek",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} chekini ochish",
-      "receiptUnavailable": "Bu xarid uchun chek mavjud emas."
+      "receiptUnavailable": "Bu xarid uchun chek mavjud emas.",
+      "retentionLimit": "Kreditlarning eng so'nggi tarixi ko'rsatilmoqda."
     },
     "title": "Kredit sotib olish",
     "description": "Kreditlar Kilo App'da AI kodlash sessiyalarini ishga tushirish uchun Kilo balansingizga qo'shiladigan bir martalik xariddir. Do'kon hisobingizdan to'lov oladi va do'kon to'lovni tasdiqlaganidan keyin kreditlar qo'shiladi.",

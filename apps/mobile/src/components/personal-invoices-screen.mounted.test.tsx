@@ -3,9 +3,10 @@
 // a membership's name into the title. The scope reads are mocked, the same way
 // the organization suite drives its states.
 
-import { createElement } from 'react';
+import { createElement, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { i18n } from '@/i18n';
@@ -26,6 +27,7 @@ const pageQuery = vi.hoisted(() => ({
 const pageHook = vi.hoisted(() => ({
   entries: [] as unknown[],
   hasMore: false,
+  isRetentionLimited: false,
 }));
 
 const connectivity = vi.hoisted(() => ({ value: 'online' as 'online' | 'offline' | 'unknown' }));
@@ -43,6 +45,7 @@ vi.mock('@/lib/hooks/use-personal-credits', () => ({
     query: pageQuery,
     entries: pageHook.entries,
     hasMore: pageHook.hasMore,
+    isRetentionLimited: pageHook.isRetentionLimited,
   }),
 }));
 
@@ -124,7 +127,8 @@ vi.mock('react-native', () => ({
 }));
 
 vi.mock('@shopify/flash-list', () => ({
-  FlashList: 'FlashList',
+  FlashList: (props: { ListFooterComponent?: ReactElement }) =>
+    createElement('FlashList', props, props.ListFooterComponent ?? null),
 }));
 
 vi.mock('@/components/tab-screen', () => ({
@@ -145,6 +149,7 @@ beforeEach(() => {
   pageQuery.data = null;
   pageHook.entries = [];
   pageHook.hasMore = false;
+  pageHook.isRetentionLimited = false;
   connectivity.value = 'online';
   screenHeaders.rendered = [];
 });
@@ -160,5 +165,66 @@ describe('PersonalInvoicesScreen header', () => {
     expect(screenHeaders.rendered[0]?.title).toBe(i18n.t('organization.invoices.title'));
     expect(screenHeaders.rendered[0]?.eyebrow).toBeUndefined();
     expect(screenHeaders.rendered[0]?.reserveEyebrow).toBeUndefined();
+  });
+});
+
+/** Every string the screen paints, so a footer note is visible to a test. */
+function flattenText(node: ReactTestInstance): string[] {
+  const collected: string[] = [];
+  const walk = (instance: ReactTestInstance): void => {
+    for (const child of instance.children) {
+      if (typeof child === 'string') {
+        collected.push(child);
+      } else if (typeof child !== 'number') {
+        walk(child);
+      }
+    }
+  };
+  walk(node);
+  return collected;
+}
+
+describe('PersonalInvoicesScreen retention-limit footer', () => {
+  it('names the retention bound with no Load more at the bound', async () => {
+    pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: null, hasMore: false }] };
+    pageHook.entries = [INVOICE];
+    pageHook.isRetentionLimited = true;
+
+    const { renderer } = await renderWithProviders(createElement(PersonalInvoicesScreen));
+
+    const texts = flattenText(renderer.root);
+    // This suite renders the real catalogs, so the assertions read the copy.
+    expect(texts).toContain(i18n.t('organization.invoices.retentionLimit'));
+    // The bound note replaces the Load more block, so its label never renders.
+    expect(texts).not.toContain(i18n.t('common.loadMore'));
+  });
+
+  it('keeps the truncated note and Load more below the bound', async () => {
+    pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: 'inv-1', hasMore: true }] };
+    pageHook.entries = [INVOICE];
+    pageHook.hasMore = true;
+
+    const { renderer } = await renderWithProviders(createElement(PersonalInvoicesScreen));
+
+    const texts = flattenText(renderer.root);
+    expect(texts).toContain(i18n.t('organization.invoices.truncated'));
+    expect(texts).not.toContain(i18n.t('organization.invoices.retentionLimit'));
+    expect(texts).toContain(i18n.t('common.loadMore'));
+  });
+
+  it('never renders the two notes together when the impossible flag pairing is forced', async () => {
+    // The hooks can never return bound flag and `hasMore` together, so force
+    // the pairing from the mock side and hold the footer to one note.
+    pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: 'inv-1', hasMore: true }] };
+    pageHook.entries = [INVOICE];
+    pageHook.hasMore = true;
+    pageHook.isRetentionLimited = true;
+
+    const { renderer } = await renderWithProviders(createElement(PersonalInvoicesScreen));
+
+    const texts = flattenText(renderer.root);
+    expect(texts).not.toContain(i18n.t('organization.invoices.retentionLimit'));
+    expect(texts).toContain(i18n.t('organization.invoices.truncated'));
+    expect(texts).toContain(i18n.t('common.loadMore'));
   });
 });

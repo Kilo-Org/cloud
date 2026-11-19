@@ -3403,7 +3403,8 @@
         "accounting_adjustment": "Boekhoudkundige aanpassing",
         "credits_expired": "Krediete het verval"
       },
-      "truncated": "Ouer kredietaktiwiteit is beskikbaar."
+      "truncated": "Ouer kredietaktiwiteit is beskikbaar.",
+      "retentionLimit": "Die mees onlangse kredietaktiwiteit word gewys."
     },
     "inviteMember": {
       "emailError": "Voer 'n geldige e-posadres in.",
@@ -3434,7 +3435,8 @@
         "void": "Nietig",
         "uncollectible": "Oninbaar"
       },
-      "truncated": "Ouer fakture is beskikbaar."
+      "truncated": "Ouer fakture is beskikbaar.",
+      "retentionLimit": "Die mees onlangse fakture word gewys."
     },
     "lowBalanceAlert": {
       "enableA11y": "Aktiveer waarskuwing vir lae saldo",
@@ -4364,7 +4366,8 @@
       "purchaseFallback": "Kredietaankoop",
       "receipt": "Kwitansie",
       "receiptA11y": "Maak die kwitansie vir {{description}}, {{amount}}, vanaf {{date}} oop",
-      "receiptUnavailable": "Geen kwitansie is vir hierdie aankoop beskikbaar nie."
+      "receiptUnavailable": "Geen kwitansie is vir hierdie aankoop beskikbaar nie.",
+      "retentionLimit": "Die mees onlangse kredietgeskiedenis word gewys."
     },
     "title": "Koop krediete",
     "description": "Krediete is 'n eenmalige aankoop wat by jou Kilo-saldo gevoeg word om AI-koderingsessies in Kilo App te laat loop. Die winkel hef jou rekening en krediete word bygevoeg nadat die winkel betaling bevestig.",

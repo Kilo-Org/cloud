@@ -3403,7 +3403,8 @@
         "accounting_adjustment": "Ukulungiswa kwezimali",
         "credits_expired": "Amakhredithi aphelelwe yisikhathi"
       },
-      "truncated": "Umnyakazo wamakhredithi wangaphambili uyatholakala."
+      "truncated": "Umnyakazo wamakhredithi wangaphambili uyatholakala.",
+      "retentionLimit": "Kuboniswa umnyakazo wamakhredithi wakamuva."
     },
     "inviteMember": {
       "emailError": "Faka ikheli le-imeyili elivumelekile.",
@@ -3434,7 +3435,8 @@
         "void": "Ikhanseliwe",
         "uncollectible": "Ayisakhokheleki"
       },
-      "truncated": "Ama-invoyisi amadala ayatholakala."
+      "truncated": "Ama-invoyisi amadala ayatholakala.",
+      "retentionLimit": "Kuboniswa ama-invoyisi akamuva."
     },
     "lowBalanceAlert": {
       "enableA11y": "Vula isaziso sebhalansi ephansi",
@@ -4364,7 +4366,8 @@
       "purchaseFallback": "Ukuthengwa kwamakhredithi",
       "receipt": "Irisidi",
       "receiptA11y": "Vula irisidi ye-{{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Ayikho irisidi etholakalayo yalokhu kuthenga."
+      "receiptUnavailable": "Ayikho irisidi etholakalayo yalokhu kuthenga.",
+      "retentionLimit": "Kuboniswa umlando wamakhredithi wakamuva."
     },
     "title": "Thenga amakhredithi",
     "description": "Amakhredithi ukuthenga kwesikhathi esisodwa okwengezwa kubhalansi yakho ye-Kilo ukuze usebenzise amaseshini okubhala ikhodi e-AI ku-Kilo App. Isitolo sikhokhisa i-akhawunti yakho futhi amakhredithi engezwa ngemva kokuba isitolo siqinisekise inkokhelo.",

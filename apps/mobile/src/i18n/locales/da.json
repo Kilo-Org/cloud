@@ -3403,7 +3403,8 @@
         "accounting_adjustment": "Regnskabsmæssig justering",
         "credits_expired": "Udløbne kreditter"
       },
-      "truncated": "Du kan se ældre bevægelser på kreditsaldoen."
+      "truncated": "Du kan se ældre bevægelser på kreditsaldoen.",
+      "retentionLimit": "Viser de seneste bevægelser på kreditsaldoen."
     },
     "inviteMember": {
       "emailError": "Angiv en gyldig e-mailadresse.",
@@ -3434,7 +3435,8 @@
         "void": "Annulleret",
         "uncollectible": "Uinddrivelig"
       },
-      "truncated": "Ældre fakturaer er tilgængelige."
+      "truncated": "Ældre fakturaer er tilgængelige.",
+      "retentionLimit": "Viser de seneste fakturaer."
     },
     "lowBalanceAlert": {
       "enableA11y": "Aktivér advarsel om lav saldo",
@@ -4364,7 +4366,8 @@
       "purchaseFallback": "Kreditkøb",
       "receipt": "Kvittering",
       "receiptA11y": "Åbn kvitteringen for {{description}}, {{amount}}, fra {{date}}",
-      "receiptUnavailable": "Der er ingen kvittering for dette køb."
+      "receiptUnavailable": "Der er ingen kvittering for dette køb.",
+      "retentionLimit": "Viser den seneste kredithistorik."
     },
     "title": "Køb kreditter",
     "description": "Kreditter er et engangskøb, der lægges til din Kilo-saldo til at køre AI-kodningssessioner i Kilo App. Butikken opkræver betaling på din konto, og kreditterne tilføjes, når butikken bekræfter betalingen.",

@@ -3519,7 +3519,8 @@
         "accounting_adjustment": "Apskaitos koregavimas",
         "credits_expired": "Kreditų galiojimas baigėsi"
       },
-      "truncated": "Galite peržiūrėti ankstesnes kreditų operacijas."
+      "truncated": "Galite peržiūrėti ankstesnes kreditų operacijas.",
+      "retentionLimit": "Rodomos naujausios kreditų operacijos."
     },
     "inviteMember": {
       "emailError": "Įveskite tinkamą el. pašto adresą",
@@ -3550,7 +3551,8 @@
         "void": "Anuliuota",
         "uncollectible": "Beviltiška skola"
       },
-      "truncated": "Galite peržiūrėti ankstesnes sąskaitas."
+      "truncated": "Galite peržiūrėti ankstesnes sąskaitas.",
+      "retentionLimit": "Rodomos naujausios sąskaitos."
     },
     "lowBalanceAlert": {
       "enableA11y": "Įjungti pranešimą apie mažą likutį",
@@ -4498,7 +4500,8 @@
       "purchaseFallback": "Kreditų pirkimas",
       "receipt": "Kvitas",
       "receiptA11y": "Atidaryti kvitą: {{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Šiam pirkimui kvito nėra."
+      "receiptUnavailable": "Šiam pirkimui kvito nėra.",
+      "retentionLimit": "Rodoma naujausia kreditų istorija."
     },
     "title": "Pirkti kreditus",
     "description": "Kreditai yra vienkartinis pirkinys, pridedamas prie jūsų Kilo balanso AI kodavimo sesijoms Kilo programoje vykdyti. Parduotuvė nuskaito lėšas iš jūsų paskyros, o kreditai pridedami po to, kai parduotuvė patvirtina mokėjimą.",

@@ -3395,7 +3395,8 @@
         "accounting_adjustment": "Điều chỉnh kế toán",
         "credits_expired": "Tiền trong số dư đã hết hạn"
       },
-      "truncated": "Còn các biến động số dư trước đó để xem."
+      "truncated": "Còn các biến động số dư trước đó để xem.",
+      "retentionLimit": "Đang hiển thị các biến động số dư gần đây nhất."
     },
     "hub": {
       "balance": "Số dư",
@@ -3439,7 +3440,8 @@
         "void": "Đã hủy",
         "uncollectible": "Không thể thu tiền"
       },
-      "truncated": "Còn các hóa đơn trước đó để xem."
+      "truncated": "Còn các hóa đơn trước đó để xem.",
+      "retentionLimit": "Đang hiển thị các hóa đơn gần đây nhất."
     },
     "lowBalanceAlert": {
       "enableA11y": "Bật cảnh báo số dư thấp",
@@ -4364,7 +4366,8 @@
       "purchaseFallback": "Mua tín dụng",
       "receipt": "Biên lai",
       "receiptA11y": "Mở biên lai cho {{description}}, {{amount}}, từ {{date}}",
-      "receiptUnavailable": "Không có biên lai cho giao dịch mua này."
+      "receiptUnavailable": "Không có biên lai cho giao dịch mua này.",
+      "retentionLimit": "Đang hiển thị lịch sử tín dụng gần đây nhất."
     },
     "title": "Mua tín dụng",
     "description": "Tín dụng là giao dịch mua một lần được thêm vào số dư Kilo của bạn để chạy các phiên lập trình AI trong Kilo App. Cửa hàng tính phí vào tài khoản của bạn và tín dụng được thêm sau khi cửa hàng xác nhận thanh toán.",

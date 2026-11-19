@@ -3403,7 +3403,8 @@
         "accounting_adjustment": "Fanitsiana kaonty",
         "credits_expired": "Lany daty ny kireditra"
       },
-      "truncated": "Misy hetsika taloha kokoa momba ny kireditra."
+      "truncated": "Misy hetsika taloha kokoa momba ny kireditra.",
+      "retentionLimit": "Aseho ny hetsika momba ny kireditra farany indrindra."
     },
     "inviteMember": {
       "emailError": "Mampidira adiresy mailaka manan-kery.",
@@ -3434,7 +3435,8 @@
         "void": "Nofoanana",
         "uncollectible": "Tsy azo takina"
       },
-      "truncated": "Misy ny faktiora taloha kokoa."
+      "truncated": "Misy ny faktiora taloha kokoa.",
+      "retentionLimit": "Aseho ny faktiora farany indrindra."
     },
     "lowBalanceAlert": {
       "enableA11y": "Alefaso ny fampandrenesana rehefa kely ny ambim-bola",
@@ -4364,7 +4366,8 @@
       "purchaseFallback": "Fividianana kredita",
       "receipt": "Rosia",
       "receiptA11y": "Sokafy ny rosia ho an'ny {{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Tsy misy rosia ho an'ity fividianana ity."
+      "receiptUnavailable": "Tsy misy rosia ho an'ity fividianana ity.",
+      "retentionLimit": "Aseho ny tantaran'ny kredita farany indrindra."
     },
     "title": "Hividy kireditra",
     "description": "Ny kireditra dia fividianana indray mandeha ampiana amin'ny balan Kilo anao hanaovana session coding AI ao amin'ny Kilo App. Ny fivarotana no maka vola amin'ny kaontinao ary ampiana ny kireditra rehefa manamarina ny fandoavam-bola ny fivarotana.",

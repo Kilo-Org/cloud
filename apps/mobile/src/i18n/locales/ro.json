@@ -3461,7 +3461,8 @@
         "accounting_adjustment": "Ajustare contabilă",
         "credits_expired": "Credite expirate"
       },
-      "truncated": "Sunt disponibile operațiuni mai vechi cu credite."
+      "truncated": "Sunt disponibile operațiuni mai vechi cu credite.",
+      "retentionLimit": "Se afișează cele mai recente operațiuni cu credite."
     },
     "inviteMember": {
       "emailError": "Introdu o adresă de e-mail validă.",
@@ -3492,7 +3493,8 @@
         "void": "Anulată",
         "uncollectible": "Neîncasabilă"
       },
-      "truncated": "Sunt disponibile facturi mai vechi."
+      "truncated": "Sunt disponibile facturi mai vechi.",
+      "retentionLimit": "Se afișează cele mai recente facturi."
     },
     "lowBalanceAlert": {
       "enableA11y": "Activează alerta de sold scăzut",
@@ -4431,7 +4433,8 @@
       "purchaseFallback": "Achiziție de credite",
       "receipt": "Chitanță",
       "receiptA11y": "Deschide chitanța pentru {{description}}, {{amount}}, din {{date}}",
-      "receiptUnavailable": "Nu există o chitanță disponibilă pentru această achiziție."
+      "receiptUnavailable": "Nu există o chitanță disponibilă pentru această achiziție.",
+      "retentionLimit": "Se afișează cel mai recent istoric de credite."
     },
     "title": "Cumpără credite",
     "description": "Creditele sunt o achiziție unică adăugată la soldul tău Kilo pentru rularea sesiunilor de codare AI în Kilo App. Magazinul îți debitează contul, iar creditele sunt adăugate după ce magazinul confirmă plata.",

@@ -3395,7 +3395,8 @@
         "accounting_adjustment": "Penyesuaian akuntansi",
         "credits_expired": "Kredit kedaluwarsa"
       },
-      "truncated": "Masih ada aktivitas kredit sebelumnya."
+      "truncated": "Masih ada aktivitas kredit sebelumnya.",
+      "retentionLimit": "Menampilkan aktivitas kredit terbaru."
     },
     "hub": {
       "balance": "Saldo",
@@ -3439,7 +3440,8 @@
         "void": "Batal",
         "uncollectible": "Tidak tertagih"
       },
-      "truncated": "Masih ada faktur sebelumnya."
+      "truncated": "Masih ada faktur sebelumnya.",
+      "retentionLimit": "Menampilkan faktur terbaru."
     },
     "lowBalanceAlert": {
       "enableA11y": "Aktifkan peringatan saldo rendah",
@@ -4364,7 +4366,8 @@
       "purchaseFallback": "Pembelian kredit",
       "receipt": "Tanda terima",
       "receiptA11y": "Buka tanda terima untuk {{description}}, {{amount}}, dari {{date}}",
-      "receiptUnavailable": "Tanda terima tidak tersedia untuk pembelian ini."
+      "receiptUnavailable": "Tanda terima tidak tersedia untuk pembelian ini.",
+      "retentionLimit": "Menampilkan riwayat kredit terbaru."
     },
     "title": "Beli kredit",
     "description": "Kredit adalah pembelian satu kali yang ditambahkan ke saldo Kilo Anda untuk menjalankan sesi coding AI di Kilo App. Toko menagih akun Anda dan kredit ditambahkan setelah toko mengonfirmasi pembayaran.",

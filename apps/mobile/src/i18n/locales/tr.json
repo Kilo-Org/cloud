@@ -3395,7 +3395,8 @@
         "accounting_adjustment": "Muhasebe düzeltmesi",
         "credits_expired": "Kredilerin süresi doldu"
       },
-      "truncated": "Daha eski kredi hareketleri mevcut."
+      "truncated": "Daha eski kredi hareketleri mevcut.",
+      "retentionLimit": "En son kredi hareketleri gösteriliyor."
     },
     "hub": {
       "balance": "Bakiye",
@@ -3439,7 +3440,8 @@
         "void": "İptal edildi",
         "uncollectible": "Tahsil edilemez"
       },
-      "truncated": "Daha eski faturalar mevcut."
+      "truncated": "Daha eski faturalar mevcut.",
+      "retentionLimit": "En son faturalar gösteriliyor."
     },
     "lowBalanceAlert": {
       "enableA11y": "Düşük bakiye uyarısını etkinleştir",
@@ -4364,7 +4366,8 @@
       "purchaseFallback": "Kredi satın alımı",
       "receipt": "Makbuz",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} için makbuzu aç",
-      "receiptUnavailable": "Bu satın alım için makbuz mevcut değil."
+      "receiptUnavailable": "Bu satın alım için makbuz mevcut değil.",
+      "retentionLimit": "En son kredi geçmişi gösteriliyor."
     },
     "title": "Kredi satın al",
     "description": "Krediler, Kilo App'te AI kodlama oturumları yürütmek için Kilo bakiyenize eklenen tek seferlik bir satın alımdır. Mağaza hesabınızdan ücret alır ve mağaza ödemeyi onayladıktan sonra krediler eklenir.",

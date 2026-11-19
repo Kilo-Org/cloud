@@ -3395,7 +3395,8 @@
         "accounting_adjustment": "Boekhoudkundige correctie",
         "credits_expired": "Tegoed verlopen"
       },
-      "truncated": "Er zijn oudere tegoedtransacties beschikbaar."
+      "truncated": "Er zijn oudere tegoedtransacties beschikbaar.",
+      "retentionLimit": "De meest recente tegoedtransacties worden weergegeven."
     },
     "hub": {
       "balance": "Saldo",
@@ -3439,7 +3440,8 @@
         "void": "Vervallen",
         "uncollectible": "Oninbaar"
       },
-      "truncated": "Oudere facturen zijn beschikbaar."
+      "truncated": "Oudere facturen zijn beschikbaar.",
+      "retentionLimit": "De meest recente facturen worden weergegeven."
     },
     "lowBalanceAlert": {
       "enableA11y": "Waarschuwing voor laag saldo inschakelen",
@@ -4364,7 +4366,8 @@
       "purchaseFallback": "Tegoedaankoop",
       "receipt": "Bon",
       "receiptA11y": "Open de bon voor {{description}}, {{amount}}, van {{date}}",
-      "receiptUnavailable": "Er is geen bon beschikbaar voor deze aankoop."
+      "receiptUnavailable": "Er is geen bon beschikbaar voor deze aankoop.",
+      "retentionLimit": "De meest recente tegoedgeschiedenis wordt weergegeven."
     },
     "title": "Credits kopen",
     "description": "Credits zijn een eenmalige aankoop die aan je Kilo-saldo wordt toegevoegd voor AI-coderingssessies in Kilo App. De store belast je account en de credits worden toegevoegd nadat de store de betaling bevestigt.",

@@ -2,12 +2,50 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  linkTarget,
   parseShard,
   resolveTemplates,
   shardBatches,
   TemplateError,
+  type RouteFile,
   type SeedMap,
 } from './batch-manifest';
+
+const route = (file: string): RouteFile => ({
+  file,
+  segments: file
+    .replace(/\.tsx$/, '')
+    .split('/')
+    .filter(part => part !== 'index'),
+});
+
+test('a link resolves through an omitted group and a catch-all, preferring the most specific', () => {
+  const routes = [
+    route('(app)/code-reviewer/[scope]/[platform]/(edit)/style.tsx'),
+    route('(app)/code-reviewer/[scope]/[platform]/index.tsx'),
+    route('(app)/pr-review/[platform]/[...identity]/index.tsx'),
+    route('(app)/pr-review/[owner]/[repo]/[number]/index.tsx'),
+    route('(app)/(tabs)/(3_profile)/triggers/[trigger-id].tsx'),
+  ];
+  const file = (link: string) => linkTarget(routes, link).route?.file;
+  assert.equal(
+    file('kiloapp:///(app)/code-reviewer/personal/github/style'),
+    '(app)/code-reviewer/[scope]/[platform]/(edit)/style.tsx'
+  );
+  assert.equal(
+    file('kiloapp:///(app)/pr-review/gitlab/acme/sample/7'),
+    '(app)/pr-review/[platform]/[...identity]/index.tsx'
+  );
+  assert.equal(
+    file('kiloapp:///(app)/pr-review/acme/sample/7'),
+    '(app)/pr-review/[owner]/[repo]/[number]/index.tsx'
+  );
+  assert.equal(
+    file('kiloapp:///(app)/triggers/missing'),
+    '(app)/(tabs)/(3_profile)/triggers/[trigger-id].tsx'
+  );
+  assert.equal(file('kiloapp:///(app)/pr-review'), undefined);
+});
 
 const ids = ['T2-G09a', 'T1-G02', 'Gauth', 'T1-G11a', 'T2-G12', 'T1-G13a', 'T2-auth03'];
 

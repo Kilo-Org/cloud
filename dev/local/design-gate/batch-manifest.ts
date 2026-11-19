@@ -324,10 +324,28 @@ export function listRouteFiles(appDir = APP_DIR): RouteFile[] {
 }
 
 const dynamic = (part: string) => part.startsWith('[');
+const catchAll = (part: string) => part.startsWith('[...') || part.startsWith('[[...');
+const group = (part: string) => part.startsWith('(') && part.endsWith(')');
 
+/**
+ * Whether a route file serves a link path the way Expo Router resolves it: a
+ * group segment the link omits is skipped, `[x]` takes one segment, `[...x]`
+ * one or more and `[[...x]]` any number.
+ */
 function matches(route: readonly string[], segments: readonly string[]): boolean {
-  if (route.length !== segments.length) return false;
-  return route.every((part, index) => dynamic(part) || part === segments[index]);
+  const [part, ...rest] = route;
+  if (part === undefined) return segments.length === 0;
+  if (group(part)) {
+    return (segments[0] === part && matches(rest, segments.slice(1))) || matches(rest, segments);
+  }
+  if (catchAll(part)) {
+    for (let take = part.startsWith('[[') ? 0 : 1; take <= segments.length; take += 1) {
+      if (matches(rest, segments.slice(take))) return true;
+    }
+    return false;
+  }
+  const [head, ...tail] = segments;
+  return head !== undefined && (dynamic(part) || part === head) && matches(rest, tail);
 }
 
 export function resolveRoute(
@@ -335,10 +353,16 @@ export function resolveRoute(
   segments: readonly string[]
 ): RouteFile | undefined {
   const hits = routes.filter(route => matches(route.segments, segments));
-  const exact = hits.find(route => route.segments.every((part, index) => part === segments[index]));
+  const exact = hits.find(
+    route =>
+      route.segments.length === segments.length &&
+      route.segments.every((part, index) => part === segments[index])
+  );
   if (exact !== undefined) return exact;
-  const count = (route: RouteFile) => route.segments.filter(dynamic).length;
-  return [...hits].sort((a, b) => count(a) - count(b))[0];
+  // The most specific route wins: a named segment over `[x]`, `[x]` over a catch-all.
+  const weight = (route: RouteFile) =>
+    route.segments.reduce((sum, part) => sum + (catchAll(part) ? 10 : dynamic(part) ? 1 : 0), 0);
+  return [...hits].sort((a, b) => weight(a) - weight(b))[0];
 }
 
 /**

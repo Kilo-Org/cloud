@@ -829,14 +829,17 @@ enum ArtifactFileName {
 
   /// The scalars this extension never puts in a filename: C0, DEL and C1
   /// controls, and the Unicode bidi formatting characters a file browser would
-  /// otherwise use to reorder the painted name. Joiners stay, because they
-  /// shape the letters of a name written in an RTL script. Mirrors the mirror
-  /// writer's `isUnnameableCodePoint`.
+  /// otherwise use to reorder the painted name. Soft hyphen and zero width
+  /// space are dropped as well, because they paint nothing. Joiners stay,
+  /// because they shape the letters of a name written in an RTL script. Mirrors
+  /// the mirror writer's `isUnnameableCodePoint`.
   private static func isUnnameableScalar(_ value: UInt32) -> Bool {
     value <= 31
       || value == 127
       || (128...159).contains(value)
+      || value == 173  // SOFT HYPHEN
       || value == 1564  // ARABIC LETTER MARK
+      || value == 8203  // ZERO WIDTH SPACE
       || value == 8206  // LEFT-TO-RIGHT MARK
       || value == 8207  // RIGHT-TO-LEFT MARK
       || (8234...8238).contains(value)  // LEFT-TO-RIGHT EMBEDDING .. RIGHT-TO-LEFT OVERRIDE

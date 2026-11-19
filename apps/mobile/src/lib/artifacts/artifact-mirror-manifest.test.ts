@@ -182,6 +182,16 @@ describe('safeArtifactDisplayName', () => {
     );
   });
 
+  it('drops a soft hyphen and a zero width space from a name', () => {
+    expect(nameOf('in\u00ADvoice\u200B.pdf')).toBe('invoice.pdf');
+  });
+
+  it('falls back to the id and MIME extension when only invisible characters survive', () => {
+    expect(safeArtifactDisplayName({ id: 'part-1', name: '\u200B\u00AD', mime: 'image/png' })).toBe(
+      'part-1.png'
+    );
+  });
+
   it('collapses whitespace runs and trims the ends', () => {
     expect(
       safeArtifactDisplayName({ id: fallbackId, name: '  a   b.txt  ', mime: 'text/plain' })

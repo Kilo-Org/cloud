@@ -1094,7 +1094,8 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
   /**
    * RPC method: Cancel a running review.
-   * Prevents retries and interrupts the Cloud Agent Next session.
+   * Prevents retries, interrupts the Cloud Agent Next session, and keeps the
+   * review cancellable when the terminal status write fails.
    */
   async cancel(reason?: string): Promise<boolean> {
     await this.loadState();
@@ -1112,9 +1113,8 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     this.cancelled = true;
 
     const errorMessage = reason ? `Review cancelled: ${reason}` : 'Review cancelled';
-    await this.updateStatus('cancelled', { errorMessage });
 
-    // If we have a sessionId, interrupt the cloud agent session to stop it from posting comments
+    // Stop the remote execution first: it must not depend on the status write.
     if (this.state.sessionId) {
       try {
         await this.interruptCloudAgentSession(this.state.sessionId);
@@ -1123,7 +1123,6 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
           sessionId: this.state.sessionId,
         });
       } catch (interruptError) {
-        // Log but don't fail - the review is already marked as cancelled
         console.warn('[CodeReviewOrchestrator] Failed to interrupt cloud agent session', {
           reviewId: this.state.reviewId,
           sessionId: this.state.sessionId,
@@ -1132,12 +1131,50 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       }
     }
 
+    // Snapshot the durable inputs so a failed status write can be rolled back.
+    try {
+      await this.persistCancellation(errorMessage);
+    } catch (error) {
+      console.warn('[CodeReviewOrchestrator] Cancellation status write failed; restored state', {
+        reviewId: this.state.reviewId,
+        attemptId: this.state.attemptId,
+        status: this.state.status,
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      throw error;
+    }
+
     console.log('[CodeReviewOrchestrator] Review cancelled', {
       reviewId: this.state.reviewId,
       reason,
     });
 
     return true;
+  }
+
+  /**
+   * Record the terminal cancellation status. When the status write fails, restore the
+   * previous review state and alarm so the review stays cancellable, then rethrow.
+   */
+  private async persistCancellation(errorMessage: string): Promise<void> {
+    const previousState = structuredClone(this.state);
+    const previousAlarm = await this.ctx.storage.getAlarm();
+
+    try {
+      await this.updateStatus('cancelled', { errorMessage });
+    } catch (error) {
+      this.state = previousState;
+      await this.saveState();
+
+      if (previousAlarm === null) {
+        await this.ctx.storage.deleteAlarm();
+      } else {
+        await this.ctx.storage.setAlarm(previousAlarm);
+      }
+
+      throw error;
+    }
   }
 
   /** Interrupt the cloud agent session to stop it from running and posting comments. */
@@ -1233,6 +1270,25 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         reviewId: this.state?.reviewId,
         status: this.state?.status,
       });
+      return;
+    }
+
+    // A cancellation that has not completed must not start work. Retry recording the
+    // terminal status so a recovered backend reconciles the record; a queued review has
+    // no session, so settling it locally is equivalent and lets cleanup reclaim it.
+    if (this.cancelled) {
+      try {
+        await this.persistCancellation('Review cancelled');
+      } catch (error) {
+        console.warn(
+          '[CodeReviewOrchestrator] Pending cancellation not recorded; settled locally',
+          {
+            reviewId: this.state.reviewId,
+            error: error instanceof Error ? error.message : String(error),
+          }
+        );
+        await this.setLocalTerminalStateFromDB('cancelled');
+      }
       return;
     }
 

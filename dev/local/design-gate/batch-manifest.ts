@@ -490,9 +490,9 @@ export function expectedOutcome(
 // --- Settled-state check (the old check-batch.mjs) -------------------------
 
 const NOT_FOUND = [
-  /^page not found$/i,
-  /^not found$/i,
-  /not found\.$/i,
+  // "Not found", "Page not found", and a detail screen's own title, such as
+  // "Trigger not found" or "Member not found".
+  /\bnot found\.?$/i,
   /may have been removed or is no longer available/i,
   /this link is no longer valid/i,
   // The share gate's stale-link state has no testID, so its copy is the verdict.

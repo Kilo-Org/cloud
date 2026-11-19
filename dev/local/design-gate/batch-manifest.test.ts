@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  classifyDump,
+  expectationMismatch,
   MANIFEST_COLUMNS,
   parseManifest,
   readManifest,
@@ -177,4 +179,19 @@ test('a failed seed step keeps its error line, and a missing declared key fails 
     'exit 1: Seed runner failed: Error: Failed query: insert into "security_findings"'
   );
   assert.equal(map.steps['security-org-scopes']?.error, 'printed no organizationId');
+});
+
+test("a detail screen's own not-found title meets a not-found row", () => {
+  const row = {
+    kind: 'not-found',
+    screen: '(app)/(tabs)/(3_profile)/triggers/[trigger-id]',
+  } as const;
+  const actual = row.screen;
+  for (const title of ['Trigger not found', 'Page not found', 'Not found']) {
+    assert.equal(expectationMismatch(row, actual, classifyDump([{ text: title }])), undefined);
+  }
+  assert.equal(
+    expectationMismatch(row, actual, classifyDump([{ text: 'Triggers & webhooks' }])),
+    'expected a not-found state, the screen rendered'
+  );
 });

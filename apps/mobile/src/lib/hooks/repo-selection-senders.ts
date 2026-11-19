@@ -29,9 +29,7 @@ export type RepoSelectionSender = {
 };
 
 // One pending debounced send per scope+platform. The timer closes over the
-// sender state, so a remount never retargets an older timer. `serverSelection`
-// is the last server-confirmed selection; `pendingSelection` is the latest
-// user-intended selection and is null while nothing is pending. Each entry
+// sender state, so a remount never retargets an older timer. Each entry
 // records the auth epoch it was created under, and an entry created under
 // another epoch is replaced before it is read.
 const repoSelectionSenders = new Map<string, RepoSelectionSender>();

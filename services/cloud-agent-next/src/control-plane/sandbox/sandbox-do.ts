@@ -84,9 +84,11 @@ import {
 } from '../../container-usage-context.js';
 import { resolveSecret } from '../../auth.js';
 import {
-  workspaceMcpAnchorSessionId,
+  workspaceSessionIdForScope,
   type WorkspaceMcpBinding,
 } from '../../cloud-agent-authority.js';
+import { getWorkspaceStub } from '../workspace/workspace-stub.js';
+import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
 import { getContainerCapacityFailureReason } from '../../container-concurrency.js';
 import {
   generateSandboxCredential,
@@ -710,10 +712,9 @@ function materializationStage(error: unknown): PrepareFrameMaterializationStage 
  * DO is B4, so the production factory resolves a stub only when the test-only
  * binding exists; tests inject a fake peer instead.
  */
+export type CloudAgentMcpGrant = { url: string; token: string; expiresAt: number };
+
 export type ControlPlaneSessionPeer = HistoryPageSession & {
-  issueCloudAgentMcpGrant?(
-    workspace?: WorkspaceMcpBinding
-  ): Promise<{ url: string; token: string; expiresAt: number } | undefined>;
   onRoute(update: ControlPlaneRouteUpdate): Promise<void>;
   /** The whole workspace stopped during preparation; settle this chat. */
   onWorkspaceStopped(payload: ControlPlaneWorkspaceStoppedPayload): Promise<void>;
@@ -1034,6 +1035,21 @@ export class SandboxControlV2 extends DurableObject<Env> {
     ownerId,
     sessionId
   ) => this.resolveSessionPeer(ownerId, sessionId);
+  /**
+   * Issues the workspace MCP credential through the workspace authority. The
+   * default resolves the workspace Durable Object; tests inject a fake.
+   */
+  cloudAgentMcpGrantFor: (
+    ownerId: string,
+    binding: WorkspaceMcpBinding
+  ) => Promise<CloudAgentMcpGrant | undefined> = (ownerId, binding) =>
+    getWorkspaceStub(this.env, ownerId, binding.workspaceSessionId).issueMcpGrant(binding);
+  /**
+   * Expiry (seconds) of the newest workspace MCP credential sent to this
+   * allocation, per workspace. In memory: after eviction the next delivery
+   * offers one fresh credential, which the wrapper keeps only if it is newer.
+   */
+  private readonly sentCloudAgentMcpExpiresAt = new Map<string, number>();
   /**
    * Current organization membership for an organization-attributed grant. The
    * default reads the Worker's database through Hyperdrive; tests inject a fake
@@ -3919,9 +3935,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // Credentials half of B3: a due grant is re-issued and `session.credentials`
     // is sent before the prompts. A failed re-issue still delivers on the
     // previous grant while it is valid; a route that was released ends here.
+    const grantExpiresAt = route.grant?.expiresAt;
     const renewal = await this.renewRouteGrant(route, state);
     if (renewal.kind !== 'ready') return 'not_ready';
     route = renewal.route;
+    // A re-issued grant already offered a fresh MCP credential.
+    if (route.grant?.expiresAt === grantExpiresAt) await this.refreshCloudAgentMcp(route, state);
 
     // One verified-expiry check immediately before the prompts, for adopted
     // handles only. A per-session scope keeps its historical behavior: the
@@ -4094,6 +4113,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ...(cloudAgentMcp ? { cloudAgentMcp } : {}),
     });
     if (this.trySendFrame(socket, { type: 'session.credentials', ...payload })) {
+      this.recordCloudAgentMcpSent(next, cloudAgentMcp);
       await this.markRouteCredentialsSent(route.sessionId, issued.grant);
     }
     return 'issued';
@@ -5108,7 +5128,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ...(cloudAgentMcp ? { cloudAgentMcp } : {}),
     });
     const sent = this.trySendFrame(socket, { ...frame, credentials });
-    if (sent) await this.markRouteCredentialsSent(sessionId, sendRoute.grant);
+    if (sent) {
+      this.recordCloudAgentMcpSent(sendRoute, cloudAgentMcp);
+      await this.markRouteCredentialsSent(sessionId, sendRoute.grant);
+    }
   }
 
   /**
@@ -5302,25 +5325,30 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return claims === null ? null : { exp: claims.exp, sessionId: claims.sessionId };
   }
 
+  /** The workspace whose MCP credential this route carries, or null when it has none. */
+  private workspaceMcpBinding(route: RouteRecord): WorkspaceMcpBinding | null {
+    const source = route.credentialSource;
+    if (source === null) return null;
+    const workspaceSessionId = workspaceSessionIdForScope(source.scopeId, route.sessionId);
+    if (workspaceSessionId === undefined) return null;
+    return {
+      workspaceSessionId,
+      worktreeId: source.scopeId?.startsWith('worktree_') ? source.scopeId : null,
+      ownerId: source.userId,
+      organizationId: source.orgId ?? null,
+    };
+  }
+
   private async tryIssueCloudAgentMcpGrant(
     route: RouteRecord
-  ): Promise<{ url: string; token: string; expiresAt: number } | undefined> {
-    const anchor = workspaceMcpAnchorSessionId(route.credentialSource?.scopeId, route.sessionId);
-    if (anchor === undefined) return undefined;
+  ): Promise<CloudAgentMcpGrant | undefined> {
+    const binding = this.workspaceMcpBinding(route);
+    if (binding === null) return undefined;
     try {
       const ownerId = await this.requireOwner();
-      const peer = ownerId === null ? null : this.sessionPeerFor(ownerId, anchor);
-      if (peer?.issueCloudAgentMcpGrant === undefined) return undefined;
+      if (ownerId === null || ownerId !== binding.ownerId) return undefined;
       return await withTimeout(
-        peer.issueCloudAgentMcpGrant(
-          route.credentialSource?.scopeId?.startsWith('worktree_')
-            ? {
-                worktreeId: route.credentialSource.scopeId,
-                ownerId: route.credentialSource.userId,
-                organizationId: route.credentialSource.orgId ?? null,
-              }
-            : undefined
-        ),
+        this.cloudAgentMcpGrantFor(ownerId, binding),
         this.grantIssueTimeoutMs(),
         'Cloud Agent MCP grant issuance timed out'
       );
@@ -5329,10 +5357,56 @@ export class SandboxControlV2 extends DurableObject<Env> {
         .withFields({
           sandboxId: this.sandboxId,
           sessionId: route.sessionId,
-          anchorSessionId: anchor,
+          workspaceSessionId: binding.workspaceSessionId,
         })
         .warn('Optional Cloud Agent MCP grant unavailable; continuing without it');
       return undefined;
+    }
+  }
+
+  private recordCloudAgentMcpSent(route: RouteRecord, grant: CloudAgentMcpGrant | undefined): void {
+    const binding = grant === undefined ? null : this.workspaceMcpBinding(route);
+    if (grant === undefined || binding === null) return;
+    const sent = this.sentCloudAgentMcpExpiresAt.get(binding.workspaceSessionId);
+    if (sent === undefined || grant.expiresAt > sent) {
+      this.sentCloudAgentMcpExpiresAt.set(binding.workspaceSessionId, grant.expiresAt);
+    }
+  }
+
+  /**
+   * Offers a newer workspace MCP credential before a prompt when the one this
+   * allocation last received is missing or due. This is how a renewed
+   * workspace authority reaches a running runtime without a restart. The
+   * current route grant is resent unchanged with it.
+   */
+  private async refreshCloudAgentMcp(route: RouteRecord, state: AllocationState): Promise<void> {
+    const binding = this.workspaceMcpBinding(route);
+    // Only interactive workspaces can launch children; automation never asks.
+    if (
+      binding === null ||
+      route.grant === null ||
+      !isInteractiveSessionOrigin(route.credentialSource?.createdOnPlatform)
+    ) {
+      return;
+    }
+    const sent = this.sentCloudAgentMcpExpiresAt.get(binding.workspaceSessionId);
+    if (
+      sent !== undefined &&
+      sent * 1000 - Date.now() >= this.sandboxTimers().credentialGrantReissueBelowMs
+    ) {
+      return;
+    }
+    const grant = await this.tryIssueCloudAgentMcpGrant(route);
+    if (grant === undefined || (sent !== undefined && grant.expiresAt <= sent)) return;
+    const socket = this.boundWrapperSocket(state);
+    const current = await readRoute(this.db, route.sessionId);
+    if (socket === null || current?.state !== 'ready' || current.grant === null) return;
+    const payload = controlPlaneSessionCredentialsPayloadSchema.parse({
+      ...sessionCredentialsPayloadFromGrant(current.grant, route.sessionId),
+      cloudAgentMcp: grant,
+    });
+    if (this.trySendFrame(socket, { type: 'session.credentials', ...payload })) {
+      this.recordCloudAgentMcpSent(current, grant);
     }
   }
 

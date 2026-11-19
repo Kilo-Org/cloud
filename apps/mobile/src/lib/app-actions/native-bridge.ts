@@ -34,7 +34,7 @@ type KiloAppActionsModule = InstanceType<typeof NativeModule> & {
    * registered, verbatim. Synchronous on both platforms: the native side has
    * to take the handler on the JS thread.
    */
-  // oxlint-disable-next-line anti-slop/no-unknown-returns -- raw native buffer, normalized on the next line of this module
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- raw native buffer, normalized by bufferedPayloads in this module
   registerAppActionDispatcher: (handler: NativeAppActionHandler) => unknown;
   /**
    * The App Intents entity catalog, optional because a development client built

@@ -30,6 +30,9 @@ export const ORGANIZATION_TRIAL_EXPIRED_MESSAGE = 'Organization trial has expire
 export const ORGANIZATION_MEMBER_EXISTS_MESSAGE =
   'This user is already a member of this organization';
 
+/** `organizations.members.invite`: the organization row is deleted or never existed. */
+const ORGANIZATION_MISSING_MESSAGE = 'This organization is no longer available';
+
 /** `organizations.members.invite`: an invitation for the address is outstanding. */
 export const ORGANIZATION_PENDING_INVITATION_MESSAGE =
   'This email already has a pending invitation';
@@ -89,6 +92,9 @@ function copyKeyFor(message: string, canManageBilling: boolean): string | undefi
     }
     case ORGANIZATION_PENDING_INVITATION_MESSAGE: {
       return 'organization.inviteMember.pendingInvitation';
+    }
+    case ORGANIZATION_MISSING_MESSAGE: {
+      return 'organization.inviteMember.organizationUnavailable';
     }
     case ORGANIZATION_SELF_ROLE_MESSAGE: {
       return 'organization.members.ownRoleChange';

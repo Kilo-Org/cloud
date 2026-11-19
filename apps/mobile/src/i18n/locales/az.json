@@ -4740,7 +4740,7 @@
     "statusSaved": "Yadda saxlanıldı",
     "statusFailed": "Yadda saxlamaq alınmadı.",
     "inputTitle": "Giriş üçün qoruyucu qaydalar",
-    "inputDescription": "Alət nəticələri daxil olmaqla hər girişi Enkrypt AI ilə yoxlayır. Enkrypt əlçatan olmadıqda bloklayan detektor sorğunu rədd edir.",
+    "inputDescription": "Alət nəticələri daxil olmaqla hər girişi Enkrypt AI ilə yoxlayır. Enkrypt əlçatan olmadıqda sorğular rədd edilmək əvəzinə yoxlanılmadan göndərilir.",
     "outputTitle": "Çıxış üçün qoruyucu qaydalar",
     "outputDescription": "Cavabları üzvlərə çatmazdan əvvəl Enkrypt AI ilə yoxlayır. Siz aktivləşdirməyincə söndürülüdür.",
     "detectorsHint": "\"Blokla\" işarələnmiş sorğunu rədd edir. \"Yalnız qeydə al\" sorğunu ləngitmədən onu sadəcə qeydə alır.",

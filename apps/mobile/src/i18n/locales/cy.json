@@ -5024,7 +5024,7 @@
     "statusSaved": "Wedi cadw",
     "statusFailed": "Methu cadw.",
     "inputTitle": "Mesurau diogelu mewnbwn",
-    "inputDescription": "Mae'n sganio pob mewnbwn gydag Enkrypt AI, gan gynnwys canlyniadau offer. Mae synhwyrydd sy'n blocio yn gwrthod cais pan nad yw Enkrypt ar gael.",
+    "inputDescription": "Mae'n sganio pob mewnbwn gydag Enkrypt AI, gan gynnwys canlyniadau offer. Pan nad yw Enkrypt ar gael, anfonir ceisiadau heb eu sganio yn hytrach na'u gwrthod.",
     "outputTitle": "Mesurau diogelu allbwn",
     "outputDescription": "Mae'n sganio ymatebion gydag Enkrypt AI cyn i aelodau eu derbyn. Wedi diffodd oni bai eich bod yn ei droi ymlaen.",
     "detectorsHint": "Mae Blocio yn gwrthod cais sydd wedi'i nodi. Mae Cofnodi yn unig yn ei gofnodi heb oedi'r cais.",

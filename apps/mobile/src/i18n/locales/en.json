@@ -4740,7 +4740,7 @@
     "statusSaved": "Saved",
     "statusFailed": "Couldn't save.",
     "inputTitle": "Input guardrails",
-    "inputDescription": "Check every input with Enkrypt AI, including tool results such as file reads and command output. Blocking detectors reject requests if Enkrypt is unavailable.",
+    "inputDescription": "Check every input with Enkrypt AI, including tool results such as file reads and command output. If Enkrypt is unavailable, requests are sent unscanned rather than rejected.",
     "outputTitle": "Output guardrails",
     "outputDescription": "Check model responses with Enkrypt AI before your members receive them. Off unless you turn it on, separately from input guardrails.",
     "detectorsHint": "Block stops a flagged request. Log only records detections without delaying the request.",

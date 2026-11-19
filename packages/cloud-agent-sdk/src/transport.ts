@@ -150,7 +150,6 @@ type Transport = {
   disconnect(): void;
   destroy(): void;
 
-  // Commands — present only on interactive transports
   send?: (payload: TransportSendInput) => Promise<unknown>;
   canSend?: () => boolean;
   retryRemoteModels?: () => void;

@@ -4740,7 +4740,7 @@
     "statusSaved": "Kaydedildi",
     "statusFailed": "Kaydedilemedi.",
     "inputTitle": "Girdi korkulukları",
-    "inputDescription": "Araç sonuçları dahil her girdiyi Enkrypt AI ile tarar. Enkrypt kullanılamadığında engelleyici bir algılayıcı isteği reddeder.",
+    "inputDescription": "Araç sonuçları dahil her girdiyi Enkrypt AI ile tarar. Enkrypt kullanılamadığında istekler reddedilmek yerine taranmadan gönderilir.",
     "outputTitle": "Çıktı korkulukları",
     "outputDescription": "Yanıtları, üyeler almadan önce Enkrypt AI ile tarar. Siz açmadıkça kapalıdır.",
     "detectorsHint": "Engelle, işaretlenen isteği reddeder. Yalnızca günlüğe kaydet seçeneği ise isteği geciktirmeden kaydeder.",

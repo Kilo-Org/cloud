@@ -4740,7 +4740,7 @@
     "statusSaved": "Disimpan",
     "statusFailed": "Tidak dapat menyimpan.",
     "inputTitle": "Pagar keselamatan input",
-    "inputDescription": "Mengimbas setiap input dengan Enkrypt AI, termasuk hasil alat. Pengesan yang menyekat menolak permintaan apabila Enkrypt tidak tersedia.",
+    "inputDescription": "Mengimbas setiap input dengan Enkrypt AI, termasuk hasil alat. Apabila Enkrypt tidak tersedia, permintaan dihantar tanpa diimbas dan bukannya ditolak.",
     "outputTitle": "Pagar keselamatan output",
     "outputDescription": "Mengimbas respons dengan Enkrypt AI sebelum ahli menerimanya. Dimatikan kecuali anda menghidupkannya.",
     "detectorsHint": "Sekat menolak permintaan yang ditandakan. Rekod sahaja merekodkannya tanpa melengahkan permintaan.",

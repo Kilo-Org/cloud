@@ -4882,7 +4882,7 @@
     "statusSaved": "Uloženo",
     "statusFailed": "Uložení se nezdařilo.",
     "inputTitle": "Ochranná pravidla pro vstup",
-    "inputDescription": "Kontroluje každý vstup pomocí Enkrypt AI, včetně výsledků nástrojů. Blokující detektor odmítne požadavek, když je Enkrypt nedostupný.",
+    "inputDescription": "Kontroluje každý vstup pomocí Enkrypt AI, včetně výsledků nástrojů. Když je Enkrypt nedostupný, požadavky se odesílají bez kontroly, místo aby byly odmítnuty.",
     "outputTitle": "Ochranná pravidla pro výstup",
     "outputDescription": "Kontroluje odpovědi pomocí Enkrypt AI dříve, než je členové obdrží. Je vypnuto, dokud ho nezapnete.",
     "detectorsHint": "Možnost Blokovat označený požadavek odmítne. Možnost Jen zaznamenat ho pouze zaznamená, aniž by požadavek zdržela.",

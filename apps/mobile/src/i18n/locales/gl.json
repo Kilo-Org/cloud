@@ -4740,7 +4740,7 @@
     "statusSaved": "Gardado",
     "statusFailed": "Non se puido gardar.",
     "inputTitle": "Barreiras de seguridade da entrada",
-    "inputDescription": "Analiza cada entrada con Enkrypt AI, incluídos os resultados das ferramentas. Un detector de bloqueo rexeita unha solicitude cando Enkrypt non está dispoñible.",
+    "inputDescription": "Analiza cada entrada con Enkrypt AI, incluídos os resultados das ferramentas. Cando Enkrypt non está dispoñible, as solicitudes envíanse sen analizar en lugar de rexeitarse.",
     "outputTitle": "Barreiras de seguridade da saída",
     "outputDescription": "Analiza as respostas con Enkrypt AI antes de que os membros as reciban. Desactivado a menos que o actives.",
     "detectorsHint": "Bloquear rexeita unha solicitude sinalada. Só rexistrar limítase a rexistrala sen atrasar a solicitude.",

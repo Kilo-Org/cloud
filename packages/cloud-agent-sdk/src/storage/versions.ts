@@ -43,7 +43,8 @@ function forgetPartVersion(
       !row.removed
     ) {
       versions.rows.delete(key);
-      // The message keeps no part but this one — its last remaining part was removed.
+      // The part row is still in storage here, so `partId` itself is among the
+      // ids: any other id means the message keeps another part.
       if (
         !sessionStorage.getMessageInfo(messageId) &&
         !sessionStorage.getPartIds(messageId).some(id => id !== partId)

@@ -4740,7 +4740,7 @@
     "statusSaved": "Vistað",
     "statusFailed": "Ekki tókst að vista.",
     "inputTitle": "Inntaksvarnir",
-    "inputDescription": "Skannar hvert inntak með Enkrypt AI, þar á meðal niðurstöður verkfæra. Blokkunarskynjari hafnar beiðni þegar Enkrypt er ekki tiltækt.",
+    "inputDescription": "Skannar hvert inntak með Enkrypt AI, þar á meðal niðurstöður verkfæra. Þegar Enkrypt er ekki tiltækt eru beiðnir sendar óskannaðar í stað þess að þeim sé hafnað.",
     "outputTitle": "Úttaksvarnir",
     "outputDescription": "Skannar svör með Enkrypt AI áður en meðlimir fá þau. Slökkt nema þú kveikir á því.",
     "detectorsHint": "Blokkun hafnar merktri beiðni. Einungis skráning skráir hana án þess að tefja beiðnina.",

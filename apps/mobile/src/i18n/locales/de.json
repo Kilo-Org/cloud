@@ -4740,7 +4740,7 @@
     "statusSaved": "Gespeichert",
     "statusFailed": "Speichern fehlgeschlagen.",
     "inputTitle": "Eingabe-Guardrails",
-    "inputDescription": "Prüft jede Eingabe mit Enkrypt AI, einschließlich Tool-Ergebnissen. Ein blockierender Detektor lehnt eine Anfrage ab, wenn Enkrypt nicht verfügbar ist.",
+    "inputDescription": "Prüft jede Eingabe mit Enkrypt AI, einschließlich Tool-Ergebnissen. Wenn Enkrypt nicht verfügbar ist, werden Anfragen ungeprüft gesendet, statt abgelehnt zu werden.",
     "outputTitle": "Ausgabe-Guardrails",
     "outputDescription": "Prüft Antworten mit Enkrypt AI, bevor Mitglieder sie erhalten. Standardmäßig aus.",
     "detectorsHint": "Blockieren lehnt eine markierte Anfrage ab. Nur protokollieren zeichnet sie auf, ohne die Anfrage zu verzögern.",

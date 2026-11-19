@@ -4811,7 +4811,7 @@
     "statusSaved": "Saglabāts",
     "statusFailed": "Neizdevās saglabāt.",
     "inputTitle": "Ievades aizsargbarjeras",
-    "inputDescription": "Pārbauda katru ievadi ar Enkrypt AI, tostarp rīku rezultātus. Bloķējošs detektors noraida pieprasījumu, kad Enkrypt nav pieejams.",
+    "inputDescription": "Pārbauda katru ievadi ar Enkrypt AI, tostarp rīku rezultātus. Kad Enkrypt nav pieejams, pieprasījumi tiek nosūtīti bez pārbaudes, nevis noraidīti.",
     "outputTitle": "Izvades aizsargbarjeras",
     "outputDescription": "Pārbauda atbildes ar Enkrypt AI, pirms dalībnieki tās saņem. Izslēgts, ja vien to neieslēdzat.",
     "detectorsHint": "Bloķēt noraida atzīmētu pieprasījumu. Tikai reģistrēt to ieraksta, neaizkavējot pieprasījumu.",

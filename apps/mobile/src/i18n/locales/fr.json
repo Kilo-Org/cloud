@@ -4811,7 +4811,7 @@
     "statusSaved": "Enregistré",
     "statusFailed": "Impossible d'enregistrer.",
     "inputTitle": "Garde-fous d'entrée",
-    "inputDescription": "Analyse chaque entrée avec Enkrypt AI, y compris les résultats d'outils. Un détecteur bloquant rejette une requête lorsque Enkrypt est indisponible.",
+    "inputDescription": "Analyse chaque entrée avec Enkrypt AI, y compris les résultats d'outils. Lorsque Enkrypt est indisponible, les requêtes sont envoyées sans analyse plutôt que rejetées.",
     "outputTitle": "Garde-fous de sortie",
     "outputDescription": "Analyse les réponses avec Enkrypt AI avant qu'elles ne parviennent aux membres. Désactivé tant que vous ne l'activez pas.",
     "detectorsHint": "Bloquer rejette une requête signalée. Journaliser uniquement l'enregistre sans retarder la requête.",

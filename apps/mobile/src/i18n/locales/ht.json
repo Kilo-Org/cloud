@@ -4740,7 +4740,7 @@
     "statusSaved": "Anrejistre",
     "statusFailed": "Pa t kapab anrejistre.",
     "inputTitle": "Gadriy antre",
-    "inputDescription": "Li eskane chak antre ak Enkrypt AI, ansanm ak rezilta zouti yo. Yon detektè blokaj rejte yon demann lè Enkrypt pa disponib.",
+    "inputDescription": "Li eskane chak antre ak Enkrypt AI, ansanm ak rezilta zouti yo. Lè Enkrypt pa disponib, yo voye demann yo san eskane yo olye yo rejte yo.",
     "outputTitle": "Gadriy sòti",
     "outputDescription": "Li eskane repons yo ak Enkrypt AI anvan manm yo resevwa yo. Dezaktive sof si ou aktive l.",
     "detectorsHint": "Blokaj rejte yon demann ki make. Anrejistre sèlman anrejistre l san retade demann lan.",

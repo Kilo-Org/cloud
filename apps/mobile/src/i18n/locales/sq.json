@@ -4740,7 +4740,7 @@
     "statusSaved": "U ruajt",
     "statusFailed": "Nuk u ruajt dot.",
     "inputTitle": "Mbrojtëset e hyrjes",
-    "inputDescription": "Skanon çdo hyrje me Enkrypt AI, duke përfshirë rezultatet e mjeteve. Një detektor bllokues e refuzon një kërkesë kur Enkrypt nuk është i disponueshëm.",
+    "inputDescription": "Skanon çdo hyrje me Enkrypt AI, duke përfshirë rezultatet e mjeteve. Kur Enkrypt nuk është i disponueshëm, kërkesat dërgohen pa u skanuar në vend që të refuzohen.",
     "outputTitle": "Mbrojtëset e daljes",
     "outputDescription": "Skanon përgjigjet me Enkrypt AI përpara se anëtarët t'i marrin ato. Është e fikur nëse nuk e aktivizoni.",
     "detectorsHint": "Bllokimi e refuzon një kërkesë të sinjalizuar. Vetëm regjistrimi e shënon atë pa e vonuar kërkesën.",

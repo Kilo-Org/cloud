@@ -4811,7 +4811,7 @@
     "statusSaved": "Salvato",
     "statusFailed": "Impossibile salvare.",
     "inputTitle": "Protezioni per gli input",
-    "inputDescription": "Analizza ogni input con Enkrypt AI, inclusi i risultati degli strumenti. Un rilevatore bloccante rifiuta una richiesta quando Enkrypt non è disponibile.",
+    "inputDescription": "Analizza ogni input con Enkrypt AI, inclusi i risultati degli strumenti. Quando Enkrypt non è disponibile, le richieste vengono inviate senza analisi anziché rifiutate.",
     "outputTitle": "Protezioni per le risposte",
     "outputDescription": "Analizza le risposte con Enkrypt AI prima che i membri le ricevano. Disattivate a meno che tu non le attivi.",
     "detectorsHint": "L'opzione Blocca rifiuta una richiesta segnalata. L'opzione Solo registrazione la registra senza ritardare la richiesta.",

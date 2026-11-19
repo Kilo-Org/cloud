@@ -4811,7 +4811,7 @@
     "statusSaved": "Desat",
     "statusFailed": "No s'ha pogut desar.",
     "inputTitle": "Salvaguardes d'entrada",
-    "inputDescription": "Analitza cada entrada amb Enkrypt AI, inclosos els resultats de les eines. Un detector de bloqueig rebutja una sol·licitud quan Enkrypt no està disponible.",
+    "inputDescription": "Analitza cada entrada amb Enkrypt AI, inclosos els resultats de les eines. Quan Enkrypt no està disponible, les sol·licituds s'envien sense analitzar en lloc de ser rebutjades.",
     "outputTitle": "Salvaguardes de sortida",
     "outputDescription": "Analitza les respostes amb Enkrypt AI abans que les rebin els membres. Està desactivat tret que l'activis.",
     "detectorsHint": "«Bloqueig» rebutja una sol·licitud marcada. «Només registre» la registra sense endarrerir la sol·licitud.",

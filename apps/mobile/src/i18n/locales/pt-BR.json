@@ -4817,7 +4817,7 @@
     "statusSaved": "Salvo",
     "statusFailed": "Não foi possível salvar.",
     "inputTitle": "Salvaguardas de entrada",
-    "inputDescription": "Verifica cada entrada com o Enkrypt AI, incluindo resultados de ferramentas. Um detector de bloqueio rejeita uma solicitação quando o Enkrypt não está disponível.",
+    "inputDescription": "Verifica cada entrada com o Enkrypt AI, incluindo resultados de ferramentas. Quando o Enkrypt não está disponível, as solicitações são enviadas sem verificação em vez de rejeitadas.",
     "outputTitle": "Salvaguardas de saída",
     "outputDescription": "Verifica as respostas com o Enkrypt AI antes que os membros as recebam. Fica desativado a menos que você o ative.",
     "detectorsHint": "Bloquear rejeita uma solicitação sinalizada. A opção Somente registrar apenas registra a solicitação sem atrasá-la.",

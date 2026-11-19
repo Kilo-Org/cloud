@@ -4740,7 +4740,7 @@
     "statusSaved": "保存しました",
     "statusFailed": "保存できませんでした。",
     "inputTitle": "入力ガードレール",
-    "inputDescription": "Enkrypt AIで、ツールの結果を含むすべての入力をスキャンします。Enkryptが利用できない場合、ブロック検出器はリクエストを拒否します。",
+    "inputDescription": "Enkrypt AIで、ツールの結果を含むすべての入力をスキャンします。Enkryptが利用できない場合、リクエストは拒否されず、スキャンされないまま送信されます。",
     "outputTitle": "出力ガードレール",
     "outputDescription": "メンバーが受け取る前に、Enkrypt AIで応答をスキャンします。オンにしない限りオフです。",
     "detectorsHint": "ブロックは、フラグが付いたリクエストを拒否します。ログのみは、リクエストを遅延させずに記録だけを行います。",

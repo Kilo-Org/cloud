@@ -4740,7 +4740,7 @@
     "statusSaved": "Voatahiry",
     "statusFailed": "Tsy afaka nitahiry.",
     "inputTitle": "Fefin-tandro fampidirana",
-    "inputDescription": "Mikaroka ny fampidirana rehetra miaraka amin'ny Enkrypt AI, anisan'izany ny valin'ny fitaovana. Mandà fangatahana ny mpikaroka manakana rehefa tsy misy Enkrypt.",
+    "inputDescription": "Mikaroka ny fampidirana rehetra miaraka amin'ny Enkrypt AI, anisan'izany ny valin'ny fitaovana. Rehefa tsy misy Enkrypt, ny fangatahana dia alefa tsy voakaroka fa tsy nolavina.",
     "outputTitle": "Fefin-tandro fivoahana",
     "outputDescription": "Mikaroka ny valiny miaraka amin'ny Enkrypt AI alohan'ny hahazoan'ny mpikambana azy. Tsy miasa raha tsy velesinao.",
     "detectorsHint": "Ny Sakano dia mandà fangatahana voamarika. Ny Rakitra fotsiny dia manoratra izany fotsiny nefa tsy manemotra ny fangatahana.",

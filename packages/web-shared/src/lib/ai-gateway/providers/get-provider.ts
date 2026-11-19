@@ -110,6 +110,9 @@ export type ProviderRoute = {
    *  outside Kilo credits pays for the request, such as the ChatGPT
    *  subscription, while abuse and organization policy checks still apply. */
   skipBalanceCheck?: boolean;
+  /** The provider the organization policy checks when a direct BYOK key serves the request (see
+   *  `getDirectByokPolicyProviderId`). */
+  directByokPolicyProviderId?: string;
 };
 
 /** Resolves a route. A BYOK key is decrypted only when its route is resolved. */
@@ -160,7 +163,6 @@ async function directByokRoute(
   directByok: DirectByokProvider,
   directByokModel: DirectByokModel,
   credential: BYOKResult,
-  requestedModel: string,
   request: GatewayRequest,
   servesCatalogId: boolean
 ): Promise<ProviderRoute> {
@@ -182,10 +184,13 @@ async function directByokRoute(
       },
     } satisfies Provider,
     userByok: [{ decryptedAPIKey: credential.decryptedAPIKey, providerId: credential.providerId }],
-    isFree: isFreeModel(requestedModel),
+    // The key's owner pays its upstream, never Kilo, whatever the id looks like: a bespoke id is
+    // named by its provider or organization, and catalog-mode keys never serve free models.
+    isFree: false,
     // Organization model and provider policies cover catalog ids. A bespoke id is only served by a
     // key outside catalog mode, which stays exempt as before.
     bypassAccessCheck: !servesCatalogId,
+    directByokPolicyProviderId: getDirectByokPolicyProviderId(directByok),
   };
 }
 
@@ -197,7 +202,7 @@ async function directByokRoute(
 async function resolveDirectByokModel(
   directByok: DirectByokProvider,
   directByokModel: DirectByokModel,
-  { user, organizationId, requestedModel, request }: GetProviderInput,
+  { user, organizationId, request }: GetProviderInput,
   decision: RoutingDecisionRecorder
 ): Promise<GetProviderProviderResult | DirectByokCatalogOnlyResult | null> {
   const providerId = directByok.id;
@@ -225,9 +230,7 @@ async function resolveDirectByokModel(
     return { kind: 'direct-byok-catalog-only', providerId, catalogModelId };
   }
   decision.step({ step: 'direct-byok-model', outcome: 'selected', provider_id: providerId });
-  return servedBy(
-    await directByokRoute(directByok, directByokModel, credential, requestedModel, request, false)
-  );
+  return servedBy(await directByokRoute(directByok, directByokModel, credential, request, false));
 }
 
 async function isEligibleForCustomLlm(
@@ -528,7 +531,7 @@ async function selectProvider(
   const resolveKey = async (step: KeyPlanStep): Promise<ProviderRoute> => {
     const credential = await decryptKey(step);
     return step.route === 'direct-byok'
-      ? directByokRoute(step.provider, step.model, credential, requestedModel, request, true)
+      ? directByokRoute(step.provider, step.model, credential, request, true)
       : gatewayRoutedByokRoute(step, credential, requestedModel);
   };
 
@@ -632,9 +635,7 @@ async function selectProvider(
           provider_id: key.providerId,
           supported_api_kinds: [...getDirectByokModelChatApis(provider, model)],
         });
-        return servedBy(
-          await directByokRoute(provider, model, credential, requestedModel, request, true)
-        );
+        return servedBy(await directByokRoute(provider, model, credential, request, true));
       }
       case 'kilo': {
         recordNoKeyServed();

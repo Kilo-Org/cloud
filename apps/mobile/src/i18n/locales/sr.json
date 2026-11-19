@@ -4811,7 +4811,7 @@
     "statusSaved": "Sačuvano",
     "statusFailed": "Čuvanje nije uspelo.",
     "inputTitle": "Zaštitne mere za ulaz",
-    "inputDescription": "Skenira svaki ulaz pomoću Enkrypt AI, uključujući rezultate alata. Detektor koji blokira odbija zahtev kada Enkrypt nije dostupan.",
+    "inputDescription": "Skenira svaki ulaz pomoću Enkrypt AI, uključujući rezultate alata. Kada Enkrypt nije dostupan, zahtevi se šalju bez skeniranja umesto da budu odbijeni.",
     "outputTitle": "Zaštitne mere za izlaz",
     "outputDescription": "Skenira odgovore pomoću Enkrypt AI pre nego što ih članovi prime. Isključene su osim ako ih uključite.",
     "detectorsHint": "Režim Blokiraj odbija označeni zahtev. Režim Samo evidentiraj beleži ga bez odlaganja zahteva.",

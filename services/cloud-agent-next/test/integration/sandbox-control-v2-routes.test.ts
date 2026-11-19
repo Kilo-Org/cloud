@@ -1411,30 +1411,21 @@ describe('SandboxControlV2 routes and forwarding', () => {
     }
   );
 
-  it('binds sibling MCP credentials to the canonical workspace root rather than the attaching chat', async () => {
+  it('binds sibling MCP credentials to the canonical workspace rather than the attaching chat', async () => {
     const root = 'workspace_12345678-1234-4234-8234-123456789abc';
     const scopeId = 'worktree_12345678-1234-4234-8234-123456789abc';
     const provider = createFakeProvider();
     const { stub } = await setup(provider);
-    const issuances: { sessionId: string; binding: unknown }[] = [];
+    const issuances: { ownerId: string; binding: unknown }[] = [];
     const grant = {
       url: 'https://mcp.kiloapps.io/mcp',
       token: 'workspace-root-grant',
       expiresAt: 1_900_000_000,
     };
     await runInDurableObject(stub, instance => {
-      const peerFor = instance.sessionPeerFor.bind(instance);
-      instance.sessionPeerFor = (ownerId, sessionId) => {
-        const peer = peerFor(ownerId, sessionId);
-        return peer
-          ? {
-              ...peer,
-              issueCloudAgentMcpGrant: async binding => {
-                issuances.push({ sessionId, binding });
-                return grant;
-              },
-            }
-          : null;
+      instance.cloudAgentMcpGrantFor = async (ownerId, binding) => {
+        issuances.push({ ownerId, binding });
+        return grant;
       };
     });
     for (const sessionId of [root, SESSION_NEXT]) {
@@ -1448,15 +1439,15 @@ describe('SandboxControlV2 routes and forwarding', () => {
       if (frame?.type !== 'session.attach') throw new Error('expected session.attach');
       expect(frame.credentials?.cloudAgentMcp).toEqual(grant);
     }
+    const binding = {
+      workspaceSessionId: root,
+      worktreeId: scopeId,
+      ownerId: 'user_123',
+      organizationId: 'org_123',
+    };
     expect(issuances).toEqual([
-      {
-        sessionId: root,
-        binding: { worktreeId: scopeId, ownerId: 'user_123', organizationId: 'org_123' },
-      },
-      {
-        sessionId: root,
-        binding: { worktreeId: scopeId, ownerId: 'user_123', organizationId: 'org_123' },
-      },
+      { ownerId: 'user_123', binding },
+      { ownerId: 'user_123', binding },
     ]);
   });
 

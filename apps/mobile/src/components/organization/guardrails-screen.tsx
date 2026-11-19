@@ -1,4 +1,5 @@
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -20,6 +21,8 @@ import { Text } from '@/components/ui/text';
 import { useOrgGuardrails, useSaveOrgGuardrails } from '@/lib/hooks/use-org-settings-queries';
 import { useOrgBoundary, useOrgWithMembers } from '@/lib/hooks/use-organization-queries';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
+import { openExternalUrl } from '@/lib/external-link';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { configKey, draftsEqual } from '@/lib/organization/guardrails-config-key';
 import {
   buildUpdateInput,
@@ -88,8 +91,21 @@ export function OrganizationGuardrailsScreen() {
         <EmptyState
           className="bg-background"
           icon={Lock}
-          title={t(TITLE_KEY)}
+          title={t('organizationGuardrails.unavailableTitle')}
           description={t('organizationGuardrails.unavailable')}
+          action={
+            <Button
+              variant="outline"
+              className={STATE_ACTION_CLASS}
+              onPress={() => {
+                void openExternalUrl(`mailto:${SUPPORT_EMAIL}`, {
+                  label: t('organizationGuardrails.contactSupport'),
+                });
+              }}
+            >
+              <Text>{t('organizationGuardrails.contactSupport')}</Text>
+            </Button>
+          }
         />
       </View>
     );

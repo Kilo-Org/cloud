@@ -10,8 +10,6 @@ import type {
   ExaUsageRecord,
   LlmUsageQueueMessage,
 } from '@kilocode/usage-contracts';
-import { enqueueVercelUsage } from '@kilocode/usage-queue/vercel/publisher';
-import { USAGE_VERCEL_QUEUE_ENABLED } from '@kilocode/usage-queue/vercel/config';
 import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 import { getVercelExecutionRegion } from '@kilocode/worker-utils/vercel-execution-region';
 
@@ -142,9 +140,6 @@ export async function enqueueUsage(
   payload: LlmUsageQueueMessage,
   { retryTransientFailures = false }: { retryTransientFailures?: boolean } = {}
 ): Promise<UsageEnqueueOutcome> {
-  if (USAGE_VERCEL_QUEUE_ENABLED) {
-    return enqueueVercelUsage(payload);
-  }
   return publishToUsageIngest({ usageId: payload.core.id }, USAGE_INGEST_URL, payload, {
     retryTransientFailures,
   });
@@ -171,8 +166,7 @@ function usageIngestSiblingUrl(
 
 /**
  * Publishes the bare Enkrypt usage write to the usage-ingest `/enkrypt-usage` path, which wraps it
- * in the tagged queue envelope. Always Cloudflare HTTP with transient retries: the staging Vercel
- * queue carries LLM usage only.
+ * in the tagged queue envelope. Always Cloudflare HTTP with transient retries.
  */
 export async function enqueueEnkryptUsage(
   usageWrite: EnkryptUsageWriteInput

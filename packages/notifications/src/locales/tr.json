@@ -2,7 +2,7 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "Aracı oturumunuzda bir güncelleme var",
+      "cloudAgentSession": "Ajan oturumunuzda bir güncelleme var",
       "lowBalance": "Bakiyeniz dikkat gerektiriyor",
       "spendAlert": "Harcamanız dikkat gerektiriyor",
       "securityFinding": "Bir güvenlik bulgusu dikkat gerektiriyor",

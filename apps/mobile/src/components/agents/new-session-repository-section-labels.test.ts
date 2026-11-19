@@ -66,8 +66,9 @@ beforeEach(() => {
 
 /** The connect action's own label node, matched by the copy it renders. */
 function actionLabel(renderer: TestRenderer.ReactTestRenderer, copy: string) {
-  // Bitbucket's card header now carries the same copy as its action, so the
-  // action label is the centre-aligned node, not the first match in the tree.
+  // The action label is the connect row's centre-aligned Text: the card headers
+  // carry their own title copy, so matching on that alignment pins the lookup to
+  // the action regardless of where it sits in the tree.
   const node = renderer.root
     .findAllByType('Text' as never)
     .find(
@@ -92,9 +93,10 @@ describe('NewSessionRepositorySection connect action labels', () => {
   it.each([
     ['github', 'agentChat.newSession.openGithub'],
     ['gitlab', 'agentChat.newSession.openGitlab'],
-    // Bitbucket's action now opens the app's own token sheet, so it shares the
-    // Connect label instead of "Open Bitbucket".
-    ['bitbucket', 'common.connectBitbucket'],
+    // Bitbucket's action opens the app's own token sheet, so it reads the bare
+    // "Connect" verb instead of "Open Bitbucket"; the card header keeps the
+    // full "Connect Bitbucket" title.
+    ['bitbucket', 'common.connect'],
   ] as const)('keeps the %s action label on one line', (_provider, copyKey) => {
     const renderer = mountSection({
       // Bitbucket renders its action only in an organization scope with a

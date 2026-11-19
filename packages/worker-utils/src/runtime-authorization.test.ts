@@ -252,6 +252,27 @@ describe('runtime authorization', () => {
     expect(decodeJwt(cloudAgent.token).exp).toBe(Date.UTC(2026, 0, 1, 1) / 1000);
   });
 
+  it('accepts a shorter delegation lifetime but never one beyond the resource maximum', async () => {
+    vi.useFakeTimers();
+    const now = new Date('2026-01-01T00:00:00.000Z');
+    vi.setSystemTime(now);
+    const shorter = await createRuntimeAuthorization({
+      ...commonInput,
+      token: (await admission({ expiresInSeconds: 60 })).token,
+      lifetimeMs: 5 * 60_000,
+      now,
+    });
+    expect(shorter.authorization.delegationExpiresAt).toBe('2026-01-01T00:05:00.000Z');
+    await expect(
+      createRuntimeAuthorization({
+        ...commonInput,
+        token: (await admission({ expiresInSeconds: 60 })).token,
+        lifetimeMs: 24 * 60 * 60_000 + 1,
+        now,
+      })
+    ).rejects.toThrow();
+  });
+
   it('caps runtime-token expiration to the positive duration remaining before the deadline', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));

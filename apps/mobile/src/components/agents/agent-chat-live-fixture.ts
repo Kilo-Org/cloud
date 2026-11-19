@@ -196,8 +196,12 @@ function fixed<T>(value: T) {
  * a bash ask, so the row that reports the agent's activity can be compared
  * while the agent waits for the answer; `running` holds the same blocked
  * transcript with the ask answered, which is the row the wait returns to.
+ * `permission-failed` holds the pending-permission screen too, but the first
+ * answer to the bash ask fails like a transient transport error, so the card
+ * shows its retryable failure branch, and a later answer — the Retry tap —
+ * succeeds.
  */
-export type AgentChatFixtureState = 'idle' | 'pending-permission' | 'running';
+export type AgentChatFixtureState = 'idle' | 'pending-permission' | 'permission-failed' | 'running';
 
 /**
  * The session manager the real screen mounts against, typed as the product's own
@@ -206,7 +210,12 @@ export type AgentChatFixtureState = 'idle' | 'pending-permission' | 'running';
 export function createAgentChatFixtureManager(
   state: AgentChatFixtureState = 'idle'
 ): SessionManager {
-  const waitingForPermission = state === 'pending-permission';
+  const waitingForPermission = state === 'pending-permission' || state === 'permission-failed';
+  // The first answer to the ask must fail like a transient transport error, and
+  // a later answer — the Retry tap — succeed, so the counter closes over the
+  // manager and every other fixture state shares the idle no-op below.
+  let failedAnswerAttempts = 0;
+  const failOnceThenAllow = state === 'permission-failed';
   const streaming = state !== 'idle';
   const messages: StoredMessage[] = streaming
     ? [opening, answer, EMOJI_ANSWER, BLOCKED_BASH_COMMAND]
@@ -236,7 +245,15 @@ export function createAgentChatFixtureManager(
     clearTranscript: () => undefined,
     answerQuestion: idle,
     rejectQuestion: idle,
-    respondToPermission: idle,
+    respondToPermission: failOnceThenAllow
+      ? async () => {
+          failedAnswerAttempts += 1;
+          if (failedAnswerAttempts > 1) {
+            return;
+          }
+          throw new Error('The answer could not be delivered');
+        }
+      : idle,
     acceptSuggestion: idle,
     dismissSuggestion: idle,
     clearFailedMessage: () => undefined,

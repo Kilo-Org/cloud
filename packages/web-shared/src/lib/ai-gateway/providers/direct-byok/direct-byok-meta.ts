@@ -9,7 +9,6 @@ export const DIRECT_BYOK_PROVIDERS_META = {
   edenai: 'Eden AI',
   'kimi-coding': 'Kimi Code',
   'inceptron-byok': 'Inceptron BYOK',
-  martian: 'Martian',
   'morph-byok': 'Morph BYOK',
   neuralwatt: 'Neuralwatt',
   'nvidia-byok': 'NVIDIA BYOK',

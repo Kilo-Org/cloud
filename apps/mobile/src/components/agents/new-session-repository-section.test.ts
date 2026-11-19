@@ -86,9 +86,9 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
 
 /** The rendered Text node holding exactly `copy`, if it is mounted. */
 function textNode(renderer: TestRenderer.ReactTestRenderer, copy: string) {
-  // The Bitbucket card's header now carries the same copy as its action, so the
-  // action label is picked by the row's own centre alignment instead of by
-  // position in the tree.
+  // The action label is the row's centre-aligned Text; the card headers carry
+  // their own title copy, so the centre alignment keeps this lookup on the
+  // action regardless of its position in the tree.
   return renderer.root
     .findAllByType('Text' as never)
     .find(
@@ -255,7 +255,7 @@ describe('NewSessionRepositorySection Bitbucket connect authority', () => {
     const text = renderedText(renderer);
     expect(text).toContain(i18n.t('prReview.connect.bitbucketAdminOnlyDescription'));
     expect(text).not.toContain(i18n.t('agentChat.newSession.bitbucketOrganizationsOnly'));
-    expect(textNode(renderer, i18n.t('common.connectBitbucket'))).toBeUndefined();
+    expect(textNode(renderer, i18n.t('common.connect'))).toBeUndefined();
     // The refresh is the card's only control once the connect action is gone.
     expect(renderer.root.findAllByType('Button' as never)).toHaveLength(1);
     expect(
@@ -280,7 +280,7 @@ describe('NewSessionRepositorySection Bitbucket connect authority', () => {
     const text = renderedText(renderer);
     expect(text).toContain(i18n.t('agentChat.newSession.bitbucketOrganizationsOnly'));
     expect(text).not.toContain(i18n.t('prReview.connect.bitbucketAdminOnlyDescription'));
-    expect(textNode(renderer, i18n.t('common.connectBitbucket'))).toBeDefined();
+    expect(textNode(renderer, i18n.t('common.connect'))).toBeDefined();
     // The one action row carries this provider's connect action and its refresh.
     expect(renderer.root.findAllByType('Button' as never)).toHaveLength(2);
   });
@@ -298,7 +298,7 @@ describe('NewSessionRepositorySection Bitbucket connect authority', () => {
     expect(renderedText(renderer)).toContain(
       i18n.t('agentChat.newSession.bitbucketOrganizationsOnly')
     );
-    expect(textNode(renderer, i18n.t('common.connectBitbucket'))).toBeDefined();
+    expect(textNode(renderer, i18n.t('common.connect'))).toBeDefined();
     expect(renderer.root.findAllByType('Button' as never)).toHaveLength(2);
   });
 
@@ -315,7 +315,7 @@ describe('NewSessionRepositorySection Bitbucket connect authority', () => {
     const text = renderedText(renderer);
     expect(text).toContain(i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'));
     expect(text).not.toContain(i18n.t('agentChat.newSession.bitbucketOrganizationsOnly'));
-    expect(textNode(renderer, i18n.t('common.connectBitbucket'))).toBeUndefined();
+    expect(textNode(renderer, i18n.t('common.connect'))).toBeUndefined();
     expect(renderer.root.findAllByType('Button' as never)).toHaveLength(1);
     expect(branchSelectorProps(renderer)?.repository).toEqual(githubRow);
   });
@@ -337,7 +337,7 @@ describe('NewSessionRepositorySection Bitbucket connect authority', () => {
     expect(text).toContain(i18n.t('prReview.connect.reconnectTitleBitbucket'));
     expect(text).toContain(i18n.t('prReview.connect.reconnectAdminOnlyDescription'));
     expect(text).not.toContain(i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'));
-    expect(textNode(renderer, i18n.t('common.connectBitbucket'))).toBeUndefined();
+    expect(textNode(renderer, i18n.t('common.connect'))).toBeUndefined();
     expect(renderer.root.findAllByType('Button' as never)).toHaveLength(1);
   });
 
@@ -384,7 +384,7 @@ describe('NewSessionRepositorySection Bitbucket connect authority', () => {
     expect(connectHeader(renderer, i18n.t('common.connectBitbucket'))).toBeUndefined();
     expect(text).not.toContain(i18n.t('prReview.connect.bitbucketAdminOnlyDescription'));
     // No action the server would refuse, and no first-connect copy either.
-    expect(textNode(renderer, i18n.t('common.connectBitbucket'))).toBeUndefined();
+    expect(textNode(renderer, i18n.t('common.connect'))).toBeUndefined();
     expect(renderer.root.findAllByType('Button' as never)).toHaveLength(1);
     expect(
       renderer.root.findByProps({
@@ -408,7 +408,7 @@ describe('NewSessionRepositorySection Bitbucket connect authority', () => {
 
     const text = renderedText(renderer);
     expect(text).toContain(i18n.t('agentChat.newSession.bitbucketOrganizationsOnly'));
-    expect(textNode(renderer, i18n.t('common.connectBitbucket'))).toBeDefined();
+    expect(textNode(renderer, i18n.t('common.connect'))).toBeDefined();
     expect(renderer.root.findAllByType('Button' as never)).toHaveLength(2);
   });
 
@@ -426,7 +426,7 @@ describe('NewSessionRepositorySection Bitbucket connect authority', () => {
 
     const text = renderedText(renderer);
     expect(text).toContain(i18n.t('agentChat.newSession.bitbucketOrganizationsOnly'));
-    expect(textNode(renderer, i18n.t('common.connectBitbucket'))).toBeDefined();
+    expect(textNode(renderer, i18n.t('common.connect'))).toBeDefined();
     expect(renderer.root.findAllByType('Button' as never)).toHaveLength(2);
   });
 });
@@ -448,12 +448,12 @@ describe('NewSessionRepositorySection connect card open action', () => {
     // A label box sized to the label's own measured width is a fraction
     // narrower than the glyphs Android lays out, so "Open GitLab" wrapped onto
     // two lines. The label takes the row's remaining width instead, and
-    // `numberOfLines` pins the single line. Bitbucket's action now uses the
-    // shared Connect label, so its card header and its action share copy.
+    // `numberOfLines` pins the single line. Bitbucket's action reads the bare
+    // "Connect" verb while its card header keeps the "Connect Bitbucket" title.
     for (const copy of [
       i18n.t('agentChat.newSession.openGithub'),
       i18n.t('agentChat.newSession.openGitlab'),
-      i18n.t('common.connectBitbucket'),
+      i18n.t('common.connect'),
     ]) {
       const label = textNode(renderer, copy);
       expect(label, copy).toBeDefined();

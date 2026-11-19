@@ -2,9 +2,11 @@ import { and, asc, eq, gte, isNotNull, isNull, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
-import { sessionLiveSummarySchema } from '@kilocode/session-ingest-contracts';
 import {
-  BRIEFING_FALLBACK_TITLE,
+  SESSION_LIVE_PLAN_STEP_LIMIT,
+  sessionLiveSummarySchema,
+} from '@kilocode/session-ingest-contracts';
+import {
   BRIEFING_MAX_SESSIONS,
   BRIEFING_MAX_SNAPSHOT_BYTES,
   BRIEFING_MAX_URL_LENGTH,
@@ -12,6 +14,7 @@ import {
   redactBriefingExcerptOrDrop,
   redactBriefingTitle,
   type BriefingSource,
+  type BriefingSourceMetadata,
 } from '@kilocode/app-shared/agent-briefing';
 
 export const briefingFactsSchema = briefingReportSchema.pick({
@@ -59,7 +62,7 @@ export function buildBriefingSnapshot(rows: SnapshotSession[]) {
   });
   for (const row of rows.slice(0, BRIEFING_MAX_SESSIONS)) {
     if (!row.last_activity_at) continue;
-    const title = redactBriefingTitle(row.title ?? BRIEFING_FALLBACK_TITLE);
+    const title = redactBriefingTitle(row.title ?? '');
     const url = `/cloud/sessions/${encodeURIComponent(row.session_id)}`;
     const occurredAt = new Date(row.last_activity_at).toISOString();
     const excerpt = completedExcerptSchema.safeParse(row.briefing_excerpt);
@@ -70,7 +73,7 @@ export function buildBriefingSnapshot(rows: SnapshotSession[]) {
       id: `activity:${row.session_id}`,
       sessionId: row.session_id,
       kind: 'activity',
-      title,
+      ...(title !== undefined ? { title } : {}),
       url,
       occurredAt: excerpt.success ? new Date(excerpt.data.completedAt).toISOString() : occurredAt,
       ...(excerptText ? { excerpt: excerptText } : {}),
@@ -85,36 +88,37 @@ export function buildBriefingSnapshot(rows: SnapshotSession[]) {
         id: `blocker:${row.session_id}`,
         sessionId: row.session_id,
         kind: 'blocker',
-        title: 'Session needs attention',
         url,
         occurredAt,
       });
     if (live.success && (live.data.plan || live.data.changes || live.data.failure)) {
-      const metadata: string[] = [];
+      const metadata: BriefingSourceMetadata = {};
       if (live.data.plan) {
-        const plan = live.data.plan;
-        metadata.push(
-          `Plan: ${plan.done} of ${plan.total} steps done${plan.current ? `; current: ${plan.current}` : ''}.`
-        );
+        // Screening can make the step longer than the field's limit or drop it, so the
+        // step is withheld instead of sending a cut placeholder.
+        const redacted =
+          live.data.plan.current === null
+            ? undefined
+            : redactBriefingExcerptOrDrop(live.data.plan.current);
+        metadata.plan = {
+          done: live.data.plan.done,
+          total: live.data.plan.total,
+          current:
+            redacted === undefined || redacted.length > SESSION_LIVE_PLAN_STEP_LIMIT
+              ? null
+              : redacted,
+        };
       }
-      if (live.data.changes) {
-        const changes = live.data.changes;
-        metadata.push(
-          `Changes: ${changes.files} files; ${changes.added} lines added, ${changes.removed} removed.`
-        );
-      }
-      if (live.data.failure) metadata.push(`Last turn failure: ${live.data.failure.kind}.`);
-      const metadataExcerpt = redactBriefingExcerptOrDrop(metadata.join('\n'));
-      if (metadataExcerpt)
-        sources.push({
-          id: `metadata:${row.session_id}`,
-          sessionId: row.session_id,
-          kind: 'artifact',
-          title: 'Captured session metadata',
-          url,
-          occurredAt,
-          excerpt: metadataExcerpt,
-        });
+      if (live.data.changes) metadata.changes = live.data.changes;
+      if (live.data.failure) metadata.failure = live.data.failure;
+      sources.push({
+        id: `metadata:${row.session_id}`,
+        sessionId: row.session_id,
+        kind: 'artifact',
+        url,
+        occurredAt,
+        metadata,
+      });
     }
     if (row.pr_url && row.pr_link_verified_at && row.pr_url.length <= BRIEFING_MAX_URL_LENGTH) {
       try {
@@ -126,7 +130,6 @@ export function buildBriefingSnapshot(rows: SnapshotSession[]) {
             id: `pr:${row.session_id}`,
             sessionId: row.session_id,
             kind: 'pull_request',
-            title: 'Verified pull request',
             url: pr.toString(),
             occurredAt,
           });
@@ -135,7 +138,13 @@ export function buildBriefingSnapshot(rows: SnapshotSession[]) {
         /* Invalid stored links are not snapshot evidence. */
       }
     }
-    const session = { sessionId: row.session_id, title, url, status: row.status, sources };
+    const session = {
+      sessionId: row.session_id,
+      ...(title !== undefined ? { title } : {}),
+      url,
+      status: row.status,
+      sources,
+    };
     facts.sessions.push(session);
     facts.sources.push(...sources);
     facts.scorecard = scorecardFor(facts);

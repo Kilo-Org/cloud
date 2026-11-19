@@ -157,7 +157,8 @@ export function useBriefingInvalidation(error: unknown) {
         try {
           await encryptedKv.removeItem(readCacheScope(userId), 'read-cache');
         } catch {
-          toast.error(i18n.t('common.couldNotSaveSetting'));
+          // Best-effort cache cleanup for a context the user can no longer
+          // read; a later read rebuilds it, so a failure is not actionable.
         }
       })();
     }

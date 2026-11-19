@@ -3,8 +3,9 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { device_auth_requests, device_sessions, kilocode_users } from '@kilocode/db/schema';
 import { eq, and, gt, isNull, isNotNull, not, sql, type SQL } from 'drizzle-orm';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
-import { randomInt, createHash, randomBytes } from 'node:crypto';
+import { randomInt, randomBytes } from 'node:crypto';
 import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
+import { hashOpaqueSecret } from '@/lib/auth/secret-hash';
 import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { requestingClientOfRow, type RequestingClient } from './requesting-client';
 import {
@@ -149,7 +150,7 @@ export function generateDeviceSecret(): string {
  * The secret is already high-entropy, so a plain digest is sufficient.
  */
 export function hashDeviceSecret(secret: string): string {
-  return createHash('sha256').update(secret).digest('hex');
+  return hashOpaqueSecret(secret);
 }
 
 /**

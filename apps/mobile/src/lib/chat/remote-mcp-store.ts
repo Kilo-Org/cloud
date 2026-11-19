@@ -8,6 +8,27 @@ import { isReservedMcpServerId } from './mcp-server-namespace';
 import { clearRemoteMcpOAuth, forgetRemoteMcpOAuth } from './remote-mcp-oauth-store';
 import { normalizeRemoteMcpUrl, sameRemoteMcpEndpoint } from './remote-mcp-url';
 
+export type RemoteMcpStoreProblem = 'duplicateUrl' | 'notFound';
+
+/**
+ * The copy key each store refusal is said with. Both keys already exist for
+ * the sheet, so a refusal the sheet did not catch is said in the reader's
+ * language instead of leaking the problem tag.
+ */
+export const REMOTE_MCP_STORE_ERROR_KEYS = {
+  duplicateUrl: 'modelChat.mcp.duplicateUrl',
+  notFound: 'modelChat.mcp.serverNotFound',
+} as const satisfies Record<RemoteMcpStoreProblem, string>;
+
+export class RemoteMcpStoreError extends Error {
+  readonly problem: RemoteMcpStoreProblem;
+
+  constructor(problem: RemoteMcpStoreProblem) {
+    super(problem);
+    this.problem = problem;
+  }
+}
+
 /**
  * The remote MCP servers the user added, and the one place they are written.
  *
@@ -265,7 +286,7 @@ export function addRemoteMcpServer(draft: RemoteMcpServerDraft): StoredRemoteMcp
   const current = store.getRequested();
   const url = normalizeRemoteMcpUrl(draft.url);
   if (current.some(server => server.url === url)) {
-    throw new Error('Remote MCP URL is already saved.');
+    throw new RemoteMcpStoreError('duplicateUrl');
   }
   const server: StoredRemoteMcpServer = {
     id: resolveServerId(draft.name, draft.id, current),
@@ -329,11 +350,11 @@ export function updateRemoteMcpServer(
   const current = store.getRequested();
   const existing = current.find(server => server.id === id);
   if (existing === undefined) {
-    throw new Error('Remote MCP server not found.');
+    throw new RemoteMcpStoreError('notFound');
   }
   const url = normalizeRemoteMcpUrl(patch.url ?? existing.url);
   if (current.some(server => server.id !== id && server.url === url)) {
-    throw new Error('Remote MCP URL is already saved.');
+    throw new RemoteMcpStoreError('duplicateUrl');
   }
   const updated: StoredRemoteMcpServer = {
     id,
@@ -354,7 +375,7 @@ export function deleteRemoteMcpServer(id: string): StoredRemoteMcpServer {
   const current = store.getRequested();
   const removed = current.find(server => server.id === id);
   if (removed === undefined) {
-    throw new Error('Remote MCP server not found.');
+    throw new RemoteMcpStoreError('notFound');
   }
   store.set(current.filter(server => server.id !== id));
   void forgetRemoteMcpOAuth(id);
@@ -366,7 +387,7 @@ export function setRemoteMcpServerEnabled(id: string, enabled: boolean): StoredR
   const current = store.getRequested();
   const existing = current.find(server => server.id === id);
   if (existing === undefined) {
-    throw new Error('Remote MCP server not found.');
+    throw new RemoteMcpStoreError('notFound');
   }
   const updated: StoredRemoteMcpServer = { ...existing, enabled };
   store.set(current.map(server => (server.id === id ? updated : server)));

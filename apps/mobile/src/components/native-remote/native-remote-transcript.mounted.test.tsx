@@ -11,6 +11,11 @@ const renderedMessageSchema = z.object({
   parts: z.array(z.object({ id: z.string(), type: z.string() }).passthrough()),
 });
 
+/** The marks the transcript puts around a displayed value, written as code points. */
+const ISOLATE_OPEN = '\u2066';
+const ISOLATE_CLOSE = '\u2069';
+const FIRST_STRONG_OPEN = '\u2068';
+
 it('reuses MessageBubble for files/tools/errors and keeps empty, incomplete and reset states distinct', async () => {
   const fixture = nativeRemoteFixture();
   const renderer = await mount(fixture.client);
@@ -247,4 +252,42 @@ it('shows one unreadable notice instead of consent controls and keeps readable c
     'agentChat.permissionCard.alwaysAllow',
     'agentChat.permissionCard.deny',
   ]);
+});
+
+it('prints the permission action, resources and message as readable text', async () => {
+  const fixture = nativeRemoteFixture();
+  const renderer = await mount(fixture.client);
+  await press(renderer, 'ses-first');
+  await act(() =>
+    fixture.publishSession('ses-first', {
+      ...readySession,
+      pending: {
+        permissions: [
+          {
+            id: 'perm-bidi',
+            action: 'shell\u202E',
+            resources: ['/tmp/\u200Ex\nrm'],
+            message: 'run\u0000it',
+          },
+        ],
+        questions: [],
+        unreadablePermissions: [],
+      },
+    })
+  );
+  const rendered = text(renderer.root);
+
+  // A format character prints as the text that names it, and the marks around
+  // each value keep its reading order on a right-to-left screen. The action and
+  // the resources are pinned left to right; the message takes the direction of
+  // its own first strong character, so an English message still reads left to
+  // right and an Arabic one keeps its own.
+  expect(rendered).toContain(`${ISOLATE_OPEN}shell\\u202e${ISOLATE_CLOSE}`);
+  expect(rendered).toContain(`${ISOLATE_OPEN}/tmp/\\u200ex\\nrm${ISOLATE_CLOSE}`);
+  expect(rendered).toContain(`${FIRST_STRONG_OPEN}run\\x00it${ISOLATE_CLOSE}`);
+  expect(rendered).not.toContain(`${ISOLATE_OPEN}run\\x00it${ISOLATE_CLOSE}`);
+  expect(rendered).toContain('• ');
+  expect(rendered).not.toContain('shell\u202E');
+  expect(rendered).not.toContain('/tmp/\u200Ex');
+  expect(rendered).not.toContain('run\u0000it');
 });

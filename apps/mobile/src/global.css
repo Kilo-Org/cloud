@@ -36,13 +36,12 @@
   --primary-disabled: #6f6a61;
   /* The shared Switch's disabled pair. A disabled control keeps the hue that
    * says which way it points instead of one grey pill for both positions: the
-   * olive on-track and the neutral off-track, each dimmed toward the row so the
-   * control reads as unavailable, with a grip that still stands off its own
+   * olive on-track and the neutral off-track, each a quieter step than the live
+   * pair beside it in the same list, with a grip that still stands off its own
    * track. Measured over the `secondary` row the switch sits on: the two tracks
-   * separate at 2.0:1 (light) and 3.1:1 (dark), each track clears 1.6:1 over
-   * the row, and each grip clears 1.6:1 over its track. Each on value also
-   * steps off the live accent pair in the same list (1.94:1 light, 1.67:1 dark)
-   * under a grip of its own. The dark block carries its own pair (see there). */
+   * separate at 2.0:1 (light) and 1.68:1 (dark), each track clears 1.6:1 over
+   * the row, and each grip clears 1.6:1 over its track. The dark block explains
+   * why its on-track cannot also step away from the live accent (see there). */
   --switch-disabled-on: #7f8650;
   /* The grip is the scheme's ink rather than white: Android's thumb is wider
    * than the track, so its outer arc sits on the light row, where a white grip
@@ -219,16 +218,17 @@
      * colour and competes with the enabled #ffdd00 it replaces. */
     --primary-disabled: #8a8680;
     /* Dark counterpart of the shared Switch's disabled pair: the olive on-track
-     * and the neutral off-track, dimmed toward the near-black row. The steps are
-     * lifted rather than darkened, because the row is: the two tracks separate
-     * at 3.1:1, each clears 1.67:1 over `--secondary`, and each grip clears
-     * 1.6:1 over its own track. One grey pair for both positions would lose the
-     * state this pair exists to show. The on-track also has to read as a
-     * different state from the live `--selection` track beside it in the same
-     * list, so it takes a lifted, quieter olive at 1.67:1 from it; the grip is
-     * the muted ink rather than `--selection-foreground`, which would be the
-     * live control's own grip. */
-    --switch-disabled-on: #8d9560;
+     * and the neutral off-track, each a quieter step than the live pair beside
+     * it in the same list. The on-track cannot also step away from the live
+     * `--selection` here: the off-track floor binds the window, so any track far
+     * enough from `--selection` to read as a different colour falls under 1.6:1
+     * from `--switch-disabled-off`. It stays at the low step (2.80:1 over
+     * `--secondary`, under the live on-track's 3.09:1) and the state reads from
+     * the position pair plus the muted row title. The grip is the muted ink
+     * rather than `--selection-foreground`, so a disabled switch also carries a
+     * quieter knob than a live one. The two tracks separate at 1.68:1 and each
+     * grip clears 1.6:1 over its own track. */
+    --switch-disabled-on: #5d6b16;
     --switch-disabled-on-foreground: #c4c1b8;
     --switch-disabled-off: #444344;
     --switch-disabled-off-foreground: #c4c1b8;

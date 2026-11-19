@@ -403,13 +403,13 @@ describe('idle composer control and ring track contrast (non-text)', () => {
 
 describe('disabled switch pair contrast (non-text)', () => {
   // The shared switch paints a disabled pair of its own on Android: the olive
-  // on track and the neutral off track, each dimmed toward the row, with a grip
-  // that still stands off its own track. iOS keeps the enabled pair and fades
-  // it itself. The switch sits on a `secondary` row, so the tracks are measured
-  // over that. The floors are perception floors, not WCAG's text ones: the pair
-  // has to read as a control, and the two positions have to stay apart, because
-  // saying which way a read-only switch points is the whole reason the pair
-  // exists.
+  // on track and the neutral off track, each a quieter step than the live pair
+  // beside it, with a grip that still stands off its own track. iOS keeps the
+  // enabled pair and fades it itself. The switch sits on a `secondary` row, so
+  // the tracks are measured over that. The floors are perception floors, not
+  // WCAG's text ones: the pair has to read as a control, and the two positions
+  // have to stay apart, because saying which way a read-only switch points is
+  // the whole reason the pair exists.
   const MIN_PAIR_RATIO = 1.6;
   // A track needs only enough step off the row to be seen as an object; the row
   // is the surface a disabled control is least prominent on.
@@ -452,17 +452,26 @@ describe('disabled switch pair contrast (non-text)', () => {
     }
   });
 
-  // A read-only list paints disabled rows beside live ones, so the disabled
-  // on-track must also read as a different state from the live accent track it
-  // replaces. Dark once shipped a disabled on-track under a 1.11:1 step from
-  // the live `selection`, which left a disabled switch looking available.
-  it('every theme: the disabled on track stands apart from the live accent track', () => {
+  // A read-only list paints disabled rows beside live ones, so a disabled
+  // track must never draw more attention than a live one. Both disabled tracks
+  // stay closer to the row than the live pair, and dark's on-track cannot also
+  // step away from the live accent: the off-track floor caps that window under
+  // 1.23:1, which is why the quieter step and the muted row title carry the
+  // state there. This assertion fails if a retune lifts a disabled track above
+  // the live one it replaces.
+  it('every theme: both disabled tracks stay quieter than the live pair', () => {
     for (const [themeName, colors] of themes) {
       const liveOnTrack = themeName === 'dark' ? colors.selection : colors.primary;
-      expect(
-        contrastRatio(colors.switchDisabledOn, liveOnTrack),
-        `disabled on vs live on (${themeName})`
-      ).toBeGreaterThanOrEqual(MIN_PAIR_RATIO);
+      const liveOffTrack = themeName === 'dark' ? colors.mutedForeground : colors.mutedSoft;
+      for (const [disabled, live, side] of [
+        [colors.switchDisabledOn, liveOnTrack, 'on'],
+        [colors.switchDisabledOff, liveOffTrack, 'off'],
+      ] as const) {
+        expect(
+          contrastRatio(disabled, colors.secondary),
+          `disabled ${side} track vs secondary, against the live ${side} track (${themeName})`
+        ).toBeLessThan(contrastRatio(live, colors.secondary));
+      }
     }
   });
 

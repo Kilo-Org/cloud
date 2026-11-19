@@ -60,7 +60,7 @@ export const darkColors = {
   primary: '#FFDD00',
   primaryForeground: '#1A1A10',
   primaryDisabled: '#8A8680',
-  switchDisabledOn: '#8D9560',
+  switchDisabledOn: '#5D6B16',
   switchDisabledOnForeground: '#C4C1B8',
   switchDisabledOff: '#444344',
   switchDisabledOffForeground: '#C4C1B8',

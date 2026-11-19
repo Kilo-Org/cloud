@@ -33,20 +33,20 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * full-strength accent track beside it and reads as both unavailable and on.
  *
  * The disabled pair keeps the positions apart rather than painting one grey
- * pill for both: the olive on-track and the neutral off-track, each dimmed
- * toward the row so the control reads as unavailable, and a grip that still
+ * pill for both: the olive on-track and the neutral off-track, each a quieter
+ * step than the live pair beside it in the same list, with a grip that still
  * stands off its own track. Painting the same mid-neutral for both positions
  * (the palette's `mutedSoft` under `foreground`) did read as unavailable, but
  * it stopped saying whether the switch was on — the one thing a read-only list
  * has to show. The steps are palette tokens of their own
  * (`--switch-disabled-on`, `--switch-disabled-off` and their grips), measured
  * over the `secondary` row the switch sits on: the two tracks separate at
- * 2.0:1 in light and 3.1:1 in dark, each track clears 1.6:1 over the row, and
- * each grip clears 1.6:1 over its track. The disabled on pair also steps away
- * from the live accent pair in the same list — the track by 1.94:1 in light and
- * 1.67:1 in dark, the grip by a different token — because a row whose title
- * dims beside a live row must not paint the live accent. A caller's own pair
- * still wins: its props are applied last.
+ * 2.0:1 in light and 1.68:1 in dark, each track clears 1.6:1 over the row, and
+ * each grip clears 1.6:1 over its track. Both stay quieter than the live pair,
+ * so a disabled switch never draws more attention than an editable one: in
+ * dark the on-track's step away from the live accent is capped by the
+ * off-track floor, and the quieter grip plus the muted row title carry the
+ * disabled cue. A caller's own pair still wins: its props are applied last.
  *
  * iOS is left alone: UIKit fades a disabled `UISwitch` itself, so the disabled
  * pair there would paint an unavailable control twice. Android is the platform

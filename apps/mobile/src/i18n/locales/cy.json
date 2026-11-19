@@ -1013,7 +1013,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Nid oes unrhyw sefydliadau gyda'r cyfrif hwn eto. Gallwch adolygu ceisiadau tynnu Bitbucket unwaith y byddwch yn creu sefydliad neu'n ymuno ag un.",
       "gitlabReconnectAdminOnlyDescription": "Gofynnwch i berchennog sefydliad, gweinyddwr neu reolwr bilio ei ailgysylltu.",
       "bitbucketNotConnectedTitle": "Nid yw Bitbucket wedi'i gysylltu",
-      "bitbucketAdminOnlyDescription": "Dim ond perchnogion, gweinyddwyr a rheolwyr bilio'r sefydliad sy'n gallu ei gysylltu.",
+      "adminOnlyConnectDescription": "Dim ond perchnogion, gweinyddwyr a rheolwyr bilio'r sefydliad sy'n gallu ei gysylltu.",
       "contextLine": "Ar gyfer {{organization}}",
       "contextLinePersonal": "Ar gyfer eich cyfrif personol"
     },
@@ -3650,7 +3650,8 @@
         "accounting_adjustment": "Addasiad cyfrifyddu",
         "credits_expired": "Credydau wedi dod i ben"
       },
-      "truncated": "Mae gweithgaredd credyd cynharach ar gael."
+      "truncated": "Mae gweithgaredd credyd cynharach ar gael.",
+      "retentionLimit": "Yn dangos gweithgaredd credyd diweddaraf."
     },
     "inviteMember": {
       "emailError": "Nodwch gyfeiriad e-bost dilys.",
@@ -3682,7 +3683,8 @@
         "void": "Wedi'i dirymu",
         "uncollectible": "Anghasgladwy"
       },
-      "truncated": "Mae anfonebau cynharach ar gael."
+      "truncated": "Mae anfonebau cynharach ar gael.",
+      "retentionLimit": "Yn dangos yr anfonebau diweddaraf."
     },
     "lowBalanceAlert": {
       "enableA11y": "Galluogi rhybudd balans isel",
@@ -4651,7 +4653,8 @@
       "purchaseFallback": "Pryniant credyd",
       "receipt": "Derbynneb",
       "receiptA11y": "Agor y dderbynneb ar gyfer {{description}}, {{amount}}, o {{date}}",
-      "receiptUnavailable": "Nid oes derbynneb ar gael ar gyfer y pryniant hwn."
+      "receiptUnavailable": "Nid oes derbynneb ar gael ar gyfer y pryniant hwn.",
+      "retentionLimit": "Yn dangos yr hanes credydau diweddaraf."
     },
     "title": "Prynu credydau",
     "description": "Mae credydau yn bryniant un-tro sy'n cael ei ychwanegu at eich balans Kilo ar gyfer rhedeg sesiynau codio AI yn Kilo App. Mae'r siop yn codi eich cyfrif ac mae credydau'n cael eu hychwanegu ar ôl i'r siop gadarnhau'r taliad.",
@@ -4930,6 +4933,9 @@
     "couldNotLoad": "Methu llwytho'r integreiddiadau",
     "permissionDenied": "Does gennych chi ddim caniatâd i reoli'r integreiddiadau hyn.",
     "managedByOwner": "Gofynnwch i berchennog y sefydliad newid cysylltiad na allwch ei newid.",
+    "managedByOwnerOrAdmin": "Gofynnwch i berchennog y sefydliad neu weinyddwr newid cysylltiad na allwch ei newid.",
+    "managedByOwnerOrBilling": "Gofynnwch i berchennog y sefydliad neu reolwr bilio newid cysylltiad na allwch ei newid.",
+    "managedByOwnerAdminOrBilling": "Gofynnwch i berchennog y sefydliad, gweinyddwr neu reolwr bilio newid cysylltiad na allwch ei newid.",
     "connectFailed": "Methu agor y dudalen gysylltu"
   },
   "invoices": {

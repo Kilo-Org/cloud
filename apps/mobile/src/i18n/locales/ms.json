@@ -945,7 +945,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Akaun ini belum mempunyai sebarang organisasi. Permintaan tarik Bitbucket boleh disemak setelah anda mencipta atau menyertai sebuah organisasi.",
       "gitlabReconnectAdminOnlyDescription": "Minta pemilik organisasi, pentadbir atau pengurus pengebilan untuk menyambungkannya.",
       "bitbucketNotConnectedTitle": "Bitbucket tidak disambungkan",
-      "bitbucketAdminOnlyDescription": "Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya.",
+      "adminOnlyConnectDescription": "Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya.",
       "contextLine": "Untuk {{organization}}",
       "contextLinePersonal": "Untuk akaun peribadi anda"
     },
@@ -3418,7 +3418,8 @@
         "accounting_adjustment": "Pelarasan perakaunan",
         "credits_expired": "Kredit tamat tempoh"
       },
-      "truncated": "Aktiviti kredit terdahulu tersedia."
+      "truncated": "Aktiviti kredit terdahulu tersedia.",
+      "retentionLimit": "Memaparkan aktiviti kredit terkini."
     },
     "inviteMember": {
       "emailError": "Masukkan alamat e-mel yang sah.",
@@ -3450,7 +3451,8 @@
         "void": "Dibatalkan",
         "uncollectible": "Tidak dapat dikutip"
       },
-      "truncated": "Invois terdahulu tersedia."
+      "truncated": "Invois terdahulu tersedia.",
+      "retentionLimit": "Memaparkan invois terkini."
     },
     "lowBalanceAlert": {
       "enableA11y": "Dayakan amaran baki rendah",
@@ -4383,7 +4385,8 @@
       "purchaseFallback": "Pembelian kredit",
       "receipt": "Resit",
       "receiptA11y": "Buka resit untuk {{description}}, {{amount}}, dari {{date}}",
-      "receiptUnavailable": "Resit tidak tersedia untuk pembelian ini."
+      "receiptUnavailable": "Resit tidak tersedia untuk pembelian ini.",
+      "retentionLimit": "Memaparkan sejarah kredit terkini."
     },
     "title": "Beli kredit",
     "description": "Kredit ialah pembelian sekali sahaja yang ditambah pada baki Kilo anda untuk menjalankan sesi pengekodan AI dalam Apl Kilo. Kedai mengenakan caj pada akaun anda dan kredit ditambah selepas kedai mengesahkan pembayaran.",
@@ -4630,6 +4633,9 @@
     "couldNotLoad": "Tidak dapat memuatkan integrasi",
     "permissionDenied": "Anda tidak mempunyai kebenaran untuk mengurus integrasi ini.",
     "managedByOwner": "Minta pemilik organisasi untuk menukar sambungan yang anda tidak boleh tukar.",
+    "managedByOwnerOrAdmin": "Minta pemilik organisasi atau pentadbir untuk menukar sambungan yang anda tidak boleh tukar.",
+    "managedByOwnerOrBilling": "Minta pemilik organisasi atau pengurus pengebilan untuk menukar sambungan yang anda tidak boleh tukar.",
+    "managedByOwnerAdminOrBilling": "Minta pemilik organisasi, pentadbir atau pengurus pengebilan untuk menukar sambungan yang anda tidak boleh tukar.",
     "connectFailed": "Tidak dapat membuka halaman sambungan"
   },
   "invoices": {

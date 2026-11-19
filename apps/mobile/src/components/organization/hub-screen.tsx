@@ -52,6 +52,7 @@ import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
 import { openExternalUrl } from '@/lib/external-link';
 import { formatPrefixedMoney } from '@/lib/format';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
   isMoneyRole,
@@ -157,6 +158,9 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   // never paint an amount the person may have hidden one screen away.
   const { hideBalance, hasLoaded: hideBalanceLoaded } = useHideBalancePreference();
   const hideOrgBalance = hideBalance || !hideBalanceLoaded;
+  // Reactive offline wording: a read that settled by failing while the device
+  // is confirmed offline names the connection, not a server fault.
+  const committedConnectivity = useCommittedConnectivityStatus();
 
   if (isResolving || organizationId == null || org == null) {
     return (
@@ -192,8 +196,12 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   } else if (orgWithMembers.data != null) {
     lowBalanceSubtitle = t('common.off');
   } else if (membershipUnavailable) {
+    // The membership read settles offline too (`SETTLE_WHILE_OFFLINE`), so the
+    // offline wording reads from the committed connectivity state, the same
+    // source the offline banner paints — `isPaused` can no longer distinguish
+    // a device-window offline read.
     lowBalanceSubtitle = t(
-      orgWithMembers.isPaused ? 'queryError.offlineTitle' : 'common.somethingWentWrong'
+      committedConnectivity === 'offline' ? 'queryError.offlineTitle' : 'common.somethingWentWrong'
     );
   }
   const lowBalanceLoading = orgWithMembers.data == null && !membershipUnavailable;

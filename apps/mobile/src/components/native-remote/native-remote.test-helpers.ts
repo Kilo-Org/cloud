@@ -63,6 +63,7 @@ function sessionConnection() {
       .fn<NativeSessionConnection['getCommandStatus']>()
       .mockResolvedValue('delivered'),
     clear: vi.fn(),
+    refresh: vi.fn(),
     close: vi.fn(),
   };
 }

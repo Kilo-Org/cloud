@@ -945,7 +945,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Bu hesabda hələ ki, heç bir təşkilat yoxdur. Təşkilat yaratdıqdan və ya ona qoşulduqdan sonra Bitbucket birləşdirmə sorğularına baxış keçirə bilərsən.",
       "gitlabReconnectAdminOnlyDescription": "Onu yenidən qoşmaq üçün təşkilat sahibindən, inzibatçıdan və ya ödəniş menecerindən xahiş edin.",
       "bitbucketNotConnectedTitle": "Bitbucket qoşulmayıb",
-      "bitbucketAdminOnlyDescription": "Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər.",
+      "adminOnlyConnectDescription": "Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər.",
       "contextLine": "{{organization}} üçün",
       "contextLinePersonal": "Şəxsi hesabınız üçün"
     },
@@ -3418,7 +3418,8 @@
         "accounting_adjustment": "Mühasibat düzəlişi",
         "credits_expired": "Kreditlərin müddəti bitib"
       },
-      "truncated": "Əvvəlki kredit əməliyyatlarına da baxmaq olar."
+      "truncated": "Əvvəlki kredit əməliyyatlarına da baxmaq olar.",
+      "retentionLimit": "Ən son kredit əməliyyatları göstərilir."
     },
     "inviteMember": {
       "emailError": "Düzgün e-poçt ünvanı daxil et.",
@@ -3450,7 +3451,8 @@
         "void": "Ləğv edilib",
         "uncollectible": "Alınmaz borc"
       },
-      "truncated": "Əvvəlki hesab-fakturalara da baxmaq olar."
+      "truncated": "Əvvəlki hesab-fakturalara da baxmaq olar.",
+      "retentionLimit": "Ən son hesab-fakturalar göstərilir."
     },
     "lowBalanceAlert": {
       "enableA11y": "Aşağı balans xəbərdarlığını aktivləşdir",
@@ -4383,7 +4385,8 @@
       "purchaseFallback": "Kredit alışı",
       "receipt": "Qəbz",
       "receiptA11y": "{{description}} üçün {{amount}}, {{date}} tarixli qəbzi açın",
-      "receiptUnavailable": "Bu alış üçün qəbz mövcud deyil."
+      "receiptUnavailable": "Bu alış üçün qəbz mövcud deyil.",
+      "retentionLimit": "Ən son kredit tarixçəsi göstərilir."
     },
     "title": "Kredit al",
     "description": "Kredit Kilo App-də AI kodlaşdırma sessiyalarını işə salmaq üçün Kilo balansına əlavə olunan birdəfəlik alışdır. Mağaza hesabından ödəniş alır və mağaza ödənişi təsdiqlədikdən sonra kredit əlavə olunur.",
@@ -4630,6 +4633,9 @@
     "couldNotLoad": "İnteqrasiyaları yükləmək mümkün olmadı",
     "permissionDenied": "Bu inteqrasiyaları idarə etmək üçün icazəniz yoxdur.",
     "managedByOwner": "Dəyişə bilmədiyiniz bir bağlantını dəyişmək üçün təşkilatın sahibinə müraciət edin.",
+    "managedByOwnerOrAdmin": "Dəyişə bilmədiyiniz bir bağlantını dəyişmək üçün təşkilatın sahibinə və ya inzibatçıya müraciət edin.",
+    "managedByOwnerOrBilling": "Dəyişə bilmədiyiniz bir bağlantını dəyişmək üçün təşkilatın sahibinə və ya ödəniş menecerinə müraciət edin.",
+    "managedByOwnerAdminOrBilling": "Dəyişə bilmədiyiniz bir bağlantını dəyişmək üçün təşkilatın sahibinə, inzibatçıya və ya ödəniş menecerinə müraciət edin.",
     "connectFailed": "Qoşulma səhifəsini açmaq mümkün olmadı"
   },
   "invoices": {

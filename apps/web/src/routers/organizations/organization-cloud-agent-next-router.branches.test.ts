@@ -54,7 +54,6 @@ jest.mock('@kilocode/web-shared/routers/organizations/utils', () => {
 // The org router's heavy runtime deps, mocked exactly as the existing
 // organization-cloud-agent-next-router.test.ts does.
 jest.mock('@kilocode/web-shared/lib/tokens', () => ({
-  generateCloudAgentToken: jest.fn(() => 'cloud-agent-token'),
   generateInternalServiceToken: jest.fn(),
   TOKEN_EXPIRY: 60,
 }));

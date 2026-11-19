@@ -165,12 +165,14 @@ export async function deleteWorktreeResources(
     }
     const runtimeLocations = [...state.runtimeLocations];
     const childSessions: NonNullable<RecordCloudAgentWorktreeCleanupParams['childSessions']> = [];
+    const refusedRoots = new Set<string>();
     setStage('collect_sessions');
     const discoveries = await mapDeletionRoots(state.manifest.sessions, async session => {
       if (!session.cloudAgentSessionId) return null;
       const cloudAgentSessionId = session.cloudAgentSessionId;
+      let rawBegin: { location: unknown; children: unknown };
       try {
-        const rawBegin = await withDORetry(
+        rawBegin = await withDORetry(
           () => getSandboxSessionStub(ctx.env, ctx.userId, cloudAgentSessionId),
           stub =>
             stub.beginWorktreeDeletion({
@@ -181,11 +183,9 @@ export async function deleteWorktreeResources(
             }),
           'beginWorktreeDeletion'
         );
-        const location = cloudAgentWorktreeLocationSchema.nullable().parse(rawBegin.location);
-        const children = z.array(cloudAgentChildSessionLineageSchema).parse(rawBegin.children);
-        return { cloudAgentSessionId, location, children };
       } catch (error) {
         if (isHardDeletionError(error)) throw error;
+        refusedRoots.add(cloudAgentSessionId);
         unreachableRootCount += 1;
         logControlDiagnostic(
           'worktree_deletion',
@@ -199,6 +199,9 @@ export async function deleteWorktreeResources(
         );
         return null;
       }
+      const location = cloudAgentWorktreeLocationSchema.nullable().parse(rawBegin.location);
+      const children = z.array(cloudAgentChildSessionLineageSchema).parse(rawBegin.children);
+      return { cloudAgentSessionId, location, children };
     });
     for (const discovery of discoveries) {
       if (!discovery) continue;
@@ -316,6 +319,7 @@ export async function deleteWorktreeResources(
       const finished = await mapDeletionRoots(state.manifest.sessions, async session => {
         if (!session.cloudAgentSessionId) return true;
         const cloudAgentSessionId = session.cloudAgentSessionId;
+        if (refusedRoots.has(cloudAgentSessionId)) return false;
         try {
           await withDORetry(
             () => getSandboxSessionStub(ctx.env, ctx.userId, cloudAgentSessionId),

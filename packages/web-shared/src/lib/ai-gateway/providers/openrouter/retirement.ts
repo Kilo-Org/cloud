@@ -1,21 +1,11 @@
 import { addMonths } from 'date-fns';
 
-/**
- * The catalog fields the retirement note reads. `pricing.prompt` is the price the model picker
- * shows, which is the one the price note reads too.
- */
+/** The catalog fields the retirement note reads. */
 export type RetirementNoteModel = Readonly<{
   name: string;
   created: number;
-  pricing: { prompt: string };
   expiration_date?: string | null;
 }>;
-
-/** A model priced high enough to earn the price note instead of any other name marker. */
-export function isExpensiveModel(model: RetirementNoteModel): boolean {
-  const promptPrice = Number.parseFloat(model.pricing.prompt);
-  return Number.isFinite(promptPrice) && promptPrice >= 0.00001; // Opus 4.8 Fast price
-}
 
 /** A preferred model created within the last week. */
 export function isNewModel(
@@ -31,9 +21,9 @@ export function isNewModel(
  * The date a catalog entry retires, as the entry's own `yyyy-MM-dd`, or `undefined` when the note
  * does not apply.
  *
- * The guards keep the note's precedence over the other name markers, as the composed name had it:
- * an entry that already states a fact in its name (it ends with `)`) or reads as expensive or new
- * carries no date. `retires_on` therefore needs no ordering of its own on a client.
+ * The guards keep the note's precedence over the `(new)` marker, as the composed name had it: an
+ * entry that already states a fact in its name (it ends with `)`) or reads as new carries no
+ * date. `retires_on` therefore needs no ordering of its own on a client.
  */
 export function retirementDate(
   model: RetirementNoteModel,
@@ -41,7 +31,6 @@ export function retirementDate(
   now: Date = new Date()
 ): string | undefined {
   if (!model.expiration_date) return undefined;
-  if (isExpensiveModel(model)) return undefined;
   if (model.name.endsWith(')')) return undefined;
   if (isNewModel(model, preferredIndex, now.getTime())) return undefined;
   const expirationDate = new Date(model.expiration_date);

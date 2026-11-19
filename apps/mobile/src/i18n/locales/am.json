@@ -945,7 +945,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "ይህ መለያ እስካሁን ድርጅቶች የለውም። ድርጅት ሲፈጥሩ ወይም ሲቀላቀሉ የBitbucket የማዋሃድ ጥያቄዎችን ማገምገም ይቻላል።",
       "gitlabReconnectAdminOnlyDescription": "የድርጅት ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ እንዲያገናኙት ይጠይቁ።",
       "bitbucketNotConnectedTitle": "Bitbucket አልተገናኘም",
-      "bitbucketAdminOnlyDescription": "ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
+      "adminOnlyConnectDescription": "ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
       "contextLine": "ለ{{organization}}",
       "contextLinePersonal": "ለግል መለያዎ"
     },
@@ -3418,7 +3418,8 @@
         "accounting_adjustment": "የሂሳብ ማስተካከያ",
         "credits_expired": "የክሬዲቱ ጊዜ አልፏል"
       },
-      "truncated": "የቆዩ የክሬዲት እንቅስቃሴዎች ይገኛሉ።"
+      "truncated": "የቆዩ የክሬዲት እንቅስቃሴዎች ይገኛሉ።",
+      "retentionLimit": "የቅርብ ጊዜ የክሬዲት እንቅስቃሴን በማሳየት ላይ።"
     },
     "inviteMember": {
       "emailError": "ትክክለኛ የኢሜይል አድራሻ ያስገቡ።",
@@ -3450,7 +3451,8 @@
         "void": "ተሰርዟል",
         "uncollectible": "ሊሰበሰብ የማይችል"
       },
-      "truncated": "የቆዩ ደረሰኞች ይገኛሉ።"
+      "truncated": "የቆዩ ደረሰኞች ይገኛሉ።",
+      "retentionLimit": "የቅርብ ጊዜ ደረሰኞችን በማሳየት ላይ።"
     },
     "lowBalanceAlert": {
       "enableA11y": "የዝቅተኛ ቀሪ ሂሳብ ማንቂያን ያንቁ",
@@ -4383,7 +4385,8 @@
       "purchaseFallback": "የክሬዲት ግዢ",
       "receipt": "ደረሰኝ",
       "receiptA11y": "የ{{description}}፣ {{amount}}፣ ከ{{date}} ደረሰኝን ክፈት",
-      "receiptUnavailable": "ለዚህ ግዢ ደረሰኝ አይገኝም።"
+      "receiptUnavailable": "ለዚህ ግዢ ደረሰኝ አይገኝም።",
+      "retentionLimit": "የቅርብ ጊዜ የክሬዲት ታሪክን በማሳየት ላይ።"
     },
     "title": "ክሬዲት ይግዙ",
     "description": "ክሬዲት በKilo App ውስጥ የAI ኮዲንግ ክፍለ-ጊዜዎችን ለማስኬድ ወደ Kilo ቀሪ ሂሳብዎ የሚጨመር የአንድ ጊዜ ግዢ ነው። መደብሩ ሂሳብዎን ይከፍላል፣ እና መደብሩ ክፍያውን ካረጋገጠ በኋላ ክሬዲት ይጨመራል።",
@@ -4630,6 +4633,9 @@
     "couldNotLoad": "ውህደቶችን መጫን አልተቻለም",
     "permissionDenied": "እነዚህን ውህደቶች የማስተዳደር ፈቃድ የለዎትም።",
     "managedByOwner": "መቀየር የማይችሉትን ግንኙነት ለመቀየር የድርጅቱን ባለቤት ይጠይቁ።",
+    "managedByOwnerOrAdmin": "መቀየር የማይችሉትን ግንኙነት ለመቀየር የድርጅቱን ባለቤት ወይም አስተዳዳሪ ይጠይቁ።",
+    "managedByOwnerOrBilling": "መቀየር የማይችሉትን ግንኙነት ለመቀየር የድርጅቱን ባለቤት ወይም የክፍያ አስተዳዳሪ ይጠይቁ።",
+    "managedByOwnerAdminOrBilling": "መቀየር የማይችሉትን ግንኙነት ለመቀየር የድርጅቱን ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ ይጠይቁ።",
     "connectFailed": "የግንኙነት ገጹን መክፈት አልተቻለም"
   },
   "invoices": {

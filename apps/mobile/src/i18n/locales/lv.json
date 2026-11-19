@@ -962,7 +962,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Šim kontam vēl nav organizāciju. Bitbucket izmaiņu pieprasījumus varēs pārskatīt, kad izveidosi organizāciju vai tai pievienosies.",
       "gitlabReconnectAdminOnlyDescription": "Lūdziet organizācijas īpašniekam, administratoram vai norēķinu pārvaldniekam to pievienot no jauna.",
       "bitbucketNotConnectedTitle": "Bitbucket nav pievienots",
-      "bitbucketAdminOnlyDescription": "To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki.",
+      "adminOnlyConnectDescription": "To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki.",
       "contextLine": "Priekš {{organization}}",
       "contextLinePersonal": "Priekš personīgā konta"
     },
@@ -3476,7 +3476,8 @@
         "accounting_adjustment": "Grāmatvedības korekcija",
         "credits_expired": "Kredītu derīguma termiņš beidzies"
       },
-      "truncated": "Ir pieejami arī iepriekšējie kredītu darījumi."
+      "truncated": "Ir pieejami arī iepriekšējie kredītu darījumi.",
+      "retentionLimit": "Tiek rādīti jaunākie kredītu darījumi."
     },
     "inviteMember": {
       "emailError": "Ievadi derīgu e-pasta adresi.",
@@ -3508,7 +3509,8 @@
         "void": "Anulēts",
         "uncollectible": "Nepiedzenams"
       },
-      "truncated": "Ir pieejami vecāki rēķini."
+      "truncated": "Ir pieejami vecāki rēķini.",
+      "retentionLimit": "Tiek rādīti jaunākie rēķini."
     },
     "lowBalanceAlert": {
       "enableA11y": "Iespējot brīdinājumu par mazu atlikumu",
@@ -4450,7 +4452,8 @@
       "purchaseFallback": "Kredītu pirkums",
       "receipt": "Kvīts",
       "receiptA11y": "Atvērt kvīti: {{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Šim pirkumam kvīts nav pieejama."
+      "receiptUnavailable": "Šim pirkumam kvīts nav pieejama.",
+      "retentionLimit": "Tiek rādīta jaunākā kredītu vēsture."
     },
     "title": "Pirkt kredītus",
     "description": "Kredīti ir vienreizējs pirkums, kas tiek pievienots tavam Kilo bilancei AI kodēšanas sesiju vadīšanai Kilo App. Veikals iekasē maksu no tava konta, un kredīti tiek pievienoti pēc tam, kad veikals apstiprina maksājumu.",
@@ -4705,6 +4708,9 @@
     "couldNotLoad": "Neizdevās ielādēt integrācijas",
     "permissionDenied": "Jums nav atļaujas pārvaldīt šīs integrācijas.",
     "managedByOwner": "Lūdziet organizācijas īpašniekam mainīt savienojumu, kuru nevarat mainīt.",
+    "managedByOwnerOrAdmin": "Lūdziet organizācijas īpašniekam vai administratoram mainīt savienojumu, kuru nevarat mainīt.",
+    "managedByOwnerOrBilling": "Lūdziet organizācijas īpašniekam vai norēķinu pārvaldniekam mainīt savienojumu, kuru nevarat mainīt.",
+    "managedByOwnerAdminOrBilling": "Lūdziet organizācijas īpašniekam, administratoram vai norēķinu pārvaldniekam mainīt savienojumu, kuru nevarat mainīt.",
     "connectFailed": "Neizdevās atvērt savienojuma lapu"
   },
   "invoices": {

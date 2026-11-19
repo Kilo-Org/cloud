@@ -945,7 +945,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Kontu honek ez du oraindik erakunderik. Erakunde bat sortu edo batekin bat egiten duzunean, haren Bitbucket bateratze-eskaerak berrikus ditzakezu.",
       "gitlabReconnectAdminOnlyDescription": "Eskatu erakunde bateko jabeari, administratzaileari edo fakturazio-kudeatzaileari berriro konekta dezan.",
       "bitbucketNotConnectedTitle": "Bitbucket ez dago konektatuta",
-      "bitbucketAdminOnlyDescription": "Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik konekta dezakete.",
+      "adminOnlyConnectDescription": "Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik konekta dezakete.",
       "contextLine": "{{organization}}-rako",
       "contextLinePersonal": "Zure kontu pertsonalerako"
     },
@@ -3418,7 +3418,8 @@
         "accounting_adjustment": "Kontabilitate-doikuntza",
         "credits_expired": "Kredituak iraungita"
       },
-      "truncated": "Aurreko kreditu-jarduera eskuragarri dago."
+      "truncated": "Aurreko kreditu-jarduera eskuragarri dago.",
+      "retentionLimit": "Azken kreditu-jarduera erakusten da."
     },
     "inviteMember": {
       "emailError": "Sartu baliozko helbide elektroniko bat.",
@@ -3450,7 +3451,8 @@
         "void": "Baliogabetuta",
         "uncollectible": "Kobratu ezina"
       },
-      "truncated": "Aurreko fakturak eskuragarri daude."
+      "truncated": "Aurreko fakturak eskuragarri daude.",
+      "retentionLimit": "Azken fakturak erakusten dira."
     },
     "lowBalanceAlert": {
       "enableA11y": "Gaitu saldo baxuko alerta",
@@ -4383,7 +4385,8 @@
       "purchaseFallback": "Kreditu-erosketa",
       "receipt": "Ordainagiria",
       "receiptA11y": "Ireki honen ordainagiria: {{description}}, {{amount}}, {{date}}tik",
-      "receiptUnavailable": "Ez dago ordainagiririk erosketa honetarako."
+      "receiptUnavailable": "Ez dago ordainagiririk erosketa honetarako.",
+      "retentionLimit": "Azken kreditu-historia erakusten da."
     },
     "title": "Erosi kredituak",
     "description": "Kredituak Kilo App-en AI kodetze-saioak exekutatzeko zure Kilo saldoari gehitzen zaion behin betiko erosketa bat dira. Dendak zure kontuari kobratzen dio eta kredituak dendak ordainketa baieztatu ondoren gehitzen dira.",
@@ -4630,6 +4633,9 @@
     "couldNotLoad": "Ezin izan dira integrazioak kargatu",
     "permissionDenied": "Ez duzu integrazio hauek kudeatzeko baimenik.",
     "managedByOwner": "Eskatu erakundearen jabe bati aldatu ezin duzun konexio bat alda dezan.",
+    "managedByOwnerOrAdmin": "Eskatu erakundearen jabe edo administratzaile bati aldatu ezin duzun konexio bat alda dezan.",
+    "managedByOwnerOrBilling": "Eskatu erakundearen jabe edo fakturazio-kudeatzaile bati aldatu ezin duzun konexio bat alda dezan.",
+    "managedByOwnerAdminOrBilling": "Eskatu erakundearen jabe, administratzaile edo fakturazio-kudeatzaile bati aldatu ezin duzun konexio bat alda dezan.",
     "connectFailed": "Ezin izan da konexio-orria ireki"
   },
   "invoices": {

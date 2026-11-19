@@ -945,7 +945,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Kont sa a pa gen òganizasyon pou kounye a. Ou ka revize demann fizyon Bitbucket lè w kreye yon òganizasyon oswa rantre nan yon sèl.",
       "gitlabReconnectAdminOnlyDescription": "Mande yon Pwopriyetè, yon Administratè, oswa yon Responsab faktirasyon nan òganizasyon an pou rekonekte l.",
       "bitbucketNotConnectedTitle": "Bitbucket pa konekte",
-      "bitbucketAdminOnlyDescription": "Se sèlman pwopriyetè òganizasyon an, administratè yo ak responsab faktirasyon yo ki ka konekte li.",
+      "adminOnlyConnectDescription": "Se sèlman pwopriyetè òganizasyon an, administratè yo ak responsab faktirasyon yo ki ka konekte li.",
       "contextLine": "Pou {{organization}}",
       "contextLinePersonal": "Pou kont pèsonèl ou"
     },
@@ -3418,7 +3418,8 @@
         "accounting_adjustment": "Ajisteman kontab",
         "credits_expired": "Kredi ekspire"
       },
-      "truncated": "Gen aktivite kredi ki pi ansyen ki disponib."
+      "truncated": "Gen aktivite kredi ki pi ansyen ki disponib.",
+      "retentionLimit": "Sa yo se aktivite kredi ki pi resan yo."
     },
     "inviteMember": {
       "emailError": "Antre yon adrès imel ki valab.",
@@ -3450,7 +3451,8 @@
         "void": "Anile",
         "uncollectible": "Pa ka rekipere"
       },
-      "truncated": "Gen fakti ki pi ansyen ki disponib."
+      "truncated": "Gen fakti ki pi ansyen ki disponib.",
+      "retentionLimit": "Sa yo se fakti ki pi resan yo."
     },
     "lowBalanceAlert": {
       "enableA11y": "Aktive alèt pou balans ki ba",
@@ -4383,7 +4385,8 @@
       "purchaseFallback": "Acha kredi",
       "receipt": "Resi",
       "receiptA11y": "Louvri resi pou {{description}}, {{amount}}, soti {{date}}",
-      "receiptUnavailable": "Pa gen resi disponib pou acha sa a."
+      "receiptUnavailable": "Pa gen resi disponib pou acha sa a.",
+      "retentionLimit": "Sa yo se istorik kredi ki pi resan an."
     },
     "title": "Achte kredi",
     "description": "Kredi se yon acha yon sèl fwa ki ajoute nan balans Kilo ou pou kouri sesyon kodaj AI nan Kilo App. Magazen an chaje kont ou epi kredi yo ajoute apre magazen an konfime peman an.",
@@ -4630,6 +4633,9 @@
     "couldNotLoad": "Pa t ka chaje entegrasyon yo",
     "permissionDenied": "Ou pa gen pèmisyon pou jere entegrasyon sa yo.",
     "managedByOwner": "Mande yon pwopriyetè òganizasyon pou chanje yon koneksyon ou pa ka chanje.",
+    "managedByOwnerOrAdmin": "Mande yon pwopriyetè òganizasyon oswa yon administratè pou chanje yon koneksyon ou pa ka chanje.",
+    "managedByOwnerOrBilling": "Mande yon pwopriyetè òganizasyon oswa yon responsab faktirasyon pou chanje yon koneksyon ou pa ka chanje.",
+    "managedByOwnerAdminOrBilling": "Mande yon pwopriyetè òganizasyon, yon administratè, oswa yon responsab faktirasyon pou chanje yon koneksyon ou pa ka chanje.",
     "connectFailed": "Pa t ka louvri paj koneksyon an"
   },
   "invoices": {

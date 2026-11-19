@@ -151,18 +151,9 @@ describe('formatName', () => {
     jest.useRealTimers();
   });
 
-  it('appends ($$$$) for expensive models', () => {
+  it('does not add a price marker to expensive models', () => {
     const model = buildModel({ pricing: { prompt: '0.00001', completion: '0' } });
-    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model ($$$$)');
-  });
-
-  it('prioritizes the expensive marker over the retirement date', () => {
-    const model = buildModel({
-      pricing: { prompt: '0.00002', completion: '0' },
-      expiration_date: '2099-01-15',
-    });
-    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model ($$$$)');
-    expect(retirementDate(model, NOT_PREFERRED)).toBeUndefined();
+    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model');
   });
 
   it('gives names that already end with a parenthesis no retirement date', () => {
@@ -232,11 +223,9 @@ describe('formatName', () => {
   });
 
   it('prefixes the name before appending markers', () => {
-    const model = buildModel({
-      id: 'openrouter/auto',
-      pricing: { prompt: '0.00001', completion: '0' },
-    });
-    expect(formatName(model, NOT_PREFERRED)).toBe('OpenRouter Test Model ($$$$)');
+    const recentlyCreated = Math.floor(Date.now() / 1000) - 24 * 3600;
+    const model = buildModel({ id: 'openrouter/auto', created: recentlyCreated });
+    expect(formatName(model, 0)).toBe('OpenRouter Test Model (new)');
   });
 });
 

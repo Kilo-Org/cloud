@@ -962,7 +962,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Ovaj nalog još nema organizacije. Zahteve za spajanje na Bitbucktu možeš pregledati kada kreiraš ili se pridružiš organizaciji.",
       "gitlabReconnectAdminOnlyDescription": "Zamoli vlasnika organizacije, administratora ili menadžera za naplatu da ga ponovo poveže.",
       "bitbucketNotConnectedTitle": "Bitbucket nije povezan",
-      "bitbucketAdminOnlyDescription": "Samo vlasnici organizacije, administratori i menadžeri naplate mogu da ga povežu.",
+      "adminOnlyConnectDescription": "Samo vlasnici organizacije, administratori i menadžeri naplate mogu da ga povežu.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za lični nalog"
     },
@@ -3476,7 +3476,8 @@
         "accounting_adjustment": "Računovodstveno usklađivanje",
         "credits_expired": "Istekli krediti"
       },
-      "truncated": "Dostupne su i ranije promene kredita."
+      "truncated": "Dostupne su i ranije promene kredita.",
+      "retentionLimit": "Prikazuju se najnovije promene kredita."
     },
     "inviteMember": {
       "emailError": "Unesi važeću adresu e-pošte.",
@@ -3508,7 +3509,8 @@
         "void": "Stornirano",
         "uncollectible": "Nenaplativo"
       },
-      "truncated": "Starije fakture su dostupne."
+      "truncated": "Starije fakture su dostupne.",
+      "retentionLimit": "Prikazuju se najnovije fakture."
     },
     "lowBalanceAlert": {
       "enableA11y": "Omogući upozorenje o niskom saldu",
@@ -4444,6 +4446,7 @@
       "receipt": "Račun",
       "receiptA11y": "Otvori račun za {{description}}, {{amount}}, od {{date}}",
       "receiptUnavailable": "Račun nije dostupan za ovu kupovinu.",
+      "retentionLimit": "Prikazuje se najnovija istorija kredita.",
       "kind": {
         "adjustment": "Korekcija",
         "balanceNeutral": "Bez uticaja na stanje",
@@ -4705,6 +4708,9 @@
     "couldNotLoad": "Učitavanje integracija nije uspelo",
     "permissionDenied": "Nemate dozvolu da upravljate ovim integracijama.",
     "managedByOwner": "Zamolite vlasnika organizacije da promeni vezu koju ne možete da promenite.",
+    "managedByOwnerOrAdmin": "Zamolite vlasnika organizacije ili administratora da promeni vezu koju ne možete da promenite.",
+    "managedByOwnerOrBilling": "Zamolite vlasnika organizacije ili menadžera za naplatu da promeni vezu koju ne možete da promenite.",
+    "managedByOwnerAdminOrBilling": "Zamolite vlasnika organizacije, administratora ili menadžera za naplatu da promeni vezu koju ne možete da promenite.",
     "connectFailed": "Otvaranje stranice za povezivanje nije uspelo"
   },
   "invoices": {

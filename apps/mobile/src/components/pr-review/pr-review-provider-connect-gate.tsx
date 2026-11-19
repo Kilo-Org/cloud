@@ -362,15 +362,22 @@ export function ProviderConnectGate({
     }
     if (action === 'organization-admin-only' && mismatch === null) {
       // The reader cannot complete the integration page's action from this
-      // role, so the state names the roles that can and carries no action. An
-      // expired GitLab connection keeps its title and asks for a reconnection;
-      // an absent Bitbucket connection cannot make the connect call its title
-      // no longer offers, so that title states the absence instead.
+      // role, so the state names the roles that can and carries no action.
+      //
+      // Every organization GitLab connect asks the integration page for a
+      // billing role, a first connect included, so the two GitLab outcomes word
+      // the roles differently: an expired connection keeps the reconnection
+      // wording under its expiry title, while a first connect carries no title
+      // claiming an expired connection and names the roles that can connect
+      // instead. An absent Bitbucket connection cannot make the connect call
+      // its title no longer offers, so that title states the absence instead.
       if (platform === 'gitlab') {
-        description = t('prReview.connect.gitlabReconnectAdminOnlyDescription');
+        description = reconnect
+          ? t('prReview.connect.gitlabReconnectAdminOnlyDescription')
+          : t('prReview.connect.adminOnlyConnectDescription');
       } else {
         title = t('prReview.connect.bitbucketNotConnectedTitle');
-        description = t('prReview.connect.bitbucketAdminOnlyDescription');
+        description = t('prReview.connect.adminOnlyConnectDescription');
       }
     }
     return (

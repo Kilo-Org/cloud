@@ -2,7 +2,7 @@ import { mount, press, text } from './native-remote-test-utils';
 import { expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { act } from '@/test/renderer';
-import { nativeRemoteFixture, readySession } from './native-remote-test-helpers';
+import { nativeRemoteFixture, readySession } from './native-remote.test-helpers';
 
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 

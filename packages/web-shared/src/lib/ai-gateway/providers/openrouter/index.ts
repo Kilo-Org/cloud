@@ -57,7 +57,6 @@ import {
 import { convertCustomLlmToCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
 import { isCustomLlmDeniedInCountry } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import {
-  isExpensiveModel,
   isNewModel,
   retirementDate,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
@@ -155,7 +154,6 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
     model.id.startsWith('openrouter/') && !model.name.includes('OpenRouter')
       ? 'OpenRouter ' + model.name
       : model.name;
-  if (isExpensiveModel(model)) return name + ' ($$$$)';
   if (name.endsWith(')')) return name;
   if (isNewModel(model, preferredIndex)) return name + ' (new)';
   return name;

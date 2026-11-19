@@ -2840,7 +2840,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Esta cuenta todavía no tiene organizaciones. Podrás revisar los PR de Bitbucket cuando crees una organización o te unas a una.",
       "gitlabReconnectAdminOnlyDescription": "Pídele a un Propietario, un Administrador o un Gestor de facturación de la organización que la vuelva a conectar.",
       "bitbucketNotConnectedTitle": "Bitbucket no está conectado",
-      "bitbucketAdminOnlyDescription": "Solo los propietarios de la organización, los administradores y los gestores de facturación pueden conectarlo.",
+      "adminOnlyConnectDescription": "Solo los propietarios de la organización, los administradores y los gestores de facturación pueden conectarlo.",
       "contextLine": "Para {{organization}}",
       "contextLinePersonal": "Para tu cuenta personal"
     },
@@ -3468,7 +3468,8 @@
         "accounting_adjustment": "Ajuste contable",
         "credits_expired": "Créditos caducados"
       },
-      "truncated": "Hay movimientos de créditos anteriores disponibles."
+      "truncated": "Hay movimientos de créditos anteriores disponibles.",
+      "retentionLimit": "Mostrando los movimientos de créditos más recientes."
     },
     "hub": {
       "balance": "Saldo",
@@ -3513,7 +3514,8 @@
         "void": "Anulada",
         "uncollectible": "Incobrable"
       },
-      "truncated": "Hay facturas más antiguas disponibles."
+      "truncated": "Hay facturas más antiguas disponibles.",
+      "retentionLimit": "Mostrando las facturas más recientes."
     },
     "lowBalanceAlert": {
       "enableA11y": "Activar la alerta de saldo bajo",
@@ -4450,7 +4452,8 @@
       "purchaseFallback": "Compra de créditos",
       "receipt": "Recibo",
       "receiptA11y": "Abrir el recibo de {{description}}, {{amount}}, de {{date}}",
-      "receiptUnavailable": "No hay ningún recibo disponible para esta compra."
+      "receiptUnavailable": "No hay ningún recibo disponible para esta compra.",
+      "retentionLimit": "Mostrando el historial de créditos más reciente."
     },
     "title": "Comprar créditos",
     "description": "Los créditos son una compra única que se añade a tu saldo de Kilo para ejecutar sesiones de codificación con IA en Kilo App. La tienda cobra en tu cuenta y los créditos se añaden cuando la tienda confirma el pago.",
@@ -4705,6 +4708,9 @@
     "couldNotLoad": "No se pudieron cargar las integraciones",
     "permissionDenied": "No tienes permiso para gestionar estas integraciones.",
     "managedByOwner": "Pide a un propietario de la organización que cambie una conexión que no puedas cambiar.",
+    "managedByOwnerOrAdmin": "Pide a un propietario o un administrador de la organización que cambie una conexión que no puedas cambiar.",
+    "managedByOwnerOrBilling": "Pide a un propietario o un gestor de facturación de la organización que cambie una conexión que no puedas cambiar.",
+    "managedByOwnerAdminOrBilling": "Pide a un propietario, un administrador o un gestor de facturación de la organización que cambie una conexión que no puedas cambiar.",
     "connectFailed": "No se pudo abrir la página de conexión"
   },
   "invoices": {

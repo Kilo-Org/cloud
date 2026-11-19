@@ -2801,7 +2801,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "此账户尚未加入任何组织。创建或加入组织后，即可审查 Bitbucket 拉取请求。",
       "gitlabReconnectAdminOnlyDescription": "请让组织所有者、管理员或账单管理员重新连接。",
       "bitbucketNotConnectedTitle": "尚未连接 Bitbucket",
-      "bitbucketAdminOnlyDescription": "只有组织所有者、管理员和账单管理员可以完成连接。",
+      "adminOnlyConnectDescription": "只有组织所有者、管理员和账单管理员可以完成连接。",
       "contextLine": "适用于 {{organization}}",
       "contextLinePersonal": "适用于个人账户"
     },
@@ -3410,7 +3410,8 @@
         "accounting_adjustment": "账务调整",
         "credits_expired": "额度已过期"
       },
-      "truncated": "还有更早的额度变动记录可供查看。"
+      "truncated": "还有更早的额度变动记录可供查看。",
+      "retentionLimit": "仅显示最近的额度变动记录。"
     },
     "hub": {
       "balance": "余额",
@@ -3455,7 +3456,8 @@
         "void": "已作废",
         "uncollectible": "无法收款"
       },
-      "truncated": "可查看更早的发票。"
+      "truncated": "可查看更早的发票。",
+      "retentionLimit": "仅显示最近的发票。"
     },
     "lowBalanceAlert": {
       "enableA11y": "启用余额不足提醒",
@@ -4383,7 +4385,8 @@
       "purchaseFallback": "积分购买",
       "receipt": "收据",
       "receiptA11y": "打开 {{description}}，{{amount}}，{{date}} 的收据",
-      "receiptUnavailable": "此购买暂无可用收据。"
+      "receiptUnavailable": "此购买暂无可用收据。",
+      "retentionLimit": "仅显示最近的积分记录。"
     },
     "title": "购买额度",
     "description": "额度是一次性购买，会添加到你的 Kilo 余额中，用于在 Kilo App 中运行 AI 编程会话。商店会向你的账户收费，商店确认付款后额度才会到账。",
@@ -4630,6 +4633,9 @@
     "couldNotLoad": "无法加载集成",
     "permissionDenied": "你没有管理这些集成的权限。",
     "managedByOwner": "请联系组织所有者更改你无法更改的连接。",
+    "managedByOwnerOrAdmin": "请让组织所有者或管理员更改你无法更改的连接。",
+    "managedByOwnerOrBilling": "请让组织所有者或账单管理员更改你无法更改的连接。",
+    "managedByOwnerAdminOrBilling": "请让组织所有者、管理员或账单管理员更改你无法更改的连接。",
     "connectFailed": "无法打开连接页面"
   },
   "invoices": {

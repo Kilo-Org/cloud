@@ -6,8 +6,6 @@ import { AccessibleStatus } from './accessible-status';
 import { act, TestRenderer } from '@/test/renderer';
 import { i18n } from '@/i18n';
 import { lightColors } from '@/lib/hooks/theme-colors.generated';
-import ar from '@/i18n/locales/ar.json';
-import en from '@/i18n/locales/en.json';
 
 const rtl = vi.hoisted(() => ({ isRTL: false }));
 // Mutable so a suite can prove the placeholder follows the active palette. The
@@ -57,70 +55,6 @@ function flattenStyle(style: unknown): Record<string, unknown> {
   return merged;
 }
 
-describe('FormField reserved validation space', () => {
-  it.each([
-    ['English', en],
-    ['Arabic', ar],
-  ] as const)(
-    'hides reserved messages and announces errors through recovery in %s',
-    (_language, catalog) => {
-      const reserveErrorMessages = [
-        catalog.login.pleaseEnterEmail,
-        catalog.authErrors.invalidRequest,
-        catalog.authErrors.invalidEmail,
-      ];
-      const props = { label: catalog.login.emailAddress, reserveErrorMessages };
-      act(() => {
-        renderer = TestRenderer.create(createElement(FormField, props));
-      });
-      if (!renderer) {
-        throw new Error('renderer was not created');
-      }
-      const mounted = renderer;
-      const reservation = () =>
-        mounted.root.findByProps({ importantForAccessibility: 'no-hide-descendants' });
-      const reserved = reservation();
-      expect(reserved.props.pointerEvents).toBe('none');
-      expect(reserved.props.accessibilityElementsHidden).toBe(true);
-      expect(mounted.root.findByType(AccessibleStatus).findAllByType('Text')).toHaveLength(0);
-
-      for (const error of [...reserveErrorMessages, undefined]) {
-        act(() => {
-          mounted.update(createElement(FormField, { ...props, error }));
-        });
-        const status = mounted.root.findByType(AccessibleStatus);
-        expect(status.findAllByType('Text').map(node => node.props.children)).toEqual(
-          error ? [error] : []
-        );
-        const input = mounted.root.findByType('TextInput');
-        if (error) {
-          expect(input.props.accessibilityLabel).toContain(error);
-          expect(status.findByType('Text').props.accessibilityLiveRegion).toBe('polite');
-        } else {
-          expect(input.props.accessibilityLabel).toBe(props.label);
-        }
-      }
-    }
-  );
-
-  it('preserves the unreserved behavior for other fields', () => {
-    act(() => {
-      renderer = TestRenderer.create(
-        createElement(FormField, {
-          label: i18n.t('login.emailAddress'),
-          error: i18n.t('login.pleaseEnterEmail'),
-        })
-      );
-    });
-    expect(
-      renderer?.root.findAllByProps({ importantForAccessibility: 'no-hide-descendants' })
-    ).toHaveLength(0);
-    expect(renderer?.root.findByType(AccessibleStatus).findByType('Text').props.children).toBe(
-      i18n.t('login.pleaseEnterEmail')
-    );
-  });
-});
-
 describe('FormField errors known from elsewhere', () => {
   const label = i18n.t('login.emailAddress');
   const ownError = i18n.t('login.pleaseEnterEmail');
@@ -148,41 +82,110 @@ describe('FormField errors known from elsewhere', () => {
   }
 
   function inputHandlers(mounted: TestRenderer.ReactTestRenderer) {
-    const props = mounted.root.findByType('TextInput').props as {
+    return mounted.root.findByType('TextInput').props as {
       onBlur: (event: unknown) => void;
       onChangeText: (value: string) => void;
     };
-    return props;
   }
 
   it('shows a rejected submit before the field has been blurred', () => {
     const mounted = mount({ error: submittedError });
-
     expect(shownError(mounted)).toEqual([submittedError]);
     expect(mounted.root.findByType('TextInput').props.className).toContain('border-destructive');
   });
 
   it("lets the field's own rule speak first once it has something to say", () => {
     const mounted = mount({ error: submittedError });
-
     act(() => {
       inputHandlers(mounted).onBlur({});
     });
-
     expect(shownError(mounted)).toEqual([ownError]);
   });
 
   it('returns to the externally known error once the value satisfies the rule', () => {
     const mounted = mount({ error: submittedError });
-
     act(() => {
       inputHandlers(mounted).onBlur({});
     });
     act(() => {
       inputHandlers(mounted).onChangeText('dev@example.com');
     });
-
     expect(shownError(mounted)).toEqual([submittedError]);
+  });
+});
+
+describe('FormField validation while typing', () => {
+  const label = i18n.t('login.emailAddress');
+  const ownError = i18n.t('authErrors.invalidEmail');
+  const validEmail = 'dev@example.com';
+
+  function mount(props: { validateWhileTyping?: boolean } = {}) {
+    act(() => {
+      renderer = TestRenderer.create(
+        createElement(FormField, {
+          label,
+          validate: (value: string) => (value === validEmail ? null : ownError),
+          ...props,
+        })
+      );
+    });
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    return renderer;
+  }
+
+  function shownError(mounted: TestRenderer.ReactTestRenderer) {
+    return mounted.root
+      .findByType(AccessibleStatus)
+      .findAllByType('Text')
+      .map(node => node.props.children);
+  }
+
+  function inputHandlers(mounted: TestRenderer.ReactTestRenderer) {
+    return mounted.root.findByType('TextInput').props as {
+      onBlur: (event: unknown) => void;
+      onChangeText: (value: string) => void;
+    };
+  }
+
+  it('shows the rule on a non-empty invalid value without a blur', () => {
+    const mounted = mount({ validateWhileTyping: true });
+    act(() => {
+      inputHandlers(mounted).onChangeText('dev@example');
+    });
+    expect(shownError(mounted)).toEqual([ownError]);
+  });
+
+  it('waits for the first blur while the value is empty', () => {
+    const mounted = mount({ validateWhileTyping: true });
+    act(() => {
+      inputHandlers(mounted).onChangeText('');
+    });
+    expect(shownError(mounted)).toEqual([]);
+    act(() => {
+      inputHandlers(mounted).onBlur({});
+    });
+    expect(shownError(mounted)).toEqual([ownError]);
+  });
+
+  it('clears the message once the typed value becomes valid', () => {
+    const mounted = mount({ validateWhileTyping: true });
+    act(() => {
+      inputHandlers(mounted).onChangeText('dev@example');
+    });
+    act(() => {
+      inputHandlers(mounted).onChangeText(validEmail);
+    });
+    expect(shownError(mounted)).toEqual([]);
+  });
+
+  it('keeps blur-only validation for a field that does not opt in', () => {
+    const mounted = mount();
+    act(() => {
+      inputHandlers(mounted).onChangeText('dev@example');
+    });
+    expect(shownError(mounted)).toEqual([]);
   });
 });
 
@@ -199,33 +202,81 @@ describe('FormField direction-aware content alignment', () => {
     return renderer.root.findByType('TextInput');
   }
 
+  function textAlign(input: TestRenderer.ReactTestInstance): unknown {
+    return flattenStyle(input.props.style).textAlign;
+  }
+
   it('right-aligns the field content in a right-to-left interface', () => {
     // The label mirrors to the right edge with the rest of the RTL layout, so
     // the value must sit on the same side even when it is Latin (an email
     // address, whose own strong direction would otherwise stay left).
     rtl.isRTL = true;
-
-    expect(flattenStyle(mountInput().props.style).textAlign).toBe('right');
+    expect(textAlign(mountInput())).toBe('right');
   });
 
   it('leaves the field alignment to the caller in a left-to-right interface', () => {
     rtl.isRTL = false;
-
-    expect(flattenStyle(mountInput().props.style).textAlign).toBeUndefined();
+    expect(textAlign(mountInput())).toBeUndefined();
   });
 
   it('keeps an explicit caller alignment after the RTL default', () => {
     rtl.isRTL = true;
-    const centered = { textAlign: 'center' } as const;
-
-    expect(flattenStyle(mountInput({ style: centered }).props.style).textAlign).toBe('center');
+    expect(textAlign(mountInput({ style: { textAlign: 'center' } }))).toBe('center');
   });
 
   it('keeps an explicit caller alignment passed as a prop after the RTL default', () => {
     // The shared field threads a `textAlign` prop straight to `Input`, so the
     // prop channel must survive the RTL default exactly like the style channel.
     rtl.isRTL = true;
+    expect(textAlign(mountInput({ textAlign: 'center' }))).toBe('center');
+  });
+});
 
-    expect(flattenStyle(mountInput({ textAlign: 'center' }).props.style).textAlign).toBe('center');
+describe('FormField label-to-input gap', () => {
+  function mountField(gapClassName?: string) {
+    act(() => {
+      renderer = TestRenderer.create(
+        createElement(FormField, {
+          label: i18n.t('login.emailAddress'),
+          ...(gapClassName === undefined ? {} : { gapClassName }),
+        })
+      );
+    });
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    // The block root carries `gap-1.5`; the wrapper carries the caller's gap
+    // class and wraps the label row and the input. `findAllByType` is
+    // self-inclusive and pre-order, so the root can also match the default
+    // class — exclude it to hold the pair's own node.
+    const root = renderer.root.findByType('View');
+    const wrapper = root
+      .findAllByType('View')
+      .find(node => node !== root && String(node.props.className) === (gapClassName ?? 'gap-1.5'));
+    if (wrapper === undefined) {
+      throw new Error('the label-to-input wrapper was not rendered');
+    }
+    return { root, wrapper };
+  }
+
+  it('keeps the compact default on the label-to-input pair', () => {
+    // An ordinary field's label row and input sit one small gap apart: the
+    // wrapper's own default is the compact gap, distinct from the block
+    // root's gap to the message slot below.
+    const { root, wrapper } = mountField();
+    expect(wrapper).not.toBe(root);
+    expect(String(wrapper.props.className)).toContain('gap-1.5');
+    expect(String(root.props.className)).toContain('gap-1.5');
+  });
+
+  it('puts the caller gap on the label-to-input pair only', () => {
+    // A screen whose row controls hover over the label line passes
+    // COMMAND_ROW_FIELD_GAP_CLASS so the controls' touch band ends above the
+    // input's edge. The class lands on the wrapper around the label row and
+    // the input; the block root keeps `gap-1.5`, so an error or reserved
+    // message below the input keeps the ordinary spacing.
+    const { root, wrapper } = mountField('gap-y-[16px]');
+    expect(String(wrapper.props.className)).toBe('gap-y-[16px]');
+    expect(String(root.props.className)).toBe('gap-1.5');
   });
 });

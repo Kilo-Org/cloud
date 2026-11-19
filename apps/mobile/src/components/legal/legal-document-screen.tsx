@@ -6,11 +6,13 @@ import { ScrollView, View } from 'react-native';
 import { MarkdownText } from '@/components/agents/markdown-text';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useLegalDocument } from '@/lib/hooks/use-legal-document';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { type LegalDocument } from '@/lib/legal-document';
-import { useSideInsetStyle } from '@/lib/screen-insets';
+import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-insets';
 
 import { planLegalInContentLink } from './legal-document-link';
 
@@ -38,6 +40,7 @@ export function LegalDocumentScreen({
   const router = useRouter();
   const { state, retry } = useLegalDocument(document);
   const sideInsetStyle = useSideInsetStyle();
+  const bottomPadding = useDetailScreenBottomPadding();
 
   // Legal copy ships published English text only, while the app's own copy is
   // localized, so readers of another app language deserve the heads-up.
@@ -83,7 +86,7 @@ export function LegalDocumentScreen({
   function renderState() {
     if (state.kind === 'loading') {
       return (
-        <View className="gap-3 px-5 pt-4">
+        <View className="gap-3 px-4 pt-3">
           {LOADING_LINE_WIDTHS.map((width, index) => (
             <Skeleton key={index} className={`h-4 rounded ${width}`} />
           ))}
@@ -100,18 +103,16 @@ export function LegalDocumentScreen({
     return (
       <ScrollView
         className="flex-1"
-        contentContainerStyle={sideInsetStyle}
-        contentContainerClassName="px-5 pt-4 pb-10"
+        contentContainerStyle={{ ...sideInsetStyle, paddingBottom: bottomPadding }}
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
         {showsEnglishOnlyNotice ? (
-          <View className="mb-4 rounded-lg border border-border bg-secondary p-3">
-            <Text className="text-base text-foreground">
-              {t('common.legalDocumentEnglishOnly')}
-            </Text>
-          </View>
+          <Card className="mb-4">
+            <Text>{t('common.legalDocumentEnglishOnly')}</Text>
+          </Card>
         ) : null}
-        <MarkdownText value={state.html} onPressLink={openInContentLink} />
+        <MarkdownText value={state.html} documentDirection="ltr" onPressLink={openInContentLink} />
       </ScrollView>
     );
   }

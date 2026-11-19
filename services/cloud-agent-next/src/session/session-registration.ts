@@ -27,6 +27,7 @@ import {
 } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   assertSandboxAllocationAvailable,
+  assertVercelRuntimeSupports,
   getSandboxSelectionCapabilities,
   isRetiredSandboxAllocation,
   isSandboxAllocationAvailable,
@@ -113,6 +114,8 @@ import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { assertKiloModelAvailable } from '../model-validation.js';
 import { initialAdmissionFailure } from './admission-failure.js';
 import { logRuntimeAuthorizationDiagnostic } from './runtime-authorization-diagnostics.js';
+import { runtimeAuthorizationLifetime } from './runtime-authorization-lifetime.js';
+import { getWorkspaceStub } from '../control-plane/workspace/workspace-stub.js';
 import {
   createCloudAgentSessionReport,
   recordCloudAgentSandboxIdentity,
@@ -138,6 +141,7 @@ import {
 import type { SessionCreateRequest, SessionRepositoryRequest } from './session-requests.js';
 import { isInteractiveSessionOrigin } from '../shared/control-plane-permission.js';
 import { egressAllowlistSchema, egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
+import { providerSupports } from '@kilocode/worker-utils/sandbox-provider-capabilities';
 import {
   RUNTIME_BUILTIN_AGENT_SLUGS,
   type RuntimeBuiltinAgents,
@@ -200,7 +204,7 @@ function assertEgressPolicyAllocation(
   allocation: Pick<SessionRegistrationResult, 'sandboxProvider'>
 ): void {
   if (input.runtime?.egressMode !== 'allowlist' && input.runtime?.egressAudit !== true) return;
-  if (allocation.sandboxProvider !== 'cloudflare-containers') {
+  if (!providerSupports(allocation.sandboxProvider, 'egressPolicy')) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: 'Egress policy requires an isolated control-plane Cloudflare containers sandbox',
@@ -852,16 +856,16 @@ async function recordParentChildSession(
   if (parentSessionId === undefined) return;
   try {
     await withDORetry(
-      () => getSandboxSessionStub(ctx.env, ctx.userId, parentSessionId),
+      () => getWorkspaceStub(ctx.env, ctx.userId, parentSessionId),
       stub =>
-        stub.recordCloudAgentChildSession({
+        stub.recordChild({
           cloudAgentSessionId: child.cloudAgentSessionId,
           ...(child.initialMessageId === undefined
             ? {}
             : { initialMessageId: child.initialMessageId }),
           ...(child.worktreeId === undefined ? {} : { worktreeId: child.worktreeId }),
         }),
-      'recordCloudAgentChildSession'
+      'recordChild'
     );
   } catch (error) {
     logger
@@ -905,9 +909,9 @@ async function issueSessionRuntimeAuthorization(
   if (ctx.cloudAgentAuthority) {
     const authority = ctx.cloudAgentAuthority;
     const runtimeAuthorization = await withDORetry(
-      () => getSandboxSessionStub(ctx.env, ctx.userId, authority.parentSessionId),
-      stub => stub.authorizeCloudAgentChild({ authority, childSessionId: cloudAgentSessionId }),
-      'authorizeCloudAgentChild'
+      () => getWorkspaceStub(ctx.env, ctx.userId, authority.parentSessionId),
+      stub => stub.authorizeChild({ authority, childSessionId: cloudAgentSessionId }),
+      'authorizeChild'
     ).catch(() => {
       throw new TRPCError({
         code: 'FORBIDDEN',
@@ -937,6 +941,7 @@ async function issueSessionRuntimeAuthorization(
       resourceKind: 'cloud-agent-next',
       resourceId: cloudAgentSessionId,
       environment: resolveRuntimeEnvironment(ctx.env.ENVIRONMENT),
+      ...runtimeAuthorizationLifetime(ctx.env),
       onAdmissionRejected: reason =>
         logRuntimeAuthorizationDiagnostic(cloudAgentSessionId, 'admission', reason),
       ...(orgId ? { organizationId: orgId } : {}),
@@ -1059,6 +1064,7 @@ async function allocateNewSession(
   await assertSandboxAllocationMembership(input, ctx);
   const requestedAllocation = requestedSandboxAllocation(input);
   const orgId = input.options?.kilocodeOrganizationId;
+  const capability = allocationCapabilityFor(input, options?.billingOrigin);
   // Every allocation is validated when it is allocated, whether the client chose
   // it or saved settings resolved it, so a pinned retry cannot outlive the
   // owner's access to sandbox selection.
@@ -1068,7 +1074,7 @@ async function allocateNewSession(
       { userId: ctx.userId, orgId },
       requestedAllocation,
       input.repository.type,
-      allocationCapabilityFor(input, options?.billingOrigin)
+      capability
     );
   }
   const initialTurn = input.initialTurn ? acceptInitialTurn(input.initialTurn) : undefined;
@@ -1182,6 +1188,7 @@ async function allocateNewSession(
       if (enrollment.setupStatus !== 'ready') {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'byoc_vercel_not_ready' });
       }
+      await assertVercelRuntimeSupports(enrollment, capability);
       sandboxProviderBinding = {
         kind: 'vercel',
         source: {
@@ -2128,6 +2135,9 @@ function profileCreateIntent(
     runtimeSkills: resolved.runtimeSkills,
     runtimeAgents: resolved.runtimeAgents,
     builtinAgents: resolved.builtinAgents,
+    modelContextLimits: resolved.modelContextLimits,
+    webSearchDisabled: resolved.webSearchDisabled,
+    webSearchProvider: resolved.webSearchProvider,
     kiloCommands: resolved.kiloCommands,
     runtimeInstructions: resolved.runtimeInstructions,
   };

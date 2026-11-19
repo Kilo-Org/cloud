@@ -13,6 +13,7 @@ import { UITextView } from '@bsky.app/react-native-uitextview';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { type HighlightToken } from '@/lib/pr-review/diff/highlight';
 import { type TokenScheme } from '@/lib/pr-review/diff/syntax-colors';
 import { LTR_TEXT_DIRECTION } from '@/lib/rtl-text';
 
@@ -20,11 +21,13 @@ import { useTranscriptTextSelectable } from './bubble-text-selection-context';
 import { renderChunkChildren, renderSelectableChunkChildren } from './code-block-chunk-content';
 import {
   chunkCodeLines,
+  releaseFenceChunkWalk,
+  retainFenceChunkWalk,
+} from './code-block-fence-walk';
+import {
   CODE_CHUNK_MOUNT_BATCH,
   CODE_FIRST_PAINT_CHUNKS,
   nextChunkMountCount,
-  releaseFenceChunkWalk,
-  retainFenceChunkWalk,
 } from './code-block-model';
 import { useMonoScrollSheet } from './mono-scroll-block';
 import {
@@ -62,6 +65,64 @@ const CODE_LINE_CLASSNAME = 'font-mono text-xs leading-[1rem]';
 
 /** `UITextView` with `className` mapped to `style`, like the built-in `Text`. */
 const SelectableCodeText = styled(UITextView, { className: 'style' });
+
+/**
+ * One chunk of a fence: the exact element the fence used to build inline for
+ * every mounted chunk. Memoized on its props so a batch that mounts new chunks
+ * constructs element trees only for the chunks whose props changed — the walk
+ * model shares each completed chunk's token array (see `extendFenceChunkWalk`),
+ * so an already-mounted chunk keeps its `chunk` identity across mount batches
+ * and streamed appends and its tree is skipped entirely.
+ */
+const CodeChunkView = memo(function CodeChunkView({
+  chunk,
+  keepBlankLineBox,
+  selectable,
+  textBase,
+  tokenScheme,
+  // `chunkIndex` stays a prop — the map site's key is built from it — but the
+  // tree itself is positional, so the body never reads it.
+}: {
+  chunk: HighlightToken[][];
+  chunkIndex: number;
+  selectable: boolean;
+  textBase: string;
+  tokenScheme: TokenScheme;
+  keepBlankLineBox: boolean;
+}) {
+  // iOS `Text selectable` copies the whole Text and shows an empty
+  // first menu (see `selectable-text.tsx`); a `UITextView` chunk gives
+  // the platform's own range selection and callout. Android keeps
+  // `RNText`, whose native selection already works per chunk.
+  return Platform.OS === 'ios' && selectable ? (
+    <SelectableCodeText
+      accessible={false}
+      selectable
+      uiTextView
+      className={CODE_LINE_CLASSNAME}
+      // Direction and ink for the native text view's own paragraph
+      // style: the selectable chunk wraps like the plain one and its
+      // continuations start under the first line in an RTL interface.
+      // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- base ink for untagged runs
+      style={{ color: textBase, ...LTR_TEXT_DIRECTION }}
+    >
+      {renderSelectableChunkChildren(chunk, tokenScheme, keepBlankLineBox)}
+    </SelectableCodeText>
+  ) : (
+    <RNText
+      // Chunks are positional: the index is their identity.
+      accessible={false}
+      // Native selection is offered per chunk; the sheet's wrap/scroll
+      // mode and this flag are independent.
+      selectable={selectable}
+      className={CODE_LINE_CLASSNAME}
+      // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- base ink for untagged runs
+      style={{ color: textBase, ...LTR_TEXT_DIRECTION }}
+    >
+      {renderChunkChildren(chunk, tokenScheme, keepBlankLineBox)}
+    </RNText>
+  );
+});
 
 /**
  * Shared highlighted code block for tool detail sheets and markdown fences.
@@ -248,44 +309,20 @@ function CodeBlockImpl({
   const codeContent = useMemo(
     () => (
       <View accessible>
-        {mountedChunks.map((chunk, chunkIndex) =>
-          // iOS `Text selectable` copies the whole Text and shows an empty
-          // first menu (see `selectable-text.tsx`); a `UITextView` chunk gives
-          // the platform's own range selection and callout. Android keeps
-          // `RNText`, whose native selection already works per chunk.
-          Platform.OS === 'ios' && effectiveSelectable ? (
-            <SelectableCodeText
-              // eslint-disable-next-line react/no-array-index-key -- code chunks are positional, not reorderable
-              key={`chunk-${chunkIndex}`}
-              accessible={false}
-              selectable
-              uiTextView
-              className={CODE_LINE_CLASSNAME}
-              // Direction and ink for the native text view's own paragraph
-              // style: the selectable chunk wraps like the plain one and its
-              // continuations start under the first line in an RTL interface.
-              // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- base ink for untagged runs
-              style={{ color: textBase, ...LTR_TEXT_DIRECTION }}
-            >
-              {renderSelectableChunkChildren(chunk, effectiveTokenScheme, keepBlankLineBox)}
-            </SelectableCodeText>
-          ) : (
-            <RNText
-              // Chunks are positional: the index is their identity.
-              // eslint-disable-next-line react/no-array-index-key -- code chunks are positional, not reorderable
-              key={`chunk-${chunkIndex}`}
-              accessible={false}
-              // Native selection is offered per chunk; the sheet's wrap/scroll
-              // mode and this flag are independent.
-              selectable={effectiveSelectable}
-              className={CODE_LINE_CLASSNAME}
-              // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- base ink for untagged runs
-              style={{ color: textBase, ...LTR_TEXT_DIRECTION }}
-            >
-              {renderChunkChildren(chunk, effectiveTokenScheme, keepBlankLineBox)}
-            </RNText>
-          )
-        )}
+        {/* The child memo keeps each mounted chunk's element tree: a batch
+            rebuilds only the chunks whose token arrays changed — the rebuilt
+            tail chunk — plus the newly mounted ones. */}
+        {mountedChunks.map((chunk, chunkIndex) => (
+          <CodeChunkView
+            key={`chunk-${chunkIndex}`}
+            chunk={chunk}
+            chunkIndex={chunkIndex}
+            selectable={effectiveSelectable}
+            textBase={textBase}
+            tokenScheme={effectiveTokenScheme}
+            keepBlankLineBox={keepBlankLineBox}
+          />
+        ))}
       </View>
     ),
     [keepBlankLineBox, mountedChunks, effectiveSelectable, textBase, effectiveTokenScheme]

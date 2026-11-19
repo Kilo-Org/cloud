@@ -45,7 +45,7 @@ import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organ
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { generateApiToken, generateOrganizationApiToken } from '@kilocode/web-shared/lib/tokens';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { auto_routing_custom_routers } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';

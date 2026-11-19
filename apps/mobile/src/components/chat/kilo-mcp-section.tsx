@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Wrench } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 
 import { kiloServerRow, type McpSettingsView } from './mcp-settings-state';
@@ -26,15 +27,17 @@ export function KiloMcpSection({
 
   return (
     <View className="gap-2">
-      <PreferenceRow
-        icon={Wrench}
-        title={t('modelChat.mcp.use')}
-        subtitle={t('modelChat.mcp.useDescription')}
-        value={kilo.enabled}
-        disabled={!kilo.toggleable}
-        busy={kilo.busy}
-        onValueChange={onToggle}
-      />
+      <RowGroup>
+        <PreferenceRow
+          icon={Wrench}
+          title={t('modelChat.mcp.use')}
+          subtitle={t('modelChat.mcp.useDescription')}
+          value={kilo.enabled}
+          disabled={!kilo.toggleable}
+          busy={kilo.busy}
+          onValueChange={onToggle}
+        />
+      </RowGroup>
       <View className="min-h-6 justify-center px-1">
         <Text className="text-sm font-medium text-foreground">
           {t(kilo.statusKey, { count: kilo.toolCount })}

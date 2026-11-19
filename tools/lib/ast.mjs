@@ -115,13 +115,11 @@ const TS_WRAPPERS = new Set([
   'TSTypeAssertion',
   'TSNonNullExpression',
   'TSInstantiationExpression',
-  'ParenthesizedExpression',
 ]);
 
 /**
  * The node a TypeScript-only wrapper holds, so `{ … } satisfies X` reads as an
- * object and `'key' as const` reads as a string. The parser drops parentheses
- * by default; the entry for them holds if a caller ever keeps them.
+ * object and `'key' as const` reads as a string.
  */
 export function unwrap(node) {
   let current = node;

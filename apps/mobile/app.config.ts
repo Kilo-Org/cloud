@@ -16,6 +16,7 @@ import WIDGET_GALLERY_COPY from './plugins/widget-gallery-copy.json';
 // metadata, not app copy — see plugins/withAppIntentLocalizations.js.
 import APP_INTENT_COPY from './plugins/app-intent-copy.json';
 import { SENTRY_NATIVE_OPTIONS } from './src/lib/sentry-dsn';
+import { SPLASH_LOGO_SIZE } from './src/lib/splash-branding.ts';
 import { UNIVERSAL_LINK_PATH_PATTERNS } from './src/lib/universal-link-paths';
 import {
   assertProductionHost,
@@ -339,7 +340,7 @@ const config: ExpoConfig = {
           // over RCTComponentViewFactory.mm would never compile into the app.
           // The Expo Podfile maps this to ENV['RCT_USE_PREBUILT_RNCORE'] = '0'
           // (KILO-APP-6H; react/react-native#58299).
-          // Compile the registration and mounting guards in patches/react-native@0.88.0.patch.
+          // Compile the registration and mounting guards in patches/react-native@0.88.1.patch.
           buildReactNativeFromSource: true,
           // GoogleSignIn is a Swift static lib that imports GoogleUtilities/RecaptchaInterop
           // (pulled transitively alongside expo-iap's AppCheckCore); those pods don't define
@@ -444,7 +445,7 @@ const config: ExpoConfig = {
       {
         image: './assets/images/logo-mark.png',
         backgroundColor: '#FFDD00',
-        imageWidth: 100,
+        imageWidth: SPLASH_LOGO_SIZE,
       },
     ],
     'expo-apple-authentication',

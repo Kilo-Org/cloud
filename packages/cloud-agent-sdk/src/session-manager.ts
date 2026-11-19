@@ -2,6 +2,8 @@ import type { ToolDisplayMode } from './tool-detail-marker';
 import type { BackgroundActivityState } from './background-activity';
 import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
 import { readCloudAgentErrorFields } from '@kilocode/app-shared/cloud-agent-error';
+import { WORKSPACE_DELETING } from '@kilocode/session-ingest-contracts';
+import type { CloudSessionSnapshotPage } from './types';
 import {
   errorShapeSchema,
   cloudSessionMetadataSchema,
@@ -862,11 +864,14 @@ function formatErrorDetail(err: unknown): FormattedErrorDetail {
         message: 'Service is unavailable right now. Please try again.',
         code: 'service-unavailable',
       };
-    if (code === 'CONFLICT' || httpStatus === 409)
+    if (code === 'CONFLICT' || httpStatus === 409) {
+      if (r.data.message === WORKSPACE_DELETING)
+        return { message: 'This workspace is being deleted.', code: 'workspace-deleting' };
       return {
         message: 'Previous task is still finishing up. Please wait a moment.',
         code: 'previous-task-in-progress',
       };
+    }
     if (code === 'SERVICE_UNAVAILABLE' || httpStatus === 503)
       return {
         message: 'Service is temporarily unavailable. Please retry in a moment.',
@@ -2302,7 +2307,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         ? `${s.type}:${s.step}:${s.commitHash ?? ''}`
         : s.type === 'scheduled'
           ? `${s.type}:${s.scheduledAt ?? ''}`
-          : s.type;
+          : s.type === 'disconnected'
+            ? s.reconnecting === true
+              ? 'disconnected:reconnecting'
+              : 'disconnected:terminal'
+            : s.type;
     const csKey = (cs: CloudStatus | null) =>
       cs === null
         ? ''
@@ -2511,27 +2520,41 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
     const loadPromise = (async (): Promise<void> => {
       store.set(isLoadingOlderMessagesAtom, true);
-      let outcome: SessionSnapshotPageOutcome | null;
+      let outcome: SessionSnapshotPageOutcome | null = null;
+      let cloudPage: unknown;
+      let cloudRead = false;
       try {
         if (cloudSessionId) {
           if (!config.fetchCloudSnapshotPage) {
             throw new Error('Cloud Agent workspace sessions require fetchCloudSnapshotPage');
           }
-          outcome = cloudSessionMessagesPageSchema.parse(
-            await config.fetchCloudSnapshotPage(cloudSessionId, { cursor })
-          );
+          cloudPage = await config.fetchCloudSnapshotPage(cloudSessionId, { cursor });
+          cloudRead = true;
         } else if (fetchSnapshotPage) {
           outcome = await fetchSnapshotPage(kiloSessionId, { cursor });
         } else {
           return;
         }
-      } catch (_err) {
+      } catch {
         // Network/transport-level failures map to a retryable outcome so
         // the UI exposes a Retry CTA. The cursor is preserved.
         if (expectedGeneration !== loadOlderGeneration) return;
         store.set(olderMessagesErrorAtom, { kind: 'retryable' });
         store.set(isLoadingOlderMessagesAtom, false);
         return;
+      }
+      if (cloudRead) {
+        // A page that fails the schema is terminal, matching the transport's
+        // snapshot read: retrying re-reads the same persisted page. The
+        // schema's transform can also throw (a session-identity mismatch),
+        // and safeParse does not convert a transform throw into a failure.
+        let parsed: { success: true; data: CloudSessionSnapshotPage | null } | { success: false };
+        try {
+          parsed = cloudSessionMessagesPageSchema.safeParse(cloudPage);
+        } catch {
+          parsed = { success: false };
+        }
+        outcome = parsed.success ? parsed.data : { kind: 'invalid_data' };
       }
       if (expectedGeneration !== loadOlderGeneration) return;
 

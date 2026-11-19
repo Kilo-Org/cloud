@@ -1,6 +1,7 @@
 import 'server-only';
 
 import {
+  kilocode_users,
   organization_group_memberships,
   organization_group_policy_settings,
   organization_groups,
@@ -306,6 +307,10 @@ function actorAudit(actor: OrganizationGroupActor) {
   };
 }
 
+function counted(count: number, singular: string, plural: string) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
 /**
  * Reject a group name that collides (case- and whitespace-insensitively) with
  * an existing group in the same organization, so both create and rename return
@@ -541,7 +546,7 @@ export async function updateOrganizationGroupDetails(params: {
       await createAuditLog({
         action: 'organization.group.update',
         ...actorAudit(params.actor),
-        message: `Updated group "${existing.name}" (${existing.id}) with ${userIds.length} members`,
+        message: `Updated group "${existing.name}" (${existing.id}) with ${counted(userIds.length, 'member', 'members')}`,
         organization_id: params.organizationId,
         tx,
       });
@@ -650,7 +655,7 @@ export async function setOrganizationGroupMembers(params: {
       await createAuditLog({
         action: 'organization.group.members.set',
         ...actorAudit(params.actor),
-        message: `Set ${userIds.length} members for group "${group.name}" (${group.id})`,
+        message: `Set ${counted(userIds.length, 'member', 'members')} for group "${group.name}" (${group.id})`,
         organization_id: params.organizationId,
         tx,
       });
@@ -671,6 +676,11 @@ export async function setOrganizationMemberGroups(params: {
     async ({ tx }) => {
       const groupIds = [...new Set(params.groupIds)];
       await assertDirectMembers(tx, params.organizationId, [params.userId]);
+      const [member] = await tx
+        .select({ email: kilocode_users.google_user_email })
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, params.userId))
+        .limit(1);
       await assertGroups(tx, params.organizationId, groupIds);
       await tx
         .delete(organization_group_memberships)
@@ -693,7 +703,7 @@ export async function setOrganizationMemberGroups(params: {
       await createAuditLog({
         action: 'organization.group.member_groups.set',
         ...actorAudit(params.actor),
-        message: `Set ${groupIds.length} groups for organization member ${params.userId}`,
+        message: `Set ${counted(groupIds.length, 'group', 'groups')} for organization member ${member?.email ?? params.userId} (${params.userId})`,
         organization_id: params.organizationId,
         tx,
       });

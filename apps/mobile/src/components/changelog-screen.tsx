@@ -1,14 +1,15 @@
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import * as Application from 'expo-application';
 import { type TFunction } from 'i18next';
-import { type ReactElement, useCallback } from 'react';
+import { type ReactElement, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
+import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
 import { formatList } from '@/lib/format';
-import { useSideInsetStyle } from '@/lib/screen-insets';
+import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-insets';
 
 import changelog from '../../CHANGELOG.md';
 import {
@@ -44,16 +45,12 @@ const INSTALLED_VERSION = Application.nativeApplicationVersion;
  */
 const NOTES_PENDING = changelogNotesArePending(changelog, INSTALLED_VERSION);
 
+/** The body's 10.5pt top pad, as the pixel value FlashList's style takes. */
+const LIST_TOP_PAD = 12;
+
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = {
-  paddingHorizontal: 20,
-  paddingTop: 16,
-  paddingBottom: 40,
-} satisfies ViewStyle;
 
 const keyExtractor = (section: ChangelogSection) => section.version;
-
-const groupLabelClass = 'uppercase tracking-wide text-muted-foreground';
 
 /**
  * The label one area reads as. The three agent products keep their own names in
@@ -98,15 +95,15 @@ function ReleaseSection({ section }: Readonly<{ section: ChangelogSection }>) {
       : 'pt-4 text-sm text-muted-foreground';
   const changesClass = section.newNotes.length === 0 ? 'gap-2' : 'gap-2 pt-4';
   return (
-    <View className="pb-6">
-      <Text variant="h4" className="pb-2">
+    // The list is full-bleed, so each release block draws the 14pt page gutter
+    // itself and keeps one section gap under it.
+    <View className="px-4 pb-6">
+      <Text variant="heading" className="pb-2">
         {section.version}
       </Text>
       {section.newNotes.length === 0 ? null : (
         <View className="gap-2">
-          <Text variant="small" className={groupLabelClass}>
-            {t('profile.changelogGroupNew')}
-          </Text>
+          <Eyebrow>{t('profile.changelogGroupNew')}</Eyebrow>
           {section.newNotes.map((note, position) => (
             <NoteRow key={`${note}-${position}`} text={note} />
           ))}
@@ -114,9 +111,7 @@ function ReleaseSection({ section }: Readonly<{ section: ChangelogSection }>) {
       )}
       {section.changeNotes.length === 0 ? null : (
         <View className={changesClass}>
-          <Text variant="small" className={groupLabelClass}>
-            {t('common.changes')}
-          </Text>
+          <Eyebrow>{t('common.changes')}</Eyebrow>
           {section.changeNotes.map((note, position) => (
             <NoteRow key={`${note}-${position}`} text={note} />
           ))}
@@ -130,16 +125,22 @@ function ReleaseSection({ section }: Readonly<{ section: ChangelogSection }>) {
 export function ChangelogScreen() {
   const { t } = useTranslation();
   const sideInsetStyle = useSideInsetStyle();
+  const bottomPadding = useDetailScreenBottomPadding();
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<ChangelogSection>) => <ReleaseSection section={item} />,
     []
   );
+  const contentContainerStyle = useMemo(
+    () => ({ paddingTop: LIST_TOP_PAD, paddingBottom: bottomPadding }),
+    [bottomPadding]
+  );
   // The notice belongs to the notes, not to the screen: as the list's header it
-  // shares the list's 20 dp inset and scrolls away with the first version. It is
-  // a caption — smaller than a bullet and muted — and its 16 dp foot is the gap
-  // above the first version heading.
+  // shares the list's page gutter and scrolls away with the first version. It is
+  // the screen's intro, so it reads as a muted body line rather than a caption —
+  // the one intro size a screen carries — and its 16 dp foot is the gap above
+  // the first version heading.
   const header: ReactElement | null = NOTES_PENDING ? (
-    <Text className="pb-4 text-xs text-muted-foreground">
+    <Text variant="muted" className="px-4 pb-4">
       {t('profile.changelogVersionPending', { version: INSTALLED_VERSION })}
     </Text>
   ) : null;
@@ -154,7 +155,7 @@ export function ChangelogScreen() {
           keyExtractor={keyExtractor}
           renderItem={renderItem}
           ListHeaderComponent={header}
-          contentContainerStyle={listContentContainerStyle}
+          contentContainerStyle={contentContainerStyle}
           showsVerticalScrollIndicator={false}
         />
       </View>

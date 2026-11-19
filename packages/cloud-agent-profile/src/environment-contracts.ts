@@ -60,11 +60,10 @@ export const encryptedEnvelopeSchema = z.object({
 });
 
 /**
- * Keys the sandbox runtime owns. Mirrors
- * `services/cloud-agent-next/src/types.ts` `RESERVED_ENV_VARS` and
- * `services/cloud-agent-next/src/shared/runtime-environment.ts`
- * `CONTROL_RUNTIME_RESERVED_ENV_VARS`, plus the prefixes
- * `worktree-runtime.ts` drops. The profile package must not import from the
+ * Keys the sandbox runtime owns. Mirrors `RESERVED_ENV_VARS` and
+ * `CONTROL_RUNTIME_RESERVED_ENV_VARS` in
+ * `services/cloud-agent-next/src/shared/runtime-environment.ts`, plus the
+ * runtime-owned prefixes there. The profile package must not import from the
  * service, so the list is mirrored here; `environment-contracts.test.ts`
  * guards the documented contents.
  */

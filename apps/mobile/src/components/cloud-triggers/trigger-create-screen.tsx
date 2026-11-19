@@ -28,6 +28,7 @@ import { triggerDetailHref } from '@/lib/cloud-triggers/trigger-routes';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { deviceTimeZone } from '@/lib/intl-cache';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { isRetryableTrpcError, readTrpcErrorField } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 
@@ -135,7 +136,7 @@ export function TriggerCreateScreen({ organizationId }: TriggerCreateScreenProps
       <ScreenHeader title={t('cloudAgent.triggers.new')} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-4 px-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}

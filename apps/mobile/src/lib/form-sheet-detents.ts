@@ -9,11 +9,15 @@ type SheetPlatform = 'android' | 'ios' | 'macos' | 'windows' | 'web';
  * is shorter than twice the tallest organization form plus the tab bar it has to
  * stay above (the band alone is 78pt with an Android safe-area inset), so the
  * half detent would put the form's last row and its submit action under the bar
- * with no way to reach them. Windows in this range open these sheets at the full
- * detent instead, where the shared sheet scroll view keeps the content above the
- * bar.
+ * with no way to reach them. The rejected-save refusal row — the sentence plus
+ * the Manage billing step under it — is part of that budget: it renders below
+ * the fields on the tallest forms, so a window must fit the fields, the refusal
+ * row and the bar inside the half detent. The tallest form content is 415pt and
+ * the bar band 78pt, so twice that budget is 986pt, rounded up here. Windows in
+ * this range open these sheets at the full detent instead, where the shared
+ * sheet scroll view keeps the content above the bar.
  */
-const ORG_SHEET_HALF_DETENT_MIN_WINDOW_HEIGHT = 840;
+const ORG_SHEET_HALF_DETENT_MIN_WINDOW_HEIGHT = 1000;
 
 /**
  * The shortest window that can still show a searchable picker at its half

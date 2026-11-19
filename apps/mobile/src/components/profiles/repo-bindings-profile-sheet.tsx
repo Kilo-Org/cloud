@@ -1,18 +1,15 @@
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
-import { EmptyState } from '@/components/empty-state';
-import { Button } from '@/components/ui/button';
-import { SlidersHorizontal } from '@/components/ui/icons';
+import { EmptyState, StateAction } from '@/components/empty-state';
+import { ChoiceRow } from '@/components/ui/choice-row';
+import { Plus, SlidersHorizontal } from '@/components/ui/icons';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { QueryError } from '@/components/query-error';
 import { SheetHeader } from '@/components/sheet-header';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Text } from '@/components/ui/text';
 import { type AgentProfileListItem } from '@/lib/hooks/use-agent-profiles';
-import { ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { cn } from '@/lib/utils';
 
 type ProfilePickerSheetProps = Readonly<{
   profiles: readonly AgentProfileListItem[];
@@ -56,12 +53,13 @@ export function ProfilePickerSheet({
 
   let body = null;
   if (isLoading) {
-    body = <Skeleton className="mx-4 h-14 w-full rounded-md bg-muted-soft" />;
+    body = <RowSkeleton />;
   } else if (isError) {
     body = (
       <QueryError
         variant="server"
         placement="top"
+        inset="gutter"
         title={t('profiles.loadFailed')}
         onRetry={onRetry}
         isRetrying={isRefetching}
@@ -74,34 +72,25 @@ export function ProfilePickerSheet({
         title={t('profiles.emptyTitle')}
         description={emptyDescription}
         placement="top"
+        inset="gutter"
         action={
           onCreateProfile === undefined ? undefined : (
-            <Button className={STATE_ACTION_CLASS} onPress={onCreateProfile}>
-              <Text>{t('profiles.createAction')}</Text>
-            </Button>
+            <StateAction label={t('profiles.createAction')} icon={Plus} onPress={onCreateProfile} />
           )
         }
       />
     );
   } else {
     body = profiles.map(profile => (
-      <Pressable
+      <ChoiceRow
         key={profile.id}
-        className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-2 px-4 active:opacity-70')}
-        accessibilityRole="button"
-        accessibilityLabel={profile.name}
-        accessibilityState={{ selected: profile.id === selectedProfileId }}
+        label={profile.name}
+        description={profile.isDefault ? t('profiles.defaultSectionTitle') : undefined}
+        selected={profile.id === selectedProfileId}
         onPress={() => {
           onSelect(profile.id);
         }}
-      >
-        <Text className="min-w-0 flex-1 text-sm text-foreground" numberOfLines={1}>
-          {profile.name}
-        </Text>
-        {profile.isDefault ? (
-          <Text className="text-xs text-muted-foreground">{t('profiles.defaultSectionTitle')}</Text>
-        ) : null}
-      </Pressable>
+      />
     ));
   }
 

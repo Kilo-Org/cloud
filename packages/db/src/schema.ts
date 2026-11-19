@@ -130,6 +130,7 @@ import type {
   AutoFreeConfig,
   GatewayModelListConfig,
   VercelModelIdOverridesConfig,
+  LatestAliasTargetsConfig,
   PreferredProviderOrderConfig,
   CustomPricingConfig,
   KiloClawAdminAuditAction,
@@ -5351,8 +5352,8 @@ export const cloud_agent_webhook_triggers = pgTable(
     organization_id: uuid('organization_id').references(() => organizations.id, {
       onDelete: 'cascade',
     }),
-    // Target type: 'cloud_agent' (default) or 'kiloclaw_chat'
     target_type: text('target_type').notNull().default('cloud_agent'),
+    cloud_agent_session_id: text('cloud_agent_session_id'),
     // KiloClaw Chat target: which instance to send messages to
     kiloclaw_instance_id: uuid('kiloclaw_instance_id').references(() => kiloclaw_instances.id),
     // Activation mode: 'webhook' (default) or 'scheduled' (cron-based)
@@ -5412,6 +5413,15 @@ export const cloud_agent_webhook_triggers = pgTable(
       sql`(
         ${table.target_type} != 'kiloclaw_chat' OR
         ${table.kiloclaw_instance_id} IS NOT NULL
+      )`
+    ),
+    check(
+      'CHK_cloud_agent_webhook_triggers_existing_chat_fields',
+      sql`(
+        (${table.target_type} = 'cloud_agent_chat' AND ${table.cloud_agent_session_id} IS NOT NULL
+          AND ${table.github_repo} IS NULL AND ${table.profile_id} IS NULL
+          AND ${table.kiloclaw_instance_id} IS NULL) OR
+        (${table.target_type} != 'cloud_agent_chat' AND ${table.cloud_agent_session_id} IS NULL)
       )`
     ),
     // Scheduled triggers require cron_expression
@@ -5633,6 +5643,11 @@ export const session_step_up_proofs = pgTable(
       table.session_id_hash,
       table.expires_at
     ),
+    // The operation lookup matches user + session + binding hash; without this
+    // index the claim scans every proof of the session.
+    index('idx_session_step_up_proofs_user_session_binding')
+      .on(table.kilo_user_id, table.session_id_hash, table.action_binding_hash)
+      .concurrently(),
     index('idx_session_step_up_proofs_expires_at').on(table.expires_at),
     index('idx_session_step_up_proofs_passkey_credential_id').on(table.passkey_credential_id),
     check('check_session_step_up_proofs_method', sql`${table.method} IN ('webauthn_uv')`),
@@ -6021,6 +6036,7 @@ export const ai_gateway_config = pgTable(
     preferred_models: jsonb().$type<GatewayModelListConfig>(),
     unavailable_models: jsonb().$type<GatewayModelListConfig>(),
     vercel_model_id_overrides: jsonb().$type<VercelModelIdOverridesConfig>(),
+    latest_alias_targets: jsonb().$type<LatestAliasTargetsConfig>(),
     preferred_provider_order: jsonb().$type<PreferredProviderOrderConfig>(),
     custom_pricing: jsonb().$type<CustomPricingConfig>(),
   },
@@ -6030,6 +6046,18 @@ export const ai_gateway_config = pgTable(
 export const blacklisted_domains = pgTable('blacklisted_domains', {
   domain: text().primaryKey(),
 });
+
+export const blacklisted_domains_settings = pgTable(
+  'blacklisted_domains_settings',
+  {
+    id: integer().primaryKey().default(1),
+    blocked_signup_tlds: text().array().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    updated_by: text(),
+    updated_by_email: text(),
+  },
+  table => [check('blacklisted_domains_settings_singleton', sql`${table.id} = 1`)]
+);
 
 export const ai_gateway_sync_providers_state = pgTable(
   'ai_gateway_sync_providers_state',
@@ -9182,6 +9210,10 @@ export type CloudAgentBuiltinAgentOverrides = Record<
   { model?: string | null; variant?: string; disable?: boolean }
 >;
 
+// Map of gateway model id (for example `openai/gpt-6.1-sol`) to a context-window
+// token cap. See ModelContextLimitsSchema in `@kilocode/cloud-agent-profile`.
+export type CloudAgentModelContextLimits = Record<string, number>;
+
 export const cloud_agent_user_settings = pgTable(
   'cloud_agent_user_settings',
   {
@@ -9190,6 +9222,9 @@ export const cloud_agent_user_settings = pgTable(
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     workspace_order: text().$type<'manual' | 'created' | 'activity'>().notNull().default('manual'),
     builtin_agents: jsonb().$type<CloudAgentBuiltinAgentOverrides>().notNull().default({}),
+    model_context_limits: jsonb().$type<CloudAgentModelContextLimits>().notNull().default({}),
+    web_search_enabled: boolean().notNull().default(true),
+    web_search_provider: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -11251,7 +11286,9 @@ export const enkrypt_usage = pgTable(
     // guardrail, and between the end of the upstream response and its release for the output
     // guardrail. Set only on the final call of the guardrail's blocking scan, or of its log-only
     // scan when no blocking call was recorded, so it is counted once per guardrail and request; null
-    // on other calls or when the request returned before awaiting the verdict.
+    // on other calls or when the request returned before awaiting the verdict. A guardrail that only
+    // logs adds no wait, so it stores its log-only scan time: how long the scan ran past the point
+    // where a blocking scan would hold the request or response.
     added_latency_ms: integer(),
     // Null on rows recorded before the output guardrail existed, which are all input guardrail calls.
     guardrail_id: integer().references(() => enkrypt_usage_guardrail.guardrail_id),

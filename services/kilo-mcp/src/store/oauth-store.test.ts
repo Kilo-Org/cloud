@@ -7,6 +7,7 @@ import {
   type NewPendingAuthorization,
 } from './oauth-store';
 import { getOAuthApi, type OAuthProviderOptions } from '@cloudflare/workers-oauth-provider';
+import backfillPreviousRefreshTokenSql from '../../drizzle/0013_backfill_previous_refresh_token.sql';
 import { TOKEN_REQUEST_MAX_BYTES, hashRefreshToken } from '../oauth/refresh-reuse';
 
 // `cloudflare:workers` does not exist under plain node vitest; the DO under
@@ -139,29 +140,68 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       const first = await hashRefreshToken('u:g:first');
       const second = await hashRefreshToken('u:g:second');
       const other = await hashRefreshToken('u:other:secret');
-      await store.rememberRefreshToken(first, { userId: 'u', grantId: 'g' }, LATER);
-      await store.rememberRefreshToken(other, { userId: 'u', grantId: 'other' }, LATER);
-      await store.rememberRefreshToken(second, { userId: 'u', grantId: 'g' }, LATER);
+      await store.rememberRefreshToken(first, { userId: 'u', grantId: 'g' }, LATER, null);
+      await store.rememberRefreshToken(other, { userId: 'u', grantId: 'other' }, LATER, null);
+      await store.rememberRefreshToken(second, { userId: 'u', grantId: 'g' }, LATER, null);
       const recreated = createStore(db);
       expect(await recreated.getRefreshToken(first, NOW)).toEqual({
         userId: 'u',
         grantId: 'g',
         current: false,
+        previous: false,
       });
       expect(await recreated.getRefreshToken(second, NOW)).toEqual({
         userId: 'u',
         grantId: 'g',
         current: true,
+        previous: false,
       });
       expect(await recreated.getRefreshToken(other, NOW)).toEqual({
         userId: 'u',
         grantId: 'other',
         current: true,
+        previous: false,
       });
       expect(await recreated.getRefreshToken('u:g:second', NOW)).toBeNull();
       expect(await recreated.getRefreshToken(second, LATER)).toBeNull();
       await recreated.purgeExpired('2026-09-09T12:06:00.000Z');
       expect(db.prepare('SELECT count(*) AS n FROM oauth_refresh_token_history').get()?.n).toBe(0);
+    });
+
+    it('records the presented token as the previous one and keeps both across pruning', async () => {
+      // Ten rotations: the presented hash must stay the previous token even
+      // when the keep bound would otherwise have shed it, and the newest row is
+      // the only current one.
+      const grant = { userId: 'u', grantId: 'rotating' };
+      const hashes = Array.from({ length: 10 }, (_value, index) => `rot-${index}`);
+      await store.rememberRefreshToken(hashes[0]!, grant, LATER, null);
+      for (let index = 1; index < hashes.length; index++) {
+        await store.rememberRefreshToken(hashes[index]!, grant, LATER, hashes[index - 1]!);
+      }
+
+      const rows = db
+        .prepare(
+          'SELECT token_hash, current, previous FROM oauth_refresh_token_history WHERE user_id = ? AND grant_id = ? ORDER BY expires_at DESC, rowid DESC'
+        )
+        .all('u', 'rotating') as Array<{ token_hash: string; current: number; previous: number }>;
+      expect(rows).toHaveLength(8);
+      expect(rows[0]).toEqual({ token_hash: hashes[9], current: 1, previous: 0 });
+      expect(rows[1]).toEqual({ token_hash: hashes[8], current: 0, previous: 1 });
+      expect(rows.slice(2).every(row => row.current === 0 && row.previous === 0)).toBe(true);
+
+      expect(await store.getRefreshToken(hashes[9]!, NOW)).toEqual({
+        userId: 'u',
+        grantId: 'rotating',
+        current: true,
+        previous: false,
+      });
+      expect(await store.getRefreshToken(hashes[8]!, NOW)).toEqual({
+        userId: 'u',
+        grantId: 'rotating',
+        current: false,
+        previous: true,
+      });
+      expect(await store.getRefreshToken(hashes[0]!, NOW)).toBeNull();
     });
 
     it('keeps the newest hashes when every write shares one expires_at', async () => {
@@ -172,7 +212,9 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       // LIMIT over an unordered tie may drop either.
       const grant = { userId: 'u', grantId: 'tied' };
       const hashes = Array.from({ length: 10 }, (_value, index) => `tied-${index}`);
-      for (const hash of hashes) await store.rememberRefreshToken(hash, grant, LATER);
+      await store.rememberRefreshToken(hashes[0]!, grant, LATER, null);
+      for (const hash of hashes.slice(1))
+        await store.rememberRefreshToken(hash, grant, LATER, null);
 
       const rows = db
         .prepare(
@@ -185,11 +227,13 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
         userId: 'u',
         grantId: 'tied',
         current: true,
+        previous: false,
       });
       expect(await store.getRefreshToken('tied-8', NOW)).toEqual({
         userId: 'u',
         grantId: 'tied',
         current: false,
+        previous: false,
       });
       // The two oldest are the ones the bound is supposed to shed.
       expect(await store.getRefreshToken('tied-1', NOW)).toBeNull();
@@ -200,9 +244,14 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       const revoked = await hashRefreshToken('u:revoked:first');
       const revokedNext = await hashRefreshToken('u:revoked:second');
       const live = await hashRefreshToken('u:live:only');
-      await store.rememberRefreshToken(revoked, { userId: 'u', grantId: 'revoked' }, LATER);
-      await store.rememberRefreshToken(revokedNext, { userId: 'u', grantId: 'revoked' }, LATER);
-      await store.rememberRefreshToken(live, { userId: 'u', grantId: 'live' }, LATER);
+      await store.rememberRefreshToken(revoked, { userId: 'u', grantId: 'revoked' }, LATER, null);
+      await store.rememberRefreshToken(
+        revokedNext,
+        { userId: 'u', grantId: 'revoked' },
+        LATER,
+        revoked
+      );
+      await store.rememberRefreshToken(live, { userId: 'u', grantId: 'live' }, LATER, null);
 
       await store.forgetRefreshTokens({ userId: 'u', grantId: 'revoked' });
 
@@ -212,22 +261,71 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
         userId: 'u',
         grantId: 'live',
         current: true,
+        previous: false,
       });
     });
 
+    it('backfills the previous token of each existing grant, and none for a single-row grant', async () => {
+      // The rows the old guard left behind: every rotation was recorded with
+      // `previous = false`, so the token the provider still accepts after the
+      // last rotation is the second-newest row of the grant.
+      const seeded: Array<[string, string]> = [
+        ['backfill-1', '2026-09-09T10:00:00.000Z'],
+        ['backfill-2', '2026-09-09T11:00:00.000Z'],
+        ['backfill-3', '2026-09-09T12:00:00.000Z'],
+      ];
+      for (const [hash, expiresAt] of seeded) {
+        await store.rememberRefreshToken(
+          hash,
+          { userId: 'backfill', grantId: 'rotated' },
+          expiresAt,
+          null
+        );
+      }
+      await store.rememberRefreshToken(
+        'backfill-single',
+        { userId: 'backfill', grantId: 'single' },
+        LATER,
+        null
+      );
+      expect(
+        db
+          .prepare(
+            'SELECT count(*) AS n FROM oauth_refresh_token_history WHERE user_id = ? AND previous = 1'
+          )
+          .get('backfill')?.n
+      ).toBe(0);
+
+      db.exec(backfillPreviousRefreshTokenSql);
+
+      expect(
+        db
+          .prepare(
+            'SELECT grant_id, previous FROM oauth_refresh_token_history WHERE user_id = ? ORDER BY grant_id, expires_at DESC, rowid DESC'
+          )
+          .all('backfill')
+      ).toEqual([
+        { grant_id: 'rotated', previous: 0 },
+        { grant_id: 'rotated', previous: 1 },
+        { grant_id: 'rotated', previous: 0 },
+        { grant_id: 'single', previous: 0 },
+      ]);
+    });
+
     it('rolls back supersession if recording the newly issued hash fails', async () => {
-      await store.rememberRefreshToken('original', { userId: 'atomic', grantId: 'g' }, LATER);
+      await store.rememberRefreshToken('original', { userId: 'atomic', grantId: 'g' }, LATER, null);
       db.exec(
         "CREATE TRIGGER fail_history BEFORE INSERT ON oauth_refresh_token_history WHEN NEW.token_hash = 'fail' BEGIN SELECT RAISE(ABORT, 'write failed'); END"
       );
       try {
         await expect(
-          store.rememberRefreshToken('fail', { userId: 'atomic', grantId: 'g' }, LATER)
+          store.rememberRefreshToken('fail', { userId: 'atomic', grantId: 'g' }, LATER, 'original')
         ).rejects.toThrow();
         expect(await store.getRefreshToken('original', NOW)).toEqual({
           userId: 'atomic',
           grantId: 'g',
           current: true,
+          previous: false,
         });
       } finally {
         db.exec('DROP TRIGGER fail_history');
@@ -711,7 +809,12 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       const tablesState = createFakeDoState(tablesDb, recorder);
       const tablesStore = new KiloMcpOAuthStore(tablesState as never, {} as never);
       await tablesState.whenReady();
-      await tablesStore.rememberRefreshToken('table-row', { userId: 'u', grantId: 'g' }, EXPIRED);
+      await tablesStore.rememberRefreshToken(
+        'table-row',
+        { userId: 'u', grantId: 'g' },
+        EXPIRED,
+        null
+      );
       tablesDb
         .prepare(
           `INSERT INTO mcp_protected_requests
@@ -1002,19 +1105,22 @@ describe('production token routing (real provider + DO SQLite)', () => {
     };
   }
 
-  it('serializes concurrent refreshes and cannot resurrect the revoked grant', async () => {
+  it('serializes concurrent refreshes and accepts the second use of the token', async () => {
     const h = await harness();
     try {
       const responses = await Promise.all([
         h.refresh(h.initial.refresh_token),
         h.refresh(h.initial.refresh_token),
       ]);
-      expect(responses.map(response => response.status)).toEqual([200, 400]);
+      // Two clients refreshing at once is what the provider tolerates: the
+      // second request presents the token the first rotated away from.
+      expect(responses.map(response => response.status)).toEqual([200, 200]);
       const newest = (await responses[0]!.json()) as {
         refresh_token: string;
         access_token: string;
       };
-      expect(await responses[1]!.json()).toMatchObject({ error: 'invalid_grant' });
+      // The library keeps only the latest token and the one it replaced, so the
+      // token the first response issued is already unrecognised by both.
       expect((await h.refresh(newest.refresh_token)).status).toBe(400);
       expect((await h.mcp(newest.access_token)).status).toBe(401);
       expect((await h.mcp(h.initial.access_token)).status).toBe(401);
@@ -1063,9 +1169,14 @@ describe('production token routing (real provider + DO SQLite)', () => {
       expect((await h.refresh(h.initial.refresh_token)).status).toBe(200);
       expect(historyRows()).toHaveLength(2);
 
-      // A superseded hash replay is the guard's revoke path: the grant dies, so
-      // its hashes can never authenticate another replay and must not sit in
-      // the single global DO until the TTL would remove them.
+      // Two rotations later the original token is older than the previous one,
+      // which is the guard's revoke path: the grant dies, so its hashes can
+      // never authenticate another replay and must not sit in the single global
+      // DO until the TTL would remove them.
+      const second = (await (await h.refresh(h.initial.refresh_token)).json()) as {
+        refresh_token: string;
+      };
+      expect((await h.refresh(second.refresh_token)).status).toBe(200);
       const replay = await h.refresh(h.initial.refresh_token);
       expect(replay.status).toBe(400);
       expect(await replay.json()).toMatchObject({
@@ -1240,16 +1351,20 @@ describe('production token routing (real provider + DO SQLite)', () => {
 
         const rows = h.db
           .prepare(
-            'SELECT token_hash, current FROM oauth_refresh_token_history WHERE user_id = ? AND grant_id = ? ORDER BY expires_at DESC'
+            'SELECT token_hash, current, previous FROM oauth_refresh_token_history WHERE user_id = ? AND grant_id = ? ORDER BY expires_at DESC, rowid DESC'
           )
-          .all('user', grantId) as Array<{ token_hash: string; current: number }>;
+          .all('user', grantId) as Array<{
+          token_hash: string;
+          current: number;
+          previous: number;
+        }>;
         const hashes = await Promise.all(issued.map(token => hashRefreshToken(token)));
         // (i) A month of rotations cannot grow the single global DO without bound.
         expect(rows).toHaveLength(8);
         // (ii) Both tokens the provider still accepts survive with right flags.
-        expect(rows[0]).toEqual({ token_hash: hashes[20], current: 1 });
-        expect(rows[1]).toEqual({ token_hash: hashes[19], current: 0 });
-        expect(rows.slice(2).every(row => row.current === 0)).toBe(true);
+        expect(rows[0]).toEqual({ token_hash: hashes[20], current: 1, previous: 0 });
+        expect(rows[1]).toEqual({ token_hash: hashes[19], current: 0, previous: 1 });
+        expect(rows.slice(2).every(row => row.current === 0 && row.previous === 0)).toBe(true);
 
         // (iii) A pruned hash is no longer matched by the guard, so the replay
         // reaches the provider and is refused there — and the grant stays alive
@@ -1261,15 +1376,21 @@ describe('production token routing (real provider + DO SQLite)', () => {
           error: 'invalid_grant',
           error_description: 'Invalid refresh token',
         });
-        expect((await h.refresh(issued[20]!)).status).toBe(200);
 
-        // The two tokens the provider still accepts stay detectable after
-        // pruning: replaying the immediately previous one is still a guard
-        // revocation, not a forwarded rotation.
+        // (iv) The token the provider rotated away from last is still accepted,
+        // after pruning, and the rotation it performs succeeds.
         vi.setSystemTime(atSecond(22));
         const previous = await h.refresh(issued[19]!);
-        expect(previous.status).toBe(400);
-        expect(await previous.json()).toMatchObject({
+        expect(previous.status).toBe(200);
+        const rotated = (await previous.json()) as { access_token: string };
+        expect((await h.mcp(rotated.access_token)).status).toBe(200);
+
+        // (v) That acceptance leaves issued[20] as neither current nor previous,
+        // so a replay of it is the case the provider refuses: the guard revokes.
+        vi.setSystemTime(atSecond(23));
+        const stale = await h.refresh(issued[20]!);
+        expect(stale.status).toBe(400);
+        expect(await stale.json()).toMatchObject({
           error: 'invalid_grant',
           error_description: 'Refresh token reuse detected; the grant has been revoked.',
         });
@@ -1354,6 +1475,11 @@ describe('production token routing (real provider + DO SQLite)', () => {
         expect(rotated.status).toBe(200);
         const next = (await rotated.json()) as { refresh_token: string; access_token: string };
         expect((await h.mcp(next.access_token)).status).toBe(200);
+
+        // One more rotation leaves the initial token older than the previous
+        // one, which is the replay the guard revokes.
+        const advanced = await h.postForm(form(next.refresh_token));
+        expect(advanced.status).toBe(200);
 
         const replay = await h.postForm(form(h.initial.refresh_token));
         expect(replay.status).toBe(400);

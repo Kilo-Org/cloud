@@ -3,6 +3,7 @@ import { View } from 'react-native';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { securityConfigMutationMessage } from '@/lib/security-agent-ledger';
+import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 
 /**
  * Largest OS font scale the refusal line grows to. It is a status line whose
@@ -12,11 +13,27 @@ import { securityConfigMutationMessage } from '@/lib/security-agent-ledger';
 const REFUSAL_MAX_FONT_SCALE = 1.6;
 
 type SettingsSaveFeedback = {
-  /** Await a settings save, keep its refusal for the inline line, and rethrow it. */
+  /**
+   * Await a settings save, keep its refusal for the inline line, and rethrow
+   * it. Rejects with `SettingsSaveAdmissionRefused` before any save starts
+   * when another save is already in flight on this screen.
+   */
   run: (save: () => Promise<void>) => Promise<void>;
   /** The refusal line: `null` until a save is refused, then the parked refusal. */
   node: ReactElement | null;
 };
+
+/**
+ * Thrown by `run` when admission refuses a save (one is already in flight on
+ * the same screen). It is not a save refusal — nothing was attempted, so no
+ * refusal line is parked and no toast fires — it only tells the caller that
+ * this attempt did not happen. Callers must treat resolving `run` as a save
+ * that succeeded and never navigate from it, so refusal has to be observable
+ * as a rejection: a header press refused in the pre-re-render window must stay
+ * on screen, and a dialog Save refused while a header save is in flight must
+ * not replay the leave.
+ */
+export class SettingsSaveAdmissionRefused extends Error {}
 
 /**
  * The durable refusal line the Security Agent settings screens share.
@@ -50,19 +67,48 @@ type SettingsSaveFeedback = {
  * the platform has one, an imperative announcement otherwise — so the save hook
  * is called with `announceFailed: false` on these screens. Announcing the
  * refusal again through `announceForA11y` would speak it twice.
+ *
+ * `run` is also these screens' one save admission point. Both surfaces that can
+ * start a save — the header `SettingsSaveButton` press and the back guard's
+ * unsaved-changes dialog Save — pass through the same `run`, so its
+ * `surface-feedback.begin()` (`@/lib/surface-feedback`, the family's one
+ * admission authority) refuses a second save while the first is still in
+ * flight: a back-guard Save pressed while a header save is pending starts no
+ * duplicate mutation. A refused attempt throws `SettingsSaveAdmissionRefused`
+ * before it touches state, so its caller — a button that swallows the
+ * rejection and stays put, or a dialog that keeps its leave behind — never
+ * navigates on an attempt that did not happen. An admitted attempt publishes
+ * nothing (these screens render their own refusal line, not the store's phase),
+ * so it settles with `abandon()` in a `finally`; `run` must keep rethrowing
+ * real save refusals, which the header button's catch and the back guard's
+ * `=== 'declined'` contract both depend on.
  */
 export function useSettingsSaveFeedback(): SettingsSaveFeedback {
   const [failure, setFailure] = useState<unknown>(null);
+  const { begin } = useSurfaceFeedback<never>();
 
-  const run = useCallback(async (save: () => Promise<void>) => {
-    try {
-      await save();
-      setFailure(null);
-    } catch (error) {
-      setFailure(error);
-      throw error;
-    }
-  }, []);
+  const run = useCallback(
+    async (save: () => Promise<void>) => {
+      const attempt = begin();
+      // One save at a time per screen. A refused attempt must be observable:
+      // the caller treats a resolved `run` as a save that succeeded, so a
+      // silent resolve would pop the screen or replay the leave without a
+      // save behind it. The sentinel rejects before any state is touched.
+      if (attempt === null) {
+        throw new SettingsSaveAdmissionRefused();
+      }
+      try {
+        await save();
+        setFailure(null);
+      } catch (error) {
+        setFailure(error);
+        throw error;
+      } finally {
+        attempt.abandon();
+      }
+    },
+    [begin]
+  );
 
   // Nothing to report mounts nothing at all: no wrapper, no live region, no
   // announcement to clear, and no gap between the header and the first card.
@@ -70,7 +116,7 @@ export function useSettingsSaveFeedback(): SettingsSaveFeedback {
   // sentence's height, so the body gives up that room only while it is needed.
   const node =
     failure === null ? null : (
-      <View className="px-6">
+      <View className="px-4">
         <AccessibleStatus
           message={securityConfigMutationMessage(failure)}
           tone="error"

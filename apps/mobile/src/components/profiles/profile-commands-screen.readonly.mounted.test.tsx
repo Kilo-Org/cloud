@@ -60,6 +60,7 @@ vi.mock('@/components/empty-state', async () => {
   // helpers must be loaded inside the factory.
   const { createElement } = await import('react');
   return {
+    StateAction: 'StateAction',
     // The real state renders its `action` below the title, so the manage slot's
     // sentence reaches the tree the way the screen hands it over.
     EmptyState: (props: { action?: unknown }) =>
@@ -70,27 +71,17 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/form-field', async () => {
   const { createElement, useRef } = await import('react');
   return {
-    FormField: (props: {
-      defaultValue?: string;
-      labelAccessory?: unknown;
-      onChangeText?: (value: string) => void;
-    }) => {
+    FormField: (props: { defaultValue?: string; onChangeText?: (value: string) => void }) => {
       // Native uncontrolled text only accepts defaultValue when mounted.
       const nativeText = useRef(props.defaultValue);
-      // The real field renders its label accessory beside the label, so the
-      // caller's row controls are children of the mocked field too.
-      return createElement(
-        'FormField',
-        {
-          ...props,
-          nativeText: nativeText.current,
-          onChangeText: (value: string) => {
-            nativeText.current = value;
-            props.onChangeText?.(value);
-          },
+      return createElement('FormField', {
+        ...props,
+        nativeText: nativeText.current,
+        onChangeText: (value: string) => {
+          nativeText.current = value;
+          props.onChangeText?.(value);
         },
-        props.labelAccessory as never
-      );
+      });
     },
   };
 });
@@ -102,6 +93,7 @@ vi.mock('@/components/ui/icons', () => ({
   ChevronUp: 'ChevronUp',
   Terminal: 'Terminal',
   Trash2: 'Trash2',
+  Plus: 'Plus',
 }));
 
 /** The role sentence a member reads in the action's place. */

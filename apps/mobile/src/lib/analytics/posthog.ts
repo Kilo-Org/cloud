@@ -3,6 +3,7 @@ import {
   type AnalyticsEventMap,
   redactProhibitedProperties,
 } from '@kilocode/app-shared/analytics';
+import { isAppVersionAtLeast } from '@kilocode/app-shared/app-version';
 import { type FeatureFlagKey } from '@kilocode/app-shared/feature-flags';
 import * as Application from 'expo-application';
 import * as Device from 'expo-device';
@@ -10,11 +11,7 @@ import PostHog, { PostHogPersistedProperty } from 'posthog-react-native';
 import { useCallback, useSyncExternalStore } from 'react';
 
 import { POSTHOG_API_KEY } from '@/lib/config';
-import {
-  currentAppVersion,
-  getFeatureFlagDefinition,
-  isAppVersionAtLeast,
-} from '@/lib/feature-flags';
+import { currentAppVersion, getFeatureFlagDefinition } from '@/lib/feature-flags';
 import { allowsMandatory, allowsOptional, currentGeneration } from '@/lib/telemetry/controller';
 import {
   posthogCustomStorage,
@@ -442,11 +439,6 @@ export async function discardPostHog(): Promise<void> {
     c.setPersistedProperty(PostHogPersistedProperty.LogsQueue, null);
     c.setPersistedProperty(PostHogPersistedProperty.AiQueue, null);
 
-    // Drop the live reference before any async work so concurrent code
-    // cannot capture through the stale instance. Flag listeners persist —
-    // like ready listeners, they must survive the discard so mounted
-    // useFeatureFlag subscribers receive updates when the client is
-    // re-created by a later initPostHog.
     // Ready listeners persist — they must observe both the false transition
     // now and a true transition from a later initPostHog.
     client = null;

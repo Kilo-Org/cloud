@@ -1,4 +1,8 @@
-import { runtimeHarness, kilo2RuntimeEnvironment, probeKilo2Health } from './runtime-harness.js';
+import {
+  runtimeHarness,
+  prepareKilo2RuntimeEnvironment,
+  probeKilo2Health,
+} from './runtime-harness.js';
 import {
   GH_STACK_EXTENSION_NAME,
   GH_STACK_EXTENSIONS_ROOT,
@@ -231,16 +235,19 @@ export type KiloProcessSpawnInput = {
 export type KiloProcessSpawner = (input: KiloProcessSpawnInput) => Promise<KiloProcess>;
 
 async function defaultSpawnKiloProcess(input: KiloProcessSpawnInput): Promise<KiloProcess> {
+  const backend = runtimeHarness();
+  const env =
+    backend.kind === 'kilo2' ? await prepareKilo2RuntimeEnvironment(input.env) : input.env;
+  input.signal?.throwIfAborted();
   const placement = admitControlWorkload(input.workload);
   const processes = createOwnedProcessScope(placement);
   input.onProcessScope?.(processes);
-  const backend = runtimeHarness();
   const credential = createKiloServerCredential(backend.username);
   // Own process group via the owned-process scope's detached spawn.
   const proc = processes.spawn(backend.cli, ['serve', '--hostname=127.0.0.1', '--port=0'], {
     cwd: input.directory,
     env: {
-      ...(backend.kind === 'kilo2' ? kilo2RuntimeEnvironment(input.env) : input.env),
+      ...env,
       ...credential.env,
     },
   });
@@ -616,6 +623,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
   /** Spec §7: one health probe per silence episode, reset by any activity. */
   let probedThisEpisode = false;
   let pendingCredentials = false;
+  let mcpRefresh: Promise<void> | undefined;
   /** Single-flight owner for the health probe and the reconnect loop. */
   let recovery: Promise<void> | undefined;
   let lastActivityAt = scheduler.now();
@@ -1093,6 +1101,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
   }
 
   async function ensure(): Promise<Harness> {
+    while (mcpRefresh !== undefined) await mcpRefresh;
     if (phase === 'stopped') throw new Error('Kilo runtime is shutting down');
     if (phase === 'unavailable') throw new Error('Kilo runtime is unavailable');
     if (client) return client;
@@ -1309,22 +1318,33 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       // Repeated proxy handles can still carry a renewed MCP credential.
       options.env = env;
       if (client && cloudAgentMcp) {
-        try {
-          await withTimeoutAndAbort(
-            client.updateCloudAgentMcp(
-              cloudAgentMcp,
-              AbortSignal.timeout(KILO_CONTROL_REQUEST_TIMEOUT_MS)
-            ),
-            {
-              timeoutMs: KILO_CONTROL_REQUEST_TIMEOUT_MS,
-              timeoutMessage: 'Cloud Agent MCP credential refresh timed out',
-              abortMessage: 'Cloud Agent MCP credential refresh aborted',
-            }
-          );
-        } catch {
-          pendingCredentials = true;
-          log('control-plane MCP credential refresh failed; retaining pending credential restart');
-        }
+        const previous = mcpRefresh;
+        const refresh = (async () => {
+          await previous;
+          if (!client) return;
+          try {
+            await withTimeoutAndAbort(
+              client.updateCloudAgentMcp(
+                cloudAgentMcp,
+                AbortSignal.timeout(KILO_CONTROL_REQUEST_TIMEOUT_MS)
+              ),
+              {
+                timeoutMs: KILO_CONTROL_REQUEST_TIMEOUT_MS,
+                timeoutMessage: 'Cloud Agent MCP credential refresh timed out',
+                abortMessage: 'Cloud Agent MCP credential refresh aborted',
+              }
+            );
+          } catch {
+            pendingCredentials = true;
+            log(
+              'control-plane MCP credential refresh failed; retaining pending credential restart'
+            );
+          }
+        })().finally(() => {
+          if (mcpRefresh === refresh) mcpRefresh = undefined;
+        });
+        mcpRefresh = refresh;
+        await refresh;
       }
     },
     applyPendingCredentials,

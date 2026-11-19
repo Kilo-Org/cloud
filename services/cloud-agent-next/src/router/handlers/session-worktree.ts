@@ -58,6 +58,7 @@ import { generateKiloSessionId } from '../../utils/kilo-session-id.js';
 import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
 import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { logRuntimeAuthorizationDiagnostic } from '../../session/runtime-authorization-diagnostics.js';
+import { runtimeAuthorizationLifetime } from '../../session/runtime-authorization-lifetime.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
 import { protectedProcedure } from '../auth.js';
 import { resolveSecret } from '../../auth.js';
@@ -229,6 +230,7 @@ type SiblingCreateOptions = {
 };
 
 const WORKTREE_CREATE_LEDGER_LEASE_SECONDS = 120;
+const WORKTREE_DELETING_INGEST_CODE = 'worktree_deleting';
 
 function sourceRejected(): TRPCError {
   return new TRPCError({ code: 'BAD_REQUEST', message: 'worktree_source_not_eligible' });
@@ -666,6 +668,7 @@ async function createDestinationRuntimeAuthorization(
       resourceKind: 'cloud-agent-next',
       resourceId: progress.cloudAgentSessionId,
       environment: resolveRuntimeEnvironment(ctx.env.ENVIRONMENT),
+      ...runtimeAuthorizationLifetime(ctx.env),
       onAdmissionRejected: reason =>
         logRuntimeAuthorizationDiagnostic(progress.cloudAgentSessionId, 'admission', reason),
       ...(organizationId ? { organizationId } : {}),
@@ -888,19 +891,23 @@ async function createOwnershipRow(
       ...(cloneFromKiloSessionId ? { cloneFromKiloSessionId } : {}),
     });
   } catch (error) {
-    logControlDiagnostic(
-      'worktree_chat_result',
-      {
-        ...diagnostic,
-        result: 'reconciliation_pending',
-        stage: 'ownership',
-        reason: 'ownership_outcome_unknown',
-        durationMs: Date.now() - startedAt,
-      },
-      'warn'
-    );
-    await markPending(db, rowId);
-    throw error;
+    if (error instanceof Error && error.message === WORKTREE_DELETING_INGEST_CODE) {
+      response = { status: 'rejected', code: WORKTREE_DELETING_INGEST_CODE };
+    } else {
+      logControlDiagnostic(
+        'worktree_chat_result',
+        {
+          ...diagnostic,
+          result: 'reconciliation_pending',
+          stage: 'ownership',
+          reason: 'ownership_outcome_unknown',
+          durationMs: Date.now() - startedAt,
+        },
+        'warn'
+      );
+      await markPending(db, rowId);
+      throw error;
+    }
   }
 
   const parsed = ingestResultSchema.safeParse(response);
@@ -957,6 +964,7 @@ async function createOwnershipRow(
       },
       'warn'
     );
+    if (parsed.data.code === WORKTREE_DELETING_INGEST_CODE) throw workspaceDeleting();
     throw creationFailed();
   }
   if (

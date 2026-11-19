@@ -49,11 +49,10 @@ import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-
 import { resolveSecret } from '../auth.js';
 import { CONTROL_PLANE_ALLOCATION_ID_ENV } from '../shared/control-plane-protocol.js';
 import {
+  VERCEL_BASE_INSTALL_COMMAND,
   VERCEL_BASE_SYSTEM_SETUP,
-  VERCEL_BASE_NODE_SETUP,
-  VERCEL_BASE_GH_STACK_SETUP,
+  VERCEL_BASE_VERIFICATION,
 } from '../byoc/vercel-runtime-base.js';
-import { toolchainVerificationScript } from '../shared/runtime-toolchain.js';
 import { downloadedStartup } from '../sandbox-control/downloaded-startup.js';
 import {
   hasStartupMarker,
@@ -687,13 +686,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
         );
         await this.runCommand(state, client, builderSessionId, 'bash', [
           '-lc',
-          [
-            VERCEL_BASE_NODE_SETUP,
-            VERCEL_BASE_GH_STACK_SETUP,
-            toolchainVerificationScript(['bun']),
-            'case "$(node --version)" in v24.*) ;; *) exit 1 ;; esac',
-            'git --version >/dev/null',
-          ].join('\n'),
+          VERCEL_BASE_INSTALL_COMMAND,
         ]);
         return this.next(state, {
           step: 'snapshot_builder',
@@ -918,9 +911,17 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
             .warn('BYOC Vercel snapshot build check failed');
           throw new Error('validator_call_home_failed');
         }
-        return status.connection === 'ready'
-          ? this.next(state, { step: 'stop_validator' })
-          : this.next(state, { step: 'verify_validator_call_home' });
+        if (status.connection !== 'ready') {
+          return this.next(state, { step: 'verify_validator_call_home' });
+        }
+        // The ready projection records the deployed base digest. Every build, including
+        // one that older code started and that resumes after its wrapper launch, passes
+        // here, so prove on this snapshot that it has the base tools.
+        await this.runCommand(state, client, validatorSessionId, 'bash', [
+          '-lc',
+          VERCEL_BASE_VERIFICATION,
+        ]);
+        return this.next(state, { step: 'stop_validator' });
       }
       case 'stop_validator': {
         const validatorSessionId = requiredBuildField(

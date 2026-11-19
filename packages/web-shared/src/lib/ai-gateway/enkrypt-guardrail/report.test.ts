@@ -4,7 +4,7 @@ import {
   ENKRYPT_RULE_RISK_CATEGORIES,
   ENKRYPT_RULE_SEVERITIES,
 } from '@kilocode/db/schema-types';
-import { guardrailSettings } from './report';
+import { EnkryptGuardrailReportSchema, guardrailSettings } from './report';
 
 describe('guardrailSettings', () => {
   it('reports each detector and its action, with only the size of authored text', () => {
@@ -82,5 +82,50 @@ describe('guardrailSettings', () => {
       status: 'invalid',
       detectors: [],
     });
+  });
+});
+
+describe('EnkryptGuardrailReportSchema', () => {
+  const scan = {
+    scan: 'blocking',
+    part: 'conversation',
+    detectors_enabled: ['injection_attack'],
+    detectors_blocking: ['injection_attack'],
+    verdict_cache: 'hit',
+    total_characters: 100,
+    cached_characters: 60,
+    total_segments: 2,
+    cached_segments: 1,
+    omitted_attachments: 0,
+    scanned_characters: 40,
+    decision: 'allowed',
+    error: null,
+    detectors_fired: [],
+    attempts: 1,
+    credits_cost: 1,
+    latency_ms: 10,
+    chunks: 1,
+    verdict_cache_write: 'skipped',
+  };
+
+  function report(scanFields: Record<string, unknown>) {
+    return {
+      settings: null,
+      verdict: 'allow',
+      unavailable_reason: null,
+      added_latency_ms: 10,
+      scans: [{ ...scan, ...scanFields }],
+    };
+  }
+
+  it('parses a scan with unit counts', () => {
+    const parsed = EnkryptGuardrailReportSchema.parse(report({ total_units: 3, cached_units: 2 }));
+    expect(parsed.scans[0]).toMatchObject({ total_units: 3, cached_units: 2 });
+  });
+
+  it('parses a scan written before units were counted', () => {
+    const parsed = EnkryptGuardrailReportSchema.parse(report({}));
+    expect(parsed.scans[0]).not.toHaveProperty('total_units');
+    expect(parsed.scans[0]).not.toHaveProperty('cached_units');
   });
 });

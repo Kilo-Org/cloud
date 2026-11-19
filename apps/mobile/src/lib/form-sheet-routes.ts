@@ -27,7 +27,6 @@ export const FORM_SHEET_ROUTE_SUFFIXES: readonly (readonly string[])[] = [
   ['voice-language-picker'],
   ['organization', 'invite-member'],
   ['organization', 'member-limit'],
-  ['organization', 'low-balance-alert'],
   ['dismiss', '[id]'],
   ['filter'],
   ['comment-composer'],
@@ -41,6 +40,21 @@ export const FORM_SHEET_ROUTE_SUFFIXES: readonly (readonly string[])[] = [
 /** Is the route these segments point at presented as a form sheet? */
 export function isFormSheetRoute(segments: readonly string[]): boolean {
   return FORM_SHEET_ROUTE_SUFFIXES.some(suffix => matchesSuffix(segments, suffix));
+}
+
+/**
+ * The route segments a presented form sheet covers: the sheet's own screen
+ * removed, so a rule that decides something about the screen beneath the sheet
+ * reads that screen instead of the sheet. A sheet is a screen of the stack it
+ * opens in, and `useSegments` reports the stack's path to it, so the covered
+ * route is the segments with the trailing sheet screen dropped — one segment,
+ * whichever stack the sheet belongs to. The profile stack's organization sheets
+ * (`organization/invite-member`) and the app stack's chat pickers
+ * (`agent-chat/model-picker`) both cover the screen their route is appended to
+ * or replaces. A route that is not a form sheet comes back unchanged.
+ */
+export function segmentsBeneathFormSheet(segments: readonly string[]): readonly string[] {
+  return isFormSheetRoute(segments) ? segments.slice(0, -1) : segments;
 }
 
 /**

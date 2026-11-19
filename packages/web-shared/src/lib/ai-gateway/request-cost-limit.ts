@@ -16,9 +16,9 @@ import {
   getCustomPricing,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
-  getModelDisplayPricing,
+  getWorstCaseModelPricing,
   type EndpointPricing,
 } from './providers/openrouter/display-pricing';
 import type { OpenRouterProviderConfig } from './providers/openrouter/types';
@@ -98,7 +98,13 @@ function pickerRequestPrice(
     model.id,
     extra
       ? model.pricing
-      : pickerModelPricing(model, models, preferredProviderOrderConfig, vercelPricingMetadata)
+      : pickerModelPricing(
+          model,
+          models,
+          preferredProviderOrderConfig,
+          vercelPricingMetadata,
+          'worstCase'
+        )
   );
   return applyTieredPricingRates(
     modelId,
@@ -354,6 +360,7 @@ export async function enforceRequestCostLimit(
     if (
       aliasTarget &&
       parsed.data.model !== model &&
+      parsed.data.model !== aliasTarget &&
       parsed.data.model !==
         mapResolvedModelIdToVercel(aliasTarget, await getVercelModelIdOverrides())
     )
@@ -454,7 +461,7 @@ function storedModelWorstRates(
   const routes = worstRates(
     metadata.endpoints.flatMap(endpoint => [
       pricedRates(endpoint.pricing),
-      pricedRates(getModelDisplayPricing(endpoint.pricing)),
+      pricedRates(getWorstCaseModelPricing(endpoint.pricing)),
     ])
   );
   const tiers = worstRates(

@@ -4,8 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { SheetHeader } from '@/components/sheet-header';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Check } from '@/components/ui/icons';
+import { RowChevron } from '@/components/ui/row-chevron';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
@@ -161,8 +161,19 @@ function EnvironmentList({
   const { height: windowHeight } = useWindowDimensions();
   return (
     <>
-      <SheetHeader title={t('agentChat.newSession.environment')} onDone={onClose} />
-      <Text className="px-4 pb-2 text-sm text-muted-foreground" numberOfLines={1}>
+      {/* The sheet sizes to its content and never reaches the window top, so
+          the header reserves no status-bar clearance — the half-detent picker's
+          rule — and it paints the sheet's own card surface, so the header and
+          the list below read as one surface instead of a tinted band over a
+          white body. */}
+      <SheetHeader
+        title={t('agentChat.newSession.environment')}
+        onDone={onClose}
+        topInset="never"
+        underHandle
+        surfaceClassName="bg-card"
+      />
+      <Text className="px-4 py-2 text-sm text-muted-foreground" numberOfLines={1}>
         {t('agentChat.environment.environmentsForRepository', { repository: repositoryLabel })}
       </Text>
       <ScrollView style={{ maxHeight: Math.round(windowHeight * LIST_MAX_WINDOW_FRACTION) }}>
@@ -202,7 +213,7 @@ function EnvironmentListRow({
   const buildLine =
     statusFailed && status === undefined ? t('common.unknown') : buildSummaryLabel(status, t);
   return (
-    <View className="flex-row items-center border-t border-border">
+    <View className="flex-row items-center border-b-[0.5px] border-hair-soft">
       <Pressable
         onPress={() => {
           onChoose(environment.id);
@@ -210,7 +221,7 @@ function EnvironmentListRow({
         accessibilityRole="button"
         accessibilityState={{ selected }}
         accessibilityLabel={environment.name}
-        className={cn(ROW_TARGET_CLASS, 'min-w-0 flex-1 flex-row items-center gap-3 py-3 ps-4')}
+        className={cn(ROW_TARGET_CLASS, 'min-w-0 flex-1 flex-row items-center gap-3 px-4 py-3')}
       >
         <View className="w-5 items-center">
           {selected ? <Check size={16} color={colors.foreground} /> : null}
@@ -219,7 +230,7 @@ function EnvironmentListRow({
           <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
             {environment.name}
           </Text>
-          <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+          <Text variant="caption" className="mt-0.5" numberOfLines={1}>
             {buildLine}
           </Text>
         </View>
@@ -232,14 +243,14 @@ function EnvironmentListRow({
         accessibilityLabel={t('agentChat.environment.buildDetails')}
         className={cn(
           ROW_TARGET_CLASS,
-          'flex-row items-center gap-1 py-3 ps-2 pe-4 active:opacity-70'
+          'flex-row items-center gap-1 pe-4 ps-2 py-3 active:opacity-70'
         )}
         hitSlop={{ top: 4, bottom: 4 }}
       >
         <Text className="text-xs font-medium text-primary">
           {t('agentChat.environment.buildDetails')}
         </Text>
-        <DirectionalChevronRight size={14} color={colors.mutedForeground} />
+        <RowChevron />
       </Pressable>
     </View>
   );

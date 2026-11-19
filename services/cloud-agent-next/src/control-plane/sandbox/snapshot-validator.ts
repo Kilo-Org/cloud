@@ -5,7 +5,7 @@ import {
   vercelProviderLocatorSchema,
 } from '../../sandbox-control/vercel-provider.js';
 import { initialAllocationState, type AllocationState } from './allocation.js';
-import type { StoredProviderPin } from './sandbox-do.js';
+import type { StoredProviderPin } from './provider-adapters.js';
 
 export const SNAPSHOT_VALIDATOR_REF_KEY = 'byoc_snapshot_validator_ref';
 export const snapshotValidatorInputSchema = z

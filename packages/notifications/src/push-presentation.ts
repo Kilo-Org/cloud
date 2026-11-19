@@ -1,4 +1,6 @@
-import { type PushData } from './push-data';
+import { isAppVersionAtLeast } from '@kilocode/app-shared/app-version';
+
+import { classifyCloudAgentSessionPush, type PushData } from './push-data';
 
 /**
  * Android notification channels. Each push is routed to exactly one channel
@@ -72,42 +74,20 @@ export const AGENT_CHANNEL_SPLIT_APP_VERSION = '1.0.12';
  */
 export const AGENT_BRIEFING_CHANNEL_APP_VERSION = '1.0.16';
 
-/** Channels that only a build at or above the given version creates. */
-const ANDROID_CHANNEL_MIN_APP_VERSIONS: Partial<Record<AndroidNotificationChannelId, string>> = {
+/**
+ * The minimum app version that creates each channel, or `undefined` when every
+ * build creates it. Total over the channel ids, so a channel added to
+ * `ANDROID_NOTIFICATION_CHANNELS` fails typecheck here until this map
+ * classifies it.
+ */
+const ANDROID_CHANNEL_MIN_APP_VERSIONS: Record<AndroidNotificationChannelId, string | undefined> = {
   'needs-input': AGENT_CHANNEL_SPLIT_APP_VERSION,
   'agent-progress': AGENT_CHANNEL_SPLIT_APP_VERSION,
   'agent-briefing': AGENT_BRIEFING_CHANNEL_APP_VERSION,
+  balance: undefined,
+  security: undefined,
+  'followed-sessions-lock-screen': undefined,
 };
-
-/**
- * Compare dotted-numeric versions (`1.10.0` > `1.9.9`, missing segments count
- * as zero). A version the server cannot parse sorts below every release, so a
- * client that cannot prove its age never receives a channel id it may not have
- * created.
- */
-export function comparePushAppVersions(a: string, b: string): number {
-  const left = a.split('.').map(segment => Number.parseInt(segment, 10) || 0);
-  const right = b.split('.').map(segment => Number.parseInt(segment, 10) || 0);
-  const length = Math.max(left.length, right.length);
-  for (let index = 0; index < length; index += 1) {
-    const delta = (left[index] ?? 0) - (right[index] ?? 0);
-    if (delta !== 0) {
-      return delta < 0 ? -1 : 1;
-    }
-  }
-  return 0;
-}
-
-/**
- * True when `current` is at or above `min`. An unknown version never clears the
- * gate, so a token without a recorded version is treated as an older build.
- */
-export function isPushAppVersionAtLeast(current: string | null | undefined, min: string): boolean {
-  if (!current) {
-    return false;
-  }
-  return comparePushAppVersions(current, min) >= 0;
-}
 
 /** A channel a server push may address, including pre-split channel ids. */
 export type AndroidPushChannelId =
@@ -159,7 +139,7 @@ export function androidChannelIdForRegisteredClient(
   if (minAppVersion === undefined) {
     return channelId;
   }
-  return isPushAppVersionAtLeast(appVersion, minAppVersion) ? channelId : undefined;
+  return isAppVersionAtLeast(appVersion, minAppVersion) ? channelId : undefined;
 }
 
 /**
@@ -198,9 +178,9 @@ export function agentNotificationKindForGlanceableSnapshot(snapshot: {
 function agentKindForAgentPush(data: AgentPushData): AgentNotificationKind {
   switch (data.type) {
     case 'cloud_agent_session':
-      // The schema default is 'status', applied at the producer's enforcement
-      // read site; an omitted category is a status update, not a question.
-      return data.category === 'attention' ? 'needs-input' : 'progress';
+      // An omitted category is a status update, not a question: the shared
+      // classifier applies the schema default.
+      return classifyCloudAgentSessionPush(data) === 'attention' ? 'needs-input' : 'progress';
     case 'active_agents_glanceable':
       return agentNotificationKindForGlanceableSnapshot(data);
     default: {
@@ -222,6 +202,11 @@ const AGENT_KIND_CHANNEL: Record<AgentNotificationKind, AndroidNotificationChann
   progress: 'agent-progress',
 };
 
+/** The reverse of `AGENT_KIND_CHANNEL`: the kind each agent channel carries. */
+const AGENT_CHANNEL_KIND: ReadonlyMap<string, AgentNotificationKind> = new Map(
+  AGENT_NOTIFICATION_KINDS.map(kind => [AGENT_KIND_CHANNEL[kind], kind] as const)
+);
+
 /** The Android channel that carries a kind. */
 export function androidChannelIdForAgentKind(
   kind: AgentNotificationKind
@@ -239,14 +224,10 @@ export function androidChannelIdForAgentKind(
 export function agentNotificationKindForAndroidChannelId(
   channelId: string | null | undefined
 ): AgentNotificationKind | null {
-  switch (channelId) {
-    case 'needs-input':
-      return 'needs-input';
-    case 'agent-progress':
-      return 'progress';
-    default:
-      return null;
+  if (channelId == null) {
+    return null;
   }
+  return AGENT_CHANNEL_KIND.get(channelId) ?? null;
 }
 
 /**

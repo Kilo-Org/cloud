@@ -13,6 +13,8 @@ import { i18n } from '@/i18n';
 import { SpendAlertsScreen } from '@/components/organization/spend-alerts-screen';
 import { thresholdError } from '@/components/organization/spend-alert-validators';
 import { formatList } from '@/lib/format';
+import { MIN_TAP_TARGET_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
+import { compiledLengthDp } from '@/test/native-dimensions';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
@@ -79,6 +81,9 @@ vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronRight: 'DirectionalChevronRight',
 }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
+// The shared row primitives reach the icon barrel through their trailing cells;
+// its lucide modules cannot be parsed in the mounted environment.
+vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
 vi.mock('@/components/ui/kv-row', () => ({ KvRow: 'KvRow' }));
 vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -215,6 +220,14 @@ function channelSwitches(renderer: ReactTestRenderer, channelKey: string): React
   const channelLabel = i18n.t(channelKey);
   return byType(renderer, 'Switch').filter(node =>
     String(node.props.accessibilityLabel).includes(channelLabel)
+  );
+}
+
+/** The row that stands in for the push switch when push is unavailable. */
+function pushOffRow(renderer: ReactTestRenderer): ReactTestInstance | undefined {
+  const caption = i18n.t('spendAlerts.pushOffByCategory');
+  return byType(renderer, 'Pressable').find(
+    node => node.findAll(child => child.props.children === caption).length > 0
   );
 }
 
@@ -401,11 +414,7 @@ describe('SpendAlertsScreen scope line', () => {
     expect(rows).toHaveLength(2);
     expect(rows[0]?.props.label).toBe(i18n.t('preferences.account'));
     expect(rows[0]?.props.value).toBe('Ada');
-    // The owner row is not the group's last, so the divider separates it from
-    // the spend row that closes the group.
-    expect(rows[0]?.props.last).toBeFalsy();
     expect(rows[1]?.props.label).toBe(i18n.t('spendAlerts.spend24h'));
-    expect(rows[1]?.props.last).toBe(true);
   });
 
   it('names an organization scope with the organization name', async () => {
@@ -532,6 +541,11 @@ describe('SpendAlertsScreen non-retryable states', () => {
     const { renderer } = await mountScreen('org-1');
 
     await waitFor(() => byType(renderer, 'PermissionDenied').length === 1);
+    // The header owns the way out, so the state must not repeat a Back action.
+    expect(byType(renderer, 'ScreenHeader')[0]?.props.title).toBe(
+      i18n.t('notifications.channel.spend')
+    );
+    expect(byType(renderer, 'PermissionDenied')[0]?.props.showBack).toBe(false);
     expect(byType(renderer, 'Button')).toHaveLength(0);
     expect(byType(renderer, 'Switch')).toHaveLength(0);
     expect(byType(renderer, 'FormField')).toHaveLength(0);
@@ -727,7 +741,7 @@ describe('SpendAlertsScreen push agreement', () => {
     expect(channelSwitches(renderer, i18n.t('notifications.push'))).toHaveLength(0);
     expect(channelSwitches(renderer, i18n.t('common.email'))).toHaveLength(2);
 
-    press(byType(renderer, 'Pressable')[0]);
+    press(pushOffRow(renderer));
 
     expect(router.push).toHaveBeenCalledWith('/(app)/notifications');
   });
@@ -736,6 +750,31 @@ describe('SpendAlertsScreen push agreement', () => {
     const { renderer } = await mountLoaded({ pushChannelBlocked: true });
 
     expect(channelSwitches(renderer, i18n.t('notifications.push'))).toHaveLength(0);
-    expect(byType(renderer, 'Pressable')).toHaveLength(2);
+    expect(pushOffRow(renderer)).toBeDefined();
+  });
+
+  it('carries the store touch target on the off-category push row itself', async () => {
+    const { renderer } = await mountLoaded({ pushCategoryEnabled: false });
+
+    // With the category off, each rule card swaps its push switch for a
+    // RowFrame aimed at Notifications. The row's own node carries the target,
+    // so no `hitSlop` band reaches across the Email switch above it.
+    const caption = i18n.t('spendAlerts.pushOffByCategory');
+    const rows = byType(renderer, 'Pressable').filter(
+      node => node.findAll(child => child.props.children === caption).length > 0
+    );
+    expect(rows).toHaveLength(2);
+
+    // The audit reads the control's laid-out node and `hitSlop` never widens
+    // it, so assert the box the installed Tailwind and react-native-css
+    // compilers emit for the classes, not a hand-written utility map.
+    const frames = await Promise.all(
+      rows.map(row => compiledLengthDp(row.props.className as string, 'minHeight'))
+    );
+    for (const [index, row] of rows.entries()) {
+      expect(row.props.hitSlop).toBeUndefined();
+      expect(frames[index]).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+      expect(frames[index]).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    }
   });
 });

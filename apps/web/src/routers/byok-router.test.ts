@@ -47,6 +47,10 @@ import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/typ
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
+import {
+  BYOK_PROVIDER_UNAVAILABLE_MESSAGE,
+  MANAGED_KEY_PROVIDER_OCCUPIED_MESSAGE,
+} from '@kilocode/app-shared/byok-errors';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   ai_gateway_config,
@@ -833,6 +837,184 @@ describe('BYOK Router', () => {
       const keys = await caller.byok.list({ organizationId: organizationA.id });
       expect(keys).toHaveLength(2);
     });
+
+    test('create rejects a second key for the same provider with a clean conflict', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      // The caller throws the TRPCError itself, so this reads the code and
+      // message the client receives: no driver text, SQL or envelope may leak.
+      async function expectCleanConflict(call: () => Promise<unknown>) {
+        const error = await call().then(
+          () => {
+            throw new Error('expected the duplicate key create to be rejected');
+          },
+          (thrown: unknown) => thrown
+        );
+        if (
+          typeof error !== 'object' ||
+          error === null ||
+          !('code' in error) ||
+          !('message' in error) ||
+          typeof error.message !== 'string'
+        ) {
+          throw new Error('expected the duplicate key create to reject with a code and message');
+        }
+        expect(error.code).toBe('CONFLICT');
+        expect(error.message).toBe(
+          'A key for this provider already exists. Remove it before you add another.'
+        );
+        for (const leak of ['Failed query', 'insert into', 'iv', 'wrapped_dek', 'arn:']) {
+          expect(error.message).not.toContain(leak);
+        }
+      }
+
+      const personal = await caller.byok.create({
+        provider_id: 'anthropic',
+        api_key: 'personal-anthropic-first',
+      });
+      const [personalBefore] = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, personal.id));
+
+      await expectCleanConflict(() =>
+        caller.byok.create({ provider_id: 'anthropic', api_key: 'personal-anthropic-second' })
+      );
+
+      const personalRows = await db
+        .select()
+        .from(byok_api_keys)
+        .where(
+          and(
+            eq(byok_api_keys.kilo_user_id, ownerUser.id),
+            eq(byok_api_keys.provider_id, 'anthropic')
+          )
+        );
+      expect(personalRows).toEqual([personalBefore]);
+      expect(decryptStoredKey(personalRows[0])).toBe('personal-anthropic-first');
+
+      // A user key and an organization key have different owners, so the
+      // personal conflict does not block the organization key for the provider.
+      const organization = await caller.byok.create({
+        organizationId: organizationA.id,
+        provider_id: 'anthropic',
+        api_key: 'organization-anthropic-first',
+      });
+      const [organizationBefore] = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, organization.id));
+      const logsBefore = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationA.id))
+        .orderBy(organization_audit_logs.id);
+
+      await expectCleanConflict(() =>
+        caller.byok.create({
+          organizationId: organizationA.id,
+          provider_id: 'anthropic',
+          api_key: 'organization-anthropic-second',
+        })
+      );
+
+      const organizationRows = await db
+        .select()
+        .from(byok_api_keys)
+        .where(
+          and(
+            eq(byok_api_keys.organization_id, organizationA.id),
+            eq(byok_api_keys.provider_id, 'anthropic')
+          )
+        );
+      expect(organizationRows).toEqual([organizationBefore]);
+      expect(decryptStoredKey(organizationRows[0])).toBe('organization-anthropic-first');
+      const logsAfter = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationA.id))
+        .orderBy(organization_audit_logs.id);
+      expect(logsAfter).toEqual(logsBefore);
+    });
+
+    test('create refuses a provider whose key the coding plan manages', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      // The installed key is a coding-plan row, so the owner cannot remove it to
+      // make room: the refusal must name the plan, not ask for a removal.
+      const [managed] = await db
+        .insert(byok_api_keys)
+        .values({
+          kilo_user_id: ownerUser.id,
+          provider_id: 'anthropic',
+          encrypted_api_key_envelope: testByokEnvelope('coding-plan-anthropic-key'),
+          management_source: 'coding_plan',
+          created_by: ownerUser.id,
+        })
+        .returning();
+
+      await expect(
+        caller.byok.create({ provider_id: 'anthropic', api_key: 'personal-anthropic-key' })
+      ).rejects.toMatchObject({
+        code: 'PRECONDITION_FAILED',
+        message: MANAGED_KEY_PROVIDER_OCCUPIED_MESSAGE,
+      });
+
+      const personalRows = await db
+        .select()
+        .from(byok_api_keys)
+        .where(
+          and(
+            eq(byok_api_keys.kilo_user_id, ownerUser.id),
+            eq(byok_api_keys.provider_id, 'anthropic')
+          )
+        );
+      expect(personalRows).toEqual([managed]);
+
+      const [managedOrganization] = await db
+        .insert(byok_api_keys)
+        .values({
+          organization_id: organizationA.id,
+          provider_id: 'anthropic',
+          encrypted_api_key_envelope: testByokEnvelope('coding-plan-organization-key'),
+          management_source: 'coding_plan',
+          created_by: ownerUser.id,
+        })
+        .returning();
+      const logsBefore = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationA.id))
+        .orderBy(organization_audit_logs.id);
+
+      await expect(
+        caller.byok.create({
+          organizationId: organizationA.id,
+          provider_id: 'anthropic',
+          api_key: 'organization-anthropic-key',
+        })
+      ).rejects.toMatchObject({
+        code: 'PRECONDITION_FAILED',
+        message: MANAGED_KEY_PROVIDER_OCCUPIED_MESSAGE,
+      });
+
+      const organizationRows = await db
+        .select()
+        .from(byok_api_keys)
+        .where(
+          and(
+            eq(byok_api_keys.organization_id, organizationA.id),
+            eq(byok_api_keys.provider_id, 'anthropic')
+          )
+        );
+      expect(organizationRows).toEqual([managedOrganization]);
+      const logsAfter = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationA.id))
+        .orderBy(organization_audit_logs.id);
+      expect(logsAfter).toEqual(logsBefore);
+    });
   });
 
   describe('KMS envelope encryption', () => {
@@ -955,6 +1137,7 @@ describe('BYOK Router', () => {
       await expect(
         caller.byok.testApiKey({ organizationId: organizationA.id, id: created.id })
       ).resolves.toEqual({
+        outcome: 'unreadable-key',
         success: false,
         message: 'API key test failed: the stored key could not be read. Try again later.',
       });
@@ -1364,7 +1547,7 @@ describe('BYOK Router', () => {
       await expect(
         caller.byok.create({ ...scope, provider_id: 'bedrock', api_key })
       ).rejects.toMatchObject({
-        code: 'BAD_REQUEST',
+        code: 'UNPROCESSABLE_CONTENT',
         message: 'Invalid credentials for provider: bedrock',
       });
       const keysAfterCreate = await db
@@ -1375,7 +1558,7 @@ describe('BYOK Router', () => {
 
       await expect(caller.byok.update({ ...scope, id: created.id, api_key })).rejects.toMatchObject(
         {
-          code: 'BAD_REQUEST',
+          code: 'UNPROCESSABLE_CONTENT',
           message: 'Invalid credentials for provider: bedrock',
         }
       );
@@ -1458,7 +1641,7 @@ describe('BYOK Router', () => {
 
       const zai = await caller.byok.create({ provider_id: 'zai-coding', api_key: 'zai-key' });
       const morph = await caller.byok.create({ provider_id: 'morph-byok', api_key: 'morph-key' });
-      const martian = await caller.byok.create({ provider_id: 'martian', api_key: 'martian-key' });
+      const kimi = await caller.byok.create({ provider_id: 'kimi-coding', api_key: 'kimi-key' });
       const vercel = await caller.byok.create({ provider_id: 'openai', api_key: 'sk-test-key' });
 
       expect(zai).toMatchObject({
@@ -1466,7 +1649,7 @@ describe('BYOK Router', () => {
         supports_catalog_mode: true,
         can_change_catalog_mode: true,
       });
-      for (const key of [morph, martian, vercel]) {
+      for (const key of [morph, kimi, vercel]) {
         expect(key).toMatchObject({
           serve_catalog_models: false,
           supports_catalog_mode: false,
@@ -1490,7 +1673,7 @@ describe('BYOK Router', () => {
 
       expect(result['zai-coding']).toEqual(['GLM-4.7 (z-ai/glm-4.7)', 'GLM-5.2 (z-ai/glm-5.2)']);
       expect(result).not.toHaveProperty('morph-byok');
-      expect(result).not.toHaveProperty('martian');
+      expect(result).not.toHaveProperty('kimi-coding');
     });
 
     test('stores catalog mode in the key settings', async () => {
@@ -1778,8 +1961,12 @@ describe('BYOK Router', () => {
         );
 
       try {
-        await expect(caller.byok.testApiKey({ id: key.id })).resolves.toMatchObject({
+        await expect(caller.byok.testApiKey({ id: key.id })).resolves.toEqual({
+          outcome: 'ok',
+          provider: 'openrouter',
+          model: 'openai/gpt-5-nano',
           success: true,
+          message: 'API key test success. Provider: openrouter. Model: openai/gpt-5-nano.',
         });
 
         const upstreamCalls = fetchSpy.mock.calls.filter(([input]) =>
@@ -1815,6 +2002,7 @@ describe('BYOK Router', () => {
 
       try {
         await expect(caller.byok.testApiKey({ id: key.id })).resolves.toEqual({
+          outcome: 'rejected',
           success: false,
           message:
             'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.',
@@ -1824,6 +2012,37 @@ describe('BYOK Router', () => {
         )!;
         expect(String(url)).toMatch(/^https:\/\/ai-gateway\.vercel\.sh\//);
         expect(new Headers(init?.headers).get('authorization')).toBe('Bearer revoked-vercel-key');
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    test('a client that reads only the legacy pair still gets the old sentence', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const key = await caller.byok.create({
+        provider_id: 'vercel-ai-gateway',
+        api_key: 'revoked-legacy-vercel-key',
+      });
+      const fakeKms = globalThis.fetch;
+      const fetchSpy = jest.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) =>
+        isFakeByokKmsRequest(input)
+          ? fakeKms(input, init)
+          : new Response(
+              JSON.stringify({
+                error: { message: 'Invalid API key', type: 'authentication_error' },
+              }),
+              { status: 401, headers: { 'content-type': 'application/json' } }
+            )
+      );
+
+      try {
+        const result = await caller.byok.testApiKey({ id: key.id });
+
+        expect(result.outcome).toBe('rejected');
+        expect(result.success).toBe(false);
+        expect(result.message).toBe(
+          'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.'
+        );
       } finally {
         fetchSpy.mockRestore();
       }
@@ -2117,14 +2336,14 @@ describe('BYOK Router', () => {
           provider_id: 'bedrock-byok',
           api_key: JSON.stringify(BEDROCK_IAM_CREDENTIALS),
         })
-      ).rejects.toThrow('Provider bedrock-byok is not available yet.');
+      ).rejects.toThrow(BYOK_PROVIDER_UNAVAILABLE_MESSAGE);
       await expect(
         caller.byok.create({
           organizationId: organizationA.id,
           provider_id: 'bedrock-byok',
           api_key: JSON.stringify(BEDROCK_IAM_CREDENTIALS),
         })
-      ).rejects.toThrow('Provider bedrock-byok is not available yet.');
+      ).rejects.toThrow(BYOK_PROVIDER_UNAVAILABLE_MESSAGE);
       await expect(
         caller.byok.create({ provider_id: 'nvidia-byok', api_key: 'nvidia-key' })
       ).resolves.toMatchObject({ provider_id: 'nvidia-byok' });
@@ -2132,11 +2351,12 @@ describe('BYOK Router', () => {
   });
 
   describe('deprecated codestral provider', () => {
-    test('declines to test a legacy codestral key with a deprecation message', async () => {
+    test('declines to test a legacy codestral key as deprecated', async () => {
       const caller = await createCallerForUser(ownerUser.id);
       const key = await caller.byok.create({ provider_id: 'codestral', api_key: 'stored-secret' });
 
       await expect(caller.byok.testApiKey({ id: key.id })).resolves.toEqual({
+        outcome: 'deprecated-provider',
         success: false,
         message: 'Codestral is deprecated and its API key can no longer be tested.',
       });

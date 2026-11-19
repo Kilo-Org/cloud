@@ -62,7 +62,7 @@ export function getToolsAvailable(request: GatewayRequest): string[] {
 
   if (request.kind === 'messages') {
     return request.body.tools.flatMap((tool): string[] =>
-      isObjectEntry(tool) ? [labeledTool('function', tool.name)] : []
+      isObjectEntry(tool) ? [labeledTool('function', 'name' in tool ? tool.name : undefined)] : []
     );
   }
 

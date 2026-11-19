@@ -90,6 +90,8 @@ const EnrollmentFieldsSchema = z.object({
   buildGeneration: z.uuid(),
   runtimeBuildId: z.string().nullable(),
   runtimeSnapshotId: z.string().nullable(),
+  // Base digest of the selected snapshot. An older web deployment omits it.
+  runtimeDigest: z.string().nullable().optional(),
   teamSlug: z.string().nullable(),
   projectSlug: z.string().nullable(),
 });

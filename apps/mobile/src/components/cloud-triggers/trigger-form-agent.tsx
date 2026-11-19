@@ -9,7 +9,7 @@
  */
 
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
 import {
   getBuiltinModeDescriptionKey,
@@ -17,10 +17,10 @@ import {
 } from '@/components/agents/mode-options';
 import { BUILTIN_AGENT_MODES } from '@/components/agents/mode-normalize';
 import { ModelSelector } from '@/components/agents/model-selector';
-import { cn } from '@/lib/utils';
+import { QueryError } from '@/components/query-error';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
-import { LINE_ACTION_BOX_CLASS, LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { triggerProblemText } from '@/lib/cloud-triggers/trigger-problem-copy';
 import { type TriggerDraft, type TriggerDraftProblems } from '@/lib/cloud-triggers/trigger-draft';
 import { TRIGGER_FIELD_EXAMPLES } from '@/lib/cloud-triggers/trigger-field-examples';
@@ -101,9 +101,7 @@ export function TriggerFormAgent({
           }}
           error={triggerProblemText(shownProblem('agent'))}
         />
-        <Text variant="muted" className="text-xs">
-          {t('cloudAgent.triggers.agentHelp')}
-        </Text>
+        <Text variant="caption">{t('cloudAgent.triggers.agentHelp')}</Text>
       </View>
       {isCustomAgent && (
         <FormField
@@ -122,42 +120,33 @@ export function TriggerFormAgent({
       )}
 
       <View className="gap-2">
-        <View className="flex-row items-center gap-2">
-          <ModelSelector
-            value={draft.model}
-            variant={draft.variant}
-            options={models.models}
-            acceptsVariant
-            onSelect={(model, variant) => {
-              onDraftChange({ ...draft, model, variant });
-            }}
-            onOpen={() => {
-              markTouched('model');
-            }}
-            isLoading={models.isLoading}
-            disabled={catalogueFailed}
-          />
-        </View>
+        <ModelSelector
+          value={draft.model}
+          variant={draft.variant}
+          options={models.models}
+          acceptsVariant
+          presentation="field"
+          onSelect={(model, variant) => {
+            onDraftChange({ ...draft, model, variant });
+          }}
+          onOpen={() => {
+            markTouched('model');
+          }}
+          isLoading={models.isLoading}
+          disabled={catalogueFailed}
+        />
         {catalogueFailed ? (
-          <View className="flex-row items-center gap-2">
-            <Text accessibilityRole="alert" className="min-w-0 flex-1 text-xs text-destructive">
-              {t('common.couldNotLoadModels')}
-            </Text>
-            <Pressable
-              accessibilityLabel={t('common.retry')}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: models.isFetching }}
-              className={cn(LINE_ACTION_BOX_CLASS, 'min-w-[36px] justify-center active:opacity-70')}
-              disabled={models.isFetching}
-              hitSlop={LINE_ACTION_HIT_SLOP}
-              onPress={() => void models.refetch()}
-            >
-              <Text className="text-xs font-medium text-destructive">{t('common.retry')}</Text>
-            </Pressable>
-          </View>
+          <QueryError
+            placement="top"
+            compact
+            variant="server"
+            title={t('common.couldNotLoadModels')}
+            onRetry={() => void models.refetch()}
+            isRetrying={models.isFetching}
+          />
         ) : null}
         {modelProblemText === undefined ? null : (
-          <Text className="text-xs text-destructive">{modelProblemText}</Text>
+          <AccessibleStatus message={modelProblemText} className="text-sm" />
         )}
       </View>
 
@@ -177,9 +166,7 @@ export function TriggerFormAgent({
             onOpenSheetChange('profile');
           }}
         />
-        <Text variant="muted" className="text-xs">
-          {t('cloudAgent.triggers.profileHelp')}
-        </Text>
+        <Text variant="caption">{t('cloudAgent.triggers.profileHelp')}</Text>
       </View>
 
       <TriggerChoiceSheet

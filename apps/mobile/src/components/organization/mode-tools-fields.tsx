@@ -1,15 +1,16 @@
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { type LayoutChangeEvent } from 'react-native';
 
 import {
   MODE_TOOL_GROUPS,
   type ModeToolGroup,
 } from '@/components/organization/org-mode-form-model';
+import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
-import { FormFieldLabel } from '@/components/ui/form-field-label';
-import { Switch } from '@/components/ui/switch';
+import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
-import { cn } from '@/lib/utils';
 
 const TOOL_LABEL_KEYS = {
   read: 'organization.modes.tool.read',
@@ -25,6 +26,8 @@ type ModeToolsFieldsProps = Readonly<{
   editRestrictionLabel: string;
   /** The identifier field's refusal message, already translated. */
   filePatternError: string | undefined;
+  /** The restriction block's top inside the form's scroll content. */
+  filePatternLayout?: (event: LayoutChangeEvent) => void;
   disabled: boolean;
   onToggleGroup: (group: ModeToolGroup, checked: boolean) => void;
   onChangeFilePattern: (value: string) => void;
@@ -42,6 +45,7 @@ export function ModeToolsFields({
   editFileRegex,
   editRestrictionLabel,
   filePatternError,
+  filePatternLayout,
   disabled,
   onToggleGroup,
   onChangeFilePattern,
@@ -50,33 +54,25 @@ export function ModeToolsFields({
   const { t } = useTranslation();
   return (
     <>
-      <View className="gap-2">
-        <FormFieldLabel label={t('profiles.agents.tools')} />
-        <View className="overflow-hidden rounded-lg bg-secondary">
-          {MODE_TOOL_GROUPS.map((group, index) => (
-            <View
+      <Section label={t('profiles.agents.tools')}>
+        <RowGroup>
+          {MODE_TOOL_GROUPS.map(group => (
+            <PreferenceRow
               key={group}
-              className={cn(
-                'flex-row items-center gap-3 px-4 py-3',
-                index < MODE_TOOL_GROUPS.length - 1 && 'border-b-[0.5px] border-hair-soft'
-              )}
-            >
-              <Text className="flex-1 text-sm text-foreground">{t(TOOL_LABEL_KEYS[group])}</Text>
-              <Switch
-                value={groups.includes(group)}
-                disabled={disabled}
-                onValueChange={checked => {
-                  onToggleGroup(group, checked);
-                }}
-                accessibilityLabel={t(TOOL_LABEL_KEYS[group])}
-              />
-            </View>
+              title={t(TOOL_LABEL_KEYS[group])}
+              value={groups.includes(group)}
+              disabled={disabled}
+              accessibilityLabel={t(TOOL_LABEL_KEYS[group])}
+              onValueChange={checked => {
+                onToggleGroup(group, checked);
+              }}
+            />
           ))}
-        </View>
-      </View>
+        </RowGroup>
+      </Section>
 
       {groups.includes('edit') ? (
-        <View className="gap-4 rounded-lg border border-border p-4">
+        <Card onLayout={filePatternLayout}>
           <FormField
             label={t('organization.modes.restrictionPattern')}
             defaultValue={editFileRegex}
@@ -86,16 +82,14 @@ export function ModeToolsFields({
             error={filePatternError}
             onChangeText={onChangeFilePattern}
           />
-          <Text variant="muted" className="text-xs">
-            {t('organization.modes.restrictionHint')}
-          </Text>
+          <Text variant="caption">{t('organization.modes.restrictionHint')}</Text>
           <FormField
             label={t('organization.modes.restrictionLabel')}
             defaultValue={editRestrictionLabel}
             disabled={disabled}
             onChangeText={onChangeRestrictionLabel}
           />
-        </View>
+        </Card>
       ) : null}
     </>
   );

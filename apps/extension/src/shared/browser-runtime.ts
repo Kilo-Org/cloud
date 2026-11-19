@@ -1,4 +1,30 @@
-/* eslint-disable max-lines -- the lease decision, the per-tab serial chain and the caller views are one contract; splitting them would hide who may run in a tab. */
+/* eslint-disable max-lines -- One runtime owns the serial chain, leases, tab groups and the agent gate; splitting it would scatter the per-tab ordering contract. */
+import {
+  createStepTokenStore,
+  hashBrowserToolArguments,
+  NEEDS_PERMISSION_ERROR,
+  ORIGIN_CHANGED_ERROR,
+  parseToolArguments,
+  SENSITIVE_REASON,
+} from './browser-agent-checks';
+import type { BrowserGrant, BrowserPermissionItem, StepTokenStore } from './browser-agent-checks';
+import { postAgentNavigate, preflightAgentCall, takeStartedDownloads } from './browser-agent-gate';
+import type { BrowserSensitiveStep } from './browser-agent-gate';
+import {
+  enableAgentFrameAutoAttach,
+  readAgentFrameTree,
+  withheldFramesOf,
+} from './browser-agent-frames';
+import { createBrowserTabGroupController } from './browser-tab-groups';
+import type {
+  BrowserOpenSessionInput,
+  BrowserSessionRef,
+  BrowserShareTabInput,
+  BrowserShareTabResult,
+  BrowserTabGroupController,
+  BrowserTabGroupOpenResult,
+  BrowserTabGroupSessionSummary,
+} from './browser-tab-groups';
 import { browserCallerKey, TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from './browser-caller';
 import type { BrowserCaller } from './browser-caller';
 import { clearBrowserToolResize } from './browser-tool-page-actions';
@@ -15,7 +41,15 @@ import type {
   EvalTabResult,
 } from './tab-debugger';
 
+/** The grant pairs and step tokens one CLI agent call carries (SPEC "Protocol v1" `tools.call`). */
+export interface BrowserAgentCallContext {
+  readonly authorized: readonly BrowserGrant[];
+  readonly sensitive?: readonly string[] | undefined;
+}
+
 export interface BrowserToolRunInput {
+  /** Present only for an `agent` caller: the CLI's grants for this call. */
+  readonly agent?: BrowserAgentCallContext | undefined;
   readonly arguments: unknown;
   readonly caller: BrowserCaller;
   readonly options?:
@@ -33,7 +67,25 @@ export type BrowserToolRunOutcome =
       readonly holder: TabLeaseHolder;
       readonly kind: 'needs_take_over';
     }
-  | { readonly kind: 'result'; readonly result: EvalTabResult };
+  | {
+      readonly kind: 'result';
+      readonly result: EvalTabResult;
+      /** Origins whose frames the agent could not read this call; the bridge puts them in `_meta`. */
+      readonly withheldFrames?: readonly string[];
+    }
+  // The transport maps these onto JSON-RPC -32010 / -32012; the result carries the model-visible tool error.
+  | {
+      readonly items: readonly BrowserPermissionItem[];
+      readonly kind: 'needs_permission';
+      readonly result: EvalTabResult;
+      readonly stepToken?: string | undefined;
+    }
+  | {
+      readonly from: string;
+      readonly kind: 'origin_changed';
+      readonly result: EvalTabResult;
+      readonly to: string;
+    };
 
 export interface BrowserEvalRunInput {
   readonly caller: BrowserCaller;
@@ -45,7 +97,18 @@ export interface BrowserEvalRunInput {
 export interface BrowserRuntimeDeps {
   readonly debuggerApi: ChromeDebuggerApi | undefined;
   readonly leases: TabLeaseRegistry;
+  /** The clock sensitive step tokens expire against; defaults to `Date.now`. */
+  readonly now?: (() => number) | undefined;
   readonly scriptingApi: BrowserScriptingApi | undefined;
+  /** The session's sensitive approvals; one store per background runtime. */
+  readonly stepTokens?: StepTokenStore | undefined;
+  /**
+   * The tab groups agent sessions live in. Optional so a test can inject its
+   * own; the runtime otherwise builds one from `tabsApi`, so the D9 boundary
+   * and the session lifecycle are wired for every caller. Group titles still
+   * need the transport that opens sessions and shares tabs (C3 item).
+   */
+  readonly tabGroups?: BrowserTabGroupController | undefined;
   readonly tabsApi: BrowserTabsApi & BrowserToolTabsApi;
 }
 
@@ -61,20 +124,32 @@ export interface BrowserTabClaimInput {
 }
 
 export interface BrowserRuntime {
+  /** Gives a session its tab group back after it ended (`/browser adopt`). */
+  readonly adoptEnded: (input: BrowserSessionRef) => Promise<BrowserTabGroupOpenResult>;
   /**
    * Takes the tab's lease before the caller's first command, so a workflow run
    * navigates under the lease rather than rewriting the page under its holder.
    */
   readonly claimTab: (input: BrowserTabClaimInput) => Promise<boolean>;
+  /** Ends a session: its group collapses, turns grey and becomes `Kilo · ended`. */
+  readonly closeSession: (input: BrowserSessionRef) => Promise<void>;
+  /** Records a tab the browser opened from one of a session's tabs, so the session may use it. */
+  readonly noteTabCreated: (tabId: number, openerTabId: number | undefined) => Promise<void>;
+  /** Drops the caller's ref registries for good; the tab sessions and leases stay alive for others. */
+  readonly disposeCaller: (caller: BrowserCaller) => number;
   /** Tab closed or left the extension's reach: drop the session, its lease and its override. */
   readonly disposeTab: (tabId: number) => Promise<void>;
   /** Runs workflow `page` scripts through the tab's one attachment. */
   readonly evalInTab: (input: BrowserEvalRunInput) => Promise<EvalTabResult>;
-  /** Drops the caller's ref registries for good; the tab sessions and leases stay alive for others. */
-  readonly disposeCaller: (caller: BrowserCaller) => number;
+  /** The sessions the group controller knows, for the settings UI. */
+  readonly listSessions: () => BrowserTabGroupSessionSummary[];
+  /** Creates the session's group `Kilo · <title>` (or tracks tabs without one). */
+  readonly openSession: (input: BrowserOpenSessionInput) => Promise<BrowserTabGroupOpenResult>;
   /** Ends the caller's tab leases. Its refs survive, so the next turn can click by an earlier ref. */
   readonly releaseCaller: (caller: BrowserCaller) => number;
   readonly runTool: (input: BrowserToolRunInput) => Promise<BrowserToolRunOutcome>;
+  /** Moves the active tab (or the named one) into the session's group (`/browser share`). */
+  readonly shareActiveTab: (input: BrowserShareTabInput) => Promise<BrowserShareTabResult>;
 }
 
 const disposeBrowserToolSession = async (
@@ -103,9 +178,26 @@ const disposeBrowserToolSession = async (
 export const createBrowserRuntime = ({
   debuggerApi,
   leases,
+  now,
   scriptingApi,
+  stepTokens,
+  tabGroups,
   tabsApi,
 }: BrowserRuntimeDeps): BrowserRuntime => {
+  const tokens = stepTokens ?? createStepTokenStore(now === undefined ? {} : { now });
+  const groups =
+    tabGroups ??
+    createBrowserTabGroupController({
+      api: {
+        tabQuery: async query => {
+          const tabs = await tabsApi.query(query);
+
+          return tabs.map(tab =>
+            tab.active === undefined ? { id: tab.id } : { active: tab.active, id: tab.id }
+          );
+        },
+      },
+    });
   const sessions = new Map<number, BrowserToolSession>();
   // One tail promise per tab: calls run in the order they were admitted.
   const chains = new Map<number, Promise<void>>();
@@ -128,6 +220,8 @@ export const createBrowserRuntime = ({
   const disposeTab = async (tabId: number): Promise<void> => {
     chains.delete(tabId);
     inFlight.delete(tabId);
+    autoAttachedTabs.delete(tabId);
+    groups.noteTabRemoved(tabId);
     leases.releaseTab(tabId);
     await disposeBrowserToolSession(sessions, tabId);
   };
@@ -168,6 +262,58 @@ export const createBrowserRuntime = ({
     return { error: reach.error, ok: false };
   };
 
+  /**
+   * Cancels downloads a call was not approved to start. `Page.setDownloadBehavior`
+   * is the page-target spelling of the browser-level method, so it works through
+   * the tab's one debugger attachment; the guard is best effort — a browser that
+   * refuses it keeps its default behaviour and the call proceeds.
+   */
+  const setDownloadBehavior = async (
+    session: BrowserToolSession,
+    behavior: 'default' | 'deny'
+  ): Promise<void> => {
+    try {
+      await session.send('Page.setDownloadBehavior', { behavior, eventsEnabled: true });
+    } catch {
+      // A target that rejects the deprecated method keeps the browser default.
+    }
+  };
+
+  // Tabs whose flattened frame auto-attach is on, so out-of-process iframes are reachable for scoping.
+  const autoAttachedTabs = new Set<number>();
+
+  const ensureFrameAutoAttach = async (
+    session: BrowserToolSession,
+    tabId: number
+  ): Promise<void> => {
+    if (autoAttachedTabs.has(tabId)) {
+      return;
+    }
+
+    await enableAgentFrameAutoAttach(session);
+    autoAttachedTabs.add(tabId);
+  };
+
+  const withheldOriginsFor = async (
+    session: BrowserToolSession,
+    authorized: readonly BrowserGrant[]
+  ): Promise<readonly string[]> => {
+    const frames = await readAgentFrameTree(session);
+    const readable = authorized.filter(grant => grant.class === 'read').map(grant => grant.origin);
+
+    return withheldFramesOf(frames, readable).map(frame => frame.origin);
+  };
+
+  const needsPermissionOutcome = (
+    items: readonly BrowserPermissionItem[],
+    stepToken: string | undefined
+  ): BrowserToolRunOutcome => ({
+    items,
+    kind: 'needs_permission',
+    result: { error: NEEDS_PERMISSION_ERROR, ok: false },
+    ...(stepToken === undefined ? {} : { stepToken }),
+  });
+
   const claimTab = async ({ caller, from, tabId }: BrowserTabClaimInput): Promise<boolean> => {
     // The handover runs before the acquire, in one message.
     // Only a panel may hand a lease over: its take-over asymmetry is the design's only one.
@@ -182,6 +328,7 @@ export const createBrowserRuntime = ({
   };
 
   const runTool = async ({
+    agent,
     arguments: toolArguments,
     caller,
     options,
@@ -190,6 +337,23 @@ export const createBrowserRuntime = ({
     title,
     toolName,
   }: BrowserToolRunInput): Promise<BrowserToolRunOutcome> => {
+    // An agent reaches only its own session's tabs; the group is the boundary (D9).
+    if (
+      caller.kind === 'agent' &&
+      // Until a transport opens its first session no group exists to compare against, so the D9 boundary applies as soon as one is known.
+      groups.listSessions().length > 0 &&
+      !groups.isTabAllowed(caller.sessionHandle, tabId)
+    ) {
+      return {
+        kind: 'result',
+        result: {
+          error:
+            'This tab is not in the agent session\u2019s tab group (blocked). Share it first or pick a tab in the group.',
+          ok: false,
+        },
+      };
+    }
+
     const lease = await leases.acquire(tabId, caller, {
       ...(takeOver === undefined ? {} : { takeOver }),
       ...(title === undefined ? {} : { title }),
@@ -228,32 +392,167 @@ export const createBrowserRuntime = ({
       });
 
       try {
-        const call = runKiloBrowserTool({
-          arguments: toolArguments,
-          options: {
+        const agentContext = caller.kind === 'agent' ? (agent ?? { authorized: [] }) : undefined;
+        const argsRecord = parseToolArguments(toolArguments);
+        const issueSensitiveToken = (sensitive: BrowserSensitiveStep): string =>
+          tokens.issue({
+            argumentHash: hashBrowserToolArguments(argsRecord),
+            element: sensitive.element,
+            origin: sensitive.origin,
+            reason: sensitive.reason,
             tabId,
-            tabsApi,
-            ...(options?.now === undefined ? {} : { now: options.now }),
-            ...(options?.webMcpDiscover === undefined
-              ? {}
-              : { webMcpDiscover: options.webMcpDiscover }),
-            ...(options?.webMcpExecute === undefined
-              ? {}
-              : { webMcpExecute: options.webMcpExecute }),
-          },
-          session,
-          toolName,
-        });
-        const result = await Promise.race([call, takenAway.then(() => null)]);
+            toolName,
+          });
+
+        if (agentContext !== undefined) {
+          // Only downloads this call starts may be reported: events left by an earlier call are stale.
+          takeStartedDownloads(session);
+          await ensureFrameAutoAttach(session, tabId);
+        }
+
+        const preflight =
+          agentContext === undefined
+            ? undefined
+            : await preflightAgentCall({
+                args: argsRecord,
+                authorized: agentContext.authorized,
+                consumeStepToken: (token, binding) => tokens.consume(token, binding),
+                session,
+                stepTokens: agentContext.sensitive ?? [],
+                tabId,
+                toolName,
+              });
+
+        if (preflight !== undefined && !preflight.ok) {
+          if (preflight.failure.kind === 'blocked') {
+            return { kind: 'result', result: { error: preflight.failure.error, ok: false } };
+          }
+
+          if (preflight.failure.kind === 'origin_changed') {
+            return {
+              from: preflight.failure.from,
+              kind: 'origin_changed',
+              result: { error: ORIGIN_CHANGED_ERROR, ok: false },
+              to: preflight.failure.to,
+            };
+          }
+
+          return needsPermissionOutcome(
+            preflight.failure.items,
+            preflight.sensitive === undefined ? undefined : issueSensitiveToken(preflight.sensitive)
+          );
+        }
+
+        // A download approval is post-action, so the gate cannot classify it on retry; a presented token bound to this tab, tool and argument set disables the guard once.
+        const downloadApproved =
+          agentContext !== undefined && preflight !== undefined && preflight.ok
+            ? (agentContext.sensitive ?? []).some(token =>
+                tokens.consume(token, {
+                  argumentHash: hashBrowserToolArguments(argsRecord),
+                  origin: preflight.origin,
+                  tabId,
+                  toolName,
+                })
+              )
+            : false;
+
+        // An unapproved act call runs with downloads denied: a download it starts is cancelled, then reported as a sensitive step.
+        const guardDownloads =
+          agentContext !== undefined &&
+          preflight !== undefined &&
+          preflight.class === 'act' &&
+          preflight.sensitiveToken === undefined &&
+          !downloadApproved;
+
+        if (guardDownloads) {
+          await setDownloadBehavior(session, 'deny');
+        }
+
+        let result: EvalTabResult | null = null;
+
+        try {
+          const call = runKiloBrowserTool({
+            arguments: toolArguments,
+            options: {
+              tabId,
+              tabsApi,
+              ...(agentContext === undefined
+                ? {}
+                : {
+                    agentAccess: {
+                      actOrigins: agentContext.authorized
+                        .filter(grant => grant.class === 'act')
+                        .map(grant => grant.origin),
+                      groupTabs:
+                        caller.kind === 'agent'
+                          ? groups.tabsForSession(caller.sessionHandle)
+                          : undefined,
+                      navigateOrigins: agentContext.authorized
+                        .filter(grant => grant.class === 'navigate')
+                        .map(grant => grant.origin),
+                      readableOrigins: agentContext.authorized
+                        .filter(grant => grant.class === 'read')
+                        .map(grant => grant.origin),
+                    },
+                    agentScope: {
+                      readableOrigins: agentContext.authorized
+                        .filter(grant => grant.class === 'read')
+                        .map(grant => grant.origin),
+                    },
+                    noteTabCreated,
+                  }),
+              ...(options?.now === undefined ? {} : { now: options.now }),
+              ...(options?.webMcpDiscover === undefined
+                ? {}
+                : { webMcpDiscover: options.webMcpDiscover }),
+              ...(options?.webMcpExecute === undefined
+                ? {}
+                : { webMcpExecute: options.webMcpExecute }),
+            },
+            session,
+            toolName,
+          });
+
+          result = await Promise.race([call, takenAway.then(() => null)]);
+        } finally {
+          if (guardDownloads) {
+            await setDownloadBehavior(session, 'default');
+          }
+        }
 
         // A taken-over call drops its late result: the page belongs to the panel now.
         if (taken) {
           return { kind: 'result', result: { error: TAB_TAKEN_ERROR, ok: false } };
         }
 
+        const settled = result ?? { error: 'The browser tool returned no result.', ok: false };
+
+        if (preflight !== undefined && preflight.class === 'navigate') {
+          const changed = await postAgentNavigate(session, preflight.origin);
+
+          if (changed !== undefined) {
+            return { from: changed.from, kind: 'origin_changed', result: settled, to: changed.to };
+          }
+        }
+
+        if (guardDownloads && takeStartedDownloads(session) > 0) {
+          const origin = preflight?.ok ? preflight.origin : '';
+          const reason = SENSITIVE_REASON.download;
+
+          return needsPermissionOutcome(
+            [{ class: 'sensitive', origin, reason }],
+            preflight?.ok ? issueSensitiveToken({ origin, reason }) : undefined
+          );
+        }
+
+        if (agentContext === undefined) {
+          return { kind: 'result', result: settled };
+        }
+
         return {
           kind: 'result',
-          result: result ?? { error: 'The browser tool returned no result.', ok: false },
+          result: settled,
+          withheldFrames: await withheldOriginsFor(session, agentContext.authorized),
         };
       } finally {
         inFlight.delete(tabId);
@@ -294,13 +593,50 @@ export const createBrowserRuntime = ({
     return leases.releaseCaller(caller);
   };
 
-  // Turn end: the lease goes, the caller's refs stay. Playwright-like, a ref from an earlier snapshot keeps resolving for as long as the caller and the tab session live.
+  const noteTabCreated = async (tabId: number, openerTabId: number | undefined): Promise<void> => {
+    if (openerTabId === undefined) {
+      return;
+    }
+
+    const openerSession = groups.sessionForTab(openerTabId);
+
+    if (openerSession === undefined) {
+      return;
+    }
+
+    const groupId = groups
+      .listSessions()
+      .find(session => session.sessionHandle === openerSession)?.groupId;
+
+    if (groupId !== undefined) {
+      groups.noteTabAdded(tabId, groupId);
+      return;
+    }
+
+    // No group yet: create it from the session's tabs plus this one, titled and coloured like a shared tab (D9: the group is what the agent may act on).
+    const owned = [...new Set([...groups.tabsForSession(openerSession), tabId])];
+
+    for (const ownedTab of owned) {
+      // eslint-disable-next-line no-await-in-loop -- grouping one tab per call, order matters for the first group
+      await groups.shareActiveTab({ sessionHandle: openerSession, tabId: ownedTab });
+    }
+  };
+
   return {
+    adoptEnded: input => groups.adoptEnded(input),
     claimTab,
+    closeSession: async input => {
+      await groups.closeSession(input);
+    },
     disposeCaller,
     disposeTab,
     evalInTab,
+    listSessions: () => groups.listSessions(),
+    noteTabCreated,
+    openSession: input => groups.openSession(input),
+    // Turn end: the lease goes, the caller's refs stay. Playwright-like, a ref from an earlier snapshot keeps resolving for as long as the caller and the tab session live.
     releaseCaller: caller => leases.releaseCaller(caller),
     runTool,
+    shareActiveTab: input => groups.shareActiveTab(input),
   };
 };

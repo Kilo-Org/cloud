@@ -47,7 +47,7 @@ const ProposalListInputSchema = PlatformOwnerInputSchema.extend({
 async function ownerFromInput(
   ctx: TRPCContext,
   input: { organizationId?: string },
-  roles?: OrganizationRole[]
+  roles?: readonly OrganizationRole[]
 ): Promise<ReviewMemoryOwner> {
   if (input.organizationId) {
     await ensureOrganizationAccess(ctx, input.organizationId, roles);

@@ -60,37 +60,6 @@ export const deriveModelPreferencesStatus = ({
   return 'ready';
 };
 
-const awaitSettled = async (promise: Promise<unknown>): Promise<void> => {
-  try {
-    await promise;
-  } catch {
-    // Sequencing only — callers observe their own run outcome.
-  }
-};
-
-interface SerialAsyncChain {
-  readonly enqueue: <TValue>(work: () => Promise<TValue>) => Promise<TValue>;
-}
-
-export const createSerialAsyncChain = (): SerialAsyncChain => {
-  let chain: Promise<unknown> | undefined = undefined;
-
-  return {
-    enqueue: <TValue>(work: () => Promise<TValue>): Promise<TValue> => {
-      const previous = chain;
-      const run = (async (): Promise<TValue> => {
-        if (previous !== undefined) {
-          await awaitSettled(previous);
-        }
-
-        return work();
-      })();
-      chain = awaitSettled(run);
-      return run;
-    },
-  };
-};
-
 /** True when a toggle completion may write latch / toggle-error UI state. */
 export const isFavoriteToggleCompletionCurrent = (
   enqueuedKeyFingerprint: string,

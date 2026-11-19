@@ -363,13 +363,7 @@ type NativeTranscriptFacts = {
  */
 function transcriptHasGap(facts: NativeTranscriptFacts): boolean {
   if (facts.session === undefined || facts.quarantinedFrames > 0) return true;
-  // The same rule as `certifiedTranscriptEntry`, inlined so no wrapper object is allocated.
-  if (
-    facts.messages.some(
-      item => item.incomplete || hasUnresolvedKilo2Assets(item.message, facts.assetURLs)
-    )
-  )
-    return true;
+  if (facts.messages.some(item => !certifiedTranscriptEntry(item, facts.assetURLs))) return true;
   // Every listed identity renders as pending in the shared projection until a snapshot or its
   // live replay settles it, so the list itself is the gap signal; `owedPendingSnapshotIDs`
   // decides which entries may leave it.

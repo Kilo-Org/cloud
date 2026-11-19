@@ -965,9 +965,9 @@ describe('resolveGatewayModelsReadFailed', () => {
 
   it('keeps the failure through the no-data refetch that Retry starts', () => {
     // v5 resets the query to pending and clears the error while it refetches.
-    expect(
-      resolveGatewayModelsReadFailed({ ...failed, isError: false, isLoading: true })
-    ).toBe(true);
+    expect(resolveGatewayModelsReadFailed({ ...failed, isError: false, isLoading: true })).toBe(
+      true
+    );
   });
 
   it('is not a failure on the first load', () => {
@@ -986,8 +986,6 @@ describe('resolveGatewayModelsReadFailed', () => {
   });
 
   it('ignores the gateway catalog while a remote target is selected', () => {
-    expect(resolveGatewayModelsReadFailed({ ...failed, isRemoteTargetSelected: true })).toBe(
-      false
-    );
+    expect(resolveGatewayModelsReadFailed({ ...failed, isRemoteTargetSelected: true })).toBe(false);
   });
 });

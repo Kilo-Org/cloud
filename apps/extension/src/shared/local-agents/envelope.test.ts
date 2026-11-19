@@ -51,6 +51,12 @@ describe('incoming frame routing', () => {
     ).toStrictEqual({ controllerId: CONTROLLER_ID, type: 'controller.disconnected' });
   });
 
+  it('accepts the hub keepalive instead of dropping the connection over it', () => {
+    expect(parseIncomingEnvelope({ type: 'hub.keepalive' })).toStrictEqual({
+      type: 'hub.keepalive',
+    });
+  });
+
   it('routes a JSON-RPC request inside an rpc envelope', () => {
     const frame = buildRpcEnvelope(CONTROLLER_ID, {
       id: 7,

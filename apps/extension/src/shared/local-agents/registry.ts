@@ -6,12 +6,16 @@ import { createSerialTaskQueue } from './storage';
 import type { LocalAgentStorageArea } from './storage';
 
 /*
- * Controller and session bookkeeping for the connected-agents list. Until the
- * browser runtime lands, this is the only state a `session.open` changes: it
- * records who is connected so the side panel can list and disconnect them.
+ * Controller and session bookkeeping for the connected-agents list, plus the
+ * handles the user stopped. It lives in `storage.session`, so a service-worker
+ * restart keeps both: a CLI's session survives the restart, and a session the
+ * user stopped stays stopped.
  */
 
 export const LOCAL_AGENT_CONTROLLERS_STORAGE_KEY = 'session:kiloLocalAgentControllers';
+
+/** Enough stopped handles to answer a CLI that raced its own revoke, and nothing more. */
+const STOPPED_SESSION_LIMIT = 256;
 
 export type LocalAgentSessionInput = {
   sessionId: string;
@@ -50,8 +54,12 @@ const controllerSchema = z.object({
 export const localAgentControllersSchema = z
   .object({
     controllers: z.array(controllerSchema).default([]),
+    /** Handles a Stop all or a switch-off ended, oldest first. */
+    stopped: z.array(z.string()).default([]),
   })
   .strip();
+
+type LocalAgentControllersState = z.infer<typeof localAgentControllersSchema>;
 
 export type LocalAgentSession = z.infer<typeof sessionSchema>;
 
@@ -73,18 +81,29 @@ export type LocalAgentControllerRegistry = {
   closeSession(controllerId: string, sessionHandle: string): Promise<boolean>;
   /** The controller that opened a session; undefined when no row holds that handle. */
   sessionOwner(sessionHandle: string): Promise<string | undefined>;
-  /** Removes every session (and its controller) and reports what was revoked. */
+  /**
+   * Removes every session (and its controller), remembers their handles as
+   * stopped by the user, and reports what was revoked.
+   */
   takeAllSessions(): Promise<{ controllerId: string; sessionHandle: string }[]>;
+  /** Whether a Stop all or a switch-off ended this handle. */
+  wasStopped(sessionHandle: string): Promise<boolean>;
+};
+
+const loadState = async (storage: LocalAgentStorageArea): Promise<LocalAgentControllersState> => {
+  const parsed = localAgentControllersSchema.safeParse(
+    await storage.getItem(LOCAL_AGENT_CONTROLLERS_STORAGE_KEY)
+  );
+
+  return parsed.success ? parsed.data : { controllers: [], stopped: [] };
 };
 
 export const loadLocalAgentControllers = async (
   storage: LocalAgentStorageArea
 ): Promise<LocalAgentController[]> => {
-  const parsed = localAgentControllersSchema.safeParse(
-    await storage.getItem(LOCAL_AGENT_CONTROLLERS_STORAGE_KEY)
-  );
+  const { controllers } = await loadState(storage);
 
-  return parsed.success ? parsed.data.controllers : [];
+  return controllers;
 };
 
 const connectedAgentsOf = (controllers: LocalAgentController[]): LocalAgentConnectedAgent[] =>
@@ -130,7 +149,9 @@ export const createLocalAgentControllerRegistry = ({
   const readControllers = (): Promise<LocalAgentController[]> => loadLocalAgentControllers(storage);
 
   const writeControllers = async (controllers: LocalAgentController[]): Promise<void> => {
-    await storage.setItem(LOCAL_AGENT_CONTROLLERS_STORAGE_KEY, { controllers });
+    const { stopped } = await loadState(storage);
+
+    await storage.setItem(LOCAL_AGENT_CONTROLLERS_STORAGE_KEY, { controllers, stopped });
   };
 
   const listControllers = (): Promise<LocalAgentController[]> => readControllers();
@@ -235,17 +256,29 @@ export const createLocalAgentControllerRegistry = ({
 
     takeAllSessions: () =>
       runExclusive(async () => {
-        const controllers = await readControllers();
-        const revoked = controllers.flatMap(controller =>
+        const state = await loadState(storage);
+        const revoked = state.controllers.flatMap(controller =>
           controller.sessions.map(session => ({
             controllerId: controller.controllerId,
             sessionHandle: session.sessionHandle,
           }))
         );
 
-        await writeControllers([]);
+        await storage.setItem(LOCAL_AGENT_CONTROLLERS_STORAGE_KEY, {
+          controllers: [],
+          stopped: [...state.stopped, ...revoked.map(entry => entry.sessionHandle)].slice(
+            -STOPPED_SESSION_LIMIT
+          ),
+        } satisfies LocalAgentControllersState);
 
         return revoked;
+      }),
+
+    wasStopped: sessionHandle =>
+      runExclusive(async () => {
+        const { stopped } = await loadState(storage);
+
+        return stopped.includes(sessionHandle);
       }),
   };
 };

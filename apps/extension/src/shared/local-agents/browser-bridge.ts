@@ -16,7 +16,7 @@ import { BROWSER_TOOL_CONTRACT } from '../browser-tool-contract';
 import { boundBrowserToolText } from '../browser-tool-snapshot';
 import type { EvalTabResult } from '../tab-debugger';
 import { BROWSER_TOOL_CONTRACT_SHA } from './envelope';
-import { LocalAgentRpcError, LOCAL_AGENT_ERROR_CODES } from './jsonrpc';
+import { LocalAgentRpcError, LOCAL_AGENT_ERROR_CODES, SESSION_LOST_MESSAGE } from './jsonrpc';
 import type { JsonRpcParams, JsonRpcResult } from './jsonrpc';
 
 /*
@@ -38,6 +38,7 @@ export type LocalAgentBrowserRuntime = Pick<
   | 'openSessionTab'
   | 'releaseCaller'
   | 'releaseTab'
+  | 'restoreSessions'
   | 'runTool'
   | 'shareActiveTab'
   | 'tabInfo'
@@ -120,7 +121,6 @@ const NO_DESTINATION_ERROR =
 const ENDED_SESSION_LIMIT = 256;
 const ENDED_SESSION_TTL_MS = 10 * 60_000;
 const NO_ACTIVE_TAB_ERROR = 'The browser has no active tab to share.';
-const SESSION_NOT_OPEN_ERROR = 'This agent session is not open.';
 const SESSION_STOPPED_ERROR = 'The user stopped this agent session.';
 
 const sessionCaller = ({
@@ -255,9 +255,10 @@ export const createRuntimeBrowserBridge = ({
       return;
     }
 
+    // A session the bridge never ended and the runtime does not hold was lost; the CLI may open a new one.
     throw isEnded(sessionHandle)
       ? new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.userStopped, SESSION_STOPPED_ERROR)
-      : new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.blocked, SESSION_NOT_OPEN_ERROR);
+      : new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.sessionLost, SESSION_LOST_MESSAGE);
   };
 
   /** The tab one call runs on: the active tab when the session owns it, else the newest group tab. */
@@ -492,8 +493,10 @@ export const createRuntimeBrowserBridge = ({
     return runOnTab(parsed, input, { tabId: opened.tabId });
   };
 
+  // Every session operation first waits for the sessions an earlier service worker stored: a CLI keeps its handle and its group across a restart.
   return {
     adopt: async input => {
+      await runtime().restoreSessions();
       ended.delete(input.sessionHandle);
       await runtime().adoptEnded({ sessionHandle: input.sessionHandle });
 
@@ -512,6 +515,7 @@ export const createRuntimeBrowserBridge = ({
 
       const input = { controllerId, sessionHandle: parsed.data.sessionHandle };
 
+      await runtime().restoreSessions();
       assertLive(input.sessionHandle);
 
       const existing = await targetTab(input.sessionHandle);
@@ -525,9 +529,13 @@ export const createRuntimeBrowserBridge = ({
       return runOnTab(parsed.data, input, { tabId: existing });
     },
 
-    closeSession: closeOne,
+    closeSession: async input => {
+      await runtime().restoreSessions();
+      await closeOne(input);
+    },
 
     endSessions: async sessions => {
+      await runtime().restoreSessions();
       await Promise.all(sessions.map(session => closeOne(session)));
     },
 
@@ -542,6 +550,7 @@ export const createRuntimeBrowserBridge = ({
       }),
 
     openSession: async input => {
+      await runtime().restoreSessions();
       ended.delete(input.sessionHandle);
       await runtime().openSession({
         controllerId: input.controllerId,
@@ -551,6 +560,7 @@ export const createRuntimeBrowserBridge = ({
     },
 
     shareActiveTab: async input => {
+      await runtime().restoreSessions();
       assertLive(input.sessionHandle);
 
       const shared = await runtime().shareActiveTab({ sessionHandle: input.sessionHandle });

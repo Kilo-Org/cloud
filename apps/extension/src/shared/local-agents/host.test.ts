@@ -326,6 +326,21 @@ const openSession = async (
   return messageOf(rpcWith(socket.sent, 'id', 1));
 };
 
+const sendSnapshotCall = (socket: FakeSocket, id: number, sessionHandle: string | undefined) => {
+  socket.handlers.onText(
+    JSON.stringify({
+      controllerId: CONTROLLER_ID,
+      message: {
+        id,
+        jsonrpc: '2.0',
+        method: 'tools.call',
+        params: { arguments: {}, authorized: [], name: 'browser_snapshot', sessionHandle },
+      },
+      type: 'rpc',
+    })
+  );
+};
+
 describe('local agents host over a loopback endpoint', () => {
   it('pairs, handshakes, announces ext.hello, opens a session, and revokes on switch off', async () => {
     const harness = createHarness();
@@ -499,6 +514,76 @@ describe('local agents host over a loopback endpoint', () => {
     ]);
     await expect(loadLocalAgentConnectedAgents(harness.storage)).resolves.toStrictEqual([]);
     host.stop();
+  });
+
+  it('keeps a session and a Stop all through a service-worker restart', async () => {
+    const first = createHarness();
+    seedEnabledWithEndpoint(first.storage);
+    const before = startHost(first);
+    await before.ready;
+    const socket = await connectSocketIfNeeded(first);
+
+    await completeHandshake(socket);
+    const kept = sessionHandleOf(
+      await openSession(socket, { cliVersion: '1', cwd: '/tmp', title: 'kept' })
+    );
+
+    // The worker dies without a word: no state change runs, only storage.session survives.
+    const second = createHarness();
+
+    for (const [key, value] of first.storage.items) {
+      second.storage.items.set(key, value);
+    }
+
+    const after = startHost(second);
+    await after.ready;
+    const resocket = await connectSocketIfNeeded(second);
+
+    await completeHandshake(resocket);
+    resocket.handlers.onText(
+      JSON.stringify({ controllerId: CONTROLLER_ID, type: 'controller.connected' })
+    );
+
+    // The same CLI's next call reaches the browser under the handle it already has.
+    sendSnapshotCall(resocket, 2, kept);
+    await vi.waitFor(() => {
+      expect(rpcWith(resocket.sent, 'id', 2)).toBeDefined();
+    });
+    expect(messageOf(rpcWith(resocket.sent, 'id', 2))?.['error']).toBeUndefined();
+    expect(second.bridge.callTool).toHaveBeenCalledWith(
+      CONTROLLER_ID,
+      expect.objectContaining({ sessionHandle: kept })
+    );
+
+    // A Stop all before the next restart is still a stop after it.
+    second.listeners.command?.('stop-all-local-agents');
+    await vi.waitFor(() => {
+      expect(rpcWith(resocket.sent, 'method', 'session.revoked')).toBeDefined();
+    });
+
+    const third = createHarness();
+
+    for (const [key, value] of second.storage.items) {
+      third.storage.items.set(key, value);
+    }
+
+    const last = startHost(third);
+    await last.ready;
+    const lastSocket = await connectSocketIfNeeded(third);
+
+    await completeHandshake(lastSocket);
+    sendSnapshotCall(lastSocket, 3, kept);
+    await vi.waitFor(() => {
+      expect(rpcWith(lastSocket.sent, 'id', 3)).toBeDefined();
+    });
+    expect(messageOf(rpcWith(lastSocket.sent, 'id', 3))?.['error']).toStrictEqual({
+      code: -32_004,
+      message: 'The user stopped this agent session.',
+    });
+    expect(third.bridge.callTool).not.toHaveBeenCalled();
+    before.stop();
+    after.stop();
+    last.stop();
   });
 
   it('forwards the structured error data the CLI reads', async () => {

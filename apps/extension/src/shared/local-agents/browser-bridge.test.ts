@@ -40,6 +40,8 @@ const callerKey = (caller: BrowserCaller): string =>
 const createFakeRuntime = (
   options: {
     readonly outcome?: ((input: BrowserToolRunInput) => BrowserToolRunOutcome) | undefined;
+    /** Settles when the sessions an earlier service worker stored are back; already settled by default. */
+    readonly restored?: Promise<void> | undefined;
     readonly share?: { readonly groupId?: number | undefined; readonly tabId: number } | undefined;
     /** What `tabInfo` reports; the default is a tab that finished its navigation. */
     readonly tabInfo?: { readonly title: string; readonly url: string } | undefined;
@@ -130,6 +132,7 @@ const createFakeRuntime = (
     releaseTab: ({ caller, tabId }) => {
       releasedTabs.push({ caller: callerKey(caller), tabId });
     },
+    restoreSessions: () => options.restored ?? Promise.resolve(),
     runTool: async input => {
       run.push(input);
 
@@ -574,13 +577,31 @@ describe('local agent browser bridge', () => {
     expect(fake.ownTabs).toStrictEqual([]);
   });
 
-  it('refuses a session handle that was never opened', async () => {
+  it('answers session_lost for a handle no session holds, so the CLI may open a new one', async () => {
     const fake = createFakeRuntime();
     const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
 
     await expect(bridge.callTool(CONTROLLER, snapshotParams())).rejects.toMatchObject({
-      code: LOCAL_AGENT_ERROR_CODES.blocked,
+      code: LOCAL_AGENT_ERROR_CODES.sessionLost,
+      message: 'This agent session is no longer open in the browser.',
     });
+    expect(fake.run).toStrictEqual([]);
+  });
+
+  it('waits for the sessions an earlier service worker stored before it judges the handle', async () => {
+    const restored = Promise.withResolvers<void>();
+    const fake = createFakeRuntime({ restored: restored.promise });
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+    const call = bridge.callTool(CONTROLLER, snapshotParams());
+
+    // The restarted worker reads storage.session; the session and its tab come back only then.
+    await Promise.resolve();
+    expect(fake.run).toStrictEqual([]);
+    fake.sessions.set(HANDLE, { ended: false, tabs: [5] });
+    restored.resolve();
+
+    await expect(call).resolves.toMatchObject({ content: [{ text: 'ok', type: 'text' }] });
+    expect(fake.run).toMatchObject([{ tabId: 5, toolName: 'browser_snapshot' }]);
   });
 
   it('maps needs_permission with its items and step token onto -32010', async () => {
@@ -816,7 +837,7 @@ describe('local agent browser bridge', () => {
 
     clock += 2 * 60_000;
     await expect(bridge.callTool(CONTROLLER, snapshotParams())).rejects.toMatchObject({
-      code: LOCAL_AGENT_ERROR_CODES.blocked,
+      code: LOCAL_AGENT_ERROR_CODES.sessionLost,
     });
   });
 
@@ -837,7 +858,7 @@ describe('local agent browser bridge', () => {
 
     // The oldest handle was evicted; the newest still answers for its own stop.
     await expect(bridge.callTool(CONTROLLER, snapshotParams(handles[0]))).rejects.toMatchObject({
-      code: LOCAL_AGENT_ERROR_CODES.blocked,
+      code: LOCAL_AGENT_ERROR_CODES.sessionLost,
     });
     await expect(bridge.callTool(CONTROLLER, snapshotParams(handles.at(-1)))).rejects.toMatchObject(
       { code: LOCAL_AGENT_ERROR_CODES.userStopped }

@@ -4,8 +4,8 @@ import { useAtom } from 'jotai';
 import { ChevronDown, ChevronRight, KeyRound, Plus, RefreshCw, Server, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { JSX } from 'react';
-import type { RemoteMcpServer } from '../../src/shared/remote-mcp';
-import { loadRemoteMcpStore, saveRemoteMcpStore } from '../../src/shared/remote-mcp-storage';
+import type { RemoteMcpServer, RemoteMcpStore } from '../../src/shared/remote-mcp';
+import { loadRemoteMcpStore, updateRemoteMcpStore } from '../../src/shared/remote-mcp-storage';
 import { remoteMcpStoreAtom } from './agent-chat-atoms';
 import { ErrorNotice } from './error-notice';
 import { connectAndPersistRemoteMcpServer } from './remote-mcp-client';
@@ -480,11 +480,36 @@ export const RemoteMcpSettings = (): JSX.Element => {
   const handleSave = async (form: FormState): Promise<string | null> => {
     const existing = editingServer;
     const draft = buildDraftFromForm(form, existing?.auth);
-    const { store: nextStore, error } = applyUpsert(store, draft);
-    if (error !== null) {
-      return error;
+    /* The atom can be stale (a connect or OAuth write may have landed since it
+       was set), so the upsert runs on the store the serialized update loads. */
+    const saveErrors: string[] = [];
+    const savedStores: RemoteMcpStore[] = [];
+    const existingIds = new Set<string>();
+
+    await updateRemoteMcpStore(storage, freshStore => {
+      for (const server of freshStore.servers) {
+        existingIds.add(server.id);
+      }
+
+      const upserted = applyUpsert(freshStore, draft);
+      if (upserted.error !== null) {
+        saveErrors.push(upserted.error);
+        return freshStore;
+      }
+
+      savedStores.push(upserted.store);
+      return upserted.store;
+    });
+
+    const [saveError] = saveErrors;
+    const [nextStore] = savedStores;
+    if (saveError !== undefined) {
+      return saveError;
     }
-    await saveRemoteMcpStore(storage, nextStore);
+    if (nextStore === undefined) {
+      return null;
+    }
+
     setStore(nextStore);
     setShowAddForm(false);
     setEditingServer(null);
@@ -492,7 +517,7 @@ export const RemoteMcpSettings = (): JSX.Element => {
     // Connect (test) on save so tools are cached and usable immediately; the row surfaces any failure.
     const savedServer =
       existing === null
-        ? nextStore.servers.find(candidate => !store.servers.some(prev => prev.id === candidate.id))
+        ? nextStore.servers.find(candidate => !existingIds.has(candidate.id))
         : nextStore.servers.find(candidate => candidate.id === existing.id);
     if (savedServer !== undefined) {
       await connectServer(savedServer);
@@ -501,9 +526,17 @@ export const RemoteMcpSettings = (): JSX.Element => {
   };
 
   const handleRemove = async (serverId: string): Promise<void> => {
-    const nextStore = removeServer(store, serverId);
-    await saveRemoteMcpStore(storage, nextStore);
-    setStore(nextStore);
+    const removedStores: RemoteMcpStore[] = [];
+    await updateRemoteMcpStore(storage, freshStore => {
+      const removedStore = removeServer(freshStore, serverId);
+      removedStores.push(removedStore);
+      return removedStore;
+    });
+
+    const [nextStore] = removedStores;
+    if (nextStore !== undefined) {
+      setStore(nextStore);
+    }
   };
 
   const handleEdit = (server: RemoteMcpServer): void => {

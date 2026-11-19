@@ -6,6 +6,7 @@ import type {
   RemoteMcpStore,
 } from './remote-mcp';
 import { normalizeRemoteMcpUrl } from './remote-mcp-url';
+import { createSerialAsyncChain } from './serial-async-chain';
 
 export const REMOTE_MCP_STORAGE_KEY = 'local:kiloRemoteMcpServers';
 
@@ -192,6 +193,18 @@ export const saveRemoteMcpStore = async (
 ): Promise<void> => {
   await storageArea.setItem(REMOTE_MCP_STORAGE_KEY, normalizeRemoteMcpStore(store));
 };
+
+const storeUpdateChain = createSerialAsyncChain();
+
+/* Serialized load-modify-save: a save from an older snapshot would drop another caller's write. */
+export const updateRemoteMcpStore = (
+  storageArea: RemoteMcpStorageArea,
+  update: (store: RemoteMcpStore) => RemoteMcpStore
+): Promise<void> =>
+  storeUpdateChain.enqueue(async () => {
+    const store = await loadRemoteMcpStore(storageArea);
+    await saveRemoteMcpStore(storageArea, update(store));
+  });
 
 const createId = (): string => crypto.randomUUID();
 

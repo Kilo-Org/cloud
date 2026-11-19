@@ -15,11 +15,7 @@ import type {
   RemoteMcpCachedTool,
   RemoteMcpServer,
 } from '../../src/shared/remote-mcp';
-import {
-  loadRemoteMcpStore,
-  saveRemoteMcpStore,
-  upsertRemoteMcpServer,
-} from '../../src/shared/remote-mcp-storage';
+import { updateRemoteMcpStore, upsertRemoteMcpServer } from '../../src/shared/remote-mcp-storage';
 import type { RemoteMcpStorageArea } from '../../src/shared/remote-mcp-storage';
 import type { RemoteMcpToolRoute } from '../../src/shared/remote-mcp-tools';
 import type { RemoteMcpOAuthProvider } from './remote-mcp-oauth-provider';
@@ -241,23 +237,62 @@ export const connectAndPersistRemoteMcpServer = async ({
   readonly storageArea: RemoteMcpStorageArea;
 }): Promise<readonly RemoteMcpServer[] | undefined> => {
   const updated = await connectRemoteMcpServer({ fetch: fetchFn, server, storageArea });
-  const freshStore = await loadRemoteMcpStore(storageArea);
-  const freshServer = freshStore.servers.find(found => found.id === server.id);
+  let savedServers: readonly RemoteMcpServer[] | undefined = undefined;
 
-  if (freshServer === undefined) {
-    return undefined;
+  await updateRemoteMcpStore(storageArea, freshStore => {
+    const freshServer = freshStore.servers.find(found => found.id === server.id);
+    if (freshServer === undefined) {
+      return freshStore;
+    }
+
+    const nextStore = upsertRemoteMcpServer(freshStore, {
+      ...freshServer,
+      cachedTools: updated.cachedTools,
+      lastConnectedAt: updated.lastConnectedAt,
+      lastError: updated.lastError,
+      status: updated.status,
+    });
+    savedServers = nextStore.servers;
+    return nextStore;
+  });
+
+  return savedServers;
+};
+
+/*
+ * The tool path is model-initiated, so it must never open the user's browser:
+ * an unauthorized server becomes a tool error that asks the user for
+ * credentials. Every other provider call (stored tokens, non-interactive
+ * refresh) still delegates unchanged.
+ */
+const withoutInteractiveSignIn = (provider: RemoteMcpOAuthProvider): RemoteMcpOAuthProvider => ({
+  ...provider,
+  redirectToAuthorization(): Promise<void> {
+    throw new UnauthorizedError('Interactive sign-in is required for this server.');
+  },
+});
+
+/*
+ * Persist needs-sign-in for a server the tool path could not authenticate, so
+ * its settings row shows the Connect/Edit affordance instead of the last good
+ * status.
+ */
+const persistNeedsAuth = async (
+  storageArea: RemoteMcpStorageArea | undefined,
+  serverId: string
+): Promise<void> => {
+  if (storageArea === undefined) {
+    return;
   }
 
-  const nextStore = upsertRemoteMcpServer(freshStore, {
-    ...freshServer,
-    cachedTools: updated.cachedTools,
-    lastConnectedAt: updated.lastConnectedAt,
-    lastError: updated.lastError,
-    status: updated.status,
-  });
-  await saveRemoteMcpStore(storageArea, nextStore);
+  await updateRemoteMcpStore(storageArea, store => {
+    const freshServer = store.servers.find(found => found.id === serverId);
+    if (freshServer === undefined) {
+      return store;
+    }
 
-  return nextStore.servers;
+    return upsertRemoteMcpServer(store, { ...freshServer, status: 'needs_auth' });
+  });
 };
 
 export const callRemoteMcpTool = async ({
@@ -277,7 +312,12 @@ export const callRemoteMcpTool = async ({
 }): Promise<CallToolResult> => {
   const combined = combineSignal(signal, CONNECT_TIMEOUT_MS);
   const client = makeClient();
-  const transport = makeTransport(server, fetchFn, makeAuthProvider(server, storageArea));
+  const authProvider = makeAuthProvider(server, storageArea);
+  const transport = makeTransport(
+    server,
+    fetchFn,
+    authProvider === undefined ? undefined : withoutInteractiveSignIn(authProvider)
+  );
 
   try {
     await client.connect(asTransport(transport), { signal: combined });
@@ -293,6 +333,10 @@ export const callRemoteMcpTool = async ({
      */
     return CallToolResultSchema.parse(result);
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      await persistNeedsAuth(storageArea, server.id);
+    }
+
     return {
       content: [{ text: describeConnectFailure(error).message, type: 'text' }],
       isError: true,

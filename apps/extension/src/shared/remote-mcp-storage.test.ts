@@ -5,6 +5,7 @@ import {
   loadRemoteMcpStore,
   normalizeRemoteMcpStore,
   saveRemoteMcpStore,
+  updateRemoteMcpStore,
   upsertRemoteMcpServer,
 } from './remote-mcp-storage';
 import { normalizeRemoteMcpUrl } from './remote-mcp-url';
@@ -336,5 +337,79 @@ describe('remote MCP storage', () => {
 
     expect(result.servers[0]?.status).toBe('untested');
     expect(result.servers[0]?.cachedTools).toStrictEqual([]);
+  });
+});
+
+describe('serialized store updates', () => {
+  /* Resolving a controlled storage promise only queues continuations; run those
+     microtasks until the observable state is reached. No wall-clock waiting. */
+  const drainUntil = async (condition: () => boolean): Promise<void> => {
+    for (let attempts = 0; attempts < 100; attempts += 1) {
+      if (condition()) {
+        return;
+      }
+      // eslint-disable-next-line no-await-in-loop -- one microtask hop per attempt
+      await Promise.resolve();
+    }
+    throw new Error('storage continuations never reached the expected state');
+  };
+
+  it('keeps both overlapping updates when a second starts mid-flight', async () => {
+    const loads: PromiseWithResolvers<unknown>[] = [];
+    const saves: (PromiseWithResolvers<void> & { value: RemoteMcpStore })[] = [];
+    let storedValue: unknown = { servers: [] };
+
+    const storage: RemoteMcpStorageArea = {
+      getItem: () => {
+        const load = Promise.withResolvers<unknown>();
+        loads.push(load);
+        return load.promise;
+      },
+      setItem: async (_key, value) => {
+        const save = Promise.withResolvers<void>();
+        saves.push({ ...save, value });
+        await save.promise;
+        storedValue = value;
+      },
+    };
+
+    const first = updateRemoteMcpStore(storage, store => ({
+      servers: [
+        ...store.servers,
+        { ...savedServer, id: 'server-a', slug: 'server-a', url: 'https://server-a.example/mcp' },
+      ],
+    }));
+    /* The second call arrives while the first one is still loading. */
+    const second = updateRemoteMcpStore(storage, store => ({
+      servers: [
+        ...store.servers,
+        { ...savedServer, id: 'server-b', slug: 'server-b', url: 'https://server-b.example/mcp' },
+      ],
+    }));
+
+    expect(loads).toHaveLength(1);
+
+    loads[0]?.resolve({ servers: [] });
+    await drainUntil(() => saves.length === 1);
+    expect(loads).toHaveLength(1);
+
+    saves[0]?.resolve();
+    await drainUntil(() => loads.length === 2);
+
+    /* The second update loads the store the first one just saved. */
+    loads[1]?.resolve(storedValue);
+    await drainUntil(() => saves.length === 2);
+    expect(saves[1]?.value.servers.map(server => server.id)).toStrictEqual([
+      'server-a',
+      'server-b',
+    ]);
+
+    saves[1]?.resolve();
+    await Promise.all([first, second]);
+
+    expect(normalizeRemoteMcpStore(storedValue).servers.map(server => server.id)).toStrictEqual([
+      'server-a',
+      'server-b',
+    ]);
   });
 });

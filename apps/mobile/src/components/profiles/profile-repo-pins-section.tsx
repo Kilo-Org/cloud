@@ -19,6 +19,7 @@ import { ROW_FRAME_CLASS } from '@/components/ui/row-frame';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
+import { SectionHeaderSkeleton } from '@/components/ui/section-header-skeleton';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
@@ -31,7 +32,6 @@ import {
   COMPACT_CONTROL_BOX_CLASS,
   COMPACT_CONTROL_HIT_SLOP_DP,
   ROW_TARGET_CLASS,
-  SECTION_ACTION_BOX_CLASS,
 } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
@@ -44,13 +44,9 @@ function hasUsableMessage(error: unknown): boolean {
 function RepoPinsSkeleton() {
   return (
     <View className="gap-3">
-      <View className="flex-row items-center justify-between gap-2 py-2">
-        <Skeleton className="h-2 w-32 rounded bg-muted-soft" />
-        {/* The placeholder reserves the loaded action's box over the same one
-            text line and the header's own `py-2`, so the section keeps one
-            header line and cannot grow when the bindings land. */}
-        <Skeleton className={cn(SECTION_ACTION_BOX_CLASS, 'w-24 rounded-md bg-muted-soft')} />
-      </View>
+      {/* The shared header twin holds the header's own row and the action's
+          band, so the section cannot grow when the bindings land. */}
+      <SectionHeaderSkeleton action />
       <Skeleton className="h-3 w-56 rounded bg-muted-soft" />
       <RowGroup>
         <RowSkeleton subtitle trailingControl />

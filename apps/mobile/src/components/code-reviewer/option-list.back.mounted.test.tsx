@@ -8,7 +8,7 @@
 // it, because a screen-level listener no longer exists to do so.
 
 import { createElement, type ReactNode } from 'react';
-import { act, TestRenderer } from '@/test/renderer';
+import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -20,8 +20,13 @@ import {
   settleLeaveWindow,
   spendsLeaveBackPress,
 } from '@/lib/navigation/leave-settle';
-import { LeaveSettleMount } from '@/lib/navigation/leave-settle-mount';
-import { OptionList } from './option-list';
+import {
+  dismissedScreen,
+  mount,
+  press,
+  row,
+  settleSave,
+} from './option-list.back.mounted.test-helpers';
 
 // Models React Native's BackHandler as a set of live subscriptions, so a test
 // can press Android Back and observe what the mounted listeners do with it.
@@ -83,6 +88,23 @@ vi.mock('expo-router', () => ({
     },
   }),
 }));
+// The connect actions read the reader's organization role for a trial refusal.
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ organizationId: 'org_1', isLoaded: true }),
+}));
+vi.mock('@/lib/hooks/use-organizations-list', () => ({
+  useOrganizationsList: () => ({
+    data: [{ organizationId: 'org_1', role: 'member' }],
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    refetch: vi.fn(),
+  }),
+}));
+vi.mock('@/lib/trpc', () => ({
+  trpcClient: {},
+  useTRPC: () => ({}),
+}));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -100,77 +122,6 @@ vi.mock('@/components/tab-screen', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666' }),
 }));
-
-const OPTIONS = ['off', 'all'] as const;
-
-type SelectFn = (value: 'off' | 'all') => Promise<unknown>;
-type RowProps = { label: string; busy: boolean; disabled: boolean; onPress: () => void };
-
-/**
- * The app shell's listener is its own root, mounted first and left mounted:
- * only the screen's route goes away, the shell does not.
- */
-async function mount(onSelect: SelectFn): Promise<TestRenderer.ReactTestRenderer> {
-  const shell = { current: undefined as TestRenderer.ReactTestRenderer | undefined };
-  const screen = { current: undefined as TestRenderer.ReactTestRenderer | undefined };
-  await act(async () => {
-    shell.current = TestRenderer.create(createElement(LeaveSettleMount));
-    screen.current = TestRenderer.create(
-      createElement(OptionList, {
-        title: 'Gate',
-        options: OPTIONS,
-        selected: 'off',
-        onSelect: onSelect as (value: string) => Promise<unknown>,
-        labels: { off: 'Off', all: 'All' },
-        disabled: false,
-      })
-    );
-    await Promise.resolve();
-  });
-  // oxlint-disable-next-line typescript-eslint/no-non-null-assertion -- act guarantees the ref is set; the linter's own preference cycle (assertion vs optional chain) makes a plain expression impossible
-  return screen.current!;
-}
-
-function row(renderer: TestRenderer.ReactTestRenderer, label: string): RowProps {
-  const found = renderer.root
-    .findAll(node => String(node.type) === 'View' && node.props.label === label)
-    .map(node => node.props as RowProps)[0];
-  if (!found) {
-    throw new Error(`row ${label} not found`);
-  }
-  return found;
-}
-
-/** The row's press handler returns void; the busy state settles a turn later. */
-async function press(rowProps: RowProps): Promise<void> {
-  await act(async () => {
-    rowProps.onPress();
-    await Promise.resolve();
-  });
-}
-
-/** Confirm the save, which runs the screen's own dismissal. */
-async function settleSave(gate: PromiseWithResolvers<boolean>): Promise<void> {
-  await act(async () => {
-    gate.resolve(true);
-    await Promise.resolve();
-  });
-}
-
-/**
- * A screen whose save confirmed and left the tree: its dismissal ran once and
- * only the leave window it opened is left behind.
- */
-async function dismissedScreen(): Promise<void> {
-  const gate = Promise.withResolvers<boolean>();
-  const renderer = await mount(() => gate.promise);
-  await press(row(renderer, 'All'));
-  await settleSave(gate);
-  expect(routerBack).toHaveBeenCalledTimes(1);
-  act(() => {
-    renderer.unmount();
-  });
-}
 
 beforeEach(() => {
   resetLeaveSettle();
@@ -209,7 +160,7 @@ describe('OptionList hardware Back during a save', () => {
   });
 
   it('spends a Back that arrives after the dismissed route was removed', async () => {
-    await dismissedScreen();
+    await dismissedScreen(routerBack);
 
     // Android delivers the Back once the navigator already dropped the route —
     // the case the screen-level listener cannot see. Only the leftover exit
@@ -220,7 +171,7 @@ describe('OptionList hardware Back during a save', () => {
   });
 
   it('spends a Back that arrives while the grace after the dismissed screen runs', async () => {
-    await dismissedScreen();
+    await dismissedScreen(routerBack);
 
     // The scene the dismissal revealed reports its appearance transition, which
     // is the end of the leave this window described.
@@ -235,7 +186,7 @@ describe('OptionList hardware Back during a save', () => {
   });
 
   it('settles the leave when the scene the dismissal revealed appears', async () => {
-    await dismissedScreen();
+    await dismissedScreen(routerBack);
 
     // The scene below this route reports its appearance transition, and that is
     // the name the dismissal derived from this route's own stack.
@@ -252,7 +203,7 @@ describe('OptionList hardware Back during a save', () => {
   });
 
   it('keeps the leave open when another scene appears first', async () => {
-    await dismissedScreen();
+    await dismissedScreen(routerBack);
 
     // A tab switch or a push reports another scene's end while this leave
     // animates. That end is not this leave's end.
@@ -272,7 +223,7 @@ describe('OptionList hardware Back during a save', () => {
     navigator.own = { index: 0, routes: [{ key: 'field-route' }] };
     navigator.parent = { index: 1, routes: [{ key: 'scene-below' }, { key: 'edit-stack' }] };
 
-    await dismissedScreen();
+    await dismissedScreen(routerBack);
 
     // Another scene's end belongs to no leave this route opened.
     act(() => {

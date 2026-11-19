@@ -10,9 +10,12 @@ import { useRouter } from 'expo-router';
 import { useEffect, useSyncExternalStore } from 'react';
 import { toast } from 'sonner-native';
 
+import { announceTrialRefusal } from '@/lib/refusal-toast';
+import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
+import { trialRefusalMessage } from '@/lib/trial-refusal-copy';
+
 import {
   appActionHref,
-  type AppActionRequest,
   type NeedsInputSession,
   resolveNeedsInputHref,
 } from './app-action-contract';
@@ -22,20 +25,6 @@ import {
   subscribePendingAppAction,
   takePendingAppAction,
 } from './pending-app-action';
-
-/**
- * A `StartAgent` the OS asked for through a URL runs once the shell is up. A
- * failure is the app's own feedback — `AGENTS.md` has every failed mutation
- * show `result.message` — because this hook owns no screen of its own to show
- * it. The confirmation a run has to pass first shows the person the request,
- * so its cancel answer reports nothing here.
- */
-async function runStartAgentRequest(request: AppActionRequest): Promise<void> {
-  const result = await dispatchAppActionRequest(request);
-  if (!result.ok && result.code !== 'start-cancelled') {
-    toast.error(result.message);
-  }
-}
 
 /**
  * Consume one parked app action once the shell can answer it.
@@ -48,6 +37,15 @@ async function runStartAgentRequest(request: AppActionRequest): Promise<void> {
  * refusal itself — the one error this surface owns: non-retryable, no CTA and
  * no navigation, because the app is already at the front on the screen it was
  * showing, and correcting the link is the fix.
+ *
+ * A `StartAgent` the OS asked for through a URL runs once the shell is up. A
+ * failure is the app's own feedback — `AGENTS.md` has every failed mutation
+ * show `result.message` — because this hook owns no screen of its own to show
+ * it. The trial refusal is the one exception: the OS path carries no
+ * organization, so it maps the member sentence, and the copy is re-derived
+ * here from the same role read that decides the step, keeping both on one
+ * reader. The confirmation a run has to pass first shows the person the
+ * request, so its cancel answer reports nothing here.
  */
 export function usePendingAppAction({
   isError,
@@ -61,6 +59,13 @@ export function usePendingAppAction({
   orgLoaded: boolean;
 }): void {
   const router = useRouter();
+  // The step a refusal offers: an OS request names no organization, so the
+  // role is the selected one — the reader every surface paints without an
+  // organization override. Read here, not in the effect, which runs later.
+  const billingAction = useBillingAction();
+  // The same predicate `billingAction` resolves, read beside it so the copy a
+  // trial refusal announces on this surface matches the step it offers.
+  const canManageBilling = useCanManageBilling();
   const pendingAppAction = useSyncExternalStore(subscribePendingAppAction, getPendingAppAction);
   useEffect(() => {
     if (pendingAppAction === null) {
@@ -89,7 +94,20 @@ export function usePendingAppAction({
       return;
     }
     if (request.action === 'StartAgent') {
-      void runStartAgentRequest(request);
+      void (async () => {
+        const result = await dispatchAppActionRequest(request);
+        if (!result.ok && result.code !== 'start-cancelled') {
+          // The OS path maps the member sentence because it cannot read a
+          // role, so a trial refusal's copy is re-derived at announce time
+          // from the same role read that decides the step.
+          const isTrialRefusal = result.trialRefusal === true;
+          announceTrialRefusal(
+            isTrialRefusal ? trialRefusalMessage(canManageBilling) : result.message,
+            billingAction,
+            isTrialRefusal
+          );
+        }
+      })();
       return;
     }
     // An open action whose input names no destination never reaches a screen,
@@ -99,5 +117,14 @@ export function usePendingAppAction({
     if (refusal !== null) {
       toast.error(refusal.message);
     }
-  }, [pendingAppAction, orgLoaded, isLoading, isError, needsInputRows, router]);
+  }, [
+    pendingAppAction,
+    orgLoaded,
+    isLoading,
+    isError,
+    needsInputRows,
+    router,
+    billingAction,
+    canManageBilling,
+  ]);
 }

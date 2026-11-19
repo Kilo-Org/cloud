@@ -95,6 +95,13 @@ export const COLLAPSED_CONNECT_CTAS_KEY = 'collapsed-connect-ctas';
 /** SQLCipher database key for the encrypted persistence store (DEC-01). */
 export const PERSIST_DB_KEY = 'persist-db-key';
 /**
+ * Consecutive encrypted-store migration failures across launches, beside
+ * `PERSIST_DB_KEY`. Durable outside the database on purpose: the failing
+ * database cannot hold its own counter. A successful migration deletes the
+ * item; a threshold reached falls back to delete-and-recreate (DEC-01 step 4).
+ */
+export const PERSIST_MIGRATION_FAILURES_KEY = 'persist-db-migration-failures';
+/**
  * Identity hint for the cold-start read-cache restore (DEC-01). Class
  * `account-metadata`: written when the authenticated identity resolves and
  * deleted on sign-out via `deleteAccountMetadata`.

@@ -36,7 +36,7 @@ function SaveCluster() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Fixture save"
-        className="ms-3 h-[48px] items-center justify-center rounded-full bg-accent px-sp-5"
+        className="ms-3 h-[48px] w-[48px] items-center justify-center rounded-full bg-accent"
       >
         <Text className="text-sm font-semibold text-primary-foreground">Save</Text>
       </Pressable>
@@ -51,7 +51,7 @@ function ClusterHeader() {
       centerTitle
       showBackButton
       headerRight={<SaveCluster />}
-      headerRightWidth={140}
+      headerRightWidth={110}
     />
   );
 }
@@ -67,7 +67,7 @@ function NoBackHeader() {
       centerTitle
       showBackButton={false}
       headerRight={<SaveCluster />}
-      headerRightWidth={140}
+      headerRightWidth={110}
     />
   );
 }

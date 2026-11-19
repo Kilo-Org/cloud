@@ -243,6 +243,9 @@ describe('low balance alert screen form', () => {
     await act(() => {
       (retry.props.onPress as () => void)();
     });
+    // The rejection stays while its own resend is open: the Retry keeps the
+    // busy face instead of vanishing with no feedback.
+    expect(retryButtonOf(renderer)?.props.loading).toBe(true);
     await act(() => {
       calls.list[1]?.options.onSuccess?.();
     });

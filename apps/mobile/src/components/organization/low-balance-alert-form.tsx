@@ -155,9 +155,10 @@ export function LowBalanceAlertForm({
     }
     inFlight.current = true;
     setSaving(true);
-    // A new write supersedes the last outcome: neither a rejected write nor a
-    // confirmation can paint beside the answer to a newer draft.
-    setOutcome({ kind: 'idle' });
+    // A new write supersedes the last confirmation. A rejected write stays: it
+    // is the one being retried, and its Retry carries the busy state until this
+    // write settles, which then replaces it with one outcome.
+    setOutcome(previous => (previous.kind === 'saved' ? { kind: 'idle' } : previous));
     const version = draftVersion.current;
     saveMutation.mutate(input, {
       onSuccess: () => {

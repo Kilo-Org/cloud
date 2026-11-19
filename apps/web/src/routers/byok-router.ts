@@ -1402,7 +1402,7 @@ export const byokRouter = createTRPCRouter({
       }
 
       try {
-        return { models: await fetchByokPrivateProviderModels({ baseUrl: base_url, credentials }) };
+        return await fetchByokPrivateProviderModels({ baseUrl: base_url, credentials });
       } catch (e) {
         if (e instanceof ByokPrivateProviderRequestError) {
           throw new TRPCError({ code: 'BAD_REQUEST', message: e.message });

@@ -5,7 +5,7 @@ const MAX_MODEL_ID_LENGTH = 200;
 const MAX_INTERNAL_ID_LENGTH = 500;
 const MAX_NAME_LENGTH = 200;
 /** Bounds the import list; a private provider itself keeps at most `BYOK_PRIVATE_PROVIDER_MAX_MODELS`. */
-const MAX_LISTED_MODELS = 5_000;
+export const MAX_LISTED_MODELS = 5_000;
 
 /** Model kinds that cannot serve chat requests, as `type` or `model_type` name them. */
 const NON_CHAT_MODEL_TYPES = new Set([
@@ -118,7 +118,8 @@ function uniqueModelId(id: string, taken: ReadonlySet<string>): string {
   }
 }
 
-function modelEntries(response: unknown): unknown[] {
+/** The entries of one page of a `GET /models` response. */
+export function modelEntries(response: unknown): unknown[] {
   if (Array.isArray(response)) return response;
   for (const key of ['data', 'models']) {
     const entries = field(response, key);

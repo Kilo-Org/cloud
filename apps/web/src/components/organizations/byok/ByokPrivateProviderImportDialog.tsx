@@ -25,6 +25,7 @@ function matchesSearch(model: ByokPrivateModel, search: string) {
 
 export function ByokPrivateProviderImportDialog({
   models,
+  truncated,
   listedInternalIds,
   capacity,
   onAdd,
@@ -32,6 +33,8 @@ export function ByokPrivateProviderImportDialog({
 }: {
   /** The models the private provider lists. */
   models: ByokPrivateModel[];
+  /** The list may hold more models than were read. */
+  truncated: boolean;
   /** Upstream ids the private provider already has; they cannot be added twice. */
   listedInternalIds: ReadonlySet<string>;
   /** How many more models the private provider can take. */
@@ -83,6 +86,9 @@ export function ByokPrivateProviderImportDialog({
             the ones to add, then check their limits before saving. {remaining} of {capacity} model
             slot
             {capacity === 1 ? '' : 's'} left.
+            {truncated
+              ? ' The list was too long to read completely, so some models may be missing. Add those by hand.'
+              : ''}
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">

@@ -630,7 +630,10 @@ function ByokPrivateProviderForm({
   const [credentials, setCredentials] = useState(EMPTY_PRIVATE_PROVIDER_CREDENTIALS_FORM);
   const [replacingCredentials, setReplacingCredentials] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
-  const [importedModels, setImportedModels] = useState<ByokPrivateModel[] | null>(null);
+  const [importedModels, setImportedModels] = useState<{
+    models: ByokPrivateModel[];
+    truncated: boolean;
+  } | null>(null);
   const updateForm = (update: Partial<PrivateProviderForm>) =>
     setForm(current => ({ ...current, ...update }));
   // Saved credentials only go to the host they were saved for.
@@ -661,12 +664,12 @@ function ByokPrivateProviderForm({
   );
   const listModelsMutation = useMutation(
     trpc.byok.listModelsFromPrivateProvider.mutationOptions({
-      onSuccess: ({ models }) => {
+      onSuccess: ({ models, truncated }) => {
         if (models.length === 0) {
           toast.error('The private provider lists no chat models.');
           return;
         }
-        setImportedModels(models);
+        setImportedModels({ models, truncated });
       },
       onError: error => toast.error(`Failed to import models: ${error.message}`),
     })
@@ -949,7 +952,8 @@ function ByokPrivateProviderForm({
 
       {importedModels ? (
         <ByokPrivateProviderImportDialog
-          models={importedModels}
+          models={importedModels.models}
+          truncated={importedModels.truncated}
           listedInternalIds={new Set(form.models.map(row => row.internal_id.trim()))}
           capacity={getImportCapacity(form.models)}
           onClose={() => setImportedModels(null)}

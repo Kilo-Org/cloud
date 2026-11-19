@@ -3,7 +3,12 @@ import {
   type ByokPrivateModel,
 } from '@kilocode/db/schema-types';
 import { resolveByokPrivateProviderUpstreamAuth } from '@kilocode/web-shared/lib/ai-gateway/byok-private-provider/direct-provider';
-import { parseByokPrivateProviderModelsResponse } from '@/lib/byok/private-provider-models';
+import {
+  MAX_LISTED_MODELS,
+  modelEntries,
+  parseByokPrivateProviderModelsResponse,
+} from '@/lib/byok/private-provider-models';
+import { privateProviderOriginChanged } from '@/lib/byok/private-provider-origin';
 import { signBedrockRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/aws-bedrock-signing';
 import {
   findUpstreamUrlViolation,
@@ -16,6 +21,13 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-policy-fetch';
 
 const REQUEST_TIMEOUT_MS = 15_000;
+/** Bounds a model import that follows pages; each request is still limited to `REQUEST_TIMEOUT_MS`. */
+const MODEL_LIST_BUDGET_MS = 30_000;
+const MAX_MODEL_PAGES = 10;
+/** Pages are not requested once less of the budget than this is left. */
+const MIN_PAGE_TIMEOUT_MS = 1_000;
+/** The page size asked for once an Anthropic-style list says there are more pages. */
+const MODEL_PAGE_SIZE = 1_000;
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
 const ANTHROPIC_VERSION = '2023-06-01';
 
@@ -125,12 +137,14 @@ export async function fetchByokPrivateProvider({
   body = '',
   credentials,
   headers: extraHeaders = {},
+  timeoutMs = REQUEST_TIMEOUT_MS,
 }: {
   url: string;
   method: 'GET' | 'POST';
   body?: string;
   credentials: ByokPrivateProviderCredentials;
   headers?: Record<string, string>;
+  timeoutMs?: number;
 }): Promise<ByokPrivateProviderResponse> {
   const { headers, secrets } = await authorizedHeaders({
     url,
@@ -146,7 +160,7 @@ export async function fetchByokPrivateProvider({
       method,
       headers,
       body: body || undefined,
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (error) {
     if (error instanceof UpstreamUrlPolicyError) {
@@ -154,7 +168,7 @@ export async function fetchByokPrivateProvider({
     }
     if (error instanceof Error && error.name === 'TimeoutError') {
       throw new ByokPrivateProviderRequestError(
-        'The private provider did not respond within 15 seconds.'
+        `The private provider did not respond within ${Math.ceil(timeoutMs / 1000)} seconds.`
       );
     }
     throw new ByokPrivateProviderRequestError('The private provider could not be reached.');
@@ -168,33 +182,125 @@ export async function fetchByokPrivateProvider({
   };
 }
 
-/** The models the private provider lists at `GET <base_url>/models`. */
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+function stringField(value: unknown, ...path: string[]): string | undefined {
+  let current = value;
+  for (const key of path) {
+    if (typeof current !== 'object' || current === null || !(key in current)) return undefined;
+    current = current[key];
+  }
+  return typeof current === 'string' && current.trim() !== '' ? current.trim() : undefined;
+}
+
+/**
+ * Where the page after `page` is, if the response says there is one: Anthropic's `has_more` with
+ * `last_id` (`?after_id=`), or a `next` link. `null` means this is the last page; `undefined`
+ * means there is another page that cannot be followed. A link must stay on the private provider's
+ * origin, because every request carries its credentials.
+ */
+function nextModelsPageUrl({
+  page,
+  currentUrl,
+  baseUrl,
+}: {
+  page: unknown;
+  currentUrl: string;
+  baseUrl: string;
+}): string | null | undefined {
+  const link =
+    stringField(page, 'next') ??
+    stringField(page, 'next_page_url') ??
+    stringField(page, 'links', 'next');
+  if (link) {
+    try {
+      const url = new URL(link, currentUrl);
+      return privateProviderOriginChanged(baseUrl, url.href) ? undefined : url.href;
+    } catch {
+      return undefined;
+    }
+  }
+  const hasMore = typeof page === 'object' && page !== null && 'has_more' in page && page.has_more;
+  if (hasMore !== true) return null;
+  const lastId = stringField(page, 'last_id');
+  if (!lastId) return undefined;
+  const url = new URL(`${baseUrl}/models`);
+  url.searchParams.set('after_id', lastId);
+  url.searchParams.set('limit', String(MODEL_PAGE_SIZE));
+  return url.href;
+}
+
+/**
+ * The models the private provider lists at `GET <base_url>/models`, following pagination within a
+ * bounded number of pages, models and time. `truncated` is set when the list is known or likely
+ * to hold more models than were read.
+ */
 export async function fetchByokPrivateProviderModels({
   baseUrl,
   credentials,
 }: {
   baseUrl: string;
   credentials: ByokPrivateProviderCredentials;
-}): Promise<ByokPrivateModel[]> {
-  const response = await fetchByokPrivateProvider({
-    url: `${baseUrl}/models`,
-    method: 'GET',
-    credentials,
-  });
-  if (!response.ok) {
-    throw new ByokPrivateProviderRequestError(
-      `The private provider could not list its models: ${describeByokPrivateProviderError(response)}`
-    );
+}): Promise<{ models: ByokPrivateModel[]; truncated: boolean }> {
+  const deadline = Date.now() + MODEL_LIST_BUDGET_MS;
+  const entries: unknown[] = [];
+  const visited = new Set<string>();
+  let truncated = false;
+  let url = `${baseUrl}/models`;
+
+  for (let pageNumber = 1; ; pageNumber++) {
+    visited.add(url);
+    const isFirstPage = pageNumber === 1;
+    let page: unknown;
+    try {
+      const response = await fetchByokPrivateProvider({
+        url,
+        method: 'GET',
+        credentials,
+        timeoutMs: Math.min(REQUEST_TIMEOUT_MS, deadline - Date.now()),
+      });
+      if (!response.ok) {
+        throw new ByokPrivateProviderRequestError(
+          `The private provider could not list its models: ${describeByokPrivateProviderError(response)}`
+        );
+      }
+      page = parseJson(response.text);
+      if (page === undefined) {
+        throw new ByokPrivateProviderRequestError(
+          'The private provider returned a model list that is not JSON.'
+        );
+      }
+    } catch (error) {
+      // The first page decides whether the import works; a later failure only cuts the list short.
+      if (isFirstPage || !(error instanceof ByokPrivateProviderRequestError)) throw error;
+      truncated = true;
+      break;
+    }
+    entries.push(...modelEntries(page));
+
+    const next = nextModelsPageUrl({ page, currentUrl: url, baseUrl });
+    if (next === null) break;
+    if (
+      next === undefined ||
+      visited.has(next) ||
+      pageNumber >= MAX_MODEL_PAGES ||
+      entries.length >= MAX_LISTED_MODELS ||
+      deadline - Date.now() < MIN_PAGE_TIMEOUT_MS
+    ) {
+      truncated = true;
+      break;
+    }
+    url = next;
   }
-  let json: unknown;
-  try {
-    json = JSON.parse(response.text);
-  } catch {
-    throw new ByokPrivateProviderRequestError(
-      'The private provider returned a model list that is not JSON.'
-    );
-  }
-  return parseByokPrivateProviderModelsResponse(json);
+
+  const models = parseByokPrivateProviderModelsResponse(entries);
+  return { models, truncated: truncated || models.length >= MAX_LISTED_MODELS };
 }
 
 const REDACTED = '[redacted]';

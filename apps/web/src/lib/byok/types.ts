@@ -108,6 +108,8 @@ export const ListByokPrivateProviderModelsInputSchema = OrganizationIdSchema.ext
 
 export const ListByokPrivateProviderModelsResponseSchema = z.object({
   models: z.array(ByokPrivateModelSchema),
+  /** The list may hold more models than were read: a page limit or a failed later page cut it short. */
+  truncated: z.boolean(),
 });
 
 /**

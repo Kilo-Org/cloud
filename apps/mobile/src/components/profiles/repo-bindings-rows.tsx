@@ -14,6 +14,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   COMPACT_CONTROL_BOX_CLASS,
   COMPACT_CONTROL_HIT_SLOP_DP,
+  COMPACT_CONTROL_ROW_END_CLASS,
   FIELD_TRIGGER_BODY_CLASS,
   FIELD_TRIGGER_FRAME_CLASS,
   ROW_TARGET_CLASS,
@@ -78,7 +79,11 @@ export function RepoBindingRow({
       </Eyebrow>
       {onRemove === undefined ? null : (
         <Pressable
-          className={cn(COMPACT_CONTROL_BOX_CLASS, '-me-[7px] active:opacity-70')}
+          className={cn(
+            COMPACT_CONTROL_BOX_CLASS,
+            COMPACT_CONTROL_ROW_END_CLASS,
+            'active:opacity-70'
+          )}
           // The 32 dp box sits 9 dp inside the row's end edge, so its 16 dp
           // glyph ends 16 dp from the edge like the leading icon's inset, and
           // the 8 dp slop reaches 48 dp of touch while staying inside the row

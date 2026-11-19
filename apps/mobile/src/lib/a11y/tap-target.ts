@@ -196,6 +196,15 @@ export const SECTION_ACTION_HIT_SLOP = {
 export const COMPACT_CONTROL_BOX_CLASS = 'h-[32px] w-[32px] items-center justify-center';
 
 /**
+ * The pull toward the row's end edge that puts a
+ * {@link COMPACT_CONTROL_BOX_CLASS} control's glyph on the row's inset: the box
+ * sits 9pt inside the row's 16pt end padding, so its 16pt glyph ends 16pt from
+ * the edge, where the leading icon starts. 7pt, not the scale's 8pt, which
+ * would leave the glyph a point off the inset.
+ */
+export const COMPACT_CONTROL_ROW_END_CLASS = '-me-[7px]';
+
+/**
  * A settings row's content band: the row's 48pt frame
  * (`ROW_FRAME_CLASS`) less its 10.5pt vertical padding a side. A trailing
  * control that contributes more than this sets the row's height, so it must

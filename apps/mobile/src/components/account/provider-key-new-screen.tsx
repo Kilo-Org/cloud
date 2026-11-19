@@ -6,10 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { ProviderKeyCredentialForm } from '@/components/account/provider-key-credential-form';
-import {
-  ProviderKeySaveFailure,
-  type SaveFailure,
-} from '@/components/account/provider-key-save-failure';
+import { ProviderKeySaveFailure } from '@/components/account/provider-key-save-failure';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { QueryError } from '@/components/query-error';

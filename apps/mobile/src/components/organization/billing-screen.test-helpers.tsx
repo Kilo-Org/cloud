@@ -1,4 +1,3 @@
-import { createElement } from 'react';
 import { vi } from 'vitest';
 
 import { type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
@@ -175,7 +174,7 @@ vi.mock('react-native', () => ({ View: 'View' }));
 
 export function mount(organizationIdOverride?: string) {
   return renderWithProviders(
-    createElement(OrganizationBillingScreen, { organizationIdOverride })
+    <OrganizationBillingScreen organizationIdOverride={organizationIdOverride} />
   );
 }
 

@@ -198,9 +198,6 @@ export async function createDeviceAuthRequest(params: {
   try {
     return await db.transaction(async tx => {
       if (ipAddress) {
-        // One instant for both the live-row predicate and the retry advisory, so
-        // the counted rows and the reported wait always describe one set of rows.
-        const now = new Date().toISOString();
         await tx.execute(sql.raw(`SET LOCAL lock_timeout = '${DEVICE_AUTH_PENDING_LOCK_WAIT_MS}'`));
 
         // The count and the insert below are one serialized unit for this
@@ -209,6 +206,12 @@ export async function createDeviceAuthRequest(params: {
         await tx.execute(
           sql`SELECT pg_advisory_xact_lock(hashtext(${PENDING_LIMIT_LOCK_NAMESPACE}), hashtext(${ipAddress}))`
         );
+
+        // One instant for both the live-row predicate and the retry advisory,
+        // captured after the lock: taking the lock can wait up to
+        // DEVICE_AUTH_PENDING_LOCK_WAIT_MS, and rows that expire during that
+        // wait must not count as live, nor the advisory promise their time.
+        const now = new Date().toISOString();
 
         const [result] = await tx
           .select({

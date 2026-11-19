@@ -152,6 +152,35 @@ export function isPlaceholderTint(tint: Tint): boolean {
 }
 
 /**
+ * Fixed tint for the `idle` eyebrow state: the inactive twin of `live`.
+ *
+ * It paints the quiet strip token (`bg-session-strip`) that the context rows
+ * paint, with the stronger `secondaryForeground` ink. The settings-tile
+ * hairline {@link NEUTRAL_TINT} composites to about 1.1:1 on the page, so an
+ * idle row painted with it would carry no leading mark at all; the strip
+ * token's dark step is set to stay legible on the near-black page (see
+ * `global.css`). Kept as its own value so `NEUTRAL_TINT` keeps painting
+ * settings tiles and so no state can collide with the context trio.
+ */
+export const IDLE_TINT = {
+  hueClass: 'bg-session-strip',
+  hueTextClass: 'text-secondary-foreground',
+  hueBorderClass: 'border-border',
+  tileBgClass: 'bg-hair-soft',
+  tileBorderClass: 'border-border',
+  hueThemeKey: 'secondaryForeground',
+} as const satisfies Tint;
+
+/**
+ * True for the tints a quiet session row paints: the context placeholder and
+ * the idle state. Their strips stay at full strength, because a quiet strip is
+ * already the faintest mark a row carries and dimming it again erases it.
+ */
+export function isQuietTint(tint: Tint): boolean {
+  return isPlaceholderTint(tint) || tint === IDLE_TINT;
+}
+
+/**
  * Fixed tint for eyebrow labels that name a state, a type or the row's
  * context, not the session: the unknown origin, the platform the row ran on,
  * the repository it ran in, idle, and live, in every language their catalog
@@ -172,23 +201,21 @@ export function isPlaceholderTint(tint: Tint): boolean {
  * | `unknown`    | PLACEHOLDER_TINT |
  * | `platform`   | PLACEHOLDER_TINT |
  * | `repository` | PLACEHOLDER_TINT |
- * | `idle`       | NEUTRAL_TINT    |
+ * | `idle`       | IDLE_TINT       |
  * | `live`       | AGENT_RAMP[4] (`agent-sky`) |
  *
  * A later ramp change must keep `live` on an entry no other state took, and
  * `idle` off both the ramp's sky and the placeholder pair, or the two
  * opposite states stop being separable by colour again.
  */
-
-/** Tint for a row whose eyebrow names a state, a type or its context, not an agent. */
 export function stateTint(state: 'unknown' | 'platform' | 'repository' | 'idle' | 'live'): Tint {
   if (state === 'unknown' || state === 'platform' || state === 'repository') {
     return PLACEHOLDER_TINT;
   }
   // The two session states pin to distinct tokens so they stay separable by
-  // colour: idle takes the muted neutral (it is the inactive state), live
-  // keeps the sky ramp entry it already rendered.
-  return state === 'idle' ? NEUTRAL_TINT : AGENT_RAMP[4];
+  // colour: idle takes the quiet neutral strip (it is the inactive state),
+  // live keeps the sky ramp entry it already rendered.
+  return state === 'idle' ? IDLE_TINT : AGENT_RAMP[4];
 }
 
 /** Deterministic agent hue from the agent name. */

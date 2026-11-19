@@ -10,7 +10,7 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import { selectSessionRowEyebrowRight } from '@/components/ui/session-row-eyebrow-right';
 import { SessionStatusIcon } from '@/components/ui/session-status-icon';
 import { Text } from '@/components/ui/text';
-import { agentColor, isPlaceholderTint, NEUTRAL_TINT, stateTint } from '@/lib/agent-color';
+import { agentColor, isQuietTint, stateTint } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -24,7 +24,7 @@ type SessionRowProps = {
    * agent the row ran on, and `repository` names the repository it ran in; all
    * three label the row's context rather than the session, so they take the
    * muted pair and the title leads. `idle` and `live` each pin a distinct
-   * token — idle the quiet neutral, live the sky ramp entry (see
+   * token — idle the quiet neutral strip, live the sky ramp entry (see
    * `stateTint`'s pin table). Omit it for a label that is the session's own
    * name, such as a chat's model, which hashes.
    */
@@ -118,14 +118,11 @@ export function SessionRow({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const color = agentState ? stateTint(agentState) : agentColor(agentLabel);
-  // A row that is neither live nor waiting recedes behind one that is. The
-  // muted context tint is already the quietest mark a row can carry, and
-  // multiplying it again erased the strip on the dark page, so only an accent
-  // strip dims. The idle state's pinned neutral is the same kind of quiet
-  // mark without being the placeholder pair, so its strip stays at full
-  // strength too.
-  const dimStrip =
-    !live && !needsInput && !isPlaceholderTint(color) && color.hueClass !== NEUTRAL_TINT.hueClass;
+  // A row that is neither live nor waiting recedes behind one that is. A quiet
+  // tint (the context placeholder, and idle's neutral strip) is already the
+  // quietest mark a row can carry, and multiplying it again erased the strip on
+  // the dark page, so only an accent strip dims.
+  const dimStrip = !live && !needsInput && !isQuietTint(color);
   const liveKind: GlanceableStatusKind = statusKind === 'idle' ? 'idle' : 'running';
 
   const eyebrowDecision = selectSessionRowEyebrowRight({

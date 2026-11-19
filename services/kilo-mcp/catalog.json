@@ -3815,28 +3815,6 @@
     ],
     "searchBlob": "appReportedMessages.createReport Report a problematic app or extension message for review, such as an unparsed or unstyled message from a CLI session. Submit the message content, mode, model, and report type to store it for investigation. appreportedmessages createreport message cli_session_id mode model report_type message cli_session_id mode model report_type"
   },
-  "byok.byokEndpointsEnabled": {
-    "path": "byok.byokEndpointsEnabled",
-    "kind": "query",
-    "summary": "Checks whether BYOK custom endpoints (an organization's own OpenAI- or Anthropic-compatible upstream providers) are enabled and available to add, optionally for a specific organization. Returns false when no organization is given or the feature has not been enabled for it.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      }
-    },
-    "tags": [
-      "byok",
-      "byokendpointsenabled",
-      "organizationid"
-    ],
-    "searchBlob": "byok.byokEndpointsEnabled Checks whether BYOK custom endpoints (an organization's own OpenAI- or Anthropic-compatible upstream providers) are enabled and available to add, optionally for a specific organization. Returns false when no organization is given or the feature has not been enabled for it. byok byokendpointsenabled organizationid organizationId"
-  },
   "byok.create": {
     "path": "byok.create",
     "kind": "mutation",
@@ -3939,10 +3917,10 @@
     ],
     "searchBlob": "byok.create Add a new bring-your-own-key (BYOK) API key for an AI provider, either for the current user or for an organization. Stores the key securely so the user's own provider credentials are used for inference. byok create organizationid provider_id api_key organizationId provider_id api_key"
   },
-  "byok.createEndpoint": {
-    "path": "byok.createEndpoint",
+  "byok.createPrivateProvider": {
+    "path": "byok.createPrivateProvider",
     "kind": "mutation",
-    "summary": "Add a new custom bring-your-own-key API endpoint (such as an OpenAI-compatible provider) for an organization, saving its URL, display settings, and encrypted credentials. Use it to connect a new LLM provider with your own key.",
+    "summary": "Add a new BYOK private provider (custom LLM endpoint) for an organization with its base URL, name, and credentials. Use to connect a self-hosted or third-party OpenAI-compatible provider.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -4228,12 +4206,12 @@
     },
     "tags": [
       "byok",
-      "createendpoint",
+      "createprivateprovider",
       "organizationid",
       "definition",
       "credentials"
     ],
-    "searchBlob": "byok.createEndpoint Add a new custom bring-your-own-key API endpoint (such as an OpenAI-compatible provider) for an organization, saving its URL, display settings, and encrypted credentials. Use it to connect a new LLM provider with your own key. byok createendpoint organizationid definition credentials organizationId definition credentials"
+    "searchBlob": "byok.createPrivateProvider Add a new BYOK private provider (custom LLM endpoint) for an organization with its base URL, name, and credentials. Use to connect a self-hosted or third-party OpenAI-compatible provider. byok createprivateprovider organizationid definition credentials organizationId definition credentials"
   },
   "byok.delete": {
     "path": "byok.delete",
@@ -4321,43 +4299,10 @@
     ],
     "searchBlob": "byok.listCatalogModeSupportedModels List which AI models each direct BYOK provider supports when running in catalog mode, grouped by provider and returned as model names with catalog ids. Use to discover available catalog-mode models per provider. byok listcatalogmodesupportedmodels"
   },
-  "byok.listEndpointCatalogModelIds": {
-    "path": "byok.listEndpointCatalogModelIds",
-    "kind": "query",
-    "summary": "Filter a list of model IDs down to the ones valid for a BYOK endpoint catalog, so callers can check which models an endpoint supports. Use it to validate or match model IDs before configuring a custom endpoint.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string"
-        },
-        "modelIds": {
-          "maxItems": 5000,
-          "type": "array",
-          "items": {
-            "type": "string",
-            "maxLength": 200
-          }
-        }
-      },
-      "required": [
-        "organizationId",
-        "modelIds"
-      ]
-    },
-    "tags": [
-      "byok",
-      "listendpointcatalogmodelids",
-      "organizationid",
-      "modelids"
-    ],
-    "searchBlob": "byok.listEndpointCatalogModelIds Filter a list of model IDs down to the ones valid for a BYOK endpoint catalog, so callers can check which models an endpoint supports. Use it to validate or match model IDs before configuring a custom endpoint. byok listendpointcatalogmodelids organizationid modelids organizationId modelIds"
-  },
-  "byok.listModelsFromEndpoint": {
-    "path": "byok.listModelsFromEndpoint",
+  "byok.listModelsFromPrivateProvider": {
+    "path": "byok.listModelsFromPrivateProvider",
     "kind": "mutation",
-    "summary": "Fetch the models a custom BYOK endpoint offers so they can be discovered and imported, using either newly entered or already stored credentials. Use it to test an endpoint connection and see its available models.",
+    "summary": "Fetch the list of available models from a private provider endpoint, using entered or stored credentials. Use to import or discover models before configuring a custom provider.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -4511,13 +4456,46 @@
     },
     "tags": [
       "byok",
-      "listmodelsfromendpoint",
+      "listmodelsfromprivateprovider",
       "organizationid",
       "base_url",
       "credentials",
       "id"
     ],
-    "searchBlob": "byok.listModelsFromEndpoint Fetch the models a custom BYOK endpoint offers so they can be discovered and imported, using either newly entered or already stored credentials. Use it to test an endpoint connection and see its available models. byok listmodelsfromendpoint organizationid base_url credentials id organizationId base_url credentials id"
+    "searchBlob": "byok.listModelsFromPrivateProvider Fetch the list of available models from a private provider endpoint, using entered or stored credentials. Use to import or discover models before configuring a custom provider. byok listmodelsfromprivateprovider organizationid base_url credentials id organizationId base_url credentials id"
+  },
+  "byok.listPrivateProviderCatalogModelIds": {
+    "path": "byok.listPrivateProviderCatalogModelIds",
+    "kind": "query",
+    "summary": "Filter a list of model IDs down to only those the private provider catalog can serve for an organization. Use to validate which models are available before adding a custom provider.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string"
+        },
+        "modelIds": {
+          "maxItems": 5000,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          }
+        }
+      },
+      "required": [
+        "organizationId",
+        "modelIds"
+      ]
+    },
+    "tags": [
+      "byok",
+      "listprivateprovidercatalogmodelids",
+      "organizationid",
+      "modelids"
+    ],
+    "searchBlob": "byok.listPrivateProviderCatalogModelIds Filter a list of model IDs down to only those the private provider catalog can serve for an organization. Use to validate which models are available before adding a custom provider. byok listprivateprovidercatalogmodelids organizationid modelids organizationId modelIds"
   },
   "byok.listProviders": {
     "path": "byok.listProviders",
@@ -4592,6 +4570,28 @@
       "apikind"
     ],
     "searchBlob": "byok.previewRouting Preview which route and BYOK provider key a given model request would use before making it, showing the ordered routing steps and why each key is used or skipped. Use this to check or debug how a model resolves under your or your organization's bring-your-own-key setup. byok previewrouting organizationid modelid apikind organizationId modelId apiKind"
+  },
+  "byok.privateProvidersEnabled": {
+    "path": "byok.privateProvidersEnabled",
+    "kind": "query",
+    "summary": "Check whether BYOK private provider features are enabled for an organization. Use to see if a team can add custom LLM providers with their own endpoint and credentials.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "byok",
+      "privateprovidersenabled",
+      "organizationid"
+    ],
+    "searchBlob": "byok.privateProvidersEnabled Check whether BYOK private provider features are enabled for an organization. Use to see if a team can add custom LLM providers with their own endpoint and credentials. byok privateprovidersenabled organizationid organizationId"
   },
   "byok.reorder": {
     "path": "byok.reorder",
@@ -4775,10 +4775,10 @@
     ],
     "searchBlob": "byok.update Replace the API key of an existing BYOK provider credential for the current user or an organization. Use to rotate or change a stored provider key without deleting it. byok update organizationid id api_key organizationId id api_key"
   },
-  "byok.updateEndpoint": {
-    "path": "byok.updateEndpoint",
+  "byok.updatePrivateProvider": {
+    "path": "byok.updatePrivateProvider",
     "kind": "mutation",
-    "summary": "Change an existing custom BYOK endpoint's name, URL, or settings, and optionally replace its stored credentials. Use it to fix an endpoint, rotate its API key, or rename a provider.",
+    "summary": "Edit an existing BYOK private provider's settings, such as its name or base URL, and optionally rotate its credentials. Use to change a custom provider's configuration for an organization.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -5069,13 +5069,13 @@
     },
     "tags": [
       "byok",
-      "updateendpoint",
+      "updateprivateprovider",
       "organizationid",
       "id",
       "definition",
       "credentials"
     ],
-    "searchBlob": "byok.updateEndpoint Change an existing custom BYOK endpoint's name, URL, or settings, and optionally replace its stored credentials. Use it to fix an endpoint, rotate its API key, or rename a provider. byok updateendpoint organizationid id definition credentials organizationId id definition credentials"
+    "searchBlob": "byok.updatePrivateProvider Edit an existing BYOK private provider's settings, such as its name or base URL, and optionally rotate its credentials. Use to change a custom provider's configuration for an organization. byok updateprivateprovider organizationid id definition credentials organizationId id definition credentials"
   },
   "claudeBilling.remove": {
     "path": "claudeBilling.remove",

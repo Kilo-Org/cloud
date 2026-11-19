@@ -403,6 +403,8 @@ jobs:
         run: node --test tools/nativewind/check-classes.test.mjs
       - name: Test the i18n catalog checker
         run: node --test tools/i18n/check-catalogs.test.mjs
+      - name: Test the shared source walk
+        run: node --test tools/lib/source-files.test.mjs
 
   # `i18n-leftover` runs the same catalog audit for a mobile change; this job
   # covers the services half of the push catalog's scan, which no mobile family

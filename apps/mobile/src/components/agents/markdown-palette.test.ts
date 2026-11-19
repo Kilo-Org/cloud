@@ -58,4 +58,23 @@ describe('markdown palette', () => {
 
     expect(palette.textColor).toBe(colors.accentSoftForeground);
   });
+
+  it('composites the user code card onto the bubble to an opaque surface', () => {
+    const palette = getPalette('user', colors);
+
+    // rgba(26,26,16,0.1) over #FFDD00 = #e8ca02; the diagram page paints this,
+    // so it must not carry alpha.
+    expect(palette.codeSurface).toBe('#e8ca02');
+    expect(palette.codeSurface.startsWith('#') && palette.codeSurface.length === 7).toBe(true);
+  });
+
+  it('keeps the assistant code card as its own opaque surface', () => {
+    const palette = getPalette('assistant', colors);
+
+    // The muted token is opaque, so the composite is the token itself (case
+    // normalized by the parser); the composite keeps it opaque even if the
+    // token ever becomes translucent.
+    expect(palette.codeSurface).toBe('#f0eee6');
+    expect(palette.codeSurface.startsWith('#') && palette.codeSurface.length === 7).toBe(true);
+  });
 });

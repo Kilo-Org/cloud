@@ -39,21 +39,73 @@ export function undoPricingDiscount(pricing: EndpointPricing): EndpointPricing {
   return result;
 }
 
+/** Whether an `overrides` entry is a long-context surcharge rather than a time-of-day window. */
+function isLongContextOverride(override: NonNullable<EndpointPricing['overrides']>[number]) {
+  return override.min_prompt_tokens !== undefined && override.min_prompt_tokens > 0;
+}
+
 /**
- * The highest price at any time of day, without the time-of-day fields: the higher of the base
- * price and each OpenRouter `overrides` window, times Vercel's peak multiplier.
+ * The highest price at any time of day for a short prompt, without the time-of-day fields: the
+ * higher of the base price and each OpenRouter time-of-day `overrides` window, times Vercel's peak
+ * multiplier. Long-context overrides are ignored.
  */
 export function getPeakPricing(pricing: EndpointPricing): EndpointPricing {
-  const { overrides, peak_pricing, ...prices } = pricing;
-  if (overrides === undefined && peak_pricing === undefined) return pricing;
+  return peakPricing(pricing, false);
+}
+
+/**
+ * The highest price at any time of day, including long-context prices: like
+ * {@link getPeakPricing}, but also the higher of each OpenRouter long-context override and each
+ * Vercel `*_tiers` price. Spending safeguards must use this price. Vercel's tier costs are compared
+ * as stored, so a discount, which applies to the base price, is undone on them too, which can only
+ * raise the result.
+ */
+export function getWorstCasePeakPricing(pricing: EndpointPricing): EndpointPricing {
+  return peakPricing(pricing, true);
+}
+
+/** Vercel's context-length price tiers, by the base price field each one tiers. */
+const TIER_FIELDS = [
+  ['prompt_tiers', 'prompt'],
+  ['completion_tiers', 'completion'],
+  ['input_cache_read_tiers', 'input_cache_read'],
+  ['input_cache_write_tiers', 'input_cache_write'],
+] as const satisfies readonly (readonly [keyof EndpointPricing, PriceKey])[];
+
+function peakPricing(pricing: EndpointPricing, includeLongContext: boolean): EndpointPricing {
+  const {
+    overrides,
+    peak_pricing,
+    prompt_tiers,
+    completion_tiers,
+    input_cache_read_tiers,
+    input_cache_write_tiers,
+    ...prices
+  } = pricing;
+  const tiers = { prompt_tiers, completion_tiers, input_cache_read_tiers, input_cache_write_tiers };
+  if (
+    overrides === undefined &&
+    peak_pricing === undefined &&
+    Object.values(tiers).every(tier => tier === undefined)
+  )
+    return pricing;
   let result: EndpointPricing = prices;
-  for (const { prompt, completion, input_cache_read, input_cache_write } of overrides ?? []) {
+  for (const override of overrides ?? []) {
+    if (!includeLongContext && isLongContextOverride(override)) continue;
+    const { prompt, completion, input_cache_read, input_cache_write } = override;
     result = maxEndpointPricing(result, {
       prompt,
       completion,
       input_cache_read,
       input_cache_write,
     });
+  }
+  if (includeLongContext) {
+    for (const [tiersKey, priceKey] of TIER_FIELDS) {
+      for (const { cost } of tiers[tiersKey] ?? []) {
+        result = maxEndpointPricing(result, { [priceKey]: cost });
+      }
+    }
   }
   const multiplier = peak_pricing?.multiplier ?? 1;
   if (multiplier > 1) {
@@ -66,12 +118,26 @@ export function getPeakPricing(pricing: EndpointPricing): EndpointPricing {
   return result;
 }
 
-/** The price Kilo shows for one provider endpoint: its peak price, without a discount. */
+/**
+ * The price Kilo shows for one provider endpoint: its short-context peak price, without a discount.
+ *
+ * This is intentional: the short-context peak price is the most likely price a user pays. A
+ * surcharge is still possible for a long context, or when a request falls back to another
+ * provider. Use {@link getWorstCaseModelPricing} where the price bounds spending.
+ */
 export function getModelDisplayPricing(
   pricing: EndpointPricing | undefined
 ): EndpointPricing | undefined {
   if (!pricing) return undefined;
   return undoPricingDiscount(getPeakPricing(pricing));
+}
+
+/** The highest price an endpoint can charge, long-context prices included, without a discount. */
+export function getWorstCaseModelPricing(
+  pricing: EndpointPricing | undefined
+): EndpointPricing | undefined {
+  if (!pricing) return undefined;
+  return undoPricingDiscount(getWorstCasePeakPricing(pricing));
 }
 
 /**
@@ -93,4 +159,14 @@ export function maxEndpointPricing(
     }
   }
   return result;
+}
+
+/** Which price of an endpoint to show: the likely short-context one, or the highest it can charge. */
+export type PricingMode = 'shortContext' | 'worstCase';
+
+export function getEndpointPricing(
+  pricing: EndpointPricing | undefined,
+  mode: PricingMode
+): EndpointPricing | undefined {
+  return mode === 'worstCase' ? getWorstCaseModelPricing(pricing) : getModelDisplayPricing(pricing);
 }

@@ -17,9 +17,14 @@ import {
 } from '@kilocode/web-shared/lib/redis-keys';
 import { captureException } from '@sentry/nextjs';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
-import { blacklisted_domains, kilocode_users } from '@kilocode/db/schema';
+import {
+  blacklisted_domains,
+  blacklisted_domains_settings,
+  kilocode_users,
+} from '@kilocode/db/schema';
+import { isGoneOrDeletingBlockedReason } from '@kilocode/db/user-soft-delete';
 import { TRPCError } from '@trpc/server';
-import { sql, count, isNotNull, desc, min, max } from 'drizzle-orm';
+import { sql, count, isNotNull, desc, min, max, eq } from 'drizzle-orm';
 import * as z from 'zod';
 import { createHash } from 'node:crypto';
 import { backfillBlockBlacklistedDomainsBatch } from '@/lib/abuse/block-blacklisted-domains';
@@ -98,10 +103,25 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
     ];
 
     let saved;
+    let settingsWriteAttempted = false;
     try {
       saved = await db.transaction(async tx => {
         // Serializes saves, including the previous-config read.
         await lockBlacklist(tx, 'EXCLUSIVE');
+        // Deletion locks the user before scrubbing the settings row. Hold the same user lock
+        // through the mirror write so an already-authorized save cannot restore deleted PII.
+        // Check before reading settings, since that read can migrate legacy Redis data.
+        const [actor] = await tx
+          .select({ blocked_reason: kilocode_users.blocked_reason })
+          .from(kilocode_users)
+          .where(eq(kilocode_users.id, ctx.user.id))
+          .for('update');
+        if (!actor || isGoneOrDeletingBlockedReason(actor.blocked_reason)) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Blacklist editor account is deleted or being deleted.',
+          });
+        }
         const previous = await readConfig(tx);
         if (previous.version !== input.expected_version) {
           throw new TRPCError({
@@ -111,14 +131,14 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
         }
         const previousDomains = new Set(previous.domains);
         const addedDomains = normalizedDomains.filter(domain => !previousDomains.has(domain));
-        const settings: BlacklistDomainsSettings = {
+        const settings = {
           blocked_signup_tlds: normalizeSignupTlds(
             input.blocked_tlds ?? previous.settings.blocked_signup_tlds ?? envFallbackSignupTlds
           ),
           updated_at: new Date().toISOString(),
           updated_by: ctx.user.id,
           updated_by_email: ctx.user.google_user_email,
-        };
+        } satisfies BlacklistDomainsSettings;
         const deadline = Date.now() + 120_000;
         await tx.delete(blacklisted_domains);
         for (let offset = 0; offset < normalizedDomains.length; offset += 1000) {
@@ -127,18 +147,26 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
             .insert(blacklisted_domains)
             .values(normalizedDomains.slice(offset, offset + 1000).map(domain => ({ domain })));
         }
+        await tx
+          .insert(blacklisted_domains_settings)
+          .values(settings)
+          .onConflictDoUpdate({ target: blacklisted_domains_settings.id, set: settings });
         // Redis and the commit cannot be atomic. Writing last keeps a failed statement from
-        // applying the settings; only a failed commit can leave them ahead of the domains.
+        // applying the settings; only a failed commit can leave Redis ahead of Postgres.
+        settingsWriteAttempted = true;
         await redisClient.set(BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY, JSON.stringify(settings));
         return { settings, addedDomains };
       });
     } catch (error) {
-      if (error instanceof TRPCError && error.code === 'CONFLICT') throw error;
+      if (error instanceof TRPCError && (error.code === 'CONFLICT' || error.code === 'FORBIDDEN')) {
+        throw error;
+      }
       captureException(error, { tags: { source: 'blacklist_domains_save' } });
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
-        message:
-          'Blacklist save failed. Reload the list before retrying; the signup TLDs may have been saved.',
+        message: settingsWriteAttempted
+          ? 'Blacklist save failed. Reload the list before retrying; the signup TLDs may have been saved.'
+          : 'Blacklist save failed before the signup TLDs were saved. Reload the list before retrying.',
         cause: error,
       });
     }

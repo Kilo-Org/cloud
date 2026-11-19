@@ -41,6 +41,13 @@ vi.mock('expo-router', () => ({
   useFocusEffect: vi.fn(),
   router: { back: vi.fn() },
 }));
+// The role read reaches the organization query chain and the Expo runtime this
+// node environment cannot load. This suite exercises the transport, not the
+// refusal copy, so a member reader (no plan step) is the stub it needs.
+vi.mock('@/lib/trial-refusal', () => ({
+  useCanManageBilling: () => false,
+  useBillingAction: () => undefined,
+}));
 
 const ENABLED_SUCCESS = { enabled: true };
 const ANALYSIS_SUCCESS = { status: 'no_pattern' as const };

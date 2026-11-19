@@ -2,16 +2,9 @@
 
 import { useEffect, useState, type ComponentProps, type MouseEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { formatDistanceToNow } from 'date-fns';
-import { Archive, CloudOff, Download, FileText, RefreshCw, Trash2 } from 'lucide-react';
+import { Archive, CloudOff, Download, FileText, RefreshCw, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,7 +22,6 @@ import {
   formatWorkspaceArtifactSize,
   groupWorkspaceArtifactsByFolder,
   isSandboxNotRunning,
-  workspaceArtifactExpiresAt,
   workspaceArtifactFileName,
 } from './workspace-artifacts';
 
@@ -66,9 +58,9 @@ export function WorkspaceArtifactsButton({
   return (
     <Button
       type="button"
-      size="sm"
+      size="icon-sm"
       variant="ghost"
-      className="aria-expanded:bg-secondary h-11 min-w-11 shrink-0 gap-1.5 px-2 font-mono text-xs tabular-nums sm:h-8 sm:min-w-8"
+      className="text-muted-foreground aria-expanded:bg-secondary"
       aria-label="Artifacts"
       aria-description={entries.length ? summary : undefined}
       title={summary}
@@ -77,9 +69,6 @@ export function WorkspaceArtifactsButton({
       onClick={onToggle}
     >
       <Archive className="size-4" aria-hidden="true" />
-      {entries.length > 0 && (
-        <span className="text-muted-foreground hidden sm:inline">{entries.length}</span>
-      )}
     </Button>
   );
 }
@@ -187,35 +176,26 @@ export function WorkspaceArtifactsView({
         portalContainer={portalContainer}
         overlayClassName="absolute"
         dismissibleOverlay
+        showCloseButton={false}
+        aria-describedby={undefined}
         className="absolute inset-y-0 right-0 h-full w-full gap-0 border-l p-0 sm:max-w-xl lg:max-w-2xl"
         onCloseAutoFocus={onCloseAutoFocus}
         onInteractOutside={event => event.preventDefault()}
       >
-        <SheetHeader className="shrink-0 border-b pr-14">
-          <div className="flex min-w-0 items-start justify-between gap-2">
-            <div className="min-w-0">
-              <SheetTitle className="truncate text-base">Artifacts</SheetTitle>
-              <SheetDescription className="truncate">Saved from /artifacts</SheetDescription>
-            </div>
+        <SheetHeader className="flex-row items-center justify-between gap-2 border-b px-4 py-2">
+          <SheetTitle className="text-base">Artifacts</SheetTitle>
+          <SheetClose asChild>
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              aria-label="Refresh artifacts"
-              title="Refresh artifacts"
-              disabled={list.isFetching}
-              onClick={() => {
-                void list.refetch();
-                void sandboxStatus.refetch();
-              }}
-              className="h-11 w-11 shrink-0 sm:h-8 sm:w-8"
+              className="size-11 sm:size-8"
+              aria-label="Close artifacts"
+              title="Close artifacts"
             >
-              <RefreshCw
-                aria-hidden="true"
-                className={`size-3.5 ${list.isFetching ? 'animate-spin motion-reduce:animate-none' : ''}`}
-              />
+              <X aria-hidden="true" />
             </Button>
-          </div>
+          </SheetClose>
         </SheetHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
@@ -275,79 +255,81 @@ export function WorkspaceArtifactsView({
                 <span className="shrink-0 font-mono tabular-nums">{group.files.length}</span>
               </h3>
               <ul aria-label={`Artifacts in ${group.label}`}>
-                {group.files.map(entry => {
-                  const expiresAt = workspaceArtifactExpiresAt(entry);
-                  return (
-                    <li
-                      key={entry.relativePath}
-                      className="hover:bg-secondary/60 flex h-11 min-w-0 items-center gap-2 rounded-sm px-2 sm:h-7"
+                {group.files.map(entry => (
+                  <li
+                    key={entry.relativePath}
+                    className="hover:bg-secondary/60 flex min-w-0 items-center gap-2 rounded-sm px-2"
+                  >
+                    <FileText
+                      aria-hidden="true"
+                      className="text-muted-foreground size-3.5 shrink-0"
+                    />
+                    <span
+                      className="min-w-0 flex-1 truncate font-mono text-xs"
+                      title={entry.relativePath}
                     >
-                      <FileText
-                        aria-hidden="true"
-                        className="text-muted-foreground size-3.5 shrink-0"
-                      />
-                      <span
-                        className="min-w-0 flex-1 truncate font-mono text-xs"
-                        title={entry.relativePath}
-                      >
-                        {workspaceArtifactFileName(entry)}
-                        <span className="sr-only"> {entry.relativePath}</span>
-                      </span>
-                      <span className="text-muted-foreground shrink-0 font-mono text-xs tabular-nums">
-                        {formatWorkspaceArtifactSize(entry.sizeBytes)}
-                      </span>
-                      <span className="text-muted-foreground hidden shrink-0 font-mono text-xs tabular-nums sm:inline">
-                        Synced{' '}
-                        <time
-                          dateTime={new Date(entry.updatedAt).toISOString()}
-                          title={new Date(entry.updatedAt).toLocaleString()}
-                        >
-                          {formatDistanceToNow(new Date(entry.updatedAt), { addSuffix: true })}
-                        </time>
-                      </span>
-                      <span className="text-muted-foreground hidden shrink-0 font-mono text-xs tabular-nums lg:inline">
-                        Expires{' '}
-                        <time
-                          dateTime={new Date(expiresAt).toISOString()}
-                          title={new Date(expiresAt).toLocaleString()}
-                        >
-                          {formatDistanceToNow(new Date(expiresAt), { addSuffix: true })}
-                        </time>
-                      </span>
+                      {workspaceArtifactFileName(entry)}
+                      <span className="sr-only"> {entry.relativePath}</span>
+                    </span>
+                    <span className="text-muted-foreground shrink-0 font-mono text-xs tabular-nums">
+                      {formatWorkspaceArtifactSize(entry.sizeBytes)}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-11 shrink-0 sm:size-8"
+                      aria-label={`Download ${entry.relativePath}`}
+                      title={`Download ${entry.relativePath}`}
+                      disabled={download.isPending}
+                      onClick={() => download.mutate(entry)}
+                    >
+                      <Download aria-hidden="true" className="size-3.5" />
+                    </Button>
+                    {!readOnly && (
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="h-11 w-11 shrink-0 sm:h-7 sm:w-7"
-                        aria-label={`Download ${entry.relativePath}`}
-                        title={`Download ${entry.relativePath}`}
-                        disabled={download.isPending}
-                        onClick={() => download.mutate(entry)}
+                        className="text-muted-foreground hover:text-destructive size-11 shrink-0 sm:size-8"
+                        aria-label={`Delete ${entry.relativePath}`}
+                        title={`Delete ${entry.relativePath}`}
+                        onClick={() => {
+                          setFeedback(null);
+                          setPendingDelete(entry);
+                        }}
                       >
-                        <Download aria-hidden="true" className="size-3.5" />
+                        <Trash2 aria-hidden="true" className="size-3.5" />
                       </Button>
-                      {!readOnly && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="text-muted-foreground hover:text-destructive h-11 w-11 shrink-0 sm:h-7 sm:w-7"
-                          aria-label={`Delete ${entry.relativePath}`}
-                          title={`Delete ${entry.relativePath}`}
-                          onClick={() => {
-                            setFeedback(null);
-                            setPendingDelete(entry);
-                          }}
-                        >
-                          <Trash2 aria-hidden="true" className="size-3.5" />
-                        </Button>
-                      )}
-                    </li>
-                  );
-                })}
+                    )}
+                  </li>
+                ))}
               </ul>
             </section>
           ))}
+        </div>
+
+        <div className="flex shrink-0 items-center justify-between gap-2 border-t px-4 py-2">
+          <p className="text-muted-foreground text-xs">
+            Kept until the workspace or standalone session is deleted.
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-11 shrink-0 sm:h-8"
+            disabled={list.isFetching}
+            onClick={() => {
+              void list.refetch();
+              void sandboxStatus.refetch();
+            }}
+          >
+            <RefreshCw
+              aria-hidden="true"
+              className={list.isFetching ? 'animate-spin motion-reduce:animate-none' : undefined}
+            />
+            Refresh
+          </Button>
         </div>
 
         <AlertDialog

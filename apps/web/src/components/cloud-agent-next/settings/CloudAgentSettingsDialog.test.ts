@@ -77,6 +77,9 @@ jest.mock('./RepositoryOverridesSection', () => ({
 }));
 
 jest.mock('./EnvironmentsSection', () => ({ EnvironmentsSection: () => null }));
+jest.mock('./WebSearchSection', () => ({
+  WebSearchSection: () => createElement('div', null, 'Web search'),
+}));
 
 jest.mock('./VercelComputeSettings', () => ({
   VercelComputeSettings: () => createElement('div', { 'data-section': 'vercel-compute' }),
@@ -199,9 +202,14 @@ function section(headingId: string): Element {
   return element;
 }
 
-function personalSwitch(): HTMLButtonElement {
-  const element = domDocument.querySelector<HTMLButtonElement>('[role="switch"]');
-  if (!element) throw new Error('Missing personal preference switch');
+function personalSwitch(label = 'Collapse tool calls'): HTMLButtonElement {
+  const field = Array.from(domDocument.querySelectorAll('label')).find(
+    element => element.textContent === label
+  );
+  const element = domDocument.querySelector<HTMLButtonElement>(
+    `[role="switch"][id="${field?.getAttribute('for')}"]`
+  );
+  if (!element) throw new Error(`Missing personal preference switch: ${label}`);
   return element;
 }
 
@@ -435,7 +443,12 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
 
     selectTab('Preferences');
 
-    expect(badgeTexts()).toEqual(['Organization workspace', 'Only you', 'This browser']);
+    expect(badgeTexts()).toEqual([
+      'Organization workspace',
+      'Only you',
+      'This browser',
+      'This browser',
+    ]);
     expect(domDocument.querySelector('#session-defaults-heading')).toBeNull();
 
     const personalSection = section('personal-preferences-heading');
@@ -497,6 +510,26 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
     expect(localStorageStub.getItem('cloud-agent:collapse-tools')).toBe('true');
   });
 
+  it('defaults completion sound to off and preserves an explicit opt-in', () => {
+    mockUseCloudAgentSettings.mockReturnValue(queryResult({ data: settings(false) }));
+    act(() => {
+      root.render(
+        createElement(CloudAgentSettingsDialog, {
+          open: true,
+          onOpenChange: jest.fn(),
+        })
+      );
+    });
+    selectTab('Preferences');
+    const sound = personalSwitch('Completion sound');
+    expect(sound.getAttribute('aria-checked')).toBe('false');
+    act(() => sound.click());
+    expect(localStorageStub.getItem('kilo-sound-notifications-enabled')).toBe('true');
+    selectTab('General');
+    selectTab('Preferences');
+    expect(personalSwitch('Completion sound').getAttribute('aria-checked')).toBe('true');
+  });
+
   it('scopes session defaults copy to the personal workspace', () => {
     mockUseCloudAgentSettings.mockReturnValue(queryResult({ data: settings(true) }));
     renderDialog();
@@ -515,7 +548,13 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
     expect(navText).toEqual(['Workspace', 'You']);
 
     selectTab('Preferences');
-    expect(badgeTexts()).toEqual(['Personal workspace', 'Only you', 'This browser']);
+    expect(badgeTexts()).toEqual([
+      'Personal workspace',
+      'Only you',
+      'This browser',
+      'This browser',
+    ]);
+    expect(section('personal-preferences-heading').textContent).toContain('Web search');
   });
 
   it('keeps the personal preference control available while settings load', () => {

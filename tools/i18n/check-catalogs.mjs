@@ -2224,7 +2224,8 @@ export function checkCatalogs(root = ROOT) {
 function run() {
   const { problems: found, languages } = checkCatalogs();
   if (found.length > 0) {
-    const limit = Number(process.env.I18N_CHECK_LIMIT ?? '50');
+    const parsedLimit = Number(process.env.I18N_CHECK_LIMIT ?? '50');
+    const limit = Number.isInteger(parsedLimit) && parsedLimit >= 0 ? parsedLimit : 50;
     const shown = found.slice(0, limit);
     for (const problem of shown) {
       console.error(problem);

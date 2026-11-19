@@ -64,6 +64,7 @@ import { useOrganization } from '@/lib/organization-context';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { HIDDEN_BALANCE } from '@/lib/storage-keys';
+import { billingHrefFor } from '@/lib/trial-refusal';
 import { cn } from '@/lib/utils';
 
 type OrganizationHubScreenProps = Readonly<{
@@ -401,7 +402,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               icon={CreditCard}
               title={t('organization.billing.title')}
               onPress={() => {
-                router.push('/(app)/(tabs)/(3_profile)/organization/billing' as Href);
+                router.push(billingHrefFor(organizationId));
               }}
             />
           )}

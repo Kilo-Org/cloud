@@ -76,7 +76,11 @@ function jsonResponse(body: unknown, status = 200) {
 
 const recorded = {
   status: 'recorded',
-  result: { usageId: 'usage-1', createdAt: '2026-08-05T10:11:12.945Z', newMicrodollarsUsed: 42 },
+  result: {
+    usageId: '0198f0b4-3f2a-7c3d-9e51-2f6b8c1d4a70',
+    createdAt: '2026-08-05T10:11:12.945Z',
+    newMicrodollarsUsed: 42,
+  },
 };
 
 beforeEach(() => {
@@ -115,7 +119,7 @@ describe('recordUsageInPrimaryRegion', () => {
       jsonResponse({
         status: 'duplicate',
         result: {
-          usageId: 'usage-1',
+          usageId: '0198f0b4-3f2a-7c3d-9e51-2f6b8c1d4a70',
           createdAt: '2026-08-05T10:11:12.945Z',
           newMicrodollarsUsed: null,
         },

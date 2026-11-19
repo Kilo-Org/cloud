@@ -4,7 +4,11 @@ import {
   INTERNAL_API_SECRET,
   SECURITY_AUTO_ANALYSIS_WORKER_URL,
 } from '@kilocode/web-shared/lib/config.server';
-import { postSecurityWorkerJson } from './security-worker-request';
+import {
+  isDefinitiveSecurityWorkerRejection,
+  postSecurityWorkerJson,
+} from './security-worker-request';
+import { SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE } from '@kilocode/app-shared/security-agent';
 import type { SecurityReviewOwner } from '../core/types';
 
 type ManualAnalysisStartParams = {
@@ -38,11 +42,17 @@ const DISABLED_ROUTING_ERROR = 'Manual analysis Worker routing is disabled';
 export async function submitManualAnalysisStart(
   params: ManualAnalysisStartParams
 ): Promise<{ queued: true; commandId: string }> {
-  if (!SECURITY_AUTO_ANALYSIS_WORKER_URL) {
-    throw new Error('SECURITY_AUTO_ANALYSIS_WORKER_URL is not configured');
-  }
-  if (!INTERNAL_API_SECRET) {
-    throw new Error('INTERNAL_API_SECRET is not configured');
+  if (!SECURITY_AUTO_ANALYSIS_WORKER_URL || !INTERNAL_API_SECRET) {
+    // Mirrored by the mobile security mutation classifier: a stable
+    // non-retryable code (PRECONDITION_FAILED), not the generic 500 the
+    // classifier treats as retryable transport. The sentence is the shared
+    // SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE, which the mobile ledger maps
+    // by exact match (stable-error-messages). Same contract as the sync and
+    // remediation clients.
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
+    });
   }
 
   // Bounded, and `BAD_GATEWAY` on a stalled or non-JSON response (see
@@ -69,9 +79,11 @@ export async function submitManualAnalysisStart(
     // Any other 5xx (including a gateway 503) may have been accepted and stays
     // ambiguous transport; a 4xx, and the known disabled-routing 503 that
     // precedes the command row, are definitive rejections.
-    const definitive =
-      response.status < 500 ||
-      (response.status === 503 && workerBody?.error === DISABLED_ROUTING_ERROR);
+    const definitive = isDefinitiveSecurityWorkerRejection({
+      status: response.status,
+      body: workerBody,
+      disabledRoutingError: DISABLED_ROUTING_ERROR,
+    });
     if (!definitive) {
       throw new TRPCError({ code: 'BAD_GATEWAY', message: `${failed}. Try again.` });
     }

@@ -1,4 +1,4 @@
-import { env, reset, runInDurableObject } from 'cloudflare:test';
+import { env, reset, runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
 import { count, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -6,7 +6,7 @@ import type {
   ControlPlaneSessionPeer,
   SandboxControlV2,
 } from '../../src/control-plane/sandbox/sandbox-do.js';
-import { writeRoute } from '../../src/control-plane/sandbox/routes.js';
+import { listRoutes, writeRoute } from '../../src/control-plane/sandbox/routes.js';
 import {
   allocation as allocationTable,
   workspaceArtifactOrphans,
@@ -17,7 +17,6 @@ import {
   WORKSPACE_ARTIFACT_MAX_FILE_BYTES,
   WORKSPACE_ARTIFACT_MAX_FILES,
   WORKSPACE_ARTIFACT_RESERVATION_TTL_MS,
-  WORKSPACE_ARTIFACT_RETENTION_MS,
   type WorkspaceArtifactIdentity,
 } from '../../src/shared/workspace-artifacts.js';
 import {
@@ -144,12 +143,10 @@ describe('workspace artifact index', () => {
         sizeBytes: 12,
         contentType: 'application/pdf',
         updatedAt: expect.any(Number),
-        expiresAt: expect.any(Number),
       },
     ]);
     const entry = listed.entries[0];
     if (entry === undefined) throw new Error('missing entry');
-    expect(entry.expiresAt - entry.updatedAt).toBe(WORKSPACE_ARTIFACT_RETENTION_MS);
     expect(await stub.getWorkspaceArtifact('reports/summary.pdf')).toEqual({
       objectKey: reserved.objectKey,
       entry,
@@ -365,7 +362,7 @@ describe('workspace artifact index', () => {
     ).toEqual({ status: 'stale' });
   });
 
-  it('prunes expired entries on index access and queues their objects', async () => {
+  it('keeps old artifacts through route release and sweeps them after standalone deletion', async () => {
     const sandboxId = `artifacts_${crypto.randomUUID()}`;
     const stub = newSandbox(sandboxId);
     const who = identity(sandboxId);
@@ -379,6 +376,7 @@ describe('workspace artifact index', () => {
       sizeBytes: 4,
     });
     if (reserved.status !== 'ok') throw new Error('reserve failed');
+    await artifactsBucket.put(reserved.objectKey, 'test');
     await stub.commitWorkspaceArtifact(who, {
       relativePath: 'old.txt',
       objectKey: reserved.objectKey,
@@ -390,14 +388,99 @@ describe('workspace artifact index', () => {
     await runInDurableObject(stub, async (_instance, state) => {
       const db = drizzle(state.storage, { logger: false });
       db.update(workspaceArtifacts)
-        .set({ updated_at: Date.now() - WORKSPACE_ARTIFACT_RETENTION_MS - 1 })
+        .set({ updated_at: Date.now() - 30 * 24 * 60 * 60 * 1_000 })
         .where(eq(workspaceArtifacts.relative_path, 'old.txt'))
         .run();
     });
 
+    await stub.release({ sessionId: 'test-session' });
+    expect(await stub.listWorkspaceArtifacts()).toEqual({
+      revision: 1,
+      entries: [expect.objectContaining({ relativePath: 'old.txt' })],
+    });
+    expect(await artifactsBucket.head(reserved.objectKey)).not.toBeNull();
+
+    await stub.release({ sessionId: 'test-session', reason: 'standalone_session_deleted' });
+    await stub.release({ sessionId: 'test-session', reason: 'standalone_session_deleted' });
     expect(await stub.listWorkspaceArtifacts()).toEqual({ revision: 2, entries: [] });
     expect(await stub.getWorkspaceArtifact('old.txt')).toBeNull();
     expect((await rows(stub)).orphans.map(row => row.object_key)).toEqual([reserved.objectKey]);
+    expect(
+      await stub.reserveWorkspaceArtifactUpload(who, { relativePath: 'late.txt', sizeBytes: 4 })
+    ).toEqual({ status: 'stale' });
+
+    await runInDurableObject(stub, (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      db.update(workspaceArtifactOrphans)
+        .set({ queued_at: Date.now() - WORKSPACE_ARTIFACT_RESERVATION_TTL_MS - 1 })
+        .where(eq(workspaceArtifactOrphans.object_key, reserved.objectKey))
+        .run();
+    });
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    await waitFor(async () => expect(await artifactsBucket.head(reserved.objectKey)).toBeNull());
+  });
+
+  it('retires a chat route without clearing workspace artifacts when a sibling route remains', async () => {
+    const sandboxId = `sbx-${crypto.randomUUID().replaceAll('-', '')}${'0'.repeat(16)}`;
+    const stub = newSandbox(sandboxId);
+    const who = identity(sandboxId);
+    const deletedSessionId = `workspace_${crypto.randomUUID()}`;
+    const siblingSessionId = `workspace_${crypto.randomUUID()}`;
+    await setAllocation(stub, {
+      state: 'connected',
+      allocationId: 'allocation-1',
+      wrapperId: 'wrapper-1',
+    });
+    const reserved = await stub.reserveWorkspaceArtifactUpload(who, {
+      relativePath: 'report.txt',
+      sizeBytes: 4,
+    });
+    if (reserved.status !== 'ok') throw new Error('reserve failed');
+    await artifactsBucket.put(reserved.objectKey, 'test');
+    expect(
+      await stub.commitWorkspaceArtifact(who, {
+        relativePath: 'report.txt',
+        objectKey: reserved.objectKey,
+        contentHash: HASH_A,
+        sizeBytes: 4,
+        contentType: 'text/plain',
+      })
+    ).toEqual({ status: 'committed', revision: 1 });
+
+    await runInDurableObject(stub, (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      for (const sessionId of [deletedSessionId, siblingSessionId]) {
+        writeRoute(db, {
+          sessionId,
+          spec: {
+            sessionId,
+            kiloSessionId: `ses_${crypto.randomUUID().replaceAll('-', '').slice(0, 26)}`,
+            directory: '/workspace/shared-worktree',
+            attemptId: 'attempt-1',
+          },
+          grant: null,
+          credentialSource: null,
+          environment: null,
+          state: 'ready',
+          attemptId: 'attempt-1',
+          attemptDeadlineAt: 0,
+          reason: null,
+        });
+      }
+    });
+
+    // A workspace chat normally omits the reason. Pass it to exercise the defensive guard.
+    await stub.release({ sessionId: deletedSessionId, reason: 'standalone_session_deleted' });
+    const remainingRoutes = await runInDurableObject(stub, async (_instance, state) =>
+      (await listRoutes(drizzle(state.storage, { logger: false }))).map(route => route.sessionId)
+    );
+    expect(remainingRoutes).toEqual([siblingSessionId]);
+    expect(await stub.listWorkspaceArtifacts()).toEqual({
+      revision: 1,
+      entries: [expect.objectContaining({ relativePath: 'report.txt' })],
+    });
+    expect((await rows(stub)).orphans).toEqual([]);
+    expect(await artifactsBucket.head(reserved.objectKey)).not.toBeNull();
   });
 
   it('leaves a fresh reservation and its object for an in-flight commit', async () => {

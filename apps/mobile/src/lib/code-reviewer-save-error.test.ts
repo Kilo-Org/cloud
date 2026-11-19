@@ -23,6 +23,38 @@ describe('reviewerSaveFailure', () => {
     });
   });
 
+  it('gives a billing role the copy that offers the plan step', () => {
+    expect(
+      reviewerSaveFailure(
+        makeError('FORBIDDEN', ORGANIZATION_TRIAL_EXPIRED_MESSAGE),
+        SAVE_FALLBACK,
+        true
+      )
+    ).toEqual({ message: i18n.t('common.organizationTrialEndedBilling'), retryable: false });
+  });
+
+  it('keeps the owner-naming copy for a reader who cannot change the plan', () => {
+    const refusal = makeError('FORBIDDEN', ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
+    expect(reviewerSaveFailure(refusal, SAVE_FALLBACK, false)).toEqual({
+      message: i18n.t('common.organizationTrialEnded'),
+      retryable: false,
+    });
+    // The role defaults to the owner-naming copy for a caller that has not
+    // resolved it yet.
+    expect(reviewerSaveFailure(refusal, SAVE_FALLBACK)).toEqual({
+      message: i18n.t('common.organizationTrialEnded'),
+      retryable: false,
+    });
+  });
+
+  it('carries the role into no other refusal', () => {
+    const denied = makeError('FORBIDDEN', 'Not a reviewer manager');
+    expect(reviewerSaveFailure(denied, SAVE_FALLBACK, true)).toEqual({
+      message: SAVE_FALLBACK,
+      retryable: false,
+    });
+  });
+
   it('keeps the caller’s generic line for an unexplained refusal, without a retry', () => {
     expect(saveFailure(makeError('FORBIDDEN', 'Not a reviewer manager'))).toEqual({
       message: SAVE_FALLBACK,

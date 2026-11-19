@@ -58,7 +58,7 @@ export const ORGANIZATION_SPEND_ALERT_RECIPIENT_ROLES = [
   'billing_manager',
 ] satisfies OrganizationRole[];
 
-export function canManageOrganization(role: string | undefined): boolean {
+export function canManageOrganization(role: OrganizationRole | undefined): boolean {
   return ORGANIZATION_MANAGE_ROLES.some(allowed => allowed === role);
 }
 
@@ -71,7 +71,7 @@ export function canManageOrganization(role: string | undefined): boolean {
  * apps/web/src/routers/organizations/organization-members-router.ts; keep the
  * two in sync so the UI does not offer actions the server rejects.
  */
-export function canManageOrganizationOwners(role: string | undefined): boolean {
+export function canManageOrganizationOwners(role: OrganizationRole | undefined): boolean {
   return role === 'owner';
 }
 
@@ -83,7 +83,7 @@ export function canManageOrganizationOwners(role: string | undefined): boolean {
  * identical `role === 'owner' || role === 'billing_manager'` check; `admin`
  * was added because admins hold the same authority as owners.
  */
-export function canManageOrganizationBilling(role: string | undefined): boolean {
+export function canManageOrganizationBilling(role: OrganizationRole | undefined): boolean {
   return ORGANIZATION_BILLING_ROLES.some(allowed => allowed === role);
 }
 

@@ -8,13 +8,16 @@ import { View } from 'react-native';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import {
   emailsError,
+  emailsErrorMessages,
   parseEmails,
   parseThreshold,
   saveErrorCopy,
   thresholdError,
+  thresholdErrorMessages,
 } from '@/components/organization/low-balance-alert-validators';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
+import { RefusalStatus } from '@/components/refusal-status';
 import { SheetScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
@@ -33,13 +36,21 @@ import {
   useOrgBoundary,
   useOrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
+import { isTrialExpiredRefusal } from '@/lib/server-error-copy';
+import { useTrialRefusalAction } from '@/lib/trial-refusal';
 
 type LowBalanceAlertFormProps = Readonly<{
   organizationId: string | null;
   settings: OrgWithMembers['settings'];
+  /** Whether this reader may change the plan, which picks the refusal copy. */
+  canManageBilling: boolean;
 }>;
 
-function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormProps) {
+function LowBalanceAlertForm({
+  organizationId,
+  settings,
+  canManageBilling,
+}: LowBalanceAlertFormProps) {
   const router = useRouter();
   const { t } = useTranslation();
   const mutations = useOrganizationMutations(organizationId ?? '');
@@ -83,9 +94,16 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
 
   // A rejected save belongs to the field that caused it; correcting either
   // field drops the rejection so Save no longer sits under a stale sentence.
-  const saveError = mutations.updateMinimumBalanceAlert.isError
-    ? saveErrorCopy(mutations.updateMinimumBalanceAlert.error)
+  // The copy and the step are chosen for this reader's role: only the plan
+  // refusal offers a step, and only to a role the server would let take it.
+  const saveFailure = mutations.updateMinimumBalanceAlert.isError
+    ? mutations.updateMinimumBalanceAlert.error
     : null;
+  const saveError = saveFailure == null ? null : saveErrorCopy(saveFailure, canManageBilling);
+  const trialRefusalAction = useTrialRefusalAction(
+    isTrialExpiredRefusal(saveFailure),
+    organizationId
+  );
   const clearSaveError = () => {
     if (mutations.updateMinimumBalanceAlert.isError) {
       mutations.updateMinimumBalanceAlert.reset();
@@ -151,6 +169,7 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
             keyboardType="decimal-pad"
             defaultValue={thresholdRef.current || undefined}
             validate={thresholdError}
+            reserveErrorMessages={thresholdErrorMessages()}
             error={draftThresholdError ?? undefined}
             onChangeText={value => {
               thresholdRef.current = value;
@@ -164,12 +183,14 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
             <FormField
               label={t('organization.lowBalanceAlert.notifyEmailsLabel')}
               required
+              validateWhileTyping
               placeholder={t('organization.inviteMember.emailPlaceholder')}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
               defaultValue={emailsRef.current || undefined}
               validate={emailsError}
+              reserveErrorMessages={emailsErrorMessages()}
               onChangeText={value => {
                 emailsRef.current = value;
                 revalidate(enabled, thresholdRef.current, value);
@@ -188,12 +209,14 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
       )}
 
       {/* updateMinimumBalanceAlert has no mutation toast (inline error pattern
-          P2), so AccessibleStatus is the single announcement owner here: one
+          P2), so the status line is the single announcement owner here: one
           announcement per platform, visuals preserved (tone error). A rejected
           save names itself in localized copy — the server's schema message is
-          a JSON array, never a sentence a person should read. */}
-      <AccessibleStatus
+          a JSON array, never a sentence a person should read — and a refusal
+          this reader can end carries the billing step under the copy. */}
+      <RefusalStatus
         message={saveError?.field === 'form' ? saveError.message : null}
+        action={trialRefusalAction}
         className="text-sm"
       />
 
@@ -276,6 +299,7 @@ export function LowBalanceAlertSheet() {
         <LowBalanceAlertForm
           organizationId={organizationId}
           settings={orgWithMembers.data.settings}
+          canManageBilling={isMoneyRole(role)}
         />
       )}
     </SheetScrollView>

@@ -254,7 +254,6 @@ describe('recordEnkryptUsage', () => {
     const usageRecord = await enkryptUsageRecordForNewOrganization({
       decision: 'error',
       creditsCost: null,
-      addedLatencyMs: null,
     });
     const { organizationId } = usageRecord;
 
@@ -279,7 +278,7 @@ describe('recordEnkryptUsage', () => {
         decision: 'error',
         enkrypt_credits_cost: null,
         charged_microdollars: 0,
-        added_latency_ms: null,
+        added_latency_ms: 212,
         microdollar_usage_id: null,
       }),
     ]);

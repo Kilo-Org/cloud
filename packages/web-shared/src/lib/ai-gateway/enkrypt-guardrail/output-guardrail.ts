@@ -16,10 +16,7 @@ import {
   guardrailSettings,
   type EnkryptOutputGuardrailReport,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
-import {
-  recordEnkryptUsageRecords,
-  usageRecordsWithAddedLatency,
-} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/input-guardrail';
+import { recordEnkryptUsageRecords } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/input-guardrail';
 import {
   extractResponseText,
   type ResponseBodyFormat,
@@ -176,14 +173,8 @@ function bodyFormat(response: Response): ResponseBodyFormat {
   return response.headers.get('content-type')?.includes('application/json') ? 'json' : 'sse';
 }
 
-function outputUsageRecords(
-  blockingCalls: EnkryptGuardrailCall[],
-  logOnlyCalls: EnkryptGuardrailCall[],
-  addedLatencyMs: number
-): EnkryptUsageRecord[] {
-  return usageRecordsWithAddedLatency(blockingCalls, logOnlyCalls, addedLatencyMs).map(
-    usageRecord => ({ ...usageRecord, guardrail: 'output' })
-  );
+function outputUsageRecords(calls: EnkryptGuardrailCall[]): EnkryptUsageRecord[] {
+  return calls.map(call => ({ ...call, guardrail: 'output' }));
 }
 
 function recordOutputUsageRecords(usageRecords: EnkryptUsageRecord[]): Promise<void> {
@@ -384,10 +375,9 @@ export async function guardEnkryptOutput({
           report.output_characters = text.length;
           if (isTooLargeToScan(text)) return notScannedBecause('output_too_large');
           const result = await scanOutput(logOnly, text);
-          // A guardrail that only logs adds no latency, so it records its log-only scan time.
-          const scanTimeMs = Math.round(performance.now() - waitStartedAt);
-          report.added_latency_ms = scanTimeMs;
-          return outputUsageRecords([], result.usageRecords, scanTimeMs);
+          // A guardrail that only logs adds no latency, so it reports its log-only scan time.
+          report.added_latency_ms = Math.round(performance.now() - waitStartedAt);
+          return outputUsageRecords(result.usageRecords);
         } catch (error) {
           console.error('[enkrypt-guardrail] log-only output scan failed unexpectedly', {
             ...logFields,
@@ -473,12 +463,11 @@ export async function guardEnkryptOutput({
 
     const waitStartedAt = performance.now();
     const { verdict, usageRecords } = await blockingResult;
-    const addedLatencyMs = Math.round(performance.now() - waitStartedAt);
-    report.added_latency_ms = addedLatencyMs;
+    report.added_latency_ms = Math.round(performance.now() - waitStartedAt);
     return {
       decision: decide(verdict, replayedResponse(response, buffered)),
       usageRecords: logOnlyResult.then(logOnlyScan =>
-        outputUsageRecords(usageRecords, logOnlyScan.usageRecords, addedLatencyMs)
+        outputUsageRecords([...usageRecords, ...logOnlyScan.usageRecords])
       ),
     };
   })();

@@ -11277,13 +11277,9 @@ export const enkrypt_usage = pgTable(
       .references(() => enkrypt_usage_decision.decision_id),
     enkrypt_credits_cost: real(),
     charged_microdollars: bigint({ mode: 'number' }).notNull(),
-    // How long the request waited for the guardrail verdict: before its upstream call for the input
-    // guardrail, and between the end of the upstream response and its release for the output
-    // guardrail. Set only on the final call of the guardrail's blocking scan, or of its log-only
-    // scan when no blocking call was recorded, so it is counted once per guardrail and request; null
-    // on other calls or when the request returned before awaiting the verdict. A guardrail that only
-    // logs adds no wait, so it stores its log-only scan time: how long the scan ran past the point
-    // where a blocking scan would hold the request or response.
+    // How long this Enkrypt call took, from sending the request until the response was read or the
+    // call failed. Older rows instead hold the request's wait for the guardrail verdict, set only on
+    // one call per guardrail and request and null on the others.
     added_latency_ms: integer(),
     // Null on rows recorded before the output guardrail existed, which are all input guardrail calls.
     guardrail_id: integer().references(() => enkrypt_usage_guardrail.guardrail_id),

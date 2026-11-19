@@ -159,9 +159,22 @@ describe('scanRequest', () => {
           creditsCost: 3,
           scannedCharacters: 11,
           totalCharacters: 11,
+          addedLatencyMs: expect.any(Number),
         },
       ],
     });
+  });
+
+  it('records the call’s latency on its usage record, the same as the report’s', async () => {
+    jest.spyOn(performance, 'now').mockReturnValueOnce(1_000).mockReturnValueOnce(1_237.4);
+
+    const result = await scanRequest(
+      makeScan(),
+      deps(async () => detectResponse({ summary: {} }))
+    );
+
+    expect(result.report.latency_ms).toBe(237);
+    expect(result.usageRecords).toEqual([expect.objectContaining({ addedLatencyMs: 237 })]);
   });
 
   it('reports the scan outcome without request text or Enkrypt messages', async () => {

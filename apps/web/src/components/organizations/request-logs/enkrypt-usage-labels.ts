@@ -32,6 +32,5 @@ export function firedDetectorsLabel(call: EnkryptUsageRow): string | null {
     : null;
 }
 
-/** What a call's latency is: the guardrail's added wait, or, for one that only logs, its scan time. */
 export const ENKRYPT_LATENCY_HINT =
-  'The wait the guardrail added. A guardrail that only logs adds none, so this is how long its scan ran after the point where a blocking scan would hold the request or response.';
+  'How long this Enkrypt scan took. Older calls show the wait the guardrail added to the request instead, on one call per request.';

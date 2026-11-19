@@ -509,6 +509,7 @@ export async function scanRequest(
       creditsCost: attempt.creditsCost,
       scannedCharacters: text.length,
       totalCharacters: coverage.totalCharacters,
+      addedLatencyMs: latencyMs,
       ...(attempt.kind === 'detected' && attempt.firedDetectors.length > 0
         ? { detectorsFired: attempt.firedDetectors }
         : {}),

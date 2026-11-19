@@ -4,15 +4,22 @@ import {
   GatewayConfigInputSchema,
   DEFAULT_GATEWAY_CONFIG,
   OrganizationFeaturesInputSchema,
+  AnthropicUserProfilesSettingsInputSchema,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import type {
+  AnthropicUserProfilesSettings,
   GatewayConfig,
   OrganizationFeatures,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import { readOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
-import { ai_gateway_config, organizations } from '@kilocode/db/schema';
+import { readAnthropicUserProfilesSettings } from '@kilocode/web-shared/lib/ai-gateway/anthropic-user-profiles/settings';
+import {
+  ai_gateway_config,
+  anthropic_user_profile_deletions,
+  organizations,
+} from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { desc, eq, inArray, sql } from 'drizzle-orm';
 
 async function readConfig(): Promise<GatewayConfig> {
   try {
@@ -89,4 +96,24 @@ export const adminGatewayConfigRouter = createTRPCRouter({
       await mergeIntoConfig({ organization_features });
       return organization_features;
     }),
+
+  getAnthropicUserProfiles: adminProcedure.query(async () => {
+    return readAnthropicUserProfilesSettings(db);
+  }),
+
+  setAnthropicUserProfiles: adminProcedure
+    .input(AnthropicUserProfilesSettingsInputSchema)
+    .mutation(async ({ input }) => {
+      const anthropic_user_profiles: AnthropicUserProfilesSettings = input;
+      await mergeIntoConfig({ anthropic_user_profiles });
+      return anthropic_user_profiles;
+    }),
+
+  listAnthropicUserProfileDeletions: adminProcedure.query(async () => {
+    return db
+      .select()
+      .from(anthropic_user_profile_deletions)
+      .orderBy(desc(anthropic_user_profile_deletions.deleted_at))
+      .limit(500);
+  }),
 });

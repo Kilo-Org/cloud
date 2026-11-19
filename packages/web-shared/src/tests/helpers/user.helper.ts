@@ -52,6 +52,7 @@ export function defineTestUser(userData: Partial<User> = {}): User {
     email_domain: null,
     external_id: null,
     personal_account_disabled: false,
+    anthropic_user_profile_id: null,
     ...userData,
   } satisfies User;
 }

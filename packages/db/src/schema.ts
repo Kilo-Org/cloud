@@ -114,6 +114,7 @@ import {
   EnkryptBenchmarkSchema,
 } from './schema-types';
 import type {
+  AnthropicUserProfileDeletionReason,
   EnkryptDetectorId,
   EnkryptGuardrailDecision,
   EnkryptGuardrailDirection,
@@ -554,9 +555,16 @@ export const kilocode_users = pgTable(
     external_id: text().default(sql`null`),
 
     personal_account_disabled: boolean().default(false).notNull(),
+
+    /** Anthropic `uprof_…` user profile that attributes this user's personal Claude traffic. */
+    anthropic_user_profile_id: text(),
   },
   table => [
     unique('UQ_b1afacbcf43f2c7c4cb9f7e7faa').on(table.google_user_email),
+    index('IDX_kilocode_users_anthropic_user_profile_id')
+      .on(table.anthropic_user_profile_id)
+      .where(sql`${table.anthropic_user_profile_id} IS NOT NULL`)
+      .concurrently(),
     index('IDX_kilocode_users_signup_ip_created_at').on(table.signup_ip, table.created_at),
     index('IDX_kilocode_users_next_credit_expiration_at')
       .on(table.next_credit_expiration_at)
@@ -3424,8 +3432,16 @@ export const organizations = pgTable(
     directory_idp_id: text(),
     // Identifier for this organization in the customer's own system.
     external_org_id: text(),
+    /**
+     * Anthropic `uprof_…` user profile that attributes this organization's Claude
+     * traffic. A sub-organization shares its parent's profile.
+     */
+    anthropic_user_profile_id: text(),
   },
   table => [
+    index('IDX_organizations_anthropic_user_profile_id')
+      .on(table.anthropic_user_profile_id)
+      .where(sql`${table.anthropic_user_profile_id} IS NOT NULL`),
     check('organizations_name_not_empty_check', sql`length(trim(${table.name})) > 0`),
     check(
       'organizations_not_parented_by_self_check',
@@ -6042,6 +6058,24 @@ export const ai_gateway_config = pgTable(
   },
   table => [check('ai_gateway_config_singleton', sql`${table.id} = 1`)]
 );
+
+/** Anthropic user profiles the daily cleanup deleted; rows older than seven days are pruned. */
+export const anthropic_user_profile_deletions = pgTable(
+  'anthropic_user_profile_deletions',
+  {
+    id: idPrimaryKeyColumn,
+    user_profile_id: text().notNull(),
+    reason: text().$type<AnthropicUserProfileDeletionReason>().notNull(),
+    /** The blocked user the profile was linked to, for `user_blocked` deletions. */
+    kilo_user_id: text(),
+    profile_created_at: timestamp({ withTimezone: true, mode: 'string' }),
+    profile_updated_at: timestamp({ withTimezone: true, mode: 'string' }),
+    deleted_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [index('IDX_anthropic_user_profile_deletions_deleted_at').on(table.deleted_at)]
+);
+
+export type AnthropicUserProfileDeletion = typeof anthropic_user_profile_deletions.$inferSelect;
 
 export const blacklisted_domains = pgTable('blacklisted_domains', {
   domain: text().primaryKey(),

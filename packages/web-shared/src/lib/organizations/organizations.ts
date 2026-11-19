@@ -1301,7 +1301,7 @@ export async function markOrganizationAsDeleted(
       .where(eq(cloud_agent_environments.owned_by_organization_id, organizationId));
     await tx
       .update(organizations)
-      .set({ ...auto_deleted_at })
+      .set({ ...auto_deleted_at, anthropic_user_profile_id: null })
       .where(eq(organizations.id, organizationId));
 
     return members.map(member => member.id);

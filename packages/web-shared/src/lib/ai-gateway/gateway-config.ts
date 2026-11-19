@@ -116,3 +116,80 @@ export const OrganizationFeaturesInputSchema = z.object({
   enkrypt_output_guardrail: organizationIdsInput,
   gateway_settings: organizationIdsInput,
 }) satisfies z.ZodType<OrganizationFeatures, unknown>;
+
+export const ANTHROPIC_USER_PROFILE_LIST_MAX_COUNT = 1000;
+
+const storedIds = z.array(z.string()).default([]);
+
+/**
+ * Settings for attributing Kilo-paid Claude requests to Anthropic user profiles,
+ * stored under `anthropic_user_profiles` in the gateway configuration. With
+ * `enabled` set, a user or organization gets a profile when explicitly opted in,
+ * or once `start_at` has passed; without `start_at`, only opt-ins get one.
+ * Opt-outs never get a profile or the header, and win over opt-ins.
+ */
+export const AnthropicUserProfilesSettingsSchema = z.object({
+  enabled: z.boolean().default(false),
+  start_at: z.string().nullable().default(null),
+  opted_in_user_ids: storedIds,
+  opted_in_organization_ids: storedIds.transform(ids => ids.map(id => id.toLowerCase())),
+  opted_out_user_ids: storedIds,
+  opted_out_organization_ids: storedIds.transform(ids => ids.map(id => id.toLowerCase())),
+});
+
+export type AnthropicUserProfilesSettings = z.infer<typeof AnthropicUserProfilesSettingsSchema>;
+
+export const DEFAULT_ANTHROPIC_USER_PROFILES_SETTINGS: AnthropicUserProfilesSettings =
+  AnthropicUserProfilesSettingsSchema.parse({});
+
+/** Reads the Anthropic user profile settings from a stored gateway configuration. */
+export const GatewayAnthropicUserProfilesConfigSchema = z.object({
+  anthropic_user_profiles: AnthropicUserProfilesSettingsSchema.prefault({}),
+});
+
+const userIdsInput = z
+  .array(z.string().trim().min(1))
+  .max(ANTHROPIC_USER_PROFILE_LIST_MAX_COUNT)
+  .transform(ids => [...new Set(ids)]);
+
+const anthropicOrganizationIdsInput = z
+  .array(z.guid())
+  .max(ANTHROPIC_USER_PROFILE_LIST_MAX_COUNT)
+  .transform(ids => [...new Set(ids.map(id => id.toLowerCase()))]);
+
+function overlap(a: string[], b: string[]): string[] {
+  const set = new Set(a);
+  return b.filter(id => set.has(id));
+}
+
+/** Schema for the admin Anthropic user profile settings mutation input. */
+export const AnthropicUserProfilesSettingsInputSchema = z
+  .object({
+    enabled: z.boolean(),
+    start_at: z.iso.datetime({ offset: true }).nullable(),
+    opted_in_user_ids: userIdsInput,
+    opted_in_organization_ids: anthropicOrganizationIdsInput,
+    opted_out_user_ids: userIdsInput,
+    opted_out_organization_ids: anthropicOrganizationIdsInput,
+  })
+  .superRefine((input, ctx) => {
+    const users = overlap(input.opted_in_user_ids, input.opted_out_user_ids);
+    if (users.length > 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['opted_out_user_ids'],
+        message: `Users cannot be both opted in and opted out: ${users.join(', ')}`,
+      });
+    }
+    const organizations = overlap(
+      input.opted_in_organization_ids,
+      input.opted_out_organization_ids
+    );
+    if (organizations.length > 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['opted_out_organization_ids'],
+        message: `Organizations cannot be both opted in and opted out: ${organizations.join(', ')}`,
+      });
+    }
+  }) satisfies z.ZodType<AnthropicUserProfilesSettings, unknown>;

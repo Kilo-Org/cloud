@@ -844,6 +844,19 @@ export const ClaudeBillingConnectionStatus = {
 export type ClaudeBillingConnectionStatus =
   (typeof ClaudeBillingConnectionStatus)[keyof typeof ClaudeBillingConnectionStatus];
 
+/**
+ * Why the daily cleanup deleted an Anthropic user profile:
+ * - `unlinked`: no user or live organization references the profile.
+ * - `user_blocked`: only users blocked for at least seven days reference it.
+ */
+export const AnthropicUserProfileDeletionReason = {
+  Unlinked: 'unlinked',
+  UserBlocked: 'user_blocked',
+} as const;
+
+export type AnthropicUserProfileDeletionReason =
+  (typeof AnthropicUserProfileDeletionReason)[keyof typeof AnthropicUserProfileDeletionReason];
+
 // --- Coding Plan enums ---
 
 export const BYOKManagementSource = {

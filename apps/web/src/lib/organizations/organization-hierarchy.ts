@@ -9,6 +9,23 @@ export const childOrganizationSettings = {
   suppress_trial_messaging: true,
 };
 
+/**
+ * A sub-organization shares its parent's Anthropic user profile. Locking the
+ * parent row until commit makes a profile the AI gateway stores on it meanwhile
+ * wait, so the gateway's share to live sub-organizations sees this one.
+ */
+export async function getParentAnthropicUserProfileId(
+  txn: DrizzleTransaction,
+  parentOrganizationId: string
+): Promise<string | null> {
+  const [parentOrganization] = await txn
+    .select({ anthropic_user_profile_id: organizations.anthropic_user_profile_id })
+    .from(organizations)
+    .where(eq(organizations.id, parentOrganizationId))
+    .for('share');
+  return parentOrganization?.anthropic_user_profile_id ?? null;
+}
+
 export async function validateParentOrganizationChange(
   organizationId: string,
   parentOrganizationId: string | null,
@@ -126,10 +143,14 @@ export async function createChildOrganization(
     }
 
     const [parentOrganization] = await tx
-      .select({ plan: organizations.plan })
+      .select({
+        plan: organizations.plan,
+        anthropic_user_profile_id: organizations.anthropic_user_profile_id,
+      })
       .from(organizations)
       .where(and(eq(organizations.id, parentOrganizationId), isNull(organizations.deleted_at)))
-      .limit(1);
+      .limit(1)
+      .for('share');
 
     if (!parentOrganization) {
       throw new TRPCError({
@@ -146,6 +167,7 @@ export async function createChildOrganization(
         require_seats: false,
         free_trial_end_at: null,
         parent_organization_id: parentOrganizationId,
+        anthropic_user_profile_id: parentOrganization.anthropic_user_profile_id,
         settings: {
           enable_usage_limits: false,
           code_indexing_enabled: true,

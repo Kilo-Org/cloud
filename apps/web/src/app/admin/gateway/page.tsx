@@ -15,6 +15,7 @@ import { VercelModelIdOverridesContent } from '@/app/admin/gateway/VercelModelId
 import { PreferredProviderOrderContent } from '@/app/admin/gateway/PreferredProviderOrderContent';
 import { CustomPricingContent } from '@/app/admin/gateway/CustomPricingContent';
 import { OrganizationFeaturesContent } from '@/app/admin/gateway/OrganizationFeaturesContent';
+import { AnthropicUserProfilesContent } from '@/app/admin/gateway/AnthropicUserProfilesContent';
 import ApiRequestLogPage from '@/app/admin/api-request-log/page';
 import { ProviderMetadataContent } from '@/app/admin/gateway/ProviderMetadataContent';
 import RequestLoggingOptInsContent from '@/app/admin/request-logging-opt-ins/RequestLoggingOptInsContent';
@@ -29,6 +30,7 @@ const VALID_TABS: readonly string[] = [
   'provider-order',
   'custom-pricing',
   'organization-features',
+  'anthropic-user-profiles',
   'api-request-log',
   'provider-metadata',
 ];
@@ -42,6 +44,7 @@ type Tab =
   | 'provider-order'
   | 'custom-pricing'
   | 'organization-features'
+  | 'anthropic-user-profiles'
   | 'api-request-log'
   | 'provider-metadata';
 const isValidTab = (value: string | null): value is Tab =>
@@ -110,6 +113,9 @@ export default function AdminGatewayPage() {
             <TabsTrigger value="organization-features" className={tabTriggerClass}>
               Organization Features
             </TabsTrigger>
+            <TabsTrigger value="anthropic-user-profiles" className={tabTriggerClass}>
+              Anthropic profiles
+            </TabsTrigger>
             <TabsTrigger value="api-request-log" className={tabTriggerClass}>
               API Request Log
             </TabsTrigger>
@@ -165,6 +171,9 @@ export default function AdminGatewayPage() {
           </TabsContent>
           <TabsContent value="organization-features" className="mt-4">
             <OrganizationFeaturesContent />
+          </TabsContent>
+          <TabsContent value="anthropic-user-profiles" className="mt-4">
+            <AnthropicUserProfilesContent />
           </TabsContent>
           <TabsContent
             value="api-request-log"

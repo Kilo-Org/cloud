@@ -235,6 +235,7 @@ function organization(): Organization {
     directory_group_id: null,
     directory_idp_id: null,
     external_org_id: null,
+    anthropic_user_profile_id: null,
   };
 }
 

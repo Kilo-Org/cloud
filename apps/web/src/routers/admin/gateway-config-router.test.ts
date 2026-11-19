@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
-import { ai_gateway_config, organizations, type User } from '@kilocode/db/schema';
+import {
+  ai_gateway_config,
+  anthropic_user_profile_deletions,
+  organizations,
+  type User,
+} from '@kilocode/db/schema';
 import {
   ORGANIZATION_FEATURE_ORGANIZATIONS_MAX_COUNT,
   VERCEL_ROUTING_OPT_OUT_MODEL_MAX_LENGTH,
@@ -264,6 +269,164 @@ describe('adminGatewayConfigRouter', () => {
         })
       ).rejects.toMatchObject({ code: 'FORBIDDEN' });
       expect(await db.select().from(ai_gateway_config)).toEqual([]);
+    });
+  });
+
+  describe('Anthropic user profiles', () => {
+    const organizationId = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
+    const settings = {
+      enabled: true,
+      start_at: '2026-12-01T09:30:00.000Z',
+      opted_in_user_ids: ['user-1', 'user-1', 'user-2'],
+      opted_in_organization_ids: [organizationId.toUpperCase()],
+      opted_out_user_ids: ['user-3'],
+      opted_out_organization_ids: [],
+    };
+    const normalizedSettings = {
+      ...settings,
+      opted_in_user_ids: ['user-1', 'user-2'],
+      opted_in_organization_ids: [organizationId],
+    };
+
+    it('returns the disabled defaults when nothing is stored', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(caller.admin.gatewayConfig.getAnthropicUserProfiles()).resolves.toEqual({
+        enabled: false,
+        start_at: null,
+        opted_in_user_ids: [],
+        opted_in_organization_ids: [],
+        opted_out_user_ids: [],
+        opted_out_organization_ids: [],
+      });
+    });
+
+    it('stores normalized settings and reads them back', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(caller.admin.gatewayConfig.setAnthropicUserProfiles(settings)).resolves.toEqual(
+        normalizedSettings
+      );
+      await expect(caller.admin.gatewayConfig.getAnthropicUserProfiles()).resolves.toEqual(
+        normalizedSettings
+      );
+    });
+
+    it('replaces the whole stored object when saved again', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await caller.admin.gatewayConfig.setAnthropicUserProfiles(settings);
+      await caller.admin.gatewayConfig.setAnthropicUserProfiles({
+        enabled: false,
+        start_at: null,
+        opted_in_user_ids: [],
+        opted_in_organization_ids: [],
+        opted_out_user_ids: [],
+        opted_out_organization_ids: [],
+      });
+
+      await expect(caller.admin.gatewayConfig.getAnthropicUserProfiles()).resolves.toMatchObject({
+        enabled: false,
+        start_at: null,
+        opted_in_user_ids: [],
+      });
+    });
+
+    it('rejects an ID that is both opted in and opted out without writing', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.gatewayConfig.setAnthropicUserProfiles({
+          ...settings,
+          opted_out_user_ids: ['user-1'],
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      await expect(
+        caller.admin.gatewayConfig.setAnthropicUserProfiles({
+          ...settings,
+          opted_out_organization_ids: [organizationId],
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(await db.select().from(ai_gateway_config)).toEqual([]);
+    });
+
+    it('rejects a start date that is not an ISO date-time and an invalid organization ID', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.gatewayConfig.setAnthropicUserProfiles({ ...settings, start_at: 'tomorrow' })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      await expect(
+        caller.admin.gatewayConfig.setAnthropicUserProfiles({
+          ...settings,
+          opted_in_organization_ids: ['not-an-id'],
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(await db.select().from(ai_gateway_config)).toEqual([]);
+    });
+
+    it('keeps the other configuration keys when saved, and when they are saved', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await caller.admin.gatewayConfig.set(input);
+      await caller.admin.gatewayConfig.setOrganizationFeatures({
+        experimental_byok: [],
+        enkrypt_output_guardrail: [],
+        gateway_settings: [organizationId],
+      });
+      await caller.admin.gatewayConfig.setAnthropicUserProfiles(settings);
+
+      await expect(caller.admin.gatewayConfig.get()).resolves.toMatchObject({
+        vercel_routing_opt_out_models: normalizedOptOutModels,
+        note: 'Holding opt-outs',
+      });
+      await expect(caller.admin.gatewayConfig.getOrganizationFeatures()).resolves.toMatchObject({
+        gateway_settings: [organizationId],
+      });
+
+      await caller.admin.gatewayConfig.set({ ...input, note: 'Updated' });
+      await expect(caller.admin.gatewayConfig.getAnthropicUserProfiles()).resolves.toEqual(
+        normalizedSettings
+      );
+    });
+
+    it('rejects non-admin users', async () => {
+      const user = await insertTestUser();
+      const caller = await createCallerForUser(user.id);
+
+      await expect(
+        caller.admin.gatewayConfig.setAnthropicUserProfiles(settings)
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      await expect(
+        caller.admin.gatewayConfig.listAnthropicUserProfileDeletions()
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('lists deleted profiles newest first', async () => {
+      const caller = await createCallerForUser(admin.id);
+      await db.insert(anthropic_user_profile_deletions).values([
+        {
+          user_profile_id: 'uprof_old',
+          reason: 'unlinked',
+          deleted_at: '2026-11-10T00:00:00.000Z',
+        },
+        {
+          user_profile_id: 'uprof_new',
+          reason: 'user_blocked',
+          kilo_user_id: admin.id,
+          deleted_at: '2026-11-18T00:00:00.000Z',
+        },
+        {
+          user_profile_id: 'uprof_mid',
+          reason: 'unlinked',
+          deleted_at: '2026-11-15T00:00:00.000Z',
+        },
+      ]);
+
+      const rows = await caller.admin.gatewayConfig.listAnthropicUserProfileDeletions();
+
+      expect(rows.map(row => row.user_profile_id)).toEqual(['uprof_new', 'uprof_mid', 'uprof_old']);
+      expect(rows[0]).toMatchObject({ reason: 'user_blocked', kilo_user_id: admin.id });
     });
   });
 });

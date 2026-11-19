@@ -1347,6 +1347,7 @@ export async function anonymizeCloudUserData(
       customer_source: null,
       signup_ip: null,
       external_id: null,
+      anthropic_user_profile_id: null,
     })
     .where(eq(kilocode_users.id, userId));
 

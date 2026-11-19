@@ -2502,6 +2502,14 @@ describe('User', () => {
       }
     });
 
+    it('clears the Anthropic user profile id', async () => {
+      const user = await insertTestUser({ anthropic_user_profile_id: 'uprof_test_soft_delete' });
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+
+      expect(await findUserById(user.id)).toMatchObject({ anthropic_user_profile_id: null });
+    });
+
     it.each([null, deletedEmail, 'deleted@deleted.invalid'])(
       'preserves deletion history and scrubs new PII on replay with normalized_email %p',
       async normalizedEmail => {

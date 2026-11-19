@@ -65,6 +65,7 @@ import { contributorChampionsRouter } from '@/routers/admin/contributor-champion
 import { salesDemoRouter } from '@/routers/admin/sales-demo-router';
 import { bulkUserCreditsRouter } from '@/routers/admin/bulk-user-credits-router';
 import { creditCampaignsRouter } from '@/routers/admin/credit-campaigns-router';
+import { pullAnthropicUserProfileStatus } from '@/lib/admin/anthropic-user-profile-status';
 import { adminInternalBotUsersRouter } from '@/routers/admin/internal-bot-users-router';
 import { cloudBillingSkusRouter } from '@/routers/admin/cloud-billing-skus-router';
 import { emailTestingRouter } from '@/routers/admin/email-testing-router';
@@ -351,6 +352,10 @@ const ResetAPIKeySchema = z.object({
 });
 
 const CheckKiloPassSchema = z.object({
+  userId: z.string(),
+});
+
+const PullAnthropicUserProfileStatusSchema = z.object({
   userId: z.string(),
 });
 
@@ -714,6 +719,19 @@ export const adminRouter = createTRPCRouter({
         });
 
         return successResult();
+      }),
+
+    pullAnthropicUserProfileStatus: adminProcedure
+      .input(PullAnthropicUserProfileStatusSchema)
+      .query(async ({ input }) => {
+        const user = await db.query.kilocode_users.findFirst({
+          columns: { anthropic_user_profile_id: true },
+          where: eq(kilocode_users.id, input.userId),
+        });
+        if (!user) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
+        }
+        return pullAnthropicUserProfileStatus(user.anthropic_user_profile_id);
       }),
 
     checkKiloPass: adminProcedure.input(CheckKiloPassSchema).mutation(async ({ input }) => {

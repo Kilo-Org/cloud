@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { type NextResponse as NextResponseType } from 'next/server';
-import { type NextRequest } from 'next/server';
+import { after, type NextRequest } from 'next/server';
+import { ensureAnthropicUserProfile } from '@kilocode/web-shared/lib/ai-gateway/anthropic-user-profiles/ensure';
+import {
+  isAnthropicUserProfileRoute,
+  resolveGatewayAnthropicUserProfile,
+} from '@kilocode/web-shared/lib/ai-gateway/anthropic-user-profiles/gateway';
 import { extractPromptInfo } from '@kilocode/web-shared/lib/ai-gateway/extractPromptInfo';
 import { determineFallbackFeature } from '@kilocode/web-shared/lib/ai-gateway/determineFallbackFeature';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
@@ -248,6 +253,21 @@ export async function handleLlmProxyRequest(
   }
 
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
+  // Overlaps routing work; a failed lookup only drops the profile header.
+  const anthropicUserProfilePromise = callerPromise
+    .then(caller =>
+      caller.kind === 'signed-in'
+        ? resolveGatewayAnthropicUserProfile({
+            model: effectiveModelIdLowerCased,
+            user: caller.user,
+            organizationId: caller.organizationId,
+          })
+        : null
+    )
+    .catch((error: unknown) => {
+      console.error('Failed to resolve the Anthropic user profile', error);
+      return null;
+    });
   const customLlm = await findCustomLlm(effectiveModelIdLowerCased);
   const isPrivateCustomLlm = customLlm !== null && !isPublicCustomLlm(customLlm.definition);
   // Anonymous callers cannot use private custom LLMs, so those are never publicly free.
@@ -426,6 +446,21 @@ export async function handleLlmProxyRequest(
     return guardrailRejection;
   }
   const requestCostBalance = requestCostLimit !== null ? await balanceAndSettingsPromise : null;
+  const anthropicUserProfile = await anthropicUserProfilePromise;
+  if (
+    anthropicUserProfile?.create &&
+    !anthropicUserProfile.userProfileId &&
+    isAnthropicUserProfileRoute(route)
+  ) {
+    // This request goes out unattributed; later ones carry the stored profile.
+    const { subject } = anthropicUserProfile;
+    after(() =>
+      ensureAnthropicUserProfile(subject).then(
+        () => undefined,
+        (error: unknown) => console.error('Failed to create an Anthropic user profile', error)
+      )
+    );
+  }
 
   const {
     attempt,
@@ -448,6 +483,7 @@ export async function handleLlmProxyRequest(
       signal: request.signal,
       vercelRequestId: headers.vercelRequestId,
       dataRegion,
+      anthropicUserProfileId: anthropicUserProfile?.userProfileId ?? null,
       costLimit:
         requestCostLimit !== null && requestCostBalance
           ? {

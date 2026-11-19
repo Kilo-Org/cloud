@@ -14,6 +14,16 @@ import {
   addUserToOrganization,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import type { User, Organization } from '@kilocode/db/schema';
+import { renameAnthropicUserProfile } from '@kilocode/web-shared/lib/ai-gateway/anthropic-user-profiles/api';
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/anthropic-user-profiles/api', () => ({
+  renameAnthropicUserProfile: jest.fn().mockResolvedValue(undefined),
+}));
+
+const mockIsClaudeOperatorConfigured = jest.fn(() => true);
+jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/operator', () => ({
+  isClaudeOperatorConfigured: () => mockIsClaudeOperatorConfigured(),
+}));
 
 jest.mock('@/lib/organizations/organization-billing', () => ({
   getOrCreateStripeCustomerIdForOrganization: jest.fn().mockResolvedValue('cus_test_child_org'),
@@ -599,6 +609,7 @@ describe('organizations trpc router', () => {
           ].sort()
         );
         expect(ownerResult).toHaveProperty('stripe_customer_id', 'cus_dto_org');
+        expect(ownerResult).not.toHaveProperty('anthropic_user_profile_id');
 
         const ownerActive = ownerResult.members.find(
           m => m.status === 'active' && m.id === member.id
@@ -992,6 +1003,70 @@ describe('organizations trpc router', () => {
         .update(organizations)
         .set({ name: oldName })
         .where(eq(organizations.id, testOrganization.id));
+    });
+
+    describe('Anthropic user profile name sync', () => {
+      let profileOrganization: Organization;
+      let subOrganization: Organization;
+
+      beforeEach(async () => {
+        jest.mocked(renameAnthropicUserProfile).mockClear();
+        mockIsClaudeOperatorConfigured.mockReturnValue(true);
+        profileOrganization = await createOrganization('Profile Rename Org', regularUser.id);
+        subOrganization = await createOrganization('Profile Rename Sub Org', regularUser.id);
+        await db
+          .update(organizations)
+          .set({ anthropic_user_profile_id: 'uprof_rename' })
+          .where(eq(organizations.id, profileOrganization.id));
+        await db
+          .update(organizations)
+          .set({
+            parent_organization_id: profileOrganization.id,
+            anthropic_user_profile_id: 'uprof_rename',
+          })
+          .where(eq(organizations.id, subOrganization.id));
+      });
+
+      afterEach(async () => {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: null })
+          .where(eq(organizations.id, subOrganization.id));
+        await db
+          .delete(organizations)
+          .where(inArray(organizations.id, [subOrganization.id, profileOrganization.id]));
+      });
+
+      it('renames the profile of a root organization', async () => {
+        const caller = await createCallerForUser(regularUser.id);
+        await caller.organizations.update({
+          organizationId: profileOrganization.id,
+          name: 'Renamed Profile Org',
+        });
+        expect(renameAnthropicUserProfile).toHaveBeenCalledWith(
+          'uprof_rename',
+          'Renamed Profile Org'
+        );
+      });
+
+      it('does not rename the shared profile when a sub-organization is renamed', async () => {
+        const caller = await createCallerForUser(regularUser.id);
+        await caller.organizations.update({
+          organizationId: subOrganization.id,
+          name: 'Renamed Sub Org',
+        });
+        expect(renameAnthropicUserProfile).not.toHaveBeenCalled();
+      });
+
+      it('does not rename when the Claude operator is not configured', async () => {
+        mockIsClaudeOperatorConfigured.mockReturnValue(false);
+        const caller = await createCallerForUser(regularUser.id);
+        await caller.organizations.update({
+          organizationId: profileOrganization.id,
+          name: 'Renamed Unconfigured Org',
+        });
+        expect(renameAnthropicUserProfile).not.toHaveBeenCalled();
+      });
     });
 
     it('should write no audit row when the name does not change', async () => {

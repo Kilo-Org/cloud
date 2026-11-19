@@ -20,6 +20,33 @@ jest.mock('@/lib/organizations/organization-billing', () => ({
   getOrCreateStripeCustomerIdForOrganization: jest.fn().mockResolvedValue('cus_test_creation'),
 }));
 
+describe('child organization Anthropic user profile', () => {
+  test.each(['uprof_parent', null])(
+    'copies the parent profile id %p to a new child organization',
+    async parentProfileId => {
+      const user = await insertTestUser();
+      const parent = await createTestOrganization(
+        `Profile Parent ${crypto.randomUUID()}`,
+        user.id,
+        0
+      );
+      await db
+        .update(organizations)
+        .set({ anthropic_user_profile_id: parentProfileId })
+        .where(eq(organizations.id, parent.id));
+
+      const child = await createChildOrganization('Profile Child', parent.id);
+
+      expect(child.anthropic_user_profile_id).toBe(parentProfileId);
+      const [persisted] = await db
+        .select({ id: organizations.anthropic_user_profile_id })
+        .from(organizations)
+        .where(eq(organizations.id, child.id));
+      expect(persisted.id).toBe(parentProfileId);
+    }
+  );
+});
+
 describe('organization creation limit', () => {
   beforeEach(() => {
     jest.clearAllMocks();

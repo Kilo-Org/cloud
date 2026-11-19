@@ -77,6 +77,7 @@ import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 import {
   childOrganizationSettings,
   createChildOrganization,
+  getParentAnthropicUserProfileId,
   validateParentOrganizationChange,
 } from '@/lib/organizations/organization-hierarchy';
 import {
@@ -89,6 +90,7 @@ import {
 import { createDefaultOrganizationServiceFeeExemptionStore } from '@kilocode/web-shared/lib/service-fees/drizzle-store';
 import { invalidateOrganizationSessionAccessForUsers } from '@/lib/organizations/organization-member-removal';
 import { runAfterResponse } from '@/lib/after-response';
+import { pullAnthropicUserProfileStatus } from '@/lib/admin/anthropic-user-profile-status';
 
 const OrganizationListInputSchema = z.object({
   page: z.number().int().min(1).default(1),
@@ -184,6 +186,7 @@ const AdminOrganizationDetailsSchema = z.object({
   created_by_user_email: z.string().nullable(),
   created_by_user_name: z.string().nullable(),
   stripe_customer_id: z.string().nullable(),
+  anthropic_user_profile_id: z.string().nullable(),
   integrations: z.array(
     z.object({
       platform: z.string(),
@@ -372,17 +375,22 @@ export const organizationAdminRouter = createTRPCRouter({
             .from(organizations)
             .where(eq(organizations.id, input.organizationId));
 
+          const parentAnthropicUserProfileId = input.parentOrganizationId
+            ? await getParentAnthropicUserProfileId(tx, input.parentOrganizationId)
+            : null;
+
           await tx
             .update(organizations)
             .set(
               input.parentOrganizationId
                 ? {
                     parent_organization_id: input.parentOrganizationId,
+                    anthropic_user_profile_id: parentAnthropicUserProfileId,
                     require_seats: false,
                     free_trial_end_at: null,
                     settings: sql`${organizations.settings} || ${JSON.stringify(childOrganizationSettings)}::jsonb`,
                   }
-                : { parent_organization_id: input.parentOrganizationId }
+                : { parent_organization_id: null, anthropic_user_profile_id: null }
             )
             .where(eq(organizations.id, input.organizationId));
 
@@ -582,6 +590,7 @@ export const organizationAdminRouter = createTRPCRouter({
             created_by_user_email: kilocode_users.google_user_email,
             created_by_user_name: kilocode_users.google_user_name,
             stripe_customer_id: organizations.stripe_customer_id,
+            anthropic_user_profile_id: organizations.anthropic_user_profile_id,
           })
           .from(organizations)
           .leftJoin(kilocode_users, eq(organizations.created_by_kilo_user_id, kilocode_users.id))
@@ -611,6 +620,20 @@ export const organizationAdminRouter = createTRPCRouter({
       }
 
       return { ...organizationDetails[0], integrations };
+    }),
+
+  pullAnthropicUserProfileStatus: adminProcedure
+    .input(OrganizationIdInputSchema)
+    .query(async ({ input }) => {
+      const [organization] = await db
+        .select({ anthropic_user_profile_id: organizations.anthropic_user_profile_id })
+        .from(organizations)
+        .where(eq(organizations.id, input.organizationId))
+        .limit(1);
+      if (!organization) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+      return pullAnthropicUserProfileStatus(organization.anthropic_user_profile_id);
     }),
 
   getKiloPassSummary: adminProcedure

@@ -279,7 +279,8 @@ function renderHeader(props: ScreenHeaderProps): TestRenderer.ReactTestRenderer 
  * reaches it without a control to anchor on.
  */
 function findTitleRow(root: TestInstance): TestInstance {
-  // An accessory row puts the title one level deeper than the plain title.
+  // A header with inline actions wraps the title in its fit box, one level
+  // deeper than the plain title.
   const centered = 'min-w-0 flex-1 flex-row items-center justify-center';
   const title = root.findByProps({ accessibilityRole: 'header' });
   const heading = [title.parent?.parent, title.parent?.parent?.parent].find(
@@ -518,8 +519,8 @@ describe('ScreenHeader mounted', () => {
     // The title row no longer carries the inline slot, and the heading keeps
     // its full-width `min-w-0 flex-1` box, so the title cannot be squeezed.
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    // Text → title column.
-    expect(title.parent?.props.className).toContain('min-w-0 flex-1');
+    // Text → fit box → title column.
+    expect(title.parent?.parent?.props.className).toContain('min-w-0 flex-1');
     expect(
       renderer.root.findAll(
         node =>
@@ -626,7 +627,7 @@ describe('ScreenHeader mounted', () => {
     // row. The emulator (2.625 px/dp) gave the title a 440px box for a word
     // 440.83px wide: the uncapped copy inside that box still reported one line,
     // so the picker stayed beside the cut title. A copy outside the row now
-    // reports the natural width (441px) and the visible title its box.
+    // reports the natural width (441px) and the box around the title its room.
     const NATURAL = 441 / PIXEL_RATIO;
     const CUT_BOX = 440 / PIXEL_RATIO;
     const isNaturalCopy = (node: TestInstance) =>
@@ -649,7 +650,10 @@ describe('ScreenHeader mounted', () => {
         layoutWidth(renderer.root.find(isNaturalCopy), widths.natural);
       }
       if (widths.box !== undefined) {
-        layoutWidth(renderer.root.findByProps({ accessibilityRole: 'header' }), widths.box);
+        layoutWidth(
+          renderer.root.findByProps({ accessibilityRole: 'header' }).parent as TestInstance,
+          widths.box
+        );
       }
     };
     const update = (renderer: TestRenderer.ReactTestRenderer, props: ScreenHeaderProps) => {
@@ -756,8 +760,9 @@ describe('ScreenHeader mounted', () => {
     // A cluster of truncating controls declares no floor.
     expect(inline.props.style).toBeUndefined();
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    // Text → accessory row → title column → title band → heading block.
-    const titleColumn = title.parent?.parent;
+    // Text → fit box → accessory row → title column → title band → heading
+    // block.
+    const titleColumn = title.parent?.parent?.parent;
     expect(titleColumn?.props.className).toBe('min-w-0 shrink');
     const headingBlock = titleColumn?.parent?.parent;
     expect(headingBlock?.props.className).toContain('grow shrink');
@@ -767,7 +772,7 @@ describe('ScreenHeader mounted', () => {
     const reflowing = renderHeader({ title: 'Chat', size: 'large', inlineActions: 'ACTIONS' });
     expect(findInlineActionsWrapper(reflowing.root).props.className).not.toContain('shrink-[100]');
     expect(
-      reflowing.root.findByProps({ accessibilityRole: 'header' }).parent?.props.className
+      reflowing.root.findByProps({ accessibilityRole: 'header' }).parent?.parent?.props.className
     ).toBe('min-w-0 flex-1');
   });
 

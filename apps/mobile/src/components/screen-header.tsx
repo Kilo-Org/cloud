@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- one header contract: the title, eyebrow and subtitle slots, the back control, the action reflow, and the safe-area and offline-banner rules must stay in step */
 import { type Href, useNavigationContainerRef, useRouter } from 'expo-router';
-import { type ReactElement, type Ref, useEffect, useState } from 'react';
+import { type ReactElement, type Ref, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { LARGE_FONT_SCALE, useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { ChevronDown } from '@/components/ui/icons';
 import { DirectionalChevronLeft } from '@/components/ui/directional-icons';
@@ -12,6 +12,7 @@ import {
   type TextInstance,
   useWindowDimensions,
   View,
+  type ViewInstance,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -159,6 +160,32 @@ const UNMEASURED_TITLE_FIT: TitleFit = {
   boxWidth: Number.NaN,
   cutKey: null,
 };
+
+/**
+ * Records measured widths and, while the cluster shares the title's row,
+ * decides whether the title is cut there. Both widths sit on the pixel grid,
+ * so a cut title's box is at least a pixel narrower than its natural width;
+ * half a pixel is the margin for float noise. A report that changes nothing
+ * keeps the state's identity, so it costs no render.
+ */
+function measureTitleFit(
+  previous: TitleFit,
+  measured: Partial<Omit<TitleFit, 'cutKey'>>,
+  layout: { key: string; inRow: boolean }
+): TitleFit {
+  const next = { ...previous, ...measured };
+  if (
+    layout.inRow &&
+    next.naturalKey === layout.key &&
+    next.naturalWidth - next.boxWidth >= 0.5 / PixelRatio.get()
+  ) {
+    next.cutKey = layout.key;
+  }
+  const changed = (Object.keys(next) as (keyof TitleFit)[]).some(
+    field => !Object.is(next[field], previous[field])
+  );
+  return changed ? next : previous;
+}
 
 /**
  * The default header title's typography: 15.75pt semibold in the header's text
@@ -544,12 +571,12 @@ export function ScreenHeader({
   //
   // Two measured widths decide it. A hidden copy of the title, outside the
   // row and free of any width but the header's, lays out at the title's own
-  // natural width; the visible title reports the box the row gives it. Both
-  // sit on the pixel grid, so the title is cut exactly when its box is a pixel
-  // or more narrower than the copy. A copy laid out inside the title's box
-  // cannot say this: Android lays an uncapped line out 0.83px wider than its
-  // box without breaking it, so that copy reported one line while the capped
-  // title beside it ended in an ellipsis.
+  // natural width; the box around the visible title reports the room the row
+  // gives it. Both sit on the pixel grid, so the title is cut exactly when its
+  // box is a pixel or more narrower than the copy. A copy laid out inside the
+  // title's box cannot say this: Android lays an uncapped line out 0.83px
+  // wider than its box without breaking it, so that copy reported one line
+  // while the capped title beside it ended in an ellipsis.
   //
   // The decision is kept per layout (title, window width, font scale) and only
   // taken while the cluster shares the title's row: once the cluster moves,
@@ -559,6 +586,8 @@ export function ScreenHeader({
   const measuresTitleFit = inlineActions != null && title != null && !titleContent && !largeFont;
   const titleFitKey = JSON.stringify([title, windowWidth, fontScale]);
   const [titleFit, setTitleFit] = useState<TitleFit>(UNMEASURED_TITLE_FIT);
+  const titleNaturalRef = useRef<TextInstance>(null);
+  const titleBoxRef = useRef<ViewInstance>(null);
   const titleOverflows = measuresTitleFit && titleFit.cutKey === titleFitKey;
   // The inline controls row reflows the same way: a caller that declares its
   // width drops it beneath the title before it squeezes the title's own
@@ -578,22 +607,40 @@ export function ScreenHeader({
           titleMinWidth,
           contentInset,
         })));
-  const recordTitleFit = (measured: Partial<Omit<TitleFit, 'cutKey'>>) => {
-    setTitleFit(previous => {
-      const next = { ...previous, ...measured };
-      const cut =
-        !stackInlineActions &&
-        next.naturalKey === titleFitKey &&
-        next.naturalWidth - next.boxWidth >= 0.5 / PixelRatio.get();
-      return cut ? { ...next, cutKey: titleFitKey } : next;
-    });
-  };
+  const titleFitLayout = { key: titleFitKey, inRow: !stackInlineActions };
   const onTitleNaturalLayout = (event: LayoutChangeEvent) => {
-    recordTitleFit({ naturalKey: titleFitKey, naturalWidth: event.nativeEvent.layout.width });
+    const measured = { naturalKey: titleFitKey, naturalWidth: event.nativeEvent.layout.width };
+    setTitleFit(previous => measureTitleFit(previous, measured, titleFitLayout));
   };
   const onTitleBoxLayout = (event: LayoutChangeEvent) => {
-    recordTitleFit({ boxWidth: event.nativeEvent.layout.width });
+    const measured = { boxWidth: event.nativeEvent.layout.width };
+    setTitleFit(previous => measureTitleFit(previous, measured, titleFitLayout));
   };
+  // A layout's first decision is read synchronously, before the frame that
+  // mounts it paints: the cut title and the cluster beside it otherwise
+  // showed for one frame of the German Chat tab's first mount before the
+  // layout events moved the cluster. The layout events keep the decision
+  // current when the row changes later (an account name that loads), and are
+  // the only source on a host without the synchronous read (a test renderer).
+  useLayoutEffect(() => {
+    const natural = titleNaturalRef.current;
+    const box = titleBoxRef.current;
+    if (
+      !measuresTitleFit ||
+      natural?.getBoundingClientRect === undefined ||
+      box?.getBoundingClientRect === undefined
+    ) {
+      return;
+    }
+    const measured = {
+      naturalKey: titleFitKey,
+      naturalWidth: natural.getBoundingClientRect().width,
+      boxWidth: box.getBoundingClientRect().width,
+    };
+    setTitleFit(previous =>
+      measureTitleFit(previous, measured, { key: titleFitKey, inRow: !stackInlineActions })
+    );
+  }, [measuresTitleFit, titleFitKey, stackInlineActions]);
   // A caller that turns the reflow off keeps its inline controls beside the
   // title while the title fits, so on that row the title is the primary text
   // and the controls (a tab root's account picker) are secondary: they truncate
@@ -685,17 +732,25 @@ export function ScreenHeader({
 
   let titleNode: React.ReactNode = null;
   if (title != null) {
-    const titleLabel = (
+    const titleLabelText = (
       <Text
         ref={titleRef}
         className={cn(titleClass, centerTitle && 'text-center')}
         numberOfLines={titleLines}
         ellipsizeMode="tail"
         accessibilityRole="header"
-        onLayout={measuresTitleFit ? onTitleBoxLayout : undefined}
       >
         {title}
       </Text>
+    );
+    // The fit check (see `measuresTitleFit`) reads the room the row gives the
+    // title from this box, which the title fills.
+    const titleLabel = measuresTitleFit ? (
+      <View ref={titleBoxRef} className="min-w-0 shrink" onLayout={onTitleBoxLayout}>
+        {titleLabelText}
+      </View>
+    ) : (
+      titleLabelText
     );
     let titleText: React.ReactNode = titleLabel;
     if (titleContent) {
@@ -1118,6 +1173,7 @@ export function ScreenHeader({
       importantForAccessibility="no-hide-descendants"
     >
       <Text
+        ref={titleNaturalRef}
         key={titleFitKey}
         className={titleClass}
         numberOfLines={titleLines}

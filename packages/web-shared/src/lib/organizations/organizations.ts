@@ -53,14 +53,17 @@ import { enforceOrganizationCreationLimit } from '@kilocode/web-shared/lib/organ
 
 // `organization_seats_purchases` is append-only, so the most recently created
 // row is the organization's current subscription state — the same input the
-// subscription gate classifies with.
-const latestSeatPurchaseStatusSql = sql<OrganizationSeatsPurchase['subscription_status'] | null>`(
-  SELECT ${organization_seats_purchases.subscription_status}
-  FROM ${organization_seats_purchases}
-  WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
-  ORDER BY ${organization_seats_purchases.created_at} DESC
-  LIMIT 1
-)`;
+// subscription gate classifies with. Lazily built: suites that mock the
+// drizzle module must not see this evaluated at import time.
+function latestSeatPurchaseStatusSql() {
+  return sql<OrganizationSeatsPurchase['subscription_status'] | null>`(
+    SELECT ${organization_seats_purchases.subscription_status}
+    FROM ${organization_seats_purchases}
+    WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
+    ORDER BY ${organization_seats_purchases.created_at} DESC
+    LIMIT 1
+  )`;
+}
 
 /** An invitation is live while it is unaccepted and unexpired. */
 function liveInvitationCondition(organizationId: string) {
@@ -112,7 +115,7 @@ export async function getUserOrganizationsWithSeats(
       createdAt: organizations.created_at,
       freeTrialEndAt: organizations.free_trial_end_at,
       settings: organizations.settings,
-      latestSeatPurchaseStatus: latestSeatPurchaseStatusSql,
+      latestSeatPurchaseStatus: latestSeatPurchaseStatusSql(),
       seatCountTotal: organizations.seat_count,
       total_member_count: sql<number>`(
         SELECT COUNT(*)::int FROM (
@@ -243,7 +246,7 @@ export async function getProfileOrganizations(
   // getProfileOrganizations a single query and adds no seat-purchase lookup for
   // callers that don't opt in.
   const latestSeatPurchaseStatus = excludeAccessBlocked
-    ? latestSeatPurchaseStatusSql
+    ? latestSeatPurchaseStatusSql()
     : sql<OrganizationSeatsPurchase['subscription_status'] | null>`NULL`;
 
   const results: ProfileOrganizationRow[] = await db

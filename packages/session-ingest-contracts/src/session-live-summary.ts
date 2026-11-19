@@ -272,23 +272,32 @@ export function sessionLiveToolStep(
     case 'read':
       return { verb: 'reading', target: basename(firstString(input, FILE_PATH_KEYS)) };
     case 'bash':
-      return { verb: 'running', target: sessionLiveText(input.command, SESSION_LIVE_TARGET_LIMIT) };
+      return {
+        verb: 'running',
+        target: sessionLiveText(input['command'], SESSION_LIVE_TARGET_LIMIT),
+      };
     case 'grep':
     case 'glob':
       return {
         verb: 'searching',
-        target: sessionLiveText(input.pattern, SESSION_LIVE_TARGET_LIMIT),
+        target: sessionLiveText(input['pattern'], SESSION_LIVE_TARGET_LIMIT),
       };
     case 'list':
-      return { verb: 'searching', target: basename(input.path) };
+      return { verb: 'searching', target: basename(input['path']) };
     case 'codesearch':
-      return { verb: 'searching', target: sessionLiveText(input.query, SESSION_LIVE_TARGET_LIMIT) };
+      return {
+        verb: 'searching',
+        target: sessionLiveText(input['query'], SESSION_LIVE_TARGET_LIMIT),
+      };
     case 'websearch':
     case 'web_search':
-      return { verb: 'searching', target: sessionLiveText(input.query, SESSION_LIVE_TARGET_LIMIT) };
+      return {
+        verb: 'searching',
+        target: sessionLiveText(input['query'], SESSION_LIVE_TARGET_LIMIT),
+      };
     case 'webfetch':
     case 'web_fetch':
-      return { verb: 'searching', target: urlHost(input.url, webHost) };
+      return { verb: 'searching', target: urlHost(input['url'], webHost) };
     default:
       return { verb: 'other', target: null };
   }

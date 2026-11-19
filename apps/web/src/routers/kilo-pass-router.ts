@@ -975,7 +975,7 @@ const GetPurchasePresentationInputSchema = z.object({
 
 const PurchasePresentationCtaOutputSchema = z.object({
   label: z.string().nullable(),
-  action: z.enum(['none', 'open_web', 'open_native']),
+  action: z.enum(['none', 'open_web']),
 });
 
 const GetPurchasePresentationOutputSchema = z.object({

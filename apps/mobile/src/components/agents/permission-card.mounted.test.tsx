@@ -88,17 +88,42 @@ async function renderCard(overrides: CardOverrides = {}) {
 }
 
 describe('PermissionCard mounted', () => {
-  it('shows the command alone when a bash request carries one', async () => {
+  it('lists the patterns beside the command when a pattern names another text', async () => {
     const renderer = await renderCard({
       patterns: ['rg todo 2_/dev/null'],
       metadata: { command: 'rg todo 2>/dev/null' },
     });
     const lines = textLines(renderer.root);
 
-    expect(lines).not.toContain(i18n.t('agentChat.permissionCard.appliesTo'));
-    expect(lines).not.toContain(isolated('rg todo 2_/dev/null'));
+    expect(lines).toContain(i18n.t('agentChat.permissionCard.appliesTo'));
+    expect(lines).toContain('• ');
+    expect(lines).toContain(isolated('rg todo 2_/dev/null'));
     expect(lines).toContain(i18n.t('profiles.commandLabel'));
     expect(lines).toContain(isolated('rg todo 2>/dev/null'));
+  });
+
+  it('lists only the command when every pattern reads the same after whitespace normalization', async () => {
+    const renderer = await renderCard({
+      patterns: ['pnpm test'],
+      metadata: { command: 'pnpm test' },
+    });
+    const lines = textLines(renderer.root);
+
+    expect(lines).not.toContain(i18n.t('agentChat.permissionCard.appliesTo'));
+    expect(lines).toContain(i18n.t('profiles.commandLabel'));
+    expect(lines).toContain(isolated('pnpm test'));
+  });
+
+  it('reads a whitespace-only difference as the same text', async () => {
+    const renderer = await renderCard({
+      patterns: [' pnpm  test '],
+      metadata: { command: 'pnpm test' },
+    });
+    const lines = textLines(renderer.root);
+
+    expect(lines).not.toContain(i18n.t('agentChat.permissionCard.appliesTo'));
+    expect(lines).toContain(i18n.t('profiles.commandLabel'));
+    expect(lines).toContain(isolated('pnpm test'));
   });
 
   it('renders an ordinary command unchanged', async () => {

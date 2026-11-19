@@ -129,11 +129,15 @@ export function PermissionCard({
   // or machine payloads and must not reach the card as raw key/value rows.
   const parsedCommand = commandSchema.safeParse(metadata?.command);
   const command = parsedCommand.success ? parsedCommand.data : null;
-  // Patterns are the rule-matching form of the request, not display copy. When
-  // the verbatim command is present they repeat it in a different spelling, so
-  // the card shows the command alone and keeps the patterns for requests that
-  // have no command, such as path scopes.
-  const showPatterns = patterns.length > 0 && !command;
+  // The card lists the rule patterns, which name the scope a stored rule
+  // covers. It lists them unless every pattern is the same text as the
+  // command, after trimming and collapsing whitespace. When it lists both, the
+  // command stays as the explanatory line.
+  const normalizedCommand = command?.replaceAll(/\s+/g, ' ').trim() ?? null;
+  const showPatterns =
+    patterns.length > 0 &&
+    (!normalizedCommand ||
+      patterns.some(pattern => pattern.replaceAll(/\s+/g, ' ').trim() !== normalizedCommand));
 
   return (
     <View className="mx-4 my-2 shrink overflow-hidden rounded-xl border border-border bg-card">

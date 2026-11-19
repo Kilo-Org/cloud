@@ -11,6 +11,7 @@ import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { describe, expect, it } from 'vitest';
 
 import migrations from '../../drizzle/migrations';
+import { AUTH_CLOCK_SKEW_SECONDS } from '../../src/auth';
 import { session, sessionRoles } from '../../src/db/sqlite-schema';
 import { getSessionSyncDOStub, type SessionSyncDO } from '../../src/dos/SessionSyncDO';
 import { errorBodySchema, sessionStateSchema, type Principal } from '../../src/protocol';
@@ -51,14 +52,14 @@ it('accepts a session-scoped web transcript credential for reads only and checks
   const binding = testEnv.NEXTAUTH_SECRET;
   const secret = typeof binding === 'string' ? binding : await binding.get();
   if (!secret) throw new Error('Missing test signing secret');
-  const token = (user: Principal, expiration = '60s') =>
+  const token = (user: Principal, ttl = 60, iat = Math.floor(Date.now() / 1000)) =>
     new SignJWT({ sessionID: id, organizationID: user.tenant.id, env: testEnv.ENVIRONMENT })
       .setProtectedHeader({ alg: 'HS256' })
       .setAudience(SESSION_TRANSCRIPT_TOKEN_AUDIENCE)
       .setIssuer(SESSION_TRANSCRIPT_TOKEN_ISSUER)
       .setSubject(user.userID)
-      .setIssuedAt()
-      .setExpirationTime(expiration)
+      .setIssuedAt(iat)
+      .setExpirationTime(iat + ttl)
       .sign(new TextEncoder().encode(secret));
   const path = `/v1/sessions/${id}`;
   const read = (path: string, token: string, method = 'GET') =>
@@ -74,7 +75,14 @@ it('accepts a session-scoped web transcript credential for reads only and checks
   expect((await read(`${path}/batches`, credential, 'POST')).status).toBe(403);
   expect((await read('/v1/auth/exchange', credential, 'POST')).status).toBe(401);
   expect((await read(`/v1/sessions/${newSessionID()}`, credential)).status).toBe(401);
-  expect((await read(path, await token(owner, '120s'))).status).toBe(401);
+  expect((await read(path, await token(owner, 120))).status).toBe(401);
+  const now = Math.floor(Date.now() / 1000);
+  expect((await read(path, await token(owner, 60, now + AUTH_CLOCK_SKEW_SECONDS))).status).toBe(
+    200
+  );
+  expect(
+    (await read(path, await token(owner, 60, now + AUTH_CLOCK_SKEW_SECONDS + 30))).status
+  ).toBe(401);
   await expectDenied(await read(path, await token(other)));
 });
 

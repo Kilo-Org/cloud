@@ -255,6 +255,8 @@ export function SessionTraceViewer() {
   const v2MessageGroups = useMemo(() => v2Messages.map(message => [message]), [v2Messages]);
 
   const messageCount = isV2 ? v2Messages.length : v1Messages.length;
+  const incompleteMessageCount =
+    messagesQuery.data?.format === 'v2' ? (messagesQuery.data.incompleteMessageCount ?? 0) : 0;
 
   const v2SummaryModel = useMemo(() => {
     for (let index = v2Messages.length - 1; index >= 0; index -= 1) {
@@ -507,13 +509,21 @@ export function SessionTraceViewer() {
               </div>
             </CardHeader>
             <CardContent>
+              {incompleteMessageCount > 0 && (
+                <p role="status" className="text-muted-foreground mb-2">
+                  Transcript incomplete: {incompleteMessageCount}{' '}
+                  {incompleteMessageCount === 1 ? 'message' : 'messages'} could not be loaded.
+                </p>
+              )}
               {messagesQuery.isLoading ? (
                 <div className="text-muted-foreground flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Loading messages...</span>
                 </div>
               ) : messageCount === 0 ? (
-                <p className="text-muted-foreground">No messages in this session</p>
+                incompleteMessageCount === 0 && (
+                  <p className="text-muted-foreground">No messages in this session</p>
+                )
               ) : isV2 ? (
                 <div className="space-y-2">
                   <CloudReadOnlyThread

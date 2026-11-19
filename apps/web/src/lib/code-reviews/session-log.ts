@@ -31,7 +31,7 @@ export type SessionLogConversionOptions = {
  * parts — those add noise without actionable context for end users.
  */
 export function v2SnapshotToLogEntries(
-  snapshot: Pick<SessionSnapshot, 'messages'>,
+  snapshot: Pick<SessionSnapshot, 'messages'> & { incompleteMessageCount?: number },
   options: SessionLogConversionOptions = {}
 ): SessionLogEntry[] {
   const entries: SessionLogEntry[] = [];
@@ -128,6 +128,14 @@ export function v2SnapshotToLogEntries(
     }
   }
 
+  const omitted = snapshot.incompleteMessageCount ?? 0;
+  if (omitted > 0) {
+    entries.push({
+      timestamp: '',
+      eventType: 'status',
+      message: `Transcript incomplete: ${omitted} ${omitted === 1 ? 'message' : 'messages'} could not be loaded.`,
+    });
+  }
   return entries;
 }
 

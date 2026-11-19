@@ -20,7 +20,7 @@ import {
 import { toSharedTranscriptMessages } from '@/app/s/[sessionId]/shared-transcript';
 
 export type WebhookRequestTranscript =
-  | { version: 'v2'; messages: StoredMessage[] }
+  | { version: 'v2'; messages: StoredMessage[]; incompleteMessageCount?: number }
   | { version: 'v1'; messages: CloudMessage[] }
   | null;
 
@@ -396,6 +396,8 @@ export async function getWebhookRequestLogs(
     transcript: {
       version: 'v2',
       messages: organizationId ? sanitizeV2Transcript(transcriptMessages) : transcriptMessages,
+      incompleteMessageCount:
+        snapshot.source === 'sync' ? snapshot.incompleteMessageCount : undefined,
     },
     logsReady: true,
   };

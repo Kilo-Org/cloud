@@ -437,6 +437,7 @@ export async function authorizeTranscript(request: Request, env: AuthEnv) {
       audience: SESSION_TRANSCRIPT_TOKEN_AUDIENCE,
       issuer: SESSION_TRANSCRIPT_TOKEN_ISSUER,
       maxTokenAge: SESSION_TRANSCRIPT_TOKEN_TTL_SECONDS,
+      clockTolerance: AUTH_CLOCK_SKEW_SECONDS,
     }
   ).catch(() => undefined);
   const claims = transcriptClaims.safeParse(verified?.payload);
@@ -444,6 +445,7 @@ export async function authorizeTranscript(request: Request, env: AuthEnv) {
     !claims.success ||
     encodeURIComponent(claims.data.sessionID) !== match[1] ||
     claims.data.env !== env.ENVIRONMENT ||
+    claims.data.iat > Math.floor(Date.now() / 1000) + AUTH_CLOCK_SKEW_SECONDS ||
     claims.data.exp - claims.data.iat > SESSION_TRANSCRIPT_TOKEN_TTL_SECONDS
   ) {
     return invalidCredential('The session transcript credential is invalid or expired');

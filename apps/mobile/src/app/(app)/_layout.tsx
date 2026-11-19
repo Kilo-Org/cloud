@@ -122,10 +122,12 @@ export const unstable_settings = {
 export default function AppLayout() {
   const colors = useThemeColors();
   const sheetOptions = useFormSheetScreenOptions();
-  // A full-screen modal that holds a guarded draft: `presentation: 'modal'`
-  // keeps the swipe dismissal off (the tour and consent routes use the same
-  // shape), so Android Back is the one removal `usePreventRemove` answers.
-  const modalOptions = {
+  // The Android presentation of a route that holds a guarded draft. A `modal`
+  // surface has no drag dismissal at all (unlike the tour and consent routes,
+  // which also disable the gesture), so Android Back is the one removal
+  // `usePreventRemove` has to answer. The screen draws its own header, which is
+  // what carries the visible close control.
+  const guardedModalOptions = {
     presentation: 'modal' as const,
     headerShown: false,
     contentStyle: { backgroundColor: colors.background },
@@ -248,7 +250,7 @@ export default function AppLayout() {
                 formSheet, where preventNativeDismiss holds the swipe. */}
             <Stack.Screen
               name="bitbucket-connect"
-              options={Platform.OS === 'android' ? modalOptions : sheetOptions}
+              options={Platform.OS === 'android' ? guardedModalOptions : sheetOptions}
             />
             <Stack.Screen name="language-picker" options={searchSheetOptions} />
             <Stack.Screen name="transcription-model-picker" options={pickerSheetOptions} />

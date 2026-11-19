@@ -24,6 +24,8 @@ import { useTranslation } from 'react-i18next';
 
 import { AlertCircle, File as FileIcon, RotateCcw, X } from '@/components/ui/icons';
 import { requestA11yFocus } from '@/lib/a11y/announce';
+import { TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { AttachmentChipErrorBoundary } from '@/components/agents/attachment-chip-error-boundary';
 
 import { Image } from '@/components/ui/image';
@@ -80,9 +82,10 @@ function removeHitSlop() {
 /**
  * The document chip is 46 px tall so its body — the whole tap target — is the
  * 44 dp minimum after the 1 dp border on each side. The chip surface clips its
- *  children, so slop on the body could not grow that target past the surface.
+ * children, so slop on the body could not grow that target past the surface.
  */
-const DOCUMENT_CHIP_SIZE_CLASS = 'h-[46px] w-48';
+const DOCUMENT_CHIP_SIZE_CLASS = 'w-48';
+const DOCUMENT_CHIP_HEIGHT_DP = TOUCH_TARGET_DP + 2;
 
 /** Drag arms only after a long press, so ordinary horizontal scroll still wins. */
 const LONG_PRESS_MS = 300;
@@ -500,7 +503,7 @@ const AttachmentChip = memo(function AttachmentChip({
             <Text className="text-xs text-foreground" numberOfLines={1} ellipsizeMode="middle">
               {description.filename}
             </Text>
-            <Text numberOfLines={1} className="text-[10px] text-muted-foreground">
+            <Text numberOfLines={1} variant="caption">
               {description.message ??
                 (description.progressText === ''
                   ? description.sizeText
@@ -554,11 +557,12 @@ const AttachmentChip = memo(function AttachmentChip({
               being shadowed by an accessible parent. */}
           <View
             className={cn(
-              'overflow-hidden rounded-md border border-border bg-card',
+              'overflow-hidden rounded-lg border border-border',
               isImage ? 'h-16 w-20' : DOCUMENT_CHIP_SIZE_CLASS,
               description.showRetry && 'border-destructive',
               isErrored && !description.showRetry && 'border-danger-tile-border'
             )}
+            style={isImage ? undefined : { height: DOCUMENT_CHIP_HEIGHT_DP }}
           >
             {description.showRetry ? (
               // A retryable chip keeps the body as a non-interactive View: the
@@ -678,7 +682,7 @@ const AttachmentChip = memo(function AttachmentChip({
           />
           {boundedPreview.text === '' ? (
             <CenteredState>
-              <Text className="px-6 text-center text-xs text-muted-foreground">
+              <Text variant="caption" className="px-4 text-center">
                 {t('agentChat.filePart.fileEmpty')}
               </Text>
             </CenteredState>
@@ -690,12 +694,16 @@ const AttachmentChip = memo(function AttachmentChip({
                 // reader needs has to be visible on the first paint.
                 <Text
                   accessibilityLabel={t('common.contentTruncated')}
-                  className="px-6 pb-1 text-xs text-muted-foreground"
+                  variant="caption"
+                  className="px-4 pb-1"
                 >
                   {t('common.truncated')}
                 </Text>
               ) : null}
-              <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
+              <ScrollView
+                className="flex-1"
+                contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}
+              >
                 {renderPreviewBody(boundedPreview)}
               </ScrollView>
               <View style={{ height: insets.bottom }} className="bg-background" />

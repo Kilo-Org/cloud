@@ -11,7 +11,8 @@ import {
   tapTargetReachDp,
   TOUCH_TARGET_DP,
 } from '@/lib/a11y/tap-target';
-import { ConsentDetails, VoiceTranscriptionControl } from './consent-details';
+import { ConsentDetails } from './consent-details';
+import { VoiceTranscriptionControl } from './voice-transcription-control';
 
 // ---- mocks ----
 

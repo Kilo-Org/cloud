@@ -95,20 +95,23 @@ type CallerRoleRowWithOrganization = CallerRoleRow & { organization: Organizatio
 async function selectCallerRoleRows(
   kiloUserId: string,
   organizationFilter: OrganizationIdFilter,
-  fields: typeof callerRoleWithOrganizationFields
+  fields: typeof callerRoleWithOrganizationFields,
+  fromDb?: typeof db
 ): Promise<CallerRoleRowWithOrganization[]>;
 async function selectCallerRoleRows(
   kiloUserId: string,
   organizationFilter: OrganizationIdFilter,
-  fields: typeof callerRoleFields
+  fields: typeof callerRoleFields,
+  fromDb?: typeof db
 ): Promise<CallerRoleRow[]>;
 async function selectCallerRoleRows(
   kiloUserId: string,
   organizationFilter: OrganizationIdFilter,
-  fields: SelectedFields
+  fields: SelectedFields,
+  fromDb: typeof db = db
 ): Promise<unknown[]> {
   const [directRows, inheritedRows] = await Promise.all([
-    db
+    fromDb
       .select(fields)
       .from(organization_memberships)
       .innerJoin(
@@ -121,7 +124,7 @@ async function selectCallerRoleRows(
           organizationFilter(organization_memberships.organization_id)
         )
       ),
-    db
+    fromDb
       .select(fields)
       .from(organizations)
       .innerJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
@@ -186,9 +189,15 @@ async function observeBatchMembershipRoles(
 
 export async function loadEffectiveMembershipRows(
   userId: string,
-  organizationId: Organization['id']
+  organizationId: Organization['id'],
+  fromDb: typeof db = db
 ): Promise<CallerRoleRow[]> {
-  return selectCallerRoleRows(userId, column => eq(column, organizationId), callerRoleFields);
+  return selectCallerRoleRows(
+    userId,
+    column => eq(column, organizationId),
+    callerRoleFields,
+    fromDb
+  );
 }
 
 export async function loadEffectiveMembershipRowsWithOrganization(
@@ -801,12 +810,35 @@ export async function ensureOrganizationAccessAndFetchOrg(
   });
 }
 
+/**
+ * Membership rows read through the caller's read client when it set one (the AI
+ * gateway passes the local replica, since `db` is a cross-region round trip from
+ * `sfo1`). Only a granting result is trusted: rows that grant no role return
+ * undefined, so `resolveOrganizationAccess` re-reads the primary and replica lag
+ * cannot deny a new member. A failed replica read falls back the same way.
+ * Revocation is eventually consistent instead: a member just removed or demoted
+ * keeps passing until the replica catches up, which `packages/web-shared/AGENTS.md`
+ * accepts for gateway auth reads. Only the read-only model-list gate sets `fromDb`.
+ */
+async function loadReplicaMembershipRows(
+  ctx: TRPCContext,
+  organizationId: Organization['id']
+): Promise<CallerRoleRow[] | undefined> {
+  if (!ctx.fromDb) return undefined;
+  const rows = await loadEffectiveMembershipRows(ctx.user.id, organizationId, ctx.fromDb).catch(
+    () => undefined
+  );
+  return rows && effectiveMembershipRole(rows) ? rows : undefined;
+}
+
 // Custom procedure that ensures user has access to the organization (any role)
 export const organizationMemberProcedure = baseProcedure
   .input(OrganizationIdInputSchema)
   .use(async ({ ctx, next, input }) => {
     try {
-      const organizationAccess = await resolveOrganizationAccess(ctx, input.organizationId);
+      const organizationAccess = await resolveOrganizationAccess(ctx, input.organizationId, {
+        membershipRows: await loadReplicaMembershipRows(ctx, input.organizationId),
+      });
       if (process.env.NODE_ENV === 'development') {
         console.log('[organizationMemberProcedure] Access granted, calling next');
       }

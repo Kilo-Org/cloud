@@ -90,9 +90,7 @@ export function PolicyRulesEditor({
   return (
     <View className="gap-3">
       {rules.length === 0 ? (
-        <Text className="text-xs text-muted-foreground">
-          {t('organizationGuardrails.rulesEmpty')}
-        </Text>
+        <Text variant="caption">{t('organizationGuardrails.rulesEmpty')}</Text>
       ) : (
         rules.map((rule, index) => (
           <View key={ruleKeys[index] ?? index} className="gap-3 rounded-lg bg-background p-3">
@@ -148,6 +146,7 @@ export function PolicyRulesEditor({
             />
             <SettingsValueRow
               label={t('organizationGuardrails.ruleRiskCategory')}
+              className="px-0"
               value={t(RISK_CATEGORY_KEYS[rule.risk_category])}
               disabled={disabled}
               onPress={() => {
@@ -156,6 +155,7 @@ export function PolicyRulesEditor({
             />
             <SettingsValueRow
               label={t('organizationGuardrails.ruleApplicability')}
+              className="px-0"
               value={t(APPLICABILITY_KEYS[rule.applicability])}
               disabled={disabled}
               onPress={() => {
@@ -164,6 +164,7 @@ export function PolicyRulesEditor({
             />
             <SettingsValueRow
               label={t('securityAgent.filter.severity')}
+              className="px-0"
               value={t(SEVERITY_KEYS[rule.severity])}
               disabled={disabled}
               onPress={() => {

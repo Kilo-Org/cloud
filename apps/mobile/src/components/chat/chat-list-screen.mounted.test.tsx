@@ -1,6 +1,6 @@
 /* eslint-disable typescript-eslint/no-deprecated -- the DOM-free `test-renderer` mounts React/RN trees under vitest (see src/test/render-with-providers.tsx) */
 import { createElement, type ElementType } from 'react';
-import { act, type ReactTestRenderer } from '@/test/renderer';
+import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ChatListScreen } from '@/components/chat/chat-list-screen';
@@ -25,6 +25,7 @@ const state = vi.hoisted(() => ({
   backends: [] as StoredChatBackend[],
 }));
 
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('@/lib/chat/use-chat', () => ({
   useChatPlace: () => ({ chatScope: 'u1:personal', org: { kind: 'personal' } }),
   newChat: state.newChat,
@@ -70,11 +71,13 @@ vi.mock('react-native', () => ({
   useWindowDimensions: () => ({ fontScale: 1, width: 400, height: 800 }),
 }));
 vi.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
-vi.mock('@/components/agents/session-list-content', () => ({ FAB_MARGIN: 16, FAB_SIZE: 56 }));
 vi.mock('@/components/centered-state-surface', () => ({
   StateSurfaceInsets: 'StateSurfaceInsets',
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 // The workspace row has its own suite (`chat-list-screen.workspace.mounted.test.tsx`);
 // here it is stubbed so these assertions stay about starting a chat.
 vi.mock('@/components/context-control', () => ({ ContextControl: () => null }));
@@ -84,6 +87,7 @@ vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'Activ
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/icons', () => ({
   MessageCircle: 'MessageCircle',
+  MessageCirclePlus: 'MessageCirclePlus',
   Plus: 'Plus',
   Server: 'Server',
 }));
@@ -131,11 +135,21 @@ async function pressStart(tree: ReactTestRenderer): Promise<void> {
   });
 }
 
-/** Press the corner button, the one a list with a chat already in it shows. */
+/** The corner button's pressable, the one a list with a chat already in it shows. */
+function findFab(tree: ReactTestRenderer): ReactTestInstance {
+  const fab = tree.root
+    .findAllByProps({ testID: 'chat-new-fab' })
+    .find(node => (node.type as string) === 'Pressable');
+  if (!fab) {
+    throw new Error('Missing chat-new-fab Pressable');
+  }
+  return fab;
+}
+
 async function pressFab(tree: ReactTestRenderer): Promise<void> {
-  const fab = tree.root.findByProps({ testID: 'chat-new-fab' });
+  const fab = findFab(tree);
   await act(async () => {
-    (fab.props as { onPress: () => void }).onPress();
+    (fab.props.onPress as () => void)();
     await Promise.resolve();
   });
 }
@@ -183,7 +197,7 @@ describe('starting a chat from the list', () => {
 
     await pressFab(tree);
 
-    const busy = tree.root.findByProps({ testID: 'chat-new-fab' });
+    const busy = findFab(tree);
     expect(busy.props.disabled).toBe(true);
     expect(busy.props.accessibilityState).toEqual({ disabled: true, busy: true });
     expect(tree.root.findAllByType('ActivityIndicator' as ElementType)).toHaveLength(1);
@@ -198,7 +212,7 @@ describe('starting a chat from the list', () => {
       await Promise.resolve();
     });
     expect(state.push).toHaveBeenCalledWith('/(app)/(tabs)/(4_chat)/session-1');
-    expect(tree.root.findByProps({ testID: 'chat-new-fab' }).props.accessibilityState).toEqual({
+    expect(findFab(tree).props.accessibilityState).toEqual({
       disabled: false,
       busy: false,
     });

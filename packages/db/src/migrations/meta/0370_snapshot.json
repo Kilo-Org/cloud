@@ -1,5 +1,5 @@
 {
-  "id": "fee5843c-8a48-4a60-af41-2f0dcbe4183e",
+  "id": "1a243d23-704e-44c1-a3a1-863463454480",
   "prevId": "c6373dd1-7a9f-41a2-80b1-1285215e64e3",
   "version": "7",
   "dialect": "postgresql",
@@ -2368,6 +2368,144 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.anthropic_user_profile_cleanup_state": {
+      "name": "anthropic_user_profile_cleanup_state",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "default": 1
+        },
+        "next_page": {
+          "name": "next_page",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "anthropic_user_profile_cleanup_state_singleton": {
+          "name": "anthropic_user_profile_cleanup_state_singleton",
+          "value": "\"anthropic_user_profile_cleanup_state\".\"id\" = 1"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.anthropic_user_profile_deletions": {
+      "name": "anthropic_user_profile_deletions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "user_profile_id": {
+          "name": "user_profile_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "profile_created_at": {
+          "name": "profile_created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "profile_updated_at": {
+          "name": "profile_updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "queued_at": {
+          "name": "queued_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "attempt_count": {
+          "name": "attempt_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "last_attempt_at": {
+          "name": "last_attempt_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "IDX_anthropic_user_profile_deletions_deleted_at": {
+          "name": "IDX_anthropic_user_profile_deletions_deleted_at",
+          "columns": [
+            {
+              "expression": "deleted_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_anthropic_user_profile_deletions_user_profile_id": {
+          "name": "UQ_anthropic_user_profile_deletions_user_profile_id",
+          "nullsNotDistinct": false,
+          "columns": [
+            "user_profile_id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -7259,8 +7397,8 @@
             }
           ],
           "isUnique": false,
-          "where": "\"cloud_agent_pending_uploads\".\"status\" IN ('pending', 'released')",
-          "concurrently": true,
+          "where": "\"cloud_agent_pending_uploads\".\"status\" = 'pending'",
+          "concurrently": false,
           "method": "btree",
           "with": {}
         }
@@ -7280,7 +7418,7 @@
       "checkConstraints": {
         "cloud_agent_pending_uploads_status_check": {
           "name": "cloud_agent_pending_uploads_status_check",
-          "value": "\"cloud_agent_pending_uploads\".\"status\" IN ('pending', 'linked', 'released', 'reaped')"
+          "value": "\"cloud_agent_pending_uploads\".\"status\" IN ('pending', 'linked', 'reaped')"
         }
       },
       "isRLSEnabled": false
@@ -24144,9 +24282,31 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "anthropic_user_profile_id": {
+          "name": "anthropic_user_profile_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
+        "IDX_kilocode_users_anthropic_user_profile_id": {
+          "name": "IDX_kilocode_users_anthropic_user_profile_id",
+          "columns": [
+            {
+              "expression": "anthropic_user_profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"kilocode_users\".\"anthropic_user_profile_id\" IS NOT NULL",
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
+        },
         "IDX_kilocode_users_signup_ip_created_at": {
           "name": "IDX_kilocode_users_signup_ip_created_at",
           "columns": [
@@ -28403,9 +28563,31 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "anthropic_user_profile_id": {
+          "name": "anthropic_user_profile_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
+        "IDX_organizations_anthropic_user_profile_id": {
+          "name": "IDX_organizations_anthropic_user_profile_id",
+          "columns": [
+            {
+              "expression": "anthropic_user_profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"organizations\".\"anthropic_user_profile_id\" IS NOT NULL",
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
+        },
         "IDX_organizations_sso_domain": {
           "name": "IDX_organizations_sso_domain",
           "columns": [

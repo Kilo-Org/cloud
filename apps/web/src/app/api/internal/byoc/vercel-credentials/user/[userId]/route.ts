@@ -56,6 +56,7 @@ export async function GET(
       buildGeneration: row.build_generation,
       runtimeBuildId: row.runtime_build_id,
       runtimeSnapshotId: row.runtime_snapshot_id,
+      runtimeDigest: row.runtime_digest,
       teamSlug: row.team_slug,
       projectSlug: row.project_slug,
     },

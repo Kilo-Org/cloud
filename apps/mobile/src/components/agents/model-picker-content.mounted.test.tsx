@@ -134,6 +134,7 @@ vi.mock('@/components/picker-sheet', () => ({
 // empty state's clear CTA is reachable from the tree; `title` stays a prop for
 // the existing assertions.
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   EmptyState: (props: { title: string; action?: ReactNode }) =>
     createElement('EmptyState', { title: props.title }, props.action),
 }));
@@ -420,18 +421,18 @@ describe('ModelPickerContent deferred search', () => {
     // The "No matches" body offers exactly one clear CTA, carrying the same
     // copy the Agents search empty state uses, so both searches recover the
     // same way.
-    const clearActions = findByType(renderer.root, 'Button');
+    const clearActions = findByType(renderer.root, 'StateAction');
     expect(clearActions).toHaveLength(1);
     const clearAction = clearActions[0];
     if (!clearAction) {
       throw new Error('clear search action not found');
     }
-    const buttonProps = clearAction.props as unknown as {
-      children?: { props?: { children?: ReactNode } };
+    const actionProps = clearAction.props as unknown as {
+      label?: unknown;
       onPress?: unknown;
     };
-    expect(buttonProps.children?.props?.children).toBe('Clear search');
-    const onPress = buttonProps.onPress;
+    expect(actionProps.label).toBe('Clear search');
+    const onPress = actionProps.onPress;
     if (typeof onPress !== 'function') {
       throw new TypeError('clear search action is not pressable');
     }
@@ -459,7 +460,7 @@ describe('ModelPickerContent deferred search', () => {
     // The mock renders `action` as a child (as the real EmptyState does), so
     // assert on the rendered children: no action node reaches the empty state.
     expect(emptyState[0]?.children).toHaveLength(0);
-    expect(findByType(renderer.root, 'Button')).toHaveLength(0);
+    expect(findByType(renderer.root, 'StateAction')).toHaveLength(0);
 
     act(() => {
       renderer.unmount();

@@ -41,7 +41,7 @@ export function SecurityCommandRetryCard({
   const colors = useThemeColors();
   const { t } = useTranslation();
   return (
-    <View className="gap-3 rounded-lg border border-destructive bg-red-50 p-3 dark:bg-red-950">
+    <View className="gap-3 rounded-xl border border-danger-tile-border bg-danger-tile-bg p-3">
       <View className="flex-row items-start gap-2">
         <AlertTriangle size={16} color={colors.destructive} className="mt-0.5" />
         <View className="flex-1">

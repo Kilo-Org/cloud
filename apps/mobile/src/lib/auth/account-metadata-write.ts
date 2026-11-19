@@ -2,6 +2,7 @@ import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { LOCK_READABLE_METADATA_KEYS } from '@/lib/auth/secure-store-gated';
 import {
   deleteStoredValue,
+  deleteStoredValueWithRetry,
   widgetStoreOptions,
   writeStoredValue,
 } from '@/lib/auth/secure-store-value';
@@ -54,5 +55,18 @@ export async function setAccountMetadata(key: string, value: string): Promise<vo
 export async function deleteAccountMetadata(key: string): Promise<void> {
   await chainSave(key, async () => {
     await deleteStoredValue(key);
+  });
+}
+
+/**
+ * The preference store's sign-out clear: a delete that must converge on disk,
+ * so a transient keychain refusal does not pin the removed value on the device
+ * until the next launch. Every attempt runs inside one chain slot, so a write
+ * queued after this delete still lands after the last attempt: a retried delete
+ * can never remove a value written after it.
+ */
+export async function deleteAccountMetadataWithRetry(key: string): Promise<void> {
+  await chainSave(key, async () => {
+    await deleteStoredValueWithRetry(key);
   });
 }

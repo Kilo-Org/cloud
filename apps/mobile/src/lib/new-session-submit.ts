@@ -71,12 +71,53 @@ export function resolveNewSessionSubmitDisabled(input: {
 }
 
 /**
+ * The effective-profile read's share of the Start gate, as one state instead of
+ * parallel booleans whose combinations include invalid ones:
+ *
+ *   - `loading`: the read has not settled, or a retry is in flight. Start waits,
+ *     so an unsettled default is never silently dropped.
+ *   - `override-error`: the read settled with an error while the person picked a
+ *     profile for this session. The pick cannot be confirmed, so Start waits for
+ *     the profile retry the footer offers.
+ *   - `ready`: the read settled, or it failed with no pick. A failed read with
+ *     nothing picked leaves the create with no profile id to send and the server
+ *     applies its default, so only a pick can block Start.
+ */
+export type NewSessionProfileGate =
+  | { readonly kind: 'ready' }
+  | { readonly kind: 'loading' }
+  | { readonly kind: 'override-error' };
+
+/**
+ * Resolve the profile gate from the read's flags. Loading is checked first: a
+ * retry in flight keeps the error status the hook reports, and the retry — not
+ * the stale error — is what the form is waiting on. An error without a pick is
+ * `ready`: the create carries no profile id and the server applies its default,
+ * so a failed read alone never blocks Start.
+ */
+export function resolveNewSessionProfileGate(input: {
+  isLoading: boolean;
+  isError: boolean;
+  hasOverride: boolean;
+}): NewSessionProfileGate {
+  if (input.isLoading) {
+    return { kind: 'loading' };
+  }
+  if (input.isError && input.hasOverride) {
+    return { kind: 'override-error' };
+  }
+  return { kind: 'ready' };
+}
+
+/**
  * Whether the cloud-target "Start session" button is disabled, including the
- * effective-profile gate. A failed profile query is deliberately NOT a disable
- * reason: the form shows an inline error + Retry and Start stays enabled,
- * submitting with no effective profile id (the default is omitted). Only a
- * still-loading profile blocks Start, so an unsettled default is never
- * silently dropped.
+ * effective-profile gate. A still-loading profile blocks Start, so an unsettled
+ * default is never silently dropped. A failed profile read blocks Start only for
+ * a pick the person made for this session: that pick cannot be confirmed while
+ * the read is in error, so Start waits for the retry. With no pick, a failed read
+ * stays out of the gate — the create submits no effective profile id (the default
+ * is omitted) and the server applies its own, so the failure is not a disable
+ * reason there.
  */
 export function resolveNewSessionStartDisabled(input: {
   attachmentsHasFailed: boolean;
@@ -89,7 +130,7 @@ export function resolveNewSessionStartDisabled(input: {
   selectedRepo: string;
   /** True when the selected repo key still resolves to a picker row. */
   selectedRepositoryResolved: boolean;
-  isProfileLoading: boolean;
+  profileGate: NewSessionProfileGate;
 }): boolean {
   // A selected key that no longer resolves to a row (after a refresh or a
   // provider change) must not submit: the create body would carry no
@@ -107,7 +148,7 @@ export function resolveNewSessionStartDisabled(input: {
       model: input.model,
       selectedRepo: input.selectedRepo,
     }) ||
-    input.isProfileLoading
+    input.profileGate.kind !== 'ready'
   );
 }
 
@@ -158,6 +199,8 @@ export type NewSessionStartBlockedReason =
   | 'attachment-uploading'
   /** A still-loading profile blocks Start until the query settles. */
   | 'profile-loading'
+  /** A pick whose profile read failed blocks Start until Retry resolves it. */
+  | 'profile-error'
   /** Cloud Agent needs a model; an empty or unavailable one disables Start. */
   | 'model-missing'
   /** A selected repository that no longer resolves to a picker row blocks Start. */
@@ -214,10 +257,10 @@ type NewSessionStartBlockedReasonInput = {
  * these disables the gate on its own (`resolveNewSessionStartDisabled` ORs
  * them in), so reading them from the gate names a real cause. A failed
  * attachment outranks an upload in flight: the same chip usually carries both,
- * and the failure is what the user has to fix. A waiting profile outranks a
- * missing model: the profile settles on its own, and the model the screen will
- * show may arrive with it. A clone entry has no composer and no profile, so it
- * never reaches here.
+ * and the failure is what the user has to fix. A waiting or failed profile read
+ * outranks a missing model: the profile settles on its own — or on the retry the
+ * footer offers — and the model the screen will show may arrive with it. A clone
+ * entry has no composer and no profile, so it never reaches here.
  */
 function resolveComposerBlockedReason(
   input: NewSessionStartBlockedReasonInput
@@ -231,8 +274,11 @@ function resolveComposerBlockedReason(
   if (input.gate.attachmentsIsUploading) {
     return 'attachment-uploading';
   }
-  if (input.gate.isProfileLoading) {
+  if (input.gate.profileGate.kind === 'loading') {
     return 'profile-loading';
+  }
+  if (input.gate.profileGate.kind === 'override-error') {
+    return 'profile-error';
   }
   if (input.gate.model === '') {
     return 'model-missing';
@@ -267,10 +313,11 @@ function resolveComposerBlockedReason(
  * button, so the footer does not render the reason and opens no connect flow.
  *
  * The other preconditions that block Start are named too, wherever they own
- * the blocker: a failed or in-flight attachment, a still-loading profile, an
- * empty model, and a repository key that no longer resolves each say what the
- * user waits for, picks, or fixes. Creating and submitting stay `null`, because
- * no copy can tell the user what to do about a request already in flight.
+ * the blocker: a failed or in-flight attachment, a still-loading profile or a
+ * pick whose read failed, an empty model, and a repository key that no longer
+ * resolves each say what the user waits for, picks, fixes, or retries. Creating
+ * and submitting stay `null`, because no copy can tell the user what to do about
+ * a request already in flight.
  */
 export function resolveNewSessionStartBlockedReason(
   input: NewSessionStartBlockedReasonInput

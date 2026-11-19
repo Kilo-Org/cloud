@@ -346,11 +346,10 @@ describe('SessionMessageList scroll-to-bottom control', () => {
     expect(String(button.props.className)).toContain(ICON_TARGET_BOX_CLASS);
     expect(button.props.hitSlop).toBeUndefined();
 
-    // The visible circle stays compact inside the enlarged target. Its explicit
-    // px keep NativeWind's 14pt rem from shrinking it back below the look it
-    // shipped with (`h-10` renders at 35pt).
+    // The visible circle stays compact inside the enlarged target: `h-10`
+    // renders at 35pt on NativeWind's 14pt rem.
     const circle = button.find(node => Object.is(node.type, 'View'));
-    expect(String(circle.props.className)).toContain('h-[35px] w-[35px]');
+    expect(String(circle.props.className)).toContain('h-10 w-10');
     expect(String(circle.props.className)).toContain('rounded-full');
   });
 });

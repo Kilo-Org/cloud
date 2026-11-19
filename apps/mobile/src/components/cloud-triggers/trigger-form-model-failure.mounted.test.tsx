@@ -42,6 +42,9 @@ vi.mock('@/lib/cloud-triggers/use-trigger-options', () => ({
   useTriggerProfiles: () => emptyOptions(),
 }));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
+vi.mock('@/components/query-error', () => ({
+  QueryError: (props: Record<string, unknown>) => createElement('QueryError', props),
+}));
 // The catalogue read each test describes; the mock reads the object live, so a
 // test sets the state it renders instead of remocking the hook.
 const availableModels = vi.hoisted(() => ({
@@ -75,7 +78,7 @@ const emptyOptions = () => ({
 });
 
 const MODEL_SELECTOR = 'ModelSelector' as ElementType;
-const PRESSABLE = 'Pressable' as ElementType;
+const QUERY_ERROR = 'QueryError' as ElementType;
 
 const CACHED_MODEL = {
   id: 'anthropic/claude-sonnet-4',
@@ -105,11 +108,9 @@ describe('trigger form model list failure', () => {
       })
     );
 
-  /** The alert `Text` the block shows while the catalogue read failed. */
-  function failureAlert(root: ReactTestRenderer['root']) {
-    return root.findAll(
-      node => Object.is(node.type, 'Text') && node.props.accessibilityRole === 'alert'
-    );
+  /** The block's one failure state while the catalogue read failed. */
+  function failureState(root: ReactTestRenderer['root']) {
+    return root.findAll(node => Object.is(node.type, QUERY_ERROR));
   }
 
   it('offers a retry in place of the failure and locks a selector with no model', async () => {
@@ -117,17 +118,16 @@ describe('trigger form model list failure', () => {
     const view = await mountAgent();
     const root = view.renderer.root;
     try {
-      expect(failureAlert(root).map(node => node.props.children)).toStrictEqual([
-        i18n.t('common.couldNotLoadModels'),
-      ]);
-
-      const [retry] = root.findAll(node => Object.is(node.type, PRESSABLE));
-      if (!retry) {
-        throw new Error('expected a retry action');
+      const [failure] = failureState(root);
+      if (!failure) {
+        throw new Error('expected a failure state');
       }
-      expect(retry.props.disabled).toBe(false);
+      // One short state under the field, not a full-surface block.
+      expect(failure.props.title).toBe(i18n.t('common.couldNotLoadModels'));
+      expect(failure.props.compact).toBe(true);
+      expect(failure.props.placement).toBe('top');
       act(() => {
-        (retry.props.onPress as () => void)();
+        (failure.props.onRetry as () => void)();
       });
       expect(availableModels.refetch).toHaveBeenCalledTimes(1);
       expect(root.findAll(node => Object.is(node.type, MODEL_SELECTOR))[0]?.props.disabled).toBe(
@@ -152,12 +152,11 @@ describe('trigger form model list failure', () => {
     const view = await mountAgent();
     const root = view.renderer.root;
     try {
-      const [retry] = root.findAll(node => Object.is(node.type, PRESSABLE));
-      if (!retry) {
-        throw new Error('expected a retry action');
+      const [failure] = failureState(root);
+      if (!failure) {
+        throw new Error('expected a failure state');
       }
-      expect(failureAlert(root)).toHaveLength(1);
-      expect(retry.props.disabled).toBe(true);
+      expect(failure.props.isRetrying).toBe(true);
     } finally {
       act(() => {
         view.renderer.unmount();
@@ -175,10 +174,8 @@ describe('trigger form model list failure', () => {
     const root = view.renderer.root;
     try {
       // A populated catalogue is usable whatever the last read answered, so no
-      // failure row shows for it; the retry only serves a model-less block.
-      const retryCount = root.findAll(node => Object.is(node.type, PRESSABLE)).length;
-      expect(retryCount).toBe(0);
-      expect(failureAlert(root).length).toBe(0);
+      // failure state shows for it; the retry only serves a model-less block.
+      expect(failureState(root)).toHaveLength(0);
       expect(root.findAll(node => Object.is(node.type, MODEL_SELECTOR))[0]?.props.disabled).toBe(
         false
       );

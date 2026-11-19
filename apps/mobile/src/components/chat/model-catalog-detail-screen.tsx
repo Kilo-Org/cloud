@@ -5,6 +5,7 @@ import { View } from 'react-native';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { Card } from '@/components/ui/card';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import {
   Cpu,
@@ -61,7 +62,7 @@ function Summary({ detail }: Readonly<{ detail: HfModelDetail }>) {
       ? undefined
       : formatNumber(detail.contextLength, i18n.language);
   return (
-    <View className="gap-4 px-6 pb-2 pt-2">
+    <View className="gap-4 px-4 pb-2 pt-2">
       <View className="flex-row flex-wrap gap-x-4 gap-y-2">
         {parameters !== undefined && (
           <CatalogStat
@@ -136,7 +137,7 @@ function QuantRow({
   const fit = deviceFit(bytes, budget);
   const blocked = gated || fit === 'noStorage';
   return (
-    <View className="mx-6 mb-3 gap-2 rounded-xl border border-border bg-card p-4">
+    <Card className="mx-4 mb-3">
       <View className="flex-row items-center justify-between gap-3">
         <Text className="min-w-0 shrink font-mono-medium text-sm" numberOfLines={1}>
           {quant.label}
@@ -170,14 +171,14 @@ function QuantRow({
         }
         downloadDetail={quant.label}
       />
-    </View>
+    </Card>
   );
 }
 
 function LoadingDetail() {
   const { t } = useTranslation();
   return (
-    <View accessibilityLabel={t('modelChat.catalog.loadingModel')} className="gap-3 px-6 pt-2">
+    <View accessibilityLabel={t('modelChat.catalog.loadingModel')} className="gap-3 px-4 pt-2">
       <Skeleton className="h-4 w-2/3" />
       <Skeleton className="h-4 w-1/2" />
       <Skeleton className="mt-4 h-28 w-full rounded-xl" />
@@ -226,6 +227,7 @@ function DetailBody({ id }: Readonly<{ id: string }>) {
           title={t('modelChat.catalog.noFiles')}
           description={t('modelChat.catalog.noFilesDescription')}
           placement="top"
+          inset="gutter"
         />
       }
       ListFooterComponent={<View className="h-12" />}

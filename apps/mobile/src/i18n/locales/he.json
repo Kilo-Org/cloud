@@ -695,8 +695,9 @@
       "notConnectedReadOnly": "Bitbucket לא מחובר. רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לחבר אותו."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "החיבור של הארגון הזה ל-Bitbucket מנוהל באתר דרך מחשב.",
-      "description": "צור אסימון גישה לסביבת העבודה עם ההרשאות הנדרשות והדבק אותו למטה.",
+      "managedOnWeb": "החיבור של {{organization}} ל-Bitbucket מנוהל באתר דרך מחשב.",
+      "description": "צור אסימון גישה לסביבת העבודה עבור {{organization}} והדבק אותו למטה.",
+      "descriptionReconnect": "צור אסימון גישה חדש לסביבת העבודה עבור {{organization}} והדבק אותו למטה.",
       "scopes": "חשבון: קריאה · מאגרים: קריאה/כתיבה · בקשות משיכה: קריאה · התראות אוטומטיות: קריאה/כתיבה",
       "tokenPlaceholder": "אסימון גישה לסביבת העבודה",
       "tokenRefused": "Bitbucket לא קיבל את אסימון הגישה לסביבת העבודה הזה. בדוק שיש לו את ההרשאות שלמעלה, ולאחר מכן נסה שוב."
@@ -1626,6 +1627,8 @@
       "renameAccessibility": "שינוי שם הסשן: {{title}}",
       "cloningSession": "משכפל סשן…",
       "couldNotLoadThisSession": "לא ניתן היה לטעון את הסשן הזה.",
+      "historyTooLarge": "ההתעתק של הסשן הזה גדול מדי מכדי לטעון.",
+      "historyUnavailable": "לא ניתן לקרוא את ההתעתק של הסשן הזה.",
       "cloneFailedRetry": "לא ניתן היה לשכפל את הסשן הזה. נסה שוב.",
       "notEnoughCredits": "אין מספיק קרדיטים לבקשה הזו. הוסף קרדיטים ונסה שוב.",
       "previousTaskFinishing": "המשימה הקודמת עדיין לא הסתיימה. המתן רגע.",
@@ -1702,6 +1705,7 @@
       "branchDefault": "ברירת מחדל",
       "branchAccessibility": "ענף: {{label}}",
       "branchLoading": "טוען ענפים",
+      "branchInactive": "בחרו מאגר כדי לטעון את הענפים שלו.",
       "branchLoadError": "לא ניתן היה לטעון את הענפים",
       "branchUnavailable": "הענפים אינם זמינים למאגר הזה. בדקו את הגישה שלך מול הספק, ואז בחרו מאגר אחר.",
       "branchEmpty": "אין ענפים זמינים",
@@ -2516,7 +2520,6 @@
   },
   "home": {
     "couldNotLoadSessions": "לא ניתן לטעון את הסשנים.",
-    "couldNotLoadActiveSessions": "לא ניתן לטעון את הסשנים הפעילים.",
     "agentSessions": "פעילים עכשיו",
     "newCodingTask": "משימת תכנות חדשה",
     "newTaskFromPicture": "משימה חדשה מתמונה",
@@ -3745,8 +3748,7 @@
     "imagesSectionEmpty": "אין אתרי תמונות מהימנים",
     "revoke": "ביטול האמון באתר {{host}}",
     "revokeMessage": "קישורים לאתר זה יבקשו אישור שוב.",
-    "revokeImageMessage": "תמונות מאתר זה יבקשו אישור שוב.",
-    "backToPreferences": "חזרה להעדפות"
+    "revokeImageMessage": "תמונות מאתר זה יבקשו אישור שוב."
   },
   "glanceable": {
     "waiting": "נתוני הסוכנים מתעדכנים",
@@ -3994,6 +3996,8 @@
       "downloading": "מוריד: {{written}} מתוך {{total}}",
       "downloadingUnknown": "מוריד: {{written}}",
       "paused": "מושהה: {{written}} מתוך {{total}}",
+      "retrying": "מנסה שוב: {{written}} מתוך {{total}}",
+      "retryingUnknown": "מנסה שוב: {{written}}",
       "verifying": "בודק את הקובץ שהורד…",
       "downloaded": "הורד · {{size}}",
       "url": "קישור הורדה ישיר",
@@ -4084,7 +4088,9 @@
         "androidModelUnavailable": "המכשיר הזה לא תומך ב-Gemini Nano, או שאפליקציית המערכת AICore עדיין בהגדרה. יש לנסות שוב מאוחר יותר.",
         "aicoreUpdateRequired": "כדי להשתמש במודל הזה צריך לעדכן את אפליקציית AICore ואת תוכנת המערכת.",
         "downloadable": "לפני השימוש הראשון צריך להוריד את המודל הזה. ההורדה נדרשת פעם אחת בלבד.",
-        "downloading": "המודל בהורדה. אפשר יהיה להשתמש בו כשההורדה תסתיים."
+        "downloading": "המודל בהורדה. אפשר יהיה להשתמש בו כשההורדה תסתיים.",
+        "batteryQuota": "המודל במכשיר מיצה את מכסת הסוללה שלו לעת עתה. אפשר לנסות שוב מאוחר יותר.",
+        "checkFailed": "האפליקציה לא הצליחה לבדוק את המודל הזה. אפשר לנסות שוב."
       },
       "unavailable": "המודל במכשיר לא זמין כרגע. אפשר לבדוק את הסטטוס שלו ב$t(modelChat.backends.title).",
       "busy": "המודל במכשיר עסוק בתשובה אחרת. יש לנסות שוב כשהוא יסיים.",
@@ -4746,7 +4752,7 @@
       "new": "טריגר חדש",
       "create": "צור טריגר",
       "emptyTitle": "אין טריגרים עדיין",
-      "emptyDescription": "צרו טריגר כדי להתחיל הרצת Cloud Agent מקריאת וובהוק או לפי לוח זמנים.",
+      "emptyDescription": "צרו את הטריגר הראשון שלכם.",
       "loadFailedTitle": "לא ניתן היה לטעון טריגרים",
       "loadFailedDescription": "נסו שוב כשיש חיבור.",
       "detailLoadFailedTitle": "לא ניתן היה לטעון את הטריגר הזה",

@@ -3,13 +3,20 @@ import { Pressable, View } from 'react-native';
 
 import { repoPlatformBadge, repoPlatformLabelKey } from '@/components/profiles/repo-bindings-model';
 import { ProfileRowIdentity, profileRowLabel } from '@/components/profiles/profile-row-identity';
+import { Eyebrow } from '@/components/ui/eyebrow';
 import { ChevronDown, GitBranch, Trash2 } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
+import { IconTile } from '@/components/ui/icon-tile';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
+import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   COMPACT_CONTROL_BOX_CLASS,
   COMPACT_CONTROL_HIT_SLOP_DP,
+  COMPACT_CONTROL_ROW_END_CLASS,
+  FIELD_TRIGGER_BODY_CLASS,
+  FIELD_TRIGGER_FRAME_CLASS,
   ROW_TARGET_CLASS,
 } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
@@ -20,11 +27,11 @@ import { cn } from '@/lib/utils';
  */
 export function RepoBindingsSkeleton() {
   return (
-    <View className="gap-2">
+    <RowGroup>
       {[0, 1, 2].map(index => (
-        <Skeleton key={index} className="h-14 w-full rounded-lg bg-muted-soft" />
+        <RowSkeleton key={index} tile subtitle trailingControl />
       ))}
-    </View>
+    </RowGroup>
   );
 }
 
@@ -50,31 +57,33 @@ export function RepoBindingRow({
   const colors = useThemeColors();
   const providerLabel = t(repoPlatformLabelKey(platform));
   return (
-    <View className="min-h-14 flex-row items-center gap-2 rounded-lg bg-secondary px-[16px] py-2">
-      <GitBranch size={16} color={colors.mutedForeground} />
+    <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-4 py-3')}>
+      <IconTile icon={GitBranch} tint={NEUTRAL_TINT} />
       {/* One identity element, first, in reading order: the row is announced as
           "repository, profile, provider" before the control that removes it. The
           badge repeats the provider, so it stays out of the accessibility tree. */}
       <ProfileRowIdentity label={profileRowLabel(repoFullName, profileName, providerLabel)}>
-        <View className="gap-0.5">
-          <Text variant="mono" className="text-sm" numberOfLines={1}>
-            {repoFullName}
-          </Text>
-          <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-            {profileName}
-          </Text>
-        </View>
+        <Text variant="mono" className="text-sm" numberOfLines={1}>
+          {repoFullName}
+        </Text>
+        <Text variant="caption" numberOfLines={1}>
+          {profileName}
+        </Text>
       </ProfileRowIdentity>
-      <Text
+      <Eyebrow
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
-        className="rounded border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground"
+        className="rounded-md border border-border px-1.5 py-0.5"
       >
         {repoPlatformBadge(platform)}
-      </Text>
+      </Eyebrow>
       {onRemove === undefined ? null : (
         <Pressable
-          className={cn(COMPACT_CONTROL_BOX_CLASS, '-me-[7px] active:opacity-70')}
+          className={cn(
+            COMPACT_CONTROL_BOX_CLASS,
+            COMPACT_CONTROL_ROW_END_CLASS,
+            'active:opacity-70'
+          )}
           // The 32 dp box sits 9 dp inside the row's end edge, so its 16 dp
           // glyph ends 16 dp from the edge like the leading icon's inset, and
           // the 8 dp slop reaches 48 dp of touch while staying inside the row
@@ -120,20 +129,31 @@ export function PickerField({
   return (
     <View className="gap-1.5">
       <Pressable
-        className={`${ROW_TARGET_CLASS} flex-row items-center justify-between gap-2 rounded-md border border-border bg-secondary px-3 py-2 active:opacity-70`}
+        className={cn(
+          ROW_TARGET_CLASS,
+          FIELD_TRIGGER_FRAME_CLASS,
+          'active:opacity-70',
+          disabled && 'opacity-70'
+        )}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         accessibilityState={{ disabled }}
         disabled={disabled}
         onPress={onPress}
       >
-        <Text
-          className={value === null ? 'text-sm text-muted-foreground' : 'text-sm text-foreground'}
-          numberOfLines={1}
-        >
-          {value ?? label}
-        </Text>
-        <ChevronDown size={16} color={colors.mutedForeground} />
+        <View className={FIELD_TRIGGER_BODY_CLASS}>
+          <Text
+            className={
+              value === null
+                ? 'min-w-0 flex-1 text-sm text-muted-foreground'
+                : 'min-w-0 flex-1 text-sm text-foreground'
+            }
+            numberOfLines={1}
+          >
+            {value ?? label}
+          </Text>
+          <ChevronDown size={16} color={colors.mutedForeground} />
+        </View>
       </Pressable>
       {reserveHint === null ? null : (
         <View>
@@ -150,7 +170,9 @@ export function PickerField({
           </View>
           {hint === null ? null : (
             <View className="absolute inset-x-0 top-0">
-              <Text className="text-xs text-destructive">{hint}</Text>
+              <Text variant="caption" className="text-destructive">
+                {hint}
+              </Text>
             </View>
           )}
         </View>

@@ -10,6 +10,7 @@ import {
   useAvailableModels,
   useOrgDefaultModel,
 } from '@/lib/hooks/use-available-models';
+import { i18n } from '@/i18n';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
@@ -149,7 +150,10 @@ describe('model catalogue reads while the online manager reports offline', () =>
     onlineManager.setOnline(true);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    if (i18n.language !== 'en') {
+      await i18n.changeLanguage('en');
+    }
     onlineManager.setOnline(true);
     vi.unstubAllGlobals();
   });
@@ -235,6 +239,46 @@ describe('model catalogue reads while the online manager reports offline', () =>
     expect(world.procedures).toEqual(['modelPreferences.get']);
     expect(preferencesRead.current?.isLoading).toBe(false);
     expect(preferencesRead.current?.lastSelected).toEqual({ model: 'a/model' });
+    unmount();
+  });
+
+  it('re-sorts the option list without a refetch after a language change', async () => {
+    // Two catalog rows whose order the two languages disagree on: `en`
+    // collation keeps "Schematron" before "Seed"; `cs` treats the "ch" digraph
+    // as a letter after "h", so "Seed" moves first.
+    vi.stubGlobal('fetch', (input: RequestInfo | URL) => {
+      const url = input instanceof Request ? input.url : input.toString();
+      world.requests.push(url);
+      return Promise.resolve(
+        Response.json({
+          data: [
+            { id: 'c/schematron', name: 'Schematron V2 Turbo' },
+            { id: 'c/seed', name: 'Seed 2.1 Turbo' },
+          ],
+        })
+      );
+    });
+    const queryClient = newClient();
+    onlineManager.setOnline(false);
+
+    const { unmount } = await renderWithProviders(<CatalogProbe />, { queryClient, wrapper });
+
+    await waitFor(() => catalogRead.current?.isFetched === true);
+    expect(catalogRead.current?.models.map(model => model.id)).toEqual(['c/schematron', 'c/seed']);
+    expect(matching('/api/openrouter/models')).toBe(1);
+
+    // `applyLanguagePreference`'s LTR switch calls `i18n.changeLanguage` in
+    // place: no remount, no new catalog read, only the language moves.
+    await act(async () => {
+      await i18n.changeLanguage('cs');
+    });
+    expect(matching('/api/openrouter/models')).toBe(1);
+    expect(catalogRead.current?.models.map(model => model.id)).toEqual(['c/seed', 'c/schematron']);
+
+    await act(async () => {
+      await i18n.changeLanguage('en');
+    });
+    expect(catalogRead.current?.models.map(model => model.id)).toEqual(['c/schematron', 'c/seed']);
     unmount();
   });
 });

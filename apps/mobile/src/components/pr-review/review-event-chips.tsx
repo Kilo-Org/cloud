@@ -24,9 +24,7 @@ export function ReviewEventChips(props: {
   const { t } = useTranslation();
   return (
     <View className="gap-1.5">
-      <Text className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-        {t('prReview.eventChips.label')}
-      </Text>
+      <Text variant="eyebrow">{t('prReview.eventChips.label')}</Text>
       <RadioGroup label={t('prReview.eventChips.label')} className="flex-row flex-wrap gap-2">
         {EVENT_OPTIONS.map(option => {
           const active = props.value === option.value;

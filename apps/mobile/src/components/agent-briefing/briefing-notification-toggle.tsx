@@ -1,21 +1,19 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { ConfigureRow } from '@/components/ui/configure-row';
 import { Newspaper } from '@/components/ui/icons';
-import { IconTile } from '@/components/ui/icon-tile';
-import { Switch } from '@/components/ui/switch';
+import { PreferenceRow } from '@/components/ui/preference-row';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { type BriefingPreferences, useBriefingPreferences } from '@/lib/agent-briefing';
-import { NEUTRAL_TINT } from '@/lib/agent-color';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
-import { cn } from '@/lib/utils';
 
 function useBriefingNotificationSwitch() {
   const trpc = useTRPC();
@@ -78,17 +76,18 @@ export function BriefingNotificationToggle() {
   const { t } = useTranslation();
   const { preferences, value, unavailable, setEnabled } = useBriefingNotificationSwitch();
   return (
-    <View className="gap-2 rounded-2xl border border-border bg-card p-4">
+    <Card>
       <View className="flex-row items-center gap-3">
-        <Text className="min-w-0 flex-1 text-sm">{t('agentBriefing.title')}</Text>
-        <Switch
-          accessibilityLabel={t('agentBriefing.title')}
-          value={value}
-          disabled={unavailable}
-          onValueChange={setEnabled}
-        />
+        <Text className="min-w-0 flex-1">{t('agentBriefing.title')}</Text>
+        {renderRowTrailing({
+          kind: 'switch',
+          accessibilityLabel: t('agentBriefing.title'),
+          value,
+          disabled: unavailable,
+          onValueChange: setEnabled,
+        })}
       </View>
-      <Text className="text-xs text-muted-foreground">{t('agentBriefing.notificationsHint')}</Text>
+      <Text variant="caption">{t('agentBriefing.notificationsHint')}</Text>
       {preferences.isError ? (
         <Button
           variant="ghost"
@@ -108,7 +107,7 @@ export function BriefingNotificationToggle() {
       >
         <Text>{t('agentBriefing.notificationPermission')}</Text>
       </Button>
-    </View>
+    </Card>
   );
 }
 
@@ -117,45 +116,39 @@ export function BriefingNotificationToggle() {
  * screen's device-notification gate, which disables every category row.
  */
 export function BriefingNotificationCategoryRow({ disabled }: Readonly<{ disabled: boolean }>) {
-  const colors = useThemeColors();
   const { t } = useTranslation();
   const { preferences, value, pending, unavailable, setEnabled } = useBriefingNotificationSwitch();
-  const isDisabled = disabled || unavailable;
-  return (
-    <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-      <IconTile icon={Newspaper} tint={NEUTRAL_TINT} />
-      <View className="flex-1">
-        <Text className={cn('text-sm font-medium', isDisabled && 'text-muted-foreground')}>
-          {t('agentBriefing.title')}
-        </Text>
-        <Text variant="muted" className="mt-0.5 text-xs">
-          {t('agentBriefing.notificationsHint')}
-        </Text>
-        {preferences.isError ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(STATE_ACTION_CLASS, 'self-start px-0')}
-            onPress={() => {
-              void preferences.refetch();
-            }}
-          >
-            <Text>{t('common.retry')}</Text>
-          </Button>
-        ) : null}
-      </View>
-      {pending && <ActivityIndicator size="small" color={colors.mutedForeground} />}
-      <Switch
-        value={value}
-        disabled={isDisabled}
-        accessibilityLabel={t('agentBriefing.title')}
-        accessibilityState={{ disabled: isDisabled, busy: pending }}
-        onValueChange={next => {
-          if (!isDisabled) {
-            setEnabled(next);
-          }
+  // The screens that stack this row retry their own query, which is not this
+  // one: a failed brief read must offer its own retry at the row, or the
+  // category is left disabled with no way back short of a screen reload.
+  if (preferences.isError) {
+    return (
+      <ConfigureRow
+        icon={Newspaper}
+        title={t('agentBriefing.title')}
+        subtitle={t('agentBriefing.notificationsHint')}
+        variant="action"
+        onPress={() => {
+          void preferences.refetch();
         }}
+        accessibilityLabel={[t('agentBriefing.title'), t('common.retry')].join('. ')}
+        trailing={
+          <Text variant="caption" className="text-destructive">
+            {t('common.retry')}
+          </Text>
+        }
       />
-    </View>
+    );
+  }
+  return (
+    <PreferenceRow
+      icon={Newspaper}
+      title={t('agentBriefing.title')}
+      subtitle={t('agentBriefing.notificationsHint')}
+      value={value}
+      disabled={disabled || unavailable}
+      busy={pending}
+      onValueChange={setEnabled}
+    />
   );
 }

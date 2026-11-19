@@ -199,15 +199,70 @@ export async function writeStoredValue(
   }
 }
 
+/**
+ * One delete attempt. A rejection propagates unreported: the caller owns both
+ * the retry and the report, so a budget of four attempts files one event.
+ */
+async function deleteStoredValueOnce(key: string, options?: SecureStoreReadOptions): Promise<void> {
+  assertProtectedDataAvailable();
+  await SecureStore.deleteItemAsync(key, ...secureStoreOptionsArgs(options));
+}
+
 /** {@link writeStoredValue} for a delete: reported at warning level and still
  *  rejected, for callers that own the recoverable outcome. */
 export async function deleteStoredValue(
   key: string,
   options?: SecureStoreReadOptions
 ): Promise<void> {
-  assertProtectedDataAvailable();
   try {
-    await SecureStore.deleteItemAsync(key, ...secureStoreOptionsArgs(options));
+    await deleteStoredValueOnce(key, options);
+  } catch (error) {
+    reportSecureStoreFailure('delete', error);
+    throw error;
+  }
+}
+
+// The retrying read's cadence in `lib/auth/secure-store-read`, so a refused
+// delete backs off on the same schedule the credential read does.
+const DELETE_RETRY_DELAYS_MS = [250, 500, 1000] as const;
+
+async function delayMs(ms: number): Promise<void> {
+  const { promise, resolve } = Promise.withResolvers<undefined>();
+  setTimeout(() => {
+    resolve(undefined);
+  }, ms);
+  await promise;
+}
+
+/**
+ * Delete with the bounded retry a keychain that refuses transiently needs: a
+ * clear that gave up after one attempt leaves the removed value on the device
+ * until the next launch, so four attempts run 250/500/1000 ms apart.
+ *
+ * One report, after the last attempt: reporting per attempt would multiply one
+ * failure into four events. A locked device refuses every attempt and is not a
+ * defect, so it rethrows at once, unreported — the same branch as the retrying
+ * read.
+ */
+export async function deleteStoredValueWithRetry(key: string): Promise<void> {
+  for (const retryDelayMs of DELETE_RETRY_DELAYS_MS) {
+    try {
+      // eslint-disable-next-line no-await-in-loop -- retry cadence: each attempt must settle before the next backoff
+      await deleteStoredValueOnce(key);
+      return;
+    } catch (error) {
+      if (!isProtectedDataAvailable()) {
+        throw error;
+      }
+      // eslint-disable-next-line no-await-in-loop -- backoff between attempts
+      await delayMs(retryDelayMs);
+    }
+  }
+  // Last attempt: its rejection is reported once here with the stable delete
+  // fingerprint and propagates to the caller, which owns the recoverable
+  // outcome.
+  try {
+    await deleteStoredValueOnce(key);
   } catch (error) {
     reportSecureStoreFailure('delete', error);
     throw error;

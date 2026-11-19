@@ -13,6 +13,7 @@ import {
   replaySnapshotPage,
   sessionSnapshotFailureMessage,
   snapshotPageFromSnapshot,
+  type SessionSnapshotFailure,
 } from './snapshot-page';
 import type { TransportFactory, TransportSink } from './transport';
 
@@ -37,7 +38,7 @@ type CliHistoricalTransportConfig = {
   ) => Promise<SessionSnapshotPageOutcome | null>;
   /** Called after a successful initial bounded page read. */
   onInitialPageLoaded?: ((page: SessionSnapshotPage) => void) | undefined;
-  onError?: ((message: string) => void) | undefined;
+  onError?: ((message: string, failure?: SessionSnapshotFailure) => void) | undefined;
 };
 
 function createCliHistoricalTransport(config: CliHistoricalTransportConfig): TransportFactory {
@@ -72,7 +73,8 @@ function createCliHistoricalTransport(config: CliHistoricalTransportConfig): Tra
               // Typed failure: surface via onError and mark the session as
               // stopped with `error` so the UI doesn't appear to load
               // forever.
-              config.onError?.(sessionSnapshotFailureMessage(page.kind));
+              const failure = sessionSnapshotFailureMessage(page.kind);
+              config.onError?.(failure.message, failure);
               sink.onServiceEvent({ type: 'stopped', reason: 'error' });
             },
             (error: unknown) => {

@@ -10,13 +10,14 @@ import type {
   SessionSnapshotPageOutcome,
 } from './types';
 import { createCliHistoricalTransport } from './cli-historical-transport';
+import type { SessionSnapshotFailure } from './snapshot-page';
 import { kiloId, makeSnapshot, stubUserMessage, stubTextPart } from './test-helpers';
 
 const SES_ID = 'ses-1';
 
 function createTransportWithSinks(
   fetchSnapshot: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>,
-  onError?: (message: string) => void
+  onError?: (message: string, failure?: SessionSnapshotFailure) => void
 ) {
   const chatEvents: ChatEvent[] = [];
   const serviceEvents: ServiceEvent[] = [];
@@ -241,7 +242,7 @@ type CreatePageTransportOptions = {
   fetchSnapshotPage: FetchPage;
   fetchSnapshot?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
   onInitialPageLoaded?: (page: SessionSnapshotPage) => void;
-  onError?: (message: string) => void;
+  onError?: (message: string, failure?: SessionSnapshotFailure) => void;
 };
 
 function createPageTransport(options: CreatePageTransportOptions) {
@@ -348,7 +349,10 @@ describe('CliHistoricalTransport page-seam', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(onError).toHaveBeenCalledWith('Session history temporarily unavailable');
+    expect(onError).toHaveBeenCalledWith(
+      'Session history temporarily unavailable',
+      { kind: 'retryable_failure', message: 'Session history temporarily unavailable' }
+    );
     expect(onInitialPageLoaded).not.toHaveBeenCalled();
     expect(serviceEvents).toEqual([{ type: 'stopped', reason: 'error' }]);
     transport.destroy();
@@ -363,7 +367,10 @@ describe('CliHistoricalTransport page-seam', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(onError).toHaveBeenCalledWith('Session history too large to load');
+    expect(onError).toHaveBeenCalledWith(
+      'Session history too large to load',
+      { kind: 'too_large', message: 'Session history too large to load' }
+    );
     expect(onInitialPageLoaded).not.toHaveBeenCalled();
     expect(serviceEvents).toEqual([{ type: 'stopped', reason: 'error' }]);
     transport.destroy();
@@ -378,7 +385,10 @@ describe('CliHistoricalTransport page-seam', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(onError).toHaveBeenCalledWith('Session history is unavailable');
+    expect(onError).toHaveBeenCalledWith(
+      'Session history is unavailable',
+      { kind: 'invalid_data', message: 'Session history is unavailable' }
+    );
     expect(serviceEvents).toEqual([{ type: 'stopped', reason: 'error' }]);
     transport.destroy();
   });

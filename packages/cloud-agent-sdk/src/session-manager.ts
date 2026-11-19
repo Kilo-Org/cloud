@@ -92,6 +92,15 @@ import type { ContextUsage } from './context-usage';
 import { CLI_MODEL_ID, cliModelLabel } from './cli-model';
 import { readCloudSnapshotPage, type SnapshotRead } from './cloud-agent-transport';
 
+/**
+ * The machine kind of a failed session-history read, carried beside
+ * `errorAtom` so consumers classify retry versus terminal without decoding
+ * the English error message.
+ */
+export type SnapshotHistoryFailure = {
+  kind: 'retryable_failure' | 'too_large' | 'invalid_data';
+};
+
 type StoredMessage = { info: MessageInfo; parts: Part[] };
 type SessionManagerPromptPayload = Omit<SendPromptPayload, 'model'> & { model?: string };
 type SessionManagerCommandPayload = Omit<SendCommandPayload, 'model'> & { model?: string };
@@ -634,6 +643,8 @@ type SessionManagerAtoms = {
   childSessionStatus: Atom<(childSessionId: string) => SessionStatus | undefined>;
   childSessionHydrationState: Atom<(childSessionId: string) => ChildSessionHydrationState>;
   childSessionError: Atom<(childSessionId: string) => string | null>;
+  /** Machine kind of the latest session-history failure, cleared with `error`. */
+  failedHistoryKind: W<SnapshotHistoryFailure | null>;
   /** True when the latest page left a non-null cursor (more history to load). */
   hasOlderMessages: W<boolean>;
   /** True while `loadOlderMessages()` is fetching a page. */
@@ -1204,6 +1215,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const canInterruptAtom = atom(false);
   const statusIndicatorAtom = atom<SessionStatusIndicator | null>(null);
   const errorAtom = atom<string | null>(null);
+  const failedHistoryKindAtom = atom<SnapshotHistoryFailure | null>(null);
   const questionAtom = atom<QuestionState | null>(null);
   const sessionInfoAtom = atom<SessionInfo | null>(null);
   const sessionIdAtom = atom<CloudAgentSessionId | null>(null);
@@ -1751,6 +1763,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(canInterruptAtom, false);
     store.set(statusIndicatorAtom, null);
     store.set(errorAtom, null);
+    store.set(failedHistoryKindAtom, null);
     store.set(questionAtom, null);
     store.set(sessionInfoAtom, null);
     store.set(sessionIdAtom, null);
@@ -2372,6 +2385,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
       if (previousStatus.type === 'disconnected' && st.type !== 'disconnected') {
         store.set(errorAtom, null);
+        store.set(failedHistoryKindAtom, null);
         setIndicator(null);
       }
 
@@ -3112,6 +3126,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           // never applies the failure at all, and the two must agree.
           if (currentSession?.state.clearFailedMessage(id)) {
             store.set(errorAtom, null);
+            store.set(failedHistoryKindAtom, null);
           }
         }
       })
@@ -3564,7 +3579,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         }
         config.onBranchChanged?.(branch);
       },
-      onError: message => {
+      onError: (message, failure) => {
         // Suppress the one-shot "Aborted" produced by this manager's own
         // interrupt() call. The service emits this after a user-initiated
         // Stop, and the interrupt path already handles composer unlock +
@@ -3581,6 +3596,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         // failure ends it and shows why.
         const failedOpen = store.get(isLoadingAtom) || store.get(isRefreshingCachedTranscriptAtom);
         store.set(errorAtom, message);
+        store.set(failedHistoryKindAtom, failure ? { kind: failure.kind } : null);
         // The live transcript will not replace the cached rows now: the error
         // indicator owns the stale-rows state, so the refresh indicator stops.
         store.set(isRefreshingCachedTranscriptAtom, false);
@@ -3957,6 +3973,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     onOptimisticSend?: () => void;
   }): Promise<boolean> {
     store.set(errorAtom, null);
+    store.set(failedHistoryKindAtom, null);
     interruptAwaitingIdleSession = null;
     if (store.get(agentStatusAtom).type !== 'disconnected') {
       setIndicator(null);
@@ -4423,6 +4440,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       // failure must clear it here — the durable-seed path does the same.
       if (currentSession?.state.clearFailedMessage(messageId)) {
         store.set(errorAtom, null);
+        store.set(failedHistoryKindAtom, null);
       }
       // A client-materialised row is a local ghost: the accepted re-send
       // supersedes its content and materialises its own row, so leaving the
@@ -4646,6 +4664,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     createAndStart,
     clearError: () => {
       store.set(errorAtom, null);
+      store.set(failedHistoryKindAtom, null);
       setIndicator(null);
     },
     destroy,
@@ -4707,6 +4726,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       childSessionStatus: childSessionStatusAtom,
       childSessionHydrationState: childSessionHydrationStateAtom,
       childSessionError: childSessionErrorAtom,
+      failedHistoryKind: failedHistoryKindAtom,
       hasOlderMessages: hasOlderMessagesAtom,
       isLoadingOlderMessages: isLoadingOlderMessagesAtom,
       olderMessagesError: olderMessagesErrorAtom,

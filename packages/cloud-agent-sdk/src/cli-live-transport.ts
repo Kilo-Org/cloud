@@ -7,6 +7,7 @@ import {
   replaySnapshotPage,
   sessionSnapshotFailureMessage,
   snapshotPageFromSnapshot,
+  type SessionSnapshotFailure,
 } from './snapshot-page';
 import { parseRemoteCommandCatalog, type RemoteCommandState } from './remote-command-catalog';
 import {
@@ -65,7 +66,7 @@ type CliLiveTransportConfig = {
    * older-messages cursor is never reset to the latest 50.
    */
   onInitialPageLoaded?: ((page: SessionSnapshotPage) => void) | undefined;
-  onError?: ((message: string) => void) | undefined;
+  onError?: ((message: string, failure?: SessionSnapshotFailure) => void) | undefined;
   onRemoteModelStateChange?: ((state: RemoteModelState) => void) | undefined;
   onRemoteCommandStateChange?: ((state: RemoteCommandState) => void) | undefined;
   onCapabilityChange?: (() => void) | undefined;
@@ -842,7 +843,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
             replaySnapshotPage(sink, page);
             drainBufferedCliEvents();
           };
-          const onError = (error: unknown): void => {
+          const onError = (error: unknown, failure?: SessionSnapshotFailure): void => {
             if (
               expectedGeneration !== generation ||
               expectedSnapshotReplayGeneration !== snapshotReplayGeneration
@@ -851,7 +852,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
             }
             if (reportError) {
               const message = error instanceof Error ? error.message : 'Failed to fetch snapshot';
-              config.onError?.(message);
+              config.onError?.(message, failure);
             }
             bufferedCliEvents = [
               ...bufferedEventsFromSupersededSnapshot,
@@ -871,7 +872,8 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
                 onError(new Error('Session not found'));
                 return;
               }
-              onError(new Error(sessionSnapshotFailureMessage(page.kind)));
+              const failure = sessionSnapshotFailureMessage(page.kind);
+              onError(new Error(failure.message), failure);
             }, onError);
             return;
           }

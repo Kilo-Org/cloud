@@ -7,6 +7,7 @@ import { createEventHelpers } from './__fixtures__/helpers';
 import type { ChatEvent, ServiceEvent } from './normalizer';
 import type { SessionStatus } from './schemas';
 import { createCloudAgentTransport } from './cloud-agent-transport';
+import type { SessionSnapshotFailure } from './snapshot-page';
 import { createServiceState } from './service-state';
 import { createMemoryStorage } from './storage/memory';
 import { createChatProcessor } from './chat-processor';
@@ -282,7 +283,7 @@ function createMockApi() {
 
 function createTransportWithSinks(
   getTicket: (sessionId: string) => string | Promise<string> = () => 'test-ticket',
-  onError?: (message: string) => void,
+  onError?: (message: string, failure?: SessionSnapshotFailure) => void,
   api = createMockApi()
 ) {
   const chatEvents: ChatEvent[] = [];
@@ -1680,7 +1681,7 @@ describe('CloudAgentTransport snapshot refetch on reconnect', () => {
 describe('CloudAgentTransport page-seam', () => {
   function createTransportWithPageFetch(
     page: SessionSnapshotPageOutcome | null,
-    onError?: (message: string) => void
+    onError?: (message: string, failure?: SessionSnapshotFailure) => void
   ) {
     const chatEvents: ChatEvent[] = [];
     const serviceEvents: ServiceEvent[] = [];
@@ -1750,6 +1751,34 @@ describe('CloudAgentTransport page-seam', () => {
     transport.destroy();
   });
 
+  it('passes no typed failure argument for a rejected read with its own message', async () => {
+    const onError = jest.fn();
+    const page = jest
+      .fn<Promise<SessionSnapshotPageOutcome | null>, []>()
+      .mockRejectedValue(new Error('Connection lost. Please retry in a moment.'));
+    const factory = createCloudAgentTransport({
+      sessionId: cloudAgentId('ses-1'),
+      kiloSessionId: kiloId('ses-1'),
+      api: createMockApi(),
+      getTicket: () => 'test-ticket',
+      fetchSnapshot: () => Promise.reject(new Error('legacy fetchSnapshot must not be called')),
+      fetchSnapshotPage: page,
+      websocketBaseUrl: 'ws://localhost:9999',
+      onError,
+    });
+    const transport = factory({
+      onChatEvent: () => undefined,
+      onServiceEvent: () => undefined,
+    });
+
+    transport.connect();
+    await flushPromises();
+
+    expect(onError).toHaveBeenCalledWith('Connection lost. Please retry in a moment.', undefined);
+
+    transport.destroy();
+  });
+
   it('surfaces invalid_data on the initial read via onError and still connects the websocket', async () => {
     const errors: string[] = [];
     const { transport, chatEvents, serviceEvents, onInitialPageLoaded } =
@@ -1771,13 +1800,18 @@ describe('CloudAgentTransport page-seam', () => {
 
   it('surfaces too_large on the initial read via onError and still connects the websocket', async () => {
     const errors: string[] = [];
+    const failures: (SessionSnapshotFailure | undefined)[] = [];
     const { transport, chatEvents, serviceEvents, onInitialPageLoaded } =
-      createTransportWithPageFetch({ kind: 'too_large' }, message => errors.push(message));
+      createTransportWithPageFetch({ kind: 'too_large' }, (message, failure) => {
+        errors.push(message);
+        failures.push(failure);
+      });
 
     transport.connect();
     await flushPromises();
 
     expect(errors).toEqual(['Session history too large to load']);
+    expect(failures).toEqual([{ kind: 'too_large', message: 'Session history too large to load' }]);
     expect(onInitialPageLoaded).not.toHaveBeenCalled();
     expect(serviceEvents.filter(e => e.type === 'session.created')).toHaveLength(0);
     expect(chatEvents).toHaveLength(0);

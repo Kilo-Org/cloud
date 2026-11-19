@@ -20,6 +20,7 @@ import {
   type UserWebSystemEvent,
 } from './user-web-connection';
 import type { KiloSessionId, SessionSnapshot, SessionSnapshotPageOutcome } from './types';
+import type { SessionSnapshotFailure } from './snapshot-page';
 import { kiloId, makeSnapshot, stubTextPart, stubUserMessage } from './test-helpers';
 import type { RemoteAttachmentPart } from './transport';
 
@@ -187,7 +188,7 @@ function createConnection(): FakeUserWebConnection {
 function createTransportWithSinks(opts?: {
   connection?: FakeUserWebConnection;
   fetchSnapshot?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
-  onError?: (message: string) => void;
+  onError?: (message: string, failure?: SessionSnapshotFailure) => void;
   onRemoteModelStateChange?: (state: RemoteModelState) => void;
   onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
   onCapabilityChange?: () => void;
@@ -1287,7 +1288,7 @@ describe('CliLiveTransport unified user web connection', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(onError).toHaveBeenCalledWith('snapshot unavailable');
+    expect(onError).toHaveBeenCalledWith('snapshot unavailable', undefined);
     expect(chatEvents).toHaveLength(1);
     expect(userWebConnection.subscribeToCliSession).toHaveBeenCalledWith(KILO_SESSION_ID);
     transport.destroy();
@@ -3721,7 +3722,7 @@ type CreatePageTransportOptions = {
     nextCursor: string | null;
     omittedItemCount: number;
   }) => void;
-  onError?: (message: string) => void;
+  onError?: (message: string, failure?: SessionSnapshotFailure) => void;
 };
 
 function createPageTransport(options: CreatePageTransportOptions) {
@@ -3923,7 +3924,10 @@ describe('CliLiveTransport page-seam + reconnect', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(onError).toHaveBeenCalledWith('Session history temporarily unavailable');
+    expect(onError).toHaveBeenCalledWith(
+      'Session history temporarily unavailable',
+      { kind: 'retryable_failure', message: 'Session history temporarily unavailable' }
+    );
     expect(onInitialPageLoaded).not.toHaveBeenCalled();
     // No session.created was emitted because no successful page replayed.
     expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(0);
@@ -3944,7 +3948,10 @@ describe('CliLiveTransport page-seam + reconnect', () => {
       transport.connect();
       await Promise.resolve();
       await Promise.resolve();
-      expect(onError).toHaveBeenCalledWith(failure.expected);
+      expect(onError).toHaveBeenCalledWith(
+        failure.expected,
+        { kind: failure.kind, message: failure.expected }
+      );
       expect(onInitialPageLoaded).not.toHaveBeenCalled();
       transport.destroy();
     }
@@ -3961,7 +3968,7 @@ describe('CliLiveTransport page-seam + reconnect', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(onError).toHaveBeenCalledWith('Session not found');
+    expect(onError).toHaveBeenCalledWith('Session not found', undefined);
     expect(onInitialPageLoaded).not.toHaveBeenCalled();
     transport.destroy();
   });

@@ -243,9 +243,7 @@ describe('ModelAccessForm lapsed-plan controls', () => {
     // The banner is one mark and the sentence; the sentence is body-sized
     // warning ink rather than the helper-sized muted caption it replaced.
     expect(root.findAllByType('AlertTriangle' as never)).toHaveLength(1);
-    const sentence = root
-      .findAllByType('Text' as never)
-      .find(node => node.props.children === copy);
+    const sentence = root.findAllByType('Text' as never).find(node => node.props.children === copy);
     if (!sentence) {
       throw new Error('the plan-ended sentence is missing');
     }

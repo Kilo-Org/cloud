@@ -444,6 +444,7 @@ describe('non_llm writer class', () => {
     await expect(gate.acquire('queue', 'side-3', nonLlm)).resolves.toEqual({
       admitted: false,
       reason: 'queue_limit',
+      classOnly: true,
     });
     expect(logs('warn').at(-1)).toMatchObject({
       writer_caller: 'queue',
@@ -457,6 +458,26 @@ describe('non_llm writer class', () => {
     const llm = Array.from({ length: 6 }, () => admitted(gate.tryAcquire('queue', 'llm')));
     expect(gate.tryAcquire('queue', 'llm')).toEqual({ admitted: false, reason: 'queue_limit' });
     for (const slot of [...side, ...llm]) slot.release();
+  });
+
+  it.each([
+    { waitingCount: 1 },
+    { totalCount: 8 },
+    { totalCount: NaN },
+    { idleCount: -1 },
+    { idleCount: 1 },
+    { waitingCount: NaN },
+    { totalCount: 11, idleCount: 10 },
+  ])('keeps shared or indeterminate pool pressure unmarked: %j', async gauges => {
+    const currentPool = pool();
+    const gate = createQueueWriterAdmission(currentPool);
+    admitted(await gate.acquire('queue', 'first', nonLlm));
+    admitted(await gate.acquire('queue', 'second', nonLlm));
+    Object.assign(currentPool, gauges);
+    await expect(gate.acquire('queue', 'third', nonLlm)).resolves.toEqual({
+      admitted: false,
+      reason: 'queue_limit',
+    });
   });
 
   it('lets LLM queue writes take all eight slots and then rejects non_llm as well', async () => {
@@ -513,6 +534,7 @@ describe('non_llm writer class', () => {
     await expect(gate.acquire('queue', 'side-4', nonLlm)).resolves.toEqual({
       admitted: false,
       reason: 'queue_limit',
+      classOnly: true,
     });
     second.release();
     replacement.release();

@@ -1,6 +1,6 @@
 /* eslint-disable import/max-dependencies, max-lines -- the header owns sign-in, identity, organization picker and the settings dialog; splitting it would spread one state machine across files */
 import { storage } from '#imports';
-import { useAtom } from 'jotai';
+import { useAtom, useSetAtom } from 'jotai';
 import { useEffect, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
 import { Settings, X } from 'lucide-react';
@@ -33,8 +33,6 @@ import { settingsDialogOpenAtom } from './settings-dialog-state';
 import { useModalDialog } from './use-dismiss';
 import { WebMcpSettings } from './web-mcp-settings';
 import { WorkflowSettings } from './workflow-settings';
-
-const emptyOrganizationOptions: KiloOrganizationOption[] = [];
 
 const iconButtonClassName =
   'flex size-8 items-center justify-center rounded-md border border-border bg-surface-overlay text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background';
@@ -175,20 +173,12 @@ export const AnalyticsSettingsRow = ({
   );
 };
 
-const HeaderActions = ({
-  auth,
+const SettingsDialog = ({
   beforeSettings,
-  onOrganizationChange,
-  onSignOut,
-  organizationOptions,
-  selectedOrganizationId,
+  children,
 }: {
-  auth: StoredAuth;
   beforeSettings?: ReactNode;
-  onOrganizationChange: (organizationId: string) => void;
-  onSignOut: () => void;
-  organizationOptions: KiloOrganizationOption[];
-  selectedOrganizationId: string;
+  children: ReactNode;
 }): JSX.Element => {
   const [isSettingsOpen, setIsSettingsOpen] = useAtom(settingsDialogOpenAtom);
   const closeSettings = (): void => {
@@ -229,33 +219,7 @@ const HeaderActions = ({
             </button>
           </div>
           <div className="agent-conversation-scrollbar grid min-h-0 flex-1 content-start gap-4 overflow-y-auto px-4 py-4">
-            <div className="min-w-0 rounded-xl border border-border bg-surface-raised p-3">
-              <p className="type-label text-foreground-muted">Signed in</p>
-              <p className="type-body mt-1 truncate text-foreground">
-                {auth.userEmail ?? 'Kilo user'}
-              </p>
-            </div>
-            <MemorySettings />
-            <WorkflowSettings />
-            <OrganizationCreditAccountSelect
-              onChange={onOrganizationChange}
-              organizationOptions={organizationOptions}
-              selectedOrganizationId={selectedOrganizationId}
-            />
-            <WebMcpSettings />
-            <RemoteMcpSettings />
-            <LocalAgentsSettings />
-            <AnalyticsSettingsRow userEmail={auth.userEmail} />
-            <button
-              className="type-label h-9 rounded-md border border-border bg-surface-overlay px-3 text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background"
-              onClick={() => {
-                setIsSettingsOpen(false);
-                onSignOut();
-              }}
-              type="button"
-            >
-              Sign out
-            </button>
+            {children}
           </div>
         </div>
       ) : null}
@@ -263,67 +227,73 @@ const HeaderActions = ({
   );
 };
 
-const Header = ({
+export const SignedInHeaderActions = ({
   auth,
-  headerBeforeSettings,
+  beforeSettings,
   onOrganizationChange,
   onSignOut,
-  organizationOptions = emptyOrganizationOptions,
-  selectedOrganizationId = '',
+  organizationOptions,
+  selectedOrganizationId,
 }: {
-  auth?: StoredAuth | undefined;
-  headerBeforeSettings?: ReactNode;
-  onOrganizationChange?: ((organizationId: string) => void) | undefined;
-  onSignOut?: (() => void) | undefined;
-  organizationOptions?: KiloOrganizationOption[] | undefined;
-  selectedOrganizationId?: string | undefined;
-}): JSX.Element => (
+  auth: StoredAuth;
+  beforeSettings?: ReactNode;
+  onOrganizationChange: (organizationId: string) => void;
+  onSignOut: () => void;
+  organizationOptions: KiloOrganizationOption[];
+  selectedOrganizationId: string;
+}): JSX.Element => {
+  const setIsSettingsOpen = useSetAtom(settingsDialogOpenAtom);
+
+  return (
+    <SettingsDialog beforeSettings={beforeSettings}>
+      <div className="min-w-0 rounded-xl border border-border bg-surface-raised p-3">
+        <p className="type-label text-foreground-muted">Signed in</p>
+        <p className="type-body mt-1 truncate text-foreground">{auth.userEmail ?? 'Kilo user'}</p>
+      </div>
+      <MemorySettings />
+      <WorkflowSettings />
+      <OrganizationCreditAccountSelect
+        onChange={onOrganizationChange}
+        organizationOptions={organizationOptions}
+        selectedOrganizationId={selectedOrganizationId}
+      />
+      <WebMcpSettings />
+      <RemoteMcpSettings />
+      <LocalAgentsSettings />
+      <AnalyticsSettingsRow userEmail={auth.userEmail} />
+      <button
+        className="type-label h-9 rounded-md border border-border bg-surface-overlay px-3 text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background"
+        onClick={() => {
+          setIsSettingsOpen(false);
+          onSignOut();
+        }}
+        type="button"
+      >
+        Sign out
+      </button>
+    </SettingsDialog>
+  );
+};
+
+/* Local agents need no Kilo account (SPEC D15), so their settings stay reachable before sign-in. */
+export const SignedOutHeaderActions = (): JSX.Element => (
+  <SettingsDialog>
+    <LocalAgentsSettings />
+  </SettingsDialog>
+);
+
+export const ShellHeader = ({ children }: { children?: ReactNode }): JSX.Element => (
   <div className="border-b border-border bg-surface-background px-4 py-3">
     <div className="flex min-w-0 items-center justify-between gap-3">
       <KiloLogo className="size-8 shrink-0 text-brand-primary" />
       <span className="sr-only">Kilo</span>
-      {auth === undefined ||
-      onOrganizationChange === undefined ||
-      onSignOut === undefined ? null : (
-        <HeaderActions
-          auth={auth}
-          beforeSettings={headerBeforeSettings}
-          onOrganizationChange={onOrganizationChange}
-          onSignOut={onSignOut}
-          organizationOptions={organizationOptions}
-          selectedOrganizationId={selectedOrganizationId}
-        />
-      )}
+      {children}
     </div>
   </div>
 );
 
-export const Shell = ({
-  auth,
-  children,
-  headerBeforeSettings,
-  onOrganizationChange,
-  onSignOut,
-  organizationOptions = emptyOrganizationOptions,
-  selectedOrganizationId = '',
-}: {
-  auth?: StoredAuth | undefined;
-  children: ReactNode;
-  headerBeforeSettings?: ReactNode;
-  onOrganizationChange?: ((organizationId: string) => void) | undefined;
-  onSignOut?: (() => void) | undefined;
-  organizationOptions?: KiloOrganizationOption[] | undefined;
-  selectedOrganizationId?: string | undefined;
-}): JSX.Element => (
+export const Shell = ({ children }: { children: ReactNode }): JSX.Element => (
   <main className="flex h-dvh min-h-0 flex-col overflow-hidden bg-surface-background text-foreground">
-    <Header
-      auth={auth}
-      headerBeforeSettings={headerBeforeSettings}
-      onOrganizationChange={onOrganizationChange}
-      onSignOut={onSignOut}
-      organizationOptions={organizationOptions}
-      selectedOrganizationId={selectedOrganizationId}
-    />
     {children}
   </main>
 );

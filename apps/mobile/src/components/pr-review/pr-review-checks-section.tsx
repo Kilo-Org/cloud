@@ -22,12 +22,15 @@ import { Button } from '@/components/ui/button';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
 import { type PrChecksModel, useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
-import { providerPrTermKey, useProviderPrWebUrl } from '@/lib/pr-review/provider-pr-ref';
+import {
+  providerPrTermKey,
+  providerViewOnLabel,
+  useProviderPrWebUrl,
+} from '@/lib/pr-review/provider-pr-ref';
 import { cn } from '@/lib/utils';
 import { openExternalUrl } from '@/lib/external-link';
 
@@ -299,10 +302,7 @@ export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewC
     );
   }
 
-  const viewOnProviderLabel =
-    queries.platform === 'github'
-      ? t('common.viewOnGitHub')
-      : t('prReview.terms.viewOnProvider', { provider: reviewerPlatformLabel(queries.platform) });
+  const viewOnProviderLabel = providerViewOnLabel(t, queries.platform);
 
   const data = checks.data;
   const runList = data?.checkRuns ?? [];

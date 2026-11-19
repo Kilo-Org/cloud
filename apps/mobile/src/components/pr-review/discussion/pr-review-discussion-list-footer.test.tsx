@@ -12,6 +12,7 @@ const GITHUB_REF: ProviderPrRef = {
   number: 7,
 };
 const PR_WEB_URL = 'https://github.com/octocat/hello-world/pull/7';
+const GITLAB_MR_WEB_URL = 'https://gitlab.example.com/octocat/hello-world/-/merge_requests/7';
 
 vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('react-i18next', () => ({
@@ -27,6 +28,9 @@ vi.mock('react-i18next', () => ({
 }));
 vi.mock('@/i18n', () => ({ i18n: { language: 'en', t: (key: string) => key } }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+vi.mock('@/lib/code-reviewer-config', () => ({
+  reviewerPlatformLabel: (platform: string) => platform,
+}));
 vi.mock('@/lib/format', () => ({ formatNumber: (value: number) => `n${String(value)}` }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: 'black' }),
@@ -136,7 +140,39 @@ describe('ListFooter truncated conversation notice', () => {
       press();
     });
 
-    expect(openExternalUrl).toHaveBeenCalledWith(PR_WEB_URL, { label: 'common.viewOnGitHub' });
+    // The toast copy reads "Could not open {{label}}", so the link hands over
+    // the provider's noun rather than the button's own text.
+    expect(openExternalUrl).toHaveBeenCalledWith(PR_WEB_URL, {
+      label: 'prReview.terms.pullRequest',
+    });
+
+    renderer.unmount();
+  });
+
+  it('names the provider on a merge request and opens it with the provider noun', () => {
+    const renderer = mountFooter(
+      {
+        prRef: { platform: 'gitlab', projectPath: 'octocat/hello-world', mrIid: 7 },
+        truncatedConversationCount: 500,
+        hasNextPage: true,
+      },
+      GITLAB_MR_WEB_URL
+    );
+
+    const button = renderer.root
+      .findAll(node => (node.type as unknown) === 'Button')
+      .find(node => node.props.accessibilityLabel === 'prReview.terms.viewOnProvider');
+    if (!button) {
+      throw new Error('the notice rendered no provider button');
+    }
+    const press = button.props.onPress as () => void;
+    act(() => {
+      press();
+    });
+
+    expect(openExternalUrl).toHaveBeenCalledWith(GITLAB_MR_WEB_URL, {
+      label: 'prReview.terms.mergeRequest',
+    });
 
     renderer.unmount();
   });

@@ -16,7 +16,9 @@ import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   type ProviderPrRef,
+  providerPrTermKey,
   providerPrWebUrl,
+  providerViewOnLabel,
   useProviderPrWebUrl,
 } from '@/lib/pr-review/provider-pr-ref';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
@@ -124,7 +126,7 @@ function TruncatedConversationNotice({
   // one. The GitHub arm publishes null on purpose, so reading the context
   // alone would leave the one recovery affordance off the GitHub surface.
   const prUrl = providerPrWebUrl({ ref: prRef, serverWebUrl });
-  const label = t('common.viewOnGitHub');
+  const label = providerViewOnLabel(t, prRef.platform);
   return (
     <View className="w-full items-center gap-2">
       <Text variant="muted" className="text-center text-xs">
@@ -139,7 +141,8 @@ function TruncatedConversationNotice({
           variant="outline"
           className={STATE_ACTION_CLASS}
           onPress={() => {
-            void openExternalUrl(prUrl, { label });
+            // "Could not open {{label}}" names the thing, not the action.
+            void openExternalUrl(prUrl, { label: t(providerPrTermKey(prRef.platform)) });
           }}
           accessibilityLabel={label}
         >

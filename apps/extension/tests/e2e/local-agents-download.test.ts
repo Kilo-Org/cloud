@@ -251,6 +251,8 @@ test('a download that lands after the click is reported on the next call, and th
 
     expect(clicked).toMatchObject({ isError: false, kind: 'result' });
 
+    // The click answered before the file was even requested: the frame's request is still in flight, held by the route.
+    await fixture.waitForLate(1);
     fixture.releaseLate();
     // The browser created the download after the call answered, and the guard's late window stopped it.
     await expect.poll(() => downloads.length, { timeout: 20_000 }).toBe(1);
@@ -281,6 +283,7 @@ test('a download that lands after the click is reported on the next call, and th
     );
 
     expect(approved).toMatchObject({ isError: false, kind: 'result' });
+    await fixture.waitForLate(2);
     fixture.releaseLate();
     await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toHaveLength(1);
 
@@ -294,6 +297,7 @@ test('a download that lands after the click is reported on the next call, and th
     );
 
     expect(reguarded).toMatchObject({ isError: false, kind: 'result' });
+    await fixture.waitForLate(3);
     fixture.releaseLate();
     // Each slow click reaches the browser as a download: the third one is cancelled in the late window, so its file
     // Never lands, and the folder keeps the approved file alone.

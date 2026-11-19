@@ -334,6 +334,10 @@ const keptDownloadText = async (
     return undefined;
   }
 
+  const requested = destination.split('/').findLast(Boolean);
+  /** Whether the browser created a download at all: a navigate that started none keeps its own error. */
+  let created = false;
+
   for (let attempt = 0; attempt < KEPT_DOWNLOAD_POLLS; attempt += 1) {
     try {
       // eslint-disable-next-line no-await-in-loop -- the browser creates the download on its own schedule
@@ -347,14 +351,15 @@ const keptDownloadText = async (
       );
 
       if (item !== undefined) {
-        const name =
-          item.filename?.split('/').pop() ??
-          item.finalUrl?.split('/').pop() ??
-          destination.split('/').pop();
+        created = true;
+        // An item the browser is still writing carries its target directory as the filename, not a file name: keep
+        // Polling until the browser names the file it wrote, so the model is told a name it can look for.
+        const written = item.filename?.endsWith('/') === true ? undefined : item.filename;
+        const name = written?.split('/').findLast(Boolean);
 
-        return name === undefined || name === ''
-          ? 'The file was downloaded; the page did not change.'
-          : `${name}: The file was downloaded; the page did not change.`;
+        if (name !== undefined && name !== '') {
+          return `${name}: The file was downloaded; the page did not change.`;
+        }
       }
     } catch {
       return undefined;
@@ -364,7 +369,14 @@ const keptDownloadText = async (
     await after(KEPT_DOWNLOAD_POLL_MS);
   }
 
-  return undefined;
+  if (!created) {
+    return undefined;
+  }
+
+  // The item never named itself inside the window: the file it kept is still the one the navigate asked for.
+  return requested === undefined || requested === ''
+    ? 'The file was downloaded; the page did not change.'
+    : `${requested}: The file was downloaded; the page did not change.`;
 };
 
 /** A string argument of a tool call, or `undefined` when it is absent or empty. */

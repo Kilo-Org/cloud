@@ -2202,6 +2202,52 @@ describe('agent browser calls', () => {
     expect(approvedText).toContain('The file was downloaded; the page did not change.');
   });
 
+  it('names the requested file when the kept item has no file name yet', async () => {
+    const downloads = createFakeDownloads();
+    // A download the browser is still writing reports its target directory, which has no last segment to name.
+    downloads.searched.push({ filename: '/home/me/Downloads/', id: 53 });
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+
+    cdp.setHandlers({ 'Page.navigate': () => ({ errorText: 'net::ERR_ABORTED' }) });
+
+    const navigate = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: {
+          authorized: [readGrant, { class: 'navigate', origin: MAIN_ORIGIN }],
+          sensitive: [...sensitive],
+        },
+        arguments: { url: `${MAIN_ORIGIN}/invoice.pdf` },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_navigate',
+      });
+
+    const guarded = await navigate([]);
+
+    expect(guarded).toMatchObject({ afterAction: true, kind: 'needs_permission' });
+
+    vi.useFakeTimers();
+
+    try {
+      const pending = navigate([expectStepToken(guarded)]);
+
+      // The browser never finishes naming the item inside the window, so the request itself names the file.
+      await vi.advanceTimersByTimeAsync(4000);
+      const approved = await pending;
+
+      expect(approved).toMatchObject({ kind: 'result', result: { ok: true } });
+
+      const approvedText =
+        approved.kind === 'result' && approved.result.ok ? String(approved.result.value) : '';
+
+      // Never a blank name: the model can still find the file the navigate kept.
+      expect(approvedText).toContain('invoice.pdf');
+      expect(approvedText).toContain('The file was downloaded; the page did not change.');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps the aborted page-load error for an approved navigate that downloaded nothing', async () => {
     const downloads = createFakeDownloads();
     const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });

@@ -355,7 +355,11 @@ lapses, with email notifications at each stage.
    a Commit deduction, bonus projection, auto top-up, past-due transition, or
    period advancement. A Stripe-funded final term MUST be made non-renewing
    beginning 30 days before its verified final boundary, while allowing a
-   later explicit Standard choice to replace that cancellation.
+   later explicit Standard choice to replace that cancellation. When the
+   payment provider subscription has ended, a pending conversion without
+   explicit Standard continuation MUST NOT keep the subscription active, and
+   a Commit retirement guard MUST cancel the local subscription instead of
+   mutating the ended provider subscription.
 8. A pending pre-cutoff Standard-to-Commit switch MAY be canceled before it
    starts, leaving the customer on Standard. Once that qualified switch starts,
    the resulting Commit period is the final Commit term.
@@ -824,7 +828,7 @@ rows renew.
    a. Set payment source to `credits`, preserving the payment
    provider subscription ID (converting a legacy Stripe row to
    hybrid, or no-op for an already-hybrid row).
-   b. Set subscription status to active.
+   b. Set subscription status to active, except as rule 11 states.
    c. Advance the billing period and credit renewal timestamp to
    the invoice-derived boundaries.
    d. For an authorized final Commit term, update the active commitment end
@@ -853,6 +857,13 @@ rows renew.
     Revenue side effects that require a paid amount, such as revenue
     analytics or affiliate sale events, MUST apply their own
     `amount_paid > 0` guard and MUST NOT block settlement.
+11. When a paid-plan subscription is canceled while it still owns the
+    settled payment provider subscription, that provider subscription has
+    ended. Settlement MUST record the ledger entries and the paid period, but
+    MUST NOT reactivate the subscription, clear suspension or destruction
+    state, trigger auto-resume, or send an activation email. The payment
+    provider never revives an ended subscription, so reactivation would leave
+    access with no renewal or enforcement owner.
 
 ### Revenue and External Reporting
 
@@ -1530,6 +1541,12 @@ rows renew.
    requirements on credit transaction records.
 
 ### Changelog
+
+#### 2026-11-19 -- End stranded final Commit subscriptions
+
+- Required a provider-ended final Commit subscription to cancel locally even when a pending conversion lacks explicit Standard continuation.
+- Required the Commit retirement guard to cancel the local subscription when the provider subscription has already ended.
+- Stopped late settlement of an ended provider subscription from reactivating the local subscription.
 
 #### 2026-08-05 -- Close fresh KiloClaw instance provisioning
 

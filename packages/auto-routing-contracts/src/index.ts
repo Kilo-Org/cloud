@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { NormalizedClassifierInputSchema } from './input';
-import { OwnerTypeSchema } from './owner';
+import { OwnerIdentityShape } from './owner';
 import {
   ReasoningEffortSchema,
   refineVariantExclusivity,
@@ -37,7 +37,14 @@ export {
   type AutoRoutingMode,
 } from './router';
 
-export { OwnerTypeSchema, type OwnerType } from './owner';
+export {
+  OwnerIdSchema,
+  OwnerIdentityShape,
+  OwnerSchema,
+  OwnerTypeSchema,
+  type Owner,
+  type OwnerType,
+} from './owner';
 
 // Capability-aware routing hints attached to the mirrored request payload.
 // Absent `constraints` (or absent fields within it) means "no extra
@@ -204,10 +211,7 @@ export type AutoRoutingClassifierModelResponse = z.infer<
   typeof AutoRoutingClassifierModelResponseSchema
 >;
 
-export const AutoRoutingModeOwnerQuerySchema = z.object({
-  ownerType: OwnerTypeSchema,
-  ownerId: z.string().trim().min(1),
-});
+export const AutoRoutingModeOwnerQuerySchema = z.object(OwnerIdentityShape);
 export type AutoRoutingModeOwnerQuery = z.infer<typeof AutoRoutingModeOwnerQuerySchema>;
 
 export const UpdateAutoRoutingModeRequestSchema = AutoRoutingModeOwnerQuerySchema.extend({

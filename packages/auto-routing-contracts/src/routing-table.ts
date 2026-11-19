@@ -259,7 +259,6 @@ const ACCURACY_WEIGHT = 15;
 export const RANKING_POLICY_VERSION = 'value-ttft-prodcost-request-pairs-v6';
 
 type RankInput = Omit<RankedCandidate, 'meetsThreshold'> & {
-  meetsThreshold?: boolean;
   // Benchmark p50 latency for this route. Null ranks last among competitors.
   p50LatencyMs: number | null;
 };

@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { AutoRouterSchema, AutoRoutingModeSchema } from './router';
-import { OwnerTypeSchema, type OwnerType } from './owner';
+import { OwnerIdentityShape, OwnerTypeSchema, type OwnerType } from './owner';
 import { ClassifierSubtaskTypeSchema, ClassifierTaskTypeSchema } from './taxonomy';
 import { VariantSchema } from './reasoning';
 import { addDuplicateKeyIssues } from './duplicate-keys';
@@ -232,14 +232,14 @@ function validateEntryBudget(
       `Too big: expected measuredAs to have <=${MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH} characters`
     );
   }
+  if (entry.model.length > MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH) {
+    addIssue(
+      ctx,
+      path('model'),
+      `Too big: expected model to have <=${MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH} characters`
+    );
+  }
   if (entry.kind === 'gateway') {
-    if (entry.model.length > MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH) {
-      addIssue(
-        ctx,
-        path('model'),
-        `Too big: expected model to have <=${MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH} characters`
-      );
-    }
     return;
   }
   if (entry.provider.length > MAX_CUSTOM_ROUTER_PROVIDER_ID_LENGTH) {
@@ -247,13 +247,6 @@ function validateEntryBudget(
       ctx,
       path('provider'),
       `Too big: expected provider to have <=${MAX_CUSTOM_ROUTER_PROVIDER_ID_LENGTH} characters`
-    );
-  }
-  if (entry.model.length > MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH) {
-    addIssue(
-      ctx,
-      path('model'),
-      `Too big: expected model to have <=${MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH} characters`
     );
   }
   if (entry.variants.length > MAX_CLIENT_VARIANTS) {
@@ -339,8 +332,7 @@ const WriteEntryKeySchema = EntryKeySchema.max(MAX_CUSTOM_ROUTER_ENTRY_KEY_LENGT
 export const CustomRouterDefinitionSchema = z
   .object({
     id: z.uuid(),
-    ownerType: OwnerTypeSchema,
-    ownerId: z.string().trim().min(1),
+    ...OwnerIdentityShape,
     slug: CustomRouterSlugSchema,
     name: CustomRouterNameSchema,
     baseRouter: AutoRouterSchema,
@@ -786,8 +778,7 @@ export const CUSTOM_ROUTER_STATUS_PATH = '/admin/custom-router-status';
 export const PLATFORM_MEASUREMENTS_PATH = '/admin/platform-measurements';
 
 const customRouterBenchmarkContextShape = {
-  ownerType: OwnerTypeSchema,
-  ownerId: z.string().trim().min(1),
+  ...OwnerIdentityShape,
   baseRouter: AutoRouterSchema,
   entries: CustomRouterEntriesSchema,
   // Keys of the entries the owner's CLI measures: every client entry, and each gateway entry the

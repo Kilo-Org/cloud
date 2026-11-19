@@ -620,16 +620,28 @@ const steps: Step[] = [
     request: chat(chatTurn3),
     store: chatStore,
     expected: {
+      // The tool result is the newest unit, so it is scanned first, and its block skips the
+      // tool call before it.
       blocking: {
         tools: 'hit allow tools=3/0 calls=0',
         system: 'hit allow calls=0',
-        conversation: 'hit block calls=2 chunks=2',
+        conversation: 'hit block calls=1 chunks=2',
       },
       log_only: {
         tools: 'hit allow tools=3/0 calls=0',
         system: 'hit allow calls=0',
         conversation: 'hit allow calls=2 chunks=2',
       },
+    },
+    check: (results, logs) => {
+      const failures: string[] = [];
+      const fired = blockedCalls(logs);
+      if (fired.join() !== '1') failures.push(`injection fired in calls ${fired}, expected only 1`);
+      const cachedBlocks = conversationCachedBlocks(results);
+      if (cachedBlocks !== 1) {
+        failures.push(`${cachedBlocks} blocks cached, expected only the tool result's`);
+      }
+      return failures;
     },
   },
   {

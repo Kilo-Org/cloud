@@ -338,6 +338,76 @@ describe('browser_find', () => {
       runReadBrowserTool('browser_find', { regex: 'a', text: 'a' }, session)
     ).resolves.toMatchObject({ ok: false });
   });
+
+  // More printed lines than one snapshot shows, short enough that all of them fit one result: the needle is the 2,102nd line.
+  const LONG_TREE: BrowserAriaNode[] = [
+    axNode({
+      childIds: [
+        ...[...Array.from({ length: 2100 }).keys()].map(index => `i${String(index)}`),
+        'n',
+      ],
+      nodeId: 'root',
+      role: 'generic',
+    }),
+    ...[...Array.from({ length: 2100 }).keys()].map(index =>
+      axNode({
+        backendDOMNodeId: 1000 + index,
+        name: String(index),
+        nodeId: `i${String(index)}`,
+        role: 'button',
+      })
+    ),
+    axNode({ backendDOMNodeId: 99_999, name: 'Needle 777', nodeId: 'n', role: 'button' }),
+  ];
+  const MAIN_ONLY_FRAME_TREE = {
+    frameTree: {
+      frame: {
+        id: 'main',
+        securityOrigin: 'https://app.example.com',
+        url: 'https://app.example.com/dashboard',
+      },
+    },
+  };
+
+  it('finds a match past the lines one snapshot prints, with its ref', async () => {
+    const { session } = createSession({ axNodes: LONG_TREE });
+    const result = await runReadBrowserTool('browser_find', { text: 'Needle 777' }, session);
+
+    expect(String(result.ok ? result.value : '')).toContain('Found 1 match(es) for "Needle 777"');
+    expect(String(result.ok ? result.value : '')).toContain('- button "Needle 777" [ref=e99999]');
+  });
+
+  it('finds a match past the printed lines for an agent caller and registers its ref', async () => {
+    const registered: string[][] = [];
+    const { session } = createSession({ axNodes: LONG_TREE, frameTree: MAIN_ONLY_FRAME_TREE });
+    const result = await runReadBrowserTool(
+      'browser_find',
+      { text: 'Needle 777' },
+      {
+        ...session,
+        registerRefs: entries => {
+          registered.push(entries.map(entry => entry.ref));
+        },
+      },
+      { agentScope: { readableOrigins: ['https://app.example.com'] } }
+    );
+
+    expect(String(result.ok ? result.value : '')).toContain('- button "Needle 777" [ref=e99999]');
+    expect(registered.at(-1)).toContain('e99999');
+  });
+
+  it('leaves browser_snapshot capped at the printed-line limit', async () => {
+    const { session } = createSession({ axNodes: LONG_TREE, frameTree: MAIN_ONLY_FRAME_TREE });
+    const panel = await runReadBrowserTool('browser_snapshot', {}, session);
+    const agent = await runReadBrowserTool('browser_snapshot', {}, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+    });
+
+    for (const result of [panel, agent]) {
+      expect(String(result.ok ? result.value : '')).toContain('(snapshot truncated at 2000 lines)');
+      expect(String(result.ok ? result.value : '')).not.toContain('Needle 777');
+    }
+  });
 });
 
 describe('browser_take_screenshot', () => {

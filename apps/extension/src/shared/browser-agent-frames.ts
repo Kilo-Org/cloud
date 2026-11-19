@@ -409,6 +409,8 @@ export interface ScopedSnapshotInput {
    */
   readonly childSessionFrameIds?: ReadonlySet<string>;
   readonly depth?: number | undefined;
+  /** Lines rendered before the walk stops; a snapshot prints `MAX_BROWSER_TOOL_SNAPSHOT_LINES`, a search reads the whole tree. */
+  readonly maxLines?: number | undefined;
 }
 
 export interface ScopedSnapshot {
@@ -458,7 +460,7 @@ export const buildScopedSnapshot = (input: ScopedSnapshotInput): ScopedSnapshot 
     }
 
     const visit = (node: AxNode, atDepth: number): void => {
-      if (lines.length >= MAX_BROWSER_TOOL_SNAPSHOT_LINES) {
+      if (lines.length >= (input.maxLines ?? MAX_BROWSER_TOOL_SNAPSHOT_LINES)) {
         truncated = true;
 
         return;
@@ -751,7 +753,11 @@ export const renderAgentSnapshotLine = renderLine;
 export const captureAgentAriaSnapshot = async (
   session: AgentFrameSession,
   scope: AgentReadScope,
-  options: { readonly depth?: number | undefined; readonly rootFrameId?: string | undefined } = {}
+  options: {
+    readonly depth?: number | undefined;
+    readonly maxLines?: number | undefined;
+    readonly rootFrameId?: string | undefined;
+  } = {}
 ): Promise<AgentSnapshotCapture> => {
   const inventory = await readAgentFrames(session);
   const { frames } = inventory;
@@ -782,6 +788,7 @@ export const captureAgentAriaSnapshot = async (
     }
 
     const unframed = buildScopedSnapshot({
+      maxLines: options.maxLines,
       ownerFrameByBackendNodeId: new Map(),
       readableTrees: new Map(),
       topNodes,
@@ -875,6 +882,7 @@ export const captureAgentAriaSnapshot = async (
   const snapshot = buildScopedSnapshot({
     childSessionFrameIds: new Set(inventory.childSessions.keys()),
     depth: options.depth,
+    maxLines: options.maxLines,
     ownerFrameByBackendNodeId,
     readableTrees,
     topNodes,
@@ -1165,6 +1173,8 @@ export const captureAgentSnapshotView = async (
   scope: AgentReadScope,
   options: {
     readonly depth?: number | undefined;
+    /** See `ScopedSnapshotInput.maxLines`. */
+    readonly maxLines?: number | undefined;
     readonly mergeRefs?: boolean;
     /** The frame a targeted snapshot starts from; defaults to the tab's main frame. */
     readonly rootFrameId?: string | undefined;
@@ -1172,6 +1182,7 @@ export const captureAgentSnapshotView = async (
 ): Promise<AgentSnapshotView> => {
   const capture = await captureAgentAriaSnapshot(session, scope, {
     depth: options.depth,
+    maxLines: options.maxLines,
     ...(options.rootFrameId === undefined ? {} : { rootFrameId: options.rootFrameId }),
   });
   // The hidden-text filter only ever asks about the names these lines print, so the probe checks those and no other text.

@@ -160,6 +160,12 @@ export interface BrowserSnapshotArguments {
   readonly target?: string | undefined;
 }
 
+/** A capture's own options: the tool's arguments plus how many lines the tree walk renders. */
+export interface BrowserSnapshotCaptureOptions extends BrowserSnapshotArguments {
+  /** Lines rendered before the walk stops; defaults to `MAX_BROWSER_TOOL_SNAPSHOT_LINES`. */
+  readonly maxLines?: number | undefined;
+}
+
 export interface BrowserAriaSnapshotCapture {
   readonly lines: readonly BrowserAriaSnapshotLine[];
   readonly refs: readonly BrowserToolRefEntry[];
@@ -276,6 +282,8 @@ export const buildBrowserAriaSnapshot = (
     readonly boxForBackendNodeId?: (backendNodeId: number) => string | undefined;
     readonly depth?: number;
     readonly rootBackendNodeId?: number;
+    /** Lines rendered before the walk stops; a snapshot prints `MAX_BROWSER_TOOL_SNAPSHOT_LINES`, a search reads the whole tree. */
+    readonly maxLines?: number;
   } = {}
 ): BrowserAriaSnapshot => {
   const byId = new Map<string, BrowserAriaNode>();
@@ -317,7 +325,7 @@ export const buildBrowserAriaSnapshot = (
   let truncated = false;
 
   const visit = (node: BrowserAriaNode, depth: number): void => {
-    if (lines.length >= MAX_BROWSER_TOOL_SNAPSHOT_LINES) {
+    if (lines.length >= (options.maxLines ?? MAX_BROWSER_TOOL_SNAPSHOT_LINES)) {
       truncated = true;
 
       return;
@@ -671,7 +679,7 @@ const resolveTargetSelector = async (
  */
 const captureAxTreeSnapshot = async (
   session: BrowserToolPageSession,
-  options: BrowserSnapshotArguments,
+  options: BrowserSnapshotCaptureOptions,
   rootBackendNodeId: number | undefined
 ): Promise<BrowserAriaSnapshot | undefined> => {
   try {
@@ -687,6 +695,7 @@ const captureAxTreeSnapshot = async (
     const treeOptions = {
       ...(options.depth === undefined ? {} : { depth: options.depth }),
       ...(rootBackendNodeId === undefined ? {} : { rootBackendNodeId }),
+      ...(options.maxLines === undefined ? {} : { maxLines: options.maxLines }),
     };
     const initial = buildBrowserAriaSnapshot(nodes, treeOptions);
 
@@ -723,7 +732,7 @@ const captureAxTreeSnapshot = async (
  */
 export const captureBrowserAriaSnapshot = async (
   session: BrowserToolPageSession,
-  options: BrowserSnapshotArguments
+  options: BrowserSnapshotCaptureOptions
 ): Promise<BrowserAriaSnapshotCapture> => {
   const rootBackendNodeId =
     options.target === undefined || options.target === ''

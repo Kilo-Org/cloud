@@ -15,7 +15,7 @@ import {
 import type {
   BrowserAriaSnapshotCapture,
   BrowserAriaSnapshotLine,
-  BrowserSnapshotArguments,
+  BrowserSnapshotCaptureOptions,
   BrowserToolPageSession,
 } from './browser-tool-snapshot';
 import { ambiguousSelectorError } from './browser-agent-checks';
@@ -611,7 +611,7 @@ const snapshotRootFrameId = async (
 
 const captureScopedSnapshot = async (
   deps: BrowserReadActionDeps,
-  options: BrowserSnapshotArguments
+  options: BrowserSnapshotCaptureOptions
 ): Promise<BrowserAriaSnapshotCapture> => {
   if (deps.agentScope === undefined) {
     return captureBrowserAriaSnapshot(deps.session, options);
@@ -623,6 +623,7 @@ const captureScopedSnapshot = async (
 
   return captureAgentSnapshotView(deps.session, deps.agentScope, {
     ...(options.depth === undefined ? {} : { depth: options.depth }),
+    ...(options.maxLines === undefined ? {} : { maxLines: options.maxLines }),
     mergeRefs: target !== '',
     ...(rootFrameId === undefined ? {} : { rootFrameId }),
   });
@@ -840,7 +841,8 @@ const browserFindHandler: BrowserReadActionHandler = async (arguments_, deps) =>
     );
   }
 
-  const capture = await captureScopedSnapshot(deps, {});
+  // A search reads the whole tree, not only the lines one snapshot prints: a match past them still needs its ref.
+  const capture = await captureScopedSnapshot(deps, { maxLines: Number.POSITIVE_INFINITY });
   const matches: number[] = [];
 
   for (const [index, line] of capture.lines.entries()) {

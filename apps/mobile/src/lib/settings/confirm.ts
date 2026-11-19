@@ -209,9 +209,12 @@ const GUARDED_CHANGES = [
 /**
  * The dialog body to show before writing this change, or nothing when the
  * change does not need one. Value-triggered: only the guarded direction of a
- * guarded setting returns a summary. The body opens with the setting's name and
- * the value it would take — the same opening the destructive list uses — so the
- * dialog always says exactly what is being asked.
+ * guarded setting returns a summary.
+ *
+ * The body is the reader's own language throughout: the translated sentence
+ * carries the ask, and the setting name and value follow as the same
+ * `name = value` tokens the tool call used, so a reader can match the sheet to
+ * the change without an English sentence inside translated copy.
  */
 export function guardedChangeSummary(name: string, value: unknown): string | undefined {
   const guarded = GUARDED_CHANGES.find(change => change.name === name);
@@ -222,8 +225,7 @@ export function guardedChangeSummary(name: string, value: unknown): string | und
   if (value !== guardedValue) {
     return undefined;
   }
-  const ask = `Change "${name}" to ${String(value)}.`;
-  return `${ask} ${i18n.t(guarded.summaryKey)}`;
+  return `${i18n.t(guarded.summaryKey)} (${name} = ${String(value)})`;
 }
 
 /**

@@ -2,8 +2,9 @@
 // does not cover: the Gateways segment exists only while the settings read
 // reports gateways available, like the web page's Advanced policies tab, so an
 // unavailable organization loses the tab instead of landing on an empty one;
-// and a lapsed plan names itself in a warning banner instead of the role
-// rule. The sibling suite owns the save contract and keeps this harness small.
+// and a lapsed plan names itself once, through the shared organization plan
+// refusal, instead of the role rule. The sibling suite owns the save contract
+// and keeps this harness small.
 
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -20,9 +21,10 @@ const saved = vi.hoisted(() => ({ mutateAsync: vi.fn<(input: unknown) => Promise
 vi.mock('@/lib/hooks/use-org-settings-queries', () => ({
   useSaveOrgModelAccess: () => ({ mutateAsync: saved.mutateAsync, isPending: false }),
 }));
-vi.mock('@/components/ui/icons', () => ({ AlertTriangle: 'AlertTriangle' }));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ warn: '#956011' }),
+// The form hands the plan state to the shared refusal and owns nothing about
+// its paint: the primitive's own suite proves the mark, the tint and the ink.
+vi.mock('@/components/organization/plan-refusal', () => ({
+  OrganizationPlanRefusal: 'OrganizationPlanRefusal',
 }));
 
 vi.mock('react-native', () => ({ View: 'View' }));
@@ -144,6 +146,11 @@ function gatewaySections(root: ReactTestInstance) {
   return root.findAllByType('GatewaySettingsSection' as never);
 }
 
+/** The shared plan refusal the form renders, which owns the sentence's paint. */
+function refusals(root: ReactTestInstance) {
+  return root.findAllByType('OrganizationPlanRefusal' as never);
+}
+
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
@@ -207,77 +214,61 @@ describe('ModelAccessForm gateways tab', () => {
 
 describe('ModelAccessForm read-only notice', () => {
   it('names the lapsed plan instead of the role for a member', () => {
-    const copy = renderedCopy(render({ canEdit: false, planEnded: true }));
+    const root = render({ canEdit: false, planEnded: true });
 
-    expect(copy).toContain(appI18n.t('common.organizationTrialEnded'));
-    expect(copy).not.toContain(appI18n.t('organizationModelAccess.readOnly'));
+    expect(refusals(root)).toHaveLength(1);
+    expect(renderedCopy(root)).not.toContain(appI18n.t('organizationModelAccess.readOnly'));
   });
 
   it('keeps the role sentence for a member on an active plan', () => {
-    const copy = renderedCopy(render({ canEdit: false, planEnded: false }));
+    const root = render({ canEdit: false, planEnded: false });
 
-    expect(copy).toContain(appI18n.t('organizationModelAccess.readOnly'));
-    expect(copy).not.toContain(appI18n.t('common.organizationTrialEnded'));
+    expect(renderedCopy(root)).toContain(appI18n.t('organizationModelAccess.readOnly'));
+    expect(refusals(root)).toHaveLength(0);
   });
 
   it('shows the lapsed plan to an admin too', () => {
-    const copy = renderedCopy(render({ canEdit: true, planEnded: true }));
+    const root = render({ canEdit: true, planEnded: true });
 
-    expect(copy).toContain(appI18n.t('common.organizationTrialEnded'));
-    expect(copy).not.toContain(appI18n.t('organizationModelAccess.readOnly'));
+    expect(refusals(root)).toHaveLength(1);
+    expect(renderedCopy(root)).not.toContain(appI18n.t('organizationModelAccess.readOnly'));
   });
 
   it('shows no notice to an admin on an active plan', () => {
-    const copy = renderedCopy(render({ canEdit: true, planEnded: false }));
+    const root = render({ canEdit: true, planEnded: false });
 
-    expect(copy).not.toContain(appI18n.t('common.organizationTrialEnded'));
-    expect(copy).not.toContain(appI18n.t('organizationModelAccess.readOnly'));
+    expect(refusals(root)).toHaveLength(0);
+    expect(renderedCopy(root)).not.toContain(appI18n.t('organizationModelAccess.readOnly'));
   });
 });
 
 describe('ModelAccessForm lapsed-plan controls', () => {
-  it('paints the plan-ended sentence as a warning banner under the segments', () => {
+  it('hands the shared refusal the plan-ended sentence once, under the segments', () => {
     const root = render({ canEdit: true, planEnded: true });
-    const copy = appI18n.t('common.organizationTrialEnded');
+    const found = refusals(root);
 
-    // The banner is one mark and the sentence; the sentence is body-sized
-    // warning ink rather than the helper-sized muted caption it replaced.
-    expect(root.findAllByType('AlertTriangle' as never)).toHaveLength(1);
-    const sentence = root.findAllByType('Text' as never).find(node => node.props.children === copy);
-    if (!sentence) {
-      throw new Error('the plan-ended sentence is missing');
+    expect(found).toHaveLength(1);
+    const refusal = found.at(0);
+    if (!refusal) {
+      throw new Error('the plan refusal is missing');
     }
-    let banner = sentence.parent;
-    while (banner !== null && !String(banner.props.className ?? '').includes('bg-warn-tile-bg')) {
-      banner = banner.parent;
-    }
-    if (banner === null) {
-      throw new Error('the plan-ended sentence is outside a tinted banner');
-    }
-    expect(String(banner.props.className)).toContain('border-warn-tile-border');
-    expect(banner.findAllByType('AlertTriangle' as never)).toHaveLength(1);
-    expect(String(sentence.props.className)).toContain('text-sm');
-    expect(String(sentence.props.className)).toContain('text-warn');
+    expect(refusal.props.message).toBe(appI18n.t('common.organizationTrialEnded'));
+
+    // The block sits directly under the segments, above the role caption slot
+    // the plan state replaces.
+    const control = root.findByType('SegmentedControl' as never);
+    const siblings = refusal.parent?.children ?? [];
+    expect(siblings.indexOf(control)).toBeLessThan(siblings.indexOf(refusal));
+
+    // The plan state is the refusal's sentence, not a save failure.
+    expect(root.findByType('AccessibleStatus' as never).props.message).toBeNull();
   });
 
-  it('keeps the role caption and no banner for a member on an active plan', () => {
+  it('keeps the role caption and no refusal for a member on an active plan', () => {
     const root = render({ canEdit: false, planEnded: false });
 
     expect(renderedCopy(root)).toContain(appI18n.t('organizationModelAccess.readOnly'));
-    expect(root.findAllByType('AlertTriangle' as never)).toHaveLength(0);
-    expect(
-      root.findAll(node => String(node.props.className ?? '').includes('bg-warn-tile-bg'))
-    ).toHaveLength(0);
-  });
-
-  it('paints the plan-ended sentence once, in the notice under the segments', () => {
-    const root = render({ canEdit: true, planEnded: true });
-    const copy = renderedCopy(root);
-
-    expect(copy.filter(text => text === appI18n.t('common.organizationTrialEnded'))).toHaveLength(
-      1
-    );
-    expect(root.findByType('AccessibleStatus' as never).props.message).toBeNull();
+    expect(refusals(root)).toHaveLength(0);
   });
 
   it('disables save and the lists while the plan lapsed, even with edits', () => {

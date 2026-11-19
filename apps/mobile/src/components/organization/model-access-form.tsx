@@ -5,10 +5,10 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { ModelDenyList, ProviderAllowList } from '@/components/organization/model-access-lists';
+import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { GatewaySettingsSection } from '@/components/organization/providers-gateways-section';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle } from '@/components/ui/icons';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import {
@@ -16,7 +16,6 @@ import {
   useSaveOrgModelAccess,
 } from '@/lib/hooks/use-org-settings-queries';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   type AvailableModel,
   type CatalogModel,
@@ -155,7 +154,6 @@ export function ModelAccessForm({
   onRetryGateway: () => void;
 }>) {
   const { t } = useTranslation();
-  const colors = useThemeColors();
   const save = useSaveOrgModelAccess(organizationId);
   const { feedback, begin, clearWhere } = useSurfaceFeedback<SettingsSaveFailure>();
   const [tab, setTab] = useState<Tab>('models');
@@ -308,17 +306,12 @@ export function ModelAccessForm({
           onChange={setTab}
           accessibilityLabel={t('organization.settingsOnWeb.providersAndModels')}
         />
-        {/* The lapsed plan blocks every edit on this screen, so its sentence is
-            a warning banner rather than helper-sized muted copy: the mark and
-            the tint separate it from the helper caption under it, and from the
-            segments' labels just above it. */}
+        {/* The lapsed plan blocks every edit on this screen, so the block under
+            the segments names that state, its cause and who can end it: the
+            shared organization plan refusal, as the hub, the billing screen and
+            the new-session form paint it. */}
         {planEnded ? (
-          <View className="flex-row items-start gap-2 rounded-xl border border-warn-tile-border bg-warn-tile-bg px-3 py-2">
-            <AlertTriangle size={16} color={colors.warn} />
-            <Text className="min-w-0 flex-1 text-sm text-warn">
-              {t('common.organizationTrialEnded')}
-            </Text>
-          </View>
+          <OrganizationPlanRefusal message={t('common.organizationTrialEnded')} />
         ) : null}
         {!canEdit && !planEnded ? (
           <Text className="text-xs text-muted-foreground">

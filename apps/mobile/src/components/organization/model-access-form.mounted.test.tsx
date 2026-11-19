@@ -26,12 +26,11 @@ const saved = vi.hoisted(() => ({ mutateAsync: vi.fn<(input: unknown) => Promise
 vi.mock('@/lib/hooks/use-org-settings-queries', () => ({
   useSaveOrgModelAccess: () => ({ mutateAsync: saved.mutateAsync, isPending: false }),
 }));
-// The form paints the lapsed-plan banner's mark from the icon barrel, whose
-// lucide modules reach react-native-svg's untranspiled entry: no Node-side test
-// project can import it, so the mark is a host stub, as in the sibling suite.
-vi.mock('@/components/ui/icons', () => ({ AlertTriangle: 'AlertTriangle' }));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ warn: '#956011' }),
+// The form hands the lapsed-plan state to the shared refusal, which owns the
+// mark, the tint and the ink: the primitive's own suite proves its paint, so
+// this harness only needs the host node.
+vi.mock('@/components/organization/plan-refusal', () => ({
+  OrganizationPlanRefusal: 'OrganizationPlanRefusal',
 }));
 
 vi.mock('react-native', () => ({ View: 'View' }));

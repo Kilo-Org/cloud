@@ -15,6 +15,7 @@ const FIXTURE_DISPLAY_SCOPE = { organizationId: null, isResolved: true };
 /** The state a link may ask for; anything else is the plain idle screen. */
 const FIXTURE_STATES = {
   'pending-permission': 'pending-permission',
+  'permission-failed': 'permission-failed',
   running: 'running',
 } satisfies Record<string, AgentChatFixtureState>;
 
@@ -27,8 +28,12 @@ const FIXTURE_STATES = {
  *
  * `?state=pending-permission` holds the same screen behind a bash ask: the
  * transcript stops at the command the ask blocks, and the row above the card
- * reports the wait. `?state=running` answers that ask, so the row reports the
- * work instead — the state the wait returns to.
+ * reports the wait. `?state=permission-failed` holds that pending screen too,
+ * but the first answer to the ask fails like a transient transport error, so
+ * the card shows its retryable failure branch — the failure banner and Retry
+ * replacing Deny/Allow — and a later answer, the Retry tap, succeeds.
+ * `?state=running` answers that ask, so the row reports the work instead — the
+ * state the wait returns to.
  *
  * The development fixture path in `src/app/+native-intent.tsx` maps to it, and a
  * release build refuses the path outright so the fixture is never reachable.

@@ -15,7 +15,7 @@ import {
 import {
   MAX_ENCRYPTED_DATA_LENGTH,
   MAX_ENCRYPTED_DEK_LENGTH,
-  MAX_MCP_SERVERS_SERIALIZED_BYTES,
+  MAX_MCP_PLAINTEXT_BYTES,
 } from '../shared/prepare-session-limits.js';
 import type { MCPServerConfig } from './types.js';
 
@@ -1216,24 +1216,7 @@ describe('prepareSession config caps', () => {
     ).toBe(false);
   });
 
-  it('caps the serialized MCP server map at the encrypted-value input budget', () => {
-    const maxEnvelope = {
-      encryptedData: 'x'.repeat(MAX_ENCRYPTED_DATA_LENGTH),
-      encryptedDEK: 'x'.repeat(MAX_ENCRYPTED_DEK_LENGTH),
-      algorithm: 'rsa-aes-256-gcm' as const,
-      version: 1 as const,
-    };
-    const recordWith = (count: number): Record<string, MCPServerConfig> => ({
-      local: {
-        type: 'local',
-        command: ['node'],
-        environment: Object.fromEntries(
-          Array.from({ length: count }, (_, index) => [`KEY_${index}`, maxEnvelope])
-        ),
-      },
-    });
-    const serializedBytes = (servers: Record<string, MCPServerConfig>) =>
-      new TextEncoder().encode(JSON.stringify(servers)).byteLength;
+  it('caps the MCP secret plaintext at the attach-schema budget', () => {
     const metadataWith = (mcpServers: Record<string, MCPServerConfig>) => ({
       version: 1,
       sessionId: 'session123',
@@ -1242,14 +1225,20 @@ describe('prepareSession config caps', () => {
       timestamp: Date.now(),
       mcpServers,
     });
-
-    let fits = 0;
-    while (serializedBytes(recordWith(fits + 1)) <= MAX_MCP_SERVERS_SERIALIZED_BYTES) fits += 1;
-    // The entry-count cap is not what bounds this record, so the budget is under test.
-    expect(fits).toBeLessThan(50);
-    expect(serializedBytes(recordWith(fits))).toBeLessThanOrEqual(MAX_MCP_SERVERS_SERIALIZED_BYTES);
-    expect(serializedBytes(recordWith(fits + 1))).toBeGreaterThan(MAX_MCP_SERVERS_SERIALIZED_BYTES);
-    expect(MetadataSchema.safeParse(metadataWith(recordWith(fits))).success).toBe(true);
-    expect(MetadataSchema.safeParse(metadataWith(recordWith(fits + 1))).success).toBe(false);
+    // A plain value is capped at 4096 characters, so this count fills the
+    // plaintext budget exactly and one more value exceeds it.
+    const perValue = 'x'.repeat(4096);
+    const recordWith = (count: number): Record<string, MCPServerConfig> => ({
+      local: {
+        type: 'local',
+        command: ['node'],
+        environment: Object.fromEntries(
+          Array.from({ length: count }, (_, index) => [`KEY_${index}`, perValue])
+        ),
+      },
+    });
+    const atCap = MAX_MCP_PLAINTEXT_BYTES / perValue.length;
+    expect(MetadataSchema.safeParse(metadataWith(recordWith(atCap))).success).toBe(true);
+    expect(MetadataSchema.safeParse(metadataWith(recordWith(atCap + 1))).success).toBe(false);
   });
 });

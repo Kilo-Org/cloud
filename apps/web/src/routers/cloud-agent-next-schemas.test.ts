@@ -29,11 +29,7 @@ import {
   baseCreatePreviewNextSchema,
   basePreviewOptionsNextSchema,
 } from './cloud-agent-next-schemas';
-import {
-  MAX_ENCRYPTED_DATA_LENGTH,
-  MAX_ENCRYPTED_DEK_LENGTH,
-  MAX_MCP_SERVERS_SERIALIZED_BYTES,
-} from '@cloud-agent-shared/prepare-session-limits';
+import { MAX_MCP_PLAINTEXT_BYTES } from '@cloud-agent-shared/prepare-session-limits';
 
 const MESSAGE_UUID = '12345678-1234-4234-9234-123456789abc';
 const ATTACHMENT_ID = '87654321-4321-4321-8321-cba987654321';
@@ -1344,33 +1340,15 @@ describe('basePrepareSessionNextSchema config caps', () => {
     expect(accepts(withRemoteServer({ headers: { '': 'value' } }))).toBe(false);
   });
 
-  it('caps the serialized MCP server map at the encrypted-value input budget', () => {
-    const maxEnvelope = {
-      encryptedData: 'x'.repeat(MAX_ENCRYPTED_DATA_LENGTH),
-      encryptedDEK: 'x'.repeat(MAX_ENCRYPTED_DEK_LENGTH),
-      algorithm: 'rsa-aes-256-gcm',
-      version: 1,
-    };
-    const serversOf = (count: number) => ({
-      local: {
-        type: 'local',
-        command: ['node'],
-        environment: Object.fromEntries(
-          Array.from({ length: count }, (_, index) => [`KEY_${index}`, maxEnvelope])
-        ),
-      },
-    });
-    const serializedBytes = (servers: Record<string, unknown>) =>
-      new TextEncoder().encode(JSON.stringify(servers)).byteLength;
-
-    let fits = 0;
-    while (serializedBytes(serversOf(fits + 1)) <= MAX_MCP_SERVERS_SERIALIZED_BYTES) fits += 1;
-    // The entry-count cap is not what bounds this record, so the budget is under test.
-    expect(fits).toBeLessThan(50);
-    expect(serializedBytes(serversOf(fits))).toBeLessThanOrEqual(MAX_MCP_SERVERS_SERIALIZED_BYTES);
-    expect(serializedBytes(serversOf(fits + 1))).toBeGreaterThan(MAX_MCP_SERVERS_SERIALIZED_BYTES);
-    expect(accepts({ mcpServers: serversOf(fits) })).toBe(true);
-    expect(accepts({ mcpServers: serversOf(fits + 1) })).toBe(false);
+  it('caps the MCP secret plaintext and the submitted size', () => {
+    const envWith = (count: number, value: string) =>
+      Object.fromEntries(Array.from({ length: count }, (_, index) => [`KEY_${index}`, value]));
+    // A plain value is capped at 4096 characters, so this count fills the
+    // plaintext budget exactly and one more value exceeds it.
+    const perValue = 'x'.repeat(4096);
+    const atCap = MAX_MCP_PLAINTEXT_BYTES / perValue.length;
+    expect(accepts(withLocalServer({ environment: envWith(atCap, perValue) }))).toBe(true);
+    expect(accepts(withLocalServer({ environment: envWith(atCap + 1, perValue) }))).toBe(false);
   });
 
   it('caps encrypted envelope strings', () => {

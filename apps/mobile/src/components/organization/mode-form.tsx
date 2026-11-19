@@ -1,3 +1,4 @@
+import { MODE_SLUG_MAX_LENGTH, modeSlugFromName } from '@kilocode/app-shared/organizations';
 import { type Href, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -6,10 +7,8 @@ import { View } from 'react-native';
 import {
   isOrgModeFormDirty,
   MODE_TOOL_GROUPS,
-  modeSlugFromName,
   type ModeToolGroup,
   ORG_MODE_NAME_MAX_LENGTH,
-  ORG_MODE_SLUG_MAX_LENGTH,
   type OrgMode,
   orgModeConfigInput,
   type OrgModeFormErrorCode,
@@ -30,6 +29,7 @@ import { ModeToolsFields } from '@/components/organization/mode-tools-fields';
 import { Text } from '@/components/ui/text';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 import { useOrgModeMutations } from '@/lib/hooks/use-org-modes-queries';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { usePopOnce } from '@/lib/navigation/pop-once';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 
@@ -195,7 +195,7 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
       <TabScreenScrollView
         ref={scrollRef}
         className="flex-1"
-        contentContainerClassName="gap-5 px-6 pb-10 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
@@ -225,7 +225,7 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
             label={t('organization.modes.identifierLabel')}
             required
             defaultValue={values.slug}
-            maxLength={ORG_MODE_SLUG_MAX_LENGTH}
+            maxLength={MODE_SLUG_MAX_LENGTH}
             autoCapitalize="none"
             autoCorrect={false}
             disabled={busy}
@@ -241,7 +241,7 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
               }
             }}
           />
-          <Text variant="muted" className="text-xs">
+          <Text variant="caption">
             {suggestion.length === 0
               ? t('organization.modes.identifierHint')
               : `${suggestion} · ${t('organization.modes.identifierHint')}`}

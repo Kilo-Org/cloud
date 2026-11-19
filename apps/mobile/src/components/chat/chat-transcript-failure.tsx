@@ -2,9 +2,8 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { QueryError } from '@/components/query-error';
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { StateAction } from '@/components/empty-state';
+import { ArrowLeft, RotateCcw } from '@/components/ui/icons';
 import { CHAT_UNAVAILABLE_KEY } from '@/lib/chat/state';
 
 type ChatTranscriptFailureProps = Readonly<{
@@ -61,16 +60,12 @@ export function ChatTranscriptFailure({
       action={
         <View className="flex-row flex-wrap items-center justify-center gap-3">
           {retryable ? (
-            <Button variant="outline" className={STATE_ACTION_CLASS} onPress={onRetry}>
-              <Text>{t('common.retry')}</Text>
-            </Button>
+            <StateAction label={t('common.retry')} icon={RotateCcw} onPress={onRetry} />
           ) : null}
           {/* Back is the only way out of the terminal state, so it carries a
               control shape like the shared error states' action instead of
               reading as a caption under the description. */}
-          <Button variant="outline" className={STATE_ACTION_CLASS} onPress={onBack}>
-            <Text>{t('common.back')}</Text>
-          </Button>
+          <StateAction label={t('common.back')} icon={ArrowLeft} onPress={onBack} />
         </View>
       }
     />

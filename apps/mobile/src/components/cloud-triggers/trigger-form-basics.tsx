@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { RepoPickerSheet } from '@/components/profiles/repo-picker-sheet';
+import { FieldSelect } from '@/components/ui/field-select';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -26,8 +27,6 @@ import {
 import { useTouchedProblems } from '@/lib/cloud-triggers/use-touched-problems';
 import { useTriggerRepositories } from '@/lib/cloud-triggers/use-trigger-options';
 import { ltrValueTextStyle } from '@/lib/rtl-text';
-
-import { TriggerSelectRow } from './trigger-form-rows';
 
 const ACTIVATION_OPTIONS = [
   { value: 'webhook' as const, labelKey: 'cloudAgent.triggers.activationWebhook' },
@@ -57,6 +56,9 @@ export function TriggerFormBasics({
   const repositories = useTriggerRepositories(organizationId, repositoryPickerOpen);
   const isScheduled = draft.activation === 'scheduled';
   const { markTouched, shownProblem } = useTouchedProblems(problems);
+  const repositoryError = triggerProblemText(shownProblem('repository'));
+  const repositoryValue =
+    draft.repository.length === 0 ? t('cloudAgent.triggers.notSelected') : draft.repository;
   const activate = (activation: TriggerActivation) => {
     // A prompt still on the other activation's default follows the choice, so a
     // scheduled trigger does not start out describing a webhook body.
@@ -90,9 +92,7 @@ export function TriggerFormBasics({
         <View className="gap-1">
           <FormFieldLabel label={t('cloudAgent.triggers.fieldName')} />
           <Text variant="mono">{draft.name}</Text>
-          <Text variant="muted" className="text-xs">
-            {t('cloudAgent.triggers.nameLocked')}
-          </Text>
+          <Text variant="caption">{t('cloudAgent.triggers.nameLocked')}</Text>
         </View>
       )}
 
@@ -140,9 +140,7 @@ export function TriggerFormBasics({
             placeholder={TRIGGER_FIELD_EXAMPLES.cron}
             style={ltrValueTextStyle()}
           />
-          <Text variant="muted" className="text-xs">
-            {t('cloudAgent.triggers.fieldCronHelp')}
-          </Text>
+          <Text variant="caption">{t('cloudAgent.triggers.fieldCronHelp')}</Text>
           <FormField
             label={t('cloudAgent.triggers.fieldTimezone')}
             defaultValue={draft.timezone}
@@ -157,33 +155,24 @@ export function TriggerFormBasics({
         </View>
       )}
 
-      <View className="gap-1">
+      <View className="gap-2">
         {mode === 'create' ? (
-          <>
-            <TriggerSelectRow
-              label={t('common.repository')}
-              value={
-                draft.repository.length === 0
-                  ? t('cloudAgent.triggers.notSelected')
-                  : draft.repository
-              }
-              onPress={() => {
-                markTouched('repository');
-                onRepositoryPickerOpenChange(true);
-              }}
-              error={triggerProblemText(shownProblem('repository'))}
-            />
-            <Text variant="muted" className="text-xs">
-              {t('cloudAgent.triggers.repositoryLocked')}
-            </Text>
-          </>
+          <FieldSelect
+            label={t('common.repository')}
+            value={repositoryValue}
+            placeholder={draft.repository.length === 0}
+            onPress={() => {
+              markTouched('repository');
+              onRepositoryPickerOpenChange(true);
+            }}
+            error={repositoryError}
+            caption={t('cloudAgent.triggers.repositoryLocked')}
+          />
         ) : (
           <>
             <FormFieldLabel label={t('common.repository')} />
             <Text variant="mono">{draft.repository}</Text>
-            <Text variant="muted" className="text-xs">
-              {t('cloudAgent.triggers.repositoryLocked')}
-            </Text>
+            <Text variant="caption">{t('cloudAgent.triggers.repositoryLocked')}</Text>
           </>
         )}
       </View>

@@ -6,19 +6,20 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View, type ViewStyle } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
-import { CenteredState } from '@/components/centered-state';
 import { ReviewMemoryAnalyzeSection } from '@/components/code-reviewer/review-memory-analyze-section';
 import { ReviewMemoryProposalSheet } from '@/components/code-reviewer/review-memory-proposal-sheet';
 import { ReviewMemoryToggleCard } from '@/components/code-reviewer/review-memory-toggle-card';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
-import { Brain } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Brain, Sparkles } from '@/components/ui/icons';
+import { RowChevron } from '@/components/ui/row-chevron';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useReviewerPermission, useSetReviewMemoryEnabled } from '@/lib/hooks/use-code-reviewer';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
@@ -32,6 +33,7 @@ import {
 } from '@/lib/review-memory-proposals';
 import { useTRPC } from '@/lib/trpc';
 import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
+import { cn } from '@/lib/utils';
 
 const PAGE_SIZE = 20;
 
@@ -96,7 +98,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
   let footer = null;
   if (laterPageError) {
     footer = (
-      <View className="items-center gap-2 px-6 py-4">
+      <View className="items-center gap-2 px-4 py-4">
         <Text variant="muted" className="text-center text-xs">
           {t('common.couldnTLoadMore')}
         </Text>
@@ -128,11 +130,14 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
             ? 'codeReviewer.reviewMemory.loading'
             : 'codeReviewer.reviewMemory.loadingProposals'
         )}
-        className="gap-3 px-6 pt-4"
+        className="flex-1"
       >
-        <Skeleton className="h-20 w-full rounded-lg" />
-        <Skeleton className="h-20 w-full rounded-lg" />
-        <Skeleton className="h-20 w-full rounded-lg" />
+        {/* The proposals list is the body's own content: flat full-bleed rows,
+            so the placeholder holds that shape (the row frame draws the page
+            gutter) instead of a card the loaded state never paints. */}
+        <RowSkeleton subtitle />
+        <RowSkeleton subtitle />
+        <RowSkeleton subtitle />
       </View>
     );
   } else if (summaryError) {
@@ -148,31 +153,29 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
     );
   } else if (disabled) {
     body = (
-      <CenteredState>
-        <View className="items-center gap-3 px-6">
-          <Text className="text-center text-sm font-medium">
-            {t('codeReviewer.reviewMemory.off')}
-          </Text>
-          <Text variant="muted" className="text-center text-xs">
-            {t('codeReviewer.reviewMemory.offDescription')}
-          </Text>
-          {readOnly ? (
-            <Text variant="muted" className="text-center text-xs">
+      <EmptyState
+        icon={Brain}
+        title={t('codeReviewer.reviewMemory.off')}
+        description={t('codeReviewer.reviewMemory.offDescription')}
+        action={
+          readOnly ? (
+            // This reader has no press to make, so the sentence that names who
+            // does takes the action's slot.
+            <Text variant="muted" className="text-center">
               {t('codeReviewer.reviewMemory.readOnlyDescription')}
             </Text>
           ) : (
-            <Button
+            <StateAction
+              label={t('codeReviewer.reviewMemory.enable')}
+              icon={Sparkles}
+              loading={setEnabled.isPending}
               onPress={() => {
                 setEnabled.mutate(true);
               }}
-              loading={setEnabled.isPending}
-              accessibilityLabel={t('codeReviewer.reviewMemory.enable')}
-            >
-              <Text>{t('codeReviewer.reviewMemory.enable')}</Text>
-            </Button>
-          )}
-        </View>
-      </CenteredState>
+            />
+          )
+        }
+      />
     );
   } else if (firstPageError) {
     body = (
@@ -204,9 +207,12 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
         data={proposals}
         style={listStyle}
         keyExtractor={proposal => proposal.id}
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <Pressable
-            className="min-h-11 border-b-[0.5px] border-hair-soft px-6 py-3 active:opacity-70"
+            className={cn(
+              'flex-row items-center gap-3 px-4 py-3 active:opacity-70',
+              index < proposals.length - 1 && 'border-b-[0.5px] border-hair-soft'
+            )}
             accessibilityRole="button"
             accessibilityLabel={[
               item.title,
@@ -217,15 +223,18 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
               setSelectedProposal(item);
             }}
           >
-            <Text className="text-sm font-medium" numberOfLines={1}>
-              {item.title}
-            </Text>
-            <Text variant="muted" className="mt-0.5 text-xs">
-              {item.repo_full_name}
-            </Text>
-            <Text variant="muted" className="mt-1 text-xs">
-              {proposalStatusLabel(item.status, t)}
-            </Text>
+            <View className="min-w-0 flex-1">
+              <Text className="text-sm font-medium" numberOfLines={1}>
+                {item.title}
+              </Text>
+              <Text variant="muted" className="mt-0.5 text-xs">
+                {item.repo_full_name}
+              </Text>
+              <Text variant="muted" className="mt-1 text-xs">
+                {proposalStatusLabel(item.status, t)}
+              </Text>
+            </View>
+            <RowChevron />
           </Pressable>
         )}
         ListFooterComponent={
@@ -251,7 +260,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
         eyebrow={t('common.codeReviewer')}
       />
       {enabled ? (
-        <View className="gap-3 px-6 pt-4">
+        <View className={SCREEN_BODY_CLASS}>
           <ReviewMemoryToggleCard
             enabled={enabled}
             readOnly={readOnly}

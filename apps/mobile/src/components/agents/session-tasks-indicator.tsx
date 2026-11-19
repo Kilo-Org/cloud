@@ -1,9 +1,10 @@
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { ListTodo } from '@/components/ui/icons';
+import { RowChevron } from '@/components/ui/row-chevron';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -50,7 +51,7 @@ export function SessionTasksChip({ summary }: Readonly<SessionTasksIndicatorProp
 /**
  * One-line task row under the session header, for a session without a goal:
  * the progress count, then the current task. The whole row is one target at
- * the 44pt touch minimum.
+ * the 48pt row minimum, full-bleed at the page gutter with a hairline.
  */
 export function SessionTasksRow({ summary }: Readonly<SessionTasksIndicatorProps>) {
   const openPartDetail = useOpenPartDetail();
@@ -67,7 +68,10 @@ export function SessionTasksRow({ summary }: Readonly<SessionTasksIndicatorProps
         ...counts,
         task: summary.current.content,
       })}
-      className="min-h-[44px] flex-row items-center gap-2 border-b border-hair-soft px-4 active:opacity-70"
+      className={cn(
+        ROW_TARGET_CLASS,
+        'flex-row items-center gap-2 border-b-[0.5px] border-hair-soft px-4 active:opacity-70'
+      )}
     >
       <ListTodo size={14} color={colors.primary} />
       <Text className="text-xs font-semibold tabular-nums text-primary">
@@ -82,7 +86,7 @@ export function SessionTasksRow({ summary }: Readonly<SessionTasksIndicatorProps
       >
         {summary.current.content}
       </Text>
-      <DirectionalChevronRight size={16} color={colors.mutedForeground} />
+      <RowChevron />
     </Pressable>
   );
 }

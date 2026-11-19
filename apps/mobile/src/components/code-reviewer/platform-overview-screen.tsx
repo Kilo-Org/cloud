@@ -1,12 +1,10 @@
 /* eslint-disable max-lines -- One reviewer overview: each read state (loading, connect, error, ready) returns its own surface, and the ready branch's row config is the picker call plus the toggle wiring. */
-import { selectionHaptic } from '@/lib/haptics';
 import { type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
-import { CenteredState } from '@/components/centered-state';
 import { openModelPicker } from '@/components/agents/model-selector';
 import { ActionRequiredBanner } from '@/components/code-reviewer/action-required-banner';
 import { BitbucketOverview } from '@/components/code-reviewer/bitbucket-overview';
@@ -15,20 +13,24 @@ import {
   buildOverviewRows,
   resolveRowOnPress,
 } from '@/components/code-reviewer/platform-overview-rows';
-import { ProviderConnectCard } from '@/components/code-reviewer/provider-connect-card';
+import { ProviderConnectState } from '@/components/code-reviewer/provider-connect-state';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { ReviewerErrorScreen } from '@/components/code-reviewer/reviewer-error-screen';
 import { PlatformOverviewSkeleton } from '@/components/code-reviewer/platform-overview-skeleton';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
-import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { Switch } from '@/components/ui/switch';
+import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
+import { Bot, ScrollText } from '@/components/ui/icons';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { canConnectProvider } from '@/lib/code-reviewer-status';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 import { useQueryBodyState } from '@/lib/hooks/use-query-body-state';
@@ -150,22 +152,22 @@ export function PlatformOverviewScreen({
 
   const handleConnected = status.refetch;
   if (!isLoading && !connected) {
-    // The connect card installs the provider's app for the scope, which is a
+    // The connect state installs the provider's app for the scope, which is a
     // narrower capability than editing the reviewer settings (see
-    // `canConnectProvider`): the card must follow the install rule, not `canEdit`.
+    // `canConnectProvider`): the state must follow the install rule, not
+    // `canEdit`.
     const canConnect = canConnectProvider(platform, permission);
     return (
       <View className="flex-1 bg-background">
         <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
-        <CenteredState contentContainerClassName="px-6">
-          {canConnect ? (
-            <ProviderConnectCard scope={scope} platform={platform} onConnected={handleConnected} />
-          ) : (
-            <Text className="text-center text-xs text-muted-foreground">
-              {t(connectNoticeKey(platform), { platform: capabilities.label })}
-            </Text>
-          )}
-        </CenteredState>
+        <ProviderConnectState
+          scope={scope}
+          platform={platform}
+          notice={
+            canConnect ? undefined : t(connectNoticeKey(platform), { platform: capabilities.label })
+          }
+          onConnected={handleConnected}
+        />
       </View>
     );
   }
@@ -225,7 +227,7 @@ export function PlatformOverviewScreen({
   return (
     <View className="flex-1 bg-background">
       <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
-      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
+      <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
         <Animated.View layout={LinearTransition}>
           {/* Every read state paints something: while connectivity is unsettled a
              paused read keeps the skeleton, and a pending read that nothing is
@@ -238,7 +240,7 @@ export function PlatformOverviewScreen({
               className="gap-6"
             >
               {platform === 'gitlab' && hasWebhookSyncWarning && (
-                <View className="flex-row items-center justify-between rounded-lg bg-warn-tile-bg p-4">
+                <View className="flex-row items-center justify-between rounded-xl bg-warn-tile-bg p-4">
                   <View className="flex-1 pe-3">
                     <Text className="text-sm font-medium">{t('codeReviewer.webhookSetup')}</Text>
                     <Text variant="muted" className="text-xs">
@@ -276,7 +278,7 @@ export function PlatformOverviewScreen({
                 />
               )}
 
-              <View className="rounded-lg bg-secondary p-4">
+              <Card>
                 <View className="flex-row items-center justify-between">
                   <View className="flex-1 pe-3">
                     <Text className="text-sm font-medium">{t('codeReviewer.autoReviews')}</Text>
@@ -286,20 +288,19 @@ export function PlatformOverviewScreen({
                       </Text>
                     ) : null}
                   </View>
-                  <Switch
-                    accessibilityLabel={t('codeReviewer.autoReviews')}
-                    value={data.isEnabled}
-                    disabled={
-                      !canEdit || toggle.isPending || (!hasRepoSelection && !data.isEnabled)
-                    }
-                    onValueChange={value => {
-                      selectionHaptic();
+                  {renderRowTrailing({
+                    kind: 'switch',
+                    accessibilityLabel: t('codeReviewer.autoReviews'),
+                    value: data.isEnabled,
+                    disabled:
+                      !canEdit || toggle.isPending || (!hasRepoSelection && !data.isEnabled),
+                    onValueChange: value => {
                       toggle.mutate({ isEnabled: value });
-                    }}
-                  />
+                    },
+                  })}
                 </View>
                 {!hasRepoSelection && (
-                  <View className="mt-3 gap-2 border-t border-hair-soft pt-3">
+                  <View className="gap-2 border-t-[0.5px] border-hair-soft pt-3">
                     <Text variant="muted" className="text-xs">
                       {t('codeReviewer.selectRepository')}
                     </Text>
@@ -315,47 +316,54 @@ export function PlatformOverviewScreen({
                     </Button>
                   </View>
                 )}
-              </View>
+              </Card>
 
-              <View>
-                {rows.map((row, index) => (
+              <RowGroup leadingTile>
+                {rows.map(row => (
                   <ConfigureRow
                     key={row.field}
                     icon={row.icon}
                     title={row.title}
                     subtitle={row.subtitle}
-                    last={index === rows.length - 1}
                     onPress={resolveRowOnPress(row, canEdit, pushField)}
                   />
                 ))}
+              </RowGroup>
+
+              {/* Every platform that reaches this body offers the review-md
+                  setting; the bot-detection row exists on GitHub only, whose
+                  webhooks carry the user type GitLab's do not. */}
+              <View className="gap-3">
+                <RowGroup leadingTile>
+                  <PreferenceRow
+                    icon={ScrollText}
+                    title={t('codeReviewer.followReviewMd')}
+                    subtitle={t('codeReviewer.followReviewMdSubtitle')}
+                    value={!data.disableReviewMd}
+                    disabled={!canEdit || save.isPending}
+                    onValueChange={value => {
+                      save.mutate({ disableReviewMd: !value });
+                    }}
+                  />
+                  {capabilities.skipBotPullRequests && (
+                    <PreferenceRow
+                      icon={Bot}
+                      title={t('codeReviewer.skipBotPullRequests.title')}
+                      value={data.skipBotPullRequests}
+                      disabled={!canEdit || save.isPending}
+                      onValueChange={value => {
+                        save.mutate({ skipBotPullRequests: value });
+                      }}
+                    />
+                  )}
+                </RowGroup>
+                {/* The explanation is the caption the card answers to, so the
+                    bot row keeps its two-line subtitle budget whatever the
+                    width, as Voice input does in Preferences. */}
+                {capabilities.skipBotPullRequests && (
+                  <Text variant="caption">{t('codeReviewer.skipBotPullRequests.subtitle')}</Text>
+                )}
               </View>
-
-              {capabilities.reviewMd && (
-                <ToggleRow
-                  title={t('codeReviewer.followReviewMd')}
-                  subtitle={t('codeReviewer.followReviewMdSubtitle')}
-                  value={!data.disableReviewMd}
-                  disabled={!canEdit || save.isPending}
-                  onValueChange={value => {
-                    save.mutate({ disableReviewMd: !value });
-                  }}
-                />
-              )}
-
-              {/* Bot detection relies on GitHub's authoritative user type, which
-                  GitLab and Bitbucket webhooks do not provide, so this setting
-                  exists on GitHub only (same gate as the web form). */}
-              {capabilities.skipBotPullRequests && (
-                <ToggleRow
-                  title={t('codeReviewer.skipBotPullRequests.title')}
-                  subtitle={t('codeReviewer.skipBotPullRequests.subtitle')}
-                  value={data.skipBotPullRequests}
-                  disabled={!canEdit || save.isPending}
-                  onValueChange={value => {
-                    save.mutate({ skipBotPullRequests: value });
-                  }}
-                />
-              )}
 
               {!canEdit && (
                 <Text className="text-center text-xs text-muted-foreground">

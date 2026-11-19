@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
 
 import {
   addCommand,
@@ -16,14 +15,15 @@ import {
   variableRows,
 } from '@/components/profiles/profile-variables-model';
 import { VariableEditForm, VariableRowView } from '@/components/profiles/profile-variables-rows';
+import { ReorderableItem, ReorderableItemActions } from '@/components/profiles/reorderable-item';
 import { SetupCommandField } from '@/components/profiles/setup-command-field';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronUp, Plus, Trash2 } from '@/components/ui/icons';
+import { Plus } from '@/components/ui/icons';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { MAX_SESSION_ENV_VAR_VALUE_LENGTH } from '@/lib/agent-profile-forms';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { cn } from '@/lib/utils';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 
 type ManualEnvVarsEditorProps = Readonly<{
   vars: readonly VariableEdit[];
@@ -55,41 +55,40 @@ export function ManualEnvVarsEditor({
   };
 
   return (
-    <View className="gap-2">
-      <Text className="text-sm font-medium text-muted-foreground">
-        {t('profiles.variablesTitle')}
-      </Text>
-      {rows.map(row =>
-        row.key === editingKey ? (
-          <VariableEditForm
-            key={editingKey}
-            isNew={false}
-            initial={{ key: row.key, value: row.value, isSecret: row.isSecret }}
-            existingKeys={vars.map(variable => variable.key)}
-            maxValueLength={MAX_SESSION_ENV_VAR_VALUE_LENGTH}
-            isSaving={false}
-            onCancel={() => {
-              setEditingKey(null);
-            }}
-            onSave={saveEdit}
-          />
-        ) : (
-          <VariableRowView
-            key={row.key}
-            row={row}
-            revealed={revealed[row.key] === true}
-            onToggleReveal={() => {
-              setRevealed(current => ({ ...current, [row.key]: current[row.key] !== true }));
-            }}
-            onEdit={() => {
-              setEditingKey(row.key);
-            }}
-            onDelete={() => {
-              onChange(vars.filter(variable => variable.key !== row.key));
-            }}
-          />
-        )
-      )}
+    <Section label={t('profiles.variablesTitle')}>
+      <RowGroup>
+        {rows.map(row =>
+          row.key === editingKey ? (
+            <VariableEditForm
+              key={editingKey}
+              isNew={false}
+              initial={{ key: row.key, value: row.value, isSecret: row.isSecret }}
+              existingKeys={vars.map(variable => variable.key)}
+              maxValueLength={MAX_SESSION_ENV_VAR_VALUE_LENGTH}
+              isSaving={false}
+              onCancel={() => {
+                setEditingKey(null);
+              }}
+              onSave={saveEdit}
+            />
+          ) : (
+            <VariableRowView
+              key={row.key}
+              row={row}
+              revealed={revealed[row.key] === true}
+              onToggleReveal={() => {
+                setRevealed(current => ({ ...current, [row.key]: current[row.key] !== true }));
+              }}
+              onEdit={() => {
+                setEditingKey(row.key);
+              }}
+              onDelete={() => {
+                onChange(vars.filter(variable => variable.key !== row.key));
+              }}
+            />
+          )
+        )}
+      </RowGroup>
       {editingKey === '' ? (
         <VariableEditForm
           isNew
@@ -115,7 +114,7 @@ export function ManualEnvVarsEditor({
           <Text>{t('profiles.addVariable')}</Text>
         </Button>
       )}
-    </View>
+    </Section>
   );
 }
 
@@ -126,9 +125,10 @@ type ManualSetupCommandsEditorProps = Readonly<{
 }>;
 
 /**
- * The manual setup-commands editor: one plain row per command, reorderable
- * with up/down buttons (never drag) and removable. The list order is the order
- * the commands run in.
+ * The manual setup-commands editor: one reorderable item per command, moved
+ * with up/down controls (never drag) and removable. The list order is the
+ * order the commands run in, and the item is the same one setup and slash
+ * commands share everywhere else.
  */
 export function ManualSetupCommandsEditor({
   commands,
@@ -141,81 +141,69 @@ export function ManualSetupCommandsEditor({
   // new order (their text belongs to the position, not the input instance).
   const [generation, setGeneration] = useState(0);
 
-  const controlClass = (controlDisabled: boolean) =>
-    cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70', controlDisabled && 'opacity-40');
-
   return (
-    <View className="gap-2">
-      <Text className="text-sm font-medium text-muted-foreground">
-        {t('profiles.commandsTitle')}
-      </Text>
-      {commands.map((command, index) => {
-        const isFirst = index === 0;
-        const isLast = index === commands.length - 1;
-        // Every row is a command slot, so a blank draft row keeps the position
-        // it occupies in the list and its controls name that command.
-        const position = index + 1;
-        const rowHint = commandRowA11yLabel(index, commands.length);
-        const upLabel = t('profiles.moveCommandUp', { position });
-        const downLabel = t('profiles.moveCommandDown', { position });
-        const deleteLabel = t('profiles.deleteCommand', { position });
-        // The field's label is also its accessible name, so it carries the same
-        // position the row's move and delete controls announce.
-        const commandLabel = t('profiles.commandLabelPosition', { position });
-        return (
-          <View key={`${generation}-${index}`} className="gap-3 rounded-lg bg-secondary p-3">
-            <SetupCommandField
-              command={command}
-              label={commandLabel}
-              disabled={disabled}
-              accessibilityHint={rowHint}
-              onChangeText={value => {
-                onChange(replaceCommand(commands, index, value));
-              }}
-            />
-            <View className="flex-row items-center justify-end gap-1">
-              <Pressable
-                className={controlClass(isFirst)}
-                disabled={isFirst}
-                accessibilityRole="button"
-                accessibilityLabel={upLabel}
+    <Section label={t('profiles.commandsTitle')}>
+      <RowGroup>
+        {commands.map((command, index) => {
+          const isFirst = index === 0;
+          const isLast = index === commands.length - 1;
+          // Every row is a command slot, so a blank draft row keeps the position
+          // it occupies in the list and its controls name that command.
+          const position = index + 1;
+          const rowHint = commandRowA11yLabel(index, commands.length);
+          const upLabel = t('profiles.moveCommandUp', { position });
+          const downLabel = t('profiles.moveCommandDown', { position });
+          const deleteLabel = t('profiles.deleteCommand', { position });
+          // The field's label is also its accessible name, so it carries the same
+          // position the row's move and delete controls announce.
+          const commandLabel = t('profiles.commandLabelPosition', { position });
+          return (
+            <ReorderableItem
+              key={`${generation}-${index}`}
+              actions={
+                <ReorderableItemActions
+                  moveUp={{
+                    label: upLabel,
+                    hint: rowHint,
+                    disabled: isFirst,
+                    onPress: () => {
+                      onChange(moveCommand(commands, index, -1));
+                      setGeneration(current => current + 1);
+                    },
+                  }}
+                  moveDown={{
+                    label: downLabel,
+                    hint: rowHint,
+                    disabled: isLast,
+                    onPress: () => {
+                      onChange(moveCommand(commands, index, 1));
+                      setGeneration(current => current + 1);
+                    },
+                  }}
+                  remove={{
+                    label: deleteLabel,
+                    hint: rowHint,
+                    onPress: () => {
+                      onChange(removeCommand(commands, index));
+                      setGeneration(current => current + 1);
+                    },
+                  }}
+                />
+              }
+            >
+              <SetupCommandField
+                command={command}
+                label={commandLabel}
+                disabled={disabled}
                 accessibilityHint={rowHint}
-                onPress={() => {
-                  onChange(moveCommand(commands, index, -1));
-                  setGeneration(current => current + 1);
+                onChangeText={value => {
+                  onChange(replaceCommand(commands, index, value));
                 }}
-              >
-                <ChevronUp size={20} color={colors.mutedForeground} />
-              </Pressable>
-              <Pressable
-                className={controlClass(isLast)}
-                disabled={isLast}
-                accessibilityRole="button"
-                accessibilityLabel={downLabel}
-                accessibilityHint={rowHint}
-                onPress={() => {
-                  onChange(moveCommand(commands, index, 1));
-                  setGeneration(current => current + 1);
-                }}
-              >
-                <ChevronDown size={20} color={colors.mutedForeground} />
-              </Pressable>
-              <Pressable
-                className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-                accessibilityRole="button"
-                accessibilityLabel={deleteLabel}
-                accessibilityHint={rowHint}
-                onPress={() => {
-                  onChange(removeCommand(commands, index));
-                  setGeneration(current => current + 1);
-                }}
-              >
-                <Trash2 size={20} color={colors.destructive} />
-              </Pressable>
-            </View>
-          </View>
-        );
-      })}
+              />
+            </ReorderableItem>
+          );
+        })}
+      </RowGroup>
       <Button
         variant="outline"
         onPress={() => {
@@ -228,6 +216,6 @@ export function ManualSetupCommandsEditor({
         <Plus size={16} color={colors.foreground} />
         <Text>{t('profiles.addCommand')}</Text>
       </Button>
-    </View>
+    </Section>
   );
 }

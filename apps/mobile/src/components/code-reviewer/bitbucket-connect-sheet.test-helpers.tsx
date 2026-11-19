@@ -166,9 +166,9 @@ vi.mock('@/lib/hooks/use-bitbucket', async () => {
 vi.mock('@/components/tab-screen', () => ({ SheetScrollView: 'SheetScrollView' }));
 // The header is the app's shared surface: its own suite covers the close
 // control, and the sheet's suite asserts the sheet wires it.
-vi.mock('@/components/screen-header', async () => {
+vi.mock('@/components/sheet-header', async () => {
   const { createElement: h } = await import('react');
-  return { ScreenHeader: (props: { title: string }) => h('ScreenHeader', props) };
+  return { SheetHeader: (props: { title: string }) => h('SheetHeader', props) };
 });
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -198,7 +198,7 @@ export const BOUNDARY = 'OrganizationBoundary' as ElementType;
 export const BUTTON = 'Button' as ElementType;
 export const DIALOG = 'ConfirmDialog' as ElementType;
 export const FORM = 'BitbucketConnectForm' as ElementType;
-export const HEADER = 'ScreenHeader' as ElementType;
+export const HEADER = 'SheetHeader' as ElementType;
 export const PERMISSION_DENIED = 'PermissionDenied' as ElementType;
 export const QUERY_ERROR = 'QueryError' as ElementType;
 export const SKELETON = 'Skeleton' as ElementType;
@@ -270,4 +270,4 @@ export function resetSheetMocks(): void {
   confirmMock.requests.length = 0;
 }
 
-export { confirmMock, platformMock, preventRemoveMock, routerMock, state, statusStore };
+export { confirmMock, preventRemoveMock, routerMock, state, statusStore };

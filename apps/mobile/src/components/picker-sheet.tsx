@@ -3,13 +3,13 @@ import { useRouter } from 'expo-router';
 import { type ReactNode, useCallback, useContext, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BackHandler, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
 import { SheetHeader } from '@/components/sheet-header';
 import { type SheetHeaderTopInset } from '@/lib/form-sheet';
 import { NavigationContext } from '@/lib/navigation/navigation-context';
 import { useRouteFocused } from '@/lib/navigation/route-focus';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 export function PickerSheet({
   title,
@@ -78,7 +78,7 @@ export function PickerSheet({
   topInset?: SheetHeaderTopInset;
 }) {
   const { t } = useTranslation();
-  const { bottom } = useSafeAreaInsets();
+  const bottomClearance = useDetailScreenBottomPadding();
   const routeFocused = useRouteFocused();
   // Back reads focus at press time, not from the render-time value: the native
   // dismissal can blur the route after the last render and before the key
@@ -179,7 +179,7 @@ export function PickerSheet({
         <ScrollView
           nestedScrollEnabled
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: bottom + 16 }}
+          contentContainerStyle={{ paddingBottom: bottomClearance }}
         >
           {body}
         </ScrollView>

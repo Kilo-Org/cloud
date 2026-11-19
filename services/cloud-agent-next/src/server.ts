@@ -47,6 +47,7 @@ import { withoutPreviewMarkers } from './shared/preview-headers.js';
 import { withDORetry } from './utils/do-retry.js';
 import { parseBearerCredential } from './sandbox-control/credential.js';
 import { admitSandboxWrapperUpgrade } from './sandbox-control/socket-admission.js';
+import { admitPreviewTunnelUpgrade } from './preview-tunnel/tunnel-admission.js';
 import { PtyIdSchema, sessionIdSchema } from './router/schemas.js';
 import { registerRuntimeArtifactRoutes } from './sandbox-control/runtime-artifact-routes.js';
 import { registerStartupFailureRoute } from './sandbox-control/startup-failure.js';
@@ -426,6 +427,10 @@ app.post('/internal/byoc/vercel-snapshot-build/cleanup', async (c: Context<HonoC
 
 app.get('/sandbox-control/:sandboxId', async (c: Context<HonoContext>) => {
   return admitSandboxWrapperUpgrade(c.req.raw, c.env, c.req.param('sandboxId') ?? '');
+});
+
+app.get('/sandbox-preview-tunnel/:sandboxId', async (c: Context<HonoContext>) => {
+  return admitPreviewTunnelUpgrade(c.req.raw, c.env, c.req.param('sandboxId') ?? '');
 });
 
 app.get('/sandbox-terminal/:ownerId/:sessionId/:ptyId', async (c: Context<HonoContext>) => {

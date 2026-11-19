@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { type Href, useLocalSearchParams } from 'expo-router';
 
 import { OrganizationModeFormScreen } from '@/components/organization/mode-form-screen';
 import { useRepairOrganizationRouteStack } from '@/lib/hooks/use-repair-organization-route-stack';
@@ -16,7 +16,7 @@ export default function OrganizationModeFormRoute() {
   // (`profile-route-stack.ts`), and a rebuilt edit form without its mode
   // would open as an empty create form.
   const modeIdParam = parseParam(modeId);
-  const self =
+  const self: Href =
     modeIdParam !== null
       ? `${MODE_FORM_PATH}?modeId=${encodeURIComponent(modeIdParam)}`
       : MODE_FORM_PATH;

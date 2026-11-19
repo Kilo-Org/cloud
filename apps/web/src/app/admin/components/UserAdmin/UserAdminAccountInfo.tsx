@@ -1,9 +1,12 @@
 'use client';
 
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 import { PaymentMethodStatusBadge } from '@/components/admin/PaymentMethodStatusBadge';
 import { UserStatusBadge } from '@/components/admin/UserStatusBadge';
 import { CopyTextButton } from '@/components/admin/CopyEmailButton';
+import { AnthropicUserProfileStatus } from '@/components/admin/AnthropicUserProfileStatus';
+import { useTRPC } from '@/lib/trpc/utils';
 import { formatDate } from '@/lib/admin-utils';
 import type { UserDetailProps } from '@/types/admin';
 import ResetAPIKeyButton from './ResetAPIKeyButton';
@@ -26,6 +29,13 @@ function getGravatarUrl(email: string, size: number = 80): string {
 type UserAdminAccountInfoProps = UserDetailProps;
 
 export function UserAdminAccountInfo(user: UserAdminAccountInfoProps) {
+  const trpc = useTRPC();
+  const anthropicStatus = useQuery(
+    trpc.admin.users.pullAnthropicUserProfileStatus.queryOptions(
+      { userId: user.id },
+      { enabled: false, retry: false }
+    )
+  );
   const gravatarUrl = getGravatarUrl(user.google_user_email);
   const stripeUrl = `https://dashboard.stripe.com/${process.env.NODE_ENV === 'development' ? 'test/' : ''}customers/${user.stripe_customer_id}`;
   const hibpUrl = `https://haveibeenpwned.com/account/${encodeURIComponent(user.google_user_email)}`;
@@ -158,6 +168,17 @@ export function UserAdminAccountInfo(user: UserAdminAccountInfoProps) {
               <span className="text-muted-foreground">N/A</span>
             )}
           </Field>
+          {user.anthropic_user_profile_id && (
+            <Field label="Anthropic User Profile" mono className="sm:col-span-2">
+              <div className="flex min-w-0 flex-col gap-2">
+                <div className="flex items-center gap-1">
+                  {user.anthropic_user_profile_id}
+                  <CopyTextButton text={user.anthropic_user_profile_id} />
+                </div>
+                <AnthropicUserProfileStatus query={anthropicStatus} />
+              </div>
+            </Field>
+          )}
           <Field
             label="Personal Account"
             tooltip="A personal account lets this user accrue usage under their own personal namespace. When disabled, they can't select their personal namespace in the clients or the web app. Either way, they can still join organizations."
@@ -236,15 +257,17 @@ function Field({
   label,
   mono,
   tooltip,
+  className,
   children,
 }: {
   label: string;
   mono?: boolean;
+  className?: string;
   tooltip?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1">
+    <div className={`flex min-w-0 flex-col gap-1 ${className ?? ''}`}>
       <h4 className="text-muted-foreground flex items-center gap-1 text-xs font-medium">
         {label}
         {tooltip ? (

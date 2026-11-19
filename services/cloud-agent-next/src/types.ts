@@ -1,5 +1,6 @@
 import type { SessionId } from './types/ids.js';
 import type { EnvironmentBuild } from './environment-build/environment-build-do.js';
+import type { PreviewTunnel } from './preview-tunnel/preview-tunnel-do.js';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import type {
@@ -476,6 +477,8 @@ export type Env = {
   SANDBOX_CONTAINERS: DurableObjectNamespace<SandboxContainers>;
   /** One environment build coordinator per repository environment id. */
   ENVIRONMENT_BUILD: DurableObjectNamespace<EnvironmentBuild>;
+  /** One preview tunnel per sandbox allocation, named `<sandboxId>:<allocationId>`. */
+  PREVIEW_TUNNEL: DurableObjectNamespace<PreviewTunnel>;
   /** Durable Object namespace for per-user Kilo SDK facade coordination */
   USER_KILO_FACADE: DurableObjectNamespace<UserKiloFacade>;
   /** Durable Object namespace for one-time stream/terminal ticket nonce consumption */

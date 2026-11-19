@@ -40,16 +40,20 @@ describe('SessionListSectionHeader mounted', () => {
       throw new Error('renderer was not created');
     }
 
-    const headings = renderer.root.findAll(node => node.props.accessibilityRole === 'header');
+    // SectionHeader draws the contract's header role itself, so the row's own
+    // spoken heading is the accessible element that carries the combined label.
+    const headings = renderer.root.findAll(
+      node => node.props.accessibilityRole === 'header' && node.props.accessible === true
+    );
     expect(headings).toHaveLength(1);
     const heading = headings[0];
     expect(heading?.props.accessible).toBe(true);
     expect(heading?.props.accessibilityLabel).toBe('Friday, 2 sessions');
 
-    // The visible row still shows the title and the count as separate parts,
-    // nested inside the heading that now carries the spoken label.
-    const parts = heading?.children.filter(child => typeof child !== 'string');
-    expect(parts).toHaveLength(2);
+    // The visible row still shows the title and the count, rendered by the
+    // shared SectionHeader inside the heading that carries the spoken label.
+    expect(renderer.root.findAll(node => node.props.children === 'Friday')).toHaveLength(1);
+    expect(renderer.root.findAll(node => node.props.children === '2')).toHaveLength(1);
   });
 
   it('keeps the visible count in the active language', async () => {

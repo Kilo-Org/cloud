@@ -94,6 +94,7 @@ import {
 import {
   resolveContinueStartDisabled,
   resolveNewSessionConnectProvider,
+  resolveNewSessionProfileGate,
   resolveNewSessionStartBlockedReason,
   resolveNewSessionStartDisabled,
   resolveRemoteStartMissingContent,
@@ -606,11 +607,21 @@ export function NewSessionScreenBody() {
   const {
     profile,
     profileId,
+    resolvedOverrideProfileId,
     isLoading: isProfileLoading,
     isError: isProfileError,
     overrideNeedsAttention: profileOverrideNeedsAttention,
     refetch: refetchProfile,
   } = useEffectiveAgentProfile(organizationId, overrideProfileId);
+
+  // One state for the profile read's share of the Start gate. Built once here:
+  // the Start gate and the blocked-reason helper read the same value, so an
+  // offer to retry is only made when Start actually waits on the read.
+  const profileGate = resolveNewSessionProfileGate({
+    isLoading: isProfileLoading,
+    isError: isProfileError,
+    hasOverride: overrideProfileId !== null,
+  });
 
   // The picker opens as the app's standard native formSheet. The bridge carries
   // the current pick; the sheet reports the new one back through `onSelect`.
@@ -1220,7 +1231,7 @@ export function NewSessionScreenBody() {
       model: displayModel,
       selectedRepo,
       selectedRepositoryResolved: selectedRepository !== null,
-      isProfileLoading,
+      profileGate,
     });
   }
 
@@ -1277,7 +1288,7 @@ export function NewSessionScreenBody() {
             isRemoteTargetSelected,
             isSubmitting,
             model: displayModel,
-            isProfileLoading,
+            profileGate,
           },
         }
   );
@@ -1322,6 +1333,12 @@ export function NewSessionScreenBody() {
     // The Environment row already shows its busy state; the footer says why
     // Start waits on it, so a disabled control is never unexplained.
     startBlockedReason = t('agentChat.newSession.profileLoadingToStart');
+  } else if (startBlockedReasonKey === 'profile-error') {
+    // The Environment row's error state offers the same retry. The footer names
+    // the failure and carries the action because Start waits on the read the
+    // retry re-runs: the picked profile cannot be submitted until it resolves.
+    startBlockedReason = t('agentChat.newSession.couldNotLoadEnvironment');
+    startBlockedAction = { label: t('common.retry'), onPress: () => void refetchProfile() };
   } else if (startBlockedReasonKey === 'model-missing') {
     startBlockedReason = t('agentChat.newSession.modelMissingToStart');
   } else if (startBlockedReasonKey === 'stale-selection') {
@@ -1500,7 +1517,7 @@ export function NewSessionScreenBody() {
         profileOverrideNeedsAttention={profileOverrideNeedsAttention}
         onRetryProfile={() => void refetchProfile()}
         onOpenProfilePicker={handleOpenProfilePicker}
-        selectedProfileId={overrideProfileId}
+        selectedProfileId={resolvedOverrideProfileId}
         onSelectProfile={setOverrideProfileId}
         manualVars={manualVars}
         manualCommands={manualCommands}

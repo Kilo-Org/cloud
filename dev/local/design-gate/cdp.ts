@@ -1,6 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { InfraError } from './capture';
+import { logBoxDisableExpression, type LogBoxDisable } from './logbox';
 import { scopeToFocusedRoute } from './route-scope';
 import { parseDump, type ProbeDump } from './tree';
 
@@ -73,6 +74,14 @@ export type ProbeClient = {
     readonly samples: ProbeSample[];
     readonly truncated: boolean;
   }>;
+  /**
+   * Disables LogBox's UI in the app runtime through every module exporting
+   * `setDisabled`, and answers how many modules exposed it and how many the gate
+   * has disabled. Idempotent per runtime, so every readiness wait calls it after
+   * a reload disables again. `budgetMs` caps the probe calls, as it does on
+   * `ready` and `dump`.
+   */
+  disableLogBox?: (budgetMs?: number) => Promise<LogBoxDisable>;
   disconnect: () => void;
 };
 
@@ -474,6 +483,15 @@ export function createProbeClient(options: ProbeClientOptions): ProbeClient {
           dump: scopeToFocusedRoute(sample.dump),
         })),
       };
+    },
+    disableLogBox: async (budgetMs?: number) => {
+      const payload = record(await call(logBoxDisableExpression(), budgetMs));
+      const exposing = payload?.exposing;
+      const disabled = payload?.disabled;
+      if (typeof exposing !== 'number' || typeof disabled !== 'number') {
+        throw new InfraError('Design gate disableLogBox() returned no module count');
+      }
+      return { exposing, disabled };
     },
     disconnect,
   };

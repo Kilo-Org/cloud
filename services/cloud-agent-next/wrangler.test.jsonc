@@ -54,6 +54,10 @@
         "name": "SENTRY_BILLING_ADMISSION_CONTAINER",
       },
       { "class_name": "SentryDisabledProbe", "name": "SENTRY_DISABLED_PROBE" },
+      {
+        "class_name": "PreviewTunnel",
+        "name": "PREVIEW_TUNNEL",
+      },
     ],
   },
   "migrations": [
@@ -99,6 +103,10 @@
         "SentryDisabledProbe",
       ],
       "tag": "sentry-probes",
+    },
+    {
+      "new_sqlite_classes": ["PreviewTunnel"],
+      "tag": "v14",
     },
   ],
   "r2_buckets": [

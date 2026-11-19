@@ -32,7 +32,7 @@ const FINDINGS_ROUTE = '/(app)/security-agent/[scope]/findings' as const;
 function FilterOptionsSkeleton() {
   const { t } = useTranslation();
   return (
-    <View className="gap-3 px-3 pt-2">
+    <View className="gap-3 px-4 pt-3">
       {/* Skeleton rows carry the shape of the list; the status line says in
           words what the sheet is waiting for, so the same progress reaches a
           screen reader. */}
@@ -95,9 +95,10 @@ function FilterFindingsSheet({ scope }: Readonly<{ scope: string }>) {
   const renderOptionList = () => {
     if (repositories.isError || repositoriesOffline) {
       return (
-        <View className="px-6">
+        <View className="px-4">
           <QueryError
             variant={repositoriesOffline ? 'offline' : 'neutral'}
+            inset="none"
             message={t('common.couldNotLoadRepositories')}
             onRetry={() => {
               void repositories.refetch();
@@ -148,7 +149,7 @@ function FilterSheetFailure({ onRetry }: Readonly<{ onRetry: () => void }>) {
   const router = useRouter();
   const { t } = useTranslation();
   return (
-    <View className="flex-1 items-center justify-center bg-background px-6">
+    <View className="flex-1 items-center justify-center bg-background px-4">
       <QueryError placement="static" message={t('common.somethingWentWrong')} onRetry={onRetry} />
       <Button
         variant="ghost"

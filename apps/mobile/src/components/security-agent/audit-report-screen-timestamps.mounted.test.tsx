@@ -41,13 +41,22 @@ vi.mock('@/lib/format', () => ({
 }));
 vi.mock('@/lib/utils', () => ({
   capitalize: (value: string) => value,
+  cn: (...values: unknown[]) => values.filter(Boolean).join(' '),
   parseTimestamp: (value: unknown) => value,
 }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/screen-header', () => ({
+  ScreenHeader: ({ subtitle }: { subtitle?: string }) =>
+    createElement(
+      'ScreenHeader',
+      null,
+      subtitle ? createElement('Text', { key: 'subtitle' }, subtitle) : null
+    ),
+}));
 // The real state renders the title, then its description node (string or node),
 // below it; the mock renders both, so the empty report's whole copy is in the
 // tree and a heading assertion means what it says.
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   EmptyState: (props: { title?: string; description?: ReactNode }) =>
     createElement(
       'EmptyState',
@@ -225,10 +234,9 @@ describe('AuditReportScreen timestamps and actor labels', () => {
     const period = { start: '2026-01-01T00:00:00.000Z', end: '2026-01-01' };
     const lines = renderedText(root);
 
-    // The owner line is the populated header's first line, so an empty report
-    // still says whose window it covers; the heading carries the "no activity"
-    // statement, so the period line states the window once and nothing repeats
-    // it in prose.
+    // The owner is the header's subtitle, so an empty report still says whose
+    // window it covers; the heading carries the "no activity" statement, so the
+    // period line states the window once and nothing repeats it in prose.
     expect(lines).toEqual([
       ORGANIZATION_OWNER.displayName,
       i18n.t('securityAgent.auditReport.noActivity'),

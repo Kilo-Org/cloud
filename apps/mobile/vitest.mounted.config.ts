@@ -23,6 +23,10 @@ export default defineProject({
     // The app build's config module cannot load in this project; the setup
     // file stubs the exports its importers read.
     setupFiles: ['./vitest.setup.ts'],
+    // `lucide-react-native` must be transformed here, not loaded by Node: its
+    // SVG backend cannot be required in Node, and the setup file's host stub
+    // only replaces modules this project resolves (see vitest.setup.ts).
+    server: { deps: { inline: ['lucide-react-native'] } },
     // Mounted suites pay the same loaded-machine import cost as `mobile-pure`
     // when the gate runs them beside Metro, the simulator, and the local
     // services; keep one budget for both projects (see vitest.pure.config.ts).

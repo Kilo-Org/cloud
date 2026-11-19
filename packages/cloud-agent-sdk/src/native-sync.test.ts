@@ -1215,6 +1215,89 @@ test('frames queued behind a closing socket cannot renew or resubscribe it', asy
   connection.close();
 });
 
+function flakyTicketFixture(failingTickets: number) {
+  const calls: { path: string }[] = [];
+  let tickets = 0;
+  const fetcher = jest.fn(async (input: string | URL | Request) => {
+    const path = new URL(String(input)).pathname;
+    calls.push({ path });
+    if (path.endsWith('/exchange'))
+      return Response.json({
+        token: 'grant',
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      });
+    if (path.endsWith('ticket')) {
+      tickets++;
+      if (tickets <= failingTickets)
+        return Response.json({ error: { code: 'service_overloaded' } }, { status: 503 });
+      return Response.json({
+        ticket: 'private-ticket',
+        expiresAt: new Date(Date.now() + 90_000).toISOString(),
+      });
+    }
+    return Response.json({ status: 'queued' });
+  });
+  const client = new NativeSyncClient({
+    baseUrl: 'https://sync.test',
+    getCredential: async () => 'kilo-credential',
+    fetch: fetcher,
+    WebSocket: FakeSocket,
+  });
+  return { client, calls };
+}
+
+test('connect attempts that never reach hello escalate to the ceiling', async () => {
+  const random = jest.spyOn(Math, 'random').mockReturnValue(0);
+  const { client, calls } = flakyTicketFixture(Number.POSITIVE_INFINITY);
+  const connection = client.connectSession('ses_a', () => {});
+  const attempts = () => calls.filter(call => call.path.endsWith('live-ticket')).length;
+  try {
+    await flush();
+    expect(attempts()).toBe(1);
+    const steps = [1000, 2000, 4000, 8000, 16_000, 32_000, 60_000, 60_000];
+    for (const [index, step] of steps.entries()) {
+      await jest.advanceTimersByTimeAsync(step);
+      await flush();
+      expect(attempts()).toBe(index + 2);
+    }
+    expect(FakeSocket.sockets).toHaveLength(0);
+  } finally {
+    random.mockRestore();
+    connection.close();
+  }
+});
+
+test('hello resets the connect backoff', async () => {
+  const random = jest.spyOn(Math, 'random').mockReturnValue(0);
+  const { client, calls } = flakyTicketFixture(2);
+  const connection = client.connectSession('ses_a', () => {});
+  const attempts = () => calls.filter(call => call.path.endsWith('live-ticket')).length;
+  try {
+    await flush();
+    expect(attempts()).toBe(1);
+    await jest.advanceTimersByTimeAsync(1000);
+    await flush();
+    expect(attempts()).toBe(2);
+    await jest.advanceTimersByTimeAsync(2000);
+    await flush();
+    expect(attempts()).toBe(3);
+    expect(FakeSocket.sockets).toHaveLength(1);
+    const socket = connectedSocket();
+    socket.frame('hello', hello());
+    await flush();
+    socket.close();
+    await flush();
+    // The escalated step stood at 4000 ms; only a hello reset yields a retry after 1000 ms.
+    await jest.advanceTimersByTimeAsync(1000);
+    await flush();
+    expect(attempts()).toBe(4);
+    expect(FakeSocket.sockets).toHaveLength(2);
+  } finally {
+    random.mockRestore();
+    connection.close();
+  }
+});
+
 test('binds the browser default fetch receiver', async () => {
   const { fetcher } = fixture();
   const original = globalThis.fetch;

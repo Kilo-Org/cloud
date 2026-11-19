@@ -108,11 +108,17 @@ vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
 vi.mock('@/components/pr-review/pr-review-unavailable-actions', () => ({
   PrReviewUnavailableActions: 'PrReviewUnavailableActions',
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/ui/icons', () => ({ MessageSquarePlus: 'MessageSquarePlus' }));
+vi.mock('@/components/ui/icons', () => ({
+  FolderOpen: 'FolderOpen',
+  MessageSquarePlus: 'MessageSquarePlus',
+}));
 vi.mock('@/components/pr-review/discussion/pr-review-discussion-list', () => ({
   PrReviewDiscussionList: 'PrReviewDiscussionList',
 }));

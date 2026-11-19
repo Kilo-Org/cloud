@@ -16,6 +16,7 @@ import {
   sampleUntilSettled,
   screenFindings,
   screenIdentity,
+  waitForApp,
   waitForLoadingPlaceholder,
   waitForStableLayout,
   type CaptureContext,
@@ -73,7 +74,7 @@ function dumpWith(
       {
         parent: 0,
         tag: 'Paragraph',
-        rect: [10, options.y ?? 50, 50, 20],
+        rect: [14, options.y ?? 50, 50, 20],
         text: options.text ?? 'Title',
         style: { opacity: options.opacity ?? 1, display: options.display ?? 'flex' },
       },
@@ -411,6 +412,25 @@ function fakeProbe(state: ProbeState): ProbeClient {
     disconnect: () => undefined,
   };
 }
+
+test("waitForApp bounds the LogBox disable by the wait's remaining budget", async () => {
+  const clock = fakeClock();
+  const budgets: number[] = [];
+  const probe: ProbeClient = {
+    ...fakeProbe(probeState()),
+    ready: async () => {
+      await clock.sleep(40);
+      return true;
+    },
+    disableLogBox: async (budgetMs?: number) => {
+      budgets.push(budgetMs ?? -1);
+      return { exposing: 1, disabled: 1 };
+    },
+  };
+  const dump = await waitForApp(probe, clock, () => false, 100);
+  assert.equal(dump.env.route, '/');
+  assert.deepEqual(budgets, [60]);
+});
 
 function fakeDevice(
   calls: string[],

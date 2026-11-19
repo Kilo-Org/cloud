@@ -244,6 +244,53 @@ A phase that several flags, refs, nullable fields, or timers encode together is 
 - Do not repeat what the screen already shows: no "Enabled" beside a switch, no product name beside its logo, no description that restates the title.
 - Change only the visual properties the task names. A color fix does not change dimensions.
 
+### Layout contract
+
+One contract, enforced by `pnpm check:classes` (baseline in `tools/nativewind/layout-baseline.json`).
+
+| Concern | Contract | Use |
+|---|---|---|
+| Page gutter | 14pt on every screen, header, sheet, list row, section header and empty state. No other horizontal page inset. | `SCREEN_GUTTER_CLASS` from `@/lib/layout` |
+| Screen body | Section gap 21pt, gutter, 10.5pt top pad. | `SCREEN_BODY_CLASS` from `@/lib/layout` as the scroll body's `contentContainerClassName` |
+| Section | Label plus content blocks, 10.5pt apart. | `Section` from `@/components/ui/section` |
+| Section header | A heading (the label carries the header role): 10pt mono uppercase eyebrow, muted; optional icon, 11pt mono primary action in a compact box that never changes the header's height, and notice. No hand-made labels. Gutter-free inside a padded body; `inset` for a full-bleed list; `actionTestID` for a native test handle. | `SectionHeader` from `@/components/ui/section-header`, or `Section` when it has content |
+| Settings and navigation rows | One grouped card per section; hairline between rows inset to the row text; none after the last. | `RowGroup` from `@/components/ui/row-group`; pass `leadingTile` for icon rows |
+| Grouped rows in a virtualized list | A list cannot pass its rows as one child array, so each cell draws its own rounded end, surface and trailing hairline. | `RowGroupItem` with `position` `first`/`middle`/`last` (`only` for a one-row section) |
+| Row anatomy | The one row geometry: `ROW_FRAME_CLASS` (`min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3`); 30pt `IconTile`; title `text-sm font-medium` on one line; up to two subtitle lines (`face: 'mono'` for an identifier, `ellipsizeMode: 'middle'` for a value); a typed trailing cell (chevron, check, switch, value, badge, action, node). Never re-spell it. | `RowFrame` from `@/components/ui/row-frame`; `ConfigureRow`, `PreferenceRow`, `KvRow` and `ChoiceRow` are thin wrappers over it (use them when their fixed anatomy fits, `RowFrame` directly for a link row, two subtitle lines or a mixed trailing cell) |
+| Flat list rows | Full-bleed, no card, content from the 14pt gutter, `border-b-[0.5px] border-hair-soft` hairline, `RowChevron`. A hue strip sits at the gutter. | `SessionRow`, which owns that geometry; callers add no padding of their own. Rows own no card and no grouped divider |
+| Card | Non-row block (balance, metric, form, info): `rounded-xl bg-secondary p-4`, inner `gap-3`, never nested. For full-bleed layered content the surface alone, with each layer owning its inset. | `Card` from `@/components/ui/card`; `padding="none"` for the bare surface |
+| Fields | A single-line `Input` owns its 44pt box and inset. A multiline field or a composer keeps its own text metrics inside the shared bordered surface; a read-only or preview box that swaps with a single-line field reuses its exported box. | `Input` from `@/components/ui/input`; `InputFrame` for a multiline/composer surface; `INPUT_BOX_SHAPE_CLASS` for the preview box |
+| Segmented control | The track and its loaded height are the control's own; a skeleton reserves that frame instead of a hand-sized box. Options may carry a badge, a disabled state and their own test handle. | `SegmentedControl` from `@/components/ui/segmented-control`; `SEGMENTED_FRAME_CLASS` / `SEGMENTED_FRAME_HEIGHT_CLASS` for a skeleton |
+| Radii | Controls `rounded-md`; tiles and thumbnails `rounded-lg`; cards, row groups and dialogs `rounded-xl`; pills, avatars and the FAB `rounded-full`. Nothing else. | the primitives above |
+| Dividers | 0.5pt `border-hair-soft`. Never `border-border` for a row divider. | `RowGroup`, `RowGroupItem`, flat list rows |
+| Typography roles | Large title 30pt/700 on tab roots; title 15.75pt/600; heading `text-base font-semibold`; body the `Text` default; secondary `variant="muted"`; caption `variant="caption"`; a metric figure `variant="figure"`, a half-width stat tile `variant="stat"`; eyebrow the 10pt mono one. No `text-[Npx]`, no `text-xl` or larger, no `uppercase` or `tracking-*` outside `components/ui`. | `Text` variants, `ScreenHeader`, `SectionHeader`, `Eyebrow` |
+| Screen intro | One muted body line under the header, above the first section, on every screen that carries intro text; never a caption size and never a hand-sized `text-xs`. | `Text` `variant="muted"` |
+| Screen header | First child of the screen root; `size="large"` on tab roots; never override its gutter, title typography or bottom padding. A badge on the title line goes through `titleAccessory`; a header a screen must measure (a pin under it) passes `titleRef`. | `ScreenHeader` |
+| Sheet header | Every formSheet route and imperative `Sheet`. The body uses the same body class. An eyebrow names the reference being edited; `doneBusy` marks a commit in flight; `variant="close"` is the header a surface with nothing to commit uses. | `SheetHeader` |
+| States | Loading, empty, error and happy states for every data screen. Every loading placeholder owns the loaded geometry — a row reserves through `RowSkeleton`, a section label through `SectionHeaderSkeleton`, a control through its own frame constant — so the swap to real content cannot move the screen. One placement rule: `center` when the state is the whole surface, `top` only when it sits under intro text or controls. A state's way out is the one action slot, filled with `StateAction` (primary, compact, label-sized, leading icon) at the slot's fixed gap. A state owns the 14pt gutter only when it is its surface's full-bleed content (a `center` state; a `top`/`static` one in a list's empty slot passes `inset="gutter"`); one laid out inside a body or card that already insets draws none, and no caller spells the inset itself. A state never repeats the screen's own way out: a header already draws the back chevron, so a denial under one carries no Back action (`PermissionDenied`'s `showBack`). | `RowSkeleton` (`variant="session"` for a flat list; `lines`, `tile`, `trailingControl`, `trailing="switch"`, `stack`), `SectionHeaderSkeleton`, `Skeleton`, `EmptyState` (`inset`, `action`), `StateAction`, `QueryError`, `CenteredState` |
+| Primary action | One per screen. A pinned footer is the shared bar, outside the scroll body; an inline action ends its section. | `ScreenFooter` from `@/components/ui/screen-footer` (`clearance` for the bottom band, `keyboard` for who lifts it) |
+| Create control | One per list screen: the header `+` creates, and the empty state carries the title and description only. | `ScreenHeader` `headerRight` with `IconButton` |
+| FAB | One 56pt round primary button, gutter-aligned above the tab bar. | `Fab` from `@/components/ui/fab` |
+| Arbitrary values | No spacing, font-size, line-height, tracking or radius in `[..]`, and none of the bans L1–L13 below the table, outside `components/ui`, the two header components, `@/lib/layout` and `@/lib/a11y/tap-target`. | `pnpm check:classes` enforces it |
+
+`pnpm check:classes` reads every class string (and every `style`/`*Style` object) against `LAYOUT_RULES` in
+`tools/nativewind/check-classes.mjs`, which is the only description of the rules: **L1** an arbitrary spacing,
+type-size, line-height, tracking or radius value; **L2** a page inset written on a scroll body or a `CenteredState`
+content container, or any padding on a `ScreenHeader`/`SheetHeader`; **L3** `uppercase` or `tracking-*` outside a
+section label; **L4** a card surface built by hand (a card fill plus a card radius, even when the two sit in
+different branches of one className); **L5** `text-xl` or larger; **L6** a layout number in a `style` or `*Style`
+object (an inset or a measurement passes); **L7** a chevron imported straight from the icon modules instead of
+`RowChevron`; **L8** an arbitrary height, width or size that pins one box; **L9** a row divider drawn as
+`border-b`/`border-t` in `border-border` instead of `border-hair-soft`; **L10** `ScreenHeader` `titleContent`
+outside the three screens that own a title line; **L11** a `Sheet` without a `SheetHeader`; **L12** a horizontal
+padding or margin wider than the 14pt gutter (`px-`/`ps-`/`pe-`/`pl-`/`pr-`/`mx-`/`ms-`/`me-` at 5 and up); **L13** a
+`Button` inside an `EmptyState`/`QueryError` `action` slot instead of `StateAction`. A
+violation the migration has not reached is admitted by `tools/nativewind/layout-baseline.json`, which only shrinks: fix the call
+site and lower its line, never regenerate the baseline over a new violation.
+
+After you change anything in `components/ui`, run the design gate on
+`kiloapp:///(auth)/design-system-fixture` and on one migrated screen per changed primitive.
+
 ## Translations
 
 Copy lives in `src/i18n/locales/en.json`. The other 86 catalogs are reviewed
@@ -301,10 +348,12 @@ pnpm dev:mobile:design-gate run --link <deep link> [--link ...] --matrix standar
 - The standard matrix covers the default size, dark mode, a compact screen, and right-to-left on Android, and the default size, dark mode, and right-to-left on iOS. It keeps font scale and display density at their defaults.
 - After a link opens, the gate keeps measuring for 2.5 s, so content that arrives late and moves the screen is a `layout-shift` error.
 - A scrolling screen must start with what it shows. Empty space above the first painted content, beyond the scroll content's top padding and one section break (24 dp), is a `leading-gap` error: a first block pushed down by a margin, or a box that holds its content at its bottom.
+- Every screen's content starts at the 14 pt page gutter. The `gutter` rule is an error for paint whose start edge lands inside the gutter and for a column that starts past it, measured from the safe-area edge, mirrored in right-to-left, and from a native sheet's or dialog's own root. A screen's header and each scrolling body are separate columns, so a 21 dp body under a 14 dp header fails. Full-bleed row backgrounds and dividers, the header's 48 pt back target and the title lines that follow it (the eyebrow, title and subtitle of one header share the title's column), a block's own inner padding, content after a row's leading element, centred states, horizontally scrolled content and a chat turn's failure footer (its container marked `message-failure-footer`) are excluded; unknown side insets skip the rule, and `run.skippedRules` names it.
 - Shift measurements use transform-free layout frames. Navigation transforms remain visible in screenshots and motion recordings without hiding real content shifts.
 - The sampler retains the newest layouts that fit its weight budget, up to a maximum count. A truncation flag in the timeline and motion artifacts marks incomplete capture.
 - Fix every `error` finding, then run the gate again until it exits 0. Fix each `warning`, or give a one-line reason in the pull request.
 - Exit code 2 is an environment failure (no device, no Metro page, no probe), not a pass.
+- The gate disables LogBox's UI in the app runtime at every readiness wait, through each module that exposes `setDisabled`, so a warning toast does not paint over a capture. It never wraps `console.*`: the app already has wrappers there, and a replacement breaks them. A React "state update on a component that hasn't mounted yet" toast painted over a screen anyway is a `dev-overlay` warning, not a screen defect: it means disabling failed in that runtime, an environment problem the run log names. Dev warnings are not graded by the gate — developers see them in Metro and LogBox in normal use.
 - Attach `contact-sheet.png` from the output directory to the pull request with `gh pr comment --attach`. Never commit it.
 - A separate reviewer judges the per-screen sheets in `sheets/` for what numbers cannot measure. Never grade your own screenshots.
 - For an Android release build, `pnpm dev:mobile:design-gate scan --source agent-device` checks the current screen from the accessibility tree of an open `agent-device` session, and `--source uiautomator` does the same without one. Both read the tree until its layout repeats and measure that read; a screen that never settles is not measured and the command exits 2.

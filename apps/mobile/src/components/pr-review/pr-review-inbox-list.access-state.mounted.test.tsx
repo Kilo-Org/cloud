@@ -50,7 +50,10 @@ vi.mock('@shopify/flash-list', async () => {
     },
   };
 });
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
   PrReviewReconnectNotice: 'PrReviewReconnectNotice',
@@ -60,6 +63,7 @@ vi.mock('@/components/ui/icons', () => ({
   Clock: 'Clock',
   GitPullRequest: 'GitPullRequest',
   Inbox: 'Inbox',
+  ArrowRight: 'ArrowRight',
 }));
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronRight: 'DirectionalChevronRight',
@@ -110,6 +114,7 @@ vi.mock('@/lib/pr-review/use-provider-inbox', () => ({
   }),
 }));
 vi.mock('@/lib/utils', () => ({
+  cn: (...classes: unknown[]) => classes.flat().filter(Boolean).join(' '),
   parseTimestamp: (value: string) => new Date(value),
   timeAgo: () => 'just now',
 }));
@@ -140,7 +145,7 @@ function accessError(renderer: TestRenderer.ReactTestRenderer) {
 }
 
 type ActionElement = {
-  props: { accessibilityLabel?: unknown; onPress?: unknown };
+  props: { label?: unknown; onPress?: unknown };
 };
 
 function isActionElement(value: unknown): value is ActionElement {
@@ -159,12 +164,13 @@ function continueInPersonalPress(renderer: TestRenderer.ReactTestRenderer): () =
   const action: unknown = accessError(renderer).props.action;
   if (
     !isActionElement(action) ||
-    typeof action.props.accessibilityLabel !== 'string' ||
+    typeof action.props.label !== 'string' ||
     typeof action.props.onPress !== 'function'
   ) {
     throw new Error('the access state rendered no action button');
   }
-  expect(action.props.accessibilityLabel).toBe('prReview.inbox.continueInPersonal');
+  // `StateAction` announces its visible label, so the label is the name.
+  expect(action.props.label).toBe('prReview.inbox.continueInPersonal');
   // The mock host element's handler is an opaque function prop.
   const press = action.props.onPress as () => void;
   return press;

@@ -168,6 +168,10 @@ const liveFrameBytes = 512 * 1024;
 const liveBacklogBytes = 4 * 1024 * 1024;
 const liveBacklogCount = 1024;
 const SNAPSHOT_FAILURE_LIMIT = 3;
+// Bounds for a connect that never reaches hello: a failing ticket mint, an offline fetch, or an
+// immediate close.
+const connectBackoffFloorMs = 1000;
+const connectBackoffCeilMs = 60_000;
 type SocketEpoch = {
   signal: AbortSignal;
   current: () => boolean;
@@ -482,6 +486,8 @@ export class NativeSyncClient {
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     let renewalTimer: ReturnType<typeof setTimeout> | undefined;
     let reconnectAfterMs = 1000;
+    let connectBackoffMs = connectBackoffFloorMs;
+    let greeted = false;
     let generation = 0;
     let retire: (() => void) | undefined;
     const send = (value: unknown) => {
@@ -539,11 +545,14 @@ export class NativeSyncClient {
       }
       clearTimeout(reconnectTimer);
       const retry = error instanceof NativeSyncError ? error['retryAfterMs'] : 0;
+      const delay = Math.max(retry, reconnectAfterMs, connectBackoffMs);
+      // Without hello there is no server retry budget to honour, so each miss doubles the wait.
+      if (!greeted) connectBackoffMs = Math.min(connectBackoffCeilMs, connectBackoffMs * 2);
       reconnectTimer = setTimeout(
         () => {
           void connect();
         },
-        Math.max(retry, reconnectAfterMs) + Math.random() * reconnectAfterMs
+        delay + Math.random() * reconnectAfterMs
       );
     };
     const connect = async () => {
@@ -581,6 +590,7 @@ export class NativeSyncClient {
         queue.length = 0;
         controller.abort();
       };
+      greeted = false;
       onConnection('connecting');
       try {
         const ticket = await mint();
@@ -605,6 +615,8 @@ export class NativeSyncClient {
                 if (frame.type === 'hello') {
                   if (typeof body['reconnectAfterMs'] === 'number')
                     reconnectAfterMs = Math.min(60_000, Math.max(1000, body['reconnectAfterMs']));
+                  greeted = true;
+                  connectBackoffMs = connectBackoffFloorMs;
                   onConnection('connected');
                   scheduleRenewal(body);
                 }
@@ -652,6 +664,7 @@ export class NativeSyncClient {
       restart: () => {
         stopped = false;
         generation++;
+        connectBackoffMs = connectBackoffFloorMs;
         retire?.();
         retire = undefined;
         clearTimeout(reconnectTimer);

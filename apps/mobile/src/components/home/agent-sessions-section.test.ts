@@ -79,12 +79,14 @@ vi.mock('@/components/agents/remote-session-exit-alert', () => ({
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { error: vi.fn(), success: vi.fn() },
 }));
-vi.mock('@/components/ui/agent-badge', () => ({ AgentBadge: 'AgentBadge' }));
 vi.mock('@/components/ui/session-status-icon', () => ({ SessionStatusIcon: 'SessionStatusIcon' }));
 // The zero state's glyph comes from the icon set, whose native renderer the
 // pure project does not load.
 vi.mock('@/components/ui/icons', () => ({ Bot: 'Bot' }));
-vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
+vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalArrowLeft: 'ArrowLeft',
+  DirectionalChevronRight: 'ChevronRight',
+}));
 // The briefing card reaches the native SQLCipher dismissal journal; these
 // assertions cover the live card and the section header only.
 vi.mock('@/components/agent-briefing/briefing-card', () => ({
@@ -93,7 +95,7 @@ vi.mock('@/components/agent-briefing/briefing-card', () => ({
 }));
 // A host element that still renders the header notice. The factory is hoisted
 // above the static imports, so it loads React itself.
-vi.mock('@/components/home/section-header', async () => {
+vi.mock('@/components/ui/section-header', async () => {
   const { createElement: create } = await import('react');
   return {
     SectionHeader: (props: { notice?: ReactNode }) => create('SectionHeader', props, props.notice),
@@ -106,6 +108,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/empty-state', async () => {
   const { createElement: create } = await import('react');
   return {
+    StateAction: 'StateAction',
     EmptyState: (props: { icon: unknown; title: string; description?: ReactNode }) =>
       create(
         'EmptyState',
@@ -301,11 +304,11 @@ describe('Home live section', () => {
     (node('SectionHeader').props.onActionPress as () => void)();
     // An empty params object is what clears a lingering status filter.
     expect(navigateSpy).toHaveBeenCalledWith({
-      pathname: '/(app)/(tabs)/(2_agents)/',
+      pathname: '/(app)/(tabs)/(2_agents)',
       params: {},
     });
     expect(dismissToSpy).toHaveBeenCalledWith({
-      pathname: '/(app)/(tabs)/(2_agents)/',
+      pathname: '/(app)/(tabs)/(2_agents)',
       params: {},
     });
     expect(navigateSpy.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
@@ -327,11 +330,11 @@ describe('Home live section', () => {
     (row.props.onPress as () => void)();
 
     expect(navigateSpy).toHaveBeenCalledWith({
-      pathname: '/(app)/(tabs)/(2_agents)/',
+      pathname: '/(app)/(tabs)/(2_agents)',
       params: { status: 'idle' },
     });
     expect(dismissToSpy).toHaveBeenCalledWith({
-      pathname: '/(app)/(tabs)/(2_agents)/',
+      pathname: '/(app)/(tabs)/(2_agents)',
       params: { status: 'idle' },
     });
   });

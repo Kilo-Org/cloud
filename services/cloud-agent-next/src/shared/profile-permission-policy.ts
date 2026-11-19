@@ -195,11 +195,53 @@ function patternIsCoveredBy(left: string, right: string): boolean {
 }
 
 /**
+ * The profile entries in one deterministic order of their patterns, broader
+ * before narrower wherever coverage proves it, so the profile's most specific
+ * rule is the one the runtime resolves last. Coverage is a strict partial order,
+ * so this is one deterministic topological sort of the broader-first edges: the
+ * lowest author index among the entries that no unplaced entry must precede is
+ * taken first. A pair the relation leaves unordered keeps the author's order
+ * only while the sort places no other entry between the two.
+ */
+function agentEntriesBroadestFirst(
+  entries: Array<[string, PermissionAction]>
+): Array<[string, PermissionAction]> {
+  const precedes: boolean[][] = entries.map(() => entries.map(() => false));
+  for (const [broadIndex, [broadPattern]] of entries.entries()) {
+    for (const [narrowIndex, [narrowPattern]] of entries.entries()) {
+      if (broadIndex === narrowIndex) continue;
+      if (
+        patternIsCoveredBy(narrowPattern, broadPattern) &&
+        !patternIsCoveredBy(broadPattern, narrowPattern)
+      )
+        precedes[broadIndex][narrowIndex] = true;
+    }
+  }
+  const placed = new Set<number>();
+  const ordered: Array<[string, PermissionAction]> = [];
+  while (placed.size < entries.length) {
+    const ready = entries.findIndex(
+      (_, index) =>
+        !placed.has(index) && precedes.every((row, other) => !row[index] || placed.has(other))
+    );
+    if (ready < 0) return [...entries];
+    placed.add(ready);
+    ordered.push(entries[ready]);
+  }
+  return ordered;
+}
+
+/**
  * Combine a session pattern map with an agent pattern map so both apply.
  *
- * The composed list keeps the agent rules in their own order, so a profile's
- * exception written after its own refusal survives, and each session decision it
- * carries follows it.
+ * The rendered map orders each tool's profile rules so that a broader pattern
+ * precedes the narrower patterns it covers, so the profile's most specific
+ * decision is the one the runtime applies, whatever its action. A pair of
+ * patterns with no coverage relation keeps the author's order only while no
+ * other rule is placed between the two, and a command that matches two such
+ * rules takes the later one. A profile's exception written after its own refusal
+ * therefore survives where the exception is the narrower of the two, and each
+ * session decision it carries follows it.
  *
  * A profile refusal applies as written. A profile ask applies as written too.
  * A profile allowance is kept only where the session writes an allow for that
@@ -215,7 +257,8 @@ function patternIsCoveredBy(left: string, right: string): boolean {
  * An ask also carries a session allow, as the profile's ask, but only when the
  * allow's own pattern satisfies the ask's pattern, so every command the allow
  * permits is one the profile asked about; a wider session allow keeps its own
- * verdict for the commands the ask does not cover.
+ * verdict for the commands the ask does not cover. A pattern the profile decides
+ * itself keeps the profile's own verdict, so a carried ask never overwrites it.
  *
  * A session refusal on the ask's own key comes before the carried allows,
  * because the session writes those allows to refine that refusal and they are
@@ -223,8 +266,8 @@ function patternIsCoveredBy(left: string, right: string): boolean {
  * because it names a command the profile never asked about, so it keeps the last
  * word and an ask never lifts a refusal the session wrote.
  *
- * Every pattern appears once, at the position of its last decision, so the
- * rendered map follows the order the decisions were made in.
+ * Every pattern appears once, at the position of its last decision, so a
+ * decision that follows another replaces it rather than repeating it.
  */
 function composeRuleMap(
   session: PermissionRuleMap | undefined,
@@ -233,7 +276,7 @@ function composeRuleMap(
   if (session === undefined) return { ...agent };
   const entries = Object.entries(session);
   const composed: Array<[string, PermissionAction]> = [];
-  for (const [pattern, action] of Object.entries(agent)) {
+  for (const [pattern, action] of agentEntriesBroadestFirst(Object.entries(agent))) {
     // A refusal and an ask apply as written; an allowance needs the session to
     // write the same pattern, which is what the session permits.
     if (action === 'allow' && session[pattern] !== 'allow') continue;
@@ -271,6 +314,9 @@ function composeRuleMap(
     composed.push(...refusals.filter(([refusalPattern]) => refusalPattern === pattern));
     for (const [allowPattern, allowAction] of entries) {
       if (allowAction !== 'allow' || allowPattern === pattern) continue;
+      // The profile decides that pattern itself, so a carried ask must not
+      // overwrite it and the profile's own order keeps deciding.
+      if (agent[allowPattern] !== undefined) continue;
       if (!patternIsCoveredBy(allowPattern, pattern)) continue;
       composed.push([allowPattern, 'ask']);
     }

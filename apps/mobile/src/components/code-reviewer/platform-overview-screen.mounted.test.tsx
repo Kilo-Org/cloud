@@ -121,9 +121,7 @@ vi.mock('@/components/code-reviewer/platform-overview-rows', () => ({
   buildOverviewRows: () => [],
   resolveRowOnPress: () => undefined,
 }));
-vi.mock('@/components/code-reviewer/provider-connect-card', () => ({
-  ProviderConnectCard: 'ProviderConnectCard',
-}));
+vi.mock('@/components/icons/github-icon', () => ({ GitHubIcon: 'GitHubIcon' }));
 vi.mock('@/components/platform-error-screen', () => ({
   PlatformErrorScreen: (props: {
     variant?: string;
@@ -141,10 +139,16 @@ vi.mock('@/components/platform-error-screen', () => ({
   },
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
-vi.mock('@/components/security-agent/settings-toggle-row', () => ({
-  ToggleRow: () => null,
+vi.mock('@/components/ui/preference-row', () => ({
+  PreferenceRow: () => null,
 }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: () => null }));
+vi.mock('@/components/ui/icons', () => ({
+  Bot: 'Bot',
+  GitBranch: 'GitBranch',
+  GitMerge: 'GitMerge',
+  ScrollText: 'ScrollText',
+}));
 vi.mock('@/components/ui/skeleton', () => ({
   Skeleton: () => {
     skeletonRenders.count += 1;
@@ -201,6 +205,7 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666' }),
+  useMutedDisabledInk: () => '#999',
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => (connectivity.known ? 'offline' : 'unknown'),
@@ -342,7 +347,7 @@ describe('PlatformOverviewScreen disconnected setup', () => {
 
       expect(centeredState).toHaveBeenCalledOnce();
       expect(scrollView).not.toHaveBeenCalled();
-      expect(renderer.root.findAllByType('ProviderConnectCard')).toHaveLength(showsCard ? 1 : 0);
+      expect(texts).toContain('Connect GitHub');
       const notice = "GitHub isn't connected. Only organization owners and admins can connect it.";
       expect(texts.includes(notice)).toBe(!showsCard);
     }
@@ -355,7 +360,7 @@ describe('PlatformOverviewScreen disconnected setup', () => {
 
     const renderer = await render('org-1', 'gitlab');
 
-    expect(renderer.root.findAllByType('ProviderConnectCard')).toHaveLength(1);
+    expect(collectText(renderer.toJSON())).toContain('Connect GitLab');
   });
 
   it.each([
@@ -690,12 +695,20 @@ describe('PlatformOverviewScreen actionRequired recovery', () => {
 });
 
 describe('PlatformOverviewScreen Automatic reviews account line', () => {
-  /** The muted line painted under the Automatic reviews label, when present. */
+  /**
+   * The optional account line in the Automatic reviews card. Scoped to the
+   * label's own sibling stack so the Follow REVIEW.md subtitle, which is also a
+   * muted line, cannot be mistaken for the account.
+   */
   function accountLines(renderer: TestRenderer.ReactTestRenderer): unknown[] {
-    return renderer.root
+    const label = renderer.root
       .findAllByType('Text')
-      .filter(node => node.props.variant === 'muted')
-      .map(node => node.props.children);
+      .find(node => node.props.children === 'Automatic reviews');
+    const stack = label?.parent?.children ?? [];
+    return stack
+      .filter((child): child is TestRenderer.ReactTestInstance => typeof child !== 'string')
+      .filter(child => child.props.variant === 'muted')
+      .map(child => child.props.children);
   }
 
   it('paints the connected account under the label', async () => {

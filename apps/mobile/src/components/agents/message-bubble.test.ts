@@ -554,7 +554,7 @@ describe('MessageBubble failure footer', () => {
     });
 
     const userFooter = footerOf(userTree);
-    expect(String(userFooter?.props.className)).toBe('gap-2 px-4 pt-1 pb-[24px] items-end');
+    expect(String(userFooter?.props.className)).toBe('gap-2 px-4 pt-1 pb-7 items-end');
     const userFooterClasses = String(userFooter?.props.className).split(' ');
     expect(userFooterClasses).toEqual(expect.arrayContaining(['px-4', 'items-end']));
     // The title and the detail line end-align with the bubble's trailing edge,
@@ -575,7 +575,7 @@ describe('MessageBubble failure footer', () => {
 
     // An assistant row's footer keeps its existing leading layout.
     const assistantFooter = footerOf(assistantTree);
-    expect(String(assistantFooter?.props.className)).toBe('gap-2 px-4 pt-1 pb-[24px]');
+    expect(String(assistantFooter?.props.className)).toBe('gap-2 px-4 pt-1 pb-7');
     const assistantFooterClasses = String(assistantFooter?.props.className).split(' ');
     expect(assistantFooterClasses).toEqual(expect.arrayContaining(['px-4']));
     expect(
@@ -585,7 +585,7 @@ describe('MessageBubble failure footer', () => {
     ).toEqual([]);
 
     const executionFooter = footerOf(executionTree);
-    expect(String(executionFooter?.props.className)).toBe('gap-2 px-4 pt-1 pb-[24px]');
+    expect(String(executionFooter?.props.className)).toBe('gap-2 px-4 pt-1 pb-7');
     expect(
       classNamesIn(executionFooter?.props.children).filter(name =>
         name.split(' ').includes('text-right')
@@ -676,7 +676,7 @@ describe('MessageBubble failure footer', () => {
     expect(findText(tree, t => t === 'Response failed')).toBe(false);
     expect(findText(tree, t => t === 'The agent could not run this message.')).toBe(false);
     // The send never left, so the statement sits in the bubble's own column.
-    expect(String(footerOf(tree)?.props.className)).toBe('gap-2 px-4 pt-1 pb-[24px] items-end');
+    expect(String(footerOf(tree)?.props.className)).toBe('gap-2 px-4 pt-1 pb-7 items-end');
     const addCredits = findElementByType(tree, 'AddCreditsRow');
     if (!addCredits) {
       throw new Error('the footer drew no Add credits action');
@@ -1765,7 +1765,7 @@ function findElementByLabel(
 /** The failed row's footer container, found by its own spacing classes. */
 function footerOf(tree: unknown): { type: string; props: Record<string, unknown> } | null {
   return findElementByType(tree, 'View', p =>
-    String(p.className).startsWith('gap-2 px-4 pt-1 pb-[24px]')
+    String(p.className).startsWith('gap-2 px-4 pt-1 pb-7')
   );
 }
 

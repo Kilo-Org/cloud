@@ -60,6 +60,9 @@ vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
   PrReviewReconnectNotice: 'PrReviewReconnectNotice',
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
+vi.mock('@/components/ui/row-group', () => ({ RowGroup: 'RowGroup' }));
+vi.mock('@/components/ui/section', () => ({ Section: 'Section' }));
 vi.mock('@/components/ui/icons', () => ({
   AlertTriangle: 'AlertTriangle',
   CheckCircle2: 'CheckCircle2',
@@ -174,10 +177,10 @@ describe('PrReviewChecksSection status groups', () => {
       ['pending', 2],
       ['skipped', 1],
     ]);
-    // The hairline sits between rows, never after the last one.
-    expect(rows.map(row => row.props.showSeparator)).toEqual([true, true, true, false]);
     // Each row's expanded detail is exactly the checks it counts.
     expect(rows.map(row => (row.props.children as unknown[]).length)).toEqual([1, 2, 2, 1]);
+    // The groups sit in the shared group surface, which owns the hairlines.
+    expect(renderer.root.findAll(node => String(node.type) === 'RowGroup')).toHaveLength(1);
   });
 
   it('buckets every run where the server rollup counts it, so no row contradicts the rollup', () => {
@@ -220,7 +223,6 @@ describe('PrReviewChecksSection status groups', () => {
 
     const rows = statusRows(renderer);
     expect(rows.map(row => [row.props.status, row.props.count])).toEqual([['success', 1]]);
-    expect(rows[0]?.props.showSeparator).toBe(false);
   });
 
   it('renders no row for a status the head commit has no checks for', () => {

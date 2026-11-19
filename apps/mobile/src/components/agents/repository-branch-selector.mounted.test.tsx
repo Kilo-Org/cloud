@@ -427,6 +427,18 @@ describe('RepositoryBranchSelector', () => {
     expect(renderer.root.findAllByType('Button' as never)).toHaveLength(0);
   });
 
+  it('shows the quiet inactive note, not loading, for a disabled row', () => {
+    // en.json alone translates this key until the translation slice lands; the
+    // fallback then resolves the English copy in every catalog.
+    const note = i18n.t('agentChat.newSession.branchInactive');
+    const renderer = mountSelector(githubRow, branchesState({ isEnabled: false }));
+
+    expect(texts(renderer)).toContain(note);
+    expect(renderer.root.findAllByType('Skeleton' as never)).toHaveLength(0);
+    expect(texts(renderer)).not.toContain(i18n.t('agentChat.newSession.branchLoading'));
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(0);
+  });
+
   it('offers no override for a repository with no branches', () => {
     const renderer = mountSelector(githubRow, branchesState({ branches: [], defaultBranch: null }));
 

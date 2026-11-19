@@ -129,9 +129,13 @@ it('routes an on-device target to its native model without Kilo, with the tools 
 });
 
 it.each([
-  ['Apple Intelligence is off', 'local:apple'],
-  ['the provider is not in this build', 'local:android'],
-])('fails explicitly without calling Kilo when %s', async (_label, model) => {
+  [
+    'Apple Intelligence is off',
+    'local:apple',
+    'modelChat.localModels.reasons.appleIntelligenceDisabled',
+  ],
+  ['the provider is not in this build', 'local:android', 'modelChat.localModels.unavailable'],
+])('fails explicitly without calling Kilo when %s', async (_label, model, key) => {
   apple.availability.mockResolvedValue({
     ...apple.available,
     status: 'unavailable',
@@ -141,9 +145,7 @@ it.each([
   const result = await Effect.runPromise(
     Effect.result(Stream.runCollect(client.stream(question(model))))
   );
-  expect(Result.isFailure(result) && backendFailureKey(result.failure)).toBe(
-    'modelChat.localModels.unavailable'
-  );
+  expect(Result.isFailure(result) && backendFailureKey(result.failure)).toBe(key);
   expect(apple.generate).not.toHaveBeenCalled();
   expect(kilo).not.toHaveBeenCalled();
   expect(fetch).not.toHaveBeenCalled();

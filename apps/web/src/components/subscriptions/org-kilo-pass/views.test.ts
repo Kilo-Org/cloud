@@ -586,25 +586,25 @@ describe('OrgKiloPassSetupView', () => {
 });
 
 describe('OrgKiloPassSubscriptionCard', () => {
-  function render(seatSubscriptionRequired: boolean) {
+  function render(seatSubscriptionState: 'active' | 'inactive') {
     return renderToStaticMarkup(
       React.createElement(OrgKiloPassSubscriptionCard, {
         organizationId: 'org-parent',
         paidSeatCount: 3,
-        seatSubscriptionRequired,
+        seatSubscriptionState,
       })
     );
   }
 
   it('links to setup when a seat subscription is active', () => {
-    const html = render(false);
+    const html = render('active');
 
     expect(html).toContain('/organizations/org-parent/subscriptions/kilo-pass/setup');
     expect(html).not.toContain('disabled=""');
   });
 
   it('disables the action and explains the seat requirement without one', () => {
-    const html = render(true);
+    const html = render('inactive');
 
     expect(html).not.toContain('/subscriptions/kilo-pass/setup');
     expect(html).toContain('disabled=""');

@@ -12,6 +12,7 @@ import { classifyFocusedElement, classifyTargetElement } from './browser-agent-p
 import { readAgentFrames } from './browser-agent-frames';
 import { preflightAgentCall } from './browser-agent-gate';
 import { SENSITIVE_REASON } from './browser-agent-checks';
+import type { BrowserGrant } from './browser-agent-checks';
 
 /** Runs the probe's own serialized source in a jsdom page, the way `scripting.executeScript` ships it. */
 const runInPage = (
@@ -273,6 +274,10 @@ describe('isolated frame list', () => {
           url: 'https://pay.example.com/form',
         },
       ],
+      owners: new Map([
+        ['0', []],
+        ['12', []],
+      ]),
     });
   });
 
@@ -343,6 +348,56 @@ describe('isolated frame list', () => {
     ).resolves.toStrictEqual({
       failure: {
         items: [{ class: 'read', frame: true, origin: 'https://pay.example.com' }],
+        kind: 'needs_permission',
+      },
+      ok: false,
+    });
+  });
+
+  it('requires the owner document’s grant for a tool that runs on the frame element there', async () => {
+    const probe = fakeProbe({
+      0: {
+        frame: {
+          origin: 'https://shop.example.com',
+          parentFrameId: null,
+          url: 'https://shop.example.com/',
+        },
+        hosted: { frameId: 12 },
+      },
+      12: {
+        frame: {
+          origin: 'https://pay.example.com',
+          parentFrameId: 0,
+          url: 'https://pay.example.com/form',
+        },
+      },
+    });
+    const call = (toolName: string, authorized: readonly BrowserGrant[]) =>
+      preflightAgentCall({
+        args: { function: '(element) => element.ownerDocument.cookie', target: '#pay' },
+        authorized,
+        consumeStepToken: () => false,
+        session: { ...sessionWith(probe), takeDownloads: () => [] },
+        sessionHandle: 'session-1',
+        stepTokens: [],
+        tabId: 7,
+        toolName,
+      });
+
+    await expect(
+      call('browser_evaluate', [{ class: 'act', origin: 'https://pay.example.com' }])
+    ).resolves.toStrictEqual({
+      failure: {
+        items: [{ class: 'act', origin: 'https://shop.example.com' }],
+        kind: 'needs_permission',
+      },
+      ok: false,
+    });
+    await expect(
+      call('browser_take_screenshot', [{ class: 'read', origin: 'https://pay.example.com' }])
+    ).resolves.toStrictEqual({
+      failure: {
+        items: [{ class: 'read', origin: 'https://shop.example.com' }],
         kind: 'needs_permission',
       },
       ok: false,

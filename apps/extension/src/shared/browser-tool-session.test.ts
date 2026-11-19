@@ -7,10 +7,12 @@ import {
   FIREFOX_UNSUPPORTED_BROWSER_TOOLS,
   MAX_BROWSER_TOOL_CONSOLE_MESSAGES,
   MAX_BROWSER_TOOL_NETWORK_REQUESTS,
+  MAX_BROWSER_TOOL_REFS,
   createBrowserToolSession,
   getFirefoxUnsupportedToolError,
 } from './browser-tool-session';
 import { TAB_NOT_INSPECTABLE_ERROR } from './tab-debugger';
+import { STALE_REF_ERROR } from './browser-agent-checks';
 import { TAB_TAKEN_ERROR } from './browser-caller';
 import type {
   BrowserScriptingApi,
@@ -490,6 +492,102 @@ const createExecutingScriptingSession = () => {
       tabId: 7,
       tabsApi: tabsApi.api,
     }),
+  };
+};
+
+type TabUpdatedListener = (
+  tabId: number,
+  changeInfo: { readonly status?: string; readonly url?: string }
+) => void;
+
+const SHOP_ORIGIN = 'https://shop.example.com';
+const PAY_ORIGIN = 'https://pay.example.com';
+
+/**
+ * One tab behind two real documents: the shop page (frame 0) and the pay
+ * frame it embeds (frame 4). MAIN-world code runs in the document its target
+ * frame names; the ISOLATED probe answers the frame tree.
+ */
+const createFramedScriptingSession = () => {
+  const shop = new JSDOM('<body><button>Top</button><iframe></iframe></body>', {
+    url: `${SHOP_ORIGIN}/`,
+  });
+  const pay = new JSDOM('<body><button>Buy</button><input></body>', { url: `${PAY_ORIGIN}/` });
+  const documents = new Map([
+    [0, shop],
+    [4, pay],
+  ]);
+  const frameAnswers = [
+    { frameId: 0, origin: SHOP_ORIGIN, owners: [4], parentFrameId: null },
+    { frameId: 4, origin: PAY_ORIGIN, owners: [], parentFrameId: 0 },
+  ];
+  const isolatedKinds: string[] = [];
+  const mainWorldFrames: (number | undefined)[] = [];
+  const updatedListeners: TabUpdatedListener[] = [];
+  const scriptingApi: BrowserScriptingApi = {
+    executeScript: async details => {
+      if (details.world === 'ISOLATED') {
+        isolatedKinds.push(details.args[0] ?? '');
+
+        return details.args[0] === 'frame'
+          ? frameAnswers.map(({ frameId, ...answer }) => ({
+              frameId,
+              result: JSON.stringify({ ...answer, url: `${answer.origin}/` }),
+            }))
+          : [];
+      }
+
+      const frameId = details.target.frameIds?.[0];
+      const dom = documents.get(frameId ?? 0);
+      const results: unknown[] = [];
+
+      mainWorldFrames.push(frameId);
+
+      if (dom !== undefined) {
+        Object.defineProperty(dom.window.HTMLElement.prototype, 'scrollIntoView', {
+          configurable: true,
+          value: vi.fn(),
+        });
+        await withPageGlobals(
+          {
+            MouseEvent: dom.window.MouseEvent,
+            document: dom.window.document,
+            location: dom.window.location,
+            window: dom.window,
+          },
+          async () => {
+            results.push(await executeWrappedPageCode(details.args[0] ?? ''));
+          }
+        );
+      }
+
+      return [{ documentId: `doc-${String(frameId ?? 0)}`, result: results[0] }];
+    },
+  };
+  const tabsApi: BrowserTabsApi = {
+    ...createTabsApi().api,
+    onUpdated: {
+      addListener: listener => {
+        updatedListeners.push(listener);
+      },
+      removeListener: () => {},
+    },
+  };
+
+  return {
+    emitUpdated: (
+      tabId: number,
+      changeInfo: { readonly status?: string; readonly url?: string }
+    ) => {
+      for (const listener of updatedListeners) {
+        listener(tabId, changeInfo);
+      }
+    },
+    isolatedKinds,
+    mainWorldFrames,
+    pay,
+    session: createBrowserToolSession({ scriptingApi, tabId: 7, tabsApi }),
+    shop,
   };
 };
 
@@ -1554,6 +1652,87 @@ describe('browser tool session scripting backend', () => {
         await expect(session.resolveTarget('e2')).resolves.toMatchObject({ kind: 'selector' });
       }
     );
+  });
+
+  it('splices a granted frame without a ref on its line, which would only reach the owner element', async () => {
+    const { isolatedKinds, session } = createFramedScriptingSession();
+
+    await expect(
+      session.callTool('browser_snapshot', {}, { readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] })
+    ).resolves.toStrictEqual({
+      ok: true,
+      value: ['- button "Top" [ref=e1]', '- iframe', '  - button "Buy"', '  - textbox'].join('\n'),
+    });
+    await expect(session.resolveTarget('e2')).resolves.toBeUndefined();
+    expect(isolatedKinds).toStrictEqual(['frame']);
+  });
+
+  it('splices from the call’s frame inventory instead of probing the frames again', async () => {
+    const { isolatedKinds, session } = createFramedScriptingSession();
+    const readFrames = vi.fn(() =>
+      Promise.resolve({
+        childSessions: new Map<string, string>(),
+        complete: true,
+        frames: [
+          { id: '0', origin: SHOP_ORIGIN, url: `${SHOP_ORIGIN}/` },
+          { id: '4', origin: PAY_ORIGIN, parentId: '0', url: `${PAY_ORIGIN}/` },
+        ],
+        owners: new Map<string, readonly (string | undefined)[]>([
+          ['0', ['4']],
+          ['4', []],
+        ]),
+      })
+    );
+
+    await expect(
+      session.callTool(
+        'browser_snapshot',
+        {},
+        { readFrames, readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] }
+      )
+    ).resolves.toStrictEqual({
+      ok: true,
+      value: ['- button "Top" [ref=e1]', '- iframe', '  - button "Buy"', '  - textbox'].join('\n'),
+    });
+    expect(readFrames.mock.calls).toStrictEqual([[]]);
+    expect(isolatedKinds).toStrictEqual([]);
+  });
+
+  it('makes every scripting ref stale once the tab starts loading another document', async () => {
+    const { emitUpdated, session } = createFramedScriptingSession();
+
+    await session.callTool('browser_snapshot', {});
+    emitUpdated(7, { url: `${SHOP_ORIGIN}/#section` });
+    emitUpdated(8, { status: 'loading' });
+    await expect(session.resolveTarget('e1')).resolves.toMatchObject({ kind: 'selector' });
+
+    emitUpdated(7, { status: 'loading' });
+
+    await expect(session.resolveTarget('e1')).resolves.toBeUndefined();
+    await expect(session.callTool('browser_click', { target: 'e1' })).resolves.toStrictEqual({
+      error: STALE_REF_ERROR,
+      ok: false,
+    });
+  });
+
+  it('caps a caller’s merged refs, dropping the oldest first', async () => {
+    const { session } = createScriptingSession();
+
+    session.registerRefs(
+      Array.from({ length: MAX_BROWSER_TOOL_REFS + 1 }, (_slot, index) => ({
+        ref: `e${String(index + 1)}`,
+        selector: `#node-${String(index + 1)}`,
+      })),
+      { merge: true }
+    );
+
+    await expect(session.callTool('browser_click', { target: 'e1' })).resolves.toStrictEqual({
+      error: STALE_REF_ERROR,
+      ok: false,
+    });
+    await expect(session.callTool('browser_click', { target: 'e2' })).resolves.toMatchObject({
+      ok: true,
+    });
   });
 
   it('types slowly character by character with key events through the injected code', async () => {

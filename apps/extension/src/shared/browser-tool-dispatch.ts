@@ -14,7 +14,7 @@ import type {
 import { READ_BROWSER_TOOL_NAMES, runReadBrowserTool } from './browser-tool-read-actions';
 import type { BrowserReadToolOptions } from './browser-tool-read-actions';
 import type { BrowserToolPageSession } from './browser-tool-snapshot';
-import { readAgentFrames } from './browser-agent-frames';
+import { createAgentFrameReader } from './browser-agent-frames';
 import type { AgentFrameInventory, AgentReadScope } from './browser-agent-frames';
 import { maskIsolatedAgentScreenshot } from './browser-agent-isolated-probe';
 import type { BrowserToolInteractSession } from './browser-tool-interact-actions';
@@ -261,14 +261,18 @@ export const runKiloBrowserTool = async ({
      */
     if (session.backend === 'scripting' && !TAB_ONLY_TOOL_NAMES.has(upstreamName)) {
       const scope = options?.agentScope;
-      const result = await session.callTool(toolName, parsedArgs.data, scope);
+      const readFrames = options?.readFrames ?? createAgentFrameReader(session);
+      const result = await session.callTool(
+        toolName,
+        parsedArgs.data,
+        scope === undefined ? undefined : { ...scope, readFrames }
+      );
 
       // The capture shows every frame and field on the page; an agent sees only what it may read.
       if (upstreamName !== 'browser_take_screenshot' || scope === undefined) {
         return result;
       }
 
-      const readFrames = options?.readFrames ?? (() => readAgentFrames(session));
       const inventory = await readFrames();
 
       return await maskIsolatedAgentScreenshot({

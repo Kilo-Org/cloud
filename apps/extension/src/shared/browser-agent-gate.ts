@@ -111,6 +111,12 @@ interface TargetFrame {
   /** The target sits in a child frame, not the tab's top-level document. */
   readonly frame: boolean;
   readonly origin: string;
+  /**
+   * The document holding a targeted frame element, when the tool runs there:
+   * on the scripting backend an evaluate or a click on an `<iframe>` runs in
+   * its owner's document, so the call needs that document's grant as well.
+   */
+  readonly owner?: { readonly frame: boolean; readonly origin: string };
 }
 
 /**
@@ -274,8 +280,16 @@ const targetFrameOf = async (
 
     if (hosted !== undefined) {
       const frame = frames.find(candidate => candidate.id === hosted.frameId);
+      const main = mainFrameOf(frames);
 
-      return { frame: true, origin: frame?.origin ?? OPAQUE_ORIGIN };
+      return {
+        frame: true,
+        origin: frame?.origin ?? OPAQUE_ORIGIN,
+        owner:
+          main === undefined
+            ? { frame: true, origin: OPAQUE_ORIGIN }
+            : { frame: false, origin: main.origin },
+      };
     }
   }
 
@@ -620,9 +634,12 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
       : { frame: primaryTargetFrame.frame, origin: primaryTargetFrame.origin };
   const origin = destinationOrigin ?? targetFrame?.origin ?? mainOrigin;
   const targetOriginFrame = grantClass !== 'navigate' && targetFrame?.frame === true;
-  // Every named target's frame needs the grant, not only the tab's top-level origin.
-  const requiredOrigins = new Set<string>(targetFrames.map(frame => frame.origin));
-  const frameByOrigin = new Map(targetFrames.map(frame => [frame.origin, frame.frame]));
+  // Every named target's frame needs the grant, not only the tab's top-level origin, and so does the document a tool on a frame element runs in.
+  const requiredFrames = targetFrames.flatMap(frame =>
+    frame.owner === undefined ? [frame] : [frame.owner, frame]
+  );
+  const requiredOrigins = new Set<string>(requiredFrames.map(frame => frame.origin));
+  const frameByOrigin = new Map(requiredFrames.map(frame => [frame.origin, frame.frame]));
 
   if (requiredOrigins.size === 0) {
     requiredOrigins.add(origin);

@@ -4,7 +4,9 @@ import { buildWorkflowPageCode } from './agent-workflow-runner';
 import { TAB_TAKEN_ERROR } from './browser-caller';
 import { STALE_REF_ERROR } from './browser-agent-checks';
 import { runIsolatedAgentProbe } from './browser-agent-isolated-probe-script';
+import { readIsolatedFrames } from './browser-agent-isolated-probe';
 import type { IsolatedAgentProbe } from './browser-agent-isolated-probe';
+import type { AgentFrameInventory } from './browser-agent-frames';
 import { spliceScriptingFrames } from './browser-tool-scripting-frames';
 import { KILO_BROWSER_TOOL_PREFIX, toKiloBrowserToolName } from './browser-tool-contract';
 import {
@@ -91,6 +93,8 @@ export const getFirefoxUnsupportedToolError = (tool: string): string | undefined
 
 /** Longest wait_for/text poll the scripting backend runs before it reports a timeout. */
 export const MAX_BROWSER_TOOL_WAIT_MS = 15_000;
+/** Refs one caller's registry keeps: merged snapshots and finds would otherwise grow it for as long as a document lives. */
+export const MAX_BROWSER_TOOL_REFS = 5000;
 /** Soft timeout for one scripting tool action; larger than the debugger's default for snapshot-sized results. */
 const SCRIPTING_ACTION_TIMEOUT_MS = 20_000;
 /** Longest a navigation waits for the browser to report the new page complete; the debugger path waits as long. */
@@ -304,6 +308,8 @@ export interface BrowserToolRefEntry {
 /** An agent caller's read grants for one call: the origins whose frames it may read. */
 export interface BrowserToolCallScope {
   readonly readableOrigins: readonly string[];
+  /** The call's shared frame inventory, so a snapshot splices frames from the tree the gate already read. */
+  readonly readFrames?: (() => Promise<AgentFrameInventory>) | undefined;
 }
 
 export type BrowserToolResolvedTarget =
@@ -812,7 +818,9 @@ const __buildAria = (root, maxDepth, withBoxes, refStart, withRefs) => {
     if (!__visible(el)) { return; }
     if (el.localName === 'iframe' || el.localName === 'frame') {
       const frameRef = refFor(el);
-      frames.push({ depth: depth, line: lines.length, owner: owners.indexOf(el) });
+      const frame = { depth: depth, line: lines.length, owner: owners.indexOf(el) };
+      if (frameRef !== '') { frame.ref = 'e' + nextRef; }
+      frames.push(frame);
       lines.push('  '.repeat(depth) + '- iframe' + frameRef);
       return;
     }
@@ -1395,7 +1403,16 @@ const browserToolScreenshotArgsSchema = z.object({
   type: z.enum(['jpeg', 'png', 'webp']).optional(),
 });
 const browserToolSnapshotResultSchema = z.object({
-  frames: z.array(z.object({ depth: z.number(), line: z.number(), owner: z.number() })).default([]),
+  frames: z
+    .array(
+      z.object({
+        depth: z.number(),
+        line: z.number(),
+        owner: z.number(),
+        ref: z.string().optional(),
+      })
+    )
+    .default([]),
   lines: z.array(z.string()),
   nextRef: z.number(),
   refs: z.array(z.object({ ref: z.string(), selector: z.string() })),
@@ -2002,6 +2019,16 @@ export const createBrowserToolSession = ({
     }
   };
 
+  // The scripting backend gets no document events: the tab starting a new load is the navigation that makes every ref stale.
+  const handleScriptingTabUpdated = (
+    updatedTabId: number,
+    changeInfo: { readonly status?: string }
+  ): void => {
+    if (updatedTabId === tabId && changeInfo.status === 'loading') {
+      invalidateDocument();
+    }
+  };
+
   const handleDetach: ChromeDebuggerDetachListener = (source, reason) => {
     if (source.tabId !== undefined && source.tabId !== tabId) {
       return;
@@ -2021,6 +2048,7 @@ export const createBrowserToolSession = ({
     debuggerApi?.onDetach.removeListener(handleDetach);
     debuggerApi?.onEvent.removeListener(handleEvent);
     tabsApi.onRemoved?.removeListener(handleTabRemoved);
+    tabsApi.onUpdated?.removeListener(handleScriptingTabUpdated);
   };
 
   const detachQuietly = async (): Promise<void> => {
@@ -2538,7 +2566,17 @@ export const createBrowserToolSession = ({
     }
 
     for (const entry of entries) {
+      refs.delete(entry.ref);
       refs.set(entry.ref, entry);
+    }
+
+    // Merged refs never shrink by themselves: past the cap the oldest go first, and resolving one is a stale ref.
+    for (const ref of refs.keys()) {
+      if (refs.size <= MAX_BROWSER_TOOL_REFS) {
+        break;
+      }
+
+      refs.delete(ref);
     }
   };
 
@@ -2654,15 +2692,30 @@ export const createBrowserToolSession = ({
     }
 
     scriptingRefCount = snapshot.data.nextRef;
-    registerRefs(call.refs, snapshot.data.refs, { merge });
 
-    if (call.scope === undefined) {
+    const { scope } = call;
+
+    if (scope === undefined) {
+      registerRefs(call.refs, snapshot.data.refs, { merge });
+
       return { lines: snapshot.data.lines, ok: true };
     }
 
-    const lines = await spliceScriptingFrames(snapshot.data, depth, {
-      probe: isolatedProbe,
-      readFrame: async (frameId, maxDepth) => {
+    const spliced = await spliceScriptingFrames(snapshot.data, depth, {
+      frameTree: async () => {
+        const inventory = await scope.readFrames?.();
+
+        if (inventory?.owners !== undefined) {
+          return {
+            complete: inventory.complete,
+            frames: inventory.frames,
+            owners: inventory.owners,
+          };
+        }
+
+        return isolatedProbe === undefined ? undefined : readIsolatedFrames(isolatedProbe);
+      },
+      readFrame: async (frameId, maxDepth, timeoutMs) => {
         const frame = await runScriptingPageScript({
           frameId,
           script: buildSnapshotPageScript({
@@ -2674,6 +2727,7 @@ export const createBrowserToolSession = ({
           }),
           scriptingApi,
           tabId,
+          timeoutMs,
         });
         const parsed = frame.ok
           ? browserToolSnapshotResultSchema.safeParse(frame.value)
@@ -2681,10 +2735,17 @@ export const createBrowserToolSession = ({
 
         return parsed?.success === true ? parsed.data : undefined;
       },
-      readableOrigins: call.scope.readableOrigins,
+      readableOrigins: scope.readableOrigins,
     });
+    const dropped = new Set(spliced.readableFrameRefs);
 
-    return { lines, ok: true };
+    registerRefs(
+      call.refs,
+      snapshot.data.refs.filter(entry => !dropped.has(entry.ref)),
+      { merge }
+    );
+
+    return { lines: spliced.lines, ok: true };
   };
 
   const resolveTargetArg = (
@@ -3543,6 +3604,10 @@ export const createBrowserToolSession = ({
   debuggerApi?.onDetach.addListener(handleDetach);
   debuggerApi?.onEvent.addListener(handleEvent);
   tabsApi.onRemoved?.addListener(handleTabRemoved);
+
+  if (backend === 'scripting') {
+    tabsApi.onUpdated?.addListener(handleScriptingTabUpdated);
+  }
 
   return {
     attach,

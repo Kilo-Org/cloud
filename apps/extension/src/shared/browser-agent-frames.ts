@@ -147,6 +147,8 @@ export interface AgentFrameInventory {
    * must fail closed instead of shipping pixels.
    */
   readonly complete: boolean;
+  /** Without a debugger protocol: per frame id, the frame each of its `<iframe>`/`<frame>` elements hosts. */
+  readonly owners?: ReadonlyMap<string, readonly (string | undefined)[]>;
 }
 
 export type AgentFrameSession = Pick<BrowserToolPageSession, 'isolatedProbe' | 'send'> & {
@@ -199,7 +201,12 @@ export const readAgentFrames = async (session: AgentFrameSession): Promise<Agent
   if (session.isolatedProbe !== undefined) {
     const isolated = await readIsolatedFrames(session.isolatedProbe);
 
-    return { childSessions: new Map(), complete: isolated.complete, frames: isolated.frames };
+    return {
+      childSessions: new Map(),
+      complete: isolated.complete,
+      frames: isolated.frames,
+      owners: isolated.owners,
+    };
   }
 
   const sameProcess = await readSameProcessFrames(session);

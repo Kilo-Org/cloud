@@ -25,7 +25,6 @@ export function createReviewPublication(input: {
   let state: 'unused' | 'submitted' | 'running' | 'spent' | 'abandoned' = 'unused';
   let signal: PublicationRecoverySignal | null = null;
   let failure: unknown;
-  let failureMessageId: string | undefined;
   let assistantMessage: { id: string; created?: number } | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const abort = new AbortController();
@@ -69,14 +68,10 @@ export function createReviewPublication(input: {
             assistantMessage = { id: message.id, created };
             texts.clear();
             failure = undefined;
-            failureMessageId = undefined;
           } else if (assistantMessage.created === undefined) {
             assistantMessage.created = created;
           }
-          if (messageInfoReportsAssistantError(message)) {
-            failure = message.error;
-            failureMessageId = message.id;
-          }
+          if (messageInfoReportsAssistantError(message)) failure = message.error;
         }
         return;
       }
@@ -102,10 +97,8 @@ export function createReviewPublication(input: {
         assistantReportsNoActionableOutput(
           [...texts.values()].map(text => ({ type: 'text', text }))
         )
-      ) {
+      )
         failure = { name: 'MessageOutputLengthError' };
-        failureMessageId = messageId;
-      }
     },
     recover(): boolean {
       if (state === 'submitted' || state === 'running') return true;
@@ -143,6 +136,5 @@ export function createReviewPublication(input: {
       abort.abort();
     },
     failure: () => failure,
-    failureMessageId: () => failureMessageId,
   };
 }

@@ -1,9 +1,7 @@
 import { z } from 'zod';
 import {
-  controlPlaneAssistantFailureReasonSchema,
   controlPlaneFailureReasonSchema,
   controlPlanePreparationStepSchema,
-  controlPlaneProviderOwnershipSchema,
   controlPlaneWorkspaceFailureSubtypeSchema,
 } from './control-plane-protocol.js';
 import {
@@ -167,7 +165,6 @@ export const controlDiagnosticFieldsSchema = z
       'prepare_failed',
       'session_ready',
       'session_outcome',
-      'assistant_failure',
       'status',
     ]),
     stage: z
@@ -272,16 +269,6 @@ export const controlDiagnosticFieldsSchema = z
         'event_ack_tracking_evicted',
       ])
       .optional(),
-    failureSource: z
-      .enum(['publication_failure', 'turn_close_error', 'session_error', 'missing_agent'])
-      .optional(),
-    errorType: z
-      .string()
-      .regex(/^[A-Za-z0-9_.:-]{1,128}$/)
-      .optional(),
-    errorStatus: z.number().min(100).max(599).optional(),
-    assistantReason: controlPlaneAssistantFailureReasonSchema.optional(),
-    providerOwnership: controlPlaneProviderOwnershipSchema.optional(),
     operation: z.enum([...CONTROL_OPERATIONS, 'other']).optional(),
     retirementCause: z
       .enum([
@@ -509,7 +496,6 @@ const PROJECTABLE_LIFECYCLE_PHASES = new Set([
   'prepare_failed',
   'session_ready',
   'session_outcome',
-  'assistant_failure',
 ]);
 
 /**

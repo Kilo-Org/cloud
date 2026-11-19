@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- the reason/comment draft state and the load-failure gates share one screen harness; the paused-offline gate joins the existing error and loading gates */
 import { useRouter } from 'expo-router';
 import { ShieldOff } from '@/components/ui/icons';
 import { useEffect, useRef, useState } from 'react';
@@ -7,7 +6,7 @@ import { ScrollView, TextInput, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { EmptyState } from '@/components/empty-state';
-import { QueryError } from '@/components/query-error';
+import { DismissFindingLoadFailure } from '@/components/security-agent/dismiss-finding-load-failure';
 import { RefusalStatus } from '@/components/refusal-status';
 import { ScreenHeader } from '@/components/screen-header';
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
@@ -31,6 +30,7 @@ import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-in
 import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
 import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
+import { isReadPausedBeforeData } from '@/lib/query/read-failure-variant';
 
 // The five GitHub dismissal reasons the backend's DismissReasonSchema accepts
 // (apps/web/src/lib/security-agent/core/schemas.ts:13-19) — exact value/label
@@ -53,18 +53,6 @@ type DismissFindingScreenProps = {
   scope: string;
   findingId: string;
 };
-
-/**
- * A first read the online manager paused (connectivity down or unsettled) can
- * never finish: the loading gate would hold the skeleton until connectivity
- * returns. Name the connection and offer Retry for each read the form waits on.
- */
-function pausedOfflineRead(query: {
-  isPending: boolean;
-  fetchStatus: 'fetching' | 'paused' | 'idle';
-}): boolean {
-  return query.isPending && query.fetchStatus === 'paused';
-}
 
 export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindingScreenProps>) {
   const router = useRouter();
@@ -185,47 +173,41 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
 
   if (findingQuery.isError && !findingQuery.data) {
     return (
-      <View className="flex-1 bg-background">
-        {sheetHeader}
-        <QueryError
-          message={t('securityAgent.dismiss.couldNotLoad')}
-          onRetry={() => void findingQuery.refetch()}
-        />
-      </View>
+      <DismissFindingLoadFailure
+        header={sheetHeader}
+        message={t('securityAgent.dismiss.couldNotLoad')}
+        onRetry={() => void findingQuery.refetch()}
+      />
     );
   }
 
-  // A first read the online manager paused (see pausedOfflineRead): the
+  // A first read the online manager paused (see isReadPausedBeforeData): the
   // loading gate would hold the skeleton until connectivity returns. Name
   // the connection and offer Retry for each read the form waits on.
-  const findingPaused = pausedOfflineRead(findingQuery);
-  const capabilityPaused = pausedOfflineRead(capability);
+  const findingPaused = isReadPausedBeforeData(findingQuery);
+  const capabilityPaused = isReadPausedBeforeData(capability);
   if (findingPaused || capabilityPaused) {
     return (
-      <View className="flex-1 bg-background">
-        {sheetHeader}
-        <QueryError
-          variant="offline"
-          message={t(
-            findingPaused
-              ? 'securityAgent.dismiss.couldNotLoad'
-              : 'securityAgent.dismiss.couldNotCheckPermissions'
-          )}
-          onRetry={() => void (findingPaused ? findingQuery.refetch() : capability.refetch())}
-        />
-      </View>
+      <DismissFindingLoadFailure
+        header={sheetHeader}
+        variant="offline"
+        message={t(
+          findingPaused
+            ? 'securityAgent.dismiss.couldNotLoad'
+            : 'securityAgent.dismiss.couldNotCheckPermissions'
+        )}
+        onRetry={() => void (findingPaused ? findingQuery.refetch() : capability.refetch())}
+      />
     );
   }
 
   if (capability.status === 'error') {
     return (
-      <View className="flex-1 bg-background">
-        {sheetHeader}
-        <QueryError
-          message={t('securityAgent.dismiss.couldNotCheckPermissions')}
-          onRetry={() => void capability.refetch()}
-        />
-      </View>
+      <DismissFindingLoadFailure
+        header={sheetHeader}
+        message={t('securityAgent.dismiss.couldNotCheckPermissions')}
+        onRetry={() => void capability.refetch()}
+      />
     );
   }
 

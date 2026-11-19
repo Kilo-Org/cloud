@@ -34,6 +34,19 @@ export function classifyReadFailureVariant({
   return isConnection ? 'offline' : 'server';
 }
 
+/**
+ * A first load the online manager paused: nothing was sent, so the read is
+ * still pending with no data and reaches neither the loading gate nor the
+ * error branch. The offline online manager is the only thing that pauses a
+ * read, so this state names the connection.
+ */
+export function isReadPausedBeforeData(read: {
+  isPending: boolean;
+  fetchStatus: 'fetching' | 'paused' | 'idle';
+}): boolean {
+  return read.isPending && read.fetchStatus === 'paused';
+}
+
 function servedAnswer(error: unknown): boolean {
   // A bare top-level `code` is not a server answer on its own: transport and
   // abort errors carry one too (the Expo fetch cancellation names itself in

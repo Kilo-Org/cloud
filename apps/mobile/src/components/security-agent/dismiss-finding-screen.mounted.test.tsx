@@ -89,9 +89,12 @@ const finding = vi.hoisted(() => ({
   refetch: vi.fn(),
 }));
 const queryError = vi.hoisted(() => ({
-  props: null as
-    | { variant?: string; message?: string; onRetry?: () => void; placement?: string }
-    | null,
+  props: null as {
+    variant?: string;
+    message?: string;
+    onRetry?: () => void;
+    placement?: string;
+  } | null,
 }));
 const pillGroup = vi.hoisted(() => ({
   onChange: (() => undefined) as (value: string) => void,
@@ -159,6 +162,11 @@ vi.mock('@/components/query-error', () => ({
     queryError.props = props;
     return 'QueryError';
   },
+}));
+// The screen routes every load-failure gate through this body; the mock is a
+// named node whose props the failure assertions read through findAllByType.
+vi.mock('@/components/security-agent/dismiss-finding-load-failure', () => ({
+  DismissFindingLoadFailure: 'DismissFindingLoadFailure',
 }));
 vi.mock('@/components/security-agent/settings-recovery-status', () => ({
   SettingsRecoveryStatus: 'SettingsRecoveryStatus',
@@ -249,6 +257,22 @@ function billingSteps(root: I): I[] {
       (n.type as string) === 'Pressable' &&
       n.props.accessibilityLabel === BILLING_ACTION_LABEL
   );
+}
+
+/** Every failure-body node the screen rendered, its props along. */
+function findAllFailures(root: I): I[] {
+  return root.findAll(
+    n => typeof n.type === 'string' && (n.type as string) === 'DismissFindingLoadFailure'
+  );
+}
+
+/** The one load-failure surface the screen must show. */
+function renderFailure(tree: R): I {
+  const nodes = findAllFailures(tree.root);
+  if (nodes.length !== 1) {
+    throw new Error(`expected 1 load-failure surface, got ${nodes.length}`);
+  }
+  return nodes[0] as I;
 }
 
 describe('DismissFindingScreen dismissal CTA states', () => {
@@ -350,8 +374,8 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       const tree = renderScreen();
       expect(tree.root.findAllByType(ScrollView)).toHaveLength(0);
       expect(tree.root.findAllByType(SettingsRecoveryStatus)).toHaveLength(0);
-      const error = tree.root.findByType(QueryError);
-      expect(error.props.placement).not.toBe('top');
+      const error = renderFailure(tree);
+      expect(error.props.variant).toBeUndefined();
       act(error.props.onRetry as () => void);
       expect(query.refetch).toHaveBeenCalledOnce();
     }
@@ -368,7 +392,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       const tree = renderScreen();
 
       expect(tree.root.findAllByType(ScrollView)).toHaveLength(0);
-      const error = tree.root.findByType(QueryError);
+      const error = renderFailure(tree);
       expect(error.props.variant).toBe('offline');
       expect(error.props.message).toBe(
         source === 'finding'
@@ -387,7 +411,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     finding.fetchStatus = 'fetching';
     const tree = renderScreen();
 
-    expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
+    expect(findAllFailures(tree.root)).toHaveLength(0);
   });
 
   it.each([

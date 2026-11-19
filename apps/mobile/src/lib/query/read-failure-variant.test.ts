@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   classifyReadFailureVariant,
+  isReadPausedBeforeData,
   type SelectReadFailureVariantInput,
 } from './read-failure-variant';
 
@@ -107,5 +108,19 @@ describe('classifyReadFailureVariant', () => {
 
   it('names the connection when the caller also pauses a coded failure', () => {
     expect(variantFor({ errors: [serverError('FORBIDDEN')], isPaused: true })).toBe('offline');
+  });
+});
+
+describe('isReadPausedBeforeData', () => {
+  it('names a pending read the online manager paused', () => {
+    expect(isReadPausedBeforeData({ isPending: true, fetchStatus: 'paused' })).toBe(true);
+  });
+
+  it('is false for a pending read still in flight', () => {
+    expect(isReadPausedBeforeData({ isPending: true, fetchStatus: 'fetching' })).toBe(false);
+  });
+
+  it('is false for a settled read whose refetch is paused', () => {
+    expect(isReadPausedBeforeData({ isPending: false, fetchStatus: 'paused' })).toBe(false);
   });
 });

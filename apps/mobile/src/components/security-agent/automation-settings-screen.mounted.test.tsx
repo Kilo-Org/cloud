@@ -1,176 +1,32 @@
 // Automation-settings approval-gate contract: the "Require approval before
 // auto-remediation" toggle hydrates from the loaded config, persists through
-// the save patch object, and renders disabled for read-only viewers.
+// the save patch object, and renders disabled for read-only viewers. The
+// paused gate contract lives here too: the mock state and mount harness they
+// share sit in the mounted-test-helpers module.
 
-import { createElement } from 'react';
-import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+// The helpers import is first: its vi.mock registrations (react-native among
+// them) must be in place before any other import evaluates, so the real
+// React Native entry never loads.
+import {
+  approvalRow,
+  capability,
+  config,
+  enabledConfig,
+  pillGroups,
+  platformError,
+  renderScreen,
+  save,
+  saveButton,
+  toastSuccess,
+  toggleRows,
+  trackInteraction,
+} from './automation-settings-screen.mounted.test-helpers';
+
+import { act } from '@/test/renderer';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { AutomationSettingsScreen } from './automation-settings-screen';
-
-const config = vi.hoisted(() => ({
-  data: null as unknown,
-  isLoading: false,
-  isError: false,
-  isPending: false,
-  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
-  refetch: vi.fn(),
-}));
-const platformError = vi.hoisted(() => ({
-  props: null as
-    | { title: string; variant?: string; message?: string; onRetry?: () => void }
-    | null,
-}));
-const capability = vi.hoisted(() => ({
-  canManage: true,
-}));
-const save = vi.hoisted(() => ({
-  mutateAsync: vi.fn(),
-  isPending: false,
-  options: undefined as { announceSaved?: boolean } | undefined,
-}));
-const trackInteraction = vi.hoisted(() => ({
-  mutate: vi.fn(),
-}));
-
-const toggleRows = vi.hoisted(() => ({
-  rows: [] as {
-    title: string;
-    accessibilityLabel?: string;
-    subtitle?: string;
-    value: boolean;
-    disabled: boolean;
-    onValueChange: (value: boolean) => void;
-  }[],
-}));
-const pillGroups = vi.hoisted(() => ({
-  groups: [] as { label: string; accessibilityLabel?: string }[],
-}));
-const saveButton = vi.hoisted(() => ({
-  onSave: null as (() => Promise<void>) | null,
-}));
-
-vi.mock('react-native', () => ({
-  View: 'View',
-  Alert: { alert: vi.fn() },
-}));
-const toastSuccess = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/a11y/announcing-toast', () => ({
-  announcingToast: { success: (message: string) => toastSuccess(message), error: vi.fn() },
-}));
-vi.mock('@kilocode/app-shared/security-agent', () => ({
-  getSettingsDirtyState: () => 'clean',
-}));
-vi.mock('@/lib/hooks/use-security-agent', () => ({
-  useSecurityAgentCapability: () => capability,
-  useSecurityAgentConfig: () => config,
-  useSaveSecurityAgentConfig: (_scope: string, options?: { announceSaved?: boolean }) => {
-    save.options = options;
-    return save;
-  },
-  useTrackSecurityAgentInteraction: () => trackInteraction,
-}));
-vi.mock('@/lib/hooks/use-settings-back-guard', () => ({
-  useSecurityAgentSettingsRedirect: () => undefined,
-  useSettingsBackGuard: () => ({
-    onBack: () => undefined,
-    skipNextGuardRef: { current: false },
-    dialog: null,
-  }),
-}));
-vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
-  useCommittedConnectivityStatus: () => 'online',
-}));
-vi.mock('@/components/security-agent/settings-pill-group', () => ({
-  PillGroup: (props: { label: string; accessibilityLabel?: string }) => {
-    pillGroups.groups.push(props);
-    return null;
-  },
-}));
-vi.mock('@/components/security-agent/settings-save-button', () => ({
-  SettingsSaveButton: (props: { onSave: () => Promise<void> }) => {
-    saveButton.onSave = props.onSave;
-    return null;
-  },
-}));
-vi.mock('@/components/security-agent/settings-toggle-row', () => ({
-  ToggleRow: (props: {
-    title: string;
-    accessibilityLabel?: string;
-    subtitle?: string;
-    value: boolean;
-    disabled: boolean;
-    onValueChange: (value: boolean) => void;
-  }) => {
-    toggleRows.rows.push(props);
-    return null;
-  },
-}));
-vi.mock('@/components/platform-error-screen', () => ({
-  PlatformErrorScreen: (props: {
-    title: string;
-    variant?: string;
-    message?: string;
-    onRetry?: () => void;
-  }) => {
-    platformError.props = props;
-    return null;
-  },
-}));
-vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: (props: { headerRight?: unknown }) => props.headerRight ?? null,
-}));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/tab-screen', () => ({
-  TabScreenScrollView: (props: { children?: unknown }) => props.children,
-}));
-
-const APPROVAL_ROW_TITLE = 'Require approval before auto-remediation';
-
-function enabledConfig(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return {
-    isEnabled: true,
-    autoAnalysisEnabled: false,
-    autoAnalysisMinSeverity: 'high',
-    autoAnalysisIncludeExisting: false,
-    autoRemediationEnabled: true,
-    autoRemediationMinSeverity: 'high',
-    autoRemediationIncludeExisting: false,
-    autoRemediationRequireApproval: true,
-    autoDismissEnabled: false,
-    autoDismissConfidenceThreshold: 'high',
-    ...overrides,
-  };
-}
-
-function renderScreen(): TestRenderer.ReactTestRenderer {
-  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
-  act(() => {
-    ref.current = TestRenderer.create(
-      createElement(AutomationSettingsScreen, { scope: 'personal' })
-    );
-  });
-  const renderer = ref.current;
-  if (!renderer) {
-    throw new Error('renderer was not created');
-  }
-  return renderer;
-}
-
-function approvalRow(): {
-  title: string;
-  value: boolean;
-  disabled: boolean;
-  onValueChange: (value: boolean) => void;
-} {
-  const row = toggleRows.rows.find(r => r.title === APPROVAL_ROW_TITLE);
-  if (!row) {
-    throw new Error('approval toggle row not found');
-  }
-  return row;
-}
 
 describe('AutomationSettingsScreen approval gate', () => {
   beforeEach(() => {
@@ -193,14 +49,14 @@ describe('AutomationSettingsScreen approval gate', () => {
 
   it('hydrates the approval toggle from the loaded config', () => {
     config.data = enabledConfig({ autoRemediationRequireApproval: false });
-    renderScreen();
+    renderScreen(AutomationSettingsScreen);
 
     expect(approvalRow().value).toBe(false);
   });
 
   it('persists the approval toggle through the save patch object', async () => {
     config.data = enabledConfig({ autoRemediationRequireApproval: true });
-    renderScreen();
+    renderScreen(AutomationSettingsScreen);
 
     act(() => {
       approvalRow().onValueChange(false);
@@ -222,7 +78,7 @@ describe('AutomationSettingsScreen approval gate', () => {
   ])('announces one confirmation for a save result of %j', async (result, expectedKey) => {
     config.data = enabledConfig();
     save.mutateAsync.mockResolvedValue(result);
-    renderScreen();
+    renderScreen(AutomationSettingsScreen);
 
     await act(async () => {
       await saveButton.onSave?.();
@@ -238,7 +94,7 @@ describe('AutomationSettingsScreen approval gate', () => {
   it('renders the approval toggle disabled for read-only viewers', () => {
     capability.canManage = false;
     config.data = enabledConfig();
-    renderScreen();
+    renderScreen(AutomationSettingsScreen);
 
     expect(approvalRow().disabled).toBe(true);
   });
@@ -249,7 +105,7 @@ describe('AutomationSettingsScreen approval gate', () => {
     config.data = null;
     config.isPending = true;
     config.fetchStatus = 'paused';
-    renderScreen();
+    renderScreen(AutomationSettingsScreen);
 
     const error = platformError.props;
     if (!error) {
@@ -268,14 +124,14 @@ describe('AutomationSettingsScreen approval gate', () => {
     config.data = null;
     config.isLoading = true;
     config.fetchStatus = 'fetching';
-    renderScreen();
+    renderScreen(AutomationSettingsScreen);
 
     expect(platformError.props).toBeNull();
   });
 
   it('names each repeated control with the section it belongs to', () => {
     config.data = enabledConfig({ autoAnalysisEnabled: true, autoRemediationEnabled: true });
-    renderScreen();
+    renderScreen(AutomationSettingsScreen);
 
     const analysisSection = i18n.t('securityAgent.automation.autoAnalysis');
     const remediationSection = i18n.t('securityAgent.automation.autoRemediation');
@@ -314,7 +170,7 @@ describe('AutomationSettingsScreen approval gate', () => {
 
   it('titles each section switch briefly with its description as muted copy', () => {
     config.data = enabledConfig();
-    renderScreen();
+    renderScreen(AutomationSettingsScreen);
 
     const sectionNames = [
       'securityAgent.automation.autoAnalysis',

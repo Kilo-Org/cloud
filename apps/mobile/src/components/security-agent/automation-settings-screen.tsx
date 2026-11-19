@@ -16,7 +16,10 @@ import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { formatList, formatNumber } from '@/lib/format';
-import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
+import {
+  classifyReadFailureVariant,
+  isReadPausedBeforeData,
+} from '@/lib/query/read-failure-variant';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
@@ -228,7 +231,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
   // unsettled) can never finish: the loading gate would hold the skeleton
   // until connectivity returns. Name the connection and offer Retry, like the
   // findings filter sheet's paused branch does.
-  if (config.isPending && config.fetchStatus === 'paused') {
+  if (isReadPausedBeforeData(config)) {
     return (
       <PlatformErrorScreen
         title={t('securityAgent.automation.title')}

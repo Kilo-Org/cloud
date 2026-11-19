@@ -342,6 +342,17 @@ describe('ByokPrivateProviderDefinitionSchema', () => {
       message: 'must not contain a username or password',
     });
   });
+
+  it.each(['', '   ', 'not a url', 'https://', 'ftp://llm.acme.example/v1', '/v1'])(
+    'reports the malformed base URL %j as a field issue instead of throwing',
+    base_url => {
+      const result = ByokPrivateProviderDefinitionSchema.safeParse(definition({ base_url }));
+
+      expect(result.success).toBe(false);
+      expect(result.error?.issues.length).toBeGreaterThan(0);
+      expect(result.error?.issues.every(issue => issue.path[0] === 'base_url')).toBe(true);
+    }
+  );
 });
 
 describe('OrganizationBrowserAllowedOriginSchema', () => {

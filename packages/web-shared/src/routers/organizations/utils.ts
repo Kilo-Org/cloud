@@ -602,7 +602,6 @@ function supportRoleForCurrentSurface(ctx: TRPCContext, access: SupportContext):
   return supportStandInRole(entry);
 }
 
-/** Groups caller role rows by organization id. */
 function groupRolesByOrganization(rows: CallerRoleRow[]): Map<string, OrganizationRole[]> {
   const rolesByOrg = new Map<string, OrganizationRole[]>();
   for (const row of rows) {

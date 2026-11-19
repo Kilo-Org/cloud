@@ -24,7 +24,6 @@ import {
   BYOK_MODEL_LABEL,
   freeModelDataLabel,
   freeModelFreeLabel,
-  getFreeModelDataAccessibilityLabel,
   modelNameStatesFree,
 } from '@/lib/free-model-data-disclosure';
 import { type ModelOption, thinkingEffortLabel } from '@/lib/hooks/use-available-models';
@@ -184,7 +183,6 @@ export function ModelSelector({
   }
 
   const pickerOptions = options.map(option => toSessionModelOption(option));
-  const effectivelyDisabled = disabled || pickerOptions.every(option => option.unavailable);
   const selectedModel = pickerOptions.find(option => option.id === value);
   const providerAware = pickerOptions.some(
     option => option.modelRef !== undefined || !option.showGatewayMetadata
@@ -204,22 +202,41 @@ export function ModelSelector({
   const { byok, collectsData } = modelSelectorBadges(selectedModel);
   const hasVariants = selectedModel ? selectedModel.variants.length > 1 : false;
   const variantLabel = variant ? thinkingEffortLabel(variant) : '';
-  const dataLabel = collectsData ? getFreeModelDataAccessibilityLabel(label) : label;
-  const modelLabel = byok ? `${dataLabel}, ${BYOK_MODEL_LABEL}` : dataLabel;
-  const accessibilityLabel =
-    (hasVariants && variantLabel
+  const chipParts = [
+    label,
+    collectsData ? freeModelDataLabel() : undefined,
+    byok ? BYOK_MODEL_LABEL : undefined,
+  ].filter((part): part is string => part !== undefined);
+  const modelLabel = formatList(chipParts, i18n.language);
+  const spokenModel =
+    hasVariants && variantLabel
       ? t('agentChat.modelSelector.thinkingEffortWithModel', {
           model: modelLabel,
           variant: variantLabel,
         })
-      : modelLabel) +
-    (lockLabel && disabled ? t('agentChat.modelSelector.lockedByAgent', { agent: lockLabel }) : '');
+      : modelLabel;
+  // The chip names one model, so it states that model's state. Every option
+  // being unavailable is therefore not what decides the announcement.
+  const selectedUnavailable = selectedModel?.unavailable === true;
+  // An empty catalog has nothing to choose, so the chip stays disabled instead
+  // of opening a sheet with no rows; an unavailable catalog keeps its press so
+  // the picker can explain each model.
+  const chipDisabled = disabled || pickerOptions.length === 0;
+  const accessibilityLabel = [
+    spokenModel,
+    selectedUnavailable ? t('agentChat.modelSelector.unavailable') : undefined,
+    lockLabel && disabled
+      ? t('agentChat.modelSelector.lockedByAgent', { agent: lockLabel })
+      : undefined,
+  ]
+    .filter((part): part is string => part !== undefined)
+    .join(t('common.sentenceJoiner'));
   // A pinned variant is meaningful even when the locked option carries a single
   // variant, so surface the badge whenever a lock label is present.
   const showVariantBadge = variantLabel !== '' && (hasVariants || Boolean(lockLabel));
 
   function handlePress() {
-    if (effectivelyDisabled) {
+    if (chipDisabled) {
       return;
     }
     onOpen?.();
@@ -236,13 +253,13 @@ export function ModelSelector({
   return (
     <Pressable
       onPress={handlePress}
-      disabled={effectivelyDisabled}
+      disabled={chipDisabled}
       // The chip's own 27.81pt frame is the visual; the vertical slop carries
       // its touch region past the 44pt design target without growing the row.
       hitSlop={CHIP_HIT_SLOP}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled: effectivelyDisabled }}
+      accessibilityState={{ disabled: chipDisabled }}
       className="min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70"
     >
       <View className="min-w-0 shrink flex-row items-center gap-1.5">
@@ -272,7 +289,7 @@ export function ModelSelector({
       </View>
       {/* The label stays at full theme contrast; a disabled chip dims only its
        * chevron so the pill text keeps the WCAG AA 4.5:1 ratio (D2). */}
-      <View className={cn(effectivelyDisabled && 'opacity-50')}>
+      <View className={cn(chipDisabled && 'opacity-50')}>
         <ChevronDown size={14} color={colors.mutedForeground} />
       </View>
     </Pressable>

@@ -615,6 +615,28 @@ describe('scheduled', () => {
     }
   });
 
+  it('names the clock time a wake was due once its retry window has closed', () => {
+    // `awaitingUpdate` is a bounded claim: inside the retry window the line
+    // asks for an update, and after it the line states the time the run was
+    // due. Small and large own the line; medium keeps its per-row detail.
+    const due = NOW + MINUTE;
+    const at = due + 16 * MINUTE;
+    const props = propsFor([scheduled('Dependency audit', due)], { now: at });
+    expect(props.home?.awaitingUpdate).toBe(false);
+    for (const family of ['systemSmall', 'systemLarge'] as const) {
+      const tree = render(props, family, { at });
+      const label = textNode(tree, 'Was due');
+      expect(label, family).toBeDefined();
+      expect(modifier(label, 'foregroundStyle')).toBe('#6F6A61');
+      const time = collect(tree).find(
+        node => node.kind === 'Text' && node.props.dateStyle === 'time'
+      );
+      expect(time, family).toBeDefined();
+      expect(modifier(time, 'foregroundStyle')).toBe('#6F6A61');
+      expect(texts(tree)).not.toContain('Next run');
+    }
+  });
+
   it('shows nothing for an unknown time: the title in small, no detail in the rows', () => {
     const rows = [scheduled('Dependency audit', null), scheduled('Usage report', null)];
     expectBaselines(render(propsFor(rows), 'systemSmall'), 'systemSmall', [

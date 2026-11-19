@@ -3,7 +3,7 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Nnọkọ onye nnọchi anya gị nwere mmelite",
-      "lowBalance": "Nguzozi gị chọrọ nlebara anya",
+      "lowBalance": "Ego fọdụrụ gị chọrọ nlebara anya",
       "spendAlert": "Mmefu gị chọrọ nlebara anya",
       "securityFinding": "Nchọpụta nchekwa chọrọ nlebara anya",
       "securityUpdate": "Nlele nchekwa nwere mmelite",
@@ -17,8 +17,8 @@
   },
   "internal": {
     "lowBalance": {
-      "title": "Ọkwa ịdọ aka na ntị nguzozi dị ala",
-      "body": "Nguzozi {{organizationName}} dara n'okpuru ${{minimumBalanceUsd}}"
+      "title": "Ịdọ aka na ntị maka ego fọdụrụ dị ala",
+      "body": "Ego fọdụrụ {{organizationName}} dara n'okpuru ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
       "title": "Ọkwa mmefu",

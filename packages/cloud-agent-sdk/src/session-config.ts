@@ -1,5 +1,4 @@
-import type { FetchedSessionData } from './session-manager';
-import type { KiloSessionId, SessionConfig } from './types';
+import type { FetchedSessionData, KiloSessionId, SessionConfig } from './types';
 
 /** The composer settings a session's metadata gives, for live opens and cached pages alike. */
 export function sessionConfigFromFetchedSession(

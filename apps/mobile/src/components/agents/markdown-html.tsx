@@ -622,8 +622,9 @@ export function MarkdownHtml({
       fontSize: 16,
       lineHeight: 24,
       // Naming the body's own direction makes the engine resolve every block
-      // left to right and left aligned; chat leaves the interface's direction
-      // in place.
+      // left to right and left aligned; a content body (chat, a PR description)
+      // omits it and the engine resolves each paragraph from its own first
+      // strong character.
       ...(documentDirection === 'ltr' ? LTR_BASE_DIRECTION : {}),
     }),
     [palette, documentDirection]

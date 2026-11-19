@@ -3776,6 +3776,7 @@
   },
   "modelChat": {
     "offlineFailure": "Ehhez a modellhez internetkapcsolat szükséges. Csatlakozz, és próbáld újra, vagy válts egy ezen az eszközön lévő modellre.",
+    "connectionLost": "Megszakadt a kapcsolat a modellel. Ellenőrizd a kapcsolatot, és próbáld újra.",
     "empty": {
       "title": "Kezdjen csevegést",
       "description": "Küldjön egy üzenetet, hogy beszélgessen egy modellel."

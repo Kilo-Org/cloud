@@ -132,11 +132,7 @@ export const RuntimeAgentContractSchema = z.object({
     }),
 });
 
-/**
- * Every kilo command field the runtime contract accepts. The schema below is
- * built from this map, and the import derives its allowed field sets from the
- * same keys, so a field added here is a field the import can carry.
- */
+/** Every kilo command field the runtime contract accepts. */
 const RUNTIME_KILO_COMMAND_SHAPE = {
   name: z
     .string()

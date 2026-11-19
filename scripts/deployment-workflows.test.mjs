@@ -784,6 +784,66 @@ test('one database gate per deployment checks out, installs and migrates once', 
   assert.match(staging.jobs['record-deployment'].if, /needs\.db-gate\.result == 'success'/);
 });
 
+test('every Worker deploy job retries a failed dependency install at most three times', () => {
+  // A registry download that fails on the runner leaves a lifecycle script (the
+  // workerd postinstall) failed, and a plain rerun repeats that script. A flake
+  // then passes on a later attempt, while a real failure still ends the job.
+  const dir = mkdtempSync(join(tmpdir(), 'install-retry-'));
+  try {
+    const bin = join(dir, 'bin');
+    mkdirSync(bin);
+    writeFileSync(
+      join(bin, 'pnpm'),
+      '#!/usr/bin/env bash\nprintf x >> "$CALLS"\n[ "$(wc -c < "$CALLS")" -gt "$FAILURES" ]\n',
+      { mode: 0o755 }
+    );
+    writeFileSync(join(bin, 'sleep'), '#!/usr/bin/env bash\necho "$1" >> "$SLEEPS"\n', {
+      mode: 0o755,
+    });
+    const installRuns = [];
+    for (const job of [
+      'deploy-manual',
+      'deploy-changed',
+      'deploy-session-ingest',
+      'deploy-cloud-agent-after-session-ingest',
+    ]) {
+      installRuns.push(
+        ...workers.jobs[job].steps.filter(step => (step.run ?? '').includes('pnpm install'))
+      );
+    }
+    assert.equal(installRuns.length, 4);
+
+    for (const { run } of installRuns) {
+      for (const [failures, status, calls, sleeps] of [
+        [0, 0, 1, ''],
+        [2, 0, 3, '20\n40\n'],
+        [3, 1, 3, '20\n40\n'],
+      ]) {
+        const callsFile = join(dir, 'calls');
+        const sleepsFile = join(dir, 'sleeps');
+        writeFileSync(callsFile, '');
+        writeFileSync(sleepsFile, '');
+        const result = spawnSync('bash', ['-e', '-c', run], {
+          cwd: dir,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            CALLS: callsFile,
+            SLEEPS: sleepsFile,
+            FAILURES: String(failures),
+          },
+        });
+        assert.equal(result.status, status, `${failures} failures: ${result.stderr}`);
+        assert.equal(readFileSync(callsFile, 'utf8').length, calls, `${failures} failures`);
+        assert.equal(readFileSync(sleepsFile, 'utf8'), sleeps, `${failures} failures`);
+      }
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('every Worker deploy job installs only the Worker closure and the root project', () => {
   // A recursive workspace install from inside a Worker links every unrelated
   // project and runs its lifecycle scripts once per deploy job. The closure

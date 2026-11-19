@@ -47,6 +47,24 @@ type PartOrderingEvidence = Map<string, number>;
 /** Per-message cached part views: the views, an invalidation marker, or nothing. */
 type PartsSnapshot = Map<string, readonly ReadonlyPart[] | null>;
 
+/**
+ * Immutable views of the stored parts of one backend, keyed by message and
+ * then by part id, so a rebuild only visits the parts of the message it is
+ * rebuilding.
+ *
+ * A view wraps a clone of the part it was built from, so it may be reused only
+ * while the part now stored is the very object the view was built from. Every
+ * storage path replaces a part object instead of mutating it (`applyTextDeltas`
+ * returns a new object and `upsertPart` stores a clone), so a replaced part
+ * always misses this cache and is rebuilt, and a reused view can never show
+ * content the store has already moved past.
+ */
+type PartViewCache = Map<string, Map<string, { source: Part; view: ReadonlyPart }>>;
+
+function createPartViewCache(): PartViewCache {
+  return new Map<string, Map<string, { source: Part; view: ReadonlyPart }>>();
+}
+
 function partOrderingKey(messageID: string, partId: string): string {
   return `${messageID}\u0000${partId}`;
 }
@@ -360,6 +378,59 @@ function publishPartsChanged(
   subscribers.notifyParts(messageId);
 }
 
+/**
+ * One parts read for the whole message: the cached snapshot when this message
+ * already has one, `EMPTY_PARTS` when it stores nothing, else the snapshot
+ * recorded for later reads, assembled from the immutable views `views` already
+ * holds for the parts that did not change and fresh clone-plus-view builds for
+ * the ones that did. A `null` marker (a change that dropped the snapshot) is
+ * falsy, so it rebuilds.
+ *
+ * The cache is per message, so a rebuild costs one visit to this message's own
+ * parts: a part whose stored object is still the one its cached view came from
+ * is reused as is, and a streamed delta batch that replaced a single part
+ * clones only that part. Entries are swept after each build to the ids the
+ * message still stores, so a deleted part cannot leak its view.
+ */
+function readPartsSnapshot(
+  messageId: string,
+  arr: Part[] | undefined,
+  snapshot: PartsSnapshot,
+  views: PartViewCache
+): readonly ReadonlyPart[] {
+  const cached = snapshot.get(messageId);
+  if (cached) return cached;
+
+  if (!arr || arr.length === 0) {
+    views.delete(messageId);
+    return EMPTY_PARTS;
+  }
+
+  let byPart = views.get(messageId);
+  if (!byPart) {
+    byPart = new Map<string, { source: Part; view: ReadonlyPart }>();
+    views.set(messageId, byPart);
+  }
+
+  const built = arr.map(part => {
+    const entry = byPart.get(part.id);
+    if (entry && entry.source === part) return entry.view;
+    const view = createReadonlyPartView(clonePart(part));
+    byPart.set(part.id, { source: part, view });
+    return view;
+  });
+
+  if (byPart.size !== built.length) {
+    const stored = new Set(built.map(part => part.id));
+    for (const partId of [...byPart.keys()]) {
+      if (!stored.has(partId)) byPart.delete(partId);
+    }
+  }
+
+  snapshot.set(messageId, built);
+  return built;
+}
+
 function createSeedTextPart(messageId: string, partId: string, text: string): TextPart {
   return {
     id: partId,
@@ -431,6 +502,7 @@ export {
   appendPartTextChunks,
   applyTextDeltas,
   clonePart,
+  createPartViewCache,
   createReadonlyPartView,
   createSeedTextPart,
   createSubscriberRegistry,
@@ -442,7 +514,14 @@ export {
   messageIdKey,
   partsKey,
   publishPartsChanged,
+  readPartsSnapshot,
   upsertPartDroppingStaleSyntheticParts,
 };
 export { orderMessageIds } from './message-order';
-export type { PartOrderingEvidence, PartsSnapshot, SessionSubscriptionKey, SubscriberRegistry };
+export type {
+  PartOrderingEvidence,
+  PartViewCache,
+  PartsSnapshot,
+  SessionSubscriptionKey,
+  SubscriberRegistry,
+};

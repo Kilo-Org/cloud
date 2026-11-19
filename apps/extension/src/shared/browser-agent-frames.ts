@@ -481,6 +481,7 @@ export const buildScopedSnapshot = (input: ScopedSnapshotInput): ScopedSnapshot 
       const interactive = INTERACTIVE_ROLES.has(role);
       const textRole = TEXT_ROLES.has(role);
       const ignored = node.ignored === true;
+      const linesBefore = lines.length;
 
       if (!ignored && withheldOrigin === undefined) {
         if (textRole) {
@@ -504,7 +505,9 @@ export const buildScopedSnapshot = (input: ScopedSnapshotInput): ScopedSnapshot 
         }
       }
 
-      if (depthBudget !== undefined && atDepth >= depthBudget) {
+      const childDepth = lines.length > linesBefore ? atDepth + 1 : atDepth;
+
+      if (depthBudget !== undefined && childDepth > depthBudget) {
         return;
       }
 
@@ -537,7 +540,7 @@ export const buildScopedSnapshot = (input: ScopedSnapshotInput): ScopedSnapshot 
                 input.childSessionFrameIds?.has(ownerFrameId) === true ? EMPTY_OWNERS : owners,
             },
             depthBudget,
-            atDepth + 1
+            childDepth
           );
           return;
         }
@@ -547,7 +550,7 @@ export const buildScopedSnapshot = (input: ScopedSnapshotInput): ScopedSnapshot 
         const child = byId.get(childId);
 
         if (child !== undefined) {
-          visit(child, atDepth + 1);
+          visit(child, childDepth);
         }
       }
     };

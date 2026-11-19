@@ -8,6 +8,7 @@ import { resolveFontScaleCap } from '@/lib/font-scale/text-scale-cap';
 
 import {
   containsJoinedScript,
+  contentTextDirection,
   hasRtlScript,
   NATURAL_LETTER_SPACING,
   RTL_WRITING_DIRECTION,
@@ -106,10 +107,20 @@ function Text({
   className,
   asChild = false,
   variant = 'default',
+  direction,
   ...props
 }: React.ComponentProps<typeof RNText> &
   TextVariantProps & {
     asChild?: boolean;
+    /**
+     * The paragraph's base direction. App copy omits it and names the
+     * interface's. `auto` is for copy the app did not write — a server's
+     * message, a finding's description, a user's own text — which names its
+     * own direction, so English content keeps its left edge and the
+     * punctuation that ends it inside a right-to-left interface
+     * (`contentTextDirection`).
+     */
+    direction?: 'auto';
   }) {
   const textClass = React.useContext(TextClassContext);
   const fontScaleCap = resolveFontScaleCap(useSystemFontScale(), props.maxFontSizeMultiplier);
@@ -157,22 +168,27 @@ function Text({
     textClass,
     className
   );
+  // The paragraph's base direction: the interface's for app copy, and the
+  // copy's own first letter's for content (`direction="auto"`), named for the
+  // node's layout as well, which is what makes a Latin sentence keep its left
+  // edge and the punctuation that ends it inside a right-to-left interface.
+  const interfaceDirection: TextStyle | undefined = isRTL ? RTL_WRITING_DIRECTION : undefined;
+  const writingDirection =
+    direction === 'auto'
+      ? (contentTextDirection(props.children) ?? interfaceDirection)
+      : interfaceDirection;
   // The direction and reset land in the same array the component has always
   // built, so a non-eyebrow text node's style never grows an empty entry; the
   // eyebrow's line box leads its own array, before `props.style`, so a caller's
   // `lineHeight` still wins (`ownStyles` reads the last entry).
   const directionStyle =
-    isRTL || resetsTracking
-      ? [
-          isRTL ? RTL_WRITING_DIRECTION : undefined,
-          resetsTracking ? NATURAL_LETTER_SPACING : undefined,
-          props.style,
-        ]
+    writingDirection !== undefined || resetsTracking
+      ? [writingDirection, resetsTracking ? NATURAL_LETTER_SPACING : undefined, props.style]
       : props.style;
   const resolvedStyle = eyebrowLineHeight
     ? [
         eyebrowLineHeight,
-        isRTL ? RTL_WRITING_DIRECTION : undefined,
+        writingDirection,
         resetsTracking ? NATURAL_LETTER_SPACING : undefined,
         props.style,
       ]

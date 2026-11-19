@@ -9,7 +9,14 @@ export function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-export async function resolveSeedUserId(email: string): Promise<string> {
+/**
+ * The account that already holds `email`, or null when no row exists for it.
+ *
+ * A fixture that owns a fixed user id calls this first: a fake account that
+ * signed in on a device keeps the id the sign-in gave it, so the fixture adopts
+ * that row instead of colliding with its unique email.
+ */
+export async function findSeedUserId(email: string): Promise<string | null> {
   const normalizedEmail = normalizeSeedEmail(email);
   const db = getSeedDb();
   const matches = await db
@@ -25,10 +32,6 @@ export async function resolveSeedUserId(email: string): Promise<string> {
       )
     );
 
-  if (matches.length === 0) {
-    throw new Error(`No user found for email ${email}`);
-  }
-
   const exactMatches = matches.filter(match => match.email === email);
   const resolvedMatches = exactMatches.length > 0 ? exactMatches : matches;
   if (resolvedMatches.length > 1) {
@@ -36,6 +39,13 @@ export async function resolveSeedUserId(email: string): Promise<string> {
     throw new Error(`Multiple users matched ${email}: ${matchList}`);
   }
 
-  const [user] = resolvedMatches;
-  return user.userId;
+  return resolvedMatches.at(0)?.userId ?? null;
+}
+
+export async function resolveSeedUserId(email: string): Promise<string> {
+  const userId = await findSeedUserId(email);
+  if (!userId) {
+    throw new Error(`No user found for email ${email}`);
+  }
+  return userId;
 }

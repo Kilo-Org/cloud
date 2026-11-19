@@ -2837,6 +2837,23 @@ describe('server preview host dispatch', () => {
     await expect(response.text()).resolves.toBe(PREVIEW_SESSION_MISSING_TEXT);
   });
 
+  it('serves a preview-host tunnel path from the preview route, never from tunnel admission', async () => {
+    const env = previewEnv('preview.test');
+    const path = `http://${HOST}/sandbox-preview-tunnel/sbx_test`;
+    const upgrade = await fetchWorker(
+      new Request(path, {
+        headers: { Upgrade: 'websocket', Connection: 'Upgrade', Authorization: 'Bearer x' },
+      }),
+      env
+    );
+    expect(upgrade.status).toBe(403);
+    await expect(upgrade.text()).resolves.toBe('Cross-origin preview request rejected');
+    const plain = await fetchWorker(new Request(path), env);
+    expect(plain.status).toBe(401);
+    await expect(plain.text()).resolves.toBe(PREVIEW_SESSION_MISSING_TEXT);
+    expect(env.SANDBOX_CONTROL.getByName).not.toHaveBeenCalled();
+  });
+
   it('serves the preview reserved path from the preview route', async () => {
     const env = previewEnv('preview.test');
     const response = await fetchWorker(new Request(`http://${HOST}/.kilo-preview/other`), env);

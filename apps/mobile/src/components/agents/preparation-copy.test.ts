@@ -179,7 +179,7 @@ describe('splitFailureSentence', () => {
         'Container limit reached. Stop an existing container before starting another.'
       )
     ).toEqual({
-      title: 'Container limit reached.',
+      title: 'Container limit reached',
       detail: 'Stop an existing container before starting another.',
     });
   });
@@ -193,9 +193,19 @@ describe('splitFailureSentence', () => {
     });
   });
 
+  it('ends a title without a full stop, like the stage titles beside it', () => {
+    expect(splitFailureSentence('The sandbox was lost.')).toEqual({
+      title: 'The sandbox was lost',
+    });
+    expect(splitFailureSentence('Is the sandbox running? Start it again.')).toEqual({
+      title: 'Is the sandbox running?',
+      detail: 'Start it again.',
+    });
+  });
+
   it('breaks at the stop a script writes, not only the Latin one', () => {
     expect(splitFailureSentence('कंटेनर सीमा तक पहुँच गई। नया कंटेनर शुरू करने से पहले रोकें।')).toEqual({
-      title: 'कंटेनर सीमा तक पहुँच गई।',
+      title: 'कंटेनर सीमा तक पहुँच गई',
       detail: 'नया कंटेनर शुरू करने से पहले रोकें।',
     });
     expect(splitFailureSentence('เซสชันนี้ขาดการอัปเกรดที่จำเป็น เริ่มเซสชันใหม่เพื่อดำเนินการต่อ')).toEqual({

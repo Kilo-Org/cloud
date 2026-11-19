@@ -71,6 +71,8 @@ export type SignedInGatewayCaller = {
   user: User;
   organizationId: string | undefined;
   botId?: string;
+  /** The request came through the Cloud Agent runtime credential proxy (verified attestation). */
+  cloudAgentRuntimeProxied: boolean;
 };
 export type AnonymousGatewayCaller = { kind: 'anonymous'; user: AnonymousUserContext };
 export type RejectedGatewayCaller = { kind: 'rejected'; response: NextResponse };
@@ -187,6 +189,7 @@ export function resolveGatewayCaller(
       user: auth.user,
       organizationId: auth.organizationId,
       botId: auth.botId,
+      cloudAgentRuntimeProxied: auth.cloudAgentRuntimeProxied === true,
     };
   }
   if (auth.rejectionReason === 'empty_organization_context') {

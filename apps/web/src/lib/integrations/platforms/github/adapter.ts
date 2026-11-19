@@ -1311,6 +1311,19 @@ export class GitHubRateLimitError extends Error {
 }
 
 /**
+ * Thrown when a GraphQL response body reports a top-level `errors` list or
+ * omits data the caller asked for. GitHub answers those with HTTP 200, so
+ * without this the failed read would look like a definite answer and callers
+ * would store it as one.
+ */
+export class GitHubGraphQlError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'GitHubGraphQlError';
+  }
+}
+
+/**
  * Thrown when GitHub rejects the App credentials with a 401 on the
  * installation-token mint in {@link getCollaboratorPermissionLevel}. A mint
  * 401 means the App ID or private key Kilo configured is not accepted, a
@@ -1420,6 +1433,45 @@ export function toGitHubRateLimitError(error: unknown): GitHubRateLimitError | n
   if (error instanceof GitHubRateLimitError) return error;
   if (!isGitHubRateLimitError(error)) return null;
   return new GitHubRateLimitError(parseRateLimitResetAt(error));
+}
+
+// GraphQL reports rate limiting in a HTTP 200 body; scan every entry because
+// the limiting error is not guaranteed to be first.
+const GRAPHQL_RATE_LIMIT_CODES = new Set([
+  'RATE_LIMITED',
+  'SECONDARY_RATE_LIMIT',
+  'ABUSE_DETECTION',
+]);
+
+export const graphQlEnvelopeSchema = z.object({
+  data: z.unknown().optional(),
+  errors: z.array(z.unknown()).optional(),
+});
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+export function isRateLimitGraphQlError(entry: unknown): boolean {
+  if (!isRecord(entry)) return false;
+  const codes: unknown[] = [entry.type];
+  if (isRecord(entry.extensions)) codes.push(entry.extensions.code);
+  return codes.some(
+    code => typeof code === 'string' && GRAPHQL_RATE_LIMIT_CODES.has(code.toUpperCase())
+  );
+}
+
+/**
+ * GraphQL answers rate limits with HTTP 200, so there are no rate headers to
+ * classify. Reuse the adapter's header parser against a synthetic 429 carrying
+ * the response's actual headers to keep one deadline rule.
+ */
+export function graphQlRateLimitError(headers: unknown): GitHubRateLimitError | null {
+  return toGitHubRateLimitError({
+    status: 429,
+    message: 'GitHub GraphQL rate limit',
+    response: { headers },
+  });
 }
 
 /**
@@ -1685,6 +1737,12 @@ function normalizeReviewDecision(decision: string | null | undefined): ReviewDec
   }
 }
 
+const reviewDecisionEntrySchema = z
+  .object({
+    pullRequest: z.object({ reviewDecision: z.string().nullable() }).nullable(),
+  })
+  .nullable();
+
 /** Largest PR number GitHub's GraphQL `Int` argument can carry. */
 const GRAPHQL_INT_MAX = 2_147_483_647;
 
@@ -1717,15 +1775,20 @@ type ReviewDecisionQueryEntry = {
 /**
  * Fetches `reviewDecision` for multiple PRs in a single aliased GraphQL query.
  * All PRs must belong to the same installation (one token is generated).
- * Returns a Map from alias → ReviewDecision|null. Entries that are not
- * actionable (see {@link isActionableReviewDecisionInput}) are absent from the
- * Map, which callers read as "no review decision".
+ * Returns a Map from alias → ReviewDecision|null, where `null` means GitHub
+ * definitively reported no review decision. Entries that are not actionable
+ * (see {@link isActionableReviewDecisionInput}) are absent from the Map, which
+ * callers read as "no review decision".
  *
  * Repository coordinates and PR numbers cross the GraphQL boundary as
  * operation variables, so the document text holds only fixed literals and the
  * generated `pr<N>` aliases.
  *
- * @throws {GitHubRateLimitError} on 403 secondary rate limit.
+ * @throws {GitHubGraphQlError} when GitHub's response reports errors or does
+ *   not carry a decision for every requested PR, so a failed read is never
+ *   returned as a definite `null`.
+ * @throws {GitHubRateLimitError} on a GraphQL rate limit or a 403 secondary
+ *   rate limit.
  */
 export async function fetchBatchedReviewDecisions(args: {
   installationId: string;
@@ -1766,18 +1829,42 @@ export async function fetchBatchedReviewDecisions(args: {
   });
 
   try {
-    const response = (await octokit.request('POST /graphql', {
+    const response = await octokit.request('POST /graphql', {
       query: `query(${variableDeclarations}) {\n${fields}\n}`,
       variables,
-    })) as {
-      data: {
-        data: Record<string, { pullRequest: { reviewDecision: string | null } | null } | null>;
-      };
-    };
+    });
+
+    const body = graphQlEnvelopeSchema.safeParse(response.data);
+    if (!body.success) {
+      throw new GitHubGraphQlError(
+        'GitHub returned an invalid GraphQL response for review decisions'
+      );
+    }
+    if (body.data.errors && body.data.errors.length > 0) {
+      if (body.data.errors.some(isRateLimitGraphQlError)) {
+        const rateError = graphQlRateLimitError(response.headers);
+        if (rateError) throw rateError;
+      }
+      throw new GitHubGraphQlError('GitHub reported errors while reading review decisions');
+    }
+    const data = body.data.data;
+    if (!isRecord(data)) {
+      throw new GitHubGraphQlError('GitHub did not return review decision data');
+    }
 
     for (const { callerAlias, fieldAlias } of entries) {
-      const repoData = response.data.data?.[fieldAlias];
-      result.set(callerAlias, normalizeReviewDecision(repoData?.pullRequest?.reviewDecision));
+      if (!(fieldAlias in data)) {
+        throw new GitHubGraphQlError(
+          'GitHub did not return a review decision for every requested pull request'
+        );
+      }
+      const entry = reviewDecisionEntrySchema.safeParse(data[fieldAlias]);
+      if (!entry.success) {
+        throw new GitHubGraphQlError(
+          'GitHub returned an invalid GraphQL response for review decisions'
+        );
+      }
+      result.set(callerAlias, normalizeReviewDecision(entry.data?.pullRequest?.reviewDecision));
     }
     return result;
   } catch (error) {
@@ -1789,10 +1876,13 @@ export async function fetchBatchedReviewDecisions(args: {
 
 /**
  * Fetches the rolled-up `reviewDecision` for a single PR via GitHub's GraphQL API.
- * Returns lowercase values matching our DB enum, or `null` when GitHub returns
- * null (no required reviewers and no review submitted yet). A coordinate or PR
- * number that is not actionable yields `null` without any request.
- * @throws {GitHubRateLimitError} on 403 secondary rate limit.
+ * Returns lowercase values matching our DB enum, or `null` only when GitHub
+ * definitively reports null (no required reviewers and no review submitted
+ * yet). A coordinate or PR number that is not actionable yields `null` without
+ * any request.
+ * @throws {GitHubGraphQlError} when the read did not complete.
+ * @throws {GitHubRateLimitError} on a GraphQL rate limit or a 403 secondary
+ *   rate limit.
  */
 export async function fetchPullRequestReviewDecision(args: {
   installationId: string;

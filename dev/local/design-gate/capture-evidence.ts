@@ -1,7 +1,16 @@
 import type { Rgba } from './pixels';
 import { normalize, type ProbeDump } from './tree';
 
-export const CAPTURE_ALIGNMENT_BUDGET_MS = 2_000;
+/**
+ * How long a bracketing tree read may stand apart from the screenshot: the read
+ * before it must end, and the read after it must start, within this window.
+ *
+ * Neither the screenshot's own time nor the reads' time counts. Two matching
+ * reads bracket the screenshot however long it takes, and `simctl io screenshot`
+ * takes 0.6 s at the median and up to 9 s under load. A bound on the whole span
+ * called every such iOS capture inconclusive while its gaps were at most 152 ms.
+ */
+export const CAPTURE_GAP_BUDGET_MS = 250;
 
 export type TimedTree = {
   startedMs: number;
@@ -13,7 +22,8 @@ export type TimedTree = {
 export type CaptureAlignment = {
   status: 'bracketed' | 'mismatch' | 'inconclusive';
   reason: string;
-  budgetMs: number;
+  /** The longer of the two gaps between a tree read and the screenshot. */
+  gapMs: number;
   before: TimedTree;
   screenshot: { startedMs: number; completedMs: number };
   after: TimedTree;
@@ -27,13 +37,15 @@ export function captureAlignment(
   screenshot: CaptureAlignment['screenshot'],
   after: TimedTree,
   signature: (dump: ProbeDump) => string,
-  observation: Pick<CaptureAlignment, 'pixels' | 'expectedText'>,
-  budgetMs = CAPTURE_ALIGNMENT_BUDGET_MS
+  observation: Pick<CaptureAlignment, 'pixels' | 'expectedText'>
 ): CaptureAlignment {
   const evidence: CaptureAlignment = {
     status: 'inconclusive',
     reason: 'A bracketing tree read failed; screenshot and tree correspondence is unknown.',
-    budgetMs,
+    gapMs: Math.max(
+      screenshot.startedMs - before.completedMs,
+      after.startedMs - screenshot.completedMs
+    ),
     before,
     screenshot,
     after,
@@ -57,9 +69,9 @@ export function captureAlignment(
   ];
   if (
     times.some((time, index) => !Number.isFinite(time) || (index > 0 && time < times[index - 1])) ||
-    after.completedMs - before.startedMs > budgetMs
+    evidence.gapMs > CAPTURE_GAP_BUDGET_MS
   ) {
-    evidence.reason = 'Tree/screenshot timing exceeded the bounded alignment window.';
+    evidence.reason = `A tree read stood more than ${CAPTURE_GAP_BUDGET_MS} ms apart from the screenshot, or the timing ran backwards.`;
     return evidence;
   }
   if (observation.pixels === 'unavailable') {

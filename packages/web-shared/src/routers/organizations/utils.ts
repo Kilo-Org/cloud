@@ -835,25 +835,10 @@ async function loadReplicaMembershipRows(
 export const organizationMemberProcedure = baseProcedure
   .input(OrganizationIdInputSchema)
   .use(async ({ ctx, next, input }) => {
-    try {
-      const organizationAccess = await resolveOrganizationAccess(ctx, input.organizationId, {
-        membershipRows: await loadReplicaMembershipRows(ctx, input.organizationId),
-      });
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[organizationMemberProcedure] Access granted, calling next');
-      }
-      return next({ ctx: { organizationAccess } });
-    } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[organizationMemberProcedure] Error in middleware', {
-          error,
-          errorMessage: error instanceof Error ? error.message : String(error),
-          errorCode: error instanceof TRPCError ? error.code : 'unknown',
-          errorStack: error instanceof Error ? error.stack : undefined,
-        });
-      }
-      throw error;
-    }
+    const organizationAccess = await resolveOrganizationAccess(ctx, input.organizationId, {
+      membershipRows: await loadReplicaMembershipRows(ctx, input.organizationId),
+    });
+    return next({ ctx: { organizationAccess } });
   });
 
 // Member procedure that also enforces trial/subscription status on mutations

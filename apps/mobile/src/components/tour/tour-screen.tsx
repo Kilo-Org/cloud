@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Cloud, type LucideIcon, Monitor, Sparkles } from '@/components/ui/icons';
 import { IconTile } from '@/components/ui/icon-tile';
+import { InlineCodeText } from '@/components/ui/inline-code-text';
 import { ScreenFooter } from '@/components/ui/screen-footer';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
@@ -16,6 +17,7 @@ import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { selectionHaptic } from '@/lib/haptics';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { modalSheetSurfaceClass } from '@/lib/form-sheet';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { useOrganization } from '@/lib/organization-context';
@@ -59,7 +61,7 @@ function ForkOption({ icon: Icon, title, body, onPress }: Readonly<ForkOptionPro
       accessibilityLabel={title}
       // The body is the reason to pick this path, and the card's own text is
       // grouped into the one control, so the hint is where a reader hears it.
-      accessibilityHint={body}
+      accessibilityHint={stripInlineCodeMarkers(body)}
       onPress={() => {
         selectionHaptic();
         onPress();
@@ -70,7 +72,9 @@ function ForkOption({ icon: Icon, title, body, onPress }: Readonly<ForkOptionPro
         <IconTile icon={Icon} tint={NEUTRAL_TINT} />
         <View className="gap-1">
           <Text variant="heading">{title}</Text>
-          <Text variant="muted">{body}</Text>
+          {/* The computer card names `kilo remote`, so the command draws in
+              mono while the reason around it keeps the muted body style. */}
+          <InlineCodeText variant="muted" codeClassName="text-muted-foreground" value={body} />
         </View>
       </Card>
     </Pressable>
@@ -115,7 +119,7 @@ function ForkStep({ onChoose }: Readonly<ForkStepProps>) {
         <ForkOption
           icon={Monitor}
           title={t('tour.remoteOptionTitle')}
-          body={stripInlineCodeMarkers(t('tour.remoteOptionBody'))}
+          body={t('tour.remoteOptionBody')}
           onPress={() => {
             onChoose('remote');
           }}
@@ -203,13 +207,14 @@ export function TourScreen() {
     }, [dismiss])
   );
 
+  const surfaceClass = modalSheetSurfaceClass();
   return (
-    <View className="flex-1 bg-background">
+    <View className={cn('flex-1', surfaceClass)}>
       {/* The tour is presented `modal` (apps/mobile/src/app/(app)/_layout.tsx),
           so the header keeps the clearance the native sheet owns. The eyebrow
           belongs to the centred step header above the title. The fork has no
           back control to return to. */}
-      <ScreenHeader modal showBackButton={false} />
+      <ScreenHeader modal showBackButton={false} className={surfaceClass} />
 
       <View className="flex-1">
         <ForkStep onChoose={choosePath} />
@@ -217,7 +222,7 @@ export function TourScreen() {
 
       {/* Skip is always available as the one alternate exit; the shared footer
           owns the bottom band and the keyboard rule. */}
-      <ScreenFooter>
+      <ScreenFooter className={surfaceClass}>
         <Button variant="ghost" onPress={dismiss}>
           <Text>{t('tour.skip')}</Text>
         </Button>

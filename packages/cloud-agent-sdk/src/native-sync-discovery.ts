@@ -1,12 +1,13 @@
 import { z } from 'zod';
+import { NATIVE_SYNC_RETAINED_WORK_BYTES, NATIVE_SYNC_RETAINED_WORK_FRAMES } from './limits';
 import type { NativePresenceConnection } from './native-sync';
 
-// Match the native client's 4 MiB / 1,024-frame retained-work bounds. A model
-// page leaves room above the runner's 48 KiB entries for its outcome wrapper.
+// A model page leaves room above the runner's 48 KiB entries for its outcome wrapper; the catalog
+// and page-count bounds are the same retained-work bounds the live transport uses.
 const discoveryLimits = {
   pageBytes: 60 * 1024,
-  catalogBytes: 4 * 1024 * 1024,
-  pages: 1024,
+  catalogBytes: NATIVE_SYNC_RETAINED_WORK_BYTES,
+  pages: NATIVE_SYNC_RETAINED_WORK_FRAMES,
 };
 
 const modelSchema = z.object({

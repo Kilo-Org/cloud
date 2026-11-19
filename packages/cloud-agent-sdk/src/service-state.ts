@@ -13,7 +13,8 @@
  */
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import type { ServiceEvent } from './normalizer';
-import { upsertByRequestId } from './pending-requests';
+import type { SessionSnapshotFailure } from './snapshot-page';
+import { removePendingRequest, upsertByRequestId } from './pending-requests';
 import { isPreparationCancellation } from './preparation-attempts';
 import { PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
 import {
@@ -75,7 +76,7 @@ function preserveGoalReason(previous: SessionInfo | null, next: SessionInfo): Se
 type ServiceStateConfig = {
   /** The root session ID we're tracking (to detect child sessions). */
   rootSessionId: string;
-  onError?: ((message: string) => void) | undefined;
+  onError?: ((message: string, failure?: SessionSnapshotFailure) => void) | undefined;
   onChildSessionError?: ((sessionId: string, message: string) => void) | undefined;
   onQuestionAsked?: ((requestId: string, questions?: QuestionInfo[]) => void) | undefined;
   onQuestionResolved?: ((requestId: string) => void) | undefined;
@@ -353,7 +354,12 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
         disconnectedSource = null;
         completed = false;
         status = { type: 'error', message: 'Session terminated', code: 'session-terminated' };
-        config.onError?.('Session terminated');
+        // A transport that already reported a typed transcript-read failure
+        // sends this stop to end its loading state. Re-reporting the generic
+        // stop message would replace the failure's machine kind with none, so
+        // the typed failure rides through instead.
+        if (event.failure) config.onError?.(event.failure.message, event.failure);
+        else config.onError?.('Session terminated');
         break;
       case 'disconnected':
         // Clear CLI pending-message state unconditionally — including when the
@@ -453,7 +459,7 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
   }
 
   function processQuestionResolved(requestId: string): void {
-    questions = questions.filter(entry => entry.requestId !== requestId);
+    questions = removePendingRequest(questions, requestId);
     config.onQuestionResolved?.(requestId);
     notify();
   }
@@ -473,7 +479,7 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       always,
     });
     // A readable request supersedes an unreadable notice for the same id.
-    unreadablePermissions = unreadablePermissions.filter(entry => entry.requestId !== requestId);
+    unreadablePermissions = removePendingRequest(unreadablePermissions, requestId);
     config.onPermissionAsked?.(requestId, permissionType, patterns, metadata, always);
     notify();
   }
@@ -482,7 +488,7 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
     // The scope could not be read, so no consent card may stand for this id: a
     // card already shown for it would describe a scope the app no longer holds.
     if (permissions.some(entry => entry.requestId === requestId)) {
-      permissions = permissions.filter(entry => entry.requestId !== requestId);
+      permissions = removePendingRequest(permissions, requestId);
       config.onPermissionResolved?.(requestId);
     }
     unreadablePermissions = upsertByRequestId(unreadablePermissions, { requestId });
@@ -490,8 +496,8 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
   }
 
   function processPermissionResolved(requestId: string): void {
-    permissions = permissions.filter(entry => entry.requestId !== requestId);
-    unreadablePermissions = unreadablePermissions.filter(entry => entry.requestId !== requestId);
+    permissions = removePendingRequest(permissions, requestId);
+    unreadablePermissions = removePendingRequest(unreadablePermissions, requestId);
     config.onPermissionResolved?.(requestId);
     notify();
   }

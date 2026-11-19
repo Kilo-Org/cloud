@@ -301,6 +301,33 @@ describe('ModeForm identifier hint', () => {
     unmount();
   });
 
+  it('folds an accented name to base letters in the suggested identifier', async () => {
+    const { renderer, unmount } = await mountCreateForm();
+
+    changeField(renderer.root, nameLabel, 'Revisor de Código');
+
+    expect(hintLines(renderer.root)).toContain(`revisor-de-codigo · ${identifierHint}`);
+
+    unmount();
+  });
+
+  it('saves a create with the folded identifier an accented name derives', async () => {
+    const { renderer, unmount } = await mountCreateForm();
+
+    changeField(renderer.root, nameLabel, 'Revisor de Código');
+    changeField(renderer.root, roleLabel, 'Reviews every change.');
+
+    pressSave(renderer.root);
+
+    expect(mutations.create.mutate).toHaveBeenCalledOnce();
+    expect(mutations.create.mutate).toHaveBeenCalledWith(
+      { name: 'Revisor de Código', slug: 'revisor-de-codigo', config: expect.anything() },
+      expect.anything()
+    );
+
+    unmount();
+  });
+
   it('re-derives the suggestion when the modes list arrives after the name was typed', async () => {
     const { renderer, box, unmount } = await mountCreateForm([]);
 

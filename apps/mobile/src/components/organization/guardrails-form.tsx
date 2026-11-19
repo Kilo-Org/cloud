@@ -22,6 +22,7 @@ import {
 } from '@/lib/organization/guardrails-draft';
 import { guardrailsIssues } from '@/lib/organization/guardrails-issues';
 import { type SettingsSaveFailure, settingsSaveStatus } from '@/lib/organization/settings-save';
+import { knownServerErrorMessage } from '@/lib/server-error-copy';
 
 /**
  * The guardrails form: the dirty draft, its save, and the keep-editing gate.
@@ -61,9 +62,13 @@ export function GuardrailsForm({
     setDraftGeneration(generation => generation + 1);
   };
 
+  // A save already in flight owns the route: a Back press is dropped instead of
+  // offered a Discard, because the write lands even if the screen popped first.
+  const saving = feedback.status === 'pending';
+
   // Declared before the rebase block below, which reports on every render that
   // takes it.
-  const guard = useMetadataLeaveGuard({ enabled: true });
+  const guard = useMetadataLeaveGuard({ enabled: true, saving });
 
   // A refetch that moved the server's configuration rebases the form, unless
   // the form holds edits of its own: those win, and the next save replaces the
@@ -84,7 +89,6 @@ export function GuardrailsForm({
   const issues = guardrailsIssues(draft, outputAvailable);
   const dirty = !draftsEqual(draft, baseline, outputAvailable);
   const firstIssue = issues[0];
-  const saving = feedback.status === 'pending';
   const editDraft = (update: (current: GuardrailsDraft) => GuardrailsDraft) => {
     clearWhere(() => true);
     const next = update(draft);
@@ -120,7 +124,7 @@ export function GuardrailsForm({
     } catch (error) {
       attempt.fail({
         kind: 'save-failed',
-        message: error instanceof Error ? error.message : t('organizationGuardrails.statusFailed'),
+        message: knownServerErrorMessage(error) ?? t('organizationGuardrails.statusFailed'),
       });
     }
   };

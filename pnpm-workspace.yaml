@@ -344,6 +344,10 @@ patchedDependencies:
   expo-dev-launcher@58.0.20: patches/expo-dev-launcher@58.0.20.patch
   # A zero badge count must not cancel every app notification: upstream called
   # cancelAll(), which removed the ongoing Active Agents card on Android.
+  # iOS holds the completion handler of a response that arrives in the
+  # background until JS calls `finishHandlingNotificationResponse` (or 25 s
+  # pass): upstream called it at once, so iOS suspended the app before an
+  # Approve or Reply action ran.
   expo-notifications@58.1.9: patches/expo-notifications@58.1.9.patch
   # Repo-local features the SDK lacks, carried onto each SDK patch release:
   # router — rank static-suffix siblings before catch-all index routes, and
@@ -439,6 +443,11 @@ patchedDependencies:
   # longer re-enter each other until React's nested update limit. Remove once an
   # upstream release carries every guard.
   '@shopify/flash-list@2.3.3': patches/@shopify+flash-list@2.3.3.patch
+  # NativeWind's `react-native` proxy names only the exports its wrapper components
+  # need; every other export, such as the `AssetRegistry` that expo-asset reads, was
+  # `undefined`, which breaks the whole module that imports it. Forward the rest from
+  # the real module. Remove once upstream forwards them itself.
+  react-native-css@3.1.0-rc.1: patches/react-native-css@3.1.0-rc.1.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

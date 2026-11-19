@@ -22,7 +22,7 @@ import {
 import { apiKeyUpstream } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import syntheticDefinition from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/synthetic';
 import zaiCodingDefinition from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/zai-coding';
-import neuralwattDefinition from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/neurowatt';
+import neuralwattDefinition from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/neuralwatt';
 import {
   getModelGatewayUserByokProviders,
   getModelInferenceUserByokProviders,

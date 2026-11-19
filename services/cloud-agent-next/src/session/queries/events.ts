@@ -2,15 +2,17 @@ import {
   count,
   max,
   eq,
+  or,
   and,
   gt,
+  getTableColumns,
   gte,
   lte,
   lt,
   inArray,
   asc,
   desc,
-  notExists,
+  isNull,
   sql,
 } from 'drizzle-orm';
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
@@ -42,11 +44,15 @@ const storedEventRowSchema = z.object({
 
 // v1 rows store `message.updated` with `info`; native v2 rows store
 // `conversation.message.updated` with the native `message` and row-level identity.
-const assistantRowSql = (payload = 'payload') =>
+const assistantRowSql = (payload: string) =>
   `json_extract(${payload}, '$.event') IN ('message.updated', 'conversation.message.updated')
   AND COALESCE(json_extract(${payload}, '$.properties.info.role'), json_extract(${payload}, '$.properties.message.type')) = 'assistant'`;
-const messageFieldSql = (v1: string, v2: string, payload = 'payload') =>
+const messageFieldSql = (v1: string, v2: string, payload: string) =>
   `COALESCE(json_extract(${payload}, '$.properties.info.${v1}'), json_extract(${payload}, '$.properties.${v2}'))`;
+const messageCreatedAt = (payload: typeof events.payload | SQL) => sql<number | null>`coalesce(
+  json_extract(${payload}, '$.properties.info.time.created'),
+  json_extract(${payload}, '$.properties.message.time.created')
+)`;
 
 const conversationMessagePayloadSchema = z.object({
   event: z.literal('conversation.message.updated'),
@@ -281,6 +287,54 @@ export function prefixUpperBound(prefix: string): string | null {
 }
 
 export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStorage) {
+  /**
+   * Root assistant rows of the Cloud turn that `promptMessageId` started. Kilo
+   * parents each assistant message to the last user or synthetic message before
+   * it, so a mid-turn instruction becomes the parent of later replies, including
+   * the final answer. Read at settlement, before another turn starts. Native
+   * creation time excludes older history inserted after the first turn row.
+   */
+  function turnAssistantRows(sessionId: string, kiloSessionId: string, promptMessageId: string) {
+    const starts = alias(events, 'turn_starts');
+    const startPayload = '"turn_starts"."payload"';
+    const turnStart = db
+      .select({ id: starts.id, createdAt: messageCreatedAt(sql`${starts.payload}`) })
+      .from(starts)
+      .where(
+        and(
+          eq(starts.session_id, sessionId),
+          sql`+${starts.stream_event_type} = 'kilocode'`,
+          gte(starts.entity_id, 'message/'),
+          lt(starts.entity_id, 'message0'),
+          eq(sql.raw(messageFieldSql('sessionID', 'sessionID', startPayload)), kiloSessionId),
+          or(
+            eq(starts.entity_id, `message/${promptMessageId}`),
+            and(
+              sql.raw(assistantRowSql(startPayload)),
+              eq(sql.raw(messageFieldSql('parentID', 'parentID', startPayload)), promptMessageId)
+            )
+          )
+        )
+      )
+      .orderBy(asc(starts.id))
+      .limit(1)
+      .get();
+    if (!turnStart) return sql`false`;
+    const createdAt = messageCreatedAt(events.payload);
+    return and(
+      eq(events.session_id, sessionId),
+      sql`+${events.stream_event_type} = 'kilocode'`,
+      gte(events.entity_id, 'message/'),
+      lt(events.entity_id, 'message0'),
+      sql.raw(assistantRowSql('"events"."payload"')),
+      eq(sql.raw(messageFieldSql('sessionID', 'sessionID', '"events"."payload"')), kiloSessionId),
+      gte(events.id, turnStart.id),
+      turnStart.createdAt === null
+        ? undefined
+        : or(isNull(createdAt), gte(createdAt, turnStart.createdAt))
+    );
+  }
+
   return {
     insert(params: InsertEventParams): EventId {
       const row = db
@@ -404,33 +458,19 @@ export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStora
         .all() satisfies StoredEvent[];
     },
 
+    /** The last root assistant message of the turn, its final answer. */
     getAssistantAnswerForUserMessage(
       sessionId: string,
       kiloSessionId: string,
-      parentMessageId: string
+      promptMessageId: string
     ): AssistantAnswer | null {
-      const messageRow = parseStoredEventRow(
-        rawSql
-          .exec(
-            `
-            SELECT id, execution_id, session_id, stream_event_type, payload, timestamp
-            FROM events
-            WHERE session_id = ?
-              AND stream_event_type = 'kilocode'
-              AND entity_id IS NOT NULL
-              AND substr(entity_id, 1, 8) = 'message/'
-              AND ${assistantRowSql()}
-              AND ${messageFieldSql('sessionID', 'sessionID')} = ?
-              AND ${messageFieldSql('parentID', 'parentID')} = ?
-            ORDER BY id DESC
-            LIMIT 1
-            `,
-            sessionId,
-            kiloSessionId,
-            parentMessageId
-          )
-          .toArray()[0]
-      );
+      const messageRow = db
+        .select()
+        .from(events)
+        .where(turnAssistantRows(sessionId, kiloSessionId, promptMessageId))
+        .orderBy(desc(events.entity_id))
+        .limit(1)
+        .get();
       if (!messageRow) return null;
 
       return readAssistantAnswer(sessionId, rawSql, messageRow);
@@ -439,52 +479,46 @@ export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStora
     getRecentAssistantAnswersForUserMessage(
       sessionId: string,
       kiloSessionId: string,
-      parentMessageId: string
+      promptMessageId: string
     ): AssistantAnswer[] {
-      const removals = alias(events, 'message_removals');
-      const rows = db
-        .select()
+      const removedMessageId = sql<string>`json_extract(${events.payload}, '$.properties.messageID')`;
+      const removals = db
+        .select({
+          messageId: removedMessageId.as('message_id'),
+          timestamp: max(events.timestamp).as('removed_at'),
+        })
         .from(events)
         .where(
           and(
             eq(events.session_id, sessionId),
             eq(events.stream_event_type, 'kilocode'),
-            gte(events.entity_id, 'message/'),
-            lt(events.entity_id, 'message0'),
-            sql.raw(assistantRowSql('"events"."payload"')),
+            eq(sql<string>`json_extract(${events.payload}, '$.event')`, 'message.removed'),
             eq(
-              sql.raw(messageFieldSql('sessionID', 'sessionID', '"events"."payload"')),
+              sql<string>`json_extract(${events.payload}, '$.properties.sessionID')`,
               kiloSessionId
-            ),
-            eq(
-              sql.raw(messageFieldSql('parentID', 'parentID', '"events"."payload"')),
-              parentMessageId
-            ),
-            notExists(
-              db
-                .select({ id: removals.id })
-                .from(removals)
-                .where(
-                  and(
-                    eq(removals.session_id, sessionId),
-                    eq(removals.stream_event_type, 'kilocode'),
-                    eq(
-                      sql<string>`json_extract(${removals.payload}, '$.event')`,
-                      'message.removed'
-                    ),
-                    eq(
-                      sql<string>`json_extract(${removals.payload}, '$.properties.sessionID')`,
-                      kiloSessionId
-                    ),
-                    eq(
-                      sql<string>`json_extract(${removals.payload}, '$.properties.messageID')`,
-                      sql<string>`json_extract(${events.payload}, '$.properties.info.id')`
-                    ),
-                    // Upserts preserve row IDs, so ambiguous timestamp ties favor removal.
-                    gte(removals.timestamp, events.timestamp)
-                  )
-                )
             )
+          )
+        )
+        .groupBy(removedMessageId)
+        .as('message_removals');
+      const rows = db
+        .select(getTableColumns(events))
+        .from(events)
+        .leftJoin(
+          removals,
+          and(
+            eq(
+              removals.messageId,
+              sql<string>`json_extract(${events.payload}, '$.properties.info.id')`
+            ),
+            // Upserts preserve row IDs, so ambiguous timestamp ties favor removal.
+            gte(removals.timestamp, events.timestamp)
+          )
+        )
+        .where(
+          and(
+            turnAssistantRows(sessionId, kiloSessionId, promptMessageId),
+            isNull(removals.messageId)
           )
         )
         .orderBy(desc(events.entity_id))

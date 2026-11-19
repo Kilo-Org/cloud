@@ -1,0 +1,41 @@
+diff --git a/dist/commonjs/components/index.cjs b/dist/commonjs/components/index.cjs
+index 23af26cff9df498d6c7723abba2e5f7a9a219336..f2f7eddf3ad8327817b6534fcc83b93a6eca5bad 100644
+--- a/dist/commonjs/components/index.cjs
++++ b/dist/commonjs/components/index.cjs
+@@ -307,4 +307,15 @@ module.exports = {
+     return require("react-native").usePressability;
+   }
+ };
++// Forward every React Native export this list does not name. A package that reads a
++// missing one gets `undefined` (expo-asset reads `AssetRegistry`), which breaks the whole
++// module that imports it.
++const reactNative = require("react-native");
++for (const key of Object.keys(reactNative)) {
++  if (key in module.exports) continue;
++  Object.defineProperty(module.exports, key, {
++    enumerable: true,
++    get: () => reactNative[key],
++  });
++}
+ //# sourceMappingURL=index.cjs.map
+\ No newline at end of file
+diff --git a/dist/module/components/index.cjs b/dist/module/components/index.cjs
+index 23af26cff9df498d6c7723abba2e5f7a9a219336..f2f7eddf3ad8327817b6534fcc83b93a6eca5bad 100644
+--- a/dist/module/components/index.cjs
++++ b/dist/module/components/index.cjs
+@@ -307,4 +307,15 @@ module.exports = {
+     return require("react-native").usePressability;
+   }
+ };
++// Forward every React Native export this list does not name. A package that reads a
++// missing one gets `undefined` (expo-asset reads `AssetRegistry`), which breaks the whole
++// module that imports it.
++const reactNative = require("react-native");
++for (const key of Object.keys(reactNative)) {
++  if (key in module.exports) continue;
++  Object.defineProperty(module.exports, key, {
++    enumerable: true,
++    get: () => reactNative[key],
++  });
++}
+ //# sourceMappingURL=index.cjs.map

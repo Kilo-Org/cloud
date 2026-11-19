@@ -37,6 +37,7 @@ jest.mock('@/lib/auth/device-sessions', () => ({
   createDeviceSession: jest.fn(),
   issueSessionCredentials: jest.fn(),
   createDeviceSessionWithAttestedKey: jest.fn(),
+  createDeviceSessionWithCredentials: jest.fn(),
 }));
 jest.mock('@/lib/user', () => ({
   createOrUpdateUser: jest.fn(),

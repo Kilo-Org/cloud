@@ -13,6 +13,7 @@ import {
   replaySnapshotPage,
   sessionSnapshotFailureMessage,
   snapshotPageFromSnapshot,
+  type SessionSnapshotFailure,
 } from './snapshot-page';
 import type { TransportFactory, TransportSink } from './transport';
 
@@ -30,6 +31,8 @@ type CliHistoricalTransportConfig = {
    * user can load older pages later via the manager's `loadOlderMessages`.
    * The transport fires `onInitialPageLoaded` so the manager can record
    * the cursor.
+   *
+   * `null` represents an access-not-found outcome (worker returns 404).
    */
   fetchSnapshotPage?: (
     kiloSessionId: KiloSessionId,
@@ -37,7 +40,7 @@ type CliHistoricalTransportConfig = {
   ) => Promise<SessionSnapshotPageOutcome | null>;
   /** Called after a successful initial bounded page read. */
   onInitialPageLoaded?: ((page: SessionSnapshotPage) => void) | undefined;
-  onError?: ((message: string) => void) | undefined;
+  onError?: ((message: string, failure?: SessionSnapshotFailure) => void) | undefined;
 };
 
 function createCliHistoricalTransport(config: CliHistoricalTransportConfig): TransportFactory {
@@ -49,61 +52,61 @@ function createCliHistoricalTransport(config: CliHistoricalTransportConfig): Tra
       sink.onServiceEvent({ type: 'stopped', reason: 'complete' });
     }
 
+    // One terminal-error path: report the failure, then stop the session as an
+    // error so the UI cannot appear to load forever.
+    function fail(message: string, failure?: SessionSnapshotFailure): void {
+      if (failure) {
+        config.onError?.(message, failure);
+      } else {
+        config.onError?.(message);
+      }
+      sink.onServiceEvent({
+        type: 'stopped',
+        reason: 'error',
+        ...(failure ? { failure } : {}),
+      });
+    }
+
     return {
       connect() {
         generation += 1;
         const expectedGeneration = generation;
 
+        const failFromFetch = (error: unknown): void => {
+          if (expectedGeneration !== generation) return;
+          fail(error instanceof Error ? error.message : 'Failed to fetch snapshot');
+        };
+
         if (config.fetchSnapshotPage) {
-          void config.fetchSnapshotPage(config.kiloSessionId, {}).then(
-            page => {
-              if (expectedGeneration !== generation) return;
-              if (page === null) {
-                const message = 'Session not found';
-                config.onError?.(message);
-                sink.onServiceEvent({ type: 'stopped', reason: 'error' });
-                return;
-              }
-              if (page.kind === 'success') {
-                config.onInitialPageLoaded?.(page);
-                replayCompletedPage(page);
-                return;
-              }
-              // Typed failure: surface via onError and mark the session as
-              // stopped with `error` so the UI doesn't appear to load
-              // forever.
-              config.onError?.(sessionSnapshotFailureMessage(page.kind));
-              sink.onServiceEvent({ type: 'stopped', reason: 'error' });
-            },
-            (error: unknown) => {
-              if (expectedGeneration !== generation) return;
-              const message = error instanceof Error ? error.message : 'Failed to fetch snapshot';
-              config.onError?.(message);
-              sink.onServiceEvent({ type: 'stopped', reason: 'error' });
+          void config.fetchSnapshotPage(config.kiloSessionId, {}).then(page => {
+            if (expectedGeneration !== generation) return;
+            if (page === null) {
+              fail('Session not found');
+              return;
             }
-          );
+            if (page.kind === 'success') {
+              config.onInitialPageLoaded?.(page);
+              replayCompletedPage(page);
+              return;
+            }
+            // Typed failure: surface via onError and mark the session as
+            // stopped with `error` so the UI doesn't appear to load
+            // forever.
+            const failure = sessionSnapshotFailureMessage(page.kind);
+            fail(failure.message, failure);
+          }, failFromFetch);
           return;
         }
 
         if (!config.fetchSnapshot) {
-          const message = 'fetchSnapshot is not configured';
-          config.onError?.(message);
-          sink.onServiceEvent({ type: 'stopped', reason: 'error' });
+          fail('fetchSnapshot is not configured');
           return;
         }
 
-        void config.fetchSnapshot(config.kiloSessionId).then(
-          snapshot => {
-            if (expectedGeneration !== generation) return;
-            replayCompletedPage(snapshotPageFromSnapshot(snapshot));
-          },
-          (error: unknown) => {
-            if (expectedGeneration !== generation) return;
-            const message = error instanceof Error ? error.message : 'Failed to fetch snapshot';
-            config.onError?.(message);
-            sink.onServiceEvent({ type: 'stopped', reason: 'error' });
-          }
-        );
+        void config.fetchSnapshot(config.kiloSessionId).then(snapshot => {
+          if (expectedGeneration !== generation) return;
+          replayCompletedPage(snapshotPageFromSnapshot(snapshot));
+        }, failFromFetch);
       },
 
       disconnect() {

@@ -3,9 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { TELEMETRY_DESCRIPTION_KEY } from '@/lib/telemetry/error-sink';
 
 import {
+  isTerminalSessionHistoryFailure,
   SESSION_HISTORY_FAILURES,
+  sessionHistoryFailureCopyKey,
   SessionHistoryFailureError,
-  TERMINAL_SESSION_HISTORY_FAILURE_MESSAGES,
+  type SessionHistoryFailureKind,
+  TERMINAL_SESSION_HISTORY_FAILURE_KINDS,
 } from './session-history-failures';
 
 function declaredTelemetry(error: Error): unknown {
@@ -61,6 +64,37 @@ describe('SessionHistoryFailureError', () => {
       fingerprint: ['session-history-page', kind],
       tags: { 'error.subsystem': 'session-history', 'error.operation': 'read-page' },
     });
-    expect(TERMINAL_SESSION_HISTORY_FAILURE_MESSAGES).toContain(failure.message);
+    expect(TERMINAL_SESSION_HISTORY_FAILURE_KINDS).toContain(kind);
+  });
+
+  it('classifies the terminal kinds and leaves the retryable one retryable', () => {
+    expect(isTerminalSessionHistoryFailure('too_large')).toBe(true);
+    expect(isTerminalSessionHistoryFailure('invalid_data')).toBe(true);
+    expect(isTerminalSessionHistoryFailure('retryable_failure')).toBe(false);
+  });
+
+  it.each([
+    ['too_large', 'agentChat.session.historyTooLarge'],
+    ['invalid_data', 'agentChat.session.historyUnavailable'],
+  ] as const)('maps the %s kind to its own reader copy key', (kind, copyKey) => {
+    expect(sessionHistoryFailureCopyKey(kind)).toBe(copyKey);
+  });
+
+  it('maps one copy key for every declared failure kind', () => {
+    // `SessionHistoryFailureKind` derives from the object, so a new kind
+    // cannot fail to type-check the mapping above; this case fails instead.
+    const expected: Record<string, string> = {
+      retryable_failure: 'agentChat.session.historyUnavailable',
+      too_large: 'agentChat.session.historyTooLarge',
+      invalid_data: 'agentChat.session.historyUnavailable',
+    };
+    expect(
+      Object.fromEntries(
+        Object.keys(SESSION_HISTORY_FAILURES).map(kind => [
+          kind,
+          sessionHistoryFailureCopyKey(kind as SessionHistoryFailureKind),
+        ])
+      )
+    ).toEqual(expected);
   });
 });

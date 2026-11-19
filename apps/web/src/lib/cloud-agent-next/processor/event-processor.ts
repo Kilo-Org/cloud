@@ -17,7 +17,7 @@
 
 import type { CloudAgentEvent } from '../event-types';
 import { isValidCloudAgentEvent } from '../event-types';
-import type { Part, QuestionInfo } from '@/types/opencode.gen';
+import type { Part, QuestionInfo } from '@/types/opencode';
 import type { ProcessedMessage, EventProcessorConfig, AutocommitStatus } from './types';
 import { stripPartContentIfFile } from '@kilocode/cloud-agent-sdk';
 import {

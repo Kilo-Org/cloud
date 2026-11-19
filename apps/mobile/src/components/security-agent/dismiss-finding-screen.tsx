@@ -172,10 +172,10 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (notFound) {
     return (
       <DismissSheetFrame>
-        <EmptyState
-          icon={ShieldOff}
+        <QueryError
+          variant="not-found"
           title={t('securityAgent.dismiss.notFoundTitle')}
-          description={t('securityAgent.dismiss.notFoundDescription')}
+          message={t('securityAgent.dismiss.notFoundDescription')}
         />
       </DismissSheetFrame>
     );
@@ -282,7 +282,9 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
             truncating — a long title must stay readable to confirm the
             finding. */}
         <Card>
-          <Text className="text-base font-medium">{finding.title}</Text>
+          <Text className="text-base font-medium" direction="auto">
+            {finding.title}
+          </Text>
           <Text variant="muted" className="text-xs">
             {finding.repo_full_name}
           </Text>

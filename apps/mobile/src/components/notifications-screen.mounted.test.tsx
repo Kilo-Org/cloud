@@ -763,7 +763,9 @@ describe('NotificationsScreen category availability', () => {
     await waitForEnabledSwitch(renderer, 'Agent updates');
 
     expect(switchesByLabel(renderer.root, 'Security findings')[0]?.props.disabled).toBe(true);
-    expect(textWithChildren(renderer.root, 'new findings and SLA reminders').length).toBe(1);
+    expect(
+      textWithChildren(renderer.root, en.notifications.category.securityFindingsSubtitle).length
+    ).toBe(1);
     expect(textWithChildren(renderer.root, 'madeUpCode').length).toBe(0);
   });
 
@@ -784,7 +786,9 @@ describe('NotificationsScreen category availability', () => {
       await waitForEnabledSwitch(renderer, 'Agent updates');
 
       expect(switchesByLabel(renderer.root, 'Security findings')[0]?.props.disabled).toBe(true);
-      expect(textWithChildren(renderer.root, 'new findings and SLA reminders').length).toBe(1);
+      expect(
+        textWithChildren(renderer.root, en.notifications.category.securityFindingsSubtitle).length
+      ).toBe(1);
       expect(textWithChildren(renderer.root, code).length).toBe(0);
     }
   );

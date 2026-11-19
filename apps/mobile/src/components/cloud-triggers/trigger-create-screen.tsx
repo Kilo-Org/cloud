@@ -86,6 +86,9 @@ export function TriggerCreateScreen({ organizationId }: TriggerCreateScreenProps
   const guard = useMetadataLeaveGuard({
     enabled: true,
     isDirty: () => isDraftDirty(draft, initialDraft),
+    // Back while the create request is in flight drops the removal instead of
+    // discarding a draft that is already committed to a request.
+    saving: submitting,
   });
 
   const submit = async () => {

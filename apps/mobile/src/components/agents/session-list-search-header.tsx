@@ -56,8 +56,7 @@ export function SessionListSearchHeader({
         accessibilityLabel={t('agents.search.searchSessions')}
         placeholder={t('agents.search.searchSessionsPlaceholder')}
         hasText={hasText}
-        busy={showSearchBusy}
-        busyLabel={t('agents.search.searching')}
+        busy={showSearchBusy ? t('agents.search.searching') : undefined}
         onChangeText={onChangeText}
         onClear={onClearSearch}
         onFocus={onFocus}

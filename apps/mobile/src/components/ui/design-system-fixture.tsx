@@ -429,7 +429,12 @@ export function DesignSystemFixture() {
             hasText
             onChangeText={() => undefined}
           />
-          <SearchField placeholder="Search" hasText={false} busy onChangeText={() => undefined} />
+          <SearchField
+            placeholder="Search"
+            hasText={false}
+            busy="Searching"
+            onChangeText={() => undefined}
+          />
         </Section>
 
         <Section label="Segmented control">

@@ -1,13 +1,16 @@
 // The one "this account is blocked" explanation for the whole app. Raised by
 // the two places that learn it — the refresh route's `USER_BLOCKED` refusal and
-// the current-user read's `accountBlocked` refusal — and cleared only when a
-// sign-in publishes new credentials.
+// the current-user read's `accountBlocked` refusal. Three paths clear it: the
+// answered current-user read that follows a raise this app made (an attempt
+// that reaches the account proves the block lifted — `account-blocked-read.ts`),
+// the blocked surface's own Sign out, and a successful sign-in.
 //
 // The flag deliberately outlives sign-out: the sign-out a blocked refusal
 // triggers tears down the credential, not the reason, so the explanation the
 // person needs (their access was restricted, and where to ask about it) stays
-// on screen after the session it belonged to is gone. A successful sign-in is
-// the one event that proves the block no longer applies, so it clears the flag.
+// on screen after the session it belonged to is gone. Nothing about that
+// teardown clears it: only the account answering again, the surface's own Sign
+// out, or credentials published by a new sign-in do.
 
 let blockedAccountActive = false;
 const listeners = new Set<() => void>();

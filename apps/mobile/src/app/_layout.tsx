@@ -323,6 +323,14 @@ function RootLayoutNav({
     error: userIdQueryError,
     userId,
     enabled: token != null,
+    fetching: userIdFetching,
+    // Every query refused while the account was blocked holds a cached
+    // failure, so the reveal would show stale error cards until each surface
+    // is retried by hand. Refetch the tree instead: a lifted block makes those
+    // reads answer.
+    onAnswered: () => {
+      void queryClient.invalidateQueries();
+    },
   });
   const [consentChecked, setConsentChecked] = useState(false);
   const [needsConsent, setNeedsConsent] = useState(false);

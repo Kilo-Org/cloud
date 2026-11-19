@@ -1005,8 +1005,8 @@ importers:
         specifier: 3.0.11
         version: 3.0.11(zod@4.6.7)
       '@anthropic-ai/sdk':
-        specifier: 0.104.1
-        version: 0.104.1(zod@4.6.7)
+        specifier: 1.10.0
+        version: 1.10.0(zod@4.6.7)
       '@apple/app-store-server-library':
         specifier: 3.1.0
         version: 3.1.0
@@ -2062,8 +2062,8 @@ importers:
         specifier: 3.0.11
         version: 3.0.11(zod@4.6.7)
       '@anthropic-ai/sdk':
-        specifier: 0.104.1
-        version: 0.104.1(zod@4.6.7)
+        specifier: 1.10.0
+        version: 1.10.0(zod@4.6.7)
       '@aws-sdk/client-s3':
         specifier: 3.1009.0
         version: 3.1009.0
@@ -3727,8 +3727,8 @@ packages:
       '@faker-js/faker': ^7.0.0 || ^8.0.0 || ^9.0.0
       zod: ^3.21.4
 
-  '@anthropic-ai/sdk@0.104.1':
-    resolution: {integrity: sha512-gGACa/+IaiXzRRmF96aOhamoBgapKRBiFWbmmTFP8aMkpaEcuStF+Q61bjo4vPxBM7gqWJNZqsngslRdnLHv0Q==}
+  '@anthropic-ai/sdk@0.109.1':
+    resolution: {integrity: sha512-q9OnEKLr5H9nxSuXdgDgJhxfYMiE+AaUEBze2Gk91UcaaLnsN+Lx5fbCYywiqurU/APLdwv23x03Wm6WN3EBsg==}
     hasBin: true
     peerDependencies:
       zod: 4.6.7
@@ -3736,8 +3736,8 @@ packages:
       zod:
         optional: true
 
-  '@anthropic-ai/sdk@0.109.1':
-    resolution: {integrity: sha512-q9OnEKLr5H9nxSuXdgDgJhxfYMiE+AaUEBze2Gk91UcaaLnsN+Lx5fbCYywiqurU/APLdwv23x03Wm6WN3EBsg==}
+  '@anthropic-ai/sdk@1.10.0':
+    resolution: {integrity: sha512-j4uVct5p3aGIz/BU4K8VU5vt2A6AueHTvx2gfF3xr4mVpwH9IJMWEAUKNwSwdZSJOHQq1Za2tv5huYc5v02D0w==}
     hasBin: true
     peerDependencies:
       zod: 4.6.7
@@ -22099,15 +22099,16 @@ snapshots:
       randexp: 0.5.3
       zod: 4.6.7
 
-  '@anthropic-ai/sdk@0.104.1(zod@4.6.7)':
+  '@anthropic-ai/sdk@0.109.1(zod@4.6.7)':
     dependencies:
       json-schema-to-ts: 3.1.1
       standardwebhooks: 1.0.0
     optionalDependencies:
       zod: 4.6.7
 
-  '@anthropic-ai/sdk@0.109.1(zod@4.6.7)':
+  '@anthropic-ai/sdk@1.10.0(zod@4.6.7)':
     dependencies:
+      '@opentelemetry/api': 1.9.1
       json-schema-to-ts: 3.1.1
       standardwebhooks: 1.0.0
     optionalDependencies:

@@ -142,4 +142,42 @@ describe('activateLanguage', () => {
     // test above shows the same backend failure alone would have succeeded.
     expect(reads).toEqual(['pt-BR', 'pt']);
   });
+
+  // i18next emits `languageChanged` synchronously inside `changeLanguage`,
+  // after it stored the bundle and set the language. The iOS glanceable
+  // refreshes re-register WidgetKit and ActivityKit surfaces from that
+  // listener, and a native host function that throws there rejects
+  // `changeLanguage` with the new catalog already active. Reporting `failed`
+  // for that state sends the startup path to its English fallback, which
+  // paints the whole app in English on a device whose language is not English.
+  it('keeps the loaded catalog when a language-changed listener throws', async () => {
+    const { instance } = createHarness();
+    const throws = () => {
+      throw new Error('native widget registration failed');
+    };
+    instance.on('languageChanged', throws);
+
+    await expect(activateLanguage('ar', instance)).resolves.toBe('loaded');
+    expect(instance.language).toBe('ar');
+    expect(instance.hasResourceBundle('ar', 'translation')).toBe(true);
+    expect(instance.t('tabs.home')).toBe('الرئيسية');
+
+    instance.off('languageChanged', throws);
+    await instance.changeLanguage('en');
+  });
+
+  it('still reports a broken catalog when a listener throws as well', async () => {
+    const { instance } = createHarness({ permanentlyFailingReads: ['pt-BR', 'pt'] });
+    brokenLoaders.add('pt-BR');
+    brokenLoaders.add('pt');
+    instance.on('languageChanged', () => {
+      throw new Error('native widget registration failed');
+    });
+
+    // The listener-throw tolerance above must not turn a real catalog failure
+    // into a success: nothing is in the store, so the caller still gets the
+    // outcome its English fallback exists for.
+    await expect(activateLanguage('pt-BR', instance)).resolves.toBe('failed');
+    expect(instance.hasResourceBundle('pt-BR', 'translation')).toBe(false);
+  });
 });

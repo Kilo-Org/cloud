@@ -31,17 +31,36 @@ export async function activateLanguage(
 
   try {
     await instance.changeLanguage(language);
-    if (instance.hasResourceBundle(language, 'translation')) {
-      return 'loaded';
-    }
+  } catch {
+    // A `languageChanged` listener can throw through `changeLanguage` after
+    // i18next has already stored the bundle and set the language: the iOS
+    // glanceable refreshes re-register WidgetKit and ActivityKit surfaces
+    // synchronously inside the emit, and those host functions throw. The
+    // store decides, not the rejection — reporting `failed` there would send
+    // the startup path to its English fallback with Arabic already applied,
+    // which is a mirrored English UI for the whole process.
+    return isActive(instance, language) ? 'loaded' : 'failed';
+  }
+  if (!instance.hasResourceBundle(language, 'translation')) {
     // The failed read is remembered for the process, so re-selecting the
     // language never asks the backend again. Parse the catalog here and
     // re-apply: it is the second `changeLanguage` that settles
     // `resolvedLanguage` on the recovered bundle.
-    instance.addResourceBundle(language, 'translation', CATALOG_LOADERS[language](), true, true);
-    await instance.changeLanguage(language);
-  } catch {
-    return 'failed';
+    try {
+      instance.addResourceBundle(language, 'translation', CATALOG_LOADERS[language](), true, true);
+      await instance.changeLanguage(language);
+    } catch {
+      // Same listener-throw case as above, now with the parsed bundle in the
+      // store: the re-apply that settles `resolvedLanguage` may be the call
+      // that threw, so the store still decides.
+      return isActive(instance, language) ? 'recovered' : 'failed';
+    }
+    return isActive(instance, language) ? 'recovered' : 'failed';
   }
-  return instance.hasResourceBundle(language, 'translation') ? 'recovered' : 'failed';
+  return 'loaded';
+}
+
+/** Whether the store holds `language` and the instance runs it. */
+function isActive(instance: I18nInstance, language: SupportedLanguage): boolean {
+  return instance.language === language && instance.hasResourceBundle(language, 'translation');
 }

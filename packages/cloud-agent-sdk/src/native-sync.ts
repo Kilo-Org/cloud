@@ -79,7 +79,7 @@ export type NativeSessionState = {
   messages: NativeSnapshotMessage[];
   pending: NativePendingRequests;
   events: NativeEvent[];
-  commands: Record<string, 'queued' | 'delivered' | 'expired'>;
+  commands: Record<string, z.infer<typeof commandStatusSchema>>;
   error?: string | undefined;
   /**
    * Set when automatic transcript reads stopped after repeated failures. The transport does
@@ -116,7 +116,7 @@ export type NativeSessionConnection = {
   replyQuestion(requestID: string, answers: string[][]): Promise<string>;
   rejectQuestion(requestID: string): Promise<string>;
   sendCommand(command: string, args?: string): Promise<string>;
-  getCommandStatus(commandID: string): Promise<'queued' | 'delivered' | 'expired'>;
+  getCommandStatus(commandID: string): Promise<z.infer<typeof commandStatusSchema>>;
   clear(): void;
   /** Retry the transcript after a latched snapshot failure with one fresh read cycle. */
   refresh(): void;

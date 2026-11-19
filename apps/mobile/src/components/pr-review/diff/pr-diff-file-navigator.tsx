@@ -24,7 +24,7 @@ import { useRouter } from 'expo-router';
 import { Search } from '@/components/ui/icons';
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, type TextInput, View, type ViewStyle } from 'react-native';
+import { Platform, View, type ViewStyle } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -32,13 +32,13 @@ import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { NavigatorFileRow } from '@/components/pr-review/diff/pr-diff-navigator-file-row';
 import { usePrDiffStateCopy } from '@/components/pr-review/diff/pr-diff-state-copy';
-import { Input } from '@/components/ui/input';
+import { SearchField } from '@/components/ui/search-field';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { FIELD_TRIGGER_FRAME_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber } from '@/lib/format';
 import { requestScrollToFile } from '@/lib/pr-review/file-navigator-bridge';
 import {
@@ -51,7 +51,6 @@ import { filterNavigatorFiles } from '@/lib/pr-review/diff/navigator-file-filter
 import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { cn } from '@/lib/utils';
 
 // Memoized row so recycled cells do not re-render on every keystroke: `file`
 // and `viewed` are stable across a search re-render, and the callbacks below
@@ -108,7 +107,6 @@ export function PrDiffFileNavigator({
   // TextInput on every keystroke (per iOS rule), so the value lives in
   // a ref and a version counter drives the filtered list.
   const [searchVersion, setSearchVersion] = useState(0);
-  const inputRef = useRef<TextInput | null>(null);
 
   const { query, files, firstPageErrorState, laterPageError } = usePrReviewFileListQuery({
     owner,
@@ -366,28 +364,17 @@ export function PrDiffFileNavigator({
     <>
       <View collapsable={false} className="bg-background pb-2">
         {header}
-        <View className={cn('mx-4 mt-2', FIELD_TRIGGER_FRAME_CLASS)}>
-          <Search size={16} color={colors.mutedForeground} />
-          <Input
-            ref={inputRef}
-            defaultValue=""
-            editable={!query.isLoading || files.length > 0}
-            placeholder={t('prReview.fileNavigator.filterPlaceholder')}
-            placeholderTextColor={colors.mutedForeground}
-            accessibilityLabel={t('prReview.fileNavigator.filterPlaceholder')}
-            onChangeText={value => {
-              searchRef.current = value;
-              setSearchVersion(version => version + 1);
-            }}
-            // The shared single-line box supplies the height floor and the one
-            // line box; this field keeps only its own size and text size.
-            className="flex-1 text-sm text-foreground"
-            returnKeyType="search"
-            autoCorrect={false}
-            autoCapitalize="none"
-            clearButtonMode="while-editing"
-          />
-        </View>
+        <SearchField
+          className="mx-4 mt-2"
+          defaultValue=""
+          editable={!query.isLoading || files.length > 0}
+          placeholder={t('prReview.fileNavigator.filterPlaceholder')}
+          hasText={searchRef.current !== ''}
+          onChangeText={value => {
+            searchRef.current = value;
+            setSearchVersion(version => version + 1);
+          }}
+        />
 
         {files.length > 0 && (
           <View className="mx-4 mt-2 flex-row items-center justify-between">

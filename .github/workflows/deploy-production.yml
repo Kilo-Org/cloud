@@ -170,10 +170,9 @@ jobs:
     with:
       deployment_url: ${{ needs.stage-app.outputs.deployment_url }}
       axiom_annotation_dataset: kilocode-app
-    # The called workflow declares the production environment, and a calling job
-    # cannot: `inherit` is the only way its environment-scoped tokens reach the
-    # callee. Repository-scoped values are passed the same way.
-    secrets: inherit
+    secrets:
+      AXIOM_ANNOTATION_TOKEN: ${{ secrets.AXIOM_ANNOTATION_TOKEN }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
   promote-ai-gateway:
     needs: [verify-main, stage-ai-gateway, db-gate]
@@ -194,9 +193,9 @@ jobs:
       # dataset, so annotate promotes there.
       axiom_annotation_dataset: vercel
       axiom_expected_project: kilocode-ai-gateway
-    # Same reason as `promote-app`: the callee declares the production
-    # environment, so `inherit` is the only way its tokens reach it.
-    secrets: inherit
+    secrets:
+      AXIOM_ANNOTATION_TOKEN: ${{ secrets.AXIOM_ANNOTATION_TOKEN }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
   # Worker change detection reads only the SHAs check-changes publishes, so this
   # call runs beside the Vercel staging chain instead of after it: the matrix is

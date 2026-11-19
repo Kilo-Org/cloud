@@ -1639,12 +1639,14 @@ function addsFamilyPlaceholderOnly(english, key, actual, expected) {
 /**
  * The push runtime resolves a token locale and reads translations from one
  * registry. Its imports and that registry are hand-written, so this check holds
- * them together with the catalog folder: every catalog file is imported, every
- * import is in the registry, and the registry names nothing else. A catalog
- * that only sat in the folder used to render in English with no gate saying so;
- * a registry entry with no import would translate nothing.
+ * them together with the catalog folder: every catalog file of a supported
+ * language is imported, every import is in the registry, and the registry names
+ * nothing else. A tag outside the supported-language list is the membership
+ * rule's finding, so it is owed neither an import nor a registry entry. A
+ * catalog that only sat in the folder used to render in English with no gate
+ * saying so; a registry entry with no import would translate nothing.
  */
-function checkPushLocaleRegistry({ root, catalog, present }) {
+function checkPushLocaleRegistry({ root, catalog, present, supported }) {
   const problems = [];
   const catalogDir = catalog.dir;
   const localeModule = catalog.localeRegistry;
@@ -1734,6 +1736,9 @@ function checkPushLocaleRegistry({ root, catalog, present }) {
   }
 
   for (const tag of [...present].sort()) {
+    if (supported !== null && !supported.has(tag)) {
+      continue;
+    }
     if (!imported.has(tag)) {
       problems.push(`${catalog.name}: catalog "${tag}.json" has no import in ${relativeModule}`);
     }
@@ -1753,13 +1758,13 @@ function checkPushLocaleRegistry({ root, catalog, present }) {
   )) {
     if (!imported.has(tag)) {
       problems.push(
-        `notifications: the push locale registry names "${tag}" with no catalog import`
+        `${catalog.name}: the push locale registry names "${tag}" with no catalog import`
       );
       continue;
     }
     if (binding !== imported.get(tag)) {
       problems.push(
-        `notifications: the push locale registry binds "${tag}" to "${binding}" instead of the "${tag}" catalog import`
+        `${catalog.name}: the push locale registry binds "${tag}" to "${binding}" instead of the "${tag}" catalog import`
       );
     }
   }
@@ -1981,60 +1986,14 @@ function checkPluralCategories({ label, tag, english, translated }) {
   return problems;
 }
 
-/** The placeholders and visible counts of the plural forms a locale adds. */
-function checkPluralFormPlaceholders({
-  label,
-  tag,
-  english,
-  translated,
-  englishFamilies,
-  englishCountedBases,
-}) {
-  const problems = [];
-  for (const [key, value] of translated) {
-    if (english.has(key)) {
-      continue;
-    }
-    const parts = pluralParts(key);
-    if (!isAdmittedPluralKey(parts, englishFamilies, englishCountedBases)) {
-      continue;
-    }
-    const englishRef =
-      english.get(`${parts.base}_${parts.category}`) ??
-      english.get(`${parts.base}_other`) ??
-      english.get(parts.base);
-    const allowed = new Set(placeholderTokens(englishRef ?? ''));
-    for (const ph of placeholderTokens(value)) {
-      if (!allowed.has(ph)) {
-        problems.push(
-          `${label}: "${key}" uses placeholder {{${ph}}}, which the English family does not`
-        );
-      }
-    }
-    // Every form keeps the family's visible count unless the reviewed list
-    // names it: a form without a numeral reads as an age only when the
-    // language spells the number out. A zero form is the exception — "none
-    // required" reads better than a numeral beside a noun, and several
-    // catalogs already word it that way.
-    if (parts.category !== 'zero' && !WORDED_COUNTS.has(`${parts.base}:${parts.category}:${tag}`)) {
-      for (const ph of familyVisibleCounts(english, parts.base)) {
-        if (!placeholderTokens(value).includes(ph)) {
-          problems.push(
-            `${label}: "${key}" drops {{${ph}}} without a reviewed worded form (WORDED_COUNTS)`
-          );
-        }
-      }
-    }
-  }
-  return problems;
-}
-
 /** The value rules every translated key passes, in emission order. */
 function checkTranslatedValues({
   label,
   tag,
   english,
   translated,
+  englishFamilies,
+  englishCountedBases,
   englishValues,
   mustTranslateKeys,
   destructiveChecks,
@@ -2047,6 +2006,19 @@ function checkTranslatedValues({
     // but a JSON object stored in it is the same storage slip.
     problems.push(...checkSerializedJson(label, key, value));
     if (!english.has(key)) {
+      problems.push(
+        ...checkAddedPluralForm({
+          label,
+          tag,
+          english,
+          key,
+          value,
+          englishFamilies,
+          englishCountedBases,
+          englishValues,
+          ownValues,
+        })
+      );
       continue;
     }
     const englishValue = english.get(key);
@@ -2066,6 +2038,55 @@ function checkTranslatedValues({
       })
     );
   }
+  return problems;
+}
+
+/**
+ * A plural form the locale adds — a category English does not ship — passes the
+ * same value rules as an English-keyed form, read against the family's English
+ * reference for that category. A key that is not an admitted family member is
+ * the extra-key rule's finding and passes nothing here.
+ */
+function checkAddedPluralForm({
+  label,
+  tag,
+  english,
+  key,
+  value,
+  englishFamilies,
+  englishCountedBases,
+  englishValues,
+  ownValues,
+}) {
+  const problems = [];
+  const parts = pluralParts(key);
+  if (!isAdmittedPluralKey(parts, englishFamilies, englishCountedBases)) {
+    return problems;
+  }
+  const englishRef =
+    english.get(`${parts.base}_${parts.category}`) ??
+    english.get(`${parts.base}_other`) ??
+    english.get(parts.base) ??
+    '';
+  // Such a key is always a plural category, so no separator exemption applies:
+  // an empty form renders nothing at that count.
+  if (value.trim() === '') {
+    problems.push(`${label}: "${key}" is empty`);
+  }
+  problems.push(
+    ...checkValuePlaceholders({
+      label,
+      english,
+      key,
+      value,
+      englishValue: englishRef,
+      countsMayBeWorded:
+        parts.category === 'zero' || WORDED_COUNTS.has(`${parts.base}:${parts.category}:${tag}`),
+      requiredCounts: familyVisibleCounts(english, parts.base),
+    })
+  );
+  problems.push(...checkValueEdges({ label, key, value, englishValue: englishRef }));
+  problems.push(...checkQuotedLabels({ label, key, value, englishValues, ownValues }));
   return problems;
 }
 
@@ -2101,10 +2122,33 @@ function checkTranslatedValue({
   if (mustTranslateKeys.has(key) && value === englishValue) {
     problems.push(`${label}: "${key}" must be translated`);
   }
-  problems.push(...checkValuePlaceholders({ label, tag, english, key, value, englishValue }));
+  const parts = pluralParts(key);
+  problems.push(
+    ...checkValuePlaceholders({
+      label,
+      english,
+      key,
+      value,
+      englishValue,
+      // Only a reviewed (key, category, locale) entry may say its number as a
+      // word; every other form keeps its language's exact placeholder set.
+      countsMayBeWorded: Boolean(
+        parts && WORDED_COUNTS.has(`${parts.base}:${parts.category}:${tag}`)
+      ),
+      requiredCounts: new Set(),
+    })
+  );
   problems.push(...checkValueEdges({ label, key, value, englishValue }));
-  // A quoted English label. The copy must name the label's key with
-  // `$t(key)`, or the message points at a button this user never sees.
+  problems.push(...checkQuotedLabels({ label, key, value, englishValues, ownValues }));
+  return problems;
+}
+
+/**
+ * A quoted English label. The copy must name the label's key with `$t(key)`, or
+ * the message points at a button this user never sees.
+ */
+function checkQuotedLabels({ label, key, value, englishValues, ownValues }) {
+  const problems = [];
   for (const run of quotedRuns(value)) {
     if (englishValues.has(run) && !holdsLabel(ownValues, run)) {
       problems.push(`${label}: "${key}" quotes the English label "${run}"; name its key with $t()`);
@@ -2113,25 +2157,57 @@ function checkTranslatedValue({
   return problems;
 }
 
-/** The placeholder set, `$t()` references and `$TOKEN` tokens of one value. */
-function checkValuePlaceholders({ label, tag, english, key, value, englishValue }) {
+/**
+ * The placeholder set, `$t()` references and `$TOKEN` tokens of one value.
+ *
+ * One rule reads both an English-keyed form and a plural form the locale adds,
+ * and its two exemptions are explicit parameters rather than a second
+ * implementation: `countsMayBeWorded` allows a dropped visible count (the
+ * `zero` category, or a form `WORDED_COUNTS` reviewed), and `requiredCounts`
+ * names the counts a form of the family must still carry. English-keyed keys
+ * pass an empty set, so a dropped count is only ever the mismatch below.
+ */
+function checkValuePlaceholders({
+  label,
+  english,
+  key,
+  value,
+  englishValue,
+  countsMayBeWorded,
+  requiredCounts,
+}) {
   const problems = [];
   const expected = placeholders(englishValue);
   const actual = placeholders(value);
   const expectedSet = placeholderTokens(englishValue);
   const actualSet = placeholderTokens(value);
-  // Only a reviewed (key, category, locale) entry may say its number as a
-  // word; every other form keeps its language's exact placeholder set.
-  const parts = pluralParts(key);
-  const wordedForm = Boolean(parts && WORDED_COUNTS.has(`${parts.base}:${parts.category}:${tag}`));
-  const droppedCount = expectedSet
-    .filter(name => !actualSet.includes(name))
-    .every(name => COUNT_PLACEHOLDERS.has(name));
-  const addedPlaceholder = actualSet.some(name => !expectedSet.includes(name));
+  const dropped = expectedSet.filter(name => !actualSet.includes(name));
+  const added = actualSet.some(name => !expectedSet.includes(name));
+  // A visible count this form must show and does not: the count reads as an
+  // age only when the language spells the number out, so the form needs the
+  // reviewed worded form that names its key, category and locale.
+  for (const name of new Set(dropped)) {
+    if (requiredCounts.has(name) && !countsMayBeWorded) {
+      problems.push(
+        `${label}: "${key}" drops {{${name}}} without a reviewed worded form (WORDED_COUNTS)`
+      );
+    }
+  }
+  // The set differs from the reference unless the difference is one the rules
+  // already explain: a family token the form adds, a count it words under an
+  // exemption, or a required count the loop above has named. One defect keeps
+  // one line. An English-keyed key passes no required count, so any drop is
+  // still this message.
+  const explained =
+    dropped.length > 0 &&
+    !added &&
+    dropped.every(name =>
+      countsMayBeWorded ? COUNT_PLACEHOLDERS.has(name) : requiredCounts.has(name)
+    );
   if (
     actual !== expected &&
     !addsFamilyPlaceholderOnly(english, key, actual, expected) &&
-    !(wordedForm && droppedCount && !addedPlaceholder)
+    !explained
   ) {
     problems.push(`${label}: "${key}" placeholders differ from English (${expected || 'none'})`);
   }
@@ -2308,10 +2384,15 @@ function checkSharedWordings({ label, tag, translated, sharedWordings, wordingEx
   return problems;
 }
 
-/** Every locale of one catalog, in the folder's order. */
+/**
+ * Every locale of one catalog that the supported-language list names, in the
+ * folder's order. A tag outside that list is the membership rule's finding, not
+ * this audit's, so it is not read here.
+ */
 function checkCatalogLocales({
   catalog,
   present,
+  supported,
   english,
   englishFamilies,
   englishCountedBases,
@@ -2326,10 +2407,20 @@ function checkCatalogLocales({
   const localeValues = new Map();
 
   for (const tag of present) {
-    if (tag === 'en') {
+    if (tag === 'en' || (supported !== null && !supported.has(tag))) {
       continue;
     }
     const label = `${catalogName}/${tag}`;
+    // A tag `Intl` refuses is structurally invalid, not merely unknown: the
+    // same tag makes `wording()`'s `toLocaleUpperCase(tag)` throw, so nothing
+    // locale-sensitive may receive it. One line, then the tag is skipped.
+    try {
+      new Intl.PluralRules(tag);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      problems.push(`${label}: cannot audit catalog: ${message}`);
+      continue;
+    }
     const parsed = parseCatalog(join(catalog.dir, `${tag}.json`), label);
     problems.push(...parsed.problems);
     const translated = parsed.catalog;
@@ -2358,21 +2449,13 @@ function checkCatalogLocales({
     );
     problems.push(...checkPluralCategories({ label, tag, english, translated }));
     problems.push(
-      ...checkPluralFormPlaceholders({
+      ...checkTranslatedValues({
         label,
         tag,
         english,
         translated,
         englishFamilies,
         englishCountedBases,
-      })
-    );
-    problems.push(
-      ...checkTranslatedValues({
-        label,
-        tag,
-        english,
-        translated,
         englishValues,
         mustTranslateKeys,
         destructiveChecks,
@@ -2585,6 +2668,9 @@ export function checkCatalogs(root = ROOT) {
   const { wordingExceptions } = wordingExceptionsRead;
   const { tags, problems: languageProblems } = supportedLanguages(root);
   problems.push(...languageProblems);
+  // A tag list this check could not read leaves the set null: every present tag
+  // is then audited, as it was before the list existed.
+  const supported = tags === null ? null : new Set(tags);
 
   const catalogs = catalogsOf(root);
   const unscannable = new Set();
@@ -2616,7 +2702,7 @@ export function checkCatalogs(root = ROOT) {
   for (const catalog of scannable) {
     const present = presentByCatalog.get(catalog);
     if (catalog.localeRegistry && present !== null) {
-      problems.push(...checkPushLocaleRegistry({ root, catalog, present }));
+      problems.push(...checkPushLocaleRegistry({ root, catalog, present, supported }));
     }
   }
 
@@ -2677,6 +2763,7 @@ export function checkCatalogs(root = ROOT) {
     const locales = checkCatalogLocales({
       catalog,
       present,
+      supported,
       english,
       englishFamilies,
       englishCountedBases,

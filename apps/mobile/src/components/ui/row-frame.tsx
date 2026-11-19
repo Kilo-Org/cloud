@@ -76,8 +76,8 @@ type RowFrameProps = Readonly<{
    * `content` presses only the leading cell and the text, so a trailing control
    * (a switch) owns its own touch and its own accessible node. A `content` press
    * is hidden from assistive technology unless `contentAccessibilityLabel`
-   * names it, because a preference row's trailing switch already carries the
-   * row's name.
+   * names it, so without that label the trailing control must carry the row's
+   * name itself (a preference row passes its title to the switch).
    */
   pressTarget?: 'row' | 'content';
   /**

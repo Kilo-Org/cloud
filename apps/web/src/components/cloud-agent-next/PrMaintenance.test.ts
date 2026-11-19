@@ -7,6 +7,7 @@ Object.assign(globalThis, { React });
 type MutationOptions = { mutationKey: string[]; onError?: (error: Error) => Promise<void> | void };
 const mockWatchRefetch = jest.fn(async () => ({ data: null }));
 const mockOptionsRefetch = jest.fn(async () => ({ data: null }));
+const mockUsePullRequestAutoFixAccess = jest.fn(() => true);
 const mockUseMutation = jest.fn((_options: MutationOptions) => ({
   mutate: jest.fn(),
   isPending: false,
@@ -31,6 +32,9 @@ jest.mock('@/lib/trpc/utils', () => ({
   }),
 }));
 jest.mock('./settings/CloudAgentSettingsDialog', () => ({ CloudAgentSettingsDialog: () => null }));
+jest.mock('@/hooks/usePullRequestAutoFixAccess', () => ({
+  usePullRequestAutoFixAccess: () => mockUsePullRequestAutoFixAccess(),
+}));
 jest.mock('@tanstack/react-query', () => ({
   useMutation: (options: MutationOptions) => mockUseMutation(options),
   useQuery: ({ queryKey }: { queryKey: string[] }) =>
@@ -48,8 +52,8 @@ jest.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: jest.fn() }),
 }));
 
-it('refreshes the watch state after an enable error without opening a per-PR settings form', async () => {
-  renderToStaticMarkup(
+function renderControls() {
+  return renderToStaticMarkup(
     createElement(PrMaintenance, {
       sessionId: 'ses_example',
       pr: {
@@ -66,6 +70,15 @@ it('refreshes the watch state after an enable error without opening a per-PR set
       },
     })
   );
+}
+
+it('hides PR Auto-fix controls when the flag is off', () => {
+  mockUsePullRequestAutoFixAccess.mockReturnValueOnce(false);
+  expect(renderControls()).toBe('');
+});
+
+it('refreshes the watch state after an enable error without opening a per-PR settings form', async () => {
+  renderControls();
   const enable = mockUseMutation.mock.calls.find(
     ([options]) => options.mutationKey[0] === 'enable'
   )?.[0];

@@ -1,4 +1,5 @@
 import { watchPrPolicySchema } from '@kilocode/db/schema-types';
+import { watchPrMaintenancePolicySchema } from '@kilocode/db/cloud-agent-pr-maintenance';
 import type { CliSessionV2, CloudAgentPrWatch } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
@@ -182,6 +183,29 @@ beforeEach(() => {
 });
 
 describe('watch consent and source boundaries', () => {
+  it('does not allow the raw watch API to start or resume auto-fix without the flag', async () => {
+    const policy = watchPrMaintenancePolicySchema.parse({
+      version: 2,
+      model: 'test/model',
+      profileId: null,
+      environmentId: null,
+      categories: { reviews: true, failedChecks: false, conflicts: false },
+      automaticWritesConsent: true,
+      historyRewriteConsent: true,
+      noHardSpendCapConsent: true,
+    });
+    const paused = { ...watch, policy, status: 'paused' as const, expires_at: null };
+    jest.mocked(db.query.cloud_agent_pr_watches.findFirst).mockResolvedValue(paused);
+    const action = { watchId: paused.id, generation: paused.generation };
+
+    await expect(enableWatchPr(ctx, { ...input, policy })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    await expect(changeWatchPr(ctx, action, 'resume')).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(recheckWatchPr(ctx, action)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
   it('requires explicit canonical repository and PR identity for queries and enablement', () => {
     expect(watchPrQuerySchema.safeParse(queryInput).success).toBe(true);
     expect(watchPrEnableSchema.safeParse(input).success).toBe(true);

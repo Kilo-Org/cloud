@@ -61,6 +61,10 @@ import {
   MaintenanceReadinessError,
 } from './watch-pr-maintenance-readiness';
 import { getMaintenanceRecoveryAction } from './watch-pr-maintenance-reasons';
+import {
+  PullRequestAutoFixUnavailableError,
+  requirePullRequestAutoFix,
+} from './pr-auto-fix-access';
 
 const inThirtySeconds = () => new Date(Date.now() + 30_000).toISOString();
 const elapsed = (dueAt: string | null) => dueAt !== null && Date.parse(dueAt) <= Date.now();
@@ -70,6 +74,7 @@ const owner = (watch: CloudAgentPrWatch) => ({
 });
 
 function maintenanceBlockedReason(error: TRPCError) {
+  if (error instanceof PullRequestAutoFixUnavailableError) return error.maintenanceReason;
   if (error instanceof MaintenanceSettingsError) return error.maintenanceReason;
   if (error instanceof MaintenanceBalanceError) return error.maintenanceReason;
   if (error instanceof MaintenanceReadinessError) return error.maintenanceReason;
@@ -575,11 +580,19 @@ async function dispatchWatch(
       Date.parse(active.next_run_at) > Date.now()
     )
       return;
+    if (
+      active.status === 'creating' &&
+      watch.status === 'watching' &&
+      watch.generation === active.generation
+    ) {
+      await requirePullRequestAutoFix(watch.kilo_user_id);
+    }
     return reconcileAttempt(watch, active);
   }
   const policy = watchPrPolicySchema.parse(watch.policy);
   if (watch.status !== 'watching' || !hasWatchPrAutomaticWriteConsent(policy)) return;
   if (watch.next_run_at && Date.parse(watch.next_run_at) > Date.now()) return;
+  await requirePullRequestAutoFix(watch.kilo_user_id);
   if (watch.last_attempt_id) {
     await authorizeMaintenanceWatch(watch);
     if (!(await settleReplies(watch, watch.last_attempt_id))) return;

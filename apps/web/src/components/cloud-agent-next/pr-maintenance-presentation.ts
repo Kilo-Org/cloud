@@ -118,6 +118,7 @@ const recoveryMessages: Record<MaintenanceReason, string> = {
     'Restore the stacked workspace parent commit, then select Recheck. Otherwise stop auto-fix and fix the workspace manually.',
   maintenance_access_unavailable:
     'Restore repository access and the GitHub connection, then Recheck.',
+  maintenance_feature_unavailable: 'Auto-fix access changed. Select Resume to continue.',
   maintenance_balance_unavailable:
     'Auto-fix needs at least $1 in credits. Add credits, then select Recheck. To change models, stop auto-fix and update your settings.',
   maintenance_precondition_changed:

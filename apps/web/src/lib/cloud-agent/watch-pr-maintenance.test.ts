@@ -17,6 +17,7 @@ import {
 } from '@kilocode/db/cloud-agent-pr-maintenance';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { emptyWatchPrProjection, type WatchPrProjection } from './watch-pr-events';
 import { assessAndScheduleWatchPr, dispatchWatchPrMaintenance } from './watch-pr-maintenance';
 import { assessWatchPr } from './watch-pr-assessment';
@@ -35,6 +36,9 @@ import {
   stopMaintenanceChat,
 } from './watch-pr-maintenance-client';
 
+jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
+  isReleaseToggleEnabled: jest.fn(),
+}));
 jest.mock('./watch-pr-maintenance-authorization', () => ({
   MaintenanceSettingsError: class extends Error {},
   MaintenanceBalanceError: class extends Error {},
@@ -194,6 +198,7 @@ async function finishWithResult(
 
 beforeEach(async () => {
   jest.clearAllMocks();
+  jest.mocked(isReleaseToggleEnabled).mockResolvedValue(true);
   jest.mocked(maintenanceChatStatus).mockResolvedValue(null);
   const user = await insertTestUser();
   const worktreeId = `worktree_${randomUUID()}`;
@@ -270,6 +275,27 @@ beforeEach(async () => {
       messageId: input.messageId,
     };
   });
+});
+
+it('pauses a due watch without starting a repair when access was removed', async () => {
+  jest.mocked(isReleaseToggleEnabled).mockResolvedValue(false);
+
+  await dispatchDue();
+
+  await expect(
+    db.query.cloud_agent_pr_watches.findFirst({
+      where: eq(cloud_agent_pr_watches.id, watch.id),
+    })
+  ).resolves.toMatchObject({
+    status: 'paused',
+    lifecycle_reason: 'maintenance_feature_unavailable',
+  });
+  await expect(
+    db.query.cloud_agent_pr_maintenance_attempts.findMany({
+      where: eq(cloud_agent_pr_maintenance_attempts.watch_id, watch.id),
+    })
+  ).resolves.toEqual([]);
+  expect(startMaintenanceChat).not.toHaveBeenCalled();
 });
 
 it('admits only one live attempt when dispatch deliveries overlap', async () => {

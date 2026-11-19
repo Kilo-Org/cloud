@@ -9,6 +9,7 @@ export const maintenanceRecoveryActions = {
   user_pause: 'resume',
   ready_to_resume: 'resume',
   maintenance_chat_stopped: 'resume',
+  maintenance_feature_unavailable: 'resume',
   user_stop: 'reenable',
   expired: 'reenable',
   total_attempt_limit: 'manual',

@@ -27,6 +27,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProfilesManager } from '@/components/cloud-agent/profile-editor/ProfilesManager';
 import { useCloudAgentSettings } from '@/hooks/useCloudAgentSettings';
+import { usePullRequestAutoFixAccess } from '@/hooks/usePullRequestAutoFixAccess';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { BuiltinAgentsSection } from './BuiltinAgentsSection';
@@ -102,9 +103,13 @@ function CloudAgentSettings({
   const isMobile = useIsMobile();
   const settingsQuery = useCloudAgentSettings({ organizationId });
   const settings = settingsQuery.data;
+  const canUseAutoFix = usePullRequestAutoFixAccess();
   const canManage = organizationId ? (settings?.canManage ?? false) : true;
   const activeSection =
-    section === 'compute' && settings && !settings.canManage ? 'general' : section;
+    (section === 'compute' && settings && !settings.canManage) ||
+    (section === 'auto-fix' && !canUseAutoFix)
+      ? 'general'
+      : section;
 
   return (
     <>
@@ -140,7 +145,7 @@ function CloudAgentSettings({
             value === 'profiles' ||
             value === 'environments' ||
             value === 'sidebar' ||
-            value === 'auto-fix' ||
+            (value === 'auto-fix' && canUseAutoFix) ||
             value === 'preferences' ||
             (value === 'compute' && settings?.canManage)
           ) {
@@ -206,21 +211,25 @@ function CloudAgentSettings({
             <LayoutList className="size-4 shrink-0" aria-hidden />
             Sidebar
           </TabsTrigger>
-          <TabsTrigger
-            value="auto-fix"
-            className="gap-2 pointer-coarse:min-h-11 md:w-full md:justify-start"
-          >
-            <Zap className="size-4 shrink-0" aria-hidden />
-            PR auto-fix
-          </TabsTrigger>
+          {canUseAutoFix && (
+            <TabsTrigger
+              value="auto-fix"
+              className="gap-2 pointer-coarse:min-h-11 md:w-full md:justify-start"
+            >
+              <Zap className="size-4 shrink-0" aria-hidden />
+              PR auto-fix
+            </TabsTrigger>
+          )}
         </TabsList>
 
-        <TabsContent
-          value="auto-fix"
-          className="mt-0 min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5"
-        >
-          <PullRequestAutoFixSection />
-        </TabsContent>
+        {canUseAutoFix && (
+          <TabsContent
+            value="auto-fix"
+            className="mt-0 min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5"
+          >
+            <PullRequestAutoFixSection />
+          </TabsContent>
+        )}
         <TabsContent
           value="general"
           className="mt-0 min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5"

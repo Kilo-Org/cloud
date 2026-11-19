@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pause, Play, RefreshCw, Settings2 } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
+import { usePullRequestAutoFixAccess } from '@/hooks/usePullRequestAutoFixAccess';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -20,8 +21,9 @@ import {
 import type { AssociatedPr } from './utils/github-pr-link';
 
 export function PrMaintenance({ pr, sessionId }: { pr: AssociatedPr; sessionId: string }) {
+  const hasAccess = usePullRequestAutoFixAccess();
   const expectedRepoUrl = getMaintenanceRepositoryUrl(pr.url);
-  if (!expectedRepoUrl || pr.platform !== 'github') return null;
+  if (!hasAccess || !expectedRepoUrl || pr.platform !== 'github') return null;
   return (
     <PrAutoFixControls
       key={`${sessionId}:${expectedRepoUrl}:${pr.number}`}

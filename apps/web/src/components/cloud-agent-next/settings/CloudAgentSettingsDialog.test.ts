@@ -13,6 +13,9 @@ jest.mock('@/hooks/useCloudAgentSettings', () => ({
 }));
 
 jest.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => false }));
+jest.mock('@/hooks/usePullRequestAutoFixAccess', () => ({
+  usePullRequestAutoFixAccess: () => true,
+}));
 
 jest.mock('@/lib/hooks/use-openrouter-models', () => ({
   useModelSelectorList: () => ({ data: { data: [] }, isLoading: false }),

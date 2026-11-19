@@ -1,5 +1,6 @@
 import 'server-only';
 import { enablePullRequestAutoFix } from '@/lib/cloud-agent/pr-auto-fix';
+import { requirePullRequestAutoFix } from '@/lib/cloud-agent/pr-auto-fix-access';
 import { createHash, randomUUID } from 'node:crypto';
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import * as z from 'zod';
@@ -966,9 +967,10 @@ export const cliSessionsV2Router = createTRPCRouter({
     .input(watchPrQuerySchema)
     .mutation(({ ctx, input }) => enablePullRequestAutoFix(ctx, input)),
 
-  getPrWatchOptions: baseProcedure
-    .input(watchPrQuerySchema)
-    .query(({ ctx, input }) => getPrWatchOptions(ctx, input)),
+  getPrWatchOptions: baseProcedure.input(watchPrQuerySchema).query(async ({ ctx, input }) => {
+    await requirePullRequestAutoFix(ctx.user.id);
+    return getPrWatchOptions(ctx, input);
+  }),
   enableWatchPr: baseProcedure
     .input(watchPrEnableSchema)
     .mutation(({ ctx, input }) => enableWatchPr(ctx, input)),

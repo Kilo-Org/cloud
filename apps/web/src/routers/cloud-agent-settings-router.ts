@@ -36,6 +36,10 @@ import {
 import { DEFAULT_WORKSPACE_ORDER, workspaceOrderSchema } from '@/lib/cloud-agent/workspace-folders';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { pullRequestAutoFixSettingsSchema } from '@kilocode/db/cloud-agent-pr-maintenance';
+import {
+  canUsePullRequestAutoFix,
+  requirePullRequestAutoFix,
+} from '@/lib/cloud-agent/pr-auto-fix-access';
 
 const RepositoryPlatformSchema = z.enum(['github', 'gitlab']);
 
@@ -77,9 +81,14 @@ function toRepositoryPlatform(platform: string): RepositoryPlatform {
 }
 
 export const cloudAgentSettingsRouter = createTRPCRouter({
+  canUsePullRequestAutoFix: baseProcedure
+    .output(z.boolean())
+    .query(({ ctx }) => canUsePullRequestAutoFix(ctx.user.id)),
+
   getPullRequestAutoFix: baseProcedure
     .output(pullRequestAutoFixSettingsSchema.nullable())
     .query(async ({ ctx }) => {
+      await requirePullRequestAutoFix(ctx.user.id);
       const settings = await db.query.cloud_agent_user_settings.findFirst({
         where: eq(cloud_agent_user_settings.kilo_user_id, ctx.user.id),
         columns: { pull_request_auto_fix: true },
@@ -93,6 +102,7 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
     .input(pullRequestAutoFixSettingsSchema)
     .output(pullRequestAutoFixSettingsSchema)
     .mutation(async ({ ctx, input }) => {
+      await requirePullRequestAutoFix(ctx.user.id);
       await db
         .insert(cloud_agent_user_settings)
         .values({ kilo_user_id: ctx.user.id, pull_request_auto_fix: input })

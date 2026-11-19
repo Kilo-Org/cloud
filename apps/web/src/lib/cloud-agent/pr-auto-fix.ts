@@ -17,12 +17,17 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { sessionAssociatedPr } from '@/lib/session-associated-pr';
 import { enableWatchPr, getPrWatchOptions, type watchPrQuerySchema } from './watch-pr';
+import {
+  PullRequestAutoFixUnavailableError,
+  requirePullRequestAutoFix,
+} from './pr-auto-fix-access';
 import type { z } from 'zod';
 
 export async function enablePullRequestAutoFix(
   ctx: Parameters<typeof enableWatchPr>[0],
   input: z.infer<typeof watchPrQuerySchema>
 ) {
+  await requirePullRequestAutoFix(ctx.user.id);
   const saved = await db.query.cloud_agent_user_settings.findFirst({
     where: eq(cloud_agent_user_settings.kilo_user_id, ctx.user.id),
     columns: { pull_request_auto_fix: true },
@@ -140,6 +145,7 @@ export async function enablePullRequestAutoFixWorkspaces() {
       await enablePullRequestAutoFix(ctx, input);
       enabled += 1;
     } catch (error) {
+      if (error instanceof PullRequestAutoFixUnavailableError) continue;
       unavailable += 1;
       const reason = error instanceof TRPCError ? error.code : 'unexpected_error';
       failures[reason] = (failures[reason] ?? 0) + 1;

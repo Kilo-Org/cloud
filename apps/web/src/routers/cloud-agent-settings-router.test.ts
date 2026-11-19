@@ -3,6 +3,7 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import type * as PostHogFeatureFlags from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { pullRequestAutoFixSettingsSchema } from '@kilocode/db/cloud-agent-pr-maintenance';
 import {
   agent_environment_profile_repo_bindings,
@@ -46,8 +47,18 @@ const mockCreateCloudAgentNextClient = jest.fn((_authToken: string) => ({
   getSandboxSelectionOptions: mockGetSandboxSelectionOptions,
 }));
 
+const mockIsReleaseToggleEnabled = jest.fn<(flag: string, userId: string) => Promise<boolean>>(
+  async () => true
+);
+
 jest.mock('@/lib/auth/resource-delegation', () => ({
   createControlTokenForRequest: jest.fn(async () => ({ token: 'cloud-agent-token' })),
+}));
+jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
+  ...jest.requireActual<typeof PostHogFeatureFlags>(
+    '@kilocode/web-shared/lib/posthog-feature-flags'
+  ),
+  isReleaseToggleEnabled: mockIsReleaseToggleEnabled,
 }));
 
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
@@ -118,6 +129,43 @@ describe('cloud-agent-settings router', () => {
   });
 
   describe('personal context', () => {
+    test('only the flagged caller can read or save auto-fix settings', async () => {
+      mockIsReleaseToggleEnabled.mockImplementation(
+        async (flag, userId) => flag === 'cloud-agent-pr-auto-fix' && userId === memberUser.id
+      );
+      try {
+        const member = await createCallerForUser(memberUser.id);
+        const other = await createCallerForUser(otherUser.id);
+        const settings = pullRequestAutoFixSettingsSchema.parse({
+          autoEnable: true,
+          model: 'test/auto-fix-model',
+          categories: { reviews: true, failedChecks: false, conflicts: false },
+          automaticWritesConsent: true,
+          historyRewriteConsent: true,
+          noHardSpendCapConsent: true,
+        });
+
+        await expect(member.cloudAgentSettings.canUsePullRequestAutoFix()).resolves.toBe(true);
+        await expect(other.cloudAgentSettings.canUsePullRequestAutoFix()).resolves.toBe(false);
+        await expect(member.cloudAgentSettings.setPullRequestAutoFix(settings)).resolves.toEqual(
+          settings
+        );
+        await expect(
+          other.cloudAgentSettings.setPullRequestAutoFix(settings)
+        ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+        await expect(other.cloudAgentSettings.getPullRequestAutoFix()).rejects.toMatchObject({
+          code: 'FORBIDDEN',
+        });
+        await expect(
+          db.query.cloud_agent_user_settings.findFirst({
+            where: eq(cloud_agent_user_settings.kilo_user_id, otherUser.id),
+          })
+        ).resolves.toBeUndefined();
+      } finally {
+        mockIsReleaseToggleEnabled.mockResolvedValue(true);
+      }
+    });
+
     test('stores auto-fix settings for the caller, including an organization member', async () => {
       const caller = await createCallerForUser(memberUser.id);
       const otherCaller = await createCallerForUser(otherUser.id);

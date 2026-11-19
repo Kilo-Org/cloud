@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { SessionStatusIndicator } from '@/components/shared/SessionStatusIndicator';
 import { TimeAgo } from '@/components/shared/TimeAgo';
+import { usePullRequestAutoFixAccess } from '@/hooks/usePullRequestAutoFixAccess';
 import {
   getMaintenanceChatSessions,
   isMaintenanceChatPinned,
@@ -30,6 +31,8 @@ export function AutoFixHistory({
   deletingSessionIds: readonly string[];
   onSelectSession: (sessionId: string) => void;
 }) {
+  const hasAccess = usePullRequestAutoFixAccess();
+  if (!hasAccess) return null;
   const runs = getMaintenanceChatSessions(sessions);
   const current = runs.find(session => session.sessionId === currentSessionId);
   const latest = runs[0];

@@ -21,6 +21,9 @@ import { maintenanceChatStatus } from './watch-pr-maintenance-client';
 import { liveAttemptCondition } from './watch-pr-maintenance-store';
 import { emptyWatchPrProjection } from './watch-pr-events';
 
+jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
+  isReleaseToggleEnabled: jest.fn(async () => true),
+}));
 jest.mock('./watch-pr-maintenance-authorization', () => ({
   MaintenanceSettingsError: class extends Error {},
   MaintenanceBalanceError: class extends Error {},

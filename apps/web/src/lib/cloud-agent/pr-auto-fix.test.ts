@@ -14,12 +14,16 @@ import {
 } from '@kilocode/db/cloud-agent-pr-maintenance';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { enableWatchPr, getPrWatchOptions } from './watch-pr';
 import { enablePullRequestAutoFix, enablePullRequestAutoFixWorkspaces } from './pr-auto-fix';
 
 jest.mock('./watch-pr', () => ({
   getPrWatchOptions: jest.fn(),
   enableWatchPr: jest.fn(async () => ({ id: 'synthetic-watch' })),
+}));
+jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
+  isReleaseToggleEnabled: jest.fn(),
 }));
 
 const settings = pullRequestAutoFixSettingsSchema.parse({
@@ -37,6 +41,7 @@ const integrationId = '10000000-0000-4000-8000-000000000003';
 
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.mocked(isReleaseToggleEnabled).mockResolvedValue(true);
   jest.mocked(getPrWatchOptions).mockResolvedValue({
     canEnable: true,
     defaultIntegrationId: integrationId,
@@ -124,6 +129,33 @@ it('requires saved consent before manual enablement', async () => {
     code: 'PRECONDITION_FAILED',
   });
   expect(enableWatchPr).not.toHaveBeenCalled();
+});
+
+it('rejects manual enrollment without the flag, even with saved consent', async () => {
+  const { user, input } = await fixture();
+  jest.mocked(isReleaseToggleEnabled).mockResolvedValue(false);
+
+  await expect(enablePullRequestAutoFix({ user }, input)).rejects.toMatchObject({
+    code: 'FORBIDDEN',
+  });
+  expect(getPrWatchOptions).not.toHaveBeenCalled();
+  expect(enableWatchPr).not.toHaveBeenCalled();
+});
+
+it('only auto-enrolls the flagged owner when both users opted in', async () => {
+  const flagged = await fixture();
+  const unflagged = await fixture();
+  jest
+    .mocked(isReleaseToggleEnabled)
+    .mockImplementation(async (_, userId) => userId === flagged.user.id);
+
+  expect(await enablePullRequestAutoFixWorkspaces()).toEqual({ enabled: 1, unavailable: 0 });
+  expect(isReleaseToggleEnabled).toHaveBeenCalledWith('cloud-agent-pr-auto-fix', unflagged.user.id);
+  expect(enableWatchPr).toHaveBeenCalledTimes(1);
+  expect(enableWatchPr).toHaveBeenCalledWith(
+    { user: flagged.user },
+    expect.objectContaining(flagged.input)
+  );
 });
 
 it('enables an existing PR workspace once even when it has multiple chats', async () => {

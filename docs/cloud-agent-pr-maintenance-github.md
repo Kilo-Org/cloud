@@ -1,5 +1,13 @@
 # PR maintenance GitHub configuration
 
+## Per-user rollout
+
+Create the PostHog release toggle `cloud-agent-pr-auto-fix`. Target `distinct_id` equal to the intended user's Kilo account ID at 100%. Remove any condition that includes everyone.
+
+The flag defaults to off. It hides Auto-fix controls and prevents enrollment and new runs for other accounts. Existing watches pause before starting a new run if the owner no longer has access. Runs already in progress can finish. Saved settings and chats are retained. Users can resume paused watches after access returns. Legacy observation watches do not require the flag.
+
+For local development, set `CLOUD_AGENT_PR_AUTO_FIX_DEV_USER_ID` to one local account ID before starting the web app. This setting has no effect in production.
+
 ## GitHub App subscriptions
 
 The repository does not contain a GitHub App registration manifest. An App administrator must configure both production Apps:

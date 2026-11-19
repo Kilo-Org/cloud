@@ -42,6 +42,7 @@ import { replayWatchPrCiEvents } from './watch-pr-ci-inbox';
 import { readWorkspacePullRequest } from '@/lib/session-associated-pr';
 import { validateMaintenanceSettings } from './watch-pr-maintenance-authorization';
 import { assessAndScheduleWatchPr, stopWatchPrAttempts } from './watch-pr-maintenance';
+import { requirePullRequestAutoFix } from './pr-auto-fix-access';
 import { maintenanceWorkspace } from './watch-pr-maintenance-client';
 import { maintenanceHistoryEntry } from './watch-pr-maintenance-history';
 import { deriveWatchPrObservationExecutionStatus } from './watch-pr-observation';
@@ -519,6 +520,7 @@ export async function getPrWatchOptions(
 }
 
 export async function enableWatchPr(ctx: WatchContext, input: z.infer<typeof watchPrEnableSchema>) {
+  if (hasWatchPrAutomaticWriteConsent(input.policy)) await requirePullRequestAutoFix(ctx.user.id);
   const expiresAt = watchPrConsentExpiry(input.policy, input.expiresAt);
   const session = await ownedWatchSource(ctx, input.sessionId);
   assertExpectedPr(session, input);
@@ -837,6 +839,7 @@ export async function changeWatchPr(
     });
   let canonicalRepoUrl: string | undefined;
   if (action === 'resume') {
+    if (hasWatchPrAutomaticWriteConsent(watch.policy)) await requirePullRequestAutoFix(ctx.user.id);
     if (watch.status !== 'paused')
       throw new TRPCError({
         code: 'PRECONDITION_FAILED',
@@ -918,8 +921,10 @@ export async function recheckWatchPr(
       code: 'PRECONDITION_FAILED',
       message: 'Finished watches cannot be rechecked',
     });
-  if (hasWatchPrAutomaticWriteConsent(watch.policy))
+  if (hasWatchPrAutomaticWriteConsent(watch.policy)) {
+    await requirePullRequestAutoFix(ctx.user.id);
     return serializeWatchPr(await assessAndScheduleWatchPr(watch, 'recheck'));
+  }
   const session = await ownedWatchSourceFor(ctx, watch);
   if (
     session.cloud_agent_worktree_id !== watch.worktree_id ||

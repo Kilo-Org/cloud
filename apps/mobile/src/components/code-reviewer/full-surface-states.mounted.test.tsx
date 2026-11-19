@@ -604,6 +604,35 @@ describe('Reviewer repository bodies', () => {
     unmount();
   });
 
+  it('leaves the line off while the organization has no name yet', async () => {
+    // A deep link straight into the screen, or a failed membership read, leaves
+    // the organization unnamed. The heading still states the connection's state,
+    // and a stand-alone label never stands where the name belongs.
+    state.platform = 'bitbucket';
+    state.scope = 'org-1';
+    state.organizations = [];
+    state.bitbucket.data = {
+      connected: false,
+      repositoryCache: { status: 'unavailable' },
+    };
+    state.bitbucketStatus = {
+      method: 'oauth',
+      status: 'connected',
+      integrationId: 'oauth-1',
+      integrationStatus: 'active',
+      recoveryAction: null,
+      workspace: { uuid: 'ws-uuid', slug: 'acme', displayName: 'Acme' },
+      repositoryCache: { status: 'available', repositories: [], syncedAt: null },
+      canManage: true,
+    };
+
+    const { renderer, unmount } = await renderWithProviders(reposRoute());
+    const empty = renderer.root.find(node => String(node.type) === 'EmptyState');
+    expect(empty.props.title).toBe(i18n.t('codeReviewer.bitbucketConnect.managedOnWebTitle'));
+    expect(empty.props.description).toBeUndefined();
+    unmount();
+  });
+
   it('keeps cached repositories beside a partial error', async () => {
     state.repositories.isError = true;
     state.repositories.data = { repositories: [{ id: 1, fullName: 'org/repo', private: false }] };

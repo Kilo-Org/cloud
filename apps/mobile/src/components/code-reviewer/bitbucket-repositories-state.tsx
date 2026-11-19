@@ -30,9 +30,10 @@ export function BitbucketRepositoriesState({
 }>) {
   const { t } = useTranslation();
   // The body names the organization the web page manages the connection for,
-  // read from the same membership row the rest of the screen uses. Until it
-  // resolves the line holds the generic noun, so it never prints an unfilled
-  // placeholder.
+  // read from the same membership row the rest of the screen uses. A row that
+  // has not resolved, or a list read that failed, leaves the line off rather
+  // than putting a stand-alone label where the name belongs: the heading alone
+  // still states the connection's state.
   const orgBoundary = useOrgBoundary(scope);
   const organizationName = orgBoundary.org?.organizationName;
 
@@ -64,9 +65,13 @@ export function BitbucketRepositoriesState({
         icon={GitMerge}
         iconSize={28}
         title={t('codeReviewer.bitbucketConnect.managedOnWebTitle')}
-        description={t('codeReviewer.bitbucketConnect.managedOnWebRepositories', {
-          organization: organizationName ?? t('common.organization'),
-        })}
+        description={
+          organizationName
+            ? t('codeReviewer.bitbucketConnect.managedOnWebRepositories', {
+                organization: organizationName,
+              })
+            : undefined
+        }
       />
     );
   }

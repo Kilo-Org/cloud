@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic } from '@/lib/haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { type ReactNode, useCallback, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -146,6 +146,33 @@ export function SaveDraftAsTodoSheet({
     }, [])
   );
   const activeLists = (lists.data ?? []).filter(list => list.archivedAt === null);
+  const shown = visible && !hiddenForCreate;
+
+  function clearFailures() {
+    for (const key of snapshot.states.keys()) {
+      clearWhere(key, () => true);
+    }
+  }
+  // Closing retires a failure the sheet already showed, so the report below
+  // covers only a save that settles after the sheet is gone.
+  function close() {
+    clearFailures();
+    onClose();
+  }
+  // A failure the closed sheet cannot show (its save settled after the close)
+  // is reported on the screen underneath instead, where a toast draws once the
+  // sheet window is gone: the same copy as the line, never the raw error.
+  useEffect(() => {
+    if (shown) {
+      return;
+    }
+    for (const [key, state] of snapshot.states) {
+      if (state.status === 'failed') {
+        toast.error(state.failure.message);
+        clearWhere(key, () => true);
+      }
+    }
+  }, [shown, snapshot, clearWhere]);
 
   async function save(list: TodoList) {
     const todo = todoFromDraft(getDraft());
@@ -158,9 +185,7 @@ export function SaveDraftAsTodoSheet({
     }
     const epoch = currentAuthEpoch();
     // The sheet reports one failure: a new attempt retires another row's line.
-    for (const key of snapshot.states.keys()) {
-      clearWhere(key, () => true);
-    }
+    clearFailures();
     try {
       await createTodo.mutateAsync({ listId: list.id, ...todo });
     } catch (error) {
@@ -247,14 +272,14 @@ export function SaveDraftAsTodoSheet({
 
   return (
     <Sheet
-      visible={visible && !hiddenForCreate}
+      visible={shown}
       onClose={() => {
         // The hide-for-create flip arms the native sheet's own dismissal, which
         // reports through `onClose`; that report is not the user closing the
         // sheet, so only a dismissal while the sheet is actually shown reaches
         // the caller.
         if (!hiddenForCreate) {
-          onClose();
+          close();
         }
       }}
       // The body scrolls, so the native sheet's drag would dismiss it on a
@@ -265,7 +290,7 @@ export function SaveDraftAsTodoSheet({
     >
       {/* The title row takes the under-handle padding itself. */}
       <View className="flex-1">
-        <SheetTitleRow title={t('todos.saveSheet.title')} onClose={onClose} />
+        <SheetTitleRow title={t('todos.saveSheet.title')} onClose={close} />
         <ScrollView nestedScrollEnabled contentContainerStyle={{ paddingBottom: bottomClearance }}>
           {body}
         </ScrollView>

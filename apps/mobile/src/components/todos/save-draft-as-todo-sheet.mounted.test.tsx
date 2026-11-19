@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- the react-native and tRPC mock harness stays inline so the sheet's contract reads as one component */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake query factories settle without await because they resolve immediately */
 import { MutationCache, onlineManager, QueryClient } from '@tanstack/react-query';
-import { createContext, createElement, type ReactNode, useEffect } from 'react';
+import { createContext, createElement, type ReactNode, useEffect, useState } from 'react';
 import { toast } from 'sonner-native';
 import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
@@ -142,6 +142,20 @@ function sheetVisible(mounted: Mounted): boolean {
   const sheet = mounted.renderer.root.find(node => (node.type as string) === 'Sheet');
   return Boolean(sheet.props.visible);
 }
+// The new-session screen keeps the sheet mounted and flips `visible` off when
+// it reports a close, as this host does.
+function SheetHost({ onSaved }: Readonly<{ onSaved: () => void }>) {
+  const [visible, setVisible] = useState(true);
+  return createElement(SaveDraftAsTodoSheet, {
+    visible,
+    organizationId: ORGANIZATION_ID,
+    getDraft: () => 'Fix the flake\nnotes',
+    onSaved,
+    onClose: () => {
+      setVisible(false);
+    },
+  });
+}
 async function mountSheet(onSaved: () => void = () => undefined) {
   // The app's mutation cache hands every failure to the auth handler
   // (`createKiloAppQueryClient`); this client keeps only that wiring.
@@ -153,18 +167,18 @@ async function mountSheet(onSaved: () => void = () => undefined) {
       },
     }),
   });
-  const mounted = await renderWithProviders(
-    createElement(SaveDraftAsTodoSheet, {
-      visible: true,
-      organizationId: ORGANIZATION_ID,
-      getDraft: () => 'Fix the flake\nnotes',
-      onSaved,
-      onClose: () => undefined,
-    }),
-    { queryClient }
-  );
+  const mounted = await renderWithProviders(createElement(SheetHost, { onSaved }), {
+    queryClient,
+  });
   onTestFinished(mounted.unmount);
   return mounted;
+}
+function closeSheet(mounted: Mounted): void {
+  act(() => {
+    controls(mounted)
+      .find(control => control.accessibilityLabel === i18n.t('common.close'))
+      ?.onPress?.();
+  });
 }
 
 async function tapList(mounted: Mounted): Promise<void> {
@@ -363,5 +377,43 @@ describe('SaveDraftAsTodoSheet', () => {
     expect(
       controls(mounted).find(control => control.accessibilityLabel === 'Errands')?.disabled
     ).toBe(false);
+  });
+
+  // Closed mid-save, the sheet has no line to show: the failure reaches the
+  // screen underneath as a toast with the same copy, never the raw error.
+  it('reports a save that fails after the sheet was closed with a toast', async () => {
+    const save = Promise.withResolvers<unknown>();
+    createTodo.mockReturnValue(save.promise);
+    const onSaved = vi.fn<() => void>();
+    const mounted = await mountSheet(onSaved);
+
+    await tapList(mounted);
+    closeSheet(mounted);
+    expect(sheetVisible(mounted)).toBe(false);
+
+    await act(async () => {
+      save.reject(new Error(OFFLINE_ERROR));
+      await Promise.resolve();
+    });
+    await waitFor(() => vi.mocked(toast.error).mock.calls.length > 0);
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(toast.error).toHaveBeenCalledWith(i18n.t('todos.saveSheet.saveFailed'));
+    expect(text(mounted)).not.toContain(i18n.t('todos.saveSheet.saveFailed'));
+    expect(onSaved).not.toHaveBeenCalled();
+  });
+
+  it('does not repeat a failure the sheet showed when it closes', async () => {
+    createTodo.mockRejectedValue(new Error(OFFLINE_ERROR));
+    const mounted = await mountSheet();
+
+    await tapList(mounted);
+    await waitFor(() => text(mounted).includes(i18n.t('todos.saveSheet.saveFailed')));
+    closeSheet(mounted);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(sheetVisible(mounted)).toBe(false);
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });

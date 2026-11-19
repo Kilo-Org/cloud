@@ -106,7 +106,10 @@ export function useRepairTriggerRouteStack({
         openedOutsideProfileTree: false,
         parents: { list: true, overview: false } satisfies ProfileStackParents,
         listRouteName: TRIGGERS_LIST_ROUTE_NAME,
-        overviewRouteName: 'profiles/[profileId]/index',
+        // The trigger screens need one parent, the list, so the overview slot is
+        // never pushed; the list's own name keeps the rule honest instead of a
+        // profile route no trigger Stack can hold.
+        overviewRouteName: TRIGGERS_LIST_ROUTE_NAME,
       });
       if (!(toPush.list || toPush.overview)) {
         return;

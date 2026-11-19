@@ -3344,8 +3344,9 @@ export const createBrowserRuntime = ({
           return {
             kind: 'result',
             result: withModalState(settled, `${modalState}${openedNote}`),
-            // The page cannot report its frames while its dialog is open, so the tab's own document is the inventory.
-            ...(agentContext === undefined
+            // A tab this call opened is the one place a result carries withheld frames: the page cannot report
+            // Them while its dialog is open, so the tab's own document is the inventory.
+            ...(agentContext === undefined || openedForStep === undefined
               ? {}
               : {
                   withheldFrames: await withheldOriginsFor(

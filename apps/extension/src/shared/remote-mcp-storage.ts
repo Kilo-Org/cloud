@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { z } from 'zod';
 import type {
   RemoteMcpAuth,
@@ -196,15 +197,28 @@ export const saveRemoteMcpStore = async (
 
 const storeUpdateChain = createSerialAsyncChain();
 
-/* Serialized load-modify-save: a stale save would drop another caller's write; a no-op update is not rewritten. */
-export const updateRemoteMcpStore = (
+export interface RemoteMcpStoreUpdate<Result> {
+  readonly result: Result;
+  readonly store: RemoteMcpStore;
+}
+
+/*
+ * Serialized load-modify-save: a stale save would drop another caller's write; a
+ * no-op update is not rewritten. The callback returns the store to persist next to
+ * the value its caller needs, so a caller never reads a snapshot taken outside the
+ * chain and never keeps its result in a mutable outer variable.
+ */
+export const updateRemoteMcpStore = <Result>(
   storageArea: RemoteMcpStorageArea,
-  update: (store: RemoteMcpStore) => RemoteMcpStore
-): Promise<void> =>
+  update: (store: RemoteMcpStore) => RemoteMcpStoreUpdate<Result>
+): Promise<Result> =>
   storeUpdateChain.enqueue(async () => {
     const store = await loadRemoteMcpStore(storageArea);
-    const next = update(store);
-    await (next === store ? undefined : saveRemoteMcpStore(storageArea, next));
+    const { result, store: next } = update(store);
+    if (next !== store) {
+      await saveRemoteMcpStore(storageArea, next);
+    }
+    return result;
   });
 
 const createId = (): string => crypto.randomUUID();

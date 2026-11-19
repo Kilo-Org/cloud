@@ -373,19 +373,25 @@ describe('serialized store updates', () => {
       },
     };
 
-    const first = updateRemoteMcpStore(storage, store => ({
-      servers: [
-        ...store.servers,
-        { ...savedServer, id: 'server-a', slug: 'server-a', url: 'https://server-a.example/mcp' },
-      ],
-    }));
+    const first = updateRemoteMcpStore(storage, store => {
+      const nextStore: RemoteMcpStore = {
+        servers: [
+          ...store.servers,
+          { ...savedServer, id: 'server-a', slug: 'server-a', url: 'https://server-a.example/mcp' },
+        ],
+      };
+      return { result: nextStore, store: nextStore };
+    });
     /* The second call arrives while the first one is still loading. */
-    const second = updateRemoteMcpStore(storage, store => ({
-      servers: [
-        ...store.servers,
-        { ...savedServer, id: 'server-b', slug: 'server-b', url: 'https://server-b.example/mcp' },
-      ],
-    }));
+    const second = updateRemoteMcpStore(storage, store => {
+      const nextStore: RemoteMcpStore = {
+        servers: [
+          ...store.servers,
+          { ...savedServer, id: 'server-b', slug: 'server-b', url: 'https://server-b.example/mcp' },
+        ],
+      };
+      return { result: nextStore, store: nextStore };
+    });
 
     expect(loads).toHaveLength(1);
 

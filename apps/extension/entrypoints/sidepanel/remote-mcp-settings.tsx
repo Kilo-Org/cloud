@@ -40,6 +40,15 @@ const authTypeValues: AuthType[] = ['none', 'bearer', 'header', 'oauth'];
 const isAuthType = (value: string): value is AuthType =>
   (authTypeValues as string[]).includes(value);
 
+/* A rejected save keeps the store untouched; an accepted one carries the saved store. */
+type SaveOutcome =
+  | { readonly error: string }
+  | {
+      readonly error: null;
+      readonly previousIds: ReadonlySet<string>;
+      readonly store: RemoteMcpStore;
+    };
+
 const defaultForm = (): FormState => ({
   allowInSafeMode: false,
   authType: 'none',
@@ -482,34 +491,24 @@ export const RemoteMcpSettings = (): JSX.Element => {
     const draft = buildDraftFromForm(form, existing?.auth);
     /* The atom can be stale (a connect or OAuth write may have landed since it
        was set), so the upsert runs on the store the serialized update loads. */
-    const saveErrors: string[] = [];
-    const savedStores: RemoteMcpStore[] = [];
-    const existingIds = new Set<string>();
-
-    await updateRemoteMcpStore(storage, freshStore => {
-      for (const server of freshStore.servers) {
-        existingIds.add(server.id);
-      }
-
+    const saved = await updateRemoteMcpStore<SaveOutcome>(storage, freshStore => {
+      const previousIds = new Set(freshStore.servers.map(server => server.id));
       const upserted = applyUpsert(freshStore, draft);
       if (upserted.error !== null) {
-        saveErrors.push(upserted.error);
-        return freshStore;
+        return { result: { error: upserted.error }, store: freshStore };
       }
 
-      savedStores.push(upserted.store);
-      return upserted.store;
+      return {
+        result: { error: null, previousIds, store: upserted.store },
+        store: upserted.store,
+      };
     });
 
-    const [saveError] = saveErrors;
-    const [nextStore] = savedStores;
-    if (saveError !== undefined) {
-      return saveError;
-    }
-    if (nextStore === undefined) {
-      return null;
+    if (saved.error !== null) {
+      return saved.error;
     }
 
+    const { previousIds, store: nextStore } = saved;
     setStore(nextStore);
     setShowAddForm(false);
     setEditingServer(null);
@@ -517,7 +516,7 @@ export const RemoteMcpSettings = (): JSX.Element => {
     // Connect (test) on save so tools are cached and usable immediately; the row surfaces any failure.
     const savedServer =
       existing === null
-        ? nextStore.servers.find(candidate => !existingIds.has(candidate.id))
+        ? nextStore.servers.find(candidate => !previousIds.has(candidate.id))
         : nextStore.servers.find(candidate => candidate.id === existing.id);
     if (savedServer !== undefined) {
       await connectServer(savedServer);
@@ -526,17 +525,12 @@ export const RemoteMcpSettings = (): JSX.Element => {
   };
 
   const handleRemove = async (serverId: string): Promise<void> => {
-    const removedStores: RemoteMcpStore[] = [];
-    await updateRemoteMcpStore(storage, freshStore => {
+    const nextStore = await updateRemoteMcpStore(storage, freshStore => {
       const removedStore = removeServer(freshStore, serverId);
-      removedStores.push(removedStore);
-      return removedStore;
+      return { result: removedStore, store: removedStore };
     });
 
-    const [nextStore] = removedStores;
-    if (nextStore !== undefined) {
-      setStore(nextStore);
-    }
+    setStore(nextStore);
   };
 
   const handleEdit = (server: RemoteMcpServer): void => {

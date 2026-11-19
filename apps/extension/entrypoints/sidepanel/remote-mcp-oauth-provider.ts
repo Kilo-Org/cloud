@@ -58,16 +58,19 @@ export const createRemoteMcpOAuthProvider = ({
     await updateRemoteMcpStore(storageArea, store => {
       const current = store.servers.find(candidate => candidate.id === server.id);
       if (current === undefined) {
-        return store;
+        return { result: undefined, store };
       }
 
       const existing = current.auth.type === 'oauth' ? current.auth.oauth : undefined;
       const oauth = patch === undefined ? undefined : { ...existing, ...patch };
 
-      return upsertRemoteMcpServer(store, {
-        ...current,
-        auth: { oauth, type: 'oauth' },
-      });
+      return {
+        result: undefined,
+        store: upsertRemoteMcpServer(store, {
+          ...current,
+          auth: { oauth, type: 'oauth' },
+        }),
+      };
     });
   };
 

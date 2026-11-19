@@ -222,10 +222,10 @@ export const connectRemoteMcpServer = async ({
 };
 
 /*
- * Connect a server and persist the connection results. Reloads the store before
- * merging so OAuth tokens written by the provider mid-connect survive, then saves
- * only the connection fields. Returns the saved servers, or undefined when the
- * server was removed mid-connect.
+ * Connect a server and persist the connection results. The merge runs on the
+ * store the serialized update loads, so OAuth tokens written by the provider
+ * mid-connect survive, and only the connection fields are saved. Returns the
+ * saved servers, or undefined when the server was removed mid-connect.
  */
 export const connectAndPersistRemoteMcpServer = async ({
   fetch: fetchFn,
@@ -237,12 +237,11 @@ export const connectAndPersistRemoteMcpServer = async ({
   readonly storageArea: RemoteMcpStorageArea;
 }): Promise<readonly RemoteMcpServer[] | undefined> => {
   const updated = await connectRemoteMcpServer({ fetch: fetchFn, server, storageArea });
-  let savedServers: readonly RemoteMcpServer[] | undefined = undefined;
 
-  await updateRemoteMcpStore(storageArea, freshStore => {
+  return updateRemoteMcpStore(storageArea, freshStore => {
     const freshServer = freshStore.servers.find(found => found.id === server.id);
     if (freshServer === undefined) {
-      return freshStore;
+      return { result: undefined, store: freshStore };
     }
 
     const nextStore = upsertRemoteMcpServer(freshStore, {
@@ -252,11 +251,9 @@ export const connectAndPersistRemoteMcpServer = async ({
       lastError: updated.lastError,
       status: updated.status,
     });
-    savedServers = nextStore.servers;
-    return nextStore;
-  });
 
-  return savedServers;
+    return { result: nextStore.servers, store: nextStore };
+  });
 };
 
 /*
@@ -288,10 +285,13 @@ const persistNeedsAuth = async (
   await updateRemoteMcpStore(storageArea, store => {
     const freshServer = store.servers.find(found => found.id === serverId);
     if (freshServer === undefined) {
-      return store;
+      return { result: undefined, store };
     }
 
-    return upsertRemoteMcpServer(store, { ...freshServer, status: 'needs_auth' });
+    return {
+      result: undefined,
+      store: upsertRemoteMcpServer(store, { ...freshServer, status: 'needs_auth' }),
+    };
   });
 };
 

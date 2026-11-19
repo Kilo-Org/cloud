@@ -25,7 +25,7 @@ export function resolveOwner(ctx: TRPCContext, organizationId?: string): Owner {
 export async function ensureIntegrationAccess(
   ctx: TRPCContext,
   organizationId?: string,
-  roles?: OrganizationRole[]
+  roles?: readonly OrganizationRole[]
 ) {
   if (organizationId) {
     await ensureOrganizationAccess(ctx, organizationId, roles ?? ORGANIZATION_BILLING_ROLES);
@@ -40,7 +40,7 @@ export async function ensureIntegrationAccess(
 export async function resolveAuthorizedOwner(
   ctx: TRPCContext,
   organizationId?: string,
-  roles?: OrganizationRole[]
+  roles?: readonly OrganizationRole[]
 ): Promise<Owner> {
   await ensureIntegrationAccess(ctx, organizationId, roles);
   return resolveOwner(ctx, organizationId);

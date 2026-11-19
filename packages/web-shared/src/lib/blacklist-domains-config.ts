@@ -1,17 +1,10 @@
 import 'server-only';
 import * as z from 'zod';
-import { captureException } from '@sentry/nextjs';
 import { asc } from 'drizzle-orm';
-import { blacklisted_domains } from '@kilocode/db/schema';
+import { blacklisted_domains, blacklisted_domains_settings } from '@kilocode/db/schema';
 import { createEmailDomainBlacklistCache } from '@kilocode/worker-utils/account-access';
-import { redisClient } from '@kilocode/web-shared/lib/redis';
-import {
-  BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY,
-  LEGACY_BLACKLIST_DOMAINS_REDIS_KEY,
-} from '@kilocode/web-shared/lib/redis-keys';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
-import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 
 /**
  * TLDs refused for new signups until an admin changes the stored list. These are
@@ -29,6 +22,9 @@ export const BlacklistDomainsSettingsSchema = z.object({
 });
 
 export type BlacklistDomainsSettings = z.infer<typeof BlacklistDomainsSettingsSchema>;
+const StoredBlacklistDomainsSettingsSchema = BlacklistDomainsSettingsSchema.required({
+  blocked_signup_tlds: true,
+});
 
 export const DEFAULT_BLACKLIST_DOMAINS_SETTINGS: BlacklistDomainsSettings = {
   updated_at: null,
@@ -60,58 +56,27 @@ function getEnvFallbackSignupTlds(): string[] {
 
 export const envFallbackSignupTlds = getEnvFallbackSignupTlds();
 
-function parseSettings(raw: string): BlacklistDomainsSettings {
-  return BlacklistDomainsSettingsSchema.parse(JSON.parse(raw));
+export async function readBlacklistDomainsSettings(
+  fromDb: Pick<typeof db, 'select'> = db
+): Promise<(BlacklistDomainsSettings & { blocked_signup_tlds: string[] }) | null> {
+  const [row] = await fromDb.select().from(blacklisted_domains_settings).limit(1);
+  if (!row) return null;
+
+  return StoredBlacklistDomainsSettingsSchema.parse({
+    blocked_signup_tlds: row.blocked_signup_tlds,
+    updated_at: new Date(row.updated_at).toISOString(),
+    updated_by: row.updated_by,
+    updated_by_email: row.updated_by_email,
+  });
 }
 
 /**
- * The settings used to share one Redis value with the complete domain list. Copies them into
- * their own key once, without overwriting a newer admin save; once that key exists, this never
- * runs. The next admin save migrates through here and then deletes the legacy value. A
- * concurrent save can do both after the caller found no settings, so the settings key is re-read
- * even when the legacy value is gone.
- */
-async function migrateLegacySettings(): Promise<BlacklistDomainsSettings | null> {
-  const legacy = await redisClient.get<string>(LEGACY_BLACKLIST_DOMAINS_REDIS_KEY);
-  if (legacy !== null) {
-    await redisClient.set(
-      BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY,
-      JSON.stringify(parseSettings(legacy)),
-      { nx: true }
-    );
-  }
-  const raw = await redisClient.get<string>(BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY);
-  return raw === null ? null : parseSettings(raw);
-}
-
-export async function readBlacklistDomainsSettings(): Promise<BlacklistDomainsSettings | null> {
-  const raw = await redisClient.get<string>(BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY);
-  return raw === null ? migrateLegacySettings() : parseSettings(raw);
-}
-
-/**
- * The cache owns the once-per-failure warning; the same failure reaches Sentry through
- * `onRefreshFailure`, so one failed read produces one log line and one report.
- */
-const getCachedSettings = createCachedFetch<BlacklistDomainsSettings | null>(
-  readBlacklistDomainsSettings,
-  60_000,
-  null,
-  {
-    name: 'blacklistDomainsSettings',
-    onRefreshFailure: ({ error }) => {
-      captureException(error, { tags: { source: 'blacklist_domains_config' } });
-    },
-  }
-);
-
-/**
- * The admin-configured signup TLD blocklist. An absent field keeps the deployment default (or
+ * The admin-configured signup TLD blocklist. An absent row keeps the deployment default (or
  * BLOCKED_SIGNUP_TLDS); an explicit empty array disables TLD blocking.
  */
 export async function getBlockedSignupTlds(): Promise<string[]> {
-  const settings = await getCachedSettings();
-  return normalizeSignupTlds(settings?.blocked_signup_tlds ?? envFallbackSignupTlds);
+  const settings = await readBlacklistDomainsSettings();
+  return normalizeSignupTlds(settings ? settings.blocked_signup_tlds : envFallbackSignupTlds);
 }
 
 const emailDomainBlacklist = createEmailDomainBlacklistCache();

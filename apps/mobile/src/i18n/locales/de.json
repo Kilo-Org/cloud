@@ -3420,6 +3420,7 @@
       "sendInvite": "Einladung senden",
       "title": "Mitglied einladen",
       "alreadyInvited": "Diese Person ist bereits eingeladen oder bereits Mitglied.",
+      "organizationUnavailable": "Diese Organisation ist nicht mehr verfügbar.",
       "sendError": "Die Einladung konnte nicht gesendet werden.",
       "pendingInvitation": "Für diese E-Mail-Adresse liegt bereits eine ausstehende Einladung vor.",
       "alreadyMember": "Diese Person ist bereits Mitglied dieser Organisation.",
@@ -4619,7 +4620,8 @@
     "connectFailed": "Die Verbindungsseite konnte nicht geöffnet werden"
   },
   "invoices": {
-    "personalEmptyDescription": "Rechnungen für deine eigenen Käufe werden hier angezeigt, sobald dir etwas in Rechnung gestellt wurde."
+    "personalEmptyDescription": "Rechnungen für deine eigenen Käufe werden hier angezeigt, sobald dir etwas in Rechnung gestellt wurde. Belege im App Store und bei Google Play findest du im Credit-Verlauf.",
+    "personalPeriod": "Letzte 12 Monate"
   },
   "cloudAgent": {
     "compute": {

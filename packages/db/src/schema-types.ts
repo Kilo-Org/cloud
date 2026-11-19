@@ -3151,7 +3151,9 @@ export type CustomLlmPublic = z.infer<typeof CustomLlmPublicSchema>;
  * Makes a custom LLM a partner route for the gateway catalog model with the same
  * public id. It does not own the id: Kilo-paid requests for the model try the
  * partner first and fall back to the regular route when it answers with an
- * unsuccessful status. User BYOK keys and other user-paid routes are unaffected.
+ * unsuccessful status. User BYOK keys and other user-paid routes are unaffected. When the
+ * definition declares `opencode_settings.reasoning_options`, a request for a reasoning effort
+ * outside them skips the partner up front.
  */
 export const CustomLlmPartnerSchema = z.object({
   /** The provider slug the partner serves the model as. Organization provider allow

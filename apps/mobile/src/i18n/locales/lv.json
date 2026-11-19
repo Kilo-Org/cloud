@@ -3473,6 +3473,7 @@
       "sendInvite": "Nosūtīt uzaicinājumu",
       "title": "Uzaicināt dalībnieku",
       "alreadyInvited": "Šī e-pasta adrese jau ir uzaicināta vai jau pieder dalībniekam.",
+      "organizationUnavailable": "Šī organizācija vairs nav pieejama.",
       "sendError": "Neizdevās nosūtīt uzaicinājumu.",
       "pendingInvitation": "Šai e-pasta adresei jau ir gaidošs uzaicinājums.",
       "alreadyMember": "Šis cilvēks jau ir šīs organizācijas dalībnieks.",
@@ -4694,7 +4695,8 @@
     "connectFailed": "Neizdevās atvērt savienojuma lapu"
   },
   "invoices": {
-    "personalEmptyDescription": "Rēķini par jūsu pirkumiem šeit parādīsies, kad jums tiks izrakstīts rēķins."
+    "personalEmptyDescription": "Rēķini par jūsu pirkumiem šeit parādās, kad jums tiks izrakstīts rēķins. Kvīti veikalā App Store un pakalpojumā Google Play atrodas sadaļā Kredītu vēsture.",
+    "personalPeriod": "Pēdējie 12 mēneši"
   },
   "cloudAgent": {
     "compute": {

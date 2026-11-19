@@ -3420,6 +3420,7 @@
       "sendInvite": "招待を送信",
       "title": "メンバーを招待",
       "alreadyInvited": "このメールアドレスは、すでに招待済みか、すでにメンバーに追加されています。",
+      "organizationUnavailable": "この組織はもう利用できません。",
       "sendError": "招待を送信できませんでした。",
       "pendingInvitation": "このメールアドレスには、すでに保留中の招待があります。",
       "alreadyMember": "このユーザーはすでにこの組織のメンバーです。",
@@ -4619,7 +4620,8 @@
     "connectFailed": "接続ページを開けませんでした"
   },
   "invoices": {
-    "personalEmptyDescription": "ご自身の購入に対する請求書は、請求が発生するとここに表示されます。"
+    "personalEmptyDescription": "ご自身の購入に対する請求書は、請求が発生するとここに表示されます。App Store と Google Play の領収書はクレジット履歴にあります。",
+    "personalPeriod": "過去12か月"
   },
   "cloudAgent": {
     "compute": {

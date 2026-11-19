@@ -3415,6 +3415,7 @@
       "sendInvite": "Taklifnomani yuborish",
       "title": "A’zo taklif qilish",
       "alreadyInvited": "Bu elektron pochta manzili allaqachon taklif qilingan yoki allaqachon a'zo.",
+      "organizationUnavailable": "Bu tashkilot endi mavjud emas.",
       "sendError": "Taklifnomani yuborib bo'lmadi.",
       "pendingInvitation": "Bu elektron pochta uchun allaqachon kutilayotgan taklifnoma mavjud.",
       "alreadyMember": "Bu shaxs allaqachon ushbu tashkilotning a'zosi.",
@@ -4619,7 +4620,8 @@
     "connectFailed": "Ulanish sahifasini ochib boʻlmadi"
   },
   "invoices": {
-    "personalEmptyDescription": "To‘lov amalga oshirilgach, shaxsiy xaridlaringiz uchun hisob-fakturalar shu yerda ko‘rinadi."
+    "personalEmptyDescription": "To‘lov amalga oshirilgach, shaxsiy xaridlaringiz uchun hisob-fakturalar shu yerda ko‘rinadi. App Store va Google Play cheklari Kreditlar tarixida.",
+    "personalPeriod": "So‘nggi 12 oy"
   },
   "cloudAgent": {
     "compute": {

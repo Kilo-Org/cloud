@@ -153,7 +153,7 @@ type Input = { organizationId?: string | null | undefined };
 export async function getCodeIndexOrganizationId(
   ctx: TRPCContext,
   input: Input,
-  roles?: OrganizationRole[]
+  roles?: readonly OrganizationRole[]
 ) {
   if (!isCodeIndexingEnabled()) {
     throw codeIndexingNotAvailable();

@@ -1,7 +1,7 @@
 import { Tabs, usePathname, useSegments } from 'expo-router';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { Bot, House, MessageCircle, UserRound } from '@/components/ui/icons';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Platform, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -63,21 +63,26 @@ export default function TabsLayout() {
   const fontScale = useLiveFontScale();
   // A form sheet covers the screen beneath it instead of becoming one, but a
   // sheet the app stack presents replaces that screen's route in `segments`, so
-  // the bar keeps the last screen the app showed. A sheet over a tab root then
+  // the layout keeps the last screen it showed. A sheet over a tab root then
   // leaves the root's bar — and the bottom inset this layout publishes for it —
-  // in place, while a sheet over a pushed screen keeps the bar hidden.
+  // in place, while a sheet over a pushed screen keeps the bar hidden. The
+  // memory is only read while a sheet is up, so an effect can fill it.
   const sheetOverTabs = isFormSheetRoute(segments);
-  const lastScreenSegments = useRef<readonly string[]>(segmentsBeneathFormSheet(segments));
-  const coveredIsCurrent =
-    lastScreenSegments.current.length === segments.length &&
-    lastScreenSegments.current.every((segment, index) => segment === segments[index]);
-  if (!sheetOverTabs && !coveredIsCurrent) {
-    lastScreenSegments.current = segments;
-  }
-  const hideTabs = shouldHideTabBar(
-    pathname,
-    sheetOverTabs ? lastScreenSegments.current : segments
+  const [lastScreenSegments, setLastScreenSegments] = useState<readonly string[]>(
+    segmentsBeneathFormSheet(segments)
   );
+  useEffect(() => {
+    if (sheetOverTabs) {
+      return;
+    }
+    setLastScreenSegments(previous =>
+      previous.length === segments.length &&
+      previous.every((segment, index) => segment === segments[index])
+        ? previous
+        : segments
+    );
+  }, [sheetOverTabs, segments]);
+  const hideTabs = shouldHideTabBar(pathname, sheetOverTabs ? lastScreenSegments : segments);
   // A form sheet presented inside a tab stack (the organization sheets, the
   // pickers) covers this tab's screen. The covered scene hides itself through
   // the stack's screen layout gate, but the bar is rendered by this navigator

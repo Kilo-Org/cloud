@@ -1,8 +1,9 @@
 // McpServerRowView regression coverage for the one-control-per-row rule: the
 // server's name is painted once, but the enabled switch is the row's only
 // element carrying it, so a screen reader meets the name as the toggle and not
-// again as a static text. The type and summary lines stay their own stops
-// because they say more than the name does.
+// again as a static text. The type, the count and the summary are painted under
+// that name, and the content press is one element, so they ride its spoken name
+// instead of becoming stops of their own.
 import { act, type ElementType, type ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -90,7 +91,7 @@ describe('<McpServerRowView>', () => {
     expect(switches[0]?.props.value).toBe(true);
   });
 
-  it('keeps the type, the summary and the two action labels as their own stops', () => {
+  it('names the content press with the type, the secret count and the summary', () => {
     const root = renderRow(row());
 
     const announced = root
@@ -98,8 +99,10 @@ describe('<McpServerRowView>', () => {
       .filter(node => node.props.accessible !== false)
       .map(node => node.props.children);
 
-    expect(announced).toContain('Remote');
-    expect(announced).toContain('https://mcp.example.com/docs');
+    // The painted lines are merged into the content press, so none of them is a
+    // stop of its own.
+    expect(announced).not.toContain('Remote');
+    expect(announced).not.toContain('https://mcp.example.com/docs');
 
     // A URL is told apart by its tail, so the value ellipsizes in the middle.
     const summary = root
@@ -108,7 +111,20 @@ describe('<McpServerRowView>', () => {
     expect(summary?.props.ellipsizeMode).toBe('middle');
 
     const buttons = root.findAllByType(PRESSABLE).map(node => node.props.accessibilityLabel);
-    expect(buttons).toEqual(['Edit MCP server docs-search', 'Delete MCP server docs-search']);
+    expect(buttons).toEqual([
+      'Edit MCP server docs-search, Remote, 2 secrets, https://mcp.example.com/docs',
+      'Delete MCP server docs-search',
+    ]);
+  });
+
+  it('leaves out the type the whole list shares, and keeps the count in the name', () => {
+    const root = renderRow(row({ showType: false }));
+
+    const buttons = root.findAllByType(PRESSABLE).map(node => node.props.accessibilityLabel);
+    expect(buttons).toEqual([
+      'Edit MCP server docs-search, 2 secrets, https://mcp.example.com/docs',
+      'Delete MCP server docs-search',
+    ]);
   });
 
   it('gives the name its own line and leaves the type and count to the line under it', () => {

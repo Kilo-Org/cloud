@@ -39,7 +39,8 @@ type McpServerRowProps = Readonly<{
  * name needs. The summary is a value, so it keeps both of its ends and ellipsizes
  * in the middle — a URL or a command is told apart by its tail. The painted lines
  * are hidden from assistive technology, and the content press and the switch are
- * what a reader reaches.
+ * what a reader reaches: the press is one element, so the type, the count and the
+ * summary ride its spoken name.
  */
 export function McpServerRowView({
   server,
@@ -56,6 +57,23 @@ export function McpServerRowView({
     server.type === 'local' ? t('profiles.mcp.localType') : t('profiles.mcp.remoteType');
   const secretLabel =
     secretCount > 0 ? t('profiles.mcp.secretCount', { count: secretCount }) : null;
+  // The content press is a single accessible element, so nothing painted under
+  // its name is announced by itself. The facts that tell two servers apart ride
+  // the name after the action, the way the members row appends the email it
+  // shows under its manage action.
+  const contentFacts = [
+    showType ? typeLabel : null,
+    secretLabel,
+    summary.length > 0 ? summary : null,
+  ]
+    .filter((fact): fact is string => fact !== null)
+    .join(', ');
+  const contentAccessibilityLabel =
+    onEdit === undefined
+      ? undefined
+      : [t('profiles.mcp.edit', { name: server.name }), contentFacts]
+          .filter(fact => fact.length > 0)
+          .join(', ');
 
   const trailing: ReactNode[] = [
     <Fragment key="enable">
@@ -87,9 +105,7 @@ export function McpServerRowView({
       leading={<IconTile icon={Server} tint={NEUTRAL_TINT} />}
       pressTarget="content"
       onPress={onEdit}
-      contentAccessibilityLabel={
-        onEdit === undefined ? undefined : t('profiles.mcp.edit', { name: server.name })
-      }
+      contentAccessibilityLabel={contentAccessibilityLabel}
       disabled={onEdit === undefined}
       trailing={{ kind: 'nodes', nodes: trailing }}
     >
@@ -98,14 +114,18 @@ export function McpServerRowView({
       </Text>
       {showType || secretLabel !== null ? (
         <View className="mt-0.5 flex-row items-center gap-2">
-          {showType ? <Text variant="caption">{typeLabel}</Text> : null}
+          {showType ? (
+            <Text variant="caption" {...HIDDEN_LABEL_PROPS}>
+              {typeLabel}
+            </Text>
+          ) : null}
           {secretLabel === null ? null : (
             <View className="flex-row items-center gap-0.5">
               <Lock size={12} color={colors.mutedForeground} />
-              {/* The count sits beside a lock glyph and a bare number reads as
-                  nothing, so the line carries the plural wording as its name
-                  while the row keeps the compact digit on screen. */}
-              <Text variant="caption" accessibilityLabel={secretLabel}>
+              {/* The count sits beside a lock glyph, so the plural wording
+                  (not the bare digit) is what the content press announces for
+                  it, while the row keeps the compact digit on screen. */}
+              <Text variant="caption" {...HIDDEN_LABEL_PROPS}>
                 {secretCount}
               </Text>
             </View>
@@ -118,6 +138,7 @@ export function McpServerRowView({
           className="mt-0.5 text-xs text-muted-foreground"
           numberOfLines={1}
           ellipsizeMode="middle"
+          {...HIDDEN_LABEL_PROPS}
         >
           {summary}
         </Text>

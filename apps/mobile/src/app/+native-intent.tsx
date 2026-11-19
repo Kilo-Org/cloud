@@ -171,6 +171,11 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/question-card-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(auth)/question-card-fixture';
     }
+    // Dev-only destructive settings confirmation: the screen that runs the
+    // agent's `settings_set` call, so the confirm can be driven without a chat.
+    if (/(?:^|\/)dev\/settings-confirm-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(auth)/settings-confirm-fixture';
+    }
     const reauthorizeFixtureMatch =
       /(?:^|\/)dev\/security-agent-reauthorize-fixture\/?(\?.*)?$/.exec(path);
     if (reauthorizeFixtureMatch) {

@@ -1,3 +1,4 @@
+import { organizationAwsComputeRouter } from '@/routers/aws-compute-router';
 import {
   microdollar_usage,
   organization_memberships,
@@ -152,6 +153,7 @@ export const organizationsRouter = createTRPCRouter({
   reviewAgent: organizationReviewAgentRouter,
   cloudAgentNext: organizationCloudAgentNextRouter,
   vercelCompute: organizationVercelComputeRouter,
+  awsCompute: organizationAwsComputeRouter,
   securityAgent: organizationSecurityAgentRouter,
   securityAuditLog: organizationSecurityAuditLogRouter,
   autoTopUp: organizationAutoTopUpRouter,

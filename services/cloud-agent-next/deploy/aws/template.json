@@ -13,8 +13,7 @@
     "ExternalId": {
       "Type": "String",
       "Description": "The owner-bound ExternalId supplied by Kilo.",
-      "AllowedPattern": "[A-Za-z0-9_-]{32,128}",
-      "NoEcho": true
+      "AllowedPattern": "[A-Za-z0-9_-]{32,128}"
     },
     "RuntimeArtifactBucket": {
       "Type": "String",

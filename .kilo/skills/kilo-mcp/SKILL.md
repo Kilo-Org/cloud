@@ -109,6 +109,7 @@ exist as an org-scoped mirror under `organizations`, for example
 - `agentBriefing`
 - `agentProfiles`
 - `appReportedMessages`
+- `awsCompute`
 - `byok`
 - `claudeBilling`
 - `cliSessions`

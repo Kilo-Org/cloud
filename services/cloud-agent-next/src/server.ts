@@ -1,3 +1,4 @@
+import { registerAwsSetupRoutes } from './byoc/aws-setup-routes.js';
 import { registerAwsEgressRoutes } from './egress/aws-route.js';
 import { byocVercelOwnerSchema } from './byoc/vercel-owner.js';
 import { Hono } from 'hono';
@@ -311,6 +312,8 @@ function requireInternalApi(c: Context<HonoContext>): Response | null {
   }
   return null;
 }
+
+registerAwsSetupRoutes(app, requireInternalApi);
 
 registerControlLogRoutes(app);
 registerWorkspaceArtifactRoutes(app);

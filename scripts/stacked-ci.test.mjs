@@ -408,6 +408,21 @@ for (const [name, files, expected] of [
     ['tools/i18n/check-catalogs.mjs'],
     { mobile: 'false', lint_only: 'false', catalogs: 'true' },
   ],
+  // The shared source walk has no family of its own in this grep: `OWNED` in
+  // scripts/affected-workspaces.mjs attributes it to the app, so real
+  // attribution selects `kilo-app` and runs the suite. The stub `node` here
+  // answers an empty selection, which pins that this path reaches the selection
+  // instead of a family above and that the catalog job stays down.
+  [
+    'a shared source walk path alone',
+    ['tools/lib/source-files.mjs'],
+    { mobile: 'false', lint_only: 'false', catalogs: 'false' },
+  ],
+  [
+    'the shared source walk and its test',
+    ['tools/lib/source-files.mjs', 'tools/lib/source-files.test.mjs'],
+    { mobile: 'false', lint_only: 'false', catalogs: 'false' },
+  ],
   // A services change beside an app path runs the whole suite, which includes
   // the audit, so the output stays true and the job stands down through its
   // `if` instead.

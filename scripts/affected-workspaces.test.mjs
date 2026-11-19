@@ -103,6 +103,15 @@ test('a root path read by a workspace selects its reader', () => {
   ]);
 });
 
+test('the shared tool helpers are attributed to the app that runs them', () => {
+  // `i18n-leftover` runs the catalog, class and walk checks that read these
+  // helpers. Without the `tools/lib` entry in `OWNED` the path selects every
+  // workspace instead, which still reports `mobile: true` and runs the suite
+  // this attribution exists to scope.
+  assert.deepEqual(select(['tools/lib/source-files.mjs']).packages, ['kilo-app']);
+  assert.deepEqual(select(['tools/lib/catalogs.mjs']).packages, ['kilo-app']);
+});
+
 test('an unattributable or global change selects everything', () => {
   for (const file of [
     'package.json',

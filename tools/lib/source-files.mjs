@@ -33,6 +33,12 @@ export function isTestArtifact(name) {
  * Every `.ts`/`.tsx` file below `dir`, depth-first, with `node_modules` pruned.
  * `skip` receives each candidate's file name and decides whether the audit
  * leaves it out.
+ *
+ * The order is part of the contract: a depth-first pre-order walk whose entries
+ * at each level — files and subdirectories interleaved — are visited sorted by
+ * name using a plain code-unit comparison, never a locale-aware one. The same
+ * tree therefore yields the same sequence on every machine and locale, so a
+ * diagnostic's position in the output is stable too.
  */
 export function sourceFiles(dir, skip) {
   const files = [];
@@ -41,7 +47,10 @@ export function sourceFiles(dir, skip) {
 }
 
 function collect(dir, skip, files) {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+  const entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
+    a.name < b.name ? -1 : a.name > b.name ? 1 : 0
+  );
+  for (const entry of entries) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) {
       if (entry.name !== 'node_modules') {

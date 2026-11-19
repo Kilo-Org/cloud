@@ -2393,6 +2393,51 @@ describe('CloudAgentTransport snapshot read recovery', () => {
     }
   });
 
+  it('reads a malformed snapshot page once and reports it as unavailable history', async () => {
+    jest.useFakeTimers();
+    try {
+      const cloudAgentWorkspaceId = 'workspace_' + 'w'.repeat(12);
+      const fetchCloudSnapshotPage = jest.fn(() =>
+        Promise.resolve({ kind: 'success', info: { id: 123 }, messages: 'nope' })
+      );
+      const errors: string[] = [];
+      const serviceEvents: ServiceEvent[] = [];
+      const onInitialPageLoaded = jest.fn();
+      const transport = createCloudAgentTransport({
+        sessionId: cloudAgentId(cloudAgentWorkspaceId),
+        kiloSessionId: kiloId('ses-1'),
+        api: createMockApi(),
+        getTicket: () => 'test-ticket',
+        fetchCloudSnapshotPage,
+        onInitialPageLoaded,
+        websocketBaseUrl: 'ws://localhost:9999',
+        onError: message => errors.push(message),
+      })({
+        onChatEvent: () => undefined,
+        onServiceEvent: event => serviceEvents.push(event),
+      });
+
+      transport.connect();
+      await flushMicrotasks();
+
+      // Cover the full retry window: a malformed page is terminal, so the
+      // read must not be repeated.
+      for (let attempt = 0; attempt < 4; attempt++) {
+        jest.advanceTimersByTime(5000);
+        await flushMicrotasks();
+      }
+
+      expect(fetchCloudSnapshotPage).toHaveBeenCalledTimes(1);
+      expect(errors).toEqual(['Session history is unavailable']);
+      expect(onInitialPageLoaded).not.toHaveBeenCalled();
+      expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(0);
+
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('records, without rows, the reseed a reconnect dispatches on a workspace session', async () => {
     jest.useFakeTimers();
     try {

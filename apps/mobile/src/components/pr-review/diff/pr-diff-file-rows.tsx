@@ -179,7 +179,10 @@ export function PatchMissingRow({
   const { t } = useTranslation();
   return (
     <View className="border-b-[0.5px] border-hair-soft bg-secondary px-4 py-3">
-      <View className="flex-row items-center gap-2">
+      {/* The row spans 7 dp of the padding around it and cancels it again, so
+          the toggle's slop lands inside the row it touches in (46 dp) without
+          reaching the GitHub link's own `mt-2` gap below. */}
+      <View className="-my-2 flex-row items-center gap-2 py-2">
         <File size={14} color={colors.mutedForeground} />
         <View className="flex-1">
           <Text className="text-sm text-foreground">

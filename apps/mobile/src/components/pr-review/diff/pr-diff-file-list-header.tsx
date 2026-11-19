@@ -80,8 +80,11 @@ export function PrDiffFileListHeader({
   }, [router, navigatorHref]);
 
   return (
-    <View className="border-b-[0.5px] border-hair-soft bg-background px-4 py-4">
-      <View className="flex-1 flex-row items-center justify-between" style={sideInsetStyle}>
+    // The vertical padding sits on the inner row, the parent the navigator
+    // entry touches in: Android delivers a touch only inside the parent view,
+    // so the entry's slop needs the padded row around it.
+    <View className="border-b-[0.5px] border-hair-soft bg-background px-4">
+      <View className="flex-1 flex-row items-center justify-between py-4" style={sideInsetStyle}>
         <Pressable
           onPress={handleOpenNavigator}
           accessibilityRole="button"

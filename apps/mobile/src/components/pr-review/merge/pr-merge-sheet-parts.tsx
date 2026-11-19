@@ -163,7 +163,10 @@ export function MergeSheetFormSkeleton(props: {
           ) : (
             <View className="flex-row flex-wrap gap-2">
               {props.methodOptions.map(option => (
-                <Skeleton key={option.value} className="h-11 w-20 rounded-full" />
+                <Skeleton
+                  key={option.value}
+                  className={cn(TOUCH_TARGET_CLASS, 'w-20 rounded-full')}
+                />
               ))}
             </View>
           )}
@@ -171,7 +174,7 @@ export function MergeSheetFormSkeleton(props: {
         {props.showTitle ? (
           <View className="gap-1.5">
             <Skeleton className="h-5 w-24" />
-            <Skeleton className="h-11" />
+            <Skeleton className={TOUCH_TARGET_CLASS} />
           </View>
         ) : null}
         <View className="gap-1.5">

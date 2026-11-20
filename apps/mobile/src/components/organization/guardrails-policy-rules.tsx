@@ -21,7 +21,7 @@ import { MenuSheet } from '@/components/ui/menu-sheet';
 import { Text } from '@/components/ui/text';
 import { selectionHaptic } from '@/lib/haptics';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { LINE_ACTION_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { LINE_ACTION_BOX_CLASS, LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 import {
   GUARDRAILS_LIMITS,
   type OrgPolicyRule,
@@ -100,7 +100,8 @@ export function PolicyRulesEditor({
                 {t('organizationGuardrails.ruleNumber', { number: index + 1 })}
               </Text>
               <Pressable
-                className={`${LINE_ACTION_BOX_CLASS} items-center justify-center active:opacity-70`}
+                className={`${LINE_ACTION_BOX_CLASS} min-w-[28px] items-center justify-center active:opacity-70`}
+                hitSlop={LINE_ACTION_HIT_SLOP}
                 disabled={disabled}
                 accessibilityRole="button"
                 accessibilityLabel={t('organizationGuardrails.ruleRemove', {

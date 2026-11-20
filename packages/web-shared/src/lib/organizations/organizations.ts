@@ -49,7 +49,10 @@ import {
   bumpOrganizationGroupPolicyRevision,
   lockOrganizationGroupPolicy,
 } from '@kilocode/web-shared/lib/organizations/organization-groups';
-import { enforceOrganizationCreationLimit } from '@kilocode/web-shared/lib/organizations/organization-creation-limit';
+import {
+  enforceOrganizationCreationLimit,
+  hasOrganizationTrialEligibility,
+} from '@kilocode/web-shared/lib/organizations/organization-creation-limit';
 
 // `organization_seats_purchases` is append-only, so the most recently created
 // row is the organization's current subscription state — the same input the
@@ -314,8 +317,7 @@ export async function createOrganization(
     // keep a trial on every organization they create.
     // A creation with no creator (admin, SCIM, helper) has no consumption record
     // to read, so it keeps a trial window as before.
-    const grantsTrial =
-      creationLimit == null || creationLimit.internalAccount || !creationLimit.trialConsumed;
+    const grantsTrial = creationLimit == null || hasOrganizationTrialEligibility(creationLimit);
     const now = new Date();
     const trialEndDate = new Date(now.getTime() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000);
 

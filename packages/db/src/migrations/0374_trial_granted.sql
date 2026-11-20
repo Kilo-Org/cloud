@@ -34,4 +34,4 @@ END $$;
 --> statement-breakpoint
 COMMIT;
 --> statement-breakpoint
-BEGIN;--> statement-breakpoint
+BEGIN;

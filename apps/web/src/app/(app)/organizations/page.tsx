@@ -3,7 +3,7 @@ import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server'
 import { NoOrganizationsState } from '@/components/organizations/NoOrganizationsState';
 import { OrganizationsList } from '@/components/organizations/OrganizationsList';
 import { PageLayout } from '@/components/PageLayout';
-import { hasFirstOrganizationTrialOffer } from '@/lib/organization-trial-offer';
+import { userHasOrganizationTrialEligibility } from '@kilocode/web-shared/lib/organizations/organization-creation-limit';
 
 export default async function OrganizationsPage() {
   const user = await getUserFromAuthOrRedirect('/users/sign_in');
@@ -18,7 +18,7 @@ export default async function OrganizationsPage() {
     >
       {!hasAnyOrganizations ? (
         <NoOrganizationsState
-          showFirstOrganizationTrialOffer={hasFirstOrganizationTrialOffer(user)}
+          showFirstOrganizationTrialOffer={userHasOrganizationTrialEligibility(user)}
         />
       ) : (
         <OrganizationsList orgs={orgs} />

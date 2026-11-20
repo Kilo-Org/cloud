@@ -21,6 +21,27 @@ export function isInternalAccountEmail(email: string | null | undefined): boolea
   return getLowerDomainFromEmail(email) === INTERNAL_ACCOUNT_DOMAIN;
 }
 
+/**
+ * Whether an account created by this user receives a trial window: internal
+ * accounts always do, and everyone else does until the offer is used.
+ */
+export function hasOrganizationTrialEligibility(account: {
+  internalAccount: boolean;
+  trialConsumed: boolean;
+}): boolean {
+  return account.internalAccount || !account.trialConsumed;
+}
+
+/** The same eligibility answer, read from the creator's user row. */
+export function userHasOrganizationTrialEligibility(
+  user: Pick<User, 'google_user_email' | 'organization_trial_consumed_at'>
+): boolean {
+  return hasOrganizationTrialEligibility({
+    internalAccount: isInternalAccountEmail(user.google_user_email),
+    trialConsumed: user.organization_trial_consumed_at != null,
+  });
+}
+
 export type OrganizationCreationLimit = {
   /** Staff at an internal domain: exempt from the cap and keep a trial on every organization. */
   internalAccount: boolean;

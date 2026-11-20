@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 import { CreateOrganizationPage } from '@/components/organizations/new/CreateOrganizationPage';
-import { hasFirstOrganizationTrialOffer } from '@/lib/organization-trial-offer';
+import { userHasOrganizationTrialEligibility } from '@kilocode/web-shared/lib/organizations/organization-creation-limit';
 
 export default async function Page() {
   const user = await getUserFromAuthOrRedirect(
@@ -10,7 +10,7 @@ export default async function Page() {
   return (
     <Suspense fallback={<div>Loading...</div>}>
       <CreateOrganizationPage
-        showFirstOrganizationTrialOffer={hasFirstOrganizationTrialOffer(user)}
+        showFirstOrganizationTrialOffer={userHasOrganizationTrialEligibility(user)}
       />
     </Suspense>
   );

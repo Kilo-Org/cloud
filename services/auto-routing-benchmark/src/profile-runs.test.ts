@@ -11,7 +11,10 @@ import type {
 } from '@kilocode/auto-routing-contracts';
 import { DECIDER_CASES, FRONTIER_CASES } from './datasets/decider-cases';
 import type { BenchmarkJobMessage } from './run';
-import { CATALOG_CONTEXT_TOO_SMALL_REASON } from './platform-models';
+import {
+  CATALOG_CONTEXT_TOO_SMALL_REASON,
+  CATALOG_NO_TOOL_SUPPORT_REASON,
+} from './platform-models';
 import {
   claimScheduledChunks,
   finishChunk,
@@ -1190,7 +1193,7 @@ describe('drainQueue', () => {
       {
         model: 'platform/no-parameters',
         variant: '',
-        failure: { failureClass: 'catalog_absent', reason: expect.stringContaining('unavailable') },
+        failure: { failureClass: 'catalog_absent', reason: CATALOG_NO_TOOL_SUPPORT_REASON },
       },
     ]);
   });

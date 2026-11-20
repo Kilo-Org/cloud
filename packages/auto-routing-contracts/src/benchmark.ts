@@ -508,7 +508,23 @@ export const RefreshBenchmarkProfilesResponseSchema = z.object({
   refreshed: z.array(BenchmarkPairSchema),
   unavailable: z.array(BenchmarkPairSchema),
   skipped: z.array(BenchmarkPairSchema),
+  /**
+   * Why each `unavailable` pair was refused, by the same rule the drain applies. Optional
+   * so a response from a worker that predates it still parses.
+   */
+  refusals: z
+    .array(
+      z.object({
+        entry: BenchmarkPairSchema,
+        failureClass: BenchmarkProfileFailureClassSchema,
+        reason: z.string(),
+      })
+    )
+    .optional(),
 });
+export type RefreshBenchmarkProfilesResponse = z.infer<
+  typeof RefreshBenchmarkProfilesResponseSchema
+>;
 
 export const BenchmarkRoutingTableResponseSchema = z.object({
   table: RoutingTableSchema.nullable(),

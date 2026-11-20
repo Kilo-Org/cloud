@@ -2,7 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 import type { BenchmarkRegistryFailedEntry } from '@kilocode/auto-routing-contracts';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { FailedModelsTable } from './FailedModelsTable';
+import { FailedModelsTable, readmitOutcome } from './FailedModelsTable';
 
 const now = new Date('2026-11-20T12:00:00.000Z');
 
@@ -95,5 +95,48 @@ describe('failed models table', () => {
     );
     expect(html).toContain('Re-admitting');
     expect(html.match(/disabled=""/g)).toHaveLength(2);
+  });
+});
+
+describe('re-admit outcome', () => {
+  const entry = { model: 'vendor/small', variant: 'high' };
+  const contextReason =
+    'Model context window leaves fewer than 20000 input tokens after the CLI completion reservation.';
+
+  it('names the refusal the worker returned for the pair', () => {
+    expect(
+      readmitOutcome(
+        {
+          refreshed: [],
+          unavailable: [entry],
+          skipped: [],
+          refusals: [
+            {
+              entry: { model: 'vendor/small', variant: 'low' },
+              failureClass: 'catalog_absent',
+              reason: 'other pair',
+            },
+            { entry, failureClass: 'context_too_small', reason: contextReason },
+          ],
+        },
+        entry
+      )
+    ).toEqual({ kind: 'error', message: `vendor/small (high) stays failed: ${contextReason}` });
+  });
+
+  it('falls back to a neutral refusal when the worker sends no reason', () => {
+    const outcome = readmitOutcome({ refreshed: [], unavailable: [entry], skipped: [] }, entry);
+    expect(outcome.kind).toBe('error');
+    expect(outcome.message).not.toContain('catalog');
+  });
+
+  it('reports a re-admitted pair and a pair that was not re-admitted', () => {
+    expect(readmitOutcome({ refreshed: [entry], unavailable: [], skipped: [] }, entry)).toEqual({
+      kind: 'success',
+      message: 'vendor/small (high) re-admitted',
+    });
+    expect(readmitOutcome({ refreshed: [], unavailable: [], skipped: [entry] }, entry).kind).toBe(
+      'error'
+    );
   });
 });

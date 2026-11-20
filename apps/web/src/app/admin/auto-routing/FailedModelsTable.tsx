@@ -5,6 +5,7 @@ import {
   type AutoRouter,
   type BenchmarkPair,
   type BenchmarkRegistryFailedEntry,
+  type RefreshBenchmarkProfilesResponse,
 } from '@kilocode/auto-routing-contracts';
 import React from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -143,6 +144,28 @@ export function FailedModelsTable({
   );
 }
 
+/** The toast for a re-admit response, naming the drain's reason when the pair was refused. */
+export function readmitOutcome(
+  data: RefreshBenchmarkProfilesResponse,
+  entry: BenchmarkPair
+): { kind: 'success' | 'error'; message: string } {
+  const label = `${entry.model} (${entry.variant ?? 'default'})`;
+  if (data.refreshed.length > 0) return { kind: 'success', message: `${label} re-admitted` };
+  if (data.unavailable.length > 0) {
+    const refusal = data.refusals?.find(
+      refused => refused.entry.model === entry.model && refused.entry.variant === entry.variant
+    );
+    return {
+      kind: 'error',
+      message: `${label} stays failed: ${refusal?.reason ?? 'the benchmark cannot run this pair.'}`,
+    };
+  }
+  return {
+    kind: 'error',
+    message: `${label} was not re-admitted: it is no longer failed or is running`,
+  };
+}
+
 async function readmitFailedModel(entry: BenchmarkPair, router: AutoRouter) {
   const response = await adminFetch('/admin/api/auto-routing/benchmark-registry/readmit', {
     method: 'POST',
@@ -163,11 +186,9 @@ export function FailedModels({
   const readmitMutation = useMutation({
     mutationFn: (entry: BenchmarkPair) => readmitFailedModel(entry, router),
     onSuccess: (data, entry) => {
-      const label = `${entry.model} (${entry.variant ?? 'default'})`;
-      if (data.refreshed.length > 0) toast.success(`${label} re-admitted`);
-      else if (data.unavailable.length > 0)
-        toast.error(`${label} is not in the benchmark catalog, so it stays failed`);
-      else toast.error(`${label} was not re-admitted: it is no longer failed or is running`);
+      const outcome = readmitOutcome(data, entry);
+      if (outcome.kind === 'success') toast.success(outcome.message);
+      else toast.error(outcome.message);
       void queryClient.invalidateQueries({
         queryKey: ['auto-routing', 'benchmark-registry', router],
       });

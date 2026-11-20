@@ -1,4 +1,8 @@
-import type { AutoRouter, BenchmarkPair } from '@kilocode/auto-routing-contracts';
+import type {
+  AutoRouter,
+  BenchmarkPair,
+  RefreshBenchmarkProfilesResponse,
+} from '@kilocode/auto-routing-contracts';
 import type { z } from 'zod';
 import { isExactModelUnavailableResult } from './cli-runner';
 import { benchmarkPairUnavailability, type BenchmarkModelCatalogSchema } from './platform-models';
@@ -40,17 +44,24 @@ export async function refreshCurrentProfiles(
   input: RefreshInput,
   catalog: z.infer<typeof BenchmarkModelCatalogSchema>,
   nowIso = new Date().toISOString()
-): Promise<{ refreshed: BenchmarkPair[]; unavailable: BenchmarkPair[]; skipped: BenchmarkPair[] }> {
-  const entries = input.entries.map(entry => {
-    const failure = benchmarkPairUnavailability(catalog, entry);
-    return {
-      model: entry.model,
-      variant: variantToStorage(entry.variant),
-      available: failure === null,
-      failureClass: failure?.failureClass ?? null,
-      failureReason: failure?.reason ?? null,
-    };
-  });
+): Promise<RefreshBenchmarkProfilesResponse> {
+  const checked = input.entries.map(entry => ({
+    entry,
+    failure: benchmarkPairUnavailability(catalog, entry),
+  }));
+  const failureByPair = new Map(
+    checked.map(({ entry, failure }) => [
+      JSON.stringify([entry.model, variantToStorage(entry.variant)]),
+      failure,
+    ])
+  );
+  const entries = checked.map(({ entry, failure }) => ({
+    model: entry.model,
+    variant: variantToStorage(entry.variant),
+    available: failure === null,
+    failureClass: failure?.failureClass ?? null,
+    failureReason: failure?.reason ?? null,
+  }));
   const selection = JSON.stringify(entries);
   const bindings = [input.router, input.engineIdentity, input.repetitions, selection] as const;
   const runningSql = `SELECT 1 FROM benchmark_profiles AS running
@@ -156,10 +167,16 @@ export async function refreshCurrentProfiles(
   const changed = new Set(result.results.map(row => JSON.stringify([row.model, row.variant])));
   const refreshed: BenchmarkPair[] = [];
   const unavailable: BenchmarkPair[] = [];
+  const refusals: NonNullable<RefreshBenchmarkProfilesResponse['refusals']> = [];
   for (const row of result.results) {
     const pair = { model: row.model, variant: variantFromStorage(row.variant) };
-    if (row.status === 'pending') refreshed.push(pair);
-    else unavailable.push(pair);
+    const failure = failureByPair.get(JSON.stringify([row.model, row.variant]));
+    if (!failure) {
+      refreshed.push(pair);
+      continue;
+    }
+    unavailable.push(pair);
+    refusals.push({ entry: pair, failureClass: failure.failureClass, reason: failure.reason });
   }
   return {
     refreshed,
@@ -167,5 +184,6 @@ export async function refreshCurrentProfiles(
     skipped: input.entries.filter(
       entry => !changed.has(JSON.stringify([entry.model, variantToStorage(entry.variant)]))
     ),
+    refusals,
   };
 }

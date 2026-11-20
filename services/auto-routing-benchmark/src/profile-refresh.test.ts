@@ -87,6 +87,13 @@ describe('targeted benchmark refresh', () => {
       refreshed: [{ model: 'vendor/selected', variant: null }],
       unavailable: [{ model: 'vendor/removed', variant: null }],
       skipped: [],
+      refusals: [
+        {
+          entry: { model: 'vendor/removed', variant: null },
+          failureClass: 'catalog_absent',
+          reason: 'Model or variant is unavailable in the executable benchmark catalog.',
+        },
+      ],
     });
     expect(
       sqlite
@@ -183,6 +190,7 @@ describe('targeted benchmark refresh', () => {
         refreshed: [],
         unavailable: [],
         skipped: [{ model: 'vendor/selected', variant: null }],
+        refusals: [],
       });
       expect(
         sqlite.prepare(`SELECT status, run_id, invalidated_at FROM benchmark_profiles`).get()

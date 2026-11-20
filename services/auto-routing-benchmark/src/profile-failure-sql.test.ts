@@ -14,7 +14,11 @@ import {
   requeueRetryableCurrentProfiles,
 } from './db';
 import { DECIDER_CASES } from './datasets/decider-cases';
-import { BenchmarkModelCatalogSchema } from './platform-models';
+import {
+  BenchmarkModelCatalogSchema,
+  CATALOG_CONTEXT_TOO_SMALL_REASON,
+  CATALOG_NO_TOOL_SUPPORT_REASON,
+} from './platform-models';
 import {
   PROFILE_FAILURE_BUDGET,
   PROFILE_MODEL_FAILURE_BUDGET,
@@ -267,6 +271,7 @@ describe('profile failure transitions (production migrations and real SQLite)', 
       refreshed: [pair],
       unavailable: [],
       skipped: [],
+      refusals: [],
     });
     expect(stored()).toEqual({
       status: 'pending',
@@ -280,6 +285,16 @@ describe('profile failure transitions (production migrations and real SQLite)', 
   });
 
   const tooSmallCatalog = { data: [{ id: pair.model, context_length: 16_384 }] };
+  const refusalOf = (catalog: unknown) => {
+    const tooSmall = catalog === tooSmallCatalog;
+    return {
+      entry: pair,
+      failureClass: tooSmall ? 'context_too_small' : 'catalog_absent',
+      reason: tooSmall
+        ? CATALOG_CONTEXT_TOO_SMALL_REASON
+        : 'Model or variant is unavailable in the executable benchmark catalog.',
+    };
+  };
 
   function wholeRow() {
     return sqlite.prepare('SELECT * FROM benchmark_profiles WHERE model = ?').get(pair.model);
@@ -304,6 +319,7 @@ describe('profile failure transitions (production migrations and real SQLite)', 
         refreshed: [],
         unavailable: [pair],
         skipped: [],
+        refusals: [refusalOf(catalog)],
       });
       expect(wholeRow()).toEqual(before);
       expect(stored().first_failed_at).toBe(iso(T0));
@@ -312,19 +328,47 @@ describe('profile failure transitions (production migrations and real SQLite)', 
   );
 
   it.each([
-    { catalog: { data: [] }, failureClass: 'catalog_absent' },
-    { catalog: tooSmallCatalog, failureClass: 'context_too_small' },
+    {
+      name: 'missing model',
+      catalog: { data: [] },
+      failureClass: 'catalog_absent',
+      reason: 'Model or variant is unavailable in the executable benchmark catalog.',
+    },
+    {
+      name: 'missing variant',
+      catalog: {
+        data: [
+          { id: pair.model, opencode: { variants: { high: { reasoning: { effort: 'high' } } } } },
+        ],
+      },
+      failureClass: 'catalog_absent',
+      reason: 'Variant default is not offered for this model in the executable benchmark catalog.',
+    },
+    {
+      name: 'no tool support',
+      catalog: { data: [{ id: pair.model, supported_parameters: ['temperature'] }] },
+      failureClass: 'catalog_absent',
+      reason: CATALOG_NO_TOOL_SUPPORT_REASON,
+    },
+    {
+      name: 'small context window',
+      catalog: tooSmallCatalog,
+      failureClass: 'context_too_small',
+      reason: CATALOG_CONTEXT_TOO_SMALL_REASON,
+    },
   ])(
-    'fails a never-failed pair permanently as $failureClass when the drain rule refuses a re-admit',
-    async ({ catalog, failureClass }) => {
+    'fails a never-failed pair permanently and names the refusal: $name',
+    async ({ catalog, failureClass, reason }) => {
       expect(await refresh(catalog, T0 + HOUR)).toEqual({
         refreshed: [],
         unavailable: [pair],
         skipped: [],
+        refusals: [{ entry: pair, failureClass, reason }],
       });
       expect(stored()).toMatchObject({
         status: 'unavailable',
         failure_class: failureClass,
+        failure_reason: reason,
         failure_attempts: 1,
         first_failed_at: iso(T0 + HOUR),
       });

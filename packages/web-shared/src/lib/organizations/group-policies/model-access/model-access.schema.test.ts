@@ -1,6 +1,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import * as z from 'zod';
 import {
+  describeModelAccessPolicyWriteRefusal,
   MAX_ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_BYTES,
   MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH,
   MAX_ORGANIZATION_GROUP_MODEL_IDS,
@@ -235,7 +236,7 @@ describe('model access policy catalog limits', () => {
     expect(modelResult.error.issues).toEqual([
       expect.objectContaining({
         code: 'custom',
-        message: 'Control characters are not allowed',
+        message: 'A model id must not contain control characters.',
         path: ['data', 'model_allow_list', 0],
       }),
     ]);
@@ -257,7 +258,7 @@ describe('model access policy catalog limits', () => {
     expect(providerResult.error.issues).toEqual([
       expect.objectContaining({
         code: 'custom',
-        message: 'Control characters are not allowed',
+        message: 'A provider slug must not contain control characters.',
         path: ['data', 'provider_allow_list', 0],
       }),
     ]);
@@ -268,6 +269,35 @@ describe('model access policy catalog limits', () => {
       `Together the allow lists must serialize to at most ${MAX_ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_BYTES} bytes of UTF-8 JSON.`
     );
     expect(selectedMemberDescription(OrganizationGroupModelAccessPolicySchema)).toBeUndefined();
+  });
+
+  it('names the serialized size bound in the write schema refusal itself', () => {
+    // Well-formed JSON escapes each lone surrogate as six ASCII bytes, so a
+    // selection at the entry and count limits still exceeds the byte bound.
+    const policy = {
+      type: 'model_access',
+      data: {
+        mode: 'selected',
+        model_allow_list: Array.from({ length: MAX_ORGANIZATION_GROUP_MODEL_IDS }, () =>
+          '\ud800'.repeat(MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH)
+        ),
+        provider_allow_list: Array.from({ length: MAX_ORGANIZATION_GROUP_PROVIDER_SLUGS }, () =>
+          'p'.repeat(MAX_ORGANIZATION_GROUP_PROVIDER_SLUG_LENGTH)
+        ),
+      },
+    } satisfies OrganizationGroupModelAccessPolicy;
+
+    const result = OrganizationGroupModelAccessPolicyWriteSchema.safeParse(policy);
+
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error('Expected an over-large serialized policy to be refused');
+    expect(result.error.issues).toEqual([
+      expect.objectContaining({
+        code: 'custom',
+        path: ['data'],
+        message: `Together the allow lists must serialize to at most ${MAX_ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_BYTES} bytes of UTF-8 JSON.`,
+      }),
+    ]);
   });
 
   it('parses every policy mode through both schemas', () => {
@@ -307,5 +337,109 @@ describe('model access policy catalog limits', () => {
     } satisfies OrganizationGroupModelAccessPolicy;
 
     expect(OrganizationGroupModelAccessPolicySchema.parse(policy)).toEqual(policy);
+  });
+});
+
+describe('model access policy write refusal sentences', () => {
+  function writeRefusal(policy: OrganizationGroupModelAccessPolicy): string {
+    const result = OrganizationGroupModelAccessPolicyWriteSchema.safeParse(policy);
+    if (result.success) throw new Error('Expected the write schema to refuse this policy');
+    return describeModelAccessPolicyWriteRefusal(result.error);
+  }
+
+  it('names the model id length bound for an over-long model id', () => {
+    expect(
+      writeRefusal({
+        type: 'model_access',
+        data: {
+          mode: 'selected',
+          model_allow_list: ['m'.repeat(MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH + 1)],
+          provider_allow_list: [],
+        },
+      })
+    ).toBe('Each model id must be at most 200 characters long.');
+  });
+
+  it('names the provider slug length bound for an over-long provider slug', () => {
+    expect(
+      writeRefusal({
+        type: 'model_access',
+        data: {
+          mode: 'selected',
+          model_allow_list: [],
+          provider_allow_list: ['p'.repeat(MAX_ORGANIZATION_GROUP_PROVIDER_SLUG_LENGTH + 1)],
+        },
+      })
+    ).toBe('Each provider slug must be at most 64 characters long.');
+  });
+
+  it('names the model id count bound for a selection above it', () => {
+    expect(writeRefusal(selectedPolicy(MAX_ORGANIZATION_GROUP_MODEL_IDS + 1))).toBe(
+      'At most 2000 model ids are allowed in one policy.'
+    );
+  });
+
+  it('names the provider slug count bound for a selection above it', () => {
+    expect(writeRefusal(selectedPolicy(1, MAX_ORGANIZATION_GROUP_PROVIDER_SLUGS + 1))).toBe(
+      'At most 500 provider slugs are allowed in one policy.'
+    );
+  });
+
+  it('names the control character bound for a model id and a provider slug', () => {
+    expect(
+      writeRefusal({
+        type: 'model_access',
+        data: {
+          mode: 'selected',
+          model_allow_list: ['\u0001'.repeat(MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH)],
+          provider_allow_list: [],
+        },
+      })
+    ).toBe('A model id must not contain control characters.');
+
+    expect(
+      writeRefusal({
+        type: 'model_access',
+        data: {
+          mode: 'selected',
+          model_allow_list: [],
+          provider_allow_list: [`${'p'.repeat(30)}\u0001${'p'.repeat(30)}`],
+        },
+      })
+    ).toBe('A provider slug must not contain control characters.');
+  });
+
+  it('names the serialized size bound when the allow lists exceed it', () => {
+    // Well-formed JSON escapes each lone surrogate as six ASCII bytes, so a
+    // selection at the entry and count limits still exceeds the byte bound.
+    expect(writeRefusal(selectionAtLimits('\ud800'))).toBe(
+      'Together the allow lists must serialize to at most 2097152 bytes of UTF-8 JSON.'
+    );
+  });
+
+  it('names the empty model id entry when a model id is blank', () => {
+    expect(
+      writeRefusal({
+        type: 'model_access',
+        data: { mode: 'selected', model_allow_list: [''], provider_allow_list: [] },
+      })
+    ).toBe('Each model id must not be empty.');
+  });
+
+  it('names the empty provider slug entry when a provider slug is blank', () => {
+    expect(
+      writeRefusal({
+        type: 'model_access',
+        data: { mode: 'selected', model_allow_list: [], provider_allow_list: ['  '] },
+      })
+    ).toBe('Each provider slug must not be empty.');
+  });
+
+  it('falls back to the generic refusal for a too_small issue outside the allow lists', () => {
+    const result = z.string().min(1).safeParse('');
+    if (result.success) throw new Error('Expected the schema to refuse the empty string');
+    expect(describeModelAccessPolicyWriteRefusal(result.error)).toBe(
+      'The organization model access policy is not valid.'
+    );
   });
 });

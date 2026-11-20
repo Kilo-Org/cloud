@@ -12,6 +12,7 @@ import {
 } from '@kilocode/db/schema';
 import { MAX_ORGANIZATION_GROUPS, OrganizationSettingsSchema } from '@kilocode/db/schema-types';
 import {
+  describeModelAccessPolicyWriteRefusal,
   OrganizationGroupPoliciesSchema,
   OrganizationGroupModelAccessPolicyWriteSchema,
   OrganizationGroupPolicySchema,
@@ -64,8 +65,8 @@ export function normalizeOrganizationGroupPolicy(
   if (!parsed.success) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
-      message:
-        'An organization model access policy entry or size is over the maximum. Remove or shorten allow-list entries before saving.',
+      message: describeModelAccessPolicyWriteRefusal(parsed.error),
+      cause: parsed.error,
     });
   }
   return parsed.data;

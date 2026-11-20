@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
+import * as z from 'zod';
 import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import {
   kilocode_users,
@@ -108,7 +109,8 @@ describe('organization group policies', () => {
   });
 
   it('refuses a selected policy entry over the documented length', () => {
-    expect(() =>
+    let refused: unknown = undefined;
+    try {
       normalizeOrganizationGroupPolicy({
         type: 'model_access',
         data: {
@@ -116,8 +118,18 @@ describe('organization group policies', () => {
           model_allow_list: ['m'.repeat(MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH + 1)],
           provider_allow_list: [],
         },
-      })
-    ).toThrow(expect.objectContaining({ code: 'BAD_REQUEST' }));
+      });
+    } catch (error) {
+      refused = error;
+    }
+
+    expect(refused).toBeInstanceOf(TRPCError);
+    if (!(refused instanceof TRPCError)) throw new Error('Expected a TRPCError refusal');
+    expect(refused.code).toBe('BAD_REQUEST');
+    expect(refused.message).toBe(
+      `Each model id must be at most ${MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH} characters long.`
+    );
+    expect(refused.cause).toBeInstanceOf(z.ZodError);
   });
 });
 

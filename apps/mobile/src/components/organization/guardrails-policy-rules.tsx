@@ -24,7 +24,6 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   COMPACT_CONTROL_BOX_CLASS,
   COMPACT_CONTROL_HIT_SLOP_DP,
-  COMPACT_CONTROL_ROW_END_CLASS,
 } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 import {
@@ -104,18 +103,14 @@ export function PolicyRulesEditor({
               <Text className="text-sm font-medium text-foreground">
                 {t('organizationGuardrails.ruleNumber', { number: index + 1 })}
               </Text>
-              {/* The rule's delete action is the shared compact icon control,
-                  not a line action: the glyph alone measures 16dp, so the box
-                  carries the 32dp target and the 8dp slop takes the reach to
-                  48dp. The end pull keeps the glyph on the card's content edge
-                  while the box itself stays inside the row Android delivers
-                  touches in. */}
+              {/* The rule's delete action is the shared compact icon control:
+                  the glyph alone measures 16dp, so the box carries the 32dp
+                  target and the 8dp slop takes the reach to 48dp. The box sits
+                  inside the row rather than pulled past its end edge, because
+                  this row has no end padding for a pull to consume and Android
+                  delivers a touch only inside the parent's bounds. */}
               <Pressable
-                className={cn(
-                  COMPACT_CONTROL_BOX_CLASS,
-                  COMPACT_CONTROL_ROW_END_CLASS,
-                  'shrink-0 active:opacity-70'
-                )}
+                className={cn(COMPACT_CONTROL_BOX_CLASS, 'shrink-0 active:opacity-70')}
                 hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
                 disabled={disabled}
                 accessibilityRole="button"

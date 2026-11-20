@@ -21,15 +21,26 @@ function isLegalDocumentName(value: string): value is LegalDocumentName {
 }
 
 // The mobile reader renders the document title in its own header, so the served
-// body starts after the source page's title heading. The web fallback pages keep
-// their H1; only this API response drops it. A document that does not open with
-// an H1 element is served unchanged.
-const LEADING_TITLE_HEADING = /^\s*<h1\b[^>]*>[\s\S]*?<\/h1>/i;
+// body starts after the source page's title heading, whatever heading level the
+// page uses and whether that heading opens the body directly or sits inside the
+// card wrappers that hold it. The web fallback pages keep their heading; only
+// this API response drops it, along with the wrappers left empty. A document
+// whose first element is content is served unchanged.
+const LEADING_TITLE_HEADING = /^((?:\s*<div\b[^>]*>)*)\s*<(h[1-6])\b[^>]*>[\s\S]*?<\/\2>/i;
+const LEADING_EMPTY_DIV = /^((?:\s*<div\b[^>]*>)*)\s*<div\b[^>]*>\s*<\/div>/i;
 
 export function stripLeadingTitleHeading(html: string): string {
   // Non-greedy is safe: sanitize-html escapes `<` in text and attribute values,
-  // so `</h1>` cannot occur inside the element and the first one closes it.
-  return html.replace(LEADING_TITLE_HEADING, '');
+  // so the closing tag cannot occur inside the element and the first one closes it.
+  let body = html.replace(LEADING_TITLE_HEADING, '$1');
+  // The wrapper that framed the removed heading is now empty.
+  for (;;) {
+    const collapsed = body.replace(LEADING_EMPTY_DIV, '$1');
+    if (collapsed === body) {
+      return body;
+    }
+    body = collapsed;
+  }
 }
 
 export const GET = withRestTiming(

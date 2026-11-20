@@ -30,9 +30,23 @@ describe('stripLeadingTitleHeading', () => {
     expect(stripLeadingTitleHeading('<p>x</p><h1>Later</h1>')).toBe('<p>x</p><h1>Later</h1>');
   });
 
-  test('keeps a document that does not start with an H1 unchanged', () => {
+  test('removes a wrapped leading heading and the wrapper it empties', () => {
     expect(stripLeadingTitleHeading('<div><h3>Terms</h3><p>body</p></div>')).toBe(
-      '<div><h3>Terms</h3><p>body</p></div>'
+      '<div><p>body</p></div>'
+    );
+  });
+
+  test('removes the card header the terms page opens with', () => {
+    expect(
+      stripLeadingTitleHeading(
+        '<div><div><h3>Terms of Service</h3></div><div><p>Last updated November 2, 2026.</p></div></div>'
+      )
+    ).toBe('<div><div><p>Last updated November 2, 2026.</p></div></div>');
+  });
+
+  test('keeps a document that opens with content unchanged', () => {
+    expect(stripLeadingTitleHeading('<div><div><p>Last updated.</p></div></div>')).toBe(
+      '<div><div><p>Last updated.</p></div></div>'
     );
   });
 
@@ -91,7 +105,7 @@ describe('GET /api/legal/[document]', () => {
     expect(body.html).toContain('<p>body</p>');
   });
 
-  test('serves a document without a leading H1 unchanged', async () => {
+  test('serves a document without a wrapped title heading', async () => {
     global.fetch = jest.fn(
       async () =>
         ({
@@ -108,7 +122,7 @@ describe('GET /api/legal/[document]', () => {
 
     expect(response.status).toBe(200);
     const body: { html: string } = await response.json();
-    expect(body.html).toContain('<h3>Terms of Service</h3>');
+    expect(body.html).not.toContain('<h3>Terms of Service</h3>');
     expect(body.html).toContain('<p>body</p>');
   });
 

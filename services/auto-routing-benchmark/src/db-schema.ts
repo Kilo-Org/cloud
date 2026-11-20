@@ -463,6 +463,28 @@ export const benchmarkSubscriptions = sqliteTable(
 );
 
 /**
+ * Progress of one day's alias sync, per router. The daily cron starts it and the minute
+ * cron resumes it while the row says work is left: whether the platform aliases were
+ * re-resolved, and a keyset cursor over owner subscriptions. `attempts` bounds how much
+ * the day may repeat after a failure.
+ */
+export const benchmarkDailyAliasSync = sqliteTable('benchmark_daily_alias_sync', {
+  router: text('router').$type<AutoRouter>().primaryKey(),
+  day: text('day').notNull(),
+  attempts: integer('attempts').notNull().default(0),
+  platform_status: text('platform_status')
+    .$type<'pending' | 'ok' | 'failed'>()
+    .notNull()
+    .default('pending'),
+  platform_error: text('platform_error'),
+  owner_cursor_type: text('owner_cursor_type').$type<'user' | 'org'>(),
+  owner_cursor_id: text('owner_cursor_id'),
+  owner_pages: integer('owner_pages').notNull().default(0),
+  owner_done: integer('owner_done').notNull().default(0),
+  updated_at: text('updated_at').notNull(),
+});
+
+/**
  * Ready registry rows queued to re-measure the cases the revision-1 prompt transport
  * measured unreliably. Kept beside the profile so the profile stays `ready` on its
  * previous run and keeps serving: a run claims the row (`run_id`), copies the previous

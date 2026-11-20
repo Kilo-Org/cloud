@@ -520,7 +520,10 @@ export async function publishPlatformRoutingTable(
   options: { flushUnchangedTable?: boolean } = {}
 ): Promise<{ version: string } | null> {
   const config = await getBenchmarkConfig(env.BENCH_DB, router);
-  if (!config) return null;
+  if (!config) {
+    console.warn(JSON.stringify({ event: 'routing_table_publish_skipped_unconfigured', router }));
+    return null;
+  }
 
   const current = {
     router,
@@ -533,21 +536,45 @@ export async function publishPlatformRoutingTable(
     config,
     PLATFORM_SUBSCRIPTION_OWNER
   );
-  if (
-    snapshot.some(
-      entry =>
-        entry.model.startsWith('~') &&
-        entry.servingPairs.length > 0 &&
-        (entry.resolutionError ||
-          entry.servingPairs.some(
-            serving =>
-              !entry.pairs.some(
-                target => target.model === serving.model && target.variant === serving.variant
-              )
-          ))
-    )
-  )
+  // A serving pair the current target set no longer contains means the alias moved and
+  // its replacement is not ready yet (or resolution failed). The table keeps the pair
+  // that is still serving, so the rebuild would drop a live model: hold, and say why.
+  type StaleServing = {
+    model: string;
+    reason: 'resolution_error' | 'replacement_pending';
+    error?: string;
+    held?: { model: string; variant: string | null }[];
+  };
+  const staleServing: StaleServing[] = [];
+  for (const entry of snapshot) {
+    if (!entry.model.startsWith('~') || entry.servingPairs.length === 0) continue;
+    if (entry.resolutionError) {
+      staleServing.push({
+        model: entry.model,
+        reason: 'resolution_error',
+        error: entry.resolutionError,
+      });
+      continue;
+    }
+    const movedAway = entry.servingPairs.filter(
+      serving =>
+        !entry.pairs.some(
+          target => target.model === serving.model && target.variant === serving.variant
+        )
+    );
+    if (movedAway.length > 0)
+      staleServing.push({ model: entry.model, reason: 'replacement_pending', held: movedAway });
+  }
+  if (staleServing.length > 0) {
+    console.log(
+      JSON.stringify({
+        event: 'routing_table_publish_skipped_serving_target_pending',
+        router,
+        held: staleServing,
+      })
+    );
     return null;
+  }
   const desired = snapshotPairs(snapshot, true);
   const targets = new Set(
     snapshotPairs(snapshot, false).map(pair => exactPairKey(pair.model, pair.variant))
@@ -568,9 +595,10 @@ export async function publishPlatformRoutingTable(
   // `desired` is the serving set, which `servingSubscriptionSnapshot` already restricts
   // to ready rows, so it cannot show that a live pair is about to disappear. The live
   // table can: a pair it serves, that is still a target, and that has no ready row under
-  // this engine would drop out of the new build. That is a re-measurement in flight or an
-  // engine bump, and either way the existing table stays. A settled `failed` pair is
-  // allowed to drop out, as it was when the gate counted only pending and running rows.
+  // this engine would drop out of the new build. A measurement in flight holds the whole
+  // table until it settles. A settled failure has nothing coming: holding on it froze
+  // every other table change for the router until an operator re-admitted that pair by
+  // hand, so the pair leaves the table (the rest still publishes) and is named instead.
   const previous = await getLatestRoutingTable(env.BENCH_DB, router).catch(() => null);
   const readyPairs = new Set(
     readyEntries.map(({ entry }) => exactPairKey(entry.model, entry.variant))
@@ -589,10 +617,18 @@ export async function publishPlatformRoutingTable(
       }
     }
   }
-  const dropped = [...livePairs.values()].find(pair => {
+  const unreadyLivePairs = [...livePairs.values()].filter(pair => {
     const key = exactPairKey(pair.model, pair.variant);
-    return !readyPairs.has(key) && targets.has(key) && statusByPair.get(key) !== 'failed';
+    return !readyPairs.has(key) && targets.has(key);
   });
+  // A settled failure is a row that will not be measured again on its own: `failed` after
+  // its retry window, or a permanent `unavailable` — which `listCurrentPlatformProfileStatuses`
+  // reports as `failed` (db.ts), so both arrive here in one class. A `pending`/`running` row
+  // is a measurement in flight, and a missing row is an engine the registry has not touched
+  // yet; those keep holding the table.
+  const settledFailure = (pair: { model: string; variant: string | null }) =>
+    statusByPair.get(exactPairKey(pair.model, pair.variant)) === 'failed';
+  const dropped = unreadyLivePairs.find(pair => !settledFailure(pair));
   if (dropped) {
     console.log(
       JSON.stringify({
@@ -604,6 +640,19 @@ export async function publishPlatformRoutingTable(
     );
     return null;
   }
+  const leftOut = unreadyLivePairs.filter(settledFailure);
+  if (leftOut.length > 0)
+    console.log(
+      JSON.stringify({
+        event: 'routing_table_publish_dropped_failed_pairs',
+        router,
+        dropped: leftOut.map(pair => ({
+          model: pair.model,
+          variant: pair.variant,
+          status: statusByPair.get(exactPairKey(pair.model, pair.variant)),
+        })),
+      })
+    );
 
   const [summaries, perCaseResults] = await Promise.all([
     getSummariesForRuns(env.BENCH_DB, [...new Set(readyEntries.map(r => r.runId))]),

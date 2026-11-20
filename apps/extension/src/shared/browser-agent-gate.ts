@@ -2,6 +2,8 @@
 import { z } from 'zod';
 import {
   ambiguousSelectorError,
+  looksLikeBrowserRef,
+  STALE_REF_ERROR,
   hashBrowserToolArguments,
   isOAuthConsentUrl,
   isOriginGranted,
@@ -25,6 +27,7 @@ import {
   readAgentFrameTree,
 } from './browser-agent-frames';
 import type { AgentFrameInventory, BrowserAgentFrame } from './browser-agent-frames';
+import { readIsolatedHostedFrame } from './browser-agent-isolated-probe';
 import {
   classifyFocusedElement,
   classifyTargetElement,
@@ -42,7 +45,7 @@ import type { BrowserToolSession } from './browser-tool-session';
  * single-use token bound to this exact call.
  */
 
-type GateSession = Pick<BrowserToolPageSession, 'send' | 'resolveTarget'> &
+type GateSession = Pick<BrowserToolPageSession, 'isolatedProbe' | 'send' | 'resolveTarget'> &
   Pick<BrowserToolSession, 'takeDownloads'>;
 
 export interface BrowserSensitiveStep {
@@ -271,6 +274,27 @@ const targetFrameOf = async (
     return undefined;
   }
 
+  // Without a debugger protocol the probe names the frame a frame element hosts (Firefox).
+  if (session.isolatedProbe !== undefined && resolved.kind === 'selector') {
+    const hosted = await readIsolatedHostedFrame(session.isolatedProbe, resolved.selector);
+    const frame =
+      hosted === undefined ? undefined : frames.find(candidate => candidate.id === hosted.frameId);
+
+    // A browser that cannot name the hosted frame leaves the element judged by the document that holds it, below.
+    if (frame !== undefined) {
+      const main = mainFrameOf(frames);
+
+      return {
+        frame: true,
+        origin: frame.origin,
+        owner:
+          main === undefined
+            ? { frame: true, origin: OPAQUE_ORIGIN }
+            : { frame: false, origin: main.origin },
+      };
+    }
+  }
+
   let node: z.infer<typeof describeNodeSchema>['node'] = undefined;
 
   try {
@@ -433,6 +457,8 @@ const sensitiveStepFor = async (input: {
   readonly args: Record<string, unknown>;
   readonly authorized: readonly BrowserGrant[];
   readonly frames: readonly BrowserAgentFrame[];
+  /** The target is a frame whose own document this read could not place, so its page is unknown. */
+  readonly framePageUnknown?: boolean;
   readonly origin: string;
   readonly pageUrl: string | undefined;
   readonly session: GateSession;
@@ -444,6 +470,11 @@ const sensitiveStepFor = async (input: {
 
   if (isOAuthConsentUrl(input.pageUrl)) {
     return { origin: input.origin, reason: SENSITIVE_REASON.oauthConsent };
+  }
+
+  // The call acts in a frame this read cannot place, so no page can be ruled out: a consent screen inside it would go unnoticed.
+  if (input.framePageUnknown === true) {
+    return { origin: input.origin, reason: SENSITIVE_REASON.frameUnverified };
   }
 
   if (isScriptTool(input.toolName)) {
@@ -485,6 +516,13 @@ const sensitiveStepFor = async (input: {
       return { origin: input.origin, reason: SENSITIVE_REASON.unknownField };
     }
 
+    if (verdict.frameId !== undefined) {
+      const frameOrigin =
+        input.frames.find(frame => frame.id === verdict.frameId)?.origin ?? OPAQUE_ORIGIN;
+
+      return { origin: frameOrigin, reason: `typing into a field inside ${frameOrigin}` };
+    }
+
     if (verdict.frameBackendNodeId === undefined) {
       return { origin: input.origin, reason: verdict.reason };
     }
@@ -516,22 +554,22 @@ const sensitiveStepFor = async (input: {
   return undefined;
 };
 
+/**
+ * The document the call acts in, for the OAuth-consent check. A frame target
+ * judged by another document's page would hide a consent screen inside it, so
+ * a frame this read cannot place has no page instead of the top page's.
+ */
 const pageUrlFor = async (
   frame: { readonly frame: boolean; readonly origin: string } | undefined,
   readFrames: () => Promise<AgentFrameInventory>
 ): Promise<string | undefined> => {
   const { frames } = await readFrames();
-  const main = mainFrameOf(frames);
 
-  if (frame !== undefined && frame.frame) {
-    const match = frames.find(candidate => candidate.origin === frame.origin);
-
-    if (match !== undefined) {
-      return match.url;
-    }
+  if (frame === undefined || !frame.frame) {
+    return mainFrameOf(frames)?.url;
   }
 
-  return main?.url;
+  return frames.find(candidate => candidate.origin === frame.origin)?.url;
 };
 
 export interface AgentPreflightInput {
@@ -644,7 +682,7 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
     return { failure: { items, kind: 'needs_permission' }, ok: false };
   }
 
-  // The call is granted: only now spend a DOM read on cardinality. A selector that names several elements cannot run, so it is refused plainly before any sensitive-step ask instead of prompting for a call that would fail.
+  // The call is granted: only now spend a DOM read on cardinality. A selector that names several elements, or a ref no snapshot holds any more, cannot run, so it is refused plainly with the tool's own error before any sensitive-step ask instead of prompting for a call that would fail.
   for (const text of targetReferencesOf(input.args)) {
     // eslint-disable-next-line no-await-in-loop -- one resolution per reference, in argument order
     const resolved = await input.session.resolveTarget(text);
@@ -654,6 +692,10 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
         failure: { error: ambiguousSelectorError(resolved.matches), kind: 'blocked' },
         ok: false,
       };
+    }
+
+    if (resolved === undefined && looksLikeBrowserRef(text)) {
+      return { failure: { error: STALE_REF_ERROR, kind: 'blocked' }, ok: false };
     }
   }
 
@@ -665,6 +707,7 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
   const sensitive = await sensitiveStepFor({
     args: input.args,
     authorized: input.authorized,
+    ...(targetFrame?.frame === true && pageUrl === undefined ? { framePageUnknown: true } : {}),
     frames,
     origin,
     pageUrl,
@@ -733,7 +776,7 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
  * must be asked for before the tab may stay there.
  */
 export const postAgentNavigate = async (
-  session: Pick<BrowserToolPageSession, 'send'>,
+  session: Pick<BrowserToolPageSession, 'isolatedProbe' | 'send'>,
   approvedOrigin: string,
   authorized: readonly BrowserGrant[]
 ): Promise<BrowserOriginChanged | undefined> => {

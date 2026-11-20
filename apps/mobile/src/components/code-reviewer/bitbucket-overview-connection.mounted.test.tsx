@@ -250,19 +250,41 @@ describe('BitbucketOverview OAuth connection', () => {
 
     const renderer = await renderScreen();
 
-    // The header already names the platform and the organization, so the card's
-    // line only says where the connection lives: no organization interpolation
-    // and no repeated platform name.
+    // The card states the connection itself at row-title size — the workspace
+    // the authorization granted — over the muted line that says where it is
+    // managed. The header already names the platform and the organization, so
+    // neither line repeats them and no organization is interpolated.
     const expected = i18n.t('codeReviewer.bitbucketConnect.managedOnWebShort');
     expect(texts(renderer)).toContain(expected);
+    expect(texts(renderer)).toContain('Acme Ltd');
+    const statusLine = renderer.root
+      .findAllByType('Text')
+      .find(node => node.props.children === 'Acme Ltd');
+    expect(statusLine?.props.className).toBe('text-sm font-medium');
+    const footnote = renderer.root
+      .findAllByType('Text')
+      .find(node => node.props.children === expected);
+    // The footnote is the muted body variant, not a hand-sized caption.
+    expect(footnote?.props.variant).toBe('muted');
+    expect(footnote?.props.className).toBeUndefined();
     expect(texts(renderer)).not.toContain(
       i18n.t('codeReviewer.bitbucketConnect.managedOnWeb', { organization: 'Acme Robotics' })
     );
     expect(texts(renderer).some(text => text.includes('{{'))).toBe(false);
-    expect(texts(renderer)).toContain('Acme Ltd');
     expect(renderer.root.findAllByType('Switch')).toHaveLength(0);
     expect(renderer.root.findAllByType('ConfigureRow')).toHaveLength(0);
     expect(renderer.root.findAllByType('Button')).toHaveLength(0);
+  });
+
+  it('names the connection "Connected" when the authorization named no workspace', async () => {
+    readiness.connected = false;
+    readiness.integrationId = null;
+    status.data = oauthStatus({ workspace: null });
+
+    const renderer = await renderScreen();
+
+    expect(texts(renderer)).toContain(i18n.t('common.connected'));
+    expect(texts(renderer)).toContain(i18n.t('codeReviewer.bitbucketConnect.managedOnWebShort'));
   });
 
   it('renders the same read-only card when the OAuth authorization needs attention', async () => {

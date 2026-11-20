@@ -801,6 +801,22 @@ describe('local agent browser bridge', () => {
     });
   });
 
+  it('maps a tool this browser cannot run onto unsupported_in_browser', async () => {
+    const error =
+      'browser_drag is not available in Firefox: this browser exposes no debugger protocol.';
+    const fake = createFakeRuntime({
+      outcome: () => ({ kind: 'unsupported', result: { error, ok: false } }),
+    });
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+
+    await openAndShare(bridge);
+
+    await expect(bridge.callTool(CONTROLLER, snapshotParams())).rejects.toMatchObject({
+      code: LOCAL_AGENT_ERROR_CODES.unsupportedInBrowser,
+      message: error,
+    });
+  });
+
   it('carries the withheld frame origins in _meta', async () => {
     const fake = createFakeRuntime({
       outcome: () => ({

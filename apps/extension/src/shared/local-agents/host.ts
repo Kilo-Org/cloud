@@ -459,6 +459,8 @@ export const startLocalAgentsHost = (
           consumeIfConnected(connection);
         }
 
+        noteUnreachablePairing(connection, next);
+
         // Entering or leaving `connected` proves the hub was reachable just now.
         if (endpoint.transport === 'loopback' && wasConnected !== (next.kind === 'connected')) {
           const at = now();
@@ -630,6 +632,20 @@ export const startLocalAgentsHost = (
     `${endpoint.hubId}|${endpoint.token}|${endpoint.ws}`;
 
   /**
+   * A fragment whose token was redeemed but whose socket keeps failing would
+   * otherwise leave the panel on "waiting" with no hint; the dial backing off
+   * means the hub was not reachable on the socket the CLI handed out.
+   */
+  const noteUnreachablePairing = (
+    connection: LocalAgentConnection,
+    state: LocalAgentConnectionState
+  ): void => {
+    if (state.kind === 'backoff' && pairingKeysByConnection.has(connection)) {
+      void savePairingNotice(storage, 'unreachable');
+    }
+  };
+
+  /**
    * Marks a fragment used once the connection whose key came from that fragment
    * reports `connected`. Another connection for the same hub proves only its own
    * key, so it must not consume a fragment it never proved. A fragment seen while
@@ -644,6 +660,7 @@ export const startLocalAgentsHost = (
 
     consumedPairings.add(key);
     pairingKeysByConnection.delete(connection);
+    void savePairingNotice(storage, null);
   };
 
   const acceptPairing = async (
@@ -691,6 +708,7 @@ export const startLocalAgentsHost = (
       ) {
         pairingKeysByConnection.set(connection, fragmentKey);
         consumeIfConnected(connection);
+        noteUnreachablePairing(connection, connection.state());
       }
     } finally {
       inFlightPairings.delete(fragmentKey);

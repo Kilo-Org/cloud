@@ -261,6 +261,19 @@ export const isScriptTool = (toolName: string): boolean =>
 export const ambiguousSelectorError = (matches: number): string =>
   `The selector matches ${String(matches)} elements. Use a snapshot ref or a selector that matches one element.`;
 
+// Callers name the snapshot tool differently (the side panel prefixes `kilo_`), so the hint names none.
+export const FRESH_SNAPSHOT_HINT =
+  'Take a new page snapshot and use a ref from it, or pass a unique CSS selector.';
+
+/** A ref no snapshot registered, or one whose element is gone: every backend answers it with this one error. */
+export const STALE_REF_ERROR = `The element reference is stale or unknown. ${FRESH_SNAPSHOT_HINT}`;
+
+const BROWSER_REF_PATTERN = /^(?:ref=)?(?:f\d+)?e\d+$/u;
+
+/** Whether a target names a snapshot ref (`e12`, `ref=e12`, `f1e12`) rather than a CSS selector. */
+export const looksLikeBrowserRef = (target: string): boolean =>
+  BROWSER_REF_PATTERN.test(target.trim());
+
 export const ORIGIN_CHANGED_ERROR =
   'The page redirected to a different origin than the one this navigation was approved for.';
 
@@ -269,6 +282,7 @@ export const SENSITIVE_REASON = {
   cardFormSubmit: 'submitting a form with payment fields',
   download: 'downloading a file',
   fileUpload: 'uploading a file',
+  frameUnverified: 'acting in a frame whose page could not be inspected',
   oauthConsent: 'acting on an OAuth consent page',
   oneTimeCode: 'typing a one-time code',
   password: 'typing a password',

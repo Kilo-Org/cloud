@@ -1252,6 +1252,22 @@ cp .wrangler/state/v3/d1/miniflare-D1DatabaseObject/*.sqlite* /tmp/
 sqlite3 /tmp/<file>.sqlite 'select id, kind, status from benchmark_runs;'
 ```
 
+## CLI under test
+
+`container/Dockerfile` pins the base image digest and `KILO_CLI_VERSION` (7.8.27, the version
+production ran when it was pinned). Before the pin, every image build installed
+`@kilocode/cli@latest`, so the measured CLI could change under an unchanged engine identity
+whenever the dist-tag moved.
+
+The CLI version is not part of the engine identity and runs do not record it: the image
+pin is the record. A new engine identity makes every stored measurement ineligible, so a full
+pool re-measure follows. A `KILO_CLI_VERSION` bump is therefore a measurement change that
+needs a planned, budgeted re-measure: bump `BENCHMARK_ENGINE_VERSION` in `src/run.ts` in the
+same change once that re-measure is approved.
+
+The pin does not make the image byte-for-byte reproducible: `apt-get` installs the current
+Debian packages, and file timestamps differ between uncached builds.
+
 ## Debugging container (decider) failures
 
 - Reusable `benchmark-slot:<n>` containers handle dynamically assigned chunks from any run.

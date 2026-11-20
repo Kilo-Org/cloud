@@ -140,6 +140,7 @@
     "keepRunning": "Halda keyrslu áfram",
     "newSession": "Ný lota",
     "noModelsAvailable": "Engin líkön tiltæk",
+    "modelRetires": "Hættir {{date}}",
     "notFound": "Fannst ekki.",
     "online": "Á netinu",
     "open": "Opna {{name}}",
@@ -507,7 +508,7 @@
     "changelogFixesPolish": "Lagfæringar og endurbætur í öllu forritinu.",
     "changelogAreas": {
       "signIn": "Innskráning",
-      "profileOrganizations": "Prófíll og stofnanir"
+      "profileOrganizations": "Prófíll & stofnanir"
     }
   },
   "preferences": {
@@ -1391,7 +1392,8 @@
     "followReviewMd": "Fylgja REVIEW.md",
     "followReviewMdSubtitle": "Fylgja leiðbeiningum í REVIEW.md-skrá hverrar geymslu",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket er ekki tengt. Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta tengt það."
+      "notConnectedReadOnly": "Bitbucket er ekki tengt. Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta tengt það.",
+      "notConnectedReadOnlyPlan": "Próftímabili fyrirtækisins er lokið, svo eigandi þarf að uppfæra greiðsluupplýsingar á kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-tengingu við {{organization}} er stjórnað á vefnum í tölvu.",

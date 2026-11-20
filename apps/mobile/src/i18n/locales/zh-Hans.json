@@ -140,6 +140,7 @@
     "keepRunning": "继续运行",
     "newSession": "新建会话",
     "noModelsAvailable": "暂无可用模型",
+    "modelRetires": "{{date}} 退役",
     "notFound": "未找到此内容",
     "online": "在线",
     "open": "打开 {{name}}",
@@ -507,7 +508,7 @@
     "changelogFixesPolish": "全应用范围的修复与改进。",
     "changelogAreas": {
       "signIn": "登录",
-      "profileOrganizations": "个人资料和组织"
+      "profileOrganizations": "个人资料与组织"
     }
   },
   "preferences": {
@@ -697,7 +698,8 @@
     },
     "autoReviews": "自动审查",
     "bitbucket": {
-      "notConnectedReadOnly": "尚未连接 Bitbucket。只有组织所有者、管理员和账单管理员可以完成连接。"
+      "notConnectedReadOnly": "尚未连接 Bitbucket。只有组织所有者、管理员和账单管理员可以完成连接。",
+      "notConnectedReadOnlyPlan": "组织的试用期已结束，因此所有者必须前往 kilo.ai 更新账单信息。"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} 的 Bitbucket 连接需在电脑上通过网页版进行管理。",

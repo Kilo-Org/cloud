@@ -140,6 +140,7 @@
     "keepRunning": "ເຮັດວຽກຕໍ່",
     "newSession": "ເຊສຊັນໃໝ່",
     "noModelsAvailable": "ບໍ່ມີໂມເດວໃຫ້ໃຊ້",
+    "modelRetires": "ຢຸດໃຊ້ວັນທີ {{date}}",
     "notFound": "ບໍ່ພົບລາຍການນີ້.",
     "online": "ອອນໄລນ໌",
     "open": "ເປີດ {{name}}",
@@ -507,7 +508,7 @@
     "changelogFixesPolish": "ການແກ້ໄຂ ແລະ ການປັບປຸງທົ່ວທັງແອັບ.",
     "changelogAreas": {
       "signIn": "ການເຂົ້າສູ່ລະບົບ",
-      "profileOrganizations": "ໂປຣໄຟລ໌ ແລະ ອົງກອນ"
+      "profileOrganizations": "ໂປຣໄຟລ໌ ກັບ ອົງກອນ"
     }
   },
   "preferences": {
@@ -1391,7 +1392,8 @@
     "followReviewMd": "ປະຕິບັດຕາມ REVIEW.md",
     "followReviewMdSubtitle": "ປະຕິບັດຕາມຄຳແນະນຳໃນໄຟລ໌ REVIEW.md ຂອງແຕ່ລະຄັງໂຄ້ດ",
     "bitbucket": {
-      "notConnectedReadOnly": "ຍັງບໍ່ໄດ້ເຊື່ອມຕໍ່ Bitbucket. ມີພຽງເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ແລະ ຜູ້ຈັດການການຮຽກເກັບເງິນທີ່ສາມາດເຊື່ອມຕໍ່ໄດ້."
+      "notConnectedReadOnly": "ຍັງບໍ່ໄດ້ເຊື່ອມຕໍ່ Bitbucket. ມີພຽງເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ແລະ ຜູ້ຈັດການການຮຽກເກັບເງິນທີ່ສາມາດເຊື່ອມຕໍ່ໄດ້.",
+      "notConnectedReadOnlyPlan": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ດັ່ງນັ້ນເຈົ້າຂອງອົງກອນຕ້ອງອັບເດດການຮຽກເກັບເງິນທີ່ kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "ການເຊື່ອມຕໍ່ Bitbucket ຂອງ {{organization}} ຖືກຈັດການຢູ່ໃນເວັບຈາກຄອມພິວເຕີ.",

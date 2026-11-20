@@ -141,6 +141,7 @@
     "keepRunning": "Mantener en ejecución",
     "newSession": "Nueva sesión",
     "noModelsAvailable": "No hay modelos disponibles",
+    "modelRetires": "Se retira el {{date}}",
     "notFound": "No se ha encontrado.",
     "online": "En línea",
     "open": "Abrir {{name}}",
@@ -508,7 +509,7 @@
     "changelogFixesPolish": "Correcciones y mejoras en toda la aplicación.",
     "changelogAreas": {
       "signIn": "Inicio de sesión",
-      "profileOrganizations": "Perfil y organizaciones"
+      "profileOrganizations": "Perfil & organizaciones"
     }
   },
   "preferences": {
@@ -698,7 +699,8 @@
     },
     "autoReviews": "Revisiones automáticas",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket no está conectado. Solo los propietarios de la organización, los administradores y los gestores de facturación pueden conectarlo."
+      "notConnectedReadOnly": "Bitbucket no está conectado. Solo los propietarios de la organización, los administradores y los gestores de facturación pueden conectarlo.",
+      "notConnectedReadOnlyPlan": "La prueba de la organización ha finalizado, así que un propietario debe actualizar la facturación en kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "La conexión de Bitbucket con {{organization}} se gestiona en la web desde un ordenador.",
@@ -749,9 +751,9 @@
     },
     "providerConnect": {
       "description": "Conecta la {{label}} de Kilo para revisar PR automáticamente.",
-      "githubApp": "Aplicación de GitHub",
+      "githubApp": "aplicación de GitHub",
       "githubError": "No se pudo abrir la configuración de GitHub. Inténtalo de nuevo.",
-      "gitlabAccount": "Cuenta de GitLab",
+      "gitlabAccount": "cuenta de GitLab",
       "gitlabError": "No se pudo abrir la configuración de GitLab. Inténtalo de nuevo."
     },
     "reviewDetail": {

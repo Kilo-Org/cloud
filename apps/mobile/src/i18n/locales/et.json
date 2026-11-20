@@ -140,6 +140,7 @@
     "keepRunning": "Jätka tööd",
     "newSession": "Uus seanss",
     "noModelsAvailable": "Mudeleid pole saadaval",
+    "modelRetires": "Aegub {{date}}",
     "notFound": "Ei leitud",
     "online": "Võrgus",
     "open": "Ava {{name}}",
@@ -507,7 +508,7 @@
     "changelogFixesPolish": "Parandused ja täiustused kogu rakenduses.",
     "changelogAreas": {
       "signIn": "Sisselogimine",
-      "profileOrganizations": "Profiil ja organisatsioonid"
+      "profileOrganizations": "Profiil ning organisatsioonid"
     }
   },
   "preferences": {
@@ -1391,7 +1392,8 @@
     "followReviewMd": "Järgi faili REVIEW.md juhiseid",
     "followReviewMdSubtitle": "Järgi iga hoidla failis REVIEW.md olevaid juhiseid",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket pole ühendatud. Selle saavad ühendada ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid."
+      "notConnectedReadOnly": "Bitbucket pole ühendatud. Selle saavad ühendada ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid.",
+      "notConnectedReadOnlyPlan": "Organisatsiooni prooviperiood on lõppenud, seega peab omanik arvelduse kilo.ai keskkonnas uuendama."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucketi ühendust {{organization}}-ga hallatakse arvutis veebi kaudu.",

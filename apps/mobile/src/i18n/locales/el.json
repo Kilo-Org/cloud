@@ -140,6 +140,7 @@
     "keepRunning": "Συνέχιση εκτέλεσης",
     "newSession": "Νέα συνεδρία",
     "noModelsAvailable": "Δεν υπάρχουν διαθέσιμα μοντέλα",
+    "modelRetires": "Αποσύρεται στις {{date}}",
     "notFound": "Δεν βρέθηκε.",
     "online": "Σε σύνδεση",
     "open": "Άνοιγμα {{name}}",
@@ -507,7 +508,7 @@
     "changelogFixesPolish": "Διορθώσεις και βελτιώσεις σε όλη την εφαρμογή.",
     "changelogAreas": {
       "signIn": "Σύνδεση",
-      "profileOrganizations": "Προφίλ και οργανισμοί"
+      "profileOrganizations": "Προφίλ & οργανισμοί"
     }
   },
   "preferences": {
@@ -936,9 +937,9 @@
       "checkFailedTitleGitLab": "Δεν ήταν δυνατός ο έλεγχος της σύνδεσης με το GitLab.",
       "checkFailedTitleBitbucket": "Δεν ήταν δυνατός ο έλεγχος της σύνδεσης με το Bitbucket.",
       "providerCheckFailedMessage": "Δεν ήταν δυνατή η σύνδεση με τον πάροχο. Έλεγξε τη σύνδεσή σου και δοκίμασε ξανά.",
-      "reconnectTitle": "Επανασύνδεση με το GitHub",
-      "reconnectTitleGitLab": "Επανασύνδεση με το GitLab",
-      "reconnectTitleBitbucket": "Επανασύνδεση με το Bitbucket",
+      "reconnectTitle": "Σύνδεσε ξανά το GitHub",
+      "reconnectTitleGitLab": "Σύνδεσε ξανά το GitLab",
+      "reconnectTitleBitbucket": "Σύνδεσε ξανά το Bitbucket",
       "reconnectDescription": "Η σύνδεσή σου με το GitHub ανακλήθηκε.",
       "gitlabDescription": "Έλεγχος αιτημάτων συγχώνευσης στο κινητό",
       "gitlabInstanceMismatchTitle": "Η σύνδεση με το GitLab αφορά άλλη εγκατάσταση",
@@ -1391,7 +1392,8 @@
     "followReviewMd": "Τήρηση του REVIEW.md",
     "followReviewMdSubtitle": "Ακολουθεί τις οδηγίες του αρχείου REVIEW.md σε κάθε αποθετήριο",
     "bitbucket": {
-      "notConnectedReadOnly": "Το Bitbucket δεν είναι συνδεδεμένο. Μόνο οι κάτοχοι του οργανισμού, οι διαχειριστές και οι διαχειριστές χρέωσης μπορούν να το συνδέσουν."
+      "notConnectedReadOnly": "Το Bitbucket δεν είναι συνδεδεμένο. Μόνο οι κάτοχοι του οργανισμού, οι διαχειριστές και οι διαχειριστές χρέωσης μπορούν να το συνδέσουν.",
+      "notConnectedReadOnlyPlan": "Η δοκιμαστική περίοδος του οργανισμού έχει λήξει, οπότε ένας ιδιοκτήτης πρέπει να ενημερώσει τη χρέωση στο kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Η σύνδεση του Bitbucket για {{organization}} γίνεται από τον ιστότοπο, σε υπολογιστή.",
@@ -1426,9 +1428,9 @@
       "activity": "Δραστηριότητα"
     },
     "providerConnect": {
-      "githubApp": "Εφαρμογή GitHub",
+      "githubApp": "εφαρμογή GitHub",
       "githubError": "Δεν ήταν δυνατό το άνοιγμα της ρύθμισης του GitHub. Δοκίμασε ξανά.",
-      "gitlabAccount": "Λογαριασμός GitLab",
+      "gitlabAccount": "λογαριασμός GitLab",
       "gitlabError": "Δεν ήταν δυνατό το άνοιγμα της ρύθμισης του GitLab. Δοκίμασε ξανά.",
       "description": "Κάνε τη σύνδεση με το Kilo ({{label}}) για να ελέγχονται αυτόματα τα PR."
     },

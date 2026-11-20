@@ -140,6 +140,7 @@
     "keepRunning": "İcranı davam etdir",
     "newSession": "Yeni sessiya",
     "noModelsAvailable": "Mövcud model yoxdur",
+    "modelRetires": "{{date}} tarixində dayandırılır",
     "notFound": "Tapılmadı.",
     "online": "Onlayn",
     "open": "{{name}} aç",
@@ -507,7 +508,7 @@
     "changelogFixesPolish": "Bütün tətbiqdə düzəlişlər və təkmilləşdirmələr.",
     "changelogAreas": {
       "signIn": "Giriş",
-      "profileOrganizations": "Profil və təşkilatlar"
+      "profileOrganizations": "Profil ilə təşkilatlar"
     }
   },
   "preferences": {
@@ -1391,7 +1392,8 @@
     "followReviewMd": "REVIEW.md təlimatlarına əməl et",
     "followReviewMdSubtitle": "Hər repozitoriyanın REVIEW.md faylındakı təlimatlara əməl et",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket qoşulmayıb. Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər."
+      "notConnectedReadOnly": "Bitbucket qoşulmayıb. Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər.",
+      "notConnectedReadOnlyPlan": "Təşkilatın sınaq müddəti başa çıxıb, ona görə də sahib kilo.ai ünvanında billinqi yeniləməlidir."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} üçün Bitbucket bağlantısı kompüterdən vebdə idarə olunur.",

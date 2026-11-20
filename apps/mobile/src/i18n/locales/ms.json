@@ -140,6 +140,7 @@
     "keepRunning": "Teruskan proses",
     "newSession": "Sesi baharu",
     "noModelsAvailable": "Tiada model tersedia",
+    "modelRetires": "Bersara pada {{date}}",
     "notFound": "Tidak ditemui.",
     "online": "Dalam talian",
     "open": "Buka {{name}}",
@@ -507,7 +508,7 @@
     "changelogFixesPolish": "Pembetulan dan penambahbaikan di seluruh aplikasi.",
     "changelogAreas": {
       "signIn": "Log masuk",
-      "profileOrganizations": "Profil dan organisasi"
+      "profileOrganizations": "Profil & organisasi"
     }
   },
   "preferences": {
@@ -1391,7 +1392,8 @@
     "followReviewMd": "Ikuti REVIEW.md",
     "followReviewMdSubtitle": "Patuhi fail arahan REVIEW.md dalam setiap repositori",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket tidak disambungkan. Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya."
+      "notConnectedReadOnly": "Bitbucket tidak disambungkan. Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya.",
+      "notConnectedReadOnlyPlan": "Percubaan organisasi telah tamat, jadi pemilik mesti mengemas kini bil di kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Sambungan Bitbucket untuk {{organization}} diurus di web melalui komputer.",
@@ -1426,9 +1428,9 @@
       "activity": "Aktiviti"
     },
     "providerConnect": {
-      "githubApp": "Apl GitHub",
+      "githubApp": "apl GitHub",
       "githubError": "Tidak dapat membuka persediaan GitHub. Sila cuba lagi.",
-      "gitlabAccount": "Akaun GitLab",
+      "gitlabAccount": "akaun GitLab",
       "gitlabError": "Tidak dapat membuka persediaan GitLab. Sila cuba lagi.",
       "description": "Sambungkan {{label}} Kilo untuk menyemak permintaan penarikan secara automatik."
     },

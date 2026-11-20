@@ -140,6 +140,7 @@
     "keepRunning": "បន្តដំណើរការ",
     "newSession": "វគ្គថ្មី",
     "noModelsAvailable": "គ្មានម៉ូដែលសម្រាប់ប្រើ",
+    "modelRetires": "ឈប់ដំណើរការនៅ {{date}}",
     "notFound": "រកមិនឃើញទេ",
     "online": "អនឡាញ",
     "open": "បើក {{name}}",
@@ -1391,7 +1392,8 @@
     "followReviewMd": "អនុវត្តតាម REVIEW.md",
     "followReviewMdSubtitle": "អនុវត្តតាមការណែនាំក្នុងឯកសារ REVIEW.md របស់ឃ្លាំងកូដនីមួយៗ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket មិនបានភ្ជាប់ទេ។ មានតែម្ចាស់អង្គការ អ្នកគ្រប់គ្រង និងអ្នកគ្រប់គ្រងការគិតប្រាក់ប៉ុណ្ណោះដែលអាចភ្ជាប់វាបាន។"
+      "notConnectedReadOnly": "Bitbucket មិនបានភ្ជាប់ទេ។ មានតែម្ចាស់អង្គការ អ្នកគ្រប់គ្រង និងអ្នកគ្រប់គ្រងការគិតប្រាក់ប៉ុណ្ណោះដែលអាចភ្ជាប់វាបាន។",
+      "notConnectedReadOnlyPlan": "ការសាកល្បងរបស់ស្ថាប័នបានបញ្ចប់ ដូច្នេះម្ចាស់ត្រូវធ្វើបច្ចុប្បន្នភាពវិក្កយបត្រនៅ kilo.ai។"
     },
     "bitbucketConnect": {
       "managedOnWeb": "ការតភ្ជាប់ Bitbucket របស់ {{organization}} ត្រូវបានគ្រប់គ្រងនៅលើវេបតាមកុំព្យូទ័រ។",

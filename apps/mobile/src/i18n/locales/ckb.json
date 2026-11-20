@@ -140,6 +140,7 @@
     "keepRunning": "بەردەوامبوونی جێبەجێکردن",
     "newSession": "دانیشتنی نوێ",
     "noModelsAvailable": "هیچ مۆدێلێک بەردەست نییە",
+    "modelRetires": "لە {{date}} خانەنشین دەبێت",
     "notFound": "نەدۆزرایەوە.",
     "online": "سەرهێڵ",
     "open": "کردنەوەی {{name}}",
@@ -936,9 +937,9 @@
       "checkFailedTitleGitLab": "نەتوانرا پەیوەندی بە GitLab بپشکنرێت.",
       "checkFailedTitleBitbucket": "نەتوانرا پەیوەندی بە Bitbucket بپشکنرێت.",
       "providerCheckFailedMessage": "نەتوانرا پەیوەندی بە دابینکەرەکە بکرێت. پەیوەندییەکەت بپشکنە و دووبارە هەوڵ بدەوە.",
-      "reconnectTitle": "دووبارە بەستنەوەی GitHub",
-      "reconnectTitleGitLab": "دووبارە بەستنەوەی GitLab",
-      "reconnectTitleBitbucket": "دووبارە بەستنەوەی Bitbucket",
+      "reconnectTitle": "دووبارە پەیوەندی بە GitHub بکە",
+      "reconnectTitleGitLab": "دووبارە پەیوەندی بە GitLab بکە",
+      "reconnectTitleBitbucket": "دووبارە پەیوەندی بە Bitbucket بکە",
       "reconnectDescription": "مۆڵەتی پەیوەندییەکەت بە GitHub هەڵوەشێنراوەتەوە.",
       "gitlabDescription": "پێداچوونەوەی داواکارییەکانی تێکەڵکردن لە مۆبایلدا",
       "gitlabInstanceMismatchTitle": "بەستنەوەی GitLab بۆ نمونەیەکی ترە",
@@ -1391,7 +1392,8 @@
     "followReviewMd": "پابەندی REVIEW.md بە",
     "followReviewMdSubtitle": "لە هەر کۆگایەکدا ڕێنماییەکانی پەڕگەی REVIEW.md جێبەجێ بکە",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket نەبەستراوە. تەنها خاوەنەکانی ڕێکخراو، بەڕێوەبەران و بەڕێوەبەرانی پارەدان دەتوانن بیبەستن."
+      "notConnectedReadOnly": "Bitbucket نەبەستراوە. تەنها خاوەنەکانی ڕێکخراو، بەڕێوەبەران و بەڕێوەبەرانی پارەدان دەتوانن بیبەستن.",
+      "notConnectedReadOnlyPlan": "تاقیکردنەوەی ڕێکخراوەکە کۆتایی هاتووە، بۆیە دەبێت خاوەنێک لە ⁨kilo.ai⁩ پارەدان نوێ بکاتەوە."
     },
     "bitbucketConnect": {
       "managedOnWeb": "پەیوەندیی Bitbucket بۆ {{organization}} لە وێبدا و لە کۆمپیوتەرێکەوە بەڕێوە دەبرێت.",

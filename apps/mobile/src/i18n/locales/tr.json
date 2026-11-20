@@ -140,6 +140,7 @@
     "keepRunning": "Çalıştırmaya devam et",
     "newSession": "Yeni oturum",
     "noModelsAvailable": "Kullanılabilir model yok",
+    "modelRetires": "Kullanımdan kalkıyor: {{date}}",
     "notFound": "Bulunamadı.",
     "online": "Çevrimiçi",
     "open": "{{name}} öğesini aç",
@@ -507,7 +508,7 @@
     "changelogFixesPolish": "Uygulama genelinde düzeltmeler ve iyileştirmeler.",
     "changelogAreas": {
       "signIn": "Oturum açma",
-      "profileOrganizations": "Profil ve kuruluşlar"
+      "profileOrganizations": "Profil & kuruluşlar"
     }
   },
   "preferences": {
@@ -697,7 +698,8 @@
     },
     "autoReviews": "Otomatik incelemeler",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket bağlı değil. Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir."
+      "notConnectedReadOnly": "Bitbucket bağlı değil. Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir.",
+      "notConnectedReadOnlyPlan": "Kuruluşun deneme süresi sona erdi, bu yüzden sahibin kilo.ai adresinden faturalandırmayı güncellemesi gerekiyor."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} için Bitbucket bağlantısı bir bilgisayardan web üzerinden yönetilir.",

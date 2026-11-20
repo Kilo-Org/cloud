@@ -140,6 +140,7 @@
     "keepRunning": "Jatka suoritusta",
     "newSession": "Uusi istunto",
     "noModelsAvailable": "Ei malleja saatavilla",
+    "modelRetires": "Poistuu {{date}}",
     "notFound": "Kohdetta ei löytynyt",
     "online": "Verkossa",
     "open": "Avaa {{name}}",
@@ -507,7 +508,7 @@
     "changelogFixesPolish": "Korjauksia ja parannuksia koko sovellukseen.",
     "changelogAreas": {
       "signIn": "Kirjautuminen",
-      "profileOrganizations": "Profiili ja organisaatiot"
+      "profileOrganizations": "Profiili & organisaatiot"
     }
   },
   "preferences": {
@@ -1391,7 +1392,8 @@
     "followReviewMd": "Noudata REVIEW.md-ohjeita",
     "followReviewMdSubtitle": "Noudata koodivarastokohtaisia REVIEW.md-ohjeita",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucketia ei ole yhdistetty. Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat yhdistää sen."
+      "notConnectedReadOnly": "Bitbucketia ei ole yhdistetty. Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat yhdistää sen.",
+      "notConnectedReadOnlyPlan": "Organisaation kokeilujakso on päättynyt, joten omistajan on päivitettävä laskutus osoitteessa kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-organisaation Bitbucket-yhteyttä hallitaan verkossa tietokoneella.",

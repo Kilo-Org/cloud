@@ -141,6 +141,7 @@
     "keepRunning": "Mantén l'execució en curs",
     "newSession": "Nova sessió",
     "noModelsAvailable": "Cap model disponible",
+    "modelRetires": "Es retira el {{date}}",
     "notFound": "No s'ha trobat l'element.",
     "online": "En línia",
     "open": "Obre {{name}}",
@@ -508,7 +509,7 @@
     "changelogFixesPolish": "Correccions i millores a tota l'aplicació.",
     "changelogAreas": {
       "signIn": "Inici de sessió",
-      "profileOrganizations": "Perfil i organitzacions"
+      "profileOrganizations": "Perfil & organitzacions"
     }
   },
   "preferences": {
@@ -1417,7 +1418,8 @@
     "followReviewMd": "Segueix REVIEW.md",
     "followReviewMdSubtitle": "Respecta els fitxers d'instruccions REVIEW.md de cada repositori",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket no està connectat. Només els propietaris, els administradors i els gestors de facturació de l'organització poden connectar-lo."
+      "notConnectedReadOnly": "Bitbucket no està connectat. Només els propietaris, els administradors i els gestors de facturació de l'organització poden connectar-lo.",
+      "notConnectedReadOnlyPlan": "El període de prova de l'organització ha finalitzat, així que un propietari ha d'actualitzar la facturació a kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "La connexió de Bitbucket amb {{organization}} es gestiona al web des d'un ordinador.",
@@ -1452,9 +1454,9 @@
       "activity": "Activitat"
     },
     "providerConnect": {
-      "githubApp": "l'Aplicació de GitHub",
+      "githubApp": "l'aplicació de GitHub",
       "githubError": "No s'ha pogut obrir la configuració de GitHub. Torna-ho a provar.",
-      "gitlabAccount": "el Compte de GitLab",
+      "gitlabAccount": "el compte de GitLab",
       "gitlabError": "No s'ha pogut obrir la configuració de GitLab. Torna-ho a provar.",
       "description": "Connecta {{label}} a Kilo per revisar automàticament les sol·licituds d'integració."
     },

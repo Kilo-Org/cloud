@@ -140,6 +140,7 @@
     "keepRunning": "ให้ทำงานต่อ",
     "newSession": "เซสชันใหม่",
     "noModelsAvailable": "ไม่มีโมเดลที่ใช้งานได้",
+    "modelRetires": "เลิกใช้ {{date}}",
     "notFound": "ไม่พบข้อมูล",
     "online": "ออนไลน์",
     "open": "เปิด {{name}}",
@@ -507,7 +508,7 @@
     "changelogFixesPolish": "การแก้ไขและปรับปรุงทั่วทั้งแอป",
     "changelogAreas": {
       "signIn": "การลงชื่อเข้าใช้",
-      "profileOrganizations": "โปรไฟล์และองค์กร"
+      "profileOrganizations": "โปรไฟล์กับองค์กร"
     }
   },
   "preferences": {
@@ -1391,7 +1392,8 @@
     "followReviewMd": "ปฏิบัติตาม REVIEW.md",
     "followReviewMdSubtitle": "ทำตามคำแนะนำในไฟล์ REVIEW.md ของแต่ละคลังโค้ด",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ยังไม่เชื่อมต่อ เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถเชื่อมต่อได้"
+      "notConnectedReadOnly": "Bitbucket ยังไม่เชื่อมต่อ เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถเชื่อมต่อได้",
+      "notConnectedReadOnlyPlan": "การทดลองใช้งานขององค์กรสิ้นสุดลงแล้ว เจ้าของจึงต้องอัปเดตการเรียกเก็บเงินที่ kilo.ai"
     },
     "bitbucketConnect": {
       "managedOnWeb": "การเชื่อมต่อ Bitbucket ของ {{organization}} ได้รับการจัดการบนเว็บจากคอมพิวเตอร์",

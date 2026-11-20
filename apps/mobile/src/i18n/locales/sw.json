@@ -140,6 +140,7 @@
     "keepRunning": "Acha iendelee",
     "newSession": "Kikao kipya",
     "noModelsAvailable": "Hakuna modeli zinazopatikana",
+    "modelRetires": "Itastaafu {{date}}",
     "notFound": "Haikupatikana.",
     "online": "Mtandaoni",
     "open": "Fungua {{name}}",
@@ -507,7 +508,7 @@
     "changelogFixesPolish": "Marekebisho na maboresho katika programu nzima.",
     "changelogAreas": {
       "signIn": "Kuingia",
-      "profileOrganizations": "Wasifu na mashirika"
+      "profileOrganizations": "Wasifu & mashirika"
     }
   },
   "preferences": {
@@ -1391,7 +1392,8 @@
     "followReviewMd": "Fuata REVIEW.md",
     "followReviewMdSubtitle": "Fuata maagizo katika faili ya REVIEW.md ya kila hazina",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket haijaunganishwa. Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuiunganisha."
+      "notConnectedReadOnly": "Bitbucket haijaunganishwa. Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuiunganisha.",
+      "notConnectedReadOnlyPlan": "Kipindi cha majaribio cha shirika kimeisha, kwa hivyo mmiliki anapaswa kusasisha malipo kwenye kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Muunganisho wa Bitbucket wa {{organization}} unasimamiwa kwenye wavuti kutoka kwenye kompyuta.",
@@ -1426,9 +1428,9 @@
       "activity": "Shughuli"
     },
     "providerConnect": {
-      "githubApp": "Programu ya GitHub",
+      "githubApp": "programu ya GitHub",
       "githubError": "Imeshindikana kufungua usanidi wa GitHub. Tafadhali jaribu tena.",
-      "gitlabAccount": "Akaunti ya GitLab",
+      "gitlabAccount": "akaunti ya GitLab",
       "gitlabError": "Imeshindikana kufungua usanidi wa GitLab. Tafadhali jaribu tena.",
       "description": "Unganisha {{label}} ya Kilo ili kukagua maombi ya kuunganisha kiotomatiki."
     },

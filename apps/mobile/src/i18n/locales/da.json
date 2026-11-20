@@ -140,6 +140,7 @@
     "keepRunning": "Lad køre",
     "newSession": "Ny session",
     "noModelsAvailable": "Ingen modeller tilgængelige",
+    "modelRetires": "Udfases {{date}}",
     "notFound": "Indholdet blev ikke fundet.",
     "online": "Forbundet",
     "open": "Åbn {{name}}",
@@ -507,7 +508,7 @@
     "changelogFixesPolish": "Rettelser og forbedringer i hele appen.",
     "changelogAreas": {
       "signIn": "Log-ind",
-      "profileOrganizations": "Profil og organisationer"
+      "profileOrganizations": "Profil & organisationer"
     }
   },
   "preferences": {
@@ -1391,7 +1392,8 @@
     "followReviewMd": "Følg REVIEW.md",
     "followReviewMdSubtitle": "Følg instruktionerne i hvert kodelagers REVIEW.md-fil",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket er ikke tilsluttet. Kun organisationsejere, administratorer og faktureringsansvarlige kan oprette forbindelsen."
+      "notConnectedReadOnly": "Bitbucket er ikke tilsluttet. Kun organisationsejere, administratorer og faktureringsansvarlige kan oprette forbindelsen.",
+      "notConnectedReadOnlyPlan": "Organisationens prøveperiode er udløbet, så en ejer skal opdatere betalingen på kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-forbindelsen til {{organization}} administreres på nettet fra en computer.",

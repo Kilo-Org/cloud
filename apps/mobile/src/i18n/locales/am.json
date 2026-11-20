@@ -140,6 +140,7 @@
     "keepRunning": "እንዲሠራ ተወው",
     "newSession": "አዲስ ክፍለ ጊዜ",
     "noModelsAvailable": "ምንም ሞዴሎች የሉም",
+    "modelRetires": "በ{{date}} ጡረታ ይወጣል",
     "notFound": "አልተገኘም።",
     "online": "በመስመር ላይ",
     "open": "{{name}}ን ክፈት",
@@ -507,7 +508,7 @@
     "changelogFixesPolish": "በመተግበሪያው ውስጥ በሙሉ ጥገናዎች እና ማሻሻያዎች ተደርገዋል።",
     "changelogAreas": {
       "signIn": "መግቢያ",
-      "profileOrganizations": "መገለጫ እና ድርጅቶች"
+      "profileOrganizations": "መገለጫና ድርጅቶች"
     }
   },
   "preferences": {
@@ -936,9 +937,9 @@
       "checkFailedTitleGitLab": "የGitLab ግንኙነቱን መፈተሽ አልተቻለም።",
       "checkFailedTitleBitbucket": "የBitbucket ግንኙነቱን መፈተሽ አልተቻለም።",
       "providerCheckFailedMessage": "አቅራቢው ላይ መድረስ አልተቻለም። ግንኙነትህን ፈትሽና እንደገና ሞክር።",
-      "reconnectTitle": "GitHubን እንደገና ማገናኘት",
-      "reconnectTitleGitLab": "GitLabን እንደገና ማገናኘት",
-      "reconnectTitleBitbucket": "Bitbucketን እንደገና ማገናኘት",
+      "reconnectTitle": "GitHubን እንደገና አገናኝ",
+      "reconnectTitleGitLab": "GitLabን እንደገና አገናኝ",
+      "reconnectTitleBitbucket": "Bitbucketን እንደገና አገናኝ",
       "reconnectDescription": "የGitHub ግንኙነትህ ፈቃድ ተሰርዟል።",
       "gitlabDescription": "የማዋሃድ ጥያቄዎችን በሞባይል ይገምግሙ",
       "gitlabInstanceMismatchTitle": "የGitLab ግንኙነት ለሌላ ኢንስታንስ ነው",
@@ -1391,7 +1392,8 @@
     "followReviewMd": "REVIEW.mdን ይከተሉ",
     "followReviewMdSubtitle": "በእያንዳንዱ ማከማቻ ውስጥ ያሉትን የREVIEW.md መመሪያ ፋይሎች ይከተሉ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket አልተገናኘም። ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።"
+      "notConnectedReadOnly": "Bitbucket አልተገናኘም። ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
+      "notConnectedReadOnlyPlan": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ስለዚህ ባለቤት በkilo.ai ላይ የክፍያ መረጃውን ማዘመን አለበት።"
     },
     "bitbucketConnect": {
       "managedOnWeb": "የ{{organization}} የBitbucket ግንኙነት ከኮምፒውተር በድር ላይ ይተዳደራል።",
@@ -1724,7 +1726,7 @@
       "dueThisWeekDetail_one": "ከእነዚህ ውስጥ {{exploitable}} ለጥቃት ሊውሉ እንደሚችሉ ተረጋግጠዋል",
       "dueThisWeekDetail_other": "ከእነዚህ ውስጥ {{exploitable}} ለጥቃት ሊውሉ እንደሚችሉ ተረጋግጠዋል",
       "noDeadline": "ምንም ጊዜ ገደብ የለም",
-      "reviewSlaAssignment": "የተወሰኑትን የSLA ጊዜ ገደቦች ይገምግሙ",
+      "reviewSlaAssignment": "የSLA ምደባን ይገምግሙ",
       "allOpenFindingsTracked": "ሁሉም ክፍት ግኝቶች በክትትል ላይ ናቸው"
     },
     "dismiss": {

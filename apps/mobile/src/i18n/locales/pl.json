@@ -142,6 +142,7 @@
     "keepRunning": "Nie przerywaj",
     "newSession": "Nowa sesja",
     "noModelsAvailable": "Brak dostępnych modeli",
+    "modelRetires": "Wycofany {{date}}",
     "notFound": "Nie znaleziono elementu.",
     "online": "W sieci",
     "open": "Otwórz {{name}}",
@@ -509,7 +510,7 @@
     "changelogFixesPolish": "Poprawki i ulepszenia w całej aplikacji.",
     "changelogAreas": {
       "signIn": "Logowanie",
-      "profileOrganizations": "Profil i organizacje"
+      "profileOrganizations": "Profil oraz organizacje"
     }
   },
   "preferences": {
@@ -699,7 +700,8 @@
     },
     "autoReviews": "Automatyczne przeglądy",
     "bitbucket": {
-      "notConnectedReadOnly": "Brak połączenia z Bitbucket. Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je skonfigurować."
+      "notConnectedReadOnly": "Brak połączenia z Bitbucket. Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je skonfigurować.",
+      "notConnectedReadOnlyPlan": "Okres próbny organizacji zakończył się, więc właściciel musi zaktualizować rozliczenia na kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Połączeniem {{organization}} z Bitbucket zarządza się w przeglądarce na komputerze.",
@@ -750,9 +752,9 @@
     },
     "providerConnect": {
       "description": "Skonfiguruj połączenie z Kilo ({{label}}), aby automatycznie przeglądać PR.",
-      "githubApp": "Aplikacja GitHub",
+      "githubApp": "aplikacja GitHub",
       "githubError": "Nie udało się otworzyć konfiguracji GitHub. Spróbuj ponownie.",
-      "gitlabAccount": "Konto GitLab",
+      "gitlabAccount": "konto GitLab",
       "gitlabError": "Nie udało się otworzyć konfiguracji GitLab. Spróbuj ponownie."
     },
     "reviewDetail": {
@@ -1251,7 +1253,7 @@
       "dueThisWeekDetail_many": "W tym {{exploitable}} z potwierdzoną możliwością wykorzystania w ataku",
       "dueThisWeekDetail_other": "W tym {{exploitable}} z potwierdzoną możliwością wykorzystania w ataku",
       "noDeadline": "Brak terminu",
-      "reviewSlaAssignment": "Sprawdź przypisane terminy SLA",
+      "reviewSlaAssignment": "Sprawdź przydział SLA",
       "allOpenFindingsTracked": "Wszystkie otwarte problemy są monitorowane"
     },
     "dismiss": {

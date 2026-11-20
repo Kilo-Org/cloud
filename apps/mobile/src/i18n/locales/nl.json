@@ -140,6 +140,7 @@
     "keepRunning": "Laten doorgaan",
     "newSession": "Nieuwe sessie",
     "noModelsAvailable": "Geen modellen beschikbaar",
+    "modelRetires": "Wordt stopgezet op {{date}}",
     "notFound": "Dit item is niet gevonden.",
     "online": "Verbonden",
     "open": "{{name}} openen",
@@ -507,7 +508,7 @@
     "changelogFixesPolish": "Oplossingen en verbeteringen in de hele app.",
     "changelogAreas": {
       "signIn": "Inloggen",
-      "profileOrganizations": "Profiel en organisaties"
+      "profileOrganizations": "Profiel & organisaties"
     }
   },
   "preferences": {
@@ -697,7 +698,8 @@
     },
     "autoReviews": "Automatische reviews",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket is niet gekoppeld. Alleen organisatie-eigenaren, beheerders en factuurbeheerders kunnen de koppeling instellen."
+      "notConnectedReadOnly": "Bitbucket is niet gekoppeld. Alleen organisatie-eigenaren, beheerders en factuurbeheerders kunnen de koppeling instellen.",
+      "notConnectedReadOnlyPlan": "De proefperiode van de organisatie is afgelopen, dus een eigenaar moet de facturering bijwerken op kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "De Bitbucket-verbinding voor {{organization}} wordt via het web op een computer beheerd.",

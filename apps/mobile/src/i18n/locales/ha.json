@@ -140,6 +140,7 @@
     "keepRunning": "Ci gaba da aikin",
     "newSession": "Sabon zama",
     "noModelsAvailable": "Babu samfura",
+    "modelRetires": "Zai yi ritaya {{date}}",
     "notFound": "Ba a samu ba.",
     "online": "Kan layi",
     "open": "Buɗe {{name}}",
@@ -507,7 +508,7 @@
     "changelogFixesPolish": "Gyare-gyare da ingantawa a duk faɗin manhajar.",
     "changelogAreas": {
       "signIn": "Shiga",
-      "profileOrganizations": "Bayanan martaba da ƙungiyoyi"
+      "profileOrganizations": "Bayanan martaba & ƙungiyoyi"
     }
   },
   "preferences": {
@@ -1391,7 +1392,8 @@
     "followReviewMd": "Bi REVIEW.md",
     "followReviewMdSubtitle": "Bi umarnin fayil ɗin REVIEW.md na kowace ma'ajiya",
     "bitbucket": {
-      "notConnectedReadOnly": "Ba a haɗa Bitbucket ba. Masu ƙungiya, masu gudanarwa, da manajannin biyan kuɗi kawai za su iya haɗa shi."
+      "notConnectedReadOnly": "Ba a haɗa Bitbucket ba. Masu ƙungiya, masu gudanarwa, da manajannin biyan kuɗi kawai za su iya haɗa shi.",
+      "notConnectedReadOnlyPlan": "Gwajin ƙungiyar ya ƙare, don haka dole ne mai shi ya sabunta lissafin kuɗi a kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Ana sarrafa haɗin Bitbucket da {{organization}} a yanar gizo daga kwamfuta.",
@@ -1426,9 +1428,9 @@
       "activity": "Aiki"
     },
     "providerConnect": {
-      "githubApp": "Manhajar GitHub",
+      "githubApp": "manhajar GitHub",
       "githubError": "An kasa buɗe saitin GitHub. Sake gwadawa.",
-      "gitlabAccount": "Asusun GitLab",
+      "gitlabAccount": "asusun GitLab",
       "gitlabError": "An kasa buɗe saitin GitLab. Sake gwadawa.",
       "description": "Haɗa {{label}} na Kilo don yin bitar buƙatun haɗa canje-canje ta atomatik."
     },
@@ -1843,7 +1845,7 @@
       "couldNotLoadMore": "An kasa loda ƙarin matsalolin da aka gano.",
       "noMatchesTitle": "Babu matsalolin da suka dace da matatun",
       "noMatchesDescription": "Gwada canza ko cire matatun da aka zaɓa.",
-      "emptyTitle": "Babu matsalolin da ba a warware ba",
+      "emptyTitle": "Babu matsalolin da suke buɗe",
       "emptyDescription": "Babu matsalolin da ba a warware ba masu buƙatar kulawa a yanzu."
     },
     "findingRow": {

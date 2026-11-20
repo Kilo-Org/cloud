@@ -142,6 +142,7 @@
     "keepRunning": "Працягнуць працу",
     "newSession": "Новы сеанс",
     "noModelsAvailable": "Няма даступных мадэляў",
+    "modelRetires": "Здымаецца {{date}}",
     "notFound": "Нічога не знойдзена.",
     "online": "У сетцы",
     "open": "Адкрыць {{name}}",
@@ -509,7 +510,7 @@
     "changelogFixesPolish": "Выпраўленні і паляпшэнні ва ўсёй праграме.",
     "changelogAreas": {
       "signIn": "Уваход",
-      "profileOrganizations": "Профіль і арганізацыі"
+      "profileOrganizations": "Профіль ды арганізацыі"
     }
   },
   "preferences": {
@@ -1443,7 +1444,8 @@
     "followReviewMd": "Выконваць інструкцыі REVIEW.md",
     "followReviewMdSubtitle": "Выконваць інструкцыі з файла REVIEW.md у кожным рэпазіторыі",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket не падключаны. Толькі ўладальнікі, адміністратары і кіраўнікі плацяжоў арганізацыі могуць яго падключыць."
+      "notConnectedReadOnly": "Bitbucket не падключаны. Толькі ўладальнікі, адміністратары і кіраўнікі плацяжоў арганізацыі могуць яго падключыць.",
+      "notConnectedReadOnlyPlan": "Пробны перыяд арганізацыі скончыўся, таму ўладальнік павінен абнавіць плацежныя даныя на kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Падключэнне Bitbucket для {{organization}} кіруецца ў вэб-версіі з камп'ютара.",
@@ -1478,9 +1480,9 @@
       "activity": "Актыўнасць"
     },
     "providerConnect": {
-      "githubApp": "Праграма GitHub",
+      "githubApp": "праграма GitHub",
       "githubError": "Не атрымалася адкрыць наладжванне GitHub. Паспрабуйце яшчэ раз.",
-      "gitlabAccount": "Уліковы запіс GitLab",
+      "gitlabAccount": "уліковы запіс GitLab",
       "gitlabError": "Не атрымалася адкрыць наладжванне GitLab. Паспрабуйце яшчэ раз.",
       "description": "Наладзьце падключэнне Kilo ({{label}}), каб аўтаматычна правяраць запыты на зліццё."
     },
@@ -1802,7 +1804,7 @@
       "dueThisWeekDetail_many": "З гэтых праблем {{exploitable}} можна выкарыстаць у атацы",
       "dueThisWeekDetail_other": "З гэтых праблем {{exploitable}} можна выкарыстаць у атацы",
       "noDeadline": "Няма тэрміну",
-      "reviewSlaAssignment": "Праверце прызначаныя тэрміны SLA",
+      "reviewSlaAssignment": "Праверце прызначэнне тэрмінаў SLA",
       "allOpenFindingsTracked": "Усе адкрытыя праблемы адсочваюцца"
     },
     "dismiss": {
@@ -2069,7 +2071,7 @@
       "failedDescription": "Агент бяспекі не змог завяршыць аналіз.",
       "extractionFailedDescription": "Тэхнічную справаздачу не атрымалася пераўтварыць у структураваны вынік.",
       "exploitableDescription": "Код праграмы можа выклікаць уразлівую функцыю.",
-      "notExploitable": "Код недасягальны",
+      "notExploitable": "Недасягальны шлях",
       "notExploitableDescription": "У гэтым рэпазіторыі не знойдзены шлях выканання да ўразлівай функцыі.",
       "unknown": "Патрабуе праверкі",
       "unknownDescription": "Аналіз не пацвердзіў, ці можа код выклікаць уразлівую функцыю.",

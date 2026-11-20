@@ -140,6 +140,7 @@
     "keepRunning": "Остави да работи",
     "newSession": "Нова сесија",
     "noModelsAvailable": "Нема достапни модели",
+    "modelRetires": "Се повлекува на {{date}}",
     "notFound": "Не е пронајдено.",
     "online": "Онлајн",
     "open": "Отвори {{name}}",
@@ -507,7 +508,7 @@
     "changelogFixesPolish": "Поправки и подобрувања низ целата апликација.",
     "changelogAreas": {
       "signIn": "Најава",
-      "profileOrganizations": "Профил и организации"
+      "profileOrganizations": "Профил & организации"
     }
   },
   "preferences": {
@@ -936,9 +937,9 @@
       "checkFailedTitleGitLab": "Не можеше да се провери врската со GitLab",
       "checkFailedTitleBitbucket": "Не можеше да се провери врската со Bitbucket",
       "providerCheckFailedMessage": "Не можеше да се поврзе со провајдерот. Провери ја врската и обиди се повторно.",
-      "reconnectTitle": "Повторно поврзување со GitHub",
-      "reconnectTitleGitLab": "Повторно поврзување со GitLab",
-      "reconnectTitleBitbucket": "Повторно поврзување со Bitbucket",
+      "reconnectTitle": "Поврзи го GitHub повторно",
+      "reconnectTitleGitLab": "Поврзи го GitLab повторно",
+      "reconnectTitleBitbucket": "Поврзи го Bitbucket повторно",
       "reconnectDescription": "Пристапот до твојата сметка на GitHub е отповикан.",
       "gitlabDescription": "Прегледувај merge барања на мобилен уред",
       "gitlabInstanceMismatchTitle": "Поврзувањето со GitLab е за друга инстанца",
@@ -1391,7 +1392,8 @@
     "followReviewMd": "Следи REVIEW.md",
     "followReviewMdSubtitle": "Почитувај ги упатствата во датотеката REVIEW.md во секое складиште",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket не е поврзан. Само сопствениците на организацијата, администраторите и одговорните за наплата можат да го поврзат."
+      "notConnectedReadOnly": "Bitbucket не е поврзан. Само сопствениците на организацијата, администраторите и одговорните за наплата можат да го поврзат.",
+      "notConnectedReadOnlyPlan": "Пробниот период на организацијата заврши, затоа сопственикот мора да го ажурира наплатувањето на kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Врската со Bitbucket на {{organization}} се управува преку веб од компјутер.",
@@ -1426,9 +1428,9 @@
       "activity": "Активност"
     },
     "providerConnect": {
-      "githubApp": "Апликација на GitHub",
+      "githubApp": "апликација на GitHub",
       "githubError": "Не можеше да се отвори поставувањето на GitHub. Обиди се повторно.",
-      "gitlabAccount": "Сметка на GitLab",
+      "gitlabAccount": "сметка на GitLab",
       "gitlabError": "Не можеше да се отвори поставувањето на GitLab. Обиди се повторно.",
       "description": "Поврзи ја {{label}} со Kilo за автоматски преглед на барањата за спојување."
     },
@@ -1724,7 +1726,7 @@
       "dueThisWeekDetail_one": "Од нив за {{exploitable}} е потврдено дека можат да се искористат за напад",
       "dueThisWeekDetail_other": "Од нив за {{exploitable}} е потврдено дека можат да се искористат за напад",
       "noDeadline": "Нема рок",
-      "reviewSlaAssignment": "Провери ги доделените рокови според SLA",
+      "reviewSlaAssignment": "Провери доделувањето на рокови според SLA",
       "allOpenFindingsTracked": "Се следат сите отворени наоди"
     },
     "dismiss": {

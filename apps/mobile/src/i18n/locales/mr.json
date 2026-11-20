@@ -140,6 +140,7 @@
     "keepRunning": "चालू ठेवा",
     "newSession": "नवीन सत्र",
     "noModelsAvailable": "कोणतेही मॉडेल उपलब्ध नाही",
+    "modelRetires": "समाप्त होते {{date}}",
     "notFound": "सापडले नाही",
     "online": "ऑनलाइन",
     "open": "{{name}} उघडा",
@@ -507,7 +508,7 @@
     "changelogFixesPolish": "संपूर्ण अ‍ॅपमध्ये दुरुस्त्या आणि सुधारणा.",
     "changelogAreas": {
       "signIn": "साइन इन",
-      "profileOrganizations": "प्रोफाइल आणि संस्था"
+      "profileOrganizations": "प्रोफाइल व संस्था"
     }
   },
   "preferences": {
@@ -1391,7 +1392,8 @@
     "followReviewMd": "REVIEW.md मधील सूचना पाळा",
     "followReviewMdSubtitle": "प्रत्येक रिपॉझिटरीतील REVIEW.md फाइलमधील सूचना पाळा",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket जोडलेले नाही. केवळ संस्थेचे मालक, प्रशासक आणि बिलिंग व्यवस्थापक ते जोडू शकतात."
+      "notConnectedReadOnly": "Bitbucket जोडलेले नाही. केवळ संस्थेचे मालक, प्रशासक आणि बिलिंग व्यवस्थापक ते जोडू शकतात.",
+      "notConnectedReadOnlyPlan": "संस्थेची चाचणी संपली आहे, म्हणून मालकाने kilo.ai वर बिलिंग अपडेट करणे आवश्यक आहे."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} चे Bitbucket कनेक्शन संगणकावरून वेबवर व्यवस्थापित केले जाते.",
@@ -1843,7 +1845,7 @@
       "couldNotLoadMore": "आणखी निष्कर्ष लोड करता आले नाहीत.",
       "noMatchesTitle": "फिल्टरशी जुळणारे निष्कर्ष नाहीत",
       "noMatchesDescription": "निवडलेले फिल्टर बदलून किंवा काढून पाहा.",
-      "emptyTitle": "प्रलंबित निष्कर्ष नाहीत",
+      "emptyTitle": "उघडे निष्कर्ष नाहीत",
       "emptyDescription": "सध्या लक्ष देण्याची गरज असलेले प्रलंबित निष्कर्ष नाहीत."
     },
     "findingRow": {
@@ -2034,7 +2036,7 @@
     "remediationUnavailable": {
       "findingNotFound": "सुरक्षा निष्कर्ष आता अस्तित्वात नाही.",
       "approvalRequired": "स्वयंचलित निराकरणासाठी मंजुरी आवश्यक आहे. मंजुरी देण्यासाठी निराकरण स्वतः सुरू करा.",
-      "findingNotOpen": "हा निष्कर्ष आता प्रलंबित नाही.",
+      "findingNotOpen": "हा निष्कर्ष आता उघडा नाही.",
       "repoNotInScope": "सुरक्षा एजंटसाठी ही रिपॉझिटरी निवडलेली नाही.",
       "analysisRequired": "निराकरण सुरू करण्यापूर्वी कोडबेसचे विश्लेषण करा.",
       "staleAnalysis": "विश्लेषणानंतर निष्कर्ष बदलला आहे. निराकरण सुरू करण्यापूर्वी पुन्हा विश्लेषण करा.",

@@ -140,6 +140,7 @@
     "keepRunning": "Շարունակել կատարումը",
     "newSession": "Նոր նստաշրջան",
     "noModelsAvailable": "Հասանելի մոդելներ չկան",
+    "modelRetires": "Դադարեցվում է {{date}}-ին",
     "notFound": "Չի գտնվել",
     "online": "Առցանց",
     "open": "Բացել {{name}}-ը",
@@ -507,7 +508,7 @@
     "changelogFixesPolish": "Ուղղումներ և բարելավումներ ամբողջ հավելվածում։",
     "changelogAreas": {
       "signIn": "Մուտք",
-      "profileOrganizations": "Պրոֆիլ և կազմակերպություններ"
+      "profileOrganizations": "Պրոֆիլ ու կազմակերպություններ"
     }
   },
   "preferences": {
@@ -936,9 +937,9 @@
       "checkFailedTitleGitLab": "Չհաջողվեց ստուգել GitLab-ի հետ կապը",
       "checkFailedTitleBitbucket": "Չհաջողվեց ստուգել Bitbucket-ի հետ կապը",
       "providerCheckFailedMessage": "Չհաջողվեց հասնել մատակարարին։ Ստուգիր կապդ և կրկին փորձիր։",
-      "reconnectTitle": "Կրկին միացում GitHub-ին",
-      "reconnectTitleGitLab": "Կրկին միացում GitLab-ին",
-      "reconnectTitleBitbucket": "Կրկին միացում Bitbucket-ին",
+      "reconnectTitle": "Կրկին միացնել GitHub-ը",
+      "reconnectTitleGitLab": "Կրկին միացնել GitLab-ը",
+      "reconnectTitleBitbucket": "Կրկին միացնել Bitbucket-ը",
       "reconnectDescription": "GitHub-ի հետ կապիդ թույլտվությունը չեղարկվել է։",
       "gitlabDescription": "Վերանայել միաձուլման հարցումները բջջային սարքում",
       "gitlabInstanceMismatchTitle": "GitLab-ի միացումը այլ ինստանսի համար է",
@@ -1391,7 +1392,8 @@
     "followReviewMd": "Հետևել REVIEW.md-ին",
     "followReviewMdSubtitle": "Հետևել յուրաքանչյուր պահոցի REVIEW.md ֆայլի հրահանգներին",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket-ը միացված չէ։ Միայն կազմակերպության սեփականատերերը, ադմինիստրատորները և վճարումների կառավարիչները կարող են այն միացնել։"
+      "notConnectedReadOnly": "Bitbucket-ը միացված չէ։ Միայն կազմակերպության սեփականատերերը, ադմինիստրատորները և վճարումների կառավարիչները կարող են այն միացնել։",
+      "notConnectedReadOnlyPlan": "Կազմակերպության փորձաշրջանն ավարտվել է, ուստի սեփականատերը պետք է թարմացնի վճարումները kilo.ai-ում։"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ի Bitbucket միացումը կառավարվում է վեբում՝ համակարգչից։",

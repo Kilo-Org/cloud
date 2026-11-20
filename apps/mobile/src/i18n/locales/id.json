@@ -140,6 +140,7 @@
     "keepRunning": "Biarkan berjalan",
     "newSession": "Sesi baru",
     "noModelsAvailable": "Tidak ada model yang tersedia",
+    "modelRetires": "Dihentikan pada {{date}}",
     "notFound": "Tidak ditemukan.",
     "online": "Daring",
     "open": "Buka {{name}}",
@@ -507,7 +508,7 @@
     "changelogFixesPolish": "Perbaikan dan peningkatan di seluruh aplikasi.",
     "changelogAreas": {
       "signIn": "Masuk",
-      "profileOrganizations": "Profil dan organisasi"
+      "profileOrganizations": "Profil & organisasi"
     }
   },
   "preferences": {
@@ -697,7 +698,8 @@
     },
     "autoReviews": "Tinjauan otomatis",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket tidak terhubung. Hanya pemilik organisasi, admin, dan manajer penagihan yang dapat menghubungkannya."
+      "notConnectedReadOnly": "Bitbucket tidak terhubung. Hanya pemilik organisasi, admin, dan manajer penagihan yang dapat menghubungkannya.",
+      "notConnectedReadOnlyPlan": "Masa percobaan organisasi telah berakhir, jadi pemilik harus memperbarui penagihan di kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Koneksi Bitbucket untuk {{organization}} dikelola di web melalui komputer.",
@@ -748,9 +750,9 @@
     },
     "providerConnect": {
       "description": "Hubungkan {{label}} Kilo untuk meninjau PR secara otomatis.",
-      "githubApp": "Aplikasi GitHub",
+      "githubApp": "aplikasi GitHub",
       "githubError": "Tidak dapat membuka penyiapan GitHub. Coba lagi.",
-      "gitlabAccount": "Akun GitLab",
+      "gitlabAccount": "akun GitLab",
       "gitlabError": "Tidak dapat membuka penyiapan GitLab. Coba lagi."
     },
     "reviewDetail": {

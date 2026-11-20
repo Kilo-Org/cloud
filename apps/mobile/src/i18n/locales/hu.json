@@ -140,6 +140,7 @@
     "keepRunning": "Futtatás folytatása",
     "newSession": "Új munkamenet",
     "noModelsAvailable": "Nem érhetők el modellek",
+    "modelRetires": "Kivezetés: {{date}}",
     "notFound": "Nem található",
     "online": "Elérhető",
     "open": "{{name}} megnyitása",
@@ -507,7 +508,7 @@
     "changelogFixesPolish": "Javítások és fejlesztések az egész alkalmazásban.",
     "changelogAreas": {
       "signIn": "Bejelentkezés",
-      "profileOrganizations": "Profil és szervezetek"
+      "profileOrganizations": "Profil & szervezetek"
     }
   },
   "preferences": {
@@ -936,9 +937,9 @@
       "checkFailedTitleGitLab": "Nem sikerült ellenőrizni a GitLab-kapcsolatot",
       "checkFailedTitleBitbucket": "Nem sikerült ellenőrizni a Bitbucket-kapcsolatot",
       "providerCheckFailedMessage": "Nem sikerült elérni a szolgáltatót. Ellenőrizd az internetkapcsolatot, és próbáld újra.",
-      "reconnectTitle": "Újracsatlakozás a GitHubhoz",
-      "reconnectTitleGitLab": "Újracsatlakozás a GitLabhoz",
-      "reconnectTitleBitbucket": "Újracsatlakozás a Bitbuckethoz",
+      "reconnectTitle": "Csatlakoztasd újra a GitHubot",
+      "reconnectTitleGitLab": "Csatlakoztasd újra a GitLabot",
+      "reconnectTitleBitbucket": "Csatlakoztasd újra a Bitbucketet",
       "reconnectDescription": "Visszavonták a GitHub-kapcsolatod engedélyét.",
       "gitlabDescription": "Módosítási kérelmek ellenőrzése mobilon",
       "gitlabInstanceMismatchTitle": "A GitLab-kapcsolat egy másik példányhoz tartozik",
@@ -1391,7 +1392,8 @@
     "followReviewMd": "REVIEW.md követése",
     "followReviewMdSubtitle": "Az adattárankénti REVIEW.md utasításfájlok követése",
     "bitbucket": {
-      "notConnectedReadOnly": "A Bitbucket nincs csatlakoztatva. Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei csatlakoztathatják."
+      "notConnectedReadOnly": "A Bitbucket nincs csatlakoztatva. Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei csatlakoztathatják.",
+      "notConnectedReadOnlyPlan": "A szervezet próbaidőszaka lejárt, ezért a tulajdonosnak frissítenie kell a számlázást a kilo.ai oldalon."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket-kapcsolata a weben, számítógépről kezelhető.",

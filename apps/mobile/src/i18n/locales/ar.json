@@ -144,6 +144,7 @@
     "keepRunning": "متابعة التشغيل",
     "newSession": "جلسة جديدة",
     "noModelsAvailable": "لا توجد نماذج متاحة",
+    "modelRetires": "يتوقف في {{date}}",
     "notFound": "لم نعثر على العنصر المطلوب.",
     "online": "متصل",
     "open": "فتح {{name}}",
@@ -511,7 +512,7 @@
     "changelogFixesPolish": "إصلاحات وتحسينات في جميع أنحاء التطبيق.",
     "changelogAreas": {
       "signIn": "تسجيل الدخول",
-      "profileOrganizations": "الملف الشخصي والمؤسسات"
+      "profileOrganizations": "الملف الشخصي & المؤسسات"
     }
   },
   "preferences": {
@@ -701,7 +702,8 @@
     },
     "autoReviews": "مراجعات تلقائية",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket غير متصل. يمكن لمالكي المؤسسة والمشرفين ومديري الفوترة فقط ربطه."
+      "notConnectedReadOnly": "Bitbucket غير متصل. يمكن لمالكي المؤسسة والمشرفين ومديري الفوترة فقط ربطه.",
+      "notConnectedReadOnlyPlan": "انتهت الفترة التجريبية للمؤسسة، لذا يجب على المالك تحديث الفوترة على ⁨kilo.ai⁩."
     },
     "bitbucketConnect": {
       "managedOnWeb": "تتم إدارة اتصال Bitbucket الخاص بالمؤسسة {{organization}} عبر الويب من جهاز كمبيوتر.",
@@ -1283,7 +1285,7 @@
       "dueThisWeekDetail_many": "منها {{exploitable}} مؤكدة القابلية للاستغلال",
       "dueThisWeekDetail_other": "منها {{exploitable}} مؤكدة القابلية للاستغلال",
       "noDeadline": "لا يوجد موعد نهائي",
-      "reviewSlaAssignment": "مراجعة المواعيد المحددة حسب SLA",
+      "reviewSlaAssignment": "مراجعة تعيين الـSLA",
       "allOpenFindingsTracked": "تُتابَع جميع النتائج المفتوحة"
     },
     "dismiss": {
@@ -2972,9 +2974,9 @@
       "checkFailedTitleGitLab": "تعذّر التحقق من ربط حساب GitLab.",
       "checkFailedTitleBitbucket": "تعذّر التحقق من ربط حساب Bitbucket.",
       "providerCheckFailedMessage": "تعذّر الوصول إلى المزوّد. تحقق من اتصالك وحاول مرة أخرى.",
-      "reconnectTitle": "إعادة ربط GitHub",
-      "reconnectTitleGitLab": "إعادة ربط GitLab",
-      "reconnectTitleBitbucket": "إعادة ربط Bitbucket",
+      "reconnectTitle": "اربط GitHub مرة أخرى",
+      "reconnectTitleGitLab": "اربط GitLab مرة أخرى",
+      "reconnectTitleBitbucket": "اربط Bitbucket مرة أخرى",
       "reconnectDescription": "أُلغي ربط حسابك على GitHub.",
       "gitlabDescription": "مراجعة طلبات الدمج على الجوال",
       "gitlabInstanceMismatchTitle": "اتصال GitLab مخصص لنسخة أخرى",

@@ -142,6 +142,7 @@
     "keepRunning": "Nechat běžet",
     "newSession": "Nová relace",
     "noModelsAvailable": "Žádné dostupné modely",
+    "modelRetires": "Vyřazuje se {{date}}",
     "notFound": "Položka nebyla nalezena.",
     "online": "Připojeno",
     "open": "Otevřít {{name}}",
@@ -509,7 +510,7 @@
     "changelogFixesPolish": "Opravy a vylepšení v celé aplikaci.",
     "changelogAreas": {
       "signIn": "Přihlášení",
-      "profileOrganizations": "Profil a organizace"
+      "profileOrganizations": "Profil i organizace"
     }
   },
   "preferences": {
@@ -1443,7 +1444,8 @@
     "followReviewMd": "Řídit se pokyny v REVIEW.md",
     "followReviewMdSubtitle": "Dodržovat pokyny ze souboru REVIEW.md v každém repozitáři",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket není připojen. Připojit ho mohou pouze vlastníci organizace, správci a správci fakturace."
+      "notConnectedReadOnly": "Bitbucket není připojen. Připojit ho mohou pouze vlastníci organizace, správci a správci fakturace.",
+      "notConnectedReadOnlyPlan": "Zkušební období organizace skončilo, takže vlastník musí aktualizovat fakturaci na kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Připojení Bitbucket k {{organization}} se spravuje na webu z počítače.",
@@ -1478,9 +1480,9 @@
       "activity": "Aktivita"
     },
     "providerConnect": {
-      "githubApp": "Aplikace GitHub",
+      "githubApp": "aplikace GitHub",
       "githubError": "Nastavení GitHubu se nepodařilo otevřít. Zkuste to prosím znovu.",
-      "gitlabAccount": "Účet GitLab",
+      "gitlabAccount": "účet GitLab",
       "gitlabError": "Nastavení GitLabu se nepodařilo otevřít. Zkuste to prosím znovu.",
       "description": "Nastavte propojení služby Kilo ({{label}}), aby se PR kontrolovaly automaticky."
     },

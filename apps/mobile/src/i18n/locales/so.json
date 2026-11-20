@@ -140,6 +140,7 @@
     "keepRunning": "Sii wad socodsiinta",
     "newSession": "Kalfadhi cusub",
     "noModelsAvailable": "Ma jiraan moodeello la heli karo",
+    "modelRetires": "Wuu hawlgabayaa {{date}}",
     "notFound": "Lama helin.",
     "online": "Khadka ku jira",
     "open": "Fur {{name}}",
@@ -507,7 +508,7 @@
     "changelogFixesPolish": "Hagaajinno iyo horumarin lagu sameeyay barnaamijka oo dhan.",
     "changelogAreas": {
       "signIn": "Gelitaanka",
-      "profileOrganizations": "Xogta shakhsiga iyo ururada"
+      "profileOrganizations": "Xogta shakhsiga & ururada"
     }
   },
   "preferences": {
@@ -1391,7 +1392,8 @@
     "followReviewMd": "Raac REVIEW.md",
     "followReviewMdSubtitle": "Raac tilmaamaha ku jira faylka REVIEW.md ee kayd kasta",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket kuma xidhna. Milkiilayaasha ururka, maamulayaasha iyo maareeyayaasha biilasha oo keliya ayaa ku xidhi kara."
+      "notConnectedReadOnly": "Bitbucket kuma xidhna. Milkiilayaasha ururka, maamulayaasha iyo maareeyayaasha biilasha oo keliya ayaa ku xidhi kara.",
+      "notConnectedReadOnlyPlan": "Tijaabadii ururku way dhamaatay, sidaas darteed milkiilaha waa inuu cusboonaysiiyaa biilasha kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Xiriirka Bitbucket ee {{organization}} waxaa lagu maamulaa shabakadda iyadoo kombiyuutar la isticmaalayo.",
@@ -1426,9 +1428,9 @@
       "activity": "Hawlaha"
     },
     "providerConnect": {
-      "githubApp": "Abka GitHub",
+      "githubApp": "abka GitHub",
       "githubError": "Dejinta GitHub lama furi karin. Fadlan mar kale isku day.",
-      "gitlabAccount": "Akoonka GitLab",
+      "gitlabAccount": "akoonka GitLab",
       "gitlabError": "Dejinta GitLab lama furi karin. Fadlan mar kale isku day.",
       "description": "Ku xidh Kilo {{label}} si codsiyada isku darka dib loogu eego si otomaatig ah."
     },

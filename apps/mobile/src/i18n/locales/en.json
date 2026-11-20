@@ -233,6 +233,7 @@
     "keepRunning": "Keep running",
     "newSession": "New session",
     "noModelsAvailable": "No models available",
+    "modelRetires": "Retires {{date}}",
     "notFound": "Not found",
     "online": "Online",
     "open": "Open {{name}}",
@@ -598,7 +599,7 @@
     "changelogFixesPolish": "Bug fixes and polish.",
     "changelogAreas": {
       "signIn": "Sign-in",
-      "profileOrganizations": "Profile and organizations"
+      "profileOrganizations": "Profile & organizations"
     },
     "changelogVersionPending": "The notes for {{version}} arrive with the next app update."
   },
@@ -1483,7 +1484,8 @@
     "followReviewMd": "Follow REVIEW.md",
     "followReviewMdSubtitle": "Honor per-repo REVIEW.md instruction files",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket isn't connected. Only organization owners, admins, and billing managers can connect it."
+      "notConnectedReadOnly": "Bitbucket isn't connected. Only organization owners, admins, and billing managers can connect it.",
+      "notConnectedReadOnlyPlan": "The organization's trial has ended, so an owner must update billing at kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "The Bitbucket connection for {{organization}} is managed on the web from a computer.",

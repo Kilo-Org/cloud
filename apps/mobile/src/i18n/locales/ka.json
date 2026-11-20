@@ -140,6 +140,7 @@
     "keepRunning": "მუშაობის გაგრძელება",
     "newSession": "ახალი სესია",
     "noModelsAvailable": "მოდელები ხელმისაწვდომი არ არის",
+    "modelRetires": "გაუქმდება {{date}}",
     "notFound": "ვერ მოიძებნა.",
     "online": "ქსელშია",
     "open": "{{name}}-ის გახსნა",
@@ -507,7 +508,7 @@
     "changelogFixesPolish": "შესწორებები და გაუმჯობესებები მთელ აპში.",
     "changelogAreas": {
       "signIn": "შესვლა",
-      "profileOrganizations": "პროფილი და ორგანიზაციები"
+      "profileOrganizations": "პროფილი & ორგანიზაციები"
     }
   },
   "preferences": {
@@ -936,9 +937,9 @@
       "checkFailedTitleGitLab": "GitLab-თან კავშირის შემოწმება ვერ მოხერხდა.",
       "checkFailedTitleBitbucket": "Bitbucket-თან კავშირის შემოწმება ვერ მოხერხდა.",
       "providerCheckFailedMessage": "პროვაიდერთან დაკავშირება ვერ მოხერხდა. შეამოწმე კავშირი და ხელახლა სცადე.",
-      "reconnectTitle": "GitHub-თან ხელახლა დაკავშირება",
-      "reconnectTitleGitLab": "GitLab-თან ხელახლა დაკავშირება",
-      "reconnectTitleBitbucket": "Bitbucket-თან ხელახლა დაკავშირება",
+      "reconnectTitle": "ხელახლა დააკავშირე GitHub",
+      "reconnectTitleGitLab": "ხელახლა დააკავშირე GitLab",
+      "reconnectTitleBitbucket": "ხელახლა დააკავშირე Bitbucket",
       "reconnectDescription": "GitHub-თან კავშირი გაუქმდა.",
       "gitlabDescription": "შერწყმის მოთხოვნების შემოწმება მობილურზე",
       "gitlabInstanceMismatchTitle": "GitLab-ის დაკავშირება სხვა ინსტანციისთვისაა",
@@ -1391,7 +1392,8 @@
     "followReviewMd": "REVIEW.md-ის მითითებების დაცვა",
     "followReviewMdSubtitle": "თითოეული რეპოზიტორის REVIEW.md ფაილში მოცემული ინსტრუქციების დაცვა",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket არ არის დაკავშირებული. მისი დაკავშირება მხოლოდ ორგანიზაციის მფლობელებს, ადმინისტრატორებსა და ანგარიშსწორების მენეჯერებს შეუძლიათ."
+      "notConnectedReadOnly": "Bitbucket არ არის დაკავშირებული. მისი დაკავშირება მხოლოდ ორგანიზაციის მფლობელებს, ადმინისტრატორებსა და ანგარიშსწორების მენეჯერებს შეუძლიათ.",
+      "notConnectedReadOnlyPlan": "ორგანიზაციის საცდელი პერიოდი დასრულდა, ამიტომ მფლობელმა ბილინგი უნდა განაახლოს kilo.ai-ზე."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ის Bitbucket-თან კავშირი იმართება ვებში, კომპიუტერიდან.",

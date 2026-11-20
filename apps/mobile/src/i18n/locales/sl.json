@@ -142,6 +142,7 @@
     "keepRunning": "Nadaljuj izvajanje",
     "newSession": "Nova seja",
     "noModelsAvailable": "Ni razpoložljivih modelov",
+    "modelRetires": "Umakne se {{date}}",
     "notFound": "Vsebine ni mogoče najti.",
     "online": "Na spletu",
     "open": "Odpri {{name}}",
@@ -509,7 +510,7 @@
     "changelogFixesPolish": "Popravki in izboljšave v celotni aplikaciji.",
     "changelogAreas": {
       "signIn": "Prijava",
-      "profileOrganizations": "Profil in organizacije"
+      "profileOrganizations": "Profil & organizacije"
     }
   },
   "preferences": {
@@ -972,9 +973,9 @@
       "checkFailedTitleGitLab": "Povezave z GitLabom ni bilo mogoče preveriti.",
       "checkFailedTitleBitbucket": "Povezave z Bitbucketom ni bilo mogoče preveriti.",
       "providerCheckFailedMessage": "Ni bilo mogoče vzpostaviti povezave s ponudnikom. Preveri povezavo in poskusi znova.",
-      "reconnectTitle": "Ponovna povezava z GitHubom",
-      "reconnectTitleGitLab": "Ponovna povezava z GitLabom",
-      "reconnectTitleBitbucket": "Ponovna povezava z Bitbucketom",
+      "reconnectTitle": "Ponovno poveži GitHub",
+      "reconnectTitleGitLab": "Ponovno poveži GitLab",
+      "reconnectTitleBitbucket": "Ponovno poveži Bitbucket",
       "reconnectDescription": "Tvoja povezava z GitHubom je bila preklicana.",
       "gitlabDescription": "Preglej zahteve za združitev na mobilni napravi",
       "gitlabInstanceMismatchTitle": "Povezava z GitLabom je za drugo instanco",
@@ -1443,7 +1444,8 @@
     "followReviewMd": "Upoštevaj REVIEW.md",
     "followReviewMdSubtitle": "Upoštevaj navodila iz datotek REVIEW.md v posameznih skladiščih",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ni povezan. Povežejo ga lahko samo lastniki organizacije, skrbniki in skrbniki obračunavanja."
+      "notConnectedReadOnly": "Bitbucket ni povezan. Povežejo ga lahko samo lastniki organizacije, skrbniki in skrbniki obračunavanja.",
+      "notConnectedReadOnlyPlan": "Preizkusna doba organizacije se je končala, zato mora lastnik posodobiti obračun na kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Povezava Bitbucket za {{organization}} se upravlja v spletu z računalnika.",
@@ -1478,9 +1480,9 @@
       "activity": "Dejavnost"
     },
     "providerConnect": {
-      "githubApp": "Aplikacija GitHub",
+      "githubApp": "aplikacija GitHub",
       "githubError": "Nastavitve povezave s platformo GitHub ni bilo mogoče odpreti. Poskusi znova.",
-      "gitlabAccount": "Račun GitLab",
+      "gitlabAccount": "račun GitLab",
       "gitlabError": "Nastavitve povezave s platformo GitLab ni bilo mogoče odpreti. Poskusi znova.",
       "description": "Za samodejne preglede zahtev za združitev vzpostavi povezavo s Kilo prek možnosti {{label}}."
     },
@@ -1802,7 +1804,7 @@
       "dueThisWeekDetail_few": "{{exploitable}} od teh je potrjeno izkoristljivih",
       "dueThisWeekDetail_other": "{{exploitable}} od teh je potrjeno izkoristljivih",
       "noDeadline": "Brez roka",
-      "reviewSlaAssignment": "Preglej dodeljene roke SLA",
+      "reviewSlaAssignment": "Preglej dodeljevanje rokov SLA",
       "allOpenFindingsTracked": "Spremljajo se vse odprte ugotovitve"
     },
     "dismiss": {

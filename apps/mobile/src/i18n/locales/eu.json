@@ -140,6 +140,7 @@
     "keepRunning": "Jarraitu exekutatzen",
     "newSession": "Saio berria",
     "noModelsAvailable": "Ez dago eredurik eskuragarri",
+    "modelRetires": "Erretiratzea: {{date}}",
     "notFound": "Ez da aurkitu.",
     "online": "Konektatuta",
     "open": "Ireki {{name}}",
@@ -507,7 +508,7 @@
     "changelogFixesPolish": "Zuzenketak eta hobekuntzak aplikazio osoan.",
     "changelogAreas": {
       "signIn": "Saioa hastea",
-      "profileOrganizations": "Profila eta erakundeak"
+      "profileOrganizations": "Profila zein erakundeak"
     }
   },
   "preferences": {
@@ -1391,7 +1392,8 @@
     "followReviewMd": "Bete REVIEW.md fitxategiko jarraibideak",
     "followReviewMdSubtitle": "Bete biltegi bakoitzeko REVIEW.md fitxategiko jarraibideak",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ez dago konektatuta. Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik konekta dezakete."
+      "notConnectedReadOnly": "Bitbucket ez dago konektatuta. Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik konekta dezakete.",
+      "notConnectedReadOnlyPlan": "Erakundearen probaldia amaitu da, beraz jabe batek fakturazioa eguneratu behar du kilo.ai-n."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ren Bitbucket konexioa webean kudeatzen da, ordenagailu batetik.",

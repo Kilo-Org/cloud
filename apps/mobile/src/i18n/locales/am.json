@@ -965,6 +965,8 @@
       "pendingComment": "ያልተላኩ አስተያየቶች",
       "pendingComment_other": "ያልተላኩ አስተያየቶች",
       "submitCountOfTotal": "ከ{{displayTotalCount}} አስተያየቶች ውስጥ {{displayFreshCount}} ላክ",
+      "submitCountOfTotal_one": "ከ{{displayTotalCount}} አስተያየቶች ውስጥ {{displayFreshCount}} ላክ",
+      "submitCountOfTotal_other": "ከ{{displayTotalCount}} አስተያየቶች ውስጥ {{displayFreshCount}} ላክ",
       "submitReview": "ግምገማውን አስገባ",
       "partialPostedFresh": "{{displayFreshCount}} አስተያየቶች ተለጥፈዋል። ",
       "partialPostedFresh_one": "{{displayFreshCount}} አስተያየቶች ተለጥፈዋል። ",
@@ -3625,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "የድርጅቱን ስም ይቀይሩ",
-      "renamePlaceholder": "የድርጅት ስም",
+      "renamePlaceholder": "የድርጅት ስም ያስገቡ",
       "balance": "ቀሪ ሂሳብ",
       "plan": "ዕቅድ",
       "planTeams": "Teams",

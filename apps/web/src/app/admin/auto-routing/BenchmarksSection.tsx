@@ -715,6 +715,7 @@ function BenchmarkConfigEditor({
   const policyStates = useMemo(
     () =>
       resolvePolicySettings({
+        router,
         minAccuracy: form.minAccuracy,
         accuracyNoiseBand: form.accuracyNoiseBand,
         productionTokenProfile: parseTokenProfile(form),
@@ -722,7 +723,7 @@ function BenchmarkConfigEditor({
         policyOverrides: policyOverridesFromForm(form.policyOverrides),
         policyComputed: config?.policyComputed ?? null,
       }),
-    [form, config]
+    [form, config, router]
   );
 
   const setOverride = useCallback(

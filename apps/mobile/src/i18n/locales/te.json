@@ -965,6 +965,8 @@
       "pendingComment": "ఇంకా పంపని వ్యాఖ్యలు",
       "pendingComment_other": "ఇంకా పంపని వ్యాఖ్యలు",
       "submitCountOfTotal": "మొత్తం {{displayTotalCount}} వ్యాఖ్యల్లో {{displayFreshCount}} వ్యాఖ్యలను సమర్పించండి",
+      "submitCountOfTotal_one": "మొత్తం {{displayTotalCount}} వ్యాఖ్యల్లో {{displayFreshCount}} వ్యాఖ్యలను సమర్పించండి",
+      "submitCountOfTotal_other": "మొత్తం {{displayTotalCount}} వ్యాఖ్యల్లో {{displayFreshCount}} వ్యాఖ్యలను సమర్పించండి",
       "submitReview": "సమీక్షను సమర్పించండి",
       "partialPostedFresh": "పోస్ట్ చేసిన వ్యాఖ్యల సంఖ్య: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "పోస్ట్ చేసిన వ్యాఖ్యల సంఖ్య: {{displayFreshCount}}. ",
@@ -3625,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "సంస్థ పేరు మార్చండి",
-      "renamePlaceholder": "సంస్థ పేరు",
+      "renamePlaceholder": "సంస్థ పేరును నమోదు చేయండి",
       "balance": "బ్యాలెన్స్",
       "plan": "ప్లాన్",
       "planTeams": "Teams",

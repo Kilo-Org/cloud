@@ -965,6 +965,8 @@
       "pendingComment": "àsọyé tí a kò tíì fi ránṣẹ́",
       "pendingComment_other": "àsọyé tí a kò tíì fi ránṣẹ́",
       "submitCountOfTotal": "Fi àsọyé {{displayFreshCount}} nínú {{displayTotalCount}} ránṣẹ́",
+      "submitCountOfTotal_one": "Fi àsọyé {{displayFreshCount}} nínú {{displayTotalCount}} ránṣẹ́",
+      "submitCountOfTotal_other": "Fi àsọyé {{displayFreshCount}} nínú {{displayTotalCount}} ránṣẹ́",
       "submitReview": "Fi àtúnyẹ̀wò ránṣẹ́",
       "partialPostedFresh": "A ti fi àsọyé {{displayFreshCount}} ránṣẹ́. ",
       "partialPostedFresh_one": "A ti fi àsọyé {{displayFreshCount}} ránṣẹ́. ",
@@ -3625,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Yí orúkọ àjọ padà",
-      "renamePlaceholder": "Orúkọ àjọ",
+      "renamePlaceholder": "Tẹ orúkọ àjọ kan sí i",
       "balance": "Owó tó kù",
       "plan": "Ètò",
       "planTeams": "Teams",

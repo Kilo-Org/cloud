@@ -2040,3 +2040,117 @@ describe('organizationMemberProcedure replica membership read', () => {
     expect(primarySelect).toHaveBeenCalled();
   });
 });
+
+/**
+ * The three access helpers share one refusal (`organizationRoleDeniedError`):
+ * a soft-deleted organization reads as missing, and a caller that is a member
+ * of a live organization gets the role-specific sentence. Every case here goes
+ * through a public helper, so the shared error stays the only implementation.
+ */
+describe('organization no-role refusal', () => {
+  afterEach(async () => {
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(organization_memberships);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(organizations);
+  });
+
+  function ctxFor(user: User): TRPCContext {
+    return {
+      user,
+      authViaToken: true,
+      tokenSource: 'cloud-agent',
+      ip: '203.0.113.7',
+      trpcPath: 'organizations.getSettings',
+      trpcType: 'query',
+    };
+  }
+
+  async function orgOwnedByAnotherUser() {
+    const owner = await insertTestUser({ is_admin: false });
+    return createTestOrganization(`no-role-${crypto.randomUUID()}`, owner.id, 0);
+  }
+
+  async function softDeleteOrganization(organizationId: string) {
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, organizationId));
+  }
+
+  test('a non-member of a live organization gets the access denial', async () => {
+    const organization = await orgOwnedByAnotherUser();
+    const stranger = await insertTestUser({ is_admin: false });
+
+    await expect(
+      ensureMemberOrganizationAccess({ id: stranger.id }, organization.id)
+    ).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
+      message: 'You do not have access to this organization',
+    });
+  });
+
+  test('a non-member of a soft-deleted organization reads as missing', async () => {
+    const organization = await orgOwnedByAnotherUser();
+    await softDeleteOrganization(organization.id);
+    const stranger = await insertTestUser({ is_admin: false });
+
+    await expect(
+      ensureMemberOrganizationAccess({ id: stranger.id }, organization.id)
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'Organization not found' });
+  });
+
+  test('a member without the required role gets the role-specific denial', async () => {
+    const organization = await orgOwnedByAnotherUser();
+    const member = await insertTestUser({ is_admin: false });
+    await db.insert(organization_memberships).values({
+      organization_id: organization.id,
+      kilo_user_id: member.id,
+      role: 'member',
+    });
+
+    await expect(
+      ensureMemberOrganizationAccess({ id: member.id }, organization.id, ['owner'])
+    ).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
+      message: 'You do not have the required organizational role to access this feature',
+    });
+    await expect(
+      ensureMemberOrganizationAccess({ id: member.id }, organization.id, ['member'])
+    ).resolves.toBe('member');
+  });
+
+  test('the support-aware resolver denies a live non-member with the access denial', async () => {
+    const organization = await orgOwnedByAnotherUser();
+    const stranger = await insertTestUser({ is_admin: false });
+
+    await expect(ensureOrganizationAccess(ctxFor(stranger), organization.id)).rejects.toMatchObject(
+      {
+        code: 'UNAUTHORIZED',
+        message: 'You do not have access to this organization',
+      }
+    );
+  });
+
+  test('the fetch helper denies a live non-member with the access denial', async () => {
+    const organization = await orgOwnedByAnotherUser();
+    const stranger = await insertTestUser({ is_admin: false });
+
+    await expect(
+      ensureOrganizationAccessAndFetchOrg(ctxFor(stranger), organization.id)
+    ).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
+      message: 'You do not have access to this organization',
+    });
+  });
+
+  test('the fetch helper reads a soft-deleted organization as missing', async () => {
+    const organization = await orgOwnedByAnotherUser();
+    await softDeleteOrganization(organization.id);
+    const stranger = await insertTestUser({ is_admin: false });
+
+    await expect(
+      ensureOrganizationAccessAndFetchOrg(ctxFor(stranger), organization.id)
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'Organization not found' });
+  });
+});

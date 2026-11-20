@@ -965,6 +965,8 @@
       "pendingComment": "प्रलंबित टिप्पण्या",
       "pendingComment_other": "प्रलंबित टिप्पण्या",
       "submitCountOfTotal": "{{displayTotalCount}} पैकी {{displayFreshCount}} टिप्पण्या सादर करा",
+      "submitCountOfTotal_one": "{{displayTotalCount}} पैकी {{displayFreshCount}} टिप्पण्या सादर करा",
+      "submitCountOfTotal_other": "{{displayTotalCount}} पैकी {{displayFreshCount}} टिप्पण्या सादर करा",
       "submitReview": "पुनरावलोकन सादर करा",
       "partialPostedFresh": "{{displayFreshCount}} टिप्पण्या पोस्ट केल्या. ",
       "partialPostedFresh_one": "{{displayFreshCount}} टिप्पणी पोस्ट केली. ",
@@ -3625,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "संस्थेचे नाव बदला",
-      "renamePlaceholder": "संस्थेचे नाव",
+      "renamePlaceholder": "संस्थेचे नाव टाका",
       "balance": "शिल्लक",
       "plan": "प्लॅन",
       "planTeams": "Teams",

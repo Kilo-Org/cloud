@@ -27,9 +27,9 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
   CODE_REVIEW_STATUS_LABELS,
+  canRetriggerReview,
   isCancellableReviewStatus,
   isInFlightReviewStatus,
-  isRetriggerableReviewStatus,
   type CodeReviewStatus,
 } from '@kilocode/app-shared/code-review';
 
@@ -135,7 +135,7 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
   const statusLabel = CODE_REVIEW_STATUS_LABELS[status] ?? review.status;
   const StatusIcon = statusInfo.icon;
   const showStreamView = status !== 'pending';
-  const canRetry = isRetriggerableReviewStatus(status);
+  const canRetry = canRetriggerReview(review);
   const canCancel = isCancellableReviewStatus(status);
   const prLabel = review.platform === 'gitlab' ? 'MR' : 'PR';
   const jobsHref = getCodeReviewJobsHref(review.platform, review.owned_by_organization_id);

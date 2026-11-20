@@ -24,7 +24,7 @@ vi.mock('./scheduler', async importOriginal => {
     claimScheduledChunks: vi.fn(),
     clearUnbilledCase: vi.fn(),
     cooldownCatalog: vi.fn(),
-    cooldownProviders: vi.fn(),
+    cooldownModel: vi.fn(),
     deferCatalogChunk: vi.fn(),
     deferChunk: vi.fn(),
     deferThrottledChunk: vi.fn(),
@@ -157,7 +157,7 @@ import {
   claimScheduledChunks,
   clearUnbilledCase,
   cooldownCatalog,
-  cooldownProviders,
+  cooldownModel,
   deferCatalogChunk,
   deferChunk,
   deferThrottledChunk,
@@ -230,7 +230,6 @@ function mockClaim(overrides: Partial<SchedulerClaim> = {}): SchedulerClaim {
     run_id: runId,
     model,
     variant: '',
-    providers: '["qwen"]',
     rep: 0,
     chunk: 0,
     case_ids: JSON.stringify([benchCase.id]),
@@ -693,8 +692,8 @@ describe('processJob — legacy whole-run migration', () => {
     expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
       runId,
       entries: [
-        { model, variant: 'high', providers: [] },
-        { model, variant: 'low', providers: [] },
+        { model, variant: 'high' },
+        { model, variant: 'low' },
       ],
       repetitions: 3,
       caseIds: DECIDER_CASES.map(c => c.id),
@@ -821,7 +820,7 @@ describe('processJob — scheduler waits and paid-call safety', () => {
       expect(failScheduledEntry).not.toHaveBeenCalled();
       expect(failChunk).not.toHaveBeenCalled();
       expect(recordLaneFailure).not.toHaveBeenCalled();
-      expect(cooldownProviders).not.toHaveBeenCalled();
+      expect(cooldownModel).not.toHaveBeenCalled();
       expect(finishChunk).not.toHaveBeenCalled();
       expect(deferChunk).not.toHaveBeenCalled();
       expect(deferCatalogChunk).toHaveBeenCalledWith(
@@ -1375,7 +1374,7 @@ describe('processJob — scheduler waits and paid-call safety', () => {
       );
       expect(deletePendingDeciderOutput).toHaveBeenCalledTimes(persisted ? 1 : 0);
       expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(persisted ? 0 : 1);
-      expect(cooldownProviders).toHaveBeenCalledWith(env.BENCH_DB, claim, expect.any(Number));
+      expect(cooldownModel).toHaveBeenCalledWith(env.BENCH_DB, claim.model, expect.any(Number));
       expect(deferThrottledChunk).toHaveBeenCalledWith(
         env.BENCH_DB,
         'chunk-1',

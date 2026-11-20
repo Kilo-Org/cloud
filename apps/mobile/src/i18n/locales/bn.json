@@ -965,6 +965,8 @@
       "pendingComment": "অপেক্ষমাণ মন্তব্য",
       "pendingComment_other": "অপেক্ষমাণ মন্তব্য",
       "submitCountOfTotal": "{{displayTotalCount}}টি মন্তব্যের মধ্যে {{displayFreshCount}}টি জমা দিন",
+      "submitCountOfTotal_one": "{{displayTotalCount}}টি মন্তব্যের মধ্যে {{displayFreshCount}}টি জমা দিন",
+      "submitCountOfTotal_other": "{{displayTotalCount}}টি মন্তব্যের মধ্যে {{displayFreshCount}}টি জমা দিন",
       "submitReview": "পর্যালোচনা জমা দিন",
       "partialPostedFresh": "{{displayFreshCount}}টি মন্তব্য পোস্ট হয়েছে। ",
       "partialPostedFresh_one": "{{displayFreshCount}}টি মন্তব্য পোস্ট হয়েছে। ",
@@ -3625,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "সংস্থার নাম পরিবর্তন করুন",
-      "renamePlaceholder": "সংস্থার নাম",
+      "renamePlaceholder": "সংস্থার একটি নাম লিখুন",
       "balance": "ব্যালেন্স",
       "plan": "প্ল্যান",
       "planTeams": "Teams",

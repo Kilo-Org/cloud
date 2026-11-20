@@ -746,13 +746,14 @@ describe('AdvancedConfigPanel', () => {
   it('shows the server sentence when the save is refused with a tRPC conflict', async () => {
     const mocks = mutations();
     const refusal = 'A profile with this name already exists';
-    // Shaped like a tRPC client error: the payload names the code and the
-    // sentence. The `Error` message differs on purpose, so only the payload
-    // path can produce the line asserted below.
+    // The shape measured against the local server: the formatted payload holds
+    // the code, status, path and zod error, and the server's sentence is the
+    // error's own message. A transport failure has the name but no payload, and
+    // the case above covers that.
     mocks.create.mutateAsync.mockRejectedValue(
-      Object.assign(new Error('TRPCClientError: request failed'), {
+      Object.assign(new Error(refusal), {
         name: 'TRPCClientError',
-        data: { code: 'CONFLICT', message: refusal },
+        data: { code: 'CONFLICT', httpStatus: 409, path: 'agentProfiles.create', zodError: null },
       })
     );
     const renderer = mount({ mocks });

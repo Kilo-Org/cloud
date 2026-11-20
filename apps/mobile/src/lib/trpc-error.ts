@@ -75,14 +75,18 @@ export function readTrpcErrorField(
 
 /**
  * The sentence a tRPC SERVER answered with, or undefined when this error is not
- * a server answer. Unlike `readTrpcErrorField` this never falls back to
- * `Error.message`: the transport wrappers are named `TRPCClientError` too and
- * carry no payload, so their text is engineering detail, not a refusal.
+ * a server answer.
+ *
+ * The envelope's presence is the signal, not a message inside it: the server's
+ * formatted `data` carries the code, status, path and zod error but no message,
+ * so the sentence lives only on `Error.message`. A transport wrapper is named
+ * `TRPCClientError` too and sets the same message field with engineering text,
+ * and it carries no `data`, so this refuses it.
  */
 export function readTrpcServerMessage(error: unknown): string | undefined {
   const direct = DirectErrorSchema.safeParse(error);
   if (direct.success) {
-    return direct.data.data.message;
+    return error instanceof Error ? error.message : undefined;
   }
   const shaped = ShapedErrorSchema.safeParse(error);
   if (shaped.success) {

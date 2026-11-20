@@ -97,13 +97,18 @@ describe('trpcErrorVariant', () => {
 });
 
 describe('readTrpcServerMessage', () => {
-  it('returns the message a server answer carries under data', () => {
-    expect(
-      readTrpcServerMessage({ data: { code: 'CONFLICT', message: 'Name already taken' } })
-    ).toBe('Name already taken');
+  it('returns the sentence of a real server answer, whose data carries the code only', () => {
+    // The production shape, measured against the local server: the formatted
+    // data carries code, httpStatus, stack and path, never a message; the
+    // server's sentence is the error's own message.
+    const answered = Object.assign(new Error('A profile with this name already exists'), {
+      name: 'TRPCClientError',
+      data: { code: 'CONFLICT', httpStatus: 409, path: 'agentProfiles.create', zodError: null },
+    });
+    expect(readTrpcServerMessage(answered)).toBe('A profile with this name already exists');
   });
 
-  it('returns the message of a shaped server answer', () => {
+  it('returns a message carried under a shaped answer', () => {
     expect(
       readTrpcServerMessage({
         shape: { data: { code: 'CONFLICT', message: 'Name already taken' } },
@@ -115,6 +120,13 @@ describe('readTrpcServerMessage', () => {
     expect(
       readTrpcServerMessage(
         Object.assign(new Error('Request timed out after 15000ms'), { name: 'TRPCClientError' })
+      )
+    ).toBeUndefined();
+    expect(
+      readTrpcServerMessage(
+        Object.assign(new Error('fetch failed: Unable to resolve host'), {
+          name: 'TRPCClientError',
+        })
       )
     ).toBeUndefined();
   });

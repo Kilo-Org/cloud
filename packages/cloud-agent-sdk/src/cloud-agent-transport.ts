@@ -194,6 +194,10 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
     let snapshotCatchUpEpoch = 0;
     let initialSnapshotRead = config.initialSnapshotRead;
     let backgroundEnabled = false;
+    // True once this connection delivered a live event. The socket's own
+    // `connected` snapshot carries the current turns, so from then on a seeded
+    // page describes an older moment and must not restate them.
+    let liveEventsDelivered = false;
     const readActivity = config.api.getBackgroundActivity;
     const background = readActivity
       ? createBackgroundActivityReader({
@@ -514,13 +518,17 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       }
       // Exactly one page per connect may seed the manager: a reconnect
       // catch-up that lands first wins, and a slower initial retry must not
-      // reset the older-pages cursor back to the newest page afterwards. The
-      // replayed queued turns are current state, so only that page emits them.
-      if (!initialPageRecorded) {
-        initialPageRecorded = true;
-        config.onInitialPageLoaded?.(page);
-        replayQueuedSnapshots(page.queuedMessages);
-      }
+      // reset the older-pages cursor back to the newest page afterwards.
+      if (initialPageRecorded) return;
+      initialPageRecorded = true;
+      config.onInitialPageLoaded?.(page);
+      // The page stands in for the socket only until the socket says anything:
+      // once a live event has arrived, its own `connected` snapshot has already
+      // carried the current turns, and the page describes a moment that is
+      // behind them. Emitting its turns then would re-add a queued badge for a
+      // turn the live replay finished, or make a settled turn the active one
+      // again.
+      if (!liveEventsDelivered) replayQueuedSnapshots(page.queuedMessages);
     }
 
     function replayInitialPage(page: SessionSnapshotPage): void {
@@ -799,6 +807,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
 
           const batch = sources.read(raw);
           if (batch.source.version === 'v2') enableBackgroundActivity();
+          liveEventsDelivered = true;
           for (const event of batch.events) deliverEvent(raw, event, batch.source.version);
         },
         onConnected: () => {
@@ -897,6 +906,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         replaying = true;
         awaitingConnectedSnapshot = true;
         initialPageRecorded = false;
+        liveEventsDelivered = false;
         const expectedGeneration = lifecycleGeneration;
 
         void fetchAndReplayInitial(expectedGeneration)

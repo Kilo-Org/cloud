@@ -52,6 +52,18 @@ async function flushPromises(): Promise<void> {
   await new Promise(r => setTimeout(r, 0));
 }
 
+/** ES2022-safe deferred: this package's `lib` target predates `Promise.withResolvers`. */
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T | PromiseLike<T>) => void;
+} {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>(res => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
 const emptySnapshot = makeSnapshot({ id: 'ses-1' });
 
 it('renders native v2 parts through the workspace transport without v1 identifier rules', async () => {
@@ -1966,6 +1978,12 @@ describe('CloudAgentTransport page-seam', () => {
             createdAt: event.createdAt,
           });
         }
+        // A command is not a prompt: the session removes the synthetic row a
+        // queued event materializes once its sent event arrives, so the
+        // transcript keeps no duplicate for it. Mirror that here.
+        if (event.type === 'cloud.message.sent' && event.turnType === 'command') {
+          storage.deleteMessage(event.messageId);
+        }
       },
     });
 
@@ -2005,12 +2023,112 @@ describe('CloudAgentTransport page-seam', () => {
     expect(storage.getParts('msg-queued')).toEqual([
       expect.objectContaining({ type: 'text', text: 'Queued prompt' }),
     ]);
-    expect(storage.getMessageInfo('msg-command')).toMatchObject({ role: 'user', synthetic: true });
-    expect(storage.getParts('msg-command')).toEqual([
-      expect.objectContaining({ type: 'text', text: '/review main' }),
-    ]);
+    // The command's synthetic row is gone by the time its sent event settles.
+    expect(storage.getMessageInfo('msg-command')).toBeUndefined();
 
     transport.destroy();
+  });
+
+  it('does not restate a page turn after the live replay already settled it', async () => {
+    // A page can settle after the socket delivered events: its own turns are a
+    // moment behind them. Restating one would put the queued badge back on a
+    // turn the live replay already finished.
+    const storage = createMemoryStorage();
+    const processor = createChatProcessor(storage);
+    const state = createServiceState({ rootSessionId: 'ses-1' });
+    const serviceEvents: ServiceEvent[] = [];
+    const page = {
+      kind: 'success' as const,
+      ...makeSnapshot({ id: 'ses-1' }),
+      nextCursor: null,
+      omittedItemCount: 0,
+      queuedMessages: [
+        {
+          messageId: 'msg-late',
+          content: 'Late prompt',
+          timestamp: 10,
+          delivery: 'queued' as const,
+        },
+      ],
+    };
+    // The read is held so the socket can speak first: the retry path is what
+    // carries a page into a connection that already has live state.
+    const heldPage = deferred<SessionSnapshotPageOutcome | null>();
+    let reads = 0;
+    const factory = createCloudAgentTransport({
+      sessionId: cloudAgentId('ses-1'),
+      kiloSessionId: kiloId('ses-1'),
+      api: createMockApi(),
+      getTicket: () => 'test-ticket',
+      fetchSnapshot: () => Promise.reject(new Error('should not be called')),
+      fetchSnapshotPage: () => {
+        reads += 1;
+        // The first read fails so the socket opens without a page; the retry
+        // then carries the page that describes the turn the socket settled.
+        return reads === 1 ? Promise.reject(new Error('history read failed')) : heldPage.promise;
+      },
+      websocketBaseUrl: 'ws://localhost:9999',
+    });
+    const transport = factory({
+      onChatEvent: () => undefined,
+      onServiceEvent: event => {
+        serviceEvents.push(event);
+        state.process(event);
+        if (event.type === 'cloud.message.queued') {
+          processor.synthesizeQueuedUserMessage({
+            messageId: event.messageId,
+            sessionId: 'ses-1',
+            content: event.content,
+            createdAt: event.createdAt,
+          });
+        }
+      },
+    });
+
+    // The retry timer is what carries a page into a connection that already has
+    // live state, so time is controlled: only this test needs it.
+    jest.useFakeTimers();
+    try {
+      transport.connect();
+      // Flush the rejected first read and the ticket, which opens the socket.
+      await jest.advanceTimersByTimeAsync(0);
+      // The socket speaks first and settles the turn.
+      mockWs.onmessage?.({
+        data: JSON.stringify({
+          eventId: 1,
+          sessionId: 'ses-1',
+          streamEventType: 'connected',
+          timestamp: '2026-10-23T09:00:00Z',
+          data: { sessionStatus: { type: 'idle' } },
+        }),
+      } as MessageEvent);
+      mockWs.onmessage?.({
+        data: JSON.stringify({
+          eventId: 2,
+          sessionId: 'ses-1',
+          streamEventType: 'cloud.message.completed',
+          timestamp: '2026-10-23T09:00:01Z',
+          data: { messageId: 'msg-late' },
+        }),
+      } as MessageEvent);
+      await jest.advanceTimersByTimeAsync(0);
+
+      await jest.advanceTimersByTimeAsync(0);
+
+      // The retry timer fires and asks for the page now that live state exists.
+      const retry = jest.advanceTimersByTimeAsync(500);
+      heldPage.resolve(page);
+      await retry;
+      expect(reads).toBeGreaterThan(1);
+
+      // The page must not put the turn back.
+      expect(serviceEvents.filter(event => event.type === 'cloud.message.queued')).toEqual([]);
+      expect(state.getPendingMessages().has('msg-late')).toBe(false);
+      expect(storage.getMessageInfo('msg-late')).toBeUndefined();
+    } finally {
+      jest.useRealTimers();
+      transport.destroy();
+    }
   });
 
   it('falls back to fetchSnapshot when fetchSnapshotPage is not provided', async () => {

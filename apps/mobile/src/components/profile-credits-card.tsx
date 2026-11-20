@@ -133,10 +133,17 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // attempt. The read itself settles regardless of the online manager
   // (`SETTLE_WHILE_OFFLINE`), so an unreachable one names the connection by
   // having no server answer at all — no separate probe is needed here.
+  const balanceFailureErrors: unknown[] = [];
+  if (balanceQueryError && balanceError != null) {
+    balanceFailureErrors.push(balanceError);
+  }
+  if (userIdError && userIdFailure != null) {
+    balanceFailureErrors.push(userIdFailure);
+  }
   const balanceFailureKind = classifyReadFailureKind({
-    errors: [balanceQueryError ? balanceError : undefined, userIdError ? userIdFailure : undefined].filter(
-      (error): error is unknown => error != null
-    ),
+    errors: balanceFailureErrors,
+    isPaused: false,
+    connectivity: 'unknown',
   });
   const balanceRetryable = readFailureKindIsRetryable(balanceFailureKind);
 

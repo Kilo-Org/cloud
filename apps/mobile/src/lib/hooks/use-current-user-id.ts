@@ -48,7 +48,6 @@ export function useCurrentUserId(options: UseCurrentUserIdOptions = {}) {
      * reads this identity must not offer a retry for them.
      */
     error,
-    isFetchError: isError || (isLoading && isFetched),
     // True when the latest attempt failed even though a cached identity is
     // still present. `isError` deliberately stays false there (a refetch
     // failure must not read as "signed out"), but a surface that presents the

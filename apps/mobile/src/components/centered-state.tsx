@@ -192,11 +192,12 @@ export function CenteredState({
   // The change of band invalidates a measurement still in flight, and so does
   // the unmount: a result that describes the previous band, or a component that
   // is gone, must not publish over newer state.
-  useLayoutEffect(() => {
-    return () => {
+  useLayoutEffect(
+    () => () => {
       requestRef.current += 1;
-    };
-  }, [measure]);
+    },
+    [measure]
+  );
 
   // The stored viewport carries the band it was measured against, and the window
   // frame is a fresh object on every dimension change, so compare the band

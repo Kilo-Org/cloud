@@ -59,6 +59,18 @@ const pendingMigrations = () => {
   );
   return migrationNames.filter(name => !applied.has(name)).length;
 };
+/** A wrangler failure with the shape the wrapper must surface, secrets included. */
+const failWithWranglerOutput = () =>
+  process.stderr.write(
+    [
+      '\u2718 [ERROR] A request to the Cloudflare API (/accounts/***/workers/scripts/auto-routing-benchmark) failed.',
+      '  Cannot apply the container configuration: the application rollout did not start.',
+      "  token='existing-claim'",
+      `  CLOUDFLARE_API_TOKEN=${process.env.BENCHMARK_DEPLOY_FIXTURE_SECRET ?? 'fixture-api-token-value'}`,
+      '  authorization=Bearer fixture-bearer-value',
+    ].join('\n') + '\n'
+  );
+
 const pauseAction = checkpoint => {
   if (process.env.BENCHMARK_DEPLOY_FIXTURE_PAUSE_CHANGE_AT !== checkpoint) return;
   if (count('pause_changed') > 0) return;
@@ -173,7 +185,7 @@ try {
     for (const name of migrationNames) record.run(name);
     pauseAction('migrations');
     if (process.env.BENCHMARK_DEPLOY_FIXTURE_MIGRATION_FAIL === '1') {
-      process.stderr.write('untrusted-stderr-canary');
+      failWithWranglerOutput();
       process.exitCode = 1;
     }
     if (process.env.BENCHMARK_DEPLOY_FIXTURE_LOSE_AFTER_MIGRATION === '1') {
@@ -303,6 +315,7 @@ try {
       process.off('SIGTERM', onSignal);
       if (process.env.BENCHMARK_DEPLOY_FIXTURE_DEPLOY_FAIL === '1') {
         event('deploy_failed');
+        failWithWranglerOutput();
         process.exitCode = 1;
       } else {
         db.prepare(

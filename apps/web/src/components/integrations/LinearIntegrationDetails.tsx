@@ -126,7 +126,7 @@ export function LinearIntegrationDetails({
   const handleInstall = () => {
     setIsStartingLinearConnection(true);
     window.location.href =
-      connectPath ?? getPlatformOAuthConnectPath(PLATFORM.LINEAR, organizationId);
+      connectPath ?? getPlatformOAuthConnectPath(PLATFORM.LINEAR, { organizationId });
   };
 
   const handleUninstall = async () => {

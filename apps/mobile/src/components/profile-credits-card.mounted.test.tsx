@@ -1268,7 +1268,12 @@ describe('CreditsCard balance row', () => {
       node => typeof node.type === 'string' && node.props.children === 'No expiring credits.'
     );
     let current = note?.parent ?? null;
-    while (current !== null && !Object.is(current.type, 'View')) {
+    // The note sits in its own fixed two-line slot; the column it shares with
+    // the amount is the first `View` above that slot.
+    while (
+      current !== null &&
+      (!Object.is(current.type, 'View') || current.props.testID === 'credits-expiry-slot')
+    ) {
       current = current.parent;
     }
     if (current === null) {
@@ -1317,6 +1322,56 @@ describe('CreditsCard balance row', () => {
     } finally {
       unmount();
       pending.resolve({ balance: 1 });
+    }
+  });
+
+  /** The note's fixed box: the one View the card tags as the expiry slot. */
+  function noteSlot(renderer: ReactTestRenderer): ReactTestInstance {
+    const [slot] = renderer.root.findAll(node => node.props.testID === 'credits-expiry-slot');
+    if (slot === undefined) {
+      throw new Error('The card painted no expiry slot');
+    }
+    return slot;
+  }
+
+  /** The height the slot reserves, in dp, at the test's font scale of 1. */
+  function slotHeight(slot: ReactTestInstance): number {
+    const style: unknown = slot.props.style;
+    if (style === null || typeof style !== 'object' || !('minHeight' in style)) {
+      return 0;
+    }
+    const { minHeight } = style;
+    return typeof minHeight === 'number' ? minHeight : 0;
+  }
+
+  it('reserves the funded note’s two lines while the credits load', async () => {
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 12.34 });
+    const pending = Promise.withResolvers<{
+      creditBlocks: { balance_mUsd: number; expiry_date: string | null }[];
+    }>();
+    personalCreditBlocksQueryFn.mockReturnValue(pending.promise);
+    const { renderer, texts, unmount } = await mountCard();
+    try {
+      // A funded note is a sentence that wraps to two `caption` lines at this
+      // card's width (14.1 dp each: the gate device measured the funded
+      // sentence at 28.19 dp), while the bar stands in for one. A slot that only
+      // held the bar grew the card by a line when funded credits landed and
+      // moved every row below it.
+      expect(slotHeight(noteSlot(renderer))).toBeCloseTo(28.2, 5);
+
+      await act(async () => {
+        pending.resolve({
+          creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
+        });
+        await pending.promise;
+      });
+      await waitFor(() => texts().some(text => text.includes('in credits expires')));
+      expect(renders(noteSlot(renderer), 'in credits expires')).toBe(true);
+      expect(slotHeight(noteSlot(renderer))).toBeCloseTo(28.2, 5);
+    } finally {
+      unmount();
+      pending.resolve({ creditBlocks: [] });
     }
   });
 

@@ -49,6 +49,14 @@ type CreditsCardProps = {
 const AMOUNT_DIRECTION = { direction: 'ltr', writingDirection: 'ltr' } as const;
 
 /**
+ * One `caption` line at font scale 1. `text-xs` lays out at 14.1 dp on the
+ * standard Android cell (measured on the Profile gate target), and the card's
+ * nearest spacing class is `h-4` (14 dp). The expiry note reserves two of these
+ * lines: the gate measured the funded sentence at 28.19 dp.
+ */
+const CAPTION_LINE_DP = 14.1;
+
+/**
  * The sentence each failure kind paints: the connection's own wording, the
  * retryable line a deadline shares (the card has no separate sentence for a
  * wait that ended, and the server was reachable), the refusal, the terminal
@@ -220,8 +228,15 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
 
   // The expiry note's slot: under the amount. No entrance fade — the caption
   // holds a row of this block, so a fade that paints it late leaves it empty.
+  //
+  // The slot is a fixed two-line box in every state: a funded account's
+  // sentence ("… in credits expires … Credits with the earliest expiry are used
+  // first.") wraps to two `caption` lines at this card's width, the empty
+  // message is one line and the loading bar is one. A one-line slot grew the
+  // card by about 14 dp when funded credits landed and moved every row below it
+  // (Profile held-loading gate target, 2026-11-20).
   const expirySlot = (
-    <>
+    <View testID="credits-expiry-slot" style={{ minHeight: CAPTION_LINE_DP * 2 * fontScale }}>
       {creditsFailed && (
         <Text className="text-xs text-muted-foreground">{t('credits.expiryUnavailable')}</Text>
       )}
@@ -238,7 +253,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           emptyMessage={t('credits.noExpiringCredits')}
         />
       )}
-    </>
+    </View>
   );
 
   // `shrink-0 grow-0` keeps the amount at its text height: a horizontal

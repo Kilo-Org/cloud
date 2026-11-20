@@ -272,9 +272,10 @@ export const SETTINGS_HEADING_LINE_DP = 21;
  * `(28 - 21) / 2 = 3.5`, where the band is {@link MIN_TAP_TARGET_DP}. The
  * switch's box is centred in the row, so half of the band it adds over the
  * heading line sits under the title's own line; the row's bottom margin cancels
- * exactly that half, and the title-to-description gap stays the header group's
- * `gap-3` (10.5dp) — the gap a section without a switch has. A row sized by the
- * switch instead pushed the description half a box further from the title.
+ * exactly that half, and the title-to-description gap stays the tight inner gap
+ * `gap-1` (3.5dp) that the detector groups and the replaced card use. A row
+ * sized by the switch instead pushed the description half a box further from
+ * the title.
  */
 export const SETTINGS_SWITCH_ROW_PULL_DP = (MIN_TAP_TARGET_DP - SETTINGS_HEADING_LINE_DP) / 2;
 

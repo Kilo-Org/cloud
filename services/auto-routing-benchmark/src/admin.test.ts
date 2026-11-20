@@ -30,6 +30,7 @@ import {
   ACTIVE_MEASUREMENT_REVISION,
   deciderCasesForRouter,
   MEASUREMENT_REVISION,
+  PROBE_REVISION,
 } from './measurement-revision';
 import { BenchmarkModelCatalogSchema } from './platform-models';
 import { fetchExecutableBenchmarkModelCatalog } from './executable-models';
@@ -1498,7 +1499,7 @@ describe('POST /admin/runs', () => {
     expect(insertRun).not.toHaveBeenCalled();
   });
 
-  it('starts a drained pair on the active revision cases', async () => {
+  it('starts a drained pair on the revision-2 case list while the hold is in force', async () => {
     vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
       { model: 'owner/a', variant: 'high', requested_at: '2026-06-01T00:00:00.000Z' },
@@ -1508,14 +1509,27 @@ describe('POST /admin/runs', () => {
 
     expect(res.status).toBe(202);
     const [, run] = vi.mocked(insertRun).mock.calls[0];
+    // The hold: a drained pair starts at the active revision, which is 2.
+    expect(ACTIVE_MEASUREMENT_REVISION).toBe(2);
     expect(run.measurement_revision).toBe(ACTIVE_MEASUREMENT_REVISION);
-    // The dispatcher materializes chunks from the run's own revision, so a drained pair
-    // measures the probe cuts and the re-graded terminal case too.
+    // The dispatcher materializes chunks from the run's own revision, so the run measures the
+    // revision-2 case list: no probe cut and the plain pwd case.
     const scheduled = deciderCasesForRouter('efficient', ACTIVE_MEASUREMENT_REVISION);
-    expect(scheduled).toHaveLength(DECIDER_CASES.length + PROBE_CASES.length);
+    expect(scheduled).toHaveLength(DECIDER_CASES.length);
     const scheduledIds = new Set(scheduled.map(benchCase => benchCase.id));
-    expect(PROBE_CASES.every(benchCase => scheduledIds.has(benchCase.id))).toBe(true);
+    expect(PROBE_CASES.every(benchCase => !scheduledIds.has(benchCase.id))).toBe(true);
     expect(scheduledIds.has('supp-agent-term-pwd-base')).toBe(true);
+  });
+
+  it('keeps the revision-3 case list defined for the drain that raises the revision back', () => {
+    // The hold turns off the activation, not revision 3: the same `deciderCasesForRouter` the
+    // drain calls returns the probe cuts plus the re-graded terminal case at revision 3, so
+    // re-activation is one constant change and no data change.
+    const rerated = deciderCasesForRouter('efficient', PROBE_REVISION);
+    expect(rerated).toHaveLength(DECIDER_CASES.length + PROBE_CASES.length);
+    const ids = new Set(rerated.map(benchCase => benchCase.id));
+    expect(PROBE_CASES.every(benchCase => ids.has(benchCase.id))).toBe(true);
+    expect(ids.has('supp-agent-term-pwd-base')).toBe(true);
   });
 
   it('starts one run per queue for queue=both', async () => {

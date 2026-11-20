@@ -365,10 +365,40 @@ describe('prompt transport re-measure (real SQLite)', () => {
     expect(scheduled.length).toBeLessThan(DECIDER_CASES.length / 5);
   });
 
-  it('finds nothing to re-measure for pairs fully measured at the active revision', async () => {
+  it('finds nothing to re-measure for pairs fully measured at the newest revision', async () => {
     insertRun('old');
-    for (const benchCase of deciderCasesForRouter('efficient', ACTIVE_MEASUREMENT_REVISION)) {
-      insertResult('old', benchCase.id, { revision: ACTIVE_MEASUREMENT_REVISION });
+    for (const benchCase of deciderCasesForRouter('efficient', MEASUREMENT_REVISION)) {
+      insertResult('old', benchCase.id, { revision: MEASUREMENT_REVISION });
+    }
+    insertProfile('old');
+    const before = tableDump();
+
+    const report = await planPromptTransportRemeasure(db, {
+      ...current,
+      revision: MEASUREMENT_REVISION,
+      action: 'request',
+      prices: new Map(),
+    });
+
+    expect(report).toMatchObject({
+      promptRevision: MEASUREMENT_REVISION,
+      pairs: 0,
+      affectedResults: 0,
+      unmeasuredResults: 0,
+      projectedCostUsd: 0,
+      changed: 0,
+    });
+    const probeIds = new Set(PROBE_CASES.map(c => c.id));
+    expect([...probeIds].every(id => report.affectedCaseIds.includes(id))).toBe(true);
+    expect(tableDump()).toEqual(before);
+  });
+
+  it('plans the argv cases only at the revision-2 hold', async () => {
+    // The hold's planner: at revision 2 nothing about the probe cases is queued, because the
+    // active revision does not measure them; every stored revision-3 result stays untouched.
+    insertRun('old');
+    for (const benchCase of deciderCasesForRouter('efficient', MEASUREMENT_REVISION)) {
+      insertResult('old', benchCase.id, { revision: MEASUREMENT_REVISION });
     }
     insertProfile('old');
     const before = tableDump();
@@ -380,16 +410,16 @@ describe('prompt transport re-measure (real SQLite)', () => {
       prices: new Map(),
     });
 
+    expect(ACTIVE_MEASUREMENT_REVISION).toBe(2);
     expect(report).toMatchObject({
-      promptRevision: ACTIVE_MEASUREMENT_REVISION,
       pairs: 0,
       affectedResults: 0,
       unmeasuredResults: 0,
-      projectedCostUsd: 0,
       changed: 0,
     });
     const probeIds = new Set(PROBE_CASES.map(c => c.id));
-    expect([...probeIds].every(id => report.affectedCaseIds.includes(id))).toBe(true);
+    expect(probeIds.size).toBeGreaterThan(0);
+    expect(report.affectedCaseIds.filter(id => probeIds.has(id))).toEqual([]);
     expect(tableDump()).toEqual(before);
   });
 

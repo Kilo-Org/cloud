@@ -160,6 +160,23 @@ describe('custom router tables and statuses (real SQLite)', () => {
     }
   }
 
+  // The run that produced a ready row, as the deployed table and the paid flow write it.
+  // `admission_marker` is the durable paid-flow proof; NULL is exactly a legacy measurement.
+  function runRow(id: string, admitted: boolean, model = 'vendor/gw') {
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_runs (id, router, kind, purpose, status, started_at, completed_at,
+          min_accuracy, switch_cost_factor, max_concurrency, repetitions, engine_identity,
+          admission_marker)
+         VALUES (?, 'efficient', 'decider', 'platform', 'completed', '2026-10-01', '2026-10-01',
+           0.7, 3, 0, 3, ?, ?)`
+      )
+      .run(id, ENGINE, admitted ? `marker-${id}` : null);
+    sqlite
+      .prepare(`INSERT INTO run_models (run_id, model, variant, enqueued) VALUES (?, ?, '', 1)`)
+      .run(id, model);
+  }
+
   const candidates = (table: CustomRoutingTable | null) =>
     (table?.routes[ROUTE] ?? []).map(c => ({
       model: c.model,
@@ -379,6 +396,172 @@ describe('custom router tables and statuses (real SQLite)', () => {
     ]);
   });
 
+  it('keeps the deployed concrete candidate for an un-pinned legacy alias, and not the alias id', async () => {
+    const alias = '~vendor/latest';
+    const aliasSource = {
+      ...source,
+      fetchImpl: (async () =>
+        Response.json({
+          data: [
+            { id: alias, alias_target: 'vendor/gw' },
+            { id: 'vendor/gw', pricing: { prompt: '0.000001', completion: '0.000002' } },
+          ],
+        })) as typeof fetch,
+    };
+    // The measurement predates the paid flow: its run has no admission marker.
+    runRow('run-legacy', false);
+    platformProfile({ engine: ENGINE, status: 'ready', runId: 'run-legacy', accuracy: 0.95 });
+    const context: CustomRouterBenchmarkContext = {
+      ownerType: 'user',
+      ownerId: 'user-1',
+      baseRouter: 'efficient',
+      entries: [{ kind: 'gateway', model: alias }],
+      clientEvalEntryKeys: [],
+    };
+
+    const result = await assembleCustomRouterTable(db, CONFIG, context, aliasSource);
+    // Same ranked id and measurement the deployed table published for this pool.
+    expect(candidates(result.table)).toEqual([
+      expect.objectContaining({ model: 'vendor/gw', accuracy: 0.95, stale: false }),
+    ]);
+    expect(
+      Object.values(result.table?.routes ?? {})
+        .flat()
+        .map(candidate => candidate.model)
+    ).not.toContain(alias);
+    expect(result.servingPins).toBeUndefined();
+    // Reading the pool wrote no pin and no measurement row.
+    expect(
+      sqlite.prepare(`SELECT COUNT(*) AS n FROM benchmark_profiles WHERE status = 'pending'`).get()
+    ).toEqual({ n: 0 });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS n FROM benchmark_runs`).get()).toEqual({ n: 1 });
+  });
+
+  it('ranks an un-pinned alias under its own id only for a paid-flow measurement', async () => {
+    const alias = '~vendor/latest';
+    const aliasSource = {
+      ...source,
+      fetchImpl: (async () =>
+        Response.json({
+          data: [
+            { id: alias, alias_target: 'vendor/gw' },
+            { id: 'vendor/gw', pricing: { prompt: '0.000001', completion: '0.000002' } },
+          ],
+        })) as typeof fetch,
+    };
+    // This run carries the paid-flow admission marker, so its result is the shared paid result.
+    runRow('run-paid', true);
+    platformProfile({ engine: ENGINE, status: 'ready', runId: 'run-paid', accuracy: 0.95 });
+    const context: CustomRouterBenchmarkContext = {
+      ownerType: 'user',
+      ownerId: 'user-1',
+      baseRouter: 'efficient',
+      entries: [{ kind: 'gateway', model: alias }],
+      clientEvalEntryKeys: [],
+    };
+    const result = await assembleCustomRouterTable(db, CONFIG, context, aliasSource);
+    expect(candidates(result.table)).toEqual([
+      expect.objectContaining({ model: alias, accuracy: 0.95 }),
+    ]);
+    // Still no pin: the pool was never asked and never confirmed.
+    expect(result.servingPins).toBeUndefined();
+  });
+
+  it('lets a no-pin alias observer rank a target another pool just completed', async () => {
+    const alias = '~vendor/latest';
+    const sharedSource = {
+      ...source,
+      fetchImpl: (async () =>
+        Response.json({
+          data: [
+            { id: alias, alias_target: 'vendor/gw' },
+            { id: 'vendor/other', pricing: { prompt: '0.000001', completion: '0.000002' } },
+            { id: 'vendor/gw', pricing: { prompt: '0.000001', completion: '0.000002' } },
+          ],
+        })) as typeof fetch,
+    };
+    // Pool A measures the alias target through the paid flow; pool B only has the alias, with a
+    // different default entry, and never clicks or pays.
+    runRow('run-paid', true);
+    platformProfile({ engine: ENGINE, status: 'ready', runId: 'run-paid', accuracy: 0.95 });
+    const plan = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      {
+        ownerType: 'user',
+        ownerId: 'user-b',
+        baseRouter: 'efficient',
+        entries: [
+          { kind: 'gateway', model: alias },
+          { kind: 'gateway', model: 'vendor/other' },
+        ],
+        clientEvalEntryKeys: [],
+      },
+      sharedSource
+    );
+    // The shared paid result ranks under the alias, which is B's non-default entry. The default
+    // (`vendor/other`) has no measurement, so a route that ignored the alias would fall through
+    // to an entry this table cannot rank at all.
+    expect(candidates(plan.table)).toEqual([
+      expect.objectContaining({ model: alias, accuracy: 0.95 }),
+    ]);
+    expect(
+      Object.values(plan.table?.routes ?? {})
+        .flat()
+        .map(candidate => candidate.model)
+    ).not.toContain('vendor/other');
+    expect(plan.servingPins).toBeUndefined();
+    expect(sqlite.prepare(`SELECT COUNT(*) AS n FROM benchmark_runs`).get()).toEqual({ n: 1 });
+    expect(
+      sqlite.prepare(`SELECT COUNT(*) AS n FROM benchmark_profiles WHERE status = 'pending'`).get()
+    ).toEqual({ n: 0 });
+  });
+
+  it('keeps the duplicate source ready rows in the table version but emits one candidate', async () => {
+    const alias = '~vendor/latest';
+    const aliasSource = {
+      ...source,
+      fetchImpl: (async () =>
+        Response.json({
+          data: [
+            { id: alias, alias_target: 'vendor/gw' },
+            { id: 'vendor/gw', pricing: { prompt: '0.000001', completion: '0.000002' } },
+          ],
+        })) as typeof fetch,
+    };
+    runRow('run-legacy', false);
+    platformProfile({ engine: ENGINE, status: 'ready', runId: 'run-legacy', accuracy: 0.95 });
+    const base = {
+      ownerType: 'user' as const,
+      ownerId: 'user-1',
+      baseRouter: 'efficient' as const,
+      clientEvalEntryKeys: [] as string[],
+    };
+    const both = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      {
+        ...base,
+        entries: [
+          { kind: 'gateway', model: alias },
+          { kind: 'gateway', model: 'vendor/gw' },
+        ],
+      },
+      aliasSource
+    );
+    const aliasOnly = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      { ...base, entries: [{ kind: 'gateway', model: alias }] },
+      aliasSource
+    );
+    // One emitted row, exactly as deployed published it.
+    expect(candidates(both.table)).toEqual([expect.objectContaining({ model: 'vendor/gw' })]);
+    // The deployed fingerprint counted the alias and its own concrete entry as two ready
+    // contributors, so the pool's version differs from the alias-only pool.
+    expect(both.table?.version).not.toBe(aliasOnly.table?.version);
+  });
+
   it('reports a permanently failed resolved pair for add-time validation without writing', async () => {
     sqlite
       .prepare(
@@ -487,8 +670,10 @@ describe('custom router tables and statuses (real SQLite)', () => {
     expect(candidates(pinned.table)).toEqual([
       expect.objectContaining({ model: alias, accuracy: 0.91 }),
     ]);
+    // B has no pin, and this measurement predates the paid flow: it keeps the concrete candidate
+    // id the deployed table published for an un-pinned alias.
     expect(candidates(unpinned.table)).toEqual([
-      expect.objectContaining({ model: alias, accuracy: 0.91 }),
+      expect.objectContaining({ model: 'vendor/gw', accuracy: 0.91 }),
     ]);
     // Only the pinned pool dispatches the concrete target; the other keeps its live alias.
     expect(pinned.servingPins).toEqual({ [`gateway:${alias}`]: 'vendor/gw' });
@@ -564,8 +749,9 @@ describe('custom router tables and statuses (real SQLite)', () => {
       await computeCustomRouterReadinessVersion(db, CONFIG, context, multiVariantSource)
     ).not.toBe(empty);
     const ready = await assembleCustomRouterTable(db, CONFIG, context, multiVariantSource);
+    // No pin and no admission marker: the deployed concrete candidate id is preserved.
     expect(candidates(ready.table)).toEqual([
-      expect.objectContaining({ model: alias, variant: 'low', accuracy: 0.93 }),
+      expect.objectContaining({ model: 'vendor/gw', variant: 'low', accuracy: 0.93 }),
     ]);
   });
 

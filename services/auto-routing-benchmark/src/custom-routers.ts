@@ -229,6 +229,104 @@ function platformPairs(resolved: readonly ResolvedCustomRouterEntry[]): Benchmar
   );
 }
 
+/** One ready row for a platform gateway entry, resolved to the candidate id it ranks under. */
+type ReadyPlatformRow = {
+  entry: GatewayCustomRouterEntry;
+  pair: BenchmarkPair;
+  runId: string;
+  stale: boolean;
+  /** Set when a saved pin backs this measurement, so the entry dispatches that target. */
+  servingPinModel: string | null;
+  candidate: string;
+};
+
+/**
+ * Run ids whose provenance row proves paid-flow admission. Migration 0038 writes
+ * `benchmark_runs.admission_marker` only from the Worker that owns the paid flow; every row an
+ * older image wrote, including every pre-cutover measurement, has NULL. A missing run row is
+ * therefore not evidence of paid admission either. This is read only for an un-pinned alias
+ * whose ready measurement it must classify — never to write or derive a serving pin.
+ */
+async function paidAdmissionRunIds(
+  db: D1Database,
+  runIds: readonly string[]
+): Promise<Set<string>> {
+  const unique = [...new Set(runIds)];
+  const admitted = new Set<string>();
+  for (let offset = 0; offset < unique.length; offset += 50) {
+    const chunk = unique.slice(offset, offset + 50);
+    const rows = await db
+      .prepare(
+        `SELECT id FROM benchmark_runs
+        WHERE id IN (${chunk.map(() => '?').join(', ')}) AND admission_marker IS NOT NULL`
+      )
+      .bind(...chunk)
+      .all<{ id: string }>();
+    for (const row of rows.results) admitted.add(row.id);
+  }
+  return admitted;
+}
+
+/**
+ * Ready platform rows for one pool, in pool order and with source multiplicity preserved (an
+ * alias and its own concrete entry stay two rows, as the deployed table recorded them).
+ *
+ * A saved pin always ranks under its logical pool entry, because both serving paths dispatch
+ * `entry.model` or the pinned target. Without a pin, a measurement admitted before the paid flow
+ * keeps the concrete target id the deployed table published, so an existing pool's artifact and
+ * decision do not change on deploy. Only a measurement the paid flow admitted ranks under the
+ * alias, which lets every pool's own entry find the shared result. A direct concrete entry has
+ * `entry.model === pair.model`, so it never needs the admission read.
+ */
+async function resolveReadyPlatformRows(
+  db: D1Database,
+  current: CurrentProfileContext,
+  resolved: readonly ResolvedCustomRouterEntry[],
+  platformRows: ReadonlyMap<string, ProfileRow[]>
+): Promise<ReadyPlatformRow[]> {
+  const sources: (Omit<ReadyPlatformRow, 'candidate'> & { pinned: boolean })[] = [];
+  for (const item of resolved) {
+    if (item.measuredBy !== 'platform') continue;
+    const pinned = item.servingPin !== null;
+    for (const pair of item.pairs ?? []) {
+      const served = newestReadyMeasurement(
+        platformRows.get(benchmarkPairKey(pair)) ?? [],
+        row => isCurrentBenchmarkProfile(row, current, pair),
+        platformMeasuredAt
+      );
+      if (!served?.row.run_id) continue;
+      sources.push({
+        entry: item.entry,
+        pair,
+        runId: served.row.run_id,
+        stale: served.stale,
+        pinned,
+        // A pin is usable for this pair only when its target is the pair being served.
+        servingPinModel: pinned && item.servingPin?.model === pair.model ? pair.model : null,
+      });
+    }
+  }
+  const unPinnedAliases = sources.filter(
+    source => !source.pinned && source.entry.model !== source.pair.model
+  );
+  const paidRunIds =
+    unPinnedAliases.length > 0
+      ? await paidAdmissionRunIds(
+          db,
+          unPinnedAliases.map(source => source.runId)
+        )
+      : null;
+  return sources.map(({ pinned, ...source }) => ({
+    ...source,
+    candidate:
+      !pinned && source.entry.model !== source.pair.model
+        ? paidRunIds?.has(source.runId)
+          ? source.entry.model
+          : source.pair.model
+        : source.entry.model,
+  }));
+}
+
 function isCurrentLinkedProfile(
   row: ProfileRow,
   current: CurrentProfileContext,
@@ -299,7 +397,7 @@ export async function assembleCustomRouterTable(
   const { current, resolved, catalog, platformRows, clientRows } =
     await loadCustomRouterMeasurements(db, config, context, source);
   const platformReady: {
-    /** Logical candidate the table ranks: the pool entry itself, so an alias keeps its own id. */
+    /** Ranked candidate, which can differ from its measured concrete pair. */
     entry: BenchmarkPair;
     /** The concrete pair whose measurement and run back it (the pinned or current alias target). */
     measured: BenchmarkPair;
@@ -318,31 +416,17 @@ export async function assembleCustomRouterTable(
   }[] = [];
   const clientReady: { profile: ClientProfileRow; stale: boolean }[] = [];
   const prices = new Map(catalog ? catalogCandidatePrices(catalog) : []);
+  // Ready platform rows are resolved once, before the entry loop, so the fingerprint and the
+  // table share one derivation of the candidate id.
+  const platformReadyRows = await resolveReadyPlatformRows(db, current, resolved, platformRows);
+  for (const ready of platformReadyRows) {
+    if (ready.candidate === ready.pair.model) continue;
+    // Price the candidate from the measured target, not the alias's current catalog price.
+    const concretePricing = prices.get(ready.pair.model);
+    if (concretePricing !== undefined) prices.set(ready.candidate, concretePricing);
+  }
   for (const item of resolved) {
-    if (item.measuredBy === 'platform') {
-      const candidate = customRouterCandidateModel(toCustomRouterEntryRef(item.entry));
-      for (const pair of item.pairs ?? []) {
-        const served = newestReadyMeasurement(
-          platformRows.get(benchmarkPairKey(pair)) ?? [],
-          row => isCurrentBenchmarkProfile(row, current, pair),
-          platformMeasuredAt
-        );
-        if (served?.row.run_id) {
-          platformReady.push({
-            entry: { model: candidate, variant: pair.variant },
-            measured: pair,
-            runId: served.row.run_id,
-            stale: served.stale,
-            servingPinModel: item.servingPin?.model === pair.model ? pair.model : null,
-          });
-          // A pinned entry dispatches a different concrete model, so its candidate is priced like
-          // that model rather than like whatever the alias points at today.
-          const concretePricing = prices.get(pair.model);
-          if (concretePricing !== undefined) prices.set(candidate, concretePricing);
-        }
-      }
-      continue;
-    }
+    if (item.measuredBy === 'platform') continue;
     const ref = toCustomRouterEntryRef(item.entry);
     const candidate = customRouterCandidateModel(ref);
     const ownerPricing =
@@ -384,6 +468,18 @@ export async function assembleCustomRouterTable(
       if (served) clientReady.push({ profile: served.row, stale: served.stale });
     }
   }
+  // Duplicate source rows stay in `platformReady` for the version hash (the deployed artifact
+  // counted an alias and its own concrete entry separately); only the emission below dedupes.
+  for (const ready of platformReadyRows) {
+    platformReady.push({
+      entry: { model: ready.candidate, variant: ready.pair.variant },
+      measured: ready.pair,
+      runId: ready.runId,
+      stale: ready.stale,
+      servingPinModel: ready.servingPinModel,
+    });
+  }
+
   if (platformReady.length === 0 && linkedReady.length === 0 && clientReady.length === 0) {
     return { table: null };
   }
@@ -413,24 +509,32 @@ export async function assembleCustomRouterTable(
     : new Set<string>();
   const platformSummaries = dropIneligibleAgenticSummaries(allPlatformSummaries, ineligible);
   const platformCases = dropIneligibleAgenticResults(allPlatformCases, ineligible);
-  // Each ready entry is ranked under its logical pool id while its measurement stays the concrete
-  // pair, so an alias and its target can be separate pool entries without sharing a candidate.
-  const platformEntries = platformReady.map(ready => ({
-    ready: { entry: ready.entry, runId: ready.runId, stale: ready.stale },
-    summaries: platformSummaries
-      .filter(
-        summary =>
-          summary.model === ready.measured.model &&
-          (summary.variant ?? null) === ready.measured.variant &&
-          summary.runId === ready.runId
-      )
-      .map(summary => ({ ...summary, model: ready.entry.model })),
-    cases: platformCases
-      .filter(
-        pair => pair.model === ready.measured.model && pair.variant === ready.measured.variant
-      )
-      .map(pair => ({ ...pair, model: ready.entry.model })),
-  }));
+  // A pool holding both an alias and its concrete target resolves both to one measured pair. The
+  // deployed table published that pair once (its summaries were keyed by the stored pair), so the
+  // emission dedupes here — after the fingerprint above already counted both source rows.
+  const emittedMeasurementKeys = new Set<string>();
+  const platformEntries = platformReady.flatMap(ready => {
+    const key = `${ready.entry.model}\u0000${ready.entry.variant ?? ''}\u0000${ready.runId}`;
+    if (emittedMeasurementKeys.has(key)) return [];
+    emittedMeasurementKeys.add(key);
+    return [
+      {
+        summaries: platformSummaries
+          .filter(
+            summary =>
+              summary.model === ready.measured.model &&
+              (summary.variant ?? null) === ready.measured.variant &&
+              summary.runId === ready.runId
+          )
+          .map(summary => ({ ...summary, model: ready.entry.model })),
+        cases: platformCases
+          .filter(
+            pair => pair.model === ready.measured.model && pair.variant === ready.measured.variant
+          )
+          .map(pair => ({ ...pair, model: ready.entry.model })),
+      },
+    ];
+  });
   // A pin is usable only with a ready measurement behind it; entries without one are absent here
   // and dispatch their own (live alias) model instead.
   const servingPins = Object.fromEntries(
@@ -499,7 +603,13 @@ export async function assembleCustomRouterTable(
     lowConfidenceThreshold: policy.lowConfidenceThreshold,
     prices,
     readyEntries: [
-      ...platformEntries.map(c => c.ready),
+      // Source multiplicity is part of the deployed version hash: an alias and its own concrete
+      // entry counted as two ready contributors even though the table emitted one candidate.
+      ...platformReady.map(ready => ({
+        entry: ready.entry,
+        runId: ready.runId,
+        stale: ready.stale,
+      })),
       ...linkedEntries.map(c => c.ready),
       ...clientEntries.map(c => c.ready),
     ],
@@ -806,23 +916,11 @@ export async function computeCustomRouterReadinessVersion(
     context,
     source
   );
-  const contributors: { runId: string; model: string; variant: string | null }[] = [];
-  for (const item of resolved) {
-    if (item.measuredBy !== 'platform') continue;
-    // Same logical candidate the table ranks, so the version changes exactly when the ranked
-    // candidate set changes — not when an unrelated entry's pricing or catalog row moves.
-    const candidate = customRouterCandidateModel(toCustomRouterEntryRef(item.entry));
-    for (const pair of item.pairs ?? []) {
-      const served = newestReadyMeasurement(
-        platformRows.get(benchmarkPairKey(pair)) ?? [],
-        row => isCurrentBenchmarkProfile(row, current, pair),
-        platformMeasuredAt
-      );
-      if (served?.row.run_id) {
-        contributors.push({ runId: served.row.run_id, model: candidate, variant: pair.variant });
-      }
-    }
-  }
+  // Same candidate ids and source multiplicity the table's own version hash counts, so a
+  // fingerprint match means the ranked set is unchanged.
+  const contributors = (await resolveReadyPlatformRows(db, current, resolved, platformRows)).map(
+    ready => ({ runId: ready.runId, model: ready.candidate, variant: ready.pair.variant })
+  );
   const policy = resolveEffectivePolicy(config);
   return computeRegistryRoutingTableVersion(contributors, {
     router: context.baseRouter,

@@ -116,7 +116,12 @@ function equalitiesOf(condition: unknown): ReadonlyArray<{ column: string; value
  * the row the service builds, so an absent string is a bug worth throwing on.
  */
 function commandOf(row: unknown): string {
-  if (typeof row === 'object' && row !== null && 'command' in row && typeof row.command === 'string') {
+  if (
+    typeof row === 'object' &&
+    row !== null &&
+    'command' in row &&
+    typeof row.command === 'string'
+  ) {
     return row.command;
   }
   throw new Error('profile limit test db: command row without command text');

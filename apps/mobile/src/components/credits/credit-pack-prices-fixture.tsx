@@ -143,6 +143,7 @@ const meResponse: RouterOutputs['user']['getMe'] = {
   id: 'credits-price-fixture',
   email: 'credits-price@example.com',
   isAdmin: false,
+  organizationTrialEligible: false,
 };
 
 const balanceResponse: RouterOutputs['user']['getContextBalance'] = {
@@ -201,6 +202,7 @@ function createFixtureClient(state: CreditPackPricesFixtureState) {
               id: 'credits-price-fixture',
               email: 'credits-price@example.com',
               isAdmin: false,
+              organizationTrialEligible: false,
             } satisfies RouterOutputs['user']['getMe']);
           }
           if (url.includes('/user.getContextBalance')) {

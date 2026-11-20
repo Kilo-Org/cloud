@@ -109,13 +109,15 @@ function NameField({ disabled, textProps, onChangeText, onSubmitEditing }: NameF
  * screen reproduces.
  *
  * The screen states the offer for the first organization and never promises a
- * window to a creator the procedure will not grant one to. Buying a plan stays
- * on the web: the organization's billing screen carries the destinations that
- * change it.
+ * window to a creator the procedure will not grant one to: the sentence renders
+ * only when `getMe` reports the account eligible, which is the same rule the
+ * create procedure applies, and an identity that has not answered yet states
+ * nothing. Buying a plan stays on the web: the organization's billing screen
+ * carries the destinations that change it.
  */
 export function CreateOrganizationScreen() {
   const { t } = useTranslation();
-  const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
+  const { userId, isLoading: isIdentityLoading, organizationTrialEligible } = useCurrentUserId();
   const draft = useFormDraft<CreateOrganizationFormDraft>({
     userId,
     isIdentityLoading,
@@ -131,9 +133,9 @@ export function CreateOrganizationScreen() {
           iOS field reads `defaultValue` once). Until then the chrome keeps the
           loaded geometry with the field disabled and empty. */}
       {draft.kind === 'ready' ? (
-        <CreateOrganizationReady draft={draft} />
+        <CreateOrganizationReady draft={draft} offersTrial={organizationTrialEligible === true} />
       ) : (
-        <CreateOrganizationLoading />
+        <CreateOrganizationLoading offersTrial={organizationTrialEligible === true} />
       )}
     </View>
   );
@@ -146,7 +148,11 @@ export function CreateOrganizationScreen() {
  */
 function CreateOrganizationReady({
   draft,
-}: Readonly<{ draft: Extract<FormDraftState<CreateOrganizationFormDraft>, { kind: 'ready' }> }>) {
+  offersTrial,
+}: Readonly<{
+  draft: Extract<FormDraftState<CreateOrganizationFormDraft>, { kind: 'ready' }>;
+  offersTrial: boolean;
+}>) {
   // `jsx-handler-names` wants a local binding per handler prop.
   const saveDraftName = draft.save;
   const clearDraftName = draft.clear;
@@ -155,12 +161,13 @@ function CreateOrganizationReady({
       initialName={draft.value?.name ?? ''}
       onDraftChange={saveDraftName}
       onDraftClear={clearDraftName}
+      offersTrial={offersTrial}
     />
   );
 }
 
 /** The create form's chrome while the draft loads: the same rows, nothing typed. */
-function CreateOrganizationLoading() {
+function CreateOrganizationLoading({ offersTrial }: Readonly<{ offersTrial: boolean }>) {
   const { t } = useTranslation();
   return (
     <TabScreenScrollView
@@ -172,7 +179,7 @@ function CreateOrganizationLoading() {
       <View className="gap-2">
         <NameField disabled textProps={EMPTY_NAME_TEXT_PROPS} />
       </View>
-      <Text variant="caption">{t('organization.create.trialNote')}</Text>
+      {offersTrial ? <Text variant="caption">{t('organization.create.trialNote')}</Text> : null}
       <Button className={STATE_ACTION_CLASS} disabled>
         <Text>{t('organization.create.title')}</Text>
       </Button>
@@ -183,12 +190,15 @@ function CreateOrganizationLoading() {
 type CreateOrganizationBodyProps = Readonly<{
   /** The stored name, or '' when the key holds none. */
   initialName: string;
+  /** Whether the create procedure will grant this creator a trial window. */
+  offersTrial: boolean;
   onDraftChange: (value: CreateOrganizationFormDraft) => void;
   onDraftClear: () => void;
 }>;
 
 function CreateOrganizationBody({
   initialName,
+  offersTrial,
   onDraftChange,
   onDraftClear,
 }: CreateOrganizationBodyProps) {
@@ -357,7 +367,7 @@ function CreateOrganizationBody({
           onSubmitEditing={submit}
         />
       </View>
-      <Text variant="caption">{t('organization.create.trialNote')}</Text>
+      {offersTrial ? <Text variant="caption">{t('organization.create.trialNote')}</Text> : null}
       {message == null ? null : (
         <Text
           className={message.tone === 'error' ? 'text-sm text-destructive' : undefined}

@@ -275,6 +275,7 @@ export function createFixtureClient(surface: string | undefined) {
               id: 'review-copy-fixture',
               email: 'review-copy@example.com',
               isAdmin: false,
+              organizationTrialEligible: false,
             } satisfies RouterOutputs['user']['getMe']);
           }
           throw new Error('Read not provided by review copy fixture');

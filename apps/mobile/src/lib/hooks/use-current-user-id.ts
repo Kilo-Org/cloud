@@ -40,6 +40,13 @@ export function useCurrentUserId(options: UseCurrentUserIdOptions = {}) {
   return {
     userId: data?.id,
     email: data?.email,
+    /**
+     * Whether a create this account starts receives the trial window, as the
+     * create procedure decides it. Unknown until the query answers, and an
+     * unknown answer offers no window: the screen states the offer only on an
+     * explicit `true`.
+     */
+    organizationTrialEligible: data?.organizationTrialEligible,
     isLoading,
     isError: data === undefined && (isError || (isLoading && isFetched)),
     /**

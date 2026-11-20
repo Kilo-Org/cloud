@@ -8,7 +8,8 @@
 // create whose screen was left only refreshes the list, a failed refresh
 // reports the organization without moving the selection, a failure shows the
 // server's copy, the submit control stays disabled until a name is typed, and
-// the durable draft restores the name and is cleared once the create lands.
+// the durable draft restores the name and is cleared once the create lands, and
+// the trial sentence appears only for an account the procedure grants one to.
 // The tRPC client is mocked so no request leaves the test.
 
 import { createElement } from 'react';
@@ -91,8 +92,19 @@ vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({ organizations: { list: { queryKey: () => ['organizations.list'] } } }),
 }));
 
+// The identity the screen reads, controllable per case: the trial sentence is
+// stated only for an account the create procedure will grant a window, and
+// `undefined` is the cold-start answer before the query settles.
+const identity = vi.hoisted(() => ({
+  trialEligible: { current: true as boolean | undefined },
+}));
+
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
-  useCurrentUserId: () => ({ userId: 'user-1', isLoading: false }),
+  useCurrentUserId: () => ({
+    userId: 'user-1',
+    isLoading: false,
+    organizationTrialEligible: identity.trialEligible.current,
+  }),
 }));
 
 vi.mock('@/lib/persist/drafts', () => ({
@@ -209,6 +221,7 @@ beforeEach(() => {
   formDraft.current.kind = 'ready';
   formDraft.current.value = null;
   errorCopy.lookup.mockClear();
+  identity.trialEligible.current = true;
   router.dismissTo.mockClear();
   router.push.mockClear();
   // The Profile entry pushes create: it is the only route of the organization
@@ -463,6 +476,37 @@ describe('CreateOrganizationScreen', () => {
     expect(inputOf(renderer).props.editable).toBe(false);
     expect(submitOf(renderer).props.disabled).toBe(true);
     unmount();
+  });
+
+  it('states the trial only for an account the procedure grants one to', async () => {
+    const trialNote =
+      'Your first organization includes a 14-day Enterprise trial. Plans are bought on the web.';
+
+    identity.trialEligible.current = true;
+    const eligible = await mount();
+    expect(texts(eligible.renderer)).toContain(trialNote);
+    eligible.unmount();
+
+    // The chrome that holds the form while the draft loads states it on the same
+    // answer, so a slow draft never drops the sentence from an offered create.
+    formDraft.current.kind = 'loading';
+    const eligibleChrome = await mount();
+    expect(texts(eligibleChrome.renderer)).toContain(trialNote);
+    eligibleChrome.unmount();
+
+    formDraft.current.kind = 'ready';
+    identity.trialEligible.current = false;
+    const ineligible = await mount();
+    expect(texts(ineligible.renderer)).not.toContain(trialNote);
+    ineligible.unmount();
+
+    // Unknown is not `true`: a cold start that has not answered yet promises no
+    // window, because the create procedure may still refuse one.
+    identity.trialEligible.current = undefined;
+    formDraft.current.kind = 'loading';
+    const unknown = await mount();
+    expect(texts(unknown.renderer)).not.toContain(trialNote);
+    unknown.unmount();
   });
 
   it('saves the typed name and clears the entry instead of saving an empty name', async () => {

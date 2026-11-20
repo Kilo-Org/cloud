@@ -20,11 +20,60 @@ import {
  */
 export const PROFILE_NAME_TAKEN_MESSAGE = 'A profile with this name already exists';
 
-/** The last attempt whose response never arrived, and the ids that scope held just before it. */
+/** One environment variable a save submits, as the create sends it. */
+export type SaveContentVar = Readonly<{
+  key: string;
+  value: string;
+  isSecret: boolean;
+}>;
+
+/** What one save submits beside its name: everything the stored profile must hold. */
+export type SaveContent = Readonly<{
+  vars: readonly SaveContentVar[];
+  commands: readonly string[];
+  setAsDefault: boolean;
+}>;
+
+/** The last attempt whose response never arrived: what it submitted, and the ids that scope held just before it. */
 export type UnknownSaveAttempt = Readonly<{
   name: string;
   knownIds: ReadonlySet<string>;
+  content: SaveContent;
 }>;
+
+/**
+ * Whether two saves submitted the same configuration.
+ *
+ * A row's identity alone does not prove the row holds what this attempt
+ * submitted: a profile created by an unanswered attempt can be edited away, or
+ * the person can change the draft before the retry, and adopting that row then
+ * confirms a save whose content never reached the server. Commands are an
+ * ordered list and compare as one; the default flag is a single value; vars
+ * compare as a set keyed by `key`, because the create stores them in the order
+ * the client sent them and a reordered draft is the same configuration, while
+ * a changed value or secret flag is not.
+ */
+export function sameSaveContent(a: SaveContent, b: SaveContent): boolean {
+  if (a.setAsDefault !== b.setAsDefault) {
+    return false;
+  }
+  if (
+    a.commands.length !== b.commands.length ||
+    a.commands.some((command, index) => command !== b.commands[index])
+  ) {
+    return false;
+  }
+  const submitted = new Map(a.vars.map(variable => [variable.key, variable]));
+  if (submitted.size !== a.vars.length || submitted.size !== b.vars.length) {
+    return false;
+  }
+  return b.vars.every(variable => {
+    const other = submitted.get(variable.key);
+    return (
+      other !== undefined && other.value === variable.value && other.isSecret === variable.isSecret
+    );
+  });
+}
 
 /** One list row this module reads: the counts the saved profile reports. */
 type RecoveryRow = Readonly<{
@@ -64,6 +113,15 @@ export function profileIds(rows: readonly RecoveryRow[]): ReadonlySet<string> {
   return new Set(rows.map(row => row.id));
 }
 
+/** The list read, the owner scope and the two contents a recovery compares. */
+export type LostSaveQuery = Readonly<{
+  data: readonly RecoveryRow[] | ProfileScopeData;
+  organizationId: string | undefined;
+  attempt: UnknownSaveAttempt;
+  /** The content this save is sending now; a mismatch leaves the collision unrecovered. */
+  retried: SaveContent;
+}>;
+
 /**
  * The profile a lost attempt created, or null when the collision belongs to
  * somebody else.
@@ -75,12 +133,22 @@ export function profileIds(rows: readonly RecoveryRow[]): ReadonlySet<string> {
  * the draft. The counts come from the refetched row, because the response that
  * would have carried them is the one that was lost and the list is the server's
  * own record.
+ *
+ * Identity is not enough on its own: the row must also be the one this flow
+ * submitted, so `retried` is the content this save is sending now and a
+ * mismatch leaves the collision unrecovered. A profile the lost attempt created
+ * can have been edited since, in which case confirming the save would credit
+ * the person with content the stored profile does not hold.
  */
-export function lostSaveProfile(
-  data: readonly RecoveryRow[] | ProfileScopeData,
-  organizationId: string | undefined,
-  attempt: UnknownSaveAttempt
-): ProfileSelectorProfile | null {
+export function lostSaveProfile({
+  data,
+  organizationId,
+  attempt,
+  retried,
+}: LostSaveQuery): ProfileSelectorProfile | null {
+  if (!sameSaveContent(attempt.content, retried)) {
+    return null;
+  }
   const matches = scopeRowsOf(data, organizationId).filter(
     row => row.name.trim() === attempt.name && !attempt.knownIds.has(row.id)
   );

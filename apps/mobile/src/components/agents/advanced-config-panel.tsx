@@ -11,6 +11,7 @@ import {
   lostSaveProfile,
   PROFILE_NAME_TAKEN_MESSAGE,
   profileIds,
+  type SaveContent,
   type UnknownSaveAttempt,
 } from '@/components/agents/lost-save-recovery';
 import { type ProfileListRow, toSelectorProfile } from '@/components/agents/profile-list-row';
@@ -195,9 +196,13 @@ export function AdvancedConfigPanel({
   /**
    * The profile a lost attempt created, or null when the collision belongs to
    * somebody else. The list is the server's own record of the write, so only a
-   * refetched row counts; see `lostSaveProfile` for why the id diff decides.
+   * refetched row counts; see `lostSaveProfile` for why the id diff and the
+   * submitted content both decide.
    */
-  const recoverLostSave = async (name: string): Promise<ProfileSelectorProfile | null> => {
+  const recoverLostSave = async (
+    name: string,
+    retried: SaveContent
+  ): Promise<ProfileSelectorProfile | null> => {
     const attempt = lostSaveAttemptRef.current;
     if (attempt === null || attempt.name !== name) {
       return null;
@@ -206,7 +211,7 @@ export function AdvancedConfigPanel({
     if (refetched.data === undefined) {
       return null;
     }
-    return lostSaveProfile(refetched.data, organizationId, attempt);
+    return lostSaveProfile({ data: refetched.data, organizationId, attempt, retried });
   };
 
   const handleSaveProfile = async (
@@ -226,6 +231,18 @@ export function AdvancedConfigPanel({
     const knownIds = profileIds(
       organizationId === undefined ? list.personalProfiles : list.orgProfiles
     );
+    // What this save submits beside its name. A lost attempt records it so a
+    // later collision can compare the row against the configuration this flow
+    // actually sent, not just against the name and an unknown id.
+    const content: SaveContent = {
+      vars: manualVars.map(variable => ({
+        key: variable.key,
+        value: variable.value,
+        isSecret: variable.isSecret,
+      })),
+      commands: setupCommands,
+      setAsDefault: submission.setAsDefault,
+    };
     try {
       // One server write: the profile, its vars, its commands and the default
       // flag commit together, so a refusal leaves nothing behind and a retry
@@ -257,7 +274,7 @@ export function AdvancedConfigPanel({
       // Only a row this panel did not know may complete the save, so a name that
       // was genuinely taken keeps the draft with the person.
       if (refusal === PROFILE_NAME_TAKEN_MESSAGE) {
-        const recovered = await recoverLostSave(name);
+        const recovered = await recoverLostSave(name, content);
         if (recovered !== null) {
           finishSave(recovered);
           return { saved: true };
@@ -266,7 +283,7 @@ export function AdvancedConfigPanel({
       // No answer arrived, so this attempt may have committed: remember what it
       // submitted and what the scope held before it, for a later collision.
       if (refusal === '') {
-        lostSaveAttemptRef.current = { name, knownIds };
+        lostSaveAttemptRef.current = { name, knownIds, content };
       }
       return { saved: false, refusal: refusal === '' ? null : refusal };
     }

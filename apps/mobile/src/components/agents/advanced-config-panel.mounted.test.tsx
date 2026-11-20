@@ -911,6 +911,69 @@ describe('AdvancedConfigPanel', () => {
     expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
   });
 
+  it('refuses a colliding retry whose draft no longer carries the lost attempt config', async () => {
+    const mocks = mutations();
+    const refusal = 'A profile with this name already exists';
+    // The first attempt's response never arrives, so its outcome is unknown.
+    mocks.create.mutateAsync
+      .mockRejectedValueOnce(
+        Object.assign(new Error('Network request failed'), { name: 'TRPCClientError' })
+      )
+      .mockRejectedValueOnce(
+        Object.assign(new Error(refusal), {
+          name: 'TRPCClientError',
+          data: { code: 'CONFLICT', httpStatus: 409, path: 'agentProfiles.create', zodError: null },
+        })
+      );
+    // The unanswered write stored the profile with the variable it submitted;
+    // the person then edits that variable before retrying the same name.
+    const created: ProfileSelectorProfile = {
+      id: 'prod-1',
+      name: 'prod',
+      varCount: 1,
+      commandCount: 1,
+      isDefault: false,
+      ownerType: 'user',
+    };
+    const refetch = vi.fn().mockResolvedValue({ data: [BACKEND, created] });
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({ mocks, list: { refetch }, onSelectProfile });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'prod');
+    // The person closes the sheet and changes the draft value from `abc` to
+    // `xyz`, then reopens it under the same name.
+    const sheet = renderer.root.findAll(node => node.type === SaveProfileSheet)[0];
+    if (!sheet) {
+      throw new TypeError('the sheet was not mounted');
+    }
+    invokeHandler(sheet.props.onClose);
+    press(byLabel(renderer, 'API_KEY'));
+    typeInto(renderer, 'Value', 'xyz');
+    press(buttonByText(renderer, 'Save'));
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'prod');
+
+    expect(mocks.create.mutateAsync).toHaveBeenCalledTimes(2);
+    // The retry really carries the edited value, so the content is what differs.
+    expect(mocks.create.mutateAsync.mock.calls[1]).toEqual([
+      {
+        ...MANUAL_PAYLOAD,
+        name: 'prod',
+        vars: [{ key: 'API_KEY', value: 'xyz', isSecret: false }],
+      },
+    ]);
+    // The row carries the identity of the lost attempt but not its content, so
+    // adopting it would confirm a save whose variables never reached the server.
+    expect(saveSheetMessage(renderer)).toBe(refusal);
+    expect(texts(renderer)).toContain('API_KEY');
+    expect(texts(renderer)).toContain('xyz');
+    expect(onSelectProfile).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
   it('states the duplicate sentence when the name was taken before any attempt', async () => {
     const mocks = mutations();
     const refusal = 'A profile with this name already exists';

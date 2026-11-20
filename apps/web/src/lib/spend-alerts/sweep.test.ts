@@ -10,6 +10,7 @@ import {
   MAX_SCOPE_DECISIONS_PER_RUN,
   SCOPE_BATCH_SIZE,
   LOOKBACK_HOURS,
+  SPEND_ALERT_ROLLUP_LOCK_KEY,
   createSpendAlertSweepStore,
   evaluateScope,
   runSpendAlertSweep,
@@ -468,12 +469,39 @@ describe('runSpendAlertSweep candidate set and batching', () => {
    * A database whose reads are the rollup (`rollupRows`), the firing-rule pages
    * and nothing else. `makePage` builds each page from the limit the walk
    * actually asked for, so the test does not hard-code the walk's page size.
+   *
+   * The rollup runs inside a transaction: `transaction` hands the callback a
+   * `tx` that records every statement it executes and answers the session
+   * settings, the advisory try-lock (`guard.lockAcquired`, default true) and the
+   * rollup (rejecting with `guard.rollupError` when given).
    */
   function pagedFiringDatabase(
     makePage: (size: number, call: number) => FiringRuleRow[],
-    rollupRows: RollupRow[] = []
-  ): { database: SweepDb; requestedLimits: number[] } {
+    rollupRows: RollupRow[] = [],
+    guard: { lockAcquired?: boolean; rollupError?: unknown } = {}
+  ): {
+    database: SweepDb;
+    requestedLimits: number[];
+    txStatements: { sql: string; params: unknown[] }[];
+    topLevelStatements: unknown[];
+    selectCalls: () => number;
+  } {
     const requestedLimits: number[] = [];
+    const txStatements: { sql: string; params: unknown[] }[] = [];
+    const topLevelStatements: unknown[] = [];
+    let selectCalls = 0;
+    const tx = {
+      execute: async (statement: unknown) => {
+        const query = new PgDialect().sqlToQuery(statement as SQL);
+        txStatements.push(query);
+        if (query.sql.startsWith('SET LOCAL')) return { rows: [] };
+        if (query.sql.includes('pg_try_advisory_xact_lock')) {
+          return { rows: [{ acquired: guard.lockAcquired ?? true }] };
+        }
+        if (guard.rollupError !== undefined) throw guard.rollupError;
+        return { rows: rollupRows };
+      },
+    };
     const chain = {
       from: () => chain,
       innerJoin: () => chain,
@@ -486,10 +514,23 @@ describe('runSpendAlertSweep candidate set and batching', () => {
       },
     };
     const database = {
-      execute: async () => ({ rows: rollupRows }),
-      select: () => chain,
+      execute: async (statement: unknown) => {
+        topLevelStatements.push(statement);
+        return { rows: rollupRows };
+      },
+      select: () => {
+        selectCalls += 1;
+        return chain;
+      },
+      transaction: async (callback: (tx: unknown) => Promise<unknown>) => callback(tx),
     } as unknown as SweepDb;
-    return { database, requestedLimits };
+    return {
+      database,
+      requestedLimits,
+      txStatements,
+      topLevelStatements,
+      selectCalls: () => selectCalls,
+    };
   }
 
   function scopeKeys(count: number, prefix: string): string[] {
@@ -804,6 +845,7 @@ describe('runSpendAlertSweep candidate set and batching', () => {
 
     const result = await runSpendAlertSweep(database, { store }, { now: NOW });
 
+    expect(result.rollupStatus).toBe('completed');
     expect(result.timings).toEqual({
       rollupMs: expect.any(Number),
       decisionMs: expect.any(Number),
@@ -816,11 +858,125 @@ describe('runSpendAlertSweep candidate set and batching', () => {
         sweptScopes: 0,
         rederivedScopes: 0,
         candidateScopes: 0,
+        rollupStatus: 'completed',
         timings: expect.objectContaining({ deferredScopes: 0 }),
         remainderTicks: 0,
         rollupWindowTicks: 36,
       })
     );
+  });
+
+  describe('rollup guard', () => {
+    const SKIPPED_COUNTS = {
+      sweptScopes: 0,
+      candidateScopes: 0,
+      fired: 0,
+      cleared: 0,
+      deliveriesEnqueued: 0,
+    };
+
+    function wrapperError(code: string): Error {
+      return Object.assign(new Error('Failed query'), {
+        cause: Object.assign(new Error('canceling statement'), { code }),
+      });
+    }
+
+    it('skips the run without a rollup or decisions when the lock is held', async () => {
+      mockSweepLog.mockClear();
+      const { database, txStatements, topLevelStatements, selectCalls } = pagedFiringDatabase(
+        () => [],
+        rollupRows(['user:owner-1']),
+        { lockAcquired: false }
+      );
+      const loadScopeSnapshots = jest.fn(async () => new Map<string, SpendAlertScopeSnapshot>());
+
+      const result = await runSpendAlertSweep(
+        database,
+        { store: { loadScopeSnapshots } },
+        { now: NOW }
+      );
+
+      expect(result).toMatchObject({ ...SKIPPED_COUNTS, rollupStatus: 'locked' });
+      expect(result.timings).toEqual({
+        rollupMs: expect.any(Number),
+        decisionMs: 0,
+        rearmMs: 0,
+        deferredScopes: 0,
+      });
+      expect(txStatements.some(statement => statement.sql.includes('spend_alert_hourly'))).toBe(
+        false
+      );
+      expect(topLevelStatements).toEqual([]);
+      expect(selectCalls()).toBe(0);
+      expect(loadScopeSnapshots).not.toHaveBeenCalled();
+      expect(mockSweepLog).toHaveBeenCalledWith(
+        'Spend alert sweep rollup did not run',
+        expect.objectContaining({ reason: 'locked', rollupMs: expect.any(Number) })
+      );
+      expect(mockSweepLog).not.toHaveBeenCalledWith(
+        'Spend alert sweep phases completed',
+        expect.anything()
+      );
+    });
+
+    it('runs the settings, lock and rollup in order inside one transaction', async () => {
+      const { database, txStatements, topLevelStatements } = pagedFiringDatabase(
+        () => [],
+        rollupRows(['user:owner-1'])
+      );
+      const { store } = recordingStore();
+
+      const result = await runSpendAlertSweep(database, { store }, { now: NOW });
+
+      expect(result.rollupStatus).toBe('completed');
+      expect(topLevelStatements).toEqual([]);
+      expect(txStatements).toHaveLength(5);
+      expect(txStatements[0]?.sql).toBe(`SET LOCAL statement_timeout = '120000'`);
+      expect(txStatements[1]?.sql).toBe(`SET LOCAL lock_timeout = '5000'`);
+      expect(txStatements[2]?.sql).toBe(`SET LOCAL idle_in_transaction_session_timeout = '10000'`);
+      expect(txStatements[3]?.sql).toContain('pg_try_advisory_xact_lock');
+      expect(txStatements[3]?.params).toEqual([SPEND_ALERT_ROLLUP_LOCK_KEY]);
+      expect(txStatements[4]?.sql).toContain('INSERT INTO "spend_alert_hourly"');
+    });
+
+    it.each(['57014', '55P03'])(
+      'skips the run without throwing when the rollup fails with SQLSTATE %s',
+      async code => {
+        mockSweepLog.mockClear();
+        const { database, selectCalls } = pagedFiringDatabase(
+          () => [],
+          rollupRows(['user:owner-1']),
+          {
+            rollupError: wrapperError(code),
+          }
+        );
+        const loadScopeSnapshots = jest.fn(async () => new Map<string, SpendAlertScopeSnapshot>());
+
+        const result = await runSpendAlertSweep(
+          database,
+          { store: { loadScopeSnapshots } },
+          { now: NOW }
+        );
+
+        expect(result).toMatchObject({ ...SKIPPED_COUNTS, rollupStatus: 'timed_out' });
+        expect(selectCalls()).toBe(0);
+        expect(loadScopeSnapshots).not.toHaveBeenCalled();
+        expect(mockSweepLog).toHaveBeenCalledWith(
+          'Spend alert sweep rollup did not run',
+          expect.objectContaining({ reason: 'timed_out', sqlState: code })
+        );
+      }
+    );
+
+    it.each([
+      ['a unique violation', wrapperError('23505')],
+      ['a plain error', new Error('boom')],
+    ])('rethrows %s from the rollup', async (_name, error) => {
+      const { database } = pagedFiringDatabase(() => [], [], { rollupError: error });
+      const { store } = recordingStore();
+
+      await expect(runSpendAlertSweep(database, { store }, { now: NOW })).rejects.toBe(error);
+    });
   });
 });
 

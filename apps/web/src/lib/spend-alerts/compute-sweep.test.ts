@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
@@ -13,7 +13,12 @@ import {
   spend_alert_settings,
 } from '@kilocode/db/schema';
 import { backfillComputeSpendAlerts } from './compute-backfill';
-import { createSpendAlertSweepStore, runSpendAlertSweep, sweepHourlyBuckets } from './sweep';
+import {
+  SPEND_ALERT_ROLLUP_LOCK_KEY,
+  createSpendAlertSweepStore,
+  runSpendAlertSweep,
+  sweepHourlyBuckets,
+} from './sweep';
 
 const HOUR_MS = 3_600_000;
 
@@ -196,6 +201,44 @@ describe('compute spend alert PostgreSQL rollup', () => {
       expect(unrelated[0].cost_microdollars).toBe(1);
     }
   );
+
+  it('skips the whole run while another transaction holds the rollup lock, then completes without leaking SET LOCAL', async () => {
+    const { user, now } = await fixture();
+    const scopeKey = `user:${user.id}`;
+    await db.insert(microdollar_usage).values({
+      kilo_user_id: user.id,
+      cost: 2_000_000,
+      input_tokens: 1,
+      output_tokens: 1,
+      cache_write_tokens: 0,
+      cache_hit_tokens: 0,
+      created_at: now.toISOString(),
+    });
+    const store = createSpendAlertSweepStore(db);
+    const buckets = () =>
+      db.select().from(spend_alert_hourly).where(eq(spend_alert_hourly.scope_key, scopeKey));
+    const statementTimeout = async () =>
+      (await db.execute<{ statement_timeout: string }>(sql`SHOW statement_timeout`)).rows[0]
+        ?.statement_timeout;
+    const before = await statementTimeout();
+
+    await db.transaction(async tx => {
+      await tx.execute(
+        sql`SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(${SPEND_ALERT_ROLLUP_LOCK_KEY}, 0))`
+      );
+      const result = await runSpendAlertSweep(db, { store }, { now });
+      expect(result.rollupStatus).toBe('locked');
+      expect(result.candidateScopes).toBe(0);
+      expect(await buckets()).toHaveLength(0);
+    });
+
+    const result = await runSpendAlertSweep(db, { store }, { now });
+    expect(result.rollupStatus).toBe('completed');
+    const written = await buckets();
+    expect(written).toHaveLength(1);
+    expect(written[0].cost_microdollars).toBe(2_000_000);
+    expect(await statementTimeout()).toBe(before);
+  });
 
   it('includes historical compute in the anomaly baseline and fires once for a compute-only increase', async () => {
     const { user, skuId, now } = await fixture();

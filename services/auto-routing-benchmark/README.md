@@ -1482,10 +1482,16 @@ work, it does not undo anything measured:
   would not re-queue the pairs or re-admit Ember on its own.
 - The 24 queued `profile_remeasures` rows are spent: the run the activation started claimed
   them.
-- `meta/muse-ember` ×6 has no ready rep-3 profile: the six rep-3 rows are held by the
-  stalled run, and they are not published until a rep-3 run settles them `ready`. A
-  `failed` row needs a re-admit. Its rep-1 provenance is not the current rep-3 identity,
-  so it does not stand in, and `src/platform-publish-revision-hold.test.ts` names it.
+- `meta/muse-ember` ×6 has no ready rep-3 profile. The re-admit moved its six rows from
+  `failed` to `pending`, and the stalled revision-3 run claimed them, so they are `running`
+  on that run. The pair has no candidate on any route: only a `ready` rep-3 row is
+  published, and a `running` row is not claimable either — the drain's
+  `listPendingCurrentProfiles` selects `pending` rows only, and `markProfilesRunningForRun`
+  never takes a row another run holds `running` (src/db.ts). The six become claimable again
+  only when that run settles them (`ready`/`failed`) or their claims are released back to
+  `pending`. Its rep-1 provenance is not the current rep-3 identity, so it does not stand
+  in. This is the same absence the pre-activation table showed, and
+  `src/platform-publish-revision-hold.test.ts` names it.
 - Every revision-3 result the stalled run stored stays in `case_results` and is still read
   for grading; it simply does not publish a table while its run is unfinished.
 

@@ -141,6 +141,7 @@
     "keepRunning": "Turpināt izpildi",
     "newSession": "Jauna sesija",
     "noModelsAvailable": "Nav pieejamu modeļu",
+    "modelRetires": "Tiks pārtraukts {{date}}",
     "notFound": "Neizdevās atrast meklēto.",
     "online": "Tiešsaistē",
     "open": "Atvērt {{name}}",
@@ -185,7 +186,8 @@
     "privateRepositoryA11y": "{{name}}, privāts repozitorijs",
     "legalDocumentEnglishOnly": "Šis dokuments ir pieejams tikai angļu valodā.",
     "organizationTrialEndedBilling": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Jūs varat atjaunināt norēķinu informāciju un pēc tam mēģināt vēlreiz.",
-    "organizationTrialEndedBillingAtKiloAi": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Jūs varat atjaunināt norēķinu informāciju vietnē kilo.ai un pēc tam mēģināt vēlreiz."
+    "organizationTrialEndedBillingAtKiloAi": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Jūs varat atjaunināt norēķinu informāciju vietnē kilo.ai un pēc tam mēģināt vēlreiz.",
+    "viewOnGitHub": "Skatīt PR GitHub"
   },
   "language": {
     "restarting": "Notiek restartēšana, lai lietotu izvēlēto valodu",
@@ -509,7 +511,7 @@
     "changelogFixesPolish": "Labojumi un uzlabojumi visā lietotnē.",
     "changelogAreas": {
       "signIn": "Pierakstīšanās",
-      "profileOrganizations": "Profils un organizācijas"
+      "profileOrganizations": "Profils & organizācijas"
     }
   },
   "preferences": {
@@ -764,6 +766,10 @@
       "couldNotLoadMore": "Neizdevās ielādēt vairāk komentāru.",
       "retryLoadingMore": "Mēģināt ielādēt vairāk komentāru vēlreiz",
       "loadMoreComments": "Ielādēt vairāk komentāru",
+      "conversationTruncated": "Tiek rādīti tikai pirmie {{displayCount}} komenti.",
+      "conversationTruncated_zero": "Tiek rādīti tikai pirmie {{displayCount}} komenti.",
+      "conversationTruncated_one": "Tiek rādīti tikai pirmie {{displayCount}} komenti.",
+      "conversationTruncated_other": "Tiek rādīti tikai pirmie {{displayCount}} komenti.",
       "addReaction": "Pievienot reakciju",
       "reactionPill": "{{emoji}} reakcija, {{displayCount}} {{countLabel}}",
       "reaction_one": "reakcija",
@@ -896,7 +902,6 @@
       "noAccess": "Tev nav piekļuves šī repozitorija pārbaudēm.",
       "couldNotLoad": "Neizdevās ielādēt pārbaudes.",
       "retryChecks": "Mēģināt vēlreiz ielādēt pārbaudes",
-      "viewOnGitHub": "Skatīt PR GitHub",
       "noChecksReported": "Nav informācijas par pārbaudēm",
       "passed": "sekmīgas: {{displayCount}}",
       "passed_one": "sekmīgas: {{displayCount}}",
@@ -984,6 +989,9 @@
       "pendingComment": "neiesniegti komentāri",
       "pendingComment_other": "neiesniegti komentāri",
       "submitCountOfTotal": "Iesniegt {{displayFreshCount}} no {{displayTotalCount}} komentāriem",
+      "submitCountOfTotal_zero": "Iesniegt {{displayFreshCount}} no {{displayTotalCount}} komentāriem",
+      "submitCountOfTotal_one": "Iesniegt {{displayFreshCount}} no {{displayTotalCount}} komentāriem",
+      "submitCountOfTotal_other": "Iesniegt {{displayFreshCount}} no {{displayTotalCount}} komentāriem",
       "submitReview": "Iesniegt pārskatīšanas rezultātus",
       "partialPostedFresh": "Publicēto komentāru skaits: {{displayFreshCount}}. ",
       "partialPostedFresh_zero": "Publicēto komentāru skaits: {{displayFreshCount}}. ",
@@ -1415,7 +1423,8 @@
     "followReviewMd": "Ievērot REVIEW.md norādījumus",
     "followReviewMdSubtitle": "Ievērot katra repozitorija REVIEW.md failā sniegtos norādījumus",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nav pievienots. To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki."
+      "notConnectedReadOnly": "Bitbucket nav pievienots. To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki.",
+      "notConnectedReadOnlyPlan": "Organizācijas izmēģinājuma periods ir beidzies, tāpēc īpašniekam ir jāatjaunina norēķini vietnē kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket savienojums tiek pārvaldīts tīmeklī no datora.",
@@ -3687,7 +3696,7 @@
     },
     "hub": {
       "renameTitle": "Pārdēvēt organizāciju",
-      "renamePlaceholder": "Organizācijas nosaukums",
+      "renamePlaceholder": "Ievadiet organizācijas nosaukumu",
       "balance": "Atlikums",
       "plan": "Plāns",
       "planTeams": "Teams",

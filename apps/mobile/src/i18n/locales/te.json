@@ -140,10 +140,12 @@
     "keepRunning": "అమలు కొనసాగించండి",
     "newSession": "కొత్త సెషన్",
     "noModelsAvailable": "మోడళ్లు అందుబాటులో లేవు",
+    "modelRetires": "{{date}}న రిటైర్ అవుతుంది",
     "notFound": "దొరకలేదు.",
     "online": "ఆన్‌లైన్",
     "open": "{{name}}ను తెరవండి",
     "openPullRequest": "పుల్ రిక్వెస్ట్ తెరవండి",
+    "viewOnGitHub": "GitHubలో PRని చూడండి",
     "completed": "పూర్తయింది",
     "pending": "వేచి ఉంది",
     "running": "నడుస్తోంది",
@@ -508,7 +510,7 @@
     "changelogFixesPolish": "యాప్ అంతటా పరిష్కారాలు మరియు మెరుగుదలలు.",
     "changelogAreas": {
       "signIn": "సైన్ ఇన్",
-      "profileOrganizations": "ప్రొఫైల్ మరియు సంస్థలు"
+      "profileOrganizations": "ప్రొఫైల్ ఇంకా సంస్థలు"
     }
   },
   "preferences": {
@@ -753,6 +755,9 @@
       "couldNotLoadMore": "మరిన్ని వ్యాఖ్యలను లోడ్ చేయలేకపోయాము.",
       "retryLoadingMore": "మరిన్ని వ్యాఖ్యలను లోడ్ చేయడానికి మళ్లీ ప్రయత్నించండి",
       "loadMoreComments": "మరిన్ని వ్యాఖ్యలను లోడ్ చేయండి",
+      "conversationTruncated": "మొదటి {{displayCount}} వ్యాఖ్యలను మాత్రమే చూపిస్తున్నాము.",
+      "conversationTruncated_one": "మొదటి {{displayCount}} వ్యాఖ్యలను మాత్రమే చూపిస్తున్నాము.",
+      "conversationTruncated_other": "మొదటి {{displayCount}} వ్యాఖ్యలను మాత్రమే చూపిస్తున్నాము.",
       "addReaction": "స్పందనను జోడించండి",
       "reactionPill": "{{emoji}} స్పందన, {{displayCount}} {{countLabel}}",
       "reaction_one": "స్పందన",
@@ -882,7 +887,6 @@
       "noAccess": "ఈ రిపోజిటరీ తనిఖీలను చూడటానికి మీకు అనుమతి లేదు.",
       "couldNotLoad": "తనిఖీలను లోడ్ చేయలేకపోయాము.",
       "retryChecks": "తనిఖీల కోసం మళ్లీ ప్రయత్నించండి",
-      "viewOnGitHub": "GitHubలో PRని చూడండి",
       "noChecksReported": "తనిఖీల సమాచారం లేదు",
       "passed": "{{displayCount}} విజయవంతమయ్యాయి",
       "passed_one": "{{displayCount}} విజయవంతమయ్యాయి",
@@ -937,9 +941,9 @@
       "checkFailedTitleGitLab": "GitLab కనెక్షన్‌ను తనిఖీ చేయలేకపోయాము.",
       "checkFailedTitleBitbucket": "Bitbucket కనెక్షన్‌ను తనిఖీ చేయలేకపోయాము.",
       "providerCheckFailedMessage": "ప్రొవైడర్‌ను చేరుకోలేకపోయాము. మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
-      "reconnectTitle": "GitHubకు మళ్లీ కనెక్షన్",
-      "reconnectTitleGitLab": "GitLabకు మళ్లీ కనెక్షన్",
-      "reconnectTitleBitbucket": "Bitbucketకు మళ్లీ కనెక్షన్",
+      "reconnectTitle": "GitHubను మళ్లీ కనెక్ట్ చేయండి",
+      "reconnectTitleGitLab": "GitLabను మళ్లీ కనెక్ట్ చేయండి",
+      "reconnectTitleBitbucket": "Bitbucketను మళ్లీ కనెక్ట్ చేయండి",
       "reconnectDescription": "మీ GitHub కనెక్షన్ అనుమతిని రద్దు చేశారు.",
       "gitlabDescription": "మొబైల్‌లో మెర్జ్ రిక్వెస్ట్‌లను సమీక్షించండి",
       "gitlabInstanceMismatchTitle": "GitLab కనెక్షన్ మరో ఇన్స్టాన్స్ కోసం ఉంది",
@@ -966,6 +970,8 @@
       "pendingComment": "ఇంకా పంపని వ్యాఖ్యలు",
       "pendingComment_other": "ఇంకా పంపని వ్యాఖ్యలు",
       "submitCountOfTotal": "మొత్తం {{displayTotalCount}} వ్యాఖ్యల్లో {{displayFreshCount}} వ్యాఖ్యలను సమర్పించండి",
+      "submitCountOfTotal_one": "మొత్తం {{displayTotalCount}} వ్యాఖ్యల్లో {{displayFreshCount}} వ్యాఖ్యలను సమర్పించండి",
+      "submitCountOfTotal_other": "మొత్తం {{displayTotalCount}} వ్యాఖ్యల్లో {{displayFreshCount}} వ్యాఖ్యలను సమర్పించండి",
       "submitReview": "సమీక్షను సమర్పించండి",
       "partialPostedFresh": "పోస్ట్ చేసిన వ్యాఖ్యల సంఖ్య: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "పోస్ట్ చేసిన వ్యాఖ్యల సంఖ్య: {{displayFreshCount}}. ",
@@ -1390,7 +1396,8 @@
     "followReviewMd": "REVIEW.mdను అనుసరించండి",
     "followReviewMdSubtitle": "ప్రతి రిపోజిటరీలోని REVIEW.md ఫైల్ సూచనలను పాటించండి",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket కనెక్ట్ కాలేదు. దానిని సంస్థ యజమానులు, నిర్వాహకులు మరియు బిల్లింగ్ మేనేజర్లు మాత్రమే కనెక్ట్ చేయగలరు."
+      "notConnectedReadOnly": "Bitbucket కనెక్ట్ కాలేదు. దానిని సంస్థ యజమానులు, నిర్వాహకులు మరియు బిల్లింగ్ మేనేజర్లు మాత్రమే కనెక్ట్ చేయగలరు.",
+      "notConnectedReadOnlyPlan": "సంస్థ యొక్క ట్రయల్ ముగిసింది, కాబట్టి యజమాని kilo.ai లో బిల్లింగ్‌ను అప్‌డేట్ చేయాలి."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} యొక్క Bitbucket కనెక్షన్ కంప్యూటర్ నుండి వెబ్‌లో నిర్వహించబడుతుంది.",
@@ -1842,7 +1849,7 @@
       "couldNotLoadMore": "మరిన్ని సమస్యలను లోడ్ చేయలేకపోయాము.",
       "noMatchesTitle": "ఫిల్టర్‌లకు సరిపోలే సమస్యలు లేవు",
       "noMatchesDescription": "ఎంచుకున్న ఫిల్టర్‌లను మార్చి లేదా తీసివేసి చూడండి.",
-      "emptyTitle": "పెండింగ్ సమస్యలు లేవు",
+      "emptyTitle": "ఓపెన్ సమస్యలు లేవు",
       "emptyDescription": "ప్రస్తుతం శ్రద్ధ పెట్టాల్సిన పెండింగ్ సమస్యలు లేవు."
     },
     "findingRow": {
@@ -2033,7 +2040,7 @@
     "remediationUnavailable": {
       "findingNotFound": "భద్రతా సమస్య ఇక లేదు.",
       "approvalRequired": "స్వయంచాలక పరిష్కారానికి ఆమోదం అవసరం. ఆమోదించడానికి పరిష్కారాన్ని మీరే ప్రారంభించండి.",
-      "findingNotOpen": "ఈ సమస్య ఇక పెండింగ్‌లో లేదు.",
+      "findingNotOpen": "ఈ సమస్య ఇక ఓపెన్‌లో లేదు.",
       "repoNotInScope": "భద్రతా ఏజెంట్ కోసం ఈ రిపోజిటరీని ఎంచుకోలేదు.",
       "analysisRequired": "పరిష్కారాన్ని ప్రారంభించే ముందు కోడ్‌బేస్ విశ్లేషణను అమలు చేయండి.",
       "staleAnalysis": "విశ్లేషణ తర్వాత సమస్య మారింది. పరిష్కారాన్ని ప్రారంభించే ముందు మళ్లీ విశ్లేషించండి.",
@@ -3626,7 +3633,7 @@
     },
     "hub": {
       "renameTitle": "సంస్థ పేరు మార్చండి",
-      "renamePlaceholder": "సంస్థ పేరు",
+      "renamePlaceholder": "సంస్థ పేరును నమోదు చేయండి",
       "balance": "బ్యాలెన్స్",
       "plan": "ప్లాన్",
       "planTeams": "Teams",

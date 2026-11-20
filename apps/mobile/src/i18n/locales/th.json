@@ -140,10 +140,12 @@
     "keepRunning": "ให้ทำงานต่อ",
     "newSession": "เซสชันใหม่",
     "noModelsAvailable": "ไม่มีโมเดลที่ใช้งานได้",
+    "modelRetires": "เลิกใช้ {{date}}",
     "notFound": "ไม่พบข้อมูล",
     "online": "ออนไลน์",
     "open": "เปิด {{name}}",
     "openPullRequest": "เปิด PR",
+    "viewOnGitHub": "ดู PR บน GitHub",
     "completed": "เสร็จสิ้น",
     "pending": "รอดำเนินการ",
     "running": "กำลังทำงาน",
@@ -508,7 +510,7 @@
     "changelogFixesPolish": "การแก้ไขและปรับปรุงทั่วทั้งแอป",
     "changelogAreas": {
       "signIn": "การลงชื่อเข้าใช้",
-      "profileOrganizations": "โปรไฟล์และองค์กร"
+      "profileOrganizations": "โปรไฟล์กับองค์กร"
     }
   },
   "preferences": {
@@ -753,6 +755,9 @@
       "couldNotLoadMore": "ไม่สามารถโหลดความคิดเห็นเพิ่มได้",
       "retryLoadingMore": "ลองโหลดความคิดเห็นเพิ่มอีกครั้ง",
       "loadMoreComments": "โหลดความคิดเห็นเพิ่ม",
+      "conversationTruncated": "กำลังแสดง {{displayCount}} ความคิดเห็นแรกเท่านั้น",
+      "conversationTruncated_one": "กำลังแสดง {{displayCount}} ความคิดเห็นแรกเท่านั้น",
+      "conversationTruncated_other": "กำลังแสดง {{displayCount}} ความคิดเห็นแรกเท่านั้น",
       "addReaction": "แสดงความรู้สึก",
       "reactionPill": "การแสดงความรู้สึก {{emoji}}: {{displayCount}} {{countLabel}}",
       "reaction_one": "การแสดงความรู้สึก",
@@ -882,7 +887,6 @@
       "noAccess": "คุณไม่มีสิทธิ์ดูผลการตรวจสอบของรีโพซิทอรีนี้",
       "couldNotLoad": "ไม่สามารถโหลดผลการตรวจสอบได้",
       "retryChecks": "ลองตรวจสอบอีกครั้ง",
-      "viewOnGitHub": "ดู PR บน GitHub",
       "noChecksReported": "ยังไม่มีรายงานผลการตรวจสอบ",
       "passed": "ผ่าน {{displayCount}} รายการ",
       "passed_one": "ผ่าน {{displayCount}} รายการ",
@@ -966,6 +970,8 @@
       "pendingComment": "ความคิดเห็นที่รอส่ง",
       "pendingComment_other": "ความคิดเห็นที่รอส่ง",
       "submitCountOfTotal": "ส่งความคิดเห็น {{displayFreshCount}} จาก {{displayTotalCount}} รายการ",
+      "submitCountOfTotal_one": "ส่งความคิดเห็น {{displayFreshCount}} จาก {{displayTotalCount}} รายการ",
+      "submitCountOfTotal_other": "ส่งความคิดเห็น {{displayFreshCount}} จาก {{displayTotalCount}} รายการ",
       "submitReview": "ส่งรีวิว",
       "partialPostedFresh": "โพสต์ความคิดเห็นแล้ว {{displayFreshCount}} รายการ ",
       "partialPostedFresh_one": "โพสต์ความคิดเห็นแล้ว {{displayFreshCount}} รายการ ",
@@ -1390,7 +1396,8 @@
     "followReviewMd": "ปฏิบัติตาม REVIEW.md",
     "followReviewMdSubtitle": "ทำตามคำแนะนำในไฟล์ REVIEW.md ของแต่ละคลังโค้ด",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ยังไม่เชื่อมต่อ เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถเชื่อมต่อได้"
+      "notConnectedReadOnly": "Bitbucket ยังไม่เชื่อมต่อ เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถเชื่อมต่อได้",
+      "notConnectedReadOnlyPlan": "การทดลองใช้งานขององค์กรสิ้นสุดลงแล้ว เจ้าของจึงต้องอัปเดตการเรียกเก็บเงินที่ kilo.ai"
     },
     "bitbucketConnect": {
       "managedOnWeb": "การเชื่อมต่อ Bitbucket ของ {{organization}} ได้รับการจัดการบนเว็บจากคอมพิวเตอร์",
@@ -3626,7 +3633,7 @@
     },
     "hub": {
       "renameTitle": "เปลี่ยนชื่อองค์กร",
-      "renamePlaceholder": "ชื่อองค์กร",
+      "renamePlaceholder": "กรอกชื่อองค์กร",
       "balance": "ยอดคงเหลือ",
       "plan": "แผน",
       "planTeams": "Teams",

@@ -142,6 +142,7 @@
     "keepRunning": "Nie przerywaj",
     "newSession": "Nowa sesja",
     "noModelsAvailable": "Brak dostępnych modeli",
+    "modelRetires": "Wycofany {{date}}",
     "notFound": "Nie znaleziono elementu.",
     "online": "W sieci",
     "open": "Otwórz {{name}}",
@@ -186,7 +187,8 @@
     "privateRepositoryA11y": "{{name}}, prywatne repozytorium",
     "legalDocumentEnglishOnly": "Ten dokument jest dostępny wyłącznie w języku angielskim.",
     "organizationTrialEndedBilling": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia, a następnie spróbować ponownie.",
-    "organizationTrialEndedBillingAtKiloAi": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia na kilo.ai, a następnie spróbować ponownie."
+    "organizationTrialEndedBillingAtKiloAi": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia na kilo.ai, a następnie spróbować ponownie.",
+    "viewOnGitHub": "Zobacz PR w serwisie GitHub"
   },
   "language": {
     "restarting": "Ponowne uruchamianie po zmianie języka",
@@ -510,7 +512,7 @@
     "changelogFixesPolish": "Poprawki i ulepszenia w całej aplikacji.",
     "changelogAreas": {
       "signIn": "Logowanie",
-      "profileOrganizations": "Profil i organizacje"
+      "profileOrganizations": "Profil oraz organizacje"
     }
   },
   "preferences": {
@@ -700,7 +702,8 @@
     },
     "autoReviews": "Automatyczne przeglądy",
     "bitbucket": {
-      "notConnectedReadOnly": "Brak połączenia z Bitbucket. Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je skonfigurować."
+      "notConnectedReadOnly": "Brak połączenia z Bitbucket. Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je skonfigurować.",
+      "notConnectedReadOnlyPlan": "Okres próbny organizacji zakończył się, więc właściciel musi zaktualizować rozliczenia na kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Połączeniem {{organization}} z Bitbucket zarządza się w przeglądarce na komputerze.",
@@ -751,9 +754,9 @@
     },
     "providerConnect": {
       "description": "Skonfiguruj połączenie z Kilo ({{label}}), aby automatycznie przeglądać PR.",
-      "githubApp": "Aplikacja GitHub",
+      "githubApp": "aplikacja GitHub",
       "githubError": "Nie udało się otworzyć konfiguracji GitHub. Spróbuj ponownie.",
-      "gitlabAccount": "Konto GitLab",
+      "gitlabAccount": "konto GitLab",
       "gitlabError": "Nie udało się otworzyć konfiguracji GitLab. Spróbuj ponownie."
     },
     "reviewDetail": {
@@ -1252,7 +1255,7 @@
       "dueThisWeekDetail_many": "W tym {{exploitable}} z potwierdzoną możliwością wykorzystania w ataku",
       "dueThisWeekDetail_other": "W tym {{exploitable}} z potwierdzoną możliwością wykorzystania w ataku",
       "noDeadline": "Brak terminu",
-      "reviewSlaAssignment": "Sprawdź przypisane terminy SLA",
+      "reviewSlaAssignment": "Sprawdź przydział SLA",
       "allOpenFindingsTracked": "Wszystkie otwarte problemy są monitorowane"
     },
     "dismiss": {
@@ -2864,7 +2867,6 @@
       "skipped_few": "pominięte: {{displayCount}}",
       "skipped_many": "pominięte: {{displayCount}}",
       "title": "Kontrole",
-      "viewOnGitHub": "Zobacz PR w serwisie GitHub",
       "checkDetails": "szczegóły kontroli"
     },
     "composer": {
@@ -2925,6 +2927,11 @@
       "commentActions": "Opcje komentarza",
       "comment": "{{displayCount}} komentarza",
       "comment_other": "{{displayCount}} komentarza",
+      "conversationTruncated": "Widoczne są tylko pierwsze {{displayCount}} komentarze.",
+      "conversationTruncated_one": "Widoczne są tylko pierwsze {{displayCount}} komentarze.",
+      "conversationTruncated_few": "Widoczne są tylko pierwsze {{displayCount}} komentarze.",
+      "conversationTruncated_many": "Widoczne są tylko pierwsze {{displayCount}} komentarze.",
+      "conversationTruncated_other": "Widoczne są tylko pierwsze {{displayCount}} komentarze.",
       "couldNotLoad": "Nie udało się wczytać dyskusji.",
       "couldNotLoadMore": "Nie udało się wczytać kolejnych komentarzy.",
       "loadMoreComments": "Wczytaj kolejne komentarze",
@@ -3353,6 +3360,10 @@
       "partialPostedStale_many": "Komentarze dotyczące starszego commita pozostały w kolejce. Ich liczba: {{displayStaleCount}}.",
       "partialPostedStale_other": "Komentarze dotyczące starszego commita pozostały w kolejce. Ich liczba: {{displayStaleCount}}.",
       "submitCountOfTotal": "Wyślij {{displayFreshCount}} z {{displayTotalCount}} komentarzy",
+      "submitCountOfTotal_one": "Wyślij {{displayFreshCount}} z {{displayTotalCount}} komentarzy",
+      "submitCountOfTotal_few": "Wyślij {{displayFreshCount}} z {{displayTotalCount}} komentarzy",
+      "submitCountOfTotal_many": "Wyślij {{displayFreshCount}} z {{displayTotalCount}} komentarzy",
+      "submitCountOfTotal_other": "Wyślij {{displayFreshCount}} z {{displayTotalCount}} komentarzy",
       "submitReview": "Prześlij wynik przeglądu",
       "pendingComment_few": "oczekujące komentarze",
       "pendingComment_many": "oczekujących komentarzy",
@@ -3568,7 +3579,7 @@
       "planStatusLapsed": " · Zakończony",
       "planEnded": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu.",
       "manageBilling": "Zarządzaj rozliczeniami",
-      "renamePlaceholder": "Nazwa organizacji",
+      "renamePlaceholder": "Wpisz nazwę organizacji",
       "renameTitle": "Zmień nazwę organizacji"
     },
     "inviteMember": {

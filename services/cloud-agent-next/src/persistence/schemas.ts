@@ -1,7 +1,7 @@
 import { setupCommandsSchema } from '@kilocode/cloud-agent-profile/setup-script';
 import { environmentSetupCommandCountSchema } from '../shared/setup-script.js';
 import {
-  RuntimeSkillsSchema,
+  PersistedRuntimeSkillsSchema,
   RuntimeAgentsSchema,
   RuntimeBuiltinAgentsSchema,
   RuntimeModelContextLimitsSchema,
@@ -252,7 +252,12 @@ const SharedSessionProfileFields = {
   encryptedSecrets: EncryptedSecretsSchema.optional(),
   setupCommands: setupCommandsSchema.optional(),
   mcpServers: mcpServersRecordSchema(MCPServerConfigSchema).optional(),
-  runtimeSkills: RuntimeSkillsSchema.optional(),
+  /**
+   * Stored bundles are read with the path rule's tolerance: a companion file
+   * written under an earlier rule is dropped instead of failing the whole
+   * payload. A caller's own skills are validated with `RuntimeSkillsSchema`.
+   */
+  runtimeSkills: PersistedRuntimeSkillsSchema,
   runtimeAgents: RuntimeAgentsSchema.optional(),
   builtinAgents: RuntimeBuiltinAgentsSchema.optional(),
   modelContextLimits: RuntimeModelContextLimitsSchema.optional(),

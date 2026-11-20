@@ -141,6 +141,7 @@
     "keepRunning": "Mantener en ejecución",
     "newSession": "Nueva sesión",
     "noModelsAvailable": "No hay modelos disponibles",
+    "modelRetires": "Se retira el {{date}}",
     "notFound": "No se ha encontrado.",
     "online": "En línea",
     "open": "Abrir {{name}}",
@@ -185,7 +186,8 @@
     "privateRepositoryA11y": "{{name}}, repositorio privado",
     "legalDocumentEnglishOnly": "Este documento solo está disponible en inglés.",
     "organizationTrialEndedBilling": "La prueba de la organización ha finalizado y no tiene ningún plan activo. Puedes actualizar la facturación y, después, volver a intentarlo.",
-    "organizationTrialEndedBillingAtKiloAi": "La prueba de la organización ha finalizado y no tiene ningún plan activo. Puedes actualizar la facturación en kilo.ai y, después, volver a intentarlo."
+    "organizationTrialEndedBillingAtKiloAi": "La prueba de la organización ha finalizado y no tiene ningún plan activo. Puedes actualizar la facturación en kilo.ai y, después, volver a intentarlo.",
+    "viewOnGitHub": "Ver PR en GitHub"
   },
   "language": {
     "restarting": "Reiniciando para aplicar el idioma",
@@ -509,7 +511,7 @@
     "changelogFixesPolish": "Correcciones y mejoras en toda la aplicación.",
     "changelogAreas": {
       "signIn": "Inicio de sesión",
-      "profileOrganizations": "Perfil y organizaciones"
+      "profileOrganizations": "Perfil & organizaciones"
     }
   },
   "preferences": {
@@ -699,7 +701,8 @@
     },
     "autoReviews": "Revisiones automáticas",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket no está conectado. Solo los propietarios de la organización, los administradores y los gestores de facturación pueden conectarlo."
+      "notConnectedReadOnly": "Bitbucket no está conectado. Solo los propietarios de la organización, los administradores y los gestores de facturación pueden conectarlo.",
+      "notConnectedReadOnlyPlan": "La prueba de la organización ha finalizado, así que un propietario debe actualizar la facturación en kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "La conexión de Bitbucket con {{organization}} se gestiona en la web desde un ordenador.",
@@ -750,9 +753,9 @@
     },
     "providerConnect": {
       "description": "Conecta la {{label}} de Kilo para revisar PR automáticamente.",
-      "githubApp": "Aplicación de GitHub",
+      "githubApp": "aplicación de GitHub",
       "githubError": "No se pudo abrir la configuración de GitHub. Inténtalo de nuevo.",
-      "gitlabAccount": "Cuenta de GitLab",
+      "gitlabAccount": "cuenta de GitLab",
       "gitlabError": "No se pudo abrir la configuración de GitLab. Inténtalo de nuevo."
     },
     "reviewDetail": {
@@ -2824,7 +2827,6 @@
       "skipped_other": "{{displayCount}} omitidas",
       "skipped_many": "{{displayCount}} omitidas",
       "title": "Verificaciones",
-      "viewOnGitHub": "Ver PR en GitHub",
       "checkDetails": "detalles de la verificación"
     },
     "composer": {
@@ -2888,6 +2890,10 @@
       "couldNotLoad": "No se pudo cargar la conversación.",
       "couldNotLoadMore": "No se pudieron cargar más comentarios.",
       "loadMoreComments": "Cargar más comentarios",
+      "conversationTruncated": "Solo se muestran los primeros {{displayCount}} comentarios.",
+      "conversationTruncated_one": "Solo se muestran los primeros {{displayCount}} comentarios.",
+      "conversationTruncated_many": "Solo se muestran los primeros {{displayCount}} comentarios.",
+      "conversationTruncated_other": "Solo se muestran los primeros {{displayCount}} comentarios.",
       "loading": "Cargando la conversación",
       "moderation": {
         "block": {
@@ -3296,6 +3302,9 @@
       "partialPostedStale_many": "Comentarios sobre una confirmación anterior que siguen pendientes de envío: {{displayStaleCount}}.",
       "partialPostedStale_other": "Comentarios sobre una confirmación anterior que siguen pendientes de envío: {{displayStaleCount}}.",
       "submitCountOfTotal": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentarios",
+      "submitCountOfTotal_one": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentarios",
+      "submitCountOfTotal_many": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentarios",
+      "submitCountOfTotal_other": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentarios",
       "submitReview": "Enviar revisión",
       "pendingComment_many": "comentarios pendientes",
       "blockedRequestChanges": "Añade un resumen o al menos un comentario para solicitar cambios.",
@@ -3508,7 +3517,7 @@
       "planStatusLapsed": " · Finalizado",
       "planEnded": "La prueba de la organización ha finalizado y no tiene ningún plan activo.",
       "manageBilling": "Gestionar facturación",
-      "renamePlaceholder": "Nombre de la organización",
+      "renamePlaceholder": "Introduce un nombre para la organización",
       "renameTitle": "Cambiar nombre de la organización"
     },
     "inviteMember": {

@@ -142,10 +142,12 @@
     "keepRunning": "Продовжити виконання",
     "newSession": "Новий сеанс",
     "noModelsAvailable": "Немає доступних моделей",
+    "modelRetires": "Виводиться {{date}}",
     "notFound": "Не знайдено.",
     "online": "У мережі",
     "open": "Відкрити {{name}}",
     "openPullRequest": "Відкрити запит на злиття",
+    "viewOnGitHub": "Переглянути PR на GitHub",
     "completed": "Завершено",
     "pending": "Очікує",
     "running": "Виконується",
@@ -510,7 +512,7 @@
     "changelogFixesPolish": "Виправлення та покращення в усьому застосунку.",
     "changelogAreas": {
       "signIn": "Вхід",
-      "profileOrganizations": "Профіль і організації"
+      "profileOrganizations": "Профіль та організації"
     }
   },
   "preferences": {
@@ -700,7 +702,8 @@
     },
     "autoReviews": "Автоматичні перевірки",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket не підключено. Підключити його можуть лише власники організації, адміністратори та менеджери з оплати."
+      "notConnectedReadOnly": "Bitbucket не підключено. Підключити його можуть лише власники організації, адміністратори та менеджери з оплати.",
+      "notConnectedReadOnlyPlan": "Пробний період організації завершився, тож власник має оновити платіжні дані на kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Підключенням Bitbucket для {{organization}} можна керувати лише у вебверсії з комп'ютера.",
@@ -751,9 +754,9 @@
     },
     "providerConnect": {
       "description": "Підключіть {{label}} до Kilo, щоб автоматично перевіряти запити на злиття.",
-      "githubApp": "Застосунок GitHub",
+      "githubApp": "застосунок GitHub",
       "githubError": "Не вдалося відкрити налаштування GitHub. Спробуйте ще раз.",
-      "gitlabAccount": "Обліковий запис GitLab",
+      "gitlabAccount": "обліковий запис GitLab",
       "gitlabError": "Не вдалося відкрити налаштування GitLab. Спробуйте ще раз."
     },
     "reviewDetail": {
@@ -1252,7 +1255,7 @@
       "dueThisWeekDetail_many": "З них {{exploitable}} з підтвердженою можливістю атаки",
       "dueThisWeekDetail_other": "З них {{exploitable}} з підтвердженою можливістю атаки",
       "noDeadline": "Терміну немає",
-      "reviewSlaAssignment": "Перевірити встановлені терміни за SLA",
+      "reviewSlaAssignment": "Перевірити призначення термінів за SLA",
       "allOpenFindingsTracked": "Усі відкриті проблеми відстежуються"
     },
     "dismiss": {
@@ -1461,7 +1464,7 @@
       "failedDescription": "Агент безпеки не зміг завершити аналіз.",
       "extractionFailedDescription": "Технічний звіт не вдалося перетворити на структурований результат.",
       "exploitableDescription": "У коді застосунку є шлях до вразливої функції.",
-      "notExploitable": "Недосяжний код",
+      "notExploitable": "Недосяжний шлях",
       "notExploitableDescription": "У цьому репозиторії не знайдено шляху виконання до вразливої функції.",
       "unknown": "Потребує перевірки",
       "unknownDescription": "Не вдалося підтвердити, чи є в коді шлях до вразливої функції.",
@@ -2864,7 +2867,6 @@
       "skipped_few": "пропущено: {{displayCount}}",
       "skipped_many": "пропущено: {{displayCount}}",
       "title": "Перевірки",
-      "viewOnGitHub": "Переглянути PR на GitHub",
       "checkDetails": "відомості про перевірку"
     },
     "composer": {
@@ -2928,6 +2930,11 @@
       "couldNotLoad": "Не вдалося завантажити обговорення.",
       "couldNotLoadMore": "Не вдалося завантажити наступні коментарі.",
       "loadMoreComments": "Завантажити ще коментарі",
+      "conversationTruncated": "Показано лише перші {{displayCount}} коментарів.",
+      "conversationTruncated_one": "Показано лише перші {{displayCount}} коментарів.",
+      "conversationTruncated_other": "Показано лише перші {{displayCount}} коментарів.",
+      "conversationTruncated_few": "Показано лише перші {{displayCount}} коментарів.",
+      "conversationTruncated_many": "Показано лише перші {{displayCount}} коментарів.",
       "loading": "Завантаження обговорення",
       "moderation": {
         "block": {
@@ -3353,6 +3360,10 @@
       "partialPostedStale_many": "У черзі залишилися коментарі до попереднього коміту: {{displayStaleCount}}.",
       "partialPostedStale_other": "У черзі залишилися коментарі до попереднього коміту: {{displayStaleCount}}.",
       "submitCountOfTotal": "Надіслати {{displayFreshCount}} із {{displayTotalCount}} коментарів",
+      "submitCountOfTotal_one": "Надіслати {{displayFreshCount}} із {{displayTotalCount}} коментарів",
+      "submitCountOfTotal_few": "Надіслати {{displayFreshCount}} із {{displayTotalCount}} коментарів",
+      "submitCountOfTotal_many": "Надіслати {{displayFreshCount}} із {{displayTotalCount}} коментарів",
+      "submitCountOfTotal_other": "Надіслати {{displayFreshCount}} із {{displayTotalCount}} коментарів",
       "submitReview": "Надіслати результати перевірки",
       "pendingComment_few": "ненадіслані коментарі",
       "pendingComment_many": "ненадісланих коментарів",
@@ -3568,7 +3579,7 @@
       "planStatusLapsed": " · Завершився",
       "planEnded": "Пробний період організації завершився, і вона не має активного плану.",
       "manageBilling": "Керувати оплатою",
-      "renamePlaceholder": "Назва організації",
+      "renamePlaceholder": "Введіть назву організації",
       "renameTitle": "Перейменувати організацію"
     },
     "inviteMember": {

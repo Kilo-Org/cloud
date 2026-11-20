@@ -260,6 +260,7 @@ describe('GET /api/cron/sync-model-stats', () => {
       ...raw,
       name: 'Synthetic public name',
       pricing: { prompt: '0', completion: '0' },
+      retires_on: '2026-11-20',
     };
     const enhancedOnly = catalogModel('qwen/qwen3-8b');
     jest.mocked(getRawOpenRouterModels).mockResolvedValue({ data: [monitoredModel, raw] });
@@ -267,7 +268,10 @@ describe('GET /api/cron/sync-model-stats', () => {
 
     expect((await GET(request())).status).toBe(200);
     expect(syncOpenRouterModels).toHaveBeenCalledWith(
-      [monitoredModel, { ...raw, name: enhanced.name, pricing: enhanced.pricing }],
+      [
+        monitoredModel,
+        { ...raw, name: enhanced.name, pricing: enhanced.pricing, retires_on: '2026-11-20' },
+      ],
       [monitoredModel.id]
     );
     expectExistingSyncCalls();
@@ -283,6 +287,7 @@ describe('GET /api/cron/sync-model-stats', () => {
       description: 'Not the raw description',
       context_length: 1234,
       pricing: { prompt: '0', completion: '0' },
+      retires_on: '2026-11-20',
     };
     const enhancedOnly = catalogModel('qwen/qwen3-8b');
     const unreviewed = catalogModel('fixture/unreviewed');
@@ -302,7 +307,7 @@ describe('GET /api/cron/sync-model-stats', () => {
     expect(syncOpenRouterModels).toHaveBeenCalledWith(
       [
         monitoredModel,
-        { ...raw, name: enhanced.name, pricing: enhanced.pricing },
+        { ...raw, name: enhanced.name, pricing: enhanced.pricing, retires_on: '2026-11-20' },
         suppressed,
         enhancedOnly,
       ],

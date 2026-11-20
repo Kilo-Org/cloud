@@ -140,10 +140,12 @@
     "keepRunning": "To‘xtatmaslik",
     "newSession": "Yangi seans",
     "noModelsAvailable": "Modellar mavjud emas",
+    "modelRetires": "Tugatiladi {{date}}",
     "notFound": "Topilmadi.",
     "online": "Onlayn",
     "open": "{{name}}ni ochish",
     "openPullRequest": "Ochiq PR",
+    "viewOnGitHub": "PRni GitHubda ko'rish",
     "completed": "Yakunlangan",
     "pending": "Kutilmoqda",
     "running": "Ishlamoqda",
@@ -508,7 +510,7 @@
     "changelogFixesPolish": "Butun ilova bo‘ylab tuzatishlar va yaxshilanishlar.",
     "changelogAreas": {
       "signIn": "Kirish",
-      "profileOrganizations": "Profil va tashkilotlar"
+      "profileOrganizations": "Profil hamda tashkilotlar"
     }
   },
   "preferences": {
@@ -753,6 +755,9 @@
       "couldNotLoadMore": "Qolgan izohlarni yuklab bo'lmadi.",
       "retryLoadingMore": "Qolgan izohlarni qayta yuklash",
       "loadMoreComments": "Yana izoh yuklash",
+      "conversationTruncated": "Faqat dastlabki {{displayCount}} ta izoh ko'rsatilmoqda.",
+      "conversationTruncated_one": "Faqat dastlabki {{displayCount}} ta izoh ko'rsatilmoqda.",
+      "conversationTruncated_other": "Faqat dastlabki {{displayCount}} ta izoh ko'rsatilmoqda.",
       "addReaction": "Reaksiya qo'shish",
       "reactionPill": "{{emoji}} reaksiyasi, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaksiya",
@@ -882,7 +887,6 @@
       "noAccess": "Sizda bu ombor tekshiruvlariga kirish huquqi yo'q.",
       "couldNotLoad": "Tekshiruvlarni yuklab bo'lmadi.",
       "retryChecks": "Tekshiruvlarni qayta yuklash",
-      "viewOnGitHub": "PRni GitHubda ko'rish",
       "noChecksReported": "Tekshiruv natijalari yo'q",
       "passed": "{{displayCount}} tasi o'tdi",
       "passed_one": "{{displayCount}} tasi o'tdi",
@@ -937,9 +941,9 @@
       "checkFailedTitleGitLab": "GitLab ulanishini tekshirib bo'lmadi.",
       "checkFailedTitleBitbucket": "Bitbucket ulanishini tekshirib bo'lmadi.",
       "providerCheckFailedMessage": "Provayder bilan bog'lanib bo'lmadi. Ulanishni tekshiring va qayta urinib ko'ring.",
-      "reconnectTitle": "GitHubga qayta ulanish",
-      "reconnectTitleGitLab": "GitLabga qayta ulanish",
-      "reconnectTitleBitbucket": "Bitbucketga qayta ulanish",
+      "reconnectTitle": "GitHubni qayta ulash",
+      "reconnectTitleGitLab": "GitLabni qayta ulash",
+      "reconnectTitleBitbucket": "Bitbucketni qayta ulash",
       "reconnectDescription": "GitHub ulanishingiz bekor qilingan.",
       "gitlabDescription": "Merge so‘rovlari tekshiruvlarini mobil qurilmada bajarish",
       "gitlabInstanceMismatchTitle": "GitLab ulanishi boshqa instansiya uchun",
@@ -966,6 +970,8 @@
       "pendingComment": "yuborilmagan izoh",
       "pendingComment_other": "yuborilmagan izoh",
       "submitCountOfTotal": "{{displayTotalCount}} ta izohdan {{displayFreshCount}} tasini yuborish",
+      "submitCountOfTotal_one": "{{displayTotalCount}} ta izohdan {{displayFreshCount}} tasini yuborish",
+      "submitCountOfTotal_other": "{{displayTotalCount}} ta izohdan {{displayFreshCount}} tasini yuborish",
       "submitReview": "Ko‘rib chiqish natijasini yuborish",
       "partialPostedFresh": "{{displayFreshCount}} ta izoh yuborildi. ",
       "partialPostedFresh_one": "{{displayFreshCount}} ta izoh yuborildi. ",
@@ -1390,7 +1396,8 @@
     "followReviewMd": "REVIEW.md fayliga amal qilish",
     "followReviewMdSubtitle": "Har bir repozitoriyaning REVIEW.md faylidagi ko'rsatmalarga amal qilish",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ulanmagan. Faqat tashkilot egalar, administratorlar va to'lov menejerlari uni ulashi mumkin."
+      "notConnectedReadOnly": "Bitbucket ulanmagan. Faqat tashkilot egalar, administratorlar va to'lov menejerlari uni ulashi mumkin.",
+      "notConnectedReadOnlyPlan": "Tashkilotning sinov muddati tugadi, shuning uchun egasi kilo.ai saytida hisob-kitobni yangilashi kerak."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} uchun Bitbucket ulanishi kompyuterdan veb orqali boshqariladi.",
@@ -1984,7 +1991,7 @@
       "failedDescription": "Xavfsizlik agenti tahlilni yakunlay olmadi.",
       "extractionFailedDescription": "Texnik hisobotni tuzilmali natijaga aylantirib bo'lmadi.",
       "exploitableDescription": "Ilova kodi zaiflik mavjud funksiyani chaqira oladi.",
-      "notExploitable": "Kodga yetib borib bo‘lmaydi",
+      "notExploitable": "Yetib bo'lmaydigan yo'l",
       "notExploitableDescription": "Bu repozitoriyada zaiflik mavjud funksiyaga olib boradigan kod yo'li topilmadi.",
       "unknown": "Ko‘rib chiqish kerak",
       "unknownDescription": "Tahlil zaiflik mavjud funksiyani chaqirish mumkinligini tasdiqlay olmadi.",
@@ -3626,7 +3633,7 @@
     },
     "hub": {
       "renameTitle": "Tashkilot nomini o'zgartirish",
-      "renamePlaceholder": "Tashkilot nomi",
+      "renamePlaceholder": "Tashkilot nomini kiriting",
       "balance": "Balans",
       "plan": "Tarif",
       "planTeams": "Teams",

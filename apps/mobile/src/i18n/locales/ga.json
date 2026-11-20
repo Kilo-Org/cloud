@@ -143,6 +143,7 @@
     "keepRunning": "Fág ag rith é",
     "newSession": "Seisiún nua",
     "noModelsAvailable": "Níl aon samhail ar fáil",
+    "modelRetires": "Dáta scoir: {{date}}",
     "notFound": "Níor aimsíodh é.",
     "online": "Ar líne",
     "open": "Oscail {{name}}",
@@ -187,7 +188,8 @@
     "privateRepositoryA11y": "{{name}}, stór príobháideach",
     "legalDocumentEnglishOnly": "Tá an doiciméad seo ar fáil i mBéarla amháin.",
     "organizationTrialEndedBilling": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir leat an billeáil a nuashonrú agus ansin triail a bhaint as arís.",
-    "organizationTrialEndedBillingAtKiloAi": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir leat an billeáil a nuashonrú ag kilo.ai agus ansin triail a bhaint as arís."
+    "organizationTrialEndedBillingAtKiloAi": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir leat an billeáil a nuashonrú ag kilo.ai agus ansin triail a bhaint as arís.",
+    "viewOnGitHub": "Féach ar an PR ar GitHub"
   },
   "language": {
     "restarting": "Ag atosú chun an teanga a chur i bhfeidhm",
@@ -511,7 +513,7 @@
     "changelogFixesPolish": "Ceartúcháin agus feabhsuithe ar fud na haipe.",
     "changelogAreas": {
       "signIn": "Síniú isteach",
-      "profileOrganizations": "Próifíl agus eagraíochtaí"
+      "profileOrganizations": "Próifíl & eagraíochtaí"
     }
   },
   "preferences": {
@@ -782,6 +784,12 @@
       "comment_one": "1 trácht",
       "comment": "{{displayCount}} trácht",
       "comment_other": "{{displayCount}} trácht",
+      "conversationTruncated": "Ní thaispeántar ach na chéad {{displayCount}} thrácht.",
+      "conversationTruncated_one": "Ní thaispeántar ach na chéad {{displayCount}} thrácht.",
+      "conversationTruncated_two": "Ní thaispeántar ach na chéad {{displayCount}} thrácht.",
+      "conversationTruncated_few": "Ní thaispeántar ach na chéad {{displayCount}} thrácht.",
+      "conversationTruncated_many": "Ní thaispeántar ach na chéad {{displayCount}} thrácht.",
+      "conversationTruncated_other": "Ní thaispeántar ach na chéad {{displayCount}} thrácht.",
       "startedRelative": " · tosaithe {{relative}}",
       "couldNotLoadMore": "Níorbh fhéidir tuilleadh tráchtanna a lódáil.",
       "retryLoadingMore": "Bain triail as tuilleadh tráchtanna a lódáil arís",
@@ -924,7 +932,6 @@
       "noAccess": "Níl rochtain agat ar sheiceálacha an stóir seo.",
       "couldNotLoad": "Níorbh fhéidir na seiceálacha a lódáil.",
       "retryChecks": "Bain triail as na seiceálacha arís",
-      "viewOnGitHub": "Féach ar an PR ar GitHub",
       "noChecksReported": "Níor tuairiscíodh aon seiceáil",
       "passed": "{{displayCount}} rathúil",
       "passed_one": "{{displayCount}} rathúil",
@@ -991,9 +998,9 @@
       "checkFailedTitleGitLab": "Níorbh fhéidir an nasc GitLab a sheiceáil.",
       "checkFailedTitleBitbucket": "Níorbh fhéidir an nasc Bitbucket a sheiceáil.",
       "providerCheckFailedMessage": "Níorbh fhéidir nasc leis an soláthraí a dhéanamh. Seiceáil do nasc agus bain triail as arís.",
-      "reconnectTitle": "Athnasc GitHub",
-      "reconnectTitleGitLab": "Athnasc GitLab",
-      "reconnectTitleBitbucket": "Athnasc Bitbucket",
+      "reconnectTitle": "Ceangail le GitHub arís",
+      "reconnectTitleGitLab": "Ceangail le GitLab arís",
+      "reconnectTitleBitbucket": "Ceangail le Bitbucket arís",
       "reconnectDescription": "Cúlghaireadh do nasc GitHub.",
       "gitlabDescription": "Athbhreithnigh iarratais chumaisc ar fhón",
       "gitlabInstanceMismatchTitle": "Baineann nasc GitLab le hásc eile",
@@ -1020,6 +1027,11 @@
       "pendingComment": "trácht ar feitheamh",
       "pendingComment_other": "trácht ar feitheamh",
       "submitCountOfTotal": "Seol {{displayFreshCount}} de {{displayTotalCount}} trácht",
+      "submitCountOfTotal_one": "Seol {{displayFreshCount}} de {{displayTotalCount}} trácht",
+      "submitCountOfTotal_two": "Seol {{displayFreshCount}} de {{displayTotalCount}} trácht",
+      "submitCountOfTotal_few": "Seol {{displayFreshCount}} de {{displayTotalCount}} trácht",
+      "submitCountOfTotal_many": "Seol {{displayFreshCount}} de {{displayTotalCount}} trácht",
+      "submitCountOfTotal_other": "Seol {{displayFreshCount}} de {{displayTotalCount}} trácht",
       "submitReview": "Seol an t-athbhreithniú",
       "partialPostedFresh": "Líon na dtráchtanna a postáladh: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Líon na dtráchtanna a postáladh: {{displayFreshCount}}. ",
@@ -1465,7 +1477,8 @@
     "followReviewMd": "Lean REVIEW.md",
     "followReviewMdSubtitle": "Lean na treoracha sna comhaid REVIEW.md i ngach stór",
     "bitbucket": {
-      "notConnectedReadOnly": "Níl Bitbucket nasctha. Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta é a cheangal."
+      "notConnectedReadOnly": "Níl Bitbucket nasctha. Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta é a cheangal.",
+      "notConnectedReadOnlyPlan": "Tá tréimhse trialach na heagraíochta thart, mar sin caithfidh úinéir an billeáil a nuashonrú ag kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bainistítear nasc Bitbucket le {{organization}} ar an ngréasán ó ríomhaire.",
@@ -3809,7 +3822,7 @@
     },
     "hub": {
       "renameTitle": "Athainmnigh an eagraíocht",
-      "renamePlaceholder": "Ainm na heagraíochta",
+      "renamePlaceholder": "Cuir isteach ainm eagraíochta",
       "balance": "Iarmhéid",
       "plan": "Plean",
       "planTeams": "Teams",

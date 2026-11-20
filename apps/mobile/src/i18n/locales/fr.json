@@ -72,7 +72,7 @@
     "findings": "Problèmes détectés",
     "mergeRequest": "requête de fusion",
     "notConnected": "Non connecté",
-    "notifications": "Alertes et notifications",
+    "notifications": "Alertes & notifications",
     "pullRequest": "PR",
     "repositories": "Dépôts",
     "securityAgent": "Agent de sécurité",
@@ -141,6 +141,7 @@
     "keepRunning": "Laisser continuer",
     "newSession": "Nouvelle session",
     "noModelsAvailable": "Aucun modèle disponible",
+    "modelRetires": "Retiré le {{date}}",
     "notFound": "Cet élément est introuvable",
     "online": "En ligne",
     "open": "Ouvrir {{name}}",
@@ -185,7 +186,8 @@
     "privateRepositoryA11y": "{{name}}, dépôt privé",
     "legalDocumentEnglishOnly": "Ce document est disponible uniquement en anglais.",
     "organizationTrialEndedBilling": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Vous pouvez mettre à jour la facturation, puis réessayer.",
-    "organizationTrialEndedBillingAtKiloAi": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Vous pouvez mettre à jour la facturation sur kilo.ai, puis réessayer."
+    "organizationTrialEndedBillingAtKiloAi": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Vous pouvez mettre à jour la facturation sur kilo.ai, puis réessayer.",
+    "viewOnGitHub": "Voir la PR sur GitHub"
   },
   "language": {
     "restarting": "Redémarrage pour changer de langue",
@@ -509,7 +511,7 @@
     "changelogFixesPolish": "Corrections et améliorations dans toute l'application.",
     "changelogAreas": {
       "signIn": "Connexion",
-      "profileOrganizations": "Profil et organisations"
+      "profileOrganizations": "Profil & organisations"
     }
   },
   "notifications": {
@@ -666,7 +668,8 @@
     },
     "autoReviews": "Revues automatiques",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket n'est pas connecté. Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent établir la connexion."
+      "notConnectedReadOnly": "Bitbucket n'est pas connecté. Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent établir la connexion.",
+      "notConnectedReadOnlyPlan": "L'essai de l'organisation a pris fin, donc un propriétaire doit mettre à jour la facturation sur kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "La connexion Bitbucket à {{organization}} se gère sur le web, depuis un ordinateur.",
@@ -717,9 +720,9 @@
     },
     "providerConnect": {
       "description": "Établissez la connexion entre Kilo et votre {{label}} pour examiner automatiquement les demandes de fusion.",
-      "githubApp": "Application GitHub",
+      "githubApp": "application GitHub",
       "githubError": "Impossible d'ouvrir la configuration de GitHub. Réessayez.",
-      "gitlabAccount": "Compte GitLab",
+      "gitlabAccount": "compte GitLab",
       "gitlabError": "Impossible d'ouvrir la configuration de GitLab. Réessayez."
     },
     "reviewDetail": {
@@ -2824,7 +2827,6 @@
       "skipped_other": "{{displayCount}} ignorées",
       "skipped_many": "{{displayCount}} ignorées",
       "title": "Vérifications",
-      "viewOnGitHub": "Voir la PR sur GitHub",
       "checkDetails": "détails de la vérification"
     },
     "composer": {
@@ -2885,6 +2887,10 @@
       "commentActions": "Actions du commentaire",
       "comment": "{{displayCount}} commentaires",
       "comment_other": "{{displayCount}} commentaires",
+      "conversationTruncated": "Seuls les {{displayCount}} premiers commentaires sont affichés.",
+      "conversationTruncated_one": "Seuls les {{displayCount}} premiers commentaires sont affichés.",
+      "conversationTruncated_many": "Seuls les {{displayCount}} premiers commentaires sont affichés.",
+      "conversationTruncated_other": "Seuls les {{displayCount}} premiers commentaires sont affichés.",
       "couldNotLoad": "Impossible de charger les échanges",
       "couldNotLoadMore": "Impossible de charger d'autres commentaires.",
       "loadMoreComments": "Charger d'autres commentaires",
@@ -3296,6 +3302,9 @@
       "partialPostedStale_many": "Commentaires conservés en attente car ils concernent un commit plus ancien : {{displayStaleCount}}.",
       "partialPostedStale_other": "Commentaires conservés en attente car ils concernent un commit plus ancien : {{displayStaleCount}}.",
       "submitCountOfTotal": "Envoyer {{displayFreshCount}} commentaires sur {{displayTotalCount}}",
+      "submitCountOfTotal_one": "Envoyer {{displayFreshCount}} commentaires sur {{displayTotalCount}}",
+      "submitCountOfTotal_many": "Envoyer {{displayFreshCount}} commentaires sur {{displayTotalCount}}",
+      "submitCountOfTotal_other": "Envoyer {{displayFreshCount}} commentaires sur {{displayTotalCount}}",
       "submitReview": "Envoyer la revue",
       "pendingComment_many": "commentaires en attente",
       "blockedRequestChanges": "Ajoutez un résumé ou au moins un commentaire pour demander des modifications.",
@@ -3508,7 +3517,7 @@
       "planStatusLapsed": " · Expiré",
       "planEnded": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif.",
       "manageBilling": "Gérer la facturation",
-      "renamePlaceholder": "Nom de l'organisation",
+      "renamePlaceholder": "Saisissez un nom d'organisation",
       "renameTitle": "Renommer l'organisation"
     },
     "inviteMember": {

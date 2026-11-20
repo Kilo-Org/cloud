@@ -140,6 +140,7 @@
     "keepRunning": "ଚାଲୁ ରଖନ୍ତୁ",
     "newSession": "ନୂଆ ସେସନ୍",
     "noModelsAvailable": "କୌଣସି ମଡେଲ୍ ଉପଲବ୍ଧ ନାହିଁ",
+    "modelRetires": "{{date}}ରେ ଅବସର ନେବ",
     "notFound": "ମିଳିଲା ନାହିଁ।",
     "online": "ଅନଲାଇନ୍",
     "open": "{{name}} ଖୋଲନ୍ତୁ",
@@ -184,7 +185,8 @@
     "privateRepositoryA11y": "{{name}}, ବ୍ୟକ୍ତିଗତ ରିପୋଜିଟୋରୀ",
     "legalDocumentEnglishOnly": "ଏହି ଦସ୍ତାବେଜଟି କେବଳ ଇଂରାଜୀରେ ଉପଲବ୍ଧ।",
     "organizationTrialEndedBilling": "ସଂଗଠନର ଟ୍ରାଏଲ୍ ଅବଧି ଶେଷ ହୋଇଛି ଏବଂ ଏହାର କୌଣସି ସକ୍ରିୟ ପ୍ଲାନ୍ ନାହିଁ। ଆପଣ ବିଲିଂ ଅପଡେଟ୍ କରିପାରିବେ, ତାପରେ ପୁନର୍ବାର ଚେଷ୍ଟା କରନ୍ତୁ।",
-    "organizationTrialEndedBillingAtKiloAi": "ସଂଗଠନର ଟ୍ରାଏଲ୍ ଅବଧି ଶେଷ ହୋଇଛି ଏବଂ ଏହାର କୌଣସି ସକ୍ରିୟ ପ୍ଲାନ୍ ନାହିଁ। ଆପଣ kilo.ai ରେ ବିଲିଂ ଅପଡେଟ୍ କରିପାରିବେ, ତାପରେ ପୁନର୍ବାର ଚେଷ୍ଟା କରନ୍ତୁ।"
+    "organizationTrialEndedBillingAtKiloAi": "ସଂଗଠନର ଟ୍ରାଏଲ୍ ଅବଧି ଶେଷ ହୋଇଛି ଏବଂ ଏହାର କୌଣସି ସକ୍ରିୟ ପ୍ଲାନ୍ ନାହିଁ। ଆପଣ kilo.ai ରେ ବିଲିଂ ଅପଡେଟ୍ କରିପାରିବେ, ତାପରେ ପୁନର୍ବାର ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "viewOnGitHub": "GitHub ରେ PR ଦେଖନ୍ତୁ"
   },
   "language": {
     "restarting": "ଭାଷା ବଦଳାଇବାକୁ ଆପ୍ ପୁଣି ଆରମ୍ଭ ହେଉଛି",
@@ -508,7 +510,7 @@
     "changelogFixesPolish": "ସମଗ୍ର ଆପରେ ସମାଧାନ ଓ ଉନ୍ନତି।",
     "changelogAreas": {
       "signIn": "ସାଇନ୍ ଇନ୍",
-      "profileOrganizations": "ପ୍ରୋଫାଇଲ୍ ଓ ସଂଗଠନ"
+      "profileOrganizations": "ପ୍ରୋଫାଇଲ୍ ଏବଂ ସଂଗଠନ"
     }
   },
   "preferences": {
@@ -753,6 +755,9 @@
       "couldNotLoadMore": "ଅଧିକ ମନ୍ତବ୍ୟ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "retryLoadingMore": "ଅଧିକ ମନ୍ତବ୍ୟ ଲୋଡ୍ କରିବାକୁ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ",
       "loadMoreComments": "ଅଧିକ ମନ୍ତବ୍ୟ ଲୋଡ୍ କରନ୍ତୁ",
+      "conversationTruncated": "କେବଳ ପ୍ରଥମ {{displayCount}} ମନ୍ତବ୍ୟ ଦେଖାଯାଉଛି।",
+      "conversationTruncated_one": "କେବଳ ପ୍ରଥମ {{displayCount}} ମନ୍ତବ୍ୟ ଦେଖାଯାଉଛି।",
+      "conversationTruncated_other": "କେବଳ ପ୍ରଥମ {{displayCount}} ମନ୍ତବ୍ୟ ଦେଖାଯାଉଛି।",
       "addReaction": "ପ୍ରତିକ୍ରିୟା ଯୋଡ଼ନ୍ତୁ",
       "reactionPill": "{{emoji}} ପ୍ରତିକ୍ରିୟା, {{displayCount}} {{countLabel}}",
       "reaction_one": "ପ୍ରତିକ୍ରିୟା",
@@ -882,7 +887,6 @@
       "noAccess": "ଏହି ରିପୋଜିଟୋରିର ଯାଞ୍ଚ ଦେଖିବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
       "couldNotLoad": "ଯାଞ୍ଚ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "retryChecks": "ଯାଞ୍ଚ ପାଇଁ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ",
-      "viewOnGitHub": "GitHub ରେ PR ଦେଖନ୍ତୁ",
       "noChecksReported": "କୌଣସି ଯାଞ୍ଚ ରିପୋର୍ଟ ହୋଇନାହିଁ",
       "passed": "{{displayCount}} ସଫଳ",
       "passed_one": "{{displayCount}} ସଫଳ",
@@ -937,9 +941,9 @@
       "checkFailedTitleGitLab": "GitLab ସଂଯୋଗ ଯାଞ୍ଚ କରିହେଲା ନାହିଁ।",
       "checkFailedTitleBitbucket": "Bitbucket ସଂଯୋଗ ଯାଞ୍ଚ କରିହେଲା ନାହିଁ।",
       "providerCheckFailedMessage": "ପ୍ରଦାନକାରୀ ସହ ସଂଯୋଗ ସ୍ଥାପନ କରିହେଲା ନାହିଁ। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
-      "reconnectTitle": "GitHub ସହ ପୁଣି ସଂଯୋଗ",
-      "reconnectTitleGitLab": "GitLab ସହ ପୁଣି ସଂଯୋଗ",
-      "reconnectTitleBitbucket": "Bitbucket ସହ ପୁଣି ସଂଯୋଗ",
+      "reconnectTitle": "GitHub ସହ ପୁଣି ସଂଯୋଗ କରନ୍ତୁ",
+      "reconnectTitleGitLab": "GitLab ସହ ପୁଣି ସଂଯୋଗ କରନ୍ତୁ",
+      "reconnectTitleBitbucket": "Bitbucket ସହ ପୁଣି ସଂଯୋଗ କରନ୍ତୁ",
       "reconnectDescription": "ଆପଣଙ୍କ GitHub ସଂଯୋଗର ଅନୁମତି ପ୍ରତ୍ୟାହାର କରାଯାଇଛି।",
       "gitlabDescription": "ମୋବାଇଲରେ ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ସମୀକ୍ଷା କରନ୍ତୁ",
       "gitlabInstanceMismatchTitle": "GitLab ସଂଯୋଗ ଅନ୍ୟ ଏକ ଇନଷ୍ଟାନ୍ସ ପାଇଁ ଅଟେ",
@@ -966,6 +970,8 @@
       "pendingComment": "ଦାଖଲ ହୋଇନଥିବା ମନ୍ତବ୍ୟ",
       "pendingComment_other": "ଦାଖଲ ହୋଇନଥିବା ମନ୍ତବ୍ୟ",
       "submitCountOfTotal": "{{displayTotalCount}} ମନ୍ତବ୍ୟ ମଧ୍ୟରୁ {{displayFreshCount}} ଦାଖଲ କରନ୍ତୁ",
+      "submitCountOfTotal_one": "{{displayTotalCount}} ମନ୍ତବ୍ୟ ମଧ୍ୟରୁ {{displayFreshCount}} ଦାଖଲ କରନ୍ତୁ",
+      "submitCountOfTotal_other": "{{displayTotalCount}} ମନ୍ତବ୍ୟ ମଧ୍ୟରୁ {{displayFreshCount}} ଦାଖଲ କରନ୍ତୁ",
       "submitReview": "ସମୀକ୍ଷା ଦାଖଲ କରନ୍ତୁ",
       "partialPostedFresh": "{{displayFreshCount}} ମନ୍ତବ୍ୟ ପୋଷ୍ଟ ହେଲା। ",
       "partialPostedFresh_one": "{{displayFreshCount}} ମନ୍ତବ୍ୟ ପୋଷ୍ଟ ହେଲା। ",
@@ -1390,7 +1396,8 @@
     "followReviewMd": "REVIEW.md ଅନୁସରଣ କରନ୍ତୁ",
     "followReviewMdSubtitle": "ପ୍ରତ୍ୟେକ ରିପୋଜିଟୋରୀର REVIEW.md ଫାଇଲ୍‌ରେ ଥିବା ନିର୍ଦ୍ଦେଶ ମାନନ୍ତୁ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ସଂଯୋଗ ହୋଇନାହିଁ। କେବଳ ସଂଗଠନର ମାଲିକ, ପ୍ରଶାସକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ଏହାକୁ ସଂଯୋଗ କରିପାରିବେ।"
+      "notConnectedReadOnly": "Bitbucket ସଂଯୋଗ ହୋଇନାହିଁ। କେବଳ ସଂଗଠନର ମାଲିକ, ପ୍ରଶାସକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ଏହାକୁ ସଂଯୋଗ କରିପାରିବେ।",
+      "notConnectedReadOnlyPlan": "ସଂଗଠନର ଟ୍ରାୟଲ୍ ଅବଧି ଶେଷ ହୋଇଛି, ତେଣୁ ମାଲିକଙ୍କୁ kilo.ai ରେ ବିଲିଂ ଅପଡେଟ୍ କରିବାକୁ ହେବ।"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}ର Bitbucket ସଂଯୋଗ ଏକ କମ୍ପ୍ୟୁଟରରୁ ୱେବରେ ପରିଚାଳନା କରାଯାଏ।",
@@ -1723,7 +1730,7 @@
       "dueThisWeekDetail_one": "ଏହା ମଧ୍ୟରୁ {{exploitable}}ଟି ଆକ୍ରମଣରେ ବ୍ୟବହାରଯୋଗ୍ୟ ବୋଲି ନିଶ୍ଚିତ",
       "dueThisWeekDetail_other": "ଏହା ମଧ୍ୟରୁ {{exploitable}}ଟି ଆକ୍ରମଣରେ ବ୍ୟବହାରଯୋଗ୍ୟ ବୋଲି ନିଶ୍ଚିତ",
       "noDeadline": "କୌଣସି ସମୟସୀମା ନାହିଁ",
-      "reviewSlaAssignment": "ଧାର୍ଯ୍ୟ SLA ସମୟସୀମା ସମୀକ୍ଷା କରନ୍ତୁ",
+      "reviewSlaAssignment": "SLA ନିର୍ଦ୍ଧାରଣ ସମୀକ୍ଷା କରନ୍ତୁ",
       "allOpenFindingsTracked": "ସମସ୍ତ ଅସମାପ୍ତ ଚିହ୍ନଟ ସମସ୍ୟାର ସ୍ଥିତି ନଜରରେ ଅଛି"
     },
     "dismiss": {
@@ -1842,7 +1849,7 @@
       "couldNotLoadMore": "ଆଉ ଅଧିକ ଚିହ୍ନଟ ସମସ୍ୟା ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "noMatchesTitle": "ଫିଲ୍ଟର ସହ ମେଳ ଖାଉଥିବା କୌଣସି ଚିହ୍ନଟ ସମସ୍ୟା ନାହିଁ",
       "noMatchesDescription": "ବଛାଯାଇଥିବା ଫିଲ୍ଟରଗୁଡ଼ିକୁ ବଦଳାନ୍ତୁ କିମ୍ବା ହଟାନ୍ତୁ।",
-      "emptyTitle": "କୌଣସି ଅସମାପ୍ତ ଚିହ୍ନଟ ସମସ୍ୟା ନାହିଁ",
+      "emptyTitle": "କୌଣସି ଖୋଲା ଚିହ୍ନଟ ସମସ୍ୟା ନାହିଁ",
       "emptyDescription": "ଏବେ ଧ୍ୟାନ ଦେବାକୁ ଥିବା କୌଣସି ଅସମାପ୍ତ ଚିହ୍ନଟ ସମସ୍ୟା ନାହିଁ।"
     },
     "findingRow": {
@@ -2033,7 +2040,7 @@
     "remediationUnavailable": {
       "findingNotFound": "ଚିହ୍ନଟ ସୁରକ୍ଷା ସମସ୍ୟା ଆଉ ନାହିଁ।",
       "approvalRequired": "ସ୍ୱୟଂଚାଳିତ ସମାଧାନ ପାଇଁ ଅନୁମୋଦନ ଆବଶ୍ୟକ। ଅନୁମୋଦନ ଦେବାକୁ ନିଜେ ସମାଧାନ ଆରମ୍ଭ କରନ୍ତୁ।",
-      "findingNotOpen": "ଚିହ୍ନଟ ସମସ୍ୟା ଆଉ ଅସମାପ୍ତ ସ୍ଥିତିରେ ନାହିଁ।",
+      "findingNotOpen": "ଚିହ୍ନଟ ସମସ୍ୟା ଆଉ ଖୋଲା ନାହିଁ।",
       "repoNotInScope": "ସୁରକ୍ଷା ଏଜେଣ୍ଟ ପାଇଁ ଏହି ରିପୋଜିଟୋରୀ ଚୟନ କରାଯାଇନାହିଁ।",
       "analysisRequired": "ସମାଧାନ ଆରମ୍ଭ କରିବା ପୂର୍ବରୁ କୋଡ୍‌ବେସ୍ ବିଶ୍ଳେଷଣ କରନ୍ତୁ।",
       "staleAnalysis": "ବିଶ୍ଳେଷଣ ପରେ ଚିହ୍ନଟ ସମସ୍ୟା ବଦଳିଛି। ସମାଧାନ ଆରମ୍ଭ କରିବା ପୂର୍ବରୁ ପୁଣି ବିଶ୍ଳେଷଣ କରନ୍ତୁ।",
@@ -3626,7 +3633,7 @@
     },
     "hub": {
       "renameTitle": "ସଂଗଠନର ନାମ ବଦଳାନ୍ତୁ",
-      "renamePlaceholder": "ସଂଗଠନର ନାମ",
+      "renamePlaceholder": "ଏକ ସଂଗଠନର ନାମ ଲେଖନ୍ତୁ",
       "balance": "ବ୍ୟାଲାନ୍ସ",
       "plan": "ଯୋଜନା",
       "planTeams": "Teams",

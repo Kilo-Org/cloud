@@ -42,13 +42,19 @@ const questionSchema = z
     fields: z.array(fieldSchema),
   })
   .passthrough();
+// A card can only be answered for an identity the runner can match, so an entry
+// with an empty `requestID` falls through to the identity rule below.
+const inventoryPermissionSchema = z
+  .object({ requestID: z.string().min(1), tool: z.string(), summary: z.string() })
+  .passthrough();
+const inventoryQuestionSchema = z
+  .object({ requestID: z.string().min(1), fields: z.array(fieldSchema) })
+  .passthrough();
+/** What an entry still says about itself when its scope cannot be read. */
+const inventoryIdentitySchema = z.object({ requestID: z.string().min(1) }).passthrough();
 const inventorySchema = z.object({
-  permissions: z.array(
-    z.object({ requestID: z.string(), tool: z.string(), summary: z.string() }).passthrough()
-  ),
-  questions: z.array(
-    z.object({ requestID: z.string(), fields: z.array(fieldSchema) }).passthrough()
-  ),
+  permissions: z.array(z.unknown()).optional(),
+  questions: z.array(z.unknown()).optional(),
 });
 const recordSchema = z.record(z.string(), z.unknown());
 export type NativePendingRequests = {
@@ -78,25 +84,48 @@ export function reduceNativePendingRequests(
 ): NativePendingRequests {
   const wrapper = recordSchema.safeParse(event.body);
   if (event.type === 'remote.state') {
+    // Entries are optional so one unreadable card no longer decides the whole
+    // inventory; a `pending` that is absent, null or wrongly shaped is still
+    // unreadable as a whole and clears every list.
     const inventory = inventorySchema.safeParse(
       wrapper.success ? wrapper.data['pending'] : undefined
     );
     if (!inventory.success) return { permissions: [], questions: [], unreadablePermissions: [] };
+    const permissions: NativePendingRequests['permissions'] = [];
+    const unreadable = new Set<string>();
+    for (const entry of inventory.data.permissions ?? []) {
+      const parsed = inventoryPermissionSchema.safeParse(entry);
+      if (parsed.success) {
+        permissions.push({
+          ...parsed.data,
+          id: parsed.data.requestID,
+          action: parsed.data.tool,
+          resources: [parsed.data.summary],
+        });
+        continue;
+      }
+      // No card may stand for a scope this app cannot read, but it can still
+      // name the request; an entry with no readable identity is dropped.
+      const identity = inventoryIdentitySchema.safeParse(entry);
+      if (identity.success) unreadable.add(identity.data.requestID);
+    }
+    const questions: NativePendingRequests['questions'] = [];
+    for (const entry of inventory.data.questions ?? []) {
+      const parsed = inventoryQuestionSchema.safeParse(entry);
+      if (parsed.success)
+        questions.push({
+          ...parsed.data,
+          id: parsed.data.requestID,
+          metadata: { kind: 'question' as const },
+        });
+    }
     return {
-      permissions: inventory.data.permissions.map(item => ({
-        ...item,
-        id: item.requestID,
-        action: item.tool,
-        resources: [item.summary],
-      })),
-      questions: inventory.data.questions.map(item => ({
-        ...item,
-        id: item.requestID,
-        metadata: { kind: 'question' as const },
-      })),
-      // The runner inventory is the authoritative snapshot, so it also clears
-      // unreadable notices: it knows every request still pending for the CLI.
-      unreadablePermissions: [],
+      permissions,
+      questions,
+      // The runner inventory is the authoritative snapshot, so it also rebuilds
+      // unreadable notices from this frame alone: a request it no longer lists
+      // is settled, and one it lists readably has a card instead.
+      unreadablePermissions: [...unreadable].map(requestId => ({ requestId })),
     };
   }
   const native = recordSchema.safeParse(wrapper.success ? wrapper.data['data'] : undefined);

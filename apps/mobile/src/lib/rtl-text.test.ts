@@ -124,6 +124,25 @@ describe('containsJoinedScript', () => {
   );
 
   it.each([
+    ['Hindi (Devanagari)', 'अभी'],
+    ['Bengali', 'এখন'],
+    ['Punjabi (Gurmukhi)', 'ਹੁਣ'],
+    ['Gujarati', 'હવે'],
+    ['Odia', 'ବର୍ତ୍ତମାନ'],
+    ['Tamil', 'இப்போது'],
+    ['Telugu', 'ఇప్పుడు'],
+    ['Kannada', 'ಈಗ'],
+    ['Malayalam', 'ഇപ്പോൾ'],
+    ['Sinhala', 'දැන්'],
+    ['Thai', 'ตอนนี้'],
+    ['Lao', 'ດຽວນີ້'],
+    ['Myanmar', 'ယခု'],
+    ['Khmer', 'ឥឡូវនេះ'],
+  ])('reads a combining cluster script in %s', (_name, text) => {
+    expect(containsJoinedScript(text)).toBe(true);
+  });
+
+  it.each([
     ['English', 'Preferences'],
     ['Hebrew (right-to-left, not joined)', 'הגדרות'],
     ['Greek', 'Ρυθμίσεις'],

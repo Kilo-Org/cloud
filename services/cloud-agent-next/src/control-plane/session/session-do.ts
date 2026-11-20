@@ -138,6 +138,7 @@ import {
   type ControlPlaneWorktreeCaptureInput,
   type ControlPlaneWorkspaceStoppedPayload,
 } from '../../shared/control-plane-protocol.js';
+import { projectStoredRouteSpecSkills } from '../../shared/runtime-profile.js';
 import {
   worktreeBranchOperationResultSchema,
   type ControlPlaneWorktreeGitInput,
@@ -464,6 +465,17 @@ export const controlPlaneSessionRegistrationSchema = z
   })
   .strict();
 export type ControlPlaneSessionRegistration = z.infer<typeof controlPlaneSessionRegistrationSchema>;
+
+/**
+ * A registration read back from storage carries the runtime skills written
+ * under an earlier path rule; it keeps the entries the current rule accepts so
+ * the session still loads its identity and spec. The registration that arrives
+ * from the Worker is parsed with the strict schema above.
+ */
+const storedControlPlaneSessionRegistrationSchema = z.preprocess(raw => {
+  if (typeof raw !== 'object' || raw === null || !('spec' in raw)) return raw;
+  return { ...raw, spec: projectStoredRouteSpecSkills(raw.spec) };
+}, controlPlaneSessionRegistrationSchema);
 
 function statusWorkspaceIdentity(registration: ControlPlaneSessionRegistration | null) {
   return registration === null
@@ -1242,7 +1254,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     await migrate(this.db, migrations);
     const raw = await this.ctx.storage.get<unknown>(REGISTRATION_KEY);
-    const parsed = controlPlaneSessionRegistrationSchema.safeParse(raw);
+    const parsed = storedControlPlaneSessionRegistrationSchema.safeParse(raw);
     this.registration = parsed.success ? parsed.data : null;
     const rawMetadata = await this.ctx.storage.get<unknown>(SESSION_METADATA_KEY);
     if (rawMetadata === undefined) {

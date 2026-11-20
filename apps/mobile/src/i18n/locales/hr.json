@@ -141,6 +141,7 @@
     "keepRunning": "Nastavi izvršavanje",
     "newSession": "Nova sesija",
     "noModelsAvailable": "Nema dostupnih modela",
+    "modelRetires": "Povlači se {{date}}",
     "notFound": "Nije pronađeno.",
     "online": "Na mreži",
     "open": "Otvori {{name}}",
@@ -185,7 +186,8 @@
     "privateRepositoryA11y": "{{name}}, privatni repozitorij",
     "legalDocumentEnglishOnly": "Ovaj je dokument dostupan samo na engleskom jeziku.",
     "organizationTrialEndedBilling": "Probno razdoblje organizacije je završilo i organizacija nema aktivan plan. Možete ažurirati naplatu i zatim pokušati ponovno.",
-    "organizationTrialEndedBillingAtKiloAi": "Probno razdoblje organizacije je završilo i organizacija nema aktivan plan. Možete ažurirati naplatu na kilo.ai i zatim pokušati ponovno."
+    "organizationTrialEndedBillingAtKiloAi": "Probno razdoblje organizacije je završilo i organizacija nema aktivan plan. Možete ažurirati naplatu na kilo.ai i zatim pokušati ponovno.",
+    "viewOnGitHub": "Pogledaj PR na GitHubu"
   },
   "language": {
     "restarting": "Ponovno pokretanje radi promjene jezika",
@@ -509,7 +511,7 @@
     "changelogFixesPolish": "Ispravci i poboljšanja u cijeloj aplikaciji.",
     "changelogAreas": {
       "signIn": "Prijava",
-      "profileOrganizations": "Profil i organizacije"
+      "profileOrganizations": "Profil te organizacije"
     }
   },
   "preferences": {
@@ -760,6 +762,10 @@
       "comment_one": "{{displayCount}} komentar",
       "comment": "{{displayCount}} komentara",
       "comment_other": "{{displayCount}} komentara",
+      "conversationTruncated": "Prikazuje se samo prvih {{displayCount}} komentara.",
+      "conversationTruncated_one": "Prikazuje se samo prvih {{displayCount}} komentara.",
+      "conversationTruncated_few": "Prikazuje se samo prvih {{displayCount}} komentara.",
+      "conversationTruncated_other": "Prikazuje se samo prvih {{displayCount}} komentara.",
       "startedRelative": " · započeto {{relative}}",
       "couldNotLoadMore": "Nije moguće učitati dodatne komentare.",
       "retryLoadingMore": "Pokušaj ponovno učitati dodatne komentare",
@@ -896,7 +902,6 @@
       "noAccess": "Nemaš pristup provjerama za ovaj repozitorij.",
       "couldNotLoad": "Nije moguće učitati provjere.",
       "retryChecks": "Pokušaj ponovno učitati provjere",
-      "viewOnGitHub": "Pogledaj PR na GitHubu",
       "noChecksReported": "Nema prijavljenih provjera",
       "passed": "uspješno: {{displayCount}}",
       "passed_one": "uspješno: {{displayCount}}",
@@ -984,6 +989,9 @@
       "pendingComment": "neposlanih komentara",
       "pendingComment_other": "neposlanih komentara",
       "submitCountOfTotal": "Pošalji {{displayFreshCount}} od {{displayTotalCount}} komentara",
+      "submitCountOfTotal_one": "Pošalji {{displayFreshCount}} od {{displayTotalCount}} komentara",
+      "submitCountOfTotal_few": "Pošalji {{displayFreshCount}} od {{displayTotalCount}} komentara",
+      "submitCountOfTotal_other": "Pošalji {{displayFreshCount}} od {{displayTotalCount}} komentara",
       "submitReview": "Pošalji pregled",
       "partialPostedFresh": "Broj objavljenih komentara: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Broj objavljenih komentara: {{displayFreshCount}}. ",
@@ -1415,7 +1423,8 @@
     "followReviewMd": "Slijedi REVIEW.md",
     "followReviewMdSubtitle": "Slijedi upute iz datoteke REVIEW.md u svakom repozitoriju",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije, administratori i upravitelji naplate mogu ga povezati."
+      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije, administratori i upravitelji naplate mogu ga povezati.",
+      "notConnectedReadOnlyPlan": "Probno razdoblje organizacije je završilo, pa vlasnik mora ažurirati naplatu na kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket vezom s {{organization}} upravlja se na webu s računala.",
@@ -1450,9 +1459,9 @@
       "activity": "Aktivnost"
     },
     "providerConnect": {
-      "githubApp": "Aplikaciju GitHub",
+      "githubApp": "aplikaciju GitHub",
       "githubError": "Nije moguće otvoriti postavljanje za GitHub. Pokušaj ponovno.",
-      "gitlabAccount": "Račun na GitLabu",
+      "gitlabAccount": "račun na GitLabu",
       "gitlabError": "Nije moguće otvoriti postavljanje za GitLab. Pokušaj ponovno.",
       "description": "Poveži {{label}} s uslugom Kilo za automatski pregled zahtjeva za spajanje."
     },
@@ -3687,7 +3696,7 @@
     },
     "hub": {
       "renameTitle": "Preimenuj organizaciju",
-      "renamePlaceholder": "Naziv organizacije",
+      "renamePlaceholder": "Unesite naziv organizacije",
       "balance": "Saldo",
       "plan": "Plan",
       "planTeams": "Teams",

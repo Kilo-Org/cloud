@@ -144,6 +144,7 @@
     "keepRunning": "Parhau i redeg",
     "newSession": "Sesiwn newydd",
     "noModelsAvailable": "Dim modelau ar gael",
+    "modelRetires": "Yn ymddeol {{date}}",
     "notFound": "Ni ddaethpwyd o hyd i'r eitem.",
     "online": "Ar-lein",
     "open": "Agor {{name}}",
@@ -188,7 +189,8 @@
     "privateRepositoryA11y": "{{name}}, yn repositori preifat",
     "legalDocumentEnglishOnly": "Dim ond yn Saesneg y mae'r ddogfen hon ar gael.",
     "organizationTrialEndedBilling": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gallwch ddiweddaru bilio, ac yna rhoi cynnig arall arni.",
-    "organizationTrialEndedBillingAtKiloAi": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gallwch ddiweddaru bilio ar kilo.ai, ac yna rhoi cynnig arall arni."
+    "organizationTrialEndedBillingAtKiloAi": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gallwch ddiweddaru bilio ar kilo.ai, ac yna rhoi cynnig arall arni.",
+    "viewOnGitHub": "Gweld y PR ar GitHub"
   },
   "language": {
     "restarting": "Yn ailgychwyn i newid yr iaith",
@@ -797,6 +799,13 @@
       "couldNotLoadMore": "Ni lwyddwyd i lwytho mwy o sylwadau.",
       "retryLoadingMore": "Rhoi cynnig eto ar lwytho mwy o sylwadau",
       "loadMoreComments": "Llwytho mwy o sylwadau",
+      "conversationTruncated": "Dim ond y {{displayCount}} sylw cyntaf sy'n cael eu dangos.",
+      "conversationTruncated_zero": "Dim ond y {{displayCount}} sylw cyntaf sy'n cael eu dangos.",
+      "conversationTruncated_one": "Dim ond y {{displayCount}} sylw cyntaf sy'n cael eu dangos.",
+      "conversationTruncated_two": "Dim ond y {{displayCount}} sylw cyntaf sy'n cael eu dangos.",
+      "conversationTruncated_few": "Dim ond y {{displayCount}} sylw cyntaf sy'n cael eu dangos.",
+      "conversationTruncated_many": "Dim ond y {{displayCount}} sylw cyntaf sy'n cael eu dangos.",
+      "conversationTruncated_other": "Dim ond y {{displayCount}} sylw cyntaf sy'n cael eu dangos.",
       "addReaction": "Ychwanegu ymateb",
       "reactionPill": "ymateb {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "ymateb",
@@ -938,7 +947,6 @@
       "noAccess": "Nid oes gennych fynediad at wiriadau'r ystorfa hon.",
       "couldNotLoad": "Ni lwyddwyd i lwytho'r gwiriadau.",
       "retryChecks": "Rhoi cynnig eto ar wiriadau",
-      "viewOnGitHub": "Gweld y PR ar GitHub",
       "noChecksReported": "Dim gwiriadau wedi'u hadrodd",
       "passed": "{{displayCount}} wedi pasio",
       "passed_one": "{{displayCount}} wedi pasio",
@@ -1038,6 +1046,12 @@
       "pendingComment": "sylwadau heb eu cyflwyno",
       "pendingComment_other": "sylwadau heb eu cyflwyno",
       "submitCountOfTotal": "Cyflwyno {{displayFreshCount}} o {{displayTotalCount}} sylw",
+      "submitCountOfTotal_zero": "Cyflwyno {{displayFreshCount}} o {{displayTotalCount}} sylw",
+      "submitCountOfTotal_one": "Cyflwyno {{displayFreshCount}} o {{displayTotalCount}} sylw",
+      "submitCountOfTotal_two": "Cyflwyno {{displayFreshCount}} o {{displayTotalCount}} sylw",
+      "submitCountOfTotal_few": "Cyflwyno {{displayFreshCount}} o {{displayTotalCount}} sylw",
+      "submitCountOfTotal_many": "Cyflwyno {{displayFreshCount}} o {{displayTotalCount}} sylw",
+      "submitCountOfTotal_other": "Cyflwyno {{displayFreshCount}} o {{displayTotalCount}} sylw",
       "submitReview": "Cyflwyno adolygiad",
       "partialPostedFresh": "Postiwyd {{displayFreshCount}} o sylwadau. ",
       "partialPostedFresh_zero": "Postiwyd {{displayFreshCount}} o sylwadau. ",
@@ -1490,7 +1504,8 @@
     "followReviewMd": "Dilyn REVIEW.md",
     "followReviewMdSubtitle": "Dilyn y cyfarwyddiadau yn ffeil REVIEW.md pob ystorfa",
     "bitbucket": {
-      "notConnectedReadOnly": "Nid yw Bitbucket wedi'i gysylltu. Dim ond perchnogion, gweinyddwyr a rheolwyr bilio'r sefydliad sy'n gallu ei gysylltu."
+      "notConnectedReadOnly": "Nid yw Bitbucket wedi'i gysylltu. Dim ond perchnogion, gweinyddwyr a rheolwyr bilio'r sefydliad sy'n gallu ei gysylltu.",
+      "notConnectedReadOnlyPlan": "Mae treial y sefydliad wedi dod i ben, felly rhaid i berchnogydd ddiweddaru bilio ar kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Caiff cysylltiad Bitbucket ag {{organization}} ei reoli ar y we o gyfrifiadur.",
@@ -1875,7 +1890,7 @@
       "dueThisWeekDetail_many": "{{exploitable}} o'r rhain y cadarnhawyd y gellir manteisio arnynt",
       "dueThisWeekDetail_other": "{{exploitable}} o'r rhain y cadarnhawyd y gellir manteisio arnynt",
       "noDeadline": "Dim dyddiad terfyn",
-      "reviewSlaAssignment": "Adolygu'r dyddiadau terfyn SLA a bennwyd",
+      "reviewSlaAssignment": "Adolygu aseinio'r SLA",
       "allOpenFindingsTracked": "Pob canfyddiad agored yn cael ei olrhain"
     },
     "dismiss": {
@@ -3870,7 +3885,7 @@
     },
     "hub": {
       "renameTitle": "Ailenwi'r sefydliad",
-      "renamePlaceholder": "Enw'r sefydliad",
+      "renamePlaceholder": "Rhowch enw ar gyfer y sefydliad",
       "balance": "Balans",
       "plan": "Cynllun",
       "planTeams": "Teams",

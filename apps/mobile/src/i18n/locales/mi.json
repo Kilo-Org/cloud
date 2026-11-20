@@ -140,6 +140,7 @@
     "keepRunning": "Whakahaere tonu",
     "newSession": "Wātū hōu",
     "noModelsAvailable": "Kāore he tauira e wātea ana",
+    "modelRetires": "Ka whakamutua ā te {{date}}",
     "notFound": "Kāore i kitea",
     "online": "Tuihono",
     "open": "Whakatuwheratia a {{name}}",
@@ -184,7 +185,8 @@
     "privateRepositoryA11y": "{{name}}, pūranga waehere tūmataiti",
     "legalDocumentEnglishOnly": "E wātea ana tēnei tuhinga i te reo Ingarihi anake.",
     "organizationTrialEndedBilling": "Kua mutu te whakamātautau o te rōpū, ā, kāore ōna mahere kaha. Ka taea e koe te whakahou i te nama, kātahi ka whakamātau anō.",
-    "organizationTrialEndedBillingAtKiloAi": "Kua mutu te whakamātautau o te rōpū, ā, kāore ōna mahere kaha. Ka taea e koe te whakahou i te nama i kilo.ai, kātahi ka whakamātau anō."
+    "organizationTrialEndedBillingAtKiloAi": "Kua mutu te whakamātautau o te rōpū, ā, kāore ōna mahere kaha. Ka taea e koe te whakahou i te nama i kilo.ai, kātahi ka whakamātau anō.",
+    "viewOnGitHub": "Tirohia te PR i GitHub"
   },
   "language": {
     "restarting": "Kei te tīmata anō hei whakamahi i te reo",
@@ -753,6 +755,9 @@
       "couldNotLoadMore": "Kāore i taea te uta i ētahi atu kōrero.",
       "retryLoadingMore": "Whakamātau anō ki te uta i ētahi atu kōrero",
       "loadMoreComments": "Utaina ētahi atu kōrero",
+      "conversationTruncated": "E whakaaturia ana ngā kōrero {{displayCount}} tuatahi anake.",
+      "conversationTruncated_one": "E whakaaturia ana ngā kōrero {{displayCount}} tuatahi anake.",
+      "conversationTruncated_other": "E whakaaturia ana ngā kōrero {{displayCount}} tuatahi anake.",
       "addReaction": "Tāpirihia he urupare",
       "reactionPill": "Urupare {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "urupare",
@@ -882,7 +887,6 @@
       "noAccess": "Kāore koe e whakaaetia kia uru ki ngā arowhai mō tēnei pātaka waehere.",
       "couldNotLoad": "Kāore i taea te uta i ngā arowhai.",
       "retryChecks": "Whakamātau anō i ngā arowhai",
-      "viewOnGitHub": "Tirohia te PR i GitHub",
       "noChecksReported": "Kāore he arowhai i pūrongotia",
       "passed": "{{displayCount}} kua tutuki",
       "passed_one": "{{displayCount}} kua tutuki",
@@ -966,6 +970,8 @@
       "pendingComment": "kōrero e tatari ana",
       "pendingComment_other": "kōrero e tatari ana",
       "submitCountOfTotal": "Tukuna te {{displayFreshCount}} o ngā kōrero {{displayTotalCount}}",
+      "submitCountOfTotal_one": "Tukuna te {{displayFreshCount}} o ngā kōrero {{displayTotalCount}}",
+      "submitCountOfTotal_other": "Tukuna te {{displayFreshCount}} o ngā kōrero {{displayTotalCount}}",
       "submitReview": "Tukuna te arotake",
       "partialPostedFresh": "Kua tukuna ngā kōrero {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Kua tukuna te kōrero {{displayFreshCount}}. ",
@@ -1390,7 +1396,8 @@
     "followReviewMd": "Whaia a REVIEW.md",
     "followReviewMdSubtitle": "Whaia ngā kōnae tohutohu REVIEW.md o ia pūranga",
     "bitbucket": {
-      "notConnectedReadOnly": "Kāore anō kia honoa a Bitbucket. Ko ngā rangatira o te rōpū, ngā kaiwhakahaere me ngā kaiwhakahaere utu anake ka āhei ki te hono."
+      "notConnectedReadOnly": "Kāore anō kia honoa a Bitbucket. Ko ngā rangatira o te rōpū, ngā kaiwhakahaere me ngā kaiwhakahaere utu anake ka āhei ki te hono.",
+      "notConnectedReadOnlyPlan": "Kua mutu te whakamātautau o te rōpū, nō reira me whakahou te rangatira i te nama i kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Ka whakahaerehia te hononga Bitbucket o {{organization}} i runga ipurangi, mā tētahi rorohiko.",
@@ -1425,9 +1432,9 @@
       "activity": "Ngā mahi"
     },
     "providerConnect": {
-      "githubApp": "Taupānga GitHub",
+      "githubApp": "taupānga GitHub",
       "githubError": "Kāore i taea te whakatuwhera i te whakarite GitHub. Whakamātau anō.",
-      "gitlabAccount": "Pūkete GitLab",
+      "gitlabAccount": "pūkete GitLab",
       "gitlabError": "Kāore i taea te whakatuwhera i te whakarite GitLab. Whakamātau anō.",
       "description": "Honohonotia te {{label}} a Kilo hei arotake aunoa i ngā tono kume."
     },
@@ -3626,7 +3633,7 @@
     },
     "hub": {
       "renameTitle": "Whakaingoatia anō te rōpū",
-      "renamePlaceholder": "Te ingoa o te rōpū",
+      "renamePlaceholder": "Tāurutia he ingoa rōpū",
       "balance": "Te toenga",
       "plan": "Mahere",
       "planTeams": "Teams",

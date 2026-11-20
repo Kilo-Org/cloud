@@ -142,10 +142,12 @@
     "keepRunning": "Continuar em execução",
     "newSession": "Nova sessão",
     "noModelsAvailable": "Sem modelos disponíveis",
+    "modelRetires": "Descontinuado em {{date}}",
     "notFound": "Conteúdo não encontrado.",
     "online": "Em linha",
     "open": "Abrir {{name}}",
     "openPullRequest": "Abrir PR",
+    "viewOnGitHub": "Ver PR no GitHub",
     "completed": "Concluída",
     "pending": "Pendente",
     "running": "Em execução",
@@ -510,7 +512,7 @@
     "changelogFixesPolish": "Correções e melhorias em toda a aplicação.",
     "changelogAreas": {
       "signIn": "Início de sessão",
-      "profileOrganizations": "Perfil e organizações"
+      "profileOrganizations": "Perfil & organizações"
     }
   },
   "preferences": {
@@ -776,6 +778,11 @@
       "couldNotLoadMore": "Não foi possível carregar mais comentários.",
       "retryLoadingMore": "Tentar carregar mais comentários novamente",
       "loadMoreComments": "Carregar mais comentários",
+      "conversationTruncated": "São apresentados apenas os primeiros {{displayCount}} comentários.",
+      "conversationTruncated_zero": "São apresentados apenas os primeiros {{displayCount}} comentários.",
+      "conversationTruncated_one": "São apresentados apenas os primeiros {{displayCount}} comentários.",
+      "conversationTruncated_other": "São apresentados apenas os primeiros {{displayCount}} comentários.",
+      "conversationTruncated_many": "São apresentados apenas os primeiros {{displayCount}} comentários.",
       "addReaction": "Adicionar reação",
       "reactionPill": "reação {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reação",
@@ -910,7 +917,6 @@
       "noAccess": "Não tens acesso às verificações deste repositório.",
       "couldNotLoad": "Não foi possível carregar as verificações.",
       "retryChecks": "Tentar carregar as verificações novamente",
-      "viewOnGitHub": "Ver PR no GitHub",
       "noChecksReported": "Nenhuma verificação comunicada",
       "passed": "{{displayCount}} com êxito",
       "passed_one": "{{displayCount}} com êxito",
@@ -1003,6 +1009,10 @@
       "pendingComment_other": "comentários pendentes",
       "pendingComment_zero": "comentários pendentes",
       "submitCountOfTotal": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_one": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_zero": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_many": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_other": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
       "submitReview": "Enviar revisão",
       "partialPostedFresh": "Comentários publicados: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Comentários publicados: {{displayFreshCount}}. ",
@@ -1440,7 +1450,8 @@
     "followReviewMd": "Seguir REVIEW.md",
     "followReviewMdSubtitle": "Respeitar as instruções do ficheiro REVIEW.md de cada repositório",
     "bitbucket": {
-      "notConnectedReadOnly": "O Bitbucket não está ligado. Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ligar."
+      "notConnectedReadOnly": "O Bitbucket não está ligado. Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ligar.",
+      "notConnectedReadOnlyPlan": "O período de teste da organização terminou, por isso um proprietário tem de atualizar a faturação em kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "A ligação ao Bitbucket para {{organization}} é gerida na Web, a partir de um computador.",
@@ -1475,9 +1486,9 @@
       "activity": "Atividade"
     },
     "providerConnect": {
-      "githubApp": "Aplicação do GitHub",
+      "githubApp": "aplicação do GitHub",
       "githubError": "Não foi possível abrir a configuração do GitHub. Tenta novamente.",
-      "gitlabAccount": "Conta do GitLab",
+      "gitlabAccount": "conta do GitLab",
       "gitlabError": "Não foi possível abrir a configuração do GitLab. Tenta novamente.",
       "description": "Liga a {{label}} ao Kilo para rever pedidos de integração automaticamente."
     },
@@ -3748,7 +3759,7 @@
     },
     "hub": {
       "renameTitle": "Renomear organização",
-      "renamePlaceholder": "Nome da organização",
+      "renamePlaceholder": "Introduza um nome para a organização",
       "balance": "Saldo",
       "plan": "Plano",
       "planTeams": "Teams",

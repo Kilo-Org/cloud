@@ -140,10 +140,12 @@
     "keepRunning": "Çalıştırmaya devam et",
     "newSession": "Yeni oturum",
     "noModelsAvailable": "Kullanılabilir model yok",
+    "modelRetires": "Kullanımdan kalkıyor: {{date}}",
     "notFound": "Bulunamadı.",
     "online": "Çevrimiçi",
     "open": "{{name}} öğesini aç",
     "openPullRequest": "Açık çekme isteği",
+    "viewOnGitHub": "PR'ı GitHub'da görüntüle",
     "completed": "Tamamlandı",
     "pending": "Bekliyor",
     "running": "Çalışıyor",
@@ -508,7 +510,7 @@
     "changelogFixesPolish": "Uygulama genelinde düzeltmeler ve iyileştirmeler.",
     "changelogAreas": {
       "signIn": "Oturum açma",
-      "profileOrganizations": "Profil ve kuruluşlar"
+      "profileOrganizations": "Profil & kuruluşlar"
     }
   },
   "preferences": {
@@ -698,7 +700,8 @@
     },
     "autoReviews": "Otomatik incelemeler",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket bağlı değil. Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir."
+      "notConnectedReadOnly": "Bitbucket bağlı değil. Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir.",
+      "notConnectedReadOnlyPlan": "Kuruluşun deneme süresi sona erdi, bu yüzden sahibin kilo.ai adresinden faturalandırmayı güncellemesi gerekiyor."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} için Bitbucket bağlantısı bir bilgisayardan web üzerinden yönetilir.",
@@ -2784,7 +2787,6 @@
       "skipped_one": "{{displayCount}} atlandı",
       "skipped_other": "{{displayCount}} atlandı",
       "title": "Kontroller",
-      "viewOnGitHub": "PR'ı GitHub'da görüntüle",
       "checkDetails": "kontrol ayrıntıları"
     },
     "composer": {
@@ -2848,6 +2850,9 @@
       "couldNotLoad": "Tartışma yüklenemedi.",
       "couldNotLoadMore": "Daha fazla yorum yüklenemedi.",
       "loadMoreComments": "Daha fazla yorum yükle",
+      "conversationTruncated": "Yalnızca ilk {{displayCount}} yorum gösteriliyor.",
+      "conversationTruncated_one": "Yalnızca ilk {{displayCount}} yorum gösteriliyor.",
+      "conversationTruncated_other": "Yalnızca ilk {{displayCount}} yorum gösteriliyor.",
       "loading": "Tartışma yükleniyor",
       "moderation": {
         "block": {
@@ -3239,6 +3244,8 @@
       "partialPostedStale_one": "{{displayStaleCount}} yorum eski bir işlemeyle ilgili olduğu için kuyrukta kaldı.",
       "partialPostedStale_other": "{{displayStaleCount}} yorum eski bir işlemeyle ilgili olduğu için kuyrukta kaldı.",
       "submitCountOfTotal": "{{displayTotalCount}} yorumun {{displayFreshCount}} tanesini gönder",
+      "submitCountOfTotal_one": "{{displayTotalCount}} yorumun {{displayFreshCount}} tanesini gönder",
+      "submitCountOfTotal_other": "{{displayTotalCount}} yorumun {{displayFreshCount}} tanesini gönder",
       "submitReview": "İncelemeyi gönder",
       "blockedRequestChanges": "Değişiklik istemek için bir özet veya en az bir yorum ekle.",
       "blockedComment": "İncelemeni yorum olarak göndermek için bir özet veya en az bir yorum ekle."
@@ -3448,7 +3455,7 @@
       "planStatusLapsed": " · Sona erdi",
       "planEnded": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok.",
       "manageBilling": "Faturalandırmayı yönet",
-      "renamePlaceholder": "Kuruluş adı",
+      "renamePlaceholder": "Bir kuruluş adı girin",
       "renameTitle": "Kuruluşu yeniden adlandır"
     },
     "inviteMember": {

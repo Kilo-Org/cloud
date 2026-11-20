@@ -140,6 +140,7 @@
     "keepRunning": "بەردەوامبوونی جێبەجێکردن",
     "newSession": "دانیشتنی نوێ",
     "noModelsAvailable": "هیچ مۆدێلێک بەردەست نییە",
+    "modelRetires": "لە {{date}} خانەنشین دەبێت",
     "notFound": "نەدۆزرایەوە.",
     "online": "سەرهێڵ",
     "open": "کردنەوەی {{name}}",
@@ -184,7 +185,8 @@
     "privateRepositoryA11y": "{{name}}، کۆگای تایبەت",
     "legalDocumentEnglishOnly": "ئەم بەڵگەنامەیە تەنها بە زمانی ئینگلیزی بەردەستە.",
     "organizationTrialEndedBilling": "تاقیکردنەوەی ڕێکخراوەکە کۆتایی هاتووە و هیچ پلانێکی چالاکی نییە. دەتوانیت پارەدان نوێ بکەیتەوە، پاشان دووبارە هەوڵ بدەیتەوە.",
-    "organizationTrialEndedBillingAtKiloAi": "تاقیکردنەوەی ڕێکخراوەکە کۆتایی هاتووە و هیچ پلانێکی چالاکی نییە. دەتوانیت لە kilo.ai پارەدان نوێ بکەیتەوە، پاشان دووبارە هەوڵ بدەیتەوە."
+    "organizationTrialEndedBillingAtKiloAi": "تاقیکردنەوەی ڕێکخراوەکە کۆتایی هاتووە و هیچ پلانێکی چالاکی نییە. دەتوانیت لە kilo.ai پارەدان نوێ بکەیتەوە، پاشان دووبارە هەوڵ بدەیتەوە.",
+    "viewOnGitHub": "PR لە GitHub ببینە"
   },
   "language": {
     "restarting": "بۆ جێبەجێکردنی گۆڕینی زمان، دووبارە دەست پێ دەکاتەوە",
@@ -753,6 +755,9 @@
       "couldNotLoadMore": "نەتوانرا بۆچوونی زیاتر بار بکرێت.",
       "retryLoadingMore": "دووبارە هەوڵی بارکردنی بۆچوونی زیاتر بدەوە",
       "loadMoreComments": "بۆچوونی زیاتر بار بکە",
+      "conversationTruncated": "تەنها یەکەم {{displayCount}} بۆچوون پیشان دەدرێت.",
+      "conversationTruncated_one": "تەنها یەکەم {{displayCount}} بۆچوون پیشان دەدرێت.",
+      "conversationTruncated_other": "تەنها یەکەم {{displayCount}} بۆچوون پیشان دەدرێت.",
       "addReaction": "کاردانەوە زیاد بکە",
       "reactionPill": "کاردانەوەی {{emoji}}، {{displayCount}} {{countLabel}}",
       "reaction_one": "کاردانەوە",
@@ -882,7 +887,6 @@
       "noAccess": "دەستت بە پشکنینەکانی ئەم ڕێپۆیە ناگات.",
       "couldNotLoad": "نەتوانرا پشکنینەکان بار بکرێن.",
       "retryChecks": "دووبارە هەوڵی پشکنینەکان بدەوە",
-      "viewOnGitHub": "PR لە GitHub ببینە",
       "noChecksReported": "هیچ پشکنینێک ڕاپۆرت نەکراوە",
       "passed": "{{displayCount}} سەرکەوتوو",
       "passed_one": "{{displayCount}} سەرکەوتوو",
@@ -937,9 +941,9 @@
       "checkFailedTitleGitLab": "نەتوانرا پەیوەندی بە GitLab بپشکنرێت.",
       "checkFailedTitleBitbucket": "نەتوانرا پەیوەندی بە Bitbucket بپشکنرێت.",
       "providerCheckFailedMessage": "نەتوانرا پەیوەندی بە دابینکەرەکە بکرێت. پەیوەندییەکەت بپشکنە و دووبارە هەوڵ بدەوە.",
-      "reconnectTitle": "دووبارە بەستنەوەی GitHub",
-      "reconnectTitleGitLab": "دووبارە بەستنەوەی GitLab",
-      "reconnectTitleBitbucket": "دووبارە بەستنەوەی Bitbucket",
+      "reconnectTitle": "دووبارە پەیوەندی بە GitHub بکە",
+      "reconnectTitleGitLab": "دووبارە پەیوەندی بە GitLab بکە",
+      "reconnectTitleBitbucket": "دووبارە پەیوەندی بە Bitbucket بکە",
       "reconnectDescription": "مۆڵەتی پەیوەندییەکەت بە GitHub هەڵوەشێنراوەتەوە.",
       "gitlabDescription": "پێداچوونەوەی داواکارییەکانی تێکەڵکردن لە مۆبایلدا",
       "gitlabInstanceMismatchTitle": "بەستنەوەی GitLab بۆ نمونەیەکی ترە",
@@ -966,6 +970,8 @@
       "pendingComment": "بۆچوونی نەنێردراو",
       "pendingComment_other": "بۆچوونی نەنێردراو",
       "submitCountOfTotal": "{{displayFreshCount}} لە {{displayTotalCount}} بۆچوون بنێرە",
+      "submitCountOfTotal_one": "{{displayFreshCount}} لە {{displayTotalCount}} بۆچوون بنێرە",
+      "submitCountOfTotal_other": "{{displayFreshCount}} لە {{displayTotalCount}} بۆچوون بنێرە",
       "submitReview": "ناردنی پێداچوونەوە",
       "partialPostedFresh": "{{displayFreshCount}} بۆچوون بڵاو کرایەوە. ",
       "partialPostedFresh_one": "{{displayFreshCount}} بۆچوون بڵاو کرایەوە. ",
@@ -1390,7 +1396,8 @@
     "followReviewMd": "پابەندی REVIEW.md بە",
     "followReviewMdSubtitle": "لە هەر کۆگایەکدا ڕێنماییەکانی پەڕگەی REVIEW.md جێبەجێ بکە",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket نەبەستراوە. تەنها خاوەنەکانی ڕێکخراو، بەڕێوەبەران و بەڕێوەبەرانی پارەدان دەتوانن بیبەستن."
+      "notConnectedReadOnly": "Bitbucket نەبەستراوە. تەنها خاوەنەکانی ڕێکخراو، بەڕێوەبەران و بەڕێوەبەرانی پارەدان دەتوانن بیبەستن.",
+      "notConnectedReadOnlyPlan": "تاقیکردنەوەی ڕێکخراوەکە کۆتایی هاتووە، بۆیە دەبێت خاوەنێک لە ⁨kilo.ai⁩ پارەدان نوێ بکاتەوە."
     },
     "bitbucketConnect": {
       "managedOnWeb": "پەیوەندیی Bitbucket بۆ {{organization}} لە وێبدا و لە کۆمپیوتەرێکەوە بەڕێوە دەبرێت.",
@@ -3626,7 +3633,7 @@
     },
     "hub": {
       "renameTitle": "گۆڕینی ناوی ڕێکخراوە",
-      "renamePlaceholder": "ناوی ڕێکخراوە",
+      "renamePlaceholder": "ناوێک بۆ ڕێکخراوە بنووسە",
       "balance": "باڵانس",
       "plan": "پلان",
       "planTeams": "Teams",

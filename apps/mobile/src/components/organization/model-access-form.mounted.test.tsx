@@ -57,6 +57,16 @@ vi.mock('@/components/organization/model-access-lists', () => ({
 vi.mock('@/components/organization/providers-gateways-section', () => ({
   GatewaySettingsSection: 'GatewaySettingsSection',
 }));
+// The form's leave guard needs a navigator; this suite asserts the save
+// contract, the refusal copy and the draft rules, so it stubs the guard and
+// ignores the `isDirty` derivation the stub takes no part in.
+vi.mock('@/components/profiles/use-metadata-leave-guard', () => ({
+  useMetadataLeaveGuard: () => ({
+    handleDirtyChange: vi.fn(),
+    leaveWithoutAsking: vi.fn(),
+    dialog: null,
+  }),
+}));
 
 function model(id: string, providers: readonly string[]): CatalogModel {
   return { id, name: id, inference_provider_ids: [...providers] } satisfies CatalogModel;

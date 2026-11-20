@@ -447,9 +447,13 @@ export async function clearOpenAiChatGptUsageLimit(
       .where(openAiChatGptOwnerWhere(owner))
       .limit(1);
     if (!recorded[0]?.usage_limit_reached_at) return;
-  } catch {
+  } catch (error) {
     // An unavailable replica must not disable clearing: the locked path below
     // re-checks on the primary, exactly as before the pre-check existed.
+    console.debug(
+      '[openai-chatgpt] usage limit pre-check failed, falling back to the primary: %s',
+      error instanceof Error ? error.name : 'UnknownError'
+    );
   }
 
   await withConnectionHoldingToken(

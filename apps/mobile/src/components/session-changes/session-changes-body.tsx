@@ -14,6 +14,7 @@ import { SessionDiffFileList } from '@/components/session-changes/session-diff-f
 import { FileDiff } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import {
   type SessionChangesFile,
   type SessionChangesFilePatch,
@@ -52,11 +53,17 @@ type SessionChangesBodyProps = {
 
 function ReadOnlyNotice() {
   const { t } = useTranslation();
+  // The bar is full-bleed across the screen; the inset goes on a wrapper so the
+  // paragraph still starts at its own `px-4` page gutter. Inline padding on the
+  // bar itself would replace that gutter and the notice would start on the edge.
+  const sideInsetStyle = useSideInsetStyle();
   return (
-    <View className="border-b border-hair-soft bg-secondary px-4 py-2">
-      <Text variant="muted" className="text-xs" testID="session-changes-read-only">
-        {t('agentChat.sessionChanges.readOnlyReason')}
-      </Text>
+    <View style={sideInsetStyle}>
+      <View className="border-b border-hair-soft bg-secondary px-4 py-2">
+        <Text variant="muted" className="text-xs" testID="session-changes-read-only">
+          {t('agentChat.sessionChanges.readOnlyReason')}
+        </Text>
+      </View>
     </View>
   );
 }

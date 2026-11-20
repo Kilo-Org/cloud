@@ -30,6 +30,8 @@ const fixture = vi.hoisted(() => {
 
 const state = vi.hoisted(() => ({
   offline: false,
+  // The landscape side safe areas the screen reads; zero in every other test.
+  insets: { left: 0, right: 0 },
   read: {
     data: undefined as unknown,
     isPending: false,
@@ -39,7 +41,21 @@ const state = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('react-native', () => ({ View: 'View', ScrollView: 'ScrollView' }));
+vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false, doLeftAndRightSwapInRTL: true },
+  View: 'View',
+  ScrollView: 'ScrollView',
+}));
+// The real `@/lib/screen-insets` helpers run, so the suite asserts the shipped
+// placement rule; only the window's insets are served per test.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({
+    top: 0,
+    bottom: 0,
+    left: state.insets.left,
+    right: state.insets.right,
+  }),
+}));
 vi.mock('expo-router', () => ({}));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -108,6 +124,8 @@ function readOf(data: unknown, overrides: Partial<typeof state.read> = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   state.offline = false;
+  state.insets.left = 0;
+  state.insets.right = 0;
   state.read = readOf({ ...fixture.preferences });
 });
 
@@ -229,4 +247,41 @@ it('names the offline note from inside the ready settings body', () => {
   }
   expect(getTexts(scroll)).toContain('agentBriefing.offline');
   expect(mounted.root.findAllByType('QueryError')).toHaveLength(0);
+});
+
+// A landscape phone's side safe area (notch or sensor housing) must move the
+// whole body inside it. The ready body is the scroller, whose content container
+// carries the page gutter, so the inset rides the scroller's own style as a
+// margin; the loading body is a padded View, so it takes the inset on a wrapper.
+it('clears the landscape side insets on the ready body scroller', () => {
+  state.insets.left = 47;
+  const mounted = mount();
+
+  const [scroll] = mounted.root.findAllByType('ScrollView');
+  const scrollProps = scroll?.props as { style?: unknown } | undefined;
+  // The 8 dp on the other side is the shared helper's corner clearance for a
+  // side status area that leaves the top inset at zero.
+  expect(scrollProps?.style).toEqual({ marginLeft: 47, marginRight: 8 });
+  expect(scroll?.props.contentContainerClassName).toContain('px-4');
+});
+
+it('clears the landscape side insets on the loading body', () => {
+  state.insets.left = 47;
+  state.read = readOf(undefined, { isPending: true });
+  const mounted = mount();
+
+  const [skeleton] = mounted.root.findAllByType('Skeleton');
+  const skeletonParent = skeleton?.parent;
+  const gutterProps = skeletonParent?.props as { className?: string } | undefined;
+  expect(gutterProps?.className).toContain('px-4');
+  const wrapperProps = skeletonParent?.parent?.props as { style?: unknown } | undefined;
+  expect(wrapperProps?.style).toEqual({ paddingLeft: 47, paddingRight: 8 });
+});
+
+it('leaves the portrait bodies without an inset style', () => {
+  const mounted = mount();
+
+  const [scroll] = mounted.root.findAllByType('ScrollView');
+  const scrollProps = scroll?.props as { style?: unknown } | undefined;
+  expect(scrollProps?.style).toBeUndefined();
 });

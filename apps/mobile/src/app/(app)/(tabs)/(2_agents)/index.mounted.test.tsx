@@ -259,6 +259,22 @@ describe('buildGitHubInstallOutcomeAlert (C13 outcome states)', () => {
     expect(alert?.buttons[0]?.onPress).toBeUndefined();
     expect(onRetry).not.toHaveBeenCalled();
   });
+
+  it('unidentified request state: explains the cause and offers no retry', () => {
+    const onRetry = vi.fn<() => void>();
+    const alert = buildGitHubInstallOutcomeAlert(
+      { kind: 'error', code: 'pending_request_unidentified' },
+      onRetry
+    );
+    expect(alert).toEqual({
+      title: 'Cannot complete installation',
+      message:
+        'Kilo could not confirm which GitHub account this request is for. Start the GitHub setup again from the account you want to connect.',
+      buttons: [{ text: 'Back' }],
+    });
+    expect(alert?.buttons[0]?.onPress).toBeUndefined();
+    expect(onRetry).not.toHaveBeenCalled();
+  });
 });
 
 describe('Agents tab return-outcome rendering', () => {

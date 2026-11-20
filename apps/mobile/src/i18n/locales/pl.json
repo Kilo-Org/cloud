@@ -1631,6 +1631,7 @@
       "installationUnavailableMessage": "Ta instalacja GitHub App jest zawieszona lub nie jest już dostępna. Przywróć ją lub zainstaluj ponownie w serwisie GitHub, a następnie rozpocznij ponownie.",
       "multipleInstallationsMessage": "Ta organizacja Kilo może obecnie połączyć tylko jedną organizację GitHub.",
       "pendingRequestMessage": "To konto ma już oczekującą prośbę o instalację GitHub. Zakończ ją lub anuluj w serwisie GitHub, a następnie spróbuj ponownie.",
+      "pendingRequestUnidentifiedMessage": "Kilo nie mogło potwierdzić, do którego konta GitHub należy ta prośba. Rozpocznij konfigurację GitHub ponownie z konta, które chcesz połączyć.",
       "didNotCompleteTitle": "Instalacja nie została ukończona",
       "didNotCompleteMessage": "Instalacja aplikacji GitHub nie została ukończona. Spróbuj ponownie w aplikacji."
     },

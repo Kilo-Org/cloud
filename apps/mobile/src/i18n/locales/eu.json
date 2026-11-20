@@ -2148,6 +2148,7 @@
       "installationUnavailableMessage": "GitHub App instalazio hau etenda dago edo jada ez dago erabilgarri. Berrezarri edo instalatu berriro GitHub-en, eta gero hasi berriro.",
       "multipleInstallationsMessage": "Kilo erakunde honek une honetan soilik GitHub erakunde bat konekta dezake.",
       "pendingRequestMessage": "Kontu honetarako GitHub instalazio-eskaera bat dagoeneko zain dago. Amaitu edo utzi bertan behera GitHub-en, eta gero saiatu berriro.",
+      "pendingRequestUnidentifiedMessage": "Kilok ezin izan du egiaztatu GitHub kontu zeini dagokion eskaera hau. Hasi GitHub konfigurazioa berriro konektatu nahi duzun kontutik.",
       "didNotCompleteTitle": "Instalazioa ez da osatu",
       "didNotCompleteMessage": "GitHub aplikazioaren instalazioa ez da osatu. Saiatu berriro aplikaziotik."
     },

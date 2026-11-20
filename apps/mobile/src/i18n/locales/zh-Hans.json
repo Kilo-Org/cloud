@@ -1587,6 +1587,7 @@
       "installationUnavailableMessage": "此 GitHub App 安装已暂停或不再可用。请在 GitHub 中恢复或重新安装，然后重新开始。",
       "multipleInstallationsMessage": "此 Kilo 组织目前只能连接一个 GitHub 组织。",
       "pendingRequestMessage": "此账号已存在待处理的 GitHub 安装请求。请在 GitHub 中完成或取消该请求，然后重试。",
+      "pendingRequestUnidentifiedMessage": "Kilo 无法确认此请求对应哪个 GitHub 账号。请从你想要连接的账号重新开始 GitHub 设置。",
       "didNotCompleteTitle": "安装未完成",
       "didNotCompleteMessage": "GitHub 应用安装未完成。请从应用中重试。"
     },

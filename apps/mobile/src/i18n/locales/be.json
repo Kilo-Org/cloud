@@ -2244,6 +2244,7 @@
       "installationUnavailableMessage": "Гэтае ўсталяванне GitHub App прыпынена або больш недаступна. Аднаві або пераўсталюй яго ў GitHub, затым пачні зноў.",
       "multipleInstallationsMessage": "Гэтая арганізацыя Kilo зараз можа падключыць толькі адну арганізацыю GitHub.",
       "pendingRequestMessage": "Для гэтага ўліковага запісу ўжо існуе незавершаны запыт на ўсталяванне праграмы Kilo для GitHub. Завяршы або скасуй яго ў GitHub, затым паспрабуй зноў.",
+      "pendingRequestUnidentifiedMessage": "Kilo не змог вызначыць, да якога ўліковага запісу GitHub адносіцца гэты запыт. Пачні наладку GitHub зноў з таго запісу, які хочаш падключыць.",
       "didNotCompleteTitle": "Усталяванне не завершана",
       "didNotCompleteMessage": "Усталяванне праграмы для GitHub не завершана. Паспрабуй яшчэ раз у праграме."
     },

@@ -2148,6 +2148,7 @@
       "installationUnavailableMessage": "การติดตั้ง GitHub App นี้ถูกระงับหรือไม่พร้อมใช้งานอีกต่อไป กู้คืนหรือติดตั้งใหม่ใน GitHub จากนั้นเริ่มอีกครั้ง",
       "multipleInstallationsMessage": "องค์กร Kilo นี้สามารถเชื่อมต่อองค์กร GitHub ได้เพียงหนึ่งองค์กรในขณะนี้",
       "pendingRequestMessage": "มีคำขอติดตั้ง GitHub ที่รอดำเนินการสำหรับบัญชีนี้อยู่แล้ว ทำให้เสร็จหรือยกเลิกใน GitHub จากนั้นลองอีกครั้ง",
+      "pendingRequestUnidentifiedMessage": "Kilo ไม่สามารถยืนยันได้ว่าคำขอนี้เป็นของบัญชี GitHub ใด เริ่มการตั้งค่า GitHub ใหม่จากบัญชีที่คุณต้องการเชื่อมต่อ",
       "didNotCompleteTitle": "การติดตั้งยังไม่เสร็จสมบูรณ์",
       "didNotCompleteMessage": "การติดตั้ง GitHub App ยังไม่เสร็จสมบูรณ์ ลองอีกครั้งจากแอป"
     },

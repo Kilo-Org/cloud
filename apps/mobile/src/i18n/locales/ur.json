@@ -2148,6 +2148,7 @@
       "installationUnavailableMessage": "یہ GitHub App انسٹالیشن معطل ہے یا اب دستیاب نہیں ہے۔ اسے GitHub میں بحال کریں یا دوبارہ انسٹال کریں، پھر دوبارہ شروع کریں۔",
       "multipleInstallationsMessage": "یہ Kilo تنظیم فی الحال صرف ایک GitHub تنظیم سے منسلک ہو سکتی ہے۔",
       "pendingRequestMessage": "اس اکاؤنٹ کے لیے GitHub انسٹالیشن کی درخواست پہلے سے التوا میں موجود ہے۔ اسے GitHub میں مکمل کریں یا منسوخ کریں، پھر دوبارہ کوشش کریں۔",
+      "pendingRequestUnidentifiedMessage": "Kilo تصدیق نہیں کر سکا کہ یہ درخواست کس GitHub اکاؤنٹ کے لیے ہے۔ جس اکاؤنٹ کو جوڑنا چاہتے ہیں، اسی سے GitHub سیٹ اپ دوبارہ شروع کریں۔",
       "didNotCompleteTitle": "انسٹالیشن مکمل نہیں ہوئی",
       "didNotCompleteMessage": "GitHub ایپ کی انسٹالیشن مکمل نہیں ہوئی۔ ایپ سے دوبارہ کوشش کریں۔"
     },

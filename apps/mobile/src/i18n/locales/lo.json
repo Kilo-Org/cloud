@@ -2148,6 +2148,7 @@
       "installationUnavailableMessage": "ການຕິດຕັ້ງ GitHub App ນີ້ຖືກໂຈະ ຫຼື ບໍ່ມີໃຫ້ໃຊ້ອີກແລ້ວ. ກູ້ຄືນ ຫຼື ຕິດຕັ້ງຄືນໃໝ່ໃນ GitHub ແລ້ວເລີ່ມອີກຄັ້ງ.",
       "multipleInstallationsMessage": "ອົງກອນ Kilo ນີ້ສາມາດເຊື່ອມຕໍ່ກັບອົງກອນ GitHub ໄດ້ພຽງແຕ່ໜຶ່ງອົງກອນເທົ່ານັ້ນໃນປັດຈຸບັນ.",
       "pendingRequestMessage": "ມີຄຳຂໍການຕິດຕັ້ງ GitHub ທີ່ຍັງລໍຖ້າຢູ່ແລ້ວສຳລັບບັນຊີນີ້. ສຳເລັດ ຫຼື ຍົກເລີກມັນໃນ GitHub ແລ້ວລອງອີກຄັ້ງ.",
+      "pendingRequestUnidentifiedMessage": "Kilo ບໍ່ສາມາດຢືນຢັນໄດ້ວ່າຄຳຂໍນີ້ເປັນຂອງບັນຊີ GitHub ໃດ. ເລີ່ມການຕັ້ງຄ່າ GitHub ຄືນໃໝ່ຈາກບັນຊີທີ່ທ່ານຕ້ອງການເຊື່ອມຕໍ່.",
       "didNotCompleteTitle": "ການຕິດຕັ້ງບໍ່ສຳເລັດ",
       "didNotCompleteMessage": "ການຕິດຕັ້ງແອັບ GitHub ຍັງບໍ່ສຳເລັດ. ລອງອີກຄັ້ງຈາກແອັບ."
     },

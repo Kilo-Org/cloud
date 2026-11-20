@@ -2196,6 +2196,7 @@
       "installationUnavailableMessage": "Această instalare GitHub App este suspendată sau nu mai este disponibilă. Restaureaz-o sau reinstaleaz-o în GitHub, apoi începe din nou.",
       "multipleInstallationsMessage": "Această organizație Kilo se poate conecta momentan doar la o singură organizație GitHub.",
       "pendingRequestMessage": "Există deja o cerere de instalare GitHub în așteptare pentru acest cont. Finalizeaz-o sau anuleaz-o în GitHub, apoi încearcă din nou.",
+      "pendingRequestUnidentifiedMessage": "Kilo nu a putut confirma cărei conturi GitHub îi aparține această cerere. Începe din nou configurarea GitHub din contul pe care vrei să îl conectezi.",
       "didNotCompleteTitle": "Instalarea nu s-a finalizat",
       "didNotCompleteMessage": "Instalarea aplicației pentru GitHub nu a fost finalizată. Încearcă din nou din aplicație."
     },

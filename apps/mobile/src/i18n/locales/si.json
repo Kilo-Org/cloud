@@ -2148,6 +2148,7 @@
       "installationUnavailableMessage": "මෙම GitHub App ස්ථාපනය අත්හිටුවා ඇත හෝ තවදුරටත් ලබා ගත නොහැක. GitHub තුළ එය ප්‍රතිස්ථාපනය කරන්න හෝ නැවත ස්ථාපනය කරන්න, පසුව නැවත ආරම්භ කරන්න.",
       "multipleInstallationsMessage": "මෙම Kilo සංවිධානයට දැනට එක් GitHub සංවිධානයක් පමණක් සම්බන්ධ කළ හැක.",
       "pendingRequestMessage": "මෙම ගිණුම සඳහා GitHub ස්ථාපන ඉල්ලීමක් දැනටමත් විවෘතව පවතී. GitHub තුළ එය සම්පූර්ණ කරන්න හෝ අවලංගු කරන්න, පසුව නැවත උත්සාහ කරන්න.",
+      "pendingRequestUnidentifiedMessage": "මෙම ඉල්ලීම කුමන GitHub ගිණුමට අයත් දැයි Kilo හට තහවුරු කළ නොහැකි විය. ඔබ සම්බන්ධ කිරීමට කැමති ගිණුමෙන් GitHub සැකසුම නැවත ආරම්භ කරන්න.",
       "didNotCompleteTitle": "ස්ථාපනය සම්පූර්ණ නොවීය",
       "didNotCompleteMessage": "GitHub යෙදුම ස්ථාපනය කිරීම සම්පූර්ණ නොවීය. යෙදුමෙන් නැවත උත්සාහ කරන්න."
     },

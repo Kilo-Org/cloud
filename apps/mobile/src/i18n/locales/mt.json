@@ -2292,6 +2292,7 @@
       "installationUnavailableMessage": "Din l-installazzjoni tal-GitHub App hija sospiża jew m'għadhiex disponibbli. Irrestawraha jew installaha mill-ġdid fi GitHub, imbagħad erġa' ibda.",
       "multipleInstallationsMessage": "Din l-organizzazzjoni ta' Kilo bħalissa tista' tikkonnettja organizzazzjoni waħda biss ta' GitHub.",
       "pendingRequestMessage": "Diġà teżisti talba pendenti għall-installazzjoni ta' GitHub għal dan il-kont. Lestiha jew ikkanċellaha fi GitHub, imbagħad erġa' pprova.",
+      "pendingRequestUnidentifiedMessage": "Kilo ma setax jikkonferma għal liema kont GitHub hija din it-talba. Ibda mill-ġdid is-setup ta' GitHub mill-kont li trid tikkonnettja.",
       "didNotCompleteTitle": "L-installazzjoni ma tlestietx",
       "didNotCompleteMessage": "L-installazzjoni tal-app ta' GitHub ma tlestietx. Erġa' pprova mill-app."
     },

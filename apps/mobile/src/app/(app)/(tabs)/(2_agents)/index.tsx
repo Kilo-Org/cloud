@@ -85,6 +85,13 @@ export function buildGitHubInstallOutcomeAlert(
           buttons: [{ text: i18n.t('common.back') }],
         };
       }
+      if (result.code === 'pending_request_unidentified') {
+        return {
+          title: i18n.t('agents.githubInstall.cannotCompleteTitle'),
+          message: i18n.t('agents.githubInstall.pendingRequestUnidentifiedMessage'),
+          buttons: [{ text: i18n.t('common.back') }],
+        };
+      }
       if (result.code === 'installation_unavailable') {
         return {
           title: i18n.t('agents.githubInstall.cannotCompleteTitle'),

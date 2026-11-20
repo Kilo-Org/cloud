@@ -2148,6 +2148,7 @@
       "installationUnavailableMessage": "Tämä GitHub App -asennus on keskeytetty tai ei ole enää saatavilla. Palauta asennus tai asenna se uudelleen GitHubissa ja aloita sitten uudelleen.",
       "multipleInstallationsMessage": "Tämä Kilo-organisaatio voi tällä hetkellä yhdistää vain yhden GitHub-organisaation.",
       "pendingRequestMessage": "Tälle tilille on jo olemassa odottava GitHub-asennuspyyntö. Viimeistele tai peruuta se GitHubissa ja yritä sitten uudelleen.",
+      "pendingRequestUnidentifiedMessage": "Kilo ei voinut vahvistaa, mihin GitHub-tiliin tämä pyyntö liittyy. Aloita GitHubin käyttöönotto uudelleen siitä tilistä, jonka haluat yhdistää.",
       "didNotCompleteTitle": "Asennus ei valmistunut",
       "didNotCompleteMessage": "GitHub-sovelluksen asennus jäi kesken. Yritä uudelleen sovelluksesta."
     },

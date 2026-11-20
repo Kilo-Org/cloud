@@ -2148,6 +2148,7 @@
       "installationUnavailableMessage": "An dakatar da wannan shigarwar GitHub App ko kuma ba ta samuwa yanzu. Maido da ita ko sake shigar da ita a GitHub, sannan ka sake farawa.",
       "multipleInstallationsMessage": "Wannan kungiyar Kilo za ta iya haɗawa da kungiya ɗaya ta GitHub kawai a halin yanzu.",
       "pendingRequestMessage": "An riga an sami buƙatar shigarwa ta GitHub da ke jira ga wannan asusun. Kammala ta ko soke ta a GitHub, sannan ka sake gwadawa.",
+      "pendingRequestUnidentifiedMessage": "Kilo bai iya tabbatar da wane asusun GitHub wannan buƙatar ta kai ba. Sake fara saitin GitHub daga asusun da kake son haɗawa.",
       "didNotCompleteTitle": "Ba a kammala shigarwa ba",
       "didNotCompleteMessage": "Ba a kammala shigar da manhajar GitHub ba. Sake gwadawa daga manhajar."
     },

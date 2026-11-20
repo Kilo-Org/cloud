@@ -2148,6 +2148,7 @@
       "installationUnavailableMessage": "د GitHub App دا نصب ځنډول شوی یا نور شتون نلري. په GitHub کې یې بحال یا بیا نصب کړئ، بیا بیا پیل کړئ.",
       "multipleInstallationsMessage": "د Kilo دا سازمان اوس مهال یوازې له یوه GitHub سازمان سره نښلېدای شي.",
       "pendingRequestMessage": "د دې حساب لپاره د GitHub د نصب یوه غوښتنه لا دمخه په تمه ده. په GitHub کې یې بشپړ کړئ یا لغوه یې کړئ، بیا هڅه وکړئ.",
+      "pendingRequestUnidentifiedMessage": "Kilo ونه توانېد چې تایید کړي دا غوښتنه د GitHub کوم حساب لپاره ده. د GitHub ترتیبول بیا له هغه حساب څخه پیل کړئ چې تړل یې غواړئ.",
       "didNotCompleteTitle": "نصب بشپړ نه شو",
       "didNotCompleteMessage": "د GitHub اپلیکیشن نصب بشپړ نه شو. له اپلیکیشن څخه بیا هڅه وکړئ."
     },

@@ -1587,6 +1587,7 @@
       "installationUnavailableMessage": "Bu GitHub App kurulumu askıya alınmış veya artık kullanılamıyor. GitHub'da geri yükle veya yeniden yükle, sonra tekrar başla.",
       "multipleInstallationsMessage": "Bu Kilo organizasyonu şu anda yalnızca bir GitHub organizasyonuna bağlanabilir.",
       "pendingRequestMessage": "Bu hesap için zaten bekleyen bir GitHub kurulum isteği var. İsteği GitHub'da tamamla veya iptal et, sonra tekrar dene.",
+      "pendingRequestUnidentifiedMessage": "Kilo bu isteğin hangi GitHub hesabına ait olduğunu doğrulayamadı. GitHub kurulumuna bağlamak istediğin hesaptan yeniden başla.",
       "didNotCompleteTitle": "Kurulum tamamlanmadı",
       "didNotCompleteMessage": "GitHub uygulamasının kurulumu tamamlanmadı. Uygulamadan tekrar dene."
     },

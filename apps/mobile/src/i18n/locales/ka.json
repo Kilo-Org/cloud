@@ -2148,6 +2148,7 @@
       "installationUnavailableMessage": "GitHub App-ის ეს დაყენება შეჩერებულია ან აღარ არის ხელმისაწვდომი. აღადგინე ან ხელახლა დააყენე ის GitHub-ში, შემდეგ თავიდან დაიწყე.",
       "multipleInstallationsMessage": "ამ Kilo ორგანიზაციას ამჟამად მხოლოდ ერთი GitHub ორგანიზაციის დაკავშირება შეუძლია.",
       "pendingRequestMessage": "ამ ანგარიშისთვის უკვე არსებობს GitHub-ის დაყენების მომლოდინე მოთხოვნა. დაასრულე ან გააუქმე ის GitHub-ში, შემდეგ ხელახლა სცადე.",
+      "pendingRequestUnidentifiedMessage": "Kilo ვერ დაადგინა, რომელ GitHub ანგარიშს ეკუთვნის ეს მოთხოვნა. GitHub-ის დაყენება თავიდან დაიწყე იმ ანგარიშიდან, რომლის დაკავშირებაც გსურს.",
       "didNotCompleteTitle": "დაყენება არ დასრულდა",
       "didNotCompleteMessage": "GitHub აპის დაყენება არ დასრულდა. აპიდან ხელახლა სცადე."
     },

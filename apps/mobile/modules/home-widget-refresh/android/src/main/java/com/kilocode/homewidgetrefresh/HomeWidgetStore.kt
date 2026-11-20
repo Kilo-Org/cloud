@@ -100,11 +100,12 @@ internal object HomeWidgetStore {
   }
   /**
    * Every configuration refusal is a `null` return: no placed widget, fixture mode, a
-   * missing endpoint, token, scope or epoch, a disallowed endpoint host, a non-200
-   * answer, or a response that names another scope. It still throws what the JDK throws
-   * on a malformed URL or transport failure, and `JSONException` on a stored value or a
-   * response body that is not shaped as expected; the caller
-   * (`HomeWidgetRefreshWorker.doWork`) catches every one of those.
+   * missing endpoint, token, scope or epoch, a disallowed endpoint host, a response that
+   * names another scope, or a non-200 answer. A current 401 is the one exception: it
+   * clears the stored content and returns the terminal fence the widget draws instead.
+   * It still throws what the JDK throws on a malformed URL or transport failure, and
+   * `JSONException` on a stored value or a response body that is not shaped as expected;
+   * the caller (`HomeWidgetRefreshWorker.doWork`) catches every one of those.
    */
   fun fetch(context: Context): JSONObject? {
     val config: JSONObject

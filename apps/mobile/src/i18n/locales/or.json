@@ -427,6 +427,15 @@
       "location": "Vertex ଅବସ୍ଥାନ",
       "clientEmail": "ସର୍ଭିସ୍ ଆକାଉଣ୍ଟ ଇମେଲ୍",
       "privateKey": "ସର୍ଭିସ୍ ଆକାଉଣ୍ଟ ପ୍ରାଇଭେଟ୍ କୀ",
+      "names": {
+        "codestral": "କେବଳ ପୁରୁଣା Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT ସହିତ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ)",
+        "xiaomi": "Xiaomi (ବ୍ୟବହାର ଅନୁସାରେ ଦେୟ)",
+        "zai": "Z.ai (ବ୍ୟବହାର ଅନୁସାରେ ଦେୟ)",
+        "bedrockByok": "Amazon Bedrock (ସିଧାସଳଖ)",
+        "vertexByok": "Google Vertex AI (ସିଧାସଳଖ)"
+      },
       "modelMappings": "ମଡେଲ୍ ମ୍ୟାପିଂ",
       "modelMappingsDescription": "ଏକ ଗେଟୱେ ମଡେଲ୍‌କୁ ଏକ କଷ୍ଟମ୍ ଡିପ୍ଲୟମେଣ୍ଟ ନାମକୁ ପଠାନ୍ତୁ।",
       "mappingTitle": "ମ୍ୟାପିଂ {{number}}",

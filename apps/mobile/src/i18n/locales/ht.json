@@ -427,6 +427,15 @@
       "location": "Lokasyon Vertex",
       "clientEmail": "Imèl kont sèvis",
       "privateKey": "Kle prive kont sèvis",
+      "names": {
+        "codestral": "Ansyen Codestral sèlman",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Konekte ak ChatGPT)",
+        "xiaomi": "Xiaomi (peye selon itilizasyon)",
+        "zai": "Z.ai (peye selon itilizasyon)",
+        "bedrockByok": "Amazon Bedrock (dirèk)",
+        "vertexByok": "Google Vertex AI (dirèk)"
+      },
       "modelMappings": "Korespondans modèl",
       "modelMappingsDescription": "Voye yon modèl gateway bay yon non deplwaman pèsonalize.",
       "mappingTitle": "Korespondans {{number}}",

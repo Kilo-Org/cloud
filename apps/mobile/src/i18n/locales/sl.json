@@ -429,6 +429,15 @@
       "location": "Lokacija Vertex",
       "clientEmail": "E-poštni naslov računa storitve",
       "privateKey": "Zasebni ključ računa storitve",
+      "names": {
+        "codestral": "Samo za starejši Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Prijavi se z računom ChatGPT)",
+        "xiaomi": "Xiaomi (plačilo po porabi)",
+        "zai": "Z.ai (plačilo po porabi)",
+        "bedrockByok": "Amazon Bedrock (neposredno)",
+        "vertexByok": "Google Vertex AI (neposredno)"
+      },
       "modelMappings": "Preslikave modelov",
       "modelMappingsDescription": "Preusmeri model prehoda na ime namestitve po meri.",
       "mappingTitle": "Preslikava {{number}}",

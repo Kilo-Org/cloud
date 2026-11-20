@@ -427,6 +427,15 @@
       "location": "Vertexロケーション",
       "clientEmail": "サービスアカウントのメールアドレス",
       "privateKey": "サービスアカウントの秘密鍵",
+      "names": {
+        "codestral": "レガシーCodestral専用",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI（ChatGPTでサインイン）",
+        "xiaomi": "Xiaomi（従量課金）",
+        "zai": "Z.ai（従量課金）",
+        "bedrockByok": "Amazon Bedrock（直接）",
+        "vertexByok": "Google Vertex AI（直接）"
+      },
       "modelMappings": "モデルマッピング",
       "modelMappingsDescription": "ゲートウェイモデルをカスタムのデプロイ名にルーティングします。",
       "mappingTitle": "マッピング{{number}}",

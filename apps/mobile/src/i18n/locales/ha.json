@@ -427,6 +427,15 @@
       "location": "Wurin Vertex",
       "clientEmail": "Imel na asusun sabis",
       "privateKey": "Maɓallin sirri na asusun sabis",
+      "names": {
+        "codestral": "Tsohon Codestral kawai",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Shiga da ChatGPT)",
+        "xiaomi": "Xiaomi (biya gwargwadon amfani)",
+        "zai": "Z.ai (biya gwargwadon amfani)",
+        "bedrockByok": "Amazon Bedrock (kai tsaye)",
+        "vertexByok": "Google Vertex AI (kai tsaye)"
+      },
       "modelMappings": "Taswirorin samfura",
       "modelMappingsDescription": "Tura samfurin gateway zuwa sunan deployment na musamman.",
       "mappingTitle": "Taswira {{number}}",

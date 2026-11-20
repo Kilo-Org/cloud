@@ -36,18 +36,12 @@ export type ModelMapping = Readonly<{ gatewayModelSlug: string; customModelId: s
 type CredentialField = Readonly<{
   id: CredentialFieldId;
   /**
-   * The value is a secret. A single-line one is masked while it is typed; the
-   * form still asks the keyboard to suggest nothing and learn nothing from
-   * either kind.
+   * The value is a secret. It is masked while it is typed, on both platforms,
+   * which is why no credential field is multiline: React Native masks a
+   * single-line input and cannot mask a multiline one. Its keyboard still
+   * suggests nothing and learns nothing.
    */
   secret: boolean;
-  /**
-   * The value needs more than one line. A PEM private key is the only one. The
-   * field is still marked secret: Android masks a multiline secure input, and
-   * where a platform cannot mask it the value stays readable but the field
-   * still asks the keyboard to suggest nothing and learn nothing.
-   */
-  multiline: boolean;
   /** The copy that names this field on the form. */
   labelKey: string;
 }>;
@@ -64,14 +58,12 @@ export type CredentialForm = Readonly<{
 const API_KEY_FIELD: CredentialField = {
   id: 'apiKey',
   secret: true,
-  multiline: false,
   labelKey: 'profile.providerKeys.apiKeyLabel',
 };
 
 const REGION_FIELD: CredentialField = {
   id: 'region',
   secret: false,
-  multiline: false,
   labelKey: 'profile.providerKeys.region',
 };
 
@@ -82,7 +74,6 @@ const AZURE_FORM: CredentialForm = {
     {
       id: 'resourceName',
       secret: false,
-      multiline: false,
       labelKey: 'profile.providerKeys.resourceName',
     },
   ],
@@ -103,13 +94,11 @@ const BEDROCK_FORMS = {
       {
         id: 'accessKeyId',
         secret: false,
-        multiline: false,
         labelKey: 'profile.providerKeys.accessKeyId',
       },
       {
         id: 'secretAccessKey',
         secret: true,
-        multiline: false,
         labelKey: 'profile.providerKeys.secretAccessKey',
       },
       REGION_FIELD,
@@ -125,25 +114,21 @@ const VERTEX_FORM: CredentialForm = {
     {
       id: 'project',
       secret: false,
-      multiline: false,
       labelKey: 'profile.providerKeys.project',
     },
     {
       id: 'location',
       secret: false,
-      multiline: false,
       labelKey: 'profile.providerKeys.location',
     },
     {
       id: 'clientEmail',
       secret: false,
-      multiline: false,
       labelKey: 'profile.providerKeys.clientEmail',
     },
     {
       id: 'privateKey',
       secret: true,
-      multiline: true,
       labelKey: 'profile.providerKeys.privateKey',
     },
   ],

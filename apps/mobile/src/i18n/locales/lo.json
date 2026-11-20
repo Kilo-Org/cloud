@@ -427,6 +427,15 @@
       "location": "ສະຖານທີ່ Vertex",
       "clientEmail": "ອີເມວບັນຊີບໍລິການ",
       "privateKey": "ຄີສ່ວນຕົວຂອງບັນຊີບໍລິການ",
+      "names": {
+        "codestral": "ສະເພາະ Codestral ສະບັບເກົ່າ",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ເຂົ້າສູ່ລະບົບດ້ວຍ ChatGPT)",
+        "xiaomi": "Xiaomi (ຈ່າຍຕາມການໃຊ້ງານ)",
+        "zai": "Z.ai (ຈ່າຍຕາມການໃຊ້ງານ)",
+        "bedrockByok": "Amazon Bedrock (ໂດຍກົງ)",
+        "vertexByok": "Google Vertex AI (ໂດຍກົງ)"
+      },
       "modelMappings": "ການຈັບຄູ່ໂມເດວ",
       "modelMappingsDescription": "ສົ່ງໂມເດວ gateway ໄປຫາຊື່ deployment ທີ່ກຳນົດເອງ.",
       "mappingTitle": "ການຈັບຄູ່ {{number}}",

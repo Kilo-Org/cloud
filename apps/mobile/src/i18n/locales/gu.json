@@ -427,6 +427,15 @@
       "location": "Vertex સ્થાન",
       "clientEmail": "સર્વિસ એકાઉન્ટ ઇમેઇલ",
       "privateKey": "સર્વિસ એકાઉન્ટ પ્રાઇવેટ કી",
+      "names": {
+        "codestral": "ફક્ત જૂનું Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT વડે સાઇન ઇન કરો)",
+        "xiaomi": "Xiaomi (વપરાશ મુજબ ચુકવણી)",
+        "zai": "Z.ai (વપરાશ મુજબ ચુકવણી)",
+        "bedrockByok": "Amazon Bedrock (સીધું)",
+        "vertexByok": "Google Vertex AI (સીધું)"
+      },
       "modelMappings": "મોડેલ મેપિંગ",
       "modelMappingsDescription": "ગેટવે મોડેલને કસ્ટમ ડિપ્લોયમેન્ટ નામ પર મોકલો.",
       "mappingTitle": "મેપિંગ {{number}}",

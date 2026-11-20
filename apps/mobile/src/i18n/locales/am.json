@@ -427,6 +427,15 @@
       "location": "የVertex አካባቢ",
       "clientEmail": "የአገልግሎት መለያ ኢሜይል",
       "privateKey": "የአገልግሎት መለያ የግል ቁልፍ",
+      "names": {
+        "codestral": "የቆየ Codestral-ብቻ",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (በChatGPT ይግቡ)",
+        "xiaomi": "Xiaomi (በአጠቃቀም መጠን ይክፈሉ)",
+        "zai": "Z.ai (በአጠቃቀም መጠን ይክፈሉ)",
+        "bedrockByok": "Amazon Bedrock (በቀጥታ)",
+        "vertexByok": "Google Vertex AI (በቀጥታ)"
+      },
       "modelMappings": "የሞዴል ማዛመጃዎች",
       "modelMappingsDescription": "የGateway ሞዴልን ወደ ብጁ የDeployment ስም ይላኩ።",
       "mappingTitle": "ማዛመጃ {{number}}",

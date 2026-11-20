@@ -429,6 +429,15 @@
       "location": "Lokalizacja Vertex",
       "clientEmail": "Adres e-mail konta usługi",
       "privateKey": "Klucz prywatny konta usługi",
+      "names": {
+        "codestral": "Starsza wersja tylko dla Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Zaloguj się przez ChatGPT)",
+        "xiaomi": "Xiaomi (płatność za użycie)",
+        "zai": "Z.ai (płatność za użycie)",
+        "bedrockByok": "Amazon Bedrock (bezpośrednio)",
+        "vertexByok": "Google Vertex AI (bezpośrednio)"
+      },
       "modelMappings": "Mapowania modeli",
       "modelMappingsDescription": "Kieruj model z bramy do niestandardowej nazwy wdrożenia.",
       "mappingTitle": "Mapowanie {{number}}",

@@ -428,6 +428,15 @@
       "location": "Emplacement Vertex",
       "clientEmail": "E-mail du compte de service",
       "privateKey": "Clé privée du compte de service",
+      "names": {
+        "codestral": "Codestral hérité uniquement",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Se connecter avec ChatGPT)",
+        "xiaomi": "Xiaomi (paiement à l’usage)",
+        "zai": "Z.ai (paiement à l’usage)",
+        "bedrockByok": "Amazon Bedrock (facturation directe)",
+        "vertexByok": "Google Vertex AI (facturation directe)"
+      },
       "modelMappings": "Correspondances de modèles",
       "modelMappingsDescription": "Associez un modèle de la passerelle à un nom de déploiement personnalisé.",
       "mappingTitle": "Correspondance {{number}}",

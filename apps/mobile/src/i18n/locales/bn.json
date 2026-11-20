@@ -427,6 +427,15 @@
       "location": "Vertex লোকেশন",
       "clientEmail": "সার্ভিস অ্যাকাউন্টের ইমেল",
       "privateKey": "সার্ভিস অ্যাকাউন্টের প্রাইভেট কী",
+      "names": {
+        "codestral": "শুধু পুরোনো Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT দিয়ে সাইন-ইন করুন)",
+        "xiaomi": "Xiaomi (ব্যবহার অনুযায়ী পেমেন্ট)",
+        "zai": "Z.ai (ব্যবহার অনুযায়ী পেমেন্ট)",
+        "bedrockByok": "Amazon Bedrock (সরাসরি)",
+        "vertexByok": "Google Vertex AI (সরাসরি)"
+      },
       "modelMappings": "মডেল ম্যাপিং",
       "modelMappingsDescription": "একটি গেটওয়ে মডেলকে কাস্টম ডিপ্লয়মেন্ট নামে পাঠান।",
       "mappingTitle": "ম্যাপিং {{number}}",

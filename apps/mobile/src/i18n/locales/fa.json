@@ -427,6 +427,15 @@
       "location": "موقعیت Vertex",
       "clientEmail": "ایمیل حساب سرویس",
       "privateKey": "کلید خصوصی حساب سرویس",
+      "names": {
+        "codestral": "فقط Codestral قدیمی",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ورود با ChatGPT)",
+        "xiaomi": "Xiaomi (پرداخت به‌ازای مصرف)",
+        "zai": "Z.ai (پرداخت به‌ازای مصرف)",
+        "bedrockByok": "Amazon Bedrock (مستقیم)",
+        "vertexByok": "Google Vertex AI (مستقیم)"
+      },
       "modelMappings": "نگاشت‌های مدل",
       "modelMappingsDescription": "یک مدل درگاه را به یک نام استقرار سفارشی هدایت کنید.",
       "mappingTitle": "نگاشت {{number}}",

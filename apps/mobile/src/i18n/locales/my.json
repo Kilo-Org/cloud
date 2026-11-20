@@ -427,6 +427,15 @@
       "location": "Vertex တည်နေရာ",
       "clientEmail": "Service account အီးမေးလ်",
       "privateKey": "Service account သီးသန့် ကီး",
+      "names": {
+        "codestral": "အဟောင်း Codestral သီးသန့်",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT ဖြင့် အကောင့်ဝင်ရန်)",
+        "xiaomi": "Xiaomi (အသုံးပြုသလောက် ပေးချေခြင်း)",
+        "zai": "Z.ai (အသုံးပြုသလောက် ပေးချေခြင်း)",
+        "bedrockByok": "Amazon Bedrock (တိုက်ရိုက်)",
+        "vertexByok": "Google Vertex AI (တိုက်ရိုက်)"
+      },
       "modelMappings": "မော်ဒယ် ချိတ်ဆက်မှုများ",
       "modelMappingsDescription": "Gateway မော်ဒယ်ကို စိတ်ကြိုက် deployment အမည်သို့ ပို့ပါ။",
       "mappingTitle": "ချိတ်ဆက်မှု {{number}}",

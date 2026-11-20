@@ -427,6 +427,15 @@
       "location": "Tauwāhi Vertex",
       "clientEmail": "Īmēra o te pūkete ratonga",
       "privateKey": "Kī tūmataiti o te pūkete ratonga",
+      "names": {
+        "codestral": "Codestral tuku iho anake",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Takiuru mā ChatGPT)",
+        "xiaomi": "Xiaomi (utu mō te whakamahinga)",
+        "zai": "Z.ai (utu mō te whakamahinga)",
+        "bedrockByok": "Amazon Bedrock (tōtika)",
+        "vertexByok": "Google Vertex AI (tōtika)"
+      },
       "modelMappings": "Ngā hononga tauira",
       "modelMappingsDescription": "Tukuna tētahi tauira gateway ki tētahi ingoa horahora ritenga.",
       "mappingTitle": "Hononga {{number}}",

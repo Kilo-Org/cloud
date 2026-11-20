@@ -427,6 +427,15 @@
       "location": "Eneo la Vertex",
       "clientEmail": "Barua pepe ya akaunti ya huduma",
       "privateKey": "Ufunguo binafsi wa akaunti ya huduma",
+      "names": {
+        "codestral": "Codestral ya zamani pekee",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Ingia na ChatGPT)",
+        "xiaomi": "Xiaomi (malipo kwa matumizi)",
+        "zai": "Z.ai (malipo kwa matumizi)",
+        "bedrockByok": "Amazon Bedrock (moja kwa moja)",
+        "vertexByok": "Google Vertex AI (moja kwa moja)"
+      },
       "modelMappings": "Ulinganishaji wa modeli",
       "modelMappingsDescription": "Elekeza modeli ya gateway kwenye jina maalum la deployment.",
       "mappingTitle": "Ulinganishaji {{number}}",

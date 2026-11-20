@@ -428,6 +428,15 @@
       "location": "Località Vertex",
       "clientEmail": "Email dell'account di servizio",
       "privateKey": "Chiave privata dell'account di servizio",
+      "names": {
+        "codestral": "Solo Codestral obsoleto",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Accedi con ChatGPT)",
+        "xiaomi": "Xiaomi (a consumo)",
+        "zai": "Z.ai (a consumo)",
+        "bedrockByok": "Amazon Bedrock (diretto)",
+        "vertexByok": "Google Vertex AI (diretto)"
+      },
       "modelMappings": "Mappature dei modelli",
       "modelMappingsDescription": "Indirizza un modello del gateway verso un nome di deployment personalizzato.",
       "mappingTitle": "Mappatura {{number}}",

@@ -427,6 +427,15 @@
       "location": "Vertex 位置",
       "clientEmail": "服务账号邮箱",
       "privateKey": "服务账号私钥",
+      "names": {
+        "codestral": "旧版仅 Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI（使用 ChatGPT 登录）",
+        "xiaomi": "Xiaomi（按量付费）",
+        "zai": "Z.ai（按量付费）",
+        "bedrockByok": "Amazon Bedrock（直连）",
+        "vertexByok": "Google Vertex AI（直连）"
+      },
       "modelMappings": "模型映射",
       "modelMappingsDescription": "将网关模型映射到自定义部署名称。",
       "mappingTitle": "映射 {{number}}",

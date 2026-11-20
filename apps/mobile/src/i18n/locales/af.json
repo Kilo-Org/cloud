@@ -427,6 +427,15 @@
       "location": "Vertex-ligging",
       "clientEmail": "Diensrekening-e-posadres",
       "privateKey": "Privaat sleutel van diensrekening",
+      "names": {
+        "codestral": "Slegs verouderde Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Meld aan met ChatGPT)",
+        "xiaomi": "Xiaomi (betaal soos jy gebruik)",
+        "zai": "Z.ai (betaal soos jy gebruik)",
+        "bedrockByok": "Amazon Bedrock (direk)",
+        "vertexByok": "Google Vertex AI (direk)"
+      },
       "modelMappings": "Modelkoppelings",
       "modelMappingsDescription": "Stuur 'n gateway-model na 'n pasgemaakte ontplooiingsnaam.",
       "mappingTitle": "Koppeling {{number}}",

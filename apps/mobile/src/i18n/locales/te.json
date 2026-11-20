@@ -427,6 +427,15 @@
       "location": "Vertex లొకేషన్",
       "clientEmail": "సర్వీస్ ఖాతా ఇమెయిల్",
       "privateKey": "సర్వీస్ ఖాతా ప్రైవేట్ కీ",
+      "names": {
+        "codestral": "పాత Codestral మాత్రమే",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPTతో సైన్ ఇన్ చేయండి)",
+        "xiaomi": "Xiaomi (వాడినంత చెల్లింపు)",
+        "zai": "Z.ai (వాడినంత చెల్లింపు)",
+        "bedrockByok": "Amazon Bedrock (నేరుగా)",
+        "vertexByok": "Google Vertex AI (నేరుగా)"
+      },
       "modelMappings": "మోడల్ మ్యాపింగ్‌లు",
       "modelMappingsDescription": "గేట్‌వే మోడల్‌ను అనుకూల డిప్లాయ్‌మెంట్ పేరుకు పంపండి.",
       "mappingTitle": "మ్యాపింగ్ {{number}}",

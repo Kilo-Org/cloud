@@ -42,4 +42,14 @@ describe('BYOK provider lists', () => {
     expect(getByokProviderDisplayName('codestral')).toBe(legacyOnlyName);
     expect(getByokProviderDisplayName('not-a-provider')).toBe('not-a-provider');
   });
+
+  test('names a stored-only key the lists never offer', () => {
+    // The ChatGPT connection is stored under its own provider id and its card
+    // owns it, so no picker lists it. A reader who is shown the stored row
+    // still has to get a name instead of the raw id.
+    expect(getByokProviderDisplayName('openai-chatgpt')).toBe(
+      'OpenAI (Sign in with ChatGPT)'
+    );
+    expect(BYOK_PROVIDERS.some(provider => provider.id === 'openai-chatgpt')).toBe(false);
+  });
 });

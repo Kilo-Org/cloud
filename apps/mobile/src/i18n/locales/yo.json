@@ -427,6 +427,15 @@
       "location": "Ibi Vertex",
       "clientEmail": "Ímeèlì service account",
       "privateKey": "Kọ́kọ́rọ́ àdáni service account",
+      "names": {
+        "codestral": "Àtijọ́ Codestral nìkan",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Wọlé pẹ̀lú ChatGPT)",
+        "xiaomi": "Xiaomi (sanwó ní ìbámu pẹ̀lú ìlò)",
+        "zai": "Z.ai (sanwó ní ìbámu pẹ̀lú ìlò)",
+        "bedrockByok": "Amazon Bedrock (tààrà)",
+        "vertexByok": "Google Vertex AI (tààrà)"
+      },
       "modelMappings": "Àwọn ìsopọ̀ àwòṣe",
       "modelMappingsDescription": "Darí àwòṣe gateway kan sí orúkọ deployment àdáni.",
       "mappingTitle": "Ìsopọ̀ {{number}}",

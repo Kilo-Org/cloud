@@ -427,6 +427,15 @@
       "location": "Vertex-plats",
       "clientEmail": "E-postadress för tjänstkonto",
       "privateKey": "Privat nyckel för tjänstkonto",
+      "names": {
+        "codestral": "Endast äldre Codestral",
+        "openai": "OpenAI-API",
+        "openaiChatgpt": "OpenAI (Logga in med ChatGPT)",
+        "xiaomi": "Xiaomi (betala per användning)",
+        "zai": "Z.ai (betala per användning)",
+        "bedrockByok": "Amazon Bedrock (direkt)",
+        "vertexByok": "Google Vertex AI (direkt)"
+      },
       "modelMappings": "Modellmappningar",
       "modelMappingsDescription": "Dirigera en gatewaymodell till ett anpassat distributionsnamn.",
       "mappingTitle": "Mappning {{number}}",

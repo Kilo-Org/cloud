@@ -427,6 +427,15 @@
       "location": "Τοποθεσία Vertex",
       "clientEmail": "Email λογαριασμού υπηρεσίας",
       "privateKey": "Ιδιωτικό κλειδί λογαριασμού υπηρεσίας",
+      "names": {
+        "codestral": "Παλαιό Codestral μόνο",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Σύνδεση με ChatGPT)",
+        "xiaomi": "Xiaomi (χρέωση ανά χρήση)",
+        "zai": "Z.ai (χρέωση ανά χρήση)",
+        "bedrockByok": "Amazon Bedrock (απευθείας)",
+        "vertexByok": "Google Vertex AI (απευθείας)"
+      },
       "modelMappings": "Αντιστοιχίσεις μοντέλων",
       "modelMappingsDescription": "Δρομολόγησε ένα μοντέλο του gateway σε ένα προσαρμοσμένο όνομα deployment.",
       "mappingTitle": "Αντιστοίχιση {{number}}",

@@ -431,6 +431,15 @@
       "location": "موقع Vertex",
       "clientEmail": "البريد الإلكتروني لحساب الخدمة",
       "privateKey": "المفتاح الخاص لحساب الخدمة",
+      "names": {
+        "codestral": "Codestral القديم فقط",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (تسجيل الدخول عبر ChatGPT)",
+        "xiaomi": "Xiaomi (الدفع حسب الاستخدام)",
+        "zai": "Z.ai (الدفع حسب الاستخدام)",
+        "bedrockByok": "Amazon Bedrock (مباشر)",
+        "vertexByok": "Google Vertex AI (مباشر)"
+      },
       "modelMappings": "تعيينات النماذج",
       "modelMappingsDescription": "وجّه نموذجًا من البوابة إلى اسم نشر مخصص.",
       "mappingTitle": "التعيين {{number}}",

@@ -427,6 +427,15 @@
       "location": "Vertex ಸ್ಥಳ",
       "clientEmail": "ಸೇವಾ ಖಾತೆಯ ಇಮೇಲ್",
       "privateKey": "ಸೇವಾ ಖಾತೆಯ ಖಾಸಗಿ ಕೀ",
+      "names": {
+        "codestral": "ಹಳೆಯ Codestral ಮಾತ್ರ",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT ಮೂಲಕ ಸೈನ್ ಇನ್ ಮಾಡಿ)",
+        "xiaomi": "Xiaomi (ಬಳಕೆ ಆಧಾರಿತ ಪಾವತಿ)",
+        "zai": "Z.ai (ಬಳಕೆ ಆಧಾರಿತ ಪಾವತಿ)",
+        "bedrockByok": "Amazon Bedrock (ನೇರ)",
+        "vertexByok": "Google Vertex AI (ನೇರ)"
+      },
       "modelMappings": "ಮಾಡೆಲ್ ಮ್ಯಾಪಿಂಗ್‌ಗಳು",
       "modelMappingsDescription": "ಗೇಟ್‌ವೇ ಮಾಡೆಲ್ ಅನ್ನು ಕಸ್ಟಮ್ ಡಿಪ್ಲಾಯ್‌ಮೆಂಟ್ ಹೆಸರಿಗೆ ಕಳುಹಿಸಿ.",
       "mappingTitle": "ಮ್ಯಾಪಿಂಗ್ {{number}}",

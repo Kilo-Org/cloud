@@ -427,6 +427,15 @@
       "location": "Vertex-staðsetning",
       "clientEmail": "Netfang þjónustureiknings",
       "privateKey": "Einkalykill þjónustureiknings",
+      "names": {
+        "codestral": "Eldri Codestral-eingöngu",
+        "openai": "OpenAI-API",
+        "openaiChatgpt": "OpenAI (Skrá sig inn með ChatGPT)",
+        "xiaomi": "Xiaomi (greiða eftir notkun)",
+        "zai": "Z.ai (greiða eftir notkun)",
+        "bedrockByok": "Amazon Bedrock (beint)",
+        "vertexByok": "Google Vertex AI (beint)"
+      },
       "modelMappings": "Líkanavarpanir",
       "modelMappingsDescription": "Beina gáttarlíkani á sérsniðið heiti uppsetningar.",
       "mappingTitle": "Vörpun {{number}}",

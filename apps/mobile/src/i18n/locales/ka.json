@@ -427,6 +427,15 @@
       "location": "Vertex-ის მდებარეობა",
       "clientEmail": "სერვისული ანგარიშის ელფოსტა",
       "privateKey": "სერვისული ანგარიშის პირადი გასაღები",
+      "names": {
+        "codestral": "მხოლოდ მოძველებული Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT-ით შესვლა)",
+        "xiaomi": "Xiaomi (გამოყენების მიხედვით გადახდა)",
+        "zai": "Z.ai (გამოყენების მიხედვით გადახდა)",
+        "bedrockByok": "Amazon Bedrock (პირდაპირი ანგარიშსწორება)",
+        "vertexByok": "Google Vertex AI (პირდაპირი ანგარიშსწორება)"
+      },
       "modelMappings": "მოდელების შესაბამისობები",
       "modelMappingsDescription": "Gateway-ის მოდელის გადამისამართება deployment-ის მორგებულ სახელზე.",
       "mappingTitle": "შესაბამისობა {{number}}",

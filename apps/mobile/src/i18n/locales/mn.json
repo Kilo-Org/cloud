@@ -427,6 +427,15 @@
       "location": "Vertex байршил",
       "clientEmail": "Service account-ийн имэйл",
       "privateKey": "Service account-ийн хувийн түлхүүр",
+      "names": {
+        "codestral": "Зөвхөн хуучин Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT-ээр нэвтрэх)",
+        "xiaomi": "Xiaomi (ашигласны дагуу төлөх)",
+        "zai": "Z.ai (ашигласны дагуу төлөх)",
+        "bedrockByok": "Amazon Bedrock (шууд)",
+        "vertexByok": "Google Vertex AI (шууд)"
+      },
       "modelMappings": "Загварын харгалзуулалт",
       "modelMappingsDescription": "Gateway загварыг өөрийн deployment нэр рүү илгээх.",
       "mappingTitle": "Харгалзуулалт {{number}}",

@@ -427,6 +427,15 @@
       "location": "Vertex स्थान",
       "clientEmail": "सेवा खाता इमेल",
       "privateKey": "सेवा खाताको निजी कुञ्जी",
+      "names": {
+        "codestral": "पुरानो Codestral मात्र",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT मार्फत साइन इन गर्नुहोस्)",
+        "xiaomi": "Xiaomi (प्रयोगअनुसार बिल)",
+        "zai": "Z.ai (प्रयोगअनुसार बिल)",
+        "bedrockByok": "Amazon Bedrock (प्रत्यक्ष)",
+        "vertexByok": "Google Vertex AI (प्रत्यक्ष)"
+      },
       "modelMappings": "मोडेल म्यापिङहरू",
       "modelMappingsDescription": "गेटवे मोडेललाई अनुकूल डिप्लोयमेन्ट नाममा पठाउनुहोस्।",
       "mappingTitle": "म्यापिङ {{number}}",

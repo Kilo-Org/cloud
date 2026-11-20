@@ -427,6 +427,15 @@
       "location": "Vertex-placering",
       "clientEmail": "Tjenestekontoens e-mailadresse",
       "privateKey": "Tjenestekontoens private nøgle",
+      "names": {
+        "codestral": "Kun ældre Codestral",
+        "openai": "OpenAI-API",
+        "openaiChatgpt": "OpenAI (Log ind med ChatGPT)",
+        "xiaomi": "Xiaomi (betal efter forbrug)",
+        "zai": "Z.ai (betal efter forbrug)",
+        "bedrockByok": "Amazon Bedrock (direkte)",
+        "vertexByok": "Google Vertex AI (direkte)"
+      },
       "modelMappings": "Modeltilknytninger",
       "modelMappingsDescription": "Send en gateway-model til et brugerdefineret deployment-navn.",
       "mappingTitle": "Tilknytning {{number}}",

@@ -519,6 +519,15 @@
       "location": "Vertex location",
       "clientEmail": "Service account email",
       "privateKey": "Service account private key",
+      "names": {
+        "codestral": "Legacy Codestral-only",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Sign in with ChatGPT)",
+        "xiaomi": "Xiaomi (pay as you go)",
+        "zai": "Z.ai (pay as you go)",
+        "bedrockByok": "Amazon Bedrock (direct)",
+        "vertexByok": "Google Vertex AI (direct)"
+      },
       "modelMappings": "Model mappings",
       "modelMappingsDescription": "Send a gateway model to a custom deployment name.",
       "mappingTitle": "Mapping {{number}}",

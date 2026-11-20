@@ -427,6 +427,15 @@
       "location": "Indawo ye-Vertex",
       "clientEmail": "I-imeyili ye-service account",
       "privateKey": "Ukhiye oyimfihlo we-service account",
+      "names": {
+        "codestral": "Codestral yakudala kuphela",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Ngena nge-ChatGPT)",
+        "xiaomi": "Xiaomi (khokha njengoba usebenzisa)",
+        "zai": "Z.ai (khokha njengoba usebenzisa)",
+        "bedrockByok": "Amazon Bedrock (ngqo)",
+        "vertexByok": "Google Vertex AI (ngqo)"
+      },
       "modelMappings": "Ukufanisa amamodeli",
       "modelMappingsDescription": "Thumela imodeli ye-gateway kugama le-deployment langokwezifiso.",
       "mappingTitle": "Ukufanisa {{number}}",

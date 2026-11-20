@@ -427,6 +427,15 @@
       "location": "Vertex ലൊക്കേഷൻ",
       "clientEmail": "സർവീസ് അക്കൗണ്ട് ഇമെയിൽ",
       "privateKey": "സർവീസ് അക്കൗണ്ട് പ്രൈവറ്റ് കീ",
+      "names": {
+        "codestral": "പഴയ Codestral മാത്രം",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT ഉപയോഗിച്ച് സൈൻ ഇൻ ചെയ്യുക)",
+        "xiaomi": "Xiaomi (ഉപയോഗത്തിനനുസരിച്ച് പേയ്മെന്റ്)",
+        "zai": "Z.ai (ഉപയോഗത്തിനനുസരിച്ച് പേയ്മെന്റ്)",
+        "bedrockByok": "Amazon Bedrock (നേരിട്ട്)",
+        "vertexByok": "Google Vertex AI (നേരിട്ട്)"
+      },
       "modelMappings": "മോഡൽ മാപ്പിംഗുകൾ",
       "modelMappingsDescription": "ഒരു ഗേറ്റ്‌വേ മോഡലിനെ ഇഷ്ടാനുസൃത ഡിപ്ലോയ്‌മെന്റ് നാമത്തിലേക്ക് അയയ്ക്കുക.",
       "mappingTitle": "മാപ്പിംഗ് {{number}}",

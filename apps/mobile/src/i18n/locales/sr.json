@@ -428,6 +428,15 @@
       "location": "Vertex lokacija",
       "clientEmail": "Imejl servisnog naloga",
       "privateKey": "Privatni ključ servisnog naloga",
+      "names": {
+        "codestral": "Samo zastareli Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Prijavi se putem ChatGPT naloga)",
+        "xiaomi": "Xiaomi (plaćanje po potrošnji)",
+        "zai": "Z.ai (plaćanje po potrošnji)",
+        "bedrockByok": "Amazon Bedrock (direktno)",
+        "vertexByok": "Google Vertex AI (direktno)"
+      },
       "modelMappings": "Mapiranja modela",
       "modelMappingsDescription": "Usmeri gateway model na prilagođeni naziv deploymenta.",
       "mappingTitle": "Mapiranje {{number}}",

@@ -427,6 +427,15 @@
       "location": "Vị trí Vertex",
       "clientEmail": "Email tài khoản dịch vụ",
       "privateKey": "Khóa riêng tư của tài khoản dịch vụ",
+      "names": {
+        "codestral": "Chỉ hỗ trợ Codestral cũ",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Đăng nhập bằng ChatGPT)",
+        "xiaomi": "Xiaomi (trả theo mức sử dụng)",
+        "zai": "Z.ai (trả theo mức sử dụng)",
+        "bedrockByok": "Amazon Bedrock (trực tiếp)",
+        "vertexByok": "Google Vertex AI (trực tiếp)"
+      },
       "modelMappings": "Ánh xạ mô hình",
       "modelMappingsDescription": "Chuyển một mô hình gateway tới tên deployment tùy chỉnh.",
       "mappingTitle": "Ánh xạ {{number}}",

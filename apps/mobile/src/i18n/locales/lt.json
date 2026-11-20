@@ -429,6 +429,15 @@
       "location": "Vertex vieta",
       "clientEmail": "Paslaugos paskyros el. paštas",
       "privateKey": "Paslaugos paskyros privatusis raktas",
+      "names": {
+        "codestral": "Tik pasenęs Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Prisijungti per ChatGPT)",
+        "xiaomi": "Xiaomi (mokama pagal naudojimą)",
+        "zai": "Z.ai (mokama pagal naudojimą)",
+        "bedrockByok": "Amazon Bedrock (tiesiogiai)",
+        "vertexByok": "Google Vertex AI (tiesiogiai)"
+      },
       "modelMappings": "Modelių susiejimai",
       "modelMappingsDescription": "Nukreipkite šliuzo modelį į pasirinktinį diegimo pavadinimą.",
       "mappingTitle": "Susiejimas {{number}}",

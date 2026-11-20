@@ -427,6 +427,15 @@
       "location": "Vertex-sijainti",
       "clientEmail": "Palvelutilin sähköpostiosoite",
       "privateKey": "Palvelutilin yksityinen avain",
+      "names": {
+        "codestral": "Vain vanha Codestral",
+        "openai": "OpenAI-API",
+        "openaiChatgpt": "OpenAI (Kirjaudu ChatGPT-tilillä)",
+        "xiaomi": "Xiaomi (käytön mukaan)",
+        "zai": "Z.ai (käytön mukaan)",
+        "bedrockByok": "Amazon Bedrock (suora laskutus)",
+        "vertexByok": "Google Vertex AI (suora laskutus)"
+      },
       "modelMappings": "Mallien vastaavuudet",
       "modelMappingsDescription": "Ohjaa yhdyskäytävän malli mukautettuun käyttöönoton nimeen.",
       "mappingTitle": "Vastaavuus {{number}}",

@@ -427,6 +427,15 @@
       "location": "Toerana Vertex",
       "clientEmail": "Mailakan'ny service account",
       "privateKey": "Lakile manokan'ny service account",
+      "names": {
+        "codestral": "Codestral taloha ihany",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Midira amin'ny ChatGPT)",
+        "xiaomi": "Xiaomi (fandoavana araka ny fampiasana)",
+        "zai": "Z.ai (fandoavana araka ny fampiasana)",
+        "bedrockByok": "Amazon Bedrock (mivantana)",
+        "vertexByok": "Google Vertex AI (mivantana)"
+      },
       "modelMappings": "Fampifandraisana modely",
       "modelMappingsDescription": "Alefaso any amin'ny anaran'ny deployment manokana ny modelin'ny gateway.",
       "mappingTitle": "Fampifandraisana {{number}}",

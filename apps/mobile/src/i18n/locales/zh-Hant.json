@@ -427,6 +427,15 @@
       "location": "Vertex 位置",
       "clientEmail": "服務帳戶電子郵件",
       "privateKey": "服務帳戶私密金鑰",
+      "names": {
+        "codestral": "舊版僅限 Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI（使用 ChatGPT 登入）",
+        "xiaomi": "Xiaomi（按用量付費）",
+        "zai": "Z.ai（按用量付費）",
+        "bedrockByok": "Amazon Bedrock（直接計費）",
+        "vertexByok": "Google Vertex AI（直接計費）"
+      },
       "modelMappings": "模型對應",
       "modelMappingsDescription": "將閘道模型對應到自訂的部署名稱。",
       "mappingTitle": "對應 {{number}}",

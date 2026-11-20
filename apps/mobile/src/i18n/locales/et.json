@@ -427,6 +427,15 @@
       "location": "Vertexi asukoht",
       "clientEmail": "Teenusekonto e-posti aadress",
       "privateKey": "Teenusekonto privaatvõti",
+      "names": {
+        "codestral": "Ainult vana Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Logi sisse ChatGPT-ga)",
+        "xiaomi": "Xiaomi (kasutuspõhine tasu)",
+        "zai": "Z.ai (kasutuspõhine tasu)",
+        "bedrockByok": "Amazon Bedrock (otse)",
+        "vertexByok": "Google Vertex AI (otse)"
+      },
       "modelMappings": "Mudelite vastendused",
       "modelMappingsDescription": "Suuna lüüsi mudel kohandatud juurutuse nimele.",
       "mappingTitle": "Vastendus {{number}}",

@@ -431,6 +431,15 @@
       "location": "Lleoliad Vertex",
       "clientEmail": "E-bost cyfrif gwasanaeth",
       "privateKey": "Allwedd breifat cyfrif gwasanaeth",
+      "names": {
+        "codestral": "Hen Codestral yn unig",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Mewngofnodi gyda ChatGPT)",
+        "xiaomi": "Xiaomi (talu wrth fynd)",
+        "zai": "Z.ai (talu wrth fynd)",
+        "bedrockByok": "Amazon Bedrock (uniongyrchol)",
+        "vertexByok": "Google Vertex AI (uniongyrchol)"
+      },
       "modelMappings": "Mapiadau model",
       "modelMappingsDescription": "Anfon model porth at enw gosodiad personol.",
       "mappingTitle": "Mapiad {{number}}",

@@ -427,6 +427,15 @@
       "location": "Lokasyon ng Vertex",
       "clientEmail": "Email ng service account",
       "privateKey": "Private key ng service account",
+      "names": {
+        "codestral": "Codestral na luma lamang",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Mag-sign in gamit ang ChatGPT)",
+        "xiaomi": "Xiaomi (bayad sa bawat paggamit)",
+        "zai": "Z.ai (bayad sa bawat paggamit)",
+        "bedrockByok": "Amazon Bedrock (direkta)",
+        "vertexByok": "Google Vertex AI (direkta)"
+      },
       "modelMappings": "Mga model mapping",
       "modelMappingsDescription": "Ipadala ang isang gateway model sa isang custom na deployment name.",
       "mappingTitle": "Mapping {{number}}",

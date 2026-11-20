@@ -429,6 +429,15 @@
       "location": "Расположение Vertex",
       "clientEmail": "Email сервисного аккаунта",
       "privateKey": "Закрытый ключ сервисного аккаунта",
+      "names": {
+        "codestral": "Устаревший только для Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Войти через ChatGPT)",
+        "xiaomi": "Xiaomi (оплата по мере использования)",
+        "zai": "Z.ai (оплата по мере использования)",
+        "bedrockByok": "Amazon Bedrock (напрямую)",
+        "vertexByok": "Google Vertex AI (напрямую)"
+      },
       "modelMappings": "Сопоставления моделей",
       "modelMappingsDescription": "Сопоставьте модель шлюза с собственным именем развёртывания.",
       "mappingTitle": "Сопоставление {{number}}",

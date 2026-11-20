@@ -427,6 +427,15 @@
       "location": "Localización de Vertex",
       "clientEmail": "Correo electrónico da conta de servizo",
       "privateKey": "Clave privada da conta de servizo",
+      "names": {
+        "codestral": "Só Codestral antigo",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Iniciar sesión con ChatGPT)",
+        "xiaomi": "Xiaomi (pago por uso)",
+        "zai": "Z.ai (pago por uso)",
+        "bedrockByok": "Amazon Bedrock (directo)",
+        "vertexByok": "Google Vertex AI (directo)"
+      },
       "modelMappings": "Correspondencias de modelos",
       "modelMappingsDescription": "Envía un modelo da pasarela a un nome de despregamento personalizado.",
       "mappingTitle": "Correspondencia {{number}}",

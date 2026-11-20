@@ -34,11 +34,11 @@ describe('credentialForm', () => {
 
   it('offers Vertex its project, location and service account', () => {
     const form = credentialForm('vertex-byok', 'apiKey');
-    expect(form?.fields.map(field => [field.id, field.multiline])).toEqual([
-      ['project', false],
-      ['location', false],
-      ['clientEmail', false],
-      ['privateKey', true],
+    expect(form?.fields.map(field => field.id)).toEqual([
+      'project',
+      'location',
+      'clientEmail',
+      'privateKey',
     ]);
   });
 

@@ -427,6 +427,15 @@
       "location": "Vertex ස්ථානය",
       "clientEmail": "සේවා ගිණුමේ ඊමේල් ලිපිනය",
       "privateKey": "සේවා ගිණුමේ පුද්ගලික යතුර",
+      "names": {
+        "codestral": "පැරණි Codestral පමණක්",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT හරහා පිවිසෙන්න)",
+        "xiaomi": "Xiaomi (භාවිතය අනුව ගෙවන්න)",
+        "zai": "Z.ai (භාවිතය අනුව ගෙවන්න)",
+        "bedrockByok": "Amazon Bedrock (සෘජු)",
+        "vertexByok": "Google Vertex AI (සෘජු)"
+      },
       "modelMappings": "මාදිලි සිතියම්ගත කිරීම්",
       "modelMappingsDescription": "Gateway මාදිලියක් අභිරුචි deployment නාමයකට යවන්න.",
       "mappingTitle": "සිතියම්ගත කිරීම {{number}}",

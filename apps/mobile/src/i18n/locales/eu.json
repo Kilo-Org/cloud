@@ -427,6 +427,15 @@
       "location": "Vertex kokapena",
       "clientEmail": "Zerbitzu-kontuaren helbide elektronikoa",
       "privateKey": "Zerbitzu-kontuaren gako pribatua",
+      "names": {
+        "codestral": "Codestral zaharra soilik",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Hasi saioa ChatGPT-rekin)",
+        "xiaomi": "Xiaomi (erabileraren araberako fakturazioa)",
+        "zai": "Z.ai (erabileraren araberako fakturazioa)",
+        "bedrockByok": "Amazon Bedrock (zuzenean)",
+        "vertexByok": "Google Vertex AI (zuzenean)"
+      },
       "modelMappings": "Eredu-esleipenak",
       "modelMappingsDescription": "Bideratu atebideko eredu bat inplementazio-izen pertsonalizatu batera.",
       "mappingTitle": "{{number}}. esleipena",

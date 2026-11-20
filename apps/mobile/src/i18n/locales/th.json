@@ -427,6 +427,15 @@
       "location": "ตำแหน่ง Vertex",
       "clientEmail": "อีเมลบัญชีบริการ",
       "privateKey": "คีย์ส่วนตัวของบัญชีบริการ",
+      "names": {
+        "codestral": "แบบเดิมสำหรับ Codestral เท่านั้น",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ลงชื่อเข้าใช้ด้วย ChatGPT)",
+        "xiaomi": "Xiaomi (จ่ายตามการใช้งาน)",
+        "zai": "Z.ai (จ่ายตามการใช้งาน)",
+        "bedrockByok": "Amazon Bedrock (โดยตรง)",
+        "vertexByok": "Google Vertex AI (โดยตรง)"
+      },
       "modelMappings": "การแมปโมเดล",
       "modelMappingsDescription": "ส่งโมเดลของเกตเวย์ไปยังชื่อการปรับใช้ที่กำหนดเอง.",
       "mappingTitle": "การแมป {{number}}",

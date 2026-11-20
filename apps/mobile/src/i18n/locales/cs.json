@@ -429,6 +429,15 @@
       "location": "Umístění Vertex",
       "clientEmail": "E-mail účtu služby",
       "privateKey": "Soukromý klíč účtu služby",
+      "names": {
+        "codestral": "Pouze starší Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Přihlásit se přes ChatGPT)",
+        "xiaomi": "Xiaomi (platba podle spotřeby)",
+        "zai": "Z.ai (platba podle spotřeby)",
+        "bedrockByok": "Amazon Bedrock (přímé účtování)",
+        "vertexByok": "Google Vertex AI (přímé účtování)"
+      },
       "modelMappings": "Mapování modelů",
       "modelMappingsDescription": "Přesměrujte model brány na vlastní název nasazení.",
       "mappingTitle": "Mapování {{number}}",

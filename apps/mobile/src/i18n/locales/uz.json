@@ -427,6 +427,15 @@
       "location": "Vertex joylashuvi",
       "clientEmail": "Xizmat hisobi e-pochtasi",
       "privateKey": "Xizmat hisobi shaxsiy kaliti",
+      "names": {
+        "codestral": "Faqat eski Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT bilan kirish)",
+        "xiaomi": "Xiaomi (foydalanishga qarab to'lov)",
+        "zai": "Z.ai (foydalanishga qarab to'lov)",
+        "bedrockByok": "Amazon Bedrock (to'g'ridan-to'g'ri)",
+        "vertexByok": "Google Vertex AI (to'g'ridan-to'g'ri)"
+      },
       "modelMappings": "Model moslashuvlari",
       "modelMappingsDescription": "Gateway modelini maxsus deployment nomiga yo'naltiring.",
       "mappingTitle": "Moslashuv {{number}}",

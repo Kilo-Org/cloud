@@ -427,6 +427,15 @@
       "location": "Goobta Vertex",
       "clientEmail": "Iimaylka service account",
       "privateKey": "Furaha gaarka ah ee service account",
+      "names": {
+        "codestral": "Codestral duugoobay kaliya",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Ku soo gal ChatGPT)",
+        "xiaomi": "Xiaomi (bixi inta aad isticmaalayso)",
+        "zai": "Z.ai (bixi inta aad isticmaalayso)",
+        "bedrockByok": "Amazon Bedrock (tooska ah)",
+        "vertexByok": "Google Vertex AI (tooska ah)"
+      },
       "modelMappings": "Isku-xidhka moodellada",
       "modelMappingsDescription": "U dir moodel gateway ah magac deployment oo gaar ah.",
       "mappingTitle": "Isku-xidhka {{number}}",

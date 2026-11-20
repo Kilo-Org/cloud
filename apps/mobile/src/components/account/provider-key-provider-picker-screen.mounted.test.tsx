@@ -155,7 +155,7 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   state.providers = [
     { id: 'anthropic', name: 'Anthropic' },
-    { id: 'openai', name: 'OpenAI' },
+    { id: 'openai', name: 'OpenAI API key' },
   ];
   state.error = false;
   state.push.mockClear();
@@ -172,7 +172,7 @@ describe('ProviderKeyProviderPickerScreen', () => {
     const root = await mount();
 
     const labels = rowLabels(root).map(node => node.props.accessibilityLabel);
-    expect(labels).toEqual(['Anthropic', 'OpenAI']);
+    expect(labels).toEqual(['Anthropic', 'OpenAI API']);
   });
 
   it('opens the key form with the chosen provider', async () => {
@@ -228,7 +228,7 @@ describe('ProviderKeyProviderPickerScreen', () => {
 
     expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual([
       'Anthropic',
-      'OpenAI',
+      'OpenAI API',
     ]);
     expect(
       root.findAll(
@@ -253,7 +253,7 @@ describe('ProviderKeyProviderPickerScreen', () => {
     // list re-anchors at its top so the first provider is what shows.
     expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual([
       'Anthropic',
-      'OpenAI',
+      'OpenAI API',
     ]);
     expect(state.scrollToOffset).toHaveBeenCalledWith({ offset: 0, animated: false });
     expect(root.findAll(node => Object.is(node.type, 'FlashList')).at(0)?.props.itemCount).toBe(2);
@@ -270,7 +270,7 @@ describe('ProviderKeyProviderPickerScreen', () => {
     });
 
     expect(state.scrollToOffset).toHaveBeenCalledWith({ offset: 0, animated: false });
-    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual(['OpenAI']);
+    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual(['OpenAI API']);
   });
 
   it('shows the matching rows after a no-match search finds a provider again', async () => {
@@ -283,7 +283,7 @@ describe('ProviderKeyProviderPickerScreen', () => {
       (searchInput(root).props.onChangeText as (value: string) => void)('openai');
     });
 
-    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual(['OpenAI']);
+    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual(['OpenAI API']);
   });
 
   it('matches a provider by its id', async () => {
@@ -293,7 +293,7 @@ describe('ProviderKeyProviderPickerScreen', () => {
       (searchInput(root).props.onChangeText as (value: string) => void)('openai');
     });
 
-    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual(['OpenAI']);
+    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual(['OpenAI API']);
   });
 
   it('matches an accented provider name from its unaccented spelling', async () => {
@@ -325,12 +325,32 @@ describe('ProviderKeyProviderPickerScreen', () => {
     }
   });
 
+  it('finds a row by the name it shows, not only the English one the server sent', async () => {
+    state.providers = [{ id: 'codestral', name: 'Legacy Codestral-only key' }];
+    await i18n.changeLanguage('pt-BR');
+    try {
+      const root = await mount();
+      const shown = rowLabels(root).map(node => node.props.accessibilityLabel);
+      expect(shown).toEqual([i18n.t('profile.providerKeys.names.codestral')]);
+
+      // The reader types what the row shows, so the search has to match the
+      // translated name too.
+      act(() => {
+        (searchInput(root).props.onChangeText as (value: string) => void)('Somente');
+      });
+
+      expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual(shown);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+
   it('offers the structured-credential providers its own form', async () => {
     state.providers = [
       { id: 'anthropic', name: 'Anthropic' },
       { id: 'azure', name: 'Azure Foundry' },
-      { id: 'bedrock', name: 'Amazon Bedrock' },
-      { id: 'bedrock-byok', name: 'AWS Bedrock (direct)' },
+      { id: 'bedrock', name: 'AWS Bedrock' },
+      { id: 'bedrock-byok', name: 'Amazon Bedrock (direct)' },
       { id: 'vertex', name: 'Google Vertex AI' },
       { id: 'vertex-byok', name: 'Google Vertex AI (direct)' },
     ];
@@ -341,8 +361,8 @@ describe('ProviderKeyProviderPickerScreen', () => {
     expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual([
       'Anthropic',
       'Azure Foundry',
-      'Amazon Bedrock',
-      'AWS Bedrock (direct)',
+      'AWS Bedrock',
+      'Amazon Bedrock (direct)',
       'Google Vertex AI',
       'Google Vertex AI (direct)',
     ]);

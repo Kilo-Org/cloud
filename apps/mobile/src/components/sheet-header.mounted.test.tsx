@@ -670,11 +670,13 @@ describe('SheetHeader', () => {
         createElement(SheetHeader, { title: 'Save as profile', onDone: () => undefined })
       );
     };
-    for (const os of ['android', 'ios']) {
-      const renderer = await mountElement(sheet(os));
-      expect(findSafeAreaWrapper(renderer.root).props.style).toBeUndefined();
-      renderer.unmount();
-    }
+    // Both platforms: the surface clears the sides, so the header adds nothing.
+    const android = await mountElement(sheet('android'));
+    expect(findSafeAreaWrapper(android.root).props.style).toBeUndefined();
+    android.unmount();
+    const ios = await mountElement(sheet('ios'));
+    expect(findSafeAreaWrapper(ios.root).props.style).toBeUndefined();
+    ios.unmount();
 
     // A page sheet is a route, not this surface: it spans the window in
     // landscape and still pays the inset.

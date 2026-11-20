@@ -30,7 +30,7 @@ function table(version: string): RoutingTable {
   };
 }
 
-type StoredValue = { value: string; metadata: unknown };
+type StoredValue = { value: string; metadata: unknown; expiresAt: number | null };
 
 describe('GET /admin/routing-table (KV in front of D1)', () => {
   let sqlite: DatabaseSync;
@@ -62,18 +62,29 @@ describe('GET /admin/routing-table (KV in front of D1)', () => {
           if (options?.cacheTtl !== undefined && options.cacheTtl < 30) {
             throw new Error(`Invalid cacheTtl of ${options.cacheTtl}.`);
           }
-          return store.get(key)?.value ?? null;
+          return live(key)?.value ?? null;
         },
         async getWithMetadata(key: string) {
           if (kvFailure) throw kvFailure;
-          const stored = store.get(key);
+          const stored = live(key);
           await onBodyRead();
           return { value: stored?.value ?? null, metadata: stored?.metadata ?? null };
         },
         async put(key: string, value: string, options?: KVNamespacePutOptions) {
           if (kvFailure) throw kvFailure;
+          // Workers KV rejects an expirationTtl below its minimum, 60 s.
+          if (options?.expirationTtl !== undefined && options.expirationTtl < 60) {
+            throw new Error(`Invalid expirationTtl of ${options.expirationTtl}.`);
+          }
           await onPut(key);
-          store.set(key, { value, metadata: options?.metadata ?? null });
+          store.set(key, {
+            value,
+            metadata: options?.metadata ?? null,
+            expiresAt:
+              options?.expirationTtl === undefined
+                ? null
+                : Date.now() + options.expirationTtl * 1000,
+          });
         },
         async delete(key: string) {
           if (kvFailure) throw kvFailure;
@@ -88,6 +99,16 @@ describe('GET /admin/routing-table (KV in front of D1)', () => {
     sqlite.close();
     vi.restoreAllMocks();
   });
+
+  function live(key: string): StoredValue | null {
+    const stored = store.get(key);
+    if (!stored) return null;
+    if (stored.expiresAt !== null && stored.expiresAt <= Date.now()) {
+      store.delete(key);
+      return null;
+    }
+    return stored;
+  }
 
   function get() {
     return app.request(
@@ -136,6 +157,7 @@ describe('GET /admin/routing-table (KV in front of D1)', () => {
     expect(store.get(routingTableResponseKvKey('efficient'))).toEqual({
       value: expected.body,
       metadata: { token: 'v1 2026-11-19T23:00:00.000Z' },
+      expiresAt: expect.any(Number),
     });
   });
 
@@ -154,7 +176,11 @@ describe('GET /admin/routing-table (KV in front of D1)', () => {
   });
 
   it('leaves no pointer and caches nothing while no table is published', async () => {
-    store.set(routingTableVersionKvKey('efficient'), { value: 'gone 2026', metadata: null });
+    store.set(routingTableVersionKvKey('efficient'), {
+      value: 'gone 2026',
+      metadata: null,
+      expiresAt: null,
+    });
 
     expect(await (await get()).text()).toBe('{"table":null,"publishedAt":null}');
 
@@ -203,6 +229,40 @@ describe('GET /admin/routing-table (KV in front of D1)', () => {
       'v2 2026-11-19T23:30:00.000Z'
     );
     expect(await servedVersion()).toBe('v2');
+  });
+
+  it('repairs the pointer from D1 once a stale body expires', async () => {
+    await publish('v1', '2026-11-19T23:00:00.000Z');
+    expect(await servedVersion()).toBe('v1');
+    // A publish whose pointer write and recovery delete both fail leaves the old pair.
+    kvFailure = new Error('KV unavailable');
+    await saveRoutingTable(db, table('v2'), '2026-11-19T23:30:00.000Z');
+    await syncRoutingTableVersionPointer(env, 'efficient');
+    kvFailure = null;
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(store.get(routingTableVersionKvKey('efficient'))?.value).toBe(
+      'v1 2026-11-19T23:00:00.000Z'
+    );
+    expect(store.get(routingTableResponseKvKey('efficient'))?.value).toEqual(
+      expect.stringContaining('"version":"v1"')
+    );
+
+    expect(await servedVersion()).toBe('v1');
+    const stored = store.get(routingTableResponseKvKey('efficient'));
+    if (!stored) throw new Error('Expected a cached body');
+    expect(stored.expiresAt).toBeGreaterThan(Date.now());
+    stored.expiresAt = Date.now() - 1;
+    const beforeExpiry = d1Reads;
+    const served = await servedVersion();
+
+    expect(served).toBe('v2');
+    expect(d1Reads).toBeGreaterThan(beforeExpiry);
+    expect(store.get(routingTableVersionKvKey('efficient'))?.value).toBe(
+      'v2 2026-11-19T23:30:00.000Z'
+    );
+    expect(store.get(routingTableResponseKvKey('efficient'))?.metadata).toEqual({
+      token: 'v2 2026-11-19T23:30:00.000Z',
+    });
   });
 
   it('serves a newly published table on the next read', async () => {

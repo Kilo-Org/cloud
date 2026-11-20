@@ -26,6 +26,11 @@ function publicationToken(latest: LatestRoutingTable): string | null {
  * keeps reading the previous pointer after a write elsewhere.
  */
 const VERSION_POINTER_CACHE_TTL_SECONDS = 30;
+/**
+ * The cached body expires on its own (KV's `expirationTtl` minimum is 60 s), so a body
+ * left unservable by a failed pointer write and a failed recovery delete still goes away.
+ */
+const RESPONSE_BODY_TTL_SECONDS = 600;
 const POINTER_SYNC_ATTEMPTS = 5;
 
 /**
@@ -145,6 +150,7 @@ export async function loadRoutingTableResponse(
     const confirmed = token === cache.pointer ? token : await confirmPointer(env, router, latest);
     if (token !== null && confirmed === token) {
       await env.AUTO_ROUTING_CONFIG.put(routingTableResponseKvKey(router), body, {
+        expirationTtl: RESPONSE_BODY_TTL_SECONDS,
         metadata: { token },
       });
     }

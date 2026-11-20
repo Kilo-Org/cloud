@@ -164,7 +164,7 @@ const capture = async (extensionPath: string, outPath: string): Promise<void> =>
 
   const profileDir = await mkdtemp(join(tmpdir(), 'kilo-sidepanel-proof-'));
   const executablePath = process.env['EXTENSION_E2E_EXECUTABLE_PATH'];
-  let context: BrowserContext | undefined;
+  let context: BrowserContext | undefined = undefined;
 
   try {
     context = await chromium.launchPersistentContext(profileDir, {

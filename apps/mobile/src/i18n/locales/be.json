@@ -1478,9 +1478,9 @@
       "activity": "Актыўнасць"
     },
     "providerConnect": {
-      "githubApp": "Праграма GitHub",
+      "githubApp": "праграма GitHub",
       "githubError": "Не атрымалася адкрыць наладжванне GitHub. Паспрабуйце яшчэ раз.",
-      "gitlabAccount": "Уліковы запіс GitLab",
+      "gitlabAccount": "уліковы запіс GitLab",
       "gitlabError": "Не атрымалася адкрыць наладжванне GitLab. Паспрабуйце яшчэ раз.",
       "description": "Наладзьце падключэнне Kilo ({{label}}), каб аўтаматычна правяраць запыты на зліццё."
     },

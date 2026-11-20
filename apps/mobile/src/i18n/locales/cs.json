@@ -1478,9 +1478,9 @@
       "activity": "Aktivita"
     },
     "providerConnect": {
-      "githubApp": "Aplikace GitHub",
+      "githubApp": "aplikace GitHub",
       "githubError": "Nastavení GitHubu se nepodařilo otevřít. Zkuste to prosím znovu.",
-      "gitlabAccount": "Účet GitLab",
+      "gitlabAccount": "účet GitLab",
       "gitlabError": "Nastavení GitLabu se nepodařilo otevřít. Zkuste to prosím znovu.",
       "description": "Nastavte propojení služby Kilo ({{label}}), aby se PR kontrolovaly automaticky."
     },

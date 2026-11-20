@@ -12,6 +12,14 @@
 export const SCREEN_GUTTER_CLASS = 'px-4';
 
 /**
+ * The same 14pt inset as a number, for the one place that has to know a
+ * body's width before its container has laid out: `px-4` at the app's 14pt
+ * rem. A block that picks a layout from its own measured width reads this
+ * for its first frame instead of guessing.
+ */
+export const SCREEN_GUTTER_DP = 14;
+
+/**
  * The contract's 21pt break between the blocks of one screen body. A body whose
  * content is a single wrapper puts this on the wrapper: the body class spaces
  * its own children, and the wrapper is the only one there.

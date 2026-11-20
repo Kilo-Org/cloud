@@ -46,6 +46,16 @@ export const LEADERBOARD_PROVIDER_RACE_REDIS_KEY = redisKey('public-api:leaderbo
 export const nonTrialEnterpriseRedisKey = (organizationId: string) =>
   redisKey(`organization:non-trial-enterprise:${organizationId}`);
 
+/** Anonymized AI-adoption aggregates for an organization over one rounded date range. */
+export const organizationAIAdoptionRedisKey = (input: {
+  organizationId: string;
+  startDate: string;
+  endDate: string;
+}) =>
+  redisKey(
+    `organization:ai-adoption:v1:${input.organizationId}:${input.startDate}:${input.endDate}`
+  );
+
 export const botIdentityRedisKey = (platform: string, teamId: string, userId: string) =>
   redisKey(`identity:${platform}:${teamId}:${userId}`);
 

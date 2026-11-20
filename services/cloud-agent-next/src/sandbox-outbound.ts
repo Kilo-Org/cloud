@@ -3,7 +3,7 @@ import {
   isControlPlaneCredential,
   parseControlPlaneCredential,
 } from './sandbox-control/managed-credential.js';
-import { withDORetry } from './utils/do-retry.js';
+import { resolveOutboundCredential } from './sandbox-control/resolve-outbound-credential.js';
 import {
   classifyScmAuthorization,
   type ResolvedScmCapability,
@@ -16,33 +16,7 @@ export { MANAGED_SCM_OUTBOUND_HANDLER } from './sandbox-id.js';
 
 const resolvedControlCredentialSchema = z.object({ credential: z.string().min(1) }).strict();
 
-type ControlCredentialResolutionBinding = {
-  resolveCredential(input: {
-    credential: string;
-    outboundContainerId: string;
-    url: string;
-    method: string;
-  }): Promise<unknown>;
-};
-
 type ManagedScmOutboundContext = { containerId: string };
-
-function supportsControlCredentialResolution(
-  service: unknown
-): service is ControlCredentialResolutionBinding {
-  return (
-    typeof service === 'object' &&
-    service !== null &&
-    'resolveCredential' in service &&
-    typeof service.resolveCredential === 'function'
-  );
-}
-
-function sanitizedCredentialResolutionError(error: unknown): Error {
-  return Object.assign(new Error('Control-plane authorization unavailable'), {
-    retryable: error instanceof Error && 'retryable' in error && error.retryable === true,
-  });
-}
 
 async function handleControlPlaneOutbound(
   request: Request,
@@ -58,29 +32,12 @@ async function handleControlPlaneOutbound(
 
   try {
     const resolved = resolvedControlCredentialSchema.safeParse(
-      await withDORetry(
-        () => {
-          try {
-            return namespace.getByName(parsed.sandboxId);
-          } catch (error) {
-            throw sanitizedCredentialResolutionError(error);
-          }
-        },
-        async stub => {
-          try {
-            if (!supportsControlCredentialResolution(stub)) return null;
-            return await stub.resolveCredential({
-              credential: capability.capability,
-              outboundContainerId: ctx.containerId,
-              url: request.url,
-              method: request.method,
-            });
-          } catch (error) {
-            throw sanitizedCredentialResolutionError(error);
-          }
-        },
-        'resolveControlPlaneCredential'
-      )
+      await resolveOutboundCredential(env, {
+        credential: capability.capability,
+        outboundContainerId: ctx.containerId,
+        url: request.url,
+        method: request.method,
+      })
     );
     if (!resolved.success) {
       return new Response('SCM authorization unavailable', { status: 502 });

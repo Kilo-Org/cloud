@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertCircle, ArrowRight, TrendingUp } from 'lucide-react';
+import { AlertCircle, ArrowRight, Clock, TrendingUp } from 'lucide-react';
 import { useOrganizationAIAdoptionTimeseries } from '@/app/api/organizations/hooks';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,6 +33,26 @@ export function AIAdoptionSummaryCard({
           <div>
             <p className="font-medium">AI adoption score is unavailable</p>
             <p className="text-muted-foreground mt-1 text-sm">Open AI usage to try again.</p>
+          </div>
+          <Button variant="secondary" size="sm" onClick={onViewDetails}>
+            View AI usage
+            <ArrowRight className="size-4" />
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (adoption.unavailable) {
+    return (
+      <Card className="h-full">
+        <CardContent className="flex h-full min-h-56 flex-col items-center justify-center gap-3 p-6 text-center">
+          <Clock className="text-muted-foreground size-5" />
+          <div>
+            <p className="font-medium">AI adoption score is temporarily unavailable</p>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Usage data is slow to load. Try again in a few minutes.
+            </p>
           </div>
           <Button variant="secondary" size="sm" onClick={onViewDetails}>
             View AI usage

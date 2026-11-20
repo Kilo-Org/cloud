@@ -269,6 +269,25 @@ describe('parseAuthError', () => {
     });
   });
 
+  it('returns the unknown-key recovery hint when the server names it', () => {
+    expect(
+      parseAuthError({ error: 'ADMISSION_REQUIRED', recovery: 'IOS_ASSERTION_UNKNOWN_KEY' })
+    ).toEqual({ code: 'ADMISSION_REQUIRED', recovery: 'IOS_ASSERTION_UNKNOWN_KEY' });
+  });
+
+  it('drops an unrecognised or malformed recovery hint without hiding the code', () => {
+    expect(parseAuthError({ error: 'ADMISSION_REQUIRED', recovery: 'SOMETHING_ELSE' })).toEqual({
+      code: 'ADMISSION_REQUIRED',
+    });
+    expect(parseAuthError({ error: 'ADMISSION_REQUIRED', recovery: 42 })).toEqual({
+      code: 'ADMISSION_REQUIRED',
+    });
+    // No hint at all stays byte-identical to the pre-hint shape.
+    expect(parseAuthError({ error: 'ADMISSION_REQUIRED' })).toEqual({
+      code: 'ADMISSION_REQUIRED',
+    });
+  });
+
   it('returns undefined for null, undefined, and non-error objects', () => {
     expect(parseAuthError(null)).toBeUndefined();
     expect(parseAuthError(undefined)).toBeUndefined();

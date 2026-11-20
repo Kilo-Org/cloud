@@ -27,7 +27,7 @@ import {
   provider_oauth_attempts,
   external_side_effect_outbox,
 } from '@kilocode/db/schema';
-import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import type { DrizzleConnection, DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { auto_deleted_at, db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { and, asc, desc, eq, inArray, isNull, gt, or } from 'drizzle-orm';
 import { TRIAL_DURATION_DAYS } from '@kilocode/web-shared/lib/constants';
@@ -501,10 +501,16 @@ export async function updateUserRoleInOrganization(
   userId: User['id'],
   role: OrganizationRole,
   txn?: DrizzleTransaction
-): Promise<{ success: boolean; updated: 'membership' | 'invitation' | 'none' }> {
+): Promise<{
+  success: boolean;
+  updated: 'membership' | 'invitation' | 'none';
+}> {
   const run = async (
     tx: DrizzleTransaction
-  ): Promise<{ success: boolean; updated: 'membership' | 'invitation' | 'none' }> => {
+  ): Promise<{
+    success: boolean;
+    updated: 'membership' | 'invitation' | 'none';
+  }> => {
     const membershipUpdateResult = await tx
       .update(organization_memberships)
       .set({ role })
@@ -533,7 +539,10 @@ export async function updateUserRoleInOrganization(
     }
 
     const pendingInvitations = await tx
-      .select({ id: organization_invitations.id, email: organization_invitations.email })
+      .select({
+        id: organization_invitations.id,
+        email: organization_invitations.email,
+      })
       .from(organization_invitations)
       .where(liveInvitationCondition(organizationId));
 
@@ -841,11 +850,15 @@ export async function inviteUserToOrganization(
   return txn ? run(txn) : db.transaction(run);
 }
 
+/**
+ * @param fromDb - Database instance to use (defaults to primary db, pass a replica connection for reads that tolerate lag)
+ */
 export async function getOrganizationMembers(
-  organizationId: Organization['id']
+  organizationId: Organization['id'],
+  fromDb: DrizzleConnection = db
 ): Promise<OrganizationMember[]> {
   const [activeMembers, pendingInvitations] = await Promise.all([
-    db
+    fromDb
       .select({
         id: organization_memberships.kilo_user_id,
         name: kilocode_users.google_user_name,
@@ -881,7 +894,7 @@ export async function getOrganizationMembers(
           eq(kilocode_users.is_bot, false)
         )
       ),
-    db
+    fromDb
       .select({
         id: organization_invitations.id,
         email: organization_invitations.email,

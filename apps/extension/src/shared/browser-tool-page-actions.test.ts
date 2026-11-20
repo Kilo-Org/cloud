@@ -890,10 +890,8 @@ describe('browser-tool-page-actions', () => {
         method: 'Page.handleJavaScriptDialog',
         params: { accept: true, promptText: 'yes' },
       });
-      expect(result).toStrictEqual({
-        ok: true,
-        value: { accepted: true, message: 'Continue?', type: 'confirm' },
-      });
+      // The message is shown with the modal state, to a caller allowed to read it, and never echoed here.
+      expect(result).toStrictEqual({ ok: true, value: { accepted: true, type: 'confirm' } });
     });
 
     it('reports no dialog when none is open', async () => {

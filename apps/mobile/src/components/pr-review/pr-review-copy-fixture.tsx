@@ -11,6 +11,7 @@ import { PrMergeSheet } from '@/components/pr-review/merge/pr-merge-sheet';
 import { providerPrMergeTitles } from '@/components/pr-review/merge/pr-merge-titles';
 import { PrReviewChecksSection } from '@/components/pr-review/pr-review-checks-section';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useSideInsetMarginStyle, useSideInsetStyle } from '@/lib/screen-insets';
 import { PrReviewCommentComposer } from '@/components/pr-review/pr-review-comment-composer';
 import {
   createFixtureClient,
@@ -97,11 +98,12 @@ const scope: ProviderPrScope = {
 function ChecksSectionSurface() {
   const queries = useProviderPrQueries(triple);
   const read = useQuery(queries.checksOptions(headSha, true));
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   if (read.isLoading) {
     return null;
   }
   return (
-    <ScrollView contentContainerClassName={SCREEN_BODY_CLASS}>
+    <ScrollView contentContainerClassName={SCREEN_BODY_CLASS} style={sideInsetMarginStyle}>
       <PrReviewChecksSection {...triple} checks={read} />
     </ScrollView>
   );
@@ -117,6 +119,7 @@ export function PrReviewCopyFixture() {
   // the deleted-line state and `selected=1` seeds an added-line selection.
   const fixtureSide = side === 'LEFT' ? 'LEFT' : 'RIGHT';
   const router = useRouter();
+  const sideInsetStyle = useSideInsetStyle();
   const { t } = useTranslation();
   const [queryClient] = useState(
     () =>
@@ -163,8 +166,10 @@ export function PrReviewCopyFixture() {
     content = <PrReviewRouteFixture surface={surface} />;
   } else if (surface === 'tabs') {
     content = (
-      <View className="px-4 pb-2 pt-3">
-        <PrReviewTabSelector activeTab={tab} onChange={setTab} discussionCount={3} />
+      <View style={sideInsetStyle}>
+        <View className="px-4 pb-2 pt-3">
+          <PrReviewTabSelector activeTab={tab} onChange={setTab} discussionCount={3} />
+        </View>
       </View>
     );
   } else if (surface === 'merge') {

@@ -17,6 +17,7 @@ import {
   useSettledSheetHeaderTopClearance,
   useSheetHeaderTopClearance,
 } from '@/lib/form-sheet';
+import { usePresentedSheetTopClearance } from '@/lib/hooks/use-presented-sheet-top-inset';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { useSideInsetStyle } from '@/lib/screen-insets';
@@ -164,6 +165,15 @@ export function SheetHeader({
   const clearance = useSheetHeaderTopClearance(topInset);
   const { clearance: topInsetHeight, onLayout: handleSurfaceLayout } =
     useSettledSheetHeaderTopClearance({ topInset, clearance, surfaceRef });
+  // iOS sizes a `formSheet` by its own maximum height, so on a short enough
+  // phone the maximum is the window and the sheet presents at the window top
+  // with its header inside the status bar. Nothing read inside the sheet can
+  // see that (the presentation offset lives outside the React tree), so the
+  // header asks the native side where the surface's origin sits and covers
+  // only the part of the status-bar band above it. A phone whose sheet presents
+  // below the inset answers nothing extra and keeps the clearance above.
+  const { clearance: presentedClearance, onLayout: handlePresentedLayout } =
+    usePresentedSheetTopClearance({ topInset, clearance: topInsetHeight, surfaceRef });
   // The sheet's toast sits below this header, so it never covers its actions.
   const reportToastHeaderLayout = useSheetToastHeader(surfaceRef);
   // Resolved at render so each platform reads its own pair, through the same
@@ -180,9 +190,9 @@ export function SheetHeader({
     verticalPadding = 'pb-3 pt-3';
   }
   const safeAreaStyle =
-    topInsetHeight > 0 || sideInsetStyle !== undefined
+    presentedClearance > 0 || sideInsetStyle !== undefined
       ? {
-          ...(topInsetHeight > 0 ? { paddingTop: topInsetHeight } : undefined),
+          ...(presentedClearance > 0 ? { paddingTop: presentedClearance } : undefined),
           ...sideInsetStyle,
         }
       : undefined;
@@ -224,6 +234,7 @@ export function SheetHeader({
       ref={surfaceRef}
       onLayout={() => {
         handleSurfaceLayout();
+        handlePresentedLayout();
         reportToastHeaderLayout?.();
       }}
       collapsable={false}

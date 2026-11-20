@@ -6,11 +6,13 @@ import {
   FIREFOX_PLATFORM_LIMIT,
   FIREFOX_UNSUPPORTED_BROWSER_TOOLS,
   MAX_BROWSER_TOOL_CONSOLE_MESSAGES,
+  MAX_BROWSER_TOOL_MESSAGE_TEXT_LENGTH,
   MAX_BROWSER_TOOL_NETWORK_REQUESTS,
   MAX_BROWSER_TOOL_REFS,
   createBrowserToolSession,
   getFirefoxUnsupportedToolError,
 } from './browser-tool-session';
+import { BROWSER_TOOL_DIALOG_OPEN_ERROR } from './browser-tool-dialog';
 import { TAB_NOT_INSPECTABLE_ERROR } from './tab-debugger';
 import { STALE_REF_ERROR } from './browser-agent-checks';
 import { TAB_TAKEN_ERROR } from './browser-caller';
@@ -79,6 +81,7 @@ const createDebuggerApi = ({
   emitDetach: (tabId: number, reason?: string) => void;
   emitEvent: (tabId: number, method: string, params?: Record<string, unknown>) => void;
   setDocumentNodeId: (nextDocumentNodeId: number) => void;
+  setFrameTree: (payload: Record<string, unknown>) => void;
   setVisibilityState: (nextVisibilityState: string) => void;
 } => {
   const attachCalls: number[] = [];
@@ -87,6 +90,7 @@ const createDebuggerApi = ({
   const detachListeners: ChromeDebuggerDetachListener[] = [];
   const eventListeners: ChromeDebuggerEventListener[] = [];
   let currentDocumentNodeId = documentNodeId;
+  let frameTree: Record<string, unknown> | undefined = undefined;
   let currentVisibilityState = visibilityState;
 
   const api: ChromeDebuggerApi = {
@@ -134,6 +138,10 @@ const createDebuggerApi = ({
 
       if (method === 'DOM.querySelectorAll') {
         return { nodeIds: selectorMatches };
+      }
+
+      if (method === 'Page.getFrameTree' && frameTree !== undefined) {
+        return frameTree;
       }
 
       if (method === 'Page.getLayoutMetrics') {
@@ -185,6 +193,9 @@ const createDebuggerApi = ({
     },
     setDocumentNodeId: nextDocumentNodeId => {
       currentDocumentNodeId = nextDocumentNodeId;
+    },
+    setFrameTree: payload => {
+      frameTree = payload;
     },
     setVisibilityState: nextVisibilityState => {
       currentVisibilityState = nextVisibilityState;
@@ -1061,6 +1072,116 @@ describe('browser tool session', () => {
     debuggerApi.emitEvent(7, 'Page.javascriptDialogClosed', {});
 
     expect(session.takeDialog()).toBeUndefined();
+  });
+
+  it('forgets a frame origin when its frame detaches, keeping the frames that remain', async () => {
+    const { debuggerApi, session } = createSession();
+
+    await session.attach();
+    // The fake answers this one read: the origins a dialog is judged by come from the frame tree.
+    debuggerApi.setFrameTree({
+      frameTree: {
+        childFrames: [
+          { frame: { id: 'gone', securityOrigin: 'https://gone.example.com', url: 'about:blank' } },
+          { frame: { id: 'kept', securityOrigin: 'https://kept.example.com', url: 'about:blank' } },
+        ],
+        frame: {
+          id: 'main',
+          securityOrigin: 'https://main.example.com',
+          url: 'https://main.example.com/',
+        },
+      },
+    });
+    await session.send('Page.getFrameTree');
+
+    debuggerApi.emitEvent(7, 'Page.frameDetached', { frameId: 'gone', reason: 'remove' });
+
+    // A dialog in the detached frame names no origin any more, while the remaining frame still does.
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogOpening', {
+      frameId: 'gone',
+      message: 'Gone',
+      type: 'alert',
+    });
+    expect(session.takeDialog()?.origin).toBeUndefined();
+
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogOpening', {
+      frameId: 'kept',
+      message: 'Kept',
+      type: 'alert',
+    });
+    expect(session.takeDialog()?.origin).toBe('https://kept.example.com');
+  });
+
+  it('bounds the page-written dialog message like every other page text', async () => {
+    const { debuggerApi, session } = createSession();
+
+    await session.attach();
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogOpening', {
+      defaultPrompt: 'x'.repeat(10_000),
+      message: 'y'.repeat(10_000),
+      type: 'prompt',
+    });
+    const dialog = session.takeDialog();
+
+    expect(dialog?.message).toBe(`${'y'.repeat(MAX_BROWSER_TOOL_MESSAGE_TEXT_LENGTH)}...`);
+    expect(dialog?.defaultValue).toBe(`${'x'.repeat(MAX_BROWSER_TOOL_MESSAGE_TEXT_LENGTH)}...`);
+  });
+
+  it('refuses page commands while a dialog is open, sends its answer, and takes commands again once it closes', async () => {
+    const { debuggerApi, session } = createSession();
+
+    await session.attach();
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogOpening', { message: 'Hi', type: 'alert' });
+    const sentBefore = debuggerApi.commands.length;
+
+    await expect(session.send('Runtime.evaluate', { expression: '1' })).rejects.toThrow(
+      BROWSER_TOOL_DIALOG_OPEN_ERROR
+    );
+    await expect(
+      session.send('Input.dispatchMouseEvent', { type: 'mousePressed' })
+    ).rejects.toThrow(BROWSER_TOOL_DIALOG_OPEN_ERROR);
+    // A refused command never reaches the page, so it cannot wait behind the dialog.
+    expect(debuggerApi.commands).toHaveLength(sentBefore);
+
+    await session.send('Page.handleJavaScriptDialog', { accept: true });
+    expect(debuggerApi.commands.at(-1)).toStrictEqual({
+      method: 'Page.handleJavaScriptDialog',
+      params: { accept: true },
+    });
+
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogClosed', { result: true });
+    await expect(session.send('Runtime.evaluate', { expression: '2' })).resolves.toStrictEqual({});
+  });
+
+  it('stops waiting for a page read in flight when the page opens a dialog', async () => {
+    const { debuggerApi, session } = createSession({
+      gate: { command: 'Page.getFrameTree', wait: Promise.withResolvers<void>().promise },
+    });
+
+    await session.attach();
+    const read = session.send('Page.getFrameTree');
+
+    await vi.waitFor(() => {
+      expect(debuggerApi.commands.at(-1)?.method).toBe('Page.getFrameTree');
+    });
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogOpening', { message: 'Hi', type: 'alert' });
+
+    await expect(read).rejects.toThrow(BROWSER_TOOL_DIALOG_OPEN_ERROR);
+  });
+
+  it('refuses a page-code eval at once while a dialog is open, instead of waiting it out', async () => {
+    const { debuggerApi, session } = createSession();
+
+    await session.attach();
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogOpening', { message: 'Hi', type: 'alert' });
+    const sentBefore = debuggerApi.commands.length;
+
+    // The workflow eval path runs page code through the session; on an open dialog it would sit out its 5 s timeout.
+    await expect(session.evaluateInTab('return 1')).resolves.toStrictEqual({
+      error: BROWSER_TOOL_DIALOG_OPEN_ERROR,
+      ok: false,
+    });
+    expect(debuggerApi.commands).toHaveLength(sentBefore);
   });
 
   it('resolves a snapshot ref to its backend node id and a selector through the DOM domain', async () => {

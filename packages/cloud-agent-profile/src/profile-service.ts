@@ -1,4 +1,5 @@
 import type { WorkerDb } from '@kilocode/db';
+import { listVarsForProfile } from './profile-vars-service';
 import {
   agent_environment_profiles,
   agent_environment_profile_vars,
@@ -312,23 +313,7 @@ export async function getProfile(
 
   const [vars, commands, mcpServers, skills, agents, kiloCommands, instructions, [usage]] =
     await Promise.all([
-      db
-        .select({
-          key: agent_environment_profile_vars.key,
-          value: sql<string>`
-          CASE
-            WHEN ${agent_environment_profile_vars.is_secret} = true
-            THEN '***'
-            ELSE ${agent_environment_profile_vars.value}
-          END
-        `.as('value'),
-          isSecret: agent_environment_profile_vars.is_secret,
-          createdAt: agent_environment_profile_vars.created_at,
-          updatedAt: agent_environment_profile_vars.updated_at,
-        })
-        .from(agent_environment_profile_vars)
-        .where(eq(agent_environment_profile_vars.profile_id, profileId))
-        .orderBy(agent_environment_profile_vars.key),
+      listVarsForProfile(db, profileId),
       db
         .select({
           sequence: agent_environment_profile_commands.sequence,

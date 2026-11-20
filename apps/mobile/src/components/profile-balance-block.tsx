@@ -5,7 +5,7 @@ import Animated, { LinearTransition } from 'react-native-reanimated';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS, LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 
 /**
  * The balance slot's states: the loading skeleton, a failed read, and the
@@ -102,7 +102,12 @@ export function BalanceBlock({ state, stacked, amount, toggle, note }: BalanceBl
   }
   let visibilityControl = toggle;
   if (state !== 'ready') {
-    visibilityControl = stacked && failed ? null : <View className="h-12 w-12" />;
+    // The placeholder holds the control's own box, not a round number near it:
+    // the loaded toggle is an `ICON_TARGET_BOX_CLASS` 48pt box, and a 42pt
+    // stand-in made the one-row card 6dp shorter while the read was in flight,
+    // so every row under the card moved down when the amount landed (measured
+    // on the Profile held-loading gate target, 2026-11-20).
+    visibilityControl = stacked && failed ? null : <View className={ICON_TARGET_BOX_CLASS} />;
   }
   // The noninteractive caption must not intercept the retry target's hit slop.
   const expiryNote = failed ? <View pointerEvents="none">{note}</View> : note;

@@ -2256,8 +2256,12 @@ async function processDeciderJob(
             outputDeadline: startedAt + PAID_OUTPUT_WAIT_MS,
           })
         );
+        // A first attempt killed before any event says nothing about the model, so it is
+        // cleared and deferred with its unreached retry; an empty answer is graded instead.
         const retry = await invokeCli().catch(error => {
-          if (isRetryableContainerAvailabilityError(error)) return null;
+          if (isRetryableContainerAvailabilityError(error) && !isKilledBeforeEventsResult(first)) {
+            return null;
+          }
           throw error;
         });
         if (retry === null) {

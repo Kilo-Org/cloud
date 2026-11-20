@@ -211,10 +211,11 @@ and the runtime's "The container just exited" or "The container is not running" 
 into a 503 with `errorCategory` `container_not_reached`, which takes the container-capacity
 path: the unbilled ledger row is cleared and the chunk is deferred. Other proxy failures
 ("Container suddenly disconnected", a closed port connection) can follow a delivered request
-and stay ambiguous. When an empty-output retry cannot reach its container, the first
-attempt's output is graded instead. A case the ledger refuses to open because the chunk lost
-its lease, its lane already failed or its run stopped is not ambiguous either: the chunk is
-released (`claim_lost`) without recording a lane failure.
+and stay ambiguous. When a retry cannot reach its container, an empty-output first attempt is
+graded as it is, while a first attempt killed before any event is cleared and deferred the same
+way. A case the ledger refuses to open because the chunk lost its lease, its lane already failed
+or its run stopped is not ambiguous either: the chunk is released (`claim_lost`) without
+recording a lane failure.
 
 Output that arrives after its lane failed or its run became terminal is graded later by a
 single-case recovery message. Recovery never starts inference. A per-case grading lease

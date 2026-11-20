@@ -12,8 +12,8 @@ import {
   soonestScheduledAt,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { aggregateLiveActivityRelevance } from '@kilocode/notifications/schemas';
-import { type TOptions } from 'i18next';
 
+import { i18n } from '@/i18n';
 import {
   type FollowableSessionRow,
   type FollowedSessionCounts,
@@ -39,7 +39,6 @@ import {
   getNotificationPermissionGranted,
 } from '@/lib/glanceable/live-activity-switch';
 import { getWaitingAsk, type WaitingAsk } from '@/lib/glanceable/waiting-ask';
-import { glanceableTranslate } from '@/lib/glanceable/translate';
 
 import { getActiveAgentsLiveActivity, OPEN_AGENTS_URL } from './active-agents-live-activity';
 import {
@@ -158,8 +157,8 @@ let revision = 0;
 let inFlightUpdate: Promise<void> | null = null;
 let lastProps: GlanceableLiveActivityProps | null = null;
 
-function translate(key: string, options?: TOptions): string {
-  return glanceableTranslate(key, options);
+function translate(key: string): string {
+  return i18n.t(key);
 }
 
 /**

@@ -7,7 +7,6 @@ import {
 import { emptyHomeWidgetDetails, type HomeWidgetData } from '@kilocode/app-shared/home-widget';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { copyTranslate } from '@/lib/glanceable/copy.test-helpers';
 import { withStatus } from '@/lib/glanceable/publisher';
 import { setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 
@@ -24,10 +23,8 @@ const COPY: Record<string, string> = {
   'glanceable.approving': 'Approving…',
   'glanceable.couldNotApprove': 'Could not approve',
   'glanceable.newestSession': 'Newest: {{title}}',
-  'glanceable.countNoun.scheduled_one': 'Scheduled',
-  'glanceable.countNoun.scheduled_other': 'Scheduled',
 };
-const translate = copyTranslate(COPY);
+const translate = (key: string): string => COPY[key] ?? key;
 
 // The extras are module state shared by the publisher and every surface; a case
 // that sets them resets them here so it cannot colour the next one.
@@ -125,7 +122,7 @@ describe('actions', () => {
     // never reflows when the CLI reports a wake for a session it had none for;
     // only the time beside the row is conditional.
     expect(withWake.countLines.find(line => line.kind === 'scheduled')).toEqual({
-      label: 'Scheduled',
+      label: 'common.scheduled',
       kind: 'scheduled',
       count: 2,
     });

@@ -13,7 +13,6 @@ import { type TOptions } from 'i18next';
 import {
   type GlanceableCountFormat,
   glanceableCountLines,
-  glanceableCountNoun,
   glanceableScheduledAt,
   glanceableSpokenLabel,
   glanceableStatusCopyKey,
@@ -102,10 +101,9 @@ export function buildAndroidWidgetProps(
     countLines: (showCounts ? glanceableCountLines(snapshot) : []).map(line => ({
       kind: line.kind,
       count: formatCount(line.count),
-      label: glanceableCountNoun(line.kind, line.count, translate),
+      label: translate(line.key),
     })),
-    primaryLabel:
-      primary === null ? null : glanceableCountNoun(primary.kind, primary.count, translate),
+    primaryLabel: primary === null ? null : translate(primary.key),
     scheduledTime: scheduledAt === null ? null : formatClock(scheduledAt),
     actionFeedback: feedback,
     actions: {

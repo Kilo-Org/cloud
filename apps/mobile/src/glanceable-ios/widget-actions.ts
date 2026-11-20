@@ -1,11 +1,10 @@
 import { addUserInteractionListener, type UserInteractionEvent } from 'expo-widgets';
-import { type TOptions } from 'i18next';
 import { Linking } from 'react-native';
 
+import { i18n } from '@/i18n';
 import { getHomeWidgetDataForSnapshot } from '@/lib/glanceable/home-widget-data';
 import { getGlanceableSnapshotForSignedInScope } from '@/lib/glanceable/persist';
 import { getSurfaceExtras, setSurfaceExtras } from '@/lib/glanceable/surface-extras';
-import { glanceableTranslate } from '@/lib/glanceable/translate';
 import { runWidgetApprove } from '@/lib/glanceable/widget-actions';
 import { LAUNCHER_NEW_AGENT_URL } from '@/lib/launcher-surfaces';
 
@@ -153,8 +152,7 @@ function republishWidgetProps(): void {
   if (snapshot === null) {
     return;
   }
-  const translate = (key: string, options?: TOptions): string =>
-    glanceableTranslate(key, options);
+  const translate = (key: string): string => i18n.t(key);
   const homeData = getHomeWidgetDataForSnapshot(snapshot);
   const props = toWidgetProps(buildGlanceableViewProps(snapshot, {}, translate, homeData));
   ActiveAgentsWidget.updateSnapshot(props);

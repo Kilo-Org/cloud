@@ -198,7 +198,7 @@ export function glanceableSpokenLabelKeys(
 export function glanceableSpokenLabel(
   snapshot: GlanceableAgentsSnapshot,
   flags: GlanceableSurfaceFlags,
-  translate: GlanceableTranslate
+  translate: (key: string) => string
 ): string {
   const status = resolveGlanceableStatus(snapshot, flags);
   const parts: string[] = [];
@@ -206,10 +206,8 @@ export function glanceableSpokenLabel(
     parts.push(translate(GLANCEABLE_STATUS_COPY_KEY[status]));
   }
   if (status === 'happy' || status === 'stale') {
-    for (const { kind, count } of glanceableCountLines(snapshot).filter(
-      line => line.count > 0
-    )) {
-      parts.push(glanceableCountMessage(kind, count, String, translate));
+    for (const { key, count } of glanceableCountLines(snapshot).filter(line => line.count > 0)) {
+      parts.push(`${count} ${translate(key)}`);
     }
   }
   parts.push(translate('glanceable.openAgents'));

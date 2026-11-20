@@ -1398,13 +1398,13 @@ describe('buildGlanceableViewProps', () => {
       {},
       key => key
     );
-    expect(props.primaryLabel).toBe('glanceable.countNoun.needsInput');
+    expect(props.primaryLabel).toBe('glanceable.needsInput');
     expect(props.primaryCount).toBe(1);
     expect(props.countLines.map(line => line.label)).toEqual([
-      'glanceable.countNoun.needsInput',
-      'glanceable.countNoun.running',
-      'glanceable.countNoun.scheduled',
-      'glanceable.countNoun.idle',
+      'glanceable.needsInput',
+      'common.working',
+      'common.scheduled',
+      'common.idle',
     ]);
   });
 
@@ -1472,11 +1472,11 @@ describe('buildGlanceableViewProps', () => {
       key => key
     );
     expect(stale.accessibilityLabel).toBe(
-      'glanceable.stale, glanceable.count.needsInput, glanceable.count.running, glanceable.openAgents'
+      'glanceable.stale, 1 glanceable.needsInput, 2 common.working, glanceable.openAgents'
     );
 
     const happy = buildGlanceableViewProps(snapshotFor([{ status: 'busy' }], 0), {}, key => key);
-    expect(happy.accessibilityLabel).toBe('glanceable.count.running, glanceable.openAgents');
+    expect(happy.accessibilityLabel).toBe('1 common.working, glanceable.openAgents');
 
     const empty = buildGlanceableSnapshot({
       ...CTX,
@@ -1600,7 +1600,7 @@ describe('buildGlanceableViewProps', () => {
     expect(props.newestResultKind).toBe('needsInput');
     expect(props.newestResultAt).toBe(newestAt);
     // The label is the mapped row's own, not a second translation of the word.
-    expect(props.newestResultLabel).toBe('glanceable.countNoun.needsInput');
+    expect(props.newestResultLabel).toBe('glanceable.needsInput');
     expect(props.newestResultLabel).toBe(
       props.countLines.find(line => line.kind === 'needsInput')?.label
     );
@@ -1682,7 +1682,7 @@ describe('toWidgetProps', () => {
 
     expect(props).toMatchObject({
       newestResultKind: 'needsInput',
-      newestResultLabel: 'glanceable.countNoun.needsInput',
+      newestResultLabel: 'glanceable.needsInput',
       newestResultAt: newestAt,
     });
   });
@@ -1695,7 +1695,7 @@ describe('toWidgetProps', () => {
     );
 
     expect(toWidgetProps(source)).toMatchObject({
-      primaryLabel: 'glanceable.countNoun.needsInput',
+      primaryLabel: 'glanceable.needsInput',
       primaryKind: 'needsInput',
       primaryCount: 1,
       countLines: [

@@ -1454,6 +1454,7 @@ const LANE_FAILURE_CLASS_BY_WAIT_REASON = {
   awaiting_output: 'ambiguous_execution',
   ambiguous_execution: 'ambiguous_execution',
   catalog_load: 'catalog_load',
+  probe_family: 'unsupported',
   model_resolution: 'model_resolution',
   grading: 'grader',
   container_capacity: 'container_capacity',

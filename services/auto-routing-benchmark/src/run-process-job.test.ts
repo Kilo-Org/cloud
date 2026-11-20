@@ -718,12 +718,14 @@ describe('processJob — scheduler-owned execution', () => {
           attemptStartedAt: expect.any(Number),
         })
       );
-      expect(deferChunk).toHaveBeenCalledWith(
+      expect(deferCatalogChunk).toHaveBeenCalledWith(
         env.BENCH_DB,
         'chunk-1',
         'token-1',
         expect.any(Number)
       );
+      expect(cooldownCatalog).toHaveBeenCalledWith(env.BENCH_DB, expect.any(Number));
+      expect(deferChunk).not.toHaveBeenCalled();
       expect(failChunk).not.toHaveBeenCalled();
       expect(upsertCaseResult).not.toHaveBeenCalled();
     });

@@ -955,7 +955,7 @@
       "couldNotLoad": "एनालिटिक्स लोड नहीं हो सका",
       "trackedReviewsCaption": "इस अवधि में एनालिटिक्स चालू रहने पर पूरी हो चुकी समीक्षाएँ। चल रही और विफल समीक्षाएँ कभी नहीं गिनी जातीं।",
       "trackedReviewsUncounted": "गिनी नहीं गईं: संगठन की {{displayTotal}} पूरी हो चुकी समीक्षाओं में से {{displayCount}} समीक्षाएँ जिनका परिणाम कैप्चर नहीं किया गया था।",
-      "trackedReviewsUncounted_one": "गिनी नहीं गईं: संगठन की {{displayTotal}} पूरी हो चुकी समीक्षाओं में से {{displayCount}} समीक्षाओं का परिणाम कैप्चर नहीं हुआ था।",
+      "trackedReviewsUncounted_one": "गिनी नहीं गई: संगठन की {{displayTotal}} पूरी हो चुकी समीक्षाओं में से {{displayCount}} समीक्षा का परिणाम कैप्चर नहीं हुआ था।",
       "trackedReviewsUncounted_other": "गिनी नहीं गईं: संगठन की {{displayTotal}} पूरी हो चुकी समीक्षाओं में से {{displayCount}} समीक्षाएँ जिनका परिणाम कैप्चर नहीं किया गया था।"
     },
     "council": {

@@ -44,6 +44,30 @@ type UsageTotalsRow = {
   kilo_covered_spend: number;
 };
 
+/** This request's own user-billed receipts. */
+type UserUsageRow = { request_id: string; billed: number; spend: number };
+
+/** Kilo's cover of the cases this request staged, by exact case key. */
+type CoverageRow = {
+  request_id: string;
+  kilo_covered_requests: number;
+  kilo_covered_spend: number;
+};
+
+/** One request's totals: its own user charge plus Kilo's cover of its staged cases. */
+function usageTotals(
+  user: UserUsageRow | null | undefined,
+  cover: CoverageRow | null | undefined
+): UsageTotalsRow {
+  return {
+    request_id: user?.request_id ?? cover?.request_id ?? '',
+    billed: Number(user?.billed ?? 0),
+    spend: Number(user?.spend ?? 0),
+    kilo_covered_requests: Number(cover?.kilo_covered_requests ?? 0),
+    kilo_covered_spend: Number(cover?.kilo_covered_spend ?? 0),
+  };
+}
+
 type PayerRow = {
   request_id: string;
   owner_type: 'user' | 'organization' | null;
@@ -62,13 +86,6 @@ type DetachRow = {
 function detachKey(requestId: string, ownerType: string | null, ownerId: string | null) {
   return JSON.stringify([requestId, ownerType, ownerId]);
 }
-
-const ZERO_USAGE: Omit<UsageTotalsRow, 'request_id'> = {
-  billed: 0,
-  spend: 0,
-  kilo_covered_requests: 0,
-  kilo_covered_spend: 0,
-};
 
 function emptyCounts(): AdminCaseCounts {
   return { queued: 0, running: 0, reused: 0, done: 0, failed: 0, paused: 0 };
@@ -99,15 +116,37 @@ function payerBreakdown(
       kiloCoveredMicrodollars: Number(usage.kilo_covered_spend),
     });
   }
+  const seen = new Set<string>();
   for (const payer of payers) {
     if (payer.owner_id === null) continue;
+    const key = detachKey(payer.request_id, payer.owner_type, payer.owner_id);
+    seen.add(key);
     rows.push({
       kind: payer.owner_type === 'organization' ? 'org' : 'user',
       ownerId: payer.owner_id,
       billedModelRequests: Number(payer.billed),
       chargedMicrodollars: Number(payer.spend),
-      detachReason:
-        detachReasons.get(detachKey(payer.request_id, payer.owner_type, payer.owner_id)) ?? null,
+      detachReason: detachReasons.get(key) ?? null,
+      ownerLabel: null,
+    });
+  }
+  // An account that was tried for this request and refused before any later account won
+  // billed nothing here, so no receipt names it — yet the admin still has to see why this
+  // request's payer set shrank. Report it at zero, never as a charge.
+  for (const [key, reason] of detachReasons) {
+    if (seen.has(key)) continue;
+    const [requestId, ownerType, ownerId] = JSON.parse(key) as [
+      string,
+      'user' | 'organization' | null,
+      string | null,
+    ];
+    if (requestId !== usage.request_id || ownerId === null) continue;
+    rows.push({
+      kind: ownerType === 'organization' ? 'org' : 'user',
+      ownerId,
+      billedModelRequests: 0,
+      chargedMicrodollars: 0,
+      detachReason: reason,
       ownerLabel: null,
     });
   }
@@ -145,19 +184,54 @@ function requestFields(
     kiloCoveredMicrodollars: Number(usage.kilo_covered_spend),
     pauseReason: row.pause_reason,
     counts,
-    payers: payerBreakdown(payers, { request_id: row.id, ...usage }, detachReasons),
+    // `request_id` last: the totals row carries the empty id when a request billed nothing
+    // (a fully refused or fully covered request), and the detach-only payer rows are
+    // matched against the row actually being rendered.
+    payers: payerBreakdown(payers, { ...usage, request_id: row.id }, detachReasons),
     poolName: null,
     failureReason: row.failure_reason,
     failureRetryable: row.failure_retryable === 1,
   };
 }
 
-const USAGE_TOTALS_SQL = `SELECT u.request_id AS request_id,
-  COUNT(DISTINCT CASE WHEN u.platform_covered = 0 THEN u.model_request_id END) AS billed,
-  COALESCE(SUM(CASE WHEN u.platform_covered = 0 THEN u.microdollars ELSE 0 END), 0) AS spend,
-  COUNT(DISTINCT CASE WHEN u.platform_covered = 1 THEN u.model_request_id END) AS kilo_covered_requests,
-  COALESCE(SUM(CASE WHEN u.platform_covered = 1 THEN u.microdollars ELSE 0 END), 0) AS kilo_covered_spend
-FROM paid_attempt_usage u`;
+/**
+ * This request's own billed model requests and spend. Keyed by `request_id`, which native
+ * billing writes as the paying pool request, so a shared case's user debit is never
+ * duplicated onto a sibling.
+ */
+const USER_USAGE_SQL = `SELECT u.request_id AS request_id,
+  COUNT(DISTINCT u.model_request_id) AS billed,
+  COALESCE(SUM(u.microdollars), 0) AS spend
+FROM paid_attempt_usage u
+WHERE u.platform_covered = 0`;
+
+/**
+ * Kilo's cover of the cases this request staged, keyed by the exact case rather than by
+ * `request_id`: a platform-covered receipt deliberately carries no paying pool request
+ * (`request_id = ''`), so it can never be found by `request_id` — and looking it up that
+ * way is what silently dropped all coverage from the admin reads. This is the same
+ * canonical union the owner progress reader uses: exact case key, live staged rows only
+ * (`reused` is a historical result, not coverage). Kilo spend is reported apart and never
+ * credits `charged_microdollars`.
+ */
+const PLATFORM_COVERAGE_SQL = `SELECT rc.request_id AS request_id,
+  COUNT(DISTINCT u.model_request_id) AS kilo_covered_requests,
+  COALESCE(SUM(u.microdollars), 0) AS kilo_covered_spend
+FROM paid_benchmark_request_cases rc
+JOIN benchmark_case_runs run
+  ON run.engine_identity = rc.engine_identity
+  AND run.model = rc.model AND run.variant = rc.variant
+  AND run.rep = rc.rep AND run.case_id = rc.case_id
+JOIN paid_attempt_usage u
+  ON u.platform_covered = 1
+  AND u.engine_identity = rc.engine_identity
+  AND u.model = rc.model AND u.variant = rc.variant
+  AND u.rep = rc.rep AND u.case_id = rc.case_id
+  -- Only the run's CURRENT generation. A cancelled generation that was later reclaimed
+  -- bumps the run's generation counter, so its Kilo receipts can never be reported as
+  -- cover for the newer exclusive user generation paying the same slot.
+  AND u.generation = run.generation
+WHERE rc.status <> 'reused'`;
 
 /**
  * Payer split from the one-time model-request assignment. `paid_model_requests` pins each
@@ -191,10 +265,20 @@ WHERE m.owner_id IS NOT NULL AND m.platform_covered = 0`;
 const PAYER_DETACH_SQL = `SELECT rc.request_id AS request_id, a.owner_type AS owner_type,
   a.owner_id AS owner_id, MAX(a.reason) AS detach_reason
 FROM paid_benchmark_request_cases rc
-JOIN paid_model_requests m ON ${MODEL_REQUEST_KEYS}
-JOIN paid_model_request_attempts a
-  ON a.model_request_id = m.id AND a.status = 'refused'
-WHERE m.platform_covered = 0`;
+JOIN (
+  -- The attempt's OWN pool_request_id scopes the trail, never whichever account the model
+  -- request later won the slot with: a refusal keeps pointing at the request it was tried
+  -- for, so an admin sees why that payer set shrank.
+  SELECT m.engine_identity, m.model, m.variant, m.rep, m.case_id,
+    a.owner_type, a.owner_id, a.pool_request_id, a.reason
+  FROM paid_model_request_attempts a
+  JOIN paid_model_requests m ON m.id = a.model_request_id
+  WHERE a.status = 'refused'
+) AS a
+  ON a.pool_request_id = rc.request_id
+  AND a.engine_identity = rc.engine_identity
+  AND a.model = rc.model AND a.variant = rc.variant
+  AND a.rep = rc.rep AND a.case_id = rc.case_id`;
 
 /**
  * One request in the console's shape. `poolName` and owner labels stay null: the worker has
@@ -209,7 +293,7 @@ export async function readPaidBenchmarkAdminRequest(
     .bind(requestId)
     .first<AdminRequestRow>();
   if (!row) return null;
-  const [counts, usage, payers, detachRows] = await Promise.all([
+  const [counts, user, cover, payers, detachRows] = await Promise.all([
     db
       .prepare(
         `SELECT status, COUNT(*) AS count FROM paid_benchmark_request_cases
@@ -218,9 +302,14 @@ export async function readPaidBenchmarkAdminRequest(
       .bind(requestId)
       .all<{ status: string; count: number }>(),
     db
-      .prepare(`${USAGE_TOTALS_SQL} WHERE request_id = ? GROUP BY request_id`)
+      .prepare(`${USER_USAGE_SQL} AND u.request_id = ? GROUP BY u.request_id`)
       .bind(requestId)
-      .first<UsageTotalsRow>(),
+      .first<UserUsageRow>(),
+    db
+      .prepare(`${PLATFORM_COVERAGE_SQL} AND rc.request_id = ?
+      GROUP BY rc.request_id`)
+      .bind(requestId)
+      .first<CoverageRow>(),
     db
       .prepare(`${PAYER_SPLIT_SQL} AND rc.request_id = ?
       GROUP BY m.owner_type, m.owner_id`)
@@ -236,16 +325,11 @@ export async function readPaidBenchmarkAdminRequest(
   for (const entry of counts.results) {
     applyStatusCount(statusCounts, entry.status, Number(entry.count));
   }
-  const totals = usage ?? ZERO_USAGE;
+  const totals = usageTotals(user, cover);
   return requestFields(
     row,
     statusCounts,
-    {
-      billed: Number(totals.billed ?? 0),
-      spend: Number(totals.spend ?? 0),
-      kilo_covered_requests: Number(totals.kilo_covered_requests ?? 0),
-      kilo_covered_spend: Number(totals.kilo_covered_spend ?? 0),
-    },
+    totals,
     payers.results.map(entry => ({ ...entry, request_id: requestId })),
     new Map(
       detachRows.results.map(entry => [
@@ -310,7 +394,7 @@ export async function listPaidBenchmarkAdminRequests(
   if (rows.length === 0) return { requests: [], nextCursor: null };
   const requestIds = rows.map(row => row.id);
   const placeholders = requestIds.map(() => '?').join(', ');
-  const [counts, usage, payers, detachRows] = await Promise.all([
+  const [counts, user, cover, payers, detachRows] = await Promise.all([
     db
       .prepare(
         `SELECT request_id, status, COUNT(*) AS count FROM paid_benchmark_request_cases
@@ -319,9 +403,18 @@ export async function listPaidBenchmarkAdminRequests(
       .bind(...requestIds)
       .all<{ request_id: string; status: string; count: number }>(),
     db
-      .prepare(`${USAGE_TOTALS_SQL} WHERE request_id IN (${placeholders}) GROUP BY request_id`)
+      .prepare(
+        `${USER_USAGE_SQL} AND u.request_id IN (${placeholders}) GROUP BY u.request_id`
+      )
       .bind(...requestIds)
-      .all<UsageTotalsRow>(),
+      .all<UserUsageRow>(),
+    db
+      .prepare(
+        `${PLATFORM_COVERAGE_SQL} AND rc.request_id IN (${placeholders})
+        GROUP BY rc.request_id`
+      )
+      .bind(...requestIds)
+      .all<CoverageRow>(),
     db
       .prepare(`${PAYER_SPLIT_SQL} AND rc.request_id IN (${placeholders})
       GROUP BY rc.request_id, m.owner_type, m.owner_id`)
@@ -339,7 +432,8 @@ export async function listPaidBenchmarkAdminRequests(
     applyStatusCount(bucket, entry.status, Number(entry.count));
     countBuckets.set(entry.request_id, bucket);
   }
-  const usageBuckets = new Map(usage.results.map(entry => [entry.request_id, entry]));
+  const userBuckets = new Map(user.results.map(entry => [entry.request_id, entry]));
+  const coverBuckets = new Map(cover.results.map(entry => [entry.request_id, entry]));
   const detachReasons = new Map(
     detachRows.results.map(entry => [
       detachKey(entry.request_id, entry.owner_type, entry.owner_id),
@@ -357,7 +451,7 @@ export async function listPaidBenchmarkAdminRequests(
       requestFields(
         row,
         countBuckets.get(row.id) ?? emptyCounts(),
-        usageBuckets.get(row.id) ?? ZERO_USAGE,
+        usageTotals(userBuckets.get(row.id), coverBuckets.get(row.id)),
         payerBuckets.get(row.id) ?? [],
         detachReasons
       )
@@ -384,13 +478,17 @@ export async function readPaidBenchmarkAdminProgress(
   }
   const [request, usage] = await Promise.all([
     readPaidBenchmarkAdminRequest(db, input.requestId),
+    // Per-case USER spend only: `request_id` is the paying pool request, and the contract's
+    // case row has no coverage amount (Kilo's cover is a request-level total plus the
+    // `coveredByKilo` flag, both already on the request row and the staged case row).
     db
       .prepare(
-        `SELECT model, variant, rep, case_id,
-          COUNT(DISTINCT CASE WHEN platform_covered = 0 THEN model_request_id END) AS billed,
-          COALESCE(SUM(CASE WHEN platform_covered = 0 THEN microdollars ELSE 0 END), 0) AS spend
-        FROM paid_attempt_usage WHERE request_id = ?
-        GROUP BY model, variant, rep, case_id`
+        `SELECT u.model, u.variant, u.rep, u.case_id,
+          COUNT(DISTINCT u.model_request_id) AS billed,
+          COALESCE(SUM(u.microdollars), 0) AS spend
+        FROM paid_attempt_usage u
+        WHERE u.platform_covered = 0 AND u.request_id = ?
+        GROUP BY u.model, u.variant, u.rep, u.case_id`
       )
       .bind(input.requestId)
       .all<{

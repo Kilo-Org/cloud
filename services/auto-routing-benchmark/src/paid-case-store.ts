@@ -2254,11 +2254,18 @@ export async function readPaidBenchmarkProgress(
         SELECT usage.engine_identity, usage.model, usage.variant, usage.rep,
           usage.case_id, 0, COUNT(*), SUM(usage.microdollars)
         FROM paid_benchmark_request_cases AS staged
+        JOIN benchmark_case_runs AS run
+          ON run.engine_identity = staged.engine_identity
+          AND run.model = staged.model AND run.variant = staged.variant
+          AND run.rep = staged.rep AND run.case_id = staged.case_id
         JOIN paid_attempt_usage AS usage
           ON usage.engine_identity = staged.engine_identity
           AND usage.model = staged.model AND usage.variant = staged.variant
           AND usage.rep = staged.rep AND usage.case_id = staged.case_id
           AND usage.platform_covered = 1
+          -- Only the run's current generation: a reclaimed generation's Kilo receipts are
+          -- not cover for the newer exclusive user generation on the same slot.
+          AND usage.generation = run.generation
         WHERE staged.request_id = ? AND staged.status <> 'reused'
         GROUP BY usage.engine_identity, usage.model, usage.variant, usage.rep, usage.case_id`
       )

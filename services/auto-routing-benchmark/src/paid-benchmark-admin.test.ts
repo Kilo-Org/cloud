@@ -72,7 +72,7 @@ function insertCase(
   requestId: string,
   caseId: string,
   status: string,
-  options: { covered?: number; charged?: number } = {}
+  options: { covered?: number; charged?: number; generation?: number } = {}
 ) {
   sqlite
     .prepare(
@@ -82,6 +82,24 @@ function insertCase(
       ) VALUES (?, ?, 'openai/gpt-test', '', 0, ?, ?, ?, ?, NULL, '2026-11-20T12:00:00.000Z')`
     )
     .run(requestId, ENGINE, caseId, status, options.covered ?? 0, options.charged ?? 0);
+  // A staged case always has its case run: the store cannot write a covered receipt
+  // without one, and the admin reads align Kilo cover to the run's current generation.
+  sqlite
+    .prepare(
+      `INSERT INTO benchmark_case_runs (
+        engine_identity, model, variant, rep, case_id, status, generation, platform_covered,
+        result_usable, created_at, updated_at
+      ) VALUES (?, 'openai/gpt-test', '', 0, ?, 'running', ?, ?, 0, ?, ?)
+      ON CONFLICT DO NOTHING`
+    )
+    .run(
+      ENGINE,
+      caseId,
+      options.generation ?? 1,
+      options.covered ?? 0,
+      '2026-11-20T12:00:00.000Z',
+      '2026-11-20T12:00:00.000Z'
+    );
 }
 
 /** One native model request: the one-time assignment of one case run to one account. */
@@ -310,18 +328,27 @@ describe('admin request reads', () => {
     );
   });
 
-  it('scopes a shared case to each payer without duplicating or hiding Kilo coverage', async () => {
-    // One case shared by a personal request (A) and a second personal request (B), plus a
-    // platform-covered call on it. Each admin row must show only its own payer's spend.
+  it('scopes a shared case to each payer and reports Kilo cover apart', async () => {
+    // Three requests: A and B share one case, C is unrelated and must stay untouched. A
+    // pays for its own call BEFORE Kilo joins the case, then Kilo covers a later call. The
+    // admin row for a sharer must show its own user debit exactly once, and Kilo's cover as
+    // a separate platform row that never enters `chargedMicrodollars`.
     insertRequest();
     insertRequest({ id: 'request-b', ownerId: 'u2', routerId: 'router-2' });
-    insertCase(REQUEST, 'case-shared', 'done');
-    insertCase('request-b', 'case-shared', 'done');
-    // A owns the pool call; B owns a separate call of its own on the same shared case.
+    insertRequest({ id: 'request-c', ownerId: 'u3', routerId: 'router-3' });
+    insertCase(REQUEST, 'case-shared', 'running');
+    insertCase('request-b', 'case-shared', 'running');
+    insertCase('request-c', 'case-other', 'done');
+    // Pre-join user calls: A owns one on the shared case, B one on the same case, and C
+    // bills an unrelated case it does not share with anyone.
     insertModelRequest('model-request-a', 'case-shared', { ownerId: 'u1' });
     insertModelRequest('model-request-b', 'case-shared', {
       ownerId: 'u2',
       requestId: 'request-b',
+    });
+    insertModelRequest('model-request-c', 'case-other', {
+      ownerId: 'u3',
+      requestId: 'request-c',
     });
     insertUsage('usage-a', 'model-request-a', 'case-shared', {
       microdollars: 400,
@@ -332,43 +359,230 @@ describe('admin request reads', () => {
       ownerId: 'u2',
       requestId: 'request-b',
     });
-    // Kilo covered one call of the shared case: neither owner is charged for it, and both
-    // requests still see that the case was covered.
-    insertModelRequest('model-request-cov', 'case-shared', {
+    insertUsage('usage-c', 'model-request-c', 'case-other', {
+      microdollars: 900,
+      ownerId: 'u3',
+      requestId: 'request-c',
+    });
+    // Post-join: Kilo covered two calls of the SHARED case. A covered receipt carries no
+    // paying pool request, so it is found by the exact case key, not by `request_id`.
+    insertModelRequest('model-request-cov1', 'case-shared', {
       platformCovered: true,
       state: 'completed',
-      requestId: 'request-b',
     });
-    insertUsage('usage-cov', 'model-request-cov', 'case-shared', {
+    insertModelRequest('model-request-cov2', 'case-shared', {
+      platformCovered: true,
+      state: 'completed',
+    });
+    insertUsage('usage-cov1', 'model-request-cov1', 'case-shared', {
       microdollars: 250,
       platformCovered: true,
-      // A covered call belongs to no pool request.
+      requestId: '',
+    });
+    insertUsage('usage-cov2', 'model-request-cov2', 'case-shared', {
+      microdollars: 150,
+      platformCovered: true,
+      requestId: '',
+    });
+    // A third covered call on the UNRELATED case must not leak onto a sharer.
+    insertModelRequest('model-request-cov3', 'case-other', {
+      platformCovered: true,
+      state: 'completed',
+    });
+    insertUsage('usage-cov3', 'model-request-cov3', 'case-other', {
+      microdollars: 1_000,
+      platformCovered: true,
       requestId: '',
     });
 
     const listed = await listPaidBenchmarkAdminRequests(db, { router: 'efficient' });
     const a = listed.requests.find(entry => entry.id === REQUEST);
     const b = listed.requests.find(entry => entry.id === 'request-b');
-    if (!a || !b) throw new Error('expected both requests');
+    const c = listed.requests.find(entry => entry.id === 'request-c');
+    if (!a || !b || !c) throw new Error('expected all three requests');
 
-    // Alpha sees its own 400 only; Bravo's 70 is not duplicated onto it, and neither is
-    // the shared case's spend multiplied by the number of staged requests.
+    // A: its own 400 once, plus the shared case's genuine Kilo cover (non-zero).
     expect(a.chargedMicrodollars).toBe(400);
     expect(a.billedModelRequests).toBe(1);
-    // Only A's own model request is a payer of A; B's request is not in A's list.
+    expect(a.kiloCoveredModelRequests).toBe(2);
+    expect(a.kiloCoveredMicrodollars).toBe(400);
     expect(a.payers.filter(payer => payer.kind === 'user')).toHaveLength(1);
-    expect(a.payers[0]).toMatchObject({ ownerId: 'u1', chargedMicrodollars: 400 });
-    // Alpha's own call was the paid one, so it shows no Kilo coverage.
-    expect(a.kiloCoveredMicrodollars).toBe(0);
+    expect(a.payers.find(payer => payer.kind === 'user')).toMatchObject({
+      ownerId: 'u1',
+      chargedMicrodollars: 400,
+    });
+    // The platform row is the request-level Kilo cover, reported apart from the charge.
+    expect(a.payers.find(payer => payer.kind === 'platform')).toMatchObject({
+      kiloCoveredModelRequests: 2,
+      kiloCoveredMicrodollars: 400,
+    });
 
+    // B: its own 70 once, and the SAME shared cover visible from its side.
     expect(b.chargedMicrodollars).toBe(70);
     expect(b.billedModelRequests).toBe(1);
+    expect(b.kiloCoveredModelRequests).toBe(2);
+    expect(b.kiloCoveredMicrodollars).toBe(400);
     expect(b.payers.filter(payer => payer.kind === 'user')).toHaveLength(1);
-    expect(b.payers[0]).toMatchObject({ ownerId: 'u2', chargedMicrodollars: 70 });
-    // A covered call has no paying pool request, so it is not attributed to either owner's
-    // payer rows: neither request gains a platform payer row of its own.
-    expect(a.payers.map(payer => payer.kind)).not.toContain('platform');
-    expect(b.payers.map(payer => payer.kind)).not.toContain('platform');
+    expect(b.payers.find(payer => payer.kind === 'user')).toMatchObject({
+      ownerId: 'u2',
+      chargedMicrodollars: 70,
+    });
+
+    // C: unrelated. Its own 900 only, and its own case's cover only (never the sharers').
+    expect(c.chargedMicrodollars).toBe(900);
+    expect(c.billedModelRequests).toBe(1);
+    expect(c.kiloCoveredModelRequests).toBe(1);
+    expect(c.kiloCoveredMicrodollars).toBe(1_000);
+    expect(c.payers.find(payer => payer.kind === 'user')).toMatchObject({
+      ownerId: 'u3',
+      chargedMicrodollars: 900,
+    });
+    expect(c.payers.find(payer => payer.kind === 'platform')).toMatchObject({
+      kiloCoveredModelRequests: 1,
+      kiloCoveredMicrodollars: 1_000,
+    });
+
+    // The single-request read agrees with the list read for every one of the three.
+    for (const expected of [a, b, c]) {
+      expect(await readPaidBenchmarkAdminRequest(db, expected.id)).toEqual(expected);
+    }
+  });
+
+  it('reports no Kilo cover for a case whose only result was reused', async () => {
+    // A reused row is a historical result, not live coverage: the owner progress reader
+    // excludes it, and the admin reads must agree so a settled case never shows as covered.
+    insertRequest();
+    insertCase(REQUEST, 'case-shared', 'reused');
+    insertModelRequest('model-request-cov', 'case-shared', {
+      platformCovered: true,
+      state: 'completed',
+    });
+    insertUsage('usage-cov', 'model-request-cov', 'case-shared', {
+      microdollars: 250,
+      platformCovered: true,
+      requestId: '',
+    });
+
+    const request = await readPaidBenchmarkAdminRequest(db, REQUEST);
+    expect(request?.kiloCoveredModelRequests).toBe(0);
+    expect(request?.kiloCoveredMicrodollars).toBe(0);
+    expect(request?.chargedMicrodollars).toBe(0);
+  });
+
+  it('ties a detach reason to the request that was refused, not the later winner', async () => {
+    // A model request was first tried for request-b (refused for no funds) and only then
+    // won by u1 for the main request. The trail must stay with request-b, where the payer
+    // set shrank; the main request keeps its accepted payer only.
+    insertRequest();
+    insertRequest({ id: 'request-b', ownerId: 'u2', routerId: 'router-2' });
+    insertCase(REQUEST, 'case-shared', 'done');
+    insertCase('request-b', 'case-shared', 'done');
+    insertModelRequest('model-request-won', 'case-shared', { ownerId: 'u1' });
+    insertUsage('usage-won', 'model-request-won', 'case-shared', { microdollars: 400 });
+    sqlite
+      .prepare(
+        `INSERT INTO paid_model_request_attempts (
+          model_request_id, assignment_id, owner_type, owner_id, pool_request_id, status,
+          reason, ordinal, created_at, updated_at
+        ) VALUES ('model-request-won', 'assignment-refused', 'user', 'u2', 'request-b',
+          'refused', 'insufficient_balance', 0, ?, ?)`
+      )
+      .run('2026-11-20T12:00:00.000Z', '2026-11-20T12:00:00.000Z');
+
+    const a = await readPaidBenchmarkAdminRequest(db, REQUEST);
+    const b = await readPaidBenchmarkAdminRequest(db, 'request-b');
+    // The winner's request shows no detach trail: nothing of its own was refused.
+    expect(a?.payers).toEqual([
+      expect.objectContaining({ kind: 'user', ownerId: 'u1', chargedMicrodollars: 400 }),
+    ]);
+    // The refused request carries the reason though it billed nothing.
+    expect(b?.payers).toEqual([
+      expect.objectContaining({
+        kind: 'user',
+        ownerId: 'u2',
+        chargedMicrodollars: 0,
+        detachReason: 'insufficient_balance',
+      }),
+    ]);
+    expect(b?.chargedMicrodollars).toBe(0);
+  });
+
+  it('never reports a reclaimed generation\'s Kilo cover on the newer user generation', async () => {
+    // The exact edge: Kilo covered generation 1 and its admitted call was billed to Kilo,
+    // then the slot was paused and RECLAIMED as generation 2, which a user request now
+    // pays exclusively. Generation 1's covered receipt must not appear as cover (or spend)
+    // on the request paying generation 2.
+    insertRequest();
+    // The run is currently on generation 2 and is no longer platform covered.
+    insertCase(REQUEST, 'case-shared', 'running', { generation: 2 });
+    // Generation 1: a Kilo-covered receipt (no paying request).
+    insertModelRequest('model-request-old', 'case-shared', {
+      platformCovered: true,
+      state: 'completed',
+    });
+    sqlite
+      .prepare(`UPDATE paid_model_requests SET generation = 1 WHERE id = 'model-request-old'`)
+      .run();
+    insertUsage('usage-old', 'model-request-old', 'case-shared', {
+      microdollars: 500,
+      platformCovered: true,
+      requestId: '',
+    });
+    sqlite.prepare(`UPDATE paid_attempt_usage SET generation = 1 WHERE usage_id = 'usage-old'`).run();
+    // Generation 2: this request's own billed call on the same slot.
+    insertModelRequest('model-request-new', 'case-shared', { ownerId: 'u1', requestId: REQUEST });
+    sqlite
+      .prepare(`UPDATE paid_model_requests SET generation = 2 WHERE id = 'model-request-new'`)
+      .run();
+    insertUsage('usage-new', 'model-request-new', 'case-shared', {
+      microdollars: 120,
+      ownerId: 'u1',
+      requestId: REQUEST,
+    });
+    sqlite.prepare(`UPDATE paid_attempt_usage SET generation = 2 WHERE usage_id = 'usage-new'`).run();
+
+    const request = await readPaidBenchmarkAdminRequest(db, REQUEST);
+    // Only its own generation-2 charge; the cancelled generation's Kilo spend is not cover.
+    expect(request?.chargedMicrodollars).toBe(120);
+    expect(request?.billedModelRequests).toBe(1);
+    expect(request?.kiloCoveredModelRequests).toBe(0);
+    expect(request?.kiloCoveredMicrodollars).toBe(0);
+    expect(request?.payers.map(payer => payer.kind)).toEqual(['user']);
+  });
+
+  it('keeps an earlier user refusal visible after the same request reselects platform', async () => {
+    // A model request was refused for u2 while trying request-b, then the SAME row was
+    // reselected as platform-covered. Scoping the trail by `m.platform_covered = 0` would
+    // erase that earlier detachment; the refusal's own signed account scope is valid
+    // evidence and must still show on request-b at zero charge.
+    insertRequest();
+    insertRequest({ id: 'request-b', ownerId: 'u2', routerId: 'router-2' });
+    insertCase(REQUEST, 'case-shared', 'done');
+    insertCase('request-b', 'case-shared', 'running');
+    insertModelRequest('model-request-flip', 'case-shared', {
+      platformCovered: true,
+      state: 'admitted',
+    });
+    sqlite
+      .prepare(
+        `INSERT INTO paid_model_request_attempts (
+          model_request_id, assignment_id, owner_type, owner_id, pool_request_id, status,
+          reason, ordinal, created_at, updated_at
+        ) VALUES ('model-request-flip', 'assignment-refused', 'user', 'u2', 'request-b',
+          'refused', 'insufficient_balance', 0, ?, ?)`
+      )
+      .run('2026-11-20T12:00:00.000Z', '2026-11-20T12:00:00.000Z');
+    const b = await readPaidBenchmarkAdminRequest(db, 'request-b');
+    // The earlier detachment is the only payer evidence for b, and it bills nothing.
+    expect(b?.payers).toEqual([
+      expect.objectContaining({
+        kind: 'user',
+        ownerId: 'u2',
+        chargedMicrodollars: 0,
+        detachReason: 'insufficient_balance',
+      }),
+    ]);
+    expect(b?.chargedMicrodollars).toBe(0);
   });
 
   it('maps an organization owner to the shared org kind', async () => {
@@ -537,20 +751,17 @@ async function seedAdmittingCase() {
       '2026-11-20T12:00:00.000Z',
       '2026-11-20T12:00:00.000Z'
     );
+  // The fixture's case run becomes the one this admission runs under, with the executor
+  // the store's claim fence expects.
   sqlite
     .prepare(
-      `INSERT INTO benchmark_case_runs (
-        engine_identity, model, variant, rep, case_id, status, generation, executor_run_id,
-        executor_token, platform_covered, result_usable, created_at, updated_at, started_at
-      ) VALUES (?, 'openai/gpt-test', '', 0, 'case-1', 'running', 1, 'exec-1', 'token-1',
-        0, 0, ?, ?, ?)`
+      `UPDATE benchmark_case_runs
+      SET status = 'running', executor_run_id = 'exec-1', executor_token = 'token-1',
+        started_at = ?
+      WHERE engine_identity = ? AND model = 'openai/gpt-test' AND variant = ''
+        AND rep = 0 AND case_id = 'case-1'`
     )
-    .run(
-      ENGINE,
-      '2026-11-20T12:00:00.000Z',
-      '2026-11-20T12:00:00.000Z',
-      '2026-11-20T12:00:00.000Z'
-    );
+    .run('2026-11-20T12:00:00.000Z', ENGINE);
   await db.batch(
     selectPaidModelRequestPayerStatements(db, {
       key: caseKey(),

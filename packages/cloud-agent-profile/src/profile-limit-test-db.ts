@@ -20,6 +20,9 @@ export type LimitTestProfileRow = {
   isDefault: boolean;
 };
 
+/** One stored setup command: its text and the sequence the service assigned. */
+export type StoredCommandRow = { command: string; sequence: number };
+
 /** One `update` the fake executed, with its condition and the rows it matched. */
 export type LimitTestDefaultWrite = {
   isDefault: boolean;
@@ -112,19 +115,22 @@ function equalitiesOf(condition: unknown): ReadonlyArray<{ column: string; value
 }
 
 /**
- * The command text of one inserted command row. The fake only ever receives
- * the row the service builds, so an absent string is a bug worth throwing on.
+ * One inserted command row: its text and the sequence the service assigned.
+ * The fake only ever receives the row the service builds, so an absent string
+ * or sequence is a bug worth throwing on.
  */
-function commandOf(row: unknown): string {
+function commandRowOf(row: unknown): StoredCommandRow {
   if (
     typeof row === 'object' &&
     row !== null &&
     'command' in row &&
-    typeof row.command === 'string'
+    typeof row.command === 'string' &&
+    'sequence' in row &&
+    typeof row.sequence === 'number'
   ) {
-    return row.command;
+    return { command: row.command, sequence: row.sequence };
   }
-  throw new Error('profile limit test db: command row without command text');
+  throw new Error('profile limit test db: command row without command text and sequence');
 }
 
 /** The key of one inserted variable row, when it carries one. */
@@ -155,7 +161,9 @@ function keyOf(row: unknown): string | undefined {
  * keys the profile already holds, `state.profileRows` is the current profile
  * rows, `state.defaultWrites` the `update`s this fake executed,
  * `state.profileInserts` the profile rows it inserted, and `initialCommands` /
- * `state.commands` the setup commands the profile holds, with
+ * `state.commands` the setup commands the profile holds in list order, with
+ * `state.commandRows` the same rows carrying the sequence each one was written
+ * under, `state.commandInserts` the command `insert`s it executed, and
  * `state.commandDeletes` counting the whole-list deletes.
  */
 export function createLimitTestDb(
@@ -168,7 +176,10 @@ export function createLimitTestDb(
   let nextId = 0;
   let upserts = 0;
   let profileInserts = 0;
-  let storedCommands: string[] = [...initialCommands];
+  let storedCommandRows: StoredCommandRow[] = initialCommands.map((command, sequence) => ({
+    command,
+    sequence,
+  }));
   const varKeys = new Set(initialVarKeys);
   const profileRows: LimitTestProfileRow[] = initialProfiles.map(row => ({ ...row }));
   const defaultWrites: LimitTestDefaultWrite[] = [];
@@ -188,13 +199,19 @@ export function createLimitTestDb(
     },
     /** The stored setup commands of the profile, in list order. */
     get commands(): readonly string[] {
-      return [...storedCommands];
+      return storedCommandRows.map(row => row.command);
+    },
+    /** The stored command rows with the sequence each one was written under. */
+    get commandRows(): readonly StoredCommandRow[] {
+      return storedCommandRows.map(row => ({ ...row }));
     },
     defaultWrites,
     lockCalls: 0,
     /** `execute`d statements, counted because the creation lock is one. */
     advisoryLocks: 0,
     commandDeletes: 0,
+    /** Command `insert`s this fake executed; a whole-list replace may run none. */
+    commandInserts: 0,
   };
 
   let tail: Promise<unknown> = Promise.resolve();
@@ -228,7 +245,8 @@ export function createLimitTestDb(
       const commit = (): Promise<unknown> => {
         if (table === agent_environment_profile_commands) {
           const rows = Array.isArray(row) ? row : [row];
-          storedCommands = rows.map(commandOf);
+          state.commandInserts += 1;
+          storedCommandRows = rows.map(commandRowOf);
           return Promise.resolve();
         }
         if (table === agent_environment_profile_vars) {
@@ -267,7 +285,7 @@ export function createLimitTestDb(
     where: (): Promise<void> => {
       if (table === agent_environment_profile_commands) {
         state.commandDeletes += 1;
-        storedCommands = [];
+        storedCommandRows = [];
         return Promise.resolve();
       }
       throw new Error('profile limit test db: unexpected delete');

@@ -92,7 +92,7 @@ export {
 export {
   MAX_PROFILE_COMMANDS,
   MAX_PROFILE_COMMAND_LENGTH,
-  assertWritableCommands,
+  writableCommands,
   setCommands,
   listCommands,
   getCommandsForSession,

@@ -12,7 +12,7 @@ import {
   type ProfileNetworkSecretPolicy,
 } from './profile-vars-service';
 import { assertNetworkSecretKeySpace } from './network-secret-storage';
-import { assertWritableCommands } from './profile-commands-service';
+import { writableCommands } from './profile-commands-service';
 import { applyDefaultProfile, insertProfileRow } from './profile-service';
 
 /** One variable offered at creation, before any at-rest transformation. */
@@ -81,9 +81,8 @@ export async function createProfileWithContent(
   input: ProfileCreateInput
 ): Promise<{ id: string }> {
   const vars = input.vars ?? [];
-  const commands = input.commands ?? [];
   assertCreatableVars(vars);
-  assertWritableCommands(commands);
+  const stored = writableCommands(input.commands ?? []);
 
   return await db.transaction(async tx => {
     const profileId = await insertProfileRow(
@@ -103,9 +102,9 @@ export async function createProfileWithContent(
       );
     }
 
-    if (commands.length > 0) {
+    if (stored.length > 0) {
       await tx.insert(agent_environment_profile_commands).values(
-        commands.map((command, index) => ({
+        stored.map((command, index) => ({
           profile_id: profileId,
           sequence: index,
           command,

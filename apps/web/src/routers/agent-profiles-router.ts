@@ -63,6 +63,8 @@ const VarSchema = z.object({
   networkSecret: networkSecretPolicySchema.optional(),
 });
 
+// Whitespace-only rows are dropped by the service before it writes, so the
+// schema stays permissive and a stored list can always be re-sent as-is.
 const CommandsSchema = z.object({
   commands: z
     .array(z.string().max(profileCommandsService.MAX_PROFILE_COMMAND_LENGTH))

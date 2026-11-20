@@ -51,17 +51,31 @@ describe('createProfileWithContent command bounds', () => {
     expect(state.commands).toEqual([]);
   });
 
-  test('refuses an empty command without storing anything', async () => {
+  test('drops a blank command and stores the rest without storing anything else', async () => {
     const { db, state } = createLimitTestDb(0);
 
     await expect(
       createProfileWithContent(db, '', OWNER, OWNER.id, {
-        name: 'Empty Command',
-        commands: ['npm ci', ''],
+        name: 'Blank Command',
+        commands: ['', 'npm ci'],
       })
-    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+    ).resolves.toEqual({ id: expect.any(String) });
 
-    expect(state.profileInserts).toBe(0);
+    expect(state.profileInserts).toBe(1);
+    expect(state.commandRows).toEqual([{ command: 'npm ci', sequence: 0 }]);
+  });
+
+  test('stores no command rows when every command is blank', async () => {
+    const { db, state } = createLimitTestDb(0);
+
+    await expect(
+      createProfileWithContent(db, '', OWNER, OWNER.id, {
+        name: 'All Blank',
+        commands: ['', '   '],
+      })
+    ).resolves.toEqual({ id: expect.any(String) });
+
+    expect(state.profileInserts).toBe(1);
     expect(state.commands).toEqual([]);
   });
 
@@ -129,5 +143,55 @@ describe('setCommands command bounds', () => {
 
     expect(state.commandDeletes).toBe(1);
     expect(state.commands).toEqual(atCap);
+  });
+
+  test('drops blank commands and renumbers the stored sequence', async () => {
+    const { db, state } = createLimitTestDb(0, [], [], ['npm ci']);
+
+    await expect(
+      setCommands(db, TEST_PROFILE_ID, ['npm ci', '', '  ', 'npm test'], OWNER)
+    ).resolves.toBeUndefined();
+
+    expect(state.commandDeletes).toBe(1);
+    expect(state.commandInserts).toBe(1);
+    expect(state.commandRows).toEqual([
+      { command: 'npm ci', sequence: 0 },
+      { command: 'npm test', sequence: 1 },
+    ]);
+  });
+
+  test('deletes the stored list and inserts nothing when every command is blank', async () => {
+    const { db, state } = createLimitTestDb(0, [], [], ['npm ci', 'npm test']);
+
+    await expect(setCommands(db, TEST_PROFILE_ID, ['', '   '], OWNER)).resolves.toBeUndefined();
+
+    expect(state.commandDeletes).toBe(1);
+    expect(state.commandInserts).toBe(0);
+    expect(state.commands).toEqual([]);
+  });
+
+  test('accepts a list at the cap once blank commands are dropped', async () => {
+    const { db, state } = createLimitTestDb(0, [], [], ['npm ci']);
+    const atCap = commandsAtCap();
+    const withBlanks = [...atCap, '', '  '];
+
+    await expect(setCommands(db, TEST_PROFILE_ID, withBlanks, OWNER)).resolves.toBeUndefined();
+
+    expect(state.commandDeletes).toBe(1);
+    expect(state.commands).toEqual(atCap);
+  });
+
+  test('refuses when the commands that survive dropping blanks exceed the cap', async () => {
+    const stored = ['npm ci'];
+    const { db, state } = createLimitTestDb(0, [], [], stored);
+    const overCap = [...Array.from({ length: MAX_PROFILE_COMMANDS + 1 }, () => 'npm ci'), '', '  '];
+
+    await expect(setCommands(db, TEST_PROFILE_ID, overCap, OWNER)).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: `Profiles are limited to ${String(MAX_PROFILE_COMMANDS)} setup commands`,
+    });
+
+    expect(state.commandDeletes).toBe(0);
+    expect(state.commands).toEqual(stored);
   });
 });

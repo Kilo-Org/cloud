@@ -23,6 +23,26 @@ const TRAILING_CONTROL_CLASS = 'shrink-0 rounded-lg bg-muted-soft';
  */
 const TRAILING_SWITCH_CLASS = 'h-[31px] w-[51px] shrink-0 rounded-full bg-muted-soft';
 
+type SwitchPlaceholderProps = {
+  /** Layout only: never another background, radius or size. */
+  className?: string;
+};
+
+/**
+ * Reserves the loaded switch's layout band with the control's own pill shape.
+ *
+ * The host is the frame the switch contributes to the row's layout, so a row
+ * that waits for a preference value keeps the height it takes once the value
+ * lands; the pill inside paints the control's own 51x31pt shape in that frame.
+ */
+export function SwitchPlaceholder({ className }: Readonly<SwitchPlaceholderProps>) {
+  return (
+    <View className={cn(SWITCH_HOST_CLASS, className)}>
+      <Skeleton className={TRAILING_SWITCH_CLASS} />
+    </View>
+  );
+}
+
 type RowSkeletonProps = {
   /** Reserve the 30pt leading tile of a row that leads with an icon. */
   tile?: boolean;
@@ -107,11 +127,7 @@ export function RowSkeleton({
           ) : (
             <View className="flex-1" />
           )}
-          {trailing === 'switch' ? (
-            <View className={SWITCH_HOST_CLASS}>
-              <Skeleton className={TRAILING_SWITCH_CLASS} />
-            </View>
-          ) : null}
+          {trailing === 'switch' ? <SwitchPlaceholder /> : null}
           {trailingControl ? (
             <Skeleton className={cn(COMPACT_CONTROL_BOX_CLASS, TRAILING_CONTROL_CLASS)} />
           ) : null}
@@ -133,11 +149,7 @@ export function RowSkeleton({
         {lineCount > 1 ? <Skeleton className={SUBTITLE_BAR_CLASS} /> : null}
         {lineCount > 2 ? <Skeleton className={SECOND_SUBTITLE_BAR_CLASS} /> : null}
       </View>
-      {trailing === 'switch' ? (
-        <View className={SWITCH_HOST_CLASS}>
-          <Skeleton className={TRAILING_SWITCH_CLASS} />
-        </View>
-      ) : null}
+      {trailing === 'switch' ? <SwitchPlaceholder /> : null}
       {trailingControl ? (
         <Skeleton className={cn(COMPACT_CONTROL_BOX_CLASS, TRAILING_CONTROL_CLASS)} />
       ) : null}

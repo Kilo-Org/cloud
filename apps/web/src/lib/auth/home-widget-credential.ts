@@ -118,9 +118,7 @@ export async function issueHomeWidgetCredential(
     widgetUserId: authority.user.id,
     apiTokenPepper: authority.user.api_token_pepper,
     organizationId,
-    ...(authority.deviceSessionId === undefined
-      ? {}
-      : { deviceSessionId: authority.deviceSessionId }),
+    deviceSessionId: authority.deviceSessionId,
     env: process.env.NODE_ENV,
     tokenPurpose: 'home-widget' as const,
     aud: HOME_WIDGET_AUDIENCE,

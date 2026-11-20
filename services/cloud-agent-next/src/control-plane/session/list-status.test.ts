@@ -3,12 +3,14 @@ import { decodeTime } from 'ulid';
 import {
   publishCloudAgentSessionStatusSchema,
   type PublishCloudAgentSessionStatusParams,
+  type SessionLiveSummary,
 } from '@kilocode/session-ingest-contracts';
 import {
   createSessionListStatusOutbox,
   deriveSessionListStatus,
   LIST_STATUS_RETRY_MS,
   LIST_STATUS_REFRESH_MS,
+  LIST_STATUS_SUMMARY_REFRESH_MS,
 } from './list-status.js';
 
 vi.mock('../../logger.js', () => ({
@@ -220,6 +222,77 @@ describe('session-list status outbox', () => {
       ['busy', rename],
       ['idle', rename],
       ['busy', undefined],
+    ]);
+  });
+
+  const editing = (target: string): SessionLiveSummary => ({
+    step: { verb: 'editing', target },
+    plan: null,
+    changes: null,
+    failure: null,
+  });
+
+  it('publishes the Kilo v2 summary and cost with every snapshot, the first summary at once', async () => {
+    const { outbox, publish } = fixture();
+    outbox.record(identity, 'busy', 1000);
+    await outbox.repair(1000);
+    outbox.record(identity, 'busy', 1001, {
+      transcript: { liveSummary: editing('index.ts'), totalCostMicrodollars: 100 },
+    });
+    await outbox.repair(1001);
+    // A higher cost under an unchanged summary waits for the next snapshot.
+    outbox.record(identity, 'busy', 1002, {
+      transcript: { liveSummary: editing('index.ts'), totalCostMicrodollars: 200 },
+    });
+    await outbox.repair(1002);
+    outbox.record(identity, 'idle', 1003, {
+      transcript: {
+        liveSummary: { step: null, plan: null, changes: null, failure: null },
+        totalCostMicrodollars: 200,
+      },
+    });
+    await outbox.repair(1003);
+    expect(
+      publish.mock.calls.map(([update]) => [
+        update.status,
+        update.liveSummary?.step ?? null,
+        update.totalCostMicrodollars,
+      ])
+    ).toEqual([
+      ['busy', null, undefined],
+      ['busy', { verb: 'editing', target: 'index.ts' }, 100],
+      ['idle', null, 200],
+    ]);
+    expect(publish.mock.calls[0]?.[0]).not.toHaveProperty('liveSummary');
+  });
+
+  it('refreshes a changed Kilo v2 summary under an unchanged status at most once per summary window', async () => {
+    const { outbox, publish } = fixture();
+    const transcript = (target: string) => ({
+      transcript: { liveSummary: editing(target), totalCostMicrodollars: 0 },
+    });
+    outbox.record(identity, 'busy', 1000, transcript('first.ts'));
+    await outbox.repair(1000);
+    outbox.record(
+      identity,
+      'busy',
+      1000 + LIST_STATUS_SUMMARY_REFRESH_MS - 1,
+      transcript('next.ts')
+    );
+    await outbox.repair(1000 + LIST_STATUS_SUMMARY_REFRESH_MS - 1);
+    outbox.record(identity, 'busy', 1000 + LIST_STATUS_SUMMARY_REFRESH_MS, transcript('last.ts'));
+    await outbox.repair(1000 + LIST_STATUS_SUMMARY_REFRESH_MS);
+    // An unchanged summary does not refresh on the summary window.
+    outbox.record(
+      identity,
+      'busy',
+      1000 + 3 * LIST_STATUS_SUMMARY_REFRESH_MS,
+      transcript('last.ts')
+    );
+    await outbox.repair(1000 + 3 * LIST_STATUS_SUMMARY_REFRESH_MS);
+    expect(publish.mock.calls.map(([update]) => update.liveSummary?.step?.target)).toEqual([
+      'first.ts',
+      'last.ts',
     ]);
   });
 

@@ -21,11 +21,13 @@ describe('parseDeviceAuthCodeResponse', () => {
         user_code: 'USER-123',
         device_code: 'device-secret',
         verificationUrl: 'https://app.kilo.ai/device-auth?code=USER-123',
+        expiresIn: 600,
       })
     ).toEqual({
       userCode: 'USER-123',
       deviceCode: 'device-secret',
       verificationUrl: 'https://app.kilo.ai/device-auth?code=USER-123',
+      expiresIn: 600,
     });
   });
 

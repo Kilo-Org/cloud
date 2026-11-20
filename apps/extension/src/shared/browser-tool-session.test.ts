@@ -555,6 +555,21 @@ describe('browser tool session', () => {
     ]);
   });
 
+  it('takes back the debugger attachment a stopped service worker left on the tab', async () => {
+    const { debuggerApi, session } = createSession();
+    // Chrome keeps the extension's debugger on the tab when it stops the worker, and refuses the new worker's attach.
+    const refused = new Error('Another debugger is already attached to the tab with id: 7.');
+    const attach = vi.fn(debuggerApi.api.attach).mockRejectedValueOnce(refused);
+
+    Object.assign(debuggerApi.api, { attach });
+
+    await session.send('Runtime.evaluate', { expression: '1 + 1' });
+
+    expect(session.isAttached()).toBe(true);
+    expect(debuggerApi.detachCalls).toStrictEqual([7]);
+    expect(debuggerApi.attachCalls).toStrictEqual([7]);
+  });
+
   it('keeps one ref registry per caller so snapshots do not invalidate each other', async () => {
     const { session } = createSession();
     const first = session.bindCaller('panel:panel-1:conversation-1');

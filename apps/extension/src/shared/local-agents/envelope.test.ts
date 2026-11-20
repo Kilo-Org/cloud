@@ -28,6 +28,7 @@ describe('contract identity', () => {
         console: true,
         dialogs: true,
         fileUpload: true,
+        keepalive: true,
         network: true,
         tabGroups: true,
         trustedInput: true,
@@ -49,6 +50,12 @@ describe('incoming frame routing', () => {
     expect(
       parseIncomingEnvelope({ controllerId: CONTROLLER_ID, type: 'controller.disconnected' })
     ).toStrictEqual({ controllerId: CONTROLLER_ID, type: 'controller.disconnected' });
+  });
+
+  it('accepts the hub keepalive instead of dropping the connection over it', () => {
+    expect(parseIncomingEnvelope({ type: 'hub.keepalive' })).toStrictEqual({
+      type: 'hub.keepalive',
+    });
   });
 
   it('routes a JSON-RPC request inside an rpc envelope', () => {
@@ -79,6 +86,7 @@ describe('incoming frame routing', () => {
           console: true,
           dialogs: true,
           fileUpload: true,
+          keepalive: true,
           network: true,
           tabGroups: true,
           trustedInput: true,

@@ -80,7 +80,10 @@ vi.mock('@/components/empty-state', () => ({
 }));
 // The workspace row has its own suite (`chat-list-screen.workspace.mounted.test.tsx`);
 // here it is stubbed so these assertions stay about starting a chat.
-vi.mock('@/components/context-control', () => ({ ContextControl: () => null }));
+vi.mock('@/components/context-control', () => ({
+  CONTEXT_CONTROL_INLINE_MIN_DP: 21,
+  ContextControl: () => null,
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));

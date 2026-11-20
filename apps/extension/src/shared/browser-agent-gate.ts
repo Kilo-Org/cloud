@@ -108,6 +108,12 @@ interface TargetFrame {
   /** The target sits in a child frame, not the tab's top-level document. */
   readonly frame: boolean;
   readonly origin: string;
+  /**
+   * The document holding a targeted frame element: a tool on an `<iframe>`
+   * runs in, reads or captures its owner's document, so the call needs that
+   * document's grant as well as the hosted frame's.
+   */
+  readonly owner?: { readonly frame: boolean; readonly origin: string };
 }
 
 /**
@@ -290,8 +296,17 @@ const targetFrameOf = async (
   if ((nodeName === 'FRAME' || nodeName === 'IFRAME') && ownerBackendNodeId !== undefined) {
     const hosted = await frameWithOwnerNode(session, frames, ownerBackendNodeId);
 
+    const owning = await frameOwningNode(session, frames, ownerBackendNodeId);
+
     // A frame owner whose frame this tab cannot see (an out-of-process iframe, a frame still loading) has no origin the gate can judge.
-    return { frame: true, origin: hosted?.origin ?? OPAQUE_ORIGIN };
+    return {
+      frame: true,
+      origin: hosted?.origin ?? OPAQUE_ORIGIN,
+      owner:
+        owning === undefined
+          ? { frame: true, origin: OPAQUE_ORIGIN }
+          : { frame: owning.parentId !== undefined, origin: owning.origin },
+    };
   }
 
   // A selector is answered by the tab's own document root, so it can only name a node there.
@@ -606,9 +621,17 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
       : { frame: primaryTargetFrame.frame, origin: primaryTargetFrame.origin };
   const origin = destinationOrigin ?? targetFrame?.origin ?? mainOrigin;
   const targetOriginFrame = grantClass !== 'navigate' && targetFrame?.frame === true;
-  // Every named target's frame needs the grant, not only the tab's top-level origin.
-  const requiredOrigins = new Set<string>(targetFrames.map(frame => frame.origin));
-  const frameByOrigin = new Map(targetFrames.map(frame => [frame.origin, frame.frame]));
+  // Every named target's frame needs the grant, not only the tab's top-level origin, and so does the document a tool on a frame element runs in.
+  const requiredFrames = targetFrames.flatMap(frame =>
+    frame.owner === undefined ? [frame] : [frame.owner, frame]
+  );
+  const requiredOrigins = new Set<string>(requiredFrames.map(frame => frame.origin));
+  // An origin is labelled a frame only when no required document of that origin is the tab's top-level one: a same-site iframe's grant also covers its owner page.
+  const frameByOrigin = new Map<string, boolean>();
+
+  for (const frame of requiredFrames) {
+    frameByOrigin.set(frame.origin, (frameByOrigin.get(frame.origin) ?? true) && frame.frame);
+  }
 
   if (requiredOrigins.size === 0) {
     requiredOrigins.add(origin);
@@ -712,19 +735,28 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
 
 /**
  * The post-action check for a navigate: a redirect moved the tab to another
- * origin than the one the navigation was approved for. The caller must ask for
- * that origin and decide whether to stay.
+ * origin than the one the navigation was approved for. A landing origin the
+ * call may already open or read is the redirect's answer; any other origin
+ * must be asked for before the tab may stay there.
  */
 export const postAgentNavigate = async (
   session: Pick<BrowserToolPageSession, 'isolatedProbe' | 'send'>,
-  approvedOrigin: string
+  approvedOrigin: string,
+  authorized: readonly BrowserGrant[]
 ): Promise<BrowserOriginChanged | undefined> => {
   const frames = await readAgentFrameTree(session);
   const finalOrigin = mainFrameOf(frames)?.origin;
 
-  return finalOrigin === undefined || finalOrigin === approvedOrigin
-    ? undefined
-    : { from: approvedOrigin, kind: 'origin_changed', to: finalOrigin };
+  if (
+    finalOrigin === undefined ||
+    finalOrigin === approvedOrigin ||
+    isOriginGranted(authorized, 'navigate', finalOrigin) ||
+    isOriginGranted(authorized, 'read', finalOrigin)
+  ) {
+    return undefined;
+  }
+
+  return { from: approvedOrigin, kind: 'origin_changed', to: finalOrigin };
 };
 
 /**

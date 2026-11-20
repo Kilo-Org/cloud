@@ -505,7 +505,7 @@
     "changelogFixesPolish": "Butun ilova bo‘ylab tuzatishlar va yaxshilanishlar.",
     "changelogAreas": {
       "signIn": "Kirish",
-      "profileOrganizations": "Profil va tashkilotlar"
+      "profileOrganizations": "Profil hamda tashkilotlar"
     }
   },
   "preferences": {

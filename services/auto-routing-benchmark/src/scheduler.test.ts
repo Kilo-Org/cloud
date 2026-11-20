@@ -5,6 +5,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import {
+  acquireInitializationLease,
   beginPaidCase,
   claimScheduledChunks,
   clearUnbilledCase,
@@ -418,6 +419,28 @@ describe('scheduler (production migrations and real SQLite)', () => {
     expect(
       sqlite.prepare('SELECT token, lease_until FROM scheduler_dispatch_lock WHERE id = 1').get()
     ).toEqual({ token: null, lease_until: 0 });
+  });
+
+  it('takes no dispatch lease while a deploy intent is fresh and resumes once it expires', async () => {
+    insertRun(sqlite, 'intent');
+    await scheduleRunChunks(db, {
+      runId: 'intent',
+      entries: independentEntries(2),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":2}');
+    sqlite
+      .prepare('INSERT INTO scheduler_dispatch_lock (id, token, lease_until) VALUES (3, ?, ?)')
+      .run('deploy-intent-fixture', NOW + 1_000);
+    expect(await claimScheduledChunks(db, config, NOW, 'during-intent')).toEqual([]);
+    expect(liveChunks(sqlite)).toEqual([]);
+    expect(
+      sqlite.prepare('SELECT token, lease_until FROM scheduler_dispatch_lock WHERE id = 1').get()
+    ).toEqual({ token: null, lease_until: 0 });
+    expect(await acquireInitializationLease(db, 'init-during-intent', NOW)).toBe(true);
+    expect(await claimScheduledChunks(db, config, NOW + 1_000, 'after-intent')).toHaveLength(2);
   });
 
   it('claims from a 100k-chunk backlog in one bounded pass', async () => {

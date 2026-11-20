@@ -248,9 +248,43 @@ Terminal scheduler rows are pruned in bounded batches after 24 hours. Benchmark 
 completed case results, and pending outputs remain available for compatible reuse.
 
 Production benchmark deploys use `pnpm run deploy`. The wrapper holds the scheduler dispatch
-lease, waits until no queued or active chunks remain, applies D1 migrations, deploys, then
-releases the lease. It renews the lease throughout and fails closed when draining exceeds
-its limit. It never pauses or resumes operator-controlled queues.
+lease, waits until no active chunks and no queued chunks with an unexpired queue lease remain,
+applies D1 migrations, deploys, waits for the container rollout to finish, then releases the
+lease. A queued claim whose queue lease expired cannot start, so it does not hold the drain;
+`recoverChunks` returns it to pending. It renews the lease throughout and fails closed when
+draining exceeds its limit. It never pauses or resumes operator-controlled queues.
+
+Busy dispatch takes the lease back as soon as each pass releases it, so the wrapper first writes
+a deploy intent: `scheduler_dispatch_lock` row 3 with a `deploy-intent-` token and a lease that
+ends with the wrapper's lock wait (`BENCHMARK_DEPLOY_LOCK_TIMEOUT_MS`, 60 seconds by default).
+While that lease is unexpired, no dispatch pass takes row 1, so the wrapper takes it when the
+current pass ends, at most one dispatch lease (20 seconds) later. It retries at the poll interval
+(`BENCHMARK_DEPLOY_POLL_INTERVAL_MS`, 5 seconds), or sooner when the holder's lease ends, and
+clears the intent once it holds row 1 or gives up; a dead wrapper's intent expires with its lock
+wait. A worker deployed before this change ignores the intent: if dispatch is busy, deploy it
+under an operator pause.
+
+Each deploy records a hash of the container inputs (the `containers` configuration, each local
+image's Dockerfile, and every file in its build context, even when the Dockerfile sits outside
+that context) as the Worker version message
+`container-inputs:<sha256>`. The rolled-out hash is the message of the Worker version that was
+live when the container application last changed, so a deploy whose image never reached the
+containers is not trusted. When the rolled-out hash matches, the wrapper deploys with
+`--containers-rollout none`, so running containers are not replaced. A different, missing or
+unreadable hash deploys with the configured rollout, and a failed deploy without a rollout is
+retried with it. After a rolling deploy the wrapper polls `wrangler containers info` until the
+application has no `active_rollout_id`, for at most `BENCHMARK_DEPLOY_ROLLOUT_TIMEOUT_MS`
+(15 minutes by default), and then releases the lease either way.
+
+When the rolled-out hash matches and every file in `migrations/` is recorded in
+`d1_migrations`, the wrapper deploys without the lease and without draining. In-flight
+invocations finish on the version that accepted them. Each `BenchRunnerContainer` keeps its old
+code until its deferred code update resets it (at most 5 minutes after the deploy); the reset
+drops the Durable Object's request to the container, but the container keeps the case running
+and posts the result to `/container/case-result`, and the chunk waits for that output. A drained
+deploy does not avoid that reset either: it lands after the lease is released, on work
+dispatched since. A pending or unreadable migration list, or an unknown hash, takes the full
+drained path.
 
 An operator pauses dispatch by holding `scheduler_dispatch_lock` row 1 with a token that starts
 with `operator-pause-` and an unexpired lease. The wrapper treats that row as the dispatch hold:

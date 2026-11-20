@@ -2,6 +2,7 @@ batch	tier	phase	matrix	platforms	state	force	link	kind	screen
 Gauth	T1	signed-out	standard	android,ios	happy	-	kiloapp:///(auth)/design-system-fixture	screen	(auth)/design-system-fixture
 T1-G02	T1	signed-in	standard	android,ios	happy	-	kiloapp:///(app)/(tabs)/(0_home)	screen	(app)/(tabs)/(0_home)
 T1-G02	T1	signed-in	standard	android,ios	happy	-	kiloapp:///(app)/(tabs)/(2_agents)	screen	(app)/(tabs)/(2_agents)
+T1-G02	T1	signed-in	standard	android,ios	happy	-	kiloapp:///(app)/(tabs)/(2_agents)?view=todos	screen	(app)/(tabs)/(2_agents)
 T1-G02	T1	signed-in	standard	android,ios	happy	-	kiloapp:///(app)/(tabs)/(2_agents)/history	screen	(app)/(tabs)/(2_agents)/history
 T1-G02	T1	signed-in	standard	android,ios	happy	-	kiloapp:///(app)/(tabs)/(4_chat)	screen	(app)/(tabs)/(4_chat)
 T1-G02	T1	signed-in	standard	android,ios	happy	-	kiloapp:///(app)/(tabs)/(3_profile)	screen	(app)/(tabs)/(3_profile)
@@ -163,7 +164,7 @@ T2-G17c	T2	signed-in	base	android,ios	long-content	-	kiloapp:///dev/instance-pic
 T2-G18	T2	signed-in	base	android,ios	happy	-	kiloapp:///(app)/voice-language-picker	screen	(app)/voice-language-picker
 T2-G18	T2	signed-in	base	android,ios	non-retryable-error	-	kiloapp:///(app)/share-gate?shareId=not-a-seeded-share	not-found	(app)/share-gate
 T2-G18	T2	signed-in	base	android,ios	non-retryable-error	-	kiloapp:///(app)/todos/item/not-a-seeded-item	not-found	(app)/todos/item/[item-id]
-T2-G18	T2	signed-in	base	android,ios	non-retryable-error	-	kiloapp:///dev/context-picker-fixture	screen	(app)/context-picker
+T2-G18	T2	signed-in	base	android,ios	happy	-	kiloapp:///dev/context-picker-fixture	screen	(app)/context-picker
 T2-auth01a	T2	signed-out	base	android,ios	happy	-	kiloapp:///(auth)/transcript-style-fixture	screen	(auth)/transcript-style-fixture
 T2-auth01a	T2	signed-out	base	android,ios	non-retryable-error	-	kiloapp:///(auth)/part-detail-transition-fixture?open=missing&state=running	screen	(auth)/part-detail-transition-fixture
 T2-auth01a	T2	signed-out	base	android,ios	happy	-	kiloapp:///(auth)/question-card-fixture	screen	(auth)/question-card-fixture

@@ -2045,6 +2045,15 @@ describe('header actions row', () => {
     expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
   });
 
+  it('treats a false headerRight as absent instead of stacking an empty slot', () => {
+    // A caller's guard can yield `false` (`loaded && <Control />`); the slot
+    // contract says it paints nothing, so no `mt-2` row may appear under the
+    // header for the empty slot the `!= null` checks kept stacking.
+    const renderer = renderHeader({ title: 'Detail', headerRight: false });
+
+    expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+  });
+
   it('drops a declared trailing cluster to its own row before it squeezes the title', () => {
     // A wide fixed-width cluster leaves too little room for a readable title.
     layout.width = 320;

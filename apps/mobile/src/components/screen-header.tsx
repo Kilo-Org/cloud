@@ -597,7 +597,7 @@ export function ScreenHeader({
   // the wider room the title gets says nothing about the row, so the title
   // never moves back and forth. A new layout (another language, a rotation)
   // returns the cluster to the row until the remounted copy measures again.
-  const measuresTitleFit = inlineActions != null && title != null && !titleContent && !largeFont;
+  const measuresTitleFit = inlineActions ? title != null && !titleContent && !largeFont : false;
   const titleFitKey = JSON.stringify([title, windowWidth, fontScale]);
   const [titleFit, setTitleFit] = useState<TitleFit>(UNMEASURED_TITLE_FIT);
   const titleNaturalRef = useRef<TextInstance>(null);
@@ -661,7 +661,7 @@ export function ScreenHeader({
   // first, and the title keeps its own width until the controls have nothing
   // left to give. The heading then sits on its content's basis instead of a
   // zero one (see `inlineActionsSlot`).
-  const pinnedInlineActions = inlineActions != null && !allowInlineActionsStacking;
+  const pinnedInlineActions = inlineActions && !allowInlineActionsStacking;
 
   // Which of the heading's lines the header paints, which decides whether the
   // header centres a leading spacer opposite the back control.
@@ -778,7 +778,7 @@ export function ScreenHeader({
           {titleContent}
         </View>
       );
-    } else if (titleAccessory != null) {
+    } else if (titleAccessory) {
       titleText = (
         <View className={cn('flex-row items-center gap-2', centerTitle && 'justify-center')}>
           {titleLabel}

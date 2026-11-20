@@ -68,7 +68,10 @@ const SCREEN_HEADER_NODE_SLOT_NAMES = [
   'eyebrowPlaceholder',
 ] as const;
 const descriptorMessage =
-  'must be { "$element": "save-cluster" } or an object/array whose values the component can render, not a bare string';
+  'must be { "$element": "save-cluster" }, an array of those, or null/false, because only an element (or nothing) can be a child of the slot\'s View';
+const descriptorSlotMessage =
+  'is not a ScreenHeader node slot; a { "$element" } descriptor belongs in one of headerRight, inlineActions, titleContent, titleAccessory, subtitlePlaceholder, eyebrowPlaceholder';
+
 /** A diagnostic prop value: plain JSON, which is all a manifest can carry. */
 type DiagnosticProp =
   | string
@@ -85,13 +88,14 @@ function checkNodeSlotProps(
 ): void {
   const slots: readonly string[] = SCREEN_HEADER_NODE_SLOT_NAMES;
   const visit = (name: string, value: DiagnosticProp, at: (string | number)[]): void => {
+    const slot = at.find(
+      (step): step is string => typeof step === 'string' && slots.includes(step)
+    );
     if (value === null || typeof value !== 'object') {
-      // A bare string anywhere under a node slot's value is the LogBox
-      // violation itself; the refusal names the slot and the descriptor.
-      const slot = at.find(
-        (step): step is string => typeof step === 'string' && slots.includes(step)
-      );
-      if (typeof value === 'string' && slot !== undefined) {
+      // React rejects a string, a number or a bare object as a child of the
+      // slot's `View` exactly as it rejects the string; only a descriptor (or
+      // null/false, which paint nothing) is a value the slot can render.
+      if (slot !== undefined && value !== null && value !== false && value !== undefined) {
         ctx.addIssue({
           code: 'custom',
           path: at,
@@ -100,10 +104,22 @@ function checkNodeSlotProps(
       }
       return;
     }
-    if (!Array.isArray(value) && '$element' in value) {
-      // Rejected in the schema so a descriptor typo fails `prepare` before any
-      // worktree is written, instead of rendering as unknown data.
-      if (!ElementDescriptorSchema.safeParse(value).success) {
+    if (Array.isArray(value)) {
+      for (const [key, item] of value.entries()) {
+        visit(name, item, [...at, key]);
+      }
+      return;
+    }
+    if ('$element' in value) {
+      if (slot === undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: at,
+          message: `${JSON.stringify(String(at[at.length - 1]))} ${descriptorSlotMessage}`,
+        });
+      } else if (!ElementDescriptorSchema.safeParse(value).success) {
+        // Rejected in the schema so a descriptor typo fails `prepare` before
+        // any worktree is written, instead of rendering as unknown data.
         ctx.addIssue({
           code: 'custom',
           path: at,
@@ -114,9 +130,8 @@ function checkNodeSlotProps(
       }
       return;
     }
-    const items = Array.isArray(value) ? value.entries() : Object.entries(value);
-    for (const [key, item] of items) {
-      visit(String(key), item as DiagnosticProp, [...at, key]);
+    for (const [key, item] of Object.entries(value)) {
+      visit(String(key), item, [...at, key]);
     }
   };
   for (const [name, value] of Object.entries(props)) {
@@ -226,6 +241,18 @@ export const ProofManifestSchema = z
       const diagnostic = target.diagnostic;
       if (diagnostic === undefined) continue;
       checkNodeSlotProps(diagnostic.props, ctx, ['targets', String(index), 'diagnostic', 'props']);
+      if ('$element' in diagnostic.props) {
+        // A diagnostic's props must be an object of prop names; a descriptor
+        // at the root would replace the whole props argument in the generated
+        // `createElement(Component, …)` call.
+        ctx.addIssue({
+          code: 'custom',
+          path: ['targets', String(index), 'diagnostic', 'props', '$element'],
+          message: `A diagnostic's props must be an object of prop names, not an element descriptor; ${JSON.stringify(
+            '$element'
+          )} belongs on one of the node-slot props`,
+        });
+      }
       // The cluster expansion only wires the imports the bare card route
       // writes; a sheet route would render the binding undefined, so the
       // descriptor is refused where the author sees it, at prepare.

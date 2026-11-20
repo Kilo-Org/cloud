@@ -40,11 +40,11 @@ export function ReviewerHeader({
    * body does not move when the read that names it lands.
    */
   reserveSubtitle?: boolean;
-  /** What the reserved subtitle line paints while its text loads. */
   /**
-   * Element-only for the same reason `ScreenHeader`'s slots are: the header
-   * paints this inside a `View`, so a string is a `Text` invariant violation,
-   * not a title.
+   * What the reserved subtitle line paints while its text loads: an element
+   * only, for the same reason `ScreenHeader`'s slots are — the header paints
+   * this inside a `View`, so a string is a `Text` invariant violation, not a
+   * title.
    */
   subtitlePlaceholder?: ScreenHeaderSlot;
   /** Where Back lands when the screen has no history to pop. */

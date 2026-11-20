@@ -70,6 +70,97 @@ test('a bare string in a node slot is refused with the descriptor guidance', () 
   );
 });
 
+test('a descriptor is legal only under a documented node slot', () => {
+  // A prop outside the node-slot list (`title`, an unknown key) is component
+  // data: a descriptor there would silently paint a Save cluster the
+  // component never asked for.
+  for (const props of [
+    { title: { $element: 'save-cluster' }, headerRight: { $element: 'save-cluster' } },
+    { heading: { $element: 'save-cluster' } },
+  ]) {
+    const result = ProofManifestSchema.safeParse({
+      version: 1,
+      targets: [{ ...SLOT_TARGET, diagnostic: { component: PRODUCT, props: props as object } }],
+    });
+    assert.equal(result.success, false, JSON.stringify(props));
+    assert.match(
+      result.error.issues.map(issue => issue.message).join('\n'),
+      /is not a ScreenHeader node slot/u
+    );
+  }
+  // Nested under a slot the same descriptor stays legal, and the walker still
+  // decides per value, not per shell.
+  assert.equal(
+    ProofManifestSchema.safeParse({
+      version: 1,
+      targets: [
+        {
+          ...SLOT_TARGET,
+          diagnostic: {
+            component: PRODUCT,
+            props: { headerRight: { row: [{ $element: 'save-cluster' }] }, title: 'Review' },
+          },
+        },
+      ],
+    }).success,
+    true
+  );
+});
+
+test('a descriptor at the root of props is refused', () => {
+  const result = ProofManifestSchema.safeParse({
+    version: 1,
+    targets: [
+      {
+        ...SLOT_TARGET,
+        diagnostic: { component: PRODUCT, props: { $element: 'save-cluster' } },
+      },
+    ],
+  });
+  assert.equal(result.success, false);
+  assert.match(
+    result.error.issues.map(issue => issue.message).join('\n'),
+    /A diagnostic's props must be an object of prop names/u
+  );
+});
+
+test('a node slot accepts only descriptors, arrays of them, or null/false', () => {
+  for (const [label, value] of [
+    ['string', 'Save'],
+    ['number', 42],
+    ['true-boolean', true],
+    ['bare-object', { width: 140 }],
+  ] as const) {
+    const result = ProofManifestSchema.safeParse({
+      version: 1,
+      targets: [
+        {
+          ...SLOT_TARGET,
+          diagnostic: { component: PRODUCT, props: { headerRight: value as object } },
+        },
+      ],
+    });
+    assert.equal(result.success, false, label);
+    assert.match(
+      result.error.issues[0]?.message ?? '',
+      /"headerRight" must be \{ "\$element": "save-cluster" \}, an array of those, or null\/false/u,
+      label
+    );
+  }
+  for (const value of [null, false]) {
+    // Both render nothing and are in the slot type, so both pass.
+    assert.equal(
+      ProofManifestSchema.safeParse({
+        version: 1,
+        targets: [
+          { ...SLOT_TARGET, diagnostic: { component: PRODUCT, props: { headerRight: value } } },
+        ],
+      }).success,
+      true
+    );
+  }
+});
+
 test('a save-cluster descriptor prepares and the generated route splices the element', async t => {
   const fixture = syntheticRepo(
     t,
@@ -182,6 +273,38 @@ test('a nested string in a node slot names its full path', () => {
     'targets/0/diagnostic/props/headerRight/row/0'
   );
   assert.match(result.error.issues[0]?.message ?? '', /"headerRight" must be/u);
+});
+
+test('a prettier-wrapped redirectSystemPath declaration still prepares', async t => {
+  const fixture = syntheticRepo(t);
+  // Prettier's wrapped form of the same declaration: five lines instead of one.
+  fs.writeFileSync(
+    path.join(fixture.repo, INTENT),
+    'export function redirectSystemPath({\n  path,\n  initial,\n}: {\n  path: string;\n  initial: boolean;\n}): string | null {\n  return initial ? path : null;\n}\n'
+  );
+  fixture.git('add', '.');
+  fixture.git('commit', '-m', 'wrapped declaration');
+  fixture.git('rev-parse', 'HEAD');
+  const preparation = await prepareProof({
+    ...fixture,
+    base: fixture.base,
+    head: fixture.git('rev-parse', 'HEAD') || fixture.head,
+  });
+  const intent = fs.readFileSync(path.join(preparation.head.directory, INTENT), 'utf8');
+  assert.match(intent, /kiloapp:\/\/\/design-proof-card/u);
+});
+
+test('an intent with neither declaration form is refused', async t => {
+  const fixture = syntheticRepo(t);
+  fs.writeFileSync(
+    path.join(fixture.repo, INTENT),
+    'export function otherRedirect({ path, initial }: { path: string; initial: boolean }) {\n  return initial ? path : null;\n}\n'
+  );
+  fixture.git('add', '.');
+  fixture.git('commit', '-m', 'unrelated intent');
+  await assert.rejects(() => prepareProof({ ...fixture, head: fixture.git('rev-parse', 'HEAD') }), {
+    message: 'Unsupported native-intent diagnostic insertion point',
+  });
 });
 
 function syntheticRepo(t: TestContext, proofManifest = manifest) {

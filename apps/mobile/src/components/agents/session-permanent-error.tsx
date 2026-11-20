@@ -1,11 +1,8 @@
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
 
 import { StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
-import { DirectionalArrowLeft } from '@/components/ui/directional-icons';
 import { RotateCcw } from '@/components/ui/icons';
-import { useBackToAgentsSessions } from '@/lib/navigation/back-to-agents-sessions';
 
 import { RestoredRouteFallback } from './restored-route-fallback';
 
@@ -24,12 +21,9 @@ type SessionPermanentErrorProps = {
 
 /**
  * The session route's terminal body: a session the server refuses to answer
- * for, or one that never resolved. A retryable denial offers its retry beside
- * the way back; a permanent one offers the way back alone, and never a retry.
- *
- * The way back truncates every `agent-chat` route above the sessions index, so
- * a composer still on the stack under a failed session is gone with it instead
- * of being revealed by a plain back.
+ * for, or one that never resolved. The body never repeats the header's way out;
+ * the header's back chevron is its only exit, so the body draws only a retry,
+ * and only when the denial is one a retry can clear.
  *
  * An automatic restore that lands here leaves instead: nobody asked for this
  * screen, so the app returns to the screen it starts on instead of holding a
@@ -44,15 +38,7 @@ export function SessionPermanentError({
   isRetrying,
   restoredRouteOpen,
 }: Readonly<SessionPermanentErrorProps>) {
-  const goBackToSessions = useBackToAgentsSessions();
   const { t } = useTranslation();
-  const backToSessions = (
-    <StateAction
-      label={t('agentChat.session.backToSessions')}
-      icon={DirectionalArrowLeft}
-      onPress={goBackToSessions}
-    />
-  );
   return (
     <>
       {restoredRouteOpen ? <RestoredRouteFallback /> : null}
@@ -61,18 +47,13 @@ export function SessionPermanentError({
         title={title}
         message={message}
         action={
-          retry === undefined ? (
-            backToSessions
-          ) : (
-            <View className="flex-row flex-wrap items-center justify-center gap-3">
-              <StateAction
-                label={t('common.retry')}
-                icon={RotateCcw}
-                loading={isRetrying}
-                onPress={retry}
-              />
-              {backToSessions}
-            </View>
+          retry === undefined ? undefined : (
+            <StateAction
+              label={t('common.retry')}
+              icon={RotateCcw}
+              loading={isRetrying}
+              onPress={retry}
+            />
           )
         }
       />

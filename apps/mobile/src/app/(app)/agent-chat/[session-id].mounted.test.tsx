@@ -106,6 +106,10 @@ const confirmationRequests = vi.hoisted(() => ({
 }));
 
 const navigationRoutes = ['session-detail'];
+// The header's back press with history: the route's own pop.
+const routerBack = vi.fn(() => {
+  navigationRoutes.pop();
+});
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 // The New-session composer mounts only from its own route; this suite asserts
 // the session route never puts it on screen for a `session-id` param. The
@@ -564,11 +568,10 @@ beforeEach(() => {
   useRouteForegroundRefreshMock.mockClear();
   cliSessionGetQueryKeyMock.mockClear();
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
+  routerBack.mockClear();
   useRouterMock.mockReturnValue({
     canGoBack: () => navigationRoutes.length > 1,
-    back: () => {
-      navigationRoutes.pop();
-    },
+    back: routerBack,
     replace: (href: string) => {
       navigationRoutes.splice(-1, 1, href);
     },
@@ -825,11 +828,15 @@ describe('SessionDetailScreen display scope', () => {
         expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
         expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
       } else if (state !== 'pending') {
-        expect(Boolean(propOf(findByType(renderer.root, 'QueryError')[0], 'onRetry'))).toBe(false);
-        const buttonLabels = findByType(renderer.root, 'Button').flatMap(button =>
-          findByType(button, 'Text').flatMap(node => node.children)
+        // The terminal body repeats no exit: the header's back chevron is the
+        // only one, and a permanent denial draws no body action.
+        const error = findByType(renderer.root, 'QueryError')[0];
+        expect(Boolean(propOf(error, 'onRetry'))).toBe(false);
+        expect(propOf(error, 'action')).toBeUndefined();
+        expect(findByType(renderer.root, 'Button')).toHaveLength(0);
+        expect(propOf(renderer.root.findByType(ScreenHeader), 'onBack')).toEqual(
+          expect.any(Function)
         );
-        expect(buttonLabels).toEqual(['Back to sessions']);
       }
       expect(globalContext.organizationId).toBe('global-org');
       expect(globalContext.setOrganizationId).not.toHaveBeenCalled();
@@ -1583,13 +1590,10 @@ describe('SessionDetailScreen owner-scoped metadata and recovery', () => {
     expect(propOf(error, 'variant')).toBe(variant);
     expect(propOf(error, 'onRetry')).toBeUndefined();
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
-    // Copy left the card when the state took one recovery action; the way back
-    // is the only button the body draws.
-    const buttons = findByType(renderer.root, 'Button');
-    expect(buttons).toHaveLength(1);
-    expect(buttons[0] && findByType(buttons[0], 'Text').flatMap(text => text.children)).toEqual([
-      i18n.t('agentChat.session.backToSessions'),
-    ]);
+    // The exit is the header's back chevron: the terminal body repeats no way
+    // out, and a permanent denial has no action to draw at all.
+    expect(findByType(renderer.root, 'Button')).toHaveLength(0);
+    expect(propOf(error, 'action')).toBeUndefined();
   });
 });
 
@@ -1809,7 +1813,9 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
       await Promise.resolve();
     });
     expect(transcriptText(renderer)).toContain('Could not load your account');
-    expect(transcriptText(renderer)).toContain('Back to sessions');
+    // The header's back chevron is the only way out; the retryable card owns
+    // its Retry and repeats no exit of the screen's.
+    expect(transcriptText(renderer)).not.toContain('Back to sessions');
     expect(propOf(retryControl(renderer), 'accessibilityState')).toMatchObject({
       disabled: false,
       busy: false,
@@ -1841,39 +1847,42 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
     expect(transcriptText(renderer)).toBe('Account B child row');
   });
 
-  it('leaves failed confirmation through Back to sessions', async () => {
+  it('leaves a failed confirmation through the header back', async () => {
     confirmationRequests.getMe.mockRejectedValueOnce(new Error('offline'));
-    // The composer-under-session shape the fix exists for: the not-found
-    // screen sits above the New session composer, and "Back to sessions" must
-    // remove both rather than reveal what was below.
+    // The composer-under-session shape: the terminal body draws no exit of its
+    // own, so the header's back press is the route's own history and returns to
+    // the composer that opened the session.
     navigationRoutes.unshift('agent-chat/new');
     const renderer = await mountRoute();
-    const back = findByType(renderer.root, 'Button').find(button =>
-      findByType(button, 'Text').some(text => text.children.includes('Back to sessions'))
-    );
     act(() => {
-      pressControl(back);
+      pressControl(
+        findByType(renderer.root.findByType(ScreenHeader), 'Pressable').find(
+          node => propOf(node, 'accessibilityLabel') === 'Go back'
+        )
+      );
     });
 
-    // Truncated to the tabs entry: the composer is no longer on the stack.
-    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)']);
+    expect(routerBack).toHaveBeenCalledTimes(1);
+    expect(navigationRoutes).toEqual(['agent-chat/new']);
     expect(rootRequests).toEqual([]);
   });
 
   it('lands on the sessions list when the session route has nothing beneath it', async () => {
     confirmationRequests.getMe.mockRejectedValueOnce(new Error('offline'));
     // The only-route shape: a cold open leaves the session as the stack's only
-    // screen, so there is nothing to dismiss to. The press must still land on
-    // the sessions list, which the stack-safe replacement pushes over this
-    // route before retiring it.
+    // screen, so the header back has no history to pop. The press must still
+    // land on the sessions list, which the stack-safe replacement pushes over
+    // this route before retiring it.
     const renderer = await mountRoute();
-    const back = findByType(renderer.root, 'Button').find(button =>
-      findByType(button, 'Text').some(text => text.children.includes('Back to sessions'))
-    );
     act(() => {
-      pressControl(back);
+      pressControl(
+        findByType(renderer.root.findByType(ScreenHeader), 'Pressable').find(
+          node => propOf(node, 'accessibilityLabel') === 'Go back'
+        )
+      );
     });
 
+    expect(routerBack).not.toHaveBeenCalled();
     expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)']);
     expect(rootRequests).toEqual([]);
   });

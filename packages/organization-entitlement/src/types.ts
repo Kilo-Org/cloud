@@ -125,6 +125,11 @@ export type OrganizationEntitlementOrganization = {
    * therefore restores the previous behavior for that caller, so decide that
    * caller's entitlement in the same change; keep this guard the single place
    * that turns the flag into a stage.
+   *
+   * The excluded-feature services that build a partial organization omit the
+   * flag deliberately: the trial-eligibility rule does not govern those paths,
+   * so they keep the previous reading and this work leaves them untouched. A
+   * caller on a maintained path passes the flag.
    */
   trial_granted?: boolean;
 };

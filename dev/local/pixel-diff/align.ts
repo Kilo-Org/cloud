@@ -180,17 +180,14 @@ export function alignRows(before: PNG, after: PNG): RowAlignment {
   return { source, blocks, removed };
 }
 
-/** Shifted runs worth reporting: dy ≠ 0 and at least `minHeight` rows; neighbours with the same dy are merged. */
+/**
+ * Shifted runs worth reporting: dy ≠ 0 and at least `minHeight` rows.
+ *
+ * No coalescing happens here. `alignRows` extends a block only while it stays contiguous on both
+ * sides, which is exactly when the dy is equal too, so its blocks are already maximal runs of one
+ * uninterrupted move. Merging neighbours by dy alone would bridge a stationary row or an
+ * unmatched row and report rows that never moved.
+ */
 export function shiftedBlocks(blocks: RowBlock[], minHeight: number): RowBlock[] {
-  const out: RowBlock[] = [];
-  for (const block of blocks) {
-    if (block.dy === 0) continue;
-    const last = out[out.length - 1];
-    if (last && last.dy === block.dy) {
-      last.height = block.afterY + block.height - last.afterY;
-      continue;
-    }
-    out.push({ ...block });
-  }
-  return out.filter(block => block.height >= minHeight);
+  return blocks.filter(block => block.dy !== 0 && block.height >= minHeight);
 }

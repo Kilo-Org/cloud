@@ -28,7 +28,11 @@ export type PixelDiffRevision = {
     config: unknown;
     screens: readonly { target: string; dump: string; screenshot: string }[];
   }[];
-  /** Readiness failures already reported by the pair: `<cell>/<target>: reason`. */
+  /**
+   * Readiness failures already reported by the pair, in `targetReadiness`'s own
+   * shapes: `<cell>/<target>: reason` for one screen, `<cell>: reason` for a
+   * coverage failure of the whole cell, and a bare reason for the whole run.
+   */
   readiness: readonly string[];
 };
 
@@ -235,18 +239,73 @@ function safeSegment(name: string, kind: string): string {
 }
 
 /**
- * Each blocked cell's own reason, keyed `<cell>/<target>`. The key names the
- * cell, and the text is what the advisory report shows for it, so an overlay is
- * reported as an overlay instead of a generic readiness failure.
+ * The readiness failures a revision reported, split by what they can block.
+ *
+ * `targetReadiness` names three scopes:
+ *
+ * - `<cell>/<target>: reason` blocks that one screen; its siblings, in that cell
+ *   and in every other cell, keep their comparison.
+ * - `<cell>: reason` is a coverage failure (the cell's targets differ from the
+ *   manifest, or a target it never captured), so every target of that cell is
+ *   blocked while unrelated cells keep their comparison.
+ * - a reason with no cell at all ("Duplicate matrix cells", "Findings are
+ *   outside the prepared target matrix") describes the run, so it blocks every
+ *   cell of that run.
+ *
+ * An entry whose scope cannot be read is treated as run-level: the pass never
+ * infers a valid readiness from a key it did not recognise.
  */
-function readinessReasons(readiness: readonly string[]): Map<string, string> {
-  const reasons = new Map<string, string>();
+type ReadinessBlocks = {
+  run: string[];
+  cells: Map<string, string>;
+  targets: Map<string, string>;
+};
+
+/** The scopes of one revision's readiness list, keyed the way it names them. */
+function readinessReasons(readiness: readonly string[]): ReadinessBlocks {
+  const blocks: ReadinessBlocks = { run: [], cells: new Map(), targets: new Map() };
   for (const entry of readiness) {
     const separator = entry.indexOf(': ');
-    const key = separator < 0 ? entry : entry.slice(0, separator);
-    reasons.set(key, separator < 0 ? entry : entry.slice(separator + 2));
+    const scope = separator < 0 ? '' : entry.slice(0, separator);
+    const reason = separator < 0 ? entry : entry.slice(separator + 2);
+    const slash = scope.indexOf('/');
+    // A cell id never contains a slash, so a `/` marks a `<cell>/<target>` scope.
+    if (slash < 0) {
+      if (scope === '') blocks.run.push(entry);
+      else blocks.cells.set(scope, reason);
+      continue;
+    }
+    const cell = scope.slice(0, slash);
+    const target = scope.slice(slash + 1);
+    if (cell === '' || target === '' || target.includes('/')) {
+      blocks.run.push(entry);
+      continue;
+    }
+    blocks.targets.set(scope, reason);
   }
-  return reasons;
+  return blocks;
+}
+
+/**
+ * One reason a cell cannot be compared for, most specific first: the target's
+ * own block, then a coverage failure of its cell. Run-level failures are
+ * handled before this runs, since they block every cell. Callers use it also for
+ * a screen only one run captured, where a readiness failure naming that screen
+ * explains the gap better than the bare "no such cell" text. The sibling
+ * targets of a per-target block keep their comparison.
+ */
+function blockedReason(
+  base: ReadinessBlocks,
+  head: ReadinessBlocks,
+  cell: string,
+  target: string
+): string | undefined {
+  return (
+    base.targets.get(`${cell}/${target}`) ??
+    head.targets.get(`${cell}/${target}`) ??
+    base.cells.get(cell) ??
+    head.cells.get(cell)
+  );
 }
 
 function artifactSuffix(report: PixelDiffReport): { comparison: string; focus?: string } {
@@ -460,27 +519,79 @@ async function collect(
     if (cells.length === 0) reasons.push(pairReason);
     return { cells, reasons };
   }
-  const blocked = {
+  const scopes = {
     base: readinessReasons(options.base.readiness),
     head: readinessReasons(options.head.readiness),
   };
+  // A `<cell>` or `<cell>/<target>` entry naming a cell neither run captured
+  // cannot be attached to any comparison, so it is not dropped: the pair has no
+  // evidence that cell was ever ready.
+  const captured = new Set([...options.base.cells, ...options.head.cells].map(cell => cell.id));
+  for (const scope of [scopes.base, scopes.head]) {
+    for (const [key, reason] of [...scope.cells.entries(), ...scope.targets.entries()]) {
+      if (captured.has(key.split('/')[0])) continue;
+      scope.run.push(`${key}: ${reason}`);
+      scope.cells.delete(key);
+      scope.targets.delete(key);
+    }
+  }
+  // A run-level failure (duplicate matrix cells, findings outside the matrix)
+  // means no cell of that run describes its screens, so nothing is compared and
+  // every cell says why. A per-cell failure never takes this path: its siblings
+  // keep their comparison.
+  const runBlocked = [
+    ...new Set([
+      ...scopes.base.run.map(reason => `base: ${reason}`),
+      ...scopes.head.run.map(reason => `head: ${reason}`),
+    ]),
+  ];
+  if (runBlocked.length > 0) {
+    const reason =
+      `the run reported a readiness failure covering every cell: ${runBlocked.join('; ')}`;
+    const emitted = new Set<string>();
+    for (const run of [options.head, options.base]) {
+      for (const cell of run.cells) {
+        for (const screen of cell.screens) {
+          const key = `${cell.id}/${screen.target}`;
+          if (emitted.has(key)) continue;
+          emitted.add(key);
+          cells.push(inconclusive(cell.id, screen.target, reason));
+        }
+      }
+    }
+    if (cells.length === 0) reasons.push(reason);
+    return { cells, reasons };
+  }
   for (const baseCell of options.base.cells) {
     if (headIds.has(baseCell.id)) continue;
     for (const screen of baseCell.screens) {
-      cells.push(inconclusive(baseCell.id, screen.target, 'the head run captured no such cell'));
+      // A readiness failure that names this cell is the sharper reason: it says
+      // why the head had nothing to compare against, not just that it did not.
+      cells.push(
+        inconclusive(
+          baseCell.id,
+          screen.target,
+          blockedReason(scopes.base, scopes.head, baseCell.id, screen.target) ??
+            'the head run captured no such cell'
+        )
+      );
     }
   }
   for (const headCell of options.head.cells) {
     const baseCell = baseCells.get(headCell.id);
     for (const headScreen of headCell.screens) {
-      const key = `${headCell.id}/${headScreen.target}`;
       if (baseCell === undefined) {
         cells.push(
-          inconclusive(headCell.id, headScreen.target, 'the base run captured no such cell')
+          inconclusive(
+            headCell.id,
+            headScreen.target,
+            blockedReason(scopes.base, scopes.head, headCell.id, headScreen.target) ??
+              'the base run captured no such cell'
+          )
         );
         continue;
       }
-      const cellBlocked = blocked.base.get(key) ?? blocked.head.get(key);
+      const cellBlocked = blockedReason(scopes.base, scopes.head, headCell.id, headScreen.target);
       if (cellBlocked !== undefined) {
         cells.push(inconclusive(headCell.id, headScreen.target, cellBlocked));
         continue;
@@ -526,7 +637,12 @@ async function collect(
     for (const baseScreen of baseCell?.screens ?? []) {
       if (headTargets.has(baseScreen.target)) continue;
       cells.push(
-        inconclusive(headCell.id, baseScreen.target, 'the head run captured no such target')
+        inconclusive(
+          headCell.id,
+          baseScreen.target,
+          blockedReason(scopes.base, scopes.head, headCell.id, baseScreen.target) ??
+            'the head run captured no such target'
+        )
       );
     }
   }

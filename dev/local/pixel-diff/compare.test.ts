@@ -6,6 +6,7 @@ import test from 'node:test';
 
 import { PNG } from 'pngjs';
 
+import { shiftedBlocks, type RowBlock } from './align';
 import { comparePngPair, LIMITS, PixelDiffError } from './compare';
 import { diffPngs, MAX_REGIONS } from './diff';
 
@@ -150,6 +151,30 @@ void test('shift explanation reports moved rows without changing the canonical c
     );
     assert.equal(plain.shift, undefined);
   });
+});
+
+void test('shifted runs of one dy are never merged across a stationary or unmatched row', () => {
+  const run = (beforeY: number, afterY: number): RowBlock => ({
+    beforeY,
+    afterY,
+    height: 2,
+    dy: 40,
+  });
+  // A stationary row between two runs of the same move: a band spanning both would claim a row
+  // that never moved had shifted.
+  assert.deepEqual(
+    shiftedBlocks([run(0, 40), { beforeY: 2, afterY: 42, height: 1, dy: 0 }, run(3, 43)], 1),
+    [run(0, 40), run(3, 43)]
+  );
+  // Unmatched rows between two runs of the same move: the move is not one run, so it stays two.
+  assert.deepEqual(shiftedBlocks([run(0, 40), run(4, 44)], 1), [run(0, 40), run(4, 44)]);
+  assert.deepEqual(shiftedBlocks([run(0, 40), run(40, 80)], 1), [run(0, 40), run(40, 80)]);
+  // Alignment already coalesces contiguous rows, so an uninterrupted run is reported as it arrives.
+  assert.deepEqual(shiftedBlocks([{ beforeY: 0, afterY: 40, height: 6, dy: 40 }], 5), [
+    { beforeY: 0, afterY: 40, height: 6, dy: 40 },
+  ]);
+  assert.deepEqual(shiftedBlocks([{ beforeY: 0, afterY: 40, height: 3, dy: 40 }], 4), []);
+  assert.deepEqual(shiftedBlocks([{ beforeY: 0, afterY: 0, height: 9, dy: 0 }], 1), []);
 });
 
 void test('unequal dimensions throw a size-mismatch instead of comparing padded images', async () => {

@@ -995,7 +995,7 @@ export async function compareProof(
     // head is a fix, so the pair still compares; the base run's own report and
     // its exit status already carry that error.
     const overlayBlocked = run.findings
-      .filter(entry => entry.rule === 'dev-overlay' && entry.severity === 'error')
+      .filter(entry => entry.rule === 'dev-overlay')
       .map(entry => `${entry.cell}/${entry.target}: a LogBox overlay painted this screen`);
     if (revision === 'head')
       reasons.push(
@@ -1009,8 +1009,11 @@ export async function compareProof(
     // The advisory pixel diff never compares a screenshot that shows an overlay:
     // a toast diffed against a screen is not a product change. These exact cells
     // are handed over as blocked, so a sibling screen still gets its comparison.
-    // This blocks the advisory cell for either revision only; the shared result
-    // above still treats a base toast as a pass, exactly as it did before.
+    // Every `dev-overlay` finding blocks it, not just an error one: a warning
+    // toast still paints over the screen, and the advisory pass reports pixels,
+    // not gate severity. This blocks the advisory cell for either revision only;
+    // the shared result above still treats a base toast as a pass and a head
+    // toast as blocking only at `error`, exactly as it did before.
     return {
       run,
       artifacts: receipt.artifacts,

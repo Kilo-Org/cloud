@@ -225,7 +225,7 @@ Add `--pixel-diff-explain-shift` to report vertical row moves separately from th
 Keep the original status bar pixels. The report counts changes in system inset bands separately.
 App content can overlap those bands, so inspect the full comparison for safe-area defects.
 An unavailable pixel comparison is inconclusive. The pixel report does not change the gate verdict.
-Use `verify_screen` for assertions about what the screenshot shows.
+Inspect the original device screenshots for assertions about what the app shows.
 
 Captures retain the original screenshot and a `.capture.json` alignment record.
 Matching probe states bracket the screenshot but do not certify native paint.

@@ -898,6 +898,43 @@ test('a LogBox error only in the base is a fix, not a blocked pair', async t => 
   assert.deepEqual(result.reasons, []);
 });
 
+test('a LogBox warning blocks the advisory cell while the head gate stays error-only', async t => {
+  const fixture = syntheticRepo(t);
+  const preparation = await prepareProof(fixture);
+  const baseRun = path.join(fixture.root, 'warn-base');
+  const headRun = path.join(fixture.root, 'warn-head');
+  // A warning-level toast still paints the screen, so the pixels are not the
+  // product's. Both revisions carry it, so neither run is a regression.
+  const overlay: Finding = { ...logBoxOverlay('Synthetic LogBox warning'), severity: 'warning' };
+  capture(preparation, 'base', baseRun, { extraCell: { id: 'dark' }, findings: [overlay] });
+  capture(preparation, 'head', headRun, { extraCell: { id: 'dark' }, findings: [overlay] });
+  const out = path.join(fixture.root, 'warn-comparison');
+  const result = await compareProof(preparation, baseRun, headRun, out, undefined, {
+    explainShift: false,
+  });
+  // The authoritative head gate stays error-only: a warning toast is not a pair
+  // reason and never becomes an introduced finding.
+  assert.equal(result.status, 'comparable');
+  assert.deepEqual(result.reasons, []);
+  assert.deepEqual(result.introduced, []);
+  const written = JSON.parse(fs.readFileSync(path.join(out, 'pixel-diff.json'), 'utf8'));
+  const byCell = new Map(
+    written.cells.map((cell: { cell: string; status: string; reason?: string }) => [
+      cell.cell,
+      cell,
+    ])
+  );
+  // Every dev-overlay finding blocks the advisory comparison of its own cell.
+  const overlaid = byCell.get('base');
+  assert.equal(overlaid.status, 'inconclusive');
+  assert.match(overlaid.reason, /a LogBox overlay painted this screen/);
+  // The clean sibling keeps its comparison; the warning never became a pair block.
+  const sibling = byCell.get('dark');
+  assert.equal(sibling.status, 'inconclusive');
+  assert.doesNotMatch(sibling.reason, /comparison already called this pair inconclusive/);
+  assert.match(sibling.reason, /not a PNG/);
+});
+
 test('a landing notice persisted in both findings artifacts still compares', async t => {
   // The shape `warningFinding` in capture.ts writes for a tab route whose link
   // leaves the route unchanged: a ratio warning on the root node.

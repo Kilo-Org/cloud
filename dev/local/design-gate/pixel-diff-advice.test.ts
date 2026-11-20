@@ -1007,6 +1007,64 @@ test('a head overlay blocks only its cell and a real sibling still compares', as
   assert.equal(summary.status, 'compared');
 });
 
+test('a run-wide readiness failure blocks every cell; a cell-wide one keeps siblings', async t => {
+  const root = rootDir(t);
+  const out = path.join(root, 'comparison');
+  fs.mkdirSync(out);
+  const base = runDir(root, 'base-run');
+  const head = runDir(root, 'head-run');
+  // A second cell the coverage failure never names, so it stays comparable.
+  bindScreen(base, 'dark', 'card');
+  bindScreen(head, 'dark', 'card');
+  const { compare, calls } = stub(async input => {
+    fs.mkdirSync(input.out, { recursive: true });
+    return report();
+  });
+  // `targetReadiness` reports a cell-wide coverage failure without a target, and
+  // a run-level one (duplicate matrix cells) with no cell at all. Neither names
+  // `<cell>/<target>`, and neither may be silently ignored.
+  head.revision.readiness = ['base: target coverage differs from manifest'];
+  const coverage = await runPixelDiffAdvisory({
+    out,
+    base: base.revision,
+    head: head.revision,
+    explainShift: false,
+    compare,
+  });
+  const byCell = new Map(coverage.cells.map(cell => [cell.cell, cell]));
+  assert.equal(byCell.get('base')?.status, 'inconclusive');
+  assert.match(byCell.get('base')?.reason ?? '', /target coverage differs from manifest/);
+  // The sibling cell keeps its real comparison.
+  assert.equal(byCell.get('dark')?.status, 'unchanged');
+  assert.equal(coverage.status, 'compared');
+  assert.equal(calls.length, 1);
+
+  const out2 = path.join(root, 'comparison-2');
+  fs.mkdirSync(out2);
+  head.revision.readiness = ['Duplicate matrix cells'];
+  const runWide = await runPixelDiffAdvisory({
+    out: out2,
+    base: base.revision,
+    head: head.revision,
+    explainShift: false,
+    compare,
+  });
+  // Nothing about the run can be trusted, so no cell is compared.
+  assert.equal(runWide.status, 'inconclusive');
+  assert.deepEqual(
+    runWide.cells.map(cell => cell.status),
+    ['inconclusive', 'inconclusive']
+  );
+  for (const cell of runWide.cells) {
+    assert.match(
+      cell.reason ?? '',
+      /readiness failure covering every cell.*Duplicate matrix cells/
+    );
+  }
+  assert.equal(calls.length, 1);
+  assert.equal(fs.existsSync(path.join(out2, 'pixel-diff')), false);
+});
+
 test('pngSize reads the declared size and refuses non-PNG bytes', () => {
   assert.deepEqual(pngSize(pngBytes(400, 800)), { width: 400, height: 800 });
   assert.equal(pngSize(Buffer.from('synthetic-image')), undefined);

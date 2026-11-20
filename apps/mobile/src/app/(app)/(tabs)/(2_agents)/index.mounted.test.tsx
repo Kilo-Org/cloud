@@ -29,6 +29,18 @@ const handoffUrlMock = vi.hoisted(() => vi.fn());
 const openAuthSessionMock = vi.hoisted(() => vi.fn());
 const openBrowserMock = vi.hoisted(() => vi.fn());
 const focusedRoute = vi.hoisted(() => ({ focused: true }));
+const routeParams = vi.hoisted(() => {
+  const params: Record<string, string | undefined> = {};
+  return { params };
+});
+const setParamsMock = vi.hoisted(() =>
+  vi.fn((params: Record<string, string | undefined>) => {
+    // Real `setParams` shallow-merges and cannot delete a key; the real
+    // `useLocalSearchParams` then hides an undefined value, so the read masks
+    // it exactly as the device does.
+    Object.assign(routeParams.params, params);
+  })
+);
 const appStateListeners = vi.hoisted(() => new Set<(state: string) => void>());
 const activityKit = vi.hoisted(() => ({ denied: false, available: false, settingsOpen: false }));
 // The widget press sweep pulls the widget layout, expo-widgets, and the
@@ -72,6 +84,11 @@ vi.mock('expo-router', async () => {
       const focused = focusedRoute.focused;
       useEffect(() => (focused ? effect() : undefined), [effect, focused]);
     },
+    useLocalSearchParams: () =>
+      Object.fromEntries(
+        Object.entries(routeParams.params).filter(([, value]) => value !== undefined)
+      ),
+    useRouter: () => ({ setParams: setParamsMock }),
   };
 });
 
@@ -426,6 +443,8 @@ describe('Agents tab header', () => {
     tabHeader.sessions = undefined;
     tabHeader.todos = undefined;
     tabHeader.onChange = undefined;
+    routeParams.params = {};
+    setParamsMock.mockClear();
   });
 
   it('gives both views the same lightweight view switch', () => {
@@ -434,11 +453,58 @@ describe('Agents tab header', () => {
     expect(tabHeader.sessions).toBeDefined();
     expect((tabHeader.sessions as ReactElement<{ value: string }>).props.value).toBe('sessions');
 
+    // The press writes the route parameter, so the URL names the view a later
+    // relaunch, Back or share lands on.
     act(() => {
       tabHeader.onChange?.('todos');
     });
+    expect(setParamsMock).toHaveBeenCalledExactlyOnceWith({ view: 'todos' });
+
+    // The next render reads the parameter it wrote, so the write and the shown
+    // view cannot disagree.
+    act(() => {
+      renderer.update(createElement(AgentSessionList));
+    });
     expect(tabHeader.todos).toBeDefined();
     expect((tabHeader.todos as ReactElement<{ value: string }>).props.value).toBe('todos');
+
+    // Sessions is the tab's default, so it is written as an absent value
+    // instead of a redundant name.
+    act(() => {
+      tabHeader.onChange?.('sessions');
+    });
+    expect(setParamsMock).toHaveBeenLastCalledWith({ view: undefined });
+
+    act(() => {
+      renderer.update(createElement(AgentSessionList));
+    });
+    expect((tabHeader.sessions as ReactElement<{ value: string }>).props.value).toBe('sessions');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('opens the To-dos list when the route names it', () => {
+    routeParams.params = { view: 'todos' };
+    const renderer = mountRoute();
+
+    expect(tabHeader.todos).toBeDefined();
+    expect((tabHeader.todos as ReactElement<{ value: string }>).props.value).toBe('todos');
+    expect(tabHeader.sessions).toBeUndefined();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('opens the Sessions list for a view it does not know', () => {
+    routeParams.params = { view: 'not-a-view' };
+    const renderer = mountRoute();
+
+    expect(tabHeader.sessions).toBeDefined();
+    expect((tabHeader.sessions as ReactElement<{ value: string }>).props.value).toBe('sessions');
+    expect(tabHeader.todos).toBeUndefined();
 
     act(() => {
       renderer.unmount();

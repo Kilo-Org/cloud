@@ -104,6 +104,7 @@ describe('opensAppRoutePath', () => {
     // so the mapper must never forward one.
     'kiloapp:///dev/unknown-fixture',
     'kiloapp:///dev/account-picker-sheet-fixture',
+    'kiloapp:///dev/context-picker-fixture',
     'kiloapp:///dev/pr-review-entry-fixture?state=empty',
     'https://app.kilo.ai/admin',
     'https://example.com/profile',

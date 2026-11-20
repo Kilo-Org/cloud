@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import * as WebBrowser from 'expo-web-browser';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert, AppState, Platform } from 'react-native';
 
 import { i18n } from '@/i18n';
 import { AgentSessionListScreen } from '@/components/agents/session-list-screen';
-import { type AgentsView, AgentsViewSegment } from '@/components/todos/agents-view-segment';
+import { AgentsViewSegment } from '@/components/todos/agents-view-segment';
 import { TodoListsScreen } from '@/components/todos/todo-lists-screen';
 import { runPendingWidgetActions } from '@/glanceable-ios/widget-actions';
 import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
+import { type AgentsView, agentsViewParam, parseAgentsViewParam } from '@/lib/agents-view';
 import {
   getGitHubInstallReturnOutcome,
   type GitHubInstallReturnOutcome,
@@ -139,7 +140,19 @@ async function retryGitHubInstall(organizationId?: string): Promise<void> {
 }
 
 export default function AgentSessionList() {
-  const [view, setView] = useState<AgentsView>('sessions');
+  const router = useRouter();
+  // The selected view is the route parameter, not local state: a link that
+  // names one (`…/(2_agents)?view=todos`) opens that surface, and a press on
+  // the segment writes the same parameter, so a relaunch, a Back and a share
+  // all land on the view the URL names.
+  const params = useLocalSearchParams<{ view?: string | string[] }>();
+  const view = parseAgentsViewParam(params.view);
+  const setView = useCallback(
+    (next: AgentsView) => {
+      router.setParams({ view: agentsViewParam(next) });
+    },
+    [router]
+  );
   const consumeReturnOutcome = useCallback(() => {
     const result = getGitHubInstallReturnOutcome();
     const alert = buildGitHubInstallOutcomeAlert(result, () => {

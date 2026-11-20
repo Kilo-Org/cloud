@@ -373,7 +373,7 @@ describe('scrubBreadcrumb', () => {
 });
 
 describe('redactUrlText', () => {
-  it('keeps origin and path when the authority password contains a path separator', () => {
+  it('keeps origin and path for a multi-part authority secret', () => {
     const password = ['abcdefghij', 'klmnopqrst'].join('/');
     const url = `https://user:${password}@example.com/api/trpc/a.b`;
 

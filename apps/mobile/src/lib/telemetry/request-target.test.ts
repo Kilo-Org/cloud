@@ -34,7 +34,7 @@ describe('stripQueryString', () => {
     );
   });
 
-  it('keeps origin and path when the authority password contains a path separator', () => {
+  it('keeps origin and path for a multi-part authority secret', () => {
     const password = ['abcdefghij', 'klmnopqrst'].join('/');
     const url = `https://user:${password}@${HOST}${TRPC_PATH_FIXTURE}`;
 
@@ -42,7 +42,7 @@ describe('stripQueryString', () => {
     expect(trpcProcedureText(url)).toBe('a.b');
   });
 
-  it('keeps origin and path when the authority password contains a query marker', () => {
+  it('keeps origin and path for an authority secret holding a delimiter', () => {
     const password = ['abcdefghij', 'klmnopqrst'].join('?');
     const url = `https://user:${password}@${HOST}${TRPC_PATH_FIXTURE}`;
 
@@ -50,30 +50,28 @@ describe('stripQueryString', () => {
     expect(trpcProcedureText(url)).toBe('a.b');
   });
 
-  it('keeps origin and path when the authority password contains a fragment marker', () => {
+  it('keeps origin and path for an authority secret holding punctuation', () => {
     const password = ['abcdefghij', 'klmnopqrst'].join('#');
     const url = `https://user:${password}@${HOST}${TRPC_PATH_FIXTURE}`;
 
     expect(stripQueryString(url)).toBe(`https://${HOST}${TRPC_PATH_FIXTURE}`);
   });
 
-  it('keeps origin and path when the authority userinfo carries more than one @', () => {
+  it('keeps origin and path for userinfo holding a second at-sign', () => {
     const password = ['abcdefghij', 'klmnopqrst'].join('@');
     const url = `https://user:${password}@${HOST}${TRPC_PATH_FIXTURE}`;
 
     expect(stripQueryString(url)).toBe(`https://${HOST}${TRPC_PATH_FIXTURE}`);
   });
 
-  it('keeps origin and path when the userinfo carries a query marker and a path segment', () => {
+  it('keeps origin and path for a delimited authority secret and a query', () => {
     const password = ['abcdefghij', 'klmnopqrst'].join('?');
     const url = `https://user:${password}@${HOST}${TRPC_PATH_FIXTURE}?batch=1`;
 
     expect(stripQueryString(url)).toBe(`https://${HOST}${TRPC_PATH_FIXTURE}`);
   });
 
-  it('reduces a port and a path segment containing @ to the text after that @', () => {
-    // The run up to the port holds a ':', which also reads as userinfo, so the
-    // shape is indistinguishable from an authority and is reduced.
+  it('reduces the text after the last at-sign when the run before a delimiter holds a colon', () => {
     expect(stripQueryString(`https://${HOST}:8443/api/${MEMBER}/x`)).toBe(`https://${HOST}/x`);
   });
 

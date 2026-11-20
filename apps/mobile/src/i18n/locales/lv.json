@@ -1422,7 +1422,6 @@
     "followReviewMd": "Ievērot REVIEW.md norādījumus",
     "followReviewMdSubtitle": "Ievērot katra repozitorija REVIEW.md failā sniegtos norādījumus",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nav pievienots. To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki.",
       "notConnectedReadOnlyPlan": "Organizācijas izmēģinājuma periods ir beidzies, tāpēc īpašniekam ir jāatjaunina norēķini vietnē kilo.ai."
     },
     "bitbucketConnect": {

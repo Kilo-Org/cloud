@@ -1395,7 +1395,6 @@
     "followReviewMd": "Whaia a REVIEW.md",
     "followReviewMdSubtitle": "Whaia ngā kōnae tohutohu REVIEW.md o ia pūranga",
     "bitbucket": {
-      "notConnectedReadOnly": "Kāore anō kia honoa a Bitbucket. Ko ngā rangatira o te rōpū, ngā kaiwhakahaere me ngā kaiwhakahaere utu anake ka āhei ki te hono.",
       "notConnectedReadOnlyPlan": "Kua mutu te whakamātautau o te rōpū, nō reira me whakahou te rangatira i te nama i kilo.ai."
     },
     "bitbucketConnect": {

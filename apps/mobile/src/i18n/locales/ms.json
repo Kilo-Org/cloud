@@ -1395,7 +1395,6 @@
     "followReviewMd": "Ikuti REVIEW.md",
     "followReviewMdSubtitle": "Patuhi fail arahan REVIEW.md dalam setiap repositori",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket tidak disambungkan. Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya.",
       "notConnectedReadOnlyPlan": "Percubaan organisasi telah tamat, jadi pemilik mesti mengemas kini bil di kilo.ai."
     },
     "bitbucketConnect": {

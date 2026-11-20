@@ -1395,7 +1395,6 @@
     "followReviewMd": "REVIEW.mdን ይከተሉ",
     "followReviewMdSubtitle": "በእያንዳንዱ ማከማቻ ውስጥ ያሉትን የREVIEW.md መመሪያ ፋይሎች ይከተሉ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket አልተገናኘም። ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
       "notConnectedReadOnlyPlan": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ስለዚህ ባለቤት በkilo.ai ላይ የክፍያ መረጃውን ማዘመን አለበት።"
     },
     "bitbucketConnect": {

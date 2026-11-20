@@ -1395,7 +1395,6 @@
     "followReviewMd": "ปฏิบัติตาม REVIEW.md",
     "followReviewMdSubtitle": "ทำตามคำแนะนำในไฟล์ REVIEW.md ของแต่ละคลังโค้ด",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ยังไม่เชื่อมต่อ เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถเชื่อมต่อได้",
       "notConnectedReadOnlyPlan": "การทดลองใช้งานขององค์กรสิ้นสุดลงแล้ว เจ้าของจึงต้องอัปเดตการเรียกเก็บเงินที่ kilo.ai"
     },
     "bitbucketConnect": {

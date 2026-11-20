@@ -701,7 +701,6 @@
     },
     "autoReviews": "Automatyczne przeglądy",
     "bitbucket": {
-      "notConnectedReadOnly": "Brak połączenia z Bitbucket. Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je skonfigurować.",
       "notConnectedReadOnlyPlan": "Okres próbny organizacji zakończył się, więc właściciel musi zaktualizować rozliczenia na kilo.ai."
     },
     "bitbucketConnect": {

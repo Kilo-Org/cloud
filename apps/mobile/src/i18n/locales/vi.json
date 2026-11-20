@@ -699,7 +699,6 @@
     },
     "autoReviews": "Rà soát tự động",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket chưa được kết nối. Chỉ chủ sở hữu tổ chức, quản trị viên và người quản lý thanh toán mới có thể kết nối.",
       "notConnectedReadOnlyPlan": "Bản dùng thử của tổ chức đã kết thúc, vì vậy chủ sở hữu phải cập nhật thanh toán tại kilo.ai."
     },
     "bitbucketConnect": {

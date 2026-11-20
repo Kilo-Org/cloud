@@ -1395,7 +1395,6 @@
     "followReviewMd": "Sundin ang REVIEW.md",
     "followReviewMdSubtitle": "Sundin ang mga tagubilin sa REVIEW.md file ng bawat repository",
     "bitbucket": {
-      "notConnectedReadOnly": "Hindi nakakonekta ang Bitbucket. Mga may-ari ng organisasyon, admin, at tagapamahala ng pagsingil lang ang maaaring magkonekta nito.",
       "notConnectedReadOnlyPlan": "Natapos na ang trial ng organisasyon, kaya kailangang i-update ng may-ari ang billing sa kilo.ai."
     },
     "bitbucketConnect": {

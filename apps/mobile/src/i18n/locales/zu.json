@@ -1395,7 +1395,6 @@
     "followReviewMd": "Landela i-REVIEW.md",
     "followReviewMdSubtitle": "Landela imiyalo yamafayela e-REVIEW.md enqolobaneni ngayinye yekhodi",
     "bitbucket": {
-      "notConnectedReadOnly": "I-Bitbucket ayixhunyiwe. Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangayixhuma.",
       "notConnectedReadOnlyPlan": "Isilingo senhlangano siphelile, ngakho umnikazi kufanele abuyekeze ukukhokhela ku-kilo.ai."
     },
     "bitbucketConnect": {

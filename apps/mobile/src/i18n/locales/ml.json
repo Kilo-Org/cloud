@@ -1395,7 +1395,6 @@
     "followReviewMd": "REVIEW.md പിന്തുടരുക",
     "followReviewMdSubtitle": "ഓരോ റിപ്പോസിറ്ററിയിലെയും REVIEW.md ഫയലിലെ നിർദ്ദേശങ്ങൾ പാലിക്കുക",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket കണക്റ്റുചെയ്തിട്ടില്ല. ഓർഗനൈസേഷൻ ഉടമകൾക്കും അഡ്മിനുകൾക്കും ബില്ലിംഗ് മാനേജർമാർക്കും മാത്രമേ അത് കണക്റ്റുചെയ്യാൻ കഴിയൂ.",
       "notConnectedReadOnlyPlan": "സ്ഥാപനത്തിന്റെ ട്രയൽ അവസാനിച്ചു, അതിനാൽ ഉടമ kilo.ai-ൽ ബില്ലിംഗ് അപ്ഡേറ്റ് ചെയ്യണം."
     },
     "bitbucketConnect": {

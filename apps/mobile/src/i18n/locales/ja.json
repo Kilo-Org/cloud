@@ -699,7 +699,6 @@
     },
     "autoReviews": "自動レビュー",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucketが接続されていません。接続できるのは組織のオーナー、管理者、請求管理者のみです。",
       "notConnectedReadOnlyPlan": "組織のトライアルは終了したため、オーナーが kilo.ai で請求情報を更新する必要があります。"
     },
     "bitbucketConnect": {

@@ -1395,7 +1395,6 @@
     "followReviewMd": "REVIEW.md követése",
     "followReviewMdSubtitle": "Az adattárankénti REVIEW.md utasításfájlok követése",
     "bitbucket": {
-      "notConnectedReadOnly": "A Bitbucket nincs csatlakoztatva. Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei csatlakoztathatják.",
       "notConnectedReadOnlyPlan": "A szervezet próbaidőszaka lejárt, ezért a tulajdonosnak frissítenie kell a számlázást a kilo.ai oldalon."
     },
     "bitbucketConnect": {

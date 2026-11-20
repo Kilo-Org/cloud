@@ -1395,7 +1395,6 @@
     "followReviewMd": "Följ REVIEW.md",
     "followReviewMdSubtitle": "Följ instruktionerna i varje kodarkivs REVIEW.md-fil",
     "bitbucket": {
-      "notConnectedReadOnly": "Det finns ingen anslutning till Bitbucket. Endast organisationsägare, administratörer och faktureringsansvariga kan skapa anslutningen.",
       "notConnectedReadOnlyPlan": "Organisationens provperiod har löpt ut, så en ägare måste uppdatera faktureringen på kilo.ai."
     },
     "bitbucketConnect": {

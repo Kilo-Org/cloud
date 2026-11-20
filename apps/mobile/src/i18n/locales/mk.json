@@ -1395,7 +1395,6 @@
     "followReviewMd": "Следи REVIEW.md",
     "followReviewMdSubtitle": "Почитувај ги упатствата во датотеката REVIEW.md во секое складиште",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket не е поврзан. Само сопствениците на организацијата, администраторите и одговорните за наплата можат да го поврзат.",
       "notConnectedReadOnlyPlan": "Пробниот период на организацијата заврши, затоа сопственикот мора да го ажурира наплатувањето на kilo.ai."
     },
     "bitbucketConnect": {

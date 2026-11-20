@@ -1422,7 +1422,6 @@
     "followReviewMd": "Respectă REVIEW.md",
     "followReviewMdSubtitle": "Respectă instrucțiunile din fișierul REVIEW.md al fiecărui depozit",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nu este conectat. Doar proprietarii, administratorii și managerii de facturare ai organizației îl pot conecta.",
       "notConnectedReadOnlyPlan": "Perioada de probă a organizației s-a încheiat, așa că un proprietar trebuie să actualizeze facturarea pe kilo.ai."
     },
     "bitbucketConnect": {

@@ -33,6 +33,10 @@ const FAILURE_TIER: Record<BenchmarkProfileFailureClass, FailureTier> = {
   orphaned_claim: 'infrastructure',
   run_init_failed: 'infrastructure',
   unknown: 'infrastructure',
+  // The pair measured its subset and lost no route it could win: a verdict on this
+  // measurement, not on the model, and one a re-measure may overturn. It counts against the
+  // model budget so a pair cannot be stopped, re-admitted and stopped forever for free.
+  subset_not_in_contention: 'model',
 };
 
 const TIER_SEVERITY: Record<FailureTier, number> = { infrastructure: 0, model: 1, terminal: 2 };

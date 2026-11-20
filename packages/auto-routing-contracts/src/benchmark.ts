@@ -428,6 +428,10 @@ export const BenchmarkProfileFailureClassSchema = z.enum([
   'orphaned_claim',
   'run_init_failed',
   'unknown',
+  // A policy stop, not a verdict on the model: the pair's stratified subset was measured and
+  // could not reach a route, so the rest of its cases would buy nothing. Emitted only after
+  // the web that reads this enum is promoted.
+  'subset_not_in_contention',
 ]);
 export type BenchmarkProfileFailureClass = z.infer<typeof BenchmarkProfileFailureClassSchema>;
 

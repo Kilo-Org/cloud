@@ -594,6 +594,40 @@ describe('share payload durable persistence', () => {
     expect(draft?.entries[owned]?.text).toBe('staged-by-a');
   });
 
+  it('keeps a live capture when the account draft alone fills the cap', async () => {
+    // A full account draft: the cap is reached by the account's own entries.
+    setSharePersistUserId('userA');
+    const owned: string[] = [];
+    for (let i = 0; i < SHARE_PAYLOAD_MAX_ENTRIES; i += 1) {
+      owned.push(putSharePayload({ text: `a-${i}`, files: [], failedFiles: [] }));
+    }
+    await persistSharePayloadsNow();
+    clearAccountStagedSharePayloads();
+    setSharePersistUserId(null);
+
+    // A capture the person is about to deliver, staged before the account resolved.
+    const captureUri = 'file:///cache/capture.jpg';
+    const stagedOut = putSharePayload({
+      text: 'captured-out',
+      files: [{ name: 'capture.jpg', uri: captureUri }],
+      failedFiles: [],
+    });
+    const deleted: string[] = [];
+    __setDeleteCachedFileForTests(uri => {
+      deleted.push(uri);
+    });
+
+    setSharePersistUserId('userA');
+    await restoreSharePayloads('userA');
+
+    // The capture stays readable and its cache copy intact, and the store holds
+    // the cap rather than the cap plus one.
+    expect(peekSharePayload(stagedOut)?.text).toBe('captured-out');
+    expect(deleted).toEqual([]);
+    const live = owned.filter(id => peekSharePayload(id) !== null);
+    expect(live.length).toBe(SHARE_PAYLOAD_MAX_ENTRIES - 1);
+  });
+
   it('never restores one capture under a second account', async () => {
     const stagedOut = putSharePayload({ text: 'captured-out', files: [], failedFiles: [] });
 

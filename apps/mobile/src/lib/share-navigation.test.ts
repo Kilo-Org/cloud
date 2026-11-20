@@ -273,6 +273,37 @@ describe('share navigation durable persistence', () => {
     expect(takePendingShareNavigation()).toBeNull();
   });
 
+  it('keeps a live destination when the account draft alone fills the cap', async () => {
+    setSharePersistUserId('userA');
+    for (let i = 0; i < SHARE_PAYLOAD_MAX_ENTRIES; i += 1) {
+      setPendingShareNavigation({
+        href: `/(app)/agent-chat/new?shareId=a-${i}`,
+        shareId: `a-${i}`,
+      });
+    }
+    await persistShareNavigationNow();
+    clearAccountStagedShareNavigation();
+    setSharePersistUserId(null);
+
+    // A destination staged before the account resolved, still waiting to deliver.
+    setPendingShareNavigation({ href: '/(app)/agent-chat/new?shareId=out', shareId: 'out' });
+
+    setSharePersistUserId('userA');
+    await restoreShareNavigation('userA');
+
+    const queued: (string | null)[] = [];
+    for (let i = 0; i < SHARE_PAYLOAD_MAX_ENTRIES + 1; i += 1) {
+      const next = takePendingShareNavigation();
+      if (next === null) {
+        break;
+      }
+      queued.push(next.shareId);
+    }
+    // The live destination is still deliverable, and the queue holds the cap.
+    expect(queued).toContain('out');
+    expect(queued.length).toBe(SHARE_PAYLOAD_MAX_ENTRIES);
+  });
+
   it('stops restoring when the account changes during the read', async () => {
     setSharePersistUserId('userA');
     saveDraft('userA', SHARE_NAV_DRAFT_KEY, [

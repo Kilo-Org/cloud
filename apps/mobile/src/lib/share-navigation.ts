@@ -110,7 +110,13 @@ export async function restoreShareNavigation(userId: string): Promise<void> {
   if (!draft) {
     return;
   }
+  // Merge in recorded order, and stop at the cap instead of dropping from the
+  // front: a destination this process staged stays deliverable, and the
+  // account's oldest retained destinations fill the room that is left.
   for (const entry of draft) {
+    if (pendingQueue.length >= SHARE_PAYLOAD_MAX_ENTRIES) {
+      break;
+    }
     pendingQueue.push({
       pending: { href: entry.href, shareId: entry.shareId },
       stagedUserId: userId,

@@ -1138,6 +1138,55 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     expect(queueSend).not.toHaveBeenCalledWith(deciderMessage(), expect.anything());
   });
 
+  it('keeps grading the chunk and defers it when clearing an unstarted retry also fails', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const secondCase = DECIDER_CASES[1];
+    mockClaim({ case_ids: JSON.stringify([benchCase.id, secondCase.id]) });
+    vi.mocked(runDeciderCaseViaCli)
+      .mockResolvedValueOnce({ ...successfulCliResult, text: '', exitCode: 0, costUsd: 0.01 })
+      .mockRejectedValueOnce(
+        new Error(
+          'container /run failed: HTTP 503 container not reached: Error proxying request to container: The container just exited'
+        )
+      );
+    vi.mocked(savePendingDeciderOutput).mockRejectedValueOnce(new Error('D1_ERROR: overloaded'));
+    vi.mocked(clearUnbilledCase).mockRejectedValueOnce(new Error('D1_ERROR: overloaded'));
+
+    await processJob(env, deciderMessage());
+
+    expect(clearUnbilledCase).toHaveBeenCalledTimes(1);
+    expect(upsertCaseResult).toHaveBeenCalledTimes(1);
+    expect(upsertCaseResult).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ case_id: secondCase.id })
+    );
+    expect(failChunk).not.toHaveBeenCalled();
+    expect(recordLaneFailure).not.toHaveBeenCalled();
+    expect(finishChunk).not.toHaveBeenCalled();
+    expect(deferChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1', expect.any(Number));
+    const events = warn.mock.calls.map(([line]) => String(line));
+    expect(events).toContain(
+      JSON.stringify({
+        event: 'benchmark_unstarted_retry_clear_failed',
+        runId,
+        model,
+        variant: '',
+        rep: 0,
+        caseId: benchCase.id,
+        slot: 7,
+        chunk: 0,
+        attemptStartedAt:
+          vi.mocked(runDeciderCaseViaCli).mock.calls[1]?.[1].resultCallback?.execution
+            .attemptStartedAt,
+        errorCategory: 'd1_error',
+      })
+    );
+    expect(schedulerWaitEvent(warn.mock.calls)).toMatchObject({
+      reason: 'grading',
+      errorType: 'DeciderGraderRetryError',
+    });
+  });
+
   it('defers a killed-before-events case whose retry never reaches the container', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.mocked(runDeciderCaseViaCli)

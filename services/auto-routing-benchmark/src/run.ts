@@ -2319,9 +2319,25 @@ async function processDeciderJob(
             // No callback can satisfy a retry that never reached its container, so its
             // ledger generation must not outlive the only copy of the first output.
             if (unstartedRetryAt !== undefined) {
+              const retryAt = unstartedRetryAt;
               await clearUnbilledCase(env.BENCH_DB, {
                 ...execution,
-                attemptStartedAt: unstartedRetryAt,
+                attemptStartedAt: retryAt,
+              }).catch((error: unknown) => {
+                console.warn(
+                  JSON.stringify({
+                    event: 'benchmark_unstarted_retry_clear_failed',
+                    runId: message.runId,
+                    model: message.model,
+                    variant: storedVariant,
+                    rep,
+                    caseId: benchCase.id,
+                    slot: claim.slot,
+                    chunk,
+                    attemptStartedAt: retryAt,
+                    errorCategory: benchmarkErrorCategory(error),
+                  })
+                );
               });
             }
             throw new DeciderGraderRetryError('Pending decider output could not be saved');

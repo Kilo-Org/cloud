@@ -37,6 +37,7 @@ import {
   type BenchmarkSchedulerConfigResponse,
   type BenchmarkSchedulerSetting,
   type BenchmarkRunProgress,
+  type BenchmarkRunTotals,
   type CustomRoutingTableResponse,
 } from '@kilocode/auto-routing-contracts';
 import { formatError, zodJsonValidator } from '@kilocode/worker-utils';
@@ -72,10 +73,12 @@ import {
   listCurrentPlatformProfileStatuses,
   getClassifierWinner,
   getRunSummariesForRouter,
+  listRunModelIds,
   listRuns,
   requeueRetryableCurrentProfiles,
 } from './db';
 import { loadRunProgress } from './run-progress';
+import { loadRunModelTotals, loadRunTotals } from './run-totals';
 import { loadRoutingTableResponse } from './routing-table-response';
 import { getSchedulerOverrides, resolveSchedulerConfig, saveSchedulerOverrides } from './scheduler';
 import type { HonoEnv } from './hono-env';
@@ -343,23 +346,55 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       );
       return new Map<string, BenchmarkRunProgress>();
     });
+    // Totals are one bounded aggregate per page of runs, never their summaries.
+    // A failed aggregate leaves the list intact, without the cost columns.
+    const runIds = runs.map(run => run.id);
+    const [totalsByRunId, modelsByRunId] = await Promise.all([
+      loadRunTotals(c.env.BENCH_DB, runIds).catch((error: unknown) => {
+        console.warn(
+          JSON.stringify({ event: 'benchmark_run_totals_failed', ...formatError(error) })
+        );
+        return new Map<string, BenchmarkRunTotals>();
+      }),
+      listRunModelIds(c.env.BENCH_DB, runIds).catch((error: unknown) => {
+        console.warn(
+          JSON.stringify({ event: 'benchmark_run_models_failed', ...formatError(error) })
+        );
+        return new Map<string, string[]>();
+      }),
+    ]);
     return c.json({
       runs: runs.map(run => {
         const progress = progressByRunId.get(run.id);
-        return withLegacyAdminRunFields(progress ? { ...run, progress } : run);
+        const totals = totalsByRunId.get(run.id);
+        const models = modelsByRunId.get(run.id);
+        return withLegacyAdminRunFields({
+          ...run,
+          ...(progress ? { progress } : {}),
+          ...(totals ? { totals } : {}),
+          ...(models ? { models } : {}),
+        });
       }),
       hasRunningRun,
     } satisfies BenchmarkRunsResponse);
   });
 
   app.get('/admin/runs/:runId/summaries', async c => {
-    const summaries = await getRunSummariesForRouter(
-      c.env.BENCH_DB,
-      c.req.param('runId'),
-      requestRouter(c)
-    );
+    const runId = c.req.param('runId');
+    const summaries = await getRunSummariesForRouter(c.env.BENCH_DB, runId, requestRouter(c));
     if (summaries === null) return c.json({ error: 'Run not found' }, 404);
-    return c.json({ summaries } satisfies BenchmarkRunSummariesResponse);
+    // The per-pair totals are display-only: a failed aggregate must not hide the
+    // route rows, which carry the same run's detail.
+    const modelTotals = await loadRunModelTotals(c.env.BENCH_DB, runId).catch((error: unknown) => {
+      console.warn(
+        JSON.stringify({ event: 'benchmark_run_model_totals_failed', runId, ...formatError(error) })
+      );
+      return undefined;
+    });
+    return c.json({
+      summaries,
+      ...(modelTotals ? { modelTotals } : {}),
+    } satisfies BenchmarkRunSummariesResponse);
   });
 
   app.post(

@@ -22,6 +22,7 @@ import {
   type BenchmarkPlatformModel,
   type BenchmarkKind,
   type BenchmarkModelSummary,
+  type BenchmarkModelTotals,
   type BenchmarkQueueSelector,
   type BenchmarkRegistryQueue,
   type BenchmarkRegistryResponse,
@@ -72,6 +73,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { parseAdminResponse } from './admin-fetch';
+import { entryMentionsModel, runMentionsModel } from './admin-time';
+import { AdminTimeLabel } from './AdminTimeLabel';
 import { SchedulerConfigCard } from './SchedulerConfigCard';
 import { FailedModels } from './FailedModelsTable';
 import { useSystemOneModelOptions } from './system-one-models';
@@ -93,6 +96,20 @@ export function costPerAccuracy(candidate: Pick<RankedCandidate, 'accuracy' | 'a
   return candidate.accuracy > 0
     ? candidate.avgCostUsd / candidate.accuracy
     : Number.POSITIVE_INFINITY;
+}
+
+/**
+ * A run or pair total, which is a sum of many small case costs: two decimals
+ * would render every real run as $0.00, so a sub-cent total keeps its own
+ * precision. A non-zero total below that precision never reads as free.
+ */
+export function formatTotalUsd(n: number | null): string {
+  if (n === null) return '—';
+  if (n === 0) return '$0';
+  if (n >= 0.01) return `$${n.toFixed(2)}`;
+  // Small totals stay readable to the sixth decimal, without trailing zeros.
+  const small = Number(n.toFixed(6));
+  return small === 0 ? '<$0.000001' : `$${small}`;
 }
 
 // Below this share of the expected cases the completion rate is still noise, so
@@ -1158,6 +1175,59 @@ export function ConfigSaveWarnings({ warnings }: { warnings: BenchmarkConfigSave
   );
 }
 
+/** Totals for one pair, recomputed from route rows when an older worker sends none. */
+export function modelTotalsFromSummaries(
+  summaries: readonly BenchmarkModelSummary[]
+): BenchmarkModelTotals[] {
+  const groups = new Map<string, BenchmarkModelTotals & { scoreSum: number; costSum: number }>();
+  for (const summary of summaries) {
+    const key = JSON.stringify([summary.model, summary.variant ?? null]);
+    const group = groups.get(key);
+    const costed = summary.avgCostUsd === null ? 0 : summary.avgCostUsd * summary.cases;
+    if (group) {
+      group.scoreSum += summary.accuracy * summary.cases;
+      group.costSum += costed;
+      group.cases += summary.cases;
+      group.errors += summary.errors;
+      group.timeouts += summary.timeouts;
+    } else {
+      groups.set(key, {
+        model: summary.model,
+        variant: summary.variant,
+        accuracy: 0,
+        routeAccuracy: null,
+        costPerCaseUsd: null,
+        totalCostUsd: null,
+        cases: summary.cases,
+        errors: summary.errors,
+        timeouts: summary.timeouts,
+        scoreSum: summary.accuracy * summary.cases,
+        costSum: costed,
+      });
+    }
+  }
+  return [...groups.values()]
+    .map(({ scoreSum, costSum, ...totals }) => ({
+      ...totals,
+      accuracy: totals.cases > 0 ? Number((scoreSum / totals.cases).toFixed(4)) : 0,
+      costPerCaseUsd:
+        totals.cases > 0 && costSum > 0 ? Number((costSum / totals.cases).toFixed(8)) : null,
+      totalCostUsd: costSum > 0 ? Number(costSum.toFixed(8)) : null,
+    }))
+    .toSorted((a, b) => b.accuracy - a.accuracy || a.model.localeCompare(b.model));
+}
+
+function RunTotalsLine({ run }: { run: BenchmarkRun }) {
+  const totals = run.totals;
+  if (!totals) return null;
+  return (
+    <p className="text-muted-foreground mb-2 text-xs tabular-nums">
+      <span className="text-foreground font-medium">{formatTotalUsd(totals.totalCostUsd)}</span>{' '}
+      total cost · {totals.measuredCases} cases measured · {totals.erroredCases} errored
+    </p>
+  );
+}
+
 function RunSummariesTable({
   run,
   router,
@@ -1179,6 +1249,9 @@ function RunSummariesTable({
     refetchInterval: running ? RUNS_POLL_INTERVAL_MS : false,
   });
   const summaries = summariesQuery.data?.summaries ?? [];
+  const modelTotals =
+    summariesQuery.data?.modelTotals ??
+    (summaries.length > 0 ? modelTotalsFromSummaries(summaries) : []);
 
   const sortedSummaries: BenchmarkModelSummary[] = isDecider
     ? [...summaries].sort((a, b) => {
@@ -1190,13 +1263,18 @@ function RunSummariesTable({
 
   return (
     <TableRow className="bg-muted/30">
-      <TableCell colSpan={6} id={id} className="px-4 py-2">
-        {/* Full error text (the collapsed row's Error cell is truncated). */}
+      <TableCell colSpan={RUN_TABLE_COLUMNS} id={id} className="px-4 py-2">
+        {/* Full error text; the collapsed row's Error cell wraps, and this reads
+            the whole message without hunting for the tooltip. */}
         {run.error ? (
-          <div className="border-destructive/40 bg-destructive/10 text-destructive mb-2 rounded-md border px-3 py-2 text-xs whitespace-pre-wrap break-words">
+          <div
+            className="border-destructive/40 bg-destructive/10 text-destructive mb-2 rounded-md border px-3 py-2 text-xs whitespace-pre-wrap break-words"
+            title={run.error}
+          >
             {run.error}
           </div>
         ) : null}
+        <RunTotalsLine run={run} />
         {summariesQuery.isLoading ? (
           <Skeleton className="h-16 w-full" />
         ) : summariesQuery.error ? (
@@ -1206,68 +1284,142 @@ function RunSummariesTable({
               ? summariesQuery.error.message
               : 'request failed'}
           </p>
-        ) : sortedSummaries.length === 0 ? (
+        ) : modelTotals.length === 0 ? (
           <p className="text-muted-foreground py-1 text-center text-xs">No summaries</p>
         ) : (
-          <div className="overflow-x-auto">
-            <Table className="min-w-max">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs">Model</TableHead>
-                  {isDecider ? <TableHead className="text-xs">Route</TableHead> : null}
-                  <TableHead className="text-right text-xs">Accuracy</TableHead>
-                  {isDecider ? null : (
-                    <TableHead className="text-right text-xs">Route accuracy</TableHead>
-                  )}
-                  <TableHead className="text-right text-xs">Avg cost</TableHead>
-                  <TableHead className="text-right text-xs">Avg latency</TableHead>
-                  <TableHead className="text-right text-xs">p50 latency</TableHead>
-                  <TableHead className="text-right text-xs">p95 latency</TableHead>
-                  <TableHead className="text-right text-xs">Cases</TableHead>
-                  <TableHead className="text-right text-xs">Errors</TableHead>
-                  <TableHead className="text-right text-xs">Timeouts</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedSummaries.map((s, i) => (
-                  <TableRow key={`${s.model}-${s.routeKey}-${i}`}>
-                    <TableCell className="max-w-56 truncate font-mono text-xs">{s.model}</TableCell>
-                    {isDecider ? (
-                      <TableCell className="font-mono text-xs">{s.routeKey}</TableCell>
-                    ) : null}
-                    <TableCell className="text-right tabular-nums text-xs">
-                      {formatAccuracy(s.accuracy)}
-                    </TableCell>
+          <div className="flex flex-col gap-3">
+            <div>
+              <h4 className="mb-1 text-xs font-medium">Models</h4>
+              <Table className="w-full table-fixed">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs">Model</TableHead>
+                    <TableHead className="w-24 text-right text-xs">Accuracy</TableHead>
                     {isDecider ? null : (
-                      <TableCell className="text-right tabular-nums text-xs">
-                        {s.routeAccuracy !== null ? formatAccuracy(s.routeAccuracy) : '—'}
-                      </TableCell>
+                      <TableHead className="w-28 text-right text-xs">Route accuracy</TableHead>
                     )}
-                    <TableCell className="text-right tabular-nums text-xs">
-                      {formatUsd(s.avgCostUsd)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-xs">
-                      {s.avgLatencyMs.toFixed(0)} ms
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-xs">
-                      {s.p50LatencyMs !== null ? `${s.p50LatencyMs.toFixed(0)} ms` : '—'}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-xs">
-                      {s.p95LatencyMs !== null ? `${s.p95LatencyMs.toFixed(0)} ms` : '—'}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-xs">{s.cases}</TableCell>
-                    <TableCell className="text-right tabular-nums text-xs">{s.errors}</TableCell>
-                    <TableCell className="text-right tabular-nums text-xs">{s.timeouts}</TableCell>
+                    <TableHead className="w-28 text-right text-xs">Cost / case</TableHead>
+                    <TableHead className="w-28 text-right text-xs">Total cost</TableHead>
+                    <TableHead className="w-20 text-right text-xs">Cases</TableHead>
+                    <TableHead className="w-20 text-right text-xs">Errors</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {modelTotals.map(totals => (
+                    <TableRow key={`${totals.model}-${totals.variant ?? ''}`}>
+                      <TableCell className="max-w-0 text-xs">
+                        <span className="block truncate font-mono" title={totals.model}>
+                          {totals.model}
+                        </span>
+                        {totals.variant ? (
+                          <span className="text-muted-foreground block truncate text-[11px]">
+                            {totals.variant}
+                          </span>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-xs">
+                        {formatAccuracy(totals.accuracy)}
+                      </TableCell>
+                      {isDecider ? null : (
+                        <TableCell className="text-right tabular-nums text-xs">
+                          {totals.routeAccuracy !== null
+                            ? formatAccuracy(totals.routeAccuracy)
+                            : '—'}
+                        </TableCell>
+                      )}
+                      <TableCell className="text-right tabular-nums text-xs">
+                        {formatUsd(totals.costPerCaseUsd)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-xs">
+                        {formatTotalUsd(totals.totalCostUsd)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-xs">
+                        {totals.cases}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-xs">
+                        {totals.errors}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <Collapsible>
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground h-8 justify-start gap-1 px-2 text-xs [&[data-state=open]>svg]:rotate-90"
+                >
+                  <ChevronRight className="size-4" />
+                  Per-route detail ({sortedSummaries.length}{' '}
+                  {sortedSummaries.length === 1 ? 'route' : 'routes'})
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <Table className="w-full table-fixed">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs">Model</TableHead>
+                      {isDecider ? <TableHead className="w-40 text-xs">Route</TableHead> : null}
+                      <TableHead className="w-20 text-right text-xs">Accuracy</TableHead>
+                      {isDecider ? null : (
+                        <TableHead className="w-24 text-right text-xs">Route accuracy</TableHead>
+                      )}
+                      <TableHead className="w-24 text-right text-xs">Avg cost</TableHead>
+                      <TableHead className="w-24 text-right text-xs">Avg latency</TableHead>
+                      <TableHead className="w-16 text-right text-xs">Cases</TableHead>
+                      <TableHead className="w-16 text-right text-xs">Errors</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedSummaries.map((s, i) => (
+                      <TableRow key={`${s.model}-${s.routeKey}-${i}`}>
+                        <TableCell className="max-w-0 font-mono text-xs">
+                          <span className="block truncate" title={s.model}>
+                            {s.model}
+                          </span>
+                        </TableCell>
+                        {isDecider ? (
+                          <TableCell className="max-w-0 font-mono text-xs">
+                            <span className="block truncate" title={s.routeKey}>
+                              {s.routeKey}
+                            </span>
+                          </TableCell>
+                        ) : null}
+                        <TableCell className="text-right tabular-nums text-xs">
+                          {formatAccuracy(s.accuracy)}
+                        </TableCell>
+                        {isDecider ? null : (
+                          <TableCell className="text-right tabular-nums text-xs">
+                            {s.routeAccuracy !== null ? formatAccuracy(s.routeAccuracy) : '—'}
+                          </TableCell>
+                        )}
+                        <TableCell className="text-right tabular-nums text-xs">
+                          {formatUsd(s.avgCostUsd)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-xs">
+                          {s.avgLatencyMs.toFixed(0)} ms
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-xs">{s.cases}</TableCell>
+                        <TableCell className="text-right tabular-nums text-xs">
+                          {s.errors}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
         )}
       </TableCell>
     </TableRow>
   );
 }
+
+/** Column count of the runs table, shared by its empty and expanded rows. */
+const RUN_TABLE_COLUMNS = 7;
 
 function statusBadgeVariant(
   status: BenchmarkRun['status']
@@ -1298,7 +1450,29 @@ function RunProgress({
   );
 }
 
-function BenchmarkRunsTable({ runs, router }: { runs: BenchmarkRun[]; router: AutoRouter }) {
+function RunCostCell({ run }: { run: BenchmarkRun }) {
+  if (!run.totals) return <span className="text-muted-foreground">—</span>;
+  return (
+    <div className="flex flex-col items-end gap-0.5">
+      <span className="font-medium">{formatTotalUsd(run.totals.totalCostUsd)}</span>
+      <span className="text-muted-foreground text-[11px]">
+        {run.totals.measuredCases} cases
+        {run.totals.erroredCases > 0 ? ` · ${run.totals.erroredCases} errored` : ''}
+      </span>
+    </div>
+  );
+}
+
+export function BenchmarkRunsTable({
+  runs,
+  router,
+  matchedIds,
+}: {
+  runs: BenchmarkRun[];
+  router: AutoRouter;
+  /** Ids surviving the model filter, or null when no filter is active. */
+  matchedIds: ReadonlySet<string> | null;
+}) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   const toggleExpand = useCallback((id: string) => {
@@ -1316,8 +1490,19 @@ function BenchmarkRunsTable({ runs, router }: { runs: BenchmarkRun[]; router: Au
   if (runs.length === 0) {
     return (
       <TableRow>
-        <TableCell colSpan={6} className="text-muted-foreground h-16 text-center">
+        <TableCell colSpan={RUN_TABLE_COLUMNS} className="text-muted-foreground h-16 text-center">
           No runs yet
+        </TableCell>
+      </TableRow>
+    );
+  }
+
+  const visible = matchedIds === null ? runs : runs.filter(run => matchedIds.has(run.id));
+  if (visible.length === 0) {
+    return (
+      <TableRow>
+        <TableCell colSpan={RUN_TABLE_COLUMNS} className="text-muted-foreground h-16 text-center">
+          No run of this list measured that model
         </TableCell>
       </TableRow>
     );
@@ -1325,7 +1510,7 @@ function BenchmarkRunsTable({ runs, router }: { runs: BenchmarkRun[]; router: Au
 
   return (
     <>
-      {runs.map(run => {
+      {visible.map(run => {
         const expanded = expandedIds.has(run.id);
         const summariesId = `run-summaries-${run.id}`;
         return (
@@ -1356,6 +1541,14 @@ function BenchmarkRunsTable({ runs, router }: { runs: BenchmarkRun[]; router: Au
                 <Badge variant={run.kind === 'classifier' ? 'outline' : 'secondary'}>
                   {runTypeLabel(run)}
                 </Badge>
+                {run.models && run.models.length > 0 ? (
+                  <span
+                    className="text-muted-foreground mt-1 block max-w-56 truncate font-mono text-[11px]"
+                    title={run.models.join(', ')}
+                  >
+                    {run.models.join(', ')}
+                  </span>
+                ) : null}
               </TableCell>
               <TableCell className="py-2">
                 <Badge variant={statusBadgeVariant(run.status)} className="capitalize">
@@ -1365,13 +1558,21 @@ function BenchmarkRunsTable({ runs, router }: { runs: BenchmarkRun[]; router: Au
                   <RunProgress progress={run.progress} startedAt={run.startedAt} />
                 ) : null}
               </TableCell>
-              <TableCell className="py-2 text-xs tabular-nums">{run.startedAt}</TableCell>
-              <TableCell className="py-2 text-xs tabular-nums">{run.completedAt ?? '—'}</TableCell>
-              <TableCell
-                className="py-2 text-xs text-destructive max-w-48 truncate"
-                title={run.error ?? undefined}
-              >
-                {run.error ?? ''}
+              <TableCell className="py-2 text-right text-xs tabular-nums">
+                <RunCostCell run={run} />
+              </TableCell>
+              <TableCell className="py-2 text-xs tabular-nums">
+                <AdminTimeLabel iso={run.startedAt} />
+              </TableCell>
+              <TableCell className="py-2 text-xs tabular-nums">
+                {run.completedAt ? <AdminTimeLabel iso={run.completedAt} /> : '—'}
+              </TableCell>
+              <TableCell className="text-destructive max-w-72 py-2 align-top text-xs">
+                {run.error ? (
+                  <span className="block whitespace-pre-wrap break-words" title={run.error}>
+                    {run.error}
+                  </span>
+                ) : null}
               </TableCell>
             </TableRow>
             {expanded ? <RunSummariesTable run={run} router={router} id={summariesId} /> : null}
@@ -1564,6 +1765,7 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
   const queryClient = useQueryClient();
   const [forceRerun, setForceRerun] = useState(false);
   const [runFilter, setRunFilter] = useState<RunFilter>('all');
+  const [modelQuery, setModelQuery] = useState('');
 
   const modelsQuery = useModelSelectorList(undefined);
   const modelOptions = useMemo(
@@ -1612,6 +1814,30 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
   // mistaken for a run finishing.
   const runActivity = runsQuery.data ? responseHasRunningRun(runsQuery.data) : undefined;
   const hasRunningRun = runActivity ?? false;
+
+  // 'Find a model' is one client-side substring match over each run's enqueued
+  // model ids, so the answer to "did my new model run, and what did it cost"
+  // costs no request.
+  const runIdsByModel = useMemo(() => {
+    if (modelQuery.trim().length === 0) return null;
+    const ids = new Set<string>();
+    for (const run of runsQuery.data?.runs ?? []) {
+      if (runMentionsModel(run, modelQuery)) ids.add(run.id);
+    }
+    return ids;
+  }, [modelQuery, runsQuery.data]);
+
+  const filteredFailedEntries = useMemo(
+    () =>
+      (registryQuery.data?.failedEntries ?? []).filter(entry =>
+        entryMentionsModel(entry, modelQuery)
+      ),
+    [modelQuery, registryQuery.data]
+  );
+  const filteredRegistryEntries = useMemo(() => {
+    const entries = registryQuery.data?.platformEntries;
+    return entries ? entries.filter(entry => entryMentionsModel(entry, modelQuery)) : entries;
+  }, [modelQuery, registryQuery.data]);
 
   // When the last running run finishes, its completion publishes a routing
   // table / classifier winner. Those live in their own query caches, so
@@ -1730,7 +1956,7 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
             modelOptions={modelOptions}
             modelsLoading={modelsQuery.isLoading}
             modelsError={modelsError}
-            registryEntries={registryQuery.data?.platformEntries}
+            registryEntries={filteredRegistryEntries}
             classifierModelOptions={systemOneModelsQuery.data ?? []}
             classifierModelsLoading={systemOneModelsQuery.isLoading}
             classifierModelsError={systemOneModelsError}
@@ -1741,6 +1967,40 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
 
       <TabsContent value="benchmarks" className="mt-4 flex flex-col gap-4">
         <SchedulerConfigCard />
+
+        <Card className="rounded-lg">
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-base">Find a model</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2 p-4 pt-0">
+            <p className="text-muted-foreground text-xs">
+              Filters the runs list, its failed models, and the registry rows by model id. One
+              lookup answers whether a model ran, what it scored, and what it cost.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                type="search"
+                value={modelQuery}
+                onChange={event => setModelQuery(event.target.value)}
+                placeholder="Filter by model id, e.g. anthropic/claude"
+                aria-label="Find a model by id"
+                className="h-8 max-w-sm text-xs"
+              />
+              {modelQuery.trim().length > 0 ? (
+                <Button type="button" variant="outline" size="sm" onClick={() => setModelQuery('')}>
+                  Clear
+                </Button>
+              ) : null}
+              {modelQuery.trim().length > 0 && runsQuery.data ? (
+                <span className="text-muted-foreground text-xs tabular-nums">
+                  {runIdsByModel?.size ?? 0} of {runsQuery.data.runs.length} runs ·{' '}
+                  {filteredFailedEntries.length} failed{' '}
+                  {filteredFailedEntries.length === 1 ? 'entry' : 'entries'}
+                </span>
+              ) : null}
+            </div>
+          </CardContent>
+        </Card>
 
         <Card className="rounded-lg">
           <CardHeader className="p-4 pb-2">
@@ -1764,7 +2024,7 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
                 <RegistrySummary data={registryQuery.data} router={router} />
                 <div className="flex flex-col gap-2">
                   <h3 className="text-sm font-medium">Failed models</h3>
-                  <FailedModels router={router} entries={registryQuery.data.failedEntries ?? []} />
+                  <FailedModels router={router} entries={filteredFailedEntries} />
                 </div>
               </>
             ) : null}
@@ -1901,13 +2161,18 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
                     <TableHead className="w-8" />
                     <TableHead>Type</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Cost</TableHead>
                     <TableHead>Started</TableHead>
                     <TableHead>Completed</TableHead>
                     <TableHead>Error</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <BenchmarkRunsTable runs={runsQuery.data?.runs ?? []} router={router} />
+                  <BenchmarkRunsTable
+                    runs={runsQuery.data?.runs ?? []}
+                    router={router}
+                    matchedIds={runIdsByModel}
+                  />
                 </TableBody>
               </Table>
             )}

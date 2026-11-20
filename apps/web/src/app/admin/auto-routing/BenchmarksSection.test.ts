@@ -1,7 +1,9 @@
 import { describe, expect, it } from '@jest/globals';
 import type {
   BenchmarkConfig,
+  BenchmarkModelSummary,
   BenchmarkRoutingTableResponse,
+  BenchmarkRun,
 } from '@kilocode/auto-routing-contracts';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -11,9 +13,13 @@ import {
   effortCoverageForModel,
   formStateToConfig,
   formatRunProgress,
+  BenchmarkRunsTable,
+  formatTotalUsd,
+  modelTotalsFromSummaries,
   RoutingTableView,
   toBenchmarkModelOptions,
 } from './BenchmarksSection';
+import { formatAdminTime, relativeAge, runMentionsModel } from './admin-time';
 
 const baseConfig: BenchmarkConfig = {
   ...formStateToConfig(configToFormState(null), null),
@@ -350,5 +356,191 @@ describe('benchmark run progress', () => {
         Date.parse('2026-06-15T00:00:30.000Z')
       ).eta
     ).toBe('<1 min');
+  });
+});
+
+describe('run cost totals', () => {
+  it('renders a page-sized total at two decimals but keeps a sub-cent total readable', () => {
+    expect(formatTotalUsd(null)).toBe('—');
+    expect(formatTotalUsd(0)).toBe('$0');
+    expect(formatTotalUsd(12.3456)).toBe('$12.35');
+    expect(formatTotalUsd(0.004321)).toBe('$0.004321');
+    // Below the sixth decimal a real cost must never read as free.
+    expect(formatTotalUsd(0.0000004)).toBe('<$0.000001');
+  });
+});
+
+describe('per-model totals from route rows', () => {
+  const summary = (
+    model: string,
+    routeKey: string,
+    accuracy: number,
+    avgCostUsd: number | null,
+    cases: number,
+    errors = 0
+  ): BenchmarkModelSummary => ({
+    model,
+    variant: null,
+    routeKey: routeKey as BenchmarkModelSummary['routeKey'],
+    accuracy,
+    avgCostUsd,
+    avgLatencyMs: 100,
+    p50LatencyMs: 90,
+    p95LatencyMs: 120,
+    cases,
+    errors,
+    timeouts: 0,
+    routeAccuracy: null,
+    avgInputTokens: null,
+    avgCachedInputTokens: null,
+    avgOutputTokens: null,
+    avgReasoningTokens: null,
+  });
+
+  it('sums the routes of one model into a case-weighted accuracy and a total cost', () => {
+    const totals = modelTotalsFromSummaries([
+      summary('vendor/alpha', 'debugging/bug_fixing', 1, 0.02, 10, 1),
+      summary('vendor/alpha', 'implementation/code_generation', 0.5, 0.04, 30),
+    ]);
+    expect(totals).toHaveLength(1);
+    const [alpha] = totals;
+    // 0.25 weighted accuracy over 40 cases, not the mean of the two route rates.
+    expect(alpha.accuracy).toBeCloseTo(0.625, 6);
+    expect(alpha.cases).toBe(40);
+    expect(alpha.errors).toBe(1);
+    // 10*0.02 + 30*0.04 = 1.4 total; 1.4/40 per case.
+    expect(alpha.totalCostUsd).toBeCloseTo(1.4, 6);
+    expect(alpha.costPerCaseUsd).toBeCloseTo(0.035, 6);
+  });
+
+  it('keeps a pair with no reported cost null rather than zero', () => {
+    const [beta] = modelTotalsFromSummaries([
+      summary('vendor/beta', 'debugging/bug_fixing', 0.8, null, 5),
+    ]);
+    expect(beta.totalCostUsd).toBeNull();
+    expect(beta.costPerCaseUsd).toBeNull();
+    expect(beta.accuracy).toBe(0.8);
+  });
+
+  it('orders the most accurate pair first', () => {
+    const totals = modelTotalsFromSummaries([
+      summary('vendor/low', 'debugging/bug_fixing', 0.4, 0.01, 10),
+      summary('vendor/high', 'debugging/bug_fixing', 0.9, 0.01, 10),
+    ]);
+    expect(totals.map(t => t.model)).toEqual(['vendor/high', 'vendor/low']);
+  });
+});
+
+describe('readable admin times', () => {
+  const iso = '2026-11-20T14:32:00.000Z';
+
+  it('shows the local time with the exact ISO value kept for a tooltip', () => {
+    const time = formatAdminTime(iso, Date.parse(iso) + 3 * 60_000);
+    expect(time.iso).toBe(iso);
+    expect(time.local).not.toBe(iso);
+    expect(time.relative).toBe('3 min ago');
+  });
+
+  it('degrades to the raw value instead of crashing on an unparseable date', () => {
+    expect(formatAdminTime('not-a-date')).toEqual({
+      local: 'not-a-date',
+      iso: 'not-a-date',
+      relative: null,
+    });
+  });
+
+  it('scales the relative age from just-now to weeks', () => {
+    const now = Date.parse(iso);
+    expect(relativeAge(now - 10_000, now)).toBe('just now');
+    expect(relativeAge(now - 90 * 60_000, now)).toBe('1 h ago');
+    expect(relativeAge(now - 3 * 86_400_000, now)).toBe('3 d ago');
+    expect(relativeAge(now - 15 * 86_400_000, now)).toBe('2 w ago');
+    // A clock skew never renders a negative age.
+    expect(relativeAge(now + 5 * 60_000, now)).toBe('in 5 min');
+  });
+});
+
+describe('find a model', () => {
+  it('matches a case-insensitive substring of any enqueued model id', () => {
+    const run = { models: ['anthropic/claude-sonnet-4.6', 'google/gemini-2.5-flash'] };
+    expect(runMentionsModel(run, 'claude')).toBe(true);
+    expect(runMentionsModel(run, 'CLAUDE')).toBe(true);
+    expect(runMentionsModel(run, '  gemini ')).toBe(true);
+    expect(runMentionsModel(run, 'openai')).toBe(false);
+  });
+
+  it('shows every run when the query is blank', () => {
+    expect(runMentionsModel({ models: [] }, '')).toBe(true);
+    expect(runMentionsModel({}, '   ')).toBe(true);
+  });
+});
+
+describe('runs table cost column', () => {
+  const model = 'vendor/alpha-that-is-long-enough-to-truncate-on-a-narrow-column';
+  const completedRun: BenchmarkRun = {
+    id: 'decider-1',
+    router: 'efficient',
+    kind: 'decider',
+    purpose: 'platform',
+    status: 'completed',
+    startedAt: '2026-11-20T10:00:00.000Z',
+    completedAt: '2026-11-20T10:30:00.000Z',
+    error: null,
+    totals: { totalCostUsd: 0.4321, measuredCases: 60, erroredCases: 3 },
+    models: [model, 'vendor/beta'],
+  };
+  const failedRun: BenchmarkRun = {
+    ...completedRun,
+    id: 'decider-2',
+    status: 'failed',
+    completedAt: null,
+    error: 'lane dead-lettered: provider returned 503 on every retry of this case',
+    totals: { totalCostUsd: null, measuredCases: 4, erroredCases: 4 },
+    models: ['vendor/beta'],
+  };
+
+  function render(runs: BenchmarkRun[], matchedIds: ReadonlySet<string> | null = null) {
+    return renderToStaticMarkup(
+      React.createElement(
+        'table',
+        null,
+        React.createElement(
+          'tbody',
+          null,
+          React.createElement(BenchmarkRunsTable, {
+            runs,
+            router: 'efficient',
+            matchedIds,
+          })
+        )
+      )
+    );
+  }
+
+  it('shows each run’s cost with its measured and errored case counts', () => {
+    const html = render([completedRun]);
+    expect(html).toContain('$0.43');
+    expect(html).toContain('60 cases · 3 errored');
+    // Readable local time with the exact ISO value kept for the tooltip.
+    expect(html).toContain('title="2026-11-20T10:00:00.000Z"');
+  });
+
+  it('keeps an unknown run cost as a dash and wraps the full error text', () => {
+    const html = render([failedRun]);
+    expect(html).toContain('4 cases · 4 errored');
+    // A run whose cases reported no cost shows a dash, never a fake $0.
+    expect(html).not.toContain('$0');
+    expect(html).toContain('lane dead-lettered');
+    expect(html).toContain('whitespace-pre-wrap');
+    expect(html).toContain(`title="lane dead-lettered`);
+  });
+
+  it('hides a run the model filter rules out and says so when none match', () => {
+    const onlyCompleted = render([completedRun], new Set(['decider-1']));
+    expect(onlyCompleted).toContain('vendor/alpha');
+    expect(onlyCompleted).not.toContain('lane dead-lettered');
+
+    const none = render([completedRun], new Set(['some-other-run']));
+    expect(none).toContain('No run of this list measured that model');
   });
 });

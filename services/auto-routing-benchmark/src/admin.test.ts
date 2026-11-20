@@ -102,6 +102,9 @@ vi.mock('./db', async importOriginal => {
     listRuns: vi.fn(),
     existsRunningRun: vi.fn(),
     listRunProgressCounts: vi.fn(),
+    listRunTotals: vi.fn(),
+    listRunModelIds: vi.fn(),
+    listRunModelTotals: vi.fn(),
     getLatestRoutingTable: vi.fn(),
     getClassifierWinner: vi.fn(),
     getLatestSummariesByModel: vi.fn(),
@@ -165,6 +168,9 @@ import {
   listRuns,
   existsRunningRun,
   listRunProgressCounts,
+  listRunTotals,
+  listRunModelIds,
+  listRunModelTotals,
   listStaleRunningDeciderRuns,
   markStaleRunsFailed,
   replaceConfig,
@@ -329,6 +335,9 @@ beforeEach(() => {
   vi.mocked(listRuns).mockResolvedValue([]);
   vi.mocked(existsRunningRun).mockResolvedValue(false);
   vi.mocked(listRunProgressCounts).mockResolvedValue([]);
+  vi.mocked(listRunTotals).mockResolvedValue([]);
+  vi.mocked(listRunModelIds).mockResolvedValue(new Map());
+  vi.mocked(listRunModelTotals).mockResolvedValue([]);
   vi.mocked(getLatestRoutingTable).mockResolvedValue(null);
   vi.mocked(getClassifierWinner).mockResolvedValue(null);
   vi.mocked(getLatestSummariesByModel).mockResolvedValue(new Map());
@@ -911,6 +920,89 @@ describe('GET /admin/runs', () => {
     expect(body.runs[1].progress).toBeUndefined();
     // Only runs that can still change are tallied.
     expect(listRunProgressCounts).toHaveBeenCalledWith(env.BENCH_DB, [running.id]);
+  });
+
+  it('attaches cost and case totals plus enqueued models to every listed run', async () => {
+    const completed: BenchmarkRun = {
+      id: 'decider-2026-06-14T00-00-00-000Z',
+      router: 'efficient',
+      kind: 'decider',
+      purpose: 'platform',
+      status: 'completed',
+      startedAt: '2026-06-14T00:00:00.000Z',
+      completedAt: '2026-06-14T01:00:00.000Z',
+      error: null,
+    };
+    const noCost: BenchmarkRun = {
+      ...completed,
+      id: 'decider-2026-06-13T00-00-00-000Z',
+      startedAt: '2026-06-13T00:00:00.000Z',
+    };
+    const unmeasured: BenchmarkRun = {
+      ...completed,
+      id: 'decider-2026-06-12T00-00-00-000Z',
+      startedAt: '2026-06-12T00:00:00.000Z',
+    };
+    vi.mocked(listRuns).mockResolvedValue([completed, noCost, unmeasured]);
+    vi.mocked(listRunTotals).mockResolvedValue([
+      { runId: completed.id, totalCostUsd: 0.42, measuredCases: 60, erroredCases: 2 },
+      // A run whose cases reported no cost keeps a null total, not a fake zero.
+      { runId: noCost.id, totalCostUsd: null, measuredCases: 12, erroredCases: 0 },
+    ]);
+    vi.mocked(listRunModelIds).mockResolvedValue(
+      new Map([[completed.id, ['vendor/alpha', 'vendor/beta']]])
+    );
+
+    const res = await authedGet('/admin/runs');
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { runs: BenchmarkRun[] };
+    // One aggregate for the whole page, never a request per run.
+    expect(listRunTotals).toHaveBeenCalledOnce();
+    expect(listRunTotals).toHaveBeenCalledWith(env.BENCH_DB, [
+      completed.id,
+      noCost.id,
+      unmeasured.id,
+    ]);
+    expect(body.runs[0].totals).toEqual({
+      totalCostUsd: 0.42,
+      measuredCases: 60,
+      erroredCases: 2,
+    });
+    expect(body.runs[1].totals).toEqual({
+      totalCostUsd: null,
+      measuredCases: 12,
+      erroredCases: 0,
+    });
+    // A run with no graded case carries no totals block at all.
+    expect(body.runs[2].totals).toBeUndefined();
+    expect(body.runs[0].models).toEqual(['vendor/alpha', 'vendor/beta']);
+    expect(body.runs[2].models).toBeUndefined();
+  });
+
+  it('still lists runs when the totals aggregate fails', async () => {
+    const run: BenchmarkRun = {
+      id: 'decider-2026-06-15T00-00-00-000Z',
+      router: 'efficient',
+      kind: 'decider',
+      purpose: 'platform',
+      status: 'completed',
+      startedAt: '2026-06-15T00:00:00.000Z',
+      completedAt: '2026-06-15T01:00:00.000Z',
+      error: null,
+    };
+    vi.mocked(listRuns).mockResolvedValue([run]);
+    vi.mocked(listRunTotals).mockRejectedValue(new Error('D1 overloaded'));
+    vi.mocked(listRunModelIds).mockRejectedValue(new Error('D1 overloaded'));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const res = await authedGet('/admin/runs');
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { runs: BenchmarkRun[] };
+    expect(body.runs.map(row => row.id)).toEqual([run.id]);
+    expect(body.runs[0].totals).toBeUndefined();
+    expect(body.runs[0].models).toBeUndefined();
   });
 
   it('still lists runs when the progress query fails', async () => {

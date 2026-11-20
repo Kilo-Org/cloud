@@ -1045,6 +1045,134 @@ export async function listRunProgressCounts(
   }));
 }
 
+export type RunTotalsRow = {
+  runId: string;
+  totalCostUsd: number | null;
+  measuredCases: number;
+  erroredCases: number;
+};
+
+/**
+ * Statement {@link listRunTotals} runs; exported for the query-plan test. One
+ * bounded index seek on case_results per run in the page, grouped by run — a
+ * page of runs never ships their case rows.
+ */
+export function listRunTotalsStatement(orm: ReturnType<typeof drizzle>, runIds: readonly string[]) {
+  return orm
+    .select({
+      runId: caseResults.run_id,
+      totalCostUsd: sql<number | null>`SUM(${caseResults.cost_usd})`,
+      measuredCases: count(),
+      erroredCases: sql<number>`SUM(
+        CASE WHEN ${caseResults.error} IS NOT NULL OR ${caseResults.timed_out} = 1 THEN 1 ELSE 0 END
+      )`,
+    })
+    .from(caseResults)
+    .where(inArray(caseResults.run_id, [...runIds]))
+    .groupBy(caseResults.run_id);
+}
+
+/**
+ * Cost and case tallies for every run among `runIds` in one statement. Runs
+ * without any graded case are absent from the result, and a run whose cases
+ * reported no cost carries a null total.
+ */
+export async function listRunTotals(
+  db: D1Database,
+  runIds: readonly string[]
+): Promise<RunTotalsRow[]> {
+  if (runIds.length === 0) return [];
+  const rows = await listRunTotalsStatement(drizzle(db), runIds);
+  return rows.map(row => ({
+    runId: row.runId,
+    totalCostUsd: row.totalCostUsd === null ? null : Number(row.totalCostUsd),
+    measuredCases: Number(row.measuredCases),
+    erroredCases: Number(row.erroredCases),
+  }));
+}
+
+/**
+ * Enqueued model ids per run for the runs among `runIds`, in one statement.
+ * A skipped (not enqueued) model is absent: it was measured by an earlier run.
+ */
+export async function listRunModelIds(
+  db: D1Database,
+  runIds: readonly string[]
+): Promise<Map<string, string[]>> {
+  if (runIds.length === 0) return new Map();
+  const rows = await drizzle(db)
+    .select({ runId: runModels.run_id, model: runModels.model })
+    .from(runModels)
+    .where(and(inArray(runModels.run_id, [...runIds]), eq(runModels.enqueued, true)));
+  const models = new Map<string, string[]>();
+  for (const row of rows) {
+    const list = models.get(row.runId);
+    if (list) list.push(row.model);
+    else models.set(row.runId, [row.model]);
+  }
+  return models;
+}
+
+export type RunModelTotalsRow = {
+  model: string;
+  variant: string;
+  scoreSum: number;
+  cases: number;
+  costedCases: number;
+  costSum: number | null;
+  errors: number;
+  timeouts: number;
+  routeGraded: number;
+  routeHits: number;
+};
+
+/**
+ * Statement {@link listRunModelTotals} runs; exported for the query-plan test.
+ * One index seek on the run's case rows, grouped by the exact pair.
+ */
+export function listRunModelTotalsStatement(orm: ReturnType<typeof drizzle>, runId: string) {
+  return orm
+    .select({
+      model: caseResults.model,
+      variant: caseResults.variant,
+      scoreSum: sql<number>`SUM(${caseResults.score})`,
+      cases: count(),
+      costedCases: sql<number>`COUNT(${caseResults.cost_usd})`,
+      costSum: sql<number | null>`SUM(${caseResults.cost_usd})`,
+      errors: sql<number>`SUM(CASE WHEN ${caseResults.error} IS NOT NULL THEN 1 ELSE 0 END)`,
+      timeouts: sql<number>`SUM(CASE WHEN ${caseResults.timed_out} = 1 THEN 1 ELSE 0 END)`,
+      routeGraded: sql<number>`COUNT(${caseResults.route_hit})`,
+      routeHits: sql<number>`COALESCE(SUM(CASE WHEN ${caseResults.route_hit} THEN 1 ELSE 0 END), 0)`,
+    })
+    .from(caseResults)
+    .where(eq(caseResults.run_id, runId))
+    .groupBy(caseResults.model, caseResults.variant);
+}
+
+/**
+ * Per-(model, variant) case aggregates for one run, summed over every route.
+ * The caller turns the sums into the accuracy and cost means a reader sees.
+ * Variant is storage form.
+ */
+export async function listRunModelTotals(
+  db: D1Database,
+  runId: string
+): Promise<RunModelTotalsRow[]> {
+  const rows = await listRunModelTotalsStatement(drizzle(db), runId);
+  return rows.map(row => ({
+    model: row.model,
+    variant: row.variant,
+    scoreSum: Number(row.scoreSum),
+    cases: Number(row.cases),
+    costedCases: Number(row.costedCases),
+    costSum: row.costSum === null ? null : Number(row.costSum),
+    errors: Number(row.errors),
+    timeouts: Number(row.timeouts),
+    routeGraded: Number(row.routeGraded),
+    routeHits: Number(row.routeHits),
+  }));
+}
+
 export async function markRunCompleted(db: D1Database, runId: string): Promise<void> {
   await drizzle(db)
     .update(benchmarkRuns)

@@ -100,27 +100,33 @@ catalogs:
 # release is caught before it is adopted.
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
-  # The registry serves no `time` metadata for tsx, so pnpm cannot age-check it
-  # and fails the install (ERR_PNPM_MISSING_TIME) when a resolution path such as
-  # the Vercel CLI pulls it in. Exempted by name so both the script runner and
-  # those resolutions install.
+  # A dlx resolution outside this workspace, such as the Vercel CLI resolving
+  # tsx through its own backend, fails the age gate with ERR_PNPM_MISSING_TIME:
+  # pnpm needs the release dates before it can match an exact version, and that
+  # path does not carry them. Exempted by name, so the script runner and those
+  # resolutions both install.
   - tsx
-  # expo-dev-client must track the Expo SDK version the app builds against, or
-  # `expo-doctor` fails on the mismatch, so it moves with the SDK before the
-  # window.
+  # expo-dev-client must match the version the installed Expo SDK expects in its
+  # `bundledNativeModules` map, or `expo-doctor`, which
+  # `apps/mobile/AGENTS.md` requires after a dependency change, reports the
+  # mismatch, so it moves with the SDK before the window.
   - expo-dev-client
   # Expo publishes these together with each SDK as transitive dependencies of
-  # expo-dev-client, so they move with it in the same install.
+  # expo-dev-client and its launcher, so they move with it in the same install.
   - expo-dev-launcher
   - expo-dev-menu
   - expo-dev-menu-interface
   - expo-manifests
   - expo-updates-interface
+  # Reached through expo-dev-launcher rather than expo-dev-client, and released
+  # with the same SDK, so it moves in that same install.
   - '@expo/schema-utils'
   # The workspace typechecks with this native compiler preview, which publishes a
-  # dev build frequently and is adopted at the newest one. Each bump is inside
-  # the window on the day it lands, and the platform packages are optional
-  # dependencies of the same build, so the whole set is exempt by name.
+  # dev build about daily, and each adopted build comes from the recent tip, so
+  # the pinned version is usually inside the window when it lands. Its seven
+  # platform packages are optionalDependencies of that same build at that
+  # identical version, so the set moves as one release. Exempt by name rather
+  # than per version, so each bump does not have to add eight new entries.
   - '@typescript/native-preview'
   - '@typescript/native-preview-darwin-arm64'
   - '@typescript/native-preview-darwin-x64'

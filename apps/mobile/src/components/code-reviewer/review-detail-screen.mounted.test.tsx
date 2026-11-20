@@ -122,6 +122,10 @@ vi.mock('expo-haptics', () => ({
 vi.mock('@kilocode/app-shared/code-review', () => ({
   isCancellableReviewStatus: () => statusHelpers.cancellable,
   isRetriggerableReviewStatus: () => statusHelpers.retriggerable,
+  // Mirrors the real predicate exactly (`packages/app-shared/src/code-review/status.ts`),
+  // so the superseded case exercises the real rule rather than a stub.
+  canRetriggerReview: (review: { status: string; terminal_reason?: string | null }) =>
+    statusHelpers.retriggerable && review.terminal_reason !== 'superseded',
   isInFlightReviewStatus: (status: string) =>
     status === 'pending' || status === 'queued' || status === 'running',
 }));
@@ -1741,6 +1745,32 @@ describe('ReviewDetailScreen retry when Code Reviewer cannot run', () => {
 
     expect(labels).toContain('Retry review');
     expect(labels).not.toContain('Fix settings');
+  });
+
+  it('offers no Retry for a review a newer commit replaced', () => {
+    // A manual review always qualifies for Retry through its own config, so this
+    // isolates the superseded rule: only the terminal reason may remove the button.
+    reviewConfig.query = { isPending: false, data: { isEnabled: true, actionRequired: null } };
+
+    const labels = renderFailedReview({
+      status: 'cancelled',
+      manual_config: { agentConfig: {} },
+      terminal_reason: 'superseded',
+    });
+
+    expect(labels).not.toContain('Retry review');
+  });
+
+  it('keeps Retry for a cancelled review the user stopped', () => {
+    reviewConfig.query = { isPending: false, data: { isEnabled: true, actionRequired: null } };
+
+    const labels = renderFailedReview({
+      status: 'cancelled',
+      manual_config: { agentConfig: {} },
+      terminal_reason: 'user_cancelled',
+    });
+
+    expect(labels).toContain('Retry review');
   });
 
   it('shows neither control while the config loads', () => {

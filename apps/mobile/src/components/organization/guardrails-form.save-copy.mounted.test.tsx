@@ -48,10 +48,6 @@ vi.mock('@/components/ui/dialog', () => ({
 vi.mock('@/lib/hooks/use-org-settings-queries', () => ({
   useSaveOrgGuardrails: () => ({ mutateAsync: h.mutateAsync, isPending: false }),
 }));
-// The form reads the reader's role through the trial-refusal barrel, whose
-// hooks reach expo-router and the organization query chain this harness does
-// not mount. The stub pins the money role: this surface's subject is the
-// refusal copy a billing role reads, and no billing step is rendered here.
 vi.mock('@/components/organization/guardrails-input-section', () => ({
   InputGuardrailsSection: (props: {
     onChange: (update: (current: GuardrailsDraft) => GuardrailsDraft) => void;
@@ -214,6 +210,9 @@ async function mountForm(refusedMessage: string) {
   );
   function Harness() {
     const [data] = useState(() => payload());
+    // The screen hands the form the reader's role; this harness passes the money
+    // role, because this surface's subject is the refusal copy a billing role
+    // reads and no billing step is rendered here.
     return createElement(GuardrailsForm, { organizationId: 'org-1', canManageBilling: true, data });
   }
   const { renderer, unmount } = await renderWithProviders(createElement(Harness));

@@ -28,10 +28,9 @@ const saved = vi.hoisted(() => ({ mutateAsync: vi.fn<(input: unknown) => Promise
 vi.mock('@/lib/hooks/use-org-settings-queries', () => ({
   useSaveOrgModelAccess: () => ({ mutateAsync: saved.mutateAsync, isPending: false }),
 }));
-// The form reads the reader's role through the trial-refusal barrel, whose
-// hooks reach expo-router and the organization query chain this harness does
-// not mount. The stub pins the money role: this suite's subject is the refusal
-// copy a billing role reads, and no billing step is rendered here.
+// The screen hands the form the reader's role; this harness passes the money
+// role, because this suite's subject is the refusal copy a billing role reads
+// and no billing step is rendered here.
 
 vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));

@@ -24,12 +24,11 @@ import {
 const toastError = vi.hoisted(() => vi.fn());
 
 vi.mock('sonner-native', () => ({ toast: { error: toastError, success: vi.fn() } }));
-// The hooks read the reader's role through the trial-refusal barrel, whose
-// hooks reach expo-router and the organization query chain this harness does
-// not mount. The stub pins the money role: these are organizationAdmin
-// writes, so every refusal reaches a reader who can change the plan, and this
-// suite's subject is the toast copy that reader gets — the sentence that
-// names the destination, because the hooks render no billing step.
+// The hooks take the reader's role as an argument; this harness passes the
+// money role, because these are organizationAdmin writes, so every refusal
+// reaches a reader who can change the plan, and this suite's subject is the
+// toast copy that reader gets — the sentence that names the destination,
+// because no billing step is rendered here.
 
 type MutationOptions = ReactQuery.MutationOptions<unknown, Error, unknown>;
 

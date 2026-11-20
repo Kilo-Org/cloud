@@ -337,19 +337,19 @@ export async function collectReplicationHealth(options?: {
     );
   }
 
-  // A monitor that silently checks zero replicas is itself an invisible failure.
-  // In production every replica that is not explicitly disabled must have a URL, so
-  // treat a short inventory as an error (which forces `healthy: false` and triggers
-  // the cron's alert). A missing URL is not the same as a disabled replica: only
-  // POSTGRES_REPLICAS_DISABLED lowers the expected count.
-  // Preview/dev deployments legitimately run without replica URLs, so gate on
-  // VERCEL_ENV to avoid false alarms there.
-  const expectedCount = KNOWN_READ_REPLICA_COUNT - inventory.disabled.length;
-  if (process.env.VERCEL_ENV === 'production' && targets.length < expectedCount) {
-    errors.push(
-      `expected ${expectedCount} read replicas but only ${targets.length} configured; ` +
-        `check POSTGRES_REPLICA_* env vars`
-    );
+  // Preview and dev deployments can legitimately run without replica URLs.
+  if (process.env.VERCEL_ENV === 'production') {
+    const expectedCount = KNOWN_READ_REPLICA_COUNT - inventory.disabled.length;
+    if (expectedCount === 0) {
+      errors.push(
+        'POSTGRES_REPLICAS_DISABLED disables all read replicas; enable at least one in production'
+      );
+    } else if (targets.length < expectedCount) {
+      errors.push(
+        `expected ${expectedCount} read replicas but only ${targets.length} configured; ` +
+          `check POSTGRES_REPLICA_* env vars`
+      );
+    }
   }
 
   const [replicas, walSenders, slots] = await Promise.all([

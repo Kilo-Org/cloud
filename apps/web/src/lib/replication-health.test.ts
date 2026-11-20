@@ -219,6 +219,25 @@ describe('collectReplicationHealth', () => {
     expect(probe.mock.calls.map(([target]) => target.name)).toEqual(['us-west', 'eu-central-1']);
   });
 
+  it('reports an error when every replica is disabled in production', async () => {
+    process.env.VERCEL_ENV = 'production';
+    mockPrimary([walSenderRow()], [slotRow()]);
+    const disabled = ['us-west', 'eu-central-1', 'eu-central-2'];
+    const probe = jest.fn(async (target: { name: string }) => okProbe(target.name));
+
+    const report = await collectReplicationHealth({
+      inventory: inventoryOf([], { disabled }),
+      probe,
+    });
+
+    expect(report.healthy).toBe(false);
+    expect(report.errors).toEqual([
+      'POSTGRES_REPLICAS_DISABLED disables all read replicas; enable at least one in production',
+    ]);
+    expect(report.disabledReplicas).toEqual(disabled);
+    expect(probe).not.toHaveBeenCalled();
+  });
+
   it('still flags a replica whose URL is missing but which is not disabled', async () => {
     process.env.VERCEL_ENV = 'production';
     mockPrimary([walSenderRow()], [slotRow()]);

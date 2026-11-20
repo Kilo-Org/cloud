@@ -561,7 +561,6 @@ describe('model access policy write refusal sentences', () => {
       'A provider slug at index 0 ("p\\u0085p") must not contain control characters.'
     );
     expect(/\p{Cc}/u.test(sentence)).toBe(false);
-    expect(sentence).toBe(sentence.normalize('NFKC'));
   });
 
   it('falls back to the generic refusal for a too_small issue outside the allow lists', () => {

@@ -1175,10 +1175,20 @@ catalog's `opencode.prompt`, else the model id, picks the system prompt, and
 cache breakpoints, the tool schemas, the fixed params, the static header values, how a
 reasoning variant maps to the wire, and how history is encoded; `src/datasets/probe-captures`
 keeps the captured requests and `src/probe/request.test.ts` rebuilds each of them from its
-template, minus per-call ids and timestamps. On a CLI bump, regenerate both with
-`node --experimental-strip-types scripts/capture-probe-templates.ts`: it starts
-`scripts/probe-gateway.mjs`, drives the pinned CLI through every family and writes the
-fixtures, with no paid calls. A model whose family has no template fails its probe lane with
+template, minus per-call ids and timestamps. On a CLI bump, regenerate both from this
+package with Docker running and the workspace installed (needs `pnpm install` at the repo
+root):
+
+```
+pnpm exec tsx scripts/capture-probe-templates.ts --pool /tmp/efficient-pool.json
+```
+
+It starts `scripts/probe-gateway.mjs`, builds the pinned CLI into `probe-capture:7.8.27`,
+drives it through every family in the pool file and writes the fixtures, with no paid calls.
+The pool file is the live Router pool as a JSON array of
+`{ "model": string, "variant": string | null }`; `--only <family>` recaptures one family and
+merges it into `probe-templates.json`, keeping every other family and the rest of the
+bookkeeping. A model whose family has no template fails its probe lane with
 `BenchmarkProbeFamilyError` (a permanent entry failure), never with a score of 0.
 
 **Executor.** `src/probe/executor.ts` builds the request — template, the history up to the
@@ -1189,10 +1199,13 @@ the SSE stream with zod into the CLI result shape (text, cost, tokens including 
 tool calls, `finalFinishReason`, exit 0) inside the same paid ledger: `beginPaidCase`,
 pending output, `recordDeciderOutput`. Cost comes from `usage.cost`; when the gateway omits
 it the executor prices the reported tokens at the run's catalog rates
-(`catalogUsageCostUsd`, src/platform-models.ts). A probe never touches the container. The
-error policy matches the CLI path: 429 and unbilled 5xx defer (throttle, no result),
-400/404/422 marks the exact model unavailable, a stream cut after the gateway billed for
-output is an ambiguous execution, and the request honours `DECIDER_CLI_TIMEOUT_MS`.
+(`catalogUsageCostUsd`, src/platform-models.ts). A probe never touches the container, and
+`latency_ms` is the whole reply, from the request to the end of its stream. The error policy
+matches the CLI path: 429 and unbilled 5xx defer (throttle, no result), 400/404/422 marks the
+exact model unavailable, a request or stream that runs into `DECIDER_CLI_TIMEOUT_MS` is a
+timed-out result, a stream cut after the gateway billed for output is an ambiguous execution,
+a terminal provider error that reported usage is a billed failure with its cost and tokens,
+and a catalog read that fails after `beginPaidCase` clears the case and defers the chunk.
 
 **Route-scoped eligibility.** After activation (`ACTIVE_MEASUREMENT_REVISION >= 3`) a ready
 pair whose provenance run lacks complete probe results is ineligible on the three agentic

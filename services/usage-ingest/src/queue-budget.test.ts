@@ -19,6 +19,8 @@ it('bounds production EU processing to 450 direct Frankfurt writer calls, 475 wi
   expect(production.vars.USAGE_INGEST_HEDGE_MODE).toBe('on');
   expect(production.vars.USAGE_INGEST_HEDGE_DELAY_MS).toBe('1000');
   expect(production.vars.USAGE_INGEST_HEDGE_PERCENT).toBe('100');
+  // Source-owned: production sends Enkrypt and Exa fallback usage to the dedicated tagged queue.
+  expect(production.vars.USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED).toBe('true');
   expect(production.vars).not.toHaveProperty('USAGE_INGEST_DIAGNOSTICS');
   expect(production.vars.USAGE_WRITER_SECRET).toBeUndefined();
   expect(production.queues.consumers).toEqual([
@@ -83,6 +85,8 @@ it('keeps staging on one EU queue, the hedge queue and the tagged queue (cap 10)
   expect(staging.vars.USAGE_INGEST_HEDGE_MODE).toBe('on');
   expect(staging.vars.USAGE_INGEST_HEDGE_DELAY_MS).toBe('1000');
   expect(staging.vars.USAGE_INGEST_HEDGE_PERCENT).toBe('100');
+  // Source-owned: staging sends Enkrypt and Exa fallback usage to the dedicated tagged queue.
+  expect(staging.vars.USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED).toBe('true');
   expect(staging.vars).not.toHaveProperty('USAGE_INGEST_DIAGNOSTICS');
   expect(staging.queues.consumers).toMatchObject([
     {

@@ -22,6 +22,7 @@ export type Env = Omit<
   | 'USAGE_INGEST_HEDGE_MODE'
   | 'USAGE_INGEST_HEDGE_DELAY_MS'
   | 'USAGE_INGEST_HEDGE_PERCENT'
+  | 'USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED'
 > & {
   USAGE_INGEST_QUEUE: Queue<UsageQueueMessage>;
   USAGE_INGEST_HEDGE_QUEUE?: Queue<UsageQueueMessage>;
@@ -29,8 +30,8 @@ export type Env = Omit<
   USAGE_INGEST_ENKRYPT_QUEUE: Queue<EnkryptUsageQueueMessage | ExaUsageQueueMessage>;
   USAGE_INGEST_PUBLISH_SECRET?: string;
   /**
-   * Set as a secret binding, not a Wrangler var, so deployments keep it. Exactly `true` sends
-   * tagged usage to the dedicated queue; anything else, including absent, keeps the shared queue.
+   * A Wrangler var per environment. Exactly `true` sends tagged usage to the dedicated queue;
+   * anything else, including absent, keeps the shared queue.
    */
   USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED?: string;
   USAGE_INGEST_PARALLELISM?: string;

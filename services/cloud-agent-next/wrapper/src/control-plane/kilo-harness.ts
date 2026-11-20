@@ -127,6 +127,9 @@ export function createKiloHarness(options: KiloHarnessOptions): Harness {
             log,
           }).catch(() => undefined);
         }
+        // The restore re-imported the record, so a marker kept past the probe
+        // is applied here; with no marker this is one fast absent read.
+        await client.settleOutstandingRuleset?.(input.sessionId, input.directory, signal);
         return true;
       }
       if (restored.code !== 404 && !restored.emptySnapshot) {

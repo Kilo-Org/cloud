@@ -587,9 +587,11 @@ describe('Kilo harness', () => {
         restoreFiles: false,
         onRestore() {},
       });
-      // The restore reports success, so the opener returns without the create path.
+      // The restore reports success, so the opener returns without the create
+      // path; the settle runs before the probe and again after the restore,
+      // which re-imported the record a kept marker's ruleset belongs to.
       expect(opened).toBe(true);
-      expect(settled).toEqual([sessionId]);
+      expect(settled).toEqual([sessionId, sessionId]);
     } finally {
       await fsp.rm(tempDir, { recursive: true, force: true });
     }
@@ -606,6 +608,7 @@ describe('Kilo harness', () => {
     });
     const calls: string[] = [];
     const ensured: string[] = [];
+    const settled: string[] = [];
     try {
       const harness = createKiloHarness({
         server: { url: native.url.toString() },
@@ -619,6 +622,7 @@ describe('Kilo harness', () => {
           server: { url: native.url.toString() },
           serverUrl: native.url.toString(),
           ensureSession: async (id: string) => void ensured.push(id),
+          settleOutstandingRuleset: async (id: string) => void settled.push(id),
         } as unknown as WrapperKiloClient,
       });
       expect(
@@ -634,6 +638,9 @@ describe('Kilo harness', () => {
       ).toBe(true);
       expect(calls).toEqual(['progress', 'restore']);
       expect(ensured).toEqual([sessionId]);
+      // The restore failed, so the create path consumes the marker and the
+      // settle runs only before the probe.
+      expect(settled).toEqual([sessionId]);
     } finally {
       await native.stop(true);
       await fsp.rm(tempDir, { recursive: true, force: true });

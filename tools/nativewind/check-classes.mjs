@@ -101,8 +101,11 @@ const LAYOUT_EXEMPT_TREES = ['src/glanceable-ios/', 'src/glanceable-android/'];
  *
  * `checkLayout` calls the detector each entry carries, so the dispatch below
  * needs no rule-specific code and a rule's id exists only in the table.
+ *
+ * Exported for the structural test that keeps this promise: an entry without a
+ * detector, a duplicated id, or a second detector on one entry fails there.
  */
-const LAYOUT_RULES = [
+export const LAYOUT_RULES = [
   {
     id: 'L1',
     patterns: [

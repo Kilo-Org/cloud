@@ -699,7 +699,6 @@
     },
     "autoReviews": "自动审查",
     "bitbucket": {
-      "notConnectedReadOnly": "尚未连接 Bitbucket。只有组织所有者、管理员和账单管理员可以完成连接。",
       "notConnectedReadOnlyPlan": "组织的试用期已结束，因此所有者必须前往 kilo.ai 更新账单信息。"
     },
     "bitbucketConnect": {

@@ -1395,7 +1395,6 @@
     "followReviewMd": "Հետևել REVIEW.md-ին",
     "followReviewMdSubtitle": "Հետևել յուրաքանչյուր պահոցի REVIEW.md ֆայլի հրահանգներին",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket-ը միացված չէ։ Միայն կազմակերպության սեփականատերերը, ադմինիստրատորները և վճարումների կառավարիչները կարող են այն միացնել։",
       "notConnectedReadOnlyPlan": "Կազմակերպության փորձաշրջանն ավարտվել է, ուստի սեփականատերը պետք է թարմացնի վճարումները kilo.ai-ում։"
     },
     "bitbucketConnect": {

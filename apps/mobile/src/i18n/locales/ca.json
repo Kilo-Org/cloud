@@ -1422,7 +1422,6 @@
     "followReviewMd": "Segueix REVIEW.md",
     "followReviewMdSubtitle": "Respecta els fitxers d'instruccions REVIEW.md de cada repositori",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket no està connectat. Només els propietaris, els administradors i els gestors de facturació de l'organització poden connectar-lo.",
       "notConnectedReadOnlyPlan": "El període de prova de l'organització ha finalitzat, així que un propietari ha d'actualitzar la facturació a kilo.ai."
     },
     "bitbucketConnect": {

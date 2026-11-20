@@ -1449,7 +1449,6 @@
     "followReviewMd": "Riadiť sa pokynmi v REVIEW.md",
     "followReviewMdSubtitle": "Dodržiavať pokyny v súbore REVIEW.md každého repozitára",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nie je pripojený. Pripojiť ho môžu iba vlastníci organizácie, správcovia a správcovia fakturácie.",
       "notConnectedReadOnlyPlan": "Skúšobné obdobie organizácie sa skončilo, preto vlastník musí aktualizovať fakturáciu na kilo.ai."
     },
     "bitbucketConnect": {

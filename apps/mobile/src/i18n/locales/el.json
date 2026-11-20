@@ -1395,7 +1395,6 @@
     "followReviewMd": "Τήρηση του REVIEW.md",
     "followReviewMdSubtitle": "Ακολουθεί τις οδηγίες του αρχείου REVIEW.md σε κάθε αποθετήριο",
     "bitbucket": {
-      "notConnectedReadOnly": "Το Bitbucket δεν είναι συνδεδεμένο. Μόνο οι κάτοχοι του οργανισμού, οι διαχειριστές και οι διαχειριστές χρέωσης μπορούν να το συνδέσουν.",
       "notConnectedReadOnlyPlan": "Η δοκιμαστική περίοδος του οργανισμού έχει λήξει, οπότε ένας ιδιοκτήτης πρέπει να ενημερώσει τη χρέωση στο kilo.ai."
     },
     "bitbucketConnect": {

@@ -1395,7 +1395,6 @@
     "followReviewMd": "پابەندی REVIEW.md بە",
     "followReviewMdSubtitle": "لە هەر کۆگایەکدا ڕێنماییەکانی پەڕگەی REVIEW.md جێبەجێ بکە",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket نەبەستراوە. تەنها خاوەنەکانی ڕێکخراو، بەڕێوەبەران و بەڕێوەبەرانی پارەدان دەتوانن بیبەستن.",
       "notConnectedReadOnlyPlan": "تاقیکردنەوەی ڕێکخراوەکە کۆتایی هاتووە، بۆیە دەبێت خاوەنێک لە ⁨kilo.ai⁩ پارەدان نوێ بکاتەوە."
     },
     "bitbucketConnect": {

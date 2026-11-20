@@ -50,13 +50,18 @@ function warn(operation: 'read' | 'write', error: unknown): void {
  */
 export function rememberPartnerUpstreamError(session: PartnerSession): void {
   const key = cacheKey(session);
-  after(async () => {
-    try {
-      await redisClient.set(key, '1', { ex: PARTNER_UPSTREAM_ERROR_TTL_SECONDS });
-    } catch (error) {
-      warn('write', error);
-    }
-  });
+  try {
+    after(async () => {
+      try {
+        await redisClient.set(key, '1', { ex: PARTNER_UPSTREAM_ERROR_TTL_SECONDS });
+      } catch (error) {
+        warn('write', error);
+      }
+    });
+  } catch (error) {
+    // `after()` throws outside a request scope; the cache never fails the request.
+    warn('write', error);
+  }
 }
 
 /**

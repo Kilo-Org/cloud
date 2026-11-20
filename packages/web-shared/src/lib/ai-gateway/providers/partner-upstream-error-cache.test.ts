@@ -103,6 +103,19 @@ describe('partner upstream error cache', () => {
     expect(mockedAfter).not.toHaveBeenCalled();
   });
 
+  it('still reports a hit when the refresh cannot be registered', async () => {
+    mockedExists.mockResolvedValue(1);
+    const outsideRequestScope = () => {
+      throw new Error('outside a request scope');
+    };
+    mockedAfter
+      .mockImplementationOnce(outsideRequestScope)
+      .mockImplementationOnce(outsideRequestScope);
+
+    await expect(hasRecentPartnerUpstreamError(session)).resolves.toBe(true);
+    expect(() => rememberPartnerUpstreamError(session)).not.toThrow();
+  });
+
   it('treats Redis trouble as a miss and a lost write', async () => {
     mockedExists.mockRejectedValue(new Error('timeout'));
     mockedSet.mockRejectedValue(new Error('timeout'));

@@ -1590,13 +1590,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       });
     } catch (error) {
       const fenceOutcome = classifyRuntimeProxyFenceError(error);
-      // A stale accepted handle is a 401 denial; never serve the scope view or
-      // fall back. A fence transport failure rethrows the retryable 503.
+      // A stale accepted handle denies. A fence transport failure, and every
+      // other outcome, rethrows so the facade answers its retryable 503.
       if (fenceOutcome === 'deny') return null;
       if (fenceOutcome === 'retry') throw error;
-      // A revoked/expired authorization threw. Fall through to scope resolution
-      // so a surviving member can still serve; if none can, the original outcome
-      // (a 503) is preserved below.
+      // A revoked or expired local runtime authorization is the one outcome
+      // that scope resolution serves, through a surviving member.
       localError = error;
     }
     if (local)

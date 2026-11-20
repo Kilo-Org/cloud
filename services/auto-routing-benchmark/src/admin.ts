@@ -61,11 +61,11 @@ import {
   countCurrentProfilesByStatus,
   listCurrentPlatformProfileStatuses,
   getClassifierWinner,
-  getLatestRoutingTable,
   listRuns,
   requeueFailedCurrentProfiles,
 } from './db';
 import { loadRunProgress } from './run-progress';
+import { loadRoutingTableResponse } from './routing-table-response';
 import { getSchedulerOverrides, resolveSchedulerConfig, saveSchedulerOverrides } from './scheduler';
 import type { HonoEnv } from './hono-env';
 import { fetchBenchmarkUserToken } from './benchmark-token';
@@ -399,13 +399,11 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     }
   );
 
-  app.get('/admin/routing-table', async c => {
-    const latest = await getLatestRoutingTable(c.env.BENCH_DB, requestRouter(c));
-    return c.json({
-      table: latest?.table ?? null,
-      publishedAt: latest?.publishedAt ?? null,
-    });
-  });
+  app.get('/admin/routing-table', async c =>
+    c.body(await loadRoutingTableResponse(c.env, requestRouter(c)), 200, {
+      'Content-Type': 'application/json',
+    })
+  );
 
   app.get('/admin/classifier-winner', async c => {
     const winner = await getClassifierWinner(c.env.BENCH_DB, computeEngineIdentity('classifier'));

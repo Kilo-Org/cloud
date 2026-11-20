@@ -1767,7 +1767,9 @@ describe('frontier router runs', () => {
     );
     expect(getLatestRoutingTable).toHaveBeenCalledWith(env.BENCH_DB, 'frontier');
     expect(kvDelete).toHaveBeenCalledWith('routing_table_frontier_v1');
+    expect(kvDelete).toHaveBeenCalledWith('benchmark_routing_table_response_v1:frontier');
     expect(kvDelete).not.toHaveBeenCalledWith('routing_table_v1');
+    expect(kvDelete).not.toHaveBeenCalledWith('benchmark_routing_table_response_v1:efficient');
   });
 
   it('publishes an admin override in place of the stored threshold', async () => {

@@ -89,6 +89,7 @@ import {
   computeRegistryRoutingTableVersion,
   filterSummariesByProvenance,
 } from './routing-table-builder';
+import { routingTableResponseKvKey } from './routing-table-response';
 import {
   addPriorAttempt,
   type AttemptUsage,
@@ -624,6 +625,7 @@ export async function publishPlatformRoutingTable(
 
   await saveRoutingTable(env.BENCH_DB, table, generatedAt, router);
   await env.AUTO_ROUTING_CONFIG.delete(routingTableKvKey(router));
+  await env.AUTO_ROUTING_CONFIG.delete(routingTableResponseKvKey(router));
   console.log(
     JSON.stringify({
       event: 'routing_table_published',

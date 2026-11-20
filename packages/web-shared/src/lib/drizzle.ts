@@ -240,6 +240,17 @@ export async function closeAllDrizzleConnections(): Promise<void> {
 
 export type DrizzleTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+export type ReadTransactionConfig = { isolationLevel?: 'read committed' | 'repeatable read' };
+
+/**
+ * Opens a read-only transaction and runs `read` in it. A helper accepts one where its caller
+ * decides how the read runs, such as the AI gateway's bounded replica read.
+ */
+export type ReadTransactionRunner = <T>(
+  read: (tx: DrizzleTransaction) => Promise<T>,
+  config?: ReadTransactionConfig
+) => Promise<T>;
+
 // Public tables that are not partitions; a partitioned root covers its partitions.
 const cleanupRoots = drizzleSql`
   roots AS (

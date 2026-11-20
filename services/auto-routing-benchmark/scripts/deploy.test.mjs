@@ -1316,6 +1316,10 @@ test('production manual and automatic benchmark paths alone select the guarded p
   const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
   assert.equal(manifest.scripts.deploy, 'node scripts/deploy.mjs');
   assert.equal(manifest.scripts.predeploy, undefined);
-  assert.equal(manifest.scripts['test:deploy'], 'tsx --test scripts/deploy.test.mjs');
+  // The package CI command must run BOTH deploy-proof suites; keep the assertion about that
+  // contract instead of pinning the whole `tsx --test …` line.
+  for (const suite of ['scripts/deploy.test.mjs', 'scripts/legacy-cancel.test.mjs']) {
+    assert.match(manifest.scripts['test:deploy'], new RegExp(`(^|\\s)${suite}(\\s|$)`));
+  }
   assert.match(manifest.scripts.test, /pnpm run test:deploy/);
 });

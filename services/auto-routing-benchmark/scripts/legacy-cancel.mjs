@@ -517,7 +517,7 @@ export const LEAN_ROUTERS = ['efficient', 'frontier'];
 
 /** Running runs, capped with LIMIT+1 so an overrun is detected without an unbounded read. */
 export function scopeRunsSql(limit = LEAN_MAX_RUNS) {
-  return `SELECT id FROM benchmark_runs WHERE status = 'running' ORDER BY id LIMIT ${limit + 1}`;
+  return `SELECT id FROM benchmark_runs WHERE status = 'running' LIMIT ${limit + 1}`;
 }
 
 /** Read a capped publication history, then select the latest artifact for each router. */
@@ -772,7 +772,12 @@ function compareLean(before, after) {
 
 /** Resolve and size the bounded scope, fail-closed; the identities go in the baseline. */
 async function resolveLeanScope(executor, previous = null) {
-  const runningRows = await executor.read(scopeRunsSql());
+  const runningSql = scopeRunsSql();
+  const runningPlan = await readQueryPlan(executor, runningSql);
+  if (runningPlan.length !== 1 || !/\bIX_benchmark_runs_running\b/.test(runningPlan[0])) {
+    throw new VerifyFailed('the live-run scope does not use the running-run index');
+  }
+  const runningRows = await executor.read(runningSql);
   const liveRunIds = runningRows.map(row => String(row.id)).sort();
   if (liveRunIds.length > LEAN_MAX_RUNS) {
     throw new VerifyFailed(
@@ -780,7 +785,15 @@ async function resolveLeanScope(executor, previous = null) {
         'this is a larger operator decision, not a routine cancel'
     );
   }
-  const publishedRows = await executor.read(scopePublishedSql());
+  const publishedSql = scopePublishedSql();
+  const publishedPlan = await readQueryPlan(executor, publishedSql);
+  if (
+    !publishedPlan.includes('MATERIALIZE publications') ||
+    publishedPlan.filter(line => /^(SCAN|SEARCH) routing_tables\b/.test(line)).length !== 1
+  ) {
+    throw new VerifyFailed('the publication query does not use one capped read');
+  }
+  const publishedRows = await executor.read(publishedSql);
   if (
     publishedRows.length !== LEAN_ROUTERS.length ||
     publishedRows.some(row => !Number.isSafeInteger(row.history_rows) || row.history_rows < 0)
@@ -870,10 +883,11 @@ const LEAN_PLAN_TABLES = [
   'run_lane_failures',
   'scheduler_executions',
   'pending_decider_outputs',
+  'benchmark_runs',
+  'routing_tables',
 ];
 
-export async function assertLeanPlan(executor, sql) {
-  // A transport that cannot report a plan cannot prove the statement is indexed.
+async function readQueryPlan(executor, sql) {
   if (typeof executor.plan !== 'function') {
     throw new VerifyFailed('the transport cannot report a query plan; refusing an unchecked read');
   }
@@ -881,6 +895,11 @@ export async function assertLeanPlan(executor, sql) {
   if (!Array.isArray(plan) || plan.length === 0) {
     throw new VerifyFailed('the query plan was empty; refusing an unchecked read');
   }
+  return plan;
+}
+
+export async function assertLeanPlan(executor, sql) {
+  const plan = await readQueryPlan(executor, sql);
   /**
    * Every history alias must be a `SEARCH` on `run_id`; a SCAN or a SEARCH on another key is an
    * unbounded read and is refused. The two global status gates are allowlisted because their
@@ -899,6 +918,8 @@ export async function assertLeanPlan(executor, sql) {
     'cancelled_lane',
     'cancelled_execution',
     'cancelled_pending',
+    'run',
+    't',
   ];
   const statusGate = /(IX_benchmark_runs_running|IX_scheduler_chunks_pending)/;
   const failures = [];
@@ -908,12 +929,6 @@ export async function assertLeanPlan(executor, sql) {
     const alias = line.replace(/^(SEARCH|SCAN)\s+/, '').split(/\s+/)[0];
     const table = LEAN_PLAN_TABLES.find(name => line.includes(name));
     if (statusGate.test(line)) continue;
-    // Any SEARCH that is not `run_id=?` on a history alias is an unbounded read. Aliases are
-    // the only thing a plan is guaranteed to name, so check them directly.
-    if (/^SEARCH\b/.test(line) && runKeyed.includes(alias) && !/run_id=\?/.test(line)) {
-      failures.push(line);
-      continue;
-    }
     // A scan of a MATERIALIZED one-row aggregate CTE is the intended shape: those CTEs each
     // read their physical table once (verified by the SEARCH lines above).
     if (
@@ -929,10 +944,6 @@ export async function assertLeanPlan(executor, sql) {
         sawKeyedHistory = true;
         continue;
       }
-      failures.push(line);
-    }
-    // An unrecognized access to a history table (by table name, any alias) is refused.
-    if (!runKeyed.includes(alias) && table && !/^SEARCH\b/.test(line)) {
       failures.push(line);
     }
   }

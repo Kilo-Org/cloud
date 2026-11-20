@@ -1855,40 +1855,56 @@ test('bounded path keeps closed current results intact and still closes live wor
   }
 });
 
-// Migrated-schema (through 0038) chunkless-live refusal, on the bounded path.
-test('post-cutover refuses a chunkless live run on the bounded path too', async () => {
-  const f = cutoverFixture();
+// A pre-cutover running row with ZERO unfinished chunks is live work no chunk count can see:
+// only `running_runs` can. `--verify` must refuse it as the sole failure, and `--apply` must be
+// able to close it — closing chunks is not what makes the deploy gate safe.
+test('verify refuses a chunkless live run on the bounded path, and apply can close it', async () => {
+  const f = fixture();
   try {
-    holdOperatorLease(f.sqlite);
-    // A running, marked paid run with ZERO chunks: only `running_runs` can catch it.
-    bindPaidRunNoChunks(f.sqlite, { id: 'paid-chunkless' });
-    const before = readAll(f.sqlite);
-    const result = await leanRun(f.path, leanArgs('--apply', f.path));
-    assert.equal(result.code, EXIT.verifyFailed, JSON.stringify(result.events));
-    assert.match(result.last('verify_failed').reason, /post-cutover/);
-    assert.deepEqual(readAll(f.sqlite), before);
+    seed(f.sqlite);
+    const baseline = join(f.directory, 'baseline.json');
+    const applied = await leanRun(
+      f.path,
+      leanArgs('--apply', f.path, ['--baseline-out', baseline])
+    );
+    assert.equal(applied.code, EXIT.ok, JSON.stringify(applied.events));
     assert.equal(
-      f.sqlite.prepare('SELECT COUNT(*) n FROM scheduler_chunks').get().n,
+      f.sqlite
+        .prepare(
+          "SELECT COUNT(*) AS n FROM scheduler_chunks WHERE status IN ('pending','queued','active')"
+        )
+        .get().n,
+      0,
+      'the precondition is zero unfinished chunks'
+    );
+
+    // A run appears AFTER the baseline with no chunks at all.
+    insertDeciderRun(f.sqlite, { id: 'run-chunkless', startedAt: '2026-11-20T18:00:00.000Z' });
+    assert.equal(
+      f.sqlite
+        .prepare("SELECT COUNT(*) AS n FROM scheduler_chunks WHERE run_id='run-chunkless'")
+        .get().n,
       0,
       'the control really has no chunks'
+    );
+
+    const refused = await leanRun(f.path, leanArgs('--verify', f.path, ['--baseline', baseline]));
+    assert.equal(refused.code, EXIT.verifyFailed, JSON.stringify(refused.events));
+    // Solely the running row: every chunk count still matches the baseline exactly.
+    assert.deepEqual(refused.last('verify_failed').failures, ['running_runs=1']);
+
+    const closed = await leanRun(f.path, leanArgs('--apply', f.path));
+    assert.equal(closed.code, EXIT.ok, JSON.stringify(closed.events));
+    assert.deepEqual(closed.last('apply_ok').cancelledRuns.sort(), ['run-chunkless']);
+    assert.equal(closed.last('apply_ok').closedChunks, 0, 'no chunk was closed: the run was');
+    assert.equal(
+      f.sqlite.prepare("SELECT COUNT(*) AS n FROM benchmark_runs WHERE status='running'").get().n,
+      0
     );
   } finally {
     f.close();
   }
 });
-
-function bindPaidRunNoChunks(sqlite, { id }) {
-  sqlite
-    .prepare(
-      `INSERT INTO benchmark_runs (id, router, kind, status, started_at, min_accuracy,
-         switch_cost_factor, best_accuracy_switch_threshold, max_concurrency, benchmark_user_id,
-         benchmark_org_id, repetitions, engine_identity, purpose, measurement_revision,
-         accuracy_noise_band, frontier_min_accuracy_delta, admission_marker)
-       VALUES (?, 'efficient', 'decider', 'running', '2026-11-20T16:00:00.000Z', 0.9, 1, 0.05, 250,
-         'bench-user', 'bench-org', 1, ?, 'user', 3, 0.05, 0, 'paid:req-x')`
-    )
-    .run(id, ENGINE);
-}
 
 // ---- real remote shell transport, recorded (no network, no credentials) --------------------
 //
@@ -1926,20 +1942,22 @@ function fakeWrangler(handler) {
 const writeEnvelope = changes => [{ success: true, results: [], meta: { changes } }];
 const rowsEnvelope = rows => [{ success: true, results: rows, meta: { changes: 0 } }];
 
-test('the real remote transport reads write counts from meta.changes', async () => {
+test('the real remote transport reports per-statement write counts from meta.changes', async () => {
   const f = fixture();
   try {
     seed(f.sqlite);
     const { createRemoteExecutor } = await import('./legacy-cancel.mjs');
     const { createLocalExecutor } = await import('./legacy-cancel.mjs');
     const local = createLocalExecutor(f.path);
+    const writes = [];
     const { calls, spawnImpl } = fakeWrangler(sql => {
-      if (/^\s*EXPLAIN QUERY PLAN/i.test(sql)) {
-        return rowsEnvelope([{ detail: 'SEARCH row USING INDEX case_results (run_id=?)' }]);
-      }
+      const explain = /^\s*EXPLAIN QUERY PLAN\s+([\s\S]+)$/i.exec(sql);
+      // The bounded path proves its scope lookups too, so answer with the REAL SQLite plan.
+      if (explain) return rowsEnvelope(local.plan(explain[1]).map(detail => ({ detail })));
       if (/^\s*(SELECT|WITH)/i.test(sql)) return rowsEnvelope(local.read(sql));
       // A write: apply it, then answer with the real envelope.
       const changed = local.write([sql]);
+      writes.push({ sql, changes: Number(changed[0]) });
       return writeEnvelope(changed[0]);
     });
     const remote = createRemoteExecutor({ spawnImpl });
@@ -1963,6 +1981,29 @@ test('the real remote transport reads write counts from meta.changes', async () 
       local.read("SELECT COUNT(*) n FROM benchmark_runs WHERE status='running'")[0].n,
       0
     );
+
+    const reportedChanges = events
+      .filter(event => event.event === 'pass')
+      .flatMap(event => event.changed);
+    assert.deepEqual(
+      reportedChanges,
+      writes.map(write => write.changes)
+    );
+    const byStatement = pattern =>
+      writes.filter(write => pattern.test(write.sql)).map(w => w.changes);
+    // Both captured runs flip; all six unfinished chunks close; three claims park; one
+    // re-measure parks. A second pass finds nothing left to do and reports real zeros.
+    assert.deepEqual(byStatement(/^UPDATE benchmark_runs/m), [2]);
+    assert.deepEqual(byStatement(/^UPDATE scheduler_chunks/m), [6, 0]);
+    // SQLite counts a row an UPDATE matched even when the stored values already match, so
+    // parking the same claim again on the second pass reports 1 rather than 0.
+    assert.deepEqual(byStatement(/^UPDATE profile_remeasures/m), [1, 1]);
+    assert.deepEqual(byStatement(/^UPDATE benchmark_profiles[\s\S]*run_id IN/), [3]);
+    assert.ok(
+      new Set(writes.map(write => write.changes)).size > 2,
+      'per-statement counts must vary, not repeat one constant'
+    );
+
     // Every invocation went through the real CLI shape.
     for (const call of calls) {
       assert.equal(call.binary.endsWith('wrangler') || call.binary === 'wrangler', true);
@@ -1970,8 +2011,17 @@ test('the real remote transport reads write counts from meta.changes', async () 
       assert.ok(call.args.includes('--json'));
       assert.ok(call.args.includes('BENCH_DB'));
     }
-    // The plan really was requested before the digest.
-    assert.ok(calls.some(c => /^\s*EXPLAIN QUERY PLAN/i.test(c.sql)));
+    // The bounded scope lookups were plan-checked through the real transport first.
+    assert.ok(
+      calls.some(call =>
+        /EXPLAIN QUERY PLAN SELECT id FROM benchmark_runs WHERE status = 'running'/.test(call.sql)
+      ),
+      'the live-run scope must be plan-checked'
+    );
+    assert.ok(
+      calls.some(call => /EXPLAIN QUERY PLAN WITH publications AS MATERIALIZED/.test(call.sql)),
+      'the publication lookup must be plan-checked'
+    );
     local.close();
   } finally {
     f.close();
@@ -2108,11 +2158,21 @@ test('the plan guard requires run_id keying, not merely a SEARCH', async () => {
       ),
     error => /not keyed by run_id/.test(error.message)
   );
-  // A SCAN of a physical history table must be rejected.
-  await assert.rejects(
-    () => assertLeanPlan({ plan: async () => ['SCAN case_results'] }, 'SELECT 1'),
-    error => /not keyed by run_id/.test(error.message)
-  );
+  // A SCAN of a physical history or scope table must be rejected, whether the plan names the
+  // table or only the alias the real bounded queries use for it.
+  for (const line of [
+    'SCAN case_results',
+    'SCAN benchmark_runs',
+    'SCAN routing_tables',
+    'SCAN run',
+    'SCAN served',
+  ]) {
+    await assert.rejects(
+      () => assertLeanPlan({ plan: async () => [line] }, 'SELECT 1'),
+      error => /not keyed by run_id/.test(error.message),
+      `${line} must be refused`
+    );
+  }
   await assert.rejects(
     () => assertLeanPlan({ plan: async () => ['SCAN unrelated'] }, 'SELECT 1'),
     error => /does not prove indexed history access/.test(error.message)

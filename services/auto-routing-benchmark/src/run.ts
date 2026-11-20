@@ -6,6 +6,7 @@ import {
   CLASSIFIER_WINNER_KV_KEY,
   routingTableKvKey,
   AUTO_ROUTERS,
+  BenchmarkRunPurposeSchema,
   type AutoRouter,
   type BenchmarkIdentity,
   BenchmarkIdentityError,
@@ -43,6 +44,7 @@ import {
   releaseDeciderGrading,
   getLatestSummariesByModel,
   getLiveContainerLanes,
+  getQueueRunOccupancy,
   getRunningRun,
   getRunWithModels,
   getLatestRoutingTable,
@@ -50,6 +52,7 @@ import {
   getSummariesForRuns,
   getRoutingCaseResultsForEntries,
   insertRun,
+  MAX_RUNNING_RUNS_PER_QUEUE,
   listLaneFailures,
   listPendingCurrentProfiles,
   listReadyCurrentProfilesForEntries,
@@ -77,6 +80,7 @@ import {
   type RunLaneFailureRow,
   type StoredDeciderOutput,
   type PriorModelResult,
+  type QueueRunOccupancy,
 } from './db';
 import {
   gradeClassifierOutput,
@@ -176,6 +180,7 @@ import {
   type MeasuredCase,
 } from './measurement-revision';
 import { isProbeCase } from './datasets/probe-cases';
+import { applyProbeActivations } from './probe-activation';
 import { BenchmarkProbeFamilyError, runProbeCaseViaGateway } from './probe/executor';
 import { agenticEligibilityView, pairsMissingProbeResults } from './probe/eligibility';
 
@@ -433,9 +438,9 @@ export type StartedQueueRun = {
 };
 
 /**
- * Drain the selected registry queues. 'both' starts at most one run per queue —
- * they hold independent slots and share the container budget. Drain failures
- * are logged per queue, never thrown, so one wedged queue cannot block the other.
+ * Drain the selected registry queues. Each drain starts at most one run; a queue
+ * may hold several active runs. Drain failures are logged per queue, never
+ * thrown, so one wedged queue cannot block the other.
  */
 export async function drainQueues(
   env: Env,
@@ -444,14 +449,18 @@ export async function drainQueues(
   // admin who pressed a button needs to be told the queue is wedged instead of
   // being shown "nothing to run".
   errors?: unknown[],
-  router: AutoRouter = 'efficient'
+  router: AutoRouter = 'efficient',
+  // A caller that reconciled the platform queue itself, in this same request
+  // (the config save), skips the drain's own reconcile. It would read the same
+  // saved decider list and write the same rows again.
+  options: { skipPlatformSync?: boolean; skipped?: DrainSkipReason[] } = {}
 ): Promise<StartedQueueRun[]> {
   const queues: BenchmarkRunPurpose[] =
     selector === 'both' ? ['platform', 'user'] : [selector satisfies BenchmarkRunPurpose];
   const started: StartedQueueRun[] = [];
   for (const queue of queues) {
     try {
-      const drained = await drainQueue(env, queue, router);
+      const drained = await drainQueue(env, queue, router, options);
       if (drained) started.push({ ...drained, router, purpose: queue });
     } catch (error) {
       errors?.push(error);
@@ -856,8 +865,8 @@ export function buildClassifierMessages(
   );
 }
 
-// Thrown when a run of the same kind is already active. The admin route maps
-// it to HTTP 409 so automated callers can distinguish it from a 5xx fault.
+// Thrown when a classifier run is already active. The admin route maps it to
+// HTTP 409 so automated callers can distinguish it from a 5xx fault.
 export class RunAlreadyActiveError extends Error {
   constructor(
     readonly kind: BenchmarkKind,
@@ -869,13 +878,29 @@ export class RunAlreadyActiveError extends Error {
 }
 
 /**
- * Thrown when every entry of a batch was already claimed by the other queue's
- * run. Not a fault: the pairs are being measured, just not by this run.
+ * Thrown when every entry of a batch was already claimed by another run. Not a
+ * fault: the pairs are being measured, just not by this run.
  */
 export class NoEntriesClaimedError extends Error {
   constructor(readonly runId: string) {
     super(`no registry entries left to claim for ${runId}`);
     this.name = 'NoEntriesClaimedError';
+  }
+}
+
+/**
+ * Thrown when a decider queue refuses a new run because one of its runs is still
+ * starting or it already holds MAX_RUNNING_RUNS_PER_QUEUE runs. The claims are
+ * released; the next drain retries.
+ */
+export class QueueRunNotAdmittedError extends Error {
+  constructor(readonly occupancy: QueueRunOccupancy) {
+    super(
+      occupancy.startingRunId !== null
+        ? `run ${occupancy.startingRunId} of this queue is still starting`
+        : `this queue already has ${occupancy.activeRuns} active runs`
+    );
+    this.name = 'QueueRunNotAdmittedError';
   }
 }
 
@@ -936,13 +961,15 @@ export async function startRun(
   const benchmarkIdentity = resolveRunIdentity(config);
   const policy = resolveEffectivePolicy(config);
 
-  // One active run per (kind, purpose). The unique partial index is the atomic
-  // backstop; this pre-check turns the common case (a run already going) into a
+  // One active classifier run: it derives a single winner. The unique partial
+  // index is the atomic backstop; this pre-check turns the common case into a
   // clean RunAlreadyActiveError instead of an insert-constraint failure.
-  // The platform and user queues hold independent slots and can run at once.
-  const activeRun = await getRunningRun(env.BENCH_DB, kind, purpose, router);
-  if (activeRun) {
-    throw new RunAlreadyActiveError(kind, activeRun.id);
+  // Decider queues admit several runs; drainQueue bounds them.
+  if (kind === 'classifier') {
+    const activeRun = await getRunningRun(env.BENCH_DB, kind, purpose, router);
+    if (activeRun) {
+      throw new RunAlreadyActiveError(kind, activeRun.id);
+    }
   }
   const repetitions =
     kind === 'classifier' ? policy.classifierRepetitions : policy.deciderRepetitions;
@@ -1047,7 +1074,7 @@ export async function startRun(
   }));
 
   try {
-    await insertRun(
+    const admission = await insertRun(
       env.BENCH_DB,
       {
         id: runId,
@@ -1072,6 +1099,7 @@ export async function startRun(
       runModelRows,
       carriedSummaries
     );
+    if (!admission.admitted) throw new QueueRunNotAdmittedError(admission.occupancy);
   } catch (error) {
     // The claim is already made, so hand the rows back to the queue — otherwise
     // they sit `running` under a run that was never written and nothing can
@@ -1087,9 +1115,13 @@ export async function startRun(
         );
       });
     }
-    const winner = await getRunningRun(env.BENCH_DB, kind, purpose, router).catch(() => undefined);
-    if (winner && winner.id !== runId) {
-      throw new RunAlreadyActiveError(kind, winner.id);
+    if (kind === 'classifier') {
+      const winner = await getRunningRun(env.BENCH_DB, kind, purpose, router).catch(
+        () => undefined
+      );
+      if (winner && winner.id !== runId) {
+        throw new RunAlreadyActiveError(kind, winner.id);
+      }
     }
     throw error;
   }
@@ -1151,28 +1183,82 @@ export async function startRun(
   return { runId, enqueuedModels: enqueuedRunEntries.length, skippedModels };
 }
 
+/**
+ * Registry queues: one per router and run purpose. Each starts one run at a time.
+ */
+const REGISTRY_QUEUES = AUTO_ROUTERS.length * BenchmarkRunPurposeSchema.options.length;
+
+function logQueueDrainSkipped(
+  router: AutoRouter,
+  queue: BenchmarkRunPurpose,
+  occupancy: QueueRunOccupancy
+): void {
+  console.log(
+    JSON.stringify(
+      occupancy.startingRunId !== null
+        ? {
+            event: 'benchmark_queue_drain_skipped_run_starting',
+            router,
+            queue,
+            startingRunId: occupancy.startingRunId,
+          }
+        : {
+            event: 'benchmark_queue_drain_skipped_queue_full',
+            router,
+            queue,
+            activeRuns: occupancy.activeRuns,
+          }
+    )
+  );
+}
+
+/**
+ * Why a queue drain started no run. `active_run` means the queue's slot is
+ * taken and the new work waits for it; `nothing_pending` means the queue holds
+ * nothing to claim, so it waits for a registration, not for a run to end.
+ */
+export type DrainSkipReason = 'active_run' | 'nothing_pending';
+
 export async function drainQueue(
   env: Env,
   queue: BenchmarkRunPurpose,
-  router: AutoRouter = 'efficient'
+  router: AutoRouter = 'efficient',
+  options: { skipPlatformSync?: boolean; skipped?: DrainSkipReason[] } = {}
 ): Promise<{ runId: string; entryCount: number } | null> {
-  const config = await getBenchmarkConfig(env.BENCH_DB, router);
-  if (!config) return null;
-
-  const active = await getRunningRun(env.BENCH_DB, 'decider', queue, router);
-  if (active) {
+  // A measurement-revision activation lands as data before this image is live; only a
+  // worker that knows `probe_activations` consumes it, so it is applied here and never by
+  // the previous one (which would have measured the rows at the revision it knows).
+  const activation = await applyProbeActivations(env.BENCH_DB, router);
+  if (activation.queued > 0 || activation.readmitted > 0) {
     console.log(
       JSON.stringify({
-        event: 'benchmark_queue_drain_skipped_slot_occupied',
-        queue,
-        activeRunId: active.id,
+        event: 'benchmark_probe_activation_applied',
+        router,
+        queued: activation.queued,
+        readmitted: activation.readmitted,
       })
     );
+  }
+  const config = await getBenchmarkConfig(env.BENCH_DB, router);
+  if (!config) {
+    // No saved config means no registry rows to claim: nothing is pending.
+    options.skipped?.push('nothing_pending');
+    return null;
+  }
+
+  // One run per queue materializes at a time, so the costly start step (reuse
+  // copies and chunk creation) stays serial. insertRun enforces this atomically;
+  // this read skips the claim and catalog work while the queue cannot admit a run.
+  const occupancy = await getQueueRunOccupancy(env.BENCH_DB, router, queue);
+  if (occupancy.startingRunId !== null || occupancy.activeRuns >= MAX_RUNNING_RUNS_PER_QUEUE) {
+    options.skipped?.push('active_run');
+    logQueueDrainSkipped(router, queue, occupancy);
     return null;
   }
 
   // Reconcile saved snapshots, not the live alias targets.
-  if (queue === 'platform') await syncPlatformRegistry(env, fetch, router);
+  if (queue === 'platform' && !options.skipPlatformSync)
+    await syncPlatformRegistry(env, fetch, router);
 
   const engineIdentity = computeEngineIdentity('decider', router);
   const repetitions = resolveEffectivePolicy(config).deciderRepetitions;
@@ -1181,7 +1267,10 @@ export async function drainQueue(
   const current = { router, engineIdentity, repetitions };
   const pending = await listPendingCurrentProfiles(env.BENCH_DB, current, queue);
   const remeasures = await listQueuedRemeasures(env.BENCH_DB, current, queue);
-  if (pending.length === 0 && remeasures.length === 0) return null;
+  if (pending.length === 0 && remeasures.length === 0) {
+    options.skipped?.push('nothing_pending');
+    return null;
+  }
   const catalog = await fetchExecutableBenchmarkModelCatalog(env, resolveRunIdentity(config));
   const checked = pending.map(row => ({
     row,
@@ -1204,7 +1293,12 @@ export async function drainQueue(
     ...remeasures,
     ...available.slice(0, Math.max(0, maxEntries - remeasures.length)),
   ];
-  if (queued.length === 0) return null;
+  if (queued.length === 0) {
+    // Every pending row this drain found is unavailable, so the queue has
+    // nothing claimable — the same answer as an empty queue.
+    options.skipped?.push('nothing_pending');
+    return null;
+  }
 
   const batch = queued.slice(0, maxEntries);
   const entries: RunModelEntry[] = batch.map(row => ({
@@ -1223,23 +1317,20 @@ export async function drainQueue(
         models: entries.map(e => e.model),
       })
     );
-    // The claimed count, not the requested one — the other queue may have taken
-    // part of this batch between the read and the claim.
+    // The claimed count, not the requested one — a concurrent drain of either
+    // queue may have claimed part of this batch between the read and the claim.
     return { runId: result.runId, entryCount: result.enqueuedModels };
   } catch (error) {
-    if (error instanceof RunAlreadyActiveError) {
-      console.log(
-        JSON.stringify({
-          event: 'benchmark_queue_drain_skipped_slot_occupied',
-          queue,
-          activeRunId: error.activeRunId,
-        })
-      );
+    if (error instanceof QueueRunNotAdmittedError) {
+      // Another drain won the slot between our read and our insert.
+      options.skipped?.push('active_run');
+      logQueueDrainSkipped(router, queue, error.occupancy);
       return null;
     }
     if (error instanceof NoEntriesClaimedError) {
-      // The other queue claimed this whole batch between our read and our
+      // Concurrent drains claimed this whole batch between our read and our
       // claim. The pairs are being measured; nothing to do.
+      options.skipped?.push('nothing_pending');
       console.log(JSON.stringify({ event: 'benchmark_queue_drain_batch_already_claimed', queue }));
       return null;
     }
@@ -1311,7 +1402,8 @@ async function initializeScheduledRun(env: Env, runId: string): Promise<boolean>
 async function initializeScheduledRuns(env: Env): Promise<boolean> {
   const uninitialized = await env.BENCH_DB.prepare(`
     SELECT id FROM benchmark_runs WHERE kind = 'decider' AND status = 'running'
-      AND NOT EXISTS (SELECT 1 FROM scheduler_runs WHERE run_id = benchmark_runs.id) LIMIT 3
+      AND NOT EXISTS (SELECT 1 FROM scheduler_runs WHERE run_id = benchmark_runs.id)
+    ORDER BY started_at LIMIT ${REGISTRY_QUEUES}
   `).all<{ id: string }>();
   if (uninitialized.results.length === 0) return false;
   const token = crypto.randomUUID();
@@ -1390,7 +1482,10 @@ export async function dispatchScheduler(env: Env): Promise<void> {
     }
     await finalizeRunIfComplete(env, claim.run_id, 'decider', await getRunState(env, claim.run_id));
   }
-  for (const runId of await listSettledSchedulerRuns(env.BENCH_DB, 3)) {
+  for (const runId of await listSettledSchedulerRuns(
+    env.BENCH_DB,
+    REGISTRY_QUEUES * MAX_RUNNING_RUNS_PER_QUEUE
+  )) {
     await finalizeRunIfComplete(env, runId, 'decider', await getRunState(env, runId));
   }
   let claimed = await dispatchClaims(env, config);
@@ -2948,8 +3043,8 @@ async function finalizeRunIfComplete(
         })
       );
     });
-    // Both queues: this run's slot just freed, and a pair it just measured may
-    // have been the only pending work the other queue was waiting on.
+    // Both queues: this queue may have been full, and a pair this run just
+    // measured may have been the only pending work the other queue was waiting on.
     await drainQueues(env, 'both', undefined, state.router);
     return;
   }

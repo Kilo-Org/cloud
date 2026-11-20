@@ -1,0 +1,1 @@
+ALTER TABLE `builds` ADD `network_secret_grants` text;

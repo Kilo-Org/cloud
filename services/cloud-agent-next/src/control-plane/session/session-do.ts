@@ -570,12 +570,17 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
     kiloSessionId: string;
     directory: string;
     handle: string;
+    /** The platform-added sandbox egress proof, when the request carried one. */
+    originProof?: string;
   }): Promise<ControlRuntimeCredentialProxyFenceScope | null>;
   /**
    * Asks the Sandbox DO to serve the handle on behalf of a surviving member of
    * the scope when this Session DO cannot resolve it locally.
    */
-  resolveScopeHandle(input: { handle: string }): Promise<ScopeHandleResolution>;
+  resolveScopeHandle(input: {
+    handle: string;
+    originProof?: string;
+  }): Promise<ScopeHandleResolution>;
   /** The locator a wiped issuer uses to keep resolving through a survivor. */
   getAcceptedHandleIssuerLocator(issuerSessionId: string): Promise<{
     scopeId: string;
@@ -1531,7 +1536,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * proxy endpoint. The handle is minted and bound by the Sandbox DO when it
    * sends `session.prepare` on a connected socket (R1).
    */
-  async resolveRuntimeCredentialProxyGrant(handle: string): Promise<{
+  async resolveRuntimeCredentialProxyGrant(
+    handle: string,
+    originProof?: string
+  ): Promise<{
     token: string;
     organizationId?: string;
     runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
@@ -1571,6 +1579,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
               kiloSessionId,
               directory,
               handle,
+              originProof,
             },
             correlation: { sessionId: metadata.identity.sessionId, kiloSessionId, sandboxId },
           });
@@ -1598,7 +1607,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       if (localError !== null) throw localError;
       return null;
     }
-    const fromScope = await this.resolveRuntimeCredentialProxyGrantFromScope(handle);
+    const fromScope = await this.resolveRuntimeCredentialProxyGrantFromScope(handle, originProof);
     if (fromScope) return fromScope;
     if (localError !== null) throw localError;
     return null;
@@ -1618,7 +1627,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * any failure to reach a decision within the total bound throws so the facade
    * returns its existing retryable 503 `Credential unavailable`.
    */
-  private async resolveRuntimeCredentialProxyGrantFromScope(handle: string): Promise<{
+  private async resolveRuntimeCredentialProxyGrantFromScope(
+    handle: string,
+    originProof: string | undefined
+  ): Promise<{
     token: string;
     organizationId?: string;
     runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
@@ -1631,7 +1643,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       outcome = await withTimeout(
         withDORetry(
           () => this.scopeResolutionPeer() ?? peer,
-          current => current.resolveScopeHandle({ handle }),
+          current => current.resolveScopeHandle({ handle, originProof }),
           'resolveScopeHandle'
         ),
         this.sessionTimers().scopeResolutionMs,

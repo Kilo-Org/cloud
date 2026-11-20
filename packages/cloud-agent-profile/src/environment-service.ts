@@ -10,6 +10,17 @@ import { TRPCError } from '@trpc/server';
 import { encryptWithPublicKey } from '@kilocode/encryption';
 import { egressPolicySchema, type EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import {
+  networkSecretStoredPolicySchema,
+  type NetworkSecrets,
+} from '@kilocode/worker-utils/network-secrets';
+import {
+  assertNetworkSecretKeySpace,
+  assertNetworkSecretAllocation,
+  networkSecretColumns,
+  storedNetworkSecret,
+  validateNetworkSecretChanges,
+} from './network-secret-storage';
+import {
   encryptedEnvelopeSchema,
   assertValidEnvironmentKey,
   validateEnvironmentCommands,
@@ -187,6 +198,7 @@ async function replacePlainVars(
     .where(
       and(
         eq(cloud_agent_environment_vars.environment_id, environmentId),
+        eq(cloud_agent_environment_vars.delivery, 'env'),
         eq(cloud_agent_environment_vars.is_secret, false)
       )
     );
@@ -244,6 +256,7 @@ async function applySecretChanges(
         and(
           eq(cloud_agent_environment_vars.environment_id, environmentId),
           inArray(cloud_agent_environment_vars.key, deleteKeys),
+          eq(cloud_agent_environment_vars.delivery, 'env'),
           eq(cloud_agent_environment_vars.is_secret, true)
         )
       )
@@ -321,10 +334,19 @@ export async function createEnvironment(
   const repositoryColumns = repositoryColumnsOfCreate(input);
   const plainVars = validateEnvironmentPlainVars(input.plainVars);
   const secrets = validateEnvironmentSecrets(input.secrets);
+  const networkSecrets = input.networkSecrets ?? [];
+  assertNetworkSecretAllocation(networkSecrets.length, input.sandboxAllocation);
+  validateNetworkSecretChanges(networkSecrets);
+  assertNetworkSecretKeySpace(
+    [...Object.keys(plainVars), ...Object.keys(secrets)],
+    networkSecrets.map(secret => secret.key)
+  );
   const commands = validateEnvironmentCommands(input.commands);
   const startCommands = validateEnvironmentCommands(input.startCommands, 'Start');
   assertNoPlainSecretCollision(plainVars, Object.keys(secrets));
-  validateEnvironmentVarCount(Object.keys(plainVars).length + Object.keys(secrets).length);
+  validateEnvironmentVarCount(
+    Object.keys(plainVars).length + Object.keys(secrets).length + networkSecrets.length
+  );
   const egress = resolveEnvironmentEgressPolicy(input);
 
   if (input.owner.type === 'organization') {
@@ -352,6 +374,10 @@ export async function createEnvironment(
   }
 
   const variableValues = [
+    ...networkSecrets.map(secret => ({
+      environment_id: environment.id,
+      ...networkSecretColumns(publicKeyBase64, secret),
+    })),
     ...Object.entries(plainVars).map(([key, value]) => ({
       environment_id: environment.id,
       key,
@@ -391,6 +417,8 @@ export async function updateEnvironment(
       ? undefined
       : validateEnvironmentCommands(input.startCommands, 'Start');
   const secretChanges = input.secrets;
+  const networkChanges = input.networkSecrets ?? [];
+  validateNetworkSecretChanges(networkChanges);
   const egress = resolveEnvironmentEgressPolicy(input);
 
   if (secretChanges !== undefined) {
@@ -430,32 +458,51 @@ export async function updateEnvironment(
   }
 
   const changesVariables =
-    plainVars !== undefined || (secretChanges !== undefined && secretChanges.length > 0);
-  const storedVars = changesVariables
-    ? await tx
-        .select({
-          key: cloud_agent_environment_vars.key,
-          // Only plaintext values are compared, so secret envelopes stay out of
-          // the row payload.
-          plainValue: sql<
-            string | null
-          >`case when ${cloud_agent_environment_vars.is_secret} then null else ${cloud_agent_environment_vars.value} end`,
-          isSecret: cloud_agent_environment_vars.is_secret,
-        })
-        .from(cloud_agent_environment_vars)
-        .where(eq(cloud_agent_environment_vars.environment_id, input.environmentId))
-    : [];
+    plainVars !== undefined ||
+    (secretChanges !== undefined && secretChanges.length > 0) ||
+    networkChanges.length > 0;
+  const storedVars =
+    changesVariables || input.sandboxAllocation !== undefined
+      ? await tx
+          .select({
+            key: cloud_agent_environment_vars.key,
+            // Only plaintext values are compared, so secret envelopes stay out of
+            // the row payload.
+            plainValue: sql<
+              string | null
+            >`case when ${cloud_agent_environment_vars.is_secret} then null else ${cloud_agent_environment_vars.value} end`,
+            isSecret: cloud_agent_environment_vars.is_secret,
+            delivery: cloud_agent_environment_vars.delivery,
+          })
+          .from(cloud_agent_environment_vars)
+          .where(eq(cloud_agent_environment_vars.environment_id, input.environmentId))
+      : [];
   const storedPlainVars: Record<string, string> = {};
   for (const row of storedVars) {
-    if (!row.isSecret && row.plainValue !== null) {
+    if (row.delivery === 'env' && !row.isSecret && row.plainValue !== null) {
       storedPlainVars[row.key] = row.plainValue;
     }
   }
   const storedPlainKeys = new Set(Object.keys(storedPlainVars));
   const changedSecretKeys = new Set(finalSecretChanges.keys());
   const retainedSecretKeys = storedVars
-    .filter(row => row.isSecret && !changedSecretKeys.has(row.key))
+    .filter(row => row.delivery === 'env' && row.isSecret && !changedSecretKeys.has(row.key))
     .map(row => row.key);
+  const networkKeys = new Set(
+    storedVars.filter(row => row.delivery === 'network').map(row => row.key)
+  );
+  for (const change of networkChanges) {
+    if ('delete' in change) networkKeys.delete(change.key);
+    else networkKeys.add(change.key);
+  }
+  assertNetworkSecretKeySpace(
+    [...Object.keys(plainVars ?? storedPlainVars), ...retainedSecretKeys, ...addedSecretKeys],
+    networkKeys
+  );
+  assertNetworkSecretAllocation(
+    networkKeys.size,
+    input.sandboxAllocation === undefined ? environment.sandbox_allocation : input.sandboxAllocation
+  );
 
   // The variable cap is decided from the resulting set, before the first
   // write, so one request cannot spend database work per submitted entry.
@@ -469,7 +516,8 @@ export async function updateEnvironment(
         ? storedPlainKeys.size - reusedPlainKeys
         : Object.keys(plainVars).length) +
         retainedSecretKeys.length +
-        addedSecretKeys.length
+        addedSecretKeys.length +
+        networkKeys.size
     );
   }
   const repositoriesUpdate =
@@ -507,8 +555,32 @@ export async function updateEnvironment(
     assertNoPlainSecretCollision(plainVars, [...retainedSecretKeys, ...addedSecretKeys]);
   }
 
-  // Secret changes run before the plaintext replacement so a deleted secret
-  // frees its key for a plaintext variable of the same name.
+  for (const change of networkChanges) {
+    if ('delete' in change) {
+      const deleted = await tx
+        .delete(cloud_agent_environment_vars)
+        .where(
+          and(
+            eq(cloud_agent_environment_vars.environment_id, input.environmentId),
+            eq(cloud_agent_environment_vars.key, change.key),
+            eq(cloud_agent_environment_vars.delivery, 'network')
+          )
+        )
+        .returning({ key: cloud_agent_environment_vars.key });
+      buildInputsChanged ||= deleted.length > 0;
+    } else {
+      const columns = networkSecretColumns(publicKeyBase64, change);
+      await tx
+        .insert(cloud_agent_environment_vars)
+        .values({ environment_id: input.environmentId, ...columns })
+        .onConflictDoUpdate({
+          target: [cloud_agent_environment_vars.environment_id, cloud_agent_environment_vars.key],
+          set: { ...columns, updated_at: new Date().toISOString() },
+        });
+      buildInputsChanged = true;
+    }
+  }
+
   if (secretChanges !== undefined && secretChanges.length > 0) {
     if (await applySecretChanges(tx, input.environmentId, publicKeyBase64, secretChanges)) {
       buildInputsChanged = true;
@@ -604,7 +676,7 @@ export async function getEnvironment(
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Environment not found' });
   }
 
-  const [plainVars, secretKeys] = await Promise.all([
+  const [plainVars, secretKeys, networkSecrets] = await Promise.all([
     db
       .select({
         key: cloud_agent_environment_vars.key,
@@ -616,6 +688,7 @@ export async function getEnvironment(
       .where(
         and(
           eq(cloud_agent_environment_vars.environment_id, environmentId),
+          eq(cloud_agent_environment_vars.delivery, 'env'),
           eq(cloud_agent_environment_vars.is_secret, false)
         )
       )
@@ -626,7 +699,22 @@ export async function getEnvironment(
       .where(
         and(
           eq(cloud_agent_environment_vars.environment_id, environmentId),
+          eq(cloud_agent_environment_vars.delivery, 'env'),
           eq(cloud_agent_environment_vars.is_secret, true)
+        )
+      )
+      .orderBy(cloud_agent_environment_vars.key),
+    db
+      .select({
+        key: cloud_agent_environment_vars.key,
+        allowedHosts: cloud_agent_environment_vars.allowed_hosts,
+        locations: cloud_agent_environment_vars.injection_locations,
+      })
+      .from(cloud_agent_environment_vars)
+      .where(
+        and(
+          eq(cloud_agent_environment_vars.environment_id, environmentId),
+          eq(cloud_agent_environment_vars.delivery, 'network')
         )
       )
       .orderBy(cloud_agent_environment_vars.key),
@@ -641,6 +729,10 @@ export async function getEnvironment(
     egressMode: environment.egress_mode,
     egressAllowlist: environment.egress_allowlist,
     secretKeys: secretKeys.map(row => row.key),
+    networkSecrets: networkSecrets.map(row => ({
+      key: row.key,
+      ...networkSecretStoredPolicySchema.parse(row),
+    })),
   };
 }
 
@@ -688,20 +780,33 @@ export async function listEnvironmentsForOwner(
 }
 
 /** Split variable rows into plaintext values and parsed secret envelopes. */
-function splitVariables(vars: ReadonlyArray<{ key: string; value: string; isSecret: boolean }>): {
+function splitVariables(
+  vars: ReadonlyArray<{
+    key: string;
+    value: string;
+    isSecret: boolean;
+    delivery: string;
+    allowedHosts: string[] | null;
+    locations: string[] | null;
+  }>
+): {
   plainVars: Record<string, string>;
   encryptedSecrets: EnvironmentBuildInput['encryptedSecrets'];
+  networkSecrets: NetworkSecrets;
 } {
   const plainVars: Record<string, string> = {};
   const encryptedSecrets: EnvironmentBuildInput['encryptedSecrets'] = {};
+  const networkSecrets: NetworkSecrets = {};
   for (const variable of vars) {
-    if (variable.isSecret) {
+    if (variable.delivery === 'network') {
+      networkSecrets[variable.key] = storedNetworkSecret(variable);
+    } else if (variable.isSecret) {
       encryptedSecrets[variable.key] = encryptedEnvelopeSchema.parse(JSON.parse(variable.value));
     } else {
       plainVars[variable.key] = variable.value;
     }
   }
-  return { plainVars, encryptedSecrets };
+  return { plainVars, encryptedSecrets, networkSecrets };
 }
 
 async function readVariables(db: Pick<WorkerDb, 'select'>, environmentId: string) {
@@ -710,6 +815,9 @@ async function readVariables(db: Pick<WorkerDb, 'select'>, environmentId: string
       key: cloud_agent_environment_vars.key,
       value: cloud_agent_environment_vars.value,
       isSecret: cloud_agent_environment_vars.is_secret,
+      delivery: cloud_agent_environment_vars.delivery,
+      allowedHosts: cloud_agent_environment_vars.allowed_hosts,
+      locations: cloud_agent_environment_vars.injection_locations,
     })
     .from(cloud_agent_environment_vars)
     .where(eq(cloud_agent_environment_vars.environment_id, environmentId))
@@ -760,7 +868,7 @@ export async function loadEnvironmentForSession(
       if (selection.status !== 'match') return selection;
 
       const { environment } = selection;
-      const { plainVars, encryptedSecrets } = splitVariables(
+      const { plainVars, encryptedSecrets, networkSecrets } = splitVariables(
         await readVariables(tx, environment.id)
       );
       const repositories = readRepositories(environment);
@@ -770,6 +878,7 @@ export async function loadEnvironmentForSession(
           layer: {
             envVars: plainVars,
             encryptedSecrets,
+            networkSecrets,
             setupCommands: environment.commands,
             startCommands: environment.start_commands,
             ...(repositories ? { repositories: repositories.map(referenceRepositoryOf) } : {}),
@@ -812,7 +921,7 @@ export async function loadEnvironmentBuildInput(
     async tx => {
       const environment = await readActiveEnvironment(tx, environmentId);
       if (environment === null) return null;
-      const { plainVars, encryptedSecrets } = splitVariables(
+      const { plainVars, encryptedSecrets, networkSecrets } = splitVariables(
         await readVariables(tx, environmentId)
       );
       const reference = referenceOf(environment);
@@ -821,6 +930,7 @@ export async function loadEnvironmentBuildInput(
         commands: environment.commands,
         plainVars,
         encryptedSecrets,
+        networkSecrets,
         sandboxAllocation: environment.sandbox_allocation,
         egressMode: environment.egress_mode,
       };

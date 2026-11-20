@@ -30,6 +30,7 @@ type RuntimeProxyFencePeer = {
     kiloSessionId: string;
     directory: string;
     handle: string;
+    originProof?: string;
   }): Promise<ControlRuntimeCredentialProxyFenceScope | null>;
 };
 
@@ -108,6 +109,7 @@ export async function readRuntimeProxyFence(input: {
     kiloSessionId: string;
     directory: string;
     handle: string;
+    originProof?: string;
   };
   correlation: RuntimeProxyFenceCorrelation;
 }): Promise<{ fence: ControlRuntimeCredentialProxyFence; scopeView?: ScopeGrantView } | null> {

@@ -1,6 +1,7 @@
 import { RESERVED_ENV_VARS } from '../../shared/runtime-environment.js';
 import { ISSUED_CREDENTIAL_ENV_KEYS } from '../../sandbox-control/session-credentials.js';
 import { mergeEnvVarsWithSecrets, type EncryptedSecrets } from '../../utils/encryption.js';
+import { parseControlPlaneCredential } from '../../shared/control-plane-credential.js';
 
 /**
  * Names the frame takes only from the pre-overlay spec: the runtime org comes
@@ -48,7 +49,10 @@ export function buildFrameEnv(input: FrameEnvInput): FrameEnvResult {
     input.privateKey
   );
   const restored = new Set<string>();
-  for (const key of ISSUED_CREDENTIAL_ENV_KEYS) {
+  const networkKeys = Object.keys(preOverlay).filter(
+    key => parseControlPlaneCredential(preOverlay[key])?.purpose === 'secret'
+  );
+  for (const key of [...ISSUED_CREDENTIAL_ENV_KEYS, ...networkKeys]) {
     if (Object.hasOwn(preOverlay, key)) {
       merged[key] = preOverlay[key];
       restored.add(key);

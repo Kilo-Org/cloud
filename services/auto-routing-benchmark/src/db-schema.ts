@@ -125,7 +125,11 @@ export const benchmarkRuns = sqliteTable(
     measurement_revision: integer('measurement_revision').notNull().default(2),
   },
   table => [
-    uniqueIndex('UQ_benchmark_runs_one_running_per_router_kind_purpose')
+    // Decider queues run several runs at once; a classifier run derives one winner.
+    uniqueIndex('UQ_benchmark_runs_one_running_classifier_per_router_purpose')
+      .on(table.router, table.purpose)
+      .where(sql`${table.status} = 'running' AND ${table.kind} = 'classifier'`),
+    index('IX_benchmark_runs_running')
       .on(table.router, table.kind, table.purpose)
       .where(sql`${table.status} = 'running'`),
   ]
@@ -517,6 +521,51 @@ export const profileRemeasures = sqliteTable(
       columns: [table.router, table.model, table.variant, table.engine_identity, table.repetitions],
     }),
     index('IDX_profile_remeasures_run').on(table.run_id),
+  ]
+);
+
+/**
+ * One-shot activation queue for a measurement revision: `remeasure` rows to queue in
+ * `profile_remeasures` and `readmit` rows to move back to `pending`, both written by the
+ * activating migration and consumed by the drain of the worker that ships with it
+ * (`applyProbeActivations` in `src/probe-activation.ts`).
+ *
+ * The rows exist only so the activation can ship as reviewed data before the new image
+ * is live: a migration applies before the container deploy, and the worker still serving
+ * during that window claims `profile_remeasures` rows and `pending` profiles directly, so
+ * a queue row written by the migration itself would be measured at the old revision. That
+ * worker never reads this table, and the apply is a no-op while the active revision is
+ * below the row's `required_revision` (see `applyProbeActivations`).
+ */
+export const probeActivations = sqliteTable(
+  'probe_activations',
+  {
+    router: text('router').$type<AutoRouter>().notNull(),
+    /** `remeasure` queues the pair in `profile_remeasures`; `readmit` re-admits it. */
+    action: text('action').$type<'remeasure' | 'readmit'>().notNull(),
+    /**
+     * The measurement revision the action needs. `applyProbeActivations` is a no-op below
+     * it and leaves the row staged, so deploying a worker that starts runs under an older
+     * `ACTIVE_MEASUREMENT_REVISION` never moves a row it cannot measure yet.
+     */
+    required_revision: integer('required_revision').notNull(),
+    model: text('model').notNull(),
+    variant: text('variant').notNull().default(''),
+    engine_identity: text('engine_identity').notNull(),
+    repetitions: integer('repetitions').notNull(),
+    requested_at: text('requested_at').notNull(),
+  },
+  table => [
+    primaryKey({
+      columns: [
+        table.router,
+        table.action,
+        table.model,
+        table.variant,
+        table.engine_identity,
+        table.repetitions,
+      ],
+    }),
   ]
 );
 

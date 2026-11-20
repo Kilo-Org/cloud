@@ -1,7 +1,8 @@
 import { describe, expect, it } from '@jest/globals';
-import type {
-  BenchmarkConfig,
-  BenchmarkRoutingTableResponse,
+import {
+  BenchmarkConfigResponseSchema,
+  type BenchmarkConfig,
+  type BenchmarkRoutingTableResponse,
 } from '@kilocode/auto-routing-contracts';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -11,7 +12,9 @@ import {
   effortCoverageForModel,
   formStateToConfig,
   formatRunProgress,
+  responseRunningRunIds,
   RoutingTableView,
+  runLeftRunningSet,
   toBenchmarkModelOptions,
 } from './BenchmarksSection';
 
@@ -241,6 +244,25 @@ describe('compact route rankings', () => {
   });
 });
 
+describe('config save drain', () => {
+  it('parses every drain outcome the worker reports', () => {
+    const parse = (drain: unknown) =>
+      BenchmarkConfigResponseSchema.safeParse({
+        config: null,
+        policySettings: null,
+        warnings: [],
+        drain,
+      }).success;
+    // The console rejects the whole save when this schema fails, so each value
+    // the worker can send has to parse here.
+    for (const skipped of ['active_run', 'nothing_pending', 'timeout', 'failed', null]) {
+      expect(parse({ runId: null, entryCount: 0, skipped })).toBe(true);
+    }
+    expect(parse({ runId: 'run-1', entryCount: 3, skipped: null })).toBe(true);
+    expect(parse({ runId: null, entryCount: 0, skipped: 'unknown_reason' })).toBe(false);
+  });
+});
+
 describe('config save warnings', () => {
   it('shows each warning with its kind and the worker’s next step', () => {
     const html = renderToStaticMarkup(
@@ -350,5 +372,37 @@ describe('benchmark run progress', () => {
         Date.parse('2026-06-15T00:00:30.000Z')
       ).eta
     ).toBe('<1 min');
+  });
+});
+
+describe('benchmark run completion refresh', () => {
+  it('refreshes when one run ends while another of the router keeps running', () => {
+    expect(runLeftRunningSet(['user-a', 'user-b'], ['user-b'])).toBe(true);
+    expect(runLeftRunningSet(['user-a'], [])).toBe(true);
+  });
+
+  it('does not refresh when runs only start or stay running', () => {
+    expect(runLeftRunningSet(['user-a'], ['user-a', 'user-b'])).toBe(false);
+    expect(runLeftRunningSet(['user-a', 'user-b'], ['user-b', 'user-a'])).toBe(false);
+    expect(runLeftRunningSet([], [])).toBe(false);
+  });
+
+  it("tracks the worker's router-wide running ids and falls back to the listed runs", () => {
+    const run = {
+      router: 'efficient' as const,
+      kind: 'decider' as const,
+      purpose: 'user' as const,
+      startedAt: '2026-06-15T00:00:00.000Z',
+      completedAt: null,
+      error: null,
+    };
+    const runs = [
+      { ...run, id: 'listed-running', status: 'running' as const },
+      { ...run, id: 'listed-done', status: 'completed' as const },
+    ];
+    expect(responseRunningRunIds({ runs, runningRunIds: ['hidden-by-filter'] })).toEqual([
+      'hidden-by-filter',
+    ]);
+    expect(responseRunningRunIds({ runs })).toEqual(['listed-running']);
   });
 });

@@ -8,6 +8,7 @@ import type * as ConfigModule from './config';
 
 import type * as SchedulerModule from './scheduler';
 import type * as SubscriptionsModule from './subscriptions';
+import type * as EligibilityModule from './probe/eligibility';
 
 vi.mock('./subscriptions', () => ({
   PLATFORM_SUBSCRIPTION_OWNER: { ownerType: 'platform', ownerId: '' },
@@ -53,6 +54,16 @@ vi.mock('./probe/executor', () => ({
   runProbeCaseViaGateway: vi.fn(),
 }));
 vi.mock('./openrouter', () => ({ createSystemOneClient: vi.fn() }));
+
+// These suites publish a fully measured pool; the ineligible branch is covered by
+// `src/probe/eligibility.test.ts` and `src/probe/publish.test.ts`.
+const missingProbeResults = vi.hoisted(() =>
+  vi.fn<(db: unknown, params: unknown) => Promise<Set<string>>>(async () => new Set<string>())
+);
+vi.mock('./probe/eligibility', async importOriginal => ({
+  ...(await importOriginal<typeof EligibilityModule>()),
+  pairsMissingProbeResults: missingProbeResults,
+}));
 vi.mock('./config', async importOriginal => {
   const actual = await importOriginal<typeof ConfigModule>();
   return { ...actual, getBenchmarkConfig: vi.fn() };
@@ -99,7 +110,7 @@ vi.mock('./db', async importOriginal => {
     markProfilesReadyForRun: vi.fn(),
     markProfilesRunningForRun: vi.fn(),
     markStaleRunsFailed: vi.fn(),
-    getRunningRun: vi.fn(),
+    getQueueRunOccupancy: vi.fn(),
     getLiveContainerLanes: vi.fn(),
     getLatestSummariesByModel: vi.fn(),
   };
@@ -138,7 +149,7 @@ import {
   getRunWithModels,
   getLiveContainerLanes,
   listPendingCurrentProfiles,
-  getRunningRun,
+  getQueueRunOccupancy,
   syncPlatformRegistryRows,
   getLatestRoutingTable,
   countCurrentProfilesByStatus,
@@ -375,7 +386,7 @@ beforeEach(() => {
   vi.mocked(syncPlatformRegistryRows).mockResolvedValue(undefined);
   vi.mocked(listStaleRunningDeciderRuns).mockResolvedValue([]);
   vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
-  vi.mocked(getRunningRun).mockResolvedValue(undefined);
+  vi.mocked(getQueueRunOccupancy).mockResolvedValue({ activeRuns: 0, startingRunId: null });
   vi.mocked(getLiveContainerLanes).mockResolvedValue(0);
   tokenGet.mockResolvedValue('internal-secret');
   queueSendBatch.mockResolvedValue(undefined);

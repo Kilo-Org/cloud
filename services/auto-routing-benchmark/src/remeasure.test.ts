@@ -367,8 +367,8 @@ describe('prompt transport re-measure (real SQLite)', () => {
 
   it('finds nothing to re-measure for pairs fully measured at the active revision', async () => {
     insertRun('old');
-    for (const benchCase of DECIDER_CASES) {
-      insertResult('old', benchCase.id, { revision: PROMPT_TRANSPORT_REVISION });
+    for (const benchCase of deciderCasesForRouter('efficient', ACTIVE_MEASUREMENT_REVISION)) {
+      insertResult('old', benchCase.id, { revision: ACTIVE_MEASUREMENT_REVISION });
     }
     insertProfile('old');
     const before = tableDump();
@@ -381,7 +381,7 @@ describe('prompt transport re-measure (real SQLite)', () => {
     });
 
     expect(report).toMatchObject({
-      promptRevision: 2,
+      promptRevision: ACTIVE_MEASUREMENT_REVISION,
       pairs: 0,
       affectedResults: 0,
       unmeasuredResults: 0,
@@ -389,7 +389,7 @@ describe('prompt transport re-measure (real SQLite)', () => {
       changed: 0,
     });
     const probeIds = new Set(PROBE_CASES.map(c => c.id));
-    expect(report.affectedCaseIds.filter(id => probeIds.has(id))).toEqual([]);
+    expect([...probeIds].every(id => report.affectedCaseIds.includes(id))).toBe(true);
     expect(tableDump()).toEqual(before);
   });
 

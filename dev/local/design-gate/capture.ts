@@ -1353,7 +1353,13 @@ export async function runMatrix(
             );
             continue;
           }
-          const mismatches = envMismatches(config, dump.env, baseWindow, language.resolved);
+          const mismatches = envMismatches(
+            config,
+            dump.env,
+            baseWindow,
+            language.resolved,
+            ctx.device.platform
+          );
           if (mismatches.length > 0) {
             outcome.findings.push(envMismatchFinding(config.id, target.id, dump, mismatches));
             continue;

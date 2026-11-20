@@ -113,6 +113,7 @@ export type CliArgs =
 export const USAGE = `Usage: pnpm dev:mobile:design-gate <command> [flags]
   run    --link <deeplink> [--link ...] [--targets <file>] [--matrix base|standard|full] [--cell <id> ...] [--observe-ms ${DEFAULT_OBSERVE_MS}]
          --cell adds a cell to the preset (${CELL_IDS.join(', ')}); font-max sets the largest text size and restores it after the run
+         On iOS, landscape rotates the simulator and fails when the display did not flip; compact needs an iPhone SE or mini (--device).
   scan   [--source probe|uiautomator|agent-device] [--session <agent-device session>]   waits for a settled layout on the accessibility sources
   motion --link <deeplink> [--tap <text|testID|label>] [--seconds 3] [--observe-ms ${DEFAULT_OBSERVE_MS}]   exit 1 on an interaction layout shift
   prepare --base <exact-40hex> --head <exact-40hex> --targets <proof-manifest.json> --out <new-dir>

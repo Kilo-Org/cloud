@@ -7,6 +7,7 @@ export const SESSION_TRANSCRIPT_TOKEN_SCHEME = 'SessionTranscript';
 export const SESSION_TRANSCRIPT_TOKEN_AUDIENCE = 'session-sync:transcript';
 export const SESSION_TRANSCRIPT_TOKEN_ISSUER = 'kilo-web';
 export const SESSION_TRANSCRIPT_TOKEN_TTL_SECONDS = 60;
+export const RUNTIME_PROXY_ORIGIN_HEADER = 'x-kilo-runtime-proxy-origin';
 
 export const cloudAgentSyncAuthorizationSchema = z.strictObject({
   userID: z.string().min(1).max(256),
@@ -19,6 +20,7 @@ export type CloudAgentSyncAuthorizationBinding = {
   authorizeUpload(input: {
     handle: string;
     sessionID?: string;
+    originProof?: string;
   }): Promise<CloudAgentSyncAuthorization | null>;
 };
 

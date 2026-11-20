@@ -62,7 +62,6 @@ type CreditsCardProps = {
  */
 const AMOUNT_DIRECTION = { direction: 'ltr', writingDirection: 'ltr' } as const;
 
-
 /**
  * The sentence each failure kind paints: the connection's own wording, the
  * retryable line a deadline shares (the card has no separate sentence for a

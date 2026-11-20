@@ -4,6 +4,7 @@ import {
   BenchmarkProfileQuotaErrorSchema,
   BenchmarkProfileStatusesResponseSchema,
   BenchmarkRegistryResponseSchema,
+  BenchmarkPriceSkipsResponseSchema,
   BenchmarkRoutingTableResponseSchema,
   BenchmarkConfigResponseSchema,
   BenchmarkSchedulerConfigResponseSchema,
@@ -132,6 +133,15 @@ export function getBenchmarkRegistry(router: AutoRouter = DEFAULT_AUTO_ROUTER) {
     `/admin/registry?router=${router}`,
     { method: 'GET' },
     BenchmarkRegistryResponseSchema
+  );
+}
+
+/** Live price-dominance skips the benchmark drain recorded for this router. */
+export function getBenchmarkPriceSkips(router: AutoRouter = DEFAULT_AUTO_ROUTER) {
+  return fetchBenchmarkAdmin(
+    `/admin/price-skips?router=${router}`,
+    { method: 'GET' },
+    BenchmarkPriceSkipsResponseSchema
   );
 }
 

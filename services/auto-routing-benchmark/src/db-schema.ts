@@ -23,6 +23,7 @@ import type {
   PolicySettingComputedMap,
   PolicySettingOverrides,
 } from '@kilocode/auto-routing-contracts';
+import type { MeasurementPoolKind } from './price-dominance';
 
 export type ClientProfileStatus = 'pending' | 'ready' | 'failed';
 
@@ -725,5 +726,76 @@ export const runLaneFailures = sqliteTable(
     primaryKey({
       columns: [table.run_id, table.model, table.variant, table.rep, table.chunk, table.shard],
     }),
+  ]
+);
+
+/**
+ * Which pools want one exact benchmark pair, one row per (pool, pair). Written when a
+ * pool's subscription admits the pair, so a drain can ask "which pools would a
+ * measurement of this pair serve" by primary-key prefix instead of reading every owner
+ * snapshot. `pool_kind` is the type the console names; `pool_id` is internal.
+ */
+export const benchmarkPoolMemberships = sqliteTable(
+  'benchmark_pool_memberships',
+  {
+    router: text('router').$type<AutoRouter>().notNull(),
+    pool_kind: text('pool_kind').$type<MeasurementPoolKind>().notNull(),
+    pool_id: text('pool_id').notNull(),
+    model: text('model').notNull(),
+    // Canonical variant key at the D1 boundary. '' means null/default variant.
+    variant: text('variant').notNull().default(''),
+  },
+  table => [
+    primaryKey({
+      columns: [table.router, table.model, table.variant, table.pool_kind, table.pool_id],
+    }),
+    index('IX_benchmark_pool_memberships_pool').on(table.router, table.pool_kind, table.pool_id),
+  ]
+);
+
+/**
+ * A pair the drain decided not to measure on one route, with the numbers behind the
+ * decision (src/price-dominance.ts). A row exists only for a skip, so the console's
+ * "skipped: cannot win at this price" list is exactly this table's live rows. The next
+ * drain re-evaluates when `leader_version` (the pool's published table) or
+ * `pair_price_fingerprint` (the pair's catalog price) moved.
+ */
+export const benchmarkPriceVerdicts = sqliteTable(
+  'benchmark_price_verdicts',
+  {
+    router: text('router').$type<AutoRouter>().notNull(),
+    model: text('model').notNull(),
+    variant: text('variant').notNull().default(''),
+    engine_identity: text('engine_identity').notNull(),
+    repetitions: integer('repetitions').notNull(),
+    route_key: text('route_key').notNull(),
+    pool_kind: text('pool_kind').$type<MeasurementPoolKind>().notNull(),
+    pool_id: text('pool_id').notNull(),
+    pair_request_cost_usd: real('pair_request_cost_usd'),
+    leader_model: text('leader_model'),
+    leader_variant: text('leader_variant'),
+    leader_request_cost_usd: real('leader_request_cost_usd'),
+    leader_value: real('leader_value'),
+    leader_accuracy: real('leader_accuracy'),
+    budget_usd: real('budget_usd'),
+    pair_best_value: real('pair_best_value'),
+    /** Version of the pool's published table the decision was made against. */
+    leader_version: text('leader_version').notNull(),
+    /** The pair's catalog price, so a price change alone re-opens the decision. */
+    pair_price_fingerprint: text('pair_price_fingerprint').notNull(),
+    evaluated_at: text('evaluated_at').notNull(),
+  },
+  table => [
+    primaryKey({
+      columns: [
+        table.router,
+        table.model,
+        table.variant,
+        table.engine_identity,
+        table.repetitions,
+        table.route_key,
+      ],
+    }),
+    index('IX_benchmark_price_verdicts_run').on(table.engine_identity, table.repetitions),
   ]
 );

@@ -474,6 +474,50 @@ export const BenchmarkRegistryQueueSchema = z.object({
 export type BenchmarkRegistryQueue = z.infer<typeof BenchmarkRegistryQueueSchema>;
 
 /**
+ * Pool types a measurement can serve. Public text names the type only: owner ids never
+ * appear on this surface, which is what keeps "the console shows which pool decided"
+ * safe to publish.
+ */
+export const BenchmarkPoolKindSchema = z.enum(['platform', 'user_subscription', 'custom']);
+export type BenchmarkPoolKind = z.infer<typeof BenchmarkPoolKindSchema>;
+
+/**
+ * One live price-dominance skip: a `(model, variant, route)` the drain will not measure
+ * because it cannot win that route at its price in the pool named here. `numbers` are the
+ * values the decision used, so the console can explain it without re-deriving the ranking.
+ */
+export const BenchmarkPriceSkipSchema = z.object({
+  model: z.string().trim().min(1),
+  variant: VariantSchema,
+  routeKey: z.string().trim().min(1),
+  poolKind: BenchmarkPoolKindSchema,
+  /** The pair's estimated request cost for this route, USD. Null when it cannot be priced. */
+  pairRequestCostUsd: z.number().nonnegative().nullable(),
+  /** The pool's route leader the pair was compared against. */
+  leader: z
+    .object({
+      model: z.string().trim().min(1),
+      variant: VariantSchema,
+      requestCostUsd: z.number().nonnegative(),
+      /** The leader's rank value: lower wins. Null when it cannot be ranked. */
+      value: z.number().nullable(),
+      accuracy: z.number().min(0).max(1),
+    })
+    .nullable(),
+  /** Frontier only: the cost bound the pair exceeded. */
+  budgetUsd: z.number().nonnegative().nullable(),
+  /** Efficient only: the pair's best conceivable rank value at 100% accuracy. */
+  pairBestValue: z.number().nullable(),
+  evaluatedAt: z.string().min(1),
+});
+export type BenchmarkPriceSkip = z.infer<typeof BenchmarkPriceSkipSchema>;
+
+export const BenchmarkPriceSkipsResponseSchema = z.object({
+  skips: z.array(BenchmarkPriceSkipSchema),
+});
+export type BenchmarkPriceSkipsResponse = z.infer<typeof BenchmarkPriceSkipsResponseSchema>;
+
+/**
  * Snapshot of the global decider registry. A pair wanted by both the platform
  * list and an owner pool is counted in both queues — it is one row, measured
  * once, and shared.

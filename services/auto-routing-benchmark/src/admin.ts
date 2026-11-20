@@ -38,6 +38,7 @@ import {
   type BenchmarkSchedulerConfigResponse,
   type BenchmarkSchedulerSetting,
   type BenchmarkRunProgress,
+  type BenchmarkPriceSkipsResponse,
   type CustomRoutingTableResponse,
 } from '@kilocode/auto-routing-contracts';
 import { formatError, zodJsonValidator } from '@kilocode/worker-utils';
@@ -79,6 +80,7 @@ import {
 } from './db';
 import { loadRunProgress } from './run-progress';
 import { loadRoutingTableResponse } from './routing-table-response';
+import { listPriceVerdicts } from './price-dominance-drain';
 import { getSchedulerOverrides, resolveSchedulerConfig, saveSchedulerOverrides } from './scheduler';
 import type { HonoEnv } from './hono-env';
 import { fetchBenchmarkUserToken } from './benchmark-token';
@@ -641,6 +643,32 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       'Content-Type': 'application/json',
     })
   );
+
+  // Live price-dominance skips: pairs the drain will not measure because they cannot win
+  // their route at their price in the pool named on the row (src/price-dominance.ts).
+  app.get('/admin/price-skips', async c => {
+    const router = requestRouter(c);
+    const config = await getBenchmarkConfig(c.env.BENCH_DB, router);
+    if (!config) return c.json({ skips: [] } satisfies BenchmarkPriceSkipsResponse);
+    const skips = await listPriceVerdicts(c.env.BENCH_DB, {
+      router,
+      engineIdentity: computeEngineIdentity('decider', router),
+      repetitions: resolveEffectivePolicy(config).deciderRepetitions,
+    });
+    return c.json({
+      skips: skips.map(skip => ({
+        model: skip.model,
+        variant: skip.variant,
+        routeKey: skip.routeKey,
+        poolKind: skip.poolKind,
+        pairRequestCostUsd: skip.numbers.pairRequestCostUsd,
+        leader: skip.numbers.leader,
+        budgetUsd: skip.numbers.budgetUsd,
+        pairBestValue: skip.numbers.pairBestValue,
+        evaluatedAt: skip.evaluatedAt,
+      })),
+    } satisfies BenchmarkPriceSkipsResponse);
+  });
 
   app.get('/admin/classifier-winner', async c => {
     const winner = await getClassifierWinner(c.env.BENCH_DB, computeEngineIdentity('classifier'));

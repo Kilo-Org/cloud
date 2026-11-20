@@ -130,6 +130,7 @@ import {
   type ProfileFailure,
 } from './profile-failure';
 import { pickClassifierWinner } from './winner';
+import { priceDominanceGate } from './price-dominance-drain';
 import { fetchExecutableBenchmarkModelCatalog } from './executable-models';
 import { fetchBenchmarkUserToken } from './benchmark-token';
 import {
@@ -1306,15 +1307,53 @@ export async function drainQueue(
     variant: variantFromStorage(row.variant),
   }));
 
+  // Price dominance (src/price-dominance-drain.ts): a pair that cannot win its route at its
+  // price in any pool that wants it is not measured. The gate records every skip per route
+  // with its numbers, and the surviving pairs are claimed exactly as before. Re-evaluation
+  // is implicit: a new publish or a catalog price change re-opens the decision next drain.
+  const gate = await priceDominanceGate({
+    db: env.BENCH_DB,
+    router,
+    engineIdentity,
+    repetitions,
+    pairs: entries,
+    prices: catalogCandidatePrices(catalog),
+    config,
+  });
+  if (gate.skipped.length > 0) {
+    console.log(
+      JSON.stringify({
+        event: 'benchmark_price_dominance_skipped',
+        queue,
+        router,
+        skipped: gate.skipped.map(pair => ({
+          model: pair.model,
+          variant: pair.variant,
+        })),
+        records: gate.recordCount,
+      })
+    );
+  }
+  if (gate.allowed.length === 0) {
+    // Every pending pair of this batch is dominated on every route of every pool, so the
+    // queue has nothing to measure right now; the next drain re-evaluates.
+    options.skipped?.push('nothing_pending');
+    return null;
+  }
+  const admitted: RunModelEntry[] = gate.allowed.map(pair => ({
+    model: pair.model,
+    variant: pair.variant,
+  }));
+
   try {
-    const result = await startRun(env, 'decider', { router, purpose: queue, entries });
+    const result = await startRun(env, 'decider', { router, purpose: queue, entries: admitted });
     console.log(
       JSON.stringify({
         event: 'benchmark_queue_drain_started',
         queue,
         runId: result.runId,
         entryCount: result.enqueuedModels,
-        models: entries.map(e => e.model),
+        models: admitted.map(e => e.model),
       })
     );
     // The claimed count, not the requested one — a concurrent drain of either

@@ -13,6 +13,7 @@ import { platformRegistryEntries, type BenchmarkModelCatalogSchema } from './pla
 import { getBenchmarkConfig } from './config';
 import { listReadyCurrentProfilesForEntries } from './db';
 import { computeEngineIdentity } from './run';
+import { poolKindForOwnerType, recordPoolMemberships } from './price-dominance-drain';
 
 const PairSchema = z.object({ model: z.string().min(1), variant: z.string().nullable() });
 const SnapshotSchema = z.array(
@@ -238,6 +239,14 @@ async function admitSubscriptionPairs(
   const now = new Date().toISOString();
   const flag = owner.ownerType === 'platform' ? 'platform_requested' : 'user_requested';
   if (!pairs.length) return;
+  // The price-dominance gate asks "which pools want this pair" per drain; record the
+  // membership here, where a pool actually admits the pair, so that answer is an index read.
+  await recordPoolMemberships(
+    db,
+    config.router,
+    { kind: poolKindForOwnerType(owner.ownerType), id: owner.ownerId || 'platform' },
+    pairs
+  );
   await db.batch(
     pairs.map(pair =>
       db

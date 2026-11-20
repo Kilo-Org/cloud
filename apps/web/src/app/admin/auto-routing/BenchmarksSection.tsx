@@ -8,6 +8,7 @@ import {
   type AutoRouter,
   BenchmarkConfigResponseSchema,
   type BenchmarkConfigSaveWarning,
+  BenchmarkPriceSkipsResponseSchema,
   BenchmarkRegistryResponseSchema,
   BenchmarkRoutingTableResponseSchema,
   BenchmarkRunsResponseSchema,
@@ -74,6 +75,7 @@ import {
 import { parseAdminResponse } from './admin-fetch';
 import { SchedulerConfigCard } from './SchedulerConfigCard';
 import { FailedModels } from './FailedModelsTable';
+import { PriceSkipsTable, priceSkipsSummary } from './PriceSkipsTable';
 import { useSystemOneModelOptions } from './system-one-models';
 
 export function formatAccuracy(n: number): string {
@@ -377,6 +379,11 @@ async function requeueBenchmarkRegistry(scope: BenchmarkQueueSelector, router: A
     body: JSON.stringify({ scope, router }),
   });
   return parseAdminResponse(response, RequeueBenchmarkRegistryResponseSchema);
+}
+
+async function fetchBenchmarkPriceSkips(router: AutoRouter) {
+  const response = await adminFetch(`/admin/api/auto-routing/benchmark-price-skips?router=${router}`);
+  return parseAdminResponse(response, BenchmarkPriceSkipsResponseSchema);
 }
 
 async function fetchBenchmarkRoutingTable(router: AutoRouter) {
@@ -1625,6 +1632,11 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
     queryFn: () => fetchBenchmarkRoutingTable(router),
   });
 
+  const priceSkipsQuery = useQuery({
+    queryKey: ['auto-routing', 'benchmark-price-skips', router],
+    queryFn: () => fetchBenchmarkPriceSkips(router),
+  });
+
   // Undefined while a newly selected filter loads, so switching filters is not
   // mistaken for a run finishing.
   const runsData = runsQuery.data;
@@ -1651,6 +1663,9 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
       });
       void queryClient.invalidateQueries({
         queryKey: ['auto-routing', 'benchmark-registry', router],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['auto-routing', 'benchmark-price-skips', router],
       });
     }
     prevRunning.current = { router, runIds: runningRunIds };
@@ -1786,6 +1801,31 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
                 <div className="flex flex-col gap-2">
                   <h3 className="text-sm font-medium">Failed models</h3>
                   <FailedModels router={router} entries={registryQuery.data.failedEntries ?? []} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <h3 className="text-sm font-medium">Skipped for price</h3>
+                  {priceSkipsQuery.isLoading ? (
+                    <Skeleton className="h-10 w-full" />
+                  ) : priceSkipsQuery.error ? (
+                    <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-xs">
+                      {priceSkipsQuery.error instanceof Error
+                        ? priceSkipsQuery.error.message
+                        : 'Failed to load price skips'}
+                    </div>
+                  ) : (priceSkipsQuery.data?.skips.length ?? 0) > 0 ? (
+                    <>
+                      <p className="text-muted-foreground text-xs">
+                        {priceSkipsSummary(priceSkipsQuery.data?.skips ?? [])} A pair that could
+                        win on any route of any pool is still measured.
+                      </p>
+                      <PriceSkipsTable skips={priceSkipsQuery.data?.skips ?? []} />
+                    </>
+                  ) : (
+                    <p className="text-muted-foreground text-xs">
+                      {priceSkipsSummary([])} Every pending pair can still win somewhere at its
+                      price.
+                    </p>
+                  )}
                 </div>
               </>
             ) : null}

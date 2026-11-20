@@ -60,6 +60,7 @@ function extractErrorMessage(error: unknown): string {
 }
 
 type CreateOrganizationPageProps = {
+  showFirstOrganizationTrialOffer: boolean;
   mockSelectedOrgName?: string; // For Storybook
 };
 
@@ -81,7 +82,10 @@ const enterpriseFeatures: FeatureItem[] = [
   { text: 'Priority support', icon: Star },
 ];
 
-export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizationPageProps = {}) {
+export function CreateOrganizationPage({
+  showFirstOrganizationTrialOffer,
+  mockSelectedOrgName,
+}: CreateOrganizationPageProps) {
   const [name, setName] = useState(mockSelectedOrgName || '');
   const [companyDomain, setCompanyDomain] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -145,7 +149,9 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
         <h1 className="mb-2 text-3xl font-bold lg:text-4xl">
           Create an organization for Kilo Enterprise
         </h1>
-        <p className="text-muted-foreground mb-2">{FIRST_ORGANIZATION_TRIAL_OFFER}</p>
+        {showFirstOrganizationTrialOffer && (
+          <p className="text-muted-foreground mb-2">{FIRST_ORGANIZATION_TRIAL_OFFER}</p>
+        )}
         <Link
           href="/get-started/personal"
           className="text-foreground text-lg underline underline-offset-4 hover:opacity-80"

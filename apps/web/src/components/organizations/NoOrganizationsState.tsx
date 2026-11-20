@@ -6,7 +6,11 @@ import { FIRST_ORGANIZATION_TRIAL_OFFER } from '@/lib/organization-trial-offer';
 import { OrganizationsList } from './OrganizationsList';
 import type { OrganizationCardOrg } from '@/components/organizations/OrganizationCard';
 
-export function NoOrganizationsState() {
+export function NoOrganizationsState({
+  showFirstOrganizationTrialOffer,
+}: {
+  showFirstOrganizationTrialOffer: boolean;
+}) {
   const canMakeOrgs = true;
   // Create fake organizations for preview
   const fakeOrganizations: OrganizationCardOrg[] = [
@@ -81,7 +85,9 @@ export function NoOrganizationsState() {
 
             {canMakeOrgs ? (
               <div>
-                <p className="mb-4 text-center">{FIRST_ORGANIZATION_TRIAL_OFFER}</p>
+                {showFirstOrganizationTrialOffer && (
+                  <p className="mb-4 text-center">{FIRST_ORGANIZATION_TRIAL_OFFER}</p>
+                )}
                 <div className="flex justify-center">
                   <NewOrganizationButton />
                 </div>

@@ -4,6 +4,9 @@ import { CreateOrganizationPage } from '@/components/organizations/new/CreateOrg
 const meta: Meta<typeof CreateOrganizationPage> = {
   title: 'Organizations/Onboarding/CreateOrganizationPage',
   component: CreateOrganizationPage,
+  args: {
+    showFirstOrganizationTrialOffer: true,
+  },
   parameters: {
     layout: 'fullscreen',
     nextjs: {

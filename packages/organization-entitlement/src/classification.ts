@@ -53,6 +53,11 @@ export function classifyOrganizationEntitlement({
   }
 
   const isTrialExpiredForEnforcement = trialStatus === 'trial_expired_hard' && bypassReason == null;
+  // An organization created without a trial stores no window, so a surface that
+  // reports the missing plan reads this instead of re-deriving the predicate.
+  const hasTrialWindow = !(
+    organization.trial_granted === false && organization.free_trial_end_at == null
+  );
 
   return {
     bypassReason,
@@ -60,6 +65,7 @@ export function classifyOrganizationEntitlement({
     displayStatus: bypassReason == null ? trialStatus : 'subscribed',
     hasEntitlement: !isTrialExpiredForEnforcement,
     hasPaidSeatEntitlement,
+    hasTrialWindow,
     isTrialExpiredForEnforcement,
     trialStatus,
   };

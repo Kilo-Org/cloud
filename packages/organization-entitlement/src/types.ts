@@ -21,6 +21,14 @@ export type OrganizationEntitlementClassification = {
   displayStatus: OrganizationTrialDisplayStatus;
   hasEntitlement: boolean;
   hasPaidSeatEntitlement: boolean;
+  /**
+   * Whether the organization has a trial window to report on. False for an
+   * organization created without a trial that an administrator never gave a
+   * stored deadline, so a surface describes the missing plan instead of
+   * elapsed days. Read it instead of re-deriving the predicate from
+   * `trial_granted` and `free_trial_end_at`.
+   */
+  hasTrialWindow: boolean;
   isTrialExpiredForEnforcement: boolean;
   trialStatus: OrganizationTrialStage;
 };

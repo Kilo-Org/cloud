@@ -127,9 +127,18 @@ describe('classifyOrganizationEntitlement', () => {
       daysRemaining: -4,
       hasEntitlement: false,
       hasPaidSeatEntitlement: false,
+      hasTrialWindow: false,
       isTrialExpiredForEnforcement: true,
       trialStatus: 'trial_expired_hard',
     });
+  });
+
+  it('reports a trial window whenever one was granted or an admin stored a deadline', () => {
+    expect(classify({ free_trial_end_at: null, trial_granted: true }).hasTrialWindow).toBe(true);
+    expect(
+      classify({ free_trial_end_at: hardExpiredTrialEnd, trial_granted: false }).hasTrialWindow
+    ).toBe(true);
+    expect(classify({ free_trial_end_at: hardExpiredTrialEnd }).hasTrialWindow).toBe(true);
   });
 
   it('keeps the previous classification when the trial grant is unspecified', () => {

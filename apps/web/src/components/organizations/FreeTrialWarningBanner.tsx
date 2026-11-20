@@ -140,7 +140,7 @@ export function FreeTrialWarningBanner({
   const canManage = canManageOrganization(userRole);
   const buttonVariant = getButtonVariantForState(state);
   const message = getTrialMessage(daysRemaining, canManage, hasTrialWindow);
-  const title = hasTrialWindow ? styles.title : `Free Kilo ${planName} Trial Not Included`;
+  const title = hasTrialWindow ? styles.title : `Your Kilo ${planName} Trial Is Not Included`;
   const pathname = usePathname();
   const shouldShowUpgradeButton = canManage && !pathname.endsWith('/subscriptions');
 

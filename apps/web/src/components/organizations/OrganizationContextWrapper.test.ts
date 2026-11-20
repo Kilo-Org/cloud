@@ -33,6 +33,7 @@ jest.mock('@/app/api/organizations/hooks', () => ({
     displayStatus: 'trial_ending_soon',
     hasEntitlement: true,
     hasPaidSeatEntitlement: false,
+    hasTrialWindow: true,
     isTrialExpiredForEnforcement: false,
     trialStatus: 'trial_ending_soon',
   }),

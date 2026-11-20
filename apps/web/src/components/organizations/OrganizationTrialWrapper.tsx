@@ -48,10 +48,12 @@ export function OrganizationTrialWrapper({
   const daysRemaining =
     classification === 'loading' || classification === 'error' ? 0 : classification.daysRemaining;
   // An organization created without a trial has no window to report on, so the
-  // banner and the lock dialog describe the missing plan rather than elapsed days.
+  // banner and the lock dialog describe the missing plan rather than elapsed
+  // days. The classifier owns the predicate; this reads its answer.
   const hasTrialWindow =
-    organizationData != null &&
-    !(organizationData.trial_granted === false && organizationData.free_trial_end_at == null);
+    classification === 'loading' || classification === 'error'
+      ? true
+      : classification.hasTrialWindow;
 
   const currentRole = assumedRole === 'KILO ADMIN' ? 'owner' : assumedRole || role;
 

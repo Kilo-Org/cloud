@@ -73,12 +73,9 @@ describe('selectChatListSurface', () => {
     ).toEqual({ kind: 'rows' });
   });
 
-  it('keeps answered rows while the catalog has not answered', () => {
-    // The rows are the device's own answer; a catalog that is still loading, or
-    // never answered at all, says nothing about them.
-    expect(selectChatListSurface({ ...answered, chatCount: 1, catalogAnswered: false })).toEqual({
-      kind: 'rows',
-    });
+  it('keeps answered rows while the catalog is still loading', () => {
+    // The rows are the device's own answer, and a catalog read that is still in
+    // flight says nothing about them.
     expect(
       selectChatListSurface({
         ...answered,

@@ -5,10 +5,12 @@ import type {
   ClientCustomRouterEntry,
   CustomRouterBenchmarkContext,
   CustomRoutingTable,
+  TaxonomyRouteKey,
 } from '@kilocode/auto-routing-contracts';
 import type * as MeasurementRevision from './measurement-revision';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { DECIDER_CASES } from './datasets/decider-cases';
+import { PROBE_ROUTE_KEYS } from './probe/eligibility';
 import { computeEngineIdentity } from './run';
 
 const CONFIG: BenchmarkConfig = {
@@ -26,9 +28,9 @@ const CONFIG: BenchmarkConfig = {
 };
 
 const ENGINE = computeEngineIdentity('decider', 'efficient');
-const AGENTIC_ROUTE = 'agentic_execution/tool_usage';
 const OTHER_ROUTE = 'implementation/code_generation';
 const LOCAL = 'client:ollama/qwen3:32b';
+const GATEWAY = 'vendor/gw';
 
 const localModel: ClientCustomRouterEntry = {
   kind: 'client',
@@ -52,16 +54,26 @@ const clientOnly: CustomRouterBenchmarkContext = {
   clientEvalEntryKeys: [LOCAL],
 };
 
+const withGateway: CustomRouterBenchmarkContext = {
+  ...clientOnly,
+  entries: [localModel, { kind: 'gateway', model: GATEWAY }],
+};
+
 const source = {
   catalogEnv: { KILO_WEB_API_BASE_URL: 'https://app.test' },
-  fetchImpl: async () => Response.json({ data: [] }),
+  fetchImpl: (async () =>
+    Response.json({
+      data: [{ id: GATEWAY, pricing: { prompt: '0.000001', completion: '0.000002' } }],
+    })) as typeof fetch,
   now: new Date('2026-10-16T12:00:00.000Z'),
 };
 
-function summary(routeKey: string) {
+const ALL_ROUTES: TaxonomyRouteKey[] = [...PROBE_ROUTE_KEYS, OTHER_ROUTE];
+
+function summary(routeKey: string, model = LOCAL, variant: string | null = 'low') {
   return {
-    model: LOCAL,
-    variant: 'low',
+    model,
+    variant,
     routeKey,
     accuracy: 0.9,
     avgCostUsd: 0,
@@ -77,8 +89,15 @@ function summary(routeKey: string) {
 
 const routes = (table: CustomRoutingTable | null) => Object.keys(table?.routes ?? {}).sort();
 
-/** Assembles the table of the owner's client entry with the given active revision. */
-async function assemble(db: D1Database, activeRevision: number) {
+const candidates = (table: CustomRoutingTable | null, routeKey: TaxonomyRouteKey) =>
+  (table?.routes[routeKey] ?? []).map(candidate => candidate.model).sort();
+
+/** Assembles the table of the given context with the given active revision. */
+async function assemble(
+  db: D1Database,
+  activeRevision: number,
+  context: CustomRouterBenchmarkContext = clientOnly
+) {
   vi.resetModules();
   // The activation constant is read when the table is assembled, so the revision under test
   // must be mocked before the module graph loads: a static import would freeze it at 2.
@@ -87,7 +106,7 @@ async function assemble(db: D1Database, activeRevision: number) {
     return { ...actual, ACTIVE_MEASUREMENT_REVISION: activeRevision };
   });
   const { assembleCustomRouterTable } = await import('./custom-routers');
-  return assembleCustomRouterTable(db, CONFIG, clientOnly, source);
+  return assembleCustomRouterTable(db, CONFIG, context, source);
 }
 
 describe('client-uploaded measurements under probe activation (real SQLite)', () => {
@@ -109,17 +128,45 @@ describe('client-uploaded measurements under probe activation (real SQLite)', ()
       .run(
         ENGINE,
         DECIDER_CASES.length * 3,
-        JSON.stringify([summary(AGENTIC_ROUTE), summary(OTHER_ROUTE)])
+        JSON.stringify(ALL_ROUTES.map(routeKey => summary(routeKey)))
       );
   });
 
-  it('drops an agentic route a client upload cannot have probed and keeps the rest', async () => {
-    const { table } = await assemble(db, 3);
-    expect(routes(table)).toEqual([OTHER_ROUTE]);
+  /** A ready platform pair of the current engine whose run has no probe results. */
+  function platformPair(runId: string) {
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles (router, model, variant, engine_identity, repetitions, status,
+          run_id, requested_at, updated_at, completed_at, platform_requested, user_requested)
+         VALUES ('efficient', ?, '', ?, 3, 'ready', ?, '2026-10-01', '2026-10-01', '2026-10-01', 0, 1)`
+      )
+      .run(GATEWAY, ENGINE, runId);
+    for (const routeKey of ALL_ROUTES) {
+      sqlite
+        .prepare(
+          `INSERT INTO model_summaries (run_id, model, variant, route_key, accuracy, avg_cost_usd,
+            avg_latency_ms, p50_latency_ms, cases, errors, p95_latency_ms, timeouts)
+           VALUES (?, ?, '', ?, 0.95, 0.001, 800, 800, 20, 0, 900, 0)`
+        )
+        .run(runId, GATEWAY, routeKey);
+    }
+  }
+
+  it('keeps every agentic route a client upload reports while a platform pair without probe results loses them', async () => {
+    platformPair('platform-run');
+    const { table } = await assemble(db, 3, withGateway);
+    expect(routes(table)).toEqual(ALL_ROUTES.slice().sort());
+    for (const routeKey of PROBE_ROUTE_KEYS) {
+      expect(candidates(table, routeKey)).toEqual([LOCAL]);
+    }
+    expect(candidates(table, OTHER_ROUTE)).toEqual([LOCAL, GATEWAY]);
   });
 
-  it('keeps every route before activation', async () => {
-    const { table } = await assemble(db, 2);
-    expect(routes(table)).toEqual([AGENTIC_ROUTE, OTHER_ROUTE].sort());
+  it('keeps a platform pair on every route before the probe revision activates', async () => {
+    platformPair('platform-run');
+    const { table } = await assemble(db, 2, withGateway);
+    for (const routeKey of PROBE_ROUTE_KEYS) {
+      expect(candidates(table, routeKey)).toEqual([LOCAL, GATEWAY]);
+    }
   });
 });

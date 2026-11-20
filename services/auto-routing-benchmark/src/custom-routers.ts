@@ -355,19 +355,6 @@ export async function assembleCustomRouterTable(
     : new Set<string>();
   const platformSummaries = dropIneligibleAgenticSummaries(allPlatformSummaries, ineligible);
   const platformCases = dropIneligibleAgenticResults(allPlatformCases, ineligible);
-  // A client eval runs the revision-2 cases: they include the agentic routes but no probe
-  // case, so after activation a client-uploaded profile has no probe evidence to offer those
-  // routes and keeps the rest — the same rule the platform entries above get.
-  const clientIneligible = probesActive
-    ? new Set(
-        clientReady.map(({ profile }) =>
-          benchmarkPairKey({
-            model: customRouterCandidateModel(clientProfileEntry(profile)),
-            variant: variantFromStorage(profile.variant),
-          })
-        )
-      )
-    : new Set<string>();
   // A profile's run id changes with every upload, so new results produce a new table version.
   const clientEntries = clientReady.map(({ profile, stale }) => {
     const runId = `client-profile:${profile.id}:${profile.results}`;
@@ -431,10 +418,10 @@ export async function assembleCustomRouterTable(
       summaries: [
         ...filterSummariesByProvenance(platformReady, platformSummaries),
         ...linkedEntries.flatMap(c => c.summaries),
-        ...dropIneligibleAgenticSummaries(
-          clientEntries.flatMap(c => c.summaries),
-          clientIneligible
-        ),
+        // The probe gate above covers only pairs this benchmark measured: a client-uploaded
+        // profile carries the owner's own measurements, which include the agentic routes, so
+        // it keeps every route it reports (src/custom-routers-probe.test.ts).
+        ...clientEntries.flatMap(c => c.summaries),
       ],
       perCaseResults: [
         ...platformCases.filter(pair =>

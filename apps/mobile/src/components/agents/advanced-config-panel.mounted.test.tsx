@@ -8,6 +8,7 @@ import { AdvancedConfigPanel } from './advanced-config-panel';
 import { SaveProfileSheet } from './save-profile-sheet';
 import { type ProfileSelectorProfile } from './profile-selector-model';
 import { MAX_SETUP_COMMANDS } from '@/components/profiles/profile-commands-model';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { SelectableText } from '@/components/ui/selectable-text';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 
@@ -324,6 +325,15 @@ async function submitSave(renderer: TestRenderer.ReactTestRenderer, name: string
     (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
     await Promise.resolve();
   });
+}
+
+/** The line the open save sheet states, or null while it states none. */
+function saveSheetMessage(renderer: TestRenderer.ReactTestRenderer): unknown {
+  const sheet = renderer.root.findAll(node => node.type === SaveProfileSheet)[0];
+  if (!sheet) {
+    throw new Error('the save sheet was not mounted');
+  }
+  return sheet.findAllByType(AccessibleStatus as never)[0]?.props.message;
 }
 
 /** The one payload the manual draft must travel in, whatever the attempt. */
@@ -679,6 +689,9 @@ describe('AdvancedConfigPanel', () => {
 
     expect(field(renderer, 'Profile name')).toBeTruthy();
     expect(toast.success).not.toHaveBeenCalled();
+    // A bare `Error` carries no tRPC payload, so the panel cannot know whether
+    // the write landed and the sheet states the neutral line, not a server one.
+    expect(saveSheetMessage(renderer)).toBe(i18n.t('profiles.saveFailed'));
   });
 
   it('a refused save leaves the draft intact and writes nothing else', async () => {
@@ -700,6 +713,34 @@ describe('AdvancedConfigPanel', () => {
     // still offered.
     expect(texts(renderer)).toContain('API_KEY');
     expect(buttonByText(renderer, 'Save as profile')).toBeDefined();
+    // A transport failure is not a server answer, so the line stays neutral.
+    expect(saveSheetMessage(renderer)).toBe(i18n.t('profiles.saveFailed'));
+  });
+
+  it('shows the server sentence when the save is refused with a tRPC conflict', async () => {
+    const mocks = mutations();
+    const refusal = 'A profile with this name already exists';
+    // Shaped like a tRPC client error: the payload names the code and the
+    // sentence. The `Error` message differs on purpose, so only the payload
+    // path can produce the line asserted below.
+    mocks.create.mutateAsync.mockRejectedValue(
+      Object.assign(new Error('TRPCClientError: request failed'), {
+        name: 'TRPCClientError',
+        data: { code: 'CONFLICT', message: refusal },
+      })
+    );
+    const renderer = mount({ mocks });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'My Setup');
+
+    expect(mocks.create.mutateAsync).toHaveBeenCalledExactlyOnceWith(MANUAL_PAYLOAD);
+    // The server answered, so its own sentence is the line the sheet shows.
+    expect(saveSheetMessage(renderer)).toBe(refusal);
+    // The sheet stayed open on the same typed name, so it can be corrected.
+    expect(renderer.root.findAll(node => node.type === SaveProfileSheet)).toHaveLength(1);
+    expect(renderer.root.findByType('SheetHeader' as never).props.doneDisabled).toBe(false);
   });
 
   it('a retry after a refusal reissues the same complete payload once more', async () => {

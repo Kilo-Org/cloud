@@ -4,7 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { SaveProfileSheet, type SaveProfileSheetProps } from './save-profile-sheet';
+import {
+  type SaveProfileOutcome,
+  SaveProfileSheet,
+  type SaveProfileSheetProps,
+} from './save-profile-sheet';
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
@@ -68,7 +72,7 @@ function defaults(overrides: Partial<SaveProfileSheetProps> = {}): SaveProfileSh
     ],
     setupCommands: ['pnpm install'],
     onClose: vi.fn<() => void>(),
-    onSave: vi.fn<() => Promise<boolean>>().mockResolvedValue(true),
+    onSave: vi.fn<() => Promise<SaveProfileOutcome>>().mockResolvedValue({ saved: true }),
     ...overrides,
   };
 }
@@ -151,7 +155,7 @@ describe('SaveProfileSheet', () => {
   });
 
   it('refuses an empty name with the profile copy and creates nothing', async () => {
-    const onSave = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
+    const onSave = vi.fn<() => Promise<SaveProfileOutcome>>().mockResolvedValue({ saved: true });
     const renderer = mount({ onSave });
 
     await submit(renderer);
@@ -161,7 +165,7 @@ describe('SaveProfileSheet', () => {
   });
 
   it('refuses an over-long name with the matching error', async () => {
-    const onSave = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
+    const onSave = vi.fn<() => Promise<SaveProfileOutcome>>().mockResolvedValue({ saved: true });
     const renderer = mount({ onSave });
 
     act(() => {
@@ -176,30 +180,25 @@ describe('SaveProfileSheet', () => {
   });
 
   it('follows the typed name after a refused submit, without waiting for another', async () => {
-    const onSave = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
+    const onSave = vi.fn<() => Promise<SaveProfileOutcome>>().mockResolvedValue({ saved: true });
     const renderer = mount({ onSave });
-    const type = (value: string) => {
-      act(() => {
-        (field(renderer, 'Profile name').props.onChangeText as (value: string) => void)(value);
-      });
-    };
 
     await submit(renderer);
     expect(field(renderer, 'Profile name').props.error).toBe('Enter a profile name');
 
-    type('x'.repeat(101));
+    typeInto(renderer, 'Profile name', 'x'.repeat(101));
     expect(field(renderer, 'Profile name').props.error).toBe('Profile name is too long');
 
-    type('My AWS');
+    typeInto(renderer, 'Profile name', 'My AWS');
     expect(field(renderer, 'Profile name').props.error).toBeUndefined();
 
-    type('');
+    typeInto(renderer, 'Profile name', '');
     expect(field(renderer, 'Profile name').props.error).toBe('Enter a profile name');
     expect(onSave).not.toHaveBeenCalled();
   });
 
   it('saves the trimmed fields and closes on success', async () => {
-    const onSave = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
+    const onSave = vi.fn<() => Promise<SaveProfileOutcome>>().mockResolvedValue({ saved: true });
     const onClose = vi.fn<() => void>();
     const renderer = mount({ onSave, onClose });
 
@@ -223,7 +222,9 @@ describe('SaveProfileSheet', () => {
   });
 
   it('shows the refused save inside the sheet and keeps Save live', async () => {
-    const onSave = vi.fn<() => Promise<boolean>>().mockResolvedValue(false);
+    const onSave = vi
+      .fn<() => Promise<SaveProfileOutcome>>()
+      .mockResolvedValue({ saved: false, refusal: 'A profile with this name already exists' });
     const renderer = mount({ onSave });
 
     act(() => {
@@ -232,14 +233,32 @@ describe('SaveProfileSheet', () => {
     await submit(renderer);
 
     // The sheet is the primary channel for a refused save: a toast would paint
-    // behind it. Save is live again, so the reader can correct and retry.
-    expect(texts(renderer)).toContain(i18n.t('profiles.saveFailed'));
+    // behind it. The line is the server's own sentence, not a guess about the
+    // connection. Save is live again, so the reader can correct and retry.
+    expect(texts(renderer)).toContain('A profile with this name already exists');
+    expect(liveMessage(renderer)).toBe('A profile with this name already exists');
+    expect(header(renderer).props.doneDisabled).toBe(false);
+  });
+
+  it('states the neutral connection line when the save had no answer', async () => {
+    const onSave = vi
+      .fn<() => Promise<SaveProfileOutcome>>()
+      .mockResolvedValue({ saved: false, refusal: null });
+    const renderer = mount({ onSave });
+
+    typeInto(renderer, 'Profile name', 'Retry me');
+    await submit(renderer);
+
+    // No server sentence arrived, so the outcome is unknown and the sheet says
+    // exactly that with the one unchanged key.
     expect(liveMessage(renderer)).toBe(i18n.t('profiles.saveFailed'));
     expect(header(renderer).props.doneDisabled).toBe(false);
   });
 
   it('states the refusal after the form, so the intro holds no empty line and a refused save moves no field', async () => {
-    const onSave = vi.fn<() => Promise<boolean>>().mockResolvedValue(false);
+    const onSave = vi
+      .fn<() => Promise<SaveProfileOutcome>>()
+      .mockResolvedValue({ saved: false, refusal: 'A profile with this name already exists' });
     const renderer = mount({ onSave });
     const body = renderer.root.findByType('ScrollView' as never);
     const lastBlock = () => {
@@ -258,12 +277,12 @@ describe('SaveProfileSheet', () => {
 
     // The refusal is the body's last block: every field above it keeps its place.
     expect(lastBlock()?.type).toBe(AccessibleStatus);
-    expect(liveMessage(renderer)).toBe(i18n.t('profiles.saveFailed'));
+    expect(liveMessage(renderer)).toBe('A profile with this name already exists');
   });
 
   it('closes a sheet with a save in flight without asking to discard', async () => {
-    const held = Promise.withResolvers<boolean>();
-    const onSave = vi.fn<() => Promise<boolean>>().mockReturnValue(held.promise);
+    const held = Promise.withResolvers<SaveProfileOutcome>();
+    const onSave = vi.fn<() => Promise<SaveProfileOutcome>>().mockReturnValue(held.promise);
     const onClose = vi.fn<() => void>();
     const confirm = vi.fn();
     confirmMock.current = request => {
@@ -290,7 +309,9 @@ describe('SaveProfileSheet', () => {
   });
 
   it('keeps the entered values and the sheet open when the save fails', async () => {
-    const onSave = vi.fn<() => Promise<boolean>>().mockResolvedValue(false);
+    const onSave = vi
+      .fn<() => Promise<SaveProfileOutcome>>()
+      .mockResolvedValue({ saved: false, refusal: null });
     const onClose = vi.fn<() => void>();
     const renderer = mount({ onSave, onClose });
 

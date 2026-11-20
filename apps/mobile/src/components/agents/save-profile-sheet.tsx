@@ -23,6 +23,7 @@ import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { draftProfileCountItems, formatProfileCountItems } from '@/lib/profile-count-labels';
+import { assertSurfaceFailureHandled } from '@/lib/surface-feedback';
 import { cn } from '@/lib/utils';
 
 /** One manual environment variable as the sheet saves it. */
@@ -34,6 +35,14 @@ export type SaveProfileSubmission = Readonly<{
   setAsDefault: boolean;
 }>;
 
+/**
+ * A save either completed, or was refused with the server's own sentence, or
+ * failed with an unknown outcome.
+ */
+export type SaveProfileOutcome =
+  | Readonly<{ saved: true }>
+  | Readonly<{ saved: false; refusal: string | null }>;
+
 export type SaveProfileSheetProps = Readonly<{
   envVars: readonly SaveProfileVar[];
   setupCommands: readonly string[];
@@ -41,18 +50,32 @@ export type SaveProfileSheetProps = Readonly<{
   /**
    * Persist the profile. The caller owns the write, which now carries the
    * vars, the setup commands and the default flag in the one create, so a
-   * refusal stores nothing. Returns `true` on success (the sheet closes) or
-   * `false` on failure (the sheet stays open with the entered values).
+   * refusal stores nothing. Resolves `{ saved: true }` on success (the sheet
+   * closes), or `{ saved: false, refusal }` on failure (the sheet stays open
+   * with the entered values), where `refusal` is the server's own sentence and
+   * `null` means no answer arrived.
    */
-  onSave: (submission: SaveProfileSubmission) => Promise<boolean>;
+  onSave: (submission: SaveProfileSubmission) => Promise<SaveProfileOutcome>;
 }>;
 
-/** The save's own refusal; the sheet's one line is the copy, so no message travels. */
-type SaveProfileFailure = { readonly kind: 'save-failed' };
+/** The save's own refusal. `refused` carries the server's sentence; `unknown` had no answer. */
+type SaveProfileFailure =
+  | { readonly kind: 'refused'; readonly message: string }
+  | { readonly kind: 'unknown' };
 
-/** The sheet's one line for this failure; it has a single refusal arm. */
-function saveFailureMessage(t: (key: string) => string): string {
-  return t('profiles.saveFailed');
+/** The sheet's one line for a failure: the server's sentence, or the neutral connection line. */
+function saveFailureMessage(t: (key: string) => string, failure: SaveProfileFailure): string {
+  switch (failure.kind) {
+    case 'refused': {
+      return failure.message;
+    }
+    case 'unknown': {
+      return t('profiles.saveFailed');
+    }
+    default: {
+      return assertSurfaceFailureHandled(failure);
+    }
+  }
 }
 
 /**
@@ -114,19 +137,23 @@ export function SaveProfileSheet({
       return;
     }
     try {
-      const saved = await onSave({ name, description, setAsDefault });
+      const outcome = await onSave({ name, description, setAsDefault });
       // The sheet closing is its own new state, so a success publishes no phase.
       // It is still fenced: a token from a closed sheet is dead, and the panel's
       // instance id stops this closure from closing its successor.
-      if (saved) {
+      if (outcome.saved) {
         if (attempt.abandon()) {
           onClose();
         }
         return;
       }
-      attempt.fail({ kind: 'save-failed' });
+      attempt.fail(
+        outcome.refusal === null
+          ? { kind: 'unknown' }
+          : { kind: 'refused', message: outcome.refusal }
+      );
     } catch {
-      attempt.fail({ kind: 'save-failed' });
+      attempt.fail({ kind: 'unknown' });
     }
   };
 
@@ -205,7 +232,7 @@ export function SaveProfileSheet({
             nothing. */}
         <AccessibleStatus
           className="text-sm"
-          message={save.failure === null ? null : saveFailureMessage(t)}
+          message={save.failure === null ? null : saveFailureMessage(t, save.failure)}
         />
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />

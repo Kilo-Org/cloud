@@ -13,6 +13,7 @@ import {
   type ProfileSelectorProfile,
 } from '@/components/agents/profile-selector-model';
 import {
+  type SaveProfileOutcome,
   SaveProfileSheet,
   type SaveProfileSubmission,
 } from '@/components/agents/save-profile-sheet';
@@ -26,6 +27,7 @@ import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useAgentProfileList, useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { draftProfileCountItems, formatProfileCountItems } from '@/lib/profile-count-labels';
+import { isTrpcClientError, readTrpcErrorField } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
 
 /** Structural view of a list row, so both the personal and combined shapes fit. */
@@ -185,7 +187,9 @@ export function AdvancedConfigPanel({
     [t, effectiveVars, effectiveCommands]
   );
 
-  const handleSaveProfile = async (submission: SaveProfileSubmission): Promise<boolean> => {
+  const handleSaveProfile = async (
+    submission: SaveProfileSubmission
+  ): Promise<SaveProfileOutcome> => {
     try {
       // One server write: the profile, its vars, its commands and the default
       // flag commit together, so a refusal leaves nothing behind and a retry
@@ -221,14 +225,20 @@ export function AdvancedConfigPanel({
       onManualVarsChange([]);
       onManualCommandsChange([]);
       toast.success(t('agentChat.newSession.profileSaved', { name: submission.name }));
-      return true;
+      return { saved: true };
     } catch (error) {
       // The mutation hook already toasts a readable server message; only fill
       // in the fallback when the server sent nothing.
       if (!(error instanceof Error) || error.message.trim().length === 0) {
         toast.error(t('profiles.saveFailed'));
       }
-      return false;
+      // Only a tRPC payload carries the server's sentence. A transport failure
+      // or timeout carries none, so the client cannot know whether the write
+      // landed: that is exactly what a null refusal reports.
+      const answered = isTrpcClientError(error)
+        ? (readTrpcErrorField(error, 'message') ?? '').trim()
+        : '';
+      return { saved: false, refusal: answered === '' ? null : answered };
     }
   };
 

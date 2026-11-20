@@ -63,6 +63,7 @@ describe('GET /api/private/users', () => {
 
     expect(mockedGetUserFromAuth).toHaveBeenCalledWith({
       adminOnly: true,
+      requestMethod: 'GET',
       stepUpExemptCredentials: ['human_bearer'],
     });
   });

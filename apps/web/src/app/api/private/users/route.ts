@@ -36,6 +36,7 @@ export async function GET(
     // step-up guard; browser sessions and other credential kinds still go through it.
     const { authFailedResponse } = await getUserFromAuth({
       adminOnly: true,
+      requestMethod: request.method,
       stepUpExemptCredentials: ['human_bearer'],
     });
     if (authFailedResponse) {

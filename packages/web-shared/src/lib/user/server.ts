@@ -57,6 +57,7 @@ import {
 } from '@kilocode/web-shared/lib/admin/privileged-access';
 import { actionClassForRoute } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import { runStepUpGuard, stepUpRefusalPayload } from '@kilocode/web-shared/lib/admin/step-up-guard';
+import { isCredentialExemptibleClass } from '@kilocode/web-shared/lib/admin/step-up-policy';
 import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
 import { z } from 'zod';
 import { v5 as uuidv5 } from 'uuid';
@@ -172,16 +173,27 @@ export type RequiredPermissions = {
    */
   skipStepUpGuard?: boolean;
   /**
-   * Credential kinds that skip the passkey step-up guard for this call. Matched
-   * against the kind `getUserFromAuth` derives for the request, not against
-   * headers, so a session request can never match a bearer kind. For a
-   * read-only, low-risk data route that has been explicitly approved to accept
-   * those credentials (`GET /api/private/users`, for Pylon webhooks). Admin
-   * authentication still applies in full. Do not add routes without a security
-   * review.
+   * Non-session credential kinds that skip the passkey step-up guard for this
+   * call, for a read-only, low-risk data route that has been explicitly
+   * approved to accept them (`GET /api/private/users`, for Pylon webhooks).
+   *
+   * Three limits hold regardless of what a caller passes:
+   * - Matched against the kind `getUserFromAuth` derives for the request, not
+   *   against headers.
+   * - `'session'` is not accepted: the type excludes it and the runtime check
+   *   ignores it, so a browser session always faces step-up.
+   * - The exemption applies only when the request's action class is
+   *   `credentialExemptible` in `step-up-policy.ts` (read-grade classes).
+   *   Writes and operation-bound classes keep the guard.
+   *
+   * Admin authentication still applies in full. Do not add routes without a
+   * security review. Pass `requestMethod` so the action class is not inferred
+   * from a missing header.
    */
-  stepUpExemptCredentials?: readonly PrivilegedCredentialKind[];
+  stepUpExemptCredentials?: readonly StepUpExemptibleCredential[];
 };
+
+export type StepUpExemptibleCredential = Exclude<PrivilegedCredentialKind, 'session'>;
 
 type GetAuthResponse =
   | {
@@ -263,14 +275,6 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
   // Admin audit trail: emit exactly one identity-attributed event per authorized
   // admin request. Guarded strictly on adminOnly so the millions of
   // adminOnly:false calls never log.
-  // `wouldBlock` sizes bearer traffic that step-up enforcement would refuse. A
-  // request whose credential kind the caller exempted is never refused, so it
-  // must not count as one. Server-component layouts skip the guard but still
-  // refuse bearer credentials themselves, so they keep reporting `wouldBlock`
-  // for non-session traffic.
-  const stepUpExempt = opts.stepUpExemptCredentials?.includes(credential) ?? false;
-  const wouldBlockUnderStepUp = credential !== 'session' && !stepUpExempt;
-
   if (opts.adminOnly === true && (result.user || authViaToken)) {
     // One header read and one privileged-inventory lookup per admin request, so
     // the step-up guard and the token outcome event that reports it cannot name
@@ -286,6 +290,19 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
       | undefined;
     const routeAttribution = () =>
       (attribution ??= actionClassForRoute({ surface, route: route ?? '', method }));
+
+    // `wouldBlock` sizes bearer traffic that step-up enforcement would refuse. A
+    // request the caller exempted is never refused, so it must not count as one.
+    // Server-component layouts skip the guard but still refuse bearer
+    // credentials themselves, so they keep reporting `wouldBlock` for
+    // non-session traffic. The exemption needs both a listed credential kind and
+    // an exemptible action class; the class is only resolved when the kind is
+    // listed.
+    const stepUpExempt =
+      credential !== 'session' &&
+      (opts.stepUpExemptCredentials?.some(kind => kind === credential) ?? false) &&
+      isCredentialExemptibleClass(routeAttribution().actionClass);
+    const wouldBlockUnderStepUp = credential !== 'session' && !stepUpExempt;
 
     if (result.user) {
       emitAdminAccessEvent({

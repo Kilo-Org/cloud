@@ -368,6 +368,7 @@ describe('privileged inventory covers discovered route handlers', () => {
     const sourceFiles = [
       ...walkFiles(path.join(REPO_ROOT, 'apps/web/src')),
       ...walkFiles(path.join(REPO_ROOT, 'packages/web-shared/src')),
+      ...walkFiles(path.join(REPO_ROOT, 'apps/ai-gateway/src')),
     ].filter(file => /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file));
     const sitesUsing = (identifier: string) =>
       sourceFiles

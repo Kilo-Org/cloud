@@ -1987,11 +1987,57 @@ describe('step-up refusal telemetry (REST)', () => {
     const result = await getUserFromAuth({
       adminOnly: true,
       requestMethod: 'GET',
-      stepUpExemptCredentials: ['human_bearer', 'delegated_workload', 'service_assertion'],
+      // The type forbids 'session'; the runtime check must hold if a caller
+      // gets past it anyway.
+      stepUpExemptCredentials: [
+        'session' as never,
+        'human_bearer',
+        'delegated_workload',
+        'service_assertion',
+      ],
     });
 
     expect(runStepUpGuard).toHaveBeenCalledTimes(1);
     expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(events.map(event => event.kind)).toEqual(['admin_guard']);
+    expect(events[0]).toMatchObject({ credential: 'session', wouldBlock: false });
+  });
+
+  test('ignores the exemption on a write-class request', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    runStepUpGuard.mockClear();
+    await bearerAdmin('/api/private/users');
+
+    const result = await getUserFromAuth({
+      adminOnly: true,
+      requestMethod: 'POST',
+      stepUpExemptCredentials: ['human_bearer'],
+    });
+
+    expect(runStepUpGuard).toHaveBeenCalledTimes(1);
+    expect(runStepUpGuard).toHaveBeenCalledWith(
+      expect.objectContaining({ actionClass: 'platform_write' })
+    );
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(events[1]).toMatchObject({ outcome: 'denied', wouldBlock: true });
+  });
+
+  test('ignores the exemption on an operation-bound class', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    runStepUpGuard.mockClear();
+    await bearerAdmin('/admin/api/users/add-credit');
+
+    const result = await getUserFromAuth({
+      adminOnly: true,
+      requestMethod: 'POST',
+      stepUpExemptCredentials: ['human_bearer'],
+    });
+
+    expect(runStepUpGuard).toHaveBeenCalledTimes(1);
+    const { actionClass } = runStepUpGuard.mock.calls[0][0] as { actionClass: string };
+    expect(['sensitive_write', 'support_write', 'worker_admin']).toContain(actionClass);
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(events[1]).toMatchObject({ outcome: 'denied', wouldBlock: true });
   });
 
   test('keeps wouldBlock true when a server-component layout skips the guard for a bearer request', async () => {

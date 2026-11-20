@@ -30,6 +30,7 @@ test('builds LAN URLs for every mobile-facing local service', () => {
     values.get('EVENT_SERVICE_URL'),
     `ws://192.168.1.10:${getService('event-service').port}`
   );
+  assert.equal(values.get('KILO_MCP_URL'), `http://192.168.1.10:${getService('kilo-mcp').port}`);
   assert.equal(
     values.get('NOTIFICATIONS_URL'),
     `http://192.168.1.10:${getService('notifications').port}`
@@ -169,4 +170,27 @@ test('prepares mobile URLs before returning values for the Metro tmux environmen
   assert.equal(result.sessionEnv.NEXTAUTH_URL, undefined);
   assert.equal(result.sessionEnv.APP_URL_OVERRIDE, undefined);
   fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('rewrites every service URL the mobile env example declares', () => {
+  // A new mobile-facing service URL in the example must reach the generator,
+  // or a port-offset stack keeps the offset-0 port in `apps/mobile/.env.local`
+  // and the app calls a port nothing listens on. Measured on a worktree stack:
+  // KILO_MCP_URL stayed at the offset-0 port, so the chat reported
+  // "Couldn't reach Kilo tools" while the MCP worker was up on its own offset.
+  // Resolve from this file, not process.cwd(): the suite runs from the repository
+  // root today, but a cwd-relative read fails or reads another checkout as soon
+  // as the runner is invoked from anywhere else.
+  const repoRoot = path.resolve(import.meta.dirname, '..', '..');
+  const exampleUrlKeys = fs
+    .readFileSync(path.join(repoRoot, 'apps/mobile/.env.local.example'), 'utf8')
+    .split('\n')
+    .map(line => /^([A-Z_0-9]+_(?:URL|WS_URL))=/.exec(line)?.[1])
+    .filter((key): key is string => key !== undefined);
+
+  assert.ok(exampleUrlKeys.includes('API_BASE_URL'), 'the example declares no service URL');
+
+  const values = buildMobileEnvValues('192.168.1.10');
+  const unmapped = exampleUrlKeys.filter(key => !values.has(key));
+  assert.deepEqual(unmapped, []);
 });

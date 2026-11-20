@@ -1328,6 +1328,27 @@ test('follows a local component that draws the sheet header', () => {
   );
 });
 
+test('does not accept a nested sheet header drawn through a local component', () => {
+  const found = layoutProblems(
+    SCREEN_FILE,
+    "import { Sheet } from '@/components/ui/sheet';\n" +
+      'function AdvancedContent() {\n' +
+      '  return <SheetHeader title="Advanced" onDone={onClose} />;\n' +
+      '}\n' +
+      'export function Screen() {\n' +
+      '  return (\n' +
+      '    <Sheet visible onClose={onClose}>\n' +
+      '      <Sheet visible={other} onClose={onClose}>\n' +
+      '        <AdvancedContent />\n' +
+      '      </Sheet>\n' +
+      '    </Sheet>\n' +
+      '  );\n' +
+      '}'
+  );
+  assert.equal(found.length, 1);
+  assert.match(found[0], /\[L11\] "<Sheet>"/);
+});
+
 test('flags horizontal padding on a CenteredState content container', () => {
   for (const classes of ['px-6', 'ps-3', 'pe-1', 'pl-2', 'pr-2', 'p-3']) {
     const found = layoutProblems(

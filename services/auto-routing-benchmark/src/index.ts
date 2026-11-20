@@ -1,5 +1,9 @@
 import { Hono } from 'hono';
-import { AUTO_ROUTERS, type AutoRouter, type ProductionAutoMetrics } from '@kilocode/auto-routing-contracts';
+import {
+  AUTO_ROUTERS,
+  type AutoRouter,
+  type ProductionAutoMetrics,
+} from '@kilocode/auto-routing-contracts';
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { registerAdminRoutes } from './admin';
 import { authMiddleware } from './auth';
@@ -49,7 +53,13 @@ async function runDailyPlatformSync(
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.warn(
-        JSON.stringify({ event: 'benchmark_daily_step_failed', cron, router, step: name, error: message })
+        JSON.stringify({
+          event: 'benchmark_daily_step_failed',
+          cron,
+          router,
+          step: name,
+          error: message,
+        })
       );
       errors.push(new Error(`${router} ${name}: ${message}`));
       return { ok: false, error: message };

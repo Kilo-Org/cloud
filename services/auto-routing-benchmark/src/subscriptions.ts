@@ -275,12 +275,16 @@ const DailyAliasSyncRowSchema = z.object({
 type DailyAliasSyncRow = z.infer<typeof DailyAliasSyncRowSchema>;
 
 /**
- * Work bounds for one day's alias sync: total attempts (so a failing day stops instead of
- * retrying every minute until midnight) and owner rows per attempt.
+ * Work bounds for one day's alias sync. `attempts` counts platform resolutions only, so a
+ * day of catalog failures stops retrying instead of trying every minute until midnight.
+ * The owner pass has its own page budget, so it finishes the pool even after the platform
+ * step spent its attempts on a catalog that was briefly unavailable.
  */
 const DAILY_ALIAS_ATTEMPT_LIMIT = 30;
 const DAILY_OWNER_PAGE_SIZE = 100;
 const DAILY_OWNER_PAGES_PER_TICK = 2;
+/** 100 pages is 10,000 owners a day: above every current pool, so a normal day finishes. */
+const DAILY_OWNER_PAGE_LIMIT = 100;
 
 /** A step that failed this attempt but has attempts left today is `pending`, not `failed`. */
 export type DailyAliasPlatform = { attempts: number } & (
@@ -491,7 +495,9 @@ async function reconcileOwnerPage(
      ORDER BY owner_type, owner_id LIMIT ?`
   )
     .bind(
-      ...(cursor ? [router, cursor.ownerType, cursor.ownerType, cursor.ownerId, pageSize] : [router, pageSize])
+      ...(cursor
+        ? [router, cursor.ownerType, cursor.ownerType, cursor.ownerId, pageSize]
+        : [router, pageSize])
     )
     .all<SnapshotRow>();
   let reconciled = 0;
@@ -577,16 +583,17 @@ async function reconcileDailyAliases(
       owners: { status: 'pending', reconciled: 0, pages: 0 },
     };
   }
-  if (
-    (progress.platformStatus === 'ok' && progress.ownersDone) ||
-    progress.attempts >= DAILY_ALIAS_ATTEMPT_LIMIT
-  ) {
-    if (progress.attempts >= DAILY_ALIAS_ATTEMPT_LIMIT && progress.platformStatus === 'pending')
-      progress.platformStatus = 'failed';
-    return aliasStepResult(router, progress, { reconciled: 0, pages: 0 });
+  const platformExhausted =
+    progress.platformStatus !== 'ok' && progress.attempts >= DAILY_ALIAS_ATTEMPT_LIMIT;
+  if (platformExhausted) {
+    if (progress.platformStatus === 'pending') progress.platformStatus = 'failed';
   }
+  const ownersExhausted = progress.ownersDone || progress.ownerPages >= DAILY_OWNER_PAGE_LIMIT;
+  if (progress.platformStatus !== 'pending' && ownersExhausted)
+    return aliasStepResult(router, progress, { reconciled: 0, pages: 0 });
 
-  progress.attempts += 1;
+  const owners = { reconciled: 0, pages: 0 };
+  const resolvesPlatform = progress.platformStatus === 'pending' && !platformExhausted;
   let catalog: z.infer<typeof BenchmarkModelCatalogSchema> | null = null;
   let catalogError = 'Model resolution is unavailable.';
   try {
@@ -599,9 +606,10 @@ async function reconcileDailyAliases(
     catalogError = error instanceof Error ? error.message : String(error);
   }
 
-  if (progress.platformStatus !== 'ok') {
+  if (resolvesPlatform) {
     if (!catalog) {
       progress.platformError = catalogError;
+      progress.attempts += 1;
     } else {
       try {
         await syncSubscriptionSnapshot(
@@ -615,6 +623,7 @@ async function reconcileDailyAliases(
         progress.platformError = null;
       } catch (error) {
         progress.platformError = errorMessage(error);
+        progress.attempts += 1;
         console.warn(
           JSON.stringify({
             event: 'benchmark_subscription_daily_failed',
@@ -624,15 +633,11 @@ async function reconcileDailyAliases(
         );
       }
     }
-    if (
-      progress.platformStatus !== 'ok' &&
-      progress.attempts >= DAILY_ALIAS_ATTEMPT_LIMIT
-    )
+    if (progress.platformStatus !== 'ok' && progress.attempts >= DAILY_ALIAS_ATTEMPT_LIMIT)
       progress.platformStatus = 'failed';
   }
 
-  const owners = { reconciled: 0, pages: 0 };
-  if (!progress.ownersDone && catalog) {
+  if (!progress.ownersDone && !ownersExhausted && catalog) {
     try {
       for (let page = 0; page < DAILY_OWNER_PAGES_PER_TICK && !progress.ownersDone; page++) {
         const result = await reconcileOwnerPage(
@@ -700,12 +705,12 @@ export async function continueDailyReconcile(
 ): Promise<DailyAliasReconcileResult | null> {
   const day = utcDay(options.now ?? new Date());
   const progress = await readDailyAliasProgress(env.BENCH_DB, router, day);
-  if (
-    !progress ||
-    (progress.platformStatus === 'ok' && progress.ownersDone) ||
-    progress.attempts >= DAILY_ALIAS_ATTEMPT_LIMIT
-  )
+  if (!progress) return null;
+  // A day of catalog failures ends the day: there is nothing to reconcile owners against.
+  if (progress.platformStatus === 'failed' || progress.attempts >= DAILY_ALIAS_ATTEMPT_LIMIT)
     return null;
+  const ownersDone = progress.ownersDone || progress.ownerPages >= DAILY_OWNER_PAGE_LIMIT;
+  if (progress.platformStatus === 'ok' && ownersDone) return null;
   return reconcileDailyAliases(env, router, day, progress, options);
 }
 export async function servingSubscriptionSnapshot(

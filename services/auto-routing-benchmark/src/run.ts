@@ -55,6 +55,7 @@ import {
   listPendingCurrentProfiles,
   listReadyCurrentProfilesForEntries,
   listStaleRunningDeciderRuns,
+  requeueRetryableCurrentProfiles,
   failPendingProfiles,
   markProfilesFailedForEntries,
   markProfilesFailedForRun,
@@ -469,6 +470,11 @@ export async function syncPlatformRegistry(
 ): Promise<{ desiredEntries: number }> {
   const config = await getBenchmarkConfig(env.BENCH_DB, router);
   if (!config) return { desiredEntries: 0 };
+  const current = {
+    router,
+    engineIdentity: computeEngineIdentity('decider', router),
+    repetitions: resolveEffectivePolicy(config).deciderRepetitions,
+  };
   const snapshot = await syncSubscriptionSnapshot(
     env,
     config,
@@ -477,15 +483,15 @@ export async function syncPlatformRegistry(
     { fetchImpl }
   );
   const desired = snapshotPairs(snapshot);
-  await syncPlatformRegistryRows(
-    env.BENCH_DB,
-    {
-      router,
-      engineIdentity: computeEngineIdentity('decider', router),
-      repetitions: resolveEffectivePolicy(config).deciderRepetitions,
-    },
-    desired
-  );
+  await syncPlatformRegistryRows(env.BENCH_DB, current, desired);
+  // A platform pair whose measurement failed stays `failed` (the claim below leaves
+  // status alone), and the publish holds the live table while a still-target pair is
+  // unready. Without this the router would stay frozen until an operator requeued it,
+  // so take back the rows whose retry window has passed. `unavailable` rows are
+  // excluded by the requeue itself: a permanent model failure needs an operator.
+  const requeued = await requeueRetryableCurrentProfiles(env.BENCH_DB, current, 'platform');
+  if (requeued > 0)
+    console.log(JSON.stringify({ event: 'benchmark_platform_retry_requeued', router, requeued }));
   return { desiredEntries: desired.length };
 }
 
@@ -521,9 +527,7 @@ export async function publishPlatformRoutingTable(
 ): Promise<{ version: string } | null> {
   const config = await getBenchmarkConfig(env.BENCH_DB, router);
   if (!config) {
-    console.warn(
-      JSON.stringify({ event: 'routing_table_publish_skipped_unconfigured', router })
-    );
+    console.warn(JSON.stringify({ event: 'routing_table_publish_skipped_unconfigured', router }));
     return null;
   }
 

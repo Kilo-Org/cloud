@@ -11,10 +11,7 @@ vi.mock('./subscriptions', () => ({
   continueDailyReconcile: vi.fn(),
 }));
 import { continueDailyReconcile, dailyReconcileSubscriptions } from './subscriptions';
-import {
-  fetchProductionAutoMetrics,
-  reevaluateSystemOptimalSettings,
-} from './system-optimal';
+import { fetchProductionAutoMetrics, reevaluateSystemOptimalSettings } from './system-optimal';
 
 vi.mock('./run', async importOriginal => {
   const actual = await importOriginal<typeof RunModule>();

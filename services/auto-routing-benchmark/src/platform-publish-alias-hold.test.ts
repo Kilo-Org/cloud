@@ -126,7 +126,9 @@ describe('publishPlatformRoutingTable — an alias move holds the live table, th
   async function moveAlias() {
     targets = { [ALIAS]: NEXT };
     sqlite
-      .prepare("UPDATE benchmark_subscriptions SET snapshot = ?, revision = 'rev-2' WHERE router = ?")
+      .prepare(
+        "UPDATE benchmark_subscriptions SET snapshot = ?, revision = 'rev-2' WHERE router = ?"
+      )
       .run(
         JSON.stringify({
           entries: [

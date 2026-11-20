@@ -80,6 +80,7 @@ import {
   addReflectionReasoningPlaceholders,
   isReflectionModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/reflection';
+import { isGatewayBackend } from '@kilocode/web-shared/lib/ai-gateway/providers/provider-type-predicates';
 
 function setGeminiThoughtSignature(value: Record<string, unknown>, signature: string) {
   const extraContent = isRecord(value.extra_content) ? value.extra_content : {};
@@ -415,7 +416,7 @@ export async function applyProviderSpecificLogic(
   }
 
   // Kilo's provider order and exclusions only shape routes Kilo pays for, never a user's own keys.
-  if (userByok === null && (provider.type === 'openrouter' || provider.type === 'vercel')) {
+  if (userByok === null && isGatewayBackend(provider.type)) {
     applyPreferredProvider(
       await getPreferredProviderOrderConfig(),
       requestedModel,

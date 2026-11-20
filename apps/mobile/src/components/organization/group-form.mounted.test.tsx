@@ -1,8 +1,10 @@
 /* eslint-disable max-lines -- the form's create swap, both leave exits and the delete path share one mock harness. */
-import { createElement } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createElement, useState } from 'react';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import { GroupForm } from '@/components/organization/group-form';
+import { type OrgGroupFormDraft } from '@/components/organization/org-group-form-model';
+import { FormField } from '@/components/ui/form-field';
 import { type OrgGroup } from '@/lib/hooks/use-org-groups-queries';
 import { i18n } from '@/i18n';
 import { act, type ReactTestInstance } from '@/test/renderer';
@@ -15,15 +17,23 @@ const mutations = vi.hoisted(() => ({
   remove: { isPending: false, mutate: vi.fn() },
 }));
 
-const members = vi.hoisted(() => ({
-  data: undefined as
-    | { members: { id: string; name: string; email: string; status: string }[] }
-    | undefined,
-  isPending: false,
-  isError: false,
-  isFetching: false,
-  refetch: vi.fn(),
-}));
+type MembersData = { members: { id: string; name: string; email: string; status: string }[] };
+
+const members = vi.hoisted(
+  (): {
+    data: MembersData | undefined;
+    isPending: boolean;
+    isError: boolean;
+    isFetching: boolean;
+    refetch: () => void;
+  } => ({
+    data: undefined,
+    isPending: false,
+    isError: false,
+    isFetching: false,
+    refetch: vi.fn<() => void>(),
+  })
+);
 
 // The navigation state the form reads for its exit decision, changeable per test.
 const nav = vi.hoisted(() => ({
@@ -39,9 +49,34 @@ const router = vi.hoisted(() => ({
 
 const popOnce = vi.hoisted(() => vi.fn());
 const stackSafeReplace = vi.hoisted(() => ({ replace: vi.fn<(href: unknown) => void>() }));
-const guard = vi.hoisted(() => ({
-  leave: [] as (() => void)[],
-  handleDirtyChange: vi.fn(),
+const guard = vi.hoisted(
+  (): {
+    leave: (() => void)[];
+    handleDirtyChange: (dirty: boolean) => void;
+    // The props the form handed the guard, so the suite reads its `onDiscard`.
+    props: Record<string, unknown>;
+  } => ({
+    leave: [],
+    handleDirtyChange: vi.fn<(dirty: boolean) => void>(),
+    props: {},
+  })
+);
+// The durable draft the wrapper reads: its state is swapped per test, and its
+// write and clear are the suite's spies.
+type GroupDraftState =
+  | { kind: 'loading' }
+  | { kind: 'ready'; value: unknown; save: (value: unknown) => void; clear: () => void };
+
+type GroupDraftMock = {
+  save: Mock<(value: unknown) => void>;
+  clear: Mock<() => void>;
+  state: GroupDraftState;
+};
+
+const draft = vi.hoisted((): GroupDraftMock => ({
+  save: vi.fn<(value: unknown) => void>(),
+  clear: vi.fn<() => void>(),
+  state: { kind: 'loading' },
 }));
 const confirmMock = vi.hoisted(() => vi.fn());
 // The picker's toggles, handed to the suite through the double's props.
@@ -64,13 +99,16 @@ vi.mock('@/lib/navigation/stack-safe-replace', () => ({
 // form navigates after a save, not the guard's own dialog, which the profile
 // overview guard suite covers.
 vi.mock('@/components/profiles/use-metadata-leave-guard', () => ({
-  useMetadataLeaveGuard: () => ({
-    handleDirtyChange: guard.handleDirtyChange,
-    leaveWithoutAsking: (leave: () => void) => {
-      guard.leave.push(leave);
-    },
-    dialog: null,
-  }),
+  useMetadataLeaveGuard: (props: Record<string, unknown>) => {
+    guard.props = props;
+    return {
+      handleDirtyChange: guard.handleDirtyChange,
+      leaveWithoutAsking: (leave: () => void) => {
+        guard.leave.push(leave);
+      },
+      dialog: null,
+    };
+  },
 }));
 // The queries module pulls `@kilocode/trpc/mobile`, whose output the Node
 // transform cannot parse, so the whole module is a double; the suite reads the
@@ -129,6 +167,20 @@ vi.mock('@rn-primitives/slot', () => ({ Root: 'Root', Pressable: 'Pressable' }))
 vi.mock('@/components/ui/activity-indicator', () => ({
   ActivityIndicator: 'ActivityIndicator',
 }));
+// The draft store, the account id and the key helper are the wrapper's inputs:
+// the store is a controllable state, so a test can hold the form in its loading
+// phase and then settle it.
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'user-1', isLoading: false }),
+}));
+vi.mock('@/lib/persist/use-form-draft', () => ({ useFormDraft: () => draft.state }));
+// The real module opens the encrypted SQLite store, which this Node project
+// cannot import; the form reads only its key helper.
+vi.mock('@/lib/persist/drafts', () => ({
+  orgGroupFormDraftKey: (organizationId: string, groupId: string | null) =>
+    `org-group-form:${organizationId}:${groupId ?? 'new'}`,
+}));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 /* `node.type` widens to `ElementType` across a tree that holds both component
  * and host nodes, so a literal comparison reads as an impossible one; the
@@ -166,7 +218,68 @@ async function mountForm(group: OrgGroup | undefined) {
   };
 }
 
+/** The draft state the mounted form reads, settled through `settle`. */
+type DraftBox = { settle: (value: OrgGroupFormDraft | null) => void };
+
+/**
+ * A form whose draft state the test can settle: the mocked store is a plain
+ * object, so swapping it needs a render of the same form instance.
+ */
+function DraftHarness({ box, group }: Readonly<{ box: DraftBox; group: OrgGroup | undefined }>) {
+  const [, setVersion] = useState(0);
+  box.settle = value => {
+    draft.state = { kind: 'ready', value, save: draft.save, clear: draft.clear };
+    act(() => {
+      setVersion(version => version + 1);
+    });
+  };
+  return createElement(GroupForm, { organizationId: 'org-1', group });
+}
+
+async function mountGatedForm(group: OrgGroup | undefined) {
+  const box: DraftBox = {
+    // Overwritten by the harness on mount; typed as a real body so the lint
+    // rule for empty functions stays quiet.
+    settle: () => undefined,
+  };
+  const mounted = await renderWithProviders(createElement(DraftHarness, { box, group }));
+  return {
+    ...mounted,
+    box,
+    unmountOnce: () => {
+      mounted.unmount();
+    },
+  };
+}
+
 type WidgetProps = Record<string, unknown>;
+
+/** A field's props by its visible label, or undefined while it is not mounted. */
+function fieldOf(root: ReactTestInstance, label: string): WidgetProps | undefined {
+  const field = root
+    .findAll(node => {
+      if (node.type !== FormField) {
+        return false;
+      }
+      const props: unknown = node.props;
+      return (
+        props !== null && typeof props === 'object' && 'label' in props && props.label === label
+      );
+    })
+    .at(0);
+  return field === undefined ? undefined : (field.props as WidgetProps);
+}
+
+/** A whole restored group draft, with the fields a test cares about replaced. */
+function restoredDraft(overrides: Partial<OrgGroupFormDraft> = {}): OrgGroupFormDraft {
+  return {
+    name: 'Drafted',
+    description: 'Drafted description',
+    memberIds: [],
+    memberQuery: '',
+    ...overrides,
+  };
+}
 
 function pressHandler(value: unknown): () => void {
   if (typeof value !== 'function') {
@@ -294,6 +407,8 @@ beforeEach(() => {
   router.dismissTo.mockReset();
   popOnce.mockReset();
   stackSafeReplace.replace.mockReset();
+  draft.save.mockClear();
+  draft.clear.mockClear();
   guard.leave = [];
   resetLeaveSettle();
   members.data = undefined;
@@ -302,6 +417,10 @@ beforeEach(() => {
   router.canGoBack.mockReturnValue(true);
   nav.isFocused = true;
   listThenForm({ key: 'form-1', name: 'group-form' });
+  // Every case starts with the store answering no draft, so the form renders
+  // its fields at once; a case that needs the loading phase sets it first.
+  draft.state = { kind: 'ready', value: null, save: draft.save, clear: draft.clear };
+  guard.props = {};
 });
 
 describe('GroupForm create path', () => {
@@ -496,6 +615,134 @@ describe('GroupForm delete path', () => {
 
     expect(router.dismissTo).toHaveBeenCalledWith(GROUPS_LIST_PATH);
     expect(popOnce).not.toHaveBeenCalled();
+
+    unmountOnce();
+  });
+});
+
+describe('GroupForm durable draft', () => {
+  const nameLabel = i18n.t('organization.groups.nameLabel');
+  const descriptionLabel = i18n.t('organization.groups.descriptionLabel');
+
+  it('holds a create back until the stored draft settles, then seeds its fields', async () => {
+    draft.state = { kind: 'loading' };
+    const { renderer, box, unmountOnce } = await mountGatedForm(undefined);
+
+    // No server record exists, so the form shows its loading state rather than
+    // an empty body a restored draft could no longer seed.
+    expect(fieldOf(renderer.root, nameLabel)).toBeUndefined();
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton').length).toBeGreaterThan(
+      0
+    );
+
+    box.settle(restoredDraft());
+
+    expect(fieldOf(renderer.root, nameLabel)?.defaultValue).toBe('Drafted');
+    expect(fieldOf(renderer.root, descriptionLabel)?.defaultValue).toBe('Drafted description');
+
+    unmountOnce();
+  });
+
+  it('applies a late draft to an edit form the person has not touched', async () => {
+    draft.state = { kind: 'loading' };
+    const { renderer, box, unmountOnce } = await mountGatedForm(storedGroup());
+
+    // The server group is the content while the stored draft loads.
+    expect(fieldOf(renderer.root, nameLabel)?.defaultValue).toBe('Workshop');
+
+    box.settle(restoredDraft());
+
+    expect(fieldOf(renderer.root, nameLabel)?.defaultValue).toBe('Drafted');
+    expect(fieldOf(renderer.root, descriptionLabel)?.defaultValue).toBe('Drafted description');
+
+    unmountOnce();
+  });
+
+  it('never overwrites an edit form the person already typed into', async () => {
+    draft.state = { kind: 'loading' };
+    const { renderer, box, unmountOnce } = await mountGatedForm(storedGroup());
+
+    changeName(renderer.root, 'Typed now');
+    box.settle(restoredDraft());
+
+    // The person's text survives the late draft: the field still carries what
+    // they typed (`defaultValue` re-reads the mutated ref), and the draft's own
+    // name never replaced it.
+    expect(fieldOf(renderer.root, nameLabel)?.defaultValue).toBe('Typed now');
+    changeName(renderer.root, 'Typed now!');
+    expect(draft.save).toHaveBeenLastCalledWith({
+      name: 'Typed now!',
+      description: 'The workshop group',
+      memberIds: [],
+      memberQuery: '',
+    });
+
+    unmountOnce();
+  });
+
+  it('writes the whole form into the draft on every edit', async () => {
+    const { unmountOnce } = await mountForm(storedGroup());
+
+    selectMember('user-1');
+
+    expect(draft.save).toHaveBeenCalledOnce();
+    expect(draft.save).toHaveBeenCalledWith({
+      name: 'Workshop',
+      description: 'The workshop group',
+      memberIds: ['user-1'],
+      memberQuery: '',
+    });
+
+    unmountOnce();
+  });
+
+  it('clears the stored draft once the create lands', async () => {
+    const { renderer, unmountOnce } = await mountForm(undefined);
+
+    changeName(renderer.root, 'Workshop');
+    await pressSave(renderer.root);
+    act(() => {
+      settleSave(mutations.create, { result: { id: 'group-9' } });
+    });
+
+    expect(draft.clear).toHaveBeenCalledOnce();
+
+    unmountOnce();
+  });
+
+  it('clears the stored draft once the members save lands', async () => {
+    const { renderer, unmountOnce } = await mountForm(storedGroup());
+    members.data = {
+      members: [{ id: 'user-1', name: 'Amira', email: 'amira@example.com', status: 'active' }],
+    };
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    selectMember('user-1');
+    await pressSave(renderer.root);
+    settleSave(mutations.updateDetails);
+
+    expect(draft.clear).toHaveBeenCalledOnce();
+
+    unmountOnce();
+  });
+
+  it('clears the stored draft once the removal lands', async () => {
+    const { renderer, unmountOnce } = await mountForm(storedGroup());
+
+    await pressDelete(renderer.root);
+    settleSave(mutations.remove);
+
+    expect(draft.clear).toHaveBeenCalledOnce();
+
+    unmountOnce();
+  });
+
+  it('hands the leave guard the draft clear for a confirmed Discard', async () => {
+    const { unmountOnce } = await mountForm(undefined);
+
+    expect(guard.props.onDiscard).toBe(draft.clear);
 
     unmountOnce();
   });

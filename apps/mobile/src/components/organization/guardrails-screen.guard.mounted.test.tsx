@@ -32,6 +32,13 @@ const h = vi.hoisted(() => ({
   setData: null as ((next: OrgGuardrails) => void) | null,
   /** The edit callback the stubbed input section forwards to the form. */
   sectionOnChange: null as ((update: (current: GuardrailsDraft) => GuardrailsDraft) => void) | null,
+  /** What the durable draft answers; `loading` has no `save`/`clear` to call. */
+  formDraft: {
+    kind: 'loading' as 'loading' | 'ready',
+    value: null as unknown,
+    save: vi.fn(),
+    clear: vi.fn(),
+  },
 }));
 
 vi.mock('expo-router', () => ({
@@ -66,6 +73,27 @@ vi.mock('@/components/ui/dialog', () => ({
 }));
 vi.mock('@/lib/hooks/use-org-settings-queries', () => ({
   useSaveOrgGuardrails: () => ({ mutateAsync: h.mutateAsync, isPending: false }),
+}));
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'user-1', isLoading: false }),
+}));
+// The durable draft is the account-scoped encrypted store, which mounts its own
+// providers; this suite drives the guard the form reports to, not the store.
+vi.mock('@/lib/persist/use-form-draft', () => ({
+  useFormDraft: () =>
+    h.formDraft.kind === 'ready'
+      ? {
+          kind: 'ready',
+          value: h.formDraft.value,
+          save: h.formDraft.save,
+          clear: h.formDraft.clear,
+        }
+      : { kind: 'loading' },
+}));
+// The real module opens the encrypted SQLCipher store, which this Node project
+// cannot import; the form reads only its key helper.
+vi.mock('@/lib/persist/drafts', () => ({
+  orgGuardrailsFormDraftKey: (organizationId: string) => `org-guardrails-form:${organizationId}`,
 }));
 vi.mock('@/components/organization/guardrails-input-section', () => ({
   InputGuardrailsSection: (props: {
@@ -263,6 +291,8 @@ beforeEach(() => {
   h.mutateAsync.mockReset();
   h.setData = null;
   h.sectionOnChange = null;
+  h.formDraft.kind = 'loading';
+  h.formDraft.value = null;
 });
 
 afterEach(() => {
@@ -409,5 +439,45 @@ describe('GuardrailsForm leave guard', () => {
     });
 
     expect(h.guard.enabled).toBe(true);
+  });
+
+  it('drops the stored draft when the person confirms Discard', async () => {
+    h.formDraft.kind = 'ready';
+    h.formDraft.value = null;
+    await mountForm();
+
+    editInputToggle();
+    pressBack();
+    await act(async () => {
+      discardRequest().onConfirm?.();
+      await Promise.resolve();
+    });
+
+    expect(h.formDraft.clear).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the stored draft while the person keeps editing', async () => {
+    h.formDraft.kind = 'ready';
+    h.formDraft.value = null;
+    await mountForm();
+
+    editInputToggle();
+    pressBack();
+    act(() => {
+      discardRequest().onCancel?.();
+    });
+
+    expect(h.formDraft.clear).not.toHaveBeenCalled();
+  });
+
+  it('drops the stored draft on Cancel, which discards the edit on purpose', async () => {
+    h.formDraft.kind = 'ready';
+    h.formDraft.value = null;
+    const renderer = await mountForm();
+
+    editInputToggle();
+    pressLabelledButton(renderer.root, i18n.t('common.cancel'));
+
+    expect(h.formDraft.clear).toHaveBeenCalledTimes(1);
   });
 });

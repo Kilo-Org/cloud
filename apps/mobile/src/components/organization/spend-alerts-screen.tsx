@@ -7,9 +7,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
-import { type ReactNode, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
+import { z } from 'zod';
 
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
@@ -47,9 +48,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatList, formatNumber, formatPrefixedMoney } from '@/lib/format';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { spendAlertsFormDraftKey } from '@/lib/persist/drafts';
+import { useFormDraft } from '@/lib/persist/use-form-draft';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
@@ -76,6 +80,49 @@ function windowOptionFor(value: number | null | undefined): WindowOption {
   return '24';
 }
 
+/** A stored window option, or `fallback` for a value this build does not know. */
+function windowOptionOr(value: string | undefined, fallback: WindowOption): WindowOption {
+  return value != null && Object.hasOwn(WINDOW_LABEL_KEYS, value)
+    ? (value as WindowOption)
+    : fallback;
+}
+
+/**
+ * The whole form on screen. A language change that flips the text direction
+ * reloads the JS bundle without running cleanup, so the typed text and the
+ * switches are persisted here instead of living only in this component.
+ */
+export type SpendAlertsFormDraft = {
+  threshold: string;
+  multiplier: string;
+  enabled: boolean;
+  thresholdEnabled: boolean;
+  thresholdEmail: boolean;
+  thresholdPush: boolean;
+  windowOption: string;
+  anomalyEnabled: boolean;
+  anomalyEmail: boolean;
+  anomalyPush: boolean;
+};
+
+const spendAlertsFormDraftSchema = z.object({
+  threshold: z.string(),
+  multiplier: z.string(),
+  enabled: z.boolean(),
+  thresholdEnabled: z.boolean(),
+  thresholdEmail: z.boolean(),
+  thresholdPush: z.boolean(),
+  windowOption: z.string(),
+  anomalyEnabled: z.boolean(),
+  anomalyEmail: z.boolean(),
+  anomalyPush: z.boolean(),
+});
+
+/** Shape guard for a stored draft; a value another build wrote stays stored. */
+export function isSpendAlertsFormDraft(value: unknown): value is SpendAlertsFormDraft {
+  return spendAlertsFormDraftSchema.safeParse(value).success;
+}
+
 /** The scope's settings: no `organizationId` is the caller's personal scope. */
 function useSpendAlertSettings(organizationId: string | undefined, enabled: boolean) {
   const trpc = useTRPC();
@@ -89,13 +136,17 @@ function useSpendAlertSettings(organizationId: string | undefined, enabled: bool
  * `spendAlerts.saveError` inline with a Retry and keeps the draft, the
  * inline-error pattern (P2) the low-balance sheet uses for org settings.
  */
-function useSaveSpendAlerts() {
+function useSaveSpendAlerts(onSaved: () => void) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const settingsFilter = trpc.spendAlerts.get.pathFilter();
   return useMutation(
     trpc.spendAlerts.save.mutationOptions({
       onSuccess: async () => {
+        // The row now holds what the draft held, so the draft is dropped before
+        // the refetch settles: a restored copy could otherwise outlive the
+        // record it was typed over.
+        onSaved();
         await queryClient.invalidateQueries(settingsFilter);
       },
     })
@@ -136,6 +187,28 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
   // form compares the string against that array and never matches.
   useRouteForegroundRefresh([[['spendAlerts']]]);
   const query = useSpendAlertSettings(organizationId, scopeResolved);
+  const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
+  // The form's own record key: a draft typed on one scope never seeds another.
+  const draft = useFormDraft<SpendAlertsFormDraft>({
+    userId,
+    isIdentityLoading,
+    entityKey: spendAlertsFormDraftKey(organizationId),
+    validate: isSpendAlertsFormDraft,
+  });
+  // The stored row is already on screen when the draft finishes loading, so the
+  // form mounts on the server values and applies a restored draft itself, once,
+  // while the person has not edited.
+  const restored = draft.kind === 'ready' ? draft.value : null;
+  const onDraftChange = (value: SpendAlertsFormDraft) => {
+    if (draft.kind === 'ready') {
+      draft.save(value);
+    }
+  };
+  const onDraftClear = () => {
+    if (draft.kind === 'ready') {
+      draft.clear();
+    }
+  };
 
   if (!scopeResolved) {
     return (
@@ -196,6 +269,9 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
           spend={query.data.spend}
           pushCategoryEnabled={query.data.pushCategoryEnabled}
           pushChannelBlocked={query.data.pushChannelBlocked}
+          restored={restored}
+          onDraftChange={onDraftChange}
+          onDraftClear={onDraftClear}
         />
       </TabScreenScrollView>
     </View>
@@ -213,6 +289,12 @@ type SpendAlertsFormProps = Readonly<{
   spend: SpendAlertSpend;
   pushCategoryEnabled: boolean;
   pushChannelBlocked: boolean;
+  /** The durable draft once it loaded; null while it loads or when none is stored. */
+  restored: SpendAlertsFormDraft | null;
+  /** Persist the whole draft on every edit. */
+  onDraftChange: (value: SpendAlertsFormDraft) => void;
+  /** Drop the stored draft: the save landed, or the person discarded it. */
+  onDraftClear: () => void;
 }>;
 
 function SpendAlertsForm({
@@ -224,10 +306,13 @@ function SpendAlertsForm({
   spend,
   pushCategoryEnabled,
   pushChannelBlocked,
+  restored,
+  onDraftChange,
+  onDraftClear,
 }: SpendAlertsFormProps) {
   const router = useRouter();
   const { t } = useTranslation();
-  const save = useSaveSpendAlerts();
+  const save = useSaveSpendAlerts(onDraftClear);
 
   // The screen serves both the caller's own account and an organization; the
   // copy alone never says which one an alert watches, so the scope line names
@@ -238,28 +323,42 @@ function SpendAlertsForm({
   const anomaly = rules?.find(rule => rule.kind === 'anomaly');
 
   // Text lives in refs (iOS: never control an input with state); the switches
-  // and the window picker are state because they render their own value.
-  const thresholdRef = useRef(
+  // and the window picker are state because they render their own value. A
+  // restored draft outranks the stored row for the first value of each: it is
+  // what the person had on screen when the bundle reloaded.
+  const storedThresholdText =
     threshold?.threshold == null
       ? ''
-      : formatNumber(threshold.threshold, i18n.language, { useGrouping: false })
-  );
-  const multiplierRef = useRef(
+      : formatNumber(threshold.threshold, i18n.language, { useGrouping: false });
+  const storedMultiplierText =
     anomaly?.multiplierBasisPoints == null
       ? String(DEFAULT_MULTIPLIER)
-      : formatNumber(anomaly.multiplierBasisPoints / 100, i18n.language, { useGrouping: false })
-  );
+      : formatNumber(anomaly.multiplierBasisPoints / 100, i18n.language, { useGrouping: false });
+  const thresholdRef = useRef(restored?.threshold ?? storedThresholdText);
+  const multiplierRef = useRef(restored?.multiplier ?? storedMultiplierText);
 
-  const [enabled, setEnabled] = useState(storedEnabled);
-  const [thresholdEnabled, setThresholdEnabled] = useState(threshold?.enabled ?? true);
-  const [thresholdEmail, setThresholdEmail] = useState(threshold?.emailEnabled ?? true);
-  const [thresholdPush, setThresholdPush] = useState(threshold?.pushEnabled ?? false);
-  const [windowOption, setWindowOption] = useState<WindowOption>(() =>
-    windowOptionFor(threshold?.windowHours)
+  const [enabled, setEnabled] = useState(restored?.enabled ?? storedEnabled);
+  const [thresholdEnabled, setThresholdEnabled] = useState(
+    restored?.thresholdEnabled ?? threshold?.enabled ?? true
   );
-  const [anomalyEnabled, setAnomalyEnabled] = useState(anomaly?.enabled ?? true);
-  const [anomalyEmail, setAnomalyEmail] = useState(anomaly?.emailEnabled ?? true);
-  const [anomalyPush, setAnomalyPush] = useState(anomaly?.pushEnabled ?? false);
+  const [thresholdEmail, setThresholdEmail] = useState(
+    restored?.thresholdEmail ?? threshold?.emailEnabled ?? true
+  );
+  const [thresholdPush, setThresholdPush] = useState(
+    restored?.thresholdPush ?? threshold?.pushEnabled ?? false
+  );
+  const [windowOption, setWindowOption] = useState<WindowOption>(() =>
+    windowOptionOr(restored?.windowOption, windowOptionFor(threshold?.windowHours))
+  );
+  const [anomalyEnabled, setAnomalyEnabled] = useState(
+    restored?.anomalyEnabled ?? anomaly?.enabled ?? true
+  );
+  const [anomalyEmail, setAnomalyEmail] = useState(
+    restored?.anomalyEmail ?? anomaly?.emailEnabled ?? true
+  );
+  const [anomalyPush, setAnomalyPush] = useState(
+    restored?.anomalyPush ?? anomaly?.pushEnabled ?? false
+  );
   // The saved confirmation. It is rendered as a real Text node on this screen,
   // not left to the toast alone: sonner-native draws outside the accessibility
   // hierarchy, so a toast-only confirmation never reaches assistive tech (and
@@ -282,6 +381,59 @@ function SpendAlertsForm({
   const revalidate = () => {
     setSaved(false);
     setCanSave(canSubmit());
+  };
+
+  // A draft that lands after this form mounted cannot seed the uncontrolled
+  // inputs: iOS reads `defaultValue` once, at mount (AGENTS.md). So the restore
+  // writes the refs and the state and bumps `formKey`, which remounts the field
+  // block once so its inputs re-read `defaultValue` — and only while the person
+  // has not typed, because their text always wins over a restored draft.
+  const [formKey, setFormKey] = useState(0);
+  const touchedRef = useRef(false);
+  const restoredAppliedRef = useRef(restored != null);
+  useEffect(() => {
+    if (restored == null || touchedRef.current || restoredAppliedRef.current) {
+      return;
+    }
+    restoredAppliedRef.current = true;
+    thresholdRef.current = restored.threshold;
+    multiplierRef.current = restored.multiplier;
+    setEnabled(restored.enabled);
+    setThresholdEnabled(restored.thresholdEnabled);
+    setThresholdEmail(restored.thresholdEmail);
+    setThresholdPush(restored.thresholdPush);
+    setWindowOption(windowOptionOr(restored.windowOption, windowOptionFor(threshold?.windowHours)));
+    setAnomalyEnabled(restored.anomalyEnabled);
+    setAnomalyEmail(restored.anomalyEmail);
+    setAnomalyPush(restored.anomalyPush);
+    setSaved(false);
+    setCanSave(
+      !restored.enabled ||
+        ((!restored.thresholdEnabled || parseThreshold(restored.threshold) != null) &&
+          (!restored.anomalyEnabled || parseMultiplier(restored.multiplier) != null))
+    );
+    setFormKey(key => key + 1);
+  }, [restored, threshold]);
+
+  // Every edit persists the whole form, not one field: the stored draft always
+  // describes what is on screen, so the restore needs no field-by-field rules.
+  const currentDraft = (update: Partial<SpendAlertsFormDraft>): SpendAlertsFormDraft => ({
+    threshold: thresholdRef.current,
+    multiplier: multiplierRef.current,
+    enabled,
+    thresholdEnabled,
+    thresholdEmail,
+    thresholdPush,
+    windowOption,
+    anomalyEnabled,
+    anomalyEmail,
+    anomalyPush,
+    ...update,
+  });
+  const editDraft = (update: Partial<SpendAlertsFormDraft>) => {
+    touchedRef.current = true;
+    setSaved(false);
+    onDraftChange(currentDraft(update));
   };
 
   // Push reaches the viewer only when the rule asks for it, the viewer's own
@@ -377,14 +529,20 @@ function SpendAlertsForm({
     });
   };
 
-  const onPushChange = (
-    target: SpendAlertRuleKind,
-    next: boolean,
-    apply: (value: boolean) => void
-  ) => {
+  const onPushChange = ({
+    target,
+    next,
+    apply,
+    draftPatch,
+  }: {
+    target: SpendAlertRuleKind;
+    next: boolean;
+    apply: (value: boolean) => void;
+    draftPatch: Partial<SpendAlertsFormDraft>;
+  }) => {
     selectionHaptic();
-    setSaved(false);
     apply(next);
+    editDraft(draftPatch);
     // Toggling push also writes the caller's notification category (the
     // server's agreement between the rule channel and the category), so the
     // Notifications screen cannot disagree. Only a valid draft can be sent; an
@@ -474,36 +632,44 @@ function SpendAlertsForm({
           value={enabled}
           disabled={false}
           onValueChange={value => {
-            setSaved(false);
             setEnabled(value);
             // Off hides the rule fields, so they stop gating Save; on restores
             // their gate with whatever the fields currently hold.
             setCanSave(value ? canSubmitWith(thresholdEnabled, anomalyEnabled) : true);
+            editDraft({ enabled: value });
           }}
         />
       </RowGroup>
 
       {enabled ? (
-        <>
+        // `formKey` remounts this block when a restored draft lands after mount:
+        // the text fields are uncontrolled, so only a fresh mount re-reads their
+        // `defaultValue` (the comment at `formKey` above says why).
+        <View key={formKey} className="gap-6">
           <RuleCard
             title={t('spendAlerts.thresholdTitle')}
             subtitle={t('spendAlerts.thresholdSubtitle')}
             enabled={thresholdEnabled}
             onEnabledChange={value => {
               selectionHaptic();
-              setSaved(false);
               setThresholdEnabled(value);
               // Switching the kind off drops its field from the Save gate.
               setCanSave(canSubmitWith(value, anomalyEnabled));
+              editDraft({ thresholdEnabled: value });
             }}
             emailEnabled={thresholdEmail}
             onEmailChange={value => {
-              setSaved(false);
               setThresholdEmail(value);
+              editDraft({ thresholdEmail: value });
             }}
             pushEnabled={thresholdPush}
             onPushChange={next => {
-              onPushChange('threshold', next, setThresholdPush);
+              onPushChange({
+                target: 'threshold',
+                next,
+                apply: setThresholdPush,
+                draftPatch: { thresholdPush: next },
+              });
             }}
             pushOffByCategory={pushOffByCategory}
             onOpenNotifications={() => {
@@ -521,6 +687,7 @@ function SpendAlertsForm({
               reserveErrorMessages={thresholdEnabled ? thresholdErrorMessages() : undefined}
               onChangeText={value => {
                 thresholdRef.current = value;
+                editDraft({});
                 revalidate();
               }}
             />
@@ -533,8 +700,8 @@ function SpendAlertsForm({
                 options={windowOptions}
                 value={windowOption}
                 onChange={value => {
-                  setSaved(false);
                   setWindowOption(value);
+                  editDraft({ windowOption: value });
                 }}
               />
             </View>
@@ -546,19 +713,24 @@ function SpendAlertsForm({
             enabled={anomalyEnabled}
             onEnabledChange={value => {
               selectionHaptic();
-              setSaved(false);
               setAnomalyEnabled(value);
               // Switching the kind off drops its field from the Save gate.
               setCanSave(canSubmitWith(thresholdEnabled, value));
+              editDraft({ anomalyEnabled: value });
             }}
             emailEnabled={anomalyEmail}
             onEmailChange={value => {
-              setSaved(false);
               setAnomalyEmail(value);
+              editDraft({ anomalyEmail: value });
             }}
             pushEnabled={anomalyPush}
             onPushChange={next => {
-              onPushChange('anomaly', next, setAnomalyPush);
+              onPushChange({
+                target: 'anomaly',
+                next,
+                apply: setAnomalyPush,
+                draftPatch: { anomalyPush: next },
+              });
             }}
             pushOffByCategory={pushOffByCategory}
             onOpenNotifications={() => {
@@ -576,6 +748,7 @@ function SpendAlertsForm({
               reserveErrorMessages={anomalyEnabled ? multiplierErrorMessages() : undefined}
               onChangeText={value => {
                 multiplierRef.current = value;
+                editDraft({});
                 revalidate();
               }}
             />
@@ -584,7 +757,7 @@ function SpendAlertsForm({
           {/* save has no mutation toast (inline error pattern P2), so
               AccessibleStatus is the single announcement owner here. */}
           {saveControls}
-        </>
+        </View>
       ) : (
         <>
           {/* The switch row above is the whole off state: it already says alerts

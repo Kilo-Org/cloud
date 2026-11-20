@@ -5,12 +5,15 @@
 // save errors (retryable, draft kept), permission denial, the off state, and
 // the push channel's agreement with the Notifications screen.
 
-import { createElement } from 'react';
+import { createElement, useState } from 'react';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { SpendAlertsScreen } from '@/components/organization/spend-alerts-screen';
+import {
+  type SpendAlertsFormDraft,
+  SpendAlertsScreen,
+} from '@/components/organization/spend-alerts-screen';
 import { thresholdError } from '@/components/organization/spend-alert-validators';
 import { formatList } from '@/lib/format';
 import { MIN_TAP_TARGET_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
@@ -28,6 +31,33 @@ const boundary = vi.hoisted(() => ({
   org: null as { organizationId: string } | null,
   isResolving: false,
 }));
+
+// The durable draft, controllable per case: a form's restore path needs the
+// draft to land after the stored row painted, and an edit to beat it.
+const formDraft = vi.hoisted(() => {
+  const save = vi.fn<(value: unknown) => void>();
+  const clear = vi.fn<() => void>();
+  const current: {
+    kind: 'loading' | 'ready';
+    value: SpendAlertsFormDraft | null;
+  } = { kind: 'ready', value: null };
+  const useFormDraft = vi.fn(
+    (_input: { userId?: string; isIdentityLoading: boolean; entityKey: string }) =>
+      current.kind === 'loading'
+        ? { kind: 'loading' as const }
+        : { kind: 'ready' as const, value: current.value, save, clear }
+  );
+  return { save, clear, current, useFormDraft };
+});
+
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'user-1', isLoading: false }),
+}));
+vi.mock('@/lib/persist/drafts', () => ({
+  spendAlertsFormDraftKey: (organizationId: string | undefined) =>
+    `spend-alerts-form:${organizationId ?? 'personal'}`,
+}));
+vi.mock('@/lib/persist/use-form-draft', () => ({ useFormDraft: formDraft.useFormDraft }));
 
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
@@ -296,11 +326,59 @@ async function mountLoaded(overrides: Record<string, unknown> = {}) {
   return view;
 }
 
+/** A stored draft matching the default fixture, with the named fields changed. */
+function restoredDraft(overrides: Partial<SpendAlertsFormDraft> = {}): SpendAlertsFormDraft {
+  return {
+    threshold: '25',
+    multiplier: '2',
+    enabled: true,
+    thresholdEnabled: true,
+    thresholdEmail: true,
+    thresholdPush: false,
+    windowOption: '24',
+    anomalyEnabled: true,
+    anomalyEmail: true,
+    anomalyPush: false,
+    ...overrides,
+  };
+}
+
+/**
+ * Mount the screen inside a harness that can re-render it in place.
+ *
+ * `renderWithProviders` returns no update path, so re-rendering the screen
+ * directly would drop the Query provider the mount established (`No QueryClient
+ * set`). The harness owns the state instead: a stored draft "lands" by bumping
+ * `version`, which re-renders the same `SpendAlertsScreen` under the same
+ * providers, and the mocked draft hook is read again on that render.
+ */
+async function mountScreenWithDraftLanding(organizationId?: string) {
+  const box: { land: () => void } = { land: () => undefined };
+  function Harness() {
+    // The counter is never read: incrementing it is what re-renders the screen
+    // under the same providers, one render after the draft lands.
+    const [, setVersion] = useState(0);
+    box.land = () => {
+      act(() => {
+        setVersion(current => current + 1);
+      });
+    };
+    // No key: the same screen instance re-renders, so state the person already
+    // built (typed text, touched flags) survives the landing. A remount would
+    // silently reset it and make the untouched-edit rule untested.
+    return createElement(SpendAlertsScreen, organizationId == null ? {} : { organizationId });
+  }
+  const view = await renderWithProviders(createElement(Harness));
+  return { ...view, land: box.land };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   boundary.organizationId = undefined;
   boundary.org = null;
   boundary.isResolving = false;
+  formDraft.current.kind = 'ready';
+  formDraft.current.value = null;
   saveMutationFn.mockResolvedValue(settingsFixture());
 });
 
@@ -776,5 +854,80 @@ describe('SpendAlertsScreen push agreement', () => {
       expect(frames[index]).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
       expect(frames[index]).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
     }
+  });
+});
+
+describe('SpendAlertsScreen restored draft', () => {
+  /** Mount through the landing harness and wait for the stored row to paint. */
+  async function mountLoadedWithLanding() {
+    getQueryFn.mockResolvedValue(settingsFixture());
+    const view = await mountScreenWithDraftLanding();
+    await waitFor(() => texts(view.renderer).includes(i18n.t('spendAlerts.subtitle')));
+    return view;
+  }
+
+  it('seeds the fields and switches from a draft that lands after the stored row', async () => {
+    const { renderer, land } = await mountLoadedWithLanding();
+
+    // The stored row paints first: the draft has not answered yet.
+    expect(formDraft.useFormDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user-1', entityKey: 'spend-alerts-form:personal' })
+    );
+    expect(fieldByLabel(renderer, LIMIT).props.defaultValue).toBe('25');
+    expect(byType(renderer, 'SegmentedControl')[0]?.props.value).toBe('24');
+
+    formDraft.current.value = restoredDraft({
+      threshold: '99',
+      multiplier: '3.5',
+      windowOption: '168',
+      thresholdEmail: false,
+    });
+    land();
+
+    // The uncontrolled fields re-read `defaultValue` because the field block
+    // remounted, and the state-driven controls carry the restored values.
+    expect(fieldByLabel(renderer, LIMIT).props.defaultValue).toBe('99');
+    expect(fieldByLabel(renderer, MULTIPLIER).props.defaultValue).toBe('3.5');
+    expect(byType(renderer, 'SegmentedControl')[0]?.props.value).toBe('168');
+    expect(channelSwitches(renderer, i18n.t('common.email'))[0]?.props.value).toBe(false);
+  });
+
+  it('keeps a value the person typed before the draft landed', async () => {
+    const { renderer, land } = await mountLoadedWithLanding();
+
+    type(renderer, LIMIT, '40');
+    expect(formDraft.save).toHaveBeenLastCalledWith(expect.objectContaining({ threshold: '40' }));
+
+    formDraft.current.value = restoredDraft({
+      threshold: '99',
+      windowOption: '720',
+      thresholdEmail: false,
+    });
+    land();
+
+    // The person's own edit wins, and no restored value reaches the rest of
+    // the form either: the draft is applied only while the form is untouched.
+    expect(fieldByLabel(renderer, LIMIT).props.defaultValue).toBe('40');
+    expect(byType(renderer, 'SegmentedControl')[0]?.props.value).toBe('24');
+    expect(channelSwitches(renderer, i18n.t('common.email'))[0]?.props.value).toBe(true);
+  });
+
+  it('saves the whole draft on an edit and clears it when the save lands', async () => {
+    const { renderer } = await mountLoaded();
+
+    toggle(switchByLabel(renderer, i18n.t('spendAlerts.sendAlerts')), false);
+    expect(formDraft.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        enabled: false,
+        threshold: '25',
+        multiplier: '2',
+        windowOption: '24',
+      })
+    );
+
+    press(buttonByVariant(renderer));
+
+    await waitFor(() => formDraft.clear.mock.calls.length === 1);
+    expect(formDraft.clear).toHaveBeenCalledTimes(1);
   });
 });

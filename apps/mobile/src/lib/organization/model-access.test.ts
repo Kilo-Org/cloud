@@ -6,6 +6,7 @@ import {
   denyListModels,
   draftsEqual,
   initialDraft,
+  isModelAccessFormDraft,
   matchesSearch,
   modelAccessSave,
   normalizeModelId,
@@ -257,5 +258,21 @@ describe('matchesSearch', () => {
     expect(matchesSearch(['OpenAI: GPT-5', 'openai/gpt-5'], 'anthropic')).toBe(false);
     expect(matchesSearch(['anything'], '  ')).toBe(true);
     expect(matchesSearch([undefined, 'openai/gpt'], 'GPT')).toBe(true);
+  });
+});
+
+describe('isModelAccessFormDraft', () => {
+  it('accepts the draft the form starts from', () => {
+    expect(
+      isModelAccessFormDraft(initialDraft({ model_deny_list: ['openai/gpt:free'] }, ['anthropic']))
+    ).toBe(true);
+  });
+
+  it('rejects a foreign shape: a string list, a nested list, and a missing list', () => {
+    const stringList = { providerAllowList: 'anthropic', modelDenyList: [] };
+    expect(isModelAccessFormDraft('anthropic')).toBe(false);
+    expect(isModelAccessFormDraft(stringList)).toBe(false);
+    expect(isModelAccessFormDraft({ providerAllowList: [], modelDenyList: [7] })).toBe(false);
+    expect(isModelAccessFormDraft({ providerAllowList: [] })).toBe(false);
   });
 });

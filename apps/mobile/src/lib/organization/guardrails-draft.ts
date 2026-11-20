@@ -1,9 +1,11 @@
+/* eslint-disable max-lines -- one module owns the guardrails draft: the router types, the limits, the draft conversions, the detector choices, the save input, and the stored draft's shape guard */
 import { KILO_DEFAULT_POLICY_TEXT } from '@kilocode/app-shared/organizations';
 import {
   type inferRouterInputs,
   type inferRouterOutputs,
   type MobileRouter,
 } from '@kilocode/trpc/mobile';
+import * as z from 'zod';
 
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
 type RouterInputs = inferRouterInputs<MobileRouter>;
@@ -139,6 +141,94 @@ export type GuardrailsDraft = {
   outputEnabled: boolean;
   outputDetectors: OutputDetectorsDraft;
 };
+
+// The stored draft's shape, field by field. It is deliberately a shape check
+// and not a policy check: `guardrailsIssues` owns the limits (a keyword too
+// long, a rule with no text), so a draft that arrived from another build and
+// breaks a limit still loads and the form reports the reason on Save. Every
+// detector's `enabled` flag and every action a detector chooses are checked; the
+// remaining fields are checked for presence and type only.
+const formDraftActionSchema = z.string();
+const formDraftToggleDetectorSchema = z.object({ enabled: z.boolean() });
+const formDraftActionDetectorSchema = z.object({
+  enabled: z.boolean(),
+  action: formDraftActionSchema,
+});
+const formDraftPiiDetectorSchema = formDraftActionDetectorSchema.extend({
+  entities: z.array(z.string()),
+});
+const formDraftKeywordDetectorSchema = formDraftActionDetectorSchema.extend({
+  banned_keywords: z.array(z.string()),
+});
+const formDraftInputTopicDetectorSchema = z.object({
+  enabled: z.boolean(),
+  topic: z.array(z.string()),
+});
+const formDraftPolicyRuleSchema = z.object({
+  id: z.string(),
+  display_text: z.string(),
+  text: z.string(),
+  risk_category: z.string(),
+  applicability: z.string(),
+  severity: z.string(),
+  frameworks: z.array(z.string()),
+});
+const formDraftPolicyDetectorSchema = formDraftActionDetectorSchema.extend({
+  format: z.string(),
+  policy_text: z.string(),
+  rules: z.array(formDraftPolicyRuleSchema),
+});
+
+/**
+ * The input detectors are the whole set the server stores, because a save sends
+ * them all back: `INPUT_DETECTOR_IDS` is the two the page configures and the
+ * gateway enforces, and the rest travel unchanged.
+ */
+const formDraftInputDetectorsSchema = z.object({
+  injection_attack: formDraftActionDetectorSchema,
+  pii: formDraftPiiDetectorSchema,
+  keyword_detector: formDraftKeywordDetectorSchema,
+  topic_detector: formDraftInputTopicDetectorSchema,
+  policy_violation: formDraftPolicyDetectorSchema,
+  toxicity: formDraftToggleDetectorSchema,
+  nsfw: formDraftToggleDetectorSchema,
+  bias: formDraftActionDetectorSchema,
+  sponge_attack: formDraftToggleDetectorSchema,
+});
+
+/**
+ * The output detectors the page lists (`OUTPUT_DETECTOR_IDS`). The two line-list
+ * fields hold the draft's own text, one keyword or topic per line, not the
+ * arrays the server stores.
+ */
+const formDraftOutputDetectorsSchema = z.object({
+  pii: formDraftPiiDetectorSchema,
+  keyword_detector: formDraftActionDetectorSchema.extend({
+    banned_keywords: z.string(),
+  }),
+  topic_detector: formDraftActionDetectorSchema.extend({ topic: z.string() }),
+  policy_violation: formDraftPolicyDetectorSchema,
+  toxicity: formDraftActionDetectorSchema,
+  nsfw: formDraftActionDetectorSchema,
+  bias: formDraftActionDetectorSchema,
+});
+
+const formDraftSchema = z.object({
+  inputEnabled: z.boolean(),
+  groupId: z.string().nullable(),
+  detectors: formDraftInputDetectorsSchema,
+  outputEnabled: z.boolean(),
+  outputDetectors: formDraftOutputDetectorsSchema,
+});
+
+/**
+ * Runtime shape guard for a stored guardrails draft. A value another build
+ * wrote, or a foreign entry under this key, stays stored instead of seeding the
+ * form with fields it cannot render.
+ */
+export function isGuardrailsFormDraft(value: unknown): value is GuardrailsDraft {
+  return formDraftSchema.safeParse(value).success;
+}
 
 /**
  * The reasons a draft cannot be saved, in the order the screen reports them.

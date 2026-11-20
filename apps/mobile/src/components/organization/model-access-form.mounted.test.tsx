@@ -25,8 +25,41 @@ import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 
 const saved = vi.hoisted(() => ({ mutateAsync: vi.fn<(input: unknown) => Promise<void>>() }));
 
+/**
+ * What the durable draft answers. `loading` has no `save`/`clear`, so the state
+ * also models the identity or the store not having answered yet.
+ */
+const draftStore = vi.hoisted(() => ({
+  kind: 'loading' as 'loading' | 'ready',
+  value: null as unknown,
+  save: vi.fn(),
+  clear: vi.fn(),
+}));
+
 vi.mock('@/lib/hooks/use-org-settings-queries', () => ({
   useSaveOrgModelAccess: () => ({ mutateAsync: saved.mutateAsync, isPending: false }),
+}));
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'user-1', isLoading: false }),
+}));
+// The durable draft is the account-scoped encrypted store, which mounts its own
+// providers; this suite drives the form's use of it, not the store.
+vi.mock('@/lib/persist/use-form-draft', () => ({
+  useFormDraft: () =>
+    draftStore.kind === 'ready'
+      ? {
+          kind: 'ready',
+          value: draftStore.value,
+          save: draftStore.save,
+          clear: draftStore.clear,
+        }
+      : { kind: 'loading' },
+}));
+// The real module opens the encrypted SQLCipher store, which this Node project
+// cannot import; the form reads only its key helper.
+vi.mock('@/lib/persist/drafts', () => ({
+  orgModelAccessFormDraftKey: (organizationId: string) =>
+    `org-model-access-form:${organizationId}`,
 }));
 
 vi.mock('react-native', () => ({ View: 'View' }));
@@ -128,6 +161,17 @@ function renderWithCatalog(
   return renderer.root;
 }
 
+/** Re-render the same form, so a mocked draft load can land after mount. */
+function rerender(providerAllowList: readonly string[] | undefined) {
+  if (!renderer) {
+    throw new Error('Missing form renderer');
+  }
+  act(() => {
+    renderer?.update(element(providerAllowList));
+  });
+  return renderer.root;
+}
+
 function list(root: ReactTestInstance, type: 'ModelDenyList' | 'ProviderAllowList') {
   return root.findByType(type as never);
 }
@@ -167,6 +211,10 @@ afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
   saved.mutateAsync.mockReset();
+  draftStore.kind = 'loading';
+  draftStore.value = null;
+  draftStore.save.mockReset();
+  draftStore.clear.mockReset();
 });
 
 describe('ModelAccessForm save', () => {
@@ -397,5 +445,82 @@ describe('ModelAccessForm save copy', () => {
     await pressSave(root);
 
     expect(String(statusMessage(root))).toBe(i18n.t('organizationGuardrails.statusFailed'));
+  });
+});
+
+describe('ModelAccessForm durable draft', () => {
+  it('seeds an untouched form from the stored draft', () => {
+    const stored = { providerAllowList: ['openai'], modelDenyList: ['anthropic/claude'] };
+    draftStore.kind = 'ready';
+    draftStore.value = stored;
+
+    const root = render(['anthropic']);
+
+    expect(list(root, 'ModelDenyList').props.draft).toEqual(stored);
+    // The restored lists differ from the saved ones, so the save is armed.
+    expect(root.findAllByType('Button' as never).at(-1)?.props.disabled).toBe(false);
+    // Nothing was typed, so nothing is written back over the restored draft.
+    expect(draftStore.save).not.toHaveBeenCalled();
+  });
+
+  it('keeps an edit made before the stored draft lands', () => {
+    const root = render(['anthropic']);
+    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+    changeDraft(root, toggleModel(draft, 'openai/gpt', false));
+
+    // The load settles after the edit: the person's change wins.
+    draftStore.kind = 'ready';
+    draftStore.value = { providerAllowList: ['anthropic'], modelDenyList: ['anthropic/claude'] };
+    const rerendered = rerender(['anthropic']);
+
+    expect(list(rerendered, 'ModelDenyList').props.draft).toEqual({
+      providerAllowList: ['anthropic'],
+      modelDenyList: ['openai/gpt'],
+    });
+  });
+
+  it('keeps the tab the person chose when the stored draft lands afterwards', () => {
+    const root = render(['anthropic']);
+    selectTab(root, 'providers');
+
+    draftStore.kind = 'ready';
+    draftStore.value = { providerAllowList: ['openai'], modelDenyList: [] };
+    const rerendered = rerender(['anthropic']);
+    selectTab(rerendered, 'models');
+
+    expect(list(rerendered, 'ModelDenyList').props.draft).toEqual({
+      providerAllowList: ['anthropic'],
+      modelDenyList: [],
+    });
+  });
+
+  it('saves the whole draft on every edit', () => {
+    draftStore.kind = 'ready';
+    draftStore.value = null;
+    const root = render(['anthropic']);
+    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+
+    changeDraft(root, toggleModel(draft, 'openai/gpt', false));
+
+    expect(draftStore.save).toHaveBeenCalledTimes(1);
+    expect(draftStore.save.mock.calls[0]?.[0]).toEqual({
+      providerAllowList: ['anthropic'],
+      modelDenyList: ['openai/gpt'],
+    });
+  });
+
+  it('clears the stored draft once a save settles', async () => {
+    draftStore.kind = 'ready';
+    draftStore.value = null;
+    const root = render(['anthropic']);
+    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+
+    changeDraft(root, toggleModel(draft, 'openai/gpt', false));
+    await pressSave(root);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(draftStore.clear).toHaveBeenCalledTimes(1);
   });
 });

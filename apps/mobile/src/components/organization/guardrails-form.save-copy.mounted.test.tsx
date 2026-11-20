@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted suite for the guardrails form: the localized save-failure line and the draft's seed, ownership, save, and clear rules share one mock harness. */
 // The guardrails form's save-failure line. A known server sentence — above all
 // the lapsed organization plan — becomes the localized explanation instead of
 // echoing the server's English words, and an unrecognized rejection falls back
@@ -13,7 +14,11 @@ import { GuardrailsForm } from './guardrails-form';
 import { i18n } from '@/i18n';
 import { resetLeaveSettle } from '@/lib/navigation/leave-settle';
 import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
-import { type GuardrailsDraft, type OrgGuardrails } from '@/lib/organization/guardrails-draft';
+import {
+  type GuardrailsDraft,
+  type OrgGuardrails,
+  toDraft,
+} from '@/lib/organization/guardrails-draft';
 import { act } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -21,9 +26,39 @@ const h = vi.hoisted(() => ({
   mutateAsync: vi.fn(),
   /** The edit callback the stubbed input section forwards to the form. */
   sectionOnChange: null as ((update: (current: GuardrailsDraft) => GuardrailsDraft) => void) | null,
+  /** The draft the stubbed input section rendered, as the form holds it. */
+  sectionDraft: null as GuardrailsDraft | null,
+  /** Re-render the harness, so a mocked draft load can land after mount. */
+  rerender: null as (() => void) | null,
+  /**
+   * What the durable draft answers. `loading` has no `save`/`clear`, so the
+   * state also models the identity or the store not having answered yet.
+   */
+  formDraft: {
+    kind: 'loading' as 'loading' | 'ready',
+    value: null as unknown,
+    save: vi.fn(),
+    clear: vi.fn(),
+  },
 }));
 
 vi.mock('expo-router', () => ({ usePreventRemove: () => undefined }));
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'user-1', isLoading: false }),
+}));
+// The durable draft is the account-scoped encrypted store, which mounts its own
+// providers; this suite drives the form's use of it, not the store.
+vi.mock('@/lib/persist/use-form-draft', () => ({
+  useFormDraft: () =>
+    h.formDraft.kind === 'ready'
+      ? {
+          kind: 'ready',
+          value: h.formDraft.value,
+          save: h.formDraft.save,
+          clear: h.formDraft.clear,
+        }
+      : { kind: 'loading' },
+}));
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
@@ -48,11 +83,18 @@ vi.mock('@/components/ui/dialog', () => ({
 vi.mock('@/lib/hooks/use-org-settings-queries', () => ({
   useSaveOrgGuardrails: () => ({ mutateAsync: h.mutateAsync, isPending: false }),
 }));
+// The real module opens the encrypted SQLCipher store, which this Node project
+// cannot import; the form reads only its key helper.
+vi.mock('@/lib/persist/drafts', () => ({
+  orgGuardrailsFormDraftKey: (organizationId: string) => `org-guardrails-form:${organizationId}`,
+}));
 vi.mock('@/components/organization/guardrails-input-section', () => ({
   InputGuardrailsSection: (props: {
+    draft: GuardrailsDraft;
     onChange: (update: (current: GuardrailsDraft) => GuardrailsDraft) => void;
   }) => {
     h.sectionOnChange = props.onChange;
+    h.sectionDraft = props.draft;
     return createElement('InputGuardrailsSection');
   },
 }));
@@ -201,6 +243,17 @@ async function pressSave(renderer: { root: TestNode }): Promise<void> {
   });
 }
 
+/** The draft the form holds for its server payload, before any edit. */
+function serverDraft(): GuardrailsDraft {
+  const data = payload();
+  return toDraft({
+    enabled: data.enabled,
+    group_id: data.group_id,
+    detectors: data.detectors,
+    output: data.output,
+  });
+}
+
 async function mountForm(refusedMessage: string) {
   h.mutateAsync.mockReset();
   h.mutateAsync.mockRejectedValue(
@@ -210,6 +263,10 @@ async function mountForm(refusedMessage: string) {
   );
   function Harness() {
     const [data] = useState(() => payload());
+    const [, setRevision] = useState(0);
+    h.rerender = () => {
+      setRevision(revision => revision + 1);
+    };
     return createElement(GuardrailsForm, { organizationId: 'org-1', data });
   }
   const { renderer, unmount } = await renderWithProviders(createElement(Harness));
@@ -222,6 +279,10 @@ beforeEach(() => {
   resetLeaveSettle();
   h.mutateAsync.mockReset();
   h.sectionOnChange = null;
+  h.sectionDraft = null;
+  h.rerender = null;
+  h.formDraft.kind = 'loading';
+  h.formDraft.value = null;
 });
 
 afterEach(() => {
@@ -243,5 +304,69 @@ describe('GuardrailsForm save copy', () => {
     await pressSave(renderer);
 
     expect(statusText(renderer.root)).toBe(i18n.t('organizationGuardrails.statusFailed'));
+  });
+});
+
+describe('GuardrailsForm durable draft', () => {
+  it('seeds an untouched form from the stored draft', async () => {
+    const stored = { ...serverDraft(), inputEnabled: false };
+    h.formDraft.kind = 'ready';
+    h.formDraft.value = stored;
+
+    await mountForm('refused');
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(h.sectionDraft).toEqual(stored);
+    // Nothing was typed, so nothing is written back over the restored draft.
+    expect(h.formDraft.save).not.toHaveBeenCalled();
+  });
+
+  it('keeps an edit made before the stored draft lands', async () => {
+    await mountForm('refused');
+    const onChange = h.sectionOnChange;
+    if (!onChange) {
+      throw new Error('the input section did not render');
+    }
+    act(() => {
+      onChange(current => ({ ...current, groupId: 'group-1' }));
+    });
+
+    // The load settles after the edit: the person's change wins.
+    h.formDraft.kind = 'ready';
+    h.formDraft.value = { ...serverDraft(), inputEnabled: false };
+    await act(async () => {
+      h.rerender?.();
+      await Promise.resolve();
+    });
+
+    expect(h.sectionDraft).toEqual({ ...serverDraft(), groupId: 'group-1' });
+  });
+
+  it('saves the whole draft on every edit', async () => {
+    h.formDraft.kind = 'ready';
+    h.formDraft.value = null;
+    await mountForm('refused');
+
+    editInputToggle();
+
+    expect(h.formDraft.save).toHaveBeenCalledTimes(1);
+    expect(h.formDraft.save.mock.calls[0]?.[0]).toEqual({
+      ...serverDraft(),
+      inputEnabled: false,
+    });
+  });
+
+  it('clears the stored draft once a save settles', async () => {
+    h.formDraft.kind = 'ready';
+    h.formDraft.value = null;
+    const renderer = await mountForm('refused');
+    h.mutateAsync.mockReset();
+    h.mutateAsync.mockResolvedValue({ ...payload(), enabled: false });
+
+    await pressSave(renderer);
+
+    expect(h.formDraft.clear).toHaveBeenCalledTimes(1);
   });
 });

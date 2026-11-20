@@ -1,4 +1,5 @@
-import { useState } from 'react';
+/* eslint-disable max-lines -- one form owns the two lists, the gateways tab and the durable-draft restore; the state rebases onto the server's answer in one place, and splitting it would let two copies disagree */
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -8,6 +9,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import {
   type OrgGatewaySettings,
   useSaveOrgModelAccess,
@@ -20,11 +22,14 @@ import {
   denyListModels,
   draftsEqual,
   initialDraft,
+  isModelAccessFormDraft,
   type ModelAccessDraft,
   modelAccessSave,
   providerRows,
 } from '@/lib/organization/model-access';
 import { type SettingsSaveFailure, settingsSaveStatus } from '@/lib/organization/settings-save';
+import { orgModelAccessFormDraftKey } from '@/lib/persist/drafts';
+import { useFormDraft } from '@/lib/persist/use-form-draft';
 
 type Tab = 'models' | 'providers' | 'gateways';
 
@@ -176,6 +181,34 @@ export function ModelAccessForm({
   }
   const { baseline, draft } = form;
 
+  // The lists also live in the account-scoped encrypted store: a device language
+  // change that flips the text direction reloads the bundle, which kills this
+  // tree without running its cleanup, and the toggles would come back as the
+  // server's. The form has the saved lists to show, so it renders from them at
+  // once and applies a restored draft once, only while the person has moved
+  // nothing.
+  const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
+  const formDraft = useFormDraft<ModelAccessDraft>({
+    userId,
+    isIdentityLoading,
+    entityKey: orgModelAccessFormDraftKey(organizationId),
+    validate: isModelAccessFormDraft,
+  });
+  // An edit or a tab change owns the form: a stored draft that lands later never
+  // replaces what the person already moved, and a restore runs once per mount.
+  const touchedRef = useRef(false);
+  const restoredRef = useRef(false);
+  const restoredDraft = formDraft.kind === 'ready' ? formDraft.value : null;
+  useEffect(() => {
+    if (restoredDraft === null || touchedRef.current || restoredRef.current) {
+      return;
+    }
+    restoredRef.current = true;
+    // Both lists move together, so the restored draft replaces the pair;
+    // `dirty` recomputes against the baseline, which is what enables Save.
+    setForm(previous => ({ ...previous, draft: restoredDraft }));
+  }, [restoredDraft]);
+
   const dirty = !draftsEqual(draft, baseline);
   const saving = feedback.status === 'pending';
   const savePayload = modelAccessSave({
@@ -190,7 +223,12 @@ export function ModelAccessForm({
   const cannotSave = !dirty || saving || savePayload.kind !== 'ready';
   const onDraftChange = (next: ModelAccessDraft) => {
     clearWhere(() => true);
+    touchedRef.current = true;
     setForm(previous => ({ ...previous, draft: next }));
+    // The whole draft, on every edit: a reload may follow any of them.
+    if (formDraft.kind === 'ready') {
+      formDraft.save(next);
+    }
   };
 
   const onSave = async () => {
@@ -217,6 +255,11 @@ export function ModelAccessForm({
         syncedKey: serverKey,
         baseline: previous.draft,
       }));
+      // The draft became the saved policy; nothing is left to restore.
+      restoredRef.current = true;
+      if (formDraft.kind === 'ready') {
+        formDraft.clear();
+      }
       attempt.succeed();
     } catch (error) {
       attempt.fail({
@@ -267,7 +310,12 @@ export function ModelAccessForm({
             { value: 'gateways' as const, label: t('organizationModelAccess.tabGateways') },
           ]}
           value={tab}
-          onChange={setTab}
+          onChange={nextTab => {
+            // A tab change is the person looking elsewhere: a draft that lands
+            // after it must not move the lists under the tab they chose.
+            touchedRef.current = true;
+            setTab(nextTab);
+          }}
           accessibilityLabel={t('organization.settingsOnWeb.providersAndModels')}
         />
         {canEdit ? null : <Text variant="caption">{t('organizationModelAccess.readOnly')}</Text>}
